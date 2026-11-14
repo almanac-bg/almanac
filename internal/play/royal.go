@@ -57,10 +57,10 @@ func royalSlots() []slot {
 	return slots
 }
 
-func drawRoyal(b *bank.Bank, seen map[string]bool, r *mrand.Rand) []Pick {
+func drawRoyal(b *bank.Bank, seen, barred map[string]bool, r *mrand.Rand) []Pick {
 	var pool []bank.Question
 	for _, q := range b.Live("", "") {
-		if t := q.Base().Type; t == "choice" || t == "truefalse" {
+		if t := q.Base().Type; (t == "choice" || t == "truefalse") && !barred[q.Base().ID] {
 			pool = append(pool, q)
 		}
 	}
@@ -77,8 +77,13 @@ func drawRoyal(b *bank.Bank, seen map[string]bool, r *mrand.Rand) []Pick {
 	return picks
 }
 
-// DrawRoyal draws an evening's questions, leaving out (while there are others) those of the last month's evenings.
+// DrawRoyal draws an evening's questions, leaving out (while there are others) those of the last month's evenings,
+// and the day's (DayQuestions).
 func (g *Game) DrawRoyal(ctx context.Context) ([]Pick, error) {
+	barred, err := g.DayQuestions(ctx)
+	if err != nil {
+		return nil, err
+	}
 	seen := map[string]bool{}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT DISTINCT questions FROM royals WHERE created_at > ?`,
 		store.Ms(g.Now().Add(-31*24*time.Hour)))
@@ -101,7 +106,7 @@ func (g *Game) DrawRoyal(ctx context.Context) ([]Pick, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	picks := drawRoyal(g.Bank(), seen, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+	picks := drawRoyal(g.Bank(), seen, barred, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 	if len(picks) < RoyalLength {
 		return nil, ErrNoQuestion
 	}

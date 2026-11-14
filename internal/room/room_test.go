@@ -1,6 +1,7 @@
 package room
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"slices"
@@ -134,7 +135,7 @@ func TestAGamePlayedTogether(t *testing.T) {
 		if v := r.View(bo.ID); v.Phase != Question || v.N != 1 {
 			t.Fatalf("the room didn't move on by itself: %+v", v)
 		}
-		time.Sleep(play.Limit(r.dealt[1].Question()) + Grace + time.Millisecond)
+		time.Sleep(play.Limit(r.dealt[1].Question()) + play.Grace + time.Millisecond)
 		synctest.Wait()
 		if v := r.View(bo.ID); v.Phase != Reveal || !v.Question.Reveal.Missed {
 			t.Fatalf("after the time ran out: %+v", v)
@@ -205,6 +206,42 @@ func TestRoomsLimits(t *testing.T) {
 	if err := r.Answer(1, 0, json.RawMessage(`{"pick":0}`)); !errors.Is(err, ErrNotNow) {
 		t.Fatalf("an answer in the lobby: %v", err)
 	}
+}
+
+// A room deals none of the questions barred (the day's), and takes an answer as late as any game does (play.Grace).
+func TestBarredAndLate(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		b := sample(t)
+		hub := NewHub(b)
+		barred := map[string]bool{}
+		for _, q := range b().Live("", "") {
+			barred[q.Base().ID] = q.Base().Category != "science"
+		}
+		hub.Barred = func(context.Context) (map[string]bool, error) { return barred, nil }
+		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
+		r, _ := hub.Open(ana, "")
+		_ = r.Join(bo)
+		sa, _ := r.Follow(ana.ID)
+		sb, _ := r.Follow(bo.ID)
+		if err := r.Start(ana.ID); err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range r.picks {
+			if barred[p.ID] {
+				t.Fatalf("a barred question dealt: %s", p.ID)
+			}
+		}
+		if len(r.picks) != play.Length {
+			t.Fatalf("%d questions", len(r.picks))
+		}
+		time.Sleep(play.Limit(r.dealt[0].Question()) + play.Grace - 100*time.Millisecond)
+		if err := r.Answer(ana.ID, 0, answer(r, true)); err != nil {
+			t.Fatalf("an answer within the grace: %v", err)
+		}
+		r.Unfollow(sa)
+		r.Unfollow(sb)
+		synctest.Wait()
+	})
 }
 
 // A clues question's clues reach the screens as their time comes, and not before.

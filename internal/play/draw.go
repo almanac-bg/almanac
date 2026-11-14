@@ -150,12 +150,13 @@ func matches(q bank.Question, s slot, typ, pictures bool) bool {
 }
 
 // Draw draws ten questions of a topic ("" for all topics) for a player of an ability there (mastery.go; 0 for one
-// who knows as much as most), questions they haven't seen (seen) before those they have. Choices come with a picture or without, whichever is
-// drawn. Everyone's run has the same shape. Topic runs, duels and rooms draw this way.
-func Draw(b *bank.Bank, category string, ability float64, seen map[string]bool, r *rand.Rand) []Pick {
+// who knows as much as most), questions they haven't seen (seen) before those they have, and never one barred (the
+// day's: DayQuestions). Choices come with a picture or without, whichever is drawn. Everyone's run has the same
+// shape. Topic runs, duels and rooms draw this way.
+func Draw(b *bank.Bank, category string, ability float64, seen, barred map[string]bool, r *rand.Rand) []Pick {
 	pool := b.Live(category, "")
 	taken := map[string]bool{}
-	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] }
+	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] && !barred[q.Base().ID] }
 	fresh := func(q bank.Question) bool { return !seen[q.Base().ID] }
 	var picks []Pick
 	for _, s := range newKind(topicSlots(ability), r) {

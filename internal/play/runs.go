@@ -50,6 +50,33 @@ func (g *Game) day(tx *sql.Tx, day string) ([]Pick, error) {
 	return picks, err
 }
 
+// dayQuestions are today's questions (drawn now if nobody has asked for them yet): until the day is over in
+// Bulgaria, no other game deals them (Draw, recordings, Роял), so that nobody sees one with its answer before playing
+// the day.
+func (g *Game) dayQuestions(tx *sql.Tx) (map[string]bool, error) {
+	picks, err := g.day(tx, g.Today())
+	if errors.Is(err, ErrNoQuestion) {
+		return nil, nil
+	}
+	barred := make(map[string]bool, len(picks))
+	for _, p := range picks {
+		barred[p.ID] = true
+	}
+	return barred, err
+}
+
+// DayQuestions are today's questions, which no other game deals before the day is over (dayQuestions): for the
+// draws made outside the game (rooms).
+func (g *Game) DayQuestions(ctx context.Context) (map[string]bool, error) {
+	var barred map[string]bool
+	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		var err error
+		barred, err = g.dayQuestions(tx)
+		return err
+	})
+	return barred, err
+}
+
 func (g *Game) insertRun(tx *sql.Tx, userID int64, kind string, day, category any, picks []Pick) (*run, error) {
 	data, _ := json.Marshal(picks)
 	res, err := tx.Exec(`INSERT INTO runs (user_id, kind, day, category, questions, started_at)
@@ -64,6 +91,8 @@ func (g *Game) insertRun(tx *sql.Tx, userID int64, kind string, day, category an
 // StartDay is the player's run of today's questions: the one they have, or a new one. One a day.
 func (g *Game) StartDay(ctx context.Context, userID int64) (State, error) {
 	var s State
+	var runID int64
+	ended := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		today := g.Today()
 		r, err := scanRun(tx.QueryRow(`SELECT `+runColumns+` FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, userID, today))
@@ -77,12 +106,16 @@ func (g *Game) StartDay(ctx context.Context, userID int64) (State, error) {
 		if err != nil {
 			return err
 		}
-		if _, err := g.settle(tx, r); err != nil {
+		runID = r.id
+		if ended, err = g.settle(tx, r); err != nil {
 			return err
 		}
 		s, err = g.state(tx, r)
 		return err
 	})
+	if err == nil && ended {
+		err = g.finished(ctx, userID, runID)
+	}
 	return s, err
 }
 
@@ -112,7 +145,11 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 		if err != nil {
 			return err
 		}
-		picks := Draw(b, category, ability, seen, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+		barred, err := g.dayQuestions(tx)
+		if err != nil {
+			return err
+		}
+		picks := Draw(b, category, ability, seen, barred, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 		if len(picks) == 0 {
 			return ErrNoQuestion
 		}
@@ -309,8 +346,10 @@ func (g *Game) Week(ctx context.Context, userID int64) ([7]bool, error) {
 	return week, rows.Err()
 }
 
-// Merge moves a guest's runs, friends and goals to the account they signed in to (account.Accounts.Merge): all runs but a
-// day the account has played itself, which stays the account's.
+// Merge moves a guest's progress to the account they signed in to (account.Accounts.Merge), where it doesn't clash
+// with the account's own: all runs but a day the account has played itself, which stays the account's; friends,
+// duels, achievements, Роял and league weeks; the better rating (with its games) and league; the goals of days the
+// account has no goals for.
 func Merge(tx *sql.Tx, from, to int64) error {
 	_, err := tx.Exec(`UPDATE runs SET user_id = ? WHERE user_id = ?
 		AND NOT (kind = 'day' AND day IN (SELECT day FROM runs WHERE user_id = ? AND kind = 'day'))`,
@@ -330,6 +369,21 @@ func Merge(tx *sql.Tx, from, to int64) error {
 			SELECT user_id, ?, since FROM friends WHERE friend_id = ? AND user_id <> ?`, []any{to, from, to}},
 		{`DELETE FROM friends WHERE user_id = ? OR friend_id = ?`, []any{from, from}},
 		{`UPDATE runs SET opponent_id = ? WHERE opponent_id = ?`, []any{to, from}},
+		// The guest's duels are the account's, those waiting too (one between the two goes with the guest).
+		{`UPDATE duels SET a_id = ?1 WHERE a_id = ?2 AND coalesce(b_id, 0) <> ?1`, []any{to, from}},
+		{`UPDATE duels SET b_id = ?1 WHERE b_id = ?2 AND a_id <> ?1`, []any{to, from}},
+		// The rating: the guest's, with its games and peak, if it's the better one of rated games.
+		{`UPDATE users SET rating = g.rating, rated = g.rated
+			FROM (SELECT rating, rated FROM users WHERE id = ?2) g
+			WHERE users.id = ?1 AND g.rated > 0 AND (users.rated = 0 OR g.rating > users.rating)`, []any{to, from}},
+		{`UPDATE users SET peak = max(users.peak, g.peak), peak_seen = max(users.peak_seen, g.peak_seen),
+			league = max(users.league, g.league)
+			FROM (SELECT peak, peak_seen, league FROM users WHERE id = ?2) g WHERE users.id = ?1`, []any{to, from}},
+		// The weeks of the leagues, and the evenings of Роял, the guest played (a week or an evening both played in
+		// stays the account's); this week's group, if the account isn't in one.
+		{`UPDATE OR IGNORE league_results SET user_id = ? WHERE user_id = ?`, []any{to, from}},
+		{`UPDATE OR IGNORE league_members SET user_id = ? WHERE user_id = ?`, []any{to, from}},
+		{`UPDATE OR IGNORE royal_players SET user_id = ? WHERE user_id = ?`, []any{to, from}},
 		// The days the guest played on were the account's player's: the same person, so not a player who left.
 		{`INSERT OR IGNORE INTO active_days (user_id, day) SELECT ?, day FROM active_days WHERE user_id = ?`, []any{to, from}},
 		{`DELETE FROM active_days WHERE user_id = ?`, []any{from}},
@@ -343,11 +397,14 @@ func Merge(tx *sql.Tx, from, to int64) error {
 		{`INSERT OR IGNORE INTO push_prefs (user_id, kind, wanted) SELECT ?, kind, wanted FROM push_prefs WHERE user_id = ?`,
 			[]any{to, from}},
 		{`UPDATE OR IGNORE royal_plans SET user_id = ? WHERE user_id = ?`, []any{to, from}},
-		// So are the goals the guest finished (with their XP), and the day's goals drawn, unless the account has its own.
+		// So are the guest's goals of a day the account has none for: those drawn, and those finished (with their XP).
+		// A day both had goals for keeps the account's, so that it's never more than a day's goals.
 		{`INSERT OR IGNORE INTO goals_done (user_id, day, goal, at, xp, seen)
-			SELECT ?, day, goal, at, xp, seen FROM goals_done WHERE user_id = ?`, []any{to, from}},
-		{`INSERT OR IGNORE INTO day_goals (user_id, day, n, goal) SELECT ?, day, n, goal FROM day_goals WHERE user_id = ?`,
-			[]any{to, from}},
+			SELECT ?1, day, goal, at, xp, seen FROM goals_done WHERE user_id = ?2
+				AND day NOT IN (SELECT day FROM day_goals WHERE user_id = ?1)
+				AND day NOT IN (SELECT day FROM goals_done WHERE user_id = ?1)`, []any{to, from}},
+		{`INSERT OR IGNORE INTO day_goals (user_id, day, n, goal) SELECT ?1, day, n, goal FROM day_goals WHERE user_id = ?2
+			AND day NOT IN (SELECT day FROM day_goals WHERE user_id = ?1)`, []any{to, from}},
 		{`UPDATE users SET avatar = coalesce(avatar, (SELECT avatar FROM users WHERE id = ?)),
 			title = coalesce(title, (SELECT title FROM users WHERE id = ?)) WHERE id = ?`, []any{from, from, to}},
 		// Friend requests: the guest's become the account's (none to itself).

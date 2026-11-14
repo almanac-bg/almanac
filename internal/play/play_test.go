@@ -514,9 +514,15 @@ func TestTopics(t *testing.T) {
 		}
 		firstPicks[p.ID] = true
 	}
-	// The next run starts with what the player hasn't seen.
+	// The next run starts with what the player hasn't seen (and isn't today's).
 	second, _ := w.g.StartTopic(ctx, u, "history")
-	unseen := len(w.b.Live("history", "")) - len(firstPicks)
+	today, _ := w.g.DayQuestions(ctx)
+	unseen := 0
+	for _, q := range w.b.Live("history", "") {
+		if !firstPicks[q.Base().ID] && !today[q.Base().ID] {
+			unseen++
+		}
+	}
 	fresh := 0
 	for _, p := range w.picks(second.ID) {
 		if !firstPicks[p.ID] {
@@ -1142,7 +1148,7 @@ func TestWardrobe(t *testing.T) {
 }
 
 func TestLeagues(t *testing.T) {
-	for _, c := range []struct{ n, up, down int }{{1, 0, 0}, {2, 1, 0}, {5, 2, 0}, {8, 2, 2}, {9, 3, 2}, {10, 5, 2},
+	for _, c := range []struct{ n, up, down int }{{1, 0, 0}, {2, 0, 0}, {4, 0, 0}, {5, 2, 0}, {8, 2, 2}, {9, 3, 2}, {10, 5, 2},
 		{14, 5, 3}, {15, 5, 5}, {20, 5, 5}} {
 		if up, down := moves(c.n); up != c.up || down != c.down {
 			t.Fatalf("a group of %d: %d up, %d down", c.n, up, down)
@@ -1178,30 +1184,38 @@ func TestLeagues(t *testing.T) {
 		v.Week != "2026-11-09" {
 		t.Fatalf("before a game: %+v %v", v, err)
 	}
-	// Ana plays two games, Bo one, Cy none: Ana and Bo race in one group, Ana ahead.
-	topic(ana, 2)
-	topic(bo, 1)
+	// Ana plays three games, Bo two, three more one each, Cy none: the five race in one group, Ana ahead; until
+	// there are five, it isn't a race.
+	topic(ana, 3)
+	topic(bo, 2)
+	if v, _ := w.g.LeagueOf(ctx, ana); !v.In || len(v.Group) != 2 || v.Up != 0 {
+		t.Fatalf("a group of two going up: %+v", v)
+	}
+	for range RaceSize - 2 {
+		topic(w.user(), 1)
+	}
 	v, err := w.g.LeagueOf(ctx, ana)
-	if err != nil || !v.In || len(v.Group) != 2 || v.Place != 1 || !v.Group[0].Me || v.Group[0].XP <= v.Group[1].XP ||
-		v.Up != 1 || v.Down != 0 || v.Group[1].Name == "" {
+	if err != nil || !v.In || len(v.Group) != RaceSize || v.Place != 1 || !v.Group[0].Me ||
+		v.Group[0].XP <= v.Group[1].XP || v.Up != 2 || v.Down != 0 || v.Group[1].Name == "" {
 		t.Fatalf("Ana's week: %+v %v", v, err)
 	}
 	if v, _ := w.g.LeagueOf(ctx, cy); v.In {
 		t.Fatal("a player in a league without a game")
 	}
 
-	// The week ends: Ana goes up with first place's XP, Bo stays with second's; told once.
+	// The week ends: Ana and Bo go up with first and second place's XP, the third stays with third's; told once.
 	var told []LeagueNews
 	w.g.LeagueNews = func(_ context.Context, n LeagueNews) { told = append(told, n) }
 	w.now = time.Date(2026, 11, 16, 0, 5, 0, 0, Bulgaria)
 	if err := w.g.SettleDue(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if len(told) != 2 || told[0].To != ana || told[0].Place != 1 || told[0].Of != 2 || told[0].XP != LeaguePay[0] ||
-		told[0].Now.Tier != 1 || told[1].To != bo || told[1].XP != LeaguePay[1] || told[1].Now.Tier != 0 {
+	if len(told) != RaceSize || told[0].To != ana || told[0].Place != 1 || told[0].Of != RaceSize ||
+		told[0].XP != LeaguePay[0] || told[0].Now.Tier != 1 || told[1].To != bo || told[1].XP != LeaguePay[1] ||
+		told[1].Now.Tier != 1 || told[2].XP != LeaguePay[2] || told[2].Now.Tier != 0 || told[3].XP != 0 {
 		t.Fatalf("the week's news: %+v", told)
 	}
-	if err := w.g.SettleDue(ctx); err != nil || len(told) != 2 {
+	if err := w.g.SettleDue(ctx); err != nil || len(told) != RaceSize {
 		t.Fatalf("a week ended twice: %v", err)
 	}
 	n, err := w.g.NewsOf(ctx, ana, 0)
@@ -1216,11 +1230,15 @@ func TestLeagues(t *testing.T) {
 	if v, _ := w.g.LeagueOf(ctx, ana); v.In || v.League.Tier != 1 || v.Last == nil || v.Last.Place != 1 {
 		t.Fatalf("Ana's new week: %+v", v)
 	}
-	// Each plays in their own league's group now.
-	topic(ana, 1)
+	// Ana and Bo race in Средна гора now, and Cy in Странджа: two and one, no race.
+	topic(ana, 2)
 	topic(bo, 1)
-	if v, _ := w.g.LeagueOf(ctx, bo); !v.In || len(v.Group) != 1 || v.League.Tier != 0 || v.Up != 0 {
-		t.Fatalf("Bo alone in Странджа: %+v", v)
+	topic(cy, 1)
+	if v, _ := w.g.LeagueOf(ctx, bo); !v.In || len(v.Group) != 2 || v.League.Tier != 1 || v.Up != 0 {
+		t.Fatalf("Ana and Bo in Средна гора: %+v", v)
+	}
+	if v, _ := w.g.LeagueOf(ctx, cy); !v.In || len(v.Group) != 1 || v.League.Tier != 0 || v.Up != 0 {
+		t.Fatalf("Cy alone in Странджа: %+v", v)
 	}
 
 	// A group of eight in Родопи, by goals' XP: the first two go up, the last two down, the rest stay.
@@ -1237,14 +1255,22 @@ func TestLeagues(t *testing.T) {
 		_, _ = w.db.Write.Exec(`INSERT INTO goals_done (user_id, day, goal, at, xp) VALUES (?, ?, 'day', 0, ?)`,
 			p, "2026-11-17", 800-100*i)
 	}
-	// And two in Рила: the first is its champion, and can go no higher.
+	// And five in Рила: the first is its champion, and can go no higher.
 	top1, top2 := w.user(), w.user()
-	_, _ = w.db.Write.Exec(`UPDATE users SET league = 5 WHERE id IN (?, ?)`, top1, top2)
-	topic(top1, 2)
-	topic(top2, 1)
+	rila := []int64{top1, top2, w.user(), w.user(), w.user()}
+	for i, p := range rila {
+		_, _ = w.db.Write.Exec(`UPDATE users SET league = 5 WHERE id = ?`, p)
+		topic(p, map[bool]int{true: 2, false: 1}[i == 0]) // the first two games, the rest one
+	}
 	w.now = time.Date(2026, 11, 23, 0, 5, 0, 0, Bulgaria)
 	if err := w.g.SettleDue(ctx); err != nil {
 		t.Fatal(err)
+	}
+	// Ana, first of two in Средна гора, goes nowhere, is paid nothing, and is no group's first for it.
+	var moved, paid int
+	_ = w.db.Read.QueryRow(`SELECT moved, xp FROM league_results WHERE user_id = ? AND week = ?`, ana, monday).Scan(&moved, &paid)
+	if firsts, _ := w.g.leagueFirsts(ctx, ana); moved != 0 || paid != 0 || firsts[1] != 0 || firsts[0] != 1 {
+		t.Fatalf("a group of two: moved %d, paid %d, firsts %v", moved, paid, firsts)
 	}
 	for i, p := range eight {
 		var tier int
