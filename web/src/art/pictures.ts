@@ -76,6 +76,7 @@ const eyes = (dx: number, y: number, r: number): Layer[] => [
   ["kw", both((x) => C(n(x(dx) + r * 0.35), n(y - r * 0.4), n(r * 0.36)))],
 ];
 const shoulders = "M7 66C8 54 19 48 32 48C45 48 56 54 57 66Z";
+const foxChest = "M25 66C25.5 57 28.5 52.5 32 52.5C35.5 52.5 38.5 57 39 66Z";
 const heart =
   "M32 55C32 55 8 41 8 24.5C8 16 14 10 21.5 10C26.5 10 30 13 32 17C34 13 37.5 10 42.5 10C50 10 56 16 56 24.5C56 41 32 55 32 55Z";
 const heartLit = "M32 17C34 13 37.5 10 42.5 10C50 10 56 16 56 24.5C56 41 32 55 32 55Z";
@@ -204,7 +205,7 @@ const sword = (deg: number): Layer[] => {
 const avatars: Record<string, Layer[]> = {
   fox: [
     ["k1", shoulders],
-    ["k5", "M25 66C25.5 57 28.5 52.5 32 52.5C35.5 52.5 38.5 57 39 66Z"],
+    ["k5", foxChest],
     ["k1", both((x) => `M${x(5.5)} 24L${x(16.5)} 7.5Q${x(19.5)} 6 ${x(20.5)} 9.5L${x(21.5)} 29Z`)],
     ["k0", both((x) => `M${x(9.5)} 22.5L${x(16)} 12.5Q${x(17.6)} 11.6 ${x(18)} 13.6L${x(18.6)} 25Z`)],
     [
@@ -672,7 +673,7 @@ const avatars: Record<string, Layer[]> = {
     ["k4", heart, 'transform="translate(25 7) scale(0.52)"'],
     ["k1", heartLit, 'transform="translate(5.5 7) scale(0.52)"'],
     ["k1", heartLit, 'transform="translate(25 7) scale(0.52)"'],
-    lift(heart),
+    ["ks", heart, 'transform="translate(13.8 16.5) scale(0.6)"'],
     ["k5", heart, 'transform="translate(12.8 15) scale(0.6)"'],
     ["k4", heartLit, 'transform="translate(12.8 15) scale(0.6)"'],
     ["kw", E(23.4, 30, 2.2, 1.5), 'transform="rotate(-38 23.4 30)"'],
@@ -908,9 +909,30 @@ const topics: Record<string, Layer[]> = {
 
 // ---- Ways to play: the cards on Начало, each in its mode's tone, over the card.
 
+/** An avatar's head as a friend on a card: the animal without its tile or its shoulders, set down at (x, y), `s` of
+ * its size, turned by `deg`. In front it's one ink lighter than on its tile, so the tone is its main colour, as on the
+ * other cards; behind, it keeps its tile's darker inks. */
+const lighter: Record<string, string> = { k1: "k2", k2: "k3", k4: "k5", l1: "l2" };
+const head = (id: string, x: number, y: number, s: number, deg: number, front: boolean): Layer[] => {
+  const t = `transform="translate(${x} ${y}) rotate(${deg}) scale(${s}) translate(-32 -32)"`;
+  return (avatars[id] ?? [])
+    .filter(([, d]) => d !== shoulders && d !== foxChest)
+    .map(([ink, d, attrs]) => [(front && lighter[ink]) || ink, d, attrs ? `${t} ${attrs}` : t]);
+};
+
 const modes: Record<string, Layer[]> = {
   almanac: [ground, ...(avatars.book ?? [])],
-  friends: [ground, ...(avatars.hearts ?? [])],
+  // Two friends side by side, the fox and the bear (the avatars are the players' faces), their heads leaning
+  // together with a little space between them, both well inside the disc; the bear, a step behind, in darker inks.
+  // Their shoulders and the fox's white chest are the avatars' own, set down with the heads and cut at the disc's edge.
+  friends: [
+    ground,
+    ["k1", "M31 46.32C31.48 40.56 36.76 37.68 43 37.68C49.24 37.68 54.52 40.56 55 46.32V51.26A30 30 0 0 1 31 61.98Z"],
+    ...head("bear", 43, 30, 0.48, -4, false),
+    ["k2", "M9 50C9.5 44 15 41 21.5 41C28 41 33.5 44 34 50V61.93A30 30 0 0 1 9 51.26Z"],
+    ["k5", "M18 50C18.25 45.5 19.75 43.25 21.5 43.25C23.25 43.25 24.75 45.5 25 50V61.17A30 30 0 0 1 18 58.53Z"],
+    ...head("fox", 21.5, 33, 0.5, 4, true),
+  ],
   duel: [ground, ...sword(-42), ...sword(42), ["k5", sparkle(32, 14, 5)]],
   arena: [
     ground,

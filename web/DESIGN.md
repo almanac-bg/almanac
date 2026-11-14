@@ -355,9 +355,9 @@ mountains and a medal — are drawn by hand as paths in `web/src/art/pictures.ts
   books; a shield, a shield with swords, a Thracian helmet; a heart, three hearts, a chess knight; a trophy, a
   scholar's cap, a wreath); a picture per topic (a bulb, a flask, an amphora, a globe, a clapperboard, a record, a
   ball, a gamepad, a quill in its inkwell, a butterfly), on its tile and, small, on its chips; one per way to play
-  (crossed swords, a crown in laurel, an open door) on its card and over its page, and over Приятели (three
-  hearts) and Моят Алманах (a book); the streak's flame; the frames, the divisions' crests, the leagues' mountains and
-  the achievements' medals.
+  (crossed swords, a crown in laurel, an open door) on its card and over its page, and over Приятели (two friends
+  side by side, the fox and the bear, heads leaning together: the avatars are the players' faces) and Моят Алманах (a
+  book); the streak's flame; the frames, the divisions' crests, the leagues' mountains and the achievements' medals.
 - **A new picture** is drawn on the 64 × 64 grid in the same inks and looked at beside the others, at its smallest
   size (an avatar at 28px) and in both themes, before it ships.
 
