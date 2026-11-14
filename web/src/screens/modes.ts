@@ -2,7 +2,7 @@
 
 import { type Child, h } from "../lib/dom.ts";
 
-type Mode = "duel" | "royal" | "room";
+type Mode = "duel" | "arena" | "royal" | "room";
 
 const all: Record<Mode, { href: string; name: string; about: string; tone: string; icon: string }> = {
   duel: {
@@ -11,6 +11,13 @@ const all: Record<Mode, { href: string; name: string; about: string; tone: strin
     about: "Ти срещу друг играч, на живо.",
     tone: "tone-rose",
     icon: "bolt",
+  },
+  arena: {
+    href: "/arena",
+    name: "Арена",
+    about: "От трима до петима играчи, на живо.",
+    tone: "tone-sky",
+    icon: "swords",
   },
   royal: {
     href: "/royal",

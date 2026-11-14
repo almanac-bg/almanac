@@ -8,6 +8,7 @@ import { applyPrefs } from "./lib/prefs.ts";
 import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
 import { almanac } from "./screens/almanac.ts";
+import { arena } from "./screens/arena.ts";
 import { duel, duelOne, playChallenge, until } from "./screens/duel.ts";
 import { friends } from "./screens/friends.ts";
 import { invite } from "./screens/invite.ts";
@@ -18,7 +19,7 @@ import { topic } from "./screens/play.ts";
 import { playerProfile } from "./screens/player.ts";
 import { ranks } from "./screens/ranks.ts";
 import { rewards } from "./screens/rewards.ts";
-import { room } from "./screens/room.ts";
+import { arenaGame, room } from "./screens/room.ts";
 import { rooms } from "./screens/rooms.ts";
 import { royal } from "./screens/royal.ts";
 import { settings } from "./screens/settings.ts";
@@ -27,7 +28,7 @@ import { type Challenge, challenges, checkWaiting, friendRequests, playing, watc
 
 /** The four main places: where each goes, its name and icon, and which paths are part of it. */
 const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
-  ["/", "Начало", "home", (p) => /^\/($|play\/|duel|royal|room|r\/)/.test(p)],
+  ["/", "Начало", "home", (p) => /^\/($|play\/|duel|arena|royal|room|r\/)/.test(p)],
   ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
   ["/rewards", "Награди", "award", (p) => p === "/rewards"],
   ["/me", "Профил", "user", (p) => /^\/(me|friends|settings|almanac|f\/)/.test(p) || p === "/together"],
@@ -90,6 +91,8 @@ if (root) {
       { path: /^\/duel$/, view: duel },
       { path: /^\/duel\/live$/, view: liveDuel },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
+      { path: /^\/arena$/, view: arena },
+      { path: /^\/arena\/([0-9]{6})$/, view: arenaGame },
       { path: /^\/royal$/, view: royal },
       { path: /^\/almanac$/, view: almanac },
       { path: /^\/room$/, view: rooms },

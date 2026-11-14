@@ -92,7 +92,7 @@ export function today() {
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
       user.peek() ? streak(t.streak, t.week) : null,
       goalsCard(),
-      modes(["duel", "royal", "room"], "С други"),
+      modes(["duel", "arena", "royal", "room"], "С други"),
       topics(),
     );
   };
@@ -122,7 +122,7 @@ function finished(t: Today, s: State): Child {
       },
       countdown(),
       goalsCard(),
-      modes(["duel", "royal", "room"], "С други"),
+      modes(["duel", "arena", "royal", "room"], "С други"),
       topics(),
       () => {
         const f = fresh().friends;

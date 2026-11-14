@@ -8,6 +8,7 @@ for (const scheme of ["light", "dark"] as const) {
     for (const path of [
       "/",
       "/duel",
+      "/arena",
       "/royal",
       "/room",
       "/ranks",

@@ -273,6 +273,8 @@ func Merge(tx *sql.Tx, from, to int64) error {
 			SELECT user_id, ?, since FROM friends WHERE friend_id = ? AND user_id <> ?`, []any{to, from, to}},
 		{`DELETE FROM friends WHERE user_id = ? OR friend_id = ?`, []any{from, from}},
 		{`UPDATE runs SET opponent_id = ? WHERE opponent_id = ?`, []any{to, from}},
+		// The guest's arenas are the account's (unless both played the same one, which can't be: one person).
+		{`UPDATE OR IGNORE arena_players SET user_id = ? WHERE user_id = ?`, []any{to, from}},
 		// What the guest earned is the account's too; so is the guest's look, if the account hasn't chosen one.
 		{`INSERT OR IGNORE INTO achievements (user_id, id, at, seen) SELECT ?, id, at, seen FROM achievements WHERE user_id = ?`,
 			[]any{to, from}},

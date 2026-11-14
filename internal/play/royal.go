@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"math"
 	mrand "math/rand/v2"
 	"slices"
 	"time"
@@ -306,21 +305,12 @@ func (g *Game) SettleRoyal(ctx context.Context, royalID int64) ([]RoyalStanding,
 			}
 		}
 		if len(list) >= 3 {
-			for i := range list {
-				sum := 0.0
-				for j := range list {
-					if i == j {
-						continue
-					}
-					score := 0.5
-					if list[i].place < list[j].place {
-						score = 1
-					} else if list[i].place > list[j].place {
-						score = 0
-					}
-					sum += float64(eloDelta(list[i].rating, list[j].rating, list[i].rated, score))
-				}
-				list[i].delta = int(math.Round(sum / float64(len(list)-1)))
+			places, ratings, rated := make([]int, len(list)), make([]int, len(list)), make([]int, len(list))
+			for i, p := range list {
+				places[i], ratings[i], rated[i] = p.place, p.rating, p.rated
+			}
+			for i, d := range placeDeltas(places, ratings, rated) {
+				list[i].delta = d
 			}
 		}
 		// Those in the lobby when it never started (the server down at the start) were in no game.
