@@ -118,6 +118,7 @@ func (im *Image) check() []string {
 		p = append(p, fmt.Sprintf("the picture's longer side must be %d–%d", ImageMinSide, ImageSide))
 	}
 	p = append(p, checkLength("image.alt", im.Alt, 3, 150)...)
+	p = append(p, checkLetters("image.alt", im.Alt)...)
 	p = append(p, checkLength("image.credit", im.Credit, 1, 120)...)
 	if !licenses[im.License] {
 		p = append(p, "image.license must be PD, CC0, CC BY or CC BY-SA")

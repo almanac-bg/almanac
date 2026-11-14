@@ -123,6 +123,18 @@ func checkLine(field, s string, max int) []string {
 	case utf8.RuneCountInString(s) > max:
 		return []string{fmt.Sprintf("%s is over %d characters", field, max)}
 	}
+	return checkLetters(field, s)
+}
+
+// foreignLetters are Cyrillic letters Bulgarian doesn't use: they come in with Russian words, names and quotes.
+const foreignLetters = "ёыэЁЫЭ"
+
+// checkLetters: a player reads only Bulgarian letters (a Russian name is written the Bulgarian way: Грозни).
+func checkLetters(field, s string) []string {
+	if i := strings.IndexAny(s, foreignLetters); i >= 0 {
+		r, _ := utf8.DecodeRuneInString(s[i:])
+		return []string{fmt.Sprintf("%s has %c, a letter Bulgarian doesn't use", field, r)}
+	}
 	return nil
 }
 
