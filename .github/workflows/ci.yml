@@ -1,11 +1,15 @@
-# Every push to main and every pull request: the server's tests (with the race detector), the client's types, lint and
-# tests, both builds (the client within its size budget), and the game played in Chromium, WebKit and Firefox.
+# Every pull request and push to main: the server's tests (with the race detector), the client's types, lint and
+# tests, and both builds (the client within its size budget) — under a minute, all a pull request waits for.
+# After a merge, on main, the game is also played in Chromium, WebKit and Firefox (about 15 minutes): it doesn't
+# hold anything up, and a failure there is fixed with the next change. Run it on a branch by hand (Actions → CI →
+# Run workflow) when a change is risky for the browsers.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions: {}
 
@@ -63,6 +67,7 @@ jobs:
 
   browsers:
     name: Browsers
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
