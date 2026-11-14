@@ -151,14 +151,15 @@ Every element that looks like a game measures something the game already counts:
 | Element      | Measures                                                                                                                                                                                                                                    | Where                        |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | Streak       | Days in a row with the day's ten; the strip is this week's days played (`week` in `/api/day` and `/api/me/stats`)                                                                                                                           | Днес, Профил                 |
-| Points       | One game's score, per answer and per run, from the server (with the part for speed); never added up across games                                                                                                                            | Verdict, result, day board   |
+| Points       | One game's score, per answer and per run, from the server (with the parts for speed and for the row); a right answer about 1000; never added up across games                                                                                | Verdict, result, day board   |
+| In a row     | Right answers in a row within a game, from the second (the flame and „3 поред“); each earns a tenth more, up to a half                                                                                                                      | Question head, verdict       |
 | XP           | What playing earns: 10 an answer and 10 more times its score, 50 a finished game, 50 more for the day's; adds up                                                                                                                            | Level, week board, goals     |
 | Place        | Place on the day's board („12-и от 318 днес.“)                                                                                                                                                                                              | Result, Профил               |
 | Mastery      | Share of a topic's questions a player knows, from every answer weighed by its question's hardness (play/mastery.go); told after 10 answers, in six tiers: Новак, Любител (35%), Познавач (50%), Експерт (65%), Майстор (78%), Светило (90%) | Игра, Профил, result         |
 | Rank change  | Places moved since the previous answer                                                                                                                                                                                                      | Room boards                  |
 | Duels        | Played in each one's own time: won of played; between two friends, their record („3 : 2“)                                                                                                                                                   | Дуел, Профил                 |
 | Rating       | Elo from 1000, moved by duels and Роял; shown as a division (Бронз → Легенда) with its generated emblem                                                                                                                                     | Дуел, Роял, Профил, Класации |
-| Роял         | A tournament of up to 20 on 15 questions in three rounds; the first wrong answer is out; place by how far, then how quick                                                                                                                   | Роял, Класации               |
+| Роял         | Live every evening at 21:00 (lobby from 20:45): up to 50 on the same question at once, 15 in three rounds; the first wrong answer is out, then watch                                                                                        | Роял, Класации               |
 | Goals        | Three a day (the day's questions, and two drawn), each a star                                                                                                                                                                               | Начало                       |
 | Season       | A calendar month's stars; 10/30/60 earn its bronze/silver/gold medal, gold its frame                                                                                                                                                        | Награди, Класации            |
 | Friends      | The day's board among you and your friends („Приятели днес“), once a friend has played                                                                                                                                                      | Result                       |
@@ -170,7 +171,7 @@ Every element that looks like a game measures something the game already counts:
 Feedback fires once, when it's earned, and then the screen is still again:
 
 - A right answer pops and glows.
-- Points rise in gold.
+- Points rise in gold, counting up to what was earned.
 - An exact number answer gets the star.
 - A wrong answer shakes once.
 

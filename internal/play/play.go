@@ -23,9 +23,9 @@ import (
 const (
 	// Length is how many questions a run has.
 	Length = 10
-	// MaxPoints is what a perfect, quick answer to a medium question is worth (an easy one's less, a hard one's more:
-	// worth).
-	MaxPoints = 100
+	// MaxPoints is what a perfect, quick answer to a medium question is worth (an easy one's less, a hard one's more,
+	// one in a row of right answers more: worth).
+	MaxPoints = 1000
 	// Grace is how late an answer may arrive and still count: the trip from the player's screen to the server.
 	Grace = 2 * time.Second
 )
@@ -134,6 +134,8 @@ type State struct {
 	At       int    `json:"at"`
 	Points   int    `json:"points"`
 	Rights   int    `json:"rights"`
+	// AllRight is what the game earned at its end for every answer right (in Points), once it's done.
+	AllRight int `json:"allRight,omitempty"`
 	// Trail is how each answered question went, in order.
 	Trail []Mark `json:"trail"`
 	// Question is the one shown now, if one is.
@@ -160,14 +162,18 @@ type Shown struct {
 // Result is what an answer earned, the answer itself, and the run after it.
 type Result struct {
 	Points int `json:"points"`
-	// Speed is how many of the points were for being quick.
+	// Speed is how many of the points were for being quick, and Row how many for the right answers in a row InRow.
 	Speed    int     `json:"speed,omitempty"`
+	Row      int     `json:"row,omitempty"`
+	InRow    int     `json:"inRow,omitempty"`
 	Score    float64 `json:"score"`
 	Right    bool    `json:"right"`
 	Exact    bool    `json:"exact,omitempty"`
 	TimedOut bool    `json:"timedOut,omitempty"`
-	Reveal   any     `json:"reveal"`
-	State    State   `json:"state"`
+	// Given is the answer as it shows (the player's screen has it already).
+	Given  json.RawMessage `json:"-"`
+	Reveal any             `json:"reveal"`
+	State  State           `json:"state"`
 }
 
 // deal finds a pick's question in the bank and deals it.
@@ -184,6 +190,9 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 	s := State{
 		ID: r.id, Kind: r.kind, Day: r.day, Category: r.category,
 		Total: len(r.picks), At: r.at, Points: r.points, Rights: r.rights, Done: r.finished, Trail: []Mark{},
+	}
+	if r.finished && r.allRight() {
+		s.AllRight = AllRight
 	}
 	rows, err := tx.Query(`SELECT points, is_right FROM answers WHERE run_id = ? ORDER BY n`, r.id)
 	if err != nil {
@@ -257,10 +266,24 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 	if r.finished {
 		finishedAt = now
 		r.xp += finishXP(r.kind)
+		if r.allRight() {
+			r.points += AllRight
+		}
 	}
 	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, points = ?, rights = ?, xp = ?, ms = ?, finished_at = ? WHERE id = ?`,
 		r.at, r.points, r.rights, r.xp, r.ms, finishedAt, r.id)
 	return err
+}
+
+// allRight is whether a run went through all of its questions, each answered right.
+func (r *run) allRight() bool { return r.at == len(r.picks) && r.rights == len(r.picks) }
+
+// rightsInRow is how many right answers a run's last ones are in a row.
+func rightsInRow(tx *sql.Tx, runID int64) (int, error) {
+	var n int
+	err := tx.QueryRow(`SELECT count(*) FROM answers WHERE run_id = ?
+		AND n > coalesce((SELECT max(n) FROM answers WHERE run_id = ? AND NOT is_right), -1)`, runID, runID).Scan(&n)
+	return n, err
 }
 
 // State is a player's run as it stands.
@@ -291,6 +314,10 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 		if _, err := g.settle(tx, r); err != nil {
 			return err
 		}
+		if r.kind == "royal" { // its questions show when the tournament shows them
+			s, err = g.state(tx, r)
+			return err
+		}
 		if !r.finished && !r.shownAt.Valid {
 			now := store.Ms(g.Now())
 			if _, err := tx.Exec(`UPDATE runs SET shown_at = ? WHERE id = ?`, now, r.id); err != nil {
@@ -306,6 +333,11 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 
 // Answer grades an answer to question n, the one showing. A null answer gives up on it.
 func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage) (Result, error) {
+	return g.answer(ctx, userID, runID, n, answer, false)
+}
+
+// answer grades an answer; a Роял run's only as its tournament's (royal), so that it keeps the tournament's pace.
+func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, royal bool) (Result, error) {
 	var res Result
 	finished := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
@@ -313,7 +345,7 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 		if err != nil {
 			return err
 		}
-		if r.finished || n != r.at {
+		if r.finished || n != r.at || (r.kind == "royal") != royal {
 			return ErrOutOfStep
 		}
 		defer func() { finished = r.finished }()
@@ -333,12 +365,22 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 				return ErrBadAnswer
 			}
 		}
-		w := WorthOf(d.Question(), gr.Score, took)
-		res.Points, res.Speed = w.Points, w.Speed
+		inRow := 0
+		if gr.Right {
+			if inRow, err = rightsInRow(tx, r.id); err != nil {
+				return err
+			}
+			inRow++
+		}
+		w := WorthOf(d.Question(), gr.Score, took, inRow)
+		res.Points, res.Speed, res.Row = w.Points, w.Speed, w.Row
+		if inRow > 1 {
+			res.InRow = inRow
+		}
 		if err := g.record(tx, r, gr, w, min(took, limit).Milliseconds()); err != nil {
 			return err
 		}
-		res.Score, res.Right, res.Exact = gr.Score, gr.Right, gr.Exact
+		res.Score, res.Right, res.Exact, res.Given = gr.Score, gr.Right, gr.Exact, gr.Shown
 		res.Reveal = d.Reveal()
 		res.State, err = g.state(tx, r)
 		return err
@@ -347,16 +389,19 @@ func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer js
 		// A duel's run settles the duel once both have played (and awards both); then what the run earned, before
 		// the answer goes back, so that the screen with the result can tell of it.
 		if err = g.settleRun(ctx, runID); err == nil {
-			err = g.royalRunDone(ctx, runID)
-		}
-		if err == nil {
-			_, err = g.Award(ctx, userID)
-		}
-		if err == nil {
-			_, err = g.GoalsOf(ctx, userID) // a goal done is kept: a star, whether or not the player looks
+			err = g.afterRun(ctx, userID)
 		}
 	}
 	return res, err
+}
+
+// afterRun keeps what a player's run, just finished, earned them: achievements, and the day's goals.
+func (g *Game) afterRun(ctx context.Context, userID int64) error {
+	if _, err := g.Award(ctx, userID); err != nil {
+		return err
+	}
+	_, err := g.GoalsOf(ctx, userID) // a goal done is kept, whether or not the player looks
+	return err
 }
 
 // newSeed is a deal's seed.

@@ -6,9 +6,9 @@
 import { mkdirSync, rmSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 
-// E2E_PORT lets two checkouts run their tests at once.
+// E2E_PORT and E2E_DB let two checkouts run their tests at once.
 const port = Number(process.env.E2E_PORT) || 8098;
-const db = "test-results/e2e.db";
+const db = process.env.E2E_DB || "test-results/e2e.db";
 // A fresh database each run. Playwright reads this file again in every worker: only the main process clears it, or a
 // worker starting late would delete the database under the running server.
 if (!process.env.TEST_WORKER_INDEX) {
@@ -47,6 +47,9 @@ export default defineConfig({
       BANK_DIR: "bank/sample",
       DB_PATH: db,
       MAIL_DIR: "test-results/mail",
+      // A Роял every half minute, its lobby open the 25 seconds before, instead of every evening at 21:00.
+      ROYAL_EVERY: "30s",
+      ROYAL_LOBBY: "25s",
     },
   },
 });

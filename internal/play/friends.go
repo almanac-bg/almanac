@@ -406,7 +406,7 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 // FriendsBoard is the day's board among a player and their friends: everyone of them who finished it, best first.
 // Empty while none of their friends has.
 func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Score, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.name, r.points, r.rights, r.ms, `+lookColumns+` FROM runs r
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+` FROM runs r
 		JOIN users u ON u.id = r.user_id
 		WHERE r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL
 		AND (r.user_id = ? OR r.user_id IN (SELECT friend_id FROM friends WHERE user_id = ?))
@@ -422,7 +422,7 @@ func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Sc
 		var id int64
 		var avatar, title string
 		var total int
-		if err := rows.Scan(&id, &s.Name, &s.Points, &s.Rights, &s.Ms, &avatar, &title, &total); err != nil {
+		if err := rows.Scan(&id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Ms, &avatar, &title, &total); err != nil {
 			return nil, err
 		}
 		s.Me, s.Look = id == userID, lookOf(id, avatar, title, total)
