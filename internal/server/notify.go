@@ -25,10 +25,15 @@ func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) error {
 	if s.push == nil {
 		return errNotFound
 	}
-	var sub push.Subscription
-	if err := readJSON(r, &sub); err != nil {
+	// What a browser sends (PushSubscription.toJSON): the subscription, and when it expires, which no browser sets.
+	var in struct {
+		push.Subscription
+		ExpirationTime *float64 `json:"expirationTime"`
+	}
+	if err := readJSON(r, &in); err != nil {
 		return err
 	}
+	sub := in.Subscription
 	// Keys come base64url without padding from most browsers; take them with it too.
 	sub.Keys.P256dh = strings.TrimRight(sub.Keys.P256dh, "=")
 	sub.Keys.Auth = strings.TrimRight(sub.Keys.Auth, "=")

@@ -28,11 +28,14 @@ async function registration(): Promise<ServiceWorkerRegistration> {
   return reg.active ? reg : navigator.serviceWorker.ready;
 }
 
-/** Whether this browser has notifications on for the game. */
+/** Whether this browser has notifications on for the game. A subscription the browser has is told to the server again
+ * (it keeps it once), so that one it never heard of, or heard of for another player here, is the one it sends to. */
 export async function pushOn(): Promise<boolean> {
   if (!pushable()) return false;
   const reg = await navigator.serviceWorker.getRegistration("/");
-  return !!(await reg?.pushManager.getSubscription());
+  const sub = await reg?.pushManager.getSubscription();
+  if (sub) api("POST", "/api/push", sub.toJSON()).catch(() => {});
+  return !!sub;
 }
 
 /** Turns notifications on (asking the player), or says why not. It subscribes straight from the player's tap, and the
@@ -52,7 +55,13 @@ export async function turnOn(): Promise<string | null> {
       ? "Brave изключва известията по подразбиране. Включи ги от Настройки → Поверителност и сигурност → „Use Google services for push messaging“ и опитай пак."
       : "Браузърът не успя да включи известията. Опитай пак или в друг браузър (Chrome, Firefox, Safari).";
   }
-  await api("POST", "/api/push", sub.toJSON());
+  try {
+    await api("POST", "/api/push", sub.toJSON());
+  } catch (err) {
+    // Not kept by the server: not on here either, so that the switch says what's true.
+    await sub.unsubscribe().catch(() => {});
+    throw err;
+  }
   return null;
 }
 
