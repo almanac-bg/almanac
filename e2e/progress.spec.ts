@@ -14,7 +14,7 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(page.locator(".achievement", { hasText: "Петдесет победи" })).toContainText("Спечели петдесет дуела.");
   // Progress towards a goal, a reward in sight, and the hidden ones kept secret.
   await expect(page.locator(".achievement", { hasText: "Сто отговора" })).toContainText(/\d+ \/ 100/);
-  await expect(page.locator(".achievement", { hasText: "Сто отговора" })).toContainText("Награда: форма „Книга“");
+  await expect(page.locator(".achievement", { hasText: "Сто отговора" })).toContainText("Награда: аватар „Книга“");
   await expect(page.locator(".achievement", { hasText: "Цял месец" })).toContainText("и титла „Неугасим пламък“");
   await expect(page.locator(".achievement", { hasText: "Скрито постижение" }).first()).toContainText(
     "Награда: ще разбереш",
@@ -22,8 +22,10 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(page.locator(".title-pick.locked", { hasText: "Сто изгрева" })).toContainText(
     "Отключва се: играй въпросите на деня сто дни поред.",
   );
-  await page.getByRole("button", { name: "Луна", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Луна", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Таралеж", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Таралеж", exact: true })).toHaveAttribute("aria-pressed", "true");
+  // Avatars are pictures (art/pictures.ts), loaded after the first screen: the hedgehog is drawn on its tile.
+  await expect(page.locator('.pick[aria-pressed="true"] .avatar-pic path').first()).toBeAttached();
   await page.getByRole("button", { name: "Корона, заключена" }).click();
   await expect(page.getByText("Короната се отключва на ниво 10.")).toBeVisible();
 

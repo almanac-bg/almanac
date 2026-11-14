@@ -70,10 +70,10 @@ var Achievements = []Achievement{
 	{"streak7", "Цяла седмица", "Играй въпросите на деня седем дни поред.", "flame", Rare, 7, false},
 	{"perfect", "Десет от десет", "Познай и десетте въпроса на деня.", "star", Rare, 1, false},
 	{"exact", "Точно в целта", "Познай число точно, без никаква грешка.", "target", Rare, 1, false},
-	{"allTopics", "Обиколка", "Изиграй поне една игра във всяка тема.", "rosette", Rare, 10, false},
+	{"allTopics", "Обиколка", "Изиграй поне една игра във всяка тема.", "compass", Rare, 10, false},
 	{"friends5", "Цяла компания", "Събери пет приятели в играта.", "heart", Rare, 5, false},
 	{"friendWin", "Между приятели", "Победи приятел в дуел.", "heart", Rare, 1, false},
-	{"nightOwl", "След полунощ", "Отговори на въпрос между полунощ и четири сутринта.", "eye", Rare, 1, true},
+	{"nightOwl", "След полунощ", "Отговори на въпрос между полунощ и четири сутринта.", "owl", Rare, 1, true},
 	{"earlyBird", "Преди седем", "Изиграй въпросите на деня преди седем сутринта.", "sun", Rare, 1, true},
 	{"lastSecond", "В последния миг", "Отговори вярно в последната секунда.", "hourglass", Rare, 1, true},
 
@@ -98,14 +98,14 @@ func achievementByID(id string) (Achievement, bool) {
 	return Achievements[i], true
 }
 
-// Avatars are a shape in a tone. Some shapes are everyone's from the start; the rest unlock: with an achievement
-// drawn with that shape, or (the crown) at a level.
+// Avatars are a picture in a tone (web/src/art/pictures.ts draws them; a "shape" is a picture's id). The animals are
+// everyone's from the start; the emblems unlock: with an achievement drawn with that emblem, or (the crown) at a level.
 var (
 	Tones      = []string{"gold", "lilac", "sky", "rose", "mint"}
-	FreeShapes = []string{"petal", "rosette", "circle", "diamond", "triangle", "moon", "leaf", "wave", "hex"}
+	FreeShapes = []string{"fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog"}
 	Unlockable = []string{
-		"flame", "star", "target", "bolt", "book", "trophy", "shield", "heart", "eye", "sun", "hourglass", "spark",
-		"clover", "crown",
+		"flame", "star", "target", "bolt", "book", "trophy", "shield", "heart", "owl", "compass", "sun", "hourglass",
+		"spark", "clover", "crown",
 	}
 )
 

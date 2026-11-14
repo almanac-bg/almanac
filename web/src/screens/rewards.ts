@@ -1,6 +1,7 @@
 // Награди: what playing earns — the achievements by tier, each with how it's earned, and the wardrobe: the avatar's
 // shape and tone, and the titles to wear.
 
+import { picture } from "../art/picture.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
@@ -88,13 +89,12 @@ function achievements(p: Progress): Child {
                 h(
                   "span",
                   { class: "achievement-reward" },
-                  h("span", {
-                    class: `reward-mark av-${a.hidden && !a.at ? "secret" : a.icon}`,
-                    "aria-hidden": "true",
-                  }),
+                  a.hidden && !a.at
+                    ? h("span", { class: "reward-mark secret", "aria-hidden": "true" })
+                    : h("span", { class: "reward-mark tone-gold", "aria-hidden": "true" }, picture(a.icon)),
                   a.hidden && !a.at
                     ? "Награда: ще разбереш"
-                    : `Награда: форма „${shapeNames[a.icon] ?? a.icon}“ за аватара${a.title ? ` и титла „${a.title.name}“` : ""}`,
+                    : `Награда: аватар „${shapeNames[a.icon] ?? a.icon}“${a.title ? ` и титла „${a.title.name}“` : ""}`,
                 ),
               ),
             ),
@@ -135,7 +135,7 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
       "section",
       null,
       h("h2", null, "Вид"),
-      h("p", { class: "muted" }, "Аватарът ти е форма в цвят. Някои форми се отключват с постижения."),
+      h("p", { class: "muted" }, "Аватарът ти е животно или знак в цвят по избор. Знаците се отключват с постижения."),
       h(
         "ul",
         { class: "picker" },

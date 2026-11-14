@@ -1,6 +1,7 @@
 // Теми: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays the same
 // game. The tiles live on Начало; a run of one is /play/<topic>.
 
+import { picture } from "../art/picture.ts";
 import { type Mastery, masteryBadge, masteryLeft } from "../game/mastery.ts";
 import { news } from "../game/news.ts";
 import { summary } from "../game/results.ts";
@@ -42,18 +43,13 @@ export function topics(): Child {
   );
 }
 
-/** A topic: its colour, its name, and how well the player knows it (once they've played enough of it to tell). */
+/** A topic: its picture and colour, its name, and how well the player knows it (once they've played enough of it to tell). */
 function tile(c: Category, m?: Mastery): Child {
   const sure = m?.sure ? m : null;
   return h(
     "a",
     { href: `/play/${c.id}`, class: `topic ${toneOf(c.id)}` },
-    h(
-      "span",
-      { class: "topic-head" },
-      h("span", { class: "dot", "aria-hidden": "true" }),
-      sure ? masteryBadge(sure) : null,
-    ),
+    h("span", { class: "topic-head" }, picture(`topic-${c.id}`, "topic-pic"), sure ? masteryBadge(sure) : null),
     h("span", { class: "topic-name" }, c.name),
     h(
       "span",
