@@ -71,7 +71,7 @@ func (s *Server) joinRoyal(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		look = play.Look{Avatar: play.DefaultAvatar(u.ID), Level: 1}
 	}
-	if err := s.royal.Join(r.Context(), royal.Player{ID: u.ID, Name: u.Name, Look: look}); err != nil {
+	if err := s.royal.Join(r.Context(), royal.Player{ID: u.ID, Name: u.Name, Tag: u.Tag, Look: look}); err != nil {
 		return err
 	}
 	return ok(w, map[string]bool{"ok": true})

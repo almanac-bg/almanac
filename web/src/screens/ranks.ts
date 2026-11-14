@@ -111,9 +111,9 @@ function ranking(heading: string, r: Ranking, score: (x: Ranked) => Child, empty
     h(
       "ol",
       null,
-      r.top.map((x, i) => boardRow(i + 1, x.name, score(x), { me: x.me, look: x })),
+      r.top.map((x, i) => boardRow(i + 1, x.name, score(x), { me: x.me, look: x, tag: x.tag })),
       !inTop && r.mine && r.place
-        ? boardRow(r.place, r.mine.name, score(r.mine), { me: true, gap: true, look: r.mine })
+        ? boardRow(r.place, r.mine.name, score(r.mine), { me: true, gap: true, look: r.mine, tag: r.mine.tag })
         : null,
     ),
   );

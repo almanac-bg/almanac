@@ -407,6 +407,7 @@ type LiveRoyal struct {
 type LiveRoyalist struct {
 	User  int64
 	Name  string
+	Tag   string
 	Run   int64 // 0: in the lobby
 	At    int   // questions answered
 	Right int
@@ -442,7 +443,7 @@ func (g *Game) LiveRoyals(ctx context.Context) ([]LiveRoyal, error) {
 		return nil, err
 	}
 	for i := range out {
-		rows, err := g.DB.Read.QueryContext(ctx, `SELECT p.user_id, u.name, coalesce(p.run_id, 0), coalesce(r.at, 0),
+		rows, err := g.DB.Read.QueryContext(ctx, `SELECT p.user_id, u.name, u.tag, coalesce(p.run_id, 0), coalesce(r.at, 0),
 				coalesce(r.rights, 0), coalesce(r.ms, 0), coalesce(r.finished_at IS NOT NULL, 0)
 			FROM royal_players p JOIN users u ON u.id = p.user_id LEFT JOIN runs r ON r.id = p.run_id
 			WHERE p.royal_id = ? ORDER BY p.joined_at, p.user_id`, out[i].ID)
@@ -451,7 +452,7 @@ func (g *Game) LiveRoyals(ctx context.Context) ([]LiveRoyal, error) {
 		}
 		for rows.Next() {
 			var p LiveRoyalist
-			if err := rows.Scan(&p.User, &p.Name, &p.Run, &p.At, &p.Right, &p.Ms, &p.Out); err != nil {
+			if err := rows.Scan(&p.User, &p.Name, &p.Tag, &p.Run, &p.At, &p.Right, &p.Ms, &p.Out); err != nil {
 				rows.Close()
 				return nil, err
 			}

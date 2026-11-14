@@ -62,6 +62,7 @@ interface Evening {
 interface Player {
   key: number;
   name: string;
+  tag: string;
   in: boolean;
   reached: number;
   /** The question they went out on (-1: they haven't). */
@@ -476,7 +477,7 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
             "li",
             { class: ["row", (p.place ?? 9) <= 3 && `p${p.place}`, p.me && "me"].filter(Boolean).join(" ") },
             h("span", { class: "place" }, String(p.place ?? "")),
-            who(p.name, p, p.me ? h("span", { class: "you" }, "ти") : null, p.name),
+            who(p.name, p, p.me ? h("span", { class: "you" }, "ти") : null, p.name, p.tag),
             h("span", { class: "royal-reach" }, h("span", { class: "muted" }, reach(p, first.length)), delta(p.delta)),
           ),
         ),

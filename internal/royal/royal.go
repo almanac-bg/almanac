@@ -68,6 +68,7 @@ func (s Schedule) Next(now time.Time) time.Time {
 type Player struct {
 	ID   int64
 	Name string
+	Tag  string
 	Look play.Look
 }
 
@@ -199,7 +200,7 @@ func (h *Hub) Load(ctx context.Context) error {
 		}
 		t := &table{id: l.ID, phase: l.Phase, n: l.N, at: now}
 		for i, p := range l.Players {
-			m := &member{Player: Player{ID: p.User, Name: p.Name}, key: i, run: p.Run, seen: now, outAt: -1}
+			m := &member{Player: Player{ID: p.User, Name: p.Name, Tag: p.Tag}, key: i, run: p.Run, seen: now, outAt: -1}
 			m.Look, _ = h.game.LookOf(ctx, p.User)
 			if p.Run != 0 {
 				t.entered++
@@ -558,6 +559,7 @@ type PlayerView struct {
 	// Key tells players apart in a tournament (names may repeat).
 	Key     int    `json:"key"`
 	Name    string `json:"name"`
+	Tag     string `json:"tag"`
 	In      bool   `json:"in"`
 	Reached int    `json:"reached"`
 	// OutAt is the question they went out on (-1: they haven't).
@@ -627,7 +629,7 @@ func (h *Hub) View(viewer int64) View {
 			v.Left++
 		}
 		v.Players = append(v.Players, PlayerView{
-			Look: m.Look, Key: m.key, Name: m.Name, In: m.in, Reached: m.reached, OutAt: m.outAt,
+			Look: m.Look, Key: m.key, Name: m.Name, Tag: m.Tag, In: m.in, Reached: m.reached, OutAt: m.outAt,
 			Online: h.online[m.ID] > 0, Answered: m.answered, Place: m.place, Delta: m.delta, Me: m == me,
 		})
 	}

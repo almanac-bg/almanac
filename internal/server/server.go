@@ -165,6 +165,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/duels/{id}/play", s.playDuel)
 	api("DELETE /api/duels/{id}", s.declineDuel)
 	api("GET /api/ranks", s.ranks)
+	api("GET /api/players/{tag}", s.profile)
 	mux.HandleFunc("GET /api/royal/events", s.royalEvents)
 	api("POST /api/royal", s.joinRoyal)
 	api("DELETE /api/royal", s.leaveRoyal)
