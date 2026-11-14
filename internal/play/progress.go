@@ -537,7 +537,8 @@ func (g *Game) anyExact(ctx context.Context, userID int64) (bool, error) {
 
 // News is what's new for a player since they last looked: achievements earned (each with its XP and what it gave),
 // the day's goals done (with their XP), a season ended (with what it paid), their level (whether it's gone up), a
-// division reached for the first time, and everything they've unlocked to wear, whatever unlocked it.
+// division reached for the first time, and everything they've unlocked to wear, whatever unlocked it. The client
+// tells it in three cards at most (web/src/game/news.ts): the goals, the one biggest event, and what's new to wear.
 type News struct {
 	Achievements []Earned   `json:"achievements"`
 	Goals        []DoneGoal `json:"goals"`
@@ -547,13 +548,15 @@ type News struct {
 	From         int        `json:"from"`
 	To           int        `json:"to"`
 	LevelUp      bool       `json:"levelUp,omitempty"`
+	// Earned is the XP all this brings: the game just played, and the goals, achievements and season told with it.
+	Earned int `json:"earned"`
 	// Division is a division the player's rating has reached for the first time.
 	Division *Division `json:"division,omitempty"`
 	// Unlocks are what the player may wear now and hasn't been told of: titles, frames, patterns, avatars.
 	Unlocks []Unlock `json:"unlocks"`
 	// Avatar is the avatar worn (shape-tone), for an unlocked shape to be put on in it.
 	Avatar string `json:"avatar"`
-	// Mastery is how the game just played moved the player's mastery of its topics, when one is told of.
+	// Mastery is how the game just played moved the player's mastery of its topics, told after a topic's game only.
 	Mastery []MasteryMove `json:"mastery,omitempty"`
 }
 
@@ -573,8 +576,8 @@ type SeasonEnd struct {
 }
 
 // NewsOf tells a player what's new, once: everything in it is marked as told. With the game just played (runID; 0
-// for none), it also tells how that game moved their mastery. It awards first, so that whatever ended meanwhile (a
-// friend's duel, an Арена, a season) is in it.
+// for none), it also counts that game's XP and, for a topic's game, tells how it moved their mastery. It awards first,
+// so that whatever ended meanwhile (a friend's duel, an Арена, a season) is in it.
 func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 	n := News{Achievements: []Earned{}, Goals: []DoneGoal{}, Unlocks: []Unlock{}}
 	if _, err := g.Award(ctx, userID); err != nil {
@@ -586,8 +589,17 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 	}
 	if runID != 0 {
 		// A game that isn't the player's, or isn't over, has nothing to tell: the rest of the news still is.
-		if n.Mastery, err = g.MasteryMoves(ctx, userID, runID); err != nil && !errors.Is(err, ErrNoRun) && !errors.Is(err, ErrOutOfStep) {
+		var kind string
+		err := g.DB.Read.QueryRowContext(ctx, `SELECT kind, xp FROM runs WHERE id = ? AND user_id = ? AND finished_at IS NOT NULL`,
+			runID, userID).Scan(&kind, &n.Earned)
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+		case err != nil:
 			return n, err
+		case kind == "topic":
+			if n.Mastery, err = g.MasteryMoves(ctx, userID, runID); err != nil {
+				return n, err
+			}
 		}
 	}
 	w, err := g.wardrobeOf(ctx, userID)
@@ -688,6 +700,15 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 			if _, err := tx.Exec(`INSERT OR IGNORE INTO unlocks_told (user_id, id) VALUES (?, ?)`, userID, u.key()); err != nil {
 				return err
 			}
+		}
+		for _, a := range n.Achievements {
+			n.Earned += a.XP
+		}
+		for _, d := range n.Goals {
+			n.Earned += d.XP
+		}
+		if n.Season != nil {
+			n.Earned += n.Season.XP
 		}
 		if d, _ := DivisionOf(peak); d.From > peakSeen {
 			n.Division = &d

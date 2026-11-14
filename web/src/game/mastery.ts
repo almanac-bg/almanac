@@ -114,30 +114,29 @@ export function masteryCard(all: Mastery[], theirs = false): Child {
   );
 }
 
-/** How a game just played moved the mastery of its topics: those that moved, the furthest first (three at most). A
- * topic still being found out, or one that didn't move, shows only when it's the game's one topic. */
-export function masteryMoves(moves: MasteryMove[]): Child {
-  const told = moves.filter((m) => m.to.sure && (!m.from.sure || m.to.known !== m.from.known)).slice(0, 3);
-  const shown = told.length ? told : moves.length === 1 ? moves : [];
-  if (!shown.length) return null;
-  const up = shown.some((m) => m.from.sure && m.to.tier > m.from.tier);
-  const first = shown.some((m) => !m.from.sure && m.to.sure);
+/** How a topic's game moved its mastery, in a line: the topic, how much of it is known now and by how much that moved
+ * (a new tier said), or what's left before it's told. Of a game of several topics, the one that moved most. */
+export function masteryLine(moves: MasteryMove[]): Child {
+  const told = moves.filter((m) => m.to.sure && (!m.from.sure || m.to.known !== m.from.known));
+  const move = told[0] ?? (moves.length === 1 ? moves[0] : undefined);
+  if (!move) return null;
+  const { from, to } = move;
+  const d = to.known - from.known;
+  const change =
+    from.sure && to.tier > from.tier
+      ? h("span", { class: "delta up" }, "нова степен")
+      : !from.sure
+        ? h("span", { class: "delta up" }, "първа оценка")
+        : d !== 0
+          ? h("span", { class: d > 0 ? "delta up" : "delta down" }, `${d > 0 ? "+" : ""}${d}%`)
+          : null;
   return h(
-    "section",
-    { class: up ? "card mastery-card up" : "card mastery-card" },
-    h("p", { class: "kicker" }, up ? "Нова степен" : first ? "Първа оценка" : "Колко знаеш"),
-    h(
-      "ol",
-      { class: "mastery-list" },
-      shown.map(({ from, to }) => {
-        const d = to.known - from.known;
-        return row(
-          to,
-          from.sure && to.sure && d !== 0
-            ? h("span", { class: d > 0 ? "delta up" : "delta down" }, `${d > 0 ? "+" : ""}${d}%`)
-            : null,
-        );
-      }),
-    ),
+    "p",
+    { class: `mastery-line ${toneOf(to.category)}` },
+    topicMark(to.category),
+    h("span", { class: "mastery-topic" }, topicName(to.category)),
+    to.sure
+      ? [h("b", { class: "mastery-known" }, `${to.known}%`), change, masteryBadge(to)]
+      : h("span", { class: "muted" }, masteryLeft(to)),
   );
 }

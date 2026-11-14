@@ -40,9 +40,10 @@ export function me() {
             const p = progress();
             return p ? levelCard(p.level, p.xp, p.from, p.to) : null;
           },
+          // The rating shows once there's one: after a first rated game (a duel, Арена, Роял).
           () => {
             const p = progress();
-            return p ? standingCard(p.standing) : null;
+            return p?.standing.rated ? standingCard(p.standing) : null;
           },
           () => {
             const p = progress();

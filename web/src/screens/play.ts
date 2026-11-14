@@ -85,9 +85,7 @@ export function topic([id = ""]: string[]) {
       "div",
       { class: "screen" },
       h("p", { class: "kicker" }, name),
-      summary(
-        s,
-        null,
+      summary(s, null, [
         news(s.id),
         h(
           "div",
@@ -95,7 +93,7 @@ export function topic([id = ""]: string[]) {
           h("button", { class: "btn primary big", onclick: again }, "Още десет"),
           h("a", { class: "btn", href: "/" }, "Друга тема"),
         ),
-      ),
+      ]),
     ),
   );
 }

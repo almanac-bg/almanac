@@ -1,11 +1,13 @@
-// Начало: where every game starts, on one short screen. At the top the player's streak and level; then the day's ten
-// questions, the same for everyone, once (or, once played, how they went); the day's goals; and every other way to
-// play — with others, and by topic — a tap away. The day's boards are in Класации.
+// Начало: where every game starts, on one short screen, and the day is its heart. At the top the player's streak and
+// level; then the day's ten questions, the same for everyone, once (or, once played, how they went, and the result to
+// share); the day's goals; and every other way to play a tap away: by topic, and — once a first game is finished —
+// with others. The day's boards are in Класации.
 
 import { picture } from "../art/picture.ts";
 import { news } from "../game/news.ts";
-import { summary } from "../game/results.ts";
+import { shareButton, summary } from "../game/results.ts";
 import { playRun, trail } from "../game/run.ts";
+import { dayShareText } from "../game/share.ts";
 import type { Board, State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
@@ -26,6 +28,8 @@ interface Today {
   reserve?: number;
   /** The player's level, from all their XP (for a player). */
   level?: { level: number; xp: number; from: number; to: number };
+  /** Whether the player has finished a game of any kind: until then Начало is the day and the topics only. */
+  played?: boolean;
   run: State | null;
   board: Board;
 }
@@ -64,7 +68,8 @@ export function today() {
     return h(
       "section",
       { class: "screen home" },
-      () => (user() ? status(fresh()) : null),
+      // A new player, before a first game finished, sees the day and the topics only.
+      () => (user() && (just || t.played) ? status(fresh()) : null),
       run?.done
         ? summary(
             run,
@@ -74,13 +79,14 @@ export function today() {
                 ? h("a", { class: "place-line", href: "/ranks" }, `${place(b.place, b.players)} днес`)
                 : null;
             }),
-            just ? news(run.id) : null,
-            countdown(),
+            [just ? news(run.id) : null, countdown()],
+            shareButton("Сподели", () => dayShareText(t.day, run.trail, run.total, fresh().streak), undefined, false),
           )
         : dayCard(t, start(t)),
       // Just played, the goals it finished are told with its news.
-      just ? null : goalsCard(),
-      modes(["duel", "arena", "royal", "room"], "С други"),
+      just || !t.played ? null : goalsCard(),
+      // The ways to play with others wait for a first game finished: a new player starts with the day and a topic.
+      just || t.played ? modes(["duel", "arena", "royal", "room"], "С други") : null,
       topics(),
     );
   }

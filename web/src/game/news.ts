@@ -1,26 +1,25 @@
-// What a game earned, said once, at its end: the day's goals it finished (with their XP), a season ended (and what it
-// paid), the level (and whether it went up), a division reached for the first time, how it moved the mastery of its
-// topics, any achievement that came with it (with its XP), and — all together — everything these unlocked to wear,
-// each a tap from being worn.
+// What a game earned, said once, at its end, in three cards at most: the day's goals it finished (with their XP); the
+// one biggest thing that happened (a season ended, a division reached, a new level), or else a line of the XP it
+// brought and the level; and „Ново за теб“: achievements and everything they unlocked to wear (each a tap from being
+// worn), with how a topic's game moved its mastery. Only the biggest of it plays its sound.
 
 import { emblem } from "../art/emblem.ts";
 import { seasonName } from "../art/season.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { place } from "../lib/ordinal.ts";
-import { play } from "../lib/sound.ts";
+import { play, type SoundName } from "../lib/sound.ts";
 import {
   type AchievementInfo,
   badge,
   type Division,
   meter,
-  rewardWords,
   tierWords,
   type Unlock,
   unlockPicture,
   unlockWords,
 } from "../ui.ts";
-import { type MasteryMove, masteryMoves } from "./mastery.ts";
+import { type MasteryMove, masteryLine } from "./mastery.ts";
 
 interface News {
   achievements: AchievementInfo[];
@@ -31,12 +30,15 @@ interface News {
   from: number;
   to: number;
   levelUp?: boolean;
+  /** The XP all this brought: the game just played, and the goals, achievements and season told with it. */
+  earned: number;
   /** A division the rating has reached for the first time. */
   division?: Division;
   /** Everything newly unlocked to wear, whatever unlocked it. */
   unlocks: Unlock[];
   /** The avatar worn (shape-tone): an unlocked shape is put on in its tone. */
   avatar: string;
+  /** How a topic's game moved its mastery. */
   mastery?: MasteryMove[];
 }
 
@@ -48,10 +50,8 @@ export function news(run: number, delay = 0): Child {
       api<News>("POST", "/api/me/news", { run }).then(
         (n) => {
           data.set(n);
-          // In the order they show, each after the one before (and after the game's end).
-          if (n.goals.length) play("goal");
-          if (n.levelUp) play("level");
-          if (n.achievements.length || n.division) play("achievement");
+          const sound = loudest(n);
+          if (sound) play(sound);
         },
         () => {},
       ),
@@ -61,20 +61,49 @@ export function news(run: number, delay = 0): Child {
   return () => {
     const n = data();
     if (!n) return null;
+    const top = headline(n);
     return [
+      top === "level" ? null : xpLine(n),
       n.goals.length ? goalsDone(n.goals) : null,
-      n.season ? seasonEnded(n.season) : null,
-      levelCard(n.level, n.xp, n.from, n.to, n.levelUp),
-      n.division ? divisionReached(n.division) : null,
-      masteryMoves(n.mastery ?? []),
-      n.achievements.map(unlocked),
-      n.unlocks.length ? unlocks(n.unlocks, n.avatar) : null,
+      top === "season" && n.season ? seasonEnded(n.season) : null,
+      top === "division" && n.division ? divisionReached(n.division) : null,
+      top === "level" ? levelCard(n.level, n.xp, n.from, n.to, true, n.earned) : null,
+      fresh(n),
     ];
   };
 }
 
-/** The level: its number, how far into it, and the XP left to the next. */
-export function levelCard(level: number, xp: number, from: number, to: number, up = false): Child {
+/** The one biggest thing a game's news holds, if any: a season ended, then a division reached, then a new level. */
+function headline(n: News): "season" | "division" | "level" | null {
+  if (n.season) return "season";
+  if (n.division) return "division";
+  if (n.levelUp) return "level";
+  return null;
+}
+
+/** The sound of the biggest thing told: one, never a run of them. */
+function loudest(n: News): SoundName | null {
+  const top = headline(n);
+  if (top === "level") return "level";
+  if (top || n.achievements.length) return "achievement";
+  if (n.goals.length) return "goal";
+  return null;
+}
+
+/** The XP a game brought and the level it leaves, in a line (when no new level has a card of its own). */
+function xpLine(n: News): Child {
+  const level = `${n.levelUp ? "ново ниво" : "ниво"} ${n.level}`;
+  return h(
+    "p",
+    { class: "news-xp" },
+    n.earned > 0
+      ? [h("b", { class: "num" }, `+${n.earned} XP`), ` · ${level}`]
+      : level.charAt(0).toUpperCase() + level.slice(1),
+  );
+}
+
+/** The level: its number, how far into it, and the XP left to the next (and, a new one, the XP that brought it). */
+export function levelCard(level: number, xp: number, from: number, to: number, up = false, earned = 0): Child {
   const share = to > from ? Math.round((100 * (xp - from)) / (to - from)) : 0;
   return h(
     "section",
@@ -84,7 +113,7 @@ export function levelCard(level: number, xp: number, from: number, to: number, u
       { class: "level-head" },
       up ? h("p", { class: "kicker" }, "Ново ниво") : null,
       h("span", { class: "level-n" }, `Ниво ${level}`),
-      h("span", { class: "muted" }, `още ${to - xp} XP до ниво ${level + 1}`),
+      h("span", { class: "muted" }, `${earned > 0 ? `+${earned} XP · ` : ""}още ${to - xp} XP до ниво ${level + 1}`),
     ),
     meter(share, `${share}% от ниво ${level}`),
   );
@@ -108,22 +137,6 @@ function goalsDone(goals: News["goals"]): Child {
           h("span", { class: "goal-xp num" }, `+${g.xp} XP`),
         ),
       ),
-    ),
-  );
-}
-
-function unlocked(a: AchievementInfo): Child {
-  return h(
-    "section",
-    { class: `card unlock t-${a.tier}` },
-    badge(a, true, "l"),
-    h(
-      "div",
-      { class: "unlock-text" },
-      h("p", { class: "kicker" }, `Ново ${tierWords[a.tier].one} постижение`),
-      h("strong", null, a.name),
-      h("span", { class: "muted" }, a.about),
-      h("span", { class: "unlock-reward" }, rewardWords(a)),
     ),
   );
 }
@@ -160,31 +173,57 @@ function divisionReached(d: Division): Child {
   );
 }
 
-/** Everything just unlocked to wear, each drawn and a tap from being worn. */
-function unlocks(list: Unlock[], worn: string): Child {
+/** „Ново за теб“: the achievements earned and everything unlocked to wear, in one list (each unlock a tap from being
+ * worn), and how a topic's game moved its mastery, in a line. */
+function fresh(n: News): Child {
+  const mastery = masteryLine(n.mastery ?? []);
+  if (!n.achievements.length && !n.unlocks.length && !mastery) return null;
   return h(
     "section",
     { class: "card unlocks" },
-    h("p", { class: "kicker" }, list.length === 1 ? "Отключено" : `Отключени: ${list.length}`),
+    h("p", { class: "kicker" }, "Ново за теб"),
+    n.achievements.length || n.unlocks.length
+      ? h(
+          "ul",
+          { class: "unlock-list" },
+          n.achievements.map(earned),
+          n.unlocks.map((u) => unlockRow(u, n.avatar)),
+        )
+      : null,
+    mastery,
+    n.unlocks.length ? h("a", { class: "link", href: "/wardrobe" }, "Към гардероба") : null,
+  );
+}
+
+/** An achievement just earned: its medal, its name, its tier and its XP. */
+function earned(a: AchievementInfo): Child {
+  return h(
+    "li",
+    { class: `unlock-row achievement-row t-${a.tier}` },
+    badge(a, true, "s"),
     h(
-      "ul",
-      { class: "unlock-list" },
-      list.map((u) =>
-        h(
-          "li",
-          { class: u.tier ? `unlock-row t-${u.tier}` : "unlock-row" },
-          unlockPicture(u, worn),
-          h(
-            "span",
-            { class: "unlock-text" },
-            h("strong", { class: u.kind === "title" ? "unlock-title-name" : undefined }, cap(unlockWords(u))),
-            h("span", { class: "muted" }, `С ${u.from}.`),
-          ),
-          wear(u, worn),
-        ),
-      ),
+      "span",
+      { class: "unlock-text" },
+      h("strong", null, a.name),
+      h("span", { class: "muted" }, a.about),
+      h("span", { class: "unlock-reward" }, `${cap(tierWords[a.tier].one)} постижение · +${a.xp ?? 0} XP`),
     ),
-    h("a", { class: "link", href: "/wardrobe" }, "Към гардероба"),
+  );
+}
+
+/** Something just unlocked to wear, drawn, and a tap from being worn. */
+function unlockRow(u: Unlock, worn: string): Child {
+  return h(
+    "li",
+    { class: u.tier ? `unlock-row t-${u.tier}` : "unlock-row" },
+    unlockPicture(u, worn),
+    h(
+      "span",
+      { class: "unlock-text" },
+      h("strong", { class: u.kind === "title" ? "unlock-title-name" : undefined }, cap(unlockWords(u))),
+      h("span", { class: "muted" }, `С ${u.from}.`),
+    ),
+    wear(u, worn),
   );
 }
 

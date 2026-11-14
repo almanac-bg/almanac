@@ -102,7 +102,9 @@ func TestGoals(t *testing.T) {
 	w.play(ana, s.ID, repeat(w.right, Length)...)
 	var games int
 	_ = w.db.Read.QueryRow(`SELECT sum(xp) FROM runs WHERE user_id = ?`, ana).Scan(&games)
-	n, err := w.g.NewsOf(ctx, ana, 0)
+	var game int
+	_ = w.db.Read.QueryRow(`SELECT xp FROM runs WHERE id = ?`, s.ID).Scan(&game)
+	n, err := w.g.NewsOf(ctx, ana, s.ID)
 	sum := 0
 	for _, d := range n.Goals {
 		sum += d.XP
@@ -114,7 +116,11 @@ func TestGoals(t *testing.T) {
 		n.XP != games+sum {
 		t.Fatalf("the news of a goal: %+v %v (games' XP %d)", n, err, games)
 	}
-	if again, _ := w.g.NewsOf(ctx, ana, 0); len(again.Goals) != 0 || again.XP != n.XP {
+	// What it all brought is told in one number; a day's game tells no mastery (a topic's does).
+	if n.Earned != game+sum || game == 0 || n.Mastery != nil {
+		t.Fatalf("the XP the day brought: %d, not %d + %d; mastery %+v", n.Earned, game, sum, n.Mastery)
+	}
+	if again, _ := w.g.NewsOf(ctx, ana, 0); len(again.Goals) != 0 || again.XP != n.XP || again.Earned != 0 {
 		t.Fatalf("a goal told twice: %+v", again)
 	}
 	if look, _ := w.g.LookOf(ctx, ana); look.Level != n.Level {
