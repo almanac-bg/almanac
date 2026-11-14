@@ -4796,6 +4796,37 @@
     margin-top: var(--space-2);
   }
 
+  /* The admin page's tables: wide ones scroll sideways on a phone, the page doesn't. */
+  .table-scroll {
+    overflow-x: auto;
+  }
+
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    padding: var(--space-2) var(--space-3) var(--space-2) 0;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .admin-table th {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .admin-table .num {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
   /* ---- Motion: feedback fires once, when it's earned. ---- */
 
   @keyframes pop {

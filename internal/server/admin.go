@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/almanac-bg/almanac/internal/bank"
+	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -64,12 +65,51 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		Answers, Right, Share  int
 		Seconds                float64
 	}
+	// A day's new players and how many came back: a cell per day after (RetentionDays).
+	type cell struct {
+		Back, Share int
+		Due         bool // the day hasn't come yet
+	}
+	type cohort struct {
+		Day   string
+		New   int
+		Cells []cell
+	}
 	data := struct {
 		Players, WithEmail, DayToday, Questions, Live int
+		Active                                        play.Active
+		After                                         []int
+		Cohorts                                       []cohort
+		Overall                                       []cell
 		Reported                                      []reported
 		Hardest, Easiest                              []stat
-	}{Questions: len(b.Questions), Live: len(b.Live("", ""))}
+	}{Questions: len(b.Questions), Live: len(b.Live("", "")), After: play.RetentionDays}
 	today := s.game.Today()
+	if cohorts, active, err := s.game.Retention(ctx, 30); err == nil {
+		data.Active = active
+		// Overall: of the players whose day N has come, the share that came back on it.
+		news, backs := make([]int, len(play.RetentionDays)), make([]int, len(play.RetentionDays))
+		for _, c := range cohorts {
+			row := cohort{Day: c.Day, New: c.New}
+			for i, n := range c.Back {
+				if n < 0 {
+					row.Cells = append(row.Cells, cell{Due: true})
+					continue
+				}
+				row.Cells = append(row.Cells, cell{Back: n, Share: 100 * n / c.New})
+				news[i] += c.New
+				backs[i] += n
+			}
+			data.Cohorts = append(data.Cohorts, row)
+		}
+		for i := range news {
+			if news[i] == 0 {
+				data.Overall = append(data.Overall, cell{Due: true})
+				continue
+			}
+			data.Overall = append(data.Overall, cell{Back: backs[i], Share: 100 * backs[i] / news[i]})
+		}
+	}
 	_ = db.QueryRowContext(ctx, `SELECT count(*), count(email) FROM users`).Scan(&data.Players, &data.WithEmail)
 	_ = db.QueryRowContext(ctx, `SELECT count(*) FROM runs WHERE kind = 'day' AND day = ? AND finished_at IS NOT NULL`, today).Scan(&data.DayToday)
 
@@ -174,6 +214,16 @@ var adminBody = template.Must(template.New("admin").Parse(`
 <p>{{.Players}} играчи ({{.WithEmail}} с имейл). Днес въпросите на деня са изиграли {{.DayToday}}.
 В банката: {{.Questions}} въпроса, {{.Live}} в игра.</p>
 
+<h2>Връщат ли се</h2>
+<p>Играли днес: {{.Active.Today}} · за 7 дни: {{.Active.Week}} · за 30 дни: {{.Active.Month}}.</p>
+<p class="muted">Новите играчи по деня на първата им игра и колко от тях са играли пак точно толкова дни по-късно.
+„Играл“ е отговорил на въпрос или изиграл Арена.</p>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th class="num">Нови</th>{{range .After}}<th class="num">След {{.}} {{if eq . 1}}ден{{else}}дни{{end}}</th>{{end}}</tr></thead><tbody>
+{{if .Cohorts}}<tr><td><strong>Общо</strong></td><td></td>{{range .Overall}}<td class="num">{{if .Due}}—{{else}}<strong>{{.Share}}%</strong>{{end}}</td>{{end}}</tr>{{end}}
+{{range .Cohorts}}<tr><td class="num">{{.Day}}</td><td class="num">{{.New}}</td>{{range .Cells}}<td class="num">{{if .Due}}—{{else}}{{.Back}} · {{.Share}}%{{end}}</td>{{end}}</tr>
+{{else}}<tr><td colspan="6" class="muted">Още няма нови играчи.</td></tr>{{end}}
+</tbody></table></div>
+
 <h2>Доклади ({{len .Reported}})</h2>
 {{range .Reported}}
 <section class="reviewed">
@@ -187,14 +237,14 @@ var adminBody = template.Must(template.New("admin").Parse(`
 
 <h2>Най-трудните</h2>
 <p class="muted">Въпроси с поне 10 отговора, по дела на верните.</p>
-<table class="stats"><thead><tr><th>Въпрос</th><th>Отговори</th><th>Верни</th></tr></thead><tbody>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th>Въпрос</th><th class="num">Отговори</th><th class="num">Верни</th></tr></thead><tbody>
 {{range .Hardest}}<tr><td>{{.ID}} · {{.Text}}<br><span class="muted">{{.Answer}}{{if .Lure}} · най-често грешат с „{{.Lure}}“{{end}}</span></td>
-<td>{{.Answers}}</td><td>{{.Share}}%</td></tr>{{else}}<tr><td colspan="3" class="muted">Още няма достатъчно отговори.</td></tr>{{end}}
-</tbody></table>
+<td class="num">{{.Answers}}</td><td class="num">{{.Share}}%</td></tr>{{else}}<tr><td colspan="3" class="muted">Още няма достатъчно отговори.</td></tr>{{end}}
+</tbody></table></div>
 
 <h2>Най-лесните</h2>
-<table class="stats"><thead><tr><th>Въпрос</th><th>Отговори</th><th>Верни</th></tr></thead><tbody>
-{{range .Easiest}}<tr><td>{{.ID}} · {{.Text}}<br><span class="muted">{{.Answer}}</span></td><td>{{.Answers}}</td><td>{{.Share}}%</td></tr>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th>Въпрос</th><th class="num">Отговори</th><th class="num">Верни</th></tr></thead><tbody>
+{{range .Easiest}}<tr><td>{{.ID}} · {{.Text}}<br><span class="muted">{{.Answer}}</span></td><td class="num">{{.Answers}}</td><td class="num">{{.Share}}%</td></tr>
 {{else}}<tr><td colspan="3" class="muted">Още няма достатъчно отговори.</td></tr>{{end}}
-</tbody></table>
+</tbody></table></div>
 `))
