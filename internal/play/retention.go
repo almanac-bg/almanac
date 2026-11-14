@@ -7,7 +7,7 @@ import (
 )
 
 // Retention is whether players come back: the game's measure of itself. A player's days are the days (in Bulgaria)
-// they played on — answered a question in any game, or played an Арена — kept in active_days as they happen. A
+// they played on — answered a question in any game — kept in active_days as they happen. A
 // player is new on their first such day, and comes back N days later if they play on that day too: the usual
 // "day N" retention, counted for each day's new players (a cohort).
 

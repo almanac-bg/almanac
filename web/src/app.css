@@ -3132,31 +3132,6 @@
     font-size: 0.875rem;
   }
 
-  /* ---- Арена: the queue's places, those taken lit ---- */
-  .arena-slots {
-    display: flex;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .arena-slots li {
-    width: 2.5rem;
-    height: 2.5rem;
-    border: 2px solid var(--line);
-    border-radius: 50%;
-  }
-
-  .arena-slots li.extra {
-    border-style: dashed;
-  }
-
-  .arena-slots li.taken {
-    border-color: var(--gold);
-    background: color-mix(in srgb, var(--gold) 35%, transparent);
-  }
-
   .status {
     color: var(--text-muted);
     font-size: 0.9375rem;

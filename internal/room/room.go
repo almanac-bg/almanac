@@ -66,12 +66,6 @@ type Hub struct {
 	bank  func() *bank.Bank
 	// Crowd, if set, is how players have answered a question (shown with its answer).
 	Crowd func(id string) *bank.Crowd
-	// OnArena, if set, is told how each arena ended (in a goroutine of its own); it may answer with Room.Settled.
-	OnArena func(*Room, []Placed)
-	// The arena's queue (arena.go): who waits, since when there have been enough of them, and the timer for then.
-	queue    []*Ticket
-	enough   time.Time
-	matching *time.Timer
 }
 
 func NewHub(b func() *bank.Bank) *Hub { return &Hub{rooms: map[string]*Room{}, bank: b} }
@@ -146,9 +140,6 @@ func (h *Hub) Sweep() {
 		}
 		r.mu.Unlock()
 	}
-	if len(h.queue) >= ArenaMin {
-		h.match() // those who waited while the rooms were full
-	}
 }
 
 // Room is one game played together.
@@ -171,9 +162,6 @@ type Room struct {
 	opened     time.Time
 	active     time.Time
 	closed     bool
-	// An arena (arena.go): filled by the hub, no host; deltas are what its places did to the players' ratings.
-	arena  bool
-	deltas map[int64]int
 }
 
 type member struct {
@@ -222,9 +210,6 @@ func (r *Room) Join(p Player) error {
 	if m := r.member(p.ID); m != nil {
 		m.Player = p // a new name or look shows from now on
 		return nil
-	}
-	if r.arena {
-		return ErrNoRoom // an arena is for those the hub put in it
 	}
 	if len(r.players) >= MaxPlayers {
 		return ErrFull
@@ -297,9 +282,6 @@ func (r *Room) close() {
 
 // mayLead says whether a player may start or move the game on: the host, or anyone while the host is away.
 func (r *Room) mayLead(id int64) bool {
-	if r.arena {
-		return false // it runs by itself
-	}
 	if id == r.host {
 		return true
 	}
@@ -465,24 +447,17 @@ func (r *Room) next() {
 			m.points += play.AllRight
 		}
 	}
-	// An arena's places count the bonus too.
-	if r.arena && r.hub.OnArena != nil {
-		go r.hub.OnArena(r, r.places())
-	}
 	r.changed()
 }
 
 // View is the room as one player sees it.
 type View struct {
-	Code     string `json:"code"`
-	Phase    Phase  `json:"phase"`
-	Host     string `json:"host"`
-	IsHost   bool   `json:"isHost"`
-	CanLead  bool   `json:"canLead"`
-	Category string `json:"category"`
-	// Arena: a room the hub filled (arena.go); StartsMs is how long until its first question, in its lobby.
-	Arena    bool          `json:"arena,omitempty"`
-	StartsMs int64         `json:"startsMs,omitempty"`
+	Code     string        `json:"code"`
+	Phase    Phase         `json:"phase"`
+	Host     string        `json:"host"`
+	IsHost   bool          `json:"isHost"`
+	CanLead  bool          `json:"canLead"`
+	Category string        `json:"category"`
 	N        int           `json:"n"`
 	Total    int           `json:"total"`
 	Players  []PlayerView  `json:"players"`
@@ -518,9 +493,6 @@ type PlayerView struct {
 	// Gained and Right are this question's, once its answer shows.
 	Gained int  `json:"gained,omitempty"`
 	Right  bool `json:"right,omitempty"`
-	// Place is where an arena's player ended, and Delta what it did to their rating (once it's known).
-	Place int  `json:"place,omitempty"`
-	Delta *int `json:"delta,omitempty"`
 }
 
 type QuestionView struct {
@@ -554,17 +526,7 @@ func (r *Room) View(viewer int64) View {
 	defer r.mu.Unlock()
 	v := View{
 		Code: r.code, Phase: r.phase, IsHost: viewer == r.host, CanLead: r.mayLead(viewer),
-		Category: r.category, N: r.n, Total: len(r.picks), Players: []PlayerView{}, Arena: r.arena,
-	}
-	if r.arena && r.phase == Lobby {
-		v.StartsMs = max(1, (ArenaCountdown - time.Since(r.shownAt)).Milliseconds())
-	}
-	var places map[int64]int
-	if r.arena && r.phase == End {
-		places = map[int64]int{}
-		for _, p := range r.places() {
-			places[p.ID] = p.Place
-		}
+		Category: r.category, N: r.n, Total: len(r.picks), Players: []PlayerView{},
 	}
 	if h := r.member(r.host); h != nil {
 		v.Host = h.Name
@@ -576,12 +538,6 @@ func (r *Room) View(viewer int64) View {
 		}
 		if r.phase == Reveal {
 			p.Gained, p.Right = m.gained, m.graded.Right
-		}
-		if places != nil {
-			p.Place = places[m.ID]
-			if d, ok := r.deltas[m.ID]; ok {
-				p.Delta = &d
-			}
 		}
 		v.Players = append(v.Players, p)
 	}

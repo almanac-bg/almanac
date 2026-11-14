@@ -28,7 +28,7 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
 - **Начало** (`/`): the day first. The streak and the level side by side (each a way to Профил); the day's ten, or
   once played, how they went (the place a way to the day's board) with „Сподели“ beside „Прегледай въпросите“; the
   day's goals; the ways to play with others, two by two; the
-  topics, two by two (three on a big screen), and all of them at once. Дуел, Арена, Роял and Стая open from here and
+  topics, two by two (three on a big screen), and all of them at once. Дуел, Роял and Стая open from here and
   have a way back to it (`back()`). A player who hasn't finished a game yet sees only the day and the topics: the
   streak, the goals and the ways to play with others come after the first game.
 - **Приятели** (`/friends`): requests, friends, and the ways to add them.
@@ -175,7 +175,7 @@ takes a token.
   what it would unlock that the player doesn't have (an avatar shared by a chain is the first one's; what the first
   of a tier unlocks is said once, under the tier's heading). A title shows in its tier's ink wherever it's worn.
 - **One system.** XP comes from answers, the day's goals, achievements and a week's first three places in the league;
-  the rating from duels, Арена and Роял. Level, achievements, mastery, division, Роял and first place in a high league
+  the rating from duels and Роял. Level, achievements, mastery, division, Роял and first place in a high league
   unlock the wardrobe. After a game, its news is three cards at most: the goals it finished; the one biggest event (a
   week of the league ended, a division
   reached, a new level), or else a line of the XP it brought and the level (`.news-xp`); and „Ново за теб“
@@ -320,7 +320,7 @@ mountains and a medal — are drawn by hand as paths in `web/src/art/pictures.ts
   books; a shield, a shield with swords, a Thracian helmet; a heart, three hearts, a chess knight; a trophy, a
   scholar's cap, a wreath); a picture per topic (a bulb, a flask, an amphora, a globe, a clapperboard, a record, a
   ball, a gamepad, a quill in its inkwell, a butterfly), on its tile and, small, on its chips; one per way to play
-  (crossed swords, an arena, a crown in laurel, an open door) on its card and over its page, and over Приятели (three
+  (crossed swords, a crown in laurel, an open door) on its card and over its page, and over Приятели (three
   hearts) and Моят Алманах (a book); the streak's flame; the frames, the divisions' crests, the leagues' mountains and
   the achievements' medals.
 - **A new picture** is drawn on the 64 × 64 grid in the same inks and looked at beside the others, at its smallest

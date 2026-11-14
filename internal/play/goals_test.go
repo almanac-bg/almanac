@@ -210,22 +210,10 @@ func TestGoalMeasures(t *testing.T) {
 func TestGoalsOfOthers(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	ana, vi, cy := w.user(), w.user(), w.user()
+	ana, vi := w.user(), w.user()
 	w.befriend(ana, vi)
 
-	// Арена: played and won, kept and told as it ends.
-	w.setGoals(ana, "day", "arena", "arenaWin")
-	w.setGoals(cy, "day", "arena", "arenaWin")
 	w.setGoals(vi, "day", "friendDuel", "duelWin")
-	if _, err := w.g.SettleArena(ctx, []ArenaPlace{{ana, 1, 3000, 3}, {vi, 2, 2000, 2}, {cy, 3, 0, 0}}); err != nil {
-		t.Fatal(err)
-	}
-	if n, _ := w.g.NewsOf(ctx, ana, 0); len(n.Goals) != 2 || n.Goals[1].XP != GoalXP[2] {
-		t.Fatalf("Ana's arena goals: %+v", n.Goals)
-	}
-	if g := w.goalsOf(cy); !g["arena"].Done || g["arenaWin"].Done {
-		t.Fatalf("Cy's arena goals: %+v", g)
-	}
 
 	// A friend's challenge: played by both; the one who wins has won a duel the day it ends.
 	s, id, err := w.g.ChallengeFriend(ctx, vi, ana)

@@ -6,7 +6,7 @@ import { picture } from "../art/picture.ts";
 import { api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 
-type Mode = "duel" | "arena" | "royal" | "room";
+type Mode = "duel" | "royal" | "room";
 
 const all: Record<Mode, { href: string; name: string; about: string; tone: string }> = {
   duel: {
@@ -14,12 +14,6 @@ const all: Record<Mode, { href: string; name: string; about: string; tone: strin
     name: "Дуел",
     about: "Един срещу един",
     tone: "tone-rose",
-  },
-  arena: {
-    href: "/arena",
-    name: "Арена",
-    about: "От трима до петима",
-    tone: "tone-sky",
   },
   royal: {
     href: "/royal",

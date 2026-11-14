@@ -124,7 +124,6 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.royal.Opened = func(ctx context.Context, start time.Time) { s.callRoyal(ctx, start) }
 	s.push = cfg.Push
 	s.rooms = room.NewHub(s.bank.Load)
-	s.rooms.OnArena = s.arenaEnded
 	s.rooms.Crowd = s.game.Crowd
 	s.live = live.NewHub(s.game, s.livePlayer)
 	s.closing = make(chan struct{})
@@ -180,7 +179,6 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/rooms/{code}/events", s.roomEvents)
 	api("POST /api/rooms/{code}/start", s.roomStart)
 	api("POST /api/rooms/{code}/answer", s.roomAnswer)
-	mux.HandleFunc("GET /api/arena/events", s.arenaEvents)
 	api("POST /api/duels", s.challenge)
 	api("GET /api/duels", s.duels)
 	mux.HandleFunc("GET /api/duels/live/events", s.liveEvents)
