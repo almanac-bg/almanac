@@ -9,7 +9,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
-import { play } from "../lib/sound.ts";
+import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { categories, player, playing } from "../state.ts";
 import { avatar, formatNumber, type Tier, type VerdictKind, verdict } from "../ui.ts";
 
@@ -191,6 +191,7 @@ function waiting(view: () => RoomView, what: string): Child {
 
 function lobby(view: () => RoomView, code: string): Child {
   const error = signal("");
+  joins(view);
   return h(
     "div",
     { class: "screen" },
@@ -228,11 +229,25 @@ function lobby(view: () => RoomView, code: string): Child {
   );
 }
 
-/** An arena before its first question: who's in it, and the seconds to go. */
+/** A sound as someone comes into the room. */
+function joins(view: () => RoomView): void {
+  let seen = untracked(view).players.length;
+  effect(() => {
+    const n = view().players.length;
+    if (n > seen) play("them");
+    seen = n;
+  });
+}
+
+/** An arena before its first question: who's in it, and the seconds to go (a beep for each of the last three). */
 function arenaLobby(view: () => RoomView): Child {
   const left = signal(Math.ceil((untracked(view).startsMs ?? 0) / 1000));
-  const tick = setInterval(() => left.update((n) => Math.max(0, n - 1)), 1000);
+  const tick = setInterval(() => {
+    left.update((n) => Math.max(0, n - 1));
+    playCount(left.peek());
+  }, 1000);
   onCleanup(() => clearInterval(tick));
+  joins(view);
   return h(
     "div",
     { class: "screen" },
@@ -270,7 +285,7 @@ function head(v: RoomView): Child {
 function question(view: () => RoomView, code: string, first: RoomView): Child {
   const q = first.question;
   if (!q) return null;
-  if (first.n === 0) play("ping"); // the game starts
+  if (first.n === 0) play("go"); // the game starts
   const locked = signal(!!q.given);
   const sent = signal(!!q.given);
   const left = signal(Math.ceil(q.leftMs / 1000));
@@ -330,7 +345,7 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
         : r.points > 0
           ? "partial"
           : "wrong";
-  play(kind);
+  playAnswer(kind, r.inRow);
   // The rank change since the last answer.
   const before = new Map(places);
   first.players.forEach((p, i) => {
@@ -391,7 +406,9 @@ function move(was: number | undefined, now: number): HTMLElement {
 function arenaEnd(view: () => RoomView): Child {
   const first = untracked(view);
   const me = first.players.find((p) => p.me);
-  play(me?.place === 1 ? "exact" : "right");
+  // First place wins (shared or not); last of several loses; a place between is just the end.
+  const last = Math.max(...first.players.map((p) => p.place ?? 0));
+  play(me?.place === 1 ? "win" : me?.place && me.place === last && last > 1 ? "lose" : "end");
   return h(
     "div",
     { class: "screen" },
@@ -454,6 +471,9 @@ function ratingChange(d: number): HTMLElement {
 
 function end(view: () => RoomView, code: string): Child {
   const error = signal("");
+  // The room's winner hears it; everyone else, just the end.
+  const first = untracked(view);
+  play(first.players.length > 1 && first.players[0]?.me ? "win" : "end");
   return h(
     "div",
     { class: "screen" },

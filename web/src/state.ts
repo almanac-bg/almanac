@@ -71,7 +71,8 @@ export function watchWaiting(): void {
     try {
       const r = await api<{ requests: number; challenges: Challenge[] }>("GET", "/api/friends/invites");
       const known = new Set(challenges.peek().map((c) => c.id));
-      if (r.requests > friendRequests.peek() || r.challenges.some((c) => !known.has(c.id))) play("ping");
+      const news = r.requests > friendRequests.peek() || r.challenges.some((c) => !known.has(c.id));
+      if (news && !playing.peek()) play("ping"); // never over a question
       friendRequests.set(r.requests);
       challenges.set(r.challenges);
     } catch {

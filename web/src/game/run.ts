@@ -5,7 +5,7 @@
 import { type ApiError, api } from "../lib/api.ts";
 import { append, type Child, effect, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
 import { tickOn } from "../lib/prefs.ts";
-import { play } from "../lib/sound.ts";
+import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { categories, playing } from "../state.ts";
 import { countUp, inRowChip, type VerdictKind, verdict } from "../ui.ts";
 import { ask, picture } from "./questions.ts";
@@ -59,7 +59,7 @@ export function playRun(initial: State, done: (s: State) => Child): Child {
 }
 
 /** Before a run: three seconds to settle in, a ring running out around them, with a way back out (also Esc) and
- * a way to start at once. Each second ticks; the start pings. */
+ * a way to start at once. Each second beeps; the start an octave higher. */
 export function getReady(what: string, start: () => void, cancel: () => void): Child {
   const seconds = 3;
   const left = signal(seconds);
@@ -72,16 +72,16 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
   };
   const begin = () =>
     leave(() => {
-      play("ping");
+      play("go");
       start();
     });
   const tick = setInterval(() => {
     left.update((n) => n - 1);
     if (left.peek() <= 0) begin();
-    else if (tickOn.peek()) play("tick");
+    else playCount(left.peek());
   }, 1000);
   onCleanup(() => clearInterval(tick));
-  if (tickOn.peek()) play("tick");
+  playCount(seconds);
   listen(document, "keydown", (e) => {
     if (e.key === "Escape") leave(cancel);
   });
@@ -289,7 +289,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
     progress = now;
     tally(score, res.state.points, s.points, res.inRow ?? 0);
     const kind = kindOf(res, answer);
-    play(kind);
+    playAnswer(kind, res.inRow ?? 0);
     const pause = pauseFor(q.view);
     append(after, [
       verdict(kind, res.points, undefined, res.speed, res.row, res.inRow),

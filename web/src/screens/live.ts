@@ -11,7 +11,7 @@ import type { Answer, Mark, Reveal, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
-import { play } from "../lib/sound.ts";
+import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { categories, player, playing } from "../state.ts";
 import { avatar, formatNumber, type Tier, type VerdictKind, verdict } from "../ui.ts";
 import { type DuelView, ended } from "./duel.ts";
@@ -195,11 +195,16 @@ function waiting(leftMs: number): Child {
   );
 }
 
-/** The two, face to face, before the first question. */
+/** The two, face to face, before the first question: a ping as the other is found, a beep for each of the last
+ * seconds. */
 function intro(v: LiveView): Child {
   play("ping");
   const left = signal(Math.max(1, Math.ceil((v.startsMs ?? 0) / 1000)));
-  const tick = setInterval(() => left.update((n) => Math.max(1, n - 1)), 1000);
+  const tick = setInterval(() => {
+    const was = left.peek();
+    left.update((n) => Math.max(1, n - 1));
+    if (left.peek() < was) playCount(left.peek());
+  }, 1000);
   onCleanup(() => clearInterval(tick));
   const card = (s: Side, label: string) =>
     h(
@@ -272,6 +277,7 @@ function doing(v: LiveView, s: Side): string {
 function question(view: () => LiveView, first: LiveView): Child {
   const q = first.question;
   if (!q) return null;
+  if (first.n === 0) play("go"); // the game starts
   const locked = signal(!!q.given);
   const sent = signal(!!q.given);
   const left = signal(Math.ceil(q.leftMs / 1000));
@@ -295,12 +301,12 @@ function question(view: () => LiveView, first: LiveView): Child {
     else locked.set(true);
   }, 1000);
   onCleanup(() => clearInterval(tick));
-  // The other answering first is news: a soft tap.
+  // The other answering is news: a sound of its own, not a tap the player might take for theirs.
   let heard = first.them.answered;
   effect(() => {
     if (view().them.answered && !heard) {
       heard = true;
-      play("tap");
+      play("them");
     }
   });
   return h(
@@ -338,7 +344,7 @@ function reveal(view: () => LiveView, first: LiveView): Child {
         : r.points > 0
           ? "partial"
           : "wrong";
-  play(kind);
+  playAnswer(kind, r.inRow);
   return h(
     "article",
     { class: "question" },
@@ -388,7 +394,7 @@ function end(v: LiveView, again: () => void): Child {
     (r) => {
       const d = r.duels.find((x) => x.id === v.id);
       if (d) {
-        play("end");
+        play(d.state === "won" ? "win" : d.state === "lost" ? "lose" : "end");
         kept.set(d);
       } else error.set("Резултатът още се записва. Виж го след малко в дуелите си.");
     },
