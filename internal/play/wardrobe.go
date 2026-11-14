@@ -42,7 +42,7 @@ type cosmetic struct {
 var Frames = []cosmetic{
 	{"ring", "Пръстен", unlock{level: 2}},
 	{"double", "Двоен пръстен", unlock{level: 5}},
-	{"dots", "Точки", unlock{level: 8}},
+	{"dots", "Мъниста", unlock{level: 8}},
 	{"flames", "Пламъци", unlock{achieved: "streak30"}},
 	{"laurel", "Лавров венец", unlock{tier: Legendary}},
 	{"gem", "Кристал", unlock{division: "diamond"}},

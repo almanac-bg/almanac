@@ -41,7 +41,7 @@ export function me() {
             const p = progress();
             return p ? levelCard(p.level, p.xp, p.from, p.to) : null;
           },
-          // The rating shows once there's one: after a first rated game (a duel, Арена, Роял).
+          // The rating shows once there's one: after a first rated game (a duel or Роял).
           () => {
             const p = progress();
             return p?.standing.rated ? standingCard(p.standing) : null;
@@ -61,7 +61,7 @@ export function me() {
       },
       () => [
         h("h1", null, "Профил"),
-        h("p", { class: "lead" }, "Още нямаш профил. Той се прави сам, щом започнеш да играеш, или тук, с имейл."),
+        h("p", { class: "lead" }, "Още нямаш профил. Създава се сам с първата ти игра. Или тук, с имейл."),
         h("a", { class: "btn primary big", href: "/settings" }, "Влез с имейл"),
       ],
     ),
@@ -149,7 +149,7 @@ function nextCard(p: Progress): Child {
               h(
                 "span",
                 { class: "muted" },
-                `от ${next.division.from} рейтинг (още ${next.division.from - p.standing.rating})`,
+                `при рейтинг ${next.division.from} (още ${next.division.from - p.standing.rating})`,
               ),
               items(next.divisionUnlocks),
             ),

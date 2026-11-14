@@ -20,7 +20,7 @@ import (
 //   - XP is for playing: every answer and game (worth.go), the day's goals (goals.go), each achievement (its tier's
 //     XP, once) and the first places of each week's league group (leagues.go). All of it adds up to a level, and each
 //     week's share of it is the race of the leagues.
-//   - The rating is strength: duels, Арена and Роял move it (rating.go); its divisions are what it's worth.
+//   - The rating is strength: duels and Роял move it (rating.go); its divisions are what it's worth.
 //
 // Both unlock the wardrobe (wardrobe.go, titles.go): a level, an achievement, a topic's mastery, a division, a Роял
 // won or first place in a high league each gives an avatar, a frame, a pattern or a title. Whatever unlocks something, the player is told
@@ -87,7 +87,7 @@ var Achievements = []Achievement{
 	{"leagueUp", "Нагоре", "Качи се в по-висока лига.", "", Common, 1, false},
 
 	{"streak7", "Цяла седмица", "Играй въпросите на деня седем дни поред.", "flame", Rare, 7, false},
-	{"perfect", "Десет от десет", "Познай и десетте въпроса на деня.", "star", Rare, 1, false},
+	{"perfect", "Десет от десет", "Отговори вярно и на десетте въпроса на деня.", "star", Rare, 1, false},
 	{"exact", "Точно в целта", "Познай число точно, без никаква грешка.", "target", Rare, 1, false},
 	{"allTopics", "Обиколка", "Изиграй поне една игра във всяка тема.", "compass", Rare, 10, false},
 	{"friends5", "Цяла компания", "Събери пет приятели в играта.", "heart", Rare, 5, false},
@@ -95,16 +95,15 @@ var Achievements = []Achievement{
 	{"nightOwl", "След полунощ", "Отговори на въпрос между полунощ и четири сутринта.", "owl", Rare, 1, true},
 	{"earlyBird", "Преди седем", "Изиграй въпросите на деня преди седем сутринта.", "sun", Rare, 1, true},
 	{"lastSecond", "В последния миг", "Отговори вярно в последната секунда.", "hourglass", Rare, 1, true},
-	{"arenaWin", "Победа в Арената", "Спечели игра в Арената.", "", Rare, 1, false},
-	{"leagueFirst", "Първи в групата", "Завърши седмица на първо място в групата си в лигата.", "", Rare, 1, false},
+	{"leagueFirst", "Първо място в групата", "Завърши седмица на първо място в групата си в лигата.", "", Rare, 1, false},
 
 	{"streak30", "Цял месец", "Играй въпросите на деня тридесет дни поред.", "flame", Epic, 30, false},
 	{"answers1000", "Хиляда отговора", "Отговори на хиляда въпроса.", "book", Epic, 1000, false},
 	{"games100", "Сто игри", "Изиграй сто игри.", "trophy", Epic, 100, false},
 	{"master", "Като петте си пръста", "Стигни до „Майстор“ в една тема.", "trophy", Epic, 1, false},
 	{"duel10", "Десет победи", "Спечели десет дуела.", "shield", Epic, 10, false},
-	{"topicPerfect", "Тема без грешка", "Познай всичките десет въпроса в игра по тема.", "spark", Epic, 1, true},
-	{"allTypes", "Всеки вид въпрос", "Отговори вярно на всеки вид въпрос: избор, число, подреждане, „Вярно или невярно“, свързване.", "clover", Epic, 5, true},
+	{"topicPerfect", "Тема без грешка", "Отговори вярно и на десетте въпроса в игра по тема.", "spark", Epic, 1, true},
+	{"allTypes", "Всеки вид въпрос", "Отговори вярно на всеки вид въпрос: с четири отговора, с число, с подреждане, „Вярно или невярно“ и с двойки.", "clover", Epic, 5, true},
 	{"royalWin", "Вечерта е твоя", "Спечели Роял.", "", Epic, 1, false},
 	{"fullDays30", "Тридесет пълни дни", "Изпълни и трите цели за деня в тридесет различни дни.", "", Epic, 30, false},
 	{"rila", "На върха", "Стигни до Рила, най-високата лига.", "", Epic, 1, false},
@@ -415,7 +414,7 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		return nil, err
 	}
 	var games, duelsWon, friends, topicsPlayed, types, fullDays int
-	var perfect, fast, friendWin, nightOwl, earlyBird, topicPerfect, arenaWin, royalWin, leagueUp, leagueFirst, rila bool
+	var perfect, fast, friendWin, nightOwl, earlyBird, topicPerfect, royalWin, leagueUp, leagueFirst, rila bool
 	err = db.QueryRowContext(ctx, `SELECT
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND finished_at IS NOT NULL),
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'duel' AND outcome = 'won'),
@@ -441,14 +440,13 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'topic' AND finished_at IS NOT NULL
 			AND rights = json_array_length(questions)),
 		(SELECT count(*) FROM (SELECT day FROM goals_done WHERE user_id = ?1 GROUP BY day HAVING count(*) >= ?2)),
-		EXISTS (SELECT 1 FROM arena_players WHERE user_id = ?1 AND place = 1),
 		EXISTS (SELECT 1 FROM royal_players p WHERE p.user_id = ?1 AND p.place = 1
 			AND (SELECT count(*) FROM royal_players o WHERE o.royal_id = p.royal_id) > 1),
 		EXISTS (SELECT 1 FROM league_results WHERE user_id = ?1 AND moved = 1),
 		EXISTS (SELECT 1 FROM league_results WHERE user_id = ?1 AND place = 1 AND of >= ` + strconv.Itoa(RaceSize) + `),
 		(SELECT league FROM users WHERE id = ?1) >= ?3`, userID, GoalsPerDay, TopLeague).
 		Scan(&games, &duelsWon, &friends, &topicsPlayed, &types, &perfect, &fast, &friendWin, &nightOwl, &earlyBird,
-			&topicPerfect, &fullDays, &arenaWin, &royalWin, &leagueUp, &leagueFirst, &rila)
+			&topicPerfect, &fullDays, &royalWin, &leagueUp, &leagueFirst, &rila)
 	if err != nil {
 		return nil, err
 	}
@@ -489,7 +487,7 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		"friend1": friends, "friends5": friends, "friendWin": one(friendWin),
 		"nightOwl": one(nightOwl), "earlyBird": one(earlyBird), "lastSecond": one(lastSecond),
 		"topicPerfect": one(topicPerfect), "allTypes": types,
-		"fullDay": fullDays, "fullDays30": fullDays, "arenaWin": one(arenaWin), "royalWin": one(royalWin),
+		"fullDay": fullDays, "fullDays30": fullDays, "royalWin": one(royalWin),
 		"leagueUp": one(leagueUp), "leagueFirst": one(leagueFirst), "rila": one(rila),
 	}, nil
 }
@@ -574,7 +572,7 @@ type DoneGoal struct {
 
 // NewsOf tells a player what's new, once: everything in it is marked as told. With the game just played (runID; 0
 // for none), it also counts that game's XP and, for a topic's game, tells how it moved their mastery. It awards first,
-// so that whatever ended meanwhile (a friend's duel, an Арена, a week of the leagues) is in it.
+// so that whatever ended meanwhile (a friend's duel, a Роял, a week of the leagues) is in it.
 func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 	n := News{Achievements: []Earned{}, Goals: []DoneGoal{}, Unlocks: []Unlock{}}
 	if err := g.ensureWeek(ctx); err != nil {

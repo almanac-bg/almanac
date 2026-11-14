@@ -302,7 +302,7 @@ function history(list: Past[]): Child {
   return h(
     "section",
     { class: "stack" },
-    h("h2", { class: "section-title" }, "Последните ти"),
+    h("h2", { class: "section-title" }, "Последните ти вечери"),
     h(
       "ul",
       { class: "duel-list" },
@@ -399,7 +399,7 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
     ),
     v0.in
       ? h("button", { class: "btn", type: "button", disabled: busy, onclick: () => act("DELETE") }, "Излез")
-      : h("button", { class: "btn primary big", type: "button", disabled: busy, onclick: () => act("POST") }, "Влизам"),
+      : h("button", { class: "btn primary big", type: "button", disabled: busy, onclick: () => act("POST") }, "Влез"),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
     () => {
       const v = view();
@@ -471,7 +471,7 @@ function question(view: () => Evening, first: Evening): Child {
     head(first),
     timer(q.leftMs, q.limitMs, secs, plays ? locked : signal(false)), // a watcher's clock runs to the end
     h("h1", { class: "ask" }, q.view.text),
-    picture(q.view),
+    picture(q.view, true),
     asked.node,
     () => {
       const v = view();
@@ -501,7 +501,7 @@ function reveal(view: () => Evening, first: Evening): Child {
     { class: "question" },
     head(first),
     h("h1", { class: "ask" }, q.view.text),
-    picture(q.view),
+    picture(q.view, true),
     answered(q.view, r.answer, r.mine ? (q.given ?? null) : null),
     r.mine
       ? verdict(kind, r.points, r.missed ? "Без отговор. Отпадаш." : r.right ? undefined : "Отпадаш.", r.speed)

@@ -186,11 +186,15 @@ function waiting(leftMs: number): Child {
       h("h1", null, "Търсим съперник"),
       h("p", { class: "lead" }, () =>
         left() > 0
-          ? `Ако до ${left()} секунди не дойде никой, ще играеш срещу запис на истинска игра.`
+          ? "Ако никой не дойде до края на броенето, ще играеш срещу запис на истинска игра."
           : "Намираме ти запис на истинска игра…",
       ),
     ),
-    h("p", { class: "live-count", role: "timer", "aria-label": () => `${left()} секунди` }, () => String(left())),
+    h(
+      "p",
+      { class: "live-count", role: "timer", "aria-label": () => `${left()} ${left() === 1 ? "секунда" : "секунди"}` },
+      () => String(left()),
+    ),
     h("button", { class: "btn", type: "button", onclick: () => go("/duel") }, "Откажи"),
   );
 }
@@ -227,7 +231,7 @@ function intro(v: LiveView): Child {
         ? h(
             "p",
             { class: "lead" },
-            `Никой не дойде навреме: играеш срещу записа на истинска игра на ${v.them.name}. Всеки отговор в записа идва в мига, в който е бил даден.`,
+            `Никой не дойде навреме. Играеш срещу запис на игра на ${v.them.name}: всеки отговор идва в мига, в който е даден.`,
           )
         : null,
     ),
@@ -321,7 +325,7 @@ function question(view: () => LiveView, first: LiveView): Child {
     scoreboard(view, first.total),
     timer(q.leftMs, q.limitMs, left, locked),
     h("h1", { class: "ask" }, q.view.text),
-    picture(q.view),
+    picture(q.view, true),
     asked.node,
     () =>
       sent()
@@ -356,7 +360,7 @@ function reveal(view: () => LiveView, first: LiveView): Child {
     questionHead(first.n, first.total, topicName(q.category)),
     scoreboard(view, first.total),
     h("h1", { class: "ask" }, q.view.text),
-    picture(q.view),
+    picture(q.view, true),
     answered(q.view, r.answer, q.given ?? null),
     verdict(kind, r.points, r.missed ? "Без отговор." : undefined, r.speed, r.row, r.inRow),
     theirs(first.them, q.view),

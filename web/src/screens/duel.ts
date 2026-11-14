@@ -83,7 +83,7 @@ const words: Record<DuelView["state"], string> = {
   lost: "Загуба",
   draw: "Равенство",
   declined: "Отказан",
-  expired: "Изтекъл",
+  expired: "Без отговор",
 };
 
 /** What a duel's state is called: a live duel without a result was cut off, not left to run out. */
@@ -192,7 +192,7 @@ export function duel() {
               h(
                 "p",
                 { class: "muted" },
-                "Играеш веднага, а приятелят ти — когато може: има 48 часа, откакто научи. С един и същ приятел само първият дуел за деня мести рейтинга.",
+                "Играеш веднага, а приятелят ти има 48 часа да изиграе своя. С един и същ приятел само първият дуел за деня мести рейтинга.",
               ),
               h(
                 "ul",
@@ -342,7 +342,7 @@ export function ended(d: DuelView, more: Child = null): Child {
               ? "Дуелът е отказан"
               : d.kind === "live"
                 ? "Дуелът прекъсна"
-                : "Дуелът изтече";
+                : "Времето за дуела изтече";
   const lead =
     d.state === "wait"
       ? `${d.opponent?.name ?? "Приятелят ти"} има време до ${until(d.expiresAt)}. Ще ти кажем резултата.`

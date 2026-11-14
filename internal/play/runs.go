@@ -384,8 +384,6 @@ func Merge(tx *sql.Tx, from, to int64) error {
 		{`UPDATE OR IGNORE league_results SET user_id = ? WHERE user_id = ?`, []any{to, from}},
 		{`UPDATE OR IGNORE league_members SET user_id = ? WHERE user_id = ?`, []any{to, from}},
 		{`UPDATE OR IGNORE royal_players SET user_id = ? WHERE user_id = ?`, []any{to, from}},
-		// The guest's arenas are the account's (unless both played the same one, which can't be: one person).
-		{`UPDATE OR IGNORE arena_players SET user_id = ? WHERE user_id = ?`, []any{to, from}},
 		// The days the guest played on were the account's player's: the same person, so not a player who left.
 		{`INSERT OR IGNORE INTO active_days (user_id, day) SELECT ?, day FROM active_days WHERE user_id = ?`, []any{to, from}},
 		{`DELETE FROM active_days WHERE user_id = ?`, []any{from}},

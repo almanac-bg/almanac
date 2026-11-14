@@ -145,7 +145,7 @@ function account(): Child {
           h("strong", null, () => user()?.email ?? ""),
           ".",
         ),
-        h("button", { class: "link", onclick: signOut }, "Изход"),
+        h("button", { class: "link", onclick: signOut }, "Излез"),
       ],
       () => [
         h("h2", null, "Запази профила си"),
@@ -327,7 +327,7 @@ function deleteAccount(): Child {
             },
             "Изтрий профила",
           ),
-          h("button", { class: "link", onclick: () => asking.set(false) }, "Отказ"),
+          h("button", { class: "link", onclick: () => asking.set(false) }, "Откажи"),
           error() && h("p", { class: "bad", role: "alert" }, error()),
         )
       : h("button", { class: "link", onclick: () => asking.set(true) }, "Изтрий профила");

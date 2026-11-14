@@ -14,6 +14,6 @@ test("a guest keeps their game with a code by email, and can sign out", async ({
   await page.getByLabel("Код").fill(code);
   await page.getByRole("button", { name: "Влез" }).click();
   await expect(page.getByText(`Влизаш с ${email}`)).toBeVisible();
-  await page.getByRole("button", { name: "Изход" }).click();
+  await page.getByRole("button", { name: "Излез" }).click();
   await expect(page.getByRole("button", { name: "Прати ми код" })).toBeVisible();
 });

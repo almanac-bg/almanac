@@ -38,9 +38,9 @@ func TestGoalDraws(t *testing.T) {
 	seen := map[string]bool{}
 	for seed := range uint64(3000) {
 		friends := seed%2 == 0
-		yesterday := drawGoals(seed+1_000_000, w.b, friends, nil)
-		ids := drawGoals(seed, w.b, friends, yesterday)
-		if len(ids) != GoalsPerDay || ids[0] != "day" || !slices.Equal(ids, drawGoals(seed, w.b, friends, yesterday)) {
+		yesterday := drawGoals(seed+1_000_000, w.b, friends, true, nil)
+		ids := drawGoals(seed, w.b, friends, seed%3 != 0, yesterday)
+		if len(ids) != GoalsPerDay || ids[0] != "day" || !slices.Equal(ids, drawGoals(seed, w.b, friends, seed%3 != 0, yesterday)) {
 			t.Fatalf("seed %d: %v", seed, ids)
 		}
 		before := map[string]bool{}
@@ -58,13 +58,17 @@ func TestGoalDraws(t *testing.T) {
 				t.Fatalf("seed %d: %v after %v, a family twice", seed, ids, yesterday)
 			case k.friends && !friends:
 				t.Fatalf("seed %d: %q for a player without friends", seed, id)
+			case k.retired:
+				t.Fatalf("seed %d: %q is retired", seed, id)
+			case k.evening && seed%3 == 0:
+				t.Fatalf("seed %d: %q after the evening's Роял", seed, id)
 			}
 			families[k.family] = true
 			seen[k.id] = true
 		}
 	}
 	for _, k := range goalKinds[1:] {
-		if !seen[k.id] {
+		if !seen[k.id] && !k.retired {
 			t.Errorf("never drawn: %s", k.id)
 		}
 	}
@@ -206,22 +210,10 @@ func TestGoalMeasures(t *testing.T) {
 func TestGoalsOfOthers(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	ana, vi, cy := w.user(), w.user(), w.user()
+	ana, vi := w.user(), w.user()
 	w.befriend(ana, vi)
 
-	// Арена: played and won, kept and told as it ends.
-	w.setGoals(ana, "day", "arena", "arenaWin")
-	w.setGoals(cy, "day", "arena", "arenaWin")
 	w.setGoals(vi, "day", "friendDuel", "duelWin")
-	if _, err := w.g.SettleArena(ctx, []ArenaPlace{{ana, 1, 3000, 3}, {vi, 2, 2000, 2}, {cy, 3, 0, 0}}); err != nil {
-		t.Fatal(err)
-	}
-	if n, _ := w.g.NewsOf(ctx, ana, 0); len(n.Goals) != 2 || n.Goals[1].XP != GoalXP[2] {
-		t.Fatalf("Ana's arena goals: %+v", n.Goals)
-	}
-	if g := w.goalsOf(cy); !g["arena"].Done || g["arenaWin"].Done {
-		t.Fatalf("Cy's arena goals: %+v", g)
-	}
 
 	// A friend's challenge: played by both; the one who wins has won a duel the day it ends.
 	s, id, err := w.g.ChallengeFriend(ctx, vi, ana)

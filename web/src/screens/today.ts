@@ -89,7 +89,7 @@ export function today() {
       // Just played, the goals it finished are told with its news.
       just || !t.played ? null : goalsCard(),
       // The ways to play with others wait for a first game finished: a new player starts with the day and a topic.
-      just || t.played ? modes(["duel", "arena", "royal", "room"], "С други") : null,
+      just || t.played ? modes(["duel", "royal", "room"], "С други") : null,
       topics(),
     );
   }
@@ -102,7 +102,7 @@ function status(t: Today): Child {
   const share = lv && lv.to > lv.from ? Math.round((100 * (lv.xp - lv.from)) / (lv.to - lv.from)) : 0;
   return h(
     "div",
-    { class: "status" },
+    { class: "status-row" },
     h(
       "a",
       { class: days ? "status-item streak-chip" : "status-item streak-chip cold", href: "/me" },

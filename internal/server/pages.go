@@ -24,11 +24,10 @@ import (
 var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/$`),
 	regexp.MustCompile(`^/play/[a-z]+$`),
-	regexp.MustCompile(`^/(duel|arena|royal|room|ranks|rewards|wardrobe|me|friends|settings|almanac|mistakes)$`),
+	regexp.MustCompile(`^/(duel|royal|room|ranks|rewards|wardrobe|me|friends|settings|almanac|mistakes)$`),
 	regexp.MustCompile(`^/duel/([0-9]{1,12}|live)$`),
 	regexp.MustCompile(`^/c/[a-z0-9]{6}$`),
 	regexp.MustCompile(`^/r/[0-9]{6}$`),
-	regexp.MustCompile(`^/arena/[0-9]{6}$`),
 	regexp.MustCompile(`^/year/[0-9]{4}$`),
 	regexp.MustCompile(`^/together$`),
 	regexp.MustCompile(`^/f/[a-z0-9]{8}$`),
@@ -121,12 +120,12 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 // preview is what a link to this page shows when it's shared (Viber, Messenger, WhatsApp): an invite says whose it
 // is; a room, its code.
 func (s *Server) preview(r *http.Request) (title, description string) {
-	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми, дуели и арена на живо, Роял всяка вечер и стаи с приятели. Всеки отговор носи по нещо ново."
+	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми, дуели на живо, Роял всяка вечер и стаи с приятели. Всеки отговор носи по нещо ново."
 	switch path := r.URL.Path; {
 	case strings.HasPrefix(path, "/f/"):
 		if _, name, err := s.game.Inviter(r.Context(), strings.TrimPrefix(path, "/f/")); err == nil {
 			title = name + " те кани в АЛМАНАХ"
-			description = "Приеми и сте приятели: виждате резултатите си за деня и се каните на дуел."
+			description = "Приеми и сте приятели: виждате резултатите си за деня и се предизвиквате на дуел."
 		}
 	case strings.HasPrefix(path, "/players/"):
 		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {

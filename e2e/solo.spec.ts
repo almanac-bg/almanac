@@ -79,7 +79,7 @@ test("a topic's count can be backed out of, or cut short", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Всички теми" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
-  await page.getByRole("button", { name: "Отказ" }).click();
+  await page.getByRole("button", { name: "Откажи" }).click();
   await expect(page).toHaveURL(/\/$/);
   // Nothing started behind it.
   await page.waitForTimeout(3500);
@@ -108,7 +108,7 @@ test("a run left between two questions goes on at once", async ({ page }) => {
 
 test("an old challenge link says where playing with friends went", async ({ page }) => {
   await page.goto("/c/abc234");
-  await expect(page.getByRole("heading", { name: "Предизвикателствата ги няма" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Тази връзка вече не работи" })).toBeVisible();
   await page.getByRole("link", { name: "Към дуелите" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Дуел" })).toBeVisible();
 });

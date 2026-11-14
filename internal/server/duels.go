@@ -245,7 +245,7 @@ func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 		}
 		word := map[string]string{"won": "Победа", "lost": "Загуба", "draw": "Равенство"}[n.Outcome]
 		m.Title = fmt.Sprintf("%s срещу %s", word, n.From)
-		m.Body = fmt.Sprintf("Рейтинг: %+d.", n.Delta)
+		m.Body = ratingWords(n.Delta)
 		if n.Friendly {
 			m.Body = "Приятелски дуел: вече сте играли днес, рейтингът не се мени."
 		}

@@ -1,4 +1,4 @@
-// A room (or an arena, which is a room the server filled by itself): the lobby, then each question for everyone at once, its answer with the scores, and the final standings.
+// A room: the lobby, then each question for everyone at once, its answer with the scores, and the final standings.
 // The server sends the room as this player sees it after every change; the browser reconnects if the line drops.
 
 import { answered, ask, picture } from "../game/questions.ts";
@@ -7,9 +7,8 @@ import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked } from "../lib/dom.ts";
-import { place } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
-import { play, playAnswer, playCount } from "../lib/sound.ts";
+import { play, playAnswer } from "../lib/sound.ts";
 import { categories, player, playing } from "../state.ts";
 import { avatar, formatNumber, type Tier, type VerdictKind, verdict } from "../ui.ts";
 
@@ -20,9 +19,6 @@ interface RoomView {
   isHost: boolean;
   canLead: boolean;
   category: string;
-  /** An arena: no host, it starts by itself after startsMs, and the places move ratings. */
-  arena?: boolean;
-  startsMs?: number;
   n: number;
   total: number;
   players: Player[];
@@ -61,9 +57,6 @@ interface Player {
   me?: boolean;
   gained?: number;
   right?: boolean;
-  /** An arena's end: the player's place, and what it did to their rating (once known). */
-  place?: number;
-  delta?: number;
   avatar?: string;
   title?: string;
   titleTier?: Tier;
@@ -73,13 +66,8 @@ interface Player {
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "Всички теми";
 const spaced = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
 
-/** An arena's game, at /arena/<code>. */
-export function arenaGame(params: string[]) {
-  return room(params, true);
-}
-
-export function room([code = ""]: string[], arena = false) {
-  title(arena ? "Арена" : "Игра");
+export function room([code = ""]: string[]) {
+  title("Стая");
   const view = signal<RoomView | null>(null);
   const trouble = signal<"" | "reconnecting" | "gone" | "full">("");
   // Where each player stood at the last answer: how far they've moved since is the room's rank change.
@@ -133,23 +121,15 @@ export function room([code = ""]: string[], arena = false) {
           )
         : null,
     () =>
-      trouble() === "gone" && arena
+      trouble() === "gone"
         ? h(
             "div",
             { class: "stack" },
-            h("h1", null, "Тази арена свърши"),
-            h("p", { class: "lead" }, "Или връзката с нея прекъсна. Влез в нова."),
-            h("a", { class: "btn primary", href: "/arena" }, "Нова арена"),
+            h("h1", null, "Няма такава стая"),
+            h("p", { class: "lead" }, "Може кодът да е грешен или стаята да е затворена."),
+            h("a", { class: "btn primary", href: "/room" }, "Отвори нова стая"),
           )
-        : trouble() === "gone"
-          ? h(
-              "div",
-              { class: "stack" },
-              h("h1", null, "Няма такава стая"),
-              h("p", { class: "lead" }, "Може кодът да е грешен или стаята да е затворена."),
-              h("a", { class: "btn primary", href: "/room" }, "Отвори нова стая"),
-            )
-          : null,
+        : null,
     () =>
       trouble() === "reconnecting"
         ? h("p", { class: "status", role: "status" }, "Връзката прекъсна. Свързваме се отново…")
@@ -162,13 +142,13 @@ export function room([code = ""]: string[], arena = false) {
       switch (v.phase) {
         case "lobby":
           places.clear();
-          return v.arena ? arenaLobby(view as () => RoomView) : lobby(view as () => RoomView, code);
+          return lobby(view as () => RoomView, code);
         case "question":
           return question(view as () => RoomView, code, v);
         case "reveal":
           return reveal(view as () => RoomView, v, places);
         case "end":
-          return v.arena ? arenaEnd(view as () => RoomView) : end(view as () => RoomView, code);
+          return end(view as () => RoomView, code);
       }
     },
   );
@@ -239,44 +219,6 @@ function joins(view: () => RoomView): void {
   });
 }
 
-/** An arena before its first question: who's in it, and the seconds to go (a beep for each of the last three). */
-function arenaLobby(view: () => RoomView): Child {
-  const left = signal(Math.ceil((untracked(view).startsMs ?? 0) / 1000));
-  const tick = setInterval(() => {
-    left.update((n) => Math.max(0, n - 1));
-    playCount(left.peek());
-  }, 1000);
-  onCleanup(() => clearInterval(tick));
-  joins(view);
-  return h(
-    "div",
-    { class: "screen" },
-    h(
-      "div",
-      { class: "intro" },
-      h("p", { class: "kicker" }, "Арена"),
-      h("h1", null, () => (left() > 0 ? `Започваме след ${left()} с` : "Започваме…")),
-      h("p", { class: "lead" }, "Който събере най-много точки, печели."),
-    ),
-    h(
-      "section",
-      { class: "card" },
-      h("h2", { class: "section-title" }, () => `Играчи (${view().players.length})`),
-      h("ul", { class: "players" }, () =>
-        view().players.map((p) =>
-          h(
-            "li",
-            { class: [!p.online && "away", p.me && "me"].filter(Boolean).join(" ") || undefined },
-            avatar(p.avatar, { size: "s", name: p.name }),
-            p.name,
-            p.me ? " (ти)" : "",
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
 /** Which question, and its topic. */
 function head(v: RoomView): Child {
   return questionHead(v.n, v.total, topicName(v.question?.category ?? ""));
@@ -320,7 +262,7 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
     head(first),
     timer(q.leftMs, q.limitMs, left, locked),
     h("h1", { class: "ask" }, q.view.text),
-    picture(q.view),
+    picture(q.view, true),
     asked.node,
     () => {
       const v = view();
@@ -361,7 +303,7 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
     { class: "question" },
     head(first),
     h("h1", { class: "ask" }, q.view.text),
-    picture(q.view),
+    picture(q.view, true),
     answered(q.view, r.answer, q.given ?? null),
     verdict(kind, r.points, r.missed ? "Без отговор." : undefined, r.speed, r.row, r.inRow),
     upNext(q.nextMs ?? 0, last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),
@@ -404,73 +346,6 @@ function move(was: number | undefined, now: number): HTMLElement {
     { class: d > 0 ? "delta up" : "delta down", "aria-label": d > 0 ? `нагоре с ${d}` : `надолу с ${-d}` },
     h("span", { class: "i delta-sign", "aria-hidden": "true" }),
     String(Math.abs(d)),
-  );
-}
-
-/** An arena's end: who won, the places with what each did to the rating, and the way to another. */
-function arenaEnd(view: () => RoomView): Child {
-  const first = untracked(view);
-  const me = first.players.find((p) => p.me);
-  // First place wins (shared or not); last of several loses; a place between is just the end.
-  const last = Math.max(...first.players.map((p) => p.place ?? 0));
-  play(me?.place === 1 ? "win" : me?.place && me.place === last && last > 1 ? "lose" : "end");
-  return h(
-    "div",
-    { class: "screen" },
-    h(
-      "div",
-      { class: "intro" },
-      h("p", { class: "kicker" }, "Арена"),
-      h("h1", null, () => {
-        const winners = view().players.filter((p) => p.place === 1);
-        if (winners.length > 1)
-          return winners.some((p) => p.me) ? "Делиш първото място!" : "Равенство за първото място";
-        const [best] = winners;
-        return !best ? "Край" : best.me ? "Ти печелиш!" : `${best.name} печели`;
-      }),
-      me?.place && me.place > 1
-        ? h("p", { class: "place-line" }, `Ти си на ${place(me.place, first.players.length)}.`)
-        : null,
-    ),
-    h("section", { class: "board" }, h("h2", null, "Класиране"), () =>
-      h(
-        "ol",
-        null,
-        view().players.map((p, i) => {
-          const row = boardRow(p.place ?? i + 1, p.name, String(p.points), { me: p.me, look: p });
-          row.classList.add("moves");
-          row.append(p.delta === undefined ? h("span", { class: "delta" }) : ratingChange(p.delta));
-          return row;
-        }),
-      ),
-    ),
-    () => {
-      const d = view().players.find((p) => p.me)?.delta;
-      return d === undefined
-        ? null
-        : h(
-            "p",
-            { class: "status" },
-            d === 0 ? "Рейтингът ти не се промени." : `Рейтинг: ${d > 0 ? "+" : "−"}${Math.abs(d)}.`,
-          );
-    },
-    h(
-      "div",
-      { class: "actions" },
-      h("a", { class: "btn primary big", href: "/arena" }, "Нова арена"),
-      h("a", { class: "btn", href: "/" }, "Начало"),
-    ),
-    review(async () => view().review ?? []),
-  );
-}
-
-/** What a place did to a rating: up, down, or none. */
-function ratingChange(d: number): HTMLElement {
-  if (d === 0) return h("span", { class: "delta", "aria-label": "рейтингът без промяна" }, "±0");
-  return h(
-    "span",
-    { class: d > 0 ? "delta up" : "delta down", "aria-label": `рейтинг ${d > 0 ? "+" : "−"}${Math.abs(d)}` },
-    `${d > 0 ? "+" : "−"}${Math.abs(d)}`,
   );
 }
 

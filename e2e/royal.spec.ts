@@ -9,7 +9,7 @@ test("Роял: in from the lobby, live to the first wrong answer (or through al
   test.setTimeout(360_000);
   await page.goto("/royal");
   // A game under way (another engine's) ends before the next lobby opens.
-  await page.getByRole("button", { name: "Влизам" }).click({ timeout: 240_000 });
+  await page.getByRole("button", { name: "Влез" }).click({ timeout: 240_000 });
   await expect(page.getByRole("button", { name: "Излез" })).toBeVisible();
   await expect(page.getByText("Вътре си.")).toBeVisible();
 

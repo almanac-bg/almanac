@@ -118,12 +118,12 @@ func New(cfg Config, d Deps) (*Server, error) {
 	if cfg.Royal == (royal.Schedule{}) {
 		cfg.Royal = royal.Evening
 	}
+	s.game.RoyalAt = cfg.Royal.Next
 	s.royal = royal.NewHub(s.game, cfg.Royal)
 	s.royal.News = s.royalNews
 	s.royal.Opened = func(ctx context.Context, start time.Time) { s.callRoyal(ctx, start) }
 	s.push = cfg.Push
 	s.rooms = room.NewHub(s.bank.Load)
-	s.rooms.OnArena = s.arenaEnded
 	s.rooms.Crowd = s.game.Crowd
 	s.rooms.Barred = s.game.DayQuestions
 	s.live = live.NewHub(s.game, s.livePlayer)
@@ -172,6 +172,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/mistakes", s.startMistakes)
 	api("GET /api/runs/{id}", s.runState)
 	api("POST /api/runs/{id}/show", s.show)
+	api("POST /api/runs/{id}/start", s.start)
 	api("POST /api/runs/{id}/answer", s.answer)
 	api("GET /api/runs/{id}/review", s.review)
 	api("POST /api/questions/{id}/report", s.report)
@@ -179,7 +180,6 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/rooms/{code}/events", s.roomEvents)
 	api("POST /api/rooms/{code}/start", s.roomStart)
 	api("POST /api/rooms/{code}/answer", s.roomAnswer)
-	mux.HandleFunc("GET /api/arena/events", s.arenaEvents)
 	api("POST /api/duels", s.challenge)
 	api("GET /api/duels", s.duels)
 	mux.HandleFunc("GET /api/duels/live/events", s.liveEvents)

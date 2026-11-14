@@ -39,7 +39,6 @@ export const medalPictures: Record<string, string> = {
   allTypes: "clover",
   fullDay: "mode-almanac",
   fullDays30: "medal",
-  arenaWin: "mode-arena",
   royalWin: "crown",
   leagueUp: "league-1",
   leagueFirst: "league-3",

@@ -192,3 +192,29 @@ func (g *Game) ranking(ctx context.Context, viewer int64, query string, division
 	}
 	return out, rows.Err()
 }
+
+// placeDeltas is what places in a game of many (Роял) do to ratings: each player's place against each other one's counts as a duel won, lost
+// or drawn, and the rating moves by the average of those.
+func placeDeltas(places, ratings, rated []int) []int {
+	out := make([]int, len(places))
+	if len(places) < 2 {
+		return out
+	}
+	for i := range places {
+		sum := 0.0
+		for j := range places {
+			if i == j {
+				continue
+			}
+			score := 0.5
+			if places[i] < places[j] {
+				score = 1
+			} else if places[i] > places[j] {
+				score = 0
+			}
+			sum += float64(eloDelta(ratings[i], ratings[j], rated[i], score))
+		}
+		out[i] = int(math.Round(sum / float64(len(places)-1)))
+	}
+	return out
+}

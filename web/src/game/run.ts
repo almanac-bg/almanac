@@ -7,8 +7,8 @@ import { append, type Child, effect, h, listen, onCleanup, type Signal, signal }
 import { tickOn } from "../lib/prefs.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { categories, playing } from "../state.ts";
-import { countUp, inRowChip, type VerdictKind, verdict } from "../ui.ts";
-import { ask, picture } from "./questions.ts";
+import { countUp, fact, inRowChip, type VerdictKind, verdict } from "../ui.ts";
+import { ask, picture, picturesIn } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Shown, State, View } from "./types.ts";
 
 /** Plays a run from where it stands; `done` draws what comes after its last answer. */
@@ -20,6 +20,17 @@ export function playRun(initial: State, done: (s: State) => Child): Child {
       at(await api<State>("POST", `/api/runs/${initial.id}/show`, {}));
     } catch (err) {
       screen.set(failed((err as ApiError).message, next));
+    }
+  };
+  // A question with pictures waits for them, its time with it (the server starts it by itself if they take too long):
+  // it shows once they're in, its time starting then.
+  const start = async (q: Shown) => {
+    await picturesIn(q.view, q.startsMs ?? 0);
+    if (gone) return;
+    try {
+      at(await api<State>("POST", `/api/runs/${initial.id}/start`, { n: q.n }));
+    } catch (err) {
+      screen.set(failed((err as ApiError).message, () => start(q)));
     }
   };
   const reload = async () => {
@@ -41,16 +52,22 @@ export function playRun(initial: State, done: (s: State) => Child): Child {
     };
     document.addEventListener("visibilitychange", seen);
   };
+  let gone = false;
   onCleanup(() => {
+    gone = true;
     if (seen) document.removeEventListener("visibilitychange", seen);
     playing.set(false);
   });
 
-  // Where the run stands: its end, a question showing, or between questions (the next one opens at once).
+  // Where the run stands: its end, a question waiting for its pictures, a question showing, or between questions
+  // (the next one opens at once).
   const at = (s: State) => {
     playing.set(!s.done);
     if (s.done) screen.set(done(s));
-    else if (s.question) screen.set(question(s, s.question, next, reload));
+    else if (s.question?.startsMs) {
+      const q = s.question;
+      whenSeen(() => start(q));
+    } else if (s.question) screen.set(question(s, s.question, next, reload));
     else whenSeen(next);
   };
 
@@ -107,7 +124,7 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
       "div",
       { class: "actions" },
       h("button", { class: "btn primary big", onclick: begin }, "Започни сега"),
-      h("button", { class: "btn", onclick: () => leave(cancel) }, "Отказ"),
+      h("button", { class: "btn", onclick: () => leave(cancel) }, "Откажи"),
     ),
   );
 }
@@ -168,7 +185,7 @@ function tally(el: HTMLElement, points: number, from: number, inRow: number) {
       points > 0
         ? h(
             "span",
-            { class: "tally-points", "aria-label": `${points} точки` },
+            { class: "tally-points", "aria-label": `${points} ${points === 1 ? "точка" : "точки"}` },
             countUp(points, from),
             h("small", null, " т."),
           )
@@ -213,7 +230,7 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
     h("div", { class: "track" }, bar),
     h(
       "span",
-      { class: "secs", role: "timer", "aria-label": () => `${left()} секунди` },
+      { class: "secs", role: "timer", "aria-label": () => `${left()} ${left() === 1 ? "секунда" : "секунди"}` },
       () => String(left()),
       h("small", null, "с"),
     ),
@@ -227,6 +244,12 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
 /** How long an answer shows before the game moves on: longer where there's more to read. */
 export function pauseFor(view: View): number {
   return view.type === "choice" || view.type === "truefalse" ? 3000 : 4500;
+}
+
+/** How long a fact takes to read, unhurried (none for no fact): a little to start, more for each letter, at most nine
+ * seconds — whoever reads faster moves on with a tap. */
+export function readingTime(text?: string): number {
+  return text ? Math.min(9000, 1200 + 45 * text.length) : 0;
 }
 
 /** The game moving on by itself: a line that fills while the answer shows. */
@@ -290,12 +313,29 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
     tally(score, res.state.points, s.points, res.inRow ?? 0);
     const kind = kindOf(res, answer);
     playAnswer(kind, res.inRow ?? 0);
-    const pause = pauseFor(q.view);
+    // The fact behind the answer, at the moment the player most wants it: time to read it, or a tap to move on.
+    const said = res.reveal.fact;
+    const pause = pauseFor(q.view) + readingTime(said);
     append(after, [
       verdict(kind, res.points, undefined, res.speed, res.row, res.inRow),
       res.learned ? h("p", { class: "learned" }, "Нов факт в Алманаха") : null,
+      said ? fact(said) : null,
       res.reveal.credit ? credit(res.reveal.credit) : null,
       upNext(pause, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`),
+      said
+        ? h(
+            "button",
+            {
+              class: "btn",
+              type: "button",
+              onclick: () => {
+                clearTimeout(advance);
+                moveOn();
+              },
+            },
+            res.state.done ? "Към резултата" : "Напред",
+          )
+        : null,
     ]);
     after.hidden = false;
     requestAnimationFrame(() => after.scrollIntoView({ block: "nearest", behavior: "smooth" }));
@@ -358,7 +398,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void): Chi
     progress,
     timer(q.leftMs, q.limitMs, left, locked),
     h("h1", { class: "ask" }, q.view.text),
-    picture(q.view),
+    picture(q.view, true),
     asked.node,
     () => problem(),
     after,
