@@ -445,7 +445,7 @@
 
   .almanac-list {
     display: grid;
-    gap: var(--space-2);
+    gap: var(--space-4);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -459,13 +459,34 @@
       inset 0 0 0 1px var(--line);
   }
 
+  .almanac-topic {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-muted);
+  }
+
+  .almanac-qa {
+    display: grid;
+    gap: var(--space-1);
+  }
+
   .almanac-q {
     color: var(--text-muted);
     font-size: 0.9375rem;
+    line-height: 1.375rem;
   }
 
   .almanac-a {
-    font: 800 1.125rem / 1.4 var(--font-sans);
+    font: 800 1.125rem / 1.5rem var(--font-sans);
+  }
+
+  /* What was learned, in the facts' face, under a line: the card's own, never the next one's. */
+  .almanac-fact {
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--line);
+    font: italic 500 1.0625rem / 1.625rem var(--font-serif);
+    text-wrap: pretty;
   }
 
   /* The day's goals: each with its mark (a star once done) and the XP it earns. */
@@ -3262,13 +3283,6 @@
       inset 0 0 0 1px var(--line);
   }
 
-  /* A fact inside a card (Моят Алманах): a well in it, its corner smaller than the card's around it. */
-  .card .fact {
-    border-radius: var(--radius-md);
-    background: var(--sunken);
-    box-shadow: none;
-  }
-
   /* A „?“ set in the card's top corner, whole, in the heading's colour: the text keeps clear of it. */
   .fact::before {
     content: "?";
@@ -3789,6 +3803,17 @@
     scrollbar-width: none;
   }
 
+  /* A row that scrolls is for a finger. With a mouse, or room enough, every chip shows at once, in as many rows as it
+     takes: a row cut off at the edge that won't drag reads as broken. */
+  @media (min-width: 48rem), (hover: hover) and (pointer: fine) {
+    .chips.scroll {
+      flex-wrap: wrap;
+      overflow-x: visible;
+      margin-inline: 0;
+      padding: 0;
+    }
+  }
+
   .chip {
     appearance: none;
     display: inline-flex;
@@ -4187,9 +4212,12 @@
     cursor: help;
   }
 
+  /* By the word it explains (ui.ts places it), not in the middle of the screen. */
   .explain-pop {
+    position: absolute;
+    inset: auto;
     max-width: min(20rem, calc(100vw - 2 * var(--space-4)));
-    margin: auto;
+    margin: 0;
     padding: var(--space-4);
     border: 0;
     border-radius: var(--radius-lg);
@@ -4200,10 +4228,6 @@
     color: var(--text);
     font: 500 1rem / 1.5rem var(--font-sans);
     text-align: left;
-  }
-
-  .explain-pop::backdrop {
-    background: rgb(0 0 0 / 0.25);
   }
 
   /* Under a result, after its gold button: „Прегледай въпросите“ and the other ways on, plain and the same size, side
@@ -4281,7 +4305,7 @@
   }
 
   /* An achievement's medal (art/badge.ts): drawn in the tier's colour, the tier's form, the achievement's picture on
-     its face; a locked one grey, with its progress in a ring. */
+     its face; a locked one grey (its progress is a bar beside it). */
   .badge {
     --tone: var(--tier, var(--gold));
     position: relative;
@@ -4302,8 +4326,7 @@
     height: 88px;
   }
 
-  .badge-medal,
-  .badge-ring {
+  .badge-medal {
     position: absolute;
     inset: 0;
   }
@@ -4327,27 +4350,6 @@
   .badge.earned.t-epic .badge-medal,
   .badge.earned.t-legendary .badge-medal {
     filter: drop-shadow(0 0 8px color-mix(in srgb, var(--tier) 55%, transparent));
-  }
-
-  .badge-ring {
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-  }
-
-  .badge-track,
-  .badge-done {
-    fill: none;
-    stroke-width: 2.5;
-    stroke-linecap: round;
-  }
-
-  .badge-track {
-    stroke: var(--line);
-  }
-
-  .badge-done {
-    stroke: var(--tier);
   }
 
   .badge .badge-glyph.secret {
@@ -4560,78 +4562,6 @@
     color: var(--text-muted);
     font-size: 0.8125rem;
     line-height: 1.125rem;
-  }
-
-  /* Награди's tiers: a grid of medals, each a tap from its card. The card spans the row after its medal's, and the
-     grid fills the rest of that row with the medals that follow (dense). */
-  .medals {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
-    grid-auto-flow: row dense;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .medal-btn {
-    appearance: none;
-    display: grid;
-    grid-template-rows: auto 1fr auto;
-    justify-items: center;
-    gap: var(--space-1);
-    width: 100%;
-    height: 100%;
-    padding: var(--space-2) var(--space-1);
-    border: 0;
-    border-radius: var(--radius-md);
-    background: transparent;
-    color: var(--text);
-    font: inherit;
-    text-align: center;
-    cursor: pointer;
-    transition: background-color 160ms;
-  }
-
-  .medal-btn:hover {
-    background: var(--surface);
-  }
-
-  .medal-btn[aria-expanded="true"] {
-    background: var(--surface);
-    box-shadow:
-      var(--elev-1),
-      inset 0 0 0 1px var(--tier);
-  }
-
-  .medal-btn:focus-visible {
-    box-shadow: var(--focus);
-  }
-
-  .medal-name {
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
-    font-size: 0.75rem;
-    line-height: 1rem;
-    font-weight: 700;
-    overflow-wrap: break-word;
-  }
-
-  .medal.locked .medal-name {
-    color: var(--text-muted);
-  }
-
-  .medal-progress {
-    color: var(--text-muted);
-    font-size: 0.6875rem;
-    line-height: 1rem;
-    font-weight: 700;
-  }
-
-  .medal-card {
-    grid-column: 1 / -1;
   }
 
   .unlock {
@@ -5118,20 +5048,23 @@
     list-style: none;
   }
 
+  /* A player in a room or a Роял: their avatar's tile inside a tile of the same corners, 8 from each edge (a pill's
+     round end can't hold a square avatar, nor its frame). */
   .players li {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
-    min-height: 2.25rem;
-    padding: 0 var(--space-3);
-    border-radius: var(--radius-full);
+    min-height: 2.75rem;
+    padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+    border-radius: var(--radius-md);
     background: var(--raised);
     box-shadow: inset 0 0 0 1px var(--line);
     font-weight: 600;
   }
 
-  .players li {
-    padding-left: 4px;
+  /* A frame sits in the tile's 8 round the avatar, so every player's tile is one height. */
+  .players .avatar.framed {
+    margin: 0;
   }
 
   .players li.away {
@@ -5551,13 +5484,21 @@
       grid-auto-rows: auto;
     }
 
+    /* The picture at the top, the name under it, and what the player knows of the topic at the bottom: level across
+       a row whether a name takes one line or two. */
     .topic {
       grid-template-columns: minmax(0, 1fr);
-      align-content: start;
+      grid-template-rows: auto 1fr auto;
+      align-items: stretch;
       padding: var(--space-3);
     }
 
+    .topic-text {
+      align-content: space-between;
+    }
+
     .topic-all .topic {
+      grid-template-rows: none;
       align-content: center;
       padding-left: var(--space-3);
     }
