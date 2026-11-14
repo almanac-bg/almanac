@@ -9,7 +9,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, type Signal, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
-import { type Tier, toneOf, topicMark } from "../ui.ts";
+import { type Open, type Tier, toneOf, topicMark } from "../ui.ts";
 import type { Standing } from "./duel.ts";
 import { type LeagueView, leagueBoard, loadLeague } from "./league.ts";
 
@@ -41,6 +41,7 @@ interface Answer {
 interface Day {
   board: Board;
   friends?: Score[] | null;
+  open?: Open;
 }
 
 type By = "day" | "league" | "rating" | "knowledge";
@@ -51,6 +52,10 @@ const tabs: [By, string][] = [
   ["rating", "Рейтинг"],
   ["knowledge", "Знания"],
 ];
+
+/** Whether a board shows to a viewer who has met these of the game's systems: the league's and the rating's wait for
+ * them. */
+const shows = (by: By, open?: Open) => (by === "league" ? !!open?.league : by === "rating" ? !!open?.rating : true);
 
 const n = (x: number) => x.toLocaleString("bg");
 
@@ -70,13 +75,19 @@ export function ranks() {
     if (by() === "knowledge" && topic()) q.set("topic", topic());
     return q.toString();
   };
+  // The day's boards come first, and say which of the others the viewer has met: a board of a league or a rating not
+  // theirs yet waits (play/unfold.go).
+  api<Day>("GET", "/api/day").then(
+    (d) => {
+      day.set(d);
+      if (!shows(by.peek(), d.open)) pick(by, "day");
+    },
+    (err) => error.set((err as ApiError).message),
+  );
   const load = () => {
     data.set(null);
     error.set("");
-    if (by() === "day") {
-      if (!day.peek()) api<Day>("GET", "/api/day").then(day.set, (err) => error.set((err as ApiError).message));
-      return;
-    }
+    if (by() === "day") return;
     if (by() === "league") {
       if (!league.peek()) loadLeague().then(league.set, (err) => error.set((err as ApiError).message));
       return;
@@ -102,7 +113,13 @@ export function ranks() {
     h(
       "div",
       { class: "board-filters" },
-      segmented("Класация", tabs, by, (v) => pick(by, v)),
+      () =>
+        segmented(
+          "Класация",
+          tabs.filter(([id]) => shows(id, day()?.open)),
+          by,
+          (v) => pick(by, v),
+        ),
       () =>
         user.peek() && by() !== "league"
           ? segmented(

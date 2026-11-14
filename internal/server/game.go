@@ -11,7 +11,7 @@ import (
 )
 
 // today is the day screen's state: the day, the viewer's streak, level and run (if any), whether they've finished a
-// game yet, and how many have played the day.
+// game yet and which of the game's systems they've met, and how many have played the day.
 func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
 	if err != nil {
@@ -40,6 +40,10 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 		out["played"] = played
+		// Which of the game's systems they've met: Начало shows the level and the goals once XP is open.
+		if out["open"], err = s.game.OpenOf(r.Context(), u.ID); err != nil {
+			return err
+		}
 		var runID int64
 		err = s.db.Read.QueryRowContext(r.Context(), `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, u.ID, day).Scan(&runID)
 		if err == nil {

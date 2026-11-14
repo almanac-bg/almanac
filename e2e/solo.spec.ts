@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { answer, moveOn, playRun } from "./play.ts";
+import { answer, moveOn, playedBefore, playRun } from "./play.ts";
 
 test("the day: ten questions, the result, the review, and one try only", async ({ page }) => {
   test.setTimeout(120_000);
@@ -18,10 +18,14 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.getByRole("button", { name: "Започни" }).click();
   await playRun(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("от 10");
-  // The day's goal is done, said once with its XP; what the game brought is a line, the level with it.
-  await expect(page.locator(".goal.fresh").filter({ hasText: "Изиграй въпросите на деня" })).toContainText("+50 XP");
-  // (A first day may well be a new level: then that's the card, with the XP.)
-  await expect(page.locator(".news-xp, .level-card.up").first()).toContainText(/\+\d+ XP · /);
+  // A first result is quiet (play/unfold.go): what its points are, in a line, and what the game earned to wear; no
+  // XP, level, goals or league yet.
+  await expect(page.locator(".news-open")).toContainText("Точките са резултатът ти в една игра");
+  await expect(page.locator(".news-xp, .level-card, .goal, .league-end")).toHaveCount(0);
+  // „точки“ is a tap from what they are.
+  await page.locator(".points").getByRole("button", { name: "точки" }).click();
+  await expect(page.locator(".points .explain-pop")).toBeVisible();
+  await page.keyboard.press("Escape");
   // After the day, the other ways to play are right there: with others, and by topic.
   await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toBeVisible();
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
@@ -38,20 +42,36 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.locator(".summary")).toBeVisible();
   await expect(page.getByRole("button", { name: "Започни" })).toHaveCount(0);
   await expect(page.locator(".modes")).toBeVisible();
-  // The day's goal stays done. (The other two goals are drawn per day, and a run of the day can finish them too.)
-  await expect(page.locator(".goal.done").filter({ hasText: "Изиграй въпросите на деня" })).toBeVisible();
-  // Начало's top tells the streak and the level the day made.
+  // Начало's top tells the streak the day made; the level and the goals come from the second day played.
   await expect(page.locator(".streak-chip")).toContainText("1");
-  await expect(page.locator(".level-chip")).toContainText("Ниво");
-  // Класации opens on the day's board, the player on it; the game put them in the week's league, racing on its XP;
-  // the rating's board waits for ten rated games.
+  await expect(page.locator(".level-chip, .card.goals")).toHaveCount(0);
+  // Класации opens on the day's board, the player on it; the league and the rating aren't theirs yet.
   await page.goto("/ranks");
   await expect(page.locator(".board .row.me")).toContainText("/10");
+  await expect(page.getByRole("tab")).toHaveText(["Днес", "Знания", "Всички", "Приятели"]);
+  await page.goto("/me");
+  await expect(page.locator(".streak")).toBeVisible();
+  await expect(page.locator(".me-level-bar, .league-link")).toHaveCount(0);
+
+  // A second day: a game tells XP once, with the goals; Начало shows the level and the goals from then on.
+  await playedBefore(page, 1);
+  await page.goto("/play/history");
+  await playRun(page);
+  await expect(page.locator(".news-open")).toContainText("Ново: XP и цели за деня.");
+  await expect(page.locator(".news-xp, .level-card.up").first()).toContainText(/\+\d+ XP/);
+  await page.goto("/");
+  await expect(page.locator(".level-chip")).toContainText("Ниво");
+  // The day's goal is done. (The other two goals are drawn per day, and a run of the day can finish them too.)
+  await expect(page.locator(".goal.done").filter({ hasText: "Изиграй въпросите на деня" })).toBeVisible();
+
+  // A third: the league. The first game put the player in the week's group, racing on its XP; the rating's board
+  // waits for a rated game of theirs.
+  await playedBefore(page, 2);
+  await page.goto("/ranks");
+  await expect(page.getByRole("tab", { name: "Рейтинг" })).toHaveCount(0);
   await page.getByRole("tab", { name: "Лига" }).click();
   await expect(page.locator(".league-card")).toContainText("Странджа");
   await expect(page.locator(".league-board .row.me")).toContainText("XP");
-  await page.getByRole("tab", { name: "Рейтинг" }).click();
-  await expect(page.locator(".board-empty")).toContainText("Още никой няма 10 игри за рейтинг.");
   // Профил shows the league too, in a line that is a tap from the group.
   await page.goto("/me");
   await expect(page.locator(".league-link")).toContainText("място от");

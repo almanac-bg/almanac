@@ -6,7 +6,7 @@ import { appShare } from "../lib/app.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
 import { categories } from "../state.ts";
-import { countUp, fact, formatNumber, type Look, who } from "../ui.ts";
+import { countUp, explain, fact, formatNumber, type Look, meaning, who } from "../ui.ts";
 import { answered, crowdLine, picture } from "./questions.ts";
 import { report } from "./report.ts";
 import { trail } from "./run.ts";
@@ -38,7 +38,8 @@ export function summary(s: State, line: Child, next: { main: Child; also?: Child
           "p",
           { class: "points" },
           h("b", { class: "points-n" }, countUp(s.points)),
-          h("span", { class: "points-label" }, s.points === 1 ? "точка" : "точки"),
+          // What points are, a tap away: the game's score, not what playing earns (XP) or strength (the rating).
+          explain(h("span", { class: "points-label" }, s.points === 1 ? "точка" : "точки"), meaning.points),
           s.allRight ? h("span", { class: "points-bonus" }, `+${formatNumber(s.allRight)} за всички верни`) : null,
         ),
       ),

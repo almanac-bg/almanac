@@ -1,7 +1,8 @@
 // Начало: where every game starts, on one short screen, and the day is its heart. At the top the player's streak and
 // level; then the day's ten questions, the same for everyone, once (left half-way, where the player stopped and the way
 // on; once played, how they went, and the result to share); the day's goals; and every other way to play a tap away: by topic, and — once a first game is finished —
-// with others. The day's boards are in Класации.
+// with others. The day's boards are in Класации. The game unfolds by the days played (play/unfold.go): a first day has
+// the streak without the level, and no goals.
 
 import { picture } from "../art/picture.ts";
 import { news } from "../game/news.ts";
@@ -16,7 +17,7 @@ import { place } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { dayInBulgaria } from "../lib/year.ts";
 import { player, playing, user } from "../state.ts";
-import { meter, reserveWords } from "../ui.ts";
+import { meter, type Open, reserveWords } from "../ui.ts";
 import { goalsCard } from "./goals.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
@@ -34,6 +35,8 @@ interface Today {
   level?: { level: number; xp: number; from: number; to: number };
   /** Whether the player has finished a game of any kind: until then Начало is the day and the topics only. */
   played?: boolean;
+  /** Which of the game's systems the player has met: the level and the goals show once XP is open. */
+  open?: Open;
   run: State | null;
   /** The day played: the right answer the fewest of its other players got (its place, their share right). */
   rarest?: { n: number; right: number } | null;
@@ -124,8 +127,8 @@ export function today() {
       h(
         "div",
         { class: "home-side" },
-        // Just played, the goals it finished are told with its news.
-        just || !t.played ? null : goalsCard(),
+        // Just played, the goals it finished are told with its news; a first day has none (play/unfold.go).
+        just || !t.open?.xp ? null : goalsCard(),
         // The ways to play with others wait for a first game finished: a new player starts with the day and a topic.
         just || t.played ? modes(["duel", "royal", "room"], "С други") : null,
       ),
@@ -134,10 +137,11 @@ export function today() {
   }
 }
 
-/** The streak and the level, side by side: each a tap from Профил, where there's more of both. */
+/** The streak and (once XP is open: a first day has the streak only) the level, side by side: each a tap from Профил,
+ * where there's more of both. */
 function status(t: Today): Child {
   const days = t.streak;
-  const lv = t.level;
+  const lv = t.open?.xp ? t.level : undefined;
   const share = lv && lv.to > lv.from ? Math.round((100 * (lv.xp - lv.from)) / (lv.to - lv.from)) : 0;
   return h(
     "div",
@@ -258,8 +262,9 @@ function keepCard(t: Today): Child {
   } catch {
     // no storage here: ask
   }
-  if (!u || !askToKeep({ email: u.email, streak: t.streak, level: t.level?.level ?? 1, laterAt, now: Date.now() }))
-    return null;
+  // The level counts once it shows.
+  const level = t.open?.xp ? (t.level?.level ?? 1) : 1;
+  if (!u || !askToKeep({ email: u.email, streak: t.streak, level, laterAt, now: Date.now() })) return null;
   const shown = signal(true);
   return () =>
     shown() && !user()?.email

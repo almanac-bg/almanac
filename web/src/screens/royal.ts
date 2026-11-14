@@ -229,7 +229,8 @@ function soon(view: () => Evening, now: Signal<number>): Child {
     ),
     () => {
       const d = past();
-      return d ? [standingCard(d.standing), history(d.royals)] : null;
+      // The division once a game has moved the rating (play/unfold.go).
+      return d ? [d.standing.rated ? standingCard(d.standing, true) : null, history(d.royals)] : null;
     },
   );
 }

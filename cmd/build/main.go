@@ -25,10 +25,11 @@ import (
 
 // Budgets, gzipped: what a player downloads the first time.
 // The budgets grew with the game, from one quiz to a platform (five places, medals and emblems drawn in code, seven
-// kinds of question, weekly leagues, a second chance, a year's look back, a game left and taken up again): still small
-// enough to arrive at once on a slow phone; the style also lays the pages out for a laptop's width. The illustrations
-// (avatars, topics, modes, frames, leagues) come after the first screen, on their own.
-var budgets = map[string]int{"app.js": 47 << 10, "app.css": 16 << 10, "pictures.js": 24 << 10}
+// kinds of question, weekly leagues, a second chance, a year's look back, a game left and taken up again, systems that
+// unfold as a player meets them and say what their numbers mean): still small enough to arrive at once on a slow
+// phone; the style also lays the pages out for a laptop's width. The illustrations (avatars, topics, modes, frames,
+// leagues) come after the first screen, on their own.
+var budgets = map[string]int{"app.js": 48 << 10, "app.css": 16 << 10, "pictures.js": 24 << 10}
 
 func main() {
 	watch := flag.Bool("watch", false, "rebuild on every change")

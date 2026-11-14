@@ -213,6 +213,7 @@ func TestLevelUpNews(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	bo := w.user()
+	w.played(bo, XPFromDay-1) // the level's told from the second day played (TestUnfolding)
 	var n News
 	for range 5 {
 		s, _ := w.g.StartTopic(ctx, bo, "")
@@ -447,7 +448,7 @@ func TestUnlocks(t *testing.T) {
 	ctx := t.Context()
 	ana, old := w.user(), w.user()
 	_, _ = w.g.NewsOf(ctx, ana, 0)
-	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1200, peak = 1200 WHERE id = ?`, ana)
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1200, peak = 1200, rated = 1 WHERE id = ?`, ana)
 	n, err := w.g.NewsOf(ctx, ana, 0)
 	got := []string{}
 	for _, u := range n.Unlocks {
@@ -491,7 +492,7 @@ func TestUnlocks(t *testing.T) {
 	}
 
 	// A player from before: what they have is taken in untold.
-	_, _ = w.db.Write.Exec(`UPDATE users SET unlocks_known = 0, peak = 1500, peak_seen = 1500 WHERE id = ?`, old)
+	_, _ = w.db.Write.Exec(`UPDATE users SET unlocks_known = 0, peak = 1500, peak_seen = 1500, rated = 1 WHERE id = ?`, old)
 	if n, _ := w.g.NewsOf(ctx, old, 0); len(n.Unlocks) != 0 || n.Division != nil {
 		t.Fatalf("a player from before: %+v", n)
 	}
@@ -744,6 +745,7 @@ func TestProgress(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
+	w.played(ana, XPFromDay-1)
 	p, err := w.g.ProgressOf(ctx, ana)
 	if err != nil || p.Level != 1 || p.Avatar != DefaultAvatar(ana) || len(p.Achievements) != len(Achievements) ||
 		p.Achievements[0].At != 0 {
@@ -1234,6 +1236,7 @@ func TestLeagues(t *testing.T) {
 		}
 	}
 	ana, bo, cy := w.user(), w.user(), w.user()
+	w.played(ana, LeagueFromDay-1) // the league's open to Ana: her week's end is told
 	if v, err := w.g.LeagueOf(ctx, ana); err != nil || v.In || v.League.Name != "Странджа" || v.DaysLeft != 4 ||
 		v.Week != "2026-11-09" {
 		t.Fatalf("before a game: %+v %v", v, err)
@@ -1311,6 +1314,7 @@ func TestLeagues(t *testing.T) {
 	}
 	// And five in Рила: the first is its champion, and can go no higher.
 	top1, top2 := w.user(), w.user()
+	w.played(top1, LeagueFromDay-1)
 	rila := []int64{top1, top2, w.user(), w.user(), w.user()}
 	for i, p := range rila {
 		_, _ = w.db.Write.Exec(`UPDATE users SET league = 5 WHERE id = ?`, p)
@@ -1386,6 +1390,7 @@ func TestTitles(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana, bo := w.user(), w.user()
+	w.played(ana, XPFromDay)
 	p, _ := w.g.ProgressOf(ctx, ana)
 	topics := len(w.g.Bank().Categories) * len(topicTiers)
 	if len(p.Titles) != 1+len(Titles)+topics || p.Titles[0].ID != championID || p.Titles[0].Name != "Шампион на Рила" ||

@@ -1,7 +1,8 @@
 // Профил: who you are in the game — your avatar, name, tag and title; your level and what comes next; your league in a
 // line (its group is Класации'); your streak, numbers, mastery and latest games (the rating's division is the duels'
 // and Роял's, on their screens) — with its own places a tap away at the top (Награди, Гардероб, Алманах) and the
-// settings beside your name. A hub: each thing once, the whole of it a tap away.
+// settings beside your name. A hub: each thing once, the whole of it a tap away. Each system shows once the player has
+// met it (play/unfold.go): the level from the second day played, the league from the third.
 
 import { emblem } from "../art/emblem.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
@@ -10,6 +11,7 @@ import { user } from "../state.ts";
 import {
   avatar,
   badge,
+  explain,
   meter,
   profileHref,
   profileNav,
@@ -17,6 +19,7 @@ import {
   type Unlock,
   unlockPicture,
   unlockWords,
+  xpWords,
 } from "../ui.ts";
 import { leagueLine } from "./league.ts";
 import { loadProgress, nearest, type Progress } from "./progress.ts";
@@ -40,8 +43,9 @@ export function me() {
             const p = progress();
             return p ? levelCard(p) : null;
           },
-          leagueLine(),
-          stats(),
+          // The league once it's open (play/unfold.go): from the third day played.
+          () => (progress()?.open.league ? leagueLine() : null),
+          stats(() => !!progress()?.open.xp),
           yearLink(),
           () =>
             user()?.tag
@@ -67,7 +71,7 @@ function head(progress: () => Progress | null): Child {
       const p = progress();
       return avatar(p?.avatar, {
         size: "l",
-        level: p?.level,
+        level: p?.open.xp ? p.level : undefined,
         name: user.peek()?.name,
         frame: p?.frame,
         backdrop: p?.backdrop,
@@ -93,9 +97,11 @@ function head(progress: () => Progress | null): Child {
 }
 
 /** The level, and what comes next: the XP to the next level and what the next that unlocks something brings, the
- * division above, and the two achievements nearest — so that every way of playing shows where it leads. */
+ * division above, and the two achievements nearest — so that every way of playing shows where it leads. Before XP is
+ * open (a first day), the achievements only. */
 function levelCard(p: Progress): Child {
   const { next } = p;
+  const xp = p.open.xp;
   const near = nearest(p.achievements, 2);
   const share = p.to > p.from ? Math.round((100 * (p.xp - p.from)) / (p.to - p.from)) : 0;
   const division = next.division && p.standing.rated ? next.division : undefined;
@@ -104,18 +110,20 @@ function levelCard(p: Progress): Child {
   return h(
     "section",
     { class: "card me-level" },
-    h(
-      "div",
-      { class: "me-level-bar" },
-      h(
-        "div",
-        { class: "level-head" },
-        h("span", { class: "level-n" }, `Ниво ${p.level}`),
-        h("span", { class: "muted" }, `още ${p.to - p.xp} XP до ниво ${p.level + 1}`),
-      ),
-      meter(share, `${share}% от ниво ${p.level}`),
-    ),
-    next.level && next.levelUnlocks.length
+    xp
+      ? h(
+          "div",
+          { class: "me-level-bar" },
+          h(
+            "div",
+            { class: "level-head" },
+            h("span", { class: "level-n" }, `Ниво ${p.level}`),
+            h("span", { class: "muted" }, explain(`още ${p.to - p.xp} XP`, xpWords(p.open)), ` до ниво ${p.level + 1}`),
+          ),
+          meter(share, `${share}% от ниво ${p.level}`),
+        )
+      : null,
+    xp && next.level && next.levelUnlocks.length
       ? h(
           "p",
           { class: "next-level" },
@@ -168,7 +176,7 @@ function levelCard(p: Progress): Child {
                   (a.goal ?? 1) > 1
                     ? meter(Math.round((100 * (a.progress ?? 0)) / (a.goal ?? 1)), `${a.progress ?? 0} от ${a.goal}`)
                     : null,
-                  h("span", { class: "next-reward" }, rewardWords(a)),
+                  h("span", { class: "next-reward" }, rewardWords(xp ? a : { ...a, xp: 0 })),
                 ),
               ),
             ),

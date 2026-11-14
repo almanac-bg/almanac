@@ -15,7 +15,8 @@ whoever comes (a recording of a real game if nobody does) and friends challenged
 evening at 21:00, up to 50 live, out at the first wrong answer; rooms with a code for playing together; friends,
 levels (XP), achievements, titles, avatars, a rating with divisions, and weekly leagues. Points are a game's score,
 XP is what playing earns, rating is strength: kept apart on purpose (`internal/play/worth.go`), and joined in one
-system of progress (`internal/play/progress.go` says how: what earns XP, what unlocks what, what's told when).
+system of progress (`internal/play/progress.go` says how: what earns XP, what unlocks what, what's told when), which a
+new player meets a part at a time, as each starts to matter (`internal/play/unfold.go`).
 
 ## Direction
 
