@@ -24,6 +24,8 @@ type world struct {
 	b    *bank.Bank
 	now  time.Time
 	next int64
+	// pace, if set, is how long a player takes over question n (three seconds otherwise).
+	pace func(n int) time.Duration
 }
 
 func setup(t *testing.T) *world {
@@ -141,7 +143,11 @@ func (w *world) play(user, runID int64, answers ...func(int64, int) json.RawMess
 		if _, err := w.g.Start(w.t.Context(), user, runID, n); err != nil { // its pictures in, if it has any
 			w.t.Fatal(err)
 		}
-		w.wait(3 * time.Second)
+		if w.pace != nil {
+			w.wait(w.pace(n))
+		} else {
+			w.wait(3 * time.Second)
+		}
 		res, err := w.g.Answer(w.t.Context(), user, runID, n, answer(runID, n))
 		if err != nil {
 			w.t.Fatalf("answer %d: %v", n, err)
