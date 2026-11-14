@@ -861,3 +861,12 @@ func TestProfilesOverHTTP(t *testing.T) {
 		t.Fatalf("the profile page: %d\n%s", res.StatusCode, body[:min(len(body), 1500)])
 	}
 }
+
+func TestOrdinal(t *testing.T) {
+	for n, want := range map[int]string{1: "1-ви", 2: "2-ри", 3: "3-ти", 4: "4-ти", 5: "5-и", 7: "7-и", 11: "11-и",
+		12: "12-и", 20: "20-и", 21: "21-ви", 22: "22-ри", 50: "50-и", 100: "100-тен", 101: "101-ви", 1000: "1000-ен"} {
+		if got := ordinal(n); got != want {
+			t.Errorf("ordinal(%d) = %q, want %q", n, got, want)
+		}
+	}
+}

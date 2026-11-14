@@ -85,14 +85,14 @@ function nameForm(): Child {
     h(
       "label",
       { class: "field" },
-      h("span", null, "Таг"),
+      h("span", null, "Потребителско име"),
       h(
         "span",
         { class: "tag-input" },
         h("span", { "aria-hidden": "true" }, "@"),
         h("input", {
           name: "tag",
-          "aria-label": "Таг",
+          "aria-label": "Потребителско име",
           "aria-describedby": "tag-how",
           autocomplete: "username",
           autocapitalize: "none",
@@ -108,7 +108,7 @@ function nameForm(): Child {
       h(
         "small",
         { class: "muted", id: "tag-how" },
-        "Само твой: по него приятелите те намират. Латински букви, цифри и _.",
+        "Само твое: по него приятелите те намират. Латински букви, цифри и _.",
       ),
     ),
     h("button", { class: "btn", disabled: busy }, "Запази"),
@@ -187,7 +187,7 @@ function access(): Child {
     null,
     h("h2", null, "Достъпност"),
     h("p", { class: "muted" }, "Важи за това устройство."),
-    row("По-малко движение", "Без анимации; таймерът пак тече.", calm, setCalm),
+    row("По-малко движение", "Без анимации; часовникът пак тече.", calm, setCalm),
     row("По-едър текст", "Всичко малко по-голямо.", bigText, setBigText),
     row("Тиктакане", "Часовникът, докато въпросът чака.", tickOn, setTick),
   );

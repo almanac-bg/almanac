@@ -41,12 +41,12 @@ var playerErrors = map[error]*apiError{
 	play.ErrOutOfStep:      {http.StatusConflict, "out_of_step", "Играта е продължила другаде. Зареждаме я наново."},
 	play.ErrBadAnswer:      {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
 	play.ErrNoQuestion:     {http.StatusServiceUnavailable, "no_questions", "В момента няма въпроси за игра."},
-	play.ErrNoInvite:       {http.StatusNotFound, "no_invite", "Няма такава покана. Може линкът да е грешен."},
-	play.ErrOwnInvite:      {http.StatusConflict, "own_invite", "Това е твоят линк. Прати го на приятел."},
+	play.ErrNoInvite:       {http.StatusNotFound, "no_invite", "Няма такава покана. Може връзката да е грешна."},
+	play.ErrOwnInvite:      {http.StatusConflict, "own_invite", "Това е твоята покана. Прати я на приятел."},
 	play.ErrNotFriends:     {http.StatusNotFound, "not_friends", "Не сте приятели в играта."},
 	play.ErrManyFriends:    {http.StatusConflict, "many_friends", "Списъкът с приятели е пълен: до 200."},
 	play.ErrNotYours:       {http.StatusForbidden, "not_yours", "Това още не е отключено."},
-	play.ErrNoPlayer:       {http.StatusNotFound, "no_player", "Няма играч с такъв таг."},
+	play.ErrNoPlayer:       {http.StatusNotFound, "no_player", "Няма играч с такова потребителско име."},
 	play.ErrNoDuel:         {http.StatusNotFound, "no_duel", "Този дуел вече го няма."},
 	play.ErrManyWaiting:    {http.StatusConflict, "many_duels", "Пет твои предизвикателства чакат приятели. Изчакай някое да свърши."},
 	play.ErrNobody:         {http.StatusConflict, "nobody", "Точно сега няма с кого да играеш. Опитай след малко."},
@@ -69,8 +69,8 @@ var playerErrors = map[error]*apiError{
 	account.ErrBadCode:     {http.StatusBadRequest, "bad_code", "Грешен код."},
 	account.ErrCodeExpired: {http.StatusBadRequest, "code_expired", "Кодът е изтекъл. Поискай нов."},
 	account.ErrBadName:     {http.StatusBadRequest, "bad_name", "Името трябва да е от 2 до 30 букви, цифри или интервали."},
-	account.ErrBadTag:      {http.StatusBadRequest, "bad_tag", "Тагът е от 3 до 20 латински букви, цифри или _ и започва с буква."},
-	account.ErrTagTaken:    {http.StatusConflict, "tag_taken", "Този таг е зает. Опитай друг."},
+	account.ErrBadTag:      {http.StatusBadRequest, "bad_tag", "Потребителското име е от 3 до 20 латински букви, цифри или _ и започва с буква."},
+	account.ErrTagTaken:    {http.StatusConflict, "tag_taken", "Това потребителско име е заето. Опитай друго."},
 }
 
 // apiHandler runs an API handler: its error becomes a JSON answer, an unexpected one a 500 that's logged.

@@ -8,13 +8,13 @@ function el(name: string, attrs: Record<string, string | number>): SVGElement {
   return e;
 }
 
-/** A season's name: its month and year („Ноември 2026“). */
+/** A season's name: its month and year, in lower case as Bulgarian writes months („Сезон ноември 2026“). */
 export function seasonName(id: string): string {
   const [y = 2026, m = 1] = id.split("-").map(Number);
   const month = new Intl.DateTimeFormat("bg", { month: "long", timeZone: "UTC" }).format(
     new Date(Date.UTC(y, m - 1, 15)),
   );
-  return `${month.charAt(0).toUpperCase()}${month.slice(1)} ${y}`;
+  return `${month} ${y}`;
 }
 
 /** A five-pointed star's points around a centre. */

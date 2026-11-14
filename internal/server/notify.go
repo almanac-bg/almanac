@@ -171,6 +171,25 @@ func (s *Server) remind(ctx context.Context, at time.Time) int {
 	return len(users)
 }
 
+// ordinal is a player's place in digits, as Bulgarian writes it: 1-ви, 2-ри, 3-ти, 4-ти, 5-и … 11-и … 21-ви, 100-тен.
+func ordinal(n int) string {
+	end := "и"
+	switch tens := n % 100; {
+	case n > 0 && n%1000 == 0:
+		end = "ен"
+	case n > 0 && tens == 0:
+		end = "тен"
+	case tens >= 11 && tens <= 19:
+	case n%10 == 1:
+		end = "ви"
+	case n%10 == 2:
+		end = "ри"
+	case n%10 == 3, n%10 == 4:
+		end = "ти"
+	}
+	return fmt.Sprintf("%d-%s", n, end)
+}
+
 // pushKey is what a browser subscribes with (empty: no notifications here).
 func (s *Server) pushKey() string {
 	if s.push == nil {
