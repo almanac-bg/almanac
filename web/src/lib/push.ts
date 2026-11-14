@@ -15,10 +15,17 @@ export const needsHomeScreen = () =>
   !("PushManager" in window) &&
   !matchMedia("(display-mode: standalone)").matches;
 
+/** Registers the service worker as the game opens, so that a tap on „Включи“ finds it ready: on an iPhone the
+ * browser asks about notifications only within a moment of the tap, and a worker still installing then costs it. */
+export function preparePush(): void {
+  if (pushable()) navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
+}
+
 async function registration(): Promise<ServiceWorkerRegistration> {
-  return (
-    (await navigator.serviceWorker.getRegistration("/")) ?? navigator.serviceWorker.register("/sw.js", { scope: "/" })
-  );
+  const reg =
+    (await navigator.serviceWorker.getRegistration("/")) ??
+    (await navigator.serviceWorker.register("/sw.js", { scope: "/" }));
+  return reg.active ? reg : navigator.serviceWorker.ready;
 }
 
 /** Whether this browser has notifications on for the game. */
@@ -28,17 +35,17 @@ export async function pushOn(): Promise<boolean> {
   return !!(await reg?.pushManager.getSubscription());
 }
 
-/** Turns notifications on (asking the player), or says why not. */
+/** Turns notifications on (asking the player), or says why not. It subscribes straight from the player's tap, and the
+ * browser asks for permission as it does: an iPhone allows the subscription only within a moment of a tap, so asking
+ * first (Notification.requestPermission) and subscribing after the player answers is too late there. */
 export async function turnOn(): Promise<string | null> {
-  if ((await Notification.requestPermission()) !== "granted") {
-    return "Браузърът не позволи известия. Може да ги разрешиш от настройките му за сайта.";
-  }
+  if (Notification.permission === "denied") return denied;
   const reg = await registration();
-  await navigator.serviceWorker.ready;
   let sub: PushSubscription;
   try {
     sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key(pushKey) });
   } catch (err) {
+    if (Notification.permission !== "granted") return denied;
     // The browser's push service said no. Brave keeps it off until it's switched on; the others have it on.
     reportProblem(`push subscribe: ${(err as Error).name}: ${(err as Error).message}`);
     return /Brave/.test(navigator.userAgent) || "brave" in navigator
@@ -48,6 +55,8 @@ export async function turnOn(): Promise<string | null> {
   await api("POST", "/api/push", sub.toJSON());
   return null;
 }
+
+const denied = "Браузърът не позволи известия. Може да ги разрешиш от настройките му за сайта.";
 
 export async function turnOff(): Promise<void> {
   const reg = await navigator.serviceWorker.getRegistration("/");

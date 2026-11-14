@@ -150,6 +150,11 @@ export function setSound(on: boolean): void {
   if (on) play("tap");
 }
 
+/** Whether this is an iPhone or iPad, where the sounds keep quiet with the silent switch (the player is told so). */
+export const quietWhenSilent = () =>
+  /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+  (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+
 let audio: AudioContext | null = null;
 let out: AudioNode | null = null;
 /** When (in the audio's time) the last of the sounds that take turns ends. */
@@ -158,9 +163,8 @@ let freeAt = 0;
 function context(): AudioContext | null {
   if (audio) return audio;
   if (typeof AudioContext === "undefined") return null;
-  // On an iPhone: mix with the player's music or podcast rather than stop it, and keep quiet with the silent switch.
-  const session = (navigator as { audioSession?: { type: string } }).audioSession;
-  if (session) session.type = "ambient";
+  // No audio session is set: a page whose only sound is this already gets the "ambient" one on an iPhone (mixing with
+  // the player's music, quiet with the silent switch), and setting it by hand only risks the phone's quirks.
   try {
     audio = new AudioContext();
   } catch {
@@ -183,17 +187,35 @@ function touchedNow(): boolean {
   return navigator.userActivation?.isActive ?? false;
 }
 
-/** Starts the audio on the player's touches and keys, the only time browsers allow it: on a phone a touch counts
- * only as it ends, so its end is listened for too. A phone may stop the audio again (a call, the app in the
- * background), so this keeps listening. */
+/** Starts the audio from inside a touch: resumes it and plays a moment of silence, which is what an iPhone needs to
+ * let the sound out (a resume alone may leave it running but mute). */
+function unlock(c: AudioContext): void {
+  c.resume().catch(() => {});
+  const silence = c.createBufferSource();
+  silence.buffer = c.createBuffer(1, 1, c.sampleRate);
+  silence.connect(c.destination);
+  silence.start();
+}
+
+/** Starts the audio on the player's touches and keys, the only time browsers allow it. An iPhone counts a touch only
+ * as it ends (touchend, click), never as the finger goes down. A phone may stop the audio again (a call, the game in
+ * the background), sometimes leaving it "running" but mute: so this keeps listening, and as the game comes back to
+ * the screen it stops the audio and starts it again. */
 export function prepareSound(): void {
   const start = () => {
     if (!soundOn.peek()) return;
     const c = context();
-    if (c && c.state !== "running") c.resume().catch(() => {});
+    if (c && c.state !== "running") unlock(c);
   };
-  for (const event of ["pointerdown", "pointerup", "touchend", "keydown"])
+  for (const event of ["touchend", "click", "keydown"])
     addEventListener(event, start, { capture: true, passive: true });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || !audio || audio.state === "closed") return;
+    const c = audio;
+    c.suspend()
+      .then(() => c.resume())
+      .catch(() => {});
+  });
 }
 
 /** Plays a sound, if sounds are on and the browser allows them (else nothing: never a backlog later). `lift` raises
@@ -205,7 +227,7 @@ export function play(name: SoundName, lift = 0): void {
   if (c.state !== "running") {
     // Not started yet (the very first touch) or stopped by the phone: a sound asked for by a touch starts it.
     if (!touchedNow()) return;
-    c.resume().catch(() => {});
+    unlock(c);
   }
   const notes = sounds[name];
   let t0 = c.currentTime + 0.01;
