@@ -3,7 +3,7 @@
 // friends, and how the last duels went.
 
 import { emblem } from "../art/emblem.ts";
-import { review } from "../game/results.ts";
+import { nextSteps, reviewParts } from "../game/results.ts";
 import { playRun } from "../game/run.ts";
 import type { Reviewed, State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
@@ -327,8 +327,13 @@ function afterDuel(id: number): Child {
   });
 }
 
-/** A duel as it stands or ended: who won, the two scores, the rating it moved; and the questions to go over. */
-export function ended(d: DuelView, more: Child = null): Child {
+/** A duel as it stands or ended: who won, the two scores, the rating it moved; what to do next (`again`: another
+ * duel, after a live one); what the game earned (`more`); and the questions to go over. */
+export function ended(d: DuelView, again: Child = null, more: Child = null): Child {
+  const questions =
+    d.runId && d.you?.done
+      ? reviewParts(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${d.runId}/review`)).questions)
+      : null;
   const heading =
     d.state === "wait"
       ? "Изигра своя дуел"
@@ -387,13 +392,15 @@ export function ended(d: DuelView, more: Child = null): Child {
             : null,
         )
       : null,
+    // The gold button is another duel where there's one (a live one), else the way back to the duels; the rest are
+    // plain, side by side.
+    nextSteps(again ?? toDuels(true), [questions?.button, again ? toDuels(false) : null]),
     more,
-    h("a", { class: more ? "btn big" : "btn primary big", href: "/duel" }, "Към дуелите"),
-    d.runId && d.you?.done
-      ? review(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${d.runId}/review`)).questions)
-      : null,
+    questions?.list,
   );
 }
+
+const toDuels = (main: boolean) => h("a", { class: main ? "btn primary big" : "btn", href: "/duel" }, "Към дуелите");
 
 function side(label: string, s: Side, tag?: string): Child {
   return h(

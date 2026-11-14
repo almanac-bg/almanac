@@ -193,7 +193,14 @@ function fresh(n: News): Child {
           "ul",
           { class: "unlock-list" },
           n.achievements.map(earned),
-          n.unlocks.slice(0, shownUnlocks).map((u) => unlockRow(u, n.avatar)),
+          n.unlocks.slice(0, shownUnlocks).map((u) =>
+            // What an achievement just told here unlocks needs no „С постижението …“: it's right above.
+            unlockRow(
+              u,
+              n.avatar,
+              n.achievements.some((a) => u.from.includes(`„${a.name}“`)),
+            ),
+          ),
         )
       : null,
     mastery,
@@ -216,14 +223,14 @@ function earned(a: AchievementInfo): Child {
       "span",
       { class: "unlock-text" },
       h("strong", null, a.name),
-      h("span", { class: "muted" }, a.about),
+      h("span", { class: "unlock-about" }, a.about),
       h("span", { class: "unlock-reward" }, `${cap(tierWords[a.tier].one)} постижение · +${a.xp ?? 0} XP`),
     ),
   );
 }
 
-/** Something just unlocked to wear, drawn, and a tap from being worn. */
-function unlockRow(u: Unlock, worn: string): Child {
+/** Something just unlocked to wear, drawn, and a tap from being worn (`told`: what unlocked it is told already). */
+function unlockRow(u: Unlock, worn: string, told = false): Child {
   return h(
     "li",
     { class: u.tier ? `unlock-row t-${u.tier}` : "unlock-row" },
@@ -232,7 +239,7 @@ function unlockRow(u: Unlock, worn: string): Child {
       "span",
       { class: "unlock-text" },
       h("strong", { class: u.kind === "title" ? "unlock-title-name" : undefined }, cap(unlockWords(u))),
-      h("span", { class: "muted" }, `С ${u.from}.`),
+      told ? null : h("span", { class: "unlock-about" }, `С ${u.from}.`),
     ),
     wear(u, worn),
   );

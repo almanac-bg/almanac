@@ -24,18 +24,18 @@ export function mistakes() {
         "div",
         { class: "screen" },
         h("p", { class: "kicker" }, "Втори шанс"),
-        summary(s, null, [
-          news(s.id),
-          () =>
-            h(
-              "div",
-              { class: "actions" },
+        summary(
+          s,
+          null,
+          {
+            main: () =>
               more()
                 ? h("button", { class: "btn primary big", onclick: again }, "Още въпроси")
                 : h("a", { class: "btn primary big", href: "/almanac" }, "Към Алманаха"),
-              h("a", { class: "btn", href: "/" }, "Към началото"),
-            ),
-        ]),
+            also: [h("a", { class: "btn", href: "/" }, "Към началото")],
+          },
+          [news(s.id)],
+        ),
       );
     },
   );

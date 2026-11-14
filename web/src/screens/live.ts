@@ -409,13 +409,14 @@ function end(v: LiveView, again: () => void): Child {
     },
     (err) => error.set((err as ApiError).message),
   );
-  const more = (d: DuelView) => [
-    h("button", { class: "btn primary big", type: "button", onclick: again }, "Още един дуел"),
-    d.runId ? news(d.runId) : null,
-  ];
   return h("div", null, () => {
     const d = kept();
-    if (d) return ended(d, more(d));
+    if (d)
+      return ended(
+        d,
+        h("button", { class: "btn primary big", type: "button", onclick: again }, "Още един дуел"),
+        d.runId ? news(d.runId) : null,
+      );
     return error() ? problem("Дуелът свърши", error(), again) : h("p", { class: "muted" }, "…");
   });
 }

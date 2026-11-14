@@ -2,7 +2,7 @@
 // The server sends the room as this player sees it after every change; the browser reconnects if the line drops.
 
 import { answered, ask, picture } from "../game/questions.ts";
-import { boardRow, review, shareButton } from "../game/results.ts";
+import { boardRow, nextSteps, reviewParts, shareButton } from "../game/results.ts";
 import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
@@ -355,6 +355,7 @@ function end(view: () => RoomView, code: string): Child {
   // The room's winner hears it; everyone else, just the end.
   const first = untracked(view);
   play(first.players.length > 1 && first.players[0]?.me ? "win" : "end");
+  const questions = reviewParts(async () => view().review ?? []);
   return h(
     "div",
     { class: "screen" },
@@ -372,12 +373,15 @@ function end(view: () => RoomView, code: string): Child {
         ? h("p", { class: "points-bonus" }, `Всички верни: +${formatNumber(view().allRight ?? 0)} т.`)
         : null,
     standings(view, false),
-    () =>
-      view().canLead
-        ? h("button", { class: "btn primary big", onclick: () => lead(code, "start", error.set) }, "Нова игра")
-        : null,
-    waiting(view, "започне нова игра"),
+    // Who leads starts the next game (the gold button); everyone else waits for it. The questions to go over, beside.
+    nextSteps(
+      () =>
+        view().canLead
+          ? h("button", { class: "btn primary big", onclick: () => lead(code, "start", error.set) }, "Нова игра")
+          : waiting(view, "започне нова игра"),
+      [questions.button],
+    ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
-    review(async () => view().review ?? []),
+    questions.list,
   );
 }

@@ -69,7 +69,7 @@ export function rooms() {
           inputmode: "numeric",
           autocomplete: "off",
           maxlength: 7,
-          placeholder: "123 456",
+          placeholder: "6 цифри",
           "aria-label": "Код на стаята",
           oninput: (e: Event) => {
             code.set((e.target as HTMLInputElement).value);

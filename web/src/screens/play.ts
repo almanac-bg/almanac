@@ -113,15 +113,15 @@ export function topic([id = ""]: string[]) {
         "div",
         { class: "screen" },
         h("p", { class: "kicker" }, name),
-        summary(s, null, [
-          news(s.id),
-          h(
-            "div",
-            { class: "actions" },
-            h("button", { class: "btn primary big", onclick: again }, "Още десет"),
-            h("a", { class: "btn", href: "/" }, "Друга тема"),
-          ),
-        ]),
+        summary(
+          s,
+          null,
+          {
+            main: h("button", { class: "btn primary big", onclick: again }, "Още десет"),
+            also: [h("a", { class: "btn", href: "/" }, "Друга тема")],
+          },
+          [news(s.id)],
+        ),
       ),
   );
 }
