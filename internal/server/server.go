@@ -144,6 +144,10 @@ func New(cfg Config, d Deps) (*Server, error) {
 // (later counts run by themselves as they fall due).
 func (s *Server) CountCrowds(ctx context.Context) error { return s.game.CountCrowds(ctx) }
 
+// JudgeRuns judges the games a migration left for the bank to judge (play.JudgeRuns): which were played at a script's
+// speed. Run as the server starts, before it serves; it says how many it marked.
+func (s *Server) JudgeRuns(ctx context.Context) (int, error) { return s.game.JudgeRuns(ctx) }
+
 // SetBank swaps in a new bank (a reload): new plays use it, plays under way keep theirs.
 func (s *Server) SetBank(b *bank.Bank) { s.bank.Store(b) }
 

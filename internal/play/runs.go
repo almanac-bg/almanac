@@ -198,7 +198,8 @@ type Score struct {
 	Look
 }
 
-// Board is a day's results: the best, and the viewer's place among everyone.
+// Board is a day's results: the best, and the viewer's place among everyone. A game played at a script's speed is on
+// it for its player alone (fairFor): they see it with the others, and their place among them as if it counted.
 type Board struct {
 	Day     string  `json:"day"`
 	Players int     `json:"players"`
@@ -211,14 +212,15 @@ type Board struct {
 // BoardOf reads a day's board for a viewer (0: nobody signed in).
 func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, error) {
 	b := Board{Day: day, Top: []Score{}}
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT count(*) FROM runs WHERE kind = 'day' AND day = ? AND finished_at IS NOT NULL`, day).
-		Scan(&b.Players)
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT count(*) FROM runs r WHERE r.kind = 'day' AND r.day = ?1
+		AND r.finished_at IS NOT NULL AND `+fairFor("r", "?2"), day, viewer).Scan(&b.Players)
 	if err != nil {
 		return b, err
 	}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+`
 		FROM runs r JOIN users u ON u.id = r.user_id
-		WHERE r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL ORDER BY r.points DESC, r.ms, r.id LIMIT 20`, day)
+		WHERE r.kind = 'day' AND r.day = ?1 AND r.finished_at IS NOT NULL AND `+fairFor("r", "?2")+`
+		ORDER BY r.points DESC, r.ms, r.id LIMIT 20`, day, viewer)
 	if err != nil {
 		return b, err
 	}
@@ -256,7 +258,7 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	mine.Me = true
 	b.Mine = &mine
 	err = g.DB.Read.QueryRowContext(ctx, `SELECT 1 + count(*) FROM runs WHERE kind = 'day' AND day = ? AND finished_at IS NOT NULL
-		AND (points > ? OR (points = ? AND (ms < ? OR (ms = ? AND id < ?))))`,
+		AND NOT scripted AND (points > ? OR (points = ? AND (ms < ? OR (ms = ? AND id < ?))))`,
 		day, mine.Points, mine.Points, mine.Ms, mine.Ms, runID).Scan(&b.Place)
 	return b, err
 }

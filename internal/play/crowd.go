@@ -15,7 +15,8 @@ import (
 // Crowds: how players have answered each question (bank.Crowd), shown with its answer — what share picked each
 // option, where the typed numbers fell, how many got it right. They're counted from the answer log now and then, in
 // the background, so that showing one never waits on the count; a question shows its crowd once it has CrowdFrom
-// answers since it last changed (a crowd that answered other options says nothing of these).
+// answers since it last changed (a crowd that answered other options says nothing of these). A crowd is people's: the
+// answers of games played at a script's speed aren't in it (fair.go).
 //
 // The day's ten are the same for everyone, so a question of the day shows how that day's other players answered it
 // („… от играчите днес“), counted with each answer, once DayCrowdFrom of them have; until then everyone's. The share
@@ -77,7 +78,7 @@ func (g *Game) CountCrowds(ctx context.Context) error {
 }
 
 func (g *Game) countCrowds(ctx context.Context, now time.Time, b *bank.Bank) error {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, given, is_right, at FROM answers`)
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, given, is_right, at FROM answers WHERE `+FairAnswers)
 	if err != nil {
 		return err
 	}
@@ -192,7 +193,8 @@ func (g *Game) dayCrowd(ctx context.Context, db querier, day string, q bank.Ques
 	// The question's answers since the day began (answers_question), each run looked up by its key: CROSS JOIN keeps
 	// that order, which the planner wouldn't choose without statistics (it would go through every day's runs).
 	rows, err := db.QueryContext(ctx, `SELECT a.given, count(*), sum(a.is_right) FROM answers a CROSS JOIN runs r ON r.id = a.run_id
-		WHERE a.question_id = ? AND a.at >= ? AND r.kind = 'day' AND r.day = ? AND r.user_id <> ? GROUP BY a.given`,
+		WHERE a.question_id = ? AND a.at >= ? AND r.kind = 'day' AND r.day = ? AND r.user_id <> ? AND NOT r.scripted
+		GROUP BY a.given`,
 		id, max(start.UnixMilli(), changedMs(q)), day, userID)
 	if err != nil {
 		return nil, err

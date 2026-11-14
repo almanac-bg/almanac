@@ -127,7 +127,8 @@ func (g *Game) RatingBoard(ctx context.Context, viewer int64, friends bool) (Ran
 }
 
 // KnowledgeBoard is the best share of right answers, over every topic ("") or in one, among those with enough
-// answers there (KnowAll, KnowTopic): who knows the most, whatever the speed. A time-out counts as wrong.
+// answers there (KnowAll, KnowTopic): who knows the most, whatever the speed. A time-out counts as wrong. Games played
+// at a script's speed count for their player alone (fairFor).
 func (g *Game) KnowledgeBoard(ctx context.Context, viewer int64, friends bool, topic string) (Ranking, error) {
 	b := g.Bank()
 	ids, least := "", KnowAll // no list: every answer
@@ -150,7 +151,7 @@ func (g *Game) KnowledgeBoard(ctx context.Context, viewer int64, friends bool, t
 	return g.ranking(ctx, viewer, `SELECT u.id, u.name, u.tag, CAST(round(100.0 * k.ok / k.n) AS INTEGER), k.n, `+
 		lookColumns+`
 		FROM (SELECT r.user_id, count(*) AS n, sum(a.is_right) AS ok FROM answers a JOIN runs r ON r.id = a.run_id
-			WHERE ?2 = '' OR a.question_id IN (SELECT value FROM json_each(?2))
+			WHERE `+fairFor("r", "?9")+` AND (?2 = '' OR a.question_id IN (SELECT value FROM json_each(?2)))
 			GROUP BY r.user_id HAVING count(*) >= ?1) k JOIN users u ON u.id = k.user_id
 		WHERE 1`+among(friends)+` ORDER BY 1.0 * k.ok / k.n DESC, k.n DESC, u.id`, false, least, ids)
 }

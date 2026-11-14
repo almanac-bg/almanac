@@ -166,6 +166,12 @@ func serve([]string) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	// Before anything is served: the games played before each was judged as its answers came in (play/fair.go).
+	if n, err := srv.JudgeRuns(ctx); err != nil {
+		slog.Error("judging runs", "err", err)
+	} else if n > 0 {
+		slog.Info("judged runs", "scripted", n)
+	}
 	go outbox.Run(ctx)
 	go every(ctx, time.Hour, func() {
 		if err := accounts.CleanUp(ctx); err != nil && ctx.Err() == nil {

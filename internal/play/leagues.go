@@ -1,9 +1,11 @@
 package play
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/store"
@@ -16,6 +18,10 @@ import (
 // three are paid XP (LeaguePay), and everyone is told how their week ended. A group of fewer than RaceSize isn't a
 // race: nobody in it goes up or is paid for a place, and its first place unlocks nothing. A week not played changes
 // nothing.
+//
+// A game played at a script's speed (fair.go) races for its player alone: its XP is in the week as they see it, and
+// in the place they're told and paid for at its end, never in anyone else's (standingsFor). It's still XP for their
+// own level, as everything they play is theirs: the league is the one place it would count against others.
 //
 // The leagues are six mountains, from the lowest highest peak to the highest: Странджа to Рила. They aren't metals,
 // so that they don't read as the rating's divisions: the rating is strength (rating.go), the league is playing.
@@ -83,10 +89,13 @@ func weekBounds(week string) (time.Time, time.Time) {
 	return from, from.AddDate(0, 0, 7)
 }
 
-// weekXP is a SQL expression for the XP a player (a column) has earned in a week: ?1 and ?2 its bounds in ms, ?3 and
-// ?4 its first day and the next week's (YYYY-MM-DD). What a week's place pays isn't in it: that's the next week's.
-func weekXP(user string) string {
-	return `(coalesce((SELECT sum(xp) FROM runs WHERE user_id = ` + user + ` AND finished_at >= ?1 AND finished_at < ?2), 0)
+// weekXP is a SQL expression for the XP a player (a column) has earned in a week, as a viewer (another SQL
+// expression) sees it: their own in full, another's without the games played at a script's speed. ?1 and ?2 are its
+// bounds in ms, ?3 and ?4 its first day and the next week's (YYYY-MM-DD). What a week's place pays isn't in it:
+// that's the next week's.
+func weekXP(user, viewer string) string {
+	return `(coalesce((SELECT sum(r.xp) FROM runs r WHERE r.user_id = ` + user + ` AND r.finished_at >= ?1 AND r.finished_at < ?2
+			AND ` + fairFor("r", viewer) + `), 0)
 		+ coalesce((SELECT sum(xp) FROM goals_done WHERE user_id = ` + user + ` AND day >= ?3 AND day < ?4), 0)
 		+ coalesce((SELECT sum(xp) FROM achievements WHERE user_id = ` + user + ` AND at >= ?1 AND at < ?2), 0))`
 }
@@ -108,16 +117,19 @@ type LeagueNews struct {
 	XP    int
 }
 
-// standing is a player's place in a group: who, the week's XP, and when they came.
+// standing is a player's place in a group: who, the week's XP as the others see it, theirs as they see it (with
+// their games played at a script's speed), and when they came.
 type standing struct {
-	user   int64
-	xp     int
-	joined int64
+	user    int64
+	xp, own int
+	joined  int64
 }
 
-// groupStandings are a group's players by the week's XP, the first first (who came first, on equal XP).
+// groupStandings are a group's players by the week's XP as the others see it, the first first (who came first, on
+// equal XP).
 func groupStandings(ctx context.Context, q querier, week string, group int64) ([]standing, error) {
-	rows, err := q.QueryContext(ctx, `SELECT m.user_id, `+weekXP("m.user_id")+`, m.joined_at FROM league_members m
+	rows, err := q.QueryContext(ctx, `SELECT m.user_id, `+weekXP("m.user_id", "0")+`, `+weekXP("m.user_id", "m.user_id")+`,
+			m.joined_at FROM league_members m
 		WHERE m.group_id = ?5 ORDER BY 2 DESC, m.joined_at, m.user_id`, append(weekArgs(week), group)...)
 	if err != nil {
 		return nil, err
@@ -126,12 +138,30 @@ func groupStandings(ctx context.Context, q querier, week string, group int64) ([
 	var out []standing
 	for rows.Next() {
 		var s standing
-		if err := rows.Scan(&s.user, &s.xp, &s.joined); err != nil {
+		if err := rows.Scan(&s.user, &s.xp, &s.own, &s.joined); err != nil {
 			return nil, err
 		}
 		out = append(out, s)
 	}
 	return out, rows.Err()
+}
+
+// standingsFor is a group's standings as one of its players sees them: their own XP with everything they played,
+// everyone else's as the others see it. A player whose games are all a person's sees the group as everyone does.
+func standingsFor(list []standing, viewer int64) []standing {
+	out := slices.Clone(list)
+	for i := range out {
+		if out[i].user == viewer {
+			out[i].xp = out[i].own
+		}
+	}
+	slices.SortStableFunc(out, func(a, b standing) int {
+		if a.xp != b.xp {
+			return b.xp - a.xp
+		}
+		return cmp.Or(cmp.Compare(a.joined, b.joined), cmp.Compare(a.user, b.user))
+	})
+	return out
 }
 
 // ensureWeek ends the week being played if it's over: every group's places are kept, the leagues move and the
@@ -183,7 +213,12 @@ func (g *Game) ensureWeek(ctx context.Context) error {
 			}
 			n := len(list)
 			up, down := moves(n)
-			for i, s := range list {
+			// Each one's place is in the group as they see it (standingsFor): for those who played as people, the
+			// same for all.
+			for _, member := range list {
+				seen := standingsFor(list, member.user)
+				i := slices.IndexFunc(seen, func(s standing) bool { return s.user == member.user })
+				s := seen[i]
 				moved, pay := 0, 0
 				switch {
 				case i < up && s.xp > 0 && gr.tier < TopLeague:
@@ -230,7 +265,7 @@ func (g *Game) joinLeague(ctx context.Context, userID int64) error {
 	return g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var in, xp, tier int
 		if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM league_members WHERE week = ?5 AND user_id = ?6),
-			`+weekXP("?6")+`, (SELECT league FROM users WHERE id = ?6)`, append(weekArgs(week), week, userID)...).
+			`+weekXP("?6", "?6")+`, (SELECT league FROM users WHERE id = ?6)`, append(weekArgs(week), week, userID)...).
 			Scan(&in, &xp, &tier); err != nil {
 			return err
 		}
@@ -339,6 +374,7 @@ func (g *Game) LeagueOf(ctx context.Context, userID int64) (LeagueView, error) {
 	if err != nil {
 		return v, err
 	}
+	list = standingsFor(list, userID)
 	v.Up, v.Down = moves(len(list))
 	if tier == TopLeague {
 		v.Up = 0
