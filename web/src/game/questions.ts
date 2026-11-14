@@ -154,7 +154,8 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
     { class: "number" },
     h(
       "div",
-      { class: "number-out" },
+      // Keys land here wherever focus is, so it always looks like a field in focus: a ring and a blinking caret.
+      { class: () => (locked() ? "number-out" : "number-out live") },
       view.signed
         ? h(
             "button",
@@ -169,11 +170,7 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
             "−",
           )
         : null,
-      h(
-        "output",
-        { class: () => (shown() ? "typed" : "typed empty"), "aria-live": "polite", "aria-label": "Твоят отговор" },
-        () => shown() || "?",
-      ),
+      h("output", { class: "typed", "aria-live": "polite", "aria-label": "Твоят отговор" }, shown),
       view.unit ? h("span", { class: "unit" }, view.unit) : null,
     ),
     h(

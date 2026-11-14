@@ -1564,6 +1564,12 @@
     border: 1px solid var(--line);
     border-radius: var(--radius-md);
     background: var(--sunken);
+    cursor: text;
+  }
+
+  .number-out.live {
+    border-color: var(--accent);
+    box-shadow: var(--focus);
   }
 
   .typed {
@@ -1577,8 +1583,23 @@
     white-space: nowrap;
   }
 
-  .typed.empty {
-    color: var(--text-muted);
+  /* The caret after the digits, blinking while the field takes keys. */
+  .number-out.live .typed::after {
+    content: "";
+    display: inline-block;
+    width: 3px;
+    height: 0.85em;
+    margin-left: 2px;
+    border-radius: 2px;
+    background: var(--accent);
+    vertical-align: -0.05em;
+    animation: caret 1s steps(1) infinite;
+  }
+
+  @keyframes caret {
+    50% {
+      opacity: 0;
+    }
   }
 
   .sign-key {
@@ -3757,7 +3778,8 @@
 
     .option.right,
     .option.wrong,
-    .verdict-pts {
+    .verdict-pts,
+    .number-out.live .typed::after {
       animation: none;
     }
   }
