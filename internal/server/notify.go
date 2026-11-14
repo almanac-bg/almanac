@@ -79,6 +79,54 @@ func (s *Server) unsubscribe(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]bool{"on": false})
 }
 
+// addPhone keeps a phone's token from its maker's push service, for its player: the game's app sends it once the
+// player allows notifications, and again whenever it opens (a token can change).
+func (s *Server) addPhone(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	if s.phones == nil {
+		return errNotFound
+	}
+	var in struct {
+		Platform string `json:"platform"`
+		Token    string `json:"token"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	if s.phones.CheckPhone(in.Platform, in.Token) != nil {
+		return errBadRequest
+	}
+	_, err = s.db.Write.ExecContext(r.Context(), `INSERT INTO phones (token, user_id, platform, created_at) VALUES (?, ?, ?, ?)
+		ON CONFLICT (token) DO UPDATE SET user_id = excluded.user_id, platform = excluded.platform`,
+		in.Token, u.ID, in.Platform, store.Now())
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]bool{"on": true})
+}
+
+// removePhone forgets a phone's token: its player turned notifications off there.
+func (s *Server) removePhone(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		Token string `json:"token"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	_, err = s.db.Write.ExecContext(r.Context(), `DELETE FROM phones WHERE token = ? AND user_id = ?`, in.Token, u.ID)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]bool{"on": false})
+}
+
 // pushKind is what a notification is about. Each player chooses which kinds they get (push_prefs); a kind they
 // haven't chosen for is at its default.
 type pushKind string
@@ -168,31 +216,35 @@ func (s *Server) setPushPref(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"prefs": prefs})
 }
 
-// notify sends a message of a kind to every browser of these players that asked for notifications, if they want that
-// kind, a few at a time.
+// notify sends a message of a kind to every browser and phone of these players that asked for notifications, if they
+// want that kind, a few at a time.
 func (s *Server) notify(ctx context.Context, kind pushKind, m push.Message, userIDs ...int64) {
-	if s.push == nil || len(userIDs) == 0 {
+	if (s.push == nil && s.phones == nil) || len(userIDs) == 0 {
 		return
 	}
+	// A target is a browser's subscription or a phone's token (with its platform).
 	type target struct {
-		sub  push.Subscription
-		user int64
+		sub      push.Subscription
+		platform string
+		token    string
 	}
-	q := `SELECT endpoint, p256dh, auth FROM push_subs p WHERE user_id = ?`
-	if kind != pushAsked {
-		q += ` AND ` + wants(kind, "p.user_id")
+	want := func(alias string) string {
+		if kind == pushAsked {
+			return ""
+		}
+		return ` AND ` + wants(kind, alias+".user_id")
 	}
 	var targets []target
 	for _, id := range userIDs {
-		rows, err := s.db.Read.QueryContext(ctx, q, id)
+		rows, err := s.db.Read.QueryContext(ctx, `SELECT endpoint, p256dh, auth, '', '' FROM push_subs b WHERE user_id = ?`+want("b")+`
+			UNION ALL SELECT '', '', '', platform, token FROM phones f WHERE user_id = ?`+want("f"), id, id)
 		if err != nil {
 			slog.Error("push", "err", err)
 			return
 		}
 		for rows.Next() {
 			var t target
-			t.user = id
-			if rows.Scan(&t.sub.Endpoint, &t.sub.Keys.P256dh, &t.sub.Keys.Auth) == nil {
+			if rows.Scan(&t.sub.Endpoint, &t.sub.Keys.P256dh, &t.sub.Keys.Auth, &t.platform, &t.token) == nil {
 				targets = append(targets, t)
 			}
 		}
@@ -203,11 +255,20 @@ func (s *Server) notify(ctx context.Context, kind pushKind, m push.Message, user
 	for range min(8, len(targets)) {
 		wg.Go(func() {
 			for t := range work {
-				err := s.push.Send(ctx, t.sub, m)
+				var err error
 				switch {
-				case errors.Is(err, push.ErrGone):
-					_, _ = s.db.Write.ExecContext(ctx, `DELETE FROM push_subs WHERE endpoint = ?`, t.sub.Endpoint)
-				case err != nil:
+				case t.token != "" && s.phones != nil:
+					err = s.phones.Send(ctx, t.platform, t.token, m)
+					if errors.Is(err, push.ErrGone) {
+						_, _ = s.db.Write.ExecContext(ctx, `DELETE FROM phones WHERE token = ?`, t.token)
+					}
+				case t.token == "" && s.push != nil:
+					err = s.push.Send(ctx, t.sub, m)
+					if errors.Is(err, push.ErrGone) {
+						_, _ = s.db.Write.ExecContext(ctx, `DELETE FROM push_subs WHERE endpoint = ?`, t.sub.Endpoint)
+					}
+				}
+				if err != nil && !errors.Is(err, push.ErrGone) {
 					slog.Warn("push", "err", err)
 				}
 			}
@@ -240,7 +301,7 @@ func (s *Server) Remind(ctx context.Context) {
 // remind does the day's reminding if it's time and it isn't done yet. The day it last did is kept, so a restart
 // around then doesn't remind twice. It says how many it reminded.
 func (s *Server) remind(ctx context.Context, at time.Time) int {
-	if s.push == nil {
+	if s.push == nil && s.phones == nil {
 		return 0
 	}
 	now := at.In(bulgaria())
@@ -258,7 +319,8 @@ func (s *Server) remind(ctx context.Context, at time.Time) int {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return 0 // done today
 	}
-	rows, err := s.db.Read.QueryContext(ctx, `SELECT DISTINCT p.user_id FROM push_subs p WHERE `+wants(pushDay, "p.user_id")+`
+	rows, err := s.db.Read.QueryContext(ctx, `SELECT DISTINCT p.user_id FROM (SELECT user_id FROM push_subs
+		UNION SELECT user_id FROM phones) p WHERE `+wants(pushDay, "p.user_id")+`
 		AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.user_id = p.user_id AND r.kind = 'day' AND r.day = ?
 		AND r.finished_at IS NOT NULL)`, today)
 	if err != nil {

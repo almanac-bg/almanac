@@ -418,6 +418,7 @@ func Merge(tx *sql.Tx, from, to int64) error {
 		// The guest's notifications come along, with what they chose of them (unless the account has chosen), and
 		// the Роял they said they'd come to.
 		{`UPDATE push_subs SET user_id = ? WHERE user_id = ?`, []any{to, from}},
+		{`UPDATE phones SET user_id = ? WHERE user_id = ?`, []any{to, from}},
 		{`INSERT OR IGNORE INTO push_prefs (user_id, kind, wanted) SELECT ?, kind, wanted FROM push_prefs WHERE user_id = ?`,
 			[]any{to, from}},
 		{`UPDATE OR IGNORE royal_plans SET user_id = ? WHERE user_id = ?`, []any{to, from}},

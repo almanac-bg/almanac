@@ -91,6 +91,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		"categories": b.Categories,
 		"version":    s.cfg.Version,
 		"push":       s.pushKey(),
+		"phones":     s.phones.Platforms(), // the platforms the game's app gets notifications on
 	})
 	m := assets.Manifest(s.client)
 	title, description := s.preview(r)

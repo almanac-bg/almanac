@@ -7,6 +7,7 @@
 // end, a level, an achievement…) take turns: one asked for while another still sounds follows it, never on top. On
 // a phone the sounds mix with whatever the player is listening to and keep quiet with the silent switch.
 
+import { feel } from "./app.ts";
 import { signal } from "./dom.ts";
 
 export type SoundName =
@@ -251,8 +252,10 @@ export function play(name: SoundName, lift = 0): void {
   }
 }
 
-/** How an answer sounds: a right one a semitone higher for each before it in a row, up to a fifth. */
+/** How an answer sounds: a right one a semitone higher for each before it in a row, up to a fifth. In the app it's
+ * felt too, sound or not. */
 export function playAnswer(kind: "exact" | "right" | "partial" | "wrong" | "time", inRow = 0): void {
+  feel(kind);
   const right = kind === "exact" || kind === "right";
   play(kind, right ? Math.min(Math.max(inRow - 1, 0), 7) : 0);
 }

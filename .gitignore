@@ -9,7 +9,7 @@
 *.db
 *.db-shm
 *.db-wal
-/node_modules/
+node_modules/
 /test-results/
 /playwright-report/
 .DS_Store

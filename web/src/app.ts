@@ -3,11 +3,12 @@
 
 import { loadPictures } from "./art/picture.ts";
 import { type ApiError, api } from "./lib/api.ts";
+import { startApp } from "./lib/app.ts";
 import { type Child, effect, h, mount, signal } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { applyPrefs } from "./lib/prefs.ts";
 import { preparePush } from "./lib/push.ts";
-import { path, start } from "./lib/router.ts";
+import { go, path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
 import { almanac } from "./screens/almanac.ts";
 import { duel, duelOne, playChallenge, until } from "./screens/duel.ts";
@@ -43,6 +44,7 @@ const links: [href: string, label: string, icon: string, here: (p: string) => bo
 
 reportErrors();
 applyPrefs();
+startApp(go);
 loadPictures().catch(() => {}); // the illustrations, in a file of their own: on their way at once
 
 const root = document.getElementById("app");
