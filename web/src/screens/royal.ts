@@ -14,7 +14,7 @@ import { ordinal } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { play } from "../lib/sound.ts";
 import { categories, player, user } from "../state.ts";
-import { avatar, pageArt, type Tier, type VerdictKind, verdict, who } from "../ui.ts";
+import { avatar, back, pageArt, type Tier, type VerdictKind, verdict, who } from "../ui.ts";
 import { type Standing, standingCard } from "./duel.ts";
 
 type Phase = "soon" | "lobby" | "question" | "reveal" | "end";
@@ -197,9 +197,10 @@ function soon(view: () => Evening, now: Signal<number>): Child {
     h(
       "div",
       { class: "intro" },
+      back("/", "Начало"),
       pageArt("royal", "tone-gold"),
       h("h1", null, "Роял"),
-      h("p", { class: "lead" }, about),
+      h("p", { class: "muted" }, about),
     ),
     h(
       "section",
@@ -297,11 +298,11 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
     h(
       "div",
       { class: "intro" },
-      h("p", { class: "kicker" }, "Роял"),
+      back("/", "Начало"),
       h(
         "h1",
         null,
-        "Започва след ",
+        "Роял започва след ",
         h("span", { class: "royal-count" }, () => left(view().startsAt - now())),
       ),
       h(

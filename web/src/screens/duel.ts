@@ -10,7 +10,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { checkWaiting, player, user } from "../state.ts";
-import { formatNumber, meter, pageArt, profileHref, type Tier, who } from "../ui.ts";
+import { back, formatNumber, meter, pageArt, profileHref, type Tier, who } from "../ui.ts";
 
 interface Side {
   name: string;
@@ -150,18 +150,15 @@ export function duel() {
     h(
       "div",
       { class: "intro" },
+      back("/", "Начало"),
       pageArt("duel", "tone-rose"),
       h("h1", null, "Дуел"),
       h(
         "p",
-        { class: "lead" },
+        { class: "muted" },
         "Ти и друг играч, на живо: едни и същи десет въпроса, в един и същи миг. Ако до 30 секунди не дойде никой, играеш срещу запис на истинска игра.",
       ),
     ),
-    () => {
-      const d = data();
-      return d ? standingCard(d.standing) : null;
-    },
     h(
       "button",
       {
@@ -175,6 +172,10 @@ export function duel() {
       "Намери съперник",
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    () => {
+      const d = data();
+      return d ? standingCard(d.standing) : null;
+    },
     () => {
       const list = data()?.duels ?? [];
       const turn = list.filter((d) => d.state === "play");
@@ -206,7 +207,12 @@ export function duel() {
                 ),
               ),
             )
-          : h("p", { class: "muted" }, "Добави приятели в Профил → Приятели и ги предизвиквай тук."),
+          : h(
+              "p",
+              { class: "muted" },
+              h("a", { href: "/friends" }, "Добави приятели"),
+              " и ги предизвиквай тук, когато им е удобно.",
+            ),
         done.length ? section("История", done.slice(0, 20)) : null,
       ];
     },

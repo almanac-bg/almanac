@@ -6,7 +6,7 @@ import { api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { categories } from "../state.ts";
-import { games, questions, stat, streak } from "../ui.ts";
+import { stat, streak } from "../ui.ts";
 
 export interface Stats {
   streak: number;
@@ -65,7 +65,6 @@ export function stats(): Child {
     if (s.games === 0) return [streak(s.streak, s.week), h("p", { class: "muted" }, "Още няма изиграни игри.")];
     const place = day()?.place;
     return [
-      h("p", { class: "muted" }, `${games(s.games)} · ${questions(s.answers)}`),
       streak(s.streak, s.week),
       h(
         "div",
@@ -75,7 +74,7 @@ export function stats(): Child {
           : stat(String(s.days), "дни с въпросите на деня", "gold"),
         stat(`${percent(s.right, s.answers)}%`, "верни отговори", "mint"),
         s.duels > 0 ? stat(`${s.won}/${s.duels}`, "спечелени дуела", "rose") : stat(String(s.answers), "отговора"),
-        stat(String(s.games), "изиграни игри"),
+        stat(String(s.games), s.games === 1 ? "изиграна игра" : "изиграни игри"),
       ),
       masteryCard(s.mastery),
       h(
@@ -85,19 +84,21 @@ export function stats(): Child {
         h(
           "ol",
           { class: "games" },
-          s.recent.map((p) =>
-            h(
-              "li",
-              { class: "game" },
+          s.recent
+            .slice(0, 5)
+            .map((p) =>
               h(
-                "div",
-                { class: "game-text" },
-                h("strong", { class: "game-what" }, what(p)),
-                h("span", { class: "game-when" }, date(p.at)),
+                "li",
+                { class: "game" },
+                h(
+                  "div",
+                  { class: "game-text" },
+                  h("strong", { class: "game-what" }, what(p)),
+                  h("span", { class: "game-when" }, date(p.at)),
+                ),
+                h("b", { class: "game-score" }, `${p.rights} от ${p.total}`),
               ),
-              h("b", { class: "game-score" }, `${p.rights} от ${p.total}`),
             ),
-          ),
         ),
       ),
     ];

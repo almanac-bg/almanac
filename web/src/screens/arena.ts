@@ -4,7 +4,7 @@
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { player } from "../state.ts";
-import { pageArt } from "../ui.ts";
+import { back, pageArt } from "../ui.ts";
 
 interface Queue {
   waiting: number;
@@ -57,11 +57,12 @@ export function arena() {
     h(
       "div",
       { class: "intro" },
+      back("/", "Начало"),
       pageArt("arena", "tone-sky"),
       h("h1", null, "Арена"),
       h(
         "p",
-        { class: "lead" },
+        { class: "muted" },
         "От трима до петима играчи, на живо, на едни и същи въпроси. Който събере най-много точки, печели.",
       ),
     ),

@@ -5,6 +5,7 @@ import { badgeArt } from "./art/badge.ts";
 import { picture } from "./art/picture.ts";
 import { type Child, h } from "./lib/dom.ts";
 import { calm } from "./lib/prefs.ts";
+import { path } from "./lib/router.ts";
 import { categories } from "./state.ts";
 
 export type VerdictKind = "exact" | "right" | "partial" | "wrong" | "time";
@@ -331,4 +332,28 @@ export function badge(a: AchievementInfo, earned: boolean, size: "s" | "m" | "l"
     progress: a.goal ? (a.progress ?? 0) / a.goal : 0,
     size,
   });
+}
+
+/** The way back to where a screen is reached from (a way to play, from Начало; Настройки, from Профил). */
+export function back(href: string, label: string): Child {
+  return h("a", { class: "back", href }, h("span", { class: "i i-left back-i", "aria-hidden": "true" }), label);
+}
+
+/** Профил's own places: the player at a glance, their rewards, their wardrobe, and their almanac. */
+const profilePlaces: [href: string, label: string][] = [
+  ["/me", "Общо"],
+  ["/rewards", "Награди"],
+  ["/wardrobe", "Гардероб"],
+  ["/almanac", "Алманах"],
+];
+
+/** The switch between Профил's places, at the top of each. */
+export function profileNav(): Child {
+  return h(
+    "nav",
+    { class: "subnav", "aria-label": "Профил" },
+    profilePlaces.map(([href, label]) =>
+      h("a", { href, "aria-current": () => (path() === href ? "page" : null) }, label),
+    ),
+  );
 }

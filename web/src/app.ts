@@ -1,4 +1,4 @@
-// АЛМАНАХ's web client: the mark and the name, the six main places (in the header on a big screen, a bar at the
+// АЛМАНАХ's web client: the mark and the name, the four main places (in the header on a big screen, a bar at the
 // bottom of a phone's), and the screen the router puts under them.
 
 import { loadPictures } from "./art/picture.ts";
@@ -25,19 +25,18 @@ import { rooms } from "./screens/rooms.ts";
 import { royal } from "./screens/royal.ts";
 import { settings } from "./screens/settings.ts";
 import { today } from "./screens/today.ts";
+import { wardrobe } from "./screens/wardrobe.ts";
 import { type Challenge, challenges, checkWaiting, friendRequests, playing, watchWaiting } from "./state.ts";
 
 /**
- * The six main places: where each goes, its name (and the part of it left out where the bar is narrow) and icon, and
- * which paths are part of it.
+ * The four main places: where each goes, its name and icon, and which paths are part of it. Playing (every way) starts
+ * from Начало; Профил holds what a player has: their rewards, their wardrobe, their almanac and their settings.
  */
-const links: [href: string, label: string, wide: string, icon: string, here: (p: string) => boolean][] = [
-  ["/", "Начало", "", "home", (p) => /^\/($|play\/|duel|arena|royal|room|r\/)/.test(p)],
-  ["/friends", "Приятели", "", "users", (p) => /^\/(friends|together|f\/)/.test(p)],
-  ["/ranks", "Класации", "", "podium", (p) => p === "/ranks"],
-  ["/rewards", "Награди", "", "award", (p) => p === "/rewards"],
-  ["/almanac", "Алманах", "Моят ", "book", (p) => p === "/almanac"],
-  ["/me", "Профил", "", "user", (p) => /^\/(me|settings)$/.test(p)],
+const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
+  ["/", "Начало", "home", (p) => /^\/($|play\/|duel|arena|royal|room|r\/)/.test(p)],
+  ["/friends", "Приятели", "users", (p) => /^\/(friends|together|f\/)/.test(p)],
+  ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
+  ["/me", "Профил", "user", (p) => /^\/(me|settings|rewards|wardrobe|almanac)$/.test(p)],
 ];
 
 reportErrors();
@@ -60,7 +59,7 @@ if (root) {
       h(
         "nav",
         { class: "tabs", "aria-label": "Основно" },
-        links.map(([href, label, wide, icon, here]) =>
+        links.map(([href, label, icon, here]) =>
           h(
             "a",
             {
@@ -71,7 +70,7 @@ if (root) {
                 (href === "/" && challenges().length) || (href === "/friends" && friendRequests()) ? "news" : "",
             },
             h("span", { class: `i i-${icon}`, "aria-hidden": "true" }),
-            h("span", { class: "tab-label" }, wide ? h("span", { class: "tab-wide" }, wide) : null, label),
+            h("span", { class: "tab-label" }, label),
             () =>
               href === "/" && challenges().length
                 ? h("span", { class: "sr" }, " (дуел те чака)")
@@ -105,6 +104,7 @@ if (root) {
       { path: /^\/room$/, view: rooms },
       { path: /^\/ranks$/, view: ranks },
       { path: /^\/rewards$/, view: rewards },
+      { path: /^\/wardrobe$/, view: wardrobe },
       { path: /^\/friends$/, view: friends },
       { path: /^\/settings$/, view: settings },
       // Where friends were before: a link in an old notification still lands somewhere that makes sense.

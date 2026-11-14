@@ -1,8 +1,8 @@
 // Теми: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays the same
-// game. The tiles live on Начало; a run of one is /play/<topic>.
+// game. The tiles live on Начало (with one more for all the topics at once); a run of one is /play/<topic>.
 
 import { picture } from "../art/picture.ts";
-import { type Mastery, masteryBadge, masteryLeft } from "../game/mastery.ts";
+import { type Mastery, masteryBadge } from "../game/mastery.ts";
 import { news } from "../game/news.ts";
 import { summary } from "../game/results.ts";
 import { getReady, playRun } from "../game/run.ts";
@@ -11,7 +11,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { type Category, categories, player, user } from "../state.ts";
-import { meter, questions, toneOf } from "../ui.ts";
+import { meter, toneOf } from "../ui.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
 /** The topics as tiles, each with how well the player knows it, and a run across all of them (on Начало). */
@@ -21,47 +21,54 @@ export function topics(): Child {
   return h(
     "section",
     { class: "stack" },
-    h(
-      "div",
-      { class: "title-row" },
-      h("h2", { class: "section-title" }, "Теми"),
-      h("a", { class: "btn inline", href: "/play/all" }, "Всички теми"),
-    ),
+    h("h2", { class: "section-title" }, "Теми"),
     h("ul", { class: "topics" }, () => {
       const mine = stats()?.mastery ?? [];
-      return categories.map((c) =>
-        h(
-          "li",
-          null,
-          tile(
-            c,
-            mine.find((m) => m.category === c.id),
+      return [
+        ...categories.map((c) =>
+          h(
+            "li",
+            null,
+            tile(
+              c,
+              mine.find((m) => m.category === c.id),
+            ),
           ),
         ),
-      );
+        h(
+          "li",
+          { class: "topic-all" },
+          h(
+            "a",
+            { href: "/play/all", class: "topic tone-gold" },
+            h(
+              "span",
+              { class: "topic-text" },
+              h("span", { class: "topic-name" }, "Всички теми"),
+              h("span", { class: "topic-meta" }, "По един въпрос от всяка"),
+            ),
+          ),
+        ),
+      ];
     }),
   );
 }
 
-/** A topic: its picture and colour, its name, and how well the player knows it (once they've played enough of it to tell). */
+/** A topic: its picture and colour, its name, and how well the player knows it (once they've played enough of it to
+ * tell: Профил has the rest). */
 function tile(c: Category, m?: Mastery): Child {
   const sure = m?.sure ? m : null;
   return h(
     "a",
     { href: `/play/${c.id}`, class: `topic ${toneOf(c.id)}` },
-    h("span", { class: "topic-head" }, picture(`topic-${c.id}`, "topic-pic"), sure ? masteryBadge(sure) : null),
-    h("span", { class: "topic-name" }, c.name),
+    picture(`topic-${c.id}`, "topic-pic"),
     h(
       "span",
-      { class: "topic-foot" },
-      h(
-        "span",
-        { class: "topic-meta" },
-        h("span", null, m?.answers ? (sure ? `знаеш ${sure.known}%` : masteryLeft(m)) : "Още не е играна"),
-        sure ? h("span", null, questions(sure.answers)) : null,
-      ),
-      sure ? meter(sure.known, `знаеш ${sure.known}% от темата`) : null,
+      { class: "topic-text" },
+      h("span", { class: "topic-name" }, c.name),
+      sure ? h("span", { class: "topic-meta" }, masteryBadge(sure), h("b", { class: "num" }, `${sure.known}%`)) : null,
     ),
+    sure ? meter(sure.known, `знаеш ${sure.known}% от темата`) : null,
   );
 }
 

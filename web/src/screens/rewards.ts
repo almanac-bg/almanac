@@ -1,33 +1,29 @@
-// Награди: what playing earns — the achievements by tier, each with how it's earned, and the wardrobe: the avatar's
-// shape and tone, and the titles to wear.
+// Награди: what playing earns — the achievements by tier, each with how it's earned, how far along it is and what it
+// gives. What they give is worn in Гардероб.
 
 import { picture } from "../art/picture.ts";
-import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { user } from "../state.ts";
-import { avatar, badge, meter, shapeNames, tiers, tierWords, toneNames } from "../ui.ts";
-import { type Cosmetic, loadProgress, type Progress, type TitleView } from "./progress.ts";
+import { badge, meter, profileNav, shapeNames, tiers, tierWords } from "../ui.ts";
+import { loadProgress, type Progress } from "./progress.ts";
 
 export function rewards() {
   title("Награди");
   return h(
     "section",
     { class: "screen" },
+    () => (user() ? profileNav() : null),
     h("h1", null, "Награди"),
     when(
       () => user(),
       () => {
         const progress = signal<Progress | null>(null);
-        const load = () => loadProgress().then(progress.set, () => {});
-        load();
-        return [
-          () => {
-            const p = progress();
-            return p ? achievements(p) : null;
-          },
-          h("div", { class: "settings" }, look(progress, load)),
-        ];
+        loadProgress().then(progress.set, () => {});
+        return () => {
+          const p = progress();
+          return p ? achievements(p) : null;
+        };
       },
       () =>
         h(
@@ -63,7 +59,8 @@ function achievements(p: Progress): Child {
         h(
           "ul",
           { class: "achievements" },
-          list.map((a) =>
+          // The earned first; the hidden ones not found yet, together in one.
+          [...list.filter((a) => a.at), ...list.filter((a) => !a.at && !a.hidden)].map((a) =>
             h(
               "li",
               { class: a.at ? "achievement" : "achievement locked" },
@@ -81,219 +78,46 @@ function achievements(p: Progress): Child {
                       h("span", { class: "num" }, `${a.progress ?? 0} / ${a.goal}`),
                     )
                   : null,
-                h(
-                  "span",
-                  { class: "achievement-when" },
-                  a.at ? `Спечелено на ${day(a.at)}` : a.hidden ? "Скрито — открий го в игра" : "Още не е спечелено",
-                ),
+                a.at ? h("span", { class: "achievement-when" }, `Спечелено на ${day(a.at)}`) : null,
                 h(
                   "span",
                   { class: "achievement-reward" },
-                  a.hidden && !a.at
-                    ? h("span", { class: "reward-mark secret", "aria-hidden": "true" })
-                    : h("span", { class: "reward-mark tone-gold", "aria-hidden": "true" }, picture(a.icon)),
-                  a.hidden && !a.at
-                    ? "Награда: ще разбереш"
-                    : `Награда: аватар „${shapeNames[a.icon] ?? a.icon}“${a.title ? ` и титла „${a.title.name}“` : ""}`,
+                  h("span", { class: "reward-mark tone-gold", "aria-hidden": "true" }, picture(a.icon)),
+                  `Награда: аватар „${shapeNames[a.icon] ?? a.icon}“${a.title ? ` и титла „${a.title.name}“` : ""}`,
                 ),
               ),
             ),
           ),
+          secret(list.filter((a) => !a.at && a.hidden)),
         ),
       );
     }),
   );
 }
 
-/** The groups of titles still locked, as headed. */
-const titleGroups: [TitleView["group"], string][] = [
-  ["level", "С нивата"],
-  ["achievement", "С постижения"],
-  ["topic", "С майсторство в тема"],
-  ["rank", "С рейтинга, Роял и сезона"],
-];
-
-/** How you look to others: the avatar's shape and tone, its frame and pattern, and a title. */
-function look(progress: () => Progress | null, reload: () => Promise<void>): Child {
-  const hint = signal("");
-  const error = signal("");
-  const set = async (body: { avatar?: string; title?: string; frame?: string; backdrop?: string }) => {
-    error.set("");
-    hint.set("");
-    try {
-      await api("PATCH", "/api/me/look", body);
-      await reload();
-    } catch (err) {
-      error.set((err as ApiError).message);
-    }
-  };
-  return () => {
-    const p = progress();
-    if (!p) return null;
-    const [shape = "", tone = ""] = p.avatar.split("-");
-    return h(
-      "section",
-      null,
-      h("h2", null, "Вид"),
-      h("p", { class: "muted" }, "Аватарът ти е животно или знак в цвят по избор. Знаците се отключват с постижения."),
-      h(
-        "ul",
-        { class: "picker" },
-        p.shapes.map((s) =>
-          h(
-            "li",
-            null,
-            h(
-              "button",
-              {
-                class: s.locked ? "pick locked" : "pick",
-                type: "button",
-                "aria-pressed": s.shape === shape,
-                "aria-label": s.locked ? `${shapeNames[s.shape]}, заключена` : shapeNames[s.shape],
-                onclick: () =>
-                  s.locked
-                    ? hint.set(
-                        s.shape === "crown"
-                          ? "Короната се отключва на ниво 10."
-                          : `${shapeNames[s.shape]}: отключва се с постижението „${s.how}“.`,
-                      )
-                    : set({ avatar: `${s.shape}-${tone}` }),
-              },
-              avatar(`${s.shape}-${tone}`),
-            ),
-          ),
-        ),
-      ),
-      () => hint() && h("p", { class: "muted", role: "status" }, hint()),
-      h(
-        "div",
-        { class: "tones" },
-        p.tones.map((t) =>
-          h("button", {
-            class: `tone-pick tone-${t}`,
-            type: "button",
-            "aria-pressed": t === tone,
-            "aria-label": `Цвят: ${toneNames[t]}`,
-            onclick: () => set({ avatar: `${shape}-${t}` }),
-          }),
-        ),
-      ),
-      wear(
-        "Рамка",
-        p.frames,
-        p.frame,
-        "Без рамка",
-        (id) => avatar(p.avatar, { frame: id, backdrop: p.backdrop }),
-        (id) => set({ frame: id }),
-      ),
-      wear(
-        "Фон",
-        p.backdrops,
-        p.backdrop,
-        "Едноцветен",
-        (id) => avatar(p.avatar, { frame: p.frame, backdrop: id }),
-        (id) => set({ backdrop: id }),
-      ),
-      h("h3", null, "Титла"),
-      h(
-        "p",
-        { class: "muted" },
-        "Титлата се вижда под името ти. Отключват се с нивата, с някои постижения, с майсторство в тема и с рейтинга.",
-      ),
-      h(
-        "ul",
-        { class: "titles" },
-        h(
-          "li",
-          null,
-          h(
-            "button",
-            { class: "title-pick", type: "button", "aria-pressed": !p.title, onclick: () => set({ title: "" }) },
-            h("span", { class: "title-name" }, "Без титла"),
-          ),
-        ),
-        p.titles
-          .filter((a) => !a.locked)
-          .map((a) =>
-            h(
-              "li",
-              null,
-              h(
-                "button",
-                {
-                  class: `title-pick t-${a.tier}`,
-                  type: "button",
-                  "aria-pressed": a.id === p.title,
-                  onclick: () => set({ title: a.id }),
-                },
-                h("span", { class: "title-name" }, a.name),
-                h("span", { class: "title-tier" }, tierWords[a.tier].title),
-              ),
-            ),
-          ),
-      ),
-      // The ones still locked, after, by where they come from: what each takes.
-      titleGroups.map(([group, heading]) => {
-        const locked = p.titles.filter((a) => a.locked && a.group === group);
-        if (!locked.length) return null;
-        return [
-          h("h4", { class: "titles-more" }, heading),
-          h(
-            "ul",
-            { class: "titles" },
-            locked.map((a) =>
-              h(
-                "li",
-                { class: `title-pick locked t-${a.tier}` },
-                h("span", { class: "title-name" }, a.name),
-                h("span", { class: "title-tier" }, tierWords[a.tier].title),
-                h("span", { class: "title-how" }, `Отключва се: ${a.how}`),
-              ),
-            ),
-          ),
-        ];
-      }),
-      () => error() && h("p", { class: "bad", role: "alert" }, error()),
-    );
-  };
-}
-
-/** Your name (anyone's: names may repeat) and your tag (yours alone: how friends find you). */
-
-/** A row of the wardrobe (frames, or patterns): each drawn on the player's avatar, the locked ones with what
- * unlocks them. */
-function wear(
-  heading: string,
-  all: Cosmetic[],
-  worn: string,
-  none: string,
-  preview: (id: string) => Child,
-  put: (id: string) => void,
-): Child {
-  const told = signal("");
-  return [
-    h("h3", null, heading),
+/** The hidden achievements of a tier not found yet: how many, and nothing more. */
+function secret(list: Progress["achievements"]): Child {
+  const first = list[0];
+  if (!first) return null;
+  return h(
+    "li",
+    { class: "achievement locked" },
+    badge(first, false),
     h(
-      "ul",
-      { class: "picker" },
-      [{ id: "", name: none } as Cosmetic, ...all].map((c) =>
-        h(
-          "li",
-          null,
-          h(
-            "button",
-            {
-              class: c.locked ? "pick locked" : "pick",
-              type: "button",
-              "aria-pressed": c.id === worn,
-              "aria-label": c.locked ? `${c.name}, заключена` : c.name,
-              onclick: () => (c.locked ? told.set(`${c.name}: отключва се с ${c.how}.`) : put(c.id)),
-            },
-            preview(c.id),
-          ),
-        ),
+      "div",
+      { class: "achievement-text" },
+      h(
+        "span",
+        { class: "achievement-name" },
+        list.length === 1 ? "Скрито постижение" : `${list.length} скрити постижения`,
+      ),
+      h("span", { class: "achievement-about" }, "Откриваш ги, докато играеш."),
+      h(
+        "span",
+        { class: "achievement-reward" },
+        h("span", { class: "reward-mark secret", "aria-hidden": "true" }),
+        "Награда: ще разбереш",
       ),
     ),
-    () => told() && h("p", { class: "muted", role: "status" }, told()),
-  ];
+  );
 }
