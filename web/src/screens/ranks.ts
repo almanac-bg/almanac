@@ -18,7 +18,9 @@ interface Ranked {
   tag: string;
   value: number;
   division?: Standing["division"];
+  /** On a board of knowledge: how many answers the mastery is from, and its tier's name. */
   answers?: number;
+  tier?: string;
   me?: boolean;
   avatar?: string;
   title?: string;
@@ -56,8 +58,6 @@ const tabs: [By, string][] = [
 /** Whether a board shows to a viewer who has met these of the game's systems: the league's and the rating's wait for
  * them. */
 const shows = (by: By, open?: Open) => (by === "league" ? !!open?.league : by === "rating" ? !!open?.rating : true);
-
-const n = (x: number) => x.toLocaleString("bg");
 
 export function ranks() {
   title("Класации");
@@ -198,9 +198,10 @@ export function ranks() {
           return ranking(
             among(name ? `Най-знаещи: ${name}` : "Най-знаещи"),
             d.board,
-            (r) => [h("small", { class: "sub" }, `${n(r.answers ?? 0)} отг. · `), `${r.value}%`],
+            // „72% · Експерт“: the mastery, as a topic's tile says it (play/knowledge.go).
+            (r) => [`${r.value}%`, r.tier ? h("small", { class: "sub" }, ` · ${r.tier}`) : null],
             `Още никой няма ${d.least ?? 100} отговора${name ? " в тази тема" : ""}.`,
-            `Делът на верните отговори след поне ${d.least ?? 100} отговора${name ? " в темата" : ""}. Изтеклото време се брои за грешен отговор.`,
+            `Колко от ${name ? "въпросите в темата" : "всички въпроси"} знае всеки по всичките си отговори, като по-трудните тежат повече. В класацията са тези с поне ${d.least ?? 100} отговора${name ? " в темата" : ""}.`,
           );
         }
       }
