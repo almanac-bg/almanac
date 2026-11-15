@@ -21,7 +21,7 @@ type Cosmetic struct {
 
 // unlock is what makes a cosmetic or a title a player's: a level, an achievement of a tier (any one), one
 // achievement, a division reached (by the highest rating), first place in a week of a league or a higher one (its
-// tier + 1), Роял won some times, or a mastery tier (or higher) in a topic.
+// tier + 1), Роял won some times, or a mastery tier (or higher) in a topic or in some number of topics.
 type unlock struct {
 	level    int
 	tier     Tier
@@ -30,8 +30,12 @@ type unlock struct {
 	first    int
 	royal    int
 	topic    string
+	topics   int // how many topics (everyTopic: all the bank's) at a mastery tier or higher
 	mastery  int
 }
+
+// everyTopic is an unlock's topics when it takes all of them.
+const everyTopic = -1
 
 type cosmetic struct {
 	id, name string
@@ -101,6 +105,17 @@ func (w wardrobe) has(u unlock) bool {
 	case u.topic != "":
 		tier, ok := w.mastery[u.topic]
 		return ok && tier >= u.mastery
+	case u.topics != 0:
+		need, n := u.topics, 0
+		if need == everyTopic {
+			need = len(w.topics)
+		}
+		for _, tier := range w.mastery {
+			if tier >= u.mastery {
+				n++
+			}
+		}
+		return need > 0 && n >= need
 	}
 	return true
 }
@@ -127,6 +142,10 @@ func (u unlock) how() string {
 			return "първо място за седмица в " + leagueOf(u.first-1).Name
 		}
 		return "първо място за седмица в " + leagueOf(u.first-1).Name + " или по-високо"
+	case u.topics == everyTopic:
+		return "„" + MasteryTiers[u.mastery].Name + "“ във всички теми"
+	case u.topics > 0:
+		return "„" + MasteryTiers[u.mastery].Name + "“ в " + inWords(u.topics) + " теми"
 	case u.royal == 1:
 		return "победа в Роял"
 	case u.royal > 1:
@@ -373,4 +392,15 @@ func (w wardrobe) next(rating int) Next {
 		}
 	}
 	return n
+}
+
+// numberWords are the numbers to ten, as a phrase says them before „теми“.
+var numberWords = []string{"", "една", "две", "три", "четири", "пет", "шест", "седем", "осем", "девет", "десет"}
+
+// inWords is a number in words, past ten in digits.
+func inWords(n int) string {
+	if n > 0 && n < len(numberWords) {
+		return numberWords[n]
+	}
+	return strconv.Itoa(n)
 }
