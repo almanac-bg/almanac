@@ -3,7 +3,7 @@
 // The tier gives the medal its form, so it reads even without colour: common is a round coin, rare a hexagon, epic an
 // eight-pointed star, legendary a sunburst with ribbons. The achievement's own picture fills its face: every achievement
 // has one (medalPictures), apart from the avatar it unlocks, which is the game's rule (internal/play). Within a family
-// the picture grows with the deed: a flame, a torch, a bonfire, a phoenix. A locked medal is grey (how far along it is
+// the picture grows with the deed: a flame, a torch, a bonfire, a phoenix, a sun. A locked medal is grey (how far along it is
 // shows beside it, as a bar); a hidden one shows only a question mark.
 
 import type { Tier } from "../ui.ts";
@@ -15,6 +15,7 @@ export const medalPictures: Record<string, string> = {
   streak7: "torch",
   streak30: "bonfire",
   streak100: "phoenix",
+  streak365: "year",
   facts100: "book",
   facts1000: "books",
   facts5000: "topic-general",

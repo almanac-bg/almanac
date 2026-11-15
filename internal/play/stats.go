@@ -5,10 +5,11 @@ import (
 	"slices"
 )
 
-// Stats is how a player has done: the streak, how much they've played, the facts they've collected, and how well they
-// know each topic.
+// Stats is how a player has done: the streak (and the longest they've had), how much they've played, the facts
+// they've collected, and how well they know each topic.
 type Stats struct {
 	Streak  int      `json:"streak"`
+	Best    int      `json:"best"`    // the longest streak the player has had (StreakNow)
 	Week    [7]bool  `json:"week"`    // this week's days played, Monday first
 	Saved   [7]bool  `json:"saved"`   // this week's days a reserve day or a repair kept the streak through
 	Reserve int      `json:"reserve"` // reserve days in hand
@@ -48,7 +49,7 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	if err != nil {
 		return s, err
 	}
-	s.Streak, s.Reserve, s.Next, s.Saved = streak.Days, streak.Reserve, streak.Next, g.InWeek(slices.Concat(streak.Saved, streak.Mended))
+	s.Streak, s.Best, s.Reserve, s.Next, s.Saved = streak.Days, streak.Best, streak.Reserve, streak.Next, g.InWeek(slices.Concat(streak.Saved, streak.Mended))
 	if s.Week, err = g.Week(ctx, userID); err != nil {
 		return s, err
 	}

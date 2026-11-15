@@ -176,9 +176,10 @@ const ReserveEvery = 7
 // StreakNow is a player's streak: the days in a row they've finished the day's questions (up to today, or yesterday
 // while today isn't played yet), the reserve days they have, the days a reserve kept the streak through and those a
 // repair kept it through (repair.go), how many more days in a row earn the next reserve day (0 with ReserveMax in
-// hand), and the last streak that ended, if one did.
+// hand), the last streak that ended, if one did, and the longest the player has had (this one, maybe).
 type StreakNow struct {
 	Days    int      `json:"days"`
+	Best    int      `json:"best"`
 	Reserve int      `json:"reserve"`
 	Saved   []string `json:"saved"`
 	Mended  []string `json:"mended"`
@@ -267,6 +268,7 @@ func walkStreak(h streakHistory, today string, saw func(day string, spent bool, 
 		switch {
 		case h.played[day]:
 			s.Days++
+			s.Best = max(s.Best, s.Days)
 			if day == h.first || s.Days%ReserveEvery == 0 || h.full[day] {
 				s.Reserve = min(ReserveMax, s.Reserve+1)
 			}

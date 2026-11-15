@@ -51,6 +51,7 @@ var Frames = []cosmetic{
 	{"laurel", "Лавров венец", unlock{tier: Legendary}},
 	{"gem", "Кристал", unlock{division: "diamond"}},
 	{"halo", "Ореол", unlock{division: "legend"}},
+	{"sun", "Слънце", unlock{achieved: "streak365"}},
 	{"peak3", "Връх Ботев", unlock{first: 4}},
 	{"peak4", "Връх Вихрен", unlock{first: 5}},
 	{"peak5", "Връх Мусала", unlock{first: 6}},
