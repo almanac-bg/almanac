@@ -40,9 +40,11 @@ var daySlots = []slot{
 	{bank.Hard, "number", noPicture, ""},
 }
 
-// drawDay draws a day: each slot from another topic, never a question an earlier day had (while any are left). The
-// slots that need something special (a picture, an order, a number) get their topics first, from those that have one.
-func drawDay(b *bank.Bank, used map[string]bool, r *rand.Rand) []Pick {
+// drawDay draws a day: each slot from another topic, never a question an earlier day had (while any are left), and of
+// those one nobody has answered (`answered`, if set) while any are left. The slots that need something special (a
+// picture, an order, a number) get their topics first, from those that have one. Exact is whether every slot had a
+// question that fits it just so, never a day's before: a day ahead is drawn only so (ahead.go).
+func drawDay(b *bank.Bank, used, answered map[string]bool, r *rand.Rand) (picks []Pick, exact bool) {
 	slots := newKind(slices.Clone(daySlots), r)
 	var topics []string
 	next := func(wants ...func(string) bool) string {
@@ -86,14 +88,19 @@ func drawDay(b *bank.Bank, used map[string]bool, r *rand.Rand) []Pick {
 	taken := map[string]bool{}
 	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] }
 	fresh := func(q bank.Question) bool { return !used[q.Base().ID] }
-	var picks []Pick
+	unseen := func(q bank.Question) bool { return !answered[q.Base().ID] }
+	exact = true
 	for i, s := range slots {
-		if q := choose(b.Live(assigned[i], ""), s, allowed, fresh, r); q != nil {
-			taken[q.Base().ID] = true
-			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
+		q := choose(b.Live(assigned[i], ""), s, allowed, fresh, unseen, r)
+		if q == nil {
+			exact = false
+			continue
 		}
+		exact = exact && fresh(q) && matches(q, s, true, true)
+		taken[q.Base().ID] = true
+		picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
 	}
-	return picks
+	return picks, exact && len(picks) == len(slots)
 }
 
 // newKinds are the kinds that take turns at the run's one slot for them ("split" in a run's shape): one or the other
@@ -111,8 +118,9 @@ func newKind(slots []slot, r *rand.Rand) []slot {
 }
 
 // choose picks an allowed question for a slot from pool: one that fits the slot exactly if it can, else as close as it
-// gets — the type kept longest, then the difficulty — and a fresh one before one that isn't.
-func choose(pool []bank.Question, s slot, allowed, fresh func(bank.Question) bool, r *rand.Rand) bank.Question {
+// gets — the type kept longest, then the difficulty — and a fresh one before one that isn't; of those, one preferred
+// (if set) while any are.
+func choose(pool []bank.Question, s slot, allowed, fresh, prefer func(bank.Question) bool, r *rand.Rand) bank.Question {
 	if s.alt != "" && !slices.ContainsFunc(pool, func(q bank.Question) bool { return q.Base().Type == s.typ && allowed(q) }) {
 		s.typ = s.alt
 	}
@@ -129,6 +137,11 @@ func choose(pool []bank.Question, s slot, allowed, fresh func(bank.Question) boo
 			for _, q := range pool {
 				if allowed(q) && fit(q) && (!needFresh || fresh(q)) {
 					found = append(found, q)
+				}
+			}
+			if prefer != nil {
+				if best := slices.DeleteFunc(slices.Clone(found), func(q bank.Question) bool { return !prefer(q) }); len(best) > 0 {
+					found = best
 				}
 			}
 			if len(found) > 0 {
@@ -160,7 +173,7 @@ func Draw(b *bank.Bank, category string, ability float64, seen, barred map[strin
 	fresh := func(q bank.Question) bool { return !seen[q.Base().ID] }
 	var picks []Pick
 	for _, s := range newKind(topicSlots(ability), r) {
-		if q := choose(pool, s, allowed, fresh, r); q != nil {
+		if q := choose(pool, s, allowed, fresh, nil, r); q != nil {
 			taken[q.Base().ID] = true
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
 		}

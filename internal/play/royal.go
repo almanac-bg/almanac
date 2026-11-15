@@ -118,7 +118,7 @@ func drawRoyal(b *bank.Bank, seen, barred map[string]bool, r *mrand.Rand) []Pick
 	fresh := func(q bank.Question) bool { return !seen[q.Base().ID] }
 	var picks []Pick
 	for _, s := range royalSlots() {
-		if q := choose(pool, s, allowed, fresh, r); q != nil {
+		if q := choose(pool, s, allowed, fresh, nil, r); q != nil {
 			taken[q.Base().ID] = true
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
 		}

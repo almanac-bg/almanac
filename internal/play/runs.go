@@ -41,7 +41,7 @@ func (g *Game) day(tx *sql.Tx, day string) ([]Pick, error) {
 		}
 	}
 	rows.Close()
-	picks := drawDay(g.Bank(), used, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+	picks, _ := drawDay(g.Bank(), used, nil, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 	if len(picks) == 0 {
 		return nil, ErrNoQuestion
 	}
@@ -50,23 +50,15 @@ func (g *Game) day(tx *sql.Tx, day string) ([]Pick, error) {
 	return picks, err
 }
 
-// dayQuestions are today's questions (drawn now if nobody has asked for them yet): until the day is over in
-// Bulgaria, no other game deals them (Draw, recordings, Роял), so that nobody sees one with its answer before playing
-// the day.
+// dayQuestions are the questions of today and of the days drawn ahead (ahead.go): no other game deals them (Draw,
+// Роял, rooms), so that nobody meets a day's question before its day, or sees one with its answer before playing it.
+// The map is shared: read it, never write to it.
 func (g *Game) dayQuestions(tx *sql.Tx) (map[string]bool, error) {
-	picks, err := g.day(tx, g.Today())
-	if errors.Is(err, ErrNoQuestion) {
-		return nil, nil
-	}
-	barred := make(map[string]bool, len(picks))
-	for _, p := range picks {
-		barred[p.ID] = true
-	}
-	return barred, err
+	d, err := g.days(tx)
+	return d.all, err
 }
 
-// DayQuestions are today's questions, which no other game deals before the day is over (dayQuestions): for the
-// draws made outside the game (rooms).
+// DayQuestions are the questions no other game deals (dayQuestions): for the draws made outside the game (rooms).
 func (g *Game) DayQuestions(ctx context.Context) (map[string]bool, error) {
 	var barred map[string]bool
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
