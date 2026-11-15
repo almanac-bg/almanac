@@ -22,6 +22,8 @@ export function rooms() {
   const code = signal("");
   const length = signal(10);
   const mix = signal<Mix>("mixed");
+  // The host plays too, or leads from a big screen (host.ts) and doesn't.
+  const leads = signal(false);
   const open = async (category: string) => {
     error.set("");
     try {
@@ -30,6 +32,7 @@ export function rooms() {
         category,
         length: length.peek(),
         mix: mix.peek(),
+        lead: leads.peek(),
       });
       go(`/r/${r.code}`);
     } catch (err) {
@@ -111,6 +114,20 @@ export function rooms() {
         ),
       ),
       setting("Трудност", segmented("Трудност", mixes, mix, mix.set, false, true)),
+      setting(
+        "Ти",
+        segmented(
+          "Ти",
+          [
+            [false, "Играя и аз"],
+            [true, "Само водя (за голям екран)"],
+          ],
+          leads,
+          leads.set,
+          false,
+          true,
+        ),
+      ),
       h(
         "ul",
         { class: "chips" },

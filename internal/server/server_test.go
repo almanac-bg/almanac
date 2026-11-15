@@ -532,6 +532,58 @@ func TestARoomOverHTTP(t *testing.T) {
 	}
 }
 
+// A host who leads from a big screen: not a player, the answer on their screen, and the pace theirs.
+func TestALeadingHostOverHTTP(t *testing.T) {
+	g := start(t)
+	ana, bo := g.player(), g.player()
+	ana.call("POST", "/api/guest", map[string]any{})
+	bo.call("POST", "/api/guest", map[string]any{})
+	_, out := ana.call("POST", "/api/rooms", map[string]any{"lead": true, "length": 5})
+	code, _ := out["code"].(string)
+	as := ana.follow(code)
+	if status, out := ana.call("POST", "/api/rooms/"+code+"/start", nil); status != 409 || out["error"] != "no_players" {
+		t.Fatalf("a game with nobody: %d %v", status, out)
+	}
+	bs := bo.follow(code)
+	v := as.until(func(v map[string]any) bool { return len(v["players"].([]any)) == 1 })
+	if v["isHost"] != true || v["lead"] != true {
+		t.Fatalf("the host's lobby: %v", v)
+	}
+	if status, _ := ana.call("POST", "/api/rooms/"+code+"/start", nil); status != 200 {
+		t.Fatalf("start: %d", status)
+	}
+	if status, _ := ana.call("POST", "/api/rooms/"+code+"/hold", map[string]any{"on": true}); status != 200 {
+		t.Fatalf("hold: %d", status)
+	}
+	// Bo alone answers (nothing, here: gives up), and the answer shows at once: no question waits for the host.
+	if status, _ := ana.call("POST", "/api/rooms/"+code+"/next", nil); status != 200 {
+		t.Fatalf("next: %d", status)
+	}
+	v = as.until(func(v map[string]any) bool { return v["phase"] == "reveal" })
+	q := v["question"].(map[string]any)
+	if q["reveal"].(map[string]any)["answer"] == nil || q["nextMs"] != nil || v["held"] != true {
+		t.Fatalf("the answer on the big screen, held: %v", q)
+	}
+	ana.call("POST", "/api/rooms/"+code+"/next", nil)
+	bs.until(func(v map[string]any) bool { return v["phase"] == "question" && v["n"] == 1.0 })
+	if status, _ := bo.call("POST", "/api/rooms/"+code+"/finish", nil); status != 403 {
+		t.Fatalf("a player ended the game: %d", status)
+	}
+	ana.call("POST", "/api/rooms/"+code+"/finish", nil)
+	if v := bs.until(func(v map[string]any) bool { return v["phase"] == "end" }); v["total"] != 2.0 {
+		t.Fatalf("ended at the second question: %v", v["total"])
+	}
+	res, err := http.Get(g.url + "/api/rooms/" + code + "/qr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.Header.Get("Content-Type") != "image/svg+xml" || !strings.HasPrefix(string(body), "<svg") {
+		t.Fatalf("the QR code: %s %.40s", res.Header.Get("Content-Type"), body)
+	}
+}
+
 // A room's end offers each player the others to add as friends (not friends yet, nor asked), and the day's ten while
 // they wait.
 func TestRoomPeople(t *testing.T) {
