@@ -2,8 +2,10 @@ package server
 
 import (
 	"bytes"
+	"cmp"
 	"html/template"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -143,31 +145,57 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// How each question goes, once enough have answered it to tell.
-	read := func(order string) []stat {
-		var out []stat
-		rows, err := db.QueryContext(ctx, `SELECT question_id, count(*), sum(is_right), avg(ms) FROM answers
-			WHERE `+play.FairAnswers+` GROUP BY question_id HAVING count(*) >= 10 ORDER BY 1.0 * sum(is_right) / count(*) `+order+`, count(*) DESC LIMIT 30`)
-		if err != nil {
-			return nil
-		}
-		defer rows.Close()
+	// How each question goes, once enough have answered it to tell: the answers tallied here as they lie, in one
+	// pass (a GROUP BY would have SQLite sort them all, twice, many times slower).
+	type tally struct{ n, right, ms int }
+	tallies := map[string]*tally{}
+	if rows, err := db.QueryContext(ctx, `SELECT question_id, is_right, ms FROM answers WHERE `+play.FairAnswers); err == nil {
+		var id []byte
+		var right bool
+		var ms int
 		for rows.Next() {
-			var st stat
-			var ms float64
-			if rows.Scan(&st.ID, &st.Answers, &st.Right, &ms) != nil {
+			if rows.Scan(&id, &right, &ms) != nil {
 				continue
 			}
-			st.Seconds = ms / 1000
-			st.Share = 100 * st.Right / st.Answers
-			if q, ok := b.Get(st.ID); ok {
-				st.Text, st.Answer = q.Base().Text, bank.KeeperText(q)
+			t := tallies[string(id)] // no copy of the id for a lookup
+			if t == nil {
+				t = &tally{}
+				tallies[string(id)] = t
 			}
-			out = append(out, st)
+			t.n++
+			t.ms += ms
+			if right {
+				t.right++
+			}
 		}
-		return out
+		rows.Close()
 	}
-	data.Hardest, data.Easiest = read("ASC"), read("DESC")
+	var told []stat
+	for id, t := range tallies {
+		if t.n < 10 {
+			continue
+		}
+		st := stat{ID: id, Answers: t.n, Right: t.right, Seconds: float64(t.ms) / float64(t.n) / 1000, Share: 100 * t.right / t.n}
+		if q, ok := b.Get(id); ok {
+			st.Text, st.Answer = q.Base().Text, bank.KeeperText(q)
+		}
+		told = append(told, st)
+	}
+	// The hardest first: the smallest share right (compared exactly), then the most answered.
+	slices.SortFunc(told, func(x, y stat) int {
+		if c := cmp.Compare(x.Right*y.Answers, y.Right*x.Answers); c != 0 {
+			return c
+		}
+		return cmp.Or(cmp.Compare(y.Answers, x.Answers), strings.Compare(x.ID, y.ID))
+	})
+	data.Hardest = slices.Clone(told[:min(30, len(told))])
+	slices.SortStableFunc(told, func(x, y stat) int {
+		if c := cmp.Compare(y.Right*x.Answers, x.Right*y.Answers); c != 0 {
+			return c
+		}
+		return cmp.Compare(y.Answers, x.Answers)
+	})
+	data.Easiest = told[:min(30, len(told))]
 	// The wrong option that draws most people, for the hardest choices.
 	for i, st := range data.Hardest {
 		q, ok := b.Get(st.ID)

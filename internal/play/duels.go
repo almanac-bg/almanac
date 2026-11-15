@@ -114,9 +114,13 @@ type Recorded struct {
 // each.
 func (g *Game) StartLive(ctx context.Context, a, b int64) (Live, error) {
 	l := Live{Users: [2]int64{a, b}}
-	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+	p, err := g.pastOf(ctx, "", a, b)
+	if err != nil {
+		return l, err
+	}
+	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var err error
-		if l.Picks, err = g.drawFor(ctx, tx, a, b); err != nil {
+		if l.Picks, err = g.drawFor(tx, p); err != nil {
 			return err
 		}
 		for i, id := range l.Users {
@@ -143,8 +147,12 @@ func (g *Game) StartLive(ctx context.Context, a, b int64) (Live, error) {
 // questions the player has seen. ErrNobody if there's none yet.
 func (g *Game) StartRecorded(ctx context.Context, userID int64) (Live, error) {
 	var l Live
+	seen := map[string]bool{}
+	if err := seenBy(ctx, g.DB.Read, userID, seen); err != nil {
+		return l, err
+	}
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		rec, err := g.recordedRun(tx, userID)
+		rec, err := g.recordedRun(tx, userID, seen)
 		if err != nil {
 			return err
 		}
@@ -222,13 +230,17 @@ func (g *Game) ChallengeFriend(ctx context.Context, userID, friendID int64) (Sta
 	if _, err := g.Friend(ctx, userID, friendID); err != nil {
 		return State{}, 0, err
 	}
+	p, err := g.pastOf(ctx, "", userID, friendID)
+	if err != nil {
+		return State{}, 0, err
+	}
 	var s State
 	var duelID int64
-	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		if err := g.mayStart(tx, userID); err != nil {
 			return err
 		}
-		picks, err := g.drawFor(ctx, tx, userID, friendID)
+		picks, err := g.drawFor(tx, p)
 		if err != nil {
 			return err
 		}
@@ -320,51 +332,58 @@ func (g *Game) mayStart(tx *sql.Tx, userID int64) error {
 	return nil
 }
 
-// drawFor draws a duel's ten questions for its players: all topics, shaped by how well they know them (on
-// average), questions neither has seen first.
-func (g *Game) drawFor(ctx context.Context, tx *sql.Tx, users ...int64) ([]Pick, error) {
-	seen := map[string]bool{}
-	ability := 0.0
+// past is what a draw needs from its players' history: the questions they've seen, and how well they know them (on
+// average over the players; in a topic, or all of them for ""). It's read before the write the draw goes into: it grows
+// with every game they've played, and the game's one writer (store.DB.Write) mustn't wait on it.
+type past struct {
+	seen    map[string]bool
+	ability float64
+}
+
+func (g *Game) pastOf(ctx context.Context, category string, users ...int64) (past, error) {
+	p := past{seen: map[string]bool{}}
 	for _, id := range users {
-		s, err := seenBy(tx, id)
+		if err := seenBy(ctx, g.DB.Read, id, p.seen); err != nil {
+			return p, err
+		}
+		a, err := g.ability(ctx, g.DB.Read, id, category)
 		if err != nil {
-			return nil, err
+			return p, err
 		}
-		for q := range s {
-			seen[q] = true
-		}
-		a, err := g.ability(ctx, tx, id, "")
-		if err != nil {
-			return nil, err
-		}
-		ability += a / float64(len(users))
+		p.ability += a / float64(len(users))
 	}
+	return p, nil
+}
+
+// drawFor draws a duel's ten questions for its players (their past): all topics, shaped by how well they know them,
+// questions neither has seen first.
+func (g *Game) drawFor(tx *sql.Tx, p past) ([]Pick, error) {
 	barred, err := g.dayQuestions(tx)
 	if err != nil {
 		return nil, err
 	}
-	picks := Draw(g.Bank(), "", ability, seen, barred, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+	picks := Draw(g.Bank(), "", p.ability, p.seen, barred, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 	if len(picks) == 0 {
 		return nil, ErrNoQuestion
 	}
 	return picks, nil
 }
 
-func seenBy(tx *sql.Tx, userID int64) (map[string]bool, error) {
-	seen := map[string]bool{}
-	rows, err := tx.Query(`SELECT a.question_id FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?`, userID)
+// seenBy adds the questions a player has answered to seen.
+func seenBy(ctx context.Context, db querier, userID int64, seen map[string]bool) error {
+	rows, err := db.QueryContext(ctx, `SELECT a.question_id FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?`, userID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
-			return nil, err
+			return err
 		}
 		seen[id] = true
 	}
-	return seen, rows.Err()
+	return rows.Err()
 }
 
 type recorded struct {
@@ -382,13 +401,9 @@ const (
 // recordedRun is another player's finished run of ten questions, all still in the bank and none of today's (a day's
 // run never), played at a person's speed (not marked a script's: fair.go), to play against: a real game
 // (RecordingRights right or more), by a player whose rating is within RecordingBand of the player's, the one with the
-// fewest questions the player has seen, the latest first. Short of such, the nearest it gets: any real game, then any
-// game. Nil if there's none.
-func (g *Game) recordedRun(tx *sql.Tx, userID int64) (*recorded, error) {
-	seen, err := seenBy(tx, userID)
-	if err != nil {
-		return nil, err
-	}
+// fewest questions the player has seen (seen, read before the write), the latest first. Short of such, the nearest it
+// gets: any real game, then any game. Nil if there's none.
+func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*recorded, error) {
 	barred, err := g.dayQuestions(tx)
 	if err != nil {
 		return nil, err

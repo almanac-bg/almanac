@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"sync"
 	"sync/atomic"
@@ -68,6 +69,18 @@ func (g *Game) Crowd(id string) *bank.Crowd {
 		return nil
 	}
 	return s.by[id]
+}
+
+// Count counts what's kept counted for everyone (the questions' crowds and hardness, the boards of knowledge), the
+// three at once, and waits for them: the server's first counts, made as it starts so that no player waits on them.
+func (g *Game) Count(ctx context.Context) error {
+	errs := make([]error, 3)
+	var wg sync.WaitGroup
+	wg.Go(func() { errs[0] = g.CountCrowds(ctx) })
+	wg.Go(func() { _, errs[1] = g.hardness(ctx) })
+	wg.Go(func() { _, errs[2] = g.knowledge(ctx) })
+	wg.Wait()
+	return errors.Join(errs...)
 }
 
 // CountCrowds counts every question's crowd now, and waits for it: the server's first count, and tests.

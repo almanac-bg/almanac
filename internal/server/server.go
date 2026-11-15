@@ -148,9 +148,10 @@ func New(cfg Config, d Deps) (*Server, error) {
 	return s, nil
 }
 
-// CountCrowds counts how players have answered each question, so that the first answers after a start show it
-// (later counts run by themselves as they fall due).
-func (s *Server) CountCrowds(ctx context.Context) error { return s.game.CountCrowds(ctx) }
+// Count makes the game's first counts over every answer (play.Game.Count): how players answered each question, how
+// hard each is, the boards of knowledge; so that the first players after a start don't wait on them (later counts
+// run by themselves, in the background, as they fall due).
+func (s *Server) Count(ctx context.Context) error { return s.game.Count(ctx) }
 
 // JudgeRuns judges the games a migration left for the bank to judge (play.JudgeRuns): which were played at a script's
 // speed. Run as the server starts, before it serves; it says how many it marked.

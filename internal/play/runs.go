@@ -127,9 +127,13 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 	if category != "" && !slices.ContainsFunc(b.Categories, func(c bank.Category) bool { return c.ID == category }) {
 		return State{}, ErrNoTopic
 	}
+	p, err := g.pastOf(ctx, category, userID)
+	if err != nil {
+		return State{}, err
+	}
 	var s State
 	var ended int64 // the run left unfinished, if its clock has just ended it
-	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		today, _ := time.ParseInLocation(time.DateOnly, g.Today(), Bulgaria)
 		left, err := scanRun(tx.QueryRow(`SELECT `+runColumns+` FROM runs WHERE user_id = ? AND kind = 'topic'
 			AND category = ? AND finished_at IS NULL AND started_at >= ? ORDER BY id DESC LIMIT 1`,
@@ -148,29 +152,11 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 		case !errors.Is(err, ErrNoRun):
 			return err
 		}
-		seen := map[string]bool{}
-		rows, err := tx.Query(`SELECT a.question_id FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?`, userID)
-		if err != nil {
-			return err
-		}
-		for rows.Next() {
-			var id string
-			if err := rows.Scan(&id); err != nil {
-				rows.Close()
-				return err
-			}
-			seen[id] = true
-		}
-		rows.Close()
-		ability, err := g.ability(ctx, tx, userID, category)
-		if err != nil {
-			return err
-		}
 		barred, err := g.dayQuestions(tx)
 		if err != nil {
 			return err
 		}
-		picks := Draw(b, category, ability, seen, barred, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+		picks := Draw(b, category, p.ability, p.seen, barred, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 		if len(picks) == 0 {
 			return ErrNoQuestion
 		}
