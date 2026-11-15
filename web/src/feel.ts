@@ -1,7 +1,13 @@
-// The game's feel, in a file of its own: the sounds' voices. It loads after the player's first touch (lib/sound.ts
-// starts it), since nothing sounds before one, and the first screen doesn't wait for it; until it's in, the game is
-// whole and only quieter. Like a screen that loads on its own (kit.ts), it imports nothing of the app but types: what
-// it needs comes as arguments, so nothing is split into a file every page would load first.
+// The game's feel, in a file of its own: the sounds' voices, the result's moment (a game's end as a short sequence),
+// the streak and the level growing in place, and the sheet for big news. It loads after the player's first touch
+// (lib/sound.ts starts it), since nothing sounds or ends before one, and the first screen doesn't wait for it; until
+// it's in, the game is whole and only plainer: the screens always draw the end state, and this only moves them there.
+// Like a screen that loads on its own (kit.ts), it imports nothing of the app but types: what it needs comes as
+// arguments, so nothing is split into a file every page would load first. Its motion is in the Web Animations API and
+// its few styles through the CSSOM (the page's CSP allows no style element), so it needs no stylesheet of its own.
+//
+// Motion is quiet and once: no confetti, no particles, nothing that loops. With less motion („По-малко движение“) every
+// moment shows its end state at once, with its sound.
 //
 // The sounds are made here, in code (no files): every note is in one key, D major pentatonic (D E F♯ A B), so sounds
 // that follow each other sound like one piece. Four voices: a bell (two-operator FM) for what's earned, a wooden pluck
@@ -290,4 +296,254 @@ export function sound(c: BaseAudioContext, name: SoundName, lift: number, t0: nu
       shape.frequency.exponentialRampToValueAtTime(2400, t + ring);
     }
   }
+}
+
+// ---- Motion ----
+
+/** What the motion needs of the app: whether there's to be less of it, the sounds, and numbers written the Bulgarian
+ * way. */
+export interface Hands {
+  calm: boolean;
+  play: (name: SoundName, lift?: number) => void;
+  format: (n: number) => string;
+}
+
+/** A spring that overshoots a little, for things that land. */
+const spring = "cubic-bezier(0.2, 1.4, 0.4, 1)";
+const settleIn = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+const easeOut = (t: number) => 1 - (1 - t) ** 3;
+
+/** A token's value from the stylesheet (the theme's own colour, for a keyframe). */
+const token = (el: Element, name: string) => getComputedStyle(el).getPropertyValue(name).trim();
+
+/** A number counting up from `from` to `to` in an element, over `ms` from `delay`. */
+function count(el: Element, from: number, to: number, delay: number, ms: number, format: (n: number) => string) {
+  el.textContent = format(from);
+  const start = performance.now() + delay;
+  const step = (now: number) => {
+    const t = Math.min(1, Math.max(0, (now - start) / ms));
+    el.textContent = format(Math.round((from + (to - from) * easeOut(t)) / 10) * 10);
+    if (t < 1 && el.isConnected) requestAnimationFrame(step);
+    else el.textContent = format(to);
+  };
+  requestAnimationFrame(step);
+}
+
+/**
+ * A game's result as a moment, once, as it opens (at most 1.6 s; a tap anywhere jumps to the end): the pips fill one
+ * by one with a pluck on the scale for each right one, the score lands with the game's motif, the points count up;
+ * ten of ten sweeps the pips in gold and draws the seal petal by petal. Resolves once it's over.
+ */
+export function result(hero: HTMLElement, perfect: boolean, hands: Hands): Promise<void> {
+  const { play } = hands;
+  let ended = false;
+  const end = () => {
+    if (ended) return;
+    ended = true;
+    play(perfect ? "perfect" : "end");
+  };
+  const points = hero.querySelector(".points-n");
+  const total = Number(points?.getAttribute("data-n") ?? 0);
+  if (hands.calm) {
+    end();
+    return Promise.resolve();
+  }
+  const moving: Animation[] = [];
+  const timers: number[] = [];
+  const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+  const pips = [...hero.querySelectorAll<HTMLElement>(".trail li")];
+  pips.forEach((li, i) => {
+    moving.push(
+      li.animate([{ transform: "scale(0.6)", opacity: 0 }, { transform: "none", opacity: 1 }], {
+        duration: 180,
+        delay: i * 60,
+        easing: spring,
+        fill: "backwards",
+      }),
+    );
+    at(i * 60, () => play(li.classList.contains("wrong") ? "dud" : "pip", i));
+  });
+  const score = hero.querySelector(".score");
+  if (score)
+    moving.push(
+      score.animate([{ transform: "scale(1.15)", opacity: 0 }, { transform: "none", opacity: 1 }], {
+        duration: 260,
+        delay: 700,
+        easing: spring,
+        fill: "backwards",
+      }),
+    );
+  at(700, end);
+  if (points) count(points, 0, total, 700, 800, hands.format);
+  if (perfect) {
+    const gold = token(hero, "--gold");
+    pips.forEach((li, i) =>
+      moving.push(
+        li.animate([{}, { background: gold, boxShadow: `0 0 14px ${gold}` }, {}], { duration: 420, delay: 900 + i * 40 }),
+      ),
+    );
+    const head = hero.querySelector(".perfect-head .kicker");
+    if (head)
+      moving.push(
+        head.animate([{ opacity: 0, transform: "translateY(6px)" }, {}], { duration: 260, delay: 900, fill: "backwards" }),
+      );
+    hero.querySelectorAll(".seal path").forEach((petal, k) =>
+      moving.push(
+        petal.animate([{ transform: "scale(0)", opacity: 0 }, { transform: "none", opacity: 1 }], {
+          duration: 240,
+          delay: 900 + k * 90,
+          easing: spring,
+          fill: "backwards",
+        }),
+      ),
+    );
+  }
+  return new Promise((resolve) => {
+    const done = () => {
+      for (const t of timers) clearTimeout(t);
+      for (const a of moving) a.finish();
+      removeEventListener("pointerdown", done, true);
+      removeEventListener("keydown", done, true);
+      if (points) points.textContent = hands.format(total);
+      end();
+      resolve();
+    };
+    addEventListener("pointerdown", done, true);
+    addEventListener("keydown", done, true);
+    at(1600, done);
+  });
+}
+
+/** A number in place rolling from what it was to what it is: the old one slides up and out, the new one in from
+ * below. */
+function roll(el: HTMLElement, from: string, to: string): Promise<void> {
+  const box = document.createElement("span");
+  box.style.cssText = "display:inline-grid;overflow:hidden;vertical-align:bottom";
+  const was = document.createElement("span");
+  const now = document.createElement("span");
+  was.textContent = from;
+  now.textContent = to;
+  for (const s of [was, now]) s.style.gridArea = "1/1";
+  box.append(was, now);
+  el.replaceChildren(box);
+  const options = { duration: 300, easing: settleIn, fill: "both" as const };
+  was.animate([{ transform: "none" }, { transform: "translateY(-100%)", opacity: 0 }], options);
+  const put = () => el.replaceChildren(to);
+  return now
+    .animate([{ transform: "translateY(100%)", opacity: 0 }, { transform: "none", opacity: 1 }], options)
+    .finished.then(put, put);
+}
+
+/** The streak one day longer, in its chip (drawn with the new number): after `delay`, the number rolls up from the
+ * day before, the flame swells once with a gold glow, and the streak's sound. */
+export function streak(chip: HTMLElement, days: number, delay: number, hands: Hands): void {
+  const n = chip.querySelector<HTMLElement>(".status-n");
+  if (!hands.calm && n) n.textContent = String(days - 1);
+  window.setTimeout(() => {
+    hands.play("streak");
+    if (hands.calm || !n) return;
+    roll(n, String(days - 1), String(days));
+    const gold = token(chip, "--gold");
+    chip
+      .querySelector(".status-flame")
+      ?.animate(
+        [
+          { transform: "none", filter: "none" },
+          { transform: "scale(1.25)", filter: `drop-shadow(0 0 10px ${gold})` },
+          { transform: "none", filter: "none" },
+        ],
+        { duration: 600, easing: "ease-in-out" },
+      );
+  }, delay);
+}
+
+/** The level growing in its chip (drawn as it is now): after `delay`, the bar fills from where it was; a new level
+ * fills it to the end, flashes gold, rolls the number and fills again from nothing. */
+export function level(
+  chip: HTMLElement,
+  from: { level: number; share: number },
+  to: { level: number; share: number },
+  delay: number,
+  hands: Hands,
+): void {
+  const fill = chip.querySelector<HTMLElement>(".meter-fill");
+  const n = chip.querySelector<HTMLElement>(".status-n");
+  if (hands.calm || !fill || !n || (from.level === to.level && from.share >= to.share)) return;
+  const width = (p: number) => `${Math.max(0, Math.min(100, p))}%`;
+  const grow = (a: number, b: number, ms: number, wait = 0) =>
+    fill.animate([{ width: width(a) }, { width: width(b) }], { duration: ms, delay: wait, easing: settleIn, fill: "both" })
+      .finished;
+  const settle = () => {
+    for (const a of fill.getAnimations()) a.cancel();
+    n.textContent = `Ниво ${to.level}`;
+  };
+  if (to.level === from.level) {
+    grow(from.share, to.share, 700, delay).then(settle, settle);
+    return;
+  }
+  n.textContent = `Ниво ${from.level}`;
+  const gold = token(chip, "--gold");
+  grow(from.share, 100, 700, delay)
+    .then(() => fill.animate([{ background: gold, boxShadow: `0 0 10px ${gold}` }, {}], { duration: 200 }).finished)
+    .then(() => roll(n, `Ниво ${from.level}`, `Ниво ${to.level}`))
+    .then(() => grow(0, to.share, 500))
+    .then(settle, settle);
+}
+
+/**
+ * The sheet for the one big thing a game brought, over the result (at most one a game): it slides up from the bottom
+ * over a dimmed screen, its picture lands (and, `glow`, glows once), and its sound plays as it opens. „Продължи“, a tap
+ * beside it or Esc puts it away; it never goes by itself. `parts` are its picture, kicker, name and lines, drawn by the
+ * app (the name with the id "moment-name"). Resolves once it's put away.
+ */
+export function sheet(parts: Element[], sound: SoundName, glow: boolean, hands: Hands): Promise<void> {
+  const box = document.createElement("dialog");
+  box.setAttribute("aria-labelledby", "moment-name");
+  box.style.cssText =
+    "position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;" +
+    "display:flex;align-items:flex-end;justify-content:center;color:var(--text);" +
+    "background:color-mix(in srgb,var(--bg) 40%,transparent)";
+  const panel = document.createElement("section");
+  panel.className = "card";
+  panel.style.cssText =
+    "display:grid;justify-items:center;gap:var(--space-3);width:min(100%,28rem);margin:0;text-align:center;" +
+    "padding:var(--space-6) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom));" +
+    "border-radius:var(--radius-xl) var(--radius-xl) 0 0;box-shadow:var(--elev-2)";
+  const go = document.createElement("button");
+  go.type = "button";
+  go.className = "btn primary big";
+  go.style.cssText = "width:100%;margin-top:var(--space-3)";
+  go.textContent = "Продължи";
+  panel.append(...parts, go);
+  box.append(panel);
+  document.body.append(box);
+  box.showModal();
+  go.focus();
+  hands.play(sound);
+  const [picture] = parts;
+  if (!hands.calm) {
+    box.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
+    panel.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 320, easing: settleIn });
+    picture?.animate([{ transform: "scale(0.6)" }, { transform: "none" }], { duration: 420, delay: 120, easing: spring });
+    if (glow && picture) {
+      const gold = token(panel, "--gold");
+      picture.animate([{ filter: "none" }, { filter: `drop-shadow(0 0 24px ${gold})` }, { filter: "none" }], {
+        duration: 900,
+        delay: 300,
+      });
+    }
+  }
+  return new Promise((resolve) => {
+    const close = () => {
+      if (box.open) box.close();
+    };
+    box.addEventListener("close", () => {
+      box.remove();
+      resolve();
+    });
+    go.addEventListener("click", close);
+    box.addEventListener("click", (e) => {
+      if (e.target === box) close();
+    });
+  });
 }
