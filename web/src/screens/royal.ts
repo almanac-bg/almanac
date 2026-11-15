@@ -8,9 +8,14 @@
 // the start plays, and those who come late may still come in until the third question's answer shows. The screen is
 // kept on in the lobby and the game.
 //
+// Those in hear a quiet bed of music while they wait in the lobby (feel.ts: the game's only music), after a touch has
+// started the sound, with „Звуци“ and „Музика в Роял“ on; it rises in the last ten seconds, and the first question
+// ends it with the motif's first two notes.
+//
 // The server sends the evening as this player sees it after every change; the browser reconnects if the line drops.
 // It loads on its own, the first time it's opened, and is handed the app's pieces (kit.ts).
 
+import type { Bed } from "../feel.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
 import type { ApiError } from "../lib/api.ts";
@@ -47,6 +52,9 @@ let {
   play,
   playAnswer,
   playCount,
+  liveAudio,
+  musicOn,
+  soundOn,
   categories,
   player,
   playing,
@@ -219,6 +227,9 @@ export function royal(kit: Kit) {
     play,
     playAnswer,
     playCount,
+    liveAudio,
+    musicOn,
+    soundOn,
     categories,
     player,
     playing,
@@ -273,6 +284,7 @@ export function royal(kit: Kit) {
     playing.set(phase === "question" || phase === "reveal");
   });
   onCleanup(() => playing.set(false));
+  onCleanup(() => hush(false));
   // The screen stays on while the evening needs it: in the lobby, once in, and through the game.
   keepAwake(() => {
     const v = view();
@@ -306,6 +318,15 @@ export function royal(kit: Kit) {
       }
     },
   );
+}
+
+/** The lobby's music, while it plays. */
+let music: Bed | null = null;
+
+/** Ends the lobby's music: as the games begin, with the motif's first two notes; else fading. */
+function hush(begin: boolean): void {
+  music?.stop(begin);
+  music = null;
 }
 
 const about = (nightly?: boolean) =>
@@ -502,7 +523,18 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
   // Those whose notifications are on here are called a minute before the start, if their screen is away.
   const notified = signal(false);
   if (v0.in) pushOn().then(notified.set, () => {});
-  // Those in hear the last three seconds.
+  // Those in hear the music while they wait (and when the sound or the music is turned off, it fades), and the last
+  // three seconds.
+  effect(() => {
+    now(); // each second: the first touch, which lets the sound start, may come at any time
+    if (!soundOn() || !musicOn() || !v0.in) return hush(false);
+    const live = music ? null : liveAudio();
+    if (!live) return;
+    music = live.feel.bed(live.audio);
+    music.until(live.audio.currentTime + (v0.startsAt - untracked(now)) / 1000);
+  });
+  // Leaving the lobby for anything but the game ends it (the game's first question ends it its own way).
+  onCleanup(() => untracked(view).phase !== "question" && hush(false));
   let heard = 0;
   effect(() => {
     const s = Math.ceil((view().startsAt - now()) / 1000);
@@ -686,7 +718,9 @@ function standings(v: Evening): Child {
 function question(view: () => Evening, first: Evening): Child {
   const q = first.question;
   if (!q) return null;
-  if (first.n === 0 && first.in) play("go"); // the game starts
+  // The game starts: with the music's end, or a sound of its own.
+  if (music) hush(first.n === 0);
+  else if (first.n === 0 && first.in) play("go");
   // Those cut play on, off the standings.
   const plays = first.in;
   const locked = signal(!plays || !!q.given);

@@ -435,6 +435,11 @@ Feedback fires once, when it's earned, and then the screen is still again:
   - `level`, `achievement` or `goal` with the news: only the biggest thing told plays;
   - `ping` when a game or a duel starts, or a friend calls to a duel.
 - **Nothing plays** for navigation, hovering or decoration.
+- **Music only in Роял's lobby**, for those in, waiting for 21:00 (none in the day or a topic: people play those on the
+  bus or among others): a quiet bed in the key, four bars at 64 a minute (a pad of detuned saws under a slow filter, a
+  soft bell every two bars), 24 dB under the sounds. In the last ten seconds it opens up and rises into the start; the
+  first question ends it with the motif's first two notes, in place of `go`. It follows „Звуци“ and has its own switch,
+  „Музика в Роял“ (on by default, kept on the device).
 - **On by default**, with one switch in Профил („Звуци“) that's kept on the device. The audio starts on the
   player's first touch, as browsers require; a sound that isn't allowed yet is skipped, never queued.
 - **Touch, in the app** (`web/src/lib/phone.ts`, sound or not; „Вибрация“ in Настройки → Звук, only in the app, on by
