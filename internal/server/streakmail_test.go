@@ -1,0 +1,149 @@
+package server
+
+import (
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+)
+
+// A streak of five ended yesterday: one mail, at the player's hour, to a player with an email whom no notification
+// reaches; it says how to win the streak back while that can be done. Never twice, nor to anyone else.
+func TestStreakMail(t *testing.T) {
+	g := start(t)
+	s := g.srv
+	day := time.Date(2030, 3, 10, 0, 0, 0, 0, bulgaria())
+	clock := day
+	s.game.Now = func() time.Time { return clock }
+	at := func(h, m int) time.Time {
+		clock = day.Add(time.Duration(h)*time.Hour + time.Duration(m)*time.Minute)
+		return clock
+	}
+	// Five days at 10:00, the last three days ago; the first day's reserve kept the day after: the streak ended
+	// yesterday.
+	player := func(email string, days int) int64 {
+		_, id := g.guest()
+		if email != "" {
+			if _, err := g.db.Write.Exec(`UPDATE users SET email = ? WHERE id = ?`, email, id); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for d := range days {
+			g.finishedDay(id, day.AddDate(0, 0, -3-d), 10*time.Hour)
+		}
+		return id
+	}
+	player("ana@example.bg", 5)
+	bo := player("bo@example.bg", 5) // notifications on a phone
+	if _, err := g.db.Write.Exec(`INSERT INTO phones (token, user_id, platform, created_at) VALUES ('t', ?, 'ios', 0)`, bo); err != nil {
+		t.Fatal(err)
+	}
+	player("vi@example.bg", 4) // a streak too short
+	player("", 5)              // no email
+	eve := player("eve@example.bg", 5)
+	if err := s.setMailPref(t.Context(), eve, mailStreak, false); err != nil {
+		t.Fatal(err)
+	}
+	gi := player("gi@example.bg", 5) // back today before their hour
+	g.finishedDay(gi, day, 8*time.Hour)
+	ha := player("ha@example.bg", 5) // a repair ten days ago: none on offer now
+	if _, err := g.db.Write.Exec(`INSERT INTO streak_repairs (user_id, day, told) VALUES (?, '2030-02-28', 1)`, ha); err != nil {
+		t.Fatal(err)
+	}
+	fe := player("fe@example.bg", 5) // mailed 29 days ago
+	if _, err := g.db.Write.Exec(`INSERT INTO streak_mails (user_id, day, at) VALUES (?, '2030-02-09', 0)`, fe); err != nil {
+		t.Fatal(err)
+	}
+
+	if n := s.streakMails(t.Context(), at(9, 29)); n != 0 {
+		t.Fatalf("before their hour: %d", n)
+	}
+	if n := s.streakMails(t.Context(), at(9, 30)); n != 2 {
+		t.Fatalf("at their hour: %d", n)
+	}
+	if n := s.streakMails(t.Context(), at(9, 31)); n != 0 {
+		t.Fatalf("again: %d", n)
+	}
+	s.streakMailing = streakMailing{} // a restart: what was in memory is gone, the claims aren't
+	if n := s.streakMails(t.Context(), at(12, 0)); n != 0 {
+		t.Fatalf("after a restart: %d", n)
+	}
+	g.outbox.Flush(t.Context())
+	if len(g.inbox.got) != 2 || g.counted("mail:streak:sent") != 2 {
+		t.Fatalf("sent %+v, counted %d", g.inbox.got, g.counted("mail:streak:sent"))
+	}
+	byTo := map[string]string{}
+	for _, m := range g.inbox.got {
+		if m.Subject != "Серията ти от 5 дни прекъсна" || !strings.Contains(m.Text, m.Unsubscribe) ||
+			!strings.Contains(m.Unsubscribe, "/mail/off?") {
+			t.Fatalf("the mail: %+v", m)
+		}
+		byTo[m.To] = m.Text
+	}
+	if !strings.Contains(byTo["ana@example.bg"], "Изиграй ги днес заедно с още една игра и серията ти се връща.") {
+		t.Fatalf("Ana's, with the repair on offer: %q", byTo["ana@example.bg"])
+	}
+	if !strings.Contains(byTo["ha@example.bg"], "Днес можеш да започнеш нова серия.") {
+		t.Fatalf("Ha's, with no repair on offer: %q", byTo["ha@example.bg"])
+	}
+}
+
+// The link in the mail stops it with a tap, no sign-in needed (and a mail program's own button posts to it); a link
+// not signed by the server does nothing. Настройки has the same switch, for those the mail is for.
+func TestStreakMailOff(t *testing.T) {
+	g := start(t)
+	s := g.srv
+	ana, anaID := g.guest()
+	if _, err := g.db.Write.Exec(`UPDATE users SET email = 'ana@example.bg' WHERE id = ?`, anaID); err != nil {
+		t.Fatal(err)
+	}
+	if _, prefs := ana.call("GET", "/api/mail/prefs", nil); prefs["can"] != true || prefs["streak"] != true {
+		t.Fatalf("prefs: %v", prefs)
+	}
+	link := s.mailOffURL(anaID, mailStreak)
+	page := func(method, link string) string {
+		res, err := http.DefaultClient.Do(must(http.NewRequest(method, strings.Replace(link, s.cfg.PublicURL, g.url, 1), nil)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		b, _ := io.ReadAll(res.Body)
+		return string(b)
+	}
+	if body := page("GET", link); !strings.Contains(body, "Не искам такива писма") {
+		t.Fatalf("the page: %s", body)
+	}
+	if on, _ := s.wantsMail(t.Context(), anaID, mailStreak); !on {
+		t.Fatal("opening the link turned the mail off")
+	}
+	forged := strings.Replace(link, "u="+fmt.Sprint(anaID), "u="+fmt.Sprint(anaID+1), 1)
+	if body := page("POST", forged); !strings.Contains(body, "не е вярна") {
+		t.Fatalf("a forged link: %s", body)
+	}
+	if body := page("POST", link); !strings.Contains(body, "Готово") {
+		t.Fatalf("turned off: %s", body)
+	}
+	if _, prefs := ana.call("GET", "/api/mail/prefs", nil); prefs["streak"] != false {
+		t.Fatalf("prefs after the link: %v", prefs)
+	}
+	if _, prefs := ana.call("PATCH", "/api/mail/prefs", map[string]any{"kind": "streak", "on": true}); prefs["streak"] != true {
+		t.Fatalf("turned on again: %v", prefs)
+	}
+	if status, _ := ana.call("PATCH", "/api/mail/prefs", map[string]any{"kind": "other", "on": true}); status != 400 {
+		t.Fatalf("an unknown kind: %d", status)
+	}
+	// A guest, with no email, can't have it.
+	bo, _ := g.guest()
+	if _, prefs := bo.call("GET", "/api/mail/prefs", nil); prefs["can"] != false {
+		t.Fatalf("a guest's prefs: %v", prefs)
+	}
+}
+
+func must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
+}

@@ -15,8 +15,7 @@ import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
 import type { ApiError } from "../lib/api.ts";
 import type { Child, Signal } from "../lib/dom.ts";
-import type { Tier, VerdictKind } from "../ui.ts";
-import type { Standing } from "./duel.ts";
+import type { Standing, Tier, VerdictKind } from "../ui.ts";
 import type { Tonight } from "./modes.ts";
 
 // The app's pieces, set as the screen opens (royal): it loads on its own, the first time it's opened (kit.ts), and

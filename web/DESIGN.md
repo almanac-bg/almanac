@@ -214,6 +214,20 @@ takes a token.
   opened (the button takes the player there).
 - **A room led from a big screen** (`host.css`, loaded only there): `.host`, `.host-row` (two columns on a laptop and
   up), `.host-qr`, `.host-join`, `.host-controls` and `.podium`.
+- **A duel's result** (`screens/outcome.ts` with `outcome.css`, loaded as a duel starts), one card (`.duel-end`) for
+  a result or a friend's duel still waiting: the kicker („Дуел с Мария“, „Дуел на живо с …“, „Дуел срещу запис“)
+  and the verdict (`.duel-verdict`: „Победа“, „Загуба“, „Равенство“, „Изигра своя дуел“); the two face to face
+  (`.duel-face`: the big avatar with its frame, the name a way to the profile, the title or „Запис“, the points and
+  the right answers; the winner's points gold and its avatar glowing, the other's plain; the other's points a dash,
+  „Тепърва ще играе“, until they have); the duel question by question (`.duel-marks`: the player's row over the
+  other's, each beside a small avatar; the quicker of two right answers ringed in gold, `.fast`, said once under
+  them; a gold band behind the question that decided it); one line of what decided it (`.duel-line`: „Реши се на
+  8-ия въпрос.“, „Реши се на последния въпрос.“, „Мария водеше от първия въпрос до края.“, „Равни точки: реши
+  времето (…)“; while waiting, until when); and what it meant under a hairline (`.duel-meant`: the division's emblem,
+  its name and the change, its bar, „Рейтинг 1062 → 1080 · 70 до Злато“; why it didn't move; the record against
+  this person, „Срещу Мария 3 : 2“, in rose). Then the next steps: „Реванш“ (a friend's), „Още един дуел“ (right
+  after a live one) or „Към дуелите“, gold. A duel without a result (turned down, not played in time, cut off) is
+  its heading and a line, and the player's own game if they played it (`.duel-mine`).
 - **Friends:** `.card.friends`, `.invitation` (a friend request, accepted with `.btn.rose`), `.friend-list`/`.friend`
   (with `.friend-day` and `.record`) and `.invite-link`.
 - **In code:**
@@ -230,6 +244,8 @@ takes a token.
   - `.players li`, `.friend`, `.invitation` and `.invite-link`
   - `.modes`, `.topics`, `.streak-chip`, `.level-chip` and `.league-card`
   - `.unlocks .unlock-row`, `.news-open` and `.explain`
+  - `.duel-head`, `.duel-verdict`, `.duel-face`, `.duel-points`, `.duel-marks .duel-pip`, `.duel-line`,
+    `.duel-rating-line` and `.duel-record`
 
 ## Tiers
 
@@ -272,11 +288,15 @@ takes a token.
 
 ## Flow
 
-- **The game moves on by itself.** There is no „Напред“ anywhere: an answer shows for 3 seconds (4.5 where there's
-  more to read: a number, an order), with a line filling under it, and the next question opens. A room shows each
-  answer with its standings for 6 seconds (a host who leads it from a big screen, „Само водя“, has „Напред“, „Задръж“
-  and „Край“: a class talks a fact over); a live duel shows both answers for 4 seconds (6 for a number, an order or
-  a match). A question never opens in a tab that's out of sight.
+- **The game moves on by itself, and a tap moves it on sooner.** Alone (the day, a topic, a friend's duel), an answer
+  shows in steps: the answer marked, the verdict with its points, then its fact („Знаеше ли?“), at the moment the
+  player most wants it. It stays 3 seconds (4.5 for anything but a choice or „Вярно или невярно“: there's more to
+  look at) and the time to read the fact (1.2 seconds and a little for each letter, 9 at most), with a line filling
+  under it; „Напред“ (Enter on a computer; „Към резултата“ after the last) goes on at once. A room shows each answer
+  with its standings for 6 seconds (a host who leads it from a big screen, „Само водя“, has „Напред“, „Задръж“ and
+  „Край“, and the fact with the answer: a class talks it over); Роял the same, 10 seconds with a cut; a live duel
+  shows both answers for 4 seconds (6 for anything but a choice or „Вярно или невярно“). A question never opens in a
+  tab that's out of sight.
 - **A game has the whole screen.** On a phone the header and the bar of places step aside while a question or its
   answer shows (an arrow before the count goes home), so the pad and the verdict fit and a stray tap can't leave the
   game. Each question opens at the top of the page.
@@ -285,11 +305,13 @@ takes a token.
   „Остани“ or „Излез“), and leaving gives that question up. The game waits where it stopped: the day on Начало with
   „Продължи“, a topic's game for the next tap on that topic the same day. No question's time starts without a tap;
   only a reload with one showing goes straight back into it.
-- **What isn't the game waits for the end.** „Знаеше ли?“ and „Нещо не е наред с въпроса?“ are in the review after
-  the last answer (of a run, a duel or a room), not between questions.
-- **Time:** 20 seconds a question, 10 for „Вярно или невярно“, 25 to put things in order, 30 to join four pairs
-  („Свържи“). When the time runs out, whatever has been put in (a
-  typed number, things moved into an order) is the answer.
+- **What isn't the answer waits for the end.** „Нещо не е наред с въпроса?“ is in the review after the last answer
+  (of a run, a duel, a room or Роял), never between questions; so are the facts of a game played with others, where
+  the clock is shared and nobody can stop to read.
+- **Time:** 20 seconds a question, 10 for „Вярно или невярно“, 30 for the ones with more to do: an order, „Свържи“,
+  „Раздели“ and „Подсказки“. A question with pictures starts its time once they're in (it waits 8 seconds at most). When the
+  time runs out, whatever has been put in (a typed number, things moved into an order, pairs joined, things sent to
+  a side) is the answer.
 - **Input without the phone's keyboard:** a number is typed on the game's own pad (a comma only where the answer may
   have decimals, a minus only for temperatures); things to order are dragged into place, or moved with the arrow
   keys.
@@ -344,7 +366,8 @@ Feedback fires once, when it's earned, and then the screen is still again:
     „21-ви“, and „3-то място“;
   - months in lower case, also after a word („Алманах за ноември 2026“).
 - **No emoji in the interface.** The one place they appear is the text a player shares of the day's result
-  (`game/share.ts`: 🟩 right, 🟨 close, 🟥 wrong), which never shows on a screen.
+  (`game/share.ts`: 🟩 right, 🟨 close, ⬜ wrong or not answered: grey, as in Wordle, so that a bad day is
+  shared too), which never shows on a screen.
 
 ## Motion
 
@@ -365,6 +388,11 @@ Feedback fires once, when it's earned, and then the screen is still again:
   from the day before with the flame swelling once and its sound, and the level's bar fills in its chip (a new level:
   to the end, a gold flash, the number rolls, it fills again). Ten of ten: the pips sweep gold, „Всички верни“ and the
   rosette as a seal, drawn petal by petal, the gold one last. All typographic: no particles.
+- **A duel's result lands, once** (feel.ts `duel`, at most 1.6s, a tap jumps to the end, never again on that
+  device): the verdict waits while the marks fill pair by pair (75ms apart, a pluck for each of the player's right
+  ones, a thud for each not), the two scores counting up with them so the lead changes hands as it did, the band of
+  the deciding question lighting as it's reached; at about 0.9s the verdict rises and the scores land, the winner's
+  turning gold, with `win`, `lose` or `end`; then what it meant fades in, the rating's bar filling from where it was.
 - **The big news is a sheet**, at most one a game, only for what really is big: a week of the league ended up or on
   its podium, a division reached, the streak at 3, 7, 30, 100 or 365 days, a level that unlocks something or is a
   fifth, an epic or legendary achievement. It opens once the result has landed, slides up (320ms) over the dimmed
@@ -408,8 +436,8 @@ Feedback fires once, when it's earned, and then the screen is still again:
   default, kept on the device): a light knock when an answer is tapped; a selection tick for each digit, move and
   card placed; a medium knock for a right answer and for the streak growing; success for an exact one and for ten of
   ten; a light knock for a close one; two light knocks, 80ms apart, for a wrong one or none (never the phone's error
-  alert); success, then a heavy knock 120ms later, for the big news's sheet and for getting through Роял's cut; a light
-  knock for going out of it.
+  alert); success, then a heavy knock 120ms later, for the big news's sheet, for getting through Роял's cut and for a
+  win (a duel, Роял, first in a room); a light knock for going out of the cut and for a duel lost.
 
 ## Pictures
 

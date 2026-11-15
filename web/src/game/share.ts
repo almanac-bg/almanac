@@ -28,7 +28,7 @@ export function percent(x: number): string {
 export const rare = 0.25;
 
 /** The day's result to share: „АЛМАНАХ · 14 ноември“, „8 от 10 · серия 12“ (the streak from two days), a square for
- * each of the ten (🟩 right, 🟨 close, 🟥 wrong or not answered), the right answer the fewest of the day's other
+ * each of the ten (🟩 right, 🟨 close, ⬜ wrong or not answered), the right answer the fewest of the day's other
  * players got, if few did (`rarest`: its place and their share right: „Познах въпрос 7, който знаят само 12%“), and
  * the player's link (their invite), or „almanac.bg“ without one. `day` is YYYY-MM-DD. */
 export function dayShareText(
@@ -43,7 +43,7 @@ export function dayShareText(
   const rights = trail.filter((m) => m.right).length;
   const squares = Array.from({ length: total }, (_, i) => {
     const m = trail[i];
-    return m?.right ? "🟩" : m?.partial ? "🟨" : "🟥";
+    return m?.right ? "🟩" : m?.partial ? "🟨" : "⬜";
   }).join("");
   const few =
     rarest && rarest.right <= rare

@@ -158,6 +158,7 @@ type firstWeek struct {
 	Streaks []streakRow
 	Spent   int
 	Repairs rate     // broken streaks won back, of those offered (7 days)
+	Mails   rate     // the mails of a streak ended (streakmail.go), and the players back within 3 days (7 days)
 	Kinds   []string // the kinds of games played in the last 7 days, by name
 	Games   []gamesRow
 	Stick   string // DAU ÷ MAU
@@ -402,6 +403,12 @@ func (s *Server) firstWeek(ctx context.Context, active play.Active) (firstWeek, 
 	}
 	f.Spent = h.Spent
 	f.Repairs = rate{win[0].t["repair:done"], win[0].t["repair:offered"]}
+	if err := s.db.Read.QueryRowContext(ctx, `SELECT count(*), count(*) FILTER (WHERE EXISTS (SELECT 1 FROM runs r
+		WHERE r.user_id = m.user_id AND r.kind = 'day' AND r.finished_at IS NOT NULL
+			AND r.day BETWEEN m.day AND date(m.day, '+2 days'))) FROM streak_mails m WHERE m.day >= ?`,
+		play.DayShift(today, -6)).Scan(&f.Mails.Of, &f.Mails.N); err != nil {
+		return f, err
+	}
 
 	// The games, by kind, day by day.
 	days, err := g.Games(ctx, 7)

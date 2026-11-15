@@ -86,17 +86,18 @@ type Server struct {
 	push     *push.Sender
 	phones   *push.Phones
 	// closing ends the streams (rooms, Роял) when the server stops, so that it needn't wait for them.
-	closing   chan struct{}
-	drain     drain
-	bank      atomic.Pointer[bank.Bank]
-	client    fs.FS
-	limits    *limiter
-	problems  *problems
-	reminders reminders // who is due the day's reminder when, today (remind.go)
-	secure    bool
-	host      string
-	cookie    string
-	handler   http.Handler
+	closing       chan struct{}
+	drain         drain
+	bank          atomic.Pointer[bank.Bank]
+	client        fs.FS
+	limits        *limiter
+	problems      *problems
+	reminders     reminders     // who is due the day's reminder when, today (remind.go)
+	streakMailing streakMailing // who is due the mail of a streak ended when, today (streakmail.go)
+	secure        bool
+	host          string
+	cookie        string
+	handler       http.Handler
 }
 
 func New(cfg Config, d Deps) (*Server, error) {
@@ -192,6 +193,8 @@ func (s *Server) routes() http.Handler {
 	api("DELETE /api/push/phone", s.removePhone)
 	api("GET /api/push/prefs", s.pushPrefs)
 	api("PATCH /api/push/prefs", s.setPushPref)
+	api("GET /api/mail/prefs", s.mailPrefs)
+	api("PATCH /api/mail/prefs", s.setMailPrefs)
 	api("POST /api/errors", s.clientError)
 	api("POST /api/guest", s.guest)
 	api("POST /api/tally", s.tally)
@@ -223,6 +226,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/rooms/{code}/people", s.roomBefriend)
 	api("POST /api/duels", s.challenge)
 	api("GET /api/duels", s.duels)
+	api("GET /api/duels/{id}", s.duelOne)
 	mux.HandleFunc("GET /api/duels/live/events", s.liveEvents)
 	api("POST /api/duels/live/{id}/answer", s.liveAnswer)
 	api("POST /api/duels/{id}/play", s.playDuel)
@@ -259,6 +263,8 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /robots.txt", s.robots)
 	mux.HandleFunc("GET /sitemap.xml", s.sitemap)
 	mux.HandleFunc("GET /privacy", s.privacy)
+	mux.HandleFunc("GET /mail/off", s.mailOff)
+	mux.HandleFunc("POST /mail/off", s.mailOff)
 	mux.HandleFunc("GET /admin", s.admin)
 	mux.HandleFunc("POST /admin/reports/{id}/resolve", s.resolve)
 	mux.HandleFunc("GET /.well-known/security.txt", s.securityTxt)

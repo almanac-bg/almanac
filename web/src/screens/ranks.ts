@@ -9,8 +9,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, type Signal, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
-import { type Open, segmented, type Tier, toneOf, topicMark } from "../ui.ts";
-import type { Standing } from "./duel.ts";
+import { type Open, type Standing, segmented, type Tier, toneOf, topicMark } from "../ui.ts";
 import { type LeagueView, leagueBoard, loadLeague } from "./league.ts";
 
 interface Ranked {

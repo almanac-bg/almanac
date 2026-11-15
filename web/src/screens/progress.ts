@@ -1,8 +1,7 @@
 // A player's progress as the server keeps it: the level, every achievement, and what they may look like.
 
 import { api } from "../lib/api.ts";
-import type { AchievementInfo, Division, Open, Tier, TitleRef, Unlock } from "../ui.ts";
-import type { Standing } from "./duel.ts";
+import type { AchievementInfo, Division, Open, Standing, Tier, TitleRef, Unlock } from "../ui.ts";
 
 export interface Progress {
   level: number;

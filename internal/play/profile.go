@@ -107,29 +107,9 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 func (g *Game) relation(ctx context.Context, p *Profile, viewer, id int64) error {
 	db := g.DB.Read
 	if _, err := g.Friend(ctx, viewer, id); err == nil {
-		p.Friend, p.ID, p.Record = "yes", id, &Record{}
-		rows, err := db.QueryContext(ctx, `SELECT outcome, count(*) FROM runs
-			WHERE user_id = ? AND kind = 'duel' AND opponent_id = ? GROUP BY outcome`, viewer, id)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var outcome string
-			var n int
-			if err := rows.Scan(&outcome, &n); err != nil {
-				return err
-			}
-			switch outcome {
-			case "won":
-				p.Record.Won = n
-			case "lost":
-				p.Record.Lost = n
-			default:
-				p.Record.Drawn = n
-			}
-		}
-		return rows.Err()
+		r, err := g.recordAgainst(ctx, viewer, id)
+		p.Friend, p.ID, p.Record = "yes", id, &r
+		return err
 	} else if !errors.Is(err, ErrNotFriends) {
 		return err
 	}

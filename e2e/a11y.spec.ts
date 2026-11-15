@@ -56,6 +56,54 @@ for (const scheme of ["light", "dark"] as const) {
   });
 }
 
+// A duel's result, as one won against a friend has it (the server's answer for it made here): the two face to face, the
+// duel question by question with the quicker answers ringed and the deciding one marked, the rating and the record.
+for (const scheme of ["light", "dark"] as const) {
+  test(`a duel's result is accessible (${scheme})`, async ({ page }) => {
+    const mark = (points: number, ms: number) => ({ points, right: points > 0, ms });
+    const side = (name: string, tag: string, points: number[], slower = 0) => ({
+      name,
+      tag,
+      points: points.reduce((a, p) => a + p, 0),
+      rights: points.filter((p) => p > 0).length,
+      ms: 40_000,
+      done: true,
+      look: { avatar: "hare-gold/double/", title: "Познавач", titleTier: "rare", level: 7 },
+      marks: points.map((p, i) => mark(p, 3000 + 300 * i + slower)),
+    });
+    const duel = {
+      id: 1,
+      kind: "friend",
+      state: "won",
+      friend: 2,
+      you: side("Заек 817", "", [1300, 1100, 0, 1500, 1200, 0, 1400, 1250, 1100, 1000]),
+      opponent: { ...side("Мария", "maria", [1200, 0, 1500, 1600, 1300, 0, 1500, 0, 1000, 0], 500), ms: 50_000 },
+      delta: 18,
+      runId: 1,
+      createdAt: Date.now(),
+      expiresAt: Date.now(),
+      endedAt: Date.now(),
+      decided: 8,
+      rating: {
+        before: 1062,
+        after: 1080,
+        division: { id: "silver", name: "Сребро", from: 1050 },
+        next: { id: "gold", name: "Злато", from: 1150 },
+      },
+      record: { won: 3, lost: 2, drawn: 1 },
+    };
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.route("**/api/duels/1", (r) => r.fulfill({ json: { duel } }));
+    await page.goto("/duel/1");
+    await expect(page.getByRole("heading", { name: "Победа" })).toBeVisible();
+    await page.keyboard.press("Shift"); // the moment, to its end
+    await expect(page.locator(".duel-record")).toBeVisible();
+    await expect(page.locator(".duel-pip.fast")).not.toHaveCount(0);
+    const { violations } = await new AxeBuilder({ page }).analyze();
+    expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
+  });
+}
+
 // Another player's profile: someone made for it, seen by a stranger.
 for (const scheme of ["light", "dark"] as const) {
   test(`a player's profile is accessible (${scheme})`, async ({ page, playwright }) => {

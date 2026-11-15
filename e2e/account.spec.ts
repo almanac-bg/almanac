@@ -14,6 +14,13 @@ test("a guest keeps their game with a code by email, and can sign out", async ({
   await page.getByLabel("Код").fill(code);
   await page.getByRole("button", { name: "Влез" }).click();
   await expect(page.getByText(`Влизаш с ${email}`)).toBeVisible();
+  // With an email and notifications on no device, a streak's end may come by mail: on, and the player's to stop.
+  const mail = page.getByRole("switch", { name: "По имейл, когато серията ми прекъсне" });
+  await expect(mail).toHaveAttribute("aria-checked", "true");
+  await mail.click();
+  await expect(mail).toHaveAttribute("aria-checked", "false");
+  await page.reload();
+  await expect(mail).toHaveAttribute("aria-checked", "false");
   await page.getByRole("button", { name: "Излез" }).click();
   await expect(page.getByRole("button", { name: "Прати ми код" })).toBeVisible();
 });

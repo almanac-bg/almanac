@@ -7,8 +7,17 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { friendRequests, player } from "../state.ts";
-import { type AchievementInfo, avatar, badge, record, stat, type Tier, tierWords } from "../ui.ts";
-import { type Standing, standingCard } from "./duel.ts";
+import {
+  type AchievementInfo,
+  avatar,
+  badge,
+  record,
+  type Standing,
+  standingCard,
+  stat,
+  type Tier,
+  tierWords,
+} from "../ui.ts";
 
 interface Profile {
   name: string;

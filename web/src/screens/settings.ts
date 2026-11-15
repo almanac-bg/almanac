@@ -223,8 +223,50 @@ function access(): Child {
   );
 }
 
-/** Notifications: on or off on this device, and which kinds the player gets (on every device they have them on). */
+/** The mail when a streak ends (server/streakmail.go): a switch, for a player with an email whom no notification
+ * reaches, on any device. */
+function byMail() {
+  const prefs = signal<{ streak: boolean; can: boolean } | null>(null);
+  const error = signal("");
+  const load = () => {
+    if (user.peek()?.email) api<{ streak: boolean; can: boolean }>("GET", "/api/mail/prefs").then(prefs.set, () => {});
+    else prefs.set(null);
+  };
+  // Again as an email is added (a guest signing in here), or the player signs out.
+  effect(() => {
+    user()?.email;
+    untracked(load);
+  });
+  const row = () =>
+    prefs()?.can
+      ? [
+          switchRow(
+            "По имейл, когато серията ми прекъсне",
+            "Едно писмо, ако серия от 5 дни или повече прекъсне. Най-много едно на 30 дни.",
+            () => prefs()?.streak ?? false,
+            async (on) => {
+              const was = prefs.peek();
+              if (!was) return;
+              error.set("");
+              prefs.set({ ...was, streak: on });
+              try {
+                prefs.set(await api("PATCH", "/api/mail/prefs", { kind: "streak", on }));
+              } catch (err) {
+                prefs.set(was);
+                error.set((err as ApiError).message);
+              }
+            },
+          ),
+          () => error() && h("p", { class: "bad", role: "alert" }, error()),
+        ]
+      : null;
+  return { row, load, can: () => !!prefs()?.can };
+}
+
+/** Notifications: on or off on this device, and which kinds the player gets (on every device they have them on); and
+ * for whom no notification reaches, the mail when a streak ends. */
 function reminders(): Child {
+  const mail = byMail();
   if (needsHomeScreen()) {
     return h(
       "section",
@@ -235,9 +277,11 @@ function reminders(): Child {
         { class: "muted" },
         "На iPhone известията идват, щом добавиш АЛМАНАХ към началния екран: Сподели → Добави към началния екран. После ги включи оттук.",
       ),
+      mail.row,
     );
   }
-  if (!pushable()) return null;
+  if (!pushable())
+    return () => (mail.can() ? h("section", { class: "stack" }, h("h2", null, "Известия"), mail.row) : null);
   const on = signal<boolean | null>(null);
   const prefs = signal<PushPrefs | null>(null);
   const error = signal("");
@@ -263,6 +307,7 @@ function reminders(): Child {
           load();
         }
       }
+      mail.load(); // notifications on a device take the mail's place, and off give it back
     } catch (err) {
       reportProblem(`reminders: ${(err as Error).name}: ${(err as Error).message}`);
       error.set("Не успяхме. Опитай пак.");
@@ -317,6 +362,7 @@ function reminders(): Child {
               h("button", { class: "btn", onclick: toggle }, "Включи известията"),
             ],
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    mail.row,
   );
 }
 

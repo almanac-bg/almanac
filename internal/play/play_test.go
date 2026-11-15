@@ -1087,6 +1087,103 @@ func TestLiveDuels(t *testing.T) {
 	}
 }
 
+// One duel's result: how each question went for each side, the question that decided it, where the rating went, and
+// the record between the two.
+func TestDuelOf(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo, gal, vi := w.user(), w.user(), w.user(), w.user()
+
+	// Ana wins from the first question; the result says so on both sides.
+	l, _ := w.g.StartLive(ctx, ana, bo)
+	w.play(ana, l.Runs[0], repeat(w.right, Length)...)
+	w.play(bo, l.Runs[1], repeat(w.wrong, Length)...)
+	d, err := w.g.DuelOf(ctx, ana, l.DuelID)
+	if err != nil || d.State != "won" || len(d.You.Marks) != Length || len(d.Opponent.Marks) != Length ||
+		!d.You.Marks[0].Right || d.You.Marks[0].Ms == 0 || d.Opponent.Marks[0].Right || d.Decided != 1 {
+		t.Fatalf("Ana's duel: %+v %v", d, err)
+	}
+	if r := d.Rating; r == nil || r.Before != StartRating || r.After != StartRating+d.Delta || r.Division.ID != "bronze" ||
+		r.Next == nil || r.Next.ID != "silver" {
+		t.Fatalf("Ana's rating: %+v", d.Rating)
+	}
+	if d.Record == nil || *d.Record != (Record{Won: 1}) {
+		t.Fatalf("Ana's record against Bo: %+v", d.Record)
+	}
+	db, _ := w.g.DuelOf(ctx, bo, l.DuelID)
+	if db.State != "lost" || db.Decided != 1 || db.Rating.After != StartRating+db.Delta || *db.Record != (Record{Lost: 1}) {
+		t.Fatalf("Bo's side: %+v", db)
+	}
+	// Someone else's duel isn't theirs to see.
+	if _, err := w.g.DuelOf(ctx, gal, l.DuelID); !errors.Is(err, ErrNoDuel) {
+		t.Fatalf("Gal saw Ana's duel: %v", err)
+	}
+
+	// A friendly the same day: the record grows, the rating doesn't move (and isn't shown).
+	l, _ = w.g.StartLive(ctx, bo, ana)
+	w.play(bo, l.Runs[0], repeat(w.right, Length)...)
+	w.play(ana, l.Runs[1], repeat(w.wrong, Length)...)
+	if d, _ = w.g.DuelOf(ctx, ana, l.DuelID); !d.Friendly || d.Rating != nil || *d.Record != (Record{Won: 1, Lost: 1}) {
+		t.Fatalf("a friendly: %+v", d)
+	}
+
+	// A friend's challenge while it waits: the player's own marks, nothing of the friend's.
+	w.befriend(gal, vi)
+	s, id, _ := w.g.ChallengeFriend(ctx, gal, vi)
+	w.play(gal, s.ID, repeat(w.right, Length)...)
+	if d, _ = w.g.DuelOf(ctx, gal, id); d.State != "wait" || len(d.You.Marks) != Length || d.Opponent.Marks != nil ||
+		d.Record != nil || d.Decided != 0 {
+		t.Fatalf("a challenge waiting: %+v", d)
+	}
+
+	// Against a recording: its marks, and no record against a recording's player.
+	l, err = w.g.StartRecorded(ctx, vi)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(vi, l.Runs[0], repeat(w.wrong, Length)...)
+	if d, _ = w.g.DuelOf(ctx, vi, l.DuelID); !d.Recorded || d.State != "lost" || len(d.Opponent.Marks) != Length ||
+		d.Record != nil || d.Rating == nil || d.Rating.After != StartRating+d.Delta {
+		t.Fatalf("against a recording: %+v", d)
+	}
+}
+
+func TestDecided(t *testing.T) {
+	marks := func(points ...int) []DuelMark {
+		out := make([]DuelMark, len(points))
+		for i, p := range points {
+			out[i] = DuelMark{Points: p}
+		}
+		return out
+	}
+	sum := func(m []DuelMark) (n int) {
+		for _, x := range m {
+			n += x.Points
+		}
+		return n
+	}
+	for _, c := range []struct {
+		name string
+		a, b []DuelMark
+		want int
+	}{
+		{"ahead from the first", marks(100, 0, 100), marks(0, 50, 0), 1},
+		{"a lead lost and taken back on the last", marks(100, 0, 0, 200), marks(0, 150, 50, 0), 4},
+		{"even after the second, ahead from the third", marks(100, 0, 100), marks(0, 100, 0), 3},
+		{"the other won it on the second", marks(100, 0, 0), marks(0, 200, 0), 2},
+		{"even points: the time decides", marks(100, 0), marks(0, 100), 0},
+		{"nothing played", nil, nil, 0},
+	} {
+		if got := decided(c.a, c.b, sum(c.a), sum(c.b)); got != c.want {
+			t.Errorf("%s: decided on %d, want %d", c.name, got, c.want)
+		}
+	}
+	// The bonus for all right comes with the last question: it can turn the duel there.
+	if got := decided(marks(100, 100), marks(300, 0), 200+AllRight, 300); got != 2 {
+		t.Errorf("turned by the bonus: decided on %d", got)
+	}
+}
+
 func TestFriendDuels(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()

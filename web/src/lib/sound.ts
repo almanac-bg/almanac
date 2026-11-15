@@ -159,6 +159,8 @@ const touches: Partial<Record<SoundName, Haptic>> = {
   perfect: "exact",
   through: "big",
   out: "close",
+  win: "big",
+  lose: "close",
 };
 
 /** Plays a sound, if sounds are on and the browser allows them (else nothing: never a backlog later). `lift` raises
