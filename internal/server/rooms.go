@@ -153,6 +153,72 @@ func (s *Server) roomRemove(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]bool{"ok": true})
 }
 
+// roomPeople is what a room's end offers its player: whom of the others to add as friends (their keys: not friends
+// yet, nor asked), and whether the day's ten still wait for them.
+func (s *Server) roomPeople(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	rm, err := s.roomOf(r)
+	if err != nil {
+		return err
+	}
+	add := []int{}
+	for key, id := range rm.Players() {
+		if id == u.ID {
+			continue
+		}
+		var known bool
+		if err := s.db.Read.QueryRowContext(r.Context(), `SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ?1 AND friend_id = ?2)
+			OR EXISTS (SELECT 1 FROM friend_requests WHERE from_id = ?1 AND to_id = ?2)`, u.ID, id).Scan(&known); err != nil {
+			return err
+		}
+		if !known {
+			add = append(add, key)
+		}
+	}
+	_, played, err := s.game.DayRights(r.Context(), u.ID, s.game.Today(), u.ID)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"add": add, "day": played})
+}
+
+// roomBefriend asks a player of the room (by their key) to be friends: a request, as by their tag.
+func (s *Server) roomBefriend(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	rm, err := s.roomOf(r)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		Key int `json:"key"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	id, here := rm.Players()[in.Key]
+	if !here || id == u.ID {
+		return play.ErrNoPlayer
+	}
+	if !s.limits.allow("request:"+s.clientIP(r), 30, time.Hour) {
+		return errTooMany
+	}
+	var tag string
+	if err := s.db.Read.QueryRowContext(r.Context(), `SELECT tag FROM users WHERE id = ?`, id).Scan(&tag); err != nil {
+		return err
+	}
+	sent, err := s.game.Request(r.Context(), u.ID, tag, false)
+	if err != nil {
+		return err
+	}
+	return ok(w, sent)
+}
+
 func (s *Server) roomAnswer(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {

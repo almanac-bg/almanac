@@ -67,6 +67,12 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 				if out["rarest"], err = s.game.RarestRight(r.Context(), u.ID, day); err != nil {
 					return err
 				}
+				// The shared result ends with the player's invite link: it brings whoever opens it to the day.
+				code, err := s.game.InviteCode(r.Context(), u.ID)
+				if err != nil {
+					return err
+				}
+				out["invite"] = s.cfg.PublicURL + "/f/" + code
 			}
 		}
 	}

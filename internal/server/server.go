@@ -211,6 +211,8 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/rooms/{code}/start", s.roomStart)
 	api("POST /api/rooms/{code}/answer", s.roomAnswer)
 	api("POST /api/rooms/{code}/remove", s.roomRemove)
+	api("GET /api/rooms/{code}/people", s.roomPeople)
+	api("POST /api/rooms/{code}/people", s.roomBefriend)
 	api("POST /api/duels", s.challenge)
 	api("GET /api/duels", s.duels)
 	mux.HandleFunc("GET /api/duels/live/events", s.liveEvents)

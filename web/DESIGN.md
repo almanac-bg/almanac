@@ -43,8 +43,9 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   from the icon beside the name.
   Общо is a hub, each thing once: the level with what comes next in one card, the league in a line (its group is
   Класации'), the streak, three numbers in one card, mastery, the latest games. Награди opens with the three
-  achievements nearest to done; then each tier, every achievement in full (`.achievements`/`.achievement`: how it's
-  earned, how far along, what it gives), the earned first: nothing is a tap away.
+  achievements nearest to done and the earned ones, each in full (`.achievements`/`.achievement`: how it's earned,
+  how far along, what it gives); the rest by tier behind „Всички постижения (n)“. Only the achievements of systems
+  the player has met, and no XP before it's open.
 
 ## First days
 
@@ -58,7 +59,8 @@ played, a rated game), never by the date. The server says which are open (`open`
 - **The second day played:** XP, the level (Начало's chip, Профил's card, the avatar's number) and the day's goals.
 - **The third:** the week's league (Профил's line, Класации' „Лига“). A week that ended before is let go untold.
 - **The first duel or Роял that moves the rating:** the rating and its division (Дуел, Роял, Класации' „Рейтинг“).
-- **A topic's first mark:** „Колко знаеш“ on Профил.
+- **A topic's first estimate** (10 answers): „Колко знаеш“ on Профил, the topic's tile and a game's news say
+  „първа оценка · 74%“, a share and no tier; the tier („Експерт“) comes with a sure mark (30 answers).
 
 Nothing earned waits, only what's shown: XP, achievements and unlocks count from the first game, and what was held
 (a level reached, its unlocks, an achievement of the goals or the league) is told when its system opens. Each system

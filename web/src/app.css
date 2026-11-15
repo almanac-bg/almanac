@@ -3597,7 +3597,8 @@
     color: var(--text-muted);
   }
 
-  /* A friend's ten, under their name (the friends' day on Начало). */
+  /* Under a name: a friend's ten (the friends' day on Начало), or the way to add a player (a room's end). */
+  .row > .row-add,
   .row > .trail {
     grid-column: 2 / -1;
     max-width: 12rem;

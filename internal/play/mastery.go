@@ -49,8 +49,13 @@ var MasteryTiers = []MasteryTier{
 // MasterTier is the tier the achievements for mastering a topic ask for.
 const MasterTier = 4
 
-// MasteryFrom is how many answers in a topic it takes before its mastery is told.
-const MasteryFrom = 10
+// MasteryFirst is how many answers in a topic it takes for a first estimate of its mastery, told as a share of the
+// topic and no more; MasteryFrom, before it's sure and told with its tier. A game of a topic is ten of its questions:
+// one game makes a first estimate, three a mark that won't call a player „Експерт“ on a lucky draw of easy ones.
+const (
+	MasteryFirst = 10
+	MasteryFrom  = 30
+)
 
 const (
 	// priorVariance is how unsure a player's ability is before their first answer: as far apart as players are.
@@ -120,8 +125,11 @@ type Mastery struct {
 	// Next is the next tier's name, and NextAt the percent it starts at ("" and 0 at the top).
 	Next   string `json:"next,omitempty"`
 	NextAt int    `json:"nextAt,omitempty"`
-	// Sure is whether there are answers enough to tell (MasteryFrom): until then, Known and Tier are only a guess.
-	Sure bool `json:"sure"`
+	// Sure is whether there are answers enough to tell (MasteryFrom): until then, Known and Tier are only a guess, and
+	// the tier isn't told. First is whether there are enough for a first estimate (MasteryFirst) but not yet for that:
+	// Known is told as one, without a tier.
+	Sure  bool `json:"sure"`
+	First bool `json:"first,omitempty"`
 }
 
 // TierOf is the tier a percent of a topic known is in.
@@ -138,7 +146,8 @@ func TierOf(known int) int {
 func masteryOf(category string, a ability, hardness []float64) Mastery {
 	known := int(math.Round(100 * knownOf(a.mean, hardness)))
 	t := TierOf(known)
-	m := Mastery{Category: category, Answers: a.answers, Known: known, Tier: t, Name: MasteryTiers[t].Name, Sure: a.answers >= MasteryFrom}
+	m := Mastery{Category: category, Answers: a.answers, Known: known, Tier: t, Name: MasteryTiers[t].Name,
+		Sure: a.answers >= MasteryFrom, First: a.answers >= MasteryFirst && a.answers < MasteryFrom}
 	if t+1 < len(MasteryTiers) {
 		m.Next, m.NextAt = MasteryTiers[t+1].Name, MasteryTiers[t+1].From
 	}

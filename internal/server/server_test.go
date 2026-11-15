@@ -532,6 +532,62 @@ func TestARoomOverHTTP(t *testing.T) {
 	}
 }
 
+// A room's end offers each player the others to add as friends (not friends yet, nor asked), and the day's ten while
+// they wait.
+func TestRoomPeople(t *testing.T) {
+	g := start(t)
+	ana, bo, cy := g.player(), g.player(), g.player()
+	for _, p := range []*player{ana, bo, cy} {
+		p.call("POST", "/api/guest", map[string]any{})
+	}
+	_, out := ana.call("POST", "/api/rooms", map[string]string{"category": ""})
+	code := out["code"].(string)
+	as := ana.follow(code)
+	bo.follow(code)
+	cy.follow(code)
+	v := as.until(func(v map[string]any) bool { return len(v["players"].([]any)) == 3 })
+	keys := map[string]float64{}
+	for _, p := range v["players"].([]any) {
+		p := p.(map[string]any)
+		keys[p["name"].(string)] = p["key"].(float64)
+	}
+	people := func(p *player) ([]any, any) {
+		status, out := p.call("GET", "/api/rooms/"+code+"/people", nil)
+		if status != 200 {
+			t.Fatalf("people: %d %v", status, out)
+		}
+		return out["add"].([]any), out["day"]
+	}
+	if add, day := people(ana); len(add) != 2 || day != false {
+		t.Fatalf("Ana's people at first: %v %v", add, day)
+	}
+	// Ana adds Bo: a request; he's no longer offered to her, she's still offered to him (he can say yes there).
+	_, me := bo.call("GET", "/api/me", nil)
+	boKey := keys[me["user"].(map[string]any)["name"].(string)]
+	if status, out := ana.call("POST", "/api/rooms/"+code+"/people", map[string]any{"key": boKey}); status != 200 ||
+		out["friends"] == true {
+		t.Fatalf("Ana adds Bo: %d %v", status, out)
+	}
+	if add, _ := people(ana); len(add) != 1 || add[0] == boKey {
+		t.Fatalf("Ana's people once she asked Bo: %v", add)
+	}
+	if add, _ := people(bo); len(add) != 2 {
+		t.Fatalf("Bo's people: %v", add)
+	}
+	// Bo adds Ana back: friends, offered to neither.
+	_, me = ana.call("GET", "/api/me", nil)
+	anaKey := keys[me["user"].(map[string]any)["name"].(string)]
+	if _, out := bo.call("POST", "/api/rooms/"+code+"/people", map[string]any{"key": anaKey}); out["friends"] != true {
+		t.Fatalf("Bo adds Ana: %v", out)
+	}
+	if add, _ := people(bo); len(add) != 1 {
+		t.Fatalf("Bo's people once friends with Ana: %v", add)
+	}
+	if status, _ := cy.call("POST", "/api/rooms/"+code+"/people", map[string]any{"key": 99}); status == 200 {
+		t.Fatal("a key nobody has")
+	}
+}
+
 func TestALiveDuelOverHTTP(t *testing.T) {
 	g := start(t)
 	ana, bo := g.player(), g.player()
@@ -1011,11 +1067,33 @@ func TestLinkPreviews(t *testing.T) {
 	_, friends := p.call("GET", "/api/friends", nil)
 	link := friends["invite"].(string)
 	who := me["user"].(map[string]any)["name"].(string)
-	if body := page(link[len(g.url):]); !strings.Contains(body, `og:title" content="`+who+` те кани в АЛМАНАХ"`) {
+	if body := page(link[len(g.url):]); !strings.Contains(body, `og:title" content="`+who+` в АЛМАНАХ"`) ||
+		!strings.Contains(body, `og:description" content="Десет въпроса за днес, едни и същи за всички. Колко ще познаеш ти?"`) {
 		t.Fatalf("the invite's preview:\n%s", body[:min(len(body), 1500)])
 	}
+	// Once its owner has played the day, their link (the one their shared result ends with) says how they did.
+	_, day := p.call("POST", "/api/day", map[string]any{})
+	id = strconv.Itoa(int(day["id"].(float64)))
+	for n := range 10 {
+		p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
+		p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": nil})
+	}
+	if _, today := p.call("GET", "/api/day", nil); today["invite"] != link {
+		t.Fatalf("the day's link to share: %v, not %s", today["invite"], link)
+	}
+	if body := page(link[len(g.url):]); !strings.Contains(body, `og:title" content="`+who+`: 0 от 10 в АЛМАНАХ днес"`) {
+		t.Fatalf("the invite's preview, its owner's day played:\n%s", body[:min(len(body), 1500)])
+	}
+	// The one who opens it hears how its owner did, and, once played, how they did themselves.
+	other := g.player()
+	other.call("POST", "/api/guest", map[string]any{})
+	code := link[strings.LastIndex(link, "/")+1:]
+	if _, info := other.call("GET", "/api/invites/"+code, nil); info["their"] != 0.0 || info["mine"] != nil ||
+		info["friends"] != false {
+		t.Fatalf("the invite as another sees it: %v", info)
+	}
 	_, room := p.call("POST", "/api/rooms", map[string]string{"category": ""})
-	code := room["code"].(string)
+	code = room["code"].(string)
 	if body := page("/r/" + code); !strings.Contains(body, "Ела в стая "+code[:3]+" "+code[3:]) {
 		t.Fatal("the room's preview")
 	}
