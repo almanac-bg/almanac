@@ -92,6 +92,14 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: The engine
         run: npx playwright install --with-deps ${{ matrix.engine }}
+      # Firefox's audio runs only with a sound device, and CI has none (Chromium brings its own stand-in): a silent one.
+      - name: A sound device that plays to nothing
+        if: matrix.engine == 'firefox'
+        run: |
+          sudo apt-get install -y --no-install-recommends pulseaudio
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=silent
+          pactl set-default-sink silent
       - name: The game, played in it
         run: npx playwright test -c e2e --project=${{ matrix.engine }}
       - name: Traces of what failed
