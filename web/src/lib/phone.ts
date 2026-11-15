@@ -84,12 +84,25 @@ export async function share(text: string, url?: string): Promise<void> {
     .catch(() => {});
 }
 
-/** A touch the player feels on an answer: one knock for right, a double for wrong. */
-export function feel(kind: "exact" | "right" | "partial" | "wrong" | "time"): void {
-  const type = kind === "exact" || kind === "right" ? "SUCCESS" : kind === "partial" ? "WARNING" : "ERROR";
-  plugin("Haptics")
-    .call("notification", { type })
-    .catch(() => {});
+/** What the player feels: a light knock for a tap (and for close, and a Роял cut out), a selection tick for each digit
+ * or move, a medium knock for right and the streak, success for exact, two light knocks for wrong (never the phone's
+ * ERROR, a sharp alert felt several times a day), and success then a heavy knock for the big moments. */
+export function haptic(kind: "tap" | "select" | "right" | "exact" | "close" | "wrong" | "streak" | "big"): void {
+  const touch = plugin("Haptics");
+  const call = (method: string, options: object = {}) => touch.call(method, options).catch(() => {});
+  const knock = (style: "LIGHT" | "MEDIUM" | "HEAVY", after = 0) =>
+    after ? setTimeout(() => call("impact", { style }), after) : call("impact", { style });
+  if (kind === "tap" || kind === "close") knock("LIGHT");
+  else if (kind === "select") call("selectionStart").then(() => call("selectionChanged"));
+  else if (kind === "right" || kind === "streak") knock("MEDIUM");
+  else if (kind === "exact") call("notification", { type: "SUCCESS" });
+  else if (kind === "wrong") {
+    knock("LIGHT");
+    knock("LIGHT", 80);
+  } else {
+    call("notification", { type: "SUCCESS" });
+    knock("HEAVY", 120);
+  }
 }
 
 // The phone's token while notifications are on (kept on the phone), so that turning them off can say which.

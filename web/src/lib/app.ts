@@ -4,6 +4,7 @@
 // game opened in the app. All of that is in phone.ts, loaded only in the app; in a browser nothing here does anything.
 
 import { tally } from "./api.ts";
+import { vibrateOn } from "./prefs.ts";
 
 const bridge = (globalThis as { Capacitor?: { isNativePlatform(): boolean; getPlatform(): string } }).Capacitor;
 
@@ -38,11 +39,14 @@ export async function appShare(text: string, url?: string): Promise<boolean> {
   return true;
 }
 
-/** An answer, felt (in the app only: a page can't on an iPhone, and a phone's browser buzzes rather than knocks). */
-export function feel(kind: "exact" | "right" | "partial" | "wrong" | "time"): void {
-  if (inApp)
+/** What the player feels (phone.ts says how each is felt): in the app only (a page can't on an iPhone, and a phone's
+ * browser buzzes rather than knocks), and while „Вибрация“ is on. */
+export function haptic(kind: Haptic): void {
+  if (inApp && vibrateOn.peek())
     phone().then(
-      (p) => p.feel(kind),
+      (p) => p.haptic(kind),
       () => {},
     );
 }
+
+export type Haptic = Parameters<typeof import("./phone.ts").haptic>[0];
