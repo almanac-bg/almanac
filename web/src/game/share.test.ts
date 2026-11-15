@@ -11,14 +11,14 @@ test("the day's result is shared as the date, the score and streak, a square for
   const trail = [right, right, wrong, right, close, right, right, right, right, wrong];
   assert.equal(
     dayShareText("2026-11-14", trail, 10, 12),
-    ["АЛМАНАХ · 14 ноември", "7 от 10 · серия 12", "🟩🟩🟥🟩🟨🟩🟩🟩🟩🟥", "almanac.bg"].join("\n"),
+    ["АЛМАНАХ · 14 ноември", "7 от 10 · серия 12", "🟩🟩⬜🟩🟨🟩🟩🟩🟩⬜", "almanac.bg"].join("\n"),
   );
 });
 
 test("a streak of one day isn't told, and a question not answered is a red square", () => {
   assert.equal(
     dayShareText("2027-01-01", [right, close], 10, 1),
-    ["АЛМАНАХ · 1 януари", "1 от 10", "🟩🟨🟥🟥🟥🟥🟥🟥🟥🟥", "almanac.bg"].join("\n"),
+    ["АЛМАНАХ · 1 януари", "1 от 10", "🟩🟨⬜⬜⬜⬜⬜⬜⬜⬜", "almanac.bg"].join("\n"),
   );
 });
 
@@ -29,7 +29,7 @@ test("nothing in it gives an answer away: only the date, numbers, squares and th
     10,
     3,
   );
-  assert.match(text, /^АЛМАНАХ · 9 май\n9 от 10 · серия 3\n[🟩🟨🟥]{10}\nalmanac\.bg$/u);
+  assert.match(text, /^АЛМАНАХ · 9 май\n9 от 10 · серия 3\n[🟩🟨⬜]{10}\nalmanac\.bg$/u);
 });
 
 test("a right answer few of the day's players got is told, by its place and their share, never its answer", () => {
@@ -39,7 +39,7 @@ test("a right answer few of the day's players got is told, by its place and thei
     [
       "АЛМАНАХ · 14 ноември",
       "7 от 10 · серия 12",
-      "🟩🟩🟥🟩🟨🟩🟩🟩🟩🟥",
+      "🟩🟩⬜🟩🟨🟩🟩🟩🟩⬜",
       "Познах въпрос 7, който знаят само 12%",
       "almanac.bg",
     ].join("\n"),
