@@ -15,10 +15,11 @@ import (
 //
 // A duel with whoever comes is played live, both on each question at the same moment (internal/live runs it; here
 // it's made, and settled once both runs are done). If nobody comes in time, it's played against a recording of a
-// real player's earlier game on the same questions (a topic's or a duel's, never the day's, and none with today's
-// questions in it), a real one by a player of about their rating, played at a person's speed and not a script's
-// (recordedRun, fair.go): only the player's rating moves, and half as far, as the recorded one didn't ask to play nor
-// plays to win; and only RecordedRatedPerDay such duels a day move it.
+// real player's earlier game on the same questions (a duel's, or else a topic's, which the player is told; never the
+// day's, and none with today's questions in it), a real one by a player of about their rating, played at a person's
+// speed and not a script's (recordedRun, fair.go): only the player's rating moves, and half as far, as the recorded one
+// didn't ask to play nor plays to win; and only RecordedRatedPerDay such duels a day move it. The recorded player hears
+// of it quietly, once a day, with a game's news (RecordingsNews).
 //
 // A friend is challenged in their own time: the challenger plays at once, and the friend hears of it when they've
 // finished; from then they have FriendFor to play the same questions or say no.
@@ -68,6 +69,8 @@ type DuelView struct {
 	State string `json:"state"`
 	// Opponent is the other player, or the recorded one it was played against.
 	Opponent *DuelSide `json:"opponent,omitempty"`
+	// Friend is the other player's id in a friend's duel: for a rematch.
+	Friend   int64     `json:"friend,omitempty"`
 	You      *DuelSide `json:"you,omitempty"`
 	Recorded bool      `json:"recorded,omitempty"`
 	// Friendly is a duel that didn't move ratings.
@@ -92,13 +95,15 @@ type DuelSide struct {
 }
 
 // Live is a live duel just made: the questions, and each side's player and run. Against a recording, the second
-// side is the recorded player and the run it plays back, with how they answered each question.
+// side is the recorded player and the run it plays back, with how they answered each question, and the one topic the
+// recorded game was in (Topic; "" for all of them).
 type Live struct {
 	DuelID    int64
 	Picks     []Pick
 	Users     [2]int64
 	Runs      [2]int64
 	Recording []Recorded
+	Topic     string
 }
 
 // Recorded is how the recorded player answered a question: what they gave (as shown; nil for nothing), what it
@@ -159,7 +164,7 @@ func (g *Game) StartRecorded(ctx context.Context, userID int64) (Live, error) {
 		if rec == nil {
 			return ErrNobody
 		}
-		l.Picks = rec.picks
+		l.Picks, l.Topic = rec.picks, rec.topic
 		if err := tx.QueryRow(`SELECT user_id FROM runs WHERE id = ?`, rec.id).Scan(&l.Users[1]); err != nil {
 			return err
 		}
@@ -389,6 +394,8 @@ func seenBy(ctx context.Context, db querier, userID int64, seen map[string]bool)
 type recorded struct {
 	id    int64
 	picks []Pick
+	// topic is the one topic the recorded game was in (a topic's game), "" for all of them (a duel's).
+	topic string
 }
 
 // RecordingBand is how far a recording's player's rating may be from the player's to be their match, while there's
@@ -403,7 +410,8 @@ const (
 // (RecordingRights right or more), by a player whose rating is within RecordingBand of the player's, the one with the
 // fewest questions the player has seen (seen, read before the write) or a day ahead holds (ahead.go: a game played
 // before those days were drawn may have them), the latest first. Short of such, the nearest it
-// gets: any real game, then any game. Nil if there's none.
+// gets: any real game, then any game. At each of these, a game over all the topics (a duel's) comes before one in a
+// single topic, which the duel's player didn't choose. Nil if there's none.
 func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*recorded, error) {
 	days, err := g.days(tx)
 	if err != nil {
@@ -414,7 +422,9 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 		return nil, err
 	}
 	// A script's game is left out before the limit, so that a script's many games can't push the people's out of it.
-	rows, err := tx.Query(`SELECT r.id, r.questions, r.rights, u.rating FROM runs r JOIN users u ON u.id = r.user_id
+	rows, err := tx.Query(`SELECT r.id, r.questions, r.rights, u.rating,
+			CASE WHEN r.kind = 'topic' THEN coalesce(r.category, '') ELSE '' END
+		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind IN ('topic', 'duel') AND r.finished_at IS NOT NULL AND NOT r.scripted AND r.user_id <> ?
 			AND json_array_length(r.questions) = ?
 			AND NOT EXISTS (SELECT 1 FROM duels d WHERE d.ended_at IS NULL AND (d.a_run = r.id OR d.b_run = r.id))
@@ -424,9 +434,10 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 	}
 	defer rows.Close()
 	b := g.Bank()
-	// The best of each kind: in the band and real (0), real (1), any (2); each the fewest seen, the latest first.
-	var best [3]*recorded
-	var fewest [3]int
+	// The best of each kind: in the band and real (0, 1), real (2, 3), any (4, 5), each over all the topics first,
+	// then in one; each the fewest seen, the latest first.
+	var best [6]*recorded
+	var fewest [6]int
 	for i := range fewest {
 		fewest[i] = Length + 1
 	}
@@ -434,7 +445,8 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 		var id int64
 		var raw string
 		var rights, rating int
-		if err := rows.Scan(&id, &raw, &rights, &rating); err != nil {
+		var topic string
+		if err := rows.Scan(&id, &raw, &rights, &rating, &topic); err != nil {
 			return nil, err
 		}
 		var picks []Pick
@@ -454,9 +466,13 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 			continue
 		}
 		real := rights >= RecordingRights
-		for kind, fits := range [3]bool{real && abs(rating-mine) <= RecordingBand, real, true} {
-			if fits && n < fewest[kind] {
-				best[kind], fewest[kind] = &recorded{id: id, picks: picks}, n
+		one := 0 // a single topic's game: after the games over all of them
+		if topic != "" {
+			one = 1
+		}
+		for level, fits := range [3]bool{real && abs(rating-mine) <= RecordingBand, real, true} {
+			if kind := 2*level + one; fits && n < fewest[kind] {
+				best[kind], fewest[kind] = &recorded{id: id, picks: picks, topic: topic}, n
 			}
 		}
 	}
@@ -755,6 +771,9 @@ func (g *Game) DuelsOf(ctx context.Context, userID int64) ([]DuelView, error) {
 	for _, r := range list {
 		v := r.v
 		v.RunID = r.myRun
+		if v.Kind == "friend" {
+			v.Friend = r.theirs
+		}
 		var err error
 		if v.You, err = g.duelSide(ctx, userID, r.myRun, true); err != nil {
 			return nil, err

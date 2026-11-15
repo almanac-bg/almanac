@@ -1,7 +1,8 @@
 // What a game earned, said once, at its end, in three cards at most: the day's goals it finished (with their XP); the
 // one biggest thing that happened (a week of the league ended, a division reached, a new level), or else a line of the XP it
 // brought and the level; and „Ново за теб“: achievements and everything they unlocked to wear (each a tap from being
-// worn), with how a topic's game moved its mastery. Only the biggest of it plays its sound. Only what the player has met
+// worn), with how a topic's game moved its mastery; in a card left free, once a day, how others' duels against the
+// player's recordings went (play/recordings.go). Only the biggest of it plays its sound. Only what the player has met
 // is told (play/unfold.go: no XP on a first day); a system met with this game is said first, once, in a line. What
 // really is big (bigOne) is also brought forward in a sheet over the result (feel.ts), its sound playing as it opens.
 
@@ -21,6 +22,7 @@ import {
   meaning,
   meter,
   type Open,
+  profileHref,
   tierWords,
   type Unlock,
   unlockPicture,
@@ -52,6 +54,8 @@ interface News {
   /** Which of the game's systems the player has met, and those met with this game (told once). */
   open: Open;
   opened?: (keyof Open)[];
+  /** Others' duels against the player's recordings, once a day, in a card the rest leaves free. */
+  recordings?: { text: string; players: { name: string; tag: string }[] };
 }
 
 /** What a game earned, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends).
@@ -95,8 +99,29 @@ export function news(run: number, delay = 0, round?: Promise<number>): Child {
       top === "division" && n.division ? divisionReached(n.division) : null,
       top === "level" ? levelCard(n.level, n.xp, n.from, n.to, true, n.earned) : null,
       fresh(n),
+      n.recordings ? recordings(n.recordings) : null,
     ];
   };
+}
+
+/** Others played against recordings of the player's games: how it went, and who, each a tap from their profile. */
+function recordings(r: NonNullable<News["recordings"]>): Child {
+  return h(
+    "section",
+    { class: "card stack" },
+    h("p", { class: "kicker" }, "Твоите записи"),
+    h("p", null, r.text),
+    h(
+      "details",
+      { class: "more" },
+      h("summary", null, "Кои играха"),
+      h(
+        "ul",
+        { class: "duel-friends" },
+        r.players.map((p) => h("li", null, h("a", { href: profileHref(p.tag) }, p.name))),
+      ),
+    ),
+  );
 }
 
 /** The one biggest thing a game's news holds, if any: a week of the league ended, then a division reached, then a
