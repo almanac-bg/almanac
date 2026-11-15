@@ -1,7 +1,7 @@
-// Sounds: short tones made in the browser (no files), for a game's moments — a pick, the other side answering, the
-// count before a game and its start, the clock ticking and its last seconds, a right answer (higher with each one in
-// a row), a wrong one or none, the end (won, lost or just over), a goal done, a new level or achievement, and
-// something new waiting. On unless the player turns them off (kept on this device).
+// Sounds: made in the browser (no files), for a game's moments — a pick, the other side answering, the count before a
+// game and its start, the clock's last seconds, a right answer (higher with each one in a row), a wrong one or none,
+// the end (won, lost, perfect or just over), the result's pips and the streak, a goal done, a new level or
+// achievement, Роял's cut, and something new waiting. On unless the player turns them off (kept on this device).
 //
 // Browsers allow sound only once the player has touched the page, so the audio starts then. The bigger sounds (an
 // end, a level, an achievement…) take turns: one asked for while another still sounds follows it, never on top. On
@@ -19,7 +19,12 @@ export type SoundName =
   | "count"
   | "go"
   | "tick"
-  | "tock"
+  | "perfect"
+  | "pip"
+  | "dud"
+  | "streak"
+  | "through"
+  | "out"
   | "hurry"
   | "right"
   | "exact"
@@ -35,7 +40,7 @@ export type SoundName =
   | "ping";
 
 /** The bigger sounds, which take turns rather than sound over each other. */
-const inTurn = new Set<SoundName>(["end", "win", "lose", "goal", "level", "achievement"]);
+const inTurn = new Set<SoundName>(["end", "perfect", "win", "lose", "goal", "level", "achievement"]);
 /** The longest a sound waits for its turn; later than that it's no longer news, and is left out. */
 const longestWait = 2.5;
 
@@ -93,7 +98,6 @@ export function loadFeel(): Promise<Feel> {
 export const feelKit = (): Feel | null => kit;
 
 let audio: AudioContext | null = null;
-let out: AudioNode | null = null;
 /** When (in the audio's time) the last of the sounds that take turns ends. */
 let freeAt = 0;
 
@@ -107,15 +111,6 @@ function context(): AudioContext | null {
   } catch {
     return null;
   }
-  const gain = audio.createGain();
-  gain.gain.value = 0.22; // quiet: the game is often played among people
-  // A gentle top cut takes the edge off the square and sawtooth tones (the hurry beeps, a wrong answer).
-  const soften = audio.createBiquadFilter();
-  soften.type = "lowpass";
-  soften.frequency.value = 5000;
-  soften.Q.value = 0.5;
-  gain.connect(soften).connect(audio.destination);
-  out = gain;
   return audio;
 }
 
@@ -157,11 +152,11 @@ export function prepareSound(): void {
 }
 
 /** Plays a sound, if sounds are on and the browser allows them (else nothing: never a backlog later). `lift` raises
- * it by that many semitones. */
+ * it by that many steps of the scale (feel.ts). */
 export function play(name: SoundName, lift = 0): void {
   if (!soundOn.peek()) return;
   const c = context();
-  if (!c || !out) return;
+  if (!c) return;
   if (c.state !== "running") {
     // Not started yet (the very first touch) or stopped by the phone: a sound asked for by a touch starts it.
     if (!touchedNow()) return;
@@ -183,15 +178,15 @@ export function play(name: SoundName, lift = 0): void {
     t0 = Math.max(t0, freeAt);
     freeAt = t0 + kit.length(name) + 0.15;
   }
-  kit.sound(c, out, name, lift, t0);
+  kit.sound(c, name, lift, t0);
 }
 
-/** How an answer sounds: a right one a semitone higher for each before it in a row, up to a fifth. In the app it's
- * felt too, sound or not. */
+/** How an answer sounds: a right one a step of the scale higher for each before it in a row, up to an octave. In the
+ * app it's felt too, sound or not. */
 export function playAnswer(kind: "exact" | "right" | "partial" | "wrong" | "time", inRow = 0): void {
   feel(kind);
   const right = kind === "exact" || kind === "right";
-  play(kind, right ? Math.min(Math.max(inRow - 1, 0), 7) : 0);
+  play(kind, right ? Math.min(Math.max(inRow - 1, 0), 5) : 0);
 }
 
 /** The beeps before a game starts: one for each of its last three seconds. */

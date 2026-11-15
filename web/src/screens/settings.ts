@@ -204,7 +204,7 @@ function sounds(): Child {
         : "Важи за това устройство.",
     ),
     switchRow("Звуци", "Часовникът, отговорите, новото ниво.", soundOn, setSound),
-    switchRow("Тиктакане", "Часовникът, докато въпросът чака.", tickOn, setTick),
+    switchRow("Тиктакане", "Последните секунди на въпроса.", tickOn, setTick),
   );
 }
 

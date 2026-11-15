@@ -363,15 +363,27 @@ Feedback fires once, when it's earned, and then the screen is still again:
 
 ## Sound
 
-- **Tones made in the browser** (`web/src/lib/sound.ts`): there are no files to load. Each sound is a few notes,
-  quiet, and over in under half a second.
+- **Made in the browser, in code** (`web/src/feel.ts`, loaded with the first touch; the switch and the turns in
+  `web/src/lib/sound.ts`): there are no files to load, and nothing to license.
+- **One key:** every note is in D major pentatonic (D E F♯ A B), so sounds that follow each other sound like one
+  piece. A right answer rises a step of the scale with each right one before it in a row, up to an octave.
+- **The motif** D–A–F♯–D, as bells (four petals, the last one gold), is the game's audio logo: `end` plays it plainly;
+  `perfect` (ten of ten) and `level` with a harmony and a little room; `win` over a low D.
+- **Four voices:** a bell (FM) for what's earned; a wooden pluck for the player's own touches; a soft thud for a wrong
+  answer or none (never a buzzer); a short beep for the clock. Everything goes through a compressor, so sounds that
+  meet can't clip.
+- **Short:** an answer's sounds are over in under half a second; a moment's (the end, a level, Роял's cut) may take up
+  to 1.4 seconds, as it comes once a game.
 - **One sound per moment**, and only for game moments:
   - `tap` when an answer is given;
   - `key` for each key of the number pad and each move in an order;
   - `right`, `exact`, `partial`, `wrong` or `time` with the verdict;
-  - the clock while a question waits: `tick` and `tock` in turn each second, then `hurry` in each of the last five;
-  - `tick` for each second of the count before a run;
-  - `end` when a run's result opens;
+  - the clock, only near the end: silent until 10 seconds are left, then a soft `tick` a second, and `hurry` once a
+    second for the last five, a step higher each (a question of 10 seconds sounds only those five). „Тиктакане“
+    turns it off;
+  - `count` for each second of the count before a run, `go` at its start;
+  - `end` when a run's result opens (`perfect` for ten of ten), `win` or `lose` at a duel's or Роял's end;
+  - `through` or `out` with Роял's cut;
   - `level`, `achievement` or `goal` with the news: only the biggest thing told plays;
   - `ping` when a game or a duel starts, or a friend calls to a duel.
 - **Nothing plays** for navigation, hovering or decoration.

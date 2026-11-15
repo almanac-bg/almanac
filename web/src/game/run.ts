@@ -236,7 +236,8 @@ function inRowOf(marks: Mark[]): number {
 }
 
 /** The time left: a bar that runs out with the seconds beside it, red for the last five, grey once answered. The
- * clock ticks each second, and beeps for each of the last five. */
+ * clock is silent until the last ten seconds: then a soft tick a second, and for the last five a beep a second, a step
+ * higher each (a question of ten seconds, „Вярно или невярно“, sounds only those five). */
 export function timer(leftMs: number, limitMs: number, left: () => number, locked: Signal<boolean>): Child {
   const bar = h("div", { class: "time-bar" });
   bar.style.transform = `scaleX(${leftMs / limitMs})`;
@@ -249,8 +250,9 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
   );
   effect(() => {
     const n = left();
-    if (n <= 0 || locked.peek() || !tickOn.peek()) return;
-    play(n <= 5 ? "hurry" : n % 2 ? "tick" : "tock");
+    if (n <= 0 || n > 10 || locked.peek() || !tickOn.peek()) return;
+    if (n <= 5) play("hurry", 5 - n);
+    else if (limitMs > 10_000) play("tick");
   });
   // Once answered, the bar stops where it is.
   const freeze = () => {
