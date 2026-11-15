@@ -15,7 +15,6 @@ import type { Mix } from "./rooms.ts";
 // The app's pieces, set as the screen opens (room); host.ts takes them from here.
 export let {
   answered,
-  back,
   api,
   ask,
   avatar,
@@ -118,7 +117,6 @@ export const about = (v: RoomView) =>
 
 export function room(kit: Kit, [code = ""]: string[]) {
   ({
-    back,
     answered,
     api,
     ask,
@@ -313,7 +311,6 @@ function nameStep(code: string, u: User, done: () => void): Child {
     h(
       "div",
       { class: "intro" },
-      back("/", "Начало"),
       h("p", { class: "kicker" }, `Стая ${spaced(code)}`),
       h("h1", null, "Как да те виждат в стаята?"),
     ),
@@ -361,7 +358,6 @@ function lobby(view: () => RoomView, code: string): Child {
     h(
       "div",
       { class: "intro" },
-      back("/", "Начало"),
       h("p", { class: "kicker" }, () => about(view())),
       h("h1", null, "Стая ", h("span", { class: "code-big" }, spaced(code))),
       h("p", { class: "lead" }, "Дай кода на другите или им прати връзката."),
@@ -629,7 +625,6 @@ function end(view: () => RoomView, code: string): Child {
     h(
       "div",
       { class: "intro" },
-      back("/", "Начало"),
       h("p", { class: "kicker" }, () => `Стая ${spaced(code)} · ${topicName(view().category)}`),
       h("h1", null, () => {
         const [best] = view().players;

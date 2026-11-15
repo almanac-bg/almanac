@@ -12,7 +12,6 @@ import {
   api,
   ask,
   avatar,
-  back,
   computed,
   fact,
   formatNumber,
@@ -68,7 +67,6 @@ function lobby(view: () => RoomView, code: string): Child {
       h(
         "div",
         { class: "intro" },
-        back("/", "Начало"),
         h("p", { class: "kicker" }, () => about(view())),
         h("h1", null, "Стая ", h("span", { class: "code-big" }, spaced(code))),
         h("p", { class: "host-join" }, `Отворете ${location.host}/r/${code} или насочете камерата към кода.`),
@@ -214,7 +212,6 @@ function end(view: () => RoomView, code: string): Child {
     h(
       "div",
       { class: "intro" },
-      back("/", "Начало"),
       h("p", { class: "kicker" }, () => `Стая ${spaced(code)} · ${about(view())}`),
       h("h1", null, () => {
         const [best] = view().players;
