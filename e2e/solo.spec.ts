@@ -52,6 +52,12 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.goto("/me");
   await expect(page.locator(".streak")).toBeVisible();
   await expect(page.locator(".me-level-bar, .league-link")).toHaveCount(0);
+  // Награди too: no XP, no goals and no league anywhere on it, folded parts included; points and achievements are
+  // what „Как се печели“ tells.
+  await page.goto("/rewards");
+  await expect(page.getByRole("heading", { name: "Най-близо" })).toBeVisible();
+  await expect(page.locator(".screen")).not.toContainText(/XP|лига|Цели за деня/);
+  await expect(page.locator(".how")).toContainText("Точки.");
 
   // A second day: a game tells XP once, with the goals; Начало shows the level and the goals from then on.
   await playedBefore(page, 1);
