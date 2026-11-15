@@ -191,6 +191,7 @@ func serve([]string) error {
 	})
 	go reloadOnHangup(ctx, bankDir, srv)
 	go srv.Remind(ctx)
+	go srv.KeepDays(ctx)
 	go func() {
 		if err := srv.Count(ctx); err != nil && ctx.Err() == nil {
 			slog.Error("counting", "err", err)

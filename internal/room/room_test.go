@@ -491,6 +491,18 @@ func TestRemove(t *testing.T) {
 		if err := again.Join(cy); !errors.Is(err, ErrRemoved) {
 			t.Fatalf("Цви came back after a restart: %v", err)
 		}
+		// Keys stay as the screens know them, the gap Цви left included: a host's „Махни“ on a key shown before the
+		// restart sends out the same player after it.
+		before := r.Players()
+		if after := again.Players(); len(after) != len(before) || after[1] != before[1] || after[2] != 0 {
+			t.Fatalf("keys after a restart: %v, before %v", after, before)
+		}
+		if err := again.Join(Player{ID: 4, Name: "Дея"}); err != nil {
+			t.Fatal(err)
+		}
+		if after := again.Players(); after[3] != 4 || after[2] != 0 {
+			t.Fatalf("one who joins after the restart takes Цви's key: %v", after)
+		}
 		synctest.Wait()
 	})
 }

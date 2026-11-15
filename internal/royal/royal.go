@@ -499,8 +499,12 @@ func (h *Hub) begin(ctx context.Context, now time.Time) error {
 			moved[to] = append(moved[to], m)
 		}
 	}
-	for i, t := range lobbies {
+	// Everyone's seat in memory as the database has it now, before any table starts: should a start fail, the next
+	// try finds each player where they were moved.
+	for _, t := range lobbies {
 		t.members = moved[t]
+	}
+	for i, t := range lobbies {
 		if i >= k {
 			if err := h.empty(ctx, t); err != nil {
 				return err
