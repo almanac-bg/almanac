@@ -1,4 +1,4 @@
-// Роял: every evening at 21:00, live. Up to fifty players on the same fifteen questions at the same moment, easy to
+// Роял: at 21:00, live, Friday to Sunday (every evening once those fill). Up to fifty players on the same fifteen questions at the same moment, easy to
 // hard in three rounds. A wrong answer puts nobody out: after questions 5, 8, 11 and 14 those with the most right go
 // on (of as many, the quicker), and the last question is a final of three; those cut play on to the end for themselves,
 // off the standings (each right answer still earns its XP). Each
@@ -22,7 +22,7 @@ import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { categories, player, playing, user } from "../state.ts";
 import { avatar, back, pageArt, type Tier, type VerdictKind, verdict, who } from "../ui.ts";
 import { type Standing, standingCard } from "./duel.ts";
-import { coming, type Tonight } from "./modes.ts";
+import { clock, coming, dayOf, type Tonight, when } from "./modes.ts";
 
 type Phase = "soon" | "lobby" | "question" | "reveal" | "end";
 
@@ -36,6 +36,8 @@ interface Evening {
   length: number;
   round: number;
   size: number;
+  /** Every evening (else Friday to Sunday). */
+  nightly?: boolean;
   /** In this tournament (its lobby, or its game); cut out of its standings (they play on). */
   in: boolean;
   out: boolean;
@@ -123,18 +125,6 @@ interface Past {
 }
 
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
-const clock = (ms: number) =>
-  new Intl.DateTimeFormat("bg", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Sofia" }).format(new Date(ms));
-const dayOf = (ms: number) => new Date(ms).toLocaleDateString("en-CA", { timeZone: "Europe/Sofia" });
-
-/** When an evening is, in words: „днес в 21:00“, „утре в 21:00“, or its weekday. */
-function when(ms: number, now: number): string {
-  const day = dayOf(ms);
-  if (day === dayOf(now)) return `днес в ${clock(ms)}`;
-  if (day === dayOf(now + 24 * 3600_000)) return `утре в ${clock(ms)}`;
-  const weekday = new Intl.DateTimeFormat("bg", { weekday: "long", timeZone: "Europe/Sofia" }).format(new Date(ms));
-  return `${weekday} в ${clock(ms)}`;
-}
 
 /** Time left, in words for hours, as a clock for the last hour (12:05). */
 function left(ms: number): string {
@@ -242,8 +232,8 @@ export function royal() {
   );
 }
 
-const about =
-  "Всяка вечер в 21:00: до 50 души, 15 въпроса, в един и същи миг. Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни, а при равни — по-бързите. Последния въпрос играят трима.";
+const about = (nightly?: boolean) =>
+  `${nightly ? "Всяка вечер" : "Петък, събота и неделя"} в 21:00: до 50 души, 15 въпроса, в един и същи миг. Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни, а при равни — по-бързите. Последния въпрос играят трима.`;
 
 /** Before the lobby opens: when the next one is, your rating, and how your last ones went. */
 function soon(view: () => Evening, now: Signal<number>): Child {
@@ -258,17 +248,17 @@ function soon(view: () => Evening, now: Signal<number>): Child {
       back("/", "Начало"),
       pageArt("royal", "tone-gold"),
       h("h1", null, "Роял"),
-      h("p", { class: "lead" }, about),
+      h("p", { class: "lead" }, () => about(view().nightly)),
     ),
     h(
       "section",
       { class: "card royal-next" },
       h("p", { class: "kicker" }, "Следващият Роял"),
       h("strong", { class: "royal-when" }, () => when(view().startsAt, now())),
-      h(
-        "p",
-        { class: "muted" },
-        () => `Входът се отваря в ${clock(view().opensAt)}, след ${left(view().opensAt - now())}.`,
+      h("p", { class: "muted" }, () =>
+        dayOf(view().opensAt) === dayOf(now())
+          ? `Входът се отваря в ${clock(view().opensAt)}, след ${left(view().opensAt - now())}.`
+          : `Входът се отваря ${when(view().opensAt, now())}.`,
       ),
       plan(),
     ),
@@ -321,7 +311,8 @@ function plan(): Child {
     () => {
       const t = tonight();
       if (!t || t.glance.phase === "lobby") return null;
-      const opens = clock(t.glance.next - (t.glance.startsAt - t.glance.opensAt));
+      const opensAt = t.glance.next - (t.glance.startsAt - t.glance.opensAt);
+      const opens = clock(opensAt);
       return [
         t.coming > 0 ? h("p", { class: "royal-coming" }, `${coming(t)}.`) : null,
         t.planned
@@ -329,7 +320,9 @@ function plan(): Child {
               h(
                 "p",
                 null,
-                notified() ? `Ще дойдеш. В ${opens} ще ти напомним.` : "Ще дойдеш. Ела тук, щом входът се отвори.",
+                notified()
+                  ? `Ще дойдеш. Ще ти напомним ${when(opensAt, t.glance.now)}.`
+                  : "Ще дойдеш. Ела тук, щом входът се отвори.",
               ),
               h(
                 "div",
@@ -401,15 +394,16 @@ function chips(players: Player[]): Child {
   );
 }
 
-function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Child {
+/** The way in (and, from the lobby, out): its button, and what went wrong. */
+function entry(joined: () => void, out?: boolean): Child[] {
   const error = signal("");
   const busy = signal(false);
-  const act = async (method: "POST" | "DELETE") => {
+  const act = async () => {
     error.set("");
     busy.set(true);
     try {
       await player();
-      await api(method, "/api/royal", method === "POST" ? {} : undefined);
+      await api(out ? "DELETE" : "POST", "/api/royal", out ? undefined : {});
       joined();
     } catch (err) {
       error.set((err as ApiError).message);
@@ -417,6 +411,17 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
       busy.set(false);
     }
   };
+  return [
+    h(
+      "button",
+      { class: out ? "btn" : "btn primary big", type: "button", disabled: busy, onclick: act },
+      out ? "Излез" : "Влез",
+    ),
+    () => error() && h("p", { class: "bad", role: "alert" }, error()),
+  ];
+}
+
+function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Child {
   const v0 = view();
   // Those whose notifications are on here are called a minute before the start, if their screen is away.
   const notified = signal(false);
@@ -450,10 +455,7 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
           : `В ${clock(v0.startsAt)} всички получават първия въпрос едновременно. Закъснелите влизат до 3-тия въпрос.`,
       ),
     ),
-    v0.in
-      ? h("button", { class: "btn", type: "button", disabled: busy, onclick: () => act("DELETE") }, "Излез")
-      : h("button", { class: "btn primary big", type: "button", disabled: busy, onclick: () => act("POST") }, "Влез"),
-    () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    entry(joined, v0.in),
     () => {
       const v = view();
       if (!v.players.length) return h("p", { class: "muted" }, "Още никой не е влязъл.");
@@ -474,29 +476,13 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
 
 /** The door, for one not in once the games have begun: still open until the third question's answer shows. */
 function door(view: () => Evening, joined: () => void): Child {
-  const error = signal("");
-  const busy = signal(false);
-  const come = async () => {
-    error.set("");
-    busy.set(true);
-    try {
-      await player();
-      await api("POST", "/api/royal", {});
-      joined();
-    } catch (err) {
-      error.set((err as ApiError).message);
-    } finally {
-      busy.set(false);
-    }
-  };
   return () =>
     view().late && !view().in
       ? h(
           "section",
           { class: "card stack" },
           h("p", null, "Роял вече започна. До 3-тия въпрос още можеш да влезеш."),
-          h("button", { class: "btn primary big", type: "button", disabled: busy, onclick: come }, "Влез"),
-          () => error() && h("p", { class: "bad", role: "alert" }, error()),
+          entry(joined),
         )
       : null;
 }

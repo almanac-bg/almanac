@@ -129,8 +129,11 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.game.LeagueNews = s.leagueNews
 	s.game.MistakesAfter = cfg.MistakesAfter
 	s.game.CrowdMin = cfg.CrowdMin
-	if cfg.Royal == (royal.Schedule{}) {
+	if cfg.Royal.Every == 0 && cfg.Royal.Hour == 0 {
 		cfg.Royal = royal.Evening
+	}
+	if cfg.Royal.Every == 0 && cfg.Royal.On == nil {
+		cfg.Royal.On = s.game.RoyalOn // Friday to Sunday, until the evenings fill
 	}
 	s.game.RoyalAt = cfg.Royal.Next
 	s.royal = royal.NewHub(s.game, cfg.Royal)

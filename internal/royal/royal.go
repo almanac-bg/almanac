@@ -1,4 +1,5 @@
-// Package royal is Роял played live: every evening at the same time, everyone in it on the same question at the same
+// Package royal is Роял played live: in the evening at the same time (on the days its Schedule says: Friday to Sunday
+// until those evenings fill, then every evening, play.RoyalPaceOf), everyone in it on the same question at the same
 // moment. A wrong answer puts nobody out: the game is cut after some questions (play.RoyalCuts) to those ahead, the
 // most right answers first and the quickest of as many, and the last question is a final of three. Those cut keep
 // answering to the end on the same clock, off the standings: their answers earn what any game's do, but never a place
@@ -54,15 +55,17 @@ var (
 
 // Schedule is when the evenings are.
 type Schedule struct {
-	// Hour and Minute are the start, in Bulgaria, every day.
+	// Hour and Minute are the start, in Bulgaria, on the days there's one.
 	Hour, Minute int
+	// On, if set, says whether there's one on the day of a start (play.Game.RoyalOn); unset, every day.
+	On func(time.Time) bool
 	// Every, when set, starts one every Every instead (for trying the game out: one each few minutes).
 	Every time.Duration
 	// Lobby is how long before the start the lobby opens.
 	Lobby time.Duration
 }
 
-// Evening is Роял's: every day at 21:00, the lobby open from 20:45.
+// Evening is Роял's: at 21:00, the lobby open from 20:45.
 var Evening = Schedule{Hour: 21, Lobby: 15 * time.Minute}
 
 // Next is the first start after now.
@@ -71,11 +74,27 @@ func (s Schedule) Next(now time.Time) time.Time {
 		return now.Truncate(s.Every).Add(s.Every)
 	}
 	d := now.In(play.Bulgaria)
-	t := time.Date(d.Year(), d.Month(), d.Day(), s.Hour, s.Minute, 0, 0, play.Bulgaria)
-	if !t.After(now) {
-		t = time.Date(d.Year(), d.Month(), d.Day()+1, s.Hour, s.Minute, 0, 0, play.Bulgaria)
+	var t time.Time
+	for i := range 8 { // a week holds the days it always plays
+		t = time.Date(d.Year(), d.Month(), d.Day()+i, s.Hour, s.Minute, 0, 0, play.Bulgaria)
+		if t.After(now) && (s.On == nil || s.On(t)) {
+			break
+		}
 	}
 	return t
+}
+
+// Nightly says whether there's one every evening of the week from now.
+func (s Schedule) Nightly(now time.Time) bool {
+	if s.Every > 0 || s.On == nil {
+		return true
+	}
+	for i := range 7 {
+		if !s.On(now.AddDate(0, 0, i)) {
+			return false
+		}
+	}
+	return true
 }
 
 // Player is someone coming to Роял.
@@ -118,6 +137,7 @@ type night struct {
 	told   bool // that the lobby is open
 	called bool // Opened, that it is
 	soon   bool // Soon, that it starts in a minute
+	held   bool // that its start came (play.HeldRoyal)
 	// absent are those of the lobbies who weren't there at the start: in as soon as they're back, while the door is
 	// open (table.open). The database keeps them in their tournament, without a run.
 	absent map[int64]Player
@@ -290,6 +310,10 @@ func (h *Hub) Step(ctx context.Context) {
 		// open already.
 		h.night = &night{start: next, absent: map[int64]Player{}}
 		h.changed(nil)
+	} else if len(n.tables) == 0 && now.Before(n.opens(h.sched)) && !n.start.Equal(next) {
+		// The days it plays on changed (play.RoyalPaceOf, a day's) before this one's lobby opened.
+		h.night = &night{start: next, absent: map[int64]Player{}}
+		h.changed(nil)
 	}
 	n := h.night
 	if !n.told && !now.Before(n.opens(h.sched)) {
@@ -315,6 +339,12 @@ func (h *Hub) Step(ctx context.Context) {
 				}
 			}
 			go h.Soon(context.WithoutCancel(ctx), n.start, away, in)
+		}
+	}
+	if !n.held && !now.Before(n.start) {
+		n.held = true
+		if err := h.game.HeldRoyal(ctx, n.start); err != nil {
+			slog.Error("royal", "held", n.start, "err", err)
 		}
 	}
 	if !now.Before(n.start) && slices.ContainsFunc(n.tables, func(t *table) bool { return t.phase == play.RoyalLobby }) {
@@ -759,6 +789,8 @@ type Glance struct {
 	Now      int64  `json:"now"`
 	// Next is the first start after now: the evening one can still say they'll come to.
 	Next int64 `json:"next"`
+	// Nightly says there's one every evening (else on its days: Friday to Sunday).
+	Nightly bool `json:"nightly,omitempty"`
 	// In is how many are in its lobbies, or still in its games.
 	In int `json:"in"`
 }
@@ -786,7 +818,7 @@ func (h *Hub) Glance() Glance {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	now := h.now()
-	g := Glance{Phase: "soon", Now: now.UnixMilli(), Next: h.sched.Next(now).UnixMilli()}
+	g := Glance{Phase: "soon", Now: now.UnixMilli(), Next: h.sched.Next(now).UnixMilli(), Nightly: h.sched.Nightly(now)}
 	n := h.night
 	if n == nil {
 		next := h.sched.Next(now)
@@ -827,6 +859,8 @@ type View struct {
 	OpensAt  int64  `json:"opensAt"`
 	// Next is the next evening's start (StartsAt's, until the evening's begun).
 	Next int64 `json:"next"`
+	// Nightly says there's one every evening (else on its days: Friday to Sunday).
+	Nightly bool `json:"nightly,omitempty"`
 	// Now is the server's clock, for the countdowns.
 	Now    int64 `json:"now"`
 	Length int   `json:"length"`
@@ -935,7 +969,7 @@ func (h *Hub) View(viewer int64) View {
 		return v
 	}
 	v.StartsAt, v.OpensAt, v.Tables = n.start.UnixMilli(), n.opens(h.sched).UnixMilli(), len(n.tables)
-	v.Next = h.sched.Next(now).UnixMilli()
+	v.Next, v.Nightly = h.sched.Next(now).UnixMilli(), h.sched.Nightly(now)
 	t, me := h.watched(viewer)
 	if t == nil {
 		if !now.Before(n.opens(h.sched)) && now.Before(n.start) {

@@ -124,7 +124,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 // preview is what a link to this page shows when it's shared (Viber, Messenger, WhatsApp): an invite says whose it
 // is; a room, its code.
 func (s *Server) preview(r *http.Request) (title, description string) {
-	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми, дуели на живо, Роял всяка вечер и стаи с приятели. Всеки отговор носи по нещо ново."
+	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми, дуели на живо, Роял на живо в 21:00 и стаи с приятели. Всеки отговор носи по нещо ново."
 	switch path := r.URL.Path; {
 	case strings.HasPrefix(path, "/f/"):
 		if _, name, err := s.game.Inviter(r.Context(), strings.TrimPrefix(path, "/f/")); err == nil {
