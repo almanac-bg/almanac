@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -275,7 +276,7 @@ func TestEvening(t *testing.T) {
 	}
 
 	// Question 6: Bo, out, plays on for himself; Vi lets the time run out, and plays on. Then Ana and Vi right to the
-	// end, all fifteen; Bo answers every other one, and isn't waited for.
+	// end, all fifteen; Bo answers every other one, and the answer waits for him (on the same clock) where he doesn't.
 	w.give(bo, true)
 	w.give(ana, true)
 	if v := w.h.View(ana.ID); v.Phase != play.RoyalQuestion {
@@ -299,8 +300,11 @@ func TestEvening(t *testing.T) {
 		}
 		w.give(ana, true)
 		w.give(vi, true)
-		if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal {
-			t.Fatalf("question %d waits for Bo, out: %+v", n+1, v)
+		if v := w.h.View(ana.ID); (v.Phase != play.RoyalReveal) != (n%2 == 1) {
+			t.Fatalf("question %d, Bo out: %+v", n+1, v)
+		}
+		if n%2 == 1 {
+			w.timeUp()
 		}
 	}
 	if v := w.h.View(ana.ID); v.Phase != play.RoyalReveal || v.N != 14 || !v.Last || v.Cut != nil {
@@ -391,8 +395,12 @@ func TestFull(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if v := w.h.View(all[50].ID); v.Tables != 2 || len(v.Players) != 1 || !v.In {
-		t.Fatalf("the one over: %+v", v)
+	// The lobby is one, whatever the tables it fills: everyone in it shows, to each.
+	for _, p := range []Player{all[0], all[50]} {
+		if v := w.h.View(p.ID); v.Tables != 2 || len(v.Players) != 51 || v.Left != 51 || !v.In ||
+			!slices.ContainsFunc(v.Players, func(x PlayerView) bool { return x.Me && x.Name == p.Name }) {
+			t.Fatalf("the lobby of 51, to %s: %+v", p.Name, v)
+		}
 	}
 	w.at(21, 0, 0)
 	n := w.h.night
@@ -1109,4 +1117,72 @@ func TestNextLobbyAfterAnEvening(t *testing.T) {
 	if v := w.h.View(bo.ID); v.Phase != play.RoyalLobby || !v.In || v.StartsAt != time.Date(2026, 11, 14, 21, 12, 0, 0, play.Bulgaria).UnixMilli() {
 		t.Fatalf("Bo in the next lobby: %+v", v)
 	}
+}
+
+// Those cut play on on the same clock: the answer waits for them too, so that theirs are taken; one who let a
+// question's time run out isn't waited for until they answer again.
+func TestCutPlayOn(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ps := []Player{w.player(), w.player(), w.player(), w.player(), w.player()}
+	in, cut := ps[:3], ps[3:]
+	w.start(ps...)
+	for n := range 5 {
+		if n > 0 {
+			w.onward()
+		}
+		for i, p := range ps {
+			w.give(p, i < 3)
+		}
+	}
+	if v := w.h.View(cut[0].ID); !v.Out || v.WentOut != 2 {
+		t.Fatalf("the cut after the fifth: %+v", v)
+	}
+	shows := func(q string, want bool) {
+		t.Helper()
+		if v := w.h.View(in[0].ID); (v.Phase == play.RoyalReveal) != want {
+			t.Fatalf("%s: %+v", q, v)
+		}
+	}
+
+	// Question 6: those in answer; the answer waits for the two cut, and shows once they've answered.
+	w.onward()
+	for _, p := range in {
+		w.give(p, true)
+	}
+	shows("question 6, the cut not answered", false)
+	w.give(cut[0], true)
+	shows("question 6, one cut not answered", false)
+	w.give(cut[1], false)
+	shows("question 6, all answered", true)
+	if v := w.h.View(cut[0].ID); !v.Out || !v.Question.Reveal.Mine || !v.Question.Reveal.Right || v.Rights != 1 {
+		t.Fatalf("a cut one's answer, taken: %+v %+v", v, v.Question.Reveal)
+	}
+
+	// Question 7: the second cut one lets the time run out.
+	w.wait(Pause)
+	for _, p := range append(slices.Clone(in), cut[0]) {
+		w.give(p, true)
+	}
+	shows("question 7, waiting for the second cut one", false)
+	w.timeUp()
+	shows("question 7, the time up", true)
+
+	// Question 8: they aren't waited for, until they answer again.
+	w.wait(Pause)
+	for _, p := range append(slices.Clone(in), cut[0]) {
+		w.give(p, true)
+	}
+	shows("question 8, one cut who let the last one go isn't waited for", true)
+	if err := w.h.Answer(ctx, cut[1].ID, 7, w.answer(cut[1], true)); !errors.Is(err, ErrNotNow) {
+		t.Fatalf("an answer after the answer showed: %v", err)
+	}
+	// Question 9 (one more cut after the eighth): the second cut one answers again; the answer waits for the first.
+	w.onward()
+	for _, p := range append(slices.Clone(in), cut[1]) {
+		w.give(p, true)
+	}
+	shows("question 9, waiting for the first cut one", false)
+	w.give(cut[0], true)
+	shows("question 9, all answered", true)
 }

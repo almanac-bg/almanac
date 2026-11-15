@@ -63,7 +63,7 @@ test("Роял: in from the lobby, its music, live to the fifteenth question, th
       await expect(page.locator(".royal-left")).toHaveText(/^В играта: \d+ от \d+$|^В турнира си само ти: /);
     }
     await answer(page);
-    // The answer shows once everyone still in has answered (or the time is up, for one cut), with the standings.
+    // The answer shows once everyone playing has answered (or the time is up), with the standings.
     await expect(page.locator(".verdict")).toBeVisible({ timeout: 40_000 });
     if (n === 0) await expect(page.locator(".verdict")).not.toContainText("Без отговор");
     await expect(page.locator(".royal-table .row.me")).toBeVisible();

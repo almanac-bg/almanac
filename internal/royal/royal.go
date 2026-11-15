@@ -12,8 +12,9 @@
 // players at the start: those there are dealt into as few as hold everyone of the lobby (those away keep a seat), of
 // sizes as even as can be (51: 26 and 25), on the same questions. Nobody is shut out while the door is open: one who
 // comes late sits at the tournament with fewest in, over its size if every one is full. Each moves on at its own
-// pace: a question's answer shows once everyone still in has answered (those cut aren't waited for), or when its time
-// is up; the answer that a cut comes with shows longer (CutPause), with who goes on and when the next cut is.
+// pace: a question's answer shows once everyone playing it has answered (those cut too, so that their answers are
+// taken, but not one who let the last one run out, nor one away), or when its time is up; the answer that a cut comes
+// with shows longer (CutPause), with who goes on and when the next cut is.
 //
 // The hub keeps the evening's clock and the screens following it. Everything a game does goes through the database
 // first (package play), so that a restart of the server picks the game up again where it was.
@@ -181,6 +182,7 @@ type member struct {
 	seen    time.Time // last on the screen
 	in      bool      // still in the game (the standings)
 	inQ     bool      // playing the question now (in, or on after a cut)
+	idle    bool      // let the last question they played run out: once cut, not waited for until they answer again
 	stood   bool      // in the standings for the question now
 	reached int       // questions answered right, as of the last answer shown (to their cut, once out)
 	ms      int64     // the time the right ones took
@@ -620,9 +622,10 @@ func (h *Hub) shown(t *table, n int, now time.Time) {
 	}
 }
 
-// Answer takes a player's answer to question n (still in, or on after a cut). Once everyone still in has answered, the
-// answer shows: those cut aren't waited for. An answer sent again (its reply lost on the way) is the one taken already:
-// no error, while its question or its answer shows.
+// Answer takes a player's answer to question n (still in, or on after a cut). Once everyone playing it has answered,
+// the answer shows: those cut too, on the same clock, but not one away or who let the last question run out (until they
+// answer again). An answer sent again (its reply lost on the way) is the one taken already: no error, while its
+// question or its answer shows.
 func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -644,10 +647,10 @@ func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) 
 		return err
 	}
 	// How it went shows to the others with the answer (reveal), not before.
-	m.answered, m.given, m.res = true, res.Given, res
+	m.answered, m.given, m.res, m.idle = true, res.Given, res, false
 	now := h.now()
 	for _, o := range t.members {
-		if o.in && !o.answered && h.there(o, now) {
+		if o.inQ && !o.answered && (o.in || !o.idle) && h.there(o, now) {
 			h.changed(t)
 			return nil
 		}
@@ -675,6 +678,7 @@ func (h *Hub) reveal(ctx context.Context, t *table, now time.Time) error {
 		if !m.answered {
 			m.res = play.Result{TimedOut: true}
 		}
+		m.idle = !m.answered
 		if m.res.Right {
 			m.rights++
 		}
@@ -906,7 +910,8 @@ type View struct {
 	// Cut is the game's next cut: the one the answer showing comes with, while it shows (none once the final's on).
 	Cut *CutView `json:"cut,omitempty"`
 	// Last says the game ends once the answer showing has shown: the standings come next.
-	Last     bool          `json:"last,omitempty"`
+	Last bool `json:"last,omitempty"`
+	// Players are the tournament's: before the start, everyone in the lobby, whatever tournament they'll be dealt to.
 	Players  []PlayerView  `json:"players"`
 	Question *QuestionView `json:"question,omitempty"`
 	// RunID is the viewer's run, once it's over: to go over its questions.
@@ -1016,7 +1021,17 @@ func (h *Hub) View(viewer int64) View {
 		}
 		v.Place, v.Delta = me.place, me.delta
 	}
-	for _, m := range t.members {
+	members := t.members
+	if t.phase == play.RoyalLobby {
+		// The lobby is one, whatever the tournaments it fills before the start deals them.
+		members = nil
+		for _, x := range n.tables {
+			if x.phase == play.RoyalLobby {
+				members = append(members, x.members...)
+			}
+		}
+	}
+	for _, m := range members {
 		if m.in {
 			v.Left++
 		}
@@ -1027,7 +1042,7 @@ func (h *Hub) View(viewer int64) View {
 	}
 	switch t.phase {
 	case play.RoyalLobby:
-		v.Left = len(t.members)
+		v.Left = len(members)
 	case play.RoyalEnd:
 		slices.SortStableFunc(v.Players, func(a, b PlayerView) int { return a.Place - b.Place })
 		for i := range v.Players {
