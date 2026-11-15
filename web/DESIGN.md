@@ -38,11 +38,12 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
 - **Класации** (`/ranks`): Днес (the day's board, first), Лига (the player's group this week; `/ranks#league`),
   Рейтинг and Знания (Лига and Рейтинг once the player has met them); of everyone or of friends (not the league: a group is its own).
 - **Профил** (`/me`): its own four places in a switch at the top (`profileNav()`): Общо (the player: level,
-  league (once open and in one), streak, numbers, mastery (once a topic has a mark), latest games), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
+  league (once open and in one), streak, numbers, the facts in the Алманах, mastery (once a topic has a mark), latest games), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
   worn as others see it, then Аватар, Рамка, Фон or Титла, one at a time) and Алманах (`/almanac`). Настройки open
   from the icon beside the name.
   Общо is a hub, each thing once: the level with what comes next in one card, the league in a line (its group is
-  Класации'), the streak, three numbers in one card, mastery, the latest games. Награди opens with the three
+  Класации'), the streak, three numbers in one card, the Алманах in a line („N факта в Алманаха“, a tap from it), mastery,
+  the latest games. Награди opens with the three
   achievements nearest to done and the earned ones, each in full (`.achievements`/`.achievement`: how it's earned,
   how far along, what it gives); the rest by tier behind „Всички постижения (n)“. Only the achievements of systems
   the player has met, and no XP before it's open.
@@ -204,7 +205,7 @@ takes a token.
     `.unlocks`/`.unlock-row` (what a game unlocked, drawn by `unlockPicture()`), `.next` (what comes next), `.badge-mark`.
   - `.achievements`/`.achievement` (and `locked`), `.worn`
     (what's worn), `.picker`/`.pick` and `.tone-pick` for choosing a look.
-  - `.league-link` (Профил's line of the league, a tap from the group).
+  - `.place-link` (a line in Профил a tap from a place: the league's group, `.league-link` too; the Алманах).
 - **Results:** `.summary`, `.board`/`.row` (with `p1`–`p3`, `me`, `gap` and `moves`), `.topics`/`.topic`,
   `.players` and `.settings`. Every result screen (the day, a topic, Втори шанс, a duel, a room) is laid out the same:
   the result; right under it what to do next (`nextSteps`): the one gold `big` button (the day's „Сподели“, „Още

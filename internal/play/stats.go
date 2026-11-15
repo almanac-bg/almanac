@@ -2,7 +2,8 @@ package play
 
 import "context"
 
-// Stats is how a player has done: the streak, how much they've played, and how well they know each topic.
+// Stats is how a player has done: the streak, how much they've played, the facts they've collected, and how well they
+// know each topic.
 type Stats struct {
 	Streak  int      `json:"streak"`
 	Week    [7]bool  `json:"week"`    // this week's days played, Monday first
@@ -15,6 +16,7 @@ type Stats struct {
 	Duels   int      `json:"duels"`
 	Won     int      `json:"won"`
 	Right   int      `json:"right"`
+	Facts   int      `json:"facts"` // facts in the player's almanac (almanac.go)
 	Recent  []Played `json:"recent"`
 	// Mastery is how well the player knows each topic, in the bank's order.
 	Mastery []Mastery `json:"mastery"`
@@ -57,6 +59,11 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	if s.Answers, s.Right, err = g.answered(ctx, userID); err != nil {
 		return s, err
 	}
+	f, err := g.factsOf(ctx, userID)
+	if err != nil {
+		return s, err
+	}
+	s.Facts = f.n
 	if s.Mastery, err = g.MasteryOf(ctx, userID); err != nil {
 		return s, err
 	}
