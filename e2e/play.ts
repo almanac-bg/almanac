@@ -63,6 +63,8 @@ export async function playRun(page: Page): Promise<void> {
  * moves on by itself. */
 export async function moveOn(page: Page): Promise<void> {
   await expect(page.locator(".verdict")).toBeVisible();
+  // The answer shows in steps: the way on comes with the fact, a moment after the verdict.
+  await expect(page.locator(".after .up-next").or(page.locator(".summary"))).toBeVisible();
   const go = page.locator(".after").getByRole("button", { name: /^(Напред|Към резултата)$/ });
   if (await go.isVisible()) await go.click().catch(() => {}); // gone already: the game moved on
 }

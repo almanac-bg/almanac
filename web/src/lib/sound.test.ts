@@ -50,7 +50,8 @@ class FakeAudio {
 }
 (globalThis as { AudioContext?: unknown }).AudioContext = FakeAudio;
 
-const { play, playAnswer, playCount, setSound } = await import("./sound.ts");
+const { loadFeel, play, playAnswer, playCount, setSound } = await import("./sound.ts");
+await loadFeel(); // in the game, the first touch sends for the voices
 
 beforeEach(() => {
   setSound(true);
