@@ -25,7 +25,8 @@ const motif = [0, 3, 2, 5];
 /** The motif as bells, 110 ms a note, the last held; `harmony` adds a voice a step of the scale above each. */
 function motifNotes(loud: number, harmony = false): Note[] {
   const notes: Note[] = motif.map((s, i) => ["b", s, i * 0.11, i === 3 ? 0.9 : 0.4, loud]);
-  if (harmony) for (const [i, s] of motif.entries()) notes.push(["b", s + 2, i * 0.11, i === 3 ? 0.9 : 0.4, loud * 0.45]);
+  if (harmony)
+    for (const [i, s] of motif.entries()) notes.push(["b", s + 2, i * 0.11, i === 3 ? 0.9 : 0.4, loud * 0.45]);
   return notes;
 }
 
@@ -41,7 +42,7 @@ const cues: Record<SoundName, Cue> = {
     ],
   },
   // Before a game: a soft bell for each of the last seconds, then the start an octave up over the root.
-  count: { notes: [["b", 3, 0, 0.2, 0.35]] },
+  count: { notes: [["b", 3, 0, 0.2, 0.55]] },
   go: {
     notes: [
       ["b", 5, 0, 0.45, 0.45],
@@ -50,8 +51,8 @@ const cues: Record<SoundName, Cue> = {
   },
   // The clock, only near the end: a soft tick for each of the last ten seconds but five, then a beep a second for the
   // last five, a step higher each.
-  tick: { notes: [["p", 12, 0, 0.012, 0.15]] },
-  hurry: { notes: [["s", 3, 0, 0.07, 0.3]] },
+  tick: { notes: [["p", 12, 0, 0.012, 0.45]] },
+  hurry: { notes: [["s", 3, 0, 0.07, 0.5]] },
   // A right answer: two bells, a step of the scale higher for each right one before it in a row.
   right: {
     notes: [
@@ -63,13 +64,13 @@ const cues: Record<SoundName, Cue> = {
     notes: [
       ["b", 0, 0, 0.25, 0.55],
       ["b", 2, 0.07, 0.25, 0.5],
-      ["b", 5, 0.14, 0.45, 0.55],
+      ["b", 5, 0.14, 0.34, 0.55],
     ],
   },
   partial: { notes: [["b", 2, 0, 0.3, 0.45]] },
   // A wrong answer and none: a soft thud.
-  wrong: { notes: [["t", 0, 0, 0.2, 0.5]] },
-  time: { notes: [["t", 0, 0, 0.2, 0.5]] },
+  wrong: { notes: [["t", 0, 0, 0.2, 0.9]] },
+  time: { notes: [["t", 0, 0, 0.2, 0.9]] },
   // The end of a game: the motif. A perfect day and a new level: with a harmony, in the room.
   end: { notes: motifNotes(0.55) },
   perfect: { notes: motifNotes(0.55, true), room: true },
@@ -108,7 +109,7 @@ const cues: Record<SoundName, Cue> = {
   // The result's pips filling: a pluck on the scale for each right one (lifted to its place), a quieter thud for
   // each that wasn't.
   pip: { notes: [["p", 0, 0, 0.05, 0.4]] },
-  dud: { notes: [["t", 0, 0, 0.12, 0.15]] },
+  dud: { notes: [["t", 0, 0, 0.12, 0.3]] },
   // The streak one day longer: a warm rising fifth over a swell of air.
   streak: {
     notes: [
@@ -205,7 +206,16 @@ function osc(c: BaseAudioContext, f: number, at: number, end: number, to: AudioN
 }
 
 /** A burst of noise through a filter. */
-function noise(c: BaseAudioContext, buffer: AudioBuffer, at: number, ring: number, filter: BiquadFilterType, f: number, q: number, env: AudioNode) {
+function noise(
+  c: BaseAudioContext,
+  buffer: AudioBuffer,
+  at: number,
+  ring: number,
+  filter: BiquadFilterType,
+  f: number,
+  q: number,
+  env: AudioNode,
+) {
   const src = c.createBufferSource();
   src.buffer = buffer;
   const shape = c.createBiquadFilter();
@@ -252,7 +262,7 @@ export function sound(c: BaseAudioContext, name: SoundName, lift: number, t0: nu
       env.connect(dry);
       for (const [from, to, share] of [
         [196, 147, 1],
-        [392, 294, 0.5],
+        [392, 294, 0.7],
       ] as const) {
         const level = c.createGain();
         level.gain.value = share;

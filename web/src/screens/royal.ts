@@ -608,13 +608,16 @@ function cutSaid(v: Evening): Child {
   const c = v.cut;
   if (!c?.now || v.entered === 1) return null;
   const me = v.players.find((p) => p.me);
-  const card = (through: boolean, head: string, line: string) =>
-    h(
+  const card = (through: boolean, head: string, line: string) => {
+    // The cut sounds a moment after the answer's own sound: through, or out.
+    setTimeout(() => play(through ? "through" : "out"), 500);
+    return h(
       "section",
       { class: through ? "card royal-cut through" : "card royal-cut", role: "status" },
       h("b", null, head),
       h("p", null, line),
     );
+  };
   if (me?.in)
     return card(
       true,

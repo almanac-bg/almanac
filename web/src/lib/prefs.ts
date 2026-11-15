@@ -26,7 +26,7 @@ const osCalm = typeof matchMedia === "function" && matchMedia("(prefers-reduced-
 export const calm = signal(read("almanac.calm", osCalm));
 /** Bigger text, everywhere. */
 export const bigText = signal(read("almanac.big", false));
-/** The clock's tick-tock while a question waits (the other sounds have their own switch). */
+/** The clock's last seconds of a question (the other sounds have their own switch). */
 export const tickOn = signal(read("almanac.tick", true));
 
 function apply(): void {

@@ -181,8 +181,8 @@ export function play(name: SoundName, lift = 0): void {
   kit.sound(c, name, lift, t0);
 }
 
-/** How an answer sounds: a right one a step of the scale higher for each before it in a row, up to an octave. In the app it's
- * felt too, sound or not. */
+/** How an answer sounds: a right one a step of the scale higher for each before it in a row, up to an octave. In the
+ * app it's felt too, sound or not. */
 export function playAnswer(kind: "exact" | "right" | "partial" | "wrong" | "time", inRow = 0): void {
   feel(kind);
   const right = kind === "exact" || kind === "right";
