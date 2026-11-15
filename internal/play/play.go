@@ -530,9 +530,12 @@ func (g *Game) finished(ctx context.Context, userID, runID int64) error {
 	return g.afterRun(ctx, userID)
 }
 
-// afterRun keeps what a player's game, just finished, earned them: achievements, the day's goals, and a place in
-// the week's league.
+// afterRun keeps what a player's game, just finished, earned them: a broken streak won back (repair.go), achievements,
+// the day's goals, and a place in the week's league.
 func (g *Game) afterRun(ctx context.Context, userID int64) error {
+	if err := g.mend(ctx, userID); err != nil { // first: the streak it keeps counts for the achievements
+		return err
+	}
 	if _, err := g.Award(ctx, userID); err != nil {
 		return err
 	}

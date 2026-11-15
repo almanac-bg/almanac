@@ -74,9 +74,11 @@ func (s *Server) cameFrom(ctx context.Context, userID int64, path string, app bo
 }
 
 // clientTallies are what the client counts (play/measure.go): the day shared, the reminder's ask on Начало (shown,
-// yes, no; and on an iPhone in a browser, the way to the home screen shown), a notification opened, by kind.
+// yes, no; and on an iPhone in a browser, the way to the home screen shown), a notification opened, by kind, a broken
+// streak's repair offered (play/repair.go).
 var clientTallies = map[string]bool{
 	"share:day": true, "pushask:shown": true, "pushask:yes": true, "pushask:no": true, "pushask:home": true,
+	"repair:offered": true,
 }
 
 func init() {
@@ -155,6 +157,7 @@ type firstWeek struct {
 	Repeats rate
 	Streaks []streakRow
 	Spent   int
+	Repairs rate     // broken streaks won back, of those offered (7 days)
 	Kinds   []string // the kinds of games played in the last 7 days, by name
 	Games   []gamesRow
 	Stick   string // DAU ÷ MAU
@@ -398,6 +401,7 @@ func (s *Server) firstWeek(ctx context.Context, active play.Active) (firstWeek, 
 		f.Streaks = append(f.Streaks, streakRow{Band: band, Going: h.Going[i], Ended: h.Ended[i]})
 	}
 	f.Spent = h.Spent
+	f.Repairs = rate{win[0].t["repair:done"], win[0].t["repair:offered"]}
 
 	// The games, by kind, day by day.
 	days, err := g.Games(ctx, 7)

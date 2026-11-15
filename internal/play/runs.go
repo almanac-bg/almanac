@@ -174,12 +174,14 @@ const ReserveMax = 2
 const ReserveEvery = 7
 
 // StreakNow is a player's streak: the days in a row they've finished the day's questions (up to today, or yesterday
-// while today isn't played yet), the reserve days they have, the days a reserve kept the streak through, how many
-// more days in a row earn the next reserve day (0 with ReserveMax in hand), and the last streak that ended, if one did.
+// while today isn't played yet), the reserve days they have, the days a reserve kept the streak through and those a
+// repair kept it through (repair.go), how many more days in a row earn the next reserve day (0 with ReserveMax in
+// hand), and the last streak that ended, if one did.
 type StreakNow struct {
 	Days    int      `json:"days"`
 	Reserve int      `json:"reserve"`
 	Saved   []string `json:"saved"`
+	Mended  []string `json:"mended"`
 	Next    int      `json:"next"`
 	Ended   *Ended   `json:"ended,omitempty"`
 }
@@ -192,55 +194,80 @@ type Ended struct {
 }
 
 // StreakOf is a player's streak, from every day they've played: each day played adds to it (and may earn a reserve
-// day: ReserveMax), each day missed spends a reserve day, or ends it.
+// day: ReserveMax), each day missed spends a reserve day, is kept by a repair (repair.go), or ends the streak.
 func (g *Game) StreakOf(ctx context.Context, userID int64) (StreakNow, error) {
-	played, full, first, err := g.streakDays(ctx, userID)
-	if err != nil || first == "" {
-		return StreakNow{Saved: []string{}}, err
+	h, err := g.streakDays(ctx, userID)
+	if err != nil || h.first == "" {
+		return StreakNow{Saved: []string{}, Mended: []string{}}, err
 	}
-	return walkStreak(played, full, first, g.Today(), nil), nil
+	return walkStreak(h, g.Today(), nil), nil
 }
 
-// streakDays are the days a player finished the day's questions on (first: the first of them, "" for none), and the
-// days they did all three goals on.
-func (g *Game) streakDays(ctx context.Context, userID int64) (played, full map[string]bool, first string, err error) {
-	played, full = map[string]bool{}, map[string]bool{}
+// streakHistory is what a streak is made of: the days a player finished the day's questions on (first: the first of
+// them, "" for none), the days they did all three goals on, and the days they won a broken streak back on (repair.go).
+type streakHistory struct {
+	played, full, mended map[string]bool
+	first                string
+}
+
+// mends says whether a repair keeps the streak through a day missed: one made on a day played soon after it
+// (RepairWithin), with nothing played between.
+func (h streakHistory) mends(missed string) bool {
+	for k := 1; k <= RepairWithin; k++ {
+		day := DayShift(missed, k)
+		if h.mended[day] {
+			return true
+		}
+		if h.played[day] {
+			return false
+		}
+	}
+	return false
+}
+
+// streakDays are a player's days as the streak counts them (streakHistory), over the last ten years.
+func (g *Game) streakDays(ctx context.Context, userID int64) (streakHistory, error) {
+	h := streakHistory{played: map[string]bool{}, full: map[string]bool{}, mended: map[string]bool{}}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT day, 0 FROM runs WHERE user_id = ?1 AND kind = 'day'
 			AND finished_at IS NOT NULL AND day >= ?2
-		UNION ALL SELECT day, 1 FROM goals_done WHERE user_id = ?1 AND day >= ?2 GROUP BY day HAVING count(*) >= ?3`,
+		UNION ALL SELECT day, 1 FROM goals_done WHERE user_id = ?1 AND day >= ?2 GROUP BY day HAVING count(*) >= ?3
+		UNION ALL SELECT day, 2 FROM streak_repairs WHERE user_id = ?1 AND day >= ?2`,
 		userID, g.Now().In(Bulgaria).AddDate(-10, 0, 0).Format(time.DateOnly), GoalsPerDay)
 	if err != nil {
-		return nil, nil, "", err
+		return h, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var day string
-		var goals bool
-		if err := rows.Scan(&day, &goals); err != nil {
-			return nil, nil, "", err
+		var what int
+		if err := rows.Scan(&day, &what); err != nil {
+			return h, err
 		}
-		if goals {
-			full[day] = true
-			continue
-		}
-		played[day] = true
-		if first == "" || day < first {
-			first = day
+		switch what {
+		case 1:
+			h.full[day] = true
+		case 2:
+			h.mended[day] = true
+		default:
+			h.played[day] = true
+			if h.first == "" || day < h.first {
+				h.first = day
+			}
 		}
 	}
-	return played, full, first, rows.Err()
+	return h, rows.Err()
 }
 
 // walkStreak goes over a player's days from the first played to today, as StreakOf tells them. saw, if set, hears of
 // each day a reserve day kept the streak through (spent), and of each day that ended a streak (ended: the days it had).
-func walkStreak(played, full map[string]bool, first, today string, saw func(day string, spent bool, ended int)) StreakNow {
-	s := StreakNow{Saved: []string{}}
-	d, _ := time.Parse(time.DateOnly, first)
-	for day := first; day <= today; day = d.Format(time.DateOnly) {
+func walkStreak(h streakHistory, today string, saw func(day string, spent bool, ended int)) StreakNow {
+	s := StreakNow{Saved: []string{}, Mended: []string{}}
+	d, _ := time.Parse(time.DateOnly, h.first)
+	for day := h.first; day <= today; day = d.Format(time.DateOnly) {
 		switch {
-		case played[day]:
+		case h.played[day]:
 			s.Days++
-			if day == first || s.Days%ReserveEvery == 0 || full[day] {
+			if day == h.first || s.Days%ReserveEvery == 0 || h.full[day] {
 				s.Reserve = min(ReserveMax, s.Reserve+1)
 			}
 		case day == today: // not played yet: the streak runs to yesterday
@@ -250,6 +277,8 @@ func walkStreak(played, full map[string]bool, first, today string, saw func(day 
 			if saw != nil {
 				saw(day, true, 0)
 			}
+		case s.Days > 0 && h.mends(day):
+			s.Mended = append(s.Mended, day)
 		default:
 			if s.Days > 0 {
 				s.Ended = &Ended{Days: s.Days, On: day}
@@ -257,7 +286,7 @@ func walkStreak(played, full map[string]bool, first, today string, saw func(day 
 					saw(day, false, s.Days)
 				}
 			}
-			s.Days, s.Saved = 0, s.Saved[:0]
+			s.Days, s.Saved, s.Mended = 0, s.Saved[:0], s.Mended[:0]
 		}
 		d = d.AddDate(0, 0, 1)
 	}
@@ -313,7 +342,7 @@ func (g *Game) Week(ctx context.Context, userID int64) ([7]bool, error) {
 
 // Merge moves a guest's progress to the account they signed in to (account.Accounts.Merge), where it doesn't clash
 // with the account's own: all runs but a day the account has played itself, which stays the account's; friends,
-// duels, achievements, Роял and league weeks; the better rating (with its games) and league; the goals of days the
+// duels, achievements, Роял and league weeks, streaks won back; the better rating (with its games) and league; the goals of days the
 // account has no goals for.
 func Merge(tx *sql.Tx, from, to int64) error {
 	_, err := tx.Exec(`UPDATE runs SET user_id = ? WHERE user_id = ?
@@ -351,6 +380,7 @@ func Merge(tx *sql.Tx, from, to int64) error {
 		{`UPDATE OR IGNORE royal_players SET user_id = ? WHERE user_id = ?`, []any{to, from}},
 		// The days the guest played on were the account's player's: the same person, so not a player who left.
 		{`INSERT OR IGNORE INTO active_days (user_id, day) SELECT ?, day FROM active_days WHERE user_id = ?`, []any{to, from}},
+		{`UPDATE OR IGNORE streak_repairs SET user_id = ? WHERE user_id = ?`, []any{to, from}},
 		{`DELETE FROM active_days WHERE user_id = ?`, []any{from}},
 		// What the guest earned is the account's too; so is the guest's look, if the account hasn't chosen one.
 		{`INSERT OR IGNORE INTO achievements (user_id, id, at, seen, xp) SELECT ?, id, at, seen, xp FROM achievements

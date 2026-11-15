@@ -3,8 +3,9 @@
 // brought and the level; and „Ново за теб“: achievements and everything they unlocked to wear (each a tap from being
 // worn), with how a topic's game moved its mastery; in a card left free, once a day, how others' duels against the
 // player's recordings went (play/recordings.go). Only the biggest of it plays its sound. Only what the player has met
-// is told (play/unfold.go: no XP on a first day); a system met with this game is said first, once, in a line. What
-// really is big (bigOne) is also brought forward in a sheet over the result (feel.ts), its sound playing as it opens.
+// is told (play/unfold.go: no XP on a first day); a system met with this game is said first, once, in a line, and so is a
+// broken streak won back (play/repair.go). What really is big (bigOne) is also brought forward in a sheet over the
+// result (feel.ts), its sound playing as it opens.
 
 import { emblem } from "../art/emblem.ts";
 import { leagueEmblem } from "../art/league.ts";
@@ -57,6 +58,8 @@ interface News {
   opened?: (keyof Open)[];
   /** Others' duels against the player's recordings, once a day, in a card the rest leaves free. */
   recordings?: { text: string; players: { name: string; tag: string }[] };
+  /** The streak's days, when a broken streak has just been won back (play/repair.go). */
+  mended?: number;
 }
 
 /** What a game earned, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends).
@@ -96,6 +99,7 @@ export function news(run: number, delay = 0, round?: Promise<number>): Child {
     const top = headline(n);
     return [
       (n.opened ?? []).map(opened),
+      n.mended ? h("p", { class: "news-open" }, h("b", null, `Серията ти е върната: ${n.mended} дни.`)) : null,
       top === "level" || !n.open.xp ? null : xpLine(n),
       n.goals.length ? goalsDone(n.goals) : null,
       top === "league" && n.league ? leagueEnded(n.league) : null,
