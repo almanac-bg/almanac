@@ -407,10 +407,13 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 // FriendsBoard is the day's board among a player and their friends: everyone of them who finished it, best first.
 // Empty while none of their friends has. A game played at a script's speed is on it for its player alone (fairFor).
 func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Score, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+` FROM runs r
+	// From the player and their friends to each one's game of the day (runs_one_a_day): CROSS JOIN keeps that order,
+	// so it costs as many as they are, not as many as the day has players.
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+`
+		FROM (SELECT ?2 AS id UNION SELECT friend_id FROM friends WHERE user_id = ?2) f
+		CROSS JOIN runs r ON r.user_id = f.id AND r.kind = 'day' AND r.day = ?1
 		JOIN users u ON u.id = r.user_id
-		WHERE r.kind = 'day' AND r.day = ?1 AND r.finished_at IS NOT NULL AND `+fairFor("r", "?2")+`
-		AND (r.user_id = ?2 OR r.user_id IN (SELECT friend_id FROM friends WHERE user_id = ?2))
+		WHERE r.finished_at IS NOT NULL AND `+fairFor("r", "?2")+`
 		ORDER BY r.points DESC, r.ms, r.id`, day, userID)
 	if err != nil {
 		return nil, err

@@ -1,7 +1,9 @@
 package store
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -9,6 +11,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 )
 
 func TestOpenMigratesAndReopens(t *testing.T) {
@@ -137,6 +140,30 @@ func TestTxRollsBack(t *testing.T) {
 	var n int
 	_ = db.Read.QueryRow(`SELECT count(*) FROM users`).Scan(&n)
 	if err == nil || n != 0 {
+		t.Fatalf("err %v, %d users", err, n)
+	}
+}
+
+// A transaction whose context ends midway (the player went away) says so, not that it's been rolled back twice.
+func TestTxWithAnEndedContext(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "game.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx, cancel := context.WithCancel(t.Context())
+	err = db.Tx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`INSERT INTO users (name, tag, created_at, seen_at) VALUES ('А', 'abc', 1, 1)`); err != nil {
+			return err
+		}
+		cancel()
+		time.Sleep(10 * time.Millisecond) // database/sql rolls it back as the context ends
+		_, err := tx.Exec(`INSERT INTO users (name, tag, created_at, seen_at) VALUES ('Б', 'abd', 1, 1)`)
+		return err
+	})
+	var n int
+	_ = db.Read.QueryRow(`SELECT count(*) FROM users`).Scan(&n)
+	if !errors.Is(err, context.Canceled) || strings.Contains(err.Error(), "already been committed") || n != 0 {
 		t.Fatalf("err %v, %d users", err, n)
 	}
 }

@@ -179,25 +179,56 @@ func (g *Game) crowdOf(ctx context.Context, db querier, r *run, q bank.Question)
 
 // dayCrowd is how the other players of a day have answered one of its questions (since it last changed): nil while
 // fewer than DayCrowdFrom have. A player's own answer is never in it, but in a crowd big enough to be kept a while
-// (dayCrowdKeep), where it can't change what shows.
+// (dayCrowdKeep), where it can't change what shows. A kept crowd is counted again once it's dayCrowdFresh old, by one
+// answer in the background, while the others are shown the last count: the count costs as much as the day has
+// players, so it's never made by every answer that comes in while it runs.
 func (g *Game) dayCrowd(ctx context.Context, db querier, day string, q bank.Question, userID int64) (*bank.Crowd, error) {
 	id, now, b := q.Base().ID, g.Now(), g.Bank()
 	key := day + " " + id
-	if c := g.dayCrowds.get(key, now, b); c != nil {
+	c, recount := g.dayCrowds.get(key, now, b)
+	if recount {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+			defer cancel()
+			c, n, err := g.countDayCrowd(ctx, g.DB.Read, day, q, 0)
+			if err != nil || n < dayCrowdKeep { // fewer than it had: answers left with a script's runs, counted each time
+				if err != nil {
+					slog.Warn("counting a day's crowd", "question", id, "err", err)
+				}
+				g.dayCrowds.drop(key)
+				return
+			}
+			g.dayCrowds.put(key, c, now, b)
+		}()
+	}
+	if c != nil {
 		return c, nil
 	}
+	c, n, err := g.countDayCrowd(ctx, db, day, q, userID)
+	if err != nil || c == nil {
+		return nil, err
+	}
+	if n >= dayCrowdKeep {
+		g.dayCrowds.put(key, c, now, b)
+	}
+	return c, nil
+}
+
+// countDayCrowd counts how the other players of a day (all but userID) have answered one of its questions, and how
+// many have: a nil crowd while fewer than DayCrowdFrom.
+func (g *Game) countDayCrowd(ctx context.Context, db querier, day string, q bank.Question, userID int64) (*bank.Crowd, int, error) {
 	start, err := time.ParseInLocation(time.DateOnly, day, Bulgaria)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	// The question's answers since the day began (answers_question), each run looked up by its key: CROSS JOIN keeps
 	// that order, which the planner wouldn't choose without statistics (it would go through every day's runs).
 	rows, err := db.QueryContext(ctx, `SELECT a.given, count(*), sum(a.is_right) FROM answers a CROSS JOIN runs r ON r.id = a.run_id
 		WHERE a.question_id = ? AND a.at >= ? AND r.kind = 'day' AND r.day = ? AND r.user_id <> ? AND NOT r.scripted
 		GROUP BY a.given`,
-		id, max(start.UnixMilli(), changedMs(q)), day, userID)
+		q.Base().ID, max(start.UnixMilli(), changedMs(q)), day, userID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 	var tallies []bank.Tally
@@ -206,7 +237,7 @@ func (g *Game) dayCrowd(ctx context.Context, db querier, day string, q bank.Ques
 		var given sql.NullString
 		var t bank.Tally
 		if err := rows.Scan(&given, &t.N, &t.Right); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if given.Valid {
 			t.Given = json.RawMessage(given.String)
@@ -215,53 +246,74 @@ func (g *Game) dayCrowd(ctx context.Context, db querier, day string, q bank.Ques
 		n += t.N
 	}
 	if err := rows.Err(); err != nil || n < g.crowdFrom(DayCrowdFrom) {
-		return nil, err
+		return nil, n, err
 	}
 	c := bank.CrowdOf(q, tallies)
 	c.Today = true
-	if n >= dayCrowdKeep {
-		g.dayCrowds.put(key, c, now, b)
-	}
-	return c, nil
+	return c, n, nil
 }
 
-// dayCrowdCache keeps the days' crowds big enough (dayCrowdKeep) for a little while (dayCrowdFresh).
+// dayCrowdCache keeps the days' crowds big enough (dayCrowdKeep): fresh for dayCrowdFresh, and then, while one is
+// counted again, shown as they were, for up to dayCrowdUsable.
 type dayCrowdCache struct {
 	mu sync.Mutex
-	by map[string]keptCrowd
+	by map[string]*keptCrowd
 }
+
+// dayCrowdUsable is how long a kept crowd may still be shown while it's counted again.
+const dayCrowdUsable = 10 * time.Minute
 
 type keptCrowd struct {
-	at   time.Time
-	bank *bank.Bank
-	c    *bank.Crowd
+	at       time.Time
+	bank     *bank.Bank
+	c        *bank.Crowd
+	counting bool // counted again now
 }
 
-func (k keptCrowd) fresh(now time.Time, b *bank.Bank) bool {
-	return k.bank == b && !now.Before(k.at) && now.Sub(k.at) < dayCrowdFresh
+// age is how old a kept crowd is, or false if it can't be shown (of another bank, or from the clock's future).
+func (k *keptCrowd) age(now time.Time, b *bank.Bank) (time.Duration, bool) {
+	age := now.Sub(k.at)
+	return age, k.bank == b && age >= 0 && age < dayCrowdUsable
 }
 
-func (d *dayCrowdCache) get(key string, now time.Time, b *bank.Bank) *bank.Crowd {
+// get is a kept crowd, if there's one to show, and whether this caller is to count it again (only one is, at a time).
+func (d *dayCrowdCache) get(key string, now time.Time, b *bank.Bank) (*bank.Crowd, bool) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if k, ok := d.by[key]; ok && k.fresh(now, b) {
-		return k.c
+	k := d.by[key]
+	if k == nil {
+		return nil, false
 	}
-	return nil
+	age, ok := k.age(now, b)
+	if !ok {
+		return nil, false
+	}
+	if age < dayCrowdFresh || k.counting {
+		return k.c, false
+	}
+	k.counting = true
+	return k.c, true
 }
 
 func (d *dayCrowdCache) put(key string, c *bank.Crowd, now time.Time, b *bank.Bank) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.by == nil {
-		d.by = map[string]keptCrowd{}
+		d.by = map[string]*keptCrowd{}
 	}
 	for k, kept := range d.by {
-		if !kept.fresh(now, b) {
+		if _, ok := kept.age(now, b); !ok {
 			delete(d.by, k)
 		}
 	}
-	d.by[key] = keptCrowd{at: now, bank: b, c: c}
+	d.by[key] = &keptCrowd{at: now, bank: b, c: c}
+}
+
+// drop forgets a kept crowd: the next answer counts it.
+func (d *dayCrowdCache) drop(key string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	delete(d.by, key)
 }
 
 // FewRight is a right answer in the day's ten and how few of the day's other players got it right: its place in the

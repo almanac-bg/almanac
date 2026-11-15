@@ -45,6 +45,9 @@ func Open(path string) (*DB, error) {
 		"busy_timeout(5000)",
 		"temp_store(MEMORY)",
 		"cache_size(-32000)", // 32 MB
+		// The file mapped into memory: a connection's own cache starts over whenever another one writes, which in a
+		// game is all the time, and then each page read is a copy through the kernel; mapped, it's a look in memory.
+		"mmap_size(1073741824)", // 1 GB, of address space (the pages are the system's file cache, shared)
 	} {
 		pragmas.Add("_pragma", p)
 	}
@@ -60,7 +63,8 @@ func Open(path string) (*DB, error) {
 		w.Close()
 		return nil, err
 	}
-	r.SetMaxOpenConns(max(4, runtime.NumCPU()))
+	// More readers than cores: a long read (a big day's board being counted) mustn't keep the quick ones waiting.
+	r.SetMaxOpenConns(max(8, 4*runtime.NumCPU()))
 	db := &DB{Write: w, Read: r}
 	if err := db.migrate(); err != nil {
 		db.Close()
@@ -213,10 +217,21 @@ func (db *DB) Tx(ctx context.Context, fn func(*sql.Tx) error) error {
 	if err != nil {
 		return err
 	}
+	// A context that ended (the player went away) has rolled the transaction back already, and then each step after
+	// says only that it's done: the context's end is what happened.
 	if err := fn(tx); err != nil {
-		return errors.Join(err, tx.Rollback())
+		rollback := tx.Rollback()
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return errors.Join(err, rollback)
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil && ctx.Err() != nil {
+		return ctx.Err()
+	} else if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Now is the time as the database keeps it: milliseconds since 1970.
