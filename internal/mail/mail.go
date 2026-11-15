@@ -26,11 +26,13 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// Message is a plain-text email to one address.
+// Message is a plain-text email to one address. A mail the player may stop (not the sign-in code) has its Unsubscribe
+// address: a mail program offers it as a button, which posts to it (RFC 8058).
 type Message struct {
-	To      string `json:"to"`
-	Subject string `json:"subject"`
-	Text    string `json:"text"`
+	To          string `json:"to"`
+	Subject     string `json:"subject"`
+	Text        string `json:"text"`
+	Unsubscribe string `json:"unsubscribe,omitempty"`
 }
 
 // Sender delivers a message (SMTP in production; the log in development).
@@ -256,6 +258,9 @@ func Compose(from string, m Message, at time.Time) []byte {
 		{"Content-Transfer-Encoding", "quoted-printable"},
 	} {
 		b.WriteString(h[0] + ": " + h[1] + "\r\n")
+	}
+	if m.Unsubscribe != "" {
+		b.WriteString("List-Unsubscribe: <" + m.Unsubscribe + ">\r\nList-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n")
 	}
 	b.WriteString("\r\n")
 	qp := quotedprintable.NewWriter(&b)

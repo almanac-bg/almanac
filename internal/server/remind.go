@@ -70,7 +70,8 @@ type reminders struct {
 // never is a minute no day reaches: a player not to be reminded today.
 const never = 24 * 60
 
-// Remind reminds, every minute, those whose hour has come (remind).
+// Remind reminds, every minute, those whose hour has come (remind), and mails those whose streak ended and whom no
+// notification reaches (streakMails).
 func (s *Server) Remind(ctx context.Context) {
 	t := time.NewTicker(time.Minute)
 	defer t.Stop()
@@ -79,7 +80,9 @@ func (s *Server) Remind(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			s.remind(ctx, time.Now())
+			now := time.Now()
+			s.remind(ctx, now)
+			s.streakMails(ctx, now) // for those no notification reaches (streakmail.go)
 		}
 	}
 }

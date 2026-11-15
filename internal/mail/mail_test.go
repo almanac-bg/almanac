@@ -39,6 +39,23 @@ func TestCompose(t *testing.T) {
 	if string(body) != "Ред едно\r\nРед две — с тире" {
 		t.Errorf("body %q", body)
 	}
+	if h.Get("List-Unsubscribe") != "" {
+		t.Errorf("a code mail with a way to stop it: %q", h.Get("List-Unsubscribe"))
+	}
+}
+
+// A mail the player may stop says how, for the mail program's own button (RFC 8058).
+func TestComposeUnsubscribe(t *testing.T) {
+	raw := Compose("АЛМАНАХ <no-reply@almanac.bg>", Message{To: "a@b.bg", Subject: "С", Text: "Т",
+		Unsubscribe: "https://almanac.bg/mail/off?k=streak"}, time.Unix(0, 0))
+	h, err := textproto.NewReader(bufio.NewReader(bytes.NewReader(raw))).ReadMIMEHeader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.Get("List-Unsubscribe") != "<https://almanac.bg/mail/off?k=streak>" ||
+		h.Get("List-Unsubscribe-Post") != "List-Unsubscribe=One-Click" {
+		t.Errorf("headers %v", h)
+	}
 }
 
 type failing struct{ n int }
