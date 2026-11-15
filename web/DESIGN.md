@@ -244,8 +244,9 @@ takes a token.
   week of the league ended, a division
   reached, a new level), or else a line of the XP it brought and the level (`.news-xp`); and „Ново за теб“
   (`.unlocks`): achievements and everything newly unlocked, each unlock with „Сложи“, whatever unlocked it. Профил shows
-  what comes next (`.next`); the day's goals, all three done, earn a reserve day for the streak (`.goals-reserve`,
-  `.week li.saved`). Награди opens with „Как се печели“, the whole of it in five lines.
+  what comes next (`.next`); reserve days keep the streak (the first day, every seventh in a row and a day with all
+  three goals earn one: `.goals-reserve`, `.week li.saved`); a day a reserve kept, or a streak that ended, is said
+  once on Начало (`.streak-notice`). Награди opens with „Как се печели“, the whole of it in five lines.
 - **Division emblems** are pictures (`division-<id>`): a silhouette per division — Бронз a plain shield, Сребро a
   chevron, Злато wings, Платина a star, Диамант a cut gem, Легенда a crowned shield of stars with rays — in `--div-*`
   colours (`art/emblem.ts` places them).

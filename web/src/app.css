@@ -924,6 +924,14 @@
     line-height: 1rem;
   }
 
+  /* What came of the days just missed: a reserve day kept the streak, or it ended. Said once, quietly. */
+  .streak-notice {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-muted);
+  }
+
   /* Начало's top: the streak and the level, side by side, each a way to Профил. */
   .status-row {
     display: grid;

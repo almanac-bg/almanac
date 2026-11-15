@@ -25,8 +25,9 @@ import (
 // Both unlock the wardrobe (wardrobe.go, titles.go): a level, an achievement, a topic's mastery, a division, a Роял
 // won or first place in a high league each gives an avatar, a frame, a pattern or a title. Whatever unlocks something, the player is told
 // once, at the end of the game that did it (NewsOf), and is shown what comes next (Next): the next level that gives
-// something, the next division, the achievements nearest. The day's goals, done all three, also keep the streak
-// through a missed day (runs.go: reserve days), and the streak makes achievements of its own.
+// something, the next division, the achievements nearest. Reserve days keep the streak through a missed day (runs.go):
+// the day itself earns them (the first day, every seventh in a row), and so do the day's goals, done all three; the
+// streak makes achievements of its own.
 //
 // All of it comes from the game's own records: nothing to buy, nothing made up. A new player meets it a part at a
 // time (unfold.go): all of it counts from the first game, but XP, the league and the rating show as each starts to

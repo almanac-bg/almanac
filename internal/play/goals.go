@@ -19,7 +19,7 @@ import (
 // in a row, how fast, a topic, a type of question, a game nearly without a mistake, duels, Роял); the two drawn are
 // never of one family, nor of a family drawn the day before, and some are about something drawn with them: a topic, a
 // type of question. Each can be done that day: Роял only while the evening's is still ahead, nothing mostly luck. A goal done earns its tier's XP, kept as it's done (whether or not the player looks) and told
-// once, at the end of the game that did it. A day with all three done earns a reserve day for the streak (runs.go),
+// once, at the end of the game that did it. A day with all three done also earns a reserve day for the streak (runs.go),
 // and counts towards the achievements for full days.
 
 // Goal is one of the day's goals: what to do, how much of it, and where it's done.

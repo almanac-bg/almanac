@@ -11,6 +11,8 @@ export interface Stats {
   week: boolean[];
   saved: boolean[];
   reserve: number;
+  /** Days in a row to the next reserve day (0: they are full). */
+  next: number;
   days: number;
   games: number;
   answers: number;
@@ -59,7 +61,7 @@ function what(p: Stats["recent"][number]): string {
 
 /** Профил's numbers: the streak and this week; how well and how much they've played, in one card (the day's place
  * is Начало's and Класации'); how well they know each topic (once one has a mark); their latest games. */
-export function stats(goals: () => boolean): Child {
+export function stats(): Child {
   const data = signal<Stats | null>(null);
   loadStats().then(data.set, () => {});
   return () => {
@@ -67,11 +69,11 @@ export function stats(goals: () => boolean): Child {
     if (!s) return null;
     if (s.games === 0)
       return [
-        streak(s.streak, s.week, s.saved, s.reserve, goals()),
+        streak(s.streak, s.week, s.saved, s.reserve, s.next),
         h("p", { class: "muted" }, "Още няма изиграни игри."),
       ];
     return [
-      streak(s.streak, s.week, s.saved, s.reserve, goals()),
+      streak(s.streak, s.week, s.saved, s.reserve, s.next),
       h(
         "section",
         { class: "card figures" },

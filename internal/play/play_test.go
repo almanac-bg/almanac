@@ -388,15 +388,15 @@ func TestBoardAndStreak(t *testing.T) {
 	if n, _ := w.g.Streak(ctx, ana); n != 1 {
 		t.Fatalf("streak %d the next morning, before playing", n)
 	}
-	w.setGoals(ana, "day", "duel", "duelWin") // goals the day's questions alone don't finish: no reserve day
+	w.setGoals(ana, "day", "duel", "duelWin") // goals the day's questions alone don't finish: no reserve day from the goals
 	s, _ := w.g.StartDay(ctx, ana)
 	w.play(ana, s.ID, repeat(w.right, Length)...)
 	if n, _ := w.g.Streak(ctx, ana); n != 2 {
 		t.Fatalf("streak %d after two days", n)
 	}
 	w.wait(48 * time.Hour)
-	if n, _ := w.g.Streak(ctx, ana); n != 0 {
-		t.Fatalf("streak %d after missing a day", n)
+	if n, _ := w.g.Streak(ctx, ana); n != 2 {
+		t.Fatalf("streak %d after missing a day, with the first day's reserve day", n)
 	}
 	if week, _ := w.g.Week(ctx, ana); week != [7]bool{3: true, 4: true} {
 		t.Fatalf("week %v on Sunday, after Thursday and Friday", week)
@@ -405,39 +405,58 @@ func TestBoardAndStreak(t *testing.T) {
 	if week, _ := w.g.Week(ctx, ana); week != [7]bool{} {
 		t.Fatalf("week %v on a new Monday", week)
 	}
+	if n, _ := w.g.Streak(ctx, ana); n != 0 {
+		t.Fatalf("streak %d after missing two days, with one reserve day", n)
+	}
 }
 
-// The day's three goals done earn a reserve day; a missed day spends it, and the streak holds.
+// Reserve days come from the day itself (the first day played, every seventh in a row) and from a day with all three
+// goals done, two at most; a missed day spends one and the streak holds; with none left it ends, and says so.
 func TestReserveDays(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
-	full := func() {
+	day := func() {
 		s, _ := w.g.StartDay(ctx, ana)
 		w.play(ana, s.ID, repeat(w.right, Length)...)
+	}
+	full := func() {
+		day()
 		for i := range GoalsPerDay {
 			_, _ = w.db.Write.Exec(`INSERT OR IGNORE INTO goals_done (user_id, day, goal, at, xp, seen) VALUES (?, ?, ?, 1, 0, 1)`,
 				ana, w.g.Today(), fmt.Sprint("g", i))
 		}
 	}
-	full()
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 1 || s.Reserve != 1 {
-		t.Fatalf("after a full day: %+v", s)
+	day() // the first day ever: a reserve day, goals or not
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 1 || s.Reserve != 1 || s.Next != 6 || s.Ended != nil {
+		t.Fatalf("after a first day: %+v", s)
 	}
 	w.wait(48 * time.Hour) // a day missed
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 1 || s.Reserve != 0 || len(s.Saved) != 1 || s.Saved[0] != "2026-11-13" {
+	missed := w.g.Now().In(Bulgaria).AddDate(0, 0, -1).Format(time.DateOnly)
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 1 || s.Reserve != 0 || len(s.Saved) != 1 || s.Saved[0] != missed {
 		t.Fatalf("a day missed, with a reserve: %+v", s)
 	}
-	if saved := w.g.InWeek([]string{"2026-11-13"}); saved != [7]bool{4: true} {
-		t.Fatalf("the saved day this week: %v", saved)
+	full() // all three goals: a reserve day
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 2 || s.Reserve != 1 || s.Next != 5 {
+		t.Fatalf("a full day: %+v", s)
 	}
-	full()
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 2 || s.Reserve != 1 {
-		t.Fatalf("played on after a reserve: %+v", s)
+	for range 5 { // to seven days in a row: the second reserve day, and no more to earn
+		w.wait(24 * time.Hour)
+		day()
 	}
-	w.wait(72 * time.Hour) // two days missed, one reserve
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 0 || s.Reserve != 0 || len(s.Saved) != 0 {
-		t.Fatalf("two days missed: %+v", s)
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 7 || s.Reserve != ReserveMax || s.Next != 0 {
+		t.Fatalf("seven days in a row: %+v", s)
+	}
+	w.wait(24 * time.Hour)
+	full() // a full day with the reserve days full earns nothing more
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 8 || s.Reserve != ReserveMax {
+		t.Fatalf("a full day with reserve days full: %+v", s)
+	}
+	w.wait(4 * 24 * time.Hour) // three days missed, two reserve days: the third ends it
+	ended := w.g.Now().In(Bulgaria).AddDate(0, 0, -1).Format(time.DateOnly)
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 0 || s.Reserve != 0 || len(s.Saved) != 0 || s.Ended == nil ||
+		*s.Ended != (Ended{Days: 8, On: ended}) || s.Next != ReserveEvery {
+		t.Fatalf("three days missed: %+v (ended %+v)", s, s.Ended)
 	}
 }
 
