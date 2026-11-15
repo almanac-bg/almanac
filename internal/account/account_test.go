@@ -3,9 +3,11 @@ package account
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	mailer "github.com/almanac-bg/almanac/internal/mail"
@@ -172,5 +174,30 @@ func TestTags(t *testing.T) {
 	}
 	if u, _ := a.Session(ctx, token); u == nil || u.Tag != "otsirh" {
 		t.Fatalf("the session's user: %+v", u)
+	}
+}
+
+// A player keeps the name drawn for them until they choose one, and their screen knows which it is.
+func TestDrawnName(t *testing.T) {
+	a, _, _, _ := setup(t)
+	ctx := t.Context()
+	u, token, _ := a.Guest(ctx)
+	if !u.Drawn() {
+		t.Fatalf("a new player's name %q isn't drawn", u.Name)
+	}
+	if data, _ := json.Marshal(u); !strings.Contains(string(data), `"drawn":true`) {
+		t.Fatalf("sent as %s", data)
+	}
+	other := AnimalOf(u.ID+1).Name + " 123"
+	for _, name := range []string{AnimalOf(u.ID).Name + " 12", AnimalOf(u.ID).Name + " 12а", other, "Мария"} {
+		if (User{ID: u.ID, Name: name}).Drawn() {
+			t.Errorf("%q is taken for drawn", name)
+		}
+	}
+	if _, err := a.Rename(ctx, u.ID, "Мария"); err != nil {
+		t.Fatal(err)
+	}
+	if s, _ := a.Session(ctx, token); s.Drawn() {
+		t.Fatal("a chosen name is still drawn")
 	}
 }

@@ -75,10 +75,14 @@ func (s *Server) roomEvents(w http.ResponseWriter, r *http.Request) {
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Accel-Buffering", "no")
 	if err != nil {
-		// Said in the stream, which is all a browser's EventSource can read: no such room (any more), or no room in it.
+		// Said in the stream, which is all a browser's EventSource can read: no such room (any more), no room in it, or
+		// not for this player (sent out by the host).
 		event := "closed"
-		if errors.Is(err, room.ErrFull) {
+		switch {
+		case errors.Is(err, room.ErrFull):
 			event = "full"
+		case errors.Is(err, room.ErrRemoved):
+			event = "removed"
 		}
 		fmt.Fprintf(w, "event: %s\ndata: {}\n\n", event)
 		return
@@ -100,7 +104,11 @@ func (s *Server) roomEvents(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		case <-sub.Done:
-			send("event: closed\ndata: {}\n\n")
+			if sub.Removed() {
+				send("event: removed\ndata: {}\n\n")
+			} else {
+				send("event: closed\ndata: {}\n\n")
+			}
 			return
 		case <-s.closing:
 			return
@@ -120,6 +128,28 @@ func (s *Server) roomStart(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	if err := rm.Start(u.ID); err != nil {
+		return err
+	}
+	return ok(w, map[string]bool{"ok": true})
+}
+
+// roomRemove is the host sending a player out of the room, by their key.
+func (s *Server) roomRemove(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	rm, err := s.roomOf(r)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		Key int `json:"key"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	if err := rm.Remove(u.ID, in.Key); err != nil {
 		return err
 	}
 	return ok(w, map[string]bool{"ok": true})

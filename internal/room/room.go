@@ -1,12 +1,14 @@
 // Package room is playing live: a room has a code, its players see the same question at the same moment, and a
 // scoreboard after each.
 //
-// A room is opened by a host, who sets the pace (anyone may while the host is away).
+// A room is opened by a host, who sets the pace (anyone may while the host is away). The host may also send a
+// player out of the room (Remove): they're kept out of it from then on.
 //
 // Rooms live in memory: they're for playing now, and close on their own when nobody's left. A restart would end
 // them, so the server keeps them over one: it pauses the hub first (Pause: no new game starts in any room, and the
 // games under way, UnderWay, play to their end), and saves the rooms as it stops (Save) for the next run of the
-// server to open again (Restore), with their code, host and players, and the standings of a game just over. A
+// server to open again (Restore), with their code, host and players (and those sent out), and the standings of a
+// game just over. A
 // player's screen comes back to its room by itself. A game still being played when the server stopped (it waited
 // long enough) is lost: its room comes back to its lobby.
 package room
@@ -57,6 +59,8 @@ var (
 	ErrTooMany  = errors.New("too many rooms")
 	// ErrPaused is a game not started because the server is about to restart (Pause).
 	ErrPaused = errors.New("the server is about to restart")
+	// ErrRemoved is a player the host has sent out of the room, coming back.
+	ErrRemoved = errors.New("sent out of the room")
 )
 
 // Player is someone in a room.
@@ -103,7 +107,7 @@ func (h *Hub) newRoom(category string) (*Room, error) {
 		}
 		r := &Room{
 			code: code, category: category, phase: Lobby, hub: h,
-			subs: map[*Sub]struct{}{}, opened: time.Now(), active: time.Now(),
+			subs: map[*Sub]struct{}{}, out: map[int64]bool{}, opened: time.Now(), active: time.Now(),
 		}
 		h.rooms[code] = r
 		return r, nil
@@ -123,7 +127,7 @@ func (h *Hub) Open(host Player, category string) (*Room, error) {
 		return nil, err
 	}
 	r.host = host.ID
-	r.players = []*member{{Player: host}}
+	r.add(host)
 	return r, nil
 }
 
@@ -183,6 +187,7 @@ type saved struct {
 	Phase    Phase         `json:"phase"`
 	Picks    []play.Pick   `json:"picks,omitempty"`
 	Players  []savedMember `json:"players"`
+	Out      []int64       `json:"out,omitempty"`
 	Opened   time.Time     `json:"opened"`
 	Active   time.Time     `json:"active"`
 }
@@ -228,6 +233,9 @@ func (h *Hub) Save(w io.Writer) error {
 			}
 			sv.Players = append(sv.Players, sm)
 		}
+		for id := range r.out {
+			sv.Out = append(sv.Out, id)
+		}
 		r.mu.Unlock()
 		out = append(out, sv)
 	}
@@ -252,7 +260,10 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 		}
 		r := &Room{
 			code: sv.Code, category: sv.Category, host: sv.Host, phase: Lobby, hub: h,
-			subs: map[*Sub]struct{}{}, opened: sv.Opened, active: sv.Active,
+			subs: map[*Sub]struct{}{}, out: map[int64]bool{}, opened: sv.Opened, active: sv.Active,
+		}
+		for _, id := range sv.Out {
+			r.out[id] = true
 		}
 		if sv.Phase == End {
 			r.phase, r.picks = End, sv.Picks
@@ -267,14 +278,13 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 			r.n = max(0, len(r.dealt)-1)
 		}
 		for _, sm := range sv.Players {
-			m := &member{Player: Player{ID: sm.ID, Name: sm.Name, Look: sm.Look}}
+			m := r.add(Player{ID: sm.ID, Name: sm.Name, Look: sm.Look})
 			if r.phase == End {
 				m.points, m.rights, m.inRow = sm.Points, sm.Rights, sm.InRow
 				for _, a := range sm.Answers {
 					m.log = append(m.log, loggedAnswer{questionID: a.Question, shown: a.Shown, points: a.Points, right: a.Right})
 				}
 			}
-			r.players = append(r.players, m)
 		}
 		h.rooms[r.code] = r
 		n++
@@ -290,6 +300,8 @@ type Room struct {
 	category   string
 	host       int64     // who opened it
 	players    []*member // in the order they joined
+	joined     int       // how many have joined: the next one's key
+	out        map[int64]bool
 	phase      Phase
 	picks      []play.Pick
 	dealt      []bank.Dealt
@@ -306,6 +318,7 @@ type Room struct {
 
 type member struct {
 	Player
+	key            int // tells them apart on the screens while the room is open: the order they came in
 	points, rights int
 	inRow          int // right answers in a row, the last ones
 	online         int
@@ -347,24 +360,71 @@ func (r *Room) Join(p Player) error {
 	if r.closed {
 		return ErrNoRoom
 	}
+	if r.out[p.ID] {
+		return ErrRemoved
+	}
 	if m := r.member(p.ID); m != nil {
 		m.Player = p // a new name or look shows from now on
+		r.changed()
 		return nil
 	}
 	if len(r.players) >= MaxPlayers {
 		return ErrFull
 	}
-	r.players = append(r.players, &member{Player: p})
+	r.add(p)
 	r.changed()
 	return nil
 }
 
-// Sub is a screen following a room: C says the room changed (read View then), Done that the room is gone.
-type Sub struct {
-	C      chan struct{}
-	Done   chan struct{}
-	viewer int64
+// add puts a player in the room, under the next key. Called with the lock held (or before anyone can see the room).
+func (r *Room) add(p Player) *member {
+	m := &member{Player: p, key: r.joined}
+	r.joined++
+	r.players = append(r.players, m)
+	return m
 }
+
+// Remove is the host sending a player (by their key) out of the room: their screens are told so, and they can't come
+// back. Whatever the room waited on them for goes on without them.
+func (r *Room) Remove(by int64, key int) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if by != r.host {
+		return ErrNotYours
+	}
+	i := slices.IndexFunc(r.players, func(m *member) bool { return m.key == key })
+	if i < 0 || r.players[i].ID == r.host {
+		return ErrNotNow
+	}
+	id := r.players[i].ID
+	r.players = slices.Delete(r.players, i, i+1)
+	r.out[id] = true
+	for s := range r.subs {
+		if s.viewer == id {
+			s.removed = true
+			close(s.Done)
+			delete(r.subs, s)
+		}
+	}
+	if r.phase == Question && r.allAnswered() {
+		r.reveal()
+		return nil
+	}
+	r.changed()
+	return nil
+}
+
+// Sub is a screen following a room: C says the room changed (read View then), Done that the room is gone, or that
+// the host sent its player out (Removed).
+type Sub struct {
+	C       chan struct{}
+	Done    chan struct{}
+	viewer  int64
+	removed bool // set before Done is closed
+}
+
+// Removed says, once Done is closed, whether it was for the host sending the player out.
+func (s *Sub) Removed() bool { return s.removed }
 
 // Follow is a player's screen following the room (Join first).
 func (r *Room) Follow(viewer int64) (*Sub, error) {
@@ -559,14 +619,17 @@ func (r *Room) answer(m *member, n int, raw json.RawMessage) error {
 	m.gained, m.speed, m.row = w.Points, w.Speed, w.Row
 	m.points += m.gained
 	m.log = append(m.log, loggedAnswer{questionID: d.Question().Base().ID, shown: g.Shown, points: m.gained, right: g.Right})
-	for _, p := range r.players {
-		if p.online > 0 && !p.answered {
-			r.changed()
-			return nil
-		}
+	if !r.allAnswered() {
+		r.changed()
+		return nil
 	}
 	r.reveal()
 	return nil
+}
+
+// allAnswered is whether everyone in the room now has answered the question showing.
+func (r *Room) allAnswered() bool {
+	return !slices.ContainsFunc(r.players, func(p *member) bool { return p.online > 0 && !p.answered })
 }
 
 func (r *Room) reveal() {
@@ -632,7 +695,7 @@ type ReviewedView struct {
 
 type PlayerView struct {
 	play.Look
-	// Key tells players apart in a room (names may repeat): the order they came in.
+	// Key tells players apart in a room (names may repeat), and is how the host sends one out (Remove).
 	Key      int    `json:"key"`
 	Name     string `json:"name"`
 	Points   int    `json:"points"`
@@ -681,9 +744,9 @@ func (r *Room) View(viewer int64) View {
 	if h := r.member(r.host); h != nil {
 		v.Host = h.Name
 	}
-	for i, m := range r.players {
+	for _, m := range r.players {
 		p := PlayerView{
-			Key: i, Look: m.Look, Name: m.Name, Points: m.points, Rights: m.rights, Online: m.online > 0, Answered: m.answered,
+			Key: m.key, Look: m.Look, Name: m.Name, Points: m.points, Rights: m.rights, Online: m.online > 0, Answered: m.answered,
 			Me: m.ID == viewer,
 		}
 		if r.phase == Reveal {

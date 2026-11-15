@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -34,6 +35,25 @@ type User struct {
 
 // Guest is a player without an email yet: their progress lives on this browser only.
 func (u *User) Guest() bool { return u.Email == "" }
+
+// Drawn is whether the player still has the name drawn for them (createUser): their animal and three digits. A room
+// asks such a player for a name as they come in.
+func (u User) Drawn() bool {
+	rest, ok := strings.CutPrefix(u.Name, AnimalOf(u.ID).Name+" ")
+	if !ok || len(rest) != 3 {
+		return false
+	}
+	return strings.Trim(rest, "0123456789") == ""
+}
+
+// MarshalJSON is a player as their own screen knows them: with Drawn, wherever they're sent.
+func (u User) MarshalJSON() ([]byte, error) {
+	type plain User
+	return json.Marshal(struct {
+		plain
+		Drawn bool `json:"drawn,omitempty"`
+	}{plain(u), u.Drawn()})
+}
 
 const (
 	// SessionDays is how long a session lasts unused; each day it's used pushes the end back (browsers keep a cookie

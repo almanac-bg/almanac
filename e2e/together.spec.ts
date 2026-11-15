@@ -10,10 +10,16 @@ test("a room for two: lobby, ten questions together, the standings", async ({ br
   await host.getByRole("button", { name: "История" }).click();
   await expect(host).toHaveURL(/\/r\/\d{6}$/);
   const code = host.url().slice(-6);
+  // A new player has a drawn name: the room asks for one first (kept as it is here).
+  await expect(host.getByRole("heading", { name: "Как да те виждат в стаята?" })).toBeVisible();
+  await host.getByRole("button", { name: "Влез" }).click();
   await guest.goto("/room");
   await guest.getByLabel("Код на стаята").fill(code);
   await guest.getByRole("button", { name: "Влез" }).click();
+  await guest.getByLabel("Име").fill("Бояна");
+  await guest.getByRole("button", { name: "Влез" }).click();
   await expect(host.locator(".players li")).toHaveCount(2);
+  await expect(host.locator(".players li").last()).toContainText("Бояна");
   await expect(guest.getByText(/Чакаме .* да започне/)).toBeVisible();
   await host.getByRole("button", { name: "Започни" }).click();
   for (let n = 0; n < 10; n++) {
@@ -29,6 +35,28 @@ test("a room for two: lobby, ten questions together, the standings", async ({ br
   await expect(host.getByRole("button", { name: "Нова игра" })).toBeVisible();
   await guest.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(guest.locator(".reviewed")).toHaveCount(10);
+});
+
+test("the host sends a player out of a room, and they stay out", async ({ browser }) => {
+  const host = await (await browser.newContext()).newPage();
+  const guest = await (await browser.newContext()).newPage();
+  await host.goto("/room");
+  await host.getByRole("button", { name: "Всички теми" }).click();
+  await expect(host).toHaveURL(/\/r\/\d{6}$/);
+  await host.getByLabel("Име").fill("Учител");
+  await host.getByRole("button", { name: "Влез" }).click();
+  await guest.goto(host.url());
+  await guest.getByLabel("Име").fill("Шегаджия");
+  await guest.getByRole("button", { name: "Влез" }).click();
+  await expect(guest.getByText("Чакаме Учител да започне.")).toBeVisible();
+  // Only the host has „Махни“, and it asks twice.
+  await expect(guest.getByRole("button", { name: /Махни/ })).toHaveCount(0);
+  await host.getByRole("button", { name: "Махни Шегаджия" }).click();
+  await host.getByRole("button", { name: "Да, махни Шегаджия" }).click();
+  await expect(guest.getByRole("heading", { name: "Водещият те махна от стаята" })).toBeVisible();
+  await expect(host.locator(".players li")).toHaveCount(1);
+  await guest.reload();
+  await expect(guest.getByRole("heading", { name: "Водещият те махна от стаята" })).toBeVisible();
 });
 
 test("two people asking for a duel play it live", async ({ browser }, info) => {

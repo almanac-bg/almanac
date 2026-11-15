@@ -10,7 +10,7 @@ import { keepAwake } from "../lib/awake.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { play, playAnswer } from "../lib/sound.ts";
-import { categories, player, playing } from "../state.ts";
+import { categories, player, playing, type User, user } from "../state.ts";
 import { avatar, formatNumber, type Tier, type VerdictKind, verdict } from "../ui.ts";
 
 interface RoomView {
@@ -70,32 +70,36 @@ const spaced = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
 export function room([code = ""]: string[]) {
   title("Стая");
   const view = signal<RoomView | null>(null);
-  const trouble = signal<"" | "reconnecting" | "gone" | "full">("");
+  const trouble = signal<"" | "reconnecting" | "gone" | "full" | "removed">("");
+  // A player still with the name drawn for them chooses one first: a class or a pub can't tell twenty animals apart.
+  const naming = signal<User | null>(null);
   // Where each player stood at the last answer: how far they've moved since is the room's rank change.
   const places = new Map<number, number>();
 
   let es: EventSource | null = null;
+  const connect = () => {
+    es = new EventSource(`/api/rooms/${code}/events`);
+    es.onmessage = (e) => {
+      trouble.set("");
+      view.set(JSON.parse(e.data));
+    };
+    // The room is gone (closed, or the server restarted), full, or the host sent this player out: no reconnecting.
+    for (const [event, why] of [
+      ["closed", "gone"],
+      ["full", "full"],
+      ["removed", "removed"],
+    ] as const)
+      es.addEventListener(event, () => {
+        es?.close();
+        trouble.set(why);
+      });
+    es.onerror = () => {
+      if (es?.readyState === EventSource.CLOSED) trouble.set(trouble.peek() || "gone");
+      else trouble.set("reconnecting"); // the browser tries again by itself
+    };
+  };
   player()
-    .then(() => {
-      es = new EventSource(`/api/rooms/${code}/events`);
-      es.onmessage = (e) => {
-        trouble.set("");
-        view.set(JSON.parse(e.data));
-      };
-      // The room is gone (closed, or the server restarted), or full: no reconnecting to it.
-      es.addEventListener("closed", () => {
-        es?.close();
-        trouble.set("gone");
-      });
-      es.addEventListener("full", () => {
-        es?.close();
-        trouble.set("full");
-      });
-      es.onerror = () => {
-        if (es?.readyState === EventSource.CLOSED) trouble.set("gone");
-        else trouble.set("reconnecting"); // the browser tries again by itself
-      };
-    })
+    .then((u) => (u.drawn && !named(code) ? naming.set(u) : connect()))
     .catch(() => trouble.set("gone"));
   onCleanup(() => es?.close());
 
@@ -137,13 +141,31 @@ export function room([code = ""]: string[]) {
           )
         : null,
     () =>
+      trouble() === "removed"
+        ? h(
+            "div",
+            { class: "stack" },
+            h("h1", null, "Водещият те махна от стаята"),
+            h("a", { class: "btn primary", href: "/" }, "Към Начало"),
+          )
+        : null,
+    () =>
       trouble() === "reconnecting"
         ? h("p", { class: "status", role: "status" }, "Връзката прекъсна. Свързваме се отново…")
         : null,
     () => {
+      const u = naming();
+      return u
+        ? nameStep(code, u, () => {
+            naming.set(null);
+            connect();
+          })
+        : null;
+    },
+    () => {
       const k = key();
       if (trouble() !== "" && trouble() !== "reconnecting") return null;
-      if (!k) return h("p", { class: "muted" }, "…");
+      if (!k) return naming() ? null : h("p", { class: "muted" }, "…");
       const v = untracked(view) as RoomView;
       switch (v.phase) {
         case "lobby":
@@ -158,6 +180,70 @@ export function room([code = ""]: string[]) {
           return end(view as () => RoomView, code);
       }
     },
+  );
+}
+
+/** Whether the player has been asked for a name in this room already (in this tab): a reload doesn't ask again. */
+function named(code: string, now = false): boolean {
+  try {
+    if (now) sessionStorage.setItem(`named:${code}`, "1");
+    return sessionStorage.getItem(`named:${code}`) === "1";
+  } catch {
+    return now;
+  }
+}
+
+/** One field before the room: the name the others will see, the drawn one in it to keep or change. It's the
+ * player's name from now on, as in Настройки. */
+function nameStep(code: string, u: User, done: () => void): Child {
+  const name = signal(u.name);
+  const error = signal("");
+  const busy = signal(false);
+  return h(
+    "form",
+    {
+      class: "stack",
+      onsubmit: async (e: SubmitEvent) => {
+        e.preventDefault();
+        error.set("");
+        busy.set(true);
+        try {
+          if (name.peek().trim() !== u.name) {
+            const r = await api<{ user: User }>("PATCH", "/api/me", { name: name.peek() });
+            user.set(r.user);
+          }
+          named(code, true);
+          done();
+        } catch (err) {
+          error.set((err as ApiError).message);
+        } finally {
+          busy.set(false);
+        }
+      },
+    },
+    h(
+      "div",
+      { class: "intro" },
+      h("p", { class: "kicker" }, `Стая ${spaced(code)}`),
+      h("h1", null, "Как да те виждат в стаята?"),
+    ),
+    h(
+      "label",
+      { class: "field" },
+      h("span", null, "Име"),
+      h("input", {
+        name: "name",
+        autocomplete: "name",
+        minlength: 2,
+        maxlength: 30,
+        required: true,
+        value: name,
+        onfocus: (e: FocusEvent) => (e.target as HTMLInputElement).select(),
+        oninput: (e: Event) => name.set((e.target as HTMLInputElement).value),
+      }),
+    ),
+    h("button", { class: "btn primary big", disabled: busy }, "Влез"),
+    () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }
 
@@ -194,18 +280,7 @@ function lobby(view: () => RoomView, code: string): Child {
       "section",
       { class: "card" },
       h("h2", { class: "section-title" }, () => `Играчи (${view().players.length})`),
-      h("ul", { class: "players" }, () =>
-        view().players.map((p) =>
-          h(
-            "li",
-            { class: [!p.online && "away", p.me && "me"].filter(Boolean).join(" ") || undefined },
-            avatar(p.avatar, { size: "s", name: p.name }),
-            p.name,
-            p.me ? " (ти)" : "",
-            p.online ? "" : " — извън стаята",
-          ),
-        ),
-      ),
+      players(view, code, error.set),
     ),
     () =>
       view().canLead
@@ -214,6 +289,52 @@ function lobby(view: () => RoomView, code: string): Child {
     waiting(view, "започне"),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
+}
+
+/** The players as chips; the host has „Махни“ on each of the others, asked twice (a slip would keep them out). */
+function players(view: () => RoomView, code: string, error: (s: string) => void): Child {
+  const sure = signal(-1); // the key of the one „Махни“ was tapped on once
+  let t = 0;
+  onCleanup(() => clearTimeout(t));
+  const remove = async (p: Player) => {
+    clearTimeout(t);
+    if (sure.peek() !== p.key) {
+      sure.set(p.key);
+      t = window.setTimeout(() => sure.set(-1), 4000);
+      return;
+    }
+    sure.set(-1);
+    try {
+      await api("POST", `/api/rooms/${code}/remove`, { key: p.key });
+    } catch (err) {
+      error((err as ApiError).message);
+    }
+  };
+  return h("ul", { class: "players" }, () => {
+    const v = view();
+    return v.players.map((p) =>
+      h(
+        "li",
+        { class: [!p.online && "away", p.me && "me"].filter(Boolean).join(" ") || undefined },
+        avatar(p.avatar, { size: "s", name: p.name }),
+        p.name,
+        p.me ? " (ти)" : "",
+        p.online ? "" : " — извън стаята",
+        v.isHost && !p.me
+          ? h(
+              "button",
+              {
+                type: "button",
+                class: () => (sure() === p.key ? "link remove bad" : "link remove"),
+                "aria-label": () => `${sure() === p.key ? "Да, махни" : "Махни"} ${p.name}`,
+                onclick: () => remove(p),
+              },
+              () => (sure() === p.key ? "Да, махни" : "Махни"),
+            )
+          : null,
+      ),
+    );
+  });
 }
 
 /** A sound as someone comes into the room. */
@@ -389,6 +510,15 @@ function end(view: () => RoomView, code: string): Child {
       [questions.button],
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    // The host can send someone out before the next game.
+    first.isHost
+      ? h(
+          "details",
+          { class: "more" },
+          h("summary", null, () => `Играчи (${view().players.length})`),
+          players(view, code, error.set),
+        )
+      : null,
     questions.list,
   );
 }
