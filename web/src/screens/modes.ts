@@ -39,9 +39,10 @@ export interface Tonight {
     /** Every evening (else Friday to Sunday). */
     nightly?: boolean;
   };
-  /** How many said they'd come to the next one, and whether the player did. */
+  /** How many said they'd come to the next one, whether the player did, and which of their friends did. */
   coming: number;
   planned: boolean;
+  friends?: string[];
 }
 
 export const clock = (ms: number) =>
@@ -62,11 +63,15 @@ export const when = (ms: number, now: number) => `${onDay(ms, now)} в ${clock(m
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-/** Who said they'd come to the next Роял, in words: „Тази вечер ще дойдат 14“ (or „Утре вечер …“, „В петък …“). */
+/** Who said they'd come to the next Роял, in words: „Тази вечер ще дойдат 14“ (or „Утре вечер …“, „В петък …“), a
+ * friend first if one did: „Мария и още 4 ще дойдат тази вечер“. */
 export function coming(t: Tonight): string {
   const day = onDay(t.glance.next, t.glance.now);
-  const at = day === "днес" ? "Тази вечер" : day === "утре" ? "Утре вечер" : cap(day);
-  return `${at} ${t.coming === 1 ? "ще дойде 1" : `ще дойдат ${t.coming}`}`;
+  const at = day === "днес" ? "тази вечер" : day === "утре" ? "утре вечер" : day;
+  const [friend] = t.friends ?? [];
+  const more = t.coming - 1 - (t.planned ? 1 : 0);
+  if (friend) return `${friend}${more > 0 ? ` и още ${more} ще дойдат` : " ще дойде"} ${at}`;
+  return `${cap(at)} ${t.coming === 1 ? "ще дойде 1" : `ще дойдат ${t.coming}`}`;
 }
 
 /** What Роял's card says now: the evening's live state, or how many are coming, or when it is. */
