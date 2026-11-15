@@ -94,7 +94,11 @@ func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.R
 		}
 	}
 	taken := map[string]bool{}
-	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] }
+	// A question that belongs to dates waits for one of them.
+	allowed := func(q bank.Question) bool {
+		t := q.Extra()
+		return !taken[q.Base().ID] && (len(t.On) == 0 || t.OnDay(day))
+	}
 	fresh := func(q bank.Question) bool { return !used[q.Base().ID] }
 	unseen := func(q bank.Question) bool { return !answered[q.Base().ID] }
 	chosen := make([]bank.Question, len(slots))

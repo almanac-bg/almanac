@@ -162,6 +162,9 @@ func (s *Server) Count(ctx context.Context) error { return s.game.Count(ctx) }
 // speed. Run as the server starts, before it serves; it says how many it marked.
 func (s *Server) JudgeRuns(ctx context.Context) (int, error) { return s.game.JudgeRuns(ctx) }
 
+// KeepDays draws the day's questions ahead, in transactions of their own (play.Game.KeepDays), until ctx ends.
+func (s *Server) KeepDays(ctx context.Context) { s.game.KeepDays(ctx) }
+
 // SetBank swaps in a new bank (a reload): new plays use it, plays under way keep theirs.
 func (s *Server) SetBank(b *bank.Bank) { s.bank.Store(b) }
 
