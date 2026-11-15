@@ -41,6 +41,10 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
   (`added`, `updated`, both YYYY-MM-DD). The checker refuses a question added since `RulesFrom` (2026-11-14)
   without them. Older questions get theirs as they're gone over.
 - Grow by adding: the balance report counts what it takes without dropping anything.
+- **Never retire to make room** (the owner's rule, 2026-11-15). A question is retired only for a fault of its own:
+  wrong, stale, weak, or a near-duplicate that gives another away. A batch that adds to some cells (say, 250 easy
+  choices with pictures) keeps the balance by writing every other cell's gap at the new size, never by retiring
+  good questions in its place.
 
 ## Difficulty: the rubric
 
