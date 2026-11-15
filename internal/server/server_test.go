@@ -636,6 +636,34 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 	if _, body := page(); !strings.Contains(body, "Няма нови") {
 		t.Fatal("the report is still open")
 	}
+	// How the questions go: geo-002 always missed, gen-001 always right, geo-001 too few answers to tell.
+	res2, err := g.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at) SELECT id, 'topic', '[]', 0 FROM users LIMIT 1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, _ := res2.LastInsertId()
+	for i, q := range []struct {
+		id    string
+		right bool
+		n     int
+	}{{"geo-002", false, 10}, {"gen-001", true, 12}, {"geo-001", false, 9}} {
+		for k := range q.n {
+			if _, err := g.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, score, points, is_right, ms, at)
+				VALUES (?, ?, ?, 0, 0, ?, 3000, 0)`, run, 100*i+k, q.id, q.right); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	_, body = page()
+	hardest, easiest, _ := strings.Cut(body[strings.Index(body, "Най-трудните"):], "Най-лесните")
+	first := func(part, a, b string) bool { // a is in part, before b
+		i, j := strings.Index(part, a+" ·"), strings.Index(part, b+" ·")
+		return i >= 0 && j >= 0 && i < j
+	}
+	if !first(hardest, "geo-002", "gen-001") || !first(easiest, "gen-001", "geo-002") ||
+		!strings.Contains(hardest, "<td class=\"num\">10</td><td class=\"num\">0%</td>") || strings.Contains(body, "geo-001 ·") {
+		t.Fatalf("the hardest and the easiest: %s", body)
+	}
 }
 
 // fakePushService takes pushes and counts them.

@@ -3,9 +3,11 @@ package play
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"math"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
@@ -150,11 +152,18 @@ type hardnesses struct {
 	byTopic map[string][]float64
 }
 
-// hardnessCache keeps the hardnesses for a while: answers change them slowly.
+// hardnessCache keeps the hardnesses for a while: answers change them slowly. Working them out goes over every
+// answer anyone has given, so it's done by one at a time, in the background once there's a count to show meanwhile:
+// a game never waits on it, except for the first count of a bank (a start, or a reload).
 type hardnessCache struct {
-	mu   sync.Mutex
-	bank *bank.Bank
+	counting sync.Mutex // held while a count runs
+	snap     atomic.Pointer[hardnessSnap]
+}
+
+// hardnessSnap is a count of the hardnesses: when, and of which bank.
+type hardnessSnap struct {
 	at   time.Time
+	bank *bank.Bank
 	h    *hardnesses
 }
 
@@ -162,38 +171,68 @@ type hardnessCache struct {
 // FairAnswers).
 func (g *Game) hardness(ctx context.Context) (*hardnesses, error) {
 	c := &g.hard
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	b, now := g.Bank(), g.Now()
-	if c.h != nil && c.bank == b && now.Sub(c.at) < hardnessFresh && !now.Before(c.at) {
-		return c.h, nil
+	s := c.snap.Load()
+	if s != nil && s.bank == b {
+		if (now.Sub(s.at) >= hardnessFresh || now.Before(s.at)) && c.counting.TryLock() {
+			go func() {
+				defer c.counting.Unlock()
+				ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
+				defer cancel()
+				if err := g.countHardness(ctx, now, b); err != nil {
+					slog.Warn("counting the questions' hardness", "err", err)
+				}
+			}()
+		}
+		return s.h, nil
 	}
+	c.counting.Lock()
+	defer c.counting.Unlock()
+	if s := c.snap.Load(); s != nil && s.bank == b { // counted while this one waited
+		return s.h, nil
+	}
+	if err := g.countHardness(ctx, now, b); err != nil {
+		return nil, err
+	}
+	return c.snap.Load().h, nil
+}
+
+// countHardness works the hardnesses out from the answers, as of now, for a bank.
+func (g *Game) countHardness(ctx context.Context, now time.Time, b *bank.Bank) error {
 	type tally struct {
 		n   int
 		sum float64
 	}
-	answered := map[string]tally{}
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, count(*), sum(score) FROM answers WHERE `+FairAnswers+` GROUP BY question_id`)
+	answered := make(map[string]*tally, len(b.Questions))
+	// Summed here, not by GROUP BY: SQLite would sort every answer by its question for it, or go through them in the
+	// question's index and look each one's score up, both many times slower than reading them as they lie.
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, score FROM answers WHERE `+FairAnswers)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
+	var id []byte
+	var score float64
 	for rows.Next() {
-		var id string
-		var t tally
-		if err := rows.Scan(&id, &t.n, &t.sum); err != nil {
-			return nil, err
+		if err := rows.Scan(&id, &score); err != nil {
+			return err
 		}
-		answered[id] = t
+		t := answered[string(id)] // no copy of the id for a lookup
+		if t == nil {
+			t = &tally{}
+			answered[string(id)] = t
+		}
+		t.n++
+		t.sum += score
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return err
 	}
 	h := &hardnesses{byID: make(map[string]float64, len(b.Questions)), byTopic: map[string][]float64{}}
 	for _, q := range b.Questions {
 		head := q.Base()
 		known := labelKnown[head.Difficulty]
-		if t := answered[head.ID]; t.n > 0 {
+		if t := answered[head.ID]; t != nil {
 			luck := chanceOf(q)
 			seen := min(max((t.sum/float64(t.n)-luck)/(1-luck), 0.02), 0.98) // above chance, as calibrate.go
 			known = (float64(t.n)*seen + hardnessPrior*known) / float64(t.n+hardnessPrior)
@@ -204,8 +243,8 @@ func (g *Game) hardness(ctx context.Context) (*hardnesses, error) {
 			h.byTopic[""] = append(h.byTopic[""], h.byID[head.ID])
 		}
 	}
-	c.bank, c.at, c.h = b, now, h
-	return h, nil
+	g.hard.snap.Store(&hardnessSnap{at: now, bank: b, h: h})
+	return nil
 }
 
 type querier interface {

@@ -192,8 +192,8 @@ func serve([]string) error {
 	go reloadOnHangup(ctx, bankDir, srv)
 	go srv.Remind(ctx)
 	go func() {
-		if err := srv.CountCrowds(ctx); err != nil && ctx.Err() == nil {
-			slog.Error("counting crowds", "err", err)
+		if err := srv.Count(ctx); err != nil && ctx.Err() == nil {
+			slog.Error("counting", "err", err)
 		}
 	}()
 	if to := os.Getenv("ALERT_EMAIL"); to != "" {

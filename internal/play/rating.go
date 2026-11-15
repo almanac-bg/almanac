@@ -2,11 +2,7 @@ package play
 
 import (
 	"context"
-	"encoding/json"
 	"math"
-	"slices"
-
-	"github.com/almanac-bg/almanac/internal/bank"
 )
 
 // Rating is a player's strength in duels: Elo, from 1000, moved by every duel that counts. It shows as a division. It
@@ -107,91 +103,48 @@ const (
 	KnowTopic = 30
 )
 
-// among limits a board's query over users u to the viewer and their friends (friends), or not at all; ?9 is the
+// among limits a board's query over users u to the viewer and their friends (friends), or not at all; ?2 is the
 // viewer.
 func among(friends bool) string {
 	if !friends {
 		return ""
 	}
-	return ` AND (u.id = ?9 OR u.id IN (SELECT friend_id FROM friends WHERE user_id = ?9))`
+	return ` AND (u.id = ?2 OR u.id IN (SELECT friend_id FROM friends WHERE user_id = ?2))`
 }
 
 // MinRatedGames is how many rated games put a player on the rating's board: a win or two isn't a rating yet.
 const MinRatedGames = 10
 
 // RatingBoard is the rating's board: everyone (or the viewer's friends) with MinRatedGames rated games, by rating.
+// Only who's where goes over everyone; names and looks are read for those shown (rankingOf).
 func (g *Game) RatingBoard(ctx context.Context, viewer int64, friends bool) (Ranking, error) {
-	return g.ranking(ctx, viewer, `SELECT u.id, u.name, u.tag, u.rating, 0, `+lookColumns+`
-		FROM users u WHERE u.rated >= ?1`+among(friends)+`
-		ORDER BY u.rating DESC, u.rated DESC, u.id`, true, MinRatedGames)
-}
-
-// KnowledgeBoard is the best share of right answers, over every topic ("") or in one, among those with enough
-// answers there (KnowAll, KnowTopic): who knows the most, whatever the speed. A time-out counts as wrong. Games played
-// at a script's speed count for their player alone (fairFor).
-func (g *Game) KnowledgeBoard(ctx context.Context, viewer int64, friends bool, topic string) (Ranking, error) {
-	b := g.Bank()
-	ids, least := "", KnowAll // no list: every answer
-	if topic != "" {
-		if !slices.ContainsFunc(b.Categories, func(c bank.Category) bool { return c.ID == topic }) {
-			return Ranking{}, ErrNoTopic
-		}
-		var list []string
-		for _, q := range b.Questions {
-			if q.Base().Category == topic {
-				list = append(list, q.Base().ID)
-			}
-		}
-		raw, err := json.Marshal(list)
-		if err != nil {
-			return Ranking{}, err
-		}
-		ids, least = string(raw), KnowTopic
-	}
-	return g.ranking(ctx, viewer, `SELECT u.id, u.name, u.tag, CAST(round(100.0 * k.ok / k.n) AS INTEGER), k.n, `+
-		lookColumns+`
-		FROM (SELECT r.user_id, count(*) AS n, sum(a.is_right) AS ok FROM answers a JOIN runs r ON r.id = a.run_id
-			WHERE `+fairFor("r", "?9")+` AND (?2 = '' OR a.question_id IN (SELECT value FROM json_each(?2)))
-			GROUP BY r.user_id HAVING count(*) >= ?1) k JOIN users u ON u.id = k.user_id
-		WHERE 1`+among(friends)+` ORDER BY 1.0 * k.ok / k.n DESC, k.n DESC, u.id`, false, least, ids)
-}
-
-// ranking reads a board from a query of (id, name, tag, value, answers, look columns), best first; its arguments
-// are ?1, ?2…, and ?9 is the viewer.
-func (g *Game) ranking(ctx context.Context, viewer int64, query string, divisions bool, args ...any) (Ranking, error) {
-	var out Ranking
-	params := make([]any, 9) // ?1…?8, then the viewer
-	copy(params, args)
-	params[8] = viewer
-	rows, err := g.DB.Read.QueryContext(ctx, query, params...)
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.rating FROM users u WHERE u.rated >= ?1`+among(friends)+`
+		ORDER BY u.rating DESC, u.rated DESC, u.id`, MinRatedGames, viewer)
 	if err != nil {
-		return out, err
+		return Ranking{}, err
 	}
 	defer rows.Close()
-	out.Top = []Ranked{}
+	var list []ranked
+	placed := viewer == 0 // nothing of the viewer's to find
 	for place := 1; rows.Next(); place++ {
-		var r Ranked
-		var id int64
-		var avatar, title string
-		var xp int
-		if err := rows.Scan(&id, &r.Name, &r.Tag, &r.Value, &r.Answers, &avatar, &title, &xp); err != nil {
-			return out, err
+		var r ranked
+		if err := rows.Scan(&r.id, &r.value); err != nil {
+			return Ranking{}, err
 		}
-		r.Look, r.Me = g.lookOf(id, avatar, title, xp), id == viewer
-		if divisions {
-			d, _ := DivisionOf(r.Value)
-			r.Division = &d
+		r.place = place
+		if place <= BoardSize || r.id == viewer {
+			list = append(list, r)
 		}
-		if r.Me {
-			out.Place, out.Mine = place, &r
-		}
-		if place <= BoardSize {
-			out.Top = append(out.Top, r)
-		} else if viewer == 0 || out.Mine != nil {
+		placed = placed || r.id == viewer
+		if place >= BoardSize && placed {
 			break
 		}
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return Ranking{}, err
+	}
+	rows.Close()
+	return g.rankingOf(ctx, viewer, list, true)
 }
 
 // placeDeltas is what places in a game of many (Роял) do to ratings: each player's place against each other one's counts as a duel won, lost

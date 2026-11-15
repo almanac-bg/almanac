@@ -1509,6 +1509,44 @@ func TestBoards(t *testing.T) {
 	}
 }
 
+// The boards of knowledge count everyone's answers once in a while, and the viewer's own whenever they look.
+func TestKnowledgeCounted(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo := w.user(), w.user()
+	w.pace = func(int) time.Duration { return 2 * time.Second } // a person's, and Bo's games well inside knowFresh
+	games := func(id int64, answer func(int64, int) json.RawMessage) {
+		for range KnowAll / Length {
+			s, err := w.g.StartTopic(ctx, id, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.play(id, s.ID, repeat(answer, Length)...)
+		}
+	}
+	games(ana, w.right)
+	if k, err := w.g.KnowledgeBoard(ctx, bo, false, ""); err != nil || len(k.Top) != 1 || k.Mine != nil {
+		t.Fatalf("before Bo plays: %+v %v", k, err)
+	}
+	games(bo, w.wrong)
+	// Bo sees their own at once, in their place; Ana sees the count, which hasn't got Bo yet.
+	if k, _ := w.g.KnowledgeBoard(ctx, bo, false, ""); len(k.Top) != 2 || k.Place != 2 || k.Mine.Value != 0 ||
+		k.Mine.Answers != KnowAll || !k.Top[1].Me {
+		t.Fatalf("Bo, just played: %+v", k)
+	}
+	if k, _ := w.g.KnowledgeBoard(ctx, ana, false, ""); len(k.Top) != 1 || k.Place != 1 {
+		t.Fatalf("Ana, before the next count: %+v", k)
+	}
+	// Once the count is old, the next look counts again (in the background), and the one after has Bo.
+	w.wait(knowFresh)
+	_, _ = w.g.KnowledgeBoard(ctx, ana, false, "")
+	w.g.known.counting.Lock() // the count under way, done
+	w.g.known.counting.Unlock()
+	if k, _ := w.g.KnowledgeBoard(ctx, ana, false, ""); len(k.Top) != 2 || k.Place != 1 || k.Top[1].Value != 0 {
+		t.Fatalf("Ana, after the next count: %+v", k)
+	}
+}
+
 func TestCalibrate(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
