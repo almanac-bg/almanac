@@ -97,11 +97,13 @@ func (s Subscription) Check() error {
 	return nil
 }
 
-// Message is what a notification shows, and where tapping it goes.
+// Message is what a notification shows, and where tapping it goes; and what it's about (its kind), which the browser
+// or the app says back on a tap, so that the game counts the notifications opened by kind.
 type Message struct {
 	Title string `json:"title"`
 	Body  string `json:"body"`
 	URL   string `json:"url"`
+	Kind  string `json:"kind,omitempty"`
 }
 
 // ErrGone means the browser unsubscribed (or the subscription expired): forget it.

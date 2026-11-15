@@ -57,8 +57,8 @@ function open(link: string, go: (path: string) => void): void {
 
 /** Starts what the app adds to the game: a tapped notification and a link to the game go to their page (by `go`,
  * the router's), the link that started the app too; Android's back button goes back a page (to Начало, if there's none
- * before), and from Начало puts the app away, as other apps do. */
-export function start(go: (path: string) => void): void {
+ * before), and from Начало puts the app away, as other apps do. `opened` hears of a notification tapped, by its kind. */
+export function start(go: (path: string) => void, opened: (kind: string) => void): void {
   app.on("appUrlOpen", (e: { url: string }) => open(e.url, go));
   app.call<{ url?: string } | undefined>("getLaunchUrl").then(
     (e) => e?.url && open(e.url, go),
@@ -70,8 +70,10 @@ export function start(go: (path: string) => void): void {
     else if (history.length > 1) history.back();
     else go("/");
   });
-  pushes.on("pushNotificationActionPerformed", (e: { notification: { data?: { url?: string } } }) => {
-    if (e.notification?.data?.url) open(e.notification.data.url, go);
+  pushes.on("pushNotificationActionPerformed", (e: { notification: { data?: { url?: string; kind?: string } } }) => {
+    const data = e.notification?.data;
+    if (data?.kind) opened(data.kind);
+    if (data?.url) open(data.url, go);
   });
 }
 

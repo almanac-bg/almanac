@@ -3,6 +3,8 @@
 // notifications (push.ts), its share sheet, its touch (an answer felt), the back button on Android, and links to the
 // game opened in the app. All of that is in phone.ts, loaded only in the app; in a browser nothing here does anything.
 
+import { tally } from "./api.ts";
+
 const bridge = (globalThis as { Capacitor?: { isNativePlatform(): boolean; getPlatform(): string } }).Capacitor;
 
 /** Whether the game is in its app. */
@@ -19,11 +21,12 @@ export const phone = () => {
   return loading;
 };
 
-/** Starts what the app adds to the game (notifications and links that open a page, the back button). */
+/** Starts what the app adds to the game (notifications and links that open a page, the back button). A notification
+ * tapped is counted by its kind. */
 export function startApp(go: (path: string) => void): void {
   if (inApp)
     phone().then(
-      (p) => p.start(go),
+      (p) => p.start(go, (kind) => tally(`push:open:${kind}`)),
       () => {},
     );
 }

@@ -186,6 +186,7 @@ func (s *Server) routes() http.Handler {
 	api("PATCH /api/push/prefs", s.setPushPref)
 	api("POST /api/errors", s.clientError)
 	api("POST /api/guest", s.guest)
+	api("POST /api/tally", s.tally)
 	api("POST /api/auth/code", s.sendCode)
 	api("POST /api/auth/verify", s.verify)
 	api("POST /api/auth/signout", s.signOut)

@@ -38,11 +38,15 @@ export const pushKey = boot.push ?? "";
 /** The platforms the game's app gets notifications on ("ios", "android"). */
 export const phonePlatforms: string[] = boot.phones ?? [];
 
+/** Where the page was first opened: a new guest says it, so the admin page can tell where players come from (an
+ * invite, a shared day, a room …), whatever pages they went through before their first game. */
+const landing = location.pathname;
+
 /** The player, made a guest first if they have no account yet (the first time they play). */
 export async function player(): Promise<User> {
   const u = user.peek();
   if (u) return u;
-  const r = await api<{ user: User }>("POST", "/api/guest", {});
+  const r = await api<{ user: User }>("POST", "/api/guest", { from: landing });
   user.set(r.user);
   return r.user;
 }

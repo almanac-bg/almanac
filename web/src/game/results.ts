@@ -66,8 +66,15 @@ export function nextSteps(main: Child, others: Child[]): Child {
   return h("div", { class: "actions" }, main, rest.length ? h("div", { class: "result-actions" }, rest) : null);
 }
 
-/** Shares through the phone's own sheet, or copies where there's none (`url`, if any, goes with the text). */
-export function shareButton(label: string, text: () => string, url?: string, primary = true): Child {
+/** Shares through the phone's own sheet, or copies where there's none (`url`, if any, goes with the text). `shared`,
+ * if given, hears of each share: the app's sheet opened, the browser's sheet sent, or the text copied or shown. */
+export function shareButton(
+  label: string,
+  text: () => string,
+  url?: string,
+  primary = true,
+  shared?: () => void,
+): Child {
   const done = signal("");
   return h(
     "div",
@@ -78,15 +85,16 @@ export function shareButton(label: string, text: () => string, url?: string, pri
         class: primary ? "btn primary big" : "btn",
         onclick: async () => {
           const body = text();
-          if (await appShare(body, url)) return;
+          if (await appShare(body, url)) return shared?.();
           if (navigator.share) {
             try {
               await navigator.share({ text: body, url });
-              return;
+              return shared?.();
             } catch (err) {
               if ((err as DOMException).name === "AbortError") return;
             }
           }
+          shared?.();
           try {
             await navigator.clipboard.writeText(url ? `${body}\n${url}` : body);
             done.set("Копирано.");

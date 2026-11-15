@@ -9,7 +9,8 @@ import (
 // Retention is whether players come back: the game's measure of itself. A player's days are the days (in Bulgaria)
 // they played on — answered a question in any game — kept in active_days as they happen. A
 // player is new on their first such day, and comes back N days later if they play on that day too: the usual
-// "day N" retention, counted for each day's new players (a cohort).
+// "day N" retention, counted for each day's new players (a cohort). What they did in their first days, and the daily
+// loop around them, is measured in measure.go.
 
 // RetentionDays are the days after the first that coming back is counted on.
 var RetentionDays = []int{1, 3, 7, 30}
@@ -22,9 +23,11 @@ type Cohort struct {
 	Back []int
 }
 
-// Active is how many players played today, in the last 7 days and in the last 30 (today included).
+// Active is how many players played today, in the last 7 days and in the last 30 (today included); and how many a
+// day, on average, over the 7 days before today (which are over).
 type Active struct {
 	Today, Week, Month int
+	Daily              float64
 }
 
 // markActive keeps that a player played today.
@@ -39,8 +42,9 @@ func (g *Game) Retention(ctx context.Context, days int) ([]Cohort, Active, error
 	day := func(back int) string { return today.AddDate(0, 0, -back).Format(time.DateOnly) }
 	var act Active
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT count(DISTINCT CASE WHEN day = ?1 THEN user_id END),
-		count(DISTINCT CASE WHEN day > ?2 THEN user_id END), count(DISTINCT user_id)
-		FROM active_days WHERE day > ?3 AND day <= ?1`, day(0), day(7), day(30)).Scan(&act.Today, &act.Week, &act.Month)
+		count(DISTINCT CASE WHEN day > ?2 THEN user_id END), count(DISTINCT user_id),
+		count(CASE WHEN day >= ?2 AND day < ?1 THEN 1 END) / 7.0
+		FROM active_days WHERE day > ?3 AND day <= ?1`, day(0), day(7), day(30)).Scan(&act.Today, &act.Week, &act.Month, &act.Daily)
 	if err != nil {
 		return nil, act, err
 	}

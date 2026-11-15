@@ -10,7 +10,7 @@ import { shareButton, summary } from "../game/results.ts";
 import { playRun, trail } from "../game/run.ts";
 import { dayShareText } from "../game/share.ts";
 import type { Board, Mark, State } from "../game/types.ts";
-import { type ApiError, api } from "../lib/api.ts";
+import { type ApiError, api, tally } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { askToKeep } from "../lib/keep.ts";
@@ -121,8 +121,12 @@ export function today() {
               }),
               // The result is the one to share: „Сподели“ is the gold button, right under it; then what it earned.
               {
-                main: shareButton("Сподели", () =>
-                  dayShareText(t.day, run.trail, run.total, fresh().streak, fresh().rarest),
+                main: shareButton(
+                  "Сподели",
+                  () => dayShareText(t.day, run.trail, run.total, fresh().streak, fresh().rarest),
+                  undefined,
+                  true,
+                  () => tally("share:day"),
                 ),
               },
               [just ? news(run.id) : null, remindCard(t.day), countdown()],
@@ -286,7 +290,7 @@ const remindKey = "almanac.remind-ask";
 /** The day played, its result on Начало: shall we remind the player tomorrow? Asked where notifications can come and
  * aren't on yet, at most three times and never twice in a day; on an iPhone in a browser tab, what it takes. */
 function remindCard(day: string): Child {
-  let asked = { n: 0, day: "" };
+  let asked = { n: 0, day: "", shown: "" };
   try {
     asked = { ...asked, ...JSON.parse(localStorage.getItem(remindKey) ?? "{}") };
   } catch {
@@ -301,11 +305,25 @@ function remindCard(day: string): Child {
       // not kept: asked again next time
     }
   };
+  // Counted once a day on a device (play/measure.go), however often Начало is drawn.
+  const shown = () => {
+    if (asked.shown === day) return;
+    tally(home ? "pushask:home" : "pushask:shown");
+    try {
+      localStorage.setItem(remindKey, JSON.stringify({ ...asked, shown: day }));
+    } catch {
+      // counted again next time
+    }
+  };
   const state = signal<"ask" | "on" | "gone">(home ? "ask" : "gone");
   const error = signal("");
-  if (!home)
+  if (home) shown();
+  else
     pushOn().then(
-      (on) => state.set(on ? "gone" : "ask"),
+      (on) => {
+        state.set(on ? "gone" : "ask");
+        if (!on) shown();
+      },
       () => {},
     );
   const yes = async () => {
@@ -316,6 +334,7 @@ function remindCard(day: string): Child {
       else {
         keep(3);
         state.set("on");
+        tally("pushask:yes");
       }
     } catch (err) {
       reportProblem(`reminder ask: ${(err as Error).name}: ${(err as Error).message}`);
@@ -325,6 +344,7 @@ function remindCard(day: string): Child {
   const no = () => {
     keep(asked.n + 1);
     state.set("gone");
+    if (!home) tally("pushask:no");
   };
   return () =>
     state() === "gone"
