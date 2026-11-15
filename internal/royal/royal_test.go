@@ -216,11 +216,8 @@ func TestEvening(t *testing.T) {
 	if _, m := w.h.mine(zed.ID); m != nil {
 		t.Fatal("Zed is in the game without being there")
 	}
-	if err := w.h.Join(ctx, zed); !errors.Is(err, ErrClosed) {
-		t.Fatalf("joined after the start: %v", err)
-	}
-	// Zed may watch.
-	if v := w.h.View(zed.ID); v.Phase != play.RoyalQuestion || v.In || v.Question == nil {
+	// Zed may watch, and could still come in (TestLate).
+	if v := w.h.View(zed.ID); v.Phase != play.RoyalQuestion || v.In || !v.Late || v.Question == nil {
 		t.Fatalf("watching: %+v", v)
 	}
 
@@ -359,31 +356,215 @@ func TestRunsKeepThePace(t *testing.T) {
 	}
 }
 
-// A full tournament: the next to come start another, on the same questions.
+// A full tournament: the next to come start another, on the same questions. At the start, those there are dealt
+// into tournaments as even as can be.
 func TestFull(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	w.at(20, 46, 0)
-	var last Player
+	var all []Player
 	for range play.RoyalSize + 1 {
-		last = w.player()
-		w.h.Follow(last.ID)
-		if err := w.h.Join(ctx, last); err != nil {
+		p := w.player()
+		all = append(all, p)
+		w.h.Follow(p.ID)
+		if err := w.h.Join(ctx, p); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if v := w.h.View(last.ID); v.Tables != 2 || len(v.Players) != 1 || !v.In {
+	if v := w.h.View(all[50].ID); v.Tables != 2 || len(v.Players) != 1 || !v.In {
 		t.Fatalf("the one over: %+v", v)
 	}
 	w.at(21, 0, 0)
 	n := w.h.night
-	if n.tables[0].phase != play.RoyalQuestion || n.tables[1].phase != play.RoyalQuestion || n.tables[0].entered != play.RoyalSize {
-		t.Fatalf("both start: %s %s", n.tables[0].phase, n.tables[1].phase)
+	if len(n.tables) != 2 || n.tables[0].phase != play.RoyalQuestion || n.tables[1].phase != play.RoyalQuestion ||
+		n.tables[0].entered != 26 || n.tables[1].entered != 25 {
+		t.Fatalf("51 in two of 26 and 25: %+v %+v", n.tables[0], n.tables[1])
 	}
-	// Alone in theirs, the last one's answer shows at once; the other tournament waits for its fifty.
-	w.give(last, true)
+	// The database has them so.
+	var first, second int
+	_ = w.db.Read.QueryRow(`SELECT count(*) FROM royal_players WHERE royal_id = ? AND run_id IS NOT NULL`, n.tables[0].id).Scan(&first)
+	_ = w.db.Read.QueryRow(`SELECT count(*) FROM royal_players WHERE royal_id = ? AND run_id IS NOT NULL`, n.tables[1].id).Scan(&second)
+	if first != 26 || second != 25 {
+		t.Fatalf("in the database: %d and %d", first, second)
+	}
+	// Each at its own pace: once the second's 25 have answered, its answer shows; the first waits for its 26.
+	for _, p := range all[26:] {
+		w.give(p, true)
+	}
 	if n.tables[1].phase != play.RoyalReveal || n.tables[0].phase != play.RoyalQuestion {
 		t.Fatalf("each at its own pace: %s %s", n.tables[0].phase, n.tables[1].phase)
+	}
+}
+
+func TestDeal(t *testing.T) {
+	for _, c := range []struct {
+		all, k int
+		want   []int
+	}{
+		{51, 2, []int{26, 25}},
+		{100, 2, []int{50, 50}},
+		{101, 3, []int{34, 34, 33}},
+		{3, 1, []int{3}},
+	} {
+		got := make([]int, c.k)
+		last := 0
+		for i := range c.all {
+			at := deal(i, c.all, c.k)
+			if at < last {
+				t.Fatalf("%d in %d: not in the order they came", c.all, c.k)
+			}
+			last = at
+			got[at]++
+		}
+		if fmt.Sprint(got) != fmt.Sprint(c.want) {
+			t.Errorf("%d in %d: %v, want %v", c.all, c.k, got, c.want)
+		}
+	}
+}
+
+// Late: those who come after the start come in until the answer to the third question shows, behind by the
+// questions they missed; a lobby member away at the start is in as soon as their screen is back.
+func TestLate(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo, vi, zed := w.player(), w.player(), w.player(), w.player()
+	w.at(20, 50, 0)
+	subs := map[int64]*Sub{}
+	for _, p := range []Player{ana, bo} {
+		subs[p.ID] = w.h.Follow(p.ID)
+		if err := w.h.Join(ctx, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w.h.Unfollow(subs[bo.ID]) // Bo's phone falls asleep in the lobby
+	w.at(21, 0, 0)
+	if v := w.h.View(ana.ID); v.Entered != 1 || len(v.Players) != 1 {
+		t.Fatalf("Ana alone at the start: %+v", v)
+	}
+	if v := w.h.View(bo.ID); v.In || !v.Late {
+		t.Fatalf("Bo, away: %+v", v)
+	}
+	w.give(ana, true)
+	w.wait(Pause)
+
+	// Vi comes during the second question: the first counts as not answered, the second is hers.
+	w.wait(5 * time.Second)
+	if err := w.h.Join(ctx, vi); err != nil {
+		t.Fatal(err)
+	}
+	v := w.h.View(vi.ID)
+	if !v.In || v.Out || v.Late || v.N != 1 || v.Entered != 2 || v.Question == nil || v.Question.LeftMs != v.Question.LimitMs-5000 {
+		t.Fatalf("Vi, late: %+v", v)
+	}
+	// The answer waits for her too.
+	w.give(ana, true)
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalQuestion {
+		t.Fatalf("the answer showed without waiting for Vi: %+v", v)
+	}
+	w.give(vi, true)
+	if v := w.h.View(vi.ID); v.Phase != play.RoyalReveal || !v.Question.Reveal.Mine || !v.Question.Reveal.Right {
+		t.Fatalf("Vi's answer: %+v", v)
+	}
+
+	// Bo's screen is back while the second answer shows: he's in, both questions missed.
+	w.h.Follow(bo.ID)
+	w.h.Step(ctx)
+	if v := w.h.View(bo.ID); !v.In || v.Phase != play.RoyalReveal || v.Entered != 3 || v.Question.Reveal.Mine {
+		t.Fatalf("Bo, back: %+v", v)
+	}
+	w.wait(Pause)
+	if v := w.h.View(bo.ID); v.Phase != play.RoyalQuestion || v.N != 2 || !v.In {
+		t.Fatalf("Bo at the third: %+v", v)
+	}
+	for _, p := range []Player{ana, bo, vi} {
+		w.give(p, true)
+	}
+	// The third's answer shows: the door is shut.
+	if v := w.h.View(zed.ID); v.Phase != play.RoyalReveal || v.Late {
+		t.Fatalf("the door after the third: %+v", v)
+	}
+	if err := w.h.Join(ctx, zed); !errors.Is(err, ErrClosed) {
+		t.Fatalf("Zed came in after the third: %v", err)
+	}
+	if v := w.h.View(ana.ID); v.Players[0].Name != ana.Name || v.Players[0].Reached != 3 || v.Players[1].Reached != 2 ||
+		v.Players[2].Name != bo.Name || v.Players[2].Reached != 1 {
+		t.Fatalf("the standings: %+v", v.Players)
+	}
+	// Their runs: Vi's first and Bo's first two recorded as missed.
+	var missed int
+	_ = w.db.Read.QueryRow(`SELECT count(*) FROM answers a JOIN royal_players p ON p.run_id = a.run_id
+		WHERE p.user_id IN (?, ?) AND a.given IS NULL`, vi.ID, bo.ID).Scan(&missed)
+	if missed != 3 {
+		t.Fatalf("%d missed, want 3", missed)
+	}
+}
+
+// Nobody there at the start, but someone away: the game runs while the door is open, and ends if nobody comes.
+func TestNobodyBack(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.player()
+	w.at(20, 50, 0)
+	sub := w.h.Follow(ana.ID)
+	if err := w.h.Join(ctx, ana); err != nil {
+		t.Fatal(err)
+	}
+	w.h.Unfollow(sub)
+	w.at(21, 0, 0)
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalQuestion || v.In || !v.Late {
+		t.Fatalf("the game, for Ana to come back to: %+v", v)
+	}
+	for range 3 {
+		w.timeUp()
+		w.wait(Pause)
+	}
+	if len(w.h.night.tables) != 0 {
+		t.Fatalf("a game nobody plays goes on: %+v", w.h.night.tables[0])
+	}
+	var rows int
+	_ = w.db.Read.QueryRow(`SELECT count(*) FROM royal_players`).Scan(&rows)
+	if rows != 0 {
+		t.Fatalf("%d left in", rows)
+	}
+}
+
+// A minute before the start, those in the lobby are told, with who of them is away.
+func TestSoon(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	type call struct {
+		start    time.Time
+		away, in []int64
+	}
+	calls := make(chan call, 4)
+	w.h.Soon = func(_ context.Context, start time.Time, away, in []int64) { calls <- call{start, away, in} }
+	ana, bo := w.player(), w.player()
+	w.at(20, 50, 0)
+	sub := w.h.Follow(ana.ID)
+	w.h.Follow(bo.ID)
+	for _, p := range []Player{ana, bo} {
+		if err := w.h.Join(ctx, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w.h.Unfollow(sub)
+	w.at(20, 58, 59)
+	select {
+	case <-calls:
+		t.Fatal("called two minutes before")
+	default:
+	}
+	w.at(20, 59, 0)
+	c := <-calls
+	if !c.start.Equal(time.Date(2026, 11, 14, 21, 0, 0, 0, play.Bulgaria)) || fmt.Sprint(c.away) != fmt.Sprint([]int64{ana.ID}) ||
+		len(c.in) != 2 {
+		t.Fatalf("the call: %+v", c)
+	}
+	w.at(20, 59, 30)
+	select {
+	case <-calls:
+		t.Fatal("called twice")
+	default:
 	}
 }
 

@@ -2,7 +2,8 @@
 // hard in three rounds. A wrong answer puts nobody out: after questions 5, 8, 11 and 14 those with the most right go
 // on (of as many, the quicker), and the last question is a final of three; those cut watch the rest to the end. Each
 // answer shows with the standings and the next cut's line. The lobby opens a quarter of an hour before; whoever is on
-// this screen at the start plays.
+// this screen at the start plays, and those who come late may still come in until the third question's answer shows.
+// The screen is kept on in the lobby and the game.
 //
 // The server sends the evening as this player sees it after every change; the browser reconnects if the line drops.
 
@@ -11,6 +12,7 @@ import { review } from "../game/results.ts";
 import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
+import { keepAwake } from "../lib/awake.ts";
 import { type Child, computed, effect, h, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
 import { ordinal, place } from "../lib/ordinal.ts";
 import { pushable, pushOn, turnOn } from "../lib/push.ts";
@@ -36,6 +38,8 @@ interface Evening {
   /** In this tournament (its lobby, or its game); out of its game. */
   in: boolean;
   out: boolean;
+  /** Not in, but may still come in: the games have begun, and the door is open until the third question's answer. */
+  late?: boolean;
   tables: number;
   n: number;
   entered: number;
@@ -200,6 +204,11 @@ export function royal() {
     playing.set(phase === "question" || phase === "reveal");
   });
   onCleanup(() => playing.set(false));
+  // The screen stays on while the evening needs it: in the lobby, once in, and through the game.
+  keepAwake(() => {
+    const v = view();
+    return !!v && (v.phase === "question" || v.phase === "reveal" || (v.phase === "lobby" && v.in));
+  });
 
   // Each phase (and each question) is drawn once; what changes inside it follows the view.
   const key = computed(() => {
@@ -220,9 +229,9 @@ export function royal() {
         case "lobby":
           return lobby(live, now, joined);
         case "question":
-          return question(live, v);
+          return [door(live, joined), question(live, v)];
         case "reveal":
-          return reveal(live, v);
+          return [door(live, joined), reveal(live, v)];
         case "end":
           return end(live, v, now);
       }
@@ -406,6 +415,9 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
     }
   };
   const v0 = view();
+  // Those whose notifications are on here are called a minute before the start, if their screen is away.
+  const notified = signal(false);
+  if (v0.in) pushOn().then(notified.set, () => {});
   // Those in hear the last three seconds.
   let heard = 0;
   effect(() => {
@@ -427,12 +439,12 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
         "Роял започва след ",
         h("span", { class: "royal-count" }, () => left(view().startsAt - now())),
       ),
-      h(
-        "p",
-        { class: "lead" },
+      h("p", { class: "lead" }, () =>
         v0.in
-          ? `Вътре си. Остани на този екран: в ${clock(v0.startsAt)} играят тези, които са тук.`
-          : `В ${clock(v0.startsAt)} всички получават първия въпрос едновременно. До 5-ия въпрос никой не отпада.`,
+          ? notified()
+            ? "Вътре си. Ако излезеш от екрана, ще ти напомним минута преди началото."
+            : `Вътре си. Остани на този екран: в ${clock(v0.startsAt)} играят тези, които са тук. Закъснелите влизат до 3-тия въпрос.`
+          : `В ${clock(v0.startsAt)} всички получават първия въпрос едновременно. Закъснелите влизат до 3-тия въпрос.`,
       ),
     ),
     v0.in
@@ -455,6 +467,35 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
       );
     },
   );
+}
+
+/** The door, for one not in once the games have begun: still open until the third question's answer shows. */
+function door(view: () => Evening, joined: () => void): Child {
+  const error = signal("");
+  const busy = signal(false);
+  const come = async () => {
+    error.set("");
+    busy.set(true);
+    try {
+      await player();
+      await api("POST", "/api/royal", {});
+      joined();
+    } catch (err) {
+      error.set((err as ApiError).message);
+    } finally {
+      busy.set(false);
+    }
+  };
+  return () =>
+    view().late && !view().in
+      ? h(
+          "section",
+          { class: "card stack" },
+          h("p", null, "Роял вече започна. До 3-тия въпрос още можеш да влезеш."),
+          h("button", { class: "btn primary big", type: "button", disabled: busy, onclick: come }, "Влез"),
+          () => error() && h("p", { class: "bad", role: "alert" }, error()),
+        )
+      : null;
 }
 
 /** Which question, of which round, and its topic. */

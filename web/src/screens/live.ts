@@ -9,6 +9,7 @@ import { answered, ask, crowdLine, picture } from "../game/questions.ts";
 import { questionHead, timer, trail, upNext } from "../game/run.ts";
 import type { Answer, Mark, Reveal, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
+import { keepAwake } from "../lib/awake.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
@@ -138,6 +139,11 @@ function session(again: () => void): Child {
     playing.set(phase === "question" || phase === "reveal");
   });
   onCleanup(() => playing.set(false));
+  // The screen stays on from the wait for an opponent to the result: a phone asleep drops the duel.
+  keepAwake(() => {
+    const phase = view()?.phase;
+    return phase ? phase !== "end" && phase !== "off" : wait() !== null;
+  });
 
   // Each phase (and each question) is drawn once; what changes inside it follows the view.
   const key = computed(() => {

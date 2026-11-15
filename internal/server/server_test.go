@@ -928,8 +928,8 @@ func TestReminderNamesAFriend(t *testing.T) {
 func TestRoyalPlans(t *testing.T) {
 	s, g, fake, subscribe := pushWorld(t)
 	ana, _ := g.guest()
-	bo, _ := g.guest()
-	cy, _ := g.guest()
+	bo, boID := g.guest()
+	cy, cyID := g.guest()
 	for p, path := range map[*player]string{ana: "/ana", bo: "/bo", cy: "/cy"} {
 		subscribe(p, path)
 	}
@@ -959,6 +959,14 @@ func TestRoyalPlans(t *testing.T) {
 	}
 	if n := s.callRoyal(t.Context(), start); n != 0 {
 		t.Fatal("called twice")
+	}
+	// A minute before the start: Ana said she'd come and isn't in; Bo is in, his screen away; Cy is in, on it.
+	if n := s.callSoon(t.Context(), start, []int64{boID}, []int64{boID, cyID}); n != 2 || fake.count("/ana") != 2 ||
+		fake.count("/bo") != 1 || fake.count("/cy") != 1 {
+		t.Fatalf("called again %d: ana %d, bo %d, cy %d", n, fake.count("/ana"), fake.count("/bo"), fake.count("/cy"))
+	}
+	if n := s.callSoon(t.Context(), start, []int64{boID}, []int64{boID}); n != 0 {
+		t.Fatal("called again twice")
 	}
 }
 
