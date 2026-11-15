@@ -86,14 +86,15 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	b := s.bank.Load()
+	m := assets.Manifest(s.client)
 	boot, _ := json.Marshal(map[string]any{ // escapes <, > and &: safe inside the script element
 		"user":       u,
 		"categories": b.Categories,
 		"version":    s.cfg.Version,
 		"push":       s.pushKey(),
 		"phones":     s.phones.Platforms(), // the platforms the game's app gets notifications on
+		"hostCss":    m["host.css"],        // a room's big screen: its style, loaded only there
 	})
-	m := assets.Manifest(s.client)
 	title, description := s.preview(r)
 	canonical := ""
 	if r.URL.Path == "/" {

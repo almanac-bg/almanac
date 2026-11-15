@@ -578,3 +578,83 @@ func TestSettingsAndRecords(t *testing.T) {
 		r.Unfollow(sb)
 	})
 }
+
+// A host leading from a big screen isn't a player, and sets the pace: an answer now, an answer held, the end.
+func TestLeadingHost(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		hub := NewHub(sample(t))
+		ana, bo := Player{ID: 1, Name: "Учител"}, Player{ID: 2, Name: "Бо"}
+		r, _ := hub.Open(ana, Settings{Lead: true})
+		sa, err := r.Follow(ana.ID)
+		if err != nil {
+			t.Fatalf("the host's screen: %v", err)
+		}
+		if err := r.Start(ana.ID); !errors.Is(err, ErrNoPlayers) {
+			t.Fatalf("a game for nobody: %v", err)
+		}
+		_ = r.Join(ana) // the host's screen joining again changes nothing
+		_ = r.Join(bo)
+		sb, _ := r.Follow(bo.ID)
+		if v := r.View(ana.ID); len(v.Players) != 1 || !v.IsHost || !v.Lead || v.Host != "Учител" {
+			t.Fatalf("the host's lobby: %+v", v)
+		}
+		if v := r.View(bo.ID); v.CanLead || v.Host != "Учител" {
+			t.Fatalf("Bo's lobby: %+v", v)
+		}
+		if err := r.Start(ana.ID); err != nil {
+			t.Fatal(err)
+		}
+		// Bo answers: the answer shows at once, with the answer (and its fact) on the host's screen.
+		_ = r.Answer(bo.ID, 0, answer(r, true))
+		if v := r.View(ana.ID); v.Phase != Reveal || v.Question.Reveal == nil || v.Question.Reveal.Answer == nil {
+			t.Fatalf("the answer on the big screen: %+v", v.Question)
+		}
+		// Held, the answer stays up past Pause until the host moves on.
+		if err := r.Hold(bo.ID, true); !errors.Is(err, ErrNotYours) {
+			t.Fatalf("a player held: %v", err)
+		}
+		_ = r.Hold(ana.ID, true)
+		time.Sleep(2 * Pause)
+		synctest.Wait()
+		if v := r.View(bo.ID); v.Phase != Reveal || !v.Held || v.Question.NextMs != 0 {
+			t.Fatalf("held: %+v", v)
+		}
+		_ = r.Next(ana.ID)
+		if v := r.View(bo.ID); v.Phase != Question || v.N != 1 {
+			t.Fatalf("after Напред: %s %d", v.Phase, v.N)
+		}
+		// Напред on a question shows its answer now; let go, the room moves on by itself again.
+		_ = r.Next(ana.ID)
+		_ = r.Hold(ana.ID, false)
+		time.Sleep(Pause + time.Millisecond)
+		synctest.Wait()
+		if v := r.View(bo.ID); v.Phase != Question || v.N != 2 {
+			t.Fatalf("let go: %s %d", v.Phase, v.N)
+		}
+		// Away, the host leaves the pace to whoever's there.
+		r.Unfollow(sa)
+		if !r.View(bo.ID).CanLead {
+			t.Fatal("nobody may lead while the host is away")
+		}
+		sa, _ = r.Follow(ana.ID)
+		if err := r.Finish(ana.ID); err != nil {
+			t.Fatal(err)
+		}
+		if v := r.View(bo.ID); v.Phase != End || v.Total != 3 || len(v.Review) != 3 {
+			t.Fatalf("ended on the third question: %s, %d questions", v.Phase, v.Total)
+		}
+		// Kept over a restart, the host still leading.
+		var saved bytes.Buffer
+		_ = hub.Save(&saved)
+		next := NewHub(sample(t))
+		if n, _ := next.Restore(&saved); n != 1 {
+			t.Fatalf("restored %d", n)
+		}
+		again, _ := next.Get(r.Code())
+		if v := again.View(ana.ID); !v.Lead || !v.IsHost || len(v.Players) != 1 || v.Host != "Учител" {
+			t.Fatalf("restored: %+v", v)
+		}
+		r.Unfollow(sa)
+		r.Unfollow(sb)
+	})
+}

@@ -13,8 +13,8 @@ import { type Child, computed, effect, h, onCleanup, signal, untracked } from ".
 import { title } from "./lib/router.ts";
 import { play, playAnswer } from "./lib/sound.ts";
 import { mixes } from "./screens/rooms.ts";
-import { categories, player, playing, user } from "./state.ts";
-import { avatar, formatNumber, verdict } from "./ui.ts";
+import { categories, hostCss, player, playing, user } from "./state.ts";
+import { avatar, fact, formatNumber, verdict } from "./ui.ts";
 
 export const kit = {
   answered,
@@ -26,7 +26,9 @@ export const kit = {
   computed,
   crowdLine,
   effect,
+  fact,
   formatNumber,
+  hostCss,
   h,
   keepAwake,
   mixes,

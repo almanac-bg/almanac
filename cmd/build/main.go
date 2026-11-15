@@ -30,8 +30,11 @@ import (
 // kinds of question, weekly leagues, a second chance, a year's look back, a game left and taken up again, systems that
 // unfold as a player meets them and say what their numbers mean, a streak that says what kept or ended it): still small enough to arrive at once on a slow
 // phone; the style also lays the pages out for a laptop's width. The illustrations (avatars, topics, modes, frames,
-// leagues) come after the first screen, on their own; a room's screen (web/src/kit.ts) when one opens.
-var budgets = map[string]int{"app.js": 50 << 10, "app.css": 16 << 10, "pictures.js": 24 << 10, "room.js": 12 << 10}
+// leagues) come after the first screen, on their own; a room's screen (web/src/kit.ts) when one opens, and the style
+// of its big screen (host.css) when a host leads one.
+var budgets = map[string]int{
+	"app.js": 50 << 10, "app.css": 16 << 10, "pictures.js": 24 << 10, "room.js": 12 << 10, "host.css": 4 << 10,
+}
 
 func main() {
 	watch := flag.Bool("watch", false, "rebuild on every change")
@@ -51,7 +54,7 @@ func build(watch bool) error {
 		return err
 	}
 	opts := api.BuildOptions{
-		EntryPoints:   []string{"web/src/app.ts", "web/src/app.css"},
+		EntryPoints:   []string{"web/src/app.ts", "web/src/app.css", "web/src/host.css"},
 		Outdir:        filepath.Join(out, "assets"),
 		Bundle:        true,
 		Write:         true,
