@@ -17,13 +17,13 @@ func TestTitlesOfDevotion(t *testing.T) {
 		}
 	}
 	for level, name := range map[int]string{8: "Постоянство", 12: "Ненаситно любопитство", 16: "Всеотдайност",
-		25: "Вярност към Алманаха"} {
+		20: "Упоритост", 25: "Вярност към Алманаха", 30: "Дълголетие", 35: "Издръжливост", 40: "Пазител на Алманаха"} {
 		if byLevel[level] != name {
 			t.Fatalf("level %d's title: %q, want %q", level, byLevel[level], name)
 		}
 	}
 	all := w.g.titles()
-	for _, gone := range []string{"Ерудиция", "Гениален ум"} {
+	for _, gone := range []string{"Ерудиция", "Гениален ум", "Извор на знания", "Жива библиотека", "Вековна мъдрост"} {
 		if slices.ContainsFunc(all, func(x Title) bool { return x.Name == gone }) {
 			t.Fatalf("%q is still a title", gone)
 		}
@@ -128,7 +128,47 @@ func TestDevotionMigration(t *testing.T) {
 			t.Fatalf("%s told again: %+v", id, n.Unlocks)
 		}
 	}
-	if !told("well") || told("oracle") || told("omniscience") {
+	if !told("grit") || told("oracle") || told("omniscience") {
 		t.Fatalf("news after the migration: %+v", n.Unlocks)
+	}
+}
+
+// The titles past level 16 name devotion too: whoever wears an old one wears its level's new one, and what was told of
+// the old names isn't told again under the new ones.
+func TestDevotionMigrationOn(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	well, wisdom := w.user(), w.user()
+	for u, title := range map[int64]string{well: "well", wisdom: "wisdom"} {
+		if _, err := w.db.Write.Exec(`UPDATE users SET title = ? WHERE id = ?`, title, u); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.db.Write.Exec(`INSERT INTO achievements (user_id, id, at, xp, seen) VALUES (?, 'streak3', 1, 200000, 1)`,
+			u); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, key := range []string{"title:well:Извор на знания", "title:keeper:Пазител на знанието"} {
+		if _, err := w.db.Write.Exec(`INSERT INTO unlocks_told (user_id, id) VALUES (?, ?)`, well, key); err != nil {
+			t.Fatal(err)
+		}
+	}
+	body, err := os.ReadFile("../store/migrations/0045_devotion_titles_on.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.db.Write.Exec(string(body)); err != nil {
+		t.Fatal(err)
+	}
+	for u, want := range map[int64]string{well: "Упоритост", wisdom: "Издръжливост"} {
+		if look, err := w.g.LookOf(ctx, u); err != nil || look.Title != want {
+			t.Fatalf("wears %q after the migration, want %q (%v)", look.Title, want, err)
+		}
+	}
+	var n int
+	_ = w.db.Read.QueryRow(`SELECT count(*) FROM unlocks_told WHERE user_id = ? AND id IN
+		('title:grit:Упоритост', 'title:keeper:Пазител на Алманаха')`, well).Scan(&n)
+	if n != 2 {
+		t.Fatalf("%d of the new names told", n)
 	}
 }
