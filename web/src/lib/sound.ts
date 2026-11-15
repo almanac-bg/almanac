@@ -5,7 +5,9 @@
 //
 // Browsers allow sound only once the player has touched the page, so the audio starts then. The bigger sounds (an
 // end, a level, an achievement…) take turns: one asked for while another still sounds follows it, never on top. On
-// a phone the sounds mix with whatever the player is listening to and keep quiet with the silent switch.
+// a phone the sounds mix with whatever the player is listening to and keep quiet with the silent switch. The voices
+// themselves are in the game's feel (../feel.ts), a file of its own that the first touch sends for: here are the
+// switch, the audio and the turns.
 
 import { feel } from "./app.ts";
 import { signal } from "./dom.ts";
@@ -31,95 +33,6 @@ export type SoundName =
   | "level"
   | "achievement"
   | "ping";
-
-/** A tone: its pitch (Hz), when it starts and how long it lasts (s), its wave, and how loud (0–1). */
-type Note = [hz: number, at: number, length: number, wave?: OscillatorType, loud?: number];
-
-// Notes in Hz: A3 220, D4 294, G4 392, A4 440, C5 523, D5 587, E5 659, G5 784, A5 880, B5 988, C6 1047, D6 1175, E6 1319, G6 1568,
-// A6 1760, C7 2093.
-const sounds: Record<SoundName, Note[]> = {
-  // The player's own touch: a pick, a digit.
-  tap: [[660, 0, 0.05, "sine", 0.45]],
-  key: [[880, 0, 0.03, "sine", 0.3]],
-  // Someone else: the other side answering, a player coming into the room. Soft and falling, unlike a tap.
-  them: [
-    [587, 0, 0.06, "sine", 0.3],
-    [440, 0.05, 0.1, "sine", 0.25],
-  ],
-  // Before a game: a beep for each of the last seconds, then an octave up for the start.
-  count: [[880, 0, 0.09, "sine", 0.5]],
-  go: [
-    [1760, 0, 0.3, "sine", 0.5],
-    [880, 0, 0.3, "triangle", 0.35],
-  ],
-  // The clock: a soft tick-tock every second, then a sharper beep for each of the last five.
-  tick: [[2100, 0, 0.022, "triangle", 0.3]],
-  tock: [[1600, 0, 0.022, "triangle", 0.3]],
-  hurry: [
-    [1760, 0, 0.05, "square", 0.22],
-    [1760, 0.09, 0.05, "square", 0.16],
-  ],
-  right: [
-    [784, 0, 0.12],
-    [1175, 0.09, 0.24],
-  ],
-  exact: [
-    [784, 0, 0.1],
-    [1047, 0.08, 0.1],
-    [1568, 0.16, 0.32],
-  ],
-  partial: [[659, 0, 0.2]],
-  // A wrong answer and none: low, falling, a little softer than a right one, but high enough for a phone's speaker
-  // (which gives little below 300 Hz).
-  wrong: [
-    [294, 0, 0.15, "sawtooth", 0.8],
-    [220, 0.12, 0.28, "sawtooth", 0.8],
-  ],
-  time: [
-    [392, 0, 0.14, "square", 0.4],
-    [294, 0.14, 0.28, "square", 0.4],
-  ],
-  // The end: just over (a game played alone, a place in the middle), won, lost.
-  end: [
-    [523, 0, 0.12],
-    [659, 0.1, 0.12],
-    [784, 0.2, 0.32],
-  ],
-  win: [
-    [784, 0, 0.1],
-    [1047, 0.1, 0.1],
-    [1319, 0.2, 0.1],
-    [1568, 0.3, 0.6],
-    [1047, 0.3, 0.6, "triangle", 0.45],
-    [1319, 0.3, 0.6, "triangle", 0.45],
-  ],
-  lose: [
-    [659, 0, 0.16, "sine", 0.6],
-    [523, 0.14, 0.16, "sine", 0.55],
-    [440, 0.28, 0.42, "sine", 0.5],
-  ],
-  // A day's goal done: a bright coin.
-  goal: [
-    [988, 0, 0.07, "square", 0.45],
-    [1319, 0.07, 0.3, "square", 0.45],
-  ],
-  level: [
-    [523, 0, 0.1],
-    [659, 0.09, 0.1],
-    [784, 0.18, 0.1],
-    [1047, 0.27, 0.5],
-  ],
-  achievement: [
-    [1319, 0, 0.08, "sine"],
-    [1760, 0.07, 0.08, "sine"],
-    [2093, 0.14, 0.38, "sine"],
-  ],
-  // Something new: an opponent found, a friend's challenge or request.
-  ping: [
-    [988, 0, 0.1, "sine"],
-    [1319, 0.1, 0.22, "sine"],
-  ],
-};
 
 /** The bigger sounds, which take turns rather than sound over each other. */
 const inTurn = new Set<SoundName>(["end", "win", "lose", "goal", "level", "achievement"]);
@@ -155,6 +68,29 @@ export function setSound(on: boolean): void {
 export const quietWhenSilent = () =>
   /iPhone|iPad|iPod/.test(navigator.userAgent) ||
   (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+
+type Feel = typeof import("../feel.ts");
+let kit: Feel | null = null;
+let loading: Promise<Feel> | null = null;
+
+/** The game's feel (../feel.ts), loaded once, with the first touch: what's heard and seen only once the player plays.
+ * A load that failed is tried again by the next touch. */
+export function loadFeel(): Promise<Feel> {
+  loading ??= import("../feel.ts").then(
+    (m) => {
+      kit = m;
+      return m;
+    },
+    (err) => {
+      loading = null;
+      throw err;
+    },
+  );
+  return loading;
+}
+
+/** The game's feel, if it's in: until then the game is whole, only plainer and quieter. */
+export const feelKit = (): Feel | null => kit;
 
 let audio: AudioContext | null = null;
 let out: AudioNode | null = null;
@@ -198,12 +134,13 @@ function unlock(c: AudioContext): void {
   silence.start();
 }
 
-/** Starts the audio on the player's touches and keys, the only time browsers allow it. An iPhone counts a touch only
- * as it ends (touchend, click), never as the finger goes down. A phone may stop the audio again (a call, the game in
- * the background), sometimes leaving it "running" but mute: so this keeps listening, and as the game comes back to
- * the screen it stops the audio and starts it again. */
+/** Starts the audio on the player's touches and keys, the only time browsers allow it, and sends for the game's feel
+ * with the first. An iPhone counts a touch only as it ends (touchend, click), never as the finger goes down. A phone
+ * may stop the audio again (a call, the game in the background), sometimes leaving it "running" but mute: so this keeps
+ * listening, and as the game comes back to the screen it stops the audio and starts it again. */
 export function prepareSound(): void {
   const start = () => {
+    loadFeel().catch(() => {});
     if (!soundOn.peek()) return;
     const c = context();
     if (c && c.state !== "running") unlock(c);
@@ -230,26 +167,23 @@ export function play(name: SoundName, lift = 0): void {
     if (!touchedNow()) return;
     unlock(c);
   }
-  const notes = sounds[name];
+  if (!kit) {
+    // The voices are on their way (the first touch sent for them): a sound asked for meanwhile plays as they come, if
+    // that's soon, and is left out if not.
+    const asked = performance.now();
+    loadFeel().then(
+      () => performance.now() - asked < 300 && play(name, lift),
+      () => {},
+    );
+    return;
+  }
   let t0 = c.currentTime + 0.01;
   if (inTurn.has(name)) {
     if (freeAt - t0 > longestWait) return;
     t0 = Math.max(t0, freeAt);
-    freeAt = t0 + Math.max(...notes.map(([, at, length]) => at + length)) + 0.15;
+    freeAt = t0 + kit.length(name) + 0.15;
   }
-  const pitch = 2 ** (lift / 12);
-  for (const [hz, at, length, wave = "triangle", loud = 1] of notes) {
-    const osc = c.createOscillator();
-    const env = c.createGain();
-    osc.type = wave;
-    osc.frequency.value = hz * pitch;
-    env.gain.setValueAtTime(0.0001, t0 + at);
-    env.gain.exponentialRampToValueAtTime(loud, t0 + at + 0.01);
-    env.gain.exponentialRampToValueAtTime(0.0001, t0 + at + length);
-    osc.connect(env).connect(out);
-    osc.start(t0 + at);
-    osc.stop(t0 + at + length + 0.02);
-  }
+  kit.sound(c, out, name, lift, t0);
 }
 
 /** How an answer sounds: a right one a semitone higher for each before it in a row, up to a fifth. In the app it's

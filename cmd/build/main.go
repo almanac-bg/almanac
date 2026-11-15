@@ -31,10 +31,11 @@ import (
 // unfold as a player meets them and say what their numbers mean, a streak that says what kept or ended it): still small enough to arrive at once on a slow
 // phone; the style also lays the pages out for a laptop's width. The illustrations (avatars, topics, modes, frames,
 // leagues) come after the first screen, on their own; a room's and Роял's screens (web/src/kit.ts) when one opens,
-// and the style of a room's big screen (host.css) when a host leads one.
+// and the style of a room's big screen (host.css) when a host leads one; the game's feel (web/src/feel.ts: the
+// sounds' voices, the result's moment, the sheet for big news) with the first touch.
 var budgets = map[string]int{
 	"app.js": 50 << 10, "app.css": 16 << 10, "pictures.js": 24 << 10, "room.js": 12 << 10, "royal.js": 12 << 10,
-	"host.css": 4 << 10,
+	"host.css": 4 << 10, "feel.js": 12 << 10,
 }
 
 func main() {

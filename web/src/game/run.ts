@@ -4,7 +4,7 @@
 
 import { type ApiError, api } from "../lib/api.ts";
 import { append, type Child, effect, h, listen, onCleanup, type Signal, signal, slot } from "../lib/dom.ts";
-import { tickOn } from "../lib/prefs.ts";
+import { calm, tickOn } from "../lib/prefs.ts";
 import { beforeLeaving } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { withName } from "../lib/words.ts";
@@ -317,6 +317,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
   // background), as its time would run unseen.
   let due: (() => void) | null = null;
   let advance = 0;
+  const shown: number[] = [];
   const moveOn = () => {
     if (!due || document.hidden) return;
     const go = due;
@@ -326,6 +327,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
   document.addEventListener("visibilitychange", moveOn);
   onCleanup(() => {
     clearTimeout(advance);
+    for (const t of shown) clearTimeout(t);
     document.removeEventListener("visibilitychange", moveOn);
   });
 
@@ -346,47 +348,69 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     }
     clearTimeout(timeout);
     clearInterval(tick);
+    // The answer shows in steps (DESIGN.md, Motion): at once the answer marked, its sound and its pip; then the
+    // verdict, its points and the tally rising with them; then the fact; then the page moves to them, the head with the
+    // pips and the tally staying in view above. With less motion, all at once.
     asked.reveal(res.reveal, answer);
     const now = trail(res.state.trail, s.total);
+    now.children[q.n]?.classList.add("fresh");
     progress.replaceWith(now);
     progress = now;
-    tally(score, res.state.points, s.points, res.inRow ?? 0);
     const kind = kindOf(res, answer);
     playAnswer(kind, res.inRow ?? 0);
     // The fact behind the answer, at the moment the player most wants it: time to read it, or a tap to move on.
     const said = res.reveal.fact;
     const pause = pauseFor(q.view) + readingTime(said);
-    append(after, [
-      verdict(kind, res.points, undefined, res.speed, res.row, res.inRow),
-      crowdLine(q.view.type, res.reveal.crowd, res.right),
-      res.learned ? h("p", { class: "learned" }, "Нов факт в Алманаха") : null,
-      said ? fact(said) : null,
-      res.reveal.credit ? credit(res.reveal.credit) : null,
-      upNext(pause, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`, true),
-      said
-        ? h(
-            "button",
-            {
-              class: "btn",
-              type: "button",
-              onclick: () => {
-                clearTimeout(advance);
-                moveOn();
-              },
-            },
-            res.state.done ? "Към резултата" : "Напред",
-          )
-        : null,
-    ]);
-    after.hidden = false;
-    requestAnimationFrame(() => after.scrollIntoView({ block: "nearest", behavior: "smooth" }));
-    due = res.state.done
-      ? () => {
-          play("end");
-          reload();
-        }
-      : next;
-    advance = window.setTimeout(moveOn, pause);
+    const steps: [number, () => void][] = [
+      [
+        120,
+        () => {
+          tally(score, res.state.points, s.points, res.inRow ?? 0);
+          append(after, [
+            verdict(kind, res.points, undefined, res.speed, res.row, res.inRow),
+            crowdLine(q.view.type, res.reveal.crowd, res.right),
+          ]);
+          after.hidden = false;
+        },
+      ],
+      [
+        320,
+        () => {
+          append(after, [
+            res.learned ? h("p", { class: "learned" }, "Нов факт в Алманаха") : null,
+            said ? fact(said) : null,
+            res.reveal.credit ? credit(res.reveal.credit) : null,
+            upNext(pause, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`, true),
+            said
+              ? h(
+                  "button",
+                  {
+                    class: "btn",
+                    type: "button",
+                    onclick: () => {
+                      clearTimeout(advance);
+                      moveOn();
+                    },
+                  },
+                  res.state.done ? "Към резултата" : "Напред",
+                )
+              : null,
+          ]);
+          due = res.state.done
+            ? () => {
+                play("end");
+                reload();
+              }
+            : next;
+          advance = window.setTimeout(moveOn, pause);
+        },
+      ],
+      [450, () => after.scrollIntoView({ block: "nearest", behavior: calm.peek() ? "auto" : "smooth" })],
+    ];
+    for (const [ms, step] of steps) {
+      if (calm.peek()) step();
+      else shown.push(window.setTimeout(step, ms));
+    }
   };
 
   const asked = ask(q.view, (a) => send(a), locked);
@@ -478,15 +502,17 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
   return h(
     "article",
     { class: "question" },
-    questionHead(
-      q.n,
-      s.total,
-      q.onThisDay ? `${topicName(q.category)} · На този ден` : topicName(q.category),
-      score,
-      versus,
+    stays(
+      questionHead(
+        q.n,
+        s.total,
+        q.onThisDay ? `${topicName(q.category)} · На този ден` : topicName(q.category),
+        score,
+        versus,
+      ),
+      progress,
     ),
     leaveAsk,
-    progress,
     timer(q.leftMs, q.limitMs, left, locked),
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view, true),
@@ -494,6 +520,26 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     () => problem(),
     after,
   );
+}
+
+/** The top of a question (its count, topic and tally, and the pips), kept in view at the top of the screen while the
+ * question and its answer scroll, and smaller there. The room it gives up stays as a margin, so nothing under it jumps.
+ * It sits a pixel above the screen's edge when stuck, which is how it knows. */
+function stays(...parts: Child[]): HTMLElement {
+  const top = h("div", { class: "question-top" }, parts);
+  const seen = new IntersectionObserver(
+    ([e]) => {
+      const stuck = !!e && e.intersectionRatio < 1 && e.boundingClientRect.top < 0;
+      if (stuck === top.classList.contains("stuck")) return;
+      const tall = top.offsetHeight;
+      top.classList.toggle("stuck", stuck);
+      top.style.marginBottom = stuck ? `${tall - top.offsetHeight}px` : "";
+    },
+    { threshold: 1 },
+  );
+  seen.observe(top);
+  onCleanup(() => seen.disconnect());
+  return top;
 }
 
 function kindOf(r: Result, given: Answer | null): VerdictKind {

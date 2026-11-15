@@ -348,8 +348,13 @@ Feedback fires once, when it's earned, and then the screen is still again:
 
 - **Timings:**
   - presses 120ms; hover and colour 160–200ms;
-  - the right answer's pop 360ms; the wrong answer's shake 320ms;
+  - the right answer's pop 360ms (to 1.04); the wrong answer's shake 320ms (4px);
   - the points' rise 520ms;
+- **An answer shows in steps:** at 0ms the answer marked (pop or shake), its sound and touch, its pip filling (0.6→1,
+  200ms); at 120ms the verdict fades up (8px, 200ms) with its points and the tally rising in step; at 320ms the fact,
+  the same way; at 450ms the page scrolls to them (smoothly, or at once with less motion). A run's head (the count,
+  the topic, the tally) and its pips stay at the top of the screen while the question and its answer scroll, smaller
+  once stuck, so the pip and the tally are seen landing.
   - the timer runs linearly with the clock, and so does the ring of the three-second count before a topic's run
     (with „Започни сега“ and „Отказ“, so a tap on a topic never throws the player straight into a question).
 - **No ambient motion** and no confetti.
