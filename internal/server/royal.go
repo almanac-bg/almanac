@@ -3,9 +3,12 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/play"
@@ -65,10 +68,47 @@ func (s *Server) joinRoyal(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		look = play.Look{Avatar: play.DefaultAvatar(u.ID), Level: 1}
 	}
-	if err := s.royal.Join(r.Context(), royal.Player{ID: u.ID, Name: u.Name, Tag: u.Tag, Look: look}); err != nil {
+	err = s.royal.Join(r.Context(), royal.Player{ID: u.ID, Name: u.Name, Tag: u.Tag, Look: look})
+	if errors.Is(err, royal.ErrClosed) || errors.Is(err, royal.ErrShut) {
+		return &apiError{http.StatusConflict, "royal_closed", refusal(err, s.royal.Glance())}
+	}
+	if err != nil {
 		return err
 	}
 	return ok(w, map[string]bool{"ok": true})
+}
+
+// refusal is why one can't come into Роял now, in words, with when they can: the lobby isn't open yet (ErrClosed), or
+// the games are past the door (ErrShut).
+func refusal(err error, g royal.Glance) string {
+	now := time.UnixMilli(g.Now)
+	if errors.Is(err, royal.ErrShut) {
+		next := time.UnixMilli(g.Next)
+		// The third: royal.Late.
+		return fmt.Sprintf("Роял вече тече, а закъснелите влизат до 3-тия въпрос. Следващият е %s в %s.",
+			onDay(next, now), next.In(play.Bulgaria).Format("15:04"))
+	}
+	opens := time.UnixMilli(g.OpensAt)
+	return fmt.Sprintf("Входът за Роял се отваря %s в %s.", onDay(opens, now), opens.In(play.Bulgaria).Format("15:04"))
+}
+
+// weekdays are the days of the week, from Sunday, as they're said after „в“.
+var weekdays = [7]string{"неделя", "понеделник", "вторник", "сряда", "четвъртък", "петък", "събота"}
+
+// onDay is the day of t from now's, in Bulgaria, in words: „днес“, „утре“, or its weekday („в петък“, „във вторник“).
+func onDay(t, now time.Time) string {
+	t, now = t.In(play.Bulgaria), now.In(play.Bulgaria)
+	switch t.Format(time.DateOnly) {
+	case now.Format(time.DateOnly):
+		return "днес"
+	case now.AddDate(0, 0, 1).Format(time.DateOnly):
+		return "утре"
+	}
+	day := weekdays[t.Weekday()]
+	if strings.HasPrefix(day, "в") {
+		return "във " + day
+	}
+	return "в " + day
 }
 
 // leaveRoyal takes the player out of the lobby.
