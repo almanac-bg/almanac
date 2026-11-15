@@ -894,7 +894,7 @@ func TestProgress(t *testing.T) {
 		{ptr("bogus"), nil, false},
 		{nil, ptr("perfect"), false}, // an achievement isn't a title
 		{nil, ptr("duelInstinct"), false},
-		{nil, ptr("erudition"), false}, // level 8
+		{nil, ptr("persistence"), false}, // level 8
 		{nil, ptr("royalCrown"), false},
 		{nil, ptr("master-science"), false},
 		{nil, ptr("champion"), false},
@@ -1503,7 +1503,7 @@ func TestTitles(t *testing.T) {
 	ana, bo := w.user(), w.user()
 	w.played(ana, XPFromDay)
 	p, _ := w.g.ProgressOf(ctx, ana)
-	topics := len(w.g.Bank().Categories) * len(topicTiers)
+	topics := len(w.g.Bank().Categories)*len(topicTiers) + len(acrossTopics)
 	if len(p.Titles) != 1+len(Titles)+topics || p.Titles[0].ID != championID || p.Titles[0].Name != "Шампион на Рила" ||
 		p.Titles[0].How != championHow {
 		t.Fatalf("a new player's titles: %+v", p.Titles)

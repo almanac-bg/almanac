@@ -14,9 +14,11 @@ import (
 // come four ways, each its own group:
 //
 //   - the level: a ladder from „Нова искра“ at the start to „Жив алманах“ at level 50, so that there's always a next
-//     one in sight;
+//     one in sight. A level is time played, so its titles name devotion („Постоянство“, „Вярност към Алманаха“), not
+//     intellect: a claim to knowing is mastery's to give;
 //   - an achievement: only those that say how someone plays („Светкавица“, „Неугасим пламък“);
-//   - a topic: „Майстор · …“ and „Светило · …“ for reaching that mastery in it;
+//   - mastery: „Майстор · …“ and „Светило · …“ for reaching that mastery in a topic, „Всезнание“ for „Експерт“ in
+//     every topic and „Оракул“ for „Светило“ in three;
 //   - the rating and the leagues: a division reached, a Роял won, and first place in a week of Рила, which counts
 //     how many times („Двукратен шампион на Рила“).
 //
@@ -51,11 +53,11 @@ var Titles = []Title{
 	{"spark", "Нова искра", Common, TitleLevel, unlock{level: 1}, ""},
 	{"curious", "Любопитен ум", Common, TitleLevel, unlock{level: 3}, ""},
 	{"passion", "Страст към викторините", Common, TitleLevel, unlock{level: 5}, ""},
-	{"erudition", "Ерудиция", Rare, TitleLevel, unlock{level: 8}, ""},
-	{"omniscience", "Всезнание", Rare, TitleLevel, unlock{level: 12}, ""},
-	{"genius", "Гениален ум", Rare, TitleLevel, unlock{level: 16}, ""},
+	{"persistence", "Постоянство", Rare, TitleLevel, unlock{level: 8}, ""},
+	{"insatiable", "Ненаситно любопитство", Rare, TitleLevel, unlock{level: 12}, ""},
+	{"devotion", "Всеотдайност", Rare, TitleLevel, unlock{level: 16}, ""},
 	{"well", "Извор на знания", Epic, TitleLevel, unlock{level: 20}, ""},
-	{"oracle", "Оракул", Epic, TitleLevel, unlock{level: 25}, ""},
+	{"loyalty", "Вярност към Алманаха", Epic, TitleLevel, unlock{level: 25}, ""},
 	{"library", "Жива библиотека", Epic, TitleLevel, unlock{level: 30}, ""},
 	{"wisdom", "Вековна мъдрост", Epic, TitleLevel, unlock{level: 35}, ""},
 	{"keeper", "Пазител на знанието", Legendary, TitleLevel, unlock{level: 40}, ""},
@@ -79,6 +81,13 @@ var Titles = []Title{
 	{"sunrises", "Сто изгрева", Legendary, TitleAchievement, unlock{achieved: "streak100"}, ""},
 }
 
+// acrossTopics are mastery's titles over several topics, after each topic's own: the claims to knowing a lot, which
+// only knowing a lot unlocks.
+var acrossTopics = []Title{
+	{"omniscience", "Всезнание", Legendary, TitleTopic, unlock{topics: everyTopic, mastery: MasterTier - 1}, ""},
+	{"oracle", "Оракул", Legendary, TitleTopic, unlock{topics: 3, mastery: MasterTier + 1}, ""},
+}
+
 // topicTiers are the mastery tiers that give a topic's title, and the tier it shows in.
 var topicTiers = []struct {
 	tier  int
@@ -88,7 +97,7 @@ var topicTiers = []struct {
 // topicTitleID is the title of a mastery tier in a topic: "master-history".
 func topicTitleID(tier int, category string) string { return MasteryTiers[tier].ID + "-" + category }
 
-// titles are every title there is: Titles, with the topics' after (from the bank's topics).
+// titles are every title there is: Titles, with the topics' after (from the bank's topics), then those across them.
 func (g *Game) titles() []Title {
 	list := slices.Clone(Titles)
 	for _, c := range g.Bank().Categories {
@@ -99,7 +108,7 @@ func (g *Game) titles() []Title {
 				about: "стигни до „" + name + "“ в „" + c.Name + "“"})
 		}
 	}
-	return list
+	return append(list, acrossTopics...)
 }
 
 func (g *Game) titleByID(id string) (Title, bool) {
