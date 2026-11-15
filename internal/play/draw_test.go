@@ -2,6 +2,7 @@ package play
 
 import (
 	"math/rand/v2"
+	"slices"
 	"testing"
 
 	"github.com/almanac-bg/almanac/internal/bank"
@@ -83,8 +84,13 @@ func TestDayOfItsDate(t *testing.T) {
 			t.Fatalf("seed %d: dated %v, %d about Bulgaria, %d topics", seed, found, bg, len(topics))
 		}
 	}
-	// Another day leaves it to chance.
-	if picks, _ := drawDay(b, "2026-03-04", map[string]bool{}, nil, rand.New(rand.NewPCG(1, 7))); len(picks) != Length {
-		t.Fatal("no day on 4 March")
+	// Any other day keeps it for its own: never drawn before (or after) its date.
+	for seed := range uint64(30) {
+		for _, day := range []string{"2026-03-02", "2026-03-04"} {
+			picks, _ := drawDay(b, day, map[string]bool{}, nil, rand.New(rand.NewPCG(seed, 7)))
+			if len(picks) != Length || slices.ContainsFunc(picks, func(p Pick) bool { return p.ID == dated.Base().ID }) {
+				t.Fatalf("seed %d, %s: %d picks, or the 3 March question spent", seed, day, len(picks))
+			}
+		}
 	}
 }
