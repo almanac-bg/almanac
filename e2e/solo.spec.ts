@@ -29,6 +29,8 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // After the day, the other ways to play are right there: with others, and by topic.
   await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toBeVisible();
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
+  // Not Роял: no evening before today has had players (a fresh database), and a first week isn't sent to an empty one.
+  await expect(page.locator(".modes").getByRole("link", { name: /Роял/ })).toHaveCount(0);
   // The result is shared without its answers: the date, the score, a square for each question (and a right answer few
   // of the day's other players got, if there's one: other tests play the same day), and the player's own link to it.
   await page.getByRole("button", { name: "Сподели" }).click();
