@@ -24,7 +24,6 @@ import { playerProfile } from "./screens/player.ts";
 import { ranks } from "./screens/ranks.ts";
 import { rewards } from "./screens/rewards.ts";
 import { rooms } from "./screens/rooms.ts";
-import { royal } from "./screens/royal.ts";
 import { settings } from "./screens/settings.ts";
 import { today } from "./screens/today.ts";
 import { wardrobe } from "./screens/wardrobe.ts";
@@ -101,7 +100,7 @@ if (root) {
       { path: /^\/duel$/, view: duel },
       { path: /^\/duel\/live$/, view: liveDuel },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
-      { path: /^\/royal$/, view: royal },
+      { path: /^\/royal$/, view: later(() => import("./screens/royal.ts").then((m) => m.royal)) },
       { path: /^\/almanac$/, view: almanac },
       { path: /^\/mistakes$/, view: mistakes },
       { path: /^\/year\/([0-9]{4})$/, view: year },

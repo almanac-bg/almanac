@@ -752,6 +752,25 @@ func (g *Game) PlanRoyal(ctx context.Context, day string, userID int64, coming b
 	return err
 }
 
+// RoyalFriends are the names of a player's friends who said they'd come to the evening of day (a few at most, by name).
+func (g *Game) RoyalFriends(ctx context.Context, day string, userID int64) ([]string, error) {
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.name FROM royal_plans p JOIN friends f ON f.friend_id = p.user_id
+		JOIN users u ON u.id = p.user_id WHERE p.day = ? AND f.user_id = ? ORDER BY u.name LIMIT 3`, day, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	names := []string{}
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			return nil, err
+		}
+		names = append(names, n)
+	}
+	return names, rows.Err()
+}
+
 // RoyalPlans is how many said they'd come to the evening of day, and whether the player (0: nobody signed in) is one
 // of them.
 func (g *Game) RoyalPlans(ctx context.Context, day string, userID int64) (n int, mine bool, err error) {
