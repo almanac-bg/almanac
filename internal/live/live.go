@@ -1,6 +1,9 @@
 // Package live plays duels live: a player asks for a duel and is matched with whoever else is asking, or, if
 // nobody comes in Wait, with a recording of a real player's earlier game. Both see the same question at the same
-// moment and each other's answers come in; after each question both answers show, then the next comes.
+// moment and each other's answers come in; after each question both answers show, then the next comes. One whose
+// screen goes is waited for a while (Away), then the duel goes on without them (gone), their time running out on each
+// question; a recording isn't waited for where its player let the time run out. An answer sent again (its reply lost
+// on the way) is taken as the first.
 //
 // Every answer goes through the player's own run (internal/play), as in any game: the score, XP, the questions'
 // statistics and the duel's result are kept there, and only the timing lives here, in memory. A restart cuts the
@@ -433,6 +436,16 @@ type side struct {
 
 func (s *side) human() bool { return s.recording == nil }
 
+// gone says a player has been away from the duel longer than Away: it goes on without them.
+func (s *side) gone() bool {
+	return s.human() && s.online == 0 && s.came && time.Since(s.leftAt) >= Away
+}
+
+// answers says whether a recording has an answer to question n (else its player let the time run out there).
+func (s *side) answers(n int) bool {
+	return n < len(s.recording) && s.recording[n].Shown != nil
+}
+
 func newMatch(h *Hub, l play.Live, players [2]Player) (*Match, error) {
 	b := h.game.Bank()
 	m := &Match{hub: h, id: l.DuelID, phase: PhaseIntro, opened: time.Now(), subs: map[*Sub]struct{}{}}
@@ -508,13 +521,17 @@ func (m *Match) Unfollow(sub *Sub) {
 	s.online--
 	if s.online == 0 {
 		s.leftAt = time.Now()
-		// Once they've been away too long, a question that waits only for them goes on.
-		n := m.n
+		// Once they've been away too long, the question up then (whichever it is) goes on if it waits only for them,
+		// and the other is told they're gone.
 		time.AfterFunc(Away+time.Millisecond, func() {
 			m.mu.Lock()
 			defer m.mu.Unlock()
-			if m.phase == PhaseQuestion && m.n == n {
+			switch {
+			case m.over():
+			case m.phase == PhaseQuestion:
 				m.maybeReveal()
+			default:
+				m.changed()
 			}
 		})
 	}
@@ -691,10 +708,10 @@ func (m *Match) Answer(by int64, n int, raw json.RawMessage) error {
 }
 
 // maybeReveal shows the answers if nobody is still waited for: a player here (or away only a moment) who hasn't
-// answered, or a recording whose answer is still to come.
+// answered, or a recording whose answer is still to come (not one whose player let the time run out there).
 func (m *Match) maybeReveal() {
 	for _, s := range m.sides {
-		if s.answered {
+		if s.answered || (!s.human() && !s.answers(m.n)) {
 			continue
 		}
 		if !s.human() || s.online > 0 || time.Since(s.leftAt) < Away {
@@ -787,6 +804,8 @@ type SideView struct {
 	Rights   int         `json:"rights"`
 	Trail    []play.Mark `json:"trail"`
 	Online   bool        `json:"online"`
+	// Gone says they've been away longer than Away: the duel goes on without them (their time runs out on each question).
+	Gone bool `json:"gone,omitempty"`
 	// Answered says they've answered the question now, and TookMs how quickly; what they gave and how it went show
 	// only with the answer (Given, Gained, Right), so nobody can follow the other's lead.
 	Answered bool            `json:"answered"`
@@ -865,7 +884,7 @@ func (m *Match) sideView(s *side, mine, shown bool) SideView {
 	v := SideView{
 		Look: s.Look, Name: s.Name, Tag: s.Tag, Rating: s.Rating, Division: s.Division.ID,
 		Points: s.points, Rights: s.rights, Trail: append([]play.Mark{}, s.marks...),
-		Online: !s.human() || s.online > 0, Answered: s.answered,
+		Online: !s.human() || s.online > 0, Answered: s.answered, Gone: s.gone(),
 	}
 	if s.answered {
 		v.TookMs = s.took.Milliseconds()

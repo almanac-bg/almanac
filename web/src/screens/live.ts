@@ -62,6 +62,8 @@ interface Side {
   rights: number;
   trail: Mark[];
   online: boolean;
+  /** Away longer than the duel waits: it goes on without them. */
+  gone?: boolean;
   answered: boolean;
   tookMs?: number;
   /** The other's answer, as shown, once both answers show. */
@@ -364,8 +366,10 @@ function scoreboard(view: () => LiveView, total: number): Child {
   );
 }
 
-/** What the other is doing on the question now: thinking, answered (and how fast), or gone for a moment. */
+/** What the other is doing on the question now: thinking, answered (and how fast), gone for a moment, or gone (the
+ * duel goes on without them). */
 function doing(v: LiveView, s: Side): string {
+  if (s.gone) return "Излезе от дуела.";
   if (v.phase !== "question") return "";
   if (s.answered) return `Отговори за ${seconds(s.tookMs ?? 0)}`;
   if (!s.online) return "Връзката на съперника прекъсна…";
