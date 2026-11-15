@@ -24,6 +24,7 @@ import type { Tonight } from "./modes.ts";
 let {
   answered,
   ask,
+  countdown,
   crowdLine,
   deliver,
   picture,
@@ -198,6 +199,7 @@ export function royal(kit: Kit) {
   ({
     answered,
     ask,
+    countdown,
     crowdLine,
     deliver,
     picture,
@@ -709,9 +711,7 @@ function question(view: () => Evening, first: Evening, out: Signal<number>, gone
   };
   const tapped = signal(false);
   const sent = signal(false);
-  const secs = signal(Math.ceil(q.leftMs / 1000));
   const locked = signal(true);
-  effect(() => locked.set(!plays || tapped() || out() === first.n || taken() || secs() <= 0));
   const error = signal("");
   // The question still takes the answer, as far as this screen knows.
   const open = () => !gone() && !taken() && view().phase === "question" && view().n === first.n;
@@ -731,6 +731,12 @@ function question(view: () => Evening, first: Evening, out: Signal<number>, gone
     }
   };
   const asked = ask(q.view, send, locked);
+  // When the time is up, whatever has been put in (a typed number, things moved into order) is the answer.
+  const secs = countdown(q.leftMs, () => {
+    if (!plays || tapped.peek() || out.peek() === first.n || untracked(taken)) return;
+    const pending = asked.pending();
+    if (pending) send(pending);
+  });
   effect(() => {
     const v = view();
     if (v.n !== first.n || !v.question || v.phase !== "question") return;
@@ -738,16 +744,9 @@ function question(view: () => Evening, first: Evening, out: Signal<number>, gone
     asked.update?.(v.question.view);
     // The clock goes by the server's.
     const s = Math.ceil(v.question.leftMs / 1000);
-    if (Math.abs(s - untracked(secs)) > 1) secs.set(s);
+    if (Math.abs(s - secs.peek()) > 1) secs.sync(v.question.leftMs);
   });
-  // When the time is up, whatever has been put in (a typed number, things moved into order) is the answer.
-  const tick = setInterval(() => {
-    secs.update((n) => Math.max(0, n - 1));
-    if (secs.peek() > 0 || !plays || tapped.peek() || out.peek() === first.n || untracked(taken)) return;
-    const pending = asked.pending();
-    if (pending) send(pending);
-  }, 1000);
-  onCleanup(() => clearInterval(tick));
+  effect(() => locked.set(!plays || tapped() || out() === first.n || taken() || secs() <= 0));
   return h(
     "article",
     { class: "question" },

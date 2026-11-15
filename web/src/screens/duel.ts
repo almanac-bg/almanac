@@ -96,7 +96,7 @@ function duelRow(d: DuelView): Child {
   const them = d.opponent;
   const line =
     d.state === "wait"
-      ? `${them ? them.name : "съперник"} · до ${until(d.expiresAt)}`
+      ? `до ${until(d.expiresAt)}` // whose turn it is: the name beside it
       : d.state === "play"
         ? d.you?.done === false && d.runId
           ? "Довърши играта си"

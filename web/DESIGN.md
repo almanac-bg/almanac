@@ -60,6 +60,9 @@ played, a rated game), never by the date. The server says which are open (`open`
 - **The second day played:** XP, the level (Начало's chip, Профил's card, the avatar's number) and the day's goals.
 - **The third:** the week's league (Профил's line, Класации' „Лига“). A week that ended before is let go untold.
 - **The first duel or Роял that moves the rating:** the rating and its division (Дуел, Роял, Класации' „Рейтинг“).
+- **Роял, while its evenings are thin** (the median of the last 7 under 8 players): in a player's first 7 days it
+  isn't among „С други“ on Начало, nor a goal, until they've found it (been in one, or said „Ще дойда“). A first live
+  game that feels empty teaches that nobody plays it (`play.NudgeRoyal`).
 - **A topic's first estimate** (10 answers): „Колко знаеш“ on Профил, the topic's tile and a game's news say
   „първа оценка · 74%“, a share and no tier; the tier („Експерт“) comes with a sure mark (30 answers).
 
@@ -150,8 +153,8 @@ takes a token.
 - **Depth:** `--elev-1` at rest, `--elev-2` on hover or for the hero card.
 - **Glows are rewards:** `--glow-gold` on the primary button, first place and an exact answer; `--glow-right` on a
   right answer. Nothing else glows.
-- **Focus:** `--focus`, a ring in the ground colour then in `--accent`, drawn as a box-shadow so it follows the
-  corners.
+- **Focus:** one rule for everything (`:focus-visible`): a 2px `--accent` outline, 2px off the edge. An outline
+  follows the corners and no component's own shadow can cover it, so a component never sets its own.
 
 ## The pieces
 
@@ -159,7 +162,7 @@ takes a token.
   `.card.hero`.
 - **Getting around:** `.tabs` (the four places), `.back` (drawn by `back()`), `.subnav` (Профил's places, drawn by
   `profileNav()`), `.icon-btn` (a square with an icon and its name for screen readers) and `.more` (a `details` that
-  folds what's rarely needed).
+  folds what's rarely needed; what it holds is spaced as a section's parts).
 - **Начало:** `.status` with `.streak-chip` and `.level-chip`; `.card.hero.day`; `.modes .mode` and `.topics .topic`
   (`.topic-all` across the row).
 - **Text:** `.kicker`, `.lead`, `.muted`, `.small`, `.bad` (errors) and `.status`; `.explain` with `.explain-pop`
@@ -211,7 +214,9 @@ takes a token.
   the result; right under it what to do next (`nextSteps`): the one gold `big` button (the day's „Сподели“, „Още
   десет“, „Още един дуел“, „Нова игра“), then the others as plain buttons of one size, side by side where they fit
   (`.result-actions`: „Прегледай въпросите“ first); then the game's news; and at the end the questions, once
-  opened (the button takes the player there).
+  opened (the button takes the player there). Each question gone over is a card of its own (`.reviewed`, a band in
+  its verdict's colour on top): its number and topic as a kicker with „Вярно“, „Близо“ or „Грешно“ beside them, the
+  question the strongest line, the answers marked, and the fact a quiet note under them.
 - **A room led from a big screen** (`host.css`, loaded only there): `.host`, `.host-row` (two columns on a laptop and
   up), `.host-qr`, `.host-join`, `.host-controls` and `.podium`.
 - **A duel's result** (`screens/outcome.ts` with `outcome.css`, loaded as a duel starts), one card (`.duel-end`) for
@@ -332,7 +337,7 @@ Every element that looks like a game measures something the game already counts:
 | Duels        | Live with whoever comes (a recording of a real game if nobody does in 30 s), a friend in their own time: won of played; between two friends, their record („3 : 2“)                                                                                                                                                                                                                                                           | Дуел, Профил                 |
 | Rating       | Elo from 1000, moved by duels and Роял; shown as a division (Бронз → Легенда) with its generated emblem                                                                                                                                                                                                                                                                                                                       | Дуел, Роял, Профил, Класации |
 | Роял         | Live at 21:00 Friday to Sunday, every evening once those fill (lobby from 20:45): up to 50 on the same question at once, 15 in three rounds; cut after 5, 8, 11, 14 by right answers (then speed), the last a final of three; those cut play on, off the standings                                                                                                                                                            | Роял, Класации               |
-| Goals        | Three a day, kept all day: the day's questions (50 XP), one drawn (100) and a harder one (150), of two families not drawn the day before, each one that can be done that day (Роял only while the evening's is ahead); each a link to where it's done, told at the game's end                                                                                                                                                 | Начало, result               |
+| Goals        | Three a day, kept all day: the day's questions (50 XP), one drawn (100) and a harder one (150), of two families not drawn the day before, each one that can be done that day (Роял only while the evening's is ahead, and as on Начало for a new player); each a link to where it's done, told at the game's end                                                                                                              | Начало, result               |
 | League       | A race every week (Monday to Sunday) on the XP earned, in a group of up to 20 of the player's league: Странджа, Средна гора, Родопи, Стара планина, Пирин, Рила. At the week's end the first go up (5 of a full group), the last go down, and the first three earn 300, 200 and 100 XP; first place in Рила is a title that counts („Двукратен шампион на Рила“)                                                              | Класации, Профил             |
 | Boards       | The day's ten, the week's league group, rating (10 rated games or more) and knowledge (mastery, the share of the questions known, after 100 answers, or 30 in a topic), of everyone or of friends                                                                                                                                                                                                                             | Класации                     |
 | Friends      | The day's board among you and your friends, once a friend has played                                                                                                                                                                                                                                                                                                                                                          | Класации                     |

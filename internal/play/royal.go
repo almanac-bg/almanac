@@ -781,9 +781,16 @@ func (g *Game) RoyalPlans(ctx context.Context, day string, userID int64) (n int,
 
 // How often Роял plays: an evening of one or two isn't a Роял, so until the evenings fill it plays on RoyalDays only,
 // and every evening once the median evening, of the last RoyalEvenings held, has had RoyalTurnout players or more.
+//
+// And whom the game points at it (NudgeRoyal): a first live game that feels empty teaches that nobody plays it, so
+// while the median of the last RoyalRecent evenings is under RoyalTurnout, a player in their first RoyalNewDays days
+// isn't drawn the goal of a Роял, nor shown it among the ways to play with others on Начало (one who has found it
+// keeps it: who has been in one, or said they'd come).
 const (
 	RoyalTurnout  = 8
 	RoyalEvenings = 14
+	RoyalRecent   = 7
+	RoyalNewDays  = 7
 )
 
 // RoyalDays are the days Роял always plays.
@@ -797,6 +804,8 @@ type RoyalPace struct {
 	// it isn't nightly yet).
 	Median   float64
 	Evenings int
+	// Recent is how many played on the median evening of the last RoyalRecent held (0 with none).
+	Recent float64
 }
 
 // HeldRoyal keeps that the evening that starts at start was held (again changes nothing).
@@ -833,17 +842,42 @@ func (g *Game) RoyalPaceOf(ctx context.Context) (RoyalPace, error) {
 	if err := rows.Err(); err != nil {
 		return RoyalPace{}, err
 	}
-	p := RoyalPace{Evenings: len(players)}
-	if k := len(players); k > 0 {
-		slices.Sort(players)
-		p.Median = float64(players[k/2])
-		if k%2 == 0 {
-			p.Median = float64(players[k/2-1]+players[k/2]) / 2
-		}
-	}
+	p := RoyalPace{Evenings: len(players), Recent: median(players[:min(len(players), RoyalRecent)]), Median: median(players)}
 	p.Nightly = p.Evenings >= RoyalEvenings && p.Median >= RoyalTurnout
 	g.pace, g.paceOn = p, today
 	return p, nil
+}
+
+// median is the middle of some numbers (of two in the middle, halfway between them; 0 for none). It sorts a copy.
+func median(of []int) float64 {
+	k := len(of)
+	if k == 0 {
+		return 0
+	}
+	s := slices.Sorted(slices.Values(of))
+	if k%2 == 0 {
+		return float64(s[k/2-1]+s[k/2]) / 2
+	}
+	return float64(s[k/2])
+}
+
+// NudgeRoyal says whether the game points the player at the evening's Роял (its goal, its place among the ways to play
+// with others): always, but in their first RoyalNewDays days while the last RoyalRecent evenings were thin, unless
+// they've found it already (been in one, or said they'd come).
+func (g *Game) NudgeRoyal(ctx context.Context, userID int64) (bool, error) {
+	p, err := g.RoyalPaceOf(ctx)
+	if err != nil || p.Recent >= RoyalTurnout {
+		return err == nil, err
+	}
+	var since int64
+	var found bool
+	err = g.DB.Read.QueryRowContext(ctx, `SELECT created_at,
+			EXISTS (SELECT 1 FROM royal_players WHERE user_id = ?1) OR EXISTS (SELECT 1 FROM royal_plans WHERE user_id = ?1)
+		FROM users WHERE id = ?1`, userID).Scan(&since, &found)
+	if err != nil {
+		return false, err
+	}
+	return found || g.Now().Sub(time.UnixMilli(since)) >= RoyalNewDays*24*time.Hour, nil
 }
 
 // RoyalOn says whether Роял plays on the day of t (in Bulgaria): on RoyalDays, and on every other while it's nightly.
