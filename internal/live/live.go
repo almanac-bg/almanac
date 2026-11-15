@@ -651,13 +651,17 @@ func (m *Match) show(n int) {
 	m.changed()
 }
 
-// Answer takes a player's answer to question n. Once both have answered, both answers show.
+// Answer takes a player's answer to question n. Once both have answered, both answers show. An answer sent again (its
+// reply lost on the way) is the one taken already: no error, while its question or its answer shows.
 func (m *Match) Answer(by int64, n int, raw json.RawMessage) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	s := m.side(by)
 	if s == nil {
 		return ErrNoMatch
+	}
+	if n == m.n && s.answered && (m.phase == PhaseQuestion || m.phase == PhaseReveal) {
+		return nil
 	}
 	if m.phase != PhaseQuestion || n != m.n || s.answered {
 		return ErrNotNow

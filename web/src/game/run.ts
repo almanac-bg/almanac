@@ -281,10 +281,20 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
 /** A question's seconds left, counting down with the clock: each second is worked out from when the time ends, so
  * that a busy page (a slow phone, a picture coming in) never leaves them behind it, as a tick every 1000 ms would.
  * `out` runs once, when the time is up; once `stopped`, they stop where they are. */
-export function countdown(ms: number, out?: () => void, stopped?: () => boolean): () => number {
-  const end = performance.now() + ms;
+export interface Countdown {
+  /** The whole seconds left (tracked). */
+  (): number;
+  /** The seconds left, untracked. */
+  peek(): number;
+  /** Sets the time left (ms) to the server's, when it says otherwise (a question shown again after a restart). */
+  sync(ms: number): void;
+}
+
+export function countdown(ms: number, out?: () => void, stopped?: () => boolean): Countdown {
+  let end = performance.now() + ms;
   const left = signal(Math.max(0, Math.ceil(ms / 1000)));
   let t = 0;
+  let done = false;
   const next = (rest: number) => {
     t = window.setTimeout(step, rest > 0 ? rest % 1000 || 1000 : 0);
   };
@@ -293,11 +303,23 @@ export function countdown(ms: number, out?: () => void, stopped?: () => boolean)
     const rest = end - performance.now();
     left.set(Math.max(0, Math.ceil(rest / 1000)));
     if (rest > 0) next(rest);
-    else out?.();
+    else if (!done) {
+      done = true;
+      out?.();
+    }
   };
   next(ms);
   onCleanup(() => clearTimeout(t));
-  return left;
+  const c = (() => left()) as Countdown;
+  c.peek = () => left.peek();
+  c.sync = (rest: number) => {
+    end = performance.now() + rest;
+    clearTimeout(t);
+    left.set(Math.max(0, Math.ceil(rest / 1000)));
+    if (rest > 0) done = false; // the question shown again, with time: it can run out again
+    if (!done) next(rest);
+  };
+  return c;
 }
 
 /** How long an answer shows before the game moves on: longer where there's more to read. */

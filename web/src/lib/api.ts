@@ -32,6 +32,22 @@ export async function api<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: 
   return data as T;
 }
 
+/** Sends an answer in a live game (Роял, a live duel): again, the same, while it doesn't get through (no line, the
+ * server restarting: no answer, or a 5xx) and open() says its question still takes it. The server takes a second send
+ * of an answer it has as the first. Resolves once it's taken, with the error that ended it if it wasn't. */
+export async function deliver(path: string, body: unknown, open: () => boolean): Promise<ApiError | null> {
+  for (let wait = 500; ; wait = Math.min(2 * wait, 4000)) {
+    try {
+      await api("POST", path, body);
+      return null;
+    } catch (err) {
+      const e = err as ApiError;
+      if ((e.status > 0 && e.status < 500) || !open()) return e;
+    }
+    await new Promise((r) => setTimeout(r, wait));
+  }
+}
+
 /** Counts one of something for the admin page (server: /api/tally; play/measure.go): the day shared, the reminder's
  * ask answered. Sent and forgotten: it goes even as the page is left, and a count lost is no matter. */
 export function tally(key: string): void {

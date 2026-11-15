@@ -174,7 +174,9 @@ func TestTwoPlayLive(t *testing.T) {
 		if err := m.Answer(ana.ID, 0, answer(m, true)); err != nil {
 			t.Fatal(err)
 		}
-		if err := m.Answer(ana.ID, 0, answer(m, true)); !errors.Is(err, ErrNotNow) {
+		// A second answer is the first sent again (its reply lost on the way): taken as it was, nothing changed.
+		time.Sleep(time.Second)
+		if err := m.Answer(ana.ID, 0, answer(m, false)); err != nil {
 			t.Fatalf("a second answer: %v", err)
 		}
 		if vb := m.View(bo.ID); vb.Phase != PhaseQuestion || !vb.Them.Answered || vb.Them.TookMs != 1000 ||
@@ -190,6 +192,9 @@ func TestTwoPlayLive(t *testing.T) {
 		if vb.Phase != PhaseReveal || vb.Question.Reveal.Right || !vb.Them.Right || vb.Them.Given == nil ||
 			vb.Them.Gained != play.WorthOf(m.dealt[0].Question(), 1, time.Second, 1).Points || vb.Them.Points != vb.Them.Gained {
 			t.Fatalf("after both answered: %+v / %+v", vb.Them, vb.Question.Reveal)
+		}
+		if err := m.Answer(ana.ID, 0, answer(m, true)); err != nil {
+			t.Fatalf("Ana's answer sent again as the answers show: %v", err)
 		}
 
 		// The rest: Ana right, Bo wrong, to the end; the result is kept as they finish.

@@ -21,6 +21,7 @@ let {
   computed,
   countdown,
   crowdLine,
+  deliver,
   effect,
   duelResult,
   emblem,
@@ -131,6 +132,7 @@ export function liveDuel(kit: Kit) {
     computed,
     countdown,
     crowdLine,
+    deliver,
     effect,
     duelResult,
     emblem,
@@ -377,27 +379,41 @@ function question(view: () => LiveView, first: LiveView): Child {
   const locked = signal(!!q.given);
   const sent = signal(!!q.given);
   const error = signal("");
+  let gone = false;
+  onCleanup(() => {
+    gone = true;
+  });
+  // An answer that doesn't get through (the line dropped) is sent again while the question is open; one refused for
+  // good, not late, frees the options again.
+  const open = () => !gone && view().phase === "question" && view().n === first.n;
   const send = async (a: Answer) => {
     locked.set(true);
-    try {
-      await api("POST", `/api/duels/live/${first.id}/answer`, { n: first.n, answer: a });
-      sent.set(true);
-    } catch (err) {
-      error.set((err as ApiError).message);
+    error.set("");
+    const e = await deliver(`/api/duels/live/${first.id}/answer`, { n: first.n, answer: a }, () => untracked(open));
+    if (!e) return sent.set(true);
+    error.set(e.message);
+    if (e.code !== "not_now" && untracked(open) && left.peek() > 0) {
+      if (asked.node instanceof Element)
+        for (const b of asked.node.querySelectorAll(".picked")) b.classList.remove("picked");
+      locked.set(false);
     }
   };
   const asked = ask(q.view, send, locked);
-  // More of the question shows as its time runs (the next clue): the server sends it when it's due.
-  effect(() => {
-    const v = view();
-    if (v.n === first.n && v.question) asked.update?.(v.question.view);
-  });
   // When the time is up, whatever has been put in (a typed number, things moved into order) is the answer.
   const left = countdown(q.leftMs, () => {
     if (locked.peek()) return;
     const pending = asked.pending();
     if (pending) send(pending);
     else locked.set(true);
+  });
+  effect(() => {
+    const v = view();
+    if (v.n !== first.n || !v.question || v.phase !== "question") return;
+    // More of the question shows as its time runs (the next clue): the server sends it when it's due.
+    asked.update?.(v.question.view);
+    // The clock goes by the server's.
+    const s = Math.ceil(v.question.leftMs / 1000);
+    if (Math.abs(s - left.peek()) > 1) left.sync(v.question.leftMs);
   });
   // The other answering is news: a sound of its own, not a tap the player might take for theirs.
   let heard = first.them.answered;

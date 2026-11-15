@@ -608,11 +608,15 @@ func (h *Hub) shown(t *table, n int, now time.Time) {
 }
 
 // Answer takes a player's answer to question n (still in, or on after a cut). Once everyone still in has answered, the
-// answer shows: those cut aren't waited for.
+// answer shows: those cut aren't waited for. An answer sent again (its reply lost on the way) is the one taken already:
+// no error, while its question or its answer shows.
 func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	t, m := h.mine(id)
+	if m != nil && n == t.n && m.inQ && m.answered && (t.phase == play.RoyalQuestion || t.phase == play.RoyalReveal) {
+		return nil
+	}
 	if m == nil || t.phase != play.RoyalQuestion || n != t.n || !m.inQ || m.answered {
 		return ErrNotNow
 	}
@@ -944,6 +948,9 @@ type QuestionView struct {
 	View     any    `json:"view"`
 	LimitMs  int64  `json:"limitMs"`
 	LeftMs   int64  `json:"leftMs"`
+	// Shown is when the question showed (the server's clock): again after a restart of the server, its time from then,
+	// so that a screen draws it again.
+	Shown int64 `json:"shown"`
 	// NextMs is how long until the game moves on, while an answer shows.
 	NextMs int64 `json:"nextMs,omitempty"`
 	// Given is the viewer's answer, as shown (once given).
@@ -1051,6 +1058,9 @@ func (h *Hub) View(viewer int64) View {
 		q := &QuestionView{
 			Category: d.Question().Base().Category, View: bank.ViewAt(d, since),
 			LimitMs: limit.Milliseconds(), LeftMs: max(0, (limit - since).Milliseconds()),
+		}
+		if t.phase == play.RoyalQuestion {
+			q.Shown = t.at.UnixMilli()
 		}
 		if me != nil && me.inQ {
 			q.Given = me.given

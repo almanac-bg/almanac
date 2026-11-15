@@ -231,7 +231,8 @@ func TestEvening(t *testing.T) {
 	if v := w.h.View(vi.ID); v.Players[0].Reached != 0 {
 		t.Fatalf("Ana's answer told before it shows: %+v", v.Players)
 	}
-	if err := w.h.Answer(ctx, bo.ID, 0, w.answer(bo, true)); !errors.Is(err, ErrNotNow) {
+	// A second answer is the first one sent again (its reply lost): it changes nothing.
+	if err := w.h.Answer(ctx, bo.ID, 0, w.answer(bo, true)); err != nil {
 		t.Fatalf("answered twice: %v", err)
 	}
 	w.wait(time.Second)
@@ -600,6 +601,7 @@ func TestRestart(t *testing.T) {
 	w.give(bo, true)
 	w.onward()
 	w.give(ana, true) // question 2: Bo hasn't answered when the server restarts
+	shown := w.h.View(bo.ID).Question.Shown
 
 	w.now = w.now.Add(30 * time.Second)
 	w.h = NewHub(w.g, Evening)
@@ -608,7 +610,9 @@ func TestRestart(t *testing.T) {
 	}
 	w.h.Step(ctx)
 	v := w.h.View(bo.ID)
-	if v.Phase != play.RoyalQuestion || v.N != 1 || !v.In || v.Out || v.Question.LeftMs != v.Question.LimitMs {
+	// The question shows again, as a new one: the screens draw it again, its time from now.
+	if v.Phase != play.RoyalQuestion || v.N != 1 || !v.In || v.Out || v.Question.LeftMs != v.Question.LimitMs ||
+		v.Question.Shown != shown+30_000 {
 		t.Fatalf("Bo after the restart: %+v", v)
 	}
 	if a := w.h.View(ana.ID); a.Question.Given == nil && !a.Players[0].Answered && !a.Players[1].Answered {
@@ -949,5 +953,44 @@ func TestThen(t *testing.T) {
 	v := w.h.View(all[0].ID)
 	if c := v.Cut; c == nil || !c.Now || c.After != 5 || c.Keep != 3 || c.Then != 8 || v.WentOut != 2 {
 		t.Fatalf("the cut after the fifth: %+v %+v", v, v.Cut)
+	}
+}
+
+// An answer sent again (the reply to the first lost on the way: the line dropped, the server restarted) is the one
+// taken: no error, nothing changed, while its question shows and once its answer does. One who didn't answer is still
+// refused once the answer shows.
+func TestAnswerAgain(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo, vi := w.player(), w.player(), w.player()
+	w.start(ana, bo, vi)
+	w.wait(2 * time.Second)
+	a := w.answer(ana, true)
+	for range 2 {
+		if err := w.h.Answer(ctx, ana.ID, 0, a); err != nil {
+			t.Fatalf("Ana's answer, sent again: %v", err)
+		}
+	}
+	w.wait(time.Second)
+	if err := w.h.Answer(ctx, ana.ID, 0, w.answer(ana, false)); err != nil {
+		t.Fatalf("Ana's answer, sent again later: %v", err)
+	}
+	w.give(bo, true)
+	w.timeUp()
+	if err := w.h.Answer(ctx, ana.ID, 0, a); err != nil {
+		t.Fatalf("Ana's answer, sent again as the answer shows: %v", err)
+	}
+	if err := w.h.Answer(ctx, vi.ID, 0, w.answer(vi, true)); !errors.Is(err, ErrNotNow) {
+		t.Fatalf("Vi's answer, after the answer showed: %v", err)
+	}
+	v := w.h.View(ana.ID)
+	if v.Phase != play.RoyalReveal || !v.Question.Reveal.Right || v.Players[0].Name != ana.Name || v.Players[0].Ms != 2000 {
+		t.Fatalf("Ana's answer, taken once: %+v %+v", v.Question.Reveal, v.Players)
+	}
+	var answers int
+	_ = w.db.Read.QueryRow(`SELECT count(*) FROM answers a JOIN royal_players p ON p.run_id = a.run_id
+		WHERE p.user_id = ?`, ana.ID).Scan(&answers)
+	if answers != 1 {
+		t.Fatalf("Ana has %d answers kept", answers)
 	}
 }
