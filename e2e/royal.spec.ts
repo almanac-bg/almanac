@@ -3,8 +3,8 @@ import { answer, playRun } from "./play.ts";
 
 // The test server runs a Роял every half minute (playwright.config.ts). The three engines' runs of this test may well
 // meet in the same one, as players do. A wrong answer puts nobody out: the game always runs its fifteen questions,
-// cut after some of them to those ahead, and those cut watch to the end.
-test("Роял: in from the lobby, live to the fifteenth question (or a cut), then the standings", async ({ page }) => {
+// cut after some of them to those ahead, and those cut play on to the end, off the standings.
+test("Роял: in from the lobby, live to the fifteenth question, then the standings", async ({ page }) => {
   test.setTimeout(480_000);
   await page.goto("/royal");
   // A game under way (another engine's) ends before the next lobby opens. The lobby's „Влез“, not the door of a game
@@ -14,16 +14,14 @@ test("Роял: in from the lobby, live to the fifteenth question (or a cut), th
   await expect(page.getByText("Вътре си.")).toBeVisible();
 
   const standings = page.getByRole("heading", { name: "Класиране" });
-  const watching = page.getByText("Гледаш до края.");
   for (let n = 0; n < 15; n++) {
     const asked = page.locator(".question-head").filter({ hasText: `${n + 1} от 15` });
-    await expect(asked.or(watching).first()).toBeVisible({ timeout: 60_000 });
-    if (await watching.isVisible()) break;
+    await expect(asked).toBeVisible({ timeout: 60_000 });
     if (n === 0) {
       await expect(page.locator(".royal-left")).toHaveText(/^В играта: \d+ от \d+$|^В турнира си само ти: /);
     }
     await answer(page);
-    // The answer shows once everyone still in has answered, with the standings.
+    // The answer shows once everyone still in has answered (or the time is up, for one cut), with the standings.
     await expect(page.locator(".verdict")).toBeVisible({ timeout: 40_000 });
     await expect(page.locator(".royal-table .row.me")).toBeVisible();
   }
