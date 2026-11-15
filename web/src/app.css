@@ -2061,9 +2061,21 @@
     box-shadow: none;
   }
 
-  /* The reviewed questions of a finished run sit still. */
+  /* The reviewed questions of a finished run sit still, their answers a step under the question, closer set (a
+     card's width at 320px holds an order's row: its place, name, value and mark). */
   .reviewed .option {
+    gap: var(--space-2);
+    min-height: 3rem;
+    padding-right: var(--space-3);
+    font-size: 1rem;
+    line-height: 1.375rem;
     animation: none;
+  }
+
+  /* A long value wraps rather than push the card past the screen. */
+  .reviewed .option .value {
+    white-space: normal;
+    text-align: right;
   }
 
   .hint {

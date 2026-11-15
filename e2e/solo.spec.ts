@@ -150,7 +150,10 @@ test("„България“: the questions about Bulgaria from every topic, a t
   await expect(page.locator(".day-line .kicker")).toHaveText("България");
   // Its ten come from more than one topic, each named in the review by its own.
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
-  const topics = new Set((await page.locator(".reviewed > .kicker").allTextContents()).map((k) => k.split(" · ")[1]));
+  await expect(page.locator(".reviewed")).toHaveCount(10);
+  const topics = new Set(
+    (await page.locator(".reviewed-head .kicker").allTextContents()).map((k) => k.split(" · ")[1]),
+  );
   expect(topics.size).toBeGreaterThan(1);
   expect(topics.has("")).toBe(false);
   await expect(page.getByRole("button", { name: "Още десет" })).toBeVisible();
