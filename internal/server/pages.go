@@ -96,6 +96,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		"push":       s.pushKey(),
 		"phones":     s.phones.Platforms(), // the platforms the game's app gets notifications on
 		"hostCss":    m["host.css"],        // a room's big screen: its style, loaded only there
+		"outcomeCss": m["outcome.css"],     // a duel's result: its style, loaded with it
 	})
 	title, description := s.preview(r)
 	canonical := ""

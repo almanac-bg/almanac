@@ -28,6 +28,7 @@ interface Boot {
   push: string;
   phones: string[] | null;
   hostCss: string;
+  outcomeCss: string;
 }
 
 const boot: Boot = JSON.parse(document.getElementById("boot")?.textContent || "{}");
@@ -46,6 +47,8 @@ export const pushKey = boot.push ?? "";
 export const phonePlatforms: string[] = boot.phones ?? [];
 /** The style of a room's screen when its host leads it from a big screen (host.css): loaded only then. */
 export const hostCss = boot.hostCss ?? "";
+/** The style of a duel's result (outcome.css): loaded with it (kit.ts). */
+export const outcomeCss = boot.outcomeCss ?? "";
 
 /** Where the page was first opened: a new guest says it, so the admin page can tell where players come from (an
  * invite, a shared day, a room …), whatever pages they went through before their first game. */

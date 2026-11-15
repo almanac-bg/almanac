@@ -12,7 +12,7 @@ import { preparePush } from "./lib/push.ts";
 import { go, path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
 import { almanac } from "./screens/almanac.ts";
-import { challengeFriend, duel, duelOne, playChallenge, until } from "./screens/duel.ts";
+import { challengeFriend, duel, duelOne, playChallenge } from "./screens/duel.ts";
 import { friends } from "./screens/friends.ts";
 import { invite } from "./screens/invite.ts";
 import { me } from "./screens/me.ts";
@@ -28,6 +28,7 @@ import { today } from "./screens/today.ts";
 import { wardrobe } from "./screens/wardrobe.ts";
 import { year } from "./screens/year.ts";
 import { type Challenge, challenges, checkWaiting, friendRequests, playing, watchWaiting } from "./state.ts";
+import { until } from "./ui.ts";
 
 /**
  * The four main places: where each goes, its name and icon, and which paths are part of it. Playing (every way) starts

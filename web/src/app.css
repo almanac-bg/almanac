@@ -2943,42 +2943,6 @@
     gap: var(--space-3);
   }
 
-  .duel-score {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    gap: var(--space-3);
-    text-align: center;
-  }
-
-  .duel-side {
-    display: grid;
-    gap: 2px;
-  }
-
-  .duel-points {
-    font: 900 2.5rem / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .duel-vs {
-    color: var(--text-muted);
-    font: 900 2rem / 1 var(--font-numeral);
-  }
-
-  .duel-delta {
-    grid-column: 1 / -1;
-    font-weight: 800;
-  }
-
-  .duel-delta.up {
-    color: var(--right-ink);
-  }
-
-  .duel-delta.down {
-    color: var(--wrong-ink);
-  }
-
   /* Before a run: a ring running out around the seconds left, and a way to start at once or back out. */
   .get-ready {
     justify-items: center;

@@ -214,6 +214,20 @@ takes a token.
   opened (the button takes the player there).
 - **A room led from a big screen** (`host.css`, loaded only there): `.host`, `.host-row` (two columns on a laptop and
   up), `.host-qr`, `.host-join`, `.host-controls` and `.podium`.
+- **A duel's result** (`screens/outcome.ts` with `outcome.css`, loaded as a duel starts), one card (`.duel-end`) for
+  a result or a friend's duel still waiting: the kicker („Дуел с Мария“, „Дуел на живо с …“, „Дуел срещу запис“)
+  and the verdict (`.duel-verdict`: „Победа“, „Загуба“, „Равенство“, „Изигра своя дуел“); the two face to face
+  (`.duel-face`: the big avatar with its frame, the name a way to the profile, the title or „Запис“, the points and
+  the right answers; the winner's points gold and its avatar glowing, the other's plain; the other's points a dash,
+  „Тепърва ще играе“, until they have); the duel question by question (`.duel-marks`: the player's row over the
+  other's, each beside a small avatar; the quicker of two right answers ringed in gold, `.fast`, said once under
+  them; a gold band behind the question that decided it); one line of what decided it (`.duel-line`: „Реши се на
+  8-ия въпрос.“, „Реши се на последния въпрос.“, „Мария водеше от първия въпрос до края.“, „Равни точки: реши
+  времето (…)“; while waiting, until when); and what it meant under a hairline (`.duel-meant`: the division's emblem,
+  its name and the change, its bar, „Рейтинг 1062 → 1080 · 70 до Злато“; why it didn't move; the record against
+  this person, „Срещу Мария 3 : 2“, in rose). Then the next steps: „Реванш“ (a friend's), „Още един дуел“ (right
+  after a live one) or „Към дуелите“, gold. A duel without a result (turned down, not played in time, cut off) is
+  its heading and a line, and the player's own game if they played it (`.duel-mine`).
 - **Friends:** `.card.friends`, `.invitation` (a friend request, accepted with `.btn.rose`), `.friend-list`/`.friend`
   (with `.friend-day` and `.record`) and `.invite-link`.
 - **In code:**
@@ -230,6 +244,8 @@ takes a token.
   - `.players li`, `.friend`, `.invitation` and `.invite-link`
   - `.modes`, `.topics`, `.streak-chip`, `.level-chip` and `.league-card`
   - `.unlocks .unlock-row`, `.news-open` and `.explain`
+  - `.duel-head`, `.duel-verdict`, `.duel-face`, `.duel-points`, `.duel-marks .duel-pip`, `.duel-line`,
+    `.duel-rating-line` and `.duel-record`
 
 ## Tiers
 
@@ -365,6 +381,11 @@ Feedback fires once, when it's earned, and then the screen is still again:
   from the day before with the flame swelling once and its sound, and the level's bar fills in its chip (a new level:
   to the end, a gold flash, the number rolls, it fills again). Ten of ten: the pips sweep gold, „Всички верни“ and the
   rosette as a seal, drawn petal by petal, the gold one last. All typographic: no particles.
+- **A duel's result lands, once** (feel.ts `duel`, at most 1.6s, a tap jumps to the end, never again on that
+  device): the verdict waits while the marks fill pair by pair (75ms apart, a pluck for each of the player's right
+  ones, a thud for each not), the two scores counting up with them so the lead changes hands as it did, the band of
+  the deciding question lighting as it's reached; at about 0.9s the verdict rises and the scores land, the winner's
+  turning gold, with `win`, `lose` or `end`; then what it meant fades in, the rating's bar filling from where it was.
 - **The big news is a sheet**, at most one a game, only for what really is big: a week of the league ended up or on
   its podium, a division reached, the streak at 3, 7, 30, 100 or 365 days, a level that unlocks something or is a
   fifth, an epic or legendary achievement. It opens once the result has landed, slides up (320ms) over the dimmed
@@ -408,8 +429,8 @@ Feedback fires once, when it's earned, and then the screen is still again:
   default, kept on the device): a light knock when an answer is tapped; a selection tick for each digit, move and
   card placed; a medium knock for a right answer and for the streak growing; success for an exact one and for ten of
   ten; a light knock for a close one; two light knocks, 80ms apart, for a wrong one or none (never the phone's error
-  alert); success, then a heavy knock 120ms later, for the big news's sheet and for getting through Роял's cut; a light
-  knock for going out of it.
+  alert); success, then a heavy knock 120ms later, for the big news's sheet, for getting through Роял's cut and for a
+  win (a duel, Роял, first in a room); a light knock for going out of the cut and for a duel lost.
 
 ## Pictures
 

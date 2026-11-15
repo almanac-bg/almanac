@@ -21,12 +21,13 @@ let {
   computed,
   crowdLine,
   effect,
+  duelResult,
   emblem,
-  ended,
   formatNumber,
   go,
   h,
   keepAwake,
+  loadDuelResult,
   news,
   onCleanup,
   picture,
@@ -129,12 +130,13 @@ export function liveDuel(kit: Kit) {
     computed,
     crowdLine,
     effect,
+    duelResult,
     emblem,
-    ended,
     formatNumber,
     go,
     h,
     keepAwake,
+    loadDuelResult,
     news,
     onCleanup,
     picture,
@@ -290,6 +292,7 @@ function waiting(wait: () => Wait): Child {
  * seconds. */
 function intro(v: LiveView): Child {
   play("ping");
+  loadDuelResult().catch(() => {}); // the result's screen, on its way while they play
   const left = signal(Math.max(1, Math.ceil((v.startsMs ?? 0) / 1000)));
   const tick = setInterval(() => {
     const was = left.peek();
@@ -482,25 +485,24 @@ function theirs(s: Side, v: View): Child {
   );
 }
 
-/** The result, as the duel was kept: who won, the scores, the rating it moved, what the game earned; then the
- * questions to go over. */
+/** The result, as the duel was kept (screens/outcome.ts, landing as a moment with its sound): who won, question by
+ * question, the rating it moved, what the game earned; then the questions to go over. */
 function end(v: LiveView, again: () => void): Child {
   const kept = signal<DuelView | null>(null);
   const error = signal("");
-  api<{ duels: DuelView[] }>("GET", "/api/duels").then(
-    (r) => {
-      const d = r.duels.find((x) => x.id === v.id);
-      if (d) {
-        play(d.state === "won" ? "win" : d.state === "lost" ? "lose" : "end");
-        kept.set(d);
-      } else error.set("Резултатът още се записва. Виж го след малко в дуелите си.");
-    },
-    (err) => error.set((err as ApiError).message),
+  api<{ duel: DuelView }>("GET", `/api/duels/${v.id}`).then(
+    (r) => kept.set(r.duel),
+    (err) =>
+      error.set(
+        (err as ApiError).code === "no_duel"
+          ? "Резултатът още се записва. Виж го след малко в дуелите си."
+          : (err as ApiError).message,
+      ),
   );
   return h("div", null, () => {
     const d = kept();
     if (d)
-      return ended(
+      return duelResult(
         d,
         h("button", { class: "btn primary big", type: "button", onclick: again }, "Още един дуел"),
         d.runId ? news(d.runId) : null,

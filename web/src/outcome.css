@@ -1,0 +1,265 @@
+/* A duel's result (screens/outcome.ts): the two face to face, the duel question by question, what it meant. Loaded
+   with it, the first time a duel's result shows; the rest of the page is app.css's. */
+
+@layer app {
+  .duel-end {
+    text-align: center;
+  }
+
+  .duel-head {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  /* The two, face to face: the avatar, the name and title, the score; the winner's in gold. */
+  .duel-faces {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-2);
+  }
+
+  .duel-face {
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  /* Beside the marks (below): small. */
+  .duel-who .avatar {
+    --size: 24px;
+    margin: 0;
+  }
+
+  .duel-face .avatar {
+    margin-bottom: var(--space-3);
+    transition: box-shadow 200ms;
+  }
+
+  .duel-face.win .avatar {
+    box-shadow: var(--glow-gold);
+  }
+
+  .duel-name {
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 1.0625rem;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .duel-title {
+    display: grid;
+    justify-items: center;
+    min-height: 1rem;
+    max-width: 100%;
+  }
+
+  .duel-points {
+    margin-top: var(--space-1);
+    font: 900 3rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+    transition: color 200ms;
+  }
+
+  .duel-face.win .duel-points {
+    color: var(--gold-ink);
+  }
+
+  .duel-points.none {
+    color: var(--text-muted);
+  }
+
+  .duel-rights {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+  }
+
+  /* Level with the scores, over the line under them. */
+  .duel-colon {
+    align-self: end;
+    margin-bottom: 1.6rem;
+    color: var(--text-muted);
+    font: 900 2rem / 1 var(--font-numeral);
+  }
+
+  /* Question by question: the player's marks over the other's, a band behind the question that decided it. */
+  .duel-marks {
+    display: grid;
+    grid-template-columns: 24px repeat(10, minmax(0, 1fr));
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    max-width: 26rem;
+    margin: var(--space-2) auto 0;
+  }
+
+  .duel-who {
+    display: grid;
+  }
+
+  .duel-pip {
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    border-radius: var(--radius-xs);
+    background: var(--sunken);
+    color: var(--on-fill);
+  }
+
+  .duel-pip::before {
+    content: "";
+    width: 60%;
+    height: 60%;
+    background: currentColor;
+    -webkit-mask: var(--i) center / contain no-repeat;
+    mask: var(--i) center / contain no-repeat;
+  }
+
+  .duel-pip:not(.right, .partial, .wrong)::before {
+    content: none;
+  }
+
+  .duel-pip.right {
+    --i: var(--i-check);
+    background: var(--right);
+    box-shadow: inset 0 0 0 1.5px var(--right-ink);
+  }
+
+  .duel-pip.partial {
+    --i: var(--i-near);
+    background: var(--gold);
+    box-shadow: inset 0 0 0 1.5px var(--gold-ink);
+  }
+
+  .duel-pip.wrong {
+    --i: var(--i-cross);
+    background: transparent;
+    color: var(--wrong-ink);
+    box-shadow: inset 0 0 0 1.5px var(--wrong-ink);
+  }
+
+  /* The quicker of two right answers. */
+  .duel-pip.fast,
+  .duel-key-ring {
+    outline: 2px solid var(--gold-ink);
+    outline-offset: 2px;
+  }
+
+  .duel-band {
+    align-self: stretch;
+    margin: -5px -3px;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--gold) 16%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold-ink) 45%, transparent);
+  }
+
+  .duel-key {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+
+  .duel-key-ring {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    background: var(--right);
+    outline-offset: 1px;
+  }
+
+  .duel-line {
+    color: var(--text-muted);
+    font-weight: 700;
+    text-wrap: balance;
+  }
+
+  .duel-line:empty {
+    display: none;
+  }
+
+  /* What it meant: the rating from and to in its division, and the record against this person. */
+  .duel-meant {
+    display: grid;
+    gap: var(--space-3);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--line);
+    text-align: start;
+  }
+
+  .duel-rating {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .duel-rating .meter-fill {
+    background: var(--div);
+  }
+
+  .duel-rating-text {
+    display: grid;
+    flex: 1;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .duel-rating-top,
+  .duel-record {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .duel-rating-top .delta {
+    font: 900 1.25rem / 1 var(--font-numeral);
+  }
+
+  .duel-rating-line,
+  .duel-why {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+  }
+
+  .duel-record {
+    font-weight: 700;
+  }
+
+  .duel-record-end {
+    display: grid;
+    justify-items: end;
+  }
+
+  .duel-record-n {
+    color: var(--rose-ink);
+    font: 900 1.5rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A duel without a result: the player's own game, if they played it. */
+  .duel-mine {
+    gap: var(--space-3);
+  }
+
+  .duel-mine-n {
+    font: 900 2rem / 1 var(--font-numeral);
+  }
+
+  @media (max-width: 22rem) {
+    .duel-marks {
+      gap: 5px;
+    }
+
+    .duel-points {
+      font-size: 2.5rem;
+    }
+  }
+}
