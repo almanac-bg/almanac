@@ -4344,9 +4344,7 @@
     background: none;
     color: inherit;
     font: inherit;
-    text-decoration: underline dotted;
-    text-underline-offset: 3px;
-    cursor: help;
+    cursor: help; /* no underline: the word is a tap away from its meaning, without standing out (owner, 15 Nov) */
   }
 
   /* By the word it explains (ui.ts places it), not in the middle of the screen. */

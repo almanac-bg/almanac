@@ -123,7 +123,7 @@ export function topic([id = ""]: string[]) {
           h("div", { class: "day-line" }, h("span", { class: "kicker" }, name)),
           {
             main: h("button", { class: "btn primary big", onclick: again }, "Още десет"),
-            also: [h("a", { class: "btn", href: "/" }, "Друга тема")],
+            also: [h("a", { class: "btn", href: "/" }, "Към Начало")], // where the day and the other topics are
           },
           [news(s.id)],
         ),
