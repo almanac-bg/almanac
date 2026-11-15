@@ -401,10 +401,11 @@ const (
 // recordedRun is another player's finished run of ten questions, all still in the bank and none of today's (a day's
 // run never), played at a person's speed (not marked a script's: fair.go), to play against: a real game
 // (RecordingRights right or more), by a player whose rating is within RecordingBand of the player's, the one with the
-// fewest questions the player has seen (seen, read before the write), the latest first. Short of such, the nearest it
+// fewest questions the player has seen (seen, read before the write) or a day ahead holds (ahead.go: a game played
+// before those days were drawn may have them), the latest first. Short of such, the nearest it
 // gets: any real game, then any game. Nil if there's none.
 func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*recorded, error) {
-	barred, err := g.dayQuestions(tx)
+	days, err := g.days(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -442,10 +443,10 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 		}
 		n, whole := 0, true
 		for _, p := range picks {
-			if _, ok := b.Get(p.ID); !ok || barred[p.ID] {
+			if _, ok := b.Get(p.ID); !ok || days.today[p.ID] {
 				whole = false
 			}
-			if seen[p.ID] {
+			if seen[p.ID] || days.all[p.ID] {
 				n++
 			}
 		}

@@ -36,7 +36,7 @@ func TestAYearOfDays(t *testing.T) {
 		for _, s := range daySlots {
 			plenty = append(plenty, left(s) >= Length)
 		}
-		picks := drawDay(b, used, r)
+		picks, _ := drawDay(b, used, nil, r)
 		topics := map[string]bool{}
 		for i, p := range picks {
 			if used[p.ID] {
