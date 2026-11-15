@@ -35,7 +35,7 @@ import (
 
 // DayRules names the day's draw as it is: change it whenever drawDay draws differently, and the days after tomorrow
 // are drawn again by the new rules.
-const DayRules = "2026-11-15 picture-first, on, bg, estimate"
+const DayRules = "2026-11-15 picture-first, on, bg, estimate, one subject"
 
 // Ahead is how many days ahead of today the day's questions are drawn.
 const Ahead = 365

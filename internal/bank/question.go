@@ -4,7 +4,8 @@
 // Every type lives in its own file (choice.go, number.go, order.go, truefalse.go, match.go, split.go, clues.go) and plugs in through the
 // same three steps: it checks itself, deals itself for one play (shuffled, without its answer), and grades what a
 // player gave. Adding a type is a new file here and its renderer in the web client; nothing else changes. With the
-// answer a deal also shows how players have answered the question so far (crowd.go), in its own order.
+// answer a deal also shows how players have answered the question so far (crowd.go), in its own order. What a question
+// names (subjects.go) keeps a day to one question of a subject, and tells the bank's keepers which subjects come back.
 package bank
 
 import (
@@ -32,6 +33,9 @@ type Head struct {
 
 	// Category comes from the file the question is in (questions/<category>.json).
 	Category string `json:"-"`
+
+	// subjects are what the question names as its subject (Subjects), worked out as the bank loads.
+	subjects []string
 }
 
 // Tail is what every question may end with: a picture, the fact behind the answer, and when it was added, last

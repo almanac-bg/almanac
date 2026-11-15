@@ -3,6 +3,7 @@ package play
 import (
 	"math/rand/v2"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 
 // With the real bank (when it's there), the days keep their shape exactly for 50 days while the bank has questions
 // for each place (it has only so many medium orders and matches: past those, a day's order is of another
-// difficulty, then a choice), and no question comes twice in a year.
+// difficulty, then a choice), no question comes twice in a year, and no subject twice in a day.
 func TestAYearOfDays(t *testing.T) {
 	if _, err := os.Stat("../../private/" + bank.CategoriesFile); err != nil {
 		t.Skip("no private bank")
@@ -39,6 +40,7 @@ func TestAYearOfDays(t *testing.T) {
 		}
 		picks, _ := drawDay(b, time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, day).Format(time.DateOnly), used, nil, r)
 		topics := map[string]bool{}
+		named := map[string]string{}
 		for i, p := range picks {
 			if used[p.ID] {
 				t.Fatalf("day %d repeats %s", day, p.ID)
@@ -46,6 +48,15 @@ func TestAYearOfDays(t *testing.T) {
 			used[p.ID] = true
 			q, _ := b.Get(p.ID)
 			s := daySlots[i]
+			if s.typ == newKinds[0] && slices.Contains(newKinds, q.Base().Type) {
+				s.typ = q.Base().Type // the new kinds' place: either of them
+			}
+			for _, k := range bank.Subjects(q) {
+				if other, ok := named[k]; ok {
+					t.Fatalf("day %d: %s and %s both name %q", day, other, p.ID, k)
+				}
+				named[k] = p.ID
+			}
 			// While the bank has none of a slot's type, the slot takes a choice (choose).
 			if day < 50 && plenty[i] && !matches(q, s, true, true) {
 				t.Fatalf("day %d, place %d: %s is a %s %s (picture %v), not as planned", day, i, p.ID,

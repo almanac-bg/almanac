@@ -3,6 +3,7 @@
 //	almanac serve                       run the game
 //	almanac bank check [-unbalanced] [dir]  check a question bank (what a server would refuse, and full balance)
 //	almanac bank fmt [dir]              rewrite a bank's files in their one format
+//	almanac bank subjects [dir]         the subjects that come back, all of them (check shows the top)
 //	almanac bank calibrate [dir]        the questions whose difficulty disagrees with what players got right (DB_PATH)
 //	almanac backup now                  copy the database to the backups at once
 //	almanac backup restore <key> <path> write a copy (hours/07.db.gz, days/12.db.gz) to a new database file
@@ -59,5 +60,5 @@ func run(args []string) error {
 }
 
 func usage() error {
-	return fmt.Errorf("usage: almanac serve | bank check [-unbalanced] [dir] | bank fmt [dir] | bank calibrate [dir] | backup now | backup restore <key> <path> | backup verify [key] | admin [-remove] <email> | push keys | version")
+	return fmt.Errorf("usage: almanac serve | bank check [-unbalanced] [dir] | bank fmt [dir] | bank subjects [dir] | bank calibrate [dir] | backup now | backup restore <key> <path> | backup verify [key] | admin [-remove] <email> | push keys | version")
 }

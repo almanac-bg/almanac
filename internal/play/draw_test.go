@@ -4,6 +4,7 @@ import (
 	"math/rand/v2"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -92,5 +93,46 @@ func TestDayOfItsDate(t *testing.T) {
 				t.Fatalf("seed %d, %s: %d picks, or the 3 March question spent", seed, day, len(picks))
 			}
 		}
+	}
+}
+
+// A day names each subject once: no two of its questions share an answer or a quoted title, though the bank has each
+// answer many times over (every sample question copied twenty times), with the question of its date and the
+// Bulgarian ones swapped in, day after day.
+func TestOneSubjectADay(t *testing.T) {
+	b := biggerSample(t, 20)
+	for i, q := range b.Live("", "") {
+		if i%4 == 0 {
+			q.Extra().BG = true
+		}
+	}
+	dated, _ := b.Get("his-015") // the treaty of San Stefano, 3 March 1878
+	dated.Extra().On = []string{"03-03"}
+	used := map[string]bool{}
+	days := 0
+	for d := range 40 {
+		day := time.Date(2026, 3, 1+d, 0, 0, 0, 0, time.UTC).Format(time.DateOnly)
+		picks, exact := drawDay(b, day, used, nil, rand.New(rand.NewPCG(uint64(d), 11)))
+		if !exact {
+			break
+		}
+		days++
+		named := map[string]string{}
+		for _, p := range picks {
+			used[p.ID] = true
+			q, _ := b.Get(p.ID)
+			for _, k := range bank.Subjects(q) {
+				if other, ok := named[k]; ok {
+					t.Fatalf("%s: %s and %s both name %q", day, other, p.ID, k)
+				}
+				named[k] = p.ID
+			}
+		}
+		if day == "2026-03-03" && named["санстефанският"] != "his-015" {
+			t.Fatalf("3 March without its question: %v", picks)
+		}
+	}
+	if days < 15 { // the sample has one hard number, so 21 days at most
+		t.Fatalf("only %d days drawn exactly", days)
 	}
 }

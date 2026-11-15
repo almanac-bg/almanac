@@ -170,6 +170,7 @@ func Load(dir string) (*Bank, []Problem) {
 			} else {
 				keys[q.key()] = h.ID
 			}
+			h.subjects = subjectsOf(q)
 			b.byID[h.ID] = q
 			b.Questions = append(b.Questions, q)
 		}

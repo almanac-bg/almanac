@@ -33,6 +33,8 @@ func bankCommand(args []string) error {
 		return bankCheck(dir(), unbalanced)
 	case "fmt":
 		return bankFmt(dir())
+	case "subjects":
+		return bankSubjects(dir())
 	case "calibrate":
 		return bankCalibrate(dir())
 	}
@@ -52,7 +54,8 @@ func defaultBankDir() string {
 
 // bankCheck checks everything the server checks before it plays a bank, and the owner's rule that every category is
 // the same size (so a batch can't be committed half done; unbalanced lets the small public sample pass). It reports
-// the mix, and the day's runway: how long each place of a day has questions for, where the next batch writes first.
+// the mix; the day's runway: how long each place of a day has questions for, where the next batch writes first; and
+// the subjects that come back.
 func bankCheck(dir string, unbalanced bool) error {
 	b, problems := bank.Load(dir)
 	errs := 0
@@ -67,6 +70,7 @@ func bankCheck(dir string, unbalanced bool) error {
 	}
 	fmt.Println(summary(b))
 	fmt.Println(runway(b))
+	fmt.Println(subjects(b, SubjectsShown))
 	sizes := map[int]bool{}
 	for _, c := range b.Categories {
 		sizes[len(b.Live(c.ID, ""))] = true
@@ -96,6 +100,75 @@ func runway(b *bank.Bank) string {
 			warn = fmt.Sprintf("   warning: under %d days: write for it first", RunwayMin)
 		}
 		fmt.Fprintf(&s, "  %-34s %5d%s\n", r.Place, r.Days, warn)
+	}
+	return strings.TrimRight(s.String(), "\n")
+}
+
+// SubjectMost is how many live questions may name one subject before it's listed; SubjectShare is the share of a
+// category one subject should stay under (the questions skill's soft cap); SubjectsShown is how many of each list
+// `bank check` shows (`bank subjects` shows them all).
+const (
+	SubjectMost   = 15
+	SubjectShare  = 0.01
+	SubjectsShown = 20
+)
+
+// bankSubjects lists every subject that comes back (subjects), for a batch that writes away from them or a pass that
+// retires the weaker of two identities.
+func bankSubjects(dir string) error {
+	b, problems := bank.Load(dir)
+	if b == nil {
+		for _, p := range problems {
+			fmt.Println(p)
+		}
+		return errors.New("fix the errors first")
+	}
+	fmt.Println(subjects(b, 0))
+	return nil
+}
+
+// subjects lists, without failing, the subjects that come back (bank.Repeats): the answers and names more than
+// SubjectMost live questions name, with the categories they fall in (marked where over SubjectShare of one); and the
+// "who or what is this" questions that share an answer (bank.SameIdentity), of which one is enough. Each list stops
+// at shown lines (0: all of them).
+func subjects(b *bank.Bank, shown int) string {
+	var s strings.Builder
+	size := map[string]int{}
+	for _, c := range b.Categories {
+		size[c.ID] = len(b.Live(c.ID, ""))
+	}
+	// cut says, at line i of n, whether the list stops there, and how many it leaves out.
+	cut := func(i, n int) bool {
+		if shown > 0 && i == shown {
+			fmt.Fprintf(&s, "  … and %d more: almanac bank subjects\n", n-shown)
+			return true
+		}
+		return false
+	}
+	repeats := b.Repeats(SubjectMost)
+	fmt.Fprintf(&s, "subjects that come back: %d named in more than %d live questions (text, options, clues, items; * over %.0f%% of a category)\n",
+		len(repeats), SubjectMost, 100*SubjectShare)
+	for i, r := range repeats {
+		if cut(i, len(repeats)) {
+			break
+		}
+		var where []string
+		for _, c := range b.Spread(r) {
+			mark := ""
+			if float64(c.N) > SubjectShare*float64(size[c.Category]) {
+				mark = "*"
+			}
+			where = append(where, c.String()+mark)
+		}
+		fmt.Fprintf(&s, "  %5d  %-28s %s\n", len(r.IDs), r.Name, strings.Join(where, ", "))
+	}
+	same := b.SameIdentity()
+	fmt.Fprintf(&s, "the same answer twice: %d \"who or what is this\" answers asked by more than one picture choice or clues (one is enough)\n", len(same))
+	for i, g := range same {
+		if cut(i, len(same)) {
+			break
+		}
+		fmt.Fprintf(&s, "  %-30s %s\n", g.Name, strings.Join(g.IDs, ", "))
 	}
 	return strings.TrimRight(s.String(), "\n")
 }
