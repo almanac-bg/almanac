@@ -4,7 +4,7 @@
 
 import { emblem } from "../art/emblem.ts";
 import { nextSteps, reviewParts } from "../game/results.ts";
-import { playRun } from "../game/run.ts";
+import { getReady, playRun } from "../game/run.ts";
 import type { Reviewed, State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, type Signal, signal, slot } from "../lib/dom.ts";
@@ -157,15 +157,7 @@ export function duel() {
       () => {},
     );
   }
-  const challenge = async (friend: Friend) => {
-    error.set("");
-    try {
-      const r = await api<{ duel: number; state: State }>("POST", "/api/duels", { friend: friend.id });
-      screen.show(() => playRun(r.state, () => afterDuel(r.duel), friend.name));
-    } catch (err) {
-      error.set((err as ApiError).message);
-    }
-  };
+  const challenge = async (friend: Friend) => go(`/duel/friend/${friend.id}`);
   const hub = h(
     "section",
     { class: "screen" },
@@ -319,6 +311,15 @@ export function duelOne(params: string[]) {
       accepted = 0;
       if (d.state === "play" && !d.runId && !yes)
         return screen.show(() => asked(d, play, () => screen.show(() => ended({ ...d, state: "declined" }))));
+      // Said yes from the notice, not started yet: the count-in first, with a way back (the challenge stays).
+      if (d.state === "play" && !d.runId)
+        return screen.show(() =>
+          getReady(
+            duelWith(d.opponent?.name),
+            () => void play(),
+            () => go("/duel"),
+          ),
+        );
       if (d.state === "play") return play();
       checkWaiting(); // a notice that pointed here, to a duel already played, goes
       told(d.id); // and Начало needn't say that the friend played it
@@ -478,8 +479,7 @@ function rematch(d: DuelView, error: Signal<string>): Child {
         error.set("");
         busy.set(true);
         try {
-          const r = await api<{ duel: number }>("POST", "/api/duels", { friend: d.friend });
-          go(`/duel/${r.duel}`); // the new duel's screen, where the player's turn plays at once
+          go(`/duel/friend/${d.friend}`); // the count-in, with a way back, then the duel
         } catch (err) {
           error.set((err as ApiError).message);
           busy.set(false);
@@ -500,4 +500,37 @@ function side(label: string, s: Side, tag?: string): Child {
     h("b", { class: "duel-points" }, formatNumber(s.points)),
     h("span", { class: "muted" }, `${s.rights} от 10`),
   );
+}
+
+/** „Дуел със Заек“, or just „Дуел“ without a name. */
+const duelWith = (name?: string) => (name ? `Дуел ${withName(name)}` : "Дуел");
+
+/** Challenges a friend (/duel/friend/<id>): the count-in first, with „Откажи“ — nothing is sent until it runs out or
+ * „Започни сега“ — then the duel is made and the player's turn plays at once. A tap by mistake costs nothing. */
+export function challengeFriend([idText]: string[]) {
+  title("Дуел");
+  const id = Number(idText);
+  const screen = slot(() => h("p", { class: "muted" }, "…"));
+  const fail = (err: unknown) => screen.show(() => h("p", { role: "alert" }, (err as ApiError).message));
+  (async () => {
+    await player();
+    const { friends } = await api<{ friends: Friend[] }>("GET", "/api/friends");
+    const name = friends.find((f) => f.id === id)?.name;
+    screen.show(() =>
+      getReady(
+        duelWith(name),
+        async () => {
+          try {
+            const r = await api<{ duel: number; state: State }>("POST", "/api/duels", { friend: id });
+            history.replaceState(null, "", `/duel/${r.duel}`); // a reload comes back to this duel, not a new one
+            screen.show(() => playRun(r.state, () => afterDuel(r.duel), name));
+          } catch (err) {
+            fail(err);
+          }
+        },
+        () => (history.length > 1 ? history.back() : go("/duel")),
+      ),
+    );
+  })().catch(fail);
+  return h("div", null, screen);
 }

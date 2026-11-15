@@ -20,8 +20,16 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
   await a.reload();
   await expect(a.locator(".friend")).toHaveCount(1);
 
+  // A tap by mistake costs nothing: the count-in comes first, and „Откажи“ goes back with no duel made.
+  await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();
+  await expect(a.getByRole("heading", { name: "Приготви се" })).toBeVisible();
+  await a.getByRole("button", { name: "Откажи" }).click();
+  await expect(a.locator(".friend")).toHaveCount(1);
+  expect((await (await a.request.get("/api/duels")).json()).duels).toHaveLength(0);
+
   // Ana challenges Bo and plays hers now; once she has, Bo is told wherever he is, and plays from there.
   await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();
+  await a.getByRole("button", { name: "Започни сега" }).click();
   // Each question says whom it's a duel with.
   await expect(a.locator(".question-head .versus")).toHaveText(/^Дуел (с|със) \S/);
   await playRun(a);
