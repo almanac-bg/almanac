@@ -9,22 +9,58 @@
 // kept on in the lobby and the game.
 //
 // The server sends the evening as this player sees it after every change; the browser reconnects if the line drops.
+// It loads on its own, the first time it's opened, and is handed the app's pieces (kit.ts).
 
-import { answered, ask, crowdLine, picture } from "../game/questions.ts";
-import { review } from "../game/results.ts";
-import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
-import { type ApiError, api } from "../lib/api.ts";
-import { keepAwake } from "../lib/awake.ts";
-import { type Child, computed, effect, h, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
-import { ordinal, place } from "../lib/ordinal.ts";
-import { pushable, pushOn, turnOn } from "../lib/push.ts";
-import { title } from "../lib/router.ts";
-import { play, playAnswer, playCount } from "../lib/sound.ts";
-import { categories, player, playing, user } from "../state.ts";
-import { avatar, back, pageArt, type Tier, type VerdictKind, verdict, who } from "../ui.ts";
-import { type Standing, standingCard } from "./duel.ts";
-import { clock, coming, type Tonight, when } from "./modes.ts";
+import type { Kit } from "../kit.ts";
+import type { ApiError } from "../lib/api.ts";
+import type { Child, Signal } from "../lib/dom.ts";
+import type { Tier, VerdictKind } from "../ui.ts";
+import type { Standing } from "./duel.ts";
+import type { Tonight } from "./modes.ts";
+
+// The app's pieces, set as the screen opens (royal): it loads on its own, the first time it's opened (kit.ts), and
+// imports only types.
+let {
+  answered,
+  ask,
+  crowdLine,
+  picture,
+  review,
+  questionHead,
+  timer,
+  upNext,
+  api,
+  keepAwake,
+  computed,
+  effect,
+  h,
+  onCleanup,
+  signal,
+  untracked,
+  ordinal,
+  place,
+  pushable,
+  pushOn,
+  turnOn,
+  title,
+  play,
+  playAnswer,
+  playCount,
+  categories,
+  player,
+  playing,
+  user,
+  avatar,
+  back,
+  pageArt,
+  verdict,
+  who,
+  standingCard,
+  clock,
+  coming,
+  when,
+} = {} as Kit;
 
 type Phase = "soon" | "lobby" | "question" | "reveal" | "end";
 
@@ -155,7 +191,47 @@ const nth = (n: number) => `${ordinal(n)}я въпрос`;
 const signed = (d: number) => `${d > 0 ? "+" : ""}${d}`;
 const delta = (d?: number) => (d ? h("span", { class: d > 0 ? "delta up" : "delta down" }, signed(d)) : null);
 
-export function royal() {
+export function royal(kit: Kit) {
+  ({
+    answered,
+    ask,
+    crowdLine,
+    picture,
+    review,
+    questionHead,
+    timer,
+    upNext,
+    api,
+    keepAwake,
+    computed,
+    effect,
+    h,
+    onCleanup,
+    signal,
+    untracked,
+    ordinal,
+    place,
+    pushable,
+    pushOn,
+    turnOn,
+    title,
+    play,
+    playAnswer,
+    playCount,
+    categories,
+    player,
+    playing,
+    user,
+    avatar,
+    back,
+    pageArt,
+    verdict,
+    who,
+    standingCard,
+    clock,
+    coming,
+    when,
+  } = kit);
   title("Роял");
   const view = signal<Evening | null>(null);
   const trouble = signal(false);
