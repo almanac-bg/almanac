@@ -6,10 +6,10 @@
 
 import { picture } from "../art/picture.ts";
 import { news } from "../game/news.ts";
-import { shareButton, summary } from "../game/results.ts";
+import { boardRow, shareButton, summary } from "../game/results.ts";
 import { playRun, trail } from "../game/run.ts";
-import { dayShareText } from "../game/share.ts";
-import type { Board, Mark, State } from "../game/types.ts";
+import { dayShareText, percent, rare } from "../game/share.ts";
+import type { Board, Mark, Score, State } from "../game/types.ts";
 import { type ApiError, api, tally } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
@@ -20,7 +20,7 @@ import { title } from "../lib/router.ts";
 import { onDay } from "../lib/words.ts";
 import { dayInBulgaria } from "../lib/year.ts";
 import { player, playing, user } from "../state.ts";
-import { meter, type Open, pointsWords, reserveWords } from "../ui.ts";
+import { formatNumber, meter, type Open, pointsWords, reserveWords } from "../ui.ts";
 import { goalsCard } from "./goals.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
@@ -50,6 +50,10 @@ interface Today {
   /** The day played: the right answer the fewest of its other players got (its place, their share right). */
   rarest?: { n: number; right: number } | null;
   board: Board;
+  /** The day among the player and their friends, best first: once a friend has played it (null before). */
+  friends?: Score[] | null;
+  /** While no friend has played: whether the player has any friends at all. */
+  befriended?: boolean;
 }
 
 const longDate = (day: string) =>
@@ -113,12 +117,23 @@ export function today() {
         run?.done
           ? summary(
               run,
-              h("div", { class: "day-line" }, h("span", { class: "kicker" }, longDate(t.day)), () => {
-                const b = fresh().board;
-                return b.place
-                  ? h("a", { class: "place-line", href: "/ranks" }, `${place(b.place, b.players)} днес`)
-                  : null;
-              }),
+              [
+                h("div", { class: "day-line" }, h("span", { class: "kicker" }, longDate(t.day)), () => {
+                  const b = fresh().board;
+                  return b.place
+                    ? h("a", { class: "place-line", href: "/ranks" }, `${place(b.place, b.players)} днес`)
+                    : null;
+                }),
+                // From ten players, how many right is usual today; and the right answer few others got, in gold.
+                () => {
+                  const avg = fresh().board.average;
+                  const lines = [
+                    avg ? h("p", { class: "crowd-says" }, `Средно днес: ${formatNumber(avg, 0.1)} от 10.`) : null,
+                    rareLine(fresh().rarest),
+                  ];
+                  return lines.some(Boolean) ? h("div", null, lines) : null;
+                },
+              ],
               // The result is the one to share: „Сподели“ is the gold button, right under it; then what it earned.
               {
                 main: shareButton(
@@ -129,7 +144,7 @@ export function today() {
                   () => tally("share:day"),
                 ),
               },
-              [just ? news(run.id) : null, remindCard(t.day), countdown()],
+              [() => friendsDay(fresh()), just ? news(run.id) : null, remindCard(t.day), countdown()],
               pointsWords(t.open),
             )
           : dayCard(t, start(t), run?.trail ?? []),
@@ -265,7 +280,69 @@ function dayCard(t: Today, start: () => Promise<void>, marks: Mark[]): Child {
             ? `Около 3 минути · ${players} ${players === 1 ? "човек е играл" : "души са играли"} днес`
             : "Около 3 минути",
         ),
+    friendsPlayed(t),
   );
+}
+
+/** The right answer of the day played that the fewest of its other players got, told in gold if few did: the line
+ * the shared result carries, on the screen. */
+function rareLine(r?: { n: number; right: number } | null): Child {
+  if (!r || r.right > rare) return null;
+  const who = r.right ? `го знаят само ${percent(r.right)} от играчите` : "не го знае никой друг";
+  return h("p", { class: "crowd-says rare" }, `Позна въпрос ${r.n + 1}: днес ${who}.`);
+}
+
+/** The friends' day beside the result: the best five (the player's own row in place of the fifth if further down),
+ * each with how their ten went, and the way to them all; for a player without friends, one quiet line to invite one.
+ * Shown once the day as fetched has the player on it. */
+function friendsDay(t: Today): Child {
+  const all = t.friends ?? [];
+  if (!all.length)
+    return t.befriended === false
+      ? h(
+          "p",
+          { class: "day-next" },
+          h("a", { href: "/friends" }, "Покани някого и сравнявайте резултатите си всеки ден."),
+        )
+      : null;
+  const mine = all.findIndex((s) => s.me);
+  if (mine < 0) return null;
+  const rows = all.slice(0, 5).map((s, i) => ({ s, i }));
+  if (mine >= 5) rows[4] = { s: all[mine] as Score, i: mine };
+  return h(
+    "section",
+    { class: "board" },
+    h("h2", null, "Приятелите ти днес"),
+    h(
+      "ol",
+      null,
+      rows.map(({ s, i }) => {
+        const row = boardRow(i + 1, s.name, [String(s.rights), h("small", { class: "sub" }, " от 10")], {
+          me: s.me,
+          gap: i > 4,
+          look: s,
+          tag: s.tag,
+        });
+        if (s.trail) row.append(trail(s.trail, 10));
+        return row;
+      }),
+    ),
+    all.length > 5 ? h("p", { class: "board-note" }, h("a", { href: "/ranks#friends" }, "Всички")) : null,
+  );
+}
+
+/** Before the day is played, the friends who have played it: names only, never how they went. */
+function friendsPlayed(t: Today): Child {
+  const names = (t.friends ?? []).filter((s) => !s.me).map((s) => s.name);
+  if (!names.length) return null;
+  const [first, second] = names;
+  const text =
+    names.length === 1
+      ? `${first} вече изигра днешните въпроси.`
+      : names.length === 2
+        ? `${first} и ${second} вече изиграха днешните въпроси.`
+        : `${first} и още ${names.length - 1} приятели вече изиграха днешните въпроси.`;
+  return h("p", { class: "day-meta" }, text);
 }
 
 /** Time until the next day's questions (midnight in Bulgaria). */

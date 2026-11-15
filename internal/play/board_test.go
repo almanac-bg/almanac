@@ -139,6 +139,65 @@ func TestDayBoardsRankRightsFirst(t *testing.T) {
 	}
 }
 
+// The friends' board shows how each of a friend's ten went once the viewer has finished the day, never before.
+func TestFriendsBoardTrails(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo := w.user(), w.user()
+	w.befriend(ana, bo)
+	today := w.g.Today()
+	s, _ := w.g.StartDay(ctx, ana)
+	w.play(ana, s.ID, append(repeat(w.right, 4), repeat(w.wrong, Length-4)...)...)
+	b, err := w.g.FriendsBoard(ctx, today, bo)
+	if err != nil || len(b) != 1 || b[0].Trail != nil {
+		t.Fatalf("the friends' board before Bo played: %+v %v", b, err)
+	}
+	s, _ = w.g.StartDay(ctx, bo)
+	w.play(bo, s.ID, repeat(w.right, Length)...)
+	b, err = w.g.FriendsBoard(ctx, today, bo)
+	if err != nil || len(b) != 2 || !b[0].Me || len(b[0].Trail) != Length || len(b[1].Trail) != Length {
+		t.Fatalf("the friends' board once Bo played: %+v %v", b, err)
+	}
+	rights := 0
+	for _, m := range b[1].Trail {
+		if m.Right {
+			rights++
+		}
+	}
+	if rights != 4 || !b[1].Trail[0].Right || b[1].Trail[Length-1].Right {
+		t.Fatalf("Ana's trail: %+v", b[1].Trail)
+	}
+}
+
+// The day's average shows once DayCrowdFrom have finished the day, to a tenth.
+func TestBoardAverage(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	stale := boardStale
+	t.Cleanup(func() { boardStale = stale })
+	boardStale = 0
+	today := w.g.Today()
+	for i := range DayCrowdFrom {
+		user := w.user()
+		s, err := w.g.StartDay(ctx, user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rights := i % 8 // 0…7, 0, 1: 29 in all
+		w.play(user, s.ID, append(repeat(w.right, rights), repeat(w.wrong, Length-rights)...)...)
+		b, err := w.g.BoardOf(ctx, today, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i < DayCrowdFrom-1 && b.Average != 0 {
+			t.Fatalf("an average of %d players: %v", i+1, b.Average)
+		}
+		if i == DayCrowdFrom-1 && b.Average != 2.9 {
+			t.Fatalf("the average of %d players: %v", i+1, b.Average)
+		}
+	}
+}
+
 // A game not yet counted takes its place among those counted as the count would put it: right answers first, then
 // points, then time, then the earlier started.
 func TestBoardRunAhead(t *testing.T) {

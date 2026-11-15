@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { playRun } from "./play.ts";
+import { playedFair, playRun } from "./play.ts";
 
 test("friends: an invite link, then a duel between the two", async ({ browser }) => {
   test.setTimeout(180_000);
@@ -44,6 +44,38 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
   // The duel counts in their record.
   await a.goto("/friends");
   await expect(a.locator(".friend .record")).toBeVisible();
+});
+
+test("friends on the day: who has played it before, and how each went after", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const a = await (await browser.newContext()).newPage();
+  const b = await (await browser.newContext()).newPage();
+
+  // Ana plays the day with no friends yet: one quiet line asks her to invite someone.
+  await a.goto("/");
+  await a.getByRole("button", { name: "Започни" }).click();
+  await playRun(a);
+  await playedFair(a);
+  await expect(a.getByRole("link", { name: /^Покани някого/ })).toBeVisible();
+
+  // Bo becomes her friend; before he plays, Начало names her, without her score.
+  await a.goto("/friends");
+  const link = await a.locator(".invite-link").getAttribute("href");
+  await b.goto(link ?? "");
+  await b.getByRole("button", { name: "Приеми" }).click();
+  const heading = await b.getByRole("heading", { name: /Вече сте приятели/ }).textContent();
+  const ana = heading?.replace("Вече сте приятели с ", "") ?? "";
+  await b.goto("/");
+  await expect(b.locator(".day-meta").last()).toHaveText(`${ana} вече изигра днешните въпроси.`);
+
+  // Once he has played: both on the friends' day, his own row marked, each with how their ten went.
+  await b.getByRole("button", { name: "Започни" }).click();
+  await playRun(b);
+  const friends = b.locator(".board", { has: b.getByRole("heading", { name: "Приятелите ти днес" }) });
+  await expect(friends.locator(".row")).toHaveCount(2);
+  await expect(friends.locator(".row.me .you")).toHaveText("ти");
+  await expect(friends.locator(".row").filter({ hasText: ana }).locator(".pts")).toHaveText(/^\d+ от 10$/);
+  await expect(friends.locator(".row .trail li")).toHaveCount(20);
 });
 
 test("a friend can turn a duel down", async ({ browser }) => {

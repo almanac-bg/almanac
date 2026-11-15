@@ -415,5 +415,5 @@ mountains and a medal — are drawn by hand as paths in `web/src/art/pictures.ts
 - **Look at it** in both themes, at 320px and 390px wide, and at 1024px and 1440px. Nothing may scroll sideways, and keyboard focus must show.
 - **Run the checks:** `npm run check`, then the browser tests (`npm run e2e`), which include the accessibility
   checks.
-- **Keep to the budgets:** 16 kB of CSS, 48 kB of JS and 24 kB of pictures, gzipped. `go run ./cmd/build` fails
+- **Keep to the budgets:** 16 kB of CSS, 50 kB of JS (and 12 kB for a room's screen, on its own) and 24 kB of pictures, gzipped. `go run ./cmd/build` fails
   over them.

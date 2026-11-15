@@ -213,6 +213,8 @@ export interface Score {
   title?: string;
   titleTier?: Tier;
   level?: number;
+  /** How each of the ten went: on the friends' board, once the viewer has finished the day. */
+  trail?: Mark[];
 }
 
 export interface Board {
@@ -221,4 +223,6 @@ export interface Board {
   top: Score[];
   place?: number;
   mine?: Score;
+  /** The day's right answers on average, once ten have played it. */
+  average?: number;
 }
