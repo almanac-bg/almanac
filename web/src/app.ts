@@ -12,7 +12,7 @@ import { preparePush } from "./lib/push.ts";
 import { go, path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
 import { almanac } from "./screens/almanac.ts";
-import { duel, duelOne, playChallenge, until } from "./screens/duel.ts";
+import { challengeFriend, duel, duelOne, playChallenge, until } from "./screens/duel.ts";
 import { friends } from "./screens/friends.ts";
 import { invite } from "./screens/invite.ts";
 import { me } from "./screens/me.ts";
@@ -99,6 +99,7 @@ if (root) {
       { path: /^\/duel$/, view: duel },
       { path: /^\/duel\/live$/, view: later(() => import("./screens/live.ts").then((m) => m.liveDuel)) },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
+      { path: /^\/duel\/friend\/([0-9]+)$/, view: challengeFriend },
       { path: /^\/royal$/, view: later(() => import("./screens/royal.ts").then((m) => m.royal)) },
       { path: /^\/almanac$/, view: almanac },
       { path: /^\/mistakes$/, view: mistakes },

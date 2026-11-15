@@ -45,7 +45,7 @@ export function invite([code = ""]: string[]) {
   };
   const duel = async () => {
     try {
-      go(`/duel/${(await api<{ duel: number }>("POST", "/api/duels", { friend: info.id })).duel}`);
+      go(`/duel/friend/${info.id}`);
     } catch (err) {
       fail(err);
     }

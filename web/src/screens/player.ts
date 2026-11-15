@@ -129,9 +129,7 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
         "Приятели сте.",
         played ? h("span", { class: "muted" }, ` Дуели помежду ви: ${record(r.won, r.lost, r.drawn)}.`) : null,
       ),
-      button("Дуел", "primary", async () =>
-        go(`/duel/${(await api<{ duel: number }>("POST", "/api/duels", { friend: p.id })).duel}`),
-      ),
+      button("Дуел", "primary", async () => go(`/duel/friend/${p.id}`)),
     ];
   } else if (p.friend === "asks") {
     body = [

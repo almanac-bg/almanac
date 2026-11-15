@@ -74,8 +74,7 @@ function friendsCard(): Child {
     }
   };
   // A duel with a friend: played now, and they play theirs when they can.
-  const duel = (f: Friend) =>
-    act(async () => go(`/duel/${(await api<{ duel: number }>("POST", "/api/duels", { friend: f.id })).duel}`));
+  const duel = (f: Friend) => act(async () => go(`/duel/friend/${f.id}`));
   const remove = (f: Friend) =>
     act(async () => {
       await api("DELETE", `/api/friends/${f.id}`);
