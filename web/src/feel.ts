@@ -432,6 +432,126 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands): Promi
   });
 }
 
+/** What a duel's moment needs besides its card (screens/outcome.ts): each side's points question by question (the
+ * other's none while the duel waits for them), the end's sound, and the question that decided it (from 1; 0: none). */
+export interface DuelPlan {
+  mine: number[];
+  theirs: number[];
+  end: SoundName;
+  decided: number;
+}
+
+/**
+ * A duel's result as a moment, once (at most 1.6 s; a tap anywhere jumps to the end). The verdict waits while the
+ * marks fill pair by pair, 75 ms apart, a pluck on the scale for each of the player's right ones and a muted thud for
+ * each that wasn't; the two scores count up with them, so the lead changes hands as it did, and the band behind the
+ * question that decided it lights as it's reached. Then the verdict and the scores land, the winner's turning gold,
+ * with the end's sound (the motif over a low D for a win, a soft fall for a loss); and what it meant fades in, the
+ * rating's bar filling from where it was. Resolves once it's over.
+ */
+export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<void> {
+  const { play, format } = hands;
+  let ended = false;
+  const end = () => {
+    if (ended) return;
+    ended = true;
+    play(plan.end);
+  };
+  if (hands.calm) {
+    end();
+    return Promise.resolve();
+  }
+  const moving: Animation[] = [];
+  const timers: number[] = [];
+  const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
+  const rise = (el: Element | null, delay: number, from: Keyframe = { opacity: 0, transform: "translateY(6px)" }) => {
+    if (el) moving.push(el.animate([from, {}], { duration: 240, delay, easing: settleIn, fill: "backwards" }));
+  };
+  const pips = [...card.querySelectorAll<HTMLElement>(".duel-pip")];
+  const n = pips.length / 2;
+  const rows = [pips.slice(0, n), pips.slice(n)];
+  const points = [...card.querySelectorAll<HTMLElement>(".duel-points[data-n]")];
+  const finals = points.map((p) => Number(p.dataset.n ?? 0));
+  const sums = [0, 0];
+  for (const p of points) p.textContent = format(0);
+  const first = 100;
+  const step = 75;
+  for (let i = 0; i < n; i++) {
+    const t = first + i * step;
+    for (const row of rows) {
+      const pip = row[i];
+      if (pip)
+        moving.push(
+          pip.animate(
+            [
+              { transform: "scale(0.6)", opacity: 0 },
+              { transform: "none", opacity: 1 },
+            ],
+            { duration: 180, delay: t, easing: spring, fill: "backwards" },
+          ),
+        );
+    }
+    at(t, () => {
+      const mine = rows[0]?.[i];
+      if (mine && i < plan.mine.length) play(mine.classList.contains("wrong") ? "dud" : "pip", i);
+      sums[0] = (sums[0] ?? 0) + (plan.mine[i] ?? 0);
+      sums[1] = (sums[1] ?? 0) + (plan.theirs[i] ?? 0);
+      points.forEach((p, k) => {
+        p.textContent = format(sums[k] ?? 0);
+      });
+    });
+  }
+  if (plan.decided > 1) rise(card.querySelector(".duel-band"), first + (plan.decided - 1) * step, { opacity: 0 });
+  const landAt = first + n * step + 50;
+  for (const el of card.querySelectorAll(".duel-head h1, .duel-line, .duel-key")) rise(el, landAt);
+  for (const p of points)
+    moving.push(
+      p.animate(
+        [
+          { transform: "scale(1.15)", opacity: 0.6 },
+          { transform: "none", opacity: 1 },
+        ],
+        { duration: 260, delay: landAt, easing: spring, fill: "backwards" },
+      ),
+    );
+  // The winner is gold only once it's landed.
+  const winner = card.querySelector(".duel-face.win");
+  winner?.classList.remove("win");
+  const settle = () => {
+    winner?.classList.add("win");
+    points.forEach((p, k) => {
+      p.textContent = format(finals[k] ?? 0);
+    });
+    end();
+  };
+  at(landAt, settle);
+  rise(card.querySelector(".duel-meant"), landAt + 150);
+  const fill = card.querySelector(".duel-rating .meter-fill");
+  const shares = card.querySelector<HTMLElement>(".duel-rating-line")?.dataset;
+  if (fill && shares)
+    moving.push(
+      fill.animate([{ width: `${shares.from}%` }, { width: `${shares.to}%` }], {
+        duration: 450,
+        delay: landAt + 200,
+        easing: settleIn,
+        fill: "backwards",
+      }),
+    );
+  return new Promise((resolve) => {
+    const done = () => {
+      for (const t of timers) clearTimeout(t);
+      for (const a of moving) a.finish();
+      removeEventListener("pointerdown", done, true);
+      removeEventListener("keydown", done, true);
+      settle();
+      resolve();
+    };
+    addEventListener("pointerdown", done, true);
+    addEventListener("keydown", done, true);
+    at(1600, done);
+  });
+}
+
 /** A number in place rolling from what it was to what it is: the old one slides up and out, the new one in from
  * below. */
 function roll(el: HTMLElement, from: string, to: string): Promise<void> {

@@ -35,7 +35,12 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
   await playRun(a);
   await expect(a.getByRole("heading", { name: "Изигра своя дуел" })).toBeVisible({ timeout: 10_000 });
   // Until when, in one sentence that ends once („… 13:39 ч. Ще ти кажем …“).
-  await expect(a.locator(".intro .lead")).toContainText(/\sч\. Ще ти кажем/);
+  await expect(a.locator(".duel-line")).toContainText(/\sч\. Ще ти кажем/);
+  // Her side, face to face with Bo's still to come: her score and her ten marks; his row empty, and no result yet.
+  await expect(a.locator(".duel-face").first().locator(".duel-points")).toHaveText(/^\d[\d\s]*$/);
+  await expect(a.locator(".duel-face").last()).toContainText("Тепърва ще играе");
+  await expect(a.locator(".duel-marks .duel-pip:is(.right, .partial, .wrong)")).toHaveCount(10);
+  await expect(a.locator(".duel-meant")).toHaveCount(0);
   await b.goto("/");
   const notice = b.locator(".challenge-notice");
   await expect(notice).toContainText("те предизвика на дуел");
@@ -45,7 +50,14 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
   await expect(b.locator(".challenge-notice")).toHaveCount(0);
   await expect(b.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 10_000 });
   // „Дуел със Заек“, „Дуел с Мечка“: the word goes with the name.
-  await expect(b.locator(".intro .kicker")).toHaveText(/^Дуел (със [СЗсз]|с [^СЗсз])/);
+  await expect(b.locator(".duel-head .kicker")).toHaveText(/^Дуел (със [СЗсз]|с [^СЗсз])/);
+  // The duel question by question, both rows; the first rated duel moves the rating, said with its division; and
+  // the record between the two, this duel in it.
+  await expect(b.locator(".duel-marks .duel-pip:is(.right, .partial, .wrong)")).toHaveCount(20);
+  await expect(b.locator(".duel-face .duel-points")).toHaveCount(2);
+  const state = (await b.locator(".duel-verdict").textContent()) ?? "";
+  if (state !== "Равенство") await expect(b.locator(".duel-rating-line")).toContainText(/ \d+ → \d+ · /);
+  await expect(b.locator(".duel-record")).toContainText(/^Срещу .+\d+\s:\s\d+/);
   // Played: the notice doesn't come back on the way out (no reload), nor its dot on Начало.
   await b.locator('nav.tabs a[href="/"]').click();
   await expect(b.locator("nav.tabs a.news")).toHaveCount(0);

@@ -219,6 +219,23 @@ func (s *Server) duels(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"duels": list, "standing": st})
 }
 
+// duelOne is one of the player's duels, with what its result says (play.DuelOf).
+func (s *Server) duelOne(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		return play.ErrNoDuel
+	}
+	d, err := s.game.DuelOf(r.Context(), u.ID, id)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"duel": d})
+}
+
 // playDuel is the player's run in a friend's challenge (made the first time).
 func (s *Server) playDuel(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)

@@ -103,7 +103,21 @@ test("two people asking for a duel play it live", async ({ browser }, info) => {
   }
   for (const p of [a, b])
     await expect(p.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 20_000 });
-  await expect(a.getByRole("button", { name: "Още един дуел" })).toBeVisible();
+  await expect(a.getByRole("button", { name: "Още един дуел" })).toHaveClass(/primary/);
+  // Face to face and question by question, the same duel from both sides: what one won, the other lost.
+  for (const p of [a, b]) {
+    await expect(p.locator(".duel-head .kicker")).toHaveText(/^Дуел на живо (с|със) \S/);
+    await expect(p.locator(".duel-marks .duel-pip:is(.right, .partial, .wrong)")).toHaveCount(20);
+    await expect(p.locator(".duel-record")).toBeVisible();
+  }
+  const verdicts = [await a.locator(".duel-verdict").textContent(), await b.locator(".duel-verdict").textContent()];
+  expect(verdicts.sort()).toEqual(verdicts.includes("Равенство") ? ["Равенство", "Равенство"] : ["Загуба", "Победа"]);
   await a.goto("/duel");
   await expect(a.locator(".duel-row").first()).toContainText(/Победа|Загуба|Равенство/);
+  // Opened again from the duels, it's the same result, standing still (the moment was once), with no live duel's
+  // „Още един дуел“: the way back is the gold one.
+  await a.locator(".duel-row").first().click();
+  await expect(a.locator(".duel-verdict")).toHaveText(verdicts.includes("Равенство") ? "Равенство" : /Победа|Загуба/);
+  await expect(a.locator(".duel-marks .duel-pip:is(.right, .partial, .wrong)")).toHaveCount(20);
+  await expect(a.getByRole("link", { name: "Към дуелите" })).toHaveClass(/primary/);
 });

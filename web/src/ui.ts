@@ -2,7 +2,7 @@
 // topic's colour. The stylesheet draws them; these only say what to draw.
 
 import { badgeArt } from "./art/badge.ts";
-import type { DivisionID } from "./art/emblem.ts";
+import { type DivisionID, emblem } from "./art/emblem.ts";
 import { picture } from "./art/picture.ts";
 import { type Child, h } from "./lib/dom.ts";
 import { calm } from "./lib/prefs.ts";
@@ -466,6 +466,44 @@ export interface Division {
   name: string;
   from: number;
 }
+
+/** A player's rating, how many rated games it's from, its division, and where the next one starts (0 at the top). */
+export interface Standing {
+  rating: number;
+  rated: number;
+  division: Division;
+  next: number;
+}
+
+/** A division: its emblem and name, the rating (yours: `own`, a tap from what it means), and how far to the next. */
+export function standingCard(s: Standing, own = false): Child {
+  const span = s.next ? s.next - s.division.from : 0;
+  const share = span ? Math.round((100 * (s.rating - s.division.from)) / span) : 100;
+  return h(
+    "section",
+    { class: `card standing d-${s.division.id}` },
+    emblem(s.division.id, "l"),
+    h(
+      "div",
+      { class: "standing-text" },
+      h("p", { class: "kicker" }, "Дивизия"),
+      h("strong", { class: "standing-name" }, s.division.name),
+      h(
+        "span",
+        { class: "muted" },
+        own ? explain("Рейтинг", meaning.rating) : "Рейтинг",
+        ` ${s.rating}${s.next ? ` · ${s.next - s.rating} до следващата` : ""}`,
+      ),
+      s.next ? meter(share, `${share}% до следващата дивизия`) : null,
+    ),
+  );
+}
+
+/** A day and an hour, the Bulgarian way: „вт, 13:39 ч.“ (it ends a sentence with its own period). */
+export const until = (ms: number) =>
+  new Intl.DateTimeFormat("bg", { weekday: "short", hour: "2-digit", minute: "2-digit" })
+    .format(new Date(ms))
+    .replace(" ч.", "\u00a0ч."); // never „ч.“ alone on a line
 
 /** Something to wear, unlocked (or to be): a title, a frame, a pattern or an avatar's shape, and what unlocks it. */
 export interface Unlock {
