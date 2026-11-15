@@ -14,7 +14,8 @@
 // for the player's own touches, a soft thud for a wrong answer or none (same meaning as a buzzer, no punishment), and a
 // plain short beep for the clock. The game's motif, D–A–F♯–D (four petals, the last one gold, as in the logo), is its
 // audio logo: the end of a game, a perfect day, a level, a win. The big ones get a little room (a reverb made of
-// noise), and everything goes through a compressor, so sounds that meet can't clip.
+// noise), and everything goes through a compressor, so sounds that meet can't clip. The game's only music is here too:
+// a quiet bed for Роял's lobby (bed).
 
 import type { SoundName } from "./lib/sound.ts";
 
@@ -234,6 +235,19 @@ function noise(
   return shape;
 }
 
+/** The bell: a sine whose pitch a second sine, 3.5 times higher, wobbles: hard at first (index 3), gone by 250 ms. */
+function bell(c: BaseAudioContext, f: number, t: number, ring: number, loud: number, to: AudioNode[]): void {
+  const env = envelope(c, t, 0.004, ring, loud);
+  for (const out of to) env.connect(out);
+  const end = t + ring + 0.05;
+  const carrier = osc(c, f, t, end, env);
+  const depth = c.createGain();
+  depth.gain.setValueAtTime(3 * 3.5 * f, t);
+  depth.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+  osc(c, 3.5 * f, t, end, depth);
+  depth.connect(carrier.frequency);
+}
+
 /** Plays a sound from `t0` (in the audio's time), `lift` steps of the scale higher. */
 export function sound(c: BaseAudioContext, name: SoundName, lift: number, t0: number): void {
   const { dry, room, noise: white } = bus(c);
@@ -242,18 +256,8 @@ export function sound(c: BaseAudioContext, name: SoundName, lift: number, t0: nu
     const t = t0 + at;
     const f = hz(step + lift);
     const end = t + ring + 0.05;
-    if (voice === "b") {
-      // The bell: a sine whose pitch a second sine, 3.5 times higher, wobbles: hard at first (index 3), gone by 250 ms.
-      const env = envelope(c, t, 0.004, ring, loud);
-      env.connect(dry);
-      if (cue.room) env.connect(room);
-      const carrier = osc(c, f, t, end, env);
-      const depth = c.createGain();
-      depth.gain.setValueAtTime(3 * 3.5 * f, t);
-      depth.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
-      osc(c, 3.5 * f, t, end, depth);
-      depth.connect(carrier.frequency);
-    } else if (voice === "p") {
+    if (voice === "b") bell(c, f, t, ring, loud, cue.room ? [dry, room] : [dry]);
+    else if (voice === "p") {
       // The pluck: a click of band-passed noise and the note, both gone at once, like a pencil's tick.
       const click = envelope(c, t, 0.001, 0.006, loud * 0.8);
       click.connect(dry);
@@ -296,6 +300,105 @@ export function sound(c: BaseAudioContext, name: SoundName, lift: number, t0: nu
       shape.frequency.exponentialRampToValueAtTime(2400, t + ring);
     }
   }
+}
+
+// ---- Music ----
+
+/** Роял's lobby music while it plays: `until` is when the games start (in the audio's time), for the build in their
+ * last ten seconds; `stop` ends it, with the motif's first two notes as the games begin (`begin`), or else fading. */
+export interface Bed {
+  until(at: number): void;
+  stop(begin: boolean): void;
+}
+
+/** The bed's bar (s): four beats at 64 a minute. */
+const bar = (4 * 60) / 64;
+/** Its four bars' chords, a root and a fifth of the scale in steps from D5: D3–A3, B2–F♯3, E3–B3, A2–E3. */
+const chords = [
+  [-10, -7],
+  [-11, -8],
+  [-9, -6],
+  [-12, -9],
+];
+
+/** The music in Роял's lobby, the only music in the game: a quiet bed in the game's key, four bars at 64 a minute
+ * going round. A pad of two detuned saws for each note of a chord, low-passed at 900 Hz with the filter slowly
+ * breathing; a soft bell of the scale every two bars, picked at random; all in the room, 24 dB under the sounds. In
+ * its last ten seconds the filter opens to 3 kHz and a rush of noise rises into the start. */
+export function bed(c: BaseAudioContext): Bed {
+  const { dry, room, noise: white } = bus(c);
+  const t0 = c.currentTime + 0.05;
+  const level = c.createGain();
+  level.gain.setValueAtTime(0.0001, t0);
+  level.gain.exponentialRampToValueAtTime(0.033, t0 + 3); // 24 dB under a cue (rms): fades in over three seconds
+  level.connect(dry);
+  level.connect(room);
+  const filter = c.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = 900;
+  filter.Q.value = 0.7;
+  filter.connect(level);
+  const sway = c.createGain(); // the filter breathing: ±250 Hz, once in 14 s
+  sway.gain.value = 250;
+  sway.connect(filter.frequency);
+  const lfo = osc(c, 0.07, t0, t0 + 3600, sway);
+  const saws = [0, 1, 2, 3].map((i) => {
+    const voice = c.createGain();
+    voice.gain.value = 0.2;
+    voice.connect(filter);
+    const o = osc(c, hz(chords[0]?.[i >> 1] ?? 0), t0, t0 + 3600, voice, "sawtooth");
+    o.detune.value = i % 2 ? 7 : -7;
+    return o;
+  });
+  // The bars, laid a little ahead as they come.
+  let next = t0;
+  let n = 0;
+  const lay = () => {
+    while (next < c.currentTime + 1.5 * bar) {
+      const chord = chords[n % chords.length] ?? [0, 0];
+      for (const [i, o] of saws.entries()) o.frequency.setTargetAtTime(hz(chord[i >> 1] ?? 0), next, 0.3);
+      if (n % 2 === 0) bell(c, hz(Math.floor(Math.random() * 6) - 3), next + bar / 4, 2.5, 0.35, [level]);
+      next += bar;
+      n++;
+    }
+  };
+  lay();
+  const laying = setInterval(lay, 1000);
+  let rush: AudioBufferSourceNode | null = null;
+  return {
+    until(at) {
+      const from = Math.max(c.currentTime + 0.05, at - 10);
+      if (at <= from) return;
+      filter.frequency.setValueAtTime(900, from);
+      filter.frequency.exponentialRampToValueAtTime(3000, at);
+      rush?.stop();
+      rush = c.createBufferSource();
+      rush.buffer = white;
+      rush.loop = true;
+      const band = c.createBiquadFilter();
+      band.type = "bandpass";
+      band.Q.value = 1.5;
+      band.frequency.setValueAtTime(400, from);
+      band.frequency.exponentialRampToValueAtTime(5000, at);
+      const swell = c.createGain();
+      swell.gain.setValueAtTime(0.0001, from);
+      swell.gain.exponentialRampToValueAtTime(1.5, at);
+      rush.connect(band).connect(swell).connect(level);
+      rush.start(from);
+    },
+    stop(begin) {
+      clearInterval(laying);
+      const t = c.currentTime + 0.02;
+      const end = t + (begin ? 0.5 : 1.2);
+      level.gain.cancelScheduledValues(t);
+      level.gain.setValueAtTime(Math.max(level.gain.value, 0.0001), t);
+      level.gain.exponentialRampToValueAtTime(0.0001, end);
+      for (const o of [...saws, lfo]) o.stop(end + 0.1);
+      rush?.stop(end + 0.1);
+      if (begin)
+        for (const [i, s] of motif.slice(0, 2).entries()) bell(c, hz(s), t + i * 0.11, 0.4 + i * 0.3, 0.55, [dry]);
+    },
+  };
 }
 
 // ---- Motion ----

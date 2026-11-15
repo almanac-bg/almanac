@@ -151,6 +151,12 @@ export function prepareSound(): void {
   });
 }
 
+/** The audio, started, with the game's feel in: for what plays on its own beside the sounds (Роял's lobby music). None
+ * while the sounds are off, or before a touch has started them. */
+export function liveAudio(): { audio: AudioContext; feel: Feel } | null {
+  return soundOn.peek() && audio?.state === "running" && kit ? { audio, feel: kit } : null;
+}
+
 /** What the sounds that come with a touch feel like in the app (the answers' are playAnswer's), sound or not. */
 const touches: Partial<Record<SoundName, Haptic>> = {
   tap: "tap",
