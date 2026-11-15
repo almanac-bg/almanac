@@ -1,6 +1,7 @@
 // Роял: every evening at 21:00, live. Up to fifty players on the same fifteen questions at the same moment, easy to
 // hard in three rounds. A wrong answer puts nobody out: after questions 5, 8, 11 and 14 those with the most right go
-// on (of as many, the quicker), and the last question is a final of three; those cut watch the rest to the end. Each
+// on (of as many, the quicker), and the last question is a final of three; those cut play on to the end for themselves,
+// off the standings (each right answer still earns its XP). Each
 // answer shows with the standings and the next cut's line. The lobby opens a quarter of an hour before; whoever is on
 // this screen at the start plays, and those who come late may still come in until the third question's answer shows.
 // The screen is kept on in the lobby and the game.
@@ -35,9 +36,11 @@ interface Evening {
   length: number;
   round: number;
   size: number;
-  /** In this tournament (its lobby, or its game); out of its game. */
+  /** In this tournament (its lobby, or its game); cut out of its standings (they play on). */
   in: boolean;
   out: boolean;
+  /** The viewer's right answers in all, those after a cut too. */
+  rights?: number;
   /** Not in, but may still come in: the games have begun, and the door is open until the third question's answer. */
   late?: boolean;
   tables: number;
@@ -521,7 +524,7 @@ function standing(view: () => Evening): Child {
     const where = !me
       ? null
       : !me.in
-        ? `Отпадна след ${nth(me.outAt + 1)}. Гледаш до края.`
+        ? `Извън класирането: отпадна след ${nth(me.outAt + 1)}.`
         : `Ти си ${ordinal(me.rank)}: ${rights(me.reached)}, ${seconds(me.ms)}.`;
     let line: string;
     if (!c) line = "Финал: печели този с най-много верни, а при равни — по-бързият.";
@@ -547,7 +550,13 @@ function cutSaid(v: Evening): string | null {
     v.wentOut === 0
       ? `Отсяване: продължават всички (${v.left}).`
       : `Отсяване: продължават ${v.left} от ${v.left + v.wentOut}.`;
-  const you = !me ? "" : me.in ? " Продължаваш!" : me.outAt === v.n ? " Отпадаш." : "";
+  const you = !me
+    ? ""
+    : me.in
+      ? " Продължаваш!"
+      : me.outAt === v.n
+        ? " Отпадаш от класирането. Играй до края за себе си: всеки верен отговор носи XP."
+        : "";
   return went + you;
 }
 
@@ -585,7 +594,8 @@ function question(view: () => Evening, first: Evening): Child {
   const q = first.question;
   if (!q) return null;
   if (first.n === 0 && first.in) play("go"); // the game starts
-  const plays = first.in && !first.out;
+  // Those cut play on, off the standings.
+  const plays = first.in;
   const locked = signal(!plays || !!q.given);
   const sent = signal(!!q.given);
   const secs = signal(Math.ceil(q.leftMs / 1000));
@@ -623,12 +633,14 @@ function question(view: () => Evening, first: Evening): Child {
     asked.node,
     () => {
       const v = view();
-      const waiting = v.players.filter((p) => p.in || p.outAt === v.n);
+      // The answer waits for those still in.
+      const waiting = v.players.filter((p) => p.in);
       const done = waiting.filter((p) => p.answered).length;
       return h(
         "p",
         { class: "status", role: "status" },
-        !plays ? "Гледаш. " : sent() ? "Отговорът ти е приет. " : "",
+        !plays ? "Гледаш. " : v.out ? "Извън класирането. " : "",
+        sent() ? "Отговорът ти е приет. " : "",
         `Отговориха ${done} от ${waiting.length}.`,
       );
     },
@@ -689,10 +701,12 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
         ? h(
             "p",
             { class: "lead" },
-            me.reached >= first.length
-              ? `Всичките ${first.length} верни.`
-              : // Of the questions they answered: those out, to their cut.
-                `${me.reached} от ${me.outAt >= 0 ? me.outAt + 1 : first.n + 1} верни.`,
+            me.outAt >= 0
+              ? // Cut, they played on: all their right answers, those after the cut too.
+                `Общо: ${first.rights ?? me.reached} от ${first.length} верни.`
+              : me.reached >= first.length
+                ? `Всичките ${first.length} верни.`
+                : `${me.reached} от ${first.n + 1} верни.`,
             first.entered >= 3 && first.delta ? ` Рейтинг: ${signed(first.delta)}.` : "",
           )
         : null,
