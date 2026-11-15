@@ -4,6 +4,7 @@
 import { append, type Child, effect, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { play } from "../lib/sound.ts";
+import { hyphenate } from "../lib/words.ts";
 import { formatNumber } from "../ui.ts";
 import { percent, rare } from "./share.ts";
 import type {
@@ -675,7 +676,7 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
         const k = pairOf();
         return k >= 0 ? String(k + 1) : "";
       }),
-      h("span", null, text),
+      h("span", null, hyphenate(text)),
     );
   };
   const lefts = view.left.map((t, i) => cell("left", i, t));
@@ -826,7 +827,7 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
         "span",
         { class: "split-label" },
         side === 0 ? h("span", { class: "split-arrow", "aria-hidden": "true" }, "← ") : null,
-        view.groups[side],
+        hyphenate(view.groups[side] ?? ""),
         side === 1 ? h("span", { class: "split-arrow", "aria-hidden": "true" }, " →") : null,
       ),
     );
@@ -838,7 +839,8 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
     undo.hidden = at === 0 || at >= n;
     const cards: HTMLElement[] = [];
     const nextText = view.items[at + 1];
-    if (nextText !== undefined) cards.push(h("div", { class: "split-card under", "aria-hidden": "true" }, nextText));
+    if (nextText !== undefined)
+      cards.push(h("div", { class: "split-card under", "aria-hidden": "true" }, hyphenate(nextText)));
     const text = view.items[at];
     if (text !== undefined) {
       const card = h(
@@ -846,7 +848,7 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
         { class: "split-card top", "aria-live": "polite" },
         h("span", { class: "split-lean on-left", "aria-hidden": "true" }, view.groups[0]),
         h("span", { class: "split-lean on-right", "aria-hidden": "true" }, view.groups[1]),
-        h("span", { class: "split-text" }, text),
+        h("span", { class: "split-text" }, hyphenate(text)),
       );
       drag(card);
       cards.push(card);
