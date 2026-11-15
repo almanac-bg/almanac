@@ -189,8 +189,17 @@ func (g *Game) LeaveRoyal(ctx context.Context, royalID, userID int64) error {
 	return err
 }
 
-// StartRoyal begins a tournament with those of its lobby who are there (the others are left out of it): each is given
-// a run of its questions, and the first question shows. It returns each player's run.
+// MoveRoyal moves a player from one tournament's lobby to another's, of the same evening (as its games begin, to
+// even them out).
+func (g *Game) MoveRoyal(ctx context.Context, from, to, userID int64) error {
+	_, err := g.DB.Write.ExecContext(ctx, `UPDATE royal_players SET royal_id = ? WHERE royal_id = ? AND user_id = ?`,
+		to, from, userID)
+	return err
+}
+
+// StartRoyal begins a tournament with those of its lobby who are there: each is given a run of its questions, and
+// the first question shows. It returns each player's run. The others stay in it without a run: they may still come
+// in late (EnterRoyal), and are taken out as it ends (SettleRoyal).
 func (g *Game) StartRoyal(ctx context.Context, royalID int64, players []int64) (map[int64]int64, error) {
 	runs := map[int64]int64{}
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
@@ -200,11 +209,6 @@ func (g *Game) StartRoyal(ctx context.Context, royalID int64, players []int64) (
 		}
 		var picks []Pick
 		if err := json.Unmarshal([]byte(questions), &picks); err != nil {
-			return err
-		}
-		ids, _ := json.Marshal(players)
-		if _, err := tx.Exec(`DELETE FROM royal_players WHERE royal_id = ? AND user_id NOT IN (SELECT value FROM json_each(?))`,
-			royalID, string(ids)); err != nil {
 			return err
 		}
 		for _, u := range players {
@@ -223,6 +227,60 @@ func (g *Game) StartRoyal(ctx context.Context, royalID int64, players []int64) (
 		return nil, err
 	}
 	return runs, g.ShowRoyal(ctx, royalID, 0)
+}
+
+// EnterRoyal puts a player into a tournament under way, late: the questions before the one showing (and it, if its
+// answer shows already) are recorded as missed; the one showing is theirs to answer in the time it has left. A place
+// they had in a lobby of the same evening is given up. It returns their run.
+func (g *Game) EnterRoyal(ctx context.Context, royalID, userID int64) (int64, error) {
+	var run int64
+	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		var questions, phase string
+		var n int
+		var starts, shown int64
+		if err := tx.QueryRow(`SELECT questions, n, phase, starts_at, coalesce(phase_at, 0) FROM royals WHERE id = ?`,
+			royalID).Scan(&questions, &n, &phase, &starts, &shown); err != nil {
+			return err
+		}
+		var picks []Pick
+		if err := json.Unmarshal([]byte(questions), &picks); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM royal_players WHERE user_id = ? AND run_id IS NULL
+			AND royal_id IN (SELECT id FROM royals WHERE starts_at = ?)`, userID, starts); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO royal_players (royal_id, user_id, joined_at) VALUES (?, ?, ?)`,
+			royalID, userID, store.Ms(g.Now())); err != nil {
+			return err
+		}
+		r, err := g.insertRun(tx, userID, "royal", nil, nil, picks)
+		if err != nil {
+			return err
+		}
+		missed := n
+		if phase != RoyalQuestion {
+			missed = n + 1
+		}
+		for r.at < missed {
+			ms := int64(0)
+			if d, ok := g.deal(r.picks[r.at]); ok {
+				ms = Limit(d.Question()).Milliseconds()
+			}
+			if err := g.record(tx, r, bank.Graded{}, Worth{}, ms); err != nil {
+				return err
+			}
+		}
+		if phase == RoyalQuestion {
+			if _, err := tx.Exec(`UPDATE runs SET shown_at = ? WHERE id = ?`, shown, r.id); err != nil {
+				return err
+			}
+		}
+		run = r.id
+		_, err = tx.Exec(`UPDATE royal_players SET run_id = ? WHERE royal_id = ? AND user_id = ?`, r.id, royalID, userID)
+		return err
+	})
+	return run, err
 }
 
 // ShowRoyal puts question n on the screens of everyone still in the tournament, and starts its time (again, for

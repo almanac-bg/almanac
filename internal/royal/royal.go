@@ -3,10 +3,13 @@
 // most right answers first and the quickest of as many, and the last question is a final of three. Those cut watch
 // the rest to the end. The game always reaches its last question, so an evening is an evening for everyone in it.
 //
-// The lobby opens a quarter of an hour before the start; whoever is there at the start plays. A tournament takes up
-// to play.RoyalSize players: when one is full, the next to come start another, on the same questions. Each moves on
-// at its own pace: a question's answer shows once everyone still in has answered, or when its time is up; the answer
-// that a cut comes with shows longer (CutPause), with who goes on.
+// The lobby opens a quarter of an hour before the start, and those in it are called again a minute before (Soon);
+// whoever is there at the start plays. Those who come late may still come in until the answer to the third question
+// shows (Late), well before the first cut: the questions they missed count as not answered. A lobby member whose
+// screen was away at the start is in as soon as it's back, in that time. A tournament takes up to play.RoyalSize
+// players: at the start, those there are dealt into as few as hold them, of sizes as even as can be (51: 26 and 25),
+// on the same questions. Each moves on at its own pace: a question's answer shows once everyone still in has
+// answered, or when its time is up; the answer that a cut comes with shows longer (CutPause), with who goes on.
 //
 // The hub keeps the evening's clock and the screens following it. Everything a game does goes through the database
 // first (package play), so that a restart of the server picks the game up again where it was.
@@ -35,6 +38,11 @@ const (
 	// away is how long a player may be gone from the screen (the line dropped, a phone asleep) and still count as
 	// there: for the start, and for the answer to show before the time is up.
 	away = 15 * time.Second
+	// Call is how long before the start those in the lobby who aren't on its screen, and those who said they'd come
+	// and haven't, are called again (Soon).
+	Call = time.Minute
+	// Late is how many questions in one may still come in: until the answer to the Late-th shows.
+	Late = 3
 )
 
 // Errors a player may cause.
@@ -86,6 +94,9 @@ type Hub struct {
 	// Opened, if set, is told (on its own goroutine) when an evening's lobby opens, with the evening's start. A
 	// restart of the server in the lobby's time tells it again.
 	Opened func(context.Context, time.Time)
+	// Soon, if set, is told (on its own goroutine) Call before the start, with the start, those in the lobby who
+	// aren't on its screen (away), and everyone in it (in). A restart of the server in that minute tells it again.
+	Soon func(ctx context.Context, start time.Time, away, in []int64)
 
 	mu     sync.Mutex
 	night  *night
@@ -105,6 +116,10 @@ type night struct {
 	tables []*table
 	told   bool // that the lobby is open
 	called bool // Opened, that it is
+	soon   bool // Soon, that it starts in a minute
+	// absent are those of the lobbies who weren't there at the start: in as soon as they're back, while the door is
+	// open (table.open). The database keeps them in their tournament, without a run.
+	absent map[int64]Player
 }
 
 func (n *night) opens(s Schedule) time.Time { return n.start.Add(-s.Lobby) }
@@ -151,6 +166,11 @@ type member struct {
 	res      play.Result
 	place    int
 	delta    int
+}
+
+// open says whether one may still come into t's game: until the answer to its Late-th question shows.
+func (t *table) open() bool {
+	return (t.phase == play.RoyalQuestion && t.n < Late) || (t.phase == play.RoyalReveal && t.n < Late-1)
 }
 
 func (t *table) member(id int64) *member {
@@ -207,12 +227,16 @@ func (h *Hub) Load(ctx context.Context) error {
 			if h.night != nil && h.night.start.After(l.StartsAt) {
 				continue // an older evening's: SettleDue ends it
 			}
-			h.night = &night{start: l.StartsAt, picks: l.Picks, dealt: h.deal(l.Picks), told: true}
+			h.night = &night{start: l.StartsAt, picks: l.Picks, dealt: h.deal(l.Picks), told: true, absent: map[int64]Player{}}
 		}
 		t := &table{id: l.ID, phase: l.Phase, n: l.N, at: now}
 		for i, p := range l.Players {
 			m := &member{Player: Player{ID: p.User, Name: p.Name, Tag: p.Tag}, key: i, run: p.Run, seen: now, outAt: -1}
 			m.Look, _ = h.game.LookOf(ctx, p.User)
+			if p.Run == 0 && l.Phase != play.RoyalLobby {
+				h.night.absent[p.User] = m.Player // away at the start
+				continue
+			}
 			if p.Run != 0 {
 				t.entered++
 				m.in, m.reached, m.ms = !p.Out, p.Right, p.RightMs
@@ -258,13 +282,13 @@ func (h *Hub) Step(ctx context.Context) {
 	now := h.now()
 	next := h.sched.Next(now)
 	if n := h.night; n == nil {
-		h.night = &night{start: next}
+		h.night = &night{start: next, absent: map[int64]Player{}}
 		h.changed(nil)
 	} else if over, since := n.over(); over && !n.start.Equal(next) &&
 		(len(n.tables) == 0 || (!now.Before(next.Add(-h.sched.Lobby)) && now.Sub(since) >= results)) {
 		// The evening is over (or nobody came), and its standings have shown: on to the next, whose lobby may be
 		// open already.
-		h.night = &night{start: next}
+		h.night = &night{start: next, absent: map[int64]Player{}}
 		h.changed(nil)
 	}
 	n := h.night
@@ -278,14 +302,43 @@ func (h *Hub) Step(ctx context.Context) {
 			go h.Opened(context.WithoutCancel(ctx), n.start)
 		}
 	}
-	for _, t := range n.tables {
-		var err error
-		switch t.phase {
-		case play.RoyalLobby:
-			if !now.Before(n.start) {
-				err = h.begin(ctx, t, now)
+	if !n.soon && !now.Before(n.start.Add(-Call)) && now.Before(n.start) {
+		n.soon = true
+		if h.Soon != nil {
+			var away, in []int64
+			for _, t := range n.tables {
+				for _, m := range t.members {
+					in = append(in, m.ID)
+					if h.online[m.ID] == 0 {
+						away = append(away, m.ID)
+					}
+				}
 			}
-		case play.RoyalQuestion:
+			go h.Soon(context.WithoutCancel(ctx), n.start, away, in)
+		}
+	}
+	if !now.Before(n.start) && slices.ContainsFunc(n.tables, func(t *table) bool { return t.phase == play.RoyalLobby }) {
+		if err := h.begin(ctx, now); err != nil {
+			slog.Error("royal", "start", n.start, "err", err) // tried again at the next step
+			return
+		}
+	}
+	// Those away at the start whose screen is back come in, while the door is open.
+	for id, p := range n.absent {
+		if h.online[id] > 0 {
+			if err := h.late(ctx, p, now); err != nil && !errors.Is(err, ErrClosed) {
+				slog.Error("royal", "late", id, "err", err)
+			}
+		}
+	}
+	for _, t := range slices.Clone(n.tables) {
+		var err error
+		switch {
+		case t.phase == play.RoyalLobby || t.phase == play.RoyalEnd:
+		case len(t.members) == 0 && !t.open():
+			// Nobody was there at the start, and nobody came in while the door was open.
+			err = h.empty(ctx, t)
+		case t.phase == play.RoyalQuestion:
 			d := n.dealt[t.n]
 			if d == nil || now.Sub(t.at) >= play.Limit(d.Question())+play.Grace {
 				err = h.reveal(ctx, t, now)
@@ -294,7 +347,7 @@ func (h *Hub) Step(ctx context.Context) {
 				t.paced += next
 				h.changed(t)
 			}
-		case play.RoyalReveal:
+		case t.phase == play.RoyalReveal:
 			if now.Sub(t.at) >= h.pause(t) {
 				err = h.next(ctx, t, now)
 			}
@@ -305,18 +358,22 @@ func (h *Hub) Step(ctx context.Context) {
 	}
 }
 
-// Join puts a player in the evening's lobby (again changes nothing): in the tournament with room for them.
+// Join puts a player in the evening's lobby (again changes nothing): in the tournament with room for them. Once the
+// games have begun, it puts them in one late, while its door is open (Late).
 func (h *Hub) Join(ctx context.Context, p Player) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	now := h.now()
 	n := h.night
-	if n == nil || now.Before(n.opens(h.sched)) || !now.Before(n.start) {
+	if n == nil || now.Before(n.opens(h.sched)) {
 		return ErrClosed
 	}
 	if _, m := h.mine(p.ID); m != nil {
 		m.Player, m.seen = p, now
 		return nil
+	}
+	if !now.Before(n.start) {
+		return h.late(ctx, p, now)
 	}
 	var t *table
 	if k := len(n.tables); k > 0 && len(n.tables[k-1].members) < play.RoyalSize {
@@ -367,33 +424,142 @@ func (h *Hub) Leave(ctx context.Context, id int64) error {
 	return nil
 }
 
-// begin starts a tournament with those of its lobby who are there.
-func (h *Hub) begin(ctx context.Context, t *table, now time.Time) error {
-	var there []int64
-	for _, m := range t.members {
-		if h.there(m, now) {
-			there = append(there, m.ID)
+// begin starts the evening's tournaments with those of their lobbies who are there, dealt into as few as hold them,
+// of sizes as even as can be, in the order they came. Those not there are kept aside (absent), in the first: they're
+// in if they come back while its door is open. A tournament nobody is left in, and nobody may come back to, ends.
+func (h *Hub) begin(ctx context.Context, now time.Time) error {
+	n := h.night
+	var lobbies []*table
+	var there, away []*member
+	for _, t := range n.tables {
+		if t.phase != play.RoyalLobby {
+			continue
+		}
+		lobbies = append(lobbies, t)
+		for _, m := range t.members {
+			if h.there(m, now) {
+				there = append(there, m)
+			} else {
+				away = append(away, m)
+			}
 		}
 	}
-	if len(there) == 0 {
-		if _, err := h.game.SettleRoyal(ctx, t.id, nil); err != nil {
+	k := (len(there) + play.RoyalSize - 1) / play.RoyalSize
+	if k == 0 && len(away) > 0 {
+		k = 1 // nobody there, but some may come back: the game runs for them
+	}
+	// Each player's seat: the first tables take one more, while there are more than divide evenly.
+	seats := map[*member]*table{}
+	for i, m := range there {
+		seats[m] = lobbies[deal(i, len(there), k)]
+	}
+	for _, m := range away {
+		seats[m] = lobbies[0]
+	}
+	moved := map[*table][]*member{}
+	for _, t := range lobbies {
+		for _, m := range t.members {
+			to := seats[m]
+			if to != t {
+				if err := h.game.MoveRoyal(ctx, t.id, to.id, m.ID); err != nil {
+					return err
+				}
+			}
+			moved[to] = append(moved[to], m)
+		}
+	}
+	for i, t := range lobbies {
+		t.members = moved[t]
+		if i >= k {
+			if err := h.empty(ctx, t); err != nil {
+				return err
+			}
+			continue
+		}
+		var ids []int64
+		for _, m := range t.members {
+			if h.there(m, now) {
+				ids = append(ids, m.ID)
+			}
+		}
+		runs, err := h.game.StartRoyal(ctx, t.id, ids)
+		if err != nil {
 			return err
 		}
-		t.members, t.phase = nil, play.RoyalEnd
-		h.changed(nil)
-		return nil
+		t.members = slices.DeleteFunc(t.members, func(m *member) bool {
+			if runs[m.ID] == 0 {
+				n.absent[m.ID] = m.Player
+				return true
+			}
+			return false
+		})
+		for _, m := range t.members {
+			m.run, m.in = runs[m.ID], true
+		}
+		t.entered = len(t.members)
+		h.shown(t, 0, now)
 	}
-	runs, err := h.game.StartRoyal(ctx, t.id, there)
+	h.changed(nil)
+	return nil
+}
+
+// deal is the table (of k) the i-th of those there sits at, of them all: in the order they came, the first tables
+// one more while there are more than divide evenly (51 in two: 26 and 25).
+func deal(i, all, k int) int {
+	size, more := all/k, all%k
+	if i < more*(size+1) {
+		return i / (size + 1)
+	}
+	return more + (i-more*(size+1))/size
+}
+
+// empty ends a tournament nobody plays (those of its lobby gone, or away and never back), and takes it off the
+// evening.
+func (h *Hub) empty(ctx context.Context, t *table) error {
+	if _, err := h.game.SettleRoyal(ctx, t.id, nil); err != nil {
+		return err
+	}
+	for _, m := range t.members {
+		delete(h.night.absent, m.ID)
+	}
+	t.members, t.phase = nil, play.RoyalEnd
+	h.night.tables = slices.DeleteFunc(h.night.tables, func(x *table) bool { return x == t })
+	h.changed(nil)
+	return nil
+}
+
+// late puts a player in a game under way, while its door is open: the one with room that has fewest in. The questions
+// before the one showing count as not answered; the one showing is theirs to answer in the time it has left.
+func (h *Hub) late(ctx context.Context, p Player, now time.Time) error {
+	var t *table
+	for _, x := range h.night.tables {
+		if x.open() && len(x.members) < play.RoyalSize && (t == nil || len(x.members) < len(t.members)) {
+			t = x
+		}
+	}
+	if t == nil {
+		return ErrClosed
+	}
+	run, err := h.game.EnterRoyal(ctx, t.id, p.ID)
 	if err != nil {
 		return err
 	}
-	t.members = slices.DeleteFunc(t.members, func(m *member) bool { return runs[m.ID] == 0 })
+	delete(h.night.absent, p.ID)
+	key := 0
 	for _, m := range t.members {
-		m.run, m.in = runs[m.ID], true
+		key = max(key, m.key+1)
 	}
-	t.entered = len(t.members)
-	h.shown(t, 0, now)
-	h.changed(nil)
+	m := &member{Player: p, key: key, run: run, seen: now, in: true, outAt: -1}
+	if p.Look == (play.Look{}) {
+		m.Look, _ = h.game.LookOf(ctx, p.ID)
+	}
+	m.inQ = t.phase == play.RoyalQuestion
+	if t.phase == play.RoyalReveal {
+		m.res = play.Result{TimedOut: true} // the answer showing: they weren't in for it
+	}
+	t.members = append(t.members, m)
+	t.entered++
+	h.changed(nil) // a watcher of another tournament may follow this one now
 	return nil
 }
 
@@ -670,6 +836,8 @@ type View struct {
 	// In says the viewer is in this tournament (its lobby, or its game), and Out that they're out of its game.
 	In  bool `json:"in"`
 	Out bool `json:"out"`
+	// Late says the viewer, not in, may still come in: the games have begun, and a door is open (Late).
+	Late bool `json:"late,omitempty"`
 	// Tables is how many tournaments there are this evening.
 	Tables  int `json:"tables"`
 	N       int `json:"n"`
@@ -775,6 +943,9 @@ func (h *Hub) View(viewer int64) View {
 	}
 	v.Phase, v.N, v.Entered, v.WentOut = t.phase, t.n, t.entered, t.wentOut
 	v.Last = t.phase == play.RoyalReveal && h.last(t)
+	if me == nil && t.phase != play.RoyalLobby {
+		v.Late = slices.ContainsFunc(n.tables, func(t *table) bool { return t.open() && len(t.members) < play.RoyalSize })
+	}
 	if me != nil {
 		v.In, v.Out = true, t.phase != play.RoyalLobby && !me.in
 		if t.phase == play.RoyalEnd || (v.Out && t.phase != play.RoyalQuestion) {

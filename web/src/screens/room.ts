@@ -6,6 +6,7 @@ import { boardRow, nextSteps, reviewParts, shareButton } from "../game/results.t
 import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
+import { keepAwake } from "../lib/awake.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { play, playAnswer } from "../lib/sound.ts";
@@ -108,6 +109,11 @@ export function room([code = ""]: string[]) {
     playing.set(phase === "question" || phase === "reveal");
   });
   onCleanup(() => playing.set(false));
+  // The screen stays on through a game's questions.
+  keepAwake(() => {
+    const phase = view()?.phase;
+    return phase === "question" || phase === "reveal";
+  });
   return h(
     "div",
     { class: "screen" },

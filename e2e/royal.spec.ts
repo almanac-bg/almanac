@@ -7,8 +7,9 @@ import { answer, playRun } from "./play.ts";
 test("Роял: in from the lobby, live to the fifteenth question (or a cut), then the standings", async ({ page }) => {
   test.setTimeout(480_000);
   await page.goto("/royal");
-  // A game under way (another engine's) ends before the next lobby opens.
-  await page.getByRole("button", { name: "Влез" }).click({ timeout: 300_000 });
+  // A game under way (another engine's) ends before the next lobby opens. The lobby's „Влез“, not the door of a game
+  // under way (which lets one in late).
+  await page.locator(".screen > button", { hasText: "Влез" }).click({ timeout: 300_000 });
   await expect(page.getByRole("button", { name: "Излез" })).toBeVisible();
   await expect(page.getByText("Вътре си.")).toBeVisible();
 
@@ -58,4 +59,25 @@ test("Роял: „Ще дойда“ before the lobby, and Начало's card 
     await page.reload();
     await expect(royal).toHaveText(/^Започва след \d+\sмин( · \d+\sвътре)?$/, { timeout: 3_000 });
   }).toPass({ timeout: 60_000 });
+});
+
+test("Роял: one who comes late comes in until the third question", async ({ page, browser }) => {
+  test.setTimeout(360_000);
+  const { baseURL, locale } = test.info().project.use;
+  const other = await browser.newContext({ baseURL, locale });
+  const early = await other.newPage();
+  // Someone is in at the start, so that a game runs.
+  await early.goto("/royal");
+  await early.locator(".screen > button", { hasText: "Влез" }).click({ timeout: 300_000 });
+  await expect(early.getByText("Вътре си.")).toBeVisible();
+
+  await page.goto("/royal");
+  const door = page.getByText("Роял вече започна. До 3-тия въпрос още можеш да влезеш.");
+  await expect(door).toBeVisible({ timeout: 60_000 });
+  await page.locator(".card", { has: door }).getByRole("button", { name: "Влез" }).click();
+  await expect(door).toBeHidden();
+  await expect(page.locator(".royal-table .row.me").or(page.locator(".question .option").first())).toBeVisible({
+    timeout: 30_000,
+  });
+  await other.close();
 });
