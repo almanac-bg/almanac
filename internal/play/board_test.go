@@ -1,6 +1,7 @@
 package play
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -78,5 +79,75 @@ func TestDayCrowdCountedByOne(t *testing.T) {
 	d.drop("k")
 	if got, _ := d.get("k", later, b); got != nil {
 		t.Fatal("shown once dropped")
+	}
+}
+
+// A day's boards rank by right answers, then points: nine right are never under eight, whatever the points (the bonus
+// for right answers in a row can give eight more than nine); points decide among as many right. The same on the day's
+// board, its places, the friends' board and the friends' list.
+func TestDayBoardsRankRightsFirst(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	stale := boardStale
+	t.Cleanup(func() { boardStale = stale })
+	boardStale = 0
+
+	nine, quick, slow := w.user(), w.user(), w.user()
+	w.befriend(nine, quick)
+	w.befriend(nine, slow)
+	// Each finishes the day, then their game is set to the case: Bo's eight right made more points than Ana's nine.
+	set := map[int64][2]int{nine: {9, 9210}, quick: {8, 9660}, slow: {8, 9000}}
+	for _, user := range []int64{slow, quick, nine} {
+		s, err := w.g.StartDay(ctx, user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c := set[user]
+		w.play(user, s.ID, append(repeat(w.right, c[0]), repeat(w.wrong, Length-c[0])...)...)
+		if _, err := w.db.Write.ExecContext(ctx, `UPDATE runs SET points = ? WHERE id = ?`, c[1], s.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	today := w.g.Today()
+	order := func(scores []Score) []int {
+		var out []int
+		for _, s := range scores {
+			out = append(out, s.Points)
+		}
+		return out
+	}
+	want := []int{9210, 9660, 9000}
+	b, err := w.g.BoardOf(ctx, today, quick)
+	if err != nil || !slices.Equal(order(b.Top), want) || b.Place != 2 || !b.Top[1].Me {
+		t.Fatalf("the day's board, as Bo sees it: %v place %d %v", order(b.Top), b.Place, err)
+	}
+	for user, place := range map[int64]int{nine: 1, quick: 2, slow: 3} {
+		if b, _ := w.g.BoardOf(ctx, today, user); b.Place != place {
+			t.Fatalf("player %d's place: %d, not %d", user, b.Place, place)
+		}
+	}
+	f, err := w.g.FriendsBoard(ctx, today, slow)
+	if err != nil || !slices.Equal(order(f), []int{9210, 9000}) {
+		t.Fatalf("the friends' board, as Vi sees it: %v %v", order(f), err)
+	}
+	if f, _ := w.g.FriendsBoard(ctx, today, nine); !slices.Equal(order(f), want) || !f[0].Me {
+		t.Fatalf("the friends' board, as Ana sees it: %v", order(f))
+	}
+	list, err := w.g.FriendsOf(ctx, nine)
+	if err != nil || len(list) != 2 || list[0].ID != quick || list[1].ID != slow {
+		t.Fatalf("Ana's friends: %+v %v", list, err)
+	}
+}
+
+// A game not yet counted takes its place among those counted as the count would put it: right answers first, then
+// points, then time, then the earlier started.
+func TestBoardRunAhead(t *testing.T) {
+	nine := boardRun{id: 2, rights: 9, points: 9210, ms: 90_000}
+	eight := boardRun{id: 1, rights: 8, points: 9660, ms: 60_000}
+	quicker := boardRun{id: 3, rights: 8, points: 9660, ms: 50_000}
+	later := boardRun{id: 4, rights: 8, points: 9660, ms: 60_000}
+	if !nine.ahead(eight) || eight.ahead(nine) || !quicker.ahead(eight) || eight.ahead(quicker) || nine.ahead(nine) ||
+		!eight.ahead(later) || later.ahead(eight) {
+		t.Fatal("ahead")
 	}
 }
