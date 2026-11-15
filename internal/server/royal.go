@@ -128,7 +128,7 @@ func (s *Server) royalNews(ctx context.Context, n play.RoyalNews) {
 }
 
 // tonight is the next Роял at a glance (for its tile on Начало and the screen before its lobby): when, how many are in
-// it once its lobby is open, and how many said they'd come, the player among them or not.
+// it once its lobby is open, and how many said they'd come, the player among them or not, and which of their friends.
 func (s *Server) tonight(w http.ResponseWriter, r *http.Request) error {
 	var viewer int64
 	if u, err := s.user(r); err == nil && u != nil {
@@ -139,11 +139,18 @@ func (s *Server) tonight(w http.ResponseWriter, r *http.Request) error {
 
 func (s *Server) tonightFor(w http.ResponseWriter, ctx context.Context, viewer int64) error {
 	g := s.royal.Glance()
-	coming, planned, err := s.game.RoyalPlans(ctx, eveningOf(g.Next), viewer)
+	day := eveningOf(g.Next)
+	coming, planned, err := s.game.RoyalPlans(ctx, day, viewer)
 	if err != nil {
 		return err
 	}
-	return ok(w, map[string]any{"glance": g, "coming": coming, "planned": planned})
+	friends := []string{}
+	if viewer != 0 && coming > 0 {
+		if friends, err = s.game.RoyalFriends(ctx, day, viewer); err != nil {
+			return err
+		}
+	}
+	return ok(w, map[string]any{"glance": g, "coming": coming, "planned": planned, "friends": friends})
 }
 
 // eveningOf is the day of the evening that starts at ms (Unix milliseconds), in Bulgaria.

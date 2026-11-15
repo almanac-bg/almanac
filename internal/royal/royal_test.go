@@ -929,3 +929,25 @@ func TestDays(t *testing.T) {
 		t.Fatalf("once nightly: %+v", g)
 	}
 }
+
+// A cut, as its answer shows, says which comes next: of five, three go on after the fifth, two after the eighth.
+func TestThen(t *testing.T) {
+	w := setup(t)
+	var all []Player
+	for range 5 {
+		all = append(all, w.player())
+	}
+	w.start(all...)
+	for n := range 5 {
+		if n > 0 {
+			w.onward()
+		}
+		for i, p := range all {
+			w.give(p, i < 3 || n > 0) // two a right answer behind
+		}
+	}
+	v := w.h.View(all[0].ID)
+	if c := v.Cut; c == nil || !c.Now || c.After != 5 || c.Keep != 3 || c.Then != 8 || v.WentOut != 2 {
+		t.Fatalf("the cut after the fifth: %+v %+v", v, v.Cut)
+	}
+}

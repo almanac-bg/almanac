@@ -11,7 +11,8 @@
 // screen was away at the start is in as soon as it's back, in that time. A tournament takes up to play.RoyalSize
 // players: at the start, those there are dealt into as few as hold them, of sizes as even as can be (51: 26 and 25),
 // on the same questions. Each moves on at its own pace: a question's answer shows once everyone still in has
-// answered (those cut aren't waited for), or when its time is up; the answer that a cut comes with shows longer (CutPause), with who goes on.
+// answered (those cut aren't waited for), or when its time is up; the answer that a cut comes with shows longer
+// (CutPause), with who goes on and when the next cut is.
 //
 // The hub keeps the evening's clock and the screens following it. Everything a game does goes through the database
 // first (package play), so that a restart of the server picks the game up again where it was.
@@ -901,6 +902,8 @@ type CutView struct {
 	Line  *ScoreView `json:"line,omitempty"`
 	// Now says it's the answer showing that the cut comes with: those behind the line are out.
 	Now bool `json:"now,omitempty"`
+	// Then is, with Now, the cut after it (after which question, counted from 1; 0: none, the final is next).
+	Then int `json:"then,omitempty"`
 }
 
 // ScoreView is a score: right answers, and the time they took.
@@ -1087,6 +1090,12 @@ func (h *Hub) cut(t *table, players []PlayerView) *CutView {
 			if in > 0 {
 				p := players[in-1]
 				c.Line = &ScoreView{Rights: p.Reached, Ms: p.Ms}
+			}
+			for m := n + 1; m < len(h.night.picks)-1; m++ {
+				if t.keep(m) > 0 {
+					c.Then = m + 1
+					break
+				}
 			}
 		} else if in > keep {
 			p := players[keep-1]
