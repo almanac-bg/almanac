@@ -67,6 +67,53 @@ func TestRecordingsOverAllTopicsFirst(t *testing.T) {
 	}
 }
 
+// A game left halfway (the tab closed: the rest of its questions not answered) isn't a real game to play against,
+// however many it got right before: a duel waited out each missing answer. A real game by anyone comes first.
+func TestRecordingsLeaveOutGamesLeft(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	near, far, ana := w.user(), w.user(), w.user()
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1350 WHERE id IN (?, ?)`, near, ana)
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 900 WHERE id = ?`, far)
+	none := func(int64, int) json.RawMessage { return nil }
+	game := func(user int64, answers ...func(int64, int) json.RawMessage) int64 {
+		s, err := w.g.StartTopic(ctx, user, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.play(user, s.ID, answers...)
+		w.wait(time.Minute)
+		return s.ID
+	}
+	real := game(far, append(repeat(w.right, 5), repeat(w.wrong, Length-5)...)...)
+	// Near Ana's rating, two not answered: still a real game, and the nearer.
+	missedTwo := game(near, append(append(repeat(w.right, 5), repeat(none, 2)...), repeat(w.wrong, Length-7)...)...)
+	pick := func() int64 {
+		t.Helper()
+		var rec *recorded
+		if err := w.db.Tx(ctx, func(tx *sql.Tx) error {
+			var err error
+			rec, err = w.g.recordedRun(tx, ana, nil)
+			return err
+		}); err != nil || rec == nil {
+			t.Fatalf("no recording: %v", err)
+		}
+		return rec.id
+	}
+	if got := pick(); got != missedTwo {
+		t.Fatalf("got %d, want the game near Ana with two not answered %d", got, missedTwo)
+	}
+	// Near her, left at the sixth: five right, the rest not answered. The real game far from her comes first.
+	_ = game(near, append(repeat(w.right, 5), repeat(none, Length-5)...)...)
+	if got := pick(); got != missedTwo {
+		t.Fatalf("got %d, want %d (the real one far off: %d)", got, missedTwo, real)
+	}
+	_, _ = w.db.Write.Exec(`DELETE FROM runs WHERE id = ?`, missedTwo)
+	if got := pick(); got != real {
+		t.Fatalf("got %d, want the real game far off %d", got, real)
+	}
+}
+
 // The recorded player hears, with a game's news and once a day, how others' duels against their recordings went.
 func TestRecordingsNews(t *testing.T) {
 	w := setup(t)

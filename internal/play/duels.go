@@ -435,15 +435,17 @@ type recorded struct {
 }
 
 // RecordingBand is how far a recording's player's rating may be from the player's to be their match, while there's
-// one that close; RecordingRights how many right answers make a game worth playing against.
+// one that close; RecordingRights how many right answers make a game worth playing against, and RecordingMissed how
+// many not answered at most (one left halfway, the tab closed, isn't: a duel would wait out each missing answer).
 const (
 	RecordingBand   = 150
 	RecordingRights = 3
+	RecordingMissed = 2
 )
 
 // recordedRun is another player's finished run of ten questions, all still in the bank and none of today's (a day's
 // run never), played at a person's speed (not marked a script's: fair.go), to play against: a real game
-// (RecordingRights right or more), by a player whose rating is within RecordingBand of the player's, the one with the
+// (RecordingRights right or more, RecordingMissed not answered at most), by a player whose rating is within RecordingBand of the player's, the one with the
 // fewest questions the player has seen (seen, read before the write) or a day ahead holds (ahead.go: a game played
 // before those days were drawn may have them), the latest first. Short of such, the nearest it
 // gets: any real game, then any game. At each of these, a game over all the topics (a duel's) comes before one in a
@@ -459,7 +461,8 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 	}
 	// A script's game is left out before the limit, so that a script's many games can't push the people's out of it.
 	rows, err := tx.Query(`SELECT r.id, r.questions, r.rights, u.rating,
-			CASE WHEN r.kind = 'topic' THEN coalesce(r.category, '') ELSE '' END
+			CASE WHEN r.kind = 'topic' THEN coalesce(r.category, '') ELSE '' END,
+			(SELECT count(*) FROM answers a WHERE a.run_id = r.id AND a.given IS NULL)
 		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind IN ('topic', 'duel') AND r.finished_at IS NOT NULL AND NOT r.scripted AND r.user_id <> ?
 			AND json_array_length(r.questions) = ?
@@ -480,9 +483,9 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 	for rows.Next() {
 		var id int64
 		var raw string
-		var rights, rating int
+		var rights, rating, missed int
 		var topic string
-		if err := rows.Scan(&id, &raw, &rights, &rating, &topic); err != nil {
+		if err := rows.Scan(&id, &raw, &rights, &rating, &topic, &missed); err != nil {
 			return nil, err
 		}
 		var picks []Pick
@@ -501,7 +504,7 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 		if !whole {
 			continue
 		}
-		real := rights >= RecordingRights
+		real := rights >= RecordingRights && missed <= RecordingMissed
 		one := 0 // a single topic's game: after the games over all of them
 		if topic != "" {
 			one = 1

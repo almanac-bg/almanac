@@ -347,6 +347,101 @@ func TestOneLeaves(t *testing.T) {
 	})
 }
 
+// One who leaves for good is waited for Away, whatever question is up by then; after it, they show as gone.
+func TestGoneForGood(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := setup(t)
+		ana, bo := w.user(), w.user()
+		sa, sb := w.hub.Seek(ana), w.hub.Seek(bo)
+		<-sb.Done()
+		m := sa.Match
+		fa, _ := m.Follow(ana.ID)
+		defer m.Unfollow(fa)
+		fb, _ := m.Follow(bo.ID)
+		v := next(m, ana.ID)
+		// Bo's tab closes a second before the first question's time is up; Ana answered it.
+		_ = m.Answer(ana.ID, 0, answer(m, true))
+		time.Sleep(time.Duration(v.Question.LimitMs-1000) * time.Millisecond)
+		m.Unfollow(fb)
+		left := time.Now()
+		v = next(m, ana.ID)
+		if v.Phase != PhaseReveal || v.Them.Gone {
+			t.Fatalf("the first answer, Bo away a moment: %+v", v.Them)
+		}
+		// The second question comes well before Away: Ana answers it at once, and it waits for Bo only until Away.
+		v = next(m, ana.ID)
+		if v.Phase != PhaseQuestion || v.N != 1 || time.Since(left) >= Away/2 {
+			t.Fatalf("the second question, %v after Bo left: %+v", time.Since(left), v)
+		}
+		_ = m.Answer(ana.ID, 1, answer(m, true))
+		v = next(m, ana.ID)
+		if v.Phase != PhaseReveal || time.Since(left) > Away+time.Second {
+			t.Fatalf("the second answer, %v after Bo left: %+v", time.Since(left), v)
+		}
+		time.Sleep(max(0, Away-time.Since(left)) + time.Millisecond) // the question's time may have run out first
+		synctest.Wait()
+		if v := m.View(ana.ID); !v.Them.Gone || v.Them.Online {
+			t.Fatalf("Bo, gone for good: %+v", v.Them)
+		}
+		// Back, he's no longer gone.
+		fb, _ = m.Follow(bo.ID)
+		defer m.Unfollow(fb)
+		if v := m.View(ana.ID); v.Them.Gone || !v.Them.Online {
+			t.Fatalf("Bo, back: %+v", v.Them)
+		}
+	})
+}
+
+// A recording that didn't answer a question isn't waited for once the player has answered it: its time ran out.
+func TestRecordingMissed(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := setup(t)
+		ana, bo, gal := w.user(), w.user(), w.user()
+		// Ana and Bo play one; Bo answers only the first half.
+		sa, sb := w.hub.Seek(ana), w.hub.Seek(bo)
+		<-sb.Done()
+		m := sa.Match
+		fa, _ := m.Follow(ana.ID)
+		fb, _ := m.Follow(bo.ID)
+		for v := next(m, ana.ID); v.Phase != PhaseEnd; v = next(m, ana.ID) {
+			if v.Phase == PhaseQuestion {
+				time.Sleep(2500 * time.Millisecond)
+				_ = m.Answer(ana.ID, v.N, answer(m, true))
+				if v.N < 5 {
+					_ = m.Answer(bo.ID, v.N, answer(m, true))
+				}
+			}
+		}
+		m.Unfollow(fa)
+		m.Unfollow(fb)
+		// Gal plays a recording: with only Ana's game real (Bo's has five not answered), it's hers. Leave it out, and
+		// Bo's is all there is.
+		_, _ = w.db.Write.Exec(`UPDATE runs SET finished_at = NULL WHERE user_id = ?`, ana.ID)
+		s := w.hub.Seek(gal)
+		<-s.Done()
+		if s.Err != nil {
+			t.Fatal(s.Err)
+		}
+		m = s.Match
+		fg, _ := m.Follow(gal.ID)
+		defer m.Unfollow(fg)
+		for v := next(m, gal.ID); v.Phase != PhaseEnd; v = next(m, gal.ID) {
+			if v.Phase != PhaseQuestion {
+				continue
+			}
+			start := time.Now()
+			time.Sleep(time.Second)
+			_ = m.Answer(gal.ID, v.N, answer(m, false))
+			if v.N >= 5 {
+				// The recording has no answer here: the answer shows at once.
+				if v := m.View(gal.ID); v.Phase != PhaseReveal || time.Since(start) > 2*time.Second || !v.Them.Missed {
+					t.Fatalf("question %d, the recording without an answer: %+v", v.N+1, v.Them)
+				}
+			}
+		}
+	})
+}
+
 func TestNeverCame(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		w := setup(t)
