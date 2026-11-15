@@ -3,8 +3,12 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
+	"time"
 
 	"github.com/almanac-bg/almanac/internal/backup"
 	"github.com/almanac-bg/almanac/internal/store"
@@ -30,7 +34,8 @@ func backupStore() (*backup.Store, error) {
 }
 
 // backupCommand: `backup now` makes a copy at once; `backup restore <key> <path>` writes a copy (hours/07.db.gz,
-// days/12.db.gz) to a new database file.
+// days/12.db.gz) to a new database file and checks it; `backup verify [key]` brings a copy back to a temporary file and
+// checks it, the latest day's copy if no key is given.
 func backupCommand(args []string) error {
 	s, err := backupStore()
 	if err != nil {
@@ -50,9 +55,49 @@ func backupCommand(args []string) error {
 		b := &backup.Backer{Store: s, DB: db.Read, Dir: filepath.Dir(path)}
 		return b.Once(context.Background())
 	case len(args) == 3 && args[0] == "restore":
-		return backup.Restore(context.Background(), s, args[1], args[2])
+		ctx := context.Background()
+		if err := backup.Restore(ctx, s, args[1], args[2]); err != nil {
+			return err
+		}
+		counts, err := backup.Check(ctx, args[2])
+		if err != nil {
+			return fmt.Errorf("restored to %s, but the copy is damaged: %w", args[2], err)
+		}
+		printCounts(args[2]+" restored and whole", counts)
+		return nil
+	case len(args) >= 1 && len(args) <= 2 && args[0] == "verify":
+		return verifyBackup(s, args[1:])
 	}
 	return usage()
+}
+
+// verifyBackup brings back the copy under key (the latest day's: today's, else yesterday's) and checks it.
+func verifyBackup(s *backup.Store, key []string) error {
+	ctx := context.Background()
+	keys := key
+	if len(keys) == 0 {
+		now := time.Now()
+		keys = []string{backup.Keys(now)[1], backup.Keys(now.AddDate(0, 0, -1))[1]}
+	}
+	for i, k := range keys {
+		counts, err := backup.Drill(ctx, s, k, os.TempDir())
+		if errors.Is(err, backup.ErrMissing) && i < len(keys)-1 {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("%s: %w", k, err)
+		}
+		printCounts(k+" brought back and whole", counts)
+		return nil
+	}
+	return nil
+}
+
+func printCounts(what string, counts map[string]int64) {
+	fmt.Println(what + ":")
+	for _, t := range slices.Sorted(maps.Keys(counts)) {
+		fmt.Printf("  %-18s %d rows\n", t, counts[t])
+	}
 }
 
 func dbPath() string {

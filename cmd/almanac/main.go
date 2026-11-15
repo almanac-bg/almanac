@@ -6,6 +6,7 @@
 //	almanac bank calibrate [dir]        the questions whose difficulty disagrees with what players got right (DB_PATH)
 //	almanac backup now                  copy the database to the backups at once
 //	almanac backup restore <key> <path> write a copy (hours/07.db.gz, days/12.db.gz) to a new database file
+//	almanac backup verify [key]         bring a copy back to a temporary file and check it (the latest day's)
 //	almanac admin [-remove] <email>     make a player an admin (the /admin page), or no longer one
 //	almanac push keys                   make a key pair for notifications (PUSH_PUBLIC_KEY, PUSH_PRIVATE_KEY)
 //	almanac version
@@ -58,5 +59,5 @@ func run(args []string) error {
 }
 
 func usage() error {
-	return fmt.Errorf("usage: almanac serve | bank check [-unbalanced] [dir] | bank fmt [dir] | bank calibrate [dir] | backup now | backup restore <key> <path> | admin [-remove] <email> | push keys | version")
+	return fmt.Errorf("usage: almanac serve | bank check [-unbalanced] [dir] | bank fmt [dir] | bank calibrate [dir] | backup now | backup restore <key> <path> | backup verify [key] | admin [-remove] <email> | push keys | version")
 }
