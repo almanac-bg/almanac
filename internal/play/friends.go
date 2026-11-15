@@ -11,8 +11,9 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// Friends are two players who joined up: through one's invite link, or a request by tag or email that the other
-// accepted. Each sees how the other did on the day's questions, they keep a record of their duels, and either can
+// Friends are two players who joined up: through one's invite link (sent, or at the end of their shared day's result:
+// it brings whoever opens it to the day, and offers the friendship with a tap), or a request by tag, by email or from
+// a room's end that the other accepted. Each sees how the other did on the day's questions, they keep a record of their duels, and either can
 // call the other to a duel.
 
 var (
@@ -70,6 +71,18 @@ func (g *Game) Inviter(ctx context.Context, code string) (id int64, name string,
 		err = ErrNoInvite
 	}
 	return id, name, err
+}
+
+// DayRights is how many of a day's ten a player got right, once they've finished it (played false before), as a viewer
+// sees it (0: nobody signed in): a game played at a script's speed is its player's alone (fairFor). It's what an
+// invite link says of its owner's day, and of the day of the one who opens it.
+func (g *Game) DayRights(ctx context.Context, userID int64, day string, viewer int64) (rights int, played bool, err error) {
+	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.rights FROM runs r WHERE r.user_id = ? AND r.kind = 'day' AND r.day = ?
+		AND r.finished_at IS NOT NULL AND `+fairFor("r", "?"), userID, day, viewer).Scan(&rights)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, false, nil
+	}
+	return rights, err == nil, err
 }
 
 // Befriend makes a player and the owner of an invite link friends (and changes nothing if they already are). It
@@ -409,10 +422,12 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 
 // FriendsBoard is the day's board among a player and their friends: everyone of them who finished it, best first.
 // Empty while none of their friends has. A game played at a script's speed is on it for its player alone (fairFor).
+// Once the player has finished the day, the first BoardTop rows and their own carry how each of the ten went (Trail),
+// as Начало shows them beside the result; before that, nothing of how the others' went.
 func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Score, error) {
 	// From the player and their friends to each one's game of the day (runs_one_a_day): CROSS JOIN keeps that order,
 	// so it costs as many as they are, not as many as the day has players.
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+`
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT r.id, u.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+`
 		FROM (SELECT ?2 AS id UNION SELECT friend_id FROM friends WHERE user_id = ?2) f
 		CROSS JOIN runs r ON r.user_id = f.id AND r.kind = 'day' AND r.day = ?1
 		JOIN users u ON u.id = r.user_id
@@ -423,21 +438,51 @@ func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Sc
 	}
 	defer rows.Close()
 	var board []Score
-	others := false
+	var runs []int64 // each row's game
+	others, played := false, false
 	for rows.Next() {
 		var s Score
-		var id int64
+		var run, id int64
 		var avatar, title string
 		var total int
-		if err := rows.Scan(&id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Ms, &avatar, &title, &total); err != nil {
+		if err := rows.Scan(&run, &id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Ms, &avatar, &title, &total); err != nil {
 			return nil, err
 		}
 		s.Me, s.Look = id == userID, g.lookOf(id, avatar, title, total)
-		others = others || !s.Me
-		board = append(board, s)
+		others, played = others || !s.Me, played || s.Me
+		board, runs = append(board, s), append(runs, run)
 	}
-	if !others {
-		return nil, rows.Err()
+	if err := rows.Err(); err != nil || !others {
+		return nil, err
 	}
-	return board, rows.Err()
+	rows.Close()
+	if !played {
+		return board, nil
+	}
+	// The trails, in one read: the first rows', and the player's own wherever it is.
+	at := map[int64]int{}
+	var ids []any
+	for i, run := range runs {
+		if i < BoardTop || board[i].Me {
+			at[run] = i
+			ids = append(ids, run)
+		}
+	}
+	marks, err := g.DB.Read.QueryContext(ctx, `SELECT run_id, points, is_right FROM answers
+		WHERE run_id IN (`+strings.Repeat("?, ", len(ids)-1)+`?) ORDER BY run_id, n`, ids...)
+	if err != nil {
+		return nil, err
+	}
+	defer marks.Close()
+	for marks.Next() {
+		var run int64
+		var m Mark
+		if err := marks.Scan(&run, &m.Points, &m.Right); err != nil {
+			return nil, err
+		}
+		m.Partial = m.Points > 0 && !m.Right
+		i := at[run]
+		board[i].Trail = append(board[i].Trail, m)
+	}
+	return board, marks.Err()
 }

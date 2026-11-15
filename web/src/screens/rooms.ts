@@ -5,18 +5,35 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { categories, player } from "../state.ts";
-import { back, pageArt, toneOf, topicMark } from "../ui.ts";
+import { back, pageArt, segmented, toneOf, topicMark } from "../ui.ts";
+
+/** How hard a room's questions are, as its host chooses: Лесни are easy and medium, Трудни medium and hard. */
+export const mixes: [Mix, string][] = [
+  ["easy", "Лесни"],
+  ["mixed", "Смесени"],
+  ["hard", "Трудни"],
+];
+export type Mix = "easy" | "mixed" | "hard";
 
 export function rooms() {
   title("Стая");
   const error = signal("");
   const codeError = signal("");
   const code = signal("");
+  const length = signal(10);
+  const mix = signal<Mix>("mixed");
+  // The host plays too, or leads from a big screen (host.ts) and doesn't.
+  const leads = signal(false);
   const open = async (category: string) => {
     error.set("");
     try {
       await player();
-      const r = await api<{ code: string }>("POST", "/api/rooms", { category });
+      const r = await api<{ code: string }>("POST", "/api/rooms", {
+        category,
+        length: length.peek(),
+        mix: mix.peek(),
+        lead: leads.peek(),
+      });
       go(`/r/${r.code}`);
     } catch (err) {
       error.set((err as ApiError).message);
@@ -84,7 +101,33 @@ export function rooms() {
       "section",
       { class: "card" },
       h("h2", { class: "card-title" }, "Отвори нова стая"),
-      h("p", { class: "muted" }, "Избери тема. После дай кода на другите."),
+      h("p", { class: "muted" }, "Колко въпроса и колко трудни, после тема. Накрая дай кода на другите."),
+      setting(
+        "Въпроси",
+        segmented(
+          "Въпроси",
+          [5, 10, 15, 20].map((n) => [n, String(n)]),
+          length,
+          length.set,
+          false,
+          true,
+        ),
+      ),
+      setting("Трудност", segmented("Трудност", mixes, mix, mix.set, false, true)),
+      setting(
+        "Ти",
+        segmented(
+          "Ти",
+          [
+            [false, "Играя и аз"],
+            [true, "Само водя (за голям екран)"],
+          ],
+          leads,
+          leads.set,
+          false,
+          true,
+        ),
+      ),
       h(
         "ul",
         { class: "chips" },
@@ -94,4 +137,9 @@ export function rooms() {
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
+}
+
+/** A setting of a room: its name over its choices. */
+function setting(name: string, control: Child): Child {
+  return h("div", { class: "field" }, h("span", { "aria-hidden": "true" }, name), control);
 }

@@ -18,7 +18,7 @@ const all: Record<Mode, { href: string; name: string; about: string; tone: strin
   royal: {
     href: "/royal",
     name: "Роял",
-    about: "Всяка вечер в 21:00",
+    about: "На живо в 21:00",
     tone: "tone-gold",
   },
   room: { href: "/room", name: "Стая", about: "С код, за своите хора", tone: "tone-lilac" },
@@ -36,18 +36,42 @@ export interface Tonight {
     next: number;
     /** In the lobby, or still in the games. */
     in: number;
+    /** Every evening (else Friday to Sunday). */
+    nightly?: boolean;
   };
-  /** How many said they'd come to the next one, and whether the player did. */
+  /** How many said they'd come to the next one, whether the player did, and which of their friends did. */
   coming: number;
   planned: boolean;
+  friends?: string[];
 }
 
-/** Who said they'd come to the next Роял, in words: „Тази вечер ще дойдат 14“ (or „Утре вечер …“ once tonight's is
- * over). */
+export const clock = (ms: number) =>
+  new Intl.DateTimeFormat("bg", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Sofia" }).format(new Date(ms));
+export const dayOf = (ms: number) => new Date(ms).toLocaleDateString("en-CA", { timeZone: "Europe/Sofia" });
+
+/** The day of ms from now's, in words: „днес“, „утре“, or its weekday („в петък“, „във вторник“). */
+function onDay(ms: number, now: number): string {
+  const day = dayOf(ms);
+  if (day === dayOf(now)) return "днес";
+  if (day === dayOf(now + 24 * 3600_000)) return "утре";
+  const weekday = new Intl.DateTimeFormat("bg", { weekday: "long", timeZone: "Europe/Sofia" }).format(new Date(ms));
+  return `${/^[вф]/.test(weekday) ? "във" : "в"} ${weekday}`;
+}
+
+/** When an evening is, in words: „днес в 21:00“, „утре в 21:00“, „в петък в 21:00“. */
+export const when = (ms: number, now: number) => `${onDay(ms, now)} в ${clock(ms)}`;
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Who said they'd come to the next Роял, in words: „Тази вечер ще дойдат 14“ (or „Утре вечер …“, „В петък …“), a
+ * friend first if one did: „Мария и още 4 ще дойдат тази вечер“. */
 export function coming(t: Tonight): string {
-  const day = (ms: number) => new Date(ms).toLocaleDateString("en-CA", { timeZone: "Europe/Sofia" });
-  const when = day(t.glance.next) === day(t.glance.now) ? "Тази вечер" : "Утре вечер";
-  return `${when} ${t.coming === 1 ? "ще дойде 1" : `ще дойдат ${t.coming}`}`;
+  const day = onDay(t.glance.next, t.glance.now);
+  const at = day === "днес" ? "тази вечер" : day === "утре" ? "утре вечер" : day;
+  const [friend] = t.friends ?? [];
+  const more = t.coming - 1 - (t.planned ? 1 : 0);
+  if (friend) return `${friend}${more > 0 ? ` и още ${more} ще дойдат` : " ще дойде"} ${at}`;
+  return `${cap(at)} ${t.coming === 1 ? "ще дойде 1" : `ще дойдат ${t.coming}`}`;
 }
 
 /** What Роял's card says now: the evening's live state, or how many are coming, or when it is. */
@@ -82,7 +106,7 @@ function royalNow(): () => string {
     }
     if (g.phase === "live") return `Играе се · ${g.in}\u00a0още вътре`;
     if (t.coming > 0) return coming(t);
-    return all.royal.about;
+    return g.nightly ? "Всяка вечер в 21:00" : cap(when(g.next, now()));
   };
 }
 

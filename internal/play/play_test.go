@@ -485,8 +485,9 @@ func TestUnlocks(t *testing.T) {
 		t.Fatalf("next after gold: %+v", p.Next)
 	}
 
-	// The shield is duel1's: once it's earned, duel10 gives its XP and its title, not the shield.
+	// The shield is duel1's: once it's earned, duel10 gives its XP (said once XP is open) and its title, not the shield.
 	_, _ = w.db.Write.Exec(`INSERT INTO achievements (user_id, id, at, xp, seen) VALUES (?, 'duel1', 1, 50, 1)`, ana)
+	w.played(ana, XPFromDay)
 	p, _ = w.g.ProgressOf(ctx, ana)
 	for _, a := range p.Achievements {
 		switch a.ID {
@@ -664,7 +665,7 @@ func TestStats(t *testing.T) {
 		t.Fatalf("stats %+v", s)
 	}
 	music := s.Mastery[slices.IndexFunc(s.Mastery, func(m Mastery) bool { return m.Category == "music" })]
-	if !music.Sure || music.Answers < Length || s.Recent[0].Kind != "topic" || s.Recent[0].Total != Length {
+	if music.Sure || !music.First || music.Answers < Length || s.Recent[0].Kind != "topic" || s.Recent[0].Total != Length {
 		t.Fatalf("music %+v, recent %+v", music, s.Recent)
 	}
 }
@@ -766,9 +767,29 @@ func TestProgress(t *testing.T) {
 	ana := w.user()
 	w.played(ana, XPFromDay-1)
 	p, err := w.g.ProgressOf(ctx, ana)
-	if err != nil || p.Level != 1 || p.Avatar != DefaultAvatar(ana) || len(p.Achievements) != len(Achievements) ||
-		p.Achievements[0].At != 0 {
+	if err != nil || p.Level != 1 || p.Avatar != DefaultAvatar(ana) || p.Achievements[0].At != 0 {
 		t.Fatalf("a new player's progress: %+v %v", p, err)
+	}
+	// Before the second day, Награди follows the unfolding: no XP said, and no achievement of the day's goals or the
+	// league; from it, the goals' and XP; from the third, the league's too.
+	hiddenNow := func(p Progress) int {
+		n := 0
+		for _, a := range Achievements {
+			if !slices.ContainsFunc(p.Achievements, func(e Earned) bool { return e.ID == a.ID }) {
+				n++
+			}
+		}
+		return n
+	}
+	if hiddenNow(p) != 5 || slices.ContainsFunc(p.Achievements, func(e Earned) bool { return e.XP != 0 }) {
+		t.Fatalf("a first day's achievements: %d hidden, %+v", hiddenNow(p), p.Achievements)
+	}
+	for _, c := range []struct{ days, hidden int }{{XPFromDay, 3}, {LeagueFromDay, 0}} {
+		w.played(ana, c.days)
+		p, _ := w.g.ProgressOf(ctx, ana)
+		if hiddenNow(p) != c.hidden || p.Achievements[0].XP != AchievementXP[p.Achievements[0].Tier] {
+			t.Fatalf("day %d's achievements: %d hidden, %+v", c.days, hiddenNow(p), p.Achievements[0])
+		}
 	}
 	for _, s := range p.Shapes {
 		if locked := slices.Contains(Unlockable, s.Shape); s.Locked != locked || (locked && s.How == "") {
@@ -848,12 +869,18 @@ func TestProgress(t *testing.T) {
 		}
 	}
 
+	// Two more games of history, all right: a sure mark there, and a master's.
+	for range MasteryFrom/Length - 1 {
+		run, _ := w.g.StartTopic(ctx, ana, "history")
+		w.play(ana, run.ID, repeat(w.right, Length)...)
+	}
+
 	// What's earned may be worn; what isn't, can't.
 	for _, c := range []struct {
 		avatar, title *string
 		ok            bool
 	}{
-		{nil, ptr("master-history"), true}, // ten right in history: sure, and a master
+		{nil, ptr("master-history"), true}, // thirty right in history: sure, and a master
 		{ptr("star-gold"), ptr("flawless"), true},
 		{ptr("crown-gold"), nil, false},
 		{ptr("star-black"), nil, false},
@@ -1569,8 +1596,8 @@ func TestBoards(t *testing.T) {
 		}
 	}
 	k, err := w.g.KnowledgeBoard(ctx, bo, false, "")
-	if err != nil || len(k.Top) != 2 || k.Top[0].Value != 100 || k.Top[0].Answers != KnowAll || k.Place != 2 ||
-		k.Mine.Value != 0 {
+	if err != nil || len(k.Top) != 2 || k.Top[0].Value < 90 || k.Top[0].Tier != "Светило" || k.Top[0].Answers != KnowAll || k.Place != 2 ||
+		k.Mine.Value > 10 || k.Mine.Tier != "Новак" {
 		t.Fatalf("the board of knowledge: %+v %v", k, err)
 	}
 	if _, err := w.g.KnowledgeBoard(ctx, bo, false, "nope"); !errors.Is(err, ErrNoTopic) {
@@ -1581,7 +1608,7 @@ func TestBoards(t *testing.T) {
 		t.Fatalf("a topic nobody has %d answers in: %+v", KnowTopic, k)
 	}
 	_ = w.g.befriend(ctx, cy, bo)
-	if k, _ := w.g.KnowledgeBoard(ctx, cy, true, ""); len(k.Top) != 1 || k.Place != 0 || k.Top[0].Value != 0 {
+	if k, _ := w.g.KnowledgeBoard(ctx, cy, true, ""); len(k.Top) != 1 || k.Place != 0 || k.Top[0].Value > 10 {
 		t.Fatalf("knowledge among friends: %+v", k)
 	}
 }
@@ -1607,7 +1634,7 @@ func TestKnowledgeCounted(t *testing.T) {
 	}
 	games(bo, w.wrong)
 	// Bo sees their own at once, in their place; Ana sees the count, which hasn't got Bo yet.
-	if k, _ := w.g.KnowledgeBoard(ctx, bo, false, ""); len(k.Top) != 2 || k.Place != 2 || k.Mine.Value != 0 ||
+	if k, _ := w.g.KnowledgeBoard(ctx, bo, false, ""); len(k.Top) != 2 || k.Place != 2 || k.Mine.Value > 10 ||
 		k.Mine.Answers != KnowAll || !k.Top[1].Me {
 		t.Fatalf("Bo, just played: %+v", k)
 	}
@@ -1619,8 +1646,66 @@ func TestKnowledgeCounted(t *testing.T) {
 	_, _ = w.g.KnowledgeBoard(ctx, ana, false, "")
 	w.g.known.counting.Lock() // the count under way, done
 	w.g.known.counting.Unlock()
-	if k, _ := w.g.KnowledgeBoard(ctx, ana, false, ""); len(k.Top) != 2 || k.Place != 1 || k.Top[1].Value != 0 {
+	if k, _ := w.g.KnowledgeBoard(ctx, ana, false, ""); len(k.Top) != 2 || k.Place != 1 || k.Top[1].Value > 10 {
 		t.Fatalf("Ana, after the next count: %+v", k)
+	}
+}
+
+// The boards of knowledge rank by mastery, not by the share right: a player who gets fewer right of hard questions
+// knows more than one who gets more right of easy ones. A topic's board waits for a sure mark there.
+func TestKnowledgeByMastery(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	of := func(d bank.Difficulty) []string {
+		var ids []string
+		for _, q := range w.b.Questions {
+			if h := q.Base(); h.Difficulty == d && !q.Extra().Retired {
+				ids = append(ids, h.ID)
+			}
+		}
+		return ids
+	}
+	// answer gives a player n answers to these questions in turn, the first `right` of every ten right.
+	answer := func(user int64, ids []string, n, right int) {
+		res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, finished_at) VALUES (?, 'topic', '[]', 0, 1)`, user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		run, _ := res.LastInsertId()
+		for i := range n {
+			ok := i%Length < right
+			if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, score, points, is_right, ms, at)
+				VALUES (?, ?, ?, ?, 0, ?, 3000, ?)`, run, i, ids[i%len(ids)], map[bool]float64{true: 1}[ok], ok, i); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	ana, bo := w.user(), w.user()
+	answer(ana, of(bank.Hard), KnowAll, 6) // 60% right, of hard questions
+	answer(bo, of(bank.Easy), KnowAll, 8)  // 80% right, of easy ones
+	k, err := w.g.KnowledgeBoard(ctx, 0, false, "")
+	if err != nil || len(k.Top) != 2 || k.Top[0].Tag != "player1" || k.Top[0].Value <= k.Top[1].Value ||
+		k.Top[0].Tier == "" || k.Top[0].Answers != KnowAll {
+		t.Fatalf("by mastery: %+v %v", k, err)
+	}
+	// As each sees it (their own gone over exactly): the same.
+	if k, _ := w.g.KnowledgeBoard(ctx, bo, false, ""); k.Place != 2 || k.Mine.Value != k.Top[1].Value {
+		t.Fatalf("as Bo sees it: %+v", k)
+	}
+	// In a topic, only a sure mark there counts: KnowTopic answers of it.
+	topic := w.b.Categories[0].ID
+	var ids []string
+	for _, q := range w.b.Live(topic, "") {
+		ids = append(ids, q.Base().ID)
+	}
+	cy := w.user()
+	answer(cy, ids, KnowTopic-1, 10)
+	if k, _ := w.g.KnowledgeBoard(ctx, cy, false, topic); len(k.Top) != 0 || k.Mine != nil {
+		t.Fatalf("a topic's board before a sure mark: %+v", k)
+	}
+	answer(cy, ids, 1, 10)
+	if k, _ := w.g.KnowledgeBoard(ctx, cy, false, topic); len(k.Top) != 1 || k.Place != 1 || k.Top[0].Answers != KnowTopic {
+		t.Fatalf("a topic's board with a sure mark: %+v", k)
 	}
 }
 

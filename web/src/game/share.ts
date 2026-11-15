@@ -1,5 +1,6 @@
-// The day's result as it's shared: no answers and no invitation, only how it went, a square for each question (the
-// one place the game uses emoji: in the text shared, never on a screen) and where it's played.
+// The day's result as it's shared: no answers and no words of invitation, only how it went, a square for each question
+// (the one place the game uses emoji: in the text shared, never on a screen) and where it's played: the player's own
+// link, which brings whoever opens it to the day and offers them the player's friendship (screens/invite.ts).
 
 import type { Mark } from "./types.ts";
 
@@ -29,13 +30,14 @@ export const rare = 0.25;
 /** The day's result to share: „АЛМАНАХ · 14 ноември“, „8 от 10 · серия 12“ (the streak from two days), a square for
  * each of the ten (🟩 right, 🟨 close, 🟥 wrong or not answered), the right answer the fewest of the day's other
  * players got, if few did (`rarest`: its place and their share right: „Познах въпрос 7, който знаят само 12%“), and
- * „almanac.bg“. `day` is YYYY-MM-DD. */
+ * the player's link (their invite), or „almanac.bg“ without one. `day` is YYYY-MM-DD. */
 export function dayShareText(
   day: string,
   trail: Mark[],
   total: number,
   streak: number,
   rarest?: { n: number; right: number } | null,
+  link = "almanac.bg",
 ): string {
   const [, month = 1, date = 1] = day.split("-").map(Number);
   const rights = trail.filter((m) => m.right).length;
@@ -52,7 +54,7 @@ export function dayShareText(
     streak > 1 ? `${rights} от ${total} · серия ${streak}` : `${rights} от ${total}`,
     squares,
     few,
-    "almanac.bg",
+    link,
   ]
     .filter(Boolean)
     .join("\n");

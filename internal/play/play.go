@@ -1,5 +1,5 @@
 // Package play is the game: runs through a set of questions (the day's, a topic's), one question at a time, against
-// the server's clock; duels kept as runs; friends.
+// the server's clock; duels, and the games played in a room (rooms.go), kept as runs; friends.
 //
 // A question's time runs only while it's shown: Show starts it, Answer stops it. A question with pictures waits for
 // them: Show starts its time PictureWait later, and Start sooner, once the player's screen has them in, so that a slow
@@ -87,6 +87,10 @@ type Game struct {
 
 	weekMu sync.Mutex
 	week   string // the leagues' week being played, once ensureWeek has seen it
+
+	paceMu sync.Mutex
+	pace   RoyalPace // how often Роял plays, as of paceDay (RoyalPaceOf)
+	paceOn string
 
 	hard      hardnessCache // how hard each question is (mastery.go)
 	crowds    crowdCache    // how players have answered each question (crowd.go)

@@ -71,6 +71,24 @@ export async function moveOn(page: Page): Promise<void> {
  * today, straight in the test server's database: a player on their next days, who has met what those open
  * (play/unfold.go). The games are of nothing, and earn nothing. */
 export async function playedBefore(page: Page, days: number): Promise<void> {
+  await inDB(page, (db, id) => {
+    const add = db.prepare(`INSERT INTO runs (user_id, kind, category, questions, started_at, finished_at)
+      VALUES (?, 'topic', '', '[{"id":""}]', ?, ?)`);
+    for (let d = 1; d <= days; d++) {
+      const at = Date.now() - d * 24 * 60 * 60 * 1000;
+      add.run(id, at, at);
+    }
+  });
+}
+
+/** Makes the player's games count as a person's for the others (a test plays quicker than a person: play/fair.go),
+ * so that their friends see their day. */
+export async function playedFair(page: Page): Promise<void> {
+  await inDB(page, (db, id) => db.prepare("UPDATE runs SET scripted = 0 WHERE user_id = ?").run(id));
+}
+
+/** Does something to the player (a guest, made now if there's none) straight in the test server's database. */
+async function inDB(page: Page, f: (db: DatabaseSync, id: number) => void): Promise<void> {
   const id = await page.evaluate(async () => {
     const r = await fetch("/api/guest", {
       method: "POST",
@@ -82,12 +100,7 @@ export async function playedBefore(page: Page, days: number): Promise<void> {
   const db = new DatabaseSync(resolve(import.meta.dirname, "..", process.env.E2E_DB || "test-results/e2e.db"));
   try {
     db.exec("PRAGMA busy_timeout = 5000");
-    const add = db.prepare(`INSERT INTO runs (user_id, kind, category, questions, started_at, finished_at)
-      VALUES (?, 'topic', '', '[{"id":""}]', ?, ?)`);
-    for (let d = 1; d <= days; d++) {
-      const at = Date.now() - d * 24 * 60 * 60 * 1000;
-      add.run(id, at, at);
-    }
+    f(db, id);
   } finally {
     db.close();
   }

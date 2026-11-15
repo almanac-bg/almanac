@@ -130,8 +130,11 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.game.LeagueNews = s.leagueNews
 	s.game.MistakesAfter = cfg.MistakesAfter
 	s.game.CrowdMin = cfg.CrowdMin
-	if cfg.Royal == (royal.Schedule{}) {
+	if cfg.Royal.Every == 0 && cfg.Royal.Hour == 0 {
 		cfg.Royal = royal.Evening
+	}
+	if cfg.Royal.Every == 0 && cfg.Royal.On == nil {
+		cfg.Royal.On = s.game.RoyalOn // Friday to Sunday, until the evenings fill
 	}
 	s.game.RoyalAt = cfg.Royal.Next
 	s.royal = royal.NewHub(s.game, cfg.Royal)
@@ -143,6 +146,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.rooms = room.NewHub(s.bank.Load)
 	s.rooms.Crowd = s.game.Crowd
 	s.rooms.Barred = s.game.DayQuestions
+	s.rooms.Record = s.game.RecordRoom
 	s.live = live.NewHub(s.game, s.livePlayer)
 	s.closing = make(chan struct{})
 	d.Accounts.Merge = append(d.Accounts.Merge, play.Merge)
@@ -205,9 +209,15 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/questions/{id}/report", s.report)
 	api("POST /api/rooms", s.openRoom)
 	mux.HandleFunc("GET /api/rooms/{code}/events", s.roomEvents)
-	api("POST /api/rooms/{code}/start", s.roomStart)
+	api("POST /api/rooms/{code}/start", s.roomLead((*room.Room).Start))
+	api("POST /api/rooms/{code}/next", s.roomLead((*room.Room).Next))
+	api("POST /api/rooms/{code}/finish", s.roomLead((*room.Room).Finish))
+	api("POST /api/rooms/{code}/hold", s.roomHold)
+	mux.HandleFunc("GET /api/rooms/{code}/qr", s.roomQR)
 	api("POST /api/rooms/{code}/answer", s.roomAnswer)
 	api("POST /api/rooms/{code}/remove", s.roomRemove)
+	api("GET /api/rooms/{code}/people", s.roomPeople)
+	api("POST /api/rooms/{code}/people", s.roomBefriend)
 	api("POST /api/duels", s.challenge)
 	api("GET /api/duels", s.duels)
 	mux.HandleFunc("GET /api/duels/live/events", s.liveEvents)

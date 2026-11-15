@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -84,7 +85,7 @@ func TestAGamePlayedTogether(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
 		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
-		r, err := hub.Open(ana, "")
+		r, err := hub.Open(ana, Settings{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -184,7 +185,7 @@ func TestAGamePlayedTogether(t *testing.T) {
 func TestScreensHearOfChanges(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
-		r, _ := hub.Open(Player{ID: 1, Name: "Ана"}, "history")
+		r, _ := hub.Open(Player{ID: 1, Name: "Ана"}, Settings{Category: "history"})
 		s, _ := r.Follow(1)
 		<-s.C // following is a change
 		_ = r.Join(Player{ID: 2, Name: "Бо"})
@@ -205,10 +206,10 @@ func TestScreensHearOfChanges(t *testing.T) {
 
 func TestRoomsLimits(t *testing.T) {
 	hub := NewHub(sample(t))
-	if _, err := hub.Open(Player{ID: 1, Name: "Ана"}, "astrology"); !errors.Is(err, play.ErrNoTopic) {
+	if _, err := hub.Open(Player{ID: 1, Name: "Ана"}, Settings{Category: "astrology"}); !errors.Is(err, play.ErrNoTopic) {
 		t.Fatalf("an unknown topic: %v", err)
 	}
-	r, _ := hub.Open(Player{ID: 1, Name: "Ана"}, "")
+	r, _ := hub.Open(Player{ID: 1, Name: "Ана"}, Settings{})
 	for i := range MaxPlayers - 1 {
 		if err := r.Join(Player{ID: int64(i + 2), Name: "Играч"}); err != nil {
 			t.Fatal(err)
@@ -233,7 +234,7 @@ func TestBarredAndLate(t *testing.T) {
 		}
 		hub.Barred = func(context.Context) (map[string]bool, error) { return barred, nil }
 		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
-		r, _ := hub.Open(ana, "")
+		r, _ := hub.Open(ana, Settings{})
 		_ = r.Join(bo)
 		sa, _ := r.Follow(ana.ID)
 		sb, _ := r.Follow(bo.ID)
@@ -264,7 +265,7 @@ func TestCluesComeInTime(t *testing.T) {
 		b := sample(t)
 		hub := NewHub(b)
 		ana := Player{ID: 1, Name: "Ана"}
-		r, _ := hub.Open(ana, "")
+		r, _ := hub.Open(ana, Settings{})
 		if err := r.Start(ana.ID); err != nil {
 			t.Fatal(err)
 		}
@@ -323,8 +324,8 @@ func TestPausedRooms(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
 		ana := Player{ID: 1, Name: "Ана"}
-		r, _ := hub.Open(ana, "")
-		other, _ := hub.Open(Player{ID: 2, Name: "Бо"}, "")
+		r, _ := hub.Open(ana, Settings{})
+		other, _ := hub.Open(Player{ID: 2, Name: "Бо"}, Settings{})
 		if err := r.Start(ana.ID); err != nil {
 			t.Fatal(err)
 		}
@@ -361,11 +362,11 @@ func TestRoomsKeptOverARestart(t *testing.T) {
 		bank := sample(t)
 		hub := NewHub(bank)
 		ana, bo, cy := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}, Player{ID: 3, Name: "Цви"}
-		lobby, _ := hub.Open(ana, "")
+		lobby, _ := hub.Open(ana, Settings{})
 		_ = lobby.Join(bo)
-		over, _ := hub.Open(bo, "")
+		over, _ := hub.Open(bo, Settings{})
 		_ = over.Join(cy)
-		playing, _ := hub.Open(cy, "")
+		playing, _ := hub.Open(cy, Settings{})
 		_ = over.Start(bo.ID)
 		sb, _ := over.Follow(bo.ID)
 		for over.View(bo.ID).Phase != End {
@@ -423,7 +424,7 @@ func TestRemove(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
 		ana, bo, cy := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}, Player{ID: 3, Name: "Цви"}
-		r, _ := hub.Open(ana, "")
+		r, _ := hub.Open(ana, Settings{})
 		_ = r.Join(bo)
 		_ = r.Join(cy)
 		sa, _ := r.Follow(ana.ID)
@@ -491,5 +492,169 @@ func TestRemove(t *testing.T) {
 			t.Fatalf("Цви came back after a restart: %v", err)
 		}
 		synctest.Wait()
+	})
+}
+
+// A room plays the length and the mix its host chose, never deals a question twice, and keeps each player's game as
+// it ends (only theirs, and only if they answered), telling their screen which run it is.
+func TestSettingsAndRecords(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		b := sample(t)
+		hub := NewHub(b)
+		if _, err := hub.Open(Player{ID: 1}, Settings{Length: 7}); !errors.Is(err, play.ErrRoomGame) {
+			t.Fatalf("seven questions: %v", err)
+		}
+		if _, err := hub.Open(Player{ID: 1}, Settings{Mix: "brutal"}); !errors.Is(err, play.ErrRoomGame) {
+			t.Fatalf("an unknown mix: %v", err)
+		}
+		type record struct {
+			user int64
+			play play.RoomPlay
+		}
+		var mu sync.Mutex
+		var kept []record
+		hub.Record = func(_ context.Context, user int64, p play.RoomPlay) (int64, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			kept = append(kept, record{user, p})
+			return 100 + int64(len(kept)), nil
+		}
+		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
+		r, err := hub.Open(ana, Settings{Length: 5, Mix: play.MixEasy})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = r.Join(bo)
+		sa, _ := r.Follow(ana.ID)
+		sb, _ := r.Follow(bo.ID)
+		if v := r.View(bo.ID); v.Length != 5 || v.Mix != play.MixEasy {
+			t.Fatalf("the lobby's settings: %+v", v.Settings)
+		}
+		dealt := map[string]bool{}
+		for game := range 2 {
+			if err := r.Start(ana.ID); err != nil {
+				t.Fatal(err)
+			}
+			if len(r.picks) != 5 {
+				t.Fatalf("game %d: %d questions", game, len(r.picks))
+			}
+			for _, p := range r.picks {
+				q, _ := b().Get(p.ID)
+				if dealt[p.ID] || q.Base().Difficulty == bank.Hard {
+					t.Fatalf("game %d dealt %s (%s), again or hard", game, p.ID, q.Base().Difficulty)
+				}
+				dealt[p.ID] = true
+			}
+			// Only Ana answers, the first two questions; Bo lets the time run out on all.
+			for r.View(ana.ID).Phase != End {
+				if v := r.View(ana.ID); v.Phase == Question && v.N < 2 && !v.Players[0].Answered && !v.Players[1].Answered {
+					_ = r.Answer(ana.ID, v.N, answer(r, true))
+				}
+				time.Sleep(time.Second)
+				synctest.Wait()
+			}
+			synctest.Wait()
+			mu.Lock()
+			if len(kept) != game+1 || kept[game].user != ana.ID {
+				t.Fatalf("game %d kept: %+v", game, kept)
+			}
+			k := kept[game].play
+			if len(k.Picks) != 5 || len(k.Answers) != 5 || k.Answers[0].Given == nil || !k.Answers[0].Right ||
+				k.Answers[2].Given != nil || k.Answers[4].N != 4 || k.Points != r.View(ana.ID).Players[0].Points {
+				t.Fatalf("Ana's game, kept: %+v", k)
+			}
+			mu.Unlock()
+			if v := r.View(ana.ID); v.Run != int64(100+game+1) {
+				t.Fatalf("Ana's run: %d", v.Run)
+			}
+			if r.View(bo.ID).Run != 0 {
+				t.Fatal("Bo, who answered nothing, has a run")
+			}
+			if hub.UnderWay() != 0 {
+				t.Fatal("a game kept counts as under way")
+			}
+		}
+		r.Unfollow(sa)
+		r.Unfollow(sb)
+	})
+}
+
+// A host leading from a big screen isn't a player, and sets the pace: an answer now, an answer held, the end.
+func TestLeadingHost(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		hub := NewHub(sample(t))
+		ana, bo := Player{ID: 1, Name: "Учител"}, Player{ID: 2, Name: "Бо"}
+		r, _ := hub.Open(ana, Settings{Lead: true})
+		sa, err := r.Follow(ana.ID)
+		if err != nil {
+			t.Fatalf("the host's screen: %v", err)
+		}
+		if err := r.Start(ana.ID); !errors.Is(err, ErrNoPlayers) {
+			t.Fatalf("a game for nobody: %v", err)
+		}
+		_ = r.Join(ana) // the host's screen joining again changes nothing
+		_ = r.Join(bo)
+		sb, _ := r.Follow(bo.ID)
+		if v := r.View(ana.ID); len(v.Players) != 1 || !v.IsHost || !v.Lead || v.Host != "Учител" {
+			t.Fatalf("the host's lobby: %+v", v)
+		}
+		if v := r.View(bo.ID); v.CanLead || v.Host != "Учител" {
+			t.Fatalf("Bo's lobby: %+v", v)
+		}
+		if err := r.Start(ana.ID); err != nil {
+			t.Fatal(err)
+		}
+		// Bo answers: the answer shows at once, with the answer (and its fact) on the host's screen.
+		_ = r.Answer(bo.ID, 0, answer(r, true))
+		if v := r.View(ana.ID); v.Phase != Reveal || v.Question.Reveal == nil || v.Question.Reveal.Answer == nil {
+			t.Fatalf("the answer on the big screen: %+v", v.Question)
+		}
+		// Held, the answer stays up past Pause until the host moves on.
+		if err := r.Hold(bo.ID, true); !errors.Is(err, ErrNotYours) {
+			t.Fatalf("a player held: %v", err)
+		}
+		_ = r.Hold(ana.ID, true)
+		time.Sleep(2 * Pause)
+		synctest.Wait()
+		if v := r.View(bo.ID); v.Phase != Reveal || !v.Held || v.Question.NextMs != 0 {
+			t.Fatalf("held: %+v", v)
+		}
+		_ = r.Next(ana.ID)
+		if v := r.View(bo.ID); v.Phase != Question || v.N != 1 {
+			t.Fatalf("after Напред: %s %d", v.Phase, v.N)
+		}
+		// Напред on a question shows its answer now; let go, the room moves on by itself again.
+		_ = r.Next(ana.ID)
+		_ = r.Hold(ana.ID, false)
+		time.Sleep(Pause + time.Millisecond)
+		synctest.Wait()
+		if v := r.View(bo.ID); v.Phase != Question || v.N != 2 {
+			t.Fatalf("let go: %s %d", v.Phase, v.N)
+		}
+		// Away, the host leaves the pace to whoever's there.
+		r.Unfollow(sa)
+		if !r.View(bo.ID).CanLead {
+			t.Fatal("nobody may lead while the host is away")
+		}
+		sa, _ = r.Follow(ana.ID)
+		if err := r.Finish(ana.ID); err != nil {
+			t.Fatal(err)
+		}
+		if v := r.View(bo.ID); v.Phase != End || v.Total != 3 || len(v.Review) != 3 {
+			t.Fatalf("ended on the third question: %s, %d questions", v.Phase, v.Total)
+		}
+		// Kept over a restart, the host still leading.
+		var saved bytes.Buffer
+		_ = hub.Save(&saved)
+		next := NewHub(sample(t))
+		if n, _ := next.Restore(&saved); n != 1 {
+			t.Fatalf("restored %d", n)
+		}
+		again, _ := next.Get(r.Code())
+		if v := again.View(ana.ID); !v.Lead || !v.IsHost || len(v.Players) != 1 || v.Host != "Учител" {
+			t.Fatalf("restored: %+v", v)
+		}
+		r.Unfollow(sa)
+		r.Unfollow(sb)
 	})
 }

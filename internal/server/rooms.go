@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/play"
+	"github.com/almanac-bg/almanac/internal/qr"
 	"github.com/almanac-bg/almanac/internal/room"
 )
 
@@ -38,16 +40,14 @@ func (s *Server) openRoom(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	var in struct {
-		Category string `json:"category"`
-	}
+	var in room.Settings
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
 	if !s.limits.allow("room:"+strconv.FormatInt(u.ID, 10), 30, time.Hour) {
 		return errTooMany
 	}
-	rm, err := s.rooms.Open(s.roomPlayer(r.Context(), u.ID, u.Name), in.Category)
+	rm, err := s.rooms.Open(s.roomPlayer(r.Context(), u.ID, u.Name), in)
 	if err != nil {
 		return err
 	}
@@ -118,19 +118,50 @@ func (s *Server) roomEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) roomStart(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
+// roomLead is who leads a room starting a game, moving it on (Next) or ending it (Finish).
+func (s *Server) roomLead(act func(*room.Room, int64) error) func(http.ResponseWriter, *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		u, err := s.mustUser(r)
+		if err != nil {
+			return err
+		}
+		rm, err := s.roomOf(r)
+		if err != nil {
+			return err
+		}
+		if err := act(rm, u.ID); err != nil {
+			return err
+		}
+		return ok(w, map[string]bool{"ok": true})
+	}
+}
+
+// roomHold is who leads keeping each answer up until they move on, or letting the room move on by itself again.
+func (s *Server) roomHold(w http.ResponseWriter, r *http.Request) error {
+	var in struct {
+		On bool `json:"on"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	return s.roomLead(func(rm *room.Room, by int64) error { return rm.Hold(by, in.On) })(w, r)
+}
+
+// roomQR is the room's link as a QR code, for a big screen: drawn here, so that no outside service sees the code.
+func (s *Server) roomQR(w http.ResponseWriter, r *http.Request) {
+	code := r.PathValue("code")
+	if !roomCode.MatchString(code) {
+		http.NotFound(w, r)
+		return
+	}
+	c, err := qr.Encode(s.cfg.PublicURL + "/r/" + code)
 	if err != nil {
-		return err
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
 	}
-	rm, err := s.roomOf(r)
-	if err != nil {
-		return err
-	}
-	if err := rm.Start(u.ID); err != nil {
-		return err
-	}
-	return ok(w, map[string]bool{"ok": true})
+	w.Header().Set("Content-Type", "image/svg+xml")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	_, _ = io.WriteString(w, c.SVG())
 }
 
 // roomRemove is the host sending a player out of the room, by their key.
@@ -153,6 +184,72 @@ func (s *Server) roomRemove(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return ok(w, map[string]bool{"ok": true})
+}
+
+// roomPeople is what a room's end offers its player: whom of the others to add as friends (their keys: not friends
+// yet, nor asked), and whether the day's ten still wait for them.
+func (s *Server) roomPeople(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	rm, err := s.roomOf(r)
+	if err != nil {
+		return err
+	}
+	add := []int{}
+	for key, id := range rm.Players() {
+		if id == u.ID {
+			continue
+		}
+		var known bool
+		if err := s.db.Read.QueryRowContext(r.Context(), `SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ?1 AND friend_id = ?2)
+			OR EXISTS (SELECT 1 FROM friend_requests WHERE from_id = ?1 AND to_id = ?2)`, u.ID, id).Scan(&known); err != nil {
+			return err
+		}
+		if !known {
+			add = append(add, key)
+		}
+	}
+	_, played, err := s.game.DayRights(r.Context(), u.ID, s.game.Today(), u.ID)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"add": add, "day": played})
+}
+
+// roomBefriend asks a player of the room (by their key) to be friends: a request, as by their tag.
+func (s *Server) roomBefriend(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	rm, err := s.roomOf(r)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		Key int `json:"key"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	id, here := rm.Players()[in.Key]
+	if !here || id == u.ID {
+		return play.ErrNoPlayer
+	}
+	if !s.limits.allow("request:"+s.clientIP(r), 30, time.Hour) {
+		return errTooMany
+	}
+	var tag string
+	if err := s.db.Read.QueryRowContext(r.Context(), `SELECT tag FROM users WHERE id = ?`, id).Scan(&tag); err != nil {
+		return err
+	}
+	sent, err := s.game.Request(r.Context(), u.ID, tag, false)
+	if err != nil {
+		return err
+	}
+	return ok(w, sent)
 }
 
 func (s *Server) roomAnswer(w http.ResponseWriter, r *http.Request) error {

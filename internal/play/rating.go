@@ -75,15 +75,17 @@ func (g *Game) StandingOf(ctx context.Context, userID int64) (Standing, error) {
 	return s, err
 }
 
-// Ranked is a player on a board: who they are, and the number the board is by (a rating, XP, a share right).
+// Ranked is a player on a board: who they are, and the number the board is by (a rating, or the percent of a topic
+// known).
 type Ranked struct {
 	Name     string    `json:"name"`
 	Tag      string    `json:"tag"`
 	Value    int       `json:"value"`
 	Division *Division `json:"division,omitempty"`
-	// Answers is what a board of knowledge counts a share of.
-	Answers int  `json:"answers,omitempty"`
-	Me      bool `json:"me,omitempty"`
+	// Answers is how many answers a board of knowledge has the mastery from, and Tier the mastery's name.
+	Answers int    `json:"answers,omitempty"`
+	Tier    string `json:"tier,omitempty"`
+	Me      bool   `json:"me,omitempty"`
 	Look
 }
 
@@ -98,7 +100,7 @@ const (
 	// BoardSize is how many a board shows.
 	BoardSize = 50
 	// KnowAll is how many answers a player needs to be on the board of knowledge, and KnowTopic in one topic: a
-	// share of a few is luck.
+	// mark from a few is luck.
 	KnowAll   = 100
 	KnowTopic = 30
 )

@@ -22,7 +22,7 @@ export interface Stats {
   mastery: Mastery[];
   recent: {
     id: number;
-    kind: "day" | "topic" | "challenge" | "duel" | "royal" | "mistakes"; // challenge: from when there were challenges
+    kind: "day" | "topic" | "challenge" | "duel" | "royal" | "mistakes" | "room"; // challenge: from when there were challenges
     day?: string;
     category?: string;
     rights: number;
@@ -54,6 +54,8 @@ function what(p: Stats["recent"][number]): string {
       return "Роял";
     case "mistakes":
       return "Втори шанс";
+    case "room":
+      return `Стая · ${topicName(p.category)}`;
     default:
       return topicName(p.category);
   }
@@ -86,8 +88,8 @@ export function stats(): Child {
           ? figure(`${s.won}/${s.duels}`, "спечелени дуела")
           : figure(String(s.days), s.days === 1 ? "ден с въпросите на деня" : "дни с въпросите на деня"),
       ),
-      // „Колко знаеш“ once a topic has a mark: a first day's one answer a topic tells nothing.
-      s.mastery.some((m) => m.sure) ? masteryCard(s.mastery) : null,
+      // „Колко знаеш“ once a topic has a first estimate: a first day's one answer a topic tells nothing.
+      s.mastery.some((m) => m.sure || m.first) ? masteryCard(s.mastery) : null,
       h(
         "section",
         { class: "stack" },

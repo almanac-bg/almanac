@@ -833,14 +833,34 @@
     font-size: 0.875rem;
   }
 
-  /* What a cut did, as its answer shows. */
+  /* A cut, as its answer shows: a card for the one it lets through (gold) or puts out (plain), its line drawn in. */
   .royal-cut {
-    margin: 0;
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-md);
-    background: var(--sunken);
-    font-weight: 800;
+    gap: var(--space-1);
     text-align: center;
+  }
+
+  .royal-cut > :first-child {
+    font-size: 1.375rem;
+  }
+
+  .royal-cut.through {
+    box-shadow: var(--glow-gold);
+  }
+
+  .royal-cut.through > :first-child {
+    color: var(--gold-ink);
+    font-size: 1.625rem;
+  }
+
+  .league-line.now {
+    border-top: 2px solid;
+    animation: cut 0.3s ease-out;
+  }
+
+  @keyframes cut {
+    from {
+      clip-path: inset(0 100% 0 0);
+    }
   }
 
   .royal-past {
@@ -2785,7 +2805,8 @@
     cursor: pointer;
   }
 
-  .segmented button[aria-selected="true"] {
+  .segmented button[aria-selected="true"],
+  .segmented button[aria-checked="true"] {
     background: var(--raised);
     box-shadow: var(--elev-1);
     color: var(--text);
@@ -3574,6 +3595,14 @@
 
   .row.away .who-name {
     color: var(--text-muted);
+  }
+
+  /* Under a name: a friend's ten (the friends' day on Начало), or the way to add a player (a room's end). */
+  .row > .row-add,
+  .row > .trail {
+    grid-column: 2 / -1;
+    max-width: 12rem;
+    gap: 3px;
   }
 
   /* A player who links to their profile: the row's look, the name underlined on hover. */
@@ -5367,7 +5396,8 @@
     .verdict-pts,
     .in-row,
     .explain-pop:popover-open,
-    .number-out.live .typed::after {
+    .number-out.live .typed::after,
+    .league-line.now {
       animation: none;
     }
   }

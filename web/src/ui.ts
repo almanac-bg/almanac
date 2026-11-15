@@ -84,6 +84,33 @@ export function verdict(
 }
 
 /** The fact behind an answer. */
+/** A segmented switch of a few choices: tabs that switch what a screen shows, or (`radio`) a setting to choose. */
+export function segmented<T>(
+  label: string,
+  options: [T, string][],
+  now: () => T,
+  choose: (v: T) => void,
+  small = false,
+  radio = false,
+): Child {
+  return h(
+    "div",
+    { class: small ? "segmented small" : "segmented", role: radio ? "radiogroup" : "tablist", "aria-label": label },
+    options.map(([id, text]) =>
+      h(
+        "button",
+        {
+          type: "button",
+          role: radio ? "radio" : "tab",
+          [radio ? "aria-checked" : "aria-selected"]: () => now() === id,
+          onclick: () => choose(id),
+        },
+        text,
+      ),
+    ),
+  );
+}
+
 export function fact(text: string): Child {
   return h("aside", { class: "fact" }, h("h2", null, "Знаеше ли?"), h("p", null, text));
 }
@@ -124,7 +151,7 @@ export interface Open {
  * Kept apart on purpose (play/worth.go), so each is said where it first shows and a tap from wherever it does. */
 export const meaning = {
   points:
-    "Точките са резултатът ти в една игра: за верните отговори, за бързината и за верните поред. По тях е класацията на деня.",
+    "Точките са резултатът ти в една игра: за верните отговори, за бързината и за верните поред. В класацията на деня решават при равен брой верни.",
   xp: "XP печелиш с всяка игра, цел и постижение. Трупа се и вдига нивото ти.",
   league: " Точките от въпросите на деня за седмицата те класират в лигата.",
   rating: "Рейтингът е силата ти в дуелите и в Роял: расте с победа, пада със загуба. По него е дивизията ти.",

@@ -9,7 +9,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, type Signal, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
-import { type Open, type Tier, toneOf, topicMark } from "../ui.ts";
+import { type Open, segmented, type Tier, toneOf, topicMark } from "../ui.ts";
 import type { Standing } from "./duel.ts";
 import { type LeagueView, leagueBoard, loadLeague } from "./league.ts";
 
@@ -18,7 +18,9 @@ interface Ranked {
   tag: string;
   value: number;
   division?: Standing["division"];
+  /** On a board of knowledge: how many answers the mastery is from, and its tier's name. */
   answers?: number;
+  tier?: string;
   me?: boolean;
   avatar?: string;
   title?: string;
@@ -57,12 +59,11 @@ const tabs: [By, string][] = [
  * them. */
 const shows = (by: By, open?: Open) => (by === "league" ? !!open?.league : by === "rating" ? !!open?.rating : true);
 
-const n = (x: number) => x.toLocaleString("bg");
-
 export function ranks() {
   title("Класации");
   const by = signal<By>(location.hash === "#league" ? "league" : "day");
-  const friends = signal(false);
+  // `#friends`: the day's board among friends (from Начало's „Всички“).
+  const friends = signal(location.hash === "#friends");
   const topic = signal("");
   const data = signal<Answer | null>(null);
   const day = signal<Day | null>(null);
@@ -198,9 +199,10 @@ export function ranks() {
           return ranking(
             among(name ? `Най-знаещи: ${name}` : "Най-знаещи"),
             d.board,
-            (r) => [h("small", { class: "sub" }, `${n(r.answers ?? 0)} отг. · `), `${r.value}%`],
+            // „72% · Експерт“: the mastery, as a topic's tile says it (play/knowledge.go).
+            (r) => [`${r.value}%`, r.tier ? h("small", { class: "sub" }, ` · ${r.tier}`) : null],
             `Още никой няма ${d.least ?? 100} отговора${name ? " в тази тема" : ""}.`,
-            `Делът на верните отговори след поне ${d.least ?? 100} отговора${name ? " в темата" : ""}. Изтеклото време се брои за грешен отговор.`,
+            `Колко от ${name ? "въпросите в темата" : "всички въпроси"} знае всеки по всичките си отговори, като по-трудните тежат повече. В класацията са тези с поне ${d.least ?? 100} отговора${name ? " в темата" : ""}.`,
           );
         }
       }
@@ -213,27 +215,6 @@ export function ranks() {
         `Играчите с поне ${least} игри за рейтинг: дуели и Роял.`,
       );
     },
-  );
-}
-
-/** A segmented switch of a few choices. */
-function segmented<T>(
-  label: string,
-  options: [T, string][],
-  now: () => T,
-  choose: (v: T) => void,
-  small = false,
-): Child {
-  return h(
-    "div",
-    { class: small ? "segmented small" : "segmented", role: "tablist", "aria-label": label },
-    options.map(([id, text]) =>
-      h(
-        "button",
-        { type: "button", role: "tab", "aria-selected": () => now() === id, onclick: () => choose(id) },
-        text,
-      ),
-    ),
   );
 }
 

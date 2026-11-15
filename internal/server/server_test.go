@@ -532,6 +532,114 @@ func TestARoomOverHTTP(t *testing.T) {
 	}
 }
 
+// A host who leads from a big screen: not a player, the answer on their screen, and the pace theirs.
+func TestALeadingHostOverHTTP(t *testing.T) {
+	g := start(t)
+	ana, bo := g.player(), g.player()
+	ana.call("POST", "/api/guest", map[string]any{})
+	bo.call("POST", "/api/guest", map[string]any{})
+	_, out := ana.call("POST", "/api/rooms", map[string]any{"lead": true, "length": 5})
+	code, _ := out["code"].(string)
+	as := ana.follow(code)
+	if status, out := ana.call("POST", "/api/rooms/"+code+"/start", nil); status != 409 || out["error"] != "no_players" {
+		t.Fatalf("a game with nobody: %d %v", status, out)
+	}
+	bs := bo.follow(code)
+	v := as.until(func(v map[string]any) bool { return len(v["players"].([]any)) == 1 })
+	if v["isHost"] != true || v["lead"] != true {
+		t.Fatalf("the host's lobby: %v", v)
+	}
+	if status, _ := ana.call("POST", "/api/rooms/"+code+"/start", nil); status != 200 {
+		t.Fatalf("start: %d", status)
+	}
+	if status, _ := ana.call("POST", "/api/rooms/"+code+"/hold", map[string]any{"on": true}); status != 200 {
+		t.Fatalf("hold: %d", status)
+	}
+	// Bo alone answers (nothing, here: gives up), and the answer shows at once: no question waits for the host.
+	if status, _ := ana.call("POST", "/api/rooms/"+code+"/next", nil); status != 200 {
+		t.Fatalf("next: %d", status)
+	}
+	v = as.until(func(v map[string]any) bool { return v["phase"] == "reveal" })
+	q := v["question"].(map[string]any)
+	if q["reveal"].(map[string]any)["answer"] == nil || q["nextMs"] != nil || v["held"] != true {
+		t.Fatalf("the answer on the big screen, held: %v", q)
+	}
+	ana.call("POST", "/api/rooms/"+code+"/next", nil)
+	bs.until(func(v map[string]any) bool { return v["phase"] == "question" && v["n"] == 1.0 })
+	if status, _ := bo.call("POST", "/api/rooms/"+code+"/finish", nil); status != 403 {
+		t.Fatalf("a player ended the game: %d", status)
+	}
+	ana.call("POST", "/api/rooms/"+code+"/finish", nil)
+	if v := bs.until(func(v map[string]any) bool { return v["phase"] == "end" }); v["total"] != 2.0 {
+		t.Fatalf("ended at the second question: %v", v["total"])
+	}
+	res, err := http.Get(g.url + "/api/rooms/" + code + "/qr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.Header.Get("Content-Type") != "image/svg+xml" || !strings.HasPrefix(string(body), "<svg") {
+		t.Fatalf("the QR code: %s %.40s", res.Header.Get("Content-Type"), body)
+	}
+}
+
+// A room's end offers each player the others to add as friends (not friends yet, nor asked), and the day's ten while
+// they wait.
+func TestRoomPeople(t *testing.T) {
+	g := start(t)
+	ana, bo, cy := g.player(), g.player(), g.player()
+	for _, p := range []*player{ana, bo, cy} {
+		p.call("POST", "/api/guest", map[string]any{})
+	}
+	_, out := ana.call("POST", "/api/rooms", map[string]string{"category": ""})
+	code := out["code"].(string)
+	as := ana.follow(code)
+	bo.follow(code)
+	cy.follow(code)
+	v := as.until(func(v map[string]any) bool { return len(v["players"].([]any)) == 3 })
+	keys := map[string]float64{}
+	for _, p := range v["players"].([]any) {
+		p := p.(map[string]any)
+		keys[p["name"].(string)] = p["key"].(float64)
+	}
+	people := func(p *player) ([]any, any) {
+		status, out := p.call("GET", "/api/rooms/"+code+"/people", nil)
+		if status != 200 {
+			t.Fatalf("people: %d %v", status, out)
+		}
+		return out["add"].([]any), out["day"]
+	}
+	if add, day := people(ana); len(add) != 2 || day != false {
+		t.Fatalf("Ana's people at first: %v %v", add, day)
+	}
+	// Ana adds Bo: a request; he's no longer offered to her, she's still offered to him (he can say yes there).
+	_, me := bo.call("GET", "/api/me", nil)
+	boKey := keys[me["user"].(map[string]any)["name"].(string)]
+	if status, out := ana.call("POST", "/api/rooms/"+code+"/people", map[string]any{"key": boKey}); status != 200 ||
+		out["friends"] == true {
+		t.Fatalf("Ana adds Bo: %d %v", status, out)
+	}
+	if add, _ := people(ana); len(add) != 1 || add[0] == boKey {
+		t.Fatalf("Ana's people once she asked Bo: %v", add)
+	}
+	if add, _ := people(bo); len(add) != 2 {
+		t.Fatalf("Bo's people: %v", add)
+	}
+	// Bo adds Ana back: friends, offered to neither.
+	_, me = ana.call("GET", "/api/me", nil)
+	anaKey := keys[me["user"].(map[string]any)["name"].(string)]
+	if _, out := bo.call("POST", "/api/rooms/"+code+"/people", map[string]any{"key": anaKey}); out["friends"] != true {
+		t.Fatalf("Bo adds Ana: %v", out)
+	}
+	if add, _ := people(bo); len(add) != 1 {
+		t.Fatalf("Bo's people once friends with Ana: %v", add)
+	}
+	if status, _ := cy.call("POST", "/api/rooms/"+code+"/people", map[string]any{"key": 99}); status == 200 {
+		t.Fatal("a key nobody has")
+	}
+}
+
 func TestALiveDuelOverHTTP(t *testing.T) {
 	g := start(t)
 	ana, bo := g.player(), g.player()
@@ -949,7 +1057,8 @@ func TestRoyalPlans(t *testing.T) {
 		t.Fatalf("Ana's plan: %d %v", status, out)
 	}
 	ana.call("POST", "/api/royal/plan", map[string]any{}) // again changes nothing
-	if _, out := bo.call("GET", "/api/royal/tonight", nil); out["coming"] != 1.0 || out["planned"] != false {
+	if _, out := bo.call("GET", "/api/royal/tonight", nil); out["coming"] != 1.0 || out["planned"] != false ||
+		len(out["friends"].([]any)) != 0 {
 		t.Fatalf("tonight, to Bo: %v", out)
 	}
 	if res, err := http.Get(g.url + "/api/royal/tonight"); err != nil || res.StatusCode != 200 {
@@ -975,6 +1084,12 @@ func TestRoyalPlans(t *testing.T) {
 	}
 	if n := s.callSoon(t.Context(), start, []int64{boID}, []int64{boID}); n != 0 {
 		t.Fatal("called again twice")
+	}
+	// Cy, Ana's friend, hears it's her who's coming.
+	befriend(ana, cy)
+	_, me := ana.call("GET", "/api/me", nil)
+	if _, out := cy.call("GET", "/api/royal/tonight", nil); fmt.Sprint(out["friends"]) != fmt.Sprint([]any{name(me)}) {
+		t.Fatalf("tonight, to Ana's friend: %v", out)
 	}
 }
 
@@ -1004,11 +1119,33 @@ func TestLinkPreviews(t *testing.T) {
 	_, friends := p.call("GET", "/api/friends", nil)
 	link := friends["invite"].(string)
 	who := me["user"].(map[string]any)["name"].(string)
-	if body := page(link[len(g.url):]); !strings.Contains(body, `og:title" content="`+who+` те кани в АЛМАНАХ"`) {
+	if body := page(link[len(g.url):]); !strings.Contains(body, `og:title" content="`+who+` в АЛМАНАХ"`) ||
+		!strings.Contains(body, `og:description" content="Десет въпроса за днес, едни и същи за всички. Колко ще познаеш ти?"`) {
 		t.Fatalf("the invite's preview:\n%s", body[:min(len(body), 1500)])
 	}
+	// Once its owner has played the day, their link (the one their shared result ends with) says how they did.
+	_, day := p.call("POST", "/api/day", map[string]any{})
+	id = strconv.Itoa(int(day["id"].(float64)))
+	for n := range 10 {
+		p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
+		p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": nil})
+	}
+	if _, today := p.call("GET", "/api/day", nil); today["invite"] != link {
+		t.Fatalf("the day's link to share: %v, not %s", today["invite"], link)
+	}
+	if body := page(link[len(g.url):]); !strings.Contains(body, `og:title" content="`+who+`: 0 от 10 в АЛМАНАХ днес"`) {
+		t.Fatalf("the invite's preview, its owner's day played:\n%s", body[:min(len(body), 1500)])
+	}
+	// The one who opens it hears how its owner did, and, once played, how they did themselves.
+	other := g.player()
+	other.call("POST", "/api/guest", map[string]any{})
+	code := link[strings.LastIndex(link, "/")+1:]
+	if _, info := other.call("GET", "/api/invites/"+code, nil); info["their"] != 0.0 || info["mine"] != nil ||
+		info["friends"] != false {
+		t.Fatalf("the invite as another sees it: %v", info)
+	}
 	_, room := p.call("POST", "/api/rooms", map[string]string{"category": ""})
-	code := room["code"].(string)
+	code = room["code"].(string)
 	if body := page("/r/" + code); !strings.Contains(body, "Ела в стая "+code[:3]+" "+code[3:]) {
 		t.Fatal("the room's preview")
 	}

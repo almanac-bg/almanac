@@ -17,6 +17,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/assets"
 	"github.com/almanac-bg/almanac/internal/bank"
+	"github.com/almanac-bg/almanac/internal/play"
 )
 
 // The app is one page: the server sends it for every path the app knows (and a 404 with it for the rest, which the
@@ -86,14 +87,15 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	b := s.bank.Load()
+	m := assets.Manifest(s.client)
 	boot, _ := json.Marshal(map[string]any{ // escapes <, > and &: safe inside the script element
 		"user":       u,
 		"categories": b.Categories,
 		"version":    s.cfg.Version,
 		"push":       s.pushKey(),
 		"phones":     s.phones.Platforms(), // the platforms the game's app gets notifications on
+		"hostCss":    m["host.css"],        // a room's big screen: its style, loaded only there
 	})
-	m := assets.Manifest(s.client)
 	title, description := s.preview(r)
 	canonical := ""
 	if r.URL.Path == "/" {
@@ -121,15 +123,18 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(out.Bytes())
 }
 
-// preview is what a link to this page shows when it's shared (Viber, Messenger, WhatsApp): an invite says whose it
-// is; a room, its code.
+// preview is what a link to this page shows when it's shared (Viber, Messenger, WhatsApp): an invite (the link a
+// shared day's result ends with) says whose it is and how they did today; a room, its code.
 func (s *Server) preview(r *http.Request) (title, description string) {
-	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми, дуели на живо, Роял всяка вечер и стаи с приятели. Всеки отговор носи по нещо ново."
+	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми, дуели на живо, Роял на живо в 21:00 и стаи с приятели. Всеки отговор носи по нещо ново."
 	switch path := r.URL.Path; {
 	case strings.HasPrefix(path, "/f/"):
-		if _, name, err := s.game.Inviter(r.Context(), strings.TrimPrefix(path, "/f/")); err == nil {
-			title = name + " те кани в АЛМАНАХ"
-			description = "Приеми и сте приятели: виждате резултатите си за деня и се предизвиквате на дуел."
+		if id, name, err := s.game.Inviter(r.Context(), strings.TrimPrefix(path, "/f/")); err == nil {
+			title = name + " в АЛМАНАХ"
+			if n, played, err := s.game.DayRights(r.Context(), id, s.game.Today(), 0); err == nil && played {
+				title = fmt.Sprintf("%s: %d от %d в АЛМАНАХ днес", name, n, play.Length)
+			}
+			description = "Десет въпроса за днес, едни и същи за всички. Колко ще познаеш ти?"
 		}
 	case strings.HasPrefix(path, "/players/"):
 		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {

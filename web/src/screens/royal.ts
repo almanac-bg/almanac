@@ -1,28 +1,66 @@
-// Роял: every evening at 21:00, live. Up to fifty players on the same fifteen questions at the same moment, easy to
-// hard in three rounds. A wrong answer puts nobody out: after questions 5, 8, 11 and 14 those with the most right go
-// on (of as many, the quicker), and the last question is a final of three; those cut play on to the end for themselves,
-// off the standings (each right answer still earns its XP). Each
-// answer shows with the standings and the next cut's line. The lobby opens a quarter of an hour before; whoever is on
-// this screen at the start plays, and those who come late may still come in until the third question's answer shows.
-// The screen is kept on in the lobby and the game.
+// Роял: at 21:00, live, Friday to Sunday (every evening once those fill). Up to fifty players on the same fifteen
+// questions at the same moment, easy to hard in three rounds. A wrong answer puts nobody out: after questions 5, 8, 11
+// and 14 those with the most right go on (of as many, the quicker), and the last question is a final of three; those
+// cut play on to the end for themselves, off the standings (each right answer still earns its XP). Each answer shows
+// with the standings and the next cut's line; the answer a cut comes with shows it as a card (gold for those who go
+// on, plain for those it puts out), its line drawn into the standings, and the time where it tells players apart.
+// The lobby opens a quarter of an hour before, with the friends who said they'd come; whoever is on this screen at
+// the start plays, and those who come late may still come in until the third question's answer shows. The screen is
+// kept on in the lobby and the game.
 //
 // The server sends the evening as this player sees it after every change; the browser reconnects if the line drops.
+// It loads on its own, the first time it's opened, and is handed the app's pieces (kit.ts).
 
-import { answered, ask, crowdLine, picture } from "../game/questions.ts";
-import { review } from "../game/results.ts";
-import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
-import { type ApiError, api } from "../lib/api.ts";
-import { keepAwake } from "../lib/awake.ts";
-import { type Child, computed, effect, h, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
-import { ordinal, place } from "../lib/ordinal.ts";
-import { pushable, pushOn, turnOn } from "../lib/push.ts";
-import { title } from "../lib/router.ts";
-import { play, playAnswer, playCount } from "../lib/sound.ts";
-import { categories, player, playing, user } from "../state.ts";
-import { avatar, back, pageArt, type Tier, type VerdictKind, verdict, who } from "../ui.ts";
-import { type Standing, standingCard } from "./duel.ts";
-import { coming, type Tonight } from "./modes.ts";
+import type { Kit } from "../kit.ts";
+import type { ApiError } from "../lib/api.ts";
+import type { Child, Signal } from "../lib/dom.ts";
+import type { Tier, VerdictKind } from "../ui.ts";
+import type { Standing } from "./duel.ts";
+import type { Tonight } from "./modes.ts";
+
+// The app's pieces, set as the screen opens (royal): it loads on its own, the first time it's opened (kit.ts), and
+// imports only types.
+let {
+  answered,
+  ask,
+  crowdLine,
+  picture,
+  review,
+  questionHead,
+  timer,
+  upNext,
+  api,
+  keepAwake,
+  computed,
+  effect,
+  h,
+  onCleanup,
+  signal,
+  untracked,
+  ordinal,
+  place,
+  pushable,
+  pushOn,
+  turnOn,
+  title,
+  play,
+  playAnswer,
+  playCount,
+  categories,
+  player,
+  playing,
+  user,
+  avatar,
+  back,
+  pageArt,
+  verdict,
+  who,
+  standingCard,
+  clock,
+  coming,
+  when,
+} = {} as Kit;
 
 type Phase = "soon" | "lobby" | "question" | "reveal" | "end";
 
@@ -36,6 +74,8 @@ interface Evening {
   length: number;
   round: number;
   size: number;
+  /** Every evening (else Friday to Sunday). */
+  nightly?: boolean;
   /** In this tournament (its lobby, or its game); cut out of its standings (they play on). */
   in: boolean;
   out: boolean;
@@ -81,8 +121,9 @@ interface Cut {
   after: number;
   keep: number;
   line?: Score;
-  /** It's the answer showing that the cut comes with. */
+  /** It's the answer showing that the cut comes with; then, the cut after it (none: the final's next). */
   now?: boolean;
+  then?: number;
 }
 
 interface Score {
@@ -123,26 +164,10 @@ interface Past {
 }
 
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
-const clock = (ms: number) =>
-  new Intl.DateTimeFormat("bg", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Sofia" }).format(new Date(ms));
-const dayOf = (ms: number) => new Date(ms).toLocaleDateString("en-CA", { timeZone: "Europe/Sofia" });
 
-/** When an evening is, in words: „днес в 21:00“, „утре в 21:00“, or its weekday. */
-function when(ms: number, now: number): string {
-  const day = dayOf(ms);
-  if (day === dayOf(now)) return `днес в ${clock(ms)}`;
-  if (day === dayOf(now + 24 * 3600_000)) return `утре в ${clock(ms)}`;
-  const weekday = new Intl.DateTimeFormat("bg", { weekday: "long", timeZone: "Europe/Sofia" }).format(new Date(ms));
-  return `${weekday} в ${clock(ms)}`;
-}
-
-/** Time left, in words for hours, as a clock for the last hour (12:05). */
+/** Time left in the last hour, as a clock (12:05). */
 function left(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
-  if (s >= 3600) {
-    const m = Math.ceil(s / 60);
-    return `${Math.floor(m / 60)} ч и ${m % 60} мин`;
-  }
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
@@ -166,7 +191,47 @@ const nth = (n: number) => `${ordinal(n)}я въпрос`;
 const signed = (d: number) => `${d > 0 ? "+" : ""}${d}`;
 const delta = (d?: number) => (d ? h("span", { class: d > 0 ? "delta up" : "delta down" }, signed(d)) : null);
 
-export function royal() {
+export function royal(kit: Kit) {
+  ({
+    answered,
+    ask,
+    crowdLine,
+    picture,
+    review,
+    questionHead,
+    timer,
+    upNext,
+    api,
+    keepAwake,
+    computed,
+    effect,
+    h,
+    onCleanup,
+    signal,
+    untracked,
+    ordinal,
+    place,
+    pushable,
+    pushOn,
+    turnOn,
+    title,
+    play,
+    playAnswer,
+    playCount,
+    categories,
+    player,
+    playing,
+    user,
+    avatar,
+    back,
+    pageArt,
+    verdict,
+    who,
+    standingCard,
+    clock,
+    coming,
+    when,
+  } = kit);
   title("Роял");
   const view = signal<Evening | null>(null);
   const trouble = signal(false);
@@ -242,8 +307,8 @@ export function royal() {
   );
 }
 
-const about =
-  "Всяка вечер в 21:00: до 50 души, 15 въпроса, в един и същи миг. Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни, а при равни — по-бързите. Последния въпрос играят трима.";
+const about = (nightly?: boolean) =>
+  `${nightly ? "Всяка вечер" : "Петък, събота и неделя"} в 21:00: до 50 души, 15 въпроса, в един и същи миг. Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни, а при равни — по-бързите. Последния въпрос играят трима.`;
 
 /** Before the lobby opens: when the next one is, your rating, and how your last ones went. */
 function soon(view: () => Evening, now: Signal<number>): Child {
@@ -258,18 +323,18 @@ function soon(view: () => Evening, now: Signal<number>): Child {
       back("/", "Начало"),
       pageArt("royal", "tone-gold"),
       h("h1", null, "Роял"),
-      h("p", { class: "lead" }, about),
+      h("p", { class: "lead" }, () => about(view().nightly)),
     ),
     h(
       "section",
       { class: "card royal-next" },
       h("p", { class: "kicker" }, "Следващият Роял"),
       h("strong", { class: "royal-when" }, () => when(view().startsAt, now())),
-      h(
-        "p",
-        { class: "muted" },
-        () => `Входът се отваря в ${clock(view().opensAt)}, след ${left(view().opensAt - now())}.`,
-      ),
+      h("p", { class: "muted" }, () => {
+        // When; a countdown too in the last hour.
+        const ms = view().opensAt - now();
+        return `Входът се отваря ${when(view().opensAt, now())}${ms < 3600_000 ? `, след ${left(ms)}` : ""}.`;
+      }),
       plan(),
     ),
     () => {
@@ -321,7 +386,8 @@ function plan(): Child {
     () => {
       const t = tonight();
       if (!t || t.glance.phase === "lobby") return null;
-      const opens = clock(t.glance.next - (t.glance.startsAt - t.glance.opensAt));
+      const opensAt = t.glance.next - (t.glance.startsAt - t.glance.opensAt);
+      const opens = clock(opensAt);
       return [
         t.coming > 0 ? h("p", { class: "royal-coming" }, `${coming(t)}.`) : null,
         t.planned
@@ -329,7 +395,9 @@ function plan(): Child {
               h(
                 "p",
                 null,
-                notified() ? `Ще дойдеш. В ${opens} ще ти напомним.` : "Ще дойдеш. Ела тук, щом входът се отвори.",
+                notified()
+                  ? `Ще дойдеш. Ще ти напомним ${when(opensAt, t.glance.now)}.`
+                  : "Ще дойдеш. Ела тук, щом входът се отвори.",
               ),
               h(
                 "div",
@@ -401,15 +469,16 @@ function chips(players: Player[]): Child {
   );
 }
 
-function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Child {
+/** The way in (and, from the lobby, out): its button, and what went wrong. */
+function entry(joined: () => void, out?: boolean): Child[] {
   const error = signal("");
   const busy = signal(false);
-  const act = async (method: "POST" | "DELETE") => {
+  const act = async () => {
     error.set("");
     busy.set(true);
     try {
       await player();
-      await api(method, "/api/royal", method === "POST" ? {} : undefined);
+      await api(out ? "DELETE" : "POST", "/api/royal", out ? undefined : {});
       joined();
     } catch (err) {
       error.set((err as ApiError).message);
@@ -417,6 +486,17 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
       busy.set(false);
     }
   };
+  return [
+    h(
+      "button",
+      { class: out ? "btn" : "btn primary big", type: "button", disabled: busy, onclick: act },
+      out ? "Излез" : "Влез",
+    ),
+    () => error() && h("p", { class: "bad", role: "alert" }, error()),
+  ];
+}
+
+function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Child {
   const v0 = view();
   // Those whose notifications are on here are called a minute before the start, if their screen is away.
   const notified = signal(false);
@@ -446,14 +526,11 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
         v0.in
           ? notified()
             ? "Вътре си. Ако излезеш от екрана, ще ти напомним минута преди началото."
-            : `Вътре си. Остани на този екран: в ${clock(v0.startsAt)} играят тези, които са тук. Закъснелите влизат до 3-тия въпрос.`
+            : `Вътре си. Остани на този екран до ${clock(v0.startsAt)}.`
           : `В ${clock(v0.startsAt)} всички получават първия въпрос едновременно. Закъснелите влизат до 3-тия въпрос.`,
       ),
     ),
-    v0.in
-      ? h("button", { class: "btn", type: "button", disabled: busy, onclick: () => act("DELETE") }, "Излез")
-      : h("button", { class: "btn primary big", type: "button", disabled: busy, onclick: () => act("POST") }, "Влез"),
-    () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    entry(joined, v0.in),
     () => {
       const v = view();
       if (!v.players.length) return h("p", { class: "muted" }, "Още никой не е влязъл.");
@@ -474,29 +551,13 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
 
 /** The door, for one not in once the games have begun: still open until the third question's answer shows. */
 function door(view: () => Evening, joined: () => void): Child {
-  const error = signal("");
-  const busy = signal(false);
-  const come = async () => {
-    error.set("");
-    busy.set(true);
-    try {
-      await player();
-      await api("POST", "/api/royal", {});
-      joined();
-    } catch (err) {
-      error.set((err as ApiError).message);
-    } finally {
-      busy.set(false);
-    }
-  };
   return () =>
     view().late && !view().in
       ? h(
           "section",
           { class: "card stack" },
           h("p", null, "Роял вече започна. До 3-тия въпрос още можеш да влезеш."),
-          h("button", { class: "btn primary big", type: "button", disabled: busy, onclick: come }, "Влез"),
-          () => error() && h("p", { class: "bad", role: "alert" }, error()),
+          entry(joined),
         )
       : null;
 }
@@ -542,22 +603,42 @@ function standing(view: () => Evening): Child {
   });
 }
 
-/** What a cut did, as its answer shows: how many go on, and whether you do. */
-function cutSaid(v: Evening): string | null {
-  if (!v.cut?.now || v.entered === 1) return null;
+/** What a cut did, as its answer shows: a card for the one it lets through or puts out, a line for the others. */
+function cutSaid(v: Evening): Child {
+  const c = v.cut;
+  if (!c?.now || v.entered === 1) return null;
   const me = v.players.find((p) => p.me);
-  const went =
-    v.wentOut === 0
-      ? `Отсяване: продължават всички (${v.left}).`
-      : `Отсяване: продължават ${v.left} от ${v.left + v.wentOut}.`;
-  const you = !me
-    ? ""
-    : me.in
-      ? " Продължаваш!"
-      : me.outAt === v.n
-        ? " Отпадаш от класирането. Играй до края за себе си: всеки верен отговор носи XP."
-        : "";
-  return went + you;
+  const card = (through: boolean, head: string, line: string) =>
+    h(
+      "section",
+      { class: through ? "card royal-cut through" : "card royal-cut", role: "status" },
+      h("b", null, head),
+      h("p", null, line),
+    );
+  if (me?.in)
+    return card(
+      true,
+      "Продължаваш!",
+      `Още ${v.left} в играта · ${c.then ? `следващото отсяване след ${nth(c.then)}` : "следва финалът"}`,
+    );
+  if (me?.outAt === v.n)
+    return card(
+      false,
+      `Отпадаш след ${nth(v.n + 1)}.`,
+      "Вече си извън класирането. Играй до края за себе си: всеки верен отговор носи XP.",
+    );
+  return h(
+    "p",
+    { class: "royal-line", role: "status" },
+    `Отсяване: продължават ${v.wentOut ? `${v.left} от ${v.left + v.wentOut}` : "всички"}.`,
+  );
+}
+
+/** The time a player's right answers took, under them, where it tells them from a neighbour with as many (5 верни,
+ * 41,2 с); none where it doesn't. */
+function timed(p: Player, ps: Player[], i: number): Child {
+  const level = (o?: Player) => o && o.outAt === p.outAt && o.reached === p.reached;
+  return level(ps[i - 1]) || level(ps[i + 1]) ? h("span", { class: "muted" }, seconds(p.ms)) : null;
 }
 
 /** The standings as the answer showing leaves them: those who go on (or would, at the next cut) marked, the line
@@ -578,13 +659,21 @@ function standings(v: Evening): Child {
           "span",
           { class: "royal-reach" },
           h("span", null, rights(p.reached)),
-          h("span", { class: "muted" }, p.in ? seconds(p.ms) : `до ${ordinal(p.outAt + 1)}я`),
+          timed(p, all, i),
+          p.in ? null : h("span", { class: "muted" }, `до ${ordinal(p.outAt + 1)}я`),
         ),
       ),
     );
     const next = all[i + 1];
     if (c && p.goes && next && !next.goes) {
-      rows.push(h("li", { class: "league-line up" }, c.now ? "Продължават" : `Дотук продължават след ${nth(c.after)}`));
+      // The cut's own line is drawn as its answer shows.
+      rows.push(
+        h(
+          "li",
+          { class: c.now ? "league-line up now" : "league-line up" },
+          c.now ? "Продължават" : `Дотук продължават след ${nth(c.after)}`,
+        ),
+      );
     }
   });
   return h("section", { class: "board league-board royal-table" }, h("h2", null, "Класиране"), h("ol", null, rows));
@@ -655,7 +744,6 @@ function reveal(view: () => Evening, first: Evening): Child {
   if (!q || !r) return null;
   const kind: VerdictKind = r.missed ? "time" : r.exact ? "exact" : r.right ? "right" : "wrong";
   if (r.mine) playAnswer(kind, r.right ? 1 : 0);
-  const said = cutSaid(first);
   return h(
     "article",
     { class: "question" },
@@ -665,7 +753,7 @@ function reveal(view: () => Evening, first: Evening): Child {
     answered(q.view, r.answer, r.mine ? (q.given ?? null) : null),
     r.mine ? verdict(kind, r.points, r.missed ? "Без отговор" : undefined, r.speed) : null,
     crowdLine(q.view.type, r.answer.crowd, r.mine && r.right),
-    said ? h("p", { class: "royal-cut", role: "status" }, said) : null,
+    cutSaid(first),
     standing(view),
     upNext(q.nextMs ?? 0, first.last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),
     standings(first),
@@ -718,13 +806,19 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
       h(
         "ol",
         null,
-        first.players.map((p) =>
+        first.players.map((p, i, all) =>
           h(
             "li",
             { class: ["row", (p.place ?? 9) <= 3 && `p${p.place}`, p.me && "me"].filter(Boolean).join(" ") },
             h("span", { class: "place" }, String(p.place ?? "")),
             who(p.name, p, p.me ? h("span", { class: "you" }, "ти") : null, p.name, p.tag),
-            h("span", { class: "royal-reach" }, h("span", { class: "muted" }, reach(p, first.length)), delta(p.delta)),
+            h(
+              "span",
+              { class: "royal-reach" },
+              h("span", { class: "muted" }, reach(p, first.length)),
+              timed(p, all, i),
+              delta(p.delta),
+            ),
           ),
         ),
       ),

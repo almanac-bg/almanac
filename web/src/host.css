@@ -1,0 +1,146 @@
+/* A room led from a big screen („Само водя“, screens/host.ts): a class's board, a pub's TV, read from across the
+   room. Loaded only on that screen; the rest of a room is app.css's. On a phone it's one column, as everything. */
+
+@layer app {
+  /* The whole width, whatever the page's column. */
+  .hosting #app,
+  .hosting main > * {
+    max-width: 100rem;
+  }
+
+  .host {
+    display: grid;
+    gap: var(--space-5);
+  }
+
+  .host-row {
+    display: grid;
+    gap: var(--space-5);
+    align-items: start;
+  }
+
+  .host-qr {
+    justify-self: center;
+    width: min(100%, 20rem);
+    height: auto;
+    border-radius: var(--radius-lg);
+  }
+
+  .host-join {
+    margin: 0;
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+
+  .host-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .host-controls .btn {
+    flex: 1 1 8rem;
+    width: auto;
+  }
+
+  .host-controls .btn[aria-pressed="true"] {
+    background: var(--accent);
+    color: var(--on-fill);
+  }
+
+  /* The first three, on their steps: second, first, third. */
+  .podium {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: end;
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    text-align: center;
+  }
+
+  .podium li {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    font-weight: 800;
+  }
+
+  .podium-name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .podium .place {
+    width: 100%;
+    height: 5rem;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    font-size: 2rem;
+  }
+
+  .podium .p1 .place {
+    height: 8rem;
+    background: var(--gold);
+    color: var(--on-fill);
+  }
+
+  .podium .p2 .place {
+    height: 6.5rem;
+    background: var(--silver);
+    color: var(--on-fill);
+  }
+
+  .podium .p3 .place {
+    background: var(--bronze);
+    color: var(--on-fill);
+  }
+
+  /* A big screen: the code and the question as large as a room reads them, the answer beside the first five. */
+  @media (min-width: 64rem) {
+    .host-row {
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+      gap: var(--space-7);
+    }
+
+    .host .code-big {
+      font-size: 8rem;
+    }
+
+    .host-join {
+      font-size: 2rem;
+      line-height: 2.5rem;
+    }
+
+    .host .ask {
+      font-size: 3rem;
+      line-height: 3.5rem;
+    }
+
+    .host .option {
+      min-height: 6rem;
+      font-size: 1.75rem;
+      line-height: 2.25rem;
+    }
+
+    .host .status {
+      font-size: 1.5rem;
+    }
+
+    .podium .place {
+      height: 8rem;
+      font-size: 3rem;
+    }
+
+    .podium .p1 .place {
+      height: 14rem;
+    }
+
+    .podium .p2 .place {
+      height: 11rem;
+    }
+  }
+}

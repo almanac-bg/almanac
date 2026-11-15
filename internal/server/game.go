@@ -11,7 +11,8 @@ import (
 )
 
 // today is the day screen's state: the day, the viewer's streak, level and run (if any), whether they've finished a
-// game yet and which of the game's systems they've met, and how many have played the day.
+// game yet and which of the game's systems they've met, how many have played the day (and how well on average), and
+// their friends' day.
 func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
 	if err != nil {
@@ -66,6 +67,12 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 				if out["rarest"], err = s.game.RarestRight(r.Context(), u.ID, day); err != nil {
 					return err
 				}
+				// The shared result ends with the player's invite link: it brings whoever opens it to the day.
+				code, err := s.game.InviteCode(r.Context(), u.ID)
+				if err != nil {
+					return err
+				}
+				out["invite"] = s.cfg.PublicURL + "/f/" + code
 			}
 		}
 	}
@@ -80,6 +87,15 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 		out["friends"] = friends
+		// No friend has played yet: whether there's any, for the result to ask a player with none to invite one.
+		if friends == nil {
+			var any bool
+			if err := s.db.Read.QueryRowContext(r.Context(), `SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ?)`, u.ID).
+				Scan(&any); err != nil {
+				return err
+			}
+			out["befriended"] = any
+		}
 	}
 	return ok(w, out)
 }

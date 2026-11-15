@@ -881,3 +881,73 @@ func TestRestartOut(t *testing.T) {
 		t.Fatalf("Bo's standing after the restart: %+v", p)
 	}
 }
+
+// On the days it plays: Friday to Sunday, and every evening once they fill. A change of the days shows before the
+// next lobby opens; an evening held is kept.
+func TestDays(t *testing.T) {
+	w := setup(t) // Saturday, 14 November
+	nightly := false
+	sched := Evening
+	sched.On = func(t time.Time) bool {
+		d := t.In(play.Bulgaria).Weekday()
+		return nightly || d == time.Friday || d == time.Saturday || d == time.Sunday
+	}
+	at := func(d, h int) time.Time { return time.Date(2026, 11, d, h, 0, 0, 0, play.Bulgaria) }
+	for _, c := range []struct{ now, want time.Time }{
+		{at(14, 10), at(14, 21)},
+		{at(15, 22), at(20, 21)}, // Sunday's over: Friday
+		{at(18, 10), at(20, 21)},
+	} {
+		if got := sched.Next(c.now); !got.Equal(c.want) {
+			t.Errorf("Next(%v) = %v, want %v", c.now, got, c.want)
+		}
+	}
+	if sched.Nightly(at(14, 10)) {
+		t.Fatal("nightly on weekends")
+	}
+	w.h = NewHub(w.g, sched)
+	ana := w.player()
+	w.now = at(15, 20)
+	w.start(ana)
+	var held int
+	_ = w.db.Read.QueryRow(`SELECT count(*) FROM royal_evenings WHERE day = '2026-11-15'`).Scan(&held)
+	if held != 1 {
+		t.Fatal("Sunday's evening not kept as held")
+	}
+	for v := w.h.View(ana.ID); v.Phase != play.RoyalEnd; v = w.h.View(ana.ID) {
+		w.wait(time.Minute)
+	}
+	w.wait(time.Hour)
+	if g := w.h.Glance(); g.StartsAt != at(20, 21).UnixMilli() || g.Nightly {
+		t.Fatalf("after Sunday's: %+v", g)
+	}
+	// Monday: the evenings filled. Tonight's on.
+	nightly = true
+	w.now = at(16, 10)
+	w.h.Step(t.Context())
+	if g := w.h.Glance(); g.StartsAt != at(16, 21).UnixMilli() || g.Next != at(16, 21).UnixMilli() || !g.Nightly {
+		t.Fatalf("once nightly: %+v", g)
+	}
+}
+
+// A cut, as its answer shows, says which comes next: of five, three go on after the fifth, two after the eighth.
+func TestThen(t *testing.T) {
+	w := setup(t)
+	var all []Player
+	for range 5 {
+		all = append(all, w.player())
+	}
+	w.start(all...)
+	for n := range 5 {
+		if n > 0 {
+			w.onward()
+		}
+		for i, p := range all {
+			w.give(p, i < 3 || n > 0) // two a right answer behind
+		}
+	}
+	v := w.h.View(all[0].ID)
+	if c := v.Cut; c == nil || !c.Now || c.After != 5 || c.Keep != 3 || c.Then != 8 || v.WentOut != 2 {
+		t.Fatalf("the cut after the fifth: %+v %+v", v, v.Cut)
+	}
+}

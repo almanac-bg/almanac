@@ -114,7 +114,7 @@ func TestMastery(t *testing.T) {
 		user   int64
 		answer func(int64, int) json.RawMessage
 	}{{ana, w.right}, {bo, w.wrong}} {
-		for range 2 {
+		for range MasteryFrom / Length {
 			s, err := w.g.StartTopic(ctx, p.user, "history")
 			if err != nil {
 				t.Fatal(err)
@@ -132,7 +132,7 @@ func TestMastery(t *testing.T) {
 		return Mastery{}
 	}
 	a, b := know(ana), know(bo)
-	if !a.Sure || a.Answers != 2*Length || a.Tier < 3 || b.Tier != 0 || a.Known <= b.Known {
+	if !a.Sure || a.Answers != MasteryFrom || a.Tier < 3 || b.Tier != 0 || a.Known <= b.Known {
 		t.Fatalf("ana %+v, bo %+v", a, b)
 	}
 	// Ana's next history run is harder than Bo's.

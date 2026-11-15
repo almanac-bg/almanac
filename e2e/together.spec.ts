@@ -1,12 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { answer } from "./play.ts";
 
-test("a room for two: lobby, ten questions together, the standings", async ({ browser }) => {
-  // Ten questions with the room's 6-second pause after each, in two browsers at once.
+test("a room for two: lobby, its questions together, the standings, a game kept", async ({ browser }) => {
+  // Five easy questions with the room's 6-second pause after each, in two browsers at once.
   test.setTimeout(180_000);
   const host = await (await browser.newContext()).newPage();
   const guest = await (await browser.newContext()).newPage();
   await host.goto("/room");
+  await host.getByRole("radio", { name: "5", exact: true }).click();
+  await host.getByRole("radio", { name: "Лесни" }).click();
   await host.getByRole("button", { name: "История" }).click();
   await expect(host).toHaveURL(/\/r\/\d{6}$/);
   const code = host.url().slice(-6);
@@ -21,10 +23,11 @@ test("a room for two: lobby, ten questions together, the standings", async ({ br
   await expect(host.locator(".players li")).toHaveCount(2);
   await expect(host.locator(".players li").last()).toContainText("Бояна");
   await expect(guest.getByText(/Чакаме .* да започне/)).toBeVisible();
+  await expect(guest.getByText("История · 5 въпроса · Лесни")).toBeVisible();
   await host.getByRole("button", { name: "Започни" }).click();
-  for (let n = 0; n < 10; n++) {
+  for (let n = 0; n < 5; n++) {
     for (const p of [host, guest])
-      await expect(p.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 15_000 });
+      await expect(p.locator(".question-head")).toContainText(`${n + 1} от 5`, { timeout: 15_000 });
     await answer(host);
     await answer(guest);
     for (const p of [host, guest]) await expect(p.locator(".verdict")).toBeVisible();
@@ -33,8 +36,22 @@ test("a room for two: lobby, ten questions together, the standings", async ({ br
   for (const p of [host, guest])
     await expect(p.getByRole("heading", { name: /печели/ })).toBeVisible({ timeout: 15_000 });
   await expect(host.getByRole("button", { name: "Нова игра" })).toBeVisible();
+  // Each can add the other as a friend, a tap beside their name; the day's ten wait for both.
+  await expect(guest.getByRole("link", { name: "Десетте за днес" })).toBeVisible();
+  await guest.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
+  await expect(guest.getByText("Поканата е изпратена.")).toBeVisible();
+  await expect(host.getByRole("button", { name: "Добави Бояна в приятели" })).toBeVisible();
   await guest.getByRole("button", { name: "Прегледай въпросите" }).click();
-  await expect(guest.locator(".reviewed")).toHaveCount(10);
+  await expect(guest.locator(".reviewed")).toHaveCount(5);
+  // Each player's game is kept as a game of theirs.
+  await expect
+    .poll(() =>
+      guest.evaluate(async () => {
+        const s = await (await fetch("/api/me/stats")).json();
+        return s.recent?.[0]?.kind;
+      }),
+    )
+    .toBe("room");
 });
 
 test("the host sends a player out of a room, and they stay out", async ({ browser }) => {

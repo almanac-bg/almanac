@@ -43,8 +43,9 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   from the icon beside the name.
   Общо is a hub, each thing once: the level with what comes next in one card, the league in a line (its group is
   Класации'), the streak, three numbers in one card, mastery, the latest games. Награди opens with the three
-  achievements nearest to done; then each tier, every achievement in full (`.achievements`/`.achievement`: how it's
-  earned, how far along, what it gives), the earned first: nothing is a tap away.
+  achievements nearest to done and the earned ones, each in full (`.achievements`/`.achievement`: how it's earned,
+  how far along, what it gives); the rest by tier behind „Всички постижения (n)“. Only the achievements of systems
+  the player has met, and no XP before it's open.
 
 ## First days
 
@@ -58,7 +59,8 @@ played, a rated game), never by the date. The server says which are open (`open`
 - **The second day played:** XP, the level (Начало's chip, Профил's card, the avatar's number) and the day's goals.
 - **The third:** the week's league (Профил's line, Класации' „Лига“). A week that ended before is let go untold.
 - **The first duel or Роял that moves the rating:** the rating and its division (Дуел, Роял, Класации' „Рейтинг“).
-- **A topic's first mark:** „Колко знаеш“ on Профил.
+- **A topic's first estimate** (10 answers): „Колко знаеш“ on Профил, the topic's tile and a game's news say
+  „първа оценка · 74%“, a share and no tier; the tier („Експерт“) comes with a sure mark (30 answers).
 
 Nothing earned waits, only what's shown: XP, achievements and unlocks count from the first game, and what was held
 (a level reached, its unlocks, an achievement of the goals or the league) is told when its system opens. Each system
@@ -167,6 +169,8 @@ takes a token.
   - Like things are one size: a field is a button's height (48), an answer row 60 whatever the question's kind, a
     meter 6, a row card 12 by 16 inside; every number of a size is from the scale.
   - `.field` and `input.code`; `.join` for an input with its button.
+  - `.segmented` (`segmented()` in `ui.ts`): tabs that switch what a screen shows, or, as radios, a setting's few
+    choices (a room's „Въпроси“ and „Трудност“). Never a native select, radio or checkbox.
   - `.tag` and `.chip`; `.chips.scroll` for a row of chips that scrolls sideways on a phone (the page itself never does);
     with a mouse or on a tablet and up it wraps, every chip in sight.
 - **Numbers:** `.figures`/`.figure`, `.stats`/`.stat`, `.streak` (with `.week`), `.games`/`.game`.
@@ -207,6 +211,8 @@ takes a token.
   десет“, „Още един дуел“, „Нова игра“), then the others as plain buttons of one size, side by side where they fit
   (`.result-actions`: „Прегледай въпросите“ first); then the game's news; and at the end the questions, once
   opened (the button takes the player there).
+- **A room led from a big screen** (`host.css`, loaded only there): `.host`, `.host-row` (two columns on a laptop and
+  up), `.host-qr`, `.host-join`, `.host-controls` and `.podium`.
 - **Friends:** `.card.friends`, `.invitation` (a friend request, accepted with `.btn.rose`), `.friend-list`/`.friend`
   (with `.friend-day` and `.record`) and `.invite-link`.
 - **In code:**
@@ -266,7 +272,8 @@ takes a token.
 
 - **The game moves on by itself.** There is no „Напред“ anywhere: an answer shows for 3 seconds (4.5 where there's
   more to read: a number, an order), with a line filling under it, and the next question opens. A room shows each
-  answer with its standings for 6 seconds; a live duel shows both answers for 4 seconds (6 for a number, an order or
+  answer with its standings for 6 seconds (a host who leads it from a big screen, „Само водя“, has „Напред“, „Задръж“
+  and „Край“: a class talks a fact over); a live duel shows both answers for 4 seconds (6 for a number, an order or
   a match). A question never opens in a tab that's out of sight.
 - **A game has the whole screen.** On a phone the header and the bar of places step aside while a question or its
   answer shows (an arrow before the count goes home), so the pad and the verdict fit and a stray tap can't leave the
@@ -300,10 +307,10 @@ Every element that looks like a game measures something the game already counts:
 | Rank change  | Places moved since the previous answer                                                                                                                                                                                                                                                                                                                                                                                        | Room boards                  |
 | Duels        | Live with whoever comes (a recording of a real game if nobody does in 30 s), a friend in their own time: won of played; between two friends, their record („3 : 2“)                                                                                                                                                                                                                                                           | Дуел, Профил                 |
 | Rating       | Elo from 1000, moved by duels and Роял; shown as a division (Бронз → Легенда) with its generated emblem                                                                                                                                                                                                                                                                                                                       | Дуел, Роял, Профил, Класации |
-| Роял         | Live every evening at 21:00 (lobby from 20:45): up to 50 on the same question at once, 15 in three rounds; cut after 5, 8, 11, 14 by right answers (then speed), the last a final of three; those cut watch                                                                                                                                                                                                                   | Роял, Класации               |
+| Роял         | Live at 21:00 Friday to Sunday, every evening once those fill (lobby from 20:45): up to 50 on the same question at once, 15 in three rounds; cut after 5, 8, 11, 14 by right answers (then speed), the last a final of three; those cut play on, off the standings                                                                                                                                                            | Роял, Класации               |
 | Goals        | Three a day, kept all day: the day's questions (50 XP), one drawn (100) and a harder one (150), of two families not drawn the day before, each one that can be done that day (Роял only while the evening's is ahead); each a link to where it's done, told at the game's end                                                                                                                                                 | Начало, result               |
 | League       | A race every week (Monday to Sunday) on the XP earned, in a group of up to 20 of the player's league: Странджа, Средна гора, Родопи, Стара планина, Пирин, Рила. At the week's end the first go up (5 of a full group), the last go down, and the first three earn 300, 200 and 100 XP; first place in Рила is a title that counts („Двукратен шампион на Рила“)                                                              | Класации, Профил             |
-| Boards       | The day's ten, the week's league group, rating (10 rated games or more) and knowledge (share right after 100 answers, or 30 in a topic), of everyone or of friends                                                                                                                                                                                                                                                            | Класации                     |
+| Boards       | The day's ten, the week's league group, rating (10 rated games or more) and knowledge (mastery, the share of the questions known, after 100 answers, or 30 in a topic), of everyone or of friends                                                                                                                                                                                                                             | Класации                     |
 | Friends      | The day's board among you and your friends, once a friend has played                                                                                                                                                                                                                                                                                                                                                          | Класации                     |
 | Level        | All the XP a player has earned; each level takes 150 more than the last (300 for the first)                                                                                                                                                                                                                                                                                                                                   | Начало, Профил, avatars      |
 | Achievements | 19 facts of a player's games in four tiers (обикновени, редки, епични, легендарни), each saying how it's earned; announced once                                                                                                                                                                                                                                                                                               | Result, Профил               |
@@ -413,5 +420,5 @@ mountains and a medal — are drawn by hand as paths in `web/src/art/pictures.ts
 - **Look at it** in both themes, at 320px and 390px wide, and at 1024px and 1440px. Nothing may scroll sideways, and keyboard focus must show.
 - **Run the checks:** `npm run check`, then the browser tests (`npm run e2e`), which include the accessibility
   checks.
-- **Keep to the budgets:** 16 kB of CSS, 48 kB of JS and 24 kB of pictures, gzipped. `go run ./cmd/build` fails
+- **Keep to the budgets:** 16 kB of CSS, 50 kB of JS (and 12 kB for a room's screen, on its own) and 24 kB of pictures, gzipped. `go run ./cmd/build` fails
   over them.
