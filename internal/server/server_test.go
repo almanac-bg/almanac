@@ -949,7 +949,8 @@ func TestRoyalPlans(t *testing.T) {
 		t.Fatalf("Ana's plan: %d %v", status, out)
 	}
 	ana.call("POST", "/api/royal/plan", map[string]any{}) // again changes nothing
-	if _, out := bo.call("GET", "/api/royal/tonight", nil); out["coming"] != 1.0 || out["planned"] != false {
+	if _, out := bo.call("GET", "/api/royal/tonight", nil); out["coming"] != 1.0 || out["planned"] != false ||
+		len(out["friends"].([]any)) != 0 {
 		t.Fatalf("tonight, to Bo: %v", out)
 	}
 	if res, err := http.Get(g.url + "/api/royal/tonight"); err != nil || res.StatusCode != 200 {
@@ -975,6 +976,12 @@ func TestRoyalPlans(t *testing.T) {
 	}
 	if n := s.callSoon(t.Context(), start, []int64{boID}, []int64{boID}); n != 0 {
 		t.Fatal("called again twice")
+	}
+	// Cy, Ana's friend, hears it's her who's coming.
+	befriend(ana, cy)
+	_, me := ana.call("GET", "/api/me", nil)
+	if _, out := cy.call("GET", "/api/royal/tonight", nil); fmt.Sprint(out["friends"]) != fmt.Sprint([]any{name(me)}) {
+		t.Fatalf("tonight, to Ana's friend: %v", out)
 	}
 }
 
