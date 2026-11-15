@@ -1,6 +1,6 @@
 // The game inside its own app on phones (mobile/): the same pages, in the phone's web view, with the app's bridge
 // (Capacitor) on the page before the game starts. Through it the game reaches what a page alone can't: the phone's
-// notifications (push.ts), its share sheet, its touch (an answer felt), the back button on Android, and links to the
+// notifications (push.ts), its share sheet, its touch (answers and rewards felt), the back button on Android, and links to the
 // game opened in the app. All of that is in phone.ts, loaded only in the app; in a browser nothing here does anything.
 
 import { tally } from "./api.ts";

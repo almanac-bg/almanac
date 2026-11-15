@@ -9,9 +9,9 @@
 import { emblem } from "../art/emblem.ts";
 import { leagueEmblem } from "../art/league.ts";
 import { type ApiError, api } from "../lib/api.ts";
+import { haptic } from "../lib/app.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { place } from "../lib/ordinal.ts";
-import { haptic } from "../lib/app.ts";
 import { feelKit, play, type SoundName, voice } from "../lib/sound.ts";
 import { type LeagueEnd, moveWords } from "../screens/league.ts";
 import {

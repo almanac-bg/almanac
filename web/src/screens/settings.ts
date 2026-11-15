@@ -1,9 +1,10 @@
 // Настройки: the name and tag, the account and its email, sounds and reminders, and the data the game keeps.
 
 import { type ApiError, api } from "../lib/api.ts";
+import { inApp } from "../lib/app.ts";
 import { type Child, computed, effect, h, signal, untracked, when } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
-import { bigText, calm, setBigText, setCalm, setTick, tickOn } from "../lib/prefs.ts";
+import { bigText, calm, setBigText, setCalm, setTick, setVibrate, tickOn, vibrateOn } from "../lib/prefs.ts";
 import {
   needsHomeScreen,
   type PushKind,
@@ -190,7 +191,7 @@ function switchRow(label: string, about: string, on: () => boolean, set: (v: boo
   );
 }
 
-/** Sounds, and the clock's ticking among them: on or off, on this device. */
+/** Sounds, the clock's last seconds among them, and in the app the phone's touch: on or off, on this device. */
 function sounds(): Child {
   return h(
     "section",
@@ -205,6 +206,8 @@ function sounds(): Child {
     ),
     switchRow("Звуци", "Часовникът, отговорите, новото ниво.", soundOn, setSound),
     switchRow("Тиктакане", "Последните секунди на въпроса.", tickOn, setTick),
+    // The phone's touch: only in the app, where it's felt.
+    inApp ? switchRow("Вибрация", "При отговорите и наградите.", vibrateOn, setVibrate) : null,
   );
 }
 
