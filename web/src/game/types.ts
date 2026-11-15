@@ -155,6 +155,8 @@ export interface Shown {
   moreMs?: number;
   /** How soon its time starts by itself, while it waits for its pictures: the screen starts it once they're in. */
   startsMs?: number;
+  /** A day's question that belongs to its date: „На този ден“ beside its topic. */
+  onThisDay?: boolean;
 }
 
 export interface State {

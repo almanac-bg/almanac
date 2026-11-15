@@ -84,6 +84,15 @@ func checkQuestion(q Question, today string) (errs, warnings []string) {
 	errs = append(errs, checkDate("added", t.Added)...)
 	errs = append(errs, checkDate("updated", t.Updated)...)
 	errs = append(errs, checkDate("reviewBy", t.ReviewBy)...)
+	for _, d := range t.On {
+		full := d
+		if len(d) == 5 {
+			full = "2024-" + d // a leap year: 02-29 is a day too
+		}
+		if _, err := time.Parse(time.DateOnly, full); err != nil {
+			errs = append(errs, `on must list days like "03-03" (every year) or "2027-05-02" (that year)`)
+		}
+	}
 	if t.Updated != "" && t.Added != "" && t.Updated < t.Added {
 		errs = append(errs, "updated is before added")
 	}

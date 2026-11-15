@@ -478,7 +478,13 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
   return h(
     "article",
     { class: "question" },
-    questionHead(q.n, s.total, topicName(q.category), score, versus),
+    questionHead(
+      q.n,
+      s.total,
+      q.onThisDay ? `${topicName(q.category)} · На този ден` : topicName(q.category),
+      score,
+      versus,
+    ),
     leaveAsk,
     progress,
     timer(q.leftMs, q.limitMs, left, locked),

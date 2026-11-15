@@ -4,6 +4,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -36,7 +37,7 @@ func TestAYearOfDays(t *testing.T) {
 		for _, s := range daySlots {
 			plenty = append(plenty, left(s) >= Length)
 		}
-		picks, _ := drawDay(b, used, nil, r)
+		picks, _ := drawDay(b, time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, day).Format(time.DateOnly), used, nil, r)
 		topics := map[string]bool{}
 		for i, p := range picks {
 			if used[p.ID] {

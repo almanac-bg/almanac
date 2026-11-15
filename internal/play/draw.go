@@ -41,11 +41,18 @@ var daySlots = []slot{
 	{bank.Hard, "number", noPicture, ""},
 }
 
-// drawDay draws a day: each slot from another topic, never a question an earlier day had (while any are left), and of
-// those one nobody has answered (`answered`, if set) while any are left. The slots that need something special (a
-// picture, an order, a number) get their topics first, from those that have one. Exact is whether every slot had a
-// question that fits it just so, never a day's before: a day ahead is drawn only so (ahead.go).
-func drawDay(b *bank.Bank, used, answered map[string]bool, r *rand.Rand) (picks []Pick, exact bool) {
+// BGFloor is how many of a day's questions are about Bulgaria, at least, where the bank has them.
+const BGFloor = 3
+
+// drawDay draws a day (YYYY-MM-DD): each slot from another topic, never a question an earlier day had (while any are
+// left), and of those one nobody has answered (`answered`, if set) while any are left. The slots that need something
+// special (a picture, an order, a number) get their topics first, from those that have one. The number to finish on
+// is an estimate (a unit, more than 20) where one is left: a year or a small count is a choice in disguise. Then the
+// day is made the day's: a question that belongs to its date („На този ден“, bank.Tail.On) takes the place it fits,
+// and at least BGFloor are about Bulgaria (bank.Tail.BG), each in a place it fits, from that place's topic. Exact is
+// whether every slot had a question that fits it just so, never a day's before: a day ahead is drawn only so
+// (ahead.go).
+func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.Rand) (picks []Pick, exact bool) {
 	slots := newKind(slices.Clone(daySlots), r)
 	var topics []string
 	next := func(wants ...func(string) bool) string {
@@ -90,18 +97,114 @@ func drawDay(b *bank.Bank, used, answered map[string]bool, r *rand.Rand) (picks 
 	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] }
 	fresh := func(q bank.Question) bool { return !used[q.Base().ID] }
 	unseen := func(q bank.Question) bool { return !answered[q.Base().ID] }
-	exact = true
+	chosen := make([]bank.Question, len(slots))
 	for i, s := range slots {
-		q := choose(b.Live(assigned[i], ""), s, allowed, fresh, unseen, r)
+		prefer := []func(bank.Question) bool{unseen}
+		if s.typ == "number" {
+			prefer = []func(bank.Question) bool{func(q bank.Question) bool { return estimate(q) && unseen(q) }, estimate, unseen}
+		}
+		if q := choose(b.Live(assigned[i], ""), s, allowed, fresh, prefer, r); q != nil {
+			chosen[i] = q
+			taken[q.Base().ID] = true
+		}
+	}
+	put := func(i int, q bank.Question) {
+		delete(taken, chosen[i].Base().ID)
+		chosen[i], assigned[i] = q, q.Base().Category
+		taken[q.Base().ID] = true
+	}
+	// place puts q in a place it fits just so, keeping the day's topics one each: its own topic's place, or another
+	// whose topic then takes q's topic's place (with a question of its own that fits that place just so). It says
+	// which place, or -1.
+	place := func(q bank.Question) int {
+		cat := q.Base().Category
+		for i, s := range slots {
+			if chosen[i] != nil && assigned[i] == cat && matches(q, s, true, true) {
+				put(i, q)
+				return i
+			}
+		}
+		for i, s := range slots {
+			if chosen[i] == nil || !matches(q, s, true, true) {
+				continue
+			}
+			j := slices.Index(assigned, cat)
+			if j < 0 {
+				put(i, q)
+				return i
+			}
+			var swap bank.Question
+			for _, o := range b.Live(assigned[i], "") {
+				if o != chosen[i] && fresh(o) && allowed(o) && matches(o, slots[j], true, true) {
+					swap = o
+					break
+				}
+			}
+			if swap != nil && chosen[j] != nil {
+				put(j, swap)
+				put(i, q)
+				return i
+			}
+		}
+		return -1
+	}
+	candidates := func(want func(bank.Question) bool) []bank.Question {
+		var out []bank.Question
+		for _, q := range b.Live("", "") {
+			if want(q) && fresh(q) && allowed(q) {
+				out = append(out, q)
+			}
+		}
+		r.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
+		slices.SortStableFunc(out, func(x, y bank.Question) int { return b2i(!unseen(x)) - b2i(!unseen(y)) })
+		return out
+	}
+	kept := map[int]bool{}
+	for _, q := range candidates(func(q bank.Question) bool { return q.Extra().OnDay(day) }) {
+		if i := place(q); i >= 0 {
+			kept[i] = true
+			break
+		}
+	}
+	bg := 0
+	for _, q := range chosen {
+		if q != nil && q.Extra().BG {
+			bg++
+		}
+	}
+	for _, i := range r.Perm(len(slots)) {
+		if bg >= BGFloor {
+			break
+		}
+		if kept[i] || chosen[i] == nil || chosen[i].Extra().BG {
+			continue
+		}
+		s, topic := slots[i], assigned[i]
+		for _, q := range candidates(func(q bank.Question) bool {
+			return q.Extra().BG && q.Base().Category == topic && matches(q, s, true, true)
+		}) {
+			put(i, q)
+			bg++
+			break
+		}
+	}
+	exact = true
+	for i, q := range chosen {
 		if q == nil {
 			exact = false
 			continue
 		}
-		exact = exact && fresh(q) && matches(q, s, true, true)
-		taken[q.Base().ID] = true
+		exact = exact && fresh(q) && matches(q, slots[i], true, true)
 		picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
 	}
 	return picks, exact && len(picks) == len(slots)
+}
+
+// estimate is a number question worth closing a day on: a quantity with a unit, more than 20 — not a year (no unit)
+// nor a small count, which are choices in disguise.
+func estimate(q bank.Question) bool {
+	n, ok := q.(*bank.Number)
+	return ok && n.Unit != "" && n.Answer > 20
 }
 
 // newKinds are the kinds that take turns at the run's one slot for them ("split" in a run's shape): one or the other
@@ -119,9 +222,9 @@ func newKind(slots []slot, r *rand.Rand) []slot {
 }
 
 // choose picks an allowed question for a slot from pool: one that fits the slot exactly if it can, else as close as it
-// gets — the type kept longest, then the difficulty — and a fresh one before one that isn't; of those, one preferred
-// (if set) while any are.
-func choose(pool []bank.Question, s slot, allowed, fresh, prefer func(bank.Question) bool, r *rand.Rand) bank.Question {
+// gets — the type kept longest, then the difficulty — and a fresh one before one that isn't; of those, the first of
+// prefer's wishes that any of them meets.
+func choose(pool []bank.Question, s slot, allowed, fresh func(bank.Question) bool, prefer []func(bank.Question) bool, r *rand.Rand) bank.Question {
 	if s.alt != "" && !slices.ContainsFunc(pool, func(q bank.Question) bool { return q.Base().Type == s.typ && allowed(q) }) {
 		s.typ = s.alt
 	}
@@ -149,9 +252,10 @@ func choose(pool []bank.Question, s slot, allowed, fresh, prefer func(bank.Quest
 					found = append(found, q)
 				}
 			}
-			if prefer != nil {
-				if best := slices.DeleteFunc(slices.Clone(found), func(q bank.Question) bool { return !prefer(q) }); len(best) > 0 {
+			for _, wish := range prefer {
+				if best := slices.DeleteFunc(slices.Clone(found), func(q bank.Question) bool { return !wish(q) }); len(best) > 0 {
 					found = best
+					break
 				}
 			}
 			if len(found) > 0 {
@@ -245,4 +349,11 @@ func DayRunway(b *bank.Bank, used map[string]bool) []Runway {
 		out = append(out, Runway{Place: place, Days: n / times})
 	}
 	return out
+}
+
+func b2i(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
