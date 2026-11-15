@@ -1,5 +1,5 @@
 // Начало: where every game starts, on one short screen, and the day is its heart. At the top the player's streak and
-// level (and, once, what came of the days just missed or of a duel a friend has played); then the day's ten questions, the same for everyone, once (left half-way, where the player stopped and the way
+// level (and, once, what came of the days just missed — a broken streak to win back while it can be — or of a duel a friend has played); then the day's ten questions, the same for everyone, once (left half-way, where the player stopped and the way
 // on; once played, how they went, and the result to share); the day's goals; and every other way to play a tap away: by topic, and — once a first game is finished —
 // with others. The day's boards are in Класации. The game unfolds by the days played (play/unfold.go): a first day has
 // the streak without the level, and no goals.
@@ -42,6 +42,9 @@ interface Today {
   kept?: string;
   /** A streak that just ended (the last 3 days): its days, and the day missed that ended it. */
   ended?: { days: number; on: string };
+  /** A streak that just ended and can be won back today (play/repair.go): its days, the day missed that ended it, and
+   * whether today's ten and another game are played. */
+  repair?: { days: number; on: string; day: boolean; other: boolean };
   /** The player's level, from all their XP (for a player). */
   level?: { level: number; xp: number; from: number; to: number };
   /** Whether the player has finished a game of any kind: until then Начало is the day and the topics only. */
@@ -132,7 +135,9 @@ export function today() {
         }
         return row;
       },
-      streakNotice(t),
+      // A streak that can be won back today, as it stands (the day just played may have done it); else what came of
+      // the days just missed, once.
+      t.repair ? () => repairCard(fresh().repair) : streakNotice(t),
       playedLine(t.duel),
       // On a big screen the day leads the page with the topics under it, and the rest waits in a column beside it
       // (app.css); on a phone the two parts are one column, in this order.
@@ -193,13 +198,16 @@ export function today() {
   }
 }
 
+/** Where the last streak news told on Начало is kept, on this device: told once. */
+const streakTold = "almanac.streakTold";
+
 /** What came of the days just missed — a reserve day kept the streak, or none was left and it ended — said once on
  * this device, above the day. */
 function streakNotice(t: Today): Child {
   const key = t.kept ? `kept:${t.kept}` : t.ended ? `ended:${t.ended.on}` : "";
   try {
-    if (!key || localStorage.getItem("almanac.streakTold") === key) return null;
-    localStorage.setItem("almanac.streakTold", key);
+    if (!key || localStorage.getItem(streakTold) === key) return null;
+    localStorage.setItem(streakTold, key);
   } catch {
     // Storage refused (a private window): said on each visit, which is the lesser loss.
   }
@@ -207,6 +215,32 @@ function streakNotice(t: Today): Child {
     ? `Резервен ден запази серията ти ${onDay(t.kept)}. Серия: ${t.streak === 1 ? "1 ден" : `${t.streak} дни`}.`
     : `Серията ти от ${t.ended?.days} дни прекъсна. ${t.run?.done ? "Днес започна нова." : "Днес започва нова."}`;
   return h("p", { class: "streak-notice", role: "status" }, picture(t.kept ? "shield" : "flame", "reserve-pic"), text);
+}
+
+/** A streak just ended that can be won back today (play/repair.go): the day's ten and one more game, and what's left of
+ * them. Shown while it's on offer; counted once on this device, which then won't hear later that the streak ended. */
+function repairCard(r: Today["repair"]): Child {
+  if (!r) return null;
+  try {
+    if (localStorage.getItem("almanac.repairOffered") !== r.on) {
+      localStorage.setItem("almanac.repairOffered", r.on);
+      localStorage.setItem(streakTold, `ended:${r.on}`);
+      tally("repair:offered");
+    }
+  } catch {
+    // no storage here: counted each time
+  }
+  const left = r.day
+    ? "Остава още една игра днес и серията се връща."
+    : r.other
+      ? "Остават въпросите на деня и серията се връща."
+      : "Върни я: изиграй днес въпросите на деня и още една игра.";
+  return h(
+    "section",
+    { class: "card keep-card" },
+    h("h2", null, `Серията ти от ${r.days} дни прекъсна`),
+    h("p", { class: "muted" }, left),
+  );
 }
 
 /** The streak and (once XP is open: a first day has the streak only) the level, side by side: each a tap from Профил,

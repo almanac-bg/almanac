@@ -308,6 +308,7 @@ var adminBody = template.Must(template.New("admin").Parse(`
 {{range .Streaks}}<tr><td>{{.Band}}</td><td class="num">{{.Going}}</td><td class="num">{{.Ended}}</td></tr>{{end}}
 </tbody></table></div>
 <p>Резервни дни, похарчени за 7 дни: {{.Spent}}.</p>
+<p>Върнати серии за 7 дни (от предложените на Начало): {{.Repairs}}.</p>
 
 <h2>Игри</h2>
 <p class="muted">Игрите по вид, без изиграните по-бързо, отколкото играе човек. „Само денят“: от завършилите деня, които не

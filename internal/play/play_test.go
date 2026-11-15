@@ -623,9 +623,15 @@ func TestMergeKeepsTheAccountsDay(t *testing.T) {
 	// The guest said they'd come to tonight's Роял, and chose no word from friends.
 	_ = w.g.PlanRoyal(ctx, "2026-11-14", guest, true)
 	_, _ = w.db.Write.Exec(`INSERT INTO push_prefs (user_id, kind, wanted) VALUES (?, 'friends', 0)`, guest)
+	// And won a streak back on the day before.
+	_, _ = w.db.Write.Exec(`INSERT INTO streak_repairs (user_id, day) VALUES (?, '2026-11-11')`, guest)
 	err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, guest, owner) })
 	if err != nil {
 		t.Fatal(err)
+	}
+	var repairs int
+	if err := w.db.Read.QueryRow(`SELECT count(*) FROM streak_repairs WHERE user_id = ?`, owner).Scan(&repairs); err != nil || repairs != 1 {
+		t.Fatalf("the guest's repair: %d %v", repairs, err)
 	}
 	if n, mine, _ := w.g.RoyalPlans(ctx, "2026-11-14", owner); n != 1 || !mine {
 		t.Fatalf("the guest's plan: %d, %v", n, mine)

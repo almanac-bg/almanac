@@ -1,13 +1,16 @@
 package play
 
-import "context"
+import (
+	"context"
+	"slices"
+)
 
 // Stats is how a player has done: the streak, how much they've played, the facts they've collected, and how well they
 // know each topic.
 type Stats struct {
 	Streak  int      `json:"streak"`
 	Week    [7]bool  `json:"week"`    // this week's days played, Monday first
-	Saved   [7]bool  `json:"saved"`   // this week's days a reserve day kept the streak through
+	Saved   [7]bool  `json:"saved"`   // this week's days a reserve day or a repair kept the streak through
 	Reserve int      `json:"reserve"` // reserve days in hand
 	Next    int      `json:"next"`    // days in a row to the next reserve day (0: they are full)
 	Days    int      `json:"days"`    // days' questions finished
@@ -45,7 +48,7 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	if err != nil {
 		return s, err
 	}
-	s.Streak, s.Reserve, s.Next, s.Saved = streak.Days, streak.Reserve, streak.Next, g.InWeek(streak.Saved)
+	s.Streak, s.Reserve, s.Next, s.Saved = streak.Days, streak.Reserve, streak.Next, g.InWeek(slices.Concat(streak.Saved, streak.Mended))
 	if s.Week, err = g.Week(ctx, userID); err != nil {
 		return s, err
 	}

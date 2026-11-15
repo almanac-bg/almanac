@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"time"
 
@@ -27,15 +28,24 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 		if err != nil {
 			return err
 		}
-		out["streak"], out["reserve"], out["saved"] = streak.Days, streak.Reserve, s.game.InWeek(streak.Saved)
+		out["streak"], out["reserve"] = streak.Days, streak.Reserve
+		out["saved"] = s.game.InWeek(slices.Concat(streak.Saved, streak.Mended)) // kept, by a reserve day or a repair
 		out["next"] = streak.Next
-		// What came of the days just missed, told on Начало (once, by the client): a reserve day kept the streak, or
-		// none was left and it ended.
+		// What came of the days just missed, told on Начало (once, by the client): a reserve day kept the streak; or
+		// none was left and it ended, and it can be won back today (play/repair.go), or a new one begins.
 		recent := s.game.Now().In(play.Bulgaria).AddDate(0, 0, -3).Format(time.DateOnly)
-		if n := len(streak.Saved); n > 0 && streak.Saved[n-1] >= recent {
+		// A reserve day spent before a repair was part of the streak that ended: what the player heard of was the end.
+		if n, m := len(streak.Saved), len(streak.Mended); n > 0 && streak.Saved[n-1] >= recent &&
+			(m == 0 || streak.Saved[n-1] > streak.Mended[m-1]) {
 			out["kept"] = streak.Saved[n-1]
 		}
-		if e := streak.Ended; e != nil && e.On >= recent && e.Days >= 2 {
+		repair, err := s.game.RepairOf(r.Context(), u.ID)
+		if err != nil {
+			return err
+		}
+		if repair != nil {
+			out["repair"] = repair
+		} else if e := streak.Ended; e != nil && e.On >= recent && e.Days >= 2 {
 			out["ended"] = e
 		}
 		if out["week"], err = s.game.Week(r.Context(), u.ID); err != nil {

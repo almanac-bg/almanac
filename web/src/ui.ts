@@ -265,8 +265,8 @@ function today(): number {
   return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(weekday.format(new Date()));
 }
 
-/** The streak: days in a row with the day's ten, this week's days played (and kept by a reserve day), the reserve
- * days in hand, and (`next`) how many more days in a row earn the next one. */
+/** The streak: days in a row with the day's ten, this week's days played (and kept by a reserve day or a repair), the
+ * reserve days in hand, and (`next`) how many more days in a row earn the next one. */
 export function streak(days: number, week?: boolean[], saved?: boolean[], reserve = 0, next = 0): Child {
   const unit = days === 1 ? "ден" : "дни";
   const now = today();
@@ -305,7 +305,7 @@ export function streak(days: number, week?: boolean[], saved?: boolean[], reserv
               {
                 class:
                   [week[i] && "on", saved?.[i] && "saved", i === now && "today"].filter(Boolean).join(" ") || undefined,
-                "aria-label": `${dayNames[i]}${week[i] ? ": изиграно" : saved?.[i] ? ": пазен с резервен ден" : ""}`,
+                "aria-label": `${dayNames[i]}${week[i] ? ": изиграно" : saved?.[i] ? ": серията е запазена" : ""}`,
               },
               h("i", { class: "week-dot" }),
               d,
