@@ -396,7 +396,7 @@ func (g *Game) RevealRoyal(ctx context.Context, royalID int64) (scores []RoyalSc
 }
 
 // AnswerRoyal grades a player's answer to a tournament's question n, the one showing (whether they're still in or
-// play on after a cut). Who goes on is RevealRoyal's to say, once everyone still in has answered.
+// play on after a cut). Who goes on is RevealRoyal's to say, once the answer shows.
 func (g *Game) AnswerRoyal(ctx context.Context, userID, runID int64, n int, answer json.RawMessage) (Result, error) {
 	return g.answer(ctx, userID, runID, n, answer, true)
 }

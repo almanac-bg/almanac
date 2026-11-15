@@ -579,16 +579,14 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
     () => {
       const v = view();
       if (!v.players.length) return h("p", { class: "muted" }, "Още никой не е влязъл.");
+      // A crowd shows as its first few (you among them), and how many more.
+      const few = [...v.players.filter((p) => p.me), ...v.players.filter((p) => !p.me)].slice(0, 12);
       return h(
         "section",
         { class: "card" },
-        h(
-          "h2",
-          { class: "section-title" },
-          `Вътре: ${v.players.length} от ${v.size}`,
-          v.tables > 1 ? h("span", { class: "muted" }, ` · тази вечер ${v.tables} турнира`) : null,
-        ),
-        chips(v.players.map((p) => ({ ...p, in: p.online || !!p.me }))),
+        h("h2", { class: "section-title" }, `Вътре: ${v.players.length}`),
+        chips(few.map((p) => ({ ...p, in: p.online || !!p.me }))),
+        v.players.length > few.length ? h("p", { class: "muted" }, `и още ${v.players.length - few.length}`) : null,
       );
     },
   );
@@ -689,17 +687,34 @@ function timed(p: Player, ps: Player[], i: number): Child {
   return level(ps[i - 1]) || level(ps[i + 1]) ? h("span", { class: "muted" }, seconds(p.ms)) : null;
 }
 
+/** Which rows of the standings show, as an answer does (a few seconds to look): all of a short board; of a long one,
+ * the first three and those around the player and the line, the rest left out (a gap). */
+function shown(ps: Player[]): boolean[] {
+  if (ps.length <= 12) return ps.map(() => true);
+  const keep = ps.map((_, i) => i < 3);
+  const near = (at: number) => {
+    for (let i = Math.max(0, at - 2); i <= at + 2 && i < ps.length; i++) keep[i] = true;
+  };
+  near(ps.findIndex((p) => p.me));
+  near(ps.findIndex((p, i) => p.goes && !ps[i + 1]?.goes));
+  return keep;
+}
+
 /** The standings as the answer showing leaves them: those who go on (or would, at the next cut) marked, the line
  * between, and those out below. */
 function standings(v: Evening): Child {
   const c = v.cut;
   const rows: Child[] = [];
+  const keep = shown(v.players);
   v.players.forEach((p, i, all) => {
+    if (!keep[i]) return;
     rows.push(
       h(
         "li",
         {
-          class: ["row", p.goes && "up", !p.in && "out", p.me && "me"].filter(Boolean).join(" "),
+          class: ["row", p.goes && "up", !p.in && "out", p.me && "me", i > 0 && !keep[i - 1] && "gap"]
+            .filter(Boolean)
+            .join(" "),
         },
         h("span", { class: "place" }, String(p.rank)),
         who(p.name, p, p.me ? h("span", { class: "you" }, "ти") : null, p.name, p.tag),
@@ -719,7 +734,7 @@ function standings(v: Evening): Child {
         h(
           "li",
           { class: c.now ? "league-line up now" : "league-line up" },
-          c.now ? "Продължават" : `Дотук продължават след ${nth(c.after)}`,
+          c.now ? "Дотук продължават" : `Дотук продължават след ${nth(c.after)}`,
         ),
       );
     }
@@ -791,15 +806,14 @@ function question(view: () => Evening, first: Evening, out: Signal<number>, gone
     asked.node,
     () => {
       const v = view();
-      // The answer waits for those still in.
-      const waiting = v.players.filter((p) => p.in);
-      const done = waiting.filter((p) => p.answered).length;
+      // The answer waits for everyone playing, those cut too.
+      const done = v.players.filter((p) => p.answered).length;
       return h(
         "p",
         { class: "status", role: "status" },
         !plays ? "Гледаш. " : v.out ? "Извън класирането. " : "",
         sent() || taken() ? "Отговорът ти е приет. " : "",
-        `Отговориха ${done} от ${waiting.length}.`,
+        `Отговориха ${done} от ${v.players.length}.`,
       );
     },
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
