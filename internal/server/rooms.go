@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/play"
+	"github.com/almanac-bg/almanac/internal/qr"
 	"github.com/almanac-bg/almanac/internal/room"
 )
 
@@ -116,19 +118,50 @@ func (s *Server) roomEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) roomStart(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
+// roomLead is who leads a room starting a game, moving it on (Next) or ending it (Finish).
+func (s *Server) roomLead(act func(*room.Room, int64) error) func(http.ResponseWriter, *http.Request) error {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		u, err := s.mustUser(r)
+		if err != nil {
+			return err
+		}
+		rm, err := s.roomOf(r)
+		if err != nil {
+			return err
+		}
+		if err := act(rm, u.ID); err != nil {
+			return err
+		}
+		return ok(w, map[string]bool{"ok": true})
+	}
+}
+
+// roomHold is who leads keeping each answer up until they move on, or letting the room move on by itself again.
+func (s *Server) roomHold(w http.ResponseWriter, r *http.Request) error {
+	var in struct {
+		On bool `json:"on"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	return s.roomLead(func(rm *room.Room, by int64) error { return rm.Hold(by, in.On) })(w, r)
+}
+
+// roomQR is the room's link as a QR code, for a big screen: drawn here, so that no outside service sees the code.
+func (s *Server) roomQR(w http.ResponseWriter, r *http.Request) {
+	code := r.PathValue("code")
+	if !roomCode.MatchString(code) {
+		http.NotFound(w, r)
+		return
+	}
+	c, err := qr.Encode(s.cfg.PublicURL + "/r/" + code)
 	if err != nil {
-		return err
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
 	}
-	rm, err := s.roomOf(r)
-	if err != nil {
-		return err
-	}
-	if err := rm.Start(u.ID); err != nil {
-		return err
-	}
-	return ok(w, map[string]bool{"ok": true})
+	w.Header().Set("Content-Type", "image/svg+xml")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	_, _ = io.WriteString(w, c.SVG())
 }
 
 // roomRemove is the host sending a player out of the room, by their key.

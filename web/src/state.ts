@@ -26,6 +26,7 @@ interface Boot {
   version: string;
   push: string;
   phones: string[] | null;
+  hostCss: string;
 }
 
 const boot: Boot = JSON.parse(document.getElementById("boot")?.textContent || "{}");
@@ -37,6 +38,8 @@ export const version = boot.version ?? "";
 export const pushKey = boot.push ?? "";
 /** The platforms the game's app gets notifications on ("ios", "android"). */
 export const phonePlatforms: string[] = boot.phones ?? [];
+/** The style of a room's screen when its host leads it from a big screen (host.css): loaded only then. */
+export const hostCss = boot.hostCss ?? "";
 
 /** Where the page was first opened: a new guest says it, so the admin page can tell where players come from (an
  * invite, a shared day, a room …), whatever pages they went through before their first game. */
