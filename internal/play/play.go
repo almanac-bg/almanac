@@ -188,6 +188,8 @@ type Shown struct {
 	// StartsMs is how soon its time starts by itself, while it waits for its pictures: the screen starts it sooner
 	// (Start), once they're in. 0 once it runs.
 	StartsMs int64 `json:"startsMs,omitempty"`
+	// OnThisDay is a day's question that belongs to its date („На този ден“: bank.Tail.On).
+	OnThisDay bool `json:"onThisDay,omitempty"`
 }
 
 // Result is what an answer earned, the answer itself, and the run after it.
@@ -253,6 +255,7 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 				N: r.at, Category: d.Question().Base().Category, View: bank.ViewAt(d, max(0, since)),
 				LimitMs: limit.Milliseconds(), LeftMs: max(0, min(limit, limit-since).Milliseconds()),
 				MoreMs: bank.NextStep(d, max(0, since)).Milliseconds(), StartsMs: max(0, -since.Milliseconds()),
+				OnThisDay: r.kind == "day" && d.Question().Extra().OnDay(r.day),
 			}
 		}
 	}

@@ -92,7 +92,7 @@ func (g *Game) days(tx *sql.Tx) (dayBars, error) {
 		if _, ok := stored[day]; ok {
 			continue
 		}
-		picks, exact := drawDay(b, used, answered, r)
+		picks, exact := drawDay(b, day, used, answered, r)
 		if !exact {
 			break // a place has run short: the days ahead stop here until the bank grows
 		}

@@ -49,6 +49,22 @@ type Tail struct {
 	ReviewBy string `json:"reviewBy,omitempty"`
 	// Retired questions are never dealt again, but stay so that history and stats keep their text.
 	Retired bool `json:"retired,omitempty"`
+	// On are the days the question belongs to: "MM-DD" every year (3 March, a birthday), or "YYYY-MM-DD" that year
+	// only (a moving feast: Великден). On such a day it goes into the day's questions („На този ден“), its fact saying
+	// why.
+	On []string `json:"on,omitempty"`
+	// BG is a question about Bulgaria: its people, places, history, culture, language, sport. Every day has a few.
+	BG bool `json:"bg,omitempty"`
+}
+
+// OnDay is whether a question belongs to a day (YYYY-MM-DD): its On holds the day, or the day's month and day.
+func (t *Tail) OnDay(day string) bool {
+	for _, d := range t.On {
+		if d == day || (len(d) == 5 && len(day) == 10 && d == day[5:]) {
+			return true
+		}
+	}
+	return false
 }
 
 // Question is one question of any type.

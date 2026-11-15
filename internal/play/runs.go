@@ -41,7 +41,7 @@ func (g *Game) day(tx *sql.Tx, day string) ([]Pick, error) {
 		}
 	}
 	rows.Close()
-	picks, _ := drawDay(g.Bank(), used, nil, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+	picks, _ := drawDay(g.Bank(), day, used, nil, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 	if len(picks) == 0 {
 		return nil, ErrNoQuestion
 	}

@@ -98,6 +98,8 @@ Every question is one JSON object in its category's file:
 | `reviewBy`           | For an answer that may stop being true (an office holder, a record): when to check it    |
 | `image`              | A picture (see below)                                                                    |
 | `retired`            | `true`: never dealt again, kept for history and stats                                    |
+| `on`                 | The days it belongs to: `"03-03"` every year, `"2027-05-02"` that year only (Великден). On such a day it goes into the day's ten as „На този ден“; its fact says why the day |
+| `bg`                 | `true` for a question about Bulgaria (people, places, history, culture, language, sport): every day has at least three |
 
 By type:
 
