@@ -15,6 +15,10 @@ import (
 // it would cost as much as the day has players, every time. So it's counted once and kept a little while for all
 // (boardCache), and each viewer's own game is set into it exactly, whenever it finished: a player who has just
 // played sees their result and place at once; only the others' come in a moment later.
+//
+// A day's board ranks by right answers, then points, then time: players tell their day as „8 от 10“, so nine right
+// are never under eight. Points decide among the same right answers, which is what they're for (worth.go). Other
+// games keep their own order: rooms and duels by points, Роял by right answers and time (royal.go).
 
 // BoardTop is how many of the best a board shows.
 const BoardTop = 20
@@ -79,7 +83,7 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	}
 	mine.Me, mine.Look = true, g.lookOf(viewer, avatar, title, points)
 	b.Mine = &mine
-	r.points, r.ms = mine.Points, mine.Ms
+	r.rights, r.points, r.ms = mine.Rights, mine.Points, mine.Ms
 	// Their place: after everyone ahead of them in the count, which has them already, or not yet: finished since, or
 	// played at a script's speed (counted for nobody else). Then they're set in as the count would have them.
 	at := sort.Search(len(d.runs), func(i int) bool { return !d.runs[i].ahead(r) })
@@ -132,14 +136,14 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 	}
 	defer tx.Rollback() //nolint:errcheck // a read: nothing to keep
 	d := &countedBoard{}
-	rows, err := tx.QueryContext(ctx, `SELECT id, points, ms FROM runs WHERE kind = 'day' AND day = ? AND finished_at IS NOT NULL
-		AND NOT scripted ORDER BY points DESC, ms, id`, day)
+	rows, err := tx.QueryContext(ctx, `SELECT id, rights, points, ms FROM runs WHERE kind = 'day' AND day = ?
+		AND finished_at IS NOT NULL AND NOT scripted ORDER BY `+dayOrder, day)
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
 		var r boardRun
-		if err := rows.Scan(&r.id, &r.points, &r.ms); err != nil {
+		if err := rows.Scan(&r.id, &r.rights, &r.points, &r.ms); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -152,7 +156,7 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 	rows, err = tx.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+`
 		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND NOT r.scripted
-		ORDER BY r.points DESC, r.ms, r.id LIMIT ?`, day, BoardTop)
+		ORDER BY `+dayOrderOf("r")+` LIMIT ?`, day, BoardTop)
 	if err != nil {
 		return nil, err
 	}
@@ -189,15 +193,31 @@ func (d *countedBoard) due() bool {
 	return time.Since(d.counted) >= min(boardStale, time.Duration(boardPatience)*d.took)
 }
 
+// dayOrder is the order of a day's board, in SQL over runs (ahead says the same in Go): more right answers, then more
+// points, then quicker, then the earlier started. dayOrderOf is it for runs under another name.
+var dayOrder = dayOrderOf("")
+
+func dayOrderOf(runs string) string {
+	if runs != "" {
+		runs += "."
+	}
+	return runs + "rights DESC, " + runs + "points DESC, " + runs + "ms, " + runs + "id"
+}
+
 // boardRun is a game on a board, as far as its place goes.
 type boardRun struct {
 	id     int64
+	rights int
 	points int
 	ms     int64
 }
 
-// ahead says whether a game is ahead of another on a board: more points, then quicker, then the earlier started.
+// ahead says whether a game is ahead of another on a day's board (dayOrder): more right answers, then more points,
+// then quicker, then the earlier started.
 func (r boardRun) ahead(o boardRun) bool {
+	if r.rights != o.rights {
+		return r.rights > o.rights
+	}
 	if r.points != o.points {
 		return r.points > o.points
 	}

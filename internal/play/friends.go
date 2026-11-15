@@ -331,7 +331,8 @@ type Friend struct {
 	Drawn int `json:"drawn"`
 }
 
-// FriendsOf lists a player's friends: those who've played today first, best first, then the rest by name. A friend's
+// FriendsOf lists a player's friends: those who've played today first, best first (as the day's board has them),
+// then the rest by name. A friend's
 // day played at a script's speed is theirs alone to see (fair.go).
 func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	db := g.DB.Read
@@ -396,6 +397,8 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 			return -1
 		case a.Today == nil && b.Today != nil:
 			return 1
+		case a.Today != nil && a.Today.Rights != b.Today.Rights:
+			return b.Today.Rights - a.Today.Rights
 		case a.Today != nil && a.Today.Points != b.Today.Points:
 			return b.Today.Points - a.Today.Points
 		}
@@ -414,7 +417,7 @@ func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Sc
 		CROSS JOIN runs r ON r.user_id = f.id AND r.kind = 'day' AND r.day = ?1
 		JOIN users u ON u.id = r.user_id
 		WHERE r.finished_at IS NOT NULL AND `+fairFor("r", "?2")+`
-		ORDER BY r.points DESC, r.ms, r.id`, day, userID)
+		ORDER BY `+dayOrderOf("r"), day, userID)
 	if err != nil {
 		return nil, err
 	}
