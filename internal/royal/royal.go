@@ -9,10 +9,11 @@
 // whoever is there at the start plays. Those who come late may still come in until the answer to the third question
 // shows (Late), well before the first cut: the questions they missed count as not answered. A lobby member whose
 // screen was away at the start is in as soon as it's back, in that time. A tournament takes up to play.RoyalSize
-// players: at the start, those there are dealt into as few as hold them, of sizes as even as can be (51: 26 and 25),
-// on the same questions. Each moves on at its own pace: a question's answer shows once everyone still in has
-// answered (those cut aren't waited for), or when its time is up; the answer that a cut comes with shows longer
-// (CutPause), with who goes on and when the next cut is.
+// players at the start: those there are dealt into as few as hold everyone of the lobby (those away keep a seat), of
+// sizes as even as can be (51: 26 and 25), on the same questions. Nobody is shut out while the door is open: one who
+// comes late sits at the tournament with fewest in, over its size if every one is full. Each moves on at its own
+// pace: a question's answer shows once everyone still in has answered (those cut aren't waited for), or when its time
+// is up; the answer that a cut comes with shows longer (CutPause), with who goes on and when the next cut is.
 //
 // The hub keeps the evening's clock and the screens following it. Everything a game does goes through the database
 // first (package play), so that a restart of the server picks the game up again where it was.
@@ -51,6 +52,7 @@ const (
 // Errors a player may cause.
 var (
 	ErrClosed = errors.New("the lobby isn't open")
+	ErrShut   = errors.New("the door is shut") // the games are past the Late-th question
 	ErrNotNow = errors.New("not now")
 )
 
@@ -357,7 +359,7 @@ func (h *Hub) Step(ctx context.Context) {
 	// Those away at the start whose screen is back come in, while the door is open.
 	for id, p := range n.absent {
 		if h.online[id] > 0 {
-			if err := h.late(ctx, p, now); err != nil && !errors.Is(err, ErrClosed) {
+			if err := h.late(ctx, p, now); err != nil && !errors.Is(err, ErrShut) {
 				slog.Error("royal", "late", id, "err", err)
 			}
 		}
@@ -390,12 +392,22 @@ func (h *Hub) Step(ctx context.Context) {
 }
 
 // Join puts a player in the evening's lobby (again changes nothing): in the tournament with room for them. Once the
-// games have begun, it puts them in one late, while its door is open (Late).
+// games have begun, it puts them in one late, while the door is open (Late; ErrShut after). Once they're over, it
+// puts them in the next evening's lobby if that's open already (evenings a few minutes apart, to try the game out).
 func (h *Hub) Join(ctx context.Context, p Player) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	now := h.now()
 	n := h.night
+	if n != nil && !now.Before(n.start) {
+		if over, _ := n.over(); over {
+			if next := h.sched.Next(now); !now.Before(next.Add(-h.sched.Lobby)) {
+				h.night = &night{start: next, told: true, absent: map[int64]Player{}}
+				h.changed(nil)
+				n = h.night
+			}
+		}
+	}
 	if n == nil || now.Before(n.opens(h.sched)) {
 		return ErrClosed
 	}
@@ -455,9 +467,10 @@ func (h *Hub) Leave(ctx context.Context, id int64) error {
 	return nil
 }
 
-// begin starts the evening's tournaments with those of their lobbies who are there, dealt into as few as hold them,
-// of sizes as even as can be, in the order they came. Those not there are kept aside (absent), in the first: they're
-// in if they come back while its door is open. A tournament nobody is left in, and nobody may come back to, ends.
+// begin starts the evening's tournaments with those of their lobbies who are there, dealt into as few as hold
+// everyone of the lobbies (those not there too: each keeps a seat), of sizes as even as can be, in the order they
+// came. Those not there are kept aside (absent), in the first: they're in if they come back while the door is open. A
+// tournament nobody is left in, and nobody may come back to, ends.
 func (h *Hub) begin(ctx context.Context, now time.Time) error {
 	n := h.night
 	var lobbies []*table
@@ -475,10 +488,9 @@ func (h *Hub) begin(ctx context.Context, now time.Time) error {
 			}
 		}
 	}
-	k := (len(there) + play.RoyalSize - 1) / play.RoyalSize
-	if k == 0 && len(away) > 0 {
-		k = 1 // nobody there, but some may come back: the game runs for them
-	}
+	// As many as hold everyone of the lobbies, those away too: a seat is kept for each (nobody there, but some may
+	// come back: a game runs for them).
+	k := (len(there) + len(away) + play.RoyalSize - 1) / play.RoyalSize
 	// Each player's seat: the first tables take one more, while there are more than divide evenly.
 	seats := map[*member]*table{}
 	for i, m := range there {
@@ -563,17 +575,18 @@ func (h *Hub) empty(ctx context.Context, t *table) error {
 	return nil
 }
 
-// late puts a player in a game under way, while its door is open: the one with room that has fewest in. The questions
-// before the one showing count as not answered; the one showing is theirs to answer in the time it has left.
+// late puts a player in a game under way, while its door is open: the one that has fewest in, over play.RoyalSize if
+// every one is full (nobody is shut out while the door is open). The questions before the one showing count as not
+// answered; the one showing is theirs to answer in the time it has left.
 func (h *Hub) late(ctx context.Context, p Player, now time.Time) error {
 	var t *table
 	for _, x := range h.night.tables {
-		if x.open() && len(x.members) < play.RoyalSize && (t == nil || len(x.members) < len(t.members)) {
+		if x.open() && (t == nil || len(x.members) < len(t.members)) {
 			t = x
 		}
 	}
 	if t == nil {
-		return ErrClosed
+		return ErrShut
 	}
 	run, err := h.game.EnterRoyal(ctx, t.id, p.ID)
 	if err != nil {
@@ -994,7 +1007,7 @@ func (h *Hub) View(viewer int64) View {
 	v.Phase, v.N, v.Entered, v.WentOut = t.phase, t.n, t.entered, t.wentOut
 	v.Last = t.phase == play.RoyalReveal && h.last(t)
 	if me == nil && t.phase != play.RoyalLobby {
-		v.Late = slices.ContainsFunc(n.tables, func(t *table) bool { return t.open() && len(t.members) < play.RoyalSize })
+		v.Late = slices.ContainsFunc(n.tables, (*table).open)
 	}
 	if me != nil {
 		v.In, v.Out, v.Rights = true, t.phase != play.RoyalLobby && !me.in, me.rights

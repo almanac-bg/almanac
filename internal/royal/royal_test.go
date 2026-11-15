@@ -503,7 +503,7 @@ func TestLate(t *testing.T) {
 	if v := w.h.View(zed.ID); v.Phase != play.RoyalReveal || v.Late {
 		t.Fatalf("the door after the third: %+v", v)
 	}
-	if err := w.h.Join(ctx, zed); !errors.Is(err, ErrClosed) {
+	if err := w.h.Join(ctx, zed); !errors.Is(err, ErrShut) {
 		t.Fatalf("Zed came in after the third: %v", err)
 	}
 	if v := w.h.View(ana.ID); v.Players[0].Name != ana.Name || v.Players[0].Reached != 3 || v.Players[1].Reached != 2 ||
@@ -992,5 +992,121 @@ func TestAnswerAgain(t *testing.T) {
 		WHERE p.user_id = ?`, ana.ID).Scan(&answers)
 	if answers != 1 {
 		t.Fatalf("Ana has %d answers kept", answers)
+	}
+}
+
+// lobby puts k new players in the evening's lobby, on its screen.
+func (w *world) lobby(k int) ([]Player, []*Sub) {
+	w.t.Helper()
+	var ps []Player
+	var subs []*Sub
+	for range k {
+		p := w.player()
+		subs = append(subs, w.h.Follow(p.ID))
+		if err := w.h.Join(w.t.Context(), p); err != nil {
+			w.t.Fatal(err)
+		}
+		ps = append(ps, p)
+	}
+	return ps, subs
+}
+
+// sizes are how many each of the evening's tournaments has in.
+func (w *world) sizes() []int {
+	var out []int
+	for _, t := range w.h.night.tables {
+		out = append(out, len(t.members))
+	}
+	return out
+}
+
+// Nobody who was in the lobby is shut out because the tournaments are full: those away at the start are counted in
+// the deal, and come back to a seat.
+func TestSeatsForThoseAway(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	w.at(20, 46, 0)
+	w.lobby(50)
+	away, subs := w.lobby(51)
+	w.wait(time.Minute)
+	for _, s := range subs {
+		w.h.Unfollow(s) // their phones asleep, well before the start
+	}
+	w.at(21, 0, 0)
+	if got := fmt.Sprint(w.sizes()); got != "[17 17 16]" {
+		t.Fatalf("the 50 there, dealt with seats for the 51 away: %s", got)
+	}
+	w.wait(5 * time.Second)
+	for _, p := range away {
+		w.h.Follow(p.ID)
+	}
+	w.h.Step(ctx)
+	for _, p := range away {
+		if v := w.h.View(p.ID); !v.In || v.Phase != play.RoyalQuestion {
+			t.Fatalf("%s, back during the first question: %+v", p.Name, v)
+		}
+	}
+	if got := fmt.Sprint(w.sizes()); got != "[34 34 33]" {
+		t.Fatalf("all back: %s", got)
+	}
+}
+
+// Nobody who comes while the door is open is shut out because the tournaments are full: they sit at the one with
+// fewest in, over its size if every one is full.
+func TestLateToFullTables(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	w.at(20, 46, 0)
+	w.lobby(2 * play.RoyalSize)
+	w.at(21, 0, 0)
+	if got := fmt.Sprint(w.sizes()); got != "[50 50]" {
+		t.Fatalf("100 there: %s", got)
+	}
+	w.wait(5 * time.Second)
+	for range 3 {
+		p := w.player()
+		w.h.Follow(p.ID)
+		if err := w.h.Join(ctx, p); err != nil {
+			t.Fatalf("late, the tournaments full: %v", err)
+		}
+		if v := w.h.View(p.ID); !v.In || v.Phase != play.RoyalQuestion {
+			t.Fatalf("late, the tournaments full: %+v", v)
+		}
+	}
+	if got := fmt.Sprint(w.sizes()); got != "[52 51]" {
+		t.Fatalf("three late: %s", got)
+	}
+	if v := w.h.View(w.player().ID); !v.Late {
+		t.Fatalf("the door, the tournaments full: %+v", v)
+	}
+}
+
+// Trying the game out, an evening every few minutes: once one's games are over, the next one's lobby (open while its
+// standings still show) takes those who come, rather than the door of the one over.
+func TestNextLobbyAfterAnEvening(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	w.h = NewHub(w.g, Schedule{Every: 12 * time.Minute, Lobby: 11 * time.Minute})
+	w.at(20, 50, 0)
+	ana := w.player()
+	w.h.Follow(ana.ID)
+	if err := w.h.Join(ctx, ana); err != nil {
+		t.Fatal(err)
+	}
+	w.at(21, 0, 0)
+	for range play.RoyalLength {
+		w.give(ana, true)
+		w.onward()
+	}
+	if v := w.h.View(ana.ID); v.Phase != play.RoyalEnd {
+		t.Fatalf("the evening over: %+v", v)
+	}
+	bo := w.player()
+	w.h.Follow(bo.ID)
+	if err := w.h.Join(ctx, bo); err != nil {
+		t.Fatalf("into the next lobby: %v", err)
+	}
+	if v := w.h.View(bo.ID); v.Phase != play.RoyalLobby || !v.In || v.StartsAt != time.Date(2026, 11, 14, 21, 12, 0, 0, play.Bulgaria).UnixMilli() {
+		t.Fatalf("Bo in the next lobby: %+v", v)
 	}
 }
