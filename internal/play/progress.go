@@ -117,6 +117,7 @@ var Achievements = []Achievement{
 	{"rila", "На върха", "Стигни до Рила, най-високата лига.", "", Epic, 1, false},
 
 	{"streak100", "Сто дни", "Играй въпросите на деня сто дни поред.", "flame", Legendary, 100, false},
+	{"streak365", "Цяла година", "Играй въпросите на деня 365 дни поред.", "flame", Legendary, 365, false},
 	{"master5", "Пет теми като петте си пръста", "Стигни до „Майстор“ в пет теми.", "trophy", Legendary, 5, false},
 	{"duel50", "Петдесет победи", "Спечели петдесет дуела.", "shield", Legendary, 50, false},
 	{"facts5000", "Пет хиляди факта", "Събери пет хиляди факта в Алманаха.", "book", Legendary, 5000, false},
@@ -513,7 +514,7 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		return 0
 	}
 	return map[string]int{
-		"streak3": streak, "streak7": streak, "streak30": streak, "streak100": streak,
+		"streak3": streak, "streak7": streak, "streak30": streak, "streak100": streak, "streak365": streak,
 		"perfect": one(perfect), "exact": one(exact), "fast": one(fast),
 		"facts100": facts.n, "facts1000": facts.n, "facts5000": facts.n, "wholeTopic": one(facts.whole),
 		"games100":  games,

@@ -667,6 +667,17 @@ const avatars: Record<string, Layer[]> = {
     ["k1", "M30.7 16.6H33.3L32 19.6Z"],
     ["k0", both((x) => C(x(1.8), 14.8, 0.8))],
   ],
+  // A whole year in a row: the sun gone round, a flame at its heart (the streak's family: flame, torch, bonfire,
+  // phoenix, then this).
+  year: [
+    ["k3", rays(32, 32, 18, 31, 12, 7.5)],
+    ["k5", rays(32, 32, 18, 25.5, 12, 6, -75)],
+    lift(C(32, 32, 17)),
+    ["k4", C(32, 32, 17)],
+    ["ks", "M32 15A17 17 0 0 1 32 49A20 20 0 0 0 32 15Z"],
+    ["k5", flame(32, 44, 22, 7)],
+    ["kw", flame(32, 44, 11, 3.6)],
+  ],
   books: [
     lift("M10 47H54V57H10ZM14 37H50V47H14ZM12 27.5H48V37H12Z"),
     ["k1", "M11.5 47H52.5Q54 47 54 48.5V55.5Q54 57 52.5 57H11.5Q10 57 10 55.5V48.5Q10 47 11.5 47Z"],
@@ -1017,6 +1028,20 @@ const modes: Record<string, Layer[]> = {
 // ---- Frames: drawn around an avatar's tile, in the frame's own tone (app.css: .fr-*). The tile sits at 8–56; a
 // frame lives in the margin around it and may reach a little past the box.
 
+/** A sun's rays out of the avatar's tile, every way from its middle: `count` of them round its outline (grown by
+ * `inset`), each `half` wide at its foot, the even ones `long` and the odd ones `short`, as two paths. */
+const sunRays = (inset: number, count: number, long: number, short: number, half: number): [string, string] => {
+  const out: [string, string] = ["", ""];
+  around(inset, count).forEach(([x, y], i) => {
+    const len = Math.hypot(x - 32, y - 32) || 1;
+    const [ux, uy] = [(x - 32) / len, (y - 32) / len];
+    const reach = i % 2 ? short : long;
+    out[i % 2] +=
+      `M${n(x - uy * half)} ${n(y + ux * half)}L${n(x + ux * reach)} ${n(y + uy * reach)}L${n(x + uy * half)} ${n(y - ux * half)}Z`;
+  });
+  return out;
+};
+
 const band = (inset: number, width: number): Layer[] => [
   ["l1", tile(inset), `stroke-width="${width}"`],
   ["l4", tile(inset), `stroke-width="${n(width * 0.42)}"`],
@@ -1072,6 +1097,10 @@ const frames: Record<string, Layer[]> = {
     ["kw", sparkle(9, 9, 3.6) + sparkle(55, 55, 3.6)],
     ["k5", sparkle(55, 9, 2.6) + sparkle(9, 55, 2.6)],
   ],
+  sun: (() => {
+    const [long, short] = sunRays(3.4, 28, 8.5, 5, 2.4);
+    return [["k3", long], ["k4", short], ...band(3.4, 3), ["k5", sunRays(3.4, 28, 4.5, 2.6, 1.1)[0]]];
+  })(),
 };
 
 /** First place in a week of a high league: a band in its metal (Стара планина bronze, Пирин silver, Рила gold), a

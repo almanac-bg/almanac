@@ -1,5 +1,5 @@
-// How a player has done: the streak and this week, their numbers, the facts in their almanac, how well they know each
-// topic, their latest games.
+// How a player has done: the streak (and their longest) and this week, their numbers, the facts in their almanac, how
+// well they know each topic, their latest games.
 
 import { picture } from "../art/picture.ts";
 import { type Mastery, masteryCard } from "../game/mastery.ts";
@@ -10,6 +10,8 @@ import { figure, formatNumber, streak } from "../ui.ts";
 
 export interface Stats {
   streak: number;
+  /** The longest streak the player has had. */
+  best: number;
   week: boolean[];
   saved: boolean[];
   reserve: number;
@@ -92,11 +94,11 @@ export function stats(): Child {
     if (!s) return null;
     if (s.games === 0)
       return [
-        streak(s.streak, s.week, s.saved, s.reserve, s.next),
+        streak(s.streak, s.week, s.saved, s.reserve, s.next, s.best),
         h("p", { class: "muted" }, "Още няма изиграни игри."),
       ];
     return [
-      streak(s.streak, s.week, s.saved, s.reserve, s.next),
+      streak(s.streak, s.week, s.saved, s.reserve, s.next, s.best),
       h(
         "section",
         { class: "card figures" },

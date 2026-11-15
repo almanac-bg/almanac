@@ -32,3 +32,11 @@ test("a streak too short to win back is only said to have ended, once", async ({
   await expect(page.getByRole("button", { name: "Започни" })).toBeVisible();
   await expect(page.locator(".streak-notice")).toHaveCount(0);
 });
+
+test("Профил keeps the longest streak, under the one going on", async ({ page }) => {
+  await page.goto("/");
+  await daysPlayed(page, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 2, 1);
+  await page.goto("/me");
+  await expect(page.locator(".streak .streak-num")).toHaveText("2");
+  await expect(page.locator(".streak")).toContainText("Най-дълга серия: 12 дни");
+});

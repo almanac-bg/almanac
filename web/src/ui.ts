@@ -266,8 +266,9 @@ function today(): number {
 }
 
 /** The streak: days in a row with the day's ten, this week's days played (and kept by a reserve day or a repair), the
- * reserve days in hand, and (`next`) how many more days in a row earn the next one. */
-export function streak(days: number, week?: boolean[], saved?: boolean[], reserve = 0, next = 0): Child {
+ * reserve days in hand, (`next`) how many more days in a row earn the next one, and (`best`, Профил's) the longest
+ * streak the player has had, when it's longer than this one. */
+export function streak(days: number, week?: boolean[], saved?: boolean[], reserve = 0, next = 0, best = 0): Child {
   const unit = days === 1 ? "ден" : "дни";
   const now = today();
   return h(
@@ -294,6 +295,7 @@ export function streak(days: number, week?: boolean[], saved?: boolean[], reserv
               : `Още ${next === 1 ? "1 ден" : `${next} дни`} поред и печелиш резервен ден за серията.`,
           )
         : null,
+      best > Math.max(days, 1) ? h("p", { class: "streak-reserve" }, `Най-дълга серия: ${best} дни`) : null,
     ),
     week?.length === 7
       ? h(
