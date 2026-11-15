@@ -12,8 +12,10 @@ import { dayShareText } from "../game/share.ts";
 import type { Board, Mark, State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
+import { reportProblem } from "../lib/errors.ts";
 import { askToKeep } from "../lib/keep.ts";
 import { place } from "../lib/ordinal.ts";
+import { needsHomeScreen, pushable, pushOn, turnOn } from "../lib/push.ts";
 import { title } from "../lib/router.ts";
 import { onDay } from "../lib/words.ts";
 import { dayInBulgaria } from "../lib/year.ts";
@@ -123,7 +125,7 @@ export function today() {
                   dayShareText(t.day, run.trail, run.total, fresh().streak, fresh().rarest),
                 ),
               },
-              [just ? news(run.id) : null, countdown()],
+              [just ? news(run.id) : null, remindCard(t.day), countdown()],
             )
           : dayCard(t, start(t), run?.trail ?? []),
         // Mid-December into January: the year in the game, a tap away.
@@ -275,6 +277,76 @@ function untilMidnight(): string {
   const minutes = 24 * 60 - (sofia.getHours() * 60 + sofia.getMinutes());
   const hours = Math.floor(minutes / 60);
   return hours > 0 ? `${hours} ч и ${minutes % 60} мин` : `${minutes} мин`;
+}
+
+/** Where the reminder's asks are kept, on this device (notifications are a device's): how many, the last one's day. */
+const remindKey = "almanac.remind-ask";
+
+/** The day played, its result on Начало: shall we remind the player tomorrow? Asked where notifications can come and
+ * aren't on yet, at most three times and never twice in a day; on an iPhone in a browser tab, what it takes. */
+function remindCard(day: string): Child {
+  let asked = { n: 0, day: "" };
+  try {
+    asked = { ...asked, ...JSON.parse(localStorage.getItem(remindKey) ?? "{}") };
+  } catch {
+    // no storage here: ask
+  }
+  const home = needsHomeScreen();
+  if (asked.n >= 3 || asked.day === day || !(home || pushable())) return null;
+  const keep = (n: number) => {
+    try {
+      localStorage.setItem(remindKey, JSON.stringify({ n, day }));
+    } catch {
+      // not kept: asked again next time
+    }
+  };
+  const state = signal<"ask" | "on" | "gone">(home ? "ask" : "gone");
+  const error = signal("");
+  if (!home)
+    pushOn().then(
+      (on) => state.set(on ? "gone" : "ask"),
+      () => {},
+    );
+  const yes = async () => {
+    error.set("");
+    try {
+      const why = await turnOn();
+      if (why) error.set(why);
+      else {
+        keep(3);
+        state.set("on");
+      }
+    } catch (err) {
+      reportProblem(`reminder ask: ${(err as Error).name}: ${(err as Error).message}`);
+      error.set("Не успяхме. Опитай пак.");
+    }
+  };
+  const no = () => {
+    keep(asked.n + 1);
+    state.set("gone");
+  };
+  return () =>
+    state() === "gone"
+      ? null
+      : h(
+          "section",
+          { class: "card keep-card" },
+          h("h2", null, "Утре — нови десет"),
+          state() === "on"
+            ? h("p", { class: "muted", role: "status" }, "Готово. Ще ти напомним в 19:00, ако въпросите още те чакат.")
+            : [
+                h(
+                  "p",
+                  { class: "muted" },
+                  home
+                    ? "На iPhone напомнянията идват, щом добавиш АЛМАНАХ към началния екран: Сподели → Добави към началния екран."
+                    : "Да ти напомним, ако въпросите още те чакат? Веднъж на ден, в 19:00.",
+                ),
+                home ? null : h("button", { class: "btn", type: "button", onclick: yes }, "Напомняй ми"),
+                h("button", { class: "link", type: "button", onclick: no }, home ? "Разбрах" : "Не сега"),
+                () => error() && h("p", { class: "bad", role: "alert" }, error()),
+              ],
+        );
 }
 
 /** Where „По-късно“ is kept, on this device. */
