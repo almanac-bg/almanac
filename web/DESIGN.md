@@ -211,6 +211,8 @@ takes a token.
   десет“, „Още един дуел“, „Нова игра“), then the others as plain buttons of one size, side by side where they fit
   (`.result-actions`: „Прегледай въпросите“ first); then the game's news; and at the end the questions, once
   opened (the button takes the player there).
+- **A room led from a big screen** (`host.css`, loaded only there): `.host`, `.host-row` (two columns on a laptop and
+  up), `.host-qr`, `.host-join`, `.host-controls` and `.podium`.
 - **Friends:** `.card.friends`, `.invitation` (a friend request, accepted with `.btn.rose`), `.friend-list`/`.friend`
   (with `.friend-day` and `.record`) and `.invite-link`.
 - **In code:**
@@ -270,7 +272,8 @@ takes a token.
 
 - **The game moves on by itself.** There is no „Напред“ anywhere: an answer shows for 3 seconds (4.5 where there's
   more to read: a number, an order), with a line filling under it, and the next question opens. A room shows each
-  answer with its standings for 6 seconds; a live duel shows both answers for 4 seconds (6 for a number, an order or
+  answer with its standings for 6 seconds (a host who leads it from a big screen, „Само водя“, has „Напред“, „Задръж“
+  and „Край“: a class talks a fact over); a live duel shows both answers for 4 seconds (6 for a number, an order or
   a match). A question never opens in a tab that's out of sight.
 - **A game has the whole screen.** On a phone the header and the bar of places step aside while a question or its
   answer shows (an arrow before the count goes home), so the pad and the verdict fit and a stray tap can't leave the
