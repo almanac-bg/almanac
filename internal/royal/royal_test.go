@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1185,4 +1186,67 @@ func TestCutPlayOn(t *testing.T) {
 	shows("question 9, waiting for the first cut one", false)
 	w.give(cut[0], true)
 	shows("question 9, all answered", true)
+}
+
+// A restart of the server while an answer shows picks it up as it was: who answered what, what it brought, and who
+// let the time run out.
+func TestRestartInReveal(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo, vi := w.player(), w.player(), w.player()
+	w.start(ana, bo, vi)
+	w.wait(2 * time.Second)
+	w.give(ana, true)
+	w.give(bo, false)
+	w.timeUp() // Vi lets it run out
+	before := map[int64]*RevealView{}
+	for _, p := range []Player{ana, bo, vi} {
+		before[p.ID] = w.h.View(p.ID).Question.Reveal
+	}
+	given := w.h.View(ana.ID).Question.Given
+
+	w.h = NewHub(w.g, Evening)
+	if err := w.h.Load(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []Player{ana, bo, vi} {
+		v := w.h.View(p.ID)
+		r, was := v.Question.Reveal, before[p.ID]
+		if v.Phase != play.RoyalReveal || r.Right != was.Right || r.Missed != was.Missed || r.Points != was.Points || !r.Mine {
+			t.Fatalf("%s's answer after the restart: %+v, before: %+v", p.Name, r, was)
+		}
+	}
+	if v := w.h.View(vi.ID); !v.Question.Reveal.Missed || v.Question.Given != nil {
+		t.Fatalf("Vi, the time ran out: %+v", v.Question)
+	}
+	if v := w.h.View(ana.ID); string(v.Question.Given) != string(given) || v.Question.Reveal.Points == 0 {
+		t.Fatalf("Ana's answer after the restart: %+v", v.Question)
+	}
+}
+
+// The time an answer took is read as it arrives, not once the hub (busy with others' answers) takes it.
+func TestAnswerTimedAsItArrives(t *testing.T) {
+	w := setup(t)
+	ana, bo := w.player(), w.player()
+	w.start(ana, bo)
+	w.wait(2 * time.Second)
+	var clock atomic.Int64
+	clock.Store(w.now.UnixNano())
+	w.g.Now = func() time.Time { return time.Unix(0, clock.Load()).In(play.Bulgaria) }
+	a := w.answer(ana, true)
+	w.h.mu.Lock() // the hub busy
+	done := make(chan error)
+	go func() { done <- w.h.Answer(t.Context(), ana.ID, 0, a) }()
+	time.Sleep(50 * time.Millisecond) // it has arrived, and waits
+	clock.Add(int64(700 * time.Millisecond))
+	w.h.mu.Unlock()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	w.now = time.Unix(0, clock.Load()).In(play.Bulgaria)
+	w.g.Now = func() time.Time { return w.now }
+	w.give(bo, true)
+	if p := w.h.View(ana.ID).Players; p[0].Name != ana.Name || p[0].Ms != 2000 {
+		t.Fatalf("Ana's answer, timed: %+v", p)
+	}
 }

@@ -450,11 +450,18 @@ func (r *run) startAt(tx *sql.Tx, t time.Time) error {
 
 // Answer grades an answer to question n, the one showing. A null answer gives up on it.
 func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage) (Result, error) {
-	return g.answer(ctx, userID, runID, n, answer, false)
+	return g.answer(ctx, userID, runID, n, answer, g.Now(), false)
 }
 
-// answer grades an answer; a Роял run's only as its tournament's (royal), so that it keeps the tournament's pace.
-func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, royal bool) (Result, error) {
+// AnswerAt is Answer for an answer that arrived at at: its time is to then, whatever it waited for after (a live game
+// busy with others' answers).
+func (g *Game) AnswerAt(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time) (Result, error) {
+	return g.answer(ctx, userID, runID, n, answer, at, false)
+}
+
+// answer grades an answer that arrived at at; a Роял run's only as its tournament's (royal), so that it keeps the
+// tournament's pace.
+func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time, royal bool) (Result, error) {
 	var res Result
 	var r *run
 	var d bank.Dealt
@@ -473,7 +480,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 		if !ok || !r.shownAt.Valid {
 			return ErrOutOfStep
 		}
-		took := max(0, g.Now().Sub(time.UnixMilli(r.shownAt.Int64))) // before its time starts: at once
+		took := max(0, at.Sub(time.UnixMilli(r.shownAt.Int64))) // before its time starts: at once
 		limit := Limit(d.Question())
 		var gr bank.Graded
 		switch {
