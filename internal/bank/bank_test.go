@@ -210,6 +210,25 @@ func TestOrderGrading(t *testing.T) {
 			t.Fatalf("the reverse order graded %+v", g)
 		}
 	}
+	// Left as dealt, or the dealt order turned round, an order is worth a third at most, and never right: over many
+	// seeds, as every player of a day gets the same one. The seeds whose plain shuffle already fits keep it.
+	untouched, turned := []int{0, 1, 2, 3}, []int{3, 2, 1, 0}
+	kept := 0
+	for seed := range uint64(2000) {
+		d := q.Deal(seed)
+		for _, as := range [][]int{untouched, turned} {
+			answer, _ := json.Marshal(OrderAnswer{Order: as})
+			if g := grade(t, d, string(answer)); g.Right || g.Score > 1.0/3+1e-9 {
+				t.Fatalf("seed %d: %v graded %+v", seed, as, g)
+			}
+		}
+		if slices.Equal(d.(*dealtOrder).order, shuffle(seed, OrderItems)) {
+			kept++
+		}
+	}
+	if kept < 2000/2 || kept == 2000 {
+		t.Errorf("%d of 2000 seeds kept their shuffle (16 of 24 orders fit)", kept)
+	}
 	d := q.Deal(3)
 	for _, bad := range []string{`{"order":[0,1,2]}`, `{"order":[0,1,2,2]}`, `{"order":[0,1,2,4]}`, `{}`} {
 		if _, err := d.Grade(json.RawMessage(bad)); err == nil {
