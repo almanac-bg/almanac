@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
@@ -62,7 +63,8 @@ var playerErrors = map[error]*apiError{
 	royal.ErrNotNow:        {http.StatusConflict, "not_now", "Вече е късно за това."},
 	room.ErrNoRoom:         {http.StatusNotFound, "no_room", "Няма такава стая. Може да е затворена."},
 	room.ErrFull:           {http.StatusConflict, "full", "Стаята е пълна."},
-	room.ErrNotYours:       {http.StatusForbidden, "not_host", "Това прави домакинът."},
+	room.ErrNotYours:       {http.StatusForbidden, "not_host", "Това прави водещият."},
+	room.ErrRemoved:        {http.StatusForbidden, "removed", "Водещият те махна от стаята."},
 	room.ErrNotNow:         {http.StatusConflict, "not_now", "Вече е късно за това."},
 	room.ErrAnswer:         {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
 	room.ErrTooMany:        {http.StatusServiceUnavailable, "too_many_rooms", "Твърде много отворени стаи. Опитай след малко."},
@@ -185,7 +187,8 @@ func (s *Server) guest(w http.ResponseWriter, r *http.Request) error {
 		}
 		return ok(w, map[string]any{"user": u})
 	}
-	if !s.limits.allow("guest:"+s.clientIP(r), 30, time.Hour) {
+	// A class or a pub comes from one address: a room's worth of new players (room.MaxPlayers), and some.
+	if !s.limits.allow("guest:"+s.clientIP(r), 60, time.Hour) {
 		return errTooMany
 	}
 	u, token, err := s.accounts.Guest(r.Context())
@@ -265,7 +268,9 @@ func (s *Server) rename(w http.ResponseWriter, r *http.Request) error {
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
-	if !s.limits.allow("rename:"+s.clientIP(r), 20, time.Hour) {
+	// By player, and loosely by address: a whole class names itself as it comes into a room, from one network.
+	if !s.limits.allow("rename:"+strconv.FormatInt(u.ID, 10), 20, time.Hour) ||
+		!s.limits.allow("rename-ip:"+s.clientIP(r), 200, time.Hour) {
 		return errTooMany
 	}
 	if in.Name != nil {

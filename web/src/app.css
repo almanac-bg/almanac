@@ -5131,6 +5131,13 @@
     box-shadow: inset 0 0 0 1.5px var(--accent);
   }
 
+  /* The host's „Махни“: the chip's full height to tap. */
+  .players .remove {
+    align-self: stretch;
+    margin: calc(var(--space-2) * -1) 0 calc(var(--space-2) * -1) var(--space-1);
+    font-size: 0.875rem;
+  }
+
   /* ---- Profile ---- */
 
   .mastery-list {

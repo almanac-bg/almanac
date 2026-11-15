@@ -416,3 +416,80 @@ func TestRoomsKeptOverARestart(t *testing.T) {
 		}
 	})
 }
+
+// The host sends a player out: their screen hears so, they can't come back (after a restart either), and a question
+// waiting on them goes on without them.
+func TestRemove(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		hub := NewHub(sample(t))
+		ana, bo, cy := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}, Player{ID: 3, Name: "Цви"}
+		r, _ := hub.Open(ana, "")
+		_ = r.Join(bo)
+		_ = r.Join(cy)
+		sa, _ := r.Follow(ana.ID)
+		sb, _ := r.Follow(bo.ID)
+		sc, _ := r.Follow(cy.ID)
+		keyOf := func(name string) int {
+			for _, p := range r.View(ana.ID).Players {
+				if p.Name == name {
+					return p.Key
+				}
+			}
+			t.Fatalf("no %s in the room", name)
+			return -1
+		}
+		if err := r.Remove(bo.ID, keyOf("Цви")); !errors.Is(err, ErrNotYours) {
+			t.Fatalf("a player sent another out: %v", err)
+		}
+		if err := r.Remove(ana.ID, keyOf("Ана")); !errors.Is(err, ErrNotNow) {
+			t.Fatalf("the host sent themself out: %v", err)
+		}
+		cyKey := keyOf("Цви")
+		if err := r.Start(ana.ID); err != nil {
+			t.Fatal(err)
+		}
+		_ = r.Answer(ana.ID, 0, answer(r, true))
+		_ = r.Answer(bo.ID, 0, answer(r, true))
+		if r.View(ana.ID).Phase != Question {
+			t.Fatal("the answer showed before Цви answered")
+		}
+		if err := r.Remove(ana.ID, keyOf("Цви")); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case <-sc.Done:
+			if !sc.Removed() {
+				t.Fatal("Цви's screen wasn't told why")
+			}
+		default:
+			t.Fatal("Цви's screen still follows the room")
+		}
+		if v := r.View(ana.ID); v.Phase != Reveal || len(v.Players) != 2 {
+			t.Fatalf("after Цви went: %+v", v)
+		}
+		if err := r.Join(cy); !errors.Is(err, ErrRemoved) {
+			t.Fatalf("Цви came back: %v", err)
+		}
+		// The others keep their keys.
+		if keyOf("Бо") != 1 || cyKey != 2 {
+			t.Fatalf("keys: Бо %d, Цви %d", keyOf("Бо"), cyKey)
+		}
+		r.Unfollow(sc) // the stream ends after
+		r.Unfollow(sa)
+		r.Unfollow(sb)
+
+		var saved bytes.Buffer
+		if err := hub.Save(&saved); err != nil {
+			t.Fatal(err)
+		}
+		next := NewHub(sample(t))
+		if _, err := next.Restore(&saved); err != nil {
+			t.Fatal(err)
+		}
+		again, _ := next.Get(r.Code())
+		if err := again.Join(cy); !errors.Is(err, ErrRemoved) {
+			t.Fatalf("Цви came back after a restart: %v", err)
+		}
+		synctest.Wait()
+	})
+}

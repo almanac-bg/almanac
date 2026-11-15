@@ -11,6 +11,8 @@ export interface User {
   tag: string;
   email?: string;
   admin?: boolean;
+  /** Still the name drawn for them (an animal and three digits): a room asks for one first. */
+  drawn?: boolean;
 }
 
 export interface Category {
