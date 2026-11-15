@@ -11,8 +11,9 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// Friends are two players who joined up: through one's invite link, or a request by tag or email that the other
-// accepted. Each sees how the other did on the day's questions, they keep a record of their duels, and either can
+// Friends are two players who joined up: through one's invite link (sent, or at the end of their shared day's result:
+// it brings whoever opens it to the day, and offers the friendship with a tap), or a request by tag, by email or from
+// a room's end that the other accepted. Each sees how the other did on the day's questions, they keep a record of their duels, and either can
 // call the other to a duel.
 
 var (
@@ -70,6 +71,18 @@ func (g *Game) Inviter(ctx context.Context, code string) (id int64, name string,
 		err = ErrNoInvite
 	}
 	return id, name, err
+}
+
+// DayRights is how many of a day's ten a player got right, once they've finished it (played false before), as a viewer
+// sees it (0: nobody signed in): a game played at a script's speed is its player's alone (fairFor). It's what an
+// invite link says of its owner's day, and of the day of the one who opens it.
+func (g *Game) DayRights(ctx context.Context, userID int64, day string, viewer int64) (rights int, played bool, err error) {
+	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.rights FROM runs r WHERE r.user_id = ? AND r.kind = 'day' AND r.day = ?
+		AND r.finished_at IS NOT NULL AND `+fairFor("r", "?"), userID, day, viewer).Scan(&rights)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, false, nil
+	}
+	return rights, err == nil, err
 }
 
 // Befriend makes a player and the owner of an invite link friends (and changes nothing if they already are). It

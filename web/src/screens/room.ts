@@ -514,8 +514,14 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
   );
 }
 
-/** The players by points; after an answer, what it brought each of them and how far they moved. */
-function standings(view: () => RoomView, gains: boolean, before?: Map<number, number>): Child {
+/** The players by points; after an answer, what it brought each of them and how far they moved; at the end, under a
+ * player's name, whatever `extra` adds (the way to add them as a friend). */
+function standings(
+  view: () => RoomView,
+  gains: boolean,
+  before?: Map<number, number>,
+  extra?: (p: Player) => Child,
+): Child {
   return h("section", { class: "board" }, h("h2", null, "Класиране"), () =>
     h(
       "ol",
@@ -534,6 +540,7 @@ function standings(view: () => RoomView, gains: boolean, before?: Map<number, nu
           row.classList.add("moves");
           row.append(move(before.get(p.key), i + 1));
         }
+        if (extra) row.append(h("span", { class: "row-add" }, extra(p)));
         return row;
       }),
     ),
@@ -559,6 +566,36 @@ function end(view: () => RoomView, code: string): Child {
   play(first.players.length > 1 && first.players[0]?.me ? "win" : "end");
   const questions = reviewParts(async () => view().review ?? []);
   const ran = computed(() => view().run ?? 0);
+  // The others to add as friends (not friends yet, nor asked), each a tap under their name, and whether the day's ten
+  // still wait for this player.
+  const people = signal<{ add: number[]; day: boolean } | null>(null);
+  const sent = signal<Record<number, string>>({});
+  api<{ add: number[]; day: boolean }>("GET", `/api/rooms/${code}/people`).then(people.set, () => {});
+  const befriend = async (key: number) => {
+    try {
+      const r = await api<{ friends?: boolean }>("POST", `/api/rooms/${code}/people`, { key });
+      sent.update((s) => ({ ...s, [key]: r.friends ? "Вече сте приятели." : "Поканата е изпратена." }));
+    } catch (err) {
+      error.set((err as ApiError).message);
+    }
+  };
+  const add =
+    (p: Player): Child =>
+    () =>
+      sent()[p.key]
+        ? h("span", { class: "muted" }, sent()[p.key])
+        : people()?.add.includes(p.key)
+          ? h(
+              "button",
+              {
+                class: "link",
+                type: "button",
+                "aria-label": `Добави ${p.name} в приятели`,
+                onclick: () => befriend(p.key),
+              },
+              "Добави",
+            )
+          : null;
   return h(
     "div",
     { class: "screen" },
@@ -575,14 +612,17 @@ function end(view: () => RoomView, code: string): Child {
       view().allRight
         ? h("p", { class: "points-bonus" }, `Всички верни: +${formatNumber(view().allRight ?? 0)} т.`)
         : null,
-    standings(view, false),
+    standings(view, false, undefined, add),
     // Who leads starts the next game (the gold button); everyone else waits for it. The questions to go over, beside.
     nextSteps(
       () =>
         view().canLead
           ? h("button", { class: "btn primary big", onclick: () => lead(code, "start", error.set) }, "Нова игра")
           : waiting(view, "започне нова игра"),
-      [questions.button],
+      [
+        questions.button,
+        () => (people()?.day === false ? h("a", { class: "btn", href: "/" }, "Десетте за днес") : null),
+      ],
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
     // What the game earned, once it's kept (a moment after its end), as any game tells it.

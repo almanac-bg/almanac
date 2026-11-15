@@ -54,6 +54,8 @@ interface Today {
   friends?: Score[] | null;
   /** While no friend has played: whether the player has any friends at all. */
   befriended?: boolean;
+  /** The day played: the player's invite link, which their shared result ends with. */
+  invite?: string;
 }
 
 const longDate = (day: string) =>
@@ -138,7 +140,7 @@ export function today() {
               {
                 main: shareButton(
                   "Сподели",
-                  () => dayShareText(t.day, run.trail, run.total, fresh().streak, fresh().rarest),
+                  () => dayShareText(t.day, run.trail, run.total, fresh().streak, fresh().rarest, fresh().invite),
                   undefined,
                   true,
                   () => tally("share:day"),
