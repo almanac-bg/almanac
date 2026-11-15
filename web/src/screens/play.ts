@@ -80,9 +80,10 @@ export function secondChance(waiting: number): Child {
 }
 
 /** A topic: its picture and colour, its name, and how well the player knows it (once they've played enough of it to
- * tell: Профил has the rest). */
+ * tell: a first estimate as a share alone, its tier once the mark is sure; Профил has the rest). */
 function tile(c: Category, m?: Mastery): Child {
   const sure = m?.sure ? m : null;
+  const first = m?.first ? m : null;
   return h(
     "a",
     { href: `/play/${c.id}`, class: `topic ${toneOf(c.id)}` },
@@ -91,7 +92,11 @@ function tile(c: Category, m?: Mastery): Child {
       "span",
       { class: "topic-text" },
       h("span", { class: "topic-name" }, c.name),
-      sure ? h("span", { class: "topic-meta" }, masteryBadge(sure), h("b", { class: "num" }, `${sure.known}%`)) : null,
+      sure
+        ? h("span", { class: "topic-meta" }, masteryBadge(sure), h("b", { class: "num" }, `${sure.known}%`))
+        : first
+          ? h("span", { class: "topic-meta" }, `първа оценка · ${first.known}%`)
+          : null,
     ),
     sure ? meter(sure.known, `знаеш ${sure.known}% от темата`) : null,
   );

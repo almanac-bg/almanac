@@ -13,7 +13,8 @@ export interface Mastery {
   name: string;
   next?: string;
   nextAt?: number;
-  sure: boolean; // answers enough to tell: until then it's a guess, and isn't shown
+  sure: boolean; // answers enough to tell, with its tier: until then it's a guess
+  first?: boolean; // answers enough for a first estimate, not yet sure: its share is told, never its tier
 }
 
 export interface MasteryMove {
@@ -24,8 +25,10 @@ export interface MasteryMove {
 /** How many tiers there are (play.MasteryTiers). */
 const TIERS = 6;
 
-/** How many answers in a topic it takes to tell (play.MasteryFrom). */
-const FROM = 10;
+/** How many answers in a topic it takes for a first estimate (play.MasteryFirst), and to tell it with its tier
+ * (play.MasteryFrom). */
+const FIRST = 10;
+const FROM = 30;
 
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? id;
 
@@ -43,15 +46,23 @@ export function masteryBadge(m: Mastery): Child {
   );
 }
 
-/** What's left before a topic's mastery is told, or to its next tier. */
+/** What's left before a topic's mastery is told (a first estimate, then its tier), or to its next tier. */
 export function masteryLeft(m: Mastery): string {
   if (!m.answers) return "Още не е играна";
-  if (!m.sure) return `още ${questions(FROM - m.answers)} до оценка`;
+  if (m.first) return `още ${questions(FROM - m.answers)} до степен`;
+  if (!m.sure) return `още ${questions(FIRST - m.answers)} до оценка`;
   return m.next ? `още ${(m.nextAt ?? 0) - m.known}% до ${m.next}` : "най-високата степен";
 }
 
+/** A first estimate, said for what it is: „първа оценка · 74%“ (and of what, `of`: „от въпросите в темата“). */
+const firstWords = (m: Mastery, of = "") => [
+  h("span", { class: "muted" }, "първа оценка ·"),
+  h("b", { class: "mastery-known" }, `${m.known}%`),
+  of ? h("span", { class: "muted" }, of) : null,
+];
+
 function row(m: Mastery, extra: Child = null): Child {
-  // Still being found out: one line, the topic and what's left before it's told.
+  // Still being found out: one line, the topic and its first estimate, or what's left before one.
   if (!m.sure)
     return h(
       "li",
@@ -60,7 +71,7 @@ function row(m: Mastery, extra: Child = null): Child {
         "div",
         { class: "mastery-head" },
         h("span", { class: "mastery-topic" }, topicMark(m.category), topicName(m.category)),
-        h("span", { class: "mastery-meta" }, extra, masteryLeft(m)),
+        h("span", { class: "mastery-meta" }, extra, m.first ? firstWords(m) : masteryLeft(m)),
       ),
     );
   return h(
@@ -87,11 +98,11 @@ function row(m: Mastery, extra: Child = null): Child {
  * still being found out and the ones not played yet named in a line each (a day's game touches all ten topics: ten
  * rows of „още 9 въпроса“ say nothing). Said to the player, or (another's) about them. */
 export function masteryCard(all: Mastery[], theirs = false): Child {
-  const order = (m: Mastery) => (m.sure ? 2000 + m.known : m.answers ? 1000 + m.answers : 0);
+  const order = (m: Mastery) => (m.sure ? 3000 + m.known : m.first ? 2000 + m.known : m.answers ? 1000 + m.answers : 0);
   const sorted = [...all].sort((a, b) => order(b) - order(a));
-  const sure = sorted.filter((m) => m.sure);
-  const finding = sorted.filter((m) => m.answers && !m.sure);
-  const played = [...sure, ...finding.slice(0, 2)];
+  const told = sorted.filter((m) => m.sure || m.first);
+  const finding = sorted.filter((m) => m.answers && !m.sure && !m.first);
+  const played = [...told, ...finding.slice(0, 2)];
   const later = finding.slice(2);
   const not = sorted.filter((m) => !m.answers);
   return h(
@@ -114,7 +125,7 @@ export function masteryCard(all: Mastery[], theirs = false): Child {
       ? h(
           "p",
           { class: "muted small" },
-          `Скоро: ${later.map((m) => topicName(m.category)).join(", ")}. Оценката идва след ${FROM} отговора в тема.`,
+          `Скоро: ${later.map((m) => topicName(m.category)).join(", ")}. Първата оценка идва след ${FIRST} отговора в тема, степента — след ${FROM}.`,
         )
       : null,
     !played.length
@@ -126,21 +137,21 @@ export function masteryCard(all: Mastery[], theirs = false): Child {
 }
 
 /** How a topic's game moved its mastery, in a line: the topic, how much of it is known now and by how much that moved
- * (a new tier said), or what's left before it's told. Of a game of several topics, the one that moved most. */
+ * (a new tier said); before its mark is sure, a first estimate of what share of the topic it is, never a tier; or
+ * what's left before either. Of a game of several topics, the one that moved most. */
 export function masteryLine(moves: MasteryMove[]): Child {
-  const told = moves.filter((m) => m.to.sure && (!m.from.sure || m.to.known !== m.from.known));
+  const shown = (m: Mastery) => m.sure || !!m.first;
+  const told = moves.filter((m) => shown(m.to) && (!shown(m.from) || m.to.known !== m.from.known));
   const move = told[0] ?? (moves.length === 1 ? moves[0] : undefined);
   if (!move) return null;
   const { from, to } = move;
   const d = to.known - from.known;
   const change =
-    from.sure && to.tier > from.tier
+    !from.sure || to.tier > from.tier
       ? h("span", { class: "delta up" }, "нова степен")
-      : !from.sure
-        ? h("span", { class: "delta up" }, "първа оценка")
-        : d !== 0
-          ? h("span", { class: d > 0 ? "delta up" : "delta down" }, `${d > 0 ? "+" : ""}${d}%`)
-          : null;
+      : d !== 0
+        ? h("span", { class: d > 0 ? "delta up" : "delta down" }, `${d > 0 ? "+" : ""}${d}%`)
+        : null;
   return h(
     "p",
     { class: `mastery-line ${toneOf(to.category)}` },
@@ -148,6 +159,8 @@ export function masteryLine(moves: MasteryMove[]): Child {
     h("span", { class: "mastery-topic" }, topicName(to.category)),
     to.sure
       ? [h("b", { class: "mastery-known" }, `${to.known}%`), change, masteryBadge(to)]
-      : h("span", { class: "muted" }, masteryLeft(to)),
+      : to.first
+        ? firstWords(to, "от въпросите в темата")
+        : h("span", { class: "muted" }, masteryLeft(to)),
   );
 }

@@ -20,8 +20,9 @@ import (
 //
 // Nothing waits to be earned, only to be shown: XP, achievements, unlocks, the league's group and the rating all count
 // from the first game, and what was held is told when its system opens (NewsOf), not lost. Each system is told once,
-// quietly, as it opens: a line in that game's news (News.Opened). A topic's mastery needs no rule here: it shows once
-// a topic has a mark (Mastery.Sure).
+// quietly, as it opens: a line in that game's news (News.Opened). A topic's mastery needs no rule here: it shows as a
+// first estimate once a topic has a few answers (Mastery.First), and with its tier once its mark is sure
+// (Mastery.Sure). Награди (ProgressOf) shows the achievements of the systems open, and their XP once XP is.
 
 const (
 	// XPFromDay is the day played that XP, the level and the day's goals show from.

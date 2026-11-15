@@ -332,13 +332,17 @@ func (g *Game) earned(ctx context.Context, userID int64) (map[string]int64, erro
 	return earned, rows.Err()
 }
 
-// ProgressOf reads a player's progress.
+// ProgressOf reads a player's progress, as far as they've met the game's systems (unfold.go): the achievements of a
+// system not open yet (the day's goals', the league's) aren't in it, and no achievement says its XP before XP is.
 func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 	var p Progress
 	var avatar, title, frame, backdrop sql.NullString
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT avatar, title, frame, backdrop FROM users WHERE id = ?`, userID).
 		Scan(&avatar, &title, &frame, &backdrop)
 	if err != nil {
+		return p, err
+	}
+	if p.Open, err = g.OpenOf(ctx, userID); err != nil {
 		return p, err
 	}
 	if p.XP, err = g.totalXP(ctx, userID); err != nil {
@@ -357,9 +361,15 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 	if err != nil {
 		return p, err
 	}
+	p.Achievements = []Earned{}
 	for _, a := range Achievements {
-		e := Earned{Achievement: a, At: earned[a.ID], Progress: min(reached[a.ID], a.Goal), XP: AchievementXP[a.Tier],
-			Rewards: w.rewardsOf(a)}
+		if s := systemOf(a.ID); s != "" && !p.Open.has(s) {
+			continue
+		}
+		e := Earned{Achievement: a, At: earned[a.ID], Progress: min(reached[a.ID], a.Goal), Rewards: w.rewardsOf(a)}
+		if p.Open.XP {
+			e.XP = AchievementXP[a.Tier]
+		}
 		if e.At != 0 {
 			e.Progress = a.Goal
 		} else if a.Hidden {
@@ -379,8 +389,7 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 	p.Frame, p.Backdrop = frame.String, backdrop.String
 	p.Frames, p.Backdrops = w.list(Frames), w.list(Backdrops)
 	p.Next, p.TierUnlocks = w.next(p.Standing.Rating), w.tierUnlocks()
-	p.Open, err = g.OpenOf(ctx, userID)
-	return p, err
+	return p, nil
 }
 
 // Award gives a player every achievement their games have earned and they don't have yet, and returns those. It's
