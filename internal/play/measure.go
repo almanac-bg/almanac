@@ -44,8 +44,10 @@ func (g *Game) tallyDayAnswer(tx *sql.Tx, r *run) error {
 		return err
 	}
 	var seen bool
-	err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM answers a JOIN runs o ON o.id = a.run_id
-		WHERE a.question_id = ? AND o.user_id = ? AND a.run_id <> ?)`, r.picks[r.at].ID, r.userID, r.id).Scan(&seen)
+	// From the player's own games (CROSS JOIN keeps that order): the question's answers grow with the day's players,
+	// and every day answer would otherwise walk all of them.
+	err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM runs o CROSS JOIN answers a ON a.run_id = o.id
+		WHERE o.user_id = ? AND o.id <> ? AND a.question_id = ?)`, r.userID, r.id, r.picks[r.at].ID).Scan(&seen)
 	if err != nil || !seen {
 		return err
 	}

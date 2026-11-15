@@ -224,12 +224,16 @@ type saved struct {
 	Players  []savedMember `json:"players"`
 	Out      []int64       `json:"out,omitempty"`
 	Used     []string      `json:"used,omitempty"`
-	Opened   time.Time     `json:"opened"`
-	Active   time.Time     `json:"active"`
+	// Joined is how many have joined: the next one's key. Kept so that keys stay as the screens know them over a
+	// restart (a player sent out leaves a gap).
+	Joined int       `json:"joined,omitempty"`
+	Opened time.Time `json:"opened"`
+	Active time.Time `json:"active"`
 }
 
 type savedMember struct {
 	ID      int64         `json:"id"`
+	Key     int           `json:"key"`
 	Name    string        `json:"name"`
 	Look    play.Look     `json:"look"`
 	Points  int           `json:"points,omitempty"`
@@ -254,7 +258,7 @@ func (h *Hub) Save(w io.Writer) error {
 	for _, r := range h.rooms {
 		r.mu.Lock()
 		sv := saved{Code: r.code, Settings: r.Settings, Host: r.host, HostName: r.hostName, Held: r.held, Phase: r.phase,
-			Opened: r.opened, Active: r.active}
+			Opened: r.opened, Active: r.active, Joined: r.joined}
 		over := r.phase == End
 		if over {
 			sv.Picks = r.picks
@@ -265,7 +269,7 @@ func (h *Hub) Save(w io.Writer) error {
 			sv.Used = append(sv.Used, id)
 		}
 		for _, m := range r.players {
-			sm := savedMember{ID: m.ID, Name: m.Name, Look: m.Look}
+			sm := savedMember{ID: m.ID, Key: m.key, Name: m.Name, Look: m.Look}
 			if over {
 				sm.Points, sm.Rights, sm.InRow, sm.Run = m.points, m.rights, m.inRow, m.run
 				for _, l := range m.log {
@@ -328,6 +332,9 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 		}
 		for _, sm := range sv.Players {
 			m := r.add(Player{ID: sm.ID, Name: sm.Name, Look: sm.Look})
+			if sv.Joined > 0 { // saved since keys are kept: each as it was
+				m.key = sm.Key
+			}
 			if r.phase == End {
 				m.points, m.rights, m.inRow, m.run = sm.Points, sm.Rights, sm.InRow, sm.Run
 				for _, a := range sm.Answers {
@@ -335,6 +342,7 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 				}
 			}
 		}
+		r.joined = max(r.joined, sv.Joined)
 		h.rooms[r.code] = r
 		n++
 	}
