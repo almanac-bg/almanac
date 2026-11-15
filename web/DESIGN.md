@@ -167,6 +167,8 @@ takes a token.
   - Like things are one size: a field is a button's height (48), an answer row 60 whatever the question's kind, a
     meter 6, a row card 12 by 16 inside; every number of a size is from the scale.
   - `.field` and `input.code`; `.join` for an input with its button.
+  - `.segmented` (`segmented()` in `ui.ts`): tabs that switch what a screen shows, or, as radios, a setting's few
+    choices (a room's „Въпроси“ and „Трудност“). Never a native select, radio or checkbox.
   - `.tag` and `.chip`; `.chips.scroll` for a row of chips that scrolls sideways on a phone (the page itself never does);
     with a mouse or on a tablet and up it wraps, every chip in sight.
 - **Numbers:** `.figures`/`.figure`, `.stats`/`.stat`, `.streak` (with `.week`), `.games`/`.game`.

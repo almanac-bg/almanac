@@ -142,6 +142,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.rooms = room.NewHub(s.bank.Load)
 	s.rooms.Crowd = s.game.Crowd
 	s.rooms.Barred = s.game.DayQuestions
+	s.rooms.Record = s.game.RecordRoom
 	s.live = live.NewHub(s.game, s.livePlayer)
 	s.closing = make(chan struct{})
 	d.Accounts.Merge = append(d.Accounts.Merge, play.Merge)

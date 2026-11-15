@@ -59,6 +59,7 @@ var playerErrors = map[error]*apiError{
 	live.ErrTooMany:        {http.StatusServiceUnavailable, "too_many_duels", "Твърде много дуели в момента. Опитай след малко."},
 	play.ErrNoRequest:      {http.StatusNotFound, "no_request", "Поканата вече я няма."},
 	play.ErrManyRequests:   {http.StatusConflict, "many_requests", "Твърде много покани чакат отговор: до 50."},
+	play.ErrRoomGame:       {http.StatusBadRequest, "bad_room_game", "Стаята играе по 5, 10, 15 или 20 въпроса, лесни, смесени или трудни."},
 	royal.ErrClosed:        {http.StatusConflict, "royal_closed", "Входът за Роял се отваря в 20:45 и е отворен до 3-тия въпрос."},
 	royal.ErrNotNow:        {http.StatusConflict, "not_now", "Вече е късно за това."},
 	room.ErrNoRoom:         {http.StatusNotFound, "no_room", "Няма такава стая. Може да е затворена."},

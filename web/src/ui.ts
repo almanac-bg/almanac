@@ -84,6 +84,33 @@ export function verdict(
 }
 
 /** The fact behind an answer. */
+/** A segmented switch of a few choices: tabs that switch what a screen shows, or (`radio`) a setting to choose. */
+export function segmented<T>(
+  label: string,
+  options: [T, string][],
+  now: () => T,
+  choose: (v: T) => void,
+  small = false,
+  radio = false,
+): Child {
+  return h(
+    "div",
+    { class: small ? "segmented small" : "segmented", role: radio ? "radiogroup" : "tablist", "aria-label": label },
+    options.map(([id, text]) =>
+      h(
+        "button",
+        {
+          type: "button",
+          role: radio ? "radio" : "tab",
+          [radio ? "aria-checked" : "aria-selected"]: () => now() === id,
+          onclick: () => choose(id),
+        },
+        text,
+      ),
+    ),
+  );
+}
+
 export function fact(text: string): Child {
   return h("aside", { class: "fact" }, h("h2", null, "Знаеше ли?"), h("p", null, text));
 }

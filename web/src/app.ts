@@ -2,6 +2,7 @@
 // bottom of a phone's), and the screen the router puts under them.
 
 import { loadPictures } from "./art/picture.ts";
+import { later } from "./kit.ts";
 import { type ApiError, api } from "./lib/api.ts";
 import { startApp } from "./lib/app.ts";
 import { type Child, effect, h, mount, signal } from "./lib/dom.ts";
@@ -22,7 +23,6 @@ import { topic } from "./screens/play.ts";
 import { playerProfile } from "./screens/player.ts";
 import { ranks } from "./screens/ranks.ts";
 import { rewards } from "./screens/rewards.ts";
-import { room } from "./screens/room.ts";
 import { rooms } from "./screens/rooms.ts";
 import { royal } from "./screens/royal.ts";
 import { settings } from "./screens/settings.ts";
@@ -113,7 +113,7 @@ if (root) {
       { path: /^\/settings$/, view: settings },
       // Where friends were before: a link in an old notification still lands somewhere that makes sense.
       { path: /^\/together$/, view: friends },
-      { path: /^\/r\/([0-9]{6})$/, view: room },
+      { path: /^\/r\/([0-9]{6})$/, view: later(() => import("./screens/room.ts").then((m) => m.room)) },
       { path: /^\/f\/([a-z0-9]{8})$/, view: invite },
       { path: /^\/me$/, view: me },
       { path: /^\/players\/([A-Za-z0-9_]{3,20})$/, view: playerProfile },

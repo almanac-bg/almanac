@@ -38,16 +38,14 @@ func (s *Server) openRoom(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	var in struct {
-		Category string `json:"category"`
-	}
+	var in room.Settings
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
 	if !s.limits.allow("room:"+strconv.FormatInt(u.ID, 10), 30, time.Hour) {
 		return errTooMany
 	}
-	rm, err := s.rooms.Open(s.roomPlayer(r.Context(), u.ID, u.Name), in.Category)
+	rm, err := s.rooms.Open(s.roomPlayer(r.Context(), u.ID, u.Name), in)
 	if err != nil {
 		return err
 	}
