@@ -1,5 +1,5 @@
-// Notifications: the evening reminder, word from friends (a link accepted, a call to a duel) and Роял's call, each kind
-// on or off as the player chooses. The browser asks the player first; the service worker (/sw.js) shows them. In the
+// Notifications: the day's reminder (at the player's own hour), word from friends (a link accepted, a call to a duel)
+// and Роял's call, each kind on or off as the player chooses. The browser asks the player first; the service worker (/sw.js) shows them. In the
 // game's app the phone asks instead, and they come from Apple's or Google's push service to the phone (phone.ts).
 
 import { phonePlatforms, pushKey } from "../state.ts";

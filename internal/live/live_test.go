@@ -272,7 +272,8 @@ func TestAgainstARecording(t *testing.T) {
 		fg, _ := m.Follow(gal.ID)
 		defer m.Unfollow(fg)
 		v := next(m, gal.ID)
-		if !v.Recorded || v.Phase != PhaseQuestion || !v.Them.Online || v.Them.Answered {
+		// A duel's game: over all the topics, so no topic is named.
+		if !v.Recorded || v.Topic != "" || v.Phase != PhaseQuestion || !v.Them.Online || v.Them.Answered {
 			t.Fatalf("against a recording: %+v", v)
 		}
 		// The recording answers when its player did (2.5 s in), right.

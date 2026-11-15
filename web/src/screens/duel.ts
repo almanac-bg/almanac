@@ -7,8 +7,9 @@ import { nextSteps, reviewParts } from "../game/results.ts";
 import { playRun } from "../game/run.ts";
 import type { Reviewed, State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
-import { type Child, h, signal, slot } from "../lib/dom.ts";
+import { type Child, h, type Signal, signal, slot } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
+import { withName } from "../lib/words.ts";
 import { checkWaiting, player, user } from "../state.ts";
 import {
   back,
@@ -38,6 +39,8 @@ export interface DuelView {
   kind: "live" | "friend";
   state: "play" | "wait" | "won" | "lost" | "draw" | "declined" | "expired";
   opponent?: Side;
+  /** The other player's id, in a friend's duel: for a rematch. */
+  friend?: number;
   you?: Side;
   recorded?: boolean;
   /** Didn't move ratings: the two had a rated duel that day already. */
@@ -89,8 +92,11 @@ export function standingCard(s: Standing, own = false): Child {
 /** Seconds, the Bulgarian way: „34,5 с“. */
 const secs = (ms: number) => `${(ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 })} с`;
 
+/** A day and an hour, the Bulgarian way: „вт, 13:39 ч.“ (it ends a sentence with its own period). */
 export const until = (ms: number) =>
-  new Intl.DateTimeFormat("bg", { weekday: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(ms));
+  new Intl.DateTimeFormat("bg", { weekday: "short", hour: "2-digit", minute: "2-digit" })
+    .format(new Date(ms))
+    .replace(" ч.", " ч."); // never „ч.“ alone on a line
 
 const words: Record<DuelView["state"], string> = {
   play: "Твой ред",
@@ -256,6 +262,40 @@ export function playChallenge(id: number): void {
   go(`/duel/${id}`);
 }
 
+/** A friend's playing of a duel the player started, as Начало hears of it. */
+export interface FriendPlayed {
+  id: number;
+  from: string;
+  state: "won" | "lost" | "draw";
+  you: number;
+  them: number;
+}
+
+/** Where the latest duel told on Начало (or seen on its screen) is kept, on this device. */
+const toldKey = "almanac.duelTold";
+
+/** Keeps a duel's result as told; whether it wasn't before. */
+function told(id: number): boolean {
+  try {
+    if (Number(localStorage.getItem(toldKey)) >= id) return false;
+    localStorage.setItem(toldKey, String(id));
+  } catch {
+    // Storage refused (a private window): told on each visit, the lesser loss.
+  }
+  return true;
+}
+
+/** A friend has played the duel the player started: said once, above the day, a tap from the result. */
+export function playedLine(p?: FriendPlayed | null): Child {
+  if (!p || !told(p.id)) return null;
+  return h(
+    "p",
+    { class: "streak-notice", role: "status" },
+    `${p.from} изигра дуела ви: ${words[p.state]} ${formatNumber(p.you)} : ${formatNumber(p.them)}`,
+    h("a", { href: `/duel/${p.id}` }, "Виж"),
+  );
+}
+
 /** One duel: played now if it's the player's turn, else how it stands or ended. */
 export function duelOne(params: string[]) {
   title("Дуел");
@@ -281,6 +321,7 @@ export function duelOne(params: string[]) {
         return screen.show(() => asked(d, play, () => screen.show(() => ended({ ...d, state: "declined" }))));
       if (d.state === "play") return play();
       checkWaiting(); // a notice that pointed here, to a duel already played, goes
+      told(d.id); // and Начало needn't say that the friend played it
       screen.show(() => ended(d));
     } catch (err) {
       screen.show(() => h("p", { role: "alert" }, (err as ApiError).message));
@@ -301,7 +342,7 @@ function asked(d: DuelView, play: () => Promise<void>, declined: () => void): Ch
       { class: "intro" },
       h("p", { class: "kicker" }, "Дуел"),
       h("h1", null, `${them} те предизвика`),
-      h("p", { class: "lead" }, `Десет въпроса, около три минути. Имаш време до ${until(d.expiresAt)}.`),
+      h("p", { class: "lead" }, `Десет въпроса, около три минути. Имаш време до ${until(d.expiresAt)}`),
     ),
     h(
       "button",
@@ -346,8 +387,10 @@ function afterDuel(id: number): Child {
 }
 
 /** A duel as it stands or ended: who won, the two scores, the rating it moved; what to do next (`again`: another
- * duel, after a live one); what the game earned (`more`); and the questions to go over. */
+ * duel, after a live one; after a friend's, a rematch); what the game earned (`more`); and the questions to go over. */
 export function ended(d: DuelView, again: Child = null, more: Child = null): Child {
+  const error = signal("");
+  const next = again ?? rematch(d, error);
   const questions =
     d.runId && d.you?.done
       ? reviewParts(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${d.runId}/review`)).questions)
@@ -368,7 +411,7 @@ export function ended(d: DuelView, again: Child = null, more: Child = null): Chi
                 : "Времето за дуела изтече";
   const lead =
     d.state === "wait"
-      ? `${d.opponent?.name ?? "Приятелят ти"} има време до ${until(d.expiresAt)}. Ще ти кажем резултата.`
+      ? `${d.opponent?.name ?? "Приятелят ти"} има време до ${until(d.expiresAt)} Ще ти кажем резултата.`
       : d.state === "expired" && d.kind === "live"
         ? "Без резултат: рейтингът не се мени."
         : [
@@ -390,7 +433,7 @@ export function ended(d: DuelView, again: Child = null, more: Child = null): Chi
     h(
       "div",
       { class: "intro" },
-      h("p", { class: "kicker" }, d.opponent ? `Дуел с ${d.opponent.name}` : "Дуел"),
+      h("p", { class: "kicker" }, d.opponent ? `Дуел ${withName(d.opponent.name)}` : "Дуел"),
       h("h1", null, heading),
       lead ? h("p", { class: "lead" }, lead) : null,
     ),
@@ -411,11 +454,39 @@ export function ended(d: DuelView, again: Child = null, more: Child = null): Chi
             : null,
         )
       : null,
-    // The gold button is another duel where there's one (a live one), else the way back to the duels; the rest are
-    // plain, side by side.
-    nextSteps(again ?? toDuels(true), [questions?.button, again ? toDuels(false) : null]),
+    // The gold button is another duel where there's one (a live one, or a rematch with the friend), else the way back
+    // to the duels; the rest are plain, side by side.
+    nextSteps(next ?? toDuels(true), [questions?.button, next ? toDuels(false) : null]),
+    () => error() && h("p", { class: "bad", role: "alert" }, error()),
     more,
     questions?.list,
+  );
+}
+
+/** A friend's duel with a result: „Реванш“ challenges the friend again and plays it at once, as challenging does
+ * (what stops it, too many waiting or no longer friends, is said in `error`). */
+function rematch(d: DuelView, error: Signal<string>): Child {
+  if (d.kind !== "friend" || !d.friend || !["won", "lost", "draw"].includes(d.state)) return null;
+  const busy = signal(false);
+  return h(
+    "button",
+    {
+      class: "btn primary big",
+      type: "button",
+      disabled: busy,
+      onclick: async () => {
+        error.set("");
+        busy.set(true);
+        try {
+          const r = await api<{ duel: number }>("POST", "/api/duels", { friend: d.friend });
+          go(`/duel/${r.duel}`); // the new duel's screen, where the player's turn plays at once
+        } catch (err) {
+          error.set((err as ApiError).message);
+          busy.set(false);
+        }
+      },
+    },
+    "Реванш",
   );
 }
 

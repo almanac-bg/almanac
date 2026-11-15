@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -11,9 +12,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
-	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/push"
 	"github.com/almanac-bg/almanac/internal/store"
 )
@@ -135,7 +134,7 @@ func (s *Server) removePhone(w http.ResponseWriter, r *http.Request) error {
 type pushKind string
 
 const (
-	// pushDay is the evening reminder of the day's questions.
+	// pushDay is the reminder of the day's questions, at the player's own hour (remind.go).
 	pushDay pushKind = "day"
 	// pushFriends is word from people and of games played: a friend accepts a link or calls to a duel, how a duel
 	// or a Роял played in one's own absence ended, how a week in the league ended.
@@ -262,7 +261,7 @@ func (s *Server) notify(ctx context.Context, kind pushKind, m push.Message, user
 		rows.Close()
 	}
 	// Counted by kind (play/measure.go): the notifications delivered, and the browsers and phones found gone.
-	m.Kind = kind.name()
+	m.Kind = cmp.Or(m.Kind, kind.name()) // a message may say more of itself (the day's last reminder: "stop")
 	var sent, gone atomic.Int64
 	defer func() {
 		for key, n := range map[string]int64{"push:sent:" + m.Kind: sent.Load(), "push:gone:" + m.Kind: gone.Load()} {
@@ -305,93 +304,6 @@ func (s *Server) notify(ctx context.Context, kind pushKind, m push.Message, user
 	}
 	close(work)
 	wg.Wait()
-}
-
-// RemindAt is when, in Bulgaria, players who haven't played the day's questions yet are reminded.
-const RemindAt = 19
-
-// Remind reminds, once a day at RemindAt, everyone with notifications on who hasn't finished the day's questions.
-func (s *Server) Remind(ctx context.Context) {
-	t := time.NewTicker(time.Minute)
-	defer t.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-			s.remind(ctx, time.Now())
-		}
-	}
-}
-
-// remind does the day's reminding if it's time and it isn't done yet. The day it last did is kept, so a restart
-// around then doesn't remind twice. It says how many it reminded.
-func (s *Server) remind(ctx context.Context, at time.Time) int {
-	if s.push == nil && s.phones == nil {
-		return 0
-	}
-	now := at.In(bulgaria())
-	today := now.Format(time.DateOnly)
-	if now.Hour() < RemindAt {
-		return 0
-	}
-	// Claim the day first: one reminder a day, whatever happens after.
-	res, err := s.db.Write.ExecContext(ctx, `INSERT INTO kv (key, value) VALUES ('reminded', ?)
-		ON CONFLICT (key) DO UPDATE SET value = excluded.value WHERE value != excluded.value`, today)
-	if err != nil {
-		slog.Error("reminders", "err", err)
-		return 0
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return 0 // done today
-	}
-	rows, err := s.db.Read.QueryContext(ctx, `SELECT DISTINCT p.user_id FROM (SELECT user_id FROM push_subs
-		UNION SELECT user_id FROM phones) p WHERE `+wants(pushDay, "p.user_id")+`
-		AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.user_id = p.user_id AND r.kind = 'day' AND r.day = ?
-		AND r.finished_at IS NOT NULL)`, today)
-	if err != nil {
-		slog.Error("reminders", "err", err)
-		return 0
-	}
-	var users []int64
-	for rows.Next() {
-		var id int64
-		if rows.Scan(&id) == nil {
-			users = append(users, id)
-		}
-	}
-	rows.Close()
-	for _, id := range users {
-		s.notify(ctx, pushDay, s.reminder(ctx, today, id), id)
-	}
-	slog.Info("reminded", "players", len(users))
-	return len(users)
-}
-
-// reminder is the evening's word to a player who hasn't played the day's questions: the best of their friends who have,
-// and their streak; or, while none of their friends has, just the streak.
-func (s *Server) reminder(ctx context.Context, today string, userID int64) push.Message {
-	m := push.Message{Title: "Въпросите на деня те чакат", URL: "/"}
-	streak, _ := s.game.Streak(ctx, userID)
-	board, _ := s.game.FriendsBoard(ctx, today, userID)
-	var best *play.Score
-	for i := range board {
-		if !board[i].Me {
-			best = &board[i]
-			break
-		}
-	}
-	switch {
-	case best != nil && streak > 0:
-		m.Body = fmt.Sprintf("%s има %d от %d днес. Серията ти е %s.", best.Name, best.Rights, play.Length, days(streak))
-	case best != nil:
-		m.Body = fmt.Sprintf("%s има %d от %d днес. А ти?", best.Name, best.Rights, play.Length)
-	case streak > 0:
-		m.Body = fmt.Sprintf("Серията ти е %s. Не я прекъсвай: десет въпроса, до полунощ.", days(streak))
-	default:
-		m.Body = "Десет въпроса, един опит. До полунощ."
-	}
-	return m
 }
 
 // days is a number of days in words: „1 ден“, „12 дни“.

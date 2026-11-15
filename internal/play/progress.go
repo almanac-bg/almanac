@@ -571,7 +571,8 @@ func (g *Game) anyExact(ctx context.Context, userID int64) (bool, error) {
 // News is what's new for a player since they last looked: achievements earned (each with its XP and what it gave),
 // the day's goals done (with their XP), a week of the leagues ended (with what it paid), their level (whether it's gone up), a
 // division reached for the first time, and everything they've unlocked to wear, whatever unlocked it. The client
-// tells it in three cards at most (web/src/game/news.ts): the goals, the one biggest event, and what's new to wear.
+// tells it in three cards at most (web/src/game/news.ts): the goals, the one biggest event, and what's new to wear; a
+// card left free may tell, once a day, how others' duels against the player's recordings went (recordings.go).
 // Only what's open to the player is told (unfold.go): the rest waits for its system to open.
 type News struct {
 	Achievements []Earned   `json:"achievements"`
@@ -595,6 +596,9 @@ type News struct {
 	// Open is which of the game's systems the player has met; Opened, those just met, told once (Systems' names).
 	Open   Open     `json:"open"`
 	Opened []string `json:"opened,omitempty"`
+	// Recordings is what others' duels against the player's recordings came to, once a day, in a card the rest
+	// leaves free (recordings.go).
+	Recordings *RecordingsNews `json:"recordings,omitempty"`
 }
 
 // DoneGoal is one of the day's goals, done: what it was, and the XP it earned.
@@ -767,6 +771,12 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 		}
 		n.LevelUp = seen < level
 		n.Opened = opened(open, systems)
+		// Others' duels against the player's recordings take a card the rest leaves free: they wait for one.
+		if n.cards() < NewsCards {
+			if n.Recordings, err = g.recordingsNews(tx, userID); err != nil {
+				return err
+			}
+		}
 		for _, q := range []string{
 			`UPDATE goals_done SET seen = 1 WHERE user_id = ?1 AND NOT seen`,
 			`UPDATE league_results SET seen = 1 WHERE user_id = ?1 AND NOT seen`,
