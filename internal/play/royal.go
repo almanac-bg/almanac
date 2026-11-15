@@ -396,9 +396,10 @@ func (g *Game) RevealRoyal(ctx context.Context, royalID int64) (scores []RoyalSc
 }
 
 // AnswerRoyal grades a player's answer to a tournament's question n, the one showing (whether they're still in or
-// play on after a cut). Who goes on is RevealRoyal's to say, once the answer shows.
-func (g *Game) AnswerRoyal(ctx context.Context, userID, runID int64, n int, answer json.RawMessage) (Result, error) {
-	return g.answer(ctx, userID, runID, n, answer, true)
+// play on after a cut), which arrived at at (its time is to then). Who goes on is RevealRoyal's to say, once the answer
+// shows.
+func (g *Game) AnswerRoyal(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time) (Result, error) {
+	return g.answer(ctx, userID, runID, n, answer, at, true)
 }
 
 // RoyalStanding is where a player came in a tournament, once it's ended.
@@ -606,8 +607,13 @@ type LiveRoyalist struct {
 	RightMs int64
 	// OutAt is the question they went out at (-1: they're still in).
 	OutAt int
-	// LastRight is whether their last answer was right.
-	LastRight bool
+	// Now is their answer to the question now (n), if they have one: Gave says it was given (not their time run out),
+	// Shown is what they gave as shown, and Points and NowRight how it went.
+	Now      bool
+	Gave     bool
+	Shown    json.RawMessage
+	Points   int
+	NowRight bool
 }
 
 // LiveRoyals are the tournaments under way or about to be (not those of before: SettleDue ends those).
@@ -649,17 +655,23 @@ func (g *Game) LiveRoyals(ctx context.Context) ([]LiveRoyal, error) {
 				(SELECT coalesce(sum(a.ms), 0) FROM answers a WHERE a.run_id = r.id AND a.is_right AND a.n < ?2
 					AND a.n <= coalesce(p.out_at, a.n)),
 				coalesce(p.out_at, -1),
-				coalesce((SELECT is_right FROM answers WHERE run_id = r.id AND n = r.at - 1), 0)
+				q.run_id IS NOT NULL, q.given IS NOT NULL, q.shown, coalesce(q.points, 0), coalesce(q.is_right, 0)
 			FROM royal_players p JOIN users u ON u.id = p.user_id LEFT JOIN runs r ON r.id = p.run_id
-			WHERE p.royal_id = ?1 ORDER BY p.joined_at, p.user_id`, out[i].ID, shown)
+				LEFT JOIN answers q ON q.run_id = r.id AND q.n = ?3
+			WHERE p.royal_id = ?1 ORDER BY p.joined_at, p.user_id`, out[i].ID, shown, out[i].N)
 		if err != nil {
 			return nil, err
 		}
 		for rows.Next() {
 			var p LiveRoyalist
-			if err := rows.Scan(&p.User, &p.Name, &p.Tag, &p.Run, &p.At, &p.Rights, &p.Right, &p.RightMs, &p.OutAt, &p.LastRight); err != nil {
+			var shownAs sql.NullString
+			if err := rows.Scan(&p.User, &p.Name, &p.Tag, &p.Run, &p.At, &p.Rights, &p.Right, &p.RightMs, &p.OutAt, &p.Now,
+				&p.Gave, &shownAs, &p.Points, &p.NowRight); err != nil {
 				rows.Close()
 				return nil, err
+			}
+			if shownAs.Valid {
+				p.Shown = json.RawMessage(shownAs.String)
 			}
 			out[i].Players = append(out[i].Players, p)
 		}

@@ -269,11 +269,16 @@ func (h *Hub) Load(ctx context.Context) error {
 				t.entered++
 				m.in, m.reached, m.ms, m.rights, m.outAt = p.OutAt < 0, p.Right, p.RightMs, p.Rights, p.OutAt
 				m.inQ, m.stood = true, m.in || p.OutAt == l.N
-				m.answered = p.At > l.N
-				m.res.Right = m.answered && p.LastRight
-				if l.Phase == play.RoyalReveal && m.inQ && !m.answered {
+				// Their answer to the question now, as it was: given, or (its answer showing) their time run out.
+				m.answered = p.Now && (p.Gave || l.Phase == play.RoyalQuestion)
+				if m.answered {
+					m.given = p.Shown
+					m.res = play.Result{Right: p.NowRight, Points: p.Points, Given: p.Shown}
+				}
+				if l.Phase == play.RoyalReveal && !m.answered {
 					m.res.TimedOut = true
 				}
+				m.idle = l.Phase == play.RoyalReveal && !m.answered
 			}
 			t.members = append(t.members, m)
 		}
@@ -627,6 +632,7 @@ func (h *Hub) shown(t *table, n int, now time.Time) {
 // answer again). An answer sent again (its reply lost on the way) is the one taken already: no error, while its
 // question or its answer shows.
 func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) error {
+	at := h.now() // its time is to when it came, not to when the hub (busy with others') takes it
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	t, m := h.mine(id)
@@ -639,7 +645,7 @@ func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) 
 	if len(raw) == 0 || string(raw) == "null" {
 		return play.ErrBadAnswer
 	}
-	res, err := h.game.AnswerRoyal(ctx, id, m.run, n, raw)
+	res, err := h.game.AnswerRoyal(ctx, id, m.run, n, raw, at)
 	if errors.Is(err, play.ErrOutOfStep) {
 		return ErrNotNow // the time ran out
 	}

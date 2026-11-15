@@ -671,6 +671,7 @@ func (m *Match) show(n int) {
 // Answer takes a player's answer to question n. Once both have answered, both answers show. An answer sent again (its
 // reply lost on the way) is the one taken already: no error, while its question or its answer shows.
 func (m *Match) Answer(by int64, n int, raw json.RawMessage) error {
+	at := time.Now() // its time is to when it came, not to when the duel takes it
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	s := m.side(by)
@@ -683,12 +684,12 @@ func (m *Match) Answer(by int64, n int, raw json.RawMessage) error {
 	if m.phase != PhaseQuestion || n != m.n || s.answered {
 		return ErrNotNow
 	}
-	took := time.Since(m.shownAt)
+	took := max(0, at.Sub(m.shownAt))
 	g, err := bank.GradeAt(m.dealt[n], raw, took)
 	if err != nil {
 		return ErrAnswer
 	}
-	res, err := m.hub.game.Answer(context.Background(), s.ID, s.run, n, raw)
+	res, err := m.hub.game.AnswerAt(context.Background(), s.ID, s.run, n, raw, at)
 	if errors.Is(err, play.ErrOutOfStep) {
 		return ErrNotNow
 	}
