@@ -4,7 +4,18 @@ import { type ApiError, api } from "../lib/api.ts";
 import { inApp } from "../lib/app.ts";
 import { type Child, computed, effect, h, signal, untracked, when } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
-import { bigText, calm, setBigText, setCalm, setTick, setVibrate, tickOn, vibrateOn } from "../lib/prefs.ts";
+import {
+  bigText,
+  calm,
+  musicOn,
+  setBigText,
+  setCalm,
+  setMusic,
+  setTick,
+  setVibrate,
+  tickOn,
+  vibrateOn,
+} from "../lib/prefs.ts";
 import {
   needsHomeScreen,
   type PushKind,
@@ -206,6 +217,7 @@ function sounds(): Child {
     ),
     switchRow("Звуци", "Часовникът, отговорите, новото ниво.", soundOn, setSound),
     switchRow("Тиктакане", "Последните секунди на въпроса.", tickOn, setTick),
+    switchRow("Музика в Роял", "Тиха музика, докато чакаш началото.", musicOn, setMusic),
     // The phone's touch: only in the app, where it's felt.
     inApp ? switchRow("Вибрация", "При отговорите и наградите.", vibrateOn, setVibrate) : null,
   );

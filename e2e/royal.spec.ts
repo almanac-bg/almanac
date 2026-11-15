@@ -4,14 +4,52 @@ import { answer, playRun } from "./play.ts";
 // The test server runs a Роял every half minute (playwright.config.ts). The three engines' runs of this test may well
 // meet in the same one, as players do. A wrong answer puts nobody out: the game always runs its fifteen questions,
 // cut after some of them to those ahead, and those cut play on to the end, off the standings.
-test("Роял: in from the lobby, live to the fifteenth question, then the standings", async ({ page }) => {
+test("Роял: in from the lobby, its music, live to the fifteenth question, then the standings", async ({ page }) => {
   test.setTimeout(480_000);
+  // The lobby's music, watched: its pad's saws started, and stopped (each is given its latest end as it starts).
+  await page.addInitScript(() => {
+    const w = window as unknown as { saws: number; stops: number };
+    w.saws = 0;
+    w.stops = 0;
+    const { start, stop } = OscillatorNode.prototype;
+    OscillatorNode.prototype.start = function (when?: number) {
+      if (this.type === "sawtooth") w.saws++;
+      start.call(this, when);
+    };
+    OscillatorNode.prototype.stop = function (when?: number) {
+      if (this.type === "sawtooth") w.stops++;
+      stop.call(this, when);
+    };
+  });
+  const pad = () =>
+    page.evaluate(() => {
+      const w = window as unknown as { saws: number; stops: number };
+      return { saws: w.saws, stops: w.stops };
+    });
+  // „Музика в Роял“ off (as Настройки keeps it, read as the page loads).
   await page.goto("/royal");
-  // A game under way (another engine's) ends before the next lobby opens. The lobby's „Влез“, not the door of a game
-  // under way (which lets one in late).
-  await page.locator(".screen > button", { hasText: "Влез" }).click({ timeout: 300_000 });
+  await page.evaluate(() => localStorage.setItem("almanac.music", "off"));
+  await page.reload();
+  // A game under way (another engine's) ends before the next lobby opens. In by the lobby's „Влез“, not the door of a
+  // game under way (which lets one in late), with time before the start for the music's turns.
+  await expect(async () => {
+    const [m = 0, s = 0] = ((await page.locator(".royal-count").textContent({ timeout: 2_000 })) ?? "").split(":");
+    expect(Number(m) * 60 + Number(s)).toBeGreaterThanOrEqual(12);
+  }).toPass({ timeout: 300_000 });
+  await page.locator(".screen > button", { hasText: "Влез" }).click();
   await expect(page.getByRole("button", { name: "Излез" })).toBeVisible();
   await expect(page.getByText("Вътре си.")).toBeVisible();
+  // No music with its switch off, though in and touched; with it on (as by default), none before a touch, and from
+  // the first one, the lobby's quiet bed.
+  await page.waitForTimeout(1000);
+  expect(await pad()).toEqual({ saws: 0, stops: 0 });
+  await page.evaluate(() => localStorage.removeItem("almanac.music"));
+  await page.reload();
+  await expect(page.getByText("Вътре си.")).toBeVisible();
+  await page.waitForTimeout(1000);
+  expect((await pad()).saws).toBe(0);
+  await page.getByRole("heading", { level: 1 }).click();
+  await expect.poll(pad).toEqual({ saws: 4, stops: 4 });
 
   const standings = page.getByRole("heading", { name: "Класиране" });
   // The first answer doesn't get through (the line drops as it's sent): it's sent again, and taken.
@@ -20,6 +58,8 @@ test("Роял: in from the lobby, live to the fifteenth question, then the stan
     const asked = page.locator(".question-head").filter({ hasText: `${n + 1} от 15` });
     await expect(asked).toBeVisible({ timeout: 60_000 });
     if (n === 0) {
+      // The first question ends the music.
+      expect(await pad()).toEqual({ saws: 4, stops: 8 });
       await expect(page.locator(".royal-left")).toHaveText(/^В играта: \d+ от \d+$|^В турнира си само ти: /);
     }
     await answer(page);

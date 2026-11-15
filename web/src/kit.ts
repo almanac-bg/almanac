@@ -13,9 +13,10 @@ import { api, deliver } from "./lib/api.ts";
 import { keepAwake } from "./lib/awake.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked } from "./lib/dom.ts";
 import { ordinal, place } from "./lib/ordinal.ts";
+import { musicOn } from "./lib/prefs.ts";
 import { pushable, pushOn, turnOn } from "./lib/push.ts";
 import { go, title } from "./lib/router.ts";
-import { feelKit, loadFeel, play, playAnswer, playCount } from "./lib/sound.ts";
+import { feelKit, liveAudio, loadFeel, play, playAnswer, playCount, soundOn } from "./lib/sound.ts";
 import { withName } from "./lib/words.ts";
 import type { DuelView } from "./screens/duel.ts";
 import { clock, coming, when } from "./screens/modes.ts";
@@ -65,10 +66,12 @@ export const kit = {
   h,
   keepAwake,
   landing,
+  liveAudio,
   loadDuelResult,
   meaning,
   meter,
   mixes,
+  musicOn,
   news,
   nextSteps,
   onCleanup,
@@ -90,6 +93,7 @@ export const kit = {
   reviewParts,
   shareButton,
   signal,
+  soundOn,
   standingCard,
   timer,
   title,
