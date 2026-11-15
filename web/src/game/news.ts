@@ -2,17 +2,19 @@
 // one biggest thing that happened (a week of the league ended, a division reached, a new level), or else a line of the XP it
 // brought and the level; and „Ново за теб“: achievements and everything they unlocked to wear (each a tap from being
 // worn), with how a topic's game moved its mastery. Only the biggest of it plays its sound. Only what the player has met
-// is told (play/unfold.go: no XP on a first day); a system met with this game is said first, once, in a line.
+// is told (play/unfold.go: no XP on a first day); a system met with this game is said first, once, in a line. What
+// really is big (bigOne) is also brought forward in a sheet over the result (feel.ts), its sound playing as it opens.
 
 import { emblem } from "../art/emblem.ts";
 import { leagueEmblem } from "../art/league.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { place } from "../lib/ordinal.ts";
-import { play, type SoundName } from "../lib/sound.ts";
+import { feelKit, play, type SoundName } from "../lib/sound.ts";
 import { type LeagueEnd, moveWords } from "../screens/league.ts";
 import {
   type AchievementInfo,
+  avatar,
   badge,
   type Division,
   explain,
@@ -25,6 +27,7 @@ import {
   unlockWords,
 } from "../ui.ts";
 import { type MasteryMove, masteryLine } from "./mastery.ts";
+import { hands, landed } from "./results.ts";
 
 interface News {
   achievements: AchievementInfo[];
@@ -51,22 +54,35 @@ interface News {
   opened?: (keyof Open)[];
 }
 
-/** What a game earned, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends). */
-export function news(run: number, delay = 0): Child {
+/** What a game earned, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends).
+ * The one big thing among it, if any (`round`: the streak reached a round number with this game), is brought forward
+ * in a sheet once the result has landed (feel.ts), with its sound then; everything else plays its sound as it comes. */
+export function news(run: number, delay = 0, round?: Promise<number>): Child {
   const data = signal<News | null>(null);
+  let gone = false;
   const t = setTimeout(
     () =>
       api<News>("POST", "/api/me/news", { run }).then(
-        (n) => {
+        async (n) => {
           data.set(n);
-          const sound = loudest(n);
-          if (sound) play(sound);
+          const kit = feelKit();
+          const top = kit && bigOne(n, (await round) ?? 0);
+          if (!kit || !top) {
+            const sound = loudest(n);
+            if (sound) play(sound);
+            return;
+          }
+          await landed(run);
+          if (!gone) kit.sheet(top.parts, top.sound, top.glow, hands());
         },
         () => {},
       ),
     delay,
   );
-  onCleanup(() => clearTimeout(t));
+  onCleanup(() => {
+    gone = true;
+    clearTimeout(t);
+  });
   return () => {
     const n = data();
     if (!n) return null;
@@ -98,6 +114,79 @@ function loudest(n: News): SoundName | null {
   if (top === "level") return "level";
   if (top || n.achievements.length) return "achievement";
   if (n.goals.length) return "goal";
+  return null;
+}
+
+/** The one big thing a game brought, for its sheet: a week of the league ended up or on its podium, a division reached,
+ * the streak at a round number (`days`), a level that unlocks something or is a fifth, an epic or legendary
+ * achievement. The smaller news stays in the cards. */
+function bigOne(n: News, days: number): { parts: Element[]; sound: SoundName; glow: boolean } | null {
+  const sheet = (picture: HTMLElement, kicker: string, name: string, ...lines: Child[]) =>
+    [
+      picture,
+      h("p", { class: "kicker" }, kicker),
+      // The name, big; a sentence (the streak's, under its number), as text.
+      h(
+        "strong",
+        { id: "moment-name", style: name.endsWith(".") ? {} : { "font-size": "2.125rem", "line-height": "2.5rem" } },
+        name,
+      ),
+      ...lines.map((l) => (typeof l === "string" ? h("p", { class: "muted" }, l) : l)),
+    ] as Element[];
+  const big = (el: HTMLElement) => {
+    el.style.setProperty("width", "112px");
+    el.style.setProperty("height", "112px");
+    el.style.setProperty("--size", "112px");
+    return el;
+  };
+  const numeral = (text: string) =>
+    h("b", { class: "num", style: { font: "900 7.5rem/1 var(--font-numeral)", color: "var(--gold-ink)" } }, text);
+  const e = n.league;
+  if (e && (e.moved > 0 || e.place <= 3))
+    return {
+      parts: sheet(
+        big(leagueEmblem(e.now.tier, "l")),
+        "Седмицата в лигата свърши",
+        `${place(e.place, e.of)} в ${e.from.name}`,
+        `${moveWords(e)}${e.xp ? ` · +${e.xp} XP` : ""}`,
+      ),
+      sound: "level",
+      glow: false,
+    };
+  const d = n.division;
+  if (d)
+    return {
+      parts: sheet(big(emblem(d.id, "l")), "Нова дивизия", d.name, `Рейтинг ${d.from} и нагоре.`),
+      sound: "level",
+      glow: false,
+    };
+  if (days)
+    return {
+      parts: sheet(numeral(String(days)), "Серия", `${days} дни поред с въпросите на деня.`),
+      sound: "streak",
+      glow: true,
+    };
+  const unlock = n.unlocks.find((u) => u.from === `ниво ${n.level}`);
+  if (n.levelUp && (unlock || n.level % 5 === 0))
+    return {
+      parts: sheet(
+        big(avatar(n.avatar, { size: "l", level: n.level })),
+        "Ново ниво",
+        `Ниво ${n.level}`,
+        unlock
+          ? h("p", { class: "muted" }, `Отключва: ${unlockWords(unlock)}. `, wear(unlock, n.avatar))
+          : `Още ${n.to - n.xp} XP до ниво ${n.level + 1}.`,
+      ),
+      sound: "level",
+      glow: true,
+    };
+  const a = n.achievements.find((x) => x.tier === "legendary") ?? n.achievements.find((x) => x.tier === "epic");
+  if (a)
+    return {
+      parts: sheet(big(badge(a, true, "l")), `${cap(tierWords[a.tier].one)} постижение`, a.name, a.about),
+      sound: "achievement",
+      glow: false,
+    };
   return null;
 }
 

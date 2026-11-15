@@ -400,7 +400,8 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
           ]);
           due = res.state.done
             ? () => {
-                play("end");
+                // A run's result sounds its own end as it lands (results.ts); a duel's, here.
+                if (versus) play("end");
                 reload();
               }
             : next;

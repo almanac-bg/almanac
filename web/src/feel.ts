@@ -354,49 +354,67 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands): Promi
   const pips = [...hero.querySelectorAll<HTMLElement>(".trail li")];
   pips.forEach((li, i) => {
     moving.push(
-      li.animate([{ transform: "scale(0.6)", opacity: 0 }, { transform: "none", opacity: 1 }], {
-        duration: 180,
-        delay: i * 60,
-        easing: spring,
-        fill: "backwards",
-      }),
+      li.animate(
+        [
+          { transform: "scale(0.6)", opacity: 0 },
+          { transform: "none", opacity: 1 },
+        ],
+        {
+          duration: 180,
+          delay: i * 60,
+          easing: spring,
+          fill: "backwards",
+        },
+      ),
     );
     at(i * 60, () => play(li.classList.contains("wrong") ? "dud" : "pip", i));
   });
   const score = hero.querySelector(".score");
   if (score)
     moving.push(
-      score.animate([{ transform: "scale(1.15)", opacity: 0 }, { transform: "none", opacity: 1 }], {
-        duration: 260,
-        delay: 700,
-        easing: spring,
-        fill: "backwards",
-      }),
+      score.animate(
+        [
+          { transform: "scale(1.15)", opacity: 0 },
+          { transform: "none", opacity: 1 },
+        ],
+        {
+          duration: 260,
+          delay: 700,
+          easing: spring,
+          fill: "backwards",
+        },
+      ),
     );
   at(700, end);
   if (points) count(points, 0, total, 700, 800, hands.format);
   if (perfect) {
     const gold = token(hero, "--gold");
-    pips.forEach((li, i) =>
+    for (const [i, li] of pips.entries())
       moving.push(
-        li.animate([{}, { background: gold, boxShadow: `0 0 14px ${gold}` }, {}], { duration: 420, delay: 900 + i * 40 }),
-      ),
-    );
+        li.animate([{}, { background: gold, boxShadow: `0 0 14px ${gold}` }, {}], {
+          duration: 420,
+          delay: 900 + i * 40,
+        }),
+      );
     const head = hero.querySelector(".perfect-head .kicker");
     if (head)
       moving.push(
-        head.animate([{ opacity: 0, transform: "translateY(6px)" }, {}], { duration: 260, delay: 900, fill: "backwards" }),
-      );
-    hero.querySelectorAll(".seal path").forEach((petal, k) =>
-      moving.push(
-        petal.animate([{ transform: "scale(0)", opacity: 0 }, { transform: "none", opacity: 1 }], {
-          duration: 240,
-          delay: 900 + k * 90,
-          easing: spring,
+        head.animate([{ opacity: 0, transform: "translateY(6px)" }, {}], {
+          duration: 260,
+          delay: 900,
           fill: "backwards",
         }),
-      ),
-    );
+      );
+    for (const [k, petal] of [...hero.querySelectorAll(".seal path")].entries())
+      moving.push(
+        petal.animate(
+          [
+            { transform: "scale(0)", opacity: 0 },
+            { transform: "none", opacity: 1 },
+          ],
+          { duration: 240, delay: 900 + k * 90, easing: spring, fill: "backwards" },
+        ),
+      );
   }
   return new Promise((resolve) => {
     const done = () => {
@@ -430,7 +448,13 @@ function roll(el: HTMLElement, from: string, to: string): Promise<void> {
   was.animate([{ transform: "none" }, { transform: "translateY(-100%)", opacity: 0 }], options);
   const put = () => el.replaceChildren(to);
   return now
-    .animate([{ transform: "translateY(100%)", opacity: 0 }, { transform: "none", opacity: 1 }], options)
+    .animate(
+      [
+        { transform: "translateY(100%)", opacity: 0 },
+        { transform: "none", opacity: 1 },
+      ],
+      options,
+    )
     .finished.then(put, put);
 }
 
@@ -444,16 +468,14 @@ export function streak(chip: HTMLElement, days: number, delay: number, hands: Ha
     if (hands.calm || !n) return;
     roll(n, String(days - 1), String(days));
     const gold = token(chip, "--gold");
-    chip
-      .querySelector(".status-flame")
-      ?.animate(
-        [
-          { transform: "none", filter: "none" },
-          { transform: "scale(1.25)", filter: `drop-shadow(0 0 10px ${gold})` },
-          { transform: "none", filter: "none" },
-        ],
-        { duration: 600, easing: "ease-in-out" },
-      );
+    chip.querySelector(".status-flame")?.animate(
+      [
+        { transform: "none", filter: "none" },
+        { transform: "scale(1.25)", filter: `drop-shadow(0 0 10px ${gold})` },
+        { transform: "none", filter: "none" },
+      ],
+      { duration: 600, easing: "ease-in-out" },
+    );
   }, delay);
 }
 
@@ -461,21 +483,28 @@ export function streak(chip: HTMLElement, days: number, delay: number, hands: Ha
  * fills it to the end, flashes gold, rolls the number and fills again from nothing. */
 export function level(
   chip: HTMLElement,
-  from: { level: number; share: number },
-  to: { level: number; share: number },
+  from: { level: number; share: number; left: string },
+  to: { level: number; share: number; left: string },
   delay: number,
   hands: Hands,
 ): void {
   const fill = chip.querySelector<HTMLElement>(".meter-fill");
   const n = chip.querySelector<HTMLElement>(".status-n");
+  const left = chip.querySelector<HTMLElement>(".status-label");
   if (hands.calm || !fill || !n || (from.level === to.level && from.share >= to.share)) return;
+  if (left) left.textContent = from.left;
   const width = (p: number) => `${Math.max(0, Math.min(100, p))}%`;
   const grow = (a: number, b: number, ms: number, wait = 0) =>
-    fill.animate([{ width: width(a) }, { width: width(b) }], { duration: ms, delay: wait, easing: settleIn, fill: "both" })
-      .finished;
+    fill.animate([{ width: width(a) }, { width: width(b) }], {
+      duration: ms,
+      delay: wait,
+      easing: settleIn,
+      fill: "both",
+    }).finished;
   const settle = () => {
     for (const a of fill.getAnimations()) a.cancel();
     n.textContent = `Ниво ${to.level}`;
+    if (left) left.textContent = to.left;
   };
   if (to.level === from.level) {
     grow(from.share, to.share, 700, delay).then(settle, settle);
@@ -485,7 +514,10 @@ export function level(
   const gold = token(chip, "--gold");
   grow(from.share, 100, 700, delay)
     .then(() => fill.animate([{ background: gold, boxShadow: `0 0 10px ${gold}` }, {}], { duration: 200 }).finished)
-    .then(() => roll(n, `Ниво ${from.level}`, `Ниво ${to.level}`))
+    .then(() => {
+      if (left) left.textContent = to.left;
+      return roll(n, `Ниво ${from.level}`, `Ниво ${to.level}`);
+    })
     .then(() => grow(0, to.share, 500))
     .then(settle, settle);
 }
@@ -524,7 +556,11 @@ export function sheet(parts: Element[], sound: SoundName, glow: boolean, hands: 
   if (!hands.calm) {
     box.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
     panel.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 320, easing: settleIn });
-    picture?.animate([{ transform: "scale(0.6)" }, { transform: "none" }], { duration: 420, delay: 120, easing: spring });
+    picture?.animate([{ transform: "scale(0.6)" }, { transform: "none" }], {
+      duration: 420,
+      delay: 120,
+      easing: spring,
+    });
     if (glow && picture) {
       const gold = token(panel, "--gold");
       picture.animate([{ filter: "none" }, { filter: `drop-shadow(0 0 24px ${gold})` }, { filter: "none" }], {
