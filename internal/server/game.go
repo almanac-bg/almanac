@@ -61,6 +61,10 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 		out["played"] = played
+		// Whether Роял is among the ways to play with others: not for a new player while its evenings are thin.
+		if out["royal"], err = s.game.NudgeRoyal(r.Context(), u.ID); err != nil {
+			return err
+		}
 		// A friend has played the duel they started: told on Начало, once (by the client), above the day.
 		if out["duel"], err = s.game.FriendPlayedOf(r.Context(), u.ID); err != nil {
 			return err

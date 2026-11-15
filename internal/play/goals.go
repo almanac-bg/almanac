@@ -18,9 +18,10 @@ import (
 // kept once drawn (day_goals), so that they stay the day's whatever changes. They come in families (how many right,
 // in a row, how fast, a topic, a type of question, a game nearly without a mistake, duels, Роял); the two drawn are
 // never of one family, nor of a family drawn the day before, and some are about something drawn with them: a topic, a
-// type of question. Each can be done that day: Роял only while the evening's is still ahead, nothing mostly luck. A goal done earns its tier's XP, kept as it's done (whether or not the player looks) and told
-// once, at the end of the game that did it. A day with all three done also earns a reserve day for the streak (runs.go),
-// and counts towards the achievements for full days.
+// type of question. Each can be done that day: Роял only while the evening's is still ahead (and not for a new player
+// while the evenings are thin: NudgeRoyal), nothing mostly luck. A goal done earns its tier's XP, kept as it's done
+// (whether or not the player looks) and told once, at the end of the game that did it. A day with all three done also
+// earns a reserve day for the streak (runs.go), and counts towards the achievements for full days.
 
 // Goal is one of the day's goals: what to do, how much of it, and where it's done.
 type Goal struct {
@@ -275,6 +276,11 @@ func (g *Game) dayGoals(ctx context.Context, userID int64, day string) ([]string
 	if g.RoyalAt != nil {
 		now := g.Now()
 		evening = g.RoyalAt(now).In(Bulgaria).Format(time.DateOnly) == day && day == now.In(Bulgaria).Format(time.DateOnly)
+	}
+	if evening { // and not for a new player while the evenings are thin
+		if evening, err = g.NudgeRoyal(ctx, userID); err != nil {
+			return nil, err
+		}
 	}
 	drawn := drawGoals(h.Sum64(), g.Bank(), friends, evening, before)
 	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {

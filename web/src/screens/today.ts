@@ -49,6 +49,9 @@ interface Today {
   level?: { level: number; xp: number; from: number; to: number };
   /** Whether the player has finished a game of any kind: until then Начало is the day and the topics only. */
   played?: boolean;
+  /** Whether Роял is among the ways to play with others: not for a new player while its evenings are thin (nor before
+   * there's a player: they're new). */
+  royal?: boolean;
   /** Which of the game's systems the player has met: the level and the goals show once XP is open. */
   open?: Open;
   run: State | null;
@@ -190,8 +193,9 @@ export function today() {
         { class: "home-side" },
         // Just played, the goals it finished are told with its news; a first day has none (play/unfold.go).
         just || !t.open?.xp ? null : goalsCard(),
-        // The ways to play with others wait for a first game finished: a new player starts with the day and a topic.
-        just || t.played ? modes(["duel", "royal", "room"], "С други") : null,
+        // The ways to play with others wait for a first game finished: a new player starts with the day and a topic;
+        // and Роял, in a player's first week, for its evenings to fill (play.NudgeRoyal).
+        just || t.played ? modes(t.royal ? ["duel", "royal", "room"] : ["duel", "room"], "С други") : null,
       ),
       topics(),
     );
