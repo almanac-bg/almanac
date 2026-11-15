@@ -1,5 +1,5 @@
 // Начало: where every game starts, on one short screen, and the day is its heart. At the top the player's streak and
-// level; then the day's ten questions, the same for everyone, once (left half-way, where the player stopped and the way
+// level (and, once, what came of the days just missed or of a duel a friend has played); then the day's ten questions, the same for everyone, once (left half-way, where the player stopped and the way
 // on; once played, how they went, and the result to share); the day's goals; and every other way to play a tap away: by topic, and — once a first game is finished —
 // with others. The day's boards are in Класации. The game unfolds by the days played (play/unfold.go): a first day has
 // the streak without the level, and no goals.
@@ -21,6 +21,7 @@ import { onDay } from "../lib/words.ts";
 import { dayInBulgaria } from "../lib/year.ts";
 import { player, playing, user } from "../state.ts";
 import { formatNumber, meter, type Open, pointsWords, reserveWords } from "../ui.ts";
+import { type FriendPlayed, playedLine } from "./duel.ts";
 import { goalsCard } from "./goals.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
@@ -56,6 +57,8 @@ interface Today {
   befriended?: boolean;
   /** The day played: the player's invite link, which their shared result ends with. */
   invite?: string;
+  /** A friend has just played the duel the player started (told once). */
+  duel?: FriendPlayed | null;
 }
 
 const longDate = (day: string) =>
@@ -111,6 +114,7 @@ export function today() {
       // A new player, before a first game finished, sees the day and the topics only.
       () => (user() && (just || t.played) ? status(fresh()) : null),
       streakNotice(t),
+      playedLine(t.duel),
       // On a big screen the day leads the page with the topics under it, and the rest waits in a column beside it
       // (app.css); on a phone the two parts are one column, in this order.
       h(

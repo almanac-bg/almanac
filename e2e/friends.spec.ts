@@ -26,6 +26,8 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
   await expect(a.locator(".question-head .versus")).toHaveText(/^Дуел (с|със) \S/);
   await playRun(a);
   await expect(a.getByRole("heading", { name: "Изигра своя дуел" })).toBeVisible({ timeout: 10_000 });
+  // Until when, in one sentence that ends once („… 13:39 ч. Ще ти кажем …“).
+  await expect(a.locator(".intro .lead")).toContainText(/\sч\. Ще ти кажем/);
   await b.goto("/");
   const notice = b.locator(".challenge-notice");
   await expect(notice).toContainText("те предизвика на дуел");
@@ -34,10 +36,21 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
   await playRun(b);
   await expect(b.locator(".challenge-notice")).toHaveCount(0);
   await expect(b.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 10_000 });
+  // „Дуел със Заек“, „Дуел с Мечка“: the word goes with the name.
+  await expect(b.locator(".intro .kicker")).toHaveText(/^Дуел (със [СЗсз]|с [^СЗсз])/);
   // Played: the notice doesn't come back on the way out (no reload), nor its dot on Начало.
   await b.locator('nav.tabs a[href="/"]').click();
   await expect(b.locator("nav.tabs a.news")).toHaveCount(0);
   await expect(b.locator(".challenge-notice")).toHaveCount(0);
+  // Bo has played it, and Ana hears of it on Начало, once, above the day: how it ended, a tap from the result.
+  await a.goto("/");
+  const played = a.locator(".streak-notice", { hasText: "изигра дуела ви" });
+  await expect(played).toContainText(/изигра дуела ви: (Победа|Загуба|Равенство) [\d\s]+\s:\s[\d\s]+/);
+  await played.getByRole("link", { name: "Виж" }).click();
+  await expect(a.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible();
+  await a.goto("/");
+  await expect(a.locator(".day")).toBeVisible();
+  await expect(played).toHaveCount(0);
   await a.goto("/duel");
   await expect(a.locator(".duel-row").first()).toContainText(/Победа|Загуба|Равенство/);
 
@@ -89,6 +102,38 @@ test("friends on the day: a shared link to it, who has played it, and how each w
   await expect(friends.locator(".row.me .you")).toHaveText("ти");
   await expect(friends.locator(".row").filter({ hasText: ana }).locator(".pts")).toHaveText(/^\d+ от 10$/);
   await expect(friends.locator(".row .trail li")).toHaveCount(20);
+});
+
+test("a rematch from a friend duel's result", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const a = await (await browser.newContext()).newPage();
+  const b = await (await browser.newContext()).newPage();
+  await a.goto("/friends");
+  await a.locator(".friends").getByRole("button", { name: "Покани приятел" }).click();
+  const link = await a.locator(".invite-link").getAttribute("href");
+  await b.goto(link ?? "");
+  await b.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
+  await expect(b.getByRole("heading", { name: /Вече сте приятели/ })).toBeVisible();
+  await a.reload();
+  await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();
+  await playRun(a);
+  await b.goto("/");
+  await b.locator(".challenge-notice").getByRole("button", { name: "Играй" }).click();
+  await playRun(b);
+  await expect(b.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 10_000 });
+
+  // The gold button is a rematch; the way back to the duels is plain.
+  const rematch = b.getByRole("button", { name: "Реванш" });
+  await expect(rematch).toHaveClass(/primary/);
+  await expect(b.getByRole("link", { name: "Към дуелите" })).not.toHaveClass(/primary/);
+  // Bo plays his side of the new duel at once, on its own screen; Ana is challenged once he has.
+  await rematch.click();
+  await expect(b.locator(".question-head .versus")).toHaveText(/^Дуел (с|със) \S/);
+  await expect(b).toHaveURL(/\/duel\/\d+$/);
+  await playRun(b);
+  await expect(b.getByRole("heading", { name: "Изигра своя дуел" })).toBeVisible({ timeout: 10_000 });
+  await a.goto("/");
+  await expect(a.locator(".challenge-notice")).toContainText("те предизвика на дуел");
 });
 
 test("a friend can turn a duel down", async ({ browser }) => {

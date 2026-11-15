@@ -15,7 +15,6 @@ import { almanac } from "./screens/almanac.ts";
 import { duel, duelOne, playChallenge, until } from "./screens/duel.ts";
 import { friends } from "./screens/friends.ts";
 import { invite } from "./screens/invite.ts";
-import { liveDuel } from "./screens/live.ts";
 import { me } from "./screens/me.ts";
 import { challengeGone, missing } from "./screens/missing.ts";
 import { mistakes } from "./screens/mistakes.ts";
@@ -98,7 +97,7 @@ if (root) {
       { path: /^\/play\/([a-z]+)$/, view: topic },
       { path: /^\/c\/([a-z0-9]{6})$/, view: challengeGone },
       { path: /^\/duel$/, view: duel },
-      { path: /^\/duel\/live$/, view: liveDuel },
+      { path: /^\/duel\/live$/, view: later(() => import("./screens/live.ts").then((m) => m.liveDuel)) },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
       { path: /^\/royal$/, view: later(() => import("./screens/royal.ts").then((m) => m.royal)) },
       { path: /^\/almanac$/, view: almanac },
