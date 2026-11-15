@@ -91,6 +91,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	boot, _ := json.Marshal(map[string]any{ // escapes <, > and &: safe inside the script element
 		"user":       u,
 		"categories": b.Categories,
+		"bulgaria":   s.game.BulgariaOpen(), // the topic „България“ (play/bulgaria.go): a tile while it has a game's worth
 		"version":    s.cfg.Version,
 		"push":       s.pushKey(),
 		"phones":     s.phones.Platforms(), // the platforms the game's app gets notifications on

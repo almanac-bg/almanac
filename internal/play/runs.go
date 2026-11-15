@@ -111,15 +111,21 @@ func (g *Game) StartDay(ctx context.Context, userID int64) (State, error) {
 	return s, err
 }
 
-// StartTopic starts a run of a topic ("" for all of them), shaped by how well the player knows it; or, if the player
-// left a run of the topic unfinished today, goes on with it where it stopped, as the day's ten do. One left on an
-// earlier day isn't taken up again: it was drawn before today's questions were kept from other games.
+// StartTopic starts a run of a topic ("" for all of them, BulgariaTopic for Bulgaria's from every topic: bulgaria.go),
+// shaped by how well the player knows it; or, if the player left a run of the topic unfinished today, goes on with it
+// where it stopped, as the day's ten do. One left on an earlier day isn't taken up again: it was drawn before today's
+// questions were kept from other games.
 func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (State, error) {
 	b := g.Bank()
-	if category != "" && !slices.ContainsFunc(b.Categories, func(c bank.Category) bool { return c.ID == category }) {
+	if category != "" && category != BulgariaTopic &&
+		!slices.ContainsFunc(b.Categories, func(c bank.Category) bool { return c.ID == category }) {
 		return State{}, ErrNoTopic
 	}
-	p, err := g.pastOf(ctx, category, userID)
+	known := category // how well the player knows Bulgaria's questions: all the topics, as for a game of them all
+	if category == BulgariaTopic {
+		known = ""
+	}
+	p, err := g.pastOf(ctx, known, userID)
 	if err != nil {
 		return State{}, err
 	}
@@ -147,6 +153,9 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 		barred, err := g.dayQuestions(tx)
 		if err != nil {
 			return err
+		}
+		if category == BulgariaTopic && bulgariaLeft(b, barred) < Length {
+			return ErrNoTopic // not open: too few of its questions are left beside the days'
 		}
 		picks := Draw(b, category, p.ability, p.seen, barred, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 		if len(picks) == 0 {

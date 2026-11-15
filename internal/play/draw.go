@@ -280,12 +280,12 @@ func matches(q bank.Question, s slot, typ, pictures bool) bool {
 	return !pictures || s.picture == eitherWay || has == (s.picture == withPicture)
 }
 
-// Draw draws ten questions of a topic ("" for all topics) for a player of an ability there (mastery.go; 0 for one
-// who knows as much as most), questions they haven't seen (seen) before those they have, and never one barred (the
-// day's: DayQuestions). Choices come with a picture or without, whichever is drawn. Everyone's run has the same
-// shape. Topic runs and duels draw this way (a room, DrawRoom).
+// Draw draws ten questions of a topic ("" for all topics, BulgariaTopic for Bulgaria's from every topic) for a player
+// of an ability there (mastery.go; 0 for one who knows as much as most), questions they haven't seen (seen) before
+// those they have, and never one barred (the day's: DayQuestions). Choices come with a picture or without, whichever
+// is drawn. Everyone's run has the same shape. Topic runs and duels draw this way (a room, DrawRoom).
 func Draw(b *bank.Bank, category string, ability float64, seen, barred map[string]bool, r *rand.Rand) []Pick {
-	pool := b.Live(category, "")
+	pool := topicPool(b, category)
 	taken := map[string]bool{}
 	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] && !barred[q.Base().ID] }
 	fresh := func(q bank.Question) bool { return !seen[q.Base().ID] }

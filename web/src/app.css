@@ -3777,6 +3777,12 @@
     padding-left: var(--space-4);
   }
 
+  /* One across the row with a picture („България“): the picture beside the name, as in a topic's tile. */
+  .topic-all .topic:has(.topic-pic) {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding-left: var(--space-2);
+  }
+
   .topic:hover {
     transform: translateY(-1px);
     box-shadow:

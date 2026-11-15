@@ -19,7 +19,7 @@ import { play, playAnswer, playCount } from "./lib/sound.ts";
 import { ended, standingCard } from "./screens/duel.ts";
 import { clock, coming, when } from "./screens/modes.ts";
 import { mixes } from "./screens/rooms.ts";
-import { categories, hostCss, player, playing, user } from "./state.ts";
+import { categories, hostCss, player, playing, topics, user } from "./state.ts";
 import { avatar, back, fact, formatNumber, pageArt, verdict, who } from "./ui.ts";
 
 export const kit = {
@@ -66,6 +66,7 @@ export const kit = {
   standingCard,
   timer,
   title,
+  topics,
   trail,
   turnOn,
   untracked,
