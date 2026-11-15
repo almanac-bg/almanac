@@ -84,6 +84,7 @@ func init() {
 		clientTallies["push:open:"+string(k)] = true
 	}
 	clientTallies["push:open:"+pushAsked.name()] = true
+	clientTallies["push:open:stop"] = true // the day's last reminder (remind.go)
 }
 
 // tally counts one of what the client counts. Anyone may (a notification is opened before the page knows who's
@@ -136,9 +137,11 @@ var kindNames = map[string]string{
 	"day": "Денят", "topic": "Тема", "duel": "Дуел", "royal": "Роял", "mistakes": "Грешки", "challenge": "Предизвикателство",
 }
 
-// pushNames are the kinds of notifications, as the admin page says them.
-var pushNames = map[pushKind]string{
-	pushDay: "Въпросите на деня", pushFriends: "Приятели и игри", pushRoyal: "Роял", pushAsked: "Роял, поискан",
+// pushNames are the kinds of notifications as they're counted (pushKind.name; "stop": the day's last reminder), and as
+// the admin page says them.
+var pushNames = []struct{ kind, name string }{
+	{"day", "Въпросите на деня"}, {"stop", "Спираме напомнянията"}, {"friends", "Приятели и игри"}, {"royal", "Роял"},
+	{"asked", "Роял, поискан"},
 }
 
 // firstWeek is what the admin page tells of players' first weeks and the daily loop.
@@ -341,6 +344,7 @@ func (s *Server) firstWeek(ctx context.Context, active play.Active) (firstWeek, 
 	type window struct {
 		t       map[string]int
 		dayTens int
+		within  rate // the day's reminders, and those followed by the day within two hours
 	}
 	var win [2]window
 	for i, days := range []int{7, 28} {
@@ -354,6 +358,12 @@ func (s *Server) firstWeek(ctx context.Context, active play.Active) (firstWeek, 
 			AND finished_at IS NOT NULL AND NOT scripted`, from, today).Scan(&win[i].dayTens); err != nil {
 			return f, err
 		}
+		// The day's reminders (remind.go), and the days finished within two hours of one.
+		if err := s.db.Read.QueryRowContext(ctx, `SELECT count(*), coalesce(sum(EXISTS (SELECT 1 FROM runs r
+			WHERE r.user_id = d.user_id AND r.kind = 'day' AND r.day = d.day AND r.finished_at BETWEEN d.at AND d.at + 7200000)), 0)
+			FROM push_reminded d WHERE d.day BETWEEN ? AND ? AND NOT d.last`, from, today).Scan(&win[i].within.Of, &win[i].within.N); err != nil {
+			return f, err
+		}
 	}
 	row := func(name string, sub bool, cell func(w window) string) {
 		f.Loop = append(f.Loop, loopRow{Name: name, Week: cell(win[0]), Month: cell(win[1]), Sub: sub})
@@ -365,10 +375,13 @@ func (s *Server) firstWeek(ctx context.Context, active play.Active) (firstWeek, 
 	row("„Напомняй ми“", true, func(w window) string { return rate{w.t["pushask:yes"], w.t["pushask:shown"]}.String() })
 	row("„Не сега“", true, func(w window) string { return rate{w.t["pushask:no"], w.t["pushask:shown"]}.String() })
 	row("На iPhone: пътят към началния екран", true, func(w window) string { return fmt.Sprint(w.t["pushask:home"]) })
-	for _, k := range []pushKind{pushDay, pushFriends, pushRoyal, pushAsked} {
-		row("Известия „"+pushNames[k]+"“, изпратени", false, func(w window) string { return fmt.Sprint(w.t["push:sent:"+k.name()]) })
-		row("отворени", true, func(w window) string { return rate{w.t["push:open:"+k.name()], w.t["push:sent:"+k.name()]}.String() })
-		row("изчезнали абонаменти", true, func(w window) string { return fmt.Sprint(w.t["push:gone:"+k.name()]) })
+	for _, k := range pushNames {
+		row("Известия „"+k.name+"“, изпратени", false, func(w window) string { return fmt.Sprint(w.t["push:sent:"+k.kind]) })
+		row("отворени", true, func(w window) string { return rate{w.t["push:open:"+k.kind], w.t["push:sent:"+k.kind]}.String() })
+		row("изчезнали абонаменти", true, func(w window) string { return fmt.Sprint(w.t["push:gone:"+k.kind]) })
+		if k.kind == "day" {
+			row("денят изигран до 2 часа след напомнянето", true, func(w window) string { return w.within.String() })
+		}
 	}
 	f.Repeats = rate{win[0].t["day:seen"], win[0].t["day:answers"]}
 

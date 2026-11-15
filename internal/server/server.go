@@ -86,16 +86,17 @@ type Server struct {
 	push     *push.Sender
 	phones   *push.Phones
 	// closing ends the streams (rooms, Роял) when the server stops, so that it needn't wait for them.
-	closing  chan struct{}
-	drain    drain
-	bank     atomic.Pointer[bank.Bank]
-	client   fs.FS
-	limits   *limiter
-	problems *problems
-	secure   bool
-	host     string
-	cookie   string
-	handler  http.Handler
+	closing   chan struct{}
+	drain     drain
+	bank      atomic.Pointer[bank.Bank]
+	client    fs.FS
+	limits    *limiter
+	problems  *problems
+	reminders reminders // who is due the day's reminder when, today (remind.go)
+	secure    bool
+	host      string
+	cookie    string
+	handler   http.Handler
 }
 
 func New(cfg Config, d Deps) (*Server, error) {
