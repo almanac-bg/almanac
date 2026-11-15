@@ -288,11 +288,15 @@ takes a token.
 
 ## Flow
 
-- **The game moves on by itself.** There is no „Напред“ anywhere: an answer shows for 3 seconds (4.5 where there's
-  more to read: a number, an order), with a line filling under it, and the next question opens. A room shows each
-  answer with its standings for 6 seconds (a host who leads it from a big screen, „Само водя“, has „Напред“, „Задръж“
-  and „Край“: a class talks a fact over); a live duel shows both answers for 4 seconds (6 for a number, an order or
-  a match). A question never opens in a tab that's out of sight.
+- **The game moves on by itself, and a tap moves it on sooner.** Alone (the day, a topic, a friend's duel), an answer
+  shows in steps: the answer marked, the verdict with its points, then its fact („Знаеше ли?“), at the moment the
+  player most wants it. It stays 3 seconds (4.5 for anything but a choice or „Вярно или невярно“: there's more to
+  look at) and the time to read the fact (1.2 seconds and a little for each letter, 9 at most), with a line filling
+  under it; „Напред“ (Enter on a computer; „Към резултата“ after the last) goes on at once. A room shows each answer
+  with its standings for 6 seconds (a host who leads it from a big screen, „Само водя“, has „Напред“, „Задръж“ and
+  „Край“, and the fact with the answer: a class talks it over); Роял the same, 10 seconds with a cut; a live duel
+  shows both answers for 4 seconds (6 for anything but a choice or „Вярно или невярно“). A question never opens in a
+  tab that's out of sight.
 - **A game has the whole screen.** On a phone the header and the bar of places step aside while a question or its
   answer shows (an arrow before the count goes home), so the pad and the verdict fit and a stray tap can't leave the
   game. Each question opens at the top of the page.
@@ -301,11 +305,13 @@ takes a token.
   „Остани“ or „Излез“), and leaving gives that question up. The game waits where it stopped: the day on Начало with
   „Продължи“, a topic's game for the next tap on that topic the same day. No question's time starts without a tap;
   only a reload with one showing goes straight back into it.
-- **What isn't the game waits for the end.** „Знаеше ли?“ and „Нещо не е наред с въпроса?“ are in the review after
-  the last answer (of a run, a duel or a room), not between questions.
-- **Time:** 20 seconds a question, 10 for „Вярно или невярно“, 25 to put things in order, 30 to join four pairs
-  („Свържи“). When the time runs out, whatever has been put in (a
-  typed number, things moved into an order) is the answer.
+- **What isn't the answer waits for the end.** „Нещо не е наред с въпроса?“ is in the review after the last answer
+  (of a run, a duel, a room or Роял), never between questions; so are the facts of a game played with others, where
+  the clock is shared and nobody can stop to read.
+- **Time:** 20 seconds a question, 10 for „Вярно или невярно“, 30 for the ones with more to do: an order, „Свържи“,
+  „Раздели“ and „Подсказки“. A question with pictures starts its time once they're in (it waits 8 seconds at most). When the
+  time runs out, whatever has been put in (a typed number, things moved into an order, pairs joined, things sent to
+  a side) is the answer.
 - **Input without the phone's keyboard:** a number is typed on the game's own pad (a comma only where the answer may
   have decimals, a minus only for temperatures); things to order are dragged into place, or moved with the arrow
   keys.
@@ -360,7 +366,8 @@ Feedback fires once, when it's earned, and then the screen is still again:
     „21-ви“, and „3-то място“;
   - months in lower case, also after a word („Алманах за ноември 2026“).
 - **No emoji in the interface.** The one place they appear is the text a player shares of the day's result
-  (`game/share.ts`: 🟩 right, 🟨 close, 🟥 wrong), which never shows on a screen.
+  (`game/share.ts`: 🟩 right, 🟨 close, ⬜ wrong or not answered: grey, as in Wordle, so that a bad day is
+  shared too), which never shows on a screen.
 
 ## Motion
 

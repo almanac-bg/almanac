@@ -34,7 +34,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.getByRole("button", { name: "Сподели" }).click();
   const shared = await page.evaluate(() => (window as unknown as { shared: string }).shared);
   expect(shared).toMatch(
-    /^АЛМАНАХ · \d{1,2} \p{L}+\n\d+ от 10\n[🟩🟨🟥]{10}\n(Познах въпрос \d+, който .+\n)?http:\/\/127\.0\.0\.1:\d+\/f\/[a-z0-9]{8}$/u,
+    /^АЛМАНАХ · \d{1,2} \p{L}+\n\d+ от 10\n[🟩🟨⬜]{10}\n(Познах въпрос \d+, който .+\n)?http:\/\/127\.0\.0\.1:\d+\/f\/[a-z0-9]{8}$/u,
   );
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(page.locator(".reviewed")).toHaveCount(10);
