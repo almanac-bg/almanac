@@ -409,10 +409,12 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 
 // FriendsBoard is the day's board among a player and their friends: everyone of them who finished it, best first.
 // Empty while none of their friends has. A game played at a script's speed is on it for its player alone (fairFor).
+// Once the player has finished the day, the first BoardTop rows and their own carry how each of the ten went (Trail),
+// as Начало shows them beside the result; before that, nothing of how the others' went.
 func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Score, error) {
 	// From the player and their friends to each one's game of the day (runs_one_a_day): CROSS JOIN keeps that order,
 	// so it costs as many as they are, not as many as the day has players.
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+`
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT r.id, u.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+`
 		FROM (SELECT ?2 AS id UNION SELECT friend_id FROM friends WHERE user_id = ?2) f
 		CROSS JOIN runs r ON r.user_id = f.id AND r.kind = 'day' AND r.day = ?1
 		JOIN users u ON u.id = r.user_id
@@ -423,21 +425,51 @@ func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Sc
 	}
 	defer rows.Close()
 	var board []Score
-	others := false
+	var runs []int64 // each row's game
+	others, played := false, false
 	for rows.Next() {
 		var s Score
-		var id int64
+		var run, id int64
 		var avatar, title string
 		var total int
-		if err := rows.Scan(&id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Ms, &avatar, &title, &total); err != nil {
+		if err := rows.Scan(&run, &id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Ms, &avatar, &title, &total); err != nil {
 			return nil, err
 		}
 		s.Me, s.Look = id == userID, g.lookOf(id, avatar, title, total)
-		others = others || !s.Me
-		board = append(board, s)
+		others, played = others || !s.Me, played || s.Me
+		board, runs = append(board, s), append(runs, run)
 	}
-	if !others {
-		return nil, rows.Err()
+	if err := rows.Err(); err != nil || !others {
+		return nil, err
 	}
-	return board, rows.Err()
+	rows.Close()
+	if !played {
+		return board, nil
+	}
+	// The trails, in one read: the first rows', and the player's own wherever it is.
+	at := map[int64]int{}
+	var ids []any
+	for i, run := range runs {
+		if i < BoardTop || board[i].Me {
+			at[run] = i
+			ids = append(ids, run)
+		}
+	}
+	marks, err := g.DB.Read.QueryContext(ctx, `SELECT run_id, points, is_right FROM answers
+		WHERE run_id IN (`+strings.Repeat("?, ", len(ids)-1)+`?) ORDER BY run_id, n`, ids...)
+	if err != nil {
+		return nil, err
+	}
+	defer marks.Close()
+	for marks.Next() {
+		var run int64
+		var m Mark
+		if err := marks.Scan(&run, &m.Points, &m.Right); err != nil {
+			return nil, err
+		}
+		m.Partial = m.Points > 0 && !m.Right
+		i := at[run]
+		board[i].Trail = append(board[i].Trail, m)
+	}
+	return board, marks.Err()
 }

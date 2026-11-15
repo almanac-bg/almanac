@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
 	"slices"
 	"sort"
 	"sync"
@@ -40,6 +41,8 @@ type Score struct {
 	Ms     int64  `json:"ms"`
 	Me     bool   `json:"me,omitempty"`
 	Look
+	// Trail is how each of the ten went, on the friends' board once the viewer has finished the day (FriendsBoard).
+	Trail []Mark `json:"trail,omitempty"`
 }
 
 // Board is a day's results: the best, and the viewer's place among everyone. A game played at a script's speed is on
@@ -51,6 +54,9 @@ type Board struct {
 	// Place is the viewer's (1 for the best), 0 if they haven't finished the day.
 	Place int    `json:"place,omitempty"`
 	Mine  *Score `json:"mine,omitempty"`
+	// Average is the right answers of the day's ten on average, to a tenth, once DayCrowdFrom have finished it (0
+	// before): what tells a player whether their eight is good today.
+	Average float64 `json:"average,omitempty"`
 }
 
 // BoardOf reads a day's board for a viewer (0: nobody signed in).
@@ -60,6 +66,9 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 		return Board{}, err
 	}
 	b := Board{Day: day, Players: len(d.runs), Top: make([]Score, len(d.top), BoardTop)}
+	if len(d.runs) >= DayCrowdFrom {
+		b.Average = math.Round(10*float64(d.rights)/float64(len(d.runs))) / 10
+	}
 	for i, s := range d.top {
 		s.Me = d.users[i] == viewer
 		b.Top[i] = s
@@ -147,7 +156,7 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 			rows.Close()
 			return nil, err
 		}
-		d.runs = append(d.runs, r)
+		d.runs, d.rights = append(d.runs, r), d.rights+r.rights
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
@@ -184,6 +193,7 @@ type countedBoard struct {
 	counted time.Time     // when, by the machine's clock (not the game's: it's about the server's time)
 	took    time.Duration // how long counting it took
 	runs    []boardRun
+	rights  int // the right answers of all of them
 	top     []Score
 	users   []int64 // who played each of top
 }

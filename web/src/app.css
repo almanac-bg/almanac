@@ -3577,6 +3577,13 @@
     color: var(--text-muted);
   }
 
+  /* A friend's ten, under their name (the friends' day on Начало). */
+  .row > .trail {
+    grid-column: 2 / -1;
+    max-width: 12rem;
+    gap: 3px;
+  }
+
   /* A player who links to their profile: the row's look, the name underlined on hover. */
   a.who,
   a.friend-name {

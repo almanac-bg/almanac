@@ -62,7 +62,8 @@ const shows = (by: By, open?: Open) => (by === "league" ? !!open?.league : by ==
 export function ranks() {
   title("Класации");
   const by = signal<By>(location.hash === "#league" ? "league" : "day");
-  const friends = signal(false);
+  // `#friends`: the day's board among friends (from Начало's „Всички“).
+  const friends = signal(location.hash === "#friends");
   const topic = signal("");
   const data = signal<Answer | null>(null);
   const day = signal<Day | null>(null);
