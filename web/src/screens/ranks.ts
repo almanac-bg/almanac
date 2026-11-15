@@ -9,7 +9,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, type Signal, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
-import { type Open, type Tier, toneOf, topicMark } from "../ui.ts";
+import { type Open, segmented, type Tier, toneOf, topicMark } from "../ui.ts";
 import type { Standing } from "./duel.ts";
 import { type LeagueView, leagueBoard, loadLeague } from "./league.ts";
 
@@ -214,27 +214,6 @@ export function ranks() {
         `Играчите с поне ${least} игри за рейтинг: дуели и Роял.`,
       );
     },
-  );
-}
-
-/** A segmented switch of a few choices. */
-function segmented<T>(
-  label: string,
-  options: [T, string][],
-  now: () => T,
-  choose: (v: T) => void,
-  small = false,
-): Child {
-  return h(
-    "div",
-    { class: small ? "segmented small" : "segmented", role: "tablist", "aria-label": label },
-    options.map(([id, text]) =>
-      h(
-        "button",
-        { type: "button", role: "tab", "aria-selected": () => now() === id, onclick: () => choose(id) },
-        text,
-      ),
-    ),
   );
 }
 

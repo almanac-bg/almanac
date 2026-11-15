@@ -14,8 +14,10 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/evanw/esbuild/pkg/api"
@@ -28,8 +30,8 @@ import (
 // kinds of question, weekly leagues, a second chance, a year's look back, a game left and taken up again, systems that
 // unfold as a player meets them and say what their numbers mean, a streak that says what kept or ended it): still small enough to arrive at once on a slow
 // phone; the style also lays the pages out for a laptop's width. The illustrations (avatars, topics, modes, frames,
-// leagues) come after the first screen, on their own.
-var budgets = map[string]int{"app.js": 50 << 10, "app.css": 16 << 10, "pictures.js": 24 << 10}
+// leagues) come after the first screen, on their own; a room's screen (web/src/kit.ts) when one opens.
+var budgets = map[string]int{"app.js": 50 << 10, "app.css": 16 << 10, "pictures.js": 24 << 10, "room.js": 12 << 10}
 
 func main() {
 	watch := flag.Bool("watch", false, "rebuild on every change")
@@ -153,6 +155,17 @@ func checkBudgets(out string) error {
 	}
 	if len(over) > 0 {
 		return fmt.Errorf("over budget: %s", strings.Join(over, ", "))
+	}
+	// A file that's no entry's is code a screen loaded on its own shares with app.js, split off for every page to load
+	// first: the screen must take it from web/src/kit.ts instead.
+	files, err := filepath.Glob(filepath.Join(out, "assets", "*.js"))
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
+		if !slices.Contains(slices.Collect(maps.Values(manifest)), "assets/"+filepath.Base(f)) {
+			return fmt.Errorf("%s is shared by app.js and a screen of its own: hand that screen what it needs in web/src/kit.ts", filepath.Base(f))
+		}
 	}
 	return nil
 }

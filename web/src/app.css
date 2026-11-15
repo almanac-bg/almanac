@@ -2785,7 +2785,8 @@
     cursor: pointer;
   }
 
-  .segmented button[aria-selected="true"] {
+  .segmented button[aria-selected="true"],
+  .segmented button[aria-checked="true"] {
     background: var(--raised);
     box-shadow: var(--elev-1);
     color: var(--text);

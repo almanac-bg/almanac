@@ -1,17 +1,50 @@
 // A room: the lobby, then each question for everyone at once, its answer with the scores, and the final standings.
 // The server sends the room as this player sees it after every change; the browser reconnects if the line drops.
+//
+// It loads on its own, the first time a room opens, and is handed the app's pieces (kit.ts): it imports only types.
 
-import { answered, ask, crowdLine, picture } from "../game/questions.ts";
-import { boardRow, nextSteps, reviewParts, shareButton } from "../game/results.ts";
-import { questionHead, timer, upNext } from "../game/run.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
-import { type ApiError, api } from "../lib/api.ts";
-import { keepAwake } from "../lib/awake.ts";
-import { type Child, computed, effect, h, onCleanup, signal, untracked } from "../lib/dom.ts";
-import { title } from "../lib/router.ts";
-import { play, playAnswer } from "../lib/sound.ts";
-import { categories, player, playing, type User, user } from "../state.ts";
-import { avatar, formatNumber, type Tier, type VerdictKind, verdict } from "../ui.ts";
+import type { Kit } from "../kit.ts";
+import type { ApiError } from "../lib/api.ts";
+import type { Child } from "../lib/dom.ts";
+import type { User } from "../state.ts";
+import type { Tier, VerdictKind } from "../ui.ts";
+import type { Mix } from "./rooms.ts";
+
+// The app's pieces, set as the screen opens (room).
+let {
+  answered,
+  api,
+  ask,
+  avatar,
+  boardRow,
+  categories,
+  computed,
+  crowdLine,
+  effect,
+  formatNumber,
+  h,
+  keepAwake,
+  mixes,
+  news,
+  nextSteps,
+  onCleanup,
+  picture,
+  play,
+  playAnswer,
+  player,
+  playing,
+  questionHead,
+  reviewParts,
+  shareButton,
+  signal,
+  timer,
+  title,
+  untracked,
+  upNext,
+  user,
+  verdict,
+} = {} as Kit;
 
 interface RoomView {
   code: string;
@@ -20,6 +53,9 @@ interface RoomView {
   isHost: boolean;
   canLead: boolean;
   category: string;
+  /** Questions a game, and how hard. */
+  length: number;
+  mix: Mix;
   n: number;
   total: number;
   players: Player[];
@@ -45,6 +81,8 @@ interface RoomView {
   };
   /** Once the game is over: what this player's game earned for every answer right (in their points). */
   allRight?: number;
+  /** Once the game is over and kept: this player's game as a run, whose news tells what it earned. */
+  run?: number;
 }
 
 interface Player {
@@ -66,8 +104,44 @@ interface Player {
 
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "Всички теми";
 const spaced = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
+/** What the room plays: its topic, how many questions and how hard. */
+const about = (v: RoomView) =>
+  `${topicName(v.category)} · ${v.length} въпроса · ${mixes.find(([m]) => m === v.mix)?.[1] ?? ""}`;
 
-export function room([code = ""]: string[]) {
+export function room(kit: Kit, [code = ""]: string[]) {
+  ({
+    answered,
+    api,
+    ask,
+    avatar,
+    boardRow,
+    categories,
+    computed,
+    crowdLine,
+    effect,
+    formatNumber,
+    h,
+    keepAwake,
+    mixes,
+    news,
+    nextSteps,
+    onCleanup,
+    picture,
+    play,
+    playAnswer,
+    player,
+    playing,
+    questionHead,
+    reviewParts,
+    shareButton,
+    signal,
+    timer,
+    title,
+    untracked,
+    upNext,
+    user,
+    verdict,
+  } = kit);
   title("Стая");
   const view = signal<RoomView | null>(null);
   const trouble = signal<"" | "reconnecting" | "gone" | "full" | "removed">("");
@@ -271,7 +345,7 @@ function lobby(view: () => RoomView, code: string): Child {
     h(
       "div",
       { class: "intro" },
-      h("p", { class: "kicker" }, () => topicName(view().category)),
+      h("p", { class: "kicker" }, () => about(view())),
       h("h1", null, "Стая ", h("span", { class: "code-big" }, spaced(code))),
       h("p", { class: "lead" }, "Дай кода на другите или им прати връзката."),
     ),
@@ -484,6 +558,7 @@ function end(view: () => RoomView, code: string): Child {
   const first = untracked(view);
   play(first.players.length > 1 && first.players[0]?.me ? "win" : "end");
   const questions = reviewParts(async () => view().review ?? []);
+  const ran = computed(() => view().run ?? 0);
   return h(
     "div",
     { class: "screen" },
@@ -510,6 +585,11 @@ function end(view: () => RoomView, code: string): Child {
       [questions.button],
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    // What the game earned, once it's kept (a moment after its end), as any game tells it.
+    () => {
+      const run = ran();
+      return run ? news(run) : null;
+    },
     // The host can send someone out before the next game.
     first.isHost
       ? h(
