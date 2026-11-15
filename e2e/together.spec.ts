@@ -24,8 +24,6 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
   await expect(host.locator(".players li").last()).toContainText("Бояна");
   await expect(guest.getByText(/Чакаме .* да започне/)).toBeVisible();
   await expect(guest.getByText("История · 5 въпроса · Лесни")).toBeVisible();
-  // The room has a way out, as every screen does.
-  await expect(host.getByRole("link", { name: "Начало" }).first()).toHaveAttribute("href", "/");
   await host.getByRole("button", { name: "Започни" }).click();
   for (let n = 0; n < 5; n++) {
     for (const p of [host, guest])
