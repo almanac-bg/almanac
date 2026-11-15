@@ -169,6 +169,34 @@ func TestFriendsBoardTrails(t *testing.T) {
 	}
 }
 
+// A player's day as an invite link tells it: nothing before it's finished; its right answers after, to anyone; a game
+// played at a script's speed to its player alone.
+func TestDayRights(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo := w.user(), w.user()
+	today := w.g.Today()
+	if _, played, err := w.g.DayRights(ctx, ana, today, bo); err != nil || played {
+		t.Fatalf("before: %v %v", played, err)
+	}
+	s, _ := w.g.StartDay(ctx, ana)
+	w.play(ana, s.ID, append(repeat(w.right, 6), repeat(w.wrong, Length-6)...)...)
+	for _, viewer := range []int64{0, ana, bo} {
+		if n, played, err := w.g.DayRights(ctx, ana, today, viewer); err != nil || !played || n != 6 {
+			t.Fatalf("as %d sees it: %d %v %v", viewer, n, played, err)
+		}
+	}
+	if _, err := w.db.Write.ExecContext(ctx, `UPDATE runs SET scripted = 1 WHERE id = ?`, s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, played, _ := w.g.DayRights(ctx, ana, today, bo); played {
+		t.Fatal("a script's game, told to another")
+	}
+	if n, played, _ := w.g.DayRights(ctx, ana, today, ana); !played || n != 6 {
+		t.Fatal("a script's game, kept from its player")
+	}
+}
+
 // The day's average shows once DayCrowdFrom have finished the day, to a tenth.
 func TestBoardAverage(t *testing.T) {
 	w := setup(t)

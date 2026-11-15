@@ -122,8 +122,9 @@ func (s *Server) duelInvites(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"requests": n, "challenges": challenges})
 }
 
-// inviteInfo says whose an invite link is, for the page that asks whether to accept it (anyone may ask), and
-// whether the one asking is its owner or already a friend.
+// inviteInfo says whose an invite link is, for the page it opens (anyone may ask): whether the one asking is its owner
+// or already a friend (then with the friend's id, for a duel), and how each of the two did on the day's ten, if
+// they've played them (`their`, `mine`). The same link ends a shared day's result: it brings the friend to the day.
 func (s *Server) inviteInfo(w http.ResponseWriter, r *http.Request) error {
 	code := r.PathValue("code")
 	if !inviteCode.MatchString(code) {
@@ -133,11 +134,30 @@ func (s *Server) inviteInfo(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	u, err := s.user(r)
+	if err != nil {
+		return err
+	}
 	out := map[string]any{"by": name, "own": false, "friends": false}
-	if u, err := s.user(r); err == nil && u != nil {
+	var viewer int64
+	if u != nil {
+		viewer = u.ID
 		out["own"] = u.ID == id
 		if _, err := s.game.Friend(r.Context(), u.ID, id); err == nil {
-			out["friends"] = true
+			out["friends"], out["id"] = true, id
+		}
+	}
+	day := s.game.Today()
+	if n, played, err := s.game.DayRights(r.Context(), id, day, viewer); err != nil {
+		return err
+	} else if played {
+		out["their"] = n
+	}
+	if u != nil {
+		if n, played, err := s.game.DayRights(r.Context(), u.ID, day, u.ID); err != nil {
+			return err
+		} else if played {
+			out["mine"] = n
 		}
 	}
 	return ok(w, out)

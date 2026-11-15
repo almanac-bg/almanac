@@ -36,6 +36,11 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
   for (const p of [host, guest])
     await expect(p.getByRole("heading", { name: /печели/ })).toBeVisible({ timeout: 15_000 });
   await expect(host.getByRole("button", { name: "Нова игра" })).toBeVisible();
+  // Each can add the other as a friend, a tap beside their name; the day's ten wait for both.
+  await expect(guest.getByRole("link", { name: "Десетте за днес" })).toBeVisible();
+  await guest.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
+  await expect(guest.getByText("Поканата е изпратена.")).toBeVisible();
+  await expect(host.getByRole("button", { name: "Добави Бояна в приятели" })).toBeVisible();
   await guest.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(guest.locator(".reviewed")).toHaveCount(5);
   // Each player's game is kept as a game of theirs.

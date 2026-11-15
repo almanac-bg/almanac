@@ -154,7 +154,7 @@ function reveal(view: () => RoomView, code: string, first: RoomView, places: Map
         answered(q.view, r.answer, null),
         r.answer.fact ? fact(r.answer.fact) : null,
       ),
-      standings(view, true, before, 5),
+      standings(view, true, before, undefined, 5),
     ),
     () =>
       held()

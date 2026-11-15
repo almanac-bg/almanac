@@ -407,6 +407,17 @@ type loggedAnswer struct {
 
 func (r *Room) Code() string { return r.code }
 
+// Players are who's in the room now, by their keys (PlayerView.Key): for a screen to befriend one by the key it shows.
+func (r *Room) Players() map[int]int64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make(map[int]int64, len(r.players))
+	for _, m := range r.players {
+		out[m.key] = m.ID
+	}
+	return out
+}
+
 func (r *Room) member(id int64) *member {
 	for _, m := range r.players {
 		if m.ID == id {

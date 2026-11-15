@@ -88,8 +88,8 @@ export function stats(): Child {
           ? figure(`${s.won}/${s.duels}`, "спечелени дуела")
           : figure(String(s.days), s.days === 1 ? "ден с въпросите на деня" : "дни с въпросите на деня"),
       ),
-      // „Колко знаеш“ once a topic has a mark: a first day's one answer a topic tells nothing.
-      s.mastery.some((m) => m.sure) ? masteryCard(s.mastery) : null,
+      // „Колко знаеш“ once a topic has a first estimate: a first day's one answer a topic tells nothing.
+      s.mastery.some((m) => m.sure || m.first) ? masteryCard(s.mastery) : null,
       h(
         "section",
         { class: "stack" },

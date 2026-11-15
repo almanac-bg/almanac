@@ -58,6 +58,15 @@ test("a right answer few of the day's players got is told, by its place and thei
   }
 });
 
+test("it ends with the player's own link, when there is one, and still has no words of invitation", () => {
+  const trail = [right, right, wrong, right, close, right, right, right, right, wrong];
+  const link = "https://almanac.bg/f/abcd2345";
+  const text = dayShareText("2026-11-14", trail, 10, 12, { n: 6, right: 0.12 }, link);
+  assert.equal(text.split("\n").at(-1), link);
+  assert.equal(text.split("\n").length, 5);
+  assert.doesNotMatch(text, /ела|покан|играй|опитай|можеш|а ти/iu);
+});
+
 test("a year is shared as its days and streak, its answers, its strongest topic and facts, and the site", () => {
   assert.equal(
     yearShareText({ year: 2026, days: 42, streak: 12, answers: 1234, right: 839, topic: "История", facts: 312 }),
