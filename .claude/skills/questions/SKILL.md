@@ -20,7 +20,10 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
   - `go run ./cmd/almanac bank check private` checks everything the server checks before it plays a bank. It ends
     with the balance report: the difficulty and kind mix, facts and dates, the mix grid, and **the day's runway** —
     how many days of the day's questions each place of a day has left. It **fails** while the categories aren't the
-    same size (`-unbalanced` lets the small public sample pass), and **warns** of every place under 180 days.
+    same size (`-unbalanced` lets the small public sample pass), and **warns** of every place under 180 days. Last,
+    **the subjects that come back** (listed, never failed): the answers and names more than 15 live questions name,
+    by category (`*` over 1% of one), and the "who or what is this" answers (a picture choice, clues) asked twice;
+    the top 20 of each, all of them with `go run ./cmd/almanac bank subjects private`.
 
 ## The aims (the owner's rules)
 
@@ -144,6 +147,11 @@ By type:
 - **Nothing goes stale.** No „сегашният“, „последният“ or „най-новият“ unless pinned to a date („към 2026 г.“), and
   add `reviewBy` for anything that can change.
 - **No near-duplicates.** Grep the bank for the subject first. The checker only catches identical texts.
+- **No subject everywhere.** A subject (Наполеон, „Титаник“, Disney) stays under 1% of a category: past that, a
+  player who plays daily meets it again and again. Write away from the subjects `bank subjects` marks with `*`, and
+  never a second "who or what is this" question with an answer one already has (it lists those): keep the better of
+  the two and replace the other in its cell. A day holds one question of each subject (same answer or quoted
+  title) by itself.
 - **Bulgarian, as the bank writes it:**
   - „…“ quotes, a spaced dash —, „г.“ after a year;
   - established spellings (Нидерландия, not Холандия);

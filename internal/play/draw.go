@@ -49,9 +49,10 @@ const BGFloor = 3
 // special (a picture, an order, a number) get their topics first, from those that have one. The number to finish on
 // is an estimate (a unit, more than 20) where one is left: a year or a small count is a choice in disguise. Then the
 // day is made the day's: a question that belongs to its date („На този ден“, bank.Tail.On) takes the place it fits,
-// and at least BGFloor are about Bulgaria (bank.Tail.BG), each in a place it fits, from that place's topic. Exact is
-// whether every slot had a question that fits it just so, never a day's before: a day ahead is drawn only so
-// (ahead.go).
+// and at least BGFloor are about Bulgaria (bank.Tail.BG), each in a place it fits, from that place's topic. Throughout,
+// a day names each subject once: no two of its questions share an answer or a quoted title (bank.Subjects), so that
+// nobody meets „Титаник“ twice in one day's ten. Exact is whether every slot had a question that fits it just so,
+// never a day's before: a day ahead is drawn only so (ahead.go).
 func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.Rand) (picks []Pick, exact bool) {
 	slots := newKind(slices.Clone(daySlots), r)
 	var topics []string
@@ -94,13 +95,53 @@ func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.R
 		}
 	}
 	taken := map[string]bool{}
+	named := map[string]int{} // the subjects the day's questions name, each by how many of them
+	name := func(q bank.Question, n int) {
+		for _, k := range bank.Subjects(q) {
+			named[k] += n
+		}
+	}
+	// clash is whether q names a subject the day has, but for the subjects of the questions it would replace.
+	clash := func(q bank.Question, replacing ...bank.Question) bool {
+		for _, k := range bank.Subjects(q) {
+			n := named[k]
+			for _, o := range replacing {
+				if o != nil && slices.Contains(bank.Subjects(o), k) {
+					n--
+				}
+			}
+			if n > 0 {
+				return true
+			}
+		}
+		return false
+	}
 	// A question that belongs to dates waits for one of them.
-	allowed := func(q bank.Question) bool {
+	free := func(q bank.Question) bool {
 		t := q.Extra()
 		return !taken[q.Base().ID] && (len(t.On) == 0 || t.OnDay(day))
 	}
+	allowed := func(q bank.Question) bool { return free(q) && !clash(q) }
 	fresh := func(q bank.Question) bool { return !used[q.Base().ID] }
 	unseen := func(q bank.Question) bool { return !answered[q.Base().ID] }
+	// candidates are the fresh questions free for the day that want takes, those nobody has answered first.
+	candidates := func(want func(bank.Question) bool) []bank.Question {
+		var out []bank.Question
+		for _, q := range b.Live("", "") {
+			if want(q) && fresh(q) && free(q) {
+				out = append(out, q)
+			}
+		}
+		r.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
+		slices.SortStableFunc(out, func(x, y bank.Question) int { return b2i(!unseen(x)) - b2i(!unseen(y)) })
+		return out
+	}
+	// The questions of the day's date come first: their subjects are kept for them while the places are filled, so that
+	// whichever takes its place, no other question of the day names its subject.
+	dated := candidates(func(q bank.Question) bool { return q.Extra().OnDay(day) })
+	for _, q := range dated {
+		name(q, 1)
+	}
 	chosen := make([]bank.Question, len(slots))
 	for i, s := range slots {
 		prefer := []func(bank.Question) bool{unseen}
@@ -110,12 +151,18 @@ func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.R
 		if q := choose(b.Live(assigned[i], ""), s, allowed, fresh, prefer, r); q != nil {
 			chosen[i] = q
 			taken[q.Base().ID] = true
+			name(q, 1)
 		}
+	}
+	for _, q := range dated {
+		name(q, -1)
 	}
 	put := func(i int, q bank.Question) {
 		delete(taken, chosen[i].Base().ID)
+		name(chosen[i], -1)
 		chosen[i], assigned[i] = q, q.Base().Category
 		taken[q.Base().ID] = true
+		name(q, 1)
 	}
 	// place puts q in a place it fits just so, keeping the day's topics one each: its own topic's place, or another
 	// whose topic then takes q's topic's place (with a question of its own that fits that place just so). It says
@@ -139,7 +186,10 @@ func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.R
 			}
 			var swap bank.Question
 			for _, o := range b.Live(assigned[i], "") {
-				if o != chosen[i] && fresh(o) && allowed(o) && matches(o, slots[j], true, true) {
+				if o != chosen[i] && fresh(o) && free(o) && matches(o, slots[j], true, true) &&
+					!clash(o, chosen[i], chosen[j]) && !slices.ContainsFunc(bank.Subjects(o), func(k string) bool {
+					return slices.Contains(bank.Subjects(q), k)
+				}) {
 					swap = o
 					break
 				}
@@ -152,19 +202,8 @@ func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.R
 		}
 		return -1
 	}
-	candidates := func(want func(bank.Question) bool) []bank.Question {
-		var out []bank.Question
-		for _, q := range b.Live("", "") {
-			if want(q) && fresh(q) && allowed(q) {
-				out = append(out, q)
-			}
-		}
-		r.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
-		slices.SortStableFunc(out, func(x, y bank.Question) int { return b2i(!unseen(x)) - b2i(!unseen(y)) })
-		return out
-	}
 	kept := map[int]bool{}
-	for _, q := range candidates(func(q bank.Question) bool { return q.Extra().OnDay(day) }) {
+	for _, q := range dated {
 		if i := place(q); i >= 0 {
 			kept[i] = true
 			break
@@ -185,7 +224,7 @@ func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.R
 		}
 		s, topic := slots[i], assigned[i]
 		for _, q := range candidates(func(q bank.Question) bool {
-			return q.Extra().BG && q.Base().Category == topic && matches(q, s, true, true)
+			return q.Extra().BG && q.Base().Category == topic && matches(q, s, true, true) && !clash(q, chosen[i])
 		}) {
 			put(i, q)
 			bg++
