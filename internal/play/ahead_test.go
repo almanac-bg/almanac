@@ -18,7 +18,7 @@ import (
 // their questions reaches another game; and a day ahead whose question leaves the bank is drawn again.
 func TestDaysAhead(t *testing.T) {
 	w := setup(t)
-	w.b = biggerSample(t, 30)
+	w.b = biggerSample(t, 20)
 	w.g.Bank = func() *bank.Bank { return w.b }
 	ctx := t.Context()
 	barred, err := w.g.DayQuestions(ctx)
@@ -100,8 +100,9 @@ func TestDaysAhead(t *testing.T) {
 	}
 }
 
-// biggerSample is the sample bank with each question copied n times more (new ids, the text marked), its splits made
-// medium too: enough of every place of a day for days ahead.
+// biggerSample is the sample bank with each question copied n times more (new ids, the text marked), each copy in
+// the next topic round, so that every topic has every kind; its splits made medium too: enough of every place of a
+// day for days ahead, whichever topics a day gives them.
 func biggerSample(t *testing.T, n int) *bank.Bank {
 	t.Helper()
 	dir := t.TempDir()
@@ -109,26 +110,36 @@ func biggerSample(t *testing.T, n int) *bank.Bank {
 		t.Fatal(err)
 	}
 	files, _ := filepath.Glob(filepath.Join(dir, bank.QuestionsDir, "*.json"))
-	for _, f := range files {
+	slices.Sort(files)
+	all := make([][]map[string]any, len(files))
+	prefixes := make([]string, len(files))
+	for i, f := range files {
 		data, _ := os.ReadFile(f)
-		var qs []map[string]any
-		if err := json.Unmarshal(data, &qs); err != nil {
+		if err := json.Unmarshal(data, &all[i]); err != nil {
 			t.Fatal(err)
 		}
-		out := slices.Clone(qs)
-		for i := range n {
-			for _, q := range qs {
+		prefixes[i], _, _ = strings.Cut(all[i][0]["id"].(string), "-")
+	}
+	out := make([][]map[string]any, len(files))
+	for i := range files {
+		out[i] = slices.Clone(all[i])
+	}
+	for i, qs := range all {
+		for k := range n {
+			to := (i + k + 1) % len(files)
+			for j, q := range qs {
 				c := maps.Clone(q)
-				prefix, num, _ := strings.Cut(q["id"].(string), "-")
-				c["id"] = fmt.Sprintf("%s-%d%s", prefix, i+1, num)
-				c["text"] = fmt.Sprintf("%d. %s", i+1, q["text"])
+				c["id"] = fmt.Sprintf("%s-%d%03d%02d", prefixes[to], k+1, j, i)
+				c["text"] = fmt.Sprintf("%d. %s", k+1, q["text"])
 				if c["type"] == "split" {
 					c["difficulty"] = "medium"
 				}
-				out = append(out, c)
+				out[to] = append(out[to], c)
 			}
 		}
-		data, _ = json.Marshal(out)
+	}
+	for i, f := range files {
+		data, _ := json.Marshal(out[i])
 		if err := os.WriteFile(f, data, 0o600); err != nil {
 			t.Fatal(err)
 		}

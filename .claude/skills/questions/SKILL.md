@@ -18,8 +18,9 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 - The tools (from the repo root):
   - `go run ./cmd/almanac bank fmt private` writes the files in their one format; run it after every edit;
   - `go run ./cmd/almanac bank check private` checks everything the server checks before it plays a bank. It ends
-    with the balance report: the difficulty and kind mix, facts and dates, and the full-balance grid. It **fails**
-    while the bank isn't fully balanced (`-unbalanced` lets the small public sample pass).
+    with the balance report: the difficulty and kind mix, facts and dates, the mix grid, and **the day's runway** —
+    how many days of the day's questions each place of a day has left. It **fails** while the categories aren't the
+    same size (`-unbalanced` lets the small public sample pass), and **warns** of every place under 180 days.
 
 ## The aims (the owner's rules)
 
@@ -27,14 +28,15 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 - **Kinds: 50% choice, 15% true-or-not, 10% number, 7.5% order, 7.5% match, 5% split, 5% clues**, in every category
   (`bank.TypeMix`), close to what the game draws (a run of ten has five choices, one of each other kind, and a split
   or clues), so that no kind runs out long before the others.
-- **The bank must be fully balanced, always** (the owner's rule): every category the same size; in it, the kinds in
-  their mix; and within each kind, the difficulties in theirs (a topic's true-or-not are 50% easy, 35% medium, 15%
-  hard, like its choices). So every category has exactly the same count in every cell: as many hard number
-  questions in music as in geography. `bank check` ends with the full grid — per category, kind and difficulty: `+n` to write, `−n`
-  too many — and how many questions are out of place in all; it must be 0 before every commit, so a batch fills the
-  same cells in every category, and a retired question is replaced in its cell in the same commit. Close a `+` by writing for that cell;
-  a `−` by judging the questions again (move one to a neighbouring difficulty only where that's honest for
-  Bulgarian players; what players get right shows how hard a question really is) or retiring the weakest.
+- **The bank grows by the day's runway** (the owner's rule since 15 Nov 2026, in place of "fully balanced, always"):
+  the day spends its places at its own pace — one easy choice with a picture, one hard number, two hard choices, a
+  medium order and match… a day — about three times faster for the hard places than for the easy ones, and no even
+  grid can follow that. So `bank check` prints, for each place of a day, the days of fresh questions left (the whole
+  bank; the days played have spent some). **Every batch writes for the shortest runway first**, and no place may stay
+  under 180 days (it warns). The mix grid (per category, kind and difficulty, `+` / `−` against an even mix) stays
+  as a reference for the topic games: keep near it where the runway doesn't say otherwise, never by filler (an
+  "easy number" whose answer is 5 is a choice in disguise; an honest hard question beats a forced cell). A retired
+  question is still replaced in its cell in the same commit.
 - **Every category the same size.** No topic outweighs another, so a batch adds to every category, or closes the
   gaps that `bank check` reports, biggest first. Never add to a category that is ahead while another is behind.
 - **Every question has a fact** („Знаеше ли?“), **the date it was added** and **the date it last changed**
@@ -177,15 +179,17 @@ By type:
 
 ## The workflow
 
-1. **Find the gaps:** run `bank check` and read the balance report. Plan the batch from the gaps: categories and
-   difficulties, biggest first.
+1. **Find the gaps:** run `bank check` and read the day's runway and the balance report. Plan the batch from the
+   shortest runway first (every place under 180 days before anything else), then the mix grid's biggest gaps; the
+   same count in every category.
 2. **Write** the questions into the category files, with the next free ids, `added` and `updated` set to today, and
    a fact on each.
 3. **Verify independently.** Give a fresh agent the new questions and answers (not your reasoning). It checks each
    one against reliable sources: the marked answer is right, no other option is also right, nothing is outdated,
    the wording has one reading, the fact is true, and the difficulty fits the definitions. It reports OK, FIX or
    DROP, with evidence. Apply the fixes, and drop what it can't confirm.
-4. **Check:** `bank fmt`, then `bank check`, with no errors and full balance (it fails otherwise).
+4. **Check:** `bank fmt`, then `bank check`: no errors, every category the same size (it fails otherwise), and no
+   place's runway shorter than before the batch.
 5. **Commit in `private/`** (`git -C private …`), one commit per batch, its message listing the ids. On the server,
    `almanac-bank` takes the new questions without a restart.
 6. **Tell the owner** what went in: a short list of question → answer, with the fact, so they can read it.

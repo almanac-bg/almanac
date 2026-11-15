@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/almanac-bg/almanac/internal/bank"
+	"github.com/almanac-bg/almanac/internal/play"
 )
 
 func bankCommand(args []string) error {
@@ -48,9 +50,9 @@ func defaultBankDir() string {
 	return "bank/sample"
 }
 
-// bankCheck checks everything the server checks before it plays a bank, and the owner's rule that the bank is fully
-// balanced: every category the same size, with the same number of questions in every kind and difficulty. An
-// unbalanced bank still plays, but fails the check unless unbalanced is set, so a batch can't be committed half done.
+// bankCheck checks everything the server checks before it plays a bank, and the owner's rule that every category is
+// the same size (so a batch can't be committed half done; unbalanced lets the small public sample pass). It reports
+// the mix, and the day's runway: how long each place of a day has questions for, where the next batch writes first.
 func bankCheck(dir string, unbalanced bool) error {
 	b, problems := bank.Load(dir)
 	errs := 0
@@ -64,10 +66,38 @@ func bankCheck(dir string, unbalanced bool) error {
 		return fmt.Errorf("%s: %d problems: the server would not play this bank", dir, errs)
 	}
 	fmt.Println(summary(b))
-	if off := b.BalanceOf().Off; off > 0 && !unbalanced {
-		return fmt.Errorf("%s: not fully balanced (%d questions out of place): write for the + cells, judge again or retire the − ones", dir, off)
+	fmt.Println(runway(b))
+	sizes := map[int]bool{}
+	for _, c := range b.Categories {
+		sizes[len(b.Live(c.ID, ""))] = true
+	}
+	if len(sizes) > 1 && !unbalanced {
+		return fmt.Errorf("%s: the categories aren't the same size: a batch adds to every category alike", dir)
 	}
 	return nil
+}
+
+// RunwayMin is the fewest days of the day's questions a place should have left: below it, `bank check` warns, and the
+// next batch writes for that place first.
+const RunwayMin = 180
+
+// runway says how many days of the day's questions the bank holds for each place of a day (play.DayRunway), counting
+// the whole bank (the days already played have spent some: production has had a day since 12 Nov 2026), and warns of
+// the places below RunwayMin. It warns rather than fails: a bank fix must still pass while a short place waits for
+// its batch.
+func runway(b *bank.Bank) string {
+	var s strings.Builder
+	s.WriteString("the day's runway (days of questions left for each place, the whole bank; shortest first):\n")
+	places := play.DayRunway(b, nil)
+	slices.SortStableFunc(places, func(x, y play.Runway) int { return x.Days - y.Days })
+	for _, r := range places {
+		warn := ""
+		if r.Days < RunwayMin {
+			warn = fmt.Sprintf("   warning: under %d days: write for it first", RunwayMin)
+		}
+		fmt.Fprintf(&s, "  %-34s %5d%s\n", r.Place, r.Days, warn)
+	}
+	return strings.TrimRight(s.String(), "\n")
 }
 
 // summary counts what a bank holds, by category, type and difficulty.
@@ -138,12 +168,13 @@ func balance(b *bank.Bank) string {
 		fmt.Fprintf(&s, " %s %.1f%% (aim %.1f)", t, share, 100*bank.TypeMix[t])
 	}
 	s.WriteString("\n")
-	// Full balance: per category, kind and difficulty, what to write (+) or judge again or retire (−).
+	// The cells against an even mix, for reference: since 15 Nov 2026 the day's runway (below) decides where to write,
+	// and only the categories' sizes must match.
 	if bal.Off == 0 {
-		s.WriteString("balance      full: every category, kind and difficulty on its aim\n")
+		s.WriteString("mix          every category, kind and difficulty even\n")
 		return s.String()
 	}
-	fmt.Fprintf(&s, "balance      %d questions out of place; every category at %d, each kind easy/medium/hard (+ write, − judge again or retire):\n",
+	fmt.Fprintf(&s, "mix          %d questions off an even mix at %d per category, each kind easy/medium/hard (for reference; the runway decides):\n",
 		bal.Off, bal.Target)
 	fmt.Fprintf(&s, "  %-10s", "")
 	for _, t := range bank.TypeOrder {

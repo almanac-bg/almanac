@@ -3,6 +3,7 @@ package play
 import (
 	"math/rand/v2"
 	"slices"
+	"strings"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -126,11 +127,20 @@ func choose(pool []bank.Question, s slot, allowed, fresh, prefer func(bank.Quest
 	}
 	fits := []func(bank.Question) bool{
 		func(q bank.Question) bool { return matches(q, s, true, true) },
+	}
+	// A picture is the point of a slot that asks for one, more than its difficulty: the nearest difficulty with a
+	// picture comes before the same difficulty without.
+	if s.picture == withPicture {
+		for _, d := range nearest(s.difficulty) {
+			fits = append(fits, func(q bank.Question) bool { return matches(q, slot{d, s.typ, s.picture, ""}, true, true) })
+		}
+	}
+	fits = append(fits,
 		func(q bank.Question) bool { return matches(q, s, true, false) },
 		func(q bank.Question) bool { return q.Base().Type == s.typ },
 		func(q bank.Question) bool { return q.Base().Difficulty == s.difficulty },
 		func(bank.Question) bool { return true },
-	}
+	)
 	for _, needFresh := range []bool{true, false} {
 		for _, fit := range fits {
 			var found []bank.Question
@@ -179,4 +189,60 @@ func Draw(b *bank.Bank, category string, ability float64, seen, barred map[strin
 		}
 	}
 	return picks
+}
+
+// nearest are the other difficulties, nearest first (easy: medium, then hard).
+func nearest(d bank.Difficulty) []bank.Difficulty {
+	switch d {
+	case bank.Easy:
+		return []bank.Difficulty{bank.Medium, bank.Hard}
+	case bank.Hard:
+		return []bank.Difficulty{bank.Medium, bank.Easy}
+	}
+	return []bank.Difficulty{bank.Easy, bank.Hard}
+}
+
+// Runway is how many days of the day's questions a bank holds for one place of a day: questions that fit it just so
+// and no day has had yet (one a day; a place the day has twice, half). The bank grows where the runway is shortest
+// (the questions skill): the day spends hard numbers three times faster than easy choices.
+type Runway struct {
+	Place string
+	Days  int
+}
+
+// DayRunway is the runway of each place of a day, in the day's order (the place the new kinds share counts both).
+// used are the questions days have had (nil: count the whole bank, as `bank check` does with no database).
+func DayRunway(b *bank.Bank, used map[string]bool) []Runway {
+	var out []Runway
+	seen := map[slot]bool{}
+	for _, s := range daySlots {
+		if seen[s] {
+			continue
+		}
+		seen[s] = true
+		times := 0
+		for _, o := range daySlots {
+			if o == s {
+				times++
+			}
+		}
+		kinds := []string{s.typ}
+		if s.typ == newKinds[0] {
+			kinds = newKinds
+		}
+		n := 0
+		for _, k := range kinds {
+			for _, q := range b.Live("", k) {
+				if !used[q.Base().ID] && matches(q, slot{s.difficulty, k, s.picture, ""}, true, true) {
+					n++
+				}
+			}
+		}
+		place := string(s.difficulty) + " " + strings.Join(kinds, "/")
+		if s.picture == withPicture {
+			place += " with a picture"
+		}
+		out = append(out, Runway{Place: place, Days: n / times})
+	}
+	return out
 }
