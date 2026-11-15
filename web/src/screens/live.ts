@@ -18,7 +18,6 @@ let {
   api,
   ask,
   avatar,
-  categories,
   computed,
   crowdLine,
   effect,
@@ -40,6 +39,7 @@ let {
   signal,
   timer,
   title,
+  topics,
   trail,
   untracked,
   upNext,
@@ -108,7 +108,7 @@ interface Wait {
   held?: boolean;
 }
 
-const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
+const topicName = (id: string) => topics.find((c) => c.id === id)?.name ?? "";
 const divisionNames: Record<Side["division"], string> = {
   bronze: "Бронз",
   silver: "Сребро",
@@ -126,7 +126,6 @@ export function liveDuel(kit: Kit) {
     api,
     ask,
     avatar,
-    categories,
     computed,
     crowdLine,
     effect,
@@ -148,6 +147,7 @@ export function liveDuel(kit: Kit) {
     signal,
     timer,
     title,
+    topics,
     trail,
     untracked,
     upNext,

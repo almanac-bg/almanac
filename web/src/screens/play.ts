@@ -1,5 +1,6 @@
 // Теми: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays the same
-// game. The tiles live on Начало (with one more for all the topics at once); a run of one is /play/<topic>.
+// game. The tiles live on Начало (with one for „България“, the questions about Bulgaria from every topic, while the
+// bank has them, and one for all the topics at once); a run of one is /play/<topic>.
 
 import { picture } from "../art/picture.ts";
 import { type Mastery, masteryBadge } from "../game/mastery.ts";
@@ -10,11 +11,12 @@ import type { State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal, slot } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
-import { type Category, categories, player, user } from "../state.ts";
+import { bulgaria, type Category, categories, player, user } from "../state.ts";
 import { meter, questions, toneOf } from "../ui.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
-/** The topics as tiles, each with how well the player knows it, and a run across all of them (on Начало). */
+/** The topics as tiles, each with how well the player knows it; „България“ across them (no mastery of its own: its
+ * answers count in their own topics), and a run across all of them (on Начало). */
 export function topics(): Child {
   const stats = signal<Stats | null>(null);
   const waiting = signal(0);
@@ -42,6 +44,23 @@ export function topics(): Child {
             ),
           ),
         ),
+        bulgaria.open
+          ? h(
+              "li",
+              { class: "topic-all" },
+              h(
+                "a",
+                { href: `/play/${bulgaria.id}`, class: "topic tone-mint" },
+                picture(`topic-${bulgaria.id}`, "topic-pic"),
+                h(
+                  "span",
+                  { class: "topic-text" },
+                  h("span", { class: "topic-name" }, bulgaria.name),
+                  h("span", { class: "topic-meta" }, "Въпроси за България от всяка тема"),
+                ),
+              ),
+            )
+          : null,
         h(
           "li",
           { class: "topic-all" },
@@ -104,7 +123,13 @@ function tile(c: Category, m?: Mastery): Child {
 
 export function topic([id = ""]: string[]) {
   const category = id === "all" ? "" : id;
-  const name = category ? categories.find((c) => c.id === category)?.name : "Всички теми";
+  const name = !category
+    ? "Всички теми"
+    : category === bulgaria.id
+      ? bulgaria.open
+        ? bulgaria.name
+        : undefined
+      : categories.find((c) => c.id === category)?.name;
   if (name === undefined) {
     go("/", true);
     return null;

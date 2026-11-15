@@ -23,6 +23,7 @@ export interface Category {
 interface Boot {
   user: User | null;
   categories: Category[];
+  bulgaria?: boolean;
   version: string;
   push: string;
   phones: string[] | null;
@@ -33,6 +34,11 @@ const boot: Boot = JSON.parse(document.getElementById("boot")?.textContent || "{
 
 export const user = signal<User | null>(boot.user ?? null);
 export const categories: Category[] = boot.categories ?? [];
+/** „България“: the questions about Bulgaria from every topic, a topic of its own (play/bulgaria.go). Its tile shows
+ * while the bank has a game's worth of them (open); its games keep its name after. */
+export const bulgaria = { id: "bulgaria", name: "България", open: boot.bulgaria === true };
+/** Every topic a game can be of, the bank's and „България“: for naming a game's topic. */
+export const topics: Category[] = [...categories, bulgaria];
 export const version = boot.version ?? "";
 /** The key browsers subscribe to notifications with ("": none here). */
 export const pushKey = boot.push ?? "";

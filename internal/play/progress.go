@@ -455,7 +455,7 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'duel' AND outcome = 'won'),
 		(SELECT count(*) FROM friends WHERE user_id = ?1),
 		(SELECT count(DISTINCT category) FROM runs WHERE user_id = ?1 AND kind = 'topic' AND finished_at IS NOT NULL
-			AND category <> ''),
+			AND category NOT IN ('', ?4)),
 		(SELECT count(*) FROM (SELECT DISTINCT CASE
 				WHEN json_type(a.given, '$.pick') IS NOT NULL THEN 'choice'
 				WHEN json_type(a.given, '$.value') IS NOT NULL THEN 'number'
@@ -479,7 +479,7 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 			AND (SELECT count(*) FROM royal_players o WHERE o.royal_id = p.royal_id) > 1),
 		EXISTS (SELECT 1 FROM league_results WHERE user_id = ?1 AND moved = 1),
 		EXISTS (SELECT 1 FROM league_results WHERE user_id = ?1 AND place = 1 AND of >= `+strconv.Itoa(RaceSize)+`),
-		(SELECT league FROM users WHERE id = ?1) >= ?3`, userID, GoalsPerDay, TopLeague).
+		(SELECT league FROM users WHERE id = ?1) >= ?3`, userID, GoalsPerDay, TopLeague, BulgariaTopic).
 		Scan(&games, &duelsWon, &friends, &topicsPlayed, &types, &perfect, &fast, &friendWin, &nightOwl, &earlyBird,
 			&topicPerfect, &fullDays, &royalWin, &leagueUp, &leagueFirst, &rila)
 	if err != nil {

@@ -138,6 +138,27 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
   await expect(page.locator(".question-head")).toContainText("1 от 10");
 });
 
+test("„България“: the questions about Bulgaria from every topic, a topic of its own", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto("/");
+  const tile = page.locator(".topics").getByRole("link", { name: /^България/ });
+  await expect(tile).toContainText("Въпроси за България от всяка тема");
+  await tile.click();
+  await expect(page).toHaveURL(/\/play\/bulgaria$/);
+  await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
+  await playRun(page);
+  await expect(page.locator(".day-line .kicker")).toHaveText("България");
+  // Its ten come from more than one topic, each named in the review by its own.
+  await page.getByRole("button", { name: "Прегледай въпросите" }).click();
+  const topics = new Set((await page.locator(".reviewed > .kicker").allTextContents()).map((k) => k.split(" · ")[1]));
+  expect(topics.size).toBeGreaterThan(1);
+  expect(topics.has("")).toBe(false);
+  await expect(page.getByRole("button", { name: "Още десет" })).toBeVisible();
+  // The player's games name it.
+  await page.goto("/me");
+  await expect(page.locator(".game-what").filter({ hasText: /^България$/ })).toBeVisible();
+});
+
 test("a topic's count can be backed out of, or cut short", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Всички теми" }).click();

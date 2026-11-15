@@ -1334,6 +1334,8 @@ const draw = (layers: Layer[]) =>
 export const pictures: Record<string, string> = {
   ...Object.fromEntries(Object.entries(avatars).map(([id, l]) => [id, draw(l)])),
   ...Object.fromEntries(Object.entries(topics).map(([id, l]) => [`topic-${id}`, draw(l)])),
+  // „България“, the questions about Bulgaria from every topic: Рила, the top league's mountain.
+  "topic-bulgaria": draw(leagues[5] ?? []),
   ...Object.fromEntries(Object.entries(modes).map(([id, l]) => [`mode-${id}`, draw(l)])),
   ...Object.fromEntries(Object.entries(frames).map(([id, l]) => [`frame-${id}`, draw(l)])),
   ...Object.fromEntries(Object.entries(divisions).map(([id, l]) => [`division-${id}`, draw(l)])),

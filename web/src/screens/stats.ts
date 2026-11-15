@@ -5,7 +5,7 @@ import { picture } from "../art/picture.ts";
 import { type Mastery, masteryCard } from "../game/mastery.ts";
 import { api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
-import { categories } from "../state.ts";
+import { topics } from "../state.ts";
 import { figure, formatNumber, streak } from "../ui.ts";
 
 export interface Stats {
@@ -44,7 +44,7 @@ export interface Stats {
 export const loadStats = () => api<Stats>("GET", "/api/me/stats");
 
 const percent = (right: number, of: number) => (of ? Math.round((100 * right) / of) : 0);
-const topicName = (id?: string) => (id ? (categories.find((c) => c.id === id)?.name ?? id) : "Всички теми");
+const topicName = (id?: string) => (id ? (topics.find((c) => c.id === id)?.name ?? id) : "Всички теми");
 const date = (ms: number) => new Intl.DateTimeFormat("bg", { day: "numeric", month: "long" }).format(new Date(ms));
 const outcome = { won: "победа", lost: "загуба", draw: "равенство" };
 
