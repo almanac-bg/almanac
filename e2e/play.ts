@@ -89,6 +89,20 @@ export async function playedFair(page: Page): Promise<void> {
   await inDB(page, (db, id) => db.prepare("UPDATE runs SET scripted = 0 WHERE user_id = ?").run(id));
 }
 
+/** Makes the player one who has answered these questions right (in a game of nothing), straight in the test server's
+ * database: their facts are in the Алманах. */
+export async function knows(page: Page, ids: string[]): Promise<void> {
+  await inDB(page, (db, id) => {
+    const run = db
+      .prepare(`INSERT INTO runs (user_id, kind, category, questions, started_at, finished_at)
+        VALUES (?, 'topic', '', '[]', 0, 0)`)
+      .run(id).lastInsertRowid;
+    const add = db.prepare(`INSERT INTO answers (run_id, n, question_id, given, score, points, is_right, ms, at)
+      VALUES (?, ?, ?, '{}', 1, 0, 1, 3000, ?)`);
+    for (const [n, q] of ids.entries()) add.run(run, n, q, Date.now());
+  });
+}
+
 /** Does something to the player (a guest, made now if there's none) straight in the test server's database. */
 async function inDB(page: Page, f: (db: DatabaseSync, id: number) => void): Promise<void> {
   const id = await page.evaluate(async () => {

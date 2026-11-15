@@ -846,8 +846,9 @@ func TestProgress(t *testing.T) {
 	for _, a := range p.Achievements {
 		byID[a.ID] = a
 	}
-	if a := byID["answers100"]; a.At != 0 || a.Progress != Length || a.Goal != 100 {
-		t.Fatalf("answers100 after ten answers: %+v", a)
+	alm, _ := w.g.AlmanacOf(ctx, ana)
+	if a := byID["facts100"]; a.At != 0 || a.Progress != len(alm.Facts) || a.Progress == 0 || a.Goal != 100 {
+		t.Fatalf("facts100 after ten right answers (%d facts): %+v", len(alm.Facts), a)
 	}
 	if a := byID["perfect"]; a.At == 0 || a.Progress != a.Goal {
 		t.Fatalf("perfect, earned: %+v", a)

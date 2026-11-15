@@ -23,6 +23,9 @@ import (
 //   - The week's league is the day's habit: a race on the day's points, added up over the week, a day missed adding
 //     nothing (leagues.go). It's not on XP, which counts how much is played: the player who plays the day every day,
 //     and plays it well, wins it, whatever else anyone plays.
+//   - Моят Алманах is what's learned: the fact behind every question answered right (almanac.go). Its achievements
+//     count facts collected (a hundred, a thousand, five thousand, every fact of a topic), never answers given, so
+//     that a wrong answer or a time-out counts for nothing; Профил says how many there are.
 //
 // All three unlock the wardrobe (wardrobe.go, titles.go): a level, an achievement, a topic's mastery, a division, a
 // Роял won or first place in a high league each gives an avatar, a frame, a pattern or a title. Whatever unlocks something, the player is told
@@ -60,7 +63,7 @@ type Achievement struct {
 	About string `json:"about"`
 	Icon  string `json:"icon"` // the avatar's shape it unlocks ("" for none); its medal's picture is the client's
 	Tier  Tier   `json:"tier"`
-	// Goal is how much of its measure it takes (3 days, 100 answers); 1 for a thing done once.
+	// Goal is how much of its measure it takes (3 days, 100 facts); 1 for a thing done once.
 	Goal int `json:"goal"`
 	// Hidden ones aren't told until they're earned: found while playing.
 	Hidden bool `json:"hidden,omitempty"`
@@ -84,7 +87,7 @@ var AchievementXP = map[Tier]int{Common: 50, Rare: 150, Epic: 400, Legendary: 10
 // Achievements are every achievement there is, by tier, in the order a profile shows them.
 var Achievements = []Achievement{
 	{"streak3", "Три поред", "Играй въпросите на деня три дни поред.", "flame", Common, 3, false},
-	{"answers100", "Сто отговора", "Отговори на сто въпроса.", "book", Common, 100, false},
+	{"facts100", "Сто факта", "Събери сто факта в Алманаха.", "book", Common, 100, false},
 	{"fast", "Под две секунди", "Отговори вярно за по-малко от 2 секунди.", "bolt", Common, 1, false},
 	{"duel1", "Първа победа", "Спечели дуел.", "shield", Common, 1, false},
 	{"friend1", "Двама сме", "Добави първия си приятел в играта.", "heart", Common, 1, false},
@@ -103,7 +106,7 @@ var Achievements = []Achievement{
 	{"leagueFirst", "Първо място в групата", "Завърши седмица на първо място в групата си в лигата.", "", Rare, 1, false},
 
 	{"streak30", "Цял месец", "Играй въпросите на деня тридесет дни поред.", "flame", Epic, 30, false},
-	{"answers1000", "Хиляда отговора", "Отговори на хиляда въпроса.", "book", Epic, 1000, false},
+	{"facts1000", "Хиляда факта", "Събери хиляда факта в Алманаха.", "book", Epic, 1000, false},
 	{"games100", "Сто игри", "Изиграй сто игри.", "trophy", Epic, 100, false},
 	{"master", "Като петте си пръста", "Стигни до „Майстор“ в една тема.", "trophy", Epic, 1, false},
 	{"duel10", "Десет победи", "Спечели десет дуела.", "shield", Epic, 10, false},
@@ -116,6 +119,8 @@ var Achievements = []Achievement{
 	{"streak100", "Сто дни", "Играй въпросите на деня сто дни поред.", "flame", Legendary, 100, false},
 	{"master5", "Пет теми като петте си пръста", "Стигни до „Майстор“ в пет теми.", "trophy", Legendary, 5, false},
 	{"duel50", "Петдесет победи", "Спечели петдесет дуела.", "shield", Legendary, 50, false},
+	{"facts5000", "Пет хиляди факта", "Събери пет хиляди факта в Алманаха.", "book", Legendary, 5000, false},
+	{"wholeTopic", "Цяла тема", "Събери всички факти от една тема в Алманаха.", "", Legendary, 1, false},
 }
 
 func achievementByID(id string) (Achievement, bool) {
@@ -434,7 +439,7 @@ func bulgarianHour(ms string) string {
 // bulgarianDate is a SQL expression for the day in Bulgaria (YYYY-MM-DD) of a time in milliseconds.
 func bulgarianDate(ms string) string { return `date(` + bulgarian(ms) + `, 'unixepoch')` }
 
-// measure is how far a player has come by each achievement's measure (days in a row, answers, duels won…), from
+// measure is how far a player has come by each achievement's measure (days in a row, facts, duels won…), from
 // their records: what Award awards and a profile shows the progress of.
 func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error) {
 	db := g.DB.Read
@@ -479,7 +484,7 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 	if err != nil {
 		return nil, err
 	}
-	answers, _, err := g.answered(ctx, userID)
+	facts, err := g.factsOf(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -510,7 +515,8 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 	return map[string]int{
 		"streak3": streak, "streak7": streak, "streak30": streak, "streak100": streak,
 		"perfect": one(perfect), "exact": one(exact), "fast": one(fast),
-		"answers100": answers, "answers1000": answers, "games100": games,
+		"facts100": facts.n, "facts1000": facts.n, "facts5000": facts.n, "wholeTopic": one(facts.whole),
+		"games100":  games,
 		"allTopics": topicsPlayed, "master": masters, "master5": masters,
 		"duel1": duelsWon, "duel10": duelsWon, "duel50": duelsWon,
 		"friend1": friends, "friends5": friends, "friendWin": one(friendWin),

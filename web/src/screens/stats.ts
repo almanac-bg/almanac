@@ -1,5 +1,7 @@
-// How a player has done: the streak and this week, their numbers, how well they know each topic, their latest games.
+// How a player has done: the streak and this week, their numbers, the facts in their almanac, how well they know each
+// topic, their latest games.
 
+import { picture } from "../art/picture.ts";
 import { type Mastery, masteryCard } from "../game/mastery.ts";
 import { api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
@@ -17,6 +19,8 @@ export interface Stats {
   games: number;
   answers: number;
   right: number;
+  /** Facts in Моят Алманах. */
+  facts: number;
   duels: number;
   won: number;
   mastery: Mastery[];
@@ -61,8 +65,25 @@ function what(p: Stats["recent"][number]): string {
   }
 }
 
+/** Профил's line of Моят Алманах: how many facts it has, a tap from them. */
+function almanacLine(facts: number): Child {
+  return h(
+    "a",
+    { class: "place-link", href: "/almanac" },
+    picture("mode-almanac", "mode-pic tone-gold"),
+    h(
+      "span",
+      { class: "place-link-text" },
+      h("strong", { class: "place-link-name" }, `${formatNumber(facts)} ${facts === 1 ? "факт" : "факта"} в Алманаха`),
+      h("span", { class: "place-link-more" }, "Фактът зад всеки въпрос, на който отговори вярно"),
+    ),
+    h("span", { class: "i i-left place-link-i", "aria-hidden": "true" }),
+  );
+}
+
 /** Профил's numbers: the streak and this week; how well and how much they've played, in one card (the day's place
- * is Начало's and Класации'); how well they know each topic (once one has a mark); their latest games. */
+ * is Начало's and Класации'); the facts in their almanac; how well they know each topic (once one has a mark); their
+ * latest games. */
 export function stats(): Child {
   const data = signal<Stats | null>(null);
   loadStats().then(data.set, () => {});
@@ -88,6 +109,7 @@ export function stats(): Child {
           ? figure(`${s.won}/${s.duels}`, "спечелени дуела")
           : figure(String(s.days), s.days === 1 ? "ден с въпросите на деня" : "дни с въпросите на деня"),
       ),
+      s.facts ? almanacLine(s.facts) : null,
       // „Колко знаеш“ once a topic has a first estimate: a first day's one answer a topic tells nothing.
       s.mastery.some((m) => m.sure || m.first) ? masteryCard(s.mastery) : null,
       h(

@@ -4,7 +4,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
-import { pageArt, profileNav, questions, toneOf, topicMark } from "../ui.ts";
+import { formatNumber, pageArt, profileNav, questions, toneOf, topicMark } from "../ui.ts";
 import { loadMistakes } from "./play.ts";
 
 interface Learned {
@@ -62,13 +62,24 @@ export function almanac() {
       if (!user()) return h("p", { class: "muted" }, "Изиграй първите си въпроси и фактите ще се събират тук.");
       if (!d) return h("p", { class: "muted" }, "…");
       const shown = topic() ? d.facts.filter((f) => f.category === topic()) : d.facts;
+      const of = d.of[topic()] ?? 0;
+      const topicName = categories.find((c) => c.id === topic())?.name ?? "";
       return [
         h(
           "div",
           { class: "card almanac-head" },
-          h("b", { class: "almanac-n" }, String(d.facts.length)),
-          // How many learned, not of how many there are: a first week's dozen out of thousands looks like nothing.
-          h("span", { class: "muted" }, d.facts.length === 1 ? "научен факт" : "научени факта"),
+          h("b", { class: "almanac-n" }, formatNumber(shown.length)),
+          // All of them: how many learned, not of how many there are (a first week's dozen out of thousands looks like
+          // nothing). A topic: how many of its facts, the way to „Цяла тема“.
+          h(
+            "span",
+            { class: "muted" },
+            topic()
+              ? `от ${formatNumber(of)} ${of === 1 ? "факт" : "факта"} в „${topicName}“`
+              : shown.length === 1
+                ? "научен факт"
+                : "научени факта",
+          ),
         ),
         h(
           "ul",

@@ -174,15 +174,15 @@ export function leagueLine(): Child {
             : null;
     return h(
       "a",
-      { class: "league-link", href: "/ranks#league" },
+      { class: "place-link league-link", href: "/ranks#league" },
       leagueEmblem(v.league.tier, "m"),
       h(
         "span",
-        { class: "league-link-text" },
-        h("strong", { class: "league-link-name" }, h("span", { class: "sr" }, "Лига "), v.league.name),
+        { class: "place-link-text" },
+        h("strong", { class: "place-link-name" }, h("span", { class: "sr" }, "Лига "), v.league.name),
         h(
           "span",
-          { class: "league-link-more" },
+          { class: "place-link-more" },
           !v.in
             ? "Още не си в група тази седмица · "
             : gathering(v)
@@ -193,7 +193,7 @@ export function leagueLine(): Child {
           daysLeft(v.daysLeft),
         ),
       ),
-      h("span", { class: "i i-left league-link-i", "aria-hidden": "true" }),
+      h("span", { class: "i i-left place-link-i", "aria-hidden": "true" }),
     );
   };
 }

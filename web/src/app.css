@@ -673,7 +673,7 @@
   }
 
   /* Профил's line of the league: its mountain, the place in the group, a tap from it. */
-  .league-link {
+  .place-link {
     display: flex;
     align-items: center;
     gap: var(--space-3);
@@ -688,33 +688,33 @@
     transition: box-shadow 160ms;
   }
 
-  .league-link:hover {
+  .place-link:hover {
     box-shadow:
       var(--elev-2),
       inset 0 0 0 1px var(--line);
   }
 
-  .league-link:focus-visible {
+  .place-link:focus-visible {
     box-shadow: var(--focus);
   }
 
-  .league-link-text {
+  .place-link-text {
     display: grid;
     flex: 1;
     min-width: 0;
   }
 
-  .league-link-name {
+  .place-link-name {
     font-weight: 800;
   }
 
-  .league-link-more {
+  .place-link-more {
     color: var(--text-muted);
     font-size: 0.8125rem;
     line-height: 1.125rem;
   }
 
-  .league-link-i {
+  .place-link-i {
     flex: none;
     color: var(--text-muted);
     transform: scaleX(-1);
