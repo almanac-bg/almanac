@@ -65,11 +65,17 @@ jobs:
         run: npx biome ci .
       - run: npm test
 
+  # One job per engine, side by side: all three in one job outgrew its time (Роял's evenings alone take minutes), so
+  # every run was cut off before it said anything.
   browsers:
-    name: Browsers
+    name: Browsers (${{ matrix.engine }})
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [chromium, webkit, firefox]
     permissions:
       contents: read
     steps:
@@ -84,14 +90,14 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
-      - name: The engines (Chromium, WebKit, Firefox)
-        run: npx playwright install --with-deps chromium webkit firefox
-      - name: The game, played in each
-        run: npx playwright test -c e2e
+      - name: The engine
+        run: npx playwright install --with-deps ${{ matrix.engine }}
+      - name: The game, played in it
+        run: npx playwright test -c e2e --project=${{ matrix.engine }}
       - name: Traces of what failed
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: browser-traces
+          name: browser-traces-${{ matrix.engine }}
           path: test-results/e2e
           retention-days: 7
