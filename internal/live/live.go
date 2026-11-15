@@ -391,6 +391,7 @@ type Match struct {
 	hub   *Hub
 	id    int64
 	dealt []bank.Dealt
+	topic string // against a recording of a game in one topic: which
 
 	mu         sync.Mutex
 	sides      [2]*side
@@ -450,6 +451,7 @@ func newMatch(h *Hub, l play.Live, players [2]Player) (*Match, error) {
 	}
 	if l.Recording != nil {
 		m.sides[1].recording = l.Recording
+		m.topic = l.Topic
 		m.sides[1].came = true
 	}
 	return m, nil
@@ -759,8 +761,10 @@ type View struct {
 	Phase Phase `json:"phase"`
 	N     int   `json:"n"`
 	Total int   `json:"total"`
-	// Recorded is a duel against a recording of the other's game.
+	// Recorded is a duel against a recording of the other's game; Topic, the one topic that game was in (a topic's
+	// game, which the duel's player didn't choose), if it was.
 	Recorded bool     `json:"recorded,omitempty"`
+	Topic    string   `json:"topic,omitempty"`
 	You      SideView `json:"you"`
 	Them     SideView `json:"them"`
 	// StartsMs is how long until the first question, while the two are shown.
@@ -825,7 +829,7 @@ func (m *Match) View(viewer int64) View {
 	}
 	shown := m.phase == PhaseReveal
 	v := View{
-		ID: m.id, Phase: m.phase, N: m.n, Total: len(m.dealt), Recorded: !them.human(),
+		ID: m.id, Phase: m.phase, N: m.n, Total: len(m.dealt), Recorded: !them.human(), Topic: m.topic,
 		You: m.sideView(me, true, shown), Them: m.sideView(them, false, shown),
 	}
 	if m.phase == PhaseIntro {

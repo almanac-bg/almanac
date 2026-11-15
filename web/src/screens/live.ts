@@ -2,20 +2,49 @@
 // each question for both at the same moment — the other's answer comes in as they give it, and shows with yours —
 // and the result. The server sends the duel as this player sees it after every change; the browser reconnects if
 // the line drops, and comes back to the same duel.
+//
+// It loads on its own, the first time a live duel opens, and is handed the app's pieces (kit.ts): it imports only types.
 
-import { emblem } from "../art/emblem.ts";
-import { news } from "../game/news.ts";
-import { answered, ask, crowdLine, picture } from "../game/questions.ts";
-import { questionHead, timer, trail, upNext } from "../game/run.ts";
 import type { Answer, Mark, Reveal, View } from "../game/types.ts";
-import { type ApiError, api } from "../lib/api.ts";
-import { keepAwake } from "../lib/awake.ts";
-import { type Child, computed, effect, h, onCleanup, signal, untracked } from "../lib/dom.ts";
-import { go, title } from "../lib/router.ts";
-import { play, playAnswer, playCount } from "../lib/sound.ts";
-import { categories, player, playing } from "../state.ts";
-import { avatar, formatNumber, type Tier, type VerdictKind, verdict } from "../ui.ts";
-import { type DuelView, ended } from "./duel.ts";
+import type { Kit } from "../kit.ts";
+import type { ApiError } from "../lib/api.ts";
+import type { Child } from "../lib/dom.ts";
+import type { Tier, VerdictKind } from "../ui.ts";
+import type { DuelView } from "./duel.ts";
+
+// The app's pieces, set as the screen opens (liveDuel).
+let {
+  answered,
+  api,
+  ask,
+  avatar,
+  categories,
+  computed,
+  crowdLine,
+  effect,
+  emblem,
+  ended,
+  formatNumber,
+  go,
+  h,
+  keepAwake,
+  news,
+  onCleanup,
+  picture,
+  play,
+  playAnswer,
+  playCount,
+  player,
+  playing,
+  questionHead,
+  signal,
+  timer,
+  title,
+  trail,
+  untracked,
+  upNext,
+  verdict,
+} = {} as Kit;
 
 interface Side {
   name: string;
@@ -45,6 +74,8 @@ interface LiveView {
   n: number;
   total: number;
   recorded?: boolean;
+  /** Against a recording of a game in one topic: which. */
+  topic?: string;
   you: Side;
   them: Side;
   startsMs?: number;
@@ -89,7 +120,39 @@ const divisionNames: Record<Side["division"], string> = {
 /** Seconds, the Bulgarian way: „4,2 с“. */
 const seconds = (ms: number) => `${(ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 })} с`;
 
-export function liveDuel() {
+export function liveDuel(kit: Kit) {
+  ({
+    answered,
+    api,
+    ask,
+    avatar,
+    categories,
+    computed,
+    crowdLine,
+    effect,
+    emblem,
+    ended,
+    formatNumber,
+    go,
+    h,
+    keepAwake,
+    news,
+    onCleanup,
+    picture,
+    play,
+    playAnswer,
+    playCount,
+    player,
+    playing,
+    questionHead,
+    signal,
+    timer,
+    title,
+    trail,
+    untracked,
+    upNext,
+    verdict,
+  } = kit);
   title("Дуел");
   const round = signal(0);
   // „Още един дуел“ starts over in place: a new wait, a new duel.
@@ -255,7 +318,7 @@ function intro(v: LiveView): Child {
         ? h(
             "p",
             { class: "lead" },
-            `Никой не дойде навреме. Играеш срещу запис на игра на ${v.them.name}: всеки отговор идва в мига, в който е даден.`,
+            `Никой не дойде навреме. Играеш срещу запис на игра на ${v.them.name}${v.topic ? ` по тема „${topicName(v.topic)}“` : ""}: всеки отговор идва в мига, в който е даден.`,
           )
         : null,
     ),

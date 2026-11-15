@@ -51,6 +51,10 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 		out["played"] = played
+		// A friend has played the duel they started: told on Начало, once (by the client), above the day.
+		if out["duel"], err = s.game.FriendPlayedOf(r.Context(), u.ID); err != nil {
+			return err
+		}
 		// Which of the game's systems they've met: Начало shows the level and the goals once XP is open.
 		if out["open"], err = s.game.OpenOf(r.Context(), u.ID); err != nil {
 			return err
