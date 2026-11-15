@@ -220,9 +220,13 @@ var lookColumns = `coalesce(u.avatar, '') || '/' || coalesce(u.frame, '') || '/'
 	` + xpOf("u.id")
 
 // xpOf is a SQL expression for all the XP a player (a column or a parameter) has earned: their games', goals',
-// achievements' and leagues' (the xp_earned view).
+// achievements' and leagues'. Each is summed from its own table by the player's key, so it costs as much as the
+// player has earned; summed over the four together (a view of them), SQLite reads all four whole, everyone's.
 func xpOf(user string) string {
-	return `(SELECT coalesce(sum(xp), 0) FROM xp_earned WHERE user_id = ` + user + `)`
+	sum := func(table string) string {
+		return `(SELECT coalesce(sum(xp), 0) FROM ` + table + ` WHERE user_id = ` + user + `)`
+	}
+	return `(` + sum("runs") + ` + ` + sum("goals_done") + ` + ` + sum("achievements") + ` + ` + sum("league_results") + `)`
 }
 
 // LookOf is how a player shows to others.
