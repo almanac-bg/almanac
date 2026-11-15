@@ -1,7 +1,9 @@
 package play
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -21,6 +23,9 @@ func TestDaysAhead(t *testing.T) {
 	w.b = biggerSample(t, 20)
 	w.g.Bank = func() *bank.Bank { return w.b }
 	ctx := t.Context()
+	if err := w.g.EnsureDays(ctx); err != nil {
+		t.Fatal(err)
+	}
 	barred, err := w.g.DayQuestions(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -72,7 +77,7 @@ func TestDaysAhead(t *testing.T) {
 	q, _ := b2.Get(gone)
 	q.Extra().Retired = true
 	w.g.Bank = func() *bank.Bank { return b2 }
-	if _, err := w.g.DayQuestions(ctx); err != nil {
+	if err := w.g.EnsureDays(ctx); err != nil {
 		t.Fatal(err)
 	}
 	var s string
@@ -89,6 +94,9 @@ func TestDaysAhead(t *testing.T) {
 	}
 	// The next day, the next day ahead is drawn; yesterday's questions may come back to the other games.
 	w.wait(24 * time.Hour)
+	if err := w.g.EnsureDays(ctx); err != nil {
+		t.Fatal(err)
+	}
 	next, err := w.g.DayQuestions(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -149,6 +157,57 @@ func biggerSample(t *testing.T, n int) *bank.Bank {
 		t.Fatal(problems)
 	}
 	return b
+}
+
+// A game that rolls back takes no days with it: the days ahead are drawn in a transaction of their own, and a
+// player's game only reads them (today's drawn there if it must be); the next game finds what was kept.
+func TestDaysAheadRollBack(t *testing.T) {
+	w := setup(t)
+	w.b = biggerSample(t, 20)
+	w.g.Bank = func() *bank.Bank { return w.b }
+	ctx := t.Context()
+	var seen map[string]bool
+	failed := w.db.Tx(ctx, func(tx *sql.Tx) error {
+		var err error
+		seen, err = w.g.dayQuestions(tx)
+		if err != nil {
+			return err
+		}
+		return errors.New("the game fails")
+	})
+	if failed == nil || len(seen) != Length {
+		t.Fatalf("today's %d, %v", len(seen), failed)
+	}
+	if err := w.g.EnsureDays(ctx); err != nil {
+		t.Fatal(err)
+	}
+	s, err := w.g.StartDay(ctx, w.user())
+	if err != nil {
+		t.Fatal(err)
+	}
+	barred, _ := w.g.DayQuestions(ctx)
+	for _, p := range w.picks(s.ID) {
+		if !barred[p.ID] {
+			t.Fatalf("today's %s isn't kept out of the other games", p.ID)
+		}
+	}
+	// New rules: the days after tomorrow are drawn again; today and tomorrow stay.
+	var before string
+	tomorrow := w.now.AddDate(0, 0, 1).In(Bulgaria).Format(time.DateOnly)
+	_ = w.db.Read.QueryRow(`SELECT questions FROM days WHERE day = ?`, tomorrow).Scan(&before)
+	_, _ = w.db.Write.Exec(`UPDATE kv SET value = 'older rules' WHERE key = 'days_drawn_by'`)
+	w.g.daysAhead.mu.Lock()
+	w.g.daysAhead.day = ""
+	w.g.daysAhead.mu.Unlock()
+	if err := w.g.EnsureDays(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var after, rules string
+	_ = w.db.Read.QueryRow(`SELECT questions FROM days WHERE day = ?`, tomorrow).Scan(&after)
+	_ = w.db.Read.QueryRow(`SELECT value FROM kv WHERE key = 'days_drawn_by'`).Scan(&rules)
+	if before == "" || after != before || rules != drawnBy(w.b) {
+		t.Fatalf("tomorrow %q → %q, rules %q", before, after, rules)
+	}
 }
 
 func mustPicks(t *testing.T, s string) []Pick {

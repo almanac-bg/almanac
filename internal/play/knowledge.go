@@ -214,39 +214,20 @@ type given struct {
 }
 
 // countKnowledge goes over everyone's fair answers (not of a script's games), as of now, for a bank: each player's in
-// the order they gave them, into their mastery in each topic and over all, as abilities does for one. Read as they
-// lie and put in order here, not by ORDER BY: SQLite would sort them all for it, many times slower. Each run's
-// answers are read after it (CROSS JOIN keeps that order): left to choose, SQLite goes through the answers by their
-// question's index and looks each one's run up, thirty times slower.
+// the order they gave them, into their mastery in each topic and over all, as abilities does for one. The runs come by
+// player (INDEXED BY runs_user: in the index's order, nothing sorted), each run's answers after it (CROSS JOIN keeps
+// that order: left to choose, SQLite goes through the answers by their question's index and looks each one's run up,
+// thirty times slower), so one player's answers are held at a time, put in order here, and let go.
 func (g *Game) countKnowledge(ctx context.Context, now time.Time, b *bank.Bank) error {
 	h, err := g.hardness(ctx)
 	if err != nil {
 		return err
 	}
-	answers := map[int64][]given{}
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT r.user_id, r.id, a.n, a.at, a.question_id, a.score FROM runs r
-		CROSS JOIN answers a ON a.run_id = r.id WHERE NOT r.scripted`)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	var user int64
-	var id []byte
-	for rows.Next() {
-		var a given
-		if err := rows.Scan(&user, &a.run, &a.n, &a.at, &id, &a.score); err != nil {
-			return err
-		}
-		var found bool
-		if a.q, found = b.Get(string(id)); found { // gone from the bank: not in a mastery
-			answers[user] = append(answers[user], a)
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
 	by := make(map[string][]known, len(b.Categories)+1)
-	for user, list := range answers {
+	fold := func(user int64, list []given) {
+		if len(list) == 0 {
+			return
+		}
 		slices.SortFunc(list, func(x, y given) int {
 			return cmp.Or(cmp.Compare(x.at, y.at), cmp.Compare(x.run, y.run), cmp.Compare(x.n, y.n))
 		})
@@ -267,6 +248,33 @@ func (g *Game) countKnowledge(ctx context.Context, now time.Time, b *bank.Bank) 
 		}
 		by[""] = append(by[""], knownFrom(user, all, h.byTopic[""]))
 	}
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT r.user_id, r.id, a.n, a.at, a.question_id, a.score
+		FROM runs r INDEXED BY runs_user CROSS JOIN answers a ON a.run_id = r.id WHERE NOT r.scripted`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	var user, last int64 = 0, -1
+	var list []given
+	var id []byte
+	for rows.Next() {
+		var a given
+		if err := rows.Scan(&user, &a.run, &a.n, &a.at, &id, &a.score); err != nil {
+			return err
+		}
+		if user != last {
+			fold(last, list)
+			list, last = list[:0], user
+		}
+		var found bool
+		if a.q, found = b.Get(string(id)); found { // gone from the bank: not in a mastery
+			list = append(list, a)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	fold(last, list)
 	for _, list := range by {
 		slices.SortFunc(list, func(a, b known) int {
 			if a.ahead(b) {
