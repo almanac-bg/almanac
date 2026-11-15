@@ -15,6 +15,7 @@ import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { askToKeep } from "../lib/keep.ts";
 import { place } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
+import { onDay } from "../lib/words.ts";
 import { dayInBulgaria } from "../lib/year.ts";
 import { player, playing, user } from "../state.ts";
 import { meter, type Open, reserveWords } from "../ui.ts";
@@ -31,6 +32,12 @@ interface Today {
   week?: boolean[];
   /** Reserve days in hand: each keeps the streak through a day missed. */
   reserve?: number;
+  /** Days in a row to the next reserve day (0: they are full). */
+  next?: number;
+  /** A day just missed that a reserve day kept the streak through (the last 3 days). */
+  kept?: string;
+  /** A streak that just ended (the last 3 days): its days, and the day missed that ended it. */
+  ended?: { days: number; on: string };
   /** The player's level, from all their XP (for a player). */
   level?: { level: number; xp: number; from: number; to: number };
   /** Whether the player has finished a game of any kind: until then Начало is the day and the topics only. */
@@ -95,6 +102,7 @@ export function today() {
       { class: "screen home" },
       // A new player, before a first game finished, sees the day and the topics only.
       () => (user() && (just || t.played) ? status(fresh()) : null),
+      streakNotice(t),
       // On a big screen the day leads the page with the topics under it, and the rest waits in a column beside it
       // (app.css); on a phone the two parts are one column, in this order.
       h(
@@ -135,6 +143,22 @@ export function today() {
       topics(),
     );
   }
+}
+
+/** What came of the days just missed — a reserve day kept the streak, or none was left and it ended — said once on
+ * this device, above the day. */
+function streakNotice(t: Today): Child {
+  const key = t.kept ? `kept:${t.kept}` : t.ended ? `ended:${t.ended.on}` : "";
+  try {
+    if (!key || localStorage.getItem("almanac.streakTold") === key) return null;
+    localStorage.setItem("almanac.streakTold", key);
+  } catch {
+    // Storage refused (a private window): said on each visit, which is the lesser loss.
+  }
+  const text = t.kept
+    ? `Резервен ден запази серията ти ${onDay(t.kept)}. Серия: ${t.streak === 1 ? "1 ден" : `${t.streak} дни`}.`
+    : `Серията ти от ${t.ended?.days} дни прекъсна. ${t.run?.done ? "Днес започна нова." : "Днес започва нова."}`;
+  return h("p", { class: "streak-notice", role: "status" }, picture(t.kept ? "shield" : "flame", "reserve-pic"), text);
 }
 
 /** The streak and (once XP is open: a first day has the streak only) the level, side by side: each a tap from Профил,

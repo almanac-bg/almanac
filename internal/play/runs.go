@@ -173,20 +173,34 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 	return s, err
 }
 
-// ReserveMax is how many reserve days a player can keep: a day whose three goals were all done earns one, and a day
-// missed spends one, so the streak holds through it. The day's goals keep the streak, not only the day's questions.
+// ReserveMax is how many reserve days a player can keep. A day missed spends one, so the streak holds through it. They
+// come from the day itself, so that a player who plays only the day's ten has them too: one with the first day ever
+// played, one on every ReserveEvery-th day in a row; and from a day with all three goals done.
 const ReserveMax = 2
 
+// ReserveEvery is how many days in a row earn a reserve day.
+const ReserveEvery = 7
+
 // StreakNow is a player's streak: the days in a row they've finished the day's questions (up to today, or yesterday
-// while today isn't played yet), the reserve days they have, and the days a reserve kept the streak through.
+// while today isn't played yet), the reserve days they have, the days a reserve kept the streak through, how many
+// more days in a row earn the next reserve day (0 with ReserveMax in hand), and the last streak that ended, if one did.
 type StreakNow struct {
 	Days    int      `json:"days"`
 	Reserve int      `json:"reserve"`
 	Saved   []string `json:"saved"`
+	Next    int      `json:"next"`
+	Ended   *Ended   `json:"ended,omitempty"`
 }
 
-// StreakOf is a player's streak, from every day they've played: each day played adds to it (and, with all its goals
-// done, earns a reserve day), each day missed spends a reserve day, or ends it.
+// Ended is a streak that ended: how many days it had, and the day that ended it (the first day missed with no reserve
+// day to keep it).
+type Ended struct {
+	Days int    `json:"days"`
+	On   string `json:"on"`
+}
+
+// StreakOf is a player's streak, from every day they've played: each day played adds to it (and may earn a reserve
+// day: ReserveMax), each day missed spends a reserve day, or ends it.
 func (g *Game) StreakOf(ctx context.Context, userID int64) (StreakNow, error) {
 	s := StreakNow{Saved: []string{}}
 	played, full := map[string]bool{}, map[string]bool{}
@@ -223,7 +237,7 @@ func (g *Game) StreakOf(ctx context.Context, userID int64) (StreakNow, error) {
 		switch {
 		case played[day]:
 			s.Days++
-			if full[day] {
+			if day == first || s.Days%ReserveEvery == 0 || full[day] {
 				s.Reserve = min(ReserveMax, s.Reserve+1)
 			}
 		case day == today: // not played yet: the streak runs to yesterday
@@ -231,9 +245,15 @@ func (g *Game) StreakOf(ctx context.Context, userID int64) (StreakNow, error) {
 			s.Reserve--
 			s.Saved = append(s.Saved, day)
 		default:
+			if s.Days > 0 {
+				s.Ended = &Ended{Days: s.Days, On: day}
+			}
 			s.Days, s.Saved = 0, s.Saved[:0]
 		}
 		d = d.AddDate(0, 0, 1)
+	}
+	if s.Reserve < ReserveMax {
+		s.Next = ReserveEvery - s.Days%ReserveEvery
 	}
 	return s, nil
 }

@@ -27,6 +27,16 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 		out["streak"], out["reserve"], out["saved"] = streak.Days, streak.Reserve, s.game.InWeek(streak.Saved)
+		out["next"] = streak.Next
+		// What came of the days just missed, told on Начало (once, by the client): a reserve day kept the streak, or
+		// none was left and it ended.
+		recent := s.game.Now().In(play.Bulgaria).AddDate(0, 0, -3).Format(time.DateOnly)
+		if n := len(streak.Saved); n > 0 && streak.Saved[n-1] >= recent {
+			out["kept"] = streak.Saved[n-1]
+		}
+		if e := streak.Ended; e != nil && e.On >= recent && e.Days >= 2 {
+			out["ended"] = e
+		}
 		if out["week"], err = s.game.Week(r.Context(), u.ID); err != nil {
 			return err
 		}

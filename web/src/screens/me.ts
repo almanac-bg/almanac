@@ -45,7 +45,7 @@ export function me() {
           },
           // The league once it's open (play/unfold.go): from the third day played.
           () => (progress()?.open.league ? leagueLine() : null),
-          stats(() => !!progress()?.open.xp),
+          stats(),
           yearLink(),
           () =>
             user()?.tag

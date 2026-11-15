@@ -238,9 +238,9 @@ function today(): number {
   return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(weekday.format(new Date()));
 }
 
-/** The streak: days in a row with the day's ten, this week's days played (and kept by a reserve day), and the reserve
- * days in hand. */
-export function streak(days: number, week?: boolean[], saved?: boolean[], reserve = 0, goals = true): Child {
+/** The streak: days in a row with the day's ten, this week's days played (and kept by a reserve day), the reserve
+ * days in hand, and (`next`) how many more days in a row earn the next one. */
+export function streak(days: number, week?: boolean[], saved?: boolean[], reserve = 0, next = 0): Child {
   const unit = days === 1 ? "ден" : "дни";
   const now = today();
   return h(
@@ -257,14 +257,14 @@ export function streak(days: number, week?: boolean[], saved?: boolean[], reserv
         h("span", { class: "streak-unit" }, unit),
       ),
       h("p", null, days ? "поред с въпросите на деня" : "Изиграй днешните и започни серия."),
-      // The way to a reserve day is the goals': said once they show (`goals`, play/unfold.go).
-      reserve || goals
+      // What keeps the streak through a day missed: the reserve days in hand, or the way to the next (play/runs.go).
+      reserve || next
         ? h(
             "p",
             { class: "streak-reserve" },
             reserve
               ? `${reserveWords(reserve)}: ако пропуснеш ден, серията остава.`
-              : "Изпълни и трите цели за деня и печелиш резервен ден за серията.",
+              : `Още ${next === 1 ? "1 ден" : `${next} дни`} поред и печелиш резервен ден за серията.`,
           )
         : null,
     ),
