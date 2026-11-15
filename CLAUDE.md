@@ -29,7 +29,7 @@ most). A change is judged by whether players come back: the retention numbers in
 
 | Path | What |
 | --- | --- |
-| `cmd/almanac` | The program: `serve`, `bank check/fmt`, `backup now/restore` |
+| `cmd/almanac` | The program: `serve`, `bank check/fmt`, `backup now/restore/verify` |
 | `cmd/build` | Builds the client into `internal/assets/dist` (esbuild; size budgets) |
 | `internal/play` | The game's rules and data: runs, scoring (`worth.go`), duels, friends, rating, leagues, goals, progress |
 | `internal/live` | Live duels: matchmaking, the shared clock, recordings |
@@ -38,7 +38,7 @@ most). A change is judged by whether players come back: the retention numbers in
 | `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: every client route must be listed there, or a reload is a 404) |
 | `internal/store` | SQLite; migrations in `internal/store/migrations`, applied once each by name |
 | `internal/bank` | Question types, the bank on disk, its checks |
-| `internal/account`, `mail`, `push`, `backup` | Players and sign-in, email, Web Push, hourly backups to R2 |
+| `internal/account`, `mail`, `push`, `backup` | Players and sign-in, email, Web Push, hourly backups to R2 (each checked before it's sent, one brought back daily) |
 | `web/src` | The client, plain TypeScript, no framework: `lib/` (DOM, signals, router), `game/` (questions, a run), `screens/` (one file per page), `ui.ts`, `app.css` |
 | `web/DESIGN.md` | How it looks and speaks: tokens, components, copy rules. Follow it for any UI |
 | `e2e` | The game in real browsers (Playwright) |
@@ -131,4 +131,7 @@ SQLite in `/var/lib/almanac`, and backs it up hourly to R2. Deploys come from CI
 `almanac-deploy vX.Y.Z` (also how to go back: an older version, as long as no migration came since; past one, the
 older version refuses the database and the deploy goes back to where it was, so put the copy from before that release
 back by hand, `/var/lib/almanac/before-vX.Y.Z.db`, and lose what was played since), `almanac-bank` (pull and reload
-the questions), `journalctl -u almanac` (logs). Health: `https://almanac.bg/api/health` shows the live version.
+the questions), `journalctl -u almanac` (logs). The `almanac backup` commands need the service's settings:
+`systemd-run --pipe --wait -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac backup verify`
+brings the latest copy back and checks it (the server does this itself daily). Health: `https://almanac.bg/api/health`
+shows the live version.
