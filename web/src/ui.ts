@@ -167,7 +167,8 @@ let explained = 0;
  * one anywhere. */
 export function explain(label: Child, words: string): Child {
   const id = `explain-${++explained}`;
-  const pop = h("span", { class: "explain-pop", id, popover: "", role: "note" }, words) as HTMLElement;
+  // A manual popover: the game says when it goes (WebKit's light dismiss closed it under the very tap that opened it).
+  const pop = h("span", { class: "explain-pop", id, popover: "manual", role: "note" }, words) as HTMLElement;
   let kept = false;
   let mouse = false; // the last press was a mouse's: hovering already shows the card, a click only keeps it shown
   const shown = () => pop.matches(":popover-open");
@@ -190,8 +191,24 @@ export function explain(label: Child, words: string): Child {
   const hide = () => {
     if (shown() && !kept) pop.hidePopover();
   };
+  // Kept by a tap, it goes with the next tap anywhere else, or Esc.
+  const away = (e: Event) => {
+    if (!pop.isConnected) {
+      // Gone with its screen while open (no toggle then): nothing to put away, and no more listening.
+      for (const type of ["pointerdown", "keydown"]) document.removeEventListener(type, away, true);
+      return;
+    }
+    if (e instanceof KeyboardEvent ? e.key !== "Escape" : word.contains(e.target as Node)) return;
+    kept = false;
+    hide();
+  };
   pop.addEventListener("toggle", () => {
-    if (!shown()) kept = false;
+    const open = shown();
+    if (!open) kept = false;
+    for (const type of ["pointerdown", "keydown"]) {
+      if (open) document.addEventListener(type, away, true);
+      else document.removeEventListener(type, away, true);
+    }
   });
   const word = h(
     "button",
