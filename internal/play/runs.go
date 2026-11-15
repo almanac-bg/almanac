@@ -194,22 +194,30 @@ type Ended struct {
 // StreakOf is a player's streak, from every day they've played: each day played adds to it (and may earn a reserve
 // day: ReserveMax), each day missed spends a reserve day, or ends it.
 func (g *Game) StreakOf(ctx context.Context, userID int64) (StreakNow, error) {
-	s := StreakNow{Saved: []string{}}
-	played, full := map[string]bool{}, map[string]bool{}
-	first := ""
+	played, full, first, err := g.streakDays(ctx, userID)
+	if err != nil || first == "" {
+		return StreakNow{Saved: []string{}}, err
+	}
+	return walkStreak(played, full, first, g.Today(), nil), nil
+}
+
+// streakDays are the days a player finished the day's questions on (first: the first of them, "" for none), and the
+// days they did all three goals on.
+func (g *Game) streakDays(ctx context.Context, userID int64) (played, full map[string]bool, first string, err error) {
+	played, full = map[string]bool{}, map[string]bool{}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT day, 0 FROM runs WHERE user_id = ?1 AND kind = 'day'
 			AND finished_at IS NOT NULL AND day >= ?2
 		UNION ALL SELECT day, 1 FROM goals_done WHERE user_id = ?1 AND day >= ?2 GROUP BY day HAVING count(*) >= ?3`,
 		userID, g.Now().In(Bulgaria).AddDate(-10, 0, 0).Format(time.DateOnly), GoalsPerDay)
 	if err != nil {
-		return s, err
+		return nil, nil, "", err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var day string
 		var goals bool
 		if err := rows.Scan(&day, &goals); err != nil {
-			return s, err
+			return nil, nil, "", err
 		}
 		if goals {
 			full[day] = true
@@ -220,10 +228,13 @@ func (g *Game) StreakOf(ctx context.Context, userID int64) (StreakNow, error) {
 			first = day
 		}
 	}
-	if err := rows.Err(); err != nil || first == "" {
-		return s, err
-	}
-	today := g.Today()
+	return played, full, first, rows.Err()
+}
+
+// walkStreak goes over a player's days from the first played to today, as StreakOf tells them. saw, if set, hears of
+// each day a reserve day kept the streak through (spent), and of each day that ended a streak (ended: the days it had).
+func walkStreak(played, full map[string]bool, first, today string, saw func(day string, spent bool, ended int)) StreakNow {
+	s := StreakNow{Saved: []string{}}
 	d, _ := time.Parse(time.DateOnly, first)
 	for day := first; day <= today; day = d.Format(time.DateOnly) {
 		switch {
@@ -236,9 +247,15 @@ func (g *Game) StreakOf(ctx context.Context, userID int64) (StreakNow, error) {
 		case s.Days > 0 && s.Reserve > 0:
 			s.Reserve--
 			s.Saved = append(s.Saved, day)
+			if saw != nil {
+				saw(day, true, 0)
+			}
 		default:
 			if s.Days > 0 {
 				s.Ended = &Ended{Days: s.Days, On: day}
+				if saw != nil {
+					saw(day, false, s.Days)
+				}
 			}
 			s.Days, s.Saved = 0, s.Saved[:0]
 		}
@@ -247,7 +264,7 @@ func (g *Game) StreakOf(ctx context.Context, userID int64) (StreakNow, error) {
 	if s.Reserve < ReserveMax {
 		s.Next = ReserveEvery - s.Days%ReserveEvery
 	}
-	return s, nil
+	return s
 }
 
 // Streak is how many days in a row a player has finished the day's questions, reserve days kept (StreakOf).

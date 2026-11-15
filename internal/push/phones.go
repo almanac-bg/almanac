@@ -162,7 +162,7 @@ func (a *Apple) Send(ctx context.Context, token string, m Message) error {
 	}
 	payload, _ := json.Marshal(map[string]any{
 		"aps": map[string]any{"alert": map[string]string{"title": m.Title, "body": m.Body}, "sound": "default"},
-		"url": m.URL,
+		"url": m.URL, "kind": m.Kind,
 	})
 	jwt, err := a.token()
 	if err != nil {
@@ -298,7 +298,7 @@ func (g *Google) Send(ctx context.Context, token string, m Message) error {
 	body, _ := json.Marshal(map[string]any{"message": map[string]any{
 		"token":        token,
 		"notification": map[string]string{"title": m.Title, "body": m.Body},
-		"data":         map[string]string{"url": m.URL},
+		"data":         map[string]string{"url": m.URL, "kind": m.Kind},
 		"android":      map[string]any{"priority": "HIGH", "ttl": "43200s"},
 	}})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.Host+"/v1/projects/"+g.project+"/messages:send", bytes.NewReader(body))

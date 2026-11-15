@@ -31,3 +31,15 @@ export async function api<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: 
   }
   return data as T;
 }
+
+/** Counts one of something for the admin page (server: /api/tally; play/measure.go): the day shared, the reminder's
+ * ask answered. Sent and forgotten: it goes even as the page is left, and a count lost is no matter. */
+export function tally(key: string): void {
+  fetch("/api/tally", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key }),
+    keepalive: true,
+    credentials: "same-origin",
+  }).catch(() => {});
+}

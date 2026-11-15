@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/play"
@@ -147,6 +148,14 @@ const (
 	pushAsked pushKind = ""
 )
 
+// name is the kind as notifications carry it, and as they're counted: an asked-for one is "asked".
+func (k pushKind) name() string {
+	if k == pushAsked {
+		return "asked"
+	}
+	return string(k)
+}
+
 // pushKinds are the kinds a player chooses, with their defaults.
 var pushKinds = map[pushKind]bool{pushDay: true, pushFriends: true, pushRoyal: false}
 
@@ -252,6 +261,16 @@ func (s *Server) notify(ctx context.Context, kind pushKind, m push.Message, user
 		}
 		rows.Close()
 	}
+	// Counted by kind (play/measure.go): the notifications delivered, and the browsers and phones found gone.
+	m.Kind = kind.name()
+	var sent, gone atomic.Int64
+	defer func() {
+		for key, n := range map[string]int64{"push:sent:" + m.Kind: sent.Load(), "push:gone:" + m.Kind: gone.Load()} {
+			if n > 0 {
+				_ = s.game.Tally(context.WithoutCancel(ctx), key, int(n))
+			}
+		}
+	}()
 	work := make(chan target)
 	var wg sync.WaitGroup
 	for range min(8, len(targets)) {
@@ -270,7 +289,12 @@ func (s *Server) notify(ctx context.Context, kind pushKind, m push.Message, user
 						_, _ = s.db.Write.ExecContext(ctx, `DELETE FROM push_subs WHERE endpoint = ?`, t.sub.Endpoint)
 					}
 				}
-				if err != nil && !errors.Is(err, push.ErrGone) {
+				switch {
+				case err == nil:
+					sent.Add(1)
+				case errors.Is(err, push.ErrGone):
+					gone.Add(1)
+				default:
 					slog.Warn("push", "err", err)
 				}
 			}

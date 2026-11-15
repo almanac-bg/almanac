@@ -626,6 +626,11 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 	if status != 200 || !strings.Contains(body, "Отговорът е остарял") || !strings.Contains(body, "Мусала") {
 		t.Fatalf("the admin page: %d %s", status, body)
 	}
+	for _, part := range []string{"Първата седмица", "Посещения без профил", "Кои се връщат", "Всеки ден", "Серии", "Игри"} {
+		if !strings.Contains(body, part) {
+			t.Fatalf("the admin page has no %q", part)
+		}
+	}
 	req, _ := http.NewRequest("POST", g.url+"/admin/reports/geo-001/resolve", nil)
 	req.Header.Set("Sec-Fetch-Site", "same-origin")
 	res, err := p.client.Do(req)
@@ -808,6 +813,9 @@ func TestNotifications(t *testing.T) {
 	}
 	if n := s.remind(t.Context(), evening.Add(time.Minute)); n != 0 {
 		t.Fatal("reminded twice in a day")
+	}
+	if g.counted("push:sent:day") != 1 {
+		t.Fatalf("reminders counted: %d", g.counted("push:sent:day"))
 	}
 	if n := s.remind(t.Context(), evening.Add(-2*time.Hour)); n != 0 {
 		t.Fatal("reminded before the hour")

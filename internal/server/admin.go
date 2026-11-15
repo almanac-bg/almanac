@@ -3,7 +3,9 @@ package server
 import (
 	"bytes"
 	"cmp"
+	"fmt"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strings"
@@ -85,10 +87,16 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		Overall                                                    []cell
 		Reported                                                   []reported
 		Hardest, Easiest                                           []stat
+		Daily                                                      string
+		First                                                      firstWeek
 	}{Questions: len(b.Questions), Live: len(b.Live("", "")), After: play.RetentionDays}
 	today := s.game.Today()
 	if cohorts, active, err := s.game.Retention(ctx, play.RetentionDays[len(play.RetentionDays)-1]+10); err == nil {
 		data.Active = active
+		data.Daily = strings.Replace(fmt.Sprintf("%.1f", active.Daily), ".", ",", 1)
+		if data.First, err = s.firstWeek(ctx, active); err != nil {
+			slog.Error("admin: the first week", "err", err)
+		}
 		// Overall: of the players whose day N has come, the share that came back on it.
 		news, backs := make([]int, len(play.RetentionDays)), make([]int, len(play.RetentionDays))
 		for _, c := range cohorts {
@@ -246,14 +254,59 @@ var adminBody = template.Must(template.New("admin").Parse(`
 В банката: {{.Questions}} въпроса, {{.Live}} в игра.</p>
 
 <h2>Връщат ли се</h2>
-<p>Играли днес: {{.Active.Today}} · за 7 дни: {{.Active.Week}} · за 30 дни: {{.Active.Month}}.</p>
-<p class="muted">Новите играчи по деня на първата им игра и колко от тях са играли пак точно толкова дни по-късно.
-„Играл“ е отговорил на въпрос.</p>
+<p>Играли днес: {{.Active.Today}} · за 7 дни: {{.Active.Week}} · за 30 дни: {{.Active.Month}}.
+На ден, средно за последните 7: {{.Daily}} ({{.First.Stick}} от играещите за 30 дни).</p>
+<p class="muted">Новите играчи по седмицата на първата им игра и колко от тях са играли пак точно толкова дни по-късно;
+„1–7“: в който и да е от дните от 1-вия до 7-мия. „Играл“ е отговорил на въпрос. Делът е от тези, за които денят е минал.</p>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th>Седмица</th><th class="num">Нови</th><th class="num">След 1 ден</th><th class="num">След 7 дни</th><th class="num">1–7</th><th class="num">След 30 дни</th></tr></thead><tbody>
+{{with .First.Overall}}{{if .New}}<tr><td><strong>{{.Week}}</strong></td><td class="num">{{.New}}</td><td class="num">{{.D1}}</td><td class="num">{{.D7}}</td><td class="num">{{.Within}}</td><td class="num">{{.D30}}</td></tr>{{end}}{{end}}
+{{range .First.Cohorts}}<tr><td class="num">{{.Week}}</td><td class="num">{{.New}}</td><td class="num">{{.D1}}</td><td class="num">{{.D7}}</td><td class="num">{{.Within}}</td><td class="num">{{.D30}}</td></tr>
+{{else}}<tr><td colspan="6" class="muted">Още няма нови играчи.</td></tr>{{end}}
+</tbody></table></div>
+<details><summary>По дни</summary>
 <div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th class="num">Нови</th>{{range .After}}<th class="num">След {{.}} {{if eq . 1}}ден{{else}}дни{{end}}</th>{{end}}</tr></thead><tbody>
 {{if .Cohorts}}<tr><td><strong>Общо</strong></td><td></td>{{range .Overall}}<td class="num">{{if .Due}}—{{else}}<strong>{{.Share}}%</strong>{{end}}</td>{{end}}</tr>{{end}}
 {{range .Cohorts}}<tr><td class="num">{{.Day}}</td><td class="num">{{.New}}</td>{{range .Cells}}<td class="num">{{if .Due}}—{{else}}{{.Back}} · {{.Share}}%{{end}}</td>{{end}}</tr>
 {{else}}<tr><td colspan="6" class="muted">Още няма нови играчи.</td></tr>{{end}}
 </tbody></table></div>
+</details>
+
+{{with .First}}
+<h2>Първата седмица</h2>
+<p class="muted">Пътят на новия играч, по седмицата (от понеделник) на първия му ден. Посещенията и гостите са от
+същата седмица; оттам нататък делът е от изигралите въпрос, за които денят вече е минал.</p>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th></th>{{range .Weeks}}<th class="num">{{.}}</th>{{end}}</tr></thead><tbody>
+{{range .Funnel}}<tr><td>{{.Step}}</td>{{range .Cells}}<td class="num">{{.}}</td>{{end}}</tr>{{end}}
+</tbody></table></div>
+
+<h2>Кои се връщат</h2>
+<p class="muted">Новите от последните 12 седмици, според първия им ден.</p>
+{{range .Splits}}{{if .Rows}}
+<h3>{{.Name}}</h3>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">Нови</th><th class="num">След 1 ден</th><th class="num">След 7 дни</th><th class="num">1–7</th><th class="num">След 30 дни</th></tr></thead><tbody>
+{{range .Rows}}<tr><td>{{.Week}}</td><td class="num">{{.New}}</td><td class="num">{{.D1}}</td><td class="num">{{.D7}}</td><td class="num">{{.Within}}</td><td class="num">{{.D30}}</td></tr>{{end}}
+</tbody></table></div>
+{{end}}{{end}}
+
+<h2>Всеки ден</h2>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">7 дни</th><th class="num">28 дни</th></tr></thead><tbody>
+{{range .Loop}}<tr><td>{{if .Sub}}<span class="muted">·</span> {{end}}{{.Name}}</td><td class="num">{{.Week}}</td><td class="num">{{.Month}}</td></tr>{{end}}
+</tbody></table></div>
+<p>Отговори в деня на въпрос, на който играчът е отговарял преди, за 7 дни: {{.Repeats}} (трябва да е 0).</p>
+
+<h2>Серии</h2>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th>Дължина</th><th class="num">Вървят сега</th><th class="num">Прекъснати за 7 дни</th></tr></thead><tbody>
+{{range .Streaks}}<tr><td>{{.Band}}</td><td class="num">{{.Going}}</td><td class="num">{{.Ended}}</td></tr>{{end}}
+</tbody></table></div>
+<p>Резервни дни, похарчени за 7 дни: {{.Spent}}.</p>
+
+<h2>Игри</h2>
+<p class="muted">Игрите по вид, без изиграните по-бързо, отколкото играе човек. „Само денят“: от завършилите деня, които не
+са играли нищо друго. Стаите не се пазят и не са тук.</p>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th>{{range .Kinds}}<th class="num">{{.}}</th>{{end}}<th class="num">Само денят</th></tr></thead><tbody>
+{{range .Games}}<tr><td class="num">{{.Day}}</td>{{range .Kinds}}<td class="num">{{.}}</td>{{end}}<td class="num">{{.Only}}</td></tr>{{end}}
+</tbody></table></div>
+{{end}}
 
 <h2>Доклади ({{len .Reported}})</h2>
 {{range .Reported}}

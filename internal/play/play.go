@@ -295,6 +295,11 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 	if err := g.markActive(tx, r.userID); err != nil {
 		return err
 	}
+	if r.kind == "day" {
+		if err := g.tallyDayAnswer(tx, r); err != nil {
+			return err
+		}
+	}
 	if err := g.judgeAnswer(tx, r, gr, ms); err != nil {
 		return err
 	}
