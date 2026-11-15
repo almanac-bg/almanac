@@ -1,5 +1,6 @@
-// What the player has set for this device: less motion, bigger text, and whether the clock ticks. Kept in the
-// browser (like the sounds' switch), and put on the page as classes on <html>, which the CSS reads.
+// What the player has set for this device: less motion, bigger text, whether the clock ticks, and (in the app) the
+// phone's touch. Kept in the browser (like the sounds' switch), and put on the page as classes on <html>, which the
+// CSS reads.
 
 import { signal } from "./dom.ts";
 
@@ -28,6 +29,14 @@ export const calm = signal(read("almanac.calm", osCalm));
 export const bigText = signal(read("almanac.big", false));
 /** The clock's last seconds of a question (the other sounds have their own switch). */
 export const tickOn = signal(read("almanac.tick", true));
+
+/** The phone's touch on answers and rewards, in the app (the sounds have their own switch). */
+export const vibrateOn = signal(read("almanac.vibrate", true));
+
+export function setVibrate(on: boolean): void {
+  vibrateOn.set(on);
+  keep("almanac.vibrate", on);
+}
 
 function apply(): void {
   const root = document.documentElement;

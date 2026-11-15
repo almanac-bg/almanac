@@ -9,9 +9,10 @@
 import { emblem } from "../art/emblem.ts";
 import { leagueEmblem } from "../art/league.ts";
 import { type ApiError, api } from "../lib/api.ts";
+import { haptic } from "../lib/app.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { place } from "../lib/ordinal.ts";
-import { feelKit, play, type SoundName } from "../lib/sound.ts";
+import { feelKit, play, type SoundName, voice } from "../lib/sound.ts";
 import { type LeagueEnd, moveWords } from "../screens/league.ts";
 import {
   type AchievementInfo,
@@ -77,7 +78,9 @@ export function news(run: number, delay = 0, round?: Promise<number>): Child {
             return;
           }
           await landed(run);
-          if (!gone) kit.sheet(top.parts, top.sound, top.glow, hands());
+          if (gone) return;
+          haptic("big");
+          kit.sheet(top.parts, top.sound, top.glow, { ...hands(), play: voice });
         },
         () => {},
       ),

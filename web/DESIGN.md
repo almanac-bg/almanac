@@ -403,6 +403,12 @@ Feedback fires once, when it's earned, and then the screen is still again:
 - **Nothing plays** for navigation, hovering or decoration.
 - **On by default**, with one switch in Профил („Звуци“) that's kept on the device. The audio starts on the
   player's first touch, as browsers require; a sound that isn't allowed yet is skipped, never queued.
+- **Touch, in the app** (`web/src/lib/phone.ts`, sound or not; „Вибрация“ in Настройки → Звук, only in the app, on by
+  default, kept on the device): a light knock when an answer is tapped; a selection tick for each digit, move and
+  card placed; a medium knock for a right answer and for the streak growing; success for an exact one and for ten of
+  ten; a light knock for a close one; two light knocks, 80ms apart, for a wrong one or none (never the phone's error
+  alert); success, then a heavy knock 120ms later, for the big news's sheet and for getting through Роял's cut; a light
+  knock for going out of it.
 
 ## Pictures
 
