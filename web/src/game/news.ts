@@ -159,7 +159,7 @@ function bigOne(n: News, days: number): { parts: Element[]; sound: SoundName; gl
         { id: "moment-name", style: name.endsWith(".") ? {} : { "font-size": "2.125rem", "line-height": "2.5rem" } },
         name,
       ),
-      ...lines.map((l) => (typeof l === "string" ? h("p", { class: "muted" }, l) : l)),
+      ...lines.filter((l) => l != null).map((l) => (typeof l === "string" ? h("p", { class: "muted" }, l) : l)),
     ] as Element[];
   const big = (el: HTMLElement) => {
     el.style.setProperty("width", "112px");
@@ -195,15 +195,30 @@ function bigOne(n: News, days: number): { parts: Element[]; sound: SoundName; gl
       glow: true,
     };
   const unlock = n.unlocks.find((u) => u.from === `ниво ${n.level}`);
-  if (n.levelUp && (unlock || n.level % 5 === 0))
+  if (n.levelUp && unlock)
+    // What the level brings is the picture: the avatar in the player's tone, the frame or pattern around their own
+    // face, a title under it in its colour — seen before it's worn.
+    return {
+      parts: sheet(
+        big(levelPicture(unlock, n.avatar)),
+        `Ново ниво · ${n.level}`,
+        cap(unlockWords(unlock)),
+        unlock.kind === "title"
+          ? h("p", null, h("span", { class: `who-title t-${unlock.tier ?? "common"}` }, unlock.name))
+          : null,
+        h("p", { class: "muted" }, `Отключва се с ниво ${n.level}.`),
+        h("p", null, wear(unlock, n.avatar)), // in an element: the sheet takes elements, and „Сложи“ changes
+      ),
+      sound: "level",
+      glow: true,
+    };
+  if (n.levelUp && n.level % 5 === 0)
     return {
       parts: sheet(
         big(avatar(n.avatar, { size: "l", level: n.level })),
         "Ново ниво",
         `Ниво ${n.level}`,
-        unlock
-          ? h("p", { class: "muted" }, `Отключва: ${unlockWords(unlock)}. `, wear(unlock, n.avatar))
-          : `Още ${n.to - n.xp} XP до ниво ${n.level + 1}.`,
+        `Още ${n.to - n.xp} XP до ниво ${n.level + 1}.`,
       ),
       sound: "level",
       glow: true,
@@ -425,4 +440,20 @@ function wear(u: Unlock, worn: string): Child {
           ),
     () => error() && h("span", { class: "bad" }, error()),
   ];
+}
+
+/** An unlock as the level's sheet shows it, large: a new avatar in the tone the player wears, a frame or a pattern
+ * around their own avatar, a title's owner (the player) with the title under them. */
+function levelPicture(u: Unlock, worn: string): HTMLElement {
+  const [, tone = "gold"] = worn.split("-");
+  switch (u.kind) {
+    case "avatar":
+      return avatar(`${u.id}-${tone}`, { size: "l" });
+    case "frame":
+      return avatar(worn, { size: "l", frame: u.id });
+    case "backdrop":
+      return avatar(worn, { size: "l", backdrop: u.id });
+    default:
+      return avatar(worn, { size: "l" });
+  }
 }
