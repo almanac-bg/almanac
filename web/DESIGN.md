@@ -153,8 +153,8 @@ takes a token.
 - **Depth:** `--elev-1` at rest, `--elev-2` on hover or for the hero card.
 - **Glows are rewards:** `--glow-gold` on the primary button, first place and an exact answer; `--glow-right` on a
   right answer. Nothing else glows.
-- **Focus:** `--focus`, a ring in the ground colour then in `--accent`, drawn as a box-shadow so it follows the
-  corners.
+- **Focus:** one rule for everything (`:focus-visible`): a 2px `--accent` outline, 2px off the edge. An outline
+  follows the corners and no component's own shadow can cover it, so a component never sets its own.
 
 ## The pieces
 
@@ -162,7 +162,7 @@ takes a token.
   `.card.hero`.
 - **Getting around:** `.tabs` (the four places), `.back` (drawn by `back()`), `.subnav` (Профил's places, drawn by
   `profileNav()`), `.icon-btn` (a square with an icon and its name for screen readers) and `.more` (a `details` that
-  folds what's rarely needed).
+  folds what's rarely needed; what it holds is spaced as a section's parts).
 - **Начало:** `.status` with `.streak-chip` and `.level-chip`; `.card.hero.day`; `.modes .mode` and `.topics .topic`
   (`.topic-all` across the row).
 - **Text:** `.kicker`, `.lead`, `.muted`, `.small`, `.bad` (errors) and `.status`; `.explain` with `.explain-pop`
@@ -214,7 +214,9 @@ takes a token.
   the result; right under it what to do next (`nextSteps`): the one gold `big` button (the day's „Сподели“, „Още
   десет“, „Още един дуел“, „Нова игра“), then the others as plain buttons of one size, side by side where they fit
   (`.result-actions`: „Прегледай въпросите“ first); then the game's news; and at the end the questions, once
-  opened (the button takes the player there).
+  opened (the button takes the player there). Each question gone over is a card of its own (`.reviewed`, a band in
+  its verdict's colour on top): its number and topic as a kicker with „Вярно“, „Близо“ or „Грешно“ beside them, the
+  question the strongest line, the answers marked, and the fact a quiet note under them.
 - **A room led from a big screen** (`host.css`, loaded only there): `.host`, `.host-row` (two columns on a laptop and
   up), `.host-qr`, `.host-join`, `.host-controls` and `.podium`.
 - **A duel's result** (`screens/outcome.ts` with `outcome.css`, loaded as a duel starts), one card (`.duel-end`) for

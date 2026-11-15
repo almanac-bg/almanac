@@ -248,7 +248,6 @@
   /* The router moves focus to a screen's title for screen readers; no ring for that. */
   h1:focus {
     outline: none;
-    box-shadow: none;
   }
 
   h2 {
@@ -270,9 +269,10 @@
     color: var(--link);
   }
 
+  /* Focus: one outline for everything, outside any shadow a component draws. */
   :focus-visible {
-    outline: none;
-    box-shadow: var(--focus);
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   .muted {
@@ -387,10 +387,6 @@
   .tabs a[aria-current="page"] .i {
     color: var(--gold);
     filter: drop-shadow(0 0 6px color-mix(in srgb, var(--gold) 60%, transparent));
-  }
-
-  .tabs a:focus-visible {
-    box-shadow: var(--focus);
   }
 
   /* Something waits there: a friend calls to a duel, someone asks to be friends. */
@@ -694,10 +690,6 @@
       inset 0 0 0 1px var(--line);
   }
 
-  .place-link:focus-visible {
-    box-shadow: var(--focus);
-  }
-
   .place-link-text {
     display: grid;
     flex: 1;
@@ -919,10 +911,6 @@
     transform: translateY(-1px);
   }
 
-  .mode:focus-visible {
-    box-shadow: var(--focus);
-  }
-
   .mode-pic {
     flex: none;
     width: 44px;
@@ -978,10 +966,6 @@
       inset 0 0 0 1px var(--line);
     color: var(--text);
     text-decoration: none;
-  }
-
-  .status-item:focus-visible {
-    box-shadow: var(--focus);
   }
 
   .status-text {
@@ -1108,10 +1092,6 @@
     color: var(--text);
   }
 
-  .subnav a:focus-visible {
-    box-shadow: var(--focus);
-  }
-
   /* A card's own title, smaller than a screen's sections. */
   .card-title {
     font-size: 1.25rem;
@@ -1234,10 +1214,6 @@
     transform: translateY(1px) scale(0.985);
   }
 
-  .btn:focus-visible {
-    box-shadow: var(--focus);
-  }
-
   .btn:disabled {
     border-color: transparent;
     background: var(--sunken);
@@ -1255,10 +1231,6 @@
 
   .btn.primary:hover:not(:disabled) {
     box-shadow: var(--glow-gold);
-  }
-
-  .btn.primary:focus-visible {
-    box-shadow: var(--focus), var(--glow-gold);
   }
 
   .btn.primary:disabled {
@@ -1369,8 +1341,6 @@
   input:focus,
   textarea:focus {
     border-color: var(--accent);
-    outline: none;
-    box-shadow: var(--focus);
   }
 
   input.code {
@@ -1768,10 +1738,6 @@
     color: var(--text);
   }
 
-  .game-leave:focus-visible {
-    box-shadow: var(--focus);
-  }
-
   /* A run's head and pips stay in view while the question and its answer scroll (run.ts), smaller once stuck. */
   .question-top {
     position: sticky;
@@ -1973,10 +1939,6 @@
     transform: translateY(-1px);
   }
 
-  .option:focus-visible {
-    box-shadow: var(--focus);
-  }
-
   .option:disabled {
     cursor: default;
   }
@@ -2026,14 +1988,12 @@
     mask: var(--i) center / contain no-repeat;
   }
 
-  .option.picked,
-  .option.placed {
+  .option.picked {
     border-color: var(--accent);
     box-shadow: 0 0 0 1px var(--accent);
   }
 
-  .option.picked .letter,
-  .option.placed .letter {
+  .option.picked .letter {
     background: var(--accent);
     color: var(--on-accent);
   }
@@ -2102,9 +2062,21 @@
     box-shadow: none;
   }
 
-  /* The reviewed questions of a finished run sit still. */
+  /* The reviewed questions of a finished run sit still, their answers a step under the question, closer set (a
+     card's width at 320px holds an order's row: its place, name, value and mark). */
   .reviewed .option {
+    gap: var(--space-2);
+    min-height: 3rem;
+    padding-right: var(--space-3);
+    font-size: 1rem;
+    line-height: 1.375rem;
     animation: none;
+  }
+
+  /* A long value wraps rather than push the card past the screen. */
+  .reviewed .option .value {
+    white-space: normal;
+    text-align: right;
   }
 
   .hint {
@@ -2215,11 +2187,6 @@
   .key:active:not(:disabled) {
     transform: scale(0.96);
     background: var(--surface);
-  }
-
-  .key:focus-visible,
-  .sign-key:focus-visible {
-    box-shadow: var(--focus);
   }
 
   .key:disabled {
@@ -2868,10 +2835,6 @@
     background: var(--raised);
     box-shadow: var(--elev-1);
     color: var(--text);
-  }
-
-  .segmented button:focus-visible {
-    box-shadow: var(--focus);
   }
 
   /* A second, lesser switch under the first: whose board it is. */
@@ -3681,16 +3644,69 @@
     color: var(--wrong-ink);
   }
 
+  /* A question gone over: a card of its own, a band in its verdict's colour on top; its number, topic and how it went
+     over the question (the strongest line), the answers, and the fact a quiet note under them. */
   .reviewed {
+    --v: var(--wrong);
+    --v-ink: var(--wrong-ink);
     display: grid;
     gap: var(--space-3);
-    padding-top: var(--space-5);
-    border-top: 1px solid var(--line);
+    padding: var(--space-5) var(--space-4) var(--space-3);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    box-shadow:
+      var(--elev-1),
+      inset 0 4px var(--v),
+      inset 0 0 0 1px var(--line);
+  }
+
+  .reviewed.right {
+    --v: var(--right);
+    --v-ink: var(--right-ink);
+  }
+
+  .reviewed.close {
+    --v: var(--gold);
+    --v-ink: var(--gold-ink);
+  }
+
+  .reviewed-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-3);
+    margin: 0;
+  }
+
+  .reviewed-says {
+    color: var(--v-ink);
+    font-size: 0.8125rem;
+    font-weight: 800;
   }
 
   .reviewed .ask {
+    margin: 0;
     font-size: 1.25rem;
     line-height: 1.625rem;
+  }
+
+  .reviewed .fact {
+    padding: var(--space-3) 0 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: inset 0 1px var(--line);
+  }
+
+  .reviewed .fact::before {
+    content: none;
+  }
+
+  .reviewed .fact p {
+    padding: 0;
+    color: var(--text-muted);
+    font-size: 1rem;
+    line-height: 1.5rem;
   }
 
   /* ---- Topics ---- */
@@ -3753,10 +3769,6 @@
     box-shadow:
       var(--elev-2),
       inset 0 0 0 1px var(--line-strong);
-  }
-
-  .topic:focus-visible {
-    box-shadow: var(--focus);
   }
 
   .topic-pic {
@@ -4230,10 +4242,6 @@
     color: var(--gold-ink);
   }
 
-  .icon-btn:focus-visible {
-    box-shadow: var(--focus);
-  }
-
   .icon-btn-i {
     font-size: 1.375rem;
   }
@@ -4259,10 +4267,16 @@
     letter-spacing: -0.02em;
   }
 
-  /* What's folded away until asked for: the locked titles. */
+  /* What's folded away until asked for: the locked titles, the rest of the achievements. What it holds is laid out
+     in the details' own content box, so it gets a grid of its own, spaced as a section's parts. */
   .more {
     display: grid;
     gap: var(--space-3);
+  }
+
+  .more::details-content {
+    display: grid;
+    gap: var(--space-4);
   }
 
   /* Closed, nothing under the summary: no gap left for what's folded. */
@@ -4588,10 +4602,6 @@
     border-color: var(--line-strong);
   }
 
-  button.title-pick:focus-visible {
-    box-shadow: var(--focus);
-  }
-
   .title-pick[aria-pressed="true"] {
     border-color: var(--accent);
     box-shadow: 0 0 0 1px var(--accent);
@@ -4622,7 +4632,7 @@
   }
 
   .titles-more {
-    margin: var(--space-3) 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--text-muted);
     font-size: 0.875rem;
     font-weight: 700;
@@ -4708,12 +4718,7 @@
     margin-top: var(--space-1);
   }
 
-  .unlock-title {
-    color: var(--text-muted);
-  }
-
-  .unlock-title-name,
-  .unlock-title b {
+  .unlock-title-name {
     color: var(--tier-ink, var(--text));
   }
 
@@ -4901,32 +4906,24 @@
   .next-unlock {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-1);
+    gap: var(--space-2);
     font-size: 0.8125rem;
   }
 
+  /* Each in the same 30px slot (a frame reaches 3px out of its avatar), so the words line up. */
   .next-unlock .avatar,
   .next-unlock .unlock-title-mark {
     --size: 24px;
     width: 24px;
     height: 24px;
+    margin: 3px;
     border-radius: 8px;
   }
 
-  .next-unlock .avatar.framed {
-    margin: 3px;
-  }
-
-  .lv-mark {
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    border-radius: var(--radius-full);
-    background: var(--gold);
-    color: var(--on-fill);
-    font-weight: 900;
+  /* A division's emblem as big as the achievements' medals under it. */
+  .next-row .emblem {
+    width: 32px;
+    height: 32px;
   }
 
   .tier-reward {
@@ -5022,17 +5019,21 @@
     min-width: 0;
   }
 
+  /* Short of room, the tag gives way, not the name. */
   .friend-name {
+    display: flex;
+    gap: 0.3em;
     overflow: hidden;
     font-weight: 700;
-    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .friend-tag,
   .me-tag {
+    overflow: hidden;
     color: var(--text-muted);
     font-weight: 600;
+    text-overflow: ellipsis;
   }
 
   .me-tag {
@@ -5259,6 +5260,13 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* Beside the topic, what's known takes the rest of the line and wraps in it, so every row keeps one shape. */
+  .mastery-head > .mastery-meta {
+    flex: 1 1 0;
+    justify-content: flex-end;
+    text-align: right;
+  }
+
   .mastery-known {
     color: var(--text);
     font: 900 1.25rem / 1 var(--font-numeral);
@@ -5483,7 +5491,6 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-4);
-    padding: var(--space-2) 0;
   }
 
   .switch-text {
@@ -5523,10 +5530,6 @@
   .switch[aria-checked="true"] .switch-knob {
     background: var(--on-accent);
     transform: translateX(22px);
-  }
-
-  .switch:focus-visible {
-    box-shadow: var(--focus);
   }
 
   @media (min-width: 40rem) {
@@ -5587,9 +5590,13 @@
       font-size: 0.875rem;
     }
 
-    /* A board's row gives its gaps to the name. */
+    /* A board's row gives its gaps to the name; a friend's row leaves out the tag (it's on their profile). */
     .row {
       gap: var(--space-2);
+    }
+
+    .friend-tag {
+      display: none;
     }
 
     .who {

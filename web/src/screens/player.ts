@@ -46,7 +46,9 @@ interface Profile {
 }
 
 const percent = (right: number, of: number) => (of ? Math.round((100 * right) / of) : 0);
-const month = (ms: number) => new Intl.DateTimeFormat("bg", { month: "long", year: "numeric" }).format(new Date(ms));
+// „г.“ kept with its year, never alone on a line.
+const month = (ms: number) =>
+  new Intl.DateTimeFormat("bg", { month: "long", year: "numeric" }).format(new Date(ms)).replace(/\s(?=г\.)/, " ");
 const day = (ms: number) => new Intl.DateTimeFormat("bg", { day: "numeric", month: "long" }).format(new Date(ms));
 
 export function playerProfile([tag]: string[]): Child {

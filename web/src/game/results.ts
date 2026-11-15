@@ -204,14 +204,22 @@ export function reviewParts(load: () => Promise<Reviewed[]>): { button: Child; l
       "section",
       { class: "review" },
       heading,
-      all.map((it) =>
-        h(
+      all.map((it) => {
+        const [kind, word] = it.right
+          ? ["right", "Вярно"]
+          : it.points > 0
+            ? ["close", "Близо"]
+            : it.given
+              ? ["wrong", "Грешно"]
+              : ["wrong", "Без отговор"];
+        return h(
           "article",
-          { class: "reviewed" },
+          { class: `reviewed ${kind}` },
           h(
             "p",
-            { class: "kicker" },
-            `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""} · ${formatNumber(it.points)} т.`,
+            { class: "reviewed-head" },
+            h("span", { class: "kicker" }, `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""}`),
+            h("span", { class: "reviewed-says" }, it.points > 0 ? `${word} · ${formatNumber(it.points)} т.` : word),
           ),
           h("h3", { class: "ask" }, it.view.text),
           picture(it.view),
@@ -219,8 +227,8 @@ export function reviewParts(load: () => Promise<Reviewed[]>): { button: Child; l
           crowdLine(it.view.type, it.reveal.crowd, it.right),
           it.reveal.fact ? fact(it.reveal.fact) : null,
           report(it.reveal.id),
-        ),
-      ),
+        );
+      }),
     );
   };
   return { button, list, opened: () => items() !== null };
