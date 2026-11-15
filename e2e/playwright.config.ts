@@ -39,7 +39,13 @@ export default defineConfig({
       use: { ...devices["Pixel 7"], launchOptions: { executablePath: process.env.BROWSER_PATH || undefined } },
     },
     { name: "webkit", use: { ...devices["iPhone 15"] } },
-    { name: "firefox", use: { ...devices["Desktop Firefox"], viewport: { width: 390, height: 844 } } },
+    {
+      name: "firefox",
+      use: {
+        ...devices["Desktop Firefox"],
+        viewport: { width: 390, height: 844 },
+      },
+    },
   ],
   webServer: {
     command: "go run ./cmd/build && go run ./cmd/almanac serve",
