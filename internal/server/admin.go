@@ -89,8 +89,15 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		Hardest, Easiest                                           []stat
 		Daily                                                      string
 		First                                                      firstWeek
-	}{Questions: len(b.Questions), Live: len(b.Live("", "")), After: play.RetentionDays}
+		Royal                                                      play.RoyalPace
+		RoyalMedian                                                string
+		RoyalTurnout, RoyalEvenings                                int
+	}{Questions: len(b.Questions), Live: len(b.Live("", "")), After: play.RetentionDays,
+		RoyalTurnout: play.RoyalTurnout, RoyalEvenings: play.RoyalEvenings}
 	today := s.game.Today()
+	// How often Роял plays, and the turnout that decides it.
+	data.Royal, _ = s.game.RoyalPaceOf(ctx)
+	data.RoyalMedian = strings.TrimSuffix(strings.Replace(fmt.Sprintf("%.1f", data.Royal.Median), ".", ",", 1), ",0")
 	if cohorts, active, err := s.game.Retention(ctx, play.RetentionDays[len(play.RetentionDays)-1]+10); err == nil {
 		data.Active = active
 		data.Daily = strings.Replace(fmt.Sprintf("%.1f", active.Daily), ".", ",", 1)
@@ -252,6 +259,8 @@ var adminBody = template.Must(template.New("admin").Parse(`
 <p>{{.Players}} играчи ({{.WithEmail}} с имейл). Днес въпросите на деня са изиграли {{.DayToday}}.{{if .DayScripted}}
 По-бързо, отколкото играе човек: {{.DayScripted}} (другите не ги виждат).{{end}}
 В банката: {{.Questions}} въпроса, {{.Live}} в игра.</p>
+<p>Роял: {{if .Royal.Nightly}}всяка вечер{{else}}петък, събота и неделя{{end}}. Медиана на играчите за последните
+{{.Royal.Evenings}} вечери: {{.RoyalMedian}} (всяка вечер, щом е поне {{.RoyalTurnout}} за {{.RoyalEvenings}} вечери).</p>
 
 <h2>Връщат ли се</h2>
 <p>Играли днес: {{.Active.Today}} · за 7 дни: {{.Active.Week}} · за 30 дни: {{.Active.Month}}.

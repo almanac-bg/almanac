@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	mrand "math/rand/v2"
 	"slices"
 	"time"
@@ -13,14 +14,15 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// Роял is played live, every evening: up to RoyalSize players on the same RoyalLength questions at the same moment,
-// easy to hard in three rounds. A wrong answer puts nobody out by itself: the game is cut, at RoyalCuts, to those
-// ahead (the most right answers, and of as many, the quickest right ones: RoyalAhead), each cut keeping a share of
-// those who began, and the last question is the final of RoyalFinal. Everyone in has a chance at every question
-// until a cut, and the game always reaches its last question. Those cut keep answering to its end, off the standings:
-// their answers go into their own run (XP, goals, their count of right answers), never into a place or the rating.
-// Those still in at the end place first, by the same order; those cut after them, the later cut ahead, each by how
-// they stood at it; the places move their ratings against everyone else in it.
+// Роял is played live in the evening (Friday to Sunday, every evening once those fill: RoyalPaceOf): up to RoyalSize
+// players on the same RoyalLength questions at the same moment, easy to hard in three rounds. A wrong answer puts
+// nobody out by itself: the game is cut, at RoyalCuts, to those ahead (the most right answers, and of as many, the
+// quickest right ones: RoyalAhead), each cut keeping a share of those who began, and the last question is the final
+// of RoyalFinal. Everyone in has a chance at every question until a cut, and the game always reaches its last
+// question. Those cut keep answering to its end, off the standings: their answers go into their own run (XP, goals,
+// their count of right answers), never into a place or the rating. Those still in at the end place first, by the
+// same order; those cut after them, the later cut ahead, each by how they stood at it; the places move their ratings
+// against everyone else in it.
 //
 // The game itself is run by package royal, which keeps the clock; this is what it keeps in the database: the
 // tournaments and where each is, who's in them, and each player's run of answers (so that what a Роял earns is
@@ -756,4 +758,83 @@ func (g *Game) RoyalPlans(ctx context.Context, day string, userID int64) (n int,
 	err = g.DB.Read.QueryRowContext(ctx, `SELECT count(*), coalesce(max(user_id = ?), 0) FROM royal_plans WHERE day = ?`,
 		userID, day).Scan(&n, &mine)
 	return n, mine, err
+}
+
+// How often Роял plays: an evening of one or two isn't a Роял, so until the evenings fill it plays on RoyalDays only,
+// and every evening once the median evening, of the last RoyalEvenings held, has had RoyalTurnout players or more.
+const (
+	RoyalTurnout  = 8
+	RoyalEvenings = 14
+)
+
+// RoyalDays are the days Роял always plays.
+var RoyalDays = []time.Weekday{time.Friday, time.Saturday, time.Sunday}
+
+// RoyalPace is how often Роял plays, as the evenings before a day decided it.
+type RoyalPace struct {
+	// Nightly says it plays every evening; else on RoyalDays only.
+	Nightly bool
+	// Median is how many played on the median evening of the last Evenings held (at most RoyalEvenings: with fewer,
+	// it isn't nightly yet).
+	Median   float64
+	Evenings int
+}
+
+// HeldRoyal keeps that the evening that starts at start was held (again changes nothing).
+func (g *Game) HeldRoyal(ctx context.Context, start time.Time) error {
+	_, err := g.DB.Write.ExecContext(ctx, `INSERT OR IGNORE INTO royal_evenings (day) VALUES (?)`,
+		start.In(Bulgaria).Format(time.DateOnly))
+	return err
+}
+
+// RoyalPaceOf is how often Роял plays today, from the evenings held before it (worked out once a day).
+func (g *Game) RoyalPaceOf(ctx context.Context) (RoyalPace, error) {
+	today := g.Today()
+	g.paceMu.Lock()
+	defer g.paceMu.Unlock()
+	if g.paceOn == today {
+		return g.pace, nil
+	}
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT (SELECT count(*) FROM royal_players p JOIN royals r ON r.id = p.royal_id
+			WHERE r.day = e.day AND p.run_id IS NOT NULL)
+		FROM royal_evenings e WHERE e.day < ? ORDER BY e.day DESC LIMIT ?`, today, RoyalEvenings)
+	if err != nil {
+		return RoyalPace{}, err
+	}
+	var players []int
+	for rows.Next() {
+		var n int
+		if err := rows.Scan(&n); err != nil {
+			rows.Close()
+			return RoyalPace{}, err
+		}
+		players = append(players, n)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return RoyalPace{}, err
+	}
+	p := RoyalPace{Evenings: len(players)}
+	if k := len(players); k > 0 {
+		slices.Sort(players)
+		p.Median = float64(players[k/2])
+		if k%2 == 0 {
+			p.Median = float64(players[k/2-1]+players[k/2]) / 2
+		}
+	}
+	p.Nightly = p.Evenings >= RoyalEvenings && p.Median >= RoyalTurnout
+	g.pace, g.paceOn = p, today
+	return p, nil
+}
+
+// RoyalOn says whether Роял plays on the day of t (in Bulgaria): on RoyalDays, and on every other while it's nightly.
+func (g *Game) RoyalOn(t time.Time) bool {
+	if slices.Contains(RoyalDays, t.In(Bulgaria).Weekday()) {
+		return true
+	}
+	p, err := g.RoyalPaceOf(context.Background())
+	if err != nil {
+		slog.Error("royal pace", "err", err)
+	}
+	return p.Nightly
 }

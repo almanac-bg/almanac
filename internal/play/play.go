@@ -88,6 +88,10 @@ type Game struct {
 	weekMu sync.Mutex
 	week   string // the leagues' week being played, once ensureWeek has seen it
 
+	paceMu sync.Mutex
+	pace   RoyalPace // how often Роял plays, as of paceDay (RoyalPaceOf)
+	paceOn string
+
 	hard      hardnessCache // how hard each question is (mastery.go)
 	crowds    crowdCache    // how players have answered each question (crowd.go)
 	dayCrowds dayCrowdCache // how the day's players have answered its questions (crowd.go)
