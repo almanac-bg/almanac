@@ -12,6 +12,7 @@ import {
   avatar,
   badge,
   explain,
+  meaning,
   meter,
   profileHref,
   profileNav,
@@ -19,7 +20,6 @@ import {
   type Unlock,
   unlockPicture,
   unlockWords,
-  xpWords,
 } from "../ui.ts";
 import { leagueLine } from "./league.ts";
 import { loadProgress, nearest, type Progress } from "./progress.ts";
@@ -118,7 +118,7 @@ function levelCard(p: Progress): Child {
             "div",
             { class: "level-head" },
             h("span", { class: "level-n" }, `Ниво ${p.level}`),
-            h("span", { class: "muted" }, explain(`още ${p.to - p.xp} XP`, xpWords(p.open)), ` до ниво ${p.level + 1}`),
+            h("span", { class: "muted" }, explain(`още ${p.to - p.xp} XP`, meaning.xp), ` до ниво ${p.level + 1}`),
           ),
           meter(share, `${share}% от ниво ${p.level}`),
         )

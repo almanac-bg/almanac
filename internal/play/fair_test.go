@@ -183,20 +183,40 @@ func dayRun(t *testing.T, w *world, user int64) int64 {
 	return id
 }
 
-// The week's league races on people's games: a script's XP is in its player's own week and place, never in another's.
-func TestScriptedXPRacesAlone(t *testing.T) {
+// dayGame plays the day's ten at a pace (all right, unless answers are given), and says which run it was.
+func (w *world) dayGame(user int64, pace func(int) time.Duration, answers ...func(int64, int) json.RawMessage) int64 {
+	w.t.Helper()
+	s, err := w.g.StartDay(w.t.Context(), user)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	if len(answers) == 0 {
+		answers = repeat(w.right, Length)
+	}
+	w.pace = pace
+	w.play(user, s.ID, answers...)
+	w.pace = nil
+	return s.ID
+}
+
+// The week's league races on people's days: a script's points are in its player's own week and place, never in
+// another's.
+func TestScriptedDayRacesAlone(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana, bot := w.user(), w.user()
-	// Ana plays a game; a script plays three in the other's name.
-	w.game(ana, nil)
-	runXP := 0
-	for range 3 {
-		var xp int
-		if err := w.db.Read.QueryRow(`SELECT xp FROM runs WHERE id = ?`, w.game(bot, scriptPace)).Scan(&xp); err != nil || xp == 0 {
-			t.Fatalf("the script's game's XP: %d %v", xp, err)
-		}
-		runXP += xp
+	// Ana plays the day with half right; a script plays it all right in the other's name; three more get none right.
+	w.dayGame(ana, nil, append(repeat(w.right, Length/2), repeat(w.wrong, Length-Length/2)...)...)
+	botRun := w.dayGame(bot, scriptPace)
+	if !w.scripted(botRun) {
+		t.Fatal("the script's day isn't marked")
+	}
+	for range RaceSize - 2 {
+		w.dayGame(w.user(), nil, repeat(w.wrong, Length)...)
+	}
+	var botPoints int
+	if err := w.db.Read.QueryRow(`SELECT points FROM runs WHERE id = ?`, botRun).Scan(&botPoints); err != nil || botPoints == 0 {
+		t.Fatalf("the script's day's points: %d %v", botPoints, err)
 	}
 	row := func(v LeagueView, me bool) LeagueRow {
 		i := slices.IndexFunc(v.Group, func(r LeagueRow) bool { return r.Me == me })
@@ -205,20 +225,20 @@ func TestScriptedXPRacesAlone(t *testing.T) {
 		}
 		return v.Group[i]
 	}
-	// The script's player is in a group, as anyone who plays: in their own view, with the script's XP, first.
+	// The script's player is in a group, as anyone who plays the day: in their own view, with the script's points,
+	// first.
 	mine, err := w.g.LeagueOf(ctx, bot)
-	if err != nil || !mine.In || len(mine.Group) != 2 || mine.Place != 1 || !mine.Group[0].Me {
+	if err != nil || !mine.In || mine.Size != RaceSize || len(mine.Group) != RaceSize || mine.Place != 1 ||
+		!mine.Group[0].Me || row(mine, true).Points != botPoints {
 		t.Fatalf("the week as the script's player sees it: %+v %v", mine, err)
 	}
+	// As Ana sees it, without them: their day adds nothing, and she's first.
 	theirs, err := w.g.LeagueOf(ctx, ana)
-	if err != nil || len(theirs.Group) != 2 || row(theirs, false).XP != row(mine, true).XP-runXP ||
-		row(theirs, true).XP != row(mine, false).XP {
-		t.Fatalf("the week as Ana sees it (the script's player's XP without the script's %d): %+v; theirs %+v", runXP,
+	if err != nil || len(theirs.Group) != RaceSize || theirs.Place != 1 || !theirs.Group[0].Me ||
+		row(theirs, true).Points != row(mine, false).Points || row(theirs, true).Points == 0 ||
+		theirs.Group[slices.IndexFunc(theirs.Group, func(r LeagueRow) bool { return r.Tag == row(mine, true).Tag })].Points != 0 {
+		t.Fatalf("the week as Ana sees it (the script's player without the script's %d): %+v; theirs %+v", botPoints,
 			theirs, mine)
-	}
-	// In Ana's, without it: she's first.
-	if theirs.Place != 1 || !theirs.Group[0].Me {
-		t.Fatalf("Ana's place: %+v", theirs)
 	}
 	// The week ends: each is told the place they saw (both first), and the script's player keeps their XP for their
 	// own level.
@@ -240,9 +260,8 @@ func TestScriptedXPRacesAlone(t *testing.T) {
 		place[u], points[u] = p, x
 	}
 	rows.Close()
-	if place[ana] != 1 || place[bot] != 1 || points[bot] != row(mine, true).XP ||
-		points[ana] != row(theirs, true).XP {
-		t.Fatalf("the week's end: places %v, XP %v", place, points)
+	if place[ana] != 1 || place[bot] != 1 || points[bot] != botPoints || points[ana] != row(theirs, true).Points {
+		t.Fatalf("the week's end: places %v, points %v", place, points)
 	}
 	if after, _ := w.g.LevelNow(ctx, bot); after.XP < level.XP {
 		t.Fatalf("the script's player's level lost XP: %+v → %+v", level, after)

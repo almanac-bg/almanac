@@ -106,7 +106,17 @@ func TestRunEndedByTheClock(t *testing.T) {
 		}
 	}
 
-	// Ana's challenge ends on the clock: Vi hears of it, and the game counts for Ana's week.
+	// Ana's day ends on the clock, and counts for her week in the league.
+	day, err := w.g.StartDay(ctx, ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lastRunsOut(ana, day.ID, w.right)
+	if v, _ := w.g.LeagueOf(ctx, ana); !v.In {
+		t.Fatal("a day ended by the clock earned nothing")
+	}
+
+	// Ana's challenge ends on the clock: Vi hears of it.
 	s, id, err := w.g.ChallengeFriend(ctx, ana, vi)
 	if err != nil {
 		t.Fatal(err)
@@ -122,9 +132,6 @@ func TestRunEndedByTheClock(t *testing.T) {
 	}
 	if len(told) != 1 || told[0].To != vi || told[0].Kind != "asked" {
 		t.Fatalf("Vi wasn't told: %+v", told)
-	}
-	if v, _ := w.g.LeagueOf(ctx, ana); !v.In {
-		t.Fatal("a game ended by the clock earned nothing")
 	}
 	// So does Vi's: the duel has its result, told to both.
 	vs, err := w.g.PlayDuel(ctx, vi, id)

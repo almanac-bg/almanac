@@ -22,8 +22,8 @@ import (
 // of:
 //   - the day's board, its count of players and its places, and friends' results of the day (BoardOf, FriendsBoard,
 //     FriendsOf; fairFor);
-//   - the week's league: its XP counts for its player's own level and their own view of the race, never against the
-//     others in it (standingsFor);
+//   - the week's league: a day's run at a script's speed counts in its player's own view of the race, never against
+//     the others in it (standingsFor);
 //   - the Знания board (KnowledgeBoard);
 //   - the questions' statistics: how players answered each (crowd.go), how hard each is (hardness, Calibrate) and
 //     /admin's tallies (FairAnswers);

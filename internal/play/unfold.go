@@ -14,8 +14,8 @@ import (
 //     achievements a game earns with what they unlock (but what the level unlocks).
 //   - From the second day played (XPFromDay): XP, with the level it makes, what the level unlocks, and the day's goals
 //     that pay it.
-//   - From the third day played (LeagueFromDay): the week's league, a race on XP that means nothing in a first day's
-//     group of two.
+//   - From the third day played (LeagueFromDay): the week's league, a race on the day's points added up over the
+//     week, which means little before the habit has begun.
 //   - From the first game that moved the rating (a duel, a Роял): the rating and its division.
 //
 // Nothing waits to be earned, only to be shown: XP, achievements, unlocks, the league's group and the rating all count
@@ -36,7 +36,7 @@ type Open struct {
 	Points bool `json:"points"`
 	// XP is what playing earns, with the level and the day's goals.
 	XP bool `json:"xp"`
-	// League is the week's race on XP.
+	// League is the week's race on the day's points.
 	League bool `json:"league"`
 	// Rating is strength in duels and Роял, with its division.
 	Rating bool `json:"rating"`
