@@ -15,15 +15,17 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// Progress is what a player earns by playing, and it's one system: two measures, and what they unlock.
+// Progress is what a player earns by playing, and it's one system: two measures, a race, and what they unlock.
 //
 //   - XP is for playing: every answer and game (worth.go), the day's goals (goals.go), each achievement (its tier's
-//     XP, once) and the first places of each week's league group (leagues.go). All of it adds up to a level, and each
-//     week's share of it is the race of the leagues.
+//     XP, once) and the first places of each week's league group (leagues.go). All of it adds up to a level.
 //   - The rating is strength: duels and Роял move it (rating.go); its divisions are what it's worth.
+//   - The week's league is the day's habit: a race on the day's points, added up over the week, a day missed adding
+//     nothing (leagues.go). It's not on XP, which counts how much is played: the player who plays the day every day,
+//     and plays it well, wins it, whatever else anyone plays.
 //
-// Both unlock the wardrobe (wardrobe.go, titles.go): a level, an achievement, a topic's mastery, a division, a Роял
-// won or first place in a high league each gives an avatar, a frame, a pattern or a title. Whatever unlocks something, the player is told
+// All three unlock the wardrobe (wardrobe.go, titles.go): a level, an achievement, a topic's mastery, a division, a
+// Роял won or first place in a high league each gives an avatar, a frame, a pattern or a title. Whatever unlocks something, the player is told
 // once, at the end of the game that did it (NewsOf), and is shown what comes next (Next): the next level that gives
 // something, the next division, the achievements nearest. Reserve days keep the streak through a missed day (runs.go):
 // the day itself earns them (the first day, every seventh in a row), and so do the day's goals, done all three; the

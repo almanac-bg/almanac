@@ -8,7 +8,8 @@ import (
 )
 
 // Points are a game's score: what each answer earned, added up within one game, to compare players who played the
-// same questions (a duel, the day's, a room). They're never added up across games: what a player earns by playing
+// same questions (a duel, the day's, a room). They're added up across games in one place only, the week's league
+// (leagues.go): the day's points over a week, the same questions for everyone in it. What a player earns by playing
 // is XP (xp), and how strong they are is their rating.
 //
 // An answer earns
@@ -82,8 +83,7 @@ func speed(took, limit time.Duration) float64 {
 	return max(0, float64(limit-took)/float64(limit-quick))
 }
 
-// XP is what a player earns by playing: it adds up across games, and makes their level (and each week's race in the
-// leagues). It's for knowing, with a little for playing: an answer earns XPKnown times its score and XPAnswer for
+// XP is what a player earns by playing: it adds up across games, and makes their level. It's for knowing, with a little for playing: an answer earns XPKnown times its score and XPAnswer for
 // being given, and a game's end earns XPFinish in the share of it answered right, so that tapping at random earns a
 // fraction of what knowing does. Never for being quick or drawing harder questions, so that someone still learning a
 // topic, or reading slowly, goes up as surely as anyone. The day's questions earn XPDay for coming, whatever the

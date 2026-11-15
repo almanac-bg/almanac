@@ -126,12 +126,12 @@ export const meaning = {
   points:
     "Точките са резултатът ти в една игра: за верните отговори, за бързината и за верните поред. По тях е класацията на деня.",
   xp: "XP печелиш с всяка игра, цел и постижение. Трупа се и вдига нивото ти.",
-  league: " С XP за седмицата се състезаваш и в лигата.",
+  league: " Точките от въпросите на деня за седмицата те класират в лигата.",
   rating: "Рейтингът е силата ти в дуелите и в Роял: расте с победа, пада със загуба. По него е дивизията ти.",
 };
 
-/** XP's words, with the league once it's open. */
-export const xpWords = (open?: Open) => meaning.xp + (open?.league ? meaning.league : "");
+/** The points' words, with the league once it's open: it races on the day's points, added up over the week. */
+export const pointsWords = (open?: Open) => meaning.points + (open?.league ? meaning.league : "");
 
 let explained = 0;
 

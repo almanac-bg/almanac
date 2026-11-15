@@ -23,7 +23,6 @@ import {
   type Unlock,
   unlockPicture,
   unlockWords,
-  xpWords,
 } from "../ui.ts";
 import { type MasteryMove, masteryLine } from "./mastery.ts";
 
@@ -113,8 +112,8 @@ function opened(system: keyof Open): Child {
     case "league":
       return line(
         "Ново: лигата. ",
-        "Всяка седмица се състезаваш по XP с група играчи. ",
-        h("a", { href: "/ranks#league" }, "Виж групата си"),
+        "Всяка седмица се състезаваш с група играчи по точките от въпросите на деня. ",
+        h("a", { href: "/ranks#league" }, "Виж лигата"),
       );
     default:
       return line("Ново: рейтинг. ", meaning.rating);
@@ -128,7 +127,7 @@ function xpLine(n: News): Child {
     "p",
     { class: "news-xp" },
     n.earned > 0
-      ? [explain(h("b", { class: "num" }, `+${n.earned} XP`), xpWords(n.open)), ` · ${level}`]
+      ? [explain(h("b", { class: "num" }, `+${n.earned} XP`), meaning.xp), ` · ${level}`]
       : level.charAt(0).toUpperCase() + level.slice(1),
   );
 }

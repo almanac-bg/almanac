@@ -1245,38 +1245,46 @@ func TestLeagues(t *testing.T) {
 
 	w := setup(t) // Thursday, 12 November
 	ctx := t.Context()
-	topic := func(user int64, games int) {
-		for range games {
-			s, err := w.g.StartTopic(ctx, user, "science")
-			if err != nil {
-				t.Fatal(err)
-			}
-			w.play(user, s.ID, repeat(w.right, Length)...)
-		}
+	// day plays the day's ten with so many right, the rest wrong.
+	day := func(user int64, rights int) {
+		w.dayGame(user, nil, append(repeat(w.right, rights), repeat(w.wrong, Length-rights)...)...)
 	}
 	ana, bo, cy := w.user(), w.user(), w.user()
 	w.played(ana, LeagueFromDay-1) // the league's open to Ana: her week's end is told
 	if v, err := w.g.LeagueOf(ctx, ana); err != nil || v.In || v.League.Name != "Странджа" || v.DaysLeft != 4 ||
-		v.Week != "2026-11-09" {
+		v.Week != "2026-11-09" || v.OnXP {
 		t.Fatalf("before a game: %+v %v", v, err)
 	}
-	// Ana plays three games, Bo two, three more one each, Cy none: the five race in one group, Ana ahead; until
-	// there are five, it isn't a race.
-	topic(ana, 3)
-	topic(bo, 2)
-	if v, _ := w.g.LeagueOf(ctx, ana); !v.In || len(v.Group) != 2 || v.Up != 0 {
-		t.Fatalf("a group of two going up: %+v", v)
+	// A topic's game, however good, puts nobody in the league: the day's questions do.
+	s, err := w.g.StartTopic(ctx, cy, "science")
+	if err != nil {
+		t.Fatal(err)
 	}
+	w.play(cy, s.ID, repeat(w.right, Length)...)
+	if v, _ := w.g.LeagueOf(ctx, cy); v.In {
+		t.Fatal("a topic's game put a player in the league")
+	}
+	// Bo plays the day all right, Ana with seven: a group of two is still gathering, and shows nobody.
+	day(bo, Length)
+	day(ana, 7)
+	if v, _ := w.g.LeagueOf(ctx, ana); !v.In || v.Size != 2 || len(v.Group) != 0 || v.Place != 0 || v.Up != 0 {
+		t.Fatalf("a group of two: %+v", v)
+	}
+	// Three more with one right each: five race, Bo ahead.
 	for range RaceSize - 2 {
-		topic(w.user(), 1)
+		day(w.user(), 1)
 	}
 	v, err := w.g.LeagueOf(ctx, ana)
-	if err != nil || !v.In || len(v.Group) != RaceSize || v.Place != 1 || !v.Group[0].Me ||
-		v.Group[0].XP <= v.Group[1].XP || v.Up != 2 || v.Down != 0 || v.Group[1].Name == "" {
-		t.Fatalf("Ana's week: %+v %v", v, err)
+	if err != nil || !v.In || v.Size != RaceSize || len(v.Group) != RaceSize || v.Place != 2 || !v.Group[1].Me ||
+		v.Group[0].Points <= v.Group[1].Points || v.Group[1].Points <= v.Group[2].Points || v.Up != 2 || v.Down != 0 ||
+		v.Group[0].Name == "" {
+		t.Fatalf("Ana's Thursday: %+v %v", v, err)
 	}
-	if v, _ := w.g.LeagueOf(ctx, cy); v.In {
-		t.Fatal("a player in a league without a game")
+	// Friday: Ana plays the day all right, and Bo misses it: a day missed adds nothing, and Ana goes ahead.
+	w.now = time.Date(2026, 11, 13, 10, 0, 0, 0, Bulgaria)
+	day(ana, Length)
+	if v, _ := w.g.LeagueOf(ctx, ana); v.Place != 1 || !v.Group[0].Me || v.Group[1].Tag != "player2" {
+		t.Fatalf("Ana's Friday: %+v", v)
 	}
 
 	// The week ends: Ana and Bo go up with first and second place's XP, the third stays with third's; told once.
@@ -1307,29 +1315,36 @@ func TestLeagues(t *testing.T) {
 		t.Fatalf("Ana's new week: %+v", v)
 	}
 	// Ana and Bo race in Средна гора now, and Cy in Странджа: two and one, no race.
-	topic(ana, 2)
-	topic(bo, 1)
-	topic(cy, 1)
-	if v, _ := w.g.LeagueOf(ctx, bo); !v.In || len(v.Group) != 2 || v.League.Tier != 1 || v.Up != 0 {
+	day(ana, 2)
+	day(bo, 1)
+	day(cy, 1)
+	if v, _ := w.g.LeagueOf(ctx, bo); !v.In || v.Size != 2 || v.League.Tier != 1 || v.Up != 0 {
 		t.Fatalf("Ana and Bo in Средна гора: %+v", v)
 	}
-	if v, _ := w.g.LeagueOf(ctx, cy); !v.In || len(v.Group) != 1 || v.League.Tier != 0 || v.Up != 0 {
+	if v, _ := w.g.LeagueOf(ctx, cy); !v.In || v.Size != 1 || v.League.Tier != 0 || v.Up != 0 {
 		t.Fatalf("Cy alone in Странджа: %+v", v)
 	}
 
-	// A group of eight in Родопи, by goals' XP: the first two go up, the last two down, the rest stay.
+	// A group of eight in Родопи: the first two go up, the last two down, the rest stay. The second and third have
+	// equal points; the one with more right answers is ahead, though they came later.
 	monday := "2026-11-16"
 	res, _ := w.db.Write.Exec(`INSERT INTO league_groups (week, tier) VALUES (?, 2)`, monday)
 	group, _ := res.LastInsertId()
 	var eight []int64
-	for i := range 8 {
+	for i, points := range []int{8000, 7000, 7000, 5000, 4000, 3000, 2000, 1000} {
 		p := w.user()
 		eight = append(eight, p)
+		rights, joined := 5, i
+		if i == 1 {
+			rights, joined = 6, 10
+		}
 		_, _ = w.db.Write.Exec(`UPDATE users SET league = 2 WHERE id = ?`, p)
 		_, _ = w.db.Write.Exec(`INSERT INTO league_members (week, user_id, group_id, joined_at) VALUES (?, ?, ?, ?)`,
-			monday, p, group, i)
-		_, _ = w.db.Write.Exec(`INSERT INTO goals_done (user_id, day, goal, at, xp) VALUES (?, ?, 'day', 0, ?)`,
-			p, "2026-11-17", 800-100*i)
+			monday, p, group, joined)
+		if _, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, day, questions, started_at, finished_at, points, rights)
+			VALUES (?, 'day', '2026-11-17', '[]', 0, 1, ?, ?)`, p, points, rights); err != nil {
+			t.Fatal(err)
+		}
 	}
 	// And five in Рила: the first is its champion, and can go no higher.
 	top1, top2 := w.user(), w.user()
@@ -1337,7 +1352,7 @@ func TestLeagues(t *testing.T) {
 	rila := []int64{top1, top2, w.user(), w.user(), w.user()}
 	for i, p := range rila {
 		_, _ = w.db.Write.Exec(`UPDATE users SET league = 5 WHERE id = ?`, p)
-		topic(p, map[bool]int{true: 2, false: 1}[i == 0]) // the first two games, the rest one
+		day(p, map[bool]int{true: Length, false: 5 - i}[i == 0])
 	}
 	w.now = time.Date(2026, 11, 23, 0, 5, 0, 0, Bulgaria)
 	if err := w.g.SettleDue(ctx); err != nil {
@@ -1387,6 +1402,49 @@ func TestLeagues(t *testing.T) {
 	if b, err := w.g.RatingBoard(ctx, bo, false); err != nil || len(b.Top) != 1 || b.Top[0].Value != 1300 ||
 		b.Top[0].Division == nil || b.Place != 0 {
 		t.Fatalf("the rating's board: %+v %v", b, err)
+	}
+}
+
+// The week under way when the race moved to the day's points ends as it began, on XP; the next is on points.
+func TestLeagueWeekOnXP(t *testing.T) {
+	w := setup(t) // Thursday, 12 November
+	ctx := t.Context()
+	if _, err := w.g.LeagueOf(ctx, 0); err != nil { // the week under way
+		t.Fatal(err)
+	}
+	if _, err := w.db.Write.Exec(`UPDATE league_week SET on_xp = 1`); err != nil {
+		t.Fatal(err)
+	}
+	// Ana plays two topics' games all right, Bo the day all wrong, three more a topic's game all wrong: in by XP,
+	// Ana ahead on it.
+	ana, bo := w.user(), w.user()
+	w.game(ana, nil)
+	w.game(ana, nil)
+	w.dayGame(bo, nil, repeat(w.wrong, Length)...)
+	for range RaceSize - 2 {
+		w.game(w.user(), nil, repeat(w.wrong, Length)...)
+	}
+	v, err := w.g.LeagueOf(ctx, ana)
+	if err != nil || !v.OnXP || !v.In || v.Size != RaceSize || v.Place != 1 || v.Group[0].Points < 2*XPFinish {
+		t.Fatalf("the week on XP: %+v %v", v, err)
+	}
+	w.now = time.Date(2026, 11, 16, 0, 5, 0, 0, Bulgaria)
+	if err := w.g.SettleDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var place, points int
+	if err := w.db.Read.QueryRow(`SELECT place, points FROM league_results WHERE user_id = ?`, ana).Scan(&place, &points); err != nil ||
+		place != 1 || points != v.Group[0].Points {
+		t.Fatalf("Ana's week on XP ended: place %d, %d XP, %v", place, points, err)
+	}
+	// The next week is on points: a topic's game puts nobody in, the day's questions do.
+	w.game(ana, nil)
+	if v, _ := w.g.LeagueOf(ctx, ana); v.OnXP || v.In {
+		t.Fatalf("the week after: %+v", v)
+	}
+	w.dayGame(ana, nil)
+	if v, _ := w.g.LeagueOf(ctx, ana); !v.In || v.Size != 1 {
+		t.Fatalf("the day in the week after: %+v", v)
 	}
 }
 

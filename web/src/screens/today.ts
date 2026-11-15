@@ -20,7 +20,7 @@ import { title } from "../lib/router.ts";
 import { onDay } from "../lib/words.ts";
 import { dayInBulgaria } from "../lib/year.ts";
 import { player, playing, user } from "../state.ts";
-import { meter, type Open, reserveWords } from "../ui.ts";
+import { meter, type Open, pointsWords, reserveWords } from "../ui.ts";
 import { goalsCard } from "./goals.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
@@ -126,6 +126,7 @@ export function today() {
                 ),
               },
               [just ? news(run.id) : null, remindCard(t.day), countdown()],
+              pointsWords(t.open),
             )
           : dayCard(t, start(t), run?.trail ?? []),
         // Mid-December into January: the year in the game, a tap away.

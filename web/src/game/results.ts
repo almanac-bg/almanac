@@ -14,8 +14,15 @@ import type { Reviewed, Score, State } from "./types.ts";
 
 /** A finished run: the score as the screen's big number, its points, a line about it (the place), and the marks;
  * right under it what to do next (`next`: the gold action, then „Прегледай въпросите“ and the others); then
- * whatever the screen adds (`more`: what the game earned); and at the end, once opened, the questions. */
-export function summary(s: State, line: Child, next: { main: Child; also?: Child[] }, more: Child[] = []): Child {
+ * whatever the screen adds (`more`: what the game earned); and at the end, once opened, the questions. `words` say
+ * what its points are (the day's say the league too, once it's open). */
+export function summary(
+  s: State,
+  line: Child,
+  next: { main: Child; also?: Child[] },
+  more: Child[] = [],
+  words = meaning.points,
+): Child {
   const questions = reviewParts(
     async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${s.id}/review`)).questions,
   );
@@ -39,7 +46,7 @@ export function summary(s: State, line: Child, next: { main: Child; also?: Child
           { class: "points" },
           h("b", { class: "points-n" }, countUp(s.points)),
           // What points are, a tap away: the game's score, not what playing earns (XP) or strength (the rating).
-          explain(h("span", { class: "points-label" }, s.points === 1 ? "точка" : "точки"), meaning.points),
+          explain(h("span", { class: "points-label" }, s.points === 1 ? "точка" : "точки"), words),
           s.allRight ? h("span", { class: "points-bonus" }, `+${formatNumber(s.allRight)} за всички верни`) : null,
         ),
       ),
