@@ -249,7 +249,8 @@ takes a token.
   line for a system met with it (`.news-open`): the goals it finished; the one biggest event (a
   week of the league ended, a division
   reached, a new level), or else a line of the XP it brought and the level (`.news-xp`); and „Ново за теб“
-  (`.unlocks`): achievements and everything newly unlocked, each unlock with „Сложи“, whatever unlocked it. Профил shows
+  (`.unlocks`): achievements and everything newly unlocked, each unlock with „Сложи“, whatever unlocked it. What
+  really is big is also brought forward in a sheet over the result (Motion). Профил shows
   what comes next (`.next`); reserve days keep the streak (the first day, every seventh in a row and a day with all
   three goals earn one: `.goals-reserve`, `.week li.saved`); a day a reserve kept, or a streak that ended, is said
   once on Начало (`.streak-notice`). Награди opens with „Как се печели“, the whole of it in five lines.
@@ -349,17 +350,30 @@ Feedback fires once, when it's earned, and then the screen is still again:
 - **Timings:**
   - presses 120ms; hover and colour 160–200ms;
   - the right answer's pop 360ms (to 1.04); the wrong answer's shake 320ms (4px);
-  - the points' rise 520ms;
+  - an answer's points rise 520ms; a result's 800ms;
+  - the timer runs linearly with the clock, and so does the ring of the three-second count before a topic's run
+    (with „Започни сега“ and „Отказ“, so a tap on a topic never throws the player straight into a question).
 - **An answer shows in steps:** at 0ms the answer marked (pop or shake), its sound and touch, its pip filling (0.6→1,
   200ms); at 120ms the verdict fades up (8px, 200ms) with its points and the tally rising in step; at 320ms the fact,
   the same way; at 450ms the page scrolls to them (smoothly, or at once with less motion). A run's head (the count,
   the topic, the tally) and its pips stay at the top of the screen while the question and its answer scroll, smaller
   once stuck, so the pip and the tally are seen landing.
-  - the timer runs linearly with the clock, and so does the ring of the three-second count before a topic's run
-    (with „Започни сега“ and „Отказ“, so a tap on a topic never throws the player straight into a question).
+- **A result lands, once** (`web/src/feel.ts`, at most 1.6s, a tap anywhere jumps to the end, never again on a
+  reload): the pips fill one by one (60ms apart, each with a pluck on the scale, a muted thud for a wrong one); at
+  700ms the score lands (1.15→1) with the motif and the points count up; on the day, at 1.1s the streak's number rolls
+  from the day before with the flame swelling once and its sound, and the level's bar fills in its chip (a new level:
+  to the end, a gold flash, the number rolls, it fills again). Ten of ten: the pips sweep gold, „Всички верни“ and the
+  rosette as a seal, drawn petal by petal, the gold one last. All typographic: no particles.
+- **The big news is a sheet**, at most one a game, only for what really is big: a week of the league ended up or on
+  its podium, a division reached, the streak at 3, 7, 30, 100 or 365 days, a level that unlocks something or is a
+  fifth, an epic or legendary achievement. It opens once the result has landed, slides up (320ms) over the dimmed
+  result, its picture landing; its sound plays as it opens; „Продължи“, a tap beside it or Esc puts it away, never by
+  itself. The news cards under the result stay as they are: the sheet is the headline brought forward, not a fourth
+  card.
 - **No ambient motion** and no confetti.
-- **Reduced motion:** under `prefers-reduced-motion` the pop, the shake, the rise and the transitions stop. The timer
-  and the count before a run still move, because they are information.
+- **Reduced motion** („По-малко движение“, which follows `prefers-reduced-motion` until set): the pop, the shake, the
+  rise, the transitions and the steps stop; a result and a sheet show their end state at once, with their sound. The
+  timer and the count before a run still move, because they are information.
 
 ## Sound
 

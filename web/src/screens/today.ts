@@ -6,7 +6,7 @@
 
 import { picture } from "../art/picture.ts";
 import { news } from "../game/news.ts";
-import { boardRow, shareButton, summary } from "../game/results.ts";
+import { boardRow, hands, shareButton, summary } from "../game/results.ts";
 import { playRun, trail } from "../game/run.ts";
 import { dayShareText, percent, rare } from "../game/share.ts";
 import type { Board, Mark, Score, State } from "../game/types.ts";
@@ -17,6 +17,7 @@ import { askToKeep } from "../lib/keep.ts";
 import { place } from "../lib/ordinal.ts";
 import { needsHomeScreen, pushable, pushOn, turnOn } from "../lib/push.ts";
 import { title } from "../lib/router.ts";
+import { feelKit } from "../lib/sound.ts";
 import { onDay } from "../lib/words.ts";
 import { dayInBulgaria } from "../lib/year.ts";
 import { player, playing, user } from "../state.ts";
@@ -105,14 +106,32 @@ export function today() {
   /** The screen itself: the day as it stands (`run` its result, if played; `just`: played this moment, so what it
    * earned is told once), then the ways to play. */
   function home(t: Today, run: State | null, just: boolean): Child {
-    // Just played: the streak, the level and the place it made, as they are now.
+    // Just played: the streak, the level and the place it made, as they are now. The streak grown to one of its round
+    // numbers is the game's big news (news.ts: a sheet of its own); otherwise it rolls on in its chip, after the
+    // result's moment has landed (feel.ts).
     const fresh = signal<Today>(t);
-    if (just) api<Today>("GET", "/api/day").then(fresh.set, () => {});
+    const now = just ? api<Today>("GET", "/api/day") : null;
+    now?.then(fresh.set, () => {});
+    const round = now?.then(
+      (f) => (f.streak > t.streak && streakMarks.includes(f.streak) ? f.streak : 0),
+      () => 0,
+    );
+    const since = performance.now();
+    let grown = false;
     return h(
       "section",
       { class: "screen home" },
       // A new player, before a first game finished, sees the day and the topics only.
-      () => (user() && (just || t.played) ? status(fresh()) : null),
+      () => {
+        if (!user() || !(just || t.played)) return null;
+        const f = fresh();
+        const row = status(f);
+        if (f !== t && !grown) {
+          grown = true;
+          grow(row, t, f, Math.max(0, since + 1100 - performance.now()));
+        }
+        return row;
+      },
       streakNotice(t),
       playedLine(t.duel),
       // On a big screen the day leads the page with the topics under it, and the rest waits in a column beside it
@@ -150,8 +169,9 @@ export function today() {
                   () => tally("share:day"),
                 ),
               },
-              [() => friendsDay(fresh()), just ? news(run.id) : null, remindCard(t.day), countdown()],
+              [() => friendsDay(fresh()), just ? news(run.id, 0, round) : null, remindCard(t.day), countdown()],
               pointsWords(t.open),
+              just,
             )
           : dayCard(t, start(t), run?.trail ?? []),
         // Mid-December into January: the year in the game, a tap away.
@@ -191,10 +211,10 @@ function streakNotice(t: Today): Child {
 
 /** The streak and (once XP is open: a first day has the streak only) the level, side by side: each a tap from Профил,
  * where there's more of both. */
-function status(t: Today): Child {
+function status(t: Today): HTMLElement {
   const days = t.streak;
   const lv = t.open?.xp ? t.level : undefined;
-  const share = lv && lv.to > lv.from ? Math.round((100 * (lv.xp - lv.from)) / (lv.to - lv.from)) : 0;
+  const share = shareOf(lv);
   return h(
     "div",
     { class: "status-row" },
@@ -232,6 +252,33 @@ function status(t: Today): Child {
         )
       : null,
   );
+}
+
+/** How far into its level a player is, in percent. */
+const shareOf = (lv?: Today["level"]) =>
+  lv && lv.to > lv.from ? Math.round((100 * (lv.xp - lv.from)) / (lv.to - lv.from)) : 0;
+
+/** The streak's round numbers (the achievements' and a year): reached, they're the game's big news. */
+const streakMarks = [3, 7, 30, 100, 365];
+
+/** The streak and the level just grown by the day played (`was` before it, `now` after), moved there in their chips
+ * once the result has landed (`delay`): the streak's number rolls on (unless a round one, told in a sheet), the
+ * level's bar fills. Without the game's feel loaded, or with less motion, they are simply as they are. */
+function grow(row: HTMLElement, was: Today, now: Today, delay: number): void {
+  const kit = feelKit();
+  if (!kit) return;
+  const streak = row.querySelector<HTMLElement>(".streak-chip");
+  if (streak && now.streak === was.streak + 1 && !streakMarks.includes(now.streak))
+    kit.streak(streak, now.streak, delay, hands());
+  const chip = row.querySelector<HTMLElement>(".level-chip");
+  if (chip && was.level && now.level && now.open?.xp)
+    kit.level(
+      chip,
+      { level: was.level.level, share: shareOf(was.level), left: `още ${was.level.to - was.level.xp} XP` },
+      { level: now.level.level, share: shareOf(now.level), left: `още ${now.level.to - now.level.xp} XP` },
+      delay + 200,
+      hands(),
+    );
 }
 
 /** The day's ten, not played yet: what they are, and the gold button; or, left half-way (`marks`: how the questions

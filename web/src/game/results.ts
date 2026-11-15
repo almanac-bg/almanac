@@ -5,6 +5,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { appShare } from "../lib/app.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
+import { feelKit, play } from "../lib/sound.ts";
 import { categories } from "../state.ts";
 import { countUp, explain, fact, formatNumber, type Look, meaning, who } from "../ui.ts";
 import { answered, crowdLine, picture } from "./questions.ts";
@@ -22,41 +23,95 @@ export function summary(
   next: { main: Child; also?: Child[] },
   more: Child[] = [],
   words = meaning.points,
+  moment = true,
 ): Child {
   const questions = reviewParts(
     async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${s.id}/review`)).questions,
   );
+  const perfect = s.total > 0 && s.rights === s.total;
+  const hero = h(
+    "div",
+    { class: "card hero" },
+    // Ten of ten: the logo's rosette as a seal, and the words.
+    perfect ? h("div", { class: "perfect-head" }, seal(), h("p", { class: "kicker" }, "Всички верни")) : null,
+    h(
+      "div",
+      { class: "score-row" },
+      h(
+        "h1",
+        { class: "score" },
+        h("b", { class: "score-n" }, String(s.rights)),
+        h("span", { class: "score-of" }, ` от ${s.total}`),
+      ),
+      h(
+        "p",
+        { class: "points" },
+        h("b", { class: "points-n", "data-n": s.points }, moment ? formatNumber(s.points) : countUp(s.points)),
+        // What points are, a tap away: the game's score, not what playing earns (XP) or strength (the rating).
+        explain(h("span", { class: "points-label" }, s.points === 1 ? "точка" : "точки"), words),
+        s.allRight ? h("span", { class: "points-bonus" }, `+${formatNumber(s.allRight)} за всички верни`) : null,
+      ),
+    ),
+    line,
+    trail(s.trail, s.total),
+  );
+  if (moment) land(hero, s.id, perfect);
   return h(
     "section",
     { class: "summary" },
-    h(
-      "div",
-      { class: "card hero" },
-      h(
-        "div",
-        { class: "score-row" },
-        h(
-          "h1",
-          { class: "score" },
-          h("b", { class: "score-n" }, String(s.rights)),
-          h("span", { class: "score-of" }, ` от ${s.total}`),
-        ),
-        h(
-          "p",
-          { class: "points" },
-          h("b", { class: "points-n" }, countUp(s.points)),
-          // What points are, a tap away: the game's score, not what playing earns (XP) or strength (the rating).
-          explain(h("span", { class: "points-label" }, s.points === 1 ? "точка" : "точки"), words),
-          s.allRight ? h("span", { class: "points-bonus" }, `+${formatNumber(s.allRight)} за всички верни`) : null,
-        ),
-      ),
-      line,
-      trail(s.trail, s.total),
-    ),
+    hero,
     nextSteps(next.main, [questions.button, ...(next.also ?? [])]),
     more,
     questions.list,
   );
+}
+
+/** What the game's feel (feel.ts) needs of the app, as it is now. */
+export const hands = () => ({ calm: calm.peek(), play, format: (n: number) => formatNumber(n) });
+
+/** Each game's result moment, while it plays: what waits for it to land (the sheet for big news). */
+const moments = new Map<number, Promise<void>>();
+
+/** When a game's result has landed: at once if it had no moment. */
+export const landed = (run: number): Promise<void> => moments.get(run) ?? Promise.resolve();
+
+/** A game's result as a moment as it ends (feel.ts: the pips, the score, the motif), once: never again on its way
+ * back to the screen. Without the feel loaded, the result is as it is, with the end's sound. */
+function land(hero: HTMLElement, run: number, perfect: boolean): void {
+  const key = `almanac.landed.${run}`;
+  try {
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, "1");
+  } catch {
+    // no storage: the moment plays, as it would the first time
+  }
+  const kit = feelKit();
+  if (!kit) {
+    play(perfect ? "perfect" : "end");
+    return;
+  }
+  moments.set(run, new Promise((done) => requestAnimationFrame(() => kit.result(hero, perfect, hands()).then(done))));
+}
+
+/** The logo's rosette as a seal: four petals, the gold one last. */
+function seal(): SVGElement {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 64 64");
+  svg.setAttribute("class", "seal");
+  svg.setAttribute("aria-hidden", "true");
+  for (const turn of [45, 135, 225, -45]) {
+    // Turned by its group, so the petal itself is free to grow (feel.ts) about the centre.
+    const group = document.createElementNS(ns, "g");
+    group.setAttribute("transform", `rotate(${turn} 32 32)`);
+    const petal = document.createElementNS(ns, "path");
+    petal.setAttribute("d", "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z");
+    petal.style.fill = turn < 0 ? "var(--gold)" : "var(--lilac)";
+    petal.style.transformOrigin = "32px 32px";
+    group.append(petal);
+    svg.append(group);
+  }
+  return svg;
 }
 
 /** What to do after a game, right under its result: the one gold action, then the others, plain and the same size,

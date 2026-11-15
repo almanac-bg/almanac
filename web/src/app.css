@@ -3435,6 +3435,22 @@
 
   /* ---- Results ---- */
 
+  /* Ten of ten: the rosette as a seal, and the words in gold, over the score. */
+  .perfect-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .perfect-head .kicker {
+    color: var(--gold-ink);
+  }
+
+  .seal {
+    width: 5.5rem;
+    height: 5.5rem;
+  }
+
   .score-row {
     display: flex;
     flex-wrap: wrap;
