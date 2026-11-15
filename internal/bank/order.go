@@ -94,7 +94,38 @@ func (q *Order) right() []int {
 	return order
 }
 
-func (q *Order) Deal(seed uint64) Dealt { return &dealtOrder{q: q, order: shuffle(seed, len(q.Items))} }
+// Deal shows the items in an order the seed decides, but never one that is already worth much as it stands: between
+// a third and two thirds of its pairs the wrong way round (2 to 4 of 4 items' 6), so that „Готово“ untouched earns
+// a third at most, and so does the dealt order turned round. A plain shuffle deals the right order one time in 24 —
+// for everyone at once on the day, whose deal is the same for all. A seed whose shuffle fits keeps that deal; one
+// whose doesn't takes the next that does, still from the seed alone.
+func (q *Order) Deal(seed uint64) Dealt {
+	right, n := q.right(), len(q.Items)
+	pairs := n * (n - 1) / 2
+	for try := uint64(0); ; try++ {
+		order := shuffle(seed+try*0x9e3779b97f4a7c15, n)
+		if wrong := inversions(order, right); n < 3 || (3*wrong >= pairs && 3*wrong <= 2*pairs) {
+			return &dealtOrder{q: q, order: order}
+		}
+	}
+}
+
+// inversions is how many pairs of given stand the wrong way round against right.
+func inversions(given, right []int) int {
+	rank := make(map[int]int, len(right))
+	for i, b := range right {
+		rank[b] = i
+	}
+	wrong := 0
+	for i := range given {
+		for j := i + 1; j < len(given); j++ {
+			if rank[given[i]] > rank[given[j]] {
+				wrong++
+			}
+		}
+	}
+	return wrong
+}
 
 // dealtOrder shows the bank's item order[i] as item i.
 type dealtOrder struct {
