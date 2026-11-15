@@ -21,6 +21,7 @@ export let {
   boardRow,
   categories,
   computed,
+  countdown,
   crowdLine,
   effect,
   fact,
@@ -124,6 +125,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
     boardRow,
     categories,
     computed,
+    countdown,
     crowdLine,
     effect,
     fact,
@@ -445,7 +447,6 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
   if (first.n === 0) play("go"); // the game starts
   const locked = signal(!!q.given);
   const sent = signal(!!q.given);
-  const left = signal(Math.ceil(q.leftMs / 1000));
   const error = signal("");
   const send = async (a: Answer) => {
     locked.set(true);
@@ -463,14 +464,12 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
     if (v.n === first.n && v.question) asked.update?.(v.question.view);
   });
   // When the time is up, whatever has been put in (a typed number, things moved into order) is the answer.
-  const tick = setInterval(() => {
-    left.update((n) => Math.max(0, n - 1));
-    if (left.peek() > 0 || locked.peek()) return;
+  const left = countdown(q.leftMs, () => {
+    if (locked.peek()) return;
     const pending = asked.pending();
     if (pending) send(pending);
     else locked.set(true);
-  }, 1000);
-  onCleanup(() => clearInterval(tick));
+  });
   return h(
     "article",
     { class: "question" },

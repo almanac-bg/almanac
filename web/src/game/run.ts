@@ -241,13 +241,18 @@ function inRowOf(marks: Mark[]): number {
 export function timer(leftMs: number, limitMs: number, left: () => number, locked: Signal<boolean>): Child {
   const bar = h("div", { class: "time-bar" });
   bar.style.transform = `scaleX(${leftMs / limitMs})`;
-  requestAnimationFrame(() =>
-    requestAnimationFrame(() => {
-      if (locked.peek()) return;
-      bar.style.transition = `transform ${leftMs}ms linear`;
-      bar.style.transform = "scaleX(0)";
-    }),
-  );
+  // The bar runs from where the time is when it first can (a busy first frame starts it late, not behind), to the end.
+  const end = performance.now() + leftMs;
+  let run: Animation | undefined;
+  requestAnimationFrame(() => {
+    const rest = Math.max(0, end - performance.now());
+    if (locked.peek() || !bar.animate) return;
+    run = bar.animate([{ transform: `scaleX(${rest / limitMs})` }, { transform: "scaleX(0)" }], {
+      duration: rest,
+      easing: "linear",
+      fill: "forwards",
+    });
+  });
   effect(() => {
     const n = left();
     if (n <= 0 || n > 10 || locked.peek() || !tickOn.peek()) return;
@@ -255,11 +260,7 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
     else if (limitMs > 10_000) play("tick");
   });
   // Once answered, the bar stops where it is.
-  const freeze = () => {
-    const now = getComputedStyle(bar).transform;
-    bar.style.transition = "none";
-    bar.style.transform = now === "none" ? bar.style.transform : now;
-  };
+  const freeze = () => run?.pause();
   return h(
     "div",
     { class: () => (locked() ? "timer stopped" : left() <= 5 ? "timer low" : "timer") },
@@ -275,6 +276,28 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
       return null;
     },
   );
+}
+
+/** A question's seconds left, counting down with the clock: each second is worked out from when the time ends, so
+ * that a busy page (a slow phone, a picture coming in) never leaves them behind it, as a tick every 1000 ms would.
+ * `out` runs once, when the time is up; once `stopped`, they stop where they are. */
+export function countdown(ms: number, out?: () => void, stopped?: () => boolean): () => number {
+  const end = performance.now() + ms;
+  const left = signal(Math.max(0, Math.ceil(ms / 1000)));
+  let t = 0;
+  const next = (rest: number) => {
+    t = window.setTimeout(step, rest > 0 ? rest % 1000 || 1000 : 0);
+  };
+  const step = () => {
+    if (stopped?.()) return;
+    const rest = end - performance.now();
+    left.set(Math.max(0, Math.ceil(rest / 1000)));
+    if (rest > 0) next(rest);
+    else out?.();
+  };
+  next(ms);
+  onCleanup(() => clearTimeout(t));
+  return left;
 }
 
 /** How long an answer shows before the game moves on: longer where there's more to read. */
@@ -348,8 +371,6 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
       problem.set(failed(e.message, () => send(answer, true)));
       return;
     }
-    clearTimeout(timeout);
-    clearInterval(tick);
     // The answer shows in steps (DESIGN.md, Motion): at once the answer marked, its sound and its pip; then the
     // verdict, its points and the tally rising with them; then the fact; then the page moves to them, the head with the
     // pips and the tally staying in view above. With less motion, all at once.
@@ -437,13 +458,11 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
   onCleanup(() => clearTimeout(more));
 
   // The time: the seconds left, and when it's up, whatever has been put in (or nothing).
-  const timeout = setTimeout(() => send(asked.pending()), q.leftMs);
-  const left = signal(Math.ceil(q.leftMs / 1000));
-  const tick = setInterval(() => left.update((n) => Math.max(0, n - 1)), 1000);
-  onCleanup(() => {
-    clearTimeout(timeout);
-    clearInterval(tick);
-  });
+  const left = countdown(
+    q.leftMs,
+    () => send(asked.pending()),
+    () => sent,
+  );
 
   // Leaving while the question's time runs would cost it, as the time runs on the server: a link out (the arrow, a
   // place in the header) asks first. Leaving gives the question up, so the run waits between two questions, where the
@@ -470,8 +489,6 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     if (!sent) {
       sent = true;
       going.set(true);
-      clearTimeout(timeout);
-      clearInterval(tick);
       try {
         await api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer: null });
       } catch {

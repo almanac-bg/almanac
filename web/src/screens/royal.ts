@@ -24,6 +24,7 @@ import type { Tonight } from "./modes.ts";
 let {
   answered,
   ask,
+  countdown,
   crowdLine,
   picture,
   review,
@@ -195,6 +196,7 @@ export function royal(kit: Kit) {
   ({
     answered,
     ask,
+    countdown,
     crowdLine,
     picture,
     review,
@@ -690,7 +692,6 @@ function question(view: () => Evening, first: Evening): Child {
   const plays = first.in;
   const locked = signal(!plays || !!q.given);
   const sent = signal(!!q.given);
-  const secs = signal(Math.ceil(q.leftMs / 1000));
   const error = signal("");
   const send = async (a: Answer) => {
     locked.set(true);
@@ -707,14 +708,12 @@ function question(view: () => Evening, first: Evening): Child {
     const v = view();
     if (v.n === first.n && v.question) asked.update?.(v.question.view);
   });
-  const tick = setInterval(() => {
-    secs.update((n) => Math.max(0, n - 1));
-    if (secs.peek() > 0 || locked.peek()) return;
+  const secs = countdown(q.leftMs, () => {
+    if (locked.peek()) return;
     const pending = asked.pending();
     if (pending) send(pending);
     else locked.set(true);
-  }, 1000);
-  onCleanup(() => clearInterval(tick));
+  });
   return h(
     "article",
     { class: "question" },

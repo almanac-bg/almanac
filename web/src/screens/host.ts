@@ -13,6 +13,7 @@ import {
   ask,
   avatar,
   computed,
+  countdown,
   fact,
   formatNumber,
   h,
@@ -105,9 +106,7 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
   const q = first.question;
   if (!q) return null;
   if (first.n === 0) play("go");
-  const left = signal(Math.ceil(q.leftMs / 1000));
-  const tick = setInterval(() => left.update((n) => Math.max(0, n - 1)), 1000);
-  onCleanup(() => clearInterval(tick));
+  const left = countdown(q.leftMs);
   // The answers to choose from, as the phones have them (a number's pad isn't one).
   const shown = q.view.type === "number" ? null : ask(q.view, () => {}, signal(true));
   return h(

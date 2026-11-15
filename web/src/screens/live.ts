@@ -19,6 +19,7 @@ let {
   ask,
   avatar,
   computed,
+  countdown,
   crowdLine,
   effect,
   emblem,
@@ -127,6 +128,7 @@ export function liveDuel(kit: Kit) {
     ask,
     avatar,
     computed,
+    countdown,
     crowdLine,
     effect,
     emblem,
@@ -371,7 +373,6 @@ function question(view: () => LiveView, first: LiveView): Child {
   if (first.n === 0) play("go"); // the game starts
   const locked = signal(!!q.given);
   const sent = signal(!!q.given);
-  const left = signal(Math.ceil(q.leftMs / 1000));
   const error = signal("");
   const send = async (a: Answer) => {
     locked.set(true);
@@ -389,14 +390,12 @@ function question(view: () => LiveView, first: LiveView): Child {
     if (v.n === first.n && v.question) asked.update?.(v.question.view);
   });
   // When the time is up, whatever has been put in (a typed number, things moved into order) is the answer.
-  const tick = setInterval(() => {
-    left.update((n) => Math.max(0, n - 1));
-    if (left.peek() > 0 || locked.peek()) return;
+  const left = countdown(q.leftMs, () => {
+    if (locked.peek()) return;
     const pending = asked.pending();
     if (pending) send(pending);
     else locked.set(true);
-  }, 1000);
-  onCleanup(() => clearInterval(tick));
+  });
   // The other answering is news: a sound of its own, not a tap the player might take for theirs.
   let heard = first.them.answered;
   effect(() => {
