@@ -101,9 +101,13 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
   the merge in one go — `gh pr merge <n> --auto --squash` — then move on: GitHub merges it when they pass. Don't
   watch CI, and don't merge `main` into a branch unless GitHub says it conflicts.
 - **Merging to `main` releases and deploys by itself** (`.github/workflows/deploy.yml`): the version comes from the
-  commit titles (feat → minor, fix/perf/revert → patch, `!` → major), and `almanac-deploy` copies the database before
-  it starts the new version, then goes back by itself, program and database copy both, if it isn't healthy. No tags
-  by hand, no ssh to deploy.
+  commit titles (feat → minor, fix/perf/revert → patch, `!` → major). `almanac-deploy` restarts the server only when
+  that cuts no play: it drains it first (no new live duel or room game; those under way finish, five minutes at the
+  most), and waits out Роял (from 20:39 to the end of its games), so a deploy may take a while to go live, and
+  several merges meanwhile go out as one. Connections wait in systemd's socket through the restart; rooms are kept
+  over it; the new version copies the database before its migrations, and the deploy goes back by itself, program
+  and database copy both, if it isn't healthy. No tags by hand, no ssh to deploy. Anything new kept in memory must
+  survive a restart or count as under way (`internal/server/drain.go`).
 - **The browser tests run after the merge, on `main`** (about 15 minutes, all three engines). They hold nothing up;
   if one fails, fix it with the next change. Before opening a PR, run only the specs your change touches, in
   Chromium: `npx playwright test -c e2e --project chromium e2e/<spec>`. Each checkout gets its own port, so sessions
@@ -128,10 +132,11 @@ This runs on the owner's own Mac, with other sessions beside you. When your work
 
 One Hetzner server (ARM) behind Cloudflare; the program runs under systemd as `almanac`, serves HTTPS itself, keeps
 SQLite in `/var/lib/almanac`, and backs it up hourly to R2. Deploys come from CI (above). By hand, as root:
-`almanac-deploy vX.Y.Z` (also how to go back: an older version, as long as no migration came since; past one, the
-older version refuses the database and the deploy goes back to where it was, so put the copy from before that release
-back by hand, `/var/lib/almanac/before-vX.Y.Z.db`, and lose what was played since), `almanac-bank` (pull and reload
-the questions), `journalctl -u almanac` (logs). The `almanac backup` commands need the service's settings:
+`almanac-deploy vX.Y.Z` (also how to go back: an older version, with `now` after it to skip the wait for play to
+end, as long as no migration came since; past one, the older version refuses the database and the deploy goes back
+to where it was, so put the copy from before that release back by hand, `/var/lib/almanac/before-vX.Y.Z.db`, with
+`systemctl stop almanac.socket almanac` first, and lose what was played since), `almanac-bank` (pull and reload the
+questions), `journalctl -u almanac` (logs). The `almanac backup` commands need the service's settings:
 `systemd-run --pipe --wait -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac backup verify`
 brings the latest copy back and checks it (the server does this itself daily). Health: `https://almanac.bg/api/health`
 shows the live version.

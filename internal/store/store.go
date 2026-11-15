@@ -1,5 +1,5 @@
-// Package store keeps the game's data in one SQLite file: opening it, bringing its schema up to date, and the few
-// helpers every query uses.
+// Package store keeps the game's data in one SQLite file: opening it, bringing its schema up to date (a new version
+// keeps a copy from before, KeepCopy), and the few helpers every query uses.
 //
 // SQLite takes one writer at a time, so writes go through a single connection (Write) and never wait on each other's
 // locks; reads go through a pool (Read) and run alongside, thanks to the write-ahead log.

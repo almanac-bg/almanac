@@ -1,0 +1,16 @@
+# The game's port, held by systemd: while the server restarts (a deploy, a crash), the connections that come wait here
+# for the new one instead of being refused (internal/server/listen.go). Port 443, IPv4 and IPv6; the server speaks
+# TLS on it itself.
+#
+# To stop the game for good, stop both (a connection to the socket alone starts the server again):
+#   systemctl stop almanac.socket almanac.service
+[Unit]
+Description=АЛМАНАХ's port (almanac.bg)
+
+[Socket]
+ListenStream=443
+NoDelay=yes
+Backlog=4096
+
+[Install]
+WantedBy=sockets.target

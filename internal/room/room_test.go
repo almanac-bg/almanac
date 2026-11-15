@@ -1,6 +1,7 @@
 package room
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -315,4 +316,103 @@ func mustJSON(t *testing.T, v any) []byte {
 		t.Fatal(err)
 	}
 	return b
+}
+
+// Paused for a restart, no game starts in a room, and a game under way counts until it's over.
+func TestPausedRooms(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		hub := NewHub(sample(t))
+		ana := Player{ID: 1, Name: "Ана"}
+		r, _ := hub.Open(ana, "")
+		other, _ := hub.Open(Player{ID: 2, Name: "Бо"}, "")
+		if err := r.Start(ana.ID); err != nil {
+			t.Fatal(err)
+		}
+		if n := hub.UnderWay(); n != 1 {
+			t.Fatalf("under way: %d", n)
+		}
+		hub.Pause()
+		if err := other.Start(2); !errors.Is(err, ErrPaused) {
+			t.Fatalf("a game started while paused: %v", err)
+		}
+		// Nobody answers: the game still runs to its end.
+		time.Sleep(time.Hour)
+		synctest.Wait()
+		if v := r.View(ana.ID); v.Phase != End {
+			t.Fatalf("the game under way: %s", v.Phase)
+		}
+		if n := hub.UnderWay(); n != 0 {
+			t.Fatalf("under way at the end: %d", n)
+		}
+		if err := r.Start(ana.ID); !errors.Is(err, ErrPaused) {
+			t.Fatalf("another game started while paused: %v", err)
+		}
+		hub.Resume()
+		if err := other.Start(2); err != nil {
+			t.Fatalf("resumed: %v", err)
+		}
+	})
+}
+
+// Rooms are kept over a restart: a lobby as it was, a game just over with its standings and review, and a game
+// still being played as its lobby.
+func TestRoomsKeptOverARestart(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		bank := sample(t)
+		hub := NewHub(bank)
+		ana, bo, cy := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}, Player{ID: 3, Name: "Цви"}
+		lobby, _ := hub.Open(ana, "")
+		_ = lobby.Join(bo)
+		over, _ := hub.Open(bo, "")
+		_ = over.Join(cy)
+		playing, _ := hub.Open(cy, "")
+		_ = over.Start(bo.ID)
+		sb, _ := over.Follow(bo.ID)
+		for over.View(bo.ID).Phase != End {
+			if v := over.View(bo.ID); v.Phase == Question && !v.Players[0].Answered && !v.Players[1].Answered {
+				_ = over.Answer(bo.ID, v.N, answer(over, true))
+			}
+			time.Sleep(time.Second)
+			synctest.Wait()
+		}
+		over.Unfollow(sb)
+		_ = playing.Start(cy.ID)
+		before := over.View(bo.ID)
+
+		var saved bytes.Buffer
+		if err := hub.Save(&saved); err != nil {
+			t.Fatal(err)
+		}
+		next := NewHub(bank)
+		if n, err := next.Restore(&saved); err != nil || n != 3 {
+			t.Fatalf("restored %d: %v", n, err)
+		}
+
+		r, err := next.Get(lobby.Code())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if v := r.View(bo.ID); v.Phase != Lobby || len(v.Players) != 2 || v.Host != "Ана" || v.IsHost {
+			t.Fatalf("the lobby, restored: %+v", v)
+		}
+		if err := r.Start(ana.ID); err != nil {
+			t.Fatalf("a game in the restored lobby: %v", err)
+		}
+
+		r, _ = next.Get(over.Code())
+		after := r.View(bo.ID)
+		if after.Phase != End || after.Total != before.Total || len(after.Review) != len(before.Review) ||
+			after.Players[0].Points != before.Players[0].Points || after.Players[0].Points == 0 ||
+			after.Review[0].Points != before.Review[0].Points || !after.Review[0].Right {
+			t.Fatalf("the game just over, restored:\n%+v\nwas\n%+v", after, before)
+		}
+		if err := r.Start(bo.ID); err != nil {
+			t.Fatalf("another game after the restored end: %v", err)
+		}
+
+		r, _ = next.Get(playing.Code())
+		if v := r.View(cy.ID); v.Phase != Lobby || len(v.Players) != 1 || !v.IsHost {
+			t.Fatalf("the game being played, restored: %+v", v)
+		}
+	})
 }

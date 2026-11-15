@@ -5,7 +5,9 @@
 # with only docs, tests, ci, build or chore commits release nothing. One at a time, in order.
 #
 # The server lets CI's key run only almanac-deploy with a version (deploy/deploy-ci.sh); the key is the DEPLOY_KEY
-# secret. Without it, this releases and stops there.
+# secret. Without it, this releases and stops there. almanac-deploy waits for a moment the restart cuts no play: the
+# games under way (five minutes at most), and Роял's evening (from 20:39, about half an hour), so the job may wait
+# that long; merges meanwhile queue behind it, and the newest of them goes out next, with all of theirs.
 name: Deploy
 
 on:
@@ -22,7 +24,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 75
     permissions:
       contents: write
       id-token: write
@@ -97,5 +99,5 @@ jobs:
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy
           chmod 600 ~/.ssh/deploy
           echo '2.31.121.12 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDrM9ez1+VTDgt97hh9na9P4y9EX4TXuI/abhp5YP8q/' > ~/.ssh/known_hosts
-          ssh -i ~/.ssh/deploy -o BatchMode=yes -o IdentitiesOnly=yes root@2.31.121.12 "$TAG"
+          ssh -i ~/.ssh/deploy -o BatchMode=yes -o IdentitiesOnly=yes -o ServerAliveInterval=30 root@2.31.121.12 "$TAG"
           echo "$TAG is live." >> "$GITHUB_STEP_SUMMARY"

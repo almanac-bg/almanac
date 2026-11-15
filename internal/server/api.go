@@ -66,6 +66,7 @@ var playerErrors = map[error]*apiError{
 	room.ErrNotNow:         {http.StatusConflict, "not_now", "Вече е късно за това."},
 	room.ErrAnswer:         {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
 	room.ErrTooMany:        {http.StatusServiceUnavailable, "too_many_rooms", "Твърде много отворени стаи. Опитай след малко."},
+	room.ErrPaused:         {http.StatusServiceUnavailable, "updating", "Играта се обновява. Опитай пак след малко."},
 	account.ErrBadEmail:    {http.StatusBadRequest, "bad_email", "Това не прилича на имейл адрес."},
 	account.ErrTooSoon:     {http.StatusTooManyRequests, "too_soon", "Току-що ти изпратихме код. Провери пощата си."},
 	account.ErrBadCode:     {http.StatusBadRequest, "bad_code", "Грешен код."},

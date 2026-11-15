@@ -607,3 +607,39 @@ func TestTwo(t *testing.T) {
 		t.Fatalf("after question 5, of two: %+v", v)
 	}
 }
+
+// Near: from lead before the lobby opens until the evening's games are over.
+func TestNear(t *testing.T) {
+	w := setup(t)
+	lead := 6 * time.Minute
+	w.at(20, 38, 59)
+	if w.h.Near(lead) {
+		t.Fatal("near at 20:38")
+	}
+	w.at(20, 39, 0)
+	if !w.h.Near(lead) {
+		t.Fatal("not near at 20:39")
+	}
+	ana := w.player()
+	w.start(ana)
+	w.wait(10 * time.Minute)
+	if !w.h.Near(lead) {
+		t.Fatal("not near while the game is on")
+	}
+	for v := w.h.View(ana.ID); v.Phase != play.RoyalEnd; v = w.h.View(ana.ID) {
+		w.wait(time.Minute)
+	}
+	if w.h.Near(lead) {
+		t.Fatalf("near once over, at %s", w.now.In(play.Bulgaria).Format(time.TimeOnly))
+	}
+	// An evening nobody came to is over at its start.
+	w.now = w.now.Add(23 * time.Hour)
+	w.at(20, 50, 0)
+	if !w.h.Near(lead) {
+		t.Fatal("not near in the next evening's lobby")
+	}
+	w.at(21, 0, 1)
+	if w.h.Near(lead) {
+		t.Fatal("near after an evening nobody came to")
+	}
+}

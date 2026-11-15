@@ -598,6 +598,24 @@ type Glance struct {
 	In int `json:"in"`
 }
 
+// Near says whether an evening is near or on: from lead before its lobby opens until its games are over. A restart of
+// the server waits for it to pass (the game would come back, but not without a gap at its best moment).
+func (h *Hub) Near(lead time.Duration) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	now := h.now()
+	if n := h.night; n != nil && !now.Before(n.start) {
+		if over, _ := n.over(); !over {
+			return true
+		}
+	}
+	next := h.sched.Next(now)
+	if n := h.night; n != nil && n.start.After(now) {
+		next = n.start
+	}
+	return !now.Before(next.Add(-h.sched.Lobby - lead))
+}
+
 // Glance is the evening now, at a glance.
 func (h *Hub) Glance() Glance {
 	h.mu.Lock()

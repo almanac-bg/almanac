@@ -4,7 +4,9 @@
 //
 // Every answer goes through the player's own run (internal/play), as in any game: the score, XP, the questions'
 // statistics and the duel's result are kept there, and only the timing lives here, in memory. A restart cuts the
-// duels under way off; they end without a result (play.EndLive).
+// duels under way off; they end without a result (play.EndLive). So before one, the server pauses the hub (Pause):
+// no new duel starts, not even with a recording; those asking go on waiting, told why (Seek.Held), and find their
+// duel once the server is back, while the duels under way (UnderWay) play to their end. Resume undoes it.
 package live
 
 import (
@@ -62,6 +64,7 @@ type Hub struct {
 	wait time.Duration
 
 	mu       sync.Mutex
+	paused   bool
 	waiting  []*Seek
 	starting map[int64]*Seek  // players whose duel is being made
 	matches  map[int64]*Match // by duel
@@ -83,9 +86,15 @@ type Seek struct {
 	refs   int // the screens asking (a second tab, a line that dropped and came back)
 	until  time.Time
 	timer  *time.Timer
+	held   bool          // waiting while the hub is paused
+	told   chan struct{} // held changed
 	done   chan struct{}
 	Match  *Match
 	Err    error
+}
+
+func newSeek(h *Hub, p Player) *Seek {
+	return &Seek{hub: h, player: p, refs: 1, done: make(chan struct{}), told: make(chan struct{}, 1)}
 }
 
 // Done closes when the seek is settled.
@@ -94,18 +103,41 @@ func (s *Seek) Done() <-chan struct{} { return s.done }
 // Left is how long the player still waits for someone before a recording.
 func (s *Seek) Left() time.Duration { return max(0, time.Until(s.until)) }
 
+// Held says whether the player waits for the server to restart (the hub is paused) rather than for someone to come.
+func (s *Seek) Held() bool {
+	s.hub.mu.Lock()
+	defer s.hub.mu.Unlock()
+	return s.held
+}
+
+// Changed says Held may have changed.
+func (s *Seek) Changed() <-chan struct{} { return s.told }
+
+// hold marks a waiting seek held or not. Called with the hub's lock held.
+func (s *Seek) hold(held bool) {
+	if s.held == held {
+		return
+	}
+	s.held = held
+	select {
+	case s.told <- struct{}{}:
+	default:
+	}
+}
+
 func (s *Seek) settle(m *Match, err error) {
 	s.Match, s.Err = m, err
 	close(s.done)
 }
 
 // Seek asks for a duel for a player: the one they're in if they're in one, else with whoever is waiting, else they
-// wait (and get a recording after Wait). Leave it when the screen goes.
+// wait (and get a recording after Wait). While the hub is paused, they wait, held, for as long as it is. Leave it
+// when the screen goes.
 func (h *Hub) Seek(p Player) *Seek {
 	h.mu.Lock()
 	if m := h.playing[p.ID]; m != nil {
 		h.mu.Unlock()
-		s := &Seek{hub: h, player: p, refs: 1, done: make(chan struct{})}
+		s := newSeek(h, p)
 		s.settle(m, nil)
 		return s
 	}
@@ -121,32 +153,101 @@ func (h *Hub) Seek(p Player) *Seek {
 			return s
 		}
 	}
-	s := &Seek{hub: h, player: p, refs: 1, done: make(chan struct{})}
-	if len(h.waiting) == 0 {
-		s.until = time.Now().Add(h.wait)
+	s := newSeek(h, p)
+	s.until = time.Now().Add(h.wait)
+	if h.paused || len(h.waiting) == 0 {
 		s.timer = time.AfterFunc(h.wait, func() { h.expire(s) })
+		s.held = h.paused
 		h.waiting = append(h.waiting, s)
 		h.mu.Unlock()
 		return s
 	}
 	other := h.waiting[0]
 	h.waiting = h.waiting[1:]
-	other.timer.Stop()
-	if len(h.matches) >= maxMatches {
-		h.mu.Unlock()
-		other.settle(nil, ErrTooMany)
-		s.settle(nil, ErrTooMany)
-		return s
-	}
-	h.starting[other.player.ID], h.starting[p.ID] = other, s
+	start := h.pair(other, s)
 	h.mu.Unlock()
-	m, err := h.launch([]int64{other.player.ID, p.ID}, func(ctx context.Context) (play.Live, [2]Player, error) {
-		l, err := h.game.StartLive(ctx, other.player.ID, p.ID)
-		return l, [2]Player{other.player, p}, err
-	})
-	other.settle(m, err)
-	s.settle(m, err)
+	start()
 	return s
+}
+
+// pair makes a duel of two seeks taken out of the queue; what it returns starts it, to run once the hub's lock is let
+// go. Called with the lock held.
+func (h *Hub) pair(a, b *Seek) func() {
+	for _, s := range []*Seek{a, b} {
+		if s.timer != nil {
+			s.timer.Stop()
+		}
+		s.hold(false)
+	}
+	if len(h.matches) >= maxMatches {
+		return func() {
+			a.settle(nil, ErrTooMany)
+			b.settle(nil, ErrTooMany)
+		}
+	}
+	h.starting[a.player.ID], h.starting[b.player.ID] = a, b
+	return func() {
+		m, err := h.launch([]int64{a.player.ID, b.player.ID}, func(ctx context.Context) (play.Live, [2]Player, error) {
+			l, err := h.game.StartLive(ctx, a.player.ID, b.player.ID)
+			return l, [2]Player{a.player, b.player}, err
+		})
+		a.settle(m, err)
+		b.settle(m, err)
+	}
+}
+
+// Pause stops new duels from starting, for a restart: whoever asks for one waits, held, and the duels under way go on.
+func (h *Hub) Pause() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.paused = true
+	for _, s := range h.waiting {
+		s.hold(true)
+	}
+}
+
+// Resume undoes Pause: those waiting meet each other two by two, and one left alone waits out the rest of their Wait
+// (if any is left) before a recording.
+func (h *Hub) Resume() {
+	h.mu.Lock()
+	if !h.paused {
+		h.mu.Unlock()
+		return
+	}
+	h.paused = false
+	var starts []func()
+	for len(h.waiting) >= 2 {
+		a, b := h.waiting[0], h.waiting[1]
+		h.waiting = h.waiting[2:]
+		starts = append(starts, h.pair(a, b))
+	}
+	for _, s := range h.waiting {
+		s.hold(false)
+		s.timer.Reset(s.Left())
+	}
+	h.mu.Unlock()
+	for _, start := range starts {
+		go start()
+	}
+}
+
+// UnderWay is how many duels a restart would cut now: those being played, and those being made.
+func (h *Hub) UnderWay() int {
+	h.mu.Lock()
+	n := len(h.starting)
+	all := make([]*Match, 0, len(h.matches))
+	for _, m := range h.matches {
+		all = append(all, m)
+	}
+	h.mu.Unlock()
+	for _, m := range all {
+		m.mu.Lock()
+		if !m.over() {
+			n++
+		}
+		m.mu.Unlock()
+	}
+	return n
 }
 
 // Leave is a screen that asked giving up (closed, gone offline): when none is left, the player stops waiting.
@@ -171,7 +272,7 @@ func (s *Seek) Leave() {
 func (h *Hub) expire(s *Seek) {
 	h.mu.Lock()
 	i := slices.Index(h.waiting, s)
-	if i < 0 { // matched, or gone, meanwhile
+	if i < 0 || h.paused { // matched, or gone, meanwhile; or held until the hub resumes
 		h.mu.Unlock()
 		return
 	}

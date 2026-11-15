@@ -24,10 +24,10 @@ printf '[Journal]\nMaxRetentionSec=14day\n' > /etc/systemd/journald.conf.d/alman
 systemctl restart systemd-journald
 
 here=$(dirname "$0")
-install -m 644 "$here/almanac.service" /etc/systemd/system/almanac.service
+install -m 644 "$here/almanac.service" "$here/almanac.socket" /etc/systemd/system/
 install -m 755 "$here/deploy.sh" /usr/local/sbin/almanac-deploy
 install -m 755 "$here/deploy-ci.sh" /usr/local/sbin/almanac-deploy-ci
 install -m 755 "$here/bank.sh" /usr/local/sbin/almanac-bank
 systemctl daemon-reload
-systemctl enable almanac
+systemctl enable almanac.socket almanac.service
 echo "ready: settings in /etc/almanac/env, then almanac-deploy vX.Y.Z"

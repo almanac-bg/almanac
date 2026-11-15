@@ -55,7 +55,9 @@ import (
 //	MTA_STS_MX          the domain's mail servers, comma-separated, for its MTA-STS policy at mta-sts.<domain>;
 //	                    MTA_STS_MODE testing (the default) or enforce
 //
-// SIGHUP reloads the bank; SIGTERM or SIGINT stop the server after the requests under way finish.
+// SIGHUP reloads the bank; SIGTERM or SIGINT stop the server after the requests under way finish (a deploy drains it
+// first: internal/server/drain.go). A new version copies the database as it first starts (store.KeepCopy). Started by
+// systemd's socket (deploy/almanac.socket), it serves on that socket, and ADDR is left aside.
 func serve([]string) error {
 	dev := os.Getenv("DEV") == "1"
 	if dev {
@@ -79,6 +81,7 @@ func serve([]string) error {
 		MTASTSMode:      os.Getenv("MTA_STS_MODE"),
 		Operator:        os.Getenv("OPERATOR_NAME"),
 		Contact:         env("CONTACT_EMAIL", "privacy@almanac.bg"),
+		RoomsFile:       filepath.Join(filepath.Dir(dbPath()), "rooms.json"),
 		Dev:             dev,
 		Version:         version,
 	}
@@ -140,6 +143,14 @@ func serve([]string) error {
 	backups, err := backupStore()
 	if err != nil {
 		return err
+	}
+	// A new version copies the database before its migrations, to go back to if they went wrong.
+	if !dev && strings.HasPrefix(version, "v") {
+		if made, err := store.KeepCopy(dbPath(), version); err != nil {
+			return fmt.Errorf("copying the database before %s: %w", version, err)
+		} else if made {
+			slog.Info("database copied", "before", version)
+		}
 	}
 	db, err := store.Open(dbPath())
 	if err != nil {
