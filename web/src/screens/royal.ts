@@ -8,8 +8,9 @@
 // the start plays, and those who come late may still come in until the third question's answer shows. The screen is
 // kept on in the lobby and the game.
 //
-// The server sends the evening as this player sees it after every change; the browser reconnects if the line drops.
-// It loads on its own, the first time it's opened, and is handed the app's pieces (kit.ts).
+// The server sends the evening as this player sees it after every change; the browser reconnects if the line drops,
+// and an answer that doesn't get through is sent again while its question is open (a restart of the server shows the
+// question again, drawn anew). It loads on its own, the first time it's opened, and is handed the app's pieces (kit.ts).
 
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
@@ -24,6 +25,7 @@ let {
   answered,
   ask,
   crowdLine,
+  deliver,
   picture,
   review,
   questionHead,
@@ -98,6 +100,8 @@ interface Evening {
     view: View;
     limitMs: number;
     leftMs: number;
+    /** When it showed (the server's clock): later, if it showed again after a restart of the server. */
+    shown?: number;
     nextMs?: number;
     given?: Answer;
     reveal?: {
@@ -195,6 +199,7 @@ export function royal(kit: Kit) {
     answered,
     ask,
     crowdLine,
+    deliver,
     picture,
     review,
     questionHead,
@@ -277,10 +282,17 @@ export function royal(kit: Kit) {
     return !!v && (v.phase === "question" || v.phase === "reveal" || (v.phase === "lobby" && v.in));
   });
 
-  // Each phase (and each question) is drawn once; what changes inside it follows the view.
+  // Each phase (and each question) is drawn once; what changes inside it follows the view. A question the server
+  // shows again (it restarted) is drawn again, its time from then.
   const key = computed(() => {
     const v = view();
-    return v ? `${v.phase}:${v.n}:${v.in}:${v.startsAt}` : "";
+    return v ? `${v.phase}:${v.n}:${v.in}:${v.startsAt}:${v.question?.shown ?? 0}` : "";
+  });
+  // The question an answer is on its way to (-1: none), for the question drawn again meanwhile.
+  const out = signal(-1);
+  let closed = false;
+  onCleanup(() => {
+    closed = true;
   });
   return h(
     "div",
@@ -296,7 +308,7 @@ export function royal(kit: Kit) {
         case "lobby":
           return lobby(live, now, joined);
         case "question":
-          return [door(live, joined), question(live, v)];
+          return [door(live, joined), question(live, v, out, () => closed)];
         case "reveal":
           return [door(live, joined), reveal(live, v)];
         case "end":
@@ -681,37 +693,59 @@ function standings(v: Evening): Child {
   return h("section", { class: "board league-board royal-table" }, h("h2", null, "Класиране"), h("ol", null, rows));
 }
 
-function question(view: () => Evening, first: Evening): Child {
+/** A question, to answer while its time runs. An answer that doesn't get through is sent again while the question is
+ * open (out: the question an answer is on its way to, for this question drawn again meanwhile, as the server shows it
+ * again after a restart); one refused for good frees the options again. */
+function question(view: () => Evening, first: Evening, out: Signal<number>, gone: () => boolean): Child {
   const q = first.question;
   if (!q) return null;
-  if (first.n === 0 && first.in) play("go"); // the game starts
+  if (first.n === 0 && first.in && !q.given && out.peek() !== 0) play("go"); // the game starts
   // Those cut play on, off the standings.
   const plays = first.in;
-  const locked = signal(!plays || !!q.given);
-  const sent = signal(!!q.given);
+  // The server has this player's answer (sent from here, or before the question was drawn again).
+  const taken = () => {
+    const v = view();
+    return v.phase === "question" && v.n === first.n && !!v.question?.given;
+  };
+  const tapped = signal(false);
+  const sent = signal(false);
   const secs = signal(Math.ceil(q.leftMs / 1000));
+  const locked = signal(true);
+  effect(() => locked.set(!plays || tapped() || out() === first.n || taken() || secs() <= 0));
   const error = signal("");
+  // The question still takes the answer, as far as this screen knows.
+  const open = () => !gone() && !taken() && view().phase === "question" && view().n === first.n;
   const send = async (a: Answer) => {
-    locked.set(true);
-    try {
-      await api("POST", "/api/royal/answer", { n: first.n, answer: a });
-      sent.set(true);
-    } catch (err) {
-      error.set((err as ApiError).message);
+    tapped.set(true);
+    error.set("");
+    out.set(first.n);
+    const e = await deliver("/api/royal/answer", { n: first.n, answer: a }, () => untracked(open));
+    if (out.peek() === first.n) out.set(-1);
+    if (!e) return sent.set(true);
+    error.set(e.message);
+    if (e.code !== "not_now" && untracked(open)) {
+      // Refused, not late: the options are free again.
+      if (asked.node instanceof Element)
+        for (const b of asked.node.querySelectorAll(".picked")) b.classList.remove("picked");
+      tapped.set(false);
     }
   };
   const asked = ask(q.view, send, locked);
-  // More of the question shows as its time runs (the next clue): the server sends it when it's due.
   effect(() => {
     const v = view();
-    if (v.n === first.n && v.question) asked.update?.(v.question.view);
+    if (v.n !== first.n || !v.question || v.phase !== "question") return;
+    // More of the question shows as its time runs (the next clue): the server sends it when it's due.
+    asked.update?.(v.question.view);
+    // The clock goes by the server's.
+    const s = Math.ceil(v.question.leftMs / 1000);
+    if (Math.abs(s - untracked(secs)) > 1) secs.set(s);
   });
+  // When the time is up, whatever has been put in (a typed number, things moved into order) is the answer.
   const tick = setInterval(() => {
     secs.update((n) => Math.max(0, n - 1));
-    if (secs.peek() > 0 || locked.peek()) return;
+    if (secs.peek() > 0 || !plays || tapped.peek() || out.peek() === first.n || untracked(taken)) return;
     const pending = asked.pending();
     if (pending) send(pending);
-    else locked.set(true);
   }, 1000);
   onCleanup(() => clearInterval(tick));
   return h(
@@ -731,7 +765,7 @@ function question(view: () => Evening, first: Evening): Child {
         "p",
         { class: "status", role: "status" },
         !plays ? "Гледаш. " : v.out ? "Извън класирането. " : "",
-        sent() ? "Отговорът ти е приет. " : "",
+        sent() || taken() ? "Отговорът ти е приет. " : "",
         `Отговориха ${done} от ${waiting.length}.`,
       );
     },

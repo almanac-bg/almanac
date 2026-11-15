@@ -14,6 +14,8 @@ test("Роял: in from the lobby, live to the fifteenth question, then the stan
   await expect(page.getByText("Вътре си.")).toBeVisible();
 
   const standings = page.getByRole("heading", { name: "Класиране" });
+  // The first answer doesn't get through (the line drops as it's sent): it's sent again, and taken.
+  await page.route("**/api/royal/answer", (route) => route.abort("connectionreset"), { times: 1 });
   for (let n = 0; n < 15; n++) {
     const asked = page.locator(".question-head").filter({ hasText: `${n + 1} от 15` });
     await expect(asked).toBeVisible({ timeout: 60_000 });
@@ -23,6 +25,7 @@ test("Роял: in from the lobby, live to the fifteenth question, then the stan
     await answer(page);
     // The answer shows once everyone still in has answered (or the time is up, for one cut), with the standings.
     await expect(page.locator(".verdict")).toBeVisible({ timeout: 40_000 });
+    if (n === 0) await expect(page.locator(".verdict")).not.toContainText("Без отговор");
     await expect(page.locator(".royal-table .row.me")).toBeVisible();
   }
   // The end: the standings of all, after the fifteenth question.

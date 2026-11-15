@@ -9,7 +9,7 @@ import { news } from "./game/news.ts";
 import { answered, ask, crowdLine, picture } from "./game/questions.ts";
 import { boardRow, hands, landing, nextSteps, review, reviewParts, shareButton } from "./game/results.ts";
 import { questionHead, timer, trail, upNext } from "./game/run.ts";
-import { api } from "./lib/api.ts";
+import { api, deliver } from "./lib/api.ts";
 import { keepAwake } from "./lib/awake.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked } from "./lib/dom.ts";
 import { ordinal, place } from "./lib/ordinal.ts";
@@ -50,6 +50,7 @@ export const kit = {
   coming,
   computed,
   crowdLine,
+  deliver,
   effect,
   duelResult,
   emblem,
