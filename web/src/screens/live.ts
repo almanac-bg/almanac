@@ -69,6 +69,13 @@ interface LiveView {
 
 type Trouble = "" | "reconnecting" | "closed" | "nobody" | "busy";
 
+/** Waiting for someone: how long until a recording, or that the game is being updated (held: the duel starts on the
+ * new version, the line coming back to it by itself). */
+interface Wait {
+  leftMs: number;
+  held?: boolean;
+}
+
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
 const divisionNames: Record<Side["division"], string> = {
   bronze: "Бронз",
@@ -94,7 +101,7 @@ export function liveDuel() {
 /** One duel, from asking for it to its result. */
 function session(again: () => void): Child {
   const view = signal<LiveView | null>(null);
-  const waitMs = signal<number | null>(null);
+  const wait = signal<Wait | null>(null);
   const trouble = signal<Trouble>("");
 
   let es: EventSource | null = null;
@@ -106,7 +113,7 @@ function session(again: () => void): Child {
         trouble.set("");
         // A line that dropped while waiting starts the wait again; a duel that ended doesn't come back.
         if (view.peek()) return stop();
-        waitMs.set(JSON.parse((e as MessageEvent).data).leftMs);
+        wait.set(JSON.parse((e as MessageEvent).data));
       });
       es.onmessage = (e) => {
         trouble.set("");
@@ -135,7 +142,7 @@ function session(again: () => void): Child {
   // Each phase (and each question) is drawn once; what changes inside it follows the view.
   const key = computed(() => {
     const v = view();
-    return v ? `${v.phase}:${v.n}` : waitMs() !== null ? "waiting" : "";
+    return v ? `${v.phase}:${v.n}` : wait() !== null ? "waiting" : "";
   });
   return h(
     "div",
@@ -152,7 +159,7 @@ function session(again: () => void): Child {
       if (t === "closed" && untracked(view)?.phase !== "end")
         return problem("Дуелът прекъсна", "Без резултат: рейтингът не се мени.", again);
       if (!k) return h("p", { class: "muted" }, "…");
-      if (k === "waiting") return waiting(untracked(waitMs) ?? 0);
+      if (k === "waiting") return waiting(wait as () => Wait);
       const v = untracked(view) as LiveView;
       const live = view as () => LiveView;
       switch (v.phase) {
@@ -171,9 +178,11 @@ function session(again: () => void): Child {
   );
 }
 
-/** Waiting for someone: how long until a recording instead. */
-function waiting(leftMs: number): Child {
-  const left = signal(Math.ceil(leftMs / 1000));
+/** Waiting for someone: how long until a recording instead, or, while the game is being updated, that the duel comes
+ * right after. */
+function waiting(wait: () => Wait): Child {
+  const left = signal(0);
+  effect(() => left.set(Math.ceil(wait().leftMs / 1000)));
   const tick = setInterval(() => left.update((n) => Math.max(0, n - 1)), 1000);
   onCleanup(() => clearInterval(tick));
   return h(
@@ -185,16 +194,25 @@ function waiting(leftMs: number): Child {
       h("p", { class: "kicker" }, "Дуел на живо"),
       h("h1", null, "Търсим съперник"),
       h("p", { class: "lead" }, () =>
-        left() > 0
-          ? "Ако никой не дойде до края на броенето, ще играеш срещу запис на истинска игра."
-          : "Намираме ти запис на истинска игра…",
+        wait().held
+          ? "Играта се обновява. Дуелът започва веднага след това."
+          : left() > 0
+            ? "Ако никой не дойде до края на броенето, ще играеш срещу запис на истинска игра."
+            : "Намираме ти запис на истинска игра…",
       ),
     ),
-    h(
-      "p",
-      { class: "live-count", role: "timer", "aria-label": () => `${left()} ${left() === 1 ? "секунда" : "секунди"}` },
-      () => String(left()),
-    ),
+    () =>
+      wait().held
+        ? null
+        : h(
+            "p",
+            {
+              class: "live-count",
+              role: "timer",
+              "aria-label": () => `${left()} ${left() === 1 ? "секунда" : "секунди"}`,
+            },
+            () => String(left()),
+          ),
     h("button", { class: "btn", type: "button", onclick: () => go("/duel") }, "Откажи"),
   );
 }

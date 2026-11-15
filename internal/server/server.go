@@ -1,4 +1,9 @@
 // Package server is the game over HTTP: the API, the app's page and its files, and the pictures.
+//
+// It listens on the socket systemd hands it (deploy/almanac.socket), if it's given one, else on Config.Addr: with the
+// socket, connections that come while the server restarts wait for the new one instead of being refused. Before a
+// restart, a deploy drains the server (drain.go), so that the restart cuts no live duel nor a room's game; the rooms
+// themselves are kept over it (Config.RoomsFile).
 package server
 
 import (
@@ -53,6 +58,8 @@ type Config struct {
 	Phones *push.Phones
 	// Operator is who runs the game, and Contact their address (the privacy page, security.txt).
 	Operator, Contact string
+	// RoomsFile is where the rooms open as the server stops are kept, for its next run to open again ("": nowhere).
+	RoomsFile string
 	// Dev serves the client from disk, as the build rewrites it.
 	Dev     bool
 	Version string
@@ -80,6 +87,7 @@ type Server struct {
 	phones   *push.Phones
 	// closing ends the streams (rooms, Роял) when the server stops, so that it needn't wait for them.
 	closing  chan struct{}
+	drain    drain
 	bank     atomic.Pointer[bank.Bank]
 	client   fs.FS
 	limits   *limiter
@@ -159,6 +167,8 @@ func (s *Server) routes() http.Handler {
 		mux.Handle(pattern, s.apiHandler(h))
 	}
 	api("GET /api/health", s.health)
+	api("POST /api/drain", s.drainHandler)
+	api("DELETE /api/drain", s.drainHandler)
 	api("GET /api/me", s.me)
 	api("PATCH /api/me", s.rename)
 	api("DELETE /api/me", s.deleteAccount)
@@ -246,8 +256,9 @@ func (s *Server) routes() http.Handler {
 	return s.recovered(h)
 }
 
-// Run serves until ctx ends, then stops taking requests and gives those under way up to drain to finish.
-func (s *Server) Run(ctx context.Context, drain time.Duration) error {
+// Run serves until ctx ends, then stops taking requests, gives those under way up to grace to finish, and keeps the
+// rooms open for the next run.
+func (s *Server) Run(ctx context.Context, grace time.Duration) error {
 	srv := &http.Server{
 		Addr:              s.cfg.Addr,
 		Handler:           s.handler,
@@ -257,7 +268,7 @@ func (s *Server) Run(ctx context.Context, drain time.Duration) error {
 		MaxHeaderBytes:    32 << 10,
 		ErrorLog:          slog.NewLogLogger(slog.Default().Handler(), slog.LevelWarn),
 	}
-	ln, err := net.Listen("tcp", s.cfg.Addr)
+	ln, err := listen(s.cfg.Addr)
 	if err != nil {
 		return err
 	}
@@ -279,7 +290,13 @@ func (s *Server) Run(ctx context.Context, drain time.Duration) error {
 		return err
 	}
 	slog.Info("serving", "addr", ln.Addr().String(), "url", s.cfg.PublicURL, "version", s.cfg.Version, "tls", s.cfg.TLSCert != "")
-	srv.RegisterOnShutdown(func() { close(s.closing) })
+	srv.RegisterOnShutdown(func() {
+		// Nothing new starts while the server stops; the streams end (the screens find the next server by themselves).
+		s.live.Pause()
+		s.rooms.Pause()
+		close(s.closing)
+	})
+	s.restoreRooms()
 	// Роял's games under way before a restart go on.
 	if err := s.royal.Load(ctx); err != nil {
 		ln.Close()
@@ -296,6 +313,18 @@ func (s *Server) Run(ctx context.Context, drain time.Duration) error {
 				return
 			case <-t.C:
 				s.royal.Step(ctx)
+			}
+		}
+	}()
+	go func() {
+		t := time.NewTicker(time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				s.drainStep(nil) // a drain whose deploy stopped asking ends; Роял coming stops one
 			}
 		}
 	}()
@@ -320,9 +349,11 @@ func (s *Server) Run(ctx context.Context, drain time.Duration) error {
 		return err
 	case <-ctx.Done():
 	}
-	shutdown, cancel := context.WithTimeout(context.Background(), drain)
+	shutdown, cancel := context.WithTimeout(context.Background(), grace)
 	defer cancel()
-	return srv.Shutdown(shutdown)
+	err = srv.Shutdown(shutdown)
+	s.saveRooms()
+	return err
 }
 
 // clientIP is the player's address, for rate limits and the log.
@@ -341,7 +372,7 @@ func (s *Server) clientIP(r *http.Request) string {
 
 // isAsset says whether a path is a static file (left out of the request log).
 func isAsset(path string) bool {
-	if strings.HasSuffix(path, "/events") { // a room's stream: logged when it ends, which says nothing
+	if strings.HasSuffix(path, "/events") || path == "/api/drain" { // a stream, logged when it ends; a deploy waiting
 		return true
 	}
 	return strings.HasPrefix(path, "/assets/") || strings.HasPrefix(path, "/qimg/") || path == "/favicon.svg"

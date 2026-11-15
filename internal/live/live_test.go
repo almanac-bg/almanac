@@ -383,3 +383,92 @@ func TestNeverCame(t *testing.T) {
 		}
 	})
 }
+
+// Paused for a restart, the hub starts no duel: those asking wait, held, past their Wait; the duel under way plays on,
+// and counts as under way until it ends. Resumed, those held meet.
+func TestPaused(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := setup(t)
+		ana, bo, cy, di := w.user(), w.user(), w.user(), w.user()
+		sa, sb := w.hub.Seek(ana), w.hub.Seek(bo)
+		<-sb.Done()
+		m := sa.Match
+		fa, _ := m.Follow(ana.ID)
+		fb, _ := m.Follow(bo.ID)
+		if n := w.hub.UnderWay(); n != 1 {
+			t.Fatalf("under way: %d", n)
+		}
+
+		w.hub.Pause()
+		sc := w.hub.Seek(cy)
+		if !sc.Held() {
+			t.Fatal("Cy isn't told the server is about to restart")
+		}
+		sd := w.hub.Seek(di)
+		time.Sleep(2 * Wait)
+		synctest.Wait()
+		select {
+		case <-sc.Done():
+			t.Fatalf("Cy got a duel while paused: %v", sc.Err)
+		case <-sd.Done():
+			t.Fatalf("Di got a duel while paused: %v", sd.Err)
+		default:
+		}
+
+		// The duel under way goes on to its end (nobody answers: it ends all the same).
+		for v := next(m, ana.ID); v.Phase != PhaseEnd; v = next(m, ana.ID) {
+			if v.Phase == PhaseOff {
+				t.Fatal("the duel under way was called off")
+			}
+		}
+		m.Unfollow(fa)
+		m.Unfollow(fb)
+		if n := w.hub.UnderWay(); n != 0 {
+			t.Fatalf("under way after the end: %d", n)
+		}
+
+		w.hub.Resume()
+		<-sc.Done()
+		<-sd.Done()
+		if sc.Err != nil || sc.Match == nil || sc.Match != sd.Match {
+			t.Fatalf("Cy and Di, resumed: %v %v", sc.Err, sd.Err)
+		}
+		if sc.Held() {
+			t.Fatal("still held after resuming")
+		}
+	})
+}
+
+// A player already waiting when the hub pauses is told so, and held there.
+func TestPausedWhileWaiting(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := setup(t)
+		s := w.hub.Seek(w.user())
+		defer s.Leave()
+		if s.Held() {
+			t.Fatal("held before any pause")
+		}
+		w.hub.Pause()
+		select {
+		case <-s.Changed():
+		default:
+			t.Fatal("not told of the pause")
+		}
+		if !s.Held() {
+			t.Fatal("not held")
+		}
+		time.Sleep(2 * Wait)
+		synctest.Wait()
+		select {
+		case <-s.Done():
+			t.Fatalf("settled while paused: %v", s.Err)
+		default:
+		}
+		// Resumed with its Wait long over: a recording at once (none here: nobody).
+		w.hub.Resume()
+		<-s.Done()
+		if !errors.Is(s.Err, play.ErrNobody) {
+			t.Fatalf("after resuming: %v", s.Err)
+		}
+	})
+}

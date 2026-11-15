@@ -55,9 +55,10 @@ func (s *Server) livePlayer(ctx context.Context, id int64) (live.Player, error) 
 
 // liveEvents is a live duel on a player's screen (Server-Sent Events). Opening it asks for a duel: the one the
 // player is in, if they're in one, else with whoever is waiting; else they wait, told how long, and play a recording
-// if nobody comes. Then the duel as they see it, again after every change, each view with the duel's id: a line
-// that dropped and came back sends it (Last-Event-ID), and follows that duel again, or hears it's gone. Closing it
-// while waiting stops waiting.
+// if nobody comes (while the server drains for a restart, they wait for it, told so, and the stream that ends with
+// the server comes back to the new one by itself). Then the duel as they see it, again after every change, each view
+// with the duel's id: a line that dropped and came back sends it (Last-Event-ID), and follows that duel again, or
+// hears it's gone. Closing it while waiting stops waiting.
 func (s *Server) liveEvents(w http.ResponseWriter, r *http.Request) {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -97,18 +98,27 @@ func (s *Server) liveEvents(w http.ResponseWriter, r *http.Request) {
 		}
 		seek := s.live.Seek(p)
 		defer seek.Leave() // once it's settled, only the waiting it stops
+		// waiting says how long until a recording, or that the server is about to restart (held: the screen waits,
+		// and finds its duel on the new server).
+		waiting := func() bool {
+			data, _ := json.Marshal(map[string]any{"leftMs": seek.Left().Milliseconds(), "held": seek.Held()})
+			return send("event: waiting\ndata: " + string(data) + "\n\n")
+		}
 		select {
 		case <-seek.Done():
 		default:
-			data, _ := json.Marshal(map[string]int64{"leftMs": seek.Left().Milliseconds()})
-			if !send("event: waiting\ndata: " + string(data) + "\n\n") {
+			if !waiting() {
 				return nil, false
 			}
 		}
-		for waiting := true; waiting; {
+		for settled := false; !settled; {
 			select {
 			case <-seek.Done():
-				waiting = false
+				settled = true
+			case <-seek.Changed():
+				if !waiting() {
+					return nil, false
+				}
 			case <-ping.C:
 				if !send(": ping\n\n") {
 					return nil, false

@@ -3,7 +3,12 @@
 //
 // A room is opened by a host, who sets the pace (anyone may while the host is away).
 //
-// Rooms live in memory: they're for playing now, and close on their own when nobody's left.
+// Rooms live in memory: they're for playing now, and close on their own when nobody's left. A restart would end
+// them, so the server keeps them over one: it pauses the hub first (Pause: no new game starts in any room, and the
+// games under way, UnderWay, play to their end), and saves the rooms as it stops (Save) for the next run of the
+// server to open again (Restore), with their code, host and players, and the standings of a game just over. A
+// player's screen comes back to its room by itself. A game still being played when the server stopped (it waited
+// long enough) is lost: its room comes back to its lobby.
 package room
 
 import (
@@ -12,10 +17,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	mrand "math/rand/v2"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
@@ -48,6 +55,8 @@ var (
 	ErrNotNow   = errors.New("not now")
 	ErrAnswer   = errors.New("an answer the question can't take")
 	ErrTooMany  = errors.New("too many rooms")
+	// ErrPaused is a game not started because the server is about to restart (Pause).
+	ErrPaused = errors.New("the server is about to restart")
 )
 
 // Player is someone in a room.
@@ -60,9 +69,11 @@ type Player struct {
 
 // Hub holds the rooms open now.
 type Hub struct {
-	mu    sync.Mutex
-	rooms map[string]*Room
-	bank  func() *bank.Bank
+	mu sync.Mutex
+	// paused: no new game starts (an atomic, read under a room's lock, which comes after the hub's).
+	paused atomic.Bool
+	rooms  map[string]*Room
+	bank   func() *bank.Bank
 	// Crowd, if set, is how players have answered a question (shown with its answer).
 	Crowd func(id string) *bank.Crowd
 	// Barred, if set, are the questions no room may deal now (the day's: play.Game.DayQuestions).
@@ -141,6 +152,134 @@ func (h *Hub) Sweep() {
 		}
 		r.mu.Unlock()
 	}
+}
+
+// Pause stops new games from starting in the rooms, for a restart; the games under way go on.
+func (h *Hub) Pause() { h.paused.Store(true) }
+
+// Resume undoes Pause.
+func (h *Hub) Resume() { h.paused.Store(false) }
+
+// UnderWay is how many rooms have a game being played: what a restart would cut.
+func (h *Hub) UnderWay() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	n := 0
+	for _, r := range h.rooms {
+		r.mu.Lock()
+		if r.phase == Question || r.phase == Reveal {
+			n++
+		}
+		r.mu.Unlock()
+	}
+	return n
+}
+
+// saved is a room as Save keeps it.
+type saved struct {
+	Code     string        `json:"code"`
+	Category string        `json:"category"`
+	Host     int64         `json:"host"`
+	Phase    Phase         `json:"phase"`
+	Picks    []play.Pick   `json:"picks,omitempty"`
+	Players  []savedMember `json:"players"`
+	Opened   time.Time     `json:"opened"`
+	Active   time.Time     `json:"active"`
+}
+
+type savedMember struct {
+	ID      int64         `json:"id"`
+	Name    string        `json:"name"`
+	Look    play.Look     `json:"look"`
+	Points  int           `json:"points,omitempty"`
+	Rights  int           `json:"rights,omitempty"`
+	InRow   int           `json:"inRow,omitempty"`
+	Answers []savedAnswer `json:"answers,omitempty"`
+}
+
+type savedAnswer struct {
+	Question string          `json:"question"`
+	Shown    json.RawMessage `json:"shown,omitempty"`
+	Points   int             `json:"points,omitempty"`
+	Right    bool            `json:"right,omitempty"`
+}
+
+// Save writes the rooms open now, for Restore after a restart. A room whose game is being played is kept as its
+// lobby: the game itself can't be.
+func (h *Hub) Save(w io.Writer) error {
+	h.mu.Lock()
+	out := make([]saved, 0, len(h.rooms))
+	for _, r := range h.rooms {
+		r.mu.Lock()
+		sv := saved{Code: r.code, Category: r.category, Host: r.host, Phase: r.phase, Opened: r.opened, Active: r.active}
+		over := r.phase == End
+		if over {
+			sv.Picks = r.picks
+		} else {
+			sv.Phase = Lobby
+		}
+		for _, m := range r.players {
+			sm := savedMember{ID: m.ID, Name: m.Name, Look: m.Look}
+			if over {
+				sm.Points, sm.Rights, sm.InRow = m.points, m.rights, m.inRow
+				for _, l := range m.log {
+					sm.Answers = append(sm.Answers, savedAnswer{Question: l.questionID, Shown: l.shown, Points: l.points, Right: l.right})
+				}
+			}
+			sv.Players = append(sv.Players, sm)
+		}
+		r.mu.Unlock()
+		out = append(out, sv)
+	}
+	h.mu.Unlock()
+	return json.NewEncoder(w).Encode(out)
+}
+
+// Restore opens again the rooms Save kept, and says how many. A room whose game's questions the bank no longer has
+// comes back to its lobby; one whose code is taken meanwhile doesn't come back.
+func (h *Hub) Restore(rd io.Reader) (int, error) {
+	var in []saved
+	if err := json.NewDecoder(rd).Decode(&in); err != nil {
+		return 0, err
+	}
+	b := h.bank()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	n := 0
+	for _, sv := range in {
+		if _, taken := h.rooms[sv.Code]; taken || len(sv.Players) == 0 || len(h.rooms) >= maxRooms {
+			continue
+		}
+		r := &Room{
+			code: sv.Code, category: sv.Category, host: sv.Host, phase: Lobby, hub: h,
+			subs: map[*Sub]struct{}{}, opened: sv.Opened, active: sv.Active,
+		}
+		if sv.Phase == End {
+			r.phase, r.picks = End, sv.Picks
+			for _, p := range sv.Picks {
+				q, ok := b.Get(p.ID)
+				if !ok {
+					r.phase, r.picks, r.dealt = Lobby, nil, nil
+					break
+				}
+				r.dealt = append(r.dealt, q.Deal(p.Seed))
+			}
+			r.n = max(0, len(r.dealt)-1)
+		}
+		for _, sm := range sv.Players {
+			m := &member{Player: Player{ID: sm.ID, Name: sm.Name, Look: sm.Look}}
+			if r.phase == End {
+				m.points, m.rights, m.inRow = sm.Points, sm.Rights, sm.InRow
+				for _, a := range sm.Answers {
+					m.log = append(m.log, loggedAnswer{questionID: a.Question, shown: a.Shown, points: a.Points, right: a.Right})
+				}
+			}
+			r.players = append(r.players, m)
+		}
+		h.rooms[r.code] = r
+		n++
+	}
+	return n, nil
 }
 
 // Room is one game played together.
@@ -299,6 +438,9 @@ func (r *Room) Start(by int64) error {
 	}
 	if r.phase != Lobby && r.phase != End {
 		return ErrNotNow
+	}
+	if r.hub.paused.Load() {
+		return ErrPaused
 	}
 	return r.start()
 }
