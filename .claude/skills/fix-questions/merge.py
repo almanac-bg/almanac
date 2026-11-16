@@ -32,6 +32,9 @@ for ch in chunks:
                 if q["id"] in seen:
                     sys.exit(f"{q['id']} twice: {ch}")
                 seen.add(q["id"])
+                # Who checked it is bank add's to say (-checked-by), not what an agent wrote in.
+                q.pop("checked", None)
+                q.pop("checkedBy", None)
                 qs[f[:-5]].append(q)
         elif f == "images":
             os.makedirs(f"{out}/images", exist_ok=True)
