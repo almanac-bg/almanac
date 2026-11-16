@@ -136,6 +136,11 @@ def readable(s, said):
     return json.dumps(said, ensure_ascii=False)
 
 
+def norm(s):
+    """A text as typed: the bank's no-break spaces („1856 г.“) are plain ones to an answerer."""
+    return " ".join(str(s).replace("\u00a0", " ").split())
+
+
 key = json.load(open(f"{out}/key.json"))
 answers = {}
 for f in glob.glob(f"{out}/answers/*.json"):
@@ -155,7 +160,8 @@ for i, k in key.items():
     elif k["kind"] == "order":
         off = str(said).replace(" ", "").replace(",", "").upper() != want
     elif k["kind"] in ("match", "split"):
-        off = not isinstance(said, dict) or any(str(said.get(x, "")).strip() != v for x, v in want.items())
+        got = {norm(x): norm(v) for x, v in said.items()} if isinstance(said, dict) else {}
+        off = any(got.get(norm(x)) != norm(v) for x, v in want.items())
     elif k["kind"] == "truefalse":
         off = said not in (want, str(want).lower())
     else:
