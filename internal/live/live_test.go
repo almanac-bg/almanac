@@ -468,9 +468,8 @@ func TestNeverCame(t *testing.T) {
 		if v := m.View(ana.ID); v.Phase != PhaseOff {
 			t.Fatalf("a duel Bo never came to: %+v", v)
 		}
-		if o := w.outcome(m.ID()); o != "expired" {
-			t.Fatalf("its result: %q", o)
-		}
+		// Nothing was played: it leaves nothing, neither the duel nor their runs.
+		w.leftNothing(m.ID(), ana.ID, bo.ID)
 		// Both may look again; the duel is forgotten after a while.
 		if s := w.hub.Seek(ana); s.Match == m {
 			t.Fatal("still in the duel called off")
@@ -481,6 +480,91 @@ func TestNeverCame(t *testing.T) {
 		w.hub.Sweep()
 		if _, err := w.hub.Get(m.ID()); !errors.Is(err, ErrNoMatch) {
 			t.Fatalf("kept: %v", err)
+		}
+	})
+}
+
+// leftNothing says a duel called off before it began is gone, and so are the players' runs made for it.
+func (w *world) leftNothing(duel int64, players ...int64) {
+	w.t.Helper()
+	var duels, runs int
+	_ = w.db.Read.QueryRow(`SELECT count(*) FROM duels WHERE id = ?`, duel).Scan(&duels)
+	for _, id := range players {
+		var n int
+		_ = w.db.Read.QueryRow(`SELECT count(*) FROM runs WHERE user_id = ? AND id NOT IN
+			(SELECT a_run FROM duels WHERE a_run IS NOT NULL UNION SELECT b_run FROM duels WHERE b_run IS NOT NULL)`, id).Scan(&n)
+		runs += n
+	}
+	if duels != 0 || runs != 0 {
+		w.t.Fatalf("duel %d called off before it began: %d duels, %d runs left", duel, duels, runs)
+	}
+}
+
+// One whose screen closed as their duel was found (the wait left in its last second, the recording found meanwhile)
+// has followed it a moment, or not at all: it doesn't go on without them to a lost duel they never saw, but waits for
+// them until Arrive, and is then called off, leaving nothing. A line that drops in the intro and comes back in time
+// plays it.
+func TestLeftAsFound(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := setup(t)
+		ana, bo, gal := w.user(), w.user(), w.user()
+		sa, sb := w.hub.Seek(ana), w.hub.Seek(bo)
+		<-sb.Done()
+		m := sa.Match
+		fa, _ := m.Follow(ana.ID)
+		fb, _ := m.Follow(bo.ID)
+		for v := next(m, ana.ID); v.Phase != PhaseEnd; v = next(m, ana.ID) {
+			if v.Phase == PhaseQuestion {
+				time.Sleep(2500 * time.Millisecond)
+				_ = m.Answer(ana.ID, v.N, answer(m, true))
+				_ = m.Answer(bo.ID, v.N, answer(m, true))
+			}
+		}
+		m.Unfollow(fa)
+		m.Unfollow(fb)
+		var recordings int
+		_ = w.db.Read.QueryRow(`SELECT count(*) FROM runs WHERE finished_at IS NOT NULL`).Scan(&recordings)
+
+		// Gal's recording is found as her screen closes: it follows the duel a moment, and goes.
+		s := w.hub.Seek(gal)
+		<-s.Done()
+		m = s.Match
+		fg, _ := m.Follow(gal.ID)
+		m.Unfollow(fg)
+		s.Leave()
+		time.Sleep(Arrive + time.Second)
+		synctest.Wait()
+		if v := m.View(gal.ID); v.Phase != PhaseOff || v.Question != nil {
+			t.Fatalf("a duel Gal left as it was found: %+v", v)
+		}
+		w.leftNothing(m.ID(), gal.ID)
+		if d, _ := w.g.DuelsOf(t.Context(), gal.ID); len(d) != 0 {
+			t.Fatalf("Gal's duels: %+v", d)
+		}
+		if st, _ := w.g.StatsOf(t.Context(), gal.ID); st.Games != 0 || st.Duels != 0 {
+			t.Fatalf("Gal's stats: %+v", st)
+		}
+		var after int
+		_ = w.db.Read.QueryRow(`SELECT count(*) FROM runs WHERE finished_at IS NOT NULL`).Scan(&after)
+		if after != recordings {
+			t.Fatalf("the recordings: %d, were %d", after, recordings)
+		}
+
+		// Her next duel: the line drops in the intro and comes back in time; the duel begins once she's back.
+		s = w.hub.Seek(gal)
+		<-s.Done()
+		m = s.Match
+		fg, _ = m.Follow(gal.ID)
+		m.Unfollow(fg)
+		time.Sleep(Intro + 3*time.Second)
+		synctest.Wait()
+		if v := m.View(gal.ID); v.Phase != PhaseIntro {
+			t.Fatalf("begun without Gal: %+v", v)
+		}
+		fg, _ = m.Follow(gal.ID)
+		defer m.Unfollow(fg)
+		if v := next(m, gal.ID); v.Phase != PhaseQuestion || v.N != 0 {
+			t.Fatalf("Gal back: %+v", v)
 		}
 	})
 }

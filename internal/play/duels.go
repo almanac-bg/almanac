@@ -251,11 +251,41 @@ func recording(tx *sql.Tx, runID int64, n int) ([]Recorded, error) {
 	return out, rows.Err()
 }
 
-// CancelLive ends a live duel without a result: a player never came to it.
+// CancelLive ends a live duel without a result: it was cut off under way.
 func (g *Game) CancelLive(ctx context.Context, duelID int64) error {
 	_, err := g.DB.Write.ExecContext(ctx, `UPDATE duels SET ended_at = ?, outcome = 'expired'
 		WHERE id = ? AND kind = 'live' AND ended_at IS NULL`, store.Ms(g.Now()), duelID)
 	return err
+}
+
+// DropLive takes back a live duel called off before its first question (a player never came to it, or left before it
+// began): nothing was played, so it leaves nothing, neither the duel nor the runs made for its players (the recording
+// it was to be played against stays as it was). One with an answer kept already is only ended (CancelLive).
+func (g *Game) DropLive(ctx context.Context, duelID int64) error {
+	return g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		var a, b sql.NullInt64
+		err := tx.QueryRow(`SELECT a_run, b_run FROM duels WHERE id = ? AND kind = 'live' AND ended_at IS NULL`, duelID).
+			Scan(&a, &b)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		var answered bool
+		if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM answers WHERE run_id IN (?, ?))`, a, b).Scan(&answered); err != nil {
+			return err
+		}
+		if answered {
+			_, err := tx.Exec(`UPDATE duels SET ended_at = ?, outcome = 'expired' WHERE id = ?`, store.Ms(g.Now()), duelID)
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM duels WHERE id = ?`, duelID); err != nil {
+			return err
+		}
+		_, err = tx.Exec(`DELETE FROM runs WHERE id IN (?, ?)`, a, b)
+		return err
+	})
 }
 
 // EndLive ends every live duel still under way without a result: run when the server starts, as live duels are

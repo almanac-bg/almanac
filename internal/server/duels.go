@@ -140,6 +140,10 @@ func (s *Server) liveEvents(w http.ResponseWriter, r *http.Request) {
 			fail("busy")
 			return nil, false
 		}
+		// A screen closed as its duel was found doesn't follow it: the duel, not come to, is called off.
+		if r.Context().Err() != nil {
+			return nil, false
+		}
 		return seek.Match, true
 	}
 	m, found := find()

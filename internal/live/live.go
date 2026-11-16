@@ -2,8 +2,10 @@
 // nobody comes in Wait, with a recording of a real player's earlier game. Both see the same question at the same
 // moment and each other's answers come in; after each question both answers show, then the next comes. One whose
 // screen goes is waited for a while (Away), then the duel goes on without them (gone), their time running out on each
-// question; a recording isn't waited for where its player let the time run out. An answer sent again (its reply lost
-// on the way) is taken as the first.
+// question; a recording isn't waited for where its player let the time run out. A player who isn't there when the
+// first question is due (never came, or left as the duel was found) is waited for until Arrive; after it, the duel is
+// called off and leaves nothing (play.DropLive), so leaving the wait at its last second never costs a lost duel. An
+// answer sent again (its reply lost on the way) is taken as the first.
 //
 // Every answer goes through the player's own run (internal/play), as in any game: the score, XP, the questions'
 // statistics and the duel's result are kept there, and only the timing lives here, in memory. A restart cuts the
@@ -31,7 +33,7 @@ const (
 	Wait = 10 * time.Second
 	// Intro is how long the two are shown face to face before the first question.
 	Intro = 4 * time.Second
-	// Arrive is how long a duel waits for both players to come to it before it's called off.
+	// Arrive is how long a duel waits for both players to be at it (come, and not gone again) before it's called off.
 	Arrive = 15 * time.Second
 	// Away is how long a player whose line dropped is waited for on a question; after it, the question goes on
 	// without them (their time still runs out on it).
@@ -306,7 +308,7 @@ func (h *Hub) launch(players []int64, start func(context.Context) (play.Live, [2
 		m, err = newMatch(h, l, sides)
 	}
 	if err != nil && l.DuelID != 0 {
-		_ = h.game.CancelLive(ctx, l.DuelID)
+		_ = h.game.DropLive(ctx, l.DuelID)
 	}
 	h.mu.Lock()
 	for _, id := range players {
@@ -385,7 +387,7 @@ const (
 	PhaseQuestion Phase = "question"
 	PhaseReveal   Phase = "reveal"
 	PhaseEnd      Phase = "end"
-	// PhaseOff is a duel called off without a result: a player never came.
+	// PhaseOff is a duel called off without a result: a player wasn't there as it began, or it was cut off.
 	PhaseOff Phase = "off"
 )
 
@@ -603,14 +605,16 @@ func (m *Match) after(d time.Duration, fn func()) {
 	})
 }
 
-// begin puts the first question up once both players have come; a duel one of them never comes to is called off.
+// begin puts the first question up once both players are at the duel. One who never comes, or who left before it
+// began (their screen closed as the duel was found), is waited for until Arrive; then the duel is called off before
+// anything was played, and leaves nothing.
 func (m *Match) begin() {
 	for _, s := range m.sides {
-		if !s.came {
+		if s.human() && s.online == 0 {
 			if time.Since(m.opened) < Arrive {
 				m.after(time.Second, m.begin)
 			} else {
-				m.cancel()
+				m.off(m.hub.game.DropLive)
 			}
 			return
 		}
@@ -618,11 +622,14 @@ func (m *Match) begin() {
 	m.show(0)
 }
 
-// cancel calls the duel off without a result.
-func (m *Match) cancel() {
+// cancel calls the duel off under way, without a result.
+func (m *Match) cancel() { m.off(m.hub.game.CancelLive) }
+
+// off calls the duel off, ending it as end keeps it (CancelLive, or DropLive before it began).
+func (m *Match) off(end func(context.Context, int64) error) {
 	m.stop()
 	m.phase, m.ended = PhaseOff, time.Now()
-	if err := m.hub.game.CancelLive(context.Background(), m.id); err != nil {
+	if err := end(context.Background(), m.id); err != nil {
 		slog.Error("live duel", "duel", m.id, "err", err)
 	}
 	m.hub.release(m)
