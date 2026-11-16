@@ -155,15 +155,10 @@ func (g *Game) countCrowds(ctx context.Context, now time.Time, b *bank.Bank) err
 	return nil
 }
 
-// changedMs is when a question last changed (its answers from before then were to another question), in ms: the
-// start of that day in Bulgaria, or 0 if it hasn't.
+// changedMs is when what a question asks last changed (its answers from before then were to another question;
+// bank.Tail.AskedSince: a fix to its fact doesn't count), in ms: the start of that day in Bulgaria, or 0 if unknown.
 func changedMs(q bank.Question) int64 {
-	t := q.Extra()
-	day := t.Updated
-	if day == "" {
-		day = t.Added
-	}
-	d, err := time.ParseInLocation(time.DateOnly, day, Bulgaria)
+	d, err := time.ParseInLocation(time.DateOnly, q.Extra().AskedSince(), Bulgaria)
 	if err != nil {
 		return 0
 	}

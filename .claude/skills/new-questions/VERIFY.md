@@ -51,8 +51,10 @@ Politics and recent history: facts only, nothing that reads as a judgement. Neve
 
 ## Deliver
 
-- `<batch>/verify/<category>/<category>.json`: the questions as they should go in. OK ones unchanged; FIXed ones corrected (same id, `updated`
-  stays the plan's date); DROPped ones left out. Keep the ids as they are: gaps are fine.
+- `<batch>/verify/<category>/<category>.json`: the questions as they should go in. OK ones unchanged; FIXed ones
+  corrected (same id, `updated` stays the plan's date); DROPped ones left out. Keep the ids as they are: gaps are
+  fine. **Every kept question carries `sources`**: the pages you confirmed it on yourself (https://…, the answer's and
+  the fact's), the writer's ones only where you read them and they hold.
 - `<batch>/verify/<category>/images/`: the pictures the kept questions use (copied from the writer's `images/`, or new ones you made by
   WRITE.md's rules for a picture you swapped).
 - `<batch>/verify/<category>.md`: one line per question: id, OK / FIX / DROP, and for FIX and DROP what was wrong and the source.

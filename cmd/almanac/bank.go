@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"math"
 	"os"
@@ -40,26 +41,25 @@ func bankCommand(args []string) error {
 	case "plan":
 		return bankPlan(rest)
 	case "add":
-		dry := len(rest) > 0 && rest[0] == "-check"
-		if dry {
-			rest = rest[1:]
-		}
-		if len(rest) == 0 {
+		fs := flag.NewFlagSet("bank add", flag.ContinueOnError)
+		dry := fs.Bool("check", false, "only check the batch: write nothing")
+		checkedBy := fs.String("checked-by", "", `mark the new questions checked today by this ("new-questions fable-5.2")`)
+		if err := fs.Parse(rest); err != nil || fs.NArg() == 0 {
 			return usage()
 		}
 		into := defaultBankDir()
-		if len(rest) > 1 {
-			into = rest[1]
+		if fs.NArg() > 1 {
+			into = fs.Arg(1)
 		}
-		return bankAdd(rest[0], into, dry)
+		return bankAdd(fs.Arg(0), into, *checkedBy, *dry)
 	}
 	return usage()
 }
 
 // bankAdd adds a checked batch (bank.Add) to a bank: all of it, or nothing. dry (-check) only checks it and says what
 // it would do: a writer checks one category's part this way, before the batch is whole.
-func bankAdd(from, dir string, dry bool) error {
-	res, err := bank.Add(dir, from, dry)
+func bankAdd(from, dir, checkedBy string, dry bool) error {
+	res, err := bank.Add(dir, from, checkedBy, dry)
 	if err != nil {
 		return err
 	}

@@ -3,6 +3,7 @@ package play
 import (
 	"context"
 	"slices"
+	"strings"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -65,32 +66,52 @@ type Calibrated struct {
 // Calibrate reads every live question with enough answers, the ones whose label disagrees with them first (the
 // furthest off first).
 func (g *Game) Calibrate(ctx context.Context) ([]Calibrated, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, count(*), avg(score) FROM answers
-		WHERE `+FairAnswers+` GROUP BY question_id HAVING count(*) >= ?`, CalibrateFrom)
+	// By the hour, so that only the answers given since a question last changed what it asks count (changedMs).
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, at / 3600000, count(*), sum(score) FROM answers
+		WHERE `+FairAnswers+` GROUP BY question_id, at / 3600000`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	b := g.Bank()
-	var out []Calibrated
+	sums := map[string]*Calibrated{}
 	for rows.Next() {
-		var c Calibrated
-		if err := rows.Scan(&c.ID, &c.Answers, &c.Score); err != nil {
+		var id string
+		var hour int64
+		var n int
+		var sum float64
+		if err := rows.Scan(&id, &hour, &n, &sum); err != nil {
 			return nil, err
 		}
-		q, ok := b.Get(c.ID)
-		if !ok || q.Extra().Retired {
+		q, ok := b.Get(id)
+		if !ok || q.Extra().Retired || (hour+1)*3600000 <= changedMs(q) {
 			continue
 		}
+		c := sums[id]
+		if c == nil {
+			c = &Calibrated{ID: id}
+			sums[id] = c
+		}
+		c.Answers += n
+		c.Score += sum
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	var out []Calibrated
+	for _, s := range sums {
+		if s.Answers < CalibrateFrom {
+			continue
+		}
+		c := *s
+		c.Score /= float64(c.Answers)
+		q, _ := b.Get(c.ID)
 		h := q.Base()
 		c.Category, c.Type, c.Labelled = h.Category, h.Type, h.Difficulty
 		guess := chanceOf(q)
 		c.Known = max(0, (c.Score-guess)/(1-guess))
 		c.Observed = KnownToDifficulty(c.Known)
 		out = append(out, c)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
 	}
 	rank := map[bank.Difficulty]int{bank.Easy: 0, bank.Medium: 1, bank.Hard: 2}
 	off := func(c Calibrated) int {
@@ -100,7 +121,10 @@ func (g *Game) Calibrate(ctx context.Context) ([]Calibrated, error) {
 		if d := off(b) - off(a); d != 0 {
 			return d
 		}
-		return b.Answers - a.Answers
+		if d := b.Answers - a.Answers; d != 0 {
+			return d
+		}
+		return strings.Compare(a.ID, b.ID)
 	})
 	return out, nil
 }

@@ -109,6 +109,25 @@ func TestDealsAreStableAndShuffled(t *testing.T) {
 	}
 }
 
+// A question's sources and its keepers' notes stay in the bank: no player is dealt them, every kind alike.
+func TestKeepersFieldsStayInTheBank(t *testing.T) {
+	b := loadSample(t)
+	for _, typ := range Types() {
+		q := b.Live("", typ)[0]
+		tail := q.Extra()
+		tail.Sources, tail.Checked, tail.CheckedBy = []string{"https://example.org/source"}, "2026-11-17", "keepers-only"
+		d := q.Deal(1)
+		view, _ := json.Marshal(d.View())
+		reveal, _ := json.Marshal(d.Reveal(nil))
+		for _, s := range []string{"example.org", "keepers-only", "2026-11-17"} {
+			if strings.Contains(string(view)+string(reveal), s) {
+				t.Errorf("%s: a player is dealt %s", typ, s)
+			}
+		}
+		tail.Sources, tail.Checked, tail.CheckedBy = nil, "", ""
+	}
+}
+
 func TestChoiceGrading(t *testing.T) {
 	q := &Choice{Head: Head{Type: "choice"}, Answer: "Мусала", Wrong: []string{"Вихрен", "Ботев", "Черни връх"}}
 	for seed := range uint64(16) {
@@ -321,6 +340,19 @@ func TestNewQuestionRules(t *testing.T) {
 		{Tail{Added: RulesFrom, Fact: "Факт.", Updated: RulesFrom}, ""},
 		{Tail{Added: "2026-11-20", Updated: "2026-11-19", Fact: "Факт."}, "updated is before added"},
 		{Tail{Updated: "13.11.2026"}, "updated must be a date"},
+		// Since SourcesFrom: where it was checked, when and by what.
+		{Tail{Added: SourcesFrom, Fact: "Факт.", Updated: SourcesFrom}, "needs its sources"},
+		{Tail{Added: SourcesFrom, Fact: "Факт.", Updated: SourcesFrom, Sources: []string{"https://bg.wikipedia.org/wiki/А"}},
+			"needs checked and checkedBy"},
+		{Tail{Added: SourcesFrom, Fact: "Факт.", Updated: SourcesFrom, Sources: []string{"https://bg.wikipedia.org/wiki/А"},
+			Checked: SourcesFrom, CheckedBy: "new-questions fable-5.2"}, ""},
+		{Tail{Sources: []string{"bg.wikipedia.org/wiki/А"}}, "a source is a page's address"},
+		{Tail{Checked: "2026-11-20"}, "checked and checkedBy go together"},
+		{Tail{Added: "2026-11-01", Changed: "2026-11-05", Updated: "2026-11-03"}, "changed is between added and updated"},
+		{Tail{Added: "2026-11-01", Changed: "2026-10-30"}, "changed is between added and updated"},
+		{Tail{Retired: true, RetiredWhy: "old"}, "retiredWhy is one of"},
+		{Tail{RetiredWhy: "wrong"}, "for a retired question"},
+		{Tail{Retired: true, RetiredWhy: "wrong", ReplacedBy: "his-002"}, ""},
 	} {
 		errs, _ := checkQuestion(q(c.tail), "2026-11-25")
 		all := strings.Join(errs, "; ")

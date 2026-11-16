@@ -1324,6 +1324,17 @@ func TestAlmanac(t *testing.T) {
 	if len(a.Facts) == 0 {
 		t.Fatal("ten right answers, and nothing learned")
 	}
+	// What was learned stays when its question leaves play, unless it wasn't so.
+	n := len(a.Facts)
+	q := mustQuestion(t, w, a.Facts[0].ID)
+	q.Extra().Retired, q.Extra().RetiredWhy = true, "weak"
+	if a, _ = w.g.AlmanacOf(ctx, ana); len(a.Facts) != n {
+		t.Fatalf("a question retired as weak left the almanac: %d of %d", len(a.Facts), n)
+	}
+	q.Extra().RetiredWhy = "wrong"
+	if a, _ = w.g.AlmanacOf(ctx, ana); len(a.Facts) != n-1 {
+		t.Fatalf("a question retired as wrong stayed learned: %d of %d", len(a.Facts), n)
+	}
 }
 
 func TestWardrobe(t *testing.T) {
@@ -1831,9 +1842,25 @@ func TestCalibrate(t *testing.T) {
 	if err != nil || len(list) == 0 {
 		t.Fatalf("calibrated: %+v %v", list, err)
 	}
+	found := false
 	for _, c := range list {
-		if c.ID == first && (c.Answers != CalibrateFrom || c.Known < 0.99 || c.Observed != bank.Easy) {
-			t.Fatalf("a question all got right: %+v", c)
+		if c.ID == first {
+			found = true
+			if c.Answers != CalibrateFrom || c.Known < 0.99 || c.Observed != bank.Easy {
+				t.Fatalf("a question all got right: %+v", c)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("the question all got right isn't calibrated")
+	}
+	// Answers from before what it asks changed don't count: it has none left.
+	q := mustQuestion(t, w, first)
+	q.Extra().Changed = time.Now().AddDate(0, 0, 1).Format(time.DateOnly)
+	list, _ = w.g.Calibrate(ctx)
+	for _, c := range list {
+		if c.ID == first {
+			t.Fatalf("calibrated on answers to what it asked before: %+v", c)
 		}
 	}
 }
@@ -1885,9 +1912,17 @@ func TestCrowds(t *testing.T) {
 	if second := w.picks(s.ID)[1].ID; w.g.Crowd(second) != nil {
 		t.Fatal("a question with one answer showed a crowd")
 	}
-	// Answers from before a question last changed were to another question: they don't count.
+	// A fix to the fact alone (updated) keeps the crowd: the question asked the same.
 	q, _ := w.b.Get(first)
 	q.Extra().Updated = "2026-11-13"
+	if err := w.g.CountCrowds(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if c := w.g.Crowd(first); c == nil {
+		t.Fatal("a fix to the fact cost a question its crowd")
+	}
+	// Answers from before what a question asks last changed were to another question: they don't count.
+	q.Extra().Changed = "2026-11-13"
 	if err := w.g.CountCrowds(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -2004,11 +2039,11 @@ func TestDayCrowd(t *testing.T) {
 	// to another question.
 	w.g.CrowdMin = 1
 	third := mustQuestion(t, w, picks[2].ID)
-	third.Extra().Added, third.Extra().Updated = "2026-11-01", "2026-11-13"
+	third.Extra().Added, third.Extra().Changed, third.Extra().Updated = "2026-11-01", "2026-11-13", "2026-11-13"
 	if c, _ := w.g.dayCrowd(ctx, w.db.Read, "2026-11-12", third, 0); c != nil {
 		t.Fatalf("the third, changed since: %+v", c)
 	}
-	third.Extra().Updated = ""
+	third.Extra().Changed = ""
 	if c, _ := w.g.dayCrowd(ctx, w.db.Read, "2026-11-12", third, 0); c == nil || c.Answers != 1 {
 		t.Fatalf("the third with CrowdMin 1: %+v", c)
 	}

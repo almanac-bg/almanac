@@ -32,17 +32,17 @@ func TestAddPutsABatchIn(t *testing.T) {
    "wrong": ["Пирин", "Витоша", "Стара планина"], "fact": "Връх Мусала е висок 2925 м — най-високият на Балканския полуостров.",
    "added": "`+today+`", "updated": "`+today+`", "bg": true}
 ]`)
-	write(t, filepath.Join(batch, RetireFile), `["`+old+`"]`)
+	write(t, filepath.Join(batch, RetireFile), `[{"id": "`+old+`", "why": "twin", "by": "`+id+`"}]`)
 
 	before, _ := os.ReadFile(filepath.Join(dir, QuestionsDir, "general.json"))
-	res, err := Add(dir, batch, true)
+	res, err := Add(dir, batch, "", true)
 	if err != nil || res.Added != 1 || res.Retired != 1 || res.Sizes[0] != (CategoryCount{"general", len(b.Live("general", ""))}) {
 		t.Fatalf("a dry run: %+v, %v", res, err)
 	}
 	if after, _ := os.ReadFile(filepath.Join(dir, QuestionsDir, "general.json")); string(after) != string(before) {
 		t.Fatal("a dry run changed the bank")
 	}
-	if res, err := Add(dir, batch, false); err != nil || res.Added != 1 || res.Retired != 1 {
+	if res, err := Add(dir, batch, "new-questions test", false); err != nil || res.Added != 1 || res.Retired != 1 {
 		t.Fatalf("added: %+v, %v", res, err)
 	}
 	after, problems := Load(dir)
@@ -52,8 +52,11 @@ func TestAddPutsABatchIn(t *testing.T) {
 	if q, ok := after.Get(id); !ok || q.Base().Category != "general" {
 		t.Errorf("%s isn't in general", id)
 	}
-	if q, _ := after.Get(old); !q.Extra().Retired {
-		t.Errorf("%s isn't retired", old)
+	if q, _ := after.Get(old); !q.Extra().Retired || q.Extra().RetiredWhy != "twin" || q.Extra().ReplacedBy != id {
+		t.Errorf("%s isn't retired as a twin replaced by %s: %+v", old, id, q.Extra())
+	}
+	if q, _ := after.Get(id); q.Extra().Checked != today || q.Extra().CheckedBy != "new-questions test" {
+		t.Errorf("%s isn't marked checked: %+v", id, q.Extra())
 	}
 	data, _ := os.ReadFile(filepath.Join(dir, QuestionsDir, "general.json"))
 	if want, _ := Format(after.InCategory("general")); string(data) != string(want) {
@@ -78,7 +81,8 @@ func TestAddWritesNothingUnlessAllOfItHolds(t *testing.T) {
 		"another category's id":               {map[string]string{"general.json": "[" + question("his-"+strconv.Itoa(next), good) + "]"}, "not an id of general"},
 		"a broken question":                   {map[string]string{"general.json": "[" + question("gen-"+strconv.Itoa(next), `"Б", "В"`) + "]"}, "exactly 3 wrong"},
 		"an unknown field":                    {map[string]string{"general.json": "[" + strings.Replace(question("gen-"+strconv.Itoa(next), good), "{", `{"typo": 1, `, 1) + "]"}, "unknown field"},
-		"retiring a question the bank hasn't": {map[string]string{RetireFile: `["gen-99999"]`}, "no such question"},
+		"retiring a question the bank hasn't": {map[string]string{RetireFile: `[{"id": "gen-99999", "why": "wrong"}]`}, "no such question"},
+		"retiring without a reason":           {map[string]string{RetireFile: `[{"id": "gen-001", "why": "old"}]`}, "why is one of"},
 		"a stray file":                        {map[string]string{"notes.json": `[]`}, "not a category's file"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -88,7 +92,7 @@ func TestAddWritesNothingUnlessAllOfItHolds(t *testing.T) {
 			for f, body := range c.files {
 				write(t, filepath.Join(batch, f), body)
 			}
-			if _, err := Add(dir, batch, false); err == nil || !strings.Contains(err.Error(), c.want) {
+			if _, err := Add(dir, batch, "", false); err == nil || !strings.Contains(err.Error(), c.want) {
 				t.Fatalf("want an error with %q, got %v", c.want, err)
 			}
 			if after, _ := os.ReadFile(filepath.Join(dir, QuestionsDir, "general.json")); string(after) != string(before) {

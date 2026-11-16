@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -30,6 +31,10 @@ var idPattern = regexp.MustCompile(`^[a-z]+-[0-9]+$`)
 // RulesFrom is when the bank's rules for new questions took effect: a question added since then has a fact and
 // the date it last changed. (Older questions get theirs as they're gone over.)
 const RulesFrom = "2026-11-14"
+
+// SourcesFrom is when the bank started keeping where each question was checked: a question added since then has its
+// sources, and when and by what it was checked (Tail.Sources, Checked, CheckedBy).
+const SourcesFrom = "2026-11-17"
 
 // Problem is something wrong with a bank. A bank with errors is never played; warnings are for whoever keeps it.
 type Problem struct {
@@ -82,8 +87,27 @@ func checkQuestion(q Question, today string) (errs, warnings []string) {
 		errs = append(errs, checkLine("fact", t.Fact, factMax)...)
 	}
 	errs = append(errs, checkDate("added", t.Added)...)
+	errs = append(errs, checkDate("changed", t.Changed)...)
 	errs = append(errs, checkDate("updated", t.Updated)...)
+	errs = append(errs, checkDate("checked", t.Checked)...)
 	errs = append(errs, checkDate("reviewBy", t.ReviewBy)...)
+	for _, u := range t.Sources {
+		if !strings.HasPrefix(u, "https://") || strings.ContainsAny(u, " \t\n") {
+			errs = append(errs, "a source is a page's address (https://…): "+u)
+		}
+	}
+	if (t.Checked == "") != (t.CheckedBy == "") {
+		errs = append(errs, "checked and checkedBy go together: when, and by what")
+	}
+	if t.RetiredWhy != "" && !slices.Contains(RetiredWhys, t.RetiredWhy) {
+		errs = append(errs, "retiredWhy is one of "+strings.Join(RetiredWhys, ", "))
+	}
+	if !t.Retired && (t.RetiredWhy != "" || t.ReplacedBy != "") {
+		errs = append(errs, "retiredWhy and replacedBy are for a retired question")
+	}
+	if t.Retired && t.RetiredWhy == "" {
+		warnings = append(warnings, "retired without a reason (retiredWhy)")
+	}
 	for _, d := range t.On {
 		full := d
 		if len(d) == 5 {
@@ -95,6 +119,17 @@ func checkQuestion(q Question, today string) (errs, warnings []string) {
 	}
 	if t.Updated != "" && t.Added != "" && t.Updated < t.Added {
 		errs = append(errs, "updated is before added")
+	}
+	if t.Changed != "" && (t.Changed < t.Added || (t.Updated != "" && t.Changed > t.Updated)) {
+		errs = append(errs, "changed is between added and updated")
+	}
+	if t.Added >= SourcesFrom && !t.Retired {
+		if len(t.Sources) == 0 {
+			errs = append(errs, "a question added since "+SourcesFrom+" needs its sources")
+		}
+		if t.Checked == "" {
+			errs = append(errs, "a question added since "+SourcesFrom+" needs checked and checkedBy")
+		}
 	}
 	if t.Added >= RulesFrom && !t.Retired {
 		if t.Fact == "" {

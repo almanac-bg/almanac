@@ -39,7 +39,8 @@ func factsIn(b *bank.Bank) map[string]int {
 }
 
 // learned calls fn with every question a player has answered right that has a fact (a retired one too: what was
-// learned stays), newest first, with when it was first answered right.
+// learned stays, unless it wasn't so: a question retired as wrong or stale, bank.Tail.Untrue), newest first, with when
+// it was first answered right.
 func (g *Game) learned(ctx context.Context, userID int64, fn func(q bank.Question, at int64)) error {
 	b := g.Bank()
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id, min(a.at) FROM answers a JOIN runs r ON r.id = a.run_id
@@ -54,7 +55,7 @@ func (g *Game) learned(ctx context.Context, userID int64, fn func(q bank.Questio
 		if err := rows.Scan(&id, &at); err != nil {
 			return err
 		}
-		if q, ok := b.Get(id); ok && q.Extra().Fact != "" {
+		if q, ok := b.Get(id); ok && q.Extra().Fact != "" && !q.Extra().Untrue() {
 			fn(q, at)
 		}
 	}

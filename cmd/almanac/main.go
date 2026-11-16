@@ -6,7 +6,7 @@
 //	almanac bank subjects [dir]         the subjects that come back, all of them (check shows the top)
 //	almanac bank calibrate [dir]        the questions whose difficulty disagrees with what players got right (DB_PATH)
 //	almanac bank plan [-n N] [-json] [dir]  plan a batch of N new questions a category, where the day needs them most
-//	almanac bank add [-check] <batch> [dir]  add a checked batch to a bank: all of it, or nothing (-check: only check)
+//	almanac bank add [-check] [-checked-by P] <batch> [dir]  add a checked batch: all of it or nothing (-check: only check)
 //	almanac backup now                  copy the database to the backups at once
 //	almanac backup restore <key> <path> write a copy (hours/07.db.gz, days/12.db.gz) to a new database file
 //	almanac backup verify [key]         bring a copy back to a temporary file and check it (the latest day's)
@@ -62,5 +62,5 @@ func run(args []string) error {
 }
 
 func usage() error {
-	return fmt.Errorf("usage: almanac serve | bank check [-unbalanced] [dir] | bank fmt [dir] | bank subjects [dir] | bank calibrate [dir] | bank plan [-n N] [-json] [dir] | bank add [-check] <batch> [dir] | backup now | backup restore <key> <path> | backup verify [key] | admin [-remove] <email> | push keys | version")
+	return fmt.Errorf("usage: almanac serve | bank check [-unbalanced] [dir] | bank fmt [dir] | bank subjects [dir] | bank calibrate [dir] | bank plan [-n N] [-json] [dir] | bank add [-check] [-checked-by P] <batch> [dir] | backup now | backup restore <key> <path> | backup verify [key] | admin [-remove] <email> | push keys | version")
 }

@@ -36,7 +36,8 @@ and `<batch>` (this batch's folder).
 
 In `<batch>/final/` (nothing else in it but these):
 
-- `<category>.json` for each of the ten: the questions to add, the same number in each.
+- `<category>.json` for each of the ten: the questions to add, the same number in each, each with its `sources`
+  (the checker's; add the page for anything you confirmed or fixed yourself).
 - `images/`: the pictures the final questions use, and nothing else.
 - `REPORT.md`: per category the count added, its cells against the plan, what you dropped, restored or fixed and why;
   every pair you resolved; the problems the writers, the checkers and you found in questions already in the bank (id, what's
