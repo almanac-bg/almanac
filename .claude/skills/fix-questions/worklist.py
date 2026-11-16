@@ -4,13 +4,17 @@ judge, by question, in chunks of a category, each with free ids for its replacem
   python3 -I worklist.py <repo> <bank> <work> [--rules R,…] [--judge J,…] [--categories C,…] [--size N]
 
 --rules: only these lint rules (default: all); --judge: false-fact, easy-picture (default: none); --size: items a
-chunk (default 40). Writes <work>/chunks/<category>-<n>.json and prints the chunk names, one a line.
+chunk (default 40). Writes <work>/chunks/<category>-<n>.json, and <work>/owners.json (each listed id: its chunk, so
+a fixer leaves another chunk's questions alone), and prints the chunk names, one a line. A question judged earlier in
+this pass (<work>/judged.json, kept by merge.py) isn't judged again. Make the list again after each run is in the bank:
+the lint, and the free ids, have moved.
 """
 import argparse
 import collections
 import json
 import os
 import re
+import shutil
 import subprocess
 
 p = argparse.ArgumentParser()
@@ -56,13 +60,16 @@ for line in out.splitlines():
 
 # The rules a pass asks to judge.
 judge = [j for j in a.judge.split(",") if j]
+judged = json.load(open(f"{a.work}/judged.json")) if os.path.exists(f"{a.work}/judged.json") else {}
 for i, (c, q) in qs.items():
-    if "false-fact" in judge and q["type"] == "truefalse" and q.get("answer") is False:
+    if "false-fact" in judge and "false-fact" not in judged.get(i, []) and q["type"] == "truefalse" and q.get("answer") is False:
         item(i)["judge"].append("false-fact: the fact starts with what is true")
-    if "easy-picture" in judge and q["type"] == "choice" and q["difficulty"] == "easy" and (q.get("image") or q.get("pictures")):
+    if "easy-picture" in judge and "easy-picture" not in judged.get(i, []) and q["type"] == "choice" and q["difficulty"] == "easy" and (q.get("image") or q.get("pictures")):
         item(i)["judge"].append("easy-picture: the picture is the question, and a quarter of adults miss it")
 
-os.makedirs(f"{a.work}/chunks", exist_ok=True)
+shutil.rmtree(f"{a.work}/chunks", ignore_errors=True)
+os.makedirs(f"{a.work}/chunks")
+owners = {}
 by_cat = collections.defaultdict(list)
 for i, it in items.items():
     by_cat[qs[i][0]].append(it)
@@ -74,6 +81,8 @@ for c in cats:
         name = f"{c}-{k // a.size + 1}"
         ids = [f"{prefix[c]}-{n}" for n in range(nxt, nxt + len(part))]
         nxt += len(part)
+        owners.update({it["id"]: name for it in part})
         json.dump({"category": c, "ids": ids, "items": part}, open(f"{a.work}/chunks/{name}.json", "w"),
                   ensure_ascii=False, indent=1)
         print(name)
+json.dump(owners, open(f"{a.work}/owners.json", "w"), ensure_ascii=False)

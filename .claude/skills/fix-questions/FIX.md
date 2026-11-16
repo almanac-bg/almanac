@@ -50,8 +50,15 @@ What the rules ask (the questions skill has the details):
   (a place, a face, a species, a work, something people confuse), never "name this everyday object", and a quarter of
   Bulgarian adults still miss it. If it's trivial, replace it with a good one in the same cell; pictures as in
   `<repo>/.claude/skills/new-questions/WRITE.md` (Commons, licences, cwebp, sizes), into
-  `<work>/fix/<chunk>/images/`.
+  `<work>/fix/<chunk>/images/`. A photograph of a thing (a sculpture, an egg, a tablet) needs a free licence for the
+  photograph itself: PD-old covers the work, not someone's photo of it (a museum's CC0 does). Grep the bank's `image`
+  sources and alt texts first: the same picture, or the same subject, must not be in another question.
 - **decoy, order-gap, fact, spelling, typography, ending, address, language**: as the rule's message says.
+
+**Other chunks run beside yours.** Change a question outside your chunk only if `<work>/owners.json` doesn't list it
+(it maps every listed id to its chunk); if it lists it, fix your side, or leave the item and say why. And before you
+write any new question, claim its subject: `grep -i '<answer>' <work>/claims.txt` — if another chunk has it, pick
+another subject — then `echo '<chunk> <answer> | <subject>' >> <work>/claims.txt`.
 
 Before you change anything, **grep the bank** for the subject, the answer and the key names and numbers (no new
 give-away, no near-duplicate), and **confirm every claim from a page you read in this session** (bg/en Wikipedia,

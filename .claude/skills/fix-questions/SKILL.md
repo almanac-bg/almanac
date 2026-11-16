@@ -44,12 +44,15 @@ If an agent fails because a model isn't available, stop and tell the owner; neve
    <work>/batch <bank>`, `bank fmt`, `bank check` (no errors). If `bank add` refuses, read why: a chunk whose new
    question collides with another's, or a change that made a new problem, goes back to its checker's notes; leave
    that chunk out (`merge.py` with the others) and fix it in the next round.
-6. **Lint again.** What's left (an item the fixer left, a problem a fix made elsewhere) is the next round's work list,
+6. **Make the work list again** (step 3) before the next run: the bank moved (the lint, the free ids). `merge.py`
+   keeps `<work>/judged.json`, so what was judged isn't judged twice, and numbers the new questions on from the bank's
+   last id. Move the run's `fix/`, `checked/` and `batch/` into `<work>/runs/<n>/` first (the new list reuses chunk
+   names). **Lint again.** What's left (an item the fixer left, a problem a fix made elsewhere) is the next round's work list,
    until a round fixes nothing more; what's left then is listed for the owner.
 7. **Report**: `<bank>/reports/<date>-fix-<slug>.md` in Bulgarian: what the pass was for, lint before → after by
    rule, how many changed, replaced (with the new ids), waived and kept, what the checkers took out and the worst
    they caught; then by topic, each changed or new question: id — what changed (the old → the new text, answer or
-   fact, short). The chunks' notes (`fix/*.md`, `checked/*.md`) go beside it in `<bank>/reports/<date>-fix-<slug>/`.
+   fact, short). The chunks' notes (`runs/*/fix/*.md`, `runs/*/checked/*.md`) go beside it in `<bank>/reports/<date>-fix-<slug>/`.
 8. **Commit and put it live** (as `/new-questions` step 9): one commit per run, the message saying the rules and the
    counts; `almanac-bank` on the server; its count line and 0 errors.
 9. **Tell the owner** in a few lines, and **clean up**: the lock, `<work>`, anything of yours.
