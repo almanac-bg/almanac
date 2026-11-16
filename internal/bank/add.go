@@ -6,14 +6,23 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Batch files: a batch to add is a directory with <category>.json for each category it adds to (a JSON array, as in
-// the bank), and maybe RetireFile (the ids it retires, each replaced by one of its questions in the same cell) and
-// ImagesDir (its pictures).
+// the bank), and maybe RetireFile (the questions it retires: [{"id", "why", "by"}], why one of RetiredWhys, by the
+// question of the batch that takes its place, if one does) and ImagesDir (its pictures).
 const RetireFile = "retire.json"
+
+// Retirement is a question a batch retires (RetireFile).
+type Retirement struct {
+	ID  string `json:"id"`
+	Why string `json:"why"`
+	By  string `json:"by,omitempty"`
+}
 
 // Added is what a batch did, or would do: how many questions it added and retired, the live size of each category
 // after it, and the warnings about its own questions.
@@ -26,8 +35,10 @@ type Added struct {
 // Add puts a batch (from) into the bank in dir: its questions at the end of their categories' files, the questions it
 // retires marked so, its pictures among the bank's. It checks first and writes nothing unless all of it holds: each
 // new question decodes strictly, takes the next numbers of its own category's ids, and the bank with the batch in it
-// loads with no errors. The files are written in the bank's format. dry checks only: the bank stays as it is.
-func Add(dir, from string, dry bool) (Added, error) {
+// loads with no errors. The files are written in the bank's format. checkedBy, if set, marks every new question
+// checked today by it (Tail.Checked, CheckedBy) where the batch doesn't say. dry checks only: the bank stays as it is.
+func Add(dir, from, checkedBy string, dry bool) (Added, error) {
+	today := time.Now().Format(time.DateOnly)
 	b, problems := Load(dir)
 	if b == nil {
 		return Added{Warnings: problems}, errors.New(dir + ": the bank has errors already: fix them first")
@@ -59,6 +70,9 @@ func Add(dir, from string, dry bool) (Added, error) {
 				fault("%s.json:%d: %s: the bank has numbers up to %s-%d already: a new question takes the next free one",
 					c.ID, item.line, id, prefix, last)
 			}
+			if t := item.q.Extra(); checkedBy != "" && t.CheckedBy == "" {
+				t.Checked, t.CheckedBy = today, checkedBy
+			}
 			news[c.ID] = append(news[c.ID], item.q)
 		}
 	}
@@ -74,7 +88,7 @@ func Add(dir, from string, dry bool) (Added, error) {
 		}
 	}
 
-	var retire []string
+	var retire []Retirement
 	if data, err := os.ReadFile(filepath.Join(from, RetireFile)); err == nil {
 		if err := strictJSON(data, &retire); err != nil {
 			fault("%s: %v", RetireFile, err)
@@ -82,15 +96,26 @@ func Add(dir, from string, dry bool) (Added, error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Added{}, err
 	}
-	for _, id := range retire {
-		q, ok := b.Get(id)
+	batch := map[string]bool{}
+	for _, qs := range news {
+		for _, q := range qs {
+			batch[q.Base().ID] = true
+		}
+	}
+	for _, r := range retire {
+		q, ok := b.Get(r.ID)
 		switch {
 		case !ok:
-			fault("%s: %s: no such question in the bank", RetireFile, id)
+			fault("%s: %s: no such question in the bank", RetireFile, r.ID)
 		case q.Extra().Retired:
-			fault("%s: %s: retired already", RetireFile, id)
+			fault("%s: %s: retired already", RetireFile, r.ID)
+		case !slices.Contains(RetiredWhys, r.Why):
+			fault("%s: %s: why is one of %s", RetireFile, r.ID, strings.Join(RetiredWhys, ", "))
+		case r.By != "" && !batch[r.By]:
+			fault("%s: %s: by %s, which isn't in the batch", RetireFile, r.ID, r.By)
 		default:
-			q.Extra().Retired = true
+			t := q.Extra()
+			t.Retired, t.RetiredWhy, t.ReplacedBy, t.Updated = true, r.Why, r.By, today
 		}
 	}
 

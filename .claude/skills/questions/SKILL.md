@@ -20,9 +20,10 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
   - `go run ./cmd/almanac bank plan [-n N] [-json] private` plans a batch of N a topic: the cells to write (the day's
     shortest runway first, at most a third of the batch in one place), the dates with the fewest questions, the ids
     and the subjects to avoid;
-  - `go run ./cmd/almanac bank add [-check] <batch> private` adds a batch (`<category>.json` files, `images/`, maybe
-    `retire.json`): every new id the next free one, the bank with it in loading with no errors, or nothing is
-    written; `-check` only checks;
+  - `go run ./cmd/almanac bank add [-check] [-checked-by P] <batch> private` adds a batch (`<category>.json` files,
+    `images/`, maybe `retire.json`: `[{"id", "why", "by"}]`): every new id the next free one, the bank with it in
+    loading with no errors, or nothing is written; `-check` only checks; `-checked-by` marks the new questions
+    checked today by that process;
   - `go run ./cmd/almanac bank check private` checks everything the server checks before it plays a bank. It ends
     with the balance report: the difficulty and kind mix, facts and dates, the mix grid, and **the day's runway** —
     how many days of the day's questions each place of a day has left. It **fails** while the categories aren't the
@@ -103,10 +104,13 @@ Every question is one JSON object in its category's file:
 | `difficulty`         | `easy`, `medium` or `hard`                                                               |
 | `text`               | The question: at most 160 characters (60 with a picture), ending in „?“ or „:“           |
 | `fact`               | One or two sentences, at most 200 characters (see below)                                 |
-| `added`, `updated`   | The day it joined the bank; the day it last changed                                      |
+| `added`, `updated`   | The day it joined the bank; the day it last changed at all                               |
+| `changed`            | The day what it asks last changed (text, answer, options, items, pairs, clues, picture): players' answers from before it don't count in its crowd and calibration. Not for a fix to the fact alone |
+| `sources`            | The pages (https://…) the answer and the fact were confirmed on: what the next check starts from. Never shown to players. Required for a question added since `SourcesFrom` (2026-11-17) |
+| `checked`, `checkedBy` | When it was last checked against its sources, and by what: a process and its model (`"new-questions fable-5.2"`), or for older questions the bank commit that added or last changed it (`"bank 7bb2938"`: its message and report say how). Required since `SourcesFrom` |
 | `reviewBy`           | For an answer that may stop being true (an office holder, a record): when to check it    |
 | `image`              | A picture (see below)                                                                    |
-| `retired`            | `true`: never dealt again, kept for history and stats                                    |
+| `retired`            | `true`: never dealt again, kept for history and stats; with `retiredWhy` (`wrong`, `stale`, `weak`, `twin`, `giveaway`, `rule`) and `replacedBy` (the id that took its place). A question retired as `wrong` or `stale` also leaves what players learned (Моят Алманах) |
 | `on`                 | The days it belongs to: `"03-03"` every year, `"2027-05-02"` that year only (Великден). On such a day it goes into the day's ten as „На този ден“; its fact says why the day |
 | `bg`                 | `true` for a question about Bulgaria (people, places, history, culture, language, sport): every day has at least three |
 
@@ -188,9 +192,13 @@ By type:
 
 ## Changing a question
 
-- Set `updated` to today whenever the text, answer, options, fact or picture changes.
-- If a change alters what the question asks, retire it (`"retired": true`) and add a new one with a new id: answers
-  already given and stats point at the old one.
+- Set `updated` to today whenever anything changes. If what it asks changed (text, answer, options, items, pairs,
+  clues, picture, tolerance), set `changed` to today too: the answers given before then stop counting.
+- Change it in place when it still asks the same thing, better (a clearer wording, a fairer option). If it would ask
+  something else (another subject or answer), retire it (`"retired": true`, `retiredWhy`, `replacedBy`) and add a new
+  one with a new id: answers already given and stats point at the old one.
+- Keep `sources` true: add the page a fix rests on, drop one that no longer supports it. A fix checked again against
+  its sources sets `checked` and `checkedBy`.
 - Don't touch a retired question except to read it.
 
 ## The workflow

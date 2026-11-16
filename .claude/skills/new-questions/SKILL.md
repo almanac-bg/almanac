@@ -54,7 +54,8 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
 4. **Read what came back:** the cross-check's result and `<batch>/final/REPORT.md`. Every category adds the same
    number; if it's less than N, the report says why, and you say so to the owner. If more than a fifth of the batch was
    dropped, read the checkers' `verify/<cat>.md` for a pattern (a writer that guessed, a misread rule) and say it.
-5. **Add it.** `bank add <batch>/final <bank>`, then `bank fmt <bank>` and `bank check <bank>`: no errors, every
+5. **Add it.** `bank add -checked-by "new-questions fable-5.2" <batch>/final <bank>` (the checkers' model: change it
+   with batch.js), then `bank fmt <bank>` and `bank check <bank>`: no errors, every
    category the same size, and no place of the day's runway shorter than in the plan's `days`. If anything fails,
    `git -C <bank> checkout -- . && git -C <bank> clean -fd -- images` and stop.
 6. **Fix what the batch found in the bank.** For the problems in REPORT.md about questions already in the bank: check
@@ -65,6 +66,8 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
    process with the models (писатели: Claude Opus 5.5; проверка и обща проверка: Claude Fable 5.2) and how many were
    fixed and dropped; then by topic, each question: id · kind/difficulty · flags (дата, България, с картинка) — text →
    answer, and its fact in italics.
+   Keep the batch's record beside it: `<batch>/plan.json`, `final/REPORT.md` and the checkers' `verify/<cat>.md` into
+   `<bank>/reports/<date>-<slug>/` (each question's sources are in the question itself).
 8. **Commit and put it live.** In `<bank>`: `git add -A`, commit `feat: <count> questions …` (what they are for, the
    bank's size per topic after; the body lists the ids by topic), `git push`. Then on the server:
    `ssh -i ~/.ssh/hetzner -o BatchMode=yes root@2.31.121.12 almanac-bank`. Its first line must be the bank's count
@@ -74,7 +77,7 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
 9. **Tell the owner,** in a few lines: how many went in, the runway before → after, how many the checks dropped and
    the worst they caught, what was fixed in older questions, a handful of the new questions (question → answer), and
    the report's path.
-10. **Clean up:** remove the lock and `<batch>` (it's in the commit and the report now), and anything else of yours
+10. **Clean up:** remove the lock and `<batch>` (its record is in the bank's commit now), and anything else of yours
     (CLAUDE.md, "Leave the machine as you found it").
 
 ## When it goes wrong

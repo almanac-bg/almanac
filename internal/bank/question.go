@@ -39,8 +39,8 @@ type Head struct {
 	subjects []string
 }
 
-// Tail is what every question may end with: a picture, the fact behind the answer, and when it was added, last
-// changed, or needs a look again.
+// Tail is what every question may end with: a picture, the fact behind the answer, when it was added, changed and
+// checked, on what sources, and why it left play if it did.
 type Tail struct {
 	Image *Image `json:"image,omitempty"`
 	// Fact is "Знаеше ли?": something worth knowing behind the answer, shown in the review after a game. Every
@@ -48,18 +48,53 @@ type Tail struct {
 	Fact string `json:"fact,omitempty"`
 	// Added is when the question joined the bank (YYYY-MM-DD).
 	Added string `json:"added,omitempty"`
-	// Updated is when the question last changed (YYYY-MM-DD): its wording, answer, options, fact or picture.
+	// Changed is when what it asks last changed (YYYY-MM-DD): its wording, answer, options, items, pairs, clues or
+	// picture, so that players' answers from before then were to another question (crowds and calibration start
+	// there). Empty: not since it was added.
+	Changed string `json:"changed,omitempty"`
+	// Updated is when the question last changed at all (YYYY-MM-DD): Changed, or its fact, labels or dates.
 	Updated string `json:"updated,omitempty"`
+	// Checked is when it was last checked against its sources, and CheckedBy by what: a process and its model
+	// ("new-questions fable-5.2"), or the bank's commit that added or last changed it ("bank 7bb2938": its message
+	// and report say how it was checked). An audit of a process finds its questions by it.
+	Checked   string `json:"checked,omitempty"`
+	CheckedBy string `json:"checkedBy,omitempty"`
 	// ReviewBy is when its answer may stop being true (a record, an office holder): checked again by then.
 	ReviewBy string `json:"reviewBy,omitempty"`
-	// Retired questions are never dealt again, but stay so that history and stats keep their text.
-	Retired bool `json:"retired,omitempty"`
+	// Retired questions are never dealt again, but stay so that history and stats keep their text. RetiredWhy says
+	// why (RetiredWhys), ReplacedBy the question that took its place, if one did.
+	Retired    bool   `json:"retired,omitempty"`
+	RetiredWhy string `json:"retiredWhy,omitempty"`
+	ReplacedBy string `json:"replacedBy,omitempty"`
 	// On are the days the question belongs to: "MM-DD" every year (3 March, a birthday), or "YYYY-MM-DD" that year
 	// only (a moving feast: Великден). On such a day it goes into the day's questions („На този ден“), its fact saying
 	// why.
 	On []string `json:"on,omitempty"`
 	// BG is a question about Bulgaria: its people, places, history, culture, language, sport. Every day has a few.
 	BG bool `json:"bg,omitempty"`
+	// Sources are the pages the answer and the fact were confirmed on (URLs): what a later check starts from, and
+	// where to look first when a source turns out wrong. Never sent to a player. Every question added since
+	// SourcesFrom has them.
+	Sources []string `json:"sources,omitempty"`
+}
+
+// RetiredWhys are the reasons a question leaves play: wrong (its answer or fact was), stale (it stopped being true),
+// weak (dull, too easy, unfair or badly made), twin (another question asks the same), giveaway (it gave another's
+// answer away, or another gave its), rule (a rule of the bank changed). Wrong and stale ones also leave what players
+// have learned (Моят Алманах): what they learned there wasn't so.
+var RetiredWhys = []string{"wrong", "stale", "weak", "twin", "giveaway", "rule"}
+
+// Untrue is whether a retired question left play because it wasn't (or stopped being) true.
+func (t *Tail) Untrue() bool {
+	return t.Retired && (t.RetiredWhy == "wrong" || t.RetiredWhy == "stale")
+}
+
+// AskedSince is the day what a question asks last changed: Changed, else Added.
+func (t *Tail) AskedSince() string {
+	if t.Changed != "" {
+		return t.Changed
+	}
+	return t.Added
 }
 
 // OnDay is whether a question belongs to a day (YYYY-MM-DD): its On holds the day, or the day's month and day.
