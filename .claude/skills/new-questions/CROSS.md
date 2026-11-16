@@ -16,6 +16,12 @@ and `<batch>` (this batch's folder).
 
 ## Do
 
+0. **The blind answers.** A third model answered every checked question without the key (`<batch>/blind/`). Run
+   `cd <repo> && python3 -I <fix>/blind.py compare <bank> <batch>`: `<batch>/blind/disagree.json` lists each question
+   where it was sure of another answer. Each is a doubt to settle from sources you read now (WebFetch), not a vote:
+   the key wrong → fix it, or drop the question; two answers defensible (an option that can be argued, a text read
+   two ways, a value that differs by source) → change the wording or the option until one holds, or drop it; the key
+   right and one reading → keep it. Don't open the answers to look for more: only these are doubts.
 1. **Pairs across categories.** Find every pair (or more) of questions across the ten verified files that ask the same
    thing, share an answer about the same subject, or give each other away: a text, option, item, clue or fact that
    names another's answer, or shows a value an order or number question asks. For each, keep exactly one, the best
@@ -40,7 +46,8 @@ In `<batch>/final/` (nothing else in it but these):
 - `<category>.json` for each of the ten: the questions to add, `each` in each where it could, each with its `sources`
   (the checker's; add the page for anything you confirmed or fixed yourself).
 - `images/`: the pictures the final questions use, and nothing else.
-- `REPORT.md`: per category the count added, its cells against the plan, what you dropped, restored or fixed and why;
+- `REPORT.md`: first the blind answers (how many it answered, how many doubts, and for each: kept, fixed or dropped,
+  and why); then per category the count added, its cells against the plan, what you dropped, restored or fixed and why;
   every pair you resolved; the problems the writers, the checkers and you found in questions already in the bank (id, what's
   wrong, the source), for the owner's session to fix.
 

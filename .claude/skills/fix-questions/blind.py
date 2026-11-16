@@ -3,6 +3,8 @@ otherwise.
 
   python3 -I blind.py sheets <bank> <work> [--size 300]   # <work>/blind/sheets/<n>.json, key.json, images/
   python3 -I blind.py compare <bank> <work>               # <work>/blind/disagree.json, and the counts
+  python3 -I blind.py sheets <bank> <work> --from <dir>   # a batch's questions instead (<dir>/*/<cat>.json, as
+                                                          # /new-questions' verify/), pictures from beside them
 
 A sheet holds live questions as a player sees them: the text, the options in a fixed shuffled order with letters, the
 clues, the items, a picture as a file in <work>/blind/images (never a path into the bank). The answerers write
@@ -22,12 +24,24 @@ p.add_argument("do", choices=["sheets", "compare"])
 p.add_argument("bank")
 p.add_argument("work")
 p.add_argument("--size", type=int, default=300)
+p.add_argument("--from", dest="src", default="")
 a = p.parse_args()
 out = f"{a.work}/blind"
 LETTERS = "ABCDEFGH"
 
 
+IMAGES = {}  # a question's id: the folder its pictures are in
+
+
 def live():
+    if a.src:
+        for f in sorted(glob.glob(f"{a.src}/*/*.json")):
+            if os.path.basename(f) == "retire.json":
+                continue
+            for q in json.load(open(f)):
+                IMAGES[q["id"]] = f"{os.path.dirname(f)}/images"
+                yield q
+        return
     for c in json.load(open(f"{a.bank}/categories.json")):
         for q in json.load(open(f"{a.bank}/questions/{c['id']}.json")):
             if not q.get("retired"):
@@ -39,8 +53,8 @@ def shuffled(qid, xs):
     return sorted(xs, key=lambda x: hashlib.sha256(f"{qid}|{json.dumps(x, ensure_ascii=False)}".encode()).hexdigest())
 
 
-def picture(im):
-    shutil.copy2(f"{a.bank}/images/{im['file']}", f"{out}/images/{im['file']}")
+def picture(im, qid):
+    shutil.copy2(f"{IMAGES.get(qid, a.bank + '/images')}/{im['file']}", f"{out}/images/{im['file']}")
     return f"{out}/images/{im['file']}"
 
 
@@ -48,14 +62,14 @@ def sheet_item(q):
     """The question as asked, and its key in the sheet's own terms."""
     s = {"id": q["id"], "kind": q["type"], "text": q["text"]}
     if q.get("image"):
-        s["picture"] = picture(q["image"])
+        s["picture"] = picture(q["image"], q["id"])
     t = q["type"]
     if t in ("choice", "clues"):
         opts = [q["answer"]] + q["wrong"]
         pics = q.get("pictures")
         idx = shuffled(q["id"], list(range(len(opts))))
         if pics:
-            s["options"] = {LETTERS[k]: {"picture": picture(pics[i])} for k, i in enumerate(idx)}
+            s["options"] = {LETTERS[k]: {"picture": picture(pics[i], q["id"])} for k, i in enumerate(idx)}
         else:
             s["options"] = {LETTERS[k]: opts[i] for k, i in enumerate(idx)}
         if t == "clues":
