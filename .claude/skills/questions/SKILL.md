@@ -17,6 +17,12 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 - The format and the checks are the code: `internal/bank` (one file per type, plus `check.go` and `balance.go`).
 - The tools (from the repo root):
   - `go run ./cmd/almanac bank fmt private` writes the files in their one format; run it after every edit;
+  - `go run ./cmd/almanac bank plan [-n N] [-json] private` plans a batch of N a topic: the cells to write (the day's
+    shortest runway first, at most a third of the batch in one place), the dates with the fewest questions, the ids
+    and the subjects to avoid;
+  - `go run ./cmd/almanac bank add [-check] <batch> private` adds a batch (`<category>.json` files, `images/`, maybe
+    `retire.json`): every new id the next free one, the bank with it in loading with no errors, or nothing is
+    written; `-check` only checks;
   - `go run ./cmd/almanac bank check private` checks everything the server checks before it plays a bank. It ends
     with the balance report: the difficulty and kind mix, facts and dates, the mix grid, and **the day's runway** —
     how many days of the day's questions each place of a day has left. It **fails** while the categories aren't the
@@ -188,6 +194,11 @@ By type:
 - Don't touch a retired question except to read it.
 
 ## The workflow
+
+**A new batch is `/new-questions`** (`.claude/skills/new-questions/`): it runs these steps with the plan from
+`almanac bank plan` (what to write, for the day's shortest runway and the dates with the fewest questions, the same in
+every topic), writers and independent checkers on fixed models, a cross-check over all topics, and `almanac bank add`
+(all of the batch, or nothing). By hand, for a fix or a few questions:
 
 1. **Find the gaps:** run `bank check` and read the day's runway and the balance report. Plan the batch from the
    shortest runway first (every place under 180 days before anything else), then the mix grid's biggest gaps; the

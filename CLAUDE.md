@@ -90,7 +90,7 @@ client, the server or the sample bank. It catches only what it knows: reading th
 
 - **Free hand.** The game was rebuilt from zero in November 2026: no legacy to keep, nothing kept for compatibility.
   Rename completely (URLs, API, files, types, stored ids with a migration), delete what's unused.
-- **The bank** (questions, facts) is changed only through the `questions` skill.
+- **The bank** (questions, facts) is changed only through the `questions` skill; a new batch is `/new-questions`.
 - **Secrets** never go into the repo, a commit or a chat.
 
 ## Shipping: a merge is a deploy

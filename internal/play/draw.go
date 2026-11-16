@@ -355,6 +355,13 @@ func nearest(d bank.Difficulty) []bank.Difficulty {
 type Runway struct {
 	Place string
 	Days  int
+	// Difficulty, Kinds and Picture say what fits the place ("split" and "clues" share theirs); Questions is how many
+	// fit it and no day has had, PerDay how many a day takes (Days is Questions / PerDay).
+	Difficulty bank.Difficulty
+	Kinds      []string
+	Picture    bool
+	Questions  int
+	PerDay     int
 }
 
 // DayRunway is the runway of each place of a day, in the day's order (the place the new kinds share counts both).
@@ -389,7 +396,8 @@ func DayRunway(b *bank.Bank, used map[string]bool) []Runway {
 		if s.picture == withPicture {
 			place += " with a picture"
 		}
-		out = append(out, Runway{Place: place, Days: n / times})
+		out = append(out, Runway{Place: place, Days: n / times, Difficulty: s.difficulty, Kinds: kinds,
+			Picture: s.picture == withPicture, Questions: n, PerDay: times})
 	}
 	return out
 }

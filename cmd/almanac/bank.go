@@ -37,8 +37,45 @@ func bankCommand(args []string) error {
 		return bankSubjects(dir())
 	case "calibrate":
 		return bankCalibrate(dir())
+	case "plan":
+		return bankPlan(rest)
+	case "add":
+		dry := len(rest) > 0 && rest[0] == "-check"
+		if dry {
+			rest = rest[1:]
+		}
+		if len(rest) == 0 {
+			return usage()
+		}
+		into := defaultBankDir()
+		if len(rest) > 1 {
+			into = rest[1]
+		}
+		return bankAdd(rest[0], into, dry)
 	}
 	return usage()
+}
+
+// bankAdd adds a checked batch (bank.Add) to a bank: all of it, or nothing. dry (-check) only checks it and says what
+// it would do: a writer checks one category's part this way, before the batch is whole.
+func bankAdd(from, dir string, dry bool) error {
+	res, err := bank.Add(dir, from, dry)
+	if err != nil {
+		return err
+	}
+	for _, p := range res.Warnings {
+		fmt.Println(p)
+	}
+	var sizes []string
+	for _, c := range res.Sizes {
+		sizes = append(sizes, c.String())
+	}
+	verb := "added"
+	if dry {
+		verb = "would be added (nothing written)"
+	}
+	fmt.Printf("%s: %d questions %s, %d retired; live after: %s\n", dir, res.Added, verb, res.Retired, strings.Join(sizes, ", "))
+	return nil
 }
 
 // defaultBankDir is the private bank when there is one (a clone in private/), else the public sample.
