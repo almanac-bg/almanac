@@ -50,6 +50,11 @@ What the rules ask (the questions skill has the details):
   sources. The bank wrong: change the answer (or replace it, `why`: wrong, if it then asks something else). Both
   defensible (another option can be argued, the text reads two ways, the value differs by source): change the wording
   or the option until one answer holds. The bank right and only one reading: keep, and say the source.
+- **judge: signal** (the bank's upkeep): a **report** is a player's words about the question: read them as a lead,
+  not a verdict, and find out from sources (a wrong key, a second right answer, a typo, a dated fact, a picture that
+  won't load). A **suspect**: most players answered otherwise; find out who's right, as for **blind**. A **review**:
+  what it says may have stopped being true; confirm it now and set a new `reviewBy` (a year or two on), or reword it to
+  what doesn't change, or replace it (`why`: stale). Nothing wrong: keep, and say the source.
 - **judge: easy-picture** (an easy choice with a picture, the day's second place): the picture must be the question
   (a place, a face, a species, a work, something people confuse), never "name this everyday object", and a quarter of
   Bulgarian adults still miss it. If it's trivial, replace it with a good one in the same cell; pictures as in
