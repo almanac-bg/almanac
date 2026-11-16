@@ -749,9 +749,16 @@ export function level(
  * The sheet for the one big thing a game brought, over the result (at most one a game): it slides up from the bottom
  * over a dimmed screen, its picture lands (and, `glow`, glows once), and its sound plays as it opens. „Продължи“, a tap
  * beside it or Esc puts it away; it never goes by itself. `parts` are its picture, kicker, name and lines, drawn by the
- * app (the name with the id "moment-name"). Resolves once it's put away.
+ * app (the name with the id "moment-name"). `actions`, if given, are its own buttons in place of „Продължи“ (the first
+ * focused), each told how to put the sheet away. Resolves once it's put away.
  */
-export function sheet(parts: Element[], sound: SoundName, glow: boolean, hands: Hands): Promise<void> {
+export function sheet(
+  parts: Element[],
+  sound: SoundName,
+  glow: boolean,
+  hands: Hands,
+  actions?: (close: () => void) => HTMLElement[],
+): Promise<void> {
   const box = document.createElement("dialog");
   box.setAttribute("aria-labelledby", "moment-name");
   box.style.cssText =
@@ -769,11 +776,15 @@ export function sheet(parts: Element[], sound: SoundName, glow: boolean, hands: 
   go.className = "btn primary big";
   go.style.cssText = "width:100%;margin-top:var(--space-3)";
   go.textContent = "Продължи";
-  panel.append(...parts, go);
+  const own = actions?.(() => {
+    if (box.open) box.close();
+  });
+  const buttons = own?.length ? own : [go];
+  panel.append(...parts, ...buttons);
   box.append(panel);
   document.body.append(box);
   box.showModal();
-  go.focus();
+  buttons[0]?.focus();
   hands.play(sound);
   const [picture] = parts;
   if (!hands.calm) {

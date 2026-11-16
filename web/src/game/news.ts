@@ -1,7 +1,7 @@
 // What a game earned, said once, at its end, in three cards at most: the day's goals it finished (with their XP); the
 // one biggest thing that happened (a week of the league ended, a division reached, a new level), or else a line of the XP it
 // brought and the level; and „Ново за теб“: achievements and everything they unlocked to wear (each a tap from being
-// worn), with how a topic's game moved its mastery; in a card left free, once a day, how others' duels against the
+// worn), three rows at most, the highest tier first, the rest a tap away; with how a topic's game moved its mastery; in a card left free, once a day, how others' duels against the
 // player's recordings went (play/recordings.go). Only the biggest of it plays its sound. Only what the player has met
 // is told (play/unfold.go: no XP on a first day); a system met with this game is said first, once, in a line, and so is a
 // broken streak won back (play/repair.go). What really is big (bigOne) is also brought forward in a sheet over the
@@ -83,7 +83,7 @@ export function news(run: number, delay = 0, round?: Promise<number>): Child {
           await landed(run);
           if (gone) return;
           haptic("big");
-          kit.sheet(top.parts, top.sound, top.glow, { ...hands(), play: voice });
+          kit.sheet(top.parts, top.sound, top.glow, { ...hands(), play: voice }, top.actions);
         },
         () => {},
       ),
@@ -152,7 +152,15 @@ function loudest(n: News): SoundName | null {
 /** The one big thing a game brought, for its sheet: a week of the league ended up or on its podium, a division reached,
  * the streak at a round number (`days`), a level that unlocks something or is a fifth, an epic or legendary
  * achievement. The smaller news stays in the cards. */
-function bigOne(n: News, days: number): { parts: Element[]; sound: SoundName; glow: boolean } | null {
+function bigOne(
+  n: News,
+  days: number,
+): {
+  parts: Element[];
+  sound: SoundName;
+  glow: boolean;
+  actions?: (close: () => void) => HTMLElement[];
+} | null {
   const sheet = (picture: HTMLElement, kicker: string, name: string, ...lines: Child[]) =>
     [
       picture,
@@ -198,32 +206,59 @@ function bigOne(n: News, days: number): { parts: Element[]; sound: SoundName; gl
       sound: "streak",
       glow: true,
     };
+  // A level: its number is the hero, in the levels' lilac, with „Ново ниво“ under it; then what it brings, as a gift.
+  const level = (...rest: Child[]) =>
+    [
+      h(
+        "b",
+        {
+          class: "num",
+          style: { font: "900 7.5rem/1 var(--font-numeral)", color: "var(--lilac-ink, var(--tier-epic-ink))" },
+        },
+        String(n.level),
+      ),
+      h("strong", { id: "moment-name", style: { "font-size": "2.125rem", "line-height": "2.5rem" } }, "Ново ниво"),
+      ...rest.filter((l) => l != null),
+    ] as Element[];
   const unlock = n.unlocks.find((u) => u.from === `ниво ${n.level}`);
   if (n.levelUp && unlock)
-    // What the level brings is the picture: the avatar in the player's tone, the frame or pattern around their own
-    // face, a title under it in its colour — seen before it's worn.
+    // The gift is seen before it's worn: the avatar in the player's tone, the frame or pattern around their own face,
+    // a title under it in its colour. „Сложи“ is the gold button; „По-късно“ leaves it in the wardrobe.
     return {
-      parts: sheet(
+      parts: level(
+        h("p", null, `Получаваш ${unlockWords(unlock)}.`),
         big(levelPicture(unlock, n.avatar)),
-        `Ново ниво · ${n.level}`,
-        cap(unlockWords(unlock)),
         unlock.kind === "title"
           ? h("p", null, h("span", { class: `who-title t-${unlock.tier ?? "common"}` }, unlock.name))
           : null,
-        h("p", { class: "muted" }, `Отключва се с ниво ${n.level}.`),
-        h("p", null, wear(unlock, n.avatar)), // in an element: the sheet takes elements, and „Сложи“ changes
       ),
       sound: "level",
       glow: true,
+      actions: (close) => {
+        const error = h("p", { class: "bad", role: "alert" });
+        const put = h(
+          "button",
+          {
+            class: "btn primary big",
+            type: "button",
+            style: { width: "100%", "margin-top": "var(--space-3)" },
+            onclick: async () => {
+              try {
+                await api("PATCH", "/api/me/look", lookBody(unlock, n.avatar));
+                close();
+              } catch (err) {
+                error.textContent = (err as ApiError).message;
+              }
+            },
+          },
+          "Сложи",
+        );
+        return [put, h("button", { class: "link", type: "button", onclick: close }, "По-късно"), error];
+      },
     };
   if (n.levelUp && n.level % 5 === 0)
     return {
-      parts: sheet(
-        big(avatar(n.avatar, { size: "l", level: n.level })),
-        "Ново ниво",
-        `Ниво ${n.level}`,
-        `Още ${n.to - n.xp} XP до ниво ${n.level + 1}.`,
-      ),
+      parts: level(h("p", { class: "muted" }, `Още ${n.to - n.xp} XP до ниво ${n.level + 1}.`)),
       sound: "level",
       glow: true,
     };
@@ -242,7 +277,8 @@ function opened(system: keyof Open): Child {
   const line = (lead: string, ...rest: Child[]) => h("p", { class: "news-open" }, lead && h("b", null, lead), rest);
   switch (system) {
     case "points":
-      return line("", meaning.points);
+      // One line: the rest is a tap away, on the word.
+      return line("", explain(h("b", null, "Точките"), meaning.points), " са резултатът ти в една игра.");
     case "xp":
       return line("Ново: XP и цели за деня. ", meaning.xp);
     case "league":
@@ -339,42 +375,54 @@ function divisionReached(d: Division): Child {
   );
 }
 
-/** How many unlocks a game's news shows one by one. */
-const shownUnlocks = 2;
+/** How many rows „Ново за теб“ shows, achievements and unlocks together. */
+const shownRows = 3;
 
 /** „Ново за теб“: the achievements earned and everything unlocked to wear, in one list (each unlock a tap from being
  * worn), and how a topic's game moved its mastery, in a line. */
 function fresh(n: News): Child {
   const mastery = masteryLine(n.mastery ?? []);
   if (!n.achievements.length && !n.unlocks.length && !mastery) return null;
+  // One list, the highest tier first (an achievement before what it unlocks, of a tier): an unlock is of its own tier
+  // (a title's), or of the achievement's that unlocked it.
+  const from = (u: Unlock) => n.achievements.find((a) => u.from.includes(`„${a.name}“`));
+  const rows = [
+    ...n.achievements.map((a) => ({ rank: tierRank[a.tier], achievement: true, row: () => earned(a, n.open.xp) })),
+    ...n.unlocks.map((u) => ({
+      rank: tierRank[u.tier ?? from(u)?.tier ?? "common"],
+      achievement: false,
+      // What an achievement just told here unlocks needs no „С постижението …“, when it's shown too.
+      row: () => unlockRow(u, n.avatar, !!from(u)),
+    })),
+  ].sort((a, b) => b.rank - a.rank);
+  const shown = rows.slice(0, shownRows);
+  const rest = rows.slice(shownRows);
   return h(
     "section",
     { class: "card unlocks" },
     h("p", { class: "kicker" }, "Ново за теб"),
-    n.achievements.length || n.unlocks.length
+    shown.length
       ? h(
           "ul",
           { class: "unlock-list" },
-          n.achievements.map((a) => earned(a, n.open.xp)),
-          n.unlocks.slice(0, shownUnlocks).map((u) =>
-            // What an achievement just told here unlocks needs no „С постижението …“: it's right above.
-            unlockRow(
-              u,
-              n.avatar,
-              n.achievements.some((a) => u.from.includes(`„${a.name}“`)),
-            ),
-          ),
+          shown.map((r) => r.row()),
         )
       : null,
     mastery,
-    // A first game unlocks several things at once: two are told here, the rest wait in the wardrobe.
-    n.unlocks.length > shownUnlocks
-      ? h("a", { class: "link", href: "/wardrobe" }, `Още ${n.unlocks.length - shownUnlocks} в гардероба`)
+    // A first game earns several things at once: three are told here, the rest wait where they're kept (an
+    // achievement, with what it gives, in Награди; what's to wear, in the wardrobe).
+    rest.length
+      ? rest.some((r) => r.achievement)
+        ? h("a", { class: "link", href: "/rewards" }, `Още ${rest.length} в Награди`)
+        : h("a", { class: "link", href: "/wardrobe" }, `Още ${rest.length} в гардероба`)
       : n.unlocks.length
         ? h("a", { class: "link", href: "/wardrobe" }, "Към гардероба")
         : null,
   );
 }
+
+/** The tiers, lowest first, for the news to put the highest first. */
+const tierRank: Record<AchievementInfo["tier"], number> = { common: 0, rare: 1, epic: 2, legendary: 3 };
 
 /** An achievement just earned: its medal, its name, its tier and (once XP is open) its XP. */
 function earned(a: AchievementInfo, xp: boolean): Child {
@@ -387,10 +435,12 @@ function earned(a: AchievementInfo, xp: boolean): Child {
       { class: "unlock-text" },
       h("strong", null, a.name),
       h("span", { class: "unlock-about" }, a.about),
+      // The tier in its own ink; gold only for the XP, which is a reward.
       h(
         "span",
         { class: "unlock-reward" },
-        `${cap(tierWords[a.tier].one)} постижение${xp ? ` · +${a.xp ?? 0} XP` : ""}`,
+        h("span", { class: "unlock-tier" }, `${cap(tierWords[a.tier].one)} постижение`),
+        xp ? [" · ", h("span", { class: "unlock-xp" }, `+${a.xp ?? 0} XP`)] : null,
       ),
     ),
   );
@@ -414,13 +464,21 @@ function unlockRow(u: Unlock, worn: string, told = false): Child {
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+/** What wears an unlock (/api/me/look): an avatar's shape in the tone worn, a title, a frame or a pattern. */
+function lookBody(u: Unlock, worn: string): Record<string, string> {
+  const [, tone = "gold"] = worn.split("-");
+  return u.kind === "avatar"
+    ? { avatar: `${u.id}-${tone}` }
+    : u.kind === "title"
+      ? { title: u.id }
+      : { [u.kind]: u.id };
+}
+
 /** Puts an unlock on at once (an avatar's shape in the tone worn), and says so. */
 function wear(u: Unlock, worn: string): Child {
   const done = signal(false);
   const error = signal("");
-  const [, tone = "gold"] = worn.split("-");
-  const body =
-    u.kind === "avatar" ? { avatar: `${u.id}-${tone}` } : u.kind === "title" ? { title: u.id } : { [u.kind]: u.id };
+  const body = lookBody(u, worn);
   return [
     () =>
       done()

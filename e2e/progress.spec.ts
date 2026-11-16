@@ -13,10 +13,14 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(page.locator(".news-xp, .level-card.up").first()).toContainText(/[Нн]иво \d+/);
   await expect(page.locator(".unlocks")).toContainText("Ново за теб");
   await expect(page.locator(".unlocks .mastery-line")).toContainText("История");
-  const unlocked = page.locator(".unlocks .unlock-row", { hasText: "Титла „Нова искра“" });
-  await expect(unlocked).toContainText("С ниво 1.");
-  await unlocked.getByRole("button", { name: "Сложи: титла „Нова искра“" }).click();
-  await expect(unlocked).toContainText("Сложено");
+  // Three rows at most (the highest tier first; the hour may add „След полунощ“), the rest a tap away.
+  expect(await page.locator(".unlocks .unlock-row").count()).toBeLessThanOrEqual(3);
+  await page
+    .locator(".unlocks")
+    .getByRole("button", { name: /^Сложи: / })
+    .first()
+    .click();
+  await expect(page.locator(".unlocks").getByRole("status")).toHaveText("Сложено");
 
   await page.goto("/rewards");
   // A second day's: XP and the goals are met, the league isn't, so its three achievements wait (play/unfold.go).

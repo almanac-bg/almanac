@@ -579,7 +579,6 @@
   .keep-card p {
     margin: 0;
   }
-
   /* A year in the game (screens/year.ts): one card at a time under a row of pips, a big figure in each. */
   /* A way in, not a card of parts: its three lines read as one. */
   .card.year-card {
@@ -1002,7 +1001,17 @@
     color: var(--gold-ink);
   }
 
-  .streak-chip.cold .status-flame {
+  .streak-chip .status-flame,
+  .streak-chip .status-n {
+    transition:
+      opacity 400ms ease-out,
+      color 400ms ease-out;
+  }
+
+  /* No streak (cold), or one at stake while the day's ten wait (unlit): the flame out; at stake, the number still
+   * reads, plain, as what the day would keep. */
+  .streak-chip.cold .status-flame,
+  .streak-chip.unlit .status-flame {
     --tone: var(--line-strong);
     opacity: 0.7;
     filter: none;
@@ -1010,6 +1019,40 @@
 
   .streak-chip.cold .status-n {
     color: var(--text-muted);
+  }
+
+  .streak-chip.unlit .status-n {
+    color: var(--text);
+  }
+
+  /* The streak's chip and the reserve days on its flame's corner, which sit beside the link (a tap on them explains
+   * them) where the flame's corner is: the chip's padding, the flame's 44px, centred. */
+  .streak-wrap {
+    position: relative;
+    display: grid;
+  }
+
+  .streak-wrap:only-child {
+    grid-column: 1 / -1;
+  }
+
+  /* The day's ten waiting: what they'd make of the streak, and in the evening that it ends at midnight. */
+  .day-stake {
+    margin: 0;
+    color: var(--text);
+    font-weight: 700;
+  }
+
+  /* Under a topic's result's gold button, the way to the day: centred with it. */
+  .actions > .day-stake {
+    text-align: center;
+  }
+
+  .remind-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
   }
 
   /* The level's words, then how far into it: beside them, so its number sits level with the streak's. */
@@ -4783,6 +4826,19 @@
     line-height: 1.125rem;
   }
 
+  /* An achievement's: its tier in the tier's ink, its XP in gold (a reward). */
+  .achievement-row .unlock-reward {
+    color: var(--text-muted);
+  }
+
+  .unlock-tier {
+    color: var(--tier-ink);
+  }
+
+  .unlock-xp {
+    color: var(--gold-ink);
+  }
+
   .unlock-about {
     color: var(--text-muted);
     font-size: 0.8125rem;
@@ -4863,11 +4919,13 @@
     font-weight: 700;
   }
 
-  /* The reserve days, a badge on the flame's corner. */
+  /* The reserve days, a badge on the flame's corner (the chip's padding and the flame's 44px, centred: .streak-wrap),
+   * a tap from what they're for. */
   .status-reserve {
     position: absolute;
-    right: -2px;
-    bottom: -4px;
+    top: calc(50% + 26px);
+    left: calc(var(--space-3) + 46px);
+    translate: -100% -100%;
     display: inline-flex;
     align-items: center;
     padding: 1px 4px 1px 1px;
@@ -4882,6 +4940,19 @@
   .status-reserve .reserve-pic {
     width: 1rem;
     height: 1rem;
+  }
+
+  .status-reserve .explain {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* A finger's worth to tap, beyond the badge's few pixels. */
+  .status-reserve .explain::after {
+    content: "";
+    position: absolute;
+    inset: -12px -8px;
   }
 
   /* How it all fits together (Награди), and what comes next (Профил). */
@@ -5201,10 +5272,6 @@
     display: flex;
     align-items: center;
     gap: var(--space-4);
-  }
-
-  .invite-link {
-    overflow-wrap: anywhere;
   }
 
   .small {

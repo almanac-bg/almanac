@@ -177,10 +177,12 @@ interface Past {
 
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
 
-/** Time left in the last hour, as a clock (12:05). */
-function left(ms: number): string {
+/** Time left in the last hour, with its unit, so that it never reads as hours: „20 с“ in the last minute; before it,
+ * whole minutes („3 мин“), or to the second (`ticking`: „2:05 мин“) where the count runs before the player's eyes. */
+function left(ms: number, ticking = false): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  if (s < 60) return `${s} с`;
+  return ticking ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} мин` : `${Math.ceil(s / 60)} мин`;
 }
 
 const rights = (n: number) => `${n} ${n === 1 ? "верен" : "верни"}`;
@@ -565,7 +567,7 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
         "h1",
         null,
         "Роял започва след ",
-        h("span", { class: "royal-count" }, () => left(view().startsAt - now())),
+        h("span", { class: "royal-count" }, () => left(view().startsAt - now(), true)),
       ),
       h("p", { class: "lead" }, () =>
         v0.in

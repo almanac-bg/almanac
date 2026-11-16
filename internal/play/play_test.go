@@ -1764,7 +1764,7 @@ func TestTitles(t *testing.T) {
 			t.Fatalf("a new player's title %+v", v)
 		}
 	}
-	if v := byID["nightOwl"]; v.How != "скрито постижение" {
+	if v := byID["polymath"]; v.How != "скрито постижение" {
 		t.Fatalf("a hidden achievement's title tells how: %+v", v)
 	}
 	if v := byID["unquenched"]; v.How != "играй въпросите на деня тридесет дни поред." {
@@ -1776,6 +1776,11 @@ func TestTitles(t *testing.T) {
 	}
 	if v := byID["diamondMind"]; v.How != "дивизия Диамант" {
 		t.Fatalf("a division's title: %+v", v)
+	}
+
+	// Until they choose, a player wears their level's title: the first from the start, the newest as the level grows.
+	if look, _ := w.g.LookOf(ctx, ana); look.Title != "Нова искра" || p.Title != "spark" {
+		t.Fatalf("a new player's title: %+v %q", look, p.Title)
 	}
 
 	// A level's title, told when the level is.
@@ -1795,6 +1800,19 @@ func TestTitles(t *testing.T) {
 	if p, _ := w.g.ProgressOf(ctx, ana); p.Next.Level != 6 || len(p.Next.LevelUnlocks) != 1 ||
 		p.Next.LevelUnlocks[0].ID != "stripes" || p.Next.Division == nil || p.Next.Division.ID != "silver" {
 		t.Fatalf("what's next at level 5: %+v", p.Next)
+	}
+	if look, _ := w.g.LookOf(ctx, ana); look.Title != "Страст към викторините" {
+		t.Fatalf("level 5's title, not chosen: %+v", look)
+	}
+	// „Без титла“ is a choice, and stays one.
+	if err := w.g.SetLook(ctx, ana, nil, ptr("")); err != nil {
+		t.Fatal(err)
+	}
+	if look, _ := w.g.LookOf(ctx, ana); look.Title != "" {
+		t.Fatalf("no title, chosen: %+v", look)
+	}
+	if p, _ := w.g.ProgressOf(ctx, ana); p.Title != "" {
+		t.Fatalf("no title, chosen, in the wardrobe: %q", p.Title)
 	}
 	if err := w.g.SetLook(ctx, ana, nil, ptr("passion")); err != nil {
 		t.Fatalf("level 5's title: %v", err)

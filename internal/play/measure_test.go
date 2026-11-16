@@ -168,3 +168,40 @@ func TestGames(t *testing.T) {
 		t.Fatalf("yesterday: %+v", d)
 	}
 }
+
+// Speed is a pace, not one tap's luck: „Пет за миг“ takes five right answers in one game, each under three seconds.
+func TestFastIsAPace(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	q := w.b.Questions[0].Base().ID
+	game := func(answers ...int) {
+		res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, finished_at) VALUES (?, 'topic', '[]', 0, 1)`, ana)
+		if err != nil {
+			t.Fatal(err)
+		}
+		run, _ := res.LastInsertId()
+		for i, ms := range answers {
+			if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, score, points, is_right, ms, at)
+				VALUES (?, ?, ?, 1, 0, 1, ?, ?)`, run, i, q, ms, i); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	fast := func() int {
+		m, err := w.g.measure(ctx, ana)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m["fast"]
+	}
+	game(900, 1200, 2500, 2900, FastMs) // four quick, the fifth on the line
+	game(1000, 1000, 1000)
+	if n := fast(); n != 4 {
+		t.Fatalf("the best game's quick right answers: %d", n)
+	}
+	game(2000, 2000, 2000, 2000, 2999)
+	if n := fast(); n != FastRights {
+		t.Fatalf("five quick in a game: %d", n)
+	}
+}

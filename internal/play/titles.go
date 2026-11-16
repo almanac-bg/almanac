@@ -16,7 +16,9 @@ import (
 //   - the level: a ladder from „Нова искра“ at the start to „Жив алманах“ at level 50, so that there's always a next
 //     one in sight. A level is time played, so its titles name devotion („Постоянство“, „Вярност към Алманаха“), not
 //     intellect: a claim to knowing is mastery's to give;
-//   - an achievement: only those that say how someone plays („Светкавица“, „Неугасим пламък“);
+//   - an achievement: only those that say how someone plays („Светкавица“ for five quick right answers in a game,
+//     „Неугасим пламък“), never one tap's luck or the hour on the clock (what „След полунощ“ or „В последния миг“
+//     earn is an avatar);
 //   - mastery: „Майстор · …“ and „Светило · …“ for reaching that mastery in a topic, „Всезнание“ for „Експерт“ in
 //     every topic and „Оракул“ for „Светило“ in three;
 //   - the rating and the leagues: a division reached, a Роял won, and first place in a week of Рила, which counts
@@ -64,14 +66,12 @@ var Titles = []Title{
 	{"chronicler", "Летописец", Legendary, TitleLevel, unlock{level: 45}, ""},
 	{"almanac", "Жив алманах", Legendary, TitleLevel, unlock{level: 50}, ""},
 
-	{"speedDemon", "Светкавица", Common, TitleAchievement, unlock{achieved: "fast"}, ""},
 	{"everyDay", "Всеки ден по малко", Rare, TitleAchievement, unlock{achieved: "streak7"}, ""},
+	{"speedDemon", "Светкавица", Rare, TitleAchievement, unlock{achieved: "fast"}, ""},
 	{"flawless", "Безупречност", Rare, TitleAchievement, unlock{achieved: "perfect"}, ""},
 	{"sharpEye", "Остър поглед", Rare, TitleAchievement, unlock{achieved: "exact"}, ""},
 	{"seeker", "Търсещ ум", Rare, TitleAchievement, unlock{achieved: "allTopics"}, ""},
 	{"heartOfGame", "Сърцето на играта", Rare, TitleAchievement, unlock{achieved: "friends5"}, ""},
-	{"nightOwl", "Нощна сова", Rare, TitleAchievement, unlock{achieved: "nightOwl"}, ""},
-	{"quietStrength", "Хладнокръвие", Rare, TitleAchievement, unlock{achieved: "lastSecond"}, ""},
 	{"duelInstinct", "Дуелен инстинкт", Epic, TitleAchievement, unlock{achieved: "duel10"}, ""},
 	{"polymath", "Всестранен ум", Epic, TitleAchievement, unlock{achieved: "allTypes"}, ""},
 	{"unquenched", "Неугасим пламък", Epic, TitleAchievement, unlock{achieved: "streak30"}, ""},
@@ -202,6 +202,22 @@ func (g *Game) titleOf(id string) (string, Tier) {
 	}
 	t, _ := g.titleByID(id)
 	return t.Name, t.Tier
+}
+
+// unchosen is the title of a player who hasn't chosen one (users.title NULL), as lookColumns read it: they wear their
+// level's (LevelTitle), so that a new player's „Нова искра“ shows from the first game and grows with the level. „Без
+// титла“ is a choice, kept as "".
+const unchosen = "~level"
+
+// LevelTitle is the newest title of the level's ladder a player at this level has reached.
+func LevelTitle(level int) string {
+	id := ""
+	for _, t := range Titles {
+		if t.Group == TitleLevel && t.by.level <= level {
+			id = t.ID
+		}
+	}
+	return id
 }
 
 // championID is the champion's title, as a player wears it: first place in a week of the top league.
