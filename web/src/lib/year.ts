@@ -19,6 +19,14 @@ export function dayInBulgaria(now = new Date()): string {
   return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
+/** A moment's hour in Bulgaria (0–23). */
+export function hourInBulgaria(now = new Date()): number {
+  const hour = new Intl.DateTimeFormat("en", { timeZone: "Europe/Sofia", hour: "numeric", hourCycle: "h23" })
+    .formatToParts(now)
+    .find((p) => p.type === "hour")?.value;
+  return Number(hour ?? 0);
+}
+
 /** The year whose look back is open at a moment (0 before the first, 2026's), and whether it's fresh: from 15
  * December to 15 January, when Начало offers it. */
 export function yearNow(now = new Date()): { year: number; fresh: boolean } {

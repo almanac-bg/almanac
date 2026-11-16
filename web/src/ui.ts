@@ -4,9 +4,11 @@
 import { badgeArt } from "./art/badge.ts";
 import { type DivisionID, emblem } from "./art/emblem.ts";
 import { picture } from "./art/picture.ts";
-import { type Child, h } from "./lib/dom.ts";
+import { type Child, h, onCleanup, signal } from "./lib/dom.ts";
 import { calm } from "./lib/prefs.ts";
 import { path } from "./lib/router.ts";
+import { stakeWords } from "./lib/words.ts";
+import { hourInBulgaria } from "./lib/year.ts";
 import { categories } from "./state.ts";
 
 export type VerdictKind = "exact" | "right" | "partial" | "wrong" | "time";
@@ -344,6 +346,23 @@ export function streak(days: number, week?: boolean[], saved?: boolean[], reserv
 
 /** Reserve days, counted: 1 резервен ден, 2 резервни дни. */
 export const reserveWords = (n: number) => (n === 1 ? "1 резервен ден" : `${n} резервни дни`);
+
+/** What reserve days in hand are for, in a line (by the shield on the streak's flame). */
+export const reserveMeaning = (n: number) =>
+  n === 1
+    ? "Резервен ден: пази серията, ако пропуснеш ден."
+    : `${reserveWords(n)}: всеки пази серията, ако пропуснеш ден.`;
+
+/** A streak at stake while the day's ten wait (play/runs.go: it runs to yesterday until they're played), in a line
+ * (stakeWords), read again each minute, so a screen left open turns to the evening's line: on the day's card and under
+ * a topic's result. */
+export function stakeLine(days: number, reserve: number): Child {
+  if (days < 1) return null;
+  const hour = signal(hourInBulgaria());
+  const every = setInterval(() => hour.set(hourInBulgaria()), 60_000);
+  onCleanup(() => clearInterval(every));
+  return h("p", { class: "day-stake" }, () => stakeWords(days, reserve, hour()));
+}
 
 /** A count of games, the way it's said: 1 игра, 2 игри. */
 export const games = (n: number) => `${n} ${n === 1 ? "игра" : "игри"}`;

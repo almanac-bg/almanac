@@ -1,6 +1,7 @@
 // Начало: where every game starts, on one short screen, and the day is its heart. At the top the player's streak and
 // level (and, once, what came of the days just missed — a broken streak to win back while it can be — or of a duel a friend has played); then the day's ten questions, the same for everyone, once (left half-way, where the player stopped and the way
-// on; once played, how they went, and the result to share); the day's goals; and every other way to play a tap away: by topic, and — once a first game is finished —
+// on, and the streak at stake while they wait; once played, how they went, the result to share, and tomorrow); the
+// day's goals; and every other way to play a tap away: by topic, and — once a first game is finished —
 // with others. The day's boards are in Класации. The game unfolds by the days played (play/unfold.go): a first day has
 // the streak without the level, and no goals.
 
@@ -11,7 +12,7 @@ import { getReady, playRun, trail } from "../game/run.ts";
 import { dayShareText, percent, rare } from "../game/share.ts";
 import type { Board, Mark, Score, State } from "../game/types.ts";
 import { type ApiError, api, tally } from "../lib/api.ts";
-import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
+import { type Child, effect, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { askToKeep } from "../lib/keep.ts";
 import { place } from "../lib/ordinal.ts";
@@ -21,7 +22,16 @@ import { feelKit } from "../lib/sound.ts";
 import { onDay } from "../lib/words.ts";
 import { dayInBulgaria } from "../lib/year.ts";
 import { player, playing, user } from "../state.ts";
-import { formatNumber, meter, type Open, pointsWords, reserveWords } from "../ui.ts";
+import {
+  explain,
+  formatNumber,
+  meter,
+  type Open,
+  pointsWords,
+  reserveMeaning,
+  reserveWords,
+  stakeLine,
+} from "../ui.ts";
 import { type FriendPlayed, playedLine } from "./duel.ts";
 import { goalsCard } from "./goals.ts";
 import { modes } from "./modes.ts";
@@ -205,22 +215,31 @@ export function today() {
                   () => tally("share:day"),
                 ),
               },
-              [() => friendsDay(fresh()), just ? news(run.id, 0, round) : null, remindCard(t.day), countdown()],
+              // Tomorrow first, right under the buttons (when the next ten come, the streak, the reminder); then the
+              // friends' day, and what the game earned.
+              // Just played, the streak waits for the day as it is now, with today in it.
+              [
+                tomorrowCard(t.day, () => (just && fresh() === t ? 0 : fresh().streak)),
+                () => friendsDay(fresh()),
+                just ? news(run.id, 0, round) : null,
+              ],
               pointsWords(t.open),
               just,
             )
           : dayCard(t, start(t), run?.trail ?? [], failed),
+        // Before a first game, a player who has a profile already (a new phone) signs in, a tap away.
+        just || t.played || user.peek()?.email ? null : haveProfile(load),
         // Mid-December into January: the year in the game, a tap away.
         yearCard(),
-        // A guest who keeps coming back is asked to keep their profile, once the day is played (the day comes first),
-        // and not right after a game, which has its news.
-        just || !run?.done ? null : keepCard(t),
       ),
       h(
         "div",
         { class: "home-side" },
         // Just played, the goals it finished are told with its news; a first day has none (play/unfold.go).
         just || !t.open?.xp ? null : goalsCard(),
+        // A guest who keeps coming back is asked to keep their profile, under the goals once the day is played (the
+        // day comes first), and not right after a game, which has its news.
+        just || !run?.done ? null : keepCard(t),
         // The ways to play with others wait for a first game finished: a new player starts with the day and a topic;
         // and Роял, in a player's first week, for its evenings to fill (play.NudgeRoyal).
         just || t.played ? modes(t.royal ? ["duel", "royal", "room"] : ["duel", "room"], "С други") : null,
@@ -276,8 +295,9 @@ function repairCard(r: Today["repair"]): Child {
 }
 
 /** The streak and (once XP is open: a first day has the streak only) the level, side by side: each a tap from Профил,
- * where there's more of both. The reserve days sit on the flame's corner, so the streak's words keep the chip's width
- * (half a phone's, or the side column's on a wide screen). */
+ * where there's more of both. The reserve days sit on the flame's corner, each a tap from what they're for, so the
+ * streak's words keep the chip's width (half a phone's, or the side column's on a wide screen). While the day's ten
+ * wait, the streak is at stake: its flame unlit, its number still there, until the day played lights it (grow). */
 function status(t: Today): HTMLElement {
   const days = t.streak;
   const lv = t.open?.xp ? t.level : undefined;
@@ -286,28 +306,34 @@ function status(t: Today): HTMLElement {
     "div",
     { class: "status-row" },
     h(
-      "a",
-      { class: days ? "status-item streak-chip" : "status-item streak-chip cold", href: "/me" },
+      "div",
+      { class: "streak-wrap" },
       h(
-        "span",
-        { class: "status-icon" },
-        picture("flame", "flame status-flame"),
-        t.reserve
-          ? h(
-              "span",
-              { class: "status-reserve", title: reserveWords(t.reserve) },
-              picture("shield", "reserve-pic"),
-              h("b", { class: "num", "aria-hidden": "true" }, String(t.reserve)),
-              h("span", { class: "sr" }, reserveWords(t.reserve)),
-            )
-          : null,
+        "a",
+        { class: `status-item streak-chip${days ? (t.run?.done ? "" : " unlit") : " cold"}`, href: "/me" },
+        h("span", { class: "status-icon" }, picture("flame", "flame status-flame")),
+        h(
+          "span",
+          { class: "status-text" },
+          h("b", { class: "status-n" }, String(days)),
+          h("span", { class: "status-label" }, days === 1 ? "ден поред" : "дни поред"),
+        ),
       ),
-      h(
-        "span",
-        { class: "status-text" },
-        h("b", { class: "status-n" }, String(days)),
-        h("span", { class: "status-label" }, days === 1 ? "ден поред" : "дни поред"),
-      ),
+      // Beside the link, not in it: a tap on the shield says what it's for, and stays on Начало.
+      t.reserve
+        ? h(
+            "span",
+            { class: "status-reserve" },
+            explain(
+              [
+                picture("shield", "reserve-pic"),
+                h("b", { class: "num", "aria-hidden": "true" }, String(t.reserve)),
+                h("span", { class: "sr" }, reserveWords(t.reserve)),
+              ],
+              reserveMeaning(t.reserve),
+            ),
+          )
+        : null,
     ),
     lv
       ? h(
@@ -339,8 +365,14 @@ function grow(row: HTMLElement, was: Today, now: Today, delay: number): void {
   const kit = feelKit();
   if (!kit) return;
   const streak = row.querySelector<HTMLElement>(".streak-chip");
-  if (streak && now.streak === was.streak + 1 && !streakMarks.includes(now.streak))
+  if (streak && now.streak === was.streak + 1 && !streakMarks.includes(now.streak)) {
+    // The flame stays as it was before the day (unlit, or cold without a streak) until its number rolls on: then it
+    // lights, swelling once.
+    const off = was.streak ? "unlit" : "cold";
+    streak.classList.add(off);
+    setTimeout(() => streak.classList.remove(off), delay);
     kit.streak(streak, now.streak, delay, hands());
+  }
   const chip = row.querySelector<HTMLElement>(".level-chip");
   if (chip && was.level && now.level && now.open?.xp)
     kit.level(
@@ -372,6 +404,7 @@ function dayCard(t: Today, start: () => void, marks: Mark[], error: string): Chi
           ? `Следва въпрос ${at + 1} от 10. Довърши ги до полунощ.`
           : "По един от всяка тема, от лесен към труден. Едни и същи за всички, с един опит.",
       ),
+      stakeLine(t.streak, t.reserve ?? 0),
     ),
     trail(marks, 10, at ? at : -1),
     h("button", { class: "btn primary big", onclick: start }, at ? "Продължи" : "Започни"),
@@ -451,12 +484,23 @@ function friendsPlayed(t: Today): Child {
   return h("p", { class: "day-meta" }, text);
 }
 
-/** Time until the next day's questions (midnight in Bulgaria). */
-function countdown(): Child {
+/** The day played, right under its result's buttons: tomorrow, in one quiet card. When the next ten come (midnight in
+ * Bulgaria), what they make of the streak (`streak`: with today's), and, where it can come and isn't on yet, the
+ * reminder's ask. */
+function tomorrowCard(day: string, streak: () => number): Child {
   const left = signal(untilMidnight());
   const t = setInterval(() => left.set(untilMidnight()), 30_000);
   onCleanup(() => clearInterval(t));
-  return h("p", { class: "muted day-next" }, () => `Нови въпроси след ${left()}.`);
+  return h(
+    "section",
+    { class: "card keep-card tomorrow" },
+    h("h2", { class: "card-title" }, "Утре — нови десет"),
+    h("p", { class: "muted" }, () => {
+      const n = streak();
+      return `След ${left()}.${n > 0 ? ` Изиграй ги и серията ти става ${n + 1}.` : ""}`;
+    }),
+    remindAsk(day),
+  );
 }
 
 function untilMidnight(): string {
@@ -470,9 +514,9 @@ function untilMidnight(): string {
 /** Where the reminder's asks are kept, on this device (notifications are a device's): how many, the last one's day. */
 const remindKey = "almanac.remind-ask";
 
-/** The day played, its result on Начало: shall we remind the player tomorrow? Asked where notifications can come and
- * aren't on yet, at most three times and never twice in a day; on an iPhone in a browser tab, what it takes. */
-function remindCard(day: string): Child {
+/** The day played, in its card for tomorrow: shall we remind the player? Asked where notifications can come and aren't
+ * on yet, at most three times and never twice in a day; on an iPhone in a browser tab, what it takes. */
+function remindAsk(day: string): Child {
   let asked = { n: 0, day: "", shown: "" };
   try {
     asked = { ...asked, ...JSON.parse(localStorage.getItem(remindKey) ?? "{}") };
@@ -532,36 +576,36 @@ function remindCard(day: string): Child {
   return () =>
     state() === "gone"
       ? null
-      : h(
-          "section",
-          { class: "card keep-card" },
-          h("h2", null, "Утре — нови десет"),
-          state() === "on"
-            ? h(
-                "p",
-                { class: "muted", role: "status" },
-                "Готово. Ще ти напомним около часа, в който играеш, ако въпросите още те чакат.",
-              )
-            : [
-                h(
-                  "p",
-                  { class: "muted" },
-                  home
-                    ? "На iPhone напомнянията идват, щом добавиш АЛМАНАХ към началния екран: Сподели → Добави към началния екран."
-                    : "Да ти напомним, ако въпросите още те чакат? Веднъж на ден, около часа, в който играеш.",
-                ),
-                home ? null : h("button", { class: "btn", type: "button", onclick: yes }, "Напомняй ми"),
-                h("button", { class: "link", type: "button", onclick: no }, home ? "Разбрах" : "Не сега"),
-                () => error() && h("p", { class: "bad", role: "alert" }, error()),
-              ],
-        );
+      : state() === "on"
+        ? h(
+            "p",
+            { class: "muted", role: "status" },
+            "Готово. Ще ти напомним около часа, в който играеш, ако въпросите още те чакат.",
+          )
+        : [
+            h(
+              "p",
+              { class: "muted" },
+              home
+                ? "На iPhone напомнянията идват, щом добавиш АЛМАНАХ към началния екран: Сподели → Добави към началния екран."
+                : "Да ти напомним, ако въпросите още те чакат? Веднъж на ден, около часа, в който играеш.",
+            ),
+            h(
+              "div",
+              { class: "remind-actions" },
+              home ? null : h("button", { class: "btn", type: "button", onclick: yes }, "Напомняй ми"),
+              h("button", { class: "link", type: "button", onclick: no }, home ? "Разбрах" : "Не сега"),
+            ),
+            () => error() && h("p", { class: "bad", role: "alert" }, error()),
+          ];
 }
 
 /** Where „По-късно“ is kept, on this device. */
 const laterKey = "keep-later";
 
 /** A guest who keeps coming back is asked to keep their profile with an email (lib/keep.ts): a guest's game lives on
- * one device only. „По-късно“ asks again in a week. */
+ * one device only. A small card under the goals, said by what's at stake; the form opens from its button. „По-късно“
+ * asks again in a week. */
 function keepCard(t: Today): Child {
   const u = user.peek();
   let laterAt = 0;
@@ -574,34 +618,53 @@ function keepCard(t: Today): Child {
   const level = t.open?.xp ? (t.level?.level ?? 1) : 1;
   if (!u || !askToKeep({ email: u.email, streak: t.streak, level, laterAt, now: Date.now() })) return null;
   const shown = signal(true);
+  const open = signal(false);
+  const stake =
+    t.streak >= 3
+      ? `Серията ти от ${t.streak} дни е само на това устройство. Ако го смениш, ще я загубиш.`
+      : `Играта ти е само на това устройство. Ако го смениш, ще загубиш ниво ${level} и всичко спечелено.`;
+  const later = () => {
+    try {
+      localStorage.setItem(laterKey, String(Date.now()));
+    } catch {
+      // no storage: just for now
+    }
+    shown.set(false);
+  };
   return () =>
     shown() && !user()?.email
       ? h(
           "section",
           { class: "card keep-card" },
-          h("h2", null, "Запази профила си"),
-          h(
-            "p",
-            { class: "muted" },
-            `${t.streak >= 3 ? `Серия от ${t.streak} дни!` : `Ниво ${t.level?.level}!`} Засега играта ти се пази само на това устройство. Добави имейл и ще я имаш навсякъде.`,
-          ),
-          signIn(),
-          h(
-            "button",
-            {
-              class: "link",
-              type: "button",
-              onclick: () => {
-                try {
-                  localStorage.setItem(laterKey, String(Date.now()));
-                } catch {
-                  // no storage: just for now
-                }
-                shown.set(false);
-              },
-            },
-            "По-късно",
-          ),
+          h("h2", { class: "card-title" }, "Запази профила си"),
+          h("p", { class: "muted" }, stake),
+          () =>
+            open()
+              ? signIn(false)
+              : h(
+                  "div",
+                  { class: "remind-actions" },
+                  h("button", { class: "btn", type: "button", onclick: () => open.set(true) }, "Запази с имейл"),
+                  h("button", { class: "link", type: "button", onclick: later }, "По-късно"),
+                ),
         )
       : null;
+}
+
+/** Before a first game: a player who has a profile already (a new phone, another browser) signs in here, the form a tap
+ * away. */
+function haveProfile(signedIn: () => void): Child {
+  const open = signal(false);
+  // Signed in: Начало again, as the profile has it.
+  effect(() => {
+    if (open() && user()?.email) signedIn();
+  });
+  return () =>
+    open()
+      ? h("section", { class: "card keep-card" }, h("h2", { class: "card-title" }, "Влез в профила си"), signIn(false))
+      : h(
+          "p",
+          { class: "day-next" },
+          h("button", { class: "link", type: "button", onclick: () => open.set(true) }, "Имаш профил? Влез"),
+        );
 }

@@ -33,8 +33,10 @@ test("Роял: in from the lobby, its music, live to the fifteenth question, th
   // A game under way (another engine's) ends before the next lobby opens. In by the lobby's „Влез“, not the door of a
   // game under way (which lets one in late), with time before the start for the music's turns.
   await expect(async () => {
-    const [m = 0, s = 0] = ((await page.locator(".royal-count").textContent({ timeout: 2_000 })) ?? "").split(":");
-    expect(Number(m) * 60 + Number(s)).toBeGreaterThanOrEqual(12);
+    // „2:05 мин“, or „42 с“ in the last minute.
+    const text = (await page.locator(".royal-count").textContent({ timeout: 2_000 })) ?? "";
+    const [m = "0", s = "0"] = text.includes(":") ? text.split(":") : ["0", text];
+    expect(Number(m) * 60 + Number.parseInt(s, 10)).toBeGreaterThanOrEqual(12);
   }).toPass({ timeout: 300_000 });
   await page.locator(".screen > button", { hasText: "Влез" }).click();
   await expect(page.getByRole("button", { name: "Излез" })).toBeVisible();

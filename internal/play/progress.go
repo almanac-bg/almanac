@@ -84,11 +84,17 @@ const (
 // play for a legendary one.
 var AchievementXP = map[Tier]int{Common: 50, Rare: 150, Epic: 400, Legendary: 1000}
 
+// Speed is an achievement („Пет за миг“) and a title („Светкавица“) only as a way of playing: five right answers in one
+// game, each in under three seconds. One quick tap is luck; five in a game are a player's pace.
+const (
+	FastRights = 5
+	FastMs     = 3000
+)
+
 // Achievements are every achievement there is, by tier, in the order a profile shows them.
 var Achievements = []Achievement{
 	{"streak3", "Три поред", "Играй въпросите на деня три дни поред.", "flame", Common, 3, false},
 	{"facts100", "Сто факта", "Събери сто факта в Алманаха.", "book", Common, 100, false},
-	{"fast", "Под две секунди", "Отговори вярно за по-малко от 2 секунди.", "bolt", Common, 1, false},
 	{"duel1", "Първа победа", "Спечели дуел.", "shield", Common, 1, false},
 	{"friend1", "Двама сме", "Добави първия си приятел в играта.", "heart", Common, 1, false},
 	{"fullDay", "Пълен ден", "Изпълни и трите цели за деня.", "", Common, 1, false},
@@ -100,6 +106,7 @@ var Achievements = []Achievement{
 	{"allTopics", "Обиколка", "Изиграй поне една игра във всяка тема.", "compass", Rare, 10, false},
 	{"friends5", "Цяла компания", "Събери пет приятели в играта.", "heart", Rare, 5, false},
 	{"friendWin", "Между приятели", "Победи приятел в дуел.", "heart", Rare, 1, false},
+	{"fast", "Пет за миг", "Отговори вярно пет пъти в една игра, всеки път за по-малко от 3 секунди.", "bolt", Rare, FastRights, false},
 	{"nightOwl", "След полунощ", "Отговори на въпрос между полунощ и четири сутринта.", "owl", Rare, 1, true},
 	{"earlyBird", "Преди седем", "Изиграй въпросите на деня преди седем сутринта.", "sun", Rare, 1, true},
 	{"lastSecond", "В последния миг", "Отговори вярно в последната секунда.", "hourglass", Rare, 1, true},
@@ -216,6 +223,9 @@ func (g *Game) lookOf(userID int64, avatar, title string, total int) Look {
 		avatar += "/" + rest
 	}
 	level, _, _ := LevelOf(total)
+	if title == unchosen {
+		title = LevelTitle(level)
+	}
 	name, tier := g.titleOf(title)
 	return Look{Avatar: avatar, Title: name, TitleTier: tier, Level: level}
 }
@@ -225,7 +235,7 @@ func (g *Game) lookOf(userID int64, avatar, title string, total int) Look {
 var lookColumns = `coalesce(u.avatar, '') || '/' || coalesce(u.frame, '') || '/' || coalesce(u.backdrop, ''),
 	CASE WHEN u.title = '` + championID + `' THEN u.title || ':' || (SELECT count(*) FROM league_results
 		WHERE user_id = u.id AND tier = ` + strconv.Itoa(TopLeague) + ` AND place = 1 AND of >= ` + strconv.Itoa(RaceSize) + `)
-		ELSE coalesce(u.title, '') END,
+		ELSE coalesce(u.title, '` + unchosen + `') END,
 	` + xpOf("u.id")
 
 // xpOf is a SQL expression for all the XP a player (a column or a parameter) has earned: their games', goals',
@@ -384,6 +394,9 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 		p.Achievements = append(p.Achievements, e)
 	}
 	p.Avatar, p.Title = avatar.String, title.String
+	if !title.Valid {
+		p.Title = LevelTitle(p.Level)
+	}
 	if p.Avatar == "" {
 		p.Avatar = DefaultAvatar(userID)
 	}
@@ -448,8 +461,8 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 	if err != nil {
 		return nil, err
 	}
-	var games, duelsWon, friends, topicsPlayed, types, fullDays int
-	var perfect, fast, friendWin, nightOwl, earlyBird, topicPerfect, royalWin, leagueUp, leagueFirst, rila bool
+	var games, duelsWon, friends, topicsPlayed, types, fullDays, fast int
+	var perfect, friendWin, nightOwl, earlyBird, topicPerfect, royalWin, leagueUp, leagueFirst, rila bool
 	err = db.QueryRowContext(ctx, `SELECT
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND finished_at IS NOT NULL),
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'duel' AND outcome = 'won'),
@@ -465,7 +478,8 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 			FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?1 AND a.is_right) WHERE t IS NOT NULL),
 		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'day' AND finished_at IS NOT NULL
 			AND rights = json_array_length(questions)),
-		EXISTS (SELECT 1 FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?1 AND a.is_right AND a.ms < 2000),
+		(SELECT coalesce(max(n), 0) FROM (SELECT count(*) AS n FROM answers a JOIN runs r ON r.id = a.run_id
+			WHERE r.user_id = ?1 AND a.is_right AND a.ms < ?5 GROUP BY a.run_id)),
 		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'duel' AND outcome = 'won'
 			AND opponent_id IN (SELECT friend_id FROM friends WHERE user_id = ?1)),
 		EXISTS (SELECT 1 FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?1
@@ -479,7 +493,7 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 			AND (SELECT count(*) FROM royal_players o WHERE o.royal_id = p.royal_id) > 1),
 		EXISTS (SELECT 1 FROM league_results WHERE user_id = ?1 AND moved = 1),
 		EXISTS (SELECT 1 FROM league_results WHERE user_id = ?1 AND place = 1 AND of >= `+strconv.Itoa(RaceSize)+`),
-		(SELECT league FROM users WHERE id = ?1) >= ?3`, userID, GoalsPerDay, TopLeague, BulgariaTopic).
+		(SELECT league FROM users WHERE id = ?1) >= ?3`, userID, GoalsPerDay, TopLeague, BulgariaTopic, FastMs).
 		Scan(&games, &duelsWon, &friends, &topicsPlayed, &types, &perfect, &fast, &friendWin, &nightOwl, &earlyBird,
 			&topicPerfect, &fullDays, &royalWin, &leagueUp, &leagueFirst, &rila)
 	if err != nil {
@@ -515,7 +529,7 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 	}
 	return map[string]int{
 		"streak3": streak, "streak7": streak, "streak30": streak, "streak100": streak, "streak365": streak,
-		"perfect": one(perfect), "exact": one(exact), "fast": one(fast),
+		"perfect": one(perfect), "exact": one(exact), "fast": fast,
 		"facts100": facts.n, "facts1000": facts.n, "facts5000": facts.n, "wholeTopic": one(facts.whole),
 		"games100":  games,
 		"allTopics": topicsPlayed, "master": masters, "master5": masters,
@@ -817,7 +831,7 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 }
 
 // SetLook changes how a player shows to others: an avatar (shape-tone, of what they may pick) and a title (one
-// they've unlocked, or "" for none). Nil leaves either as it is.
+// they've unlocked, or "" for none, which is kept as chosen: a player who never chose wears their level's). Nil leaves either as it is.
 func (g *Game) SetLook(ctx context.Context, userID int64, avatar, title *string, wear ...*string) error {
 	earned, err := g.earned(ctx, userID)
 	if err != nil {
@@ -880,12 +894,8 @@ func (g *Game) SetLook(ctx context.Context, userID int64, avatar, title *string,
 				return err
 			}
 		}
-		if title != nil {
-			var t any
-			if *title != "" {
-				t = *title
-			}
-			if _, err := tx.Exec(`UPDATE users SET title = ? WHERE id = ?`, t, userID); err != nil {
+		if title != nil { // "" is a choice too, no title, where NULL wears the level's (LevelTitle)
+			if _, err := tx.Exec(`UPDATE users SET title = ? WHERE id = ?`, *title, userID); err != nil {
 				return err
 			}
 		}

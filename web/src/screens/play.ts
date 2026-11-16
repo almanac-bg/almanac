@@ -12,7 +12,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal, slot } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { bulgaria, type Category, categories, player, user } from "../state.ts";
-import { meter, questions, toneOf } from "../ui.ts";
+import { meter, questions, stakeLine, toneOf } from "../ui.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
 /** The topics as tiles, each with how well the player knows it: a run across all of them first, „България“ across
@@ -136,25 +136,58 @@ export function topic([id = ""]: string[]) {
     return null;
   }
   title(name);
+  // While the day's ten wait, a topic's result points to them (the habit comes first), with the streak at stake.
+  // Asked as each game starts (a new player is a player only then), so it's in long before the game ends.
+  let day: DayWaits | null = null;
   return run(
     name,
-    () => api<State>("POST", "/api/topic", { category }),
+    async () => {
+      const s = await api<State>("POST", "/api/topic", { category });
+      dayWaits().then(
+        (d) => {
+          day = d;
+        },
+        () => {},
+      );
+      return s;
+    },
     (s, again) =>
       h(
         "div",
         { class: "screen" },
-        // What was played, where the day's result has its date: every result laid out the same.
-        summary(
-          s,
-          h("div", { class: "day-line" }, h("span", { class: "kicker" }, name)),
-          {
-            main: h("button", { class: "btn primary big", onclick: again }, "Още десет"),
-            also: [h("a", { class: "btn", href: "/" }, "Към Начало")], // where the day and the other topics are
-          },
-          [news(s.id)],
-        ),
+        // What was played, where the day's result has its date: every result laid out the same. (The day's state is
+        // in long before a game ends: as it was then, never drawing the result again.)
+        summary(s, h("div", { class: "day-line" }, h("span", { class: "kicker" }, name)), nextOf(day, again), [
+          news(s.id),
+        ]),
       ),
   );
+}
+
+/** A topic's result's buttons: „Още десет“, gold; or, while the day's ten wait, the way to them, gold, with the streak
+ * at stake under it, and „Още десет“ plain. */
+function nextOf(d: DayWaits | null, again: () => void): { main: Child; also: Child[] } {
+  if (!d)
+    return {
+      main: h("button", { class: "btn primary big", onclick: again }, "Още десет"),
+      also: [h("a", { class: "btn", href: "/" }, "Към Начало")], // where the day and the other topics are
+    };
+  return {
+    main: [h("a", { class: "btn primary big", href: "/" }, "Към въпросите на деня"), stakeLine(d.streak, d.reserve)],
+    also: [h("button", { class: "btn", onclick: again }, "Още десет")],
+  };
+}
+
+/** The day's ten, while they wait for the player: the streak (to yesterday) and the reserve days in hand. */
+interface DayWaits {
+  streak: number;
+  reserve: number;
+}
+
+/** Whether the day's ten still wait for the player (null once played), from Начало's state. */
+async function dayWaits(): Promise<DayWaits | null> {
+  const t = await api<{ streak: number; reserve?: number; run: State | null }>("GET", "/api/day");
+  return t.run?.done ? null : { streak: t.streak, reserve: t.reserve ?? 0 };
 }
 
 /** Plays a run that `begin` starts (a topic's, a second chance), and what finished draws at its end (again: another

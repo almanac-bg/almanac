@@ -40,3 +40,38 @@ test("Профил keeps the longest streak, under the one going on", async ({ p
   await expect(page.locator(".streak .streak-num")).toHaveText("2");
   await expect(page.locator(".streak")).toContainText("Най-дълга серия: 12 дни");
 });
+
+test("a streak at stake: unlit till the day lights it, pointed to from a topic, tomorrow under the result", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.goto("/");
+  // Two days, to yesterday; the first earned a reserve day, so nothing ends at midnight, whatever the hour.
+  await daysPlayed(page, 2, 1);
+  await page.reload();
+  await expect(page.locator(".streak-chip.unlit")).toContainText("2");
+  await expect(page.locator(".day .day-stake")).toHaveText("Серия от 2 дни. С днешните въпроси става 3.");
+  // The reserve day, a tap from what it's for.
+  await page.locator(".status-reserve .explain").click();
+  await expect(page.getByRole("note")).toHaveText("Резервен ден: пази серията, ако пропуснеш ден.");
+  // A topic's result points to the day while it waits: the gold button, the streak under it, „Още десет“ plain.
+  await page.goto("/play/history");
+  await page.getByRole("button", { name: "Започни сега" }).click();
+  await playRun(page);
+  // A new level may come with the game, in its sheet once the result has landed: put away.
+  await page.waitForTimeout(2500);
+  await page.keyboard.press("Escape");
+  const day = page.getByRole("link", { name: "Към въпросите на деня" });
+  await expect(day).toHaveClass(/primary/);
+  await expect(page.locator(".actions .day-stake")).toHaveText("Серия от 2 дни. С днешните въпроси става 3.");
+  await expect(page.getByRole("button", { name: "Още десет" })).not.toHaveClass(/primary/);
+  await day.click();
+  await startDay(page);
+  await playRun(page);
+  // Played: the flame lit, and tomorrow right under the result's buttons, before the rest.
+  await expect(page.locator(".streak-chip")).toContainText("3");
+  await expect(page.locator(".streak-chip.unlit")).toHaveCount(0);
+  const tomorrow = page.locator(".summary > .actions + .tomorrow");
+  await expect(tomorrow).toContainText("Утре — нови десет");
+  await expect(tomorrow).toContainText("Изиграй ги и серията ти става 4.");
+});

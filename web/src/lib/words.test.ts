@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { hyphenate, withName } from "./words.ts";
+import { hyphenate, stakeWords, withName } from "./words.ts";
 
 test("„със“ before an с or a з, „с“ before anything else", () => {
   assert.deepEqual(["Заек 817", "Сова", "зора", "Мечка 12", "Ана", "Sasho", "Zara", "Shon", "Ivo"].map(withName), [
@@ -49,4 +49,13 @@ test("a word breaks by its syllables, as Bulgarian hyphenates", () => {
   assert.equal(breaks("Сент-Екзюпери"), "Сент-Ек-зю-пе-ри");
   // The text reads the same without them.
   assert.equal(hyphenate("Независимостта").replaceAll("\u00ad", ""), "Независимостта");
+});
+
+test("a streak at stake says what the day's ten make of it, and from 18:00 that it ends at midnight", () => {
+  assert.equal(stakeWords(0, 0, 20), ""); // nothing to lose
+  assert.equal(stakeWords(1, 0, 9), "Серия от 1 ден. С днешните въпроси става 2.");
+  assert.equal(stakeWords(5, 0, 17), "Серия от 5 дни. С днешните въпроси става 6.");
+  assert.equal(stakeWords(5, 0, 18), "Серия от 5 дни. Прекъсва в полунощ, ако не изиграеш днешните.");
+  // A reserve day would keep it: nothing ends at midnight.
+  assert.equal(stakeWords(5, 1, 23), "Серия от 5 дни. С днешните въпроси става 6.");
 });

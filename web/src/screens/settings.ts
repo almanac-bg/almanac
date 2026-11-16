@@ -169,11 +169,11 @@ function account(): Child {
         h("button", { class: "link", onclick: signOut }, "Излез"),
       ],
       () => [
-        h("h2", null, "Запази профила си"),
+        h("h2", null, "Влез или запази профила си"),
         h(
           "p",
           { class: "muted" },
-          "Сега играта ти се пази само на това устройство. Добави имейл и ще я имаш навсякъде, където влезеш с него.",
+          "Сега играта ти се пази само на това устройство. Добави имейл и ще я имаш навсякъде, където влезеш с него. Имаш профил от друго устройство? Влез с имейла му и играта оттук ще се добави към него.",
         ),
         signIn(),
       ],
@@ -416,9 +416,9 @@ async function signOut() {
   user.set(null);
 }
 
-/** Signing in with an email: the address, then the code mailed to it. */
-/** Signing in by email, with a code: in Настройки, and on Начало for a guest who keeps coming back. */
-export function signIn(): Child {
+/** Signing in by email, with a code: in Настройки, and on Начало (a guest who keeps coming back, a player with a
+ * profile before a first game, where its button is a plain one: `primary` false). */
+export function signIn(primary = true): Child {
   const email = signal("");
   const code = signal("");
   const sent = signal(false);
@@ -511,7 +511,7 @@ export function signIn(): Child {
             oninput: (e: Event) => email.set((e.target as HTMLInputElement).value),
           }),
         ),
-        h("button", { class: "btn primary", disabled: busy }, "Прати ми код"),
+        h("button", { class: primary ? "btn primary" : "btn", disabled: busy }, "Прати ми код"),
         errorLine,
         h("p", { class: "muted" }, "Без пароли: всеки път ти пращаме код за вход."),
       ),

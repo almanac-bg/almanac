@@ -9,7 +9,7 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
   // Ana's link: a player is made for her the first time she asks for it.
   await a.goto("/friends");
   await a.locator(".friends").getByRole("button", { name: "Покани приятел" }).click();
-  const link = await a.locator(".invite-link").getAttribute("href");
+  const link = await a.locator("[data-invite]").first().getAttribute("data-invite");
   expect(link).toMatch(/^\/f\/[a-z0-9]{8}$/);
 
   // Bo opens it and accepts: they're friends, both ways.
@@ -96,7 +96,7 @@ test("friends on the day: a shared link to it, who has played it, and how each w
   const ana = await a.evaluate(async () => (await (await fetch("/api/me")).json()).user.name as string);
   const right = Number(await a.locator(".score-n").textContent());
   await a.goto("/friends");
-  const link = (await a.locator(".invite-link").getAttribute("href")) ?? "";
+  const link = (await a.locator("[data-invite]").first().getAttribute("data-invite")) ?? "";
   const c = await (await browser.newContext()).newPage();
   await c.goto(link);
   await expect(c.getByRole("heading", { name: `${ana} има ${right} от 10 днес. А ти?` })).toBeVisible();
@@ -130,7 +130,7 @@ test("a rematch from a friend duel's result", async ({ browser }) => {
   const b = await (await browser.newContext()).newPage();
   await a.goto("/friends");
   await a.locator(".friends").getByRole("button", { name: "Покани приятел" }).click();
-  const link = await a.locator(".invite-link").getAttribute("href");
+  const link = await a.locator("[data-invite]").first().getAttribute("data-invite");
   await b.goto(link ?? "");
   await b.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
   await expect(b.getByRole("heading", { name: /Вече сте приятели/ })).toBeVisible();
@@ -162,7 +162,7 @@ test("a friend can turn a duel down", async ({ browser }) => {
   const b = await (await browser.newContext()).newPage();
   await a.goto("/friends");
   await a.locator(".friends").getByRole("button", { name: "Покани приятел" }).click();
-  const link = await a.locator(".invite-link").getAttribute("href");
+  const link = await a.locator("[data-invite]").first().getAttribute("data-invite");
   await b.goto(link ?? "");
   await b.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
   await expect(b.getByRole("heading", { name: /Вече сте приятели/ })).toBeVisible();
@@ -205,10 +205,10 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await b.goto("/friends");
   await b.locator(".friends").getByRole("button", { name: "Покани приятел" }).click();
   await b.getByLabel("Потребителско име или имейл на приятел").fill("@nosuch_player_here");
-  await b.getByRole("button", { name: "Покани", exact: true }).click();
+  await b.getByRole("button", { name: "Добави", exact: true }).click();
   await expect(b.getByText("Няма играч с такова потребителско име.")).toBeVisible();
   await b.getByLabel("Потребителско име или имейл на приятел").fill(`@${tag.toUpperCase()}`);
-  await b.getByRole("button", { name: "Покани", exact: true }).click();
+  await b.getByRole("button", { name: "Добави", exact: true }).click();
   await expect(b.getByText("Поканата до Ана Петрова е изпратена.")).toBeVisible();
   await expect(b.locator(".waiting")).toContainText(`@${tag}`);
 

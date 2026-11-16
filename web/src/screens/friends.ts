@@ -166,11 +166,15 @@ function friendsCard(): Child {
                   ),
                 ),
               )
-            : h(
-                "p",
-                { class: "muted" },
-                "Още нямаш приятели тук. Добави ги по потребителско име или имейл, или им прати поканата си.",
-              ),
+            : [
+                h(
+                  "p",
+                  { class: "muted" },
+                  "Още нямаш приятели тук. Прати им покана или ги добави по потребителско име или имейл.",
+                ),
+                // No friends yet: the invitation is the one thing to do here, gold, first.
+                invite(d.invite, true),
+              ],
         ];
       },
       // Outside the blocks drawn again on each look (every 15 s): drawn again, its field would lose the focus mid-word.
@@ -205,18 +209,22 @@ function friendsCard(): Child {
                 ),
               )
             : null,
-          shareButton("Покани с връзка", () => "Ела да сме приятели в АЛМАНАХ:", d.invite, false),
-          h(
-            "p",
-            { class: "muted small" },
-            "Твоята покана: ",
-            h("a", { href: new URL(d.invite).pathname, class: "invite-link" }, d.invite),
-          ),
+          d.friends.length ? invite(d.invite, false) : null,
         ];
       },
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
     ),
   ];
+}
+
+/** The player's invitation, by the phone's share sheet (or copied: „Копирано.“), never printed as a raw address; gold
+ * while there are no friends yet. The link itself is on the element for the browser tests (`data-invite`). */
+function invite(url: string, primary: boolean): Child {
+  return h(
+    "div",
+    { class: "invite", "data-invite": new URL(url).pathname },
+    shareButton("Покани с връзка", () => "Ела да сме приятели в АЛМАНАХ:", url, primary),
+  );
 }
 
 /** Asking someone to be friends: by their tag (@tag) or their email. */
@@ -272,7 +280,7 @@ function addFriend(reload: () => Promise<void>): Child {
           value: to,
           oninput: (e: Event) => to.set((e.target as HTMLInputElement).value),
         }),
-        h("button", { class: "btn inline", disabled: busy }, "Покани"),
+        h("button", { class: "btn inline", disabled: busy }, "Добави"),
       ),
     ),
     () => {

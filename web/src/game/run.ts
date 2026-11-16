@@ -226,7 +226,7 @@ function tally(el: HTMLElement, points: number, from: number, inRow: number) {
             "span",
             { class: "tally-points", "aria-label": `${points} ${points === 1 ? "точка" : "точки"}` },
             countUp(points, from),
-            h("small", null, " т."),
+            h("small", null, points === 1 ? " точка" : " точки"),
           )
         : null,
     ].filter((c): c is HTMLElement => c !== null),
