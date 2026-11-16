@@ -3753,7 +3753,7 @@
     list-style: none;
   }
 
-  /* All the topics at once: a tile across the row, after the others. */
+  /* All the topics at once: a tile across the row, before the others (and „България“, „Втори шанс“ after them). */
   .topic-all {
     grid-column: 1 / -1;
   }
@@ -5667,12 +5667,12 @@
       font-size: 1.125rem;
     }
 
-    /* Ten topics, five to a row (no topic alone in a row), the picture over the name; all of them at once under. */
+    /* Ten topics, five to a row (no topic alone in a row), the picture over the name; all of them at once above. */
     /* Here the tiles stand tall, the picture over the name: the two rows of topics as tall as each other, and
-       „Всички теми“ (and „Втори шанс“) its own height under them. */
+       „Всички теми“ above them (and „България“, „Втори шанс“ under them) each its own height. */
     .topics {
       grid-template-columns: repeat(5, minmax(0, 1fr));
-      grid-template-rows: repeat(2, 1fr);
+      grid-template-rows: auto repeat(2, 1fr);
       grid-auto-rows: auto;
     }
 
