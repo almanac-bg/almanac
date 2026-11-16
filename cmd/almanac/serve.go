@@ -18,6 +18,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/backup"
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/mail"
+	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/push"
 	"github.com/almanac-bg/almanac/internal/royal"
 	"github.com/almanac-bg/almanac/internal/server"
@@ -138,7 +139,7 @@ func serve([]string) error {
 		}
 		return fmt.Errorf("the bank in %s has problems", bankDir)
 	}
-	slog.Info("bank", "dir", bankDir, "questions", len(b.Questions), "live", len(b.Live("", "")))
+	slog.Info("bank", "dir", bankDir, "questions", len(b.Questions), "live", len(b.Live("", "")), "overdue", overdue(b))
 
 	backups, err := backupStore()
 	if err != nil {
@@ -235,9 +236,19 @@ func reloadOnHangup(ctx context.Context, dir string, srv *server.Server) {
 				continue
 			}
 			srv.SetBank(b)
-			slog.Info("bank reloaded", "questions", len(b.Questions), "live", len(b.Live("", "")))
+			slog.Info("bank reloaded", "questions", len(b.Questions), "live", len(b.Live("", "")), "overdue", overdue(b))
 		}
 	}
+}
+
+// overdue says how many of a bank's questions are due for review today (play.Overdue): no game deals them until the
+// questions skill checks them and moves their date. A warning names them.
+func overdue(b *bank.Bank) int {
+	ids := play.Overdue(b, today())
+	if len(ids) > 0 {
+		slog.Warn("bank: questions due for review are left out of every game until they're checked", "ids", ids)
+	}
+	return len(ids)
 }
 
 // every runs fn now and then every period, until ctx ends.

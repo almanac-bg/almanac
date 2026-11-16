@@ -17,17 +17,21 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 - The format and the checks are the code: `internal/bank` (one file per type, plus `check.go` and `balance.go`).
 - The tools (from the repo root):
   - `go run ./cmd/almanac bank fmt private` writes the files in their one format; run it after every edit;
-  - `go run ./cmd/almanac bank plan [-n N] [-json] private` plans a batch of N a topic: the cells to write (the day's
-    shortest runway first, at most a third of the batch in one place), the dates with the fewest questions, the ids
-    and the subjects to avoid;
+  - `almanac bank used`, on the server, prints the question ids the days have had (played and drawn ahead) and the
+    last day drawn, nothing of a player's; fetch it into a file for `-used` (the `new-questions` skill shows the ssh
+    line);
+  - `go run ./cmd/almanac bank plan [-n N] [-json] [-used file] private` plans a batch of N a topic: the cells to
+    write (the day's shortest runway first, at most a third of the batch in one place), how many about Bulgaria (30%,
+    per cell: `bg`), the dates with the fewest questions left, the ids and the subjects to avoid;
   - `go run ./cmd/almanac bank add [-check] [-checked-by P] <batch> private` adds a batch (`<category>.json` files,
     `images/`, maybe `retire.json`: `[{"id", "why", "by"}]`): every new id the next free one, the bank with it in
     loading with no errors, or nothing is written; `-check` only checks; `-checked-by` marks the new questions
     checked today by that process;
-  - `go run ./cmd/almanac bank check private` checks everything the server checks before it plays a bank. It ends
-    with the balance report: the difficulty and kind mix, facts and dates, the mix grid, and **the day's runway** —
-    how many days of the day's questions each place of a day has left. It **fails** while the categories aren't the
-    same size (`-unbalanced` lets the small public sample pass), and **warns** of every place under 180 days. Last,
+  - `go run ./cmd/almanac bank check [-used file] private` checks everything the server checks before it plays a
+    bank. It ends with the balance report: the difficulty and kind mix, facts and dates, the mix grid, and **the day's
+    runway** — how many days from today each place of a day has questions for, and the day it runs out on. It
+    **fails** while the categories aren't the same size (`-unbalanced` lets the small public sample pass), and
+    **warns** of every place under 150 days (`play.RunwayWarn`: the 90 days drawn ahead and 60 to write). Last,
     **the subjects that come back** (listed, never failed): the answers and names more than 15 live questions name,
     by category (`*` over 1% of one), and the "who or what is this" answers (a picture choice, clues) asked twice;
     the top 20 of each, all of them with `go run ./cmd/almanac bank subjects private`.
@@ -41,9 +45,13 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 - **The bank grows by the day's runway** (the owner's rule since 15 Nov 2026, in place of "fully balanced, always"):
   the day spends its places at its own pace — one easy choice with a picture, one hard number, two hard choices, a
   medium order and match… a day — about three times faster for the hard places than for the easy ones, and no even
-  grid can follow that. So `bank check` prints, for each place of a day, the days of fresh questions left (the whole
-  bank; the days played have spent some). **Every batch writes for the shortest runway first**, and no place may stay
-  under 180 days (it warns). The mix grid (per category, kind and difficulty, `+` / `−` against an even mix) stays
+  grid can follow that. So `bank check` prints, for each place of a day, how many days from today it has questions
+  for, counted as the day takes them: only the questions a day can still take (with `-used`, none the days played or
+  drawn ahead have had; without it, the whole bank, which overstates it), never a dated one (it waits for its date;
+  those are counted apart), never one due for review, and for the hard number only the estimates. The questions about
+  Bulgaria have their own line (a day takes three). The days are drawn 90 days ahead (`play.Ahead`), and only while
+  every place has a question that fits it: a place that runs out stops them. **Every batch writes for the shortest
+  runway first**, and no place may stay under 150 days (it warns: 90 drawn ahead, 60 to write the batch). The mix grid (per category, kind and difficulty, `+` / `−` against an even mix) stays
   as a reference for the topic games: keep near it where the runway doesn't say otherwise, never by filler (an
   "easy number" whose answer is 5 is a choice in disguise; an honest hard question beats a forced cell). A retired
   question is still replaced in its cell in the same commit.
@@ -108,7 +116,7 @@ Every question is one JSON object in its category's file:
 | `changed`            | The day what it asks last changed (text, answer, options, items, pairs, clues, picture): players' answers from before it don't count in its crowd and calibration. Not for a fix to the fact alone |
 | `sources`            | The pages (https://…) the answer and the fact were confirmed on: what the next check starts from. Never shown to players. Required for a question added since `SourcesFrom` (2026-11-17) |
 | `checked`, `checkedBy` | When it was last checked against its sources, and by what: a process and its model (`"new-questions fable-5.2"`), or for older questions the bank commit that added or last changed it (`"bank 7bb2938"`: its message and report say how). Required since `SourcesFrom` |
-| `reviewBy`           | For an answer that may stop being true (an office holder, a record): when to check it    |
+| `reviewBy`           | For an answer that may stop being true (an office holder, a record): when to check it. From that day no game deals it (`bank check` warns, the server logs it) until it is checked and the date moved |
 | `image`              | A picture (see below)                                                                    |
 | `retired`            | `true`: never dealt again, kept for history and stats; with `retiredWhy` (`wrong`, `stale`, `weak`, `twin`, `giveaway`, `rule`) and `replacedBy` (the id that took its place). A question retired as `wrong` or `stale` also leaves what players learned (Моят Алманах) |
 | `on`                 | The days it belongs to: `"03-03"` every year, `"2027-05-02"` that year only (Великден). On such a day it goes into the day's ten as „На този ден“; its fact says why the day |
@@ -209,7 +217,7 @@ every topic), writers and independent checkers on fixed models, a cross-check ov
 (all of the batch, or nothing). By hand, for a fix or a few questions:
 
 1. **Find the gaps:** run `bank check` and read the day's runway and the balance report. Plan the batch from the
-   shortest runway first (every place under 180 days before anything else), then the mix grid's biggest gaps; the
+   shortest runway first (every place under 150 days before anything else), then the mix grid's biggest gaps; the
    same count in every category.
 2. **Write** the questions into the category files, with the next free ids, `added` and `updated` set to today, and
    a fact on each.

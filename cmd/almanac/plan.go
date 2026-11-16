@@ -15,23 +15,28 @@ import (
 )
 
 // A batch plan says what a batch of new questions writes, the same in every category (the bank's categories stay the
-// same size): where the day's runway is shortest first, the dates that have the fewest questions of their own, and
-// the ids to take. The /new-questions skill runs its writers, checkers and cross-check from it.
+// same size): where the day's runway is shortest first, the dates that have the fewest questions of their own, how many
+// about Bulgaria, and the ids to take. The /new-questions skill runs its writers, checkers and cross-check from it.
 type batchPlan struct {
 	Date string `json:"date"`
+	// Through is the last day drawn of the days whose questions were taken off the runway (-used), "" for none.
+	Through string `json:"through,omitempty"`
 	// Each is how many questions every category adds; Write how many each writer writes, the spares for the checkers'
 	// drops included.
 	Each  int `json:"each"`
 	Write int `json:"write"`
-	// Places are the day's places, shortest runway first: days now, and after the batch (its questions for the place
-	// in every category; the dated ones not counted).
+	// Places are the day's places, shortest runway first: days now (and the day it runs out on), and after the batch
+	// (its questions for the place in every category; the dated ones not counted). Bulgaria is the runway of the
+	// questions about Bulgaria the days need (BGFloor a day), now and after the batch's undated ones.
 	Places     []planPlace    `json:"places"`
+	Bulgaria   planPlace      `json:"bulgaria"`
 	Categories []planCategory `json:"categories"`
 }
 
 type planPlace struct {
 	Place  string `json:"place"`
 	Days   int    `json:"days"`
+	Out    string `json:"out"`
 	After  int    `json:"after"`
 	Each   int    `json:"each"`
 	Spares int    `json:"spares"`
@@ -45,6 +50,8 @@ type planCategory struct {
 	LastID  string `json:"lastId"`
 	// Cells are what to write: Count of a kind and difficulty (with a picture or not), and Spares more of it.
 	Cells []planCell `json:"cells"`
+	// BG is how many of the category's Each are about Bulgaria (bank.Tail.BG), spread over the cells (their BG).
+	BG int `json:"bg"`
 	// Dates are the days (MM-DD) the category's dated questions belong to, one question each, the fewest-covered and
 	// the soonest first.
 	Dates []string `json:"dates"`
@@ -61,6 +68,8 @@ type planCell struct {
 	Dated  bool `json:"dated,omitempty"`
 	Count  int  `json:"count"`
 	Spares int  `json:"spares"`
+	// BG is how many of Count are about Bulgaria (BGShare of the batch, spread over its cells).
+	BG int `json:"bg"`
 }
 
 // bankPlan prints the plan for a batch of each questions a category: as text, or as JSON for the skill.
@@ -68,7 +77,12 @@ func bankPlan(args []string) error {
 	fs := flag.NewFlagSet("bank plan", flag.ContinueOnError)
 	each := fs.Int("n", 30, "questions each category adds")
 	asJSON := fs.Bool("json", false, "print the plan as JSON")
+	from := fs.String("used", "", "a file of the question ids the days have had (almanac bank used)")
 	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	used, err := readUsed(*from)
+	if err != nil {
 		return err
 	}
 	if *each < 1 || *each > 500 {
@@ -85,7 +99,7 @@ func bankPlan(args []string) error {
 		}
 		return errors.New("fix the errors first")
 	}
-	p := planBatch(b, *each, time.Now())
+	p := planBatch(b, *each, time.Now().In(play.Bulgaria), used)
 	if *asJSON {
 		out, err := json.MarshalIndent(p, "", "  ")
 		if err != nil {
@@ -109,22 +123,28 @@ const PlaceShare = 1.0 / 3
 // of its own each year („На този ден“).
 const DatedShare = 0.2
 
-// planBatch plans a batch of each questions a category, on the day now: DatedShare of it for the dates with the
-// fewest questions, the rest for the places of the day with the shortest runway, and Spares more of each.
-func planBatch(b *bank.Bank, each int, now time.Time) batchPlan {
+// BGShare is the share of a batch about Bulgaria (bank.Tail.BG), in every category and spread over its cells: every
+// day takes at least play.BGFloor of its ten (play.BulgariaRunway), and they are what a quiz from elsewhere can't give.
+const BGShare = 0.3
+
+// planBatch plans a batch of each questions a category, on the day now, the days' questions used taken off the
+// runway: DatedShare of it for the dates with the fewest questions, the rest for the places of the day with the
+// shortest runway, BGShare of all of it about Bulgaria, and Spares more of each.
+func planBatch(b *bank.Bank, each int, now time.Time, used play.Used) batchPlan {
 	spares := func(n int) int { return int(math.Ceil(float64(n) * Spares)) }
 	dated := int(math.Ceil(float64(each) * DatedShare))
-	places := play.DayRunway(b, nil)
+	today := now.Format(time.DateOnly)
+	places := play.DayRunway(b, used, today)
 	cats := len(b.Categories)
 	got := fill(places, cats, each-dated, int(math.Ceil(float64(each)*PlaceShare)))
 
-	p := batchPlan{Date: now.Format(time.DateOnly), Each: each}
+	p := batchPlan{Date: today, Through: used.Through, Each: each}
 	// The cells every category writes, in the day's order, then the dated ones. A place two kinds share is one cell:
 	// about half each.
 	var cells []planCell
 	for i, r := range places {
-		after := (r.Questions + got[i]*cats) / r.PerDay
-		p.Places = append(p.Places, planPlace{Place: r.Place, Days: r.Days, After: after, Each: got[i], Spares: spares(got[i])})
+		p.Places = append(p.Places, planPlace{Place: r.Place, Days: r.Days, Out: r.Out, After: r.After(got[i]*cats, today).Days,
+			Each: got[i], Spares: spares(got[i])})
 		if got[i] > 0 {
 			cells = append(cells, planCell{Kinds: strings.Join(r.Kinds, "/"), Difficulty: r.Difficulty, Picture: r.Picture,
 				Count: got[i], Spares: spares(got[i])})
@@ -134,15 +154,22 @@ func planBatch(b *bank.Bank, each int, now time.Time) batchPlan {
 	if dated > 0 {
 		cells = append(cells, planCell{Kinds: "choice/truefalse/number", Dated: true, Count: dated, Spares: spares(dated)})
 	}
+	bg := aboutBulgaria(cells, int(math.Round(float64(each)*BGShare)))
+	undated := 0
 	for _, c := range cells {
 		p.Write += c.Count + c.Spares
+		if !c.Dated {
+			undated += c.BG
+		}
 	}
+	r := play.BulgariaRunway(b, used, today)
+	p.Bulgaria = planPlace{Place: r.Place, Days: r.Days, Out: r.Out, After: r.After(undated*cats, today).Days, Each: bg}
 
-	dates := thinDates(b, now)
+	dates := thinDates(b, now, used)
 	repeats := b.Repeats(SubjectMost)
 	for i, c := range b.Categories {
 		prefix, next := b.NextID(c.ID)
-		pc := planCategory{ID: c.ID, Name: c.Name, Cells: cells,
+		pc := planCategory{ID: c.ID, Name: c.Name, Cells: cells, BG: bg,
 			FirstID: fmt.Sprintf("%s-%d", prefix, next), LastID: fmt.Sprintf("%s-%d", prefix, next+p.Write-1)}
 		// Round the categories: each takes every cats-th date, so the thinnest are spread over all of them. The
 		// spares' dates come after.
@@ -188,12 +215,52 @@ func fill(places []play.Runway, cats, units, most int) []int {
 	return got
 }
 
-// thinDates are the days of the year (MM-DD) by how many live questions belong to them, the fewest first, then the
-// soonest from now: each year a date takes a question of its own, so the thinnest run out first.
-func thinDates(b *bank.Bank, now time.Time) []string {
+// aboutBulgaria marks n of the cells' questions as about Bulgaria (planCell.BG), each cell its share of them by its
+// count (the largest remainders rounding up, the day's order breaking ties), and says how many it marked.
+func aboutBulgaria(cells []planCell, n int) int {
+	total := 0
+	for _, c := range cells {
+		total += c.Count
+	}
+	if total == 0 {
+		return 0
+	}
+	n = min(n, total)
+	given := 0
+	rest := make([]int, len(cells))
+	for i := range cells {
+		cells[i].BG = cells[i].Count * n / total
+		rest[i] = cells[i].Count * n % total
+		given += cells[i].BG
+	}
+	for given < n {
+		best := 0
+		for i := range cells {
+			if rest[i] > rest[best] {
+				best = i
+			}
+		}
+		cells[best].BG++
+		rest[best] = -1
+		given++
+	}
+	return n
+}
+
+// thinDates are the days of the year (MM-DD) by how many live questions no day has had (used) belong to them, the
+// fewest first, then the soonest from now: each year a date takes a question of its own, so the thinnest run out
+// first. A question of one year's date (YYYY-MM-DD) counts only while that day is still to come.
+func thinDates(b *bank.Bank, now time.Time, used play.Used) []string {
 	count := map[string]int{}
+	today := now.Format(time.DateOnly)
 	for _, q := range b.Live("", "") {
+		if used.IDs[q.Base().ID] {
+			continue
+		}
 		for _, d := range q.Extra().On {
+			if len(d) == 10 && d < today {
+				continue
+			}
 			count[d[len(d)-5:]]++
 		}
 	}
@@ -228,18 +295,44 @@ func thinDates(b *bank.Bank, now time.Time) []string {
 	return out
 }
 
+// name is a cell as the plan names it: "hard number", "easy choice with a picture", "dated".
+func (c planCell) name() string {
+	if c.Dated {
+		return "dated"
+	}
+	n := string(c.Difficulty) + " " + c.Kinds
+	if c.Picture {
+		n += " with a picture"
+	}
+	return n
+}
+
 func (p batchPlan) String() string {
 	var s strings.Builder
 	fmt.Fprintf(&s, "a batch of %d questions a category (%d in all); each writer writes %d, the spares for the checkers' drops\n",
 		p.Each, p.Each*len(p.Categories), p.Write)
-	s.WriteString("the day's runway, shortest first (days now → after the batch):\n")
+	from := "the whole bank: no day's questions taken off; -used <file> from `almanac bank used` for the truth"
+	if p.Through != "" {
+		from = "the days' questions taken off, drawn through " + p.Through
+	}
+	fmt.Fprintf(&s, "the day's runway on %s (%s), shortest first (days now, out on → after the batch):\n", p.Date, from)
 	for _, pl := range p.Places {
-		fmt.Fprintf(&s, "  %-34s %5d → %-5d %3d a category", pl.Place, pl.Days, pl.After, pl.Each)
+		fmt.Fprintf(&s, "  %-34s %5d %s → %-5d %3d a category", pl.Place, pl.Days, pl.Out, pl.After, pl.Each)
 		if pl.Spares > 0 {
 			fmt.Fprintf(&s, " (+%d spare)", pl.Spares)
 		}
 		s.WriteString("\n")
 	}
+	var cells []string
+	if len(p.Categories) > 0 {
+		for _, c := range p.Categories[0].Cells {
+			if c.BG > 0 {
+				cells = append(cells, fmt.Sprintf("%s %d", c.name(), c.BG))
+			}
+		}
+	}
+	fmt.Fprintf(&s, "  %-34s %5d %s → %-5d %3d a category of the %d (bg), in the cells: %s\n", p.Bulgaria.Place,
+		p.Bulgaria.Days, p.Bulgaria.Out, p.Bulgaria.After, p.Bulgaria.Each, p.Each, strings.Join(cells, ", "))
 	if len(p.Categories) == 0 {
 		return s.String()
 	}
