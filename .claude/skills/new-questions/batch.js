@@ -5,6 +5,7 @@ export const meta = {
   phases: [
     { title: 'Write', detail: 'one writer per topic, by the plan', model: 'opus' },
     { title: 'Verify', detail: 'one independent checker per topic, on another model', model: 'fable' },
+    { title: 'Blind', detail: 'the checked questions answered without the key, on a third model', model: 'sonnet' },
     { title: 'Cross', detail: 'pairs across the topics, the sizes, the final batch', model: 'fable' },
   ],
 }
@@ -15,6 +16,10 @@ export const meta = {
 // on the owner's word.
 const WRITER = { model: 'opus', effort: 'high' }
 const CHECKER = { model: 'fable', effort: 'high' }
+// The blind answerers: a third model, neither the writers' nor the checkers', answers the checked questions without
+// the key; where it is sure of something else, the cross-check finds out who is right. The sheets are made by a helper
+// on the same model, so no answerer ever runs what reads the key.
+const BLIND = { model: 'sonnet', effort: 'medium' }
 
 const { plan, batch, repo, bank, skill } = args ?? {}
 if (!plan?.categories?.length || !batch || !repo || !bank || !skill) {
@@ -83,10 +88,34 @@ if (missing.length) {
   return { done: false, missing, topics: topics.filter(Boolean) }
 }
 
+phase('Blind')
+const fix = `${repo}/.claude/skills/fix-questions`
+const made = await agent(
+  `Run exactly this, and nothing else: cd ${repo} && python3 -I ${fix}/blind.py sheets ${bank} ${batch} --from ${batch}/verify --size 150\nIt prints "<n> questions on <s> sheets". Don't open any file. Your final answer: the number of sheets.`,
+  { ...BLIND, effort: 'low', label: 'blind:sheets', phase: 'Blind', schema: { type: 'object', properties: { sheets: { type: 'integer' } }, required: ['sheets'] } },
+)
+if (!made?.sheets) {
+  log('the blind sheets were not made; resume this run')
+  return { done: false, missing: ['blind'], topics }
+}
+const sheets = Array.from({ length: made.sheets }, (_, i) => i + 1)
+const answered = await parallel(
+  sheets.map((n) => () =>
+    agent(
+      `Answer the sheet ${batch}/blind/sheets/${n}.json into ${batch}/blind/answers/${n}.json. Read ${fix}/ANSWER.md and follow it exactly.`,
+      { ...BLIND, label: `blind:${n}`, phase: 'Blind', schema: { type: 'object', properties: { answered: { type: 'integer' }, sure: { type: 'integer' } }, required: ['answered', 'sure'] } },
+    ),
+  ),
+)
+if (answered.some((r) => !r)) {
+  log('a blind sheet was not answered; resume this run')
+  return { done: false, missing: ['blind'], topics }
+}
+
 phase('Cross')
 const bankProblems = topics.flatMap((t) => t.written.bankProblems.map((p) => `${t.id}: ${p}`))
 const crossed = await agent(
-  `You make the final batch. Read ${skill}/CROSS.md and follow it exactly.\n\n${where}` +
+  `You make the final batch. Read ${skill}/CROSS.md and follow it exactly.\n\n${where}\n<fix> = ${fix}` +
     (bankProblems.length ? `\n\nThe writers found these in questions already in the bank:\n- ${bankProblems.join('\n- ')}` : ''),
   { ...CHECKER, label: 'cross', phase: 'Cross', schema: CROSSED },
 )
