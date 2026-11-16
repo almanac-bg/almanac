@@ -166,6 +166,8 @@ test("„България“: the questions about Bulgaria from every topic, a t
 
 test("a topic's count can be backed out of, or cut short", async ({ page }) => {
   await page.goto("/");
+  // All the topics at once is the first tile, where a thumb reaches first: not a topic in the corner.
+  await expect(page.locator(".topics li").first()).toHaveText(/Всички теми/);
   await page.getByRole("link", { name: "Всички теми" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await page.getByRole("button", { name: "Откажи" }).click();

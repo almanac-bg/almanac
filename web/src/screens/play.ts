@@ -1,6 +1,6 @@
 // Теми: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays the same
-// game. The tiles live on Начало (with one for „България“, the questions about Bulgaria from every topic, while the
-// bank has them, and one for all the topics at once); a run of one is /play/<topic>.
+// game. The tiles live on Начало (all the topics at once first, then each topic, and one for „България“, the
+// questions about Bulgaria from every topic, while the bank has them); a run of one is /play/<topic>.
 
 import { picture } from "../art/picture.ts";
 import { type Mastery, masteryBadge } from "../game/mastery.ts";
@@ -15,8 +15,8 @@ import { bulgaria, type Category, categories, player, user } from "../state.ts";
 import { meter, questions, toneOf } from "../ui.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
-/** The topics as tiles, each with how well the player knows it; „България“ across them (no mastery of its own: its
- * answers count in their own topics), and a run across all of them (on Начало). */
+/** The topics as tiles, each with how well the player knows it: a run across all of them first, „България“ across
+ * them after (no mastery of its own: its answers count in their own topics). */
 export function topics(): Child {
   const stats = signal<Stats | null>(null);
   const waiting = signal(0);
@@ -34,6 +34,21 @@ export function topics(): Child {
     h("ul", { class: "topics" }, () => {
       const mine = stats()?.mastery ?? [];
       return [
+        // First, where a thumb lands first: a tile in the corner reads as „all of them“, so it's this one.
+        h(
+          "li",
+          { class: "topic-all" },
+          h(
+            "a",
+            { href: "/play/all", class: "topic tone-gold" },
+            h(
+              "span",
+              { class: "topic-text" },
+              h("span", { class: "topic-name" }, "Всички теми"),
+              h("span", { class: "topic-meta" }, "Въпроси от всички теми"),
+            ),
+          ),
+        ),
         ...categories.map((c) =>
           h(
             "li",
@@ -61,20 +76,6 @@ export function topics(): Child {
               ),
             )
           : null,
-        h(
-          "li",
-          { class: "topic-all" },
-          h(
-            "a",
-            { href: "/play/all", class: "topic tone-gold" },
-            h(
-              "span",
-              { class: "topic-text" },
-              h("span", { class: "topic-name" }, "Всички теми"),
-              h("span", { class: "topic-meta" }, "Въпроси от всички теми"),
-            ),
-          ),
-        ),
         waiting() ? h("li", { class: "topic-all" }, secondChance(waiting())) : null,
       ];
     }),
