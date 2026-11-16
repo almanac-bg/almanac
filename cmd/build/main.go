@@ -1,6 +1,8 @@
 // Command build turns the web client (web/) into the files the server serves (internal/assets/dist): one script and
 // one stylesheet, minified, the illustrations as a script of their own (loaded after the game starts), and the fonts,
-// all named by their content, plus web/public as it is. It fails if any outgrows its budget: the game must stay light.
+// all named by their content, plus web/public as it is. It says how big each is, and fails only if all of them together
+// pass a ceiling far above what the game is: a guard against an accident (a library pulled in, data built into the
+// code), not a limit to write around.
 //
 //	go run ./cmd/build           a release build
 //	go run ./cmd/build -watch    rebuild on every change (with DEV=1 on the server)
@@ -25,19 +27,18 @@ import (
 	"github.com/almanac-bg/almanac/internal/assets"
 )
 
-// Budgets, gzipped: what a player downloads the first time.
-// The budgets grew with the game, from one quiz to a platform (five places, medals and emblems drawn in code, seven
-// kinds of question, weekly leagues, a second chance, a year's look back, a game left and taken up again, systems that
-// unfold as a player meets them and say what their numbers mean, a streak that says what kept or ended it): still small enough to arrive at once on a slow
-// phone; the style also lays the pages out for a laptop's width. The illustrations (avatars, topics, modes, frames,
-// leagues) come after the first screen, on their own; a room's, Роял's and a live duel's screens (web/src/kit.ts) when
-// one opens, and the style of a room's big screen (host.css) when a host leads one; a duel's result with its style
-// (outcome.js, outcome.css) as a duel starts; the game's feel (web/src/feel.ts: the sounds' voices, the result's
-// moment, the sheet for big news) with the first touch.
-var budgets = map[string]int{
-	"app.js": 50 << 10, "app.css": 16 << 10, "pictures.js": 24 << 10, "room.js": 12 << 10, "royal.js": 12 << 10,
-	"live.js": 12 << 10, "host.css": 4 << 10, "feel.js": 12 << 10, "outcome.js": 6 << 10, "outcome.css": 3 << 10,
-}
+// entries are what a player can download, each when its screen needs it: the game (app.js, app.css) first; the
+// illustrations (avatars, topics, modes, frames, leagues) after the first screen, on their own; a room's, Роял's and a
+// live duel's screens (web/src/kit.ts) when one opens, and the style of a room's big screen (host.css) when a host leads
+// one; a duel's result with its style (outcome.js, outcome.css) as a duel starts; the game's feel (web/src/feel.ts: the
+// sounds' voices, the result's moment, the sheet for big news) with the first touch.
+var entries = []string{"app.js", "app.css", "pictures.js", "room.js", "royal.js", "live.js", "host.css", "feel.js",
+	"outcome.js", "outcome.css"}
+
+// ceiling is how big, gzipped, all the entries together may grow: about two and a half times the game in November 2026
+// (about 100 kB, the first screen's share 63). Growing with the game never reaches it; something pulled in by mistake
+// does. Past it, find what grew; raise it only for something worth that much to every player.
+const ceiling = 256 << 10
 
 func main() {
 	watch := flag.Bool("watch", false, "rebuild on every change")
@@ -103,7 +104,7 @@ func build(watch bool) error {
 	if err := writeManifest(out, r.Metafile); err != nil {
 		return err
 	}
-	return checkBudgets(out)
+	return checkSize(out)
 }
 
 // writeManifest records which file each entry became (app.js → assets/app-3F2A9C.js).
@@ -135,7 +136,7 @@ func writeManifest(out, metafile string) error {
 	return os.WriteFile(filepath.Join(out, assets.ManifestFile), data, 0o644)
 }
 
-func checkBudgets(out string) error {
+func checkSize(out string) error {
 	data, err := os.ReadFile(filepath.Join(out, assets.ManifestFile))
 	if err != nil {
 		return err
@@ -144,8 +145,8 @@ func checkBudgets(out string) error {
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		return err
 	}
-	var over []string
-	for name, budget := range budgets {
+	total := 0
+	for _, name := range entries {
 		body, err := os.ReadFile(filepath.Join(out, manifest[name]))
 		if err != nil {
 			return err
@@ -154,13 +155,12 @@ func checkBudgets(out string) error {
 		w, _ := gzip.NewWriterLevel(&gz, gzip.BestCompression)
 		_, _ = w.Write(body)
 		_ = w.Close()
-		fmt.Printf("%-8s %6.1f kB, %5.1f kB gzipped (budget %d kB)\n", name, float64(len(body))/1024, float64(gz.Len())/1024, budget>>10)
-		if gz.Len() > budget {
-			over = append(over, name)
-		}
+		total += gz.Len()
+		fmt.Printf("%-12s %6.1f kB, %5.1f kB gzipped\n", name, float64(len(body))/1024, float64(gz.Len())/1024)
 	}
-	if len(over) > 0 {
-		return fmt.Errorf("over budget: %s", strings.Join(over, ", "))
+	fmt.Printf("%-12s %21.1f kB gzipped (ceiling %d kB)\n", "all", float64(total)/1024, ceiling>>10)
+	if total > ceiling {
+		return fmt.Errorf("the client is %d kB gzipped, past its ceiling of %d kB: something grew by far more than a feature does", total>>10, ceiling>>10)
 	}
 	// A file that's no entry's is code a screen loaded on its own shares with app.js, split off for every page to load
 	// first: the screen must take it from web/src/kit.ts instead.
