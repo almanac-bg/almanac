@@ -1,8 +1,0 @@
-{
-  "recommendations": [
-    "biomejs.biome",
-    "editorconfig.editorconfig",
-    "bradlc.vscode-tailwindcss",
-    "typescriptteam.native-preview"
-  ]
-}
