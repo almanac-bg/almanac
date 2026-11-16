@@ -7,8 +7,15 @@ import (
 	"testing"
 )
 
-// knows gives a player right answers to these questions, in a game of their own (as many games would).
+// knows gives a player right answers to these questions, in a game of their own (as many games would), one after
+// another from the start of time.
 func (w *world) knows(user int64, ids ...string) {
+	w.t.Helper()
+	w.knowsAt(user, 0, ids...)
+}
+
+// knowsAt is knows from a time on.
+func (w *world) knowsAt(user, at int64, ids ...string) {
 	w.t.Helper()
 	res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, finished_at) VALUES (?, 'topic', '[]', 0, 0)`, user)
 	if err != nil {
@@ -17,7 +24,7 @@ func (w *world) knows(user int64, ids ...string) {
 	run, _ := res.LastInsertId()
 	for n, id := range ids {
 		if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, given, score, points, is_right, ms, at)
-			VALUES (?, ?, ?, '{}', 1, 0, 1, 3000, ?)`, run, n, id, n); err != nil {
+			VALUES (?, ?, ?, '{}', 1, 0, 1, 3000, ?)`, run, n, id, at+int64(n)); err != nil {
 			w.t.Fatal(err)
 		}
 	}
@@ -54,9 +61,9 @@ func TestFactsCollected(t *testing.T) {
 			again = append(again, p.ID)
 		}
 	}
-	alm, err := w.g.AlmanacOf(ctx, ana)
-	if err != nil || len(alm.Facts) != want {
-		t.Fatalf("%d facts in the almanac after a game half right, want %d (%v)", len(alm.Facts), want, err)
+	alm, err := w.g.AlmanacOf(ctx, ana, "", "", AlmanacPage)
+	if err != nil || alm.All != want || len(alm.Facts) != want {
+		t.Fatalf("%d facts in the almanac after a game half right, want %d (%v)", alm.All, want, err)
 	}
 	s, err := w.g.StatsOf(ctx, ana)
 	if err != nil || s.Facts != want || s.Answers != Length {
