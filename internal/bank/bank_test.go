@@ -368,21 +368,20 @@ func TestBalance(t *testing.T) {
 	if bal.Total != len(b.Live("", "")) {
 		t.Fatalf("counted %d of %d", bal.Total, len(b.Live("", "")))
 	}
-	// The full balance: each cell's gap brings it to the aim, and Off counts every question out of place.
+	// Each kind's gap brings it to its share of its category, and Off adds up what's to write.
 	off := 0
 	for _, c := range b.Categories {
+		size := len(b.Live(c.ID, ""))
 		for _, typ := range TypeOrder {
-			for _, d := range Difficulties {
-				g := bal.Gaps[c.ID][typ][d]
-				if bal.Cells[c.ID][typ][d]+g != Want(bal.Target, typ, d) {
-					t.Errorf("%s %s %s: %d %+d is not the aim %d", c.ID, typ, d, bal.Cells[c.ID][typ][d], g, Want(bal.Target, typ, d))
-				}
-				off += max(g, -g)
+			g := bal.Gaps[c.ID][typ]
+			if bal.Types[c.ID][typ]+g != Want(size, typ) {
+				t.Errorf("%s %s: %d %+d is not the aim %d", c.ID, typ, bal.Types[c.ID][typ], g, Want(size, typ))
 			}
+			off += max(g, 0)
 		}
 	}
-	if off != bal.Off || bal.Target != steady(bal.Cells) {
-		t.Errorf("off %d (counted %d), target %d", bal.Off, off, bal.Target)
+	if off != bal.Off {
+		t.Errorf("off %d, counted %d", bal.Off, off)
 	}
 	sum := 0.0
 	for _, share := range TypeMix {
@@ -393,34 +392,25 @@ func TestBalance(t *testing.T) {
 	}
 }
 
-// The target is the smallest size whose aims cover every kind and every difficulty, and it's steady: a bank filled
-// exactly to its aims keeps that size (the aims, rounded per cell, don't ask for a bigger one).
-func TestSteadyTarget(t *testing.T) {
-	filled := func(size int) map[string]map[string]map[Difficulty]int {
-		kinds := map[string]map[Difficulty]int{}
-		for _, k := range TypeOrder {
-			kinds[k] = map[Difficulty]int{}
-			for _, d := range Difficulties {
-				kinds[k][d] = Want(size, k, d)
-			}
-		}
-		return map[string]map[string]map[Difficulty]int{"a": kinds}
-	}
-	for _, size := range []int{25, 100, 600, 657, 660, 667, 680, 1000} {
-		if got := steady(filled(size)); got > size {
-			t.Errorf("filled to the aims of %d, the target is %d", size, got)
-		}
-		// One more of the largest cell needs a bigger size.
-		cells := filled(size)
-		cells["a"]["choice"][Easy]++
-		if got := steady(cells); got <= size {
-			t.Errorf("one more than the aims of %d still fits in %d", size, got)
+// The categories are about the same size: within SizeSlack of the mean, not exactly.
+func TestUneven(t *testing.T) {
+	b := &Bank{Categories: []Category{{"a", "А"}, {"b", "Б"}, {"c", "В"}}, byID: map[string]Question{}}
+	add := func(cat string, n int) {
+		for range n {
+			q := &TrueFalse{Head: Head{Category: cat}}
+			b.Questions = append(b.Questions, q)
 		}
 	}
-	// The minimum: one size less doesn't fit.
-	cells := filled(657)
-	if got := steady(cells); got > 657 || got < 640 {
-		t.Errorf("the aims of 657 make a target of %d", got)
+	add("a", 100)
+	add("b", 101)
+	add("c", 99)
+	if off, mean := b.Uneven(); len(off) != 0 || mean != 100 {
+		t.Errorf("100, 101, 99: off %v (mean %v)", off, mean)
+	}
+	add("a", 5)
+	add("c", 2)
+	if off, _ := b.Uneven(); len(off) != 1 || off[0].Category != "a" {
+		t.Errorf("105, 101, 101 (mean 102.3, 2.05 either way): off %v", off)
 	}
 }
 

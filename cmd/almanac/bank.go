@@ -34,6 +34,18 @@ func bankCommand(args []string) error {
 		return bankCheck(dir(), unbalanced)
 	case "fmt":
 		return bankFmt(dir())
+	case "lint":
+		fs := flag.NewFlagSet("bank lint", flag.ContinueOnError)
+		rules := fs.String("rule", "", "only these rules (comma-separated: giveaway,stale)")
+		short := fs.Bool("summary", false, "only the count of each rule")
+		if err := fs.Parse(rest); err != nil {
+			return usage()
+		}
+		into := defaultBankDir()
+		if fs.NArg() > 0 {
+			into = fs.Arg(0)
+		}
+		return bankLint(into, *rules, *short)
 	case "subjects":
 		return bankSubjects(dir())
 	case "calibrate":
@@ -89,32 +101,99 @@ func defaultBankDir() string {
 	return "bank/sample"
 }
 
-// bankCheck checks everything the server checks before it plays a bank, and the owner's rule that every category is
-// the same size (so a batch can't be committed half done; unbalanced lets the small public sample pass). It reports
-// the mix; the day's runway: how long each place of a day has questions for, where the next batch writes first; and
-// the subjects that come back.
+// bankCheck checks everything the server checks before it plays a bank, and the owner's rule that the categories are
+// about the same size (bank.SizeSlack; unbalanced lets the small public sample pass). It prints every error, and
+// counts the warnings by rule (bank lint lists them); it reports the mix; the day's runway: how long each place of a
+// day has questions for, where the next batch writes first; and the subjects that come back. Its last line counts
+// the problems.
 func bankCheck(dir string, unbalanced bool) error {
 	b, problems := bank.Load(dir)
-	errs := 0
+	count := bank.CountOf(problems)
+	tally := fmt.Sprintf("%s: %s", dir, count)
+	if count.Warnings > 0 {
+		tally += ": almanac bank lint lists them"
+	}
 	for _, p := range problems {
-		fmt.Println(p)
 		if !p.Warning {
-			errs++
+			fmt.Println(p)
 		}
 	}
 	if b == nil {
-		return fmt.Errorf("%s: %d problems: the server would not play this bank", dir, errs)
+		fmt.Println(tally)
+		return fmt.Errorf("%s: %d errors: the server would not play this bank", dir, count.Errors)
 	}
 	fmt.Println(summary(b))
 	fmt.Println(runway(b))
 	fmt.Println(subjects(b, SubjectsShown))
-	sizes := map[int]bool{}
-	for _, c := range b.Categories {
-		sizes[len(b.Live(c.ID, ""))] = true
+	fmt.Println(tally)
+	if off, mean := b.Uneven(); len(off) > 0 && !unbalanced {
+		return fmt.Errorf("%s: categories more than %.0f%% off the mean of %.0f: %s (a batch adds to every category alike)",
+			dir, 100*bank.SizeSlack, mean, countList(off))
 	}
-	if len(sizes) > 1 && !unbalanced {
-		return fmt.Errorf("%s: the categories aren't the same size: a batch adds to every category alike", dir)
+	return nil
+}
+
+func countList(cs []bank.CategoryCount) string {
+	var parts []string
+	for _, c := range cs {
+		parts = append(parts, c.String())
 	}
+	return strings.Join(parts, ", ")
+}
+
+// bankLint lists every problem of a bank by rule (bank.Rules, the format's first), each with its question's id: what
+// a content pass works through. rules ("giveaway,stale") keeps only those; short prints only each rule's count.
+func bankLint(dir, rules string, short bool) error {
+	_, problems := bank.Load(dir)
+	want := map[string]bool{}
+	for _, r := range strings.Split(rules, ",") {
+		if r = strings.TrimSpace(r); r != "" {
+			if _, ok := bank.RuleNamed(r); !ok && !slices.Contains(bank.RuleOrder(), r) {
+				return fmt.Errorf("no rule %q: the rules are %s", r, strings.Join(bank.RuleOrder(), ", "))
+			}
+			want[r] = true
+		}
+	}
+	byRule := map[string][]bank.Problem{}
+	for _, p := range problems {
+		r := p.Rule
+		if r == "" {
+			r = "format"
+		}
+		if len(want) == 0 || want[r] {
+			byRule[r] = append(byRule[r], p)
+		}
+	}
+	all := bank.CountOf(nil)
+	for _, r := range bank.RuleOrder() {
+		ps := byRule[r]
+		if len(ps) == 0 {
+			continue
+		}
+		c := bank.CountOf(ps)
+		all.Errors, all.Warnings = all.Errors+c.Errors, all.Warnings+c.Warnings
+		says := "the format: lengths, fields, dates"
+		if rule, ok := bank.RuleNamed(r); ok {
+			says = rule.Says
+		}
+		fmt.Printf("%-14s %5d errors %5d warnings   %s\n", r, c.Errors, c.Warnings, says)
+		if short {
+			continue
+		}
+		slices.SortStableFunc(ps, func(x, y bank.Problem) int { return strings.Compare(x.ID, y.ID) })
+		for _, p := range ps {
+			mark := "warning"
+			if !p.Warning {
+				mark = "ERROR"
+			}
+			where := p.ID
+			if where == "" {
+				where = p.File
+			}
+			fmt.Printf("  %-9s %-7s %s\n", where, mark, p.Msg)
+		}
+	}
+	fmt.Printf("%s: %d errors, %d warnings\n", dir, all.Errors, all.Warnings)
 	return nil
 }
 
@@ -241,8 +320,8 @@ func summary(b *bank.Bank) string {
 	return strings.TrimRight(s.String(), "\n")
 }
 
-// balance says how the bank stands against its aims (full balance, a fact and dates on every question), and per
-// category, kind and difficulty what to write or judge again to get there.
+// balance says how the bank stands against its aims: a fact and dates on every question, every kind at its share of
+// every category.
 func balance(b *bank.Bank) string {
 	var s strings.Builder
 	bal := b.BalanceOf()
@@ -258,9 +337,8 @@ func balance(b *bank.Bank) string {
 			all[d] += k
 		}
 	}
-	fmt.Fprintf(&s, "\ndifficulty   %d/%d/%d%% easy/medium/hard (aim %.0f/%.0f/%.0f)\n",
-		pct(all[bank.Easy], bal.Total), pct(all[bank.Medium], bal.Total), pct(all[bank.Hard], bal.Total),
-		100*bank.Mix[bank.Easy], 100*bank.Mix[bank.Medium], 100*bank.Mix[bank.Hard])
+	fmt.Fprintf(&s, "\ndifficulty   %d/%d/%d%% easy/medium/hard (no aim: batches follow the day's runway)\n",
+		pct(all[bank.Easy], bal.Total), pct(all[bank.Medium], bal.Total), pct(all[bank.Hard], bal.Total))
 	fmt.Fprintf(&s, "facts        %d of %d (%d without)\n", bal.Facts, bal.Total, bal.Total-bal.Facts)
 	fmt.Fprintf(&s, "dates        added on %d, updated on %d (of %d)\n", bal.Added, bal.Updated, bal.Total)
 	kinds := map[string]int{}
@@ -278,24 +356,21 @@ func balance(b *bank.Bank) string {
 		fmt.Fprintf(&s, " %s %.1f%% (aim %.1f)", t, share, 100*bank.TypeMix[t])
 	}
 	s.WriteString("\n")
-	// The cells against an even mix, for reference: since 15 Nov 2026 the day's runway (below) decides where to write,
-	// and only the categories' sizes must match.
+	// Each category's kinds against its TypeMix share: what the topic games draw from.
 	if bal.Off == 0 {
-		s.WriteString("mix          every category, kind and difficulty even\n")
+		s.WriteString("kinds mix    every category at its share of every kind\n")
 		return s.String()
 	}
-	fmt.Fprintf(&s, "mix          %d questions off an even mix at %d per category, each kind easy/medium/hard (for reference; the runway decides):\n",
-		bal.Off, bal.Target)
+	fmt.Fprintf(&s, "kinds mix    %d questions to write for every category to have its share of each kind (+ to write, − over):\n", bal.Off)
 	fmt.Fprintf(&s, "  %-10s", "")
 	for _, t := range bank.TypeOrder {
-		fmt.Fprintf(&s, "%16s", t)
+		fmt.Fprintf(&s, "%10s", t)
 	}
 	s.WriteString("\n")
 	for _, c := range b.Categories {
 		fmt.Fprintf(&s, "  %-10s", c.ID)
 		for _, t := range bank.TypeOrder {
-			g := bal.Gaps[c.ID][t]
-			fmt.Fprintf(&s, "%16s", fmt.Sprintf("%+d/%+d/%+d", g[bank.Easy], g[bank.Medium], g[bank.Hard]))
+			fmt.Fprintf(&s, "%10s", fmt.Sprintf("%+d", bal.Gaps[c.ID][t]))
 		}
 		s.WriteString("\n")
 	}

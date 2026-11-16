@@ -3,6 +3,7 @@ package bank
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 )
@@ -52,6 +53,42 @@ func (q *Order) check() []string {
 		p = append(p, `direction must be "asc" or "desc"`)
 	}
 	return append(p, checkUnit(q.Unit)...)
+}
+
+// Measured values (a length, an area, a population, a weight) come out differently by source and by year, so
+// neighbours in an order stand at least OrderGap apart (the bigger one at least 10% above the smaller): then every
+// source puts them the same way round. Exact values (years, dates, counts, places on a map) only need to differ.
+const OrderGap = 0.10
+
+// measured are the units of measured values: the ones OrderGap holds for.
+var measured = map[string]bool{
+	"м": true, "км": true, "см": true, "мм": true, "нм": true, "км²": true, "м²": true, "см²": true, "млн. км²": true,
+	"кг": true, "т": true, "г": true, "мг": true, "л": true, "мл": true, "км/ч": true, "м/с": true, "ч": true, "мин": true,
+	"с": true, "дни": true, "години": true, "млн. години": true, "млрд. години": true, "св. години": true,
+	"земни маси": true, "Hz": true, "kHz": true, "MHz": true, "ккал": true, "%": true, "жители": true,
+	"млн. жители": true, "души": true, "млн. души": true, "млн.": true, "млрд.": true, "млн. долара": true,
+	"млрд. долара": true, "долара": true, "€": true, "цента": true, "г/см³": true, "г/л": true, "мм живак": true,
+}
+
+func ruleOrderGap(q Question) []string {
+	o, ok := q.(*Order)
+	if !ok || !measured[o.Unit] {
+		return nil
+	}
+	values := make([]float64, 0, len(o.Items))
+	for _, it := range o.Items {
+		values = append(values, it.Value)
+	}
+	slices.Sort(values)
+	var out []string
+	for i := 1; i < len(values); i++ {
+		a, b := values[i-1], values[i]
+		if a > 0 && b < a*(1+OrderGap) {
+			out = append(out, fmt.Sprintf("%s and %s %s are under %.0f%% apart: sources may order them either way",
+				sayNumber(a, 0.01), sayNumber(b, 0.01), o.Unit, 100*OrderGap))
+		}
+	}
+	return out
 }
 
 // key: order questions often share a text („Подреди от най-ранното…“), so their items tell them apart.

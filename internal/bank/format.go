@@ -16,6 +16,8 @@ const lineWidth = 120
 
 // Format writes questions the one way the bank's files are kept: fields in a fixed order, short values on one line,
 // longer ones opened up. Tools that edit the bank write through it, so a change shows in a diff as just that change.
+// It sets the typography the bank keeps one way too (tidy: „…“, the dash, „г.“ held to its year), so that nobody has
+// to remember it.
 func Format(questions []Question) ([]byte, error) {
 	if len(questions) == 0 {
 		return []byte("[]\n"), nil
@@ -135,7 +137,7 @@ func readNode(dec *json.Decoder) (*node, error) {
 		}
 		return n, nil
 	case string:
-		s, err := marshal(t)
+		s, err := marshal(tidy(t))
 		return &node{scalar: s}, err
 	case json.Number:
 		return &node{scalar: json.RawMessage(t.String())}, nil

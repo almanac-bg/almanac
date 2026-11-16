@@ -19,13 +19,14 @@ never edit it), `<batch>` (this batch's folder) and your category.
 - **`cells`**: what to write: `count` questions of `kinds` and `difficulty` (with a picture over the question if
   `picture`), and `spares` more of the same. Write `count + spares` of each: the checker's drops come out of the spares.
   - `split/clues`: about half of each.
-  - A hard `number` is an **estimate**: a unit, an answer above 20, one accepted value, a tolerance by the skill. The day
-    ends on it; a year or a small count is a choice in disguise.
+  - A `number` is an **estimate**: a year, or a quantity of more than 20 of its steps, with one accepted value and
+    the tolerance of the skill's formula (`bank check` says the figure). A small count is a choice in disguise. The
+    day ends on a hard one: a figure only an enthusiast can place.
   - `picture`: an easy choice with a picture (see Pictures).
   - **`dated`**: one question for each of your `dates`, in order (the first `count`, the spares on the rest), each with
     `"on": ["MM-DD"]`. A dated question is a choice without a picture (any difficulty), an easy true-or-not, or a hard
     estimate number. It is about what happened on, or is marked on, that exact day (a birth, a death, an event, a
-    holiday, a name day, a world day), and its fact says why the day in passing („На 3 март 1878 г. …“). Bulgarian
+    holiday, a name day, a world day), and its fact says the date in passing („На 3 март 1878 г. …“). Bulgarian
     events before 1916: the New Style date Bulgaria marks today. If a date truly has nothing worth asking in your
     category, take the next of your dates and say so in your notes.
 - **`firstId` … `lastId`**: your ids. Number your questions from `firstId` up, one by one, no gaps.
@@ -79,7 +80,11 @@ cd <repo> && go run ./cmd/almanac bank add -check <batch>/write/<category> <bank
 ```
 
 It writes nothing; it fails on any error, prints the warnings about your questions (fix those too, unless the
-warning is plainly wrong for the question), and says how big each category would be.
+warning is plainly wrong for the question), and says how big each category would be. Every rule of the skill's
+"The rules code checks" is an **error** for a new question: a give-away with a question in the bank, a word of the
+answer in a clue, a small count as a number, a tolerance off the formula, an option that stands out by its form. Fix
+the question; if the rule is truly wrong for it, say so in your final answer (only the owner's session waives a
+rule).
 
 Your final answer (structured): how many you wrote, by cell; the dates you couldn't fill and why; anything you're
 not fully sure of, by id (`unconfirmed`); and problems you found in questions already in the bank (by id, with the

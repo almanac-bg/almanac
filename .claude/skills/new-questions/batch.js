@@ -5,7 +5,7 @@ export const meta = {
   phases: [
     { title: 'Write', detail: 'one writer per topic, by the plan', model: 'opus' },
     { title: 'Verify', detail: 'one independent checker per topic, on another model', model: 'fable' },
-    { title: 'Cross', detail: 'pairs across the topics, equal sizes, the final batch', model: 'fable' },
+    { title: 'Cross', detail: 'pairs across the topics, the sizes, the final batch', model: 'fable' },
   ],
 }
 
@@ -51,7 +51,7 @@ const CROSSED = {
     each: { type: 'integer', description: 'how many questions every category adds in final/' },
     pairs: { type: 'integer', description: 'pairs across categories resolved' },
     dropped: { type: 'integer', description: 'questions dropped in all, checkers and cross-check' },
-    passes: { type: 'boolean', description: 'bank add -check passed on final/ with equal sizes' },
+    passes: { type: 'boolean', description: 'bank add -check passed on final/, the categories within 2% of their mean' },
     worst: { type: 'array', items: { type: 'string' }, description: 'the three worst problems the batch caught' },
   },
   required: ['each', 'pairs', 'dropped', 'passes', 'worst'],
