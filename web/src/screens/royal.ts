@@ -365,7 +365,12 @@ function soon(view: () => Evening, now: Signal<number>): Child {
       "section",
       { class: "card royal-next" },
       h("p", { class: "kicker" }, "Следващият Роял"),
-      h("strong", { class: "royal-when" }, () => when(view().startsAt, now())),
+      // The day in words, the hour in the numerals: „днес в“ small, „21:00“ big.
+      h("strong", { class: "royal-when" }, () => {
+        const at = when(view().startsAt, now());
+        const cut = at.lastIndexOf(" ") + 1;
+        return [h("span", { class: "num-word" }, at.slice(0, cut)), at.slice(cut)];
+      }),
       h("p", { class: "muted" }, () => {
         // When; a countdown too in the last hour.
         const ms = view().opensAt - now();

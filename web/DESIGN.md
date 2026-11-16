@@ -9,8 +9,9 @@ three when you add or change a screen.
 
 - **One obvious action per screen**, and it is the gold button: `.btn.primary`, plus `big` for a screen's main
   action. Everything else is a plain `.btn` or a `.link`.
-- **Gold means the one right answer**, as in the logo: the primary action, progress (the timer, the current pip,
-  the streak) and reward (points, first place). Nothing is gold for decoration.
+- **Gold means the one right answer**, as in the logo: the primary action, the current game's progress (the timer,
+  the current pip), the streak, and reward just earned (points, first place, an exact answer). Nothing else: where
+  the player is takes the accent, levels lilac, XP in a list muted, and nothing is gold for decoration.
 - **Numbers are the heroes.** Scores, places, the streak, the timer and room codes use the numeral face, with
   tabular figures.
 - **Game feel comes only from data the game has** (see Game feel below). No currencies, shops or made-up numbers:
@@ -86,8 +87,9 @@ is said once, as it opens, in one quiet line at the top of that game's news (`.n
 wherever it does (`explain()`: the word dotted under, its meaning in a small card over the page; the words are
 `meaning` in `ui.ts`):
 
-- **точки:** one game's score (right answers, speed, right in a row); the day's board is by them;
-- **XP:** what playing earns (games, goals, achievements); it adds up to the level, and the week's to the league;
+- **точки:** one game's score (right answers, speed, right in a row); the day's board is by them, and the week's
+  league by the day's, added up;
+- **XP:** what playing earns (games, goals, achievements); it adds up to the level;
 - **рейтинг:** strength in duels and Роял, up with a win, down with a loss; the division is by it.
 
 ## Space and size
@@ -118,24 +120,34 @@ wherever it does (`explain()`: the word dotted under, its meaning in a small car
 Night is on `:root`; Day replaces it under `prefers-color-scheme: light`. A rule never holds a literal colour: it
 takes a token.
 
-- **Grounds, back to front:** `--bg` (the page), `--surface` (cards that hold information), `--raised` (things you
-  press: buttons, answers) and `--sunken` (tracks, wells, inputs). Set them apart with depth (`--elev-1`,
-  `--elev-2`) and `--line`, not with borders.
+- **Grounds, back to front:** `--bg` (the page), `--surface` (cards that hold information), `--hero` (the one hero
+  card: the surface in Night, a warm white in Day, so the day outranks the tiles), `--raised` (things you press:
+  buttons, answers) and `--sunken` (tracks, wells, inputs, a question not played yet). Set them apart with depth
+  (`--elev-1`, `--elev-2`) and `--line`, not with borders; an answer's edge is `--edge` (the line in Night, stronger
+  in Day, where white answers sit on a light page).
 - **Text:** `--text` and `--text-muted`. Links, focus and the player's own choice use `--accent` (`--link`).
 - **Fills:** `--gold`, `--lilac`, `--right`, `--wrong`, `--sky`, `--rose`, `--silver` and `--bronze`, always with
   `--on-fill` text on them. A meaning set as text uses its `-ink` twin: `--gold-ink`, `--right-ink`, `--wrong-ink`,
-  `--sky-ink` or `--rose-ink`.
+  `--sky-ink` or `--rose-ink`. Gold as a big number (24px and up, or 22px bold: the streak, points just earned, the
+  winner's score) and as the time bar is `--gold-display`: gold in both themes, where `--gold-ink`, made for small
+  words, turns brown in Day.
 - **What each colour means:**
+  - `gold`: the one right answer (see Principles).
+  - `accent`: where the player is (the place in the bar, a line under it in the header, never a glow), their own
+    choice, the day's goals (their bars and marks).
   - `right`: a right answer.
   - `wrong`: a wrong answer, the last five seconds, deleting.
   - `rose`: duels and friends (an invitation to a duel, the record between two friends).
   - `sky`: rooms.
-  - `lilac`: levels.
+  - `lilac`: levels: the level's bars, the chip's and Профил's, and the level's disc on an avatar (`.lv`).
   - `silver` and `bronze`: second and third place.
 - **Topics** keep one colour everywhere: `toneOf(category)` in `ui.ts` gives gold, lilac, sky, rose or mint, in
   the bank's order. Each also has its picture (see Pictures).
 - **Right, close and wrong never rest on hue alone.** Each also gets ✓, ∼ or ✕, the word, and a filled or hollow
-  mark. „Вярно или невярно“ is the one exception on the answers themselves: a ✓ or ✕ on „Вярно“ and „Невярно“ reads
+  mark. Wherever they're marked after the moment (the pips of a run, a result, Начало's day played, a duel's marks,
+  the review), they look as the shared text has them (🟩 🟨 ⬜): right filled in `--right` with ✓, the strongest; close
+  hollow, a `--gold-ink` ring with ∼; wrong quiet, the `--sunken` of a question not played yet with a muted ✕. The red
+  is the answer card's, in the moment, and the verdict's. „Вярно или невярно“ is the one exception on the answers themselves: a ✓ or ✕ on „Вярно“ and „Невярно“ reads
   as the answer's own word, so they have none, before or after; the verdict under them carries the mark and the word.
 - **Contrast:** text holds at least 4.5:1 on its ground in both themes. `e2e/a11y.spec.ts` checks this with axe.
 
@@ -155,16 +167,19 @@ takes a token.
   - Body 16/24; `.lead` 18/26 in muted.
   - `.kicker` 12px, 800 weight, capitals with 0.14em tracking, for the date, the topic and section titles.
 - **Numerals:** 120px for the result, 56px for the question count, 52px for stats and the streak, 32px for figures
-  and points.
+  and points. The numeral face is for digits only: Cyrillic words read badly in it at display size. A word beside a
+  big number („Ниво“ 4, 7 „от“ 10, „днес в“ 21:00, a board's „точки“) is in the words' face, small, muted, on the
+  number's baseline (`.num-word`, `.sub`; `levelNumber()` in `ui.ts`).
 - **Case:** sentence case everywhere. Capitals come only through `.kicker` and `.tag`.
 
 ## Shape and depth
 
 - **Radii:** `--radius-md` for buttons, answers and inputs; `--radius-lg` for cards; `--radius-xl` for the one hero
-  card; `--radius-full` for tracks, pills and place discs; `--radius-xs` for trail pips.
+  card; `--radius-full` for tracks, pills and place discs; `--radius-xs` for trail pips and a question's picture (a
+  flag's corners stay square).
 - **Depth:** `--elev-1` at rest, `--elev-2` on hover or for the hero card.
 - **Glows are rewards:** `--glow-gold` on the primary button, first place and an exact answer; `--glow-right` on a
-  right answer. Nothing else glows.
+  right answer. Nothing else glows: not the place in the bar, not a level.
 - **Focus:** one rule for everything (`:focus-visible`): a 2px `--accent` outline, 2px off the edge. An outline
   follows the corners and no component's own shadow can cover it, so a component never sets its own.
 
@@ -195,7 +210,8 @@ takes a token.
 - **Play:**
   - `.question-head` (with `.count`, which never wraps; `.versus`, the friend in a duel with one; and `.game-leave`,
     the way out on a phone), `.leave-ask` (asked to leave while the time runs), `.trail`, `.timer` and `.ask`.
-  - `.picture` over a question: while it's asked, `picture(view, true)` keeps it low enough for the question, the
+  - `.picture` over a question, its box the picture's own (no wider than the column), a hairline `--line` inside its
+    edge so a white flag holds on a white card, on `--sunken` while it loads: while it's asked, `picture(view, true)` keeps it low enough for the question, the
     picture and the whole answering part to fit on the screen (no less than 128px); a question's time starts once
     its pictures are in.
   - `.options .option`, with the states `picked`, `placed`, `right`, `wrong` and `dim`; and `missed`, a row of a right
@@ -268,17 +284,19 @@ takes a token.
 
 ## Tiers
 
-- **Four tiers of achievement**, each with its colour: обикновено (silver, `--tier-common`), рядко (sky,
-  `--tier-rare`), епично (violet, `--tier-epic`) and легендарно (gold, `--tier-legendary`). Each has an `-ink`
-  token for words. A `.t-<tier>` class sets `--tier` and `--tier-ink` for anything inside it.
+- **Four tiers of achievement**, each with its colour: обикновено (silver, `--tier-common`: a cool metal, never the
+  grey of what's locked), рядко (sky, `--tier-rare`), епично (violet, `--tier-epic`) and легендарно (gold,
+  `--tier-legendary`). Each has an `-ink` token for words. A `.t-<tier>` class sets `--tier` and `--tier-ink` for
+  anything inside it.
 - **Medals are pictures** (`badge-<tier>`, placed by `art/badge.ts`): the tier gives the form — common a round coin,
   rare a hexagon, epic an eight-pointed star, legendary a sunburst with ribbons — with a raised rim around a face in
   the tier's colour, where the achievement's own picture is drawn large (`medalPictures`, one per achievement). Epic
-  and legendary glow. Locked: grey; its progress is the bar beside it, never a ring around the medal. Hidden and not found: a „?“, and nothing about how
+  and legendary glow. Locked: grey (`--locked`, pale in Day); its progress is the bar beside it, never a ring around the medal. Hidden and not found: a „?“, and nothing about how
   or what it gives.
 - Every achievement says how it's earned, how far along the player is, and its reward: its tier's XP, and only
   what it would unlock that the player doesn't have (an avatar shared by a chain is the first one's; what the first
-  of a tier unlocks is said once, under the tier's heading). A title shows in its tier's ink wherever it's worn.
+  of a tier unlocks is said once, under the tier's heading). A title shows in its tier's ink wherever it's worn; as
+  an unlock it's drawn as a ribbon with a nameplate in its tier's colour (`.unlock-title-mark`).
 - **One system.** XP comes from answers, the day's goals, achievements and a week's first three places in the league;
   the rating from duels and Роял. Level, achievements, mastery, division, Роял and first place in a high league
   unlock the wardrobe. After a game, its news is three cards at most, of what the player has met (First days), under a
@@ -303,7 +321,8 @@ takes a token.
   `-rays`, `-stars`). Both unlock by level, achievement or the highest division reached, and show on every avatar
   (the server sends a look's avatar as `shape-tone/frame/backdrop`).
 - **League emblems** are pictures (`league-<tier>`): a mountain on a round of sky, rising with the league — Странджа's
-  low wooded hills, Средна гора's ridge, Родопи's first peak, then Стара планина, Пирин and Рила in snow, a star over
+  wooded hills (up to two thirds of a round of its own tint, as a topic stands on: under a pale sky its low hills
+  left an empty disc), Средна гора's ridge, Родопи's first peak, then Стара планина, Пирин and Рила in snow, a star over
   Рила — in `--lg-*` colours, green to ice (`art/league.ts` places them). In a group (`.league-board`) the ones going
   up and down are marked at the row's edge (`.row.up`, `.row.down`), with a line where each zone ends (`.league-line`).
 
@@ -346,7 +365,7 @@ Every element that looks like a game measures something the game already counts:
 | Streak       | Days in a row with the day's ten; the strip is this week's days played (`week` in `/api/day` and `/api/me/stats`)                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Начало, Профил               |
 | Points       | One game's score, per answer and per run, from the server (with the parts for speed and for the row); a right answer about 1000; never added up across games                                                                                                                                                                                                                                                                                                                                                                                                            | Verdict, result, day board   |
 | In a row     | Right answers in a row within a game, from the second (the flame and „3 поред“); each earns a tenth more, up to a half                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Question head, verdict       |
-| XP           | What knowing earns: 2 an answer and 18 more times its score (20 a right one), a finished game's 50 in the share answered right, 50 for the day's whatever the score, 50 to 150 a daily goal; adds up                                                                                                                                                                                                                                                                                                                                                                    | Level, league, goals         |
+| XP           | What knowing earns: 2 an answer and 18 more times its score (20 a right one), a finished game's 50 in the share answered right, 50 for the day's whatever the score, 50 to 150 a daily goal; adds up; muted in a list, never gold                                                                                                                                                                                                                                                                                                                                       | Level, goals                 |
 | Place        | Place on the day's board („12-и от 318 днес“)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Начало, Класации, Профил     |
 | Mastery      | Share of a topic's questions a player knows, from every answer weighed by its question's hardness (play/mastery.go); told after 10 answers, in six tiers: Новак, Любител (35%), Познавач (50%), Експерт (65%), Майстор (78%), Светило (90%)                                                                                                                                                                                                                                                                                                                             | Игра, Профил, result         |
 | Rank change  | Places moved since the previous answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Room boards                  |
@@ -354,11 +373,11 @@ Every element that looks like a game measures something the game already counts:
 | Rating       | Elo from 1000, moved by duels and Роял; shown as a division (Бронз → Легенда) with its generated emblem                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Дуел, Роял, Профил, Класации |
 | Роял         | Live at 21:00 Friday to Sunday, every evening once those fill (lobby from 20:45): up to 50 on the same question at once, 15 in three rounds; cut after 5, 8, 11, 14 by right answers (then speed), the last a final of three; those cut play on, off the standings                                                                                                                                                                                                                                                                                                      | Роял, Класации               |
 | Goals        | Three a day, kept all day: the day's questions (50 XP), one drawn (100) and a harder one (150), of two families not drawn the day before, each one that can be done that day (Роял only while the evening's is ahead, and as on Начало for a new player); each a link to where it's done, told at the game's end                                                                                                                                                                                                                                                        | Начало, result               |
-| League       | A race every week (Monday to Sunday) on the XP earned, in a group of up to 20 of the player's league: Странджа, Средна гора, Родопи, Стара планина, Пирин, Рила. At the week's end the first go up (5 of a full group), the last go down, and the first three earn 300, 200 and 100 XP; first place in Рила is a title that counts („Двукратен шампион на Рила“)                                                                                                                                                                                                        | Класации, Профил             |
+| League       | A race every week (Monday to Sunday) on the day's points, added up day by day, in a group of up to 20 of the player's league: Странджа, Средна гора, Родопи, Стара планина, Пирин, Рила. At the week's end the first go up (5 of a full group), the last go down, and the first three earn 300, 200 and 100 XP; first place in Рила is a title that counts („Двукратен шампион на Рила“)                                                                                                                                                                                | Класации, Профил             |
 | Boards       | The day's ten, the week's league group, rating (10 rated games or more) and knowledge (mastery, the share of the questions known, after 100 answers, or 30 in a topic), of everyone or of friends                                                                                                                                                                                                                                                                                                                                                                       | Класации                     |
 | Friends      | The day's board among you and your friends, once a friend has played                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Класации                     |
-| Level        | All the XP a player has earned; each level takes 150 more than the last (300 for the first)                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Начало, Профил, avatars      |
-| Achievements | 19 facts of a player's games in four tiers (обикновени, редки, епични, легендарни), each saying how it's earned; announced once                                                                                                                                                                                                                                                                                                                                                                                                                                         | Result, Профил               |
+| Level        | All the XP a player has earned; each level takes 150 more than the last (300 for the first); lilac (its bars, the disc on an avatar)                                                                                                                                                                                                                                                                                                                                                                                                                                    | Начало, Профил, avatars      |
+| Achievements | 33 facts of a player's games in four tiers (обикновени, редки, епични, легендарни), each saying how it's earned; announced once                                                                                                                                                                                                                                                                                                                                                                                                                                         | Result, Профил               |
 | Titles       | Words for the player and their knowledge, worn under their name, never only a deed, one tap's luck or the hour: a ladder by level („Нова искра“ at 1 … „Жив алманах“ at 50, worn until the player chooses another, the newest reached), some achievements of how someone plays („Светкавица“: five right in a game, each under 3 s), a topic's mastery („Майстор · История“, „Светило · История“), and the rating and the league (divisions, a Роял won, Рила's champion counted). In their tier's colour; yours first, the locked ones by group with what unlocks them | Boards, friends, rooms       |
 | Avatars      | A picture on a tone: nine animals free, emblems unlocked by achievements (the crown at level 10)                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Everywhere a player is       |
 
@@ -407,7 +426,7 @@ Feedback fires once, when it's earned, and then the screen is still again:
   reload): the pips fill one by one (60ms apart, each with a pluck on the scale, a muted thud for a wrong one); at
   700ms the score lands (1.15→1) with the motif and the points count up; on the day, at 1.1s the streak's number rolls
   from the day before with the flame, unlit till then, lighting and swelling once and its sound, and the level's bar fills in its chip (a new level:
-  to the end, a gold flash, the number rolls, it fills again). Ten of ten: the pips sweep gold, „Всички верни“ and the
+  to the end, a lilac flash, the number rolls, it fills again). Ten of ten: the pips sweep gold, „Всички верни“ and the
   rosette as a seal, drawn petal by petal, the gold one last. All typographic: no particles.
 - **A duel's result lands, once** (feel.ts `duel`, at most 1.6s, a tap jumps to the end, never again on that
   device): the verdict waits while the marks fill pair by pair (75ms apart, a pluck for each of the player's right

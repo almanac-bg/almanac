@@ -21,6 +21,7 @@ import {
   badge,
   type Division,
   explain,
+  levelNumber,
   meaning,
   meter,
   type Open,
@@ -180,7 +181,7 @@ function bigOne(
     return el;
   };
   const numeral = (text: string) =>
-    h("b", { class: "num", style: { font: "900 7.5rem/1 var(--font-numeral)", color: "var(--gold-ink)" } }, text);
+    h("b", { class: "num", style: { font: "900 7.5rem/1 var(--font-numeral)", color: "var(--gold-display)" } }, text);
   const e = n.league;
   if (e && (e.moved > 0 || e.place <= 3))
     return {
@@ -314,7 +315,7 @@ export function levelCard(level: number, xp: number, from: number, to: number, u
       "div",
       { class: "level-head" },
       up ? h("p", { class: "kicker" }, "Ново ниво") : null,
-      h("span", { class: "level-n" }, `Ниво ${level}`),
+      h("span", { class: "level-n" }, levelNumber(level)),
       h("span", { class: "muted" }, `${earned > 0 ? `+${earned} XP · ` : ""}още ${to - xp} XP до ниво ${level + 1}`),
     ),
     meter(share, `${share}% от ниво ${level}`),

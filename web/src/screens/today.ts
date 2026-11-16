@@ -25,6 +25,7 @@ import { player, playing, user } from "../state.ts";
 import {
   explain,
   formatNumber,
+  levelNumber,
   meter,
   type Open,
   pointsWords,
@@ -342,7 +343,7 @@ function status(t: Today): HTMLElement {
           h(
             "span",
             { class: "status-text" },
-            h("b", { class: "status-n" }, `Ниво ${lv.level}`),
+            h("b", { class: "status-n" }, levelNumber(lv.level)),
             h("span", { class: "status-label" }, `още ${lv.to - lv.xp} XP`),
           ),
           meter(share, `${share}% от ниво ${lv.level}`),

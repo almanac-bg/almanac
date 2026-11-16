@@ -3,6 +3,7 @@ package play
 import (
 	"os"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -170,5 +171,24 @@ func TestDevotionMigrationOn(t *testing.T) {
 		('title:grit:Упоритост', 'title:keeper:Пазител на Алманаха')`, well).Scan(&n)
 	if n != 2 {
 		t.Fatalf("%d of the new names told", n)
+	}
+}
+
+// The avatars the game gives: players who sign up one after another differ in tone as well as shape, the first ones
+// aren't all one tone, and every shape comes in every tone.
+func TestDefaultAvatars(t *testing.T) {
+	pairs := map[string]bool{}
+	n := int64(len(FreeShapes) * len(Tones))
+	for id := int64(1); id <= n; id++ {
+		a, b := DefaultAvatar(id), DefaultAvatar(id+1)
+		pairs[a] = true
+		_, toneA, _ := strings.Cut(a, "-")
+		_, toneB, _ := strings.Cut(b, "-")
+		if toneA == toneB {
+			t.Fatalf("players %d and %d share the tone %s", id, id+1, toneA)
+		}
+	}
+	if len(pairs) != int(n) {
+		t.Fatalf("%d of %d shapes and tones given", len(pairs), n)
 	}
 }

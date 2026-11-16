@@ -12,6 +12,7 @@ import {
   avatar,
   badge,
   explain,
+  levelNumber,
   meaning,
   meter,
   profileHref,
@@ -117,7 +118,7 @@ function levelCard(p: Progress): Child {
           h(
             "div",
             { class: "level-head" },
-            h("span", { class: "level-n" }, `Ниво ${p.level}`),
+            h("span", { class: "level-n" }, levelNumber(p.level)),
             h("span", { class: "muted" }, explain(`още ${p.to - p.xp} XP`, meaning.xp), ` до ниво ${p.level + 1}`),
           ),
           meter(share, `${share}% от ниво ${p.level}`),
