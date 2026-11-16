@@ -398,3 +398,81 @@ func TestLiveDuels(t *testing.T) {
 	}
 	db.Close()
 }
+
+// openBefore opens a database migrated up to (not with) the named migration.
+func openBefore(t *testing.T, path, name string) *DB {
+	t.Helper()
+	files, _ := fs.Glob(migrations, "migrations/*.sql")
+	n := 0
+	for _, f := range files {
+		if strings.TrimPrefix(f, "migrations/") < name {
+			n++
+		}
+	}
+	return openAt(t, path, n)
+}
+
+// Titles by play (0046): „Под две секунди“ is kept only by who meets „Пет за миг“'s rule (five right in one game, each
+// under 3 s), with a rare one's XP; the others lose it, its title and avatar (taken off) and their telling; the clock's
+// and the last second's titles go from whoever wears them.
+func TestFastByTheNewRule(t *testing.T) {
+	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0046_titles_by_play.sql")
+	for _, q := range []string{
+		`INSERT INTO users (id, name, tag, created_at, seen_at, title, avatar) VALUES
+			(1, 'А', 'a', 1, 1, 'speedDemon', 'bolt-gold'), (2, 'Б', 'b', 1, 1, 'speedDemon', 'bolt-rose'),
+			(3, 'В', 'c', 1, 1, 'nightOwl', 'fox-sky')`,
+		`INSERT INTO runs (id, user_id, kind, questions, started_at) VALUES (1, 1, 'topic', '[]', 1),
+			(2, 2, 'topic', '[]', 1), (3, 2, 'topic', '[]', 1)`,
+		// Five quick right answers in one game; four in one (the fifth on the line) and one in another.
+		`INSERT INTO answers (run_id, n, question_id, score, points, is_right, ms, at) VALUES
+			(1, 0, 'q', 1, 0, 1, 900, 1), (1, 1, 'q', 1, 0, 1, 1500, 1), (1, 2, 'q', 1, 0, 1, 2000, 1),
+			(1, 3, 'q', 1, 0, 1, 2500, 1), (1, 4, 'q', 1, 0, 1, 2999, 1),
+			(2, 0, 'q', 1, 0, 1, 900, 1), (2, 1, 'q', 1, 0, 1, 900, 1), (2, 2, 'q', 1, 0, 1, 900, 1),
+			(2, 3, 'q', 1, 0, 1, 900, 1), (2, 4, 'q', 1, 0, 1, 3000, 1), (3, 0, 'q', 1, 0, 1, 900, 1)`,
+		`INSERT INTO achievements (user_id, id, at, xp) VALUES (1, 'fast', 1, 50), (2, 'fast', 1, 50),
+			(2, 'perfect', 1, 150)`,
+		`INSERT INTO unlocks_told (user_id, id) VALUES (1, 'title:speedDemon:Светкавица'), (1, 'avatar:bolt:'),
+			(2, 'title:speedDemon:Светкавица'), (2, 'avatar:bolt:'), (3, 'title:nightOwl:Нощна сова')`,
+	} {
+		if _, err := db.Write.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	if err := db.migrate(); err != nil {
+		t.Fatal(err)
+	}
+	look := func(id int) string {
+		var title, avatar sql.NullString
+		_ = db.Read.QueryRow(`SELECT title, avatar FROM users WHERE id = ?`, id).Scan(&title, &avatar)
+		return title.String + " " + avatar.String
+	}
+	count := func(q string) int {
+		var n int
+		if err := db.Read.QueryRow(q).Scan(&n); err != nil {
+			t.Fatal(q, err)
+		}
+		return n
+	}
+	if got := look(1); got != "speedDemon bolt-gold" {
+		t.Errorf("who meets the rule: %q", got)
+	}
+	if xp := count(`SELECT xp FROM achievements WHERE user_id = 1 AND id = 'fast'`); xp != 150 {
+		t.Errorf("kept with %d XP", xp)
+	}
+	if n := count(`SELECT count(*) FROM unlocks_told WHERE user_id = 1`); n != 2 {
+		t.Errorf("who meets the rule keeps %d told", n)
+	}
+	if got := look(2); got != " " {
+		t.Errorf("who doesn't: %q", got)
+	}
+	if n := count(`SELECT count(*) FROM achievements WHERE user_id = 2`); n != 1 {
+		t.Errorf("who doesn't keeps %d achievements", n)
+	}
+	if n := count(`SELECT count(*) FROM unlocks_told WHERE user_id IN (2, 3)`); n != 0 {
+		t.Errorf("still told: %d", n)
+	}
+	if got := look(3); got != " fox-sky" {
+		t.Errorf("the night's title: %q", got)
+	}
+	db.Close()
+}
