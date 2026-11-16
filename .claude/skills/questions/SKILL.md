@@ -299,7 +299,10 @@ shows with the answer, over the fact: the player learns why the day. (The owner'
 **A new batch is `/new-questions`** (`.claude/skills/new-questions/`): it runs these steps with the plan from
 `almanac bank plan` (what to write, for the day's shortest runway and the dates with the fewest questions, the same in
 every topic), writers and independent checkers on fixed models, a cross-check over all topics, and `almanac bank add`
-(all of the batch, or nothing). By hand, for a fix or a few questions:
+(all of the batch, or nothing). **Fixes by the rules are `/fix-questions`**: what `bank lint` flags (or a rule code can't check, judged by
+selector), fixed a chunk at a time by a fixer and an independent checker, and added through `bank add`. A new rule is
+a check in `internal/bank/rules.go` first, then a `/fix-questions` pass over what it flags: never a pass over the whole
+bank. By hand, for a fix or a few questions:
 
 1. **Find the gaps:** run `bank check` and read the day's runway and the balance report. Plan the batch from the
    shortest runway first (every place under 150 days before anything else), then the kinds a category lacks; about
