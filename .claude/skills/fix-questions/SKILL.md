@@ -41,7 +41,8 @@ If an agent fails because a model isn't available, stop and tell the owner; neve
    notes for what the fixers got wrong, and sharpen FIX.md before the rest.
 5. **Apply each run**: `python3 -I <skill>/merge.py <work> <bank> <chunks…>` (the checked chunks into
    `<work>/batch/`, their waivers into `<bank>/waivers.json`), then `bank add -checked-by "fix-questions fable-5.2"
-   <work>/batch <bank>`, `bank fmt`, `bank check` (no errors). If `bank add` refuses, read why: a chunk whose new
+   <work>/batch <bank>`, `bank fmt`, `bank check` (no errors). A changed question's old picture stays on disk: `git rm` the files
+   `bank lint -rule picture <bank>` says no question uses. If `bank add` refuses, read why: a chunk whose new
    question collides with another's, or a change that made a new problem, goes back to its checker's notes; leave
    that chunk out (`merge.py` with the others) and fix it in the next round.
 6. **Make the work list again** (step 3) before the next run: the bank moved (the lint, the free ids). `merge.py`

@@ -60,6 +60,11 @@ What the rules ask (the questions skill has the details):
 write any new question, claim its subject: `grep -i '<answer>' <work>/claims.txt` — if another chunk has it, pick
 another subject — then `echo '<chunk> <answer> | <subject>' >> <work>/claims.txt`.
 
+**Every word you write can give another question away**, and `bank add -check` sees only a few kinds of it: in round
+1 most of what the checkers caught was a new fact, `day` line, item or option that named another question's answer
+or showed a value it asks. For each name, year and number you write, grep the bank, and if it's another question's
+answer, or the value it asks next to its subject, write something else.
+
 Before you change anything, **grep the bank** for the subject, the answer and the key names and numbers (no new
 give-away, no near-duplicate), and **confirm every claim from a page you read in this session** (bg/en Wikipedia,
 Britannica, official sites; WebFetch the page itself; WebSearch is rate-limited). Never send personal data anywhere.
