@@ -88,7 +88,11 @@ test("two people asking for a duel play it live", async ({ browser }, info) => {
   await expect(a.getByRole("heading", { name: "Търсим съперник" })).toBeVisible();
   await b.goto("/duel");
   await b.getByRole("button", { name: "Намери съперник" }).click();
-  for (const p of [a, b]) await expect(p.getByRole("heading", { name: "Съперникът е тук" })).toBeVisible();
+  for (const p of [a, b]) {
+    await expect(p.getByRole("heading", { name: "Съперникът е тук" })).toBeVisible();
+    // The seconds to the first question, seen as they're heard: big, in the screen, above the tabs.
+    await expect(p.getByRole("timer")).toBeInViewport();
+  }
   // Ana's first answer doesn't get through (the line drops as it's sent): it's sent again, and Bo sees it come.
   await a.route("**/api/duels/live/*/answer", (route) => route.abort("connectionreset"), { times: 1 });
   for (let n = 0; n < 10; n++) {

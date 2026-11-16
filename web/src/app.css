@@ -3032,6 +3032,22 @@
     font-weight: 800;
   }
 
+  /* The seconds to the first question, under the two: smaller on a short phone, so they stay above the tabs. */
+  .live-intro .ready-clock {
+    justify-self: center;
+  }
+
+  @media (max-height: 700px) {
+    .live-intro .ready-clock {
+      width: 120px;
+      height: 120px;
+    }
+
+    .live-intro .ready-n {
+      font-size: 3.25rem;
+    }
+  }
+
   .live-board {
     display: grid;
     grid-template-columns: 1fr 1fr;

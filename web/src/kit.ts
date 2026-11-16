@@ -8,7 +8,7 @@ import { emblem } from "./art/emblem.ts";
 import { news } from "./game/news.ts";
 import { answered, ask, crowdLine, picture } from "./game/questions.ts";
 import { boardRow, hands, landing, nextSteps, review, reviewParts, shareButton } from "./game/results.ts";
-import { countdown, questionHead, timer, trail, upNext } from "./game/run.ts";
+import { countdown, questionHead, readyClock, timer, trail, upNext } from "./game/run.ts";
 import { api, deliver } from "./lib/api.ts";
 import { keepAwake } from "./lib/awake.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked } from "./lib/dom.ts";
@@ -88,6 +88,7 @@ export const kit = {
   pushable,
   pushOn,
   questionHead,
+  readyClock,
   record,
   review,
   reviewParts,

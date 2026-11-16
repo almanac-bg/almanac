@@ -115,22 +115,11 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
     else if (e.key === "Enter" && !(e.target as Element).closest?.("button:enabled, a")) begin();
   });
 
-  // The ring: a full circle that runs down with the clock (in CSS, over the same seconds), like a question's time bar.
-  const ring = svg("svg", { class: "ready-ring", viewBox: "0 0 120 120", "aria-hidden": "true" });
-  const circle = (cls: string) => svg("circle", { class: cls, cx: 60, cy: 60, r: 52, pathLength: 100 });
-  ring.append(circle("ready-track"), circle("ready-arc"));
-  ring.style.setProperty("--ready", `${seconds}s`);
-
   return h(
     "div",
     { class: "screen get-ready" },
     h("div", { class: "intro" }, h("p", { class: "kicker" }, what), h("h1", null, "Приготви се")),
-    h(
-      "div",
-      { class: "ready-clock", role: "timer", "aria-label": () => `Започва след ${left()} с` },
-      ring,
-      h("b", { class: "ready-n" }, () => String(Math.max(1, left()))),
-    ),
+    readyClock(seconds * 1000, left),
     h(
       "div",
       { class: "actions" },
@@ -147,6 +136,22 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
         h("kbd", { class: "key-hint", "aria-hidden": "true" }, "Esc"),
       ),
     ),
+  );
+}
+
+/** The seconds before a start, big, in a ring that runs out with them (in CSS, over the same time, like a question's
+ * time bar): before a run, and as a live duel's two are shown. `ms` is the time to the start, `left` the whole seconds
+ * still to go. */
+export function readyClock(ms: number, left: () => number): Child {
+  const ring = svg("svg", { class: "ready-ring", viewBox: "0 0 120 120", "aria-hidden": "true" });
+  const circle = (cls: string) => svg("circle", { class: cls, cx: 60, cy: 60, r: 52, pathLength: 100 });
+  ring.append(circle("ready-track"), circle("ready-arc"));
+  ring.style.setProperty("--ready", `${ms}ms`);
+  return h(
+    "div",
+    { class: "ready-clock", role: "timer", "aria-label": () => `Започва след ${Math.max(1, left())} с` },
+    ring,
+    h("b", { class: "ready-n" }, () => String(Math.max(1, left()))),
   );
 }
 

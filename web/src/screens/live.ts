@@ -39,6 +39,7 @@ let {
   player,
   playing,
   questionHead,
+  readyClock,
   signal,
   timer,
   title,
@@ -152,6 +153,7 @@ export function liveDuel(kit: Kit) {
     player,
     playing,
     questionHead,
+    readyClock,
     signal,
     timer,
     title,
@@ -294,12 +296,13 @@ function waiting(wait: () => Wait): Child {
   );
 }
 
-/** The two, face to face, before the first question: a ping as the other is found, a beep for each of the last
- * seconds. */
+/** The two, face to face, before the first question, and the seconds to it, big, in a ring: a ping as the other is
+ * found, a beep for each of the last seconds. */
 function intro(v: LiveView): Child {
   play("ping");
   loadDuelResult().catch(() => {}); // the result's screen, on its way while they play
-  const left = signal(Math.max(1, Math.ceil((v.startsMs ?? 0) / 1000)));
+  const ms = v.startsMs ?? 0;
+  const left = signal(Math.max(1, Math.ceil(ms / 1000)));
   const tick = setInterval(() => {
     const was = left.peek();
     left.update((n) => Math.max(1, n - 1));
@@ -317,7 +320,7 @@ function intro(v: LiveView): Child {
     );
   return h(
     "div",
-    { class: "stack" },
+    { class: "stack live-intro" },
     h(
       "div",
       { class: "intro" },
@@ -338,7 +341,7 @@ function intro(v: LiveView): Child {
       h("span", { class: "live-vs", "aria-hidden": "true" }, "срещу"),
       card(v.them, v.recorded ? "Запис" : "Съперник"),
     ),
-    h("p", { class: "status", role: "status" }, () => `Започваме след ${left()}…`),
+    readyClock(ms, left),
   );
 }
 
