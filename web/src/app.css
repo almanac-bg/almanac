@@ -987,8 +987,13 @@
     white-space: nowrap;
   }
 
-  .status-item .status-flame {
+  .status-icon {
+    position: relative;
     flex: none;
+  }
+
+  .status-item .status-flame {
+    display: block;
     width: 44px;
     height: 44px;
   }
@@ -4842,13 +4847,25 @@
     font-weight: 700;
   }
 
+  /* The reserve days, a badge on the flame's corner. */
   .status-reserve {
+    position: absolute;
+    right: -2px;
+    bottom: -4px;
     display: inline-flex;
     align-items: center;
-    gap: 2px;
-    margin-left: auto;
-    font-size: 0.8125rem;
+    padding: 1px 4px 1px 1px;
+    border-radius: 999px;
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--line);
+    font-size: 0.75rem;
+    line-height: 1rem;
     font-weight: 700;
+  }
+
+  .status-reserve .reserve-pic {
+    width: 1rem;
+    height: 1rem;
   }
 
   /* How it all fits together (Награди), and what comes next (Профил). */

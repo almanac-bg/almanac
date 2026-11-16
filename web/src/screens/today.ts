@@ -248,7 +248,8 @@ function repairCard(r: Today["repair"]): Child {
 }
 
 /** The streak and (once XP is open: a first day has the streak only) the level, side by side: each a tap from Профил,
- * where there's more of both. */
+ * where there's more of both. The reserve days sit on the flame's corner, so the streak's words keep the chip's width
+ * (half a phone's, or the side column's on a wide screen). */
 function status(t: Today): HTMLElement {
   const days = t.streak;
   const lv = t.open?.xp ? t.level : undefined;
@@ -259,22 +260,26 @@ function status(t: Today): HTMLElement {
     h(
       "a",
       { class: days ? "status-item streak-chip" : "status-item streak-chip cold", href: "/me" },
-      picture("flame", "flame status-flame"),
+      h(
+        "span",
+        { class: "status-icon" },
+        picture("flame", "flame status-flame"),
+        t.reserve
+          ? h(
+              "span",
+              { class: "status-reserve", title: reserveWords(t.reserve) },
+              picture("shield", "reserve-pic"),
+              h("b", { class: "num", "aria-hidden": "true" }, String(t.reserve)),
+              h("span", { class: "sr" }, reserveWords(t.reserve)),
+            )
+          : null,
+      ),
       h(
         "span",
         { class: "status-text" },
         h("b", { class: "status-n" }, String(days)),
         h("span", { class: "status-label" }, days === 1 ? "ден поред" : "дни поред"),
       ),
-      t.reserve
-        ? h(
-            "span",
-            { class: "status-reserve", title: reserveWords(t.reserve) },
-            picture("shield", "reserve-pic"),
-            h("b", { class: "num", "aria-hidden": "true" }, String(t.reserve)),
-            h("span", { class: "sr" }, reserveWords(t.reserve)),
-          )
-        : null,
     ),
     lv
       ? h(
