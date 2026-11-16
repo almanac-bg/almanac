@@ -149,7 +149,7 @@ func (d *dealtSplit) Reveal(c *Crowd) any {
 	for i, b := range d.order {
 		sides[i] = d.q.Items[b].Group
 	}
-	return struct {
+	return &struct {
 		Sides []int `json:"sides"`
 		reveal
 	}{sides, revealOf(&d.q.Head, &d.q.Tail, c.view(nil))}

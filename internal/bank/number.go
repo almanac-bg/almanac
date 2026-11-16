@@ -261,7 +261,7 @@ func (d *dealtNumber) Grade(answer json.RawMessage) (Graded, error) {
 }
 
 func (d *dealtNumber) Reveal(c *Crowd) any {
-	return struct {
+	return &struct {
 		Value float64 `json:"value"`
 		Unit  string  `json:"unit,omitempty"`
 		reveal

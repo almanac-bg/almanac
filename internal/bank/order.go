@@ -230,7 +230,7 @@ func (d *dealtOrder) Reveal(c *Crowd) any {
 	for i, b := range d.order {
 		values[i] = d.q.Items[b].Value
 	}
-	return struct {
+	return &struct {
 		Order  []int     `json:"order"`
 		Values []float64 `json:"values"`
 		Unit   string    `json:"unit,omitempty"`

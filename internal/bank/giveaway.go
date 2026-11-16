@@ -72,6 +72,7 @@ func exposuresOf(q Question) []exposure {
 		in(text, "text") // a false statement's numbers are the wrong ones
 	}
 	in(q.Extra().Fact, "fact")
+	in(q.Extra().Day, "day's line")
 	switch q := q.(type) {
 	case *Number:
 		out = append(out, exposure{q, q.Answer, stemSet(text), "answer"})
@@ -193,6 +194,9 @@ func rulePairGiveaway(l *lintBank) []finding {
 			for _, s := range strings.SplitAfter(f, ". ") {
 				lines = append(lines, line{q, places(s), "its fact: " + strings.TrimSpace(s)})
 			}
+		}
+		if d := q.Extra().Day; d != "" {
+			lines = append(lines, line{q, places(d), "its day's line: " + d})
 		}
 	}
 	byStem := map[string][]int{}

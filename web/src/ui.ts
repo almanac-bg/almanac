@@ -83,7 +83,6 @@ export function verdict(
   );
 }
 
-/** The fact behind an answer. */
 /** A segmented switch of a few choices: tabs that switch what a screen shows, or (`radio`) a setting to choose. */
 export function segmented<T>(
   label: string,
@@ -111,8 +110,16 @@ export function segmented<T>(
   );
 }
 
-export function fact(text: string): Child {
-  return h("aside", { class: "fact" }, h("h2", null, "Знаеше ли?"), h("p", null, text));
+/** The fact behind an answer; over it, for a question of the day's ten dealt on its date, what happened that day
+ * („На този ден“). Nothing when there's neither. */
+export function fact(text?: string, day?: string): Child {
+  if (!text && !day) return null;
+  return h(
+    "aside",
+    { class: day ? (text ? "fact dated" : "fact dated alone") : "fact" },
+    day ? h("div", { class: "fact-day" }, h("h2", null, "На този ден"), h("p", null, day)) : null,
+    text ? [h("h2", null, "Знаеше ли?"), h("p", null, text)] : null,
+  );
 }
 
 const tones = ["gold", "lilac", "sky", "rose", "mint"];

@@ -6,7 +6,8 @@
 // player gave. Adding a type is a new file here and its renderer in the web client; nothing else changes. With the
 // answer a deal also shows how players have answered the question so far (crowd.go), in its own order. What a question
 // names (subjects.go) keeps a day to one question of a subject, and tells the bank's keepers which subjects come back.
-// A batch of new questions goes in whole or not at all (add.go): checked against the bank as it would be first.
+// A batch goes in whole or not at all (add.go): its new questions, its changes to questions the bank has, and its
+// retirements, checked against the bank as it would be first.
 //
 // Besides its format (check.go), a loaded bank is held to every rule of the questions skill a program can judge
 // (rules.go): how lines end and are typed (wording.go), the options (options.go), numbers as estimates with one
@@ -73,9 +74,13 @@ type Tail struct {
 	RetiredWhy string `json:"retiredWhy,omitempty"`
 	ReplacedBy string `json:"replacedBy,omitempty"`
 	// On are the days the question belongs to: "MM-DD" every year (3 March, a birthday), or "YYYY-MM-DD" that year
-	// only (a moving feast: Великден). On such a day it goes into the day's questions („На този ден“), its fact saying
+	// only (a moving feast: Великден). On such a day it goes into the day's questions („На този ден“), its Day saying
 	// why.
 	On []string `json:"on,omitempty"`
+	// Day is the line of a question that belongs to days (On): what happened on that day, naming it („На 16 декември
+	// 1982 г. умира Колин Чапман.“). It shows with the answer (it could give the answer away before), and only when the
+	// question is dealt on its day as „На този ден“ (RevealOn), so that the fact is free to say something else.
+	Day string `json:"day,omitempty"`
 	// BG is a question about Bulgaria: its people, places, history, culture, language, sport. Every day has a few.
 	BG bool `json:"bg,omitempty"`
 	// Sources are the pages the answer and the fact were confirmed on (URLs): what a later check starts from, and
@@ -185,9 +190,11 @@ func viewOf(h *Head, t *Tail) view {
 }
 
 // reveal is what every type's reveal ends with: the question's id (for reporting it, once it's answered), the fact
-// behind the answer, the picture's credit, and how players have answered it.
+// behind the answer, the line of its day (dealt on it: RevealOn), the picture's credit, and how players have answered
+// it. Each type's reveal is a pointer to a struct that embeds it, so that RevealOn can add the day's line.
 type reveal struct {
 	ID     string       `json:"id"`
+	Day    string       `json:"day,omitempty"`
 	Fact   string       `json:"fact,omitempty"`
 	Credit *ImageCredit `json:"credit,omitempty"`
 	Crowd  *CrowdView   `json:"crowd,omitempty"`
@@ -195,6 +202,20 @@ type reveal struct {
 
 func revealOf(h *Head, t *Tail, c *CrowdView) reveal {
 	return reveal{ID: h.ID, Fact: t.Fact, Credit: t.Image.credit(), Crowd: c}
+}
+
+func (r *reveal) shared() *reveal { return r }
+
+// RevealOn is a deal's reveal in the day's questions of day (YYYY-MM-DD; "" for any other game): with the line of its
+// day (Tail.Day) when the question belongs to that day („На този ден“), as Reveal without it otherwise.
+func RevealOn(d Dealt, c *Crowd, day string) any {
+	out := d.Reveal(c)
+	if t := d.Question().Extra(); day != "" && t.OnDay(day) {
+		if r, ok := out.(interface{ shared() *reveal }); ok {
+			r.shared().Day = t.Day
+		}
+	}
+	return out
 }
 
 func mustJSON(v any) json.RawMessage {

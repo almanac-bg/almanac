@@ -24,6 +24,7 @@ const (
 	groupMax     = 24  // a split's group: two buttons side by side on a phone
 	unitMax      = 12
 	factMax      = 200 // "Знаеше ли?": one or two sentences, read at a glance
+	dayMax       = 100 // the line of a question's day („На този ден“): one short sentence
 )
 
 var idPattern = regexp.MustCompile(`^[a-z]+-[0-9]+$`)
@@ -91,6 +92,12 @@ func checkQuestion(q Question, today string) (errs []string, warnings []Problem)
 	}
 	if t.Fact != "" {
 		errs = append(errs, checkLine("fact", t.Fact, factMax)...)
+	}
+	if t.Day != "" {
+		errs = append(errs, checkLine("day", t.Day, dayMax)...)
+		if len(t.On) == 0 {
+			errs = append(errs, "day is the line of a question for a day: it goes with on")
+		}
 	}
 	errs = append(errs, checkDate("added", t.Added)...)
 	errs = append(errs, checkDate("changed", t.Changed)...)

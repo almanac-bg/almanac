@@ -151,7 +151,7 @@ func (d *dealtChoice) Reveal(c *Crowd) any {
 			right = i
 		}
 	}
-	out := struct {
+	out := &struct {
 		Pick int `json:"pick"`
 		// Names and Credits are a choice of pictures' options' names and their pictures' credits, as shown.
 		Names   []string       `json:"names,omitempty"`

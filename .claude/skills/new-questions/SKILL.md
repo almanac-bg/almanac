@@ -89,7 +89,8 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
 ## When it goes wrong
 
 - **The bank changed under the batch** (another session committed to it): `bank add` refuses ids that aren't the
-  next free ones. Renumber the final files from the new `firstId`s (the ids aren't used anywhere yet) and add again.
+  next free ones (an id the bank has now reads as a change to that question, refused with "or, as a new question,
+  it takes the next free id"). Renumber the final files from the new `firstId`s (the ids aren't used anywhere yet) and add again.
 - **A writer or checker ran out of web search:** the brief tells them to fetch pages directly; what they couldn't
   confirm is dropped, and the cross-check fills from spares. A topic far short: resume, or run that topic again.
 - **Never** skip the checkers or the cross-check, relax a rule to keep a question, or put a dropped question back

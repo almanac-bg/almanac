@@ -5,7 +5,8 @@
 // A question's time runs only while it's shown: Show starts it, Answer stops it. A question with pictures waits for
 // them: Show starts its time PictureWait later, and Start sooner, once the player's screen has them in, so that a slow
 // line doesn't eat the time, and the server still says when it runs. Between questions a player reads the
-// answer and its fact for as long as they like. A question left showing past its time counts as unanswered, whenever
+// answer and its fact for as long as they like; a question of the day's ten dealt on its own date („На този ден“)
+// shows its day's line with them (dealtOn). A question left showing past its time counts as unanswered, whenever
 // the run is next looked at. Everything a run does goes through the database, so a refresh, a second tab or a
 // restart of the server changes nothing. A run left half-way goes on where it stopped: the day's when the player comes
 // back to it, a topic's when they start the same topic again that day (StartTopic). A game played quicker than a
@@ -148,6 +149,15 @@ func scanRun(row scanner) (*run, error) {
 	return &r, json.Unmarshal([]byte(picks), &r.picks)
 }
 
+// dealtOn is the day a run's questions are dealt for, as „На този ден“ goes: the day's questions' date, "" for any
+// other game (a question that belongs to a date is that day's only in the day's ten).
+func (r *run) dealtOn() string {
+	if r.kind == "day" {
+		return r.day
+	}
+	return ""
+}
+
 // load reads a player's run (another player's is as good as missing).
 func load(q interface {
 	QueryRow(string, ...any) *sql.Row
@@ -260,7 +270,7 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 				N: r.at, Category: d.Question().Base().Category, View: bank.ViewAt(d, max(0, since)),
 				LimitMs: limit.Milliseconds(), LeftMs: max(0, min(limit, limit-since).Milliseconds()),
 				MoreMs: bank.NextStep(d, max(0, since)).Milliseconds(), StartsMs: max(0, -since.Milliseconds()),
-				OnThisDay: r.kind == "day" && d.Question().Extra().OnDay(r.day),
+				OnThisDay: r.dealtOn() != "" && d.Question().Extra().OnDay(r.dealtOn()),
 			}
 		}
 	}
@@ -521,7 +531,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 	if err != nil {
 		slog.Warn("counting a question's crowd", "question", d.Question().Base().ID, "err", err)
 	}
-	res.Reveal = d.Reveal(crowd)
+	res.Reveal = bank.RevealOn(d, crowd, r.dealtOn())
 	if finished {
 		err = g.finished(ctx, userID, runID)
 	}
@@ -608,7 +618,7 @@ func (g *Game) Review(ctx context.Context, userID, runID int64) ([]Reviewed, err
 		if err != nil {
 			return nil, err
 		}
-		it.Category, it.View, it.Reveal = d.Question().Base().Category, d.View(), d.Reveal(crowd)
+		it.Category, it.View, it.Reveal = d.Question().Base().Category, d.View(), bank.RevealOn(d, crowd, r.dealtOn())
 		out = append(out, it)
 	}
 	return out, nil
