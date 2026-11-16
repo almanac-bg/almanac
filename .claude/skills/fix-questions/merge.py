@@ -3,7 +3,9 @@
   python3 -I merge.py <work> <bank> <chunk>…
 
 Writes <work>/batch/<category>.json (the chunks' questions, changed and new), <work>/batch/retire.json,
-<work>/batch/images/, and adds the agreed waivers to <bank>/waivers.json (none twice). Prints the counts.
+<work>/batch/images/, and adds the agreed waivers to <bank>/waivers.json (none twice). The new questions are numbered
+again from the bank's next free id, in order, so the chunks' reserved ranges leave no gaps. What the chunks judged goes
+into <work>/judged.json, so the next work list doesn't judge it again. Prints the counts.
 """
 import collections
 import json
@@ -38,6 +40,31 @@ for ch in chunks:
     w = f"{work}/checked/{ch}.waivers.json"
     if os.path.exists(w):
         waivers += json.load(open(w))
+# The bank's last number in each category (retired ones too): new ids follow it, one after another.
+last = {}
+for f in os.listdir(f"{bank}/questions"):
+    for q in json.load(open(f"{bank}/questions/{f}")):
+        p_, n = q["id"].rsplit("-", 1)
+        last[p_] = max(last.get(p_, 0), int(n))
+renum = {}
+for c, lst in qs.items():
+    news = sorted((q for q in lst if int(q["id"].rsplit("-", 1)[1]) > last[q["id"].rsplit("-", 1)[0]]),
+                  key=lambda q: int(q["id"].rsplit("-", 1)[1]))
+    for q in news:
+        p_ = q["id"].rsplit("-", 1)[0]
+        last[p_] += 1
+        renum[q["id"]] = f"{p_}-{last[p_]}"
+        q["id"] = renum[q["id"]]
+for r in retire:
+    r["by"] = renum.get(r.get("by"), r.get("by"))
+judged = json.load(open(f"{work}/judged.json")) if os.path.exists(f"{work}/judged.json") else {}
+for ch in chunks:
+    for it in json.load(open(f"{work}/chunks/{ch}.json"))["items"]:
+        judged.setdefault(it["id"], [])
+        judged[it["id"]] = sorted(set(judged[it["id"]]) | {j.split(":")[0] for j in it["judge"]})
+for new in renum.values():
+    judged[new] = ["easy-picture", "false-fact"]
+json.dump(judged, open(f"{work}/judged.json", "w"), ensure_ascii=False)
 for c, lst in qs.items():
     json.dump(lst, open(f"{out}/{c}.json", "w"), ensure_ascii=False, indent=2)
 if retire:
@@ -50,4 +77,4 @@ if new:
     with open(path, "w") as f:
         json.dump(have + new, f, ensure_ascii=False, indent=2)
         f.write("\n")
-print(f"questions {sum(len(v) for v in qs.values())}, retired {len(retire)}, waivers {len(new)} new")
+print(f"questions {sum(len(v) for v in qs.values())} ({len(renum)} new, numbered on), retired {len(retire)}, waivers {len(new)} new")
