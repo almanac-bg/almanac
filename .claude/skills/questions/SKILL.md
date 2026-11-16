@@ -110,6 +110,7 @@ enough to be worth a look, not always.
 | `dated` | A question for a day (`on`) has its day's line (`day`), ending in a period, and the line names the date („На 3 март 1878 г. …“; a moving feast's names the feast) |
 | `decoy` | A match has a decoy |
 | `giveaway` | No question shows a value another asks (a number's answer, a year a choice asks, an order's values) next to the same subject: in its text, options, items, clues, fact, day's line or reveal. Judged by the value and the rare words around it |
+| `answer-giveaway` (hint) | No question shows a choice's or clues' answer as true (text, clue, fact, day's line, item, pair) in a line that, with its question's text, shares rare words with the asking question's subject („Ариел“ in „бащата на русалката Ариел в анимацията на „Дисни““) |
 | `pair-giveaway` (hint) | No question shows both sides of a medium or hard match's pair within four words („Кучето Лайка“ for Лайка — Куче) |
 | `shared-items` | Two orders share no two items with the same values, nor three items in the same order (one's reveal orders the other); two matches share no pair |
 | `same-identity` | A "who or what is this" answer (a picture choice, clues) is asked once |

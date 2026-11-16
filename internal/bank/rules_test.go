@@ -13,7 +13,7 @@ import (
 // word with them: how much a shared word says depends on how few questions have it.
 func bankOf(qs ...Question) *Bank {
 	b := &Bank{Categories: []Category{{"gen", "Общи"}}, byID: map[string]Question{}}
-	for i := range 300 {
+	for i := range 1500 {
 		qs = append(qs, &TrueFalse{Head: Head{ID: fmt.Sprintf("pad-%d", i), Type: "truefalse", Text: "Пълнеж."}})
 	}
 	for _, q := range qs {
@@ -194,6 +194,33 @@ func TestGiveaway(t *testing.T) {
 		Tail:  Tail{Added: "2026-11-01"}}
 	died := number("lit-1", "През коя година умира Леонардо да Винчи?", 1519, 24, "")
 	if got := found(bankOf(order, died)); len(got) != 1 || !strings.HasPrefix(got[0], "giveaway") {
+		t.Errorf("found %v", got)
+	}
+}
+
+func TestAnswerGiveaway(t *testing.T) {
+	asks := choice("mov-1", "Как се казва малката русалка в анимацията на „Дисни“?", "Ариел", "Жасмин", "Бел", "Аврора")
+	shows := choice("mov-2", "Как се казва бащата на русалката Ариел в анимацията на „Дисни“?", "Тритон", "Посейдон", "Нептун", "Атлас")
+	// Rare words are rare only in a bank of some size: the rest of it, questions that share no words with these.
+	var qs []Question
+	for i := range 1500 {
+		qs = append(qs, choice(fmt.Sprintf("gen-%d", i+10), fmt.Sprintf("Въпрос номер %d за нещо?", i), "Едно", "Друго", "Трето", "Четвърто"))
+	}
+	with := func(more ...Question) []string {
+		var out []string
+		for _, f := range found(bankOf(append(slices.Clone(qs), more...)...)) {
+			if strings.HasPrefix(f, "answer-giveaway") {
+				out = append(out, f)
+			}
+		}
+		return out
+	}
+	if got := with(asks, shows); len(got) != 1 {
+		t.Errorf("found %v", got)
+	}
+	// A wrong option names it without telling: no give-away.
+	shows.Text, shows.Answer, shows.Wrong = "Коя е героинята на „Дисни“ с вълшебна лампа?", "Жасмин", []string{"Ариел", "Бел", "Аврора"}
+	if got := with(asks, shows); len(got) != 0 {
 		t.Errorf("found %v", got)
 	}
 }
