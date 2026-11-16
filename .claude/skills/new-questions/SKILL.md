@@ -26,6 +26,7 @@ Fixed for every batch, never a session's default:
 | This session (plan, merge, report) | Claude Opus 5.5 (`model: opus` above) | |
 | Writers, one per topic | Claude Opus 5.5 (`opus`, effort high) | strong writer, half Fable's price for the longest stage |
 | Checkers, one per topic, and the cross-check | Claude Fable 5.2 (`fable`, effort high) | the most capable model, on the gate that matters, and not the writers' model: a mistake one model is prone to doesn't pass its own blind spot |
+| Blind answerers, after the checkers | Claude Sonnet 5.5 (`sonnet`, effort medium) | a third model answers the checked questions without the key; where it's sure of something else, the cross-check settles it from sources |
 
 They are pinned in `batch.js`, per agent, so a subagent setting or another session model doesn't change them (this
 skill's `model:` holds only for the turn it starts in; the pins hold for the whole run). If an agent fails because a
@@ -54,7 +55,8 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
 4. **Write and check.** Run the workflow, and wait for its notification (don't poll):
    `Workflow({scriptPath: "<repo>/.claude/skills/new-questions/batch.js", args: {plan: <plan.json's content, as an
    object>, batch: "<batch>", repo: "<repo>", bank: "<bank>", skill: "<repo>/.claude/skills/new-questions"}})`.
-   It runs ten writers, each topic's checker as soon as its writer is done, then the cross-check over all ten. If it
+   It runs ten writers, each topic's checker as soon as its writer is done, then the blind answers, then the
+   cross-check over all ten. If it
    returns `done: false` (an agent died, a topic missing, or the final batch didn't pass), resume it with the same
    `scriptPath`, `args` and `resumeFromRunId`: what finished is kept. Two failed resumes: stop and tell the owner.
 5. **Read what came back:** the cross-check's result and `<batch>/final/REPORT.md`. Every category adds the same
