@@ -6,6 +6,7 @@
 // player gave. Adding a type is a new file here and its renderer in the web client; nothing else changes. With the
 // answer a deal also shows how players have answered the question so far (crowd.go), in its own order. What a question
 // names (subjects.go) keeps a day to one question of a subject, and tells the bank's keepers which subjects come back.
+// A batch of new questions goes in whole or not at all (add.go): checked against the bank as it would be first.
 package bank
 
 import (
