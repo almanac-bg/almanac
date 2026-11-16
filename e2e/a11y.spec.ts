@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { playRun } from "./play.ts";
+import { playRun, startDay } from "./play.ts";
 
 // The main screens, light and dark: nothing axe finds (contrast, names, roles, structure).
 for (const scheme of ["light", "dark"] as const) {
@@ -46,7 +46,7 @@ for (const scheme of ["light", "dark"] as const) {
     test.setTimeout(120_000);
     await page.emulateMedia({ colorScheme: scheme });
     await page.goto("/");
-    await page.getByRole("button", { name: "Започни" }).click();
+    await startDay(page);
     await playRun(page);
     await expect(page.getByRole("button", { name: "Сподели" })).toBeVisible();
     // A first day's news: what points are, in a line (play/unfold.go).

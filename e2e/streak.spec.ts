@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { daysPlayed, playRun } from "./play.ts";
+import { daysPlayed, playRun, startDay } from "./play.ts";
 
 test("a broken streak is won back: the day's ten and one more game, the same day", async ({ page }) => {
   test.setTimeout(120_000);
@@ -9,7 +9,7 @@ test("a broken streak is won back: the day's ten and one more game, the same day
   await page.reload();
   const card = page.locator(".keep-card").filter({ hasText: "Серията ти от 3 дни прекъсна" });
   await expect(card).toContainText("Върни я: изиграй днес въпросите на деня и още една игра.");
-  await page.getByRole("button", { name: "Започни" }).click();
+  await startDay(page);
   await playRun(page);
   // The day played: one game left.
   await expect(card).toContainText("Остава още една игра днес и серията се връща.");

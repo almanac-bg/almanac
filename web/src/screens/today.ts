@@ -7,7 +7,7 @@
 import { picture } from "../art/picture.ts";
 import { news } from "../game/news.ts";
 import { boardRow, hands, shareButton, summary } from "../game/results.ts";
-import { playRun, trail } from "../game/run.ts";
+import { getReady, playRun, trail } from "../game/run.ts";
 import { dayShareText, percent, rare } from "../game/share.ts";
 import type { Board, Mark, Score, State } from "../game/types.ts";
 import { type ApiError, api, tally } from "../lib/api.ts";
@@ -89,16 +89,44 @@ export function today() {
       screen.show(() => h("p", { role: "alert" }, (err as ApiError).message));
     }
   };
-  const start = (t: Today) => async () => {
-    await player();
-    const s = await api<State>("POST", "/api/day", {});
-    screen.show(() => playRun(s, (end) => home(t, end, true)));
+  // The day's ten (or the rest of them) start after the count every game has, which „Откажи“ backs out of: nothing
+  // is sent before it runs out or „Започни сега“, so a tap by mistake costs nothing. What went wrong starting shows
+  // on the day's card, back on Начало.
+  let counting = false;
+  let failed = "";
+  const back = (t: Today) => {
+    counting = false;
+    screen.show(() => home(t, t.run, false));
+    scrollTo(0, 0);
+  };
+  const start = (t: Today) => () => {
+    counting = true;
+    failed = "";
+    screen.show(() =>
+      getReady(
+        "Въпросите на деня",
+        async () => {
+          screen.show(() => h("p", { class: "muted" }, "…"));
+          try {
+            await player();
+            const s = await api<State>("POST", "/api/day", {});
+            counting = false;
+            screen.show(() => playRun(s, (end) => home(t, end, true)));
+          } catch (err) {
+            failed = (err as ApiError).message;
+            back(t);
+          }
+        },
+        () => back(t),
+      ),
+    );
+    scrollTo(0, 0);
   };
   // A new day while the screen stays open (a phone left on Начало overnight): the new day's ten, not yesterday's
-  // result with a countdown to a day that has come. Never in the middle of a game.
+  // result with a countdown to a day that has come. Never in the middle of a game, nor of its count.
   let day = "";
   const newDay = () => {
-    if (day && !document.hidden && !playing.peek() && dayInBulgaria() !== day) load();
+    if (day && !document.hidden && !playing.peek() && !counting && dayInBulgaria() !== day) load();
   };
   document.addEventListener("visibilitychange", newDay);
   const every = setInterval(newDay, 60_000);
@@ -181,7 +209,7 @@ export function today() {
               pointsWords(t.open),
               just,
             )
-          : dayCard(t, start(t), run?.trail ?? []),
+          : dayCard(t, start(t), run?.trail ?? [], failed),
         // Mid-December into January: the year in the game, a tap away.
         yearCard(),
         // A guest who keeps coming back is asked to keep their profile, once the day is played (the day comes first),
@@ -320,10 +348,8 @@ function grow(row: HTMLElement, was: Today, now: Today, delay: number): void {
 }
 
 /** The day's ten, not played yet: what they are, and the gold button; or, left half-way (`marks`: how the questions
- * answered went), where the player stopped, and the way on from there. */
-function dayCard(t: Today, start: () => Promise<void>, marks: Mark[]): Child {
-  const busy = signal(false);
-  const error = signal("");
+ * answered went), where the player stopped, and the way on from there; and what went wrong starting them (`error`). */
+function dayCard(t: Today, start: () => void, marks: Mark[], error: string): Child {
   const players = t.board.players;
   const at = marks.length;
   return h(
@@ -343,24 +369,8 @@ function dayCard(t: Today, start: () => Promise<void>, marks: Mark[]): Child {
       ),
     ),
     trail(marks, 10, at ? at : -1),
-    h(
-      "button",
-      {
-        class: "btn primary big",
-        disabled: busy,
-        onclick: async () => {
-          busy.set(true);
-          try {
-            await start();
-          } catch (err) {
-            error.set((err as ApiError).message);
-            busy.set(false);
-          }
-        },
-      },
-      at ? "Продължи" : "Започни",
-    ),
-    () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    h("button", { class: "btn primary big", onclick: start }, at ? "Продължи" : "Започни"),
+    error ? h("p", { class: "bad", role: "alert" }, error) : null,
     at
       ? null
       : h(
