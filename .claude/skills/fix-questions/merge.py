@@ -4,10 +4,12 @@
 
 Writes <work>/batch/<category>.json (the chunks' questions, changed and new), <work>/batch/retire.json,
 <work>/batch/images/, and adds the agreed waivers to <bank>/waivers.json (none twice). The new questions are numbered
-again from the bank's next free id, in order, so the chunks' reserved ranges leave no gaps. What the chunks judged goes
+again from the bank's next free id, in order, so the chunks' reserved ranges leave no gaps (their waivers follow), and
+every date is the day it goes in (a run may pass midnight). What the chunks judged goes
 into <work>/judged.json, so the next work list doesn't judge it again. Prints the counts.
 """
 import collections
+import datetime
 import json
 import os
 import shutil
@@ -44,11 +46,23 @@ for ch in chunks:
     if os.path.exists(w):
         waivers += json.load(open(w))
 # The bank's last number in each category (retired ones too): new ids follow it, one after another.
-last = {}
+last, have = {}, {}
 for f in os.listdir(f"{bank}/questions"):
     for q in json.load(open(f"{bank}/questions/{f}")):
         p_, n = q["id"].rsplit("-", 1)
         last[p_] = max(last.get(p_, 0), int(n))
+        have[q["id"]] = q
+# The dates are the day it goes in, which bank add checks, not the day an agent wrote it (a run can pass midnight):
+# a change is updated today, and changed today if the agent changed what it asks; a new question is added today.
+today = datetime.date.today().isoformat()
+for lst in qs.values():
+    for q in lst:
+        old = have.get(q["id"])
+        q["updated"] = today
+        if old is None:
+            q["added"] = today
+        elif q.get("changed") and q.get("changed") != old.get("changed"):
+            q["changed"] = today
 renum = {}
 for c, lst in qs.items():
     news = sorted((q for q in lst if int(q["id"].rsplit("-", 1)[1]) > last[q["id"].rsplit("-", 1)[0]]),
@@ -60,6 +74,8 @@ for c, lst in qs.items():
         q["id"] = renum[q["id"]]
 for r in retire:
     r["by"] = renum.get(r.get("by"), r.get("by"))
+for w in waivers:
+    w["id"] = renum.get(w["id"], w["id"])
 judged = json.load(open(f"{work}/judged.json")) if os.path.exists(f"{work}/judged.json") else {}
 for ch in chunks:
     for it in json.load(open(f"{work}/chunks/{ch}.json"))["items"]:
