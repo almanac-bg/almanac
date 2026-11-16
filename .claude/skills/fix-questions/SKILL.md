@@ -1,7 +1,7 @@
 ---
 name: fix-questions
 description: Fix questions already in АЛМАНАХ's bank by what `almanac bank lint` flags or a rule asks to judge again — a fixer and an independent checker per chunk on pinned models, then `bank add` (all of it or nothing), the report, the commit and the questions live. Run as /fix-questions [rules] [judge] [categories]; for a rule change, add the rule's check first, then run this.
-argument-hint: "[rules: all|giveaway,stale,…] [judge: false-fact,easy-picture] [categories]"
+argument-hint: "[rules: all|giveaway,stale,…] [judge: false-fact,easy-picture,blind] [categories]"
 disable-model-invocation: true
 model: opus
 effort: high
@@ -21,6 +21,17 @@ would be, all or nothing.
 
 As `/new-questions`, pinned in `fix.js` per agent: fixers Claude Opus 5.5, checkers Claude Fable 5.2 (effort high).
 If an agent fails because a model isn't available, stop and tell the owner; never run on a weaker model.
+
+## The blind pass
+
+Once in a while (after a big pass, or when the owner asks), the whole bank is answered without its key by a third
+model (Claude Sonnet 5.5, pinned in `blind.js`), and what it was sure of and the key says otherwise is judged like
+any rule:
+
+1. `python3 -I <skill>/blind.py sheets <bank> <work>` (300 questions a sheet, pictures copied beside them).
+2. `Workflow({scriptPath: "<skill>/blind.js", args: {sheets: [1, …, n], work, skill}})`; resume if `done: false`.
+3. `python3 -I <skill>/blind.py compare <bank> <work>` writes `<work>/blind/disagree.json`; then the steps below
+   from 3, with `--judge blind` (what lint flags joins in).
 
 ## Steps
 

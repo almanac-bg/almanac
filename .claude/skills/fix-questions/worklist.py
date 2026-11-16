@@ -3,7 +3,8 @@ judge, by question, in chunks of a category, each with free ids for its replacem
 
   python3 -I worklist.py <repo> <bank> <work> [--rules R,…] [--judge J,…] [--categories C,…] [--size N]
 
---rules: only these lint rules (default: all); --judge: false-fact, easy-picture (default: none); --size: items a
+--rules: only these lint rules (default: all); --judge: false-fact, easy-picture, blind (what blind.py compare
+found; default: none); --size: items a
 chunk (default 40). Writes <work>/chunks/<category>-<n>.json, and <work>/owners.json (each listed id: its chunk, so
 a fixer leaves another chunk's questions alone), and prints the chunk names, one a line. A question judged earlier in
 this pass (<work>/judged.json, kept by merge.py) isn't judged again. Make the list again after each run is in the bank:
@@ -66,6 +67,12 @@ for i, (c, q) in qs.items():
         item(i)["judge"].append("false-fact: the fact starts with what is true")
     if "easy-picture" in judge and "easy-picture" not in judged.get(i, []) and q["type"] == "choice" and q["difficulty"] == "easy" and (q.get("image") or q.get("pictures")):
         item(i)["judge"].append("easy-picture: the picture is the question, and a quarter of adults miss it")
+
+if "blind" in judge:
+    blind = json.load(open(f"{a.work}/blind/disagree.json"))
+    for i, said in blind.items():
+        if i in qs and "blind" not in judged.get(i, []):
+            item(i)["judge"].append(f"blind: {said}")
 
 shutil.rmtree(f"{a.work}/chunks", ignore_errors=True)
 os.makedirs(f"{a.work}/chunks")

@@ -46,6 +46,10 @@ What the rules ask (the questions skill has the details):
   new fact worth knowing.
 - **judge: false-fact** (a true-or-not whose answer is false): the fact must start with what is true („Роден е в
   Русе, не във Варна…“ or simply the true value first). If it does, keep; if not, change the fact only.
+- **judge: blind** (a model answering without the key was sure of another answer): find out who is right, from
+  sources. The bank wrong: change the answer (or replace it, `why`: wrong, if it then asks something else). Both
+  defensible (another option can be argued, the text reads two ways, the value differs by source): change the wording
+  or the option until one answer holds. The bank right and only one reading: keep, and say the source.
 - **judge: easy-picture** (an easy choice with a picture, the day's second place): the picture must be the question
   (a place, a face, a species, a work, something people confuse), never "name this everyday object", and a quarter of
   Bulgarian adults still miss it. If it's trivial, replace it with a good one in the same cell; pictures as in
