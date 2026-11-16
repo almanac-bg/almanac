@@ -6,9 +6,10 @@ import (
 	"strings"
 )
 
-// Give-aways across the bank: games mix topics, so one question's words can answer another's. Three rules look for
+// Give-aways across the bank: games mix topics, so one question's words can answer another's. Four rules look for
 // it: a value asked (a number's answer, a year a choice asks, an order's values) that another question shows next to
-// the same subject (ruleGiveaway); both sides of a match's pair shown together by another question
+// the same subject (ruleGiveaway); a choice's answer that another shows as true next to its subject
+// (ruleAnswerGiveaway); both sides of a match's pair shown together by another question
 // (rulePairGiveaway); two orders with items in common (ruleSharedItems).
 
 // secret is a value a question asks, with the words that say what it is the value of.
@@ -25,6 +26,15 @@ type exposure struct {
 	value   float64
 	context map[string]bool
 	where   string // where it shows: "fact", "text", "item „…“", "answer"
+}
+
+// shownLine is a line a question shows a player as true, with the words around it and its words' places.
+type shownLine struct {
+	q       Question
+	line    string
+	where   string
+	context map[string]bool
+	at      map[string][]int
 }
 
 // numericAnswer is an answer that is a number and nothing more (1877, „1 600“), as a value.
@@ -170,20 +180,7 @@ func rulePairGiveaway(l *lintBank) []finding {
 		at    map[string][]int // each stem's word places
 		where string
 	}
-	// places keeps a longer word under its first four letters too, so that a side of four (Куче) finds its longer
-	// forms (Кучето).
-	places := func(s string) map[string][]int {
-		at := map[string][]int{}
-		for i, w := range letterWords(s) {
-			if st := stem(w); st != "" {
-				at[st] = append(at[st], i)
-				if r := []rune(st); len(r) == stemLen {
-					at[string(r[:stemLen-1])] = append(at[string(r[:stemLen-1])], i)
-				}
-			}
-		}
-		return at
-	}
+	places := wordPlaces
 	var lines []line
 	for _, q := range l.live {
 		sentences, labels := asked(q)
@@ -231,6 +228,141 @@ func rulePairGiveaway(l *lintBank) []finding {
 				out = append(out, finding{ids: l.newer(q, ln.q), msg: fmt.Sprintf("%s's pair %s — %s shows together in %s: %s",
 					m.ID, p.Left, p.Right, id, ln.where)})
 			}
+		}
+	}
+	return out
+}
+
+// wordPlaces is each stem's word places in s. It keeps a longer word under its first four letters too, so that a word
+// of four (Куче) finds its longer forms (Кучето).
+func wordPlaces(s string) map[string][]int {
+	at := map[string][]int{}
+	for i, w := range letterWords(s) {
+		if st := stem(w); st != "" {
+			at[st] = append(at[st], i)
+			if r := []rune(st); len(r) == stemLen {
+				at[string(r[:stemLen-1])] = append(at[string(r[:stemLen-1])], i)
+			}
+		}
+	}
+	return at
+}
+
+// shownLines are the lines a question shows a player as true, each with the words around it: its text (unless it
+// is a false statement), its clues, its fact's sentences, its day's line, an order's items, a match's pairs, a split's
+// items. Not a choice's options: a name among four says nothing.
+func shownLines(q Question) []shownLine {
+	text := q.Base().Text
+	var out []shownLine
+	add := func(line, where string) {
+		out = append(out, shownLine{q: q, line: line, where: where, context: stemSet(line, text), at: wordPlaces(line)})
+	}
+	if tf, ok := q.(*TrueFalse); !ok || tf.Answer {
+		add(text, "text")
+	}
+	for _, s := range strings.SplitAfter(q.Extra().Fact, ". ") {
+		if s = strings.TrimSpace(s); s != "" {
+			add(s, "fact")
+		}
+	}
+	if d := q.Extra().Day; d != "" {
+		add(d, "day's line")
+	}
+	switch q := q.(type) {
+	case *Clues:
+		for _, c := range q.Clues {
+			add(c, "clue")
+		}
+	case *Order:
+		for _, it := range q.Items {
+			add(it.Text, "item")
+		}
+	case *Match:
+		for _, p := range q.Pairs {
+			add(p.Left+" — "+p.Right, "pair")
+		}
+	case *Split:
+		for _, it := range q.Items {
+			add(it.Text+" — "+q.Groups[it.Group], "item")
+		}
+	}
+	return out
+}
+
+// AnswerGiveawayFrom and AnswerGiveawayRare are how much the words around an answer shown elsewhere must say of the
+// asking question's subject: more than a value needs (GiveawayFrom), because a name stands in many lines that aren't
+// about the same thing (Варна, Турция, Норвегия); and at least one shared word must be rare (a name, a title:
+// Вестерплате, „Вчера“), not only common ones (държава, голям, българия). Measured on the real bank (16 Nov 2026):
+// 549 pairs, about four in five real (Ариел in „бащата на русалката Ариел“, Тезей beside Ариадна and the Минотавър);
+// at 10 and 5 it finds 1172, half of them a common name among common words; at 14 and 6, 291, losing real ones.
+var (
+	AnswerGiveawayFrom = 12.0
+	AnswerGiveawayRare = 5.5
+)
+
+// rarest is the weight of the rarest of the stems.
+func (l *lintBank) rarest(stems []string) float64 {
+	best := 0.0
+	for _, s := range stems {
+		best = max(best, l.weight(s))
+	}
+	return best
+}
+
+// ruleAnswerGiveaway: a choice's or clues' answer that another question shows, as true, next to the asked answer's
+// subject: „Кой композира музиката към филма „Вчера“?“ → Кирил Маричков, given away by a fact that says „…песента от
+// филма „Вчера“, по музика на Кирил Маричков“. The answer's words stand together in one line of the other question,
+// and that line and its question's text share with the asking question's text what GiveawayFrom asks of a value's
+// subject. A number answer is ruleGiveaway's.
+func ruleAnswerGiveaway(l *lintBank) []finding {
+	byStem := map[string][]shownLine{}
+	for _, q := range l.live {
+		for _, e := range shownLines(q) {
+			for s := range e.at {
+				byStem[s] = append(byStem[s], e)
+			}
+		}
+	}
+	type pair struct{ a, b string }
+	done := map[pair]bool{}
+	var out []finding
+	for _, q := range l.live {
+		var answer string
+		var subject map[string]bool
+		switch c := q.(type) {
+		case *Choice:
+			if len(c.Pictures) > 0 {
+				continue // the options are pictures: a name shown elsewhere doesn't pick one
+			}
+			answer, subject = c.Answer, stemSet(c.Text)
+		case *Clues:
+			answer, subject = c.Answer, stemSet(append(c.Clues, c.Text)...)
+		default:
+			continue
+		}
+		if strings.ContainsAny(answer, "0123456789") {
+			continue // a number, an amount, a share: ruleGiveaway's
+		}
+		words := stems(answer)
+		if len(words) == 0 {
+			continue
+		}
+		for _, w := range words {
+			delete(subject, w)
+		}
+		for _, e := range byStem[words[0]] {
+			k := pair{min(q.Base().ID, e.q.Base().ID), max(q.Base().ID, e.q.Base().ID)}
+			if e.q == q || done[k] || !together(e.at, words) {
+				continue
+			}
+			shared, w := l.common(subject, e.context, kindStems)
+			if w < AnswerGiveawayFrom || l.rarest(shared) < AnswerGiveawayRare {
+				continue
+			}
+			done[k] = true
+			slices.Sort(shared)
+			out = append(out, finding{ids: l.newer(q, e.q), msg: fmt.Sprintf("%s's answer %s shows in %s's %s (shared: %s): %s",
+				q.Base().ID, answer, e.q.Base().ID, e.where, strings.Join(shared, ", "), e.line)})
 		}
 	}
 	return out

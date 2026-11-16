@@ -5,6 +5,7 @@
 //	almanac bank fmt [dir]              rewrite a bank's files in their one format
 //	almanac bank subjects [dir]         the subjects that come back, all of them (check shows the top)
 //	almanac bank calibrate [dir]        the questions whose difficulty disagrees with what players got right (DB_PATH)
+//	almanac bank suspects [dir]         the questions whose players' answers speak against the key (DB_PATH)
 //	almanac bank used                   the question ids the days have had, for -used (DB_PATH; nothing of a player's)
 //	almanac bank plan [-n N] [-json] [-used file] [dir]  plan a batch of N new questions a category, where the day needs them most
 //	almanac bank add [-check] [-checked-by P] <batch> [dir]  add, change and retire a checked batch: all of it or nothing (-check: only check)
@@ -63,5 +64,5 @@ func run(args []string) error {
 }
 
 func usage() error {
-	return fmt.Errorf("usage: almanac serve | bank check [-unbalanced] [-used file] [dir] | bank lint [-rule R,…] [-summary] [dir] | bank fmt [dir] | bank subjects [dir] | bank calibrate [dir] | bank used | bank plan [-n N] [-json] [-used file] [dir] | bank add [-check] [-checked-by P] <batch> [dir] | backup now | backup restore <key> <path> | backup verify [key] | admin [-remove] <email> | push keys | version")
+	return fmt.Errorf("usage: almanac serve | bank check [-unbalanced] [-used file] [dir] | bank lint [-rule R,…] [-summary] [dir] | bank fmt [dir] | bank subjects [dir] | bank calibrate [dir] | bank suspects [dir] | bank used | bank plan [-n N] [-json] [-used file] [dir] | bank add [-check] [-checked-by P] <batch> [dir] | backup now | backup restore <key> <path> | backup verify [key] | admin [-remove] <email> | push keys | version")
 }
