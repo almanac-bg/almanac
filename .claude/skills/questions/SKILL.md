@@ -14,9 +14,14 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
   `categories.json` and `questions/<category>.json`: the real bank, kept private so answers can't be searched. Never
   paste many of its questions anywhere public.
 - `bank/sample/` is the public sample that CI and the browser tests play. Its answers are public.
-- The format and the checks are the code: `internal/bank` (one file per type, plus `check.go` and `balance.go`).
+- The format and the checks are the code: `internal/bank` (one file per type, `check.go` for the format,
+  `rules.go` and the files it names for the rules below, `balance.go`). `internal/bank/names.json` is the spelling of
+  names written more than one way; `internal/bank/language.json` the Russian words and loanwords the game never uses
+  (the client's language test reads it too). A bank's `waivers.json` (in `private/`) lists its true exceptions.
 - The tools (from the repo root):
-  - `go run ./cmd/almanac bank fmt private` writes the files in their one format; run it after every edit;
+  - `go run ./cmd/almanac bank fmt private` writes the files in their one format, and sets the typography kept one
+    way („…“ for three dots, „ — “ for a spaced hyphen, a no-break space between a number and its „г.“); run it after
+    every edit;
   - `almanac bank used`, on the server, prints the question ids the days have had (played and drawn ahead) and the
     last day drawn, nothing of a player's; fetch it into a file for `-used` (the `new-questions` skill shows the ssh
     line);
@@ -28,43 +33,81 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
     loading with no errors, or nothing is written; `-check` only checks; `-checked-by` marks the new questions
     checked today by that process;
   - `go run ./cmd/almanac bank check [-used file] private` checks everything the server checks before it plays a
-    bank. It ends with the balance report: the difficulty and kind mix, facts and dates, the mix grid, and **the day's
+    bank: the format and **every rule below that code can judge**. It prints every error, then the balance report:
+    the difficulty and kind mix, facts and dates, each category's kinds against their share, and **the day's
     runway** — how many days from today each place of a day has questions for, and the day it runs out on. It
-    **fails** while the categories aren't the same size (`-unbalanced` lets the small public sample pass), and
-    **warns** of every place under 150 days (`play.RunwayWarn`: the 90 days drawn ahead and 60 to write). Last,
-    **the subjects that come back** (listed, never failed): the answers and names more than 15 live questions name,
-    by category (`*` over 1% of one), and the "who or what is this" answers (a picture choice, clues) asked twice;
-    the top 20 of each, all of them with `go run ./cmd/almanac bank subjects private`.
+    **fails** on an error, and while a category is more than 2% off the mean size (`bank.SizeSlack`; `-unbalanced`
+    lets the small public sample pass), and **warns** of every place under 150 days (`play.RunwayWarn`: the 90 days
+    drawn ahead and 60 to write). Then **the subjects that come back** (listed, never failed): the answers and names
+    more than 15 live questions name, by category (`*` over 1% of one); the top 20, all of them with
+    `go run ./cmd/almanac bank subjects private`. Its last line counts the errors and the warnings by rule;
+  - `go run ./cmd/almanac bank lint [-rule giveaway,stale] [-summary] private` lists every problem by rule, with
+    the question's id and what's wrong: what a content pass works through.
 
 ## The aims (the owner's rules)
 
-- **Difficulty: 50% easy, 35% medium, 15% hard,** in every category (`bank.Mix`), judged by the rubric below.
+- **Difficulty is the rubric's, not a quota.** Since 16 Nov 2026 there is no mix to aim for (it was 50/35/15): a
+  question is labelled for what Bulgarian players know (below), and batches are written by the day's runway.
 - **Kinds: 50% choice, 15% true-or-not, 10% number, 7.5% order, 7.5% match, 5% split, 5% clues**, in every category
   (`bank.TypeMix`), close to what the game draws (a run of ten has five choices, one of each other kind, and a split
-  or clues), so that no kind runs out long before the others.
+  or clues), so that no kind runs out long before the others. `bank check` shows each category's kinds against it.
 - **The bank grows by the day's runway** (the owner's rule since 15 Nov 2026, in place of "fully balanced, always"):
   the day spends its places at its own pace — one easy choice with a picture, one hard number, two hard choices, a
-  medium order and match… a day — about three times faster for the hard places than for the easy ones, and no even
-  grid can follow that. So `bank check` prints, for each place of a day, how many days from today it has questions
-  for, counted as the day takes them: only the questions a day can still take (with `-used`, none the days played or
+  medium order and match… a day — about three times faster for the hard places than for the easy ones. So
+  `bank check` prints, for each place of a day, how many days from today it has questions for, counted as the day
+  takes them: only the questions a day can still take (with `-used`, none the days played or
   drawn ahead have had; without it, the whole bank, which overstates it), never a dated one (it waits for its date;
   those are counted apart), never one due for review, and for the hard number only the estimates. The questions about
   Bulgaria have their own line (a day takes three). The days are drawn 90 days ahead (`play.Ahead`), and only while
   every place has a question that fits it: a place that runs out stops them. **Every batch writes for the shortest
-  runway first**, and no place may stay under 150 days (it warns: 90 drawn ahead, 60 to write the batch). The mix grid (per category, kind and difficulty, `+` / `−` against an even mix) stays
-  as a reference for the topic games: keep near it where the runway doesn't say otherwise, never by filler (an
-  "easy number" whose answer is 5 is a choice in disguise; an honest hard question beats a forced cell). A retired
-  question is still replaced in its cell in the same commit.
-- **Every category the same size.** No topic outweighs another, so a batch adds to every category, or closes the
-  gaps that `bank check` reports, biggest first. Never add to a category that is ahead while another is behind.
+  runway first**, and no place may stay under 150 days (it warns: 90 drawn ahead, 60 to write the batch). Never by
+  filler (an "easy number" whose answer is 5 is a choice in disguise; an honest hard question beats a forced place). A retired question is still replaced in its place in the same commit.
+- **The categories about the same size:** within 2% of the mean (`bank.SizeSlack`; `bank check` fails past it). No
+  topic outweighs another, so a batch adds about as many to every category, and never to one that is ahead while
+  another is behind.
 - **Every question has a fact** („Знаеше ли?“), **the date it was added** and **the date it last changed**
   (`added`, `updated`, both YYYY-MM-DD). The checker refuses a question added since `RulesFrom` (2026-11-14)
-  without them. Older questions get theirs as they're gone over.
+  without them.
 - Grow by adding: the balance report counts what it takes without dropping anything.
 - **Never retire to make room** (the owner's rule, 2026-11-15). A question is retired only for a fault of its own:
-  wrong, stale, weak, or a near-duplicate that gives another away. A batch that adds to some cells (say, 250 easy
-  choices with pictures) keeps the balance by writing every other cell's gap at the new size, never by retiring
-  good questions in its place.
+  wrong, stale, weak, or a near-duplicate that gives another away. A batch that adds to some places (say, 250 easy
+  choices with pictures) keeps the balance by writing for the other places, never by retiring good questions.
+
+## The rules code checks
+
+`bank check` judges these on every live question (`internal/bank/rules.go` lists them; `bank lint` shows each one's
+findings). **A question added since `bank.StrictFrom` (2026-11-17) must pass all of them: a finding is an error and
+the bank isn't played** (`bank add` refuses the batch). Older questions are warned of until a content pass fixes
+them. A finding about two questions is an error if either is new. The *hints* only ever warn: they are right often
+enough to be worth a look, not always.
+
+| Rule | What it holds |
+| --- | --- |
+| `ending` | A question ends in „?“ or „:“; a true-or-not statement and a clue end in a period |
+| `address` | „ти“ to one player: „Подреди“, never „Подредете“ |
+| `fact` | One or two sentences, ending in a period; never „Интересно е, че…“ |
+| `typography` | „…“ quotes in pairs (never "…" or «…»); `bank fmt` sets the rest: „…“ for three dots, a spaced dash —, a no-break space before „г.“ |
+| `language` | None of the Russian words or loanwords in `language.json` |
+| `spelling` | A name spelled as `names.json` says (Чингис хан, НАСА, Sony, „Дисни“, Ferrari, Нидерландия, олимпийските игри mid-sentence); a quoted title keeps its own spelling |
+| `stale` | Wording that can stop being true has `reviewBy`: „към 2026 г.“, „все още“, „в момента“, „понастоящем“, the oldest still „действащ“, „държи рекорда“, „рекордьор“, „досега“ |
+| `estimate` | A number question is an estimate: a year, or a quantity of more than 20 of its steps (6,5 млн. on a step of 0,1 is 65). A small count, a phone number, a place in a row is a choice |
+| `tolerance` | The tolerance follows the formula (below), within half again either way |
+| `order-gap` | An order's measured values (м, км², кг, жители, %, …: `measured` in order.go) stand 10% apart; exact ones (years, counts, coordinates) only differ |
+| `options` | No option stands out by its form: only the answer with a regnal numeral (Симеон I), only the answer in Latin or in Cyrillic letters (bTV among БНТ, Нова), quotes on some options only |
+| `long-answer` (hint) | The answer isn't half again as long as every wrong option and 10 letters longer |
+| `answer-word` | No clue, and no question text, shares a word with the answer that no wrong option has („Кой е този водопад?“ — „Ниагарският водопад“; „френски лекари“ — „Лекари без граници“) |
+| `dated` | A question for a day of every year (`on`: "MM-DD") says the date in its fact („На 3 март 1878 г. …“) |
+| `decoy` | A match has a decoy |
+| `giveaway` | No question shows a value another asks (a number's answer, a year a choice asks, an order's values) next to the same subject: in its text, options, items, clues, fact or reveal. Judged by the value and the rare words around it |
+| `pair-giveaway` (hint) | No question shows both sides of a medium or hard match's pair within four words („Кучето Лайка“ for Лайка — Куче) |
+| `shared-items` | Two orders share no two items with the same values, nor three items in the same order (one's reveal orders the other); two matches share no pair |
+| `same-identity` | A "who or what is this" answer (a picture choice, clues) is asked once |
+
+**A true exception** (a proverb to finish ends without „?“; a question about the word „таг“ itself) goes into the
+bank's `waivers.json`, with its reason: `[{"id": "gen-085", "rule": "ending", "why": "поговорка за довършване"}]`.
+`bank check` refuses a waiver for a question or a rule that doesn't exist, and warns of one that waives nothing.
+**A new spelling to keep one way** goes into `names.json` (`{"use": "НАСА", "not": ["NASA"], "except": [...]}`),
+in the game's repo, with a pull request.
 
 ## Difficulty: the rubric
 
@@ -84,8 +127,8 @@ By kind:
   change them rather than mislabel.
 - **True or not:** easy is a famous fact stated plainly; hard is a plausible detail (true or false) that only an
   enthusiast can tell. Never hard by a trick of wording.
-- **Number:** easy is a number everyone has met (1878, 7 continents); hard is a precise figure. The tolerance
-  follows: generous for easy, tight for hard.
+- **Number:** easy is a number everyone has met (1878, the height of Мусала); hard is a figure only an enthusiast
+  can place. The tolerance doesn't follow the label: it is one formula at every difficulty (see the format).
 - **Order:** easy has familiar things with values far apart (centuries); hard has values close together, or
   unfamiliar things.
 - **Clues:** the label is for the first clue's answer only if the last clue makes it easy: easy is a famous answer
@@ -130,13 +173,24 @@ By type:
   then names what to find („Кое е знамето на Литва?“, at most 60 characters); the names show only with the answer.
   Each `alt` describes its picture without naming it („Три хоризонтални ивици: жълта, зелена, червена“), and the four
   look alike enough that the picture, not a giveaway, decides.
-- **`number`:** `answer`, `unit` (empty for a year), `step` (1 for whole numbers; 0.1 for one decimal), `scale`
-  (`linear`, or `log` across orders of magnitude) and `tolerance` (how far off scores nothing; on a log scale, a
-  factor above 1). It's typed on a pad, and the player isn't told a range. Only a temperature (°C) may be below 0.
+- **`number`:** an **estimate** (the owner's rule, 16 Nov 2026): a year, or a quantity of more than 20 steps. A
+  small count (4 evangelists, 7 times, the 15th of August) is a choice. `answer`, `unit` (empty for a year), `step`
+  (1 for whole numbers; 0.1 for one decimal), `scale` (`linear`, or `log` across orders of magnitude) and `tolerance`
+  (how far off scores nothing; on a log scale, a factor above 1). It's typed on a pad, and the player isn't told a
+  range. Only a temperature (°C) may be below 0. **The tolerance is one formula** (`bank.Tolerance`), the same at
+  every difficulty, so that a well-read guess scores about half (a guess half the tolerance off does):
+  - a quantity, linear: 3/10 of the answer (15% off scores half; within 6% counts right);
+  - a year: 3·∛(years since it), at least 3 (1990: 10; 1878: 16; 1519: 24; 681: 33);
+  - a log scale: 3;
+  - a temperature: by judgement (the formula has no proportion for it).
+
+  `bank check` takes a tolerance within half again of the formula, and says the formula's figure when it isn't.
 - **`order`:** four `items` (`text` at most 45 characters and an exact `value`), `direction` (`asc` or `desc`) and
   `unit`. The text says the direction.
 - **`truefalse`:** the text is a statement ending with a period, and `answer` is `true` or `false`. Write about as
-  many false ones as true, each false by one clear fact, not by a trick of wording. 10 seconds to answer.
+  many false ones as true, each false by one clear fact, not by a trick of wording. **A false statement's fact starts
+  with what is true** („Монако граничи с Италия.“ — „Монако граничи по суша само с Франция…“), then the rest. 10
+  seconds to answer.
 - **`clues`:** „Подсказки“. The text asks what to name („Кой е този човек?“, „Коя е тази държава?“), three `clues`
   (each at most 110 characters, a sentence ending with a period), `answer` and three `wrong` like a choice. The clues
   go from the hardest to the easiest: the first one only an expert knows, the second narrows it to a well-read
@@ -163,19 +217,19 @@ By type:
 - **Nothing gives the answer away:** not in the text, not in the picture, and not in another question or fact
   (games mix topics). Grep the bank for the answer and the key words before adding.
 - **Nothing goes stale.** No „сегашният“, „последният“ or „най-новият“ unless pinned to a date („към 2026 г.“), and
-  add `reviewBy` for anything that can change.
+  add `reviewBy` for anything that can change (the `stale` rule finds the wording that needs it).
 - **No near-duplicates.** Grep the bank for the subject first. The checker only catches identical texts.
-- **No subject everywhere.** A subject (Наполеон, „Титаник“, Disney) stays under 1% of a category: past that, a
+- **No subject everywhere.** A subject (Наполеон, „Титаник“, „Дисни“) stays under 1% of a category: past that, a
   player who plays daily meets it again and again. Write away from the subjects `bank subjects` marks with `*`, and
-  never a second "who or what is this" question with an answer one already has (it lists those): keep the better of
-  the two and replace the other in its cell. A day holds one question of each subject (same answer or quoted
+  never a second "who or what is this" question with an answer one already has (the `same-identity` rule): keep the
+  better of the two and replace the other in its place. A day holds one question of each subject (same answer or quoted
   title) by itself.
 - **Bulgarian, as the bank writes it:**
-  - „…“ quotes, a spaced dash —, „г.“ after a year;
-  - established spellings (Нидерландия, not Холандия);
-  - text that speaks to the player is gender-neutral.
-- **Numbers:** something worth estimating with one accepted value. Pin the source where sources differ
-  („според измерването от 2020 г.“). The tolerance is set so that a well-read guess still scores about half.
+  - „…“ quotes, a spaced dash —, „г.“ after a year (`bank fmt` holds it to the year with a no-break space);
+  - established spellings (Нидерландия, not Холандия), one way for one name: `names.json`;
+  - text that speaks to the player says „ти“ and is gender-neutral.
+- **Numbers:** something worth estimating (a year, or more than 20 steps) with one accepted value. Pin the source
+  where sources differ („според измерването от 2020 г.“). The tolerance is the formula's.
 - **Orders:** exact, sourced values in the same order under every source. Measurements that sources give
   differently (areas, lengths, populations, heights) need at least 10% between neighbours; exact values (years,
   dates) only need to be distinct and undisputed. The reveal shows every value, so none of them may be another
@@ -217,16 +271,17 @@ every topic), writers and independent checkers on fixed models, a cross-check ov
 (all of the batch, or nothing). By hand, for a fix or a few questions:
 
 1. **Find the gaps:** run `bank check` and read the day's runway and the balance report. Plan the batch from the
-   shortest runway first (every place under 150 days before anything else), then the mix grid's biggest gaps; the
-   same count in every category.
+   shortest runway first (every place under 150 days before anything else), then the kinds a category lacks; about
+   the same count in every category.
 2. **Write** the questions into the category files, with the next free ids, `added` and `updated` set to today, and
    a fact on each.
 3. **Verify independently.** Give a fresh agent the new questions and answers (not your reasoning). It checks each
    one against reliable sources: the marked answer is right, no other option is also right, nothing is outdated,
    the wording has one reading, the fact is true, and the difficulty fits the definitions. It reports OK, FIX or
    DROP, with evidence. Apply the fixes, and drop what it can't confirm.
-4. **Check:** `bank fmt`, then `bank check`: no errors, every category the same size (it fails otherwise), and no
-   place's runway shorter than before the batch.
+4. **Check:** `bank fmt`, then `bank check`: no errors (every rule above holds for the new questions), the
+   categories within 2% of each other's mean (it fails otherwise), and no place's runway shorter than before the
+   batch.
 5. **Commit in `private/`** (`git -C private …`), one commit per batch, its message listing the ids. On the server,
    `almanac-bank` takes the new questions without a restart.
 6. **Tell the owner** what went in: a short list of question → answer, with the fact, so they can read it.

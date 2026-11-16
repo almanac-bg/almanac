@@ -7,6 +7,12 @@
 // answer a deal also shows how players have answered the question so far (crowd.go), in its own order. What a question
 // names (subjects.go) keeps a day to one question of a subject, and tells the bank's keepers which subjects come back.
 // A batch of new questions goes in whole or not at all (add.go): checked against the bank as it would be first.
+//
+// Besides its format (check.go), a loaded bank is held to every rule of the questions skill a program can judge
+// (rules.go): how lines end and are typed (wording.go), the options (options.go), numbers as estimates with one
+// tolerance formula (number.go), orders' gaps (order.go), and give-aways from one question to another (giveaway.go,
+// on the word stems of text.go). Errors for questions added since StrictFrom, warnings for older ones, waivers for
+// the true exceptions.
 package bank
 
 import (

@@ -30,12 +30,12 @@ func TestAddPutsABatchIn(t *testing.T) {
 	write(t, filepath.Join(batch, "general.json"), `[
   {"id": "`+id+`", "type": "choice", "difficulty": "easy", "text": "Коя е най-високата планина в България?", "answer": "Рила",
    "wrong": ["Пирин", "Витоша", "Стара планина"], "fact": "Връх Мусала е висок 2925 м — най-високият на Балканския полуостров.",
-   "added": "`+today+`", "updated": "`+today+`", "bg": true}
+   "added": "`+today+`", "updated": "`+today+`", "bg": true, "sources": ["https://bg.wikipedia.org/wiki/Рила"]}
 ]`)
 	write(t, filepath.Join(batch, RetireFile), `[{"id": "`+old+`", "why": "twin", "by": "`+id+`"}]`)
 
 	before, _ := os.ReadFile(filepath.Join(dir, QuestionsDir, "general.json"))
-	res, err := Add(dir, batch, "", true)
+	res, err := Add(dir, batch, "new-questions test", true)
 	if err != nil || res.Added != 1 || res.Retired != 1 || res.Sizes[0] != (CategoryCount{"general", len(b.Live("general", ""))}) {
 		t.Fatalf("a dry run: %+v, %v", res, err)
 	}
@@ -84,6 +84,7 @@ func TestAddWritesNothingUnlessAllOfItHolds(t *testing.T) {
 		"retiring a question the bank hasn't": {map[string]string{RetireFile: `[{"id": "gen-99999", "why": "wrong"}]`}, "no such question"},
 		"retiring without a reason":           {map[string]string{RetireFile: `[{"id": "gen-001", "why": "old"}]`}, "why is one of"},
 		"a stray file":                        {map[string]string{"notes.json": `[]`}, "not a category's file"},
+		"a rule a new question breaks":        {map[string]string{"general.json": "[" + strings.NewReplacer("Кое?", "Кое", `"added": "`+today, `"sources": ["https://bg.wikipedia.org"], "checked": "2026-11-17", "checkedBy": "t", "added": "`+StrictFrom, `"updated": "`+today, `"updated": "`+StrictFrom).Replace(question("gen-"+strconv.Itoa(next), good)) + "]"}, "[ending]"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := sampleCopy(t)

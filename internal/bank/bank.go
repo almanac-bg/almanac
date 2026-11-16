@@ -97,8 +97,8 @@ func Load(dir string) (*Bank, []Problem) {
 	fail := func(file string, line int, id, msg string) {
 		problems = append(problems, Problem{File: file, Line: line, ID: id, Msg: msg})
 	}
-	warn := func(file string, line int, id, msg string) {
-		problems = append(problems, Problem{File: file, Line: line, ID: id, Msg: msg, Warning: true})
+	warn := func(file string, line int, id, rule, msg string) {
+		problems = append(problems, Problem{File: file, Line: line, ID: id, Msg: msg, Rule: rule, Warning: true})
 	}
 
 	data, err := os.ReadFile(filepath.Join(dir, CategoriesFile))
@@ -158,7 +158,7 @@ func Load(dir string) (*Bank, []Problem) {
 				fail(file, line, h.ID, e)
 			}
 			for _, w := range warnings {
-				warn(file, line, h.ID, w)
+				warn(file, line, h.ID, w.Rule, w.Msg)
 			}
 			if first, dup := where[h.ID]; dup {
 				fail(file, line, h.ID, fmt.Sprintf("the id is taken (%s:%d)", first.File, first.Line))
@@ -186,10 +186,17 @@ func Load(dir string) (*Bank, []Problem) {
 	if images, err := os.ReadDir(filepath.Join(dir, ImagesDir)); err == nil {
 		for _, im := range images {
 			if !used[im.Name()] && !strings.HasPrefix(im.Name(), ".") {
-				warn(filepath.Join(ImagesDir, im.Name()), 0, "", "no question uses this picture")
+				warn(filepath.Join(ImagesDir, im.Name()), 0, "", RulePicture, "no question uses this picture")
 			}
 		}
 	}
+
+	// The rules over the questions (rules.go), now that the bank is all in: one question can give another away.
+	waivers, err := readWaivers(dir)
+	if err != nil {
+		fail(WaiversFile, 0, "", err.Error())
+	}
+	problems = append(problems, b.lint(waivers, where)...)
 
 	for _, p := range problems {
 		if !p.Warning {

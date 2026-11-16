@@ -24,11 +24,11 @@ Your prompt gives you: `<skill>` (this folder), `<repo>` (the game's code), `<ba
    hedges kept: „около“, „според преданието“).
 3. **Dates (`on`):** the date is exactly the day of what the question is about; the fact says why the day; Bulgarian
    events before 1916 on the New Style date Bulgaria marks today.
-4. **One reading:** the wording can't be read two ways. True-or-not is false by one clear fact, never by a trick.
-   Numbers have one accepted value (or the text pins the source) and a tolerance by the skill; a hard number is an
-   estimate (a unit, an answer above 20). Orders: exact values, far enough apart. Matches: one right per left, a
-   tempting decoy that fits no left. Splits: every item in its group only, under every source. Clues: hardest to
-   easiest, each true of the answer only, none giving it away by a word.
+4. **One reading:** the wording can't be read two ways. True-or-not is false by one clear fact, never by a trick,
+   and a false one's fact starts with what is true. Numbers are estimates (a year, or more than 20 steps), with one
+   accepted value (or the text pins the source) and the skill's tolerance formula. Orders: exact values, measured ones
+   10% apart. Matches: one right per left, a tempting decoy that fits no left. Splits: every item in its group only,
+   under every source. Clues: hardest to easiest, each true of the answer only, none giving it away by a word.
 5. **The difficulty** fits the rubric for players in Bulgaria. Relabel only within the plan's cells: a question that
    doesn't fit its cell is a FIX (reword or change options) or a DROP, not a relabel into a cell the plan didn't ask
    for.
@@ -36,6 +36,8 @@ Your prompt gives you: `<skill>` (this folder), `<repo>` (the game's code), `<ba
    of this file for the answer, the key names, years and numbers. Another question or fact that gives this one away,
    or that this one gives away (at the reveal too: every value of an order, every option's name), is a DROP or a FIX
    that removes the leak. No "who or what is this" answer the bank asks already. This is the commonest flaw.
+   `bank add -check` finds the plain cases (a value next to the same subject, both sides of a pair, shared order
+   items, an identity asked twice) as errors; the rest only a reader finds: a name, a date said another way.
 7. **Pictures:** the picture really is what it says; the licence on its Commons page is PD, CC0, CC BY or CC BY-SA
    (an artwork: the artist died 70+ years ago); no legible text naming the answer; it reads at about 170×100 px on a
    phone. Look at each with the Read tool.

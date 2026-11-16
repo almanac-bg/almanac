@@ -1,10 +1,14 @@
 package bank
 
-import "math"
+import (
+	"math"
+	"slices"
+)
 
-// Mix is the share of each difficulty the bank aims for, in every category (the owner's call, 2026-11-13): half
-// easy, a third medium, the rest hard. Every category also aims for the same size: no topic outweighs another.
-var Mix = map[Difficulty]float64{Easy: 0.50, Medium: 0.35, Hard: 0.15}
+// The bank's balance. Since 16 Nov 2026 there is no aim for the difficulties (the owner's call: batches are written
+// by the day's runway, which spends hard places about three times faster than easy ones, so no fixed mix could
+// follow it). What stays: every category about the same size (within SizeSlack of the mean: no topic outweighs
+// another), and each category's kinds near TypeMix, so that the topic games have every kind.
 
 // Difficulties in order, easy first.
 var Difficulties = []Difficulty{Easy, Medium, Hard}
@@ -17,6 +21,10 @@ var TypeMix = map[string]float64{"choice": 0.50, "truefalse": 0.15, "number": 0.
 // TypeOrder is the kinds in the order a report shows them.
 var TypeOrder = []string{"choice", "truefalse", "number", "order", "match", "split", "clues"}
 
+// SizeSlack is how far a category's live size may stand from the mean of all of them, as a share of the mean: about
+// the same size, not exactly (a batch whose checks drop a question here and there still goes in).
+const SizeSlack = 0.02
+
 // Balance is how a bank stands against its aims: what it has, and what it takes to reach them by adding questions
 // (never by dropping any).
 type Balance struct {
@@ -26,68 +34,26 @@ type Balance struct {
 	Facts, Added, Updated, Total int
 	// Types counts the live questions by category and kind.
 	Types map[string]map[string]int
-	// Full balance: every category at Target questions (the steady size), its kinds in the TypeMix and each kind's
-	// difficulties in the Mix. Cells counts the live questions by category, kind and difficulty; Gaps is what each cell lacks (above 0:
-	// to write) or has too many of (below 0: to judge again into a neighbouring difficulty where that's honest, or
-	// retire). Off is how many questions are out of place in all; 0 is a fully balanced bank.
-	Target int
-	Cells  map[string]map[string]map[Difficulty]int
-	Gaps   map[string]map[string]map[Difficulty]int
-	Off    int
+	// Gaps is, by category and kind, how far the kind is from its TypeMix share of the category (above 0: to
+	// write; below 0: more than its share). Off adds up the questions to write.
+	Gaps map[string]map[string]int
+	Off  int
 }
 
-// Want is how many questions of a kind and a difficulty a category of size questions aims for (the share rounded,
-// halves up: the tiny nudge keeps a share like 660 × 0.075 = 49.5 from rounding down by a float's last bit).
-func Want(size int, kind string, d Difficulty) int {
-	return int(math.Round(float64(size)*TypeMix[kind]*Mix[d] + 1e-9))
+// Want is how many questions of a kind a category of size questions aims for (the share rounded, halves up: the tiny
+// nudge keeps a share like 660 × 0.075 = 49.5 from rounding down by a float's last bit).
+func Want(size int, kind string) int {
+	return int(math.Round(float64(size)*TypeMix[kind] + 1e-9))
 }
 
-// steady is the smallest size at which, in every category, each kind's aims and each difficulty's aims (rounded as
-// Want rounds them) add up to at least what the category has of it. Reachable by adding questions, and steady: a
-// bank filled to its aims has that same size, so the aims don't run ahead of the questions written for them (the
-// unrounded sizes did: aims rounded up per cell add up to more than a kind's share, which then asked for a bigger
-// size). A single cell may still be above its aim: that's a question to judge again or retire, not more to write.
-func steady(cells map[string]map[string]map[Difficulty]int) int {
-	fits := func(size int) bool {
-		for _, kinds := range cells {
-			for _, t := range TypeOrder {
-				has, aim := 0, 0
-				for _, d := range Difficulties {
-					has += kinds[t][d]
-					aim += Want(size, t, d)
-				}
-				if has > aim {
-					return false
-				}
-			}
-			for _, d := range Difficulties {
-				has, aim := 0, 0
-				for _, t := range TypeOrder {
-					has += kinds[t][d]
-					aim += Want(size, t, d)
-				}
-				if has > aim {
-					return false
-				}
-			}
-		}
-		return true
-	}
-	size := 1
-	for !fits(size) {
-		size++
-	}
-	return size
-}
-
-// BalanceOf works out where the bank stands against full balance: every category the same size, with the same
-// number of questions in every kind and difficulty (as many hard number questions in music as in geography).
+// BalanceOf works out where the bank stands: its kinds against TypeMix in every category, its facts and dates.
 func (b *Bank) BalanceOf() Balance {
-	bal := Balance{Live: map[string]map[Difficulty]int{}, Types: map[string]map[string]int{}}
+	bal := Balance{Live: map[string]map[Difficulty]int{}, Types: map[string]map[string]int{}, Gaps: map[string]map[string]int{}}
 	for _, c := range b.Categories {
 		n := map[Difficulty]int{}
 		types := map[string]int{}
-		for _, q := range b.Live(c.ID, "") {
+		live := b.Live(c.ID, "")
+		for _, q := range live {
 			n[q.Base().Difficulty]++
 			types[q.Base().Type]++
 			t := q.Extra()
@@ -96,41 +62,36 @@ func (b *Bank) BalanceOf() Balance {
 			bal.Added += b2i(t.Added != "")
 			bal.Updated += b2i(t.Updated != "")
 		}
-		bal.Live[c.ID] = n
-		bal.Types[c.ID] = types
-	}
-	// The full balance aims at the steady size (every kind and every difficulty reachable by adding), and says per
-	// cell what's missing or too much.
-	bal.Cells, bal.Gaps = map[string]map[string]map[Difficulty]int{}, map[string]map[string]map[Difficulty]int{}
-	for _, c := range b.Categories {
-		cells := map[string]map[Difficulty]int{}
+		bal.Live[c.ID], bal.Types[c.ID] = n, types
+		gaps := map[string]int{}
 		for _, t := range TypeOrder {
-			cells[t] = map[Difficulty]int{}
-		}
-		for _, q := range b.Live(c.ID, "") {
-			t := q.Base().Type
-			if cells[t] == nil {
-				cells[t] = map[Difficulty]int{}
-			}
-			cells[t][q.Base().Difficulty]++
-		}
-		bal.Cells[c.ID] = cells
-	}
-	bal.Target = steady(bal.Cells)
-	for _, c := range b.Categories {
-		cells := bal.Cells[c.ID]
-		gaps := map[string]map[Difficulty]int{}
-		for _, t := range TypeOrder {
-			gaps[t] = map[Difficulty]int{}
-			for _, d := range Difficulties {
-				g := Want(bal.Target, t, d) - cells[t][d]
-				gaps[t][d] = g
-				bal.Off += max(g, -g)
-			}
+			gaps[t] = Want(len(live), t) - types[t]
+			bal.Off += max(gaps[t], 0)
 		}
 		bal.Gaps[c.ID] = gaps
 	}
 	return bal
+}
+
+// Uneven lists the categories whose live size is more than SizeSlack off the mean (none in a balanced bank), with
+// the mean.
+func (b *Bank) Uneven() (off []CategoryCount, mean float64) {
+	if len(b.Categories) == 0 {
+		return nil, 0
+	}
+	sizes := make([]CategoryCount, 0, len(b.Categories))
+	for _, c := range b.Categories {
+		sizes = append(sizes, CategoryCount{c.ID, len(b.Live(c.ID, ""))})
+		mean += float64(sizes[len(sizes)-1].N)
+	}
+	mean /= float64(len(sizes))
+	for _, s := range sizes {
+		if math.Abs(float64(s.N)-mean) > SizeSlack*mean {
+			off = append(off, s)
+		}
+	}
+	slices.SortStableFunc(off, func(x, y CategoryCount) int { return x.N - y.N })
+	return off, mean
 }
 
 func b2i(ok bool) int {

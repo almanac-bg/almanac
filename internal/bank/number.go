@@ -3,9 +3,12 @@ package bank
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Number is "Колко…?" or "През коя година…?": a number typed in on a keypad, scored by how close it is. On a linear
@@ -77,6 +80,94 @@ func (q *Number) Closeness(guess float64) float64 {
 		return 0
 	}
 	return math.Max(0, 1-off)
+}
+
+// A number question is an estimate (the owner's rule, 16 Nov 2026): a year, or a quantity of more than EstimateFrom
+// steps (6,5 million on a step of 0,1 is 65 of them). A small count (4 evangelists, 7 times) is a choice in disguise:
+// it is known or not, never estimated. A phone number or a place in a row isn't a quantity at all.
+const EstimateFrom = 20
+
+// yearText says the question asks for a year (and not „на колко години“, an age).
+var yearText = regexp.MustCompile(`(?i)годин`)
+
+// IsYear is whether the question asks for a year: no unit, and its text asks when.
+func (q *Number) IsYear() bool {
+	return q.Unit == "" && yearText.MatchString(q.Text) && !strings.Contains(strings.ToLower(q.Text), "колко")
+}
+
+var notQuantity = regexp.MustCompile(`(?i)(?:^|[^\p{L}])(?:номер\p{L}*|поред)(?:[^\p{L}]|$)`)
+
+func ruleEstimate(q Question) []string {
+	n, ok := q.(*Number)
+	if !ok || n.IsYear() || n.Step <= 0 {
+		return nil
+	}
+	if notQuantity.MatchString(n.Text) {
+		return []string{"a number, a code or a place in a row is no estimate: make it a choice"}
+	}
+	if math.Abs(n.Answer)/n.Step <= EstimateFrom {
+		return []string{fmt.Sprintf("%s is a small count, not an estimate (a year, or more than %d steps): make it a choice",
+			sayNumber(n.Answer, n.Step), EstimateFrom)}
+	}
+	return nil
+}
+
+// The tolerance follows one formula at every difficulty (the owner's rule, 16 Nov 2026): a well-read guess scores
+// about half. Closeness falls from 1 to 0 over the tolerance, so half is half the tolerance away, and the tolerance is
+// twice how far off a well-read guess is:
+//
+//   - a quantity on a linear scale: 3/10 of the answer (a guess 15% off scores half; within 6% counts right);
+//   - a year: 3·∛(years since it), at least 3 (1939: 13; 1519: 24; 681: 33): a well-read person knows the recent
+//     closer than the distant;
+//   - a log scale: a factor of 3 (a guess √3 times off scores half);
+//   - a temperature (°C, linear): none, a degree's worth has no proportion to the answer; set by the rubric.
+//
+// A tolerance within ToleranceSlack of the formula holds: the formula rounded the way a person rounds it.
+const ToleranceSlack = 1.5
+
+// Tolerance is what the formula says a number question's tolerance is, two figures kept; 0 for a temperature.
+func Tolerance(q *Number) float64 {
+	switch {
+	case q.Signed():
+		return 0
+	case q.Scale == "log":
+		return 3
+	case q.IsYear():
+		since := max(float64(time.Now().Year())-q.Answer, 1)
+		return max(3, math.Round(3*math.Cbrt(since)))
+	}
+	return twoFigures(0.3 * q.Answer)
+}
+
+// twoFigures rounds a number to two significant figures (2 600, 0,26).
+func twoFigures(v float64) float64 {
+	if v == 0 {
+		return 0
+	}
+	p := math.Pow(10, math.Floor(math.Log10(math.Abs(v)))-1)
+	return math.Round(v/p) * p
+}
+
+func ruleTolerance(q Question) []string {
+	n, ok := q.(*Number)
+	if !ok || ruleEstimate(q) != nil {
+		return nil // a small count is to become a choice: its tolerance goes with it
+	}
+	want := Tolerance(n)
+	if want <= 0 || n.Tolerance <= 0 {
+		return nil
+	}
+	ratio := n.Tolerance / want
+	if n.Scale == "log" {
+		if n.Tolerance <= 1 {
+			return nil // an error of the format
+		}
+		ratio = math.Log(n.Tolerance) / math.Log(want)
+	}
+	if ratio > ToleranceSlack || ratio < 1/ToleranceSlack {
+		return []string{fmt.Sprintf("tolerance %s, the formula says %s", sayNumber(n.Tolerance, 0.01), sayNumber(want, 0.01))}
+	}
+	return nil
 }
 
 // Signed is whether the answer may be below 0, so the keypad has a minus: for a temperature (whichever way it is, so

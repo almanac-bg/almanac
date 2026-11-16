@@ -13,26 +13,17 @@ const kinds = /\.(ts|go|css|html|json|webmanifest|txt)$/;
 /** Letters of Russian (and other Cyrillic alphabets) that Bulgarian has none of. */
 const letters = /[ёыэЁЫЭ]/u;
 
-/** Russian words that look Bulgarian enough to pass unnoticed, with the Bulgarian ones to use. */
-const words: Record<string, string> = {
-  знаток: "експерт, познавач",
-  вопрос: "въпрос",
-  ответ: "отговор",
-  игрок: "играч",
-  уровень: "ниво",
-  сейчас: "сега",
-  пожалуйста: "моля",
-  спасибо: "благодаря",
+/**
+ * The Russian words that look Bulgarian enough to pass unnoticed, and the loanwords that have crept in (each in the
+ * forms it takes), with the Bulgarian words to use: one list, internal/bank/language.json, that `almanac bank check`
+ * holds the questions to as well.
+ */
+const list = "internal/bank/language.json";
+const { russian: words, loans } = JSON.parse(readFileSync(join(root, list), "utf8")) as {
+  russian: Record<string, string>;
+  loans: Record<string, string>;
 };
 const word = new RegExp(`(?<!\\p{L})(${Object.keys(words).join("|")})(?!\\p{L})`, "iu");
-
-/** Loanwords that have crept in, each in the forms it takes, with the Bulgarian words that say the same. */
-const loans: Record<string, string> = {
-  "линк|линка|линкът|линкове|линковете": "връзка, покана",
-  "таг|тага|тагът|тагове|таговете": "потребителско име",
-  "таймер|таймера|таймерът": "часовник",
-  "лог|лога|логът": "дневник",
-};
 const loan = new RegExp(`(?<!\\p{L})(${Object.keys(loans).join("|")})(?!\\p{L})`, "iu");
 const loanFor = (w: string) => Object.entries(loans).find(([k]) => k.split("|").includes(w.toLowerCase()))?.[1];
 
@@ -40,7 +31,7 @@ function* files(dir: string): Generator<string> {
   for (const e of readdirSync(join(root, dir), { withFileTypes: true })) {
     const path = join(dir, e.name);
     if (e.isDirectory()) yield* files(path);
-    else if (kinds.test(e.name) && !e.name.endsWith("language.test.ts")) yield path;
+    else if (kinds.test(e.name) && !e.name.endsWith("language.test.ts") && path !== list) yield path;
   }
 }
 

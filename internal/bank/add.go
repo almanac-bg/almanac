@@ -141,6 +141,11 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 	if err := WriteCategories(tmp, b.Categories); err != nil {
 		return Added{}, err
 	}
+	if _, err := os.Stat(filepath.Join(dir, WaiversFile)); err == nil {
+		if err := copyFile(filepath.Join(dir, WaiversFile), filepath.Join(tmp, WaiversFile)); err != nil {
+			return Added{}, err
+		}
+	}
 	for _, c := range b.Categories {
 		if err := WriteCategory(tmp, c.ID, append(b.InCategory(c.ID), news[c.ID]...)); err != nil {
 			return Added{}, err

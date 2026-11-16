@@ -61,8 +61,8 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
    number; if it's less than N, the report says why, and you say so to the owner. If more than a fifth of the batch was
    dropped, read the checkers' `verify/<cat>.md` for a pattern (a writer that guessed, a misread rule) and say it.
 6. **Add it.** `bank add -checked-by "new-questions fable-5.2" <batch>/final <bank>` (the checkers' model: change it
-   with batch.js), then `bank fmt <bank>` and `bank check -used <batch>/used.txt <bank>`: no errors, every
-   category the same size, and no place of the day's runway shorter than in the plan's `days`. If anything fails,
+   with batch.js), then `bank fmt <bank>` and `bank check -used <batch>/used.txt <bank>`: no errors, the
+   categories within 2% of their mean, and no place of the day's runway shorter than in the plan's `days`. If anything fails,
    `git -C <bank> checkout -- . && git -C <bank> clean -fd -- images` and stop.
 7. **Fix what the batch found in the bank.** For the problems in REPORT.md about questions already in the bank: check
    each yourself from a source, and fix the real ones by the `questions` skill (set `updated`; a change in what a
@@ -77,8 +77,8 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
 9. **Commit and put it live.** In `<bank>`: `git add -A`, commit `feat: <count> questions …` (what they are for, the
    bank's size per topic after; the body lists the ids by topic), `git push`. Then on the server:
    `ssh -i ~/.ssh/hetzner -o BatchMode=yes root@2.31.121.12 almanac-bank`. Its first line must be the bank's count
-   (`…: N questions (M live)`, M the new live total; anything else is a problem the server found) and its last your
-   commit; then `journalctl -u almanac -n 20 --no-pager` over the same ssh shows the reload with no error. If the push
+   (`…: N questions (M live)`, M the new live total), its second the problems counted (`…: 0 errors, W warnings
+   (by rule)`: anything but 0 errors stops it before the reload, with the errors), and its last your commit; then `journalctl -u almanac -n 20 --no-pager` over the same ssh shows the reload with no error. If the push
    or the server step fails, say so; the batch is safe in the commit.
 10. **Tell the owner,** in a few lines: how many went in, the runway before → after, how many the checks dropped and
    the worst they caught, what was fixed in older questions, a handful of the new questions (question → answer), and

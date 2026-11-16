@@ -38,10 +38,12 @@ const SourcesFrom = "2026-11-17"
 
 // Problem is something wrong with a bank. A bank with errors is never played; warnings are for whoever keeps it.
 type Problem struct {
-	File    string
-	Line    int
-	ID      string
-	Msg     string
+	File string
+	Line int
+	ID   string
+	Msg  string
+	// Rule is the rule broken (Rules, or an upkeep warning: RuleReview…); "" for the format.
+	Rule    string
 	Warning bool
 }
 
@@ -60,12 +62,16 @@ func (p Problem) String() string {
 	if p.Warning {
 		b.WriteString("warning: ")
 	}
+	if p.Rule != "" {
+		b.WriteString("[" + p.Rule + "] ")
+	}
 	b.WriteString(p.Msg)
 	return b.String()
 }
 
-// checkQuestion finds what's wrong with one question: the fields every type shares, then its type's own rules.
-func checkQuestion(q Question, today string) (errs, warnings []string) {
+// checkQuestion finds what's wrong with one question's format: the fields every type shares, then its type's own
+// rules. Its warnings are about upkeep (a reason to retire, a review due), each with its rule.
+func checkQuestion(q Question, today string) (errs []string, warnings []Problem) {
 	h, t := q.Base(), q.Extra()
 	if !idPattern.MatchString(h.ID) {
 		errs = append(errs, "id must be like gen-001")
@@ -106,7 +112,7 @@ func checkQuestion(q Question, today string) (errs, warnings []string) {
 		errs = append(errs, "retiredWhy and replacedBy are for a retired question")
 	}
 	if t.Retired && t.RetiredWhy == "" {
-		warnings = append(warnings, "retired without a reason (retiredWhy)")
+		warnings = append(warnings, Problem{Rule: RuleRetired, Msg: "retired without a reason (retiredWhy)"})
 	}
 	for _, d := range t.On {
 		full := d
@@ -139,15 +145,11 @@ func checkQuestion(q Question, today string) (errs, warnings []string) {
 			errs = append(errs, "a question added since "+RulesFrom+" needs updated (the day it last changed)")
 		}
 	}
-	if m, ok := q.(*Match); ok && m.Decoy == "" && !t.Retired {
-		if t.Added >= DecoysFrom {
-			errs = append(errs, "a match added since "+DecoysFrom+" needs a decoy")
-		} else {
-			warnings = append(warnings, "a match without a decoy: whoever knows three pairs gets the fourth")
-		}
+	if m, ok := q.(*Match); ok && m.Decoy == "" && !t.Retired && t.Added >= DecoysFrom {
+		errs = append(errs, "a match added since "+DecoysFrom+" needs a decoy")
 	}
 	if t.ReviewBy != "" && t.ReviewBy <= today && !t.Retired {
-		warnings = append(warnings, "due for review since "+t.ReviewBy)
+		warnings = append(warnings, Problem{Rule: RuleReview, Msg: "due for review since " + t.ReviewBy})
 	}
 	errs = append(errs, q.check()...)
 	return errs, warnings
