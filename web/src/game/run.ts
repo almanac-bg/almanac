@@ -9,8 +9,8 @@ import { beforeLeaving } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { withName } from "../lib/words.ts";
 import { categories, playing } from "../state.ts";
-import { countUp, fact, inRowChip, type VerdictKind, verdict } from "../ui.ts";
-import { ask, beats, crowdLine, picture, picturesIn, type Stage } from "./questions.ts";
+import { countUp, fact, formatNumber, inRowChip, type VerdictKind, verdict, verdictWords } from "../ui.ts";
+import { ask, beats, crowdLine, picture, picturesIn, type Stage, spokenAnswer } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Shown, State, View } from "./types.ts";
 
 /** Plays a run from where it stands; `done` draws what comes after its last answer. A duel with a friend names them
@@ -76,14 +76,30 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
       whenSeen(() => start(q));
     } else if (s.question) {
       const q = s.question;
-      screen.show(() => question(s, q, next, reload, versus));
+      screen.show(() => question(s, q, next, reload, versus, say));
       scrollTo(0, 0);
     } else whenSeen(next);
   };
 
+  // What a screen reader says as the run goes (an answer's verdict, a clue come out): one live region for the whole
+  // run, there from its start and empty until it speaks, as screen readers reliably read only such a one.
+  const region = h("p", { class: "sr", role: "status" });
+  let speaking = 0;
+  const say = (text: string) => {
+    region.textContent = "";
+    clearTimeout(speaking);
+    speaking = window.setTimeout(() => {
+      region.textContent = text;
+    }, 60);
+  };
+  onCleanup(() => clearTimeout(speaking));
+
   at(initial);
-  return h("div", { class: "run" }, screen);
+  return h("div", { class: "run" }, region, screen);
 }
+
+/** Says something to a screen reader, in the run's live region. */
+type Say = (text: string) => void;
 
 /** Before a run: three seconds to settle in, a ring running out around them, with a way back out (also Esc) and
  * a way to start at once. Each second beeps; the start an octave higher. The game has the whole screen from here (on
@@ -376,7 +392,7 @@ export function upNext(ms: number, label: string, enter = false): Child {
   );
 }
 
-function question(s: State, q: Shown, next: () => void, reload: () => void, versus: string): Child {
+function question(s: State, q: Shown, next: () => void, reload: () => void, versus: string, say: Say): Child {
   const locked = signal(false);
   const problem = signal<Child>(null);
   const after = h("div", { class: "after", hidden: true });
@@ -479,10 +495,17 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
           res.state.done ? "Към резултата" : "Напред",
         ),
       ].map(waiting);
-      append(after, [verdict(kind, res.points, undefined, res.speed, res.row, res.inRow), crowd, ...rest]);
+      // The verdict is said once, in plain words, through the run's live region (not its own, made already full, nor
+      // its points counting up from nothing).
+      const told = verdict(kind, res.points, undefined, res.speed, res.row, res.inRow);
+      if (told instanceof HTMLElement) told.removeAttribute("role");
+      append(after, [told, crowd, ...rest]);
       after.hidden = false;
       page.classList.add("answered");
       room();
+      say(
+        spokenVerdict(kind, res.points, kind === "right" || kind === "exact" ? "" : spokenAnswer(q.view, res.reveal)),
+      );
       advance = window.setTimeout(moveOn, lasts);
       // On a phone the panel docks at the screen's foot and the answers move up above it; where they can't all fit
       // (a picture, a short screen), the page moves just enough to show the right answer. On a big screen the answer
@@ -495,6 +518,11 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     at(beats.crowd, () => shows(crowd));
     at(beats.fact, () => {
       for (const part of rest) shows(part);
+      // Where answering took the focus away with it (a pad, a list, a deck gone for their answer), it goes to the way
+      // on; on an answer chosen, it stays there.
+      const focus = document.activeElement;
+      if (!focus || focus === document.body || !focus.isConnected || (focus as HTMLElement).offsetParent === null)
+        after.querySelector<HTMLElement>(".up-next-go")?.focus({ preventScroll: true });
       due = res.state.done
         ? () => {
             // A run's result sounds its own end as it lands (results.ts); a duel's, here.
@@ -505,7 +533,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     });
   };
 
-  const asked = ask(q.view, (a) => send(a), locked);
+  const asked = ask(q.view, (a) => send(a), locked, say);
 
   // More of the question shows as its time runs (the next clue): the server sends it when it's due, not before.
   let more = 0;
@@ -581,10 +609,17 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
   // Enter, once the answer shows, goes on at once (keys 1–4 answer: questions.ts); Esc keeps playing, asked to leave.
   listen(document, "keydown", (e: KeyboardEvent) => {
     if (e.key === "Escape" && asking()) return keep();
-    if (e.key !== "Enter" || !due || e.repeat || (e.target as Element).closest?.("button:enabled, a, input")) return;
+    const own = (e.target as Element).closest?.("button:enabled:not([aria-disabled='true']), a, input");
+    if (e.key !== "Enter" || !due || e.repeat || own) return;
     e.preventDefault();
     clearTimeout(advance);
     moveOn();
+  });
+
+  // Each question takes the focus as it opens, so a screen reader reads it first (no ring for it: app.css, h1).
+  const heading = h("h1", { class: "ask", tabindex: -1 }, q.view.text);
+  requestAnimationFrame(() => {
+    if (heading.isConnected) heading.focus({ preventScroll: true });
   });
 
   // On a phone the question is a column the screen's height: the head, the pips and the clock at the top, the
@@ -604,7 +639,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
       timer(q.leftMs, q.limitMs, left, locked),
     ),
     leaveAsk,
-    h("h1", { class: "ask" }, q.view.text),
+    heading,
     picture(q.view, true),
     h("div", { class: "answering" }, asked.node, () => problem()),
     after,
@@ -667,6 +702,12 @@ function kindOf(r: Result, given: Answer | null): VerdictKind {
   if (r.exact) return "exact";
   if (r.right) return "right";
   return r.points > 0 ? "partial" : "wrong";
+}
+
+/** A verdict as a screen reader says it: „Не е това. Вярно е: Бийтълс.“, „Вярно! +1040 точки.“ */
+function spokenVerdict(kind: VerdictKind, points: number, answer: string): string {
+  const pts = points > 0 ? `+${formatNumber(points)} ${points === 1 ? "точка" : "точки"}.` : "";
+  return [verdictWords[kind], pts, answer].filter(Boolean).join(" ");
 }
 
 function credit(c: Credit): Child {

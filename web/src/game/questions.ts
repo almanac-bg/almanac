@@ -92,8 +92,14 @@ function crowdOnAll(buttons: HTMLElement[], picks: number[] | undefined): void {
 
 /** Draws a question's answering part; submit sends an answer once, and locked stops input. With the answer it shows
  * how everyone else has answered each option (once the question has had enough answers to say); the sentence that
- * sums it up goes under the verdict (crowdLine). */
-export function ask(view: View, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
+ * sums it up goes under the verdict (crowdLine). `say` tells a screen reader what changes as the question runs (a
+ * clue come out), in the game's live region; without it, the question keeps one of its own. */
+export function ask(
+  view: View,
+  submit: (a: Answer) => void,
+  locked: Signal<boolean>,
+  say?: (s: string) => void,
+): Asked {
   switch (view.type) {
     case "choice":
       return choice(view, submit, locked);
@@ -108,15 +114,41 @@ export function ask(view: View, submit: (a: Answer) => void, locked: Signal<bool
     case "split":
       return split(view, submit, locked);
     case "clues":
-      return clues(view, submit, locked);
+      return clues(view, submit, locked, say);
   }
 }
 
-/** Draws a question as it was answered, for going over a run. */
+/** Draws a question as it was answered, for going over it once the question is past (a review, a live game's
+ * answer). „Вярно“ and „Невярно“ carry no ✓ while asked; here the right one says it is, for whoever can't tell
+ * colours. */
 export function answered(view: View, reveal: Reveal, given: Answer | null): Child {
   const a = ask(view, () => {}, signal(true));
   a.reveal(reveal, given);
+  if (a.node instanceof Element)
+    a.node.querySelector(".option.tf.right")?.append(h("small", { class: "tf-right" }, "верният отговор"));
   return a.node;
+}
+
+/** The right answer as a screen reader says it after a miss, where one short sentence holds it: „Вярно е: Бийтълс.“
+ * (none for an order, pairs or groups: their rows say it). */
+export function spokenAnswer(view: View, reveal: Reveal): string {
+  switch (view.type) {
+    case "choice": {
+      const pick = reveal.pick ?? -1;
+      const name = reveal.names?.[pick] ?? view.choices?.[pick] ?? view.pictures?.[pick]?.alt;
+      return name ? `Вярно е: ${name}.` : "";
+    }
+    case "clues": {
+      const name = view.choices[reveal.pick ?? -1];
+      return name ? `Вярно е: ${name}.` : "";
+    }
+    case "truefalse":
+      return reveal.truth ? "Твърдението е вярно." : "Твърдението е невярно.";
+    case "number":
+      return `Вярно е: ${formatNumber(reveal.value ?? 0, view.step)}${view.unit ? ` ${view.unit}` : ""}.`;
+    default:
+      return "";
+  }
 }
 
 /** How the question's picture and a choice's pictures are drawn: the size each takes on the screen, for the browser
@@ -209,7 +241,7 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
       {
         class: pictures ? "option pic-option" : "option",
         type: "button",
-        disabled: locked,
+        "aria-disabled": locked,
         "aria-label": typeof option === "string" ? null : `${letters[i]}: ${option.alt}`,
         onclick: () => {
           if (locked.peek()) return;
@@ -465,23 +497,41 @@ function spread(s: Spread, answer: number, mine: number | null, view: NumberView
 
 let orders = 0; // for each order's hint its own id
 
-/** Things to put in order: dragged into place (or moved with the arrow keys), then sent with „Готово“. */
+/** Things to put in order, then sent with „Готово“: a tap on one picks it up and a tap on another place puts it
+ * there (a screen reader's way too); or it's dragged into place, by its grip on a touch screen (the rest of the row
+ * scrolls the page, as a finger expects) and anywhere with a mouse; or moved with the arrow keys. */
 function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
   const how = `order-how-${++orders}`;
   const n = view.items.length;
   const arrangement = view.items.map((_, i) => i); // the item at each place
   let moved = false;
+  const picked = signal(-1); // the item picked up by a tap, to be put down by the next
+  let dragged = false; // the pointer down now has moved: a drag, not a tap
+  let swallow = false; // a drag just ended: the click that may follow it is no tap (none follows a finger's)
   const said = h("p", { class: "sr", "aria-live": "polite" });
-  const rows = view.items.map((text) =>
+  const rows = view.items.map((text, item) =>
     h(
       "li",
-      { class: "option sortable", tabindex: 0, "aria-describedby": how },
+      {
+        class: () => (picked() === item ? "option sortable chosen" : "option sortable"),
+        role: "button",
+        tabindex: 0,
+        "aria-pressed": () => picked() === item,
+        "aria-describedby": how,
+      },
       h("span", { class: "letter", "aria-hidden": "true" }),
       h("span", null, text),
       h("span", { class: "grip", "aria-hidden": "true" }),
     ),
   );
   const list = h("ol", { class: "options sortable-list" });
+  list.addEventListener(
+    "pointerdown",
+    () => {
+      swallow = false;
+    },
+    true,
+  );
   // Puts the rows in the order they're in now, numbered by place.
   const lay = () => {
     arrangement.forEach((item, place) => {
@@ -501,9 +551,34 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
     play("key");
     said.textContent = `„${view.items[item]}“ е на ${ordinal(to + 1, "n")} място.`;
   };
+  // A tap: picks a thing up, puts the one picked up in this one's place, or (on the one picked up) puts it back.
+  const tap = (item: number) => {
+    if (locked.peek()) return;
+    const held = picked.peek();
+    if (held === item) {
+      picked.set(-1);
+      said.textContent = `„${view.items[item]}“ остава на мястото си.`;
+    } else if (held >= 0) {
+      const keys = list.contains(document.activeElement);
+      picked.set(-1);
+      move(arrangement.indexOf(held), arrangement.indexOf(item));
+      if (keys) (rows[held] as HTMLElement).focus({ preventScroll: true }); // the rows were laid anew
+    } else {
+      picked.set(item);
+      play("tap");
+      said.textContent = `Взе „${view.items[item]}“. Докосни мястото, където да отиде.`;
+    }
+  };
   rows.forEach((row, item) => {
+    row.addEventListener("click", () => {
+      if (swallow) swallow = false;
+      else tap(item);
+    });
     row.addEventListener("pointerdown", (e: PointerEvent) => {
       if (locked.peek() || e.button !== 0) return;
+      // A finger drags by the grip only: elsewhere on the row it scrolls the page, or taps.
+      if (e.pointerType !== "mouse" && !(e.target as Element).closest(".grip")) return;
+      dragged = false;
       const from = arrangement.indexOf(item);
       const first = rows[arrangement[0] ?? 0] as HTMLElement;
       const second = rows[arrangement[1] ?? 0] as HTMLElement;
@@ -514,6 +589,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
       row.classList.add("dragging");
       list.classList.add("sorting");
       const follow = (ev: PointerEvent) => {
+        if (Math.abs(ev.clientY - y0) > 4) dragged = true;
         const dy = Math.max(-from * pitch, Math.min((n - 1 - from) * pitch, ev.clientY - y0));
         row.style.transform = `translateY(${dy}px)`;
         to = from + Math.round(dy / pitch);
@@ -529,8 +605,12 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
         row.removeEventListener("pointercancel", drop);
         row.classList.remove("dragging");
         list.classList.remove("sorting");
+        if (dragged) {
+          picked.set(-1);
+          swallow = true;
+        }
         if (to !== from && !locked.peek()) move(from, to);
-        else lay();
+        else if (dragged) lay(); // back where it was (left alone on a tap: laying the rows anew would lose its click)
       };
       row.addEventListener("pointermove", follow);
       row.addEventListener("pointerup", drop);
@@ -538,6 +618,12 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
     });
     row.addEventListener("keydown", (e: KeyboardEvent) => {
       if (locked.peek()) return;
+      // A row is a button: Enter or Space taps it.
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        e.stopPropagation();
+        return tap(item);
+      }
       const at = arrangement.indexOf(item);
       const to = e.key === "ArrowUp" ? at - 1 : e.key === "ArrowDown" ? at + 1 : -1;
       if (to < 0 || to >= n) return;
@@ -563,9 +649,8 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
   const hint = h(
     "p",
     { class: "hint", id: how },
-    "Плъзни ги в правилния ред",
-    h("span", { class: "sr" }, " или ги мести със стрелките нагоре и надолу"),
-    ".",
+    "Докосни едно, после мястото му, или го плъзни.",
+    h("span", { class: "sr" }, " Стрелките нагоре и надолу също го местят."),
   );
   return {
     node: h("div", { class: "stack" }, hint, list, said, done),
@@ -615,7 +700,7 @@ function truefalse(_view: TrueFalseView, submit: (a: Answer) => void, locked: Si
       {
         class: "option tf",
         type: "button",
-        disabled: locked,
+        "aria-disabled": locked,
         onclick: () => pick(truth),
       },
       h("span", null, truth ? "Вярно" : "Невярно"),
@@ -837,7 +922,9 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
       card.style.transform = "";
     }
     play("key");
-    said.textContent = `„${view.items[at]}“: ${view.groups[side]}.`;
+    // Said here, once: what went where, and what's next on the card (the card itself is drawn anew each time).
+    const next = view.items[at + 1];
+    said.textContent = `„${view.items[at]}“: ${view.groups[side]}.${next === undefined ? "" : ` Следва „${next}“.`}`;
     sides.update((s) => [...s, side]);
     if (at + 1 === n) submit({ sides: [...sides.peek()] });
     else window.setTimeout(lay, 180);
@@ -847,6 +934,7 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
     sides.update((s) => s.slice(0, -1));
     play("tap");
     lay();
+    said.textContent = `Върнато: „${view.items[sides.peek().length]}“.`;
   };
   const sideButton = (side: number) =>
     h(
@@ -880,7 +968,7 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
     if (text !== undefined) {
       const card = h(
         "div",
-        { class: "split-card top", "aria-live": "polite" },
+        { class: "split-card top" },
         h("span", { class: "split-lean on-left", "aria-hidden": "true" }, view.groups[0]),
         h("span", { class: "split-lean on-right", "aria-hidden": "true" }, view.groups[1]),
         h("span", { class: "split-text" }, hyphenate(text)),
@@ -981,8 +1069,19 @@ const clueWorth = [1, 0.6, 0.3];
 
 /** „Подсказки“: the clues one under another, each with what a right answer is worth while it's the last one out; the
  * ones still to come count down. The four options are there from the start: answer as soon as you know. */
-function clues(view: CluesView, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
+function clues(
+  view: CluesView,
+  submit: (a: Answer) => void,
+  locked: Signal<boolean>,
+  say?: (s: string) => void,
+): Asked {
   let now = view;
+  // A clue come out is said once (the list itself only counts down, and says nothing every second).
+  const said = say ? null : h("p", { class: "sr", "aria-live": "polite" });
+  const tell = (s: string) => {
+    if (say) say(s);
+    else if (said) said.textContent = s;
+  };
   const born = performance.now() - view.sinceMs; // when the question showed, on this screen's clock
   const rows = Array.from({ length: view.total }, (_, i) =>
     h(
@@ -992,7 +1091,7 @@ function clues(view: CluesView, submit: (a: Answer) => void, locked: Signal<bool
       h("span", { class: "clue-text" }),
     ),
   );
-  const list = h("ol", { class: "clues", "aria-live": "polite" }, rows);
+  const list = h("ol", { class: "clues" }, rows);
   const paint = (all?: string[]) => {
     const out = all ?? now.clues;
     const elapsed = performance.now() - born;
@@ -1015,7 +1114,7 @@ function clues(view: CluesView, submit: (a: Answer) => void, locked: Signal<bool
       {
         class: "option",
         type: "button",
-        disabled: locked,
+        "aria-disabled": locked,
         onclick: () => {
           if (locked.peek()) return;
           buttons[i]?.classList.add("picked");
@@ -1029,13 +1128,15 @@ function clues(view: CluesView, submit: (a: Answer) => void, locked: Signal<bool
   );
   answerKeys(buttons, locked);
   return {
-    node: h("div", { class: "stack" }, list, h("div", { class: "options" }, buttons)),
+    node: h("div", { class: "stack" }, list, said, h("div", { class: "options" }, buttons)),
     pending: () => null,
     update(next) {
       if (next.type !== "clues" || next.clues.length <= now.clues.length || locked.peek()) return;
       now = next;
       paint();
       play("key");
+      const n = next.clues.length;
+      tell(`Подсказка ${n}: ${next.clues[n - 1] ?? ""}`);
     },
     reveal(reveal, given, at = atOnce) {
       clearInterval(tick);

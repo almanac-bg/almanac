@@ -224,9 +224,11 @@
     box-sizing: border-box;
   }
 
+  /* No grey flash over what's tapped: each control shows its own press. */
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
@@ -1283,9 +1285,12 @@
       background-color 160ms ease;
   }
 
-  .btn:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: var(--elev-2);
+  /* Only where a pointer hovers: on a touch screen hover sticks after the tap. */
+  @media (hover: hover) and (pointer: fine) {
+    .btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: var(--elev-2);
+    }
   }
 
   .btn:active:not(:disabled) {
@@ -1813,8 +1818,10 @@
     font-size: 1.5rem;
   }
 
-  .game-leave:hover {
-    color: var(--text);
+  @media (hover: hover) and (pointer: fine) {
+    .game-leave:hover {
+      color: var(--text);
+    }
   }
 
   /* A run's head and pips stay in view while the question and its answer scroll (run.ts), smaller once stuck. */
@@ -1849,9 +1856,10 @@
     margin-bottom: 0;
   }
 
+  /* Stuck, the arrow keeps a thumb's room (44px), reaching past the smaller head's row. */
   .stuck .game-leave {
-    height: 1.75rem;
-    margin-bottom: 0;
+    align-self: center;
+    margin-block: -0.5rem;
   }
 
   .stuck .kicker {
@@ -2042,12 +2050,23 @@
       box-shadow 200ms ease;
   }
 
-  .option:hover:not(:disabled) {
-    border-color: var(--line-strong);
-    transform: translateY(-1px);
+  /* An answer pressed gives under the finger; hovered (only where a pointer hovers: on a touch screen hover sticks
+     after the tap, and an answer would look chosen), it lifts. Once answered, it stays put (aria-disabled keeps the
+     focus on it, questions.ts). */
+  .option:active:not(:disabled, [aria-disabled="true"]) {
+    border-color: var(--accent);
+    transform: scale(0.98);
   }
 
-  .option:disabled {
+  @media (hover: hover) and (pointer: fine) {
+    .option:hover:not(:disabled, [aria-disabled="true"], :active) {
+      border-color: var(--line-strong);
+      transform: translateY(-1px);
+    }
+  }
+
+  .option:disabled,
+  .option[aria-disabled="true"] {
     cursor: default;
   }
 
@@ -2311,7 +2330,8 @@
     mask: var(--i-back) center / contain no-repeat;
   }
 
-  /* Things to order: each row is dragged into place. */
+  /* Things to order: a row tapped is picked up (.chosen) and goes where the next tap says, or is dragged into place,
+     by its grip on a touch screen: the rest of the row scrolls the page. */
   .sortable-list {
     margin: 0;
     padding: 0;
@@ -2319,10 +2339,17 @@
   }
 
   .option.sortable {
-    cursor: grab;
-    touch-action: none;
+    cursor: pointer;
+    touch-action: pan-y;
     user-select: none;
     -webkit-user-select: none;
+  }
+
+  .option.sortable.chosen {
+    border-color: var(--accent);
+    box-shadow:
+      0 0 0 1px var(--accent),
+      var(--elev-2);
   }
 
   .sortable-list.sorting .option.sortable:not(.dragging) {
@@ -2344,11 +2371,22 @@
     color: var(--on-accent);
   }
 
+  /* The grip: drawn at 20px, a thumb's room (44px) to take hold of. */
   .grip {
     flex: none;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin: -12px -12px -12px auto;
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .grip::before {
+    content: "";
     width: 20px;
     height: 20px;
-    margin-left: auto;
     background: var(--text-muted);
     -webkit-mask: var(--i-grip) center / contain no-repeat;
     mask: var(--i-grip) center / contain no-repeat;
@@ -2370,6 +2408,12 @@
     font-size: 1.25rem;
     font-weight: 800;
     text-align: center;
+  }
+
+  /* Gone over (a review, a live game's answer): the right one of the two says so in words, not by colour alone. */
+  .tf-right {
+    font: 700 0.75rem / 1 var(--font-sans);
+    letter-spacing: 0.04em;
   }
 
   /* How everyone else answered: a bar behind each answer as long as the share that gave it, the share beside it, and
@@ -2730,6 +2774,15 @@
   .split-pips {
     display: flex;
     gap: 6px;
+  }
+
+  /* „Върни последното“: a link to look at, a thumb's room to tap (44px), the foot's height kept. */
+  .split-back {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin: -6px calc(-1 * var(--space-2)) -6px 0;
+    padding-inline: var(--space-2);
   }
 
   .split-pips b {
@@ -5888,6 +5941,10 @@
       overflow-y: auto;
       overscroll-behavior: contain;
       background: var(--raised);
+      /* A long fact fades out at the card's foot, where it scrolls on, rather than stop on a line cut in half (a short
+         one fades only its padding). */
+      -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 1.25rem), transparent);
+      mask-image: linear-gradient(to bottom, #000 calc(100% - 1.25rem), transparent);
     }
 
     .run-question .after .fact p {
