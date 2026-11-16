@@ -47,6 +47,13 @@ export async function answer(page: Page): Promise<void> {
   }
 }
 
+/** Starts the day's ten from Начало (or the rest of them: „Продължи“), cutting its count short. */
+export async function startDay(page: Page, button = "Започни"): Promise<void> {
+  await page.getByRole("button", { name: button, exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
+  await page.getByRole("button", { name: "Започни сега" }).click();
+}
+
 /** Plays a run's ten questions, solo: answer, see the answer (and its fact), and move on. Each question opens at the
  * top of the page, wherever the answer before it was scrolled to. */
 export async function playRun(page: Page): Promise<void> {

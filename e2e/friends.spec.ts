@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { playedFair, playRun } from "./play.ts";
+import { playedFair, playRun, startDay } from "./play.ts";
 
 test("friends: an invite link, then a duel between the two", async ({ browser }) => {
   test.setTimeout(180_000);
@@ -86,7 +86,7 @@ test("friends on the day: a shared link to it, who has played it, and how each w
 
   // Ana plays the day with no friends yet: one quiet line asks her to invite someone.
   await a.goto("/");
-  await a.getByRole("button", { name: "Започни" }).click();
+  await startDay(a);
   await playRun(a);
   await playedFair(a);
   await expect(a.getByRole("link", { name: /^Покани някого/ })).toBeVisible();

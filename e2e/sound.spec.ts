@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { answer } from "./play.ts";
+import { answer, startDay } from "./play.ts";
 
 // The game's sounds start with the player's first tap, and come back after the game has been in the background.
 test("sounds start with a tap and come back from the background", async ({ page }) => {
@@ -28,7 +28,7 @@ test("sounds start with a tap and come back from the background", async ({ page 
   await page.goto("/");
   // Nothing sounds, nor is started, before a touch.
   expect(await audio()).toEqual({ contexts: 0, state: undefined, tones: 0 });
-  await page.getByRole("button", { name: "Започни" }).click();
+  await startDay(page);
   await answer(page);
   await expect.poll(audio).toMatchObject({ contexts: 1, state: "running" });
   expect((await audio()).tones).toBeGreaterThan(0);

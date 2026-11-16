@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { answer, moveOn, playedBefore, playRun } from "./play.ts";
+import { answer, moveOn, playedBefore, playRun, startDay } from "./play.ts";
 
 test("the day: ten questions, the result, the review, and one try only", async ({ page }) => {
   test.setTimeout(120_000);
@@ -15,7 +15,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
   await expect(page.locator(".modes")).toHaveCount(0);
   await expect(page.locator(".streak-chip")).toHaveCount(0);
-  await page.getByRole("button", { name: "Започни" }).click();
+  await startDay(page);
   await playRun(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("от 10");
   // A first result is quiet (play/unfold.go): what its points are, in a line, and what the game earned to wear; no
@@ -104,7 +104,7 @@ test("the day says how its other players did with each question: under the verdi
   await other.dispose();
 
   await page.goto("/");
-  await page.getByRole("button", { name: "Започни" }).click();
+  await startDay(page);
   await answer(page);
   const says = page.locator(".after .verdict + .crowd-says");
   // The other answered nothing, so this may be the first right answer: then it says so, never „0%“.
@@ -186,10 +186,33 @@ test("a topic's count can be backed out of, or cut short", async ({ page }) => {
   await expect(page.locator(".question-head")).toContainText("1 от 10", { timeout: 1500 });
 });
 
+test("the day's count can be backed out of, and nothing starts; let run, it starts by itself", async ({ page }) => {
+  await page.goto("/");
+  const day = page.locator(".card.day");
+  await page.getByRole("button", { name: "Започни", exact: true }).click();
+  await expect(page.locator(".get-ready .kicker")).toHaveText("Въпросите на деня");
+  await page.getByRole("button", { name: "Откажи" }).click();
+  await expect(day).toContainText("Десет въпроса за днес");
+  // Nothing started behind it: the day is still unplayed, after a reload too.
+  await page.waitForTimeout(3500);
+  await expect(page.locator(".question-head")).toHaveCount(0);
+  await page.reload();
+  await expect(day.getByRole("button", { name: "Започни", exact: true })).toBeVisible();
+
+  await day.getByRole("button", { name: "Започни", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(day).toBeVisible();
+
+  await day.getByRole("button", { name: "Започни", exact: true }).click();
+  await expect(page.getByRole("timer")).toHaveAccessibleName(/Започва след [1-3] с/);
+  await expect(page.locator(".question-head")).toContainText("1 от 10", { timeout: 6000 });
+});
+
 test("the day left after its third question waits on Начало, and goes on from the fourth", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/");
-  await page.getByRole("button", { name: "Започни" }).click();
+  await startDay(page);
   for (let n = 0; n < 3; n++) {
     await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
     await answer(page);
@@ -207,7 +230,7 @@ test("the day left after its third question waits on Начало, and goes on f
   await page.waitForTimeout(4000);
   await page.reload();
   await expect(page.locator(".card.day")).toContainText("Следва въпрос 4 от 10.");
-  await page.getByRole("button", { name: "Продължи" }).click();
+  await startDay(page, "Продължи");
   for (let n = 3; n < 10; n++) {
     await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
     await answer(page);
