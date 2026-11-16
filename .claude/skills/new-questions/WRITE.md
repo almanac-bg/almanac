@@ -28,9 +28,12 @@ never edit it), `<batch>` (this batch's folder) and your category.
   - **`dated`**: one question for each of your `dates`, in order (the first `count`, the spares on the rest), each with
     `"on": ["MM-DD"]`. A dated question is a choice without a picture (any difficulty), an easy true-or-not, or a hard
     estimate number. It is about what happened on, or is marked on, that exact day (a birth, a death, an event, a
-    holiday, a name day, a world day), and its fact says the date in passing („На 3 март 1878 г. …“). Bulgarian
-    events before 1916: the New Style date Bulgaria marks today. If a date truly has nothing worth asking in your
-    category, take the next of your dates and say so in your notes.
+    holiday, a name day, a world day), and it has its **`day` line**: one short sentence (at most 100 characters,
+    ending in a period) that says what happened that day and names the date: `"day": "На 16 декември 1982 г. умира
+    Колин Чапман."`. The player reads it with the answer, over the fact, only on that date. So the text names the date
+    only when the date is what's asked (not „Колин Чапман, починал на 16 декември 1982 г., основава…“), and the fact
+    says something new, never the date again. Bulgarian events before 1916: the New Style date Bulgaria marks today.
+    If a date truly has nothing worth asking in your category, take the next of your dates and say so in your notes.
 - **`firstId` … `lastId`**: your ids. Number your questions from `firstId` up, one by one, no gaps.
 - **`avoid`**: subjects your category names too often already. Write away from them; never a question whose answer or
   main subject is one of them.

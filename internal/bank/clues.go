@@ -166,7 +166,7 @@ func (d *dealtClues) Reveal(c *Crowd) any {
 			right = i
 		}
 	}
-	return struct {
+	return &struct {
 		Pick  int      `json:"pick"`
 		Clues []string `json:"clues"`
 		reveal

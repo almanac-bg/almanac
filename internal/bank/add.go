@@ -1,9 +1,12 @@
 package bank
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,9 +15,10 @@ import (
 	"time"
 )
 
-// Batch files: a batch to add is a directory with <category>.json for each category it adds to (a JSON array, as in
-// the bank), and maybe RetireFile (the questions it retires: [{"id", "why", "by"}], why one of RetiredWhys, by the
-// question of the batch that takes its place, if one does) and ImagesDir (its pictures).
+// Batch files: a batch is a directory with <category>.json for each category it adds to or changes (a JSON array, as
+// in the bank: a question whose id the bank has is that question changed, whole; any other is new), and maybe
+// RetireFile (the questions it retires: [{"id", "why", "by"}], why one of RetiredWhys, by the question of the batch
+// that takes its place, if one does) and ImagesDir (its pictures).
 const RetireFile = "retire.json"
 
 // Retirement is a question a batch retires (RetireFile).
@@ -24,19 +28,22 @@ type Retirement struct {
 	By  string `json:"by,omitempty"`
 }
 
-// Added is what a batch did, or would do: how many questions it added and retired, the live size of each category
-// after it, and the warnings about its own questions.
+// Added is what a batch did, or would do: how many questions it added, changed and retired, the live size of each
+// category after it, and the warnings about its own questions (the new and the changed).
 type Added struct {
-	Added, Retired int
-	Sizes          []CategoryCount
-	Warnings       []Problem
+	Added, Changed, Retired int
+	Sizes                   []CategoryCount
+	Warnings                []Problem
 }
 
-// Add puts a batch (from) into the bank in dir: its questions at the end of their categories' files, the questions it
-// retires marked so, its pictures among the bank's. It checks first and writes nothing unless all of it holds: each
-// new question decodes strictly, takes the next numbers of its own category's ids, and the bank with the batch in it
-// loads with no errors. The files are written in the bank's format. checkedBy, if set, marks every new question
-// checked today by it (Tail.Checked, CheckedBy) where the batch doesn't say. dry checks only: the bank stays as it is.
+// Add puts a batch (from) into the bank in dir: its new questions at the end of their categories' files, its changed
+// ones in their places, the questions it retires marked so, its pictures among the bank's. It checks first and writes
+// nothing unless all of it holds: each question decodes strictly; a new one takes the next numbers of its own
+// category's ids; a changed one is a live question of that category, keeps its added, is updated today, and is
+// changed today if and only if what it asks changed (askedChanges); and the bank with the batch in it loads with no
+// errors. The files are written in the bank's format. checkedBy, if set, marks every new or changed question checked
+// today by it (Tail.Checked, CheckedBy) where the batch doesn't say (a changed one: says no other than the bank).
+// dry checks only: the bank stays as it is.
 func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 	today := time.Now().Format(time.DateOnly)
 	b, problems := Load(dir)
@@ -47,6 +54,8 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 	fault := func(format string, a ...any) { faults = append(faults, fmt.Sprintf(format, a...)) }
 
 	news := map[string][]Question{}
+	changes := map[string]Question{}
+	seen := map[string]bool{}
 	for _, c := range b.Categories {
 		data, err := os.ReadFile(filepath.Join(from, c.ID+".json"))
 		if errors.Is(err, os.ErrNotExist) {
@@ -62,6 +71,27 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 		}
 		for _, item := range qs {
 			id := item.q.Base().ID
+			at := fmt.Sprintf("%s.json:%d: %s", c.ID, item.line, id)
+			if seen[id] {
+				fault("%s: twice in the batch", at)
+				continue
+			}
+			seen[id] = true
+			if old, ok := b.Get(id); ok {
+				faults := changeFaults(old, item.q, c.ID, today)
+				for _, f := range faults {
+					fault("%s: %s", at, f)
+				}
+				o, t := old.Extra(), item.q.Extra()
+				if checkedBy != "" && (t.CheckedBy == "" || (t.Checked == o.Checked && t.CheckedBy == o.CheckedBy)) {
+					t.Checked, t.CheckedBy = today, checkedBy
+				}
+				if len(faults) == 0 && sameQuestion(old, item.q) {
+					fault("%s: the same as the bank's: a batch holds only the questions it changes", at)
+				}
+				changes[id] = item.q
+				continue
+			}
 			p, n, ok := splitID(id)
 			switch {
 			case !ok || (prefix != "" && p != prefix):
@@ -96,22 +126,18 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Added{}, err
 	}
-	batch := map[string]bool{}
-	for _, qs := range news {
-		for _, q := range qs {
-			batch[q.Base().ID] = true
-		}
-	}
 	for _, r := range retire {
 		q, ok := b.Get(r.ID)
 		switch {
+		case changes[r.ID] != nil:
+			fault("%s: %s: changed and retired in one batch", RetireFile, r.ID)
 		case !ok:
 			fault("%s: %s: no such question in the bank", RetireFile, r.ID)
 		case q.Extra().Retired:
 			fault("%s: %s: retired already", RetireFile, r.ID)
 		case !slices.Contains(RetiredWhys, r.Why):
 			fault("%s: %s: why is one of %s", RetireFile, r.ID, strings.Join(RetiredWhys, ", "))
-		case r.By != "" && !batch[r.By]:
+		case r.By != "" && !seen[r.By]:
 			fault("%s: %s: by %s, which isn't in the batch", RetireFile, r.ID, r.By)
 		default:
 			t := q.Extra()
@@ -147,7 +173,13 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 		}
 	}
 	for _, c := range b.Categories {
-		if err := WriteCategory(tmp, c.ID, append(b.InCategory(c.ID), news[c.ID]...)); err != nil {
+		qs := b.InCategory(c.ID)
+		for i, q := range qs {
+			if changed, ok := changes[q.Base().ID]; ok {
+				qs[i] = changed
+			}
+		}
+		if err := WriteCategory(tmp, c.ID, append(qs, news[c.ID]...)); err != nil {
 			return Added{}, err
 		}
 	}
@@ -174,8 +206,11 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 		return Added{}, errors.New("nothing added: the bank with the batch in it has errors:\n" + strings.Join(lines, "\n"))
 	}
 
-	res := Added{Retired: len(retire)}
+	res := Added{Changed: len(changes), Retired: len(retire)}
 	mine := map[string]bool{}
+	for id := range changes {
+		mine[id] = true
+	}
 	for _, c := range after.Categories {
 		res.Sizes = append(res.Sizes, CategoryCount{c.ID, len(after.Live(c.ID, ""))})
 		res.Added += len(news[c.ID])
@@ -203,6 +238,115 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 		}
 	}
 	return res, nil
+}
+
+// changeFaults is what's wrong with q as a change to the bank's question old, in a batch's file of category, today:
+// old is a live question of that category; q keeps its added, is updated today, and is changed today if what it asks
+// changed, or keeps its changed if only the rest did (its fact, its labels, its sources).
+func changeFaults(old, q Question, category, today string) []string {
+	o, t := old.Extra(), q.Extra()
+	switch {
+	case old.Base().Category != category:
+		return []string{fmt.Sprintf("a question of %s: it's changed in %s.json", old.Base().Category, old.Base().Category)}
+	case o.Retired:
+		return []string{"retired: a retired question isn't changed (a new one takes its place)"}
+	case t.Retired:
+		return []string{"a batch retires a question in " + RetireFile}
+	}
+	// as is a date as the bank has it, for saying so.
+	as := func(date string) string {
+		if date == "" {
+			return "none"
+		}
+		return date
+	}
+	var out []string
+	if t.Added != o.Added {
+		out = append(out, fmt.Sprintf("added stays as the bank has it (%s)", as(o.Added)))
+	}
+	if t.Updated != today {
+		out = append(out, fmt.Sprintf("a change sets updated to today (%s)", today))
+	}
+	if asked := askedChanges(old, q); len(asked) > 0 {
+		if t.Changed != today {
+			msg := fmt.Sprintf("what it asks changed (%s): changed is today (%s) too", strings.Join(asked, ", "), today)
+			if t.Changed == "" {
+				msg += "; or, as a new question, it takes the next free id (the bank has this one)"
+			}
+			out = append(out, msg)
+		}
+	} else if t.Changed != o.Changed {
+		out = append(out, fmt.Sprintf("what it asks is the same (only its fact or labels changed): changed stays as the bank has it (%s)", as(o.Changed)))
+	}
+	return out
+}
+
+// notAsked are a question's fields that aren't what it asks: its labels (difficulty, days, Bulgaria), the fact and
+// the day's line, its dates, sources and retirement. Players' answers from before a change to them were to the same
+// question (Tail.Changed). Every other field is what it asks: the text, the answer and options, items, pairs, decoy,
+// clues, groups, a number's unit, step, scale and tolerance, an order's direction, the type, a picture.
+var notAsked = map[string]bool{
+	"id": true, "difficulty": true, "fact": true, "day": true, "on": true, "bg": true, "sources": true,
+	"added": true, "changed": true, "updated": true, "checked": true, "checkedBy": true, "reviewBy": true,
+	"retired": true, "retiredWhy": true, "replacedBy": true,
+}
+
+// askedChanges are the fields of what a question asks that differ between two versions of it, by name.
+func askedChanges(a, b Question) []string {
+	fa, fb := askedOf(a), askedOf(b)
+	var out []string
+	for _, k := range slices.Sorted(maps.Keys(fa)) {
+		if !notAsked[k] && fa[k] != fb[k] {
+			out = append(out, k)
+		}
+	}
+	for _, k := range slices.Sorted(maps.Keys(fb)) {
+		if _, ok := fa[k]; !ok && !notAsked[k] {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+// sameQuestion is whether two versions of a question are the same but for the day they were updated.
+func sameQuestion(a, b Question) bool {
+	fa, fb := fieldsOf(a), fieldsOf(b)
+	delete(fa, "updated")
+	delete(fb, "updated")
+	return maps.Equal(fa, fb)
+}
+
+// fieldsOf is a question's fields as the bank writes them (its typography set, tidy), each compact.
+func fieldsOf(q Question) map[string]string {
+	data, err := Format([]Question{q})
+	var raw []map[string]json.RawMessage
+	if err != nil || json.Unmarshal(data, &raw) != nil || len(raw) != 1 {
+		return map[string]string{}
+	}
+	out := map[string]string{}
+	for k, v := range raw[0] {
+		var b bytes.Buffer
+		_ = json.Compact(&b, v)
+		out[k] = b.String()
+	}
+	return out
+}
+
+// askedOf is fieldsOf with each picture as the file it shows: who took it, its licence and its description are its
+// labels.
+func askedOf(q Question) map[string]string {
+	out := fieldsOf(q)
+	if im := q.Extra().Image; im != nil {
+		out["image"] = im.File
+	}
+	if c, ok := q.(*Choice); ok && len(c.Pictures) > 0 {
+		files := make([]string, len(c.Pictures))
+		for i, p := range c.Pictures {
+			files[i] = p.File
+		}
+		out["pictures"] = strings.Join(files, " ")
+	}
+	return out
 }
 
 // lastID is a category's id prefix ("gen") and the highest number its questions have, retired ones too.

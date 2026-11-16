@@ -56,7 +56,7 @@ func bankCommand(args []string) error {
 	case "add":
 		fs := flag.NewFlagSet("bank add", flag.ContinueOnError)
 		dry := fs.Bool("check", false, "only check the batch: write nothing")
-		checkedBy := fs.String("checked-by", "", `mark the new questions checked today by this ("new-questions fable-5.2")`)
+		checkedBy := fs.String("checked-by", "", `mark the new and changed questions checked today by this ("new-questions fable-5.2")`)
 		if err := fs.Parse(rest); err != nil || fs.NArg() == 0 {
 			return usage()
 		}
@@ -69,8 +69,9 @@ func bankCommand(args []string) error {
 	return usage()
 }
 
-// bankAdd adds a checked batch (bank.Add) to a bank: all of it, or nothing. dry (-check) only checks it and says what
-// it would do: a writer checks one category's part this way, before the batch is whole.
+// bankAdd puts a checked batch (bank.Add) into a bank, its new questions, changes and retirements: all of it, or
+// nothing. dry (-check) only checks it and says what it would do: a writer checks one category's part this way, before
+// the batch is whole.
 func bankAdd(from, dir, checkedBy string, dry bool) error {
 	res, err := bank.Add(dir, from, checkedBy, dry)
 	if err != nil {
@@ -83,11 +84,11 @@ func bankAdd(from, dir, checkedBy string, dry bool) error {
 	for _, c := range res.Sizes {
 		sizes = append(sizes, c.String())
 	}
-	verb := "added"
+	did := fmt.Sprintf("%d questions added, %d changed, %d retired", res.Added, res.Changed, res.Retired)
 	if dry {
-		verb = "would be added (nothing written)"
+		did = fmt.Sprintf("would add %d questions, change %d, retire %d (nothing written)", res.Added, res.Changed, res.Retired)
 	}
-	fmt.Printf("%s: %d questions %s, %d retired; live after: %s\n", dir, res.Added, verb, res.Retired, strings.Join(sizes, ", "))
+	fmt.Printf("%s: %s; live after: %s\n", dir, did, strings.Join(sizes, ", "))
 	return nil
 }
 

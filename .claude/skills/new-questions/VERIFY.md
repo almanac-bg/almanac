@@ -22,8 +22,10 @@ Your prompt gives you: `<skill>` (this folder), `<repo>` (the game's code), `<ba
    argued to be; nothing is outdated (or it is pinned to a date, with `reviewBy`).
 2. **The fact:** true, about the answer, says something the question didn't, claims no more than the sources (their
    hedges kept: „около“, „според преданието“).
-3. **Dates (`on`):** the date is exactly the day of what the question is about; the fact says why the day; Bulgarian
-   events before 1916 on the New Style date Bulgaria marks today.
+3. **Dates (`on`):** the date is exactly the day of what the question is about; the `day` line is true, names that
+   date and says what happened on it, in one short sentence; the text names the date only if the date is what's
+   asked; the fact says something new, not the date again. Bulgarian events before 1916 on the New Style date
+   Bulgaria marks today.
 4. **One reading:** the wording can't be read two ways. True-or-not is false by one clear fact, never by a trick,
    and a false one's fact starts with what is true. Numbers are estimates (a year, or more than 20 steps), with one
    accepted value (or the text pins the source) and the skill's tolerance formula. Orders: exact values, measured ones

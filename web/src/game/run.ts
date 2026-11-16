@@ -403,8 +403,9 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     progress = now;
     const kind = kindOf(res, answer);
     playAnswer(kind, res.inRow ?? 0);
-    // The fact behind the answer, at the moment the player most wants it: time to read it, or a tap to move on.
-    const said = res.reveal.fact;
+    // The fact behind the answer (and on its date, what happened that day), at the moment the player most wants it:
+    // time to read it, or a tap to move on.
+    const said = [res.reveal.day, res.reveal.fact].filter(Boolean).join(" ");
     const pause = pauseFor(q.view) + readingTime(said);
     const steps: [number, () => void][] = [
       [
@@ -423,7 +424,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
         () => {
           append(after, [
             res.learned ? h("p", { class: "learned" }, "Нов факт в Алманаха") : null,
-            said ? fact(said) : null,
+            fact(res.reveal.fact, res.reveal.day),
             res.reveal.credit ? credit(res.reveal.credit) : null,
             upNext(pause, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`, true),
             said

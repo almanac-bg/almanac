@@ -184,7 +184,7 @@ func (d *dealtMatch) Reveal(c *Crowd) any {
 	if len(d.right) > len(d.left) {
 		decoy = &shownAt[len(d.left)]
 	}
-	return struct {
+	return &struct {
 		Pairs []int `json:"pairs"`
 		// Decoy is where the decoy is shown, if there is one.
 		Decoy *int `json:"decoy,omitempty"`

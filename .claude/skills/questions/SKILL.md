@@ -28,10 +28,21 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
   - `go run ./cmd/almanac bank plan [-n N] [-json] [-used file] private` plans a batch of N a topic: the cells to
     write (the day's shortest runway first, at most a third of the batch in one place), how many about Bulgaria (30%,
     per cell: `bg`), the dates with the fewest questions left, the ids and the subjects to avoid;
-  - `go run ./cmd/almanac bank add [-check] [-checked-by P] <batch> private` adds a batch (`<category>.json` files,
-    `images/`, maybe `retire.json`: `[{"id", "why", "by"}]`): every new id the next free one, the bank with it in
-    loading with no errors, or nothing is written; `-check` only checks; `-checked-by` marks the new questions
-    checked today by that process;
+  - `go run ./cmd/almanac bank add [-check] [-checked-by P] <batch> private` puts a batch into the bank: new
+    questions, changes to existing ones and retirements (`<category>.json` files, `images/`, maybe `retire.json`:
+    `[{"id", "why", "by"}]`). It is the one checked way to change the bank, for a fix of one question and a content
+    pass over thousands alike:
+    - an id the bank doesn't have is a **new** question: the next free number of its category;
+    - an id the bank has (live, in that category's file) is a **change**: the batch's object replaces the question
+      whole, in its place. It keeps `added` as the bank has it, sets `updated` to today, and sets `changed` to today
+      if what it asks changed (its text, answer, options, items, pairs, decoy, clues, groups, picture, tolerance,
+      unit, step, scale or direction, against the bank's version); if only the fact, the day's line or the labels
+      (difficulty, `on`, `bg`, `sources`, `reviewBy`, a picture's credit) changed, `changed` stays as it was. A
+      retired question isn't changed (a new one takes its place), nor one the batch also retires; one the same as
+      the bank's is left out of the batch;
+    - all of it holds and the bank with it in loads with no errors, or nothing is written. It reports how many
+      questions it added, changed and retired, and the warnings left on them. `-check` only checks; `-checked-by`
+      marks the new and changed questions checked today by that process (where the batch doesn't say otherwise);
   - `go run ./cmd/almanac bank check [-used file] private` checks everything the server checks before it plays a
     bank: the format and **every rule below that code can judge**. It prints every error, then the balance report:
     the difficulty and kind mix, facts and dates, each category's kinds against their share, and **the day's
@@ -96,9 +107,9 @@ enough to be worth a look, not always.
 | `options` | No option stands out by its form: only the answer with a regnal numeral (Симеон I), only the answer in Latin or in Cyrillic letters (bTV among БНТ, Нова), quotes on some options only |
 | `long-answer` (hint) | The answer isn't half again as long as every wrong option and 10 letters longer |
 | `answer-word` | No clue, and no question text, shares a word with the answer that no wrong option has („Кой е този водопад?“ — „Ниагарският водопад“; „френски лекари“ — „Лекари без граници“) |
-| `dated` | A question for a day of every year (`on`: "MM-DD") says the date in its fact („На 3 март 1878 г. …“) |
+| `dated` | A question for a day (`on`) has its day's line (`day`), ending in a period, and the line names the date („На 3 март 1878 г. …“; a moving feast's names the feast) |
 | `decoy` | A match has a decoy |
-| `giveaway` | No question shows a value another asks (a number's answer, a year a choice asks, an order's values) next to the same subject: in its text, options, items, clues, fact or reveal. Judged by the value and the rare words around it |
+| `giveaway` | No question shows a value another asks (a number's answer, a year a choice asks, an order's values) next to the same subject: in its text, options, items, clues, fact, day's line or reveal. Judged by the value and the rare words around it |
 | `pair-giveaway` (hint) | No question shows both sides of a medium or hard match's pair within four words („Кучето Лайка“ for Лайка — Куче) |
 | `shared-items` | Two orders share no two items with the same values, nor three items in the same order (one's reveal orders the other); two matches share no pair |
 | `same-identity` | A "who or what is this" answer (a picture choice, clues) is asked once |
@@ -162,7 +173,8 @@ Every question is one JSON object in its category's file:
 | `reviewBy`           | For an answer that may stop being true (an office holder, a record): when to check it. From that day no game deals it (`bank check` warns, the server logs it) until it is checked and the date moved |
 | `image`              | A picture (see below)                                                                    |
 | `retired`            | `true`: never dealt again, kept for history and stats; with `retiredWhy` (`wrong`, `stale`, `weak`, `twin`, `giveaway`, `rule`) and `replacedBy` (the id that took its place). A question retired as `wrong` or `stale` also leaves what players learned (Моят Алманах) |
-| `on`                 | The days it belongs to: `"03-03"` every year, `"2027-05-02"` that year only (Великден). On such a day it goes into the day's ten as „На този ден“; its fact says why the day |
+| `on`                 | The days it belongs to: `"03-03"` every year, `"2027-05-02"` that year only (Великден). On such a day it goes into the day's ten as „На този ден“ |
+| `day`                | With `on`, required: one short line (at most 100 characters, ending in a period) saying what happened on that day and naming the date: „На 16 декември 1982 г. умира Колин Чапман.“ The player reads it with the answer, only when the question is dealt on its date (never before answering: it could give the answer away; never in a topic's game). See „A question for a day“ below |
 | `bg`                 | `true` for a question about Bulgaria (people, places, history, culture, language, sport): every day has at least three |
 
 By type:
@@ -245,6 +257,22 @@ By type:
 - It must not answer another question in the bank: grep its names and numbers.
 - Claim only what the sources claim, and keep their hedges („според преданието“, „около“).
 
+## A question for a day
+
+A question with `on` is dealt on its date as „На този ден“ (its topic and „На този ден“ over it), and its `day` line
+shows with the answer, over the fact: the player learns why the day. (The owner's decision B, 16 Nov 2026.)
+
+- **The `day` line** says what happened on that day and names the date, in one short sentence (at most 100
+  characters, ending in a period): „На 16 декември 1982 г. умира Колин Чапман.“, „На 3 март 1878 г. е подписан
+  Санстефанският мирен договор.“ A moving feast's line (`on` with years) names the feast and what it marks instead
+  of a date („На Великден християните празнуват Възкресението Христово.“). It shows only after the answer, so it may
+  name what the question asks; it never shows in a topic's game.
+- **The text names the date only when the date is what's asked.** Not „Колин Чапман, починал на 16 декември
+  1982 г., основава коя марка…“, but „Кой основава марката „Лотус“?“: the day's line says the date.
+- **The fact says something new,** not the date again: the day's line has said it. „Чапман умира на 16 декември.“
+  is a wasted fact.
+- Bulgarian events before 1916: the New Style date Bulgaria marks today.
+
 ## Pictures
 
 - Free licences only (public domain, CC0, CC BY, CC BY-SA). Artworks only if the artist died 70 or more years ago.
@@ -254,8 +282,11 @@ By type:
 
 ## Changing a question
 
+- Change it through `bank add`: the changed questions, whole, in a batch's `<category>.json` (see the tools above),
+  never by hand in the bank's files; it checks the dates below for you.
 - Set `updated` to today whenever anything changes. If what it asks changed (text, answer, options, items, pairs,
-  clues, picture, tolerance), set `changed` to today too: the answers given before then stop counting.
+  decoy, clues, groups, picture, tolerance, unit, step, scale, direction), set `changed` to today too: the answers
+  given before then stop counting. A fix to the fact, the day's line or the labels leaves `changed` as it was.
 - Change it in place when it still asks the same thing, better (a clearer wording, a fairer option). If it would ask
   something else (another subject or answer), retire it (`"retired": true`, `retiredWhy`, `replacedBy`) and add a new
   one with a new id: answers already given and stats point at the old one.
@@ -273,8 +304,9 @@ every topic), writers and independent checkers on fixed models, a cross-check ov
 1. **Find the gaps:** run `bank check` and read the day's runway and the balance report. Plan the batch from the
    shortest runway first (every place under 150 days before anything else), then the kinds a category lacks; about
    the same count in every category.
-2. **Write** the questions into the category files, with the next free ids, `added` and `updated` set to today, and
-   a fact on each.
+2. **Write** the questions into a batch's category files (new ones with the next free ids, `added` and `updated` set
+   to today, and a fact on each; changed ones whole, with their own ids), and put it in with `bank add` (`-check`
+   first).
 3. **Verify independently.** Give a fresh agent the new questions and answers (not your reasoning). It checks each
    one against reliable sources: the marked answer is right, no other option is also right, nothing is outdated,
    the wording has one reading, the fact is true, and the difficulty fits the definitions. It reports OK, FIX or

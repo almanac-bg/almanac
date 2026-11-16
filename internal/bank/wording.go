@@ -12,11 +12,11 @@ import (
 
 // The rules of a question's wording (the skill's „Bulgarian, as the bank writes it“): how its lines end, its
 // typography, its words and names, and what may go stale. They read everything a player reads: the text, the options,
-// items, pairs, clues, the fact, a picture's description.
+// items, pairs, clues, the fact, the day's line, a picture's description.
 
-// read is every line of a question a player reads, the fact and the pictures' descriptions too.
+// read is every line of a question a player reads, the fact, the day's line and the pictures' descriptions too.
 func read(q Question) []string {
-	out := append(q.words(), q.Extra().Fact)
+	out := append(q.words(), q.Extra().Fact, q.Extra().Day)
 	for _, im := range picturesOf(q) {
 		out = append(out, im.Alt)
 	}
@@ -289,11 +289,23 @@ func ruleStale(q Question) []string {
 // monthNames are the months as a date writes them (3 март).
 var monthNames = []string{"януари", "февруари", "март", "април", "май", "юни", "юли", "август", "септември", "октомври", "ноември", "декември"}
 
-// ruleDated: a question for a day of every year says in its fact why the day: the date itself (3 март). A moving
-// feast's (Великден: a day of one year, another the next) names the feast instead, and isn't checked.
+// ruleDated: a question for a day (on) has the line of its day (Tail.Day), a sentence ending in a period, and the
+// line names the date (16 декември): one of them, for a question of several days. A moving feast's day (Великден: a
+// day of one year, another the next) is named by the feast instead, so its date isn't looked for.
 func ruleDated(q Question) []string {
 	t := q.Extra()
+	if len(t.On) == 0 {
+		return nil
+	}
+	if t.Day == "" {
+		return []string{"a question for a day (on) has its day's line (day): what happened on the day, naming it"}
+	}
 	var out []string
+	if !strings.ContainsRune(".!…", ends(t.Day)) {
+		out = append(out, "its day's line ends in a period")
+	}
+	var dates []string
+	named := false
 	for _, d := range t.On {
 		var month, day int
 		if len(d) != 5 {
@@ -302,10 +314,12 @@ func ruleDated(q Question) []string {
 		if _, err := fmt.Sscanf(d, "%d-%d", &month, &day); err != nil || month < 1 || month > 12 {
 			continue // a malformed day is an error of the format
 		}
+		dates = append(dates, fmt.Sprintf("%d %s", day, monthNames[month-1]))
 		date := regexp.MustCompile(fmt.Sprintf(`(?:^|[^\d])0?%d(?:-?\p{L}{1,2})? %s`, day, monthNames[month-1]))
-		if !date.MatchString(t.Fact) {
-			out = append(out, fmt.Sprintf("its fact doesn't say the day it is for (%d %s)", day, monthNames[month-1]))
-		}
+		named = named || date.MatchString(t.Day)
+	}
+	if len(dates) > 0 && !named {
+		out = append(out, fmt.Sprintf("its day's line doesn't name the date (%s)", strings.Join(dates, " or ")))
 	}
 	return out
 }

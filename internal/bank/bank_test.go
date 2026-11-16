@@ -128,6 +128,34 @@ func TestKeepersFieldsStayInTheBank(t *testing.T) {
 	}
 }
 
+// The line of a question's day shows only with its answer, and only when it's dealt on that day („На този ден“):
+// every kind alike.
+func TestDaysLineOnlyOnItsDay(t *testing.T) {
+	b := loadSample(t)
+	const line = "На 16 декември 1982 г. умира Колин Чапман."
+	for _, typ := range Types() {
+		q := b.Live("", typ)[0]
+		tail := q.Extra()
+		on, day := tail.On, tail.Day
+		tail.On, tail.Day = []string{"12-16"}, line
+		d := q.Deal(1)
+		view, _ := json.Marshal(d.View())
+		if strings.Contains(string(view), "Чапман") {
+			t.Errorf("%s: the day's line shows before the answer", typ)
+		}
+		for when, want := range map[string]bool{"2026-12-16": true, "2027-12-16": true, "2026-12-17": false, "": false} {
+			reveal, _ := json.Marshal(RevealOn(d, nil, when))
+			if got := strings.Contains(string(reveal), `"day":"`+line+`"`); got != want {
+				t.Errorf("%s dealt for %q: the day's line shows %v, want %v: %s", typ, when, got, want, reveal)
+			}
+		}
+		if reveal, _ := json.Marshal(d.Reveal(nil)); strings.Contains(string(reveal), "Чапман") {
+			t.Errorf("%s: a plain reveal has the day's line", typ)
+		}
+		tail.On, tail.Day = on, day
+	}
+}
+
 func TestChoiceGrading(t *testing.T) {
 	q := &Choice{Head: Head{Type: "choice"}, Answer: "Мусала", Wrong: []string{"Вихрен", "Ботев", "Черни връх"}}
 	for seed := range uint64(16) {
@@ -353,6 +381,10 @@ func TestNewQuestionRules(t *testing.T) {
 		{Tail{Retired: true, RetiredWhy: "old"}, "retiredWhy is one of"},
 		{Tail{RetiredWhy: "wrong"}, "for a retired question"},
 		{Tail{Retired: true, RetiredWhy: "wrong", ReplacedBy: "his-002"}, ""},
+		// The day's line: with on, one short line.
+		{Tail{On: []string{"12-16"}, Day: "На 16 декември 1982 г. умира Колин Чапман."}, ""},
+		{Tail{Day: "На 16 декември 1982 г. умира Колин Чапман."}, "it goes with on"},
+		{Tail{On: []string{"12-16"}, Day: "На 16 декември 1982 г. " + strings.Repeat("умира ", 15) + "Колин Чапман."}, "day is over 100"},
 	} {
 		errs, _ := checkQuestion(q(c.tail), "2026-11-25")
 		all := strings.Join(errs, "; ")

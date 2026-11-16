@@ -145,7 +145,7 @@ type lintBank struct {
 func newLintBank(b *Bank) *lintBank {
 	l := &lintBank{live: b.Live("", ""), df: map[string]int{}}
 	for _, q := range l.live {
-		for s := range stemSet(append(q.words(), q.Extra().Fact)...) {
+		for s := range stemSet(append(q.words(), q.Extra().Fact, q.Extra().Day)...) {
 			l.df[s]++
 		}
 	}

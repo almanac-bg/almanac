@@ -69,7 +69,7 @@ var Rules = []Rule{
 	{Name: "options", Says: "no option stands out by its form: only the answer with a regnal numeral, in another script, or in quotes", one: ruleOptions},
 	{Name: "long-answer", Says: "the answer isn't much longer than every wrong option", Hint: true, one: ruleLongAnswer},
 	{Name: "answer-word", Says: "no clue, and no question text, shares a word with the answer that the wrong options don't", one: ruleAnswerWord},
-	{Name: "dated", Says: "a question for a day (on) says the day in its fact", one: ruleDated},
+	{Name: "dated", Says: "a question for a day (on) has its day's line (day), ending in a period and naming the date", one: ruleDated},
 	{Name: "decoy", Says: "a match has a decoy", one: ruleDecoy},
 	{Name: "giveaway", Says: "no question shows a value another asks (a year, a number, an order's value) next to the same subject", all: ruleGiveaway},
 	{Name: "pair-giveaway", Says: "no question shows both sides of a medium or hard match's pair close together", Hint: true, all: rulePairGiveaway},

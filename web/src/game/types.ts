@@ -101,6 +101,8 @@ export interface Reveal {
   names?: string[];
   credits?: Credit[];
   unit?: string;
+  /** A question of the day's ten dealt on its date („На този ден“): what happened that day. */
+  day?: string;
   fact?: string;
   credit?: Credit;
   /** How players have answered the question so far (none until it has enough answers). */

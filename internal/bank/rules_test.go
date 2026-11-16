@@ -122,24 +122,50 @@ func TestRulesOfAQuestion(t *testing.T) {
 		{"answer-word", choice("a", "Кой е този водопад?", "Ниагарският водопад", "Водопадът Виктория", "Игуасу", "Анхел"), false},
 		{"answer-word", &Clues{Head: Head{ID: "a", Type: "clues", Text: "Коя е тази организация?"}, Answer: "Лекари без граници",
 			Wrong: []string{"Червеният кръст", "УНИЦЕФ", "Амнести"}, Clues: []string{"Основават я френски лекари.", "Втора.", "Трета."}}, true},
+		{"dated", plain("a"), false},
+		{"dated", func() Question {
+			q := plain("a")
+			q.On = []string{"03-03"}
+			q.Day = "На 3 март 1878 г. е подписан Санстефанският мирен договор."
+			q.Fact = "Мирът е подписан в Сан Стефано."
+			return q
+		}(), false},
+		// The fact saying the date is no longer enough: the day's line says it.
 		{"dated", func() Question {
 			q := plain("a")
 			q.On = []string{"03-03"}
 			q.Fact = "На 3 март 1878 г. е подписан мирът."
 			return q
-		}(), false},
+		}(), true},
 		{"dated", func() Question {
 			q := plain("a")
 			q.On = []string{"03-03"}
-			q.Fact = "Мирът е подписан в Сан Стефано."
+			q.Day = "На този ден е подписан Санстефанският мирен договор."
 			return q
 		}(), true},
 		{"dated", func() Question {
 			q := plain("a")
-			q.On = []string{"2027-05-02"}
-			q.Fact = "На Великден се боядисват яйца."
+			q.On = []string{"03-03"}
+			q.Day = "На 3 март 1878 г. е подписан Санстефанският мирен договор"
+			return q
+		}(), true},
+		{"dated", func() Question {
+			q := plain("a")
+			q.On = []string{"07-15", "07-16", "07-17"}
+			q.Day = "От 15 до 17 юли са Горещниците."
 			return q
 		}(), false},
+		{"dated", func() Question {
+			q := plain("a")
+			q.On = []string{"2027-05-02"}
+			q.Day = "Днес е Великден."
+			return q
+		}(), false},
+		{"dated", func() Question {
+			q := plain("a")
+			q.On = []string{"2027-05-02"}
+			return q
+		}(), true},
 		{"decoy", &Match{Head: Head{ID: "a", Type: "match", Text: "Свържи:"}, Pairs: []MatchPair{{"А", "Б"}}, Tail: Tail{Added: "2026-11-01"}}, true},
 	} {
 		rule, _ := RuleNamed(c.rule)

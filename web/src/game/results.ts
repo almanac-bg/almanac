@@ -225,7 +225,7 @@ export function reviewParts(load: () => Promise<Reviewed[]>): { button: Child; l
           picture(it.view),
           answered(it.view, it.reveal, it.given),
           crowdLine(it.view.type, it.reveal.crowd, it.right),
-          it.reveal.fact ? fact(it.reveal.fact) : null,
+          fact(it.reveal.fact, it.reveal.day),
           report(it.reveal.id),
         );
       }),

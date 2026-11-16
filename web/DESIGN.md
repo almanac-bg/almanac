@@ -200,7 +200,9 @@ takes a token.
     part in `--right`, the player's in `--accent`) and `.crowd-says` (one quiet sentence under the verdict, or under
     the answer in a review, `crowdLine()`: the share right, of the day's players today for the day's ten; `.rare`,
     in `--gold-ink`, for a right answer a quarter or fewer got).
-  - `.verdict` and `.fact`.
+  - `.verdict` and `.fact` (`fact()`: „Знаеше ли?“ in Literata; for a question of the day's ten dealt on its own
+    date, `.fact-day` heads the same card, „На този ден“ and what happened that day in plain type, a hairline under
+    it, the „?“ moving down to the fact. Only with the answer, never before it, never in a topic's game).
 - **Progress:**
   - `.avatar` (a picture on a tile of its tone `tone-…`, sizes `s` and `l`, the level in `.lv`), drawn by `avatar()`.
   - `.who` (avatar, name, `.who-title`) for a player on a board or a list, drawn by `who()`.
@@ -296,8 +298,8 @@ takes a token.
 - **The game moves on by itself, and a tap moves it on sooner.** Alone (the day, a topic, a friend's duel), an answer
   shows in steps: the answer marked, the verdict with its points, then its fact („Знаеше ли?“), at the moment the
   player most wants it. It stays 3 seconds (4.5 for anything but a choice or „Вярно или невярно“: there's more to
-  look at) and the time to read the fact (1.2 seconds and a little for each letter, 9 at most), with a line filling
-  under it; „Напред“ (Enter on a computer; „Към резултата“ after the last) goes on at once. A room shows each answer
+  look at) and the time to read the fact and the day's line (1.2 seconds and a little for each letter, 9 at most),
+  with a line filling under it; „Напред“ (Enter on a computer; „Към резултата“ after the last) goes on at once. A room shows each answer
   with its standings for 6 seconds (a host who leads it from a big screen, „Само водя“, has „Напред“, „Задръж“ and
   „Край“, and the fact with the answer: a class talks it over); Роял the same, 10 seconds with a cut; a live duel
   shows both answers for 4 seconds (6 for anything but a choice or „Вярно или невярно“). A question never opens in a

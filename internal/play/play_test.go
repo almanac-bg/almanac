@@ -208,6 +208,72 @@ func TestTheDay(t *testing.T) {
 	}
 }
 
+// A question that belongs to the day is „На този ден“ in the day's ten, its day's line in the answer (and the review),
+// never before; the same question in a topic's game, or on another day, has neither.
+func TestOnThisDay(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	u := w.user()
+	const line = "На 12 ноември 1982 г. се случва нещо."
+	dayOf := func(r any) string {
+		var v struct{ Day string }
+		raw, _ := json.Marshal(r)
+		_ = json.Unmarshal(raw, &v)
+		return v.Day
+	}
+	// answer shows run's question n, says whether it's „На този ден“, and answers it: what its answer shows.
+	answer := func(runID int64, n int) (bool, Result) {
+		shown, err := w.g.Show(ctx, u, runID)
+		if err != nil || shown.Question == nil {
+			t.Fatalf("showing %d: %v", n, err)
+		}
+		if v, _ := json.Marshal(shown.Question.View); strings.Contains(string(v), line) {
+			t.Fatal("the day's line shows before the answer")
+		}
+		if _, err := w.g.Start(ctx, u, runID, n); err != nil {
+			t.Fatal(err)
+		}
+		w.wait(3 * time.Second)
+		res, err := w.g.Answer(ctx, u, runID, n, w.right(runID, n))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return shown.Question.OnThisDay, res
+	}
+	date := func(q bank.Question, on string) { q.Extra().On, q.Extra().Day = []string{on}, line }
+
+	s, _ := w.g.StartDay(ctx, u)
+	picks := w.picks(s.ID)
+	first, _ := w.b.Get(picks[0].ID)
+	second, _ := w.b.Get(picks[1].ID)
+	date(first, "11-12")  // today
+	date(second, "11-13") // tomorrow
+	if on, res := answer(s.ID, 0); !on || dayOf(res.Reveal) != line {
+		t.Errorf("the day's own question: on this day %v, its line %q", on, dayOf(res.Reveal))
+	}
+	if on, res := answer(s.ID, 1); on || dayOf(res.Reveal) != "" {
+		t.Errorf("another day's question: on this day %v, its line %q", on, dayOf(res.Reveal))
+	}
+	for n := 2; n < Length; n++ {
+		answer(s.ID, n)
+	}
+	review, err := w.g.Review(ctx, u, s.ID)
+	if err != nil || len(review) != Length {
+		t.Fatal(err)
+	}
+	if dayOf(review[0].Reveal) != line || dayOf(review[1].Reveal) != "" {
+		t.Errorf("the review: %q, %q", dayOf(review[0].Reveal), dayOf(review[1].Reveal))
+	}
+
+	// A topic's game, today: the question it deals is no day's.
+	topic, _ := w.g.StartTopic(ctx, u, "")
+	q, _ := w.b.Get(w.picks(topic.ID)[0].ID)
+	date(q, "11-12")
+	if on, res := answer(topic.ID, 0); on || dayOf(res.Reveal) != "" {
+		t.Errorf("a topic's game: on this day %v, its line %q", on, dayOf(res.Reveal))
+	}
+}
+
 // The first level comes with the run that passes 300 XP, in the news once.
 func TestLevelUpNews(t *testing.T) {
 	w := setup(t)
