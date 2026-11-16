@@ -1,5 +1,5 @@
 # Every pull request and push to main: the server's tests (with the race detector), the client's types, lint and
-# tests, and both builds (the client within its size budget) — under a minute, all a pull request waits for.
+# tests, and both builds (the client under its size ceiling) — under a minute, all a pull request waits for.
 # After a merge, on main, the game is also played in Chromium, WebKit and Firefox (about 15 minutes): it doesn't
 # hold anything up, and a failure there is fixed with the next change. Run it on a branch by hand (Actions → CI →
 # Run workflow) when a change is risky for the browsers.
@@ -36,7 +36,7 @@ jobs:
           unformatted=$(gofmt -l .)
           if [ -n "$unformatted" ]; then echo "::error::gofmt these: $unformatted"; exit 1; fi
       - run: go vet ./...
-      - name: The client, within its budget
+      - name: The client, under its size ceiling
         run: go run ./cmd/build
       - run: go test -race ./...
       - name: The program
