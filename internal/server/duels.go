@@ -329,13 +329,15 @@ func (s *Server) ranks(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"board": b, "least": play.MinRatedGames})
 }
 
-// almanac is the player's collection of learned facts.
+// almanac is a page of the player's collection of learned facts: of a topic (?topic=, or all), from where the page
+// before ended (?from=, its next).
 func (s *Server) almanac(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
 		return err
 	}
-	a, err := s.game.AlmanacOf(r.Context(), u.ID)
+	q := r.URL.Query()
+	a, err := s.game.AlmanacOf(r.Context(), u.ID, q.Get("topic"), q.Get("from"), play.AlmanacPage)
 	if err != nil {
 		return err
 	}

@@ -2,6 +2,8 @@ package play
 
 import (
 	"context"
+	"strconv"
+	"strings"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -21,10 +23,18 @@ type Learned struct {
 	At       int64  `json:"at"` // when it was first answered right
 }
 
-// Almanac is a player's collection, newest first, and how many facts each topic has in all.
+// AlmanacPage is how many facts a page of Моят Алманах shows: a few screens' worth on a phone. The collection grows
+// to thousands, so it comes a page at a time, as the player scrolls.
+const AlmanacPage = 30
+
+// Almanac is a page of a player's collection (of one topic, or of all), newest first; how many facts they have, by
+// topic and in all; how many each topic has in all; and where the next page starts (none after the last).
 type Almanac struct {
 	Facts []Learned      `json:"facts"`
+	Have  map[string]int `json:"have"`
+	All   int            `json:"all"`
 	Of    map[string]int `json:"of"`
+	Next  string         `json:"next,omitempty"`
 }
 
 // factsIn is how many facts each topic has: its live questions with a fact.
@@ -44,7 +54,7 @@ func factsIn(b *bank.Bank) map[string]int {
 func (g *Game) learned(ctx context.Context, userID int64, fn func(q bank.Question, at int64)) error {
 	b := g.Bank()
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id, min(a.at) FROM answers a JOIN runs r ON r.id = a.run_id
-		WHERE r.user_id = ? AND a.is_right GROUP BY a.question_id ORDER BY min(a.at) DESC`, userID)
+		WHERE r.user_id = ? AND a.is_right GROUP BY a.question_id ORDER BY min(a.at) DESC, a.question_id DESC`, userID)
 	if err != nil {
 		return err
 	}
@@ -62,13 +72,36 @@ func (g *Game) learned(ctx context.Context, userID int64, fn func(q bank.Questio
 	return rows.Err()
 }
 
-// AlmanacOf reads a player's collection.
-func (g *Game) AlmanacOf(ctx context.Context, userID int64) (Almanac, error) {
-	out := Almanac{Facts: []Learned{}, Of: factsIn(g.Bank())}
-	err := g.learned(ctx, userID, func(q bank.Question, at int64) {
-		out.Facts = append(out.Facts, Learned{ID: q.Base().ID, Category: q.Base().Category, Question: q.Base().Text,
-			Answer: bank.AnswerText(q), Fact: q.Extra().Fact, At: at})
+// learnedAs is a learned question as its almanac shows it.
+func learnedAs(q bank.Question, at int64) Learned {
+	return Learned{ID: q.Base().ID, Category: q.Base().Category, Question: q.Base().Text, Answer: bank.AnswerText(q),
+		Fact: q.Extra().Fact, At: at}
+}
+
+// AlmanacOf reads a page of a player's collection: up to limit facts of a topic ("": of all), the first after from (the
+// Next of the page before; "": from the newest). Next is when and which fact the page ends on, since facts are in that
+// order (learned, newest first), so a fact learned meanwhile never moves the next page.
+func (g *Game) AlmanacOf(ctx context.Context, userID int64, topic, from string, limit int) (Almanac, error) {
+	out := Almanac{Facts: []Learned{}, Have: map[string]int{}, Of: factsIn(g.Bank())}
+	fromAt, fromID, paged := strings.Cut(from, ":")
+	after, err := strconv.ParseInt(fromAt, 10, 64)
+	paged = paged && err == nil
+	more := false
+	err = g.learned(ctx, userID, func(q bank.Question, at int64) {
+		id, category := q.Base().ID, q.Base().Category
+		out.All++
+		out.Have[category]++
+		switch {
+		case topic != "" && category != topic, paged && (at > after || at == after && id >= fromID):
+		case len(out.Facts) == limit:
+			more = true
+		default:
+			out.Facts = append(out.Facts, learnedAs(q, at))
+		}
 	})
+	if last := len(out.Facts) - 1; more && last >= 0 {
+		out.Next = strconv.FormatInt(out.Facts[last].At, 10) + ":" + out.Facts[last].ID
+	}
 	return out, err
 }
 

@@ -7,6 +7,8 @@ import (
 	"errors"
 	"slices"
 	"time"
+
+	"github.com/almanac-bg/almanac/internal/bank"
 )
 
 // A player's year in the game („Твоята 2026“): the days they played, their longest streak, their answers, their
@@ -92,17 +94,14 @@ func (g *Game) YearOf(ctx context.Context, userID int64, year int) (Year, error)
 	}); best.Sure {
 		y.Topic = &best
 	}
-	almanac, err := g.AlmanacOf(ctx, userID)
-	if err != nil {
-		return y, err
-	}
-	for i := len(almanac.Facts) - 1; i >= 0; i-- { // newest first: the first learned is last
-		if f := almanac.Facts[i]; f.At >= from && f.At < to {
+	if err := g.learned(ctx, userID, func(q bank.Question, at int64) {
+		if at >= from && at < to {
 			y.Facts++
-			if y.First == nil {
-				y.First = &f
-			}
+			f := learnedAs(q, at) // newest first: the year's first is the last of them
+			y.First = &f
 		}
+	}); err != nil {
+		return y, err
 	}
 	var place, of sql.NullInt64
 	if err := db.QueryRowContext(ctx, `SELECT p.place, (SELECT count(*) FROM royal_players o WHERE o.royal_id = p.royal_id)
