@@ -435,9 +435,10 @@ function count(el: Element, from: number, to: number, delay: number, ms: number,
 /**
  * A game's result as a moment, once, as it opens (at most 1.6 s; a tap anywhere jumps to the end): the pips fill one
  * by one with a pluck on the scale for each right one, the score lands with the game's motif, the points count up;
- * ten of ten sweeps the pips in gold and draws the seal petal by petal. Resolves once it's over.
+ * ten of ten sweeps the pips in gold and draws the seal petal by petal. Resolves once it's over. `gap` is the time
+ * between two pips (the day's ten take it slower, 85 ms: it's the game of the day).
  */
-export function result(hero: HTMLElement, perfect: boolean, hands: Hands): Promise<void> {
+export function result(hero: HTMLElement, perfect: boolean, hands: Hands, gap = 60): Promise<void> {
   const { play } = hands;
   let ended = false;
   const end = () => {
@@ -455,6 +456,9 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands): Promi
   const timers: number[] = [];
   const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
   const pips = [...hero.querySelectorAll<HTMLElement>(".trail li")];
+  // Each pluck a step up the scale for each right answer before it, as the bell in a run: a good game climbs, a
+  // wrong one thuds where the climb stands. The score lands as the last pip fills.
+  let rights = 0;
   pips.forEach((li, i) => {
     moving.push(
       li.animate(
@@ -464,14 +468,17 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands): Promi
         ],
         {
           duration: 180,
-          delay: i * 60,
+          delay: i * gap,
           easing: spring,
           fill: "backwards",
         },
       ),
     );
-    at(i * 60, () => play(li.classList.contains("wrong") ? "dud" : "pip", i));
+    const lift = rights;
+    if (li.classList.contains("right")) rights++;
+    at(i * gap, () => play(li.classList.contains("wrong") ? "dud" : "pip", lift));
   });
+  const lands = Math.max(700, (pips.length - 1) * gap + 160);
   const score = hero.querySelector(".score");
   if (score)
     moving.push(
@@ -482,21 +489,21 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands): Promi
         ],
         {
           duration: 260,
-          delay: 700,
+          delay: lands,
           easing: spring,
           fill: "backwards",
         },
       ),
     );
-  at(700, end);
-  if (points) count(points, 0, total, 700, 800, hands.format);
+  at(lands, end);
+  if (points) count(points, 0, total, lands, Math.min(800, 1550 - lands), hands.format);
   if (perfect) {
     const gold = token(hero, "--gold");
     for (const [i, li] of pips.entries())
       moving.push(
         li.animate([{}, { background: gold, boxShadow: `0 0 14px ${gold}` }, {}], {
           duration: 420,
-          delay: 900 + i * 40,
+          delay: lands + 200 + i * 40,
         }),
       );
     const head = hero.querySelector(".perfect-head .kicker");
@@ -504,7 +511,7 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands): Promi
       moving.push(
         head.animate([{ opacity: 0, transform: "translateY(6px)" }, {}], {
           duration: 260,
-          delay: 900,
+          delay: lands + 200,
           fill: "backwards",
         }),
       );
@@ -515,7 +522,7 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands): Promi
             { transform: "scale(0)", opacity: 0 },
             { transform: "none", opacity: 1 },
           ],
-          { duration: 240, delay: 900 + k * 90, easing: spring, fill: "backwards" },
+          { duration: 240, delay: lands + 200 + k * 90, easing: spring, fill: "backwards" },
         ),
       );
   }

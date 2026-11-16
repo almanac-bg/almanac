@@ -10,7 +10,7 @@ import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { withName } from "../lib/words.ts";
 import { categories, playing } from "../state.ts";
 import { countUp, fact, inRowChip, type VerdictKind, verdict } from "../ui.ts";
-import { ask, crowdLine, picture, picturesIn } from "./questions.ts";
+import { ask, beats, crowdLine, picture, picturesIn, type Stage } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Shown, State, View } from "./types.ts";
 
 /** Plays a run from where it stands; `done` draws what comes after its last answer. A duel with a friend names them
@@ -86,11 +86,14 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
 }
 
 /** Before a run: three seconds to settle in, a ring running out around them, with a way back out (also Esc) and
- * a way to start at once. Each second beeps; the start an octave higher. */
+ * a way to start at once. Each second beeps; the start an octave higher. The game has the whole screen from here (on
+ * a phone, the header and the bar of places step aside), and keeps it while its first question comes: should none
+ * come (it failed to start), the screen is given back. */
 export function getReady(what: string, start: () => void, cancel: () => void): Child {
   const seconds = 3;
   const left = signal(seconds);
   let gone = false;
+  let began = false;
   const leave = (fn: () => void) => {
     if (gone) return;
     gone = true;
@@ -99,6 +102,7 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
   };
   const begin = () =>
     leave(() => {
+      began = true;
       play("go");
       start();
     });
@@ -107,7 +111,14 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
     if (left.peek() <= 0) begin();
     else playCount(left.peek());
   }, 1000);
-  onCleanup(() => clearInterval(tick));
+  playing.set(true);
+  onCleanup(() => {
+    clearInterval(tick);
+    if (!began) return playing.set(false);
+    window.setTimeout(() => {
+      if (!document.querySelector(".run")) playing.set(false);
+    }, 1500);
+  });
   playCount(seconds);
   listen(document, "keydown", (e) => {
     if (e.key === "Escape") leave(cancel);
@@ -203,7 +214,7 @@ export function questionHead(n: number, total: number, aside: string, tally: Chi
       "p",
       { class: "count" },
       h("b", { class: "count-n" }, String(n + 1)),
-      h("span", { class: "count-of" }, ` от ${total}`),
+      h("span", { class: "count-of" }, h("span", { class: "num-word" }, " от "), String(total)),
     ),
     h(
       "div",
@@ -240,9 +251,10 @@ function inRowOf(marks: Mark[]): number {
   return n;
 }
 
-/** The time left: a bar that runs out with the seconds beside it, red for the last five, grey once answered. The
- * clock is silent until the last ten seconds: then a soft tick a second, and for the last five a beep a second, a step
- * higher each (a question of ten seconds, „Вярно или невярно“, sounds only those five). */
+/** The time left: a bar that runs out with the seconds beside it, muted, then gold for the last ten seconds and red
+ * for the last five, grey once answered. The clock is silent until the last ten seconds: then a soft tick a second,
+ * and for the last five a beep a second, a step higher each (a question of ten seconds, „Вярно или невярно“, sounds
+ * and turns red only for those five). */
 export function timer(leftMs: number, limitMs: number, left: () => number, locked: Signal<boolean>): Child {
   const bar = h("div", { class: "time-bar" });
   bar.style.transform = `scaleX(${leftMs / limitMs})`;
@@ -268,7 +280,15 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
   const freeze = () => run?.pause();
   return h(
     "div",
-    { class: () => (locked() ? "timer stopped" : left() <= 5 ? "timer low" : "timer") },
+    // Quiet while there's time, as the clock's sound is; gold from the last ten seconds, red for the last five.
+    {
+      class: () => {
+        const n = left();
+        if (locked()) return "timer stopped";
+        if (n <= 5) return "timer low";
+        return n <= 10 && limitMs > 10_000 ? "timer soon" : "timer";
+      },
+    },
     h("div", { class: "track" }, bar),
     h(
       "span",
@@ -377,18 +397,33 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     go();
   };
   document.addEventListener("visibilitychange", moveOn);
+  // The room the answer's panel takes at the screen's foot on a phone (app.css), kept under the question, so that
+  // what's above it can always be seen.
+  const room = () => page.style.setProperty("--after", `${after.offsetHeight}px`);
+  const sized = new ResizeObserver(room);
+  sized.observe(after);
   onCleanup(() => {
     clearTimeout(advance);
     for (const t of shown) clearTimeout(t);
     document.removeEventListener("visibilitychange", moveOn);
+    sized.disconnect();
   });
 
-  // An answer goes once; after a failed send, only its retry goes again.
+  // A step of the answer's showing, `ms` after its first; with less motion, at once.
+  const at: Stage = (ms, step) => {
+    if (calm.peek()) step();
+    else shown.push(window.setTimeout(step, ms));
+  };
+
+  // An answer goes once; after a failed send, only its retry goes again. The clock stops at the tap (the server takes
+  // the time the answer came in); what the player chose stays chosen a moment, however quick the line, before the
+  // answer shows.
   const send = async (answer: Answer | null, retry = false) => {
     if (sent && !retry) return;
     sent = true;
     locked.set(true);
     problem.set(null);
+    const held = answer === null ? 0 : performance.now() + holdMs;
     let res: Result;
     try {
       res = await api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer });
@@ -398,10 +433,16 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
       problem.set(failed(e.message, () => send(answer, true)));
       return;
     }
-    // The answer shows in steps (DESIGN.md, Motion): at once the answer marked, its sound and its pip; then the
-    // verdict, its points and the tally rising with them; then the fact; then the page moves to them, the head with the
-    // pips and the tally staying in view above. With less motion, all at once.
-    asked.reveal(res.reveal, answer);
+    const wait = held - performance.now();
+    if (wait > 0 && !calm.peek()) await new Promise((on) => at(wait, () => on(null)));
+    reveal(res, answer);
+  };
+
+  // The answer shows in beats (DESIGN.md, Motion): the player's own answer judged, its sound and its pip; the right
+  // one (if it wasn't theirs) and the verdict docked at the screen's foot, its points and the tally rising with them;
+  // how everyone else answered; the fact, and the way on. With less motion, all at once.
+  const reveal = (res: Result, answer: Answer | null) => {
+    asked.reveal(res.reveal, answer, at);
     const now = trail(res.state.trail, s.total);
     now.children[q.n]?.classList.add("fresh");
     progress.replaceWith(now);
@@ -409,60 +450,59 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     const kind = kindOf(res, answer);
     playAnswer(kind, res.inRow ?? 0);
     // The fact behind the answer (and on its date, what happened that day), at the moment the player most wants it:
-    // time to read it, or a tap to move on.
+    // time to read it, or a tap to move on. The verdict comes with all that follows it in place, still hidden, so
+    // the panel opens once at its height and the answers settle once above it.
     const said = [res.reveal.day, res.reveal.fact].filter(Boolean).join(" ");
     const pause = pauseFor(q.view) + readingTime(said);
-    const steps: [number, () => void][] = [
-      [
-        120,
-        () => {
-          tally(score, res.state.points, s.points, res.inRow ?? 0);
-          append(after, [
-            verdict(kind, res.points, undefined, res.speed, res.row, res.inRow),
-            crowdLine(q.view.type, res.reveal.crowd, res.right),
-          ]);
-          after.hidden = false;
-        },
-      ],
-      [
-        320,
-        () => {
-          append(after, [
-            res.learned ? h("p", { class: "learned" }, "Нов факт в Алманаха") : null,
-            fact(res.reveal.fact, res.reveal.day),
-            res.reveal.credit ? credit(res.reveal.credit) : null,
-            upNext(pause, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`, true),
-            said
-              ? h(
-                  "button",
-                  {
-                    class: "btn",
-                    type: "button",
-                    onclick: () => {
-                      clearTimeout(advance);
-                      moveOn();
-                    },
-                  },
-                  res.state.done ? "Към резултата" : "Напред",
-                )
-              : null,
-          ]);
-          due = res.state.done
-            ? () => {
-                // A run's result sounds its own end as it lands (results.ts); a duel's, here.
-                if (versus) play("end");
-                reload();
-              }
-            : next;
-          advance = window.setTimeout(moveOn, pause);
-        },
-      ],
-      [450, () => after.scrollIntoView({ block: "nearest", behavior: calm.peek() ? "auto" : "smooth" })],
-    ];
-    for (const [ms, step] of steps) {
-      if (calm.peek()) step();
-      else shown.push(window.setTimeout(step, ms));
-    }
+    // From the verdict on, the time it stays: the beats to the fact, then the pause.
+    const lasts = pause + beats.fact - beats.right;
+    let crowd: Child = null;
+    let rest: Child[] = [];
+    at(beats.right, () => {
+      tally(score, res.state.points, s.points, res.inRow ?? 0);
+      crowd = waiting(crowdLine(q.view.type, res.reveal.crowd, res.right));
+      rest = [
+        res.learned ? h("p", { class: "learned" }, "Нов факт в Алманаха") : null,
+        fact(res.reveal.fact, res.reveal.day),
+        res.reveal.credit ? credit(res.reveal.credit) : null,
+        upNext(lasts, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`, true),
+        h(
+          "button",
+          {
+            class: "btn up-next-go",
+            type: "button",
+            onclick: () => {
+              clearTimeout(advance);
+              moveOn();
+            },
+          },
+          res.state.done ? "Към резултата" : "Напред",
+        ),
+      ].map(waiting);
+      append(after, [verdict(kind, res.points, undefined, res.speed, res.row, res.inRow), crowd, ...rest]);
+      after.hidden = false;
+      page.classList.add("answered");
+      room();
+      advance = window.setTimeout(moveOn, lasts);
+      // On a phone the panel docks at the screen's foot and the answers move up above it; where they can't all fit
+      // (a picture, a short screen), the page moves just enough to show the right answer. On a big screen the answer
+      // shows under the question, and the page moves to it.
+      at(dockMs, () => {
+        if (docked()) uncover(asked.node, after);
+        else after.scrollIntoView({ block: "nearest", behavior: calm.peek() ? "auto" : "smooth" });
+      });
+    });
+    at(beats.crowd, () => shows(crowd));
+    at(beats.fact, () => {
+      for (const part of rest) shows(part);
+      due = res.state.done
+        ? () => {
+            // A run's result sounds its own end as it lands (results.ts); a duel's, here.
+            if (versus) play("end");
+            reload();
+          }
+        : next;
+    });
   };
 
   const asked = ask(q.view, (a) => send(a), locked);
@@ -547,9 +587,11 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     moveOn();
   });
 
-  return h(
+  // On a phone the question is a column the screen's height: the head, the pips and the clock at the top, the
+  // question under them, and what answers it at the foot, under the thumb (app.css).
+  const page = h(
     "article",
-    { class: "question" },
+    { class: "question run-question" },
     stays(
       questionHead(
         q.n,
@@ -559,15 +601,45 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
         versus,
       ),
       progress,
+      timer(q.leftMs, q.limitMs, left, locked),
     ),
     leaveAsk,
-    timer(q.leftMs, q.limitMs, left, locked),
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view, true),
-    asked.node,
-    () => problem(),
+    h("div", { class: "answering" }, asked.node, () => problem()),
     after,
   );
+  return page;
+}
+
+/** How long what the player chose stays chosen before the answer shows, however quick the line. */
+const holdMs = 280;
+
+/** How long the answer's panel takes to dock at a phone's foot (app.css), the answers moving up with it. */
+const dockMs = 260;
+
+/** Whether the answer docks at the screen's foot: a phone's width (app.css). */
+const docked = () => matchMedia("(max-width: 47.99rem)").matches;
+
+/** A part of the answer's panel, in its place but not shown yet; and shown. */
+function waiting<T extends Child>(part: T): T {
+  if (part instanceof HTMLElement) part.classList.add("unseen");
+  return part;
+}
+
+function shows(part: Child): void {
+  if (part instanceof HTMLElement) part.classList.remove("unseen");
+}
+
+/** Moves the page just enough that the answer (the right one, for a question of options) shows between the head and
+ * the panel docked at the foot, when they can't all fit on the screen. */
+function uncover(answers: Child, panel: HTMLElement): void {
+  if (!(answers instanceof Element)) return;
+  const key = answers.querySelector("button.option.right") ?? answers;
+  const head = document.querySelector(".question-top")?.getBoundingClientRect().bottom ?? 0;
+  const box = key.getBoundingClientRect();
+  const by = Math.min(box.bottom - (panel.getBoundingClientRect().top - 12), box.top - head - 12);
+  if (by > 0) scrollBy({ top: by, behavior: calm.peek() ? "auto" : "smooth" });
 }
 
 /** The top of a question (its count, topic and tally, and the pips), kept in view at the top of the screen while the

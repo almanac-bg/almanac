@@ -55,7 +55,7 @@ export function summary(
     line,
     trail(s.trail, s.total),
   );
-  if (moment) land(hero, s.id, perfect);
+  if (moment) land(hero, s.id, perfect, s.kind === "day");
   return h(
     "section",
     { class: "summary" },
@@ -79,8 +79,9 @@ export const landed = (run: number): Promise<void> => moments.get(run) ?? Promis
 export const landing = (run: number, moment: Promise<void>): void => void moments.set(run, moment);
 
 /** A game's result as a moment as it ends (feel.ts: the pips, the score, the motif), once: never again on its way
- * back to the screen. Without the feel loaded, the result is as it is, with the end's sound. */
-function land(hero: HTMLElement, run: number, perfect: boolean): void {
+ * back to the screen; the day's pips a little slower. Without the feel loaded, the result is as it is, with the end's
+ * sound. */
+function land(hero: HTMLElement, run: number, perfect: boolean, day: boolean): void {
   const key = `almanac.landed.${run}`;
   try {
     if (sessionStorage.getItem(key)) return;
@@ -93,7 +94,10 @@ function land(hero: HTMLElement, run: number, perfect: boolean): void {
     play(perfect ? "perfect" : "end");
     return;
   }
-  moments.set(run, new Promise((done) => requestAnimationFrame(() => kit.result(hero, perfect, hands()).then(done))));
+  moments.set(
+    run,
+    new Promise((done) => requestAnimationFrame(() => kit.result(hero, perfect, hands(), day ? 85 : 60).then(done))),
+  );
 }
 
 /** The logo's rosette as a seal: four petals, the gold one last. */

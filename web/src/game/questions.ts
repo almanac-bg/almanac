@@ -23,11 +23,22 @@ import type {
   View,
 } from "./types.ts";
 
+/** Runs a step of an answer's showing `ms` after its first (DESIGN.md, Motion), or at once. */
+export type Stage = (ms: number, step: () => void) => void;
+
+/** An answer shown all at once: in a review, in a game played with others, with less motion. */
+const atOnce: Stage = (_ms, step) => step();
+
+/** The beats of an answer's showing, from the moment the player's own answer is judged: the right answer (when it
+ * wasn't theirs) with the verdict; how everyone else answered; the fact. */
+export const beats = { right: 300, crowd: 550, fact: 700 };
+
 export interface Asked {
   /** The answering part, under the question. */
   node: Child;
-  /** Shows the answer: what was right, and how what was given compares. */
-  reveal(reveal: Reveal, given: Answer | null): void;
+  /** Shows the answer: what was right, and how what was given compares; in beats on a stage (a run, run.ts), the
+   * player's own answer first. */
+  reveal(reveal: Reveal, given: Answer | null, at?: Stage): void;
   /** What's been put in but not sent yet (a typed number, things moved into an order): it counts when time runs out. */
   pending(): Answer | null;
   /** Takes a newer view of the same question, as more of it shows (the next clue). */
@@ -69,6 +80,14 @@ function crowdOn(button: HTMLElement, x: number): void {
   button.classList.add("crowd");
   button.append(h("span", { class: "value crowd-share" }, percent(x)));
   requestAnimationFrame(() => button.style.setProperty("--share", `${Math.round(x * 1000) / 10}%`));
+}
+
+/** The shares on each answer, where the question has had enough answers to say. */
+function crowdOnAll(buttons: HTMLElement[], picks: number[] | undefined): void {
+  buttons.forEach((b, i) => {
+    const x = picks?.[i];
+    if (x !== undefined) crowdOn(b, x);
+  });
 }
 
 /** Draws a question's answering part; submit sends an answer once, and locked stops input. With the answer it shows
@@ -126,11 +145,16 @@ export function picture(view: View, fit = false): Child {
   });
   if (fit) {
     // The answering part follows the picture; the room it leaves is the screen's height less the question's height
-    // without the picture (as if the page were at its top, where a question opens), and a margin under it.
+    // without the picture (as if the page were at its top, where a question opens), and a margin under it. Where the
+    // answering part is set at the screen's foot (a run on a phone), the room between them is the picture's too.
     const size = () => {
       const below = img.nextElementSibling;
       if (!img.isConnected || !below) return;
-      const end = below.getBoundingClientRect().bottom + scrollY - img.getBoundingClientRect().height;
+      const box = img.getBoundingClientRect();
+      const under = below.getBoundingClientRect();
+      const gap = Number.parseFloat(getComputedStyle(img.parentElement ?? img).rowGap) || 0;
+      const spare = Math.max(0, under.top - box.bottom - gap);
+      const end = under.bottom + scrollY - box.height - spare;
       img.style.setProperty("--fit", `${Math.max(pictureFloor, Math.floor(innerHeight - end - 16))}px`);
     };
     requestAnimationFrame(size);
@@ -221,31 +245,38 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
   return {
     node: h("div", null, h("div", { class: pictures ? "options pic-options" : "options" }, buttons), credits),
     pending: () => null,
-    reveal(reveal, given) {
-      buttons.forEach((b, i) => {
+    reveal(reveal, given, at = atOnce) {
+      const mine = given && "pick" in given ? given.pick : -1;
+      const mark = (b: HTMLElement, i: number) => {
         b.classList.remove("picked");
-        const how = i === reveal.pick ? "right" : given && "pick" in given && given.pick === i ? "wrong" : "dim";
+        const how = i === reveal.pick ? "right" : i === mine ? "wrong" : "dim";
         b.classList.add(how);
         const name = reveal.names?.[i];
         if (name) {
           names[i]?.replaceChildren(name);
           b.setAttribute("aria-label", `${letters[i]}: ${name}`);
         }
-        const picked = reveal.crowd?.picks?.[i];
-        if (picked !== undefined) crowdOn(b, picked);
         if (how !== "dim") (b.querySelector(".pic-foot") ?? b).append(sign());
+      };
+      const own = buttons[mine];
+      if (own) mark(own, mine);
+      at(beats.right, () => {
+        buttons.forEach((b, i) => {
+          if (b !== own) mark(b, i);
+        });
+        if (reveal.credits?.length) {
+          credits.hidden = false;
+          credits.replaceChildren(
+            "Снимки: ",
+            ...reveal.credits.flatMap((c, i) => [
+              i ? " · " : "",
+              h("a", { href: c.source, target: "_blank", rel: "noopener" }, `${letters[i]} ${c.credit}`),
+              ` (${c.license})`,
+            ]),
+          );
+        }
       });
-      if (reveal.credits?.length) {
-        credits.hidden = false;
-        credits.replaceChildren(
-          "Снимки: ",
-          ...reveal.credits.flatMap((c, i) => [
-            i ? " · " : "",
-            h("a", { href: c.source, target: "_blank", rel: "noopener" }, `${letters[i]} ${c.credit}`),
-            ` (${c.license})`,
-          ]),
-        );
-      }
+      at(beats.crowd, () => crowdOnAll(buttons, reveal.crowd?.picks));
     },
   };
 }
@@ -356,7 +387,7 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
       const v = value();
       return v === null ? null : { value: v };
     },
-    reveal(reveal, given) {
+    reveal(reveal, given, at = atOnce) {
       pad.hidden = true;
       result.hidden = false;
       const right = `${formatNumber(reveal.value ?? 0, view.step)}${unit}`;
@@ -365,17 +396,21 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
         given && "value" in given
           ? h("p", { class: "muted" }, `Ти каза ${formatNumber(given.value, view.step)}${unit}.`)
           : h("p", { class: "muted" }, "Без отговор."),
-        reveal.crowd?.guesses
-          ? spread(reveal.crowd.guesses, reveal.value ?? 0, given && "value" in given ? given.value : null, view)
-          : null,
       ]);
+      // Everyone's guesses take their room at once, and show on their beat.
+      const guesses = reveal.crowd?.guesses;
+      if (!guesses) return;
+      const all = spread(guesses, reveal.value ?? 0, given && "value" in given ? given.value : null, view);
+      all.classList.add("unseen");
+      result.append(all);
+      at(beats.crowd, () => all.classList.remove("unseen"));
     },
   };
 }
 
 /** Where everyone's guesses at a number fell: a bar for each part of the range a guess scores in, one at each end for
  * the guesses beyond it, the answer's part in the colour of a right answer and the player's own in theirs. */
-function spread(s: Spread, answer: number, mine: number | null, view: NumberView): Child {
+function spread(s: Spread, answer: number, mine: number | null, view: NumberView): HTMLElement {
   const n = s.bins.length;
   const at = (v: number) =>
     s.log ? (v <= 0 ? -1 : Math.log(v / s.lo) / Math.log(s.hi / s.lo)) : (v - s.lo) / (s.hi - s.lo);
@@ -596,19 +631,19 @@ function truefalse(_view: TrueFalseView, submit: (a: Answer) => void, locked: Si
   return {
     node: h("div", { class: "tf-options" }, yes, no),
     pending: () => null,
-    reveal(reveal, given) {
-      for (const [b, truth] of [
-        [yes, true],
-        [no, false],
-      ] as const) {
+    // No ✓ or ✕ here: on „Вярно“ and „Невярно“ they read as the answers' own words. The verdict under them says it.
+    reveal(reveal, given, at = atOnce) {
+      const mine = given && "truth" in given ? given.truth : null;
+      const mark = (b: HTMLElement, truth: boolean) => {
         b.classList.remove("picked");
-        const how =
-          truth === reveal.truth ? "right" : given && "truth" in given && given.truth === truth ? "wrong" : "dim";
-        b.classList.add(how);
-        const said = reveal.crowd?.picks?.[truth ? 0 : 1];
-        // No ✓ or ✕ here: on „Вярно“ and „Невярно“ they read as the answers' own words. The verdict under them says it.
-        if (said !== undefined) crowdOn(b, said);
-      }
+        b.classList.add(truth === reveal.truth ? "right" : truth === mine ? "wrong" : "dim");
+      };
+      if (mine !== null) mark(mine ? yes : no, mine);
+      at(beats.right, () => {
+        if (mine !== true) mark(yes, true);
+        if (mine !== false) mark(no, false);
+      });
+      at(beats.crowd, () => crowdOnAll([yes, no], reveal.crowd?.picks));
     },
   };
 }
@@ -1002,17 +1037,24 @@ function clues(view: CluesView, submit: (a: Answer) => void, locked: Signal<bool
       paint();
       play("key");
     },
-    reveal(reveal, given) {
+    reveal(reveal, given, at = atOnce) {
       clearInterval(tick);
       paint(reveal.clues ?? now.clues);
-      buttons.forEach((b, i) => {
+      const mine = given && "pick" in given ? given.pick : -1;
+      const mark = (b: HTMLElement, i: number) => {
         b.classList.remove("picked");
-        const how = i === reveal.pick ? "right" : given && "pick" in given && given.pick === i ? "wrong" : "dim";
+        const how = i === reveal.pick ? "right" : i === mine ? "wrong" : "dim";
         b.classList.add(how);
-        const picked = reveal.crowd?.picks?.[i];
-        if (picked !== undefined) crowdOn(b, picked);
         if (how !== "dim") b.append(sign());
-      });
+      };
+      const own = buttons[mine];
+      if (own) mark(own, mine);
+      at(beats.right, () =>
+        buttons.forEach((b, i) => {
+          if (b !== own) mark(b, i);
+        }),
+      );
+      at(beats.crowd, () => crowdOnAll(buttons, reveal.crowd?.picks));
     },
   };
 }
