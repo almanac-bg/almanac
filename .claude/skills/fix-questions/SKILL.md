@@ -1,7 +1,7 @@
 ---
 name: fix-questions
 description: Fix questions already in АЛМАНАХ's bank by what `almanac bank lint` flags or a rule asks to judge again — a fixer and an independent checker per chunk on pinned models, then `bank add` (all of it or nothing), the report, the commit and the questions live. Run as /fix-questions [rules] [judge] [categories]; for a rule change, add the rule's check first, then run this.
-argument-hint: "[rules: all|giveaway,stale,…] [judge: false-fact,easy-picture,blind] [categories]"
+argument-hint: "[rules: all|giveaway,stale,…] [judge: false-fact,easy-picture,blind,signals] [categories]"
 disable-model-invocation: true
 model: opus
 effort: high
@@ -32,6 +32,19 @@ any rule:
 2. `Workflow({scriptPath: "<skill>/blind.js", args: {sheets: [1, …, n], work, skill}})`; resume if `done: false`.
 3. `python3 -I <skill>/blind.py compare <bank> <work>` writes `<work>/blind/disagree.json`; then the steps below
    from 3, with `--judge blind` (what lint flags joins in).
+
+## The upkeep
+
+Every few weeks (the owner's call, or when the server mails about reports), what says a live question may have gone
+wrong is fixed the same way:
+
+1. From the server, as `bank used` in `/new-questions` (`systemd-run --pipe --wait -p User=almanac -p
+   EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac …` over ssh): `bank reports > <work>/reports.txt` and
+   `bank suspects > <work>/suspects.txt`.
+2. `python3 -I <skill>/upkeep.py <bank> <work> --reports <work>/reports.txt --suspects <work>/suspects.txt` (adds the
+   questions due for review), then the steps below from 3 with `--judge signals` (what lint flags joins in).
+3. Once the fixes are live, mark the reports done: `bank reports -resolve <ids>` on the server, every id that was in
+   `reports.txt` and is judged now (fixed, replaced or kept with a source).
 
 ## Steps
 

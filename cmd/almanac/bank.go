@@ -53,6 +53,8 @@ func bankCommand(args []string) error {
 		return bankCalibrate(dir())
 	case "suspects":
 		return bankSuspects(dir())
+	case "reports":
+		return bankReports(rest)
 	case "plan":
 		return bankPlan(rest)
 	case "add":
