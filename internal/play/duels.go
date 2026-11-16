@@ -443,12 +443,12 @@ const (
 	RecordingMissed = 2
 )
 
-// recordedRun is another player's finished run of ten questions, all still in the bank and none of today's (a day's
-// run never), played at a person's speed (not marked a script's: fair.go), to play against: a real game
-// (RecordingRights right or more, RecordingMissed not answered at most), by a player whose rating is within RecordingBand of the player's, the one with the
-// fewest questions the player has seen (seen, read before the write) or a day ahead holds (ahead.go: a game played
-// before those days were drawn may have them), the latest first. Short of such, the nearest it
-// gets: any real game, then any game. At each of these, a game over all the topics (a duel's) comes before one in a
+// recordedRun is another player's finished run of ten questions, all still in the bank, none of today's and none due
+// for review (dayBars.now; a day's run never), played at a person's speed (not marked a script's: fair.go), to play
+// against: a real game (RecordingRights right or more, RecordingMissed not answered at most), by a player whose rating
+// is within RecordingBand of the player's, the one with the fewest questions the player has seen (seen, read before
+// the write) or a day ahead holds (ahead.go: a game played before those days were drawn may have them), the latest
+// first. Short of such, the nearest it gets: any real game, then any game. At each of these, a game over all the topics (a duel's) comes before one in a
 // single topic, which the duel's player didn't choose. Nil if there's none.
 func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*recorded, error) {
 	days, err := g.days(tx)
@@ -494,7 +494,7 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 		}
 		n, whole := 0, true
 		for _, p := range picks {
-			if _, ok := b.Get(p.ID); !ok || days.today[p.ID] {
+			if _, ok := b.Get(p.ID); !ok || days.now[p.ID] {
 				whole = false
 			}
 			if seen[p.ID] || days.all[p.ID] {

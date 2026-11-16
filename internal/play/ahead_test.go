@@ -218,3 +218,92 @@ func mustPicks(t *testing.T, s string) []Pick {
 	}
 	return p
 }
+
+// A question due for review is dealt by no game from its date on: the days ahead drawn before it was due are drawn
+// again without it, and it is barred from every other game (DayQuestions: topics, duels, Роял, rooms). DaysUsed gives
+// the days' questions, and the last day drawn.
+func TestNoGameDealsAQuestionDueForReview(t *testing.T) {
+	w := setup(t)
+	w.b = biggerSample(t, 20)
+	w.g.Bank = func() *bank.Bank { return w.b }
+	ctx := t.Context()
+	if err := w.g.EnsureDays(ctx); err != nil {
+		t.Fatal(err)
+	}
+	today := w.g.Today()
+	days, err := storedDays(mustTx(t, w), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	used, err := w.g.DaysUsed(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var last string
+	n := 0
+	for day, picks := range days {
+		last = max(last, day)
+		n += len(picks)
+		for _, p := range picks {
+			if !used.IDs[p.ID] {
+				t.Fatalf("DaysUsed misses %s of %s", p.ID, day)
+			}
+		}
+	}
+	if used.Through != last || len(used.IDs) != n {
+		t.Fatalf("DaysUsed: %d through %s, want %d through %s", len(used.IDs), used.Through, n, last)
+	}
+	// A question of the third day ahead is due for review on its day, and one no day has today. The third day is drawn
+	// again without it (or, the sample being short of estimates by then, left to its morning).
+	d, _ := time.Parse(time.DateOnly, today)
+	third := d.AddDate(0, 0, 3).Format(time.DateOnly)
+	b2, _ := bank.Load(w.b.Dir)
+	later, _ := b2.Get(days[third][4].ID)
+	later.Extra().ReviewBy = third
+	var now bank.Question
+	for _, q := range b2.Live("history", "") {
+		if !used.IDs[q.Base().ID] {
+			now = q
+			break
+		}
+	}
+	now.Extra().ReviewBy = today
+	w.g.Bank = func() *bank.Bank { return b2 }
+	if err := w.g.EnsureDays(ctx); err != nil {
+		t.Fatal(err)
+	}
+	again, _ := storedDays(mustTx(t, w), third)
+	if slices.ContainsFunc(again[third], func(p Pick) bool { return p.ID == later.Base().ID }) {
+		t.Fatalf("%s kept %s, due for review that day", third, later.Base().ID)
+	}
+	barred, err := w.g.DayQuestions(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !barred[now.Base().ID] {
+		t.Fatalf("%s, due for review today, isn't barred", now.Base().ID)
+	}
+	ana := w.user()
+	for range 5 {
+		s, err := w.g.StartTopic(ctx, ana, "history")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range w.picks(s.ID) {
+			if p.ID == now.Base().ID {
+				t.Fatalf("a history game dealt %s, due for review", p.ID)
+			}
+		}
+		w.play(ana, s.ID)
+	}
+}
+
+func mustTx(t *testing.T, w *world) *sql.Tx {
+	t.Helper()
+	tx, err := w.db.Read.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = tx.Rollback() })
+	return tx
+}

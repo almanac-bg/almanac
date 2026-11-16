@@ -52,7 +52,8 @@ func (g *Game) day(tx *sql.Tx, day string) ([]Pick, error) {
 
 // dayQuestions are the questions of today and of the days drawn ahead (ahead.go): no other game deals them (Draw,
 // Роял, rooms), so that nobody meets a day's question before its day, or sees one with its answer before playing it.
-// The map is shared: read it, never write to it.
+// With them are the questions due for review today (overdue), which no game deals. The map is shared: read it, never
+// write to it.
 func (g *Game) dayQuestions(tx *sql.Tx) (map[string]bool, error) {
 	d, err := g.days(tx)
 	return d.all, err

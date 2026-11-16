@@ -17,11 +17,13 @@ never edit it), `<batch>` (this batch's folder) and your category.
 ## What the plan asks
 
 - **`cells`**: what to write: `count` questions of `kinds` and `difficulty` (with a picture over the question if
-  `picture`), and `spares` more of the same. Write `count + spares` of each: the checker's drops come out of the spares.
+  `picture`), `bg` of them about Bulgaria, and `spares` more of the same. Write `count + spares` of each: the
+  checker's drops come out of the spares.
   - `split/clues`: about half of each.
   - A `number` is an **estimate**: a year, or a quantity of more than 20 of its steps, with one accepted value and
     the tolerance of the skill's formula (`bank check` says the figure). A small count is a choice in disguise. The
-    day ends on a hard one: a figure only an enthusiast can place.
+    day ends on a hard number, and only a quantity takes that place (a unit, an answer above 20: the day's draw
+    doesn't end on a year), so a hard `number` cell is a quantity a well-read person can only estimate.
   - `picture`: an easy choice with a picture (see Pictures).
   - **`dated`**: one question for each of your `dates`, in order (the first `count`, the spares on the rest), each with
     `"on": ["MM-DD"]`. A dated question is a choice without a picture (any difficulty), an easy true-or-not, or a hard
@@ -32,10 +34,12 @@ never edit it), `<batch>` (this batch's folder) and your category.
 - **`firstId` … `lastId`**: your ids. Number your questions from `firstId` up, one by one, no gaps.
 - **`avoid`**: subjects your category names too often already. Write away from them; never a question whose answer or
   main subject is one of them.
-- **About a third about Bulgaria** where it comes naturally (`"bg": true`: Bulgarian people, places, history,
-  culture, language, food, customs, sport, institutions, nature; not merely written in Bulgarian). Every day needs
-  three. Everyday Bulgaria after 2015 is welcome; never news that goes stale (pin what can change to a date and add
-  `reviewBy`).
+- **About Bulgaria: your entry's `bg`** questions (about 30% of the batch), each cell's `bg` of its `count`
+  (`"bg": true`: Bulgarian people, places, history, culture, language, food, customs, sport, institutions, nature; not
+  merely written in Bulgarian). Every day needs three. If a cell's subject truly can't give its `bg` honestly, write
+  the rest in another cell of yours and say so in your notes; never mark a question `bg` that isn't about Bulgaria.
+  Everyday Bulgaria after 2015 is welcome; never news that goes stale (pin what can change to a date and add
+  `reviewBy`: from that day no game deals it until it is checked again).
 - Every question: `added` and `updated` = the plan's `date`, a fact.
 - Spread the difficulty honestly by the rubric: a question is labelled for what Bulgarian players know, not for its
   cell. If a question you wrote is easier or harder than its cell, write another one for the cell.

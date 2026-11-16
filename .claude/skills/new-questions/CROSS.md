@@ -30,8 +30,8 @@ and `<batch>` (this batch's folder).
    dropped for a wrong answer or an unconfirmed fact. If a category still can't reach `each`, it adds fewer, and you
    say so prominently: the bank holds the categories within 2% of their mean size (`bank add -check` says if the
    batch would break that), so never cut the others to match, and never pad.
-4. **Within each category, the plan's cells:** keep each cell's `count` where the questions allow; report the cells
-   that came out short.
+4. **Within each category, the plan's cells:** keep each cell's `count`, and the category's `bg` about Bulgaria, where
+   the questions allow; report the cells (and a `bg`) that came out short.
 
 ## Deliver
 

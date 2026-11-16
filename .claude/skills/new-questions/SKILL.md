@@ -42,42 +42,48 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
      left behind: remove it). Then write the lock: the date, this session's folder;
    - `git -C <bank> status --porcelain` is empty, then `git -C <bank> pull --ff-only`;
    - `bank check <bank>` has no errors.
-2. **Plan.** `bank plan -n <N> -json <bank> > <batch>/plan.json` (N = the number given, else 30), and add the
-   owner's focus to it as `"focus"` if one was given. Show the owner the text plan (`bank plan -n <N> <bank>`) in a
-   few lines: how many, which places of the day, the runway before → after. Don't wait for an answer.
-3. **Write and check.** Run the workflow, and wait for its notification (don't poll):
+2. **Fetch the days' questions** from the server, so that the runway counts what the days have left, not the whole
+   bank (only question ids and the last day drawn come back, nothing of a player's):
+   `ssh -i ~/.ssh/hetzner -o BatchMode=yes root@2.31.121.12 systemd-run --pipe --wait -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac bank used > <batch>/used.txt`.
+   Its second line is `# through <the last day drawn>`; if the command fails, say so and plan without `-used` (the
+   runway then counts the whole bank and overstates it).
+3. **Plan.** `bank plan -n <N> -json -used <batch>/used.txt <bank> > <batch>/plan.json` (N = the number given, else
+   30), and add the owner's focus to it as `"focus"` if one was given. Show the owner the text plan (the same without
+   `-json`) in a few lines: how many, which places of the day, the runway before → after with the day the shortest
+   runs out on, and how many about Bulgaria. Don't wait for an answer.
+4. **Write and check.** Run the workflow, and wait for its notification (don't poll):
    `Workflow({scriptPath: "<repo>/.claude/skills/new-questions/batch.js", args: {plan: <plan.json's content, as an
    object>, batch: "<batch>", repo: "<repo>", bank: "<bank>", skill: "<repo>/.claude/skills/new-questions"}})`.
    It runs ten writers, each topic's checker as soon as its writer is done, then the cross-check over all ten. If it
    returns `done: false` (an agent died, a topic missing, or the final batch didn't pass), resume it with the same
    `scriptPath`, `args` and `resumeFromRunId`: what finished is kept. Two failed resumes: stop and tell the owner.
-4. **Read what came back:** the cross-check's result and `<batch>/final/REPORT.md`. Every category adds the same
+5. **Read what came back:** the cross-check's result and `<batch>/final/REPORT.md`. Every category adds the same
    number; if it's less than N, the report says why, and you say so to the owner. If more than a fifth of the batch was
    dropped, read the checkers' `verify/<cat>.md` for a pattern (a writer that guessed, a misread rule) and say it.
-5. **Add it.** `bank add -checked-by "new-questions fable-5.2" <batch>/final <bank>` (the checkers' model: change it
-   with batch.js), then `bank fmt <bank>` and `bank check <bank>`: no errors, the
+6. **Add it.** `bank add -checked-by "new-questions fable-5.2" <batch>/final <bank>` (the checkers' model: change it
+   with batch.js), then `bank fmt <bank>` and `bank check -used <batch>/used.txt <bank>`: no errors, the
    categories within 2% of their mean, and no place of the day's runway shorter than in the plan's `days`. If anything fails,
    `git -C <bank> checkout -- . && git -C <bank> clean -fd -- images` and stop.
-6. **Fix what the batch found in the bank.** For the problems in REPORT.md about questions already in the bank: check
+7. **Fix what the batch found in the bank.** For the problems in REPORT.md about questions already in the bank: check
    each yourself from a source, and fix the real ones by the `questions` skill (set `updated`; a change in what a
    question asks retires it, and its replacement goes in the same cell). Keep these in a commit of their own.
-7. **Report.** Write `<bank>/reports/<date>-<slug>.md` in Bulgarian, in the form of the newest report there: a title,
+8. **Report.** Write `<bank>/reports/<date>-<slug>.md` in Bulgarian, in the form of the newest report there: a title,
    a short paragraph (what the batch is for, how many, the runway before → after, live per topic), one line on the
    process with the models (писатели: Claude Opus 5.5; проверка и обща проверка: Claude Fable 5.2) and how many were
    fixed and dropped; then by topic, each question: id · kind/difficulty · flags (дата, България, с картинка) — text →
    answer, and its fact in italics.
    Keep the batch's record beside it: `<batch>/plan.json`, `final/REPORT.md` and the checkers' `verify/<cat>.md` into
    `<bank>/reports/<date>-<slug>/` (each question's sources are in the question itself).
-8. **Commit and put it live.** In `<bank>`: `git add -A`, commit `feat: <count> questions …` (what they are for, the
+9. **Commit and put it live.** In `<bank>`: `git add -A`, commit `feat: <count> questions …` (what they are for, the
    bank's size per topic after; the body lists the ids by topic), `git push`. Then on the server:
    `ssh -i ~/.ssh/hetzner -o BatchMode=yes root@2.31.121.12 almanac-bank`. Its first line must be the bank's count
    (`…: N questions (M live)`, M the new live total), its second the problems counted (`…: 0 errors, W warnings
    (by rule)`: anything but 0 errors stops it before the reload, with the errors), and its last your commit; then `journalctl -u almanac -n 20 --no-pager` over the same ssh shows the reload with no error. If the push
    or the server step fails, say so; the batch is safe in the commit.
-9. **Tell the owner,** in a few lines: how many went in, the runway before → after, how many the checks dropped and
+10. **Tell the owner,** in a few lines: how many went in, the runway before → after, how many the checks dropped and
    the worst they caught, what was fixed in older questions, a handful of the new questions (question → answer), and
    the report's path.
-10. **Clean up:** remove the lock and `<batch>` (its record is in the bank's commit now), and anything else of yours
+11. **Clean up:** remove the lock and `<batch>` (its record is in the bank's commit now), and anything else of yours
     (CLAUDE.md, "Leave the machine as you found it").
 
 ## When it goes wrong

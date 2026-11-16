@@ -99,9 +99,9 @@ func roomSlots(n int, mix Mix) []slot {
 	return slots
 }
 
-// DrawRoom draws a room's game: n questions of a topic ("" for all) in a mix, never one barred (the day's, and those
-// the room has dealt already). A mix that leaves out a difficulty never deals it, even if that makes the game
-// shorter; the types give way first.
+// DrawRoom draws a room's game: n questions of a topic ("" for all) in a mix, never one barred (the day's, those due
+// for review: DayQuestions; and those the room has dealt already), a number an estimate where one is left (wishes). A
+// mix that leaves out a difficulty never deals it, even if that makes the game shorter; the types give way first.
 func DrawRoom(b *bank.Bank, category string, n int, mix Mix, barred map[string]bool, r *rand.Rand) []Pick {
 	pool := b.Live(category, "")
 	switch mix {
@@ -115,7 +115,7 @@ func DrawRoom(b *bank.Bank, category string, n int, mix Mix, barred map[string]b
 	fresh := func(bank.Question) bool { return true }
 	var picks []Pick
 	for _, s := range newKind(roomSlots(n, mix), r) {
-		if q := choose(pool, s, allowed, fresh, nil, r); q != nil {
+		if q := choose(pool, s, allowed, fresh, wishes(s), r); q != nil {
 			taken[q.Base().ID] = true
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
 		}

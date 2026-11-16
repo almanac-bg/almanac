@@ -22,12 +22,20 @@ import (
 // reach a topic game, a duel, a room or Роял before its own day, and the players who play most would meet more and
 // more of the day as a rerun, with its answer known.
 //
-// A day ahead is drawn only while every one of its places has a question that fits it just so (drawDay's exact): when a
-// place runs short (the pictures, say), the days stop there, and go on as the bank grows, rather than fill a day a
-// year off with what's at hand. Of the questions that fit, those nobody has answered come first. A day ahead whose
-// question has left the bank is drawn again; so are all the days after tomorrow when the draw's rules change
-// (DayRules) or the bank's days and Bulgarian questions do (bank.Tail.On, BG): a day drawn ahead is drawn by today's
-// rules, never a year-old version's.
+// A day ahead is drawn only while every one of its places has a question that fits it just so (none short in drawDay):
+// when a place runs short (the estimates, say), the days stop there, with a warning in the log, and go on as the bank
+// grows, rather than fill a day months off with what's at hand: a day drawn short ahead would keep its stand-in (or a
+// question an earlier day had) even after the batch written for it, while a day drawn on its morning takes whatever
+// the bank has by then. The stop should never come: the day's runway (runway.go, `almanac bank check` with the days'
+// questions) warns RunwayWarn days before a place runs out: Ahead of them before the stop, and 60 more to write the
+// batch. Of the questions that fit, those nobody has answered come first. A day ahead whose question has left the
+// bank, or is due for review by its day (overdue), is drawn again; so are all the days after tomorrow when the draw's
+// rules change (DayRules) or the bank's days and Bulgarian questions do (bank.Tail.On, BG): a day drawn ahead is drawn
+// by today's rules, never an older version's.
+//
+// Ahead is three months, not a year (the owner's call, 16 Nov 2026): long enough that the players who play most meet
+// no day as a rerun, and what the days hold out of every other game is a season's questions, not a year's 3,650; the
+// runway warns a season and two months before a place runs out, early enough to write for it.
 //
 // The days ahead are drawn in a transaction of their own (KeepDays: as the server starts, then each minute when the
 // day or the bank has changed), never in a player's: a game that rolls back can't take them with it. A player's game
@@ -35,14 +43,19 @@ import (
 
 // DayRules names the day's draw as it is: change it whenever drawDay draws differently, and the days after tomorrow
 // are drawn again by the new rules.
-const DayRules = "2026-11-15 picture-first, on, bg, estimate, one subject"
+const DayRules = "2026-11-16 picture-first, on, bg, estimate topic, review, one subject"
 
 // Ahead is how many days ahead of today the day's questions are drawn.
-const Ahead = 365
+const Ahead = 90
 
-// dayBars are the questions no other game deals: today's, and all of them (today's and the days ahead).
+// RunwayWarn is how many days of a place's runway are enough (runway.go): below it, `almanac bank check` warns, and
+// the next batch writes for that place first. Ahead of them are drawn already; the other 60 are time to write.
+const RunwayWarn = Ahead + 60
+
+// dayBars are the questions no game deals now (now: today's, and those due for review today, overdue), and those no
+// other game deals but a recording that has them already (all: those, and the days ahead's).
 type dayBars struct {
-	today, all map[string]bool
+	now, all map[string]bool
 }
 
 type daysCache struct {
@@ -69,7 +82,7 @@ func (g *Game) days(tx *sql.Tx) (dayBars, error) {
 	if err != nil {
 		return dayBars{}, err
 	}
-	return barsOf(stored, today), nil
+	return barsOf(stored, today, b), nil
 }
 
 // KeepDays draws the days ahead as the server starts, then every minute that the day or the bank has changed, until
@@ -115,8 +128,9 @@ func (g *Game) EnsureDays(ctx context.Context) error {
 }
 
 // drawAhead draws today if it isn't yet, the days after tomorrow again if the rules or the bank's dated and Bulgarian
-// questions changed since they were drawn, a day ahead again if a question of it left the bank, and the days missing
-// up to Ahead (while they can be drawn exactly); it says what today and the days ahead hold.
+// questions changed since they were drawn, a day ahead again if a question of it left the bank or is due for review by
+// then, and the days missing up to Ahead (while none is short, else it warns in the log); it says what today and the
+// days ahead hold.
 func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank) (dayBars, error) {
 	if _, err := g.day(tx, today); err != nil && !errors.Is(err, ErrNoQuestion) {
 		return dayBars{}, err
@@ -143,8 +157,12 @@ func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank) (dayBars, error
 	}
 	used := map[string]bool{}
 	for day, picks := range all {
-		// A day ahead with a question the bank no longer has is drawn again; nobody has played it.
-		if day > today && !allLive(b, picks) {
+		// A day ahead with a question the bank no longer has, or one due for review by then, is drawn again; nobody has
+		// played it.
+		if day > today && (!allLive(b, picks) || slices.ContainsFunc(picks, func(p Pick) bool {
+			q, _ := b.Get(p.ID)
+			return overdue(q, day)
+		})) {
 			if _, err := tx.Exec(`DELETE FROM days WHERE day = ?`, day); err != nil {
 				return dayBars{}, err
 			}
@@ -166,9 +184,11 @@ func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank) (dayBars, error
 		if _, ok := all[day]; ok {
 			continue
 		}
-		picks, exact := drawDay(b, day, used, answered, r)
-		if !exact {
-			break // a place has run short: the days ahead stop here until the bank grows
+		picks, short := drawDay(b, day, used, answered, r)
+		if len(short) > 0 {
+			// A place has run short: the days ahead stop here until the bank grows.
+			slog.Warn("days ahead stop short: the bank needs questions for the day", "day", day, "short", short)
+			break
 		}
 		data, _ := json.Marshal(picks)
 		if _, err := tx.Exec(`INSERT INTO days (day, questions) VALUES (?, ?)`, day, string(data)); err != nil {
@@ -179,7 +199,7 @@ func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank) (dayBars, error
 			used[p.ID] = true
 		}
 	}
-	return barsOf(all, today), nil
+	return barsOf(all, today, b), nil
 }
 
 // storedDays are the days stored from `from` on (every day for "").
@@ -201,9 +221,9 @@ func storedDays(tx *sql.Tx, from string) (map[string][]Pick, error) {
 	return out, rows.Err()
 }
 
-// barsOf are the questions of today and the days after it.
-func barsOf(days map[string][]Pick, today string) dayBars {
-	bars := dayBars{today: map[string]bool{}, all: map[string]bool{}}
+// barsOf are the questions of today and the days after it, and those of the bank due for review today.
+func barsOf(days map[string][]Pick, today string, b *bank.Bank) dayBars {
+	bars := dayBars{now: map[string]bool{}, all: map[string]bool{}}
 	for day, picks := range days {
 		if day < today {
 			continue
@@ -211,11 +231,33 @@ func barsOf(days map[string][]Pick, today string) dayBars {
 		for _, p := range picks {
 			bars.all[p.ID] = true
 			if day == today {
-				bars.today[p.ID] = true
+				bars.now[p.ID] = true
 			}
 		}
 	}
+	for _, id := range Overdue(b, today) {
+		bars.now[id], bars.all[id] = true, true
+	}
 	return bars
+}
+
+// DaysUsed are the questions the days have had (Used): every day stored, played or drawn ahead. `almanac bank used`
+// prints them for the day's runway; they are question ids and days, nothing of a player's.
+func (g *Game) DaysUsed(ctx context.Context) (Used, error) {
+	tx, err := g.DB.Read.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return Used{}, err
+	}
+	defer tx.Rollback() //nolint:errcheck // a read: nothing to keep
+	days, err := storedDays(tx, "")
+	used := Used{IDs: map[string]bool{}}
+	for day, picks := range days {
+		used.Through = max(used.Through, day)
+		for _, p := range picks {
+			used.IDs[p.ID] = true
+		}
+	}
+	return used, err
 }
 
 // drawnBy names what the days ahead were drawn by: the rules, and the bank's dated and Bulgarian questions.
