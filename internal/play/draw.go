@@ -45,15 +45,17 @@ var daySlots = []slot{
 const BGFloor = 3
 
 // drawDay draws a day (YYYY-MM-DD): each slot from another topic, never a question an earlier day had (while any are
-// left), and of those one nobody has answered (`answered`, if set) while any are left. The slots that need something
-// special (a picture, an order, a number) get their topics first, from those that have one. The number to finish on
-// is an estimate (a unit, more than 20) where one is left: a year or a small count is a choice in disguise. Then the
-// day is made the day's: a question that belongs to its date („На този ден“, bank.Tail.On) takes the place it fits,
-// and at least BGFloor are about Bulgaria (bank.Tail.BG), each in a place it fits, from that place's topic. Throughout,
-// a day names each subject once: no two of its questions share an answer or a quoted title (bank.Subjects), so that
-// nobody meets „Титаник“ twice in one day's ten. Exact is whether every slot had a question that fits it just so,
-// never a day's before: a day ahead is drawn only so (ahead.go).
-func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.Rand) (picks []Pick, exact bool) {
+// left), never one due for review by the day (overdue), and of those one nobody has answered (`answered`, if set) while
+// any are left. The slots that need something special (a picture, an order, a number) get their topics first, from
+// those that have one; the number's from those that have an estimate (a unit, more than 20) while any do, for the day
+// finishes on one: a year or a small count is a choice in disguise. Then the day is made the day's: a question that
+// belongs to its date („На този ден“, bank.Tail.On) takes the place it fits, and at least BGFloor are about Bulgaria
+// (bank.Tail.BG), each in a place it fits, from that place's topic (an estimate's place only by another estimate).
+// Throughout, a day names each subject once: no two of its questions share an answer or a quoted title
+// (bank.Subjects), so that nobody meets „Титаник“ twice in one day's ten. Short names the places (Runway.Place) that
+// had no question fitting them just so, never a day's before (the number's: an estimate, or the date's own question):
+// a day ahead is drawn only with none short (ahead.go).
+func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.Rand) (picks []Pick, short []string) {
 	slots := newKind(slices.Clone(daySlots), r)
 	var topics []string
 	next := func(wants ...func(string) bool) string {
@@ -75,24 +77,48 @@ func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.R
 		return t
 	}
 	special := func(s slot) bool { return s.typ != "choice" || s.picture == withPicture }
-	assigned := make([]string, len(slots))
-	for pass := range 2 {
-		for i, s := range slots {
-			if special(s) != (pass == 0) {
-				continue
+	// A question dealable on the day: not due for review, and not another date's.
+	dealable := func(q bank.Question) bool {
+		t := q.Extra()
+		return !overdue(q, day) && (len(t.On) == 0 || t.OnDay(day))
+	}
+	// What each slot wants of a topic, best first: a question that fits it just so (fitsPlace: the number an estimate),
+	// then (the number) any of its difficulty, then any of its type.
+	wants := make([][]func(string) bool, len(slots))
+	for i, s := range slots {
+		has := func(fit func(bank.Question) bool) func(string) bool {
+			return func(topic string) bool {
+				return slices.ContainsFunc(b.Live(topic, s.typ), func(q bank.Question) bool {
+					return !used[q.Base().ID] && dealable(q) && fit(q)
+				})
 			}
-			has := func(fit func(bank.Question) bool) func(string) bool {
-				return func(topic string) bool {
-					return slices.ContainsFunc(b.Live(topic, s.typ), func(q bank.Question) bool { return !used[q.Base().ID] && fit(q) })
-				}
-			}
-			assigned[i] = next(
-				has(func(q bank.Question) bool { return matches(q, s, true, true) }),
-				has(func(q bank.Question) bool {
-					return matches(q, slot{q.Base().Difficulty, s.typ, s.picture, ""}, true, true)
-				}),
-			)
 		}
+		wants[i] = append(wants[i], has(func(q bank.Question) bool { return fitsPlace(q, s, s.typ) }))
+		if s.typ == "number" {
+			wants[i] = append(wants[i], has(func(q bank.Question) bool { return matches(q, s, true, true) }))
+		}
+		wants[i] = append(wants[i], has(func(q bank.Question) bool {
+			return matches(q, slot{q.Base().Difficulty, s.typ, s.picture, ""}, true, true)
+		}))
+	}
+	// The special slots choose first, the one with the fewest topics to choose from first (the day's order on a tie),
+	// so that a topic one of them can't do without isn't spent on another.
+	var order, rest []int
+	choices := make([]int, len(slots))
+	for i, s := range slots {
+		if !special(s) {
+			rest = append(rest, i)
+			continue
+		}
+		order = append(order, i)
+		for _, c := range b.Categories {
+			choices[i] += b2i(wants[i][0](c.ID))
+		}
+	}
+	slices.SortStableFunc(order, func(x, y int) int { return choices[x] - choices[y] })
+	assigned := make([]string, len(slots))
+	for _, i := range append(order, rest...) {
+		assigned[i] = next(wants[i]...)
 	}
 	taken := map[string]bool{}
 	named := map[string]int{} // the subjects the day's questions name, each by how many of them
@@ -117,10 +143,7 @@ func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.R
 		return false
 	}
 	// A question that belongs to dates waits for one of them.
-	free := func(q bank.Question) bool {
-		t := q.Extra()
-		return !taken[q.Base().ID] && (len(t.On) == 0 || t.OnDay(day))
-	}
+	free := func(q bank.Question) bool { return !taken[q.Base().ID] && dealable(q) }
 	allowed := func(q bank.Question) bool { return free(q) && !clash(q) }
 	fresh := func(q bank.Question) bool { return !used[q.Base().ID] }
 	unseen := func(q bank.Question) bool { return !answered[q.Base().ID] }
@@ -186,7 +209,7 @@ func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.R
 			}
 			var swap bank.Question
 			for _, o := range b.Live(assigned[i], "") {
-				if o != chosen[i] && fresh(o) && free(o) && matches(o, slots[j], true, true) &&
+				if o != chosen[i] && fresh(o) && free(o) && fitsPlace(o, slots[j], slots[j].typ) &&
 					!clash(o, chosen[i], chosen[j]) && !slices.ContainsFunc(bank.Subjects(o), func(k string) bool {
 					return slices.Contains(bank.Subjects(q), k)
 				}) {
@@ -224,23 +247,69 @@ func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.R
 		}
 		s, topic := slots[i], assigned[i]
 		for _, q := range candidates(func(q bank.Question) bool {
-			return q.Extra().BG && q.Base().Category == topic && matches(q, s, true, true) && !clash(q, chosen[i])
+			return q.Extra().BG && q.Base().Category == topic && matches(q, s, true, true) && !clash(q, chosen[i]) &&
+				(!estimate(chosen[i]) || estimate(q))
 		}) {
 			put(i, q)
 			bg++
 			break
 		}
 	}
-	exact = true
 	for i, q := range chosen {
-		if q == nil {
-			exact = false
-			continue
+		s := slots[i]
+		if q == nil || !fresh(q) || !matches(q, s, true, true) || (s.typ == "number" && !estimate(q) && !kept[i]) {
+			short = append(short, s.place())
 		}
-		exact = exact && fresh(q) && matches(q, slots[i], true, true)
-		picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
+		if q != nil {
+			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
+		}
 	}
-	return picks, exact && len(picks) == len(slots)
+	return picks, short
+}
+
+// overdue is whether q is due for review (bank.Tail.ReviewBy) on day: its answer may have stopped being true, so no
+// game deals it from that day on, until the questions skill checks it and moves the date.
+func overdue(q bank.Question, day string) bool {
+	by := q.Extra().ReviewBy
+	return by != "" && by <= day
+}
+
+// Overdue are the live questions due for review on day (overdue): no game deals them (DayQuestions bars them, the day
+// passes them by), and the server says how many when it loads a bank.
+func Overdue(b *bank.Bank, day string) []string {
+	var out []string
+	for _, q := range b.Live("", "") {
+		if overdue(q, day) {
+			out = append(out, q.Base().ID)
+		}
+	}
+	return out
+}
+
+// place names the place of a day a slot is (Runway.Place): "medium split/clues" for the new kinds' place, whichever
+// it has; "hard number (estimate)", for the day finishes on one.
+func (s slot) place() string {
+	kinds := s.typ
+	if slices.Contains(newKinds, s.typ) {
+		kinds = strings.Join(newKinds, "/")
+	}
+	name := string(s.difficulty) + " " + kinds
+	if s.typ == "number" {
+		name += " (estimate)"
+	}
+	if s.picture == withPicture {
+		name += " with a picture"
+	}
+	return name
+}
+
+// wishes are what choose prefers for a slot of a game that isn't the day: an estimate for the number, where one is
+// left (estimate).
+func wishes(s slot) []func(bank.Question) bool {
+	if s.typ == "number" {
+		return []func(bank.Question) bool{estimate}
+	}
+	return nil
 }
 
 // estimate is a number question worth closing a day on: a quantity with a unit, more than 20 — not a year (no unit)
@@ -322,7 +391,8 @@ func matches(q bank.Question, s slot, typ, pictures bool) bool {
 // Draw draws ten questions of a topic ("" for all topics, BulgariaTopic for Bulgaria's from every topic) for a player
 // of an ability there (mastery.go; 0 for one who knows as much as most), questions they haven't seen (seen) before
 // those they have, and never one barred (the day's: DayQuestions). Choices come with a picture or without, whichever
-// is drawn. Everyone's run has the same shape. Topic runs and duels draw this way (a room, DrawRoom).
+// is drawn, and the number an estimate where one is left (wishes). Everyone's run has the same shape. Topic runs and
+// duels draw this way (a room, DrawRoom). The questions due for review are among the barred (DayQuestions).
 func Draw(b *bank.Bank, category string, ability float64, seen, barred map[string]bool, r *rand.Rand) []Pick {
 	pool := topicPool(b, category)
 	taken := map[string]bool{}
@@ -330,7 +400,7 @@ func Draw(b *bank.Bank, category string, ability float64, seen, barred map[strin
 	fresh := func(q bank.Question) bool { return !seen[q.Base().ID] }
 	var picks []Pick
 	for _, s := range newKind(topicSlots(ability), r) {
-		if q := choose(pool, s, allowed, fresh, nil, r); q != nil {
+		if q := choose(pool, s, allowed, fresh, wishes(s), r); q != nil {
 			taken[q.Base().ID] = true
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
 		}
@@ -347,59 +417,6 @@ func nearest(d bank.Difficulty) []bank.Difficulty {
 		return []bank.Difficulty{bank.Medium, bank.Easy}
 	}
 	return []bank.Difficulty{bank.Easy, bank.Hard}
-}
-
-// Runway is how many days of the day's questions a bank holds for one place of a day: questions that fit it just so
-// and no day has had yet (one a day; a place the day has twice, half). The bank grows where the runway is shortest
-// (the questions skill): the day spends hard numbers three times faster than easy choices.
-type Runway struct {
-	Place string
-	Days  int
-	// Difficulty, Kinds and Picture say what fits the place ("split" and "clues" share theirs); Questions is how many
-	// fit it and no day has had, PerDay how many a day takes (Days is Questions / PerDay).
-	Difficulty bank.Difficulty
-	Kinds      []string
-	Picture    bool
-	Questions  int
-	PerDay     int
-}
-
-// DayRunway is the runway of each place of a day, in the day's order (the place the new kinds share counts both).
-// used are the questions days have had (nil: count the whole bank, as `bank check` does with no database).
-func DayRunway(b *bank.Bank, used map[string]bool) []Runway {
-	var out []Runway
-	seen := map[slot]bool{}
-	for _, s := range daySlots {
-		if seen[s] {
-			continue
-		}
-		seen[s] = true
-		times := 0
-		for _, o := range daySlots {
-			if o == s {
-				times++
-			}
-		}
-		kinds := []string{s.typ}
-		if s.typ == newKinds[0] {
-			kinds = newKinds
-		}
-		n := 0
-		for _, k := range kinds {
-			for _, q := range b.Live("", k) {
-				if !used[q.Base().ID] && matches(q, slot{s.difficulty, k, s.picture, ""}, true, true) {
-					n++
-				}
-			}
-		}
-		place := string(s.difficulty) + " " + strings.Join(kinds, "/")
-		if s.picture == withPicture {
-			place += " with a picture"
-		}
-		out = append(out, Runway{Place: place, Days: n / times, Difficulty: s.difficulty, Kinds: kinds,
-			Picture: s.picture == withPicture, Questions: n, PerDay: times})
-	}
-	return out
 }
 
 func b2i(b bool) int {

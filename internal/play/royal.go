@@ -130,7 +130,7 @@ func drawRoyal(b *bank.Bank, seen, barred map[string]bool, r *mrand.Rand) []Pick
 }
 
 // DrawRoyal draws an evening's questions, leaving out (while there are others) those of the last month's evenings,
-// and the day's (DayQuestions).
+// and the day's and those due for review (DayQuestions).
 func (g *Game) DrawRoyal(ctx context.Context) ([]Pick, error) {
 	barred, err := g.DayQuestions(ctx)
 	if err != nil {

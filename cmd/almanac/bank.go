@@ -1,28 +1,27 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
+	"maps"
 	"math"
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/play"
+	"github.com/almanac-bg/almanac/internal/store"
 )
 
 func bankCommand(args []string) error {
 	if len(args) == 0 {
 		return usage()
 	}
-	// check takes -unbalanced: a bank that isn't fully balanced (the public sample) passes, with its gaps reported.
-	unbalanced := false
 	rest := args[1:]
-	if args[0] == "check" && len(rest) > 0 && rest[0] == "-unbalanced" {
-		unbalanced, rest = true, rest[1:]
-	}
 	dir := func() string {
 		if len(rest) > 0 {
 			return rest[0]
@@ -31,7 +30,9 @@ func bankCommand(args []string) error {
 	}
 	switch args[0] {
 	case "check":
-		return bankCheck(dir(), unbalanced)
+		return bankCheck(rest)
+	case "used":
+		return bankUsed()
 	case "fmt":
 		return bankFmt(dir())
 	case "subjects":
@@ -90,10 +91,24 @@ func defaultBankDir() string {
 }
 
 // bankCheck checks everything the server checks before it plays a bank, and the owner's rule that every category is
-// the same size (so a batch can't be committed half done; unbalanced lets the small public sample pass). It reports
-// the mix; the day's runway: how long each place of a day has questions for, where the next batch writes first; and
-// the subjects that come back.
-func bankCheck(dir string, unbalanced bool) error {
+// the same size (so a batch can't be committed half done; -unbalanced lets the small public sample pass). It reports
+// the mix; the day's runway: how long each place of a day has questions for, where the next batch writes first (with
+// -used, the questions the days have had are taken off: `almanac bank used`); and the subjects that come back.
+func bankCheck(args []string) error {
+	fs := flag.NewFlagSet("bank check", flag.ContinueOnError)
+	unbalanced := fs.Bool("unbalanced", false, "pass a bank whose categories aren't the same size (the public sample)")
+	from := fs.String("used", "", "a file of the question ids the days have had (almanac bank used)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	dir := defaultBankDir()
+	if fs.NArg() > 0 {
+		dir = fs.Arg(0)
+	}
+	used, err := readUsed(*from)
+	if err != nil {
+		return err
+	}
 	b, problems := bank.Load(dir)
 	errs := 0
 	for _, p := range problems {
@@ -106,39 +121,130 @@ func bankCheck(dir string, unbalanced bool) error {
 		return fmt.Errorf("%s: %d problems: the server would not play this bank", dir, errs)
 	}
 	fmt.Println(summary(b))
-	fmt.Println(runway(b))
+	fmt.Println(runway(b, used, today()))
 	fmt.Println(subjects(b, SubjectsShown))
 	sizes := map[int]bool{}
 	for _, c := range b.Categories {
 		sizes[len(b.Live(c.ID, ""))] = true
 	}
-	if len(sizes) > 1 && !unbalanced {
+	if len(sizes) > 1 && !*unbalanced {
 		return fmt.Errorf("%s: the categories aren't the same size: a batch adds to every category alike", dir)
 	}
 	return nil
 }
 
-// RunwayMin is the fewest days of the day's questions a place should have left: below it, `bank check` warns, and the
-// next batch writes for that place first.
-const RunwayMin = 180
+// today is the game's day now, in Bulgaria.
+func today() string { return time.Now().In(play.Bulgaria).Format(time.DateOnly) }
 
-// runway says how many days of the day's questions the bank holds for each place of a day (play.DayRunway), counting
-// the whole bank (the days already played have spent some: production has had a day since 12 Nov 2026), and warns of
-// the places below RunwayMin. It warns rather than fails: a bank fix must still pass while a short place waits for
-// its batch.
-func runway(b *bank.Bank) string {
+// runway says how long the bank holds the day's questions for each place of a day (play.DayRunway), shortest first,
+// and for the questions about Bulgaria a day needs (play.BulgariaRunway): the days from today, the date the place runs
+// out on, and a warning under play.RunwayWarn days. With used (the days' questions: `almanac bank used`), the days
+// played and drawn ahead are taken off; without, the whole bank counts, which overstates it. The dated questions are
+// counted apart: each goes on its own date only. It warns rather than fails: a bank fix must still pass while a short
+// place waits for its batch.
+func runway(b *bank.Bank, used play.Used, today string) string {
 	var s strings.Builder
-	s.WriteString("the day's runway (days of questions left for each place, the whole bank; shortest first):\n")
-	places := play.DayRunway(b, nil)
+	if used.IDs == nil {
+		fmt.Fprintf(&s, "the day's runway on %s (the whole bank: no day's questions taken off; -used <file> from `almanac bank used` for the truth), shortest first:\n", today)
+	} else {
+		fmt.Fprintf(&s, "the day's runway on %s (%d questions the days have had taken off, drawn through %s), shortest first:\n",
+			today, len(used.IDs), used.Through)
+	}
+	places := append(play.DayRunway(b, used, today), play.BulgariaRunway(b, used, today))
 	slices.SortStableFunc(places, func(x, y play.Runway) int { return x.Days - y.Days })
 	for _, r := range places {
 		warn := ""
-		if r.Days < RunwayMin {
-			warn = fmt.Sprintf("   warning: under %d days: write for it first", RunwayMin)
+		if r.Days < play.RunwayWarn {
+			warn = fmt.Sprintf("   warning: under %d days: write for it first", play.RunwayWarn)
 		}
-		fmt.Fprintf(&s, "  %-34s %5d%s\n", r.Place, r.Days, warn)
+		place := r.Place
+		if r.Kinds == nil {
+			place = fmt.Sprintf("%s (%d a day)", r.Place, r.PerDay)
+		}
+		fmt.Fprintf(&s, "  %-34s %5d days, %5d questions, out on %s%s\n", place, r.Days, r.Questions, r.Out, warn)
 	}
-	return strings.TrimRight(s.String(), "\n")
+	n, dates := datedLeft(b, used, today)
+	fmt.Fprintf(&s, "  dated („На този ден“, not in the places): %d questions no day has had, for %d of the year's 366 dates", n, dates)
+	return s.String()
+}
+
+// datedLeft counts the dated questions no day has had whose date is still to come (every year's, or that year's on
+// or after today), and how many dates of the year they cover.
+func datedLeft(b *bank.Bank, used play.Used, today string) (questions, dates int) {
+	covered := map[string]bool{}
+	for _, q := range b.Live("", "") {
+		if used.IDs[q.Base().ID] || len(q.Extra().On) == 0 {
+			continue
+		}
+		counted := false
+		for _, d := range q.Extra().On {
+			if len(d) == 10 && d < today {
+				continue
+			}
+			covered[d[len(d)-5:]], counted = true, true
+		}
+		questions += b2i(counted)
+	}
+	return questions, len(covered)
+}
+
+func b2i(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// bankUsed prints the questions the days have had (play.Game.DaysUsed), played and drawn ahead, for `bank check` and
+// `bank plan` -used: run it where the game's database is (DB_PATH). Question ids and the last day drawn, nothing of
+// a player's, so the file may leave the server.
+func bankUsed() error {
+	db, err := store.Open(dbPath())
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	g := play.New(db, func() *bank.Bank { return nil })
+	used, err := g.DaysUsed(context.Background())
+	if err != nil {
+		return err
+	}
+	ids := slices.Sorted(maps.Keys(used.IDs))
+	fmt.Printf("# the questions the days have had (almanac bank used), %d\n%s%s\n", len(ids), usedThrough, used.Through)
+	for _, id := range ids {
+		fmt.Println(id)
+	}
+	return nil
+}
+
+// usedThrough starts the line of `bank used` that names the last day drawn.
+const usedThrough = "# through "
+
+// readUsed reads a file `bank used` printed: the question ids, one a line, and the last day drawn. No file ("") is
+// the zero Used: the whole bank counts.
+func readUsed(path string) (play.Used, error) {
+	if path == "" {
+		return play.Used{}, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return play.Used{}, err
+	}
+	used := play.Used{IDs: map[string]bool{}}
+	for line := range strings.Lines(string(data)) {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, usedThrough):
+			used.Through = strings.TrimPrefix(line, usedThrough)
+			if _, err := time.Parse(time.DateOnly, used.Through); err != nil && used.Through != "" {
+				return play.Used{}, fmt.Errorf("%s: %q isn't a day", path, used.Through)
+			}
+		case line == "" || strings.HasPrefix(line, "#"):
+		default:
+			used.IDs[line] = true
+		}
+	}
+	return used, nil
 }
 
 // SubjectMost is how many live questions may name one subject before it's listed; SubjectShare is the share of a

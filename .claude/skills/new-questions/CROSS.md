@@ -29,8 +29,8 @@ and `<batch>` (this batch's folder).
    checker dropped only for a fault you can fix, fix them and check them as a checker would; never put back a question
    dropped for a wrong answer or an unconfirmed fact. If a category still can't reach `each`, cut every category to
    the smallest count and say so prominently: equal sizes are the bank's rule.
-4. **Within each category, the plan's cells:** keep each cell's `count` where the questions allow; report the cells
-   that came out short.
+4. **Within each category, the plan's cells:** keep each cell's `count`, and the category's `bg` about Bulgaria, where
+   the questions allow; report the cells (and a `bg`) that came out short.
 
 ## Deliver
 

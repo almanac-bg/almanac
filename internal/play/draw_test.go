@@ -38,12 +38,12 @@ func TestPictureBeforeDifficulty(t *testing.T) {
 		}
 	}
 	// The runway counts that place's fresh questions: none left of it.
-	for _, r := range DayRunway(b, used) {
+	for _, r := range DayRunway(b, Used{IDs: used}, "2026-11-16") {
 		if r.Place == "easy choice with a picture" && r.Days != 0 {
 			t.Fatalf("runway %+v with every easy picture spent", r)
 		}
 	}
-	if r := DayRunway(b, nil); r[1].Place != "easy choice with a picture" || r[1].Days != len(used) {
+	if r := DayRunway(b, Used{}, "2026-11-16"); r[1].Place != "easy choice with a picture" || r[1].Days != len(used) {
 		t.Fatalf("runway %+v, %d easy pictures", r, len(used))
 	}
 }
@@ -67,9 +67,9 @@ func TestDayOfItsDate(t *testing.T) {
 		}
 	}
 	for seed := range uint64(30) {
-		picks, exact := drawDay(b, day, map[string]bool{}, nil, rand.New(rand.NewPCG(seed, 7)))
-		if !exact || len(picks) != Length {
-			t.Fatalf("seed %d: %d picks, exact %v", seed, len(picks), exact)
+		picks, short := drawDay(b, day, map[string]bool{}, nil, rand.New(rand.NewPCG(seed, 7)))
+		if len(short) > 0 || len(picks) != Length {
+			t.Fatalf("seed %d: %d picks, short %v", seed, len(picks), short)
 		}
 		found, bg, topics := false, 0, map[string]bool{}
 		for i, p := range picks {
@@ -112,8 +112,8 @@ func TestOneSubjectADay(t *testing.T) {
 	days := 0
 	for d := range 40 {
 		day := time.Date(2026, 3, 1+d, 0, 0, 0, 0, time.UTC).Format(time.DateOnly)
-		picks, exact := drawDay(b, day, used, nil, rand.New(rand.NewPCG(uint64(d), 11)))
-		if !exact {
+		picks, short := drawDay(b, day, used, nil, rand.New(rand.NewPCG(uint64(d), 11)))
+		if len(short) > 0 {
 			break
 		}
 		days++
