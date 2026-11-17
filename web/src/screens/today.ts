@@ -32,7 +32,16 @@ import {
   reserveWords,
   stakeLine,
 } from "../ui.ts";
-import { type Accepted, acceptedLine, type FriendPlayed, type Left, leftLine, playedLine } from "./duel.ts";
+import {
+  type Accepted,
+  acceptedLine,
+  type ChallengeNews,
+  challengesLine,
+  type FriendPlayed,
+  type Left,
+  leftLine,
+  playedLine,
+} from "./duel.ts";
 import { goalsCard } from "./goals.ts";
 import { haveProfile, keepLine } from "./keep.ts";
 import { modes } from "./modes.ts";
@@ -87,6 +96,8 @@ export interface Today {
   /** A game that ended without its result on screen (the day's last question let run out, a game left at its end):
    * its news, told here once (play/told.go). */
   untold?: number;
+  /** Who took the player's challenges since they last heard (play/challenges.go). */
+  challenges?: ChallengeNews | null;
 }
 
 /** The day's ten played on another page (an invite's): their result there as Начало draws it (`before`: the day as
@@ -220,8 +231,12 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
       // the days just missed, once.
       t.repair ? () => repairCard(fresh().repair) : streakNotice(t),
       // One line at a time: a live game of the player's going on; of others, a friend played the duel, said yes to
-      // the invite, or the duel left went on.
-      playingLine(t.playing) ?? playedLine(t.duel) ?? acceptedLine(t.accepted) ?? leftLine(t.left),
+      // the invite, the duel left went on, or who took their challenges.
+      playingLine(t.playing) ??
+        playedLine(t.duel) ??
+        acceptedLine(t.accepted) ??
+        leftLine(t.left) ??
+        challengesLine(t.challenges),
       // On a big screen the day leads the page with the topics under it, and the rest waits in a column beside it
       // (app.css); on a phone the two parts are one column, in this order.
       h(

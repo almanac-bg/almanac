@@ -15,24 +15,3 @@ export function missing() {
     h("a", { class: "btn primary big", href: "/" }, "Към днешните въпроси"),
   );
 }
-
-/** A challenge link from before: challenges are gone, and friends play each other now. */
-export function challengeGone() {
-  title("Стара връзка");
-  return h(
-    "section",
-    { class: "screen" },
-    h(
-      "div",
-      { class: "intro" },
-      h("p", { class: "kicker" }, "Стара връзка"),
-      h("h1", null, "Тази връзка вече не работи"),
-      h(
-        "p",
-        { class: "lead" },
-        "Сега се играе с приятели: добави ги и се предизвиквайте на дуел. А резултатите от въпросите на деня сравнявате всеки ден.",
-      ),
-    ),
-    h("a", { class: "btn primary big", href: "/duel" }, "Към дуелите"),
-  );
-}

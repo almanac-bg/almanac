@@ -50,7 +50,7 @@ export interface Side {
 
 export interface DuelView {
   id: number;
-  kind: "live" | "friend";
+  kind: "live" | "friend" | "challenge";
   state: "play" | "wait" | "won" | "lost" | "draw" | "declined" | "expired";
   opponent?: Side;
   /** The other player's id, in a friend's duel: for a rematch. */
@@ -322,6 +322,27 @@ export function leftLine(l?: Left | null): Child {
     { class: "streak-notice", role: "status" },
     `Дуелът с ${l.them} продължи без теб (излезе ${leftAfter(l.after)}): ${words[l.state]}${rating}.`,
     h("a", { href: `/duel/${l.id}` }, "Виж"),
+  );
+}
+
+/** Who took the player's challenges since they last heard: how many, how many of them won, the latest's code. */
+export interface ChallengeNews {
+  played: number;
+  beat: number;
+  name?: string;
+  code: string;
+}
+
+/** Who took the player's challenges: one line for all of them, once, a tap from who took the latest. */
+export function challengesLine(n?: ChallengeNews | null): Child {
+  if (!n || !toldOnce("challenges")) return null;
+  const beat = n.beat === 0 ? "" : n.played === 1 ? " и те би" : ` · ${n.beat} ${n.beat === 1 ? "те би" : "те биха"}`;
+  const who = n.played === 1 && n.name ? `${n.name} изигра` : `${n.played} изиграха`;
+  return h(
+    "p",
+    { class: "streak-notice", role: "status" },
+    `${who} предизвикателството ти${beat}.`,
+    h("a", { href: `/c/${n.code}` }, "Виж"),
   );
 }
 
