@@ -19,6 +19,14 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
   await expect(b.getByRole("heading", { name: /Вече сте приятели/ })).toBeVisible();
   await a.reload();
   await expect(a.locator(".friend")).toHaveCount(1);
+  // Ana hears it on Начало too, once, a tap from a duel with Bo.
+  await a.goto("/");
+  const yes = a.locator(".streak-notice", { hasText: "прие поканата ти." });
+  await expect(yes.getByRole("link", { name: "Дуел" })).toHaveAttribute("href", /^\/duel\/friend\/\d+$/);
+  await a.reload();
+  await expect(a.locator(".day")).toBeVisible();
+  await expect(yes).toHaveCount(0);
+  await a.goto("/friends");
 
   // A tap by mistake costs nothing: the count-in comes first, and „Откажи“ goes back with no duel made.
   await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();

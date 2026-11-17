@@ -5,13 +5,18 @@
 // question; a recording isn't waited for where its player let the time run out. A player who isn't there when the
 // first question is due (never came, or left as the duel was found) is waited for until Arrive; after it, the duel is
 // called off and leaves nothing (play.DropLive), so leaving the wait at its last second never costs a lost duel. An
-// answer sent again (its reply lost on the way) is taken as the first.
+// answer sent again (its reply lost on the way) is taken as the first. One who left for good is named on the result
+// (play.LeftLive: after which question).
+//
+// Once a duel between two people is over, either may ask for a rematch (Rematch): the other sees it, and if they ask
+// too within RematchFor, a new duel between the two is made at once.
 //
 // Every answer goes through the player's own run (internal/play), as in any game: the score, XP, the questions'
 // statistics and the duel's result are kept there, and only the timing lives here, in memory. A restart cuts the
 // duels under way off; they end without a result (play.EndLive). So before one, the server pauses the hub (Pause):
 // no new duel starts, not even with a recording; those asking go on waiting, told why (Seek.Held), and find their
-// duel once the server is back, while the duels under way (UnderWay) play to their end. Resume undoes it.
+// duel once the server is back, while the duels under way (UnderWay) play to their end; a rematch waiting for its yes
+// is called off, told so (ErrPaused), as its duel would be lost. Resume undoes it.
 package live
 
 import (
@@ -42,6 +47,8 @@ const (
 	Keep = 2 * time.Minute
 	// maxMatches caps the duels under way at once, so that nobody can fill the server's memory with them.
 	maxMatches = 2000
+	// RematchFor is how long one who asks for a rematch waits for the other to ask too.
+	RematchFor = 15 * time.Second
 )
 
 var (
@@ -49,6 +56,11 @@ var (
 	ErrNotNow  = errors.New("not now")
 	ErrAnswer  = errors.New("an answer the question can't take")
 	ErrTooMany = errors.New("too many duels")
+	// ErrNoRematch is a rematch that didn't come about: the other didn't ask in time (or left), or the duel can't
+	// have one (against a recording, not over, gone).
+	ErrNoRematch = errors.New("no rematch")
+	// ErrPaused is a rematch asked for while the server is about to restart: the duel it would be is lost with it.
+	ErrPaused = errors.New("the server is about to restart")
 )
 
 // Player is someone in a duel, as the other sees them.
@@ -71,15 +83,17 @@ type Hub struct {
 	mu       sync.Mutex
 	paused   bool
 	waiting  []*Seek
-	starting map[int64]*Seek  // players whose duel is being made
-	matches  map[int64]*Match // by duel
-	playing  map[int64]*Match // the duel each player is in, until it ends
+	starting map[int64]*Seek // players whose duel is being made
+	// rematches are the rematches asked for by one of a duel's two (by the duel), waiting for the other.
+	rematches map[int64]*Seek
+	matches   map[int64]*Match // by duel
+	playing   map[int64]*Match // the duel each player is in, until it ends
 }
 
 func NewHub(g *play.Game, who func(context.Context, int64) (Player, error)) *Hub {
 	return &Hub{
 		game: g, who: who, wait: Wait,
-		starting: map[int64]*Seek{}, matches: map[int64]*Match{}, playing: map[int64]*Match{},
+		starting: map[int64]*Seek{}, matches: map[int64]*Match{}, playing: map[int64]*Match{}, rematches: map[int64]*Seek{},
 	}
 }
 
@@ -93,9 +107,11 @@ type Seek struct {
 	timer  *time.Timer
 	held   bool          // waiting while the hub is paused
 	told   chan struct{} // held changed
-	done   chan struct{}
-	Match  *Match
-	Err    error
+	// rematch is the duel a rematch is asked for after (0: a duel with whoever comes).
+	rematch int64
+	done    chan struct{}
+	Match   *Match
+	Err     error
 }
 
 func newSeek(h *Hub, p Player) *Seek {
@@ -202,12 +218,108 @@ func (h *Hub) pair(a, b *Seek) func() {
 }
 
 // Pause stops new duels from starting, for a restart: whoever asks for one waits, held, and the duels under way go on.
+// A rematch waiting for the other's yes is called off at once, told so: the duel it was for is lost with the restart.
 func (h *Hub) Pause() {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	h.paused = true
 	for _, s := range h.waiting {
 		s.hold(true)
+	}
+	var off []*Seek
+	for id, s := range h.rematches {
+		delete(h.rematches, id)
+		s.timer.Stop()
+		off = append(off, s)
+	}
+	h.mu.Unlock()
+	for _, s := range off {
+		h.unwant(s)
+		s.settle(nil, ErrPaused)
+	}
+}
+
+// Rematch asks for a new duel between the two players of a live duel just over (id), against a person: the first to
+// ask waits up to RematchFor for the other, who sees that they asked (SideView.Rematch); once both have, the duel is
+// made, and both seeks settle with it. ErrNoRematch if the other doesn't ask in time, or the duel can't have one (not
+// over, against a recording, gone, one of the two in another duel); ErrPaused while the hub is paused. Leave it when
+// the screen goes, as any seek: the one who asked first, gone, isn't waited for.
+func (h *Hub) Rematch(p Player, id int64) *Seek {
+	s := newSeek(h, p)
+	m, err := h.Get(id)
+	if err != nil {
+		s.settle(nil, ErrNoRematch)
+		return s
+	}
+	m.mu.Lock()
+	me, other := m.sides[0], m.sides[1]
+	if other.ID == p.ID {
+		me, other = other, me
+	}
+	can := m.phase == PhaseEnd && me.ID == p.ID && me.human() && other.human()
+	m.mu.Unlock()
+	if !can {
+		s.settle(nil, ErrNoRematch)
+		return s
+	}
+	h.mu.Lock()
+	if h.paused {
+		h.mu.Unlock()
+		s.settle(nil, ErrPaused)
+		return s
+	}
+	if h.playing[p.ID] != nil || h.playing[other.ID] != nil || h.starting[p.ID] != nil || h.starting[other.ID] != nil {
+		h.mu.Unlock()
+		s.settle(nil, ErrNoRematch)
+		return s
+	}
+	w := h.rematches[id]
+	switch {
+	case w == nil: // the first to ask: they wait for the other
+		s.rematch, s.until = id, time.Now().Add(RematchFor)
+		s.timer = time.AfterFunc(RematchFor, func() { h.rematchOver(s) })
+		h.rematches[id] = s
+		h.mu.Unlock()
+		m.want(p.ID, true)
+		return s
+	case w.player.ID == p.ID: // asked again (a second screen, a line come back)
+		w.refs++
+		h.mu.Unlock()
+		return w
+	}
+	delete(h.rematches, id)
+	start := h.pair(w, s)
+	h.mu.Unlock()
+	start()
+	return s
+}
+
+// rematchOver is a rematch the other didn't ask for in time.
+func (h *Hub) rematchOver(s *Seek) {
+	h.mu.Lock()
+	if h.rematches[s.rematch] != s { // met, or gone, meanwhile
+		h.mu.Unlock()
+		return
+	}
+	delete(h.rematches, s.rematch)
+	h.mu.Unlock()
+	h.unwant(s)
+	s.settle(nil, ErrNoRematch)
+}
+
+// unwant is a rematch asked for no longer: the other's screen stops saying so. Called without the hub's lock.
+func (h *Hub) unwant(s *Seek) {
+	if m, err := h.Get(s.rematch); err == nil {
+		m.want(s.player.ID, false)
+	}
+}
+
+// want marks a player of the duel as asking for a rematch, or no longer.
+func (m *Match) want(id int64, on bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if s := m.side(id); s != nil && s.rematch != on {
+		s.rematch = on
+		m.changed()
 	}
 }
 
@@ -262,6 +374,12 @@ func (s *Seek) Leave() {
 	defer h.mu.Unlock()
 	s.refs--
 	if s.refs > 0 {
+		return
+	}
+	if s.rematch != 0 && h.rematches[s.rematch] == s {
+		delete(h.rematches, s.rematch)
+		s.timer.Stop()
+		go h.unwant(s) // the match's lock comes before the hub's
 		return
 	}
 	for i, w := range h.waiting {
@@ -421,6 +539,8 @@ type side struct {
 	online    int
 	came      bool // has followed the duel at least once
 	leftAt    time.Time
+	leftAfter int  // how many questions they had played when they last left
+	rematch   bool // asks for a rematch, once the duel is over (Hub.Rematch)
 	points    int
 	rights    int
 	marks     []play.Mark
@@ -523,6 +643,10 @@ func (m *Match) Unfollow(sub *Sub) {
 	s.online--
 	if s.online == 0 {
 		s.leftAt = time.Now()
+		s.leftAfter = m.n
+		if m.phase == PhaseReveal {
+			s.leftAfter++ // its answer seen: that question was played
+		}
 		// Once they've been away too long, the question up then (whichever it is) goes on if it waits only for them,
 		// and the other is told they're gone.
 		time.AfterFunc(Away+time.Millisecond, func() {
@@ -778,6 +902,12 @@ func (m *Match) end() {
 		if s.rights == len(m.dealt) {
 			s.points += play.AllRight
 		}
+		// One who left for good is named on the result: when they left, and that it went on without them.
+		if s.gone() {
+			if err := m.hub.game.LeftLive(context.Background(), m.id, s.ID, s.leftAfter); err != nil {
+				slog.Error("live duel", "duel", m.id, "err", err)
+			}
+		}
 	}
 	m.phase, m.ended = PhaseEnd, time.Now()
 	m.hub.release(m)
@@ -814,6 +944,8 @@ type SideView struct {
 	Online   bool        `json:"online"`
 	// Gone says they've been away longer than Away: the duel goes on without them (their time runs out on each question).
 	Gone bool `json:"gone,omitempty"`
+	// Rematch says they ask for a rematch (the duel is over): the other has RematchFor to ask too.
+	Rematch bool `json:"rematch,omitempty"`
 	// Answered says they've answered the question now, and TookMs how quickly; what they gave and how it went show
 	// only with the answer (Given, Gained, Right), so nobody can follow the other's lead.
 	Answered bool            `json:"answered"`
@@ -892,7 +1024,7 @@ func (m *Match) sideView(s *side, mine, shown bool) SideView {
 	v := SideView{
 		Look: s.Look, Name: s.Name, Tag: s.Tag, Rating: s.Rating, Division: s.Division.ID,
 		Points: s.points, Rights: s.rights, Trail: append([]play.Mark{}, s.marks...),
-		Online: !s.human() || s.online > 0, Answered: s.answered, Gone: s.gone(),
+		Online: !s.human() || s.online > 0, Answered: s.answered, Gone: s.gone(), Rematch: s.rematch,
 	}
 	if s.answered {
 		v.TookMs = s.took.Milliseconds()

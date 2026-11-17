@@ -40,6 +40,7 @@ let {
   playing,
   questionHead,
   readyClock,
+  shareButton,
   signal,
   timer,
   title,
@@ -66,6 +67,8 @@ interface Side {
   /** Away longer than the duel waits: it goes on without them. */
   gone?: boolean;
   answered: boolean;
+  /** Asks for a rematch, the duel over: the other has a moment to ask too. */
+  rematch?: boolean;
   tookMs?: number;
   /** The other's answer, as shown, once both answers show. */
   given?: Answer;
@@ -105,7 +108,7 @@ interface LiveView {
   };
 }
 
-type Trouble = "" | "reconnecting" | "closed" | "nobody" | "busy";
+type Trouble = "" | "reconnecting" | "closed" | "nobody" | "busy" | "norematch" | "paused";
 
 /** Waiting for someone: how long until a recording, or that the game is being updated (held: the duel starts on the
  * new version, the line coming back to it by itself). */
@@ -154,6 +157,7 @@ export function liveDuel(kit: Kit) {
     playing,
     questionHead,
     readyClock,
+    shareButton,
     signal,
     timer,
     title,
@@ -164,25 +168,34 @@ export function liveDuel(kit: Kit) {
     verdict,
   } = kit);
   title("Дуел");
-  const round = signal(0);
-  // „Още един дуел“ starts over in place: a new wait, a new duel.
+  // „Още един дуел“ starts over in place: a new wait, a new duel; „Реванш“ too, with the one just played.
+  const round = signal<{ n: number; rematch?: Rematch }>({ n: 0 });
+  const again = (rematch?: Rematch) => round.update((r) => ({ n: r.n + 1, rematch }));
   return h("div", null, () => {
-    round();
-    return untracked(() => session(() => round.update((n) => n + 1)));
+    const r = round();
+    return untracked(() => session(again, r.rematch));
   });
 }
 
-/** One duel, from asking for it to its result. */
-function session(again: () => void): Child {
+/** A rematch asked for: of which duel, with whom. */
+interface Rematch {
+  id: number;
+  name: string;
+}
+
+/** One duel, from asking for it (with whoever comes, or for a rematch with the one just played) to its result. */
+function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
   const view = signal<LiveView | null>(null);
   const wait = signal<Wait | null>(null);
   const trouble = signal<Trouble>("");
 
   let es: EventSource | null = null;
   const stop = () => es?.close();
+  // Over, the result stays: a stream that ends then (the duel forgotten) or drops doesn't take it away.
+  const over = () => view.peek()?.phase === "end";
   player()
     .then(() => {
-      es = new EventSource("/api/duels/live/events");
+      es = new EventSource(`/api/duels/live/events${rematch ? `?rematch=${rematch.id}` : ""}`);
       es.addEventListener("waiting", (e) => {
         trouble.set("");
         // A line that dropped while waiting starts the wait again; a duel that ended doesn't come back.
@@ -193,15 +206,17 @@ function session(again: () => void): Child {
         trouble.set("");
         const v: LiveView = JSON.parse(e.data);
         view.set(v);
-        if (v.phase === "end" || v.phase === "off") stop();
+        // Over, it's still followed for a while: the other may ask for a rematch.
+        if (v.phase === "off") stop();
       };
-      for (const event of ["closed", "nobody", "busy"] as const)
+      for (const event of ["closed", "nobody", "busy", "norematch", "paused"] as const)
         es.addEventListener(event, () => {
           stop();
-          trouble.set(event);
+          if (!over()) trouble.set(event);
         });
       es.onerror = () => {
-        if (es?.readyState === EventSource.CLOSED) trouble.set("closed");
+        if (over()) stop();
+        else if (es?.readyState === EventSource.CLOSED) trouble.set("closed");
         else trouble.set("reconnecting"); // the browser tries again by itself
       };
     })
@@ -233,12 +248,21 @@ function session(again: () => void): Child {
     () => {
       const k = key();
       const t = trouble();
-      if (t === "nobody") return nobody(again);
-      if (t === "busy") return problem("Твърде много дуели в момента", "Опитай след малко.", again);
+      const anew = () => again();
+      if (t === "nobody") return nobody(anew);
+      if (t === "busy") return problem("Твърде много дуели в момента", "Опитай след малко.", anew);
+      if (t === "norematch")
+        return problem("Реванш няма да има", `${rematch?.name ?? "Съперникът"} не поиска реванш навреме.`, anew);
+      if (t === "paused")
+        return problem(
+          "Играта се обновява",
+          "Реванш сега не става. Потърси нов дуел: започва веднага след обновяването.",
+          anew,
+        );
       if (t === "closed" && untracked(view)?.phase !== "end")
-        return problem("Дуелът прекъсна", "Без резултат: рейтингът не се мени.", again);
+        return problem("Дуелът прекъсна", "Без резултат: рейтингът не се мени.", anew);
       if (!k) return h("p", { class: "muted" }, "…");
-      if (k === "waiting") return waiting(wait as () => Wait);
+      if (k === "waiting") return waiting(wait as () => Wait, rematch);
       const v = untracked(view) as LiveView;
       const live = view as () => LiveView;
       switch (v.phase) {
@@ -249,17 +273,17 @@ function session(again: () => void): Child {
         case "reveal":
           return reveal(live, v);
         case "end":
-          return end(v, again);
+          return end(live, v, again);
         case "off":
-          return problem("Съперникът не дойде", "Дуелът е без резултат. Потърси нов.", again);
+          return problem("Съперникът не дойде", "Дуелът е без резултат. Потърси нов.", anew);
       }
     },
   );
 }
 
 /** Waiting for someone: how long until a recording instead, or, while the game is being updated, that the duel comes
- * right after. */
-function waiting(wait: () => Wait): Child {
+ * right after; for a rematch, how long the other has to ask too. */
+function waiting(wait: () => Wait, rematch?: Rematch): Child {
   const left = signal(0);
   effect(() => left.set(Math.ceil(wait().leftMs / 1000)));
   const tick = setInterval(() => left.update((n) => Math.max(0, n - 1)), 1000);
@@ -271,13 +295,15 @@ function waiting(wait: () => Wait): Child {
       "div",
       { class: "intro" },
       h("p", { class: "kicker" }, "Дуел на живо"),
-      h("h1", null, "Търсим съперник"),
+      h("h1", null, rematch ? "Реванш" : "Търсим съперник"),
       h("p", { class: "lead" }, () =>
-        wait().held
-          ? "Играта се обновява. Дуелът започва веднага след това."
-          : left() > 0
-            ? "Ако никой не дойде до края на броенето, ще играеш срещу запис на истинска игра."
-            : "Намираме ти запис на истинска игра…",
+        rematch
+          ? `Чакаме и ${rematch.name} да поиска реванш.`
+          : wait().held
+            ? "Играта се обновява. Дуелът започва веднага след това."
+            : left() > 0
+              ? "Ако никой не дойде до края на броенето, ще играеш срещу запис на истинска игра."
+              : "Намираме ти запис на истинска игра…",
       ),
     ),
     () =>
@@ -509,8 +535,34 @@ function theirs(s: Side, v: View): Child {
 
 /** The result, as the duel was kept (screens/outcome.ts, landing as a moment with its sound): who won, question by
  * question, the rating it moved, what the game earned; then the questions to go over. */
-function end(v: LiveView, again: () => void): Child {
+function end(view: () => LiveView, v: LiveView, again: (rematch?: Rematch) => void): Child {
   const kept = signal<DuelView | null>(null);
+  const another = (main: boolean) =>
+    h("button", { class: main ? "btn primary big" : "btn", type: "button", onclick: () => again() }, "Още един дуел");
+  // Against a person: „Реванш“, gold (the other sees it asked, and has a moment to ask too), and another duel beside
+  // it; against a recording, another duel.
+  const steps = v.recorded
+    ? another(true)
+    : {
+        main: h(
+          "div",
+          { class: "rematch" },
+          () =>
+            view().them.rematch
+              ? h("p", { class: "rematch-asks", role: "status" }, `${view().them.name} иска реванш.`)
+              : null,
+          h(
+            "button",
+            {
+              class: "btn primary big",
+              type: "button",
+              onclick: () => again({ id: v.id, name: v.them.name }),
+            },
+            "Реванш",
+          ),
+        ),
+        also: [another(false)],
+      };
   const error = signal("");
   api<{ duel: DuelView }>("GET", `/api/duels/${v.id}`).then(
     (r) => kept.set(r.duel),
@@ -523,17 +575,16 @@ function end(v: LiveView, again: () => void): Child {
   );
   return h("div", null, () => {
     const d = kept();
-    if (d)
-      return duelResult(
-        d,
-        h("button", { class: "btn primary big", type: "button", onclick: again }, "Още един дуел"),
-        d.runId ? news(d.runId) : null,
-      );
-    return error() ? problem("Дуелът свърши", error(), again) : h("p", { class: "muted" }, "…");
+    if (d) return duelResult(d, steps, d.runId ? news(d.runId) : null);
+    return error() ? problem("Дуелът свърши", error(), () => again()) : h("p", { class: "muted" }, "…");
   });
 }
 
+/** Nobody to play, not even a recording (a game that has just begun): the friends to challenge, each a tap from a duel
+ * in their own time; with none, the invite to send; and a topic's game, alone, meanwhile. */
 function nobody(again: () => void): Child {
+  const mine = signal<{ invite: string; friends: { id: number; name: string }[] } | null>(null);
+  api<{ invite: string; friends: { id: number; name: string }[] }>("GET", "/api/friends").then(mine.set, () => {});
   return h(
     "div",
     { class: "stack" },
@@ -541,14 +592,37 @@ function nobody(again: () => void): Child {
       "div",
       { class: "intro" },
       h("h1", null, "Точно сега няма с кого"),
-      h(
-        "p",
-        { class: "lead" },
-        "Никой не търси дуел, а записи на игри още няма. Опитай пак след малко или предизвикай приятел.",
+      h("p", { class: "lead" }, () =>
+        mine()?.friends.length
+          ? "Никой не търси дуел, а записи на игри още няма. Предизвикай приятел: играеш сега, а приятелят ти — когато може."
+          : "Никой не търси дуел, а записи на игри още няма. Покани приятел или изиграй игра по тема.",
       ),
     ),
-    h("button", { class: "btn primary big", type: "button", onclick: again }, "Опитай пак"),
-    h("a", { class: "btn", href: "/duel" }, "Към дуелите"),
+    () => {
+      const m = mine();
+      if (!m) return null;
+      if (!m.friends.length) return shareButton("Покани приятел", () => "Ела да сме приятели в АЛМАНАХ:", m.invite);
+      return h(
+        "ul",
+        { class: "duel-friends" },
+        m.friends
+          .slice(0, 5)
+          .map((f) =>
+            h(
+              "li",
+              null,
+              h("strong", null, f.name),
+              h("button", { class: "btn inline", type: "button", onclick: () => go(`/duel/friend/${f.id}`) }, "Дуел"),
+            ),
+          ),
+      );
+    },
+    h(
+      "div",
+      { class: "result-actions" },
+      h("a", { class: "btn", href: "/play/all" }, "Игра по тема"),
+      h("button", { class: "btn", type: "button", onclick: again }, "Опитай пак"),
+    ),
   );
 }
 

@@ -288,14 +288,17 @@ takes a token.
   and the verdict (`.duel-verdict`: „Победа“, „Загуба“, „Равенство“, „Изигра своя дуел“); the two face to face
   (`.duel-face`: the big avatar with its frame, the name a way to the profile, the title or „Запис“, the points and
   the right answers; the winner's points gold and its avatar glowing, the other's plain; the other's points a dash,
-  „Тепърва ще играе“, until they have); the duel question by question (`.duel-marks`: the player's row over the
+  „Тепърва ще играе“, until they have; under a person met in a live duel, not a friend yet, „Добави в приятели“,
+  `.duel-add`); the duel question by question (`.duel-marks`: the player's row over the
   other's, each beside a small avatar; the quicker of two right answers ringed in gold, `.fast`, said once under
   them; a gold band behind the question that decided it); one line of what decided it (`.duel-line`: „Реши се на
   8-ия въпрос.“, „Реши се на последния въпрос.“, „Мария водеше от първия въпрос до края.“, „Равни точки: реши
-  времето (…)“; while waiting, until when); and what it meant under a hairline (`.duel-meant`: the division's emblem,
+  времето (…)“; one who left a live duel under way, „Мария излезе след 4-тия въпрос.“; while waiting, until when, the
+  weekday in full); and what it meant under a hairline (`.duel-meant`: the division's emblem,
   its name and the change, its bar, „Рейтинг 1062 → 1080 · 70 до Злато“; why it didn't move; the record against
-  this person, „Срещу Мария 3 : 2“, in rose). Then the next steps: „Реванш“ (a friend's), „Още един дуел“ (right
-  after a live one) or „Към дуелите“, gold. A duel without a result (turned down, not played in time, cut off) is
+  this person, „Срещу Мария 3 : 2“, in rose). Then the next steps: „Реванш“, gold (a friend's; or right after a
+  live one against a person: the other sees „Мария иска реванш.“ over theirs, `.rematch-asks`, and has 15 seconds to
+  ask too), with „Още един дуел“ beside it; „Още един дуел“ gold after one against a recording; else „Към дуелите“. A duel without a result (turned down, not played in time, cut off) is
   its heading and a line, and the player's own game if they played it (`.duel-mine`).
 - **Friends:** `.card.friends`, `.invitation` (a friend request, accepted with `.btn.rose`), `.friend-list`/`.friend`
   (with `.friend-day` and `.record`) and `.invite-link`.
@@ -343,7 +346,8 @@ takes a token.
   really is big is also brought forward in a sheet over the result (Motion). Профил shows
   what comes next (`.next`); reserve days keep the streak (the first day, every seventh in a row and a day with all
   three goals earn one: `.goals-reserve`, `.week li.saved`); a day a reserve kept, or a streak that ended, is said
-  once on Начало (`.streak-notice`). Награди opens with „Как се печели“, the whole of it in five lines.
+  once on Начало (`.streak-notice`), as is, one at a time, what others did meanwhile: a friend played the duel, said yes
+  to an invite („Мария прие поканата ти.“ and „Дуел“), or a live duel left went on without the player. Награди opens with „Как се печели“, the whole of it in five lines.
 - **Division emblems** are pictures (`division-<id>`): a silhouette per division — Бронз a plain shield, Сребро a
   chevron, Злато wings, Платина a star, Диамант a cut gem, Легенда a crowned shield of stars with rays — in `--div-*`
   colours (`art/emblem.ts` places them).

@@ -251,6 +251,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/friends/requests/{id}/accept", s.answerRequest(true))
 	api("DELETE /api/friends/requests/{id}", s.answerRequest(false))
 	api("DELETE /api/friends/{id}", s.unfriend)
+	api("POST /api/told", s.told)
 	api("GET /api/invites/{code}", s.inviteInfo)
 	api("POST /api/invites/{code}", s.acceptInvite)
 	mux.Handle("/api/", s.apiHandler(func(http.ResponseWriter, *http.Request) error { return errNotFound }))

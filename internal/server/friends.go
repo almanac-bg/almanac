@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -207,6 +208,27 @@ func (s *Server) unfriend(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	if err := s.game.Unfriend(r.Context(), u.ID, id); err != nil {
+		return err
+	}
+	return ok(w, map[string]bool{"ok": true})
+}
+
+// told keeps a line Начало has told the player once (play.Told): a friend's yes, what came of a duel they left.
+func (s *Server) told(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		Line string `json:"line"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	if err := s.game.Told(r.Context(), u.ID, in.Line); err != nil {
+		if errors.Is(err, play.ErrNoLine) {
+			return errBadRequest
+		}
 		return err
 	}
 	return ok(w, map[string]bool{"ok": true})

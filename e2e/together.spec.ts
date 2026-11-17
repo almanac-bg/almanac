@@ -109,7 +109,9 @@ test("two people asking for a duel play it live", async ({ browser }, info) => {
   }
   for (const p of [a, b])
     await expect(p.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 20_000 });
-  await expect(a.getByRole("button", { name: "Още един дуел" })).toHaveClass(/primary/);
+  // Against a person, the gold button is a rematch with them; another duel with whoever comes is beside it.
+  await expect(a.getByRole("button", { name: "Реванш" })).toHaveClass(/primary/);
+  await expect(a.getByRole("button", { name: "Още един дуел" })).not.toHaveClass(/primary/);
   // Face to face and question by question, the same duel from both sides: what one won, the other lost.
   for (const p of [a, b]) {
     await expect(p.locator(".duel-head .kicker")).toHaveText(/^Дуел на живо (с|със) \S/);
@@ -118,6 +120,18 @@ test("two people asking for a duel play it live", async ({ browser }, info) => {
   }
   const verdicts = [await a.locator(".duel-verdict").textContent(), await b.locator(".duel-verdict").textContent()];
   expect(verdicts.sort()).toEqual(verdicts.includes("Равенство") ? ["Равенство", "Равенство"] : ["Загуба", "Победа"]);
+  // Met by chance: a tap under the other asks them to be friends.
+  await a
+    .locator(".duel-add")
+    .getByRole("button", { name: /^Добави .+ в приятели$/ })
+    .click();
+  await expect(a.locator(".duel-add")).toHaveText("Поканата е изпратена.");
+  // Ana asks for a rematch: Bo sees it, asks too, and they're face to face again.
+  await a.getByRole("button", { name: "Реванш" }).click();
+  await expect(a.getByRole("heading", { name: "Реванш" })).toBeVisible();
+  await expect(b.locator(".rematch-asks")).toHaveText(/иска реванш\.$/);
+  await b.getByRole("button", { name: "Реванш" }).click();
+  for (const p of [a, b]) await expect(p.getByRole("heading", { name: "Съперникът е тук" })).toBeVisible();
   await a.goto("/duel");
   await expect(a.locator(".duel-row").first()).toContainText(/Победа|Загуба|Равенство/);
   // Opened again from the duels, it's the same result, standing still (the moment was once), with no live duel's

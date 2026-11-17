@@ -20,6 +20,7 @@ import { feelKit, liveAudio, loadFeel, play, playAnswer, playCount, soundOn } fr
 import { withName } from "./lib/words.ts";
 import type { DuelView } from "./screens/duel.ts";
 import { clock, coming, dayWord, when } from "./screens/modes.ts";
+import type { Steps } from "./screens/outcome.ts";
 import { mixes } from "./screens/rooms.ts";
 import { categories, hostCss, outcomeCss, player, playing, topics, user } from "./state.ts";
 import {
@@ -147,7 +148,7 @@ function stylesheet(href: string): Promise<void> {
 
 /** A duel's result as it stands or ended (screens/outcome.ts), drawn once it has loaded: `again` is the gold button
  * where there's another duel to play (else a friend's has a rematch), `more` what the game earned. */
-export function duelResult(d: DuelView, again: Child = null, more: Child = null): Child {
+export function duelResult(d: DuelView, again: Child | Steps = null, more: Child = null): Child {
   const screen = signal<Outcome | null>(null);
   const failed = signal(false);
   loadDuelResult().then(screen.set, () => failed.set(true));

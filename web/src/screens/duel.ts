@@ -8,7 +8,8 @@ import { getReady, playRun } from "../game/run.ts";
 import type { State } from "../game/types.ts";
 import { duelResult, loadDuelResult } from "../kit.ts";
 import { type ApiError, api } from "../lib/api.ts";
-import { type Child, h, signal, slot } from "../lib/dom.ts";
+import { type Child, effect, h, signal, slot } from "../lib/dom.ts";
+import { ordinal } from "../lib/ordinal.ts";
 import { go, title } from "../lib/router.ts";
 import { withName } from "../lib/words.ts";
 import { checkWaiting, player, user } from "../state.ts";
@@ -23,6 +24,7 @@ import {
   until,
   who,
 } from "../ui.ts";
+import { signIn } from "./settings.ts";
 
 /** How one question of a duel went for one side: its points, right or partly (some points, not right), how long it
  * took, and whether nothing was given. */
@@ -67,6 +69,11 @@ export interface DuelView {
   decided?: number;
   rating?: { before: number; after: number; division: Division; next?: Division };
   record?: { won: number; lost: number; drawn: number };
+  /** A live duel one of the two left under way (it went on without them): how many questions they had played. */
+  youLeft?: number;
+  theyLeft?: number;
+  /** The other, met in a live duel, may be asked to be friends (not a friend, nor asked). */
+  befriend?: boolean;
 }
 
 interface Friend {
@@ -264,12 +271,100 @@ export function playedLine(p?: FriendPlayed | null): Child {
   );
 }
 
+/** A friend's yes to the player's invite, as Начало hears of it (play.AcceptedOf). */
+export interface Accepted {
+  id: number;
+  name: string;
+  line: string;
+}
+
+/** A live duel the player left under way, and what came of it (play.LeftOf). */
+export interface Left {
+  id: number;
+  them: string;
+  after: number;
+  state: "won" | "lost" | "draw";
+  delta?: number;
+  line: string;
+}
+
+/** Lines told on this page already: Начало drawn again (after a game) doesn't say them twice. */
+const toldHere = new Set<string>();
+
+/** Tells a line once, wherever the player is signed in (the server keeps it as told): whether it's news here. */
+function toldOnce(line: string): boolean {
+  if (toldHere.has(line)) return false;
+  toldHere.add(line);
+  api("POST", "/api/told", { line }).catch(() => {});
+  return true;
+}
+
+/** A friend said yes to the player's invite: said once, above the day, a tap from a duel with them. */
+export function acceptedLine(a?: Accepted | null): Child {
+  if (!a || !toldOnce(a.line)) return null;
+  return h(
+    "p",
+    { class: "streak-notice", role: "status" },
+    `${a.name} прие поканата ти.`,
+    h("a", { href: `/duel/friend/${a.id}` }, "Дуел"),
+  );
+}
+
+/** After which question one left, in words: „след 4-тия въпрос“, or „още на първия въпрос“. */
+const leftAfter = (n: number) => (n > 0 ? `след ${ordinal(n)}я въпрос` : "още на първия въпрос");
+
+/** A live duel the player left went on without them: what came of it, said once, a tap from the result. */
+export function leftLine(l?: Left | null): Child {
+  if (!l || !toldOnce(l.line)) return null;
+  const rating = l.delta ? `, рейтинг ${l.delta > 0 ? "+" : "−"}${Math.abs(l.delta)}` : "";
+  return h(
+    "p",
+    { class: "streak-notice", role: "status" },
+    `Дуелът с ${l.them} продължи без теб (излезе ${leftAfter(l.after)}): ${words[l.state]}${rating}.`,
+    h("a", { href: `/duel/${l.id}` }, "Виж"),
+  );
+}
+
+/** The duel isn't this player's, as far as the server can tell: signed out (another phone, another browser), or in a
+ * profile kept with an email they haven't signed in with here. Signing in opens it. */
+function notHere(signedIn: () => void): Child {
+  const u = user.peek();
+  if (u?.email)
+    return h(
+      "section",
+      { class: "screen" },
+      h(
+        "div",
+        { class: "intro" },
+        h("p", { class: "kicker" }, "Дуел"),
+        h("h1", null, "Този дуел не е тук"),
+        h("p", { class: "lead" }, "Или е на друг профил, или вече го няма."),
+      ),
+      h("a", { class: "btn primary big", href: "/duel" }, "Към дуелите"),
+    );
+  effect(() => {
+    if (user()?.email) signedIn();
+  });
+  return h(
+    "section",
+    { class: "screen" },
+    h(
+      "div",
+      { class: "intro" },
+      h("p", { class: "kicker" }, "Дуел"),
+      h("h1", null, "Дуелът те чака в профила ти"),
+      h("p", { class: "lead" }, "Влез с имейла на профила си и го изиграй тук."),
+    ),
+    h("section", { class: "card" }, signIn()),
+  );
+}
+
 /** One duel: played now if it's the player's turn, else how it stands or ended. */
 export function duelOne(params: string[]) {
   title("Дуел");
   const id = Number(params[0]);
   const screen = slot(() => h("p", { class: "muted" }, "…"));
-  (async () => {
+  const load = async () => {
     try {
       const d = await oneDuel(id);
       const play = async () => {
@@ -300,9 +395,12 @@ export function duelOne(params: string[]) {
       told(d.id); // and Начало needn't say that the friend played it
       screen.show(() => duelResult(d));
     } catch (err) {
+      const code = (err as ApiError).code;
+      if (code === "signed_out" || code === "no_duel") return screen.show(() => notHere(() => void load()));
       screen.show(() => h("p", { role: "alert" }, (err as ApiError).message));
     }
-  })();
+  };
+  load();
   return h("div", null, screen);
 }
 
