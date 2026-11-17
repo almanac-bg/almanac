@@ -1,7 +1,9 @@
 // Your name before you share: a player who never chose one shares as the name drawn for them („Мечка 164 иска да
 // сте приятели“, the link's preview „Мечка 164 в АЛМАНАХ“), which nobody they send it to knows. So the first share or
 // invite by such a player asks once, in a sheet over the page: one field, the drawn name in it to keep or change,
-// „Сподели“ gold (the name saved, then the share), „Не сега“ quiet. Asked once on a device, whatever the answer.
+// „Сподели“ gold (the name saved, then the share), „Не сега“ quiet (the share as it is, with the drawn name: the
+// player tapped to share, and the name can wait). Asked once on a device, whatever the answer; Esc or a tap beside the
+// sheet is no answer: neither the share nor the question goes, and the next share asks.
 
 import { type ApiError, api } from "../lib/api.ts";
 import { h } from "../lib/dom.ts";
@@ -51,7 +53,7 @@ export function normalName(s: string): string {
 }
 
 /** Before a share by a player still with the name drawn for them, not asked yet on this device: the sheet, and true
- * (`share` goes from its gold button, once the name is saved). Otherwise false: share at once. */
+ * (`share` goes from its gold button, once the name is saved, or from „Не сега“). Otherwise false: share at once. */
 export function askName(share: () => void): boolean {
   const u = user.peek();
   if (!u?.drawn || asked(u.id)) return false;
@@ -103,7 +105,19 @@ function sheet(u: User, share: () => void): void {
       h("label", { class: "field" }, h("span", null, "Име"), input),
       error,
       go,
-      h("button", { class: "link tap sheet-skip", type: "button", onclick: () => box.close() }, "Не сега"),
+      h(
+        "button",
+        {
+          class: "link tap sheet-skip",
+          type: "button",
+          onclick: () => {
+            markAsked(u.id);
+            box.close();
+            share();
+          },
+        },
+        "Не сега",
+      ),
     ),
   );
   const say = (text: string) => {

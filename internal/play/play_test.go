@@ -358,6 +358,112 @@ func TestQuestionTime(t *testing.T) {
 	}
 }
 
+// An answer sent again, its reply lost on the way, gets what it got the first time and changes nothing: the screen
+// shows its verdict, never skips it. A question whose time ran out meanwhile gives that; only the last answered does.
+func TestAnswerAgain(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	u := w.user()
+	s, _ := w.g.StartDay(ctx, u)
+	answer := func(n int, a json.RawMessage) (Result, error) {
+		if _, err := w.g.Show(ctx, u, s.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.g.Start(ctx, u, s.ID, n); err != nil {
+			t.Fatal(err)
+		}
+		w.wait(3 * time.Second)
+		return w.g.Answer(ctx, u, s.ID, n, a)
+	}
+	plain := func(r Result) string {
+		r.Reveal = nil
+		out, _ := json.Marshal(r)
+		return string(out)
+	}
+	// Two right in a row: the second's points are made up of its speed and the row, and so are they again.
+	if _, err := answer(0, w.right(s.ID, 0)); err != nil {
+		t.Fatal(err)
+	}
+	first, err := answer(1, w.right(s.ID, 1))
+	if err != nil || !first.Right || first.InRow != 2 || first.Row == 0 {
+		t.Fatalf("the first time: %+v %v", first, err)
+	}
+	w.wait(5 * time.Second)
+	again, err := w.g.Answer(ctx, u, s.ID, 1, w.wrong(s.ID, 1)) // what's sent again changes nothing either
+	if err != nil || again.Reveal == nil || plain(again) != plain(first) {
+		t.Fatalf("sent again:\n%s\n%s\n%v", plain(again), plain(first), err)
+	}
+	st, _ := w.g.State(ctx, u, s.ID)
+	if st.At != 2 || st.Points != first.State.Points || len(st.Trail) != 2 {
+		t.Fatalf("the run after an answer sent again: %+v", st)
+	}
+	// Only the last answered: one before it is out of step, as is one not shown yet.
+	if _, err := w.g.Answer(ctx, u, s.ID, 0, w.right(s.ID, 0)); !errors.Is(err, ErrOutOfStep) {
+		t.Fatalf("an older answer sent again: %v", err)
+	}
+	// The next question shown meanwhile (another tab): the answer before it still gets its own, and the run's
+	// question showing is in its state.
+	if _, err := w.g.Show(ctx, u, s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if again, err := w.g.Answer(ctx, u, s.ID, 1, w.right(s.ID, 1)); err != nil || again.Points != first.Points ||
+		again.State.Question == nil || again.State.Question.N != 2 {
+		t.Fatalf("sent again with the next question showing: %+v %v", again, err)
+	}
+	// A question whose time ran out: sent after it did, the answer is that.
+	w.wait(time.Minute)
+	if _, err := w.g.State(ctx, u, s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if late, err := w.g.Answer(ctx, u, s.ID, 2, w.right(s.ID, 2)); err != nil || !late.TimedOut || late.Points != 0 ||
+		late.Right {
+		t.Fatalf("an answer after its time ran out: %+v %v", late, err)
+	}
+	// The last answer of the run, sent again: the run as it ended, ended once.
+	var last Result
+	for n := 3; n < Length; n++ {
+		if last, err = answer(n, w.right(s.ID, n)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	xp := func() (xp int) {
+		_ = w.db.Read.QueryRow(`SELECT xp FROM runs WHERE id = ?`, s.ID).Scan(&xp)
+		return xp
+	}
+	before := xp()
+	again, err = w.g.Answer(ctx, u, s.ID, Length-1, w.right(s.ID, Length-1))
+	if err != nil || !again.State.Done || plain(again) != plain(last) || xp() != before {
+		t.Fatalf("the last answer sent again: %+v %v (XP %d, was %d)", again, err, xp(), before)
+	}
+}
+
+// A challenge taken and left half-way is the taker's duel to go on with: there (a reload, its link again), and among
+// their duels.
+func TestChallengeHalfPlayed(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo := w.user(), w.user()
+	s, _ := w.g.StartTopic(ctx, ana, "")
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	code, err := w.g.Challenge(ctx, ana, s.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bs, duel, err := w.g.TakeChallenge(ctx, bo, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(bo, bs.ID, w.right, w.wrong)
+	d, err := w.g.DuelOf(ctx, bo, duel)
+	if err != nil || d.State != "play" || d.RunID != bs.ID || d.Kind != "challenge" {
+		t.Fatalf("the duel half-played: %+v %v", d, err)
+	}
+	all, err := w.g.DuelsOf(ctx, bo)
+	if err != nil || !slices.ContainsFunc(all, func(v DuelView) bool { return v.ID == duel }) {
+		t.Fatalf("among Bo's duels: %+v %v", all, err)
+	}
+}
+
 // A question with a picture waits for it: its time starts once the player's screen has it in, or PictureWait after
 // it's shown at the latest. A live duel's starts at once (the match keeps the time).
 func TestPictureTime(t *testing.T) {

@@ -458,7 +458,9 @@ func (r *run) startAt(tx *sql.Tx, t time.Time) error {
 	return nil
 }
 
-// Answer grades an answer to question n, the one showing. A null answer gives up on it.
+// Answer grades an answer to question n, the one showing. A null answer gives up on it. An answer to the question just
+// answered is one sent again, its reply lost on the way (a line that dropped, a server restarting): it gets the answer
+// taken the first time, as it was, and changes nothing (again).
 func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage) (Result, error) {
 	return g.answer(ctx, userID, runID, n, answer, g.Now(), false)
 }
@@ -479,6 +481,10 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var err error
 		if r, err = load(tx, userID, runID); err != nil {
+			return err
+		}
+		if n == r.at-1 && !royal && r.kind != "royal" {
+			res, d, err = g.again(tx, r, n)
 			return err
 		}
 		if r.finished || n != r.at || (r.kind == "royal") != royal {
@@ -536,6 +542,54 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 		err = g.finished(ctx, userID, runID)
 	}
 	return res, err
+}
+
+// again is an answer to question n, the run's last answered, sent again: its reply was lost on the way, so the screen
+// never showed it. What it gets is what the answer taken the first time got (its points, its verdict, the answer and
+// its fact), and the run as it stands; nothing changes. A question that ran out of time, or was given up on, gives
+// that: no answer, and timed out if its time ran out.
+func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
+	var res Result
+	d, ok := g.deal(r.picks[n])
+	if !ok {
+		return res, nil, ErrOutOfStep
+	}
+	var given, shown sql.NullString
+	var ms int64
+	err := tx.QueryRow(`SELECT given, shown, score, points, is_right, ms FROM answers WHERE run_id = ? AND n = ?`, r.id, n).
+		Scan(&given, &shown, &res.Score, &res.Points, &res.Right, &ms)
+	if errors.Is(err, sql.ErrNoRows) {
+		return res, nil, ErrOutOfStep
+	}
+	if err != nil {
+		return res, nil, err
+	}
+	took := time.Duration(ms) * time.Millisecond
+	if given.Valid {
+		res.Given = json.RawMessage(shown.String)
+		if gr, err := bank.GradeAt(d, json.RawMessage(given.String), took); err == nil {
+			res.Exact = gr.Exact
+		}
+	} else {
+		res.TimedOut = took >= Limit(d.Question())
+	}
+	inRow := 0
+	if res.Right {
+		if inRow, err = rightsInRow(tx, r.id); err != nil { // the run's last answer: the row it made
+			return res, nil, err
+		}
+		if inRow > 1 {
+			res.InRow = inRow
+		}
+	}
+	// How the points were made up, as far as they can be worked out again (the time kept is to the end of the
+	// question's time at most).
+	if w := WorthOf(d.Question(), res.Score, took, inRow); w.Points == res.Points {
+		res.Speed, res.Row = w.Speed, w.Row
+	}
+	res.Learned = r.kind == "mistakes" && res.Right && d.Question().Extra().Fact != ""
+	res.State, err = g.state(tx, r)
+	return res, d, err
 }
 
 // finished follows a run that has just ended, by an answer or by its clock (settle), once: a duel's run settles the

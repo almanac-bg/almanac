@@ -10,7 +10,7 @@
 // first day has the streak without the level, and no goals.
 
 import { picture } from "../art/picture.ts";
-import { dayGold, nextGame } from "../game/gold.ts";
+import { type DayGold, dayGold, nextGame } from "../game/gold.ts";
 import { news } from "../game/news.ts";
 import { boardRow, hands, shareButton, summary } from "../game/results.ts";
 import { getReady, playRun, shownHere, trail } from "../game/run.ts";
@@ -283,7 +283,7 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
                 },
               ],
               // Right under it, what to do next: one gold action (game/gold.ts), „Сподели“ plain when it isn't.
-              dayNext(t, run, just, fresh, next),
+              dayNext(t, run, just, fresh, next, now),
               // The goals still open, just played (else they're in their card); tomorrow (when the next ten come, the
               // streak, the reminder); where the day leaves the league, and what waits for a second chance; then the
               // friends' day, and what the game earned (a day whose result was never on screen: told now, once).
@@ -344,13 +344,15 @@ const sharedKey = "almanac.sharedDay";
 /** What to do next under the day's result: the one gold action (game/gold.ts) — „Сподели“ for a result worth sharing,
  * not shared yet today; else another game, to where a goal points (`next`); none while a broken streak is half won
  * back, whose card has it — and „Сподели“ plain when it isn't gold. The rule is weighed once, as the result is drawn,
- * so that the gold doesn't move under the player's thumb. */
+ * so that the gold doesn't move under the player's thumb; just played, once the day as it is now is in (`now`), as
+ * the right answer few others got is known only once the day is played (and if it doesn't come, on what's known). */
 function dayNext(
   t: Today,
   run: State,
   just: boolean,
   fresh: () => Today,
   next: () => string,
+  now: Promise<Today> | null,
 ): { main: Child; also?: Child[] } {
   let shared = false;
   try {
@@ -358,32 +360,42 @@ function dayNext(
   } catch {
     // no storage here: not shared, as far as this device knows
   }
-  const gold = dayGold({
-    rights: run.rights,
-    streak: just ? t.streak + 1 : t.streak,
-    rare: !!t.rarest && t.rarest.right <= rare,
-    shared,
-    repairing: !!t.repair && !t.repair.other,
-  });
-  const share = shareButton(
-    "Сподели",
-    () => dayShareText(t.day, t.issue, run.trail, run.total, fresh().streak, fresh().rarest, fresh().invite),
-    undefined,
-    gold === "share",
-    () => {
-      tally("share:day");
-      try {
-        localStorage.setItem(sharedKey, t.day);
-      } catch {
-        // not kept: gold again next time
-      }
-    },
-    true, // its link shows whose it is
+  const weigh = (d: Today) =>
+    dayGold({
+      rights: run.rights,
+      streak: just ? t.streak + 1 : t.streak,
+      rare: !!d.rarest && d.rarest.right <= rare,
+      shared,
+      repairing: !!t.repair && !t.repair.other,
+    });
+  const gold = signal<DayGold | null>(now ? null : weigh(t));
+  now?.then(
+    (d) => gold.set(weigh(d)),
+    () => gold.set(weigh(t)),
   );
-  if (gold === "share") return { main: share };
+  const share = (primary: boolean) =>
+    shareButton(
+      "Сподели",
+      () => dayShareText(t.day, t.issue, run.trail, run.total, fresh().streak, fresh().rarest, fresh().invite),
+      undefined,
+      primary,
+      () => {
+        tally("share:day");
+        try {
+          localStorage.setItem(sharedKey, t.day);
+        } catch {
+          // not kept: gold again next time
+        }
+      },
+      true, // its link shows whose it is
+    );
   return {
-    main: gold === "next" ? () => h("a", { class: "btn primary big", href: next() }, "Още десет") : null,
-    also: [share],
+    main: () => {
+      const g = gold();
+      if (g === "share") return share(true);
+      return g === "next" ? () => h("a", { class: "btn primary big", href: next() }, "Още десет") : null;
+    },
+    also: [() => (gold() && gold() !== "share" ? share(false) : null)],
   };
 }
 
@@ -394,7 +406,7 @@ function missesLine(m: Today["misses"]): Child {
   return h(
     "p",
     { class: "day-next" },
-    m.n === 1 ? `Един от днешните въпроси ще те чака ${when}.` : `${m.n} от днешните въпроса ще те чакат ${when}.`,
+    m.n === 1 ? `Един от днешните въпроси ще те чака ${when}.` : `${m.n} от днешните въпроси ще те чакат ${when}.`,
   );
 }
 

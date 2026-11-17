@@ -33,13 +33,17 @@ import { quietWhenSilent, setSound, soundOn } from "../lib/sound.ts";
 import { type User, user } from "../state.ts";
 import { back } from "../ui.ts";
 
-/** What became of the profile just now, said once where the player lands: signed out (here), deleted, or a game
- * brought from another browser (on Начало). */
+/** What became of the profile just now, said once where the player lands, on Начало: deleted, or a game brought from
+ * another browser. */
 export const notice = signal("");
+
+/** Signed out just now: said here, where it was done, and only here (Начало, next, doesn't say it again). */
+const signedOut = signal(false);
 
 export function settings() {
   title("Настройки");
   notice.set("");
+  signedOut.set(false);
   return h(
     "section",
     { class: "screen" },
@@ -72,8 +76,12 @@ export function settings() {
             "section",
             { class: "stack" },
             () =>
-              notice()
-                ? h("p", { class: "lead", role: "status" }, `${notice()} Влез пак с имейла си или започни да играеш.`)
+              signedOut()
+                ? h(
+                    "p",
+                    { class: "lead", role: "status" },
+                    "Излезе от профила. Влез пак с имейла си или започни да играеш.",
+                  )
                 : h("p", { class: "lead" }, "Още нямаш профил. Влез с имейл или започни да играеш."),
             signIn(),
           ),
@@ -459,7 +467,7 @@ async function signOut() {
   // This browser's notifications were the account's: they stop with it (while signed in, so the server forgets them).
   if (pushable()) await turnOff().catch(() => {});
   await api("POST", "/api/auth/signout", {}).catch(() => {});
-  notice.set("Излезе от профила.");
+  signedOut.set(true);
   user.set(null);
 }
 

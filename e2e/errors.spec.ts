@@ -63,3 +63,41 @@ test("a run offline: the clock runs on while the answer is sent, and the run kee
   await context.setOffline(false);
   await expect(page.locator("article.question h1.ask")).toBeVisible({ timeout: 10_000 });
 });
+
+test("an answer tried again offline, by hand and as the line comes back, goes once; its verdict shows", async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(90_000);
+  // The answers that reached the server, by their status.
+  const answers: number[] = [];
+  page.on("response", (r) => {
+    if (/\/api\/runs\/\d+\/answer$/.test(r.url())) answers.push(r.status());
+  });
+  await openGame(page, "/play/history");
+  const q = page.locator("article.question");
+  await expect(q.locator(".question-head")).toContainText("1 от 10");
+  // Offline: the answer, and „Опитай пак“ tapped twice while the line is still out.
+  await context.setOffline(true);
+  await answer(page);
+  const again = q.getByRole("button", { name: "Опитай пак" });
+  for (let i = 0; i < 2; i++) {
+    await expect(again).toBeVisible({ timeout: 10_000 });
+    await again.click();
+  }
+  await expect(again).toBeVisible({ timeout: 10_000 });
+  // The line back: the answer goes once, and its verdict shows, on its own question.
+  await context.setOffline(false);
+  await expect(page.locator(".verdict")).toBeVisible({ timeout: 10_000 });
+  await expect(q.locator(".question-head")).toContainText("1 от 10");
+  // The line drops and comes back once more: nothing goes again, nothing moves on early.
+  await context.setOffline(true);
+  await context.setOffline(false);
+  await page.waitForTimeout(1000);
+  await expect(page.locator(".verdict")).toBeVisible();
+  await expect(q.locator(".question-head")).toContainText("1 от 10");
+  expect(answers).toEqual([200]);
+  await moveOn(page);
+  await expect(page.locator(".question-head")).toContainText("2 от 10", { timeout: 10_000 });
+  expect(answers).toEqual([200]);
+});

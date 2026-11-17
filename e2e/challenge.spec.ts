@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { openGame, playRun } from "./play.ts";
+import { answer, moveOn, openGame, playRun } from "./play.ts";
 
 /** What the page shares, kept instead of the phone's sheet. */
 async function catchShares(page: Page): Promise<void> {
@@ -46,6 +46,8 @@ test("a challenge: one link, a stranger plays it as a guest, both see the two si
   await b.getByRole("button", { name: "Започни сега" }).click();
   await playRun(b);
   await expect(b.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 10_000 });
+  // The page, its address now the duel's, is still the first in the history (back from it leaves, as it should).
+  await expect.poll(() => b.evaluate(() => history.state?.i)).toBe(0);
   await expect(b.locator(".duel-head .kicker")).toHaveText(/^Предизвикателство от \S/);
   await expect(b.locator(".duel-face .duel-points")).toHaveCount(2);
   await expect(b.locator(".duel-meant .duel-rating")).toHaveCount(0); // no rating moves
@@ -79,4 +81,38 @@ test("a challenge: one link, a stranger plays it as a guest, both see the two si
   await a.reload();
   await expect(a.locator(".day")).toBeVisible();
   await expect(line).toHaveCount(0);
+});
+
+test("a challenge left half-way, its link opened again from outside, waits for „Продължи“", async ({ browser }) => {
+  test.setTimeout(150_000);
+  const a = await (await browser.newContext()).newPage();
+  await catchShares(a);
+  await openGame(a, "/play/history");
+  await playRun(a);
+  await a.getByRole("button", { name: "Предизвикай" }).click();
+  await a
+    .getByRole("dialog", { name: "Как да те познаят приятелите?" })
+    .getByRole("button", { name: "Не сега" })
+    .click();
+  await expect.poll(() => shared(a)).not.toBeNull();
+  const path = new URL((await shared(a))?.url ?? "").pathname;
+
+  // Bo plays its first question, and leaves it at the second.
+  const bo = await browser.newContext();
+  const b = await bo.newPage();
+  await b.goto(path);
+  await b.getByRole("button", { name: "Започни", exact: true }).click();
+  await b.getByRole("button", { name: "Започни сега" }).click();
+  await expect(b.locator(".question-head")).toContainText("1 от 10");
+  await answer(b);
+  await moveOn(b);
+  await expect(b.locator(".question-head")).toContainText("2 от 10", { timeout: 10_000 });
+  // The link again, in another tab: the duel it is now, waiting for a tap, its time not running in sight.
+  const again = await bo.newPage();
+  await again.goto(path);
+  await expect(again).toHaveURL(/\/duel\/\d+$/);
+  await expect(again.getByRole("button", { name: "Продължи" })).toBeVisible();
+  await expect(again.locator(".question-head")).toHaveCount(0);
+  await a.context().close();
+  await bo.close();
 });

@@ -80,11 +80,18 @@ function outside(stake: string, platform: string, keep: Child): Child {
           class: "btn",
           type: "button",
           onclick: () => {
-            const copy = ready()
-              ? navigator.clipboard.writeText(url.peek())
-              : navigator.clipboard.write([
-                  new ClipboardItem({ "text/plain": make().then((u) => new Blob([u], { type: "text/plain" })) }),
-                ]);
+            // Where there's no clipboard to write to (an older iPhone, some apps' browsers), the calls themselves
+            // throw: the link is shown all the same.
+            let copy: Promise<void>;
+            try {
+              copy = ready()
+                ? navigator.clipboard.writeText(url.peek())
+                : navigator.clipboard.write([
+                    new ClipboardItem({ "text/plain": make().then((u) => new Blob([u], { type: "text/plain" })) }),
+                  ]);
+            } catch (err) {
+              copy = Promise.reject(err);
+            }
             copy.then(
               () => said.set("Копирано. Отвори Safari и постави връзката горе, в адреса."),
               () => make().then((u) => said.set(u), fail), // no clipboard here: the link, to copy by hand

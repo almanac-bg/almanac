@@ -11,8 +11,8 @@ import { getReady, playRun } from "../game/run.ts";
 import type { State } from "../game/types.ts";
 import { duelResult, loadDuelResult } from "../kit.ts";
 import { type ApiError, api } from "../lib/api.ts";
-import { type Child, h, signal, slot } from "../lib/dom.ts";
-import { go, title } from "../lib/router.ts";
+import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
+import { go, redirect, rename, title } from "../lib/router.ts";
 import { player, topics } from "../state.ts";
 import { formatNumber, type Look, who } from "../ui.ts";
 import type { DuelView } from "./duel.ts";
@@ -44,13 +44,21 @@ const topicName = (id?: string) => (id ? topics.find((t) => t.id === id)?.name :
 export function challenge([code = ""]: string[]) {
   title("Предизвикателство");
   const screen = slot(() => h("p", { class: "muted" }, "…"));
+  // A reply come once the screen is gone does nothing: it would open a page over another, or rename its entry.
+  let left = false;
+  onCleanup(() => {
+    left = true;
+  });
+  const here = () => !left;
   api<Challenge>("GET", `/api/challenges/${code}`).then(
     (c) => {
-      // The viewer's own game of it (a taker's, or the friend's duel it was sent for): there, not here again.
-      if (c.duel) return go(`/duel/${c.duel}`, true);
+      if (left) return;
+      // The viewer's own game of it (a taker's, or the friend's duel it was sent for): there, not here again, as this
+      // page was come to (a game half-played, come to by a link from outside, waits there for „Продължи“).
+      if (c.duel) return redirect(`/duel/${c.duel}`);
       if (c.own) return screen.show(() => own(c));
       if (c.over) return screen.show(() => gone("Времето за това предизвикателство изтече"));
-      screen.show(() => asked(c, screen));
+      screen.show(() => asked(c, screen, here));
     },
     (err) =>
       screen.show(() =>
@@ -79,7 +87,7 @@ function gone(heading: string): Child {
 }
 
 /** Who challenges, and how they did: the same ten, a tap away. */
-function asked(c: Challenge, screen: ReturnType<typeof slot>): Child {
+function asked(c: Challenge, screen: ReturnType<typeof slot>, here: () => boolean): Child {
   const error = signal("");
   const topic = topicName(c.topic);
   const start = () =>
@@ -92,15 +100,18 @@ function asked(c: Challenge, screen: ReturnType<typeof slot>): Child {
             await player();
             loadDuelResult().catch(() => {}); // the result's screen, on its way while the player plays
             const r = await api<{ duel: number; state?: State }>("POST", `/api/challenges/${c.code}/play`, {});
+            if (!here()) return;
             if (!r.state) return go(`/duel/${r.duel}`, true);
-            history.replaceState(null, "", `/duel/${r.duel}`); // a reload comes back to this duel
+            // A reload comes back to this duel; the entry keeps its place in the history, and the page it came from.
+            rename(`/duel/${r.duel}`);
             screen.show(() => playRun(r.state as State, (end) => after(r.duel, end.id), c.by.name));
           } catch (err) {
+            if (!here()) return;
             error.set((err as ApiError).message);
-            screen.show(() => asked(c, screen));
+            screen.show(() => asked(c, screen, here));
           }
         },
-        () => screen.show(() => asked(c, screen)),
+        () => screen.show(() => asked(c, screen, here)),
       ),
     );
   return h(
