@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -123,6 +124,99 @@ func TestMigrationsWithTheSameNumber(t *testing.T) {
 	set["migrations/bad.sql"] = &fstest.MapFile{Data: []byte(`SELECT 1;`)}
 	if err := db.migrate(); err == nil {
 		t.Fatal("took a migration without a number")
+	}
+}
+
+// A burst of reads keeps its connections for the next one: none closed for want of room among the idle, none opened
+// anew (opening one reads the whole schema).
+func TestReadsKeepTheirConnections(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "game.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	readers := db.Read.Stats().MaxOpenConnections
+	burst := func() {
+		var held, done sync.WaitGroup
+		held.Add(readers)
+		done.Add(readers)
+		for range readers {
+			go func() {
+				defer done.Done()
+				rows, err := db.Read.Query(`SELECT name FROM sqlite_schema`)
+				held.Done()
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				held.Wait() // every connection taken at once
+				rows.Close()
+			}()
+		}
+		done.Wait()
+	}
+	burst()
+	opened := db.Read.Stats().OpenConnections
+	for range 3 {
+		burst()
+	}
+	if s := db.Read.Stats(); s.MaxIdleClosed != 0 || s.OpenConnections != opened || opened != readers {
+		t.Fatalf("after four bursts of %d reads: %d open (%d after the first), %d closed as idle", readers,
+			s.OpenConnections, opened, s.MaxIdleClosed)
+	}
+}
+
+// A database played on but never analysed has the tables' statistics once it's opened.
+func TestOpenAnalyses(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "game.db")
+	db := openAt(t, path, -1)
+	if _, err := db.Write.Exec(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 1000)
+		INSERT INTO users (name, tag, created_at, seen_at) SELECT 'И', 't' || i, 1, 1 FROM n`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var stat string
+	if err := db.Read.QueryRow(`SELECT stat FROM sqlite_stat1 WHERE tbl = 'users' AND idx = 'sqlite_autoindex_users_1'`).
+		Scan(&stat); err != nil || !strings.HasPrefix(stat, "1000 ") {
+		t.Fatalf("users' statistics: %q, %v", stat, err)
+	}
+}
+
+// Every column that points to another table's rows has an index that starts with it (one of only the rows where it's
+// set will do): deleting a row there, or a guest's merge, looks for what points to it, and without one reads the
+// whole table, in the one write transaction.
+func TestForeignKeysIndexed(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "game.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	rows, err := db.Read.Query(`
+		WITH fk AS (SELECT m.name t, f."from" c FROM sqlite_schema m, pragma_foreign_key_list(m.name) f
+				WHERE m.type = 'table'),
+			lead AS (SELECT m.name t, i.name c FROM sqlite_schema m, pragma_index_list(m.name) l, pragma_index_info(l.name) i
+				LEFT JOIN sqlite_schema s ON s.name = l.name
+				WHERE m.type = 'table' AND i.seqno = 0 AND (NOT l.partial OR s.sql LIKE '% WHERE ' || i.name || ' IS NOT NULL')
+			UNION ALL SELECT m.name, p.name FROM sqlite_schema m, pragma_table_info(m.name) p WHERE m.type = 'table' AND p.pk = 1)
+		SELECT DISTINCT fk.t || '.' || fk.c FROM fk WHERE NOT EXISTS (SELECT 1 FROM lead WHERE lead.t = fk.t AND lead.c = fk.c)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var col string
+		if err := rows.Scan(&col); err != nil {
+			t.Fatal(err)
+		}
+		t.Errorf("%s points to another table's rows and no index starts with it", col)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
 	}
 }
 

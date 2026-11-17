@@ -123,3 +123,23 @@ func TestMisses(t *testing.T) {
 		t.Fatalf("after a topic: the day's %d, the topic's %d, %d in all", missed, topic, all)
 	}
 }
+
+// A question missed in two games waits once, and one put right in another game waits no more, in either.
+func TestMissesAcrossGames(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	s, _ := w.g.StartDay(ctx, ana)
+	w.play(ana, s.ID, w.right, w.right, w.right, w.wrong, w.wrong, w.wrong, w.wrong, w.wrong, w.wrong, w.wrong)
+	w.wait(MistakesAfter)
+	m, err := w.g.StartMistakes(ctx, ana)
+	if err != nil || m.Total != 7 {
+		t.Fatalf("the second chance: %+v, %v", m, err)
+	}
+	w.play(ana, m.ID, w.right, w.wrong, w.wrong, w.wrong, w.wrong, w.wrong, w.wrong)
+	for _, id := range []int64{s.ID, m.ID} {
+		if missed, all, err := w.g.Misses(ctx, ana, id); err != nil || missed != 6 || all != 6 {
+			t.Fatalf("run %d: %d of %d, %v; want 6 of 6", id, missed, all, err)
+		}
+	}
+}

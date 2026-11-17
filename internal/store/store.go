@@ -2,7 +2,13 @@
 // keeps a copy from before, KeepCopy), and the few helpers every query uses.
 //
 // SQLite takes one writer at a time, so writes go through a single connection (Write) and never wait on each other's
-// locks; reads go through a pool (Read) and run alongside, thanks to the write-ahead log.
+// locks; reads go through a pool (Read) and run alongside, thanks to the write-ahead log. The pool keeps its
+// connections open between requests: opening one sets it up and reads the whole schema, which under load would cost
+// more than the reads themselves.
+//
+// The query planner chooses by the tables' statistics (ANALYZE): Open brings them up to date, and so does every hour
+// after (PRAGMA optimize, which looks again only at tables that have grown or shrunk a lot). A read connection reads
+// them when it opens, so the pool's are renewed hourly too.
 package store
 
 import (
@@ -12,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"net/url"
 	"regexp"
 	"runtime"
@@ -32,7 +39,12 @@ var migrations fs.FS = embedded
 type DB struct {
 	Write *sql.DB
 	Read  *sql.DB
+	stop  context.CancelFunc // ends keepOptimized
 }
+
+// optimizeEvery is how often the statistics are looked at again, and how long a read connection is kept (so that it
+// plans by them).
+const optimizeEvery = time.Hour
 
 // Open opens (or creates) the database at path and brings its schema up to date. It refuses a database newer than
 // this program (one a later version has migrated): running old code on it could lose data.
@@ -63,17 +75,53 @@ func Open(path string) (*DB, error) {
 		w.Close()
 		return nil, err
 	}
-	// More readers than cores: a long read (a big day's board being counted) mustn't keep the quick ones waiting.
-	r.SetMaxOpenConns(max(8, 4*runtime.NumCPU()))
+	// More readers than cores: a long read (a big day's board being counted) mustn't keep the quick ones waiting. All
+	// of them are kept open while in use (database/sql would keep two, and open the rest anew for each burst); a
+	// few minutes idle closes one, and with it what its cache holds.
+	readers := max(8, 4*runtime.NumCPU())
+	r.SetMaxOpenConns(readers)
+	r.SetMaxIdleConns(readers)
+	r.SetConnMaxIdleTime(5 * time.Minute)
+	r.SetConnMaxLifetime(optimizeEvery)
 	db := &DB{Write: w, Read: r}
 	if err := db.migrate(); err != nil {
 		db.Close()
 		return nil, err
 	}
+	// Every table looked at (0x10000) and analysed if it needs it (0x2), in a bounded time (0x10: a big table's
+	// indexes are sampled): milliseconds, where analysing all of a big database would hold the writer for seconds.
+	if _, err := w.Exec("PRAGMA optimize=0x10012"); err != nil {
+		db.Close()
+		return nil, err
+	}
+	ctx, stop := context.WithCancel(context.Background())
+	db.stop = stop
+	go db.keepOptimized(ctx)
 	return db, nil
 }
 
-func (db *DB) Close() error { return errors.Join(db.Read.Close(), db.Write.Close()) }
+// keepOptimized brings the statistics up to date every optimizeEvery, until Close.
+func (db *DB) keepOptimized(ctx context.Context) {
+	t := time.NewTicker(optimizeEvery)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if _, err := db.Write.ExecContext(ctx, "PRAGMA optimize"); err != nil && ctx.Err() == nil {
+				slog.Warn("updating the statistics", "err", err)
+			}
+		}
+	}
+}
+
+func (db *DB) Close() error {
+	if db.stop != nil {
+		db.stop()
+	}
+	return errors.Join(db.Read.Close(), db.Write.Close())
+}
 
 // migrate applies every migration in migrations/ the database hasn't had yet, in the order of their names
 // (NNNN_what.sql), each in a transaction, and keeps their names in schema_migrations. Names, not a count: two
