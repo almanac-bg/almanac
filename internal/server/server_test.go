@@ -362,6 +362,13 @@ func TestPlayingOverHTTP(t *testing.T) {
 		t.Fatalf("start: %d %v", status, run)
 	}
 	id := strconv.Itoa(int(run["id"].(float64)))
+	// A topic left with its question showing, to come back to (the day is no such game: Начало has it).
+	_, topic := p.call("POST", "/api/topic", map[string]any{"category": "history"})
+	p.call("POST", "/api/runs/"+strconv.Itoa(int(topic["id"].(float64)))+"/show", map[string]any{})
+	if status, out := p.call("GET", "/api/runs/left", nil); status != 200 || len(out["runs"].([]any)) != 1 ||
+		out["runs"].([]any)[0].(map[string]any)["category"] != "history" || out["runs"].([]any)[0].(map[string]any)["open"] != true {
+		t.Fatalf("left: %d %v", status, out)
+	}
 	for n := range 10 {
 		_, st := p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
 		q := st["question"].(map[string]any)
@@ -741,6 +748,16 @@ func TestALiveDuelOverHTTP(t *testing.T) {
 	stranger.call("POST", "/api/guest", map[string]any{})
 	if status, _ := stranger.call("POST", path, map[string]any{"n": 0, "answer": answer}); status != 404 {
 		t.Fatalf("a stranger answered: %d", status)
+	}
+	// The duel under way: Начало, and any screen that asks, has the way back to it.
+	if _, p := ana.call("GET", "/api/playing", nil); p["playing"].(map[string]any)["kind"] != "duel" {
+		t.Fatalf("playing: %v", p)
+	}
+	if _, today := bo.call("GET", "/api/day", nil); today["playing"].(map[string]any)["kind"] != "duel" {
+		t.Fatalf("today's playing: %v", today["playing"])
+	}
+	if _, p := stranger.call("GET", "/api/playing", nil); p["playing"] != nil {
+		t.Fatalf("a stranger playing: %v", p)
 	}
 	bo.call("POST", path, map[string]any{"n": 0, "answer": answer})
 	v = as.until(func(v map[string]any) bool { return v["phase"] == "reveal" })

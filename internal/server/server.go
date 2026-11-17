@@ -210,6 +210,8 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/topic", s.startTopic)
 	api("GET /api/mistakes", s.mistakes)
 	api("POST /api/mistakes", s.startMistakes)
+	api("GET /api/runs/left", s.left)
+	api("GET /api/playing", s.playingNow)
 	api("GET /api/runs/{id}", s.runState)
 	api("POST /api/runs/{id}/show", s.show)
 	api("POST /api/runs/{id}/start", s.start)

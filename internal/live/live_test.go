@@ -156,6 +156,9 @@ func TestTwoPlayLive(t *testing.T) {
 		if again := w.hub.Seek(ana); again.Match != m { // a line that came back: the same duel
 			t.Fatal("a second look found another duel")
 		}
+		if !w.hub.Playing(ana.ID) || !w.hub.Playing(bo.ID) {
+			t.Fatal("the duel isn't under way for its players")
+		}
 		fa, _ := m.Follow(ana.ID)
 		fb, _ := m.Follow(bo.ID)
 		defer m.Unfollow(fa)
@@ -228,6 +231,9 @@ func TestTwoPlayLive(t *testing.T) {
 		d, _ := w.g.DuelsOf(t.Context(), ana.ID)
 		if len(d) != 1 || d[0].State != "won" || d[0].Delta <= 0 {
 			t.Fatalf("Ana's duels: %+v", d)
+		}
+		if w.hub.Playing(ana.ID) {
+			t.Fatal("a duel over is still under way")
 		}
 		// Over: each may look for another.
 		if s := w.hub.Seek(ana); s.Match == m {

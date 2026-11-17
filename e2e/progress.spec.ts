@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { earnedUntold, playedBefore, playRun } from "./play.ts";
+import { earnedUntold, openGame, playedBefore, playRun } from "./play.ts";
 
 test("progress: a game's level, the achievements, and a look of one's own", async ({ page }) => {
   test.setTimeout(120_000);
@@ -9,7 +9,7 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   // An achievement („Точно в целта“: a number to the unit) earned and not told yet: its avatar comes with this news.
   // (The first level's title isn't news: everyone has it from the start.)
   await earnedUntold(page, "exact");
-  await page.goto("/play/history");
+  await openGame(page, "/play/history");
   await playRun(page);
   // What the game brought is a line (a level card only for a new level), and „Ново за теб“ tells the rest: how the
   // topic is known now, and everything the game unlocked, each a tap from being worn.

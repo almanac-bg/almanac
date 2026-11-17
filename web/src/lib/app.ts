@@ -24,10 +24,10 @@ export const phone = () => {
 
 /** Starts what the app adds to the game (notifications and links that open a page, the back button). A notification
  * tapped is counted by its kind. */
-export function startApp(go: (path: string) => void): void {
+export function startApp(nav: import("./phone.ts").Nav): void {
   if (inApp)
     phone().then(
-      (p) => p.start(go, (kind) => tally(`push:open:${kind}`)),
+      (p) => p.start(nav, (kind) => tally(`push:open:${kind}`)),
       () => {},
     );
 }

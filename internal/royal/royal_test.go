@@ -218,6 +218,9 @@ func TestEvening(t *testing.T) {
 	if _, m := w.h.mine(zed.ID); m != nil {
 		t.Fatal("Zed is in the game without being there")
 	}
+	if !w.h.Playing(ana.ID) || !w.h.Playing(zed.ID) {
+		t.Fatal("the game isn't under way for Ana, or for Zed, who may still come in")
+	}
 	// Zed may watch, and could still come in (TestLate).
 	if v := w.h.View(zed.ID); v.Phase != play.RoyalQuestion || v.In || !v.Late || v.Question == nil {
 		t.Fatalf("watching: %+v", v)

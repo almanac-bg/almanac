@@ -616,9 +616,15 @@ export function badge(a: AchievementInfo, earned: boolean, size: "s" | "m" | "l"
   });
 }
 
-/** The way back to where a screen is reached from (a way to play, from Начало; Настройки, from Профил). */
+/** The way back to where a screen is reached from (a way to play, from Начало; Настройки, from Профил): back in the
+ * history when that's the page before, else that page in place of this one (router.ts, leave), never a new entry. */
 export function back(href: string, label: string): Child {
-  return h("a", { class: "back", href }, h("span", { class: "i i-left back-i", "aria-hidden": "true" }), label);
+  return h(
+    "a",
+    { class: "back", href, "data-back": "" },
+    h("span", { class: "i i-left back-i", "aria-hidden": "true" }),
+    label,
+  );
 }
 
 /** Профил's own places: the player at a glance, their rewards, their wardrobe, and their almanac. */

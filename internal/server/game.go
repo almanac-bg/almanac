@@ -12,8 +12,8 @@ import (
 )
 
 // today is the day screen's state: the day and its issue (play.Issue), the viewer's streak, level and run (if any),
-// whether they've finished a game yet and which of the game's systems they've met, how many have played the day (and
-// how well on average), and their friends' day.
+// a live game they're in (playing), whether they've finished a game yet and which of the game's systems they've met,
+// how many have played the day (and how well on average), and their friends' day.
 func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
 	if err != nil {
@@ -69,6 +69,10 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 		// Whether Роял is among the ways to play with others: not for a new player while its evenings are thin.
 		if out["royal"], err = s.game.NudgeRoyal(r.Context(), u.ID); err != nil {
 			return err
+		}
+		// A live game they're in, under way: Начало has the way back to it.
+		if p := s.playing(u.ID); p != nil {
+			out["playing"] = p
 		}
 		// A friend has played the duel they started: told on Начало, once (by the client), above the day.
 		if out["duel"], err = s.game.FriendPlayedOf(r.Context(), u.ID); err != nil {
@@ -231,6 +235,54 @@ func (s *Server) runOf(r *http.Request) (int64, int64, error) {
 		return 0, 0, errNotFound
 	}
 	return u.ID, id, nil
+}
+
+// left are the player's games of their own left unfinished today (play.Left): a topic's tile says where each stopped,
+// and its screen goes on with it.
+func (s *Server) left(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	runs, err := s.game.Left(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"runs": runs})
+}
+
+// Playing is a live game the player is in, under way now, which their screen may have left: a live duel, a room's
+// game (by its code) or tonight's Роял. Only one is said, in that order: a player is rarely in two.
+type Playing struct {
+	Kind string `json:"kind"` // "duel", "room" or "royal"
+	Code string `json:"code,omitempty"`
+}
+
+// playing is the live game a player is in now, if any.
+func (s *Server) playing(id int64) *Playing {
+	switch {
+	case s.live.Playing(id):
+		return &Playing{Kind: "duel"}
+	case s.rooms.Playing(id) != "":
+		return &Playing{Kind: "room", Code: s.rooms.Playing(id)}
+	case s.royal.Playing(id):
+		return &Playing{Kind: "royal"}
+	}
+	return nil
+}
+
+// playingNow says which live game the player is in now (null: none), for a screen deciding whether to go straight
+// back into it.
+func (s *Server) playingNow(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.user(r)
+	if err != nil {
+		return err
+	}
+	var p *Playing
+	if u != nil {
+		p = s.playing(u.ID)
+	}
+	return ok(w, map[string]any{"playing": p})
 }
 
 func (s *Server) runState(w http.ResponseWriter, r *http.Request) error {

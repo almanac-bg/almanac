@@ -7,7 +7,8 @@ import { board, boardRow } from "../game/results.ts";
 import type { Board, Score } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, type Signal, signal } from "../lib/dom.ts";
-import { title } from "../lib/router.ts";
+import { type By, boardHash, readBoard } from "../lib/hash.ts";
+import { rename, title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
 import { type Open, type Standing, segmented, type Tier, toneOf, topicMark } from "../ui.ts";
 import { type LeagueView, leagueBoard, loadLeague } from "./league.ts";
@@ -45,8 +46,6 @@ interface Day {
   open?: Open;
 }
 
-type By = "day" | "league" | "rating" | "knowledge";
-
 const tabs: [By, string][] = [
   ["day", "Днес"],
   ["league", "Лига"],
@@ -60,10 +59,15 @@ const shows = (by: By, open?: Open) => (by === "league" ? !!open?.league : by ==
 
 export function ranks() {
   title("Класации");
-  const by = signal<By>(location.hash === "#league" ? "league" : "day");
-  // `#friends`: the day's board among friends (from Начало's „Всички“).
-  const friends = signal(location.hash === "#friends");
-  const topic = signal("");
+  // Which board, among whom and of which topic, in the address (lib/hash.ts): back to the page, a reload or a link
+  // opens the same one („#league“; „#friends“, the day's among friends, from Начало's „Всички“).
+  const at = readBoard(
+    location.hash,
+    categories.map((c) => c.id),
+  );
+  const by = signal<By>(at.by);
+  const friends = signal(at.friends);
+  const topic = signal(at.topic);
   const data = signal<Answer | null>(null);
   const day = signal<Day | null>(null);
   const league = signal<LeagueView | null>(null);
@@ -104,6 +108,7 @@ export function ranks() {
   const pick = <T>(s: Signal<T>, v: T) => {
     if (s() === v) return;
     s.set(v);
+    rename(location.pathname + boardHash({ by: by.peek(), friends: friends.peek(), topic: topic.peek() }));
     load();
   };
   return h(

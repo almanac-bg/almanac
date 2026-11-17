@@ -212,6 +212,22 @@ func (h *Hub) UnderWay() int {
 	return n
 }
 
+// Playing is the code of a room whose game a player is in now ("" for none): one whose screen went may come back to
+// it by the code.
+func (h *Hub) Playing(id int64) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for code, r := range h.rooms {
+		r.mu.Lock()
+		in := (r.phase == Question || r.phase == Reveal) && r.member(id) != nil
+		r.mu.Unlock()
+		if in {
+			return code
+		}
+	}
+	return ""
+}
+
 // saved is a room as Save keeps it.
 type saved struct {
 	Code string `json:"code"`

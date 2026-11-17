@@ -1,11 +1,17 @@
 // Playing a run: a question, its answer, and on by itself to the next, to the end. The server keeps the clock and
 // the score; this shows them. What's behind each answer („Знаеше ли?“) and a word about a question wait for the
 // end, so that the game flows.
+//
+// A run is a game under way from its count to its end: it has an entry of its own in the tab's history if its page has
+// none behind it in the app (router.ts, hold), so that back comes to the question's guard; at its end the entry goes
+// and the page keeps its result (a reload or a back to it shows the result again, not a new count). A question's time
+// runs on the server: come back to it on the device that showed it (a reload), the run goes straight back in; on
+// another device (or tab), the screen waits for „Продължи“.
 
 import { type ApiError, api } from "../lib/api.ts";
-import { append, type Child, effect, h, listen, onCleanup, type Signal, signal, slot } from "../lib/dom.ts";
+import { append, type Child, computed, effect, h, listen, onCleanup, type Signal, signal, slot } from "../lib/dom.ts";
 import { calm, tickOn } from "../lib/prefs.ts";
-import { beforeLeaving } from "../lib/router.ts";
+import { beforeLeaving, hold, release } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { withName } from "../lib/words.ts";
 import { categories, playing } from "../state.ts";
@@ -13,10 +19,32 @@ import { countUp, fact, formatNumber, inRowChip, type VerdictKind, verdict, verd
 import { ask, beats, crowdLine, picture, picturesIn, type Stage, spokenAnswer } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Shown, State, View } from "./types.ts";
 
+/** Where the run whose question this tab showed last is kept (this tab's, for as long as it's open). */
+const showingKey = "almanac.showing";
+
+/** Whether this tab showed the run's question last: a reload goes straight back into it, its time running; another
+ * device or tab waits for a tap. */
+export function shownHere(run: number): boolean {
+  try {
+    return sessionStorage.getItem(showingKey) === String(run);
+  } catch {
+    return false;
+  }
+}
+
+function showing(run: number): void {
+  try {
+    sessionStorage.setItem(showingKey, String(run));
+  } catch {
+    // no storage here: a reload waits for „Продължи“
+  }
+}
+
 /** Plays a run from where it stands; `done` draws what comes after its last answer. A duel with a friend names them
  * (`opponent`) over each question. */
 export function playRun(initial: State, done: (s: State) => Child, opponent = ""): Child {
   const screen = slot();
+  hold();
 
   const next = async () => {
     try {
@@ -69,6 +97,7 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
   const at = (s: State) => {
     playing.set(!s.done);
     if (s.done) {
+      release({ result: s.id });
       screen.show(() => done(s));
       scrollTo(0, 0);
     } else if (s.question?.startsMs) {
@@ -76,6 +105,7 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
       whenSeen(() => start(q));
     } else if (s.question) {
       const q = s.question;
+      showing(s.id);
       screen.show(() => question(s, q, next, reload, versus, say));
       scrollTo(0, 0);
     } else whenSeen(next);
@@ -166,6 +196,31 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
   );
 }
 
+/** A game come to without a tap (a reload, back or forward, a link from outside): nothing starts by itself. What it is
+ * (`what`, `lead`), where it stopped if it was left half-way (`left`: its pips, and the next question), and the gold
+ * button that starts it (its count) or goes on with it (`button`, if it says another word). */
+export function startScreen(
+  what: string,
+  lead: string,
+  left: { at: number; total: number; marks?: Mark[] } | null,
+  start: () => void,
+  button = left ? "Продължи" : "Започни",
+): Child {
+  const go = h("button", { class: "btn primary big", type: "button", onclick: start }, button);
+  return h(
+    "div",
+    { class: "screen get-ready start-screen" },
+    h(
+      "div",
+      { class: "intro" },
+      h("h1", null, what),
+      h("p", { class: "lead" }, left ? `Следва въпрос ${left.at + 1} от ${left.total}.` : lead),
+    ),
+    left?.marks ? trail(left.marks, left.total, left.at) : null,
+    h("div", { class: "actions" }, go),
+  );
+}
+
 /** The seconds before a start, big, in a ring that runs out with them (in CSS, over the same time, like a question's
  * time bar): before a run, and as a live duel's two are shown. `ms` is the time to the start, `left` the whole seconds
  * still to go. */
@@ -213,17 +268,70 @@ export function trail(marks: Mark[], total: number, now = -1): HTMLElement {
 
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
 
+/** While leaving would cost the player something (`costs`: a question with its time running, a live game under way),
+ * every way out (a link, back, the game's arrow) first asks, in a sheet over the game at the screen's foot: what it
+ * costs (`text`), „Остани“ (gold: playing on is the one right answer) and „Излез“, which does `leave` (given the way
+ * on) and goes. Esc stays too. The clock runs on meanwhile, in sight above the sheet. */
+export function guardLeaving(
+  text: string,
+  costs: () => boolean,
+  leave: (on: () => void) => void | Promise<void> = (on) => on(),
+): Child {
+  const asking = signal(false);
+  const going = signal(false);
+  const now = computed(costs);
+  let proceed: (() => void) | null = null;
+  const stay = h("button", { class: "btn primary", type: "button", onclick: () => keep() }, "Остани");
+  onCleanup(
+    beforeLeaving((on) => {
+      if (!now()) return false;
+      proceed = on;
+      asking.set(true);
+      requestAnimationFrame(() => stay.focus({ preventScroll: true }));
+      return true;
+    }),
+  );
+  const keep = () => {
+    proceed = null;
+    asking.set(false);
+  };
+  const go = async () => {
+    const on = proceed;
+    if (!on || going.peek()) return;
+    going.set(true);
+    await leave(on);
+  };
+  listen(document, "keydown", (e: KeyboardEvent) => {
+    if (e.key === "Escape" && asking()) keep();
+  });
+  return h(
+    "div",
+    { class: "leave-layer", hidden: () => !asking() || !(now() || going()) },
+    h(
+      "div",
+      { class: "card leave-ask", role: "alertdialog", "aria-modal": "true", "aria-label": "Излизане от играта" },
+      h("p", { class: "leave-text" }, text),
+      h(
+        "div",
+        { class: "leave-actions" },
+        stay,
+        h("button", { class: "btn", type: "button", disabled: going, onclick: go }, "Излез"),
+      ),
+    ),
+  );
+}
+
 /** The top of a question: which one of how many, and its topic (and, in a duel with a friend, with whom: `versus`),
  * with the game's tally under it, if it has one. On a phone a game has the whole screen, the header with it, so the
  * way out is here: an arrow to Начало (on Начало itself too, where the day's ten are played: it opens afresh, the
- * day waiting there as a card). */
+ * day waiting there as a card), the way back (router.ts): back in the history where Начало is the page before. */
 export function questionHead(n: number, total: number, aside: string, tally: Child = null, versus = ""): Child {
   return h(
     "header",
     { class: "question-head" },
     h(
       "a",
-      { class: "game-leave", href: "/", "aria-label": "Към Начало", title: "Към Начало" },
+      { class: "game-leave", href: "/", "data-back": true, "aria-label": "Към Начало", title: "Към Начало" },
       h("span", { class: "i i-left", "aria-hidden": "true" }),
     ),
     h(
@@ -560,55 +668,28 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     () => sent,
   );
 
-  // Leaving while the question's time runs would cost it, as the time runs on the server: a link out (the arrow, a
-  // place in the header) asks first. Leaving gives the question up, so the run waits between two questions, where the
-  // player comes back to it („Продължи“). Once the answer is in, leaving costs nothing and asks nothing.
-  const asking = signal(false);
-  const going = signal(false);
-  let proceed: (() => void) | null = null;
-  onCleanup(
-    beforeLeaving((on) => {
-      if (sent) return false;
-      proceed = on;
-      asking.set(true);
-      stay.focus();
-      return true;
-    }),
-  );
-  const keep = () => {
-    proceed = null;
-    asking.set(false);
-  };
-  const leave = async () => {
-    const on = proceed;
-    if (!on) return;
-    if (!sent) {
-      sent = true;
-      going.set(true);
-      try {
-        await api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer: null });
-      } catch {
-        // its time runs out on the server all the same
+  // Leaving while the question's time runs would cost it, as the time runs on the server: a way out (the arrow, back,
+  // a place in the header) asks first. Leaving gives the question up, so the run waits between two questions, where
+  // the player comes back to it („Продължи“). Once the answer is in, leaving costs nothing and asks nothing.
+  const leaveAsk = guardLeaving(
+    "Ако излезеш сега, въпросът остава без отговор.",
+    () => !locked(),
+    async (on) => {
+      if (!sent) {
+        sent = true;
+        locked.set(true);
+        try {
+          await api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer: null });
+        } catch {
+          // its time runs out on the server all the same
+        }
       }
-    }
-    on();
-  };
-  const stay = h("button", { class: "btn", type: "button", onclick: keep }, "Остани");
-  const leaveAsk = h(
-    "div",
-    { class: "card leave-ask", hidden: () => !asking() || (locked() && !going()) },
-    h("p", { role: "alert" }, () => (asking() ? "Ако излезеш сега, въпросът остава без отговор." : "")),
-    h(
-      "div",
-      { class: "leave-actions" },
-      stay,
-      h("button", { class: "btn", type: "button", disabled: going, onclick: leave }, "Излез"),
-    ),
+      on();
+    },
   );
 
-  // Enter, once the answer shows, goes on at once (keys 1–4 answer: questions.ts); Esc keeps playing, asked to leave.
+  // Enter, once the answer shows, goes on at once (keys 1–4 answer: questions.ts).
   listen(document, "keydown", (e: KeyboardEvent) => {
-    if (e.key === "Escape" && asking()) return keep();
     const own = (e.target as Element).closest?.("button:enabled:not([aria-disabled='true']), a, input");
     if (e.key !== "Enter" || !due || e.repeat || own) return;
     e.preventDefault();
@@ -638,11 +719,11 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
       progress,
       timer(q.leftMs, q.limitMs, left, locked),
     ),
-    leaveAsk,
     heading,
     picture(q.view, true),
     h("div", { class: "answering" }, asked.node, () => problem()),
     after,
+    leaveAsk,
   );
   return page;
 }

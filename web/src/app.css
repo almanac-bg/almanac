@@ -2040,9 +2040,35 @@
     animation: enter 200ms ease-out;
   }
 
-  /* Asked to leave while a question's time runs: what it costs, and the choice, under the count. */
+  /* Asked to leave while a game would cost it (run.ts, guardLeaving): what it costs, and the choice, in a sheet over
+     the game at the screen's foot (over the answers, nothing pushed down), the clock running on in sight above it. */
+  .leave-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: var(--space-4);
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--bg) 45%, transparent);
+  }
+
+  .leave-layer[hidden] {
+    display: none;
+  }
+
   .leave-ask {
-    margin-top: var(--space-3);
+    display: grid;
+    gap: var(--space-4);
+    width: min(100%, 28rem);
+    box-shadow: var(--elev-2);
+    animation: enter 200ms ease-out;
+  }
+
+  .leave-text {
+    margin: 0;
+    font-weight: 600;
   }
 
   .leave-actions {
@@ -3276,8 +3302,14 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .get-ready .actions {
+  .get-ready .actions,
+  .start-screen .trail {
     width: min(100%, 320px);
+  }
+
+  /* A game left half-way today, on its tile: where it goes on from, in the accent (where the player is). */
+  .topic-left {
+    color: var(--link);
   }
 
   /* A friend's challenge, wherever the player is: who, until when, play or say no. */

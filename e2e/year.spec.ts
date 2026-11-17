@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { playRun } from "./play.ts";
+import { openGame, playRun } from "./play.ts";
 
 test("a year in the game: one card at a time, from the days played to the XP, and a few lines to share", async ({
   page,
 }) => {
   test.setTimeout(120_000);
-  await page.goto("/play/history");
+  await openGame(page, "/play/history");
   await playRun(page);
 
   await page.goto("/year/2026");

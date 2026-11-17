@@ -17,9 +17,16 @@ three when you add or change a screen.
   tabular figures.
 - **Game feel comes only from data the game has** (see Game feel below). No currencies, shops or made-up numbers:
   the level is the XP a player has really earned by playing, and every achievement is a fact of their games.
-- **Few taps.** Every game starts one tap from Начало (the count before a topic's run starts by itself). A screen
-  shows what it's for first and its details after, and folds away what's rarely needed (locked titles, hidden
-  achievements) instead of listing it.
+- **Few taps.** Every game starts one tap from Начало (the count before a topic's run starts by itself). Only a
+  tap starts one: a game come to otherwise (a reload, back or forward, a link from outside) waits on a still screen
+  (`startScreen()`, `.start-screen`: what it is, or where it was left with its pips, and „Започни“ or „Продължи“).
+  A screen shows what it's for first and its details after, and folds away what's rarely needed (locked titles,
+  hidden achievements) instead of listing it.
+- **Leaving asks.** While leaving costs something (a question with its time running, a live game under way), every
+  way out (a link, the browser's or a phone's back, the game's arrow) asks first, saying what it costs
+  (`guardLeaving()`). A way back (`back()`, a game's arrow) goes back in the history when that's the page it points
+  to, and never piles up an entry; back comes to a page scrolled where it was. A game left half-way says so where it
+  starts (its tile: „Продължи · въпрос 4 от 10“; a live game, one line on Начало: „Дуелът ти продължава · Върни се“).
 - **Phone first.** The layout is one column, at most 40rem wide, with a 16px gutter. Every screen fits a 320px phone
   without scrolling sideways.
 - **A big screen uses its width** (see Wide screens), and never changes how a phone looks: its rules live in
@@ -250,7 +257,8 @@ takes a token.
   `.mastery-line` (how a topic's game moved it) in a result's „Ново за теб“.
 - **Play:**
   - `.question-head` (with `.count`, which never wraps; `.versus`, the friend in a duel with one; and `.game-leave`,
-    the way out on a phone), `.leave-ask` (asked to leave while the time runs), `.trail`, `.timer` (muted while
+    the way out on a phone), `.leave-layer` with `.leave-ask` (asked to leave, in a sheet at
+    the foot over the answers, „Остани“ gold, the clock running in sight above it), `.trail`, `.timer` (muted while
     there's time, `.soon` gold for the last ten seconds of a question longer than ten, `.low` red for the last five,
     `.stopped` grey once answered) and `.ask`; in a run, `.question-top` holds the head, the pips and the clock, and
     on a phone `.answering` is set at the foot and `.after` (the answer: verdict, fact, „Напред“) docks under it.
