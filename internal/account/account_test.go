@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	mailer "github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/store"
@@ -471,5 +472,74 @@ func TestDrawnName(t *testing.T) {
 	}
 	if s, _ := a.Session(ctx, token); s.Drawn() {
 		t.Fatal("a chosen name is still drawn")
+	}
+}
+
+// The clean-up clears guests who never played nor have a friend once unseen for IdleGuestDays, and keeps everyone
+// else: guests seen lately, guests with a game or a friend (or a request), players with an email.
+func TestCleanUpIdleGuests(t *testing.T) {
+	a, db, out, in := setup(t)
+	ctx := t.Context()
+	old := store.Ms(time.Now().AddDate(0, 0, -IdleGuestDays-1))
+	exec := func(q string, args ...any) {
+		t.Helper()
+		if _, err := db.Write.ExecContext(ctx, q, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	guest := func(seen int64) int64 {
+		t.Helper()
+		u, _, err := a.Guest(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		exec(`UPDATE users SET seen_at = ?, created_at = ? WHERE id = ?`, seen, seen, u.ID)
+		return u.ID
+	}
+	idle, recent := guest(old), guest(store.Now())
+	played, friended, asked := guest(old), guest(old), guest(old)
+	exec(`INSERT INTO runs (user_id, kind, questions, started_at) VALUES (?, 'topic', '[]', ?)`, played, old)
+	exec(`INSERT INTO friends (user_id, friend_id, since) VALUES (?, ?, ?), (?, ?, ?)`, friended, recent, old, recent, friended, old)
+	exec(`INSERT INTO friend_requests (from_id, to_email, at) VALUES (?, 'x@example.com', ?)`, asked, old)
+	c := code(t, a, out, in, "kept@example.com")
+	profile, _, err := a.Verify(ctx, "kept@example.com", c, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	exec(`UPDATE users SET seen_at = ?, created_at = ? WHERE id = ?`, old, old, profile.ID)
+
+	if err := a.CleanUp(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[int64]bool{idle: false, recent: true, played: true, friended: true, asked: true, profile.ID: true} {
+		var n int
+		if err := db.Read.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE id = ?`, id).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if (n == 1) != want {
+			t.Errorf("player %d kept: %v, want %v", id, n == 1, want)
+		}
+	}
+}
+
+// A flood of guests made and dropped goes, all of it, in batches.
+func TestCleanUpManyGuests(t *testing.T) {
+	a, db, _, _ := setup(t)
+	ctx := t.Context()
+	for range cleanBatch*2 + 7 {
+		if _, _, err := a.Guest(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := store.Ms(time.Now().AddDate(0, 0, -IdleGuestDays-1))
+	if _, err := db.Write.ExecContext(ctx, `UPDATE users SET seen_at = ?, created_at = ?`, old, old); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.CleanUp(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var left int
+	if err := db.Read.QueryRowContext(ctx, `SELECT count(*) FROM users`).Scan(&left); err != nil || left != 0 {
+		t.Fatalf("guests left: %d (%v)", left, err)
 	}
 }

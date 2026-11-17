@@ -36,8 +36,8 @@ import (
 //	SMTP_URL            smtp://user:password@host:587 (required outside development)
 //	MAIL_FROM           "АЛМАНАХ <no-reply@almanac.bg>"
 //	TLS_CERT, TLS_KEY   serve HTTPS with this certificate (behind Cloudflare: its origin certificate)
-//	TRUST_CLOUDFLARE=1  take players' addresses from Cloudflare's header (only if nothing else can reach the server)
-//	ALERT_EMAIL         where new kinds of problems are mailed (hourly, each kind once)
+//	TRUST_CLOUDFLARE=1  take players' addresses from Cloudflare's header, on connections from Cloudflare's addresses
+//	ALERT_EMAIL         where new kinds of problems are mailed (hourly, each kind once a day)
 //	PUSH_PUBLIC_KEY,    notifications (Web Push): the VAPID key pair `almanac push keys` makes; without them,
 //	PUSH_PRIVATE_KEY    no notifications
 //	APNS_KEY_FILE       notifications to the app on iPhones: the team's APNs key (.p8), with APNS_KEY_ID and
@@ -90,6 +90,7 @@ func serve([]string) error {
 		Operator:        os.Getenv("OPERATOR_NAME"),
 		Contact:         env("CONTACT_EMAIL", "privacy@almanac.bg"),
 		RoomsFile:       filepath.Join(filepath.Dir(dbPath()), "rooms.json"),
+		LimitsFile:      filepath.Join(filepath.Dir(dbPath()), "limits.json"),
 		Dev:             dev,
 		Version:         version,
 	}

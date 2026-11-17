@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
-	"sync"
 	"time"
 )
 
@@ -87,56 +86,4 @@ func (s *Server) headers(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-// limiter counts what each key (an address, an email) did in a window, to stop floods and guessing.
-type limiter struct {
-	off  bool // development and the browser tests: every request from one address
-	mu   sync.Mutex
-	hits map[string]*window
-	last time.Time
-}
-
-type window struct {
-	start time.Time
-	n     int
-}
-
-func newLimiter() *limiter { return &limiter{hits: map[string]*window{}} }
-
-// allow counts one for key and says whether it's within n per period.
-func (l *limiter) allow(key string, n int, per time.Duration) bool {
-	if l.off {
-		return true
-	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	now := time.Now()
-	if now.Sub(l.last) > time.Minute { // forget old windows now and then
-		for k, w := range l.hits {
-			if now.Sub(w.start) > 24*time.Hour {
-				delete(l.hits, k)
-			}
-		}
-		l.last = now
-	}
-	w := l.hits[key]
-	if w == nil || now.Sub(w.start) >= per {
-		w = &window{start: now}
-		l.hits[key] = w
-	}
-	w.n++
-	return w.n <= n
-}
-
-// spent says whether key has had its n per period already, counting nothing: for a limit on what failed, checked
-// before trying (allow counts each failure after).
-func (l *limiter) spent(key string, n int, per time.Duration) bool {
-	if l.off {
-		return false
-	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	w := l.hits[key]
-	return w != nil && time.Since(w.start) < per && w.n >= n
 }

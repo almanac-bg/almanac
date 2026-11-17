@@ -195,6 +195,12 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"user": u})
 }
 
+// How many guests a network may start in an hour, and a site (an IPv6 /48; address.go).
+const (
+	guestsNet  = 2*room.MaxPlayers + 20
+	guestsSite = 5 * guestsNet
+)
+
 // guest starts a player who has none: the first time they play.
 func (s *Server) guest(w http.ResponseWriter, r *http.Request) error {
 	if u, err := s.user(r); err != nil || u != nil {
@@ -203,8 +209,10 @@ func (s *Server) guest(w http.ResponseWriter, r *http.Request) error {
 		}
 		return ok(w, map[string]any{"user": u})
 	}
-	// A class or a pub comes from one address: a room's worth of new players (room.MaxPlayers), and some.
-	if !s.limits.allow("guest:"+s.clientIP(r), 60, time.Hour) {
+	// A school or a pub comes from one network (an IPv4 address, an IPv6 /64), and a mobile carrier puts many phones
+	// behind one IPv4 address: two rooms' worth of new players an hour (room.MaxPlayers), and a site's /48 (a big
+	// school's, a company's) five times that. A guest that never plays is cleared in a few days (account.CleanUp).
+	if !s.allowFrom(r, "guest", guestsNet, guestsSite, time.Hour) {
 		return errTooMany
 	}
 	// Where the player came in: the path the client was first opened at (an old client sends nothing).
@@ -234,7 +242,8 @@ func (s *Server) sendCode(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if !s.limits.allow("code:"+s.clientIP(r), 10, time.Hour) || !s.limits.allow("code:"+email, 5, time.Hour) {
+	// Each code is a mail: 10 an hour from a network, 50 from a site's /48, 5 to an address.
+	if !s.allowFrom(r, "code", 10, 50, time.Hour) || !s.limits.allow("code:"+email, 5, time.Hour) {
 		return errTooMany
 	}
 	if err := s.accounts.SendCode(r.Context(), email); err != nil {
@@ -270,7 +279,7 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) error {
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
-	if !s.limits.allow("verify:"+s.clientIP(r), 30, time.Hour) {
+	if !s.allowFrom(r, "verify", 30, 0, time.Hour) {
 		return errTooMany
 	}
 	// The browser's session is replaced by a new one (account.Verify), its notifications brought along.
@@ -312,7 +321,7 @@ func (s *Server) takeHandoff(w http.ResponseWriter, r *http.Request) error {
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
-	if !s.limits.allow("hand:"+s.clientIP(r), 30, time.Hour) {
+	if !s.allowFrom(r, "hand", 30, 0, time.Hour) {
 		return errTooMany
 	}
 	u, token, err := s.accounts.TakeHandoff(r.Context(), in.Token, s.session(r))
@@ -365,7 +374,7 @@ func (s *Server) rename(w http.ResponseWriter, r *http.Request) error {
 	}
 	// By player, and loosely by address: a whole class names itself as it comes into a room, from one network.
 	if !s.limits.allow("rename:"+strconv.FormatInt(u.ID, 10), 20, time.Hour) ||
-		!s.limits.allow("rename-ip:"+s.clientIP(r), 200, time.Hour) {
+		!s.allowFrom(r, "rename-net", 200, 0, time.Hour) {
 		return errTooMany
 	}
 	if in.Name != nil {
