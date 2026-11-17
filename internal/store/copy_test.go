@@ -3,6 +3,7 @@ package store
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 )
@@ -39,7 +40,7 @@ func TestKeepCopy(t *testing.T) {
 		t.Fatal("copied again for the same version")
 	}
 
-	// The ten latest are kept.
+	// The latest are kept.
 	_ = os.Chtimes(filepath.Join(dir, "before-v1.0.0.db"), time.Unix(0, 0), time.Unix(0, 0))
 	for i := range 12 {
 		v := "v1.1." + string(rune('a'+i))
@@ -56,9 +57,37 @@ func TestKeepCopy(t *testing.T) {
 	if len(left) != KeptCopies {
 		t.Fatalf("%d copies kept", len(left))
 	}
-	for _, gone := range []string{"v1.0.0", "v1.1.a", "v1.1.b", "v1.1.c"} {
-		if _, err := os.Stat(filepath.Join(dir, "before-"+gone+".db")); err == nil {
-			t.Fatalf("%s still kept", gone)
+	for _, kept := range []string{"v2.0.0", "v1.1.l", "v1.1.k"} {
+		if _, err := os.Stat(filepath.Join(dir, "before-"+kept+".db")); err != nil {
+			t.Fatalf("%s not kept", kept)
 		}
+	}
+}
+
+// Every copy beside the database goes after a month, whoever made it; the database itself never.
+func TestPruneCopies(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "almanac.db")
+	old := time.Now().Add(-CopiesKept - time.Hour)
+	for _, name := range []string{"almanac.db", "before-v1.0.0.db", "before-v1.0.0.db-wal", "pre-v0.9.db",
+		"replaced-2026-10-01T000000Z.db", "restored.db", "rooms.json"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		_ = os.Chtimes(filepath.Join(dir, name), old, old)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "replaced-new.db"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := PruneCopies(path); err != nil {
+		t.Fatal(err)
+	}
+	var left []string
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		left = append(left, e.Name())
+	}
+	if want := []string{"almanac.db", "replaced-new.db", "rooms.json"}; !slices.Equal(left, want) {
+		t.Fatalf("left %v, want %v", left, want)
 	}
 }

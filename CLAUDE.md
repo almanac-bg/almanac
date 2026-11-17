@@ -30,7 +30,7 @@ most). A change is judged by whether players come back: the retention numbers in
 
 | Path | What |
 | --- | --- |
-| `cmd/almanac` | The program: `serve`, `bank check/fmt`, `backup now/restore/verify` |
+| `cmd/almanac` | The program: `serve`, `bank check/fmt`, `backup now/list/restore/verify/keys` |
 | `cmd/build` | Builds the client into `internal/assets/dist` (esbuild; a size ceiling against accidents) |
 | `internal/play` | The game's rules and data: runs, scoring (`worth.go`), duels, friends, rating, leagues, goals, progress |
 | `internal/live` | Live duels: matchmaking, the shared clock, recordings |
@@ -39,7 +39,7 @@ most). A change is judged by whether players come back: the retention numbers in
 | `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: the paths it sends the app for, the client's router's list again; a test holds them equal) |
 | `internal/store` | SQLite; migrations in `internal/store/migrations`, applied once each by name |
 | `internal/bank` | Question types, the bank on disk, its checks |
-| `internal/account`, `mail`, `push`, `backup`, `qr` | Players and sign-in, email, Web Push, hourly backups to R2 (each checked before it's sent, one brought back daily), QR codes |
+| `internal/account`, `mail`, `push`, `backup`, `qr` | Players and sign-in, email, Web Push, hourly backups to R2 (each checked before it's sent, encrypted to a key kept off the server, one brought back daily), QR codes |
 | `web/src` | The client, plain TypeScript, no framework: `lib/` (DOM, signals, router), `game/` (questions, a run), `screens/` (one file per page), `ui.ts`, `app.css` |
 | `web/DESIGN.md` | How it looks and speaks: tokens, components, copy rules. Follow it for any UI |
 | `e2e` | The game in real browsers (Playwright) |

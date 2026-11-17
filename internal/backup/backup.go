@@ -1,220 +1,388 @@
 // Package backup copies the database to S3-compatible storage (Cloudflare R2) every hour, and brings a copy back.
 //
-// A copy is the database as it was at one moment (VACUUM INTO, which doesn't stop the game), gzipped. Copies are named
-// by the hour of the day and the day of the month, so each new one replaces the one before in its place: there are
-// always the last 24 hours and the last month or so, nothing to clean up, and nothing kept longer.
+// A copy is the database as it was at one moment (VACUUM INTO a file beside it, which doesn't stop the game), checked
+// (Check: SQLite's integrity_check, and the game's core tables are there, and not empty, so a new server's empty
+// database is never sent), then gzipped and, given recipients (BACKUP_RECIPIENT), encrypted with age as it streams to
+// a second file, which is sent. A copy costs a buffer's memory whatever the database's size, and a fast level of gzip.
+// The key that opens the copies is kept off the server (crypt.go): neither the storage's key, wherever it leaks, nor
+// the server itself reads a copy once it's sent. Without recipients the copies go unencrypted, as before there were
+// any, and the server says so in its problems once a day: a missing key never stops the copies.
 //
-// Because each copy overwrites a good one, a copy is checked before it's sent (Check: SQLite's integrity_check, and
-// the game's core tables are there); a damaged one is never sent, the heartbeat stays quiet, and the error goes to
-// whoever runs the game. Once a day (the copy made in drillHour) the copy just stored is brought back as a restore
-// would bring it — downloaded, unzipped, opened read-only — and checked again, with rows in every core table (Drill),
-// so a restore is known to work before one is needed. `almanac backup verify` does the same by hand.
+// Each copy is a new object, named by the moment it was made (hours/2026-11-17T153012Z.db.gz.age), and the first of
+// each UTC day is also stored under days/. Nothing here overwrites or deletes a copy: the bucket's lifecycle rules
+// delete them (hours/ after HoursKept, days/ after DaysKept), and its lock rules keep anyone, the server's own key
+// included, from changing or deleting one before (README: Резервни копия). The copy of the day is brought back as a
+// restore would bring it — downloaded, decrypted, unzipped, checked again with rows in every core table (Drill) — so a
+// restore is known to work before one is needed. The server can open it for that though it holds no key to the copies:
+// each copy is also encrypted to a key made for it alone, whose secret half lives in memory until that check
+// (drillKey). The copies older than they should be, which the lifecycle rules ought to have deleted, are a problem
+// told daily too.
+//
+// The server makes a copy at half past every hour (Run), away from the hour's own work (the new day at midnight, Роял at
+// 21:00), by running itself as a program of its own (`almanac backup now`) at a lower priority, so a copy never takes
+// the game's processor or memory (cmd/almanac). A file beside the database remembers the last copy (State): when it was
+// made, for the first after a start (soon, if it's an hour old), the rows it had, against which the next one's are
+// compared (a sharp fall is a problem told, the copy sent all the same), and the day whose copy was brought back.
 package backup
 
 import (
-	"bytes"
+	"bufio"
 	"compress/gzip"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
-	"net/url"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
+	"filippo.io/age"
 	_ "modernc.org/sqlite" // Check opens a copy itself
 )
 
-// Store is a bucket in S3-compatible storage.
-type Store struct {
-	// Endpoint is the storage's address (R2: https://<account>.eu.r2.cloudflarestorage.com).
-	Endpoint string
-	Bucket   string
-	// AccessKey and SecretKey are an access key pair allowed to read and write the bucket.
-	AccessKey, SecretKey string
-	// Region is the signing region ("auto" for R2).
-	Region string
-	Client *http.Client
-}
+const (
+	// HoursKept and DaysKept are how long the copies under hours/ and days/ are kept: the bucket's lifecycle rules
+	// delete them after (README). The privacy page promises a deleted player's data is gone from them within a month.
+	HoursKept = 2 * 24 * time.Hour
+	DaysKept  = 30 * 24 * time.Hour
+	// stamp names a copy by when it was made (UTC): names sort as they were made.
+	stamp = "2006-01-02T150405Z"
+	// level is gzip's: fast, at little cost in size, so a copy takes seconds of a processor, not minutes.
+	level = gzip.BestSpeed
+	// stateFile is the last copy's memory, beside the database.
+	stateFile = "backup.json"
+)
 
-func (s *Store) client() *http.Client {
-	if s.Client != nil {
-		return s.Client
+// core are the tables a copy of the game is nothing without: its schema, its players, its days and their games.
+var core = []string{"schema_migrations", "users", "days", "runs"}
+
+// Name is the key of a copy made at t, under prefix (hours or days): encrypted copies end in .age.
+func Name(prefix string, t time.Time, encrypted bool) string {
+	key := prefix + "/" + t.UTC().Format(stamp) + ".db.gz"
+	if encrypted {
+		key += ".age"
 	}
-	return &http.Client{Timeout: 5 * time.Minute}
+	return key
 }
 
-func (s *Store) url(key string) (*url.URL, error) {
-	u, err := url.Parse(strings.TrimSuffix(s.Endpoint, "/") + "/" + s.Bucket + "/" + key)
-	if err != nil || u.Scheme != "https" && u.Hostname() != "127.0.0.1" {
-		return nil, errors.New("the backup endpoint must be an https:// address")
+// Backer makes the copies.
+type Backer struct {
+	Store *Store
+	// DB reads the database (read-only is enough).
+	DB *sql.DB
+	// Dir is where a copy is made before it's sent (next to the database), and where State is kept.
+	Dir string
+	// Recipients are whom the copies are encrypted to (none: they go unencrypted).
+	Recipients []age.Recipient
+	// Force sends a copy even of a database with an empty core table.
+	Force bool
+	now   func() time.Time // the clock (tests); nil: time.Now
+}
+
+// Report is what a copy made: where it went, how big, the rows in its core tables, and what's wrong that didn't stop
+// it (problems for whoever runs the game).
+type Report struct {
+	Keys      []string         `json:"keys"`
+	Bytes     int64            `json:"bytes"`
+	Rows      map[string]int64 `json:"rows"`
+	Encrypted bool             `json:"encrypted"`
+	Drilled   bool             `json:"drilled"` // brought back and checked (the day's copy)
+	Warnings  []string         `json:"warnings,omitempty"`
+}
+
+// State is what's kept of the last copy, beside the database.
+type State struct {
+	At   time.Time        `json:"at"` // when the last copy was stored
+	Key  string           `json:"key"`
+	Rows map[string]int64 `json:"rows"`
+	Day  string           `json:"day"` // the last UTC day (2006-01-02) whose copy was brought back whole
+}
+
+// LoadState reads the state kept in dir (the zero State if there's none).
+func LoadState(dir string) State {
+	var s State
+	if data, err := os.ReadFile(filepath.Join(dir, stateFile)); err == nil {
+		_ = json.Unmarshal(data, &s)
 	}
-	return u, nil
+	return s
 }
 
-// Put stores body under key.
-func (s *Store) Put(ctx context.Context, key string, body []byte) error {
-	u, err := s.url(key)
+func (s State) save(dir string) error {
+	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, u.String(), bytes.NewReader(body))
-	if err != nil {
+	tmp := filepath.Join(dir, stateFile+".part")
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		return err
 	}
-	req.ContentLength = int64(len(body))
-	sign(req, s.AccessKey, s.SecretKey, s.Region, body, time.Now())
-	return s.do(req, nil)
+	return os.Rename(tmp, filepath.Join(dir, stateFile))
 }
 
-// ErrMissing is the error for a key the bucket doesn't have.
-var ErrMissing = errors.New("no such copy")
+func (b *Backer) clock() time.Time {
+	if b.now != nil {
+		return b.now()
+	}
+	return time.Now()
+}
 
-// Get reads what's stored under key.
-func (s *Store) Get(ctx context.Context, key string) ([]byte, error) {
-	u, err := s.url(key)
+// Once makes a copy, checks it, and stores it under hours/ (and under days/ too if it's the day's first, then brings
+// that back and checks it again). A damaged copy, or one of an empty game, is not stored.
+func (b *Backer) Once(ctx context.Context) (*Report, error) {
+	ctx, cancel := context.WithTimeout(ctx, 50*time.Minute) // never into the next hour's
+	defer cancel()
+	removeLeftovers(b.Dir)
+	now := b.clock().UTC()
+	state := LoadState(b.Dir)
+	r := &Report{Encrypted: len(b.Recipients) > 0}
+
+	snap, err := snapshot(ctx, b.DB, b.Dir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("snapshot: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return nil, err
+	defer os.Remove(snap)
+	if r.Rows, err = Check(ctx, snap); err != nil {
+		return nil, fmt.Errorf("the copy is damaged, not sent: %w", err)
 	}
-	sign(req, s.AccessKey, s.SecretKey, s.Region, nil, time.Now())
-	var out bytes.Buffer
-	if err := s.do(req, &out); err != nil {
-		return nil, err
+	if t := empty(r.Rows); t != "" && !b.Force {
+		return nil, fmt.Errorf("table %s is empty, so the copy is not sent (a new server, not yet restored? README)", t)
 	}
-	return out.Bytes(), nil
-}
+	r.Warnings = append(r.Warnings, fell(state.Rows, r.Rows)...)
 
-func (s *Store) do(req *http.Request, out io.Writer) error {
-	res, err := s.client().Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode == http.StatusNotFound {
-		return fmt.Errorf("%s %s: %w", req.Method, req.URL.Path, ErrMissing)
-	}
-	if res.StatusCode/100 != 2 {
-		msg, _ := io.ReadAll(io.LimitReader(res.Body, 512))
-		return fmt.Errorf("%s %s: %s %s", req.Method, req.URL.Path, res.Status, bytes.TrimSpace(msg))
-	}
-	if out != nil {
-		_, err = io.Copy(out, res.Body)
-	}
-	return err
-}
-
-// sign signs a request with AWS Signature Version 4: the host and every header already set, and the body's hash.
-func sign(req *http.Request, accessKey, secretKey, region string, body []byte, now time.Time) {
-	now = now.UTC()
-	amzDate := now.Format("20060102T150405Z")
-	day := now.Format("20060102")
-	payload := sha256.Sum256(body)
-	payloadHash := hex.EncodeToString(payload[:])
-	req.Header.Set("x-amz-date", amzDate)
-	req.Header.Set("x-amz-content-sha256", payloadHash)
-
-	headers := map[string]string{"host": req.URL.Host}
-	for k, v := range req.Header {
-		headers[strings.ToLower(k)] = strings.TrimSpace(strings.Join(v, ","))
-	}
-	names := make([]string, 0, len(headers))
-	for k := range headers {
-		names = append(names, k)
-	}
-	slices.Sort(names)
-	var canonHeaders strings.Builder
-	for _, k := range names {
-		canonHeaders.WriteString(k + ":" + headers[k] + "\n")
-	}
-	signed := strings.Join(names, ";")
-
-	canonical := strings.Join([]string{
-		req.Method,
-		escapePath(req.URL.Path),
-		req.URL.Query().Encode(),
-		canonHeaders.String(),
-		signed,
-		payloadHash,
-	}, "\n")
-	scope := day + "/" + region + "/s3/aws4_request"
-	hashed := sha256.Sum256([]byte(canonical))
-	toSign := "AWS4-HMAC-SHA256\n" + amzDate + "\n" + scope + "\n" + hex.EncodeToString(hashed[:])
-
-	key := hmacSHA256([]byte("AWS4"+secretKey), day)
-	for _, part := range []string{region, "s3", "aws4_request"} {
-		key = hmacSHA256(key, part)
-	}
-	signature := hex.EncodeToString(hmacSHA256(key, toSign))
-	req.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential="+accessKey+"/"+scope+
-		", SignedHeaders="+signed+", Signature="+signature)
-}
-
-func hmacSHA256(key []byte, data string) []byte {
-	m := hmac.New(sha256.New, key)
-	m.Write([]byte(data))
-	return m.Sum(nil)
-}
-
-// escapePath encodes a path as S3 signs it: every byte but the unreserved ones and the slashes.
-func escapePath(p string) string {
-	var b strings.Builder
-	for i := 0; i < len(p); i++ {
-		c := p[i]
-		if 'A' <= c && c <= 'Z' || 'a' <= c && c <= 'z' || '0' <= c && c <= '9' || strings.IndexByte("-._~/", c) >= 0 {
-			b.WriteByte(c)
-		} else {
-			fmt.Fprintf(&b, "%%%02X", c)
+	recipients := b.Recipients
+	var drill []age.Identity
+	if len(recipients) > 0 {
+		id, rec, err := drillKey(recipients)
+		if err != nil {
+			return nil, err
 		}
+		recipients, drill = append(recipients[:len(recipients):len(recipients)], rec), []age.Identity{id}
 	}
-	return b.String()
+	packed, err := pack(snap, recipients)
+	if err != nil {
+		return nil, fmt.Errorf("packing the copy: %w", err)
+	}
+	defer os.Remove(packed)
+	os.Remove(snap) // as soon as it's no longer needed: it's the database's size
+	f, err := os.Open(packed)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	r.Bytes = fi.Size()
+	meta := map[string]string{"rows": rowsMeta(r.Rows)}
+
+	key := Name("hours", now, r.Encrypted)
+	if err := b.put(ctx, key, f, meta); err != nil {
+		return nil, err
+	}
+	r.Keys = append(r.Keys, key)
+	state.At, state.Key, state.Rows = now, key, r.Rows
+	if err := state.save(b.Dir); err != nil {
+		slog.Warn("backup: keeping its state", "err", err)
+	}
+	day := now.Format(time.DateOnly)
+	if state.Day == day {
+		return r, nil
+	}
+
+	// The day's first: kept a month, and brought back now to know it would restore.
+	key = Name("days", now, r.Encrypted)
+	if err := b.put(ctx, key, f, meta); err != nil {
+		return r, err
+	}
+	r.Keys = append(r.Keys, key)
+	rows, err := Drill(ctx, b.Store, key, b.Dir, drill...)
+	if err != nil {
+		return r, fmt.Errorf("restore drill of %s: %w", key, err)
+	}
+	slog.Info("restore drill passed", "key", key, "rows", rows)
+	r.Drilled = true
+	state.Day = day
+	if err := state.save(b.Dir); err != nil {
+		slog.Warn("backup: keeping its state", "err", err)
+	}
+	stale, err := Overdue(ctx, b.Store, now)
+	if err != nil {
+		r.Warnings = append(r.Warnings, "listing the copies: "+err.Error())
+	} else if len(stale) > 0 {
+		r.Warnings = append(r.Warnings, fmt.Sprintf("the bucket keeps %d copies past their time (the oldest %s): set its lifecycle rules (README)", len(stale), stale[len(stale)-1].Key))
+	}
+	return r, nil
 }
 
-// Snapshot is the database as it is now, gzipped.
-func Snapshot(ctx context.Context, db *sql.DB, dir string) ([]byte, error) {
+func (b *Backer) put(ctx context.Context, key string, f *os.File, meta map[string]string) error {
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	return b.Store.Put(ctx, key, f, meta)
+}
+
+// snapshot copies the database read through db into a new file in dir (VACUUM INTO: the database as it is at one
+// moment, while the game goes on), and returns its path.
+func snapshot(ctx context.Context, db *sql.DB, dir string) (string, error) {
 	f, err := os.CreateTemp(dir, "snapshot-*.db")
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	path := f.Name()
 	f.Close()
 	os.Remove(path) // VACUUM INTO makes the file itself
-	defer os.Remove(path)
 	if _, err := db.ExecContext(ctx, `VACUUM INTO ?`, path); err != nil {
-		return nil, err
+		os.Remove(path)
+		return "", err
 	}
-	if _, err := Check(ctx, path); err != nil {
-		return nil, fmt.Errorf("the copy is damaged, not sent: %w", err)
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var gz bytes.Buffer
-	w, _ := gzip.NewWriterLevel(&gz, gzip.BestCompression)
-	if _, err := w.Write(data); err != nil {
-		return nil, err
-	}
-	if err := w.Close(); err != nil {
-		return nil, err
-	}
-	return gz.Bytes(), nil
+	return path, nil
 }
 
-// core are the tables a copy of the game is nothing without: its schema, its players, its days and their games.
-var core = []string{"schema_migrations", "users", "days", "runs"}
+// pack gzips the database file at path and encrypts it to recipients (if any) into a new file beside it, as it
+// streams: no more of it is in memory at once than the buffers.
+func pack(path string, recipients []age.Recipient) (_ string, err error) {
+	in, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer in.Close()
+	out, err := os.CreateTemp(filepath.Dir(path), "copy-*.part")
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if cerr := out.Close(); err == nil {
+			err = cerr
+		}
+		if err != nil {
+			os.Remove(out.Name())
+		}
+	}()
+	buf := bufio.NewWriterSize(out, 256<<10)
+	var w io.Writer = buf
+	var enc io.WriteCloser
+	if len(recipients) > 0 {
+		if enc, err = age.Encrypt(buf, recipients...); err != nil {
+			return "", err
+		}
+		w = enc
+	}
+	zw, _ := gzip.NewWriterLevel(w, level)
+	if _, err := io.Copy(zw, bufio.NewReaderSize(in, 256<<10)); err != nil {
+		return "", err
+	}
+	if err := zw.Close(); err != nil {
+		return "", err
+	}
+	if enc != nil {
+		if err := enc.Close(); err != nil {
+			return "", err
+		}
+	}
+	if err := buf.Flush(); err != nil {
+		return "", err
+	}
+	return out.Name(), out.Sync()
+}
+
+// removeLeftovers removes what a copy cut short (the server stopped under it) left in dir: an hour old, so never
+// another copy's that is under way.
+func removeLeftovers(dir string) {
+	for _, pattern := range []string{"snapshot-*.db", "copy-*.part", "drill-*"} {
+		paths, _ := filepath.Glob(filepath.Join(dir, pattern))
+		for _, p := range paths {
+			if fi, err := os.Stat(p); err == nil && time.Since(fi.ModTime()) > time.Hour {
+				os.RemoveAll(p)
+			}
+		}
+	}
+}
+
+// empty is the first core table with no rows ("": none).
+func empty(rows map[string]int64) string {
+	for _, t := range core {
+		if rows[t] == 0 {
+			return t
+		}
+	}
+	return ""
+}
+
+// fell says which core tables have fewer than half the rows they had in the copy before: a game doesn't lose half its
+// players or games in an hour, unless something deleted them.
+func fell(before, now map[string]int64) []string {
+	var out []string
+	for _, t := range core {
+		if was := before[t]; was >= 10 && now[t] < was/2 {
+			out = append(out, fmt.Sprintf("table %s fell from %d rows to %d since the copy before: if that's wrong, restore one from before it (README)", t, was, now[t]))
+		}
+	}
+	return out
+}
+
+func rowsMeta(rows map[string]int64) string {
+	var parts []string
+	for _, t := range slices.Sorted(maps.Keys(rows)) {
+		parts = append(parts, fmt.Sprintf("%s=%d", t, rows[t]))
+	}
+	return strings.Join(parts, ",")
+}
+
+// Overdue lists the copies older than their prefix keeps them (with a day for the lifecycle rules to get to them),
+// newest first: there should be none.
+func Overdue(ctx context.Context, s *Store, now time.Time) ([]Object, error) {
+	var out []Object
+	for prefix, kept := range map[string]time.Duration{"hours/": HoursKept, "days/": DaysKept} {
+		objs, err := s.List(ctx, prefix)
+		if err != nil {
+			return nil, err
+		}
+		for _, o := range objs {
+			if now.Sub(o.Modified) > kept+48*time.Hour {
+				out = append(out, o)
+			}
+		}
+	}
+	slices.SortFunc(out, func(a, b Object) int { return b.Modified.Compare(a.Modified) })
+	return out, nil
+}
+
+// Run makes a copy at half past every hour until ctx ends, by calling once (soon after starting instead, if the last
+// copy kept in dir is an hour old or more); a copy that failed is tried again in ten minutes.
+func Run(ctx context.Context, dir string, once func(context.Context) error) {
+	now := time.Now()
+	wait := time.Until(next(now))
+	if now.Sub(LoadState(dir).At) >= time.Hour {
+		wait = time.Minute
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait):
+		}
+		if err := once(ctx); err != nil && ctx.Err() == nil {
+			wait = 10 * time.Minute
+			continue
+		}
+		wait = time.Until(next(time.Now()))
+	}
+}
+
+// next is the first half past an hour after t.
+func next(t time.Time) time.Time {
+	n := t.Truncate(time.Hour).Add(30 * time.Minute)
+	if !n.After(t) {
+		n = n.Add(time.Hour)
+	}
+	return n
+}
 
 // Check opens the database file at path read-only and makes sure it's whole: SQLite's integrity_check finds nothing
 // wrong (every page, every index), and each core table is there. It returns the rows in each core table.
@@ -261,147 +429,4 @@ func Check(ctx context.Context, path string) (map[string]int64, error) {
 		counts[t] = n
 	}
 	return counts, nil
-}
-
-// Drill brings back the copy stored under key as a restore would (into a new file in dir, removed after) and checks
-// it: whole, with every core table, and none of them empty. It returns the rows in each core table.
-func Drill(ctx context.Context, s *Store, key, dir string) (map[string]int64, error) {
-	tmp, err := os.MkdirTemp(dir, "drill-*")
-	if err != nil {
-		return nil, err
-	}
-	defer os.RemoveAll(tmp)
-	path := filepath.Join(tmp, "drill.db")
-	if err := Restore(ctx, s, key, path); err != nil {
-		return nil, err
-	}
-	counts, err := Check(ctx, path)
-	if err != nil {
-		return nil, err
-	}
-	for _, t := range core {
-		if counts[t] == 0 {
-			return counts, fmt.Errorf("table %s is empty", t)
-		}
-	}
-	return counts, nil
-}
-
-// Keys are where a copy made at t goes: its hour of the day, and its day of the month.
-func Keys(t time.Time) []string {
-	t = t.UTC()
-	return []string{fmt.Sprintf("hours/%02d.db.gz", t.Hour()), fmt.Sprintf("days/%02d.db.gz", t.Day())}
-}
-
-// Backer makes the copies.
-type Backer struct {
-	Store *Store
-	DB    *sql.DB
-	// Dir is where a copy is made before it's sent (next to the database).
-	Dir string
-	// Heartbeat, if set, is fetched after each copy that made it (checked and stored): a monitor that hears nothing for
-	// a while says so.
-	Heartbeat string
-}
-
-// drillHour is the hour (UTC) whose copy is brought back and checked: 05:00 in Bulgaria, when few play.
-const drillHour = 3
-
-// Once makes a copy, checks it, and stores it in each of its places. A damaged copy is not stored, and the heartbeat
-// not sent.
-func (b *Backer) Once(ctx context.Context) error {
-	return b.once(ctx, time.Now())
-}
-
-func (b *Backer) once(ctx context.Context, now time.Time) error {
-	data, err := Snapshot(ctx, b.DB, b.Dir)
-	if err != nil {
-		return fmt.Errorf("snapshot: %w", err)
-	}
-	keys := Keys(now)
-	for _, key := range keys {
-		if err := b.Store.Put(ctx, key, data); err != nil {
-			return err
-		}
-	}
-	slog.Info("backed up", "bytes", len(data), "keys", keys)
-	if b.Heartbeat != "" {
-		beat, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-		if req, err := http.NewRequestWithContext(beat, http.MethodGet, b.Heartbeat, nil); err == nil {
-			if res, err := b.Store.client().Do(req); err == nil {
-				res.Body.Close()
-			}
-		}
-	}
-	return nil
-}
-
-// Drill brings back the day's copy made at now (days/DD.db.gz) and checks it (see the package Drill).
-func (b *Backer) Drill(ctx context.Context, now time.Time) error {
-	key := Keys(now)[1]
-	counts, err := Drill(ctx, b.Store, key, b.Dir)
-	if err != nil {
-		return fmt.Errorf("restore drill of %s: %w", key, err)
-	}
-	slog.Info("restore drill passed", "key", key, "rows", counts)
-	return nil
-}
-
-// Run makes a copy every hour until ctx ends; a failed one is tried again in ten minutes. The copy made in drillHour
-// is then brought back and checked.
-func (b *Backer) Run(ctx context.Context, onError func(error)) {
-	wait := time.Minute // the first soon after starting
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(wait):
-		}
-		wait = time.Hour
-		now := time.Now()
-		if err := b.once(ctx, now); err != nil {
-			if ctx.Err() == nil {
-				slog.Error("backup", "err", err)
-				onError(err)
-				wait = 10 * time.Minute
-			}
-			continue
-		}
-		if now.UTC().Hour() == drillHour {
-			if err := b.Drill(ctx, now); err != nil && ctx.Err() == nil {
-				slog.Error("backup", "err", err)
-				onError(err)
-			}
-		}
-	}
-}
-
-// Restore writes the copy stored under key to path, as a database file. It refuses to overwrite one.
-func Restore(ctx context.Context, s *Store, key, path string) error {
-	if _, err := os.Stat(path); err == nil {
-		return fmt.Errorf("%s is there already: restore to a new path, then swap it in with the game stopped", path)
-	}
-	data, err := s.Get(ctx, key)
-	if err != nil {
-		return err
-	}
-	r, err := gzip.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return err
-	}
-	tmp := path + ".partial"
-	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(f, r); err != nil {
-		f.Close()
-		os.Remove(tmp)
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmp, filepath.Clean(path))
 }
