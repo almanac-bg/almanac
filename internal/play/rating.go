@@ -2,7 +2,10 @@ package play
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"math"
+	"strconv"
 )
 
 // Rating is a player's strength in duels: Elo, from 1000, moved by every duel that counts. It shows as a division. It
@@ -117,35 +120,57 @@ func among(friends bool) string {
 // MinRatedGames is how many rated games put a player on the rating's board: a win or two isn't a rating yet.
 const MinRatedGames = 10
 
-// RatingBoard is the rating's board: everyone (or the viewer's friends) with MinRatedGames rated games, by rating.
-// Only who's where goes over everyone; names and looks are read for those shown (rankingOf).
+// onRatingBoard is who's on the rating's board, as the index of it (users_rated) says it: SQLite uses an index of
+// some rows only for a query that says the very same of them, a number written out, not one bound.
+var onRatingBoard = "u.rated >= " + strconv.Itoa(MinRatedGames)
+
+// RatingBoard is the rating's board: everyone (or the viewer's friends) with MinRatedGames rated games, by rating
+// (then more rated games, then who came first). The best are read in order from the board's index; the viewer's
+// place, if they're further down, is counted there, never walked to; names and looks only for those shown
+// (rankingOf). It's all one read, so the viewer's place and the best agree.
 func (g *Game) RatingBoard(ctx context.Context, viewer int64, friends bool) (Ranking, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.rating FROM users u WHERE u.rated >= ?1`+among(friends)+`
-		ORDER BY u.rating DESC, u.rated DESC, u.id`, MinRatedGames, viewer)
+	tx, err := g.DB.Read.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return Ranking{}, err
 	}
-	defer rows.Close()
+	defer tx.Rollback() //nolint:errcheck // a read: nothing to keep
+	rows, err := tx.QueryContext(ctx, `SELECT u.id, u.rating FROM users u WHERE `+onRatingBoard+among(friends)+`
+		ORDER BY u.rating DESC, u.rated DESC, u.id LIMIT ?1`, BoardSize, viewer)
+	if err != nil {
+		return Ranking{}, err
+	}
 	var list []ranked
 	placed := viewer == 0 // nothing of the viewer's to find
-	for place := 1; rows.Next(); place++ {
-		var r ranked
+	for rows.Next() {
+		r := ranked{place: len(list) + 1}
 		if err := rows.Scan(&r.id, &r.value); err != nil {
+			rows.Close()
 			return Ranking{}, err
 		}
-		r.place = place
-		if place <= BoardSize || r.id == viewer {
-			list = append(list, r)
-		}
+		list = append(list, r)
 		placed = placed || r.id == viewer
-		if place >= BoardSize && placed {
-			break
-		}
 	}
+	rows.Close()
 	if err := rows.Err(); err != nil {
 		return Ranking{}, err
 	}
-	rows.Close()
+	if !placed {
+		var rating, rated, ahead int
+		err := tx.QueryRowContext(ctx, `SELECT rating, rated FROM users WHERE id = ?`, viewer).Scan(&rating, &rated)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return Ranking{}, err
+		}
+		if rated >= MinRatedGames {
+			// Ahead of them: a better rating, or the same with more rated games, or the same games and earlier.
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM users u WHERE `+onRatingBoard+among(friends)+`
+				AND u.rating >= ?1 AND NOT (u.rating = ?1 AND (u.rated < ?3 OR u.rated = ?3 AND u.id >= ?2))`,
+				rating, viewer, rated).Scan(&ahead); err != nil {
+				return Ranking{}, err
+			}
+			list = append(list, ranked{id: viewer, place: ahead + 1, value: rating})
+		}
+	}
+	tx.Rollback() //nolint:errcheck // done reading; its connection back before rankingOf takes one
 	return g.rankingOf(ctx, viewer, list, true)
 }
 
