@@ -1,8 +1,8 @@
 // Keeping a guest's game: a guest's game lives in the one browser it began in, until an email keeps it everywhere.
 // Asked in one quiet line in the day's „Утре“ card, from the second day played; at once in an app's own browser
-// (Messenger, Instagram …: lib/embedded.ts), where the way out to the phone's browser is offered too, carrying the
-// game (account.Handoff, taken on /hand/<token>). And the way in for a player who has a profile already, a tap from
-// Начало and Профил.
+// (Messenger, Instagram …: lib/embedded.ts), where the way out to the phone's browser is offered too, moving the
+// game (account.Handoff, taken on /hand/<token> with a tap). And the way in for a player who has a profile already,
+// a tap from Начало and Профил.
 
 import { type ApiError, api } from "../lib/api.ts";
 import { inApp } from "../lib/app.ts";
@@ -134,19 +134,40 @@ export function haveProfile(signedIn: () => void, label = "Имаш профил
         );
 }
 
-/** /hand/<token>: a game brought from an app's own browser (keepLine), taken here, once; then Начало, which says so. */
+/** /hand/<token>: a game brought from an app's own browser (keepLine), taken here once, when the player taps for it
+ * (a link that opens by itself, as the app does with one, or that someone else sent, takes nothing on its own); then
+ * Начало, which says so. The game moves: where it was, it's gone (account.TakeHandoff). */
 export function handoff([token = ""]: string[]) {
-  title();
-  api<{ user: User }>("POST", "/api/auth/hand", { token }).then(
-    (r) => {
-      user.set(r.user);
-      notice.set("Готово: играта ти е тук.");
-      go("/", true);
-    },
-    (err: ApiError) => {
-      notice.set(err.message);
-      go("/", true);
-    },
+  title("Продължи играта тук");
+  const busy = signal(false);
+  const take = () => {
+    busy.set(true);
+    api<{ user: User }>("POST", "/api/auth/hand", { token }).then(
+      (r) => {
+        user.set(r.user);
+        notice.set("Готово: играта ти е тук.");
+        go("/", true);
+      },
+      (err: ApiError) => {
+        notice.set(err.message);
+        go("/", true);
+      },
+    );
+  };
+  return h(
+    "section",
+    { class: "screen" },
+    h("div", { class: "intro" }, h("h1", null, "Продължи играта тук")),
+    h(
+      "div",
+      { class: "stack" },
+      h("p", { class: "lead" }, () =>
+        user()
+          ? "Играта, която започна на друго място, ще се добави към тази тук. Там вече няма да я има."
+          : "Играта, която започна на друго място, ще продължи тук. Там вече няма да я има.",
+      ),
+      h("button", { class: "btn primary", type: "button", onclick: take, disabled: busy }, "Продължи тук"),
+      h("a", { class: "link tap", href: "/" }, "Откажи"),
+    ),
   );
-  return h("section", { class: "screen" }, h("p", { class: "muted" }, "…"));
 }

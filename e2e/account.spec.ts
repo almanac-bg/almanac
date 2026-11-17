@@ -41,7 +41,11 @@ test("a guest keeps their game with a code by email, and can sign out", async ({
   await expect(mail).toHaveAttribute("aria-checked", "false");
   await page.reload();
   await expect(mail).toHaveAttribute("aria-checked", "false");
-  await page.getByRole("button", { name: "Излез" }).click();
+  // Out of the profile everywhere else; still in here.
+  await page.getByRole("button", { name: "Излез от другите устройства" }).click();
+  await expect(page.getByRole("status")).toHaveText("Готово: профилът ти е отворен само на това устройство.");
+  await expect(page.getByText(`Влизаш с ${email}`)).toBeVisible();
+  await page.getByRole("button", { name: "Излез", exact: true }).click();
   // Signed out: said so, the way back in, and this device's own settings still here.
   await expect(page.getByText("Излезе от профила си.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Прати ми код" })).toBeVisible();

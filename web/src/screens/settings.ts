@@ -218,6 +218,7 @@ function account(): Child {
           ".",
         ),
         h("button", { class: "link", onclick: signOut }, "Излез"),
+        signOutOthers(),
       ],
       () => [
         h("h2", null, "Влез или запази профила си"),
@@ -464,11 +465,39 @@ function deleteAccount(): Child {
 }
 
 async function signOut() {
-  // This browser's notifications were the account's: they stop with it (while signed in, so the server forgets them).
+  // This browser's notifications were the account's: they stop with it. The server forgets them with the session
+  // (account.SignOut); the browser lets go of its subscription here.
   if (pushable()) await turnOff().catch(() => {});
   await api("POST", "/api/auth/signout", {}).catch(() => {});
   signedOut.set(true);
   user.set(null);
+}
+
+/** Signing out of the profile everywhere else (a phone lost, a computer left signed in): this device stays in. */
+function signOutOthers(): Child {
+  const said = signal("");
+  const bad = signal(false);
+  const busy = signal(false);
+  const run = async () => {
+    busy.set(true);
+    try {
+      await api("POST", "/api/auth/signout-others", {});
+      bad.set(false);
+      said.set("Готово: профилът ти е отворен само на това устройство.");
+      // Notifications turned on here before they were kept with this session ended with the others: told again,
+      // they're kept (push.ts).
+      if (pushable()) pushOn().catch(() => {});
+    } catch (err) {
+      bad.set(true);
+      said.set((err as ApiError).message);
+    } finally {
+      busy.set(false);
+    }
+  };
+  return [
+    h("button", { class: "link", onclick: run, disabled: busy }, "Излез от другите устройства"),
+    () => said() && h("p", { class: bad() ? "bad" : "muted", role: "status" }, said()),
+  ];
 }
 
 /** Signing in by email, with a code: in Настройки, and on Начало (a guest who keeps coming back, a player with a
@@ -535,6 +564,9 @@ export function signIn(primary = true): Child {
                 code: code.peek(),
               });
               user.set(r.user);
+              // The browser has a new session, and its notifications went along with it (account.Verify); any it
+              // turned on before they were kept with a session are told again, to be kept with this one.
+              if (pushable()) pushOn().catch(() => {});
             });
           },
         },

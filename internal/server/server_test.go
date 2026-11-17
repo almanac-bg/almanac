@@ -165,9 +165,79 @@ func TestHandoffLink(t *testing.T) {
 	if _, out := browser.call("GET", "/api/me", nil); name(out) != guest {
 		t.Fatalf("the browser is %v", out)
 	}
+	// The game moved: the app's browser it left is signed out.
+	if _, out := app.call("GET", "/api/me", nil); out["user"] != nil {
+		t.Fatalf("the app's browser is still %v", out)
+	}
 	if status, out := g.player().call("POST", "/api/auth/hand", map[string]string{"token": token}); status != 404 ||
 		out["error"] != "no_handoff" {
 		t.Fatalf("taken twice: %d %v", status, out)
+	}
+}
+
+// signIn signs a browser in with an email, by the code mailed to it.
+func (p *player) signIn(email string) map[string]any {
+	p.g.t.Helper()
+	p.g.inbox.got = nil
+	if status, out := p.call("POST", "/api/auth/code", map[string]string{"email": email}); status != 200 {
+		p.g.t.Fatalf("sending a code: %d %v", status, out)
+	}
+	p.g.outbox.Flush(p.g.t.Context())
+	code := regexp.MustCompile(`\d{6}`).FindString(p.g.inbox.got[0].Text)
+	status, out := p.call("POST", "/api/auth/verify", map[string]string{"email": email, "code": code})
+	if status != 200 {
+		p.g.t.Fatalf("verify: %d %v", status, out)
+	}
+	return out
+}
+
+// The takeover a handoff once let through (review 2026-11-17, S1), as it was done: someone makes a link in a game
+// of their own and sends it; it's taken in a browser with nobody in it, which later gives its email. The link's maker
+// is signed out, and stays out of the profile.
+func TestHandoffTakeover(t *testing.T) {
+	g := start(t)
+	maker := g.player()
+	maker.call("POST", "/api/guest", map[string]any{})
+	_, out := maker.call("POST", "/api/auth/handoff", map[string]any{})
+	link, _ := out["url"].(string)
+	token := strings.TrimPrefix(link, g.url+"/hand/")
+
+	victim := g.player()
+	if status, out := victim.call("POST", "/api/auth/hand", map[string]string{"token": token}); status != 200 {
+		t.Fatalf("taken: %d %v", status, out)
+	}
+	if u, _ := victim.signIn("victim@example.com")["user"].(map[string]any); u["email"] != "victim@example.com" {
+		t.Fatalf("signed in as %v", u)
+	}
+	if _, out := maker.call("GET", "/api/me", nil); out["user"] != nil {
+		t.Fatalf("the link's maker is in the profile: %v", out)
+	}
+	if status, _ := maker.call("PATCH", "/api/me", map[string]string{"name": "Чужд"}); status != 401 {
+		t.Fatalf("the link's maker renamed the profile: %d", status)
+	}
+	if _, out := victim.call("GET", "/api/me", nil); name(out) == "Чужд" || out["user"] == nil {
+		t.Fatalf("the profile is %v", out)
+	}
+}
+
+// „Излез от другите устройства“: every other browser signed in to the profile is signed out; this one stays.
+func TestSignOutOthers(t *testing.T) {
+	g := start(t)
+	if status, out := g.player().call("POST", "/api/auth/signout-others", map[string]any{}); status != 401 {
+		t.Fatalf("signed out the others of nobody: %d %v", status, out)
+	}
+	phone, laptop, tablet := g.player(), g.player(), g.player()
+	for _, p := range []*player{phone, laptop, tablet} {
+		p.signIn("many@example.com")
+	}
+	if status, out := laptop.call("POST", "/api/auth/signout-others", map[string]any{}); status != 200 ||
+		out["ended"] != float64(2) {
+		t.Fatalf("signed out the others: %d %v", status, out)
+	}
+	for p, in := range map[*player]bool{phone: false, laptop: true, tablet: false} {
+		if _, out := p.call("GET", "/api/me", nil); (out["user"] != nil) != in {
+			t.Fatalf("after signing out the others, a browser is %v", out)
+		}
 	}
 }
 

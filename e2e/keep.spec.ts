@@ -50,11 +50,18 @@ test.describe("in Messenger's own browser", () => {
     });
     const phone = await browser.newPage();
     await phone.goto(url);
+    // Nothing is taken until the player taps for it: a link that opens by itself, or someone else's, brings nothing.
+    await expect(phone.getByText("ще продължи тук. Там вече няма да я има.")).toBeVisible();
+    await phone.getByRole("button", { name: "Продължи тук" }).click();
     await expect(phone.getByRole("status").filter({ hasText: "Готово: играта ти е тук." })).toBeVisible();
     await expect(phone).toHaveURL(/\/$/);
     await expect(phone.locator(".summary .score-n")).toHaveText(rights ?? "");
+    // The game moved: Messenger's browser is signed out of it.
+    const left = await page.evaluate(async () => ((await (await fetch("/api/me")).json()) as { user: unknown }).user);
+    expect(left).toBeNull();
     const late = await browser.newPage();
     await late.goto(url);
+    await late.getByRole("button", { name: "Продължи тук" }).click();
     await expect(late.getByRole("status")).toContainText("Тази връзка вече не работи");
     await phone.close();
     await late.close();

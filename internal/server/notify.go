@@ -13,11 +13,13 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/push"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// subscribe keeps a browser's push subscription, for its player.
+// subscribe keeps a browser's push subscription, for its player, tied to the browser's session: it ends with it
+// (account). Told again, it's tied to the session the browser has now.
 func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -51,9 +53,10 @@ func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) error {
 		}
 		return errBadRequest
 	}
-	_, err = s.db.Write.ExecContext(r.Context(), `INSERT INTO push_subs (endpoint, user_id, p256dh, auth, created_at)
-		VALUES (?, ?, ?, ?, ?) ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh,
-		auth = excluded.auth`, sub.Endpoint, u.ID, sub.Keys.P256dh, sub.Keys.Auth, store.Now())
+	_, err = s.db.Write.ExecContext(r.Context(), `INSERT INTO push_subs (endpoint, user_id, session, p256dh, auth,
+		created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id,
+		session = excluded.session, p256dh = excluded.p256dh, auth = excluded.auth`,
+		sub.Endpoint, u.ID, account.SessionKey(s.session(r)), sub.Keys.P256dh, sub.Keys.Auth, store.Now())
 	if err != nil {
 		return err
 	}
@@ -80,7 +83,8 @@ func (s *Server) unsubscribe(w http.ResponseWriter, r *http.Request) error {
 }
 
 // addPhone keeps a phone's token from its maker's push service, for its player: the game's app sends it once the
-// player allows notifications, and again whenever it opens (a token can change).
+// player allows notifications, and again whenever it opens (a token can change). Like a browser's subscription, it's
+// tied to the app's session, and ends with it.
 func (s *Server) addPhone(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -100,9 +104,10 @@ func (s *Server) addPhone(w http.ResponseWriter, r *http.Request) error {
 	if s.phones.CheckPhone(in.Platform, in.Token) != nil {
 		return errBadRequest
 	}
-	_, err = s.db.Write.ExecContext(r.Context(), `INSERT INTO phones (token, user_id, platform, created_at) VALUES (?, ?, ?, ?)
-		ON CONFLICT (token) DO UPDATE SET user_id = excluded.user_id, platform = excluded.platform`,
-		in.Token, u.ID, in.Platform, store.Now())
+	_, err = s.db.Write.ExecContext(r.Context(), `INSERT INTO phones (token, user_id, session, platform, created_at)
+		VALUES (?, ?, ?, ?, ?) ON CONFLICT (token) DO UPDATE SET user_id = excluded.user_id, session = excluded.session,
+		platform = excluded.platform`,
+		in.Token, u.ID, account.SessionKey(s.session(r)), in.Platform, store.Now())
 	if err != nil {
 		return err
 	}

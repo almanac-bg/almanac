@@ -64,7 +64,8 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   card, said by what's at stake („Серията ти от 2 дни е само на това устройство. Запази я с имейл.“), the form opening
   in place. In an app's own browser (Messenger, Instagram …: `lib/embedded.ts`), where a guest's game would stay, it's
   asked on the first day, with the way out that carries the game: „Отвори в браузъра“ on Android, „Копирай връзката“
-  (for Safari) on an iPhone (`/hand/<token>`, once, `account.Handoff`). A guest's Профил has „Играеш и на друго
+  (for Safari) on an iPhone (`/hand/<token>`, once, `account.Handoff`). The link takes nothing until „Продължи тук“
+  is tapped, and then the game moves: the browser it came from no longer has it. A guest's Профил has „Играеш и на друго
   устройство? Влез с имейла си“ under the name.
 - **The streak at stake.** While the day's ten wait, a streak (1 day or more: the second day is where a habit is won or
   lost) is at stake: its flame is unlit (`.streak-chip.unlit`, the number still there), and the day's card says what
