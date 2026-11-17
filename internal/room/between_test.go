@@ -14,7 +14,7 @@ func TestTiesByTime(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
 		ana, bo, cy := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}, Player{ID: 3, Name: "Цвети"}
-		r, _ := hub.Open(ana, Settings{Length: 5})
+		r, _ := hub.Open(ana, "", Settings{Length: 5})
 		_ = r.Join(bo)
 		_ = r.Join(cy)
 		for _, p := range []Player{ana, bo, cy} {
@@ -51,7 +51,7 @@ func TestChangeBetweenGames(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
 		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
-		r, _ := hub.Open(ana, Settings{Length: 5, Mix: play.MixEasy})
+		r, _ := hub.Open(ana, "", Settings{Length: 5, Mix: play.MixEasy})
 		_ = r.Join(bo)
 		topic := hub.bank().Categories[0].ID
 		if err := r.Change(bo.ID, Settings{Category: topic, Length: 10}); !errors.Is(err, ErrNotYours) {

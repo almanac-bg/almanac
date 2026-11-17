@@ -5801,6 +5801,17 @@
     font-size: 0.875rem;
   }
 
+  /* The host's lock on the room, under its players: who may come in, and the switch beside it (below, on a phone). */
+  .door {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-3);
+    margin-top: var(--space-3);
+    color: var(--text-muted);
+  }
+
   /* ---- Profile ---- */
 
   .mastery-list {

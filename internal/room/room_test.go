@@ -83,7 +83,7 @@ func TestAGamePlayedTogether(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
 		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
-		r, err := hub.Open(ana, Settings{})
+		r, err := hub.Open(ana, "", Settings{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -186,7 +186,7 @@ func TestAGamePlayedTogether(t *testing.T) {
 func TestScreensHearOfChanges(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
-		r, _ := hub.Open(Player{ID: 1, Name: "Ана"}, Settings{Category: "history"})
+		r, _ := hub.Open(Player{ID: 1, Name: "Ана"}, "", Settings{Category: "history"})
 		s, _ := r.Follow(1)
 		<-s.C // following is a change
 		_ = r.Join(Player{ID: 2, Name: "Бо"})
@@ -207,10 +207,10 @@ func TestScreensHearOfChanges(t *testing.T) {
 
 func TestRoomsLimits(t *testing.T) {
 	hub := NewHub(sample(t))
-	if _, err := hub.Open(Player{ID: 1, Name: "Ана"}, Settings{Category: "astrology"}); !errors.Is(err, play.ErrNoTopic) {
+	if _, err := hub.Open(Player{ID: 1, Name: "Ана"}, "", Settings{Category: "astrology"}); !errors.Is(err, play.ErrNoTopic) {
 		t.Fatalf("an unknown topic: %v", err)
 	}
-	r, _ := hub.Open(Player{ID: 1, Name: "Ана"}, Settings{})
+	r, _ := hub.Open(Player{ID: 1, Name: "Ана"}, "", Settings{})
 	for i := range MaxPlayers - 1 {
 		if err := r.Join(Player{ID: int64(i + 2), Name: "Играч"}); err != nil {
 			t.Fatal(err)
@@ -235,7 +235,7 @@ func TestBarredAndLate(t *testing.T) {
 		}
 		hub.Barred = func(context.Context) (map[string]bool, error) { return barred, nil }
 		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
-		r, _ := hub.Open(ana, Settings{})
+		r, _ := hub.Open(ana, "", Settings{})
 		_ = r.Join(bo)
 		sa, _ := r.Follow(ana.ID)
 		sb, _ := r.Follow(bo.ID)
@@ -266,7 +266,7 @@ func TestCluesComeInTime(t *testing.T) {
 		b := sample(t)
 		hub := NewHub(b)
 		ana := Player{ID: 1, Name: "Ана"}
-		r, _ := hub.Open(ana, Settings{})
+		r, _ := hub.Open(ana, "", Settings{})
 		if err := r.Start(ana.ID); err != nil {
 			t.Fatal(err)
 		}
@@ -325,8 +325,8 @@ func TestPausedRooms(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
 		ana := Player{ID: 1, Name: "Ана"}
-		r, _ := hub.Open(ana, Settings{})
-		other, _ := hub.Open(Player{ID: 2, Name: "Бо"}, Settings{})
+		r, _ := hub.Open(ana, "", Settings{})
+		other, _ := hub.Open(Player{ID: 2, Name: "Бо"}, "", Settings{})
 		if err := r.Start(ana.ID); err != nil {
 			t.Fatal(err)
 		}
@@ -363,11 +363,11 @@ func TestRoomsKeptOverARestart(t *testing.T) {
 		bank := sample(t)
 		hub := NewHub(bank)
 		ana, bo, cy := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}, Player{ID: 3, Name: "Цви"}
-		lobby, _ := hub.Open(ana, Settings{})
+		lobby, _ := hub.Open(ana, "", Settings{})
 		_ = lobby.Join(bo)
-		over, _ := hub.Open(bo, Settings{})
+		over, _ := hub.Open(bo, "", Settings{})
 		_ = over.Join(cy)
-		playing, _ := hub.Open(cy, Settings{})
+		playing, _ := hub.Open(cy, "", Settings{})
 		_ = over.Start(bo.ID)
 		sb, _ := over.Follow(bo.ID)
 		for over.View(bo.ID).Phase != End {
@@ -425,7 +425,7 @@ func TestRemove(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
 		ana, bo, cy := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}, Player{ID: 3, Name: "Цви"}
-		r, _ := hub.Open(ana, Settings{})
+		r, _ := hub.Open(ana, "", Settings{})
 		_ = r.Join(bo)
 		_ = r.Join(cy)
 		sa, _ := r.Follow(ana.ID)
@@ -514,10 +514,10 @@ func TestSettingsAndRecords(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		b := sample(t)
 		hub := NewHub(b)
-		if _, err := hub.Open(Player{ID: 1}, Settings{Length: 7}); !errors.Is(err, play.ErrRoomGame) {
+		if _, err := hub.Open(Player{ID: 1}, "", Settings{Length: 7}); !errors.Is(err, play.ErrRoomGame) {
 			t.Fatalf("seven questions: %v", err)
 		}
-		if _, err := hub.Open(Player{ID: 1}, Settings{Mix: "brutal"}); !errors.Is(err, play.ErrRoomGame) {
+		if _, err := hub.Open(Player{ID: 1}, "", Settings{Mix: "brutal"}); !errors.Is(err, play.ErrRoomGame) {
 			t.Fatalf("an unknown mix: %v", err)
 		}
 		type record struct {
@@ -533,7 +533,7 @@ func TestSettingsAndRecords(t *testing.T) {
 			return 100 + int64(len(kept)), nil
 		}
 		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
-		r, err := hub.Open(ana, Settings{Length: 5, Mix: play.MixEasy})
+		r, err := hub.Open(ana, "", Settings{Length: 5, Mix: play.MixEasy})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -597,7 +597,7 @@ func TestLeadingHost(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
 		ana, bo := Player{ID: 1, Name: "Учител"}, Player{ID: 2, Name: "Бо"}
-		r, _ := hub.Open(ana, Settings{Lead: true})
+		r, _ := hub.Open(ana, "", Settings{Lead: true})
 		sa, err := r.Follow(ana.ID)
 		if err != nil {
 			t.Fatalf("the host's screen: %v", err)

@@ -96,6 +96,19 @@ test("the host sends a player out of a room, and they stay out", async ({ browse
   await expect(host.locator(".players li")).toHaveCount(1);
   await guest.reload();
   await expect(guest.getByRole("heading", { name: "Водещият те махна от стаята" })).toBeVisible();
+  // The host locks the room (a class, all in): nobody new comes in until it's open again.
+  await expect(host.getByText("Всеки с кода може да влезе.")).toBeVisible();
+  await host.getByRole("button", { name: "Заключи стаята" }).click();
+  await expect(host.getByText("Стаята е заключена: нови играчи не могат да влязат.")).toBeVisible();
+  const late = await (await browser.newContext()).newPage();
+  await late.goto(host.url());
+  await late.getByLabel("Име").fill("Закъснял");
+  await late.getByRole("button", { name: "Влез" }).click();
+  await expect(late.getByRole("heading", { name: "Стаята е заключена" })).toBeVisible();
+  await host.getByRole("button", { name: "Отключи" }).click();
+  await late.getByRole("button", { name: "Опитай пак" }).click();
+  await expect(late.getByText("Чакаме Учител да започне.")).toBeVisible();
+  await expect(host.locator(".players li")).toHaveCount(2);
 });
 
 test("two people asking for a duel play it live", async ({ browser }, info) => {

@@ -15,6 +15,7 @@ import {
   choose,
   computed,
   countdown,
+  door,
   fact,
   formatNumber,
   h,
@@ -87,6 +88,7 @@ function lobby(view: () => RoomView, code: string): Child {
       h("h2", { class: "section-title" }, () => `Играчи (${view().players.length})`),
       () => (view().players.length ? null : h("p", { class: "muted" }, "Още никой не е влязъл.")),
       players(view, code, error.set),
+      door(view, code, error.set),
     ),
     h("button", { class: "btn primary big", onclick: () => lead(code, "start", error.set) }, "Започни"),
     choose(view, code),
@@ -237,6 +239,7 @@ function end(view: () => RoomView, code: string): Child {
       { class: "more" },
       h("summary", null, () => `Играчи (${view().players.length})`),
       players(view, code, error.set),
+      door(view, code, error.set),
     ),
   );
 }
