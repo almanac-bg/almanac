@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -121,7 +122,8 @@ func TestCodeTries(t *testing.T) {
 	g := start(t)
 	p := g.player()
 	email := map[string]string{"email": "tries@example.com"}
-	if status, out := p.call("POST", "/api/auth/code", email); status != 200 || out["again"] != float64(60) {
+	if status, out := p.call("POST", "/api/auth/code", email); status != 200 || out["again"] != float64(60) ||
+		out["digits"] != float64(account.CodeDigits) {
 		t.Fatalf("sending a code: %d %v", status, out)
 	}
 	wrong := map[string]string{"email": "tries@example.com", "code": "x"}
@@ -138,6 +140,49 @@ func TestCodeTries(t *testing.T) {
 	}
 	if status, out := p.call("POST", "/api/auth/code", email); status != 200 {
 		t.Fatalf("a new code once the old is dead: %d %v", status, out)
+	}
+}
+
+// A code works only in the browser that asked for it (its ask cookie), and what others ask for with a player's
+// address, from their own network, never uses up what the player may ask for (review 2026-11-17, S3).
+func TestCodeIsTheBrowsers(t *testing.T) {
+	g := start(t)
+	mine, theirs := g.player(), g.player()
+	mine.call("POST", "/api/auth/code", map[string]string{"email": "me@example.com"})
+	g.outbox.Flush(t.Context())
+	code := regexp.MustCompile(`\d{6}`).FindString(g.inbox.got[0].Text)
+	if _, out := theirs.call("POST", "/api/auth/verify", map[string]string{"email": "me@example.com", "code": code}); out["error"] != "code_expired" {
+		t.Fatalf("my code in another browser: %v", out)
+	}
+	if _, out := mine.call("POST", "/api/auth/verify", map[string]string{"email": "me@example.com", "code": code}); out["user"] == nil {
+		t.Fatalf("my code in my browser: %v", out)
+	}
+	// The ask cookie is gone with the code.
+	for _, c := range mine.client.Jar.Cookies(must(url.Parse(g.url))) {
+		if c.Name == "ask" {
+			t.Fatalf("the ask cookie stayed: %v", c)
+		}
+	}
+
+	ask := func(from, email string) int {
+		r := httptest.NewRequest("POST", g.url+"/api/auth/code", strings.NewReader(`{"email":"`+email+`"}`))
+		r.RemoteAddr = from + ":1234"
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("Sec-Fetch-Site", "same-origin")
+		w := httptest.NewRecorder()
+		g.srv.Handler().ServeHTTP(w, r)
+		return w.Code
+	}
+	for i := range 5 {
+		if status := ask("198.51.100.1", "victim@example.com"); status != 200 {
+			t.Fatalf("code %d from one network: %d", i+1, status)
+		}
+	}
+	if status := ask("198.51.100.1", "victim@example.com"); status != 429 {
+		t.Fatalf("a sixth code to one address from one network: %d", status)
+	}
+	if status := ask("198.51.100.2", "victim@example.com"); status != 200 {
+		t.Fatalf("the player's own code, after another network's: %d", status)
 	}
 }
 

@@ -1616,6 +1616,12 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* Twelve digits fit a phone's width. */
+  input.code.long {
+    font-size: clamp(1.25rem, 6.5vw, 2rem);
+    letter-spacing: 0.04em;
+  }
+
   /* Empty, the code's field says what goes in it in plain words, never in digits that look typed. */
   input.code::placeholder {
     font: 500 1.125rem / 1 var(--font-sans);

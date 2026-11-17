@@ -101,7 +101,8 @@ type Server struct {
 	streakMailing streakMailing // who is due the mail of a streak ended when, today (streakmail.go)
 	secure        bool
 	host          string
-	cookie        string
+	cookie        string // the session's
+	askCookie     string // the token of the browser a sign-in code is for (account.Asked)
 	handler       http.Handler
 }
 
@@ -124,9 +125,9 @@ func New(cfg Config, d Deps) (*Server, error) {
 		host:   strings.ToLower(u.Hostname()),
 	}
 	// A __Host- cookie is bound to this exact host, over HTTPS, for the whole site: nothing else can set or read it.
-	s.cookie = "sid"
+	s.cookie, s.askCookie = "sid", "ask"
 	if s.secure {
-		s.cookie = "__Host-sid"
+		s.cookie, s.askCookie = "__Host-sid", "__Host-ask"
 	}
 	s.limits.off = cfg.Dev
 	s.bank.Store(d.Bank)

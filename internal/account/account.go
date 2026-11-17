@@ -9,6 +9,14 @@
 // other session the guest had ends: only the browser that proved the email is in it. SignOutOthers ends a player's
 // other sessions on demand. A guest who never plays is cleared after a few days unused (CleanUp), so that guests
 // made and dropped don't stay.
+//
+// A sign-in code is the browser's that asked for it (SendCode gives it a token, which it keeps in a cookie): only that
+// browser can try it, so nobody else can guess at it, use up its tries or replace it, and a player's own sign-in
+// never waits on what others do with their address. What could still be guessed at is a code someone asks for with a
+// player's address, mailed to the player: the wrong codes given for an address, from every browser, are counted in
+// the database (Misses within MissesKept), and past them the address's codes are long (LongCodeDigits) instead of
+// refused, so guessing gets nowhere and the player still signs in. Code mails are urgent in the outbox (sent first,
+// dropped once dead), and there are at most CodesAMinute of them, apart for addresses with a profile and new ones.
 package account
 
 import (
@@ -25,6 +33,7 @@ import (
 	"net/mail"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -69,10 +78,28 @@ const (
 	// SessionDays is how long a session lasts unused; each day it's used pushes the end back (browsers keep a cookie
 	// at most 400 days).
 	SessionDays = 400
-	CodeTTL     = 15 * time.Minute
-	CodeTries   = 5
-	// CodeEvery is the least time between two codes to one address.
+	// CodeTTL is how long a code works: time for a slow mail, not for a guess at leisure.
+	CodeTTL = 15 * time.Minute
+	// CodeTries is how many times the browser a code is for may try it: a typo or two, not a search.
+	CodeTries = 5
+	// CodeEvery is the least time between two codes to one browser and address.
 	CodeEvery = time.Minute
+
+	// CodeDigits is how long a code is, while its address has had fewer than Misses wrong codes within MissesKept
+	// (from every browser, counted in the database, so no restart forgets them). A guesser gets at most Misses tries at
+	// a short code a stretch: 10 × 12 in a year of a million codes, about 1 in 8000 a year for the most persistent.
+	CodeDigits = 6
+	Misses     = 10
+	MissesKept = 30 * 24 * time.Hour
+	// LongCodeDigits is how long an address's codes are past Misses: nobody is locked out by others' wrong guesses,
+	// their code is longer. Even every code the game may mail to one address (CodesAMinute, each CodeTries tries) is
+	// about 8 × 10⁷ guesses a year against 10¹²: under 1 in 10 000 for a guesser who takes all of them, all year.
+	LongCodeDigits = 12
+
+	// CodesAMinute is the most codes mailed a minute to addresses with a profile, and apart, to new ones: well past
+	// what players need (a class saving its games at once), well under what one mail worker sends, so that codes never
+	// queue past their time; and a flood of codes to made-up addresses can't stop players with a profile signing in.
+	CodesAMinute = 30
 )
 
 // Errors a player may see.
@@ -82,6 +109,7 @@ var (
 	ErrBadCode     = errors.New("wrong code")
 	ErrCodeExpired = errors.New("the code expired")
 	ErrCodeTries   = errors.New("the code ran out of tries")
+	ErrCodesBusy   = errors.New("the most codes a minute were mailed")
 	ErrBadName     = errors.New("bad name")
 	ErrBadTag      = errors.New("bad tag")
 	ErrTagTaken    = errors.New("tag taken")
@@ -93,8 +121,8 @@ type WrongCode struct{ Left int }
 func (e WrongCode) Error() string        { return fmt.Sprintf("wrong code, %d tries left", e.Left) }
 func (e WrongCode) Is(target error) bool { return target == ErrBadCode }
 
-// TooSoon is a code asked for while the last one to the address is still alive and was sent less than CodeEvery ago:
-// another may go in Wait (ErrTooSoon).
+// TooSoon is a code asked for while the browser's last one, to the same address, is still alive and was sent less
+// than CodeEvery ago: another may go in Wait (ErrTooSoon).
 type TooSoon struct{ Wait time.Duration }
 
 func (e TooSoon) Error() string        { return fmt.Sprintf("a code was just sent, again in %v", e.Wait) }
@@ -109,6 +137,33 @@ type Accounts struct {
 	Secret []byte
 	// Merge moves what guest `from` has into account `to`, inside the sign-in's transaction; `from` is deleted after.
 	Merge []func(tx *sql.Tx, from, to int64) error
+	// Unlimited lifts CodesAMinute, in development (as the server's limits are lifted there): the browser tests ask
+	// for codes by the dozen.
+	Unlimited bool
+
+	// mailed counts the codes mailed this minute, to addresses with a profile [1] and new ones [0] (CodesAMinute):
+	// kept in memory, as a restart losing a minute's count lets through at most a minute's more.
+	mu     sync.Mutex
+	minute int64
+	mailed [2]int
+}
+
+// mailOne counts a code mailed to an address with a profile or a new one, if this minute has room for it.
+func (a *Accounts) mailOne(profile bool, now time.Time) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if m := now.Unix() / 60; m != a.minute {
+		a.minute, a.mailed = m, [2]int{}
+	}
+	i := 0
+	if profile {
+		i = 1
+	}
+	if a.mailed[i] >= CodesAMinute && !a.Unlimited {
+		return false
+	}
+	a.mailed[i]++
+	return true
 }
 
 // newToken makes a session token (what the cookie holds) and the hash the database keeps.
@@ -333,19 +388,24 @@ const IdleGuestDays = 3
 // writes, with the game's own between them, not in one that holds the writer for seconds.
 const cleanBatch = 500
 
-// CleanUp drops expired sessions, codes and handoffs, and the guests nobody can use or does: those whose sessions are
-// gone (nothing of theirs can come back), and those who never played nor have a friend, unseen for IdleGuestDays.
-// Their days played stay counted (play.Retention: active_days keeps no link to a player).
+// CleanUp drops expired sessions, codes and handoffs, the wrong codes counted for an address once their stretch is
+// over (MissesKept), and the guests nobody can use or does: those whose sessions are gone (nothing of theirs can come
+// back), and those who never played nor have a friend, unseen for IdleGuestDays. Their days played stay counted
+// (play.Retention: active_days keeps no link to a player).
 func (a *Accounts) CleanUp(ctx context.Context) error {
 	now := store.Now()
 	for _, q := range []string{
 		`DELETE FROM sessions WHERE expires_at <= ?`,
-		`DELETE FROM email_codes WHERE expires_at <= ?`,
+		`DELETE FROM sign_in_codes WHERE expires_at <= ?`,
 		`DELETE FROM handoffs WHERE expires_at <= ?`,
 	} {
 		if _, err := a.DB.Write.ExecContext(ctx, q, now); err != nil {
 			return err
 		}
+	}
+	if _, err := a.DB.Write.ExecContext(ctx, `DELETE FROM code_misses WHERE since <= ?`,
+		store.Ms(time.Now().Add(-MissesKept))); err != nil {
+		return err
 	}
 	idle := store.Ms(time.Now().AddDate(0, 0, -IdleGuestDays))
 	for _, q := range []struct {
@@ -389,83 +449,217 @@ func (a *Accounts) codeHash(email, code string) []byte {
 	return m.Sum(nil)
 }
 
-// SendCode mails a sign-in code to an address. A new code replaces the one before; while that one is alive, not
-// within CodeEvery of it (TooSoon), but at once once it's dead (expired, or out of tries).
-func (a *Accounts) SendCode(ctx context.Context, email string) error {
+// Asked is a code on its way to an address, for the browser that asked: Token is what that browser keeps (a cookie,
+// for CodeTTL), without which the code works nowhere; Digits is how long the code is.
+type Asked struct {
+	Token  string
+	Digits int
+}
+
+// SendCode mails a sign-in code to an address, for the browser that asks (asked: the token it kept from its last
+// code, maybe ""). That browser's last code is replaced, and its mail dropped if it hasn't gone yet; while it's alive
+// and to the same address, not within CodeEvery (TooSoon). Nobody else's code is touched: each browser has its own.
+// The code is long once the address has had Misses wrong codes (LongCodeDigits); past CodesAMinute, none goes
+// (ErrCodesBusy).
+func (a *Accounts) SendCode(ctx context.Context, email, asked string) (Asked, error) {
 	email, err := NormalEmail(email)
 	if err != nil {
-		return err
+		return Asked{}, err
 	}
-	n, _ := rand.Int(rand.Reader, big.NewInt(1_000_000))
-	code := fmt.Sprintf("%06d", n.Int64())
+	token, asker := newToken()
+	out := Asked{Token: token, Digits: CodeDigits}
 	now := time.Now()
 	err = a.DB.Tx(ctx, func(tx *sql.Tx) error {
-		var sent, expires int64
-		var tries int
-		err := tx.QueryRow(`SELECT sent_at, expires_at, tries FROM email_codes WHERE email = ?`, email).
-			Scan(&sent, &expires, &tries)
-		alive := err == nil && expires > store.Ms(now) && tries < CodeTries
-		if wait := CodeEvery - time.Duration(store.Ms(now)-sent)*time.Millisecond; alive && wait > 0 {
-			return TooSoon{Wait: wait}
-		}
-		_, err = tx.Exec(`INSERT INTO email_codes (email, code_hash, sent_at, expires_at) VALUES (?, ?, ?, ?)
-			ON CONFLICT (email) DO UPDATE SET code_hash = excluded.code_hash, sent_at = excluded.sent_at,
-				expires_at = excluded.expires_at, tries = 0`,
-			email, a.codeHash(email, code), store.Ms(now), store.Ms(now.Add(CodeTTL)))
+		misses, err := missesOf(tx, email, now)
 		if err != nil {
 			return err
 		}
-		return a.Outbox.Enqueue(tx, mailer.Message{
-			To:      email,
-			Subject: "Кодът ти за АЛМАНАХ: " + code,
-			Text: "Кодът ти за вход в АЛМАНАХ е:\n\n    " + code + "\n\n" +
-				"Важи 15 минути. Ако не очакваш такъв код, просто не обръщай внимание на писмото.\n\nalmanac.bg\n",
-		})
+		if misses >= Misses {
+			out.Digits = LongCodeDigits
+		}
+		if err := a.replace(tx, asked, email, out.Digits, now); err != nil {
+			return err
+		}
+		var profile bool
+		if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM users WHERE email = ?)`, email).Scan(&profile); err != nil {
+			return err
+		}
+		if !a.mailOne(profile, now) {
+			return ErrCodesBusy
+		}
+		code := newCode(out.Digits)
+		mail, err := a.Outbox.Urgent(tx, codeMail(email, code), now.Add(CodeTTL))
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(`INSERT INTO sign_in_codes (asker, email, code_hash, digits, sent_at, expires_at, mail)
+			VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			asker, email, a.codeHash(email, code), out.Digits, store.Ms(now), store.Ms(now.Add(CodeTTL)), mail)
+		return err
 	})
-	if err == nil {
-		a.Outbox.Wake()
+	if err != nil {
+		return Asked{}, err
 	}
+	a.Outbox.Wake()
+	return out, nil
+}
+
+// replace ends the last code of the browser that kept the token asked, as it asks for another (to email, of so many
+// digits): not within CodeEvery while it's alive and to the same address (TooSoon; a short one is dead once the next
+// is long), and its mail goes no more if it's still waiting.
+func (a *Accounts) replace(tx *sql.Tx, asked, email string, digits int, now time.Time) error {
+	if asked == "" {
+		return nil
+	}
+	var to string
+	var sent, expires int64
+	var was, tries int
+	var mail sql.NullInt64
+	err := tx.QueryRow(`SELECT email, digits, sent_at, expires_at, tries, mail FROM sign_in_codes WHERE asker = ?`,
+		hashToken(asked)).Scan(&to, &was, &sent, &expires, &tries, &mail)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	alive := to == email && expires > store.Ms(now) && tries < CodeTries && was >= digits
+	if wait := CodeEvery - time.Duration(store.Ms(now)-sent)*time.Millisecond; alive && wait > 0 {
+		return TooSoon{Wait: wait}
+	}
+	if mail.Valid {
+		if err := a.Outbox.Drop(tx, mail.Int64); err != nil {
+			return err
+		}
+	}
+	_, err = tx.Exec(`DELETE FROM sign_in_codes WHERE asker = ?`, hashToken(asked))
 	return err
 }
 
+// missesOf is how many wrong codes an address has had in its stretch of MissesKept.
+func missesOf(tx *sql.Tx, email string, now time.Time) (int, error) {
+	var n int
+	err := tx.QueryRow(`SELECT misses FROM code_misses WHERE email = ? AND since > ?`,
+		email, store.Ms(now.Add(-MissesKept))).Scan(&n)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return n, err
+}
+
+// miss counts a wrong code given for an address: in its stretch, or as the first of a new one once MissesKept is out.
+func miss(tx *sql.Tx, email string, now time.Time) error {
+	_, err := tx.Exec(`INSERT INTO code_misses (email, misses, since) VALUES (?1, 1, ?2)
+		ON CONFLICT (email) DO UPDATE SET
+			misses = CASE WHEN since > ?3 THEN misses + 1 ELSE 1 END,
+			since = CASE WHEN since > ?3 THEN since ELSE ?2 END`,
+		email, store.Ms(now), store.Ms(now.Add(-MissesKept)))
+	return err
+}
+
+// newCode is a code of n random digits.
+func newCode(n int) string {
+	most := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(n)), nil)
+	c, _ := rand.Int(rand.Reader, most)
+	return fmt.Sprintf("%0*s", n, c.String())
+}
+
+// spaced is a code as a mail shows it: a long one in fours, to be read and typed in pieces.
+func spaced(code string) string {
+	if len(code) <= CodeDigits {
+		return code
+	}
+	var b strings.Builder
+	for i, r := range code {
+		if i > 0 && i%4 == 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// onlyDigits is a code as it was typed or pasted, without the spaces (or anything else) between its digits.
+func onlyDigits(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, s)
+}
+
+// codeMail is the mail that brings a code.
+func codeMail(email, code string) mailer.Message {
+	text := "Кодът ти за вход в АЛМАНАХ е:\n\n    " + spaced(code) + "\n\n" +
+		fmt.Sprintf("Важи %d минути и само там, където го поиска. ", int(CodeTTL/time.Minute)) +
+		"Ако не очакваш такъв код, просто не обръщай внимание на писмото.\n\n"
+	if len(code) > CodeDigits {
+		text += "Този път кодът е по-дълъг: напоследък някой въвежда грешни кодове за този имейл.\n\n"
+	}
+	return mailer.Message{To: email, Subject: "Кодът ти за АЛМАНАХ: " + spaced(code), Text: text + "almanac.bg\n"}
+}
+
+// Proof is what signs a browser in by email: the address, the code mailed to it, and the token the browser kept when
+// it asked for the code (Asked.Token).
+type Proof struct{ Email, Code, Asked string }
+
 // Verify checks a code and signs its address in, in the browser of session (its token, maybe ""), with a new session
-// in place of that one (moveSession). A wrong one counts a try (WrongCode, with the tries left); the last try used up,
-// the code is dead (ErrCodeTries), as it is once its time is out (ErrCodeExpired). The player the browser was is kept
-// when they can be: a guest giving a new address keeps their account, and every other session they had ends (one made
-// anywhere else, before the email was proved here, must not come into the profile); a guest signing in to an account
-// that has the address brings their progress along (Merge) and is gone after.
-func (a *Accounts) Verify(ctx context.Context, email, code, session string) (User, string, error) {
-	email, err := NormalEmail(email)
+// in place of that one (moveSession). Only the browser that asked for the code can (p.Asked): to any other, as once
+// its time is out, there's no code (ErrCodeExpired). A wrong one counts a try (WrongCode, with the tries left) and a
+// miss for the address; the last try used up, the code is dead (ErrCodeTries), and so is a short one once the address
+// has had Misses (the next code is long). The player the browser was is kept when they can be: a guest giving a new
+// address keeps their account, and every other session they had ends (one made anywhere else, before the email was
+// proved here, must not come into the profile); a guest signing in to an account that has the address brings their
+// progress along (Merge) and is gone after.
+func (a *Accounts) Verify(ctx context.Context, p Proof, session string) (User, string, error) {
+	email, err := NormalEmail(p.Email)
 	if err != nil {
 		return User{}, "", err
 	}
-	code = strings.TrimSpace(code)
+	code := onlyDigits(p.Code)
+	asker := hashToken(p.Asked)
 	var u User
 	var token string
 	var wrong error
 	err = a.DB.Tx(ctx, func(tx *sql.Tx) error {
+		now := time.Now()
+		var to string
 		var hash []byte
+		var digits, tries int
 		var expires int64
-		var tries int
-		err := tx.QueryRow(`SELECT code_hash, expires_at, tries FROM email_codes WHERE email = ?`, email).
-			Scan(&hash, &expires, &tries)
+		err := tx.QueryRow(`SELECT email, code_hash, digits, expires_at, tries FROM sign_in_codes WHERE asker = ?`,
+			asker).Scan(&to, &hash, &digits, &expires, &tries)
 		switch {
-		case errors.Is(err, sql.ErrNoRows), err == nil && expires <= store.Now():
+		case p.Asked == "", errors.Is(err, sql.ErrNoRows), err == nil && (to != email || expires <= store.Ms(now)):
 			return ErrCodeExpired
 		case err != nil:
 			return err
 		case tries >= CodeTries:
 			return ErrCodeTries
 		}
+		misses, err := missesOf(tx, email, now)
+		if err != nil {
+			return err
+		}
+		short := digits < LongCodeDigits
+		if short && misses >= Misses { // dead from now on, so that a new one goes at once
+			wrong = ErrCodeTries
+			_, err := tx.Exec(`UPDATE sign_in_codes SET tries = ? WHERE asker = ?`, CodeTries, asker)
+			return err
+		}
 		if !hmac.Equal(hash, a.codeHash(email, code)) {
 			wrong = WrongCode{Left: CodeTries - tries - 1}
-			if tries+1 >= CodeTries {
+			if tries+1 >= CodeTries || short && misses+1 >= Misses {
 				wrong = ErrCodeTries
 			}
-			_, err := tx.Exec(`UPDATE email_codes SET tries = tries + 1 WHERE email = ?`, email)
+			if err := miss(tx, email, now); err != nil {
+				return err
+			}
+			_, err := tx.Exec(`UPDATE sign_in_codes SET tries = tries + 1 WHERE asker = ?`, asker)
 			return err // the try counts: committed below, then the wrong code's error
 		}
-		if _, err := tx.Exec(`DELETE FROM email_codes WHERE email = ?`, email); err != nil {
+		if _, err := tx.Exec(`DELETE FROM sign_in_codes WHERE asker = ?`, asker); err != nil {
 			return err
 		}
 		current, err := sessionUser(tx, session)

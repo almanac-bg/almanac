@@ -83,6 +83,42 @@ test("a code tried too often is dead, and a new one goes at once", async ({ page
   await expect(page.getByText(`Влизаш с ${email}`)).toBeVisible();
 });
 
+/** The last long code mailed to `email`, as the mail has it (in fours). */
+function longCode(email: string): string {
+  try {
+    return /\b(\d{4} \d{4} \d{4})\b/.exec(readFileSync(`test-results/mail/${email}.txt`, "utf8"))?.[1] ?? "";
+  } catch {
+    return "";
+  }
+}
+
+test("past ten wrong codes for an address its code is longer, and still signs in", async ({ page }, info) => {
+  const email = `long-${info.project.name}-${Date.now()}@example.com`;
+  await page.goto("/settings");
+  await page.getByLabel("Имейл").fill(email);
+  await page.getByRole("button", { name: "Прати ми код" }).click();
+  // Two codes' tries, all wrong: ten for the address (account.Misses), whoever gave them.
+  let last = "";
+  for (const _ of [1, 2]) {
+    await expect.poll(() => mailedCode(email)).not.toBe(last);
+    last = mailedCode(email);
+    for (let i = 0; i < 5; i++) {
+      await page.getByLabel("Код").fill(last === "000000" ? "111111" : "000000");
+      await page.getByRole("button", { name: "Влез" }).click();
+      await expect(page.getByRole("alert")).toHaveText(/Грешен код|Твърде много опити/);
+    }
+    await expect(page.getByRole("alert")).toHaveText("Твърде много опити. Поискай нов код.");
+    await page.getByRole("button", { name: "Прати нов код" }).click();
+    await expect(page.getByRole("button", { name: "Влез" })).toBeVisible(); // sent: the field is cleared for it
+  }
+  // The next is twelve digits, in fours in the mail: pasted as it is, it signs in.
+  await expect.poll(() => longCode(email)).not.toBe("");
+  await page.getByLabel("Код").fill(longCode(email));
+  await expect(page.getByLabel("Код")).toHaveValue(longCode(email).replaceAll(" ", ""));
+  await page.getByRole("button", { name: "Влез" }).click();
+  await expect(page.getByText(`Влизаш с ${email}`)).toBeVisible();
+});
+
 test("a name changed in Настройки is kept on leaving, and a deleted profile ends on Начало", async ({ page }) => {
   await becomeGuest(page);
   await page.goto("/settings");

@@ -82,6 +82,7 @@ var playerErrors = map[error]*apiError{
 	account.ErrBadCode:     {http.StatusBadRequest, "bad_code", "Грешен код."},
 	account.ErrCodeExpired: {http.StatusBadRequest, "code_expired", "Кодът вече не важи. Поискай нов."},
 	account.ErrCodeTries:   {http.StatusBadRequest, "code_tries", "Твърде много опити. Поискай нов код."},
+	account.ErrCodesBusy:   {http.StatusServiceUnavailable, "codes_busy", "Точно сега пращаме много кодове. Опитай пак след минута."},
 	account.ErrNoHandoff:   {http.StatusNotFound, "no_handoff", "Тази връзка вече не работи: играта ти остана там, където я започна."},
 	account.ErrHandoffSignedIn: {http.StatusConflict, "handoff_signed_in",
 		"Тук вече играеш с профила си. За да добавиш към него играта от другото място, влез с имейла си там, където я започна."},
@@ -242,19 +243,37 @@ func (s *Server) sendCode(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	// Each code is a mail: 10 an hour from a network, 50 from a site's /48, 5 to an address.
-	if !s.allowFrom(r, "code", 10, 50, time.Hour) || !s.limits.allow("code:"+email, 5, time.Hour) {
+	// Each code is a mail: 10 an hour from a network, 50 from a site's /48; to one address, 5 an hour from a network.
+	// Only from a network: what others ask for with a player's address never uses up what the player may ask for.
+	if !s.allowFrom(r, "code", 10, 50, time.Hour) || !s.allowFrom(r, "code-to:"+email, 5, 0, time.Hour) {
 		return errTooMany
 	}
-	if err := s.accounts.SendCode(r.Context(), email); err != nil {
-		if soon := (account.TooSoon{}); errors.As(err, &soon) {
-			return &apiError{http.StatusTooManyRequests, "too_soon",
-				fmt.Sprintf("Току-що ти пратихме код. Нов можеш да поискаш след %d с.", seconds(soon.Wait))}
-		}
+	asked, err := s.accounts.SendCode(r.Context(), email, s.asked(r))
+	if soon := (account.TooSoon{}); errors.As(err, &soon) {
+		return &apiError{http.StatusTooManyRequests, "too_soon",
+			fmt.Sprintf("Току-що ти пратихме код. Нов можеш да поискаш след %d с.", seconds(soon.Wait))}
+	}
+	if errors.Is(err, account.ErrCodesBusy) {
+		s.problems.add("sign-in codes: the most a minute were asked for (account.CodesAMinute); a flood?")
+	}
+	if err != nil {
 		return err
 	}
-	// Another code may go after CodeEvery: the client counts it down.
-	return ok(w, map[string]any{"sent": true, "again": seconds(account.CodeEvery)})
+	// The code works only in this browser, which keeps its token for as long as the code lives.
+	http.SetCookie(w, &http.Cookie{
+		Name: s.askCookie, Value: asked.Token, Path: "/", MaxAge: int(account.CodeTTL / time.Second),
+		HttpOnly: true, Secure: s.secure, SameSite: http.SameSiteStrictMode,
+	})
+	// Another code may go after CodeEvery: the client counts it down. The field takes the code's digits.
+	return ok(w, map[string]any{"sent": true, "again": seconds(account.CodeEvery), "digits": asked.Digits})
+}
+
+// asked is the token this browser kept from the last code it asked for ("": none).
+func (s *Server) asked(r *http.Request) string {
+	if c, err := r.Cookie(s.askCookie); err == nil {
+		return c.Value
+	}
+	return ""
 }
 
 // seconds is a wait in whole seconds, rounded up: never "0 с" while there's still a wait.
@@ -282,14 +301,18 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) error {
 	if !s.allowFrom(r, "verify", 30, 0, time.Hour) {
 		return errTooMany
 	}
-	// The browser's session is replaced by a new one (account.Verify), its notifications brought along.
-	u, token, err := s.accounts.Verify(r.Context(), in.Email, in.Code, s.session(r))
+	// Only by the browser the code is for (its ask cookie). Its session is replaced by a new one (account.Verify),
+	// its notifications brought along.
+	proof := account.Proof{Email: in.Email, Code: in.Code, Asked: s.asked(r)}
+	u, token, err := s.accounts.Verify(r.Context(), proof, s.session(r))
 	if wrong := (account.WrongCode{}); errors.As(err, &wrong) {
 		return &apiError{http.StatusBadRequest, "bad_code", wrongCodeWords(wrong.Left)}
 	}
 	if err != nil {
 		return err
 	}
+	http.SetCookie(w, &http.Cookie{Name: s.askCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.secure,
+		SameSite: http.SameSiteStrictMode})
 	s.setSession(w, token)
 	return ok(w, map[string]any{"user": u})
 }
