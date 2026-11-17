@@ -20,17 +20,17 @@ import (
 
 // A player's devices are few: a session is one browser's (account), so it keeps one subscription and one phone's
 // token, the last it told; and a player keeps pushDevices of each, the newest. Each is told again at most
-// pushTellsPerHour times an hour by a player, pushTellsPerIP from an address: the app tells its token at every start.
+// pushTellsPerHour times an hour by a player, pushTellsPerNet from a network (clientNet): the app tells its token at every start.
 const (
 	pushDevices      = 5
 	pushTellsPerHour = 60
-	pushTellsPerIP   = 600
+	pushTellsPerNet  = 600
 )
 
-// mayTell says whether a player may tell a device now (pushTellsPerHour, pushTellsPerIP).
+// mayTell says whether a player may tell a device now (pushTellsPerHour, pushTellsPerNet).
 func (s *Server) mayTell(r *http.Request, userID int64) bool {
 	return s.limits.allow("push:user:"+strconv.FormatInt(userID, 10), pushTellsPerHour, time.Hour) &&
-		s.limits.allow("push:ip:"+s.clientIP(r), pushTellsPerIP, time.Hour)
+		s.limits.allow("push:net:"+s.clientNet(r), pushTellsPerNet, time.Hour)
 }
 
 // keepDevice keeps a device told by a session (an upsert into table, keyed by column), and makes it the session's
