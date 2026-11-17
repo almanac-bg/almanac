@@ -217,7 +217,14 @@ function pages(topic: string, counted: (c: Counts) => void): Child {
   return [
     when(
       () => next() === "" && !days.childElementCount,
-      () => h("p", { class: "muted" }, "Тук още няма факти. Отговори вярно на въпрос от тази тема и ще дойдат."),
+      () =>
+        h(
+          "p",
+          { class: "muted" },
+          topic
+            ? "Тук още няма факти. Отговори вярно на въпрос от тази тема и ще дойдат."
+            : "Още няма факти. Всеки верен отговор носи един.",
+        ),
       () => days,
     ),
     () => (trouble() ? h("p", { role: "alert" }, trouble()) : null),
