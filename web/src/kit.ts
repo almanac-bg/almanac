@@ -31,7 +31,7 @@ import { withName } from "./lib/words.ts";
 import type { DuelView } from "./screens/duel.ts";
 import { clock, coming, dayWord, when } from "./screens/modes.ts";
 import type { Steps } from "./screens/outcome.ts";
-import { mixes } from "./screens/rooms.ts";
+import { changeGame, mixes } from "./screens/rooms.ts";
 import { categories, hostCss, outcomeCss, player, playing, topics, user } from "./state.ts";
 import {
   avatar,
@@ -62,6 +62,7 @@ export const kit = {
   categories,
   challengeButton,
   challengeText,
+  changeGame,
   clock,
   coming,
   dayWord,

@@ -41,6 +41,8 @@ test("Роял: in from the lobby, its music, live to the fifteenth question, th
   await page.locator(".screen > button", { hasText: "Влез" }).click();
   await expect(page.getByRole("button", { name: "Излез" })).toBeVisible();
   await expect(page.getByText("Вътре си.")).toBeVisible();
+  // Never in a Роял before: how it's played, in a line, in the lobby.
+  await expect(page.getByText(/^Грешката не те изважда: след 5-ия/)).toBeVisible();
   // No music with its switch off, though in and touched; with it on (as by default), none before a touch, and from
   // the first one, the lobby's quiet bed.
   await page.waitForTimeout(1000);
@@ -63,6 +65,8 @@ test("Роял: in from the lobby, its music, live to the fifteenth question, th
       // The first question ends the music.
       expect(await pad()).toEqual({ saws: 4, stops: 8 });
       await expect(page.locator(".royal-left")).toHaveText(/^В играта: \d+ от \d+$|^В турнира си само ти: /);
+      // Before the first answer, everyone is level: no place yet.
+      await expect(page.locator(".royal-me")).toHaveCount(0);
     }
     await answer(page);
     // The answer shows once everyone playing has answered (or the time is up), with the standings.
@@ -75,10 +79,19 @@ test("Роял: in from the lobby, its music, live to the fifteenth question, th
   await expect(standings).toBeVisible();
   await expect(page.locator(".royal-table .row.me")).toBeVisible();
   await expect(page.getByText(/Следващият Роял:/)).toBeVisible();
+  // The day's ten haven't been played: they're the gold way on.
+  await expect(page.getByRole("link", { name: "Въпросите на деня" })).toHaveClass(/primary/);
 });
 
 test("Роял: „Ще дойда“ before the lobby, and Начало's card while it's open", async ({ page }) => {
   test.setTimeout(480_000);
+  // Before any game, Начало shows Роял alone among the ways to play with others, while its lobby is open.
+  await page.goto("/");
+  await expect(async () => {
+    await page.reload();
+    await expect(page.locator(".modes .mode")).toHaveCount(1, { timeout: 3_000 });
+    await expect(page.locator(".mode.tone-gold .mode-about")).toHaveText(/^Започва след|^Играе се/);
+  }).toPass({ timeout: 60_000 });
   // Начало shows the ways to play with others once a first game is finished.
   await openGame(page, "/play/history");
   await playRun(page);

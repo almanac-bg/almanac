@@ -16,6 +16,10 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
   await expect(host.getByRole("heading", { name: "Как да те виждат в стаята?" })).toBeVisible();
   await host.getByRole("button", { name: "Влез" }).click();
   await guest.goto("/room");
+  // A wrong code is said at once, in place, before anything is asked.
+  await guest.getByLabel("Код на стаята").fill("000000");
+  await guest.getByRole("button", { name: "Влез" }).click();
+  await expect(guest.getByText("Няма отворена стая с този код. Провери цифрите.")).toBeVisible();
   await guest.getByLabel("Код на стаята").fill(code);
   await guest.getByRole("button", { name: "Влез" }).click();
   await guest.getByLabel("Име").fill("Бояна");
@@ -41,6 +45,16 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
   await guest.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
   await expect(guest.getByText("Поканата е изпратена.")).toBeVisible();
   await expect(host.getByRole("button", { name: "Добави Бояна в приятели" })).toBeVisible();
+  // Between games the host changes what the room plays: the code and the players stay.
+  await expect(guest.getByRole("button", { name: "Промени играта" })).toHaveCount(0);
+  await host.getByText("Промени играта").click();
+  const change = host.locator("details.more", { hasText: "Промени играта" });
+  await change.getByRole("radio", { name: "10", exact: true }).click();
+  await expect(change.getByRole("button", { name: "История" })).toHaveAttribute("aria-pressed", "true");
+  await change.getByRole("button", { name: "Всички теми" }).click();
+  await expect(change.getByRole("button", { name: "Всички теми" })).toHaveAttribute("aria-pressed", "true");
+  await expect(change.getByRole("button", { name: "История" })).toHaveAttribute("aria-pressed", "false");
+  await expect(guest.locator(".intro .kicker")).toHaveText(`Стая ${code.slice(0, 3)} ${code.slice(3)} · Всички теми`);
   await guest.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(guest.locator(".reviewed")).toHaveCount(5);
   // Each player's game is kept as a game of theirs.
@@ -52,6 +66,14 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
       }),
     )
     .toBe("room");
+});
+
+test("a room's link with a wrong code says so before asking for a name", async ({ page }) => {
+  await page.goto("/r/000000");
+  await expect(page.getByRole("heading", { name: "Няма такава стая" })).toBeVisible();
+  await expect(page.getByLabel("Име")).toHaveCount(0);
+  await page.getByRole("link", { name: "Опитай друг код" }).click();
+  await expect(page.getByLabel("Код на стаята")).toBeVisible();
 });
 
 test("the host sends a player out of a room, and they stay out", async ({ browser }) => {

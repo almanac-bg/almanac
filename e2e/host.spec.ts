@@ -11,8 +11,7 @@ test("a host leads a room from a big screen and doesn't play", async ({ browser 
   await host.getByRole("button", { name: "Всички теми" }).click();
   await expect(host).toHaveURL(/\/r\/\d{6}$/);
   const code = host.url().slice(-6);
-  await host.getByLabel("Име").fill("Учителката");
-  await host.getByRole("button", { name: "Влез" }).click();
+  // Leading, not playing: no name to ask for.
 
   // The lobby: the code, the link as a QR code drawn by the server, and nobody yet (the host isn't a player).
   await expect(host.getByText(`/r/${code} или насочете камерата към кода.`)).toBeVisible();
@@ -24,7 +23,8 @@ test("a host leads a room from a big screen and doesn't play", async ({ browser 
   await guest.goto(`/r/${code}`);
   await guest.getByLabel("Име").fill("Бояна");
   await guest.getByRole("button", { name: "Влез" }).click();
-  await expect(guest.getByText("Чакаме Учителката да започне.")).toBeVisible();
+  // The players wait for „водещия“, not for the host's drawn name.
+  await expect(guest.getByText("Чакаме водещия да започне.")).toBeVisible();
   await expect(host.locator(".players li")).toHaveCount(1);
   await host.getByRole("button", { name: "Започни" }).click();
 

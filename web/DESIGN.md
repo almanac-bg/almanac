@@ -50,7 +50,8 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   „Втори шанс“, short tiles side by side). Дуел, Роял and Стая open from here and
   have a way back to it (`back()`). A player who hasn't finished a game yet sees only the day and the topics, and a
   quiet „Имаш профил? Влез“ (a new phone) that opens the sign-in in place (open from the start, above the day, for a
-  browser signed out that came from the streak's mail, `/?from=mail`): the
+  browser signed out that came from the streak's mail, `/?from=mail`), and „Влез в стая с код“ in a line (a room's
+  code from a friend or a teacher works from the first visit); Роял too while its lobby is open or it's on: the
   streak and the ways to play with others come after the first game, the level and the goals from the second day
   played (see First days). From the second day played, a guest is asked to keep the game in one line of the „Утре“
   card, said by what's at stake („Серията ти от 2 дни е само на това устройство. Запази я с имейл.“), the form opening
@@ -108,7 +109,9 @@ played, a rated game), never by the date. The server says which are open (`open`
 - **The first duel or Роял that moves the rating:** the rating and its division (Дуел, Роял, Класации' „Рейтинг“).
 - **Роял, while its evenings are thin** (the median of the last 7 under 8 players): in a player's first 7 days it
   isn't among „С други“ on Начало, nor a goal, until they've found it (been in one, or said „Ще дойда“). A first live
-  game that feels empty teaches that nobody plays it (`play.NudgeRoyal`).
+  game that feels empty teaches that nobody plays it (`play.NudgeRoyal`). While its lobby is open or its games are on,
+  though, Роял shows on Начало to everyone (`royalNow`), a player before a first game too (the only way with others
+  they see then): a full evening is the best way to meet it.
 - **A topic's first estimate** (10 answers): „Колко знаеш“ on Профил, the topic's tile and a game's news say
   „първа оценка · 74%“, a share and no tier; the tier („Експерт“) comes with a sure mark (30 answers).
 
@@ -235,7 +238,9 @@ takes a token.
   `.almanac-a`, `.almanac-untrue`, `.almanac-fact`).
 - **Page openers** lead with the thing, not its rules: Роял's next evening is its start in big numerals
   (`.royal-when`), the time to it under it (`.royal-countdown`) and „Ще дойда“ gold, the rules folded in „Как се
-  играе“; the league's card says the week as it stands (`.league-now`: „Още 6 дни · първите 5 се качват“, and the
+  играе“ (and, in the lobby, in one line for one who hasn't played a Роял, and what two or three in it make of the
+  cuts; in the game, the player's place only from the first answer on, „На 2-ро място си“; at its end the day's ten in
+  gold if they wait, else „Ще дойда“); the league's card says the week as it stands (`.league-now`: „Още 6 дни · първите 5 се качват“, and the
   gap worth playing for, `.league-gap`: „До 3-то място: 300 точки.“, „Водиш с 120 точки.“, „Още 80 точки и излизаш
   от зоната за слизане.“), its rules folded in „Как работи лигата“ (open the first time, on that device). A lead is
   one sentence.
@@ -302,6 +307,10 @@ takes a token.
   opened (the button takes the player there). Each question gone over is a card of its own (`.reviewed`, a band in
   its verdict's colour on top): its number and topic as a kicker with „Вярно“, „Близо“ or „Грешно“ beside them, the
   question the strongest line, the answers marked, and the fact a quiet note under them.
+- **A room between games:** its host may change what it plays (folded, „Промени играта“: the questions, how hard,
+  the topic, the code and the players kept); the standings go by points, then by the time the answers took, and those
+  level on both share a place. A host who only leads isn't asked for a name, and the players wait for „водещия“. A
+  wrong code is said before anything is asked: in place on `/room`, and on `/r/<code>` with „Опитай друг код“.
 - **A room led from a big screen** (`host.css`, loaded only there): `.host`, `.host-row` (two columns on a laptop and
   up), `.host-qr`, `.host-join`, `.host-controls` and `.podium`.
 - **A duel's result** (`screens/outcome.ts` with `outcome.css`, loaded as a duel starts), one card (`.duel-end`) for

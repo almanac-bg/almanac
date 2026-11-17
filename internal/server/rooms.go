@@ -136,6 +136,27 @@ func (s *Server) roomLead(act func(*room.Room, int64) error) func(http.ResponseW
 	}
 }
 
+// roomOpen says whether a room is open under a code, to anyone who asks (before a name is asked or a player made for
+// it): a wrong code is told at once. Limited by address, so that it's no way to look for rooms.
+func (s *Server) roomOpen(w http.ResponseWriter, r *http.Request) error {
+	if !s.limits.allow("roomcode:"+s.clientIP(r), 120, time.Hour) {
+		return errTooMany
+	}
+	if _, err := s.roomOf(r); err != nil {
+		return err
+	}
+	return ok(w, map[string]bool{"open": true})
+}
+
+// roomSettings is the host choosing what the room plays next, between games (room.Room.Change).
+func (s *Server) roomSettings(w http.ResponseWriter, r *http.Request) error {
+	var in room.Settings
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	return s.roomLead(func(rm *room.Room, by int64) error { return rm.Change(by, in) })(w, r)
+}
+
 // roomHold is who leads keeping each answer up until they move on, or letting the room move on by itself again.
 func (s *Server) roomHold(w http.ResponseWriter, r *http.Request) error {
 	var in struct {
