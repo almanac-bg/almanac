@@ -16,7 +16,7 @@ test("a second chance: the questions missed come back, from Начало and fro
     await page.goto("/almanac");
     await expect(line).toBeVisible({ timeout: 1000 });
   }).toPass({ timeout: 20_000 });
-  await expect(line).toHaveText(/^\d+ въпрос(а чакат| чака) втори шанс$/);
+  await expect(line).toHaveText(/^\d+ въпрос(а чакат| чака) Втори шанс$/);
   await page.goto("/");
   await expect(page.getByRole("link", { name: /Втори шанс/ })).toContainText(
     /\d+ въпрос(а, на които|, на който) сгреши/,
