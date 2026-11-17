@@ -158,8 +158,8 @@ func (s *Server) preview(r *http.Request) (title, description string) {
 			}
 		}
 	case strings.HasPrefix(path, "/r/"):
-		code := strings.TrimPrefix(path, "/r/")
-		if _, err := s.rooms.Get(code); err == nil {
+		// Whatever the code, open or not: a preview that changed with it would tell anyone which rooms are open.
+		if code := strings.TrimPrefix(path, "/r/"); roomCode.MatchString(code) {
 			title = "Ела в стая " + code[:3] + " " + code[3:]
 			description = "Играем АЛМАНАХ заедно: един и същ въпрос за всички, в един и същ момент."
 		}

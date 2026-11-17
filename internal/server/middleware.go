@@ -128,3 +128,15 @@ func (l *limiter) allow(key string, n int, per time.Duration) bool {
 	w.n++
 	return w.n <= n
 }
+
+// spent says whether key has had its n per period already, counting nothing: for a limit on what failed, checked
+// before trying (allow counts each failure after).
+func (l *limiter) spent(key string, n int, per time.Duration) bool {
+	if l.off {
+		return false
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	w := l.hits[key]
+	return w != nil && time.Since(w.start) < per && w.n >= n
+}

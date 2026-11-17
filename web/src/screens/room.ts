@@ -91,6 +91,8 @@ export interface RoomView {
   lead?: boolean;
   /** Each answer stays up until who leads moves on („Задръж“). */
   held?: boolean;
+  /** Nobody new comes in: the host has locked the room (door). */
+  locked?: boolean;
   /** Once the game is over and kept: this player's game as a run, whose news tells what it earned. */
   run?: number;
 }
@@ -161,23 +163,25 @@ export function room(kit: Kit, [code = ""]: string[]) {
   } = kit);
   title("Стая");
   const view = signal<RoomView | null>(null);
-  const trouble = signal<"" | "reconnecting" | "gone" | "full" | "removed">("");
+  const trouble = signal<"" | "reconnecting" | "gone" | "full" | "removed" | "locked" | "busy">("");
   // A player still with the name drawn for them chooses one first: a class or a pub can't tell twenty animals apart.
   const naming = signal<User | null>(null);
   // Where each player stood at the last answer: how far they've moved since is the room's rank change.
   const places = new Map<number, number>();
 
   let es: EventSource | null = null;
+  // The screen is gone (another page): what was on its way doesn't join the room or open its stream after it.
+  let left = false;
   const connect = () => {
+    if (left) return;
     es = new EventSource(`/api/rooms/${code}/events`);
     es.onmessage = (e) => {
       trouble.set("");
       view.set(JSON.parse(e.data));
     };
-    // The room is gone (closed, or the server restarted), full, or the host sent this player out: no reconnecting.
+    // The room is gone (closed, or the server restarted), or the host sent this player out: no reconnecting.
     for (const [event, why] of [
       ["closed", "gone"],
-      ["full", "full"],
       ["removed", "removed"],
     ] as const)
       es.addEventListener(event, () => {
@@ -189,12 +193,25 @@ export function room(kit: Kit, [code = ""]: string[]) {
       else trouble.set("reconnecting"); // the browser tries again by itself
     };
   };
+  // Why the room won't have this player, by the server's word for it.
+  const refused = (err: unknown) => {
+    const why = { full: "full", removed: "removed", locked: "locked", too_many: "busy" } as const;
+    trouble.set(why[(err as ApiError).code as keyof typeof why] ?? "gone");
+  };
+  // In the room (again: the name and look as they are now), then its stream.
+  const enter = () => {
+    if (left) return;
+    api("POST", `/api/rooms/${code}/join`).then(connect, refused);
+  };
   // A wrong code is said at once, before a name is asked or a player made for it.
   api("GET", `/api/rooms/${code}`)
     .then(() => player())
-    .then((u) => (u.drawn && !named(code) ? naming.set(u) : connect()))
-    .catch(() => trouble.set("gone"));
-  onCleanup(() => es?.close());
+    .then((u) => (u.drawn && !named(code) ? naming.set(u) : enter()))
+    .catch(refused);
+  onCleanup(() => {
+    left = true;
+    es?.close();
+  });
 
   // Each phase (and each question) is drawn once; what changes inside it follows the view.
   const key = computed(() => {
@@ -256,6 +273,26 @@ export function room(kit: Kit, [code = ""]: string[]) {
           )
         : null,
     () =>
+      trouble() === "locked"
+        ? h(
+            "div",
+            { class: "stack" },
+            h("h1", null, "Стаята е заключена"),
+            h("p", { class: "lead" }, "Нови играчи не могат да влязат. Помоли водещия да я отключи и опитай пак."),
+            h("button", { class: "btn primary big", type: "button", onclick: () => location.reload() }, "Опитай пак"),
+          )
+        : null,
+    () =>
+      trouble() === "busy"
+        ? h(
+            "div",
+            { class: "stack" },
+            h("h1", null, "Твърде много опити"),
+            h("p", { class: "lead" }, "Опитай пак малко по-късно."),
+            h("a", { class: "btn primary", href: "/" }, "Към Начало"),
+          )
+        : null,
+    () =>
       trouble() === "reconnecting"
         ? h("p", { class: "status", role: "status" }, "Връзката прекъсна. Свързваме се отново…")
         : null,
@@ -264,7 +301,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
       return u
         ? nameStep(code, u, () => {
             naming.set(null);
-            connect();
+            enter();
           })
         : null;
     },
@@ -402,6 +439,7 @@ function lobby(view: () => RoomView, code: string): Child {
       { class: "card" },
       h("h2", { class: "section-title" }, () => `Играчи (${view().players.length})`),
       players(view, code, error.set),
+      door(view, code, error.set),
     ),
     () =>
       view().canLead
@@ -410,6 +448,30 @@ function lobby(view: () => RoomView, code: string): Child {
     waiting(view, "започне"),
     untracked(view).isHost ? choose(view, code) : null,
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
+  );
+}
+
+/** The host's lock on the room: locked, nobody new comes in (a class, once it's all there), and whoever is in it
+ * comes back as ever. Nothing for anyone else. */
+export function door(view: () => RoomView, code: string, error: (s: string) => void): Child {
+  if (!untracked(view).isHost) return null;
+  const locked = computed(() => !!view().locked);
+  const toggle = async () => {
+    try {
+      await api("POST", `/api/rooms/${code}/lock`, { on: !untracked(locked) });
+    } catch (err) {
+      error((err as ApiError).message);
+    }
+  };
+  return h(
+    "div",
+    { class: "door" },
+    h("span", { role: "status" }, () =>
+      locked() ? "Стаята е заключена: нови играчи не могат да влязат." : "Всеки с кода може да влезе.",
+    ),
+    h("button", { class: "btn inline", type: "button", onclick: toggle }, () =>
+      locked() ? "Отключи" : "Заключи стаята",
+    ),
   );
 }
 
@@ -703,6 +765,7 @@ function end(view: () => RoomView, code: string): Child {
           { class: "more" },
           h("summary", null, () => `Играчи (${view().players.length})`),
           players(view, code, error.set),
+          door(view, code, error.set),
         )
       : null,
     questions.list,

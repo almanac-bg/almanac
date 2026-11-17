@@ -551,8 +551,12 @@ type stream struct {
 	res *http.Response
 }
 
+// follow joins a room and opens its stream, as a player's screen does.
 func (p *player) follow(code string) *stream {
 	p.g.t.Helper()
+	if status, out := p.call("POST", "/api/rooms/"+code+"/join", nil); status != 200 {
+		p.g.t.Fatalf("joining room %s: %d %v", code, status, out)
+	}
 	return p.stream("/api/rooms/" + code + "/events")
 }
 
@@ -700,7 +704,7 @@ func TestALeadingHostOverHTTP(t *testing.T) {
 	if v := bs.until(func(v map[string]any) bool { return v["phase"] == "end" }); v["total"] != 2.0 {
 		t.Fatalf("ended at the second question: %v", v["total"])
 	}
-	res, err := http.Get(g.url + "/api/rooms/" + code + "/qr")
+	res, err := ana.client.Get(g.url + "/api/rooms/" + code + "/qr")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -708,6 +712,17 @@ func TestALeadingHostOverHTTP(t *testing.T) {
 	res.Body.Close()
 	if res.Header.Get("Content-Type") != "image/svg+xml" || !strings.HasPrefix(string(body), "<svg") {
 		t.Fatalf("the QR code: %s %.40s", res.Header.Get("Content-Type"), body)
+	}
+	// Only for who's in the room: drawn for nobody else, nor for a code no room has.
+	for _, path := range []string{"/api/rooms/" + code + "/qr", "/api/rooms/999999/qr"} {
+		res, err := http.Get(g.url + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != 404 {
+			t.Fatalf("a stranger's QR code %s: %d", path, res.StatusCode)
+		}
 	}
 }
 
@@ -1284,6 +1299,14 @@ func TestLinkPreviews(t *testing.T) {
 	code = room["code"].(string)
 	if body := page("/r/" + code); !strings.Contains(body, "Ела в стая "+code[:3]+" "+code[3:]) {
 		t.Fatal("the room's preview")
+	}
+	// A code no room has looks the same: the preview tells nobody which rooms are open.
+	none := "100000"
+	if none == code {
+		none = "100001"
+	}
+	if body := page("/r/" + none); !strings.Contains(body, "Ела в стая "+none[:3]+" "+none[3:]) {
+		t.Fatal("a closed room's preview")
 	}
 }
 
