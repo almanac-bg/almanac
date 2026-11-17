@@ -8,6 +8,11 @@
 // on waits for the evening to end (bank.go). Every API answer names the version (api.go), so that a page loaded before
 // a deploy loads itself anew at a quiet moment (web/src/fresh.ts); the app on phones opens only the game's own pages
 // (applinks.go).
+//
+// A panic in a request ends that request alone (middleware.go); one in the work done in the background (Роял's clock,
+// the sweeps, the loops the program starts) is stopped there by package safe, and told as a problem, mailed to whoever
+// runs the game (problems.go). A run that ends some other way (a crash, a kill, the machine) is told of by the next
+// (running.go).
 package server
 
 import (
@@ -31,6 +36,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/push"
 	"github.com/almanac-bg/almanac/internal/room"
 	"github.com/almanac-bg/almanac/internal/royal"
+	"github.com/almanac-bg/almanac/internal/safe"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -61,8 +67,12 @@ type Config struct {
 	Phones *push.Phones
 	// Operator is who runs the game, and Contact their address (the privacy page, security.txt).
 	Operator, Contact string
-	// RoomsFile is where the rooms open as the server stops are kept, for its next run to open again ("": nowhere).
+	// RoomsFile is where the rooms open are kept, every few seconds and as the server stops, for its next run to open
+	// again ("": nowhere).
 	RoomsFile string
+	// RunningFile is where the server notes that it runs, to tell at its next start whether it stopped cleanly
+	// (running.go; "": nowhere).
+	RunningFile string
 	// LimitsFile is where the limits' counts are kept as the server stops, for its next run to go on counting from
 	// ("": nowhere; a restart then starts every count again).
 	LimitsFile string
@@ -99,6 +109,7 @@ type Server struct {
 	client        fs.FS
 	limits        *limiter
 	problems      *problems
+	roomsSaved    roomsSaved
 	reminders     reminders     // who is due the day's reminder when, today (remind.go)
 	pushq         pushQueue     // the notifications' queue, as Push sends it (pushes.go)
 	streakMailing streakMailing // who is due the mail of a streak ended when, today (streakmail.go)
@@ -138,6 +149,9 @@ func New(cfg Config, d Deps) (*Server, error) {
 	if err := s.game.Keep(context.Background(), d.Bank); err != nil { // its versions, before anything is shown
 		return nil, err
 	}
+	// Every panic stopped in the work done in the background (package safe), anywhere in the program, is told as
+	// one of this server's problems: there is one server in the program.
+	safe.Tell(s.problems.add)
 	s.game.DuelNews = s.duelNews
 	s.game.RoyalNews = s.royalNews
 	s.game.LeagueNews = s.leagueNews
@@ -305,8 +319,23 @@ func (s *Server) routes() http.Handler {
 }
 
 // Run serves until ctx ends, then stops taking requests, gives those under way up to grace to finish, and keeps the
-// rooms open for the next run.
+// rooms open for the next run. A run that ends otherwise is told of by the next (running.go).
 func (s *Server) Run(ctx context.Context, grace time.Duration) error {
+	s.noteRunning()
+	err := s.run(ctx, grace)
+	s.noteStopped() // not reached past a panic: the next run tells of it
+	return err
+}
+
+// How often the work done in the background comes round.
+const (
+	// stepEvery moves Роял's clock on.
+	stepEvery = 200 * time.Millisecond
+	// roomsEvery saves the rooms, if they've changed: what a crash may lose of them.
+	roomsEvery = 15 * time.Second
+)
+
+func (s *Server) run(ctx context.Context, grace time.Duration) error {
 	srv := &http.Server{
 		Addr:              s.cfg.Addr,
 		Handler:           s.handler,
@@ -346,54 +375,36 @@ func (s *Server) Run(ctx context.Context, grace time.Duration) error {
 	})
 	s.restoreRooms()
 	s.restoreLimits()
-	// Роял's games under way before a restart go on.
-	if err := s.royal.Load(ctx); err != nil {
+	// Роял's games under way before a restart go on. Should loading them panic, the site is served all the same, and
+	// the problem told: a state that panics as it's read would otherwise stop every start, and the whole game with it.
+	if !safe.Do("royal: loading the evening", func() { err = s.royal.Load(ctx) }) {
+		err = nil
+	}
+	if err != nil {
 		ln.Close()
 		return err
 	}
 	errs := make(chan error, 1)
-	go func() { errs <- srv.Serve(ln) }()
-	go func() {
-		t := time.NewTicker(200 * time.Millisecond)
-		defer t.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-t.C:
-				s.royal.Step(ctx)
-			}
+	go func() { errs <- srv.Serve(ln) }() // a handler's panic is its request's alone (recovered)
+	// The work done in the background: each round on its own, a panic in one stopped and told (package safe).
+	go safe.Every(ctx, "royal: the clock", stepEvery, func() { s.royal.Step(ctx) })
+	go safe.Every(ctx, "the drain and the bank", time.Second, func() {
+		s.drainStep(nil) // a drain whose deploy stopped asking ends; Роял coming stops one
+		s.bankStep()     // a bank held for Роял goes in as it ends
+	})
+	go safe.Every(ctx, "rooms: saving", roomsEvery, s.saveRoomsChanged)
+	go safe.Every(ctx, "rooms: sweeping", time.Minute, s.rooms.Sweep)
+	go safe.Every(ctx, "live: sweeping", time.Minute, s.live.Sweep)
+	go safe.Every(ctx, "duels: settling", time.Minute, func() {
+		if err := s.game.SettleDue(ctx); err != nil && ctx.Err() == nil {
+			slog.Error("duels", "err", err)
 		}
-	}()
-	go func() {
-		t := time.NewTicker(time.Second)
-		defer t.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-t.C:
-				s.drainStep(nil) // a drain whose deploy stopped asking ends; Роял coming stops one
-				s.bankStep()     // a bank held for Роял goes in as it ends
-			}
+	})
+	go safe.Every(ctx, "after the runs", time.Minute, func() {
+		if err := s.game.AfterDue(ctx); err != nil && ctx.Err() == nil {
+			slog.Error("after the runs", "err", err)
 		}
-	}()
-	go func() {
-		t := time.NewTicker(time.Minute)
-		defer t.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-t.C:
-				s.rooms.Sweep()
-				s.live.Sweep()
-				if err := s.game.SettleDue(ctx); err != nil {
-					slog.Error("duels", "err", err)
-				}
-			}
-		}
-	}()
+	})
 	select {
 	case err := <-errs:
 		return err

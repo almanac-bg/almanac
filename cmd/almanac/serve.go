@@ -20,6 +20,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/push"
 	"github.com/almanac-bg/almanac/internal/royal"
+	"github.com/almanac-bg/almanac/internal/safe"
 	"github.com/almanac-bg/almanac/internal/server"
 	"github.com/almanac-bg/almanac/internal/store"
 )
@@ -93,6 +94,7 @@ func serve([]string) error {
 		Contact:         env("CONTACT_EMAIL", "privacy@almanac.bg"),
 		RoomsFile:       filepath.Join(filepath.Dir(dbPath()), "rooms.json"),
 		LimitsFile:      filepath.Join(filepath.Dir(dbPath()), "limits.json"),
+		RunningFile:     filepath.Join(filepath.Dir(dbPath()), "running.json"),
 		Dev:             dev,
 		Version:         version,
 	}
@@ -205,8 +207,10 @@ func serve([]string) error {
 	} else if n > 0 {
 		slog.Info("judged runs", "scripted", n)
 	}
-	go outbox.Run(ctx)
-	go every(ctx, time.Hour, func() {
+	// The work done in the background, each loop started again if it panics (package safe: the panic is told, and
+	// the process, with every game in it, goes on).
+	go safe.Loop(ctx, "mail: the outbox", outbox.Run)
+	go every(ctx, "accounts: the clean-up", time.Hour, func() {
 		if err := accounts.CleanUp(ctx); err != nil && ctx.Err() == nil {
 			slog.Error("clean-up", "err", err)
 		}
@@ -216,24 +220,24 @@ func serve([]string) error {
 			}
 		}
 	})
-	go reloadOnHangup(ctx, hup, banks, srv)
-	go srv.Remind(ctx)
+	go safe.Loop(ctx, "bank: reloading", func(ctx context.Context) { reloadOnHangup(ctx, hup, banks, srv) })
+	go safe.Loop(ctx, "push: the reminders", srv.Remind)
 	pushed := make(chan struct{})
 	go func() {
-		srv.Push(ctx) // notifications; stopping, it finishes the sends it has begun
+		safe.Loop(ctx, "push: sending", srv.Push) // notifications; stopping, it finishes the sends it has begun
 		close(pushed)
 	}()
-	go srv.KeepDays(ctx)
-	go func() {
+	go safe.Loop(ctx, "days ahead", srv.KeepDays)
+	safe.Go("counting", func() {
 		if err := srv.Count(ctx); err != nil && ctx.Err() == nil {
 			slog.Error("counting", "err", err)
 		}
-	}()
+	})
 	if to := os.Getenv("ALERT_EMAIL"); to != "" {
-		go srv.MailProblems(ctx, to, time.Hour)
+		go safe.Loop(ctx, "mailing problems", func(ctx context.Context) { srv.MailProblems(ctx, to, time.Hour) })
 	}
 	if backups != nil {
-		go runBackups(ctx, srv)
+		go safe.Loop(ctx, "backups", func(ctx context.Context) { runBackups(ctx, srv) })
 	} else if !dev {
 		slog.Warn("no backups configured (BACKUP_ENDPOINT)")
 	}
@@ -294,18 +298,10 @@ func overdue(b *bank.Bank) int {
 	return len(ids)
 }
 
-// every runs fn now and then every period, until ctx ends.
-func every(ctx context.Context, period time.Duration, fn func()) {
-	t := time.NewTicker(period)
-	defer t.Stop()
-	for {
-		fn()
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-		}
-	}
+// every runs fn now and then every period, until ctx ends: each round on its own, a panic in one stopped (safe).
+func every(ctx context.Context, what string, period time.Duration, fn func()) {
+	safe.Do(what, fn)
+	safe.Every(ctx, what, period, fn)
 }
 
 // phones is what sends notifications to the game's app, from the keys the environment names (nil: none at all).

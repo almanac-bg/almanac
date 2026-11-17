@@ -338,19 +338,25 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 // go on. It reports whether that ended the run: then, once the transaction is done, the caller follows it with
 // finished, as an answer that ends a run does.
 func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
-	if r.finished || !r.shownAt.Valid {
+	if !g.settles(r) {
 		return false, nil
 	}
 	d, ok := g.deal(r.picks[r.at])
-	if ok && g.Now().Sub(time.UnixMilli(r.shownAt.Int64)) <= Limit(d.Question())+Grace {
-		return false, nil
-	}
 	ms := int64(0)
 	if ok {
 		ms = Limit(d.Question()).Milliseconds()
 	}
 	err := g.record(tx, r, bank.Graded{}, Worth{}, ms)
 	return err == nil && r.finished, err
+}
+
+// settles says whether settle has anything to do: a question showing past its time, or gone from the bank.
+func (g *Game) settles(r *run) bool {
+	if r.finished || !r.shownAt.Valid {
+		return false
+	}
+	d, ok := g.deal(r.picks[r.at])
+	return !ok || g.Now().Sub(time.UnixMilli(r.shownAt.Int64)) > Limit(d.Question())+Grace
 }
 
 // record keeps an answer, and the points and XP it earned, and moves the run to the next question (or its end).
@@ -394,8 +400,17 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 	return err
 }
 
-// finish ends a run where it is: what playing it to its end earns, and a game right throughout its bonus.
-func (g *Game) finish(tx *sql.Tx, r *run) error { return g.finishOf(tx, r, len(r.picks)) }
+// finish ends a run where it is: what playing it to its end earns, and a game right throughout its bonus; and notes
+// that what follows it is due (after.go), but for a Роял's, whose evening keeps what it earned (AfterRoyal).
+func (g *Game) finish(tx *sql.Tx, r *run) error {
+	if err := g.finishOf(tx, r, len(r.picks)); err != nil {
+		return err
+	}
+	if r.kind == "royal" {
+		return nil
+	}
+	return g.afterDue(tx, r.id)
+}
 
 // finishOf ends a run as a game of total questions: what playing it to its end earns is in the share of those answered
 // right (a Роял won before its last question was a game of the questions it asked).
@@ -421,11 +436,37 @@ func rightsInRow(tx *sql.Tx, runID int64) (int, error) {
 	return n, err
 }
 
-// State is a player's run as it stands.
+// read runs fn in a transaction of the read pool: what it reads is one moment's, and it waits on no write.
+func (g *Game) read(ctx context.Context, fn func(*sql.Tx) error) error {
+	tx, err := g.DB.Read.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck // a read: nothing to keep
+	return fn(tx)
+}
+
+// State is a player's run as it stands. It's read alongside everything else, and takes the one writer only when
+// there's something to write: a question whose time has run out (settle).
 func (g *Game) State(ctx context.Context, userID, runID int64) (State, error) {
 	var s State
+	write := false
+	err := g.read(ctx, func(tx *sql.Tx) error {
+		r, err := load(tx, userID, runID)
+		if err != nil {
+			return err
+		}
+		if write = g.settles(r); write {
+			return nil
+		}
+		s, err = g.state(tx, r)
+		return err
+	})
+	if err != nil || !write {
+		return s, err
+	}
 	ended := false
-	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		r, err := load(tx, userID, runID)
 		if err != nil {
 			return err
@@ -437,7 +478,7 @@ func (g *Game) State(ctx context.Context, userID, runID int64) (State, error) {
 		return err
 	})
 	if err == nil && ended {
-		err = g.finished(ctx, userID, runID)
+		g.finished(ctx, userID, runID)
 	}
 	return s, err
 }
@@ -469,7 +510,7 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 		return err
 	})
 	if err == nil && ended {
-		err = g.finished(ctx, userID, runID)
+		g.finished(ctx, userID, runID)
 	}
 	return s, err
 }
@@ -636,9 +677,9 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 	}
 	res.Reveal = bank.RevealOn(d, crowd, r.dealtOn())
 	if finished {
-		err = g.finished(ctx, userID, runID)
+		g.finished(ctx, userID, runID)
 	}
-	return res, err
+	return res, nil
 }
 
 // again is an answer to question n, the run's last answered, sent again: its reply was lost on the way, so the screen
@@ -687,16 +728,6 @@ func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
 	res.Learned = r.kind == "mistakes" && res.Right && d.Question().Extra().Fact != ""
 	res.State, err = g.state(tx, r)
 	return res, d, err
-}
-
-// finished follows a run that has just ended, by an answer or by its clock (settle), once: a duel's run settles the
-// duel once both have played (and awards both); then what the run earned is kept, before the answer or the run goes
-// back, so that the screen with the result can tell of it.
-func (g *Game) finished(ctx context.Context, userID, runID int64) error {
-	if err := g.settleRun(ctx, runID); err != nil {
-		return err
-	}
-	return g.afterRun(ctx, userID)
 }
 
 // afterRun keeps what a player's game, just finished, earned them: a broken streak won back (repair.go), achievements,

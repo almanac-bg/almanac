@@ -378,7 +378,18 @@ func TestRoomsKeptOverARestart(t *testing.T) {
 			synctest.Wait()
 		}
 		over.Unfollow(sb)
+		// The game being played: Цви has answered the first question, Ана (on screen too) not yet.
+		_ = playing.Join(ana)
+		sc, _ := playing.Follow(cy.ID)
+		sa, _ := playing.Follow(ana.ID)
 		_ = playing.Start(cy.ID)
+		time.Sleep(3 * time.Second)
+		if err := playing.Answer(cy.ID, 0, answer(playing, true)); err != nil {
+			t.Fatal(err)
+		}
+		playingBefore := playing.View(cy.ID)
+		playing.Unfollow(sc)
+		playing.Unfollow(sa)
 		before := over.View(bo.ID)
 
 		var saved bytes.Buffer
@@ -412,9 +423,90 @@ func TestRoomsKeptOverARestart(t *testing.T) {
 			t.Fatalf("another game after the restored end: %v", err)
 		}
 
+		// The game being played goes on where it was: Цви's answer and points kept, the question showing with its time
+		// from the start for Ана, who hadn't answered it.
 		r, _ = next.Get(playing.Code())
-		if v := r.View(cy.ID); v.Phase != Lobby || len(v.Players) != 1 || !v.IsHost {
-			t.Fatalf("the game being played, restored: %+v", v)
+		v := r.View(cy.ID)
+		if v.Phase != Question || v.N != 0 || len(v.Players) != 2 || !v.IsHost || v.Question.Given == nil ||
+			v.Players[0].Name != "Цви" || !v.Players[0].Answered || v.Players[0].Points != playingBefore.Players[0].Points ||
+			v.Players[0].Points == 0 || v.Players[1].Answered || v.Question.LeftMs != v.Question.LimitMs {
+			t.Fatalf("the game being played, restored:\n%+v\nwas\n%+v", v, playingBefore)
+		}
+		if _, err := r.Follow(ana.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.Answer(ana.ID, 0, answer(r, false)); err != nil {
+			t.Fatal(err)
+		}
+		if v := r.View(cy.ID); v.Phase != Reveal || v.Question.Reveal == nil || !v.Question.Reveal.Right {
+			t.Fatalf("its answer, once both have: %+v", v)
+		}
+		// Saved again as the answer shows, it shows again for its pause, then the game goes on.
+		saved.Reset()
+		if err := next.Save(&saved); err != nil {
+			t.Fatal(err)
+		}
+		again := NewHub(bank)
+		if _, err := again.Restore(&saved); err != nil {
+			t.Fatal(err)
+		}
+		r, _ = again.Get(playing.Code())
+		if v := r.View(cy.ID); v.Phase != Reveal || v.Players[0].Points != playingBefore.Players[0].Points {
+			t.Fatalf("the answer showing, restored: %+v", v)
+		}
+		time.Sleep(Pause + time.Second)
+		synctest.Wait()
+		if v := r.View(cy.ID); v.Phase != Question || v.N != 1 {
+			t.Fatalf("after the restored answer's pause: %+v", v)
+		}
+	})
+}
+
+// A game's clock that panics ends the game where it is, the players' games kept, and the process goes on.
+func TestABrokenClockEndsTheGame(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		hub := NewHub(sample(t))
+		var mu sync.Mutex
+		kept := 0
+		hub.Record = func(_ context.Context, user int64, p play.RoomPlay) (int64, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			kept++
+			if kept == 1 {
+				panic("keeping the first player's game") // stopped: the others' are kept still
+			}
+			return 7, nil
+		}
+		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
+		r, _ := hub.Open(ana, "", Settings{})
+		_ = r.Join(bo)
+		sa, _ := r.Follow(ana.ID)
+		sb, _ := r.Follow(bo.ID)
+		defer r.Unfollow(sa)
+		defer r.Unfollow(sb)
+		if err := r.Start(ana.ID); err != nil {
+			t.Fatal(err)
+		}
+		_ = r.Answer(ana.ID, 0, answer(r, true))
+		_ = r.Answer(bo.ID, 0, answer(r, true))
+		r.mu.Lock()
+		r.after(time.Second, func() { panic("the clock broke") })
+		r.mu.Unlock()
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		v := r.View(ana.ID)
+		if v.Phase != End || v.Total != 1 || len(v.Review) != 1 || !v.Review[0].Right {
+			t.Fatalf("the broken game: %+v", v)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if kept != 2 {
+			t.Fatalf("%d games kept", kept)
+		}
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		if r.recording != 0 {
+			t.Fatalf("still keeping: %d", r.recording)
 		}
 	})
 }

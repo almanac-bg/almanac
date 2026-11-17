@@ -1,15 +1,15 @@
 package server
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
-	"runtime/debug"
 	"time"
+
+	"github.com/almanac-bg/almanac/internal/safe"
 )
 
 // recovered turns a panic in a handler into a 500, a log entry with its stack and a problem, instead of a dropped
-// connection.
+// connection: as package safe does for the work done in the background.
 func (s *Server) recovered(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
@@ -17,8 +17,7 @@ func (s *Server) recovered(next http.Handler) http.Handler {
 				if v == http.ErrAbortHandler {
 					panic(v)
 				}
-				slog.Error("panic", "method", r.Method, "path", r.URL.Path, "err", v, "stack", string(debug.Stack()))
-				s.problems.add(fmt.Sprintf("panic: %s %s: %v", r.Method, r.Pattern, v))
+				safe.Report(r.Method+" "+r.Pattern, v) // logged with its stack, and told as a problem (New: safe.Tell)
 				http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 			}
 		}()

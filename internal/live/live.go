@@ -23,6 +23,9 @@
 // a recording; those asking go on waiting, told why (Seek.Held), and find their duel once the server is back, while
 // the duels under way (UnderWay) play to their end, which each can tell (Left: Longest at most); a rematch waiting for
 // its yes is called off, told so (ErrPaused), as its duel would be lost. Resume undoes it.
+//
+// A duel's clock that panics (package safe stops it, and the process goes on) calls its duel off without a result, as
+// a restart would (Match.broken); a wait for a duel whose clock panics ends, told so.
 package live
 
 import (
@@ -36,6 +39,7 @@ import (
 
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/play"
+	"github.com/almanac-bg/almanac/internal/safe"
 )
 
 const (
@@ -74,6 +78,8 @@ var (
 	ErrNoRematch = errors.New("no rematch")
 	// ErrPaused is a rematch asked for while the server is about to restart: the duel it would be is lost with it.
 	ErrPaused = errors.New("the server is about to restart")
+	// errBroken is a duel (or the wait for one) whose clock panicked: stopped, reported (package safe), and over.
+	errBroken = errors.New("the duel broke off")
 )
 
 // Player is someone in a duel, as the other sees them.
@@ -123,6 +129,7 @@ type Seek struct {
 	// rematch is the duel a rematch is asked for after (0: a duel with whoever comes).
 	rematch int64
 	done    chan struct{}
+	settled sync.Once
 	Match   *Match
 	Err     error
 }
@@ -159,10 +166,16 @@ func (s *Seek) hold(held bool) {
 	}
 }
 
+// settle says how the seek came out, once: a second time (a clock that broke after the first) changes nothing.
 func (s *Seek) settle(m *Match, err error) {
-	s.Match, s.Err = m, err
-	close(s.done)
+	s.settled.Do(func() {
+		s.Match, s.Err = m, err
+		close(s.done)
+	})
 }
+
+// broken settles a seek whose clock panicked, if nothing else has.
+func (s *Seek) broken() { s.settle(nil, errBroken) }
 
 // Seek asks for a duel for a player: the one they're in if they're in one, else with whoever is waiting, else they
 // wait (and get a recording after Wait). While the hub is paused, they wait, held, for as long as it is. Leave it
@@ -190,7 +203,7 @@ func (h *Hub) Seek(p Player) *Seek {
 	s := newSeek(h, p)
 	s.until = time.Now().Add(h.wait)
 	if h.paused || len(h.waiting) == 0 {
-		s.timer = time.AfterFunc(h.wait, func() { h.expire(s) })
+		s.timer = safe.AfterFunc(h.wait, "live: a wait for a duel", func() { h.expire(s) }, s.broken)
 		s.held = h.paused
 		h.waiting = append(h.waiting, s)
 		h.mu.Unlock()
@@ -221,6 +234,7 @@ func (h *Hub) pair(a, b *Seek) func() {
 	}
 	h.starting[a.player.ID], h.starting[b.player.ID] = a, b
 	return func() {
+		defer safe.Recover("live: making a duel", a.broken, b.broken)
 		m, err := h.launch([]int64{a.player.ID, b.player.ID}, func(ctx context.Context) (play.Live, [2]Player, error) {
 			l, err := h.game.StartLive(ctx, a.player.ID, b.player.ID)
 			return l, [2]Player{a.player, b.player}, err
@@ -289,7 +303,7 @@ func (h *Hub) Rematch(p Player, id int64) *Seek {
 	switch {
 	case w == nil: // the first to ask: they wait for the other
 		s.rematch, s.until = id, time.Now().Add(RematchFor)
-		s.timer = time.AfterFunc(RematchFor, func() { h.rematchOver(s) })
+		s.timer = safe.AfterFunc(RematchFor, "live: a wait for a rematch", func() { h.rematchOver(s) }, s.broken)
 		h.rematches[id] = s
 		h.mu.Unlock()
 		m.want(p.ID, true)
@@ -357,7 +371,7 @@ func (h *Hub) Resume() {
 	}
 	h.mu.Unlock()
 	for _, start := range starts {
-		go start()
+		go start() // stopped there if it panics (pair)
 	}
 }
 
@@ -426,7 +440,7 @@ func (s *Seek) Leave() {
 	if s.rematch != 0 && h.rematches[s.rematch] == s {
 		delete(h.rematches, s.rematch)
 		s.timer.Stop()
-		go h.unwant(s) // the match's lock comes before the hub's
+		safe.Go("live: a rematch no longer asked for", func() { h.unwant(s) }) // the match's lock comes before the hub's
 		return
 	}
 	for i, w := range h.waiting {
@@ -467,6 +481,16 @@ func (h *Hub) expire(s *Seek) {
 // launch makes a duel (in the database, by start) and starts it; the players it's made for stop starting either way.
 func (h *Hub) launch(players []int64, start func(context.Context) (play.Live, [2]Player, error)) (*Match, error) {
 	ctx := context.Background()
+	made := false
+	defer func() {
+		if !made { // a panic on the way (stopped by the caller): the players aren't left being matched for ever
+			h.mu.Lock()
+			for _, id := range players {
+				delete(h.starting, id)
+			}
+			h.mu.Unlock()
+		}
+	}()
 	l, sides, err := start(ctx)
 	var m *Match
 	if err == nil {
@@ -479,6 +503,7 @@ func (h *Hub) launch(players []int64, start func(context.Context) (play.Live, [2
 	for _, id := range players {
 		delete(h.starting, id)
 	}
+	made = true
 	if m != nil {
 		h.matches[m.id] = m
 		for _, s := range m.sides {
@@ -697,7 +722,7 @@ func (m *Match) Unfollow(sub *Sub) {
 		}
 		// Once they've been away too long, the question up then (whichever it is) goes on if it waits only for them,
 		// and the other is told they're gone.
-		time.AfterFunc(Away+time.Millisecond, func() {
+		safe.AfterFunc(Away+time.Millisecond, "live: a player away", func() {
 			m.mu.Lock()
 			defer m.mu.Unlock()
 			switch {
@@ -707,7 +732,7 @@ func (m *Match) Unfollow(sub *Sub) {
 			default:
 				m.changed()
 			}
-		})
+		}, m.broken)
 	}
 	m.changed()
 }
@@ -781,14 +806,14 @@ func (m *Match) pace(n int) {
 	if next == 0 {
 		return
 	}
-	m.paceTimer = time.AfterFunc(next, func() {
+	m.paceTimer = safe.AfterFunc(next, "live: a question's clues", func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
 		if m.n == n && m.phase == PhaseQuestion {
 			m.changed()
 			m.pace(n)
 		}
-	})
+	}, m.broken)
 }
 
 // after runs fn after d, if the duel is then still on the same question and phase.
@@ -797,13 +822,23 @@ func (m *Match) after(d time.Duration, fn func()) {
 		m.timer.Stop()
 	}
 	n, phase := m.n, m.phase
-	m.timer = time.AfterFunc(d, func() {
+	m.timer = safe.AfterFunc(d, "live: a duel's clock", func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
 		if m.n == n && m.phase == phase {
 			fn()
 		}
-	})
+	}, m.broken)
+}
+
+// broken ends a duel whose clock panicked (package safe stopped it, the lock let go): what it holds can't be trusted,
+// so it isn't played on. It's called off without a result, as one cut off by a restart, and its players are free.
+func (m *Match) broken() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !m.over() {
+		m.cancel()
+	}
 }
 
 // begin puts the first question up once both players are at the duel. One who never comes, or who left before it
@@ -891,7 +926,7 @@ func (m *Match) show(n int) {
 		}
 		r := s.recording[n]
 		at := min(time.Duration(r.Ms)*time.Millisecond, limit)
-		m.recTimer = time.AfterFunc(at, func() {
+		m.recTimer = safe.AfterFunc(at, "live: a recording's answer", func() {
 			m.mu.Lock()
 			defer m.mu.Unlock()
 			if m.phase != PhaseQuestion || m.n != n || s.answered {
@@ -899,7 +934,7 @@ func (m *Match) show(n int) {
 			}
 			s.answered, s.took, s.given, s.gained, s.right = true, at, r.Shown, r.Points, r.Right
 			m.maybeReveal()
-		})
+		}, m.broken)
 	}
 	m.changed()
 }

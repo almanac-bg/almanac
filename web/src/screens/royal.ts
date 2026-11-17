@@ -20,7 +20,6 @@
 import type { Bed } from "../feel.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
-import type { ApiError } from "../lib/api.ts";
 import type { Child, Signal } from "../lib/dom.ts";
 import type { Standing, Tier, VerdictKind } from "../ui.ts";
 import type { Tonight } from "./modes.ts";
@@ -74,6 +73,8 @@ let {
   dayWord,
   when,
   whileSeen,
+  errorText,
+  lifetime,
 } = {} as Kit;
 
 type Phase = "soon" | "lobby" | "question" | "reveal" | "end";
@@ -261,6 +262,8 @@ export function royal(kit: Kit) {
     dayWord,
     when,
     whileSeen,
+    errorText,
+    lifetime,
   } = kit);
   title("Роял");
   const view = signal<Evening | null>(null);
@@ -273,9 +276,11 @@ export function royal(kit: Kit) {
 
   let es: EventSource | null = null;
   // The stream follows the evening as whoever is signed in sees it: again once someone who only looked becomes a
-  // player, by joining.
+  // player, by joining. Never once the screen is gone: joining answers after a wait, by when the player may have left.
+  const life = lifetime();
   let as = user.peek()?.id ?? 0;
   const connect = () => {
+    if (life.aborted) return;
     es?.close();
     es = new EventSource("/api/royal/events");
     es.onmessage = (e) => {
@@ -292,7 +297,7 @@ export function royal(kit: Kit) {
   };
   const joined = () => {
     const id = user.peek()?.id ?? 0;
-    if (id !== as) {
+    if (id !== as && !life.aborted) {
       as = id;
       connect();
     }
@@ -445,7 +450,7 @@ function plan(main = false): Child {
     try {
       await fn();
     } catch (err) {
-      error.set((err as ApiError).message);
+      error.set(errorText(err));
     } finally {
       busy.set(false);
     }
@@ -566,7 +571,7 @@ function entry(joined: () => void, out?: boolean): Child[] {
       await api(out ? "DELETE" : "POST", "/api/royal", out ? undefined : {});
       joined();
     } catch (err) {
-      error.set((err as ApiError).message);
+      error.set(errorText(err));
     } finally {
       busy.set(false);
     }

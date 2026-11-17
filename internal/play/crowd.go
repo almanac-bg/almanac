@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
+	"github.com/almanac-bg/almanac/internal/safe"
 )
 
 // Crowds: how players have answered each question (bank.Crowd), shown with its answer — what share picked each
@@ -203,7 +204,8 @@ func (g *Game) dayCrowd(ctx context.Context, db querier, day string, q bank.Ques
 		}
 	}
 	if recount {
-		go func() {
+		// A count that panics leaves no crowd kept: the next answer counts it again.
+		safe.Go("counting a day's crowd", func() {
 			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
 			defer cancel()
 			c, n, err := g.countDayCrowd(ctx, g.DB.Read, day, q, 0)
@@ -215,7 +217,7 @@ func (g *Game) dayCrowd(ctx context.Context, db querier, day string, q bank.Ques
 				return
 			}
 			g.dayCrowds.put(key, version, c, now)
-		}()
+		}, func() { g.dayCrowds.drop(key) })
 	}
 	if c := g.dayCrowds.crowd(k); c != nil {
 		return c, nil
