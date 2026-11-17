@@ -69,8 +69,8 @@ export function moveWords(e: LeagueEnd): string {
   return `Оставаш в ${e.now.name}`;
 }
 
-/** The league's head: its mountain and name, and the days left of the week. */
-function head(v: LeagueView): Child {
+/** The league's head: its mountain and name, and (`days`) the days left of the week. */
+function head(v: LeagueView, days = true): Child {
   return h(
     "div",
     { class: "league-head" },
@@ -81,12 +81,23 @@ function head(v: LeagueView): Child {
       h("p", { class: "kicker" }, "Лига"),
       h("strong", { class: `lg-${v.league.tier}` }, v.league.name),
     ),
-    h("span", { class: "muted" }, daysLeft(v.daysLeft)),
+    days ? h("span", { class: "muted" }, daysLeft(v.daysLeft)) : null,
   );
 }
 
-/** What the week is: who races, how, and what the end brings; and, in the one week still raced on XP, that it is. */
+/** Where the rules were opened by themselves once, on this device: a first visit reads them, later ones don't. */
+const rulesSeen = "almanac.leagueRules";
+
+/** What the week is, folded under „Как работи лигата“ (open on the first visit): who races, how, and what the end
+ * brings; and, in the one week still raced on XP, that it is, in sight. */
 function rules(v: LeagueView): Child {
+  let first = false;
+  try {
+    first = !localStorage.getItem(rulesSeen);
+    if (first) localStorage.setItem(rulesSeen, "1");
+  } catch {
+    // no storage here: folded
+  }
   return [
     v.onXP
       ? h(
@@ -96,11 +107,47 @@ function rules(v: LeagueView): Child {
         )
       : null,
     h(
-      "p",
-      { class: "board-note" },
-      `Всяка седмица играчите се състезават в групи до 20 души по точките от въпросите на деня. Пропуснат ден носи нула точки. В неделя в полунощ първите се качват в по-висока лига, последните слизат, а първите трима печелят ${v.pay[0]}, ${v.pay[1]} и ${v.pay[2]} XP. В група под ${v.race} души няма качване и награди.`,
+      "details",
+      { class: "more league-rules", open: first },
+      h("summary", null, "Как работи лигата"),
+      h(
+        "p",
+        { class: "board-note" },
+        `Всяка седмица играчите се състезават в групи до 20 души по точките от въпросите на деня. Пропуснат ден носи нула точки. В неделя в полунощ първите се качват в по-висока лига, последните слизат, а първите трима печелят ${v.pay[0]}, ${v.pay[1]} и ${v.pay[2]} XP. В група под ${v.race} души няма качване и награди.`,
+      ),
     ),
   ];
+}
+
+/** The week as it stands for the player, in two lines: the days left and who goes up („Още 6 дни · първите 5 се
+ * качват“); and the gap that's worth playing for: the lead over the second, the points to the place above, or out of
+ * the zone that goes down. */
+function standing(v: LeagueView): Child {
+  const n = v.group.length;
+  const at = v.place ?? 0;
+  const pts = (x: number) => (v.onXP ? `${formatNumber(x)} XP` : `${formatNumber(x)} ${x === 1 ? "точка" : "точки"}`);
+  const points = (i: number) => v.group[i]?.points ?? 0;
+  const mine = points(at - 1);
+  const safe = n - v.down; // the last place that doesn't go down
+  let gap = "";
+  if (at === 1 && n > 1) gap = mine > points(1) ? `Водиш с ${pts(mine - points(1))}.` : "Наравно с 2-ро място.";
+  else if (at > safe && safe > 0) gap = `Още ${pts(points(safe - 1) - mine + 1)} и излизаш от зоната за слизане.`;
+  else if (at > 1) {
+    const above = points(at - 2) - mine;
+    gap = above > 0 ? `До ${ordinal(at - 1, "n")} място: ${pts(above)}.` : `Наравно с ${ordinal(at - 1, "n")} място.`;
+  }
+  const days = daysLeft(v.daysLeft);
+  return h(
+    "div",
+    { class: "league-now" },
+    h(
+      "p",
+      { class: "league-when" },
+      days.charAt(0).toUpperCase() + days.slice(1),
+      v.up ? ` · първите ${v.up} се качват` : "",
+    ),
+    gap ? h("p", { class: "league-gap" }, gap) : null,
+  );
 }
 
 /** Whether the player's group is still gathering: they're in it, and it isn't a race yet. */
@@ -144,7 +191,7 @@ export function leagueBoard(v: LeagueView): Child {
     if (v.up && i === v.up - 1 && i < n - 1) rows.push(h("li", { class: "league-line up" }, "Дотук се качват"));
   });
   return [
-    h("section", { class: "card league-card" }, head(v), rules(v)),
+    h("section", { class: "card league-card" }, head(v, false), standing(v), rules(v)),
     h("section", { class: "board league-board" }, h("h2", null, `Групата ти · ${n}`), h("ol", null, rows)),
   ];
 }

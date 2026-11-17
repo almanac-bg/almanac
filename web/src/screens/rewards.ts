@@ -27,7 +27,8 @@ export function rewards() {
     "section",
     { class: "screen" },
     () => (user() ? profileNav() : null),
-    h("h1", null, "Награди"),
+    // Профил's switch names the place: the heading is for screen readers then.
+    h("h1", { class: () => (user() ? "sr" : "") }, "Награди"),
     when(
       () => user(),
       () => {

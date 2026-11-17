@@ -461,12 +461,16 @@
     --i: var(--i-users);
   }
 
-  /* Моят Алманах: the count, and each fact as a card in its topic's colour. */
-  .card.almanac-head {
+  /* Моят Алманах, read as an almanac: the count in the numeral face, then the days, newest first, each under its
+     dateline (a kicker running into a hairline), its facts as entries between hairlines rather than cards. */
+  .almanac-head {
     display: grid;
-    grid-template-columns: auto 1fr;
-    align-items: baseline;
-    gap: var(--space-1) var(--space-3);
+    gap: var(--space-1);
+  }
+
+  .almanac-count {
+    font-size: 1.125rem;
+    font-weight: 700;
   }
 
   .almanac-n {
@@ -474,20 +478,52 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .almanac-head > .second-chance {
+    justify-self: start;
+    margin-top: var(--space-2);
+    font-weight: 700;
+  }
+
+  .almanac-days {
+    display: grid;
+    gap: var(--space-6);
+  }
+
+  .almanac-day {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .almanac-date {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .almanac-date::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--line);
+  }
+
   .almanac-list {
     display: grid;
-    gap: var(--space-4);
+    gap: 0 var(--space-5);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  /* The topic's colour as an edge painted inside the card, so the content keeps the card's 16. */
-  .card.almanac-item {
-    box-shadow:
-      inset 4px 0 0 var(--tone),
-      var(--elev-1),
-      inset 0 0 0 1px var(--line);
+  /* An entry: the topic, the question small, what was learned as its headline, and the fact; a hairline between two. */
+  .almanac-item {
+    display: grid;
+    align-content: start;
+    gap: var(--space-2);
+    padding: var(--space-3) 0 var(--space-4);
+  }
+
+  .almanac-item + .almanac-item {
+    border-top: 1px solid var(--line);
   }
 
   .almanac-topic {
@@ -509,13 +545,17 @@
   }
 
   .almanac-a {
-    font: 800 1.125rem / 1.5rem var(--font-sans);
+    font: 800 1.25rem / 1.625rem var(--font-sans);
+    letter-spacing: -0.01em;
+    text-wrap: pretty;
   }
 
-  /* What was learned, in the facts' face, under a line: the card's own, never the next one's. */
+  .almanac-untrue {
+    color: var(--text-muted);
+  }
+
+  /* What was learned, in the facts' face. */
   .almanac-fact {
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--line);
     font: italic 500 1.0625rem / 1.625rem var(--font-serif);
     text-wrap: pretty;
   }
@@ -698,6 +738,24 @@
     font: 900 1.5rem / 1.75rem var(--font-sans);
   }
 
+  /* The week as it stands: the days left and who goes up, then the gap worth playing for, a size up. */
+  .league-now {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .league-when {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .league-gap {
+    font-size: 1.125rem;
+    line-height: 1.5rem;
+    font-weight: 800;
+  }
+
   /* Профил's line of the league: its mountain, the place in the group, a tap from it. */
   .place-link {
     display: flex;
@@ -809,9 +867,21 @@
     opacity: 0.62;
   }
 
-  /* Роял's next evening, and the countdown to its start. */
+  /* Роял's next evening: its start the hero, large, and the countdown to it under it. */
+  .royal-next {
+    gap: var(--space-2);
+  }
+
   .royal-when {
-    font: 900 2rem / 1 var(--font-numeral);
+    font: 900 4.5rem / 0.9 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .royal-countdown {
+    font-size: 1.125rem;
+    line-height: 1.5rem;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
   }
 
@@ -823,6 +893,10 @@
   .royal-plan {
     display: grid;
     gap: var(--space-3);
+  }
+
+  .royal-next > .royal-plan {
+    margin-top: var(--space-3);
   }
 
   .royal-plan p {
@@ -1065,6 +1139,36 @@
 
   .streak-wrap:only-child {
     grid-column: 1 / -1;
+  }
+
+  /* The day as the day's issue: a dateline over the card (the weekday and „Брой N“ on a hairline, the date set large,
+     a hairline under it), then what the ten are, a size down. */
+  .masthead {
+    display: grid;
+    gap: var(--space-2);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .masthead-line {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding-top: var(--space-1);
+    border-top: 1px solid var(--line);
+  }
+
+  .masthead-date {
+    font-size: 2.75rem;
+    line-height: 1;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+  }
+
+  .day-title {
+    font-size: 1.375rem;
+    line-height: 1.75rem;
+    letter-spacing: -0.02em;
   }
 
   /* The day's ten waiting: what they'd make of the streak, and in the evening that it ends at midnight. */
@@ -4137,11 +4241,7 @@
     background: var(--div);
   }
 
-  /* A second chance (Втори шанс): the way in from the Almanac, and the note on an answer that put a fact in it. */
-  .second-chance {
-    justify-items: start;
-  }
-
+  /* An answer that put a fact in the Almanac, on a second chance (Втори шанс). */
   .learned {
     margin: 0;
     color: var(--gold-ink);
@@ -6082,32 +6182,56 @@
       font-size: 1.125rem;
     }
 
-    /* Ten topics, five to a row (no topic alone in a row), the picture over the name; all of them at once above. */
-    /* Here the tiles stand tall, the picture over the name: the two rows of topics as tall as each other, and
-       „Всички теми“ above them (and „България“, „Втори шанс“ under them) each its own height. */
+    /* Ten topics, five to a row (no topic alone in a row), the picture over the name, each tile as tall as what's in
+       it. After them, one row of the rest (all of them at once, „България“, „Втори шанс“), each a short tile with
+       its picture beside the name: two of them two fifths of the row each, three a third each (in fifteenths). */
     .topics {
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      grid-template-rows: auto repeat(2, 1fr);
+      grid-template-columns: repeat(15, minmax(0, 1fr));
       grid-auto-rows: auto;
     }
 
-    /* The picture at the top, the name under it, and what the player knows of the topic at the bottom: level across
-       a row whether a name takes one line or two. */
+    .topics > li {
+      grid-column: span 3;
+    }
+
+    .topics > .topic-all {
+      order: 1;
+      grid-column: span 6;
+    }
+
+    .topics:has(> .topic-all ~ .topic-all ~ .topic-all) > .topic-all {
+      grid-column: span 5;
+    }
+
+    /* The picture at the top, the name under it, and what the player knows of the topic under that. */
     .topic {
       grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: auto 1fr auto;
-      align-items: stretch;
+      align-content: start;
+      align-items: start;
       padding: var(--space-3);
     }
 
-    .topic-text {
-      align-content: space-between;
+    .topic-pic {
+      width: 72px;
+      height: 72px;
+      margin: -4px 0 0 -4px;
     }
 
     .topic-all .topic {
-      grid-template-rows: none;
       align-content: center;
-      padding-left: var(--space-3);
+      padding-left: var(--space-4);
+    }
+
+    .topic-all .topic:has(.topic-pic) {
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      padding-left: var(--space-2);
+    }
+
+    .topic-all .topic-pic {
+      width: 44px;
+      height: 44px;
+      margin: 0;
     }
 
     .topic-name {
@@ -6141,6 +6265,46 @@
     /* A tablet: the column a little wider than a phone's. */
     #app {
       max-width: 48rem;
+    }
+
+    /* A page's picture beside its heading and lead, not over them: the page opens on what it's for. */
+    .intro:has(> .page-art) {
+      grid-template-columns: auto minmax(0, 1fr);
+      column-gap: var(--space-5);
+    }
+
+    .intro:has(> .page-art) > :not(.page-art) {
+      grid-column: 2;
+    }
+
+    .intro:has(> .page-art) > .back {
+      grid-column: 1 / -1;
+    }
+
+    .intro > .page-art {
+      grid-column: 1;
+      grid-row: span 2;
+      align-self: center;
+      margin: 0;
+    }
+
+    .intro:has(> .page-art) > h1 {
+      align-self: end;
+    }
+
+    /* The day's gold button and a page's own: a hand's width, not the column's. */
+    .day > .btn.primary.big,
+    .screen > .btn.primary.big,
+    .royal-plan > .btn.primary.big {
+      max-width: 22rem;
+    }
+
+    .day > .day-meta {
+      text-align: left;
+    }
+
+    .masthead-date {
+      font-size: 3.5rem;
     }
 
     /* In a game: the question and its answers bigger, read from further away; a choice's answers two by two. A
@@ -6252,6 +6416,11 @@
 
     .almanac-list {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    /* Two to a row: the second opens the day beside the first, with no line over it either. */
+    .almanac-item:nth-child(2) {
+      border-top: 0;
     }
 
     /* A new player: the day and the topics, one centred column. */

@@ -11,16 +11,16 @@ import (
 	"github.com/almanac-bg/almanac/internal/play"
 )
 
-// today is the day screen's state: the day, the viewer's streak, level and run (if any), whether they've finished a
-// game yet and which of the game's systems they've met, how many have played the day (and how well on average), and
-// their friends' day.
+// today is the day screen's state: the day and its issue (play.Issue), the viewer's streak, level and run (if any),
+// whether they've finished a game yet and which of the game's systems they've met, how many have played the day (and
+// how well on average), and their friends' day.
 func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
 	if err != nil {
 		return err
 	}
 	day := s.game.Today()
-	out := map[string]any{"day": day, "streak": 0, "run": nil}
+	out := map[string]any{"day": day, "issue": play.Issue(day), "streak": 0, "run": nil}
 	var viewer int64
 	if u != nil {
 		viewer = u.ID

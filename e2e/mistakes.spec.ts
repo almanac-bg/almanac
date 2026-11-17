@@ -10,19 +10,20 @@ test("a second chance: the questions missed come back, from Начало and fro
   await playRun(page);
 
   // After the wait (seconds here, three days in the game), they wait for a second chance.
-  const card = page.locator(".second-chance");
+  // The Almanac says so in a line under its count, a tap from them.
+  const line = page.locator(".almanac-head .second-chance");
   await expect(async () => {
     await page.goto("/almanac");
-    await expect(card).toBeVisible({ timeout: 1000 });
+    await expect(line).toBeVisible({ timeout: 1000 });
   }).toPass({ timeout: 20_000 });
-  await expect(card).toContainText(/\d+ въпрос(а, на които сгреши, чакат|, на който сгреши, чака) нов опит/);
+  await expect(line).toHaveText(/^\d+ въпрос(а чакат| чака) втори шанс$/);
   await page.goto("/");
   await expect(page.getByRole("link", { name: /Втори шанс/ })).toContainText(
     /\d+ въпрос(а, на които|, на който) сгреши/,
   );
 
   await page.goto("/almanac");
-  await page.getByRole("link", { name: "Опитай пак" }).click();
+  await line.click();
   await expect(page).toHaveURL(/\/mistakes$/);
   const head = page.locator(".question-head");
   await expect(head).toContainText(/1 от \d+/, { timeout: 10_000 });

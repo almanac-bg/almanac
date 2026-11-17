@@ -32,7 +32,8 @@ export function wardrobe() {
     "section",
     { class: "screen" },
     () => (user() ? profileNav() : null),
-    h("h1", null, "Гардероб"),
+    // Профил's switch names the place: the heading is for screen readers then.
+    h("h1", { class: () => (user() ? "sr" : "") }, "Гардероб"),
     when(
       () => user(),
       () => {

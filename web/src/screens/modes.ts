@@ -50,7 +50,7 @@ export const clock = (ms: number) =>
 export const dayOf = (ms: number) => new Date(ms).toLocaleDateString("en-CA", { timeZone: "Europe/Sofia" });
 
 /** The day of ms from now's, in words: „днес“, „утре“, or its weekday („в петък“, „във вторник“). */
-function onDay(ms: number, now: number): string {
+export function dayWord(ms: number, now: number): string {
   const day = dayOf(ms);
   if (day === dayOf(now)) return "днес";
   if (day === dayOf(now + 24 * 3600_000)) return "утре";
@@ -59,14 +59,14 @@ function onDay(ms: number, now: number): string {
 }
 
 /** When an evening is, in words: „днес в 21:00“, „утре в 21:00“, „в петък в 21:00“. */
-export const when = (ms: number, now: number) => `${onDay(ms, now)} в ${clock(ms)}`;
+export const when = (ms: number, now: number) => `${dayWord(ms, now)} в ${clock(ms)}`;
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Who said they'd come to the next Роял, in words: „Тази вечер ще дойдат 14“ (or „Утре вечер …“, „В петък …“), a
  * friend first if one did: „Мария и още 4 ще дойдат тази вечер“. */
 export function coming(t: Tonight): string {
-  const day = onDay(t.glance.next, t.glance.now);
+  const day = dayWord(t.glance.next, t.glance.now);
   const at = day === "днес" ? "тази вечер" : day === "утре" ? "утре вечер" : day;
   const [friend] = t.friends ?? [];
   const more = t.coming - 1 - (t.planned ? 1 : 0);

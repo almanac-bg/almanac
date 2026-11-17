@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { hyphenate, stakeWords, withName } from "./words.ts";
+import { dateWords, hyphenate, issueWords, stakeWords, weekday, withName } from "./words.ts";
+
+test("a day as the game writes it: the date, the month in lower case; with its issue, a dateline", () => {
+  assert.equal(dateWords("2026-11-17"), "17 ноември");
+  assert.equal(dateWords("2027-01-01"), "1 януари");
+  assert.equal(weekday("2026-11-17"), "Вторник");
+  assert.equal(issueWords(6, "2026-11-17"), "Брой 6 · 17 ноември");
+  assert.equal(issueWords(0, "2026-11-11"), "11 ноември");
+  assert.equal(issueWords(undefined, "2026-11-11"), "11 ноември");
+});
 
 test("„със“ before an с or a з, „с“ before anything else", () => {
   assert.deepEqual(["Заек 817", "Сова", "зора", "Мечка 12", "Ана", "Sasho", "Zara", "Shon", "Ivo"].map(withName), [
