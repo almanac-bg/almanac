@@ -496,10 +496,15 @@ function spread(s: Spread, answer: number, mine: number | null, view: NumberView
 }
 
 let orders = 0; // for each order's hint its own id
+/** How long a finger rests on a row, in ms, to take it up to drag (on the grip it's at once), and how far, in px, it
+ * may stir meanwhile: moved further first, it scrolls the page. */
+const HOLD = 300;
+const STILL = 8;
 
 /** Things to put in order, then sent with „Готово“: a tap on one picks it up and a tap on another place puts it
- * there (a screen reader's way too); or it's dragged into place, by its grip on a touch screen (the rest of the row
- * scrolls the page, as a finger expects) and anywhere with a mouse; or moved with the arrow keys. */
+ * there (a screen reader's way too); or it's dragged into place: with a mouse from anywhere on it, with a finger by its
+ * grip at once or from anywhere else once held a moment (a finger that moves at once scrolls the page, as it expects);
+ * or moved with the arrow keys. */
 function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
   const how = `order-how-${++orders}`;
   const n = view.items.length;
@@ -508,6 +513,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
   const picked = signal(-1); // the item picked up by a tap, to be put down by the next
   let dragged = false; // the pointer down now has moved: a drag, not a tap
   let swallow = false; // a drag just ended: the click that may follow it is no tap (none follows a finger's)
+  let holding = false; // a finger drags a row now: the page stays put under it
   const said = h("p", { class: "sr", "aria-live": "polite" });
   const rows = view.items.map((text, item) =>
     h(
@@ -574,10 +580,42 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
       if (swallow) swallow = false;
       else tap(item);
     });
+    // A long press is the drag's, not the phone's: no menu, no text picked.
+    row.addEventListener("contextmenu", (e) => e.preventDefault());
+    // A finger dragging a row moves the row, not the page (the row lets the page pan: till it's taken up, it may).
+    row.addEventListener(
+      "touchmove",
+      (e) => {
+        if (holding) e.preventDefault();
+      },
+      { passive: false },
+    );
     row.addEventListener("pointerdown", (e: PointerEvent) => {
       if (locked.peek() || e.button !== 0) return;
-      // A finger drags by the grip only: elsewhere on the row it scrolls the page, or taps.
-      if (e.pointerType !== "mouse" && !(e.target as Element).closest(".grip")) return;
+      // A mouse drags from anywhere on the row, a finger by the grip at once…
+      if (e.pointerType === "mouse" || (e.target as Element).closest(".grip")) return grab(e, false);
+      // …or anywhere else once held still a moment: before that, a finger that moves scrolls the page, one lifted taps.
+      const { pointerId: id, clientX: x0, clientY: y0 } = e;
+      const wait = () => {
+        clearTimeout(timer);
+        row.removeEventListener("pointermove", stir);
+        row.removeEventListener("pointerup", wait);
+        row.removeEventListener("pointercancel", wait);
+      };
+      const stir = (ev: PointerEvent) => {
+        if (ev.pointerId === id && Math.hypot(ev.clientX - x0, ev.clientY - y0) > STILL) wait();
+      };
+      const timer = setTimeout(() => {
+        wait();
+        if (!locked.peek()) grab(e, true);
+      }, HOLD);
+      row.addEventListener("pointermove", stir);
+      row.addEventListener("pointerup", wait);
+      row.addEventListener("pointercancel", wait);
+    });
+    // Takes the row up and has it follow the pointer, from where it went down, till it's let go. `held`: taken up by a
+    // long press, which says so (a lift and a tap's sound), and, let go without a move, is a tap: the row picked up.
+    const grab = (e: PointerEvent, held: boolean) => {
       dragged = false;
       const from = arrangement.indexOf(item);
       const first = rows[arrangement[0] ?? 0] as HTMLElement;
@@ -588,6 +626,8 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
       row.setPointerCapture(e.pointerId);
       row.classList.add("dragging");
       list.classList.add("sorting");
+      holding = e.pointerType !== "mouse";
+      if (held) play("tap");
       const follow = (ev: PointerEvent) => {
         if (Math.abs(ev.clientY - y0) > 4) dragged = true;
         const dy = Math.max(-from * pitch, Math.min((n - 1 - from) * pitch, ev.clientY - y0));
@@ -606,9 +646,13 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
         row.removeEventListener("lostpointercapture", drop);
         row.classList.remove("dragging");
         list.classList.remove("sorting");
+        holding = false;
         if (dragged) {
           picked.set(-1);
           swallow = true;
+        } else if (held) {
+          swallow = true; // the click a long press may still bring is this tap's
+          return tap(item);
         }
         if (to !== from && !locked.peek()) move(from, to);
         else if (dragged) lay(); // back where it was (left alone on a tap: laying the rows anew would lose its click)
@@ -619,7 +663,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
       // The row let go of the pointer before it was lifted (WebKit does as the page scrolls under it): the drag ends
       // there, where it got to, and nothing is left half-dragged.
       row.addEventListener("lostpointercapture", drop);
-    });
+    };
     row.addEventListener("keydown", (e: KeyboardEvent) => {
       if (locked.peek()) return;
       // A row is a button: Enter or Space taps it.

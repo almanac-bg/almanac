@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { expect, type Page } from "@playwright/test";
 
 /** Answers the question showing: the first option; „Вярно“; a number on the game's pad; an order, dragging the first
- * item to the end and tapping it back (which checks that both ways work); a match, joining each left to the right beside it (a line
+ * item to the end (by a finger in Chromium) and tapping it back (which checks that both ways work); a match, joining each left to the right beside it (a line
  * for each); or a split, swiping the first thing left and sending the rest left too. */
 export async function answer(page: Page): Promise<void> {
   const q = page.locator("article.question");
@@ -19,13 +19,19 @@ export async function answer(page: Page): Promise<void> {
     const text = (row: ReturnType<typeof rows.first>) => row.locator("span").nth(1);
     const first = (await text(rows.first()).textContent()) ?? "";
     // Dragged by hand, from where the rows are: the page held still (Playwright's own drag scrolls the page under a
-    // button held down, in WebKit, and the row taken moves away from under it).
-    const [from, to] = [await rows.first().boundingBox(), await rows.last().boundingBox()];
+    // button held down, in WebKit, and the row taken moves away from under it). In Chromium (a phone) by a finger held
+    // a moment on the words, as a player does (never only by the grip); elsewhere by the mouse.
+    const touch = page.context().browser()?.browserType().name() === "chromium";
+    const [from, to] = [await text(rows.first()).boundingBox(), await rows.last().boundingBox()];
     if (!from || !to) throw new Error("the rows aren't on the screen");
-    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 5 });
-    await page.mouse.up();
+    const [x, y0, y1] = [from.x + from.width / 2, from.y + from.height / 2, to.y + to.height / 2];
+    if (touch) await fingerDrag(page, x, y0, y1);
+    else {
+      await page.mouse.move(x, y0);
+      await page.mouse.down();
+      await page.mouse.move(to.x + to.width / 2, y1, { steps: 5 });
+      await page.mouse.up();
+    }
     await expect(text(rows.last())).toHaveText(first);
     // And by taps: the last picked up, put down in the first place.
     await rows.last().click();
@@ -59,6 +65,20 @@ export async function answer(page: Page): Promise<void> {
   } else {
     await q.locator(".options .option").first().click();
   }
+}
+
+/** Rests a finger at (x, y0) as long as a long press takes, drags it straight down or up to y1 in steps, and lifts it:
+ * real touch events, Chromium only (Playwright has a tap, not a drag, of a finger). */
+async function fingerDrag(page: Page, x: number, y0: number, y1: number): Promise<void> {
+  const cdp = await page.context().newCDPSession(page);
+  const at = (y: number) => [{ x, y }];
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: at(y0) });
+  await page.waitForTimeout(400);
+  for (let i = 1; i <= 6; i++) {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: at(y0 + ((y1 - y0) * i) / 6) });
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await cdp.detach();
 }
 
 /** Scrolls the page to its foot, as a player does to see all of a long answer: on a short screen „Готово“ stays at
