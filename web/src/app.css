@@ -650,6 +650,49 @@
   .keep-card p {
     margin: 0;
   }
+
+  /* One question over the page, in a sheet from the bottom (screens/name.ts: a name before the first share). */
+  .sheet {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    color: var(--text);
+    background: color-mix(in srgb, var(--bg) 40%, transparent);
+    border: 0;
+  }
+
+  .sheet[open] {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .sheet::backdrop {
+    background: transparent;
+  }
+
+  .sheet-panel {
+    width: min(100%, 28rem);
+    margin: 0;
+    padding: var(--space-6) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom));
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow: var(--elev-2);
+  }
+
+  .sheet-panel h2,
+  .sheet-panel p {
+    margin: 0;
+  }
+
+  /* The quiet way out, centred under the gold button. */
+  .sheet-skip {
+    justify-self: center;
+  }
   /* A year in the game (screens/year.ts): one card at a time under a row of pips, a big figure in each. */
   /* A way in, not a card of parts: its three lines read as one. */
   .card.year-card {

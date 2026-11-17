@@ -61,6 +61,30 @@ test.describe("in Messenger's own browser", () => {
   });
 });
 
+test("a first invite asks for a name the friends would know, once", async ({ page }) => {
+  await page.goto("/friends");
+  await page.locator(".friends").getByRole("button", { name: "Покани приятел" }).click();
+  await page.getByRole("button", { name: "Покани с връзка" }).click();
+  const sheet = page.getByRole("dialog", { name: "Как да те познаят приятелите?" });
+  await expect(sheet.getByLabel("Име")).toHaveValue(/ \d{3}$/);
+  // „Не сега“: nothing shared, and asked again next time.
+  await sheet.getByRole("button", { name: "Не сега" }).click();
+  await expect(sheet).toHaveCount(0);
+  await page.getByRole("button", { name: "Покани с връзка" }).click();
+  await sheet.getByLabel("Име").fill("Х");
+  await sheet.getByRole("button", { name: "Сподели" }).click();
+  await expect(sheet.getByRole("alert")).toHaveText("Името е от 2 до 30 букви, цифри или интервали.");
+  await sheet.getByLabel("Име").fill("Светулка");
+  await sheet.getByRole("button", { name: "Сподели" }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(async () => (await (await fetch("/api/me")).json()).user.name))
+    .toBe("Светулка");
+  // Named: the next invite goes at once.
+  await page.getByRole("button", { name: "Покани с връзка" }).click();
+  await expect(sheet).toHaveCount(0);
+});
+
 test("a guest's Профил has the way in for a profile from elsewhere", async ({ page }) => {
   await page.goto("/");
   await daysPlayed(page, 1);

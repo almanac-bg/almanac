@@ -601,7 +601,8 @@ function nobody(again: () => void): Child {
     () => {
       const m = mine();
       if (!m) return null;
-      if (!m.friends.length) return shareButton("Покани приятел", () => "Ела да сме приятели в АЛМАНАХ:", m.invite);
+      if (!m.friends.length)
+        return shareButton("Покани приятел", () => "Ела да сме приятели в АЛМАНАХ:", m.invite, true, undefined, true);
       return h(
         "ul",
         { class: "duel-friends" },

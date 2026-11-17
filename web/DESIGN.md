@@ -59,7 +59,12 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   button, the same line under it, and „Още десет“ plain.
 - **Приятели** (`/friends`): requests, friends, and the ways to add them. With none yet, „Покани с връзка“ is the gold
   button, first (the phone's share sheet, or „Копирано.“: the address itself is never printed), the field by
-  потребителско име or имейл under it with „Добави“.
+  потребителско име or имейл under it with „Добави“. What's shared that carries the player's name (an invite, the
+  day's result with its link) asks a player still with the name drawn for them for theirs first, once on a device: a
+  sheet from the bottom (`.sheet`, `screens/name.ts`), „Как да те познаят приятелите?“, the drawn name in its one
+  field, „Сподели“ gold, „Не сега“ quiet. An invite (`/f/…`) is to the day's ten („Мария има 8 от 10 днес. А ти?“, or
+  „Мария те кани на днешните 10“ before she has played); played there, the day's result is Начало's, with one card
+  more first (`.invite-card`: the two results side by side and „Добави Мария в приятели“).
 - **Класации** (`/ranks`): Днес (the day's board, first), Лига (the player's group this week; `/ranks#league`),
   Рейтинг and Знания (Лига and Рейтинг once the player has met them); of everyone or of friends (not the league: a group is its own).
 - **Профил** (`/me`): its own four places in a switch at the top (`profileNav()`): Общо (the player: level,

@@ -1176,7 +1176,7 @@ func TestLinkPreviews(t *testing.T) {
 	_, friends := p.call("GET", "/api/friends", nil)
 	link := friends["invite"].(string)
 	who := me["user"].(map[string]any)["name"].(string)
-	if body := page(link[len(g.url):]); !strings.Contains(body, `og:title" content="`+who+` в АЛМАНАХ"`) ||
+	if body := page(link[len(g.url):]); !strings.Contains(body, `og:title" content="`+who+` те кани на днешните 10 в АЛМАНАХ"`) ||
 		!strings.Contains(body, `og:description" content="Десет въпроса за днес, едни и същи за всички. Колко ще познаеш ти?"`) {
 		t.Fatalf("the invite's preview:\n%s", body[:min(len(body), 1500)])
 	}
