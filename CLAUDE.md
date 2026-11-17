@@ -138,6 +138,8 @@ This runs on the owner's own Mac, with other sessions beside you. When your work
   port. Playwright closes its browsers and its test server by itself; a browser or script you opened yourself, close.
 - **Remove what you made:** temporary worktrees (`git worktree remove`), test databases and `test-results/`,
   screenshots, scripts and files in the scratchpad or `/tmp`, temporary config copies.
+  Merged branches and finished worktrees left behind anyway are cleared as sessions start (`.claude/hooks/tidy.sh`,
+  logged in `.git/tidy.log`).
 - **Never touch another session's** worktree, branch, server or files: check that a process or port is yours
   (its folder) before stopping it.
 - Check with `ps`, `lsof -iTCP -sTCP:LISTEN` and `git status` that nothing of yours is left.
