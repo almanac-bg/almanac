@@ -1,5 +1,5 @@
 // Стая: a room for many at once — on everyone's phone, around a table or across a classroom. Here one is opened, or
-// joined by its code.
+// joined by its code (checked before anything is asked); and its host chooses again between games (changeGame).
 
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
@@ -34,6 +34,13 @@ export function rooms() {
         mix: mix.peek(),
         lead: leads.peek(),
       });
+      // A host who only leads isn't in the room as a player: no name to ask for.
+      if (leads.peek())
+        try {
+          sessionStorage.setItem(`named:${r.code}`, "1");
+        } catch {
+          // asked, then: the lesser loss
+        }
       go(`/r/${r.code}`);
     } catch (err) {
       error.set((err as ApiError).message);
@@ -74,11 +81,21 @@ export function rooms() {
         "form",
         {
           class: "join",
-          onsubmit: (e: SubmitEvent) => {
+          onsubmit: async (e: SubmitEvent) => {
             e.preventDefault();
             const c = code.peek().replace(/\D/g, "");
-            if (c.length === 6) go(`/r/${c}`);
-            else codeError.set("Кодът е от 6 цифри.");
+            if (c.length !== 6) return codeError.set("Кодът е от 6 цифри.");
+            // A wrong code is said here, before anything is asked of the player.
+            try {
+              await api("GET", `/api/rooms/${c}`);
+              go(`/r/${c}`);
+            } catch (err) {
+              codeError.set(
+                (err as ApiError).code === "no_room"
+                  ? "Няма отворена стая с този код. Провери цифрите."
+                  : (err as ApiError).message,
+              );
+            }
           },
         },
         h("input", {
@@ -134,6 +151,85 @@ export function rooms() {
         topic("", "Всички теми"),
         categories.map((c) => topic(c.id, c.name)),
       ),
+    ),
+    () => error() && h("p", { class: "bad", role: "alert" }, error()),
+  );
+}
+
+/** What a room plays: a topic ("" for all), how many questions, how hard. */
+export interface Game {
+  category: string;
+  length: number;
+  mix: Mix;
+}
+
+/** Between a room's games, its host chooses again what it plays, the code and the players kept: how many questions and
+ * how hard, then the topic, a tap on which makes it the next game's (`change`, which says what went wrong, if
+ * anything). Folded: the next game as it was is one tap away. */
+export function changeGame(now: Game, change: (g: Game) => Promise<string>): Child {
+  const length = signal(now.length);
+  const mix = signal<Mix>(now.mix);
+  const category = signal(now.category);
+  const error = signal("");
+  const pick = async (id: string) => {
+    error.set(await change({ category: id, length: length.peek(), mix: mix.peek() }));
+    if (!error.peek()) category.set(id);
+  };
+  const again = (g: Partial<Game>) =>
+    change({ category: category.peek(), length: length.peek(), mix: mix.peek(), ...g });
+  const topic = (id: string, name: string): Child =>
+    h(
+      "li",
+      null,
+      h(
+        "button",
+        {
+          class: `chip ${id ? toneOf(id) : "tone-gold"}`,
+          type: "button",
+          "aria-pressed": () => String(category() === id),
+          onclick: () => pick(id),
+        },
+        topicMark(id),
+        name,
+      ),
+    );
+  return h(
+    "details",
+    { class: "more" },
+    h("summary", null, "Промени играта"),
+    setting(
+      "Въпроси",
+      segmented(
+        "Въпроси",
+        [5, 10, 15, 20].map((n) => [n, String(n)]),
+        length,
+        async (n) => {
+          length.set(n);
+          error.set(await again({ length: n }));
+        },
+        false,
+        true,
+      ),
+    ),
+    setting(
+      "Трудност",
+      segmented(
+        "Трудност",
+        mixes,
+        mix,
+        async (m) => {
+          mix.set(m);
+          error.set(await again({ mix: m }));
+        },
+        false,
+        true,
+      ),
+    ),
+    h(
+      "ul",
+      { class: "chips" },
+      topic("", "Всички теми"),
+      categories.map((c) => topic(c.id, c.name)),
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );

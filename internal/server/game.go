@@ -21,6 +21,10 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	}
 	day := s.game.Today()
 	out := map[string]any{"day": day, "issue": play.Issue(day), "streak": 0, "run": nil}
+	// Роял's lobby open or its games under way: Начало shows it to everyone then, new players too (it's the best
+	// nudge there is), whatever play.NudgeRoyal says between evenings.
+	royalNow := s.royal.Glance().Phase != "soon"
+	out["royalNow"] = royalNow
 	var viewer int64
 	if u != nil {
 		viewer = u.ID
@@ -67,13 +71,15 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 		}
 		out["played"] = played
 		// Whether Роял is among the ways to play with others: not for a new player while its evenings are thin.
-		if out["royal"], err = s.game.NudgeRoyal(r.Context(), u.ID); err != nil {
+		nudge, err := s.game.NudgeRoyal(r.Context(), u.ID)
+		if err != nil {
 			return err
 		}
 		// A live game they're in, under way: Начало has the way back to it.
 		if p := s.playing(u.ID); p != nil {
 			out["playing"] = p
 		}
+		out["royal"] = nudge || royalNow
 		// A friend has played the duel they started: told on Начало, once (by the client), above the day.
 		if out["duel"], err = s.game.FriendPlayedOf(r.Context(), u.ID); err != nil {
 			return err

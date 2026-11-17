@@ -79,8 +79,10 @@ export interface Today {
   /** Whether the player has finished a game of any kind: until then Начало is the day and the topics only. */
   played?: boolean;
   /** Whether Роял is among the ways to play with others: not for a new player while its evenings are thin (nor before
-   * there's a player: they're new). */
+   * there's a player: they're new); always while its lobby is open or its games are on. */
   royal?: boolean;
+  /** Роял's lobby is open or its games are on (for anyone, signed in or not). */
+  royalNow?: boolean;
   /** Which of the game's systems the player has met: the level and the goals show once XP is open. */
   open?: Open;
   run: State | null;
@@ -321,8 +323,15 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
         // Just played, the goals it finished are told with its news; a first day has none (play/unfold.go).
         just || !t.open?.xp ? null : goalsCard(),
         // The ways to play with others wait for a first game finished: a new player starts with the day and a topic;
-        // and Роял, in a player's first week, for its evenings to fill (play.NudgeRoyal).
-        just || t.played ? modes(t.royal ? ["duel", "royal", "room"] : ["duel", "room"], "С други") : null,
+        // and Роял, in a player's first week, for its evenings to fill (play.NudgeRoyal). While its lobby is open or
+        // its games are on, Роял shows to everyone, a new player too: a full evening is the best way to meet it.
+        just || t.played
+          ? modes(t.royal ? ["duel", "royal", "room"] : ["duel", "room"], "С други")
+          : [
+              t.royalNow ? modes(["royal"], "С други") : null,
+              // A room's code from a friend or a teacher works from the first visit: the way in, in a line.
+              h("p", { class: "day-next" }, h("a", { href: "/room" }, "Влез в стая с код")),
+            ],
       ),
       topics(),
     );

@@ -11,9 +11,11 @@ test("the day: ten questions, the result, the review, and one try only", async (
   });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Десет въпроса за днес" })).toBeVisible();
-  // A new player sees the day and the topics only: playing with others comes after a first game.
+  // A new player sees the day and the topics: duels and rooms come after a first game (a room's code is a line), Роял
+  // only while it's on (the test server always has a lobby open).
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
-  await expect(page.locator(".modes")).toHaveCount(0);
+  await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Влез в стая с код" })).toBeVisible();
   await expect(page.locator(".streak-chip")).toHaveCount(0);
   await startDay(page);
   await playRun(page);
@@ -29,8 +31,6 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // After the day, the other ways to play are right there: with others, and by topic.
   await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toBeVisible();
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
-  // Not Роял: no evening before today has had players (a fresh database), and a first week isn't sent to an empty one.
-  await expect(page.locator(".modes").getByRole("link", { name: /Роял/ })).toHaveCount(0);
   // The result is shared without its answers: the day's issue and date, the score, a square for each question (and a
   // right answer few of the day's other players got, if there's one: other tests play the same day), and the player's
   // own link to it.

@@ -2,7 +2,8 @@
 // scoreboard after each.
 //
 // A room is opened by a host, who chooses what it plays (Settings: a topic, how many questions, how hard) and sets
-// the pace (anyone may while the host is away). The host may also send a player out of the room (Remove): they're
+// the pace (anyone may while the host is away); between games the host may choose again (Change), keeping the code
+// and the players. The standings are by points, then by the time the answers took, as in a duel. The host may also send a player out of the room (Remove): they're
 // kept out of it from then on. A room never deals a question twice, over all its games, nor one of the day's.
 //
 // A host may also lead from a big screen (Settings.Lead: a class's board, a pub's TV) rather than play: they're no
@@ -22,6 +23,7 @@
 package room
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -255,6 +257,7 @@ type savedMember struct {
 	Points  int           `json:"points,omitempty"`
 	Rights  int           `json:"rights,omitempty"`
 	InRow   int           `json:"inRow,omitempty"`
+	Ms      int64         `json:"ms,omitempty"`
 	Run     int64         `json:"run,omitempty"`
 	Answers []savedAnswer `json:"answers,omitempty"`
 }
@@ -287,7 +290,7 @@ func (h *Hub) Save(w io.Writer) error {
 		for _, m := range r.players {
 			sm := savedMember{ID: m.ID, Key: m.key, Name: m.Name, Look: m.Look}
 			if over {
-				sm.Points, sm.Rights, sm.InRow, sm.Run = m.points, m.rights, m.inRow, m.run
+				sm.Points, sm.Rights, sm.InRow, sm.Ms, sm.Run = m.points, m.rights, m.inRow, m.ms, m.run
 				for _, l := range m.log {
 					sm.Answers = append(sm.Answers, savedAnswer{Question: l.questionID, Shown: l.shown, Points: l.points, Right: l.right})
 				}
@@ -352,7 +355,7 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 				m.key = sm.Key
 			}
 			if r.phase == End {
-				m.points, m.rights, m.inRow, m.run = sm.Points, sm.Rights, sm.InRow, sm.Run
+				m.points, m.rights, m.inRow, m.ms, m.run = sm.Points, sm.Rights, sm.InRow, sm.Ms, sm.Run
 				for _, a := range sm.Answers {
 					m.log = append(m.log, loggedAnswer{questionID: a.Question, shown: a.Shown, points: a.Points, right: a.Right})
 				}
@@ -402,7 +405,8 @@ type member struct {
 	Player
 	key            int // tells them apart on the screens while the room is open: the order they came in
 	points, rights int
-	inRow          int // right answers in a row, the last ones
+	ms             int64 // the time their answers took, this game: of as many points, the quicker stands first
+	inRow          int   // right answers in a row, the last ones
 	online         int
 	// The question now: whether they've answered, what they gave (as shown), how it went.
 	answered bool
@@ -623,6 +627,30 @@ func (r *Room) Start(by int64) error {
 	return r.start()
 }
 
+// Change is the host choosing what the room plays next (a topic, how many questions, how hard), in its lobby or
+// between games: the code and the players stay, and whether the host leads from a big screen.
+func (r *Room) Change(by int64, s Settings) error {
+	if s.Category != "" && !slices.ContainsFunc(r.bank().Categories, func(c bank.Category) bool { return c.ID == s.Category }) {
+		return play.ErrNoTopic
+	}
+	var err error
+	if s.Length, s.Mix, err = play.RoomGame(s.Length, s.Mix); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if by != r.host {
+		return ErrNotYours
+	}
+	if r.phase != Lobby && r.phase != End {
+		return ErrNotNow
+	}
+	s.Lead = r.Lead
+	r.Settings = s
+	r.changed()
+	return nil
+}
+
 // Next is who leads moving the game on at once: the answer now, while a question is up; the next question (or the
 // end) while an answer shows.
 func (r *Room) Next(by int64) error {
@@ -715,7 +743,7 @@ func (r *Room) start() error {
 	}
 	r.game++
 	for _, m := range r.players {
-		m.points, m.rights, m.inRow, m.log, m.run = 0, 0, 0, nil, 0
+		m.points, m.rights, m.inRow, m.ms, m.log, m.run = 0, 0, 0, 0, nil, 0
 	}
 	r.show(0)
 	return nil
@@ -806,6 +834,7 @@ func (r *Room) answer(m *member, n int, raw json.RawMessage) error {
 	w := play.WorthOf(d.Question(), g.Score, took, m.inRow)
 	m.gained, m.speed, m.row = w.Points, w.Speed, w.Row
 	m.points += m.gained
+	m.ms += min(took, limit).Milliseconds()
 	m.log = append(m.log, loggedAnswer{questionID: d.Question().Base().ID, shown: g.Shown, points: m.gained, right: g.Right,
 		n: n, given: g.Given, score: g.Score, ms: min(took, limit).Milliseconds(), at: time.Now()})
 	if !r.allAnswered() {
@@ -828,6 +857,7 @@ func (r *Room) reveal() {
 		if !m.answered { // the time ran out on them
 			m.log = append(m.log, loggedAnswer{questionID: d.Question().Base().ID, n: r.n,
 				ms: play.Limit(d.Question()).Milliseconds(), at: time.Now()})
+			m.ms += play.Limit(d.Question()).Milliseconds()
 			m.inRow = 0
 		}
 	}
@@ -960,6 +990,11 @@ type PlayerView struct {
 	Online   bool   `json:"online"`
 	Answered bool   `json:"answered"`
 	Me       bool   `json:"me,omitempty"`
+	// Place is where they stand (once there's a score): by points, then, of as many, by the time their answers took
+	// (as in a duel or Роял); those level on both share it.
+	Place int `json:"place,omitempty"`
+	// ms is the time their answers took, for the order.
+	ms int64
 	// Gained and Right are this question's, once its answer shows.
 	Gained int  `json:"gained,omitempty"`
 	Right  bool `json:"right,omitempty"`
@@ -1005,7 +1040,7 @@ func (r *Room) View(viewer int64) View {
 	for _, m := range r.players {
 		p := PlayerView{
 			Key: m.key, Look: m.Look, Name: m.Name, Points: m.points, Rights: m.rights, Online: m.online > 0, Answered: m.answered,
-			Me: m.ID == viewer,
+			Me: m.ID == viewer, ms: m.ms,
 		}
 		if r.phase == Reveal {
 			p.Gained, p.Right = m.gained, m.graded.Right
@@ -1013,8 +1048,15 @@ func (r *Room) View(viewer int64) View {
 		v.Players = append(v.Players, p)
 	}
 	if r.phase != Lobby {
-		// Best first, once there's a score (ties: who joined first).
-		slices.SortStableFunc(v.Players, func(a, b PlayerView) int { return b.Points - a.Points })
+		// Best first, once there's a score: more points, then the quicker; those level on both share a place.
+		ahead := func(a, b PlayerView) int { return cmp.Or(b.Points-a.Points, cmp.Compare(a.ms, b.ms)) }
+		slices.SortStableFunc(v.Players, ahead)
+		for i := range v.Players {
+			v.Players[i].Place = i + 1
+			if i > 0 && ahead(v.Players[i-1], v.Players[i]) == 0 {
+				v.Players[i].Place = v.Players[i-1].Place
+			}
+		}
 	}
 	if r.phase == Question || r.phase == Reveal {
 		d := r.dealt[r.n]

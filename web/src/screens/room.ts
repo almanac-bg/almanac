@@ -20,6 +20,7 @@ export let {
   avatar,
   boardRow,
   categories,
+  changeGame,
   computed,
   countdown,
   crowdLine,
@@ -103,6 +104,8 @@ export interface Player {
   online: boolean;
   answered: boolean;
   me?: boolean;
+  /** Where they stand: by points, then by the time the answers took; those level on both share it. */
+  place?: number;
   gained?: number;
   right?: boolean;
   avatar?: string;
@@ -125,6 +128,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
     avatar,
     boardRow,
     categories,
+    changeGame,
     computed,
     countdown,
     crowdLine,
@@ -185,7 +189,9 @@ export function room(kit: Kit, [code = ""]: string[]) {
       else trouble.set("reconnecting"); // the browser tries again by itself
     };
   };
-  player()
+  // A wrong code is said at once, before a name is asked or a player made for it.
+  api("GET", `/api/rooms/${code}`)
+    .then(() => player())
     .then((u) => (u.drawn && !named(code) ? naming.set(u) : connect()))
     .catch(() => trouble.set("gone"));
   onCleanup(() => es?.close());
@@ -237,7 +243,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
             { class: "stack" },
             h("h1", null, "Няма такава стая"),
             h("p", { class: "lead" }, "Може кодът да е грешен или стаята да е затворена."),
-            h("a", { class: "btn primary", href: "/room" }, "Отвори нова стая"),
+            h("a", { class: "btn primary big", href: "/room" }, "Опитай друг код"),
           )
         : null,
     () =>
@@ -348,6 +354,19 @@ function nameStep(code: string, u: User, done: () => void): Child {
   );
 }
 
+/** The host's way to change what the room plays next (rooms.ts: changeGame). */
+export function choose(view: () => RoomView, code: string): Child {
+  const v = untracked(view);
+  return changeGame({ category: v.category, length: v.length, mix: v.mix }, async (g) => {
+    try {
+      await api("POST", `/api/rooms/${code}/settings`, g);
+      return "";
+    } catch (err) {
+      return (err as ApiError).message;
+    }
+  });
+}
+
 export async function lead(code: string, action: "start" | "next" | "finish", error: (s: string) => void) {
   try {
     await api("POST", `/api/rooms/${code}/${action}`);
@@ -359,7 +378,8 @@ export async function lead(code: string, action: "start" | "next" | "finish", er
 function waiting(view: () => RoomView, what: string): Child {
   return () => {
     const v = view();
-    return v.canLead ? null : h("p", { class: "status" }, `Чакаме ${v.host} да ${what}.`);
+    // A host who only leads (a big screen) is „водещият“, not a name the players don't know.
+    return v.canLead ? null : h("p", { class: "status" }, `Чакаме ${v.lead ? "водещия" : v.host} да ${what}.`);
   };
 }
 
@@ -388,6 +408,7 @@ function lobby(view: () => RoomView, code: string): Child {
         ? h("button", { class: "btn primary big", onclick: () => lead(code, "start", error.set) }, "Започни")
         : null,
     waiting(view, "започне"),
+    untracked(view).isHost ? choose(view, code) : null,
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }
@@ -562,7 +583,7 @@ export function standings(
         .players.slice(0, top)
         .map((p, i) => {
           const row = boardRow(
-            i + 1,
+            p.place ?? i + 1,
             p.name,
             gains && p.gained
               ? [h("small", { class: "sub" }, `+${formatNumber(p.gained)} · `), formatNumber(p.points)]
@@ -638,7 +659,8 @@ function end(view: () => RoomView, code: string): Child {
       { class: "intro" },
       h("p", { class: "kicker" }, () => `Стая ${spaced(code)} · ${topicName(view().category)}`),
       h("h1", null, () => {
-        const [best] = view().players;
+        const [best, next] = view().players;
+        if (best && next?.place === 1) return `${best.name} и ${next.name} делят първото място`;
         return best ? `${best.name} печели` : "Край";
       }),
     ),
@@ -659,6 +681,8 @@ function end(view: () => RoomView, code: string): Child {
       ],
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    // The host may change what the next game plays, keeping the code and the players.
+    first.isHost ? choose(view, code) : null,
     // What the game earned, once it's kept (a moment after its end), as any game tells it.
     () => {
       const run = ran();
