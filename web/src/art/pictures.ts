@@ -1292,8 +1292,15 @@ const mountain = (...range: Layer[]): Layer[] => [
 ];
 
 const leagues: Layer[][] = [
-  // Странджа: low wooded hills.
-  mountain(hill(37, 12, 16.4, "k2"), hill(22, 8, 11.4), hill(47, 5, 6.4, "k4")),
+  // Странджа: low wooded hills rolling up the lower two thirds of the round, on the tinted ground a topic stands on:
+  // under the pale sky of the higher leagues, its low hills left an empty disc.
+  [
+    ["kt", C(32, 32, 28)],
+    hill(38, 20, 15.4, "k2"),
+    hill(22.5, 15, 11.9),
+    hill(47.5, 8, 6.6, "k4"),
+    ["k1", "M10.55 50A28 28 0 0 0 53.45 50Z"],
+  ],
   // Средна гора: a rounder, higher ridge between two hills.
   mountain(hill(32, 16, 21.4, "k2"), hill(19, 8, 8.4), hill(45, 9, 8.4)),
   // Родопи: a long soft ridge with a first peak.

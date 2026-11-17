@@ -703,7 +703,7 @@ export function streak(chip: HTMLElement, days: number, delay: number, hands: Ha
 }
 
 /** The level growing in its chip (drawn as it is now): after `delay`, the bar fills from where it was; a new level
- * fills it to the end, flashes gold, rolls the number and fills again from nothing. */
+ * fills it to the end, flashes in its lilac, rolls the number and fills again from nothing. */
 export function level(
   chip: HTMLElement,
   from: { level: number; share: number; left: string },
@@ -712,7 +712,7 @@ export function level(
   hands: Hands,
 ): void {
   const fill = chip.querySelector<HTMLElement>(".meter-fill");
-  const n = chip.querySelector<HTMLElement>(".status-n");
+  const n = chip.querySelector<HTMLElement>(".level-num");
   const left = chip.querySelector<HTMLElement>(".status-label");
   if (hands.calm || !fill || !n || (from.level === to.level && from.share >= to.share)) return;
   if (left) left.textContent = from.left;
@@ -726,20 +726,20 @@ export function level(
     }).finished;
   const settle = () => {
     for (const a of fill.getAnimations()) a.cancel();
-    n.textContent = `Ниво ${to.level}`;
+    n.textContent = String(to.level);
     if (left) left.textContent = to.left;
   };
   if (to.level === from.level) {
     grow(from.share, to.share, 700, delay).then(settle, settle);
     return;
   }
-  n.textContent = `Ниво ${from.level}`;
-  const gold = token(chip, "--gold");
+  n.textContent = String(from.level);
+  const lilac = token(chip, "--lilac");
   grow(from.share, 100, 700, delay)
-    .then(() => fill.animate([{ background: gold, boxShadow: `0 0 10px ${gold}` }, {}], { duration: 200 }).finished)
+    .then(() => fill.animate([{ background: lilac, boxShadow: `0 0 10px ${lilac}` }, {}], { duration: 200 }).finished)
     .then(() => {
       if (left) left.textContent = to.left;
-      return roll(n, `Ниво ${from.level}`, `Ниво ${to.level}`);
+      return roll(n, String(from.level), String(to.level));
     })
     .then(() => grow(0, to.share, 500))
     .then(settle, settle);

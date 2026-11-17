@@ -140,6 +140,13 @@ export function pageArt(id: string, tone: string): Child {
   return picture(`mode-${id}`, `page-art ${tone}`);
 }
 
+/** The level as words and a number: „Ниво“ in the words' face, small and muted, the number in the numerals'. The
+ * numeral face is for digits only: Cyrillic words read badly in it at display size. */
+export const levelNumber = (level: number): Child[] => [
+  h("span", { class: "num-word" }, "Ниво "),
+  h("span", { class: "level-num" }, String(level)),
+];
+
 /** A topic's small picture, as on a chip (decoration); a plain dot for all of them. */
 export function topicMark(category: string): Child {
   return category ? picture(`topic-${category}`, "topic-mark") : h("span", { class: "dot", "aria-hidden": "true" });

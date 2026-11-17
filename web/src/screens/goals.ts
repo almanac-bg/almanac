@@ -45,7 +45,7 @@ export function goalsCard(): Child {
         "div",
         { class: "card-head" },
         h("h2", { class: "card-title" }, "Цели за деня"),
-        h("span", { class: "tag gold num" }, `${earned} от ${all} XP`),
+        h("span", { class: "tag num" }, `${earned} от ${all} XP`),
       ),
       h(
         "ul",

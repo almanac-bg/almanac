@@ -41,7 +41,7 @@ export function summary(
         "h1",
         { class: "score" },
         h("b", { class: "score-n" }, String(s.rights)),
-        h("span", { class: "score-of" }, ` от ${s.total}`),
+        h("span", { class: "score-of" }, h("span", { class: "num-word" }, "от "), String(s.total)),
       ),
       h(
         "p",
