@@ -117,7 +117,7 @@ func TestPhoneNotifications(t *testing.T) {
 	playRun(ana, run)
 	evening := time.Date(2030, 1, 1, 19, 5, 0, 0, bulgaria())
 	_, _ = db.Write.Exec(`UPDATE runs SET day = ?`, evening.Format(time.DateOnly))
-	if n := s.remind(t.Context(), evening); n != 1 || fake.count(boPhone) != 1 || fake.count(anaPhone) != 0 {
+	if n := s.remindSent(t.Context(), evening); n != 1 || fake.count(boPhone) != 1 || fake.count(anaPhone) != 0 {
 		t.Fatalf("reminded %d; bo %d, ana %d", n, fake.count(boPhone), fake.count(anaPhone))
 	}
 
@@ -127,7 +127,7 @@ func TestPhoneNotifications(t *testing.T) {
 	fake.mu.Unlock()
 	var boID int64
 	_ = db.Read.QueryRow(`SELECT user_id FROM phones WHERE token = ?`, boPhone).Scan(&boID)
-	s.notify(t.Context(), pushAsked, push.Message{Title: "Роял", Body: "Започва.", URL: "/royal"}, boID)
+	s.notifySent(t.Context(), pushAsked, push.Message{Title: "Роял", Body: "Започва.", URL: "/royal"}, boID)
 	var left int
 	_ = db.Read.QueryRow(`SELECT count(*) FROM phones WHERE token = ?`, boPhone).Scan(&left)
 	if left != 0 {

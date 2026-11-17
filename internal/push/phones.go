@@ -178,15 +178,19 @@ func (a *Apple) Send(ctx context.Context, token string, m Message) error {
 		req.Header.Set("apns-push-type", "alert")
 		req.Header.Set("apns-priority", "10")
 		req.Header.Set("apns-expiration", fmt.Sprint(time.Now().Add(12*time.Hour).Unix())) // an old reminder is no use
+		if m.Tag != "" {
+			req.Header.Set("apns-collapse-id", m.Tag) // shown in place of one with the same tag
+		}
 		res, err := client(a.Client).Do(req)
 		if err != nil {
-			return err
+			return unreached(err)
 		}
 		var answer struct {
 			Reason string `json:"reason"`
 		}
 		_ = json.NewDecoder(io.LimitReader(res.Body, 4096)).Decode(&answer)
 		res.Body.Close()
+		err = fmt.Errorf("apns: %s %s", res.Status, answer.Reason)
 		switch {
 		case res.StatusCode == http.StatusOK:
 			return nil
@@ -194,10 +198,13 @@ func (a *Apple) Send(ctx context.Context, token string, m Message) error {
 			return ErrGone
 		case answer.Reason == "BadDeviceToken":
 			continue // a token of the other environment: try the next host
+		case answer.Reason == "DeviceTokenNotForTopic":
+			return &Refused{err} // another app's
 		case answer.Reason == "ExpiredProviderToken" || answer.Reason == "InvalidProviderToken":
 			a.forget()
+			return err
 		}
-		return fmt.Errorf("apns: %s %s", res.Status, answer.Reason)
+		return answered(res, err)
 	}
 	return ErrGone // bad on every host
 }
@@ -295,11 +302,15 @@ func (g *Google) Send(ctx context.Context, token string, m Message) error {
 	if err != nil {
 		return err
 	}
+	android := map[string]any{"priority": "HIGH", "ttl": "43200s"}
+	if m.Tag != "" { // shown in place of one with the same tag; held in place of one FCM still holds
+		android["collapse_key"], android["notification"] = m.Tag, map[string]string{"tag": m.Tag}
+	}
 	body, _ := json.Marshal(map[string]any{"message": map[string]any{
 		"token":        token,
 		"notification": map[string]string{"title": m.Title, "body": m.Body},
 		"data":         map[string]string{"url": m.URL, "kind": m.Kind},
-		"android":      map[string]any{"priority": "HIGH", "ttl": "43200s"},
+		"android":      android,
 	}})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.Host+"/v1/projects/"+g.project+"/messages:send", bytes.NewReader(body))
 	if err != nil {
@@ -309,14 +320,17 @@ func (g *Google) Send(ctx context.Context, token string, m Message) error {
 	req.Header.Set("Content-Type", "application/json")
 	res, err := client(g.Client).Do(req)
 	if err != nil {
-		return err
+		return unreached(err)
 	}
 	defer res.Body.Close()
 	var answer struct {
 		Error struct {
 			Status  string `json:"status"`
 			Details []struct {
-				ErrorCode string `json:"errorCode"`
+				ErrorCode       string `json:"errorCode"`
+				FieldViolations []struct {
+					Field string `json:"field"`
+				} `json:"fieldViolations"`
 			} `json:"details"`
 		} `json:"error"`
 	}
@@ -324,21 +338,29 @@ func (g *Google) Send(ctx context.Context, token string, m Message) error {
 	if res.StatusCode == http.StatusOK {
 		return nil
 	}
-	code := answer.Error.Status
+	code, badToken := answer.Error.Status, false
 	for _, d := range answer.Error.Details {
 		if d.ErrorCode != "" {
 			code = d.ErrorCode
 		}
+		for _, v := range d.FieldViolations {
+			badToken = badToken || v.Field == "message.token"
+		}
 	}
+	err = fmt.Errorf("fcm: %s %s", res.Status, code)
 	switch {
 	case code == "UNREGISTERED" || res.StatusCode == http.StatusNotFound:
 		return ErrGone
-	case code == "INVALID_ARGUMENT" && res.StatusCode == http.StatusBadRequest:
-		return ErrGone // the token is all a message here could get wrong
+	case code == "INVALID_ARGUMENT" && badToken:
+		// Only when FCM names the token: any other bad argument is the message's, and would forget every phone.
+		return ErrGone
+	case code == "SENDER_ID_MISMATCH":
+		return &Refused{err} // a token of another Firebase project's
 	case res.StatusCode == http.StatusUnauthorized:
 		g.mu.Lock()
 		g.access = ""
 		g.mu.Unlock()
+		return err
 	}
-	return fmt.Errorf("fcm: %s %s", res.Status, code)
+	return answered(res, err)
 }

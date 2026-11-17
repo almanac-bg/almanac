@@ -949,17 +949,44 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 	}
 }
 
-// fakePushService takes pushes and counts them.
+// fakePushService takes pushes and counts them, with the topic of each path's last; or answers a path with its status
+// (answer), uncounted.
 type fakePushService struct {
-	mu   sync.Mutex
-	hits map[string]int
+	mu     sync.Mutex
+	hits   map[string]int
+	answer map[string]int
+	topics map[string]string
 }
 
 func (f *fakePushService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
+	defer f.mu.Unlock()
+	if status := f.answer[r.URL.Path]; status != 0 {
+		w.WriteHeader(status)
+		return
+	}
 	f.hits[r.URL.Path]++
-	f.mu.Unlock()
+	if f.topics == nil {
+		f.topics = map[string]string{}
+	}
+	f.topics[r.URL.Path] = r.Header.Get("Topic")
 	w.WriteHeader(http.StatusCreated)
+}
+
+// answering makes the fake answer a path with a status (0: take its pushes again).
+func (f *fakePushService) answering(path string, status int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.answer == nil {
+		f.answer = map[string]int{}
+	}
+	f.answer[path] = status
+}
+
+func (f *fakePushService) topic(path string) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.topics[path]
 }
 
 func (f *fakePushService) count(path string) int {
@@ -1085,25 +1112,23 @@ func TestNotifications(t *testing.T) {
 	playRun(ana, run)
 	evening := time.Date(2030, 1, 1, 19, 5, 0, 0, bulgaria())
 	_, _ = db.Write.Exec(`UPDATE runs SET day = ?`, evening.Format(time.DateOnly))
-	if n := s.remind(t.Context(), evening); n != 1 || fake.count("/bo") != 1 || fake.count("/ana") != 0 {
+	if n := s.remindSent(t.Context(), evening); n != 1 || fake.count("/bo") != 1 || fake.count("/ana") != 0 {
 		t.Fatalf("reminded %d; bo %d, ana %d", n, fake.count("/bo"), fake.count("/ana"))
 	}
-	if n := s.remind(t.Context(), evening.Add(time.Minute)); n != 0 {
+	if n := s.remindSent(t.Context(), evening.Add(time.Minute)); n != 0 {
 		t.Fatal("reminded twice in a day")
 	}
 	if g.counted("push:sent:day") != 1 {
 		t.Fatalf("reminders counted: %d", g.counted("push:sent:day"))
 	}
-	if n := s.remind(t.Context(), evening.Add(-2*time.Hour)); n != 0 {
+	if n := s.remindSent(t.Context(), evening.Add(-2*time.Hour)); n != 0 {
 		t.Fatal("reminded before the hour")
 	}
 
 	// Bo accepts Ana's invite link: Ana hears of it. Ana challenges Bo and plays hers: Bo hears of it.
 	pushes := func(path string, want int) {
 		t.Helper()
-		for deadline := time.Now().Add(5 * time.Second); fake.count(path) < want && time.Now().Before(deadline); {
-			time.Sleep(10 * time.Millisecond)
-		}
+		s.sendQueued(t.Context()) // queued by the request, before it answered
 		if got := fake.count(path); got != want {
 			t.Fatalf("%s: %d pushes, want %d", path, got, want)
 		}
@@ -1146,18 +1171,18 @@ func TestPushKinds(t *testing.T) {
 
 	// Bo turned the day's reminder off: only Ana hears it.
 	evening := time.Date(2030, 1, 1, 19, 5, 0, 0, bulgaria())
-	if n := s.remind(t.Context(), evening); n != 1 || fake.count("/ana") != 1 || fake.count("/bo") != 0 {
+	if n := s.remindSent(t.Context(), evening); n != 1 || fake.count("/ana") != 1 || fake.count("/bo") != 0 {
 		t.Fatalf("reminded %d; ana %d, bo %d", n, fake.count("/ana"), fake.count("/bo"))
 	}
 	// Ana turned word from friends off; the day's reminders she still gets.
 	m := push.Message{Title: "Т", Body: "Т", URL: "/"}
-	s.notify(t.Context(), pushFriends, m, anaID)
-	s.notify(t.Context(), pushRoyal, m, anaID)
+	s.notifySent(t.Context(), pushFriends, m, anaID)
+	s.notifySent(t.Context(), pushRoyal, m, anaID)
 	if got := fake.count("/ana"); got != 1 {
 		t.Fatalf("ana got %d pushes, want 1", got)
 	}
-	s.notify(t.Context(), pushDay, m, anaID)
-	s.notify(t.Context(), pushAsked, m, anaID)
+	s.notifySent(t.Context(), pushDay, m, anaID)
+	s.notifySent(t.Context(), pushAsked, m, anaID)
 	if got := fake.count("/ana"); got != 3 {
 		t.Fatalf("ana got %d pushes, want 3", got)
 	}
@@ -1240,18 +1265,18 @@ func TestRoyalPlans(t *testing.T) {
 
 	_, out := ana.call("GET", "/api/royal/tonight", nil)
 	start := time.UnixMilli(int64(out["glance"].(map[string]any)["next"].(float64)))
-	if n := s.callRoyal(t.Context(), start); n != 2 || fake.count("/ana") != 1 || fake.count("/cy") != 1 || fake.count("/bo") != 0 {
+	if n := s.callRoyalSent(t.Context(), start); n != 2 || fake.count("/ana") != 1 || fake.count("/cy") != 1 || fake.count("/bo") != 0 {
 		t.Fatalf("called %d: ana %d, cy %d, bo %d", n, fake.count("/ana"), fake.count("/cy"), fake.count("/bo"))
 	}
-	if n := s.callRoyal(t.Context(), start); n != 0 {
+	if n := s.callRoyalSent(t.Context(), start); n != 0 {
 		t.Fatal("called twice")
 	}
 	// A minute before the start: Ana said she'd come and isn't in; Bo is in, his screen away; Cy is in, on it.
-	if n := s.callSoon(t.Context(), start, []int64{boID}, []int64{boID, cyID}); n != 2 || fake.count("/ana") != 2 ||
+	if n := s.callSoonSent(t.Context(), start, []int64{boID}, []int64{boID, cyID}); n != 2 || fake.count("/ana") != 2 ||
 		fake.count("/bo") != 1 || fake.count("/cy") != 1 {
 		t.Fatalf("called again %d: ana %d, bo %d, cy %d", n, fake.count("/ana"), fake.count("/bo"), fake.count("/cy"))
 	}
-	if n := s.callSoon(t.Context(), start, []int64{boID}, []int64{boID}); n != 0 {
+	if n := s.callSoonSent(t.Context(), start, []int64{boID}, []int64{boID}); n != 0 {
 		t.Fatal("called again twice")
 	}
 	// Cy, Ana's friend, hears it's her who's coming.

@@ -15,12 +15,15 @@ import (
 
 // The day's reminder: once a day at most, to a player with notifications on who hasn't finished the day's questions,
 // at their own hour (RemindMinute): half an hour before they usually finish the day. Each is claimed in push_reminded
-// before it's sent, so a restart never sends two.
+// and queued (pushes.go) in one transaction, unless the day is played by then, so a restart never sends two nor loses
+// one; it's written as it's sent, and not sent if the player has played the day meanwhile. The claim keeps how many
+// of the player's devices it reached.
 //
-// It stops when it doesn't help: after RemindIgnored reminders since the player last played the day, none more; on
-// the RemindQuietAfter-th day without play, one last word that the reminders stop (with the streak that ended), then
-// nothing until they play the day again, when the reminders start again by themselves. Word from friends and Роял's
-// call go as before.
+// It stops when it doesn't help: after RemindIgnored reminders reached the player since they last played the day,
+// none more; on the RemindQuietAfter-th day without play, one last word that the reminders stop (with the streak that
+// ended), then nothing until they play the day again, when the reminders start again by themselves. A reminder that
+// reached none of their devices (a service down, the game's keys wrong) counts for neither. Word from friends and
+// Роял's call go as before.
 
 const (
 	// RemindDefault is the hour of a player who hasn't finished a day yet (minutes into the day, in Bulgaria): 19:00.
@@ -87,7 +90,8 @@ func (s *Server) Remind(ctx context.Context) {
 	}
 }
 
-// remind reminds the players whose hour has come at `at` and who haven't been reminded today. It says how many.
+// remind queues the reminders of the players whose hour has come at `at` and who haven't been reminded today. It says
+// how many.
 func (s *Server) remind(ctx context.Context, at time.Time) int {
 	if s.push == nil && s.phones == nil {
 		return 0
@@ -130,32 +134,75 @@ func (s *Server) remind(ctx context.Context, at time.Time) int {
 		}
 		return m
 	}
-	n := 0
+	type claim struct {
+		user int64
+		last bool
+	}
+	var claims []claim
 	for _, id := range users {
 		if minute < due(id) {
 			continue
 		}
-		m, last, ok := s.dayReminder(ctx, today, id)
-		if !ok {
+		last, ok, err := s.dayReminder(ctx, today, id)
+		switch {
+		case err != nil:
+			slog.Error("reminders", "err", err) // tried again the next minute
+		case !ok:
 			s.reminders.mu.Lock()
 			s.reminders.due[id] = never // stopped: not again today
 			s.reminders.mu.Unlock()
-			continue
+		default:
+			claims = append(claims, claim{id, last})
 		}
-		// Claim it first: one a day, whatever happens after.
-		res, err := s.db.Write.ExecContext(ctx, `INSERT INTO push_reminded (user_id, day, at, last) VALUES (?, ?, ?, ?)
-			ON CONFLICT DO NOTHING`, id, today, at.UnixMilli(), last)
+	}
+	// Claimed and queued together, a few hundred to a transaction: one a day, whatever happens after.
+	d, _ := time.ParseInLocation(time.DateOnly, today, bulgaria())
+	until := d.AddDate(0, 0, 1)
+	n := 0
+	for chunk := range slices.Chunk(claims, 500) {
+		k := 0
+		err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+			k = 0
+			q, err := s.queuer(ctx, tx)
+			if err != nil {
+				return err
+			}
+			defer q.close()
+			stmt, err := tx.PrepareContext(ctx, `INSERT INTO push_reminded (user_id, day, at, last, delivered)
+				SELECT ?1, ?2, ?3, ?4, 0 WHERE NOT EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'day'
+					AND day = ?2 AND finished_at IS NOT NULL)
+				ON CONFLICT DO NOTHING`)
+			if err != nil {
+				return err
+			}
+			defer stmt.Close()
+			for _, c := range chunk {
+				res, err := stmt.ExecContext(ctx, c.user, today, at.UnixMilli(), c.last)
+				if err != nil {
+					return err
+				}
+				if a, _ := res.RowsAffected(); a == 0 {
+					continue
+				}
+				m := push.Message{} // written as it's sent
+				if c.last {
+					m.Kind = "stop"
+				}
+				if _, err := q.add(ctx, notice{kind: pushDay, m: m, day: today, until: until}, c.user); err != nil {
+					return err
+				}
+				k++
+			}
+			return nil
+		})
 		if err != nil {
-			slog.Error("reminders", "err", err)
-			return n
+			slog.Error("reminders", "err", err) // the rest are tried again the next minute
+			break
 		}
-		if k, _ := res.RowsAffected(); k == 0 {
-			continue
-		}
-		s.notify(ctx, pushDay, m, id)
-		n++
+		n += k
 	}
 	if n > 0 {
+		s.pushq.poke()
 		slog.Info("reminded", "players", n)
 	}
 	return n
@@ -180,28 +227,28 @@ func (s *Server) remindMinute(ctx context.Context, today string, userID int64) i
 	return RemindMinute(finished)
 }
 
-// dayReminder is the reminder a player gets today, if any: the usual one (reminder) while they haven't left
-// RemindIgnored of them since they last played the day; the last one (last) on the RemindQuietAfter-th day without
-// play; else none, until they play the day again.
-func (s *Server) dayReminder(ctx context.Context, today string, userID int64) (m push.Message, last, ok bool) {
+// dayReminder says whether a player gets a reminder today, and which: the usual one (reminder) while RemindIgnored
+// of them haven't reached them since they last played the day; the last one (last) on the RemindQuietAfter-th day
+// without play; else none, until they play the day again. Only those that reached a device count.
+func (s *Server) dayReminder(ctx context.Context, today string, userID int64) (last, ok bool, err error) {
 	var played sql.NullString
 	if err := s.db.Read.QueryRowContext(ctx, `SELECT max(day) FROM runs WHERE user_id = ? AND kind = 'day'
 		AND finished_at IS NOT NULL`, userID).Scan(&played); err != nil {
-		return m, false, false
+		return false, false, err
 	}
 	var ignored int
 	var stopped bool
 	var first sql.NullString
 	if err := s.db.Read.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE NOT last), coalesce(max(last), 0), min(day)
-		FROM push_reminded WHERE user_id = ? AND day > ? AND day < ?`, userID, played.String, today).
+		FROM push_reminded WHERE user_id = ? AND day > ? AND day < ? AND delivered > 0`, userID, played.String, today).
 		Scan(&ignored, &stopped, &first); err != nil {
-		return m, false, false
+		return false, false, err
 	}
 	switch {
 	case stopped:
-		return m, false, false
+		return false, false, nil
 	case ignored < RemindIgnored:
-		return s.reminder(ctx, today, userID), false, true
+		return false, true, nil
 	}
 	// The days without play: since the day last played, or, for one who never has, since the first reminder left.
 	without := 0
@@ -210,10 +257,7 @@ func (s *Server) dayReminder(ctx context.Context, today string, userID int64) (m
 	} else if first.Valid {
 		without = dayGap(first.String, today) + 1
 	}
-	if without < RemindQuietAfter {
-		return m, false, false
-	}
-	return s.lastReminder(ctx, userID, played.String), true, true
+	return true, without >= RemindQuietAfter, nil
 }
 
 // lastReminder says the reminders stop, with the streak that ended since the day last played, if it had 2 days or more.

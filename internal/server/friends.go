@@ -181,11 +181,8 @@ func (s *Server) acceptInvite(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-		defer cancel()
-		s.notify(ctx, pushFriends, push.Message{Title: u.Name + " прие поканата ти", Body: "Вече сте приятели в АЛМАНАХ.", URL: "/friends"}, id)
-	}()
+	s.notify(context.WithoutCancel(r.Context()), pushFriends,
+		push.Message{Title: u.Name + " прие поканата ти", Body: "Вече сте приятели в АЛМАНАХ.", URL: "/friends"}, id)
 	return ok(w, map[string]any{"id": id, "name": name})
 }
 

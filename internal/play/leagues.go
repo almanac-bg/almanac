@@ -203,8 +203,10 @@ func standingsFor(list []standing, viewer int64) []standing {
 }
 
 // ensureWeek ends the week being played if it's over: every group's places are kept, the leagues move and the
-// places pay. It runs every minute and before anything about a week, so that no game of a new week counts for the
-// old one; it's cheap once the week is the current one.
+// places pay, and each player's news of it is handed on (LeagueNews) in the same transaction. It runs every minute
+// and before anything about a week, so that no game of a new week counts for the old one; it's cheap once the week
+// is the current one. Whoever comes first ends the week, to the end: a request whose player leaves meanwhile doesn't
+// stop it.
 func (g *Game) ensureWeek(ctx context.Context) error {
 	now := weekOf(g.Now())
 	g.weekMu.Lock()
@@ -212,6 +214,7 @@ func (g *Game) ensureWeek(ctx context.Context) error {
 	if g.week == now {
 		return nil
 	}
+	ctx = context.WithoutCancel(ctx)
 	var news []LeagueNews
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var open string
@@ -245,6 +248,17 @@ func (g *Game) ensureWeek(ctx context.Context) error {
 		if err := rows.Err(); err != nil {
 			return err
 		}
+		result, err := tx.PrepareContext(ctx, `INSERT INTO league_results (week, user_id, tier, place, of, points, moved, xp)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+		if err != nil {
+			return err
+		}
+		defer result.Close()
+		move, err := tx.PrepareContext(ctx, `UPDATE users SET league = ? WHERE id = ?`)
+		if err != nil {
+			return err
+		}
+		defer move.Close()
 		for _, gr := range groups {
 			list, err := groupStandings(ctx, tx, open, gr.id, xp)
 			if err != nil {
@@ -268,29 +282,25 @@ func (g *Game) ensureWeek(ctx context.Context) error {
 				if n >= RaceSize && i < len(LeaguePay) {
 					pay = LeaguePay[i]
 				}
-				if _, err := tx.Exec(`INSERT INTO league_results (week, user_id, tier, place, of, points, moved, xp)
-					VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, open, s.user, gr.tier, i+1, n, s.points, moved, pay); err != nil {
+				if _, err := result.Exec(open, s.user, gr.tier, i+1, n, s.points, moved, pay); err != nil {
 					return err
 				}
-				if _, err := tx.Exec(`UPDATE users SET league = ? WHERE id = ?`, gr.tier+moved, s.user); err != nil {
+				if _, err := move.Exec(gr.tier+moved, s.user); err != nil {
 					return err
 				}
 				news = append(news, LeagueNews{To: s.user, Week: open, From: leagueOf(gr.tier),
 					Now: leagueOf(gr.tier + moved), Place: i + 1, Of: n, XP: pay})
 			}
 		}
-		_, err = tx.Exec(`UPDATE league_week SET id = ?, on_xp = 0`, now)
-		return err
+		if _, err = tx.Exec(`UPDATE league_week SET id = ?, on_xp = 0`, now); err != nil || g.LeagueNews == nil {
+			return err
+		}
+		return g.LeagueNews(ctx, tx, news)
 	})
 	if err != nil {
 		return err
 	}
 	g.week = now
-	if g.LeagueNews != nil {
-		for _, n := range news {
-			g.LeagueNews(ctx, n)
-		}
-	}
 	return nil
 }
 

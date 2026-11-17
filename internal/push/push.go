@@ -3,6 +3,12 @@
 // push services browsers use are posted to (Services), never a redirect: a subscription is whatever a player sends.
 // The game's own app on phones gets its notifications from Apple's and Google's push services instead (phones.go).
 // Standard library only.
+//
+// A send that fails says why, the same way for every service, so that the caller knows what to do with the browser
+// or the phone: ErrGone, it's no more (forget it); Refused, the service won't take pushes for it (forget it if that
+// goes on); Busy, the service can't take one now (try again, after what it asked). Any other error is the game's own
+// (its keys, its message) and says nothing of the device. A message's Tag makes a second send of it replace the
+// first, at the service and on the device, so that a notification sent twice shows once.
 package push
 
 import (
@@ -23,8 +29,10 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -82,7 +90,8 @@ type Subscription struct {
 	} `json:"keys"`
 }
 
-// Check says whether a subscription is one a push service gave (an https endpoint, keys of the right size).
+// Check says whether a subscription is one a push service gave: an https endpoint, the browser's key a point on its
+// curve, an auth secret of the right size.
 func (s Subscription) Check() error {
 	u, err := url.Parse(s.Endpoint)
 	if err != nil || u.Scheme != "https" || u.Host == "" || len(s.Endpoint) > 2000 {
@@ -90,6 +99,8 @@ func (s Subscription) Check() error {
 	}
 	if p, err := b64.DecodeString(s.Keys.P256dh); err != nil || len(p) != 65 {
 		return errors.New("bad p256dh")
+	} else if _, err := ecdh.P256().NewPublicKey(p); err != nil {
+		return errors.New("bad p256dh: not a P-256 point")
 	}
 	if a, err := b64.DecodeString(s.Keys.Auth); err != nil || len(a) != 16 {
 		return errors.New("bad auth")
@@ -104,10 +115,59 @@ type Message struct {
 	Body  string `json:"body"`
 	URL   string `json:"url"`
 	Kind  string `json:"kind,omitempty"`
+	// Tag, if set, names this notification: one sent again with the same tag replaces it, at the service and on the
+	// device (up to 32 letters, digits, '-' and '_').
+	Tag string `json:"tag,omitempty"`
 }
 
-// ErrGone means the browser unsubscribed (or the subscription expired): forget it.
+// ErrGone means the browser unsubscribed (or the subscription expired, or can't be one): forget it.
 var ErrGone = errors.New("the subscription is gone")
+
+// Refused is a push the service wouldn't take for this browser or phone, for a reason of the device's (keys it
+// doesn't know, another app's token, a host that doesn't exist): the same is likely to go on.
+type Refused struct{ Err error }
+
+func (e *Refused) Error() string { return "refused: " + e.Err.Error() }
+func (e *Refused) Unwrap() error { return e.Err }
+
+// Busy is a push the service couldn't take now (too many, down for a while, no answer in time): worth trying again,
+// not before After if the service said when (0: it didn't).
+type Busy struct {
+	After time.Duration
+	Err   error
+}
+
+func (e *Busy) Error() string { return "busy: " + e.Err.Error() }
+func (e *Busy) Unwrap() error { return e.Err }
+
+// answered is what a service's status says of a push it didn't take: Busy (429, 5xx, with its Retry-After), or err.
+func answered(res *http.Response, err error) error {
+	if res.StatusCode == http.StatusTooManyRequests || res.StatusCode/100 == 5 {
+		return &Busy{After: retryAfter(res.Header.Get("Retry-After")), Err: err}
+	}
+	return err
+}
+
+// retryAfter reads a Retry-After header: seconds, or a date (0: none, or none that makes sense).
+func retryAfter(h string) time.Duration {
+	if s, err := strconv.Atoi(h); err == nil && s > 0 {
+		return time.Duration(s) * time.Second
+	}
+	if t, err := http.ParseTime(h); err == nil {
+		return max(time.Until(t), 0)
+	}
+	return 0
+}
+
+// unreached is a post that got no answer: to a host that doesn't exist it's Refused (a made-up endpoint never will
+// answer), else Busy.
+func unreached(err error) error {
+	var dns *net.DNSError
+	if errors.As(err, &dns) && dns.IsNotFound {
+		return &Refused{err}
+	}
+	return &Busy{Err: err}
+}
 
 // ErrNotService means an endpoint isn't at a push service the game knows: it's never posted to, since anyone can
 // send any address as their subscription.
@@ -152,9 +212,9 @@ func (s *Sender) Check(sub Subscription) error {
 }
 
 // Send encrypts m for a subscription and posts it to its push service. A subscription that isn't at a known push
-// service is ErrGone, to be forgotten.
+// service, or that can't be one, is ErrGone, to be forgotten.
 func (s *Sender) Send(ctx context.Context, sub Subscription, m Message) error {
-	if err := s.Check(sub); errors.Is(err, ErrNotService) {
+	if err := s.Check(sub); err != nil {
 		return ErrGone
 	}
 	payload, _ := json.Marshal(m)
@@ -179,6 +239,9 @@ func (s *Sender) Send(ctx context.Context, sub Subscription, m Message) error {
 	req.Header.Set("TTL", "43200") // half a day: an old reminder is no use
 	req.Header.Set("Urgency", "normal")
 	req.Header.Set("Authorization", "vapid t="+jwt+", k="+s.Keys.Public)
+	if m.Tag != "" {
+		req.Header.Set("Topic", m.Tag) // one the service still holds with the same tag is replaced (RFC 8030, 5.4)
+	}
 	client := http.Client{Timeout: 15 * time.Second}
 	if s.Client != nil {
 		client = *s.Client
@@ -187,17 +250,22 @@ func (s *Sender) Send(ctx context.Context, sub Subscription, m Message) error {
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	res, err := client.Do(req)
 	if err != nil {
-		return err
+		return unreached(err)
 	}
 	defer res.Body.Close()
 	_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 4096))
+	err = fmt.Errorf("push service: %s", res.Status)
 	switch {
+	case res.StatusCode/100 == 2:
+		return nil
 	case res.StatusCode == http.StatusNotFound || res.StatusCode == http.StatusGone:
 		return ErrGone
-	case res.StatusCode/100 != 2:
-		return fmt.Errorf("push service: %s", res.Status)
+	case res.StatusCode == http.StatusBadRequest || res.StatusCode == http.StatusUnauthorized ||
+		res.StatusCode == http.StatusForbidden:
+		// An endpoint the service doesn't know, or one subscribed with a key that isn't the game's (since changed).
+		return &Refused{err}
 	}
-	return nil
+	return answered(res, err)
 }
 
 // vapid is the signed claim of who sends (ES256 JWT), for one push service, valid 12 hours.

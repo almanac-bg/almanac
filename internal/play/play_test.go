@@ -1851,9 +1851,18 @@ func TestLeagues(t *testing.T) {
 	}
 
 	// The week ends: Ana and Bo go up with first and second place's XP, the third stays with third's; told once.
-	var told []LeagueNews
-	w.g.LeagueNews = func(_ context.Context, n LeagueNews) { told = append(told, n) }
+	// The news is kept with the week's end, or neither is: a failure to keep it ends nothing, and it's done again.
 	w.now = time.Date(2026, 11, 16, 0, 5, 0, 0, Bulgaria)
+	w.g.LeagueNews = func(context.Context, *sql.Tx, []LeagueNews) error { return errors.New("no room") }
+	if err := w.g.SettleDue(ctx); err == nil {
+		t.Fatal("the week ended without its news")
+	}
+	var results int
+	if _ = w.db.Read.QueryRow(`SELECT count(*) FROM league_results`).Scan(&results); results != 0 {
+		t.Fatalf("the week ended without its news: %d places kept", results)
+	}
+	var told []LeagueNews
+	w.g.LeagueNews = func(_ context.Context, _ *sql.Tx, n []LeagueNews) error { told = append(told, n...); return nil }
 	if err := w.g.SettleDue(ctx); err != nil {
 		t.Fatal(err)
 	}

@@ -88,8 +88,9 @@ type Game struct {
 	RoyalNews func(context.Context, RoyalNews)
 	// RoyalAt, if set, is when the next Роял starts after a moment: a day's goals draw Роял only while it's ahead.
 	RoyalAt func(time.Time) time.Time
-	// LeagueNews, if set, is told of each place when a week of the leagues ends.
-	LeagueNews func(context.Context, LeagueNews)
+	// LeagueNews, if set, is told of every place when a week of the leagues ends, inside the transaction that ends it:
+	// what it keeps there (a notification queued) is kept with the week's end, or not at all.
+	LeagueNews func(context.Context, *sql.Tx, []LeagueNews) error
 	// MistakesAfter is how long a missed question waits for its second chance (MistakesAfter when 0; the browser
 	// tests make it seconds).
 	MistakesAfter time.Duration

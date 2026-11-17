@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -164,7 +165,7 @@ func (s *Server) royalNews(ctx context.Context, n play.RoyalNews) {
 	if n.Of >= 3 { // with fewer, ratings don't move
 		m.Body = ratingWords(n.Delta)
 	}
-	go s.notify(context.WithoutCancel(ctx), pushFriends, m, n.To)
+	s.notify(context.WithoutCancel(ctx), pushFriends, m, n.To)
 }
 
 // tonight is the next Роял at a glance (for its tile on Начало and the screen before its lobby): when, how many are in
@@ -212,79 +213,113 @@ func (s *Server) planRoyal(w http.ResponseWriter, r *http.Request) error {
 	return s.tonightFor(w, r.Context(), u.ID)
 }
 
-// claimCall says whether the call named key to the evening that starts at start is still to be made, and claims it:
-// once an evening, whatever restarts the server.
-func (s *Server) claimCall(ctx context.Context, key string, start time.Time) bool {
-	res, err := s.db.Write.ExecContext(ctx, `INSERT INTO kv (key, value) VALUES (?, ?)
+// claimCall says whether the call named key to the evening that starts at start is still to be made, and claims it
+// in tx, which queues the call (pushes.go): once an evening, whatever restarts the server.
+func claimCall(ctx context.Context, tx *sql.Tx, key string, start time.Time) (bool, error) {
+	res, err := tx.ExecContext(ctx, `INSERT INTO kv (key, value) VALUES (?, ?)
 		ON CONFLICT (key) DO UPDATE SET value = excluded.value WHERE value != excluded.value`, key, start.UTC().Format(time.RFC3339))
 	if err != nil {
-		slog.Error("royal call", "err", err)
-		return false
+		return false, err
 	}
 	n, _ := res.RowsAffected()
-	return n > 0
+	return n > 0, nil
 }
 
-// planners are those who said they'd come to the evening of day.
-func (s *Server) planners(ctx context.Context, q string, args ...any) []int64 {
-	rows, err := s.db.Read.QueryContext(ctx, q, args...)
+// planners are the players a query lists: those who said they'd come to an evening, say.
+func planners(ctx context.Context, tx *sql.Tx, q string, args ...any) ([]int64, error) {
+	rows, err := tx.QueryContext(ctx, q, args...)
 	if err != nil {
-		slog.Error("royal call", "err", err)
-		return nil
+		return nil, err
 	}
 	defer rows.Close()
 	var out []int64
 	for rows.Next() {
 		var id int64
-		if rows.Scan(&id) == nil {
-			out = append(out, id)
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
 		}
+		out = append(out, id)
 	}
-	return out
+	return out, rows.Err()
+}
+
+// call claims a call to an evening and queues it, in one transaction (once an evening, whatever restarts the
+// server): to is who, by the kind of call each gets, read as it's claimed. It says how many it called.
+func (s *Server) call(ctx context.Context, key string, start time.Time, m push.Message,
+	to func(tx *sql.Tx) (map[pushKind][]int64, error)) int {
+	if s.push == nil && s.phones == nil {
+		return 0
+	}
+	called := 0
+	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		called = 0
+		if ok, err := claimCall(ctx, tx, key, start); err != nil || !ok {
+			return err // or called already
+		}
+		lists, err := to(tx)
+		if err != nil {
+			return err
+		}
+		for kind, ids := range lists {
+			// Of no use once it has started.
+			if _, err := s.queue(ctx, tx, notice{kind: kind, m: m, until: start}, ids...); err != nil {
+				return err
+			}
+			called += len(ids)
+		}
+		return nil
+	})
+	if err != nil {
+		slog.Error("royal call", "err", err)
+		return 0
+	}
+	s.pushq.poke()
+	return called
 }
 
 // callRoyal calls to the evening that starts at start, as its lobby opens: those who said they'd come, and those who
 // want Роял's notifications every evening. Once an evening, whatever restarts the server. It says how many it called.
 func (s *Server) callRoyal(ctx context.Context, start time.Time) int {
-	if s.push == nil && s.phones == nil {
-		return 0
-	}
-	if !s.claimCall(ctx, "royal_called", start) {
-		return 0 // called already
-	}
 	day := eveningOf(start.UnixMilli())
-	planned := s.planners(ctx, `SELECT user_id FROM royal_plans WHERE day = ?`, day)
-	always := s.planners(ctx, `SELECT user_id FROM push_prefs WHERE kind = 'royal' AND wanted = 1
-		AND user_id NOT IN (SELECT user_id FROM royal_plans WHERE day = ?)`, day)
-	// The plans of evenings gone are of no more use.
-	_, _ = s.db.Write.ExecContext(ctx, `DELETE FROM royal_plans WHERE day < ?`, day)
 	at := start.In(play.Bulgaria).Format("15:04")
 	m := push.Message{Title: "Входът за Роял е отворен", Body: "Роял започва в " + at + ". Влез.", URL: "/royal"}
-	s.notify(ctx, pushAsked, m, planned...)
-	s.notify(ctx, pushRoyal, m, always...)
-	slog.Info("royal called", "planned", len(planned), "always", len(always))
-	return len(planned) + len(always)
+	return s.call(ctx, "royal_called", start, m, func(tx *sql.Tx) (map[pushKind][]int64, error) {
+		planned, err := planners(ctx, tx, `SELECT user_id FROM royal_plans WHERE day = ?`, day)
+		if err != nil {
+			return nil, err
+		}
+		always, err := planners(ctx, tx, `SELECT user_id FROM push_prefs WHERE kind = 'royal' AND wanted = 1
+			AND user_id NOT IN (SELECT user_id FROM royal_plans WHERE day = ?)`, day)
+		if err != nil {
+			return nil, err
+		}
+		// The plans of evenings gone are of no more use.
+		if _, err := tx.ExecContext(ctx, `DELETE FROM royal_plans WHERE day < ?`, day); err != nil {
+			return nil, err
+		}
+		slog.Info("royal called", "planned", len(planned), "always", len(always))
+		return map[pushKind][]int64{pushAsked: planned, pushRoyal: always}, nil
+	})
 }
 
 // callSoon calls again, a minute before the start: those in the lobby whose screen isn't on it (away), and those who
 // said they'd come and aren't in it (in is everyone who is). Once an evening, whatever restarts the server. It says
 // how many it called.
 func (s *Server) callSoon(ctx context.Context, start time.Time, away, in []int64) int {
-	if s.push == nil && s.phones == nil {
-		return 0
-	}
-	if !s.claimCall(ctx, "royal_called_soon", start) {
-		return 0
-	}
-	to := slices.Clone(away)
-	for _, id := range s.planners(ctx, `SELECT user_id FROM royal_plans WHERE day = ?`, eveningOf(start.UnixMilli())) {
-		if !slices.Contains(in, id) {
-			to = append(to, id)
-		}
-	}
 	at := start.In(play.Bulgaria).Format("15:04")
 	m := push.Message{Title: "Роял започва след минута", Body: "Влез сега: първият въпрос е в " + at + ".", URL: "/royal"}
-	s.notify(ctx, pushAsked, m, to...)
-	slog.Info("royal called again", "away", len(away), "coming", len(to)-len(away))
-	return len(to)
+	return s.call(ctx, "royal_called_soon", start, m, func(tx *sql.Tx) (map[pushKind][]int64, error) {
+		planned, err := planners(ctx, tx, `SELECT user_id FROM royal_plans WHERE day = ?`, eveningOf(start.UnixMilli()))
+		if err != nil {
+			return nil, err
+		}
+		to := slices.Clone(away)
+		for _, id := range planned {
+			if !slices.Contains(in, id) {
+				to = append(to, id)
+			}
+		}
+		slog.Info("royal called again", "away", len(away), "coming", len(to)-len(away))
+		return map[pushKind][]int64{pushAsked: to}, nil
+	})
 }

@@ -45,20 +45,20 @@ func TestRemindAtTheirHour(t *testing.T) {
 		g.finishedDay(anaID, day.AddDate(0, 0, -i-1), at)
 	}
 	at := func(h, m int) time.Time { return day.Add(time.Duration(h)*time.Hour + time.Duration(m)*time.Minute) }
-	if n := s.remind(t.Context(), at(9, 49)); n != 0 {
+	if n := s.remindSent(t.Context(), at(9, 49)); n != 0 {
 		t.Fatalf("before Ana's hour: %d", n)
 	}
-	if n := s.remind(t.Context(), at(9, 50)); n != 1 || fake.count("/ana") != 1 || fake.count("/bo") != 0 {
+	if n := s.remindSent(t.Context(), at(9, 50)); n != 1 || fake.count("/ana") != 1 || fake.count("/bo") != 0 {
 		t.Fatalf("at Ana's hour: %d (ana %d, bo %d)", n, fake.count("/ana"), fake.count("/bo"))
 	}
-	if n := s.remind(t.Context(), at(9, 51)); n != 0 {
+	if n := s.remindSent(t.Context(), at(9, 51)); n != 0 {
 		t.Fatal("Ana reminded twice")
 	}
-	if n := s.remind(t.Context(), at(18, 59)); n != 0 {
+	if n := s.remindSent(t.Context(), at(18, 59)); n != 0 {
 		t.Fatal("Bo before 19:00")
 	}
 	s.reminders = reminders{} // a restart: what was in memory is gone, the claims aren't
-	if n := s.remind(t.Context(), at(19, 0)); n != 1 || fake.count("/bo") != 1 || fake.count("/ana") != 1 {
+	if n := s.remindSent(t.Context(), at(19, 0)); n != 1 || fake.count("/bo") != 1 || fake.count("/ana") != 1 {
 		t.Fatalf("at 19:00: %d (ana %d, bo %d)", n, fake.count("/ana"), fake.count("/bo"))
 	}
 	var claims int
@@ -84,7 +84,7 @@ func TestRemindersBackOff(t *testing.T) {
 	sent := map[int]bool{}
 	for d := 1; d <= 9; d++ {
 		clock = start.AddDate(0, 0, d).Add(20 * time.Hour)
-		if s.remind(t.Context(), clock) == 1 {
+		if s.remindSent(t.Context(), clock) == 1 {
 			sent[d] = true
 		}
 	}
@@ -104,7 +104,7 @@ func TestRemindersBackOff(t *testing.T) {
 	// Ana plays the day on the 10th: the next day she's reminded again.
 	g.finishedDay(anaID, start.AddDate(0, 0, 10), 18*time.Hour)
 	clock = start.AddDate(0, 0, 11).Add(20 * time.Hour)
-	if n := s.remind(t.Context(), clock); n != 1 {
+	if n := s.remindSent(t.Context(), clock); n != 1 {
 		t.Fatal("not reminded after playing again")
 	}
 }
