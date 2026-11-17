@@ -61,8 +61,9 @@ import (
 // last good copy when BANK_DIR has errors. SIGHUP reloads the bank (deploy/bank.sh), from the moment the program
 // starts (one that comes during the start is taken once it's up); a new bank waits while Роял is on
 // (internal/server/bank.go). SIGTERM or SIGINT stop the server after the requests under way finish (a deploy drains it
-// first: internal/server/drain.go). A new version copies the database as it first starts (store.KeepCopy). Started by
-// systemd's socket (deploy/almanac.socket), it serves on that socket, and ADDR is left aside.
+// first: internal/server/drain.go). A version that brings a migration copies the database as it first starts, before
+// migrating it (store.KeepCopy); one without makes no copy, and starts at once. Started by systemd's socket
+// (deploy/almanac.socket), it serves on that socket, and ADDR is left aside.
 func serve([]string) error {
 	// First of all: a reload asked while the server starts would kill it (the default for SIGHUP).
 	hup := make(chan os.Signal, 1)
@@ -161,12 +162,12 @@ func serve([]string) error {
 	if err != nil {
 		return err
 	}
-	// A new version copies the database before its migrations, to go back to if they went wrong.
+	// A release's version copies the database if it has migrations to apply, to go back to if they went wrong.
 	if !dev && strings.HasPrefix(version, "v") {
 		if made, err := store.KeepCopy(dbPath(), version); err != nil {
 			return fmt.Errorf("copying the database before %s: %w", version, err)
 		} else if made {
-			slog.Info("database copied", "before", version)
+			slog.Info("database copied before its migrations", "before", version)
 		}
 	}
 	db, err := store.Open(dbPath())

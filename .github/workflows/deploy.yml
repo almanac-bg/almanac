@@ -1,16 +1,31 @@
-# A merge to main is a release when it changes the program, and a release is deployed. Nobody judges either: the
-# program is built without its version (the build is reproducible: same sources, same bytes) and its hash compared with
-# the last release's (program.sha256); the same hash, nothing to release (tests, docs, the repo's tooling). A new
-# version is the last one with its patch counted up, or its minor when the release brings a new migration, so that one
-# minor is one schema: any version of it runs on the others' database, and going back within it is safe. A major is
-# the owner's call alone: run this workflow by hand with `major`. The version is tested, built for the server,
-# published as a GitHub release, and installed on the server by almanac-deploy (which copies the database first and
-# goes back by itself if the new version isn't healthy). One at a time, in order.
+# A merge to main is a release when it changes the program, and the latest release is what runs on the server. Nobody
+# judges either: the program is built without its version (the build is reproducible: same sources, same bytes) and
+# its hash compared with the last release's (program.sha256); the same hash, nothing to release (tests, docs, the
+# repo's tooling). A new version is the last one with its patch counted up, or its minor when the release brings a new
+# migration, so that one minor is one schema: any version of it runs on the others' database, and going back within
+# it is safe. A major is the owner's call alone: run this workflow by hand, on main, with `major`. One run at a time,
+# in order.
 #
-# The server lets CI's key run only almanac-deploy with a version (deploy/deploy-ci.sh); the key is the DEPLOY_KEY
-# secret. Without it, this releases and stops there. almanac-deploy waits for a moment the restart cuts no play: the
-# games under way (seven minutes at most), and Роял's evening (from 20:37, about half an hour), so the job may wait
-# that long; merges meanwhile queue behind it, and the newest of them goes out next, with all of theirs.
+# Every run then deploys the latest release, new or not: almanac-deploy leaves a version that is live already as it
+# is, so a deploy that didn't happen (cut off, timed out, a download that failed) is tried again by the next run, or by
+# re-running this one, and a run is green only when the latest release is live. One that went back for not being
+# healthy isn't tried again (it would fail the same way, cutting play twice each merge): the runs stay red until a new
+# release goes out.
+#
+# The jobs hold only what they need, and code from the repository never runs where a key is: the plan and the test
+# and the build read the repository (and nothing more); the release runs nothing of the repository's, only GitHub's
+# own actions and gh, and holds the rights to publish (a release, its provenance) and the key that signs the program;
+# the deploy holds the key to the server, and runs only on main. The keys are secrets: DEPLOY_KEY, which the server
+# lets run only deploy/deploy-ci.sh; RELEASE_SIGNING_KEY, whose public half is in deploy/release-signers, which
+# almanac-deploy checks before it runs anything (without the key, releases go out unsigned, and a server whose
+# release-signers names no key takes them on their checksum).
+#
+# almanac-deploy waits for a moment the restart cuts no play: the games under way (seven minutes at most), and Роял's
+# evening (from 20:37, about half an hour), so the deploy may wait that long; merges meanwhile queue behind it, and the
+# newest of them goes out next, with all of theirs. It runs on the server as a unit of its own: cancelling this run
+# doesn't stop it, and it goes back by itself if the new version isn't healthy. Last, the run compares the server's
+# deploy files (its units and scripts, installed by deploy/setup.sh, by hand) with the repository's, and fails on a
+# difference, so a change to deploy/ that hasn't reached the server can't pass for shipped.
 name: Deploy
 
 on:
@@ -30,13 +45,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  plan:
+    name: The plan
+    # Only main releases and deploys: a run by hand on another branch does nothing.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 75
+    timeout-minutes: 10
     permissions:
-      contents: write
-      id-token: write
-      attestations: write
+      contents: read
+    outputs:
+      release: ${{ steps.version.outputs.release }}
+      deploy: ${{ steps.version.outputs.deploy }}
+      program: ${{ steps.program.outputs.hash }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -50,8 +70,7 @@ jobs:
         run: |
           go run ./cmd/build
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false -ldflags "-s -w -X main.version=program" -o program ./cmd/almanac
-          sha256sum program | cut -d' ' -f1 > program.sha256
-          echo "hash=$(cat program.sha256)" >> "$GITHUB_OUTPUT"
+          echo "hash=$(sha256sum program | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
       - name: The next version
         id: version
         env:
@@ -65,48 +84,158 @@ jobs:
           if [ "$MAJOR" = true ]; then
             major=$((major + 1)) minor=0 patch=0 why="the owner's new major"
           elif [ "$before" = "$PROGRAM" ]; then
-            echo "The program is the same as $last's: nothing to release." >> "$GITHUB_STEP_SUMMARY"
+            echo "The program is the same as $last's: nothing to release; $last is deployed if it isn't live." >> "$GITHUB_STEP_SUMMARY"
+            echo "deploy=$last" >> "$GITHUB_OUTPUT"
             exit 0
           elif git diff --name-only --diff-filter=A "$last" HEAD -- internal/store/migrations | grep -q .; then
             minor=$((minor + 1)) patch=0 why="a new migration since $last"
           else
             patch=$((patch + 1)) why="the program changed since $last, its schema didn't"
           fi
-          echo "tag=v$major.$minor.$patch" >> "$GITHUB_OUTPUT"
+          echo "release=v$major.$minor.$patch" >> "$GITHUB_OUTPUT"
+          echo "deploy=v$major.$minor.$patch" >> "$GITHUB_OUTPUT"
           echo "Releasing v$major.$minor.$patch: $why." >> "$GITHUB_STEP_SUMMARY"
-      - name: Tested
-        if: steps.version.outputs.tag
-        run: go vet ./... && go test -race ./...
-      - name: Built for the server (Linux, ARM)
-        if: steps.version.outputs.tag
+
+  test:
+    name: Tested
+    needs: plan
+    if: needs.plan.outputs.release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: go run ./cmd/build
+      - run: go vet ./... && go test -race ./...
+
+  # A checkout of its own: nothing the tests did reaches what is built.
+  build:
+    name: Built for the server (Linux, ARM)
+    needs: plan
+    if: needs.plan.outputs.release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: The program, with its version
         env:
-          VERSION: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ needs.plan.outputs.release }}
+          PROGRAM: ${{ needs.plan.outputs.program }}
         run: |
+          go run ./cmd/build
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false -ldflags "-s -w -X main.version=$VERSION" -o almanac-linux-arm64 ./cmd/almanac
           sha256sum almanac-linux-arm64 > almanac-linux-arm64.sha256
+          printf '%s\n' "$PROGRAM" > program.sha256
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release
+          path: |
+            almanac-linux-arm64
+            almanac-linux-arm64.sha256
+            program.sha256
+          retention-days: 1
+          if-no-files-found: error
+
+  # Nothing of the repository's runs here: GitHub's actions, ssh-keygen and gh only.
+  release:
+    name: Published
+    needs: [plan, test, build]
+    if: needs.plan.outputs.release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+      - name: Whole
+        run: sha256sum -c almanac-linux-arm64.sha256
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        if: steps.version.outputs.tag
         with:
           subject-path: almanac-linux-arm64
+      - name: Signed
+        env:
+          SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: |
+          if [ -z "$SIGNING_KEY" ]; then
+            echo "::warning::No RELEASE_SIGNING_KEY: the release goes out unsigned (deploy/release-signers says how to set it up)."
+            exit 0
+          fi
+          key="$RUNNER_TEMP/signing"
+          (umask 077 && printf '%s\n' "$SIGNING_KEY" > "$key")
+          ssh-keygen -q -Y sign -f "$key" -n almanac-release almanac-linux-arm64
+          rm -f "$key"
       - name: Published
-        if: steps.version.outputs.tag
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
-        run: gh release create "$TAG" almanac-linux-arm64 almanac-linux-arm64.sha256 program.sha256 --target "$GITHUB_SHA" --generate-notes
-      - name: Deployed
-        if: steps.version.outputs.tag
+          TAG: ${{ needs.plan.outputs.release }}
+        run: |
+          assets=(almanac-linux-arm64 almanac-linux-arm64.sha256 program.sha256)
+          if [ -f almanac-linux-arm64.sig ]; then assets+=(almanac-linux-arm64.sig); fi
+          gh release create "$TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --generate-notes
+
+  deploy:
+    name: Deployed
+    needs: [plan, release]
+    # The latest release: the new one once it's published, else the last one (live already, or tried again).
+    if: >-
+      always() && github.ref == 'refs/heads/main' && needs.plan.result == 'success' && needs.plan.outputs.deploy != '' &&
+      (needs.release.result == 'success' || (needs.plan.outputs.release == '' && needs.release.result == 'skipped'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: deploy
+      - name: The server's key
+        id: key
         env:
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
-          TAG: ${{ steps.version.outputs.tag }}
         run: |
           if [ -z "$DEPLOY_KEY" ]; then
-            echo "No DEPLOY_KEY: $TAG is released, not deployed." >> "$GITHUB_STEP_SUMMARY"
+            echo "No DEPLOY_KEY: nothing deployed." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           install -d -m 700 ~/.ssh
-          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy
-          chmod 600 ~/.ssh/deploy
+          (umask 077 && printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy)
           echo '2.31.121.12 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDrM9ez1+VTDgt97hh9na9P4y9EX4TXuI/abhp5YP8q/' > ~/.ssh/known_hosts
-          ssh -i ~/.ssh/deploy -o BatchMode=yes -o IdentitiesOnly=yes -o ServerAliveInterval=30 root@2.31.121.12 "$TAG"
+          printf 'Host almanac\n  HostName 2.31.121.12\n  User root\n  IdentityFile ~/.ssh/deploy\n  IdentitiesOnly yes\n  BatchMode yes\n  ServerAliveInterval 30\n' > ~/.ssh/config
+          echo "ready=1" >> "$GITHUB_OUTPUT"
+      - name: Live
+        if: steps.key.outputs.ready
+        env:
+          TAG: ${{ needs.plan.outputs.deploy }}
+        run: |
+          if ! [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "::error::not a version: $TAG"; exit 1; fi
+          ssh almanac "$TAG"
           echo "$TAG is live." >> "$GITHUB_STEP_SUMMARY"
+      - name: The server's deploy files are the repository's
+        if: ${{ !cancelled() && steps.key.outputs.ready }}
+        run: |
+          ssh almanac check > installed.sha256
+          if ! sha256sum -c installed.sha256; then
+            echo "::error::The server's deploy files differ from deploy/ (above): install them as deploy/setup.sh does."
+            exit 1
+          fi
+      - name: The key, gone
+        if: always()
+        run: rm -f ~/.ssh/deploy

@@ -122,9 +122,12 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
   that cuts no play: it drains it first (no new live duel or room game; those under way finish: a duel by its own
   clock, seven minutes at the most, a room's game five), and waits out Роял (from 20:37 to the end of its games), so
   a deploy may take a while to go live, and several merges meanwhile go out as one. Connections wait in systemd's socket through the restart; rooms are kept
-  over it; the new version copies the database before its migrations, and the deploy goes back by itself, program
-  and database copy both, if it isn't healthy. No tags by hand, no ssh to deploy. Anything new kept in memory must
-  survive a restart or count as under way (`internal/server/drain.go`).
+  over it; a version that brings a migration copies the database before it, and the deploy goes back by itself,
+  program and database copy both, if it isn't healthy. Every run deploys the latest release if it isn't live, so a
+  failed deploy is tried again by the next merge. No tags by hand, no ssh to deploy. A change to `deploy/` reaches the
+  server only by hand, as root, the way `deploy/setup.sh` installs it (then `systemctl daemon-reload` for a unit);
+  until then the Deploy run is red. Anything new kept in memory must survive a restart or count as under way
+  (`internal/server/drain.go`).
 - **The browser tests run after the merge, on `main`** (about 15 minutes, all three engines). They hold nothing up;
   if one fails, whoever sees it fixes it, at once (a session is told as it starts: `.claude/hooks/main-red.sh`).
   Before opening a PR, run only the specs your change touches, in Chromium:
@@ -161,7 +164,8 @@ SQLite in `/var/lib/almanac`, and backs it up hourly to R2. Deploys come from CI
 `almanac-deploy vX.Y.Z` (also how to go back: an older version, with `now` after it to skip the wait for play to
 end, within the same minor (`vX.Y.*`: the same migrations); to an older minor, the older version refuses the database and the deploy goes back
 to where it was, so put the copy from before that release back by hand, `/var/lib/almanac/before-vX.Y.Z.db`, with
-`systemctl stop almanac.socket almanac` first, and lose what was played since), `almanac-bank` (check the new
+`systemctl stop almanac.socket almanac` first, and lose what was played since; a release from before signatures
+that isn't in `/usr/local/lib/almanac` any more needs `ALMANAC_UNSIGNED=1` before it), `almanac-bank` (check the new
 questions apart, then pull and reload them; while Роял is on they wait for its end), `journalctl -u almanac` (logs). The `almanac backup` commands need the service's settings:
 `systemd-run --pipe --wait -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac backup verify`
 brings the latest copy back and checks it (the server does this itself daily). Health: `https://almanac.bg/api/health`
