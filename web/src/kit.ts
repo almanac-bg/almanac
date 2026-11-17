@@ -29,7 +29,7 @@ import { byTap, go, goBack, title } from "./lib/router.ts";
 import { feelKit, liveAudio, loadFeel, play, playAnswer, playCount, soundOn } from "./lib/sound.ts";
 import { withName } from "./lib/words.ts";
 import type { DuelView } from "./screens/duel.ts";
-import { clock, coming, dayWord, when } from "./screens/modes.ts";
+import { clock, coming, dayWord, when, whileSeen } from "./screens/modes.ts";
 import type { Steps } from "./screens/outcome.ts";
 import { changeGame, mixes } from "./screens/rooms.ts";
 import { categories, hostCss, outcomeCss, player, playing, topics, user } from "./state.ts";
@@ -128,6 +128,7 @@ export const kit = {
   user,
   verdict,
   when,
+  whileSeen,
   who,
   withName,
 };

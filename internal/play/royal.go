@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	mrand "math/rand/v2"
 	"slices"
@@ -200,11 +201,14 @@ func (g *Game) MoveRoyal(ctx context.Context, from, to, userID int64) error {
 	return err
 }
 
-// StartRoyal begins a tournament with those of its lobby who are there: each is given a run of its questions, and
-// the first question shows. It returns each player's run. The others stay in it without a run: they may still come
-// in late (EnterRoyal), and are taken out as it ends (SettleRoyal).
-func (g *Game) StartRoyal(ctx context.Context, royalID int64, players []int64) (map[int64]int64, error) {
+// StartRoyal begins a tournament with those of its lobby who are there, in one write: each is given a run of its
+// questions, and the first question shows. One given a run already (a start tried before, whose answer never came
+// back) keeps it, so that a start tried again deals nobody a second. It returns each player's run, and when the
+// question showed. The others stay in it without a run: they may still come in late (EnterRoyal), and are taken out
+// as it ends (SettleRoyal).
+func (g *Game) StartRoyal(ctx context.Context, royalID int64, players []int64) (map[int64]int64, time.Time, error) {
 	runs := map[int64]int64{}
+	now := g.Now()
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var questions string
 		if err := tx.QueryRow(`SELECT questions FROM royals WHERE id = ?`, royalID).Scan(&questions); err != nil {
@@ -215,6 +219,15 @@ func (g *Game) StartRoyal(ctx context.Context, royalID int64, players []int64) (
 			return err
 		}
 		for _, u := range players {
+			var had sql.NullInt64
+			err := tx.QueryRow(`SELECT run_id FROM royal_players WHERE royal_id = ? AND user_id = ?`, royalID, u).Scan(&had)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+			if had.Valid {
+				runs[u] = had.Int64
+				continue
+			}
 			r, err := g.insertRun(tx, u, "royal", nil, nil, picks)
 			if err != nil {
 				return err
@@ -224,12 +237,12 @@ func (g *Game) StartRoyal(ctx context.Context, royalID int64, players []int64) (
 			}
 			runs[u] = r.id
 		}
-		return nil
+		return showRoyal(tx, 0, store.Ms(now), royalID)
 	})
 	if err != nil {
-		return nil, err
+		return nil, time.Time{}, err
 	}
-	return runs, g.ShowRoyal(ctx, royalID, 0)
+	return runs, now, nil
 }
 
 // EnterRoyal puts a player into a tournament under way, late: the questions before the one showing (and it, if its
@@ -286,27 +299,41 @@ func (g *Game) EnterRoyal(ctx context.Context, royalID, userID int64) (int64, er
 	return run, err
 }
 
-// ShowRoyal puts question n on the screens of everyone still in the tournament, and starts its time (again, for
-// those who haven't answered it, when the server picks up a game it was running).
-func (g *Game) ShowRoyal(ctx context.Context, royalID int64, n int) error {
-	return g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		now := store.Ms(g.Now())
+// ShowRoyal puts question n on the screens of everyone still in the tournaments (an evening's together, in one
+// write: they go on one clock), and starts its time (again, for those who haven't answered it, when the server picks
+// up a game it was running). It returns when that was.
+func (g *Game) ShowRoyal(ctx context.Context, n int, royalIDs ...int64) (time.Time, error) {
+	now := g.Now()
+	return now, g.DB.Tx(ctx, func(tx *sql.Tx) error { return showRoyal(tx, n, store.Ms(now), royalIDs...) })
+}
+
+func showRoyal(tx *sql.Tx, n int, at int64, royalIDs ...int64) error {
+	for _, id := range royalIDs {
 		if _, err := tx.Exec(`UPDATE runs SET shown_at = ? WHERE finished_at IS NULL AND at = ?
-			AND id IN (SELECT run_id FROM royal_players WHERE royal_id = ?)`, now, n, royalID); err != nil {
+			AND id IN (SELECT run_id FROM royal_players WHERE royal_id = ?)`, at, n, id); err != nil {
 			return err
 		}
-		_, err := tx.Exec(`UPDATE royals SET n = ?, phase = 'question', phase_at = ? WHERE id = ?`, n, now, royalID)
-		return err
-	})
+		if _, err := tx.Exec(`UPDATE royals SET n = ?, phase = 'question', phase_at = ? WHERE id = ?`, n, at, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RoyalShown is what the answer to a tournament's question did: how everyone still in stands now, ahead first
+// (RoyalAhead); on a question the game is cut after (RoyalKeep), who's out; and whose runs it ended (the last
+// question's time run out on them: what the game earned is AfterRoyal's).
+type RoyalShown struct {
+	Scores     []RoyalScore
+	Out, Ended []int64
 }
 
 // RevealRoyal shows the answer to the question now: those who haven't answered it (the time ran out on them, or
-// they're gone) have it recorded as missed. It returns how everyone still in stands now, ahead first (RoyalAhead),
-// and, on a question the game is cut after (RoyalKeep), who's out: those behind the last who goes on (all level with
-// them go on too). Those out keep their runs, and answer on; their standing is kept as it was at their cut.
-func (g *Game) RevealRoyal(ctx context.Context, royalID int64) (scores []RoyalScore, out []int64, err error) {
-	var late []int64
-	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
+// they're gone) have it recorded as missed. Those a cut puts out are those behind the last who goes on (all level
+// with them go on too); they keep their runs, and answer on; their standing is kept as it was at their cut.
+func (g *Game) RevealRoyal(ctx context.Context, royalID int64) (RoyalShown, error) {
+	var rv RoyalShown
+	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var n, entered int
 		if err := tx.QueryRow(`SELECT n, (SELECT count(*) FROM royal_players WHERE royal_id = ?1 AND run_id IS NOT NULL)
 			FROM royals WHERE id = ?1`, royalID).Scan(&n, &entered); err != nil {
@@ -343,7 +370,7 @@ func (g *Game) RevealRoyal(ctx context.Context, royalID int64) (scores []RoyalSc
 				return err
 			}
 			if r.finished {
-				late = append(late, l.user)
+				rv.Ended = append(rv.Ended, l.user)
 			}
 		}
 		// How everyone still in stands (those out are off the standings; one who came late after question n has no
@@ -361,20 +388,20 @@ func (g *Game) RevealRoyal(ctx context.Context, royalID int64) (scores []RoyalSc
 				rows.Close()
 				return err
 			}
-			scores = append(scores, s)
+			rv.Scores = append(rv.Scores, s)
 		}
 		rows.Close()
 		if err := rows.Err(); err != nil {
 			return err
 		}
-		slices.SortStableFunc(scores, RoyalAhead)
-		if keep := RoyalKeep(n, entered); keep > 0 && len(scores) > keep {
-			line := scores[keep-1]
-			for _, s := range scores[keep:] {
+		slices.SortStableFunc(rv.Scores, RoyalAhead)
+		if keep := RoyalKeep(n, entered); keep > 0 && len(rv.Scores) > keep {
+			line := rv.Scores[keep-1]
+			for _, s := range rv.Scores[keep:] {
 				if RoyalAhead(s, line) <= 0 {
 					continue // level with the last who goes on
 				}
-				out = append(out, s.User)
+				rv.Out = append(rv.Out, s.User)
 				if _, err := tx.Exec(`UPDATE royal_players SET out_at = ? WHERE royal_id = ? AND user_id = ?`,
 					n, royalID, s.User); err != nil {
 					return err
@@ -385,35 +412,44 @@ func (g *Game) RevealRoyal(ctx context.Context, royalID int64) (scores []RoyalSc
 		return err
 	})
 	if err != nil {
-		return nil, nil, err
+		return RoyalShown{}, err
 	}
-	for _, u := range late {
-		if err := g.afterRun(ctx, u); err != nil {
-			return scores, out, err
-		}
-	}
-	return scores, out, nil
+	return rv, nil
 }
 
 // AnswerRoyal grades a player's answer to a tournament's question n, the one showing (whether they're still in or
-// play on after a cut), which arrived at at (its time is to then). Who goes on is RevealRoyal's to say, once the answer
-// shows.
+// play on after a cut), which arrived at at (its time is to then). Who goes on is RevealRoyal's to say, once the
+// answer shows, and the crowd shows then too, to everyone at once (none comes with the result). What the game earned,
+// if this answer ended it (State.Done), is AfterRoyal's.
 func (g *Game) AnswerRoyal(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time) (Result, error) {
 	return g.answer(ctx, userID, runID, n, answer, at, byRoyal)
 }
 
-// RoyalStanding is where a player came in a tournament, once it's ended.
+// AfterRoyal keeps what a player's Роял earned them once its game is over for them: all a game earns (afterRun) if
+// their run has just ended (ended), else what their place earned (the achievements). The hub calls it off the
+// evening's clock: it goes over the player's history, and a tournament's end is fifty of them at once.
+func (g *Game) AfterRoyal(ctx context.Context, userID int64, ended bool) error {
+	if ended {
+		return g.afterRun(ctx, userID)
+	}
+	_, err := g.Award(ctx, userID)
+	return err
+}
+
+// RoyalStanding is where a player came in a tournament, once it's ended. Ended says their run ended with it (it
+// hadn't reached its last answer): AfterRoyal's ended.
 type RoyalStanding struct {
 	User  int64
 	Place int
 	Delta int
+	Ended bool
 }
 
 // SettleRoyal ends a tournament: places (those still in the game at its end first; then those out, the later cut
 // further ahead; each by RoyalAhead, those out as they stood at their cut), and ratings moved by each place against
 // everyone else's (with three or more in it). A run still open (the game ended before its last question: the server
 // was down for it) was played to where it got: it ends as a game of the questions it asked. An ended one is left as
-// it is.
+// it is (no standings come back). What each player earned is AfterRoyal's to keep.
 func (g *Game) SettleRoyal(ctx context.Context, royalID int64) ([]RoyalStanding, error) {
 	type royalist struct {
 		RoyalScore
@@ -529,15 +565,7 @@ func (g *Game) SettleRoyal(ctx context.Context, royalID int64) ([]RoyalStanding,
 	}
 	out := make([]RoyalStanding, 0, len(list))
 	for _, p := range list {
-		if slices.Contains(played, p.User) {
-			// A game just ended: its goals and the week's league as well (afterRun awards too).
-			if err := g.afterRun(ctx, p.User); err != nil {
-				return nil, err
-			}
-		} else if _, err := g.Award(ctx, p.User); err != nil {
-			return nil, err
-		}
-		out = append(out, RoyalStanding{User: p.User, Place: p.place, Delta: p.delta})
+		out = append(out, RoyalStanding{User: p.User, Place: p.place, Delta: p.delta, Ended: slices.Contains(played, p.User)})
 	}
 	return out, nil
 }
@@ -573,6 +601,11 @@ func (g *Game) settleRoyalsDue(ctx context.Context) error {
 		list, err := g.SettleRoyal(ctx, id)
 		if err != nil {
 			return err
+		}
+		for _, p := range list {
+			if err := g.AfterRoyal(ctx, p.User, p.Ended); err != nil {
+				return err
+			}
 		}
 		if g.RoyalNews != nil {
 			for _, p := range list {

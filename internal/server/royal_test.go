@@ -1,12 +1,45 @@
 package server
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/royal"
 )
+
+// Роял's stream sends the evening as one object (the board, with the viewer's own part); a player's screen too many
+// is told to try again in a while, not shut out for good.
+func TestRoyalStream(t *testing.T) {
+	g := start(t)
+	ana := g.player()
+	ana.call("POST", "/api/guest", map[string]any{})
+	v := ana.stream("/api/royal/events").until(func(map[string]any) bool { return true })
+	if v["phase"] == nil || v["now"] == nil || v["in"] != false {
+		t.Fatalf("the evening: %v", v)
+	}
+	for range 4 { // royal.maxOfPlayer, with the first
+		ana.stream("/api/royal/events").until(func(map[string]any) bool { return true })
+	}
+	busy := ana.stream("/api/royal/events")
+	var got []string
+	for {
+		line, err := busy.r.Reader.ReadString('\n')
+		if err != nil {
+			break
+		}
+		got = append(got, strings.TrimSpace(line))
+	}
+	var ms int
+	if len(got) < 2 || got[1] != "event: busy" {
+		t.Fatalf("a screen too many: %q", got)
+	}
+	if _, err := fmt.Sscanf(got[0], "retry: %d", &ms); err != nil || ms < 30_000 {
+		t.Fatalf("a screen too many, back in: %q", got[0])
+	}
+}
 
 // One who can't come into Роял is told why, and when they can, as the evenings are.
 func TestRefusal(t *testing.T) {

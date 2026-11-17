@@ -30,7 +30,7 @@ func (w *world) evening(day time.Time, players []int64) {
 			w.t.Fatal(err)
 		}
 	}
-	if _, err := w.g.StartRoyal(ctx, id, players); err != nil {
+	if _, _, err := w.g.StartRoyal(ctx, id, players); err != nil {
 		w.t.Fatal(err)
 	}
 }
@@ -159,5 +159,46 @@ func TestNudgeRoyal(t *testing.T) {
 	}
 	if p, _ := w.g.RoyalPaceOf(ctx); p.Recent != RoyalTurnout || p.Nightly {
 		t.Fatalf("the pace after seven full evenings: %+v", p)
+	}
+}
+
+// A start tried again (its answer lost: an error back, the server stopped) deals nobody a second run; the first
+// question shows with the runs, in the same write.
+func TestStartRoyalAgain(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	a, b := w.user(), w.user()
+	picks, err := w.g.DrawRoyal(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := w.g.NewRoyal(ctx, w.now, picks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range []int64{a, b} {
+		if err := w.g.JoinRoyal(ctx, id, u); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first, _, err := w.g.StartRoyal(ctx, id, []int64{a})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var phase string
+	var shown int
+	_ = w.db.Read.QueryRow(`SELECT phase FROM royals WHERE id = ?`, id).Scan(&phase)
+	_ = w.db.Read.QueryRow(`SELECT count(*) FROM runs WHERE id = ? AND shown_at IS NOT NULL`, first[a]).Scan(&shown)
+	if phase != RoyalQuestion || shown != 1 {
+		t.Fatalf("started: %s, the first question shown to %d", phase, shown)
+	}
+	again, _, err := w.g.StartRoyal(ctx, id, []int64{a, b})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var runs int
+	_ = w.db.Read.QueryRow(`SELECT count(*) FROM runs WHERE kind = 'royal'`).Scan(&runs)
+	if again[a] != first[a] || again[b] == 0 || runs != 2 {
+		t.Fatalf("started again: %v then %v, %d runs", first, again, runs)
 	}
 }

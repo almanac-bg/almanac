@@ -598,6 +598,11 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 	if err != nil {
 		return res, err
 	}
+	if by == byRoyal {
+		// Роял shows the answer and its crowd to everyone at once, and keeps what a game earned off its clock
+		// (AfterRoyal).
+		return res, nil
+	}
 	// How other players answered it: counted once the answer is kept, outside the write, which it never waits on. The
 	// answer is kept whatever happens here: a count that fails shows none.
 	crowd, err := g.crowdOf(ctx, g.DB.Read, r, d.Question())

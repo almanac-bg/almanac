@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -51,7 +52,12 @@ func TestStreamOutlivesWriteDeadline(t *testing.T) {
 	if err := sc.Err(); err != nil {
 		t.Fatalf("stream broke after %q: %v", got, err)
 	}
-	if len(got) != 2 {
-		t.Fatalf("got %q, want both lines", got)
+	if len(got) != 3 || got[1] != "data: 1" || got[2] != "data: 2" {
+		t.Fatalf("got %q, want how long to wait, and both lines", got)
+	}
+	// How long the browser waits to come back, should the line drop: a while of its own, not the same for all.
+	var ms int
+	if _, err := fmt.Sscanf(got[0], "retry: %d", &ms); err != nil || ms < 1500 || ms >= 6000 {
+		t.Fatalf("the first line: %q", got[0])
 	}
 }

@@ -595,8 +595,20 @@ func TestHosts(t *testing.T) {
 // stream is a room's event stream as a browser reads it.
 type stream struct {
 	t   *testing.T
-	r   *bufio.Reader
+	r   lines
 	res *http.Response
+}
+
+// lines reads a stream's lines past how long to wait before reconnecting (retry: the browser's own).
+type lines struct{ *bufio.Reader }
+
+func (l lines) ReadString(delim byte) (string, error) {
+	for {
+		line, err := l.Reader.ReadString(delim)
+		if err != nil || !strings.HasPrefix(line, "retry:") {
+			return line, err
+		}
+	}
 }
 
 // follow joins a room and opens its stream, as a player's screen does.
@@ -623,7 +635,7 @@ func (p *player) stream(path string, lastID ...string) *stream {
 		p.g.t.Fatalf("not a stream: %d %s", res.StatusCode, res.Header.Get("Content-Type"))
 	}
 	p.g.t.Cleanup(func() { res.Body.Close() })
-	return &stream{t: p.g.t, r: bufio.NewReader(res.Body), res: res}
+	return &stream{t: p.g.t, r: lines{bufio.NewReader(res.Body)}, res: res}
 }
 
 // until reads views until one passes ok.

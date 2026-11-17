@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"slices"
 	"strings"
@@ -18,7 +19,8 @@ import (
 )
 
 // royalEvents streams the evening's Роял to a screen (Server-Sent Events): as the viewer sees it, again after every
-// change. Anyone may look; playing takes a player. The browser reconnects by itself if the line drops.
+// change (royal.Hub.Look). Anyone may look; playing takes a player. The browser reconnects by itself if the line
+// drops. A screen too many (of the player's, the address's, or all: royal.ErrBusy) is told to try again in a while.
 func (s *Server) royalEvents(w http.ResponseWriter, r *http.Request) {
 	var viewer int64
 	if u, err := s.user(r); err == nil && u != nil {
@@ -28,22 +30,28 @@ func (s *Server) royalEvents(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Accel-Buffering", "no")
-	sub := s.royal.Follow(viewer)
+	send := sender(w)
+	sub, err := s.royal.Follow(viewer, s.clientNet(r))
+	if err != nil {
+		send(fmt.Sprintf("retry: %d\nevent: busy\ndata: {}\n\n", 30_000+rand.N(30_000)))
+		return
+	}
 	defer s.royal.Unfollow(sub)
 
-	send := sender(w)
 	ping := time.NewTicker(20 * time.Second) // keeps the line open through proxies (Cloudflare closes it after 100 s)
 	defer ping.Stop()
 	for {
 		select {
 		case <-sub.C:
-			data, _ := json.Marshal(s.royal.View(viewer))
+			data, pause := s.royal.Look(sub)
 			if !send("data: " + string(data) + "\n\n") {
 				return
 			}
-			// Many answers in a moment make one look, not one each.
+			// Many answers in a moment make one look, not one each; the clock moving on, or a change of the viewer's
+			// own, is looked at at once.
 			select {
-			case <-time.After(150 * time.Millisecond):
+			case <-time.After(pause):
+			case <-sub.Now:
 			case <-r.Context().Done():
 				return
 			}
