@@ -332,7 +332,7 @@ function nameStep(code: string, u: User, done: () => void): Child {
       "div",
       { class: "intro" },
       h("p", { class: "kicker" }, `Стая ${spaced(code)}`),
-      h("h1", null, "Как да те виждат в стаята?"),
+      h("h1", null, "С какво име влизаш?"),
     ),
     h(
       "label",
@@ -396,7 +396,7 @@ function lobby(view: () => RoomView, code: string): Child {
       h("h1", null, "Стая ", h("span", { class: "code-big" }, spaced(code))),
       h("p", { class: "lead" }, "Дай кода на другите или им прати връзката."),
     ),
-    shareButton("Прати връзката", () => "Ела да играем на АЛМАНАХ:", `${location.origin}/r/${code}`, false),
+    shareButton("Прати връзката", () => "Ела да играем заедно в АЛМАНАХ:", `${location.origin}/r/${code}`, false),
     h(
       "section",
       { class: "card" },
@@ -553,7 +553,7 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view, true),
     answered(q.view, r.answer, q.given ?? null),
-    verdict(kind, r.points, r.missed ? "Без отговор." : undefined, r.speed, r.row, r.inRow),
+    verdict(kind, r.points, r.missed ? "Времето изтече." : undefined, r.speed, r.row, r.inRow),
     crowdLine(q.view.type, r.answer.crowd, r.right),
     // Held, the answer stays up until who leads moves on.
     () =>
@@ -659,9 +659,13 @@ function end(view: () => RoomView, code: string): Child {
       { class: "intro" },
       h("p", { class: "kicker" }, () => `Стая ${spaced(code)} · ${topicName(view().category)}`),
       h("h1", null, () => {
-        const [best, next] = view().players;
-        if (best && next?.place === 1) return `${best.name} и ${next.name} делят първото място`;
-        return best ? `${best.name} печели` : "Край";
+        const top = view().players.filter((p) => p.place === 1);
+        if (top.length > 1)
+          return `${top
+            .slice(0, -1)
+            .map((p) => p.name)
+            .join(", ")} и ${top.at(-1)?.name} делят първото място`;
+        return top[0] ? `${top[0].name} печели` : "Край";
       }),
     ),
     () =>
@@ -673,11 +677,15 @@ function end(view: () => RoomView, code: string): Child {
     nextSteps(
       () =>
         view().canLead
-          ? h("button", { class: "btn primary big", onclick: () => lead(code, "start", error.set) }, "Нова игра")
+          ? h(
+              "button",
+              { class: "btn primary big", onclick: () => lead(code, "start", error.set) },
+              "Започни нова игра",
+            )
           : waiting(view, "започне нова игра"),
       [
         questions.button,
-        () => (people()?.day === false ? h("a", { class: "btn", href: "/" }, "Десетте за днес") : null),
+        () => (people()?.day === false ? h("a", { class: "btn", href: "/" }, "Към въпросите на деня") : null),
       ],
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),

@@ -188,7 +188,7 @@ export const meaning = {
   dayBoard: " При равен брой верни в класацията на деня решават точките.",
   xp: "XP печелиш с всяка игра, цел и постижение. Трупа се и вдига нивото ти.",
   league: " Точките от въпросите на деня за седмицата те класират в лигата.",
-  rating: "Рейтингът е силата ти в дуелите и в Роял: расте с победа, пада със загуба. По него е дивизията ти.",
+  rating: "Рейтингът е силата ти в дуелите и в Роял: расте с победа, пада със загуба. От него зависи дивизията ти.",
 };
 
 /** The day's points' words: the day's board they place on, and the league once it's open, which races on them, added
@@ -336,7 +336,7 @@ export function streak(days: number, week?: boolean[], saved?: boolean[], reserv
         h("b", { class: "streak-num" }, String(days)),
         h("span", { class: "streak-unit" }, unit),
       ),
-      h("p", null, days ? "поред с въпросите на деня" : "Изиграй днешните и започни серия."),
+      h("p", null, days ? "поред с въпросите на деня" : "Изиграй въпросите на деня и започни серия."),
       // What keeps the streak through a day missed: the reserve days in hand, or the way to the next (play/runs.go).
       reserve || next
         ? h(
@@ -377,7 +377,7 @@ export const reserveWords = (n: number) => (n === 1 ? "1 резервен ден
 export const reserveMeaning = (n: number) =>
   n === 1
     ? "Резервен ден: пази серията, ако пропуснеш ден."
-    : `${reserveWords(n)}: всеки пази серията, ако пропуснеш ден.`;
+    : `${reserveWords(n)}: всеки пази серията за един пропуснат ден.`;
 
 /** A streak at stake while the day's ten wait (play/runs.go: it runs to yesterday until they're played), in a line
  * (stakeWords), read again each minute, so a screen left open turns to the evening's line: on the day's card and under
@@ -563,7 +563,7 @@ export function standingCard(s: Standing, own = false): Child {
         own ? explain("Рейтинг", meaning.rating) : "Рейтинг",
         ` ${s.rating}${s.next ? ` · ${s.next - s.rating} до следващата` : ""}`,
       ),
-      s.next ? meter(share, `${share}% до следващата дивизия`) : null,
+      s.next ? meter(share, `${share}% от пътя до следващата дивизия`) : null,
     ),
   );
 }

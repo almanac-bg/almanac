@@ -193,7 +193,7 @@ export function liveDuel(kit: Kit) {
     if (!r.n)
       return startScreen(
         "Дуел на живо",
-        "Ти и друг играч: едни и същи десет въпроса, в един и същи миг.",
+        "Ти и друг играч: едни и същи десет въпроса, в един и същ миг.",
         null,
         () => again(),
         "Намери съперник",
@@ -301,7 +301,7 @@ function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
           anew,
         );
       if (t === "closed" && untracked(view)?.phase !== "end")
-        return problem("Дуелът прекъсна", "Без резултат: рейтингът не се мени.", anew);
+        return problem("Дуелът прекъсна", "Без резултат: рейтингът не се променя.", anew);
       if (!k) return h("p", { class: "muted" }, "…");
       if (k === "waiting") return waiting(wait as () => Wait, rematch);
       const v = untracked(view) as LiveView;
@@ -541,7 +541,7 @@ function reveal(view: () => LiveView, first: LiveView): Child {
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view, true),
     answered(q.view, r.answer, q.given ?? null),
-    verdict(kind, r.points, r.missed ? "Без отговор." : undefined, r.speed, r.row, r.inRow),
+    verdict(kind, r.points, r.missed ? "Времето изтече." : undefined, r.speed, r.row, r.inRow),
     crowdLine(q.view.type, r.answer.crowd, r.right),
     theirs(first.them, q.view),
     upNext(q.nextMs ?? 0, last ? "Към резултата…" : `Въпрос ${first.n + 2} след малко…`),
@@ -666,7 +666,7 @@ function nobody(again: () => void): Child {
     h(
       "div",
       { class: "result-actions" },
-      h("a", { class: "btn", href: "/play/all" }, "Игра по тема"),
+      h("a", { class: "btn", href: "/play/all" }, "Играй по тема"),
       h("button", { class: "btn", type: "button", onclick: again }, "Опитай пак"),
     ),
   );

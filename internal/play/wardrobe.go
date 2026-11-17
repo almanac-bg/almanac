@@ -130,8 +130,8 @@ func (u unlock) how() string {
 		a, _ := achievementByID(u.achieved)
 		return "постижението „" + a.Name + "“"
 	case u.tier != "":
-		return map[Tier]string{Common: "обикновено", Rare: "рядко", Epic: "епично", Legendary: "легендарно"}[u.tier] +
-			" постижение"
+		return "първото " + map[Tier]string{Common: "обикновено", Rare: "рядко", Epic: "епично",
+			Legendary: "легендарно"}[u.tier] + " постижение"
 	case u.division != "":
 		for _, d := range Divisions {
 			if d.ID == u.division {
@@ -142,7 +142,7 @@ func (u unlock) how() string {
 		if u.first-1 >= TopLeague {
 			return "първо място за седмица в " + leagueOf(u.first-1).Name
 		}
-		return "първо място за седмица в " + leagueOf(u.first-1).Name + " или по-високо"
+		return "първо място за седмица в " + leagueOf(u.first-1).Name + " или по-висока лига"
 	case u.topics == everyTopic:
 		return "„" + MasteryTiers[u.mastery].Name + "“ във всички теми"
 	case u.topics > 0:
@@ -226,8 +226,6 @@ func (w wardrobe) from(u unlock) string {
 	switch {
 	case u.topic != "":
 		return "„" + MasteryTiers[u.mastery].Name + "“ в „" + w.topics[u.topic] + "“"
-	case u.tier != "":
-		return "първото си " + u.how()
 	}
 	return u.how()
 }
@@ -400,7 +398,7 @@ func (w wardrobe) next(rating int) Next {
 	return n
 }
 
-// numberWords are the numbers to ten, as a phrase says them before „теми“.
+// numberWords are the numbers to ten, as a phrase says them before „теми“ or „купи“.
 var numberWords = []string{"", "една", "две", "три", "четири", "пет", "шест", "седем", "осем", "девет", "десет"}
 
 // inWords is a number in words, past ten in digits.

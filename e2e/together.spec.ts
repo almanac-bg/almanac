@@ -13,7 +13,7 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
   await expect(host).toHaveURL(/\/r\/\d{6}$/);
   const code = host.url().slice(-6);
   // A new player has a drawn name: the room asks for one first (kept as it is here).
-  await expect(host.getByRole("heading", { name: "Как да те виждат в стаята?" })).toBeVisible();
+  await expect(host.getByRole("heading", { name: "С какво име влизаш?" })).toBeVisible();
   await host.getByRole("button", { name: "Влез" }).click();
   await guest.goto("/room");
   // A wrong code is said at once, in place, before anything is asked.
@@ -39,9 +39,9 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
   // The room moves on by itself, to the standings; the questions and their facts are there at the end.
   for (const p of [host, guest])
     await expect(p.getByRole("heading", { name: /печели/ })).toBeVisible({ timeout: 15_000 });
-  await expect(host.getByRole("button", { name: "Нова игра" })).toBeVisible();
+  await expect(host.getByRole("button", { name: "Започни нова игра" })).toBeVisible();
   // Each can add the other as a friend, a tap beside their name; the day's ten wait for both.
-  await expect(guest.getByRole("link", { name: "Десетте за днес" })).toBeVisible();
+  await expect(guest.getByRole("link", { name: "Към въпросите на деня" })).toBeVisible();
   await guest.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
   await expect(guest.getByText("Поканата е изпратена.")).toBeVisible();
   await expect(host.getByRole("button", { name: "Добави Бояна в приятели" })).toBeVisible();

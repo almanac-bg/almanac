@@ -85,7 +85,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := s.user(r)
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
 	}
 	b := s.bank.Load()
@@ -111,7 +111,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		"Title": title, "Description": description, "Canonical": canonical,
 		"URL": s.cfg.PublicURL + r.URL.Path, "Image": s.cfg.PublicURL + "/og.png",
 	}); err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
 	}
 	if status == http.StatusOK && u == nil {
@@ -130,12 +130,12 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 // preview is what a link to this page shows when it's shared (Viber, Messenger, WhatsApp): an invite (the link a
 // shared day's result ends with) says whose it is and how they did today; a room, its code.
 func (s *Server) preview(r *http.Request) (title, description string) {
-	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми, дуели на живо, Роял на живо в 21:00 и стаи с приятели. Всеки отговор носи по нещо ново."
+	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми, дуели и Роял на живо, стаи с приятели. Всеки отговор носи по нещо ново."
 	switch path := r.URL.Path; {
 	case strings.HasPrefix(path, "/f/"):
 		if id, name, err := s.game.Inviter(r.Context(), strings.TrimPrefix(path, "/f/")); err == nil {
 			// The link is to the day's ten, and often to a group: an invitation to them, not to be friends.
-			title = name + " те кани на днешните 10 в АЛМАНАХ"
+			title = name + " те кани на въпросите на деня в АЛМАНАХ"
 			if n, played, err := s.game.DayRights(r.Context(), id, s.game.Today(), 0); err == nil && played {
 				title = fmt.Sprintf("%s: %d от %d в АЛМАНАХ днес", name, n, play.Length)
 			}

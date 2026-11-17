@@ -120,7 +120,7 @@ function kicker(d: DuelView): string {
 
 const headings: Record<DuelView["state"], string> = {
   play: "Дуел",
-  wait: "Изигра своите десет",
+  wait: "Твоите десет са изиграни",
   won: "Победа",
   lost: "Загуба",
   draw: "Равенство",
@@ -304,8 +304,8 @@ function meant(d: DuelView): Child {
   const delta = r ? r.after - r.before : 0;
   const why = d.friendly
     ? d.recorded
-      ? "Срещу запис рейтингът се мени до пет пъти на ден: този дуел е приятелски."
-      : "Приятелски дуел: днес вече сте играли, рейтингът не се мени."
+      ? "Срещу запис рейтингът се променя до пет пъти на ден: този дуел е без рейтинг."
+      : "Дуел без рейтинг: днес вече сте играли."
     : "";
   const rec = d.record;
   const them = d.opponent?.name ?? "";
@@ -372,8 +372,8 @@ function plain(d: DuelView): Child {
   const heading = d.state === "expired" && live ? "Дуелът прекъсна" : headings[d.state];
   const lead =
     d.state === "expired" && !live && d.you?.done
-      ? `${them} не изигра предизвикателството навреме. Без резултат: рейтингът не се мени.`
-      : "Без резултат: рейтингът не се мени.";
+      ? `${them} не изигра предизвикателството навреме. Без резултат: рейтингът не се променя.`
+      : "Без резултат: рейтингът не се променя.";
   const you = d.you;
   return [
     h(
@@ -400,14 +400,14 @@ function plain(d: DuelView): Child {
   ];
 }
 
-/** A challenge between friends with a result: „Предизвикай обратно“ challenges the friend again (the count-in first,
+/** A challenge between friends with a result: „Предизвикай отново“ challenges the friend again (the count-in first,
  * with a way back). */
 function rematch(d: DuelView): Child {
   if (d.kind !== "challenge" || !d.friend || !["won", "lost", "draw"].includes(d.state)) return null;
   return h(
     "button",
     { class: "btn primary big", type: "button", onclick: () => go(`/challenge/${d.friend}`) },
-    "Предизвикай обратно",
+    "Предизвикай отново",
   );
 }
 
@@ -420,7 +420,7 @@ function sendOn(d: DuelView): Child {
     return challengeButton(
       `Прати на ${d.opponent?.name ?? "приятеля си"}`,
       d.runId,
-      () => "Изиграх предизвикателството в АЛМАНАХ. Твой ред.",
+      () => "Изиграх предизвикателството в АЛМАНАХ. Ти си наред.",
       true,
     );
   if (!d.sent && ["won", "lost", "draw"].includes(d.state))

@@ -175,7 +175,7 @@ export function duelResult(d: DuelView, again: Child | Steps = null, more: Child
     const m = screen();
     if (m) return untracked(() => m.outcome(kit, d, again, more));
     return failed()
-      ? h("p", { class: "bad", role: "alert" }, "Резултатът не се зареди. Провери връзката и опитай пак.")
+      ? h("p", { class: "bad", role: "alert" }, "Резултатът не се зареди. Провери интернета си и опитай пак.")
       : h("p", { class: "muted" }, "…");
   };
 }
@@ -193,7 +193,7 @@ export function later(load: () => Promise<(kit: Kit, params: string[]) => Child>
       const s = screen();
       if (s) return untracked(() => s(kit, params));
       return failed()
-        ? failure(new ApiError("offline", "Страницата не се зареди. Провери връзката и опитай пак."), () =>
+        ? failure(new ApiError("offline", "Страницата не се зареди. Провери интернета си и опитай пак."), () =>
             location.reload(),
           )
         : h("p", { class: "muted" }, "…");

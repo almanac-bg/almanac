@@ -29,7 +29,7 @@ type apiError struct {
 func (e *apiError) Error() string { return e.code }
 
 var (
-	errNotFound   = &apiError{http.StatusNotFound, "not_found", "Не го намираме."}
+	errNotFound   = &apiError{http.StatusNotFound, "not_found", "Не намираме това, което търсиш."}
 	errBadRequest = &apiError{http.StatusBadRequest, "bad_request", "Нещо не е наред. Опитай пак."}
 	errSignedOut  = &apiError{http.StatusUnauthorized, "signed_out", "Първо влез в профила си."}
 	errTooMany    = &apiError{http.StatusTooManyRequests, "too_many", "Твърде много опити. Опитай пак малко по-късно."}
@@ -43,11 +43,11 @@ var playerErrors = map[error]*apiError{
 	play.ErrBadAnswer:      {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
 	play.ErrNoQuestion:     {http.StatusServiceUnavailable, "no_questions", "В момента няма въпроси за игра."},
 	play.ErrNoYear:         {http.StatusNotFound, "no_year", "Тази година още не е започнала."},
-	play.ErrNoMistakes:     {http.StatusConflict, "no_mistakes", "Още няма въпроси за втори шанс."},
+	play.ErrNoMistakes:     {http.StatusConflict, "no_mistakes", "Още няма достатъчно въпроси за втори шанс."},
 	play.ErrNoInvite:       {http.StatusNotFound, "no_invite", "Няма такава покана. Може връзката да е грешна."},
 	play.ErrOwnInvite:      {http.StatusConflict, "own_invite", "Това е твоята покана. Прати я на приятел."},
 	play.ErrNotFriends:     {http.StatusNotFound, "not_friends", "Не сте приятели в играта."},
-	play.ErrManyFriends:    {http.StatusConflict, "many_friends", "Списъкът с приятели е пълен: до 200."},
+	play.ErrManyFriends:    {http.StatusConflict, "many_friends", "Списъкът с приятели е пълен: в него има място за 200."},
 	play.ErrNotYours:       {http.StatusForbidden, "not_yours", "Това още не е отключено."},
 	play.ErrNotice:         {http.StatusBadRequest, "no_notice", "Няма такова известие."},
 	play.ErrNoPlayer:       {http.StatusNotFound, "no_player", "Няма играч с такова потребителско име."},
@@ -55,7 +55,7 @@ var playerErrors = map[error]*apiError{
 	play.ErrNoChallenge:    {http.StatusNotFound, "no_challenge", "Това предизвикателство вече го няма."},
 	play.ErrChallengeOver:  {http.StatusGone, "challenge_over", "Времето за това предизвикателство изтече."},
 	play.ErrOwnChallenge:   {http.StatusConflict, "own_challenge", "Това е твоето предизвикателство. Прати го на някого."},
-	play.ErrNoChallengeRun: {http.StatusBadRequest, "no_challenge_run", "С тази игра не може да се предизвиква."},
+	play.ErrNoChallengeRun: {http.StatusBadRequest, "no_challenge_run", "Предизвикателство става само от завършена игра от десет въпроса."},
 	play.ErrManyWaiting:    {http.StatusConflict, "many_challenges", "Три твои предизвикателства вече чакат този приятел. Изчакай да изиграе някое."},
 	play.ErrNobody:         {http.StatusConflict, "nobody", "Точно сега няма с кого да играеш. Опитай след малко."},
 	live.ErrNoMatch:        {http.StatusNotFound, "no_duel", "Този дуел вече го няма."},
@@ -63,14 +63,14 @@ var playerErrors = map[error]*apiError{
 	live.ErrAnswer:         {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
 	live.ErrTooMany:        {http.StatusServiceUnavailable, "too_many_duels", "Твърде много дуели в момента. Опитай след малко."},
 	play.ErrNoRequest:      {http.StatusNotFound, "no_request", "Поканата вече я няма."},
-	play.ErrManyRequests:   {http.StatusConflict, "many_requests", "Твърде много покани чакат отговор: до 50."},
+	play.ErrManyRequests:   {http.StatusConflict, "many_requests", "Твърде много покани чакат отговор. Изчакай да отговорят на някоя от тях."},
 	play.ErrRoomGame:       {http.StatusBadRequest, "bad_room_game", "Стаята играе по 5, 10, 15 или 20 въпроса, лесни, смесени или трудни."},
 	royal.ErrClosed:        {http.StatusConflict, "royal_closed", "Входът за Роял още не е отворен."}, // joinRoyal says when
-	royal.ErrShut:          {http.StatusConflict, "royal_closed", "Роял вече тече, а закъснелите влизат до 3-тия въпрос."},
+	royal.ErrShut:          {http.StatusConflict, "royal_closed", "Роял вече тече, а закъснелите влизат само до 3-тия въпрос."},
 	royal.ErrNotNow:        {http.StatusConflict, "not_now", "Вече е късно за това."},
 	room.ErrNoRoom:         {http.StatusNotFound, "no_room", "Няма такава стая. Може да е затворена."},
 	room.ErrFull:           {http.StatusConflict, "full", "Стаята е пълна."},
-	room.ErrNotYours:       {http.StatusForbidden, "not_host", "Това прави водещият."},
+	room.ErrNotYours:       {http.StatusForbidden, "not_host", "Само водещият може да прави това."},
 	room.ErrRemoved:        {http.StatusForbidden, "removed", "Водещият те махна от стаята."},
 	room.ErrNotNow:         {http.StatusConflict, "not_now", "Вече е късно за това."},
 	room.ErrAnswer:         {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
@@ -80,13 +80,13 @@ var playerErrors = map[error]*apiError{
 	account.ErrBadEmail:    {http.StatusBadRequest, "bad_email", "Това не прилича на имейл адрес."},
 	account.ErrTooSoon:     {http.StatusTooManyRequests, "too_soon", "Току-що ти пратихме код. Провери пощата си."},
 	account.ErrBadCode:     {http.StatusBadRequest, "bad_code", "Грешен код."},
-	account.ErrCodeExpired: {http.StatusBadRequest, "code_expired", "Кодът е изтекъл. Поискай нов."},
+	account.ErrCodeExpired: {http.StatusBadRequest, "code_expired", "Кодът вече не важи. Поискай нов."},
 	account.ErrCodeTries:   {http.StatusBadRequest, "code_tries", "Твърде много опити. Поискай нов код."},
 	account.ErrNoHandoff:   {http.StatusNotFound, "no_handoff", "Тази връзка вече не работи: играта ти остана там, където я започна."},
 	account.ErrHandoffSignedIn: {http.StatusConflict, "handoff_signed_in",
-		"Тук вече си с профила си. За да добавиш към него играта оттам, влез с имейла си там, където я започна."},
-	account.ErrBadName:  {http.StatusBadRequest, "bad_name", "Името трябва да е от 2 до 30 букви, цифри или интервали."},
-	account.ErrBadTag:   {http.StatusBadRequest, "bad_tag", "Потребителското име е от 3 до 20 латински букви, цифри или _ и започва с буква."},
+		"Тук вече играеш с профила си. За да добавиш към него играта от другото място, влез с имейла си там, където я започна."},
+	account.ErrBadName:  {http.StatusBadRequest, "bad_name", "Името трябва да е от 2 до 30 знака: букви, цифри, интервали, точки или тирета, с поне една буква. Някои имена са запазени."},
+	account.ErrBadTag:   {http.StatusBadRequest, "bad_tag", "Потребителското име трябва да е от 3 до 20 знака: латински букви, цифри или _, като първият е буква."},
 	account.ErrTagTaken: {http.StatusConflict, "tag_taken", "Това потребителско име е заето. Опитай друго."},
 }
 

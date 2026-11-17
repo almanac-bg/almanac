@@ -103,14 +103,14 @@ var Achievements = []Achievement{
 	{"streak7", "Цяла седмица", "Играй въпросите на деня седем дни поред.", "flame", Rare, 7, false},
 	{"perfect", "Десет от десет", "Отговори вярно и на десетте въпроса на деня.", "star", Rare, 1, false},
 	{"exact", "Точно в целта", "Познай число точно, без никаква грешка.", "target", Rare, 1, false},
-	{"allTopics", "Обиколка", "Изиграй поне една игра във всяка тема.", "compass", Rare, 10, false},
+	{"allTopics", "Обиколка", "Изиграй поне една игра по всяка тема.", "compass", Rare, 10, false},
 	{"friends5", "Цяла компания", "Събери пет приятели в играта.", "heart", Rare, 5, false},
 	{"friendWin", "Между приятели", "Победи приятел в дуел.", "heart", Rare, 1, false},
-	{"fast", "Пет за миг", "Отговори вярно пет пъти в една игра, всеки път за по-малко от 3 секунди.", "bolt", Rare, FastRights, false},
+	{"fast", "Пет за миг", "Отговори вярно пет пъти в една игра, всеки път за по-малко от три секунди.", "bolt", Rare, FastRights, false},
 	{"nightOwl", "След полунощ", "Отговори на въпрос между полунощ и четири сутринта.", "owl", Rare, 1, true},
 	{"earlyBird", "Преди седем", "Изиграй въпросите на деня преди седем сутринта.", "sun", Rare, 1, true},
 	{"lastSecond", "В последния миг", "Отговори вярно в последната секунда.", "hourglass", Rare, 1, true},
-	{"leagueFirst", "Първо място в групата", "Завърши седмица на първо място в групата си в лигата.", "", Rare, 1, false},
+	{"leagueFirst", "Първо място в групата", "Завърши седмица на първо място в групата си.", "", Rare, 1, false},
 
 	{"streak30", "Цял месец", "Играй въпросите на деня тридесет дни поред.", "flame", Epic, 30, false},
 	{"facts1000", "Хиляда факта", "Събери хиляда факта в Алманаха.", "book", Epic, 1000, false},
@@ -192,7 +192,7 @@ func shapes(earned map[string]int64, level int) []Shape {
 					break
 				}
 				if sh.How == "" {
-					sh.How = a.Name // the first achievement drawn with it
+					sh.How = "постижението „" + a.Name + "“" // the first achievement drawn with it
 					if a.Hidden {
 						sh.How = "скрито постижение" // found while playing: not told
 					}

@@ -64,7 +64,7 @@ test("a streak at stake says what the day's ten make of it, and from 18:00 that 
   assert.equal(stakeWords(0, 0, 20), ""); // nothing to lose
   assert.equal(stakeWords(1, 0, 9), "Серия от 1 ден. С днешните въпроси става 2.");
   assert.equal(stakeWords(5, 0, 17), "Серия от 5 дни. С днешните въпроси става 6.");
-  assert.equal(stakeWords(5, 0, 18), "Серия от 5 дни. Прекъсва в полунощ, ако не изиграеш днешните.");
+  assert.equal(stakeWords(5, 0, 18), "Серия от 5 дни. Прекъсва в полунощ, ако не изиграеш въпросите на деня.");
   // A reserve day would keep it: nothing ends at midnight.
   assert.equal(stakeWords(5, 1, 23), "Серия от 5 дни. С днешните въпроси става 6.");
 });

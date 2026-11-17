@@ -20,7 +20,7 @@ func (s *Server) recovered(next http.Handler) http.Handler {
 				}
 				slog.Error("panic", "method", r.Method, "path", r.URL.Path, "err", v, "stack", string(debug.Stack()))
 				s.problems.add(fmt.Sprintf("panic: %s %s: %v", r.Method, r.Pattern, v))
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 			}
 		}()
 		next.ServeHTTP(w, r)

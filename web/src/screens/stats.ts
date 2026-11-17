@@ -77,7 +77,7 @@ function almanacLine(facts: number): Child {
       "span",
       { class: "place-link-text" },
       h("strong", { class: "place-link-name" }, `${formatNumber(facts)} ${facts === 1 ? "факт" : "факта"} в Алманаха`),
-      h("span", { class: "place-link-more" }, "Фактът зад всеки въпрос, на който отговори вярно"),
+      h("span", { class: "place-link-more" }, "Фактът към всеки въпрос, на който отговори вярно"),
     ),
     h("span", { class: "i i-left place-link-i", "aria-hidden": "true" }),
   );
@@ -108,8 +108,8 @@ export function stats(): Child {
         ),
         figure(String(s.games), s.games === 1 ? "изиграна игра" : "изиграни игри"),
         s.duels > 0
-          ? figure(`${s.won}/${s.duels}`, "спечелени дуела")
-          : figure(String(s.days), s.days === 1 ? "ден с въпросите на деня" : "дни с въпросите на деня"),
+          ? figure(`${s.won}/${s.duels}`, "победи в дуели")
+          : figure(String(s.days), s.days === 1 ? "изигран брой" : "изиграни броя"),
       ),
       s.facts ? almanacLine(s.facts) : null,
       // „Колко знаеш“ once a topic has a first estimate: a first day's one answer a topic tells nothing.

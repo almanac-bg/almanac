@@ -104,7 +104,7 @@ function royalNow(): () => string {
       // No breaks inside „12 мин“: the card is narrow.
       return `Започва след ${min}\u00a0мин${g.in ? ` · ${g.in}\u00a0вътре` : ""}`;
     }
-    if (g.phase === "live") return `Играе се · ${g.in}\u00a0още вътре`;
+    if (g.phase === "live") return `Играе се · още ${g.in}\u00a0в играта`;
     if (t.coming > 0) return coming(t);
     return g.nightly ? "Всяка вечер в 21:00" : cap(when(g.next, now()));
   };

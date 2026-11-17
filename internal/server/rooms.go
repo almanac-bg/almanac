@@ -177,7 +177,7 @@ func (s *Server) roomQR(w http.ResponseWriter, r *http.Request) {
 	}
 	c, err := qr.Encode(s.cfg.PublicURL + "/r/" + code)
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "image/svg+xml")

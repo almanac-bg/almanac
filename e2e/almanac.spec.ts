@@ -30,7 +30,7 @@ test("Моят Алманах in progress: Профил counts the facts, a topi
 
   // „Цяла тема“: every fact of a topic, there for the taking (it's given with the next game's news).
   await page.goto("/rewards");
-  await page.getByText(/^Всички постижения \(\d+\)$/).click();
+  await page.getByText(/^Останалите постижения \(\d+\)$/).click();
   const whole = page.locator(".achievement", { hasText: "Цяла тема" }).last();
   await expect(whole).toContainText("Събери всички факти от една тема в Алманаха.");
   await expect(page.locator(".achievement", { hasText: "Сто факта" }).last()).toContainText("8 / 100");

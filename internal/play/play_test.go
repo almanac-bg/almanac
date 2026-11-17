@@ -1752,7 +1752,7 @@ func TestLeagues(t *testing.T) {
 	for _, c := range []struct {
 		n    int
 		want string
-	}{{1, "Шампион на Рила"}, {3, "Трикратен шампион на Рила"}, {12, "12-кратен шампион на Рила"}} {
+	}{{1, "Купата на Рила"}, {3, "Три купи на Рила"}, {12, "12 купи на Рила"}} {
 		if name, tier := ChampionTitle(c.n); name != c.want || tier != Legendary {
 			t.Fatalf("champion %d times: %q", c.n, name)
 		}
@@ -1902,12 +1902,12 @@ func TestLeagues(t *testing.T) {
 	if err := w.g.SetLook(ctx, top2, nil, nil, ptr("peak3"), nil); !errors.Is(err, ErrNotYours) {
 		t.Fatalf("a peak's frame without a first place: %v", err)
 	}
-	if look, _ := w.g.LookOf(ctx, top1); look.Title != "Шампион на Рила" || !strings.Contains(look.Avatar, "/peak5/") {
+	if look, _ := w.g.LookOf(ctx, top1); look.Title != "Купата на Рила" || !strings.Contains(look.Avatar, "/peak5/") {
 		t.Fatalf("the champion's look: %+v", look)
 	}
 	n, _ = w.g.NewsOf(ctx, top1, 0)
 	if !slices.ContainsFunc(n.Achievements, func(a Earned) bool { return a.ID == "rila" }) ||
-		!slices.ContainsFunc(n.Unlocks, func(u Unlock) bool { return u.ID == championID && u.Name == "Шампион на Рила" }) {
+		!slices.ContainsFunc(n.Unlocks, func(u Unlock) bool { return u.ID == championID && u.Name == "Купата на Рила" }) {
 		t.Fatalf("the champion's news: %+v", n)
 	}
 
@@ -1985,7 +1985,7 @@ func TestTitles(t *testing.T) {
 	w.played(ana, XPFromDay)
 	p, _ := w.g.ProgressOf(ctx, ana)
 	topics := len(w.g.Bank().Categories)*len(topicTiers) + len(acrossTopics)
-	if len(p.Titles) != 1+len(Titles)+topics || p.Titles[0].ID != championID || p.Titles[0].Name != "Шампион на Рила" ||
+	if len(p.Titles) != 1+len(Titles)+topics || p.Titles[0].ID != championID || p.Titles[0].Name != "Купата на Рила" ||
 		p.Titles[0].How != championHow {
 		t.Fatalf("a new player's titles: %+v", p.Titles)
 	}
@@ -1999,10 +1999,10 @@ func TestTitles(t *testing.T) {
 	if v := byID["polymath"]; v.How != "скрито постижение" {
 		t.Fatalf("a hidden achievement's title tells how: %+v", v)
 	}
-	if v := byID["unquenched"]; v.How != "играй въпросите на деня тридесет дни поред." {
+	if v := byID["unquenched"]; v.How != "постижението „Цял месец“" {
 		t.Fatalf("an achievement's title: %+v", v)
 	}
-	if v := byID["master-history"]; v.Name != "Майстор · История" || v.How != "стигни до „Майстор“ в „История“" ||
+	if v := byID["master-history"]; v.Name != "Майстор · История" || v.How != "„Майстор“ в „История“" ||
 		v.Group != TitleTopic {
 		t.Fatalf("a topic's title: %+v", v)
 	}

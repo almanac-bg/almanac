@@ -916,7 +916,7 @@ function kindOf(r: Result, given: Answer | null): VerdictKind {
   return r.points > 0 ? "partial" : "wrong";
 }
 
-/** A verdict as a screen reader says it: „Не е това. Вярно е: Бийтълс.“, „Вярно! +1040 точки.“ */
+/** A verdict as a screen reader says it: „Не е това. Верният отговор е Бийтълс.“, „Вярно! +1040 точки.“ */
 function spokenVerdict(kind: VerdictKind, points: number, answer: string): string {
   const pts = points > 0 ? `+${formatNumber(points)} ${points === 1 ? "точка" : "точки"}.` : "";
   return [verdictWords[kind], pts, answer].filter(Boolean).join(" ");

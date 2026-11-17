@@ -111,6 +111,7 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
               (id) => avatar(p.avatar, { frame: id, backdrop: p.backdrop }),
               (id) => set({ frame: id }),
               told,
+              "заключена рамка",
             );
           case "backdrop":
             return wear(
@@ -120,6 +121,7 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
               (id) => avatar(p.avatar, { frame: p.frame, backdrop: id }),
               (id) => set({ backdrop: id }),
               told,
+              "заключен фон",
             );
           case "title":
             return titles(p, set);
@@ -161,14 +163,10 @@ function avatars(p: Progress, set: (body: { avatar: string }) => void, told: { s
               class: s.locked ? "pick locked" : "pick",
               type: "button",
               "aria-pressed": s.shape === shape,
-              "aria-label": s.locked ? `${shapeNames[s.shape]}, заключено` : shapeNames[s.shape],
+              "aria-label": s.locked ? `${shapeNames[s.shape]}, заключен аватар` : shapeNames[s.shape],
               onclick: () =>
                 s.locked
-                  ? told.set(
-                      s.shape === "crown"
-                        ? "Короната се отключва на ниво 10."
-                        : `${shapeNames[s.shape]}: отключва се с постижението „${s.how}“.`,
-                    )
+                  ? told.set(`${shapeNames[s.shape]}. Отключва се: ${s.how}.`)
                   : set({ avatar: `${s.shape}-${tone}` }),
             },
             avatar(`${s.shape}-${tone}`),
@@ -187,6 +185,7 @@ function wear(
   preview: (id: string) => Child,
   put: (id: string) => void,
   told: { set: (s: string) => void },
+  locked: string,
 ): Child {
   return h(
     "ul",
@@ -201,7 +200,7 @@ function wear(
             class: c.locked ? "pick locked" : "pick",
             type: "button",
             "aria-pressed": c.id === worn,
-            "aria-label": c.locked ? `${c.name}, заключено` : c.name,
+            "aria-label": c.locked ? `${c.name}, ${locked}` : c.name,
             onclick: () => (c.locked ? told.set(`${c.name}. Отключва се: ${c.how}.`) : put(c.id)),
           },
           preview(c.id),

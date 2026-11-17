@@ -41,11 +41,11 @@ test("a host leads a room from a big screen and doesn't play", async ({ browser 
   await host.getByRole("button", { name: "Напред" }).click();
   await expect(guest.locator(".question-head")).toContainText("2 от 5");
 
-  // „Напред“ on a question shows its answer at once; „Край“, asked twice, ends the game where it is.
+  // „Напред“ on a question shows its answer at once; „Приключи“, asked twice, ends the game where it is.
   await host.getByRole("button", { name: "Напред" }).click();
   await expect(guest.locator(".verdict")).toBeVisible();
-  await host.getByRole("button", { name: "Край" }).click();
-  await host.getByRole("button", { name: "Да, край" }).click();
+  await host.getByRole("button", { name: "Приключи" }).click();
+  await host.getByRole("button", { name: "Да, приключи" }).click();
   await expect(host.getByRole("heading", { name: "Бояна печели" })).toBeVisible();
   await expect(host.locator(".podium li.p1")).toContainText("Бояна");
   await expect(guest.getByRole("heading", { name: "Бояна печели" })).toBeVisible();

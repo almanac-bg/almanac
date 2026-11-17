@@ -139,7 +139,7 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
   await page.getByRole("button", { name: "Нещо не е наред с въпроса?" }).first().click();
   await page.getByLabel("Какво не е наред?").fill("Отговорът е остарял.");
-  await page.getByRole("button", { name: "Изпрати" }).click();
+  await page.getByRole("button", { name: "Прати" }).click();
   await expect(page.getByText("Благодарим! Ще го прегледаме.")).toBeVisible();
   // Another topic is a tap away, under the result.
   await expect(page.locator(".other-topics .chip")).toHaveCount(3);
@@ -313,7 +313,7 @@ test("the day left at its last question comes back done, with what it earned tol
 test("a challenge link that's gone (an old one) says so and offers the day", async ({ page }) => {
   await page.goto("/c/abc234");
   await expect(page.getByRole("heading", { name: "Това предизвикателство вече го няма" })).toBeVisible();
-  await page.getByRole("link", { name: "Въпросите на деня" }).click();
+  await page.getByRole("link", { name: "Към въпросите на деня" }).click();
   await expect(page.locator(".card.day")).toBeVisible();
 });
 

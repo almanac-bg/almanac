@@ -226,7 +226,7 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 
 	var body bytes.Buffer
 	if err := adminBody.Execute(&body, data); err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
 	}
 	s.plain(w, "Управление", template.HTML(body.String()))
@@ -242,7 +242,7 @@ func (s *Server) resolve(w http.ResponseWriter, r *http.Request) {
 	_, err = s.db.Write.ExecContext(r.Context(), `UPDATE reports SET resolved_at = ? WHERE question_id = ? AND resolved_at IS NULL`,
 		store.Now(), r.PathValue("id"))
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)

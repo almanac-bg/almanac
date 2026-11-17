@@ -31,8 +31,8 @@ test("a challenge: made on Дуел, one link, a stranger plays it as a guest, b
   await expect(a.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await a.getByRole("button", { name: "Започни сега" }).click();
   await playRun(a);
-  await expect(a.getByRole("button", { name: "Изпрати" })).toHaveClass(/primary/);
-  await a.getByRole("button", { name: "Изпрати" }).click();
+  await expect(a.getByRole("button", { name: "Прати" })).toHaveClass(/primary/);
+  await a.getByRole("button", { name: "Прати" }).click();
   // What a challenge says carries the name: one still drawn is asked first (kept as it is here).
   await a
     .getByRole("dialog", { name: "Как да те познаят приятелите?" })

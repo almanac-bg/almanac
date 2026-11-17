@@ -189,12 +189,12 @@ func (s *Server) streakMailOf(ctx context.Context, today string, userID int64) (
 		Unsubscribe: s.mailOffURL(userID, mailStreak)}
 	m.Text = "Въпросите на деня те чакат на almanac.bg. "
 	if repair != nil {
-		m.Text += "Изиграй ги днес заедно с още една игра и серията ти се връща."
+		m.Text += "Изиграй ги днес заедно с още една игра и серията ти ще се върне."
 	} else {
 		m.Text += "Днес можеш да започнеш нова серия."
 	}
 	// The link says it came from the mail: a browser signed out is asked to sign in first (screens/today.ts).
-	m.Text += "\n\n" + s.cfg.PublicURL + "/?from=mail\n\n—\nНе искам такива писма: " + m.Unsubscribe + "\n"
+	m.Text += "\n\n" + s.cfg.PublicURL + "/?from=mail\n\n—\nСпри тези писма: " + m.Unsubscribe + "\n"
 	return m, true, nil
 }
 
@@ -229,10 +229,10 @@ var mailOffPage = template.Must(template.New("off").Parse(`{{if .Done}}
 <p role="status">Готово. Няма да ти пращаме писма, когато серията ти прекъсне.</p>
 <p class="muted">Ако размислиш, включи ги пак от <a href="/settings">Профил → Настройки → Известия</a>.</p>
 {{else if .Bad}}
-<p>Тази връзка не е вярна. Писмата можеш да спреш и от <a href="/settings">Профил → Настройки → Известия</a>.</p>
+<p>Тази връзка не работи. Писмата можеш да спреш и от <a href="/settings">Профил → Настройки → Известия</a>.</p>
 {{else}}
-<p>Пращаме ти по едно писмо, когато серия от {{.From}} дни или повече прекъсне, и само ако не получаваш известия.</p>
-<form method="post"><button class="btn" type="submit">Не искам такива писма</button></form>
+<p>Пращаме ти писмо, когато прекъсне серия от поне {{.From}} дни, и само ако не получаваш известия.</p>
+<form method="post"><button class="btn" type="submit">Спри писмата</button></form>
 {{end}}`))
 
 // mailOff stops a kind of mail by the signed link in it: shown, then turned off with a tap (a page that turned it off
@@ -248,7 +248,7 @@ func (s *Server) mailOff(w http.ResponseWriter, r *http.Request) {
 	if good && r.Method == http.MethodPost {
 		if err := s.setMailPref(r.Context(), id, kind, false); err != nil {
 			slog.Error("mail off", "err", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 			return
 		}
 		data["Done"] = true

@@ -28,7 +28,7 @@ test("Роял: „Ще дойда“ before the lobby, and Начало's card 
   await expect(async () => {
     await page.reload();
     const come = page.getByRole("button", { name: "Ще дойда" });
-    const said = page.getByText(/^Ще дойдеш\./);
+    const said = page.getByText(/^Записа се\./);
     await expect(come.or(said)).toBeVisible({ timeout: 30_000 });
     if (await come.isVisible()) await come.click();
     await expect(said).toBeVisible({ timeout: 2_000 });
@@ -111,7 +111,7 @@ test("Роял: in from the lobby, its music, live to the fifteenth question, th
     await answer(page);
     // The answer shows once everyone playing has answered (or the time is up), with the standings.
     await expect(page.locator(".verdict")).toBeVisible({ timeout: 40_000 });
-    if (n === 0) await expect(page.locator(".verdict")).not.toContainText("Без отговор");
+    if (n === 0) await expect(page.locator(".verdict")).not.toContainText("Времето изтече");
     await expect(page.locator(".royal-table .row.me")).toBeVisible();
   }
   // The end: the standings of all, after the fifteenth question.
@@ -120,7 +120,7 @@ test("Роял: in from the lobby, its music, live to the fifteenth question, th
   await expect(page.locator(".royal-table .row.me")).toBeVisible();
   await expect(page.getByText(/Следващият Роял:/)).toBeVisible();
   // The day's ten haven't been played: they're the gold way on.
-  await expect(page.getByRole("link", { name: "Въпросите на деня" })).toHaveClass(/primary/);
+  await expect(page.getByRole("link", { name: "Към въпросите на деня" })).toHaveClass(/primary/);
 });
 
 test("Роял: one who comes late comes in until the third question", async ({ page, browser }) => {

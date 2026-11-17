@@ -365,7 +365,7 @@ const about = (nightly?: boolean) =>
 
 /** How it's played, folded under the evening: the cuts, and the final. */
 const rules =
-  "Всички получават един и същи въпрос в един и същи миг. Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни, а при равни — по-бързите. Последния въпрос играят трима. Отпадналите играят до края за себе си.";
+  "Всички получават един и същ въпрос в един и същ миг. Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни, а при равни — по-бързите. Последния въпрос играят трима. Отпадналите играят до края за себе си.";
 
 /** How long until a moment, in words: „След 3 ч и 12 мин“; in the last hour to the second („След 12:05 мин“); nothing
  * a day or more ahead (the day says it). */
@@ -469,8 +469,8 @@ function plan(main = false): Child {
                 "p",
                 null,
                 notified()
-                  ? `Ще дойдеш. Ще ти напомним ${when(opensAt, t.glance.now)}.`
-                  : "Ще дойдеш. Ела тук, щом входът се отвори.",
+                  ? `Записа се. Ще ти напомним ${when(opensAt, t.glance.now)}.`
+                  : "Записа се. Ела тук, щом входът се отвори.",
               ),
               h(
                 "div",
@@ -914,7 +914,7 @@ function reveal(view: () => Evening, first: Evening): Child {
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view, true),
     answered(q.view, r.answer, r.mine ? (q.given ?? null) : null),
-    r.mine ? verdict(kind, r.points, r.missed ? "Без отговор" : undefined, r.speed) : null,
+    r.mine ? verdict(kind, r.points, r.missed ? "Времето изтече." : undefined, r.speed) : null,
     crowdLine(q.view.type, r.answer.crowd, r.mine && r.right),
     cutSaid(first),
     standing(view),
@@ -998,7 +998,7 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
     () => {
       const d = dayWaits();
       if (d === null) return null;
-      return d ? [h("a", { class: "btn primary big", href: "/" }, "Въпросите на деня"), plan()] : plan(true);
+      return d ? [h("a", { class: "btn primary big", href: "/" }, "Към въпросите на деня"), plan()] : plan(true);
     },
     first.runId
       ? review(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${first.runId}/review`)).questions)

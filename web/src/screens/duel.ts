@@ -91,7 +91,7 @@ const words: Record<DuelView["state"], string> = {
   lost: "Загуба",
   draw: "Равенство",
   declined: "Отказано",
-  expired: "Без отговор",
+  expired: "Изтекло",
 };
 
 /** What a duel's state is called: a live duel without a result was cut off, not left to run out. */
@@ -109,7 +109,7 @@ function duelRow(d: DuelView): Child {
           : `${them?.name ?? "Някой"} те чака`
         : d.state === "declined" || d.state === "expired"
           ? "Без резултат"
-          : `${formatNumber(d.you?.points ?? 0)} : ${formatNumber(them?.points ?? 0)}${d.recorded ? " · срещу запис" : ""}${d.friendly ? " · приятелски" : ""}`;
+          : `${formatNumber(d.you?.points ?? 0)} : ${formatNumber(them?.points ?? 0)}${d.recorded ? " · срещу запис" : ""}${d.friendly ? " · без рейтинг" : ""}`;
   return h(
     "li",
     null,
@@ -143,7 +143,7 @@ export function duel() {
       back("/", "Начало"),
       pageArt("duel", "tone-rose"),
       h("h1", null, "Дуел"),
-      h("p", { class: "lead" }, "Ти и друг играч на живо: едни и същи десет въпроса, в един и същи миг."),
+      h("p", { class: "lead" }, "Ти и друг играч на живо: едни и същи десет въпроса, в един и същ миг."),
     ),
     nextSteps(
       h(
@@ -173,7 +173,7 @@ export function duel() {
       const done = list.filter((d) => d.endedAt);
       return [
         turn.length ? section("Твой ред", turn) : null,
-        waiting.length ? section("Чакат приятелите ти", waiting) : null,
+        waiting.length ? section("Ред на другите", waiting) : null,
         done.length ? section("История", done.slice(0, 20)) : null,
       ];
     },
@@ -227,7 +227,7 @@ export function playedLine(p?: FriendPlayed | null): Child {
   return h(
     "p",
     { class: "streak-notice", role: "status" },
-    `${p.from} изигра предизвикателството ти: ${words[p.state]} ${formatNumber(p.you)} : ${formatNumber(p.them)}`,
+    `${p.from} изигра предизвикателството ти: ${p.state === "won" ? "ти печелиш" : p.state === "lost" ? `победата е за ${p.from}` : "равенство"}, ${formatNumber(p.you)} : ${formatNumber(p.them)}.`,
     h("a", { href: `/duel/${p.id}` }, "Виж"),
   );
 }
@@ -282,7 +282,7 @@ export function leftLine(l?: Left | null): Child {
   return h(
     "p",
     { class: "streak-notice", role: "status" },
-    `Дуелът с ${l.them} продължи без теб (излезе ${leftAfter(l.after)}): ${words[l.state]}${rating}.`,
+    `Дуелът ${withName(l.them)} продължи без теб (излезе ${leftAfter(l.after)}): ${words[l.state].toLowerCase()}${rating}.`,
     h("a", { href: `/duel/${l.id}` }, "Виж"),
   );
 }
@@ -299,8 +299,15 @@ export interface ChallengeNews {
 export function challengesLine(n?: ChallengeNews | null): Child {
   // The same news drawn again isn't told twice; newer news (Начало loaded again) is.
   if (!n || !toldOnce("challenges", n)) return null;
-  const beat = n.beat === 0 ? "" : n.played === 1 ? " и те би" : ` · ${n.beat} ${n.beat === 1 ? "те би" : "те биха"}`;
-  const who = n.played === 1 && n.name ? `${n.name} изигра` : `${n.played} изиграха`;
+  const beat =
+    n.beat === 0
+      ? ""
+      : n.played === 1
+        ? " и те би"
+        : n.beat === 1
+          ? ", един от тях те би"
+          : `, ${n.beat} от тях те биха`;
+  const who = n.played === 1 ? `${n.name || "Един човек"} изигра` : `${n.played} души изиграха`;
   return h(
     "p",
     { class: "streak-notice", role: "status" },

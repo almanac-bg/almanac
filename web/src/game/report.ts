@@ -40,7 +40,7 @@ export function report(id: string): Child {
               ref: (el) => queueMicrotask(() => el.focus()),
             }),
           ),
-          h("button", { class: "btn" }, "Изпрати"),
+          h("button", { class: "btn" }, "Прати"),
           h("button", { type: "button", class: "link", onclick: () => state.set("closed") }, "Откажи"),
           // Its own child: read by the form, an error would draw the form again and lose what was typed.
           () => error() && h("p", { class: "bad", role: "alert" }, error()),

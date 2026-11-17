@@ -112,7 +112,7 @@ func recordingsWords(firstToday, lastToday bool, people, games, won int) string 
 	}
 	who := fmt.Sprintf("%d души играха", people)
 	if people == 1 {
-		who = "1 човек игра"
+		who = "един човек игра"
 	}
 	against := "записи на твои игри"
 	if games == 1 {
@@ -126,7 +126,7 @@ func recordingsWords(firstToday, lastToday bool, people, games, won int) string 
 	case won == games:
 		s += " Записите ти спечелиха всички дуели."
 	default:
-		s += fmt.Sprintf(" Записите ти спечелиха %d от дуелите.", won)
+		s += fmt.Sprintf(" Записите ти спечелиха %d от %d дуела.", won, games)
 	}
 	return s
 }

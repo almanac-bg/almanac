@@ -1,7 +1,7 @@
 // Предизвикателство (play/challenges.go): a player's game of ten, sent to friends and as a link for anyone. Made two
 // ways: on Дуел, „Предизвикай“ (/challenge): a topic (or all of them), its ten played, then sent (sendChallenge: the
 // friends picked, and the link to share); or a friend challenged at once (/challenge/<id>, „Предизвикай“ on Приятели,
-// „Предизвикай обратно“ on a friend's result): ten drawn for the two, played now, the friend told once they are.
+// „Предизвикай отново“ on a friend's result): ten drawn for the two, played now, the friend told once they are.
 //
 // Its link (/c/<code>) is for whoever opens it to play the same questions as a duel against it, a guest as well as
 // anyone: first who sent it and how they did, and „Започни“ (the count only after that tap); then the game; then the
@@ -17,7 +17,7 @@ import { loadDuelResult } from "../kit.ts";
 import { ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { byTap, go, goBack, hold, redirect, rename, title } from "../lib/router.ts";
-import { withName } from "../lib/words.ts";
+import { listWords, withName } from "../lib/words.ts";
 import { bulgaria, categories, player, topics, user } from "../state.ts";
 import { back, failure, formatNumber, type Look, topicMark, who } from "../ui.ts";
 import { afterDuel } from "./duel.ts";
@@ -98,7 +98,7 @@ function gone(heading: string): Child {
       h("h1", null, heading),
       h("p", { class: "lead" }, "Десетте въпроса за днес са едни и същи за всички: изиграй ги и сравни."),
     ),
-    h("a", { class: "btn primary big", href: "/" }, "Въпросите на деня"),
+    h("a", { class: "btn primary big", href: "/" }, "Към въпросите на деня"),
   );
 }
 
@@ -141,7 +141,7 @@ function asked(c: Challenge, screen: ReturnType<typeof slot>, here: () => boolea
       h(
         "p",
         { class: "lead" },
-        `${c.by.name} позна ${c.rights} от ${c.total}${topic ? ` по „${topic}“` : ""}. Изиграй същите десет въпроса и вижте кой знае повече. Около три минути.`,
+        `${c.by.name} позна ${c.rights} от ${c.total}${topic ? ` по „${topic}“` : ""}. Изиграй същите десет въпроса и ще видите кой знае повече. Около три минути.`,
       ),
     ),
     h("button", { class: "btn primary big", type: "button", onclick: start }, "Започни"),
@@ -149,7 +149,7 @@ function asked(c: Challenge, screen: ReturnType<typeof slot>, here: () => boolea
   );
 }
 
-const stateWords = { won: "Ти печелиш", lost: "Печели", draw: "Равенство", play: "Играе", wait: "Изигра" };
+const stateWords = { won: "Победа", lost: "Загуба", draw: "Равенство", play: "Играе", wait: "Изигра" };
 
 /** The one who sent it: who has taken it so far, and the link to send again. */
 function own(c: Challenge): Child {
@@ -175,7 +175,7 @@ function own(c: Challenge): Child {
     ),
     // Sent again, its time to be taken starts again.
     c.run ? challengeButton("Прати го пак", c.run, () => challengeText(c.rights, topic), true) : null,
-    c.over ? h("p", { class: "muted" }, "Времето му беше изтекло: прати го пак и тече отново.") : null,
+    c.over ? h("p", { class: "muted" }, "Времето му изтече. Прати го пак и ще има още три дни.") : null,
     takers.length
       ? h(
           "ul",
@@ -203,7 +203,7 @@ function own(c: Challenge): Child {
 /** Making a challenge (/challenge): a topic, or all of them, a tap from its ten; at their end, the challenge is sent
  * (sendChallenge). */
 export function newChallenge() {
-  title("Предизвикай");
+  title("Ново предизвикателство");
   const all = [
     { id: "all", name: "Всички теми" },
     ...categories,
@@ -216,7 +216,7 @@ export function newChallenge() {
       "div",
       { class: "intro" },
       back("/duel", "Дуел"),
-      h("h1", null, "Предизвикай"),
+      h("h1", null, "Ново предизвикателство"),
       h(
         "p",
         { class: "lead" },
@@ -238,8 +238,6 @@ export function newChallenge() {
 }
 
 /** „Мария“, „Мария и Бо“, „Мария, Бо и Ци“. */
-const names = (list: string[]) => (list.length > 1 ? `${list.slice(0, -1).join(", ")} и ${list.at(-1)}` : list[0]);
-
 /** A game played to be sent (`s`, of a topic or all of them): the gold way sends it to the friends picked (each a
  * tap), told in the game; the link for anyone else beside it. With no friends yet, the link is the gold way. */
 export function sendChallenge(s: State, topic?: string): { main: Child; also: Child[] } {
@@ -272,16 +270,18 @@ export function sendChallenge(s: State, topic?: string): { main: Child; also: Ch
   const main = () => {
     const list = friends();
     if (!list) return h("p", { class: "muted" }, "…");
-    if (!list.length) return challengeButton("Изпрати", s.id, text, true);
+    if (!list.length) return challengeButton("Прати", s.id, text, true);
     const done = sent();
     if (done)
       return [
         h(
           "p",
           { class: "send-done", role: "status" },
-          done.to.length ? `Изпратено на ${names(done.to)}. Ще ти кажем как е минало.` : null,
+          done.to.length ? `Изпратено на ${listWords(done.to)}. Ще ти кажем как е минало.` : null,
           done.to.length && done.not.length ? " " : null,
-          done.not.length ? `${names(done.not)}: не е изпратено, вече има чакащи предизвикателства от теб.` : null,
+          done.not.length
+            ? `Не е изпратено на ${listWords(done.not)}: там вече чакат три твои предизвикателства.`
+            : null,
         ),
         h("a", { class: "btn primary big", href: "/duel" }, "Към дуелите"),
       ];
@@ -317,7 +317,7 @@ export function sendChallenge(s: State, topic?: string): { main: Child; also: Ch
           disabled: () => !picked().length || busy(),
           onclick: send,
         },
-        "Изпрати",
+        "Прати",
       ),
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
     );
@@ -349,7 +349,11 @@ export function challengeFriend([idText]: string[]) {
     if (!name)
       return screen.show(() =>
         failure(
-          new ApiError("not_friends", "Предизвикваш така приятел, а с този играч още не сте приятели.", 404),
+          new ApiError(
+            "not_friends",
+            "Така можеш да предизвикаш само приятел, а с този играч още не сте приятели.",
+            404,
+          ),
           undefined,
           ["/friends", "Към приятелите"],
         ),

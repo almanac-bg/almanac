@@ -5,6 +5,11 @@ export function withName(name: string): string {
   return `${/^([сз]|[sz](?!h))/i.test(name) ? "със" : "с"} ${name}`;
 }
 
+/** Several things in a sentence, as Bulgarian lists them: „Мария, Бо и Ци“. */
+export function listWords(list: string[]): string {
+  return list.length > 1 ? `${list.slice(0, -1).join(", ")} и ${list.at(-1)}` : (list[0] ?? "");
+}
+
 /** On a day of the week, as Bulgarian says it: „в събота“, „във вторник“ (`day` YYYY-MM-DD). */
 export function onDay(day: string): string {
   const name = new Intl.DateTimeFormat("bg", { weekday: "long", timeZone: "UTC" }).format(new Date(`${day}T12:00:00Z`));
@@ -86,6 +91,6 @@ export function stakeWords(days: number, reserve: number, hour: number): string 
   if (days < 1) return "";
   const streak = `Серия от ${days} ${days === 1 ? "ден" : "дни"}.`;
   return hour >= stakeHour && !reserve
-    ? `${streak} Прекъсва в полунощ, ако не изиграеш днешните.`
+    ? `${streak} Прекъсва в полунощ, ако не изиграеш въпросите на деня.`
     : `${streak} С днешните въпроси става ${days + 1}.`;
 }

@@ -195,7 +195,7 @@ function numbers(p: Profile): Child {
     stat(`${percent(p.right, p.answers)}%`, "верни отговори", "mint"),
     p.duels > 0
       ? stat(`${p.won}/${p.duels}`, "спечелени дуела", "rose")
-      : stat(String(p.days), p.days === 1 ? "ден с въпросите на деня" : "дни с въпросите на деня"),
+      : stat(String(p.days), p.days === 1 ? "изигран брой" : "изиграни броя"),
     stat(String(p.games), p.games === 1 ? "изиграна игра" : "изиграни игри"),
   );
 }

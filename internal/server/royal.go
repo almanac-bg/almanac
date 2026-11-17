@@ -85,7 +85,7 @@ func refusal(err error, g royal.Glance) string {
 	if errors.Is(err, royal.ErrShut) {
 		next := time.UnixMilli(g.Next)
 		// The third: royal.Late.
-		return fmt.Sprintf("Роял вече тече, а закъснелите влизат до 3-тия въпрос. Следващият е %s в %s.",
+		return fmt.Sprintf("Роял вече тече, а закъснелите влизат само до 3-тия въпрос. Следващият е %s в %s.",
 			onDay(next, now), next.In(play.Bulgaria).Format("15:04"))
 	}
 	opens := time.UnixMilli(g.OpensAt)
