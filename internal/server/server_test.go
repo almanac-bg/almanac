@@ -122,6 +122,32 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// A wrong code says how many tries are left once they're few; the last used, the code is dead and a new one goes at
+// once.
+func TestCodeTries(t *testing.T) {
+	g := start(t)
+	p := g.player()
+	email := map[string]string{"email": "tries@example.com"}
+	if status, out := p.call("POST", "/api/auth/code", email); status != 200 || out["again"] != float64(60) {
+		t.Fatalf("sending a code: %d %v", status, out)
+	}
+	wrong := map[string]string{"email": "tries@example.com", "code": "x"}
+	for _, want := range []string{
+		"Грешен код.", "Грешен код.", "Грешен код. Остават ти още 2 опита.", "Грешен код. Остава ти още 1 опит.",
+	} {
+		_, out := p.call("POST", "/api/auth/verify", wrong)
+		if out["error"] != "bad_code" || out["message"] != want {
+			t.Fatalf("a wrong code: %v, want %q", out, want)
+		}
+	}
+	if _, out := p.call("POST", "/api/auth/verify", wrong); out["error"] != "code_tries" {
+		t.Fatalf("the last try: %v", out)
+	}
+	if status, out := p.call("POST", "/api/auth/code", email); status != 200 {
+		t.Fatalf("a new code once the old is dead: %d %v", status, out)
+	}
+}
+
 func TestSignInFlow(t *testing.T) {
 	g := start(t)
 	p := g.player()
@@ -164,8 +190,9 @@ func TestSignInFlow(t *testing.T) {
 	_, _ = other.call("POST", "/api/guest", map[string]any{})
 	g.inbox.got = nil
 	other.call("POST", "/api/auth/code", map[string]string{"email": "me@example.com"})
-	if status, _ := other.call("POST", "/api/auth/code", map[string]string{"email": "me@example.com"}); status != 429 {
-		t.Fatalf("a second code at once: %d", status)
+	if status, out := other.call("POST", "/api/auth/code", map[string]string{"email": "me@example.com"}); status != 429 ||
+		!regexp.MustCompile(`след [1-6]?[0-9] с\.$`).MatchString(fmt.Sprint(out["message"])) {
+		t.Fatalf("a second code at once: %d %v", status, out)
 	}
 	g.outbox.Flush(t.Context())
 	code = regexp.MustCompile(`\d{6}`).FindString(g.inbox.got[0].Text)

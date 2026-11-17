@@ -106,7 +106,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 		return nil, errors.New("PUBLIC_URL must be like https://almanac.bg")
 	}
 	if cfg.Operator == "" {
-		cfg.Operator = "екипът на АЛМАНАХ"
+		cfg.Operator = "екипа на АЛМАНАХ" // "Играта се поддържа от …"
 	}
 	if cfg.Contact == "" {
 		cfg.Contact = "privacy@almanac.bg"

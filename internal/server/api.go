@@ -73,9 +73,10 @@ var playerErrors = map[error]*apiError{
 	room.ErrPaused:         {http.StatusServiceUnavailable, "updating", "Играта се обновява. Опитай пак след малко."},
 	room.ErrNoPlayers:      {http.StatusConflict, "no_players", "Още няма играчи в стаята."},
 	account.ErrBadEmail:    {http.StatusBadRequest, "bad_email", "Това не прилича на имейл адрес."},
-	account.ErrTooSoon:     {http.StatusTooManyRequests, "too_soon", "Току-що ти изпратихме код. Провери пощата си."},
+	account.ErrTooSoon:     {http.StatusTooManyRequests, "too_soon", "Току-що ти пратихме код. Провери пощата си."},
 	account.ErrBadCode:     {http.StatusBadRequest, "bad_code", "Грешен код."},
 	account.ErrCodeExpired: {http.StatusBadRequest, "code_expired", "Кодът е изтекъл. Поискай нов."},
+	account.ErrCodeTries:   {http.StatusBadRequest, "code_tries", "Твърде много опити. Поискай нов код."},
 	account.ErrBadName:     {http.StatusBadRequest, "bad_name", "Името трябва да е от 2 до 30 букви, цифри или интервали."},
 	account.ErrBadTag:      {http.StatusBadRequest, "bad_tag", "Потребителското име е от 3 до 20 латински букви, цифри или _ и започва с буква."},
 	account.ErrTagTaken:    {http.StatusConflict, "tag_taken", "Това потребителско име е заето. Опитай друго."},
@@ -225,9 +226,28 @@ func (s *Server) sendCode(w http.ResponseWriter, r *http.Request) error {
 		return errTooMany
 	}
 	if err := s.accounts.SendCode(r.Context(), email); err != nil {
+		if soon := (account.TooSoon{}); errors.As(err, &soon) {
+			return &apiError{http.StatusTooManyRequests, "too_soon",
+				fmt.Sprintf("Току-що ти пратихме код. Нов можеш да поискаш след %d с.", seconds(soon.Wait))}
+		}
 		return err
 	}
-	return ok(w, map[string]any{"sent": true})
+	// Another code may go after CodeEvery: the client counts it down.
+	return ok(w, map[string]any{"sent": true, "again": seconds(account.CodeEvery)})
+}
+
+// seconds is a wait in whole seconds, rounded up: never "0 с" while there's still a wait.
+func seconds(d time.Duration) int { return int((d + time.Second - 1) / time.Second) }
+
+// wrongCodeWords say a code was wrong and, once the tries left are few, how many.
+func wrongCodeWords(left int) string {
+	switch left {
+	case 1:
+		return "Грешен код. Остава ти още 1 опит."
+	case 2:
+		return "Грешен код. Остават ти още 2 опита."
+	}
+	return "Грешен код."
 }
 
 func (s *Server) verify(w http.ResponseWriter, r *http.Request) error {
@@ -246,6 +266,9 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	u, token, err := s.accounts.Verify(r.Context(), in.Email, in.Code, current)
+	if wrong := (account.WrongCode{}); errors.As(err, &wrong) {
+		return &apiError{http.StatusBadRequest, "bad_code", wrongCodeWords(wrong.Left)}
+	}
 	if err != nil {
 		return err
 	}
