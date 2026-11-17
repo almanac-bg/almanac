@@ -2,7 +2,8 @@
 # Formatting the way CI checks it (gofmt for Go, Biome for the client), so that no session's pull request fails on it.
 #
 #   format.sh edit    after an Edit or Write: formats that file (the hook's JSON on stdin names it)
-#   format.sh commit  before a git commit: formats every changed file; if any changed, stops the commit to add them
+#   format.sh commit  before a git commit: refuses a message that skips CI; formats every changed file, and if any
+#                     changed, stops the commit to add them
 #
 # Sessions write files with tools and scripts, never through an editor that formats on save: this is that editor.
 set -u
@@ -36,6 +37,11 @@ edit)
 	exit 0
 	;;
 commit)
+	# A skip marker in a commit's message skips every check of the push, the one that would refuse it too.
+	if jq -r '.tool_input.command // empty' | grep -qiE '\[(skip ci|ci skip|no ci|skip actions|actions skip)\]'; then
+		echo "The commit's message holds [skip ci] or the like: GitHub would run no check and no deploy on it. Reword it." >&2
+		exit 2
+	fi
 	changed=$(fmt $( (git diff --name-only HEAD; git ls-files --others --exclude-standard) | sort -u))
 	if [ -n "$changed" ]; then
 		echo "Formatted as CI wants it, so the commit was stopped: git add these and commit again:" >&2
