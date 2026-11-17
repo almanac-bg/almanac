@@ -1,5 +1,7 @@
 // Package store keeps the game's data in one SQLite file: opening it, bringing its schema up to date (a new version
-// keeps a copy from before, KeepCopy), and the few helpers every query uses.
+// keeps a copy from before, KeepCopy), and the few helpers every query uses. The migrations apply in the order of
+// their names, and are checked so that the schema comes out the same wherever they ran, whatever order they landed in
+// (migrate).
 //
 // SQLite takes one writer at a time, so writes go through a single connection (Write) and never wait on each other's
 // locks; reads go through a pool (Read) and run alongside, thanks to the write-ahead log. The pool keeps its
@@ -128,9 +130,25 @@ func (db *DB) Close() error {
 // changes made side by side may both add a migration with the same number, and each is still applied once, whichever
 // lands first. A database holding a migration this program doesn't have is newer than it, and refused: running old
 // code on it could lose data. user_version keeps the count too, so that releases from before names refuse it as well.
+//
+// The order is the names' everywhere, and the schema it makes is the same everywhere: in production, in the tests and
+// in a new database. Two checks hold it so:
+//
+//   - A migration takes nothing away it doesn't name (a table, a column, an index, a trigger, a view): what it drops
+//     on purpose is in a line "-- drops: runs.opponent, runs_board". Otherwise it fails, and nothing of it is kept:
+//     a rebuild that copies a table by a list of its columns can't lose one another migration added.
+//   - A migration that arrives late (changes made side by side land in any order, so production may have had
+//     0052_b before 0051_a comes) is tried first, with the rest still to apply, on a copy of the schema alone. Unless
+//     that makes the schema of a new database migrated in name order, the database is refused before anything is
+//     applied, and the program doesn't start (a deploy then goes back by itself). The late migration never ran
+//     there, so it can be changed to hold after the others, or given a number after the latest.
 func (db *DB) migrate() error { return db.migrateTo(-1) }
 
 var migrationName = regexp.MustCompile(`^[0-9]{4}_[a-z0-9_]+\.sql$`)
+
+// migrationsTable keeps the names of the migrations a database has had.
+const migrationsTable = `CREATE TABLE IF NOT EXISTS schema_migrations (
+	name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL) STRICT, WITHOUT ROWID`
 
 // migrateTo migrates with the first n migrations only (all of them for -1): for tests of a migration.
 func (db *DB) migrateTo(n int) error {
@@ -150,8 +168,7 @@ func (db *DB) migrateTo(n int) error {
 	if n >= 0 {
 		names = names[:n]
 	}
-	if _, err := db.Write.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-		name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL) STRICT, WITHOUT ROWID`); err != nil {
+	if _, err := db.Write.Exec(migrationsTable); err != nil {
 		return err
 	}
 	done, err := db.applied()
@@ -181,10 +198,76 @@ func (db *DB) migrateTo(n int) error {
 			}
 		}
 	}
+	var todo, late []string
+	last := ""
+	for name := range done {
+		last = max(last, name)
+	}
 	for _, name := range names {
-		if done[name] {
-			continue
+		if !done[name] {
+			todo = append(todo, name)
+			if name < last {
+				late = append(late, name)
+			}
 		}
+	}
+	if len(late) > 0 {
+		slog.Warn("migrations arrive after a later one", "late", late, "latest", last)
+		if err := db.tryLate(names, todo, late, last); err != nil {
+			return err
+		}
+	}
+	return db.applyAll(todo)
+}
+
+// tryLate applies the migrations still to do (todo, some of them late: named before the latest one the database has
+// had) to a copy of the database's schema, without its rows. Unless the schema that makes is the one a new database
+// migrated with all of them in order (names) has, it says how they differ, and nothing is applied.
+func (db *DB) tryLate(names, todo, late []string, last string) error {
+	refuse := func(err error) error {
+		return fmt.Errorf("migrations %s arrive after %s, which the database has had already: %w. Nothing is "+
+			"applied. They never ran on it: change them to hold after the others too, or give them numbers after "+
+			"the latest", strings.Join(late, ", "), last, err)
+	}
+	trial, err := memory()
+	if err != nil {
+		return err
+	}
+	defer trial.Close()
+	if err := copySchema(db.Write, trial.Write); err != nil {
+		return err
+	}
+	if err := trial.applyAll(todo); err != nil {
+		return refuse(err)
+	}
+	fresh, err := memory()
+	if err != nil {
+		return err
+	}
+	defer fresh.Close()
+	if _, err := fresh.Write.Exec(migrationsTable); err != nil {
+		return err
+	}
+	if err := fresh.applyAll(names); err != nil {
+		return refuse(fmt.Errorf("a new database can't be migrated with them: %w", err))
+	}
+	have, err := shapeOf(trial.Write)
+	if err != nil {
+		return err
+	}
+	want, err := shapeOf(fresh.Write)
+	if err != nil {
+		return err
+	}
+	if diff := unlike(have, want); len(diff) > 0 {
+		return refuse(fmt.Errorf("the schema would differ from a new database's: %s", strings.Join(diff, "; ")))
+	}
+	return nil
+}
+
+// applyAll applies the migrations named, in that order.
+func (db *DB) applyAll(names []string) error {
+	for _, name := range names {
 		body, err := fs.ReadFile(migrations, "migrations/"+name)
 		if err != nil {
 			return err
@@ -219,6 +302,8 @@ func (db *DB) applied() (map[string]bool, error) {
 // for broken references before it's committed: SQLite's own procedure (sqlite.org/lang_altertable.html).
 const rebuildMark = "-- rebuild"
 
+// apply applies one migration in a transaction, committed only if the migration takes away nothing of the schema
+// that it doesn't name in a drops line (and, a rebuild, breaks no reference).
 func (db *DB) apply(body, name string) error {
 	ctx := context.Background()
 	conn, err := db.Write.Conn(ctx) // the one write connection: the pragmas hold for the transaction on it
@@ -237,8 +322,25 @@ func (db *DB) apply(body, name string) error {
 	if err != nil {
 		return err
 	}
+	var before, after map[string]part
+	check := mayDrop.MatchString(body)
+	if check {
+		if before, err = partsOf(tx); err != nil {
+			return errors.Join(err, tx.Rollback())
+		}
+	}
 	if _, err := tx.Exec(body); err != nil {
 		return errors.Join(err, tx.Rollback())
+	}
+	if check {
+		if after, err = partsOf(tx); err != nil {
+			return errors.Join(err, tx.Rollback())
+		}
+	}
+	if gone := lost(body, before, after); len(gone) > 0 {
+		return errors.Join(fmt.Errorf("it takes away %s without naming them in a line \"-- drops: ...\" (name "+
+			"them there if that's meant; if not, keep them: a rebuild copies every column the table has, and makes "+
+			"its indexes and triggers again)", strings.Join(gone, ", ")), tx.Rollback())
 	}
 	if rebuild {
 		var broken int

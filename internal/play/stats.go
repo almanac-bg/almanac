@@ -85,6 +85,9 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 		if err := rows.Scan(&p.ID, &p.Kind, &p.Day, &p.Category, &p.Rights, &p.Points, &p.Total, &p.At, &p.Opponent, &p.Recorded, &p.Outcome); err != nil {
 			return s, err
 		}
+		if p.Outcome != "" && p.Opponent == "" {
+			p.Opponent = GoneName // a duel's result keeps no name of a player who has gone (Forget)
+		}
 		s.Recent = append(s.Recent, p)
 	}
 	return s, rows.Err()

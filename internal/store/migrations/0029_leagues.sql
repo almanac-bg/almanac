@@ -2,6 +2,7 @@
 -- a group of their league on the XP they earn that week; the first go up a league, the last down. The rating stays
 -- what a player's strength is, with no monthly reset. Nothing of a season was ever paid (the first would have ended
 -- on 1 December), so the seasons go without a trace.
+-- drops: season, season_results, users.season_games
 DROP VIEW xp_earned;
 
 -- The week being played (its Monday, YYYY-MM-DD): one row.

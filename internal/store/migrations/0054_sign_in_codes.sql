@@ -1,6 +1,7 @@
 -- A sign-in code is the browser's that asked for it, not the address's (review 2026-11-17, S3): each browser has a
 -- code of its own, which nobody else can replace, try or use up. Codes on their way at the deploy are dropped: they
 -- were the address's, and a new one is a tap away.
+-- drops: email_codes, outbox_next
 DROP TABLE email_codes;
 CREATE TABLE sign_in_codes (
   asker      BLOB    PRIMARY KEY, -- the hash of the token the browser that asked keeps (its ask cookie)

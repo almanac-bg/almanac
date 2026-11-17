@@ -10,6 +10,10 @@
 // other sessions on demand. A guest who never plays is cleared after a few days unused (CleanUp), so that guests
 // made and dropped don't stay.
 //
+// A player goes one way, whether they delete their account, are a guest cleared, or a guest folded into an account
+// (remove): what's theirs goes with them, others' history of them stays without them (the game's Forget), and their
+// address goes from everywhere it's kept.
+//
 // A sign-in code is the browser's that asked for it (SendCode gives it a token, which it keeps in a cookie): only that
 // browser can try it, so nobody else can guess at it, use up its tries or replace it, and a player's own sign-in
 // never waits on what others do with their address. What could still be guessed at is a code someone asks for with a
@@ -128,8 +132,8 @@ type TooSoon struct{ Wait time.Duration }
 func (e TooSoon) Error() string        { return fmt.Sprintf("a code was just sent, again in %v", e.Wait) }
 func (e TooSoon) Is(target error) bool { return target == ErrTooSoon }
 
-// Accounts does the work; Merge, if set, moves a guest's progress into the account they sign in to (each part of the
-// game that keeps progress adds its step).
+// Accounts does the work; Merge, if set, moves a guest's progress into the account they sign in to, and Forget keeps
+// others' history of a player who goes (each part of the game that keeps them adds its step).
 type Accounts struct {
 	DB     *store.DB
 	Outbox *mailer.Outbox
@@ -137,6 +141,8 @@ type Accounts struct {
 	Secret []byte
 	// Merge moves what guest `from` has into account `to`, inside the sign-in's transaction; `from` is deleted after.
 	Merge []func(tx *sql.Tx, from, to int64) error
+	// Forget is told of a player about to be deleted, inside the deletion's transaction (remove).
+	Forget []func(tx *sql.Tx, id int64) error
 	// Unlimited lifts CodesAMinute, in development (as the server's limits are lifted there): the browser tests ask
 	// for codes by the dozen.
 	Unlimited bool
@@ -352,9 +358,42 @@ func (a *Accounts) Session(ctx context.Context, token string) (*User, error) {
 	return &u, nil
 }
 
-// Delete deletes a player and, with them, everything of theirs (sessions; runs and answers through the schema).
+// Delete deletes a player and, with them, everything of theirs (remove).
 func (a *Accounts) Delete(ctx context.Context, userID int64) error {
-	_, err := a.DB.Write.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, userID)
+	return a.DB.Tx(ctx, func(tx *sql.Tx) error { return a.remove(tx, userID) })
+}
+
+// remove deletes a player, inside the caller's transaction: every way a player goes (Delete, CleanUp, a guest folded
+// into an account) comes here. What's theirs goes with them by the schema (ON DELETE CASCADE: sessions, runs and
+// answers, friends, ...); what others keep of them is kept without them, by the schema (SET NULL: the other side of a
+// duel) and by each part of the game's Forget, told first; and their address goes from wherever else it's kept: mail
+// on its way to it, codes, wrong codes counted.
+func (a *Accounts) remove(tx *sql.Tx, id int64) error {
+	var email sql.NullString
+	if err := tx.QueryRow(`SELECT email FROM users WHERE id = ?`, id).Scan(&email); errors.Is(err, sql.ErrNoRows) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	for _, forget := range a.Forget {
+		if err := forget(tx, id); err != nil {
+			return err
+		}
+	}
+	if email.Valid {
+		for _, q := range []string{
+			`DELETE FROM sign_in_codes WHERE email = ?`,
+			`DELETE FROM code_misses WHERE email = ?`,
+		} {
+			if _, err := tx.Exec(q, email.String); err != nil {
+				return err
+			}
+		}
+		if err := mailer.Unqueue(tx, email.String); err != nil {
+			return err
+		}
+	}
+	_, err := tx.Exec(`DELETE FROM users WHERE id = ?`, id)
 	return err
 }
 
@@ -384,14 +423,19 @@ func (a *Accounts) SignOutOthers(ctx context.Context, token string) (int, error)
 // who left at once, or a flood of guests made and dropped, which this keeps from staying for a session's 400 days.
 const IdleGuestDays = 3
 
-// cleanBatch is how many players CleanUp deletes in one statement: a flood's worth of guests goes in many short
+// cleanBatch is how many players CleanUp deletes in one transaction: a flood's worth of guests goes in many short
 // writes, with the game's own between them, not in one that holds the writer for seconds.
-const cleanBatch = 500
+const cleanBatch = 200
+
+// EmailRequestDays is how long a friend request sent to an address is kept unanswered: the address is someone
+// else's, given by a player, and not kept for good.
+const EmailRequestDays = 60
 
 // CleanUp drops expired sessions, codes and handoffs, the wrong codes counted for an address once their stretch is
-// over (MissesKept), and the guests nobody can use or does: those whose sessions are gone (nothing of theirs can come
-// back), and those who never played nor have a friend, unseen for IdleGuestDays. Their days played stay counted
-// (play.Retention: active_days keeps no link to a player).
+// over (MissesKept), friend requests to an address older than EmailRequestDays, and the guests nobody can use or
+// does: those whose sessions are gone (nothing of theirs can come back), and those who never played nor have a
+// friend, unseen for IdleGuestDays. Their days played stay counted (play.Retention: active_days keeps no link to a
+// player).
 func (a *Accounts) CleanUp(ctx context.Context) error {
 	now := store.Now()
 	for _, q := range []string{
@@ -407,6 +451,10 @@ func (a *Accounts) CleanUp(ctx context.Context) error {
 		store.Ms(time.Now().Add(-MissesKept))); err != nil {
 		return err
 	}
+	if _, err := a.DB.Write.ExecContext(ctx, `DELETE FROM friend_requests WHERE to_email IS NOT NULL AND at <= ?`,
+		store.Ms(time.Now().AddDate(0, 0, -EmailRequestDays))); err != nil {
+		return err
+	}
 	idle := store.Ms(time.Now().AddDate(0, 0, -IdleGuestDays))
 	for _, q := range []struct {
 		where string
@@ -420,12 +468,38 @@ func (a *Accounts) CleanUp(ctx context.Context) error {
 			AND NOT EXISTS (SELECT 1 FROM friend_requests q WHERE q.to_id = u.id)`, []any{idle, idle}},
 	} {
 		for {
-			res, err := a.DB.Write.ExecContext(ctx, `DELETE FROM users WHERE id IN (SELECT u.id FROM users u
-				WHERE u.email IS NULL AND `+q.where+` LIMIT `+strconv.Itoa(cleanBatch)+`)`, q.args...)
+			var n int
+			err := a.DB.Tx(ctx, func(tx *sql.Tx) error {
+				rows, err := tx.Query(`SELECT u.id FROM users u WHERE u.email IS NULL AND `+q.where+`
+					LIMIT `+strconv.Itoa(cleanBatch), q.args...)
+				if err != nil {
+					return err
+				}
+				var ids []int64
+				for rows.Next() {
+					var id int64
+					if err := rows.Scan(&id); err != nil {
+						rows.Close()
+						return err
+					}
+					ids = append(ids, id)
+				}
+				rows.Close()
+				if err := rows.Err(); err != nil {
+					return err
+				}
+				n = len(ids)
+				for _, id := range ids {
+					if err := a.remove(tx, id); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
 			if err != nil {
 				return err
 			}
-			if n, _ := res.RowsAffected(); n < cleanBatch {
+			if n < cleanBatch {
 				break
 			}
 		}
@@ -724,8 +798,7 @@ func (a *Accounts) fold(tx *sql.Tx, from, to int64) error {
 			return err
 		}
 	}
-	_, err := tx.Exec(`DELETE FROM users WHERE id = ?`, from)
-	return err
+	return a.remove(tx, from)
 }
 
 // HandoffTTL is how long a handoff's link works (once).

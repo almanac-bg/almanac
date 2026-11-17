@@ -88,6 +88,13 @@ func (o *Outbox) Urgent(tx *sql.Tx, m Message, until time.Time) (int64, error) {
 	return res.LastInsertId()
 }
 
+// Unqueue takes every message to an address out of the queue, inside the caller's transaction: the player there
+// has deleted their account.
+func Unqueue(tx *sql.Tx, to string) error {
+	_, err := tx.Exec(`DELETE FROM outbox WHERE json_extract(message, '$.to') = ?`, to)
+	return err
+}
+
 // Drop takes a message out of the queue if it hasn't gone yet: a code replaced by a newer one.
 func (o *Outbox) Drop(tx *sql.Tx, id int64) error {
 	_, err := tx.Exec(`DELETE FROM outbox WHERE id = ?`, id)

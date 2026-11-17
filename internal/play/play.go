@@ -17,6 +17,9 @@
 // and takes each answer (ShowLive and AnswerLive, ShowRoyal and AnswerRoyal), and the player's own Show, Start and
 // Answer refuse it, so that nobody sees a question before the others do, nor answers it outside its time. An answer
 // counts if it reaches the server within Grace of its time's end; its time is to when it arrived.
+//
+// A guest who signs in to their account brings everything along (Merge), and a player who goes leaves others'
+// history whole (Forget): merge.go, checked against the schema so that no table of a player's is left out.
 package play
 
 import (

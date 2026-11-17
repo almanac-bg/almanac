@@ -735,19 +735,22 @@ func (g *Game) DuelsOf(ctx context.Context, userID int64) ([]DuelView, error) {
 // duelsOf are DuelsOf, or (only) that one duel of theirs. The player is a, or b: a live duel's other, or a
 // challenge's sender (whose game is its ghost_run).
 func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, error) {
+	// mine: the player is a. The other side may be none: a player who has gone since (play.Forget), whose game went
+	// with them.
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.kind, d.created_at, d.expires_at, coalesce(d.ended_at, 0),
-			coalesce(d.outcome, ''), d.a_id = ?1, d.rated,
-			coalesce(CASE WHEN d.a_id = ?1 THEN d.a_delta ELSE d.b_delta END, 0),
-			coalesce(CASE WHEN d.a_id = ?1 THEN d.a_run WHEN d.kind = 'challenge' THEN d.ghost_run ELSE d.b_run END, 0),
-			coalesce(CASE WHEN d.a_id <> ?1 THEN d.a_run WHEN d.ghost_run IS NOT NULL THEN d.ghost_run ELSE d.b_run END, 0),
-			coalesce(CASE WHEN d.a_id <> ?1 THEN d.a_id WHEN d.ghost_run IS NOT NULL
+			coalesce(d.outcome, ''), d.mine, d.rated,
+			coalesce(CASE WHEN d.mine THEN d.a_delta ELSE d.b_delta END, 0),
+			coalesce(CASE WHEN d.mine THEN d.a_run WHEN d.kind = 'challenge' THEN d.ghost_run ELSE d.b_run END, 0),
+			coalesce(CASE WHEN NOT d.mine THEN d.a_run WHEN d.ghost_run IS NOT NULL THEN d.ghost_run ELSE d.b_run END, 0),
+			coalesce(CASE WHEN NOT d.mine THEN d.a_id WHEN d.ghost_run IS NOT NULL
 				THEN (SELECT user_id FROM runs WHERE id = d.ghost_run) ELSE d.b_id END, 0),
-			CASE WHEN d.a_id = ?1 THEN d.a_left ELSE d.b_left END, CASE WHEN d.a_id = ?1 THEN d.b_left ELSE d.a_left END,
+			CASE WHEN d.mine THEN d.a_left ELSE d.b_left END, CASE WHEN d.mine THEN d.b_left ELSE d.a_left END,
 			coalesce(c.code, ''), d.b_id IS NOT NULL, coalesce(c.for_id = d.a_id, 0)
-		FROM duels d LEFT JOIN challenges c ON c.id = d.challenge_id
-		WHERE (d.a_id = ?1 OR d.b_id = ?1) AND (d.kind = 'challenge' OR d.ended_at IS NOT NULL)
-			-- a challenge is its taker's once its sender has played it
-			AND NOT (d.a_id = ?1 AND d.kind = 'challenge'
+		FROM (SELECT *, coalesce(a_id = ?1, 0) AS mine FROM duels WHERE a_id = ?1 OR b_id = ?1) d
+		LEFT JOIN challenges c ON c.id = d.challenge_id
+		WHERE (d.kind = 'challenge' OR d.ended_at IS NOT NULL)
+			-- a challenge is its taker's once its sender has played it (one played, whose sender has gone since, too)
+			AND NOT (d.mine AND d.kind = 'challenge' AND (d.ended_at IS NULL OR d.ghost_run IS NOT NULL)
 				AND coalesce((SELECT finished_at FROM runs WHERE id = d.ghost_run), 0) = 0)
 			AND (?2 = 0 OR d.id = ?2)
 		ORDER BY d.ended_at IS NOT NULL, coalesce(d.ended_at, d.created_at) DESC LIMIT 50`, userID, only)
@@ -803,6 +806,9 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			if v.Opponent, err = g.duelSide(ctx, r.theirs, r.theirRun, v.EndedAt != 0); err != nil {
 				return nil, err
 			}
+		} else {
+			// Every duel has another side (a player, a recording's, a challenge's sender): none is one who's gone.
+			v.Opponent = &DuelSide{Name: GoneName, Done: true}
 		}
 		v.Recorded = strings.HasPrefix(r.outcome, "ghost_") && !challenge
 		won := map[bool]string{true: "a", false: "b"}[r.mine]
