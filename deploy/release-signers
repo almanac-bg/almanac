@@ -3,7 +3,7 @@
 # on the owner's computer, never on the server:
 #
 #   ssh-keygen -t ed25519 -N '' -C almanac-release -f release-signing
-#   gh secret set RELEASE_SIGNING_KEY < release-signing    (or --env production, once that environment exists)
+#   gh secret set RELEASE_SIGNING_KEY --env production < release-signing
 #   rm release-signing
 #
 # then a line here, as below with release-signing.pub's key, merged, and installed on the server; from then on the
@@ -11,3 +11,5 @@
 # needs it.
 #
 #   almanac-release namespaces="almanac-release" ssh-ed25519 AAAA… almanac-release
+
+almanac-release namespaces="almanac-release" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAI2Jd8NBsc4bj7SznlVc2/5bZEpdFmJbKoAy8XGe+uK almanac-release
