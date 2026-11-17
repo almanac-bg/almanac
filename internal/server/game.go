@@ -85,6 +85,10 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 		if out["left"], err = s.game.LeftOf(r.Context(), u.ID); err != nil {
 			return err
 		}
+		// Who took the player's challenges since they last heard: one line for all of them.
+		if out["challenges"], err = s.game.ChallengeNewsOf(r.Context(), u.ID); err != nil {
+			return err
+		}
 		// Which of the game's systems they've met: Начало shows the level and the goals once XP is open.
 		if out["open"], err = s.game.OpenOf(r.Context(), u.ID); err != nil {
 			return err

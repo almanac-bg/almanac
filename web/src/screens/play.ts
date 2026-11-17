@@ -6,7 +6,7 @@
 import { picture } from "../art/picture.ts";
 import { type Mastery, masteryBadge } from "../game/mastery.ts";
 import { news } from "../game/news.ts";
-import { summary } from "../game/results.ts";
+import { challengeButton, challengeText, summary } from "../game/results.ts";
 import { getReady, playRun, shownHere, startScreen } from "../game/run.ts";
 import type { State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
@@ -180,7 +180,10 @@ export function topic([id = ""]: string[]) {
         summary(
           s,
           h("div", { class: "day-line" }, h("span", { class: "kicker" }, name)),
-          { main: () => nextOf(day(), again).main, also: [() => nextOf(day(), again).also] },
+          {
+            main: () => nextOf(day(), again).main,
+            also: [() => nextOf(day(), again).also, challenged(s, category ? name : undefined)],
+          },
           just ? [otherTopics(category), news(s.id)] : [otherTopics(category)],
           undefined,
           just,
@@ -231,6 +234,12 @@ function otherTopics(current: string): Child {
       ),
     );
   };
+}
+
+/** A topic's game of ten, as a challenge to anyone (play/challenges.go): „Предизвикай“, plain, after the rest. */
+function challenged(s: State, topic?: string): Child {
+  if (s.total !== 10) return null;
+  return challengeButton("Предизвикай", s.id, () => challengeText(s.rights, topic));
 }
 
 /** The day's ten, while they wait for the player: the streak (to yesterday) and the reserve days in hand. */

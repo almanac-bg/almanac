@@ -7,7 +7,17 @@
 import { emblem } from "./art/emblem.ts";
 import { news } from "./game/news.ts";
 import { answered, ask, crowdLine, picture } from "./game/questions.ts";
-import { boardRow, hands, landing, nextSteps, review, reviewParts, shareButton } from "./game/results.ts";
+import {
+  boardRow,
+  challengeButton,
+  challengeText,
+  hands,
+  landing,
+  nextSteps,
+  review,
+  reviewParts,
+  shareButton,
+} from "./game/results.ts";
 import { countdown, guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
 import { api, deliver } from "./lib/api.ts";
 import { keepAwake } from "./lib/awake.ts";
@@ -49,6 +59,8 @@ export const kit = {
   boardRow,
   byTap,
   categories,
+  challengeButton,
+  challengeText,
   clock,
   coming,
   dayWord,

@@ -27,7 +27,7 @@ var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/play/[a-z]+$`),
 	regexp.MustCompile(`^/(duel|royal|room|ranks|rewards|wardrobe|me|friends|settings|almanac|mistakes)$`),
 	regexp.MustCompile(`^/duel/([0-9]{1,12}|live|friend/[0-9]{1,12})$`),
-	regexp.MustCompile(`^/c/[a-z0-9]{6}$`),
+	regexp.MustCompile(`^/c/[a-z0-9]{6,8}$`),
 	regexp.MustCompile(`^/r/[0-9]{6}$`),
 	regexp.MustCompile(`^/year/[0-9]{4}$`),
 	regexp.MustCompile(`^/games/[0-9]{1,12}$`),
@@ -139,6 +139,11 @@ func (s *Server) preview(r *http.Request) (title, description string) {
 				title = fmt.Sprintf("%s: %d от %d в АЛМАНАХ днес", name, n, play.Length)
 			}
 			description = "Десет въпроса за днес, едни и същи за всички. Колко ще познаеш ти?"
+		}
+	case strings.HasPrefix(path, "/c/"):
+		if c, err := s.game.ChallengeOf(r.Context(), strings.TrimPrefix(path, "/c/"), 0); err == nil && !c.Over {
+			title = c.By.Name + " те предизвиква в АЛМАНАХ"
+			description = fmt.Sprintf("%s позна %d от %d. Изиграй същите въпроси и сравнете.", c.By.Name, c.Rights, c.Total)
 		}
 	case strings.HasPrefix(path, "/players/"):
 		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {
