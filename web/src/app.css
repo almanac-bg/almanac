@@ -1762,15 +1762,15 @@
   }
 
   .count-n {
-    font-size: 3.5rem;
-    line-height: 3.25rem;
+    font-size: 2.25rem;
+    line-height: 2.25rem;
     font-weight: 900;
   }
 
   .count-of {
     color: var(--text-muted);
-    font-size: 2rem;
-    line-height: 2rem;
+    font-size: 1.25rem;
+    line-height: 1.25rem;
     font-weight: 800;
   }
 
@@ -1836,13 +1836,13 @@
   }
 
   .stuck .count-n {
-    font-size: 1.75rem;
-    line-height: 1.75rem;
+    font-size: 1.5rem;
+    line-height: 1.5rem;
   }
 
   .stuck .count-of {
-    font-size: 1.125rem;
-    line-height: 1.125rem;
+    font-size: 1rem;
+    line-height: 1rem;
   }
 
   .stuck .head-side {
@@ -1859,7 +1859,7 @@
   }
 
   .stuck .trail {
-    max-width: 15rem;
+    max-width: min(15rem, 100% - 4.5rem);
   }
 
   .trail li.fresh {
@@ -1871,6 +1871,17 @@
   }
 
   .after > * {
+    animation: enter 200ms ease-out;
+  }
+
+  /* A part of an answer shown in beats (run.ts): in its place, unseen, until its beat. */
+  .after > .unseen,
+  .spread.unseen {
+    visibility: hidden;
+    animation: none;
+  }
+
+  .spread {
     animation: enter 200ms ease-out;
   }
 
@@ -1922,27 +1933,40 @@
     overflow: hidden;
   }
 
+  /* The clock is quiet while there's time (as its sound is), gold for the last ten seconds, red for the last five. */
   .time-bar {
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: var(--gold-display);
-    box-shadow: 0 0 14px -2px var(--gold);
+    background: var(--text-muted);
     transform-origin: left;
+    transition:
+      background-color 200ms ease,
+      box-shadow 200ms ease;
   }
 
   .secs {
     min-width: 3.2ch;
-    color: var(--text);
-    font: 800 1.875rem / 1 var(--font-numeral);
+    color: var(--text-muted);
+    font: 800 1.625rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     text-align: right;
     white-space: nowrap;
+    transition: color 200ms ease;
   }
 
   .secs small {
     color: var(--text-muted);
     font: 700 0.875rem / 1 var(--font-sans);
+  }
+
+  .timer.soon .time-bar {
+    background: var(--gold-display);
+    box-shadow: 0 0 14px -2px var(--gold);
+  }
+
+  .timer.soon .secs {
+    color: var(--gold-ink);
   }
 
   .timer.low .time-bar {
@@ -1966,8 +1990,8 @@
   /* 24 above the question: the game's count and clock apart from what's asked. */
   .ask {
     margin-top: var(--space-2);
-    font-size: 1.5rem;
-    line-height: 1.875rem;
+    font-size: 1.75rem;
+    line-height: 2.125rem;
     font-weight: 700;
     letter-spacing: -0.01em;
   }
@@ -2367,9 +2391,20 @@
     --crowd-fill: color-mix(in srgb, var(--wrong) 20%, transparent);
   }
 
+  /* The shares fade in as their bars grow. */
+  .crowd-share {
+    animation: shown 240ms ease-out;
+  }
+
   .option.tf .crowd-share {
     margin-left: 0;
     font-size: 1.125rem;
+  }
+
+  @keyframes shown {
+    0% {
+      opacity: 0;
+    }
   }
 
   .crowd-says {
@@ -3260,6 +3295,27 @@
     background: var(--text-muted);
     transform: scaleX(0);
     transform-origin: left;
+  }
+
+  /* Stuck, the clock is a thin bar along the head's lower edge, its seconds at the end of the pips' row. */
+  .stuck .timer {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+  }
+
+  .stuck .timer .track {
+    height: 3px;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .stuck .timer .secs {
+    position: absolute;
+    right: var(--space-4);
+    bottom: calc(var(--space-2) + 3px);
+    font-size: 1.25rem;
   }
 
   .unit {
@@ -5755,12 +5811,141 @@
     }
 
     .playing #app {
-      padding-top: max(var(--space-4), env(safe-area-inset-top));
-      padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));
+      --app-top: max(var(--space-4), env(safe-area-inset-top));
+      --app-foot: max(var(--space-4), env(safe-area-inset-bottom));
+      padding-top: var(--app-top);
+      padding-bottom: var(--app-foot);
     }
 
     .playing .game-leave {
       display: grid;
+    }
+
+    /* The count before a run: in the middle of the screen it has to itself. */
+    .playing .get-ready {
+      min-height: calc(100dvh - var(--app-top) - var(--app-foot));
+      align-content: center;
+    }
+
+    /* A run's question is a column the screen's height (run.ts): the head, the pips and the clock at the top, the
+       question under them, what answers it at the foot, under the thumb. */
+    .run-question {
+      display: flex;
+      flex-direction: column;
+      min-height: calc(100dvh - var(--app-top) - var(--app-foot));
+      padding-bottom: var(--after, 0px);
+      transition: padding-bottom 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .run-question .answering {
+      display: grid;
+      gap: var(--space-4);
+      margin-top: auto;
+    }
+
+    /* „Отговори“ and „Готово“ stay at hand on a screen too short for the whole question: at its foot, over what
+       scrolls under them. */
+    .run-question .answering .btn.primary.big {
+      position: sticky;
+      bottom: var(--app-foot);
+      z-index: 1;
+    }
+
+    /* A narrow phone: a long question in four lines at most. */
+    @media (max-width: 22.5rem) {
+      .run-question .ask {
+        font-size: 1.5rem;
+        line-height: 1.875rem;
+      }
+    }
+
+    /* The answer docks at the screen's foot, in the same place every time, the answers moving up above it: the
+       verdict, how everyone answered, the fact (scrolling on its own when it's long), and the way on. */
+    .run-question .after {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 5;
+      max-width: 40rem;
+      max-height: calc(100dvh - 4rem);
+      margin-inline: auto;
+      gap: var(--space-3);
+      padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right)) var(--app-foot)
+        max(var(--space-4), env(safe-area-inset-left));
+      overflow-y: auto;
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      background: var(--surface);
+      box-shadow:
+        0 -1px 0 var(--line),
+        0 -12px 32px -12px #0000008c;
+      animation: dock 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .run-question .after .fact {
+      flex: none;
+      max-height: min(9.5rem, 24dvh);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      background: var(--raised);
+    }
+
+    .run-question .after .fact p {
+      font-size: 1.0625rem;
+      line-height: 1.5rem;
+    }
+
+    /* The line that fills while the answer shows runs along the panel's top edge; „Напред“ says the rest. */
+    .run-question .after .up-next {
+      position: absolute;
+      top: 0;
+      right: var(--radius-xl);
+      left: var(--radius-xl);
+    }
+
+    .run-question .after .up-next-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .run-question .after .up-next .track {
+      height: 3px;
+      background: transparent;
+    }
+
+    .run-question .after .up-next-go {
+      width: 100%;
+    }
+
+    /* Once answered, the stopped clock steps aside with the panel coming up: room for the answers. */
+    .run-question .question-top > .timer {
+      max-height: 3rem;
+      transition:
+        max-height 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        margin 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        opacity 160ms ease;
+    }
+
+    .run-question.answered .question-top > .timer {
+      max-height: 0;
+      margin-top: calc(-1 * var(--space-4));
+      overflow: hidden;
+      opacity: 0;
+    }
+
+    .run-question.answered .question-top.stuck > .timer {
+      margin-top: 0;
+    }
+
+    @keyframes dock {
+      0% {
+        transform: translateY(24px);
+        opacity: 0;
+      }
     }
   }
 

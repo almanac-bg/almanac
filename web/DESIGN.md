@@ -9,9 +9,10 @@ three when you add or change a screen.
 
 - **One obvious action per screen**, and it is the gold button: `.btn.primary`, plus `big` for a screen's main
   action. Everything else is a plain `.btn` or a `.link`.
-- **Gold means the one right answer**, as in the logo: the primary action, the current game's progress (the timer,
-  the current pip), the streak, and reward just earned (points, first place, an exact answer). Nothing else: where
-  the player is takes the accent, levels lilac, XP in a list muted, and nothing is gold for decoration.
+- **Gold means the one right answer**, as in the logo: the primary action, the current game's progress (the
+  clock's last ten seconds, the current pip), the streak, and reward just earned (points, first place, an exact
+  answer). Nothing else: where the player is takes the accent, levels lilac, XP in a list muted, and nothing is
+  gold for decoration.
 - **Numbers are the heroes.** Scores, places, the streak, the timer and room codes use the numeral face, with
   tabular figures.
 - **Game feel comes only from data the game has** (see Game feel below). No currencies, shops or made-up numbers:
@@ -163,10 +164,10 @@ takes a token.
 - **Scale:**
   - `h1` 34px (40px on wide screens), 800 weight, -0.03em tracking.
   - `h2` 26px.
-  - The question (`.ask`) 24/30, 700 weight.
+  - The question (`.ask`) 28/34 (24/30 at 320px), 700 weight.
   - Body 16/24; `.lead` 18/26 in muted.
   - `.kicker` 12px, 800 weight, capitals with 0.14em tracking, for the date, the topic and section titles.
-- **Numerals:** 120px for the result, 56px for the question count, 52px for stats and the streak, 32px for figures
+- **Numerals:** 120px for the result, 36px for the question count, 52px for stats and the streak, 32px for figures
   and points. The numeral face is for digits only: Cyrillic words read badly in it at display size. A word beside a
   big number („Ниво“ 4, 7 „от“ 10, „днес в“ 21:00, a board's „точки“) is in the words' face, small, muted, on the
   number's baseline (`.num-word`, `.sub`; `levelNumber()` in `ui.ts`).
@@ -209,7 +210,10 @@ takes a token.
   `.mastery-line` (how a topic's game moved it) in a result's „Ново за теб“.
 - **Play:**
   - `.question-head` (with `.count`, which never wraps; `.versus`, the friend in a duel with one; and `.game-leave`,
-    the way out on a phone), `.leave-ask` (asked to leave while the time runs), `.trail`, `.timer` and `.ask`.
+    the way out on a phone), `.leave-ask` (asked to leave while the time runs), `.trail`, `.timer` (muted while
+    there's time, `.soon` gold for the last ten seconds of a question longer than ten, `.low` red for the last five,
+    `.stopped` grey once answered) and `.ask`; in a run, `.question-top` holds the head, the pips and the clock, and
+    on a phone `.answering` is set at the foot and `.after` (the answer: verdict, fact, „Напред“) docks under it.
   - `.picture` over a question, its box the picture's own (no wider than the column), a hairline `--line` inside its
     edge so a white flag holds on a white card, on `--sunken` while it loads: while it's asked, `picture(view, true)` keeps it low enough for the question, the
     picture and the whole answering part to fit on the screen (no less than 128px); a question's time starts once
@@ -332,14 +336,21 @@ takes a token.
   shows in steps: the answer marked, the verdict with its points, then its fact („Знаеше ли?“), at the moment the
   player most wants it. It stays 3 seconds (4.5 for anything but a choice or „Вярно или невярно“: there's more to
   look at) and the time to read the fact and the day's line (1.2 seconds and a little for each letter, 9 at most),
-  with a line filling under it; „Напред“ (Enter on a computer; „Към резултата“ after the last) goes on at once. A room shows each answer
-  with its standings for 6 seconds (a host who leads it from a big screen, „Само водя“, has „Напред“, „Задръж“ and
+  with a line filling as it waits; „Напред“, always there (Enter on a computer; „Към резултата“ after the last), goes
+  on at once. A room shows each answer with its standings for 6 seconds (a host who leads it from a big screen, „Само водя“, has „Напред“, „Задръж“ and
   „Край“, and the fact with the answer: a class talks it over); Роял the same, 10 seconds with a cut; a live duel
   shows both answers for 4 seconds (6 for anything but a choice or „Вярно или невярно“). A question never opens in a
   tab that's out of sight.
-- **A game has the whole screen.** On a phone the header and the bar of places step aside while a question or its
-  answer shows (an arrow before the count goes home), so the pad and the verdict fit and a stray tap can't leave the
-  game. Each question opens at the top of the page.
+- **A game has the whole screen.** On a phone the header and the bar of places step aside from the count before a
+  run, and while a question or its answer shows (an arrow before the count goes home), so the pad and the verdict fit
+  and a stray tap can't leave the game. Each question opens at the top of the page.
+- **On a phone, the answers are at the thumb.** A run's question is a column the screen's height: the head, the pips
+  and the clock at the top (kept there as the page scrolls), the question under them, and what answers it at the
+  foot — the answers, „Вярно“ and „Невярно“, the pad with „Отговори“, „Готово“ (which stays at hand on a screen too
+  short for the rest). The answer docks at the screen's foot, always in the same place: the verdict, how everyone
+  answered, the fact (scrolling on its own when it's long) and „Напред“ across the width; the answers move up above
+  it, marked, and the page moves only when they can't all fit, just enough to show the right one. A big screen shows
+  the answer under the question, as before.
 - **Leaving a game is free between two questions.** While a question's time runs (on the server, so it can't wait),
   a way out — the arrow, a place in the header — asks first („Ако излезеш сега, въпросът остава без отговор.“,
   „Остани“ or „Излез“), and leaving gives that question up. The game waits where it stopped: the day on Начало with
@@ -416,16 +427,24 @@ Feedback fires once, when it's earned, and then the screen is still again:
   - the right answer's pop 360ms (to 1.04); the wrong answer's shake 320ms (4px);
   - an answer's points rise 520ms; a result's 800ms;
   - the timer runs linearly with the clock, and so does the ring of the three-second count before a topic's run
-    (with „Започни сега“ and „Отказ“, so a tap on a topic never throws the player straight into a question).
-- **An answer shows in steps:** at 0ms the answer marked (pop or shake), its sound and touch, its pip filling (0.6→1,
-  200ms); at 120ms the verdict fades up (8px, 200ms) with its points and the tally rising in step; at 320ms the fact,
-  the same way; at 450ms the page scrolls to them (smoothly, or at once with less motion). A run's head (the count,
-  the topic, the tally) and its pips stay at the top of the screen while the question and its answer scroll, smaller
-  once stuck, so the pip and the tally are seen landing.
+    (with „Започни сега“ and „Откажи“, so a tap on a topic never throws the player straight into a question).
+- **An answer shows in beats** (a run's: the day, a topic, a friend's duel; `beats` in `game/questions.ts`), the
+  same however quick the line, all within a second: the clock stops at the tap, and what was chosen stays chosen (its
+  accent ring) at least 280ms; then the player's own answer is judged (pop or shake), with its sound and touch and its
+  pip filling (0.6→1, 200ms); at 300ms the right answer pops if it wasn't theirs, the rest dim, and the verdict docks
+  (24px up, 240ms) with its points and the tally rising in step; at 550ms the shares of everyone's answers grow behind
+  them, their numbers fading in, and the sentence about them; at 700ms the fact and „Напред“. The page doesn't scroll
+  to them on a phone (the panel comes to the player); on a big screen it does, at 560ms. A run's head (the count, the
+  topic, the tally, the clock) and its pips stay at the top of the screen while the question and its answer scroll,
+  smaller once stuck (the clock a thin bar along its edge, the seconds at the pips' end), so the pip and the tally
+  are seen landing. A game played with others (a live duel, a room, Роял) shows its answer at once, when the server
+  says.
 - **A result lands, once** (`web/src/feel.ts`, at most 1.6s, a tap anywhere jumps to the end, never again on a
-  reload): the pips fill one by one (60ms apart, each with a pluck on the scale, a muted thud for a wrong one); at
-  700ms the score lands (1.15→1) with the motif and the points count up; on the day, at 1.1s the streak's number rolls
-  from the day before with the flame, unlit till then, lighting and swelling once and its sound, and the level's bar fills in its chip (a new level:
+  reload): the pips fill one by one (60ms apart, 85 on the day; each with a pluck a step up the scale for each right
+  answer before it, so a good game climbs, and a muted thud for a wrong one); as the last fills (at 700ms, about 0.9s
+  on the day) the score lands (1.15→1) with the motif and the points count up; on the day, at 1.1s the streak's
+  number rolls from the day before with the flame, unlit till then, lighting and swelling once and its sound, and the
+  level's bar fills in its chip (a new level:
   to the end, a lilac flash, the number rolls, it fills again). Ten of ten: the pips sweep gold, „Всички верни“ and the
   rosette as a seal, drawn petal by petal, the gold one last. All typographic: no particles.
 - **A duel's result lands, once** (feel.ts `duel`, at most 1.6s, a tap jumps to the end, never again on that
