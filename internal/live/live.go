@@ -16,7 +16,9 @@
 // statistics and the duel's result are kept there, and only the timing lives here, in memory. The run moves on the
 // duel's clock alone: the duel starts each question's time on it at the moment it shows it to both (play.ShowLive) and
 // hands it each answer with the moment it came (play.AnswerLive); the player can't show, start or answer it
-// themselves, so nobody reads a question before the duel shows it. A restart cuts the duels under way off; they end
+// themselves, so nobody reads a question before the duel shows it. The duel deals its questions as it begins (a
+// recording's as its player was shown them: play.Game.Deal), and each answer is graded through the deal shown,
+// whatever the bank has become meanwhile. A restart cuts the duels under way off; they end
 // without a result (play.EndLive). So before one, the server pauses the hub (Pause): no new duel starts, not even with
 // a recording; those asking go on waiting, told why (Seek.Held), and find their duel once the server is back, while
 // the duels under way (UnderWay) play to their end, which each can tell (Left: Longest at most); a rematch waiting for
@@ -615,14 +617,13 @@ func (s *side) answers(n int) bool {
 }
 
 func newMatch(h *Hub, l play.Live, players [2]Player) (*Match, error) {
-	b := h.game.Bank()
 	m := &Match{hub: h, id: l.DuelID, phase: PhaseIntro, opened: time.Now(), subs: map[*Sub]struct{}{}}
 	for _, p := range l.Picks {
-		q, ok := b.Get(p.ID)
+		d, ok := h.game.Deal(p) // a recording's: the version its player answered
 		if !ok {
 			return nil, play.ErrNoQuestion
 		}
-		m.dealt = append(m.dealt, q.Deal(p.Seed))
+		m.dealt = append(m.dealt, d)
 	}
 	if len(m.dealt) == 0 {
 		return nil, play.ErrNoQuestion
@@ -870,7 +871,7 @@ func (m *Match) show(n int) {
 	for _, s := range m.sides {
 		s.answered, s.took, s.given, s.gained, s.speed, s.row, s.inRow, s.right, s.exact = false, 0, nil, 0, 0, 0, 0, false, false
 		if s.human() {
-			if err := m.hub.game.ShowLive(context.Background(), s.ID, s.run, n, m.shownAt); err != nil {
+			if err := m.hub.game.ShowLive(context.Background(), s.ID, s.run, n, m.shownAt, m.dealt[n]); err != nil {
 				slog.Error("live duel", "duel", m.id, "err", err)
 				m.cancel()
 				return
@@ -924,7 +925,7 @@ func (m *Match) Answer(by int64, n int, raw json.RawMessage) error {
 	if err != nil {
 		return ErrAnswer
 	}
-	res, err := m.hub.game.AnswerLive(context.Background(), s.ID, s.run, n, raw, at)
+	res, err := m.hub.game.AnswerLive(context.Background(), s.ID, s.run, n, raw, at, m.dealt[n])
 	if errors.Is(err, play.ErrOutOfStep) {
 		return ErrNotNow
 	}
@@ -966,7 +967,7 @@ func (m *Match) reveal() {
 	}
 	for _, s := range m.sides {
 		if !s.answered && s.human() {
-			if _, err := m.hub.game.AnswerLive(context.Background(), s.ID, s.run, m.n, nil, time.Now()); err != nil &&
+			if _, err := m.hub.game.AnswerLive(context.Background(), s.ID, s.run, m.n, nil, time.Now(), m.dealt[m.n]); err != nil &&
 				!errors.Is(err, play.ErrOutOfStep) {
 				slog.Error("live duel", "duel", m.id, "err", err)
 			}
@@ -1116,7 +1117,7 @@ func (m *Match) View(viewer int64) View {
 		if shown {
 			q.LeftMs = 0
 			q.NextMs = max(1, (m.pause - time.Since(m.revealedAt)).Milliseconds())
-			q.Reveal = &RevealView{Answer: d.Reveal(m.hub.game.Crowd(d.Question().Base().ID)), Points: me.gained, Speed: me.speed, Row: me.row, InRow: me.inRow,
+			q.Reveal = &RevealView{Answer: d.Reveal(m.hub.game.Crowd(d.Question())), Points: me.gained, Speed: me.speed, Row: me.row, InRow: me.inRow,
 				Right: me.right, Exact: me.exact, Missed: !me.answered}
 		}
 		v.Question = q

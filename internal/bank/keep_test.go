@@ -1,10 +1,12 @@
 package bank
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // A copy is the bank as Load reads it, and the next copy links the pictures it shares with this one.
@@ -130,5 +132,106 @@ func TestCommit(t *testing.T) {
 	}
 	if !strings.HasPrefix(main, Short(main)) || len(Short(main)) != 7 {
 		t.Errorf("Short: %q", Short(main))
+	}
+}
+
+// A copy keeps the pictures the bank no longer has, for KeepGone after they left: a play may still show the version of
+// a question they were in. Load doesn't count them as left behind.
+func TestCopyKeepsGonePictures(t *testing.T) {
+	from := filepath.Join(t.TempDir(), "bank")
+	if err := os.CopyFS(from, os.DirFS(sample)); err != nil {
+		t.Fatal(err)
+	}
+	first := filepath.Join(t.TempDir(), "first")
+	if err := Copy(from, first, ""); err != nil {
+		t.Fatal(err)
+	}
+	// A question with a picture leaves the bank, and its picture with it.
+	var gone *Image
+	files, _ := filepath.Glob(filepath.Join(from, QuestionsDir, "*.json"))
+	for _, f := range files {
+		data, _ := os.ReadFile(f)
+		var qs []json.RawMessage
+		if err := json.Unmarshal(data, &qs); err != nil {
+			t.Fatal(err)
+		}
+		for i, raw := range qs {
+			var q struct{ Image *Image }
+			_ = json.Unmarshal(raw, &q)
+			if q.Image != nil && gone == nil {
+				gone = q.Image
+				qs = append(qs[:i], qs[i+1:]...)
+				data, _ = json.Marshal(qs)
+				os.WriteFile(f, data, 0o644)
+				break
+			}
+		}
+	}
+	if gone == nil {
+		t.Fatal("no picture in the sample")
+	}
+	os.Remove(filepath.Join(from, ImagesDir, gone.File))
+	os.Remove(filepath.Join(from, ImagesDir, gone.Small()))
+
+	second := filepath.Join(t.TempDir(), "second")
+	if err := Copy(from, second, first); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{gone.File, gone.Small()} {
+		a, _ := os.Stat(filepath.Join(first, ImagesDir, f))
+		b, err := os.Stat(filepath.Join(second, ImagesDir, f))
+		if err != nil || !os.SameFile(a, b) {
+			t.Fatalf("%s isn't kept in the next copy: %v", f, err)
+		}
+	}
+	today := time.Now().Format(time.DateOnly)
+	if left := Gone(second); len(left) != 2 || left[gone.File] != today || left[gone.Small()] != today {
+		t.Fatalf("gone: %v", left)
+	}
+	_, problems := Load(second)
+	for _, p := range problems {
+		if strings.Contains(p.File, gone.File) {
+			t.Fatalf("a picture kept for plays is told as left behind: %v", p)
+		}
+	}
+	// It goes along to the next copy, with the day it left; and no longer, once that's KeepGone ago.
+	third := filepath.Join(t.TempDir(), "third")
+	if err := Copy(from, third, second); err != nil {
+		t.Fatal(err)
+	}
+	if left := Gone(third); left[gone.File] != today {
+		t.Fatalf("the day it left: %v", left)
+	}
+	fourth := filepath.Join(t.TempDir(), "fourth", ImagesDir)
+	if err := carry(filepath.Join(third, ImagesDir), fourth, time.Now().Add(KeepGone+24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(fourth, gone.File)); err == nil {
+		t.Fatal("kept past KeepGone")
+	}
+}
+
+// A picture's name is its content's hash: one changed under its name is refused (it's cached for good by its name).
+func TestPictureNamedByContent(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "bank")
+	if err := os.CopyFS(dir, os.DirFS(sample)); err != nil {
+		t.Fatal(err)
+	}
+	images, _ := filepath.Glob(filepath.Join(dir, ImagesDir, "????????????????.webp"))
+	if len(images) < 2 {
+		t.Fatal("too few pictures in the sample")
+	}
+	data, _ := os.ReadFile(images[1])
+	os.WriteFile(images[0], data, 0o644)
+	b, problems := Load(dir)
+	if b != nil {
+		t.Fatal("a bank with a picture changed under its name loads")
+	}
+	found := false
+	for _, p := range problems {
+		found = found || strings.Contains(p.Msg, "isn't named by its content")
+	}
+	if !found {
+		t.Fatalf("not told: %v", problems)
 	}
 }

@@ -169,7 +169,7 @@ func TestScriptedDayIsTheirsAlone(t *testing.T) {
 	if err := w.g.CountCrowds(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if c := w.g.Crowd(q.Base().ID); c == nil || c.Answers != 2 {
+	if c := w.g.Crowd(q); c == nil || c.Answers != 2 {
 		t.Fatalf("everyone's crowd: %+v, want Ana's and Cy's answers", c)
 	}
 }

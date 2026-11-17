@@ -1,7 +1,9 @@
 package bank
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -133,10 +135,16 @@ func (im *Image) check() []string {
 	return p
 }
 
-// checkFiles finds what's wrong with the picture's files in dir: both sizes there, light enough, and the shape the
-// question says.
+// checkFiles finds what's wrong with the picture's files in dir: both sizes there, light enough, the shape the
+// question says, and the picture named by its content (the first 16 hex digits of its SHA-256), as it's served:
+// cached for good, and found by its name in an earlier bank's copy while a play still shows it there.
 func (im *Image) checkFiles(dir string) []string {
 	var p []string
+	if imageFile.MatchString(im.File) {
+		if sum, err := hashOf(filepath.Join(dir, im.File)); err == nil && sum+".webp" != im.File {
+			p = append(p, fmt.Sprintf("%s isn't named by its content (%s.webp): a picture changed is a new file", im.File, sum))
+		}
+	}
 	for _, f := range []struct {
 		name string
 		w, h int
@@ -162,6 +170,20 @@ func (im *Image) checkFiles(dir string) []string {
 }
 
 func abs(n int) int { return max(n, -n) }
+
+// hashOf is the name a picture's file has by its content: the first 16 hex digits of its SHA-256.
+func hashOf(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)[:8]), nil
+}
 
 // webpSize reads a WebP file's width and height from its header (lossy VP8, lossless VP8L or extended VP8X).
 func webpSize(path string) (w, h int, err error) {

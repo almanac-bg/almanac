@@ -51,34 +51,61 @@ func TestBoardKeptAWhile(t *testing.T) {
 }
 
 // A day's crowd kept is shown fresh for a while; then one answer at a time counts it again, the others shown the
-// last count meanwhile; one too old, or of another bank, isn't shown.
+// last count meanwhile; one too old, or of another version of its question, isn't shown. With none kept, the first
+// answer counts it, and the others wait for that count.
 func TestDayCrowdCountedByOne(t *testing.T) {
 	var d dayCrowdCache
-	now, b, c := time.Date(2026, 11, 12, 10, 0, 0, 0, Bulgaria), &bank.Bank{}, &bank.Crowd{Answers: 300}
-	d.put("k", c, now, b)
-	if got, again := d.get("k", now.Add(time.Second), b); got != c || again {
-		t.Fatalf("fresh: %v %v", got, again)
+	now, c := time.Date(2026, 11, 12, 10, 0, 0, 0, Bulgaria), &bank.Crowd{Answers: 300}
+	d.put("k", "v1", c, now)
+	if k, lead, again := d.look("k", "v1", now.Add(time.Second)); d.crowd(k) != c || lead || again {
+		t.Fatalf("fresh: %v %v %v", k, lead, again)
 	}
 	later := now.Add(dayCrowdFresh)
-	if got, again := d.get("k", later, b); got != c || !again {
-		t.Fatalf("due, the first: %v %v", got, again)
+	if k, _, again := d.look("k", "v1", later); d.crowd(k) != c || !again {
+		t.Fatalf("due, the first: %v", again)
 	}
-	if got, again := d.get("k", later, b); got != c || again {
-		t.Fatalf("due, while it's counted: %v %v", got, again)
+	if k, _, again := d.look("k", "v1", later); d.crowd(k) != c || again {
+		t.Fatalf("due, while it's counted: %v", again)
 	}
-	d.put("k", c, later, b)
-	if _, again := d.get("k", later.Add(time.Second), b); again {
+	d.put("k", "v1", c, later)
+	if _, _, again := d.look("k", "v1", later.Add(time.Second)); again {
 		t.Fatal("counted again, still due")
 	}
-	if got, _ := d.get("k", later.Add(dayCrowdUsable), b); got != nil {
+	if k, lead, _ := d.look("k", "v1", later.Add(dayCrowdUsable)); d.crowd(k) != nil || !lead {
 		t.Fatal("shown too old")
 	}
-	if got, _ := d.get("k", later, &bank.Bank{}); got != nil {
-		t.Fatal("shown for another bank")
+	d.put("k", "v1", c, later)
+	if k, lead, _ := d.look("k", "v2", later); d.crowd(k) != nil || !lead {
+		t.Fatal("shown for another version")
 	}
 	d.drop("k")
-	if got, _ := d.get("k", later, b); got != nil {
-		t.Fatal("shown once dropped")
+	// None kept: the first counts, those meanwhile wait for it; a crowd too small to keep is for each to count.
+	k, lead, _ := d.look("k", "v1", later)
+	if !lead {
+		t.Fatal("nobody counts the first")
+	}
+	other, again, _ := d.look("k", "v1", later)
+	if again || other != k {
+		t.Fatal("two count the first")
+	}
+	select {
+	case <-other.ready:
+		t.Fatal("ready before its count")
+	default:
+	}
+	d.first("k", k, &bank.Crowd{Answers: 12}, 12, nil)
+	<-other.ready
+	if d.crowd(other) != nil {
+		t.Fatal("a crowd too small to keep, kept")
+	}
+	if _, lead, _ := d.look("k", "v1", later.Add(time.Second)); lead {
+		t.Fatal("counted first again, while the small one stands")
+	}
+	d.drop("k")
+	k, _, _ = d.look("k", "v1", later)
+	d.first("k", k, c, dayCrowdKeep, nil)
+	if k, lead, _ := d.look("k", "v1", later.Add(time.Second)); lead || d.crowd(k) != c {
+		t.Fatal("a first count big enough isn't kept")
 	}
 }
 

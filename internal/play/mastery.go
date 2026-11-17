@@ -3,11 +3,8 @@ package play
 import (
 	"context"
 	"database/sql"
-	"log/slog"
 	"math"
 	"slices"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
@@ -25,7 +22,8 @@ import (
 // year ago. The same ability over all topics shapes a run of all of them, and a duel.
 //
 // Nothing is stored: a player's answers are gone over again whenever it's asked for, against the questions'
-// hardness as it is now, so it's always as good as the answers and the bank allow.
+// hardness as last counted, so it's always as good as the answers and the bank allow. Questions retired as untrue
+// count for nothing.
 
 // MasteryTier is a band of mastery with a name: a player is in it from From percent of a topic known.
 type MasteryTier struct {
@@ -155,93 +153,75 @@ func masteryOf(category string, a ability, hardness []float64) Mastery {
 }
 
 // hardnesses are every question's hardness, and the live questions' by topic ("" for all of them), as the bank and
-// the answers have them now.
+// the answers had them when they were counted.
 type hardnesses struct {
 	byID    map[string]float64
 	byTopic map[string][]float64
 }
 
-// hardnessCache keeps the hardnesses for a while: answers change them slowly. Working them out goes over every
-// answer anyone has given, so it's done by one at a time, in the background once there's a count to show meanwhile:
-// a game never waits on it, except for the first count of a bank (a start, or a reload).
-type hardnessCache struct {
-	counting sync.Mutex // held while a count runs
-	snap     atomic.Pointer[hardnessSnap]
-}
-
-// hardnessSnap is a count of the hardnesses: when, and of which bank.
-type hardnessSnap struct {
-	at   time.Time
-	bank *bank.Bank
-	h    *hardnesses
+// of is a question's hardness: as counted, or, for one the count didn't have (the bank changed since), what its label
+// says.
+func (h *hardnesses) of(q bank.Question) float64 {
+	if v, ok := h.byID[q.Base().ID]; ok {
+		return v
+	}
+	return hardnessOf(labelKnown[q.Base().Difficulty])
 }
 
 // hardness is how hard each question is: what its label says, and, the more answers it has, what they say (people's:
-// FairAnswers).
+// FairAnswers; to it as it is now: versions.go). Answers change it slowly, and working it out goes over every answer
+// anyone has given, so it's kept (snapshot.go) and counted again every hardnessFresh in the background: a game waits
+// only for the server's first count.
 func (g *Game) hardness(ctx context.Context) (*hardnesses, error) {
-	c := &g.hard
-	b, now := g.Bank(), g.Now()
-	s := c.snap.Load()
-	if s != nil && s.bank == b {
-		if (now.Sub(s.at) >= hardnessFresh || now.Before(s.at)) && c.counting.TryLock() {
-			go func() {
-				defer c.counting.Unlock()
-				ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
-				defer cancel()
-				if err := g.countHardness(ctx, now, b); err != nil {
-					slog.Warn("counting the questions' hardness", "err", err)
-				}
-			}()
-		}
-		return s.h, nil
-	}
-	c.counting.Lock()
-	defer c.counting.Unlock()
-	if s := c.snap.Load(); s != nil && s.bank == b { // counted while this one waited
-		return s.h, nil
-	}
-	if err := g.countHardness(ctx, now, b); err != nil {
-		return nil, err
-	}
-	return c.snap.Load().h, nil
+	return g.hard.get(ctx, g.Now(), g.Bank(), hardnessFresh, g.countHardness)
 }
 
-// countHardness works the hardnesses out from the answers, as of now, for a bank.
-func (g *Game) countHardness(ctx context.Context, now time.Time, b *bank.Bank) error {
+// countHardness works the hardnesses out from the answers, as of now, for a bank. A question retired as untrue
+// (bank.Tail.Untrue) has none: its answers say nothing of anyone's knowledge (abilities leave them out).
+func (g *Game) countHardness(ctx context.Context, now time.Time, b *bank.Bank) (*hardnesses, error) {
 	type tally struct {
-		n   int
-		sum float64
+		counted Counted
+		n       int
+		sum     float64
 	}
 	answered := make(map[string]*tally, len(b.Questions))
+	for _, q := range b.Questions {
+		if !q.Extra().Untrue() {
+			answered[q.Base().ID] = &tally{counted: g.CountedOf(q)}
+		}
+	}
 	// Summed here, not by GROUP BY: SQLite would sort every answer by its question for it, or go through them in the
 	// question's index and look each one's score up, both many times slower than reading them as they lie.
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, score FROM answers WHERE `+FairAnswers)
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, version, score, at FROM answers WHERE `+FairAnswers)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
 	var id []byte
+	var version sql.NullInt64
 	var score float64
+	var at int64
 	for rows.Next() {
-		if err := rows.Scan(&id, &score); err != nil {
-			return err
+		if err := rows.Scan(&id, &version, &score, &at); err != nil {
+			return nil, err
 		}
-		t := answered[string(id)] // no copy of the id for a lookup
-		if t == nil {
-			t = &tally{}
-			answered[string(id)] = t
+		if t := answered[string(id)]; t != nil && t.counted.Counts(version, at) { // no copy of the id for a lookup
+			t.n++
+			t.sum += score
 		}
-		t.n++
-		t.sum += score
 	}
 	if err := rows.Err(); err != nil {
-		return err
+		return nil, err
 	}
 	h := &hardnesses{byID: make(map[string]float64, len(b.Questions)), byTopic: map[string][]float64{}}
 	for _, q := range b.Questions {
 		head := q.Base()
+		t := answered[head.ID]
+		if t == nil {
+			continue // untrue
+		}
 		known := labelKnown[head.Difficulty]
-		if t := answered[head.ID]; t != nil {
+		if t.n > 0 {
 			luck := chanceOf(q)
 			seen := min(max((t.sum/float64(t.n)-luck)/(1-luck), 0.02), 0.98) // above chance, as calibrate.go
 			known = (float64(t.n)*seen + hardnessPrior*known) / float64(t.n+hardnessPrior)
@@ -252,8 +232,7 @@ func (g *Game) countHardness(ctx context.Context, now time.Time, b *bank.Bank) e
 			h.byTopic[""] = append(h.byTopic[""], h.byID[head.ID])
 		}
 	}
-	g.hard.snap.Store(&hardnessSnap{at: now, bank: b, h: h})
-	return nil
+	return h, nil
 }
 
 type querier interface {
@@ -261,7 +240,8 @@ type querier interface {
 }
 
 // abilities goes over a player's answers, oldest first, up to a time (ms; 0 for all of them): their ability in each
-// topic, and over all of them.
+// topic, and over all of them. The answers to a question that turned out untrue (bank.Tail.Untrue: its key was wrong,
+// or stopped being right) say nothing of what a player knows, and are left out.
 func (g *Game) abilities(ctx context.Context, db querier, h *hardnesses, userID, until int64) (map[string]ability, ability, error) {
 	topics, all := map[string]ability{}, newAbility()
 	rows, err := db.QueryContext(ctx, `SELECT a.question_id, a.score FROM answers a JOIN runs r ON r.id = a.run_id
@@ -278,17 +258,18 @@ func (g *Game) abilities(ctx context.Context, db querier, h *hardnesses, userID,
 			return nil, all, err
 		}
 		q, ok := b.Get(id)
-		if !ok {
-			continue // gone from the bank
+		if !ok || q.Extra().Untrue() {
+			continue // gone from the bank, or untrue
 		}
 		head := q.Base()
 		a, ok := topics[head.Category]
 		if !ok {
 			a = newAbility()
 		}
-		a.learn(score, h.byID[id], chanceOf(q))
+		hard := h.of(q)
+		a.learn(score, hard, chanceOf(q))
 		topics[head.Category] = a
-		all.learn(score, h.byID[id], chanceOf(q))
+		all.learn(score, hard, chanceOf(q))
 	}
 	return topics, all, rows.Err()
 }

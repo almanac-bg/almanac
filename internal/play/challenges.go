@@ -32,7 +32,9 @@ import (
 // the taker has answered before. Anyone else's moves no rating, and the sender hears of those quietly: one line on
 // Начало for all of them since they last heard (ChallengeNewsOf), and a push at most once a day.
 //
-// It can be taken for ChallengeFor from when it was sent; sent again, its time starts again.
+// It can be taken for ChallengeFor from when it was sent; sent again, its time starts again. Its questions are played
+// as the sender was shown them (versions.go), so that both played the same game; one that has left the game since as
+// untrue (its key was wrong) ends it: nobody takes it after (ErrChallengeGone).
 
 // ChallengeFor is how long a challenge can be taken, from when it was sent: a weekend in a group's chat, and not so
 // long that a friend's turn hangs for a week.
@@ -51,6 +53,9 @@ var (
 	ErrNoChallengeRun = errors.New("no game to challenge with")
 	// ErrManyWaiting is a friend with MaxWaiting of the player's challenges waiting unstarted.
 	ErrManyWaiting = errors.New("too many challenges waiting")
+	// ErrChallengeGone is a challenge with a question that has left the game since as untrue (bank.Tail.Untrue), or
+	// left the bank: it can't be played as it was.
+	ErrChallengeGone = errors.New("a question of the challenge left the game")
 )
 
 // Challenge sends one of the player's finished games of ten: its link, made the first time and the same after, and to
@@ -412,6 +417,14 @@ func (g *Game) TakeChallenge(ctx context.Context, viewer int64, code string) (St
 		var picks []Pick
 		if err := json.Unmarshal([]byte(raw), &picks); err != nil {
 			return err
+		}
+		// The same game, question for question: each as the sender was shown it (Pick.V), whatever the bank has
+		// become since. But not one that turned out untrue: its key was wrong, and no game is graded against it again.
+		for _, p := range picks {
+			now, ok := g.Bank().Get(p.ID)
+			if _, shown := g.question(p); !ok || !shown || now.Extra().Untrue() {
+				return ErrChallengeGone
+			}
 		}
 		r, err := g.insertRun(tx, viewer, "duel", nil, nil, picks)
 		if err != nil {

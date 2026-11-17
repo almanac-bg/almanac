@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"cmp"
+	"database/sql"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -172,21 +173,34 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// How each question goes, once enough have answered it to tell: the answers tallied here as they lie, in one
-	// pass (a GROUP BY would have SQLite sort them all, twice, many times slower).
-	type tally struct{ n, right, ms int }
+	// pass (a GROUP BY would have SQLite sort them all, twice, many times slower); those to it as it is now
+	// (play.Counted), if it's in the bank.
+	type tally struct {
+		n, right, ms int
+		counted      *play.Counted
+	}
 	tallies := map[string]*tally{}
-	if rows, err := db.QueryContext(ctx, `SELECT question_id, is_right, ms FROM answers WHERE `+play.FairAnswers); err == nil {
+	if rows, err := db.QueryContext(ctx, `SELECT question_id, version, at, is_right, ms FROM answers WHERE `+play.FairAnswers); err == nil {
 		var id []byte
+		var version sql.NullInt64
+		var at int64
 		var right bool
 		var ms int
 		for rows.Next() {
-			if rows.Scan(&id, &right, &ms) != nil {
+			if rows.Scan(&id, &version, &at, &right, &ms) != nil {
 				continue
 			}
 			t := tallies[string(id)] // no copy of the id for a lookup
 			if t == nil {
 				t = &tally{}
+				if q, ok := b.Get(string(id)); ok {
+					c := s.game.CountedOf(q)
+					t.counted = &c
+				}
 				tallies[string(id)] = t
+			}
+			if t.counted != nil && !t.counted.Counts(version, at) {
+				continue
 			}
 			t.n++
 			t.ms += ms
@@ -229,8 +243,10 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		var pick int
+		c := s.game.CountedOf(q)
 		if db.QueryRowContext(ctx, `SELECT json_extract(given, '$.pick') p FROM answers WHERE question_id = ? AND given IS NOT NULL
-			AND json_extract(given, '$.pick') > 0 AND `+play.FairAnswers+` GROUP BY p ORDER BY count(*) DESC LIMIT 1`, st.ID).Scan(&pick) == nil {
+			AND json_extract(given, '$.pick') > 0 AND (version = ? OR version IS NULL AND at >= ?) AND `+play.FairAnswers+`
+			GROUP BY p ORDER BY count(*) DESC LIMIT 1`, st.ID, c.Version, c.From).Scan(&pick) == nil {
 			data.Hardest[i].Lure = bank.Option(q, pick)
 		}
 	}

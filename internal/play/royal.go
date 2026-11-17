@@ -124,7 +124,8 @@ func drawRoyal(b *bank.Bank, seen, barred map[string]bool, r *mrand.Rand) []Pick
 	for _, s := range royalSlots() {
 		if q := choose(pool, s, allowed, fresh, nil, r); q != nil {
 			taken[q.Base().ID] = true
-			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
+			// The version too, from the start: the evening deals its questions once, and its every run plays them so.
+			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64(), V: bank.Version(q)})
 		}
 	}
 	return picks
@@ -418,11 +419,11 @@ func (g *Game) RevealRoyal(ctx context.Context, royalID int64) (RoyalShown, erro
 }
 
 // AnswerRoyal grades a player's answer to a tournament's question n, the one showing (whether they're still in or
-// play on after a cut), which arrived at at (its time is to then). Who goes on is RevealRoyal's to say, once the
-// answer shows, and the crowd shows then too, to everyone at once (none comes with the result). What the game earned,
-// if this answer ended it (State.Done), is AfterRoyal's.
-func (g *Game) AnswerRoyal(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time) (Result, error) {
-	return g.answer(ctx, userID, runID, n, answer, at, byRoyal)
+// play on after a cut), which arrived at at (its time is to then), against the question as the evening deals it (d).
+// Who goes on is RevealRoyal's to say, once the answer shows, and the crowd shows then too, to everyone at once (none
+// comes with the result). What the game earned, if this answer ended it (State.Done), is AfterRoyal's.
+func (g *Game) AnswerRoyal(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time, d bank.Dealt) (Result, error) {
+	return g.answer(ctx, userID, runID, n, answer, at, byRoyal, d)
 }
 
 // AfterRoyal keeps what a player's Роял earned them once its game is over for them: all a game earns (afterRun) if

@@ -54,6 +54,7 @@ var playerErrors = map[error]*apiError{
 	play.ErrNoDuel:         {http.StatusNotFound, "no_duel", "Този дуел вече го няма."},
 	play.ErrNoChallenge:    {http.StatusNotFound, "no_challenge", "Това предизвикателство вече го няма."},
 	play.ErrChallengeOver:  {http.StatusGone, "challenge_over", "Времето за това предизвикателство изтече."},
+	play.ErrChallengeGone:  {http.StatusGone, "challenge_over", "Въпрос от това предизвикателство се оказа грешен, затова то вече не може да се играе."},
 	play.ErrOwnChallenge:   {http.StatusConflict, "own_challenge", "Това е твоето предизвикателство. Прати го на някого."},
 	play.ErrNoChallengeRun: {http.StatusBadRequest, "no_challenge_run", "Предизвикателство става само от завършена игра от десет въпроса."},
 	play.ErrManyWaiting:    {http.StatusConflict, "many_challenges", "Три твои предизвикателства вече чакат този приятел. Изчакай да изиграе някое."},

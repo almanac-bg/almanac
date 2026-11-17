@@ -117,7 +117,8 @@ func DrawRoom(b *bank.Bank, category string, n int, mix Mix, barred map[string]b
 	for _, s := range newKind(roomSlots(n, mix), r) {
 		if q := choose(pool, s, allowed, fresh, wishes(s), r); q != nil {
 			taken[q.Base().ID] = true
-			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
+			// A room deals its game as it starts, and keeps it: the version too.
+			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64(), V: bank.Version(q)})
 		}
 	}
 	return picks
@@ -168,9 +169,9 @@ func (g *Game) RecordRoom(ctx context.Context, userID int64, p RoomPlay) (int64,
 			if a.Given != nil {
 				giv, shown, given = string(a.Given), string(a.Shown), true
 			}
-			if _, err := tx.Exec(`INSERT INTO answers (run_id, n, question_id, given, shown, score, points, is_right, ms, at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, r.id, a.N, p.Picks[a.N].ID, giv, shown, a.Score, a.Points, a.Right,
-				a.Ms, store.Ms(a.At)); err != nil {
+			if _, err := tx.Exec(`INSERT INTO answers (run_id, n, question_id, given, shown, score, points, is_right, ms, at, version)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, r.id, a.N, p.Picks[a.N].ID, giv, shown, a.Score, a.Points, a.Right,
+				a.Ms, store.Ms(a.At), g.versionOf(p.Picks[a.N])); err != nil {
 				return err
 			}
 			gained += xp(bank.Graded{Given: a.Given, Score: a.Score})
