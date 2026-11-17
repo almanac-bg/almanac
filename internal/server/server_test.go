@@ -1104,7 +1104,7 @@ func TestReminderNamesAFriend(t *testing.T) {
 			rights = int(r["rights"].(float64))
 		}
 	}
-	if want := fmt.Sprintf("%s има %d от 10 днес. Серията ти е 1 ден.", anaName, rights); s.reminder(ctx, today, boID).Body != want {
+	if want := fmt.Sprintf("%s позна %d от 10 днес. Серията ти е 1 ден.", anaName, rights); s.reminder(ctx, today, boID).Body != want {
 		t.Fatalf("with a friend: %q, want %q", s.reminder(ctx, today, boID).Body, want)
 	}
 	// Cy isn't Ana's friend, and has no streak.
@@ -1193,7 +1193,7 @@ func TestLinkPreviews(t *testing.T) {
 	_, friends := p.call("GET", "/api/friends", nil)
 	link := friends["invite"].(string)
 	who := me["user"].(map[string]any)["name"].(string)
-	if body := page(link[len(g.url):]); !strings.Contains(body, `og:title" content="`+who+` те кани на днешните 10 в АЛМАНАХ"`) ||
+	if body := page(link[len(g.url):]); !strings.Contains(body, `og:title" content="`+who+` те кани на въпросите на деня в АЛМАНАХ"`) ||
 		!strings.Contains(body, `og:description" content="Десет въпроса за днес, едни и същи за всички. Колко ще познаеш ти?"`) {
 		t.Fatalf("the invite's preview:\n%s", body[:min(len(body), 1500)])
 	}

@@ -6,6 +6,7 @@
 import { picture } from "../art/picture.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
+import { listWords } from "../lib/words.ts";
 import { user } from "../state.ts";
 import {
   type AchievementInfo,
@@ -82,7 +83,7 @@ function achievements(p: Progress): Child {
       ? h(
           "details",
           { class: "more" },
-          h("summary", null, `Всички постижения (${rest.length})`),
+          h("summary", null, `Останалите постижения (${rest.length})`),
           tiers.map((tier) => {
             const all = p.achievements.filter((a) => a.tier === tier);
             const left = rest.filter((a) => a.tier === tier);
@@ -101,7 +102,7 @@ function achievements(p: Progress): Child {
                 ? h(
                     "p",
                     { class: "tier-reward" },
-                    `Първото ${tierWords[tier].one} постижение отключва ${p.tierUnlocks[tier]?.map(unlockWords).join(" и ")}.`,
+                    `Първото ${tierWords[tier].one} постижение отключва ${listWords(p.tierUnlocks[tier]?.map(unlockWords) ?? [])}.`,
                   )
                 : null,
               h(
@@ -165,11 +166,11 @@ export function howItWorks(open?: Open): Child {
       open?.xp
         ? item(
             "XP и нива. ",
-            `XP носят верните отговори (и по малко всеки опит), всяка цел за деня, всяко постижение${open.league ? " и първите три места в седмицата на лигата" : ""}. XP вдига нивото, а нивата отключват титли, рамки, фонове и короната.`,
+            `XP носят отговорите (верните — повече), всяка цел за деня, всяко постижение${open.league ? " и първите три места в седмицата на лигата" : ""}. XP вдига нивото, а нивата отключват титли, рамки, фонове и короната.`,
           )
         : null,
       open?.rating
-        ? item("Рейтинг и дивизии. ", "Дуелите и Роял местят рейтинга. Нова дивизия отключва титла, рамка или фон.")
+        ? item("Рейтинг и дивизии. ", "Дуелите и Роял променят рейтинга. Нова дивизия отключва титла, рамка или фон.")
         : null,
       open?.league
         ? item(
@@ -186,7 +187,7 @@ export function howItWorks(open?: Open): Child {
       open?.xp
         ? item(
             "Цели за деня. ",
-            "Три на ден, за XP. Изпълниш ли и трите, печелиш резервен ден, както и с всеки седми ден поред: ако пропуснеш ден, серията ти остава.",
+            "Три на ден, за XP. Изпълниш ли и трите, печелиш резервен ден; такъв носи и всеки седми ден поред. Ако пропуснеш ден, резервният пази серията ти.",
           )
         : null,
       item(
@@ -211,7 +212,11 @@ function secret(list: Progress["achievements"]): Child {
         { class: "achievement-name" },
         list.length === 1 ? "Скрито постижение" : `${list.length} скрити постижения`,
       ),
-      h("span", { class: "achievement-about" }, "Откриваш ги, докато играеш."),
+      h(
+        "span",
+        { class: "achievement-about" },
+        list.length === 1 ? "Откриваш го, докато играеш." : "Откриваш ги, докато играеш.",
+      ),
       h(
         "span",
         { class: "achievement-reward" },

@@ -83,7 +83,7 @@ func TestStreakMail(t *testing.T) {
 		}
 		byTo[m.To] = m.Text
 	}
-	if !strings.Contains(byTo["ana@example.bg"], "Изиграй ги днес заедно с още една игра и серията ти се връща.") {
+	if !strings.Contains(byTo["ana@example.bg"], "Изиграй ги днес заедно с още една игра и серията ти ще се върне.") {
 		t.Fatalf("Ana's, with the repair on offer: %q", byTo["ana@example.bg"])
 	}
 	if !strings.Contains(byTo["ha@example.bg"], "Днес можеш да започнеш нова серия.") {
@@ -113,14 +113,14 @@ func TestStreakMailOff(t *testing.T) {
 		b, _ := io.ReadAll(res.Body)
 		return string(b)
 	}
-	if body := page("GET", link); !strings.Contains(body, "Не искам такива писма") {
+	if body := page("GET", link); !strings.Contains(body, "Спри писмата") {
 		t.Fatalf("the page: %s", body)
 	}
 	if on, _ := s.wantsMail(t.Context(), anaID, mailStreak); !on {
 		t.Fatal("opening the link turned the mail off")
 	}
 	forged := strings.Replace(link, "u="+fmt.Sprint(anaID), "u="+fmt.Sprint(anaID+1), 1)
-	if body := page("POST", forged); !strings.Contains(body, "не е вярна") {
+	if body := page("POST", forged); !strings.Contains(body, "не работи") {
 		t.Fatalf("a forged link: %s", body)
 	}
 	if body := page("POST", link); !strings.Contains(body, "Готово") {

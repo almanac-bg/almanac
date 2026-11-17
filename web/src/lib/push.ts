@@ -63,7 +63,7 @@ export async function turnOn(): Promise<string | null> {
     // The browser's push service said no. Brave keeps it off until it's switched on; the others have it on.
     reportProblem(`push subscribe: ${(err as Error).name}: ${(err as Error).message}`);
     return /Brave/.test(navigator.userAgent) || "brave" in navigator
-      ? "Brave изключва известията по подразбиране. Включи ги от Настройки → Поверителност и сигурност → „Use Google services for push messaging“ и опитай пак."
+      ? "Brave изключва известията по подразбиране. Отвори brave://settings/privacy, включи „Use Google services for push messaging“ и опитай пак."
       : "Браузърът не успя да включи известията. Опитай пак или в друг браузър (Chrome, Firefox, Safari).";
   }
   try {
@@ -76,7 +76,7 @@ export async function turnOn(): Promise<string | null> {
   return null;
 }
 
-const denied = "Браузърът не позволи известия. Може да ги разрешиш от настройките му за сайта.";
+const denied = "Браузърът не позволи известия. Можеш да ги разрешиш от настройките на браузъра за този сайт.";
 
 export async function turnOff(): Promise<void> {
   if (inApp) return (await phone()).turnOff(api);

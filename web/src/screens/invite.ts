@@ -1,6 +1,6 @@
 // An invite link: a player's own, sent to a friend, and the link their shared day's result ends with. It brings
 // whoever opens it to the day: how its owner did today („Мария има 8 от 10 днес. А ти?“, or „Мария те кани на
-// днешните 10“ before she has played), the day's ten played right here, then the day's result as Начало has it (the
+// въпросите на деня“ before they have played), the day's ten played right here, then the day's result as Начало has it (the
 // streak, what it earned, tomorrow), with one card more: the two results side by side and the friendship, a tap away,
 // never by itself (then a duel is a tap away).
 
@@ -10,6 +10,7 @@ import type { State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal, slot } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
+import { withName } from "../lib/words.ts";
 import { player, user } from "../state.ts";
 import { type Today, today } from "./today.ts";
 
@@ -105,9 +106,9 @@ export function invite([code = ""]: string[]) {
         ? `${i.by} има ${i.their} от 10 днес. А ти?`
         : (mine !== undefined && both(mine)) ||
           (i.friends
-            ? `Вече сте приятели с ${i.by}`
+            ? `Вече сте приятели ${withName(i.by)}`
             : mine === undefined
-              ? `${i.by} те кани на днешните 10`
+              ? `${i.by} те кани на въпросите на деня`
               : `${i.by} иска да сте приятели`);
     return h(
       "section",
@@ -122,11 +123,13 @@ export function invite([code = ""]: string[]) {
           { class: "lead" },
           mine === undefined
             ? `Десет въпроса за днес, едни и същи за всички.${user() ? "" : " Без регистрация: играеш веднага."}`
-            : "Приятелите виждат резултатите си за деня и се предизвикват на дуел.",
+            : "Приятелите виждат резултатите си един на друг и се предизвикват.",
         ),
       ),
       // The day's ten first, while they wait; then being friends.
-      mine === undefined ? h("button", { class: "btn primary big", onclick: playDay }, "Играй днешните 10") : null,
+      mine === undefined
+        ? h("button", { class: "btn primary big", onclick: playDay }, "Играй въпросите на деня")
+        : null,
       friendship(mine !== undefined),
       alert,
     );

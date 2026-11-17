@@ -255,9 +255,9 @@ func (s *Server) reminder(ctx context.Context, today string, userID int64) push.
 	}
 	switch {
 	case best != nil && streak > 0:
-		m.Body = fmt.Sprintf("%s има %d от %d днес. Серията ти е %s.", best.Name, best.Rights, play.Length, days(streak))
+		m.Body = fmt.Sprintf("%s позна %d от %d днес. Серията ти е %s.", best.Name, best.Rights, play.Length, days(streak))
 	case best != nil:
-		m.Body = fmt.Sprintf("%s има %d от %d днес. А ти?", best.Name, best.Rights, play.Length)
+		m.Body = fmt.Sprintf("%s позна %d от %d днес. А ти?", best.Name, best.Rights, play.Length)
 	case streak > 0:
 		m.Body = fmt.Sprintf("Серията ти е %s. Не я прекъсвай: десет въпроса, до полунощ.", days(streak))
 	default:

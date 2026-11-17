@@ -90,7 +90,7 @@ export function goalsCard(): Child {
         all3
           ? `И трите са изпълнени: имаш ${reserveWords(d.reserve)} за серията.`
           : d.reserve >= d.reserveMax
-            ? `Резервните ти дни са пълни: ${d.reserve} от ${d.reserveMax}.`
+            ? `Имаш всички резервни дни: ${d.reserve} от ${d.reserveMax}.`
             : "Изпълни и трите: +1 резервен ден за серията.",
       ),
     );

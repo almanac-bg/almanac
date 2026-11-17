@@ -529,7 +529,7 @@ function unlockRow(u: Unlock, worn: string, told = false): Child {
       "span",
       { class: "unlock-text" },
       h("strong", { class: u.kind === "title" ? "unlock-title-name" : undefined }, cap(unlockWords(u))),
-      told ? null : h("span", { class: "unlock-about" }, `С ${u.from}.`),
+      told ? null : h("span", { class: "unlock-about" }, `${/^„?[сз]/i.test(u.from) ? "Със" : "С"} ${u.from}.`),
     ),
     wear(u, worn),
   );

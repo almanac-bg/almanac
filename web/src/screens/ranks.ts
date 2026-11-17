@@ -10,7 +10,7 @@ import { type Child, h, type Signal, signal } from "../lib/dom.ts";
 import { type By, boardHash, readBoard } from "../lib/hash.ts";
 import { rename, title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
-import { failure, type Open, type Standing, segmented, type Tier, toneOf, topicMark } from "../ui.ts";
+import { failure, formatNumber, type Open, type Standing, segmented, type Tier, toneOf, topicMark } from "../ui.ts";
 import { type LeagueView, leagueBoard, loadLeague } from "./league.ts";
 
 interface Ranked {
@@ -183,7 +183,7 @@ export function ranks() {
             : h("p", { class: "board-empty" }, "Още никой от приятелите ти не е играл днес.");
         return t.board.top.length
           ? board(
-              `Днес · ${t.board.players} ${t.board.players === 1 ? "играч" : "играчи"}`,
+              `Днес · ${formatNumber(t.board.players)} ${t.board.players === 1 ? "играч" : "играчи"}`,
               t.board.top,
               t.board.place,
               t.board.mine,
@@ -206,7 +206,7 @@ export function ranks() {
             // „72% · Експерт“: the mastery, as a topic's tile says it (play/knowledge.go).
             (r) => [`${r.value}%`, r.tier ? h("small", { class: "sub" }, ` · ${r.tier}`) : null],
             `Още никой няма ${d.least ?? 100} отговора${name ? " в тази тема" : ""}.`,
-            `Колко от ${name ? "въпросите в темата" : "всички въпроси"} знае всеки по всичките си отговори, като по-трудните тежат повече. В класацията са тези с поне ${d.least ?? 100} отговора${name ? " в темата" : ""}.`,
+            `Каква част от ${name ? "въпросите в темата" : "всички въпроси"} знае всеки, според всичките му отговори. По-трудните тежат повече. В класацията са играчите с поне ${d.least ?? 100} отговора${name ? " в темата" : ""}.`,
           );
         }
       }

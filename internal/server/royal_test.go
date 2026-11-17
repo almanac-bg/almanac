@@ -23,7 +23,7 @@ func TestRefusal(t *testing.T) {
 		{royal.ErrClosed, royal.Glance{Now: at(16, 22, 0), OpensAt: at(17, 22, 50)}, "Входът за Роял се отваря утре в 22:50."},
 		{royal.ErrClosed, royal.Glance{Now: at(15, 22, 0), OpensAt: at(17, 20, 45)}, "Входът за Роял се отваря във вторник в 20:45."},
 		{royal.ErrShut, royal.Glance{Now: at(14, 21, 2), Next: at(15, 21, 0)},
-			"Роял вече тече, а закъснелите влизат до 3-тия въпрос. Следващият е утре в 21:00."},
+			"Роял вече тече, а закъснелите влизат само до 3-тия въпрос. Следващият е утре в 21:00."},
 	} {
 		if got := refusal(c.err, c.g); got != c.want {
 			t.Errorf("%v at %v: %q, want %q", c.err, time.UnixMilli(c.g.Now), got, c.want)

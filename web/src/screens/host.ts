@@ -1,7 +1,7 @@
 // A room as its host sees it when they lead it from a big screen („Само водя“: a class's board, a pub's TV) and
 // don't play: the code to come in by, with its link as a QR code; each question large, with its clock and how many
 // have answered; the answer with its fact and the first five; the podium. And the pace: „Напред“ (the answer now, or
-// the next question), „Задръж“ (each answer stays up until „Напред“, to talk it over), „Край“. The players' phones
+// the next question), „Задръж“ (each answer stays up until „Напред“, to talk it over), „Приключи“. The players' phones
 // are as in any room. Part of room.ts's file, loaded with it; its style (host.css) loads the first time it shows.
 
 import type { ApiError } from "../lib/api.ts";
@@ -197,7 +197,7 @@ function controls(view: () => RoomView, code: string): Child {
       h("button", { class: "btn primary", type: "button", onclick: () => lead(code, "next", error.set) }, "Напред"),
       h("button", { class: "btn", type: "button", "aria-pressed": () => !!view().held, onclick: hold }, "Задръж"),
       h("button", { class: () => (sure() ? "btn danger" : "btn"), type: "button", onclick: finish }, () =>
-        sure() ? "Да, край" : "Край",
+        sure() ? "Да, приключи" : "Приключи",
       ),
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
@@ -215,15 +215,19 @@ function end(view: () => RoomView, code: string): Child {
       { class: "intro" },
       h("p", { class: "kicker" }, () => `Стая ${spaced(code)} · ${about(view())}`),
       h("h1", null, () => {
-        const [best, next] = view().players;
-        if (best && next?.place === 1) return `${best.name} и ${next.name} делят първото място`;
-        return best ? `${best.name} печели` : "Край";
+        const top = view().players.filter((p) => p.place === 1);
+        if (top.length > 1)
+          return `${top
+            .slice(0, -1)
+            .map((p) => p.name)
+            .join(", ")} и ${top.at(-1)?.name} делят първото място`;
+        return top[0] ? `${top[0].name} печели` : "Край";
       }),
     ),
     podium(view),
     standings(view, false),
     nextSteps(
-      h("button", { class: "btn primary big", onclick: () => lead(code, "start", error.set) }, "Нова игра"),
+      h("button", { class: "btn primary big", onclick: () => lead(code, "start", error.set) }, "Започни нова игра"),
       [],
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),

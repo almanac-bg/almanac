@@ -450,7 +450,7 @@ function streakNotice(t: Today): Child {
   const key = t.kept ? `kept:${t.kept}` : t.ended ? `ended:${t.ended.on}` : "";
   if (!key || !tellStreak(key)) return null;
   const text = t.kept
-    ? `Резервен ден запази серията ти ${onDay(t.kept)}. Серия: ${t.streak === 1 ? "1 ден" : `${t.streak} дни`}.`
+    ? `${onDay(t.kept).replace(/^./, (c) => c.toUpperCase())} резервен ден запази серията ти. Серия: ${t.streak === 1 ? "1 ден" : `${t.streak} дни`}.`
     : `Серията ти от ${t.ended?.days} дни прекъсна. ${t.run?.done ? "Днес започна нова." : "Днес започва нова."}`;
   return h("p", { class: "streak-notice", role: "status" }, picture(t.kept ? "shield" : "flame", "reserve-pic"), text);
 }
@@ -601,7 +601,7 @@ function dayCard(t: Today, start: () => void, marks: Mark[], error: string): Chi
         "p",
         { class: "muted" },
         at
-          ? `Следва въпрос ${at + 1} от 10. Довърши ги до полунощ.`
+          ? `Следва въпрос ${at + 1} от 10. Довърши играта до полунощ.`
           : "По един от всяка тема, от лесен към труден. Едни и същи за всички, с един опит.",
       ),
       stakeLine(t.streak, t.reserve ?? 0),
@@ -616,8 +616,8 @@ function dayCard(t: Today, start: () => void, marks: Mark[], error: string): Chi
           { class: "day-meta" },
           // Who has played today, once someone has: a zero says only that the place is empty.
           players
-            ? `Около 3 минути · ${players} ${players === 1 ? "човек е играл" : "души са играли"} днес`
-            : "Около 3 минути",
+            ? `Около три минути · ${players} ${players === 1 ? "човек е играл" : "души са играли"} днес`
+            : "Около три минути",
         ),
     friendsPlayed(t),
   );
@@ -638,7 +638,11 @@ function friendsDay(t: Today): Child {
   const all = t.friends ?? [];
   if (!all.length)
     return t.befriended === false
-      ? h("p", { class: "day-next" }, h("a", { href: "/friends" }, "Покани приятел и сравнявайте всеки ден."))
+      ? h(
+          "p",
+          { class: "day-next" },
+          h("a", { href: "/friends" }, "Покани приятел и сравнявайте резултатите си всеки ден."),
+        )
       : null;
   const mine = all.findIndex((s) => s.me);
   if (mine < 0) return null;
@@ -705,7 +709,8 @@ function untilMidnight(): string {
   const sofia = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Sofia" }));
   const minutes = 24 * 60 - (sofia.getHours() * 60 + sofia.getMinutes());
   const hours = Math.floor(minutes / 60);
-  return hours > 0 ? `${hours} ч и ${minutes % 60} мин` : `${minutes} мин`;
+  if (!hours) return `${minutes} мин`;
+  return minutes % 60 ? `${hours} ч и ${minutes % 60} мин` : `${hours} ч`;
 }
 
 /** Where the reminder's asks are kept, on this device (notifications are a device's): how many, the last one's day. */

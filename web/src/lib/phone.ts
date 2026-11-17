@@ -187,7 +187,7 @@ export async function pushOn(call: Call): Promise<boolean> {
 /** Turns notifications on (the phone asks the player), or says why not. */
 export async function turnOn(call: Call): Promise<string | null> {
   if (!(await allowed(true))) {
-    return "Телефонът не позволи известия. Може да ги разрешиш от настройките му за АЛМАНАХ.";
+    return "Телефонът не позволи известия. Можеш да ги разрешиш от настройките на телефона за АЛМАНАХ.";
   }
   const t = await token();
   await call("POST", "/api/push/phone", { platform, token: t });

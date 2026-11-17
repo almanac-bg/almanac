@@ -161,7 +161,7 @@ func TestRecordingsNews(t *testing.T) {
 	w.wait(8 * time.Hour)
 	duel(bo, w.right)
 	w.wait(16 * time.Hour)
-	if r := news(); r == nil || r.Text != "Вчера 1 човек игра срещу запис на твоя игра." {
+	if r := news(); r == nil || r.Text != "Вчера един човек игра срещу запис на твоя игра." {
 		t.Fatalf("yesterday's evening, the next day: %+v", r)
 	}
 }
@@ -172,9 +172,9 @@ func TestRecordingsWords(t *testing.T) {
 		people, games, won    int
 		want                  string
 	}{
-		{true, true, 3, 3, 2, "Днес 3 души играха срещу записи на твои игри. Записите ти спечелиха 2 от дуелите."},
-		{true, true, 1, 1, 1, "Днес 1 човек игра срещу запис на твоя игра. Записът ти спечели дуела."},
-		{false, false, 1, 2, 2, "Вчера 1 човек игра срещу записи на твои игри. Записите ти спечелиха всички дуели."},
+		{true, true, 3, 3, 2, "Днес 3 души играха срещу записи на твои игри. Записите ти спечелиха 2 от 3 дуела."},
+		{true, true, 1, 1, 1, "Днес един човек игра срещу запис на твоя игра. Записът ти спечели дуела."},
+		{false, false, 1, 2, 2, "Вчера един човек игра срещу записи на твои игри. Записите ти спечелиха всички дуели."},
 		{false, true, 2, 2, 0, "Вчера и днес 2 души играха срещу записи на твои игри."},
 	} {
 		if got := recordingsWords(c.firstToday, c.lastToday, c.people, c.games, c.won); got != c.want {

@@ -114,7 +114,7 @@ function rules(v: LeagueView): Child {
       h(
         "p",
         { class: "board-note" },
-        `Всяка седмица играчите се състезават в групи до 20 души по точките от въпросите на деня. Пропуснат ден носи нула точки. В неделя в полунощ първите се качват в по-висока лига, последните слизат, а първите трима печелят ${v.pay[0]}, ${v.pay[1]} и ${v.pay[2]} XP. В група под ${v.race} души няма качване и награди.`,
+        `Всяка седмица играчите се състезават в групи до 20 души по точките от въпросите на деня. Пропуснат ден носи нула точки. В полунощ срещу понеделник първите се качват в по-висока лига, последните слизат, а първите трима печелят ${v.pay[0]}, ${v.pay[1]} и ${v.pay[2]} XP. В група под ${v.race} души няма нито качване, нито награди.`,
       ),
     ),
   ];
@@ -177,11 +177,11 @@ export function leagueBoard(v: LeagueView): Child {
       rules(v),
     );
   const n = v.group.length;
-  const unit = v.onXP ? " XP" : " точки";
+  const unit = (points: number) => (v.onXP ? " XP" : points === 1 ? " точка" : " точки");
   const rows: Child[] = [];
   v.group.forEach((r, i) => {
     if (v.down && i === n - v.down) rows.push(h("li", { class: "league-line down" }, "Оттук слизат"));
-    const row = boardRow(i + 1, r.name, [formatNumber(r.points), h("small", { class: "sub" }, unit)], {
+    const row = boardRow(i + 1, r.name, [formatNumber(r.points), h("small", { class: "sub" }, unit(r.points))], {
       me: r.me,
       look: r,
       tag: r.tag,

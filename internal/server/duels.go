@@ -289,11 +289,11 @@ func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 		if err := s.db.Read.QueryRowContext(ctx, `SELECT kind FROM duels WHERE id = ?`, n.DuelID).Scan(&kind); err != nil || kind != "challenge" {
 			return
 		}
-		word := map[string]string{"won": "Победа", "lost": "Загуба", "draw": "Равенство"}[n.Outcome]
-		m.Title = fmt.Sprintf("%s срещу %s", word, n.From)
+		word := map[string]string{"won": "Победа срещу", "lost": "Загуба срещу", "draw": "Равенство с"}[n.Outcome]
+		m.Title = fmt.Sprintf("%s %s", word, n.From)
 		m.Body = ratingWords(n.Delta)
 		if n.Friendly {
-			m.Body = "Приятелски дуел: вече сте играли днес, рейтингът не се мени."
+			m.Body = "Дуел без рейтинг: днес вече сте играли."
 		}
 	default:
 		return
@@ -380,14 +380,14 @@ func (s *Server) leagueNews(ctx context.Context, n play.LeagueNews) {
 	if open, err := s.game.OpenOf(ctx, n.To); err != nil || !open.League {
 		return
 	}
-	body := fmt.Sprintf("%s в %s.", place(n.Place, n.Of), n.From.Name)
+	body := fmt.Sprintf("%s в лига %s.", place(n.Place, n.Of), n.From.Name)
 	switch {
 	case n.Now.Tier > n.From.Tier:
-		body += " Качваш се в " + n.Now.Name + "."
+		body += " Качваш се в лига " + n.Now.Name + "."
 	case n.Now.Tier < n.From.Tier:
-		body += " Слизаш в " + n.Now.Name + "."
+		body += " Слизаш в лига " + n.Now.Name + "."
 	default:
-		body += " Оставаш в " + n.Now.Name + "."
+		body += " Оставаш в лига " + n.Now.Name + "."
 	}
 	if n.XP > 0 {
 		body += fmt.Sprintf(" +%d XP.", n.XP)

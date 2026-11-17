@@ -22,7 +22,7 @@ import (
 //   - mastery: „Майстор · …“ and „Светило · …“ for reaching that mastery in a topic, „Всезнание“ for „Експерт“ in
 //     every topic and „Оракул“ for „Светило“ in three;
 //   - the rating and the leagues: a division reached, a Роял won, and first place in a week of Рила, which counts
-//     how many times („Двукратен шампион на Рила“).
+//     how many times („Три купи на Рила“).
 //
 // Each has a tier, the colour it's worn in.
 
@@ -47,7 +47,7 @@ const (
 // Titles are every title but the topics' (made from the bank's topics) and the champion's: the rating's, the level's
 // ladder, then the achievements', each group from the first a player is likely to earn.
 var Titles = []Title{
-	{"goldStandard", "Златен стандарт", Rare, TitleRank, unlock{division: "gold"}, ""},
+	{"goldStandard", "Чисто злато", Rare, TitleRank, unlock{division: "gold"}, ""},
 	{"diamondMind", "Диамантен ум", Epic, TitleRank, unlock{division: "diamond"}, ""},
 	{"livingLegend", "Жива легенда", Legendary, TitleRank, unlock{division: "legend"}, ""},
 	{"royalCrown", "Короната на Роял", Epic, TitleRank, unlock{royal: 1}, ""},
@@ -62,8 +62,8 @@ var Titles = []Title{
 	{"loyalty", "Вярност към Алманаха", Epic, TitleLevel, unlock{level: 25}, ""},
 	{"longevity", "Дълголетие", Epic, TitleLevel, unlock{level: 30}, ""},
 	{"endurance", "Издръжливост", Epic, TitleLevel, unlock{level: 35}, ""},
-	{"keeper", "Пазител на Алманаха", Legendary, TitleLevel, unlock{level: 40}, ""},
-	{"chronicler", "Летописец", Legendary, TitleLevel, unlock{level: 45}, ""},
+	{"keeper", "Стълб на Алманаха", Legendary, TitleLevel, unlock{level: 40}, ""},
+	{"chronicler", "Летопис на дните", Legendary, TitleLevel, unlock{level: 45}, ""},
 	{"almanac", "Жив алманах", Legendary, TitleLevel, unlock{level: 50}, ""},
 
 	{"everyDay", "Всеки ден по малко", Rare, TitleAchievement, unlock{achieved: "streak7"}, ""},
@@ -72,7 +72,7 @@ var Titles = []Title{
 	{"sharpEye", "Остър поглед", Rare, TitleAchievement, unlock{achieved: "exact"}, ""},
 	{"seeker", "Търсещ ум", Rare, TitleAchievement, unlock{achieved: "allTopics"}, ""},
 	{"heartOfGame", "Сърцето на играта", Rare, TitleAchievement, unlock{achieved: "friends5"}, ""},
-	{"duelInstinct", "Дуелен инстинкт", Epic, TitleAchievement, unlock{achieved: "duel10"}, ""},
+	{"duelInstinct", "Инстинкт за победа", Epic, TitleAchievement, unlock{achieved: "duel10"}, ""},
 	{"polymath", "Всестранен ум", Epic, TitleAchievement, unlock{achieved: "allTypes"}, ""},
 	{"unquenched", "Неугасим пламък", Epic, TitleAchievement, unlock{achieved: "streak30"}, ""},
 	{"purpose", "Целеустременост", Epic, TitleAchievement, unlock{achieved: "fullDays30"}, ""},
@@ -106,7 +106,7 @@ func (g *Game) titles() []Title {
 			name := MasteryTiers[t.tier].Name
 			list = append(list, Title{ID: topicTitleID(t.tier, c.ID), Name: name + " · " + c.Name, Tier: t.shows,
 				Group: TitleTopic, by: unlock{topic: c.ID, mastery: t.tier},
-				about: "стигни до „" + name + "“ в „" + c.Name + "“"})
+				about: "„" + name + "“ в „" + c.Name + "“"})
 		}
 	}
 	return append(list, acrossTopics...)
@@ -162,21 +162,16 @@ func (w wardrobe) titleViews(all []Title) []TitleView {
 	return list
 }
 
-// how says what unlocks a title, for whoever hasn't yet: an achievement's how (a hidden one isn't told), or the
-// unlock's.
+// how says what unlocks a title, for whoever hasn't yet, as a phrase after „Отключва се:“: the topic's mastery, the
+// achievement (a hidden one isn't named), or the unlock's.
 func (t Title) how() string {
 	if t.about != "" {
 		return t.about
 	}
-	if t.by.achieved == "" {
-		return t.by.how()
-	}
-	a, _ := achievementByID(t.by.achieved)
-	if a.Hidden {
+	if a, ok := achievementByID(t.by.achieved); ok && a.Hidden {
 		return "скрито постижение"
 	}
-	first, n := utf8.DecodeRuneInString(a.About)
-	return string(unicode.ToLower(first)) + a.About[n:]
+	return t.by.how()
 }
 
 // wears is whether a player with this wardrobe may wear a title: one they've unlocked, or the champion's, won.
@@ -223,20 +218,16 @@ func LevelTitle(level int) string {
 // championID is the champion's title, as a player wears it: first place in a week of the top league.
 const championID = "champion"
 
-// times say how many times, before a title („Двукратен“); past ten, in digits.
-var times = []string{"", "", "Двукратен", "Трикратен", "Четирикратен", "Петкратен", "Шесткратен", "Седемкратен",
-	"Осемкратен", "Деветкратен", "Десеткратен"}
-
-// ChampionTitle is the champion's title, won n times: „Шампион на Рила“, „Трикратен шампион на Рила“.
+// ChampionTitle is the champion's title, won n times: „Купата на Рила“, „Три купи на Рила“ (a cup won, not „шампион“,
+// so that it's the same for anyone who wears it).
 func ChampionTitle(n int) (string, Tier) {
 	top := " на " + Leagues[TopLeague].Name
-	switch {
-	case n <= 1:
-		return "Шампион" + top, Legendary
-	case n < len(times):
-		return times[n] + " шампион" + top, Legendary
+	if n <= 1 {
+		return "Купата" + top, Legendary
 	}
-	return strconv.Itoa(n) + "-кратен шампион" + top, Legendary
+	w := inWords(n)
+	first, size := utf8.DecodeRuneInString(w)
+	return string(unicode.ToUpper(first)) + w[size:] + " купи" + top, Legendary
 }
 
 // royalWins is how many Роял tournaments a player has won (first place, with someone else in it).

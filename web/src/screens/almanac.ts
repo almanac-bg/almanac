@@ -101,13 +101,13 @@ function head(c: Counts, topic: () => string, waiting: () => number): Child {
         return ` от ${formatNumber(of)} ${of === 1 ? "факт" : "факта"} в „${categories.find((x) => x.id === t)?.name ?? ""}“`;
       }),
     ),
-    h("p", { class: "muted" }, "Фактът зад всеки въпрос, на който отговори вярно, ден по ден."),
+    h("p", { class: "muted" }, "Фактът към всеки въпрос, на който отговори вярно, ден по ден."),
     () =>
       waiting()
         ? h(
             "a",
             { class: "second-chance", href: "/mistakes" },
-            `${questions(waiting())} ${waiting() === 1 ? "чака" : "чакат"} втори шанс`,
+            `${questions(waiting())} ${waiting() === 1 ? "чака" : "чакат"} Втори шанс`,
           )
         : null,
   );
@@ -222,7 +222,7 @@ function pages(topic: string, counted: (c: Counts) => void): Child {
           "p",
           { class: "muted" },
           topic
-            ? "Тук още няма факти. Отговори вярно на въпрос от тази тема и ще дойдат."
+            ? "Тук още няма факти. Отговори вярно на въпрос от тази тема и фактът му ще се появи тук."
             : "Още няма факти. Всеки верен отговор носи един.",
         ),
       () => days,

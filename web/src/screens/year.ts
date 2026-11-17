@@ -94,7 +94,7 @@ function slides(y: Year): Child[] {
       slide(
         "Най-силната ти тема",
         topicName(y.topic.category),
-        `Знаеш ${y.topic.known}% от въпросите в нея: ${y.topic.name}.`,
+        `Знаеш ${y.topic.known}% от въпросите в нея. Степен: ${y.topic.name}.`,
       ),
     );
   if (y.facts)
@@ -119,14 +119,18 @@ function slides(y: Year): Child[] {
     );
   if (y.royal)
     out.push(
-      slide("Роял", `${ordinal(y.royal, "n")} място`, `Най-доброто ти от ${count(y.royalOf ?? 0, "играч", "играчи")}.`),
+      slide(
+        "Роял",
+        `${ordinal(y.royal, "n")} място`,
+        `Най-доброто ти класиране, сред ${count(y.royalOf ?? 0, "играч", "играчи")}.`,
+      ),
     );
   if (y.league)
     out.push(
       slide(
         "Лигата",
         h("span", { class: "year-league" }, leagueEmblem(y.league.tier, "l"), y.league.name),
-        "Най-високо, докъдето стигна.",
+        "Най-високата лига, до която стигна.",
       ),
     );
   out.push(slide("XP за годината", `+${formatNumber(y.xp)}`, "Благодарим ти, че играеш."));

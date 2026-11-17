@@ -291,7 +291,7 @@ func (a *Accounts) SendCode(ctx context.Context, email string) error {
 			To:      email,
 			Subject: "Кодът ти за АЛМАНАХ: " + code,
 			Text: "Кодът ти за вход в АЛМАНАХ е:\n\n    " + code + "\n\n" +
-				"Важи 15 минути. Ако не ти трябва, просто не го използвай.\n\nalmanac.bg\n",
+				"Важи 15 минути. Ако не очакваш такъв код, просто не обръщай внимание на писмото.\n\nalmanac.bg\n",
 		})
 	})
 	if err == nil {

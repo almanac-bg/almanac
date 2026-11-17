@@ -12,6 +12,6 @@ export function missing() {
       h("h1", null, "Тази страница я няма"),
       h("p", { class: "lead" }, "Може връзката да е стара или да има грешка в нея."),
     ),
-    h("a", { class: "btn primary big", href: "/" }, "Към днешните въпроси"),
+    h("a", { class: "btn primary big", href: "/" }, "Към въпросите на деня"),
   );
 }

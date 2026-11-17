@@ -35,7 +35,7 @@ test("a guest keeps their game with a code by email, and can sign out", async ({
   await page.getByRole("button", { name: "Влез" }).click();
   await expect(page.getByText(`Влизаш с ${email}`)).toBeVisible();
   // With an email and notifications on no device, a streak's end may come by mail: on, and the player's to stop.
-  const mail = page.getByRole("switch", { name: "По имейл, когато серията ми прекъсне" });
+  const mail = page.getByRole("switch", { name: "Имейл, когато серията ти прекъсне" });
   await expect(mail).toHaveAttribute("aria-checked", "true");
   await mail.click();
   await expect(mail).toHaveAttribute("aria-checked", "false");
@@ -43,14 +43,14 @@ test("a guest keeps their game with a code by email, and can sign out", async ({
   await expect(mail).toHaveAttribute("aria-checked", "false");
   await page.getByRole("button", { name: "Излез" }).click();
   // Signed out: said so, the way back in, and this device's own settings still here.
-  await expect(page.getByText("Излезе от профила.")).toBeVisible();
+  await expect(page.getByText("Излезе от профила си.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Прати ми код" })).toBeVisible();
   await expect(page.getByRole("switch", { name: "Звуци" })).toBeVisible();
   await expect(page.getByRole("switch", { name: "По-малко движение" })).toBeVisible();
   // Said there, once: Начало, next, doesn't say it again.
   await page.locator("nav.tabs").getByRole("link", { name: "Начало" }).click();
   await expect(page.locator(".card.day")).toBeVisible();
-  await expect(page.getByText("Излезе от профила.")).toHaveCount(0);
+  await expect(page.getByText("Излезе от профила си.")).toHaveCount(0);
 });
 
 test("a code tried too often is dead, and a new one goes at once", async ({ page }, info) => {

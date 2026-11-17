@@ -38,7 +38,7 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   // far along, what it gives.
   await expect(page.getByRole("heading", { name: "Най-близо" })).toBeVisible();
   await expect(page.getByRole("heading", { name: /Легендарни/ })).toBeHidden();
-  await page.getByText(/^Всички постижения \(\d+\)$/).click();
+  await page.getByText(/^Останалите постижения \(\d+\)$/).click();
   await expect(page.getByRole("heading", { name: "Легендарни · 0 от 6" })).toBeVisible();
   const row = (name: string) => page.locator(".achievement", { hasText: name }).last();
   await expect(row("Петдесет победи")).toContainText("Спечели петдесет дуела.");
@@ -58,15 +58,15 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await page.getByRole("tab", { name: "Титла" }).click();
   await page.getByText(/Още \d+ за отключване/).click();
   await expect(page.locator(".title-pick.locked", { hasText: "Сто изгрева" })).toContainText(
-    "Отключва се: играй въпросите на деня сто дни поред.",
+    "Отключва се: постижението „Сто дни“",
   );
   await page.getByRole("tab", { name: "Аватар" }).click();
   await page.getByRole("button", { name: "Таралеж", exact: true }).click();
   await expect(page.getByRole("button", { name: "Таралеж", exact: true })).toHaveAttribute("aria-pressed", "true");
   // Avatars are pictures (art/pictures.ts), loaded after the first screen: the hedgehog is drawn on its tile.
   await expect(page.locator('.pick[aria-pressed="true"] .avatar-pic path').first()).toBeAttached();
-  await page.getByRole("button", { name: "Корона, заключено" }).click();
-  await expect(page.getByText("Короната се отключва на ниво 10.")).toBeVisible();
+  await page.getByRole("button", { name: "Корона, заключен аватар" }).click();
+  await expect(page.getByText("Корона. Отключва се: ниво 10.")).toBeVisible();
 
   // Sounds are on until turned off, and stay off on this device.
   await page.goto("/settings");

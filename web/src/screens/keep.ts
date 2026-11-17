@@ -26,7 +26,8 @@ export function keepLine(days: () => number, streak: () => number): Child {
   };
   // What's at stake: the game in this app's browser only, or on this device.
   const stake = () => {
-    if (app) return `Играта ти е само тук, ${app.app ? `в ${app.app}` : "в това приложение"}.`;
+    if (app)
+      return `Играта ти е само тук, ${app.app ? `${/^[ВвФфVvFf]/.test(app.app) ? "във" : "в"} ${app.app}` : "в това приложение"}.`;
     const n = streak();
     return n >= 2 ? `Серията ти от ${n} дни е само на това устройство.` : "Играта ти е само на това устройство.";
   };
@@ -93,7 +94,7 @@ function outside(stake: string, platform: string, keep: Child): Child {
               copy = Promise.reject(err);
             }
             copy.then(
-              () => said.set("Копирано. Отвори Safari и постави връзката горе, в адреса."),
+              () => said.set("Копирано. Отвори Safari и постави връзката в адресното поле."),
               () => make().then((u) => said.set(u), fail), // no clipboard here: the link, to copy by hand
             );
           },

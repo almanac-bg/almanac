@@ -69,8 +69,8 @@ export function crowdLine(type: View["type"], c: Crowd | undefined, right: boole
     clues: `Вярно отговарят ${s}.`,
     number: `Достатъчно близо са ${s}.`,
     order: `Изцяло вярно подреждат ${s}.`,
-    match: `Всички двойки свързват ${s}.`,
-    split: `Всичко на място слагат ${s}.`,
+    match: `Всички двойки свързват вярно ${s}.`,
+    split: `Всичко разпределят вярно ${s}.`,
   }[type];
   return h("p", { class: "crowd-says" }, says);
 }
@@ -129,23 +129,23 @@ export function answered(view: View, reveal: Reveal, given: Answer | null): Chil
   return a.node;
 }
 
-/** The right answer as a screen reader says it after a miss, where one short sentence holds it: „Вярно е: Бийтълс.“
+/** The right answer as a screen reader says it after a miss, where one short sentence holds it: „Верният отговор е Бийтълс.“
  * (none for an order, pairs or groups: their rows say it). */
 export function spokenAnswer(view: View, reveal: Reveal): string {
   switch (view.type) {
     case "choice": {
       const pick = reveal.pick ?? -1;
       const name = reveal.names?.[pick] ?? view.choices?.[pick] ?? view.pictures?.[pick]?.alt;
-      return name ? `Вярно е: ${name}.` : "";
+      return name ? `Верният отговор е ${name}.` : "";
     }
     case "clues": {
       const name = view.choices[reveal.pick ?? -1];
-      return name ? `Вярно е: ${name}.` : "";
+      return name ? `Верният отговор е ${name}.` : "";
     }
     case "truefalse":
       return reveal.truth ? "Твърдението е вярно." : "Твърдението е невярно.";
     case "number":
-      return `Вярно е: ${formatNumber(reveal.value ?? 0, view.step)}${view.unit ? ` ${view.unit}` : ""}.`;
+      return `Верният отговор е ${formatNumber(reveal.value ?? 0, view.step)}${view.unit ? ` ${view.unit}` : ""}.`;
     default:
       return "";
   }
@@ -381,7 +381,7 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
               type: "button",
               disabled: locked,
               "aria-pressed": negative,
-              "aria-label": "Под нулата",
+              "aria-label": "Минус",
               onclick: () => negative.update((n) => !n),
             },
             "−",
