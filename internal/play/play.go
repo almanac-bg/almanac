@@ -4,13 +4,19 @@
 //
 // A question's time runs only while it's shown: Show starts it, Answer stops it. A question with pictures waits for
 // them: Show starts its time PictureWait later, and Start sooner, once the player's screen has them in, so that a slow
-// line doesn't eat the time, and the server still says when it runs. Between questions a player reads the
-// answer and its fact for as long as they like; a question of the day's ten dealt on its own date („На този ден“)
-// shows its day's line with them (dealtOn). A question left showing past its time counts as unanswered, whenever
-// the run is next looked at. Everything a run does goes through the database, so a refresh, a second tab or a
-// restart of the server changes nothing. A run left half-way goes on where it stopped: the day's when the player comes
-// back to it, a topic's when they start the same topic again that day (StartTopic). A game played quicker than a
-// person plays counts for its player alone (fair.go).
+// line doesn't eat the time, and the server still says when it runs. Until its time runs, the screen gets the pictures
+// only (bank.PicturesView): its words and options come with its time, and an answer before it is refused, so that
+// nobody reads a question off the clock. Between questions a player reads the answer and its fact for as long as they
+// like; a question of the day's ten dealt on its own date („На този ден“) shows its day's line with them (dealtOn). A
+// question left showing past its time counts as unanswered, whenever the run is next looked at. Everything a run does
+// goes through the database, so a refresh, a second tab or a restart of the server changes nothing. A run left
+// half-way goes on where it stopped: the day's when the player comes back to it, a topic's when they start the same
+// topic again that day (StartTopic). A game played quicker than a person plays counts for its player alone (fair.go).
+//
+// A run played live (a live duel's, a Роял's) moves on its game's clock alone (driver): the game shows each question
+// and takes each answer (ShowLive and AnswerLive, ShowRoyal and AnswerRoyal), and the player's own Show, Start and
+// Answer refuse it, so that nobody sees a question before the others do, nor answers it outside its time. An answer
+// counts if it reaches the server within Grace of its time's end; its time is to when it arrived.
 package play
 
 import (
@@ -34,7 +40,8 @@ const (
 	// MaxPoints is what a perfect, quick answer to a medium question is worth (an easy one's less, a hard one's more,
 	// one in a row of right answers more: worth).
 	MaxPoints = 1000
-	// Grace is how late an answer may arrive and still count: the trip from the player's screen to the server.
+	// Grace is how late an answer may arrive and still count: the trip from the player's screen to the server, on a
+	// slow phone's line too.
 	Grace = 2 * time.Second
 	// PictureWait is the longest a question's time waits for its pictures to come in (four of them, on a slow line),
 	// and so the most anyone gets to look before it runs.
@@ -48,10 +55,13 @@ func Limit(q bank.Question) time.Duration {
 	case "truefalse":
 		return 10 * time.Second
 	case "order", "match", "split", "clues":
-		return 30 * time.Second
+		return LongestLimit
 	}
 	return 20 * time.Second
 }
+
+// LongestLimit is the longest any question is shown (Limit).
+const LongestLimit = 30 * time.Second
 
 // Bulgaria is where the game's days begin and end.
 var Bulgaria, _ = time.LoadLocation("Europe/Sofia")
@@ -147,6 +157,50 @@ func scanRun(row scanner) (*run, error) {
 		return nil, err
 	}
 	return &r, json.Unmarshal([]byte(picks), &r.picks)
+}
+
+// driver is who moves a run on: its player (Show, Start, Answer), or the live game it's played in, on that game's
+// clock: its live duel (ShowLive, AnswerLive) or its Роял (ShowRoyal, AnswerRoyal).
+type driver int
+
+const (
+	byPlayer driver = iota
+	byDuel
+	byRoyal
+)
+
+// driver says who moves a run on. A live duel's run is its duel's for good: one cut off (the server restarted under
+// it) stays where it stopped, never played on alone, as its duel ended without a result.
+func (r *run) driver(tx *sql.Tx) (driver, error) {
+	switch r.kind {
+	case "royal":
+		return byRoyal, nil
+	case "duel":
+		var live bool
+		err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM duels WHERE kind = 'live' AND (a_run = ?1 OR b_run = ?1))`,
+			r.id).Scan(&live)
+		if live {
+			return byDuel, err
+		}
+		return byPlayer, err
+	}
+	return byPlayer, nil
+}
+
+// loadBy reads a player's run that by moves on: another's (a live game's, when by is its player) is out of step.
+func loadBy(tx *sql.Tx, userID, runID int64, by driver) (*run, error) {
+	r, err := load(tx, userID, runID)
+	if err != nil {
+		return nil, err
+	}
+	d, err := r.driver(tx)
+	if err != nil {
+		return nil, err
+	}
+	if d != by {
+		return nil, ErrOutOfStep
+	}
+	return r, nil
 }
 
 // dealtOn is the day a run's questions are dealt for, as „На този ден“ goes: the day's questions' date, "" for any
@@ -272,6 +326,9 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 				MoreMs: bank.NextStep(d, max(0, since)).Milliseconds(), StartsMs: max(0, -since.Milliseconds()),
 				OnThisDay: r.dealtOn() != "" && d.Question().Extra().OnDay(r.dealtOn()),
 			}
+			if since < 0 { // waiting for its pictures: those only, until its time runs
+				s.Question.View, s.Question.MoreMs = bank.PicturesView(d), 0
+			}
 		}
 	}
 	return s, nil
@@ -384,36 +441,22 @@ func (g *Game) State(ctx context.Context, userID, runID int64) (State, error) {
 }
 
 // Show puts the next question on screen and starts its time (the one already showing keeps its time); a question
-// with pictures, PictureWait later at most (Start).
+// with pictures, PictureWait later at most (Start). A run a live game moves on is out of step (driver).
 func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
-	return g.show(ctx, userID, runID, PictureWait)
-}
-
-// ShowNow puts the next question on screen and starts its time at once, pictures or not: a live duel's, whose clock
-// is the match's.
-func (g *Game) ShowNow(ctx context.Context, userID, runID int64) (State, error) {
-	return g.show(ctx, userID, runID, 0)
-}
-
-func (g *Game) show(ctx context.Context, userID, runID int64, wait time.Duration) (State, error) {
 	var s State
 	ended := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		r, err := load(tx, userID, runID)
+		r, err := loadBy(tx, userID, runID, byPlayer)
 		if err != nil {
 			return err
 		}
 		if ended, err = g.settle(tx, r); err != nil {
 			return err
 		}
-		if r.kind == "royal" { // its questions show when the tournament shows them
-			s, err = g.state(tx, r)
-			return err
-		}
 		if !r.finished && !r.shownAt.Valid {
 			start := g.Now()
 			if d, ok := g.deal(r.picks[r.at]); ok && bank.HasPictures(d.Question()) {
-				start = start.Add(wait)
+				start = start.Add(PictureWait)
 			}
 			if err := r.startAt(tx, start); err != nil {
 				return err
@@ -428,11 +471,26 @@ func (g *Game) show(ctx context.Context, userID, runID int64, wait time.Duration
 	return s, err
 }
 
+// ShowLive puts question n of a live duel's run on screen, its time starting at at: the duel's own moment for it, the
+// same for both players, pictures or not (the duel keeps the time). It's out of step if the run isn't at n.
+func (g *Game) ShowLive(ctx context.Context, userID, runID int64, n int, at time.Time) error {
+	return g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		r, err := loadBy(tx, userID, runID, byDuel)
+		if err != nil {
+			return err
+		}
+		if r.finished || r.at != n {
+			return ErrOutOfStep
+		}
+		return r.startAt(tx, at)
+	})
+}
+
 // Start starts the time of question n, shown and waiting for its pictures, now that the player's screen has them in.
 func (g *Game) Start(ctx context.Context, userID, runID int64, n int) (State, error) {
 	var s State
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		r, err := load(tx, userID, runID)
+		r, err := loadBy(tx, userID, runID, byPlayer)
 		if err != nil {
 			return err
 		}
@@ -460,34 +518,35 @@ func (r *run) startAt(tx *sql.Tx, t time.Time) error {
 
 // Answer grades an answer to question n, the one showing. A null answer gives up on it. An answer to the question just
 // answered is one sent again, its reply lost on the way (a line that dropped, a server restarting): it gets the answer
-// taken the first time, as it was, and changes nothing (again).
+// taken the first time, as it was, and changes nothing (again). One before the question's time runs (still waiting for
+// its pictures), or to a run a live game moves on (driver), is out of step.
 func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage) (Result, error) {
-	return g.answer(ctx, userID, runID, n, answer, g.Now(), false)
+	return g.answer(ctx, userID, runID, n, answer, g.Now(), byPlayer)
 }
 
-// AnswerAt is Answer for an answer that arrived at at: its time is to then, whatever it waited for after (a live game
-// busy with others' answers).
-func (g *Game) AnswerAt(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time) (Result, error) {
-	return g.answer(ctx, userID, runID, n, answer, at, false)
+// AnswerLive grades a player's answer to question n of their live duel, which arrived at at: its time is to then,
+// whatever it waited for after (the duel busy with the other's answer).
+func (g *Game) AnswerLive(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time) (Result, error) {
+	return g.answer(ctx, userID, runID, n, answer, at, byDuel)
 }
 
-// answer grades an answer that arrived at at; a Роял run's only as its tournament's (royal), so that it keeps the
-// tournament's pace.
-func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time, royal bool) (Result, error) {
+// answer grades an answer that arrived at at, to a run that by moves on: its player's, or the live game's it's played
+// in, which keeps its pace (and takes an answer sent again itself).
+func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time, by driver) (Result, error) {
 	var res Result
 	var r *run
 	var d bank.Dealt
 	finished := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var err error
-		if r, err = load(tx, userID, runID); err != nil {
+		if r, err = loadBy(tx, userID, runID, by); err != nil {
 			return err
 		}
-		if n == r.at-1 && !royal && r.kind != "royal" {
+		if n == r.at-1 && by == byPlayer {
 			res, d, err = g.again(tx, r, n)
 			return err
 		}
-		if r.finished || n != r.at || (r.kind == "royal") != royal {
+		if r.finished || n != r.at {
 			return ErrOutOfStep
 		}
 		defer func() { finished = r.finished }()
@@ -496,7 +555,11 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 		if !ok || !r.shownAt.Valid {
 			return ErrOutOfStep
 		}
-		took := max(0, at.Sub(time.UnixMilli(r.shownAt.Int64))) // before its time starts: at once
+		took := at.Sub(time.UnixMilli(r.shownAt.Int64))
+		if took < 0 && by == byPlayer { // still waiting for its pictures: its words aren't on screen yet
+			return ErrOutOfStep
+		}
+		took = max(0, took)
 		limit := Limit(d.Question())
 		var gr bank.Graded
 		switch {

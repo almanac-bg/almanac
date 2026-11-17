@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -134,24 +135,61 @@ func (w *world) play(user, runID int64, answers ...func(int64, int) json.RawMess
 	w.t.Helper()
 	var s State
 	for n, answer := range answers {
-		if _, err := w.g.Show(w.t.Context(), user, runID); err != nil {
-			w.t.Fatal(err)
-		}
-		if _, err := w.g.Start(w.t.Context(), user, runID, n); err != nil { // its pictures in, if it has any
-			w.t.Fatal(err)
-		}
+		w.show(user, runID)
 		if w.pace != nil {
 			w.wait(w.pace(n))
 		} else {
 			w.wait(3 * time.Second)
 		}
-		res, err := w.g.Answer(w.t.Context(), user, runID, n, answer(runID, n))
+		res, err := w.answer(user, runID, n, answer(runID, n))
 		if err != nil {
 			w.t.Fatalf("answer %d: %v", n, err)
 		}
 		s = res.State
 	}
 	return s
+}
+
+// live says whether a run is a live duel's, which its duel moves on (internal/live), not its player.
+func (w *world) live(runID int64) bool {
+	var live bool
+	_ = w.db.Read.QueryRow(`SELECT EXISTS (SELECT 1 FROM duels WHERE kind = 'live' AND (a_run = ?1 OR b_run = ?1))`,
+		runID).Scan(&live)
+	return live
+}
+
+// show shows a run's next question and starts its time, its pictures in at once if it has any, as a screen does; a
+// live duel's, as its duel does.
+func (w *world) show(user, runID int64) State {
+	w.t.Helper()
+	ctx := w.t.Context()
+	if w.live(runID) {
+		s, err := w.g.State(ctx, user, runID)
+		if err == nil {
+			err = w.g.ShowLive(ctx, user, runID, s.At, w.now)
+		}
+		if err != nil {
+			w.t.Fatal(err)
+		}
+		s, _ = w.g.State(ctx, user, runID)
+		return s
+	}
+	s, err := w.g.Show(ctx, user, runID)
+	if err == nil && s.Question != nil && s.Question.StartsMs > 0 {
+		s, err = w.g.Start(ctx, user, runID, s.Question.N)
+	}
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	return s
+}
+
+// answer answers a run's question n now, as its player does; a live duel's, through its duel.
+func (w *world) answer(user, runID int64, n int, a json.RawMessage) (Result, error) {
+	if w.live(runID) {
+		return w.g.AnswerLive(w.t.Context(), user, runID, n, a, w.now)
+	}
+	return w.g.Answer(w.t.Context(), user, runID, n, a)
 }
 
 func repeat(f func(int64, int) json.RawMessage, n int) []func(int64, int) json.RawMessage {
@@ -462,7 +500,8 @@ func TestChallengeHalfPlayed(t *testing.T) {
 }
 
 // A question with a picture waits for it: its time starts once the player's screen has it in, or PictureWait after
-// it's shown at the latest. A live duel's starts at once (the match keeps the time).
+// it's shown at the latest. Until then the screen has its pictures only, and an answer is refused: nobody reads it, nor
+// answers it, off the clock.
 func TestPictureTime(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -478,12 +517,26 @@ func TestPictureTime(t *testing.T) {
 		t.Fatal("geo-901 has no picture")
 	}
 
-	// Shown, waiting: the full time, and when it starts by itself.
+	// Shown, waiting: the full time, and when it starts by itself; its picture to load, and not a word of it.
 	shown, _ := w.g.Show(ctx, u, s.ID)
 	if q := shown.Question; q == nil || q.LeftMs != q.LimitMs || q.StartsMs != PictureWait.Milliseconds() {
 		t.Fatalf("shown, waiting for its picture: %+v", q)
 	}
+	waiting, _ := json.Marshal(shown.Question.View)
+	var seen map[string]any
+	_ = json.Unmarshal(waiting, &seen)
+	if img, _ := seen["image"].(map[string]any); img == nil || img["src"] == "" || img["alt"] != "" ||
+		seen["type"] != "choice" || seen["text"] != nil || seen["choices"] != nil {
+		t.Fatalf("what a screen has of a question waiting for its picture: %s", waiting)
+	}
+	if st, _ := w.g.State(ctx, u, s.ID); !reflect.DeepEqual(st.Question.View, shown.Question.View) {
+		t.Fatalf("a look at the run while it waits: %+v", st.Question.View)
+	}
 	w.wait(2 * time.Second) // the picture loading
+	// Answered before its time runs (a screen that skipped Start): refused, never a 0 ms answer.
+	if _, err := w.g.Answer(ctx, u, s.ID, 0, w.right(s.ID, 0)); !errors.Is(err, ErrOutOfStep) {
+		t.Fatalf("answered while it waits for its picture: %v", err)
+	}
 	if again, _ := w.g.Show(ctx, u, s.ID); again.Question.LeftMs != again.Question.LimitMs || again.Question.StartsMs != 6000 {
 		t.Fatalf("a refresh while it waits: %+v", again.Question)
 	}
@@ -493,6 +546,9 @@ func TestPictureTime(t *testing.T) {
 	started, _ := w.g.Start(ctx, u, s.ID, 0)
 	if q := started.Question; q.StartsMs != 0 || q.LeftMs != q.LimitMs {
 		t.Fatalf("started: %+v", q)
+	}
+	if v, _ := json.Marshal(started.Question.View); !strings.Contains(string(v), `"choices"`) || !strings.Contains(string(v), `"alt":"Знаме`) {
+		t.Fatalf("started, without its words: %s", v)
 	}
 	w.wait(time.Second)
 	if again, _ := w.g.Start(ctx, u, s.ID, 0); again.Question.LeftMs != again.Question.LimitMs-1000 {
@@ -507,18 +563,13 @@ func TestPictureTime(t *testing.T) {
 	// Never started by the screen: it starts by itself, PictureWait after it's shown.
 	_, _ = w.g.Show(ctx, u, s.ID)
 	w.wait(PictureWait + Limit(w.question(s.ID, 1)))
-	if st, _ := w.g.State(ctx, u, s.ID); st.At != 1 || st.Question == nil || st.Question.LeftMs != 0 {
+	if st, _ := w.g.State(ctx, u, s.ID); st.At != 1 || st.Question == nil || st.Question.LeftMs != 0 ||
+		!strings.Contains(fmt.Sprint(st.Question.View), "Чие") {
 		t.Fatalf("its time, after it started by itself: %+v", st.Question)
 	}
 	w.wait(Grace + time.Second)
 	if st, _ := w.g.State(ctx, u, s.ID); st.At != 2 {
 		t.Fatalf("not out of time after PictureWait and its time: %+v", st)
-	}
-
-	// A live duel's starts at once.
-	now, _ := w.g.ShowNow(ctx, u, s.ID)
-	if now.Question.StartsMs != 0 {
-		t.Fatalf("a live duel's question waits: %+v", now.Question)
 	}
 }
 
@@ -2286,9 +2337,7 @@ func TestCrowds(t *testing.T) {
 	// The next player sees it with the answer; a question with fewer answers shows none.
 	p := w.user()
 	s, _ := w.g.StartDay(ctx, p)
-	if _, err := w.g.Show(ctx, p, s.ID); err != nil {
-		t.Fatal(err)
-	}
+	w.show(p, s.ID)
 	res, err := w.g.Answer(ctx, p, s.ID, 0, w.right(s.ID, 0))
 	if err != nil {
 		t.Fatal(err)
@@ -2370,7 +2419,7 @@ func TestDayCrowd(t *testing.T) {
 	// Nine others say too little: nothing shows (the crowd of everyone isn't counted yet either).
 	ana := w.user()
 	s, _ := w.g.StartDay(ctx, ana)
-	w.g.Show(ctx, ana, s.ID)
+	w.show(ana, s.ID)
 	res, err := w.g.Answer(ctx, ana, s.ID, 0, w.right(s.ID, 0))
 	if err != nil {
 		t.Fatal(err)
@@ -2378,7 +2427,7 @@ func TestDayCrowd(t *testing.T) {
 	if c := crowdOf(res.Reveal); c != nil {
 		t.Fatalf("nine others showed a crowd: %+v", c)
 	}
-	w.g.Show(ctx, ana, s.ID)
+	w.show(ana, s.ID)
 	if _, err := w.g.Answer(ctx, ana, s.ID, 1, w.wrong(s.ID, 1)); err != nil {
 		t.Fatal(err)
 	}
@@ -2386,7 +2435,7 @@ func TestDayCrowd(t *testing.T) {
 	// The next player has ten others, ana the tenth, and not their own answer (with it, 9 right of 11).
 	bo := w.user()
 	s, _ = w.g.StartDay(ctx, bo)
-	w.g.Show(ctx, bo, s.ID)
+	w.show(bo, s.ID)
 	if res, err = w.g.Answer(ctx, bo, s.ID, 0, w.right(s.ID, 0)); err != nil {
 		t.Fatal(err)
 	}
@@ -2396,7 +2445,7 @@ func TestDayCrowd(t *testing.T) {
 
 	// bo plays on, the second right too, the rest wrong; the review shows the same, and the third has no crowd.
 	for n := 1; n < Length; n++ {
-		w.g.Show(ctx, bo, s.ID)
+		w.show(bo, s.ID)
 		w.wait(3 * time.Second) // at a person's pace, or bo's answers count for bo alone (fair.go)
 		answer := w.wrong
 		if n == 1 {
@@ -2541,9 +2590,7 @@ func TestMistakes(t *testing.T) {
 		}
 	}
 	// Right on the first, and its fact is learned; wrong on the rest, which wait three days again.
-	if _, err := w.g.Show(ctx, ana, m.ID); err != nil {
-		t.Fatal(err)
-	}
+	w.show(ana, m.ID)
 	res, err := w.g.Answer(ctx, ana, m.ID, 0, w.right(m.ID, 0))
 	if err != nil {
 		t.Fatal(err)
@@ -2560,9 +2607,7 @@ func TestMistakes(t *testing.T) {
 		t.Fatalf("left: %+v", left)
 	}
 	for n := 1; n < Length; n++ {
-		if _, err := w.g.Show(ctx, ana, m.ID); err != nil {
-			t.Fatal(err)
-		}
+		w.show(ana, m.ID)
 		if _, err := w.g.Answer(ctx, ana, m.ID, n, w.wrong(m.ID, n)); err != nil {
 			t.Fatal(err)
 		}
@@ -2576,7 +2621,7 @@ func TestMistakes(t *testing.T) {
 	}
 	// A right answer in a topic run is never a second chance's „learned“.
 	s, _ = w.g.StartTopic(ctx, ana, "general")
-	w.g.Show(ctx, ana, s.ID)
+	w.show(ana, s.ID)
 	if res, _ := w.g.Answer(ctx, ana, s.ID, 0, w.right(s.ID, 0)); res.Learned {
 		t.Error("learned in a topic run")
 	}

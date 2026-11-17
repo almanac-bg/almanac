@@ -373,7 +373,13 @@ func TestRunsKeepThePace(t *testing.T) {
 	}
 	w.give(ana, true) // alone: the answer shows at once
 	w.wait(Pause)
-	if s, err := w.g.Show(ctx, ana.ID, m.run); err != nil || s.At != 1 {
+	if _, err := w.g.Show(ctx, ana.ID, m.run); !errors.Is(err, play.ErrOutOfStep) {
+		t.Fatalf("a Роял run's next question shown by its player: %v", err)
+	}
+	if _, err := w.g.Start(ctx, ana.ID, m.run, 1); !errors.Is(err, play.ErrOutOfStep) {
+		t.Fatalf("a Роял run's question started by its player: %v", err)
+	}
+	if s, err := w.g.State(ctx, ana.ID, m.run); err != nil || s.At != 1 {
 		t.Fatalf("a Роял run's state: %+v %v", s, err)
 	}
 }

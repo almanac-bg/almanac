@@ -106,6 +106,7 @@ test("the day says how its other players did with each question: under the verdi
   await other.post("/api/guest", { data: {} });
   const run = await (await other.post("/api/day", { data: {} })).json();
   await other.post(`/api/runs/${run.id}/show`, { data: {} });
+  await other.post(`/api/runs/${run.id}/start`, { data: { n: 0 } }); // its pictures in, if it has any
   expect((await other.post(`/api/runs/${run.id}/answer`, { data: { n: 0, answer: null } })).ok()).toBe(true);
   await other.dispose();
 

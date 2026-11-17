@@ -211,3 +211,29 @@ func picturesOf(q Question) []*Image {
 
 // HasPictures says whether a question shows a picture: over it, or as its options.
 func HasPictures(q Question) bool { return len(picturesOf(q)) > 0 }
+
+// PicturesView is a deal's view while its time waits for its pictures: its type and the pictures to load (as View
+// has them, a choice's options in the deal's order), without their words; the question's text, its options and the
+// pictures' descriptions wait for its time, so that nobody reads them off the clock.
+func PicturesView(d Dealt) any {
+	bare := func(im *Image) *ImageView {
+		v := im.view()
+		if v != nil {
+			v.Alt = ""
+		}
+		return v
+	}
+	v := struct {
+		Type     string       `json:"type"`
+		Image    *ImageView   `json:"image,omitempty"`
+		Pictures []*ImageView `json:"pictures,omitempty"`
+	}{Type: d.Question().Base().Type, Image: bare(d.Question().Extra().Image)}
+	if c, ok := d.(*dealtChoice); ok {
+		for _, b := range c.order {
+			if b < len(c.q.Pictures) {
+				v.Pictures = append(v.Pictures, bare(&c.q.Pictures[b]))
+			}
+		}
+	}
+	return v
+}

@@ -2,6 +2,7 @@ package live
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -654,6 +655,126 @@ func TestPausedWhileWaiting(t *testing.T) {
 		<-s.Done()
 		if !errors.Is(s.Err, play.ErrNobody) {
 			t.Fatalf("after resuming: %v", s.Err)
+		}
+	})
+}
+
+// A live duel's run moves on the duel's clock alone: its player can't show its next question early through their own
+// run (in the intro, or while an answer shows), start it, or answer it outside the duel; each question's time on the
+// run starts at the moment the duel shows it, so the time on the run is the time in the duel.
+func TestNoPeekAhead(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := setup(t)
+		ctx := context.Background()
+		ana, bo := w.user(), w.user()
+		sa, sb := w.hub.Seek(ana), w.hub.Seek(bo)
+		<-sb.Done()
+		m := sa.Match
+		fa, _ := m.Follow(ana.ID)
+		fb, _ := m.Follow(bo.ID)
+		defer m.Unfollow(fa)
+		defer m.Unfollow(fb)
+		run := m.sides[0].run
+		if m.sides[0].ID != ana.ID {
+			run = m.sides[1].run
+		}
+		shownAt := func() int64 {
+			var at sql.NullInt64
+			_ = w.db.Read.QueryRow(`SELECT shown_at FROM runs WHERE id = ?`, run).Scan(&at)
+			return at.Int64
+		}
+		refused := func(when string, n int) {
+			t.Helper()
+			if s, err := w.g.Show(ctx, ana.ID, run); !errors.Is(err, play.ErrOutOfStep) {
+				t.Fatalf("%s: the next question shown through the run: %+v %v", when, s.Question, err)
+			}
+			if _, err := w.g.Start(ctx, ana.ID, run, n); !errors.Is(err, play.ErrOutOfStep) {
+				t.Fatalf("%s: a question started through the run: %v", when, err)
+			}
+			if _, err := w.g.Answer(ctx, ana.ID, run, n, answer(m, true)); !errors.Is(err, play.ErrOutOfStep) {
+				t.Fatalf("%s: answered through the run: %v", when, err)
+			}
+			if n > 0 {
+				if _, err := w.g.Answer(ctx, ana.ID, run, n-1, answer(m, true)); !errors.Is(err, play.ErrOutOfStep) {
+					t.Fatalf("%s: the answer before sent again through the run: %v", when, err)
+				}
+			}
+		}
+
+		// The intro: nothing to see on the run, and nothing it can be made to show.
+		refused("the intro", 0)
+		if s, _ := w.g.State(ctx, ana.ID, run); s.Question != nil || shownAt() != 0 {
+			t.Fatalf("the run shows a question in the intro: %+v", s.Question)
+		}
+
+		// The first question: on the run at the duel's moment; answered in the duel a second in, a second on the run.
+		next(m, ana.ID)
+		if shownAt() != m.shownAt.UnixMilli() {
+			t.Fatalf("the run's question shown at %d, the duel's at %d", shownAt(), m.shownAt.UnixMilli())
+		}
+		refused("the question", 0)
+		time.Sleep(time.Second)
+		if err := m.Answer(ana.ID, 0, answer(m, true)); err != nil {
+			t.Fatal(err)
+		}
+		if err := m.Answer(bo.ID, 0, answer(m, false)); err != nil {
+			t.Fatal(err)
+		}
+		var ms int64
+		_ = w.db.Read.QueryRow(`SELECT ms FROM answers WHERE run_id = ? AND n = 0`, run).Scan(&ms)
+		if ms != 1000 {
+			t.Fatalf("a second in the duel is %d ms on the run", ms)
+		}
+
+		// The answer shows: the next question isn't on the run yet, and can't be put there.
+		if v := m.View(ana.ID); v.Phase != PhaseReveal {
+			t.Fatalf("not the answer: %+v", v)
+		}
+		refused("the answer", 1)
+		if s, _ := w.g.State(ctx, ana.ID, run); s.Question != nil || shownAt() != 0 {
+			t.Fatalf("the next question on the run while the answer shows: %+v", s.Question)
+		}
+		v := next(m, ana.ID)
+		if v.Phase != PhaseQuestion || v.N != 1 || shownAt() != m.shownAt.UnixMilli() {
+			t.Fatalf("the second question: %+v, on the run at %d, in the duel at %d", v, shownAt(), m.shownAt.UnixMilli())
+		}
+	})
+}
+
+// A duel can tell how long it may still take, by its own clock: from its start, never less than it takes, however its
+// questions go; it shrinks as it's played, and is nothing once it's over.
+func TestLeft(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := setup(t)
+		if l := w.hub.Left(); l != 0 {
+			t.Fatalf("nothing under way, %v left", l)
+		}
+		ana, bo := w.user(), w.user()
+		sa, sb := w.hub.Seek(ana), w.hub.Seek(bo)
+		<-sb.Done()
+		m := sa.Match
+		fa, _ := m.Follow(ana.ID)
+		fb, _ := m.Follow(bo.ID)
+		defer m.Unfollow(fa)
+		defer m.Unfollow(fb)
+		left := w.hub.Left()
+		if left <= 0 || left > Longest {
+			t.Fatalf("a duel just made: %v left (Longest %v)", left, Longest)
+		}
+		end := time.Now().Add(left)
+		// Nobody answers: each question takes all its time, and its answer shows after.
+		for v := next(m, ana.ID); v.Phase != PhaseEnd; v = next(m, ana.ID) {
+			now := w.hub.Left()
+			if now <= 0 || now > left || time.Now().Add(now).After(end) {
+				t.Fatalf("question %d (%s): %v left, after %v", v.N, v.Phase, now, left)
+			}
+			left = now
+		}
+		if time.Now().After(end) {
+			t.Fatalf("the duel ended %v after it said it would at the latest", time.Since(end))
+		}
+		if l := w.hub.Left(); l != 0 {
+			t.Fatalf("over, %v left", l)
 		}
 	})
 }

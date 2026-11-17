@@ -399,7 +399,7 @@ func (g *Game) RevealRoyal(ctx context.Context, royalID int64) (scores []RoyalSc
 // play on after a cut), which arrived at at (its time is to then). Who goes on is RevealRoyal's to say, once the answer
 // shows.
 func (g *Game) AnswerRoyal(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time) (Result, error) {
-	return g.answer(ctx, userID, runID, n, answer, at, true)
+	return g.answer(ctx, userID, runID, n, answer, at, byRoyal)
 }
 
 // RoyalStanding is where a player came in a tournament, once it's ended.
