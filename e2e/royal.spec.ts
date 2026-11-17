@@ -4,6 +4,46 @@ import { answer, openGame, playRun } from "./play.ts";
 // The test server runs a Роял every half minute (playwright.config.ts). The three engines' runs of this test may well
 // meet in the same one, as players do. A wrong answer puts nobody out: the game always runs its fifteen questions,
 // cut after some of them to those ahead, and those cut play on to the end, off the standings.
+//
+// One engine's tests here run one after another, in this order: „Ще дойда“ shows only while no evening is under
+// way nor its standings showing (some 4½ minutes each), so it's said first, before this file's own evenings.
+test.describe.configure({ mode: "default" });
+
+test("Роял: „Ще дойда“ before the lobby, and Начало's card while it's open", async ({ page }) => {
+  test.setTimeout(480_000);
+  // Before any game, Начало shows Роял alone among the ways to play with others, while its lobby is open.
+  await page.goto("/");
+  await expect(async () => {
+    await page.reload();
+    await expect(page.locator(".modes .mode")).toHaveCount(1, { timeout: 3_000 });
+    await expect(page.locator(".mode.tone-gold .mode-about")).toHaveText(/^Започва след|^Играе се/);
+  }).toPass({ timeout: 60_000 });
+  // Начало shows the ways to play with others once a first game is finished.
+  await openGame(page, "/play/history");
+  await playRun(page);
+  await page.goto("/royal");
+  // „Ще дойда“ shows until the next lobby opens. Here, a Роял every half minute, that's the five seconds before each
+  // lobby, and only while no evening is under way: under an evening's standings the next lobby is open already (the
+  // other engines' evenings, when all three run on one server, may hold it a while).
+  await expect(async () => {
+    await page.reload();
+    const come = page.getByRole("button", { name: "Ще дойда" });
+    const said = page.getByText(/^Ще дойдеш\./);
+    await expect(come.or(said)).toBeVisible({ timeout: 30_000 });
+    if (await come.isVisible()) await come.click();
+    await expect(said).toBeVisible({ timeout: 2_000 });
+    await expect(page.getByText(/^Тази вечер ще дойд(е|ат) \d+\.$/)).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 360_000 });
+
+  // While the lobby is open, Начало's Роял card says how soon it starts and how many are in.
+  await page.goto("/");
+  const royal = page.locator(".mode.tone-gold .mode-about");
+  await expect(async () => {
+    await page.reload();
+    await expect(royal).toHaveText(/^Започва след \d+\sмин( · \d+\sвътре)?$/, { timeout: 3_000 });
+  }).toPass({ timeout: 60_000 });
+});
+
 test("Роял: in from the lobby, its music, live to the fifteenth question, then the standings", async ({ page }) => {
   test.setTimeout(480_000);
   // The lobby's music, watched: its pad's saws started, and stopped (each is given its latest end as it starts).
@@ -81,41 +121,6 @@ test("Роял: in from the lobby, its music, live to the fifteenth question, th
   await expect(page.getByText(/Следващият Роял:/)).toBeVisible();
   // The day's ten haven't been played: they're the gold way on.
   await expect(page.getByRole("link", { name: "Въпросите на деня" })).toHaveClass(/primary/);
-});
-
-test("Роял: „Ще дойда“ before the lobby, and Начало's card while it's open", async ({ page }) => {
-  test.setTimeout(480_000);
-  // Before any game, Начало shows Роял alone among the ways to play with others, while its lobby is open.
-  await page.goto("/");
-  await expect(async () => {
-    await page.reload();
-    await expect(page.locator(".modes .mode")).toHaveCount(1, { timeout: 3_000 });
-    await expect(page.locator(".mode.tone-gold .mode-about")).toHaveText(/^Започва след|^Играе се/);
-  }).toPass({ timeout: 60_000 });
-  // Начало shows the ways to play with others once a first game is finished.
-  await openGame(page, "/play/history");
-  await playRun(page);
-  await page.goto("/royal");
-  // „Ще дойда“ shows until the next lobby opens. Here, a Роял every half minute, that's the five seconds before each
-  // lobby, and only while no evening is under way: under an evening's standings the next lobby is open already. The
-  // other tests' evenings, run at the same time, take up to some 4½ minutes with their standings.
-  await expect(async () => {
-    await page.reload();
-    const come = page.getByRole("button", { name: "Ще дойда" });
-    const said = page.getByText(/^Ще дойдеш\./);
-    await expect(come.or(said)).toBeVisible({ timeout: 30_000 });
-    if (await come.isVisible()) await come.click();
-    await expect(said).toBeVisible({ timeout: 2_000 });
-    await expect(page.getByText(/^Тази вечер ще дойд(е|ат) \d+\.$/)).toBeVisible({ timeout: 2_000 });
-  }).toPass({ timeout: 360_000 });
-
-  // While the lobby is open, Начало's Роял card says how soon it starts and how many are in.
-  await page.goto("/");
-  const royal = page.locator(".mode.tone-gold .mode-about");
-  await expect(async () => {
-    await page.reload();
-    await expect(royal).toHaveText(/^Започва след \d+\sмин( · \d+\sвътре)?$/, { timeout: 3_000 });
-  }).toPass({ timeout: 60_000 });
 });
 
 test("Роял: one who comes late comes in until the third question", async ({ page, browser }) => {

@@ -116,12 +116,29 @@ export function segmented<T>(
  * („На този ден“). Nothing when there's neither. */
 export function fact(text?: string, day?: string): Child {
   if (!text && !day) return null;
-  return h(
+  const box = h(
     "aside",
-    { class: day ? (text ? "fact dated" : "fact dated alone") : "fact" },
+    {
+      class: day ? (text ? "fact dated" : "fact dated alone") : "fact",
+      "aria-label": text ? "Знаеше ли?" : "На този ден",
+    },
     day ? h("div", { class: "fact-day" }, h("h2", null, "На този ден"), h("p", null, day)) : null,
     text ? [h("h2", null, "Знаеше ли?"), h("p", null, text)] : null,
   );
+  if (box instanceof HTMLElement) reachable(box);
+  return box;
+}
+
+/** A box that may scroll on its own (a long fact docked at a run's foot, app.css): while it does, the keyboard can
+ * reach it to scroll it, a stop of its own; while all of it shows, it's none. */
+function reachable(box: HTMLElement): void {
+  const check = () => {
+    if (box.scrollHeight > box.clientHeight + 1) box.tabIndex = 0;
+    else box.removeAttribute("tabindex");
+  };
+  const sized = new ResizeObserver(check);
+  sized.observe(box);
+  onCleanup(() => sized.disconnect());
 }
 
 const tones = ["gold", "lilac", "sky", "rose", "mint"];
@@ -553,10 +570,15 @@ export function standingCard(s: Standing, own = false): Child {
 
 /** A day and an hour, the Bulgarian way, the day in full: „четвъртък, 09:11 ч.“ (it ends a sentence with its own
  * period). */
-export const until = (ms: number) =>
-  new Intl.DateTimeFormat("bg", { weekday: "long", hour: "2-digit", minute: "2-digit" })
-    .format(new Date(ms))
-    .replace(" ч.", "\u00a0ч."); // never „ч.“ alone on a line
+export function until(ms: number): string {
+  const at = new Date(ms);
+  // Each part on its own, the „ч.“ ours: the browsers' own Bulgarian differs (Safari leaves it out).
+  const day = new Intl.DateTimeFormat("bg", { weekday: "long" }).format(at);
+  const time = new Intl.DateTimeFormat("bg", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    .format(at)
+    .replace(/\s*ч\.$/, "");
+  return `${day}, ${time} ч.`; // never „ч.“ alone on a line
+}
 
 /** Something to wear, unlocked (or to be): a title, a frame, a pattern or an avatar's shape, and what unlocks it. */
 export interface Unlock {
