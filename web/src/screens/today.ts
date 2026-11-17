@@ -37,7 +37,7 @@ import { type FriendPlayed, playedLine } from "./duel.ts";
 import { goalsCard } from "./goals.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
-import { signIn } from "./settings.ts";
+import { farewell, signIn } from "./settings.ts";
 import { yearCard } from "./year.ts";
 
 interface Today {
@@ -83,6 +83,9 @@ interface Today {
 
 export function today() {
   title();
+  // A profile just deleted is said once, over the day.
+  let bye = farewell.peek();
+  farewell.set("");
   const screen = slot(() => h("p", { class: "muted" }, "…"));
   const load = async () => {
     try {
@@ -160,9 +163,12 @@ export function today() {
     );
     const since = performance.now();
     let grown = false;
+    const said = bye;
+    bye = "";
     return h(
       "section",
       { class: "screen home" },
+      said ? h("p", { class: "muted", role: "status" }, said) : null,
       // A new player, before a first game finished, sees the day and the topics only.
       () => {
         if (!user() || !(just || t.played)) return null;

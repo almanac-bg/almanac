@@ -115,14 +115,30 @@ func TestCodesLimits(t *testing.T) {
 	a, _, out, in := setup(t)
 	ctx := t.Context()
 	c := code(t, a, out, in, "y@example.com")
-	if err := a.SendCode(ctx, "y@example.com"); !errors.Is(err, ErrTooSoon) {
+	var soon TooSoon
+	if err := a.SendCode(ctx, "y@example.com"); !errors.Is(err, ErrTooSoon) || !errors.As(err, &soon) ||
+		soon.Wait <= 0 || soon.Wait > CodeEvery {
 		t.Fatalf("a second code at once: %v", err)
 	}
-	for range CodeTries {
-		_, _, _ = a.Verify(ctx, "y@example.com", "x", nil)
+	// Each wrong try says how many are left; the last one says the code is dead.
+	for i := range CodeTries {
+		_, _, err := a.Verify(ctx, "y@example.com", "x", nil)
+		var wrong WrongCode
+		if i < CodeTries-1 {
+			if !errors.Is(err, ErrBadCode) || !errors.As(err, &wrong) || wrong.Left != CodeTries-1-i {
+				t.Fatalf("wrong try %d: %v", i+1, err)
+			}
+		} else if !errors.Is(err, ErrCodeTries) {
+			t.Fatalf("the last wrong try: %v", err)
+		}
 	}
-	if _, _, err := a.Verify(ctx, "y@example.com", c, nil); !errors.Is(err, ErrCodeExpired) {
+	if _, _, err := a.Verify(ctx, "y@example.com", c, nil); !errors.Is(err, ErrCodeTries) {
 		t.Fatalf("the right code after %d wrong tries: %v", CodeTries, err)
+	}
+	// A dead code holds no new one back.
+	c = code(t, a, out, in, "y@example.com")
+	if _, _, err := a.Verify(ctx, "y@example.com", c, nil); err != nil {
+		t.Fatalf("the new code: %v", err)
 	}
 	for _, bad := range []string{"", "no", "a@b", "a b@c.d", "<a@b.c>"} {
 		if err := a.SendCode(ctx, bad); !errors.Is(err, ErrBadEmail) {

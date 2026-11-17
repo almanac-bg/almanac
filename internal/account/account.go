@@ -70,11 +70,25 @@ var (
 	ErrBadEmail    = errors.New("bad email")
 	ErrTooSoon     = errors.New("a code was just sent")
 	ErrBadCode     = errors.New("wrong code")
-	ErrCodeExpired = errors.New("the code expired or ran out of tries")
+	ErrCodeExpired = errors.New("the code expired")
+	ErrCodeTries   = errors.New("the code ran out of tries")
 	ErrBadName     = errors.New("bad name")
 	ErrBadTag      = errors.New("bad tag")
 	ErrTagTaken    = errors.New("tag taken")
 )
+
+// WrongCode is a wrong code that may still be tried again: Left tries remain (ErrBadCode).
+type WrongCode struct{ Left int }
+
+func (e WrongCode) Error() string        { return fmt.Sprintf("wrong code, %d tries left", e.Left) }
+func (e WrongCode) Is(target error) bool { return target == ErrBadCode }
+
+// TooSoon is a code asked for while the last one to the address is still alive and was sent less than CodeEvery ago:
+// another may go in Wait (ErrTooSoon).
+type TooSoon struct{ Wait time.Duration }
+
+func (e TooSoon) Error() string        { return fmt.Sprintf("a code was just sent, again in %v", e.Wait) }
+func (e TooSoon) Is(target error) bool { return target == ErrTooSoon }
 
 // Accounts does the work; Merge, if set, moves a guest's progress into the account they sign in to (each part of the
 // game that keeps progress adds its step).
@@ -245,7 +259,8 @@ func (a *Accounts) codeHash(email, code string) []byte {
 	return m.Sum(nil)
 }
 
-// SendCode mails a sign-in code to an address. A new code replaces the one before.
+// SendCode mails a sign-in code to an address. A new code replaces the one before; while that one is alive, not
+// within CodeEvery of it (TooSoon), but at once once it's dead (expired, or out of tries).
 func (a *Accounts) SendCode(ctx context.Context, email string) error {
 	email, err := NormalEmail(email)
 	if err != nil {
@@ -255,10 +270,13 @@ func (a *Accounts) SendCode(ctx context.Context, email string) error {
 	code := fmt.Sprintf("%06d", n.Int64())
 	now := time.Now()
 	err = a.DB.Tx(ctx, func(tx *sql.Tx) error {
-		var sent int64
-		err := tx.QueryRow(`SELECT sent_at FROM email_codes WHERE email = ?`, email).Scan(&sent)
-		if err == nil && store.Ms(now)-sent < CodeEvery.Milliseconds() {
-			return ErrTooSoon
+		var sent, expires int64
+		var tries int
+		err := tx.QueryRow(`SELECT sent_at, expires_at, tries FROM email_codes WHERE email = ?`, email).
+			Scan(&sent, &expires, &tries)
+		alive := err == nil && expires > store.Ms(now) && tries < CodeTries
+		if wait := CodeEvery - time.Duration(store.Ms(now)-sent)*time.Millisecond; alive && wait > 0 {
+			return TooSoon{Wait: wait}
 		}
 		_, err = tx.Exec(`INSERT INTO email_codes (email, code_hash, sent_at, expires_at) VALUES (?, ?, ?, ?)
 			ON CONFLICT (email) DO UPDATE SET code_hash = excluded.code_hash, sent_at = excluded.sent_at,
@@ -280,7 +298,8 @@ func (a *Accounts) SendCode(ctx context.Context, email string) error {
 	return err
 }
 
-// Verify checks a code and signs its address in. The player who asked (current, maybe nil) is kept when they can be:
+// Verify checks a code and signs its address in. A wrong one counts a try (WrongCode, with the tries left); the last
+// try used up, the code is dead (ErrCodeTries), as it is once its time is out (ErrCodeExpired). The player who asked (current, maybe nil) is kept when they can be:
 // a guest giving a new address keeps their account; a guest signing in to an account that has the address brings their
 // progress along (Merge) and is gone after.
 func (a *Accounts) Verify(ctx context.Context, email, code string, current *User) (User, string, error) {
@@ -291,23 +310,28 @@ func (a *Accounts) Verify(ctx context.Context, email, code string, current *User
 	code = strings.TrimSpace(code)
 	var u User
 	var token string
-	var wrong bool
+	var wrong error
 	err = a.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var hash []byte
 		var expires int64
 		var tries int
 		err := tx.QueryRow(`SELECT code_hash, expires_at, tries FROM email_codes WHERE email = ?`, email).
 			Scan(&hash, &expires, &tries)
-		if errors.Is(err, sql.ErrNoRows) || (err == nil && (expires <= store.Now() || tries >= CodeTries)) {
+		switch {
+		case errors.Is(err, sql.ErrNoRows), err == nil && expires <= store.Now():
 			return ErrCodeExpired
-		}
-		if err != nil {
+		case err != nil:
 			return err
+		case tries >= CodeTries:
+			return ErrCodeTries
 		}
 		if !hmac.Equal(hash, a.codeHash(email, code)) {
-			wrong = true
+			wrong = WrongCode{Left: CodeTries - tries - 1}
+			if tries+1 >= CodeTries {
+				wrong = ErrCodeTries
+			}
 			_, err := tx.Exec(`UPDATE email_codes SET tries = tries + 1 WHERE email = ?`, email)
-			return err // the try counts: committed below, then ErrBadCode
+			return err // the try counts: committed below, then the wrong code's error
 		}
 		if _, err := tx.Exec(`DELETE FROM email_codes WHERE email = ?`, email); err != nil {
 			return err
@@ -346,8 +370,8 @@ func (a *Accounts) Verify(ctx context.Context, email, code string, current *User
 		token, err = startSession(tx, u.ID)
 		return err
 	})
-	if wrong && err == nil {
-		err = ErrBadCode
+	if wrong != nil && err == nil {
+		err = wrong
 	}
 	if err != nil {
 		return User{}, "", err
