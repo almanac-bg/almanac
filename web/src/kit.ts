@@ -9,7 +9,7 @@ import { news } from "./game/news.ts";
 import { answered, ask, crowdLine, picture } from "./game/questions.ts";
 import { boardRow, hands, landing, nextSteps, review, reviewParts, shareButton } from "./game/results.ts";
 import { countdown, guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
-import { api, deliver } from "./lib/api.ts";
+import { ApiError, api, deliver } from "./lib/api.ts";
 import { keepAwake } from "./lib/awake.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked } from "./lib/dom.ts";
 import { ordinal, place } from "./lib/ordinal.ts";
@@ -28,6 +28,7 @@ import {
   back,
   explain,
   fact,
+  failure,
   formatNumber,
   meaning,
   meter,
@@ -60,6 +61,7 @@ export const kit = {
   duelResult,
   emblem,
   explain,
+  failure,
   fact,
   feelKit,
   formatNumber,
@@ -178,7 +180,9 @@ export function later(load: () => Promise<(kit: Kit, params: string[]) => Child>
       const s = screen();
       if (s) return untracked(() => s(kit, params));
       return failed()
-        ? h("p", { class: "bad", role: "alert" }, "Страницата не се зареди. Провери връзката и опитай пак.")
+        ? failure(new ApiError("offline", "Страницата не се зареди. Провери връзката и опитай пак."), () =>
+            location.reload(),
+          )
         : h("p", { class: "muted" }, "…");
     };
   };

@@ -23,6 +23,7 @@ import { dayInBulgaria } from "../lib/year.ts";
 import { player, playing, user } from "../state.ts";
 import {
   explain,
+  failure,
   formatNumber,
   levelNumber,
   meter,
@@ -114,7 +115,7 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
         screen.show(() => playRun(run, (s) => home(t, s, true)));
       else screen.show(() => home(t, t.run, false));
     } catch (err) {
-      screen.show(() => h("p", { role: "alert" }, (err as ApiError).message));
+      screen.show(() => failure(err, load, null));
     }
   };
   // The day's ten (or the rest of them) start after the count every game has, which „Откажи“ backs out of: nothing

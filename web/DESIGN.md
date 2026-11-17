@@ -241,6 +241,10 @@ takes a token.
   one sentence.
 - **Text:** `.kicker`, `.lead`, `.muted`, `.small`, `.bad` (errors) and `.status`; `.explain` with `.explain-pop`
   (a number's name, a tap from its meaning: `explain()`).
+- **What went wrong** is never a dead end: `failure()` (`.failure`) says it, offers „Опитай пак“ (gold) only where
+  trying again can help (no line, the server for a moment), tries again by itself as the line comes back, and has a
+  way on („Към Начало“, or the screen's own place). In a run it keeps the run's frame (the head with its arrow, the
+  pips) and its clock: a step that doesn't get through is tried again quietly first.
 - **Controls:**
   - `.btn`, with `primary`, `big`, `rose` (accepting a friend request), `danger` and `inline`, all with one corner
     (`--radius-md`); and `.link` (`tap` for one on its own line, a finger's height).

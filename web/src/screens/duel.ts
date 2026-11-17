@@ -7,7 +7,7 @@ import { news } from "../game/news.ts";
 import { getReady, playRun, shownHere, startScreen } from "../game/run.ts";
 import type { State } from "../game/types.ts";
 import { duelResult, loadDuelResult } from "../kit.ts";
-import { type ApiError, api } from "../lib/api.ts";
+import { ApiError, api } from "../lib/api.ts";
 import { type Child, effect, h, signal, slot } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { byTap, go, goBack, hold, rename, title } from "../lib/router.ts";
@@ -16,6 +16,7 @@ import { checkWaiting, player, user } from "../state.ts";
 import {
   back,
   type Division,
+  failure,
   formatNumber,
   pageArt,
   type Standing,
@@ -408,7 +409,7 @@ export function duelOne(params: string[]) {
     } catch (err) {
       const code = (err as ApiError).code;
       if (code === "signed_out" || code === "no_duel") return screen.show(() => notHere(() => void load()));
-      screen.show(() => h("p", { role: "alert" }, (err as ApiError).message));
+      screen.show(() => failure(err, () => void load(), ["/duel", "Към дуелите"]));
     }
   };
   load();
@@ -483,10 +484,19 @@ export function challengeFriend([idText]: string[]) {
   const id = Number(idText);
   const screen = slot(() => h("p", { class: "muted" }, "…"));
   const tap = byTap();
-  const fail = (err: unknown) => screen.show(() => h("p", { role: "alert" }, (err as ApiError).message));
+  const fail = (err: unknown) => screen.show(() => failure(err, undefined, ["/duel", "Към дуелите"]));
   (async () => {
     const friends = user.peek() ? (await api<{ friends: Friend[] }>("GET", "/api/friends")).friends : [];
     const name = friends.find((f) => f.id === id)?.name;
+    // Not a friend (or not one any more): said at once, with the way to friends, before any count.
+    if (!name)
+      return screen.show(() =>
+        failure(
+          new ApiError("not_friends", "Дуел се играе с приятел, а с този играч още не сте приятели.", 404),
+          undefined,
+          ["/friends", "Към приятелите"],
+        ),
+      );
     loadDuelResult().catch(() => {}); // the result's screen, on its way while the player plays
     const ready = () => {
       hold();
