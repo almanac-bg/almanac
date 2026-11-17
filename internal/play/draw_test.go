@@ -48,8 +48,56 @@ func TestPictureBeforeDifficulty(t *testing.T) {
 	}
 }
 
+// dayNumber is a day's number question, which is among its hard ones.
+func dayNumber(t *testing.T, b *bank.Bank, picks []Pick) bank.Question {
+	t.Helper()
+	for i, p := range picks {
+		if q, _ := b.Get(p.ID); q != nil && q.Base().Type == "number" {
+			if daySlots[i].difficulty != bank.Hard {
+				t.Fatalf("the day's number is in place %d, not among the hard ones", i)
+			}
+			return q
+		}
+	}
+	t.Fatal("the day has no number")
+	return nil
+}
+
+// A run goes easy to hard, a plain choice first, but where its special questions sit changes from run to run, within
+// their difficulty; and a day's shape, drawn once, is the same for everyone.
+func TestShapesDiffer(t *testing.T) {
+	where := func(slots []slot, typ string) int {
+		return slices.IndexFunc(slots, func(s slot) bool { return s.typ == typ })
+	}
+	for _, shape := range [][]slot{daySlots, topicSlots(0), topicSlots(2)} {
+		seen := map[string]map[int]bool{}
+		for seed := range uint64(40) {
+			slots := inBands(slices.Clone(shape), rand.New(rand.NewPCG(seed, 5)))
+			if slots[0] != shape[0] || slots[0].typ != "choice" || slots[0].picture == withPicture {
+				t.Fatalf("seed %d: the first question is %+v", seed, slots[0])
+			}
+			for i := range slots {
+				if slots[i].difficulty != shape[i].difficulty {
+					t.Fatalf("seed %d: place %d is %s, not %s", seed, i, slots[i].difficulty, shape[i].difficulty)
+				}
+			}
+			for _, typ := range []string{"truefalse", "order", "match", "number"} {
+				if seen[typ] == nil {
+					seen[typ] = map[int]bool{}
+				}
+				seen[typ][where(slots, typ)] = true
+			}
+		}
+		for typ, at := range seen {
+			if len(at) < 2 {
+				t.Errorf("the %s is always in place %v", typ, at)
+			}
+		}
+	}
+}
+
 // A day takes the question that belongs to its date, at least BGFloor about Bulgaria where the bank has them, and an
-// estimate to finish on; every place still fits just so, and the topics stay one each.
+// estimate for its number; every place still fits just so, and the topics stay one each.
 func TestDayOfItsDate(t *testing.T) {
 	b := biggerSample(t, 20)
 	day := "2026-03-03"
@@ -72,14 +120,14 @@ func TestDayOfItsDate(t *testing.T) {
 			t.Fatalf("seed %d: %d picks, short %v", seed, len(picks), short)
 		}
 		found, bg, topics := false, 0, map[string]bool{}
-		for i, p := range picks {
+		for _, p := range picks {
 			q, _ := b.Get(p.ID)
 			found = found || p.ID == dated.Base().ID
 			bg += b2i(q.Extra().BG)
 			topics[q.Base().Category] = true
-			if i == Length-1 && !estimate(q) {
-				t.Fatalf("seed %d: the day ends on %s, not an estimate", seed, p.ID)
-			}
+		}
+		if n := dayNumber(t, b, picks); !estimate(n) {
+			t.Fatalf("seed %d: the day's number is %s, not an estimate", seed, n.Base().ID)
 		}
 		if !found || bg < BGFloor || len(topics) != Length {
 			t.Fatalf("seed %d: dated %v, %d about Bulgaria, %d topics", seed, found, bg, len(topics))

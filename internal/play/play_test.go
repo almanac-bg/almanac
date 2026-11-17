@@ -181,12 +181,14 @@ func TestTheDay(t *testing.T) {
 	}
 	picks := w.picks(s.ID)
 	topics := map[string]bool{}
+	types := map[string]bank.Difficulty{}
 	for i, p := range picks {
 		q, _ := w.b.Get(p.ID)
 		topics[q.Base().Category] = true
-		if want := daySlots[i].typ; q.Base().Type != want && (want == "order" || want == "number") {
-			t.Errorf("place %d is a %s, not a %s", i, q.Base().Type, want)
-		}
+		types[q.Base().Type] = daySlots[i].difficulty // where in the day it is: its places are drawn within their band
+	}
+	if types["order"] != bank.Medium || types["number"] != bank.Hard {
+		t.Errorf("the day's order and number are in the %q and %q places", types["order"], types["number"])
 	}
 	if len(topics) != Length {
 		t.Errorf("the day's questions come from %d topics", len(topics))
@@ -2099,6 +2101,11 @@ func TestDayCrowd(t *testing.T) {
 		var rev struct{ Crowd *bank.CrowdView }
 		_ = json.Unmarshal(mustJSON(t, reveal), &rev)
 		return rev.Crowd
+	}
+	// Every question asked as it is since before the day, whichever the day's second is (the sample's newer ones were
+	// added after it).
+	for _, q := range w.b.Live("", "") {
+		q.Extra().Added, q.Extra().Changed = "2026-11-01", ""
 	}
 	// Nine players answer the day's first two questions: seven get the first right, two the second.
 	var picks []Pick

@@ -25,9 +25,10 @@ const (
 	noPicture
 )
 
-// daySlots is the day's shape: one question from each topic, easy to hard; a picture and a true-or-not early, an
-// order, a split and a match in the middle, and a number to finish on (closest wins). A slot whose type a topic lacks
-// takes a choice instead (choose).
+// daySlots is the day's shape: one question from each topic, easy to hard; a picture and a true-or-not among the easy
+// ones, an order, a split and a match among the medium ones, and a number among the hard ones. Where each sits in its
+// band is drawn with the day (inBands), the same for everyone who plays it, so that the days don't all have one shape.
+// A slot whose type a topic lacks takes a choice instead (choose).
 var daySlots = []slot{
 	{bank.Easy, "choice", noPicture, ""},
 	{bank.Easy, "choice", withPicture, ""},
@@ -47,8 +48,8 @@ const BGFloor = 3
 // drawDay draws a day (YYYY-MM-DD): each slot from another topic, never a question an earlier day had (while any are
 // left), never one due for review by the day (overdue), and of those one nobody has answered (`answered`, if set) while
 // any are left. The slots that need something special (a picture, an order, a number) get their topics first, from
-// those that have one; the number's from those that have an estimate (a unit, more than 20) while any do, for the day
-// finishes on one: a year or a small count is a choice in disguise. Then the day is made the day's: a question that
+// those that have one; the number's from those that have an estimate (a unit, more than 20) while any do, for the
+// day's hardest stretch has one: a year or a small count is a choice in disguise. Then the day is made the day's: a question that
 // belongs to its date („На този ден“, bank.Tail.On) takes the place it fits, and at least BGFloor are about Bulgaria
 // (bank.Tail.BG), each in a place it fits, from that place's topic (an estimate's place only by another estimate).
 // Throughout, a day names each subject once: no two of its questions share an answer or a quoted title
@@ -56,7 +57,7 @@ const BGFloor = 3
 // had no question fitting them just so, never a day's before (the number's: an estimate, or the date's own question):
 // a day ahead is drawn only with none short (ahead.go).
 func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.Rand) (picks []Pick, short []string) {
-	slots := newKind(slices.Clone(daySlots), r)
+	slots := inBands(newKind(slices.Clone(daySlots), r), r)
 	var topics []string
 	next := func(wants ...func(string) bool) string {
 		if len(topics) == 0 { // more slots than topics: round again
@@ -323,6 +324,23 @@ func estimate(q bank.Question) bool {
 // in each run.
 var newKinds = []string{"split", "clues"}
 
+// inBands shuffles a run's slots within their difficulty: the run still goes from easy to hard, but where its special
+// questions sit (the true-or-not, the order, the match, the number) changes from run to run, so that no two games
+// share one shape. The first stays where it is, a plain choice in every shape: a game opens gently, with four options
+// to read and tap. A day is drawn once for everyone (ahead.go): its shape is the same for all who play it.
+func inBands(slots []slot, r *rand.Rand) []slot {
+	for from := 1; from < len(slots); {
+		to := from + 1
+		for to < len(slots) && slots[to].difficulty == slots[from].difficulty {
+			to++
+		}
+		band := slots[from:to]
+		r.Shuffle(len(band), func(i, j int) { band[i], band[j] = band[j], band[i] })
+		from = to
+	}
+	return slots
+}
+
 // newKind gives a run's slot for the new kinds one of them, at random.
 func newKind(slots []slot, r *rand.Rand) []slot {
 	for i := range slots {
@@ -391,7 +409,8 @@ func matches(q bank.Question, s slot, typ, pictures bool) bool {
 // Draw draws ten questions of a topic ("" for all topics, BulgariaTopic for Bulgaria's from every topic) for a player
 // of an ability there (mastery.go; 0 for one who knows as much as most), questions they haven't seen (seen) before
 // those they have, and never one barred (the day's: DayQuestions). Choices come with a picture or without, whichever
-// is drawn, and the number an estimate where one is left (wishes). Everyone's run has the same shape. Topic runs and
+// is drawn, and the number an estimate where one is left (wishes). Every run goes from easy to hard, its special
+// questions in places drawn within their difficulty (inBands). Topic runs and
 // duels draw this way (a room, DrawRoom). The questions due for review are among the barred (DayQuestions).
 func Draw(b *bank.Bank, category string, ability float64, seen, barred map[string]bool, r *rand.Rand) []Pick {
 	pool := topicPool(b, category)
@@ -399,7 +418,7 @@ func Draw(b *bank.Bank, category string, ability float64, seen, barred map[strin
 	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] && !barred[q.Base().ID] }
 	fresh := func(q bank.Question) bool { return !seen[q.Base().ID] }
 	var picks []Pick
-	for _, s := range newKind(topicSlots(ability), r) {
+	for _, s := range inBands(newKind(topicSlots(ability), r), r) {
 		if q := choose(pool, s, allowed, fresh, wishes(s), r); q != nil {
 			taken[q.Base().ID] = true
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
