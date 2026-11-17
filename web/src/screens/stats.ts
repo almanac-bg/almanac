@@ -1,5 +1,5 @@
 // How a player has done: the streak (and their longest) and this week, their numbers, the facts in their almanac, how
-// well they know each topic, their latest games.
+// well they know each topic (each a way to play it), their latest games (each a way to go over it: /games/<id>).
 
 import { picture } from "../art/picture.ts";
 import { type Mastery, masteryCard } from "../game/mastery.ts";
@@ -126,19 +126,23 @@ export function stats(): Child {
             .map((p) =>
               h(
                 "li",
-                { class: "game" },
+                null,
                 h(
-                  "div",
-                  { class: "game-text" },
-                  h("strong", { class: "game-what" }, what(p)),
-                  h("span", { class: "game-when" }, date(p.at)),
-                ),
-                h(
-                  "b",
-                  { class: "game-score" },
-                  String(p.rights),
-                  h("span", { class: "num-word" }, " от "),
-                  String(p.total),
+                  "a",
+                  { class: "game", href: `/games/${p.id}` },
+                  h(
+                    "div",
+                    { class: "game-text" },
+                    h("strong", { class: "game-what" }, what(p)),
+                    h("span", { class: "game-when" }, date(p.at)),
+                  ),
+                  h(
+                    "b",
+                    { class: "game-score" },
+                    String(p.rights),
+                    h("span", { class: "num-word" }, " от "),
+                    String(p.total),
+                  ),
                 ),
               ),
             ),

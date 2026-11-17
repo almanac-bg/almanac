@@ -141,8 +141,11 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
   await page.getByLabel("Какво не е наред?").fill("Отговорът е остарял.");
   await page.getByRole("button", { name: "Изпрати" }).click();
   await expect(page.getByText("Благодарим! Ще го прегледаме.")).toBeVisible();
+  // Another topic is a tap away, under the result.
+  await expect(page.locator(".other-topics .chip")).toHaveCount(3);
+  await expect(page.locator(".other-topics")).not.toContainText("История");
+  // Ten more from a result start at once: the player is ready, no count.
   await page.getByRole("button", { name: "Още десет" }).click();
-  await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
 });
 
@@ -275,6 +278,12 @@ test("a question left while its time runs: asked first, given up, and the topic 
   // Back to the topic: the same game, the question left counted unanswered, the third next.
   await page.locator(".topics").getByRole("link", { name: "История" }).click();
   await page.getByRole("button", { name: "Започни сега" }).click();
+  // First, once, what the question given up was: its answer, without points; then on.
+  const missed = page.locator(".given-up");
+  await expect(missed).toContainText("Въпрос 2 от 10");
+  await expect(missed).toContainText("Излезе, без да отговориш. Ето верния отговор.");
+  await expect(missed.locator(".right").first()).toBeVisible();
+  await missed.getByRole("button", { name: "Напред" }).click();
   await expect(page.locator(".question-head")).toContainText("3 от 10");
   await expect(page.locator("article.question .trail li:is(.right, .partial, .wrong)")).toHaveCount(2);
   await expect(page.locator("article.question .trail li").nth(1)).toHaveClass("wrong");

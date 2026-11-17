@@ -123,7 +123,8 @@ export function news(run: number, delay = 0, round?: Promise<number>, late?: { t
     const n = data();
     if (!n) return null;
     const top = headline(n);
-    const moved = n.open.xp ? (n.moved ?? []) : [];
+    // The goals a game moved; not the day's, whose result lists the goals still open, each with how far along.
+    const moved = n.open.xp && n.kind !== "day" ? (n.moved ?? []) : [];
     const parts = [
       (n.opened ?? []).map((s) => opened(s, n)),
       n.mended ? h("p", { class: "news-open" }, h("b", null, `Серията ти е върната: ${n.mended} дни.`)) : null,

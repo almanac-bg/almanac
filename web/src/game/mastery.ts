@@ -46,7 +46,11 @@ const firstWords = (m: Mastery) => [
   h("b", { class: "mastery-known" }, `${m.known}%`),
 ];
 
-function row(m: Mastery, extra: Child = null): Child {
+/** A topic's row: how well it's known; the whole row a way to play it (`play`: the player's own). */
+function row(m: Mastery, extra: Child = null, play = false): Child {
+  const topic = play
+    ? h("a", { class: "mastery-topic", href: `/play/${m.category}` }, topicMark(m.category), topicName(m.category))
+    : h("span", { class: "mastery-topic" }, topicMark(m.category), topicName(m.category));
   // Still being found out: one line, the topic and its first estimate, or what's left before one.
   if (!m.sure)
     return h(
@@ -55,19 +59,14 @@ function row(m: Mastery, extra: Child = null): Child {
       h(
         "div",
         { class: "mastery-head" },
-        h("span", { class: "mastery-topic" }, topicMark(m.category), topicName(m.category)),
+        topic,
         h("span", { class: "mastery-meta" }, extra, m.first ? firstWords(m) : masteryLeft(m)),
       ),
     );
   return h(
     "li",
     { class: `mastery-row ${toneOf(m.category)}` },
-    h(
-      "div",
-      { class: "mastery-head" },
-      h("span", { class: "mastery-topic" }, topicMark(m.category), topicName(m.category)),
-      masteryBadge(m),
-    ),
+    h("div", { class: "mastery-head" }, topic, masteryBadge(m)),
     meter(m.known, `${m.known}% от темата`),
     h(
       "div",
@@ -81,7 +80,8 @@ function row(m: Mastery, extra: Child = null): Child {
 
 /** Every topic, how well it's known: the best known first, then the two nearest to being told, the rest of those
  * still being found out and the ones not played yet named in a line each (a day's game touches all ten topics: ten
- * rows of „още 9 въпроса“ say nothing). Said to the player, or (another's) about them. */
+ * rows of „още 9 въпроса“ say nothing). Said to the player, each row a way to play its topic; or (another's) about
+ * them. */
 export function masteryCard(all: Mastery[], theirs = false): Child {
   const order = (m: Mastery) => (m.sure ? 3000 + m.known : m.first ? 2000 + m.known : m.answers ? 1000 + m.answers : 0);
   const sorted = [...all].sort((a, b) => order(b) - order(a));
@@ -103,7 +103,7 @@ export function masteryCard(all: Mastery[], theirs = false): Child {
       ? h(
           "ol",
           { class: "mastery-list" },
-          played.map((m) => row(m)),
+          played.map((m) => row(m, null, !theirs)),
         )
       : null,
     later.length

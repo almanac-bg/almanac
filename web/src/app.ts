@@ -20,6 +20,7 @@ import { me } from "./screens/me.ts";
 import { challengeGone, missing } from "./screens/missing.ts";
 import { mistakes } from "./screens/mistakes.ts";
 import { topic } from "./screens/play.ts";
+import { playedGame } from "./screens/played.ts";
 import { playerProfile } from "./screens/player.ts";
 import { ranks } from "./screens/ranks.ts";
 import { rewards } from "./screens/rewards.ts";
@@ -40,7 +41,7 @@ const links: [href: string, label: string, icon: string, here: (p: string) => bo
   ["/", "Начало", "home", (p) => /^\/($|play\/|mistakes|duel|royal|room|r\/|f\/)/.test(p)],
   ["/friends", "Приятели", "users", (p) => p === "/friends"],
   ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
-  ["/me", "Профил", "user", (p) => /^\/(me|settings|rewards|wardrobe|almanac|year\/[0-9]{4})$/.test(p)],
+  ["/me", "Профил", "user", (p) => /^\/(me|settings|rewards|wardrobe|almanac|year\/[0-9]{4}|games\/[0-9]+)$/.test(p)],
 ];
 
 reportErrors();
@@ -118,6 +119,7 @@ if (root) {
       { path: /^\/f\/([a-z0-9]{8})$/, view: invite },
       { path: /^\/hand\/([A-Za-z0-9_-]{43})$/, view: handoff },
       { path: /^\/me$/, view: me },
+      { path: /^\/games\/([0-9]+)$/, view: playedGame },
       { path: /^\/players\/([A-Za-z0-9_]{3,20})$/, view: playerProfile },
     ],
     missing,

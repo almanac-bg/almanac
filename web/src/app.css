@@ -1134,6 +1134,11 @@
     white-space: nowrap;
   }
 
+  /* A broken streak's days still to win back: the longer words may take two lines on a narrow phone. */
+  .streak-chip.repair .status-label {
+    white-space: normal;
+  }
+
   .status-icon {
     position: relative;
     flex: none;
@@ -1264,6 +1269,23 @@
     font-size: 0.875rem;
     line-height: 1.25rem;
     text-align: center;
+  }
+
+  /* The day's result, just played: the goals still open, as what's next, quietly (no card), and under a topic's result
+     the way to another topic. */
+  .open-goals,
+  .other-topics {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .open-goals .kicker,
+  .other-topics .kicker {
+    margin: 0;
+  }
+
+  .other-topics a.chip {
+    text-decoration: none;
   }
 
   /* The way back from a screen reached from a main place. */
@@ -5784,6 +5806,31 @@
     font-weight: 800;
   }
 
+  /* The player's own topic leads to playing it: the whole row is the link. */
+  .mastery-row:has(a.mastery-topic) {
+    position: relative;
+  }
+
+  a.mastery-topic {
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  a.mastery-topic::before {
+    position: absolute;
+    inset: -4px 0;
+    content: "";
+  }
+
+  a.mastery-topic::after {
+    content: "\00a0›";
+    color: var(--text-muted);
+  }
+
+  a.mastery-topic:hover {
+    color: var(--link);
+  }
+
   /* On a row, the picture starts at the card's edge like the words under it (a chip pulls it in instead). */
   .mastery-topic .topic-mark {
     margin-left: 0;
@@ -5846,6 +5893,18 @@
     box-shadow:
       var(--elev-1),
       inset 0 0 0 1px var(--line);
+  }
+
+  /* A game played leads to going over it. */
+  a.game {
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  a.game:hover {
+    box-shadow:
+      var(--elev-2),
+      inset 0 0 0 1px var(--line-strong);
   }
 
   .game-text {

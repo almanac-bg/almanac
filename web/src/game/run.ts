@@ -7,6 +7,8 @@
 // and the page keeps its result (a reload or a back to it shows the result again, not a new count). A question's time
 // runs on the server: come back to it on the device that showed it (a reload), the run goes straight back in; on
 // another device (or tab), the screen waits for „Продължи“.
+// A question given up by leaving shows its answer and fact once the run comes back, on this device, before the
+// next one: what the player missed, without points.
 
 import { type ApiError, api } from "../lib/api.ts";
 import { append, type Child, computed, effect, h, listen, onCleanup, type Signal, signal, slot } from "../lib/dom.ts";
@@ -16,8 +18,8 @@ import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { withName } from "../lib/words.ts";
 import { categories, playing } from "../state.ts";
 import { countUp, fact, formatNumber, inRowChip, type VerdictKind, verdict, verdictWords } from "../ui.ts";
-import { ask, beats, crowdLine, picture, picturesIn, type Stage, spokenAnswer } from "./questions.ts";
-import type { Answer, Credit, Mark, Result, Shown, State, View } from "./types.ts";
+import { answered, ask, beats, crowdLine, picture, picturesIn, type Stage, spokenAnswer } from "./questions.ts";
+import type { Answer, Credit, Mark, Result, Reveal, Shown, State, View } from "./types.ts";
 
 /** Where the run whose question this tab showed last is kept (this tab's, for as long as it's open). */
 const showingKey = "almanac.showing";
@@ -124,8 +126,62 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
   };
   onCleanup(() => clearTimeout(speaking));
 
-  at(initial);
+  // Back to a run whose last question was given up by leaving: that question's answer first, then on.
+  const left = takeGivenUp(initial.id);
+  if (left && !initial.done && !initial.question) screen.show(() => givenUp(left, initial.total, () => at(initial)));
+  else at(initial);
   return h("div", { class: "run" }, region, screen);
+}
+
+/** Where a question given up by leaving is kept, on this device, until its run comes back: what to show of it then. */
+const givenUpKey = "almanac.givenUp";
+
+interface GivenUp {
+  run: number;
+  n: number;
+  category: string;
+  view: View;
+  reveal: Reveal;
+}
+
+function keepGivenUp(run: number, q: Shown, reveal: Reveal): void {
+  try {
+    localStorage.setItem(givenUpKey, JSON.stringify({ run, n: q.n, category: q.category, view: q.view, reveal }));
+  } catch {
+    // no storage here: it's in the game's review all the same
+  }
+}
+
+/** The question given up in a run, if any, taken: it shows once. */
+function takeGivenUp(run: number): GivenUp | null {
+  try {
+    const g = JSON.parse(localStorage.getItem(givenUpKey) ?? "null") as GivenUp | null;
+    if (g?.run !== run) return null;
+    localStorage.removeItem(givenUpKey);
+    return g;
+  } catch {
+    return null;
+  }
+}
+
+/** A question given up by leaving, as the run comes back: what it asked, its answer marked, the fact behind it, and
+ * the way on. No points: it's what was missed. */
+function givenUp(g: GivenUp, total: number, on: () => void): Child {
+  const go = h("button", { class: "btn primary big", type: "button", onclick: on }, "Напред");
+  requestAnimationFrame(() => {
+    if (go.isConnected) go.focus({ preventScroll: true });
+  });
+  return h(
+    "article",
+    { class: "question given-up" },
+    h("p", { class: "kicker" }, `Въпрос ${g.n + 1} от ${total} · ${topicName(g.category)}`),
+    h("p", { class: "muted" }, "Излезе, без да отговориш. Ето верния отговор."),
+    h("h1", { class: "ask" }, g.view.text),
+    picture(g.view),
+    answered(g.view, g.reveal, null),
+    fact(g.reveal.fact, g.reveal.day),
+    go,
+  );
 }
 
 /** Says something to a screen reader, in the run's live region. */
@@ -679,7 +735,8 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
         sent = true;
         locked.set(true);
         try {
-          await api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer: null });
+          const res = await api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer: null });
+          if (!res.state.done) keepGivenUp(s.id, q, res.reveal);
         } catch {
           // its time runs out on the server all the same
         }

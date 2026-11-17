@@ -42,12 +42,19 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   measure nothing yet). The issue is the day's number from the first day of the day's ten (`play/issue.go`, 12
   November 2026 is Брой 1), the same for everyone. Left half-way, the same card with where the player stopped,
   „Следва въпрос 4 от 10“, the pips so far, and „Продължи“; or once played, how they went (under the score the issue
-  line, „Брой 6 · 17 ноември“, and the place a way to the day's board) with „Сподели“, the gold button, right under it
-  and „Прегледай въпросите“ below, then tomorrow in one quiet card (`.tomorrow`: when the next ten come, what they make
-  of the streak, and the reminder's ask) before the friends' day and the game's news; the day's goals; the ways to play with others, three in a row (the picture over
+  line, „Брой 6 · 17 ноември“, and the place a way to the day's board, from two players) with the one gold thing to do
+  next right under it (`game/gold.ts`: „Сподели“ for a result worth sharing — 6 of 10, a streak of 3, a right answer
+  few got — not shared yet today; else „Още десет“, to where an open goal points; none while a broken streak is half
+  won back, whose card has „Още една игра“), „Прегледай въпросите“ and a plain „Сподели“ below; just played, the goals
+  still open (`.open-goals`, no card); then tomorrow in one quiet card (`.tomorrow`: when the next ten come, what they
+  make of the streak, and the reminder's ask); a line each for where the day leaves the league („Лига Странджа: 2-ро
+  място от 12 · зона за качване“) and for the questions got wrong that will wait in Втори шанс; before the friends' day
+  and the game's news; the day's goals; the ways to play with others, three in a row (the picture over
   the name on a phone); the topics, two by two (five to a row on a big screen, the picture over the name, each tile
-  as tall as what's in it), and all of them at once (on a big screen in one row after the topics with „България“ and
-  „Втори шанс“, short tiles side by side). Дуел, Роял and Стая open from here and
+  as tall as what's in it), and all of them at once, with „Втори шанс“ right after it while questions wait (on a big
+  screen in one row after the topics with „България“, short tiles side by side). The streak's chip shows only a
+  streak: a broken one that can still be won back as its days, unlit, „за връщане“; none at all rather than „0 дни
+  поред“. Дуел, Роял and Стая open from here and
   have a way back to it (`back()`). A player who hasn't finished a game yet sees only the day and the topics, and a
   quiet „Имаш профил? Влез“ (a new phone) that opens the sign-in in place (open from the start, above the day, for a
   browser signed out that came from the streak's mail, `/?from=mail`): the
@@ -75,7 +82,9 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
 - **Класации** (`/ranks`): Днес (the day's board, first), Лига (the player's group this week; `/ranks#league`),
   Рейтинг and Знания (Лига and Рейтинг once the player has met them); of everyone or of friends (not the league: a group is its own).
 - **Профил** (`/me`): its own four places in a switch at the top (`profileNav()`): Общо (the player: level,
-  league (once open and in one), streak, numbers, the facts in the Алманах, mastery (once a topic has a mark), latest games), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
+  league (once open and in one), streak, numbers, the facts in the Алманах, mastery (once a topic has a mark; each row
+  a way to play the topic), latest games (each a way to go over it, read-only: `/games/<id>`, the score as its result
+  had it and the questions)), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
   worn as others see it, then Аватар, Рамка, Фон or Титла, one at a time) and Алманах (`/almanac`). Настройки open
   from the icon beside the name. The switch names the place, so Награди, Гардероб and Алманах have no heading of
   their own on the screen (it's there for screen readers).
@@ -293,8 +302,9 @@ takes a token.
   - `.place-link` (a line in Профил a tap from a place: the league's group, `.league-link` too; the Алманах).
 - **Results:** `.summary`, `.board`/`.row` (with `p1`–`p3`, `me`, `gap` and `moves`), `.topics`/`.topic`,
   `.players` and `.settings`. Every result screen (the day, a topic, Втори шанс, a duel, a room) is laid out the same:
-  the result; right under it what to do next (`nextSteps`): the one gold `big` button (the day's „Сподели“, „Още
-  десет“, „Още един дуел“, „Нова игра“), then the others as plain buttons of one size, side by side where they fit
+  the result; right under it what to do next (`nextSteps`): the one gold `big` button (the day's by `game/gold.ts`; a topic's „Още
+  десет“, at once without a count, with „Друга тема“, three topics as chips, under the buttons; „Още един дуел“, „Нова
+  игра“), then the others as plain buttons of one size, side by side where they fit
   (`.result-actions`: „Прегледай въпросите“ first); then the game's news; and at the end the questions, once
   opened (the button takes the player there). Each question gone over is a card of its own (`.reviewed`, a band in
   its verdict's colour on top): its number and topic as a kicker with „Вярно“, „Близо“ or „Грешно“ beside them, the
