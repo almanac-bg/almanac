@@ -184,7 +184,7 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) error {
 	if err := s.db.Read.PingContext(r.Context()); err != nil {
 		return err
 	}
-	return ok(w, map[string]any{"ok": true, "version": s.cfg.Version, "questions": len(s.bank.Load().Live("", ""))})
+	return ok(w, map[string]any{"ok": true, "version": s.cfg.Version, "bank": s.BankStatus()})
 }
 
 func (s *Server) me(w http.ResponseWriter, r *http.Request) error {

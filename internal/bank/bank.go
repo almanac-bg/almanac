@@ -36,7 +36,11 @@ type Category struct {
 
 // Bank is a loaded, checked bank.
 type Bank struct {
-	Dir        string
+	// Dir is where it was loaded from: its pictures are served from there.
+	Dir string
+	// Commit is the commit of the bank's repository it was loaded from, when the loader knows it (Commit): which bank
+	// a server plays, in its /api/health.
+	Commit     string
 	Categories []Category
 	// Questions are every question, retired ones too, by category in the order of Categories, then as in its file.
 	Questions []Question

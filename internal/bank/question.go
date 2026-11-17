@@ -7,7 +7,8 @@
 // answer a deal also shows how players have answered the question so far (crowd.go), in its own order. What a question
 // names (subjects.go) keeps a day to one question of a subject, and tells the bank's keepers which subjects come back.
 // A batch goes in whole or not at all (add.go): its new questions, its changes to questions the bank has, and its
-// retirements, checked against the bank as it would be first.
+// retirements, checked against the bank as it would be first. A server plays a copy of a bank (keep.go), and knows
+// which commit of the bank's repository it is.
 //
 // Besides its format (check.go), a loaded bank is held to every rule of the questions skill a program can judge
 // (rules.go): how lines end and are typed (wording.go), the options (options.go), numbers as estimates with one
