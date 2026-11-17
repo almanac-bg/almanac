@@ -15,6 +15,7 @@ import (
 // for each place (it has only so many medium orders and matches: past those, a day's order is of another
 // difficulty, then a choice), no question comes twice in a year, and no subject twice in a day.
 func TestAYearOfDays(t *testing.T) {
+	t.Parallel() // a long simulation: alongside the other one, after the quick tests
 	if _, err := os.Stat("../../private/" + bank.CategoriesFile); err != nil {
 		t.Skip("no private bank")
 	}

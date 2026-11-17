@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 
 	mailer "github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/store"
+	"github.com/almanac-bg/almanac/internal/store/storetest"
 )
 
 // inbox keeps what would have been sent.
@@ -24,11 +24,7 @@ func (i *inbox) Send(_ context.Context, _ string, m mailer.Message) error {
 
 func setup(t *testing.T) (*Accounts, *store.DB, *mailer.Outbox, *inbox) {
 	t.Helper()
-	db, err := store.Open(filepath.Join(t.TempDir(), "game.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
 	in := &inbox{}
 	out := mailer.NewOutbox(db, in, "АЛМАНАХ <no-reply@almanac.bg>")
 	return &Accounts{DB: db, Outbox: out, Secret: []byte("test secret")}, db, out, in

@@ -10,17 +10,16 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
-	"github.com/almanac-bg/almanac/internal/bank"
+	"github.com/almanac-bg/almanac/internal/bank/banktest"
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/push"
-	"github.com/almanac-bg/almanac/internal/store"
+	"github.com/almanac-bg/almanac/internal/store/storetest"
 )
 
 // fakeAPNs takes pushes for iPhones and counts them by token; the tokens in gone are ones Apple no longer knows.
@@ -62,9 +61,8 @@ func TestPhoneNotifications(t *testing.T) {
 	}
 	apple.Client, apple.Hosts = apns.Client(), []string{apns.URL}
 
-	db, _ := store.Open(filepath.Join(t.TempDir(), "game.db"))
-	t.Cleanup(func() { db.Close() })
-	b, _ := bank.Load("../../bank/sample")
+	db := storetest.Open(t)
+	b := banktest.Sample(t)
 	out := mail.NewOutbox(db, &inbox{}, "a@almanac.bg")
 	ts := httptest.NewUnstartedServer(nil)
 	s, err := New(Config{PublicURL: "http://" + ts.Listener.Addr().String(), Phones: &push.Phones{Apple: apple}},

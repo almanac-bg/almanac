@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/store"
+	"github.com/almanac-bg/almanac/internal/store/storetest"
 )
 
 type world struct {
@@ -30,11 +30,8 @@ type world struct {
 
 func setup(t *testing.T) *world {
 	t.Helper()
-	db, err := store.Open(filepath.Join(t.TempDir(), "game.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
+	db := storetest.Open(t)
+	// Its own bank, not banktest.Sample: these tests change questions (retire them, date them).
 	b, problems := bank.Load("../../bank/sample")
 	if b == nil {
 		t.Fatal(problems)

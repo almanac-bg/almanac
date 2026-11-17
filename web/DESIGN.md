@@ -662,8 +662,8 @@ mountains and a medal — are drawn by hand as paths in `web/src/art/pictures.ts
 ## Before a UI change ships
 
 - **Look at it** in both themes, at 320px and 390px wide, and at 1024px and 1440px. Nothing may scroll sideways, and keyboard focus must show.
-- **Run the checks:** `npm run check`, then the browser tests (`npm run e2e`), which include the accessibility
-  checks.
+- **Run the checks:** `npm run check`, then the browser specs the change touches (`npx playwright test -c e2e
+  --project=chromium e2e/<spec>`), and `e2e/a11y.spec.ts`, the accessibility checks.
 - **Keep it light:** `go run ./cmd/build` says how big each file is, gzipped. What a change adds should be worth its
   size, but there's no budget to write around: the build fails only past a ceiling far above the game, which only a
   mistake reaches.

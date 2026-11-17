@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"slices"
 	"testing"
 	"testing/synctest"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
+	"github.com/almanac-bg/almanac/internal/bank/banktest"
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/store"
+	"github.com/almanac-bg/almanac/internal/store/storetest"
 )
 
 type world struct {
@@ -27,15 +28,8 @@ type world struct {
 // setup is a game on a new database, with a hub over it; inside a synctest bubble, so time is the test's.
 func setup(t *testing.T) *world {
 	t.Helper()
-	db, err := store.Open(filepath.Join(t.TempDir(), "game.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-	b, problems := bank.Load("../../bank/sample")
-	if b == nil {
-		t.Fatal(problems)
-	}
+	db := storetest.Open(t)
+	b := banktest.Sample(t)
 	w := &world{t: t, db: db, g: play.New(db, func() *bank.Bank { return b })}
 	w.hub = NewHub(w.g, func(_ context.Context, id int64) (Player, error) {
 		return Player{ID: id, Name: fmt.Sprint("Играч ", id)}, nil

@@ -35,10 +35,10 @@ most). A change is judged by whether players come back: the retention numbers in
 | `internal/live` | Live duels: matchmaking, the shared clock, recordings |
 | `internal/royal` | Роял, live in the evening (Friday to Sunday until the evenings fill) |
 | `internal/room` | Rooms with a code |
-| `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: every client route must be listed there, or a reload is a 404) |
+| `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: the paths it sends the app for, the client's router's list again; a test holds them equal) |
 | `internal/store` | SQLite; migrations in `internal/store/migrations`, applied once each by name |
 | `internal/bank` | Question types, the bank on disk, its checks |
-| `internal/account`, `mail`, `push`, `backup` | Players and sign-in, email, Web Push, hourly backups to R2 (each checked before it's sent, one brought back daily) |
+| `internal/account`, `mail`, `push`, `backup`, `qr` | Players and sign-in, email, Web Push, hourly backups to R2 (each checked before it's sent, one brought back daily), QR codes |
 | `web/src` | The client, plain TypeScript, no framework: `lib/` (DOM, signals, router), `game/` (questions, a run), `screens/` (one file per page), `ui.ts`, `app.css` |
 | `web/DESIGN.md` | How it looks and speaks: tokens, components, copy rules. Follow it for any UI |
 | `e2e` | The game in real browsers (Playwright) |
@@ -53,16 +53,24 @@ package, and keep it true after.
 
 ```bash
 go run ./cmd/build -watch & DEV=1 go run ./cmd/almanac serve   # http://localhost:8080, mail in the log
-go vet ./... && go test -race ./...                            # the server
+go vet ./... && go test ./...                                  # the server: about 15 seconds
+go test -race ./internal/<package>                             # the race detector, on a package you changed that runs things at once
 npm run check && npm test                                      # the client: types, lint, unit tests, language
-npx playwright test -c e2e --project chromium e2e/<spec>       # the browser specs your change touches
+npx playwright test -c e2e --project=chromium e2e/<spec>       # the browser specs your change touches (`=`, or the spec reads as a project)
 ```
+
+CI runs the race detector on everything (`go test -race ./...`, a minute or two); locally run it where goroutines
+meet (`live`, `room`, `royal`, `server`, or `play` when you touch its locks), not on everything: the SQLite driver is
+Go, so under the detector every query is instrumented, and the whole tree takes minutes instead of seconds. A test gets
+its database from `storetest.Open(t)` (migrated once per test program, copied) and the sample bank from
+`banktest.Sample(t)` (shared: a test that changes questions loads its own with `bank.Load`).
 
 Formatting is done for you: a hook (`.claude/hooks/format.sh`) runs gofmt or Biome on every file a session edits,
 and stops a `git commit` with an unformatted file in it (`git add` them and commit again).
 
-Node lives under `~/.nvm` (put its `bin` on PATH in tool shells). Locally, Playwright's Chromium may be missing:
-`BROWSER_PATH="/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"`. Test what you change; a new rule or
+Node (from `~/.nvm`) is on the shell's PATH already: don't `export PATH` in a command (a worktree-isolated agent is
+refused git commands that do). Without Playwright's Chromium, the Chromium tests run in Brave by themselves
+(`BROWSER_PATH` names another browser). Test what you change; a new rule or
 screen gets a test. Look at a UI change at phone width (320–390 px) before shipping it.
 
 ## The game is in Bulgarian
@@ -97,7 +105,7 @@ client, the server or the sample bank. It catches only what it knows: reading th
 
 Fast is the rule: several sessions work at once, and every wait multiplies across them.
 
-- **A pull request waits only for the fast checks** (Server, Client, PR title: about a minute). Open it and queue
+- **A pull request waits only for the fast checks** (Server, Client, PR title: two minutes or so). Open it and queue
   the merge in one go — `gh pr merge <n> --auto --squash` — then move on: GitHub merges it when they pass. Don't
   watch CI, and don't merge `main` into a branch unless GitHub says it conflicts.
 - **Merging to `main` releases and deploys by itself** (`.github/workflows/deploy.yml`): the version comes from the

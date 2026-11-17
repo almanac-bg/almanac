@@ -1,6 +1,7 @@
 package play
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"os"
 	"slices"
@@ -191,6 +192,7 @@ func TestDayPassesOverdueQuestions(t *testing.T) {
 // With the real bank (when it's there), the runway tells the truth: drawn day after day, the days stay whole until
 // about the day the shortest place's runway says, and then that place is the one short.
 func TestTheRunwayIsTrue(t *testing.T) {
+	t.Parallel() // a long simulation: alongside the other one, after the quick tests
 	if _, err := os.Stat("../../private/" + bank.CategoriesFile); err != nil {
 		t.Skip("no private bank")
 	}
@@ -202,20 +204,23 @@ func TestTheRunwayIsTrue(t *testing.T) {
 	places := DayRunway(b, Used{}, start.Format(time.DateOnly))
 	shortest := slices.MinFunc(places, func(x, y Runway) int { return x.Days - y.Days })
 	for seed := range uint64(3) {
-		used := map[string]bool{}
-		r := rand.New(rand.NewPCG(seed, 2))
-		for day := range shortest.Days * 2 {
-			picks, short := drawDay(b, start.AddDate(0, 0, day).Format(time.DateOnly), used, nil, r)
-			if len(short) > 0 {
-				if day < shortest.Days*9/10 || day > shortest.Days*5/4 || !slices.Contains(short, shortest.Place) {
-					t.Fatalf("seed %d: short on day %d (%v); the runway said %s, %d days", seed, day, short, shortest.Place, shortest.Days)
+		t.Run(fmt.Sprint("seed ", seed), func(t *testing.T) {
+			t.Parallel() // each seed draws its own days
+			used := map[string]bool{}
+			r := rand.New(rand.NewPCG(seed, 2))
+			for day := range shortest.Days * 2 {
+				picks, short := drawDay(b, start.AddDate(0, 0, day).Format(time.DateOnly), used, nil, r)
+				if len(short) > 0 {
+					if day < shortest.Days*9/10 || day > shortest.Days*5/4 || !slices.Contains(short, shortest.Place) {
+						t.Fatalf("short on day %d (%v); the runway said %s, %d days", day, short, shortest.Place, shortest.Days)
+					}
+					t.Logf("short on day %d (%v); the runway said %d days", day, short, shortest.Days)
+					return
 				}
-				t.Logf("seed %d: short on day %d (%v); the runway said %d days", seed, day, short, shortest.Days)
-				break
+				for _, p := range picks {
+					used[p.ID] = true
+				}
 			}
-			for _, p := range picks {
-				used[p.ID] = true
-			}
-		}
+		})
 	}
 }
