@@ -390,7 +390,8 @@ func (g *Game) PlayDuel(ctx context.Context, userID, duelID int64) (State, error
 // the challenger calls it off.
 func (g *Game) DeclineDuel(ctx context.Context, userID, duelID int64) error {
 	res, err := g.DB.Write.ExecContext(ctx, `UPDATE duels SET outcome = 'declined', ended_at = ?
-		WHERE id = ? AND kind = 'friend' AND ended_at IS NULL AND b_run IS NULL AND (b_id = ? OR a_id = ?)`,
+		WHERE id = ? AND kind = 'friend' AND challenge_id IS NULL AND ended_at IS NULL AND b_run IS NULL
+			AND (b_id = ? OR a_id = ?)`,
 		store.Ms(g.Now()), duelID, userID, userID)
 	if err != nil {
 		return err

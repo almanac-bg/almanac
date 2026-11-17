@@ -83,9 +83,11 @@ var playerErrors = map[error]*apiError{
 	account.ErrCodeExpired: {http.StatusBadRequest, "code_expired", "Кодът е изтекъл. Поискай нов."},
 	account.ErrCodeTries:   {http.StatusBadRequest, "code_tries", "Твърде много опити. Поискай нов код."},
 	account.ErrNoHandoff:   {http.StatusNotFound, "no_handoff", "Тази връзка вече не работи: играта ти остана там, където я започна."},
-	account.ErrBadName:     {http.StatusBadRequest, "bad_name", "Името трябва да е от 2 до 30 букви, цифри или интервали."},
-	account.ErrBadTag:      {http.StatusBadRequest, "bad_tag", "Потребителското име е от 3 до 20 латински букви, цифри или _ и започва с буква."},
-	account.ErrTagTaken:    {http.StatusConflict, "tag_taken", "Това потребителско име е заето. Опитай друго."},
+	account.ErrHandoffSignedIn: {http.StatusConflict, "handoff_signed_in",
+		"Тук вече си с профила си. За да добавиш към него играта оттам, влез с имейла си там, където я започна."},
+	account.ErrBadName:  {http.StatusBadRequest, "bad_name", "Името трябва да е от 2 до 30 букви, цифри или интервали."},
+	account.ErrBadTag:   {http.StatusBadRequest, "bad_tag", "Потребителското име е от 3 до 20 латински букви, цифри или _ и започва с буква."},
+	account.ErrTagTaken: {http.StatusConflict, "tag_taken", "Това потребителско име е заето. Опитай друго."},
 }
 
 // apiHandler runs an API handler: its error becomes a JSON answer, an unexpected one a 500 that's logged.

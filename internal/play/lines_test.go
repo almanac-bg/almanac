@@ -65,4 +65,11 @@ func TestAccepted(t *testing.T) {
 	if err := w.g.Told(ctx, ana, "anything"); !errors.Is(err, ErrNoLine) {
 		t.Fatalf("a line that isn't one: %v", err)
 	}
+	// Nor one about someone not a friend, or a duel not theirs: nothing to fill the table with.
+	stranger := w.user()
+	for _, line := range []string{fmt.Sprintf("friend:%d", stranger), "left:999999"} {
+		if err := w.g.Told(ctx, ana, line); !errors.Is(err, ErrNoLine) {
+			t.Fatalf("%s: %v", line, err)
+		}
+	}
 }

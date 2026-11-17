@@ -2,6 +2,7 @@ package play
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"testing"
 	"time"
@@ -162,5 +163,39 @@ func TestFriendDuelLink(t *testing.T) {
 	// Taking challenges never counts against the challenges one may have waiting on friends.
 	if n, _ := w.g.Challenges(ctx, vi); len(n) != 1 {
 		t.Fatalf("Vi's turn: %+v", n)
+	}
+}
+
+// A guest's challenge is the account's once the guest signs in (Merge): its link still works, and the duels of those
+// who took it stay theirs, though the guest is gone.
+func TestChallengeKeptOverSignIn(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	guest, owner, bo := w.user(), w.user(), w.user()
+	s, err := w.g.StartTopic(ctx, guest, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(guest, s.ID, repeat(w.right, Length)...)
+	code, err := w.g.Challenge(ctx, guest, s.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bs, duel, err := w.g.TakeChallenge(ctx, bo, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(bo, bs.ID, repeat(w.wrong, Length)...)
+	if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, guest, owner) }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.db.Write.Exec(`DELETE FROM users WHERE id = ?`, guest); err != nil { // as signing in does
+		t.Fatal(err)
+	}
+	if v, err := w.g.ChallengeOf(ctx, code, owner); err != nil || !v.Own {
+		t.Fatalf("the account's challenge: %+v (%v)", v, err)
+	}
+	if d, err := w.g.DuelOf(ctx, bo, duel); err != nil || d.State != "lost" {
+		t.Fatalf("Bo's duel: %+v (%v)", d, err)
 	}
 }

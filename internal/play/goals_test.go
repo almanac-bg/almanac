@@ -235,3 +235,19 @@ func TestGoalsOfOthers(t *testing.T) {
 		t.Fatalf("Vi's duel won: %+v", n.Goals)
 	}
 }
+
+// A duel won against a recording (no second player's run) is a duel won, as one won against a person is.
+func TestGoalDuelWonAgainstARecording(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	now := w.g.Now().UnixMilli()
+	if _, err := w.db.Write.Exec(`INSERT INTO duels (kind, questions, a_id, created_at, expires_at, ended_at, outcome)
+		VALUES ('live', '[]', ?, ?, ?, ?, 'ghost_won')`, ana, now, now, now); err != nil {
+		t.Fatal(err)
+	}
+	tl, err := w.g.tallyOf(ctx, ana, w.g.Today())
+	if err != nil || tl.duelWins != 1 {
+		t.Fatalf("duel wins %+v (%v), want 1", tl, err)
+	}
+}

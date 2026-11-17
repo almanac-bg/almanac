@@ -203,6 +203,22 @@ func (g *Game) TakeChallenge(ctx context.Context, viewer int64, code string) (St
 			s, err = g.state(tx, r)
 			return err
 		}
+		// Another tab of the same player may have taken it a moment ago: theirs is the one game of it.
+		var taken, takenRun int64
+		err := tx.QueryRow(`SELECT id, a_run FROM duels WHERE challenge_id = ? AND a_id = ?`, v.id, viewer).
+			Scan(&taken, &takenRun)
+		if err == nil {
+			r, err := load(tx, viewer, takenRun)
+			if err != nil {
+				return err
+			}
+			duelID = taken
+			s, err = g.state(tx, r)
+			return err
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
 		var raw string
 		if err := tx.QueryRow(`SELECT questions FROM runs WHERE id = ?`, v.runID).Scan(&raw); err != nil {
 			return err
