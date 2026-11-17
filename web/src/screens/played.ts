@@ -3,7 +3,7 @@
 
 import { reviewed, scoreCard } from "../game/results.ts";
 import type { Reviewed, State } from "../game/types.ts";
-import { type ApiError, api } from "../lib/api.ts";
+import { api, errorText } from "../lib/api.ts";
 import { h, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { issueWords } from "../lib/words.ts";
@@ -42,7 +42,7 @@ export function playedGame([id = ""]: string[]) {
     api<{ questions: Reviewed[] }>("GET", `/api/runs/${id}/review`),
   ]).then(
     ([s, r]) => game.set({ s, questions: r.questions }),
-    (err) => error.set((err as ApiError).message),
+    (err) => error.set(errorText(err)),
   );
   return h("section", { class: "screen" }, back("/me", "Профил"), () => {
     const g = game();

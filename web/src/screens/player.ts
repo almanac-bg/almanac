@@ -3,7 +3,7 @@
 // asking, call them to a duel.
 
 import { type Mastery, masteryCard } from "../game/mastery.ts";
-import { type ApiError, api } from "../lib/api.ts";
+import { api, errorText } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { friendRequests, player } from "../state.ts";
@@ -61,7 +61,7 @@ export function playerProfile([tag]: string[]): Child {
         profile.set(p);
         title(p.name);
       },
-      (err) => error.set((err as ApiError).message),
+      (err) => error.set(errorText(err)),
     );
   load();
   return h("section", { class: "screen" }, (): Child => {
@@ -121,7 +121,7 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
     try {
       await fn();
     } catch (err) {
-      note.set({ text: (err as ApiError).message, bad: true });
+      note.set({ text: errorText(err), bad: true });
     } finally {
       busy.set(false);
     }

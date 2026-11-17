@@ -3,8 +3,8 @@
 // facts learned that day under it. A topic is a quiet filter above. It grows to thousands, so it comes a page at a
 // time: the next as the list's end comes near, each day's facts going on under its head across pages.
 
-import { type ApiError, api } from "../lib/api.ts";
-import { type Child, h, onCleanup, signal, slot, when } from "../lib/dom.ts";
+import { api, errorText } from "../lib/api.ts";
+import { type Child, h, lifetime, onCleanup, signal, slot, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { issueWords } from "../lib/words.ts";
 import { dayInBulgaria } from "../lib/year.ts";
@@ -175,10 +175,7 @@ function pages(topic: string, counted: (c: Counts) => void): Child {
   const next = signal<string | null>(null); // where the next page starts; "" after the last; null before the first
   const busy = signal(false);
   const trouble = signal("");
-  let gone = false;
-  onCleanup(() => {
-    gone = true;
-  });
+  const life = lifetime();
   const more = h("button", { class: "btn", type: "button", disabled: busy, onclick: () => load() }, () =>
     trouble() ? "Опитай пак" : "Още факти",
   );
@@ -197,7 +194,7 @@ function pages(topic: string, counted: (c: Counts) => void): Child {
     const query = new URLSearchParams({ topic, from: from ?? "" });
     api<Page>("GET", `/api/almanac?${query}`).then(
       (p) => {
-        if (gone) return;
+        if (life.aborted) return;
         counted(p);
         for (const f of p.facts) add(f);
         next.set(p.next ?? "");
@@ -207,9 +204,9 @@ function pages(topic: string, counted: (c: Counts) => void): Child {
         if (p.next) near.observe(more);
       },
       (err) => {
-        if (gone) return;
+        if (life.aborted) return;
         busy.set(false);
-        trouble.set((err as ApiError).message);
+        trouble.set(errorText(err));
       },
     );
   };

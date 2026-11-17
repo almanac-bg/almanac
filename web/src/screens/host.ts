@@ -4,7 +4,6 @@
 // the next question), „Задръж“ (each answer stays up until „Напред“, to talk it over), „Приключи“. The players' phones
 // are as in any room. Part of room.ts's file, loaded with it; its style (host.css) loads the first time it shows.
 
-import type { ApiError } from "../lib/api.ts";
 import type { Child } from "../lib/dom.ts";
 import {
   about,
@@ -16,6 +15,7 @@ import {
   computed,
   countdown,
   door,
+  errorText,
   fact,
   formatNumber,
   h,
@@ -179,7 +179,7 @@ function controls(view: () => RoomView, code: string): Child {
     try {
       await api("POST", `/api/rooms/${code}/hold`, { on: !view().held });
     } catch (err) {
-      error.set((err as ApiError).message);
+      error.set(errorText(err));
     }
   };
   const finish = () => {

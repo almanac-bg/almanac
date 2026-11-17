@@ -2,7 +2,7 @@
 // make more: by their tag or email, or your invite link.
 
 import { shareButton } from "../game/results.ts";
-import { type ApiError, api } from "../lib/api.ts";
+import { api, errorText } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal, when } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { friendRequests, player, user } from "../state.ts";
@@ -74,7 +74,7 @@ function friendsCard(): Child {
     try {
       await fn();
     } catch (err) {
-      error.set((err as ApiError).message);
+      error.set(errorText(err));
     }
   };
   // A friend challenged: ten played now, and they play theirs when they can.
@@ -260,7 +260,7 @@ function addFriend(reload: () => Promise<void>): Child {
           to.set("");
           await reload();
         } catch (err) {
-          note.set({ text: (err as ApiError).message, bad: true });
+          note.set({ text: errorText(err), bad: true });
         } finally {
           busy.set(false);
         }

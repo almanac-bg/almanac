@@ -1,7 +1,7 @@
 // The end of a game: how it went, then what to do next (the way to share it, the questions to go over with their
 // answers), laid out the same on every result screen.
 
-import { type ApiError, api, tally } from "../lib/api.ts";
+import { api, errorText, tally } from "../lib/api.ts";
 import { appShare } from "../lib/app.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
@@ -156,7 +156,7 @@ export function shareButton(
     try {
       url = link ? await link() : (to as string | undefined);
     } catch (err) {
-      return done.set((err as ApiError).message);
+      return done.set(errorText(err));
     }
     const body = text();
     if (await appShare(body, url)) return shared?.();
@@ -241,7 +241,7 @@ export function reviewParts(load: () => Promise<Reviewed[]>): { button: Child; l
       error.set("");
       requestAnimationFrame(show);
     } catch (err) {
-      error.set((err as ApiError).message);
+      error.set(errorText(err));
     }
   };
   const button = h("button", { class: "btn", type: "button", onclick: open }, "Прегледай въпросите");

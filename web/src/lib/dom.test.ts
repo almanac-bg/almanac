@@ -1,7 +1,23 @@
 // The signals and scopes the UI rests on (the DOM parts are covered by the browser tests).
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { batch, computed, effect, onCleanup, safeURL, scope, signal, slot } from "./dom.ts";
+import { batch, computed, effect, lifetime, onCleanup, safeURL, scope, signal, slot } from "./dom.ts";
+
+test("a scope's lifetime ends with it, so what was on its way when it ended does nothing", async () => {
+  const opened: string[] = [];
+  const [life, dispose] = scope(() => {
+    const life = lifetime();
+    Promise.resolve().then(() => {
+      if (!life.aborted) opened.push("stream");
+    });
+    return life;
+  });
+  dispose(); // the screen gone before the answer came
+  await Promise.resolve();
+  assert.equal(life.aborted, true);
+  assert.deepEqual(opened, []);
+  assert.equal(lifetime().aborted, false); // outside any scope: never ends
+});
 
 test("an effect runs again when what it read changes, and only then", () => {
   const a = signal(1);
@@ -77,6 +93,7 @@ test("links go to this site, the web or mail only", () => {
     "/play/history",
     "/qimg/a.webp 600w, /qimg/b.webp 1200w",
     "https://commons.wikimedia.org/x",
+    "https://almanac.bg/privacy",
     "mailto:a@b.bg",
   ]) {
     assert.ok(safeURL(ok), ok);
@@ -87,6 +104,10 @@ test("links go to this site, the web or mail only", () => {
     "data:text/html,x",
     "//evil.example",
     "/ok, javascript:x",
+    // An address only made to look like the game's (the app's web view would take it as its own on an iPhone).
+    "https://almanac.bg.evil.example/",
+    "https://almanac.bg@evil.example/",
+    "https://user:pass@commons.wikimedia.org/x",
   ]) {
     assert.ok(!safeURL(bad), bad);
   }

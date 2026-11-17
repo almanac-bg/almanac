@@ -1,7 +1,7 @@
 // Стая: a room for many at once — on everyone's phone, around a table or across a classroom. Here one is opened, or
 // joined by its code (checked before anything is asked); and its host chooses again between games (changeGame).
 
-import { type ApiError, api } from "../lib/api.ts";
+import { type ApiError, api, errorText } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { categories, player } from "../state.ts";
@@ -43,7 +43,7 @@ export function rooms() {
         }
       go(`/r/${r.code}`);
     } catch (err) {
-      error.set((err as ApiError).message);
+      error.set(errorText(err));
     }
   };
   // Opening a room is an action, not a place: a button per topic.
@@ -93,7 +93,7 @@ export function rooms() {
               codeError.set(
                 (err as ApiError).code === "no_room"
                   ? "Няма отворена стая с този код. Провери цифрите."
-                  : (err as ApiError).message,
+                  : errorText(err),
               );
             }
           },

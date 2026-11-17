@@ -92,10 +92,15 @@ var playerErrors = map[error]*apiError{
 	account.ErrTagTaken: {http.StatusConflict, "tag_taken", "Това потребителско име е заето. Опитай друго."},
 }
 
+// versionHeader names the game's version on every API answer: a page loaded before a deploy sees it's another and
+// loads itself anew at a moment that costs the player nothing (web/src/fresh.ts).
+const versionHeader = "X-Almanac-Version"
+
 // apiHandler runs an API handler: its error becomes a JSON answer, an unexpected one a 500 that's logged.
 func (s *Server) apiHandler(h func(http.ResponseWriter, *http.Request) error) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set(versionHeader, s.cfg.Version)
 		err := h(w, r)
 		if err == nil {
 			return

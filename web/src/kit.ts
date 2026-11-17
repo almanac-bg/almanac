@@ -5,6 +5,7 @@
 // page then loads first (cmd/build fails if there is one).
 
 import { emblem } from "./art/emblem.ts";
+import { recover, staying } from "./fresh.ts";
 import { news } from "./game/news.ts";
 import { answered, ask, crowdLine, picture } from "./game/questions.ts";
 import {
@@ -19,9 +20,9 @@ import {
   shareButton,
 } from "./game/results.ts";
 import { countdown, guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
-import { ApiError, api, deliver } from "./lib/api.ts";
+import { ApiError, api, deliver, errorText } from "./lib/api.ts";
 import { keepAwake } from "./lib/awake.ts";
-import { type Child, computed, effect, h, onCleanup, signal, untracked } from "./lib/dom.ts";
+import { type Child, computed, effect, h, lifetime, onCleanup, signal, untracked } from "./lib/dom.ts";
 import { ordinal, place } from "./lib/ordinal.ts";
 import { musicOn } from "./lib/prefs.ts";
 import { pushable, pushOn, turnOn } from "./lib/push.ts";
@@ -71,6 +72,7 @@ export const kit = {
   crowdLine,
   deliver,
   effect,
+  errorText,
   duelResult,
   emblem,
   explain,
@@ -85,6 +87,7 @@ export const kit = {
   hostCss,
   h,
   keepAwake,
+  lifetime,
   landing,
   liveAudio,
   loadDuelResult,
@@ -116,6 +119,7 @@ export const kit = {
   signal,
   soundOn,
   standingCard,
+  staying,
   startScreen,
   timer,
   title,
@@ -167,7 +171,8 @@ function stylesheet(href: string): Promise<void> {
 }
 
 /** A duel's result as it stands or ended (screens/outcome.ts), drawn once it has loaded: `again` is the gold button
- * where there's another duel to play (else a friend's has a rematch), `more` what the game earned. */
+ * where there's another duel to play (else a friend's has a rematch), `more` what the game earned. Should it not load
+ * (no line, or a version of the game gone by), the duel's own page has it: loaded as a page, it's whole again. */
 export function duelResult(d: DuelView, again: Child | Steps = null, more: Child = null): Child {
   const screen = signal<Outcome | null>(null);
   const failed = signal(false);
@@ -176,19 +181,31 @@ export function duelResult(d: DuelView, again: Child | Steps = null, more: Child
     const m = screen();
     if (m) return untracked(() => m.outcome(kit, d, again, more));
     return failed()
-      ? h("p", { class: "bad", role: "alert" }, "Резултатът не се зареди. Провери интернета си и опитай пак.")
+      ? h(
+          "div",
+          { class: "stack failure" },
+          h("p", { role: "alert" }, "Резултатът не се зареди."),
+          h(
+            "button",
+            { class: "btn primary", type: "button", onclick: () => location.assign(`/duel/${d.id}`) },
+            "Виж резултата",
+          ),
+        )
       : h("p", { class: "muted" }, "…");
   };
 }
 
-/** A screen that loads the first time it's opened: a line while it comes, and one if it can't. */
+/** A screen that loads the first time it's opened: a line while it comes, and one if it can't. A file that doesn't
+ * come while the server answers is one of a version gone by: the page loads anew for it (fresh.ts). */
 export function later(load: () => Promise<(kit: Kit, params: string[]) => Child>): (params: string[]) => Child {
   return (params) => {
     const screen = signal<((kit: Kit, params: string[]) => Child) | null>(null);
     const failed = signal(false);
     load().then(
       (s) => screen.set(s),
-      () => failed.set(true),
+      async () => {
+        if (!(await recover())) failed.set(true);
+      },
     );
     return () => {
       const s = screen();

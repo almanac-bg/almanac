@@ -5,7 +5,7 @@
 // player tapped to share, and the name can wait). Asked once on a device, whatever the answer; Esc or a tap beside the
 // sheet is no answer: neither the share nor the question goes, and the next share asks.
 
-import { type ApiError, api } from "../lib/api.ts";
+import { api, errorText } from "../lib/api.ts";
 import { h } from "../lib/dom.ts";
 import { type User, user } from "../state.ts";
 
@@ -92,7 +92,7 @@ function sheet(u: User, share: () => void): void {
               await Promise.race([saved, late]);
             } catch (err) {
               go.disabled = false;
-              return say((err as ApiError).message);
+              return say(errorText(err));
             }
           }
           markAsked(u.id);

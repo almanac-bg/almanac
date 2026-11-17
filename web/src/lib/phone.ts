@@ -45,23 +45,38 @@ function plugin(name: string) {
 const pushes = plugin("PushNotifications");
 const app = plugin("App");
 
-/** Goes to a link to the game (a notification's, or one opened in the app): only the game's own pages. */
-function open(link: string, go: (path: string) => void): void {
-  try {
-    const u = new URL(link, location.origin);
-    if (u.origin === location.origin) go(u.pathname + u.search + u.hash);
-  } catch {
-    // not a link: nothing to open
-  }
-}
-
-/** How the app gets around the game's pages (the router's, handed in): `go` opens a page; `home` says whether Начало is
- * showing with nothing under way on it (the day's ten are played on it); `canGoBack`, whether the page before is one of
- * the game's. */
+/** How the app gets around the game's pages (the router's, handed in): `navigate` opens a link from outside the page as
+ * a tap on it would (a game under way asks first; a page of the server's own loads as a page); `go` opens a page of the
+ * game's; `home` says whether Начало is showing with nothing under way on it (the day's ten are played on it);
+ * `playing`, whether a game is under way; `canGoBack`, whether the page before is one of the game's; `resumed` hears of
+ * the app brought back. */
 export interface Nav {
+  navigate: (link: string) => void;
   go: (path: string) => void;
   home: () => boolean;
+  playing: () => boolean;
   canGoBack: () => boolean;
+  resumed: () => void;
+}
+
+/** The link opened last, and when: one the phone tells of twice at once opens once. */
+let last = { link: "", at: 0 };
+
+/** Opens a link to the game (a notification's, or one opened in the app): only the game's own site. The page showing
+ * now, with a game under way on it (a Роял reminder tapped in Роял), stays as it is. */
+export function open(link: string, nav: Pick<Nav, "navigate" | "playing">): void {
+  let u: URL;
+  try {
+    u = new URL(link, location.origin);
+  } catch {
+    return; // not a link: nothing to open
+  }
+  if (u.origin !== location.origin) return;
+  const now = Date.now();
+  if (u.href === last.link && now - last.at < 3_000) return;
+  last = { link: u.href, at: now };
+  if (nav.playing() && u.pathname + u.search === location.pathname + location.search) return;
+  nav.navigate(u.href);
 }
 
 /** What Android's back button does: from Начало, puts the app away, as other apps do; else back a page (a game under
@@ -71,27 +86,25 @@ export function backAction(nav: Pick<Nav, "home" | "canGoBack">): "away" | "back
   return nav.canGoBack() ? "back" : "home";
 }
 
-/** Starts what the app adds to the game: a tapped notification and a link to the game go to their page (by `nav.go`),
- * the link that started the app too; Android's back button does what backAction says. `opened` hears of a notification
- * tapped, by its kind. */
+/** Starts what the app adds to the game: a tapped notification and a link to the game go to their page (open), the
+ * link that started the app too (the app keeps its appUrlOpen until it's listened to; asking for the launch's link as
+ * well would open it twice, and again at each reload after, the app keeping that link for good); Android's back button
+ * does what backAction says; the app brought back is told (`nav.resumed`). `opened` hears of a notification tapped, by
+ * its kind. */
 export function start(nav: Nav, opened: (kind: string) => void): void {
-  const { go } = nav;
-  app.on("appUrlOpen", (e: { url: string }) => open(e.url, go));
-  app.call<{ url?: string } | undefined>("getLaunchUrl").then(
-    (e) => e?.url && open(e.url, go),
-    () => {},
-  );
+  app.on("appUrlOpen", (e: { url: string }) => open(e.url, nav));
   // Android's own canGoBack leaves out pages opened without a tap (a notification's): back goes by the game's history.
   app.on("backButton", () => {
     const what = backAction(nav);
     if (what === "away") app.call("minimizeApp").catch(() => {});
     else if (what === "back") history.back();
-    else go("/");
+    else nav.go("/");
   });
+  app.on("resume", () => nav.resumed());
   pushes.on("pushNotificationActionPerformed", (e: { notification: { data?: { url?: string; kind?: string } } }) => {
     const data = e.notification?.data;
     if (data?.kind) opened(data.kind);
-    if (data?.url) open(data.url, go);
+    if (data?.url) open(data.url, nav);
   });
 }
 

@@ -4,7 +4,7 @@
 // game (account.Handoff, taken on /hand/<token> with a tap). And the way in for a player who has a profile already,
 // a tap from Начало and Профил.
 
-import { type ApiError, api } from "../lib/api.ts";
+import { type ApiError, api, errorText } from "../lib/api.ts";
 import { inApp } from "../lib/app.ts";
 import { type Child, effect, h, signal, when } from "../lib/dom.ts";
 import { embedded, outsideLink } from "../lib/embedded.ts";
@@ -59,7 +59,7 @@ function outside(stake: string, platform: string, keep: Child): Child {
   };
   make().catch(() => {});
   const said = signal("");
-  const fail = (err: unknown) => said.set((err as ApiError).message ?? "Не успяхме. Опитай пак.");
+  const fail = (err: unknown) => said.set(errorText(err));
   const android = platform === "android";
   const ready = () => !!url.peek() && Date.now() - made < 20 * 60_000;
   const action = android

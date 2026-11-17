@@ -8,11 +8,16 @@ adds what a page can't do well on a phone, through Capacitor's plugins, which th
 - **notifications** from Apple (APNs) and Google (Firebase Cloud Messaging), sent by the server
   (`internal/push/phones.go`) to the token the phone gives (`POST /api/push/phone`);
 - **sharing** through the phone's share sheet, **a touch felt** on an answer, Android's **back button**;
-- **links** to almanac.bg opened in the app (the site's `/.well-known/apple-app-site-association` and
-  `assetlinks.json`, `internal/server/applinks.go`);
+- **links** to the game's pages on almanac.bg opened in the app (the site's `/.well-known/apple-app-site-association`
+  and `assetlinks.json`, `internal/server/applinks.go`; Android's list of them is in `AndroidManifest.xml`, kept the
+  same by a test); the server's own pages (privacy, a mail's „no more of these“) stay in the browser;
 - a page of its own when there's no connection (`www/offline.html`).
 
-A new build is needed only when this folder changes (a plugin, the icon, the native settings).
+A new build is needed only when this folder changes (a plugin, the icon, the native settings, the links it opens).
+The page that has been open for days in the app's web view loads itself anew after a deploy, at a moment that costs no
+play (`web/src/fresh.ts`). `server.url` in `capacitor.config.json` ends in `/`: an iPhone's web view takes every
+address that starts with it, letter for letter, for the app's own (with its bridge), and without the slash
+`almanac.bg.example.com` would be one.
 
 ## Identity
 

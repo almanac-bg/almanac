@@ -19,12 +19,37 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Links to almanac.bg open in the app (the site's /.well-known/assetlinks.json says it may). -->
+            <!-- Links to the game's pages on almanac.bg open in the app (the site's /.well-known/assetlinks.json says it
+                 may): the paths of appLinks in internal/server/applinks.go, and only those (its test keeps the two one).
+                 The server's own pages (privacy, a mail's „no more of these“, admin) stay in the browser. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="almanac.bg" />
+                <data android:path="/" />
+                <data android:pathPrefix="/play/" />
+                <data android:path="/duel" />
+                <data android:pathPrefix="/duel/" />
+                <data android:path="/challenge" />
+                <data android:pathPrefix="/challenge/" />
+                <data android:pathPrefix="/c/" />
+                <data android:pathPrefix="/r/" />
+                <data android:pathPrefix="/f/" />
+                <data android:pathPrefix="/hand/" />
+                <data android:pathPrefix="/year/" />
+                <data android:pathPrefix="/games/" />
+                <data android:pathPrefix="/players/" />
+                <data android:path="/royal" />
+                <data android:path="/room" />
+                <data android:path="/ranks" />
+                <data android:path="/rewards" />
+                <data android:path="/wardrobe" />
+                <data android:path="/me" />
+                <data android:path="/friends" />
+                <data android:path="/settings" />
+                <data android:path="/almanac" />
+                <data android:path="/mistakes" />
             </intent-filter>
         </activity>
 

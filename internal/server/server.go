@@ -5,7 +5,9 @@
 // restart, a deploy drains the server (drain.go), so that the restart cuts no live duel nor a room's game; the rooms
 // themselves are kept over it (Config.RoomsFile), and so are the limits' counts (Config.LimitsFile, limits.go), which
 // count by network, from the player's own address even behind Cloudflare (address.go). A bank reloaded while Роял is
-// on waits for the evening to end (bank.go).
+// on waits for the evening to end (bank.go). Every API answer names the version (api.go), so that a page loaded before
+// a deploy loads itself anew at a quiet moment (web/src/fresh.ts); the app on phones opens only the game's own pages
+// (applinks.go).
 package server
 
 import (

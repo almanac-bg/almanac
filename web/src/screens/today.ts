@@ -16,7 +16,7 @@ import { boardRow, hands, shareButton, summary } from "../game/results.ts";
 import { getReady, playRun, shownHere, trail } from "../game/run.ts";
 import { dayShareText, percent, rare } from "../game/share.ts";
 import type { Board, Mark, Score, State } from "../game/types.ts";
-import { type ApiError, api, tally } from "../lib/api.ts";
+import { api, errorText, serverNow, tally } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { place } from "../lib/ordinal.ts";
@@ -177,7 +177,7 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
             counting = false;
             screen.show(() => playRun(s, (end) => home(t, end, true)));
           } catch (err) {
-            failed = (err as ApiError).message;
+            failed = errorText(err);
             back(t);
           }
         },
@@ -190,10 +190,12 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
     scrollTo(0, 0);
   };
   // A new day while the screen stays open (a phone left on Начало overnight): the new day's ten, not yesterday's
-  // result with a countdown to a day that has come. Never in the middle of a game, nor of its count.
+  // result with a countdown to a day that has come. Never in the middle of a game, nor of its count. The day is the
+  // server's, by its clock: a phone whose clock is a day off would otherwise load the day again every minute.
   let day = "";
   const newDay = () => {
-    if (day && !document.hidden && !playing.peek() && !counting && dayInBulgaria() !== day) load();
+    const now = dayInBulgaria(new Date(serverNow()));
+    if (day && !document.hidden && !playing.peek() && !counting && now !== day) load();
   };
   document.addEventListener("visibilitychange", newDay);
   const every = setInterval(newDay, 60_000);

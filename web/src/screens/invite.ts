@@ -7,7 +7,7 @@
 import { shareButton } from "../game/results.ts";
 import { playRun } from "../game/run.ts";
 import type { State } from "../game/types.ts";
-import { type ApiError, api } from "../lib/api.ts";
+import { type ApiError, api, errorText } from "../lib/api.ts";
 import { type Child, h, signal, slot } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { withName } from "../lib/words.ts";
@@ -30,7 +30,7 @@ export function invite([code = ""]: string[]) {
   const screen = slot(() => h("p", { class: "muted" }, "…"));
   const error = signal("");
   const info = signal<Info>({ by: "", own: false, friends: false });
-  const fail = (err: unknown) => error.set((err as ApiError).message);
+  const fail = (err: unknown) => error.set(errorText(err));
   let played = false; // the day's ten, just played here
   const big = (gold: boolean) => (gold ? "btn primary big" : "btn");
   const alert = () => error() && h("p", { class: "bad", role: "alert" }, error());

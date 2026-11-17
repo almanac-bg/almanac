@@ -10,24 +10,14 @@
 // A question given up by leaving shows its answer and fact once the run comes back, on this device, before the
 // next one: what the player missed, without points.
 
-import { type ApiError, api } from "../lib/api.ts";
+import { type ApiError, api, tries } from "../lib/api.ts";
 import { append, type Child, computed, effect, h, listen, onCleanup, type Signal, signal, slot } from "../lib/dom.ts";
 import { calm, tickOn } from "../lib/prefs.ts";
 import { beforeLeaving, hold, release } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { withName } from "../lib/words.ts";
 import { categories, playing } from "../state.ts";
-import {
-  countUp,
-  fact,
-  failure,
-  formatNumber,
-  inRowChip,
-  passing,
-  type VerdictKind,
-  verdict,
-  verdictWords,
-} from "../ui.ts";
+import { countUp, fact, failure, formatNumber, inRowChip, type VerdictKind, verdict, verdictWords } from "../ui.ts";
 import { answered, ask, beats, crowdLine, picture, picturesIn, type Stage, spokenAnswer } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Reveal, Shown, State, View } from "./types.ts";
 
@@ -323,19 +313,6 @@ function svg(name: string, attrs: Record<string, string | number>): SVGElement {
   const e = document.createElementNS("http://www.w3.org/2000/svg", name);
   for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
   return e;
-}
-
-/** Calls the server, and again, twice more, a moment apart, while it doesn't get through for a reason that passes (no
- * line, the server restarting): a run's step lost to a moment offline goes on unseen. */
-async function tries<T>(call: () => Promise<T>): Promise<T> {
-  for (let n = 1; ; n++) {
-    try {
-      return await call();
-    } catch (err) {
-      if (n >= 3 || !passing(err)) throw err;
-    }
-    await new Promise((on) => setTimeout(on, 800 * n));
-  }
 }
 
 /** A run that couldn't take its next step: in its own frame (the head with its arrow out, the pips), what went wrong
