@@ -14,10 +14,18 @@ export async function answer(page: Page): Promise<void> {
     await expect(q.locator(".typed")).toHaveText("1900");
     await q.getByRole("button", { name: "Отговори" }).click();
   } else if (await q.locator(".sortable-list").count()) {
+    await uncover(page);
     const rows = q.locator(".sortable-list .option");
     const text = (row: ReturnType<typeof rows.first>) => row.locator("span").nth(1);
     const first = (await text(rows.first()).textContent()) ?? "";
-    await rows.first().dragTo(rows.last());
+    // Dragged by hand, from where the rows are: the page held still (Playwright's own drag scrolls the page under a
+    // button held down, in WebKit, and the row taken moves away from under it).
+    const [from, to] = [await rows.first().boundingBox(), await rows.last().boundingBox()];
+    if (!from || !to) throw new Error("the rows aren't on the screen");
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 5 });
+    await page.mouse.up();
     await expect(text(rows.last())).toHaveText(first);
     // And by taps: the last picked up, put down in the first place.
     await rows.last().click();
@@ -26,6 +34,7 @@ export async function answer(page: Page): Promise<void> {
     await expect(text(rows.first())).toHaveText(first);
     await q.getByRole("button", { name: "Готово" }).click();
   } else if (await q.locator(".match").count()) {
+    await uncover(page);
     const [left, right] = [q.locator(".match-col").first(), q.locator(".match-col").last()];
     for (let i = 0; i < 4; i++) {
       await left.locator(".match-item").nth(i).click();
@@ -50,6 +59,12 @@ export async function answer(page: Page): Promise<void> {
   } else {
     await q.locator(".options .option").first().click();
   }
+}
+
+/** Scrolls the page to its foot, as a player does to see all of a long answer: on a short screen „Готово“ stays at
+ * the screen's foot over what scrolls under it, and at the page's foot it's below the last of it. */
+async function uncover(page: Page): Promise<void> {
+  await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
 }
 
 /** Opens a game by its address, as a link from outside the game does (nothing starts by itself: „Започни“ first), and

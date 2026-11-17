@@ -603,6 +603,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
         row.removeEventListener("pointermove", follow);
         row.removeEventListener("pointerup", drop);
         row.removeEventListener("pointercancel", drop);
+        row.removeEventListener("lostpointercapture", drop);
         row.classList.remove("dragging");
         list.classList.remove("sorting");
         if (dragged) {
@@ -615,6 +616,9 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
       row.addEventListener("pointermove", follow);
       row.addEventListener("pointerup", drop);
       row.addEventListener("pointercancel", drop);
+      // The row let go of the pointer before it was lifted (WebKit does as the page scrolls under it): the drag ends
+      // there, where it got to, and nothing is left half-dragged.
+      row.addEventListener("lostpointercapture", drop);
     });
     row.addEventListener("keydown", (e: KeyboardEvent) => {
       if (locked.peek()) return;

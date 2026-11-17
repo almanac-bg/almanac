@@ -2005,6 +2005,12 @@
     background: var(--bg);
   }
 
+  /* The head keeps the page's height itself as it gets smaller (run.ts, stays): the browser's own scroll anchoring
+     would move the page a second time, and WebKit's, on a page a little taller than the screen, back to its top. */
+  html:has(.question-top) {
+    overflow-anchor: none;
+  }
+
   .question-top.stuck {
     gap: var(--space-1);
     padding-block: max(var(--space-2), env(safe-area-inset-top)) var(--space-2);

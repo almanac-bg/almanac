@@ -870,9 +870,17 @@ function stays(...parts: Child[]): HTMLElement {
     ([e]) => {
       const stuck = !!e && e.intersectionRatio < 1 && e.boundingClientRect.top < 0;
       if (stuck === top.classList.contains("stuck")) return;
+      if (!stuck) {
+        top.classList.remove("stuck");
+        top.style.marginBottom = "";
+        return;
+      }
+      // Smaller, measured with its whole height still kept below it: the page is never shorter for a moment, which
+      // on a page only a little taller than the screen could pull the scroll back up, out from under the finger.
       const tall = top.offsetHeight;
-      top.classList.toggle("stuck", stuck);
-      top.style.marginBottom = stuck ? `${tall - top.offsetHeight}px` : "";
+      top.style.marginBottom = `${tall}px`;
+      top.classList.add("stuck");
+      top.style.marginBottom = `${tall - top.offsetHeight}px`;
     },
     { threshold: 1 },
   );
