@@ -219,7 +219,12 @@ function achievements(p: Profile): Child {
                 "div",
                 { class: "achievement-text" },
                 h("span", { class: "achievement-name" }, a.name),
-                h("span", { class: "achievement-when" }, `${tierWords[a.tier].one}${a.at ? ` · ${day(a.at)}` : ""}`),
+                // A common one's tier is its ink alone: „обикновено“ reads as „nothing special“.
+                h(
+                  "span",
+                  { class: "achievement-when" },
+                  [a.tier === "common" ? "" : tierWords[a.tier].one, a.at ? day(a.at) : ""].filter(Boolean).join(" · "),
+                ),
               ),
             ),
           ),

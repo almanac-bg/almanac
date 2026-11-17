@@ -40,6 +40,27 @@ func (s *Server) news(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, n)
 }
 
+// streakTold keeps a streak notice Начало has told as told (play.TellStreak), so that it isn't told again on another
+// device; repair says it's a broken streak on offer to be won back, which counts as offered once.
+func (s *Server) streakTold(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		Key    string `json:"key"`
+		Repair bool   `json:"repair"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	fresh, err := s.game.TellStreak(r.Context(), u.ID, in.Key, in.Repair)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"fresh": fresh})
+}
+
 // setLook changes the player's avatar or title (either may be left out; an empty title takes it off).
 func (s *Server) setLook(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)

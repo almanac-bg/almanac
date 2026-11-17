@@ -1787,13 +1787,14 @@ func TestTitles(t *testing.T) {
 	if _, err := w.db.Write.Exec(`INSERT INTO goals_done (user_id, day, goal, at, xp, seen) VALUES (?, '2026-11-01', 'x', 1, 2100, 1)`, ana); err != nil {
 		t.Fatal(err)
 	}
-	// Everything the levels up to 5 unlock is told with it: the titles, a frame, a pattern.
+	// Everything the levels up to 5 unlock is told with it (but the first level's title, worn from the start): the
+	// titles, a frame, a pattern.
 	n, err := w.g.NewsOf(ctx, ana, 0)
 	told := []string{}
 	for _, u := range n.Unlocks {
 		told = append(told, u.Kind+":"+u.ID+" "+u.From)
 	}
-	if err != nil || n.Level != 5 || !slices.Equal(told, []string{"title:spark ниво 1", "title:curious ниво 3",
+	if err != nil || n.Level != 5 || !slices.Equal(told, []string{"title:curious ниво 3",
 		"title:passion ниво 5", "frame:ring ниво 2", "frame:double ниво 5", "backdrop:dots ниво 3"}) {
 		t.Fatalf("level 5's news: %v %+v %v", told, n, err)
 	}

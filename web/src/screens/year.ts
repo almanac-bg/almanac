@@ -167,7 +167,7 @@ export function year([which = ""]: string[]) {
                   true,
                 )
               : null,
-            h("a", { class: "btn", href: "/" }, "Към началото"),
+            h("a", { class: "btn", href: "/" }, "Към Начало"),
           )
         : h(
             "div",

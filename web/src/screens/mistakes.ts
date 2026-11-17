@@ -32,7 +32,7 @@ export function mistakes() {
               more()
                 ? h("button", { class: "btn primary big", onclick: again }, "Още въпроси")
                 : h("a", { class: "btn primary big", href: "/almanac" }, "Към Алманаха"),
-            also: [h("a", { class: "btn", href: "/" }, "Към началото")],
+            also: [h("a", { class: "btn", href: "/" }, "Към Начало")],
           },
           [news(s.id)],
         ),

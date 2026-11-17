@@ -276,6 +276,27 @@ test("a question left while its time runs: asked first, given up, and the topic 
   await expect(page.locator("article.question .trail li").nth(1)).toHaveClass("wrong");
 });
 
+test("the day left at its last question comes back done, with what it earned told under it, once", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto("/");
+  await startDay(page);
+  for (let n = 0; n < 9; n++) {
+    await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
+    await answer(page);
+    await moveOn(page);
+  }
+  await expect(page.locator(".question-head")).toContainText("10 от 10", { timeout: 10_000 });
+  await page.getByRole("link", { name: "Към Начало", exact: true }).click();
+  await page.getByRole("button", { name: "Излез" }).click();
+  // Its result was never on screen: Начало has it, and its news (a first day's: what points are), told now.
+  await expect(page.locator(".summary")).toBeVisible();
+  await expect(page.locator(".summary .news-open")).toContainText("са резултатът ти в една игра");
+  await page.reload();
+  await expect(page.locator(".summary")).toBeVisible();
+  await expect(page.locator(".summary .trail")).toBeVisible();
+  await expect(page.locator(".news-open")).toHaveCount(0);
+});
+
 test("an old challenge link says where playing with friends went", async ({ page }) => {
   await page.goto("/c/abc234");
   await expect(page.getByRole("heading", { name: "Тази връзка вече не работи" })).toBeVisible();

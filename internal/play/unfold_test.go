@@ -65,7 +65,7 @@ func TestUnfolding(t *testing.T) {
 		t.Fatal("the first day's achievements are told")
 	}
 	for _, u := range n.Unlocks {
-		if u.byLevel {
+		if u.byLevel > 0 {
 			t.Fatalf("a level's unlock on the first day: %+v", u)
 		}
 	}
@@ -85,13 +85,14 @@ func TestUnfolding(t *testing.T) {
 	}
 	level := n.Level
 
-	// Day 2: XP opens, and what waited for it is told: the level, its unlocks, the goals' achievement.
+	// Day 2: XP opens, and what waited for it is told: the level, its unlocks (but the first level's, which everyone
+	// has from the start), the goals' achievement.
 	w.wait(24 * time.Hour)
 	s, _ = w.g.StartDay(ctx, ana)
 	w.play(ana, s.ID, repeat(w.wrong, Length)...)
 	n, _ = w.g.NewsOf(ctx, ana, s.ID)
 	if !slices.Equal(n.Opened, []string{"xp"}) || !n.Open.XP || n.Open.League || !n.LevelUp || n.Level < level ||
-		!slices.ContainsFunc(n.Unlocks, func(u Unlock) bool { return u.ID == "spark" }) ||
+		slices.ContainsFunc(n.Unlocks, func(u Unlock) bool { return u.ID == "spark" || u.byLevel == 1 }) ||
 		!slices.ContainsFunc(n.Achievements, func(a Earned) bool { return a.ID == "fullDay" }) ||
 		!slices.Contains(n.Goals, DoneGoal{Name: "Изиграй въпросите на деня", XP: GoalXP[0]}) {
 		t.Fatalf("the second day's news: %+v", n)

@@ -79,6 +79,9 @@ interface Today {
   invite?: string;
   /** A friend has just played the duel the player started (told once). */
   duel?: FriendPlayed | null;
+  /** A game that ended without its result on screen (the day's last question let run out, a game left at its end):
+   * its news, told here once (play/told.go). */
+  untold?: number;
 }
 
 export function today() {
@@ -187,9 +190,10 @@ export function today() {
           ? summary(
               run,
               [
+                // The place, once there's someone to be placed among: „1-во място от 1“ says nothing.
                 h("div", { class: "day-line" }, h("span", { class: "kicker" }, issueWords(t.issue, t.day)), () => {
                   const b = fresh().board;
-                  return b.place
+                  return b.place && b.players > 1
                     ? h("a", { class: "place-line", href: "/ranks" }, `${place(b.place, b.players)} днес`)
                     : null;
                 }),
@@ -215,12 +219,12 @@ export function today() {
                 ),
               },
               // Tomorrow first, right under the buttons (when the next ten come, the streak, the reminder); then the
-              // friends' day, and what the game earned.
+              // friends' day, and what the game earned (a day whose result was never on screen: told now, once).
               // Just played, the streak waits for the day as it is now, with today in it.
               [
                 tomorrowCard(t.day, () => (just && fresh() === t ? 0 : fresh().streak)),
                 () => friendsDay(fresh()),
-                just ? news(run.id, 0, round) : null,
+                just ? news(run.id, 0, round) : untold(t, run.id),
               ],
               pointsWords(t.open),
               just,
@@ -234,6 +238,8 @@ export function today() {
       h(
         "div",
         { class: "home-side" },
+        // Another game whose result was never on screen: what it earned, told here once, before what's next.
+        just ? null : untold(t),
         // Just played, the goals it finished are told with its news; a first day has none (play/unfold.go).
         just || !t.open?.xp ? null : goalsCard(),
         // A guest who keeps coming back is asked to keep their profile, under the goals once the day is played (the
@@ -248,19 +254,32 @@ export function today() {
   }
 }
 
-/** Where the last streak news told on Начало is kept, on this device: told once. */
-const streakTold = "almanac.streakTold";
+/** The news of a game whose result was never on screen (`t.untold`; of `run` only, if given: the day's, under its
+ * result; another's under „От последната ти игра“), told once: the next drawing of Начало has none. */
+function untold(t: Today, run?: number): Child {
+  const id = t.untold;
+  if (!id || (run !== undefined && id !== run)) return null;
+  t.untold = undefined;
+  return news(id, 0, undefined, { title: run ? "" : "От последната ти игра" });
+}
 
-/** What came of the days just missed — a reserve day kept the streak, or none was left and it ended — said once on
- * this device, above the day. */
+/** The streak notices told on this page: the server keeps them as told (play.TellStreak), and each is said once. */
+const toldHere = new Set<string>();
+
+/** Keeps a streak notice as told, on the server, so that no other device (or private window) tells it again; a broken
+ * streak on offer to be won back (`repair`) counts as offered then, once. */
+function tellStreak(key: string, repair = false): boolean {
+  if (toldHere.has(key)) return false;
+  toldHere.add(key);
+  api("POST", "/api/me/streak-told", { key, repair }).catch(() => toldHere.delete(key));
+  return true;
+}
+
+/** What came of the days just missed — a reserve day kept the streak, or none was left and it ended — said once,
+ * above the day (the server sends it until it's told). */
 function streakNotice(t: Today): Child {
   const key = t.kept ? `kept:${t.kept}` : t.ended ? `ended:${t.ended.on}` : "";
-  try {
-    if (!key || localStorage.getItem(streakTold) === key) return null;
-    localStorage.setItem(streakTold, key);
-  } catch {
-    // Storage refused (a private window): said on each visit, which is the lesser loss.
-  }
+  if (!key || !tellStreak(key)) return null;
   const text = t.kept
     ? `Резервен ден запази серията ти ${onDay(t.kept)}. Серия: ${t.streak === 1 ? "1 ден" : `${t.streak} дни`}.`
     : `Серията ти от ${t.ended?.days} дни прекъсна. ${t.run?.done ? "Днес започна нова." : "Днес започва нова."}`;
@@ -268,18 +287,11 @@ function streakNotice(t: Today): Child {
 }
 
 /** A streak just ended that can be won back today (play/repair.go): the day's ten and one more game, and what's left of
- * them. Shown while it's on offer; counted once on this device, which then won't hear later that the streak ended. */
+ * them. Shown while it's on offer; told as the streak's end (so that it isn't said later that it ended), and counted
+ * as offered, once, on the server. */
 function repairCard(r: Today["repair"]): Child {
   if (!r) return null;
-  try {
-    if (localStorage.getItem("almanac.repairOffered") !== r.on) {
-      localStorage.setItem("almanac.repairOffered", r.on);
-      localStorage.setItem(streakTold, `ended:${r.on}`);
-      tally("repair:offered");
-    }
-  } catch {
-    // no storage here: counted each time
-  }
+  tellStreak(`ended:${r.on}`, true);
   const left = r.day
     ? "Остава още една игра днес и серията се връща."
     : r.other
@@ -449,11 +461,7 @@ function friendsDay(t: Today): Child {
   const all = t.friends ?? [];
   if (!all.length)
     return t.befriended === false
-      ? h(
-          "p",
-          { class: "day-next" },
-          h("a", { href: "/friends" }, "Покани някого и сравнявайте резултатите си всеки ден."),
-        )
+      ? h("p", { class: "day-next" }, h("a", { href: "/friends" }, "Покани приятел и сравнявайте всеки ден."))
       : null;
   const mine = all.findIndex((s) => s.me);
   if (mine < 0) return null;
