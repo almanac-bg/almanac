@@ -3,9 +3,7 @@
 import { expect, test } from "@playwright/test";
 import { answer, moveOn, openGame } from "./play.ts";
 
-test("Начало and Класации that can't load try again, by a tap or as the line comes back", async ({
-  page,
-}) => {
+test("Начало and Класации that can't load try again, by a tap or as the line comes back", async ({ page }) => {
   await page.route("**/api/day", (route) => route.abort("internetdisconnected"));
   await page.goto("/");
   await expect(page.getByRole("alert")).toContainText("Няма връзка");
