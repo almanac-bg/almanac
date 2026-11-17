@@ -845,6 +845,22 @@ func (h *Hub) Near(lead time.Duration) bool {
 	return !now.Before(next.Add(-h.sched.Lobby - lead))
 }
 
+// Playing says whether a player's game tonight is under way (they're in a tournament past its lobby and before its
+// end, or were in a lobby, away at the start, and may still come in): one whose screen went may come back to it.
+func (h *Hub) Playing(id int64) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if t, _ := h.mine(id); t != nil {
+		return t.phase == play.RoyalQuestion || t.phase == play.RoyalReveal
+	}
+	if n := h.night; n != nil {
+		if _, away := n.absent[id]; away {
+			return slices.ContainsFunc(n.tables, (*table).open)
+		}
+	}
+	return false
+}
+
 // Glance is the evening now, at a glance.
 func (h *Hub) Glance() Glance {
 	h.mu.Lock()

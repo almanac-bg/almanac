@@ -8,7 +8,7 @@
 import { picture } from "../art/picture.ts";
 import { news } from "../game/news.ts";
 import { boardRow, hands, shareButton, summary } from "../game/results.ts";
-import { getReady, playRun, trail } from "../game/run.ts";
+import { getReady, playRun, shownHere, trail } from "../game/run.ts";
 import { dayShareText, percent, rare } from "../game/share.ts";
 import type { Board, Mark, Score, State } from "../game/types.ts";
 import { type ApiError, api, tally } from "../lib/api.ts";
@@ -16,7 +16,7 @@ import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { place } from "../lib/ordinal.ts";
 import { needsHomeScreen, pushable, pushOn, turnOn } from "../lib/push.ts";
-import { title } from "../lib/router.ts";
+import { goBack, hold, release, title } from "../lib/router.ts";
 import { feelKit } from "../lib/sound.ts";
 import { dateWords, issueWords, onDay, weekday } from "../lib/words.ts";
 import { dayInBulgaria } from "../lib/year.ts";
@@ -77,6 +77,8 @@ interface Today {
   befriended?: boolean;
   /** The day played: the player's invite link, which their shared result ends with. */
   invite?: string;
+  /** A live game the player is in, under way (its screen left): the way back to it. */
+  playing?: { kind: "duel" | "room" | "royal"; code?: string } | null;
   /** A friend has just played the duel the player started (told once). */
   duel?: FriendPlayed | null;
   /** A friend said yes to the player's invite, and a live duel they left: each told once (play/lines.go). */
@@ -98,9 +100,10 @@ export function today() {
       const t = await api<Today>("GET", "/api/day");
       day = t.day;
       const run = t.run;
-      // A question showing has its time running (a reload, a tab closed and opened again): straight back into it.
-      // Otherwise the day left half-way waits on Начало for „Продължи“: no question's time starts without a tap.
-      if (run && !run.done && run.question) screen.show(() => playRun(run, (s) => home(t, s, true)));
+      // A question this tab was showing has its time running (a reload): straight back into it. Otherwise (another
+      // device, or tab) the day left half-way waits on Начало for „Продължи“: no question's time starts without a tap.
+      if (run && !run.done && run.question && shownHere(run.id))
+        screen.show(() => playRun(run, (s) => home(t, s, true)));
       else screen.show(() => home(t, t.run, false));
     } catch (err) {
       screen.show(() => h("p", { role: "alert" }, (err as ApiError).message));
@@ -108,17 +111,27 @@ export function today() {
   };
   // The day's ten (or the rest of them) start after the count every game has, which „Откажи“ backs out of: nothing
   // is sent before it runs out or „Започни сега“, so a tap by mistake costs nothing. What went wrong starting shows
-  // on the day's card, back on Начало.
+  // on the day's card, back on Начало. They're played over Начало in an entry of their own (router.ts, hold): back,
+  // mid-game, asks first, then comes to Начало, not out of the game.
   let counting = false;
   let failed = "";
   const back = (t: Today) => {
     counting = false;
+    release();
     screen.show(() => home(t, t.run, false));
     scrollTo(0, 0);
   };
   const start = (t: Today) => () => {
-    counting = true;
     failed = "";
+    hold(true);
+    // A question showing (left so on another device): its time runs, so straight back to it, without a count.
+    const left = t.run;
+    if (left && !left.done && left.question) {
+      screen.show(() => playRun(left, (s) => home(t, s, true)));
+      scrollTo(0, 0);
+      return;
+    }
+    counting = true;
     screen.show(() =>
       getReady(
         "Въпросите на деня",
@@ -134,7 +147,10 @@ export function today() {
             back(t);
           }
         },
-        () => back(t),
+        () => {
+          counting = false;
+          goBack("/");
+        },
       ),
     );
     scrollTo(0, 0);
@@ -189,8 +205,9 @@ export function today() {
       // A streak that can be won back today, as it stands (the day just played may have done it); else what came of
       // the days just missed, once.
       t.repair ? () => repairCard(fresh().repair) : streakNotice(t),
-      // Of others, one line at a time: a friend played the duel, said yes to the invite, or the duel left went on.
-      playedLine(t.duel) ?? acceptedLine(t.accepted) ?? leftLine(t.left),
+      // One line at a time: a live game of the player's going on; of others, a friend played the duel, said yes to
+      // the invite, or the duel left went on.
+      playingLine(t.playing) ?? playedLine(t.duel) ?? acceptedLine(t.accepted) ?? leftLine(t.left),
       // On a big screen the day leads the page with the topics under it, and the rest waits in a column beside it
       // (app.css); on a phone the two parts are one column, in this order.
       h(
@@ -266,6 +283,19 @@ export function today() {
       topics(),
     );
   }
+}
+
+/** A live game the player is in goes on while its screen is away (a duel, a room's game, Роял): one quiet line above
+ * the day, and the way back into it (its screen comes back to it by itself). */
+function playingLine(p: Today["playing"]): Child {
+  if (!p) return null;
+  const [text, href] =
+    p.kind === "duel"
+      ? ["Дуелът ти продължава", "/duel/live"]
+      : p.kind === "room"
+        ? ["Играта в стаята продължава", `/r/${p.code}`]
+        : ["Роял продължава", "/royal"];
+  return h("p", { class: "streak-notice playing-notice", role: "status" }, text, h("a", { href }, "Върни се"));
 }
 
 /** Where the last streak news told on Начало is kept, on this device: told once. */

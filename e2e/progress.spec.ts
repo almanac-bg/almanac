@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { playedBefore, playRun } from "./play.ts";
+import { openGame, playedBefore, playRun } from "./play.ts";
 
 test("progress: a game's level, the achievements, and a look of one's own", async ({ page }) => {
   test.setTimeout(120_000);
   // A player on their second day played, who has met XP (play/unfold.go: a first day's news has none).
   await page.goto("/");
   await playedBefore(page, 1);
-  await page.goto("/play/history");
+  await openGame(page, "/play/history");
   await playRun(page);
   // What the game brought is a line (a level card only for a new level), and „Ново за теб“ tells the rest: how the
   // topic is known now, and everything the game unlocked, each a tap from being worn.

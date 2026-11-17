@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
+import { openGame } from "./play.ts";
 
 /** The last sign-in code mailed to `email` (the dev server writes its mail to files). */
 function mailedCode(email: string): string {
@@ -12,8 +13,7 @@ function mailedCode(email: string): string {
 
 /** Plays a topic's first question in, which makes the page a guest. */
 async function becomeGuest(page: Page) {
-  await page.goto("/play/music");
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await openGame(page, "/play/music");
   await expect(page.locator(".question-head")).toContainText("1 от 10"); // playing made a guest
 }
 

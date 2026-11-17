@@ -65,10 +65,28 @@ func (g *Game) Mistakes(ctx context.Context, userID int64) (int, error) {
 }
 
 // StartMistakes starts a run of the questions waiting for a second chance (ErrNoMistakes with fewer than
-// MistakesFrom).
+// MistakesFrom); or, if the player left one unfinished today, goes on with it where it stopped, as a topic's does.
 func (g *Game) StartMistakes(ctx context.Context, userID int64) (State, error) {
 	var s State
+	var ended int64 // the run left unfinished, if its clock has just ended it
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		today, _ := time.ParseInLocation(time.DateOnly, g.Today(), Bulgaria)
+		left, err := scanRun(tx.QueryRow(`SELECT `+runColumns+` FROM runs WHERE user_id = ? AND kind = 'mistakes'
+			AND finished_at IS NULL AND started_at >= ? ORDER BY id DESC LIMIT 1`, userID, store.Ms(today)))
+		switch {
+		case err == nil:
+			done, err := g.settle(tx, left)
+			if err != nil {
+				return err
+			}
+			if !done {
+				s, err = g.state(tx, left)
+				return err
+			}
+			ended = left.id
+		case !errors.Is(err, ErrNoRun):
+			return err
+		}
 		ids, err := g.waiting(ctx, tx, userID, Length)
 		if err != nil {
 			return err
@@ -87,5 +105,8 @@ func (g *Game) StartMistakes(ctx context.Context, userID int64) (State, error) {
 		s, err = g.state(tx, r)
 		return err
 	})
+	if err == nil && ended != 0 {
+		err = g.finished(ctx, userID, ended)
+	}
 	return s, err
 }

@@ -9,7 +9,7 @@ import { type Child, effect, h, mount, signal } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { applyPrefs } from "./lib/prefs.ts";
 import { preparePush } from "./lib/push.ts";
-import { go, path, start } from "./lib/router.ts";
+import { canGoBack, entry, go, path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
 import { almanac } from "./screens/almanac.ts";
 import { challengeFriend, duel, duelOne, playChallenge } from "./screens/duel.ts";
@@ -45,7 +45,8 @@ const links: [href: string, label: string, icon: string, here: (p: string) => bo
 
 reportErrors();
 applyPrefs();
-startApp(go);
+// Android's back puts the app away from Начало, unless a game is under way there (the day's ten), which it asks of.
+startApp({ go, home: () => location.pathname === "/" && !entry().game && !playing.peek(), canGoBack });
 loadPictures().catch(() => {}); // the illustrations, in a file of their own: on their way at once
 
 const root = document.getElementById("app");

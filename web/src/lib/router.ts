@@ -1,10 +1,31 @@
 // Pages without page loads: links inside the app change the screen in place, and Back and Forward work as they should.
+//
+// Each entry of the tab's history that the app makes keeps a little in its state (Entry): its place in the history,
+// the page it was opened from, and how far down the page was scrolled; back comes to a page where it was left. A game
+// under way guards its screen (beforeLeaving): a link out, the browser's back (or a phone's) and the game's own arrow
+// all ask first, and only „Излез“ goes on, to where they were going. A game gets an entry of its own when its screen
+// has none behind it in the app (hold): the day's ten on Начало, a game opened by a link from outside; so that back,
+// mid-question, lands on the guard and not outside the game.
 
 import { type Child, mount, signal } from "./dom.ts";
 
 export interface Route {
   path: RegExp;
   view: (params: string[]) => Child;
+}
+
+/** What the app keeps in an entry of the tab's history. */
+export interface Entry {
+  /** The entry's place in the history: back from it is one less. */
+  i: number;
+  /** The page it was opened from, in the app (none: the first page opened, or one opened again in place of another). */
+  from?: string;
+  /** An entry of a game's own, over the same page (hold): back from it is back to that page. */
+  game?: boolean;
+  /** How far down the page was scrolled. */
+  y?: number;
+  /** A game finished on this page: its result shows again here (a reload, back to it). */
+  result?: number;
 }
 
 /** The path shown now (for navigation to highlight where you are). */
@@ -15,11 +36,35 @@ let missing: () => Child = () => null;
 let root: Element;
 let disposeView: (() => void) | null = null;
 
+/** The entry shown now, as the app keeps it. */
+export const entry = (): Partial<Entry> => (history.state ?? {}) as Partial<Entry>;
+
+/** The page shown now, with its query and hash. */
+const here = () => location.pathname + location.search + location.hash;
+
+/** The place in the history of the entry shown. */
+let at = 0;
+
+/** Whether the screen shown was opened by a tap in the app (a link, a button): not by back or forward, a reload, or a
+ * link from outside. */
+let tapped = false;
+
+/** Moves through the history of the app's own (put back after a back that asked first, then on): what each does once
+ * its popstate comes, in order. */
+const moves: (() => void)[] = [];
+
 export function start(target: Element, list: Route[], notFound: () => Child): void {
   root = target;
   routes = list;
   missing = notFound;
-  addEventListener("popstate", () => render(false));
+  try {
+    history.scrollRestoration = "manual"; // the app puts each page back where it was (restore)
+  } catch {
+    // an old browser: it scrolls as it likes
+  }
+  if (typeof entry().i !== "number") history.replaceState({ ...entry(), i: 0 }, "");
+  at = entry().i ?? 0;
+  addEventListener("popstate", popped);
   document.addEventListener("click", (e) => {
     const a = (e.target as Element).closest?.("a");
     if (
@@ -38,16 +83,33 @@ export function start(target: Element, list: Route[], notFound: () => Child): vo
       return;
     e.preventDefault();
     const to = a.pathname + a.search + a.hash;
-    if (!leaving?.(() => go(to))) go(to);
+    // A way back (back(), a game's arrow) goes back to where it points if that's the page before; any other link opens
+    // its page.
+    const way = a.hasAttribute("data-back") ? () => leave(to) : () => go(to);
+    if (!leaving?.(way)) way();
   });
+  // How far down the page is, kept in its entry as it scrolls (a moment after it stops: a browser allows only so many
+  // writes to the history).
+  let still = 0;
+  addEventListener(
+    "scroll",
+    () => {
+      clearTimeout(still);
+      still = window.setTimeout(() => {
+        if (!restoring) mark({ y: Math.round(scrollY) });
+      }, 200);
+    },
+    { passive: true },
+  );
   render(false);
+  restore(entry().y);
 }
 
-/** While leaving the screen would cost the player something (a question with its time running), a link first asks
- * this: it takes the way on (`proceed`), and says whether it holds the link back until then. */
+/** While leaving the screen would cost the player something (a question with its time running, a live game), a way
+ * out first asks this: it takes the way on (`proceed`), and says whether it holds the way out back until then. */
 let leaving: ((proceed: () => void) => boolean) | null = null;
 
-/** Asks `fn` before a link leaves the screen, until the returned function is called. */
+/** Asks `fn` before a link, back or the game's arrow leaves the screen, until the returned function is called. */
 export function beforeLeaving(fn: (proceed: () => void) => boolean): () => void {
   leaving = fn;
   return () => {
@@ -55,12 +117,113 @@ export function beforeLeaving(fn: (proceed: () => void) => boolean): () => void 
   };
 }
 
+/** Back or forward in the tab's history (a browser's button, a phone's): a game that asks first is asked, its entry
+ * put back meanwhile, and „Излез“ goes on to where it was going. */
+function popped(): void {
+  const s = entry();
+  const to = typeof s.i === "number" ? s.i : at - 1;
+  const move = moves.shift();
+  if (move) {
+    at = to;
+    move();
+    return;
+  }
+  const by = to - at;
+  if (by && leaving?.(() => travel(by, arrive))) {
+    // Put back the entry of the screen that asks, without drawing it again.
+    travel(-by, () => {});
+    return;
+  }
+  at = to;
+  arrive();
+}
+
+/** A page come to by back or forward: drawn again where it was scrolled to. */
+function arrive(): void {
+  tapped = false;
+  render(false);
+  restore(entry().y);
+}
+
+/** Moves `by` entries through the history, doing `then` once there (not drawing the page unless `then` does). */
+function travel(by: number, then: () => void): void {
+  moves.push(then);
+  history.go(by);
+}
+
+/** Gives the entry shown another address, the screen staying as it is (a friend's duel made: a reload comes back to
+ * it, not to a new one). A game's own entry so renamed is a page of its own from then on: its end keeps it. */
+export function rename(to: string): void {
+  history.replaceState({ ...entry(), game: undefined }, "", to);
+  path.set(location.pathname);
+}
+
+/** Keeps this in the entry shown. */
+export function mark(patch: Partial<Entry>): void {
+  try {
+    history.replaceState({ ...entry(), ...patch }, "");
+  } catch {
+    // too many writes for a moment: kept with the next
+  }
+}
+
 /** Opens a path in the app; the one already open opens afresh (Начало, tapped in the middle of the day's ten, is
- * Начало again, not the question). */
+ * Начало again, not the question). A path that a game's own entry was opened over is gone back to. */
 export function go(to: string, replace = false): void {
-  const here = to === location.pathname + location.search + location.hash;
-  if (!here || replace) history[replace ? "replaceState" : "pushState"](null, "", to);
+  const s = entry();
+  if (!replace && s.game && s.from === to) {
+    leave(to);
+    return;
+  }
+  const here_ = here();
+  if (replace) history.replaceState({ i: at, from: s.from }, "", to);
+  else if (to !== here_) {
+    mark({ y: Math.round(scrollY) });
+    at += 1;
+    history.pushState({ i: at, from: here_ }, "", to);
+  }
+  tapped = true;
   render(true);
+}
+
+/** Goes to `to` the way back: back in the history if it's the page before, else opening it in place of this one (a
+ * page reached from outside, its way back to Начало): never a new entry, so that back after it doesn't come here
+ * again. */
+export function leave(to: string): void {
+  if (entry().from === to) travel(-1, arrive);
+  else go(to, true);
+}
+
+/** Back where the screen was come to from (a game's count backed out of): the page before, if it's the app's, else
+ * `fallback` in place of this one. */
+export function goBack(fallback: string): void {
+  if (canGoBack()) travel(-1, arrive);
+  else go(fallback, true);
+}
+
+/** Whether the screen shown was opened by a tap in the app, rather than come to by back or forward, a reload or a link
+ * from outside: a game counts in only after a tap. */
+export const byTap = (): boolean => tapped;
+
+/** Whether back stays in the app: the page before is one of its own. */
+export const canGoBack = (): boolean => entry().from !== undefined;
+
+/** Gives a game under way an entry of its own over the page it's played on, unless back from the page stays in the
+ * app already (`always`: even then; the day's ten, on Начало, whose back would leave Начало itself): back, mid-game,
+ * comes to the game's guard, then to the page under it. */
+export function hold(always = false): void {
+  const s = entry();
+  if (s.game || (!always && s.from !== undefined)) return;
+  mark({ y: Math.round(scrollY) });
+  at += 1;
+  history.pushState({ i: at, from: here(), game: true }, "", here());
+}
+
+/** A game over: its entry of its own (hold) goes, back to the page under it, which keeps what's given (its result); the
+ * screen stays as it is. */
+export function release(keep: Partial<Entry> = {}): void {
+  if (entry().game) travel(-1, () => mark(keep));
+  else mark(keep);
 }
 
 function render(scrollTop: boolean): void {
@@ -82,6 +245,34 @@ function render(scrollTop: boolean): void {
     heading.tabIndex = -1;
     heading.focus({ preventScroll: true });
   }
+}
+
+/** Whether the page is being put back where it was scrolled to: its scrolling meanwhile isn't the player's. */
+let restoring = false;
+let stopRestoring = () => {};
+
+/** Puts the page back where it was scrolled to (`y`), once it's tall enough: a screen draws what it loads a moment
+ * after it opens. A scroll or a key of the player's, or two seconds, end the wait. */
+function restore(y = 0): void {
+  stopRestoring();
+  scrollTo(0, y);
+  if (y <= 0 || Math.abs(scrollY - y) < 2) return;
+  restoring = true;
+  const until = performance.now() + 2000;
+  const seen = new ResizeObserver(() => {
+    scrollTo(0, y);
+    if (Math.abs(scrollY - y) < 2 || performance.now() > until) stop();
+  });
+  const stop = () => {
+    restoring = false;
+    seen.disconnect();
+    clearTimeout(timeout);
+    for (const e of ["wheel", "touchstart", "keydown"]) removeEventListener(e, stop);
+  };
+  const timeout = setTimeout(stop, 2000);
+  for (const e of ["wheel", "touchstart", "keydown"]) addEventListener(e, stop, { passive: true });
+  seen.observe(root);
+  stopRestoring = stop;
 }
 
 /** Sets the tab's title for the screen. */

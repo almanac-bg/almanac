@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { daysPlayed, playRun, startDay } from "./play.ts";
+import { daysPlayed, openGame, playRun, startDay } from "./play.ts";
 
 test("a broken streak is won back: the day's ten and one more game, the same day", async ({ page }) => {
   test.setTimeout(120_000);
@@ -13,7 +13,7 @@ test("a broken streak is won back: the day's ten and one more game, the same day
   await playRun(page);
   // The day played: one game left.
   await expect(card).toContainText("Остава още една игра днес и серията се връща.");
-  await page.goto("/play/history");
+  await openGame(page, "/play/history");
   await playRun(page);
   await expect(page.locator(".news-open")).toContainText("Серията ти е върната: 4 дни.");
   // Back on Начало: the streak goes on, and nothing more is said of it.
@@ -55,8 +55,7 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
   await page.locator(".status-reserve .explain").click();
   await expect(page.getByRole("note")).toHaveText("Резервен ден: пази серията, ако пропуснеш ден.");
   // A topic's result points to the day while it waits: the gold button, the streak under it, „Още десет“ plain.
-  await page.goto("/play/history");
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await openGame(page, "/play/history");
   await playRun(page);
   // A new level may come with the game, in its sheet once the result has landed: put away.
   await page.waitForTimeout(2500);
