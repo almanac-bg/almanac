@@ -224,8 +224,10 @@ func runBackups(ctx context.Context, srv *server.Server) {
 		r, err := backupAside(ctx)
 		if err != nil {
 			if ctx.Err() == nil {
-				slog.Error("backup", "err", err)
-				srv.Problem("backup: " + err.Error())
+				// The error carries the child's own words; kept on one line (the JSON log escapes it anyway).
+				msg := strings.ReplaceAll(strings.ReplaceAll(err.Error(), "\r", " "), "\n", " ")
+				slog.Error("backup", "err", msg)
+				srv.Problem("backup: " + msg)
 			}
 			return err
 		}
