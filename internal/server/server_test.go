@@ -1341,7 +1341,7 @@ func TestALeftRequestIsNoProblem(t *testing.T) {
 	if w.Code != 499 {
 		t.Fatalf("a left request: %d", w.Code)
 	}
-	if news := g.srv.problems.take(); len(news) != 0 {
+	if news, _ := g.srv.problems.take(); len(news) != 0 {
 		t.Fatalf("a left request became a problem: %v", news)
 	}
 }

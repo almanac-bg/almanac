@@ -7,7 +7,8 @@
 // (Verify) gets a new session in place of the one it had, and its notifications go along to the new one. A handoff
 // moves a game, it doesn't share it: the browser it came from is signed out. When a guest becomes a profile, every
 // other session the guest had ends: only the browser that proved the email is in it. SignOutOthers ends a player's
-// other sessions on demand.
+// other sessions on demand. A guest who never plays is cleared after a few days unused (CleanUp), so that guests
+// made and dropped don't stay.
 package account
 
 import (
@@ -22,6 +23,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/mail"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -322,17 +324,53 @@ func (a *Accounts) SignOutOthers(ctx context.Context, token string) (int, error)
 	return n, err
 }
 
-// CleanUp drops expired sessions, codes and handoffs, and guests nobody has used for a while (nothing of theirs can
-// come back: their session is gone).
+// IdleGuestDays is how long a guest who never played (no game of any kind) nor has a friend is kept while unused.
+// They'd lose nothing but a drawn name: a guest is made as a player first plays, so one without a game is someone
+// who left at once, or a flood of guests made and dropped, which this keeps from staying for a session's 400 days.
+const IdleGuestDays = 3
+
+// cleanBatch is how many players CleanUp deletes in one statement: a flood's worth of guests goes in many short
+// writes, with the game's own between them, not in one that holds the writer for seconds.
+const cleanBatch = 500
+
+// CleanUp drops expired sessions, codes and handoffs, and the guests nobody can use or does: those whose sessions are
+// gone (nothing of theirs can come back), and those who never played nor have a friend, unseen for IdleGuestDays.
+// Their days played stay counted (play.Retention: active_days keeps no link to a player).
 func (a *Accounts) CleanUp(ctx context.Context) error {
-	now := time.Now()
-	_, err := a.DB.Write.ExecContext(ctx, `
-		DELETE FROM sessions WHERE expires_at <= ?;
-		DELETE FROM email_codes WHERE expires_at <= ?;
-		DELETE FROM handoffs WHERE expires_at <= ?;
-		DELETE FROM users WHERE email IS NULL AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.user_id = users.id);`,
-		store.Ms(now), store.Ms(now), store.Ms(now))
-	return err
+	now := store.Now()
+	for _, q := range []string{
+		`DELETE FROM sessions WHERE expires_at <= ?`,
+		`DELETE FROM email_codes WHERE expires_at <= ?`,
+		`DELETE FROM handoffs WHERE expires_at <= ?`,
+	} {
+		if _, err := a.DB.Write.ExecContext(ctx, q, now); err != nil {
+			return err
+		}
+	}
+	idle := store.Ms(time.Now().AddDate(0, 0, -IdleGuestDays))
+	for _, q := range []struct {
+		where string
+		args  []any
+	}{
+		{`NOT EXISTS (SELECT 1 FROM sessions s WHERE s.user_id = u.id)`, nil},
+		{`u.seen_at < ? AND u.created_at < ?
+			AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.user_id = u.id)
+			AND NOT EXISTS (SELECT 1 FROM friends f WHERE f.user_id = u.id)
+			AND NOT EXISTS (SELECT 1 FROM friend_requests q WHERE q.from_id = u.id)
+			AND NOT EXISTS (SELECT 1 FROM friend_requests q WHERE q.to_id = u.id)`, []any{idle, idle}},
+	} {
+		for {
+			res, err := a.DB.Write.ExecContext(ctx, `DELETE FROM users WHERE id IN (SELECT u.id FROM users u
+				WHERE u.email IS NULL AND `+q.where+` LIMIT `+strconv.Itoa(cleanBatch)+`)`, q.args...)
+			if err != nil {
+				return err
+			}
+			if n, _ := res.RowsAffected(); n < cleanBatch {
+				break
+			}
+		}
+	}
+	return nil
 }
 
 // NormalEmail is an address as the game keeps it, or ErrBadEmail.

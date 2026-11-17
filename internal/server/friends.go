@@ -58,7 +58,7 @@ func (s *Server) requestFriend(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	// Tags are public, but a stream of guesses isn't asking a friend.
-	if !s.limits.allow("request:"+s.clientIP(r), 30, time.Hour) {
+	if !s.allowFrom(r, "request", 30, 0, time.Hour) {
 		return errTooMany
 	}
 	to, byEmail := strings.TrimSpace(in.To), strings.Contains(in.To, "@") && !strings.HasPrefix(strings.TrimSpace(in.To), "@")

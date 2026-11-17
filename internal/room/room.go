@@ -206,7 +206,8 @@ func (h *Hub) makeWay(host int64, from string) error {
 	return nil
 }
 
-// Open makes a room, with its host in it (as a player, unless they lead it), opened from an address ("": none known).
+// Open makes a room, with its host in it (as a player, unless they lead it), opened from an address ("": none known;
+// the server gives a network: an IPv4 address, or an IPv6 /64, which one home or one school has all of).
 func (h *Hub) Open(host Player, from string, s Settings) (*Room, error) {
 	if s.Category != "" && !slices.ContainsFunc(h.bank().Categories, func(c bank.Category) bool { return c.ID == s.Category }) {
 		return nil, play.ErrNoTopic

@@ -47,7 +47,7 @@ func (s *Server) roomOf(r *http.Request) (*room.Room, error) {
 
 // roomMisses are the limits on codes that miss for a request: its address's, and its player's (0: none).
 func (s *Server) roomMisses(r *http.Request, userID int64) map[string]int {
-	keys := map[string]int{"roommiss:" + s.clientIP(r): roomMissesAddress}
+	keys := map[string]int{"roommiss:" + s.clientNet(r): roomMissesAddress}
 	if userID != 0 {
 		keys["roommiss:user:"+strconv.FormatInt(userID, 10)] = roomMissesPlayer
 	}
@@ -65,7 +65,7 @@ func (s *Server) missed(r *http.Request, userID int64) {
 // codes that miss: once it's spent, no code is looked up, so that the answer then tells nothing.
 func (s *Server) roomByCode(r *http.Request, userID int64) (*room.Room, error) {
 	for key, n := range s.roomMisses(r, userID) {
-		if s.limits.spent(key, n, time.Hour) {
+		if s.limits.spent(key, n) {
 			return nil, errTooMany
 		}
 	}
@@ -106,7 +106,7 @@ func (s *Server) openRoom(w http.ResponseWriter, r *http.Request) error {
 	if !s.limits.allow("room:"+strconv.FormatInt(u.ID, 10), 30, time.Hour) {
 		return errTooMany
 	}
-	rm, err := s.rooms.Open(s.roomPlayer(r.Context(), u.ID, u.Name), s.clientIP(r), in)
+	rm, err := s.rooms.Open(s.roomPlayer(r.Context(), u.ID, u.Name), s.clientNet(r), in)
 	if err != nil {
 		return err
 	}
@@ -338,7 +338,7 @@ func (s *Server) roomBefriend(w http.ResponseWriter, r *http.Request) error {
 	if !here || id == u.ID {
 		return play.ErrNoPlayer
 	}
-	if !s.limits.allow("request:"+s.clientIP(r), 30, time.Hour) {
+	if !s.allowFrom(r, "request", 30, 0, time.Hour) {
 		return errTooMany
 	}
 	var tag string

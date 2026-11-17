@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -15,6 +16,14 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/store"
+)
+
+// How many questions may be reported in an hour: by a player (a careful one finds a few in a game), from a network (a
+// class, playing the same day's ten, may all report the same slip), and by everyone together (a guard on the table).
+const (
+	reportsPlayer = 20
+	reportsNet    = 60
+	reportsAll    = 600
 )
 
 // report takes what a player says is wrong with a question.
@@ -37,7 +46,8 @@ func (s *Server) report(w http.ResponseWriter, r *http.Request) error {
 	if n := utf8.RuneCountInString(text); n < 3 || n > 500 {
 		return &apiError{http.StatusBadRequest, "bad_report", "Напиши с няколко думи какво не е наред (до 500 знака)."}
 	}
-	if !s.limits.allow("report:"+u.Name, 20, time.Hour) {
+	if !s.limits.allow("report:"+strconv.FormatInt(u.ID, 10), reportsPlayer, time.Hour) ||
+		!s.allowFrom(r, "report", reportsNet, 0, time.Hour) || !s.limits.allow("report", reportsAll, time.Hour) {
 		return errTooMany
 	}
 	_, err = s.db.Write.ExecContext(r.Context(), `INSERT INTO reports (question_id, user_id, text, at) VALUES (?, ?, ?, ?)`,
@@ -45,7 +55,8 @@ func (s *Server) report(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	s.problems.add("a question was reported: " + id) // whoever runs the game hears of it (each question once)
+	// Whoever runs the game hears that there are reports, once a day; which, and what they say, is on /admin.
+	s.problems.add("a question was reported (the reports are on /admin)")
 	return ok(w, map[string]bool{"ok": true})
 }
 

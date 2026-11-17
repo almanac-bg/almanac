@@ -3,8 +3,9 @@
 // It listens on the socket systemd hands it (deploy/almanac.socket), if it's given one, else on Config.Addr: with the
 // socket, connections that come while the server restarts wait for the new one instead of being refused. Before a
 // restart, a deploy drains the server (drain.go), so that the restart cuts no live duel nor a room's game; the rooms
-// themselves are kept over it (Config.RoomsFile). A bank reloaded while Роял is on waits for the evening to end
-// (bank.go).
+// themselves are kept over it (Config.RoomsFile), and so are the limits' counts (Config.LimitsFile, limits.go), which
+// count by network, from the player's own address even behind Cloudflare (address.go). A bank reloaded while Роял is
+// on waits for the evening to end (bank.go).
 package server
 
 import (
@@ -13,7 +14,6 @@ import (
 	"errors"
 	"io/fs"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -40,8 +40,8 @@ type Config struct {
 	PublicURL string
 	// TLSCert and TLSKey, when set, make the server speak HTTPS itself (behind Cloudflare: its origin certificate).
 	TLSCert, TLSKey string
-	// TrustCloudflare takes the player's address from CF-Connecting-IP. Only when nothing but Cloudflare can reach the
-	// server, or anyone could claim any address.
+	// TrustCloudflare takes the player's address from CF-Connecting-IP, on connections from Cloudflare's own
+	// addresses (address.go).
 	TrustCloudflare bool
 	// MTASTS are the domain's mail servers, for its MTA-STS policy at mta-sts.<domain> (none: no policy), and
 	// MTASTSMode the policy's mode ("testing" until reports are clean, then "enforce").
@@ -61,6 +61,9 @@ type Config struct {
 	Operator, Contact string
 	// RoomsFile is where the rooms open as the server stops are kept, for its next run to open again ("": nowhere).
 	RoomsFile string
+	// LimitsFile is where the limits' counts are kept as the server stops, for its next run to go on counting from
+	// ("": nowhere; a restart then starts every count again).
+	LimitsFile string
 	// Dev serves the client from disk, as the build rewrites it.
 	Dev     bool
 	Version string
@@ -334,6 +337,7 @@ func (s *Server) Run(ctx context.Context, grace time.Duration) error {
 		close(s.closing)
 	})
 	s.restoreRooms()
+	s.restoreLimits()
 	// Роял's games under way before a restart go on.
 	if err := s.royal.Load(ctx); err != nil {
 		ln.Close()
@@ -391,21 +395,8 @@ func (s *Server) Run(ctx context.Context, grace time.Duration) error {
 	defer cancel()
 	err = srv.Shutdown(shutdown)
 	s.saveRooms()
+	s.saveLimits()
 	return err
-}
-
-// clientIP is the player's address, for rate limits and the log.
-func (s *Server) clientIP(r *http.Request) string {
-	if s.cfg.TrustCloudflare {
-		if ip := r.Header.Get("CF-Connecting-IP"); ip != "" {
-			return ip
-		}
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }
 
 // isAsset says whether a path is a static file (left out of the request log).
