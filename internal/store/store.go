@@ -60,6 +60,9 @@ func Open(path string) (*DB, error) {
 		// The file mapped into memory: a connection's own cache starts over whenever another one writes, which in a
 		// game is all the time, and then each page read is a copy through the kernel; mapped, it's a look in memory.
 		"mmap_size(1073741824)", // 1 GB, of address space (the pages are the system's file cache, shared)
+		// The write-ahead log, once checkpointed, cut back to 64 MB: a burst of writes (a migration that rebuilds a
+		// table) would otherwise leave it at its largest until the server stops.
+		"journal_size_limit(67108864)",
 	} {
 		pragmas.Add("_pragma", p)
 	}

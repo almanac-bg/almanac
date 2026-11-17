@@ -10,9 +10,12 @@
 //	almanac bank used                   the question ids the days have had, for -used (DB_PATH; nothing of a player's)
 //	almanac bank plan [-n N] [-json] [-used file] [dir]  plan a batch of N new questions a category, where the day needs them most
 //	almanac bank add [-check] [-checked-by P] <batch> [dir]  add, change and retire a checked batch: all of it or nothing (-check: only check)
-//	almanac backup now                  copy the database to the backups at once
-//	almanac backup restore <key> <path> write a copy (hours/07.db.gz, days/12.db.gz) to a new database file
-//	almanac backup verify [key]         bring a copy back to a temporary file and check it (the latest day's)
+//	almanac backup now [-force]         copy the database to the backups at once
+//	almanac backup list                 the copies, newest first
+//	almanac backup restore [-identity F] [-into-place] <key|latest> [path]  write a copy to a new database file, or
+//	                                    in place of the game's (stopped); -identity: the key that opens it (- : input)
+//	almanac backup verify [-identity F] [key|latest]  bring a copy back and check it (the latest day's)
+//	almanac backup keys                 make the key pair the copies are encrypted to (BACKUP_RECIPIENT) and opened with
 //	almanac admin [-remove] <email>     make a player an admin (the /admin page), or no longer one
 //	almanac push keys                   make a key pair for notifications (PUSH_PUBLIC_KEY, PUSH_PRIVATE_KEY)
 //	almanac version
@@ -65,5 +68,5 @@ func run(args []string) error {
 }
 
 func usage() error {
-	return fmt.Errorf("usage: almanac serve | bank check [-unbalanced] [-used file] [dir] | bank lint [-rule R,…] [-summary] [dir] | bank fmt [dir] | bank subjects [dir] | bank calibrate [dir] | bank suspects [dir] | bank reports [-resolve ids] | bank used | bank plan [-n N] [-json] [-used file] [dir] | bank add [-check] [-checked-by P] <batch> [dir] | backup now | backup restore <key> <path> | backup verify [key] | admin [-remove] <email> | push keys | version")
+	return fmt.Errorf("usage: almanac serve | bank check [-unbalanced] [-used file] [dir] | bank lint [-rule R,…] [-summary] [dir] | bank fmt [dir] | bank subjects [dir] | bank calibrate [dir] | bank suspects [dir] | bank reports [-resolve ids] | bank used | bank plan [-n N] [-json] [-used file] [dir] | bank add [-check] [-checked-by P] <batch> [dir] | backup now [-force] | backup list | backup restore [-identity F] [-into-place] <key|latest> [path] | backup verify [-identity F] [key|latest] | backup keys | admin [-remove] <email> | push keys | version")
 }

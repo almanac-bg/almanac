@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
-	"github.com/almanac-bg/almanac/internal/backup"
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/play"
@@ -46,6 +45,8 @@ import (
 //	                    it, none there
 //	BACKUP_ENDPOINT     S3-compatible storage for hourly copies of the database (R2), with BACKUP_BUCKET,
 //	                    BACKUP_ACCESS_KEY, BACKUP_SECRET_KEY, and BACKUP_HEARTBEAT (a monitor's URL, fetched after each)
+//	BACKUP_RECIPIENT    the age public key the copies are encrypted to (`almanac backup keys`); without it they go
+//	                    unencrypted, and that's a problem told daily
 //	OPERATOR_NAME       who runs the game, for the privacy page
 //	CONTACT_EMAIL       where players write about their data (privacy@almanac.bg)
 //	ROYAL_EVERY         development only: a Роял every this long (2m), its lobby open ROYAL_LOBBY (1m) before; else
@@ -208,6 +209,11 @@ func serve([]string) error {
 		if err := accounts.CleanUp(ctx); err != nil && ctx.Err() == nil {
 			slog.Error("clean-up", "err", err)
 		}
+		if !dev {
+			if err := store.PruneCopies(dbPath()); err != nil {
+				slog.Error("clean-up: the database's copies", "err", err)
+			}
+		}
 	})
 	go reloadOnHangup(ctx, hup, banks, srv)
 	go srv.Remind(ctx)
@@ -221,8 +227,7 @@ func serve([]string) error {
 		go srv.MailProblems(ctx, to, time.Hour)
 	}
 	if backups != nil {
-		b := &backup.Backer{Store: backups, DB: db.Read, Dir: filepath.Dir(dbPath()), Heartbeat: os.Getenv("BACKUP_HEARTBEAT")}
-		go b.Run(ctx, func(err error) { srv.Problem("backup: " + err.Error()) })
+		go runBackups(ctx, srv)
 	} else if !dev {
 		slog.Warn("no backups configured (BACKUP_ENDPOINT)")
 	}

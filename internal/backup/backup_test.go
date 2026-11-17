@@ -3,17 +3,23 @@ package backup
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"encoding/xml"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"filippo.io/age"
 
 	"github.com/almanac-bg/almanac/internal/store"
 )
@@ -22,7 +28,7 @@ import (
 func TestSignsAsAWSDoes(t *testing.T) {
 	req, _ := http.NewRequest("GET", "https://examplebucket.s3.amazonaws.com/test.txt", nil)
 	req.Header.Set("Range", "bytes=0-9")
-	sign(req, "AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "us-east-1", nil,
+	sign(req, "AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "us-east-1", emptyHash,
 		time.Date(2013, 5, 24, 0, 0, 0, 0, time.UTC))
 	want := "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20130524/us-east-1/s3/aws4_request, " +
 		"SignedHeaders=host;range;x-amz-content-sha256;x-amz-date, " +
@@ -32,10 +38,29 @@ func TestSignsAsAWSDoes(t *testing.T) {
 	}
 }
 
-// fakeStore keeps what's put in it, checking each request is signed.
+// AWS's example of a signed listing ("Example: GET Bucket (List Objects)").
+func TestSignsAListingAsAWSDoes(t *testing.T) {
+	req, _ := http.NewRequest("GET", "https://examplebucket.s3.amazonaws.com/?max-keys=2&prefix=J", nil)
+	sign(req, "AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "us-east-1", emptyHash,
+		time.Date(2013, 5, 24, 0, 0, 0, 0, time.UTC))
+	want := "Signature=34b48302e7b5fa45bde8084f4b7868a86f0a534bc59db6670ed5711ef69dc6f7"
+	if got := req.Header.Get("Authorization"); !strings.HasSuffix(got, want) {
+		t.Fatalf("signed\n%s\nwant …%s", got, want)
+	}
+}
+
+type object struct {
+	body     []byte
+	meta     http.Header
+	modified time.Time
+}
+
+// fakeStore keeps what's put in it, checking each request is signed and its body is what was signed. Like a bucket
+// with lock rules, it refuses to overwrite or delete what it has.
 type fakeStore struct {
 	mu   sync.Mutex
-	objs map[string][]byte
+	objs map[string]*object // by path: /backups/<key>
+	now  time.Time          // when what's put now is put (zero: time.Now)
 }
 
 func (f *fakeStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -45,27 +70,94 @@ func (f *fakeStore) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	switch r.Method {
-	case http.MethodPut:
+	switch {
+	case r.Method == http.MethodPut:
+		if _, ok := f.objs[r.URL.Path]; ok {
+			http.Error(w, "locked", http.StatusForbidden)
+			return
+		}
 		body, _ := io.ReadAll(r.Body)
-		f.objs[r.URL.Path] = body
-	case http.MethodGet:
-		body, ok := f.objs[r.URL.Path]
+		if sha := r.Header.Get("x-amz-content-sha256"); sha != hashOf(body) || r.ContentLength != int64(len(body)) {
+			http.Error(w, "the body isn't what was signed", http.StatusBadRequest)
+			return
+		}
+		at := f.now
+		if at.IsZero() {
+			at = time.Now()
+		}
+		meta := http.Header{}
+		for k, v := range r.Header {
+			if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-") {
+				meta[k] = v
+			}
+		}
+		f.objs[r.URL.Path] = &object{body: body, meta: meta, modified: at}
+	case r.Method == http.MethodGet && r.URL.Query().Get("list-type") == "2":
+		type content struct {
+			Key          string
+			Size         int
+			LastModified time.Time
+		}
+		var res struct {
+			XMLName  xml.Name `xml:"ListBucketResult"`
+			Contents []content
+		}
+		for path, o := range f.objs {
+			key := strings.TrimPrefix(path, "/backups/")
+			if strings.HasPrefix(key, r.URL.Query().Get("prefix")) {
+				res.Contents = append(res.Contents, content{key, len(o.body), o.modified})
+			}
+		}
+		_ = xml.NewEncoder(w).Encode(res)
+	case r.Method == http.MethodGet:
+		o, ok := f.objs[r.URL.Path]
 		if !ok {
 			http.NotFound(w, r)
 			return
 		}
-		_, _ = w.Write(body)
+		for k, v := range o.meta {
+			w.Header()[k] = v
+		}
+		_, _ = w.Write(o.body)
+	default:
+		http.Error(w, "no", http.StatusMethodNotAllowed)
 	}
 }
 
-// world is a game's database with a player, a day and a game in it, a bucket, and a heartbeat that counts its beats.
+func hashOf(b []byte) string {
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
+}
+
+func (f *fakeStore) keys(prefix string) []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []string
+	for path := range f.objs {
+		if key := strings.TrimPrefix(path, "/backups/"); strings.HasPrefix(key, prefix) {
+			out = append(out, key)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+func (f *fakeStore) get(key string) []byte {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if o := f.objs["/backups/"+key]; o != nil {
+		return o.body
+	}
+	return nil
+}
+
+// world is a game's database with a player, a day and a game in it, and a bucket.
 type world struct {
 	dir   string
 	db    *store.DB
 	fake  *fakeStore
 	store *Store
-	beats *int
+	at    time.Time
 }
 
 func newWorld(t *testing.T) *world {
@@ -85,17 +177,20 @@ func newWorld(t *testing.T) *world {
 			t.Fatal(err)
 		}
 	}
-	fake := &fakeStore{objs: map[string][]byte{}}
+	fake := &fakeStore{objs: map[string]*object{}}
 	srv := httptest.NewServer(fake)
 	t.Cleanup(srv.Close)
-	return &world{dir: dir, db: db, fake: fake, beats: new(int),
+	return &world{dir: dir, db: db, fake: fake, at: time.Date(2026, 11, 15, 10, 30, 0, 0, time.UTC),
 		store: &Store{Endpoint: srv.URL, Bucket: "backups", AccessKey: "key", SecretKey: "secret", Region: "auto"}}
 }
 
-func (w *world) backer(t *testing.T, db *sql.DB) *Backer {
-	beat := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { *w.beats++ }))
-	t.Cleanup(beat.Close)
-	return &Backer{Store: w.store, DB: db, Dir: w.dir, Heartbeat: beat.URL}
+// backer makes copies of what db reads, encrypted to recipients, each an hour after the one before.
+func (w *world) backer(db *sql.DB, recipients ...age.Recipient) *Backer {
+	return &Backer{Store: w.store, DB: db, Dir: w.dir, Recipients: recipients, now: func() time.Time {
+		w.at = w.at.Add(time.Hour)
+		w.fake.now = w.at
+		return w.at
+	}}
 }
 
 // put stores a file, gzipped, under key, as a copy would be.
@@ -104,34 +199,34 @@ func (w *world) put(t *testing.T, key string, file []byte) {
 	zw := gzip.NewWriter(&gz)
 	zw.Write(file)
 	zw.Close()
-	if err := w.store.Put(t.Context(), key, gz.Bytes()); err != nil {
+	if err := w.store.Put(t.Context(), key, bytes.NewReader(gz.Bytes()), nil); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestBackUpAndRestore(t *testing.T) {
 	w := newWorld(t)
-	dir, fake, s, beats := w.dir, w.fake, w.store, w.beats
-	b := w.backer(t, w.db.Read)
-	if err := b.Once(t.Context()); err != nil {
+	r, err := w.backer(w.db.Read).Once(t.Context())
+	if err != nil {
 		t.Fatal(err)
 	}
-	keys := Keys(time.Now())
-	for _, k := range keys {
-		data := fake.objs["/backups/"+k]
-		if _, err := gzip.NewReader(bytes.NewReader(data)); err != nil || len(data) == 0 {
-			t.Fatalf("%s: %d bytes, %v", k, len(data), err)
+	if r.Encrypted || !r.Drilled || len(r.Keys) != 2 || r.Rows["users"] != 1 || r.Bytes == 0 || len(r.Warnings) > 0 {
+		t.Fatalf("report %+v", r)
+	}
+	if want := []string{"days/2026-11-15T113000Z.db.gz", "hours/2026-11-15T113000Z.db.gz"}; !slices.Equal(w.fake.keys(""), want) {
+		t.Fatalf("stored %v, want %v", w.fake.keys(""), want)
+	}
+	for _, k := range r.Keys {
+		if _, err := gzip.NewReader(bytes.NewReader(w.fake.get(k))); err != nil {
+			t.Fatalf("%s: %v", k, err)
 		}
 	}
-	if *beats != 1 {
-		t.Fatalf("%d heartbeats", *beats)
-	}
 
-	restored := filepath.Join(dir, "restored.db")
-	if err := Restore(t.Context(), s, keys[0], restored); err != nil {
+	restored := filepath.Join(w.dir, "restored.db")
+	if err := Restore(t.Context(), w.store, r.Keys[0], restored); err != nil {
 		t.Fatal(err)
 	}
-	if err := Restore(t.Context(), s, keys[0], restored); err == nil {
+	if err := Restore(t.Context(), w.store, r.Keys[0], restored); err == nil {
 		t.Fatal("restored over a file that's there")
 	}
 	back, err := sql.Open("sqlite", "file:"+restored+"?mode=ro")
@@ -146,61 +241,195 @@ func TestBackUpAndRestore(t *testing.T) {
 	if err := back.QueryRow(`PRAGMA integrity_check`).Scan(&check); err != nil || check != "ok" {
 		t.Fatalf("integrity %q %v", check, err)
 	}
+	for _, pattern := range []string{"snapshot-*", "copy-*", "drill-*"} {
+		if left, _ := filepath.Glob(filepath.Join(w.dir, pattern)); len(left) > 0 {
+			t.Fatalf("left behind %v", left)
+		}
+	}
 }
 
-// The day's copy just stored comes back whole, with its rows; nothing of the drill is left behind.
-func TestTheDrillBringsTheDaysCopyBack(t *testing.T) {
+// Each copy is a new object: nothing is overwritten (the fake bucket refuses it, as a locked one would). The day's
+// copy is the first of each UTC day, and it's the one brought back.
+func TestEachCopyIsNew(t *testing.T) {
 	w := newWorld(t)
-	b := w.backer(t, w.db.Read)
-	now := time.Date(2026, 11, 15, drillHour, 5, 0, 0, time.UTC)
-	if err := b.once(t.Context(), now); err != nil {
-		t.Fatal(err)
+	b := w.backer(w.db.Read)
+	w.at = time.Date(2026, 11, 15, 21, 30, 0, 0, time.UTC)
+	drilled := 0
+	for range 4 { // 22:30, 23:30, then 00:30 and 01:30 the next day
+		r, err := b.Once(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.Drilled {
+			drilled++
+		}
 	}
-	if _, ok := w.fake.objs["/backups/days/15.db.gz"]; !ok {
-		t.Fatalf("stored %v", w.fake.objs)
+	if got := w.fake.keys("hours/"); len(got) != 4 {
+		t.Fatalf("hours %v", got)
 	}
-	if err := b.Drill(t.Context(), now); err != nil {
-		t.Fatal(err)
+	if got, want := w.fake.keys("days/"), []string{"days/2026-11-15T223000Z.db.gz", "days/2026-11-16T003000Z.db.gz"}; !slices.Equal(got, want) || drilled != 2 {
+		t.Fatalf("days %v, drilled %d", got, drilled)
 	}
-	counts, err := Drill(t.Context(), w.store, "days/15.db.gz", w.dir)
+	if s := LoadState(w.dir); s.Day != "2026-11-16" || s.Key != "hours/2026-11-16T013000Z.db.gz" || s.Rows["runs"] != 1 {
+		t.Fatalf("state %+v", s)
+	}
+	if latest, err := Latest(t.Context(), w.store, "days/"); err != nil || latest != "days/2026-11-16T003000Z.db.gz" {
+		t.Fatalf("latest %q %v", latest, err)
+	}
+}
+
+// Encrypted, a copy can be opened only with the key kept off the server; the server checks the day's all the same,
+// with a key made for that copy alone.
+func TestEncryptedCopies(t *testing.T) {
+	w := newWorld(t)
+	owner, err := age.GenerateHybridIdentity()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if counts["users"] != 1 || counts["days"] != 1 || counts["runs"] != 1 || counts["schema_migrations"] == 0 {
-		t.Fatalf("rows %v", counts)
+	r, err := w.backer(w.db.Read, owner.Recipient()).Once(t.Context())
+	if err != nil {
+		t.Fatal(err)
 	}
-	left, _ := filepath.Glob(filepath.Join(w.dir, "drill-*"))
-	if len(left) > 0 {
-		t.Fatalf("left behind %v", left)
+	if !r.Encrypted || !r.Drilled || !strings.HasSuffix(r.Keys[0], ".db.gz.age") {
+		t.Fatalf("report %+v", r)
+	}
+	data := w.fake.get(r.Keys[0])
+	if !bytes.HasPrefix(data, ageMagic) || bytes.Contains(data, []byte("SQLite format")) {
+		t.Fatal("not encrypted")
+	}
+
+	path := filepath.Join(w.dir, "back.db")
+	if err := Restore(t.Context(), w.store, r.Keys[0], path); !errors.Is(err, ErrEncrypted) {
+		t.Fatalf("restored without the key: %v", err)
+	}
+	other, _ := age.GenerateHybridIdentity()
+	if _, err := Drill(t.Context(), w.store, r.Keys[0], w.dir, other); err == nil {
+		t.Fatal("opened with another key")
+	}
+	rows, err := Drill(t.Context(), w.store, r.Keys[0], w.dir, owner)
+	if err != nil || rows["users"] != 1 {
+		t.Fatalf("with the key: %v %v", rows, err)
+	}
+
+	// Without its key, it's known to be stored as it was sent.
+	st, err := Intact(t.Context(), w.store, r.Keys[1])
+	if err != nil || st.Bytes != int64(len(data)) || !strings.Contains(st.Rows, "users=1") {
+		t.Fatalf("intact %+v %v", st, err)
+	}
+	w.fake.mu.Lock()
+	w.fake.objs["/backups/"+r.Keys[1]].body[len(data)-5] ^= 1
+	w.fake.mu.Unlock()
+	if _, err := Intact(t.Context(), w.store, r.Keys[1]); err == nil {
+		t.Fatal("a changed copy passed")
+	}
+	if _, err := Drill(t.Context(), w.store, r.Keys[1], w.dir, owner); err == nil {
+		t.Fatal("a changed copy opened")
+	}
+}
+
+// A copy from before they were encrypted, under its old name, still comes back.
+func TestOldCopiesStillRestore(t *testing.T) {
+	w := newWorld(t)
+	if _, err := w.db.Write.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.ReadFile(filepath.Join(w.dir, "game.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.put(t, "days/15.db.gz", file)
+	owner, _ := age.GenerateX25519Identity()
+	if rows, err := Drill(t.Context(), w.store, "days/15.db.gz", w.dir, owner); err != nil || rows["runs"] != 1 {
+		t.Fatalf("%v %v", rows, err)
+	}
+}
+
+func TestRecipients(t *testing.T) {
+	secret, recipient, err := NewKeys()
+	if err != nil || !strings.HasPrefix(secret, "AGE-SECRET-KEY-PQ-1") || !strings.HasPrefix(recipient, "age1pq1") {
+		t.Fatalf("%q %q %v", secret, recipient, err)
+	}
+	x, _ := age.GenerateX25519Identity()
+	x2, _ := age.GenerateX25519Identity()
+	if rs, err := Recipients(" " + recipient + "\n"); err != nil || len(rs) != 1 {
+		t.Fatalf("%v %v", rs, err)
+	}
+	if rs, err := Recipients(x.Recipient().String() + ", " + x2.Recipient().String()); err != nil || len(rs) != 2 {
+		t.Fatalf("%v %v", rs, err)
+	}
+	if rs, err := Recipients(""); err != nil || rs != nil {
+		t.Fatalf("none: %v %v", rs, err)
+	}
+	for _, bad := range []string{"age1nope", secret, recipient + " " + x.Recipient().String()} {
+		if _, err := Recipients(bad); err == nil {
+			t.Fatalf("took %q", bad)
+		}
+	}
+	ids, err := Identities(strings.NewReader("# the key\n" + secret + "\n"))
+	if err != nil || len(ids) != 1 {
+		t.Fatalf("%v %v", ids, err)
+	}
+}
+
+// An empty game is never sent (a new server, before its restore), unless asked; a game that lost half its rows is sent,
+// and that's said.
+func TestAnEmptyGameIsNotSent(t *testing.T) {
+	w := newWorld(t)
+	b := w.backer(w.db.Read)
+	for i := range 30 {
+		if _, err := w.db.Write.Exec(`INSERT INTO users (name, tag, created_at, seen_at) VALUES ('Играч', ?, 1, 1)`, "p"+string(rune('a'+i))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := b.Once(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.db.Write.Exec(`DELETE FROM users WHERE id > 5`); err != nil {
+		t.Fatal(err)
+	}
+	r, err := b.Once(t.Context())
+	if err != nil || len(r.Warnings) != 1 || !strings.Contains(r.Warnings[0], "users fell from 31 rows to 5") {
+		t.Fatalf("%+v %v", r, err)
+	}
+
+	if _, err := w.db.Write.Exec(`DELETE FROM runs`); err != nil {
+		t.Fatal(err)
+	}
+	stored := len(w.fake.keys(""))
+	if _, err := b.Once(t.Context()); err == nil || !strings.Contains(err.Error(), "runs is empty") {
+		t.Fatalf("sent: %v", err)
+	}
+	if len(w.fake.keys("")) != stored {
+		t.Fatal("stored")
+	}
+	b.Force = true
+	if _, err := b.Once(t.Context()); err != nil {
+		t.Fatal(err)
 	}
 }
 
 func TestTheDrillFails(t *testing.T) {
 	w := newWorld(t)
-	b := w.backer(t, w.db.Read)
-	now := time.Date(2026, 11, 15, drillHour, 5, 0, 0, time.UTC)
 
 	// No copy at all.
-	if _, err := Drill(t.Context(), w.store, "days/15.db.gz", w.dir); !errors.Is(err, ErrMissing) {
-		t.Fatalf("a missing copy: %v", err)
-	}
-	if err := b.Drill(t.Context(), now); err == nil || !strings.Contains(err.Error(), "days/15.db.gz") {
+	if _, err := Drill(t.Context(), w.store, "days/x.db.gz", w.dir); !errors.Is(err, ErrMissing) {
 		t.Fatalf("a missing copy: %v", err)
 	}
 
 	// A copy cut short on its way.
-	if err := b.once(t.Context(), now); err != nil {
+	r, err := w.backer(w.db.Read).Once(t.Context())
+	if err != nil {
 		t.Fatal(err)
 	}
-	whole := w.fake.objs["/backups/days/15.db.gz"]
-	w.fake.objs["/backups/days/15.db.gz"] = whole[:len(whole)/2]
-	if _, err := Drill(t.Context(), w.store, "days/15.db.gz", w.dir); err == nil {
+	whole := w.fake.get(r.Keys[0])
+	w.fake.objs["/backups/cut"] = &object{body: whole[:len(whole)/2]}
+	if _, err := Drill(t.Context(), w.store, "cut", w.dir); err == nil {
 		t.Fatal("a cut copy passed")
 	}
 
 	// A copy whose pages are damaged.
-	w.put(t, "days/15.db.gz", damaged(t))
-	if _, err := Drill(t.Context(), w.store, "days/15.db.gz", w.dir); err == nil {
+	w.put(t, "damaged", damaged(t))
+	if _, err := Drill(t.Context(), w.store, "damaged", w.dir); err == nil {
 		t.Fatal("a damaged copy passed")
 	}
 
@@ -208,15 +437,22 @@ func TestTheDrillFails(t *testing.T) {
 	if _, err := w.db.Write.Exec(`DELETE FROM runs`); err != nil {
 		t.Fatal(err)
 	}
-	if err := b.once(t.Context(), now); err != nil {
+	b := w.backer(w.db.Read)
+	b.Force = true
+	r, err = b.Once(t.Context())
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Drill(t.Context(), w.store, "days/15.db.gz", w.dir); err == nil || !strings.Contains(err.Error(), "runs is empty") {
+	if _, err := Drill(t.Context(), w.store, r.Keys[0], w.dir); err == nil || !strings.Contains(err.Error(), "runs is empty") {
 		t.Fatalf("an empty copy: %v", err)
+	}
+	left, _ := filepath.Glob(filepath.Join(w.dir, "drill-*"))
+	if len(left) > 0 {
+		t.Fatalf("left behind %v", left)
 	}
 }
 
-// A copy that isn't the game's is never sent: the good copies stay, and the heartbeat stays quiet.
+// A copy that isn't the game's is never sent.
 func TestABadCopyIsNotSent(t *testing.T) {
 	w := newWorld(t)
 	other, err := sql.Open("sqlite", filepath.Join(w.dir, "other.db"))
@@ -227,17 +463,45 @@ func TestABadCopyIsNotSent(t *testing.T) {
 	if _, err := other.Exec(`CREATE TABLE users (id INTEGER PRIMARY KEY)`); err != nil {
 		t.Fatal(err)
 	}
-	b := w.backer(t, other)
-	err = b.Once(t.Context())
+	_, err = w.backer(other).Once(t.Context())
 	if err == nil || !strings.Contains(err.Error(), "damaged, not sent") {
 		t.Fatalf("sent: %v", err)
 	}
-	if len(w.fake.objs) != 0 || *w.beats != 0 {
-		t.Fatalf("stored %d, %d heartbeats", len(w.fake.objs), *w.beats)
+	if len(w.fake.keys("")) != 0 {
+		t.Fatalf("stored %v", w.fake.keys(""))
 	}
-	left, _ := filepath.Glob(filepath.Join(w.dir, "snapshot-*"))
-	if len(left) > 0 {
-		t.Fatalf("left behind %v", left)
+	for _, pattern := range []string{"snapshot-*", "copy-*"} {
+		if left, _ := filepath.Glob(filepath.Join(w.dir, pattern)); len(left) > 0 {
+			t.Fatalf("left behind %v", left)
+		}
+	}
+}
+
+// Copies the lifecycle rules should have deleted by now are said to be there.
+func TestOverdue(t *testing.T) {
+	w := newWorld(t)
+	now := time.Date(2026, 11, 17, 10, 0, 0, 0, time.UTC)
+	for key, age := range map[string]time.Duration{
+		"hours/new":  time.Hour,
+		"hours/old":  5 * 24 * time.Hour,
+		"days/fresh": 31 * 24 * time.Hour,
+		"days/old":   40 * 24 * time.Hour,
+	} {
+		w.fake.now = now.Add(-age)
+		w.put(t, key, []byte("x"))
+	}
+	stale, err := Overdue(t.Context(), w.store, now)
+	if err != nil || len(stale) != 2 || stale[0].Key != "hours/old" || stale[1].Key != "days/old" {
+		t.Fatalf("%v %v", stale, err)
+	}
+}
+
+func TestNextIsHalfPast(t *testing.T) {
+	for at, want := range map[string]string{"10:00": "10:30", "10:29": "10:30", "10:30": "11:30", "10:59": "11:30"} {
+		in, _ := time.Parse("15:04", at)
+		if got := next(in).Format("15:04"); got != want {
+			t.Errorf("after %s: %s, want %s", at, got, want)
+		}
 	}
 }
 

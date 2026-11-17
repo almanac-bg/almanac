@@ -11,7 +11,7 @@
 # drain: the restart waits. Connections that come during the restart wait in systemd's socket (almanac.socket) for the
 # new server. One deploy at a time: a second waits for the first.
 #
-# The new version copies the database as it first starts, before its migrations (before-vX.Y.Z.db, the ten latest
+# The new version copies the database as it first starts, before its migrations (before-vX.Y.Z.db, the three latest
 # kept: store.KeepCopy); this script can't, as the socket starts the server again as soon as a connection comes. Going
 # back puts that copy back as well: a program refuses a database that has a migration it doesn't know
 # (internal/store), so the version before can only start on the database as it was before the new one migrated it.
