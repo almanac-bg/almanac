@@ -445,7 +445,7 @@ func TestChallengeHalfPlayed(t *testing.T) {
 	ana, bo := w.user(), w.user()
 	s, _ := w.g.StartTopic(ctx, ana, "")
 	w.play(ana, s.ID, repeat(w.right, Length)...)
-	code, err := w.g.Challenge(ctx, ana, s.ID, nil)
+	code, _, err := w.g.Challenge(ctx, ana, s.ID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1476,6 +1476,18 @@ func TestFriendChallenge(t *testing.T) {
 		*d.Record != (Record{Won: 1, Lost: 1}) {
 		t.Fatalf("a friendly: %+v", d)
 	}
+	// Taken by its link by another of Vi's friends: it was drawn for Ana, not for Bo, so a duel between the two,
+	// unrated, and no friendly either (it never could have counted).
+	bo := w.user()
+	w.befriend(vi, bo)
+	bs, bd, err := w.g.TakeChallenge(ctx, bo, w.code(back))
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(bo, bs.ID, repeat(w.right, Length)...)
+	if d, _ := w.g.DuelOf(ctx, bo, bd); d.Friend != vi || d.Rating != nil || d.Delta != 0 || d.Friendly {
+		t.Fatalf("Bo's game of Ana's challenge: %+v", d)
+	}
 
 	// A friend may say no (only to theirs, only before they start); one not played in time ends without a result.
 	s, no, _ := w.g.ChallengeFriend(ctx, ana, vi)
@@ -1512,6 +1524,22 @@ func TestFriendChallenge(t *testing.T) {
 	}
 	if c, _ := w.g.AskedOf(ctx, vi); len(c) != 0 {
 		t.Fatalf("still waiting: %+v", c)
+	}
+
+	// The next day, drawn for the two, but no longer friends when it's played: unrated.
+	w.wait(24 * time.Hour)
+	s, gone, _ := w.g.ChallengeFriend(ctx, ana, vi)
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	vs, err = w.take(vi, gone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.g.Unfriend(ctx, vi, ana); err != nil {
+		t.Fatal(err)
+	}
+	w.play(vi, vs.ID, repeat(w.wrong, Length)...)
+	if d, _ := w.g.DuelOf(ctx, vi, gone); d.State != "lost" || d.Rating != nil || d.Delta != 0 {
+		t.Fatalf("after unfriending: %+v", d)
 	}
 }
 

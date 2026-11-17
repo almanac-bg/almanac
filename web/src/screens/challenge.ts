@@ -250,7 +250,8 @@ export function sendChallenge(s: State, topic?: string): { main: Child; also: Ch
     () => friends.set([]),
   );
   const picked = signal<number[]>([]);
-  const sent = signal<string[] | null>(null);
+  // Whom it reached, and whom not (who has it waiting already, or too many of the player's).
+  const sent = signal<{ to: string[]; not: string[] } | null>(null);
   const busy = signal(false);
   const error = signal("");
   const toggle = (id: number) => picked.update((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
@@ -259,8 +260,9 @@ export function sendChallenge(s: State, topic?: string): { main: Child; also: Ch
     busy.set(true);
     try {
       const to = picked.peek();
-      await api("POST", "/api/challenges", { run: s.id, to });
-      sent.set((friends.peek() ?? []).filter((f) => to.includes(f.id)).map((f) => f.name));
+      const r = await api<{ sent: number[] }>("POST", "/api/challenges", { run: s.id, to });
+      const of = (ids: number[]) => (friends.peek() ?? []).filter((f) => ids.includes(f.id)).map((f) => f.name);
+      sent.set({ to: of(r.sent), not: of(to.filter((id) => !r.sent.includes(id))) });
     } catch (err) {
       error.set((err as ApiError).message);
     } finally {
@@ -271,10 +273,16 @@ export function sendChallenge(s: State, topic?: string): { main: Child; also: Ch
     const list = friends();
     if (!list) return h("p", { class: "muted" }, "…");
     if (!list.length) return challengeButton("Изпрати", s.id, text, true);
-    const to = sent();
-    if (to)
+    const done = sent();
+    if (done)
       return [
-        h("p", { class: "send-done", role: "status" }, `Изпратено на ${names(to)}. Ще ти кажем как е минало.`),
+        h(
+          "p",
+          { class: "send-done", role: "status" },
+          done.to.length ? `Изпратено на ${names(done.to)}. Ще ти кажем как е минало.` : null,
+          done.to.length && done.not.length ? " " : null,
+          done.not.length ? `${names(done.not)}: не е изпратено, вече има чакащи предизвикателства от теб.` : null,
+        ),
         h("a", { class: "btn primary big", href: "/duel" }, "Към дуелите"),
       ];
     return h(

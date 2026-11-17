@@ -19,21 +19,27 @@ import (
 //
 // It's made two ways. A game already played is sent (Challenge: a topic's, or all of them; the link, and the friends
 // it's sent to). Or a friend is challenged at once (ChallengeFriend): ten drawn fresh for the two, questions neither
-// has seen first, sent to the friend as soon as the player has played them (sent). A friend it's sent to has their
-// game of it made then, not started (a_run none), and is told once the sender has played: they play it or say no
-// (Decline); after, it can still go to anyone by its link.
+// has seen first, sent to the friend as soon as the player has played them (sent); the challenge is drawn for that
+// pair (challenges.for_id). A friend it's sent to has their game of it made then, not started (a_run none), and is told
+// once the sender has played: they play it or say no (Decline); after, it can still go to anyone by its link. Sent
+// again to a friend whose turn ran out or who said no, it's theirs to play again. At most MaxWaiting of a sender's
+// challenges wait unstarted on one friend, and a push tells of one only when none of theirs waits already.
 //
-// A taker who is the sender's friend plays a duel between the two (b_id is the sender): the first of a day between
-// them moves both their ratings (ratedToday), it counts in the record between them, and its result is told to both.
-// Anyone else's moves no rating (the two may be of any strength, and accounts made to farm a rating are the risk), and
-// the sender hears of those quietly: one line on Начало for all of them since they last heard (ChallengeNewsOf), and a
-// push at most once a day.
+// A taker who is the sender's friend plays a duel between the two (b_id is the sender): it counts in the record
+// between them, and its result is told to both. Only a challenge drawn for the pair moves ratings, played by the
+// friend it was drawn for, while they're still friends, the first rated duel of a day between them (ratedToday):
+// anything else could be chosen to win, a sender's best game sent, or taken knowing the score to beat, or on questions
+// the taker has answered before. Anyone else's moves no rating, and the sender hears of those quietly: one line on
+// Начало for all of them since they last heard (ChallengeNewsOf), and a push at most once a day.
 //
 // It can be taken for ChallengeFor from when it was sent; sent again, its time starts again.
 
 // ChallengeFor is how long a challenge can be taken, from when it was sent: a weekend in a group's chat, and not so
 // long that a friend's turn hangs for a week.
 const ChallengeFor = 3 * 24 * time.Hour
+
+// MaxWaiting is how many of a sender's challenges may wait unstarted on one friend.
+const MaxWaiting = 3
 
 var (
 	ErrNoChallenge = errors.New("no such challenge")
@@ -43,14 +49,17 @@ var (
 	ErrOwnChallenge = errors.New("one's own challenge")
 	// ErrNoChallengeRun is a game that can't be a challenge: not the player's, not finished, not a game of ten.
 	ErrNoChallengeRun = errors.New("no game to challenge with")
+	// ErrManyWaiting is a friend with MaxWaiting of the player's challenges waiting unstarted.
+	ErrManyWaiting = errors.New("too many challenges waiting")
 )
 
 // Challenge sends one of the player's finished games of ten: its link, made the first time and the same after, and to
 // the friends in `to` (anyone else in it is left out), who are told. Its time to be taken starts again, for the
-// friends it was sent to who haven't started too.
-func (g *Game) Challenge(ctx context.Context, userID, runID int64, to []int64) (string, error) {
+// friends it was sent to who haven't started too. The friends it reached now: those it's waiting for again, or for the
+// first time.
+func (g *Game) Challenge(ctx context.Context, userID, runID int64, to []int64) (string, []int64, error) {
 	var code string
-	var asked []int64
+	var made []sentTo
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var ok bool
 		err := tx.QueryRow(`SELECT finished_at IS NOT NULL AND kind IN ('topic', 'duel')
@@ -62,25 +71,30 @@ func (g *Game) Challenge(ctx context.Context, userID, runID int64, to []int64) (
 			return err
 		}
 		var id int64
-		if id, code, err = g.challengeFor(tx, userID, runID); err != nil {
+		if id, code, err = g.challengeFor(tx, userID, runID, 0); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`UPDATE duels SET expires_at = ? WHERE challenge_id = ? AND a_run IS NULL AND ended_at IS NULL`,
 			store.Ms(g.Now().Add(ChallengeFor)), id); err != nil {
 			return err
 		}
-		asked, err = g.sendTo(tx, id, userID, runID, to)
+		made, err = g.sendTo(tx, id, userID, runID, to)
 		return err
 	})
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return code, g.tellAsked(ctx, userID, asked)
+	reached := make([]int64, 0, len(made))
+	duels := make([]int64, 0, len(made))
+	for _, m := range made {
+		reached, duels = append(reached, m.friend), append(duels, m.duel)
+	}
+	return code, reached, g.tellAsked(ctx, userID, duels)
 }
 
-// challengeFor is the challenge of a player's game (its id and code), made the first time, its time to be taken
-// started again.
-func (g *Game) challengeFor(tx *sql.Tx, userID, runID int64) (int64, string, error) {
+// challengeFor is the challenge of a player's game (its id and code), made the first time (drawn for the pair with
+// friend forID, if not 0), its time to be taken started again.
+func (g *Game) challengeFor(tx *sql.Tx, userID, runID, forID int64) (int64, string, error) {
 	now := g.Now()
 	for range 3 {
 		var id int64
@@ -94,36 +108,56 @@ func (g *Game) challengeFor(tx *sql.Tx, userID, runID int64) (int64, string, err
 			return 0, "", err
 		}
 		// A code taken already leaves it unmade, and the loop draws another.
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO challenges (code, user_id, run_id, created_at, expires_at)
-			VALUES (?, ?, ?, ?, ?)`, newInviteCode(), userID, runID, store.Ms(now), store.Ms(now.Add(ChallengeFor))); err != nil {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO challenges (code, user_id, run_id, created_at, expires_at, for_id)
+			VALUES (?, ?, ?, ?, ?, nullif(?, 0))`, newInviteCode(), userID, runID, store.Ms(now), store.Ms(now.Add(ChallengeFor)),
+			forID); err != nil {
 			return 0, "", err
 		}
 	}
 	return 0, "", errors.New("no free challenge code")
 }
 
-// sendTo sends a challenge (of the sender's game, run) to those of `to` who are the sender's friends: each one's game
-// of it is made, not started, as long as the challenge lasts. The duels made for those not sent it before.
-func (g *Game) sendTo(tx *sql.Tx, challengeID, sender, run int64, to []int64) ([]int64, error) {
-	var made []int64
+// sentTo is a friend a challenge reached: their duel of it.
+type sentTo struct{ duel, friend int64 }
+
+// sendTo sends a challenge (of the sender's game, run) to those of `to` who are the sender's friends with fewer than
+// MaxWaiting of the sender's challenges waiting unstarted: each one's game of it is made, not started, as long as the
+// challenge lasts; or, theirs already and over unplayed (their time ran out, or they said no), open again. Those it
+// reached.
+func (g *Game) sendTo(tx *sql.Tx, challengeID, sender, run int64, to []int64) ([]sentTo, error) {
+	var made []sentTo
+	now := store.Ms(g.Now())
 	for _, friend := range slices.Compact(slices.Sorted(slices.Values(to))) {
-		res, err := tx.Exec(`INSERT OR IGNORE INTO duels (kind, questions, a_id, b_id, ghost_run, challenge_id, created_at,
-				expires_at)
+		var ok bool
+		if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ?1 AND friend_id = ?2)
+				AND (SELECT count(*) FROM duels WHERE a_id = ?2 AND b_id = ?1 AND kind = 'challenge' AND a_run IS NULL
+					AND ended_at IS NULL AND challenge_id <> ?3) < ?4`,
+			sender, friend, challengeID, MaxWaiting).Scan(&ok); err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+		var id int64
+		err := tx.QueryRow(`INSERT INTO duels (kind, questions, a_id, b_id, ghost_run, challenge_id, created_at, expires_at)
 			SELECT 'challenge', r.questions, ?1, ?2, r.id, c.id, ?4, c.expires_at FROM runs r JOIN challenges c ON c.run_id = r.id
-			WHERE r.id = ?3 AND c.id = ?5 AND EXISTS (SELECT 1 FROM friends WHERE user_id = ?2 AND friend_id = ?1)`,
-			friend, sender, run, store.Ms(g.Now()), challengeID)
+			WHERE r.id = ?3 AND c.id = ?5
+			ON CONFLICT DO UPDATE SET ended_at = NULL, outcome = NULL, expires_at = excluded.expires_at
+				WHERE a_run IS NULL AND outcome IN ('declined', 'expired')
+			RETURNING id`, friend, sender, run, now, challengeID).Scan(&id)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue // theirs already: waiting, or played
+		}
 		if err != nil {
 			return nil, err
 		}
-		if n, _ := res.RowsAffected(); n > 0 {
-			id, _ := res.LastInsertId()
-			made = append(made, id)
-		}
+		made = append(made, sentTo{duel: id, friend: friend})
 	}
 	return made, nil
 }
 
-// tellAsked tells the friends a player's challenge was sent to (their duels of it) that it waits for them.
+// tellAsked tells the friends a player's challenge was sent to (their duels of it) that it waits for them: by a push,
+// unless another of the player's challenges waits on them already (its notice in the game says enough).
 func (g *Game) tellAsked(ctx context.Context, sender int64, duels []int64) error {
 	if g.DuelNews == nil || len(duels) == 0 {
 		return nil
@@ -134,10 +168,16 @@ func (g *Game) tellAsked(ctx context.Context, sender int64, duels []int64) error
 	}
 	for _, id := range duels {
 		var to int64
-		if err := g.DB.Read.QueryRowContext(ctx, `SELECT a_id FROM duels WHERE id = ?`, id).Scan(&to); err != nil {
+		var waiting bool
+		if err := g.DB.Read.QueryRowContext(ctx, `SELECT d.a_id, EXISTS (SELECT 1 FROM duels o JOIN runs r ON r.id = o.ghost_run
+				WHERE o.a_id = d.a_id AND o.b_id = d.b_id AND o.id <> d.id AND o.kind = 'challenge' AND o.a_run IS NULL
+					AND o.ended_at IS NULL AND r.finished_at IS NOT NULL)
+			FROM duels d WHERE d.id = ?`, id).Scan(&to, &waiting); err != nil {
 			return err
 		}
-		g.DuelNews(ctx, DuelNews{To: to, Kind: "asked", From: name, DuelID: id})
+		if !waiting {
+			g.DuelNews(ctx, DuelNews{To: to, Kind: "asked", From: name, DuelID: id})
+		}
 	}
 	return nil
 }
@@ -179,7 +219,8 @@ func (g *Game) sent(ctx context.Context, runID int64) error {
 
 // ChallengeFriend challenges a friend at once: ten questions drawn for the two (questions neither has seen first, as
 // hard as they know on average), the player's game of them started, and the challenge sent to the friend, who hears
-// of it once the player has played. The friend's duel of it, for the player to follow.
+// of it once the player has played. The friend's duel of it, for the player to follow. ErrManyWaiting while MaxWaiting
+// of the player's challenges wait unstarted on that friend.
 func (g *Game) ChallengeFriend(ctx context.Context, userID, friendID int64) (State, int64, error) {
 	if _, err := g.Friend(ctx, userID, friendID); err != nil {
 		return State{}, 0, err
@@ -199,7 +240,7 @@ func (g *Game) ChallengeFriend(ctx context.Context, userID, friendID int64) (Sta
 		if err != nil {
 			return err
 		}
-		id, _, err := g.challengeFor(tx, userID, r.id)
+		id, _, err := g.challengeFor(tx, userID, r.id, friendID)
 		if err != nil {
 			return err
 		}
@@ -208,9 +249,9 @@ func (g *Game) ChallengeFriend(ctx context.Context, userID, friendID int64) (Sta
 			return err
 		}
 		if len(made) != 1 {
-			return ErrNotFriends
+			return ErrManyWaiting // a friend, checked: too many wait on them
 		}
-		duelID = made[0]
+		duelID = made[0].duel
 		s, err = g.state(tx, r)
 		return err
 	})

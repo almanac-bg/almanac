@@ -352,10 +352,12 @@ takes a token.
   поканата ти.“ (`/challenge/<id>`: ten drawn for the two, the count first). A topic's result has it plain too
   (`challengeButton()`: the link made as the finger comes down, shared with a plain line, „Познах 7 от 10 по „История“
   в АЛМАНАХ. Можеш ли повече?“). A friend it's sent to hears once the sender has played: a notice wherever they are
-  („Мария те предизвика“, „Играй“ and „Откажи“) and a push; three days to play it. While it waits, the sender's
-  result has „Прати на Мария“ gold: the same link brings the friend to their turn. A friend's game of it is a duel
-  between the two (rated, the first of the day; their record), its result told to both; anyone else's moves no
-  rating. Opened: who sent it and how they did, „Започни“ (the count after that tap), then the duel's result
+  („Мария те предизвика“, „Играй“ and „Откажи“) and a push (none while another of the sender's waits on them; three
+  at most wait unstarted); three days to play it. Sent to them again after their time ran out or they said no, it's
+  theirs again; the send step names only those it reached. While it waits, the sender's result has „Прати на Мария“
+  gold: the same link brings the friend to their turn. A friend's game of it is a duel between the two (their record),
+  its result told to both; only one drawn for the two, played by that friend, moves ratings (the first of the day).
+  Anyone else's moves no rating. Opened: who sent it and how they did, „Започни“ (the count after that tap), then the duel's result
   („Предизвикателство от Мария“, „Добави в приятели“ under a stranger, „Предизвикай и ти“ gold). Opened again, the
   taker's result; by the one who sent it, who took it and „Прати го пак“; past its three days, or gone, it says so
   and offers the day's ten.

@@ -7,17 +7,30 @@
 -- still playing, the friend not told yet; the friend's turn; the friend half-way); those over keep their result, the
 -- sides turned round. kind is live or challenge.
 
+-- A challenge drawn for a pair: its ten drawn fresh for the one who sends it and one friend (play.ChallengeFriend), the
+-- only one whose game moves ratings (for_id is that friend). Every friend's duel was one.
+ALTER TABLE challenges ADD COLUMN for_id INTEGER REFERENCES users (id) ON DELETE SET NULL;
+
 -- The challenger's game of each friend's duel becomes a challenge, as long as the duel had; one shared by its link
--- already keeps its code. A code is eight letters, as play.newInviteCode makes them; a second pass for one whose code
--- was taken.
+-- already keeps its code. A code is eight of the invite links' letters (play.inviteLetters: no 0, o, 1 or l), as
+-- play.newInviteCode makes them; a second pass for one whose code was taken.
 INSERT OR IGNORE INTO challenges (code, user_id, run_id, created_at, expires_at)
-  SELECT lower(hex(randomblob(4))), a_id, a_run, created_at, expires_at FROM duels
+  SELECT substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1) || substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1)
+    || substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1) || substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1)
+    || substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1) || substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1)
+    || substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1) || substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1),
+    a_id, a_run, created_at, expires_at FROM duels
   WHERE kind = 'friend' AND challenge_id IS NULL AND a_run IS NOT NULL;
 INSERT OR IGNORE INTO challenges (code, user_id, run_id, created_at, expires_at)
-  SELECT lower(hex(randomblob(4))), a_id, a_run, created_at, expires_at FROM duels
+  SELECT substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1) || substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1)
+    || substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1) || substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1)
+    || substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1) || substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1)
+    || substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1) || substr('abcdefghijkmnpqrstuvwxyz23456789', abs(random()) % 32 + 1, 1),
+    a_id, a_run, created_at, expires_at FROM duels
   WHERE kind = 'friend' AND challenge_id IS NULL AND a_run IS NOT NULL;
 UPDATE challenges SET expires_at = max(expires_at, (SELECT max(d.expires_at) FROM duels d
-    WHERE d.kind = 'friend' AND d.challenge_id IS NULL AND d.a_run = challenges.run_id))
+    WHERE d.kind = 'friend' AND d.challenge_id IS NULL AND d.a_run = challenges.run_id)),
+    for_id = (SELECT d.b_id FROM duels d WHERE d.kind = 'friend' AND d.challenge_id IS NULL AND d.a_run = challenges.run_id)
   WHERE run_id IN (SELECT a_run FROM duels WHERE kind = 'friend' AND challenge_id IS NULL);
 
 -- A friend has one game of a challenge: one taken by its link besides their duel (the link brought them to the duel,

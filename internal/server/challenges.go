@@ -31,11 +31,12 @@ func (s *Server) challengeLink(w http.ResponseWriter, r *http.Request) error {
 	if len(in.To) > 200 {
 		return errBadRequest
 	}
-	code, err := s.game.Challenge(r.Context(), u.ID, in.Run, in.To)
+	code, sent, err := s.game.Challenge(r.Context(), u.ID, in.Run, in.To)
 	if err != nil {
 		return err
 	}
-	return ok(w, map[string]string{"code": code, "url": s.cfg.PublicURL + "/c/" + code})
+	// sent: the friends of `to` it reached now (not those who have it already, nor those with too many waiting).
+	return ok(w, map[string]any{"code": code, "url": s.cfg.PublicURL + "/c/" + code, "sent": sent})
 }
 
 // challengeFriend challenges a friend at once: ten questions drawn for the two, the player's game of them to play now

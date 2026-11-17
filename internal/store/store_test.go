@@ -470,21 +470,22 @@ func TestOneChallenge(t *testing.T) {
 			t.Errorf("duel %d: %q, want %q", id, got[id], w)
 		}
 	}
-	// A challenge for each challenger's game, with a code like any; the one shared already keeps its own, lasting as
-	// long as its duel.
-	codes, err := db.Read.Query(`SELECT run_id, code, user_id, expires_at FROM challenges ORDER BY run_id`)
+	// A challenge for each challenger's game, drawn for the pair (Bo), with a code like an invite's; the one shared
+	// already keeps its own, lasting as long as its duel.
+	codes, err := db.Read.Query(`SELECT run_id, code, user_id, expires_at, coalesce(for_id, 0) FROM challenges
+		ORDER BY run_id`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer codes.Close()
 	var list []string
 	for codes.Next() {
-		var run, user, exp int64
+		var run, user, exp, pair int64
 		var code string
-		_ = codes.Scan(&run, &code, &user, &exp)
-		if len(code) != 8 || strings.Trim(code, "abcdefghijklmnopqrstuvwxyz0123456789") != "" || user != 1 ||
+		_ = codes.Scan(&run, &code, &user, &exp, &pair)
+		if len(code) != 8 || strings.Trim(code, "abcdefghijkmnpqrstuvwxyz23456789") != "" || user != 1 || pair != 2 ||
 			(run == 16 && code != "abcdefgh") {
-			t.Errorf("challenge of %d: %q by %d", run, code, user)
+			t.Errorf("challenge of %d: %q by %d for %d", run, code, user, pair)
 		}
 		list = append(list, fmt.Sprintf("%d %d", run, exp))
 	}
