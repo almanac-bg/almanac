@@ -1,6 +1,13 @@
 // Package account is who plays: guests who start at once, the email code that keeps an account across devices, the
 // one-time link that brings a game from an app's own browser to the phone's (Handoff), the sessions that keep a
 // browser signed in, and names.
+//
+// A session is one browser's (or one phone's app's): nobody else gets it. The notifications turned on in a browser
+// (push_subs and phones) are tied to the session that turned them on, and end with it. A browser signing in by email
+// (Verify) gets a new session in place of the one it had, and its notifications go along to the new one. A handoff
+// moves a game, it doesn't share it: the browser it came from is signed out. When a guest becomes a profile, every
+// other session the guest had ends: only the browser that proved the email is in it. SignOutOthers ends a player's
+// other sessions on demand.
 package account
 
 import (
@@ -115,12 +122,80 @@ func hashToken(token string) []byte {
 	return h[:]
 }
 
+// SessionKey is what a session is kept under (its token's hash): what the notifications turned on in its browser are
+// tied to (push_subs, phones), so that they end with it.
+func SessionKey(token string) []byte { return hashToken(token) }
+
 func startSession(tx *sql.Tx, userID int64) (string, error) {
 	token, hash := newToken()
 	now := time.Now()
 	_, err := tx.Exec(`INSERT INTO sessions (token_hash, user_id, created_at, seen_at, expires_at) VALUES (?, ?, ?, ?, ?)`,
 		hash, userID, store.Ms(now), store.Ms(now), store.Ms(now.AddDate(0, 0, SessionDays)))
 	return token, err
+}
+
+// sessionUser is who a browser's session (its token, maybe "") signs in: nil for no one, or a session that ended.
+func sessionUser(tx *sql.Tx, token string) (*User, error) {
+	if token == "" {
+		return nil, nil
+	}
+	var u User
+	var email sql.NullString
+	err := tx.QueryRow(`SELECT u.id, u.name, u.tag, u.email, u.admin FROM sessions s JOIN users u ON u.id = s.user_id
+		WHERE s.token_hash = ? AND s.expires_at > ?`, hashToken(token), store.Now()).
+		Scan(&u.ID, &u.Name, &u.Tag, &email, &u.Admin)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	u.Email = email.String
+	return &u, nil
+}
+
+// moveSession signs a browser in as player userID: a new session in place of the one it had (old, "" for none),
+// which ends, and the notifications turned on in the browser come along, to the new session and its player.
+func moveSession(tx *sql.Tx, old string, userID int64) (string, error) {
+	token, err := startSession(tx, userID)
+	if err != nil || old == "" {
+		return token, err
+	}
+	for _, q := range []string{
+		`UPDATE push_subs SET session = ?, user_id = ? WHERE session = ?`,
+		`UPDATE phones SET session = ?, user_id = ? WHERE session = ?`,
+	} {
+		if _, err := tx.Exec(q, hashToken(token), userID, hashToken(old)); err != nil {
+			return "", err
+		}
+	}
+	_, err = tx.Exec(`DELETE FROM sessions WHERE token_hash = ?`, hashToken(old))
+	return token, err
+}
+
+// endSessions ends every session of a player but the one kept (keep, a SessionKey; nil: every one), and with them the
+// notifications of their browsers (by the schema). A browser's notifications not tied to any session (turned on
+// before they were tied, and not told to the server since) go too: whose they are, nobody can tell, and a browser of
+// the player's own tells its own again (push.ts pushOn). It says how many sessions ended.
+func endSessions(tx *sql.Tx, userID int64, keep []byte) (int, error) {
+	q, args := `DELETE FROM sessions WHERE user_id = ?`, []any{userID}
+	if keep != nil {
+		q, args = q+` AND token_hash <> ?`, append(args, keep)
+	}
+	res, err := tx.Exec(q, args...)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	for _, q := range []string{
+		`DELETE FROM push_subs WHERE user_id = ? AND session IS NULL`,
+		`DELETE FROM phones WHERE user_id = ? AND session IS NULL`,
+	} {
+		if _, err := tx.Exec(q, userID); err != nil {
+			return 0, err
+		}
+	}
+	return int(n), nil
 }
 
 // Guest makes a new guest with a session.
@@ -226,10 +301,25 @@ func (a *Accounts) Delete(ctx context.Context, userID int64) error {
 	return err
 }
 
-// SignOut ends a session.
+// SignOut ends a session, and the notifications turned on in its browser (by the schema).
 func (a *Accounts) SignOut(ctx context.Context, token string) error {
 	_, err := a.DB.Write.ExecContext(ctx, `DELETE FROM sessions WHERE token_hash = ?`, hashToken(token))
 	return err
+}
+
+// SignOutOthers ends every session but this one (token) of the player it signs in: a phone lost, a computer left
+// signed in. It says how many ended.
+func (a *Accounts) SignOutOthers(ctx context.Context, token string) (int, error) {
+	var n int
+	err := a.DB.Tx(ctx, func(tx *sql.Tx) error {
+		u, err := sessionUser(tx, token)
+		if err != nil || u == nil {
+			return err
+		}
+		n, err = endSessions(tx, u.ID, hashToken(token))
+		return err
+	})
+	return n, err
 }
 
 // CleanUp drops expired sessions, codes and handoffs, and guests nobody has used for a while (nothing of theirs can
@@ -300,11 +390,13 @@ func (a *Accounts) SendCode(ctx context.Context, email string) error {
 	return err
 }
 
-// Verify checks a code and signs its address in. A wrong one counts a try (WrongCode, with the tries left); the last
-// try used up, the code is dead (ErrCodeTries), as it is once its time is out (ErrCodeExpired). The player who asked
-// (current, maybe nil) is kept when they can be: a guest giving a new address keeps their account; a guest signing in
-// to an account that has the address brings their progress along (Merge) and is gone after.
-func (a *Accounts) Verify(ctx context.Context, email, code string, current *User) (User, string, error) {
+// Verify checks a code and signs its address in, in the browser of session (its token, maybe ""), with a new session
+// in place of that one (moveSession). A wrong one counts a try (WrongCode, with the tries left); the last try used up,
+// the code is dead (ErrCodeTries), as it is once its time is out (ErrCodeExpired). The player the browser was is kept
+// when they can be: a guest giving a new address keeps their account, and every other session they had ends (one made
+// anywhere else, before the email was proved here, must not come into the profile); a guest signing in to an account
+// that has the address brings their progress along (Merge) and is gone after.
+func (a *Accounts) Verify(ctx context.Context, email, code, session string) (User, string, error) {
 	email, err := NormalEmail(email)
 	if err != nil {
 		return User{}, "", err
@@ -338,18 +430,19 @@ func (a *Accounts) Verify(ctx context.Context, email, code string, current *User
 		if _, err := tx.Exec(`DELETE FROM email_codes WHERE email = ?`, email); err != nil {
 			return err
 		}
+		current, err := sessionUser(tx, session)
+		if err != nil {
+			return err
+		}
 
 		var owner User
+		var fold, upgraded bool
 		err = tx.QueryRow(`SELECT id, name, tag, admin FROM users WHERE email = ?`, email).
 			Scan(&owner.ID, &owner.Name, &owner.Tag, &owner.Admin)
 		switch {
 		case err == nil:
 			owner.Email = email
-			if current != nil && current.Guest() && current.ID != owner.ID {
-				if err := a.fold(tx, current.ID, owner.ID); err != nil {
-					return err
-				}
-			}
+			fold = current != nil && current.Guest() && current.ID != owner.ID
 			u = owner
 		case errors.Is(err, sql.ErrNoRows) && current != nil && current.Guest():
 			if _, err := tx.Exec(`UPDATE users SET email = ? WHERE id = ?`, email, current.ID); err != nil {
@@ -357,6 +450,7 @@ func (a *Accounts) Verify(ctx context.Context, email, code string, current *User
 			}
 			u = *current
 			u.Email = email
+			upgraded = true
 		case errors.Is(err, sql.ErrNoRows):
 			if u, err = createUser(tx, email); err != nil {
 				return err
@@ -364,8 +458,23 @@ func (a *Accounts) Verify(ctx context.Context, email, code string, current *User
 		default:
 			return err
 		}
-		token, err = startSession(tx, u.ID)
-		return err
+		// The browser's notifications move to its new session first: a guest folded away takes its sessions along.
+		old := ""
+		if current != nil {
+			old = session
+		}
+		if token, err = moveSession(tx, old, u.ID); err != nil {
+			return err
+		}
+		if upgraded {
+			if _, err := endSessions(tx, u.ID, hashToken(token)); err != nil {
+				return err
+			}
+		}
+		if fold {
+			return a.fold(tx, current.ID, owner.ID)
+		}
+		return nil
 	})
 	if wrong != nil && err == nil {
 		err = wrong
@@ -431,14 +540,15 @@ func (a *Accounts) Handoff(ctx context.Context, userID int64) (string, error) {
 	return token, err
 }
 
-// TakeHandoff signs this browser in by a handoff's token (once): the guest who made it (from), joined with the guest
-// this browser had (current, maybe nil), as signing in by email joins them. With no one here, it's simply `from`;
-// with a guest here, the game brought along is folded into it, but not the notifications of the browser it came
-// from (a link from someone else must not bring their phone the notifications of the one who opened it). A profile
-// here isn't joined by a link (ErrHandoffSignedIn). The session token is "" when the browser keeps the one it has.
-func (a *Accounts) TakeHandoff(ctx context.Context, token string, current *User) (User, string, error) {
+// TakeHandoff brings the game of the guest who made a handoff's token (from) to the browser of session (its token,
+// maybe ""), once. The game moves, it isn't shared: every session `from` had ends, with the notifications of its
+// browsers and its other links, so the browser it came from is signed out (whoever made a link that reached someone
+// else keeps no way into the game it gave away). With no one here, the browser becomes `from`, with a new session;
+// with a guest here, the game brought along is folded into it, as signing in by email joins them. A profile here
+// isn't joined by a link (ErrHandoffSignedIn). The session token is "" when the browser keeps the one it has.
+func (a *Accounts) TakeHandoff(ctx context.Context, token, session string) (User, string, error) {
 	var u User
-	var session string
+	var started string
 	err := a.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var from User
 		var email sql.NullString
@@ -451,25 +561,29 @@ func (a *Accounts) TakeHandoff(ctx context.Context, token string, current *User)
 		if err != nil {
 			return err
 		}
+		current, err := sessionUser(tx, session)
+		if err != nil {
+			return err
+		}
 		if current != nil && current.ID != from.ID && !current.Guest() {
 			return ErrHandoffSignedIn // the link stays good, for the browser it was meant for
 		}
-		if _, err := tx.Exec(`DELETE FROM handoffs WHERE token_hash = ?`, hashToken(token)); err != nil {
+		if current != nil && current.ID == from.ID { // opened where it was made: nothing moves
+			_, err := tx.Exec(`DELETE FROM handoffs WHERE token_hash = ?`, hashToken(token))
+			u = *current
 			return err
 		}
-		if current != nil && current.ID == from.ID {
-			u = *current
-			return nil
+		// The game leaves where it was: its sessions (and their notifications), and every link to it.
+		if _, err := endSessions(tx, from.ID, nil); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM handoffs WHERE user_id = ?`, from.ID); err != nil {
+			return err
 		}
 		if current == nil {
 			u = from
-			session, err = startSession(tx, u.ID)
+			started, err = startSession(tx, u.ID)
 			return err
-		}
-		for _, q := range []string{`DELETE FROM push_subs WHERE user_id = ?`, `DELETE FROM phones WHERE user_id = ?`} {
-			if _, err := tx.Exec(q, from.ID); err != nil {
-				return err
-			}
 		}
 		u = *current
 		return a.fold(tx, from.ID, current.ID)
@@ -477,7 +591,7 @@ func (a *Accounts) TakeHandoff(ctx context.Context, token string, current *User)
 	if err != nil {
 		return User{}, "", err
 	}
-	return u, session, nil
+	return u, started, nil
 }
 
 // Rename gives a player a new name (anyone's: names may repeat; the tag tells players apart).

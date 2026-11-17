@@ -147,6 +147,17 @@ func TestPhoneNotifications(t *testing.T) {
 	if left != 0 {
 		t.Fatal("a phone turned off, kept")
 	}
+
+	// Ana turns them on again, then signs out without the app saying a word of its phone (it lost the token, or the
+	// call failed): the phone is forgotten with the session, and the next player there gets none of hers.
+	ana.call("POST", "/api/push/phone", map[string]any{"platform": "ios", "token": anaPhone})
+	if status, _ := ana.call("POST", "/api/auth/signout", map[string]any{}); status != 200 {
+		t.Fatalf("sign out: %d", status)
+	}
+	_ = db.Read.QueryRow(`SELECT count(*) FROM phones WHERE token = ?`, anaPhone).Scan(&left)
+	if left != 0 {
+		t.Fatal("a phone signed out of, kept")
+	}
 }
 
 // The site says which app opens its links, as an iPhone and Android check it.

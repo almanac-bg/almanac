@@ -148,11 +148,15 @@ func readJSON(r *http.Request, v any) error {
 
 // user is who's signed in, or nil.
 func (s *Server) user(r *http.Request) (*account.User, error) {
-	c, err := r.Cookie(s.cookie)
-	if err != nil {
-		return nil, nil
+	return s.accounts.Session(r.Context(), s.session(r))
+}
+
+// session is the token of the browser's session, as its cookie has it ("": none).
+func (s *Server) session(r *http.Request) string {
+	if c, err := r.Cookie(s.cookie); err == nil {
+		return c.Value
 	}
-	return s.accounts.Session(r.Context(), c.Value)
+	return ""
 }
 
 // mustUser is who's signed in, or errSignedOut.
@@ -269,19 +273,13 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) error {
 	if !s.limits.allow("verify:"+s.clientIP(r), 30, time.Hour) {
 		return errTooMany
 	}
-	current, err := s.user(r)
-	if err != nil {
-		return err
-	}
-	u, token, err := s.accounts.Verify(r.Context(), in.Email, in.Code, current)
+	// The browser's session is replaced by a new one (account.Verify), its notifications brought along.
+	u, token, err := s.accounts.Verify(r.Context(), in.Email, in.Code, s.session(r))
 	if wrong := (account.WrongCode{}); errors.As(err, &wrong) {
 		return &apiError{http.StatusBadRequest, "bad_code", wrongCodeWords(wrong.Left)}
 	}
 	if err != nil {
 		return err
-	}
-	if c, err := r.Cookie(s.cookie); err == nil {
-		_ = s.accounts.SignOut(r.Context(), c.Value)
 	}
 	s.setSession(w, token)
 	return ok(w, map[string]any{"user": u})
@@ -305,7 +303,8 @@ func (s *Server) handoff(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"url": s.cfg.PublicURL + "/hand/" + token})
 }
 
-// takeHandoff signs this browser in by a handoff's token, the game it brings joined with what's here.
+// takeHandoff brings the game of a handoff's token to this browser, joined with what's here, and takes it from the
+// browser it came from (account.TakeHandoff): posted from /hand/<token> once the player taps to bring it.
 func (s *Server) takeHandoff(w http.ResponseWriter, r *http.Request) error {
 	var in struct {
 		Token string `json:"token"`
@@ -316,31 +315,39 @@ func (s *Server) takeHandoff(w http.ResponseWriter, r *http.Request) error {
 	if !s.limits.allow("hand:"+s.clientIP(r), 30, time.Hour) {
 		return errTooMany
 	}
-	current, err := s.user(r)
-	if err != nil {
-		return err
-	}
-	u, token, err := s.accounts.TakeHandoff(r.Context(), in.Token, current)
+	u, token, err := s.accounts.TakeHandoff(r.Context(), in.Token, s.session(r))
 	if err != nil {
 		return err
 	}
 	if token != "" {
-		if c, err := r.Cookie(s.cookie); err == nil {
-			_ = s.accounts.SignOut(r.Context(), c.Value)
-		}
 		s.setSession(w, token)
 	}
 	return ok(w, map[string]any{"user": u})
 }
 
+// signOut ends this browser's session, and with it the notifications turned on here (account.SignOut): whatever the
+// browser or the app did or didn't manage to say of them itself.
 func (s *Server) signOut(w http.ResponseWriter, r *http.Request) error {
-	if c, err := r.Cookie(s.cookie); err == nil {
-		if err := s.accounts.SignOut(r.Context(), c.Value); err != nil {
+	if token := s.session(r); token != "" {
+		if err := s.accounts.SignOut(r.Context(), token); err != nil {
 			return err
 		}
 	}
 	s.clearSession(w)
 	return ok(w, map[string]any{"user": nil})
+}
+
+// signOutOthers ends the player's every other session, and the notifications of those browsers and phones: a phone
+// lost, a computer left signed in. This browser stays signed in.
+func (s *Server) signOutOthers(w http.ResponseWriter, r *http.Request) error {
+	if _, err := s.mustUser(r); err != nil {
+		return err
+	}
+	n, err := s.accounts.SignOutOthers(r.Context(), s.session(r))
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"ended": n})
 }
 
 func (s *Server) rename(w http.ResponseWriter, r *http.Request) error {
