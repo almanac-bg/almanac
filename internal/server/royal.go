@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
-	"net/netip"
 	"slices"
 	"strings"
 	"time"
@@ -32,7 +31,7 @@ func (s *Server) royalEvents(w http.ResponseWriter, r *http.Request) {
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Accel-Buffering", "no")
 	send := sender(w)
-	sub, err := s.royal.Follow(viewer, network(s.clientIP(r)))
+	sub, err := s.royal.Follow(viewer, s.clientNet(r))
 	if err != nil {
 		send(fmt.Sprintf("retry: %d\nevent: busy\ndata: {}\n\n", 30_000+rand.N(30_000)))
 		return
@@ -48,7 +47,8 @@ func (s *Server) royalEvents(w http.ResponseWriter, r *http.Request) {
 			if !send("data: " + string(data) + "\n\n") {
 				return
 			}
-			// Many answers in a moment make one look, not one each; the clock moving on, or a change of the viewer's own, is looked at at once.
+			// Many answers in a moment make one look, not one each; the clock moving on, or a change of the viewer's
+			// own, is looked at at once.
 			select {
 			case <-time.After(pause):
 			case <-sub.Now:
@@ -65,17 +65,6 @@ func (s *Server) royalEvents(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-}
-
-// network is the network an address is of, for a limit on what one may open: an IPv4 address itself, an IPv6 one's
-// /64 (one home or phone has all of it).
-func network(addr string) string {
-	ip, err := netip.ParseAddr(addr)
-	if err != nil || !ip.Is6() || ip.Is4In6() {
-		return addr
-	}
-	p, _ := ip.Prefix(64)
-	return p.String()
 }
 
 // joinRoyal puts the player in the evening's lobby.

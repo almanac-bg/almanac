@@ -603,7 +603,8 @@ function firstTimer(): Signal<boolean> {
 }
 
 function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Child {
-  const v0 = view();
+  // The lobby as it was drawn, read untracked: else every view sent would draw it again (its music anew).
+  const v0 = untracked(view);
   const newcomer = firstTimer();
   // Those whose notifications are on here are called a minute before the start, if their screen is away.
   const notified = signal(false);
