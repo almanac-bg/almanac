@@ -40,7 +40,7 @@ import { topics } from "./play.ts";
 import { notice } from "./settings.ts";
 import { yearCard } from "./year.ts";
 
-interface Today {
+export interface Today {
   day: string;
   /** The day's issue: its number from the first day of the day's ten (play/issue.go), the same for everyone. */
   issue?: number;
@@ -84,7 +84,15 @@ interface Today {
   left?: Left | null;
 }
 
-export function today() {
+/** The day's ten played on another page (an invite's): their result there as Начало draws it (`before`: the day as
+ * it stood before they were played), with that page's own card under it. */
+export interface PlayedElsewhere {
+  before: Today;
+  run: State;
+  card: () => Child;
+}
+
+export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
   title();
   // A profile just deleted, or a game just brought here, is said once, over the day.
   let bye = notice.peek();
@@ -151,7 +159,10 @@ export function today() {
     document.removeEventListener("visibilitychange", newDay);
     clearInterval(every);
   });
-  load();
+  if (elsewhere) {
+    day = elsewhere.before.day;
+    screen.show(() => home(elsewhere.before, elsewhere.run, true));
+  } else load();
   return h("div", null, screen);
 
   /** The screen itself: the day as it stands (`run` its result, if played; `just`: played this moment, so what it
@@ -227,12 +238,15 @@ export function today() {
                   undefined,
                   true,
                   () => tally("share:day"),
+                  true, // its link shows whose it is
                 ),
               },
               // Tomorrow first, right under the buttons (when the next ten come, the streak, the reminder); then the
               // friends' day, and what the game earned.
-              // Just played, the streak waits for the day as it is now, with today in it.
+              // Just played, the streak waits for the day as it is now, with today in it. Played on an invite's page,
+              // that page's card comes first, in place of the friends' day.
               [
+                elsewhere && run === elsewhere.run ? elsewhere.card() : null,
                 tomorrowCard(
                   t.day,
                   () => (just && fresh() === t ? 0 : fresh().streak),
@@ -242,7 +256,7 @@ export function today() {
                     () => fresh().streak,
                   ),
                 ),
-                () => friendsDay(fresh()),
+                elsewhere && run === elsewhere.run ? null : () => friendsDay(fresh()),
                 just ? news(run.id, 0, round) : null,
               ],
               pointsWords(t.open),
