@@ -6,13 +6,13 @@
 import { leagueEmblem } from "../art/league.ts";
 import { shareButton } from "../game/results.ts";
 import { count, yearShareText } from "../game/share.ts";
-import { type ApiError, api } from "../lib/api.ts";
+import { api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { title } from "../lib/router.ts";
 import { yearNow } from "../lib/year.ts";
 import { categories, user } from "../state.ts";
-import { fact, formatNumber } from "../ui.ts";
+import { fact, failure, formatNumber } from "../ui.ts";
 import type { League } from "./league.ts";
 
 interface Year {
@@ -137,12 +137,16 @@ export function year([which = ""]: string[]) {
   const n = Number(which);
   title(`Твоята ${n}`);
   const data = signal<Year | null>(null);
-  const error = signal("");
+  const error = signal<unknown>(null);
   const at = signal(0);
-  if (user.peek()) api<Year>("GET", `/api/year/${n}`).then(data.set, (err) => error.set((err as ApiError).message));
+  const load = () => {
+    error.set(null);
+    if (user.peek()) api<Year>("GET", `/api/year/${n}`).then(data.set, error.set);
+  };
+  load();
   return h("section", { class: "screen year" }, (): Child => {
     if (!user()) return h("p", { class: "muted" }, "Изиграй първите си въпроси и годината ти ще се събира тук.");
-    if (error()) return h("p", { role: "alert" }, error());
+    if (error()) return failure(error(), load, ["/me", "Към Профил"]);
     const y = data();
     if (!y) return h("p", { class: "muted" }, "…");
     const all = slides(y);

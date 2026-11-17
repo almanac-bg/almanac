@@ -12,6 +12,7 @@ import {
   avatar,
   badge,
   explain,
+  failure,
   levelNumber,
   meaning,
   meter,
@@ -37,10 +38,13 @@ export function me() {
       () => user(),
       () => {
         const progress = signal<Progress | null>(null);
-        loadProgress().then(progress.set, () => {});
+        // Профил that couldn't load (no line): said, with the way to try again (the whole page, afresh).
+        const failed = signal<unknown>(null);
+        loadProgress().then(progress.set, failed.set);
         return [
           profileNav(),
           head(progress),
+          () => (failed() && !progress() ? failure(failed(), () => go("/me", true)) : null),
           // A guest who has a profile elsewhere signs in here, a tap away; Профил again, as the profile has it.
           () =>
             user()?.email ? null : haveProfile(() => go("/me", true), "Играеш и на друго устройство? Влез с имейла си"),
