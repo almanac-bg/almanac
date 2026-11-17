@@ -1,0 +1,60 @@
+# Decisions
+
+The owner's calls that the code alone doesn't explain, each with its reason. A session doesn't undo one of these on its
+own judgment, however good the case: it says so, and why, and the owner decides. When the owner makes a new call, or
+changes one, the session that hears it writes it here in the same pull request as the work. Mechanics live in the
+packages' doc comments; this file holds only what must not drift.
+
+## How the work is done
+
+- **The owner gives a purpose; the session decides the rest** and says why in a line. A question back is only for what
+  is truly the owner's: money, legal, credentials, something that can't be undone, a change to a decision below.
+- **The right shape, not a pleasing one.** Asked „ok?“, give the trade-off first: what it duplicates, what it should
+  replace. A complaint („I don't see it“) is a reason to rethink the design, not to add another way in.
+- **Asked for an opinion, give your own,** even against a decision here: say where it's wrong. Building still follows
+  the decision until the owner changes it.
+- **The best finished product,** not one tuned to today (few players, little time). Effort is never the reason to
+  leave something out.
+- **Fast over ceremony.** Merge is deploy; nothing waits on the browser tests (CLAUDE.md, Shipping). Work from several
+  builders at once gets an independent review before or right after it merges.
+- **No open-source ritual** (contributing guides, templates, changelogs by hand): the repo serves the game and the
+  sessions that build it.
+
+## The game
+
+- **The day's ten questions are the heart;** everything else serves them or stays out of the way. A new system replaces
+  one or proves it's needed (CLAUDE.md, Direction).
+- **Points, XP and rating are kept apart** (`play/worth.go`). The word stays **XP**, not „опит“: „опит“ already means a
+  try in the game's texts.
+- **Live means live.** Duels are played at once, with a recording of a real game when nobody comes; Роял is online only,
+  at 21:00, Friday to Sunday until the evenings fill. No made-up opponents: no bots answering by a player's rates.
+- **Роял cuts by right answers, then the time of the right ones** (more rights never lose to fewer but faster), after
+  the 5th, 8th, 11th and 14th; it always reaches the 15th. Those cut keep answering on the same clock, off the
+  standings. Rejected: out at the first wrong (most were out by the 5th), lives, a final from zero (luck over
+  knowledge).
+- **One challenge**, by a link anyone can open (#402): friend duels and challenges were two near-identical systems.
+- **Leagues race on the day's points**, not XP; reserve days come from the day itself and from goals.
+- **Gamification only from what the game really counts:** no invented currencies, no random boxes, never real money.
+- **Sharing:** the day's result ends with the player's own link; the text itself has no invitation words.
+
+## Questions
+
+- **The real bank is private** (`almanac-bg/almanac-questions`, in `private/`): answers that leak make cheating and
+  copies. Only `bank/sample` is public.
+- **The bank grows by the day's runway** (how many days each place of the day has left), topics kept equal in size.
+- **Balance by adding, never by retiring.** A question is retired only for a real flaw (wrong, stale, weak, a twin that
+  gives another away), never to make room.
+- **Rules are code** (`bank lint`), so a later change of a rule is a query, not a pass over 14 000 questions.
+
+## How it looks and speaks
+
+- **Modern Editorial Gamified** (`web/DESIGN.md`): the owner's final choice among three. Night first, gold for the one
+  right answer, one obvious action per screen.
+- **Art never changes the rules.** Asked for pictures, draw pictures; an achievement doesn't start giving avatars
+  because a drawing exists (#234, undone in #236).
+- **The mark is the rosette:** abstract, not a letter, no gradients. Ask before changing the mark itself.
+- **Bulgarian for players, English for code and URLs; never Bulgarian in Latin letters** (`/daily`, not `/dnes`).
+
+## The app on phones
+
+- **A shell around the site** (Capacitor, `mobile/`): one game, one client. Never Expo.
