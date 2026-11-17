@@ -124,6 +124,31 @@ type facts struct {
 	whole bool
 }
 
+// learnedIn is how many facts a game (runID) put in the player's almanac: the questions it answered right for the
+// first time that have a fact, as the almanac counts them (learned). Its news says so: what a first day earns that only
+// goes up.
+func (g *Game) learnedIn(ctx context.Context, userID, runID int64) (int, error) {
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id FROM answers a WHERE a.run_id = ?1 AND a.is_right
+		AND NOT EXISTS (SELECT 1 FROM answers b JOIN runs r ON r.id = b.run_id WHERE r.user_id = ?2
+			AND b.question_id = a.question_id AND b.is_right AND (b.at < a.at OR (b.at = a.at AND b.run_id < a.run_id)))`,
+		runID, userID)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	b, n := g.Bank(), 0
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return 0, err
+		}
+		if q, ok := b.Get(id); ok && q.Extra().Fact != "" && !q.Extra().Untrue() {
+			n++
+		}
+	}
+	return n, rows.Err()
+}
+
 // factsOf counts a player's almanac, as its achievements and Профил do.
 func (g *Game) factsOf(ctx context.Context, userID int64) (facts, error) {
 	var f facts

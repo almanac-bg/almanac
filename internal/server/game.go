@@ -35,12 +35,17 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 		out["streak"], out["reserve"] = streak.Days, streak.Reserve
 		out["saved"] = s.game.InWeek(slices.Concat(streak.Saved, streak.Mended)) // kept, by a reserve day or a repair
 		out["next"] = streak.Next
-		// What came of the days just missed, told on Начало (once, by the client): a reserve day kept the streak; or
-		// none was left and it ended, and it can be won back today (play/repair.go), or a new one begins.
+		// What came of the days just missed, told on Начало once (play.TellStreak: the client says when it has): a
+		// reserve day kept the streak; or none was left and it ended, and it can be won back today (play/repair.go),
+		// or a new one begins.
 		recent := s.game.Now().In(play.Bulgaria).AddDate(0, 0, -3).Format(time.DateOnly)
+		told, err := s.game.StreakTold(r.Context(), u.ID)
+		if err != nil {
+			return err
+		}
 		// A reserve day spent before a repair was part of the streak that ended: what the player heard of was the end.
 		if n, m := len(streak.Saved), len(streak.Mended); n > 0 && streak.Saved[n-1] >= recent &&
-			(m == 0 || streak.Saved[n-1] > streak.Mended[m-1]) {
+			(m == 0 || streak.Saved[n-1] > streak.Mended[m-1]) && told != "kept:"+streak.Saved[n-1] {
 			out["kept"] = streak.Saved[n-1]
 		}
 		repair, err := s.game.RepairOf(r.Context(), u.ID)
@@ -49,7 +54,7 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 		}
 		if repair != nil {
 			out["repair"] = repair
-		} else if e := streak.Ended; e != nil && e.On >= recent && e.Days >= 2 {
+		} else if e := streak.Ended; e != nil && e.On >= recent && e.Days >= 2 && told != "ended:"+e.On {
 			out["ended"] = e
 		}
 		if out["week"], err = s.game.Week(r.Context(), u.ID); err != nil {
@@ -93,6 +98,12 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 		// Which of the game's systems they've met: Начало shows the level and the goals once XP is open.
 		if out["open"], err = s.game.OpenOf(r.Context(), u.ID); err != nil {
 			return err
+		}
+		// A game that ended without its result on screen: its news is told on Начало, once (play/told.go).
+		if untold, err := s.game.Untold(r.Context(), u.ID); err != nil {
+			return err
+		} else if untold != 0 {
+			out["untold"] = untold
 		}
 		var runID int64
 		err = s.db.Read.QueryRowContext(r.Context(), `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, u.ID, day).Scan(&runID)

@@ -166,15 +166,17 @@ export interface Open {
 /** The game's three numbers, each in a few words: what one game scored, what playing earns, how strong a player is.
  * Kept apart on purpose (play/worth.go), so each is said where it first shows and a tap from wherever it does. */
 export const meaning = {
-  points:
-    "Точките са резултатът ти в една игра: за верните отговори, за бързината и за верните поред. В класацията на деня решават при равен брой верни.",
+  points: "Точките са резултатът ти в една игра: за верните отговори, за бързината и за верните поред.",
+  /** The day's board: said of the day's points only (a topic's game has no board). */
+  dayBoard: " При равен брой верни в класацията на деня решават точките.",
   xp: "XP печелиш с всяка игра, цел и постижение. Трупа се и вдига нивото ти.",
   league: " Точките от въпросите на деня за седмицата те класират в лигата.",
   rating: "Рейтингът е силата ти в дуелите и в Роял: расте с победа, пада със загуба. По него е дивизията ти.",
 };
 
-/** The points' words, with the league once it's open: it races on the day's points, added up over the week. */
-export const pointsWords = (open?: Open) => meaning.points + (open?.league ? meaning.league : "");
+/** The day's points' words: the day's board they place on, and the league once it's open, which races on them, added
+ * up over the week. */
+export const pointsWords = (open?: Open) => meaning.points + meaning.dayBoard + (open?.league ? meaning.league : "");
 
 let explained = 0;
 

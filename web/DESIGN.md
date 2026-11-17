@@ -112,8 +112,9 @@ played, a rated game), never by the date. The server says which are open (`open`
   game that feels empty teaches that nobody plays it (`play.NudgeRoyal`). While its lobby is open or its games are on,
   though, Роял shows on Начало to everyone (`royalNow`), a player before a first game too (the only way with others
   they see then): a full evening is the best way to meet it.
-- **A topic's first estimate** (10 answers): „Колко знаеш“ on Профил, the topic's tile and a game's news say
-  „първа оценка · 74%“, a share and no tier; the tier („Експерт“) comes with a sure mark (30 answers).
+- **A topic's first estimate** (10 answers): „Колко знаеш“ on Профил and the topic's tile say „първа оценка · 74%“,
+  a game's news „Първа оценка: знаеш около 74% от темата“, a share and no tier; the tier („Експерт“) comes with a sure
+  mark (30 answers).
 
 Nothing earned waits, only what's shown: XP, achievements and unlocks count from the first game, and what was held
 (a level reached, its unlocks, an achievement of the goals or the league) is told when its system opens. Each system
@@ -374,17 +375,24 @@ takes a token.
 - **One system.** XP comes from answers, the day's goals, achievements and a week's first three places in the league;
   the rating from duels and Роял. Level, achievements, mastery, division, Роял and first place in a high league
   unlock the wardrobe. After a game, its news is three cards at most, of what the player has met (First days), under a
-  line for a system met with it (`.news-open`): the goals it finished; the one biggest event (a
-  week of the league ended, a division
-  reached, a new level), or else a line of the XP it brought and the level (`.news-xp`); and „Ново за теб“
-  (`.unlocks`): achievements and everything newly unlocked, each unlock with „Сложи“, whatever unlocked it, three
-  rows at most, the highest tier first, the rest in one line („Още 4 в Награди“, or „в гардероба“ when it's only
-  things to wear). An achievement's row says its tier in the tier's ink and only its XP in gold. What
-  really is big is also brought forward in a sheet over the result (Motion). Профил shows
+  line for a system met with it (`.news-open`) and a line of the facts it put in Моят Алманах (`.news-facts`, from the
+  first day: what playing gives that only goes up): the goals it finished, with those it moved under them (a goal
+  moved while none was finished is a line, `.news-goal`, not a card); the one biggest event (a week of the league
+  ended, a division reached, a new level), or else a line of the XP it brought and the level (`.news-xp`); and „Ново
+  за теб“ (`.unlocks`): achievements and everything newly unlocked, each unlock with „Сложи“, whatever unlocked it,
+  three rows at most, the highest tier first, the rest in one line („Още 4 в Награди“, or „в гардероба“ when it's
+  only things to wear), and how a topic's game moved its mastery when that's news (a first estimate, a tier above the
+  lowest, a share gone up: never a loss). An achievement's row says its tier in the tier's ink (a common one just
+  „Постижение“: „обикновено“ reads as „nothing special“) and only its XP in gold. The first level's unlocks, which
+  everyone has, are never news. A game that ended without its result on screen (the day's last question let run
+  out, a game left at its end, a Роял) has its news told on Начало, once, under „От последната ти игра“, with no sheet
+  or sound (`play/told.go`). What really is big is also brought forward in a sheet over the result (Motion). Профил shows
   what comes next (`.next`); reserve days keep the streak (the first day, every seventh in a row and a day with all
   three goals earn one: `.goals-reserve`, `.week li.saved`); a day a reserve kept, or a streak that ended, is said
-  once on Начало (`.streak-notice`), as is, one at a time, what others did meanwhile: a friend played the duel, said yes
-  to an invite („Мария прие поканата ти.“ and „Дуел“), or a live duel left went on without the player, or who took their challenges („3 изиграха предизвикателството ти · 2 те биха“). Награди opens with „Как се печели“, the whole of it in five lines.
+  once on Начало (`.streak-notice`; told once on the server, not once per device), as is, one at a time, what others
+  did meanwhile: a friend played the duel, said yes to an invite („Мария прие поканата ти.“ and „Дуел“), or a live duel
+  left went on without the player, or who took their challenges („3 изиграха предизвикателството ти · 2 те биха“).
+  Награди opens with „Как се печели“, the whole of it in five lines.
 - **Division emblems** are pictures (`division-<id>`): a silhouette per division — Бронз a plain shield, Сребро a
   chevron, Злато wings, Платина a star, Диамант a cut gem, Легенда a crowned shield of stars with rays — in `--div-*`
   colours (`art/emblem.ts` places them).

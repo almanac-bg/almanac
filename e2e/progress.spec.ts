@@ -1,11 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { openGame, playedBefore, playRun } from "./play.ts";
+import { earnedUntold, openGame, playedBefore, playRun } from "./play.ts";
 
 test("progress: a game's level, the achievements, and a look of one's own", async ({ page }) => {
   test.setTimeout(120_000);
   // A player on their second day played, who has met XP (play/unfold.go: a first day's news has none).
   await page.goto("/");
   await playedBefore(page, 1);
+  // An achievement („Точно в целта“: a number to the unit) earned and not told yet: its avatar comes with this news.
+  // (The first level's title isn't news: everyone has it from the start.)
+  await earnedUntold(page, "exact");
   await openGame(page, "/play/history");
   await playRun(page);
   // What the game brought is a line (a level card only for a new level), and „Ново за теб“ tells the rest: how the
@@ -15,6 +18,11 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(page.locator(".unlocks .mastery-line")).toContainText("История");
   // Three rows at most (the highest tier first; the hour may add „След полунощ“), the rest a tap away.
   expect(await page.locator(".unlocks .unlock-row").count()).toBeLessThanOrEqual(3);
+  // A new level that unlocks something comes in its sheet once the result has landed (the goals and achievements the
+  // game earned may make one): put away for later.
+  await page.waitForTimeout(2500);
+  const later = page.getByRole("dialog").getByRole("button", { name: "По-късно" });
+  if (await later.isVisible()) await later.click();
   await page
     .locator(".unlocks")
     .getByRole("button", { name: /^Сложи: / })

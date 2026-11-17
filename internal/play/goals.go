@@ -301,6 +301,37 @@ func (g *Game) dayGoals(ctx context.Context, userID int64, day string) ([]string
 	return storedGoals(ctx, g.DB.Write, userID, day) // the ones kept, should another look have drawn them first
 }
 
+// GoalsMoved are the player's goals for today that a game (runID) moved without finishing them, with how far along
+// each is now: its news says so, in the card of the goals it finished (a goal finished is told as done).
+func (g *Game) GoalsMoved(ctx context.Context, userID, runID int64) ([]DayGoal, error) {
+	day := g.Today()
+	ids, err := storedGoals(ctx, g.DB.Read, userID, day)
+	if err != nil || len(ids) == 0 {
+		return nil, err
+	}
+	before, err := g.tallyWithout(ctx, userID, day, runID)
+	if err != nil {
+		return nil, err
+	}
+	after, err := g.tallyOf(ctx, userID, day)
+	if err != nil {
+		return nil, err
+	}
+	b := g.Bank()
+	var out []DayGoal
+	for _, id := range ids {
+		goal, k, arg, ok := goalOf(b, id)
+		if !ok {
+			continue
+		}
+		now, was := min(k.reached(after, arg), goal.Target), min(k.reached(before, arg), goal.Target)
+		if now > was && now < goal.Target {
+			out = append(out, DayGoal{Goal: goal, Progress: now, XP: GoalXP[k.tier]})
+		}
+	}
+	return out, nil
+}
+
 // storedGoals are the ids of a player's goals kept for a day, in their order.
 func storedGoals(ctx context.Context, db *sql.DB, userID int64, day string) ([]string, error) {
 	rows, err := db.QueryContext(ctx, `SELECT goal FROM day_goals WHERE user_id = ? AND day = ? ORDER BY n`, userID, day)
@@ -344,31 +375,39 @@ const fastMs = 5000
 
 // tallyOf is how far a player's day has got: the games they finished and the answers they gave that day.
 func (g *Game) tallyOf(ctx context.Context, userID int64, day string) (*tally, error) {
+	return g.tallyWithout(ctx, userID, day, 0)
+}
+
+// tallyWithout is how far a player's day had got without one of its games (except; 0 for none): where their goals
+// stood before it, for its news to say which goals it moved.
+func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, except int64) (*tally, error) {
 	from, to := dayBounds(day)
 	t := &tally{topics: map[string]int{}, rightIn: map[string]int{}, rightOf: map[string]int{}}
 	db := g.DB.Read
 	// A duel won counts the day it ends (a friend's challenge may end days after the challenger played); against a
 	// recording too. Роял counts the day it's entered.
 	err := db.QueryRowContext(ctx, `SELECT
-		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'day' AND day = ?4 AND finished_at IS NOT NULL),
-		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'duel' AND finished_at BETWEEN ?2 AND ?3),
-		(SELECT count(*) FROM duels WHERE ended_at BETWEEN ?2 AND ?3
+		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'day' AND day = ?4 AND finished_at IS NOT NULL AND id <> ?6),
+		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'duel' AND finished_at BETWEEN ?2 AND ?3 AND id <> ?6),
+		(SELECT count(*) FROM duels WHERE ended_at BETWEEN ?2 AND ?3 AND ?6 NOT IN (coalesce(a_run, 0), coalesce(b_run, 0))
 			AND ((a_id = ?1 AND outcome IN ('a', 'ghost_won')) OR (b_id = ?1 AND outcome = 'b'))),
 		(SELECT count(*) FROM duels d JOIN runs r ON r.id = CASE WHEN d.a_id = ?1 THEN d.a_run ELSE d.b_run END
-			WHERE d.kind = 'friend' AND (d.a_id = ?1 OR d.b_id = ?1) AND r.finished_at BETWEEN ?2 AND ?3),
-		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'royal' AND started_at BETWEEN ?2 AND ?3),
-		(SELECT coalesce(max(rights), 0) FROM runs WHERE user_id = ?1 AND kind = 'royal' AND started_at BETWEEN ?2 AND ?3),
+			WHERE d.kind = 'friend' AND (d.a_id = ?1 OR d.b_id = ?1) AND r.finished_at BETWEEN ?2 AND ?3 AND r.id <> ?6),
+		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'royal' AND started_at BETWEEN ?2 AND ?3 AND id <> ?6),
+		(SELECT coalesce(max(rights), 0) FROM runs WHERE user_id = ?1 AND kind = 'royal' AND started_at BETWEEN ?2 AND ?3
+			AND id <> ?6),
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND finished_at BETWEEN ?2 AND ?3 AND rights > 0
-			AND rights = json_array_length(questions)),
+			AND rights = json_array_length(questions) AND id <> ?6),
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND finished_at BETWEEN ?2 AND ?3
-			AND json_array_length(questions) = ?5 AND rights >= ?5 - 2)`, userID, from, to, day, Length).
+			AND json_array_length(questions) = ?5 AND rights >= ?5 - 2 AND id <> ?6)`, userID, from, to, day, Length, except).
 		Scan(&t.day, &t.duels, &t.duelWins, &t.friendDuels, &t.royals, &t.royalBest, &t.perfect,
 			&t.eight)
 	if err != nil {
 		return nil, err
 	}
 	rows, err := db.QueryContext(ctx, `SELECT category, count(*) FROM runs
-		WHERE user_id = ? AND kind = 'topic' AND finished_at BETWEEN ? AND ? GROUP BY category`, userID, from, to)
+		WHERE user_id = ? AND kind = 'topic' AND finished_at BETWEEN ? AND ? AND id <> ? GROUP BY category`,
+		userID, from, to, except)
 	if err != nil {
 		return nil, err
 	}
@@ -388,8 +427,8 @@ func (g *Game) tallyOf(ctx context.Context, userID int64, day string) (*tally, e
 	// The day's answers, game by game in their order (for a row); a game begun before midnight counts from it.
 	rows, err = db.QueryContext(ctx, `SELECT a.run_id, a.question_id, a.is_right, a.ms, coalesce(a.given, '')
 		FROM answers a JOIN runs r ON r.id = a.run_id
-		WHERE r.user_id = ? AND r.started_at >= ? AND a.at BETWEEN ? AND ? ORDER BY a.run_id, a.n`,
-		userID, from-24*time.Hour.Milliseconds(), from, to)
+		WHERE r.user_id = ? AND r.started_at >= ? AND a.at BETWEEN ? AND ? AND r.id <> ? ORDER BY a.run_id, a.n`,
+		userID, from-24*time.Hour.Milliseconds(), from, to, except)
 	if err != nil {
 		return nil, err
 	}

@@ -100,7 +100,7 @@ test("friends on the day: a shared link to it, who has played it, and how each w
   await startDay(a);
   await playRun(a);
   await playedFair(a);
-  await expect(a.getByRole("link", { name: /^Покани някого/ })).toBeVisible();
+  await expect(a.getByRole("link", { name: /^Покани приятел и сравнявайте всеки ден/ })).toBeVisible();
 
   // Her link (the one her shared result ends with) brings Cy to the day, with her score; Cy adds her before playing,
   // and the day's ten stay the gold action. Начало then names her, without her score.

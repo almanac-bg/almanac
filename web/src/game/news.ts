@@ -1,11 +1,16 @@
-// What a game earned, said once, at its end, in three cards at most: the day's goals it finished (with their XP); the
-// one biggest thing that happened (a week of the league ended, a division reached, a new level), or else a line of the XP it
-// brought and the level; and „Ново за теб“: achievements and everything they unlocked to wear (each a tap from being
-// worn), three rows at most, the highest tier first, the rest a tap away; with how a topic's game moved its mastery; in a card left free, once a day, how others' duels against the
-// player's recordings went (play/recordings.go). Only the biggest of it plays its sound. Only what the player has met
-// is told (play/unfold.go: no XP on a first day); a system met with this game is said first, once, in a line, and so is a
+// What a game earned, said once, at its end, in three cards at most: the day's goals it finished (with their XP, and
+// how far it took those it moved: a goal moved alone is a line, not a card); the one biggest thing that happened (a
+// week of the league ended, a division reached, a new level), or else a line of the XP it brought and the level; and
+// „Ново за теб“: achievements and everything they unlocked to wear (each a tap from being worn), three rows at most,
+// the highest tier first, the rest a tap away; with how a topic's game moved its mastery, said only when it's news (a
+// share gone down isn't: Профил has it); in a card left free, once a day, how others' duels against the player's
+// recordings went (play/recordings.go). The facts it put in Моят Алманах are a line of their own, from the first day:
+// what playing gives that only goes up. Only the biggest of it plays its sound. Only what the player has met is told
+// (play/unfold.go: no XP on a first day); a system met with this game is said first, once, in a line, and so is a
 // broken streak won back (play/repair.go). What really is big (bigOne) is also brought forward in a sheet over the
-// result (feel.ts), its sound playing as it opens.
+// result (feel.ts), its sound playing as it opens. A game that ended without its result on screen has its news told on
+// Начало later (play/told.go), quietly, with no sheet and no sound: under its result, if it's the day's; else under a
+// line that says whose it is.
 
 import { emblem } from "../art/emblem.ts";
 import { leagueEmblem } from "../art/league.ts";
@@ -25,6 +30,7 @@ import {
   meaning,
   meter,
   type Open,
+  pointsWords,
   profileHref,
   tierWords,
   type Unlock,
@@ -61,12 +67,30 @@ interface News {
   recordings?: { text: string; players: { name: string; tag: string }[] };
   /** The streak's days, when a broken streak has just been won back (play/repair.go). */
   mended?: number;
+  /** The game's kind: what its points are said to be for. */
+  kind?: string;
+  /** The facts the game put in Моят Алманах. */
+  facts?: number;
+  /** The day's goals the game moved without finishing them, with how far along each is now. */
+  moved?: MovedGoal[];
+}
+
+/** A goal of the day a game moved, not done yet. */
+interface MovedGoal {
+  id: string;
+  name: string;
+  target: number;
+  progress: number;
+  href?: string;
+  xp: number;
 }
 
 /** What a game earned, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends).
  * The one big thing among it, if any (`round`: the streak reached a round number with this game), is brought forward
- * in a sheet once the result has landed (feel.ts), with its sound then; everything else plays its sound as it comes. */
-export function news(run: number, delay = 0, round?: Promise<number>): Child {
+ * in a sheet once the result has landed (feel.ts), with its sound then; everything else plays its sound as it comes.
+ * Told `late` (on Начало, of a game whose result was never on screen), it's said without a sheet or a sound, under a
+ * line that says whose it is (`late.title`), if any. */
+export function news(run: number, delay = 0, round?: Promise<number>, late?: { title?: string }): Child {
   const data = signal<News | null>(null);
   let gone = false;
   const t = setTimeout(
@@ -74,6 +98,7 @@ export function news(run: number, delay = 0, round?: Promise<number>): Child {
       api<News>("POST", "/api/me/news", { run }).then(
         async (n) => {
           data.set(n);
+          if (late) return;
           const kit = feelKit();
           const top = kit && bigOne(n, (await round) ?? 0);
           if (!kit || !top) {
@@ -98,18 +123,32 @@ export function news(run: number, delay = 0, round?: Promise<number>): Child {
     const n = data();
     if (!n) return null;
     const top = headline(n);
-    return [
-      (n.opened ?? []).map(opened),
+    const moved = n.open.xp ? (n.moved ?? []) : [];
+    const parts = [
+      (n.opened ?? []).map((s) => opened(s, n)),
       n.mended ? h("p", { class: "news-open" }, h("b", null, `Серията ти е върната: ${n.mended} дни.`)) : null,
+      n.facts ? factsLine(n.facts) : null,
       top === "level" || !n.open.xp ? null : xpLine(n),
-      n.goals.length ? goalsDone(n.goals) : null,
+      n.goals.length ? goalsDone(n.goals, moved) : moved.length ? movedLine(moved) : null,
       top === "league" && n.league ? leagueEnded(n.league) : null,
       top === "division" && n.division ? divisionReached(n.division) : null,
       top === "level" ? levelCard(n.level, n.xp, n.from, n.to, true, n.earned) : null,
       fresh(n),
       n.recordings ? recordings(n.recordings) : null,
     ];
+    if (!late?.title) return parts;
+    // Late, on Начало: whose news it is, over it; nothing at all when there's nothing to tell.
+    return parts.flat().some(Boolean) ? [h("p", { class: "kicker news-late" }, late.title), parts] : null;
   };
+}
+
+/** The facts a game put in Моят Алманах, a tap from them. */
+function factsLine(n: number): Child {
+  return h(
+    "p",
+    { class: "news-facts" },
+    h("a", { href: "/almanac" }, h("b", { class: "num" }, `+${n}`), ` ${n === 1 ? "факт" : "факта"} в Алманаха`),
+  );
 }
 
 /** Others played against recordings of the player's games: how it went, and who, each a tap from their profile. */
@@ -266,20 +305,24 @@ function bigOne(
   const a = n.achievements.find((x) => x.tier === "legendary") ?? n.achievements.find((x) => x.tier === "epic");
   if (a)
     return {
-      parts: sheet(big(badge(a, true, "l")), `${cap(tierWords[a.tier].one)} постижение`, a.name, a.about),
+      parts: sheet(big(badge(a, true, "l")), achievementWord(a.tier), a.name, a.about),
       sound: "achievement",
       glow: false,
     };
   return null;
 }
 
-/** A system met with this game, said once, in a line: what it is, in a few words. */
-function opened(system: keyof Open): Child {
+/** A system met with this game (`n`), said once, in a line: what it is, in a few words. */
+function opened(system: keyof Open, n: News): Child {
   const line = (lead: string, ...rest: Child[]) => h("p", { class: "news-open" }, lead && h("b", null, lead), rest);
   switch (system) {
     case "points":
-      // One line: the rest is a tap away, on the word.
-      return line("", explain(h("b", null, "Точките"), meaning.points), " са резултатът ти в една игра.");
+      // One line: the rest is a tap away, on the word (with the day's board only after the day's ten: it's theirs).
+      return line(
+        "",
+        explain(h("b", null, "Точките"), n.kind === "day" ? pointsWords(n.open) : meaning.points),
+        " са резултатът ти в една игра.",
+      );
     case "xp":
       return line("Ново: XP и цели за деня. ", meaning.xp);
     case "league":
@@ -322,8 +365,8 @@ export function levelCard(level: number, xp: number, from: number, to: number, u
   );
 }
 
-/** The day's goals a game finished, and the XP they earned. */
-function goalsDone(goals: News["goals"]): Child {
+/** The day's goals a game finished, and the XP they earned; under them, the ones it moved, and how far along. */
+function goalsDone(goals: News["goals"], moved: MovedGoal[]): Child {
   return h(
     "section",
     { class: "card goals" },
@@ -340,6 +383,34 @@ function goalsDone(goals: News["goals"]): Child {
           h("span", { class: "goal-xp num" }, `+${g.xp} XP`),
         ),
       ),
+      moved.map(movedRow),
+    ),
+  );
+}
+
+/** A goal a game moved, not done yet: its name (a tap from where it's done), and how far along, as Начало's card
+ * has it. */
+function movedRow(g: MovedGoal): Child {
+  return h(
+    "li",
+    { class: "goal" },
+    h("span", { class: "goal-mark", "aria-hidden": "true" }),
+    g.href ? h("a", { class: "goal-name", href: g.href }, g.name) : h("span", { class: "goal-name" }, g.name),
+    h("span", { class: "goal-xp num" }, `+${g.xp} XP`),
+    meter(Math.round((100 * g.progress) / g.target), `${g.progress} от ${g.target}`),
+    h("span", { class: "goal-n num" }, `${g.progress}/${g.target}`),
+  );
+}
+
+/** The goals a game moved, when it finished none: a line each, not a card („Цел: 3 от 5 · …“). */
+function movedLine(moved: MovedGoal[]): Child {
+  return moved.map((g) =>
+    h(
+      "p",
+      { class: "news-goal" },
+      h("span", { class: "news-goal-n" }, `Цел: ${g.progress} от ${g.target}`),
+      " · ",
+      g.href ? h("a", { href: g.href }, g.name) : g.name,
     ),
   );
 }
@@ -440,7 +511,7 @@ function earned(a: AchievementInfo, xp: boolean): Child {
       h(
         "span",
         { class: "unlock-reward" },
-        h("span", { class: "unlock-tier" }, `${cap(tierWords[a.tier].one)} постижение`),
+        h("span", { class: "unlock-tier" }, achievementWord(a.tier)),
         xp ? [" · ", h("span", { class: "unlock-xp" }, `+${a.xp ?? 0} XP`)] : null,
       ),
     ),
@@ -464,6 +535,11 @@ function unlockRow(u: Unlock, worn: string, told = false): Child {
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** An achievement, said with its tier: „Рядко постижение“; a common one, the first a player earns, just „Постижение“
+ * (its tier is in its ink: „обикновено“ would read as „nothing special“). */
+const achievementWord = (tier: AchievementInfo["tier"]) =>
+  tier === "common" ? "Постижение" : `${cap(tierWords[tier].one)} постижение`;
 
 /** What wears an unlock (/api/me/look): an avatar's shape in the tone worn, a title, a frame or a pattern. */
 function lookBody(u: Unlock, worn: string): Record<string, string> {

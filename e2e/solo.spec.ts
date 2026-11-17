@@ -11,9 +11,11 @@ test("the day: ten questions, the result, the review, and one try only", async (
   });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Десет въпроса за днес" })).toBeVisible();
-  // A new player sees the day and the topics only: playing with others comes after a first game.
+  // A new player sees the day and the topics: duels and rooms come after a first game (a room's code is a line), Роял
+  // only while it's on (the test server always has a lobby open).
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
-  await expect(page.locator(".modes")).toHaveCount(0);
+  await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Влез в стая с код" })).toBeVisible();
   await expect(page.locator(".streak-chip")).toHaveCount(0);
   await startDay(page);
   await playRun(page);
@@ -29,8 +31,6 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // After the day, the other ways to play are right there: with others, and by topic.
   await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toBeVisible();
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
-  // Not Роял: no evening before today has had players (a fresh database), and a first week isn't sent to an empty one.
-  await expect(page.locator(".modes").getByRole("link", { name: /Роял/ })).toHaveCount(0);
   // The result is shared without its answers: the day's issue and date, the score, a square for each question (and a
   // right answer few of the day's other players got, if there's one: other tests play the same day), and the player's
   // own link to it.
@@ -278,6 +278,27 @@ test("a question left while its time runs: asked first, given up, and the topic 
   await expect(page.locator(".question-head")).toContainText("3 от 10");
   await expect(page.locator("article.question .trail li:is(.right, .partial, .wrong)")).toHaveCount(2);
   await expect(page.locator("article.question .trail li").nth(1)).toHaveClass("wrong");
+});
+
+test("the day left at its last question comes back done, with what it earned told under it, once", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto("/");
+  await startDay(page);
+  for (let n = 0; n < 9; n++) {
+    await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
+    await answer(page);
+    await moveOn(page);
+  }
+  await expect(page.locator(".question-head")).toContainText("10 от 10", { timeout: 10_000 });
+  await page.getByRole("link", { name: "Към Начало", exact: true }).click();
+  await page.getByRole("button", { name: "Излез" }).click();
+  // Its result was never on screen: Начало has it, and its news (a first day's: what points are), told now.
+  await expect(page.locator(".summary")).toBeVisible();
+  await expect(page.locator(".summary .news-open")).toContainText("са резултатът ти в една игра");
+  await page.reload();
+  await expect(page.locator(".summary")).toBeVisible();
+  await expect(page.locator(".summary .trail")).toBeVisible();
+  await expect(page.locator(".news-open")).toHaveCount(0);
 });
 
 test("a challenge link that's gone (an old one) says so and offers the day", async ({ page }) => {

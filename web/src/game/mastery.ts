@@ -4,23 +4,9 @@
 import { type Child, h } from "../lib/dom.ts";
 import { categories } from "../state.ts";
 import { meter, questions, toneOf, topicMark } from "../ui.ts";
+import { type Mastery, type MasteryMove, masteryNews } from "./known.ts";
 
-export interface Mastery {
-  category: string;
-  answers: number;
-  known: number; // percent of the topic's questions
-  tier: number; // 0 (Новак) … TIERS - 1 (Светило)
-  name: string;
-  next?: string;
-  nextAt?: number;
-  sure: boolean; // answers enough to tell, with its tier: until then it's a guess
-  first?: boolean; // answers enough for a first estimate, not yet sure: its share is told, never its tier
-}
-
-export interface MasteryMove {
-  from: Mastery;
-  to: Mastery;
-}
+export type { Mastery, MasteryMove } from "./known.ts";
 
 /** How many tiers there are (play.MasteryTiers). */
 const TIERS = 6;
@@ -54,11 +40,10 @@ export function masteryLeft(m: Mastery): string {
   return m.next ? `още ${(m.nextAt ?? 0) - m.known}% до ${m.next}` : "най-високата степен";
 }
 
-/** A first estimate, said for what it is: „първа оценка · 74%“ (and of what, `of`: „от въпросите в темата“). */
-const firstWords = (m: Mastery, of = "") => [
+/** A first estimate, said for what it is: „първа оценка · 74%“. */
+const firstWords = (m: Mastery) => [
   h("span", { class: "muted" }, "първа оценка ·"),
   h("b", { class: "mastery-known" }, `${m.known}%`),
-  of ? h("span", { class: "muted" }, of) : null,
 ];
 
 function row(m: Mastery, extra: Child = null): Child {
@@ -136,21 +121,22 @@ export function masteryCard(all: Mastery[], theirs = false): Child {
   );
 }
 
-/** How a topic's game moved its mastery, in a line: the topic, how much of it is known now and by how much that moved
- * (a new tier said); before its mark is sure, a first estimate of what share of the topic it is, never a tier; or
- * what's left before either. Of a game of several topics, the one that moved most. */
+/** How a topic's game moved its mastery, in a line, when it's news (masteryNews): the topic, how much of it is known
+ * now and how it moved — „нова степен“ for a tier above the lowest reached, else the share gained; before its mark is
+ * sure, a first estimate of what share of the topic it is, never a tier; or, while there's no estimate yet, what's left
+ * before one. Of a game of several topics, the one that moved most. */
 export function masteryLine(moves: MasteryMove[]): Child {
   const shown = (m: Mastery) => m.sure || !!m.first;
-  const told = moves.filter((m) => shown(m.to) && (!shown(m.from) || m.to.known !== m.from.known));
-  const move = told[0] ?? (moves.length === 1 ? moves[0] : undefined);
+  const only = moves.length === 1 ? moves[0] : undefined;
+  const move = moves.find(masteryNews) ?? (only && !shown(only.to) ? only : undefined);
   if (!move) return null;
   const { from, to } = move;
   const d = to.known - from.known;
   const change =
-    !from.sure || to.tier > from.tier
+    to.tier > 0 && (!from.sure || to.tier > from.tier)
       ? h("span", { class: "delta up" }, "нова степен")
-      : d !== 0
-        ? h("span", { class: d > 0 ? "delta up" : "delta down" }, `${d > 0 ? "+" : ""}${d}%`)
+      : from.sure && d > 0
+        ? h("span", { class: "delta up" }, `+${d}%`)
         : null;
   return h(
     "p",
@@ -160,7 +146,11 @@ export function masteryLine(moves: MasteryMove[]): Child {
     to.sure
       ? [h("b", { class: "mastery-known" }, `${to.known}%`), change, masteryBadge(to)]
       : to.first
-        ? firstWords(to, "от въпросите в темата")
+        ? [
+            h("span", { class: "muted" }, "Първа оценка: знаеш около"),
+            h("b", { class: "mastery-known" }, `${to.known}%`),
+            h("span", { class: "muted" }, "от темата"),
+          ]
         : h("span", { class: "muted" }, masteryLeft(to)),
   );
 }

@@ -33,8 +33,24 @@ func TestStreakEndedOnTheDay(t *testing.T) {
 	if repair == nil || repair["days"] != 3.0 || repair["day"] != false || repair["other"] != false || today["ended"] != nil {
 		t.Fatalf("a streak of three, ended yesterday: %v, %v", today["repair"], today["ended"])
 	}
-	if status, _ := ana.call("POST", "/api/tally", map[string]string{"key": "repair:offered"}); status != 200 {
-		t.Fatalf("the offer counted: %d", status)
+	// The day's reminder says how to win it back.
+	if m := g.srv.reminder(t.Context(), g.srv.game.Today(), anaID); m.Body !=
+		"Серията ти от 3 дни прекъсна. Върни я днес: въпросите на деня и още една игра." {
+		t.Fatalf("the reminder of a streak to win back: %+v", m)
+	}
+	// Начало shows the offer and says so: counted as offered once, on whichever device.
+	on := "ended:" + repair["on"].(string)
+	for i, want := range []bool{true, false} {
+		if status, out := ana.call("POST", "/api/me/streak-told", map[string]any{"key": on, "repair": true}); status != 200 ||
+			out["fresh"] != want {
+			t.Fatalf("told the offer, time %d: %d %v", i+1, status, out)
+		}
+	}
+	if c, _ := g.srv.game.Tallies(t.Context(), g.srv.game.Today(), g.srv.game.Today()); c["repair:offered"] != 1 {
+		t.Fatalf("the offer counted: %v", c)
+	}
+	if status, _ := ana.call("POST", "/api/me/streak-told", map[string]any{"key": "ended:soon"}); status != 400 {
+		t.Fatalf("a notice that isn't one: %d", status)
 	}
 
 	// Won back (as if the day's ten and another game were played today): Начало says nothing more of the days missed,
@@ -54,5 +70,10 @@ func TestStreakEndedOnTheDay(t *testing.T) {
 	ended, _ := today["ended"].(map[string]any)
 	if today["repair"] != nil || ended == nil || ended["days"] != 2.0 {
 		t.Fatalf("a streak of two, ended yesterday: %v, %v", today["repair"], today["ended"])
+	}
+	// Told once: Начало, on another device, doesn't tell it again.
+	bo.call("POST", "/api/me/streak-told", map[string]any{"key": "ended:" + ended["on"].(string)})
+	if _, today = bo.call("GET", "/api/day", nil); today["ended"] != nil {
+		t.Fatalf("told again: %v", today["ended"])
 	}
 }

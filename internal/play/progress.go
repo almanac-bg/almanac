@@ -625,6 +625,14 @@ type News struct {
 	Recordings *RecordingsNews `json:"recordings,omitempty"`
 	// Mended is the streak's days, when a broken streak has just been won back (repair.go): said in a line, once.
 	Mended int `json:"mended,omitempty"`
+	// Kind is the game's kind ("day", "topic", …): what its points are said to be for.
+	Kind string `json:"kind,omitempty"`
+	// Facts is how many facts the game put in the player's almanac (almanac.go): told from the first day, before XP
+	// is, as what playing gives that only goes up.
+	Facts int `json:"facts,omitempty"`
+	// Moved are the day's goals the game moved without finishing them, with how far along each is (goals.go): told
+	// in the card of those it finished, once XP is open.
+	Moved []DayGoal `json:"moved,omitempty"`
 }
 
 // DoneGoal is one of the day's goals, done: what it was, and the XP it earned.
@@ -634,7 +642,8 @@ type DoneGoal struct {
 }
 
 // NewsOf tells a player what's new, once: everything in it is marked as told. With the game just played (runID; 0
-// for none), it also counts that game's XP and, for a topic's game, tells how it moved their mastery. It awards first,
+// for none), it also counts that game's XP and the facts it put in the almanac, the goals it moved, and, for a topic's
+// game, how it moved their mastery; that game is told then, and so is every one finished before it (Untold). It awards first,
 // so that whatever ended meanwhile (a friend's duel, a Роял, a week of the leagues) is in it. What belongs to a system
 // the player hasn't met yet (unfold.go) waits for it: a new level, what a level unlocks, an achievement of the goals or
 // of the league; what can't wait (a day's goals, a week ended) is let go untold, its XP kept.
@@ -650,18 +659,33 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 	if err != nil {
 		return n, err
 	}
+	open, err := g.OpenOf(ctx, userID)
+	if err != nil {
+		return n, err
+	}
+	n.Open = open
+	var finished int64 // the game's end: it, and every game finished before it, are told with this news
 	if runID != 0 {
 		// A game that isn't the player's, or isn't over, has nothing to tell: the rest of the news still is.
-		var kind string
-		err := g.DB.Read.QueryRowContext(ctx, `SELECT kind, xp FROM runs WHERE id = ? AND user_id = ? AND finished_at IS NOT NULL`,
-			runID, userID).Scan(&kind, &n.Earned)
+		err := g.DB.Read.QueryRowContext(ctx, `SELECT kind, xp, finished_at FROM runs WHERE id = ? AND user_id = ?
+			AND finished_at IS NOT NULL`, runID, userID).Scan(&n.Kind, &n.Earned, &finished)
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
 		case err != nil:
 			return n, err
-		case kind == "topic":
-			if n.Mastery, err = g.MasteryMoves(ctx, userID, runID); err != nil {
+		default:
+			if n.Facts, err = g.learnedIn(ctx, userID, runID); err != nil {
 				return n, err
+			}
+			if open.XP {
+				if n.Moved, err = g.GoalsMoved(ctx, userID, runID); err != nil {
+					return n, err
+				}
+			}
+			if n.Kind == "topic" {
+				if n.Mastery, err = g.MasteryMoves(ctx, userID, runID); err != nil {
+					return n, err
+				}
 			}
 		}
 	}
@@ -669,11 +693,6 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 	if err != nil {
 		return n, err
 	}
-	open, err := g.OpenOf(ctx, userID)
-	if err != nil {
-		return n, err
-	}
-	n.Open = open
 	// A streak won back: told with the streak as it is now.
 	var mended bool
 	if err := g.DB.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM streak_repairs WHERE user_id = ? AND NOT told)`,
@@ -775,10 +794,11 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 			}
 		}
 		for _, u := range have {
-			if told[u.key()] || (known && u.byLevel && !open.XP) {
+			if told[u.key()] || (known && u.byLevel > 0 && !open.XP) {
 				continue
 			}
-			if known {
+			// What the first level gives, everyone has from the start: kept as told, never told as news.
+			if known && u.byLevel != 1 {
 				n.Unlocks = append(n.Unlocks, u)
 			}
 			if _, err := tx.Exec(`INSERT OR IGNORE INTO unlocks_told (user_id, id) VALUES (?, ?)`, userID, u.key()); err != nil {
@@ -820,10 +840,11 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 			`UPDATE goals_done SET seen = 1 WHERE user_id = ?1 AND NOT seen`,
 			`UPDATE league_results SET seen = 1 WHERE user_id = ?1 AND NOT seen`,
 			`UPDATE streak_repairs SET told = 1 WHERE user_id = ?1 AND NOT told`,
+			`UPDATE runs SET told = 1 WHERE user_id = ?1 AND NOT told AND finished_at <= ?4`,
 			`UPDATE users SET level_seen = max(level_seen, ?2), peak_seen = max(peak_seen, peak), unlocks_known = 1,
 				systems_told = trim(systems_told || ' ' || ?3) WHERE id = ?1`,
 		} {
-			if _, err := tx.Exec(q, userID, level, strings.Join(n.Opened, " ")); err != nil {
+			if _, err := tx.Exec(q, userID, level, strings.Join(n.Opened, " "), finished); err != nil {
 				return err
 			}
 		}

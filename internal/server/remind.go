@@ -233,11 +233,18 @@ func dayGap(from, to string) int {
 	return int(b.Sub(a).Hours() / 24)
 }
 
-// reminder is the day's word to a player who hasn't played the day's questions: the best of their friends who have,
-// and their streak; or, while none of their friends has, just the streak.
+// reminder is the day's word to a player who hasn't played the day's questions: a streak just broken that can still
+// be won back today (play/repair.go), and how, as the streak's mail says it; else the best of their friends who have
+// played, and their streak; or, while none of their friends has, just the streak.
 func (s *Server) reminder(ctx context.Context, today string, userID int64) push.Message {
 	m := push.Message{Title: "Въпросите на деня те чакат", URL: "/"}
 	streak, _ := s.game.Streak(ctx, userID)
+	if streak == 0 {
+		if r, _ := s.game.RepairOf(ctx, userID); r != nil {
+			m.Body = fmt.Sprintf("Серията ти от %s прекъсна. Върни я днес: въпросите на деня и още една игра.", days(r.Days))
+			return m
+		}
+	}
 	board, _ := s.game.FriendsBoard(ctx, today, userID)
 	var best *play.Score
 	for i := range board {

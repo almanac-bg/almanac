@@ -161,7 +161,7 @@ export function howItWorks(open?: Open): Child {
     h(
       "ul",
       { class: "how-list" },
-      item("Точки. ", meaning.points),
+      item("Точки. ", meaning.points + meaning.dayBoard),
       open?.xp
         ? item(
             "XP и нива. ",

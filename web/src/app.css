@@ -4772,6 +4772,46 @@
     color: var(--text);
   }
 
+  /* The facts a game put in Моят Алманах (news.ts): a line from the first day, what playing gives that only goes up,
+     a tap from them. */
+  .news-facts {
+    margin: 0;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .news-facts a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .news-facts b {
+    color: var(--text);
+    font: 900 1.25rem / 1 var(--font-numeral);
+  }
+
+  /* A day's goal a game moved without finishing it, when it finished none: a line, not a card. */
+  .news-goal {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.9375rem;
+    line-height: 1.375rem;
+    text-align: center;
+    text-wrap: pretty;
+  }
+
+  .news-goal-n {
+    color: var(--text);
+    font-weight: 700;
+  }
+
+  /* News told late, on Начало (play/told.go): whose it is, over it. */
+  .news-late {
+    margin: 0;
+    text-align: center;
+  }
+
   /* A number's name, a tap from what it means: dotted under, the words in a small card over the page. */
   .explain {
     padding: 0;

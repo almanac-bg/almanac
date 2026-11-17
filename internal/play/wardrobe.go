@@ -213,8 +213,9 @@ type Unlock struct {
 	Tier Tier   `json:"tier,omitempty"`
 	// From is what unlocks it, as a phrase after „с“: „ниво 5“, „постижението „Цял месец““, „дивизия Злато“.
 	From string `json:"from"`
-	// byLevel is whether a level unlocks it: told once XP has opened (unfold.go).
-	byLevel bool
+	// byLevel is the level that unlocks it (0: none): told once XP has opened (unfold.go), but the first level's,
+	// which everyone has from the start.
+	byLevel int
 }
 
 // key is what's kept of an unlock once told. The champion's title is told again with each week won, by its new name.
@@ -281,7 +282,7 @@ func (w wardrobe) unlocks() []Unlock {
 	for _, t := range w.titles {
 		if w.has(t.by) {
 			out = append(out, Unlock{Kind: "title", ID: t.ID, Name: t.Name, Tier: t.Tier, From: w.from(t.by),
-				byLevel: t.by.level > 0})
+				byLevel: t.by.level})
 		}
 	}
 	for _, set := range []struct {
@@ -290,13 +291,17 @@ func (w wardrobe) unlocks() []Unlock {
 	}{{"frame", Frames}, {"backdrop", Backdrops}} {
 		for _, c := range set.all {
 			if w.has(c.by) {
-				out = append(out, Unlock{Kind: set.kind, ID: c.id, Name: c.name, From: w.from(c.by), byLevel: c.by.level > 0})
+				out = append(out, Unlock{Kind: set.kind, ID: c.id, Name: c.name, From: w.from(c.by), byLevel: c.by.level})
 			}
 		}
 	}
 	for _, s := range Unlockable {
 		if w.shapeOpen(s) {
-			out = append(out, Unlock{Kind: "avatar", ID: s, From: w.shapeFrom(s), byLevel: s == "crown"})
+			u := Unlock{Kind: "avatar", ID: s, From: w.shapeFrom(s)}
+			if s == "crown" {
+				u.byLevel = CrownLevel
+			}
+			out = append(out, u)
 		}
 	}
 	return out
