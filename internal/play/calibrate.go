@@ -2,6 +2,7 @@ package play
 
 import (
 	"context"
+	"database/sql"
 	"slices"
 	"strings"
 
@@ -66,9 +67,10 @@ type Calibrated struct {
 // Calibrate reads every live question with enough answers, the ones whose label disagrees with them first (the
 // furthest off first).
 func (g *Game) Calibrate(ctx context.Context) ([]Calibrated, error) {
-	// By the hour, so that only the answers given since a question last changed what it asks count (changedMs).
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, at / 3600000, count(*), sum(score) FROM answers
-		WHERE `+FairAnswers+` GROUP BY question_id, at / 3600000`)
+	// By version, and by the hour, so that only the answers to a question as it is now count (versions.go: those from
+	// before versions were kept, by the day it last changed).
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, version, at / 3600000, count(*), sum(score) FROM answers
+		WHERE `+FairAnswers+` GROUP BY question_id, version, at / 3600000`)
 	if err != nil {
 		return nil, err
 	}
@@ -77,14 +79,18 @@ func (g *Game) Calibrate(ctx context.Context) ([]Calibrated, error) {
 	sums := map[string]*Calibrated{}
 	for rows.Next() {
 		var id string
+		var version sql.NullInt64
 		var hour int64
 		var n int
 		var sum float64
-		if err := rows.Scan(&id, &hour, &n, &sum); err != nil {
+		if err := rows.Scan(&id, &version, &hour, &n, &sum); err != nil {
 			return nil, err
 		}
 		q, ok := b.Get(id)
-		if !ok || q.Extra().Retired || (hour+1)*3600000 <= changedMs(q) {
+		if !ok || q.Extra().Retired {
+			continue
+		}
+		if c := g.CountedOf(q); version.Valid && version.Int64 != c.Version || !version.Valid && (hour+1)*3600000 <= c.From {
 			continue
 		}
 		c := sums[id]

@@ -250,7 +250,7 @@ func (h *Hub) render(b *board, t *table, now time.Time) Board {
 			q.Shown = n.at.UnixMilli()
 		} else {
 			since = limit // everything shows with the answer
-			q.Reveal = &RevealView{Answer: d.Reveal(h.game.Crowd(d.Question().Base().ID))}
+			q.Reveal = &RevealView{Answer: d.Reveal(h.game.Crowd(d.Question()))}
 		}
 		q.View = bank.ViewAt(d, since)
 		v.Question = q

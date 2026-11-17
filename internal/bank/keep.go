@@ -7,16 +7,29 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // A server never plays the bank's checkout itself (cmd/almanac: serve): a pull moves that under it, and a pull that
 // fails its check would be there for the next start to refuse. It plays a copy of its own, made by Copy as it starts
 // and at each reload, and keeps the last few good ones to start from when the checkout has errors.
+//
+// A copy's pictures only grow: one the bank no longer has (its question changed, or left) stays in the copies for
+// KeepGone after it left, as a play may still show the version of the question it was in (the game keeps every
+// version it played), and images/.gone says since when each such has gone.
+
+// KeepGone is how long a picture the bank no longer has stays in its copies: longer than any play shows a question's
+// earlier version (a challenge's time, a game gone over after).
+const KeepGone = 30 * 24 * time.Hour
+
+// GoneFile lists the pictures a copy keeps that the bank no longer has, a line each: the file and the day it left.
+const GoneFile = ".gone"
 
 // Copy copies the bank in from into to (a new directory): the files Load reads and nothing else (not the repository,
 // nor a batch's reports). A picture that like (an earlier copy, "" for none) already has, by the same name and size, is
 // linked rather than copied: names are hashes of the content, so a copy costs the questions' text and the new pictures
-// only. Load reads the copy as it would read from.
+// only. Those like has that the bank no longer does come along for KeepGone after they left (GoneFile). Load reads the
+// copy as it would read from.
 func Copy(from, to, like string) error {
 	if err := os.Mkdir(to, 0o755); err != nil {
 		return err
@@ -33,7 +46,7 @@ func Copy(from, to, like string) error {
 	}); err != nil {
 		return err
 	}
-	return mirror(filepath.Join(from, ImagesDir), filepath.Join(to, ImagesDir), func(src, dst string) error {
+	if err := mirror(filepath.Join(from, ImagesDir), filepath.Join(to, ImagesDir), func(src, dst string) error {
 		name := filepath.Base(src)
 		if strings.HasPrefix(name, ".") {
 			return nil // Load passes over them
@@ -49,7 +62,74 @@ func Copy(from, to, like string) error {
 			}
 		}
 		return copyFile(src, dst)
-	})
+	}); err != nil {
+		return err
+	}
+	if like == "" {
+		return nil
+	}
+	return carry(filepath.Join(like, ImagesDir), filepath.Join(to, ImagesDir), time.Now())
+}
+
+// carry brings the pictures an earlier copy has (in from) and the bank no longer does into a new copy's (to), linked,
+// until KeepGone after they left, and lists them in to's GoneFile.
+func carry(from, to string, now time.Time) error {
+	entries, err := os.ReadDir(from)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	left := Gone(filepath.Dir(from))
+	today := now.Format(time.DateOnly)
+	var lines []string
+	for _, e := range entries {
+		name := e.Name()
+		if strings.HasPrefix(name, ".") || !e.Type().IsRegular() {
+			continue
+		}
+		dst := filepath.Join(to, name)
+		if _, err := os.Lstat(dst); err == nil {
+			continue // the bank has it
+		}
+		day, ok := left[name]
+		if !ok {
+			day = today // left with this copy
+		}
+		if d, err := time.Parse(time.DateOnly, day); err != nil || now.Sub(d) >= KeepGone {
+			continue
+		}
+		if err := os.MkdirAll(to, 0o755); err != nil {
+			return err
+		}
+		if os.Link(filepath.Join(from, name), dst) != nil {
+			if err := copyFile(filepath.Join(from, name), dst); err != nil {
+				return err
+			}
+		}
+		lines = append(lines, name+" "+day+"\n")
+	}
+	if len(lines) == 0 {
+		return nil
+	}
+	return os.WriteFile(filepath.Join(to, GoneFile), []byte(strings.Join(lines, "")), 0o644)
+}
+
+// Gone are the pictures a copy of the bank in dir keeps that the bank no longer has, by file, with the day each left
+// (GoneFile; none in a bank's checkout).
+func Gone(dir string) map[string]string {
+	out := map[string]string{}
+	data, err := os.ReadFile(filepath.Join(dir, ImagesDir, GoneFile))
+	if err != nil {
+		return out
+	}
+	for line := range strings.Lines(string(data)) {
+		if name, day, ok := strings.Cut(strings.TrimSpace(line), " "); ok {
+			out[name] = day
+		}
+	}
+	return out
 }
 
 // mirror makes dir to with what dir from has: each file through file, each directory an empty one (a bank has none

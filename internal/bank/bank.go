@@ -174,14 +174,18 @@ func Load(dir string) (*Bank, []Problem) {
 			} else {
 				keys[q.key()] = h.ID
 			}
-			h.subjects = subjectsOf(q)
+			h.subjects, h.version = subjectsOf(q), versionOf(q)
 			b.byID[h.ID] = q
 			b.Questions = append(b.Questions, q)
 		}
 	}
 
-	// Pictures nobody uses: left behind by an edit, or a question that went missing.
+	// Pictures nobody uses: left behind by an edit, or a question that went missing. Not those a copy keeps for plays
+	// still showing a question's earlier version (keep.go).
 	used := map[string]bool{}
+	for name := range Gone(dir) {
+		used[name] = true
+	}
 	for _, q := range b.Questions {
 		for _, im := range picturesOf(q) {
 			used[im.File], used[im.Small()] = true, true

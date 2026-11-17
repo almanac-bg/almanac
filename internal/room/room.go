@@ -108,8 +108,8 @@ type Hub struct {
 	paused atomic.Bool
 	rooms  map[string]*Room
 	bank   func() *bank.Bank
-	// Crowd, if set, is how players have answered a question (shown with its answer).
-	Crowd func(id string) *bank.Crowd
+	// Crowd, if set, is how players have answered a question, this version of it (shown with its answer).
+	Crowd func(q bank.Question) *bank.Crowd
 	// Barred, if set, are the questions no room may deal now (the day's: play.Game.DayQuestions).
 	Barred func(context.Context) (map[string]bool, error)
 	// Record, if set, keeps a player's game in a room once it's over, and says as which run (play.Game.RecordRoom).
@@ -119,11 +119,11 @@ type Hub struct {
 func NewHub(b func() *bank.Bank) *Hub { return &Hub{rooms: map[string]*Room{}, bank: b} }
 
 // crowd is how players have answered a question, if the hub knows.
-func (h *Hub) crowd(id string) *bank.Crowd {
+func (h *Hub) crowd(q bank.Question) *bank.Crowd {
 	if h.Crowd == nil {
 		return nil
 	}
-	return h.Crowd(id)
+	return h.Crowd(q)
 }
 
 // Settings are what a room plays, as its host opens it.
@@ -375,7 +375,7 @@ func (h *Hub) Save(w io.Writer) error {
 }
 
 // Restore opens again the rooms Save kept, and says how many. A room whose game's questions the bank no longer has
-// comes back to its lobby; one whose code is taken meanwhile doesn't come back.
+// as they were shown comes back to its lobby; one whose code is taken meanwhile doesn't come back.
 func (h *Hub) Restore(rd io.Reader) (int, error) {
 	var in []saved
 	if err := json.NewDecoder(rd).Decode(&in); err != nil {
@@ -409,7 +409,7 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 			r.phase, r.picks = End, sv.Picks
 			for _, p := range sv.Picks {
 				q, ok := b.Get(p.ID)
-				if !ok {
+				if !ok || p.V != "" && bank.Version(q) != p.V { // gone, or changed: not what the game showed
 					r.phase, r.picks, r.dealt = Lobby, nil, nil
 					break
 				}
@@ -1210,7 +1210,7 @@ func (r *Room) View(viewer int64) View {
 		if me := r.member(viewer); me != nil {
 			q.Given = me.given
 			if r.phase == Reveal {
-				q.Reveal = &RevealView{Answer: d.Reveal(r.hub.crowd(d.Question().Base().ID)), Points: me.gained, Speed: me.speed, Row: me.row,
+				q.Reveal = &RevealView{Answer: d.Reveal(r.hub.crowd(d.Question())), Points: me.gained, Speed: me.speed, Row: me.row,
 					Right: me.graded.Right, Exact: me.graded.Exact, Missed: !me.answered}
 				if me.row > 0 {
 					q.Reveal.InRow = me.inRow
@@ -1218,7 +1218,7 @@ func (r *Room) View(viewer int64) View {
 			}
 		} else if r.phase == Reveal && viewer == r.host {
 			// The host leading: the answer (and its fact) for the big screen.
-			q.Reveal = &RevealView{Answer: d.Reveal(r.hub.crowd(d.Question().Base().ID))}
+			q.Reveal = &RevealView{Answer: d.Reveal(r.hub.crowd(d.Question()))}
 		}
 		if r.phase == Reveal {
 			q.LeftMs = 0
@@ -1246,7 +1246,7 @@ func (r *Room) review(m *member) []ReviewedView {
 	}
 	out := make([]ReviewedView, 0, len(r.dealt))
 	for i, d := range r.dealt {
-		it := ReviewedView{N: i, Category: d.Question().Base().Category, View: d.View(), Reveal: d.Reveal(r.hub.crowd(d.Question().Base().ID)), Given: json.RawMessage("null")}
+		it := ReviewedView{N: i, Category: d.Question().Base().Category, View: d.View(), Reveal: d.Reveal(r.hub.crowd(d.Question())), Given: json.RawMessage("null")}
 		if l, ok := logged[d.Question().Base().ID]; ok && l.shown != nil {
 			it.Given, it.Points, it.Right = l.shown, l.points, l.right
 		}

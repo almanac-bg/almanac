@@ -20,7 +20,9 @@
 // not a player with a second account at another table, nor anyone watching (who follows the first).
 //
 // The hub keeps the evening's clock and the screens following it. Everything a game does goes through the database
-// first (package play), so that a restart of the server picks the game up again where it was. What changes the
+// first (package play), so that a restart of the server picks the game up again where it was. The evening's questions
+// are drawn with their versions (play.Pick.V), dealt so, and every answer graded through the deal shown
+// (play.Game.AnswerRoyal), whatever the bank has become meanwhile. What changes the
 // evening (its clock, a player in or out) goes one at a time (op), and writes to the database outside the lock on
 // what's in memory (mu), which is held only for moments: an answer, or a screen's look, never waits on a write. An
 // answer goes to the database by itself, outside both; the clock moves on only once the answers on their way are in.
@@ -468,11 +470,10 @@ func (h *Hub) catchUp(ctx context.Context, t *table) error {
 }
 
 func (h *Hub) deal(picks []play.Pick) []bank.Dealt {
-	b := h.game.Bank()
 	out := make([]bank.Dealt, len(picks))
 	for i, p := range picks {
-		if q, ok := b.Get(p.ID); ok {
-			out[i] = q.Deal(p.Seed)
+		if d, ok := h.game.Deal(p); ok { // the version the evening drew, whatever the bank has become since
+			out[i] = d
 		}
 	}
 	return out
@@ -1065,10 +1066,10 @@ func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) 
 		return play.ErrBadAnswer
 	}
 	m.sending, night.sending = true, night.sending+1
-	run := m.run
+	run, d := m.run, night.dealt[n]
 	h.mu.Unlock()
 
-	res, err := h.game.AnswerRoyal(ctx, id, run, n, raw, at)
+	res, err := h.game.AnswerRoyal(ctx, id, run, n, raw, at, d)
 
 	h.mu.Lock()
 	m.sending, night.sending = false, night.sending-1

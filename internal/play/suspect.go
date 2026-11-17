@@ -30,18 +30,19 @@ const SuspectTruth = 0.35
 
 // Suspects counts the crowds now and lists the suspects, the most answered first.
 func (g *Game) Suspects(ctx context.Context) ([]Suspect, error) {
-	if err := g.CountCrowds(ctx); err != nil {
+	b := g.Bank()
+	by, err := g.crowds.refresh(ctx, g.Now(), b, g.countCrowds)
+	if err != nil {
 		return nil, err
 	}
-	s := g.crowds.snap.Load()
 	var out []Suspect
-	for id, c := range s.by {
-		q, ok := s.bank.Get(id)
+	for id, c := range by {
+		q, ok := b.Get(id)
 		if !ok {
 			continue
 		}
-		if why := suspect(q, c); why != "" {
-			out = append(out, Suspect{id, c.Answers, why})
+		if why := suspect(q, c.c); why != "" {
+			out = append(out, Suspect{id, c.c.Answers, why})
 		}
 	}
 	slices.SortFunc(out, func(a, b Suspect) int {

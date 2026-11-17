@@ -4,11 +4,8 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
-	"log/slog"
 	"math"
 	"slices"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
@@ -22,27 +19,17 @@ import (
 // MasteryFrom).
 //
 // Counted for each viewer, they'd go over every answer anyone has ever given, each time. So every player's answers
-// are gone over once in a while for all of them (knowCache), in each topic and over all, in the background once
-// there's a count to show meanwhile; and the viewer's own are gone over exactly whenever they look, and set in, so
-// that a player who has just played sees their mastery and place as they are now.
+// are gone over once in a while for all of them (snapshot.go), in each topic and over all, in the background once
+// there's a count to show meanwhile (over a bank reloaded too); and the viewer's own are gone over exactly whenever
+// they look, and set in, so that a player who has just played sees their mastery and place as they are now.
 
 // knowFresh is how long a count of everyone's answers stands before the next one: masteries over a hundred answers
 // and more move slowly.
 var knowFresh = 5 * time.Minute
 
-// knowCache keeps the last count of everyone's answers.
-type knowCache struct {
-	counting sync.Mutex // held while a count runs
-	snap     atomic.Pointer[knowSnap]
-}
-
-// knowSnap is a count of everyone's answers: when, of which bank, and in each topic ("" for all of them) the players
-// with any answers there, best first.
-type knowSnap struct {
-	at   time.Time
-	bank *bank.Bank
-	by   map[string][]known
-}
+// knowledge is a count of everyone's answers: in each topic ("" for all of them) the players with any answers there,
+// best first.
+type knowledge map[string][]known
 
 // known is a player's mastery in a topic: of how many answers, and the share of its questions they'd know (0–1).
 type known struct {
@@ -90,7 +77,7 @@ func (g *Game) KnowledgeBoard(ctx context.Context, viewer int64, friends bool, t
 	if err != nil {
 		return Ranking{}, err
 	}
-	everyone := s.by[topic]
+	everyone := s[topic]
 	var mine known
 	var among map[int64]bool
 	if viewer != 0 {
@@ -174,34 +161,10 @@ func (g *Game) friendsOf(ctx context.Context, userID int64) (map[int64]bool, err
 	return out, rows.Err()
 }
 
-// knowledge is the last count of everyone's answers: counted again in the background once it's knowFresh old, and
-// waited for only when there's none of this bank yet.
-func (g *Game) knowledge(ctx context.Context) (*knowSnap, error) {
-	c := &g.known
-	b, now := g.Bank(), g.Now()
-	s := c.snap.Load()
-	if s != nil && s.bank == b {
-		if (now.Sub(s.at) >= knowFresh || now.Before(s.at)) && c.counting.TryLock() {
-			go func() {
-				defer c.counting.Unlock()
-				ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
-				defer cancel()
-				if err := g.countKnowledge(ctx, now, b); err != nil {
-					slog.Warn("counting the boards of knowledge", "err", err)
-				}
-			}()
-		}
-		return s, nil
-	}
-	c.counting.Lock()
-	defer c.counting.Unlock()
-	if s := c.snap.Load(); s != nil && s.bank == b { // counted while this one waited
-		return s, nil
-	}
-	if err := g.countKnowledge(ctx, now, b); err != nil {
-		return nil, err
-	}
-	return c.snap.Load(), nil
+// knowledge is the last count of everyone's answers (snapshot.go): counted again in the background once it's knowFresh
+// old, or the bank has changed, and waited for only before the server's first.
+func (g *Game) knowledge(ctx context.Context) (knowledge, error) {
+	return g.known.get(ctx, g.Now(), g.Bank(), knowFresh, g.countKnowledge)
 }
 
 // given is an answer as a count of knowledge goes over it: when, in which run and place (its order among a player's,
@@ -213,17 +176,18 @@ type given struct {
 	score   float64
 }
 
-// countKnowledge goes over everyone's fair answers (not of a script's games), as of now, for a bank: each player's in
-// the order they gave them, into their mastery in each topic and over all, as abilities does for one. The runs come by
-// player (INDEXED BY runs_user: in the index's order, nothing sorted), each run's answers after it (CROSS JOIN keeps
-// that order: left to choose, SQLite goes through the answers by their question's index and looks each one's run up,
-// thirty times slower), so one player's answers are held at a time, put in order here, and let go.
-func (g *Game) countKnowledge(ctx context.Context, now time.Time, b *bank.Bank) error {
+// countKnowledge goes over everyone's fair answers (not of a script's games; not to questions retired as untrue), as
+// of now, for a bank: each player's in the order they gave them, into their mastery in each topic and over all, as
+// abilities does for one. The runs come by player (INDEXED BY runs_user: in the index's order, nothing sorted), each
+// run's answers after it (CROSS JOIN keeps that order: left to choose, SQLite goes through the answers by their
+// question's index and looks each one's run up, thirty times slower), so one player's answers are held at a time, put
+// in order here, and let go.
+func (g *Game) countKnowledge(ctx context.Context, now time.Time, b *bank.Bank) (knowledge, error) {
 	h, err := g.hardness(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	by := make(map[string][]known, len(b.Categories)+1)
+	by := make(knowledge, len(b.Categories)+1)
 	fold := func(user int64, list []given) {
 		if len(list) == 0 {
 			return
@@ -234,7 +198,7 @@ func (g *Game) countKnowledge(ctx context.Context, now time.Time, b *bank.Bank) 
 		topics, all := map[string]ability{}, newAbility()
 		for _, a := range list {
 			head := a.q.Base()
-			hard, luck := h.byID[head.ID], chanceOf(a.q)
+			hard, luck := h.of(a.q), chanceOf(a.q)
 			t, ok := topics[head.Category]
 			if !ok {
 				t = newAbility()
@@ -251,7 +215,7 @@ func (g *Game) countKnowledge(ctx context.Context, now time.Time, b *bank.Bank) 
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT r.user_id, r.id, a.n, a.at, a.question_id, a.score
 		FROM runs r INDEXED BY runs_user CROSS JOIN answers a ON a.run_id = r.id WHERE NOT r.scripted`)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
 	var user, last int64 = 0, -1
@@ -260,19 +224,19 @@ func (g *Game) countKnowledge(ctx context.Context, now time.Time, b *bank.Bank) 
 	for rows.Next() {
 		var a given
 		if err := rows.Scan(&user, &a.run, &a.n, &a.at, &id, &a.score); err != nil {
-			return err
+			return nil, err
 		}
 		if user != last {
 			fold(last, list)
 			list, last = list[:0], user
 		}
 		var found bool
-		if a.q, found = b.Get(string(id)); found { // gone from the bank: not in a mastery
+		if a.q, found = b.Get(string(id)); found && !a.q.Extra().Untrue() { // gone from the bank, or untrue: not in a mastery
 			list = append(list, a)
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return err
+		return nil, err
 	}
 	fold(last, list)
 	for _, list := range by {
@@ -283,8 +247,7 @@ func (g *Game) countKnowledge(ctx context.Context, now time.Time, b *bank.Bank) 
 			return 1
 		})
 	}
-	g.known.snap.Store(&knowSnap{at: now, bank: b, by: by})
-	return nil
+	return by, nil
 }
 
 // ranked is a player's place on a board, before their name and look are read: on a board of knowledge, with their

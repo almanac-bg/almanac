@@ -8,15 +8,17 @@
 // only (bank.PicturesView): its words and options come with its time, and an answer before it is refused, so that
 // nobody reads a question off the clock. Between questions a player reads the answer and its fact for as long as they
 // like; a question of the day's ten dealt on its own date („На този ден“) shows its day's line with them (dealtOn). A
-// question left showing past its time counts as unanswered, whenever the run is next looked at. Everything a run does
+// question left showing past its time counts as unanswered, whenever the run is next looked at. A question is graded
+// against the version of it that showed, whatever the bank has become meanwhile (versions.go). Everything a run does
 // goes through the database, so a refresh, a second tab or a restart of the server changes nothing. A run left
 // half-way goes on where it stopped: the day's when the player comes back to it, a topic's when they start the same
 // topic again that day (StartTopic). A game played quicker than a person plays counts for its player alone (fair.go).
 //
 // A run played live (a live duel's, a Роял's) moves on its game's clock alone (driver): the game shows each question
-// and takes each answer (ShowLive and AnswerLive, ShowRoyal and AnswerRoyal), and the player's own Show, Start and
-// Answer refuse it, so that nobody sees a question before the others do, nor answers it outside its time. An answer
-// counts if it reaches the server within Grace of its time's end; its time is to when it arrived.
+// and takes each answer (ShowLive and AnswerLive, ShowRoyal and AnswerRoyal: graded through the deal it shows), and
+// the player's own Show, Start and Answer refuse it, so that nobody sees a question before the others do, nor answers
+// it outside its time. An answer counts if it reaches the server within Grace of its time's end; its time is to when
+// it arrived.
 //
 // A guest who signs in to their account brings everything along (Merge), and a player who goes leaves others'
 // history whole (Forget): merge.go, checked against the schema so that no table of a player's is left out.
@@ -108,12 +110,13 @@ type Game struct {
 	pace   RoyalPace // how often Роял plays, as of paceDay (RoyalPaceOf)
 	paceOn string
 
-	hard      hardnessCache // how hard each question is (mastery.go)
-	crowds    crowdCache    // how players have answered each question (crowd.go)
-	dayCrowds dayCrowdCache // how the day's players have answered its questions (crowd.go)
-	boards    boardCache    // the days' boards (board.go)
-	daysAhead daysCache     // today's questions and the days ahead's (ahead.go)
-	known     knowCache     // everyone's answers, for the boards of knowledge (knowledge.go)
+	hard      snapshot[*hardnesses] // how hard each question is (mastery.go)
+	crowds    snapshot[crowds]      // how players have answered each question (crowd.go)
+	dayCrowds dayCrowdCache         // how the day's players have answered its questions (crowd.go)
+	boards    boardCache            // the days' boards (board.go)
+	daysAhead daysCache             // today's questions and the days ahead's (ahead.go)
+	known     snapshot[knowledge]   // everyone's answers, for the boards of knowledge (knowledge.go)
+	versions  versions              // the questions' versions kept (versions.go)
 }
 
 func New(db *store.DB, b func() *bank.Bank) *Game {
@@ -123,10 +126,12 @@ func New(db *store.DB, b func() *bank.Bank) *Game {
 // Today is the day it is in Bulgaria, as the days are kept (2026-11-12).
 func (g *Game) Today() string { return g.Now().In(Bulgaria).Format(time.DateOnly) }
 
-// Pick is a question as a run holds it: which one, and how it's dealt.
+// Pick is a question as a run holds it: which one, how it's dealt, and, once it's shown, which version of it showed
+// (bank.Version: versions.go).
 type Pick struct {
 	ID   string `json:"id"`
 	Seed uint64 `json:"seed"`
+	V    string `json:"v,omitempty"`
 }
 
 // run is a run as the database has it.
@@ -285,15 +290,6 @@ type Result struct {
 	State  State           `json:"state"`
 }
 
-// deal finds a pick's question in the bank and deals it.
-func (g *Game) deal(p Pick) (bank.Dealt, bool) {
-	q, ok := g.Bank().Get(p.ID)
-	if !ok {
-		return nil, false
-	}
-	return q.Deal(p.Seed), true
-}
-
 // state builds what a player sees of a run.
 func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 	s := State{
@@ -364,8 +360,10 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 		given, shown = string(gr.Given), string(gr.Shown)
 	}
 	now := store.Ms(g.Now())
-	if _, err := tx.Exec(`INSERT INTO answers (run_id, n, question_id, given, shown, score, points, is_right, ms, at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, r.id, r.at, r.picks[r.at].ID, given, shown, gr.Score, w.Points, gr.Right, ms, now); err != nil {
+	p := r.picks[r.at]
+	if _, err := tx.Exec(`INSERT INTO answers (run_id, n, question_id, given, shown, score, points, is_right, ms, at, version)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, r.id, r.at, p.ID, given, shown, gr.Score, w.Points, gr.Right, ms, now,
+		g.versionOf(p)); err != nil {
 		return err
 	}
 	if err := g.markActive(tx, r.userID); err != nil {
@@ -459,10 +457,11 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 		}
 		if !r.finished && !r.shownAt.Valid {
 			start := g.Now()
-			if d, ok := g.deal(r.picks[r.at]); ok && bank.HasPictures(d.Question()) {
+			d, ok := g.deal(r.picks[r.at])
+			if ok && bank.HasPictures(d.Question()) {
 				start = start.Add(PictureWait)
 			}
-			if err := r.startAt(tx, start); err != nil {
+			if err := r.showAt(tx, start, d); err != nil {
 				return err
 			}
 		}
@@ -475,18 +474,19 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 	return s, err
 }
 
-// ShowLive puts question n of a live duel's run on screen, its time starting at at: the duel's own moment for it, the
-// same for both players, pictures or not (the duel keeps the time). It's out of step if the run isn't at n.
-func (g *Game) ShowLive(ctx context.Context, userID, runID int64, n int, at time.Time) error {
+// ShowLive puts question n of a live duel's run on screen, as the duel deals it (d: the version it shows, whatever the
+// bank has become since the duel began), its time starting at at: the duel's own moment for it, the same for both
+// players, pictures or not (the duel keeps the time). It's out of step if the run isn't at n, or d isn't its question.
+func (g *Game) ShowLive(ctx context.Context, userID, runID int64, n int, at time.Time, d bank.Dealt) error {
 	return g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		r, err := loadBy(tx, userID, runID, byDuel)
 		if err != nil {
 			return err
 		}
-		if r.finished || r.at != n {
+		if r.finished || r.at != n || d == nil || d.Question().Base().ID != r.picks[n].ID {
 			return ErrOutOfStep
 		}
-		return r.startAt(tx, at)
+		return r.showAt(tx, at, d)
 	})
 }
 
@@ -510,6 +510,26 @@ func (g *Game) Start(ctx context.Context, userID, runID int64, n int) (State, er
 	return s, err
 }
 
+// showAt shows the question now, d (nil: none to show, gone from the bank), its time starting at t: the run keeps
+// which version of it shows (Pick.V), so that it's graded against that one, whatever the bank becomes meanwhile.
+func (r *run) showAt(tx *sql.Tx, t time.Time, d bank.Dealt) error {
+	if d == nil {
+		return r.startAt(tx, t)
+	}
+	v := bank.Version(d.Question())
+	if v == r.picks[r.at].V {
+		return r.startAt(tx, t)
+	}
+	at := store.Ms(t)
+	if _, err := tx.Exec(`UPDATE runs SET shown_at = ?, questions = json_set(questions, '$[' || ? || '].v', ?) WHERE id = ?`,
+		at, r.at, v, r.id); err != nil {
+		return err
+	}
+	r.picks[r.at].V = v
+	r.shownAt = sql.NullInt64{Int64: at, Valid: true}
+	return nil
+}
+
 // startAt keeps when the question showing starts its time.
 func (r *run) startAt(tx *sql.Tx, t time.Time) error {
 	at := store.Ms(t)
@@ -525,18 +545,19 @@ func (r *run) startAt(tx *sql.Tx, t time.Time) error {
 // taken the first time, as it was, and changes nothing (again). One before the question's time runs (still waiting for
 // its pictures), or to a run a live game moves on (driver), is out of step.
 func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage) (Result, error) {
-	return g.answer(ctx, userID, runID, n, answer, g.Now(), byPlayer)
+	return g.answer(ctx, userID, runID, n, answer, g.Now(), byPlayer, nil)
 }
 
-// AnswerLive grades a player's answer to question n of their live duel, which arrived at at: its time is to then,
-// whatever it waited for after (the duel busy with the other's answer).
-func (g *Game) AnswerLive(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time) (Result, error) {
-	return g.answer(ctx, userID, runID, n, answer, at, byDuel)
+// AnswerLive grades a player's answer to question n of their live duel, which arrived at at, against the question as
+// the duel shows it (d): its time is to then, whatever it waited for after (the duel busy with the other's answer).
+func (g *Game) AnswerLive(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time, d bank.Dealt) (Result, error) {
+	return g.answer(ctx, userID, runID, n, answer, at, byDuel, d)
 }
 
 // answer grades an answer that arrived at at, to a run that by moves on: its player's, or the live game's it's played
-// in, which keeps its pace (and takes an answer sent again itself).
-func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time, by driver) (Result, error) {
+// in, which keeps its pace (and takes an answer sent again itself), and grades against the deal it shows (shown).
+// Otherwise it's graded against the version the run showed (Pick.V).
+func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time, by driver, shown bank.Dealt) (Result, error) {
 	var res Result
 	var r *run
 	var d bank.Dealt
@@ -554,8 +575,12 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 			return ErrOutOfStep
 		}
 		defer func() { finished = r.finished }()
-		var ok bool
-		d, ok = g.deal(r.picks[r.at])
+		ok := false
+		if shown != nil {
+			d, ok = shown, shown.Question().Base().ID == r.picks[r.at].ID
+		} else {
+			d, ok = g.deal(r.picks[r.at])
+		}
 		if !ok || !r.shownAt.Valid {
 			return ErrOutOfStep
 		}

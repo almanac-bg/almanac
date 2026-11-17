@@ -133,6 +133,9 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.limits.off = cfg.Dev
 	s.bank.Store(d.Bank)
 	s.game = play.New(d.DB, s.bank.Load)
+	if err := s.game.Keep(context.Background(), d.Bank); err != nil { // its versions, before anything is shown
+		return nil, err
+	}
 	s.game.DuelNews = s.duelNews
 	s.game.RoyalNews = s.royalNews
 	s.game.LeagueNews = s.leagueNews

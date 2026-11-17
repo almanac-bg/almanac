@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"log/slog"
 	"sync"
 	"time"
@@ -9,10 +10,12 @@ import (
 )
 
 // A bank reload (cmd/almanac: SIGHUP, after deploy/bank.sh pulls) offers the server a bank already loaded and checked.
-// A play keeps only its picks, and is graded at each answer against the bank in play then (package play); Роял shows
-// the questions it dealt at the start, but grades through that bank too. So a new bank never goes into play while Роял
-// is on, from its lobby until its games are over: it's held, and goes in as the evening ends. /api/health tells which
-// bank is played, which is held, and which was refused, for bank.sh to confirm what became of its pull.
+// The game keeps its questions' versions first (play.Game.Keep): a play is graded against the version it showed,
+// whatever the bank has become since, and a live game (a live duel, Роял, a room) through the questions it dealt. Even
+// so, a new bank never goes into play while Роял is on, from its lobby until its games are over: the evening's
+// questions are one game for fifty, and nothing of it changes under them. It's held, and goes in as the evening ends.
+// /api/health tells which bank is played, which is held, and which was refused, for bank.sh to confirm what became of
+// its pull.
 
 // banks is what became of the banks offered.
 type banks struct {
@@ -40,9 +43,22 @@ type RefusedBank struct {
 	At     time.Time `json:"at"`
 }
 
-// SetBank puts a bank in play at once, whatever is under way: a play under way is graded against it from its next
-// answer. A reload goes through OfferBank instead.
-func (s *Server) SetBank(b *bank.Bank) { s.bank.Store(b) }
+// SetBank puts a bank in play at once, whatever is under way (its versions kept first: a question showing is graded
+// as it showed). A reload goes through OfferBank instead.
+func (s *Server) SetBank(b *bank.Bank) {
+	s.keep(b)
+	s.bank.Store(b)
+}
+
+// keep keeps a bank's versions of its questions, before it goes into play (play.Game.Keep). One that can't be kept
+// still goes in: a question shown from it is graded as it showed while it's in play, and only once it's gone would
+// that version be lost.
+func (s *Server) keep(b *bank.Bank) {
+	if err := s.game.Keep(context.Background(), b); err != nil {
+		slog.Error("keeping the bank's versions", "commit", b.Commit, "err", err)
+		s.Problem("bank: its questions' versions couldn't be kept")
+	}
+}
 
 // Bank is the bank in play.
 func (s *Server) Bank() *bank.Bank { return s.bank.Load() }
@@ -62,6 +78,7 @@ func (s *Server) Banks() []*bank.Bank {
 // OfferBank puts a newly loaded bank in play, or holds it while Роял is on (then it says so). It replaces a bank held
 // before it, and clears a refusal: a good bank came after it.
 func (s *Server) OfferBank(b *bank.Bank) (held bool) {
+	s.keep(b)
 	s.banks.mu.Lock()
 	defer s.banks.mu.Unlock()
 	s.banks.refused = nil

@@ -43,8 +43,10 @@ type Head struct {
 	// Category comes from the file the question is in (questions/<category>.json).
 	Category string `json:"-"`
 
-	// subjects are what the question names as its subject (Subjects), worked out as the bank loads.
+	// subjects are what the question names as its subject (Subjects), and version which version of it this is
+	// (Version), worked out as the bank loads.
 	subjects []string
+	version  string
 }
 
 // Tail is what every question may end with: a picture, the fact behind the answer, when it was added, changed and

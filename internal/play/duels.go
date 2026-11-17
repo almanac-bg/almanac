@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -376,7 +377,7 @@ const (
 )
 
 // recordedRun is another player's finished run of ten questions (none still played against: a duel's, a challenge's),
-// all still in the bank, none of today's and none due
+// all still in play as it played them (asPlayed: none retired, none changed since), none of today's and none due
 // for review (dayBars.now; a day's run never), played at a person's speed (not marked a script's: fair.go), to play
 // against: a real game (RecordingRights right or more, RecordingMissed not answered at most), by a player whose rating
 // is within RecordingBand of the player's, the one with the fewest questions the player has seen (seen, read before
@@ -393,7 +394,7 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 		return nil, err
 	}
 	// A script's game is left out before the limit, so that a script's many games can't push the people's out of it.
-	rows, err := tx.Query(`SELECT r.id, r.questions, r.rights, u.rating,
+	rows, err := tx.Query(`SELECT r.id, r.questions, r.rights, u.rating, r.finished_at,
 			CASE WHEN r.kind = 'topic' THEN coalesce(r.category, '') ELSE '' END,
 			(SELECT count(*) FROM answers a WHERE a.run_id = r.id AND a.given IS NULL)
 		FROM runs r JOIN users u ON u.id = r.user_id
@@ -415,11 +416,11 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 		fewest[i] = Length + 1
 	}
 	for rows.Next() {
-		var id int64
+		var id, finished int64
 		var raw string
 		var rights, rating, missed int
 		var topic string
-		if err := rows.Scan(&id, &raw, &rights, &rating, &topic, &missed); err != nil {
+		if err := rows.Scan(&id, &raw, &rights, &rating, &finished, &topic, &missed); err != nil {
 			return nil, err
 		}
 		var picks []Pick
@@ -428,7 +429,7 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 		}
 		n, whole := 0, true
 		for _, p := range picks {
-			if _, ok := b.Get(p.ID); !ok || days.now[p.ID] {
+			if !asPlayed(b, p, finished) || days.now[p.ID] {
 				whole = false
 			}
 			if seen[p.ID] || days.all[p.ID] {
@@ -458,6 +459,20 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 		}
 	}
 	return nil, nil
+}
+
+// asPlayed says whether a finished run's question is still in play as the run played it (by finished, ms): not
+// retired, and the version it showed (one from before versions were kept: not changed since). A recording replays
+// its answers against it, and a run's answers to another version say nothing of this one.
+func asPlayed(b *bank.Bank, p Pick, finished int64) bool {
+	q, ok := b.Get(p.ID)
+	switch {
+	case !ok || q.Extra().Retired:
+		return false
+	case p.V != "":
+		return bank.Version(q) == p.V
+	}
+	return changedMs(q) <= finished
 }
 
 func abs(n int) int {

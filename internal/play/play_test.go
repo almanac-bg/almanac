@@ -166,7 +166,7 @@ func (w *world) show(user, runID int64) State {
 	if w.live(runID) {
 		s, err := w.g.State(ctx, user, runID)
 		if err == nil {
-			err = w.g.ShowLive(ctx, user, runID, s.At, w.now)
+			err = w.g.ShowLive(ctx, user, runID, s.At, w.now, w.dealt(runID, s.At))
 		}
 		if err != nil {
 			w.t.Fatal(err)
@@ -187,9 +187,29 @@ func (w *world) show(user, runID int64) State {
 // answer answers a run's question n now, as its player does; a live duel's, through its duel.
 func (w *world) answer(user, runID int64, n int, a json.RawMessage) (Result, error) {
 	if w.live(runID) {
-		return w.g.AnswerLive(w.t.Context(), user, runID, n, a, w.now)
+		return w.g.AnswerLive(w.t.Context(), user, runID, n, a, w.now, w.dealt(runID, n))
 	}
 	return w.g.Answer(w.t.Context(), user, runID, n, a)
+}
+
+// crowd is how players have answered a question as the bank has it, as last counted.
+func (w *world) crowd(id string) *bank.Crowd {
+	w.t.Helper()
+	q, ok := w.b.Get(id)
+	if !ok {
+		w.t.Fatal("no question", id)
+	}
+	return w.g.Crowd(q)
+}
+
+// dealt is a run's question n as a live game deals it: the version the run shows, if it shows one yet, else the bank's.
+func (w *world) dealt(runID int64, n int) bank.Dealt {
+	w.t.Helper()
+	d, ok := w.g.Deal(w.picks(runID)[n])
+	if !ok {
+		w.t.Fatalf("no question %d of run %d", n, runID)
+	}
+	return d
 }
 
 func repeat(f func(int64, int) json.RawMessage, n int) []func(int64, int) json.RawMessage {
@@ -2208,8 +2228,7 @@ func TestKnowledgeCounted(t *testing.T) {
 	// Once the count is old, the next look counts again (in the background), and the one after has Bo.
 	w.wait(knowFresh)
 	_, _ = w.g.KnowledgeBoard(ctx, ana, false, "")
-	w.g.known.counting.Lock() // the count under way, done
-	w.g.known.counting.Unlock()
+	w.g.known.settle() // the count under way, done
 	if k, _ := w.g.KnowledgeBoard(ctx, ana, false, ""); len(k.Top) != 2 || k.Place != 1 || k.Top[1].Value > 10 {
 		t.Fatalf("Ana, after the next count: %+v", k)
 	}
@@ -2339,7 +2358,7 @@ func TestCrowds(t *testing.T) {
 	if err := w.g.CountCrowds(ctx); err != nil {
 		t.Fatal(err)
 	}
-	c := w.g.Crowd(first)
+	c := w.crowd(first)
 	if c == nil || c.Answers != CrowdFrom || math.Abs(c.Right-0.75) > 1e-9 {
 		t.Fatalf("the first question's crowd: %+v", c)
 	}
@@ -2356,7 +2375,7 @@ func TestCrowds(t *testing.T) {
 	if rev.Crowd == nil || rev.Crowd.Answers != CrowdFrom {
 		t.Fatalf("revealed %+v", rev.Crowd)
 	}
-	if second := w.picks(s.ID)[1].ID; w.g.Crowd(second) != nil {
+	if second := w.picks(s.ID)[1].ID; w.crowd(second) != nil {
 		t.Fatal("a question with one answer showed a crowd")
 	}
 	// A fix to the fact alone (updated) keeps the crowd: the question asked the same.
@@ -2365,7 +2384,7 @@ func TestCrowds(t *testing.T) {
 	if err := w.g.CountCrowds(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if c := w.g.Crowd(first); c == nil {
+	if c := w.crowd(first); c == nil {
 		t.Fatal("a fix to the fact cost a question its crowd")
 	}
 	// Answers from before what a question asks last changed were to another question: they don't count.
@@ -2373,7 +2392,7 @@ func TestCrowds(t *testing.T) {
 	if err := w.g.CountCrowds(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if c := w.g.Crowd(first); c != nil {
+	if c := w.crowd(first); c != nil {
 		t.Fatalf("a changed question kept its crowd: %+v", c)
 	}
 }
