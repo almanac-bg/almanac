@@ -69,6 +69,7 @@ let {
   standingCard,
   clock,
   coming,
+  dayWord,
   when,
 } = {} as Kit;
 
@@ -249,6 +250,7 @@ export function royal(kit: Kit) {
     standingCard,
     clock,
     coming,
+    dayWord,
     when,
   } = kit);
   title("Роял");
@@ -343,10 +345,26 @@ function hush(begin: boolean): void {
   music = null;
 }
 
+/** What Роял is, in a sentence: when, and how many on how many questions. */
 const about = (nightly?: boolean) =>
-  `${nightly ? "Всяка вечер" : "Петък, събота и неделя"} в 21:00: до 50 души, 15 въпроса, в един и същи миг. Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни, а при равни — по-бързите. Последния въпрос играят трима.`;
+  `${nightly ? "Всяка вечер" : "Петък, събота и неделя"} в 21:00. До 50 души, 15 въпроса.`;
 
-/** Before the lobby opens: when the next one is, your rating, and how your last ones went. */
+/** How it's played, folded under the evening: the cuts, and the final. */
+const rules =
+  "Всички получават един и същи въпрос в един и същи миг. Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни, а при равни — по-бързите. Последния въпрос играят трима. Отпадналите играят до края за себе си.";
+
+/** How long until a moment, in words: „След 3 ч и 12 мин“; in the last hour to the second („След 12:05 мин“); nothing
+ * a day or more ahead (the day says it). */
+function until(ms: number): string {
+  if (ms >= 24 * 3600_000) return "";
+  if (ms < 3600_000) return `След ${left(ms, true)}`;
+  const minutes = Math.ceil(ms / 60_000);
+  const hours = Math.floor(minutes / 60);
+  return minutes % 60 ? `След ${hours} ч и ${minutes % 60} мин` : `След ${hours} ч`;
+}
+
+/** Before the lobby opens: the next evening's start, large, and the time to it; „Ще дойда“; how it's played, folded;
+ * your rating, and how your last ones went. */
 function soon(view: () => Evening, now: Signal<number>): Child {
   const past = signal<{ royals: Past[]; standing: Standing } | null>(null);
   if (user.peek()) api<{ royals: Past[]; standing: Standing }>("GET", "/api/royal").then(past.set, () => {});
@@ -363,21 +381,20 @@ function soon(view: () => Evening, now: Signal<number>): Child {
     ),
     h(
       "section",
-      { class: "card royal-next" },
-      h("p", { class: "kicker" }, "Следващият Роял"),
-      // The day in words, the hour in the numerals: „днес в“ small, „21:00“ big.
-      h("strong", { class: "royal-when" }, () => {
-        const at = when(view().startsAt, now());
-        const cut = at.lastIndexOf(" ") + 1;
-        return [h("span", { class: "num-word" }, at.slice(0, cut)), at.slice(cut)];
+      { class: "card hero royal-next" },
+      h("p", { class: "kicker" }, () => {
+        const day = dayWord(view().startsAt, now());
+        const evening = day === "днес" ? "тази вечер" : day === "утре" ? "утре вечер" : day.replace(/^във? /, "");
+        return `Следващият Роял · ${evening}`;
       }),
-      h("p", { class: "muted" }, () => {
-        // When; a countdown too in the last hour.
-        const ms = view().opensAt - now();
-        return `Входът се отваря ${when(view().opensAt, now())}${ms < 3600_000 ? `, след ${left(ms)}` : ""}.`;
-      }),
-      plan(),
+      h("strong", { class: "royal-when" }, () => clock(view().startsAt)),
+      h("p", { class: "royal-countdown", hidden: () => !until(view().startsAt - now()) }, () =>
+        until(view().startsAt - now()),
+      ),
+      h("p", { class: "muted" }, () => `Входът се отваря в ${clock(view().opensAt)}.`),
+      plan(true),
     ),
+    h("details", { class: "more" }, h("summary", null, "Как се играе"), h("p", null, rules)),
     () => {
       const d = past();
       // The division once a game has moved the rating (play/unfold.go).
@@ -386,9 +403,10 @@ function soon(view: () => Evening, now: Signal<number>): Child {
   );
 }
 
-/** „Ще дойда“: saying you'll come to the next evening, and how many have (before the lobby opens, and under an evening's
- * standings). Those who said so are called as its lobby opens, if notifications are on here. */
-function plan(): Child {
+/** „Ще дойда“: saying you'll come to the next evening, and how many have (before the lobby opens, the gold button
+ * there: `main`; and under an evening's standings). Those who said so are called as its lobby opens, if notifications
+ * are on here. */
+function plan(main = false): Child {
   const tonight = signal<Tonight | null>(null);
   const notified = signal<boolean | null>(null);
   const busy = signal(false);
@@ -449,7 +467,11 @@ function plan(): Child {
                 h("button", { class: "link", disabled: busy, onclick: () => say(false) }, "Няма да успея"),
               ),
             ]
-          : h("button", { class: "btn", disabled: busy, onclick: () => say(true) }, "Ще дойда"),
+          : h(
+              "button",
+              { class: main ? "btn primary big" : "btn", disabled: busy, onclick: () => say(true) },
+              "Ще дойда",
+            ),
       ];
     },
     () => error() && h("p", { class: "bad", role: "alert" }, error()),

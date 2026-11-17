@@ -7,24 +7,25 @@ const right: Mark = { points: 1000, right: true };
 const close: Mark = { points: 400, right: false, partial: true };
 const wrong: Mark = { points: 0, right: false };
 
-test("the day's result is shared as the date, the score and streak, a square for each question, and the site", () => {
+test("the day's result is shared as its issue and date, the score and streak, a square for each question, and the site", () => {
   const trail = [right, right, wrong, right, close, right, right, right, right, wrong];
   assert.equal(
-    dayShareText("2026-11-14", trail, 10, 12),
-    ["АЛМАНАХ · 14 ноември", "7 от 10 · серия 12", "🟩🟩⬜🟩🟨🟩🟩🟩🟩⬜", "almanac.bg"].join("\n"),
+    dayShareText("2026-11-14", 3, trail, 10, 12),
+    ["АЛМАНАХ · Брой 3 · 14 ноември", "7 от 10 · серия 12", "🟩🟩⬜🟩🟨🟩🟩🟩🟩⬜", "almanac.bg"].join("\n"),
   );
 });
 
 test("a streak of one day isn't told, and a question not answered is a red square", () => {
   assert.equal(
-    dayShareText("2027-01-01", [right, close], 10, 1),
-    ["АЛМАНАХ · 1 януари", "1 от 10", "🟩🟨⬜⬜⬜⬜⬜⬜⬜⬜", "almanac.bg"].join("\n"),
+    dayShareText("2027-01-01", 51, [right, close], 10, 1),
+    ["АЛМАНАХ · Брой 51 · 1 януари", "1 от 10", "🟩🟨⬜⬜⬜⬜⬜⬜⬜⬜", "almanac.bg"].join("\n"),
   );
 });
 
-test("nothing in it gives an answer away: only the date, numbers, squares and the site", () => {
+test("nothing in it gives an answer away: only the date (a day before the first issue has none), numbers, squares and the site", () => {
   const text = dayShareText(
     "2026-05-09",
+    0,
     [right, wrong, right, right, right, right, right, right, right, right],
     10,
     3,
@@ -35,9 +36,9 @@ test("nothing in it gives an answer away: only the date, numbers, squares and th
 test("a right answer few of the day's players got is told, by its place and their share, never its answer", () => {
   const trail = [right, right, wrong, right, close, right, right, right, right, wrong];
   assert.equal(
-    dayShareText("2026-11-14", trail, 10, 12, { n: 6, right: 0.12 }),
+    dayShareText("2026-11-14", 3, trail, 10, 12, { n: 6, right: 0.12 }),
     [
-      "АЛМАНАХ · 14 ноември",
+      "АЛМАНАХ · Брой 3 · 14 ноември",
       "7 от 10 · серия 12",
       "🟩🟩⬜🟩🟨🟩🟩🟩🟩⬜",
       "Познах въпрос 7, който знаят само 12%",
@@ -46,22 +47,22 @@ test("a right answer few of the day's players got is told, by its place and thei
   );
   // A quarter is still few; nobody else is said so; more than a quarter, or none known, isn't told.
   assert.match(
-    dayShareText("2026-11-14", trail, 10, 1, { n: 0, right: 0.25 }),
+    dayShareText("2026-11-14", 3, trail, 10, 1, { n: 0, right: 0.25 }),
     /\nПознах въпрос 1, който знаят само 25%\n/,
   );
   assert.match(
-    dayShareText("2026-11-14", trail, 10, 1, { n: 3, right: 0 }),
+    dayShareText("2026-11-14", 3, trail, 10, 1, { n: 3, right: 0 }),
     /\nПознах въпрос 4, който не знае никой друг\n/,
   );
   for (const rarest of [{ n: 3, right: 0.26 }, null, undefined]) {
-    assert.equal(dayShareText("2026-11-14", trail, 10, 1, rarest).split("\n").length, 4);
+    assert.equal(dayShareText("2026-11-14", 3, trail, 10, 1, rarest).split("\n").length, 4);
   }
 });
 
 test("it ends with the player's own link, when there is one, and still has no words of invitation", () => {
   const trail = [right, right, wrong, right, close, right, right, right, right, wrong];
   const link = "https://almanac.bg/f/abcd2345";
-  const text = dayShareText("2026-11-14", trail, 10, 12, { n: 6, right: 0.12 }, link);
+  const text = dayShareText("2026-11-14", 3, trail, 10, 12, { n: 6, right: 0.12 }, link);
   assert.equal(text.split("\n").at(-1), link);
   assert.equal(text.split("\n").length, 5);
   assert.doesNotMatch(text, /ела|покан|играй|опитай|можеш|а ти/iu);

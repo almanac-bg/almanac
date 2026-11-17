@@ -117,8 +117,8 @@ export async function playedFair(page: Page): Promise<void> {
 }
 
 /** Makes the player one who has answered these questions right (in a game of nothing), straight in the test server's
- * database: their facts are in the Алманах. */
-export async function knows(page: Page, ids: string[]): Promise<void> {
+ * database: their facts are in the Алманах, learned at a moment (`at`, ms; now if not given). */
+export async function knows(page: Page, ids: string[], at = Date.now()): Promise<void> {
   await inDB(page, (db, id) => {
     const run = db
       .prepare(`INSERT INTO runs (user_id, kind, category, questions, started_at, finished_at)
@@ -126,7 +126,7 @@ export async function knows(page: Page, ids: string[]): Promise<void> {
       .run(id).lastInsertRowid;
     const add = db.prepare(`INSERT INTO answers (run_id, n, question_id, given, score, points, is_right, ms, at)
       VALUES (?, ?, ?, '{}', 1, 0, 1, 3000, ?)`);
-    for (const [n, q] of ids.entries()) add.run(run, n, q, Date.now());
+    for (const [n, q] of ids.entries()) add.run(run, n, q, at + n);
   });
 }
 

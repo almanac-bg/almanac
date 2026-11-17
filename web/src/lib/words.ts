@@ -11,6 +11,39 @@ export function onDay(day: string): string {
   return `${/^[вф]/i.test(name) ? "във" : "в"} ${name}`;
 }
 
+/** A day's weekday (`day` YYYY-MM-DD), with a capital: „Вторник“. */
+export function weekday(day: string): string {
+  const name = new Intl.DateTimeFormat("bg", { weekday: "long", timeZone: "UTC" }).format(new Date(`${day}T12:00:00Z`));
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+const months = [
+  "януари",
+  "февруари",
+  "март",
+  "април",
+  "май",
+  "юни",
+  "юли",
+  "август",
+  "септември",
+  "октомври",
+  "ноември",
+  "декември",
+];
+
+/** A day (YYYY-MM-DD) as the game writes it: „17 ноември“, the month in lower case. */
+export function dateWords(day: string): string {
+  const [, month = 1, date = 1] = day.split("-").map(Number);
+  return `${date} ${months[month - 1]}`;
+}
+
+/** A day's issue (play/issue.go) and its date, as the game's dateline: „Брой 6 · 17 ноември“; the date alone without
+ * one. */
+export function issueWords(issue: number | undefined, day: string): string {
+  return issue ? `Брой ${issue} · ${dateWords(day)}` : dateWords(day);
+}
+
 const vowel = /[аъоуеиюяѝ]/;
 /** A stop or a hiss with р or л after it: they begin a syllable together. */
 const onset = /^[бвгдзкпстфхжшчц][рл]$/;

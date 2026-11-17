@@ -2,22 +2,8 @@
 // (the one place the game uses emoji: in the text shared, never on a screen) and where it's played: the player's own
 // link, which brings whoever opens it to the day and offers them the player's friendship (screens/invite.ts).
 
+import { issueWords } from "../lib/words.ts";
 import type { Mark } from "./types.ts";
-
-const months = [
-  "януари",
-  "февруари",
-  "март",
-  "април",
-  "май",
-  "юни",
-  "юли",
-  "август",
-  "септември",
-  "октомври",
-  "ноември",
-  "декември",
-];
 
 /** A share as the game writes it: „58%“, and „под 1%“ for what rounds to nothing but isn't. */
 export function percent(x: number): string {
@@ -27,19 +13,20 @@ export function percent(x: number): string {
 /** The share of players right at or under which a right answer is a rare one, told and shared: a quarter. */
 export const rare = 0.25;
 
-/** The day's result to share: „АЛМАНАХ · 14 ноември“, „8 от 10 · серия 12“ (the streak from two days), a square for
- * each of the ten (🟩 right, 🟨 close, ⬜ wrong or not answered), the right answer the fewest of the day's other
- * players got, if few did (`rarest`: its place and their share right: „Познах въпрос 7, който знаят само 12%“), and
- * the player's link (their invite), or „almanac.bg“ without one. `day` is YYYY-MM-DD. */
+/** The day's result to share: „АЛМАНАХ · Брой 3 · 14 ноември“ (the day's issue, play/issue.go), „8 от 10 · серия 12“
+ * (the streak from two days), a square for each of the ten (🟩 right, 🟨 close, ⬜ wrong or not answered), the right
+ * answer the fewest of the day's other players got, if few did (`rarest`: its place and their share right: „Познах
+ * въпрос 7, който знаят само 12%“), and the player's link (their invite), or „almanac.bg“ without one. `day` is
+ * YYYY-MM-DD. */
 export function dayShareText(
   day: string,
+  issue: number | undefined,
   trail: Mark[],
   total: number,
   streak: number,
   rarest?: { n: number; right: number } | null,
   link = "almanac.bg",
 ): string {
-  const [, month = 1, date = 1] = day.split("-").map(Number);
   const rights = trail.filter((m) => m.right).length;
   const squares = Array.from({ length: total }, (_, i) => {
     const m = trail[i];
@@ -50,7 +37,7 @@ export function dayShareText(
       ? `Познах въпрос ${rarest.n + 1}, който ${rarest.right ? `знаят само ${percent(rarest.right)}` : "не знае никой друг"}`
       : "";
   return [
-    `АЛМАНАХ · ${date} ${months[month - 1]}`,
+    `АЛМАНАХ · ${issueWords(issue, day)}`,
     streak > 1 ? `${rights} от ${total} · серия ${streak}` : `${rights} от ${total}`,
     squares,
     few,

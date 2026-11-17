@@ -26,6 +26,9 @@ func TestStreakEndedOnTheDay(t *testing.T) {
 	ana, anaID := g.guest()
 	g.daysPlayed(anaID, 5, 4, 3) // three days; the reserve kept the 2nd day back, the 1st ended it
 	_, today := ana.call("GET", "/api/day", nil)
+	if want := play.Issue(g.srv.game.Today()); want < 1 || today["issue"] != float64(want) {
+		t.Fatalf("the day's issue: %v, want %d", today["issue"], want)
+	}
 	repair, _ := today["repair"].(map[string]any)
 	if repair == nil || repair["days"] != 3.0 || repair["day"] != false || repair["other"] != false || today["ended"] != nil {
 		t.Fatalf("a streak of three, ended yesterday: %v, %v", today["repair"], today["ended"])

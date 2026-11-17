@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -13,14 +14,20 @@ import (
 // achievements of their own (a hundred, a thousand, five thousand, and every fact of a topic), and Профил says how
 // many there are.
 
-// Learned is one fact in a player's almanac: the question, its answer, and the fact behind it.
+// Learned is one fact in a player's almanac: the question, its answer, and the fact behind it; and the day it was
+// learned (first answered right, in Bulgaria) with that day's issue (Issue), which head a day's facts. A statement to
+// judge true or not has no question: its answer is the statement itself, Untrue if it isn't so (the bank keeps no
+// corrected one).
 type Learned struct {
 	ID       string `json:"id"`
 	Category string `json:"category"`
-	Question string `json:"question"`
+	Question string `json:"question,omitempty"`
 	Answer   string `json:"answer"`
+	Untrue   bool   `json:"untrue,omitempty"`
 	Fact     string `json:"fact"`
-	At       int64  `json:"at"` // when it was first answered right
+	At       int64  `json:"at"`
+	Day      string `json:"day"`
+	Issue    int    `json:"issue,omitempty"`
 }
 
 // AlmanacPage is how many facts a page of Моят Алманах shows: a few screens' worth on a phone. The collection grows
@@ -74,8 +81,13 @@ func (g *Game) learned(ctx context.Context, userID int64, fn func(q bank.Questio
 
 // learnedAs is a learned question as its almanac shows it.
 func learnedAs(q bank.Question, at int64) Learned {
-	return Learned{ID: q.Base().ID, Category: q.Base().Category, Question: q.Base().Text, Answer: bank.AnswerText(q),
-		Fact: q.Extra().Fact, At: at}
+	day := time.UnixMilli(at).In(Bulgaria).Format(time.DateOnly)
+	l := Learned{ID: q.Base().ID, Category: q.Base().Category, Question: q.Base().Text, Answer: bank.AnswerText(q),
+		Fact: q.Extra().Fact, At: at, Day: day, Issue: Issue(day)}
+	if tf, ok := q.(*bank.TrueFalse); ok {
+		l.Question, l.Answer, l.Untrue = "", tf.Text, !tf.Answer
+	}
+	return l
 }
 
 // AlmanacOf reads a page of a player's collection: up to limit facts of a topic ("": of all), the first after from (the

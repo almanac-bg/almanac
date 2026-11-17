@@ -1,5 +1,5 @@
 // Начало: where every game starts, on one short screen, and the day is its heart. At the top the player's streak and
-// level (and, once, what came of the days just missed — a broken streak to win back while it can be — or of a duel a friend has played); then the day's ten questions, the same for everyone, once (left half-way, where the player stopped and the way
+// level (and, once, what came of the days just missed — a broken streak to win back while it can be — or of a duel a friend has played); then the day's ten questions, the same for everyone, once, as the day's issue („Брой 6“, play/issue.go) (left half-way, where the player stopped and the way
 // on, and the streak at stake while they wait; once played, how they went, the result to share, and tomorrow); the
 // day's goals; and every other way to play a tap away: by topic, and — once a first game is finished —
 // with others. The day's boards are in Класации. The game unfolds by the days played (play/unfold.go): a first day has
@@ -19,7 +19,7 @@ import { place } from "../lib/ordinal.ts";
 import { needsHomeScreen, pushable, pushOn, turnOn } from "../lib/push.ts";
 import { title } from "../lib/router.ts";
 import { feelKit } from "../lib/sound.ts";
-import { onDay } from "../lib/words.ts";
+import { dateWords, issueWords, onDay, weekday } from "../lib/words.ts";
 import { dayInBulgaria } from "../lib/year.ts";
 import { player, playing, user } from "../state.ts";
 import {
@@ -42,6 +42,8 @@ import { yearCard } from "./year.ts";
 
 interface Today {
   day: string;
+  /** The day's issue: its number from the first day of the day's ten (play/issue.go), the same for everyone. */
+  issue?: number;
   streak: number;
   /** This week's days played, Monday first (for a player who has played). */
   week?: boolean[];
@@ -78,11 +80,6 @@ interface Today {
   /** A friend has just played the duel the player started (told once). */
   duel?: FriendPlayed | null;
 }
-
-const longDate = (day: string) =>
-  new Intl.DateTimeFormat("bg", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(
-    new Date(`${day}T12:00:00Z`),
-  );
 
 export function today() {
   title();
@@ -190,7 +187,7 @@ export function today() {
           ? summary(
               run,
               [
-                h("div", { class: "day-line" }, h("span", { class: "kicker" }, longDate(t.day)), () => {
+                h("div", { class: "day-line" }, h("span", { class: "kicker" }, issueWords(t.issue, t.day)), () => {
                   const b = fresh().board;
                   return b.place
                     ? h("a", { class: "place-line", href: "/ranks" }, `${place(b.place, b.players)} днес`)
@@ -210,7 +207,8 @@ export function today() {
               {
                 main: shareButton(
                   "Сподели",
-                  () => dayShareText(t.day, run.trail, run.total, fresh().streak, fresh().rarest, fresh().invite),
+                  () =>
+                    dayShareText(t.day, t.issue, run.trail, run.total, fresh().streak, fresh().rarest, fresh().invite),
                   undefined,
                   true,
                   () => tally("share:day"),
@@ -385,8 +383,10 @@ function grow(row: HTMLElement, was: Today, now: Today, delay: number): void {
     );
 }
 
-/** The day's ten, not played yet: what they are, and the gold button; or, left half-way (`marks`: how the questions
- * answered went), where the player stopped, and the way on from there; and what went wrong starting them (`error`). */
+/** The day's ten, not played yet, as the day's issue: its dateline (the weekday and the issue over the date, set
+ * large), what they are, and the gold button; or, left half-way (`marks`: how the questions answered went), where the
+ * player stopped, the pips so far, and the way on from there; and what went wrong starting them (`error`). Before
+ * play there are no pips: they'd measure nothing yet. */
 function dayCard(t: Today, start: () => void, marks: Mark[], error: string): Child {
   const players = t.board.players;
   const at = marks.length;
@@ -394,10 +394,20 @@ function dayCard(t: Today, start: () => void, marks: Mark[], error: string): Chi
     "section",
     { class: "card hero day" },
     h(
+      "header",
+      { class: "masthead" },
+      h(
+        "p",
+        { class: "kicker masthead-line" },
+        h("span", null, weekday(t.day)),
+        t.issue ? h("span", null, `Брой ${t.issue}`) : null,
+      ),
+      h("p", { class: "masthead-date" }, h("time", { datetime: t.day }, dateWords(t.day))),
+    ),
+    h(
       "div",
       { class: "intro" },
-      h("p", { class: "kicker" }, longDate(t.day)),
-      h("h1", null, "Десет въпроса за днес"),
+      h("h1", { class: "day-title" }, "Десет въпроса за днес"),
       h(
         "p",
         { class: "muted" },
@@ -407,7 +417,7 @@ function dayCard(t: Today, start: () => void, marks: Mark[], error: string): Chi
       ),
       stakeLine(t.streak, t.reserve ?? 0),
     ),
-    trail(marks, 10, at ? at : -1),
+    at ? trail(marks, 10, at) : null,
     h("button", { class: "btn primary big", onclick: start }, at ? "Продължи" : "Започни"),
     error ? h("p", { class: "bad", role: "alert" }, error) : null,
     at

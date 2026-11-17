@@ -19,7 +19,7 @@ import { go, title } from "./lib/router.ts";
 import { feelKit, liveAudio, loadFeel, play, playAnswer, playCount, soundOn } from "./lib/sound.ts";
 import { withName } from "./lib/words.ts";
 import type { DuelView } from "./screens/duel.ts";
-import { clock, coming, when } from "./screens/modes.ts";
+import { clock, coming, dayWord, when } from "./screens/modes.ts";
 import { mixes } from "./screens/rooms.ts";
 import { categories, hostCss, outcomeCss, player, playing, topics, user } from "./state.ts";
 import {
@@ -49,6 +49,7 @@ export const kit = {
   categories,
   clock,
   coming,
+  dayWord,
   computed,
   countdown,
   crowdLine,

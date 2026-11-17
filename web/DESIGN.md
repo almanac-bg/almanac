@@ -29,11 +29,18 @@ three when you add or change a screen.
 
 Four main places, in a bar at the bottom of a phone (in the header on a big screen). Nothing else goes in the bar.
 
-- **Начало** (`/`): the day first. The streak and the level side by side (each a way to Профил); the day's ten (left
-  half-way, the same card with where the player stopped, „Следва въпрос 4 от 10“, and „Продължи“), or once played, how they went (the place a way to the day's board) with „Сподели“, the gold button, right under it
+- **Начало** (`/`): the day first. The streak and the level side by side (each a way to Профил); the day's ten as the
+  day's issue (`.masthead`: the weekday and „Брой 6“ on a hairline, the date set large, „17 ноември“, a hairline
+  under it; then „Десет въпроса за днес“ a size down, what they are, and „Започни“; no pips before play: they'd
+  measure nothing yet). The issue is the day's number from the first day of the day's ten (`play/issue.go`, 12
+  November 2026 is Брой 1), the same for everyone. Left half-way, the same card with where the player stopped,
+  „Следва въпрос 4 от 10“, the pips so far, and „Продължи“; or once played, how they went (under the score the issue
+  line, „Брой 6 · 17 ноември“, and the place a way to the day's board) with „Сподели“, the gold button, right under it
   and „Прегледай въпросите“ below, then tomorrow in one quiet card (`.tomorrow`: when the next ten come, what they make
   of the streak, and the reminder's ask) before the friends' day and the game's news; the day's goals; the ways to play with others, three in a row (the picture over
-  the name on a phone); the topics, two by two (five to a row on a big screen, the picture over the name), and all of them at once. Дуел, Роял and Стая open from here and
+  the name on a phone); the topics, two by two (five to a row on a big screen, the picture over the name, each tile
+  as tall as what's in it), and all of them at once (on a big screen in one row after the topics with „България“ and
+  „Втори шанс“, short tiles side by side). Дуел, Роял and Стая open from here and
   have a way back to it (`back()`). A player who hasn't finished a game yet sees only the day and the topics, and a
   quiet „Имаш профил? Влез“ (a new phone) that opens the sign-in in place: the
   streak and the ways to play with others come after the first game, the level and the goals from the second day
@@ -54,7 +61,16 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
 - **Профил** (`/me`): its own four places in a switch at the top (`profileNav()`): Общо (the player: level,
   league (once open and in one), streak, numbers, the facts in the Алманах, mastery (once a topic has a mark), latest games), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
   worn as others see it, then Аватар, Рамка, Фон or Титла, one at a time) and Алманах (`/almanac`). Настройки open
-  from the icon beside the name.
+  from the icon beside the name. The switch names the place, so Награди, Гардероб and Алманах have no heading of
+  their own on the screen (it's there for screen readers).
+  **Моят Алманах** reads as an almanac, by day, newest first: the count in the numeral face („42 факта досега“, or a
+  topic's „7 от 24 факта в „История““), what they are in a line, and the questions waiting for a second chance as one
+  plain link („17 въпроса чакат втори шанс“: Начало has its tile too); the topics as a quiet row of chips (names
+  only) to read one by; then each day under its dateline (`.almanac-date`: „Брой 6 · 17 ноември“, a kicker running
+  into a hairline, with the year once it isn't this one), its facts as entries between hairlines, not cards: the
+  topic, the question in a small line, what was learned as the headline (the answer; a statement to judge is its
+  own headline, „Невярно:“ before one that isn't so), and the fact. It comes a page at a time, a day going on under
+  its head from page to page.
   Общо is a hub, each thing once: the level with what comes next in one card, the league in a line (its group is
   Класации'), the streak, three numbers in one card, the Алманах in a line („N факта в Алманаха“, a tap from it), mastery,
   the latest games. Награди opens with the three
@@ -105,7 +121,8 @@ wherever it does (`explain()`: the word dotted under, its meaning in a small car
 
 - **48rem (a tablet):** the column grows to 48rem; the places move into the header; in a game the question and its
   answers are bigger, and a choice's answers sit two by two (a list stays one column: an order, pairs, groups). The
-  number's field and pad stay a phone's width.
+  number's field and pad stay a phone's width. A page's picture sits beside its heading and lead, not over them;
+  the day's gold button and a page's own are a hand's width (22rem), not the column's.
 - **64rem (a laptop):** the page is up to 76rem wide with a 32px gutter. Начало is two columns: the day (or its result,
   „Сподели“ beside „Прегледай въпросите“), and under it the topics, five to a row; beside them, at most 22rem wide,
   the streak and the level, the goals and the ways to play with others, one under another. A new player, with only
@@ -168,10 +185,12 @@ takes a token.
   - The question (`.ask`) 28/34 (24/30 at 320px), 700 weight.
   - Body 16/24; `.lead` 18/26 in muted.
   - `.kicker` 12px, 800 weight, capitals with 0.14em tracking, for the date, the topic and section titles.
+  - The day's date on Начало (`.masthead-date`) 44px (56px on wide screens), 800 weight: the one place words are set
+    this large, as an issue's dateline.
 - **Numerals:** 120px for the result, 36px for the question count, 52px for stats and the streak, 32px for figures
-  and points. The numeral face is for digits only: Cyrillic words read badly in it at display size. A word beside a
-  big number („Ниво“ 4, 7 „от“ 10, „днес в“ 21:00, a board's „точки“) is in the words' face, small, muted, on the
-  number's baseline (`.num-word`, `.sub`; `levelNumber()` in `ui.ts`).
+  and points, 72px for Роял's start. The numeral face is for digits only: Cyrillic words read badly in it at display
+  size. A word beside a big number („Ниво“ 4, 7 „от“ 10, a board's „точки“) is in the words' face, small, muted, on
+  the number's baseline (`.num-word`, `.sub`; `levelNumber()` in `ui.ts`).
 - **Case:** sentence case everywhere. Capitals come only through `.kicker` and `.tag`.
 
 ## Shape and depth
@@ -192,8 +211,18 @@ takes a token.
 - **Getting around:** `.tabs` (the four places), `.back` (drawn by `back()`), `.subnav` (Профил's places, drawn by
   `profileNav()`), `.icon-btn` (a square with an icon and its name for screen readers) and `.more` (a `details` that
   folds what's rarely needed; what it holds is spaced as a section's parts).
-- **Начало:** `.status` with `.streak-chip` and `.level-chip`; `.card.hero.day`; `.modes .mode` and `.topics .topic`
-  (`.topic-all` across the row).
+- **Начало:** `.status` with `.streak-chip` and `.level-chip`; `.card.hero.day` opening with `.masthead`
+  (`.masthead-line`, `.masthead-date`) over `.day-title`; `.modes .mode` and `.topics .topic` (`.topic-all` across
+  the row).
+- **Моят Алманах:** `.almanac-head` (`.almanac-count` with `.almanac-n`, and `.second-chance`), `.almanac-topics`,
+  `.almanac-day` with `.almanac-date` and `.almanac-list`, each `.almanac-item` (`.almanac-topic`, `.almanac-q`,
+  `.almanac-a`, `.almanac-untrue`, `.almanac-fact`).
+- **Page openers** lead with the thing, not its rules: Роял's next evening is its start in big numerals
+  (`.royal-when`), the time to it under it (`.royal-countdown`) and „Ще дойда“ gold, the rules folded in „Как се
+  играе“; the league's card says the week as it stands (`.league-now`: „Още 6 дни · първите 5 се качват“, and the
+  gap worth playing for, `.league-gap`: „До 3-то място: 300 точки.“, „Водиш с 120 точки.“, „Още 80 точки и излизаш
+  от зоната за слизане.“), its rules folded in „Как работи лигата“ (open the first time, on that device). A lead is
+  one sentence.
 - **Text:** `.kicker`, `.lead`, `.muted`, `.small`, `.bad` (errors) and `.status`; `.explain` with `.explain-pop`
   (a number's name, a tap from its meaning: `explain()`).
 - **Controls:**
@@ -424,6 +453,8 @@ Feedback fires once, when it's earned, and then the screen is still again:
   - ordinals with the ending the dictionary gives (`lib/ordinal.ts`): „1-ви“, „2-ри“, „3-ти“, „4-ти“, „5-и“, „12-и“,
     „21-ви“, and „3-то място“;
   - months in lower case, also after a word („Алманах за ноември 2026“).
+- **The day's issue** is said one way everywhere (`issueWords()` in `lib/words.ts`): „Брой 6 · 17 ноември“, the
+  result's line and Моят Алманах's days; the shared result's first line is „АЛМАНАХ · Брой 6 · 17 ноември“.
 - **No emoji in the interface.** The one place they appear is the text a player shares of the day's result
   (`game/share.ts`: 🟩 right, 🟨 close, ⬜ wrong or not answered: grey, as in Wordle, so that a bad day is
   shared too), which never shows on a screen.
