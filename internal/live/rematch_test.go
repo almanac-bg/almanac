@@ -72,6 +72,85 @@ func TestLeftIsNamed(t *testing.T) {
 	})
 }
 
+// One who says they leave (asked on their screen, and confirmed) is gone at once, not after Away: the other is told,
+// the question up waits for the other only, the leaver's answers count as not given, and the result names them.
+// Coming back undoes it.
+func TestLeaves(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := setup(t)
+		ana, bo := w.user(), w.user()
+		sa, sb := w.hub.Seek(ana), w.hub.Seek(bo)
+		<-sb.Done()
+		m := sa.Match
+		fa, _ := m.Follow(ana.ID)
+		defer m.Unfollow(fa)
+		fb, _ := m.Follow(bo.ID)
+		// Nothing to leave before the first question.
+		if err := m.Leave(bo.ID); err != nil || m.View(ana.ID).Them.Gone {
+			t.Fatalf("left in the intro: %v", err)
+		}
+		v := next(m, ana.ID)
+		time.Sleep(2500 * time.Millisecond)
+		_ = m.Answer(ana.ID, v.N, answer(m, true))
+		_ = m.Answer(bo.ID, v.N, answer(m, true))
+		if v = next(m, ana.ID); v.Phase != PhaseQuestion || v.N != 1 {
+			t.Fatalf("the second question: %+v", v)
+		}
+		// Bo leaves on the second question, his screen still open as he says so; it closes after.
+		if err := m.Leave(bo.ID); err != nil {
+			t.Fatal(err)
+		}
+		if v := m.View(ana.ID); !v.Them.Gone || v.Phase != PhaseQuestion {
+			t.Fatalf("Bo left, Ana not told at once: %+v", v)
+		}
+		if err := m.Answer(bo.ID, 1, answer(m, true)); !errors.Is(err, ErrNotNow) {
+			t.Fatalf("Bo's answer after leaving: %v", err)
+		}
+		m.Unfollow(fb)
+		time.Sleep(2500 * time.Millisecond)
+		_ = m.Answer(ana.ID, 1, answer(m, true))
+		if v := m.View(ana.ID); v.Phase != PhaseReveal {
+			t.Fatalf("Ana's answer waited for Bo, who left: %+v", v)
+		}
+		// Back on the third question, he's in it again and is waited for.
+		if v := next(m, ana.ID); v.Phase != PhaseQuestion || v.N != 2 {
+			t.Fatalf("the third question: %+v", v)
+		}
+		fb, _ = m.Follow(bo.ID)
+		if v := m.View(ana.ID); v.Them.Gone || !v.Them.Online {
+			t.Fatalf("Bo, back: %+v", v.Them)
+		}
+		time.Sleep(2500 * time.Millisecond)
+		_ = m.Answer(ana.ID, 2, answer(m, true))
+		if v := m.View(ana.ID); v.Phase != PhaseQuestion {
+			t.Fatalf("Bo, back, not waited for: %+v", v)
+		}
+		_ = m.Answer(bo.ID, 2, answer(m, true))
+		// He leaves for good as the fourth shows; the duel plays to its end without waiting for him.
+		if v := next(m, ana.ID); v.Phase != PhaseQuestion || v.N != 3 {
+			t.Fatalf("the fourth question: %+v", v)
+		}
+		_ = m.Leave(bo.ID)
+		m.Unfollow(fb)
+		for v := m.View(ana.ID); v.Phase != PhaseEnd; v = next(m, ana.ID) {
+			if v.Phase == PhaseQuestion {
+				time.Sleep(2500 * time.Millisecond)
+				_ = m.Answer(ana.ID, v.N, answer(m, true))
+				if v := m.View(ana.ID); v.Phase != PhaseReveal {
+					t.Fatalf("waited for Bo, who left: question %d", v.N)
+				}
+			}
+		}
+		d, err := w.g.DuelOf(t.Context(), ana.ID, m.ID())
+		if err != nil || d.TheyLeft == nil || *d.TheyLeft != 3 || d.State != "won" {
+			t.Fatalf("Ana's result: %+v (%v)", d, err)
+		}
+		if d, _ := w.g.DuelOf(t.Context(), bo.ID, m.ID()); d.YouLeft == nil || *d.YouLeft != 3 || d.You.Rights != 2 { // the second, left, not answered
+			t.Fatalf("Bo's result: %+v", d)
+		}
+	})
+}
+
 // A duel just over: one asks for a rematch, the other sees it and asks too, and they're in a new duel together.
 func TestRematch(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {

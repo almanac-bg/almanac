@@ -2,11 +2,12 @@
 // nobody comes in Wait, with a recording of a real player's earlier game. Both see the same question at the same
 // moment and each other's answers come in; after each question both answers show, then the next comes. One whose
 // screen goes is waited for a while (Away), then the duel goes on without them (gone), their time running out on each
-// question; a recording isn't waited for where its player let the time run out. A player who isn't there when the
+// question; one who says they leave (Leave: asked on their screen, and confirmed) is gone at once, and the other told
+// so. A recording isn't waited for where its player let the time run out. A player who isn't there when the
 // first question is due (never came, or left as the duel was found) is waited for until Arrive; after it, the duel is
 // called off and leaves nothing (play.DropLive), so leaving the wait at its last second never costs a lost duel. An
 // answer sent again (its reply lost on the way) is taken as the first. One who left for good is named on the result
-// (play.LeftLive: after which question).
+// (play.LeftLive: after which question). Either way, one who comes back to the duel is in it again.
 //
 // Once a duel between two people is over, either may ask for a rematch (Rematch): the other sees it, and if they ask
 // too within RematchFor, a new duel between the two is made at once.
@@ -553,6 +554,7 @@ type side struct {
 	came      bool // has followed the duel at least once
 	leftAt    time.Time
 	leftAfter int  // how many questions they had played when they last left
+	left      bool // said they leave (Leave): gone at once, until they come back
 	rematch   bool // asks for a rematch, once the duel is over (Hub.Rematch)
 	points    int
 	rights    int
@@ -571,9 +573,9 @@ type side struct {
 
 func (s *side) human() bool { return s.recording == nil }
 
-// gone says a player has been away from the duel longer than Away: it goes on without them.
+// gone says a player has left the duel, or been away from it longer than Away: it goes on without them.
 func (s *side) gone() bool {
-	return s.human() && s.online == 0 && s.came && time.Since(s.leftAt) >= Away
+	return s.human() && (s.left || s.online == 0 && s.came && time.Since(s.leftAt) >= Away)
 }
 
 // answers says whether a recording has an answer to question n (else its player let the time run out there).
@@ -637,6 +639,7 @@ func (m *Match) Follow(viewer int64) (*Sub, error) {
 	m.subs[sub] = struct{}{}
 	s.online++
 	s.came = true
+	s.left = false
 	m.changed()
 	return sub, nil
 }
@@ -654,7 +657,7 @@ func (m *Match) Unfollow(sub *Sub) {
 		return
 	}
 	s.online--
-	if s.online == 0 {
+	if s.online == 0 && !s.left { // one who said they leave left then
 		s.leftAt = time.Now()
 		s.leftAfter = m.n
 		if m.phase == PhaseReveal {
@@ -675,6 +678,35 @@ func (m *Match) Unfollow(sub *Sub) {
 		})
 	}
 	m.changed()
+}
+
+// Leave is a player leaving the duel under way of their own will (asked on their screen, and confirmed): it goes on
+// without them at once, not after Away. The other is told they're gone, the question up waits only for the other,
+// and the leaver's time runs out on it and on the rest, as for one away too long. Before the first question and once
+// it's over, there's nothing to leave: the duel calls itself off or has ended.
+func (m *Match) Leave(id int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s := m.side(id)
+	if s == nil {
+		return ErrNoMatch
+	}
+	if s.left || (m.phase != PhaseQuestion && m.phase != PhaseReveal) {
+		return nil
+	}
+	s.left = true
+	if s.online > 0 { // still on its screen as they say so: they leave now (else when it went)
+		s.leftAt, s.leftAfter = time.Now(), m.n
+		if m.phase == PhaseReveal {
+			s.leftAfter++ // its answer seen: that question was played
+		}
+	}
+	if m.phase == PhaseQuestion {
+		m.maybeReveal()
+	} else {
+		m.changed()
+	}
+	return nil
 }
 
 // changed tells every screen to look again. Called with the lock held.
@@ -825,7 +857,7 @@ func (m *Match) Answer(by int64, n int, raw json.RawMessage) error {
 	if n == m.n && s.answered && (m.phase == PhaseQuestion || m.phase == PhaseReveal) {
 		return nil
 	}
-	if m.phase != PhaseQuestion || n != m.n || s.answered {
+	if m.phase != PhaseQuestion || n != m.n || s.answered || s.left {
 		return ErrNotNow
 	}
 	took := max(0, at.Sub(m.shownAt))
@@ -852,14 +884,14 @@ func (m *Match) Answer(by int64, n int, raw json.RawMessage) error {
 	return nil
 }
 
-// maybeReveal shows the answers if nobody is still waited for: a player here (or away only a moment) who hasn't
-// answered, or a recording whose answer is still to come (not one whose player let the time run out there).
+// maybeReveal shows the answers if nobody is still waited for: a player here (or away only a moment, and not left)
+// who hasn't answered, or a recording whose answer is still to come (not one whose player let the time run out there).
 func (m *Match) maybeReveal() {
 	for _, s := range m.sides {
 		if s.answered || (!s.human() && !s.answers(m.n)) {
 			continue
 		}
-		if !s.human() || s.online > 0 || time.Since(s.leftAt) < Away {
+		if !s.human() || (!s.left && (s.online > 0 || time.Since(s.leftAt) < Away)) {
 			m.changed()
 			return
 		}

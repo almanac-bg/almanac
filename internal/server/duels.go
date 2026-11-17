@@ -219,6 +219,27 @@ func (s *Server) liveAnswer(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]bool{"ok": true})
 }
 
+// liveLeave is a player leaving a live duel under way, as they confirmed on its screen: it goes on without them at
+// once, the other told so (live.Match.Leave).
+func (s *Server) liveLeave(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		return live.ErrNoMatch
+	}
+	m, err := s.live.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := m.Leave(u.ID); err != nil {
+		return err
+	}
+	return ok(w, map[string]bool{"ok": true})
+}
+
 // duels lists the player's duels, with their rating.
 func (s *Server) duels(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
