@@ -112,9 +112,9 @@ func TestDayNumberIsAnEstimate(t *testing.T) {
 	}
 	for seed := range uint64(30) {
 		picks, short := drawDay(b, day, map[string]bool{}, nil, rand.New(rand.NewPCG(seed, 3)))
-		last, _ := b.Get(picks[len(picks)-1].ID)
+		last := dayNumber(t, b, picks)
 		if len(short) > 0 || !slices.Contains(estimates, last.Base().ID) {
-			t.Fatalf("seed %d: the day ends on %s (short %v), not science's estimate", seed, last.Base().ID, short)
+			t.Fatalf("seed %d: the day's number is %s (short %v), not science's estimate", seed, last.Base().ID, short)
 		}
 	}
 	used := map[string]bool{}
@@ -122,9 +122,9 @@ func TestDayNumberIsAnEstimate(t *testing.T) {
 		used[id] = true
 	}
 	picks, short := drawDay(b, day, used, nil, rand.New(rand.NewPCG(1, 3)))
-	last, _ := b.Get(picks[len(picks)-1].ID)
+	last := dayNumber(t, b, picks)
 	if !slices.Equal(short, []string{"hard number (estimate)"}) || last.Base().Type != "number" {
-		t.Fatalf("with the estimates spent: ends on %s, short %v", last.Base().ID, short)
+		t.Fatalf("with the estimates spent: the number is %s, short %v", last.Base().ID, short)
 	}
 }
 
