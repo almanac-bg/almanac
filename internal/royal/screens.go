@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
@@ -193,10 +194,7 @@ func (h *Hub) look(viewer int64) ([]byte, time.Duration) {
 	h.mu.Unlock()
 	mine, _ := json.Marshal(own)
 	// {own…} and {board…} as one object: their fields are apart.
-	out := make([]byte, 0, len(mine)+len(data))
-	out = append(out, mine[:len(mine)-1]...)
-	out = append(out, ',')
-	return append(out, data[1:]...), pace
+	return slices.Concat(mine[:len(mine)-1], []byte{','}, data[1:]), pace
 }
 
 // render makes a board as it is now. Called with mu held.
