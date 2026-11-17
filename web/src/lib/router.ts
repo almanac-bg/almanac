@@ -151,7 +151,7 @@ function travel(by: number, then: () => void): void {
   history.go(by);
 }
 
-/** Gives the entry shown another address, the screen staying as it is (a friend's duel made: a reload comes back to
+/** Gives the entry shown another address, the screen staying as it is (a challenge made: a reload comes back to
  * it, not to a new one). A game's own entry so renamed is a page of its own from then on: its end keeps it. */
 export function rename(to: string): void {
   history.replaceState({ ...entry(), game: undefined }, "", to);

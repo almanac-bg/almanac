@@ -1,9 +1,10 @@
-// A duel's result, the most dramatic moment in the game, for every way a duel ends (a friend's, a challenge taken, a
-// live one, against a recording): the two face to face with their scores, the winner in gold and the other plain; the duel
-// question by question, the two rows of marks aligned, the quicker of two right answers ringed, and the question that
-// decided it; what it meant (the rating from and to, in its division, and the record against this person); and what
-// to do next. A friend's duel waiting for the friend shows the player's own side, and until when; one turned down,
-// not played in time or cut off says so. The first time it shows, it lands as a moment (feel.ts: duel), never again.
+// A duel's result, the most dramatic moment in the game, for every way a duel ends (a challenge, between friends or
+// taken by anyone; a live one, against a recording): the two face to face with their scores, the winner in gold and the
+// other plain; the duel question by question, the two rows of marks aligned, the quicker of two right answers ringed,
+// and the question that decided it; what it meant (the rating from and to, in its division, and the record against
+// this person); and what to do next. A challenge sent to a friend, waiting for them, shows the player's own side, and
+// until when; one turned down, not played in time or cut off says so. The first time it shows, it lands as a moment
+// (feel.ts: duel), never again.
 //
 // It loads on its own, with its style (outcome.css) and the game's feel, the first time a duel's result shows (kit.ts:
 // duelResult; asked for as a duel starts, so it's in by its end), and is handed the app's pieces: it imports only types.
@@ -55,7 +56,7 @@ export interface Steps {
 }
 
 /** A duel as it stands or ended (`d`, as one duel's view has it); what to do next (`again`: after a live one, a
- * rematch and another duel; else, after a friend's, a rematch); and what the game earned (`more`). */
+ * rematch and another duel; else, after a challenge between friends, one back); and what the game earned (`more`). */
 export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child): Child {
   ({
     api,
@@ -86,8 +87,8 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
   const settled = d.state === "won" || d.state === "lost" || d.state === "draw";
   const steps = again && typeof again === "object" && "main" in again ? again : null;
   const next = steps ? steps.main : ((again as Child) ?? rematch(d) ?? sendOn(d));
-  // A duel's own ten, played in the player's own time (a friend's): anyone may be challenged with it.
-  const challenge = !steps && d.kind === "friend" && d.state !== "wait" ? challengeAnyone(d) : null;
+  // A challenge between friends: anyone else may be challenged with the player's game of it too.
+  const challenge = !steps && d.kind === "challenge" && d.friend && d.state !== "wait" ? challengeAnyone(d) : null;
   const questions =
     d.runId && d.you?.done
       ? reviewParts(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${d.runId}/review`)).questions)
@@ -97,8 +98,8 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
     "section",
     { class: "screen" },
     head,
-    // The gold button is another duel where there's one (a live one, or a rematch with the friend), else the way back
-    // to the duels; the rest are plain, side by side.
+    // The gold button is another duel where there's one (a live one, or a challenge back to the friend), else the
+    // way back to the duels; the rest are plain, side by side.
     nextSteps(
       next ?? toDuels(true),
       steps ? [questions?.button, ...(steps.also ?? [])] : [questions?.button, challenge, next ? toDuels(false) : null],
@@ -108,26 +109,26 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
   );
 }
 
-/** „Дуел с Мария“, „Дуел на живо с Мария“ or „Дуел срещу запис“. */
+/** „Дуел на живо с Мария“, „Дуел срещу запис“, „Предизвикателство от Мария“ or (the one who sent it)
+ * „Предизвикателство към Мария“. */
 function kicker(d: DuelView): string {
   if (d.recorded) return "Дуел срещу запис";
   const them = d.opponent?.name;
-  if (!them) return "Дуел";
-  if (d.kind === "challenge") return `Предизвикателство от ${them}`;
-  return d.kind === "live" ? `Дуел на живо ${withName(them)}` : `Дуел ${withName(them)}`;
+  if (d.kind === "challenge") return them ? `Предизвикателство ${d.sent ? "към" : "от"} ${them}` : "Предизвикателство";
+  return them ? `Дуел на живо ${withName(them)}` : "Дуел";
 }
 
 const headings: Record<DuelView["state"], string> = {
   play: "Дуел",
-  wait: "Изигра своя дуел",
+  wait: "Изигра своите десет",
   won: "Победа",
   lost: "Загуба",
   draw: "Равенство",
-  declined: "Дуелът е отказан",
-  expired: "Времето за дуела изтече",
+  declined: "Предизвикателството е отказано",
+  expired: "Времето за предизвикателството изтече",
 };
 
-/** A duel with a result, or waiting for the friend: the card that holds it, landing once as a moment. */
+/** A duel with a result, or a challenge waiting for the friend: the card that holds it, landing once as a moment. */
 function hero(d: DuelView): Child {
   const settled = d.state !== "wait";
   const you = d.you as Side;
@@ -189,7 +190,8 @@ function face(s: Side, label: string, tag: string, won: boolean, shown: boolean,
   );
 }
 
-/** Under the other, met in a live duel: a tap asks them to be friends (a request, as by their tag). */
+/** Under the other, met in a live duel or by a challenge: a tap asks them to be friends (a request, as by their
+ * tag). */
 function befriend(name: string, tag: string): Child {
   const said = signal("");
   const busy = signal(false);
@@ -370,7 +372,7 @@ function plain(d: DuelView): Child {
   const heading = d.state === "expired" && live ? "Дуелът прекъсна" : headings[d.state];
   const lead =
     d.state === "expired" && !live && d.you?.done
-      ? `${them} не изигра своя дуел навреме. Без резултат: рейтингът не се мени.`
+      ? `${them} не изигра предизвикателството навреме. Без резултат: рейтингът не се мени.`
       : "Без резултат: рейтингът не се мени.";
   const you = d.you;
   return [
@@ -398,33 +400,35 @@ function plain(d: DuelView): Child {
   ];
 }
 
-/** A friend's duel with a result: „Реванш“ challenges the friend again (the count-in first, with a way back). */
+/** A challenge between friends with a result: „Предизвикай обратно“ challenges the friend again (the count-in first,
+ * with a way back). */
 function rematch(d: DuelView): Child {
-  if (d.kind !== "friend" || !d.friend || !["won", "lost", "draw"].includes(d.state)) return null;
+  if (d.kind !== "challenge" || !d.friend || !["won", "lost", "draw"].includes(d.state)) return null;
   return h(
     "button",
-    { class: "btn primary big", type: "button", onclick: () => go(`/duel/friend/${d.friend}`) },
-    "Реванш",
+    { class: "btn primary big", type: "button", onclick: () => go(`/challenge/${d.friend}`) },
+    "Предизвикай обратно",
   );
 }
 
-/** The friend's turn still to come: the gold way is to send them the duel (its link brings them to it; anyone else it
- * reaches gets the same ten as a challenge). A challenge taken: send it on, the player's own game the one to beat. */
+/** A challenge sent to a friend, waiting for them: the gold way is to send it to them where they talk (its link
+ * brings them to their turn; anyone else it reaches can take it too). A challenge taken from anyone: send it on, the
+ * player's own game the one to beat. */
 function sendOn(d: DuelView): Child {
-  if (!d.runId || !d.you?.done) return null;
-  if (d.kind === "friend" && d.state === "wait")
+  if (d.kind !== "challenge" || !d.runId || !d.you?.done) return null;
+  if (d.sent && d.state === "wait")
     return challengeButton(
       `Прати на ${d.opponent?.name ?? "приятеля си"}`,
       d.runId,
-      () => "Изиграх дуела ни в АЛМАНАХ. Твой ред.",
+      () => "Изиграх предизвикателството в АЛМАНАХ. Твой ред.",
       true,
     );
-  if (d.kind === "challenge" && ["won", "lost", "draw"].includes(d.state))
+  if (!d.sent && ["won", "lost", "draw"].includes(d.state))
     return challengeButton("Предизвикай и ти", d.runId, () => challengeText(d.you?.rights ?? 0), true);
   return null;
 }
 
-/** The player's own ten of a friend's duel, as a challenge to anyone: plain, beside the gold way on. */
+/** The player's own ten of a challenge between friends, as a challenge to anyone: plain, beside the gold way on. */
 function challengeAnyone(d: DuelView): Child {
   if (!d.runId || !d.you?.done) return null;
   return challengeButton("Предизвикай", d.runId, () => challengeText(d.you?.rights ?? 0));

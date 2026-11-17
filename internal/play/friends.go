@@ -378,8 +378,8 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	rows, err = db.QueryContext(ctx, `SELECT opponent_id, outcome, count(*) FROM runs
-		WHERE user_id = ? AND kind = 'duel' AND opponent_id IS NOT NULL GROUP BY opponent_id, outcome`, userID)
+	rows, err = db.QueryContext(ctx, `SELECT other, outcome, count(*) FROM `+duelResults+`
+		WHERE other IS NOT NULL GROUP BY other, outcome`, userID)
 	if err != nil {
 		return nil, err
 	}

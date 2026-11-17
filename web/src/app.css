@@ -1284,8 +1284,20 @@
     margin: 0;
   }
 
-  .other-topics a.chip {
+  .other-topics a.chip,
+  .challenge-topics a.chip {
     text-decoration: none;
+  }
+
+  /* A game played to be sent as a challenge: the friends to send it to, each a tap, over the gold way. */
+  .send {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .send .kicker,
+  .send-done {
+    margin: 0;
   }
 
   /* The way back from a screen reached from a main place. */
@@ -5575,11 +5587,18 @@
     list-style: none;
   }
 
+  /* Short of room (a phone's 320px), the way to challenge a friend goes under the row, at its end. */
   .friend {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-3) 0;
+  }
+
+  .friend-act {
+    margin-inline-start: auto;
+    padding-inline: var(--space-4);
   }
 
   .friend + .friend {
@@ -5588,7 +5607,7 @@
 
   .friend-text {
     display: grid;
-    flex: 1;
+    flex: 1 1 6rem;
     min-width: 0;
   }
 

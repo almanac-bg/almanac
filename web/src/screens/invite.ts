@@ -45,7 +45,7 @@ export function invite([code = ""]: string[]) {
       fail(err);
     }
   };
-  const duel = () => go(`/duel/friend/${info.peek().id}`);
+  const challenge = () => go(`/challenge/${info.peek().id}`);
   const playDay = async () => {
     error.set("");
     try {
@@ -65,7 +65,8 @@ export function invite([code = ""]: string[]) {
     }
   };
 
-  /** Being friends: „Добави … в приятели“ until they are, then a duel a tap away (`gold`: the screen's main action). */
+  /** Being friends: „Добави … в приятели“ until they are, then a challenge a tap away (`gold`: the screen's main
+   * action). */
   const friendship =
     (gold: boolean): Child =>
     () => {
@@ -73,7 +74,7 @@ export function invite([code = ""]: string[]) {
       return i.friends
         ? [
             i.their === undefined ? null : h("p", { class: "muted", role: "status" }, "Вече сте приятели."),
-            i.id ? h("button", { class: big(gold), onclick: duel }, "Покани на дуел") : null,
+            i.id ? h("button", { class: big(gold), onclick: challenge }, "Предизвикай") : null,
           ]
         : h("button", { class: big(gold), onclick: accept }, `Добави ${i.by} в приятели`);
     };

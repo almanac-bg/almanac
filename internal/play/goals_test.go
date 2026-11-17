@@ -226,7 +226,7 @@ func TestGoalsOfOthers(t *testing.T) {
 	if g := w.goalsOf(vi); !g["friendDuel"].Done || g["duelWin"].Done {
 		t.Fatalf("Vi before Ana played: %+v", g)
 	}
-	as, err := w.g.PlayDuel(ctx, ana, id)
+	as, err := w.take(ana, id)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -15,15 +15,24 @@ async function catchShares(page: Page): Promise<void> {
 
 const shared = (page: Page) => page.evaluate(() => (window as unknown as { shared?: ShareData }).shared ?? null);
 
-test("a challenge: one link, a stranger plays it as a guest, both see the two side by side", async ({ browser }) => {
+test("a challenge: made on Дуел, one link, a stranger plays it as a guest, both see the two side by side", async ({
+  browser,
+}) => {
   test.setTimeout(240_000);
   const a = await (await browser.newContext()).newPage();
   await catchShares(a);
 
-  // Ana plays a topic's ten, and sends the game as a challenge: plain text with her score, and the link.
-  await openGame(a, "/play/history");
+  // Ana makes one on Дуел: a topic, its ten, and then (no friends yet) the link is the gold way: plain text with her
+  // score, and the link.
+  await a.goto("/duel");
+  await a.getByRole("link", { name: "Предизвикай" }).click();
+  await expect(a).toHaveURL(/\/challenge$/);
+  await a.locator(".challenge-topics").getByRole("link", { name: "История" }).click();
+  await expect(a.getByRole("heading", { name: "Приготви се" })).toBeVisible();
+  await a.getByRole("button", { name: "Започни сега" }).click();
   await playRun(a);
-  await a.getByRole("button", { name: "Предизвикай" }).click();
+  await expect(a.getByRole("button", { name: "Изпрати" })).toHaveClass(/primary/);
+  await a.getByRole("button", { name: "Изпрати" }).click();
   // What a challenge says carries the name: one still drawn is asked first (kept as it is here).
   await a
     .getByRole("dialog", { name: "Как да те познаят приятелите?" })

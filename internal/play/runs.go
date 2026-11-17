@@ -424,8 +424,14 @@ func Merge(tx *sql.Tx, from, to int64) error {
 			SELECT user_id, ?, since, asked FROM friends WHERE friend_id = ? AND user_id <> ?`, []any{to, from, to}},
 		{`DELETE FROM friends WHERE user_id = ? OR friend_id = ?`, []any{from, from}},
 		{`UPDATE runs SET opponent_id = ? WHERE opponent_id = ?`, []any{to, from}},
-		// The guest's duels are the account's, those waiting too (one between the two goes with the guest).
-		{`UPDATE duels SET a_id = ?1 WHERE a_id = ?2 AND coalesce(b_id, 0) <> ?1`, []any{to, from}},
+		// The account's game of a challenge the guest sent would be one against itself: it goes (the game stays).
+		{`DELETE FROM duels WHERE a_id = ?1 AND challenge_id IN (SELECT id FROM challenges WHERE user_id = ?2)`,
+			[]any{to, from}},
+		// The guest's duels are the account's, those waiting too, and the challenges sent to the guest. One between
+		// the two goes with the guest, as does the guest's game of a challenge the account sent, or took too (one game
+		// of a challenge each).
+		{`UPDATE OR IGNORE duels SET a_id = ?1 WHERE a_id = ?2 AND coalesce(b_id, 0) <> ?1
+			AND coalesce((SELECT user_id FROM challenges WHERE id = duels.challenge_id), 0) <> ?1`, []any{to, from}},
 		{`UPDATE duels SET b_id = ?1 WHERE b_id = ?2 AND a_id <> ?1`, []any{to, from}},
 		// The rating: the guest's, with its games and peak, if it's the better one of rated games.
 		{`UPDATE users SET rating = g.rating, rated = g.rated

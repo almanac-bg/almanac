@@ -104,7 +104,8 @@ for (const scheme of ["light", "dark"] as const) {
     });
     const duel = {
       id: 1,
-      kind: "friend",
+      kind: "challenge",
+      challenge: "abcdefgh",
       state: "won",
       friend: 2,
       you: side("Заек 817", "", [1300, 1100, 0, 1500, 1200, 0, 1400, 1250, 1100, 1000]),

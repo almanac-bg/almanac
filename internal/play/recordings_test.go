@@ -209,7 +209,7 @@ func TestFriendPlayed(t *testing.T) {
 	if p, _ := w.g.FriendPlayedOf(ctx, ana); p != nil {
 		t.Fatalf("told before Vi played: %+v", p)
 	}
-	vs, err := w.g.PlayDuel(ctx, vi, id)
+	vs, err := w.take(vi, id)
 	if err != nil {
 		t.Fatal(err)
 	}

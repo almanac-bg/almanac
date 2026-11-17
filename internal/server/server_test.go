@@ -1003,7 +1003,7 @@ func TestNotifications(t *testing.T) {
 		t.Fatal("reminded before the hour")
 	}
 
-	// Bo accepts Ana's invite link: Ana hears of it. Ana asks Bo to a duel and plays hers: Bo hears of it.
+	// Bo accepts Ana's invite link: Ana hears of it. Ana challenges Bo and plays hers: Bo hears of it.
 	pushes := func(path string, want int) {
 		t.Helper()
 		for deadline := time.Now().Add(5 * time.Second); fake.count(path) < want && time.Now().Before(deadline); {
@@ -1019,7 +1019,7 @@ func TestNotifications(t *testing.T) {
 	pushes("/ana", 1)
 	_, mine = ana.call("GET", "/api/friends", nil)
 	boID := int64(mine["friends"].([]any)[0].(map[string]any)["id"].(float64))
-	_, duel := ana.call("POST", "/api/duels", map[string]any{"friend": boID})
+	_, duel := ana.call("POST", fmt.Sprintf("/api/friends/%d/challenge", boID), nil)
 	if _, w := bo.call("GET", "/api/friends/invites", nil); len(w["challenges"].([]any)) != 0 {
 		t.Fatalf("Bo challenged before Ana played: %v", w)
 	}
@@ -1274,8 +1274,8 @@ func TestFriendsOverHTTP(t *testing.T) {
 	// Strangers can't ask each other.
 	vi := g.player()
 	vi.call("POST", "/api/guest", map[string]any{})
-	if status, _ := vi.call("POST", "/api/duels", map[string]any{"friend": boID}); status != http.StatusNotFound {
-		t.Fatalf("a stranger asked Bo to a duel: %d", status)
+	if status, _ := vi.call("POST", fmt.Sprintf("/api/friends/%d/challenge", boID), nil); status != http.StatusNotFound {
+		t.Fatalf("a stranger challenged Bo: %d", status)
 	}
 	if status, _ := bo.call("DELETE", fmt.Sprintf("/api/friends/%d", int64(a["user"].(map[string]any)["id"].(float64))), nil); status != http.StatusOK {
 		t.Fatalf("unfriending: %d", status)

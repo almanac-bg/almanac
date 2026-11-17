@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	mrand "math/rand/v2"
+	"strings"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/store"
@@ -22,33 +23,30 @@ import (
 // didn't ask to play nor plays to win; and only RecordedRatedPerDay such duels a day move it. The recorded player hears
 // of it quietly, once a day, with a game's news (RecordingsNews).
 //
-// A friend is challenged in their own time: the challenger plays at once, and the friend hears of it when they've
-// finished; from then they have FriendFor to play the same questions or say no.
+// A friend, or anyone, is challenged in their own time: a challenge (challenges.go), each taker's game of it a duel
+// of kind challenge, played against the sender's game as one against a recording is; one taken by a friend is a duel
+// between the two (b_id is the sender).
 //
 // Only the first duel of a day between the same two players moves their ratings; those after are friendlies, so
 // that two accounts can't trade wins for rating.
 
 const (
-	// FriendFor is how long a friend has to play a duel they're challenged to, from when they hear of it.
-	FriendFor = 48 * time.Hour
-	// MaxWaiting is how many challenges a player may have waiting on friends at once.
-	MaxWaiting = 5
 	// LiveFor is how long a live duel may take before it counts as cut off (the server restarted under it): ten
 	// questions at their longest, with the pauses between, take well under it.
 	LiveFor = 20 * time.Minute
 )
 
 var (
-	ErrNoDuel      = errors.New("no such duel")
-	ErrManyWaiting = errors.New("too many duels waiting")
+	ErrNoDuel = errors.New("no such duel")
 	// ErrNobody is that there's nobody to play: no one waiting, and no recording to play against yet.
 	ErrNobody = errors.New("nobody to play")
 )
 
-// DuelNews is told to whoever should hear of a duel: a friend challenges them, or a result.
+// DuelNews is told to whoever should hear of a duel: a friend's challenge waits for them (asked), a result, or
+// someone (not a friend) took their challenge (challenge).
 type DuelNews struct {
 	To   int64
-	Kind string // asked, result
+	Kind string // asked, result, challenge
 	From string // the other player's name
 	// Outcome is the one told's: won, lost or draw (with a result).
 	Outcome string
@@ -66,13 +64,13 @@ type DuelNews struct {
 // DuelView is a duel as one of its two players sees it.
 type DuelView struct {
 	ID   int64  `json:"id"`
-	Kind string `json:"kind"` // live, friend
+	Kind string `json:"kind"` // live, challenge
 	// State is the player's: play (their turn), wait (the other's), won, lost, draw, declined, expired (no result:
 	// not played in time, or a live one cut off).
 	State string `json:"state"`
 	// Opponent is the other player, or the recorded one it was played against.
 	Opponent *DuelSide `json:"opponent,omitempty"`
-	// Friend is the other player's id in a friend's duel: for a rematch.
+	// Friend is the other player's id in a challenge between friends: to challenge them back.
 	Friend   int64     `json:"friend,omitempty"`
 	You      *DuelSide `json:"you,omitempty"`
 	Recorded bool      `json:"recorded,omitempty"`
@@ -100,8 +98,9 @@ type DuelView struct {
 	TheyLeft *int `json:"theyLeft,omitempty"`
 	// Befriend says the other, a person met in a live duel, may be asked to be friends: not a friend yet, nor asked.
 	Befriend bool `json:"befriend,omitempty"`
-	// Challenge is, for a challenge's duel (Kind "challenge": the player took it), its code (challenges.go).
+	// Challenge is, for a challenge's duel, its code (challenges.go); Sent says the player sent it (else they took it).
 	Challenge string `json:"challenge,omitempty"`
+	Sent      bool   `json:"sent,omitempty"`
 
 	// against is the other player (the recorded one's, against a recording), theirRun their run.
 	against, theirRun int64
@@ -306,114 +305,6 @@ func (g *Game) EndLive(ctx context.Context) error {
 	return err
 }
 
-// ChallengeFriend starts a duel with a friend: the player plays it now, the friend when they can.
-func (g *Game) ChallengeFriend(ctx context.Context, userID, friendID int64) (State, int64, error) {
-	if _, err := g.Friend(ctx, userID, friendID); err != nil {
-		return State{}, 0, err
-	}
-	p, err := g.pastOf(ctx, "", userID, friendID)
-	if err != nil {
-		return State{}, 0, err
-	}
-	var s State
-	var duelID int64
-	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		if err := g.mayStart(tx, userID); err != nil {
-			return err
-		}
-		picks, err := g.drawFor(tx, p)
-		if err != nil {
-			return err
-		}
-		r, err := g.insertRun(tx, userID, "duel", nil, nil, picks)
-		if err != nil {
-			return err
-		}
-		data, _ := json.Marshal(picks)
-		now := store.Ms(g.Now())
-		// The friend's time starts once the challenger has played (settleRun); until then, this is how long the
-		// challenger has.
-		res, err := tx.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, b_id, created_at, expires_at)
-			VALUES ('friend', ?, ?, ?, ?, ?, ?)`, string(data), userID, r.id, friendID, now, now+FriendFor.Milliseconds())
-		if err != nil {
-			return err
-		}
-		duelID, _ = res.LastInsertId()
-		s, err = g.state(tx, r)
-		return err
-	})
-	return s, duelID, err
-}
-
-// PlayDuel is the player's run in a friend's challenge: made the first time (once the friend has played theirs),
-// the same after.
-func (g *Game) PlayDuel(ctx context.Context, userID, duelID int64) (State, error) {
-	var s State
-	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		var questions string
-		var bRun sql.NullInt64
-		var aDone bool
-		err := tx.QueryRow(`SELECT d.questions, d.b_run, r.finished_at IS NOT NULL FROM duels d JOIN runs r ON r.id = d.a_run
-			WHERE d.id = ? AND d.kind = 'friend' AND d.b_id = ? AND d.ended_at IS NULL`, duelID, userID).Scan(&questions, &bRun, &aDone)
-		if errors.Is(err, sql.ErrNoRows) || (err == nil && !aDone) {
-			return ErrNoDuel
-		}
-		if err != nil {
-			return err
-		}
-		if bRun.Valid {
-			r, err := load(tx, userID, bRun.Int64)
-			if err != nil {
-				return err
-			}
-			s, err = g.state(tx, r)
-			return err
-		}
-		var picks []Pick
-		if err := json.Unmarshal([]byte(questions), &picks); err != nil {
-			return err
-		}
-		r, err := g.insertRun(tx, userID, "duel", nil, nil, picks)
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(`UPDATE duels SET b_run = ? WHERE id = ?`, r.id, duelID); err != nil {
-			return err
-		}
-		s, err = g.state(tx, r)
-		return err
-	})
-	return s, err
-}
-
-// DeclineDuel ends a friend's challenge that hasn't been played by both: the friend says no (before they start), or
-// the challenger calls it off.
-func (g *Game) DeclineDuel(ctx context.Context, userID, duelID int64) error {
-	res, err := g.DB.Write.ExecContext(ctx, `UPDATE duels SET outcome = 'declined', ended_at = ?
-		WHERE id = ? AND kind = 'friend' AND challenge_id IS NULL AND ended_at IS NULL AND b_run IS NULL
-			AND (b_id = ? OR a_id = ?)`,
-		store.Ms(g.Now()), duelID, userID, userID)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNoDuel
-	}
-	return nil
-}
-
-// mayStart refuses a player one more challenge while too many of theirs wait on friends.
-func (g *Game) mayStart(tx *sql.Tx, userID int64) error {
-	var n int
-	if err := tx.QueryRow(`SELECT count(*) FROM duels WHERE a_id = ? AND kind = 'friend' AND ended_at IS NULL AND challenge_id IS NULL`, userID).Scan(&n); err != nil {
-		return err
-	}
-	if n >= MaxWaiting {
-		return ErrManyWaiting
-	}
-	return nil
-}
-
 // past is what a draw needs from its players' history: the questions they've seen, and how well they know them (on
 // average over the players; in a topic, or all of them for ""). It's read before the write the draw goes into: it grows
 // with every game they've played, and the game's one writer (store.DB.Write) mustn't wait on it.
@@ -484,7 +375,8 @@ const (
 	RecordingMissed = 2
 )
 
-// recordedRun is another player's finished run of ten questions, all still in the bank, none of today's and none due
+// recordedRun is another player's finished run of ten questions (none still played against: a duel's, a challenge's),
+// all still in the bank, none of today's and none due
 // for review (dayBars.now; a day's run never), played at a person's speed (not marked a script's: fair.go), to play
 // against: a real game (RecordingRights right or more, RecordingMissed not answered at most), by a player whose rating
 // is within RecordingBand of the player's, the one with the fewest questions the player has seen (seen, read before
@@ -507,7 +399,8 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind IN ('topic', 'duel') AND r.finished_at IS NOT NULL AND NOT r.scripted AND r.user_id <> ?
 			AND json_array_length(r.questions) = ?
-			AND NOT EXISTS (SELECT 1 FROM duels d WHERE d.ended_at IS NULL AND (d.a_run = r.id OR d.b_run = r.id))
+			AND NOT EXISTS (SELECT 1 FROM duels d WHERE d.ended_at IS NULL
+				AND (d.a_run = r.id OR d.b_run = r.id OR (d.kind = 'challenge' AND d.ghost_run = r.id)))
 		ORDER BY r.finished_at DESC LIMIT 200`, userID, Length)
 	if err != nil {
 		return nil, err
@@ -575,18 +468,19 @@ func abs(n int) int {
 }
 
 // settleRun settles the duel a just-finished run belongs to once both sides are played (a live one against a
-// recording, once the player's is); and, when a challenger has played, starts their friend's time and tells them.
+// recording, or a challenge's game, once the player's is); and, when it's a challenge sent to friends before it was
+// played, starts its time and tells them (sent).
 func (g *Game) settleRun(ctx context.Context, runID int64) error {
-	var duelID, aID, aRun int64
-	var kind, aName string
-	var bID sql.NullInt64
-	var ghost, challenge, aDone, bDone bool
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT d.id, d.kind, d.a_id, ua.name, d.a_run, d.b_id, d.ghost_run IS NOT NULL,
-			d.challenge_id IS NOT NULL,
+	if err := g.sent(ctx, runID); err != nil {
+		return err
+	}
+	var duelID int64
+	var ghost, aDone, bDone bool
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT d.id, d.ghost_run IS NOT NULL,
 			coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = d.a_run), 0),
 			coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = d.b_run), 0)
-		FROM duels d JOIN users ua ON ua.id = d.a_id WHERE (d.a_run = ?1 OR d.b_run = ?1) AND d.ended_at IS NULL`, runID).
-		Scan(&duelID, &kind, &aID, &aName, &aRun, &bID, &ghost, &challenge, &aDone, &bDone)
+		FROM duels d WHERE (d.a_run = ?1 OR d.b_run = ?1) AND d.ended_at IS NULL`, runID).
+		Scan(&duelID, &ghost, &aDone, &bDone)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
@@ -596,16 +490,8 @@ func (g *Game) settleRun(ctx context.Context, runID int64) error {
 	switch {
 	case aDone && bDone:
 		return g.settleDuel(ctx, duelID, false, runID)
-	case (kind == "live" || challenge) && ghost && aDone:
+	case ghost && aDone:
 		return g.settleDuel(ctx, duelID, true, runID)
-	case kind == "friend" && aDone && runID == aRun && bID.Valid:
-		if _, err := g.DB.Write.ExecContext(ctx, `UPDATE duels SET expires_at = ? WHERE id = ?`,
-			store.Ms(g.Now().Add(FriendFor)), duelID); err != nil {
-			return err
-		}
-		if g.DuelNews != nil {
-			g.DuelNews(ctx, DuelNews{To: bID.Int64, Kind: "asked", From: aName, DuelID: duelID})
-		}
 	}
 	return nil
 }
@@ -619,24 +505,29 @@ func (g *Game) recordedRatedToday(tx *sql.Tx, userID int64) (int, error) {
 	now := g.Now().In(Bulgaria)
 	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, Bulgaria)
 	var n int
-	err := tx.QueryRow(`SELECT count(*) FROM duels WHERE rated = 1 AND ghost_run IS NOT NULL AND a_id = ?
+	err := tx.QueryRow(`SELECT count(*) FROM duels WHERE rated = 1 AND kind = 'live' AND ghost_run IS NOT NULL AND a_id = ?
 		AND ended_at >= ?`, userID, store.Ms(midnight)).Scan(&n)
 	return n, err
 }
 
-// ratedToday says whether a duel between the two players has already moved their ratings today (in Bulgaria).
+// ratedToday says whether a duel between the two players (a live one, or a challenge between them) has already moved
+// their ratings today (in Bulgaria).
 func (g *Game) ratedToday(tx *sql.Tx, a, b int64) (bool, error) {
 	now := g.Now().In(Bulgaria)
 	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, Bulgaria)
 	var n int
-	err := tx.QueryRow(`SELECT count(*) FROM duels WHERE rated = 1 AND ghost_run IS NULL AND outcome IN ('a', 'b', 'draw')
+	err := tx.QueryRow(`SELECT count(*) FROM duels WHERE rated = 1 AND outcome IN ('a', 'b', 'draw')
 		AND ended_at >= ?1 AND ((a_id = ?2 AND b_id = ?3) OR (a_id = ?3 AND b_id = ?2))`, store.Ms(midnight), a, b).Scan(&n)
 	return n > 0, err
 }
 
-// settleDuel ends a duel: both played (a result for both), or a live one against a recording (a result for its
-// player only). The first duel of the day between the two moves their ratings; one after is a friendly. A duel
-// already ended (both sides finished at once, and the other settled it) is left as it is.
+// settleDuel ends a duel: both played (a result for both), or one played against a game played back (ghost: a
+// recording, or a challenge's sender's game). Two people who both asked to play, a live duel's two or a challenge
+// between friends, both have its result. A live duel's two, or a challenge drawn for the pair played by the friend it
+// was drawn for (still a friend), move their ratings with the first duel of the day between them; one after is a
+// friendly. Any other challenge moves no rating (challenges.go says why). Against a recording only the player has a
+// result, and their rating moves half as far, RecordedRatedPerDay times a day; a challenge taken by anyone but a
+// friend is told to its sender quietly (challengeNews). A duel already ended (both sides finished at once, and the other settled it) is left as it is.
 func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finished int64) error {
 	type side struct {
 		id             int64
@@ -651,18 +542,23 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 	settled := false
 	var challenge sql.NullInt64 // a challenge's duel: its taker against the one who sent it (challenges.go)
 	var outcome string
+	both := !ghost // a person on each side, both with a result
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		other := "d.b_run"
 		if ghost {
 			other = "d.ghost_run"
 		}
+		var friends, pair bool
 		err := tx.QueryRow(`SELECT d.a_id, ua.name, ua.rating, ua.rated, ra.id, ra.points, ra.rights, ra.ms,
-				rb.user_id, ub.name, ub.rating, ub.rated, rb.id, rb.points, rb.rights, rb.ms
+				rb.user_id, ub.name, ub.rating, ub.rated, rb.id, rb.points, rb.rights, rb.ms, d.challenge_id, d.b_id IS NOT NULL,
+				-- drawn for this pair, and friends still
+				coalesce((SELECT for_id FROM challenges WHERE id = d.challenge_id), 0) = d.a_id
+					AND EXISTS (SELECT 1 FROM friends WHERE user_id = d.a_id AND friend_id = rb.user_id)
 			FROM duels d JOIN users ua ON ua.id = d.a_id JOIN runs ra ON ra.id = d.a_run
 			JOIN runs rb ON rb.id = `+other+` JOIN users ub ON ub.id = rb.user_id
 			WHERE d.id = ? AND d.ended_at IS NULL AND ra.finished_at IS NOT NULL AND rb.finished_at IS NOT NULL`, duelID).
 			Scan(&a.id, &a.name, &a.rating, &a.rated, &a.run, &a.points, &a.rights, &a.ms,
-				&b.id, &b.name, &b.rating, &b.rated, &b.run, &b.points, &b.rights, &b.ms)
+				&b.id, &b.name, &b.rating, &b.rated, &b.run, &b.points, &b.rights, &b.ms, &challenge, &friends, &pair)
 		if errors.Is(err, sql.ErrNoRows) {
 			settled = true // the other side's last answer settled it a moment ago: it's done
 			return nil
@@ -670,19 +566,19 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 		if err != nil {
 			return err
 		}
-		if err := tx.QueryRow(`SELECT challenge_id FROM duels WHERE id = ?`, duelID).Scan(&challenge); err != nil {
-			return err
-		}
-		rated := true
-		if challenge.Valid {
-			rated = false // between people of any strength: no rating moves
-		} else if ghost {
+		recording := ghost && !challenge.Valid
+		both = both || (challenge.Valid && friends)
+		var rated bool
+		switch {
+		case challenge.Valid && !pair:
+			rated = false // a game that could be chosen to win, or taken knowing it: no rating moves
+		case recording:
 			n, err := g.recordedRatedToday(tx, a.id)
 			if err != nil {
 				return err
 			}
 			rated = n < RecordedRatedPerDay
-		} else {
+		default:
 			done, err := g.ratedToday(tx, a.id, b.id)
 			if err != nil {
 				return err
@@ -713,7 +609,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 				return 0, after, nil
 			}
 			d := eloDelta(s.rating, against, s.rated, score)
-			if ghost {
+			if recording {
 				d /= 2 // a recording doesn't play to win: it moves a rating half as far
 			}
 			err := tx.QueryRow(`UPDATE users SET rating = max(0, rating + ?1), peak = max(peak, rating + ?1), rated = rated + 1
@@ -721,20 +617,20 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 			return d, after, err
 		}
 		now := store.Ms(g.Now())
-		// opponent_id is a player the duel was against, never a recording's: the record between friends, their
-		// achievements and the year's rival count only duels both played.
-		opponentID := sql.NullInt64{Int64: b.id, Valid: !ghost || challenge.Valid}
+		// opponent_id is a player the duel was against, never a recording's: the year's rival counts only duels
+		// played against a person.
+		opponentID := sql.NullInt64{Int64: b.id, Valid: !recording}
 		da, ra, err := rate(a, b.rating, score)
 		if err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`UPDATE runs SET opponent = ?, opponent_id = ?, recorded = ?, outcome = ? WHERE id = ?`,
-			b.name, opponentID, ghost && !challenge.Valid, outcomeOf(score), a.run); err != nil {
+			b.name, opponentID, recording, outcomeOf(score), a.run); err != nil {
 			return err
 		}
 		news = append(news, DuelNews{To: a.id, Kind: "result", From: b.name, Outcome: outcomeOf(score), Delta: da,
 			Friendly: !rated, DuelID: duelID, Seen: a.run == finished})
-		if ghost {
+		if !both {
 			outcome = outcomeOf(score)
 			_, err = tx.Exec(`UPDATE duels SET ended_at = ?, outcome = ?, a_delta = ?, a_rating = ?, rated = ? WHERE id = ?`,
 				now, "ghost_"+outcomeOf(score), da, ra, rated, duelID)
@@ -744,9 +640,13 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`UPDATE runs SET opponent = ?, opponent_id = ?, recorded = 0, outcome = ? WHERE id = ?`,
-			a.name, a.id, outcomeOf(1-score), b.run); err != nil {
-			return err
+		// A challenge's sender's game is theirs alone, played against by everyone who takes it: the result is the
+		// duel's, not the game's.
+		if !ghost {
+			if _, err := tx.Exec(`UPDATE runs SET opponent = ?, opponent_id = ?, recorded = 0, outcome = ? WHERE id = ?`,
+				a.name, a.id, outcomeOf(1-score), b.run); err != nil {
+				return err
+			}
 		}
 		news = append(news, DuelNews{To: b.id, Kind: "result", From: a.name, Outcome: outcomeOf(1 - score), Delta: db,
 			Friendly: !rated, DuelID: duelID, Seen: b.run == finished})
@@ -758,7 +658,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 	if err != nil || settled {
 		return err
 	}
-	if challenge.Valid {
+	if challenge.Valid && !both {
 		if err := g.challengeNews(ctx, challenge.Int64, a.name, outcome, duelID); err != nil {
 			return err
 		}
@@ -774,7 +674,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 	return nil
 }
 
-// SettleDue ends the duels whose time is up — a friend's challenge not played in time, a live duel cut off — and
+// SettleDue ends the duels whose time is up — a challenge not played in time, a live duel cut off — and
 // the tournaments whose time is up. Run every few minutes. A week of the leagues that's over ends first.
 func (g *Game) SettleDue(ctx context.Context) error {
 	if err := g.ensureWeek(ctx); err != nil {
@@ -825,26 +725,30 @@ func (g *Game) SettleDue(ctx context.Context) error {
 	return nil
 }
 
-// DuelsOf are a player's duels: friends' challenges to play or waiting, then the latest ended (a live duel shows
-// once it's over). The other's score shows only once the duel has ended: nobody plays knowing what to beat.
+// DuelsOf are a player's duels: challenges to play or waiting (theirs to take once their sender has played; those
+// they sent, until each is played), then the latest ended (a live duel shows once it's over). The other's score shows
+// only once the duel has ended: nobody plays knowing what to beat.
 func (g *Game) DuelsOf(ctx context.Context, userID int64) ([]DuelView, error) {
 	return g.duelsOf(ctx, userID, 0)
 }
 
-// duelsOf are DuelsOf, or (only) that one duel of theirs.
+// duelsOf are DuelsOf, or (only) that one duel of theirs. The player is a, or b: a live duel's other, or a
+// challenge's sender (whose game is its ghost_run).
 func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, error) {
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.kind, d.created_at, d.expires_at, coalesce(d.ended_at, 0),
 			coalesce(d.outcome, ''), d.a_id = ?1, d.rated,
 			coalesce(CASE WHEN d.a_id = ?1 THEN d.a_delta ELSE d.b_delta END, 0),
-			coalesce(CASE WHEN d.a_id = ?1 THEN d.a_run ELSE d.b_run END, 0),
+			coalesce(CASE WHEN d.a_id = ?1 THEN d.a_run WHEN d.kind = 'challenge' THEN d.ghost_run ELSE d.b_run END, 0),
 			coalesce(CASE WHEN d.a_id <> ?1 THEN d.a_run WHEN d.ghost_run IS NOT NULL THEN d.ghost_run ELSE d.b_run END, 0),
 			coalesce(CASE WHEN d.a_id <> ?1 THEN d.a_id WHEN d.ghost_run IS NOT NULL
 				THEN (SELECT user_id FROM runs WHERE id = d.ghost_run) ELSE d.b_id END, 0),
 			CASE WHEN d.a_id = ?1 THEN d.a_left ELSE d.b_left END, CASE WHEN d.a_id = ?1 THEN d.b_left ELSE d.a_left END,
-			coalesce((SELECT code FROM challenges WHERE id = d.challenge_id), '')
-		FROM duels d WHERE (d.a_id = ?1 OR d.b_id = ?1) AND (d.kind = 'friend' OR d.ended_at IS NOT NULL)
-			AND NOT (d.b_id IS ?1 AND d.ended_at IS NULL -- IS: a challenge taken has no b_id, and NOT of NULL hid it
-				AND (SELECT finished_at FROM runs WHERE id = d.a_run) IS NULL)
+			coalesce(c.code, ''), d.b_id IS NOT NULL, coalesce(c.for_id = d.a_id, 0)
+		FROM duels d LEFT JOIN challenges c ON c.id = d.challenge_id
+		WHERE (d.a_id = ?1 OR d.b_id = ?1) AND (d.kind = 'challenge' OR d.ended_at IS NOT NULL)
+			-- a challenge is its taker's once its sender has played it
+			AND NOT (d.a_id = ?1 AND d.kind = 'challenge'
+				AND coalesce((SELECT finished_at FROM runs WHERE id = d.ghost_run), 0) = 0)
 			AND (?2 = 0 OR d.id = ?2)
 		ORDER BY d.ended_at IS NOT NULL, coalesce(d.ended_at, d.created_at) DESC LIMIT 50`, userID, only)
 	if err != nil {
@@ -853,21 +757,19 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 	type row struct {
 		v                       DuelView
 		outcome                 string
-		mine, rated             bool
+		mine, rated, friends    bool
+		pair                    bool
 		myRun, theirRun, theirs int64
 	}
 	var list []row
 	for rows.Next() {
 		var r row
 		var youLeft, theyLeft sql.NullInt64
-		var code string
 		if err := rows.Scan(&r.v.ID, &r.v.Kind, &r.v.CreatedAt, &r.v.ExpiresAt, &r.v.EndedAt, &r.outcome, &r.mine,
-			&r.rated, &r.v.Delta, &r.myRun, &r.theirRun, &r.theirs, &youLeft, &theyLeft, &code); err != nil {
+			&r.rated, &r.v.Delta, &r.myRun, &r.theirRun, &r.theirs, &youLeft, &theyLeft, &r.v.Challenge, &r.friends,
+			&r.pair); err != nil {
 			rows.Close()
 			return nil, err
-		}
-		if code != "" {
-			r.v.Kind, r.v.Challenge = "challenge", code
 		}
 		for _, l := range []struct {
 			n  sql.NullInt64
@@ -888,10 +790,11 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 	for _, r := range list {
 		v := r.v
 		v.RunID, v.against, v.theirRun = r.myRun, r.theirs, r.theirRun
-		if v.Kind == "friend" {
+		challenge := v.Kind == "challenge"
+		v.Sent = challenge && !r.mine
+		if challenge && r.friends {
 			v.Friend = r.theirs
 		}
-		challenge := v.Kind == "challenge"
 		var err error
 		if v.You, err = g.duelSide(ctx, userID, r.myRun, true); err != nil {
 			return nil, err
@@ -901,7 +804,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 				return nil, err
 			}
 		}
-		v.Recorded = len(r.outcome) > 6 && r.outcome[:6] == "ghost_" && !challenge
+		v.Recorded = strings.HasPrefix(r.outcome, "ghost_") && !challenge
 		won := map[bool]string{true: "a", false: "b"}[r.mine]
 		switch {
 		case r.outcome == won || r.outcome == "ghost_won":
@@ -917,7 +820,8 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 		default:
 			v.State = "wait"
 		}
-		v.Friendly = !r.rated && !challenge && (v.State == "won" || v.State == "lost" || v.State == "draw")
+		// Friendly: a duel that could have moved ratings, and didn't (only a challenge drawn for the pair could).
+		v.Friendly = !r.rated && (!challenge || r.pair) && (v.State == "won" || v.State == "lost" || v.State == "draw")
 		out = append(out, v)
 	}
 	return out, nil
@@ -1063,59 +967,24 @@ func decided(a, b []DuelMark, pointsA, pointsB int) int {
 	return at
 }
 
+// duelResults is, in a query whose ?1 is a player, every duel they've played to a result, one row each: the other
+// (a person; null against a recording), how it went for the player (won, lost, draw) and when it ended. A
+// challenge's sender has a result only of one a friend took, a duel between the two (b_id); the game they sent is
+// theirs alone, and the duels anyone else plays against it are the takers' (each taker's other is the sender).
+const duelResults = `(SELECT d.id, coalesce(d.b_id, c.user_id) AS other,
+		CASE WHEN d.outcome IN ('a', 'ghost_won') THEN 'won' WHEN d.outcome IN ('b', 'ghost_lost') THEN 'lost' ELSE 'draw' END
+			AS outcome, d.ended_at
+	FROM duels d LEFT JOIN challenges c ON c.id = d.challenge_id
+	WHERE d.a_id = ?1 AND d.outcome IN ('a', 'b', 'draw', 'ghost_won', 'ghost_lost', 'ghost_draw')
+	UNION ALL
+	SELECT d.id, d.a_id, CASE d.outcome WHEN 'b' THEN 'won' WHEN 'a' THEN 'lost' ELSE 'draw' END, d.ended_at
+	FROM duels d WHERE d.b_id = ?1 AND d.outcome IN ('a', 'b', 'draw'))`
+
 // recordAgainst is how a player's duels against another went: won, lost, drawn.
 func (g *Game) recordAgainst(ctx context.Context, userID, other int64) (Record, error) {
 	var r Record
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT outcome, count(*) FROM runs
-		WHERE user_id = ? AND kind = 'duel' AND opponent_id = ? GROUP BY outcome`, userID, other)
-	if err != nil {
-		return r, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var outcome string
-		var n int
-		if err := rows.Scan(&outcome, &n); err != nil {
-			return r, err
-		}
-		switch outcome {
-		case "won":
-			r.Won = n
-		case "lost":
-			r.Lost = n
-		default:
-			r.Drawn = n
-		}
-	}
-	return r, rows.Err()
-}
-
-// Challenge is a friend's challenge waiting for the player: who, and until when.
-type Challenge struct {
-	ID        int64  `json:"id"`
-	From      string `json:"from"`
-	ExpiresAt int64  `json:"expiresAt"`
-	// Started is a challenge the player has begun (and not finished).
-	Started bool `json:"started,omitempty"`
-}
-
-// Challenges are the friends' challenges waiting for the player to play, the soonest to run out first.
-func (g *Game) Challenges(ctx context.Context, userID int64) ([]Challenge, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, ua.name, d.expires_at, d.b_run IS NOT NULL
-		FROM duels d JOIN users ua ON ua.id = d.a_id JOIN runs ra ON ra.id = d.a_run LEFT JOIN runs rb ON rb.id = d.b_run
-		WHERE d.kind = 'friend' AND d.b_id = ? AND d.ended_at IS NULL AND ra.finished_at IS NOT NULL AND rb.finished_at IS NULL
-		ORDER BY d.expires_at`, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := []Challenge{}
-	for rows.Next() {
-		var c Challenge
-		if err := rows.Scan(&c.ID, &c.From, &c.ExpiresAt, &c.Started); err != nil {
-			return nil, err
-		}
-		out = append(out, c)
-	}
-	return out, rows.Err()
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE outcome = 'won'),
+			count(*) FILTER (WHERE outcome = 'lost'), count(*) FILTER (WHERE outcome = 'draw')
+		FROM `+duelResults+` WHERE other = ?2`, userID, other).Scan(&r.Won, &r.Lost, &r.Drawn)
+	return r, err
 }

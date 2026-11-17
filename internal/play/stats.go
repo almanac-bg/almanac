@@ -54,8 +54,9 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 		return s, err
 	}
 	db := g.DB.Read
-	err = db.QueryRowContext(ctx, `SELECT count(*), count(*) FILTER (WHERE kind = 'day'), count(*) FILTER (WHERE kind = 'duel' AND outcome IS NOT NULL),
-		count(*) FILTER (WHERE outcome = 'won') FROM runs WHERE user_id = ? AND finished_at IS NOT NULL`, userID).
+	err = db.QueryRowContext(ctx, `SELECT count(*), count(*) FILTER (WHERE kind = 'day'),
+		(SELECT count(*) FROM `+duelResults+`), (SELECT count(*) FROM `+duelResults+` WHERE outcome = 'won')
+		FROM runs WHERE user_id = ?1 AND finished_at IS NOT NULL`, userID).
 		Scan(&s.Games, &s.Days, &s.Duels, &s.Won)
 	if err != nil {
 		return s, err

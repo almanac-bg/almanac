@@ -70,10 +70,8 @@ func (g *Game) YearOf(ctx context.Context, userID int64, year int) (Year, error)
 		(SELECT count(*) FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?1 AND a.at >= ?2 AND a.at < ?3),
 		(SELECT coalesce(sum(a.is_right), 0) FROM answers a JOIN runs r ON r.id = a.run_id
 			WHERE r.user_id = ?1 AND a.at >= ?2 AND a.at < ?3),
-		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'duel' AND outcome IS NOT NULL
-			AND finished_at >= ?2 AND finished_at < ?3),
-		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'duel' AND outcome = 'won'
-			AND finished_at >= ?2 AND finished_at < ?3),
+		(SELECT count(*) FROM `+duelResults+` WHERE ended_at >= ?2 AND ended_at < ?3),
+		(SELECT count(*) FROM `+duelResults+` WHERE outcome = 'won' AND ended_at >= ?2 AND ended_at < ?3),
 		coalesce((SELECT sum(xp) FROM runs WHERE user_id = ?1 AND finished_at >= ?2 AND finished_at < ?3), 0)
 			+ coalesce((SELECT sum(xp) FROM goals_done WHERE user_id = ?1 AND day BETWEEN ?4 AND ?5), 0)
 			+ coalesce((SELECT sum(xp) FROM achievements WHERE user_id = ?1 AND at >= ?2 AND at < ?3), 0)
@@ -125,9 +123,9 @@ func (g *Game) YearOf(ctx context.Context, userID int64, year int) (Year, error)
 		l := leagueOf(max(int(top.Int64), int(current.Int64)))
 		y.League = &l
 	}
-	if err := db.QueryRowContext(ctx, `SELECT u.name, count(*) FROM runs r JOIN users u ON u.id = r.opponent_id
-		WHERE r.user_id = ? AND r.kind = 'duel' AND r.finished_at >= ? AND r.finished_at < ?
-		GROUP BY r.opponent_id ORDER BY 2 DESC, max(r.finished_at) DESC LIMIT 1`, userID, from, to).
+	if err := db.QueryRowContext(ctx, `SELECT u.name, count(*) FROM `+duelResults+` r JOIN users u ON u.id = r.other
+		WHERE r.ended_at >= ?2 AND r.ended_at < ?3
+		GROUP BY r.other ORDER BY 2 DESC, max(r.ended_at) DESC LIMIT 1`, userID, from, to).
 		Scan(&y.Rival, &y.RivalGames); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return y, err
 	}

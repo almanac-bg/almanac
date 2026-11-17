@@ -97,7 +97,7 @@ export interface Today {
   invite?: string;
   /** A live game the player is in, under way (its screen left): the way back to it. */
   playing?: { kind: "duel" | "room" | "royal"; code?: string } | null;
-  /** A friend has just played the duel the player started (told once). */
+  /** A friend has just played the player's challenge (told once). */
   duel?: FriendPlayed | null;
   /** A friend said yes to the player's invite, and a live duel they left: each told once (play/lines.go). */
   accepted?: Accepted | null;
@@ -247,8 +247,8 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
       // A streak that can be won back today, as it stands (the day just played may have done it); else what came of
       // the days just missed, once.
       t.repair ? () => repairCard(fresh().repair, next) : streakNotice(t),
-      // One line at a time: a live game of the player's going on; of others, a friend played the duel, said yes to
-      // the invite, the duel left went on, or who took their challenges.
+      // One line at a time: a live game of the player's going on; of others, a friend played their challenge, said
+      // yes to the invite, the duel left went on, or who else took their challenges.
       playingLine(t.playing) ??
         playedLine(t.duel) ??
         acceptedLine(t.accepted) ??
