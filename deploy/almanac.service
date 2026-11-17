@@ -16,8 +16,19 @@ ExecStart=/usr/local/bin/almanac serve
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=2
+# One that keeps failing is started again ever more slowly, up to a minute apart (a deploy's restart starts the count
+# over). A crash soon after a deploy goes back to the version before (deploy.sh).
+RestartSteps=5
+RestartMaxDelaySec=60
 # Requests under way get 30 seconds to finish (a deploy drains the games first: deploy.sh).
 TimeoutStopSec=45
+
+# Memory, of the machine's 3.8 GB: the program's heap kept under 2 GiB (Go collects harder as it nears that), and the
+# whole service, the database's pages in memory included, slowed and its cache given back past 2.6 GB, and stopped
+# (then started again) past 3 GB, before the kernel would pick a process of the machine's to end, ssh's say.
+Environment=GOMEMLIMIT=2GiB
+MemoryHigh=2600M
+MemoryMax=3G
 
 # No privilege at all: the port comes from the socket.
 CapabilityBoundingSet=

@@ -1,7 +1,10 @@
 #!/bin/sh
-# Prepares a server for the game, once (running it again changes nothing). As root, on Ubuntu:
+# Prepares a server for the game, once (running it again changes nothing but what deploy/ changed). As root, on Ubuntu:
 #
 #   sh setup.sh
+#
+# It is also how a change to deploy/ reaches the server: the deploy workflow compares the files installed here with the
+# repository's after every deploy (deploy-ci.sh check), and fails until they're the same.
 #
 # Then: put the settings in /etc/almanac/env (deploy/env.example), Cloudflare's origin certificate and key in
 # /etc/almanac/origin.pem and origin.key, and install a release with deploy.sh.
@@ -28,6 +31,7 @@ install -m 644 "$here/almanac.service" "$here/almanac.socket" /etc/systemd/syste
 install -m 755 "$here/deploy.sh" /usr/local/sbin/almanac-deploy
 install -m 755 "$here/deploy-ci.sh" /usr/local/sbin/almanac-deploy-ci
 install -m 755 "$here/bank.sh" /usr/local/sbin/almanac-bank
+install -m 644 "$here/release-signers" /etc/almanac/release-signers
 systemctl daemon-reload
 systemctl enable almanac.socket almanac.service
 echo "ready: settings in /etc/almanac/env, then almanac-deploy vX.Y.Z"

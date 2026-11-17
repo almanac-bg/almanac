@@ -1,7 +1,7 @@
-// Package store keeps the game's data in one SQLite file: opening it, bringing its schema up to date (a new version
-// keeps a copy from before, KeepCopy), and the few helpers every query uses. The migrations apply in the order of
-// their names, and are checked so that the schema comes out the same wherever they ran, whatever order they landed in
-// (migrate).
+// Package store keeps the game's data in one SQLite file: opening it, bringing its schema up to date (a version that
+// brings migrations keeps a copy from before them, KeepCopy), and the few helpers every query uses. The migrations
+// apply in the order of their names, and are checked so that the schema comes out the same wherever they ran, whatever
+// order they landed in (migrate).
 //
 // SQLite takes one writer at a time, so writes go through a single connection (Write) and never wait on each other's
 // locks; reads go through a pool (Read) and run alongside, thanks to the write-ahead log. The pool keeps its
@@ -149,25 +149,34 @@ func (db *DB) migrate() error { return db.migrateTo(-1) }
 
 var migrationName = regexp.MustCompile(`^[0-9]{4}_[a-z0-9_]+\.sql$`)
 
+// migrationNames is the names of this program's migrations, in order.
+func migrationNames() ([]string, error) {
+	files, err := fs.Glob(migrations, "migrations/*.sql")
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(files))
+	for _, f := range files {
+		name := strings.TrimPrefix(f, "migrations/")
+		if !migrationName.MatchString(name) {
+			return nil, fmt.Errorf("%s: a migration is named like 0021_live_duels.sql", f)
+		}
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	return names, nil
+}
+
 // migrationsTable keeps the names of the migrations a database has had.
 const migrationsTable = `CREATE TABLE IF NOT EXISTS schema_migrations (
 	name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL) STRICT, WITHOUT ROWID`
 
 // migrateTo migrates with the first n migrations only (all of them for -1): for tests of a migration.
 func (db *DB) migrateTo(n int) error {
-	files, err := fs.Glob(migrations, "migrations/*.sql")
+	names, err := migrationNames()
 	if err != nil {
 		return err
 	}
-	names := make([]string, 0, len(files))
-	for _, f := range files {
-		name := strings.TrimPrefix(f, "migrations/")
-		if !migrationName.MatchString(name) {
-			return fmt.Errorf("%s: a migration is named like 0021_live_duels.sql", f)
-		}
-		names = append(names, name)
-	}
-	slices.Sort(names)
 	if n >= 0 {
 		names = names[:n]
 	}
