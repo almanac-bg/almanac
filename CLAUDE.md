@@ -6,7 +6,8 @@ session designs it, builds it, tests it and ships it, all the way to production,
 doesn't need. Decide; say why in a line; act. Ask only when the answer changes the product in a way the owner would
 want to choose.
 
-This file is the way in. Read it first; it says where everything else is.
+This file is the way in. Read it first; it says where everything else is. `DECISIONS.md` holds the owner's calls and
+their reasons: read it before changing what a player sees or how the game plays, and don't undo one on your own.
 
 ## The game, in a paragraph
 
@@ -96,6 +97,10 @@ client, the server or the sample bank. It catches only what it knows: reading th
 
 ## Other rules
 
+- **A mistake becomes a check.** When something goes wrong that another session could do again (a rule forgotten, a
+  list kept in two places, a command that doesn't work), make it fail a test, a lint or a hook, in the same pull
+  request; a sentence here is the last resort. That is how `TestAppPathsMatchTheClient`, `language.test.ts`, the
+  format hook and the bank's lint came to be.
 - **Free hand.** The game was rebuilt from zero in November 2026: no legacy to keep, nothing kept for compatibility.
   Rename completely (URLs, API, files, types, stored ids with a migration), delete what's unused.
 - **The bank** (questions, facts) is changed only through the `questions` skill; a new batch is `/new-questions`; a fix by the rules (what `bank lint` lists) is `/fix-questions`.
@@ -117,8 +122,9 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
   and database copy both, if it isn't healthy. No tags by hand, no ssh to deploy. Anything new kept in memory must
   survive a restart or count as under way (`internal/server/drain.go`).
 - **The browser tests run after the merge, on `main`** (about 15 minutes, all three engines). They hold nothing up;
-  if one fails, fix it with the next change. Before opening a PR, run only the specs your change touches, in
-  Chromium: `npx playwright test -c e2e --project chromium e2e/<spec>`. Each checkout gets its own port, so sessions
+  if one fails, whoever sees it fixes it, at once (a session is told as it starts: `.claude/hooks/main-red.sh`).
+  Before opening a PR, run only the specs your change touches, in Chromium:
+  `npx playwright test -c e2e --project=chromium e2e/<spec>`. Each checkout gets its own port, so sessions
   don't stop each other's test servers.
 - **A migration is a new file in `internal/store/migrations`,** named `NNNN_what.sql` with the next number you see.
   The database keeps the names of the migrations it has had, so if another session lands one with the same number,
