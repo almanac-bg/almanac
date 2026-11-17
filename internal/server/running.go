@@ -14,7 +14,7 @@ import (
 // going down) leaves nothing in its log to say so, and its problems, kept in memory, go with it. So the server notes
 // that it runs (Config.RunningFile) as it starts, and takes the note away as it stops cleanly: a note found at the
 // start is a run that ended otherwise, told as a problem. The note counts such runs in a row, so that a server that
-// keeps falling over says how often, once a run lives long enough to mail (MailProblems mails its first a minute
+// keeps falling over says how often, once a run lives long enough to tell it (TellProblems tells its first a minute
 // after the start).
 
 // runNote is what the note holds: the run it's for, and how many runs before it in a row ended without a clean stop.

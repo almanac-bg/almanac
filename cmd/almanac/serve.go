@@ -37,7 +37,8 @@ import (
 //	MAIL_FROM           "АЛМАНАХ <no-reply@almanac.bg>"
 //	TLS_CERT, TLS_KEY   serve HTTPS with this certificate (behind Cloudflare: its origin certificate)
 //	TRUST_CLOUDFLARE=1  take players' addresses from Cloudflare's header, on connections from Cloudflare's addresses
-//	ALERT_EMAIL         where new kinds of problems are mailed (hourly, each kind once a day)
+//	ALERT_SLACK         a Slack incoming webhook where new kinds of problems are told (hourly, each kind once a day)
+//	ALERT_EMAIL         where they are mailed instead (no ALERT_SLACK), or when Slack can't be reached
 //	PUSH_PUBLIC_KEY,    notifications (Web Push): the VAPID key pair `almanac push keys` makes; without them,
 //	PUSH_PRIVATE_KEY    no notifications
 //	APNS_KEY_FILE       notifications to the app on iPhones: the team's APNs key (.p8), with APNS_KEY_ID and
@@ -233,8 +234,8 @@ func serve([]string) error {
 			slog.Error("counting", "err", err)
 		}
 	})
-	if to := os.Getenv("ALERT_EMAIL"); to != "" {
-		go safe.Loop(ctx, "mailing problems", func(ctx context.Context) { srv.MailProblems(ctx, to, time.Hour) })
+	if to := (server.Alerts{Slack: os.Getenv("ALERT_SLACK"), Email: os.Getenv("ALERT_EMAIL")}); to != (server.Alerts{}) {
+		go safe.Loop(ctx, "telling problems", func(ctx context.Context) { srv.TellProblems(ctx, to, time.Hour) })
 	}
 	if backups != nil {
 		go safe.Loop(ctx, "backups", func(ctx context.Context) { runBackups(ctx, srv) })

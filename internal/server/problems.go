@@ -1,11 +1,16 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"regexp"
 	"slices"
 	"strings"
@@ -16,8 +21,9 @@ import (
 	"github.com/almanac-bg/almanac/internal/mail"
 )
 
-// problems collects what went wrong, so that whoever runs the game hears of each new kind by mail, once a day, rather
-// than having to read the logs.
+// problems collects what went wrong, so that whoever runs the game hears of each new kind once a day, rather than
+// having to read the logs: in Slack when there is a channel for it (ALERT_SLACK), by mail when there isn't, or when
+// Slack can't be reached.
 //
 // What anyone can send must never silence what the server says itself, so each source has a budget of its own:
 //   - background work (a failed backup): never capped; only the code says these, a few a day at most.
@@ -119,42 +125,92 @@ func (s *Server) Problem(kind string) { s.problems.note(kind, background) }
 // as it loads) is heard of at once, not an hour on, when a server falling over again may be gone.
 const problemsFirst = time.Minute
 
-// MailProblems sends whatever new problems there are to `to`, problemsFirst after the start and every period after,
-// until ctx ends; and then once more, so that what the run found last isn't lost with it (the mail waits in the
-// outbox for the next run, if this one can't send it).
-func (s *Server) MailProblems(ctx context.Context, to string, period time.Duration) {
+// Alerts is where problems are told: a Slack channel's incoming webhook, an address to mail, or both (Slack first,
+// the mail only when Slack can't be reached).
+type Alerts struct {
+	Slack string // an incoming webhook (https://hooks.slack.com/services/…), a secret
+	Email string
+}
+
+// TellProblems tells whatever new problems there are, problemsFirst after the start and every period after, until ctx
+// ends; and then once more, so that what the run found last isn't lost with it (a mail waits in the outbox for the
+// next run, if this one can't send it).
+func (s *Server) TellProblems(ctx context.Context, to Alerts, period time.Duration) {
 	t := time.NewTimer(min(problemsFirst, period))
 	defer t.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			last, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-			s.mailProblems(last, to)
+			s.tellProblems(last, to)
 			cancel()
 			return
 		case <-t.C:
 			t.Reset(period)
 		}
-		s.mailProblems(ctx, to)
+		s.tellProblems(ctx, to)
 	}
 }
 
-// mailProblems puts the new problems, if there are any, in the outbox for `to`.
-func (s *Server) mailProblems(ctx context.Context, to string) {
+// tellProblems tells the new problems, if there are any: to Slack, or (Slack unset or unreachable) by mail.
+func (s *Server) tellProblems(ctx context.Context, to Alerts) {
 	news, over := s.problems.take()
 	text := problemsMail(news, over, s.cfg.PublicURL, s.cfg.Version)
 	if text == "" {
 		return
 	}
 	subject := problemsSubject(len(news) + over[fromServer] + over[fromBrowser])
+	if to.Slack != "" {
+		err := postSlack(ctx, to.Slack, subject+"\n\n"+text)
+		if err == nil {
+			return
+		}
+		slog.Error("telling problems in Slack", "err", err)
+	}
+	if to.Email == "" {
+		return
+	}
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
-		return s.outbox.Enqueue(tx, mail.Message{To: to, Subject: subject, Text: text})
+		return s.outbox.Enqueue(tx, mail.Message{To: to.Email, Subject: subject, Text: text})
 	})
 	if err != nil {
 		slog.Error("mailing problems", "err", err)
 		return
 	}
 	s.outbox.Wake()
+}
+
+// slackClient posts to Slack: a webhook that hangs holds up nothing for long.
+var slackClient = &http.Client{Timeout: 10 * time.Second}
+
+// postSlack posts text to a Slack incoming webhook as plain text: Slack's formatting is off and its control characters
+// escaped, so what a browser sent (in the text) can't link anywhere or call anyone (<!channel>).
+func postSlack(ctx context.Context, webhook, text string) error {
+	plain := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(text)
+	body, err := json.Marshal(map[string]any{"text": plain, "mrkdwn": false, "unfurl_links": false, "unfurl_media": false})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhook, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	res, err := slackClient.Do(req)
+	if err != nil {
+		// The error names the webhook, which is a secret: only how it failed is said.
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			return fmt.Errorf("posting: %w", ue.Err)
+		}
+		return errors.New("posting failed")
+	}
+	defer res.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, 4096))
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("Slack answered %s", res.Status)
+	}
+	return nil
 }
 
 // problemsMail is the mail about new problems ("": none): the server's first, then the browsers', apart.
