@@ -13,8 +13,8 @@ import (
 
 // Lines are what Начало tells a player once, in a line above the day, of what others did with them while they were
 // away: a friend said yes to their invite (AcceptedOf: a tap from a duel with them), or what came of a live duel they
-// left (LeftOf: it went on without them). Each is told once wherever the player is signed in (Told keeps it), and only
-// while it's news (LinesRecent).
+// left (LeftOf: it went on without them), or who took their challenges (ChallengeNewsOf, told as "challenges"). Each
+// is told once wherever the player is signed in (Told keeps it), and only while it's news (LinesRecent).
 
 // LinesRecent is how long a line waits to be told: past it, it's old news.
 const LinesRecent = 7 * 24 * time.Hour
@@ -99,6 +99,9 @@ func (g *Game) LeftOf(ctx context.Context, userID int64) (*Left, error) {
 
 // Told keeps a line as told to the player: it isn't told again, on any device.
 func (g *Game) Told(ctx context.Context, userID int64, line string) error {
+	if line == "challenges" { // who took their challenges, so far (ChallengeNewsOf)
+		return g.challengeTold(ctx, userID)
+	}
 	if !lineKey.MatchString(line) {
 		return ErrNoLine
 	}

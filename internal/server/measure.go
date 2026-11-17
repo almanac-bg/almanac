@@ -77,7 +77,7 @@ func (s *Server) cameFrom(ctx context.Context, userID int64, path string, app bo
 // yes, no; and on an iPhone in a browser, the way to the home screen shown), a notification opened, by kind, a broken
 // streak's repair offered (play/repair.go).
 var clientTallies = map[string]bool{
-	"share:day": true, "pushask:shown": true, "pushask:yes": true, "pushask:no": true, "pushask:home": true,
+	"share:day": true, "share:challenge": true, "pushask:shown": true, "pushask:yes": true, "pushask:no": true, "pushask:home": true,
 	"repair:offered": true,
 }
 

@@ -1,5 +1,5 @@
-// A duel's result, the most dramatic moment in the game, for every way a duel ends (a friend's, a live one, one
-// against a recording): the two face to face with their scores, the winner in gold and the other plain; the duel
+// A duel's result, the most dramatic moment in the game, for every way a duel ends (a friend's, a challenge taken, a
+// live one, against a recording): the two face to face with their scores, the winner in gold and the other plain; the duel
 // question by question, the two rows of marks aligned, the quicker of two right answers ringed, and the question that
 // decided it; what it meant (the rating from and to, in its division, and the record against this person); and what
 // to do next. A friend's duel waiting for the friend shows the player's own side, and until when; one turned down,
@@ -18,6 +18,8 @@ import type { DuelMark, DuelView, Side } from "./duel.ts";
 let {
   api,
   avatar,
+  challengeButton,
+  challengeText,
   emblem,
   explain,
   feelKit,
@@ -58,6 +60,8 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
   ({
     api,
     avatar,
+    challengeButton,
+    challengeText,
     emblem,
     explain,
     feelKit,
@@ -81,7 +85,9 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
   } = kit);
   const settled = d.state === "won" || d.state === "lost" || d.state === "draw";
   const steps = again && typeof again === "object" && "main" in again ? again : null;
-  const next = steps ? steps.main : ((again as Child) ?? rematch(d));
+  const next = steps ? steps.main : ((again as Child) ?? rematch(d) ?? sendOn(d));
+  // A duel's own ten, played in the player's own time (a friend's): anyone may be challenged with it.
+  const challenge = !steps && d.kind === "friend" && d.state !== "wait" ? challengeAnyone(d) : null;
   const questions =
     d.runId && d.you?.done
       ? reviewParts(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${d.runId}/review`)).questions)
@@ -95,7 +101,7 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
     // to the duels; the rest are plain, side by side.
     nextSteps(
       next ?? toDuels(true),
-      steps ? [questions?.button, ...(steps.also ?? [])] : [questions?.button, next ? toDuels(false) : null],
+      steps ? [questions?.button, ...(steps.also ?? [])] : [questions?.button, challenge, next ? toDuels(false) : null],
     ),
     more,
     questions?.list,
@@ -107,6 +113,7 @@ function kicker(d: DuelView): string {
   if (d.recorded) return "Дуел срещу запис";
   const them = d.opponent?.name;
   if (!them) return "Дуел";
+  if (d.kind === "challenge") return `Предизвикателство от ${them}`;
   return d.kind === "live" ? `Дуел на живо ${withName(them)}` : `Дуел ${withName(them)}`;
 }
 
@@ -399,6 +406,28 @@ function rematch(d: DuelView): Child {
     { class: "btn primary big", type: "button", onclick: () => go(`/duel/friend/${d.friend}`) },
     "Реванш",
   );
+}
+
+/** The friend's turn still to come: the gold way is to send them the duel (its link brings them to it; anyone else it
+ * reaches gets the same ten as a challenge). A challenge taken: send it on, the player's own game the one to beat. */
+function sendOn(d: DuelView): Child {
+  if (!d.runId || !d.you?.done) return null;
+  if (d.kind === "friend" && d.state === "wait")
+    return challengeButton(
+      `Прати на ${d.opponent?.name ?? "приятеля си"}`,
+      d.runId,
+      () => "Изиграх дуела ни в АЛМАНАХ. Твой ред.",
+      true,
+    );
+  if (d.kind === "challenge" && ["won", "lost", "draw"].includes(d.state))
+    return challengeButton("Предизвикай и ти", d.runId, () => challengeText(d.you?.rights ?? 0), true);
+  return null;
+}
+
+/** The player's own ten of a friend's duel, as a challenge to anyone: plain, beside the gold way on. */
+function challengeAnyone(d: DuelView): Child {
+  if (!d.runId || !d.you?.done) return null;
+  return challengeButton("Предизвикай", d.runId, () => challengeText(d.you?.rights ?? 0));
 }
 
 const toDuels = (main: boolean) => h("a", { class: main ? "btn primary big" : "btn", href: "/duel" }, "Към дуелите");

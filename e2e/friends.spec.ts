@@ -50,6 +50,8 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
   await expect(a.locator(".duel-face").last()).toContainText("Тепърва ще играе");
   await expect(a.locator(".duel-marks .duel-pip:is(.right, .partial, .wrong)")).toHaveCount(10);
   await expect(a.locator(".duel-meant")).toHaveCount(0);
+  // The gold way on is to tell Bo: his duel's link (a challenge's: it brings him to his turn).
+  await expect(a.getByRole("button", { name: /^Прати на \S/ })).toHaveClass(/primary/);
   await b.goto("/");
   const notice = b.locator(".challenge-notice");
   await expect(notice).toContainText("те предизвика на дуел");

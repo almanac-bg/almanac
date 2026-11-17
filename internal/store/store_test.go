@@ -206,8 +206,9 @@ func TestRebuildKeepsWhatPointsToIt(t *testing.T) {
 	if fk != 1 {
 		t.Fatal("foreign keys stayed off")
 	}
-	// Challenges went later (0007): their links with them, and their runs stay, as games.
-	if err := db.migrate(); err != nil {
+	// Those challenges went later (0007): their links with them, and their runs stay, as games. (Challenges came back
+	// in 0048, another table.)
+	if err := db.migrateTo(7); err != nil {
 		t.Fatal(err)
 	}
 	var runs int

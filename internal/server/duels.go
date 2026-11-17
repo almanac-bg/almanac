@@ -294,6 +294,11 @@ func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 	case "asked":
 		m.Title = n.From + " те предизвика на дуел"
 		m.Body = fmt.Sprintf("Десет въпроса, когато ти е удобно: имаш %d часа.", int(play.FriendFor.Hours()))
+	case "challenge": // someone took the player's challenge (play.challengeNews: once a day at most)
+		m.URL = "/c/" + n.Code
+		m.Title = n.From + " изигра предизвикателството ти"
+		m.Body = map[string]string{"won": "Ти печелиш.", "lost": "Победата е за " + n.From + ".", "draw": "Равенство."}[n.Outcome] +
+			" Виж кой още го е изиграл."
 	case "result":
 		if n.Seen {
 			return
