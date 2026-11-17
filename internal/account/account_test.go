@@ -705,3 +705,96 @@ func TestCleanUpManyGuests(t *testing.T) {
 		t.Fatalf("guests left: %d (%v)", left, err)
 	}
 }
+
+// Deleting a player tells the game first (Forget), and takes their address from wherever else it's kept: mail on its
+// way, codes and wrong codes counted. Others' mail stays.
+func TestDeleteForgetsTheAddress(t *testing.T) {
+	a, db, out, in := setup(t)
+	ctx := t.Context()
+	var told []int64
+	a.Forget = []func(*sql.Tx, int64) error{func(_ *sql.Tx, id int64) error {
+		told = append(told, id)
+		return nil
+	}}
+	profile, _, err := a.Verify(ctx, code(t, a, out, in, "gone@example.com"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.SendCode(ctx, "gone@example.com", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Write.ExecContext(ctx, `INSERT INTO code_misses (email, misses, since)
+		VALUES ('gone@example.com', 2, ?)`, store.Now()); err != nil {
+		t.Fatal(err)
+	}
+	err = db.Tx(ctx, func(tx *sql.Tx) error {
+		for _, to := range []string{"gone@example.com", "other@example.com"} {
+			if err := out.Enqueue(tx, mailer.Message{To: to, Subject: "Серия", Text: "Здравей"}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Delete(ctx, profile.ID); err != nil {
+		t.Fatal(err)
+	}
+	var users, codes, misses int
+	_ = db.Read.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM users), (SELECT count(*) FROM sign_in_codes),
+		(SELECT count(*) FROM code_misses)`).Scan(&users, &codes, &misses)
+	out.Flush(ctx)
+	if users != 0 || codes != 0 || misses != 0 || len(told) != 1 || told[0] != profile.ID {
+		t.Fatalf("after: %d players, %d codes, %d misses; the game told of %v", users, codes, misses, told)
+	}
+	if len(in.got) != 1 || in.got[0].To != "other@example.com" {
+		t.Fatalf("mail sent after: %+v", in.got)
+	}
+}
+
+// Friend requests to an address are kept EmailRequestDays; a guest cleared away is forgotten as a deleted player is.
+func TestCleanUpForgets(t *testing.T) {
+	a, db, _, _ := setup(t)
+	ctx := t.Context()
+	var told []int64
+	a.Forget = []func(*sql.Tx, int64) error{func(_ *sql.Tx, id int64) error {
+		told = append(told, id)
+		return nil
+	}}
+	u, _, err := a.Guest(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sender, _, err := a.Guest(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := store.Ms(time.Now().AddDate(0, 0, -EmailRequestDays-1))
+	for _, q := range []string{
+		`UPDATE users SET seen_at = ?2, created_at = ?2 WHERE id = ?1`,
+		`INSERT INTO friend_requests (from_id, to_email, at) VALUES (?3, 'old@example.com', ?2),
+			(?3, 'new@example.com', ?4)`,
+	} {
+		if _, err := db.Write.ExecContext(ctx, q, u.ID, old, sender.ID, store.Now()); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	if err := a.CleanUp(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var requests []string
+	rows, err := db.Read.QueryContext(ctx, `SELECT to_email FROM friend_requests`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var e string
+		_ = rows.Scan(&e)
+		requests = append(requests, e)
+	}
+	rows.Close()
+	if len(requests) != 1 || requests[0] != "new@example.com" || len(told) != 1 || told[0] != u.ID {
+		t.Fatalf("requests kept %v; the game told of %v", requests, told)
+	}
+}

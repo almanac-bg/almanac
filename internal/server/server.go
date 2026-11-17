@@ -158,6 +158,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.live = live.NewHub(s.game, s.livePlayer)
 	s.closing = make(chan struct{})
 	d.Accounts.Merge = append(d.Accounts.Merge, play.Merge)
+	d.Accounts.Forget = append(d.Accounts.Forget, play.Forget)
 	s.handler = s.routes()
 	return s, nil
 }

@@ -2,6 +2,7 @@
 -- is still challenged in their own time. SQLite changes a CHECK only by rebuilding the table (store.go). Open duels
 -- still waiting end without a result; a recording stays only on the duels settled against it. And whether a duel
 -- moved ratings: only the first of a day between the same two players does.
+-- drops: duels_open
 CREATE TABLE duels_new (
   id         INTEGER PRIMARY KEY,
   -- live: two players at once (or one against a recording); friend: a friend challenged, each in their own time.

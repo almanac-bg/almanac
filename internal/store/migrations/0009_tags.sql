@@ -1,5 +1,6 @@
 -- rebuild: every player gets a tag of their own (@tag: how friends find them), and names stop being unique — two
 -- people may well share one. SQLite drops a UNIQUE only by rebuilding the table (store.go, rebuildMark).
+-- drops: users.name_key
 CREATE TABLE users_new (
   id         INTEGER PRIMARY KEY,
   name       TEXT    NOT NULL,
