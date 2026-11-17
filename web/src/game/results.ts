@@ -199,8 +199,8 @@ export const challengeText = (rights: number, topic?: string) =>
   `Познах ${rights} от 10${topic ? ` по „${topic}“` : ""} в АЛМАНАХ. Можеш ли повече?`;
 
 /** A challenge to anyone (play/challenges.go): the link to a finished game of ten (`run`), made as the finger comes
- * down and shared as it lifts, with `text` (the score and a question, plain, never a boast). The same link brings the
- * friend a friend's duel was for to their duel. */
+ * down and shared as it lifts, with `text` (the score and a question, plain, never a boast). The same link brings a
+ * friend it was sent to to their turn. */
 export function challengeButton(label: string, run: number, text: () => string, primary = false): Child {
   let made: Promise<string> | null = null;
   const link = () => {

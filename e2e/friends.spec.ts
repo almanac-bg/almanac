@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { playedFair, playRun, startDay } from "./play.ts";
 
-test("friends: an invite link, then a duel between the two", async ({ browser }) => {
+test("friends: an invite link, then a challenge between the two", async ({ browser }) => {
   test.setTimeout(180_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
@@ -20,29 +20,29 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
   await expect(b.getByRole("heading", { name: /Вече сте приятели/ })).toBeVisible();
   await a.reload();
   await expect(a.locator(".friend")).toHaveCount(1);
-  // Ana hears it on Начало too, once, a tap from a duel with Bo.
+  // Ana hears it on Начало too, once, a tap from challenging Bo.
   await a.goto("/");
   const yes = a.locator(".streak-notice", { hasText: "прие поканата ти." });
-  await expect(yes.getByRole("link", { name: "Дуел" })).toHaveAttribute("href", /^\/duel\/friend\/\d+$/);
+  await expect(yes.getByRole("link", { name: "Предизвикай" })).toHaveAttribute("href", /^\/challenge\/\d+$/);
   await a.reload();
   await expect(a.locator(".day")).toBeVisible();
   await expect(yes).toHaveCount(0);
   await a.goto("/friends");
 
-  // A tap by mistake costs nothing: the count-in comes first, and „Откажи“ goes back with no duel made.
-  await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();
+  // A tap by mistake costs nothing: the count-in comes first, and „Откажи“ goes back with nothing made.
+  await a.locator(".friend").getByRole("button", { name: "Предизвикай" }).click();
   await expect(a.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await a.getByRole("button", { name: "Откажи" }).click();
   await expect(a.locator(".friend")).toHaveCount(1);
   expect((await (await a.request.get("/api/duels")).json()).duels).toHaveLength(0);
 
   // Ana challenges Bo and plays hers now; once she has, Bo is told wherever he is, and plays from there.
-  await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();
+  await a.locator(".friend").getByRole("button", { name: "Предизвикай" }).click();
   await a.getByRole("button", { name: "Започни сега" }).click();
   // Each question says whom it's a duel with.
   await expect(a.locator(".question-head .versus")).toHaveText(/^Дуел (с|със) \S/);
   await playRun(a);
-  await expect(a.getByRole("heading", { name: "Изигра своя дуел" })).toBeVisible({ timeout: 10_000 });
+  await expect(a.getByRole("heading", { name: "Изигра своите десет" })).toBeVisible({ timeout: 10_000 });
   // Until when, in one sentence that ends once („… 13:39 ч. Ще ти кажем …“).
   await expect(a.locator(".duel-line")).toContainText(/\sч\. Ще ти кажем/);
   // Her side, face to face with Bo's still to come: her score and her ten marks; his row empty, and no result yet.
@@ -50,18 +50,17 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
   await expect(a.locator(".duel-face").last()).toContainText("Тепърва ще играе");
   await expect(a.locator(".duel-marks .duel-pip:is(.right, .partial, .wrong)")).toHaveCount(10);
   await expect(a.locator(".duel-meant")).toHaveCount(0);
-  // The gold way on is to tell Bo: his duel's link (a challenge's: it brings him to his turn).
+  // The gold way on is to tell Bo: the challenge's link (it brings him to his turn).
   await expect(a.getByRole("button", { name: /^Прати на \S/ })).toHaveClass(/primary/);
   await b.goto("/");
   const notice = b.locator(".challenge-notice");
-  await expect(notice).toContainText("те предизвика на дуел");
+  await expect(notice).toContainText("те предизвика");
   await notice.getByRole("button", { name: "Играй" }).click();
   await expect(b.locator(".question-head .versus")).toHaveText(/^Дуел (с|със) \S/);
   await playRun(b);
   await expect(b.locator(".challenge-notice")).toHaveCount(0);
   await expect(b.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 10_000 });
-  // „Дуел със Заек“, „Дуел с Мечка“: the word goes with the name.
-  await expect(b.locator(".duel-head .kicker")).toHaveText(/^Дуел (със [СЗсз]|с [^СЗсз])/);
+  await expect(b.locator(".duel-head .kicker")).toHaveText(/^Предизвикателство от \S/);
   // The duel question by question, both rows; the first rated duel moves the rating, said with its division; and
   // the record between the two, this duel in it.
   await expect(b.locator(".duel-marks .duel-pip:is(.right, .partial, .wrong)")).toHaveCount(20);
@@ -75,10 +74,14 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
   await expect(b.locator(".challenge-notice")).toHaveCount(0);
   // Bo has played it, and Ana hears of it on Начало, once, above the day: how it ended, a tap from the result.
   await a.goto("/");
-  const played = a.locator(".streak-notice", { hasText: "изигра дуела ви" });
-  await expect(played).toContainText(/изигра дуела ви: (Победа|Загуба|Равенство) [\d\s]+\s:\s[\d\s]+/);
+  const played = a.locator(".streak-notice", { hasText: "изигра предизвикателството ти" });
+  await expect(played).toContainText(/изигра предизвикателството ти: (Победа|Загуба|Равенство) [\d\s]+\s:\s[\d\s]+/);
   await played.getByRole("link", { name: "Виж" }).click();
   await expect(a.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible();
+  await expect(a.locator(".duel-head .kicker")).toHaveText(/^Предизвикателство към \S/);
+  await expect(a.locator(".duel-face .duel-points")).toHaveCount(2);
+  // Her way on is to challenge Bo back.
+  await expect(a.getByRole("button", { name: "Предизвикай обратно" })).toHaveClass(/primary/);
   await a.goto("/");
   await expect(a.locator(".day")).toBeVisible();
   await expect(played).toHaveCount(0);
@@ -114,7 +117,7 @@ test("friends on the day: a shared link to it, who has played it, and how each w
   await c.getByRole("button", { name: `Добави ${ana} в приятели` }).click();
   await expect(c.getByText("Вече сте приятели.")).toBeVisible();
   await expect(c.getByRole("button", { name: "Играй днешните 10" })).toHaveClass(/primary/);
-  await expect(c.getByRole("button", { name: "Покани на дуел" })).toBeVisible();
+  await expect(c.getByRole("button", { name: "Предизвикай" })).toBeVisible();
   await c.goto("/");
   await expect(c.locator(".day-meta").last()).toHaveText(`${ana} вече изигра днешните въпроси.`);
 
@@ -132,7 +135,7 @@ test("friends on the day: a shared link to it, who has played it, and how each w
   );
   await card.getByRole("button", { name: `Добави ${ana} в приятели` }).click();
   await expect(card.getByText("Вече сте приятели.")).toBeVisible();
-  await expect(card.getByRole("button", { name: "Покани на дуел" })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Предизвикай" })).toBeVisible();
 
   // Then, on Начало: both on the friends' day, his own row marked, each with how their ten went.
   await b.goto("/");
@@ -143,7 +146,7 @@ test("friends on the day: a shared link to it, who has played it, and how each w
   await expect(friends.locator(".row .trail li")).toHaveCount(20);
 });
 
-test("a rematch from a friend duel's result", async ({ browser }) => {
+test("a challenge back from a friend's result", async ({ browser }) => {
   test.setTimeout(180_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
@@ -154,28 +157,28 @@ test("a rematch from a friend duel's result", async ({ browser }) => {
   await b.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
   await expect(b.getByRole("heading", { name: /Вече сте приятели/ })).toBeVisible();
   await a.reload();
-  await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();
+  await a.locator(".friend").getByRole("button", { name: "Предизвикай" }).click();
   await playRun(a);
   await b.goto("/");
   await b.locator(".challenge-notice").getByRole("button", { name: "Играй" }).click();
   await playRun(b);
   await expect(b.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 10_000 });
 
-  // The gold button is a rematch; the way back to the duels is plain.
-  const rematch = b.getByRole("button", { name: "Реванш" });
+  // The gold button challenges Ana back; the way back to the duels is plain.
+  const rematch = b.getByRole("button", { name: "Предизвикай обратно" });
   await expect(rematch).toHaveClass(/primary/);
   await expect(b.getByRole("link", { name: "Към дуелите" })).not.toHaveClass(/primary/);
-  // Bo plays his side of the new duel at once, on its own screen; Ana is challenged once he has.
+  // Bo plays his side of the new challenge at once, on its own screen; Ana is challenged once he has.
   await rematch.click();
   await expect(b.locator(".question-head .versus")).toHaveText(/^Дуел (с|със) \S/);
   await expect(b).toHaveURL(/\/duel\/\d+$/);
   await playRun(b);
-  await expect(b.getByRole("heading", { name: "Изигра своя дуел" })).toBeVisible({ timeout: 10_000 });
+  await expect(b.getByRole("heading", { name: "Изигра своите десет" })).toBeVisible({ timeout: 10_000 });
   await a.goto("/");
-  await expect(a.locator(".challenge-notice")).toContainText("те предизвика на дуел");
+  await expect(a.locator(".challenge-notice")).toContainText("те предизвика");
 });
 
-test("a friend can turn a duel down", async ({ browser }) => {
+test("a friend can turn a challenge down", async ({ browser }) => {
   test.setTimeout(120_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
@@ -186,22 +189,22 @@ test("a friend can turn a duel down", async ({ browser }) => {
   await b.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
   await expect(b.getByRole("heading", { name: /Вече сте приятели/ })).toBeVisible();
   await a.reload();
-  await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();
+  await a.locator(".friend").getByRole("button", { name: "Предизвикай" }).click();
   await playRun(a);
   // From its own screen…
   await b.goto("/duel");
   await b.locator(".duel-row.s-play").click();
   await b.getByRole("button", { name: "Откажи" }).click();
-  await expect(b.getByRole("heading", { name: "Дуелът е отказан" })).toBeVisible();
+  await expect(b.getByRole("heading", { name: "Предизвикателството е отказано" })).toBeVisible();
   // …or from the notice, wherever Bo is.
   await a.goto("/friends");
-  await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();
+  await a.locator(".friend").getByRole("button", { name: "Предизвикай" }).click();
   await playRun(a);
   await b.goto("/");
   await b.locator(".challenge-notice").getByRole("button", { name: "Откажи" }).click();
   await expect(b.locator(".challenge-notice")).toHaveCount(0);
   await a.goto("/duel");
-  await expect(a.locator(".duel-row").first()).toContainText("Отказан");
+  await expect(a.locator(".duel-row").first()).toContainText("Отказано");
 });
 
 test("friends by tag: a name and a tag of one's own, a request, a yes", async ({ browser }, info) => {

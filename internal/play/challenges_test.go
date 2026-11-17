@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 )
@@ -27,19 +28,19 @@ func TestChallenges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.g.Challenge(ctx, ana, s.ID); !errors.Is(err, ErrNoChallengeRun) {
+	if _, err := w.g.Challenge(ctx, ana, s.ID, nil); !errors.Is(err, ErrNoChallengeRun) {
 		t.Fatalf("a game under way: %v", err)
 	}
 	half := append(repeat(w.right, Length/2), repeat(w.wrong, Length/2)...)
 	w.play(ana, s.ID, half...)
-	if _, err := w.g.Challenge(ctx, bo, s.ID); !errors.Is(err, ErrNoChallengeRun) {
+	if _, err := w.g.Challenge(ctx, bo, s.ID, nil); !errors.Is(err, ErrNoChallengeRun) {
 		t.Fatalf("someone else's game: %v", err)
 	}
-	code, err := w.g.Challenge(ctx, ana, s.ID)
+	code, err := w.g.Challenge(ctx, ana, s.ID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if again, _ := w.g.Challenge(ctx, ana, s.ID); again != code {
+	if again, _ := w.g.Challenge(ctx, ana, s.ID, nil); again != code {
 		t.Fatalf("a second link for the same game: %q, %q", again, code)
 	}
 	if _, _, err := w.g.TakeChallenge(ctx, ana, code); !errors.Is(err, ErrOwnChallenge) {
@@ -112,7 +113,7 @@ func TestChallenges(t *testing.T) {
 		t.Fatalf("the takers' duels in Ana's list: %+v", news)
 	}
 
-	// A week on, it's over: Di can't take it; Bo still sees his result.
+	// Three days on, it's over: Di can't take it; Bo still sees his result.
 	w.wait(ChallengeFor + time.Hour)
 	if v, _ := w.g.ChallengeOf(ctx, code, di); !v.Over {
 		t.Fatal("not over")
@@ -124,7 +125,7 @@ func TestChallenges(t *testing.T) {
 		t.Fatalf("Bo's, past its time: %v", err)
 	}
 	// Sent again, it's open again.
-	if again, _ := w.g.Challenge(ctx, ana, s.ID); again != code {
+	if again, _ := w.g.Challenge(ctx, ana, s.ID, nil); again != code {
 		t.Fatal("a new code")
 	}
 	if _, _, err := w.g.TakeChallenge(ctx, di, code); err != nil {
@@ -135,34 +136,115 @@ func TestChallenges(t *testing.T) {
 	}
 }
 
-// A friend's duel is sent by its challenger's game: its link brings the friend to their duel, anyone else to a
-// challenge.
-func TestFriendDuelLink(t *testing.T) {
+// A game played is sent to friends and by its link: the friends it's sent to are told and find it in the game; a friend
+// who takes it, sent it or not, plays a duel between the two (rated, once a day, in their record, its result told to
+// both); anyone else, a challenge as any (no rating, the line for strangers). Each plays it once.
+func TestChallengeSentToFriends(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	ana, vi, cy := w.user(), w.user(), w.user()
-	w.befriend(ana, vi)
-	s, id, err := w.g.ChallengeFriend(ctx, ana, vi)
+	ana, vi, bo, di, cy := w.user(), w.user(), w.user(), w.user(), w.user()
+	for _, f := range []int64{vi, bo, di} {
+		w.befriend(ana, f)
+	}
+	var told []DuelNews
+	w.g.DuelNews = func(_ context.Context, n DuelNews) { told = append(told, n) }
+	s, err := w.g.StartTopic(ctx, ana, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	code, err := w.g.Challenge(ctx, ana, s.ID)
+	w.play(ana, s.ID, append(repeat(w.right, Length/2), repeat(w.wrong, Length/2)...)...)
+
+	// Sent to Vi and Bo (Cy, not a friend, and Ana herself are left out): those two are told, at once.
+	code, err := w.g.Challenge(ctx, ana, s.ID, []int64{vi, bo, cy, ana, vi})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := w.g.ChallengeOf(ctx, code, vi); v.Duel != id {
-		t.Fatalf("Vi opens it: %+v", v)
+	asked := map[int64]int64{}
+	for _, n := range told {
+		if n.Kind == "asked" {
+			asked[n.To] = n.DuelID
+		}
 	}
-	if st, d, err := w.g.TakeChallenge(ctx, vi, code); err != nil || d != id || st.ID != 0 {
-		t.Fatalf("Vi takes it: %d %v", d, err)
+	if len(asked) != 2 || asked[vi] == 0 || asked[bo] == 0 {
+		t.Fatalf("told: %+v", told)
 	}
-	if _, d, err := w.g.TakeChallenge(ctx, cy, code); err != nil || d == id || d == 0 {
-		t.Fatalf("Cy takes it: %d %v", d, err)
+	if c, _ := w.g.AskedOf(ctx, vi); len(c) != 1 || c[0].ID != asked[vi] {
+		t.Fatalf("Vi's: %+v", c)
 	}
-	// Taking challenges never counts against the challenges one may have waiting on friends.
-	if n, _ := w.g.Challenges(ctx, vi); len(n) != 1 {
-		t.Fatalf("Vi's turn: %+v", n)
+	if c, _ := w.g.AskedOf(ctx, cy); len(c) != 0 {
+		t.Fatalf("Cy's: %+v", c)
+	}
+	// Sent again to Vi: nobody is told twice.
+	told = nil
+	if again, _ := w.g.Challenge(ctx, ana, s.ID, []int64{vi}); again != code || len(told) != 0 {
+		t.Fatalf("sent twice: %q %+v", again, told)
+	}
+
+	// Vi opens the link: it's her duel of it, and her game the duel between the two.
+	if v, _ := w.g.ChallengeOf(ctx, code, vi); v.Duel != asked[vi] {
+		t.Fatalf("Vi's link: %+v", v)
+	}
+	vs, err := w.take(vi, asked[vi])
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(vi, vs.ID, repeat(w.right, Length)...)
+	if d, _ := w.g.DuelOf(ctx, vi, asked[vi]); d.State != "won" || d.Rating == nil || d.Friend != ana || d.Befriend {
+		t.Fatalf("Vi's result: %+v", d)
+	}
+
+	// Di, a friend it wasn't sent to, takes it by the link: a duel between the two as well.
+	ds, dd, err := w.g.TakeChallenge(ctx, di, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(di, ds.ID, repeat(w.wrong, Length)...)
+	if d, _ := w.g.DuelOf(ctx, ana, dd); d.State != "won" || d.Rating == nil || d.Friend != di {
+		t.Fatalf("Ana against Di: %+v", d)
+	}
+
+	// Cy, a stranger: no rating, no duel in Ana's list, and the line for anyone's.
+	cs, cd, err := w.g.TakeChallenge(ctx, cy, code)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(cy, cs.ID, repeat(w.right, Length)...)
+	if d, _ := w.g.DuelOf(ctx, cy, cd); d.State != "won" || d.Rating != nil || d.Friend != 0 || d.Friendly || !d.Befriend {
+		t.Fatalf("Cy's result: %+v", d)
+	}
+	if _, err := w.g.DuelOf(ctx, ana, cd); !errors.Is(err, ErrNoDuel) {
+		t.Fatalf("Cy's duel in Ana's: %v", err)
+	}
+	if n, _ := w.g.ChallengeNewsOf(ctx, ana); n == nil || n.Played != 1 || n.Beat != 1 {
+		t.Fatalf("Ana's line: %+v", n)
+	}
+	// Ana's link: every taker but Bo, who hasn't started.
+	if v, _ := w.g.ChallengeOf(ctx, code, ana); len(v.Takers) != 3 {
+		t.Fatalf("Ana's takers: %+v", v.Takers)
+	}
+	// Her record: a loss to Vi, a win over Di; none against Cy, who isn't a friend.
+	list, _ := w.g.FriendsOf(ctx, ana)
+	rec := map[int64]Record{}
+	for _, f := range list {
+		rec[f.ID] = Record{Won: f.Won, Lost: f.Lost, Drawn: f.Drawn}
+	}
+	if rec[vi] != (Record{Lost: 1}) || rec[di] != (Record{Won: 1}) || rec[bo] != (Record{}) {
+		t.Fatalf("Ana's records: %+v", rec)
+	}
+	if st, _ := w.g.StatsOf(ctx, ana); st.Duels != 2 || st.Won != 1 {
+		t.Fatalf("Ana's stats: %+v", st)
+	}
+
+	// Bo's time is the challenge's: three days from when it was last sent; then it's over for him.
+	w.wait(ChallengeFor + time.Minute)
+	if err := w.g.SettleDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if d, _ := w.g.DuelOf(ctx, bo, asked[bo]); d.State != "expired" {
+		t.Fatalf("Bo's, past its time: %+v", d)
+	}
+	if _, d, err := w.g.TakeChallenge(ctx, bo, code); err != nil || d != asked[bo] {
+		t.Fatalf("Bo opens it after: %d %v", d, err)
 	}
 }
 
@@ -177,7 +259,7 @@ func TestChallengeKeptOverSignIn(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.play(guest, s.ID, repeat(w.right, Length)...)
-	code, err := w.g.Challenge(ctx, guest, s.ID)
+	code, err := w.g.Challenge(ctx, guest, s.ID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,6 +268,22 @@ func TestChallengeKeptOverSignIn(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.play(bo, bs.ID, repeat(w.wrong, Length)...)
+	// Vi, a friend, sent the guest a challenge; Cy's the guest and the account have both taken.
+	vi, cy := w.user(), w.user()
+	w.befriend(vi, guest)
+	vr, sent, err := w.g.ChallengeFriend(ctx, vi, guest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(vi, vr.ID, repeat(w.right, Length)...)
+	cr, err := w.g.StartTopic(ctx, cy, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(cy, cr.ID, repeat(w.right, Length)...)
+	cyCode, _ := w.g.Challenge(ctx, cy, cr.ID, nil)
+	_, theirs, _ := w.g.TakeChallenge(ctx, guest, cyCode)
+	_, mine, _ := w.g.TakeChallenge(ctx, owner, cyCode)
 	if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, guest, owner) }); err != nil {
 		t.Fatal(err)
 	}
@@ -197,5 +295,12 @@ func TestChallengeKeptOverSignIn(t *testing.T) {
 	}
 	if d, err := w.g.DuelOf(ctx, bo, duel); err != nil || d.State != "lost" {
 		t.Fatalf("Bo's duel: %+v (%v)", d, err)
+	}
+	// Vi's waits for the account; of Cy's, the account keeps its own game, the guest's goes with the guest.
+	if c, _ := w.g.AskedOf(ctx, owner); !slices.ContainsFunc(c, func(a Asked) bool { return a.ID == sent }) {
+		t.Fatalf("the account's challenges: %+v", c)
+	}
+	if v, _ := w.g.ChallengeOf(ctx, cyCode, owner); v.Duel != mine {
+		t.Fatalf("Cy's, the account's game: %d, not %d (the guest's %d)", v.Duel, mine, theirs)
 	}
 }

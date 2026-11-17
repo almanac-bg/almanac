@@ -13,7 +13,7 @@ import (
 )
 
 // Lines are what Начало tells a player once, in a line above the day, of what others did with them while they were
-// away: a friend said yes to their invite (AcceptedOf: a tap from a duel with them), or what came of a live duel they
+// away: a friend said yes to their invite (AcceptedOf: a tap from challenging them), or what came of a live duel they
 // left (LeftOf: it went on without them), or who took their challenges (ChallengeNewsOf, told as "challenges"). Each
 // is told once wherever the player is signed in (Told keeps it), and only while it's news (LinesRecent).
 
@@ -35,13 +35,14 @@ type Accepted struct {
 }
 
 // AcceptedOf is the latest friend who said yes to the player in the last LinesRecent and hasn't been told of yet, nor
-// challenged to a duel since (that says they know); or nil.
+// challenged since (that says they know); or nil.
 func (g *Game) AcceptedOf(ctx context.Context, userID int64) (*Accepted, error) {
 	var a Accepted
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT f.friend_id, u.name FROM friends f JOIN users u ON u.id = f.friend_id
 		WHERE f.user_id = ?1 AND f.asked = 1 AND f.since >= ?2
 			AND NOT EXISTS (SELECT 1 FROM home_lines WHERE user_id = ?1 AND what = 'friend:' || f.friend_id)
-			AND NOT EXISTS (SELECT 1 FROM duels WHERE kind = 'friend' AND a_id = ?1 AND b_id = f.friend_id AND created_at >= f.since)
+			AND NOT EXISTS (SELECT 1 FROM duels WHERE kind = 'challenge' AND b_id = ?1 AND a_id = f.friend_id
+				AND created_at >= f.since)
 		ORDER BY f.since DESC LIMIT 1`, userID, store.Ms(g.Now().Add(-LinesRecent))).Scan(&a.ID, &a.Name)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil

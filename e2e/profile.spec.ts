@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { playRun } from "./play.ts";
 
-test("a player's profile: asked to be friends, then a duel from it", async ({ browser }) => {
+test("a player's profile: asked to be friends, then a challenge from it", async ({ browser }) => {
   test.setTimeout(120_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
@@ -33,9 +33,9 @@ test("a player's profile: asked to be friends, then a duel from it", async ({ br
   await a.getByRole("button", { name: "Приеми" }).click();
   await expect(a.getByText("Приятели сте.")).toBeVisible();
 
-  // Friends now: a duel from her profile.
+  // Friends now: a challenge from her profile.
   await b.reload();
-  await b.locator(".player-actions").getByRole("button", { name: "Дуел" }).click();
+  await b.locator(".player-actions").getByRole("button", { name: "Предизвикай" }).click();
   await expect(b.locator("article.question")).toBeVisible();
 
   // Her own profile, as others see it, says so.

@@ -77,8 +77,8 @@ function friendsCard(): Child {
       error.set((err as ApiError).message);
     }
   };
-  // A duel with a friend: played now, and they play theirs when they can.
-  const duel = (f: Friend) => act(async () => go(`/duel/friend/${f.id}`));
+  // A friend challenged: ten played now, and they play theirs when they can.
+  const challenge = (f: Friend) => act(async () => go(`/challenge/${f.id}`));
   const remove = (f: Friend) =>
     act(async () => {
       await api("DELETE", `/api/friends/${f.id}`);
@@ -165,7 +165,7 @@ function friendsCard(): Child {
                 d.friends.map((f) =>
                   row(
                     f,
-                    () => duel(f),
+                    () => challenge(f),
                     () => remove(f),
                     editing,
                   ),
@@ -295,8 +295,8 @@ function addFriend(reload: () => Promise<void>): Child {
   );
 }
 
-/** A friend: their name, their day, the duels between you, and a duel now (or, while editing, removing them). */
-function row(f: Friend, duel: () => void, remove: () => void, editing: () => boolean): Child {
+/** A friend: their name, their day, the duels between you, and a challenge now (or, while editing, removing them). */
+function row(f: Friend, challenge: () => void, remove: () => void, editing: () => boolean): Child {
   const played = f.won + f.lost + f.drawn;
   return h(
     "li",
@@ -332,6 +332,6 @@ function row(f: Friend, duel: () => void, remove: () => void, editing: () => boo
     () =>
       editing()
         ? h("button", { class: "link muted", type: "button", onclick: remove }, "Премахни")
-        : h("button", { class: "btn inline", type: "button", onclick: duel }, "Дуел"),
+        : h("button", { class: "btn inline friend-act", type: "button", onclick: challenge }, "Предизвикай"),
   );
 }

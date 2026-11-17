@@ -654,7 +654,11 @@ function nobody(again: () => void): Child {
               "li",
               null,
               h("strong", null, f.name),
-              h("button", { class: "btn inline", type: "button", onclick: () => go(`/duel/friend/${f.id}`) }, "Дуел"),
+              h(
+                "button",
+                { class: "btn inline", type: "button", onclick: () => go(`/challenge/${f.id}`) },
+                "Предизвикай",
+              ),
             ),
           ),
       );

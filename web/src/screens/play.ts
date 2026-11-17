@@ -1,7 +1,9 @@
 // Теми: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays the same
 // game. The tiles live on Начало (all the topics at once first, and Втори шанс beside it while questions wait for one,
 // then each topic, and one for „България“, the questions about Bulgaria from every topic, while the bank has them); a
-// run of one is /play/<topic>, whose result offers ten more at once, and another topic a tap away.
+// run of one is /play/<topic>, whose result offers ten more at once, and another topic a tap away. Played to be sent
+// as a challenge (/play/<topic>?challenge, from Дуел's „Предизвикай“), its result sends it instead
+// (screens/challenge.ts).
 
 import { picture } from "../art/picture.ts";
 import { type Mastery, masteryBadge } from "../game/mastery.ts";
@@ -14,6 +16,7 @@ import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { byTap, entry, go, goBack, hold, mark, title } from "../lib/router.ts";
 import { bulgaria, type Category, categories, player, user } from "../state.ts";
 import { meter, questions, stakeLine, toneOf, topicMark } from "../ui.ts";
+import { sendChallenge } from "./challenge.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
 /** The topics as tiles, each with how well the player knows it: a run across all of them first, and the second chance
@@ -152,6 +155,7 @@ export function topic([id = ""]: string[]) {
     return null;
   }
   title(name);
+  const sending = new URLSearchParams(location.search).has("challenge");
   // While the day's ten wait, a topic's result points to them (the habit comes first), with the streak at stake.
   // Asked as the screen opens and as each game starts (a new player is a player only then), so it's in long before
   // the game ends.
@@ -164,7 +168,9 @@ export function topic([id = ""]: string[]) {
   if (user.peek()) ask();
   return run({
     name,
-    lead: "Десет въпроса по темата, от лесен към труден.",
+    lead: sending
+      ? "Десет въпроса, от лесен към труден. После ги пращаш като предизвикателство."
+      : "Десет въпроса по темата, от лесен към труден.",
     begin: async () => {
       const s = await api<State>("POST", "/api/topic", { category });
       ask();
@@ -180,11 +186,13 @@ export function topic([id = ""]: string[]) {
         summary(
           s,
           h("div", { class: "day-line" }, h("span", { class: "kicker" }, name)),
-          {
-            main: () => nextOf(day(), again).main,
-            also: [() => nextOf(day(), again).also, challenged(s, category ? name : undefined)],
-          },
-          just ? [otherTopics(category), news(s.id)] : [otherTopics(category)],
+          sending
+            ? sendChallenge(s, category ? name : undefined)
+            : {
+                main: () => nextOf(day(), again).main,
+                also: [() => nextOf(day(), again).also, challenged(s, category ? name : undefined)],
+              },
+          just ? [sending ? null : otherTopics(category), news(s.id)] : [sending ? null : otherTopics(category)],
           undefined,
           just,
         ),

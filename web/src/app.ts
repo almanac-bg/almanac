@@ -12,8 +12,8 @@ import { preparePush } from "./lib/push.ts";
 import { canGoBack, entry, go, path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
 import { almanac } from "./screens/almanac.ts";
-import { challenge } from "./screens/challenge.ts";
-import { challengeFriend, duel, duelOne, playChallenge } from "./screens/duel.ts";
+import { challenge, challengeFriend, newChallenge } from "./screens/challenge.ts";
+import { duel, duelOne, playChallenge } from "./screens/duel.ts";
 import { friends } from "./screens/friends.ts";
 import { invite } from "./screens/invite.ts";
 import { handoff } from "./screens/keep.ts";
@@ -105,7 +105,8 @@ if (root) {
       { path: /^\/duel$/, view: duel },
       { path: /^\/duel\/live$/, view: later(() => import("./screens/live.ts").then((m) => m.liveDuel)) },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
-      { path: /^\/duel\/friend\/([0-9]+)$/, view: challengeFriend },
+      { path: /^\/challenge$/, view: newChallenge },
+      { path: /^\/challenge\/([0-9]+)$/, view: challengeFriend },
       { path: /^\/royal$/, view: later(() => import("./screens/royal.ts").then((m) => m.royal)) },
       { path: /^\/almanac$/, view: almanac },
       { path: /^\/mistakes$/, view: mistakes },
@@ -141,7 +142,7 @@ function challengeNotice(c: Challenge): Child {
     h(
       "p",
       { class: "challenge-text" },
-      h("strong", null, `${c.from} те предизвика на дуел`),
+      h("strong", null, `${c.from} те предизвика`),
       h("span", { class: "muted" }, c.started ? "Довърши играта си" : `Имаш време до ${until(c.expiresAt)}`),
     ),
     h(

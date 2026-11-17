@@ -56,7 +56,6 @@ var playerErrors = map[error]*apiError{
 	play.ErrChallengeOver:  {http.StatusGone, "challenge_over", "Времето за това предизвикателство изтече."},
 	play.ErrOwnChallenge:   {http.StatusConflict, "own_challenge", "Това е твоето предизвикателство. Прати го на някого."},
 	play.ErrNoChallengeRun: {http.StatusBadRequest, "no_challenge_run", "С тази игра не може да се предизвиква."},
-	play.ErrManyWaiting:    {http.StatusConflict, "many_duels", "Пет твои дуела чакат приятели. Изчакай някой от тях да свърши."},
 	play.ErrNobody:         {http.StatusConflict, "nobody", "Точно сега няма с кого да играеш. Опитай след малко."},
 	live.ErrNoMatch:        {http.StatusNotFound, "no_duel", "Този дуел вече го няма."},
 	live.ErrNotNow:         {http.StatusConflict, "not_now", "Този въпрос вече отмина."},

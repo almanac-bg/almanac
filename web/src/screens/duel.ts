@@ -1,16 +1,17 @@
 // Дуел: two players, the same ten questions. Your division and rating; a live duel with whoever comes (screens/
-// live.ts), or a friend challenged to play in their own time; the challenges that are your turn, those waiting on
-// friends, and how the last duels went. One duel's screen plays the player's turn, or shows how it stands or ended
-// (screens/outcome.ts, loaded on its own: kit.ts).
+// live.ts), or „Предизвикай“: a game sent to friends and anyone, played in their own time (screens/challenge.ts); the
+// challenges that are your turn, those waiting on friends, and how the last duels went. One duel's screen plays the
+// player's turn, or shows how it stands or ended (screens/outcome.ts, loaded on its own: kit.ts).
 
 import { news } from "../game/news.ts";
+import { nextSteps } from "../game/results.ts";
 import { getReady, playRun, shownHere, startScreen } from "../game/run.ts";
 import type { State } from "../game/types.ts";
 import { duelResult, loadDuelResult } from "../kit.ts";
-import { ApiError, api } from "../lib/api.ts";
-import { type Child, effect, h, signal, slot } from "../lib/dom.ts";
+import { type ApiError, api } from "../lib/api.ts";
+import { type Child, effect, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
-import { byTap, go, goBack, hold, rename, title } from "../lib/router.ts";
+import { byTap, go, goBack, hold, title } from "../lib/router.ts";
 import { withName } from "../lib/words.ts";
 import { checkWaiting, player, user } from "../state.ts";
 import {
@@ -51,10 +52,10 @@ export interface Side {
 
 export interface DuelView {
   id: number;
-  kind: "live" | "friend" | "challenge";
+  kind: "live" | "challenge";
   state: "play" | "wait" | "won" | "lost" | "draw" | "declined" | "expired";
   opponent?: Side;
-  /** The other player's id, in a friend's duel: for a rematch. */
+  /** The other player's id, in a challenge between friends: to challenge them back. */
   friend?: number;
   you?: Side;
   recorded?: boolean;
@@ -73,14 +74,11 @@ export interface DuelView {
   /** A live duel one of the two left under way (it went on without them): how many questions they had played. */
   youLeft?: number;
   theyLeft?: number;
-  /** The other, met in a live duel, may be asked to be friends (not a friend, nor asked). */
+  /** The other, met in a live duel or by a challenge, may be asked to be friends (not a friend, nor asked). */
   befriend?: boolean;
-}
-
-interface Friend {
-  id: number;
-  name: string;
-  tag: string;
+  /** A challenge's: its code, and whether the player sent it (else they take it). */
+  challenge?: string;
+  sent?: boolean;
 }
 
 /** One of the player's duels, as its screen shows it. */
@@ -92,7 +90,7 @@ const words: Record<DuelView["state"], string> = {
   won: "Победа",
   lost: "Загуба",
   draw: "Равенство",
-  declined: "Отказан",
+  declined: "Отказано",
   expired: "Без отговор",
 };
 
@@ -135,18 +133,8 @@ function duelRow(d: DuelView): Child {
 export function duel() {
   title("Дуел");
   const data = signal<{ duels: DuelView[]; standing: Standing } | null>(null);
-  const friends = signal<Friend[]>([]);
-  const screen = slot();
-  const error = signal("");
-  if (user.peek()) {
-    api<{ duels: DuelView[]; standing: Standing }>("GET", "/api/duels").then(data.set, () => {});
-    api<{ friends: Friend[] }>("GET", "/api/friends").then(
-      (f) => friends.set(f.friends),
-      () => {},
-    );
-  }
-  const challenge = async (friend: Friend) => go(`/duel/friend/${friend.id}`);
-  const hub = h(
+  if (user.peek()) api<{ duels: DuelView[]; standing: Standing }>("GET", "/api/duels").then(data.set, () => {});
+  return h(
     "section",
     { class: "screen" },
     h(
@@ -157,19 +145,22 @@ export function duel() {
       h("h1", null, "Дуел"),
       h("p", { class: "lead" }, "Ти и друг играч на живо: едни и същи десет въпроса, в един и същи миг."),
     ),
-    h(
-      "button",
-      {
-        class: "btn primary big",
-        type: "button",
-        onclick: async () => {
-          await player();
-          go("/duel/live");
+    nextSteps(
+      h(
+        "button",
+        {
+          class: "btn primary big",
+          type: "button",
+          onclick: async () => {
+            await player();
+            go("/duel/live");
+          },
         },
-      },
-      "Намери съперник",
+        "Намери съперник",
+      ),
+      // In their own time: a game sent to friends, and to anyone by its link.
+      [h("a", { class: "btn", href: "/challenge" }, "Предизвикай")],
     ),
-    () => error() && h("p", { class: "bad", role: "alert" }, error()),
     // The division once a duel has moved the rating (play/unfold.go): before that it says nothing.
     () => {
       const d = data();
@@ -183,41 +174,10 @@ export function duel() {
       return [
         turn.length ? section("Твой ред", turn) : null,
         waiting.length ? section("Чакат приятелите ти", waiting) : null,
-        friends().length
-          ? h(
-              "section",
-              { class: "stack" },
-              h("h2", { class: "section-title" }, "Предизвикай приятел"),
-              h(
-                "p",
-                { class: "muted" },
-                "Играеш веднага, а приятелят ти има 48 часа да изиграе своя. С един и същ приятел само първият дуел за деня мести рейтинга.",
-              ),
-              h(
-                "ul",
-                { class: "duel-friends" },
-                friends().map((f) =>
-                  h(
-                    "li",
-                    null,
-                    h("span", null, h("strong", null, f.name), h("span", { class: "muted" }, ` @${f.tag}`)),
-                    h("button", { class: "btn inline", type: "button", onclick: () => challenge(f) }, "Дуел"),
-                  ),
-                ),
-              ),
-            )
-          : h(
-              "p",
-              { class: "muted" },
-              h("a", { href: "/friends" }, "Добави приятели"),
-              " и ги предизвиквай тук, когато им е удобно.",
-            ),
         done.length ? section("История", done.slice(0, 20)) : null,
       ];
     },
   );
-  screen.show(() => hub);
-  return h("div", null, screen);
 }
 
 function section(heading: string, list: DuelView[]): Child {
@@ -238,7 +198,7 @@ export function playChallenge(id: number): void {
   go(`/duel/${id}`);
 }
 
-/** A friend's playing of a duel the player started, as Начало hears of it. */
+/** A friend's game of the player's challenge, played, as Начало hears of it. */
 export interface FriendPlayed {
   id: number;
   from: string;
@@ -261,13 +221,13 @@ function told(id: number): boolean {
   return true;
 }
 
-/** A friend has played the duel the player started: said once, above the day, a tap from the result. */
+/** A friend has played the player's challenge: said once, above the day, a tap from the result. */
 export function playedLine(p?: FriendPlayed | null): Child {
   if (!p || !told(p.id)) return null;
   return h(
     "p",
     { class: "streak-notice", role: "status" },
-    `${p.from} изигра дуела ви: ${words[p.state]} ${formatNumber(p.you)} : ${formatNumber(p.them)}`,
+    `${p.from} изигра предизвикателството ти: ${words[p.state]} ${formatNumber(p.you)} : ${formatNumber(p.them)}`,
     h("a", { href: `/duel/${p.id}` }, "Виж"),
   );
 }
@@ -301,14 +261,14 @@ function toldOnce(line: string, news: unknown = line): boolean {
   return true;
 }
 
-/** A friend said yes to the player's invite: said once, above the day, a tap from a duel with them. */
+/** A friend said yes to the player's invite: said once, above the day, a tap from challenging them. */
 export function acceptedLine(a?: Accepted | null): Child {
   if (!a || !toldOnce(a.line)) return null;
   return h(
     "p",
     { class: "streak-notice", role: "status" },
     `${a.name} прие поканата ти.`,
-    h("a", { href: `/duel/friend/${a.id}` }, "Дуел"),
+    h("a", { href: `/challenge/${a.id}` }, "Предизвикай"),
   );
 }
 
@@ -383,25 +343,37 @@ function notHere(signedIn: () => void): Child {
   );
 }
 
-/** One duel: played now if it's the player's turn, else how it stands or ended. */
+/** One duel: played now if it's the player's turn (a challenge to take, or their own game of one they sent, left
+ * half-way), else how it stands or ended. */
 export function duelOne(params: string[]) {
   title("Дуел");
   const id = Number(params[0]);
   const screen = slot(() => h("p", { class: "muted" }, "…"));
   const tap = byTap();
+  // What comes back once the screen is gone (another page opened meanwhile) does nothing: a game's entry held over
+  // that page, or a game started on it, would be another page's.
+  let gone = false;
+  onCleanup(() => {
+    gone = true;
+  });
   const load = async () => {
     try {
       const d = await oneDuel(id);
+      if (gone) return;
       const play = async () => {
         loadDuelResult().catch(() => {}); // the result's screen, on its way while the player plays
-        const s =
-          d.runId && d.you
-            ? await api<State>("GET", `/api/runs/${d.runId}`)
-            : await api<State>("POST", `/api/duels/${id}/play`, {});
+        const s = d.runId
+          ? await api<State>("GET", `/api/runs/${d.runId}`)
+          : (await api<{ duel: number; state?: State }>("POST", `/api/challenges/${d.challenge}/play`, {})).state;
+        if (gone) return;
         checkWaiting(); // the notice goes
+        if (!s) return void load(); // over meanwhile (its time ran out): how it ended
         screen.show(() => playRun(s, (end) => afterDuel(id, end.id), d.opponent?.name));
       };
-      // Asked and not started: who asks, and the choice (unless said yes to already).
+      const failed = (err: unknown) => {
+        if (!gone) screen.show(() => failure(err, () => void load(), ["/duel", "Към дуелите"]));
+      };
+      // Sent to the player and not started: who asks, and the choice (unless said yes to already).
       const yes = accepted === id;
       accepted = 0;
       if (d.state === "play" && !d.runId && !yes)
@@ -412,7 +384,7 @@ export function duelOne(params: string[]) {
         return screen.show(() =>
           getReady(
             duelWith(d.opponent?.name),
-            () => void play(),
+            () => void play().catch(failed),
             () => goBack("/duel"),
           ),
         );
@@ -421,15 +393,22 @@ export function duelOne(params: string[]) {
       // otherwise (another device, back or forward), it waits for „Продължи“.
       if (d.state === "play" && d.runId) {
         const s = await api<State>("GET", `/api/runs/${d.runId}`);
-        if (yes || tap || (s.question && shownHere(s.id))) return play();
+        if (gone) return;
+        if (yes || tap || (s.question && shownHere(s.id))) return play().catch(failed);
         return screen.show(() =>
-          startScreen(duelWith(d.opponent?.name), "", { at: s.at, total: s.total, marks: s.trail }, () => void play()),
+          startScreen(
+            duelWith(d.opponent?.name),
+            "",
+            { at: s.at, total: s.total, marks: s.trail },
+            () => void play().catch(failed),
+          ),
         );
       }
       checkWaiting(); // a notice that pointed here, to a duel already played, goes
       told(d.id); // and Начало needn't say that the friend played it
       screen.show(() => duelResult(d));
     } catch (err) {
+      if (gone) return;
       const code = (err as ApiError).code;
       if (code === "signed_out" || code === "no_duel") return screen.show(() => notHere(() => void load()));
       screen.show(() => failure(err, () => void load(), ["/duel", "Към дуелите"]));
@@ -439,7 +418,7 @@ export function duelOne(params: string[]) {
   return h("div", null, screen);
 }
 
-/** A duel the player is asked to: who asks, and play it or say no. */
+/** A friend's challenge sent to the player: who asks, and play it or say no. */
 function asked(d: DuelView, play: () => Promise<void>, declined: () => void): Child {
   const error = signal("");
   const them = d.opponent?.name ?? "Някой";
@@ -449,7 +428,7 @@ function asked(d: DuelView, play: () => Promise<void>, declined: () => void): Ch
     h(
       "div",
       { class: "intro" },
-      h("p", { class: "kicker" }, "Дуел"),
+      h("p", { class: "kicker" }, "Предизвикателство"),
       h("h1", null, `${them} те предизвика`),
       h("p", { class: "lead" }, `Десет въпроса, около три минути. Имаш време до ${until(d.expiresAt)}`),
     ),
@@ -470,6 +449,7 @@ function asked(d: DuelView, play: () => Promise<void>, declined: () => void): Ch
         onclick: async () => {
           try {
             await api("DELETE", `/api/duels/${d.id}`);
+            checkWaiting();
             declined();
           } catch (err) {
             error.set((err as ApiError).message);
@@ -484,7 +464,7 @@ function asked(d: DuelView, play: () => Promise<void>, declined: () => void): Ch
 
 /** Right after the player's run (`run`): the duel's result if the other has played too, else that it waits; and what
  * the game earned. */
-function afterDuel(id: number, run: number): Child {
+export function afterDuel(id: number, run: number): Child {
   const view = signal<DuelView | null>(null);
   const error = signal("");
   oneDuel(id).then(view.set, (err) => error.set((err as ApiError).message));
@@ -497,58 +477,3 @@ function afterDuel(id: number, run: number): Child {
 
 /** „Дуел със Заек“, or just „Дуел“ without a name. */
 const duelWith = (name?: string) => (name ? `Дуел ${withName(name)}` : "Дуел");
-
-/** Challenges a friend (/duel/friend/<id>): opened by a tap, the count-in first, with „Откажи“ (back where the tap
- * was) — nothing is sent until it runs out or „Започни сега“ — then the duel is made and the player's turn plays at
- * once. A tap by mistake costs nothing. Come to otherwise (a reload, back or forward, a link), nothing starts by
- * itself: „Започни“ first. */
-export function challengeFriend([idText]: string[]) {
-  title("Дуел");
-  const id = Number(idText);
-  const screen = slot(() => h("p", { class: "muted" }, "…"));
-  const tap = byTap();
-  const fail = (err: unknown) => screen.show(() => failure(err, undefined, ["/duel", "Към дуелите"]));
-  (async () => {
-    const friends = user.peek() ? (await api<{ friends: Friend[] }>("GET", "/api/friends")).friends : [];
-    const name = friends.find((f) => f.id === id)?.name;
-    // Not a friend (or not one any more): said at once, with the way to friends, before any count.
-    if (!name)
-      return screen.show(() =>
-        failure(
-          new ApiError("not_friends", "Дуел се играе с приятел, а с този играч още не сте приятели.", 404),
-          undefined,
-          ["/friends", "Към приятелите"],
-        ),
-      );
-    loadDuelResult().catch(() => {}); // the result's screen, on its way while the player plays
-    const ready = () => {
-      hold();
-      screen.show(() =>
-        getReady(
-          duelWith(name),
-          async () => {
-            try {
-              await player();
-              const r = await api<{ duel: number; state: State }>("POST", "/api/duels", { friend: id });
-              rename(`/duel/${r.duel}`); // a reload comes back to this duel, not a new one
-              screen.show(() => playRun(r.state, (end) => afterDuel(r.duel, end.id), name));
-            } catch (err) {
-              fail(err);
-            }
-          },
-          () => goBack("/duel"),
-        ),
-      );
-    };
-    if (tap) return ready();
-    screen.show(() =>
-      startScreen(
-        duelWith(name),
-        `Десет въпроса. Играеш сега, а ${name ?? "приятелят ти"} има 48 часа за своя ред.`,
-        null,
-        ready,
-      ),
-    );
-  })().catch(fail);
-  return h("div", null, screen);
-}

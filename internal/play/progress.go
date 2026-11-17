@@ -467,7 +467,7 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 	var perfect, friendWin, nightOwl, earlyBird, topicPerfect, royalWin, leagueUp, leagueFirst, rila bool
 	err = db.QueryRowContext(ctx, `SELECT
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND finished_at IS NOT NULL),
-		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'duel' AND outcome = 'won'),
+		(SELECT count(*) FROM `+duelResults+` WHERE outcome = 'won'),
 		(SELECT count(*) FROM friends WHERE user_id = ?1),
 		(SELECT count(DISTINCT category) FROM runs WHERE user_id = ?1 AND kind = 'topic' AND finished_at IS NOT NULL
 			AND category NOT IN ('', ?4)),
@@ -482,8 +482,8 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 			AND rights = json_array_length(questions)),
 		(SELECT coalesce(max(n), 0) FROM (SELECT count(*) AS n FROM answers a JOIN runs r ON r.id = a.run_id
 			WHERE r.user_id = ?1 AND a.is_right AND a.ms < ?5 GROUP BY a.run_id)),
-		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'duel' AND outcome = 'won'
-			AND opponent_id IN (SELECT friend_id FROM friends WHERE user_id = ?1)),
+		EXISTS (SELECT 1 FROM `+duelResults+` WHERE outcome = 'won'
+			AND other IN (SELECT friend_id FROM friends WHERE user_id = ?1)),
 		EXISTS (SELECT 1 FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?1
 			AND `+bulgarianHour("a.at")+` < 4),
 		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'day' AND finished_at IS NOT NULL
@@ -644,7 +644,7 @@ type DoneGoal struct {
 // NewsOf tells a player what's new, once: everything in it is marked as told. With the game just played (runID; 0
 // for none), it also counts that game's XP and the facts it put in the almanac, the goals it moved, and, for a topic's
 // game, how it moved their mastery; that game is told then, and so is every one finished before it (Untold). It awards first,
-// so that whatever ended meanwhile (a friend's duel, a Роял, a week of the leagues) is in it. What belongs to a system
+// so that whatever ended meanwhile (a friend's challenge, a Роял, a week of the leagues) is in it. What belongs to a system
 // the player hasn't met yet (unfold.go) waits for it: a new level, what a level unlocks, an achievement of the goals or
 // of the league; what can't wait (a day's goals, a week ended) is let go untold, its XP kept.
 func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {

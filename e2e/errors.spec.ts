@@ -24,7 +24,7 @@ test("Начало and Класации that can't load try again, by a tap or a
 test("a page that isn't there says so, with a way on", async ({ page }) => {
   await page.goto("/");
   await page.evaluate(() => fetch("/api/guest", { method: "POST", body: "{}" }));
-  await page.goto("/duel/friend/999999");
+  await page.goto("/challenge/999999");
   await expect(page.getByText("с този играч още не сте приятели")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
   await page.getByRole("link", { name: "Към приятелите" }).click();

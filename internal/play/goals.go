@@ -384,15 +384,17 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 	from, to := dayBounds(day)
 	t := &tally{topics: map[string]int{}, rightIn: map[string]int{}, rightOf: map[string]int{}}
 	db := g.DB.Read
-	// A duel won counts the day it ends (a friend's challenge may end days after the challenger played); against a
-	// recording too. Роял counts the day it's entered.
+	// A duel won counts the day it ends (a challenge may end days after its sender played); against a recording too.
+	// A duel with a friend is a challenge between the two, the player's game in it played that day (the sender's, or
+	// the taker's). Роял counts the day it's entered.
 	err := db.QueryRowContext(ctx, `SELECT
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'day' AND day = ?4 AND finished_at IS NOT NULL AND id <> ?6),
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'duel' AND finished_at BETWEEN ?2 AND ?3 AND id <> ?6),
 		(SELECT count(*) FROM duels WHERE ended_at BETWEEN ?2 AND ?3 AND (?6 = 0 OR ?6 NOT IN (coalesce(a_run, -1), coalesce(b_run, -1)))
 			AND ((a_id = ?1 AND outcome IN ('a', 'ghost_won')) OR (b_id = ?1 AND outcome = 'b'))),
-		(SELECT count(*) FROM duels d JOIN runs r ON r.id = CASE WHEN d.a_id = ?1 THEN d.a_run ELSE d.b_run END
-			WHERE d.kind = 'friend' AND (d.a_id = ?1 OR d.b_id = ?1) AND r.finished_at BETWEEN ?2 AND ?3 AND r.id <> ?6),
+		(SELECT count(DISTINCT r.id) FROM duels d JOIN runs r ON r.id = CASE WHEN d.a_id = ?1 THEN d.a_run ELSE d.ghost_run END
+			WHERE d.kind = 'challenge' AND d.b_id IS NOT NULL AND (d.a_id = ?1 OR d.b_id = ?1)
+				AND r.finished_at BETWEEN ?2 AND ?3 AND r.id <> ?6),
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'royal' AND started_at BETWEEN ?2 AND ?3 AND id <> ?6),
 		(SELECT coalesce(max(rights), 0) FROM runs WHERE user_id = ?1 AND kind = 'royal' AND started_at BETWEEN ?2 AND ?3
 			AND id <> ?6),

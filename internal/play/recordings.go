@@ -1,9 +1,7 @@
 package play
 
 import (
-	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
@@ -131,36 +129,4 @@ func recordingsWords(firstToday, lastToday bool, people, games, won int) string 
 		s += fmt.Sprintf(" Записите ти спечелиха %d от дуелите.", won)
 	}
 	return s
-}
-
-// FriendPlayed is a friend's duel the player started that the friend has played: who, how it ended for the player,
-// and the two scores. Начало tells it once (the client keeps which it has told).
-type FriendPlayed struct {
-	DuelID int64  `json:"id"`
-	From   string `json:"from"`
-	State  string `json:"state"` // won, lost, draw
-	You    int    `json:"you"`
-	Them   int    `json:"them"`
-}
-
-// PlayedRecent is how long a friend's playing of the player's challenge is told on Начало.
-const PlayedRecent = 72 * time.Hour
-
-// FriendPlayedOf is the latest of the player's challenges that a friend has played in the last PlayedRecent, or nil.
-func (g *Game) FriendPlayedOf(ctx context.Context, userID int64) (*FriendPlayed, error) {
-	var p FriendPlayed
-	var outcome string
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT d.id, ub.name, d.outcome, ra.points, rb.points
-		FROM duels d JOIN users ub ON ub.id = d.b_id JOIN runs ra ON ra.id = d.a_run JOIN runs rb ON rb.id = d.b_run
-		WHERE d.a_id = ? AND d.kind = 'friend' AND d.outcome IN ('a', 'b', 'draw') AND d.ended_at >= ?
-		ORDER BY d.ended_at DESC LIMIT 1`, userID, store.Ms(g.Now().Add(-PlayedRecent))).
-		Scan(&p.DuelID, &p.From, &outcome, &p.You, &p.Them)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	p.State = map[string]string{"a": "won", "b": "lost", "draw": "draw"}[outcome]
-	return &p, nil
 }

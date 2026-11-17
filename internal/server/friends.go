@@ -110,13 +110,13 @@ func (s *Server) duelInvites(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	if u == nil {
-		return ok(w, map[string]any{"requests": 0, "challenges": []play.Challenge{}})
+		return ok(w, map[string]any{"requests": 0, "challenges": []play.Asked{}})
 	}
 	n, err := s.game.RequestsWaiting(r.Context(), u.ID)
 	if err != nil {
 		return err
 	}
-	challenges, err := s.game.Challenges(r.Context(), u.ID)
+	challenges, err := s.game.AskedOf(r.Context(), u.ID)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func (s *Server) duelInvites(w http.ResponseWriter, r *http.Request) error {
 }
 
 // inviteInfo says whose an invite link is, for the page it opens (anyone may ask): whether the one asking is its owner
-// or already a friend (then with the friend's id, for a duel), and how each of the two did on the day's ten, if
+// or already a friend (then with the friend's id, to challenge them), and how each of the two did on the day's ten, if
 // they've played them (`their`, `mine`). The same link ends a shared day's result: it brings the friend to the day.
 func (s *Server) inviteInfo(w http.ResponseWriter, r *http.Request) error {
 	code := r.PathValue("code")

@@ -326,8 +326,9 @@ takes a token.
 - **A room led from a big screen** (`host.css`, loaded only there): `.host`, `.host-row` (two columns on a laptop and
   up), `.host-qr`, `.host-join`, `.host-controls` and `.podium`.
 - **A duel's result** (`screens/outcome.ts` with `outcome.css`, loaded as a duel starts), one card (`.duel-end`) for
-  a result or a friend's duel still waiting: the kicker („Дуел с Мария“, „Дуел на живо с …“, „Дуел срещу запис“)
-  and the verdict (`.duel-verdict`: „Победа“, „Загуба“, „Равенство“, „Изигра своя дуел“); the two face to face
+  a result or a challenge still waiting for the friend it was sent to: the kicker („Дуел на живо с Мария“, „Дуел срещу
+  запис“, „Предизвикателство от Мария“, to the one who sent it „Предизвикателство към Мария“) and the verdict
+  (`.duel-verdict`: „Победа“, „Загуба“, „Равенство“, „Изигра своите десет“); the two face to face
   (`.duel-face`: the big avatar with its frame, the name a way to the profile, the title or „Запис“, the points and
   the right answers; the winner's points gold and its avatar glowing, the other's plain; the other's points a dash,
   „Тепърва ще играе“, until they have; under a person met in a live duel, not a friend yet, „Добави в приятели“,
@@ -338,17 +339,26 @@ takes a token.
   времето (…)“; one who left a live duel under way, „Мария излезе след 4-тия въпрос.“; while waiting, until when, the
   weekday in full); and what it meant under a hairline (`.duel-meant`: the division's emblem,
   its name and the change, its bar, „Рейтинг 1062 → 1080 · 70 до Злато“; why it didn't move; the record against
-  this person, „Срещу Мария 3 : 2“, in rose). Then the next steps: „Реванш“, gold (a friend's; or right after a
-  live one against a person: the other sees „Мария иска реванш.“ over theirs, `.rematch-asks`, and has 15 seconds to
-  ask too), with „Още един дуел“ beside it; „Още един дуел“ gold after one against a recording; else „Към дуелите“. A duel without a result (turned down, not played in time, cut off) is
+  this person, „Срещу Мария 3 : 2“, in rose). Then the next steps: „Реванш“, gold, right after a live one against a
+  person (the other sees „Мария иска реванш.“ over theirs, `.rematch-asks`, and has 15 seconds to ask too), with „Още
+  един дуел“ beside it; „Още един дуел“ gold after one against a recording; „Предизвикай обратно“ gold after a
+  challenge between friends; else „Към дуелите“. A duel without a result (turned down, not played in time, cut off) is
   its heading and a line, and the player's own game if they played it (`.duel-mine`).
-- **A challenge** (`/c/<code>`, `screens/challenge.ts`): a finished game of ten (a topic's, a friend's duel's own ten) sent to
-  anyone, by „Предизвикай“ (plain, after the result's other steps; `challengeButton()`: the link made as the finger comes
-  down, shared with a plain line, „Познах 7 от 10 по „История“ в АЛМАНАХ. Можеш ли повече?“). A friend's duel waiting
-  for the friend has it gold as „Прати на Мария“: the same link brings the friend to their turn. Opened: who sent it
-  and how they did, „Започни“ (the count after that tap), then the duel's result („Предизвикателство от Мария“, no
-  rating, „Добави в приятели“ under them, „Предизвикай и ти“ gold). Opened again, the taker's result; by the one who
-  sent it, who took it and „Прати го пак“; past its week, or gone, it says so and offers the day's ten.
+- **A challenge** („Предизвикателство“, `screens/challenge.ts`): a game of ten sent to friends and, by its link
+  (`/c/<code>`), to anyone; a friend's duel is a challenge sent to a friend. Made on Дуел by „Предизвикай“ (plain, under
+  „Намери съперник“): a topic or all of them as chips (`/challenge`), its ten, then at the result „Кого
+  предизвикваш?“, the friends as chips to tap (`.send`), „Изпрати“ gold and „Сподели връзката“ plain (with no friends,
+  „Изпрати“ shares the link); or a friend at once by „Предизвикай“ on Приятели, their profile, an invite and „Мария прие
+  поканата ти.“ (`/challenge/<id>`: ten drawn for the two, the count first). A topic's result has it plain too
+  (`challengeButton()`: the link made as the finger comes down, shared with a plain line, „Познах 7 от 10 по „История“
+  в АЛМАНАХ. Можеш ли повече?“). A friend it's sent to hears once the sender has played: a notice wherever they are
+  („Мария те предизвика“, „Играй“ and „Откажи“) and a push; three days to play it. While it waits, the sender's
+  result has „Прати на Мария“ gold: the same link brings the friend to their turn. A friend's game of it is a duel
+  between the two (rated, the first of the day; their record), its result told to both; anyone else's moves no
+  rating. Opened: who sent it and how they did, „Започни“ (the count after that tap), then the duel's result
+  („Предизвикателство от Мария“, „Добави в приятели“ under a stranger, „Предизвикай и ти“ gold). Opened again, the
+  taker's result; by the one who sent it, who took it and „Прати го пак“; past its three days, or gone, it says so
+  and offers the day's ten.
 - **Friends:** `.card.friends`, `.invitation` (a friend request, accepted with `.btn.rose`), `.friend-list`/`.friend`
   (with `.friend-day` and `.record`) and `.invite-link`.
 - **In code:**
@@ -401,8 +411,9 @@ takes a token.
   what comes next (`.next`); reserve days keep the streak (the first day, every seventh in a row and a day with all
   three goals earn one: `.goals-reserve`, `.week li.saved`); a day a reserve kept, or a streak that ended, is said
   once on Начало (`.streak-notice`; told once on the server, not once per device), as is, one at a time, what others
-  did meanwhile: a friend played the duel, said yes to an invite („Мария прие поканата ти.“ and „Дуел“), or a live duel
-  left went on without the player, or who took their challenges („3 изиграха предизвикателството ти · 2 те биха“).
+  did meanwhile: a friend played their challenge („Мария изигра предизвикателството ти: Победа 1800 : 1500“), said
+  yes to an invite („Мария прие поканата ти.“ and „Предизвикай“), or a live duel left went on without the player, or
+  who else took their challenges („3 изиграха предизвикателството ти · 2 те биха“).
   Награди opens with „Как се печели“, the whole of it in five lines.
 - **Division emblems** are pictures (`division-<id>`): a silhouette per division — Бронз a plain shield, Сребро a
   chevron, Злато wings, Платина a star, Диамант a cut gem, Легенда a crowned shield of stars with rays — in `--div-*`
@@ -422,7 +433,7 @@ takes a token.
 
 ## Flow
 
-- **The game moves on by itself, and a tap moves it on sooner.** Alone (the day, a topic, a friend's duel), an answer
+- **The game moves on by itself, and a tap moves it on sooner.** Alone (the day, a topic, a challenge), an answer
   shows in steps: the answer marked, the verdict with its points, then its fact („Знаеше ли?“), at the moment the
   player most wants it. It stays 3 seconds (4.5 for anything but a choice or „Вярно или невярно“: there's more to
   look at) and the time to read the fact and the day's line (1.2 seconds and a little for each letter, 9 at most),
@@ -477,7 +488,7 @@ Every element that looks like a game measures something the game already counts:
 | Place        | Place on the day's board („12-и от 318 днес“)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Начало, Класации, Профил     |
 | Mastery      | Share of a topic's questions a player knows, from every answer weighed by its question's hardness (play/mastery.go); told after 10 answers, in six tiers: Новак, Любител (35%), Познавач (50%), Експерт (65%), Майстор (78%), Светило (90%)                                                                                                                                                                                                                                                                                                                             | Игра, Профил, result         |
 | Rank change  | Places moved since the previous answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Room boards                  |
-| Duels        | Live with whoever comes (a recording of a real game if nobody does in 10 s), a friend in their own time: won of played; between two friends, their record („3 : 2“)                                                                                                                                                                                                                                                                                                                                                                                                     | Дуел, Профил                 |
+| Duels        | Live with whoever comes (a recording of a real game if nobody does in 10 s), or a challenge in their own time: won of played; between two friends, their record („3 : 2“)                                                                                                                                                                                                                                                                                                                                                                                               | Дуел, Профил                 |
 | Rating       | Elo from 1000, moved by duels and Роял; shown as a division (Бронз → Легенда) with its generated emblem                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Дуел, Роял, Профил, Класации |
 | Роял         | Live at 21:00 Friday to Sunday, every evening once those fill (lobby from 20:45): up to 50 on the same question at once, 15 in three rounds; cut after 5, 8, 11, 14 by right answers (then speed), the last a final of three; those cut play on, off the standings                                                                                                                                                                                                                                                                                                      | Роял, Класации               |
 | Goals        | Three a day, kept all day: the day's questions (50 XP), one drawn (100) and a harder one (150), of two families not drawn the day before, each one that can be done that day (Роял only while the evening's is ahead, and as on Начало for a new player); each a link to where it's done, told at the game's end                                                                                                                                                                                                                                                        | Начало, result               |
@@ -527,7 +538,7 @@ Feedback fires once, when it's earned, and then the screen is still again:
   - an answer's points rise 520ms; a result's 800ms;
   - the timer runs linearly with the clock, and so does the ring of the three-second count before a topic's run
     (with „Започни сега“ and „Откажи“, so a tap on a topic never throws the player straight into a question).
-- **An answer shows in beats** (a run's: the day, a topic, a friend's duel; `beats` in `game/questions.ts`), the
+- **An answer shows in beats** (a run's: the day, a topic, a challenge; `beats` in `game/questions.ts`), the
   same however quick the line, all within a second: the clock stops at the tap, and what was chosen stays chosen (its
   accent ring) at least 280ms; then the player's own answer is judged (pop or shake), with its sound and touch and its
   pip filling (0.6→1, 200ms); at 300ms the right answer pops if it wasn't theirs, the rest dim, and the verdict docks

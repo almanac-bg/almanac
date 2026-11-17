@@ -15,28 +15,6 @@ import (
 	"github.com/almanac-bg/almanac/internal/push"
 )
 
-// challenge starts a duel with a friend: the player plays theirs now, and the friend hears of it once they have.
-func (s *Server) challenge(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	var in struct {
-		Friend int64 `json:"friend"`
-	}
-	if err := readJSON(r, &in); err != nil {
-		return err
-	}
-	if in.Friend == 0 {
-		return errBadRequest
-	}
-	st, id, err := s.game.ChallengeFriend(r.Context(), u.ID, in.Friend)
-	if err != nil {
-		return err
-	}
-	return ok(w, map[string]any{"duel": id, "state": st})
-}
-
 // livePlayer is a player as a live duel shows them: name, tag, look and rating.
 func (s *Server) livePlayer(ctx context.Context, id int64) (live.Player, error) {
 	var p live.Player
@@ -274,24 +252,7 @@ func (s *Server) duelOne(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"duel": d})
 }
 
-// playDuel is the player's run in a friend's challenge (made the first time).
-func (s *Server) playDuel(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		return play.ErrNoDuel
-	}
-	st, err := s.game.PlayDuel(r.Context(), u.ID, id)
-	if err != nil {
-		return err
-	}
-	return ok(w, st)
-}
-
-// declineDuel turns a friend's challenge down, or calls it off (its challenger, before the friend has started).
+// declineDuel says no to a friend's challenge sent to the player, before they've started it.
 func (s *Server) declineDuel(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -301,20 +262,20 @@ func (s *Server) declineDuel(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return play.ErrNoDuel
 	}
-	if err := s.game.DeclineDuel(r.Context(), u.ID, id); err != nil {
+	if err := s.game.Decline(r.Context(), u.ID, id); err != nil {
 		return err
 	}
 	return ok(w, map[string]bool{"ok": true})
 }
 
-// duelNews tells a player of a duel: a friend challenges them, or the result of one they played in their own time
-// (a live duel's result they've just seen).
+// duelNews tells a player of a duel: a friend's challenge waits for them, the result of one played in their own time
+// (a challenge between friends; a live duel's result they've just seen), or someone took their challenge.
 func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 	m := push.Message{URL: fmt.Sprintf("/duel/%d", n.DuelID)}
 	switch n.Kind {
 	case "asked":
-		m.Title = n.From + " те предизвика на дуел"
-		m.Body = fmt.Sprintf("Десет въпроса, когато ти е удобно: имаш %d часа.", int(play.FriendFor.Hours()))
+		m.Title = n.From + " те предизвика"
+		m.Body = fmt.Sprintf("Десет въпроса, когато ти е удобно: имаш %d дни.", int(play.ChallengeFor.Hours()/24))
 	case "challenge": // someone took the player's challenge (play.challengeNews: once a day at most)
 		m.URL = "/c/" + n.Code
 		m.Title = n.From + " изигра предизвикателството ти"
@@ -325,7 +286,7 @@ func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 			return
 		}
 		var kind string
-		if err := s.db.Read.QueryRowContext(ctx, `SELECT kind FROM duels WHERE id = ?`, n.DuelID).Scan(&kind); err != nil || kind != "friend" {
+		if err := s.db.Read.QueryRowContext(ctx, `SELECT kind FROM duels WHERE id = ?`, n.DuelID).Scan(&kind); err != nil || kind != "challenge" {
 			return
 		}
 		word := map[string]string{"won": "Победа", "lost": "Загуба", "draw": "Равенство"}[n.Outcome]

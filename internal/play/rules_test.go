@@ -134,7 +134,7 @@ func TestRunEndedByTheClock(t *testing.T) {
 		t.Fatalf("Vi wasn't told: %+v", told)
 	}
 	// So does Vi's: the duel has its result, told to both.
-	vs, err := w.g.PlayDuel(ctx, vi, id)
+	vs, err := w.take(vi, id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestRunEndedByTheClock(t *testing.T) {
 		t.Fatalf("Vi's duel: %+v, told %+v", d[0], told)
 	}
 	// Vi has the result on screen (their run settled it); Ana hears of it.
-	if told[1].To != ana || told[1].Seen || told[2].To != vi || !told[2].Seen {
+	if told[1].To != vi || !told[1].Seen || told[2].To != ana || told[2].Seen {
 		t.Fatalf("who has seen the result: %+v", told[1:])
 	}
 	// Settled again (both sides at once): nothing more, and no error.
@@ -222,19 +222,19 @@ func TestMergeBringsProgress(t *testing.T) {
 	}
 	merge(guest, owner)
 
-	var rating, rated, peak, league, results, royals, aID int
+	var rating, rated, peak, league, results, royals, sender int
 	_ = w.db.Read.QueryRow(`SELECT rating, rated, peak, league,
 			(SELECT count(*) FROM league_results WHERE user_id = u.id),
 			(SELECT count(*) FROM royal_players WHERE user_id = u.id AND place = 1),
-			(SELECT a_id FROM duels WHERE id = ?)
-		FROM users u WHERE id = ?`, duel, owner).Scan(&rating, &rated, &peak, &league, &results, &royals, &aID)
-	if rating != 1180 || rated != 12 || peak != 1200 || league != 3 || results != 1 || royals != 1 || aID != int(owner) {
-		t.Fatalf("the account after: rating %d (%d games, peak %d), league %d, %d weeks, %d evenings won, duel's %d",
-			rating, rated, peak, league, results, royals, aID)
+			(SELECT b_id FROM duels WHERE id = ?)
+		FROM users u WHERE id = ?`, duel, owner).Scan(&rating, &rated, &peak, &league, &results, &royals, &sender)
+	if rating != 1180 || rated != 12 || peak != 1200 || league != 3 || results != 1 || royals != 1 || sender != int(owner) {
+		t.Fatalf("the account after: rating %d (%d games, peak %d), league %d, %d weeks, %d evenings won, sent by %d",
+			rating, rated, peak, league, results, royals, sender)
 	}
 	// The challenge is the account's to finish, and its friend's to play then.
 	w.play(owner, s.ID, repeat(w.right, Length)...)
-	if c, _ := w.g.Challenges(ctx, friend); len(c) != 1 || c[0].ID != duel {
+	if c, _ := w.g.AskedOf(ctx, friend); len(c) != 1 || c[0].ID != duel {
 		t.Fatalf("the friend's challenge: %+v", c)
 	}
 	goals := func(day string) (n int) {
