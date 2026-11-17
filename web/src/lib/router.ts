@@ -168,21 +168,35 @@ export function mark(patch: Partial<Entry>): void {
 }
 
 /** Opens a path in the app; the one already open opens afresh (Начало, tapped in the middle of the day's ten, is
- * Начало again, not the question). A path that a game's own entry was opened over is gone back to. */
+ * Начало again, not the question). A game's own entry (hold) is the game's, not a page: a path opened from it opens
+ * from the page under it, gone back to first, so that back from there comes to that page once, not to it twice (and
+ * the path it was opened over is that page itself). */
 export function go(to: string, replace = false): void {
+  open(to, replace, true);
+}
+
+/** Opens `to` in place of the page shown, as that page was come to (a tap, or not): a page that is another's now (a
+ * challenge already taken, its duel), where a game starts only as it would have on the page asked for. */
+export function redirect(to: string): void {
+  open(to, true, tapped);
+}
+
+/** Opens `to` (`tap`: as a tap does); `under`: from the page under a game's own entry, which keeps where it was
+ * scrolled to before the game (hold). */
+function open(to: string, replace: boolean, tap: boolean, under = false): void {
   const s = entry();
-  if (!replace && s.game && s.from === to) {
-    leave(to);
+  if (s.game) {
+    travel(-1, () => (!replace && s.from === to ? arrive() : open(to, replace, tap, true)));
     return;
   }
   const here_ = here();
   if (replace) history.replaceState({ i: at, from: s.from }, "", to);
   else if (to !== here_) {
-    mark({ y: Math.round(scrollY) });
+    if (!under) mark({ y: Math.round(scrollY) });
     at += 1;
     history.pushState({ i: at, from: here_ }, "", to);
   }
-  tapped = true;
+  tapped = tap;
   render(true);
 }
 

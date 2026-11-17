@@ -60,9 +60,14 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
 
   // A step of the run that doesn't get through (no line, the server restarting) is tried again quietly, a few times;
   // then it says so in the run's own frame (its head, its arrow out, its pips), and goes on as the line comes back.
+  // Once the run's screen is gone, a step on its way (a reply come late, a retry as the line comes back) does nothing:
+  // it would draw into a screen nobody sees, or take the history's entry of another page.
   let last = initial;
-  const stuck = (err: unknown, retry: () => void) => screen.show(() => stuckAt(last, err, retry));
+  const stuck = (err: unknown, retry: () => void) => {
+    if (!gone) screen.show(() => stuckAt(last, err, retry));
+  };
   const next = async () => {
+    if (gone) return;
     try {
       at(await tries(() => api<State>("POST", `/api/runs/${initial.id}/show`, {})));
     } catch (err) {
@@ -81,6 +86,7 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
     }
   };
   const reload = async () => {
+    if (gone) return;
     try {
       at(await tries(() => api<State>("GET", `/api/runs/${initial.id}`)));
     } catch (err) {
@@ -111,6 +117,7 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
   // them (its fact, „Напред“) was scrolled to.
   const versus = opponent ? `Дуел ${withName(opponent)}` : "";
   const at = (s: State) => {
+    if (gone) return;
     last = s;
     playing.set(!s.done);
     if (s.done) {
@@ -602,10 +609,15 @@ function question(
 ): Child {
   const locked = signal(false);
   const stopped = signal(false); // the clock, once the answer is taken
-  const problem = signal<Child>(null);
+  const problem = slot();
   const after = h("div", { class: "after", hidden: true });
   let progress = trail(s.trail, s.total, q.n);
   let sent = false;
+  let sending = false;
+  let over = false; // the question's screen gone
+  onCleanup(() => {
+    over = true;
+  });
   const score = h("div", { class: "tally" });
   tally(score, s.points, s.points, inRowOf(s.trail));
 
@@ -639,24 +651,32 @@ function question(
     else shown.push(window.setTimeout(step, ms));
   };
 
-  // An answer goes once; after a failed send, only its retry goes again. The answers lock at the tap; the clock stops
-  // once the answer is taken, as the server takes the time it came in: on a slow line, or none, it runs on in sight
-  // while the answer is sent again quietly, and only then says what's wrong, under the question. What the player chose
-  // stays chosen a moment, however quick the line, before the answer shows.
+  // An answer goes once; after a failed send, only its retry goes again, and never while it's on its way already (a
+  // tap on „Опитай пак“ and the line coming back at once). The answers lock at the tap; the clock stops once the
+  // answer is taken, as the server takes the time it came in: on a slow line, or none, it runs on in sight while the
+  // answer is sent again quietly (the server gives an answer sent again, its reply lost, as it took it the first
+  // time), and only then says what's wrong, under the question. What went wrong is the question's own (a slot in its
+  // scope): its „Опитай пак“, and its retry as the line comes back, go with the next try and with the question. What
+  // the player chose stays chosen a moment, however quick the line, before the answer shows.
   const send = async (answer: Answer | null, retry = false) => {
-    if (sent && !retry) return;
+    if (sending || (sent && !retry)) return;
     sent = true;
+    sending = true;
     locked.set(true);
-    problem.set(null);
+    problem.show(() => null);
     const held = answer === null ? 0 : performance.now() + holdMs;
     let res: Result;
     try {
       res = await tries(() => api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer }));
     } catch (err) {
+      sending = false;
+      if (over) return;
       if ((err as ApiError).code === "out_of_step") return reload();
-      problem.set(failure(err, () => send(answer, true), null));
+      problem.show(() => failure(err, () => send(answer, true), null));
       return;
     }
+    sending = false;
+    if (over) return;
     stopped.set(true);
     taken(res.state);
     const wait = held - performance.now();
@@ -824,7 +844,7 @@ function question(
     ),
     heading,
     picture(q.view, true),
-    h("div", { class: "answering" }, asked.node, () => problem()),
+    h("div", { class: "answering" }, asked.node, problem),
     after,
     leaveAsk,
   );

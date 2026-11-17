@@ -10,7 +10,7 @@ import { challengeButton, challengeText, summary } from "../game/results.ts";
 import { getReady, playRun, shownHere, startScreen } from "../game/run.ts";
 import type { State } from "../game/types.ts";
 import { type ApiError, api } from "../lib/api.ts";
-import { type Child, h, signal, slot } from "../lib/dom.ts";
+import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { byTap, entry, go, goBack, hold, mark, title } from "../lib/router.ts";
 import { bulgaria, type Category, categories, player, user } from "../state.ts";
 import { meter, questions, stakeLine, toneOf, topicMark } from "../ui.ts";
@@ -301,12 +301,20 @@ export function run(r: Run): Child {
     start();
   };
   const play = (s: State) => screen.show(() => playRun(s, (end) => r.finished(end, again, true)));
+  // What comes back once the screen is gone (another page opened meanwhile) does nothing: a game's entry held over
+  // that page, or its entry marked, would be another page's.
+  let gone = false;
+  onCleanup(() => {
+    gone = true;
+  });
   const start = async () => {
     screen.show(() => h("p", { class: "muted" }, "…"));
     try {
       await player();
-      play(await r.begin());
+      const s = await r.begin();
+      if (!gone) play(s);
     } catch (err) {
+      if (gone) return;
       screen.show(() =>
         h(
           "div",
@@ -322,21 +330,26 @@ export function run(r: Run): Child {
   (async () => {
     if (kept) {
       const s = await api<State>("GET", `/api/runs/${kept}`).catch(() => null);
+      if (gone) return;
       if (s?.done) return screen.show(() => r.finished(s, again, false));
       mark({ result: undefined });
     }
     const left = (await loadLeft().catch(() => [])).find(r.left);
+    if (gone) return;
     // Its question showing, its time running: straight back in, where that tab was showing it or a tap asked.
     if (left?.open && (tap || shownHere(left.id))) {
       const s = await api<State>("GET", `/api/runs/${left.id}`).catch(() => null);
+      if (gone) return;
       if (s && !s.done) return play(s);
     }
     if (!left) {
       const closed = await r.closed?.();
+      if (gone) return;
       if (closed) return screen.show(() => closed);
     }
     if (tap) return ready();
     const marks = left ? (await api<State>("GET", `/api/runs/${left.id}`).catch(() => null))?.trail : undefined;
+    if (gone) return;
     screen.show(() =>
       startScreen(r.name, r.lead, left ? { at: left.at, total: left.total, marks } : null, () =>
         left?.open ? start() : ready(),

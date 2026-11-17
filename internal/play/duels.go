@@ -843,7 +843,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			CASE WHEN d.a_id = ?1 THEN d.a_left ELSE d.b_left END, CASE WHEN d.a_id = ?1 THEN d.b_left ELSE d.a_left END,
 			coalesce((SELECT code FROM challenges WHERE id = d.challenge_id), '')
 		FROM duels d WHERE (d.a_id = ?1 OR d.b_id = ?1) AND (d.kind = 'friend' OR d.ended_at IS NOT NULL)
-			AND NOT (d.b_id = ?1 AND d.ended_at IS NULL
+			AND NOT (d.b_id IS ?1 AND d.ended_at IS NULL -- IS: a challenge taken has no b_id, and NOT of NULL hid it
 				AND (SELECT finished_at FROM runs WHERE id = d.a_run) IS NULL)
 			AND (?2 = 0 OR d.id = ?2)
 		ORDER BY d.ended_at IS NOT NULL, coalesce(d.ended_at, d.created_at) DESC LIMIT 50`, userID, only)

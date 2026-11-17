@@ -290,12 +290,13 @@ export interface Left {
 }
 
 /** Lines told on this page already: Начало drawn again (after a game) doesn't say them twice. */
-const toldHere = new Set<string>();
+const toldHere = new Set<unknown>();
 
-/** Tells a line once, wherever the player is signed in (the server keeps it as told): whether it's news here. */
-function toldOnce(line: string): boolean {
-  if (toldHere.has(line)) return false;
-  toldHere.add(line);
+/** Tells a line once, wherever the player is signed in (the server keeps it as told): whether it's news here. `news`
+ * is what's told, where the line's id is the same for all of it (its own, if it has one). */
+function toldOnce(line: string, news: unknown = line): boolean {
+  if (toldHere.has(news)) return false;
+  toldHere.add(news);
   api("POST", "/api/told", { line }).catch(() => {});
   return true;
 }
@@ -336,7 +337,8 @@ export interface ChallengeNews {
 
 /** Who took the player's challenges: one line for all of them, once, a tap from who took the latest. */
 export function challengesLine(n?: ChallengeNews | null): Child {
-  if (!n || !toldOnce("challenges")) return null;
+  // The same news drawn again isn't told twice; newer news (Начало loaded again) is.
+  if (!n || !toldOnce("challenges", n)) return null;
   const beat = n.beat === 0 ? "" : n.played === 1 ? " и те би" : ` · ${n.beat} ${n.beat === 1 ? "те би" : "те биха"}`;
   const who = n.played === 1 && n.name ? `${n.name} изигра` : `${n.played} изиграха`;
   return h(

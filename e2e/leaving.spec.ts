@@ -128,6 +128,50 @@ test("the ways back pop the history; back comes to a page and its board where th
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(y);
 });
 
+test("a link out of the day's ten opens from Начало: back comes to it once", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 1024, height: 800 }); // the places in the header, there in a game too
+  await page.goto("/");
+  await startDay(page);
+  await expect(page.locator(".question-head")).toContainText("1 от 10");
+  await page.locator("nav.tabs").getByRole("link", { name: "Класации" }).click();
+  await page.getByRole("button", { name: "Излез" }).click();
+  await expect(page).toHaveURL(/\/ranks$/);
+  // In place of the game's own entry, not over it: back from Класации is Начало, and Начало is the first page.
+  await expect.poll(() => page.evaluate(() => history.state?.i)).toBe(1);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator(".card.day")).toContainText("Следва въпрос 2 от 10.");
+  expect(await page.evaluate(() => history.state)).toMatchObject({ i: 0 });
+  expect(await page.evaluate(() => history.state?.game)).toBeUndefined();
+});
+
+test("a game's page left before it's ready holds nothing over the page come to", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => fetch("/api/guest", { method: "POST", body: "{}" }));
+  await page.reload();
+  await expect(page.locator(".card.day")).toBeVisible();
+  // The topic's start-up waits for the games left today; meanwhile the player goes back to Начало.
+  let free = () => {};
+  const held = new Promise<void>((on) => {
+    free = on;
+  });
+  await page.route("**/api/runs/left", async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.locator(".topics").getByRole("link", { name: "История" }).click();
+  await expect(page).toHaveURL(/\/play\/history$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
+  free();
+  await page.waitForTimeout(1000);
+  // The topic's count never came: no game's entry over Начало, and the header and the places are there.
+  expect(await page.evaluate(() => history.state?.game)).toBeUndefined();
+  await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
+  await expect(page.locator("nav.tabs")).toBeVisible();
+});
+
 test("a second chance with nothing waiting says so at once, with no count", async ({ page }) => {
   await page.goto("/mistakes");
   await expect(page.getByText("Още няма въпроси за втори шанс.")).toBeVisible();

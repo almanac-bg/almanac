@@ -82,6 +82,32 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(page.locator("html")).toHaveClass(/big-text/);
 });
 
+test("just played, a right answer few others got makes „Сподели“ gold", async ({ page }) => {
+  test.setTimeout(120_000);
+  // The day as the server would have it with others playing: few right answers of the player's own (worth sharing
+  // only for the rare one), and the right answer a tenth of the others got, told (as the server does) only once the
+  // day is played.
+  await page.route("**/api/runs/*", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const res = await route.fetch();
+    const s = await res.json();
+    if (s.done) s.rights = 0;
+    await route.fulfill({ response: res, json: s });
+  });
+  await page.route("**/api/day", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const res = await route.fetch();
+    const t = await res.json();
+    if (t.run?.done) t.rarest = { n: 0, right: 0.1 };
+    await route.fulfill({ response: res, json: t });
+  });
+  await page.goto("/");
+  await startDay(page);
+  await playRun(page);
+  await expect(page.locator(".summary").getByRole("button", { name: "Сподели" })).toHaveClass(/primary/);
+  await expect(page.locator(".summary .btn.primary")).toHaveCount(1);
+});
+
 test("after the day: one gold thing to do next, the goals still open, and Профил leading back to play", async ({
   page,
 }) => {
