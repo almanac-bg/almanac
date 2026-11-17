@@ -113,8 +113,12 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
 - **A pull request waits only for the fast checks** (Server, Client, PR title: two minutes or so). Open it and queue
   the merge in one go — `gh pr merge <n> --auto --squash` — then move on: GitHub merges it when they pass. Don't
   watch CI, and don't merge `main` into a branch unless GitHub says it conflicts.
-- **Merging to `main` releases and deploys by itself** (`.github/workflows/deploy.yml`): the version comes from the
-  commit titles (feat → minor, fix/perf/revert → patch, `!` → major). `almanac-deploy` restarts the server only when
+- **A PR's title is plain English** saying what changed; it becomes the commit on main and the release notes' line.
+  No format to follow: nothing reads one.
+- **Merging to `main` releases and deploys by itself** (`.github/workflows/deploy.yml`), and nobody decides it: a
+  merge that changes the program (its build's hash differs from the last release's) is released, one that doesn't
+  (tests, docs, tooling) isn't. The version counts up its minor when the release brings a new migration, its patch
+  otherwise: one minor, one schema. A major is the owner's call only (the workflow run by hand). `almanac-deploy` restarts the server only when
   that cuts no play: it drains it first (no new live duel or room game; those under way finish, five minutes at the
   most), and waits out Роял (from 20:39 to the end of its games), so a deploy may take a while to go live, and
   several merges meanwhile go out as one. Connections wait in systemd's socket through the restart; rooms are kept
@@ -147,7 +151,7 @@ This runs on the owner's own Mac, with other sessions beside you. When your work
 One Hetzner server (ARM) behind Cloudflare; the program runs under systemd as `almanac`, serves HTTPS itself, keeps
 SQLite in `/var/lib/almanac`, and backs it up hourly to R2. Deploys come from CI (above). By hand, as root:
 `almanac-deploy vX.Y.Z` (also how to go back: an older version, with `now` after it to skip the wait for play to
-end, as long as no migration came since; past one, the older version refuses the database and the deploy goes back
+end, within the same minor (`vX.Y.*`: the same migrations); to an older minor, the older version refuses the database and the deploy goes back
 to where it was, so put the copy from before that release back by hand, `/var/lib/almanac/before-vX.Y.Z.db`, with
 `systemctl stop almanac.socket almanac` first, and lose what was played since), `almanac-bank` (pull and reload the
 questions), `journalctl -u almanac` (logs). The `almanac backup` commands need the service's settings:
