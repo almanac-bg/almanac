@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { playRun, startDay } from "./play.ts";
+import { answer, moveOn, playRun, startDay } from "./play.ts";
 
 // The main screens, light and dark: nothing axe finds (contrast, names, roles, structure).
 for (const scheme of ["light", "dark"] as const) {
@@ -36,6 +36,37 @@ for (const scheme of ["light", "dark"] as const) {
           await check();
         }
       });
+    }
+  });
+}
+
+// A run as a screen reader has it: each question takes the focus as it opens, and its answer's verdict is said once,
+// in plain words, in the run's one live region; the answer shown passes axe too.
+for (const scheme of ["light", "dark"] as const) {
+  test(`a run is read out: the question takes the focus, the verdict is said (${scheme})`, async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto("/play/history");
+    await page.getByRole("button", { name: "Започни сега" }).click();
+    const region = page.locator(".run > [role=status]");
+    await expect(region).toHaveCount(1);
+    for (let n = 0; n < 2; n++) {
+      await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`);
+      await expect(page.locator("h1.ask")).toBeFocused();
+      await answer(page);
+      await expect(region).toHaveText(/^(Точно!|Вярно!|Близо\.|Не е това\.|Времето изтече\.)( \+[\d ]+ точк[аи]\.)?/);
+      // The verdict on the screen says nothing by itself: the region says it.
+      await expect(page.locator(".after .verdict")).not.toHaveAttribute("role");
+      if (n === 0) {
+        await expect(page.locator(".after .up-next-go")).toBeVisible();
+        // Once what fades in has (a colour mid-fade isn't one to judge).
+        await page.waitForFunction(() =>
+          document.getAnimations().every((a) => !(a instanceof CSSAnimation) || a.playState !== "running"),
+        );
+        const { violations } = await new AxeBuilder({ page }).analyze();
+        expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
+      }
+      await moveOn(page);
     }
   });
 }

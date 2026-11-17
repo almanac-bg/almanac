@@ -149,7 +149,8 @@ takes a token.
   the review), they look as the shared text has them (🟩 🟨 ⬜): right filled in `--right` with ✓, the strongest; close
   hollow, a `--gold-ink` ring with ∼; wrong quiet, the `--sunken` of a question not played yet with a muted ✕. The red
   is the answer card's, in the moment, and the verdict's. „Вярно или невярно“ is the one exception on the answers themselves: a ✓ or ✕ on „Вярно“ and „Невярно“ reads
-  as the answer's own word, so they have none, before or after; the verdict under them carries the mark and the word.
+  as the answer's own word, so they have none, before or after; the verdict under them carries the mark and the word,
+  and gone over later (a review, a live game's answer), the right one says „верният отговор“ under its word.
 - **Contrast:** text holds at least 4.5:1 on its ground in both themes. `e2e/a11y.spec.ts` checks this with axe.
 
 ## Type
@@ -364,8 +365,15 @@ takes a token.
   time runs out, whatever has been put in (a typed number, things moved into an order, pairs joined, things sent to
   a side) is the answer.
 - **Input without the phone's keyboard:** a number is typed on the game's own pad (a comma only where the answer may
-  have decimals, a minus only for temperatures); things to order are dragged into place, or moved with the arrow
-  keys.
+  have decimals, a minus only for temperatures); things to order are tapped (one picked up, then its place), dragged
+  into place (by the grip on a touch screen, so the rest of a row scrolls the page) or moved with the arrow keys.
+- **A screen reader plays too.** Each question takes the focus as it opens; an answer chosen keeps it
+  (`aria-disabled`, not `disabled`, once answered), and where the answering part goes (a pad, a list) „Напред“ takes
+  it. A run has one live region, there from its start: it says each verdict once in plain words („Не е това. Вярно
+  е: Бийтълс.“, „Вярно! +1040 точки.“) and each clue as it comes, never a countdown.
+- **Touch:** no grey flash on a tap; an answer gives under the finger (98%, the accent edge); hover lifts only where
+  a pointer hovers, so on a phone no answer looks chosen after a tap. Small drawn controls (the arrow out of a stuck
+  head, „Върни последното“, an order's grip) still have 44px to tap.
 
 ## Game feel
 

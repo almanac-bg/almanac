@@ -13,7 +13,7 @@ import { categories } from "./state.ts";
 
 export type VerdictKind = "exact" | "right" | "partial" | "wrong" | "time";
 
-const verdictWords: Record<VerdictKind, string> = {
+export const verdictWords: Record<VerdictKind, string> = {
   exact: "Точно!",
   right: "Вярно!",
   partial: "Близо.",

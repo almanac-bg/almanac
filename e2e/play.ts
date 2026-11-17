@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { expect, type Page } from "@playwright/test";
 
 /** Answers the question showing: the first option; „Вярно“; a number on the game's pad; an order, dragging the first
- * item to the end (which checks that dragging works); a match, joining each left to the right beside it (a line
+ * item to the end and tapping it back (which checks that both ways work); a match, joining each left to the right beside it (a line
  * for each); or a split, swiping the first thing left and sending the rest left too. */
 export async function answer(page: Page): Promise<void> {
   const q = page.locator("article.question");
@@ -19,6 +19,11 @@ export async function answer(page: Page): Promise<void> {
     const first = (await text(rows.first()).textContent()) ?? "";
     await rows.first().dragTo(rows.last());
     await expect(text(rows.last())).toHaveText(first);
+    // And by taps: the last picked up, put down in the first place.
+    await rows.last().click();
+    await expect(rows.last()).toHaveAttribute("aria-pressed", "true");
+    await rows.first().click();
+    await expect(text(rows.first())).toHaveText(first);
     await q.getByRole("button", { name: "Готово" }).click();
   } else if (await q.locator(".match").count()) {
     const [left, right] = [q.locator(".match-col").first(), q.locator(".match-col").last()];
