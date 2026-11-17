@@ -144,49 +144,56 @@ func TestHandoff(t *testing.T) {
 		t.Fatalf("a link used twice: %v", err)
 	}
 
-	// Out of time, or replaced by a newer one: no more.
-	old, _ := a.Handoff(ctx, guest.ID)
-	newer, _ := a.Handoff(ctx, guest.ID)
-	if _, _, err := a.TakeHandoff(ctx, old, nil); !errors.Is(err, ErrNoHandoff) {
-		t.Fatalf("a replaced link: %v", err)
+	// The last few links work, the ones before them not; out of time, none.
+	var links []string
+	for range HandoffsKept + 1 {
+		l, _ := a.Handoff(ctx, guest.ID)
+		links = append(links, l)
+	}
+	if _, _, err := a.TakeHandoff(ctx, links[0], nil); !errors.Is(err, ErrNoHandoff) {
+		t.Fatalf("a link past the last %d: %v", HandoffsKept, err)
+	}
+	if u, _, err := a.TakeHandoff(ctx, links[1], nil); err != nil || u.ID != guest.ID {
+		t.Fatalf("one of the last %d: %+v %v", HandoffsKept, u, err)
 	}
 	_, _ = db.Write.Exec(`UPDATE handoffs SET expires_at = 0`)
-	if _, _, err := a.TakeHandoff(ctx, newer, nil); !errors.Is(err, ErrNoHandoff) {
+	if _, _, err := a.TakeHandoff(ctx, links[2], nil); !errors.Is(err, ErrNoHandoff) {
 		t.Fatalf("a link out of time: %v", err)
 	}
 
-	// A guest brought to a browser with a guest of its own: the one here keeps both games.
+	// A guest brought to a browser with a guest of its own: the one here keeps both games, but not the
+	// notifications of the browser the link came from.
 	here, _, _ := a.Guest(ctx)
+	if _, err := db.Write.Exec(`INSERT INTO push_subs (user_id, endpoint, p256dh, auth, created_at)
+		VALUES (?, 'https://push.example/1', 'k', 'a', 0)`, guest.ID); err != nil {
+		t.Fatal(err)
+	}
 	token, _ = a.Handoff(ctx, guest.ID)
 	u, session, err = a.TakeHandoff(ctx, token, &here)
 	if err != nil || u.ID != here.ID || session != "" || exists(guest.ID) ||
 		merged[len(merged)-1] != [2]int64{guest.ID, here.ID} {
 		t.Fatalf("a guest to a guest: %+v %q %v %v", u, session, err, merged)
 	}
+	var subs int
+	_ = db.Read.QueryRow(`SELECT count(*) FROM push_subs`).Scan(&subs)
+	if subs != 0 {
+		t.Fatalf("the notifications of the browser the link came from came along: %d", subs)
+	}
 
-	// A guest brought to an account: into the account.
+	// A guest brought to a profile: not joined (only signing in by email joins them), and the link still works for
+	// the browser it was meant for.
 	owner, _, _ := a.Verify(ctx, "h@example.com", code(t, a, out, in, "h@example.com"), nil)
 	token, _ = a.Handoff(ctx, here.ID)
-	if u, session, err = a.TakeHandoff(ctx, token, &owner); err != nil || u.ID != owner.ID || session != "" ||
-		exists(here.ID) {
-		t.Fatalf("a guest to an account: %+v %q %v", u, session, err)
+	if _, _, err = a.TakeHandoff(ctx, token, &owner); !errors.Is(err, ErrHandoffSignedIn) || !exists(here.ID) {
+		t.Fatalf("a guest to a profile: %v", err)
+	}
+	if u, _, err := a.TakeHandoff(ctx, token, nil); err != nil || u.ID != here.ID {
+		t.Fatalf("the link after: %+v %v", u, err)
 	}
 
-	// An account brought to a guest: the guest into the account, signed in to it here.
-	visitor, _, _ := a.Guest(ctx)
-	token, _ = a.Handoff(ctx, owner.ID)
-	if u, session, err = a.TakeHandoff(ctx, token, &visitor); err != nil || u.ID != owner.ID || session == "" ||
-		exists(visitor.ID) || merged[len(merged)-1] != [2]int64{visitor.ID, owner.ID} {
-		t.Fatalf("an account to a guest: %+v %q %v", u, session, err)
-	}
-
-	// Two accounts: each keeps its own.
-	in.got = nil
-	other, _, _ := a.Verify(ctx, "o@example.com", code(t, a, out, in, "o@example.com"), nil)
-	token, _ = a.Handoff(ctx, owner.ID)
-	if u, session, err = a.TakeHandoff(ctx, token, &other); err != nil || u.ID != other.ID || session != "" ||
-		!exists(owner.ID) {
-		t.Fatalf("two accounts: %+v %q %v", u, session, err)
+	// A profile makes no link: one would sign in whoever it reached.
+	if _, err := a.Handoff(ctx, owner.ID); !errors.Is(err, ErrNoHandoff) {
+		t.Fatalf("a profile's link: %v", err)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/store"
@@ -20,7 +21,7 @@ import (
 const LinesRecent = 7 * 24 * time.Hour
 
 // lineKey is what a told line is kept as: "friend:<their id>", "left:<the duel's id>".
-var lineKey = regexp.MustCompile(`^(friend|left):[0-9]{1,12}$`)
+var lineKey = regexp.MustCompile(`^(friend|left):([0-9]{1,12})$`)
 
 // ErrNoLine is a line that isn't one of the game's.
 var ErrNoLine = errors.New("no such line")
@@ -102,7 +103,22 @@ func (g *Game) Told(ctx context.Context, userID int64, line string) error {
 	if line == "challenges" { // who took their challenges, so far (ChallengeNewsOf)
 		return g.challengeTold(ctx, userID)
 	}
-	if !lineKey.MatchString(line) {
+	m := lineKey.FindStringSubmatch(line)
+	if m == nil {
+		return ErrNoLine
+	}
+	// Only a line the player could have been told: of a friend of theirs, or a duel of theirs (anything else would
+	// let a script fill the table).
+	id, _ := strconv.ParseInt(m[2], 10, 64)
+	q := `SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ?)`
+	if m[1] == "left" {
+		q = `SELECT EXISTS (SELECT 1 FROM duels WHERE (a_id = ?1 OR b_id = ?1) AND id = ?2)`
+	}
+	var ok bool
+	if err := g.DB.Read.QueryRowContext(ctx, q, userID, id).Scan(&ok); err != nil {
+		return err
+	}
+	if !ok {
 		return ErrNoLine
 	}
 	_, err := g.DB.Write.ExecContext(ctx, `INSERT OR IGNORE INTO home_lines (user_id, what, at) VALUES (?, ?, ?)`,

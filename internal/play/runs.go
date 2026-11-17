@@ -403,8 +403,8 @@ func (g *Game) Week(ctx context.Context, userID int64) ([7]bool, error) {
 
 // Merge moves a guest's progress to the account they signed in to (account.Accounts.Merge), where it doesn't clash
 // with the account's own: all runs but a day the account has played itself, which stays the account's; friends,
-// duels, achievements, Роял and league weeks, streaks won back; the better rating (with its games) and league; the goals of days the
-// account has no goals for.
+// duels and challenges, achievements, Роял and league weeks, streaks won back; the better rating (with its games) and
+// league; the goals of days the account has no goals for.
 func Merge(tx *sql.Tx, from, to int64) error {
 	_, err := tx.Exec(`UPDATE runs SET user_id = ? WHERE user_id = ?
 		AND NOT (kind = 'day' AND day IN (SELECT day FROM runs WHERE user_id = ? AND kind = 'day'))`,
@@ -418,10 +418,10 @@ func Merge(tx *sql.Tx, from, to int64) error {
 		sql  string
 		args []any
 	}{
-		{`INSERT OR IGNORE INTO friends (user_id, friend_id, since)
-			SELECT ?, friend_id, since FROM friends WHERE user_id = ? AND friend_id <> ?`, []any{to, from, to}},
-		{`INSERT OR IGNORE INTO friends (user_id, friend_id, since)
-			SELECT user_id, ?, since FROM friends WHERE friend_id = ? AND user_id <> ?`, []any{to, from, to}},
+		{`INSERT OR IGNORE INTO friends (user_id, friend_id, since, asked)
+			SELECT ?, friend_id, since, asked FROM friends WHERE user_id = ? AND friend_id <> ?`, []any{to, from, to}},
+		{`INSERT OR IGNORE INTO friends (user_id, friend_id, since, asked)
+			SELECT user_id, ?, since, asked FROM friends WHERE friend_id = ? AND user_id <> ?`, []any{to, from, to}},
 		{`DELETE FROM friends WHERE user_id = ? OR friend_id = ?`, []any{from, from}},
 		{`UPDATE runs SET opponent_id = ? WHERE opponent_id = ?`, []any{to, from}},
 		// The guest's duels are the account's, those waiting too (one between the two goes with the guest).
@@ -469,6 +469,14 @@ func Merge(tx *sql.Tx, from, to int64) error {
 			[]any{to, from, to}},
 		{`UPDATE OR IGNORE friend_requests SET to_id = ? WHERE to_id = ? AND from_id <> ?`, []any{to, from, to}},
 		{`DELETE FROM friend_requests WHERE from_id = ? OR to_id = ?`, []any{from, from}},
+		// The guest's challenges, with every taker's duel on them (deleting the guest would take those along), and
+		// what of them, and of Начало's lines, the guest has been told already.
+		{`UPDATE challenges SET user_id = ? WHERE user_id = ?`, []any{to, from}},
+		{`UPDATE users SET challenges_told = max(users.challenges_told, g.challenges_told),
+			challenge_pushed = max(users.challenge_pushed, g.challenge_pushed)
+			FROM (SELECT challenges_told, challenge_pushed FROM users WHERE id = ?2) g WHERE users.id = ?1`, []any{to, from}},
+		{`INSERT OR IGNORE INTO home_lines (user_id, what, at) SELECT ?, what, at FROM home_lines WHERE user_id = ?`,
+			[]any{to, from}},
 	} {
 		if _, err := tx.Exec(q.sql, q.args...); err != nil {
 			return err

@@ -390,31 +390,52 @@ func (a *Accounts) fold(tx *sql.Tx, from, to int64) error {
 // HandoffTTL is how long a handoff's link works (once).
 const HandoffTTL = 30 * time.Minute
 
-// ErrNoHandoff is a handoff's link that doesn't work: used, out of time, or never made.
-var ErrNoHandoff = errors.New("no such handoff")
+// HandoffsKept is how many of a player's handoff links work at once: a newer one leaves the last few working, so
+// that the link copied a moment ago isn't dead by the time it's pasted.
+const HandoffsKept = 3
 
-// Handoff makes the token of a link that brings a player's game to another browser, once, within HandoffTTL: how a
+var (
+	// ErrNoHandoff is a handoff's link that doesn't work: used, out of time, never made, or not a guest's.
+	ErrNoHandoff = errors.New("no such handoff")
+	// ErrHandoffSignedIn is a guest's game brought to a browser signed in to a profile: it isn't joined to it by a
+	// link (a link from someone else would join their game, and their phone, to this profile), only by signing in
+	// with the email where the game is.
+	ErrHandoffSignedIn = errors.New("a handoff to a profile")
+)
+
+// Handoff makes the token of a link that brings a guest's game to another browser, once, within HandoffTTL: how a
 // game begun in an app's own browser (Messenger, Instagram …), which a guest's game would never leave, moves to the
-// phone's browser. A new one replaces the player's last.
+// phone's browser. Only a guest's: a profile moves by signing in with its email, and a link to it would sign in
+// whoever it reached.
 func (a *Accounts) Handoff(ctx context.Context, userID int64) (string, error) {
 	token, hash := newToken()
 	err := a.DB.Tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(`DELETE FROM handoffs WHERE user_id = ? OR expires_at <= ?`, userID, store.Now()); err != nil {
+		var guest bool
+		if err := tx.QueryRow(`SELECT email IS NULL FROM users WHERE id = ?`, userID).Scan(&guest); err != nil {
 			return err
 		}
-		_, err := tx.Exec(`INSERT INTO handoffs (token_hash, user_id, expires_at) VALUES (?, ?, ?)`,
+		if !guest {
+			return ErrNoHandoff
+		}
+		if _, err := tx.Exec(`DELETE FROM handoffs WHERE expires_at <= ? OR token_hash IN (SELECT token_hash
+				FROM handoffs WHERE user_id = ? ORDER BY expires_at DESC LIMIT -1 OFFSET ?)`,
+			store.Now(), userID, HandoffsKept-1); err != nil {
+			return err
+		}
+		// Each later than the player's last, if only by a millisecond: which are the last few is never a tie.
+		_, err := tx.Exec(`INSERT INTO handoffs (token_hash, user_id, expires_at) VALUES (?1, ?2,
+				max(?3, (SELECT coalesce(max(expires_at), 0) + 1 FROM handoffs WHERE user_id = ?2)))`,
 			hash, userID, store.Ms(time.Now().Add(HandoffTTL)))
 		return err
 	})
 	return token, err
 }
 
-// TakeHandoff signs this browser in by a handoff's token (once), keeping what each side has: the player who made it
-// (from) and the one this browser had (current, maybe nil) become one, as signing in by email makes them. With no one
-// here, it's simply `from`. A guest on either side is folded into the other, an account keeping its own (a guest's
-// game into the account here, or a guest here into the account it brings); two guests become the one here, the
-// game brought along. Two accounts stay as they were: this browser keeps its own. The session token is "" when the
-// browser keeps the one it has.
+// TakeHandoff signs this browser in by a handoff's token (once): the guest who made it (from), joined with the guest
+// this browser had (current, maybe nil), as signing in by email joins them. With no one here, it's simply `from`;
+// with a guest here, the game brought along is folded into it, but not the notifications of the browser it came
+// from (a link from someone else must not bring their phone the notifications of the one who opened it). A profile
+// here isn't joined by a link (ErrHandoffSignedIn). The session token is "" when the browser keeps the one it has.
 func (a *Accounts) TakeHandoff(ctx context.Context, token string, current *User) (User, string, error) {
 	var u User
 	var session string
@@ -424,33 +445,34 @@ func (a *Accounts) TakeHandoff(ctx context.Context, token string, current *User)
 		err := tx.QueryRow(`SELECT u.id, u.name, u.tag, u.email, u.admin FROM handoffs h JOIN users u ON u.id = h.user_id
 			WHERE h.token_hash = ? AND h.expires_at > ?`, hashToken(token), store.Now()).
 			Scan(&from.ID, &from.Name, &from.Tag, &email, &from.Admin)
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) || (err == nil && email.Valid) { // a profile's (made before only guests'): none
 			return ErrNoHandoff
 		}
 		if err != nil {
 			return err
 		}
-		from.Email = email.String
+		if current != nil && current.ID != from.ID && !current.Guest() {
+			return ErrHandoffSignedIn // the link stays good, for the browser it was meant for
+		}
 		if _, err := tx.Exec(`DELETE FROM handoffs WHERE token_hash = ?`, hashToken(token)); err != nil {
 			return err
 		}
-		switch {
-		case current == nil:
-			u = from
-		case current.ID == from.ID || (!current.Guest() && !from.Guest()):
+		if current != nil && current.ID == from.ID {
 			u = *current
 			return nil
-		case current.Guest() && !from.Guest():
-			if err := a.fold(tx, current.ID, from.ID); err != nil {
+		}
+		if current == nil {
+			u = from
+			session, err = startSession(tx, u.ID)
+			return err
+		}
+		for _, q := range []string{`DELETE FROM push_subs WHERE user_id = ?`, `DELETE FROM phones WHERE user_id = ?`} {
+			if _, err := tx.Exec(q, from.ID); err != nil {
 				return err
 			}
-			u = from
-		default: // a guest brought here, to a guest or an account
-			u = *current
-			return a.fold(tx, from.ID, current.ID)
 		}
-		session, err = startSession(tx, u.ID)
-		return err
+		u = *current
+		return a.fold(tx, from.ID, current.ID)
 	})
 	if err != nil {
 		return User{}, "", err

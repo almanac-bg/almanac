@@ -389,7 +389,7 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 	err := db.QueryRowContext(ctx, `SELECT
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'day' AND day = ?4 AND finished_at IS NOT NULL AND id <> ?6),
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'duel' AND finished_at BETWEEN ?2 AND ?3 AND id <> ?6),
-		(SELECT count(*) FROM duels WHERE ended_at BETWEEN ?2 AND ?3 AND ?6 NOT IN (coalesce(a_run, 0), coalesce(b_run, 0))
+		(SELECT count(*) FROM duels WHERE ended_at BETWEEN ?2 AND ?3 AND (?6 = 0 OR ?6 NOT IN (coalesce(a_run, -1), coalesce(b_run, -1)))
 			AND ((a_id = ?1 AND outcome IN ('a', 'ghost_won')) OR (b_id = ?1 AND outcome = 'b'))),
 		(SELECT count(*) FROM duels d JOIN runs r ON r.id = CASE WHEN d.a_id = ?1 THEN d.a_run ELSE d.b_run END
 			WHERE d.kind = 'friend' AND (d.a_id = ?1 OR d.b_id = ?1) AND r.finished_at BETWEEN ?2 AND ?3 AND r.id <> ?6),
