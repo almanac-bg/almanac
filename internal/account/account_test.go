@@ -111,18 +111,113 @@ func TestGuestSigningInMergesIntoAccount(t *testing.T) {
 	}
 }
 
+// A handoff's link signs another browser in as the player who made it, once; what that browser had is kept, as a
+// sign-in by email keeps it.
+func TestHandoff(t *testing.T) {
+	a, db, out, in := setup(t)
+	ctx := t.Context()
+	var merged [][2]int64
+	a.Merge = append(a.Merge, func(tx *sql.Tx, from, to int64) error {
+		merged = append(merged, [2]int64{from, to})
+		return nil
+	})
+	exists := func(id int64) bool {
+		var n int
+		_ = db.Read.QueryRow(`SELECT count(*) FROM users WHERE id = ?`, id).Scan(&n)
+		return n == 1
+	}
+
+	// A browser with nobody in it: the guest who made the link, with a session of its own. Once only.
+	guest, _, _ := a.Guest(ctx)
+	token, err := a.Handoff(ctx, guest.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, session, err := a.TakeHandoff(ctx, token, nil)
+	if err != nil || u.ID != guest.ID || session == "" {
+		t.Fatalf("taken as %+v %q %v", u, session, err)
+	}
+	if s, _ := a.Session(ctx, session); s == nil || s.ID != guest.ID {
+		t.Fatalf("the new session is %+v", s)
+	}
+	if _, _, err := a.TakeHandoff(ctx, token, nil); !errors.Is(err, ErrNoHandoff) {
+		t.Fatalf("a link used twice: %v", err)
+	}
+
+	// Out of time, or replaced by a newer one: no more.
+	old, _ := a.Handoff(ctx, guest.ID)
+	newer, _ := a.Handoff(ctx, guest.ID)
+	if _, _, err := a.TakeHandoff(ctx, old, nil); !errors.Is(err, ErrNoHandoff) {
+		t.Fatalf("a replaced link: %v", err)
+	}
+	_, _ = db.Write.Exec(`UPDATE handoffs SET expires_at = 0`)
+	if _, _, err := a.TakeHandoff(ctx, newer, nil); !errors.Is(err, ErrNoHandoff) {
+		t.Fatalf("a link out of time: %v", err)
+	}
+
+	// A guest brought to a browser with a guest of its own: the one here keeps both games.
+	here, _, _ := a.Guest(ctx)
+	token, _ = a.Handoff(ctx, guest.ID)
+	u, session, err = a.TakeHandoff(ctx, token, &here)
+	if err != nil || u.ID != here.ID || session != "" || exists(guest.ID) ||
+		merged[len(merged)-1] != [2]int64{guest.ID, here.ID} {
+		t.Fatalf("a guest to a guest: %+v %q %v %v", u, session, err, merged)
+	}
+
+	// A guest brought to an account: into the account.
+	owner, _, _ := a.Verify(ctx, "h@example.com", code(t, a, out, in, "h@example.com"), nil)
+	token, _ = a.Handoff(ctx, here.ID)
+	if u, session, err = a.TakeHandoff(ctx, token, &owner); err != nil || u.ID != owner.ID || session != "" ||
+		exists(here.ID) {
+		t.Fatalf("a guest to an account: %+v %q %v", u, session, err)
+	}
+
+	// An account brought to a guest: the guest into the account, signed in to it here.
+	visitor, _, _ := a.Guest(ctx)
+	token, _ = a.Handoff(ctx, owner.ID)
+	if u, session, err = a.TakeHandoff(ctx, token, &visitor); err != nil || u.ID != owner.ID || session == "" ||
+		exists(visitor.ID) || merged[len(merged)-1] != [2]int64{visitor.ID, owner.ID} {
+		t.Fatalf("an account to a guest: %+v %q %v", u, session, err)
+	}
+
+	// Two accounts: each keeps its own.
+	in.got = nil
+	other, _, _ := a.Verify(ctx, "o@example.com", code(t, a, out, in, "o@example.com"), nil)
+	token, _ = a.Handoff(ctx, owner.ID)
+	if u, session, err = a.TakeHandoff(ctx, token, &other); err != nil || u.ID != other.ID || session != "" ||
+		!exists(owner.ID) {
+		t.Fatalf("two accounts: %+v %q %v", u, session, err)
+	}
+}
+
 func TestCodesLimits(t *testing.T) {
 	a, _, out, in := setup(t)
 	ctx := t.Context()
 	c := code(t, a, out, in, "y@example.com")
-	if err := a.SendCode(ctx, "y@example.com"); !errors.Is(err, ErrTooSoon) {
+	var soon TooSoon
+	if err := a.SendCode(ctx, "y@example.com"); !errors.Is(err, ErrTooSoon) || !errors.As(err, &soon) ||
+		soon.Wait <= 0 || soon.Wait > CodeEvery {
 		t.Fatalf("a second code at once: %v", err)
 	}
-	for range CodeTries {
-		_, _, _ = a.Verify(ctx, "y@example.com", "x", nil)
+	// Each wrong try says how many are left; the last one says the code is dead.
+	for i := range CodeTries {
+		_, _, err := a.Verify(ctx, "y@example.com", "x", nil)
+		var wrong WrongCode
+		if i < CodeTries-1 {
+			if !errors.Is(err, ErrBadCode) || !errors.As(err, &wrong) || wrong.Left != CodeTries-1-i {
+				t.Fatalf("wrong try %d: %v", i+1, err)
+			}
+		} else if !errors.Is(err, ErrCodeTries) {
+			t.Fatalf("the last wrong try: %v", err)
+		}
 	}
-	if _, _, err := a.Verify(ctx, "y@example.com", c, nil); !errors.Is(err, ErrCodeExpired) {
+	if _, _, err := a.Verify(ctx, "y@example.com", c, nil); !errors.Is(err, ErrCodeTries) {
 		t.Fatalf("the right code after %d wrong tries: %v", CodeTries, err)
+	}
+	// A dead code holds no new one back.
+	c = code(t, a, out, in, "y@example.com")
+	if _, _, err := a.Verify(ctx, "y@example.com", c, nil); err != nil {
+		t.Fatalf("the new code: %v", err)
 	}
 	for _, bad := range []string{"", "no", "a@b", "a b@c.d", "<a@b.c>"} {
 		if err := a.SendCode(ctx, bad); !errors.Is(err, ErrBadEmail) {

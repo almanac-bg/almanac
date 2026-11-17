@@ -223,7 +223,7 @@ function invite(url: string, primary: boolean): Child {
   return h(
     "div",
     { class: "invite", "data-invite": new URL(url).pathname },
-    shareButton("Покани с връзка", () => "Ела да сме приятели в АЛМАНАХ:", url, primary),
+    shareButton("Покани с връзка", () => "Ела да сме приятели в АЛМАНАХ:", url, primary, undefined, true),
   );
 }
 

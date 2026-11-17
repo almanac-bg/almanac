@@ -6,6 +6,7 @@ import { appShare } from "../lib/app.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
 import { feelKit, play } from "../lib/sound.ts";
+import { askName } from "../screens/name.ts";
 import { categories } from "../state.ts";
 import { countUp, explain, fact, formatNumber, type Look, meaning, who } from "../ui.ts";
 import { answered, crowdLine, picture } from "./questions.ts";
@@ -129,15 +130,37 @@ export function nextSteps(main: Child, others: Child[]): Child {
 }
 
 /** Shares through the phone's own sheet, or copies where there's none (`url`, if any, goes with the text). `shared`,
- * if given, hears of each share: the app's sheet opened, the browser's sheet sent, or the text copied or shown. */
+ * if given, hears of each share: the app's sheet opened, the browser's sheet sent, or the text copied or shown.
+ * `named`: what's shared carries the player's name (an invite, the day's result with its link), so a player who never
+ * chose one is asked for it first (screens/name.ts). */
 export function shareButton(
   label: string,
   text: () => string,
   url?: string,
   primary = true,
   shared?: () => void,
+  named = false,
 ): Child {
   const done = signal("");
+  const share = async () => {
+    const body = text();
+    if (await appShare(body, url)) return shared?.();
+    if (navigator.share) {
+      try {
+        await navigator.share({ text: body, url });
+        return shared?.();
+      } catch (err) {
+        if ((err as DOMException).name === "AbortError") return;
+      }
+    }
+    shared?.();
+    try {
+      await navigator.clipboard.writeText(url ? `${body}\n${url}` : body);
+      done.set("Копирано.");
+    } catch {
+      done.set(url ?? body);
+    }
+  };
   return h(
     "div",
     { class: "share" },
@@ -145,24 +168,8 @@ export function shareButton(
       "button",
       {
         class: primary ? "btn primary big" : "btn",
-        onclick: async () => {
-          const body = text();
-          if (await appShare(body, url)) return shared?.();
-          if (navigator.share) {
-            try {
-              await navigator.share({ text: body, url });
-              return shared?.();
-            } catch (err) {
-              if ((err as DOMException).name === "AbortError") return;
-            }
-          }
-          shared?.();
-          try {
-            await navigator.clipboard.writeText(url ? `${body}\n${url}` : body);
-            done.set("Копирано.");
-          } catch {
-            done.set(url ?? body);
-          }
+        onclick: () => {
+          if (!(named && askName(share))) share();
         },
       },
       label,

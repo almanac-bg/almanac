@@ -1,5 +1,6 @@
 // Package account is who plays: guests who start at once, the email code that keeps an account across devices, the
-// sessions that keep a browser signed in, and names.
+// one-time link that brings a game from an app's own browser to the phone's (Handoff), the sessions that keep a
+// browser signed in, and names.
 package account
 
 import (
@@ -70,11 +71,25 @@ var (
 	ErrBadEmail    = errors.New("bad email")
 	ErrTooSoon     = errors.New("a code was just sent")
 	ErrBadCode     = errors.New("wrong code")
-	ErrCodeExpired = errors.New("the code expired or ran out of tries")
+	ErrCodeExpired = errors.New("the code expired")
+	ErrCodeTries   = errors.New("the code ran out of tries")
 	ErrBadName     = errors.New("bad name")
 	ErrBadTag      = errors.New("bad tag")
 	ErrTagTaken    = errors.New("tag taken")
 )
+
+// WrongCode is a wrong code that may still be tried again: Left tries remain (ErrBadCode).
+type WrongCode struct{ Left int }
+
+func (e WrongCode) Error() string        { return fmt.Sprintf("wrong code, %d tries left", e.Left) }
+func (e WrongCode) Is(target error) bool { return target == ErrBadCode }
+
+// TooSoon is a code asked for while the last one to the address is still alive and was sent less than CodeEvery ago:
+// another may go in Wait (ErrTooSoon).
+type TooSoon struct{ Wait time.Duration }
+
+func (e TooSoon) Error() string        { return fmt.Sprintf("a code was just sent, again in %v", e.Wait) }
+func (e TooSoon) Is(target error) bool { return target == ErrTooSoon }
 
 // Accounts does the work; Merge, if set, moves a guest's progress into the account they sign in to (each part of the
 // game that keeps progress adds its step).
@@ -217,15 +232,16 @@ func (a *Accounts) SignOut(ctx context.Context, token string) error {
 	return err
 }
 
-// CleanUp drops expired sessions and codes, and guests nobody has used for a while (nothing of theirs can come back:
-// their session is gone).
+// CleanUp drops expired sessions, codes and handoffs, and guests nobody has used for a while (nothing of theirs can
+// come back: their session is gone).
 func (a *Accounts) CleanUp(ctx context.Context) error {
 	now := time.Now()
 	_, err := a.DB.Write.ExecContext(ctx, `
 		DELETE FROM sessions WHERE expires_at <= ?;
 		DELETE FROM email_codes WHERE expires_at <= ?;
+		DELETE FROM handoffs WHERE expires_at <= ?;
 		DELETE FROM users WHERE email IS NULL AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.user_id = users.id);`,
-		store.Ms(now), store.Ms(now))
+		store.Ms(now), store.Ms(now), store.Ms(now))
 	return err
 }
 
@@ -245,7 +261,8 @@ func (a *Accounts) codeHash(email, code string) []byte {
 	return m.Sum(nil)
 }
 
-// SendCode mails a sign-in code to an address. A new code replaces the one before.
+// SendCode mails a sign-in code to an address. A new code replaces the one before; while that one is alive, not
+// within CodeEvery of it (TooSoon), but at once once it's dead (expired, or out of tries).
 func (a *Accounts) SendCode(ctx context.Context, email string) error {
 	email, err := NormalEmail(email)
 	if err != nil {
@@ -255,10 +272,13 @@ func (a *Accounts) SendCode(ctx context.Context, email string) error {
 	code := fmt.Sprintf("%06d", n.Int64())
 	now := time.Now()
 	err = a.DB.Tx(ctx, func(tx *sql.Tx) error {
-		var sent int64
-		err := tx.QueryRow(`SELECT sent_at FROM email_codes WHERE email = ?`, email).Scan(&sent)
-		if err == nil && store.Ms(now)-sent < CodeEvery.Milliseconds() {
-			return ErrTooSoon
+		var sent, expires int64
+		var tries int
+		err := tx.QueryRow(`SELECT sent_at, expires_at, tries FROM email_codes WHERE email = ?`, email).
+			Scan(&sent, &expires, &tries)
+		alive := err == nil && expires > store.Ms(now) && tries < CodeTries
+		if wait := CodeEvery - time.Duration(store.Ms(now)-sent)*time.Millisecond; alive && wait > 0 {
+			return TooSoon{Wait: wait}
 		}
 		_, err = tx.Exec(`INSERT INTO email_codes (email, code_hash, sent_at, expires_at) VALUES (?, ?, ?, ?)
 			ON CONFLICT (email) DO UPDATE SET code_hash = excluded.code_hash, sent_at = excluded.sent_at,
@@ -280,9 +300,10 @@ func (a *Accounts) SendCode(ctx context.Context, email string) error {
 	return err
 }
 
-// Verify checks a code and signs its address in. The player who asked (current, maybe nil) is kept when they can be:
-// a guest giving a new address keeps their account; a guest signing in to an account that has the address brings their
-// progress along (Merge) and is gone after.
+// Verify checks a code and signs its address in. A wrong one counts a try (WrongCode, with the tries left); the last
+// try used up, the code is dead (ErrCodeTries), as it is once its time is out (ErrCodeExpired). The player who asked
+// (current, maybe nil) is kept when they can be: a guest giving a new address keeps their account; a guest signing in
+// to an account that has the address brings their progress along (Merge) and is gone after.
 func (a *Accounts) Verify(ctx context.Context, email, code string, current *User) (User, string, error) {
 	email, err := NormalEmail(email)
 	if err != nil {
@@ -291,23 +312,28 @@ func (a *Accounts) Verify(ctx context.Context, email, code string, current *User
 	code = strings.TrimSpace(code)
 	var u User
 	var token string
-	var wrong bool
+	var wrong error
 	err = a.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var hash []byte
 		var expires int64
 		var tries int
 		err := tx.QueryRow(`SELECT code_hash, expires_at, tries FROM email_codes WHERE email = ?`, email).
 			Scan(&hash, &expires, &tries)
-		if errors.Is(err, sql.ErrNoRows) || (err == nil && (expires <= store.Now() || tries >= CodeTries)) {
+		switch {
+		case errors.Is(err, sql.ErrNoRows), err == nil && expires <= store.Now():
 			return ErrCodeExpired
-		}
-		if err != nil {
+		case err != nil:
 			return err
+		case tries >= CodeTries:
+			return ErrCodeTries
 		}
 		if !hmac.Equal(hash, a.codeHash(email, code)) {
-			wrong = true
+			wrong = WrongCode{Left: CodeTries - tries - 1}
+			if tries+1 >= CodeTries {
+				wrong = ErrCodeTries
+			}
 			_, err := tx.Exec(`UPDATE email_codes SET tries = tries + 1 WHERE email = ?`, email)
-			return err // the try counts: committed below, then ErrBadCode
+			return err // the try counts: committed below, then the wrong code's error
 		}
 		if _, err := tx.Exec(`DELETE FROM email_codes WHERE email = ?`, email); err != nil {
 			return err
@@ -320,12 +346,7 @@ func (a *Accounts) Verify(ctx context.Context, email, code string, current *User
 		case err == nil:
 			owner.Email = email
 			if current != nil && current.Guest() && current.ID != owner.ID {
-				for _, merge := range a.Merge {
-					if err := merge(tx, current.ID, owner.ID); err != nil {
-						return err
-					}
-				}
-				if _, err := tx.Exec(`DELETE FROM users WHERE id = ?`, current.ID); err != nil {
+				if err := a.fold(tx, current.ID, owner.ID); err != nil {
 					return err
 				}
 			}
@@ -346,13 +367,95 @@ func (a *Accounts) Verify(ctx context.Context, email, code string, current *User
 		token, err = startSession(tx, u.ID)
 		return err
 	})
-	if wrong && err == nil {
-		err = ErrBadCode
+	if wrong != nil && err == nil {
+		err = wrong
 	}
 	if err != nil {
 		return User{}, "", err
 	}
 	return u, token, nil
+}
+
+// fold moves what player `from` has into player `to` (Merge), and deletes `from`.
+func (a *Accounts) fold(tx *sql.Tx, from, to int64) error {
+	for _, merge := range a.Merge {
+		if err := merge(tx, from, to); err != nil {
+			return err
+		}
+	}
+	_, err := tx.Exec(`DELETE FROM users WHERE id = ?`, from)
+	return err
+}
+
+// HandoffTTL is how long a handoff's link works (once).
+const HandoffTTL = 30 * time.Minute
+
+// ErrNoHandoff is a handoff's link that doesn't work: used, out of time, or never made.
+var ErrNoHandoff = errors.New("no such handoff")
+
+// Handoff makes the token of a link that brings a player's game to another browser, once, within HandoffTTL: how a
+// game begun in an app's own browser (Messenger, Instagram …), which a guest's game would never leave, moves to the
+// phone's browser. A new one replaces the player's last.
+func (a *Accounts) Handoff(ctx context.Context, userID int64) (string, error) {
+	token, hash := newToken()
+	err := a.DB.Tx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`DELETE FROM handoffs WHERE user_id = ? OR expires_at <= ?`, userID, store.Now()); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`INSERT INTO handoffs (token_hash, user_id, expires_at) VALUES (?, ?, ?)`,
+			hash, userID, store.Ms(time.Now().Add(HandoffTTL)))
+		return err
+	})
+	return token, err
+}
+
+// TakeHandoff signs this browser in by a handoff's token (once), keeping what each side has: the player who made it
+// (from) and the one this browser had (current, maybe nil) become one, as signing in by email makes them. With no one
+// here, it's simply `from`. A guest on either side is folded into the other, an account keeping its own (a guest's
+// game into the account here, or a guest here into the account it brings); two guests become the one here, the
+// game brought along. Two accounts stay as they were: this browser keeps its own. The session token is "" when the
+// browser keeps the one it has.
+func (a *Accounts) TakeHandoff(ctx context.Context, token string, current *User) (User, string, error) {
+	var u User
+	var session string
+	err := a.DB.Tx(ctx, func(tx *sql.Tx) error {
+		var from User
+		var email sql.NullString
+		err := tx.QueryRow(`SELECT u.id, u.name, u.tag, u.email, u.admin FROM handoffs h JOIN users u ON u.id = h.user_id
+			WHERE h.token_hash = ? AND h.expires_at > ?`, hashToken(token), store.Now()).
+			Scan(&from.ID, &from.Name, &from.Tag, &email, &from.Admin)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNoHandoff
+		}
+		if err != nil {
+			return err
+		}
+		from.Email = email.String
+		if _, err := tx.Exec(`DELETE FROM handoffs WHERE token_hash = ?`, hashToken(token)); err != nil {
+			return err
+		}
+		switch {
+		case current == nil:
+			u = from
+		case current.ID == from.ID || (!current.Guest() && !from.Guest()):
+			u = *current
+			return nil
+		case current.Guest() && !from.Guest():
+			if err := a.fold(tx, current.ID, from.ID); err != nil {
+				return err
+			}
+			u = from
+		default: // a guest brought here, to a guest or an account
+			u = *current
+			return a.fold(tx, from.ID, current.ID)
+		}
+		session, err = startSession(tx, u.ID)
+		return err
+	})
+	if err != nil {
+		return User{}, "", err
+	}
+	return u, session, nil
 }
 
 // Rename gives a player a new name (anyone's: names may repeat; the tag tells players apart).

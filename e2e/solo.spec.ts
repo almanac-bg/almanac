@@ -35,6 +35,11 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // right answer few of the day's other players got, if there's one: other tests play the same day), and the player's
   // own link to it.
   await page.getByRole("button", { name: "Сподели" }).click();
+  // The first share by a player still with the name drawn for them asks for theirs, once: kept as it is here.
+  const sheet = page.getByRole("dialog", { name: "Как да те познаят приятелите?" });
+  await expect(sheet.getByLabel("Име")).toHaveValue(/ \d{3}$/);
+  await sheet.getByRole("button", { name: "Сподели" }).click();
+  await expect(sheet).toHaveCount(0);
   const shared = await page.evaluate(() => (window as unknown as { shared: string }).shared);
   expect(shared).toMatch(
     /^АЛМАНАХ · Брой \d+ · \d{1,2} \p{L}+\n\d+ от 10\n[🟩🟨⬜]{10}\n(Познах въпрос \d+, който .+\n)?http:\/\/127\.0\.0\.1:\d+\/f\/[a-z0-9]{8}$/u,

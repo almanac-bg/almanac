@@ -74,6 +74,13 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 		if out["duel"], err = s.game.FriendPlayedOf(r.Context(), u.ID); err != nil {
 			return err
 		}
+		// A friend said yes to their invite, and what came of a live duel they left: each told once (POST /api/told).
+		if out["accepted"], err = s.game.AcceptedOf(r.Context(), u.ID); err != nil {
+			return err
+		}
+		if out["left"], err = s.game.LeftOf(r.Context(), u.ID); err != nil {
+			return err
+		}
 		// Which of the game's systems they've met: Начало shows the level and the goals once XP is open.
 		if out["open"], err = s.game.OpenOf(r.Context(), u.ID); err != nil {
 			return err

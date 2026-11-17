@@ -14,11 +14,20 @@ test("friends: an invite link, then a duel between the two", async ({ browser })
 
   // Bo opens it and accepts: they're friends, both ways.
   await b.goto(link ?? "");
-  await expect(b.getByRole("heading", { name: /иска да сте приятели/ })).toBeVisible();
+  // Ana hasn't played today: her link is to the day's ten (a link may go to a whole group), with being friends under.
+  await expect(b.getByRole("heading", { name: /те кани на днешните 10$/ })).toBeVisible();
   await b.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
   await expect(b.getByRole("heading", { name: /Вече сте приятели/ })).toBeVisible();
   await a.reload();
   await expect(a.locator(".friend")).toHaveCount(1);
+  // Ana hears it on Начало too, once, a tap from a duel with Bo.
+  await a.goto("/");
+  const yes = a.locator(".streak-notice", { hasText: "прие поканата ти." });
+  await expect(yes.getByRole("link", { name: "Дуел" })).toHaveAttribute("href", /^\/duel\/friend\/\d+$/);
+  await a.reload();
+  await expect(a.locator(".day")).toBeVisible();
+  await expect(yes).toHaveCount(0);
+  await a.goto("/friends");
 
   // A tap by mistake costs nothing: the count-in comes first, and „Откажи“ goes back with no duel made.
   await a.locator(".friend").getByRole("button", { name: "Дуел" }).click();
@@ -107,13 +116,20 @@ test("friends on the day: a shared link to it, who has played it, and how each w
   await c.goto("/");
   await expect(c.locator(".day-meta").last()).toHaveText(`${ana} вече изигра днешните въпроси.`);
 
-  // Bo plays the day right there, sees the two results side by side, and adds her: a tap, never by itself.
+  // Bo plays the day right there: its result as on Начало (tomorrow, „Сподели“ gold), and one card more, the two
+  // results side by side and Ana a tap from being his friend, never by itself.
   await b.goto(link);
   await b.getByRole("button", { name: "Играй днешните 10" }).click();
   await playRun(b);
-  await expect(b.locator(".place-line")).toHaveText(new RegExp(`^Ти: \\d+\\sот\\s10 · ${ana}: ${right}\\sот\\s10$`));
-  await b.getByRole("button", { name: `Добави ${ana} в приятели` }).click();
-  await expect(b.getByText("Вече сте приятели.")).toBeVisible();
+  await expect(b.locator(".tomorrow")).toBeVisible();
+  await expect(b.getByRole("button", { name: "Сподели" })).toHaveClass(/primary/);
+  const card = b.locator(".invite-card");
+  await expect(card.locator(".invite-both")).toHaveText(
+    new RegExp(`^Ти: \\d+\\sот\\s10 · ${ana}: ${right}\\sот\\s10$`),
+  );
+  await card.getByRole("button", { name: `Добави ${ana} в приятели` }).click();
+  await expect(card.getByText("Вече сте приятели.")).toBeVisible();
+  await expect(card.getByRole("button", { name: "Покани на дуел" })).toBeVisible();
 
   // Then, on Начало: both on the friends' day, his own row marked, each with how their ten went.
   await b.goto("/");

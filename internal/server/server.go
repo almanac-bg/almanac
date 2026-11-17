@@ -106,7 +106,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 		return nil, errors.New("PUBLIC_URL must be like https://almanac.bg")
 	}
 	if cfg.Operator == "" {
-		cfg.Operator = "екипът на АЛМАНАХ"
+		cfg.Operator = "екипа на АЛМАНАХ" // "Играта се поддържа от …"
 	}
 	if cfg.Contact == "" {
 		cfg.Contact = "privacy@almanac.bg"
@@ -202,6 +202,8 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/auth/code", s.sendCode)
 	api("POST /api/auth/verify", s.verify)
 	api("POST /api/auth/signout", s.signOut)
+	api("POST /api/auth/handoff", s.handoff)
+	api("POST /api/auth/hand", s.takeHandoff)
 	api("GET /api/day", s.today)
 	api("POST /api/day", s.startDay)
 	api("GET /api/day/{day}/board", s.board)
@@ -252,6 +254,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/friends/requests/{id}/accept", s.answerRequest(true))
 	api("DELETE /api/friends/requests/{id}", s.answerRequest(false))
 	api("DELETE /api/friends/{id}", s.unfriend)
+	api("POST /api/told", s.told)
 	api("GET /api/invites/{code}", s.inviteInfo)
 	api("POST /api/invites/{code}", s.acceptInvite)
 	mux.Handle("/api/", s.apiHandler(func(http.ResponseWriter, *http.Request) error { return errNotFound }))

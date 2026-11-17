@@ -96,11 +96,12 @@ export async function playedBefore(page: Page, days: number): Promise<void> {
 }
 
 /** Makes the player (a guest, made now if there's none) one who has earned an achievement not told yet, straight in the
- * test server's database: the next game's news tells it, with what it unlocks. */
+ * test server's database: the next game's news tells it, with what it unlocks (its XP left out, so that no level comes
+ * with it). */
 export async function earnedUntold(page: Page, achievement: string): Promise<void> {
   await inDB(page, (db, id) =>
     db
-      .prepare("INSERT INTO achievements (user_id, id, at, seen, xp) VALUES (?, ?, ?, 0, 150)")
+      .prepare("INSERT INTO achievements (user_id, id, at, seen, xp) VALUES (?, ?, ?, 0, 0)")
       .run(id, achievement, Date.now()),
   );
 }

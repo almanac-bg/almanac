@@ -1,8 +1,9 @@
-// Настройки: the name and tag, the account and its email, sounds and reminders, and the data the game keeps.
+// Настройки: the name and tag (saved as they're left), the account and its email, reminders, and the data the game
+// keeps; and this device's sound and access, with a profile or without one.
 
 import { type ApiError, api } from "../lib/api.ts";
 import { inApp } from "../lib/app.ts";
-import { type Child, computed, effect, h, signal, untracked, when } from "../lib/dom.ts";
+import { type Child, computed, effect, h, onCleanup, signal, untracked, when } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
 import {
   bigText,
@@ -27,17 +28,23 @@ import {
   turnOff,
   turnOn,
 } from "../lib/push.ts";
-import { title } from "../lib/router.ts";
+import { go, title } from "../lib/router.ts";
 import { quietWhenSilent, setSound, soundOn } from "../lib/sound.ts";
 import { type User, user } from "../state.ts";
 import { back } from "../ui.ts";
 
+/** What became of the profile just now, said once where the player lands: signed out (here), deleted, or a game
+ * brought from another browser (on Начало). */
+export const notice = signal("");
+
 export function settings() {
   title("Настройки");
+  notice.set("");
   return h(
     "section",
     { class: "screen" },
     h("div", { class: "intro" }, () => (user() ? back("/me", "Профил") : null), h("h1", null, "Настройки")),
+    // What's this device's (sounds, less motion) is there with a profile or without one.
     when(
       () => user(),
       () =>
@@ -57,7 +64,22 @@ export function settings() {
             deleteAccount(),
           ),
         ),
-      () => [h("p", { class: "lead" }, "Още нямаш профил. Влез с имейл или започни да играеш."), signIn()],
+      () =>
+        h(
+          "div",
+          { class: "settings" },
+          h(
+            "section",
+            { class: "stack" },
+            () =>
+              notice()
+                ? h("p", { class: "lead", role: "status" }, `${notice()} Влез пак с имейла си или започни да играеш.`)
+                : h("p", { class: "lead" }, "Още нямаш профил. Влез с имейл или започни да играеш."),
+            signIn(),
+          ),
+          sounds(),
+          access(),
+        ),
     ),
   );
 }
@@ -76,25 +98,46 @@ function nameForm(): Child {
   });
   const busy = signal(false);
   const note = signal<{ text: string; bad?: boolean } | null>(null);
+  let form: HTMLFormElement | null = null;
+  // A name or tag changed and not saved yet, that would be taken as it is (the fields' own rules hold).
+  const unsaved = () => {
+    const u = user.peek();
+    return !!u && !!form?.checkValidity() && (name.peek().trim() !== u.name || tag.peek().trim() !== u.tag);
+  };
+  const save = async () => {
+    busy.set(true);
+    note.set(null);
+    try {
+      const r = await api<{ user: User }>("PATCH", "/api/me", { name: name.peek(), tag: tag.peek() });
+      user.set(r.user);
+      name.set(r.user.name);
+      tag.set(r.user.tag);
+      note.set({ text: "Запазено." });
+    } catch (err) {
+      note.set({ text: (err as ApiError).message, bad: true });
+    } finally {
+      busy.set(false);
+    }
+  };
+  // Saved as a field is left, and as the screen is: a name changed is never dropped by going elsewhere.
+  const saveIfChanged = () => {
+    if (!busy.peek() && unsaved()) save();
+  };
+  onCleanup(saveIfChanged);
   return h(
     "form",
     {
       class: "stack",
-      onsubmit: async (e: SubmitEvent) => {
+      ref: (el) => {
+        form = el as HTMLFormElement;
+      },
+      onsubmit: (e: SubmitEvent) => {
         e.preventDefault();
-        busy.set(true);
-        note.set(null);
-        try {
-          const r = await api<{ user: User }>("PATCH", "/api/me", { name: name.peek(), tag: tag.peek() });
-          user.set(r.user);
-          name.set(r.user.name);
-          tag.set(r.user.tag);
-          note.set({ text: "Запазено." });
-        } catch (err) {
-          note.set({ text: (err as ApiError).message, bad: true });
-        } finally {
-          busy.set(false);
-        }
+        if (!busy.peek()) save();
+      },
+      onfocusout: (e: FocusEvent) => {
+        // Not while moving between the form's own fields and its button.
+        if (!form?.contains(e.relatedTarget as Node | null)) saveIfChanged();
       },
     },
     h(
@@ -395,7 +438,10 @@ function deleteAccount(): Child {
               onclick: async () => {
                 try {
                   await api("DELETE", "/api/me");
+                  // Nothing is left here: Начало, as for someone new, says so once.
+                  notice.set("Профилът е изтрит.");
                   user.set(null);
+                  go("/", true);
                 } catch (err) {
                   error.set((err as ApiError).message);
                 }
@@ -413,6 +459,7 @@ async function signOut() {
   // This browser's notifications were the account's: they stop with it (while signed in, so the server forgets them).
   if (pushable()) await turnOff().catch(() => {});
   await api("POST", "/api/auth/signout", {}).catch(() => {});
+  notice.set("Излезе от профила.");
   user.set(null);
 }
 
@@ -424,6 +471,22 @@ export function signIn(primary = true): Child {
   const sent = signal(false);
   const busy = signal(false);
   const error = signal("");
+  // The code sent can't be used any more (its tries used up, or its time): a new one is the way on.
+  const dead = signal(false);
+  // The seconds until another code may go (account.CodeEvery), counted down beside „прати нов код“.
+  const wait = signal(0);
+  let ticking: ReturnType<typeof setInterval> | undefined;
+  const countDown = (seconds: number) => {
+    clearInterval(ticking);
+    const until = Date.now() + seconds * 1000;
+    const tick = () => {
+      wait.set(Math.max(0, Math.ceil((until - Date.now()) / 1000)));
+      if (!wait.peek()) clearInterval(ticking);
+    };
+    tick();
+    ticking = setInterval(tick, 1000);
+  };
+  onCleanup(() => clearInterval(ticking));
 
   const run = async (fn: () => Promise<void>) => {
     busy.set(true);
@@ -431,14 +494,19 @@ export function signIn(primary = true): Child {
     try {
       await fn();
     } catch (err) {
-      error.set((err as ApiError).message);
+      const e = err as ApiError;
+      error.set(e.message);
+      if (e.code === "code_tries" || e.code === "code_expired") dead.set(true);
     } finally {
       busy.set(false);
     }
   };
   const send = () =>
     run(async () => {
-      await api("POST", "/api/auth/code", { email: email.peek() });
+      const r = await api<{ again?: number }>("POST", "/api/auth/code", { email: email.peek() });
+      countDown(r.again ?? 60);
+      code.set("");
+      dead.set(false);
       sent.set(true);
     });
 
@@ -474,18 +542,33 @@ export function signIn(primary = true): Child {
             pattern: "[0-9]{6}",
             maxlength: 6,
             required: true,
+            value: code,
             oninput: (e: Event) => code.set((e.target as HTMLInputElement).value.replace(/\D/g, "")),
             ref: (el) => queueMicrotask(() => el.focus()),
           }),
         ),
-        h("button", { class: "btn primary", disabled: busy }, "Влез"),
+        // A dead code takes no more tries: the way on is a new one, at once.
+        () =>
+          dead()
+            ? h("button", { type: "button", class: "btn primary", onclick: send, disabled: busy }, "Прати нов код")
+            : h("button", { class: "btn primary", disabled: busy }, "Влез"),
         errorLine,
         h(
           "p",
           { class: "muted" },
-          "Няма го? Виж в спама или ",
-          h("button", { type: "button", class: "link", onclick: send, disabled: busy }, "прати нов код"),
-          ". ",
+          () =>
+            dead()
+              ? null
+              : [
+                  "Няма го? Виж в спама или ",
+                  h(
+                    "button",
+                    { type: "button", class: "link", onclick: send, disabled: () => busy() || wait() > 0 },
+                    "прати нов код",
+                  ),
+                  () => (wait() ? ` след ${wait()} с` : ""),
+                  ". ",
+                ],
           h("button", { type: "button", class: "link", onclick: () => sent.set(false) }, "Друг имейл"),
         ),
       ),

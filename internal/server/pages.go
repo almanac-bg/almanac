@@ -30,8 +30,8 @@ var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/c/[a-z0-9]{6}$`),
 	regexp.MustCompile(`^/r/[0-9]{6}$`),
 	regexp.MustCompile(`^/year/[0-9]{4}$`),
-	regexp.MustCompile(`^/together$`),
 	regexp.MustCompile(`^/f/[a-z0-9]{8}$`),
+	regexp.MustCompile(`^/hand/[A-Za-z0-9_-]{43}$`),
 	regexp.MustCompile(`^/players/[A-Za-z0-9_]{3,20}$`),
 }
 
@@ -132,7 +132,8 @@ func (s *Server) preview(r *http.Request) (title, description string) {
 	switch path := r.URL.Path; {
 	case strings.HasPrefix(path, "/f/"):
 		if id, name, err := s.game.Inviter(r.Context(), strings.TrimPrefix(path, "/f/")); err == nil {
-			title = name + " в АЛМАНАХ"
+			// The link is to the day's ten, and often to a group: an invitation to them, not to be friends.
+			title = name + " те кани на днешните 10 в АЛМАНАХ"
 			if n, played, err := s.game.DayRights(r.Context(), id, s.game.Today(), 0); err == nil && played {
 				title = fmt.Sprintf("%s: %d от %d в АЛМАНАХ днес", name, n, play.Length)
 			}

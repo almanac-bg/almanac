@@ -15,6 +15,7 @@ import { almanac } from "./screens/almanac.ts";
 import { challengeFriend, duel, duelOne, playChallenge } from "./screens/duel.ts";
 import { friends } from "./screens/friends.ts";
 import { invite } from "./screens/invite.ts";
+import { handoff } from "./screens/keep.ts";
 import { me } from "./screens/me.ts";
 import { challengeGone, missing } from "./screens/missing.ts";
 import { mistakes } from "./screens/mistakes.ts";
@@ -35,8 +36,9 @@ import { until } from "./ui.ts";
  * from Начало; Профил holds what a player has: their rewards, their wardrobe, their almanac and their settings.
  */
 const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
-  ["/", "Начало", "home", (p) => /^\/($|play\/|mistakes|duel|royal|room|r\/)/.test(p)],
-  ["/friends", "Приятели", "users", (p) => /^\/(friends|together|f\/)/.test(p)],
+  // An invite (/f/) brings its taker to the day's ten: Начало's.
+  ["/", "Начало", "home", (p) => /^\/($|play\/|mistakes|duel|royal|room|r\/|f\/)/.test(p)],
+  ["/friends", "Приятели", "users", (p) => p === "/friends"],
   ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
   ["/me", "Профил", "user", (p) => /^\/(me|settings|rewards|wardrobe|almanac|year\/[0-9]{4})$/.test(p)],
 ];
@@ -111,10 +113,9 @@ if (root) {
       { path: /^\/wardrobe$/, view: wardrobe },
       { path: /^\/friends$/, view: friends },
       { path: /^\/settings$/, view: settings },
-      // Where friends were before: a link in an old notification still lands somewhere that makes sense.
-      { path: /^\/together$/, view: friends },
       { path: /^\/r\/([0-9]{6})$/, view: later(() => import("./screens/room.ts").then((m) => m.room)) },
       { path: /^\/f\/([a-z0-9]{8})$/, view: invite },
+      { path: /^\/hand\/([A-Za-z0-9_-]{43})$/, view: handoff },
       { path: /^\/me$/, view: me },
       { path: /^\/players\/([A-Za-z0-9_]{3,20})$/, view: playerProfile },
     ],

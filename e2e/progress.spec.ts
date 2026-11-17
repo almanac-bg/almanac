@@ -18,6 +18,11 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(page.locator(".unlocks .mastery-line")).toContainText("История");
   // Three rows at most (the highest tier first; the hour may add „След полунощ“), the rest a tap away.
   expect(await page.locator(".unlocks .unlock-row").count()).toBeLessThanOrEqual(3);
+  // A new level that unlocks something comes in its sheet once the result has landed (the goals and achievements the
+  // game earned may make one): put away for later.
+  await page.waitForTimeout(2500);
+  const later = page.getByRole("dialog").getByRole("button", { name: "По-късно" });
+  if (await later.isVisible()) await later.click();
   await page
     .locator(".unlocks")
     .getByRole("button", { name: /^Сложи: / })
