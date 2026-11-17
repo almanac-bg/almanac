@@ -241,12 +241,19 @@ func (s *Server) clientError(w http.ResponseWriter, r *http.Request) error {
 		!s.limits.allow("client-error", clientErrorsAll, time.Hour) {
 		return errTooMany
 	}
-	slog.Warn("client error", "message", cut(in.Message, 300), "where", cut(in.Where, 200), "page", cut(in.Page, 200),
-		"stack", cut(in.Stack, 2000), "ua", cut(r.UserAgent(), 200), "version", cut(in.Version, 40))
+	slog.Warn("client error", "message", logLine(in.Message, 300), "where", logLine(in.Where, 200),
+		"page", logLine(in.Page, 200), "stack", logLine(in.Stack, 2000), "ua", logLine(r.UserAgent(), 200),
+		"version", logLine(in.Version, 40))
 	if in.Version != "" && in.Version != s.cfg.Version {
 		return ok(w, map[string]bool{"ok": true})
 	}
 	site := s.cfg.PublicURL
 	s.problems.note("browser: "+plainKind(in.Message, site, 160)+" at "+plainKind(in.Where, site, 100), fromBrowser)
 	return ok(w, map[string]bool{"ok": true})
+}
+
+// logLine is a browser's text for the log: cut, and on one line (a stack's lines joined by " | "), so what a browser
+// sends can never pass for a line of the server's own (the JSON log escapes it as well).
+func logLine(s string, n int) string {
+	return strings.ReplaceAll(strings.ReplaceAll(cut(s, n), "\r", ""), "\n", " | ")
 }
