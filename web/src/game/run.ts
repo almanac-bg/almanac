@@ -17,7 +17,17 @@ import { beforeLeaving, hold, release } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { withName } from "../lib/words.ts";
 import { categories, playing } from "../state.ts";
-import { countUp, fact, formatNumber, inRowChip, type VerdictKind, verdict, verdictWords } from "../ui.ts";
+import {
+  countUp,
+  fact,
+  failure,
+  formatNumber,
+  inRowChip,
+  passing,
+  type VerdictKind,
+  verdict,
+  verdictWords,
+} from "../ui.ts";
 import { answered, ask, beats, crowdLine, picture, picturesIn, type Stage, spokenAnswer } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Reveal, Shown, State, View } from "./types.ts";
 
@@ -48,11 +58,15 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
   const screen = slot();
   hold();
 
+  // A step of the run that doesn't get through (no line, the server restarting) is tried again quietly, a few times;
+  // then it says so in the run's own frame (its head, its arrow out, its pips), and goes on as the line comes back.
+  let last = initial;
+  const stuck = (err: unknown, retry: () => void) => screen.show(() => stuckAt(last, err, retry));
   const next = async () => {
     try {
-      at(await api<State>("POST", `/api/runs/${initial.id}/show`, {}));
+      at(await tries(() => api<State>("POST", `/api/runs/${initial.id}/show`, {})));
     } catch (err) {
-      screen.show(() => failed((err as ApiError).message, next));
+      stuck(err, next);
     }
   };
   // A question with pictures waits for them, its time with it (the server starts it by itself if they take too long):
@@ -61,16 +75,16 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
     await picturesIn(q.view, q.startsMs ?? 0);
     if (gone) return;
     try {
-      at(await api<State>("POST", `/api/runs/${initial.id}/start`, { n: q.n }));
+      at(await tries(() => api<State>("POST", `/api/runs/${initial.id}/start`, { n: q.n })));
     } catch (err) {
-      screen.show(() => failed((err as ApiError).message, () => start(q)));
+      stuck(err, () => start(q));
     }
   };
   const reload = async () => {
     try {
-      at(await api<State>("GET", `/api/runs/${initial.id}`));
+      at(await tries(() => api<State>("GET", `/api/runs/${initial.id}`)));
     } catch (err) {
-      screen.show(() => failed((err as ApiError).message, reload));
+      stuck(err, reload);
     }
   };
   // A question opens only while the page is in view: its time would otherwise run unseen.
@@ -97,6 +111,7 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
   // them (its fact, „Напред“) was scrolled to.
   const versus = opponent ? `Дуел ${withName(opponent)}` : "";
   const at = (s: State) => {
+    last = s;
     playing.set(!s.done);
     if (s.done) {
       release({ result: s.id });
@@ -108,7 +123,11 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
     } else if (s.question) {
       const q = s.question;
       showing(s.id);
-      screen.show(() => question(s, q, next, reload, versus, say));
+      screen.show(() =>
+        question(s, q, next, reload, versus, say, (now) => {
+          last = now;
+        }),
+      );
       scrollTo(0, 0);
     } else whenSeen(next);
   };
@@ -299,12 +318,27 @@ function svg(name: string, attrs: Record<string, string | number>): SVGElement {
   return e;
 }
 
-function failed(message: string, retry: () => void): Child {
+/** Calls the server, and again, twice more, a moment apart, while it doesn't get through for a reason that passes (no
+ * line, the server restarting): a run's step lost to a moment offline goes on unseen. */
+async function tries<T>(call: () => Promise<T>): Promise<T> {
+  for (let n = 1; ; n++) {
+    try {
+      return await call();
+    } catch (err) {
+      if (n >= 3 || !passing(err)) throw err;
+    }
+    await new Promise((on) => setTimeout(on, 800 * n));
+  }
+}
+
+/** A run that couldn't take its next step: in its own frame (the head with its arrow out, the pips), what went wrong
+ * and „Опитай пак“, tried again by itself as the line comes back. */
+function stuckAt(s: State, err: unknown, retry: () => void): Child {
   return h(
-    "div",
-    { class: "stack" },
-    h("p", { role: "alert" }, message),
-    h("button", { class: "btn primary", onclick: retry }, "Опитай пак"),
+    "article",
+    { class: "question run-question" },
+    h("div", { class: "question-top" }, questionHead(s.at, s.total, ""), trail(s.trail, s.total, s.at)),
+    failure(err, retry, null),
   );
 }
 
@@ -556,8 +590,18 @@ export function upNext(ms: number, label: string, enter = false): Child {
   );
 }
 
-function question(s: State, q: Shown, next: () => void, reload: () => void, versus: string, say: Say): Child {
+/** A question of a run, asked and answered; `taken` hears where the run stands once its answer is in. */
+function question(
+  s: State,
+  q: Shown,
+  next: () => void,
+  reload: () => void,
+  versus: string,
+  say: Say,
+  taken: (now: State) => void,
+): Child {
   const locked = signal(false);
+  const stopped = signal(false); // the clock, once the answer is taken
   const problem = signal<Child>(null);
   const after = h("div", { class: "after", hidden: true });
   let progress = trail(s.trail, s.total, q.n);
@@ -595,9 +639,10 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     else shown.push(window.setTimeout(step, ms));
   };
 
-  // An answer goes once; after a failed send, only its retry goes again. The clock stops at the tap (the server takes
-  // the time the answer came in); what the player chose stays chosen a moment, however quick the line, before the
-  // answer shows.
+  // An answer goes once; after a failed send, only its retry goes again. The answers lock at the tap; the clock stops
+  // once the answer is taken, as the server takes the time it came in: on a slow line, or none, it runs on in sight
+  // while the answer is sent again quietly, and only then says what's wrong, under the question. What the player chose
+  // stays chosen a moment, however quick the line, before the answer shows.
   const send = async (answer: Answer | null, retry = false) => {
     if (sent && !retry) return;
     sent = true;
@@ -606,13 +651,14 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
     const held = answer === null ? 0 : performance.now() + holdMs;
     let res: Result;
     try {
-      res = await api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer });
+      res = await tries(() => api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer }));
     } catch (err) {
-      const e = err as ApiError;
-      if (e.code === "out_of_step") return reload();
-      problem.set(failed(e.message, () => send(answer, true)));
+      if ((err as ApiError).code === "out_of_step") return reload();
+      problem.set(failure(err, () => send(answer, true), null));
       return;
     }
+    stopped.set(true);
+    taken(res.state);
     const wait = held - performance.now();
     if (wait > 0 && !calm.peek()) await new Promise((on) => at(wait, () => on(null)));
     reveal(res, answer);
@@ -721,7 +767,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
   const left = countdown(
     q.leftMs,
     () => send(asked.pending()),
-    () => sent,
+    () => stopped.peek(),
   );
 
   // Leaving while the question's time runs would cost it, as the time runs on the server: a way out (the arrow, back,
@@ -774,7 +820,7 @@ function question(s: State, q: Shown, next: () => void, reload: () => void, vers
         versus,
       ),
       progress,
-      timer(q.leftMs, q.limitMs, left, locked),
+      timer(q.leftMs, q.limitMs, left, stopped),
     ),
     heading,
     picture(q.view, true),
