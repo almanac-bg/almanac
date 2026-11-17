@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { answer, moveOn, playRun, startDay } from "./play.ts";
+import { answer, moveOn, openGame, playRun, startDay } from "./play.ts";
 
 // The main screens, light and dark: nothing axe finds (contrast, names, roles, structure).
 for (const scheme of ["light", "dark"] as const) {
@@ -29,8 +29,9 @@ for (const scheme of ["light", "dark"] as const) {
         await page.goto(path);
         await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
         await check();
-        // A topic: its count first, then a question.
+        // A topic opened by its address: „Започни“ first, its count, then a question.
         if (path === "/play/geography") {
+          await page.getByRole("button", { name: "Започни", exact: true }).click();
           await page.getByRole("button", { name: "Започни сега" }).click();
           await expect(page.locator(".split, .options, .keypad, .tf-options, .match").first()).toBeVisible();
           await check();
@@ -46,8 +47,7 @@ for (const scheme of ["light", "dark"] as const) {
   test(`a run is read out: the question takes the focus, the verdict is said (${scheme})`, async ({ page }) => {
     test.setTimeout(60_000);
     await page.emulateMedia({ colorScheme: scheme });
-    await page.goto("/play/history");
-    await page.getByRole("button", { name: "Започни сега" }).click();
+    await openGame(page, "/play/history");
     const region = page.locator(".run > [role=status]");
     await expect(region).toHaveCount(1);
     for (let n = 0; n < 2; n++) {

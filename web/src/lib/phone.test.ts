@@ -12,7 +12,17 @@ const calls: string[] = [];
   nativeCallback: () => "",
 };
 
-const { haptic } = await import("./phone.ts");
+const { backAction, haptic } = await import("./phone.ts");
+
+test("Android's back puts the app away from Начало only, never from a game under way", () => {
+  const at = (home: boolean, canGoBack: boolean) => backAction({ home: () => home, canGoBack: () => canGoBack });
+  assert.equal(at(true, true), "away");
+  assert.equal(at(true, false), "away");
+  // The day's ten under way on Начало isn't Начало: back goes back, and the game asks first.
+  assert.equal(at(false, true), "back");
+  // A page opened from outside the game (a notification's): to Начало.
+  assert.equal(at(false, false), "home");
+});
 const felt = async (kind: Parameters<typeof haptic>[0]) => {
   calls.length = 0;
   haptic(kind);

@@ -656,8 +656,23 @@ func TestTopicLeftHalfWay(t *testing.T) {
 	if other, _ := w.g.StartTopic(ctx, u, "science"); other.ID == first.ID {
 		t.Fatal("another topic went on with history's run")
 	}
-	if all, _ := w.g.StartTopic(ctx, u, ""); all.ID == first.ID {
+	all, _ := w.g.StartTopic(ctx, u, "")
+	if all.ID == first.ID {
 		t.Fatal("all the topics went on with history's run")
+	}
+	// The games left, to come back to: each topic's latest, the latest first; one with its question showing is open.
+	if _, err := w.g.Show(ctx, u, all.ID); err != nil {
+		t.Fatal(err)
+	}
+	left, err := w.g.Left(ctx, u)
+	if err != nil || len(left) != 3 {
+		t.Fatalf("left: %+v %v", left, err)
+	}
+	if l := left[0]; l.ID != all.ID || l.Category != "" || l.At != 0 || l.Total != Length || !l.Open {
+		t.Errorf("all the topics, left: %+v", l)
+	}
+	if l := left[2]; l.ID != first.ID || l.Category != "history" || l.At != 4 || l.Open {
+		t.Errorf("history, left: %+v", l)
 	}
 	// Finished, the next is new.
 	for n := 4; n < Length; n++ {
@@ -2323,6 +2338,13 @@ func TestMistakes(t *testing.T) {
 	q, _ := w.b.Get(missed[0].ID)
 	if res.Learned != (q.Extra().Fact != "") {
 		t.Errorf("learned = %v for a question with fact %q", res.Learned, q.Extra().Fact)
+	}
+	// Left after it and come back to: the same second chance, from the second question.
+	if again, err := w.g.StartMistakes(ctx, ana); err != nil || again.ID != m.ID || again.At != 1 {
+		t.Fatalf("back to the second chance: %+v %v", again, err)
+	}
+	if left, _ := w.g.Left(ctx, ana); len(left) != 1 || left[0].ID != m.ID || left[0].Kind != "mistakes" || left[0].At != 1 {
+		t.Fatalf("left: %+v", left)
 	}
 	for n := 1; n < Length; n++ {
 		if _, err := w.g.Show(ctx, ana, m.ID); err != nil {

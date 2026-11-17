@@ -367,6 +367,19 @@ func (h *Hub) UnderWay() int {
 	return n
 }
 
+// Playing says whether a player is in a duel under way: one whose screen went may come back to it (Seek finds it).
+func (h *Hub) Playing(id int64) bool {
+	h.mu.Lock()
+	m := h.playing[id]
+	h.mu.Unlock()
+	if m == nil {
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return !m.over()
+}
+
 // Leave is a screen that asked giving up (closed, gone offline): when none is left, the player stops waiting.
 func (s *Seek) Leave() {
 	h := s.hub

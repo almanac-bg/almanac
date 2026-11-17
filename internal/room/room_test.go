@@ -108,6 +108,9 @@ func TestAGamePlayedTogether(t *testing.T) {
 		if v.Phase != Question || v.Total != play.Length || v.Question == nil || v.Question.Reveal != nil {
 			t.Fatalf("the first question: %+v", v)
 		}
+		if hub.Playing(bo.ID) != r.Code() || hub.Playing(3) != "" {
+			t.Fatalf("the game under way: %q", hub.Playing(bo.ID))
+		}
 
 		// Ana answers at once and right; the answer waits for Bo, then shows.
 		time.Sleep(time.Second)

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { answer, moveOn, playedBefore, playRun, startDay } from "./play.ts";
+import { answer, moveOn, openGame, playedBefore, playRun, startDay } from "./play.ts";
 
 test("the day: ten questions, the result, the review, and one try only", async ({ page }) => {
   test.setTimeout(120_000);
@@ -69,7 +69,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
 
   // A second day: a game tells XP once, with the goals; Начало shows the level and the goals from then on.
   await playedBefore(page, 1);
-  await page.goto("/play/history");
+  await openGame(page, "/play/history");
   await playRun(page);
   await expect(page.locator(".news-open")).toContainText("Ново: XP и цели за деня.");
   await expect(page.locator(".news-xp, .level-card.up").first()).toContainText(/\+\d+ XP/);
@@ -255,8 +255,7 @@ test("the day left after its third question waits on Начало, and goes on f
 
 test("a question left while its time runs: asked first, given up, and the topic goes on after it", async ({ page }) => {
   test.setTimeout(60_000);
-  await page.goto("/play/history");
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await openGame(page, "/play/history");
   await expect(page.locator(".question-head")).toContainText("1 от 10");
   await answer(page);
   await moveOn(page);
@@ -294,6 +293,7 @@ test.describe("on a computer", () => {
   test("the keys play a topic, and Начало takes the width", async ({ page }) => {
     test.setTimeout(120_000);
     await page.goto("/play/history");
+    await page.getByRole("button", { name: "Започни", exact: true }).click();
     // The count says its keys: Enter starts at once.
     await expect(page.getByRole("button", { name: "Започни сега" }).locator(".key-hint")).toHaveText("Enter");
     await page.keyboard.press("Enter");

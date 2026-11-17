@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { answer, moveOn, playRun } from "./play.ts";
+import { answer, moveOn, openGame, playRun } from "./play.ts";
 
 test("a second chance: the questions missed come back, from Начало and from the Almanac", async ({ page }) => {
   test.setTimeout(180_000);
   // Two topic games of first answers: plenty of them wrong.
-  await page.goto("/play/science");
+  await openGame(page, "/play/science");
   await playRun(page);
   await page.getByRole("button", { name: "Още десет" }).click();
   await playRun(page);

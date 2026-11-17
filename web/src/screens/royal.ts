@@ -63,6 +63,7 @@ let {
   user,
   avatar,
   back,
+  guardLeaving,
   pageArt,
   verdict,
   who,
@@ -244,6 +245,7 @@ export function royal(kit: Kit) {
     user,
     avatar,
     back,
+    guardLeaving,
     pageArt,
     verdict,
     who,
@@ -306,6 +308,16 @@ export function royal(kit: Kit) {
     const v = view();
     return v ? `${v.phase}:${v.n}:${v.in}:${v.startsAt}:${v.question?.shown ?? 0}` : "";
   });
+  // Leaving the game while in its standings costs it: it goes on without the player, their time running out on each
+  // question, and the place they end in counts. Every way out asks first; one cut, playing on for themselves, isn't
+  // asked.
+  const leaveAsk = guardLeaving(
+    "Излизаш от Роял? Играта продължава без теб: въпросите остават без отговор, а мястото ти се брои.",
+    () => {
+      const v = view();
+      return !!v && (v.phase === "question" || v.phase === "reveal") && v.in && !v.out;
+    },
+  );
   // The question an answer is on its way to (-1: none), for the question drawn again meanwhile.
   const out = signal(-1);
   let closed = false;
@@ -315,6 +327,7 @@ export function royal(kit: Kit) {
   return h(
     "div",
     { class: "screen" },
+    leaveAsk,
     () => (trouble() ? h("p", { class: "status", role: "status" }, "Връзката прекъсна. Свързваме се отново…") : null),
     () => {
       if (!key()) return h("p", { class: "muted" }, "…");

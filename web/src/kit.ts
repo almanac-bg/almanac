@@ -8,14 +8,14 @@ import { emblem } from "./art/emblem.ts";
 import { news } from "./game/news.ts";
 import { answered, ask, crowdLine, picture } from "./game/questions.ts";
 import { boardRow, hands, landing, nextSteps, review, reviewParts, shareButton } from "./game/results.ts";
-import { countdown, questionHead, readyClock, timer, trail, upNext } from "./game/run.ts";
+import { countdown, guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
 import { api, deliver } from "./lib/api.ts";
 import { keepAwake } from "./lib/awake.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked } from "./lib/dom.ts";
 import { ordinal, place } from "./lib/ordinal.ts";
 import { musicOn } from "./lib/prefs.ts";
 import { pushable, pushOn, turnOn } from "./lib/push.ts";
-import { go, title } from "./lib/router.ts";
+import { byTap, go, goBack, title } from "./lib/router.ts";
 import { feelKit, liveAudio, loadFeel, play, playAnswer, playCount, soundOn } from "./lib/sound.ts";
 import { withName } from "./lib/words.ts";
 import type { DuelView } from "./screens/duel.ts";
@@ -47,6 +47,7 @@ export const kit = {
   avatar,
   back,
   boardRow,
+  byTap,
   categories,
   clock,
   coming,
@@ -63,6 +64,8 @@ export const kit = {
   feelKit,
   formatNumber,
   go,
+  goBack,
+  guardLeaving,
   hands,
   hostCss,
   h,
@@ -98,6 +101,7 @@ export const kit = {
   signal,
   soundOn,
   standingCard,
+  startScreen,
   timer,
   title,
   topics,

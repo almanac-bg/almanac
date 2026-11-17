@@ -98,6 +98,28 @@ test("two people asking for a duel play it live", async ({ browser }, info) => {
   for (let n = 0; n < 10; n++) {
     for (const p of [a, b])
       await expect(p.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 15_000 });
+    // Leaving costs the duel: the arrow (and back) asks first, saying so; „Остани“ plays on.
+    const asked = a.getByText("Излизаш от дуела? Той продължава без теб");
+    if (n === 1) {
+      await a.goBack();
+      await expect(asked).toBeVisible();
+      await expect(a).toHaveURL(/\/duel\/live$/);
+      await a.getByRole("button", { name: "Остани" }).click();
+      await expect(asked).toBeHidden();
+    }
+    // Left all the same: Начало says the duel goes on, and „Върни се“ is back in it, on the same question.
+    if (n === 2) {
+      await a.getByRole("link", { name: "Към Начало", exact: true }).click();
+      await expect(asked).toBeVisible();
+      await a.getByRole("button", { name: "Излез" }).click();
+      await expect(a).toHaveURL(/\/$/);
+      await a
+        .getByRole("status")
+        .filter({ hasText: "Дуелът ти продължава" })
+        .getByRole("link", { name: "Върни се" })
+        .click();
+      await expect(a.locator(".question-head")).toContainText("3 от 10", { timeout: 15_000 });
+    }
     // Ana answers: Bo sees that she has, not what; then both answers show, side by side.
     await answer(a);
     await expect(b.locator(".live-doing")).toContainText("Отговори за");

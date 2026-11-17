@@ -25,6 +25,7 @@ export let {
   crowdLine,
   effect,
   fact,
+  guardLeaving,
   formatNumber,
   hostCss,
   h,
@@ -129,6 +130,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
     crowdLine,
     effect,
     fact,
+    guardLeaving,
     formatNumber,
     hostCss,
     h,
@@ -204,11 +206,21 @@ export function room(kit: Kit, [code = ""]: string[]) {
     const phase = view()?.phase;
     return phase === "question" || phase === "reveal" || leading();
   });
+  // Leaving a game under way costs its questions: it goes on without the player (who may come back to it by the
+  // code). Every way out asks first; a host leading from a big screen plays nothing, and isn't asked.
+  const leaveAsk = guardLeaving(
+    "Излизаш от стаята? Играта продължава без теб, а въпросите остават без отговор.",
+    () => {
+      const v = view();
+      return !!v && (v.phase === "question" || v.phase === "reveal") && !(v.lead && v.isHost);
+    },
+  );
   effect(() => document.documentElement.classList.toggle("hosting", leading()));
   onCleanup(() => document.documentElement.classList.remove("hosting"));
   return h(
     "div",
     { class: "screen" },
+    leaveAsk,
     () =>
       trouble() === "full"
         ? h(

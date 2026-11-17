@@ -18,6 +18,7 @@ let {
   api,
   ask,
   avatar,
+  byTap,
   computed,
   countdown,
   crowdLine,
@@ -27,6 +28,8 @@ let {
   emblem,
   formatNumber,
   go,
+  goBack,
+  guardLeaving,
   h,
   keepAwake,
   loadDuelResult,
@@ -42,6 +45,7 @@ let {
   readyClock,
   shareButton,
   signal,
+  startScreen,
   timer,
   title,
   topics,
@@ -135,6 +139,7 @@ export function liveDuel(kit: Kit) {
     api,
     ask,
     avatar,
+    byTap,
     computed,
     countdown,
     crowdLine,
@@ -144,6 +149,8 @@ export function liveDuel(kit: Kit) {
     emblem,
     formatNumber,
     go,
+    goBack,
+    guardLeaving,
     h,
     keepAwake,
     loadDuelResult,
@@ -159,6 +166,7 @@ export function liveDuel(kit: Kit) {
     readyClock,
     shareButton,
     signal,
+    startScreen,
     timer,
     title,
     topics,
@@ -168,11 +176,28 @@ export function liveDuel(kit: Kit) {
     verdict,
   } = kit);
   title("Дуел");
+  // Opened by a tap, the search starts at once; come to otherwise (a reload, back or forward, a link), only to go back
+  // into a duel under way: else „Намери съперник“ first, so that back to a duel's result never starts another.
+  // The round: each a search of its own (-1: not known yet whether a duel is under way; 0: none started).
+  const round = signal<{ n: number; rematch?: Rematch }>({ n: byTap() ? 1 : -1 });
+  if (round.peek().n < 0)
+    api<{ playing: { kind: string } | null }>("GET", "/api/playing").then(
+      (p) => round.set({ n: p.playing?.kind === "duel" ? 1 : 0 }),
+      () => round.set({ n: 0 }),
+    );
   // „Още един дуел“ starts over in place: a new wait, a new duel; „Реванш“ too, with the one just played.
-  const round = signal<{ n: number; rematch?: Rematch }>({ n: 0 });
-  const again = (rematch?: Rematch) => round.update((r) => ({ n: r.n + 1, rematch }));
+  const again = (rematch?: Rematch) => round.update((r) => ({ n: Math.max(1, r.n + 1), rematch }));
   return h("div", null, () => {
     const r = round();
+    if (r.n < 0) return h("p", { class: "muted" }, "…");
+    if (!r.n)
+      return startScreen(
+        "Дуел на живо",
+        "Ти и друг играч: едни и същи десет въпроса, в един и същи миг.",
+        null,
+        () => again(),
+        "Намери съперник",
+      );
     return untracked(() => session(again, r.rematch));
   });
 }
@@ -228,6 +253,15 @@ function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
   });
   onCleanup(() => playing.set(false));
   // The screen stays on from the wait for an opponent to the result: a phone asleep drops the duel.
+  // Leaving mid-duel costs it (live.go): the duel goes on without the player, their time running out on each question,
+  // and its result counts. Every way out asks first.
+  const leaveAsk = guardLeaving(
+    "Излизаш от дуела? Той продължава без теб: въпросите остават без отговор, а резултатът се брои.",
+    () => {
+      const phase = view()?.phase;
+      return phase === "question" || phase === "reveal";
+    },
+  );
   keepAwake(() => {
     const phase = view()?.phase;
     return phase ? phase !== "end" && phase !== "off" : wait() !== null;
@@ -241,6 +275,7 @@ function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
   return h(
     "div",
     { class: "screen live" },
+    leaveAsk,
     () =>
       trouble() === "reconnecting"
         ? h("p", { class: "status", role: "status" }, "Връзката прекъсна. Свързваме се отново…")
@@ -318,7 +353,7 @@ function waiting(wait: () => Wait, rematch?: Rematch): Child {
             },
             () => String(left()),
           ),
-    h("button", { class: "btn", type: "button", onclick: () => go("/duel") }, "Откажи"),
+    h("button", { class: "btn", type: "button", onclick: () => goBack("/duel") }, "Откажи"),
   );
 }
 
