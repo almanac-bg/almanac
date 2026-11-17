@@ -10,6 +10,7 @@ import (
 
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/play"
+	"github.com/almanac-bg/almanac/internal/safe"
 )
 
 // What the screens following the evening are sent: a board, the same for everyone following the same thing, made
@@ -178,20 +179,22 @@ func (h *Hub) watched(viewer int64) (*board, *table, *member) {
 func (h *Hub) Look(s *Sub) ([]byte, time.Duration) { return h.look(s.viewer) }
 
 func (h *Hub) look(viewer int64) ([]byte, time.Duration) {
-	h.mu.Lock()
-	now := h.now()
-	b, t, m := h.watched(viewer)
-	if b.data == nil || b.made != b.ver {
-		b.data, _ = json.Marshal(h.render(b, t, now))
-		b.made = b.ver
-	}
-	data := b.data
-	own := h.own(t, m, now)
+	var data []byte
+	var own Own
 	pace := glance
-	if h.night == nil || h.night.phase == play.RoyalLobby || m == nil {
-		pace = idle
-	}
-	h.mu.Unlock()
+	h.locked(func() {
+		now := h.now()
+		b, t, m := h.watched(viewer)
+		if b.data == nil || b.made != b.ver {
+			b.data, _ = json.Marshal(h.render(b, t, now))
+			b.made = b.ver
+		}
+		data = b.data
+		own = h.own(t, m, now)
+		if h.night == nil || h.night.phase == play.RoyalLobby || m == nil {
+			pace = idle
+		}
+	})
 	mine, _ := json.Marshal(own)
 	// {own…} and {board…} as one object: their fields are apart.
 	return slices.Concat(mine[:len(mine)-1], []byte{','}, data[1:]), pace
@@ -343,7 +346,7 @@ func (h *Hub) later(users []int64, ended bool) {
 	if !a.running {
 		a.running = true
 		a.done.Add(1)
-		go h.earn()
+		go h.earn() // each player's in it stopped if it panics (safe.Do)
 	}
 }
 
@@ -360,11 +363,14 @@ func (h *Hub) earn() {
 		x := a.due[0]
 		a.due = a.due[1:]
 		a.mu.Unlock()
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-		if err := h.game.AfterRoyal(ctx, x.user, x.ended); err != nil {
-			slog.Error("royal", "after", x.user, "err", err)
-		}
-		cancel()
+		// One player's that panics is lost alone (package safe stops it): the rest are kept, and the queue goes on.
+		safe.Do("royal: what a game earned", func() {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
+			if err := h.game.AfterRoyal(ctx, x.user, x.ended); err != nil {
+				slog.Error("royal", "after", x.user, "err", err)
+			}
+		})
 	}
 }
 

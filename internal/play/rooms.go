@@ -145,7 +145,7 @@ type RoomAnswer struct {
 	At           time.Time
 }
 
-// RecordRoom keeps a player's game in a room as a finished run, and what it earned them (afterRun), and says which
+// RecordRoom keeps a player's game in a room as a finished run, and what it earned them (after.go), and says which
 // run it is. The run has the game's questions; those before the player came in have no answer, and count as nothing
 // (what playing to the end earns is in the share of all the game's questions answered right).
 func (g *Game) RecordRoom(ctx context.Context, userID int64, p RoomPlay) (int64, error) {
@@ -189,12 +189,15 @@ func (g *Game) RecordRoom(ctx context.Context, userID int64, p RoomPlay) (int64,
 			return err
 		}
 		r.xp = gained + finishXP("room", r.rights, len(p.Picks))
-		_, err = tx.Exec(`UPDATE runs SET at = ?, points = ?, rights = ?, xp = ?, ms = ?, finished_at = ? WHERE id = ?`,
-			len(p.Picks), p.Points, r.rights, r.xp, r.ms, store.Ms(g.Now()), r.id)
-		return err
+		if _, err := tx.Exec(`UPDATE runs SET at = ?, points = ?, rights = ?, xp = ?, ms = ?, finished_at = ? WHERE id = ?`,
+			len(p.Picks), p.Points, r.rights, r.xp, r.ms, store.Ms(g.Now()), r.id); err != nil {
+			return err
+		}
+		return g.afterDue(tx, r.id)
 	})
 	if err != nil {
 		return 0, err
 	}
-	return runID, g.afterRun(ctx, userID)
+	g.finished(ctx, userID, runID)
+	return runID, nil
 }

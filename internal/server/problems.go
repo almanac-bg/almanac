@@ -115,31 +115,46 @@ func (p *problems) take() (map[string]*problem, [sources]int) {
 // Problem records a problem from outside a request (a failed backup), to be mailed like the rest.
 func (s *Server) Problem(kind string) { s.problems.note(kind, background) }
 
-// MailProblems sends whatever new problems there are to `to`, every period, until ctx ends.
+// problemsFirst is how soon after the start the first mail goes: what a start finds (the last run's crash, a panic
+// as it loads) is heard of at once, not an hour on, when a server falling over again may be gone.
+const problemsFirst = time.Minute
+
+// MailProblems sends whatever new problems there are to `to`, problemsFirst after the start and every period after,
+// until ctx ends; and then once more, so that what the run found last isn't lost with it (the mail waits in the
+// outbox for the next run, if this one can't send it).
 func (s *Server) MailProblems(ctx context.Context, to string, period time.Duration) {
-	t := time.NewTicker(period)
+	t := time.NewTimer(min(problemsFirst, period))
 	defer t.Stop()
 	for {
 		select {
 		case <-ctx.Done():
+			last, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+			s.mailProblems(last, to)
+			cancel()
 			return
 		case <-t.C:
+			t.Reset(period)
 		}
-		news, over := s.problems.take()
-		text := problemsMail(news, over, s.cfg.PublicURL, s.cfg.Version)
-		if text == "" {
-			continue
-		}
-		subject := problemsSubject(len(news) + over[fromServer] + over[fromBrowser])
-		err := s.db.Tx(ctx, func(tx *sql.Tx) error {
-			return s.outbox.Enqueue(tx, mail.Message{To: to, Subject: subject, Text: text})
-		})
-		if err != nil {
-			slog.Error("mailing problems", "err", err)
-			continue
-		}
-		s.outbox.Wake()
+		s.mailProblems(ctx, to)
 	}
+}
+
+// mailProblems puts the new problems, if there are any, in the outbox for `to`.
+func (s *Server) mailProblems(ctx context.Context, to string) {
+	news, over := s.problems.take()
+	text := problemsMail(news, over, s.cfg.PublicURL, s.cfg.Version)
+	if text == "" {
+		return
+	}
+	subject := problemsSubject(len(news) + over[fromServer] + over[fromBrowser])
+	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		return s.outbox.Enqueue(tx, mail.Message{To: to, Subject: subject, Text: text})
+	})
+	if err != nil {
+		slog.Error("mailing problems", "err", err)
+		return
+	}
+	s.outbox.Wake()
 }
 
 // problemsMail is the mail about new problems ("": none): the server's first, then the browsers', apart.

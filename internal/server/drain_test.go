@@ -137,16 +137,29 @@ func TestDrainWaitsForADuel(t *testing.T) {
 	}
 }
 
-// The rooms open as the server stops are open again when it starts.
+// The rooms open are saved as they change (each roomsEvery) and as the server stops, and are open again when it
+// starts; the file stays, for a crash before the next save to come back to.
 func TestRoomsOverARestart(t *testing.T) {
 	g := start(t)
 	file := filepath.Join(t.TempDir(), "rooms.json")
 	g.srv.cfg.RoomsFile = file
+	g.srv.saveRoomsChanged()
+	if _, err := os.Stat(file); err == nil {
+		t.Fatal("saved with nothing to save")
+	}
 	ana := g.player()
 	ana.call("POST", "/api/guest", map[string]any{})
 	_, out := ana.call("POST", "/api/rooms", map[string]string{"category": ""})
 	code := out["code"].(string)
-	g.srv.saveRooms()
+	g.srv.saveRoomsChanged() // a room opened: saved
+	if data, err := os.ReadFile(file); err != nil || !strings.Contains(string(data), code) {
+		t.Fatalf("the room opened wasn't saved: %s %v", data, err)
+	}
+	saved := g.srv.roomsSaved.changesNow()
+	g.srv.saveRoomsChanged() // nothing new: not saved again
+	if g.srv.roomsSaved.changesNow() != saved {
+		t.Fatal("saved again with nothing changed")
+	}
 
 	next := start(t)
 	next.srv.cfg.RoomsFile = file
@@ -154,7 +167,7 @@ func TestRoomsOverARestart(t *testing.T) {
 	if _, err := next.srv.rooms.Get(code); err != nil {
 		t.Fatalf("the room after a restart: %v", err)
 	}
-	if _, err := os.Stat(file); err == nil {
-		t.Fatal("the rooms' file is left to be opened again")
+	if _, err := os.Stat(file); err != nil {
+		t.Fatalf("the rooms' file went with the restore: %v", err)
 	}
 }

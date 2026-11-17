@@ -112,10 +112,16 @@ func (g *Game) EnsureDays(ctx context.Context) error {
 	if done {
 		return nil
 	}
+	// Which questions anyone has answered is read first, alongside the game: never in the one write, which every
+	// answer waits on, at the moment the day changes.
+	answered, err := g.answeredQuestions(ctx)
+	if err != nil {
+		return err
+	}
 	var bars dayBars
-	err := g.DB.Tx(context.WithoutCancel(ctx), func(tx *sql.Tx) error {
+	err = g.DB.Tx(context.WithoutCancel(ctx), func(tx *sql.Tx) error {
 		var err error
-		bars, err = g.drawAhead(tx, today, b)
+		bars, err = g.drawAhead(tx, today, b, answered)
 		return err
 	})
 	if err != nil {
@@ -130,8 +136,8 @@ func (g *Game) EnsureDays(ctx context.Context) error {
 // drawAhead draws today if it isn't yet, the days after tomorrow again if the rules or the bank's dated and Bulgarian
 // questions changed since they were drawn, a day ahead again if a question of it left the bank or is due for review by
 // then, and the days missing up to Ahead (while none is short, else it warns in the log); it says what today and the
-// days ahead hold.
-func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank) (dayBars, error) {
+// days ahead hold. Of the questions that fit, those not answered (by anyone) come first.
+func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank, answered map[string]bool) (dayBars, error) {
 	if _, err := g.day(tx, today); err != nil && !errors.Is(err, ErrNoQuestion) {
 		return dayBars{}, err
 	}
@@ -172,10 +178,6 @@ func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank) (dayBars, error
 		for _, p := range picks {
 			used[p.ID] = true
 		}
-	}
-	answered, err := answeredQuestions(tx)
-	if err != nil {
-		return dayBars{}, err
 	}
 	r := mrand.New(mrand.NewPCG(newSeed(), newSeed()))
 	for range Ahead {
@@ -286,20 +288,24 @@ func allLive(b *bank.Bank, picks []Pick) bool {
 	return true
 }
 
-// answeredQuestions are the questions anyone has answered.
-func answeredQuestions(tx *sql.Tx) (map[string]bool, error) {
-	rows, err := tx.Query(`SELECT DISTINCT question_id FROM answers`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+// answeredQuestions are the questions anyone has answered, read on the read pool: one step of the index on answers'
+// questions from each to the next (as many steps as questions, however many answers each has), not a pass over every
+// answer ever given.
+func (g *Game) answeredQuestions(ctx context.Context) (map[string]bool, error) {
 	out := map[string]bool{}
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
+	err := g.read(ctx, func(tx *sql.Tx) error {
+		after := ""
+		for {
+			var id sql.NullString
+			if err := tx.QueryRowContext(ctx, `SELECT min(question_id) FROM answers WHERE question_id > ?`, after).
+				Scan(&id); err != nil {
+				return err
+			}
+			if !id.Valid {
+				return nil
+			}
+			out[id.String], after = true, id.String
 		}
-		out[id] = true
-	}
-	return out, rows.Err()
+	})
+	return out, err
 }

@@ -34,6 +34,11 @@
 // look costs the same whether a tournament has five players or fifty, and an answer tells only the screens of its own
 // tournament (and those watching the first). The board holds only what's shown: in the lobby, how many are in and the
 // first few; during a question, how many have answered; with its answer, and at the end, the standings.
+//
+// The clock runs in the background (Step, from the server): a panic there is stopped, and the next step comes as
+// ever (package safe). So the lock on what's in memory is let go however the work under it ends (locked, or a
+// defer), and an answer on its way stops counting as one however its write ends: a panic never leaves the evening
+// locked, or waiting for ever.
 package royal
 
 import (
@@ -47,6 +52,7 @@ import (
 
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/play"
+	"github.com/almanac-bg/almanac/internal/safe"
 )
 
 const (
@@ -487,66 +493,85 @@ func (h *Hub) ids(tables []*table) []int64 {
 	return ids
 }
 
+// locked runs fn with mu held, and lets it go however fn ends: a panic too (stopped above, by the server's or by
+// package safe), after which the hub must not stay locked for ever.
+func (h *Hub) locked(fn func()) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	fn()
+}
+
+// Answer's outcomes inside its lock, apart from the errors it returns.
+var (
+	errAgain = errors.New("the answer sent again")
+	errBroke = errors.New("the write broke off")
+)
+
 // Step moves the evening on: the lobby opens, the game starts, a question's time runs out, the next question shows,
 // the game ends. Run it a few times a second.
 func (h *Hub) Step(ctx context.Context) {
 	h.op.Lock()
 	defer h.op.Unlock()
-	h.mu.Lock()
-	now := h.now()
-	next := h.sched.Next(now)
-	if n := h.night; n == nil {
-		h.renew(next, false)
-	} else if over, since := n.over(); over && !n.start.Equal(next) &&
-		(len(n.tables) == 0 || (!now.Before(next.Add(-h.sched.Lobby)) && now.Sub(since) >= results)) {
-		// The evening is over (or nobody came), and its standings have shown: on to the next, whose lobby may be
-		// open already.
-		h.renew(next, false)
-	} else if len(n.tables) == 0 && now.Before(n.opens(h.sched)) && !n.start.Equal(next) {
-		// The days it plays on changed (play.RoyalPaceOf, a day's) before this one's lobby opened.
-		h.renew(next, false)
-	}
-	n := h.night
-	if !n.told && !now.Before(n.opens(h.sched)) {
-		n.told = true
-		h.changed()
-	}
-	if !n.called && !now.Before(n.opens(h.sched)) && now.Before(n.start) {
-		n.called = true
-		if h.Opened != nil {
-			go h.Opened(context.WithoutCancel(ctx), n.start)
+	var n *night
+	var now time.Time
+	var held, begin bool
+	var back []Player
+	h.locked(func() {
+		now = h.now()
+		next := h.sched.Next(now)
+		if n := h.night; n == nil {
+			h.renew(next, false)
+		} else if over, since := n.over(); over && !n.start.Equal(next) &&
+			(len(n.tables) == 0 || (!now.Before(next.Add(-h.sched.Lobby)) && now.Sub(since) >= results)) {
+			// The evening is over (or nobody came), and its standings have shown: on to the next, whose lobby may be
+			// open already.
+			h.renew(next, false)
+		} else if len(n.tables) == 0 && now.Before(n.opens(h.sched)) && !n.start.Equal(next) {
+			// The days it plays on changed (play.RoyalPaceOf, a day's) before this one's lobby opened.
+			h.renew(next, false)
 		}
-	}
-	if !n.soon && !now.Before(n.start.Add(-Call)) && now.Before(n.start) {
-		n.soon = true
-		if h.Soon != nil {
-			var away, in []int64
-			for _, t := range n.tables {
-				for _, m := range t.members {
-					in = append(in, m.ID)
-					if len(h.screens[m.ID]) == 0 {
-						away = append(away, m.ID)
+		n = h.night
+		if !n.told && !now.Before(n.opens(h.sched)) {
+			n.told = true
+			h.changed()
+		}
+		if !n.called && !now.Before(n.opens(h.sched)) && now.Before(n.start) {
+			n.called = true
+			if h.Opened != nil {
+				start := n.start
+				safe.Go("royal: the lobby open", func() { h.Opened(context.WithoutCancel(ctx), start) })
+			}
+		}
+		if !n.soon && !now.Before(n.start.Add(-Call)) && now.Before(n.start) {
+			n.soon = true
+			if h.Soon != nil {
+				var away, in []int64
+				for _, t := range n.tables {
+					for _, m := range t.members {
+						in = append(in, m.ID)
+						if len(h.screens[m.ID]) == 0 {
+							away = append(away, m.ID)
+						}
 					}
 				}
-			}
-			go h.Soon(context.WithoutCancel(ctx), n.start, away, in)
-		}
-	}
-	held := !n.held && !now.Before(n.start)
-	if held {
-		n.held = true
-		h.changed() // begun: those not in see the first tournament, or that there's none
-	}
-	begin := !now.Before(n.start) && n.phase == play.RoyalLobby && len(n.tables) > 0
-	var back []Player
-	if n.open() {
-		for id, p := range n.absent {
-			if len(h.screens[id]) > 0 {
-				back = append(back, p)
+				start := n.start
+				safe.Go("royal: the start soon", func() { h.Soon(context.WithoutCancel(ctx), start, away, in) })
 			}
 		}
-	}
-	h.mu.Unlock()
+		held = !n.held && !now.Before(n.start)
+		if held {
+			n.held = true
+			h.changed() // begun: those not in see the first tournament, or that there's none
+		}
+		begin = !now.Before(n.start) && n.phase == play.RoyalLobby && len(n.tables) > 0
+		if n.open() {
+			for id, p := range n.absent {
+				if len(h.screens[id]) > 0 {
+					back = append(back, p)
+				}
+			}
+		}
+	})
 
 	if held {
 		if err := h.game.HeldRoyal(ctx, n.start); err != nil {
@@ -583,42 +608,43 @@ func (h *Hub) Step(ctx context.Context) {
 // tick moves the clock on, once it's time: the answer shows (the question closed, everyone playing it having
 // answered: Answer; or its time is up), the next question shows, or the games end. Called with op held.
 func (h *Hub) tick(ctx context.Context) error {
-	h.mu.Lock()
-	n, now := h.night, h.now()
-	switch n.phase {
-	case play.RoyalQuestion:
-		d := n.dealt[n.n]
-		if !n.closing && d != nil && now.Sub(n.at) < play.Limit(d.Question())+play.Grace {
-			if next := bank.NextStep(d, n.paced); next > 0 && now.Sub(n.at) >= n.paced+next {
-				// More of the question shows (its next clue): the screens look again.
-				n.paced += next
-				h.changed()
+	var move func() error
+	h.locked(func() {
+		n, now := h.night, h.now()
+		switch n.phase {
+		case play.RoyalQuestion:
+			d := n.dealt[n.n]
+			if !n.closing && d != nil && now.Sub(n.at) < play.Limit(d.Question())+play.Grace {
+				if next := bank.NextStep(d, n.paced); next > 0 && now.Sub(n.at) >= n.paced+next {
+					// More of the question shows (its next clue): the screens look again.
+					n.paced += next
+					h.changed()
+				}
+				return
 			}
-			h.mu.Unlock()
-			return nil
+			n.closing = true
+			if n.sending > 0 {
+				return // the answers on their way go in first: the last of them moves the clock on
+			}
+			tables := slices.Clone(n.tables)
+			move = func() error { return h.reveal(ctx, tables) }
+		case play.RoyalReveal:
+			if now.Sub(n.at) < h.pause() {
+				return
+			}
+			last, tables, k := h.last(), slices.Clone(n.tables), n.n+1
+			move = func() error {
+				if last {
+					return h.end(ctx, tables)
+				}
+				return h.show(ctx, tables, k)
+			}
 		}
-		n.closing = true
-		if n.sending > 0 {
-			h.mu.Unlock()
-			return nil // the answers on their way go in first: the last of them moves the clock on
-		}
-		tables := slices.Clone(n.tables)
-		h.mu.Unlock()
-		return h.reveal(ctx, tables)
-	case play.RoyalReveal:
-		if now.Sub(n.at) < h.pause() {
-			h.mu.Unlock()
-			return nil
-		}
-		last, tables := h.last(), slices.Clone(n.tables)
-		h.mu.Unlock()
-		if last {
-			return h.end(ctx, tables)
-		}
-		return h.show(ctx, tables, n.n+1)
+	})
+	if move == nil {
+		return nil
 	}
-	h.mu.Unlock()
-	return nil
+	return move()
 }
 
 // allIn says whether everyone playing the question now, at every tournament, has answered it: those cut too, but not
@@ -738,25 +764,25 @@ func (h *Hub) end(ctx context.Context, tables []*table) error {
 		}
 	}
 	var news []play.RoyalNews
-	h.mu.Lock()
-	n, now := h.night, h.now()
-	n.phase, n.at = play.RoyalEnd, now
-	for _, t := range n.tables {
-		for _, p := range t.places {
-			_, m := h.mine(p.User)
-			if m == nil {
-				continue
+	h.locked(func() {
+		n, now := h.night, h.now()
+		n.phase, n.at = play.RoyalEnd, now
+		for _, t := range n.tables {
+			for _, p := range t.places {
+				_, m := h.mine(p.User)
+				if m == nil {
+					continue
+				}
+				m.place, m.delta = p.Place, p.Delta
+				if !h.there(m, now) {
+					news = append(news, play.RoyalNews{To: m.ID, Place: p.Place, Of: len(t.places), Delta: p.Delta})
+				}
 			}
-			m.place, m.delta = p.Place, p.Delta
-			if !h.there(m, now) {
-				news = append(news, play.RoyalNews{To: m.ID, Place: p.Place, Of: len(t.places), Delta: p.Delta})
-			}
+			t.places = nil
+			h.rank(t)
 		}
-		t.places = nil
-		h.rank(t)
-	}
-	h.changed()
-	h.mu.Unlock()
+		h.changed()
+	})
 	if h.News != nil {
 		for _, x := range news {
 			h.News(ctx, x)
@@ -771,37 +797,47 @@ func (h *Hub) end(ctx context.Context, tables []*table) error {
 func (h *Hub) Join(ctx context.Context, p Player) error {
 	h.op.Lock()
 	defer h.op.Unlock()
-	h.mu.Lock()
-	now := h.now()
-	n := h.night
-	if n != nil && !now.Before(n.start) {
-		if over, _ := n.over(); over {
-			if next := h.sched.Next(now); !now.Before(next.Add(-h.sched.Lobby)) {
-				h.renew(next, true)
-				n = h.night
+	var now time.Time
+	var n *night
+	var t *table
+	var picks []play.Pick
+	in, late := false, false
+	h.locked(func() {
+		now, n = h.now(), h.night
+		if n != nil && !now.Before(n.start) {
+			if over, _ := n.over(); over {
+				if next := h.sched.Next(now); !now.Before(next.Add(-h.sched.Lobby)) {
+					h.renew(next, true)
+					n = h.night
+				}
 			}
 		}
-	}
-	if n == nil || now.Before(n.opens(h.sched)) {
-		h.mu.Unlock()
+		if n == nil || now.Before(n.opens(h.sched)) {
+			n = nil
+			return
+		}
+		if t, m := h.mine(p.ID); m != nil {
+			m.Player, m.seen = p, now
+			h.touch(t)
+			in = true
+			return
+		}
+		if late = !now.Before(n.start); late {
+			return
+		}
+		if k := len(n.tables); k > 0 && len(n.tables[k-1].members) < play.RoyalSize {
+			t = n.tables[k-1]
+		}
+		picks = n.picks
+	})
+	switch {
+	case n == nil:
 		return ErrClosed
-	}
-	if t, m := h.mine(p.ID); m != nil {
-		m.Player, m.seen = p, now
-		h.touch(t)
-		h.mu.Unlock()
+	case in:
 		return nil
-	}
-	if !now.Before(n.start) {
-		h.mu.Unlock()
+	case late:
 		return h.late(ctx, p, now)
 	}
-	var t *table
-	if k := len(n.tables); k > 0 && len(n.tables[k-1].members) < play.RoyalSize {
-		t = n.tables[k-1]
-	}
-	picks := n.picks
-	h.mu.Unlock()
 
 	if t == nil {
 		if picks == nil {
@@ -815,12 +851,12 @@ func (h *Hub) Join(ctx context.Context, p Player) error {
 			return err
 		}
 		t = &table{id: id, done: step{play.RoyalLobby, 0}}
-		h.mu.Lock()
-		if n.picks == nil {
-			n.picks, n.dealt = picks, h.deal(picks)
-		}
-		n.tables = append(n.tables, t)
-		h.mu.Unlock()
+		h.locked(func() {
+			if n.picks == nil {
+				n.picks, n.dealt = picks, h.deal(picks)
+			}
+			n.tables = append(n.tables, t)
+		})
 	}
 	if err := h.game.JoinRoyal(ctx, t.id, p.ID); err != nil {
 		return err
@@ -838,11 +874,14 @@ func (h *Hub) Join(ctx context.Context, p Player) error {
 func (h *Hub) Leave(ctx context.Context, id int64) error {
 	h.op.Lock()
 	defer h.op.Unlock()
-	h.mu.Lock()
-	t, m := h.mine(id)
-	n := h.night // set, with a seat
-	begun := m != nil && (n.phase != play.RoyalLobby || !h.now().Before(n.start))
-	h.mu.Unlock()
+	var t *table
+	var m *member
+	begun := false
+	h.locked(func() {
+		t, m = h.mine(id)
+		n := h.night // set, with a seat
+		begun = m != nil && (n.phase != play.RoyalLobby || !h.now().Before(n.start))
+	})
 	if m == nil {
 		return nil
 	}
@@ -866,20 +905,22 @@ func (h *Hub) Leave(ctx context.Context, id int64) error {
 // tournament nobody is left in, and nobody may come back to, ends. A start that fails part way is tried again whole:
 // each player keeps the seat and the run it gave them (play.StartRoyal).
 func (h *Hub) begin(ctx context.Context, now time.Time) error {
-	h.mu.Lock()
-	n := h.night
-	lobbies := slices.Clone(n.tables)
+	var n *night
+	var lobbies []*table
 	var there, away []*member
-	for _, t := range lobbies {
-		for _, m := range t.members {
-			if h.there(m, now) {
-				there = append(there, m)
-			} else {
-				away = append(away, m)
+	h.locked(func() {
+		n = h.night
+		lobbies = slices.Clone(n.tables)
+		for _, t := range lobbies {
+			for _, m := range t.members {
+				if h.there(m, now) {
+					there = append(there, m)
+				} else {
+					away = append(away, m)
+				}
 			}
 		}
-	}
-	h.mu.Unlock()
+	})
 	// As many as hold everyone of the lobbies, those away too: a seat is kept for each (nobody there, but some may
 	// come back: a game runs for them).
 	k := (len(there) + len(away) + play.RoyalSize - 1) / play.RoyalSize
@@ -905,14 +946,14 @@ func (h *Hub) begin(ctx context.Context, now time.Time) error {
 	}
 	// Everyone's seat in memory as the database has it now, before any table starts: should a start fail, the next
 	// try finds each player where they were moved.
-	h.mu.Lock()
-	for _, t := range lobbies {
-		t.members = moved[t]
-		for _, m := range t.members {
-			h.seats[m.ID] = seat{t, m}
+	h.locked(func() {
+		for _, t := range lobbies {
+			t.members = moved[t]
+			for _, m := range t.members {
+				h.seats[m.ID] = seat{t, m}
+			}
 		}
-	}
-	h.mu.Unlock()
+	})
 	for _, t := range lobbies[k:] {
 		if err := h.empty(ctx, t); err != nil {
 			return err
@@ -1005,17 +1046,18 @@ func (h *Hub) empty(ctx context.Context, t *table) error {
 // every one is full (nobody is shut out while the door is open). The questions before the one showing count as not
 // answered; the one showing is theirs to answer in the time it has left. Called with op held.
 func (h *Hub) late(ctx context.Context, p Player, now time.Time) error {
-	h.mu.Lock()
-	n := h.night
+	var n *night
 	var t *table
-	if n.open() {
-		for _, x := range n.tables {
-			if t == nil || len(x.members) < len(t.members) {
-				t = x
+	h.locked(func() {
+		n = h.night
+		if n.open() {
+			for _, x := range n.tables {
+				if t == nil || len(x.members) < len(t.members) {
+					t = x
+				}
 			}
 		}
-	}
-	h.mu.Unlock()
+	})
 	if t == nil {
 		return ErrShut
 	}
@@ -1049,40 +1091,55 @@ func (h *Hub) late(ctx context.Context, p Player, now time.Time) error {
 // already: no error, while its question or its answer shows.
 func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) error {
 	at := h.now() // its time is to when it came, not to when the hub (busy with others') takes it
-	h.mu.Lock()
-	t, m := h.mine(id)
-	night := h.night
-	if m != nil && n == night.n && m.inQ && m.answered &&
-		(night.phase == play.RoyalQuestion || night.phase == play.RoyalReveal) {
-		h.mu.Unlock()
+	var t *table
+	var m *member
+	var night *night
+	var run int64
+	var d bank.Dealt
+	var refused error
+	h.locked(func() {
+		t, m = h.mine(id)
+		night = h.night
+		switch {
+		case m != nil && n == night.n && m.inQ && m.answered &&
+			(night.phase == play.RoyalQuestion || night.phase == play.RoyalReveal):
+			refused = errAgain
+		case m == nil || night.phase != play.RoyalQuestion || night.closing || n != night.n || !m.inQ || m.answered || m.sending:
+			refused = ErrNotNow
+		case len(raw) == 0 || string(raw) == "null":
+			refused = play.ErrBadAnswer
+		default:
+			m.sending, night.sending = true, night.sending+1
+			run, d = m.run, night.dealt[n]
+		}
+	})
+	if refused == errAgain {
 		return nil
 	}
-	if m == nil || night.phase != play.RoyalQuestion || night.closing || n != night.n || !m.inQ || m.answered || m.sending {
-		h.mu.Unlock()
-		return ErrNotNow
+	if refused != nil {
+		return refused
 	}
-	if len(raw) == 0 || string(raw) == "null" {
-		h.mu.Unlock()
-		return play.ErrBadAnswer
-	}
-	m.sending, night.sending = true, night.sending+1
-	run, d := m.run, night.dealt[n]
-	h.mu.Unlock()
 
-	res, err := h.game.AnswerRoyal(ctx, id, run, n, raw, at, d)
-
-	h.mu.Lock()
-	m.sending, night.sending = false, night.sending-1
-	if err == nil {
-		// How it went shows to the others with the answer (reveal), not before.
-		m.answered, m.given, m.res, m.idle = true, res.Given, res, false
-		h.touch(t)
-		if h.allIn(h.now()) {
-			night.closing = true // the answer shows now: the clock moves on (tick)
-		}
-	}
-	move := night.sending == 0 && night.closing
-	h.mu.Unlock()
+	var res play.Result
+	var err error
+	move := false
+	func() {
+		// However the write ends (a panic too), the answer is on its way no more: the clock never waits on it for ever.
+		defer h.locked(func() {
+			m.sending, night.sending = false, night.sending-1
+			if err == nil {
+				// How it went shows to the others with the answer (reveal), not before.
+				m.answered, m.given, m.res, m.idle = true, res.Given, res, false
+				h.touch(t)
+				if h.allIn(h.now()) {
+					night.closing = true // the answer shows now: the clock moves on (tick)
+				}
+			}
+			move = night.sending == 0 && night.closing
+		})
+		err = errBroke // until the write says otherwise
+		res, err = h.game.AnswerRoyal(ctx, id, run, n, raw, at, d)
+	}()
 
 	if err == nil && res.State.Done {
 		h.later([]int64{id}, true)

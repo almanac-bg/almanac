@@ -18,7 +18,7 @@ import (
 // seconds while it waits. Draining, the server starts no live duel (whoever asks for one waits, told why, and finds
 // it on the new server) and no game in a room, and says it's ready once nothing is under way: each live duel waited
 // for to its end, by its own clock (live.Hub.Left: however long its questions, live.Longest at most), the rooms' games
-// for drainCap at most. Around Роял, from drainLead before its lobby opens until its games are over, it doesn't drain
+// for drainCap at most (a game cut then goes on after the restart, where it was: room.Hub.Restore). Around Роял, from drainLead before its lobby opens until its games are over, it doesn't drain
 // at all: the restart waits for the evening to pass. A drain nobody asks about for drainLease ends by itself (a deploy
 // that died midway), and DELETE /api/drain ends it at once.
 const (
@@ -106,15 +106,43 @@ func (s *Server) drainHandler(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, s.drainStep(&asked))
 }
 
-// saveRooms keeps the rooms open as the server stops, for the next run to open again (room.Hub.Save).
+// roomsSaved is where the rooms' file stands: one save at a time, and the hub's changes it holds.
+type roomsSaved struct {
+	mu      sync.Mutex
+	changes uint64
+}
+
+// saveRoomsChanged saves the rooms if they've changed since they were last saved: every roomsEvery, so that a crash
+// loses no more of them than that (the game under way in each, every answer in it).
+func (s *Server) saveRoomsChanged() {
+	if s.rooms.Changes() != s.roomsSaved.changesNow() {
+		s.saveRooms()
+	}
+}
+
+func (r *roomsSaved) changesNow() uint64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.changes
+}
+
+// saveRooms keeps the rooms open, with their games as they stand, for the next run to open again (room.Hub.Save):
+// written whole beside the file, synced, then put in its place, so that a crash or a power cut at any moment leaves
+// the last save or this one, never half of one.
 func (s *Server) saveRooms() {
 	if s.cfg.RoomsFile == "" {
 		return
 	}
+	s.roomsSaved.mu.Lock()
+	defer s.roomsSaved.mu.Unlock()
+	changes := s.rooms.Changes() // before the save: a change during it is saved next time
 	tmp := s.cfg.RoomsFile + ".part"
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err == nil {
 		err = s.rooms.Save(f)
+		if err == nil {
+			err = f.Sync()
+		}
 		if cerr := f.Close(); err == nil {
 			err = cerr
 		}
@@ -124,10 +152,13 @@ func (s *Server) saveRooms() {
 	}
 	if err != nil {
 		slog.Error("saving rooms", "err", err)
+		return
 	}
+	s.roomsSaved.changes = changes
 }
 
-// restoreRooms opens again the rooms the last run of the server kept, once.
+// restoreRooms opens again the rooms the last run of the server kept. The file stays: until the next save, it is what
+// a crash would come back to.
 func (s *Server) restoreRooms() {
 	if s.cfg.RoomsFile == "" {
 		return
@@ -142,7 +173,6 @@ func (s *Server) restoreRooms() {
 	}
 	n, err := s.rooms.Restore(f)
 	f.Close()
-	os.Remove(s.cfg.RoomsFile)
 	if err != nil {
 		slog.Error("restoring rooms", "err", err)
 		return

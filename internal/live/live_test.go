@@ -14,6 +14,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/bank/banktest"
 	"github.com/almanac-bg/almanac/internal/play"
+	"github.com/almanac-bg/almanac/internal/safe"
 	"github.com/almanac-bg/almanac/internal/store"
 	"github.com/almanac-bg/almanac/internal/store/storetest"
 )
@@ -775,6 +776,62 @@ func TestLeft(t *testing.T) {
 		}
 		if l := w.hub.Left(); l != 0 {
 			t.Fatalf("over, %v left", l)
+		}
+	})
+}
+
+// A duel's clock that panics (package safe stops it) calls the duel off, without a result, and frees its players; a
+// wait for a duel whose clock panics ends, told so, and the player may ask again. The process goes on.
+func TestABrokenClock(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := setup(t)
+		ana, bo, vi := w.user(), w.user(), w.user()
+		sa := w.hub.Seek(ana)
+		sb := w.hub.Seek(bo)
+		<-sa.Done()
+		<-sb.Done()
+		m := sa.Match
+		fa, _ := m.Follow(ana.ID)
+		fb, _ := m.Follow(bo.ID)
+		defer m.Unfollow(fa)
+		defer m.Unfollow(fb)
+		if v := next(m, ana.ID); v.Phase != PhaseQuestion {
+			t.Fatalf("the first question: %+v", v)
+		}
+		m.mu.Lock()
+		m.after(time.Second, func() { panic("the clock broke") })
+		m.mu.Unlock()
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		if v := m.View(ana.ID); v.Phase != PhaseOff {
+			t.Fatalf("the broken duel: %+v", v)
+		}
+		if w.hub.Playing(ana.ID) || w.hub.Playing(bo.ID) {
+			t.Fatal("its players are still in it")
+		}
+		if o := w.outcome(m.ID()); o != "expired" {
+			t.Fatalf("kept as %q", o)
+		}
+
+		// Vi's wait breaks as it runs out: the seek ends, and Vi isn't left waiting or being matched.
+		sv := w.hub.Seek(vi)
+		w.hub.mu.Lock()
+		sv.timer.Stop()
+		sv.timer = safe.AfterFunc(time.Second, "live: a wait for a duel", func() { panic("the wait broke") }, sv.broken)
+		w.hub.mu.Unlock()
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		select {
+		case <-sv.Done():
+		default:
+			t.Fatal("the broken wait never ended")
+		}
+		if sv.Err == nil {
+			t.Fatal("the broken wait ended without an error")
+		}
+		sv.settle(nil, nil) // a second settle changes nothing
+		if sv.Err == nil {
+			t.Fatal("settled twice")
 		}
 	})
 }

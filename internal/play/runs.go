@@ -107,7 +107,7 @@ func (g *Game) StartDay(ctx context.Context, userID int64) (State, error) {
 		return err
 	})
 	if err == nil && ended {
-		err = g.finished(ctx, userID, runID)
+		g.finished(ctx, userID, runID)
 	}
 	return s, err
 }
@@ -170,7 +170,7 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 		return err
 	})
 	if err == nil && ended != 0 {
-		err = g.finished(ctx, userID, ended)
+		g.finished(ctx, userID, ended)
 	}
 	return s, err
 }

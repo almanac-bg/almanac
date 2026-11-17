@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/push"
+	"github.com/almanac-bg/almanac/internal/safe"
 )
 
 // Notifications go out through a queue in the database (push_queue): notify saves a row for each player, in its own
@@ -335,11 +336,7 @@ func (s *Server) sendTo(ctx context.Context, d device, m push.Message) error {
 // deliver sends a row of the queue to the player's devices, and keeps what came of it: the row done (or tried again
 // later), the devices gone or failing forgotten or counted, a day's reminder's devices reached.
 func (s *Server) deliver(ctx context.Context, j queued) {
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("push: panic", "err", r, "row", j.id)
-		}
-	}()
+	defer safe.Recover("push: a send") // the row's lease runs out, and it's tried again
 	now := s.game.Now()
 	m, ok, err := s.message(ctx, j, now)
 	var devices []device

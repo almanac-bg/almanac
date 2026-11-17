@@ -2,11 +2,13 @@ package play
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
+	"github.com/almanac-bg/almanac/internal/safe"
 )
 
 // snapshot keeps a count that goes over everyone's answers (the crowds, the questions' hardness, the boards of
@@ -85,6 +87,9 @@ func (s *snapshot[T]) refresh(ctx context.Context, now time.Time, b *bank.Bank, 
 	}
 }
 
+// errCountBroke is a count that panicked (stopped and reported by package safe).
+var errCountBroke = errors.New("the count broke off")
+
 // start starts a count, unless one is under way. Called with the lock held.
 func (s *snapshot[T]) start(now time.Time, b *bank.Bank, count countFunc[T]) {
 	if s.running != nil {
@@ -93,7 +98,11 @@ func (s *snapshot[T]) start(now time.Time, b *bank.Bank, count countFunc[T]) {
 	done := make(chan struct{})
 	s.running = done
 	go func() {
-		v, err := count(context.Background(), now, b)
+		var v T
+		var err error
+		if !safe.Do("counting everyone's answers", func() { v, err = count(context.Background(), now, b) }) {
+			err = errCountBroke // a count that panicked is a count that failed: the next asks again
+		}
 		if err != nil {
 			slog.Warn("counting everyone's answers", "err", err)
 		}

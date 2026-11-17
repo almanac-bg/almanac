@@ -136,7 +136,7 @@ func (g *Game) StartMistakes(ctx context.Context, userID int64) (State, error) {
 		return err
 	})
 	if err == nil && ended != 0 {
-		err = g.finished(ctx, userID, ended)
+		g.finished(ctx, userID, ended)
 	}
 	return s, err
 }

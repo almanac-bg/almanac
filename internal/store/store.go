@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/almanac-bg/almanac/internal/safe"
 	_ "modernc.org/sqlite" // the driver: pure Go, so the program stays one static file
 )
 
@@ -101,7 +102,7 @@ func Open(path string) (*DB, error) {
 	}
 	ctx, stop := context.WithCancel(context.Background())
 	db.stop = stop
-	go db.keepOptimized(ctx)
+	go safe.Loop(ctx, "store: the statistics", db.keepOptimized)
 	return db, nil
 }
 

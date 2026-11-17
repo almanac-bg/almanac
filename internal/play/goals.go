@@ -232,6 +232,10 @@ func (g *Game) GoalsOf(ctx context.Context, userID int64) ([]DayGoal, error) {
 	if err != nil {
 		return nil, err
 	}
+	kept, err := keptGoals(ctx, g.DB.Read, userID, day)
+	if err != nil {
+		return nil, err
+	}
 	b := g.Bank()
 	now := store.Ms(g.Now())
 	out := []DayGoal{}
@@ -242,7 +246,7 @@ func (g *Game) GoalsOf(ctx context.Context, userID int64) ([]DayGoal, error) {
 		}
 		d := DayGoal{Goal: goal, Progress: min(k.reached(t, arg), goal.Target), XP: GoalXP[k.tier]}
 		d.Done = d.Progress >= goal.Target
-		if d.Done {
+		if d.Done && !kept[id] { // the writer only for a goal newly done: a look at the goals reads alone
 			if _, err := g.DB.Write.ExecContext(ctx, `INSERT OR IGNORE INTO goals_done (user_id, day, goal, at, xp, seen)
 				VALUES (?, ?, ?, ?, ?, 0)`, userID, day, id, now, d.XP); err != nil {
 				return nil, err
@@ -348,6 +352,24 @@ func storedGoals(ctx context.Context, db *sql.DB, userID int64, day string) ([]s
 		ids = append(ids, id)
 	}
 	return ids, rows.Err()
+}
+
+// keptGoals are the player's goals of a day kept as done (goals_done).
+func keptGoals(ctx context.Context, db *sql.DB, userID int64, day string) (map[string]bool, error) {
+	rows, err := db.QueryContext(ctx, `SELECT goal FROM goals_done WHERE user_id = ? AND day = ?`, userID, day)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	kept := map[string]bool{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		kept[id] = true
+	}
+	return kept, rows.Err()
 }
 
 // tally is how far a player's day has got, by every measure a goal has.

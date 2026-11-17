@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	mrand "math/rand/v2"
 	"strings"
 	"time"
@@ -558,7 +559,19 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 	var challenge sql.NullInt64 // a challenge's duel: its taker against the one who sent it (challenges.go)
 	var outcome string
 	both := !ghost // a person on each side, both with a result
+	type run struct{ user, run int64 }
+	var followed []run
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		followed = nil
+		// follow notes, with the result, that what follows a side's run is due again (after.go): a duel won finishes
+		// goals too. Not for the run that settles the duel: its own follow-up is under way.
+		follow := func(user, r int64) error {
+			if r == finished {
+				return nil
+			}
+			followed = append(followed, run{user, r})
+			return g.afterDue(tx, r)
+		}
 		other := "d.b_run"
 		if ghost {
 			other = "d.ghost_run"
@@ -645,6 +658,9 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 		}
 		news = append(news, DuelNews{To: a.id, Kind: "result", From: b.name, Outcome: outcomeOf(score), Delta: da,
 			Friendly: !rated, DuelID: duelID, Seen: a.run == finished})
+		if err := follow(a.id, a.run); err != nil {
+			return err
+		}
 		if !both {
 			outcome = outcomeOf(score)
 			_, err = tx.Exec(`UPDATE duels SET ended_at = ?, outcome = ?, a_delta = ?, a_rating = ?, rated = ? WHERE id = ?`,
@@ -665,6 +681,9 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 		}
 		news = append(news, DuelNews{To: b.id, Kind: "result", From: a.name, Outcome: outcomeOf(1 - score), Delta: db,
 			Friendly: !rated, DuelID: duelID, Seen: b.run == finished})
+		if err := follow(b.id, b.run); err != nil {
+			return err
+		}
 		outcome := map[float64]string{1: "a", 0: "b", 0.5: "draw"}[score]
 		_, err = tx.Exec(`UPDATE duels SET ended_at = ?, outcome = ?, a_delta = ?, b_delta = ?, a_rating = ?, b_rating = ?,
 			rated = ? WHERE id = ?`, now, outcome, da, db, ra, rb, rated, duelID)
@@ -678,11 +697,15 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 			return err
 		}
 	}
-	for _, n := range news {
-		if err := g.afterRun(ctx, n.To); err != nil { // a duel won finishes goals too
-			return err
+	// A duel won finishes goals too: what follows each side's run is done again, but the run that has just settled the
+	// duel, whose own follow-up this is. What fails is left to the sweep (AfterDue): the duel's result is kept.
+	for _, f := range followed {
+		if err := g.after(ctx, f.user, f.run); err != nil {
+			slog.Error("after a duel", "duel", duelID, "run", f.run, "err", err)
 		}
-		if g.DuelNews != nil {
+	}
+	if g.DuelNews != nil {
+		for _, n := range news {
 			g.DuelNews(ctx, n)
 		}
 	}
