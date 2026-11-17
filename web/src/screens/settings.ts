@@ -506,6 +506,8 @@ export function signIn(primary = true): Child {
   const email = signal("");
   const code = signal("");
   const sent = signal(false);
+  // How long the code sent is: the server says (account.CodeDigits, or LongCodeDigits).
+  const digits = signal(6);
   const busy = signal(false);
   const error = signal("");
   // The code sent can't be used any more (its tries used up, or its time): a new one is the way on.
@@ -540,8 +542,9 @@ export function signIn(primary = true): Child {
   };
   const send = () =>
     run(async () => {
-      const r = await api<{ again?: number }>("POST", "/api/auth/code", { email: email.peek() });
+      const r = await api<{ again?: number; digits?: number }>("POST", "/api/auth/code", { email: email.peek() });
       countDown(r.again ?? 60);
+      digits.set(r.digits ?? 6);
       code.set("");
       dead.set(false);
       sent.set(true);
@@ -576,14 +579,19 @@ export function signIn(primary = true): Child {
           { class: "field" },
           h("span", null, "Код"),
           h("input", {
-            class: "code",
+            // A long code (past many wrong ones for the address: account.LongCodeDigits) in a smaller hand, to fit.
+            class: () => (digits() > 6 ? "code long" : "code"),
             inputmode: "numeric",
             autocomplete: "one-time-code",
-            pattern: "[0-9]{6}",
-            maxlength: 6,
+            pattern: () => `[0-9]{${digits()}}`,
             required: true,
             value: code,
-            oninput: (e: Event) => code.set((e.target as HTMLInputElement).value.replace(/\D/g, "")),
+            // Only the digits, however it was typed or pasted (a long code comes in fours, with spaces).
+            oninput: (e: Event) => {
+              const el = e.target as HTMLInputElement;
+              el.value = el.value.replace(/\D/g, "").slice(0, digits.peek());
+              code.set(el.value);
+            },
             ref: (el) => queueMicrotask(() => el.focus()),
           }),
         ),

@@ -1,5 +1,10 @@
 // Package mail sends the game's emails through an outbox: a message is saved first and sent by a worker that retries
 // until it goes out, so a slow or failing mail server never holds up a player, and nothing is lost on a restart.
+//
+// A message worth sending only for a while (a sign-in code: Urgent) goes before every other, and is dropped unsent once
+// its time is out, so that a queue of other mail, or a flood of codes, never delivers a code that no longer works. One
+// message is sent at a time, and once the mail server has taken it (its DATA accepted) it counts as sent, whatever
+// happens after: a mail goes once.
 package mail
 
 import (
@@ -21,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/store"
@@ -46,6 +52,9 @@ type Outbox struct {
 	Sender Sender
 	From   string // "АЛМАНАХ <no-reply@almanac.bg>"
 	wake   chan struct{}
+	// sending is held while a message is picked and sent: the worker (Run) and a Flush (at a shutdown) never send the
+	// same message at once.
+	sending sync.Mutex
 }
 
 func NewOutbox(db *store.DB, sender Sender, from string) *Outbox {
@@ -63,6 +72,28 @@ func (o *Outbox) Enqueue(tx *sql.Tx, m Message) error {
 	return err
 }
 
+// Urgent saves a message worth sending only until a time (a sign-in code), inside the caller's transaction: it goes
+// out before any other mail, and is dropped unsent once that time is past. It says the message's id, for Drop.
+func (o *Outbox) Urgent(tx *sql.Tx, m Message, until time.Time) (int64, error) {
+	body, err := json.Marshal(m)
+	if err != nil {
+		return 0, err
+	}
+	now := store.Now()
+	res, err := tx.Exec(`INSERT INTO outbox (message, next_at, created_at, urgent, expires_at) VALUES (?, ?, ?, 1, ?)`,
+		string(body), now, now, store.Ms(until))
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// Drop takes a message out of the queue if it hasn't gone yet: a code replaced by a newer one.
+func (o *Outbox) Drop(tx *sql.Tx, id int64) error {
+	_, err := tx.Exec(`DELETE FROM outbox WHERE id = ?`, id)
+	return err
+}
+
 // Wake tells the worker there's mail, after the transaction that queued it has committed.
 func (o *Outbox) Wake() {
 	select {
@@ -74,8 +105,14 @@ func (o *Outbox) Wake() {
 // retries are the waits between attempts; after the last, a message is given up on.
 var retries = []time.Duration{10 * time.Second, time.Minute, 5 * time.Minute, 30 * time.Minute, 2 * time.Hour}
 
-// Flush sends whatever is due now (before a shutdown, and in tests).
+// Flush sends whatever is due now (before a shutdown, and in tests), the urgent first, once the mail out of time is
+// dropped.
 func (o *Outbox) Flush(ctx context.Context) {
+	if res, err := o.DB.Write.ExecContext(ctx, `DELETE FROM outbox WHERE expires_at <= ?`, store.Now()); err == nil {
+		if n, _ := res.RowsAffected(); n > 0 {
+			slog.Warn("mail dropped: its time was out before it could go", "n", n)
+		}
+	}
 	for o.sendDue(ctx) {
 	}
 }
@@ -95,13 +132,16 @@ func (o *Outbox) Run(ctx context.Context) {
 	}
 }
 
-// sendDue sends the oldest message that's due, and says whether there was one.
+// sendDue sends the message due first (the urgent before the rest, then the oldest), and says whether there was one.
 func (o *Outbox) sendDue(ctx context.Context) bool {
+	o.sending.Lock()
+	defer o.sending.Unlock()
 	var id int64
 	var body string
 	var attempts int
-	err := o.DB.Write.QueryRowContext(ctx,
-		`SELECT id, message, attempts FROM outbox WHERE next_at <= ? ORDER BY next_at LIMIT 1`, store.Now(),
+	now := store.Now()
+	err := o.DB.Write.QueryRowContext(ctx, `SELECT id, message, attempts FROM outbox
+		WHERE next_at <= ? AND (expires_at IS NULL OR expires_at > ?) ORDER BY urgent DESC, next_at LIMIT 1`, now, now,
 	).Scan(&id, &body, &attempts)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) && ctx.Err() == nil {
@@ -217,7 +257,10 @@ func (s *SMTP) Send(ctx context.Context, from string, m Message) error {
 	if err := w.Close(); err != nil {
 		return err
 	}
-	return c.Quit()
+	// The server has taken the message: it's sent. A failed goodbye after that isn't a failed send, which would send
+	// the message again.
+	_ = c.Quit()
+	return nil
 }
 
 // mailAddress is the bare address of "Name <address>".

@@ -31,22 +31,43 @@ func setup(t *testing.T) (*Accounts, *store.DB, *mailer.Outbox, *inbox) {
 	return &Accounts{DB: db, Outbox: out, Secret: []byte("test secret")}, db, out, in
 }
 
-var codePattern = regexp.MustCompile(`\b(\d{6})\b`)
+// codePattern finds a code in a mail: six digits, or twelve in fours.
+var codePattern = regexp.MustCompile(`\b(\d{4} \d{4} \d{4}|\d{6})\b`)
 
-// code sends a code to email and reads it from the mail that went out.
-func code(t *testing.T, a *Accounts, out *mailer.Outbox, in *inbox, email string) string {
+// code sends a code to email for a browser of its own, and reads it from the mail that went out: what that browser
+// signs in with.
+func code(t *testing.T, a *Accounts, out *mailer.Outbox, in *inbox, email string) Proof {
 	t.Helper()
-	if err := a.SendCode(t.Context(), email); err != nil {
+	asked, err := a.SendCode(t.Context(), email, "")
+	if err != nil {
 		t.Fatal(err)
 	}
+	return Proof{Email: email, Code: read(t, out, in, email, asked.Digits), Asked: asked.Token}
+}
+
+// read is the code in the last mail to email, of so many digits.
+func read(t *testing.T, out *mailer.Outbox, in *inbox, email string, digits int) string {
+	t.Helper()
 	out.Flush(t.Context())
+	if len(in.got) == 0 {
+		t.Fatal("no mail")
+	}
 	m := in.got[len(in.got)-1]
 	in.got = nil
 	found := codePattern.FindStringSubmatch(m.Text)
-	if want, _ := NormalEmail(email); m.To != want || found == nil {
+	if want, _ := NormalEmail(email); m.To != want || found == nil || len(onlyDigits(found[1])) != digits ||
+		!strings.Contains(m.Subject, found[1]) {
 		t.Fatalf("mail %+v", m)
 	}
 	return found[1]
+}
+
+// wrongFor is a code that isn't c.
+func wrongFor(c string) string {
+	if onlyDigits(c) == "000000" {
+		return "111111"
+	}
+	return "000000"
 }
 
 func TestGuestKeepsAccountWithEmail(t *testing.T) {
@@ -60,15 +81,18 @@ func TestGuestKeepsAccountWithEmail(t *testing.T) {
 		t.Fatalf("the guest's session gave %v", u)
 	}
 	c := code(t, a, out, in, " Me@Example.com ")
-	if _, _, err := a.Verify(ctx, "me@example.com", "000000", token); !errors.Is(err, ErrBadCode) && c != "000000" {
+	wrong := c
+	wrong.Code = wrongFor(c.Code)
+	if _, _, err := a.Verify(ctx, wrong, token); !errors.Is(err, ErrBadCode) {
 		t.Fatalf("a wrong code: %v", err)
 	}
-	u, token2, err := a.Verify(ctx, "ME@example.com", c, token)
+	c.Email = "ME@example.com"
+	u, token2, err := a.Verify(ctx, c, token)
 	if err != nil || u.ID != guest.ID || u.Email != "me@example.com" {
 		t.Fatalf("verified %+v, %v", u, err)
 	}
 	// A code works once.
-	if _, _, err := a.Verify(ctx, "me@example.com", c, ""); !errors.Is(err, ErrCodeExpired) {
+	if _, _, err := a.Verify(ctx, c, ""); !errors.Is(err, ErrCodeExpired) {
 		t.Fatalf("a used code: %v", err)
 	}
 	if u, _ := a.Session(ctx, token2); u == nil || u.Email != "me@example.com" {
@@ -89,7 +113,7 @@ func TestGuestKeepsAccountWithEmail(t *testing.T) {
 func TestGuestSigningInMergesIntoAccount(t *testing.T) {
 	a, db, out, in := setup(t)
 	ctx := t.Context()
-	owner, _, _ := a.Verify(ctx, "x@example.com", code(t, a, out, in, "x@example.com"), "")
+	owner, _, _ := a.Verify(ctx, code(t, a, out, in, "x@example.com"), "")
 	guest, guestSession, _ := a.Guest(ctx)
 	var merged [2]int64
 	a.Merge = append(a.Merge, func(tx *sql.Tx, from, to int64) error {
@@ -97,8 +121,7 @@ func TestGuestSigningInMergesIntoAccount(t *testing.T) {
 		return nil
 	})
 	in.got = nil
-	_, _ = db.Write.Exec(`UPDATE email_codes SET sent_at = 0`) // past the wait between codes
-	u, _, err := a.Verify(ctx, "x@example.com", code(t, a, out, in, "x@example.com"), guestSession)
+	u, _, err := a.Verify(ctx, code(t, a, out, in, "x@example.com"), guestSession)
 	if err != nil || u.ID != owner.ID {
 		t.Fatalf("signed in as %+v, %v", u, err)
 	}
@@ -232,7 +255,7 @@ func TestHandoff(t *testing.T) {
 
 	// A guest brought to a profile: not joined (only signing in by email joins them), and the link still works for
 	// the browser it was meant for.
-	owner, ownerSession, _ := a.Verify(ctx, "h@example.com", code(t, a, out, in, "h@example.com"), "")
+	owner, ownerSession, _ := a.Verify(ctx, code(t, a, out, in, "h@example.com"), "")
 	token, _ = a.Handoff(ctx, here.ID)
 	if _, _, err = a.TakeHandoff(ctx, token, ownerSession); !errors.Is(err, ErrHandoffSignedIn) || !exists(here.ID) {
 		t.Fatalf("a guest to a profile: %v", err)
@@ -266,7 +289,7 @@ func TestHandoffTakeover(t *testing.T) {
 		t.Fatal(err)
 	}
 	notified(t, db, maker.ID, opened, "opened")
-	u, profile, err := a.Verify(ctx, "victim@example.com", code(t, a, out, in, "victim@example.com"), opened)
+	u, profile, err := a.Verify(ctx, code(t, a, out, in, "victim@example.com"), opened)
 	if err != nil || u.ID != maker.ID || u.Email != "victim@example.com" {
 		t.Fatalf("the game given, kept with an email: %+v %v", u, err)
 	}
@@ -303,7 +326,7 @@ func TestProfileEndsOtherSessions(t *testing.T) {
 	notified(t, db, guest.ID, elsewhere, "elsewhere")
 	notified(t, db, guest.ID, "", "untied")
 
-	u, session, err := a.Verify(ctx, "me@example.com", code(t, a, out, in, "me@example.com"), here)
+	u, session, err := a.Verify(ctx, code(t, a, out, in, "me@example.com"), here)
 	if err != nil || u.ID != guest.ID {
 		t.Fatalf("verified %+v %v", u, err)
 	}
@@ -322,7 +345,7 @@ func TestProfileEndsOtherSessions(t *testing.T) {
 	}
 
 	// Signing in to the profile elsewhere ends nothing: only a guest's sessions end, as the guest becomes a profile.
-	_, other, _ := a.Verify(ctx, "me@example.com", code(t, a, out, in, "me@example.com"), "")
+	_, other, _ := a.Verify(ctx, code(t, a, out, in, "me@example.com"), "")
 	if s, _ := a.Session(ctx, session); s == nil {
 		t.Fatal("a sign-in elsewhere ended this session")
 	}
@@ -339,7 +362,7 @@ func TestSignOut(t *testing.T) {
 	sessions := map[string]string{}
 	var id int64
 	for _, name := range []string{"phone", "laptop", "tablet"} {
-		u, s, err := a.Verify(ctx, "me@example.com", code(t, a, out, in, "me@example.com"), "")
+		u, s, err := a.Verify(ctx, code(t, a, out, in, "me@example.com"), "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -373,13 +396,15 @@ func TestCodesLimits(t *testing.T) {
 	ctx := t.Context()
 	c := code(t, a, out, in, "y@example.com")
 	var soon TooSoon
-	if err := a.SendCode(ctx, "y@example.com"); !errors.Is(err, ErrTooSoon) || !errors.As(err, &soon) ||
+	if _, err := a.SendCode(ctx, "y@example.com", c.Asked); !errors.Is(err, ErrTooSoon) || !errors.As(err, &soon) ||
 		soon.Wait <= 0 || soon.Wait > CodeEvery {
 		t.Fatalf("a second code at once: %v", err)
 	}
 	// Each wrong try says how many are left; the last one says the code is dead.
 	for i := range CodeTries {
-		_, _, err := a.Verify(ctx, "y@example.com", "x", "")
+		guess := c
+		guess.Code = wrongFor(c.Code)
+		_, _, err := a.Verify(ctx, guess, "")
 		var wrong WrongCode
 		if i < CodeTries-1 {
 			if !errors.Is(err, ErrBadCode) || !errors.As(err, &wrong) || wrong.Left != CodeTries-1-i {
@@ -389,18 +414,155 @@ func TestCodesLimits(t *testing.T) {
 			t.Fatalf("the last wrong try: %v", err)
 		}
 	}
-	if _, _, err := a.Verify(ctx, "y@example.com", c, ""); !errors.Is(err, ErrCodeTries) {
+	if _, _, err := a.Verify(ctx, c, ""); !errors.Is(err, ErrCodeTries) {
 		t.Fatalf("the right code after %d wrong tries: %v", CodeTries, err)
 	}
-	// A dead code holds no new one back.
-	c = code(t, a, out, in, "y@example.com")
-	if _, _, err := a.Verify(ctx, "y@example.com", c, ""); err != nil {
+	// A dead code holds no new one back, in the same browser.
+	asked, err := a.SendCode(ctx, "y@example.com", c.Asked)
+	if err != nil {
+		t.Fatalf("a new code once the last is dead: %v", err)
+	}
+	c = Proof{Email: "y@example.com", Code: read(t, out, in, "y@example.com", CodeDigits), Asked: asked.Token}
+	if _, _, err := a.Verify(ctx, c, ""); err != nil {
 		t.Fatalf("the new code: %v", err)
 	}
+	// Nor does a live one to another address: an address mistyped is put right at once.
+	typo, _ := a.SendCode(ctx, "z@exampel.com", "")
+	if _, err := a.SendCode(ctx, "z@example.com", typo.Token); err != nil {
+		t.Fatalf("a code to the address put right: %v", err)
+	}
 	for _, bad := range []string{"", "no", "a@b", "a b@c.d", "<a@b.c>"} {
-		if err := a.SendCode(ctx, bad); !errors.Is(err, ErrBadEmail) {
+		if _, err := a.SendCode(ctx, bad, ""); !errors.Is(err, ErrBadEmail) {
 			t.Errorf("%q: %v", bad, err)
 		}
+	}
+}
+
+// The lock-out the codes once let through (review 2026-11-17, S3): someone else asks for codes with a player's
+// address and guesses. The player's own code is neither replaced nor used up, and works only in the player's browser.
+func TestCodeIsTheBrowsers(t *testing.T) {
+	a, _, out, in := setup(t)
+	ctx := t.Context()
+	mine := code(t, a, out, in, "me@example.com")
+	theirs := code(t, a, out, in, "me@example.com") // another browser, at once: no wait, nothing of mine touched
+	for range CodeTries {
+		guess := theirs
+		guess.Code = mine.Code // even the right code, from the wrong browser
+		if mine.Code == theirs.Code {
+			guess.Code = wrongFor(mine.Code)
+		}
+		_, _, _ = a.Verify(ctx, guess, "")
+	}
+	for _, p := range []Proof{
+		{Email: mine.Email, Code: mine.Code},                           // no token
+		{Email: mine.Email, Code: mine.Code, Asked: "made-up"},         // a token never given
+		{Email: "you@example.com", Code: mine.Code, Asked: mine.Asked}, // my token, another address
+	} {
+		if _, _, err := a.Verify(ctx, p, ""); !errors.Is(err, ErrCodeExpired) {
+			t.Fatalf("%+v: %v", p, err)
+		}
+	}
+	if u, _, err := a.Verify(ctx, mine, ""); err != nil || u.Email != "me@example.com" {
+		t.Fatalf("my own code, after another's tries: %+v %v", u, err)
+	}
+}
+
+// Past Misses wrong codes for an address, from any browser, its codes are long: nobody is locked out, and guessing
+// gets nowhere. A short code alive then takes no more tries. The count is in the database: a restart keeps it.
+func TestMissesLengthenCodes(t *testing.T) {
+	a, db, out, in := setup(t)
+	ctx := t.Context()
+	mine := code(t, a, out, in, "me@example.com")
+	for i := 0; i < Misses; {
+		theirs := code(t, a, out, in, "me@example.com")
+		for range min(CodeTries, Misses-i) {
+			guess := theirs
+			guess.Code = wrongFor(theirs.Code)
+			_, _, _ = a.Verify(ctx, guess, "")
+			i++
+		}
+	}
+	if _, _, err := a.Verify(ctx, mine, ""); !errors.Is(err, ErrCodeTries) {
+		t.Fatalf("a short code past the misses: %v", err)
+	}
+	a = &Accounts{DB: db, Outbox: out, Secret: a.Secret} // as after a restart
+	asked, err := a.SendCode(ctx, "me@example.com", mine.Asked)
+	if err != nil || asked.Digits != LongCodeDigits {
+		t.Fatalf("the code after the misses: %+v %v", asked, err)
+	}
+	long := Proof{Email: "me@example.com", Code: read(t, out, in, "me@example.com", LongCodeDigits), Asked: asked.Token}
+	guess := long
+	guess.Code = "000000000000"
+	if _, _, err := a.Verify(ctx, guess, ""); !errors.As(err, new(WrongCode)) {
+		t.Fatalf("a wrong long code: %v", err)
+	}
+	if u, _, err := a.Verify(ctx, long, ""); err != nil || u.Email != "me@example.com" {
+		t.Fatalf("the long code, spaced as the mail has it: %+v %v", u, err)
+	}
+	// Another address is as it was; this one's codes are short again once the stretch is over.
+	if c := code(t, a, out, in, "you@example.com"); len(c.Code) != CodeDigits {
+		t.Fatalf("another address's code: %q", c.Code)
+	}
+	if _, err := db.Write.Exec(`UPDATE code_misses SET since = ?`, store.Ms(time.Now().Add(-MissesKept))); err != nil {
+		t.Fatal(err)
+	}
+	if c := code(t, a, out, in, "me@example.com"); len(c.Code) != CodeDigits {
+		t.Fatalf("a code once the stretch is over: %q", c.Code)
+	}
+	if err := a.CleanUp(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	_ = db.Read.QueryRow(`SELECT count(*) FROM code_misses`).Scan(&n)
+	if n != 0 {
+		t.Fatalf("%d stretches over still kept", n)
+	}
+}
+
+// A browser asking again replaces its code, and the mail of the last one goes no more if it hasn't gone yet.
+func TestNewCodeDropsTheLastMail(t *testing.T) {
+	a, db, out, in := setup(t)
+	ctx := t.Context()
+	first, err := a.SendCode(ctx, "me@example.com", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = db.Write.Exec(`UPDATE sign_in_codes SET sent_at = 0`) // past the wait between codes
+	second, err := a.SendCode(ctx, "me@example.com", first.Token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := read(t, out, in, "me@example.com", CodeDigits) // the only mail
+	if _, _, err := a.Verify(ctx, Proof{Email: "me@example.com", Code: c, Asked: first.Token}, ""); !errors.Is(err, ErrCodeExpired) {
+		t.Fatalf("the replaced code: %v", err)
+	}
+	if _, _, err := a.Verify(ctx, Proof{Email: "me@example.com", Code: c, Asked: second.Token}, ""); err != nil {
+		t.Fatalf("the new code: %v", err)
+	}
+}
+
+// At most CodesAMinute codes go a minute to new addresses, and apart to addresses with a profile: a flood to made-up
+// addresses doesn't stop players with a profile signing in.
+func TestCodesAMinute(t *testing.T) {
+	a, _, out, in := setup(t)
+	ctx := t.Context()
+	if _, _, err := a.Verify(ctx, code(t, a, out, in, "me@example.com"), ""); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		minute := time.Now().Unix() / 60
+		a.mu.Lock()
+		a.minute, a.mailed = minute, [2]int{CodesAMinute, 1}
+		a.mu.Unlock()
+		_, flooded := a.SendCode(ctx, "new@example.com", "")
+		_, profile := a.SendCode(ctx, "me@example.com", "")
+		if time.Now().Unix()/60 != minute {
+			continue // the minute turned meanwhile: again
+		}
+		if !errors.Is(flooded, ErrCodesBusy) || profile != nil {
+			t.Fatalf("a new address past the most a minute: %v; one with a profile: %v", flooded, profile)
+		}
+		return
 	}
 }
 
@@ -502,7 +664,7 @@ func TestCleanUpIdleGuests(t *testing.T) {
 	exec(`INSERT INTO friends (user_id, friend_id, since) VALUES (?, ?, ?), (?, ?, ?)`, friended, recent, old, recent, friended, old)
 	exec(`INSERT INTO friend_requests (from_id, to_email, at) VALUES (?, 'x@example.com', ?)`, asked, old)
 	c := code(t, a, out, in, "kept@example.com")
-	profile, _, err := a.Verify(ctx, "kept@example.com", c, "")
+	profile, _, err := a.Verify(ctx, c, "")
 	if err != nil {
 		t.Fatal(err)
 	}
