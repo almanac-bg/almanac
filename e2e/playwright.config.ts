@@ -2,10 +2,10 @@
 // phone's size. They start the program on the public sample bank with a fresh database.
 //
 //   npx playwright test -c e2e                     all three engines
-//   npx playwright test -c e2e --project webkit    one
+//   npx playwright test -c e2e --project=webkit    one (with `=`: a spec after it would read as a project)
 import { createHash } from "node:crypto";
-import { mkdirSync, rmSync } from "node:fs";
-import { defineConfig, devices } from "@playwright/test";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { chromium, defineConfig, devices } from "@playwright/test";
 
 // Each checkout (a worktree per session) gets a port of its own, so that several can run their tests at once;
 // E2E_PORT and E2E_DB choose others.
@@ -23,6 +23,12 @@ if (!process.env.TEST_WORKER_INDEX) {
   mkdirSync("test-results", { recursive: true });
 }
 
+// Chromium's tests run in Playwright's own Chromium, or, on a Mac without it, in Brave; BROWSER_PATH names another.
+const brave = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
+const chromiumPath =
+  process.env.BROWSER_PATH ||
+  (!process.env.CI && !existsSync(chromium.executablePath()) && existsSync(brave) ? brave : undefined);
+
 export default defineConfig({
   testDir: ".",
   outputDir: "../test-results/e2e",
@@ -33,11 +39,7 @@ export default defineConfig({
   timeout: 60_000,
   use: { baseURL: `http://127.0.0.1:${port}`, trace: "retain-on-failure", locale: "bg-BG" },
   projects: [
-    // BROWSER_PATH runs Chromium's tests in a local Chromium-based browser instead of Playwright's own.
-    {
-      name: "chromium",
-      use: { ...devices["Pixel 7"], launchOptions: { executablePath: process.env.BROWSER_PATH || undefined } },
-    },
+    { name: "chromium", use: { ...devices["Pixel 7"], launchOptions: { executablePath: chromiumPath } } },
     { name: "webkit", use: { ...devices["iPhone 15"] } },
     {
       name: "firefox",

@@ -12,15 +12,13 @@ import (
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
+	"github.com/almanac-bg/almanac/internal/bank/banktest"
 	"github.com/almanac-bg/almanac/internal/play"
 )
 
 func sample(t *testing.T) func() *bank.Bank {
 	t.Helper()
-	b, problems := bank.Load("../../bank/sample")
-	if b == nil {
-		t.Fatal(problems)
-	}
+	b := banktest.Sample(t)
 	return func() *bank.Bank { return b }
 }
 

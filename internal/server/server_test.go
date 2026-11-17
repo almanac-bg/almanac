@@ -14,7 +14,6 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -23,11 +22,12 @@ import (
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
-	"github.com/almanac-bg/almanac/internal/bank"
+	"github.com/almanac-bg/almanac/internal/bank/banktest"
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/push"
 	"github.com/almanac-bg/almanac/internal/store"
+	"github.com/almanac-bg/almanac/internal/store/storetest"
 )
 
 type inbox struct {
@@ -53,15 +53,8 @@ type game struct {
 
 func start(t *testing.T) *game {
 	t.Helper()
-	db, err := store.Open(filepath.Join(t.TempDir(), "game.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-	b, problems := bank.Load("../../bank/sample")
-	if b == nil {
-		t.Fatal(problems)
-	}
+	db := storetest.Open(t)
+	b := banktest.Sample(t)
 	in := &inbox{}
 	out := mail.NewOutbox(db, in, "АЛМАНАХ <no-reply@almanac.bg>")
 	accounts := &account.Accounts{DB: db, Outbox: out, Secret: []byte("test")}
@@ -882,9 +875,8 @@ func pushWorld(t *testing.T) (*Server, *game, *fakePushService, func(p *player, 
 	pub, priv, _ := push.NewKeys()
 	keys, _ := push.ParseKeys(pub, priv)
 
-	db, _ := store.Open(filepath.Join(t.TempDir(), "game.db"))
-	t.Cleanup(func() { db.Close() })
-	b, _ := bank.Load("../../bank/sample")
+	db := storetest.Open(t)
+	b := banktest.Sample(t)
 	out := mail.NewOutbox(db, &inbox{}, "a@almanac.bg")
 	ts := httptest.NewUnstartedServer(nil)
 	s, err := New(Config{PublicURL: "http://" + ts.Listener.Addr().String(), Push: &push.Sender{Keys: keys, Subject: "mailto:a@b.bg", Client: ps.Client(),

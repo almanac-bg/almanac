@@ -10,12 +10,11 @@ import (
 	"mime"
 	"mime/quotedprintable"
 	"net/textproto"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/almanac-bg/almanac/internal/store"
+	"github.com/almanac-bg/almanac/internal/store/storetest"
 )
 
 func TestCompose(t *testing.T) {
@@ -66,11 +65,7 @@ func (f *failing) Send(context.Context, string, Message) error {
 }
 
 func TestOutboxRetriesThenGivesUp(t *testing.T) {
-	db, err := store.Open(filepath.Join(t.TempDir(), "game.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
+	db := storetest.Open(t)
 	f := &failing{}
 	o := NewOutbox(db, f, "a@almanac.bg")
 	_ = db.Tx(t.Context(), func(tx *sql.Tx) error { return o.Enqueue(tx, Message{To: "x@y.bg", Subject: "s", Text: "t"}) })

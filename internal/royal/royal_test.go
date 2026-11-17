@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
+	"github.com/almanac-bg/almanac/internal/bank/banktest"
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/store"
+	"github.com/almanac-bg/almanac/internal/store/storetest"
 )
 
 type world struct {
@@ -27,15 +28,8 @@ type world struct {
 
 func setup(t *testing.T) *world {
 	t.Helper()
-	db, err := store.Open(filepath.Join(t.TempDir(), "game.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-	b, problems := bank.Load("../../bank/sample")
-	if b == nil {
-		t.Fatal(problems)
-	}
+	db := storetest.Open(t)
+	b := banktest.Sample(t)
 	w := &world{t: t, db: db, now: time.Date(2026, 11, 14, 20, 0, 0, 0, play.Bulgaria)}
 	w.g = play.New(db, func() *bank.Bank { return b })
 	w.g.Now = func() time.Time { return w.now }
