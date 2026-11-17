@@ -59,6 +59,8 @@ type DuelNews struct {
 	DuelID   int64
 	// Seen is a result the one told has on screen already: they just finished the run that settled the duel.
 	Seen bool
+	// Code is, with Kind "challenge", the challenge a taker played (its link shows the one who sent it who took it).
+	Code string
 }
 
 // DuelView is a duel as one of its two players sees it.
@@ -98,6 +100,8 @@ type DuelView struct {
 	TheyLeft *int `json:"theyLeft,omitempty"`
 	// Befriend says the other, a person met in a live duel, may be asked to be friends: not a friend yet, nor asked.
 	Befriend bool `json:"befriend,omitempty"`
+	// Challenge is, for a challenge's duel (Kind "challenge": the player took it), its code (challenges.go).
+	Challenge string `json:"challenge,omitempty"`
 
 	// against is the other player (the recorded one's, against a recording), theirRun their run.
 	against, theirRun int64
@@ -400,7 +404,7 @@ func (g *Game) DeclineDuel(ctx context.Context, userID, duelID int64) error {
 // mayStart refuses a player one more challenge while too many of theirs wait on friends.
 func (g *Game) mayStart(tx *sql.Tx, userID int64) error {
 	var n int
-	if err := tx.QueryRow(`SELECT count(*) FROM duels WHERE a_id = ? AND kind = 'friend' AND ended_at IS NULL`, userID).Scan(&n); err != nil {
+	if err := tx.QueryRow(`SELECT count(*) FROM duels WHERE a_id = ? AND kind = 'friend' AND ended_at IS NULL AND challenge_id IS NULL`, userID).Scan(&n); err != nil {
 		return err
 	}
 	if n >= MaxWaiting {
@@ -575,12 +579,13 @@ func (g *Game) settleRun(ctx context.Context, runID int64) error {
 	var duelID, aID, aRun int64
 	var kind, aName string
 	var bID sql.NullInt64
-	var ghost, aDone, bDone bool
+	var ghost, challenge, aDone, bDone bool
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT d.id, d.kind, d.a_id, ua.name, d.a_run, d.b_id, d.ghost_run IS NOT NULL,
+			d.challenge_id IS NOT NULL,
 			coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = d.a_run), 0),
 			coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = d.b_run), 0)
 		FROM duels d JOIN users ua ON ua.id = d.a_id WHERE (d.a_run = ?1 OR d.b_run = ?1) AND d.ended_at IS NULL`, runID).
-		Scan(&duelID, &kind, &aID, &aName, &aRun, &bID, &ghost, &aDone, &bDone)
+		Scan(&duelID, &kind, &aID, &aName, &aRun, &bID, &ghost, &challenge, &aDone, &bDone)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
@@ -590,7 +595,7 @@ func (g *Game) settleRun(ctx context.Context, runID int64) error {
 	switch {
 	case aDone && bDone:
 		return g.settleDuel(ctx, duelID, false, runID)
-	case kind == "live" && ghost && aDone:
+	case (kind == "live" || challenge) && ghost && aDone:
 		return g.settleDuel(ctx, duelID, true, runID)
 	case kind == "friend" && aDone && runID == aRun && bID.Valid:
 		if _, err := g.DB.Write.ExecContext(ctx, `UPDATE duels SET expires_at = ? WHERE id = ?`,
@@ -643,6 +648,8 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 	var a, b side
 	var news []DuelNews
 	settled := false
+	var challenge sql.NullInt64 // a challenge's duel: its taker against the one who sent it (challenges.go)
+	var outcome string
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		other := "d.b_run"
 		if ghost {
@@ -662,8 +669,13 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 		if err != nil {
 			return err
 		}
+		if err := tx.QueryRow(`SELECT challenge_id FROM duels WHERE id = ?`, duelID).Scan(&challenge); err != nil {
+			return err
+		}
 		rated := true
-		if ghost {
+		if challenge.Valid {
+			rated = false // between people of any strength: no rating moves
+		} else if ghost {
 			n, err := g.recordedRatedToday(tx, a.id)
 			if err != nil {
 				return err
@@ -710,18 +722,19 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 		now := store.Ms(g.Now())
 		// opponent_id is a player the duel was against, never a recording's: the record between friends, their
 		// achievements and the year's rival count only duels both played.
-		opponentID := sql.NullInt64{Int64: b.id, Valid: !ghost}
+		opponentID := sql.NullInt64{Int64: b.id, Valid: !ghost || challenge.Valid}
 		da, ra, err := rate(a, b.rating, score)
 		if err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`UPDATE runs SET opponent = ?, opponent_id = ?, recorded = ?, outcome = ? WHERE id = ?`,
-			b.name, opponentID, ghost, outcomeOf(score), a.run); err != nil {
+			b.name, opponentID, ghost && !challenge.Valid, outcomeOf(score), a.run); err != nil {
 			return err
 		}
 		news = append(news, DuelNews{To: a.id, Kind: "result", From: b.name, Outcome: outcomeOf(score), Delta: da,
 			Friendly: !rated, DuelID: duelID, Seen: a.run == finished})
 		if ghost {
+			outcome = outcomeOf(score)
 			_, err = tx.Exec(`UPDATE duels SET ended_at = ?, outcome = ?, a_delta = ?, a_rating = ?, rated = ? WHERE id = ?`,
 				now, "ghost_"+outcomeOf(score), da, ra, rated, duelID)
 			return err
@@ -743,6 +756,11 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 	})
 	if err != nil || settled {
 		return err
+	}
+	if challenge.Valid {
+		if err := g.challengeNews(ctx, challenge.Int64, a.name, outcome, duelID); err != nil {
+			return err
+		}
 	}
 	for _, n := range news {
 		if err := g.afterRun(ctx, n.To); err != nil { // a duel won finishes goals too
@@ -821,7 +839,8 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			coalesce(CASE WHEN d.a_id <> ?1 THEN d.a_run WHEN d.ghost_run IS NOT NULL THEN d.ghost_run ELSE d.b_run END, 0),
 			coalesce(CASE WHEN d.a_id <> ?1 THEN d.a_id WHEN d.ghost_run IS NOT NULL
 				THEN (SELECT user_id FROM runs WHERE id = d.ghost_run) ELSE d.b_id END, 0),
-			CASE WHEN d.a_id = ?1 THEN d.a_left ELSE d.b_left END, CASE WHEN d.a_id = ?1 THEN d.b_left ELSE d.a_left END
+			CASE WHEN d.a_id = ?1 THEN d.a_left ELSE d.b_left END, CASE WHEN d.a_id = ?1 THEN d.b_left ELSE d.a_left END,
+			coalesce((SELECT code FROM challenges WHERE id = d.challenge_id), '')
 		FROM duels d WHERE (d.a_id = ?1 OR d.b_id = ?1) AND (d.kind = 'friend' OR d.ended_at IS NOT NULL)
 			AND NOT (d.b_id = ?1 AND d.ended_at IS NULL
 				AND (SELECT finished_at FROM runs WHERE id = d.a_run) IS NULL)
@@ -840,10 +859,14 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 	for rows.Next() {
 		var r row
 		var youLeft, theyLeft sql.NullInt64
+		var code string
 		if err := rows.Scan(&r.v.ID, &r.v.Kind, &r.v.CreatedAt, &r.v.ExpiresAt, &r.v.EndedAt, &r.outcome, &r.mine,
-			&r.rated, &r.v.Delta, &r.myRun, &r.theirRun, &r.theirs, &youLeft, &theyLeft); err != nil {
+			&r.rated, &r.v.Delta, &r.myRun, &r.theirRun, &r.theirs, &youLeft, &theyLeft, &code); err != nil {
 			rows.Close()
 			return nil, err
+		}
+		if code != "" {
+			r.v.Kind, r.v.Challenge = "challenge", code
 		}
 		for _, l := range []struct {
 			n  sql.NullInt64
@@ -867,6 +890,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 		if v.Kind == "friend" {
 			v.Friend = r.theirs
 		}
+		challenge := v.Kind == "challenge"
 		var err error
 		if v.You, err = g.duelSide(ctx, userID, r.myRun, true); err != nil {
 			return nil, err
@@ -876,7 +900,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 				return nil, err
 			}
 		}
-		v.Recorded = len(r.outcome) > 6 && r.outcome[:6] == "ghost_"
+		v.Recorded = len(r.outcome) > 6 && r.outcome[:6] == "ghost_" && !challenge
 		won := map[bool]string{true: "a", false: "b"}[r.mine]
 		switch {
 		case r.outcome == won || r.outcome == "ghost_won":
@@ -892,7 +916,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 		default:
 			v.State = "wait"
 		}
-		v.Friendly = !r.rated && (v.State == "won" || v.State == "lost" || v.State == "draw")
+		v.Friendly = !r.rated && !challenge && (v.State == "won" || v.State == "lost" || v.State == "draw")
 		out = append(out, v)
 	}
 	return out, nil
@@ -972,8 +996,8 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 			return v, err
 		}
 		v.Record = &r
-		if v.Kind == "live" {
-			// Met by chance: a tap from asking them to be friends, unless they are, or either has asked.
+		if v.Kind == "live" || v.Kind == "challenge" {
+			// Met by chance, or by a link: a tap from asking them to be friends, unless they are, or either has asked.
 			err := g.DB.Read.QueryRowContext(ctx, `SELECT NOT (EXISTS (SELECT 1 FROM friends WHERE user_id = ?1 AND friend_id = ?2)
 				OR EXISTS (SELECT 1 FROM friend_requests WHERE (from_id = ?1 AND to_id = ?2) OR (from_id = ?2 AND to_id = ?1)))`,
 				userID, v.against).Scan(&v.Befriend)

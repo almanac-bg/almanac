@@ -317,6 +317,13 @@ takes a token.
   live one against a person: the other sees „Мария иска реванш.“ over theirs, `.rematch-asks`, and has 15 seconds to
   ask too), with „Още един дуел“ beside it; „Още един дуел“ gold after one against a recording; else „Към дуелите“. A duel without a result (turned down, not played in time, cut off) is
   its heading and a line, and the player's own game if they played it (`.duel-mine`).
+- **A challenge** (`/c/<code>`, `screens/challenge.ts`): a finished game of ten (a topic's, a friend's duel's own ten) sent to
+  anyone, by „Предизвикай“ (plain, after the result's other steps; `challengeButton()`: the link made as the finger comes
+  down, shared with a plain line, „Познах 7 от 10 по „История“ в АЛМАНАХ. Можеш ли повече?“). A friend's duel waiting
+  for the friend has it gold as „Прати на Мария“: the same link brings the friend to their turn. Opened: who sent it
+  and how they did, „Започни“ (the count after that tap), then the duel's result („Предизвикателство от Мария“, no
+  rating, „Добави в приятели“ under them, „Предизвикай и ти“ gold). Opened again, the taker's result; by the one who
+  sent it, who took it and „Прати го пак“; past its week, or gone, it says so and offers the day's ten.
 - **Friends:** `.card.friends`, `.invitation` (a friend request, accepted with `.btn.rose`), `.friend-list`/`.friend`
   (with `.friend-day` and `.record`) and `.invite-link`.
 - **In code:**
@@ -364,7 +371,7 @@ takes a token.
   what comes next (`.next`); reserve days keep the streak (the first day, every seventh in a row and a day with all
   three goals earn one: `.goals-reserve`, `.week li.saved`); a day a reserve kept, or a streak that ended, is said
   once on Начало (`.streak-notice`), as is, one at a time, what others did meanwhile: a friend played the duel, said yes
-  to an invite („Мария прие поканата ти.“ and „Дуел“), or a live duel left went on without the player. Награди opens with „Как се печели“, the whole of it in five lines.
+  to an invite („Мария прие поканата ти.“ and „Дуел“), or a live duel left went on without the player, or who took their challenges („3 изиграха предизвикателството ти · 2 те биха“). Награди opens with „Как се печели“, the whole of it in five lines.
 - **Division emblems** are pictures (`division-<id>`): a silhouette per division — Бронз a plain shield, Сребро a
   chevron, Злато wings, Платина a star, Диамант a cut gem, Легенда a crowned shield of stars with rays — in `--div-*`
   colours (`art/emblem.ts` places them).

@@ -58,7 +58,7 @@ func (g *Game) recordingsNews(tx *sql.Tx, userID int64) (*RecordingsNews, error)
 	}
 	rows, err := tx.Query(`SELECT d.a_id, u.name, u.tag, d.outcome, d.ended_at
 		FROM runs r JOIN duels d ON d.ghost_run = r.id JOIN users u ON u.id = d.a_id
-		WHERE r.user_id = ? AND d.ended_at > ? AND d.outcome IN ('ghost_won', 'ghost_lost', 'ghost_draw')
+		WHERE r.user_id = ? AND d.ended_at > ? AND d.outcome IN ('ghost_won', 'ghost_lost', 'ghost_draw') AND d.challenge_id IS NULL
 		ORDER BY d.ended_at DESC`, userID, max(told, store.Ms(midnight.AddDate(0, 0, -1))))
 	if err != nil {
 		return nil, err

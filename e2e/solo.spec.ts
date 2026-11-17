@@ -280,11 +280,11 @@ test("a question left while its time runs: asked first, given up, and the topic 
   await expect(page.locator("article.question .trail li").nth(1)).toHaveClass("wrong");
 });
 
-test("an old challenge link says where playing with friends went", async ({ page }) => {
+test("a challenge link that's gone (an old one) says so and offers the day", async ({ page }) => {
   await page.goto("/c/abc234");
-  await expect(page.getByRole("heading", { name: "Тази връзка вече не работи" })).toBeVisible();
-  await page.getByRole("link", { name: "Към дуелите" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Дуел" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Това предизвикателство вече го няма" })).toBeVisible();
+  await page.getByRole("link", { name: "Въпросите на деня" }).click();
+  await expect(page.locator(".card.day")).toBeVisible();
 });
 
 test.describe("on a computer", () => {
