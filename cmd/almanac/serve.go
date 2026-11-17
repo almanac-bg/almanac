@@ -211,6 +211,11 @@ func serve([]string) error {
 	})
 	go reloadOnHangup(ctx, hup, banks, srv)
 	go srv.Remind(ctx)
+	pushed := make(chan struct{})
+	go func() {
+		srv.Push(ctx) // notifications; stopping, it finishes the sends it has begun
+		close(pushed)
+	}()
 	go srv.KeepDays(ctx)
 	go func() {
 		if err := srv.Count(ctx); err != nil && ctx.Err() == nil {
@@ -231,6 +236,10 @@ func serve([]string) error {
 	flush, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	outbox.Flush(flush)
+	select { // a send cut here is sent again by the next run, shown once (server/pushes.go)
+	case <-pushed:
+	case <-flush.Done():
+	}
 	slog.Info("stopped")
 	return err
 }

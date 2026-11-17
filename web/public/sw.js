@@ -1,6 +1,6 @@
 // The service worker: it shows the game's notifications, and opens the game where a tap on one points, counting the tap
 // by the notification's kind (for the admin page). Nothing else: no caching, so the game is always the one on the
-// server.
+// server. A notification's tag names it: one sent again (after a restart of the server's) shows in its place.
 
 self.addEventListener("push", (event) => {
   let m = {};
@@ -13,6 +13,7 @@ self.addEventListener("push", (event) => {
       icon: "/icon-192.png",
       badge: "/badge-96.png",
       lang: "bg",
+      ...(m.tag ? { tag: m.tag } : {}),
       data: { url: m.url || "/", kind: m.kind || "" },
     }),
   );

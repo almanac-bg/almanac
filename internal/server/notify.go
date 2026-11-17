@@ -1,25 +1,56 @@
 package server
 
 import (
-	"cmp"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
+	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/push"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
+// A player's devices are few: a session is one browser's (account), so it keeps one subscription and one phone's
+// token, the last it told; and a player keeps pushDevices of each, the newest. Each is told again at most
+// pushTellsPerHour times an hour by a player, pushTellsPerNet from a network (clientNet): the app tells its token at every start.
+const (
+	pushDevices      = 5
+	pushTellsPerHour = 60
+	pushTellsPerNet  = 600
+)
+
+// mayTell says whether a player may tell a device now (pushTellsPerHour, pushTellsPerNet).
+func (s *Server) mayTell(r *http.Request, userID int64) bool {
+	return s.limits.allow("push:user:"+strconv.FormatInt(userID, 10), pushTellsPerHour, time.Hour) &&
+		s.limits.allow("push:net:"+s.clientNet(r), pushTellsPerNet, time.Hour)
+}
+
+// keepDevice keeps a device told by a session (an upsert into table, keyed by column), and makes it the session's
+// only one there, and its player's only pushDevices there.
+func (s *Server) keepDevice(ctx context.Context, table, column, key string, userID int64, session []byte, upsert string, args ...any) error {
+	return s.db.Tx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, upsert, args...); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE session = ? AND `+column+` <> ?`, session, key); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE user_id = ?1 AND `+column+` NOT IN (SELECT `+column+`
+			FROM `+table+` WHERE user_id = ?1 ORDER BY created_at DESC, `+column+` LIMIT ?2)`, userID, pushDevices)
+		return err
+	})
+}
+
 // subscribe keeps a browser's push subscription, for its player, tied to the browser's session: it ends with it
-// (account). Told again, it's tied to the session the browser has now.
+// (account), and is the session's one (keepDevice). Told again, it's tied to the session the browser has now.
 func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -27,6 +58,9 @@ func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) error {
 	}
 	if s.push == nil {
 		return errNotFound
+	}
+	if !s.mayTell(r, u.ID) {
+		return errTooMany
 	}
 	// What a browser sends (PushSubscription.toJSON): the subscription, and when it expires, which no browser sets.
 	var in struct {
@@ -53,10 +87,11 @@ func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) error {
 		}
 		return errBadRequest
 	}
-	_, err = s.db.Write.ExecContext(r.Context(), `INSERT INTO push_subs (endpoint, user_id, session, p256dh, auth,
-		created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id,
-		session = excluded.session, p256dh = excluded.p256dh, auth = excluded.auth`,
-		sub.Endpoint, u.ID, account.SessionKey(s.session(r)), sub.Keys.P256dh, sub.Keys.Auth, store.Now())
+	session := account.SessionKey(s.session(r))
+	err = s.keepDevice(r.Context(), "push_subs", "endpoint", sub.Endpoint, u.ID, session, `INSERT INTO push_subs (endpoint,
+		user_id, session, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (endpoint) DO UPDATE SET
+		user_id = excluded.user_id, session = excluded.session, p256dh = excluded.p256dh, auth = excluded.auth`,
+		sub.Endpoint, u.ID, session, sub.Keys.P256dh, sub.Keys.Auth, store.Now())
 	if err != nil {
 		return err
 	}
@@ -84,7 +119,7 @@ func (s *Server) unsubscribe(w http.ResponseWriter, r *http.Request) error {
 
 // addPhone keeps a phone's token from its maker's push service, for its player: the game's app sends it once the
 // player allows notifications, and again whenever it opens (a token can change). Like a browser's subscription, it's
-// tied to the app's session, and ends with it.
+// tied to the app's session, and ends with it; and it's the session's one (keepDevice).
 func (s *Server) addPhone(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -92,6 +127,9 @@ func (s *Server) addPhone(w http.ResponseWriter, r *http.Request) error {
 	}
 	if s.phones == nil {
 		return errNotFound
+	}
+	if !s.mayTell(r, u.ID) {
+		return errTooMany
 	}
 	var in struct {
 		Platform string `json:"platform"`
@@ -104,10 +142,11 @@ func (s *Server) addPhone(w http.ResponseWriter, r *http.Request) error {
 	if s.phones.CheckPhone(in.Platform, in.Token) != nil {
 		return errBadRequest
 	}
-	_, err = s.db.Write.ExecContext(r.Context(), `INSERT INTO phones (token, user_id, session, platform, created_at)
-		VALUES (?, ?, ?, ?, ?) ON CONFLICT (token) DO UPDATE SET user_id = excluded.user_id, session = excluded.session,
-		platform = excluded.platform`,
-		in.Token, u.ID, account.SessionKey(s.session(r)), in.Platform, store.Now())
+	session := account.SessionKey(s.session(r))
+	err = s.keepDevice(r.Context(), "phones", "token", in.Token, u.ID, session, `INSERT INTO phones (token, user_id,
+		session, platform, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (token) DO UPDATE SET user_id = excluded.user_id,
+		session = excluded.session, platform = excluded.platform`,
+		in.Token, u.ID, session, in.Platform, store.Now())
 	if err != nil {
 		return err
 	}
@@ -229,86 +268,6 @@ func (s *Server) setPushPref(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return ok(w, map[string]any{"prefs": prefs})
-}
-
-// notify sends a message of a kind to every browser and phone of these players that asked for notifications, if they
-// want that kind, a few at a time.
-func (s *Server) notify(ctx context.Context, kind pushKind, m push.Message, userIDs ...int64) {
-	if (s.push == nil && s.phones == nil) || len(userIDs) == 0 {
-		return
-	}
-	// A target is a browser's subscription or a phone's token (with its platform).
-	type target struct {
-		sub      push.Subscription
-		platform string
-		token    string
-	}
-	want := func(alias string) string {
-		if kind == pushAsked {
-			return ""
-		}
-		return ` AND ` + wants(kind, alias+".user_id")
-	}
-	var targets []target
-	for _, id := range userIDs {
-		rows, err := s.db.Read.QueryContext(ctx, `SELECT endpoint, p256dh, auth, '', '' FROM push_subs b WHERE user_id = ?`+want("b")+`
-			UNION ALL SELECT '', '', '', platform, token FROM phones f WHERE user_id = ?`+want("f"), id, id)
-		if err != nil {
-			slog.Error("push", "err", err)
-			return
-		}
-		for rows.Next() {
-			var t target
-			if rows.Scan(&t.sub.Endpoint, &t.sub.Keys.P256dh, &t.sub.Keys.Auth, &t.platform, &t.token) == nil {
-				targets = append(targets, t)
-			}
-		}
-		rows.Close()
-	}
-	// Counted by kind (play/measure.go): the notifications delivered, and the browsers and phones found gone.
-	m.Kind = cmp.Or(m.Kind, kind.name()) // a message may say more of itself (the day's last reminder: "stop")
-	var sent, gone atomic.Int64
-	defer func() {
-		for key, n := range map[string]int64{"push:sent:" + m.Kind: sent.Load(), "push:gone:" + m.Kind: gone.Load()} {
-			if n > 0 {
-				_ = s.game.Tally(context.WithoutCancel(ctx), key, int(n))
-			}
-		}
-	}()
-	work := make(chan target)
-	var wg sync.WaitGroup
-	for range min(8, len(targets)) {
-		wg.Go(func() {
-			for t := range work {
-				var err error
-				switch {
-				case t.token != "" && s.phones != nil:
-					err = s.phones.Send(ctx, t.platform, t.token, m)
-					if errors.Is(err, push.ErrGone) {
-						_, _ = s.db.Write.ExecContext(ctx, `DELETE FROM phones WHERE token = ?`, t.token)
-					}
-				case t.token == "" && s.push != nil:
-					err = s.push.Send(ctx, t.sub, m)
-					if errors.Is(err, push.ErrGone) {
-						_, _ = s.db.Write.ExecContext(ctx, `DELETE FROM push_subs WHERE endpoint = ?`, t.sub.Endpoint)
-					}
-				}
-				switch {
-				case err == nil:
-					sent.Add(1)
-				case errors.Is(err, push.ErrGone):
-					gone.Add(1)
-				default:
-					slog.Warn("push", "err", err)
-				}
-			}
-		})
-	}
-	for _, t := range targets {
-		work <- t
-	}
-	close(work)
-	wg.Wait()
 }
 
 // days is a number of days in words: „1 ден“, „12 дни“.

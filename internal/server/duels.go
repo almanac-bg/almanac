@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -298,7 +299,7 @@ func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 	default:
 		return
 	}
-	go s.notify(context.WithoutCancel(ctx), pushFriends, m, n.To)
+	s.notify(context.WithoutCancel(ctx), pushFriends, m, n.To)
 }
 
 // ranks is a board: by rating, or by knowledge (over every topic, or one); of everyone, or of the viewer and their
@@ -375,11 +376,29 @@ func (s *Server) year(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, y)
 }
 
-// leagueNews tells a player how their week in the league ended, once the league is theirs to see (play/unfold.go).
-func (s *Server) leagueNews(ctx context.Context, n play.LeagueNews) {
-	if open, err := s.game.OpenOf(ctx, n.To); err != nil || !open.League {
-		return
+// leagueNews queues, in the transaction that ends a week of the leagues, the word to each player of how their week
+// ended: sent once the league is theirs to see (play/unfold.go), as the queue sends it (pushes.go).
+func (s *Server) leagueNews(ctx context.Context, tx *sql.Tx, news []play.LeagueNews) error {
+	if s.push == nil && s.phones == nil {
+		return nil
 	}
+	q, err := s.queuer(ctx, tx)
+	if err != nil {
+		return err
+	}
+	defer q.close()
+	for _, n := range news {
+		m := push.Message{URL: "/ranks#league", Title: "Седмицата в лигата свърши", Body: leagueWords(n)}
+		if _, err := q.add(ctx, notice{kind: pushFriends, m: m, needs: "league"}, n.To); err != nil {
+			return err
+		}
+	}
+	s.pushq.poke() // what's queued is seen once the week's end is in, at the latest the next second
+	return nil
+}
+
+// leagueWords is how a player's week in the league ended: „1-во място от 8 в лига Странджа. Качваш се в лига …“
+func leagueWords(n play.LeagueNews) string {
 	body := fmt.Sprintf("%s в лига %s.", place(n.Place, n.Of), n.From.Name)
 	switch {
 	case n.Now.Tier > n.From.Tier:
@@ -392,7 +411,7 @@ func (s *Server) leagueNews(ctx context.Context, n play.LeagueNews) {
 	if n.XP > 0 {
 		body += fmt.Sprintf(" +%d XP.", n.XP)
 	}
-	go s.notify(context.WithoutCancel(ctx), pushFriends, push.Message{URL: "/ranks#league", Title: "Седмицата в лигата свърши", Body: body}, n.To)
+	return body
 }
 
 // goals are the player's goals for today.

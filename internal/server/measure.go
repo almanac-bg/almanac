@@ -362,10 +362,11 @@ func (s *Server) firstWeek(ctx context.Context, active play.Active) (firstWeek, 
 			AND finished_at IS NOT NULL AND NOT scripted`, from, today).Scan(&win[i].dayTens); err != nil {
 			return f, err
 		}
-		// The day's reminders (remind.go), and the days finished within two hours of one.
+		// The day's reminders that reached the player (remind.go), and the days finished within two hours of one.
 		if err := s.db.Read.QueryRowContext(ctx, `SELECT count(*), coalesce(sum(EXISTS (SELECT 1 FROM runs r
 			WHERE r.user_id = d.user_id AND r.kind = 'day' AND r.day = d.day AND r.finished_at BETWEEN d.at AND d.at + 7200000)), 0)
-			FROM push_reminded d WHERE d.day BETWEEN ? AND ? AND NOT d.last`, from, today).Scan(&win[i].within.Of, &win[i].within.N); err != nil {
+			FROM push_reminded d WHERE d.day BETWEEN ? AND ? AND NOT d.last AND d.delivered > 0`, from, today).
+			Scan(&win[i].within.Of, &win[i].within.N); err != nil {
 			return f, err
 		}
 	}
@@ -383,6 +384,7 @@ func (s *Server) firstWeek(ctx context.Context, active play.Active) (firstWeek, 
 		row("Известия „"+k.name+"“, изпратени", false, func(w window) string { return fmt.Sprint(w.t["push:sent:"+k.kind]) })
 		row("отворени", true, func(w window) string { return rate{w.t["push:open:"+k.kind], w.t["push:sent:"+k.kind]}.String() })
 		row("изчезнали абонаменти", true, func(w window) string { return fmt.Sprint(w.t["push:gone:"+k.kind]) })
+		row("не стигнали до никое устройство", true, func(w window) string { return fmt.Sprint(w.t["push:failed:"+k.kind]) })
 		if k.kind == "day" {
 			row("денят изигран до 2 часа след напомнянето", true, func(w window) string { return w.within.String() })
 		}
