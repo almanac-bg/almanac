@@ -236,6 +236,7 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/duels/{id}", s.duelOne)
 	mux.HandleFunc("GET /api/duels/live/events", s.liveEvents)
 	api("POST /api/duels/live/{id}/answer", s.liveAnswer)
+	api("POST /api/duels/live/{id}/leave", s.liveLeave)
 	api("POST /api/duels/{id}/play", s.playDuel)
 	api("DELETE /api/duels/{id}", s.declineDuel)
 	api("GET /api/ranks", s.ranks)

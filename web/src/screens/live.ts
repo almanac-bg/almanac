@@ -254,12 +254,18 @@ function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
   onCleanup(() => playing.set(false));
   // The screen stays on from the wait for an opponent to the result: a phone asleep drops the duel.
   // Leaving mid-duel costs it (live.go): the duel goes on without the player, their time running out on each question,
-  // and its result counts. Every way out asks first.
+  // and its result counts. Every way out asks first; a leave confirmed is told the server at once, so that the other
+  // isn't kept waiting for this player's line to drop (it goes all the same if that can't be said).
   const leaveAsk = guardLeaving(
     "Излизаш от дуела? Той продължава без теб: въпросите остават без отговор, а резултатът се брои.",
     () => {
       const phase = view()?.phase;
       return phase === "question" || phase === "reveal";
+    },
+    async (on) => {
+      const id = view.peek()?.id;
+      if (id) await api("POST", `/api/duels/live/${id}/leave`).catch(() => {});
+      on();
     },
   );
   keepAwake(() => {

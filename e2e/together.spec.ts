@@ -135,12 +135,15 @@ test("two people asking for a duel play it live", async ({ browser }, info) => {
       await expect(asked).toBeVisible();
       await a.getByRole("button", { name: "Излез" }).click();
       await expect(a).toHaveURL(/\/$/);
+      // Bo is told at once, not after the half minute a dropped line is waited for.
+      await expect(b.locator(".live-doing")).toHaveText("Излезе от дуела.", { timeout: 5_000 });
       await a
         .getByRole("status")
         .filter({ hasText: "Дуелът ти продължава" })
         .getByRole("link", { name: "Върни се" })
         .click();
       await expect(a.locator(".question-head")).toContainText("3 от 10", { timeout: 15_000 });
+      await expect(b.locator(".live-doing")).toHaveText("Мисли…"); // and back, to Bo too
     }
     // Ana answers: Bo sees that she has, not what; then both answers show, side by side.
     await answer(a);
