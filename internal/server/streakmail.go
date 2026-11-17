@@ -193,7 +193,8 @@ func (s *Server) streakMailOf(ctx context.Context, today string, userID int64) (
 	} else {
 		m.Text += "Днес можеш да започнеш нова серия."
 	}
-	m.Text += "\n\n" + s.cfg.PublicURL + "\n\n—\nНе искам такива писма: " + m.Unsubscribe + "\n"
+	// The link says it came from the mail: a browser signed out is asked to sign in first (screens/today.ts).
+	m.Text += "\n\n" + s.cfg.PublicURL + "/?from=mail\n\n—\nНе искам такива писма: " + m.Unsubscribe + "\n"
 	return m, true, nil
 }
 

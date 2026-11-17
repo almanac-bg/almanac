@@ -76,8 +76,9 @@ func TestStreakMail(t *testing.T) {
 	}
 	byTo := map[string]string{}
 	for _, m := range g.inbox.got {
+		// Its link to the game says where it came from: a browser signed out is asked to sign in first.
 		if m.Subject != "Серията ти от 5 дни прекъсна" || !strings.Contains(m.Text, m.Unsubscribe) ||
-			!strings.Contains(m.Unsubscribe, "/mail/off?") {
+			!strings.Contains(m.Unsubscribe, "/mail/off?") || !strings.Contains(m.Text, "/?from=mail\n") {
 			t.Fatalf("the mail: %+v", m)
 		}
 		byTo[m.To] = m.Text

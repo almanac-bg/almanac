@@ -148,6 +148,36 @@ func TestCodeTries(t *testing.T) {
 	}
 }
 
+// A guest in an app's own browser takes the game to the phone's browser by a link, once.
+func TestHandoffLink(t *testing.T) {
+	g := start(t)
+	app := g.player()
+	_, out := app.call("POST", "/api/guest", map[string]any{})
+	guest := name(out)
+	_, out = app.call("POST", "/api/auth/handoff", map[string]any{})
+	link, _ := out["url"].(string)
+	token, found := strings.CutPrefix(link, g.url+"/hand/")
+	if !found || len(token) != 43 {
+		t.Fatalf("the link: %v", out)
+	}
+	// The page itself is the app's, and takes nothing (a link preview fetches it).
+	if res, err := http.Get(g.url + "/hand/" + token); err != nil || res.StatusCode != 200 {
+		t.Fatalf("the page: %v %v", res, err)
+	}
+	browser := g.player()
+	if status, out := browser.call("POST", "/api/auth/hand", map[string]string{"token": token}); status != 200 ||
+		name(out) != guest {
+		t.Fatalf("taken: %d %v", status, out)
+	}
+	if _, out := browser.call("GET", "/api/me", nil); name(out) != guest {
+		t.Fatalf("the browser is %v", out)
+	}
+	if status, out := g.player().call("POST", "/api/auth/hand", map[string]string{"token": token}); status != 404 ||
+		out["error"] != "no_handoff" {
+		t.Fatalf("taken twice: %d %v", status, out)
+	}
+}
+
 func TestSignInFlow(t *testing.T) {
 	g := start(t)
 	p := g.player()

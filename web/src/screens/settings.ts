@@ -33,12 +33,13 @@ import { quietWhenSilent, setSound, soundOn } from "../lib/sound.ts";
 import { type User, user } from "../state.ts";
 import { back } from "../ui.ts";
 
-/** What became of the profile just now, said once where the player lands: signed out here, or deleted (on Начало). */
-export const farewell = signal("");
+/** What became of the profile just now, said once where the player lands: signed out (here), deleted, or a game
+ * brought from another browser (on Начало). */
+export const notice = signal("");
 
 export function settings() {
   title("Настройки");
-  farewell.set("");
+  notice.set("");
   return h(
     "section",
     { class: "screen" },
@@ -71,8 +72,8 @@ export function settings() {
             "section",
             { class: "stack" },
             () =>
-              farewell()
-                ? h("p", { class: "lead", role: "status" }, `${farewell()} Влез пак с имейла си или започни да играеш.`)
+              notice()
+                ? h("p", { class: "lead", role: "status" }, `${notice()} Влез пак с имейла си или започни да играеш.`)
                 : h("p", { class: "lead" }, "Още нямаш профил. Влез с имейл или започни да играеш."),
             signIn(),
           ),
@@ -438,7 +439,7 @@ function deleteAccount(): Child {
                 try {
                   await api("DELETE", "/api/me");
                   // Nothing is left here: Начало, as for someone new, says so once.
-                  farewell.set("Профилът е изтрит.");
+                  notice.set("Профилът е изтрит.");
                   user.set(null);
                   go("/", true);
                 } catch (err) {
@@ -458,7 +459,7 @@ async function signOut() {
   // This browser's notifications were the account's: they stop with it (while signed in, so the server forgets them).
   if (pushable()) await turnOff().catch(() => {});
   await api("POST", "/api/auth/signout", {}).catch(() => {});
-  farewell.set("Излезе от профила.");
+  notice.set("Излезе от профила.");
   user.set(null);
 }
 
