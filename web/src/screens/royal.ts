@@ -73,10 +73,13 @@ let {
   coming,
   dayWord,
   when,
+  whileSeen,
 } = {} as Kit;
 
 type Phase = "soon" | "lobby" | "question" | "reveal" | "end";
 
+/** The evening as this screen sees it: its tournament's board (the same for everyone following it) with the player's
+ * own part, in one (royal.Board and royal.Own). */
 interface Evening {
   phase: Phase;
   startsAt: number;
@@ -99,33 +102,35 @@ interface Evening {
   tables: number;
   n: number;
   entered: number;
+  /** How many are still in; in the lobby, how many are in it. */
   left: number;
   /** How many went out on the answer showing (a cut). */
   wentOut: number;
+  /** How many have answered the question showing, of how many play it (those cut too). */
+  answered: number;
+  playing: number;
   /** The next cut: the one the answer showing comes with, while it shows (none in the final). */
   cut?: Cut;
   /** The game ends once the answer showing has shown: the standings come next. */
   last?: boolean;
+  /** In the lobby, its first few; with an answer and at the end, everyone, in their order; none during a question. */
   players: Player[];
+  /** The player, as the board would show them (it may not: the lobby shows a few, a question nobody). */
+  me?: Player;
   question?: {
     category: string;
     view: View;
     limitMs: number;
-    leftMs: number;
     /** When it showed (the server's clock): later, if it showed again after a restart of the server. */
     shown?: number;
-    nextMs?: number;
-    given?: Answer;
-    reveal?: {
-      answer: Reveal;
-      mine: boolean;
-      points: number;
-      speed?: number;
-      right: boolean;
-      exact?: boolean;
-      missed?: boolean;
-    };
+    reveal?: { answer: Reveal };
   };
+  /** How long the question has left, and, while its answer shows, how long until the game moves on. */
+  leftMs: number;
+  nextMs?: number;
+  /** The player's answer, once given, and how it went, once the answer shows (if they were in for it). */
+  given?: Answer;
+  mine?: { points: number; speed?: number; right: boolean; exact?: boolean; missed?: boolean };
   runId?: number;
   place?: number;
   delta?: number;
@@ -160,8 +165,8 @@ interface Player {
   goes?: boolean;
   /** The question they went out on (-1: they haven't). */
   outAt: number;
-  online: boolean;
-  answered: boolean;
+  /** On the screen (in the lobby). */
+  online?: boolean;
   place?: number;
   delta?: number;
   me?: boolean;
@@ -255,6 +260,7 @@ export function royal(kit: Kit) {
     coming,
     dayWord,
     when,
+    whileSeen,
   } = kit);
   title("Роял");
   const view = signal<Evening | null>(null);
@@ -274,6 +280,9 @@ export function royal(kit: Kit) {
     es = new EventSource("/api/royal/events");
     es.onmessage = (e) => {
       const v = JSON.parse(e.data) as Evening;
+      // The board is everyone's: the player is told apart by their key.
+      for (const p of v.players) p.me = p.key === v.me?.key;
+      if (v.me) v.me.me = true;
       skew = v.now - Date.now();
       now.set(v.now);
       trouble.set(false);
@@ -428,8 +437,7 @@ function plan(main = false): Child {
   // Again now and then: the screen may stay while the evening moves on (its standings show for a while).
   const load = () => api<Tonight>("GET", "/api/royal/tonight").then(tonight.set, () => {});
   load();
-  const again = setInterval(load, 20_000);
-  onCleanup(() => clearInterval(again));
+  whileSeen(load, 20_000);
   pushOn().then(notified.set, () => notified.set(false));
   const run = async (fn: () => Promise<void>) => {
     error.set("");
@@ -642,22 +650,22 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
       // How it's played, in a line, for one who hasn't played a Роял yet; and how few are in, if few are.
       () => (newcomer() ? h("p", { class: "muted" }, firstRules) : null),
       () => {
-        const n = view().players.length;
+        const n = view().left;
         return n === 2 || n === 3 ? h("p", { class: "muted" }, small[n]) : null;
       },
     ),
     entry(joined, v0.in),
     () => {
       const v = view();
-      if (!v.players.length) return h("p", { class: "muted" }, "Още никой не е влязъл.");
+      if (!v.left) return h("p", { class: "muted" }, "Още никой не е влязъл.");
       // A crowd shows as its first few (you among them), and how many more.
-      const few = [...v.players.filter((p) => p.me), ...v.players.filter((p) => !p.me)].slice(0, 12);
+      const few = [...(v.me ? [v.me] : []), ...v.players.filter((p) => !p.me)].slice(0, 12);
       return h(
         "section",
         { class: "card" },
-        h("h2", { class: "section-title" }, `Вътре: ${v.players.length}`),
-        chips(few.map((p) => ({ ...p, in: p.online || !!p.me }))),
-        v.players.length > few.length ? h("p", { class: "muted" }, `и още ${v.players.length - few.length}`) : null,
+        h("h2", { class: "section-title" }, `Вътре: ${v.left}`),
+        chips(few.map((p) => ({ ...p, in: !!p.online || !!p.me }))),
+        v.left > few.length ? h("p", { class: "muted" }, `и още ${v.left - few.length}`) : null,
       );
     },
   );
@@ -694,7 +702,7 @@ function standing(view: () => Evening): Child {
         v.in ? "В турнира си само ти: играеш и петнадесетте въпроса." : "В този турнир играе само един.",
       );
     }
-    const me = v.players.find((p) => p.me);
+    const me = v.me;
     const c = v.cut;
     // Before the first answer there's no standing to speak of: everyone is level.
     const first = v.phase === "question" && v.n === 0;
@@ -730,7 +738,7 @@ function standing(view: () => Evening): Child {
 function cutSaid(v: Evening): Child {
   const c = v.cut;
   if (!c?.now || v.entered === 1) return null;
-  const me = v.players.find((p) => p.me);
+  const me = v.me;
   const card = (through: boolean, head: string, line: string) => {
     // The cut sounds a moment after the answer's own sound: through, or out.
     setTimeout(() => play(through ? "through" : "out"), 500);
@@ -830,13 +838,13 @@ function question(view: () => Evening, first: Evening, out: Signal<number>, gone
   if (!q) return null;
   // The game starts: with the music's end, or a sound of its own (not again for the question drawn anew).
   if (music) hush(first.n === 0);
-  else if (first.n === 0 && first.in && !q.given && out.peek() !== 0) play("go");
+  else if (first.n === 0 && first.in && !first.given && out.peek() !== 0) play("go");
   // Those cut play on, off the standings.
   const plays = first.in;
   // The server has this player's answer (sent from here, or before the question was drawn again).
   const taken = () => {
     const v = view();
-    return v.phase === "question" && v.n === first.n && !!v.question?.given;
+    return v.phase === "question" && v.n === first.n && !!v.given;
   };
   const tapped = signal(false);
   const sent = signal(false);
@@ -861,7 +869,7 @@ function question(view: () => Evening, first: Evening, out: Signal<number>, gone
   };
   const asked = ask(q.view, send, locked);
   // When the time is up, whatever has been put in (a typed number, things moved into order) is the answer.
-  const secs = countdown(q.leftMs, () => {
+  const secs = countdown(first.leftMs, () => {
     if (!plays || tapped.peek() || out.peek() === first.n || untracked(taken)) return;
     const pending = asked.pending();
     if (pending) send(pending);
@@ -872,28 +880,28 @@ function question(view: () => Evening, first: Evening, out: Signal<number>, gone
     // More of the question shows as its time runs (the next clue): the server sends it when it's due.
     asked.update?.(v.question.view);
     // The clock goes by the server's.
-    const s = Math.ceil(v.question.leftMs / 1000);
-    if (Math.abs(s - secs.peek()) > 1) secs.sync(v.question.leftMs);
+    const s = Math.ceil(v.leftMs / 1000);
+    if (Math.abs(s - secs.peek()) > 1) secs.sync(v.leftMs);
   });
   effect(() => locked.set(!plays || tapped() || out() === first.n || taken() || secs() <= 0));
   return h(
     "article",
     { class: "question" },
     head(first),
-    timer(q.leftMs, q.limitMs, secs, plays ? locked : signal(false)), // a watcher's clock runs to the end
+    timer(first.leftMs, q.limitMs, secs, plays ? locked : signal(false)), // a watcher's clock runs to the end
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view, true),
     asked.node,
     () => {
       const v = view();
       // The answer waits for everyone playing, those cut too.
-      const done = v.players.filter((p) => p.answered).length;
+      const done = v.answered;
       return h(
         "p",
         { class: "status", role: "status" },
         !plays ? "Гледаш. " : v.out ? "Извън класирането. " : "",
         sent() || taken() ? "Отговорът ти е приет. " : "",
-        `Отговориха ${done} от ${v.players.length}.`,
+        `Отговориха ${done} от ${v.playing}.`,
       );
     },
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
@@ -905,26 +913,28 @@ function reveal(view: () => Evening, first: Evening): Child {
   const q = first.question;
   const r = q?.reveal;
   if (!q || !r) return null;
-  const kind: VerdictKind = r.missed ? "time" : r.exact ? "exact" : r.right ? "right" : "wrong";
-  if (r.mine) playAnswer(kind, r.right ? 1 : 0);
+  // How the player's answer went (none: they weren't in for it).
+  const m = first.mine;
+  const kind: VerdictKind = m?.missed ? "time" : m?.exact ? "exact" : m?.right ? "right" : "wrong";
+  if (m) playAnswer(kind, m.right ? 1 : 0);
   return h(
     "article",
     { class: "question" },
     head(first),
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view, true),
-    answered(q.view, r.answer, r.mine ? (q.given ?? null) : null),
-    r.mine ? verdict(kind, r.points, r.missed ? "Времето изтече." : undefined, r.speed) : null,
-    crowdLine(q.view.type, r.answer.crowd, r.mine && r.right),
+    answered(q.view, r.answer, m ? (first.given ?? null) : null),
+    m ? verdict(kind, m.points, m.missed ? "Времето изтече." : undefined, m.speed) : null,
+    crowdLine(q.view.type, r.answer.crowd, !!m?.right),
     cutSaid(first),
     standing(view),
-    upNext(q.nextMs ?? 0, first.last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),
+    upNext(first.nextMs ?? 0, first.last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),
     standings(first),
   );
 }
 
 function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
-  const me = first.players.find((p) => p.me);
+  const me = first.me;
   const [best] = first.players;
   const won = me?.place === 1 && first.entered > 1;
   if (me) play(won ? "win" : "end");

@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
+	"net/netip"
 	"slices"
 	"strings"
 	"time"
@@ -18,7 +20,8 @@ import (
 )
 
 // royalEvents streams the evening's Роял to a screen (Server-Sent Events): as the viewer sees it, again after every
-// change. Anyone may look; playing takes a player. The browser reconnects by itself if the line drops.
+// change (royal.Hub.Look). Anyone may look; playing takes a player. The browser reconnects by itself if the line
+// drops. A screen too many (of the player's, the address's, or all: royal.ErrBusy) is told to try again in a while.
 func (s *Server) royalEvents(w http.ResponseWriter, r *http.Request) {
 	var viewer int64
 	if u, err := s.user(r); err == nil && u != nil {
@@ -28,22 +31,27 @@ func (s *Server) royalEvents(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Accel-Buffering", "no")
-	sub := s.royal.Follow(viewer)
+	send := sender(w)
+	sub, err := s.royal.Follow(viewer, network(s.clientIP(r)))
+	if err != nil {
+		send(fmt.Sprintf("retry: %d\nevent: busy\ndata: {}\n\n", 30_000+rand.N(30_000)))
+		return
+	}
 	defer s.royal.Unfollow(sub)
 
-	send := sender(w)
 	ping := time.NewTicker(20 * time.Second) // keeps the line open through proxies (Cloudflare closes it after 100 s)
 	defer ping.Stop()
 	for {
 		select {
 		case <-sub.C:
-			data, _ := json.Marshal(s.royal.View(viewer))
+			data, pause := s.royal.Look(sub)
 			if !send("data: " + string(data) + "\n\n") {
 				return
 			}
-			// Many answers in a moment make one look, not one each.
+			// Many answers in a moment make one look, not one each; a change of the viewer's own is looked at at once.
 			select {
-			case <-time.After(150 * time.Millisecond):
+			case <-time.After(pause):
+			case <-sub.Own:
 			case <-r.Context().Done():
 				return
 			}
@@ -57,6 +65,17 @@ func (s *Server) royalEvents(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+// network is the network an address is of, for a limit on what one may open: an IPv4 address itself, an IPv6 one's
+// /64 (one home or phone has all of it).
+func network(addr string) string {
+	ip, err := netip.ParseAddr(addr)
+	if err != nil || !ip.Is6() || ip.Is4In6() {
+		return addr
+	}
+	p, _ := ip.Prefix(64)
+	return p.String()
 }
 
 // joinRoyal puts the player in the evening's lobby.

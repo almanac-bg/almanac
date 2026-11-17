@@ -63,6 +63,20 @@ export const when = (ms: number, now: number) => `${dayWord(ms, now)} в ${clock
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+/** Runs load again every ms while the page is in view, and at once as it comes back into view (a tab again, a phone
+ * woken): never while nobody looks. Until the screen goes. */
+export function whileSeen(load: () => void, ms: number): void {
+  const look = () => {
+    if (!document.hidden) load();
+  };
+  const every = setInterval(look, ms);
+  document.addEventListener("visibilitychange", look);
+  onCleanup(() => {
+    clearInterval(every);
+    document.removeEventListener("visibilitychange", look);
+  });
+}
+
 /** Who said they'd come to the next Роял, in words: „Тази вечер ще дойдат 14“ (or „Утре вечер …“, „В петък …“), a
  * friend first if one did: „Мария и още 4 ще дойдат тази вечер“. */
 export function coming(t: Tonight): string {
@@ -89,12 +103,9 @@ function royalNow(): () => string {
       () => {},
     );
   load();
+  whileSeen(load, 60_000);
   const tick = setInterval(() => now.set(Date.now() + skew), 15_000);
-  const again = setInterval(load, 60_000);
-  onCleanup(() => {
-    clearInterval(tick);
-    clearInterval(again);
-  });
+  onCleanup(() => clearInterval(tick));
   return () => {
     const t = tonight();
     if (!t) return all.royal.about;
