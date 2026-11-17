@@ -2544,7 +2544,8 @@
   }
 
   /* Things to order: a row tapped is picked up (.chosen) and goes where the next tap says, or is dragged into place,
-     by its grip on a touch screen: the rest of the row scrolls the page. */
+     by its grip at once on a touch screen, or by the rest of the row once held a moment (moved at once, it scrolls the
+     page). A long press shows no menu over it. */
   .sortable-list {
     margin: 0;
     padding: 0;
@@ -2556,6 +2557,7 @@
     touch-action: pan-y;
     user-select: none;
     -webkit-user-select: none;
+    -webkit-touch-callout: none;
   }
 
   .option.sortable.chosen {
