@@ -67,8 +67,8 @@ const (
 )
 
 // How often a screen looks again, at most, after a change: a moment in a game, where the clock runs; a second in the
-// lobby, and for those watching a game they're not in, whom a second costs nothing. A change of the viewer's own (in,
-// out, their answer taken) is looked at at once.
+// lobby, and for those watching a game they're not in, whom a second costs nothing. The clock moving on (the start, a
+// question, its answer) and a change of the viewer's own (in, out) are looked at at once.
 const (
 	glance = 150 * time.Millisecond
 	idle   = time.Second
@@ -1211,10 +1211,10 @@ func (h *Hub) cutOf(t *table, order []*member) *CutView {
 	return nil
 }
 
-// Sub is a screen following the evening: C says it changed (Look then), and Own that the viewer's own part did
-// (look at once, whatever the pause after the last).
+// Sub is a screen following the evening: C says it changed (Look then), and Now that it should look at once,
+// whatever its pause after the last (the clock moved, or the viewer's own part changed).
 type Sub struct {
-	C, Own chan struct{}
+	C, Now chan struct{}
 	viewer int64
 	from   string
 }
@@ -1228,7 +1228,7 @@ func (h *Hub) Follow(viewer int64, from string) (*Sub, error) {
 		(viewer == 0 && h.anon >= maxAnonymous) {
 		return nil, ErrBusy
 	}
-	s := &Sub{C: make(chan struct{}, 1), Own: make(chan struct{}, 1), viewer: viewer, from: from}
+	s := &Sub{C: make(chan struct{}, 1), Now: make(chan struct{}, 1), viewer: viewer, from: from}
 	h.subs[s] = struct{}{}
 	h.from[from]++
 	s.C <- struct{}{} // the evening as it is
@@ -1279,7 +1279,8 @@ func (h *Hub) Unfollow(s *Sub) {
 	}
 }
 
-// changed tells every screen to look again: the clock moved, so every board changed. Called with mu held.
+// changed tells every screen to look again, at once (whatever its pause: the clock is everyone's, and a question
+// shows on every screen the moment it starts): the clock moved, so every board changed. Called with mu held.
 func (h *Hub) changed() {
 	h.lobby.changed()
 	h.none.changed()
@@ -1290,6 +1291,7 @@ func (h *Hub) changed() {
 	}
 	for s := range h.subs {
 		wake(s.C)
+		wake(s.Now)
 	}
 }
 
@@ -1320,7 +1322,7 @@ func (h *Hub) touch(t *table) {
 func (h *Hub) tell(id int64) {
 	for s := range h.screens[id] {
 		wake(s.C)
-		wake(s.Own)
+		wake(s.Now)
 	}
 }
 

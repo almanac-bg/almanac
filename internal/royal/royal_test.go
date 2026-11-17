@@ -1394,6 +1394,35 @@ func TestScreens(t *testing.T) {
 	}
 }
 
+// A screen in the lobby looks again only a second after a change (someone came in), but at the start at once: the
+// first question is on every screen the moment its time starts.
+func TestStartAtOnce(t *testing.T) {
+	w := setup(t)
+	ana, bo := w.player(), w.player()
+	w.at(20, 50, 0)
+	s := w.follow(ana.ID)
+	if err := w.h.Join(t.Context(), ana); err != nil {
+		t.Fatal(err)
+	}
+	if _, pace := w.h.Look(s); pace != idle {
+		t.Fatalf("the lobby looks again after %v", pace)
+	}
+	for len(s.Now) > 0 {
+		<-s.Now
+	}
+	w.follow(bo.ID)
+	if err := w.h.Join(t.Context(), bo); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Now) != 0 {
+		t.Fatal("someone in, and the lobby looks at once")
+	}
+	w.at(21, 0, 0)
+	if len(s.Now) != 1 {
+		t.Fatal("the start, and the lobby's screen waits its second")
+	}
+}
+
 // The server stopped as the clock moved its tournaments on, one by one: the one it hadn't moved yet is brought to the
 // others, and the answer shows at both.
 func TestRestartAStepApart(t *testing.T) {

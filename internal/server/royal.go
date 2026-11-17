@@ -48,10 +48,10 @@ func (s *Server) royalEvents(w http.ResponseWriter, r *http.Request) {
 			if !send("data: " + string(data) + "\n\n") {
 				return
 			}
-			// Many answers in a moment make one look, not one each; a change of the viewer's own is looked at at once.
+			// Many answers in a moment make one look, not one each; the clock moving on, or a change of the viewer's own, is looked at at once.
 			select {
 			case <-time.After(pause):
-			case <-sub.Own:
+			case <-sub.Now:
 			case <-r.Context().Done():
 				return
 			}

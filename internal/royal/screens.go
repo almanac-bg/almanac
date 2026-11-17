@@ -173,7 +173,7 @@ func (h *Hub) watched(viewer int64) (*board, *table, *member) {
 }
 
 // Look is what a screen is sent now (one JSON object: its board, with its own part), and how long it may wait before
-// it looks again after a change (a change of its own is looked at at once: Sub.Own).
+// it looks again after a change (the clock moving on, or a change of its own, is looked at at once: Sub.Now).
 func (h *Hub) Look(s *Sub) ([]byte, time.Duration) { return h.look(s.viewer) }
 
 func (h *Hub) look(viewer int64) ([]byte, time.Duration) {
