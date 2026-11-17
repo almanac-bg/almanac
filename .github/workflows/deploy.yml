@@ -15,10 +15,10 @@
 # The jobs hold only what they need, and code from the repository never runs where a key is: the plan and the test
 # and the build read the repository (and nothing more); the release runs nothing of the repository's, only GitHub's
 # own actions and gh, and holds the rights to publish (a release, its provenance) and the key that signs the program;
-# the deploy holds the key to the server, and runs only on main. The keys are secrets: DEPLOY_KEY, which the server
-# lets run only deploy/deploy-ci.sh; RELEASE_SIGNING_KEY, whose public half is in deploy/release-signers, which
-# almanac-deploy checks before it runs anything (without the key, releases go out unsigned, and a server whose
-# release-signers names no key takes them on their checksum).
+# the deploy holds the key to the server, and runs only on main. The keys are secrets of the `production` environment
+# (which only main may use), so only the release and the deploy see them: DEPLOY_KEY, which the server lets run only
+# deploy/deploy-ci.sh; RELEASE_SIGNING_KEY, whose public half is in deploy/release-signers, which almanac-deploy checks
+# before it runs anything (a server whose release-signers names a key refuses a release without its signature).
 #
 # almanac-deploy waits for a moment the restart cuts no play: the games under way (seven minutes at most), and Роял's
 # evening (from 20:37, about half an hour), so the deploy may wait that long; merges meanwhile queue behind it, and the
@@ -154,6 +154,7 @@ jobs:
     name: Published
     needs: [plan, test, build]
     if: needs.plan.outputs.release
+    environment: production
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -197,6 +198,7 @@ jobs:
     if: >-
       always() && github.ref == 'refs/heads/main' && needs.plan.result == 'success' && needs.plan.outputs.deploy != '' &&
       (needs.release.result == 'success' || (needs.plan.outputs.release == '' && needs.release.result == 'skipped'))
+    environment: production
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     permissions:
