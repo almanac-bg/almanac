@@ -1,7 +1,8 @@
 // The week's league: every week, a race on the day's points added up over the week, in a group of up to twenty of
 // their league — when the week ends the first go up a league and the last go down, and the first three are paid XP
 // (play/leagues.go). A group isn't a race until it has five: until then it's gathering, and shows nobody. Класации has
-// the group („Лига“); Профил a line with where the player stands, once they've been in a league.
+// the group („Лига“); Профил a line with where the player stands, once they've been in a league; and the day's result
+// a quiet line of where the day just played leaves them.
 
 import { leagueEmblem } from "../art/league.ts";
 import { boardRow } from "../game/results.ts";
@@ -199,6 +200,24 @@ export function leagueBoard(v: LeagueView): Child {
 /** How the last week ended, in a line. */
 function lastWeek(e: LeagueEnd): Child {
   return h("p", { class: "muted" }, `Миналата седмица: ${place(e.place, e.of)} в ${e.from.name}.`);
+}
+
+/** The day's result: where the week's race stands, in one quiet line, a tap from the group („Лига Странджа: 2-ро място
+ * · зона за качване“); nothing while the group is gathering or the player isn't in one. */
+export function leagueNote(): Child {
+  const data = signal<LeagueView | null>(null);
+  loadLeague().then(data.set, () => {});
+  return () => {
+    const v = data();
+    if (!v?.in || gathering(v) || !v.place) return null;
+    const n = v.group.length;
+    const zone = v.place <= v.up ? " · зона за качване" : v.place > n - v.down ? " · зона за слизане" : "";
+    return h(
+      "p",
+      { class: "day-next league-note" },
+      h("a", { href: "/ranks#league" }, `Лига ${v.league.name}: ${place(v.place, n)}${zone}`),
+    );
+  };
 }
 
 /** Профил's line: the league, the place in the group (and its zone; or that it's still gathering) and the days left,

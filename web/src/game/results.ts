@@ -30,7 +30,23 @@ export function summary(
     async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${s.id}/review`)).questions,
   );
   const perfect = s.total > 0 && s.rights === s.total;
-  const hero = h(
+  const hero = scoreCard(s, line, words, moment ? formatNumber(s.points) : countUp(s.points));
+  if (moment) land(hero, s.id, perfect, s.kind === "day");
+  return h(
+    "section",
+    { class: "summary" },
+    hero,
+    nextSteps(next.main, [questions.button, ...(next.also ?? [])]),
+    more,
+    questions.list,
+  );
+}
+
+/** A finished game's score, as its result has it: the right answers big, its points (`points`: as they're drawn),
+ * a line about it, and the marks. */
+export function scoreCard(s: State, line: Child, words = meaning.points, points: Child = formatNumber(s.points)) {
+  const perfect = s.total > 0 && s.rights === s.total;
+  return h(
     "div",
     { class: "card hero" },
     // Ten of ten: the logo's rosette as a seal, and the words.
@@ -47,7 +63,7 @@ export function summary(
       h(
         "p",
         { class: "points" },
-        h("b", { class: "points-n", "data-n": s.points }, moment ? formatNumber(s.points) : countUp(s.points)),
+        h("b", { class: "points-n", "data-n": s.points }, points),
         // What points are, a tap away: the game's score, not what playing earns (XP) or strength (the rating).
         explain(h("span", { class: "points-label" }, s.points === 1 ? "точка" : "точки"), words),
         s.allRight ? h("span", { class: "points-bonus" }, `+${formatNumber(s.allRight)} за всички верни`) : null,
@@ -55,15 +71,6 @@ export function summary(
     ),
     line,
     trail(s.trail, s.total),
-  );
-  if (moment) land(hero, s.id, perfect, s.kind === "day");
-  return h(
-    "section",
-    { class: "summary" },
-    hero,
-    nextSteps(next.main, [questions.button, ...(next.also ?? [])]),
-    more,
-    questions.list,
   );
 }
 
@@ -242,38 +249,44 @@ export function reviewParts(load: () => Promise<Reviewed[]>): { button: Child; l
     const all = items();
     if (!all) return error() ? h("p", { class: "bad", role: "alert" }, error()) : null;
     heading = h("h2", { class: "section-title review-head", tabindex: -1 }, "Въпросите");
-    return h(
-      "section",
-      { class: "review" },
-      heading,
-      all.map((it) => {
-        const [kind, word] = it.right
-          ? ["right", "Вярно"]
-          : it.points > 0
-            ? ["close", "Близо"]
-            : it.given
-              ? ["wrong", "Грешно"]
-              : ["wrong", "Без отговор"];
-        return h(
-          "article",
-          { class: `reviewed ${kind}` },
-          h(
-            "p",
-            { class: "reviewed-head" },
-            h("span", { class: "kicker" }, `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""}`),
-            h("span", { class: "reviewed-says" }, it.points > 0 ? `${word} · ${formatNumber(it.points)} т.` : word),
-          ),
-          h("h3", { class: "ask" }, it.view.text),
-          picture(it.view),
-          answered(it.view, it.reveal, it.given),
-          crowdLine(it.view.type, it.reveal.crowd, it.right),
-          fact(it.reveal.fact, it.reveal.day),
-          report(it.reveal.id),
-        );
-      }),
-    );
+    return reviewed(all, heading);
   };
   return { button, list, opened: () => items() !== null };
+}
+
+/** A game's questions gone over, under their heading: each with the answer, what was given, how others answered,
+ * the fact behind it, and a word about the question if something's wrong with it. */
+export function reviewed(all: Reviewed[], heading: Child): Child {
+  return h(
+    "section",
+    { class: "review" },
+    heading,
+    all.map((it) => {
+      const [kind, word] = it.right
+        ? ["right", "Вярно"]
+        : it.points > 0
+          ? ["close", "Близо"]
+          : it.given
+            ? ["wrong", "Грешно"]
+            : ["wrong", "Без отговор"];
+      return h(
+        "article",
+        { class: `reviewed ${kind}` },
+        h(
+          "p",
+          { class: "reviewed-head" },
+          h("span", { class: "kicker" }, `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""}`),
+          h("span", { class: "reviewed-says" }, it.points > 0 ? `${word} · ${formatNumber(it.points)} т.` : word),
+        ),
+        h("h3", { class: "ask" }, it.view.text),
+        picture(it.view),
+        answered(it.view, it.reveal, it.given),
+        crowdLine(it.view.type, it.reveal.crowd, it.right),
+        fact(it.reveal.fact, it.reveal.day),
+        report(it.reveal.id),
+      );
+    }),
+  );
 }
 
 /** One row of a board: the place (gold, silver, bronze for the first three), the player with their look, the

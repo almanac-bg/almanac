@@ -58,6 +58,40 @@ func (g *Game) waiting(ctx context.Context, q interface {
 	return ids, rows.Err()
 }
 
+// Misses is what a game's mistakes will make of the player's second chance: how many of its questions they got wrong
+// and have never got right (each waits MistakesAfter), and how many wait or will in all, those included. The day's
+// result says so when there'll be a game of them (MistakesFrom).
+func (g *Game) Misses(ctx context.Context, userID, runID int64) (missed, all int, err error) {
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id, a.run_id = ? FROM answers a JOIN runs r ON r.id = a.run_id
+		WHERE r.user_id = ? GROUP BY a.question_id, a.run_id = ? HAVING max(a.is_right) = 0
+			AND NOT EXISTS (SELECT 1 FROM answers b JOIN runs s ON s.id = b.run_id
+				WHERE s.user_id = ? AND b.question_id = a.question_id AND b.is_right)`, runID, userID, runID, userID)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer rows.Close()
+	b := g.Bank()
+	seen := map[string]bool{}
+	for rows.Next() {
+		var id string
+		var here bool
+		if err := rows.Scan(&id, &here); err != nil {
+			return 0, 0, err
+		}
+		if q, ok := b.Get(id); !ok || q.Extra().Retired {
+			continue
+		}
+		if here {
+			missed++
+		}
+		if !seen[id] {
+			seen[id] = true
+			all++
+		}
+	}
+	return missed, all, rows.Err()
+}
+
 // Mistakes is how many questions are waiting for a player's second chance.
 func (g *Game) Mistakes(ctx context.Context, userID int64) (int, error) {
 	ids, err := g.waiting(ctx, g.DB.Read, userID, 0)

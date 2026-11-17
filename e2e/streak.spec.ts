@@ -8,12 +8,17 @@ test("a broken streak is won back: the day's ten and one more game, the same day
   await daysPlayed(page, 5, 4, 3);
   await page.reload();
   const card = page.locator(".keep-card").filter({ hasText: "Серията ти от 3 дни прекъсна" });
-  await expect(card).toContainText("Върни я: изиграй днес въпросите на деня и още една игра.");
+  await expect(card).toContainText("Върни я до полунощ: въпросите на деня и още една игра.");
+  // At stake, not gone: the chip has the streak's days to win back, not „0 дни поред“.
+  await expect(page.locator(".streak-chip")).toContainText("3дни за връщане");
   await startDay(page);
   await playRun(page);
-  // The day played: one game left.
+  // The day played: one game left, and the card has the gold way to it (the result's „Сподели“ is plain then).
   await expect(card).toContainText("Остава още една игра днес и серията се връща.");
-  await openGame(page, "/play/history");
+  await expect(page.locator(".btn.primary")).toHaveCount(1);
+  await card.getByRole("link", { name: "Още една игра" }).click();
+  await expect(page).toHaveURL(/\/play\/[a-z]+$/);
+  await page.getByRole("button", { name: "Започни сега" }).click();
   await playRun(page);
   await expect(page.locator(".news-open")).toContainText("Серията ти е върната: 4 дни.");
   // Back on Начало: the streak goes on, and nothing more is said of it.
@@ -67,10 +72,10 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
   await day.click();
   await startDay(page);
   await playRun(page);
-  // Played: the flame lit, and tomorrow right under the result's buttons, before the rest.
+  // Played: the flame lit, and tomorrow under the result's buttons (and the goals still open).
   await expect(page.locator(".streak-chip")).toContainText("3");
   await expect(page.locator(".streak-chip.unlit")).toHaveCount(0);
-  const tomorrow = page.locator(".summary > .actions + .tomorrow");
+  const tomorrow = page.locator(".summary .tomorrow");
   await expect(tomorrow).toContainText("Утре — нови десет");
   await expect(tomorrow).toContainText("Изиграй ги и серията ти става 4.");
 });

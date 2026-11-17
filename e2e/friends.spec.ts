@@ -118,13 +118,14 @@ test("friends on the day: a shared link to it, who has played it, and how each w
   await c.goto("/");
   await expect(c.locator(".day-meta").last()).toHaveText(`${ana} вече изигра днешните въпроси.`);
 
-  // Bo plays the day right there: its result as on Начало (tomorrow, „Сподели“ gold), and one card more, the two
-  // results side by side and Ana a tap from being his friend, never by itself.
+  // Bo plays the day right there: its result as on Начало (tomorrow, „Сподели“, one gold action: game/gold.ts), and
+  // one card more, the two results side by side and Ana a tap from being his friend, never by itself.
   await b.goto(link);
   await b.getByRole("button", { name: "Играй днешните 10" }).click();
   await playRun(b);
   await expect(b.locator(".tomorrow")).toBeVisible();
-  await expect(b.getByRole("button", { name: "Сподели" })).toHaveClass(/primary/);
+  await expect(b.getByRole("button", { name: "Сподели" })).toBeVisible();
+  await expect(b.locator(".summary .btn.primary")).toHaveCount(1);
   const card = b.locator(".invite-card");
   await expect(card.locator(".invite-both")).toHaveText(
     new RegExp(`^Ти: \\d+\\sот\\s10 · ${ana}: ${right}\\sот\\s10$`),

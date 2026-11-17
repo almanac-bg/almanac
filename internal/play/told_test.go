@@ -103,3 +103,23 @@ func TestNewsFactsAndGoals(t *testing.T) {
 		t.Fatalf("one done, one moved: moved %+v, done %+v", n.Moved, n.Goals)
 	}
 }
+
+// The day's result says how many of its questions will wait for a second chance: those got wrong and never right.
+func TestMisses(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	right, wrong := w.right, w.wrong
+	s, _ := w.g.StartDay(ctx, ana)
+	w.play(ana, s.ID, right, right, right, wrong, wrong, wrong, wrong, wrong, wrong, wrong)
+	if missed, all, err := w.g.Misses(ctx, ana, s.ID); err != nil || missed != 7 || all != 7 {
+		t.Fatalf("the day's misses: %d of %d, %v", missed, all, err)
+	}
+	// A topic's misses wait too; the day's own are still the day's.
+	ts, _ := w.g.StartTopic(ctx, ana, "history")
+	w.play(ana, ts.ID, repeat(wrong, Length)...)
+	missed, all, _ := w.g.Misses(ctx, ana, s.ID)
+	if topic, _, _ := w.g.Misses(ctx, ana, ts.ID); missed != 7 || all != 7+topic || topic == 0 {
+		t.Fatalf("after a topic: the day's %d, the topic's %d, %d in all", missed, topic, all)
+	}
+}

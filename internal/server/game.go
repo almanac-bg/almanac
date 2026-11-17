@@ -117,6 +117,12 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 				if out["rarest"], err = s.game.RarestRight(r.Context(), u.ID, day); err != nil {
 					return err
 				}
+				// The questions it got wrong will wait for a second chance: said when there'll be a game of them.
+				if missed, all, err := s.game.Misses(r.Context(), u.ID, runID); err != nil {
+					return err
+				} else if missed > 0 && all >= play.MistakesFrom {
+					out["misses"] = map[string]int{"n": missed, "days": int(play.MistakesAfter.Hours() / 24)}
+				}
 				// The shared result ends with the player's invite link: it brings whoever opens it to the day.
 				code, err := s.game.InviteCode(r.Context(), u.ID)
 				if err != nil {

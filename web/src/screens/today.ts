@@ -1,11 +1,16 @@
 // Начало: where every game starts, on one short screen, and the day is its heart. At the top the player's streak and
-// level (and, once, what came of the days just missed — a broken streak to win back while it can be — or, one line at a time, of a duel a friend has played, a friend's yes to an invite, a live duel left that went on); then the day's ten questions, the same for everyone, once, as the day's issue („Брой 6“, play/issue.go) (left half-way, where the player stopped and the way
-// on, and the streak at stake while they wait; once played, how they went, the result to share, and tomorrow); the
-// day's goals; and every other way to play a tap away: by topic, and — once a first game is finished —
-// with others. The day's boards are in Класации. The game unfolds by the days played (play/unfold.go): a first day has
-// the streak without the level, and no goals.
+// level (and, once, what came of the days just missed — a broken streak to win back while it can be, with the way to
+// — or, one line at a time, of a duel a friend has played, a friend's yes to an invite, a live duel left that went
+// on); then the day's ten questions, the same for everyone, once, as the day's issue („Брой 6“, play/issue.go) (left
+// half-way, where the player stopped and the way on, and the streak at stake while they wait; once played, how they
+// went and the one gold thing to do next (game/gold.ts: the result to share, when it's worth it and not shared yet
+// today; else another game, where a goal points), the goals still open, tomorrow, and where the day leaves the league
+// and the second chance); the day's goals; and every other way to play a tap away: by topic, and — once a first game
+// is finished — with others. The day's boards are in Класации. The game unfolds by the days played (play/unfold.go): a
+// first day has the streak without the level, and no goals.
 
 import { picture } from "../art/picture.ts";
+import { dayGold, nextGame } from "../game/gold.ts";
 import { news } from "../game/news.ts";
 import { boardRow, hands, shareButton, summary } from "../game/results.ts";
 import { getReady, playRun, shownHere, trail } from "../game/run.ts";
@@ -43,8 +48,9 @@ import {
   leftLine,
   playedLine,
 } from "./duel.ts";
-import { goalsCard } from "./goals.ts";
+import { type Goals, goalsCard, loadGoals, openGoals } from "./goals.ts";
 import { haveProfile, keepLine } from "./keep.ts";
+import { leagueNote } from "./league.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
 import { notice } from "./settings.ts";
@@ -99,6 +105,9 @@ export interface Today {
   /** A game that ended without its result on screen (the day's last question let run out, a game left at its end):
    * its news, told here once (play/told.go). */
   untold?: number;
+  /** The day played: how many of its questions got wrong will wait for a second chance, in how many days (sent when
+   * there'll be a game of them: play.MistakesFrom). */
+  misses?: { n: number; days: number };
   /** Who took the player's challenges since they last heard (play/challenges.go). */
   challenges?: ChallengeNews | null;
 }
@@ -215,6 +224,11 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
     let grown = false;
     const said = bye;
     bye = "";
+    // The day's goals (shown once XP is open: play/unfold.go; the day just played may open it): what's next after the
+    // day, and where another game goes.
+    const goals = signal<Goals | null>(null);
+    if (user.peek() && (run?.done || t.repair)) loadGoals().then(goals.set, () => {});
+    const next = () => nextGame(fresh().open?.xp ? (goals()?.goals ?? []) : []);
     return h(
       "section",
       { class: "screen home" },
@@ -224,7 +238,7 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
         if (!user() || !(just || t.played)) return null;
         const f = fresh();
         const row = status(f);
-        if (f !== t && !grown) {
+        if (row && f !== t && !grown) {
           grown = true;
           grow(row, t, f, Math.max(0, since + 1100 - performance.now()));
         }
@@ -232,7 +246,7 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
       },
       // A streak that can be won back today, as it stands (the day just played may have done it); else what came of
       // the days just missed, once.
-      t.repair ? () => repairCard(fresh().repair) : streakNotice(t),
+      t.repair ? () => repairCard(fresh().repair, next) : streakNotice(t),
       // One line at a time: a live game of the player's going on; of others, a friend played the duel, said yes to
       // the invite, the duel left went on, or who took their challenges.
       playingLine(t.playing) ??
@@ -268,24 +282,16 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
                   return lines.some(Boolean) ? h("div", null, lines) : null;
                 },
               ],
-              // The result is the one to share: „Сподели“ is the gold button, right under it; then what it earned.
-              {
-                main: shareButton(
-                  "Сподели",
-                  () =>
-                    dayShareText(t.day, t.issue, run.trail, run.total, fresh().streak, fresh().rarest, fresh().invite),
-                  undefined,
-                  true,
-                  () => tally("share:day"),
-                  true, // its link shows whose it is
-                ),
-              },
-              // Tomorrow first, right under the buttons (when the next ten come, the streak, the reminder); then the
+              // Right under it, what to do next: one gold action (game/gold.ts), „Сподели“ plain when it isn't.
+              dayNext(t, run, just, fresh, next),
+              // The goals still open, just played (else they're in their card); tomorrow (when the next ten come, the
+              // streak, the reminder); where the day leaves the league, and what waits for a second chance; then the
               // friends' day, and what the game earned (a day whose result was never on screen: told now, once).
               // Just played, the streak waits for the day as it is now, with today in it. Played on an invite's page,
               // that page's card comes first, in place of the friends' day.
               [
                 elsewhere && run === elsewhere.run ? elsewhere.card() : null,
+                just ? () => (fresh().open?.xp ? openGoals(goals) : null) : null,
                 tomorrowCard(
                   t.day,
                   () => (just && fresh() === t ? 0 : fresh().streak),
@@ -295,6 +301,8 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
                     () => fresh().streak,
                   ),
                 ),
+                () => (fresh().open?.league ? leagueNote() : null),
+                () => missesLine(fresh().misses),
                 elsewhere && run === elsewhere.run ? null : () => friendsDay(fresh()),
                 just ? news(run.id, 0, round) : untold(t, run.id),
               ],
@@ -328,6 +336,66 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
       topics(),
     );
   }
+}
+
+/** Where the day's result was shared last, on this device: once shared, gold goes to what's next. */
+const sharedKey = "almanac.sharedDay";
+
+/** What to do next under the day's result: the one gold action (game/gold.ts) — „Сподели“ for a result worth sharing,
+ * not shared yet today; else another game, to where a goal points (`next`); none while a broken streak is half won
+ * back, whose card has it — and „Сподели“ plain when it isn't gold. The rule is weighed once, as the result is drawn,
+ * so that the gold doesn't move under the player's thumb. */
+function dayNext(
+  t: Today,
+  run: State,
+  just: boolean,
+  fresh: () => Today,
+  next: () => string,
+): { main: Child; also?: Child[] } {
+  let shared = false;
+  try {
+    shared = localStorage.getItem(sharedKey) === t.day;
+  } catch {
+    // no storage here: not shared, as far as this device knows
+  }
+  const gold = dayGold({
+    rights: run.rights,
+    streak: just ? t.streak + 1 : t.streak,
+    rare: !!t.rarest && t.rarest.right <= rare,
+    shared,
+    repairing: !!t.repair && !t.repair.other,
+  });
+  const share = shareButton(
+    "Сподели",
+    () => dayShareText(t.day, t.issue, run.trail, run.total, fresh().streak, fresh().rarest, fresh().invite),
+    undefined,
+    gold === "share",
+    () => {
+      tally("share:day");
+      try {
+        localStorage.setItem(sharedKey, t.day);
+      } catch {
+        // not kept: gold again next time
+      }
+    },
+    true, // its link shows whose it is
+  );
+  if (gold === "share") return { main: share };
+  return {
+    main: gold === "next" ? () => h("a", { class: "btn primary big", href: next() }, "Още десет") : null,
+    also: [share],
+  };
+}
+
+/** The day played: how many of its questions got wrong will wait for a second chance, and when, in a quiet line. */
+function missesLine(m: Today["misses"]): Child {
+  if (!m?.n) return null;
+  const when = `във Втори шанс след ${m.days} ${m.days === 1 ? "ден" : "дни"}`;
+  return h(
+    "p",
+    { class: "day-next" },
+    m.n === 1 ? `Един от днешните въпроси ще те чака ${when}.` : `${m.n} от днешните въпроса ще те чакат ${when}.`,
+  );
 }
 
 /** The news of a game whose result was never on screen (`t.untold`; of `run` only, if given: the day's, under its
@@ -376,21 +444,23 @@ function streakNotice(t: Today): Child {
 }
 
 /** A streak just ended that can be won back today (play/repair.go): the day's ten and one more game, and what's left of
- * them. Shown while it's on offer; told as the streak's end (so that it isn't said later that it ended), and counted
- * as offered, once, on the server. */
-function repairCard(r: Today["repair"]): Child {
+ * them, by midnight. Half done (the day's ten played), the card has the gold action: the other game, where a goal
+ * points (`next`). Shown while it's on offer; told as the streak's end (so that it isn't said later that it ended),
+ * and counted as offered, once, on the server. */
+function repairCard(r: Today["repair"], next: () => string): Child {
   if (!r) return null;
   tellStreak(`ended:${r.on}`, true);
   const left = r.day
     ? "Остава още една игра днес и серията се връща."
     : r.other
-      ? "Остават въпросите на деня и серията се връща."
-      : "Върни я: изиграй днес въпросите на деня и още една игра.";
+      ? "Изиграй въпросите на деня до полунощ и серията се връща."
+      : "Върни я до полунощ: въпросите на деня и още една игра.";
   return h(
     "section",
     { class: "card keep-card" },
     h("h2", null, `Серията ти от ${r.days} дни прекъсна`),
     h("p", { class: "muted" }, left),
+    r.day && !r.other ? () => h("a", { class: "btn primary big", href: next() }, "Още една игра") : null,
   );
 }
 
@@ -398,9 +468,13 @@ function repairCard(r: Today["repair"]): Child {
  * where there's more of both. The reserve days sit on the flame's corner, each a tap from what they're for, so the
  * streak's words keep the chip's width (half a phone's, or the side column's on a wide screen). While the day's ten
  * wait, the streak is at stake: its flame unlit, its number still there, until the day played lights it (grow). */
-function status(t: Today): HTMLElement {
-  const days = t.streak;
+function status(t: Today): HTMLElement | null {
+  // A streak broken that can still be won back is at stake, not gone: its days, unlit. A plain „0 дни поред“ reads as
+  // a scold: without a streak there's no chip, until the day played starts one.
+  const repair = !t.streak && t.repair ? t.repair.days : 0;
+  const days = t.streak || repair;
   const lv = t.open?.xp ? t.level : undefined;
+  if (!days && !lv) return null;
   const share = shareOf(lv);
   return h(
     "div",
@@ -408,17 +482,19 @@ function status(t: Today): HTMLElement {
     h(
       "div",
       { class: "streak-wrap" },
-      h(
-        "a",
-        { class: `status-item streak-chip${days ? (t.run?.done ? "" : " unlit") : " cold"}`, href: "/me" },
-        h("span", { class: "status-icon" }, picture("flame", "flame status-flame")),
-        h(
-          "span",
-          { class: "status-text" },
-          h("b", { class: "status-n" }, String(days)),
-          h("span", { class: "status-label" }, days === 1 ? "ден поред" : "дни поред"),
-        ),
-      ),
+      days
+        ? h(
+            "a",
+            { class: `status-item streak-chip${repair ? " unlit repair" : t.run?.done ? "" : " unlit"}`, href: "/me" },
+            h("span", { class: "status-icon" }, picture("flame", "flame status-flame")),
+            h(
+              "span",
+              { class: "status-text" },
+              h("b", { class: "status-n" }, String(days)),
+              h("span", { class: "status-label" }, repair ? "дни за връщане" : days === 1 ? "ден поред" : "дни поред"),
+            ),
+          )
+        : null,
       // Beside the link, not in it: a tap on the shield says what it's for, and stays on Начало.
       t.reserve
         ? h(

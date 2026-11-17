@@ -1,6 +1,7 @@
 // Теми: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays the same
-// game. The tiles live on Начало (all the topics at once first, then each topic, and one for „България“, the
-// questions about Bulgaria from every topic, while the bank has them); a run of one is /play/<topic>.
+// game. The tiles live on Начало (all the topics at once first, and Втори шанс beside it while questions wait for one,
+// then each topic, and one for „България“, the questions about Bulgaria from every topic, while the bank has them); a
+// run of one is /play/<topic>, whose result offers ten more at once, and another topic a tap away.
 
 import { picture } from "../art/picture.ts";
 import { type Mastery, masteryBadge } from "../game/mastery.ts";
@@ -12,11 +13,12 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, signal, slot } from "../lib/dom.ts";
 import { byTap, entry, go, goBack, hold, mark, title } from "../lib/router.ts";
 import { bulgaria, type Category, categories, player, user } from "../state.ts";
-import { meter, questions, stakeLine, toneOf } from "../ui.ts";
+import { meter, questions, stakeLine, toneOf, topicMark } from "../ui.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
-/** The topics as tiles, each with how well the player knows it: a run across all of them first, „България“ across
- * them after (no mastery of its own: its answers count in their own topics). A game left half-way today says so on
+/** The topics as tiles, each with how well the player knows it: a run across all of them first, and the second chance
+ * right after it while questions wait for one (at the end of the list it went unseen); „България“ across them after
+ * the topics (no mastery of its own: its answers count in their own topics). A game left half-way today says so on
  * its tile, where it goes on from. */
 export function topics(): Child {
   const stats = signal<Stats | null>(null);
@@ -57,6 +59,9 @@ export function topics(): Child {
             ),
           ),
         ),
+        waiting() || goesOn("mistakes")
+          ? h("li", { class: "topic-all" }, secondChance(waiting(), goesOn("mistakes")))
+          : null,
         ...categories.map((c) =>
           h(
             "li",
@@ -85,9 +90,6 @@ export function topics(): Child {
                 ),
               ),
             )
-          : null,
-        waiting() || goesOn("mistakes")
-          ? h("li", { class: "topic-all" }, secondChance(waiting(), goesOn("mistakes")))
           : null,
       ];
     }),
@@ -182,7 +184,7 @@ export function topic([id = ""]: string[]) {
             main: () => nextOf(day(), again).main,
             also: [() => nextOf(day(), again).also, challenged(s, category ? name : undefined)],
           },
-          just ? [news(s.id)] : [],
+          just ? [otherTopics(category), news(s.id)] : [otherTopics(category)],
           undefined,
           just,
         ),
@@ -201,6 +203,36 @@ function nextOf(d: DayWaits | null, again: () => void): { main: Child; also: Chi
   return {
     main: [h("a", { class: "btn primary big", href: "/" }, "Към въпросите на деня"), stakeLine(d.streak, d.reserve)],
     also: [h("button", { class: "btn", onclick: again }, "Още десет")],
+  };
+}
+
+/** How many other topics a topic's result offers. */
+const othersShown = 3;
+
+/** Under a topic's result, a way to another, a tap away (Начало's tiles are a scroll from there): the ones the player
+ * has played least first, so that the game goes round what they know; under a game of all of them, the topics. */
+function otherTopics(current: string): Child {
+  const stats = signal<Stats | null>(null);
+  loadStats().then(stats.set, () => {});
+  return () => {
+    const answers = (id: string) => stats()?.mastery.find((m) => m.category === id)?.answers ?? 0;
+    const others = categories
+      .filter((c) => c.id !== current)
+      .map((c, i) => ({ c, i }))
+      .sort((a, b) => answers(a.c.id) - answers(b.c.id) || a.i - b.i)
+      .slice(0, othersShown)
+      .map(({ c }) => c);
+    if (!stats()) return null;
+    return h(
+      "nav",
+      { class: "other-topics", "aria-label": "Друга тема" },
+      h("p", { class: "kicker" }, "Друга тема"),
+      h(
+        "ul",
+        { class: "chips" },
+        others.map((c) => h("li", null, h("a", { class: "chip", href: `/play/${c.id}` }, topicMark(c.id), c.name))),
+      ),
+    );
   };
 }
 
@@ -263,7 +295,12 @@ export function run(r: Run): Child {
     hold();
     screen.show(() => getReady(r.name, start, () => goBack("/")));
   };
-  const play = (s: State) => screen.show(() => playRun(s, (end) => r.finished(end, ready, true)));
+  // Another from a result starts at once: the player is ready.
+  const again = () => {
+    hold();
+    start();
+  };
+  const play = (s: State) => screen.show(() => playRun(s, (end) => r.finished(end, again, true)));
   const start = async () => {
     screen.show(() => h("p", { class: "muted" }, "…"));
     try {
@@ -285,7 +322,7 @@ export function run(r: Run): Child {
   (async () => {
     if (kept) {
       const s = await api<State>("GET", `/api/runs/${kept}`).catch(() => null);
-      if (s?.done) return screen.show(() => r.finished(s, ready, false));
+      if (s?.done) return screen.show(() => r.finished(s, again, false));
       mark({ result: undefined });
     }
     const left = (await loadLeft().catch(() => [])).find(r.left);

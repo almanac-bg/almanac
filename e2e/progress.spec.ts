@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { earnedUntold, openGame, playedBefore, playRun } from "./play.ts";
+import { earnedUntold, openGame, playedBefore, playRun, startDay } from "./play.ts";
 
 test("progress: a game's level, the achievements, and a look of one's own", async ({ page }) => {
   test.setTimeout(120_000);
@@ -80,4 +80,41 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(page.getByRole("switch", { name: "По-едър текст" })).toHaveAttribute("aria-checked", "true");
   await page.reload();
   await expect(page.locator("html")).toHaveClass(/big-text/);
+});
+
+test("after the day: one gold thing to do next, the goals still open, and Профил leading back to play", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.goto("/");
+  await playedBefore(page, 1);
+  await page.reload();
+  await startDay(page);
+  await playRun(page);
+  // One gold action: „Сподели“ for a result worth it, else another game (and „Сподели“ plain beside the review).
+  const gold = page.locator(".btn.primary");
+  await expect(gold).toHaveCount(1);
+  if ((await gold.textContent())?.includes("Още десет")) {
+    await expect(gold).toHaveAttribute("href", /^\/play\/[a-z]+$/);
+    await expect(page.getByRole("button", { name: "Сподели" })).not.toHaveClass(/primary/);
+  }
+  // The goals still open, each the way to where it's done; the day's own is done.
+  const open = page.locator(".open-goals");
+  await expect(open).toBeVisible();
+  await expect(open).not.toContainText("Изиграй въпросите на деня");
+
+  // A topic, then Профил: the topic known leads back to it, the games played to going over them.
+  await openGame(page, "/play/history");
+  await playRun(page);
+  await page.goto("/me");
+  await expect(page.locator(".mastery-row a.mastery-topic", { hasText: "История" })).toHaveAttribute(
+    "href",
+    "/play/history",
+  );
+  await page.locator("a.game").first().click();
+  await expect(page).toHaveURL(/\/games\/\d+$/);
+  await expect(page.locator(".day-line")).toContainText("История");
+  await expect(page.locator(".reviewed")).toHaveCount(10);
+  await page.getByRole("link", { name: "Профил" }).first().click();
+  await expect(page).toHaveURL(/\/me$/);
 });
