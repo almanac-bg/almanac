@@ -6,7 +6,8 @@
 // on, plain for those it puts out), its line drawn into the standings, and the time where it tells players apart.
 // The lobby opens a quarter of an hour before, with the friends who said they'd come; whoever is on this screen at
 // the start plays, and those who come late may still come in until the third question's answer shows. The screen is
-// kept on in the lobby and the game.
+// kept on in the lobby and the game. The lobby tells one who hasn't played a Роял how it's played, in a line, and what
+// two or three in it make of the cuts; the end leads on to the day's ten if they wait, else to the next evening.
 //
 // Those in hear a quiet bed of music while they wait in the lobby (feel.ts: the game's only music), after a touch has
 // started the sound, with „Звуци“ and „Музика в Роял“ on; it rises in the last ten seconds, and the first question
@@ -572,8 +573,30 @@ function entry(joined: () => void, out?: boolean): Child[] {
   ];
 }
 
+/** The rules in a line, for the lobby of one who hasn't played a Роял yet. */
+const firstRules =
+  "Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни, а при равни — по-бързите.";
+
+/** A lobby of two or three, as it is: what that makes of the cuts (play.RoyalKeep keeps at least two). */
+const small: Record<number, string> = {
+  2: "Засега сте двама: без отсявания, играете и петнадесетте въпроса.",
+  3: "Засега сте трима: след 5-ия въпрос продължават двама, до края.",
+};
+
+/** Whether the player hasn't played a Роял yet (or isn't a player yet): the lobby tells them how it's played. */
+function firstTimer(): Signal<boolean> {
+  const fresh = signal(!user.peek());
+  if (user.peek())
+    api<{ royals: Past[] }>("GET", "/api/royal").then(
+      (r) => fresh.set(r.royals.length === 0),
+      () => {},
+    );
+  return fresh;
+}
+
 function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Child {
   const v0 = view();
+  const newcomer = firstTimer();
   // Those whose notifications are on here are called a minute before the start, if their screen is away.
   const notified = signal(false);
   if (v0.in) pushOn().then(notified.set, () => {});
@@ -616,6 +639,12 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
             : `Вътре си. Остани на този екран до ${clock(v0.startsAt)}.`
           : `В ${clock(v0.startsAt)} всички получават първия въпрос едновременно. Закъснелите влизат до 3-тия въпрос.`,
       ),
+      // How it's played, in a line, for one who hasn't played a Роял yet; and how few are in, if few are.
+      () => (newcomer() ? h("p", { class: "muted" }, firstRules) : null),
+      () => {
+        const n = view().players.length;
+        return n === 2 || n === 3 ? h("p", { class: "muted" }, small[n]) : null;
+      },
     ),
     entry(joined, v0.in),
     () => {
@@ -667,13 +696,22 @@ function standing(view: () => Evening): Child {
     }
     const me = v.players.find((p) => p.me);
     const c = v.cut;
+    // Before the first answer there's no standing to speak of: everyone is level.
+    const first = v.phase === "question" && v.n === 0;
     const where = !me
       ? null
       : !me.in
         ? `Извън класирането: отпадна след ${nth(me.outAt + 1)}.`
-        : `Ти си ${ordinal(me.rank)}: ${rights(me.reached)}, ${seconds(me.ms)}.`;
+        : first
+          ? null
+          : `На ${ordinal(me.rank, "n")} място си: ${rights(me.reached)}, ${seconds(me.ms)}.`;
+    const wins = "Печели този с най-много верни, а при равни — по-бързият.";
     let line: string;
-    if (!c) line = "Финал: печели този с най-много верни, а при равни — по-бързият.";
+    // No cut ahead that could put anyone out (two players, or a few left after an earlier cut): the game goes to its
+    // end as it is; the last question alone is the final.
+    if (!c && v.n < v.length - 1)
+      line = v.entered < 4 && first ? `Малък турнир: без отсявания до края. ${wins}` : `Оттук без отсявания. ${wins}`;
+    else if (!c) line = `Финал: ${wins.charAt(0).toLowerCase()}${wins.slice(1)}`;
     else if (c.now) line = "";
     else if (!c.line) line = `След ${nth(c.after)} продължават първите ${c.keep}: засега всички.`;
     else
@@ -890,6 +928,13 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
   const [best] = first.players;
   const won = me?.place === 1 && first.entered > 1;
   if (me) play(won ? "win" : "end");
+  // Whether the day's ten still wait for the player (null: not known yet).
+  const dayWaits = signal<boolean | null>(user.peek() ? null : true);
+  if (user.peek())
+    api<{ run: { done: boolean } | null }>("GET", "/api/day").then(
+      (t) => dayWaits.set(!t.run?.done),
+      () => dayWaits.set(false),
+    );
   return h(
     "div",
     { class: "screen" },
@@ -949,7 +994,12 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
       ),
     ),
     h("p", { class: "muted" }, () => `Следващият Роял: ${when(view().next, now())}.`),
-    plan(),
+    // What next, in gold: the day's ten if they still wait, else „Ще дойда“ to the next evening.
+    () => {
+      const d = dayWaits();
+      if (d === null) return null;
+      return d ? [h("a", { class: "btn primary big", href: "/" }, "Въпросите на деня"), plan()] : plan(true);
+    },
     first.runId
       ? review(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${first.runId}/review`)).questions)
       : null,
