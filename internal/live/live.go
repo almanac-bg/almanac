@@ -13,11 +13,14 @@
 // too within RematchFor, a new duel between the two is made at once.
 //
 // Every answer goes through the player's own run (internal/play), as in any game: the score, XP, the questions'
-// statistics and the duel's result are kept there, and only the timing lives here, in memory. A restart cuts the
-// duels under way off; they end without a result (play.EndLive). So before one, the server pauses the hub (Pause):
-// no new duel starts, not even with a recording; those asking go on waiting, told why (Seek.Held), and find their
-// duel once the server is back, while the duels under way (UnderWay) play to their end; a rematch waiting for its yes
-// is called off, told so (ErrPaused), as its duel would be lost. Resume undoes it.
+// statistics and the duel's result are kept there, and only the timing lives here, in memory. The run moves on the
+// duel's clock alone: the duel starts each question's time on it at the moment it shows it to both (play.ShowLive) and
+// hands it each answer with the moment it came (play.AnswerLive); the player can't show, start or answer it
+// themselves, so nobody reads a question before the duel shows it. A restart cuts the duels under way off; they end
+// without a result (play.EndLive). So before one, the server pauses the hub (Pause): no new duel starts, not even with
+// a recording; those asking go on waiting, told why (Seek.Held), and find their duel once the server is back, while
+// the duels under way (UnderWay) play to their end, which each can tell (Left: Longest at most); a rematch waiting for
+// its yes is called off, told so (ErrPaused), as its duel would be lost. Resume undoes it.
 package live
 
 import (
@@ -50,6 +53,13 @@ const (
 	maxMatches = 2000
 	// RematchFor is how long one who asks for a rematch waits for the other to ask too.
 	RematchFor = 15 * time.Second
+	// longestPause is the longest an answer shows before the next question (pauseFor).
+	longestPause = 6 * time.Second
+	// slack is what a duel's end may come after its clock says, for the database's writes on the way.
+	slack = 10 * time.Second
+	// Longest is the most a duel may take, from the moment it's made to its end: its players waited for, then each
+	// question at its longest, its time run out, and its answer shown.
+	Longest = Arrive + play.Length*(play.LongestLimit+play.Grace+longestPause) + slack
 )
 
 var (
@@ -366,6 +376,27 @@ func (h *Hub) UnderWay() int {
 		m.mu.Unlock()
 	}
 	return n
+}
+
+// Left is how long the duels under way may still take, at most: the longest of them, by its own clock (Match.left).
+// Nothing more starts while the hub is paused, so a restart that waits that long cuts no duel.
+func (h *Hub) Left() time.Duration {
+	h.mu.Lock()
+	var left time.Duration
+	if len(h.starting) > 0 { // being made: all of a duel to come
+		left = Longest
+	}
+	all := make([]*Match, 0, len(h.matches))
+	for _, m := range h.matches {
+		all = append(all, m)
+	}
+	h.mu.Unlock()
+	for _, m := range all {
+		m.mu.Lock()
+		left = max(left, m.left())
+		m.mu.Unlock()
+	}
+	return left
 }
 
 // Playing says whether a player is in a duel under way: one whose screen went may come back to it (Seek finds it).
@@ -805,13 +836,41 @@ func (m *Match) off(end func(context.Context, int64) error) {
 	m.changed()
 }
 
-// show puts question n up for both, and starts its time (on each player's run too, which keeps the score).
+// left is how long the duel may still take, at most, by its own clock: the rest of the wait for its players, of the
+// question up or its answer, and every question after at its longest, with the slack for the database. Called with the
+// lock held.
+func (m *Match) left() time.Duration {
+	if m.over() {
+		return 0
+	}
+	var left time.Duration
+	after := m.n // the questions to come in full, from this one
+	switch m.phase {
+	case PhaseIntro:
+		left = Arrive - time.Since(m.opened)
+	case PhaseQuestion:
+		q := m.dealt[m.n].Question()
+		left = play.Limit(q) + play.Grace - time.Since(m.shownAt) + pauseFor(q)
+		after++
+	case PhaseReveal:
+		left = m.pause - time.Since(m.revealedAt)
+		after++
+	}
+	left = max(0, left)
+	for _, d := range m.dealt[after:] {
+		left += play.Limit(d.Question()) + play.Grace + pauseFor(d.Question())
+	}
+	return left + slack
+}
+
+// show puts question n up for both, and starts its time, on each player's run too (which keeps the score) at the same
+// moment as here: one clock for the duel.
 func (m *Match) show(n int) {
 	m.phase, m.n, m.shownAt = PhaseQuestion, n, time.Now()
 	for _, s := range m.sides {
 		s.answered, s.took, s.given, s.gained, s.speed, s.row, s.inRow, s.right, s.exact = false, 0, nil, 0, 0, 0, 0, false, false
 		if s.human() {
-			if _, err := m.hub.game.ShowNow(context.Background(), s.ID, s.run); err != nil {
+			if err := m.hub.game.ShowLive(context.Background(), s.ID, s.run, n, m.shownAt); err != nil {
 				slog.Error("live duel", "duel", m.id, "err", err)
 				m.cancel()
 				return
@@ -865,7 +924,7 @@ func (m *Match) Answer(by int64, n int, raw json.RawMessage) error {
 	if err != nil {
 		return ErrAnswer
 	}
-	res, err := m.hub.game.AnswerAt(context.Background(), s.ID, s.run, n, raw, at)
+	res, err := m.hub.game.AnswerLive(context.Background(), s.ID, s.run, n, raw, at)
 	if errors.Is(err, play.ErrOutOfStep) {
 		return ErrNotNow
 	}
@@ -907,7 +966,7 @@ func (m *Match) reveal() {
 	}
 	for _, s := range m.sides {
 		if !s.answered && s.human() {
-			if _, err := m.hub.game.Answer(context.Background(), s.ID, s.run, m.n, nil); err != nil &&
+			if _, err := m.hub.game.AnswerLive(context.Background(), s.ID, s.run, m.n, nil, time.Now()); err != nil &&
 				!errors.Is(err, play.ErrOutOfStep) {
 				slog.Error("live duel", "duel", m.id, "err", err)
 			}
@@ -936,7 +995,7 @@ func pauseFor(q bank.Question) time.Duration {
 	case "choice", "truefalse":
 		return 4 * time.Second
 	}
-	return 6 * time.Second
+	return longestPause
 }
 
 // end is the last answer shown: the duel's result is kept already (the runs settled it as their last answers came).

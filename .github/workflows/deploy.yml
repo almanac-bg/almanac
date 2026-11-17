@@ -9,7 +9,7 @@
 #
 # The server lets CI's key run only almanac-deploy with a version (deploy/deploy-ci.sh); the key is the DEPLOY_KEY
 # secret. Without it, this releases and stops there. almanac-deploy waits for a moment the restart cuts no play: the
-# games under way (five minutes at most), and Роял's evening (from 20:39, about half an hour), so the job may wait
+# games under way (seven minutes at most), and Роял's evening (from 20:37, about half an hour), so the job may wait
 # that long; merges meanwhile queue behind it, and the newest of them goes out next, with all of theirs.
 name: Deploy
 

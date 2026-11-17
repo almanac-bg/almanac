@@ -9,20 +9,23 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/almanac-bg/almanac/internal/live"
 )
 
 // A restart cuts what is played in memory: live duels (internal/live) and games in rooms (internal/room). So a deploy
 // (deploy/deploy.sh) asks the server to drain first, with POST /api/drain from the machine itself, again every few
 // seconds while it waits. Draining, the server starts no live duel (whoever asks for one waits, told why, and finds
-// it on the new server) and no game in a room, and says it's ready once nothing is under way, or once it has drained
-// for drainCap. Around Роял, from drainLead before its lobby opens until its games are over, it doesn't drain at all:
-// the restart waits for the evening to pass. A drain nobody asks about for drainLease ends by itself (a deploy that
-// died midway), and DELETE /api/drain ends it at once.
+// it on the new server) and no game in a room, and says it's ready once nothing is under way: each live duel waited
+// for to its end, by its own clock (live.Hub.Left: however long its questions, live.Longest at most), the rooms' games
+// for drainCap at most. Around Роял, from drainLead before its lobby opens until its games are over, it doesn't drain
+// at all: the restart waits for the evening to pass. A drain nobody asks about for drainLease ends by itself (a deploy
+// that died midway), and DELETE /api/drain ends it at once.
 const (
-	// drainCap is the longest a restart waits for the games under way: a live duel, start to end, if slow.
+	// drainCap is the longest a restart waits for the rooms' games under way.
 	drainCap = 5 * time.Minute
 	// drainLead is how long before Роял's lobby opens a drain no longer starts: one begun earlier is over in time.
-	drainLead = drainCap + time.Minute
+	drainLead = max(drainCap, live.Longest) + time.Minute
 	// drainLease is how long a drain lasts without being asked about again.
 	drainLease = time.Minute
 )
@@ -40,6 +43,8 @@ type DrainStatus struct {
 	// Duels and Rooms are the live duels and the rooms' games under way.
 	Duels int `json:"duels"`
 	Rooms int `json:"rooms"`
+	// DuelsLeft is, in seconds, how long the live duels under way may still take, at most.
+	DuelsLeft int `json:"duelsLeft"`
 	// Royal says Роял is near or on: no drain until it's over.
 	Royal bool `json:"royal"`
 	// Waited is how long the server has drained, in seconds.
@@ -76,10 +81,16 @@ func (s *Server) drainStep(asked *bool) DrainStatus {
 		slog.Info("drain over", "asked", wanted, "royal", royal)
 	}
 	st := DrainStatus{Duels: s.live.UnderWay(), Rooms: s.rooms.UnderWay(), Royal: royal}
+	left := time.Duration(0)
+	if st.Duels > 0 {
+		left = s.live.Left()
+		st.DuelsLeft = int(left.Round(time.Second).Seconds())
+	}
 	if !d.since.IsZero() {
 		waited := now.Sub(d.since)
 		st.Waited = int(waited.Seconds())
-		st.Ready = st.Duels+st.Rooms == 0 || waited >= drainCap
+		// A duel past its longest by its own clock (left 0) is stuck: waiting for it would save nothing.
+		st.Ready = (st.Duels == 0 || left == 0) && (st.Rooms == 0 || waited >= drainCap)
 	}
 	return st
 }

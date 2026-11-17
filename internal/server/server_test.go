@@ -434,6 +434,9 @@ func TestPlayingOverHTTP(t *testing.T) {
 	}
 	for n := range 10 {
 		_, st := p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
+		if st["question"].(map[string]any)["startsMs"] != nil { // its pictures in
+			_, st = p.call("POST", "/api/runs/"+id+"/start", map[string]any{"n": n})
+		}
 		q := st["question"].(map[string]any)
 		view := q["view"].(map[string]any)
 		var answer any
@@ -802,6 +805,21 @@ func TestALiveDuelOverHTTP(t *testing.T) {
 	path := fmt.Sprintf("/api/duels/live/%d/answer", id)
 	if status, _ := ana.call("POST", path, map[string]any{"n": 0, "answer": map[string]any{"pick": 0}}); status != 409 {
 		t.Fatalf("an answer before the question: %d", status)
+	}
+	// Nor through Ana's own run: the duel alone shows its questions and takes its answers.
+	_, me := ana.call("GET", "/api/me", nil)
+	var run int64
+	if err := g.db.Read.QueryRow(`SELECT CASE WHEN a_id = ? THEN a_run ELSE b_run END FROM duels WHERE id = ?`,
+		int64(me["user"].(map[string]any)["id"].(float64)), id).Scan(&run); err != nil {
+		t.Fatal(err)
+	}
+	runPath := fmt.Sprintf("/api/runs/%d/", run)
+	for step, body := range map[string]map[string]any{
+		"show": {}, "start": {"n": 0}, "answer": {"n": 0, "answer": map[string]any{"pick": 0}},
+	} {
+		if status, out := ana.call("POST", runPath+step, body); status != 409 {
+			t.Fatalf("the duel's first question through %s on its run: %d %v", step, status, out)
+		}
 	}
 	v = bs.until(func(v map[string]any) bool { return v["phase"] == "question" })
 	answer := map[string]any{"pick": 0}
@@ -1265,6 +1283,7 @@ func TestLinkPreviews(t *testing.T) {
 	id := strconv.Itoa(int(run["id"].(float64)))
 	for n := range 10 {
 		p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
+		p.call("POST", "/api/runs/"+id+"/start", map[string]any{"n": n}) // its pictures in, if it has any
 		p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": nil})
 	}
 	_, friends := p.call("GET", "/api/friends", nil)
@@ -1279,6 +1298,7 @@ func TestLinkPreviews(t *testing.T) {
 	id = strconv.Itoa(int(day["id"].(float64)))
 	for n := range 10 {
 		p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
+		p.call("POST", "/api/runs/"+id+"/start", map[string]any{"n": n}) // its pictures in, if it has any
 		p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": nil})
 	}
 	if _, today := p.call("GET", "/api/day", nil); today["invite"] != link {
@@ -1382,6 +1402,7 @@ func TestProfilesOverHTTP(t *testing.T) {
 	id := strconv.Itoa(int(run["id"].(float64)))
 	for n := range 10 {
 		ana.call("POST", "/api/runs/"+id+"/show", map[string]any{})
+		ana.call("POST", "/api/runs/"+id+"/start", map[string]any{"n": n}) // its pictures in, if it has any
 		ana.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": nil})
 	}
 

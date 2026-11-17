@@ -105,9 +105,7 @@ func TestRowsInARun(t *testing.T) {
 	bo := w.user()
 	answer := func(runID int64, n int, how func(int64, int) json.RawMessage) Result {
 		t.Helper()
-		if _, err := w.g.Show(ctx, bo, runID); err != nil {
-			t.Fatal(err)
-		}
+		w.show(bo, runID)
 		w.wait(time.Second)
 		res, err := w.g.Answer(ctx, bo, runID, n, how(runID, n))
 		if err != nil {

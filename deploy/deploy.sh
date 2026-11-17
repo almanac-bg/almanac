@@ -6,10 +6,10 @@
 #   almanac-deploy v2.0.0 now    at once (to go back from a broken release)
 #
 # Before the restart it drains the server (internal/server/drain.go): asked every few seconds, the server starts no
-# live duel and no game in a room, and says it's ready once those under way are over (five minutes at the most). Near
-# Роял, from 20:39 until the evening's games are over, it doesn't drain: the restart waits. Connections that come
-# during the restart wait in systemd's socket (almanac.socket) for the new server. One deploy at a time: a second
-# waits for the first.
+# live duel and no game in a room, and says it's ready once those under way are over (a duel by its own clock, seven
+# minutes at the most; a room's game, five). Near Роял, from 20:37 until the evening's games are over, it doesn't
+# drain: the restart waits. Connections that come during the restart wait in systemd's socket (almanac.socket) for the
+# new server. One deploy at a time: a second waits for the first.
 #
 # The new version copies the database as it first starts, before its migrations (before-vX.Y.Z.db, the ten latest
 # kept: store.KeepCopy); this script can't, as the socket starts the server again as soon as a connection comes. Going

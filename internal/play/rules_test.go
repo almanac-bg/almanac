@@ -97,9 +97,7 @@ func TestRunEndedByTheClock(t *testing.T) {
 	// lastRunsOut plays a run to its last question, shows it and lets its time run out; the next look ends the run.
 	lastRunsOut := func(user, runID int64, answer func(int64, int) json.RawMessage) {
 		w.play(user, runID, repeat(answer, Length-1)...)
-		if _, err := w.g.Show(ctx, user, runID); err != nil {
-			t.Fatal(err)
-		}
+		w.show(user, runID)
 		w.wait(time.Minute)
 		if s, err := w.g.State(ctx, user, runID); err != nil || !s.Done {
 			t.Fatalf("the run after its time ran out: %+v %v", s, err)

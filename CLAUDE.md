@@ -119,9 +119,9 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
   merge that changes the program (its build's hash differs from the last release's) is released, one that doesn't
   (tests, docs, tooling) isn't. The version counts up its minor when the release brings a new migration, its patch
   otherwise: one minor, one schema. A major is the owner's call only (the workflow run by hand). `almanac-deploy` restarts the server only when
-  that cuts no play: it drains it first (no new live duel or room game; those under way finish, five minutes at the
-  most), and waits out Роял (from 20:39 to the end of its games), so a deploy may take a while to go live, and
-  several merges meanwhile go out as one. Connections wait in systemd's socket through the restart; rooms are kept
+  that cuts no play: it drains it first (no new live duel or room game; those under way finish: a duel by its own
+  clock, seven minutes at the most, a room's game five), and waits out Роял (from 20:37 to the end of its games), so
+  a deploy may take a while to go live, and several merges meanwhile go out as one. Connections wait in systemd's socket through the restart; rooms are kept
   over it; the new version copies the database before its migrations, and the deploy goes back by itself, program
   and database copy both, if it isn't healthy. No tags by hand, no ssh to deploy. Anything new kept in memory must
   survive a restart or count as under way (`internal/server/drain.go`).

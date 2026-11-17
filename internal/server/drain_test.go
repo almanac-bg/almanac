@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/almanac-bg/almanac/internal/live"
 	"github.com/almanac-bg/almanac/internal/play"
 )
 
@@ -104,6 +105,35 @@ func TestDrain(t *testing.T) {
 	g.srv.apiHandler(g.srv.drainHandler).ServeHTTP(w, r)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("from afar: %d", w.Code)
+	}
+}
+
+// A live duel under way is waited for by its own clock, past drainCap if it may still need it (the longest takes more
+// than five minutes): a restart cuts no duel, however long its questions.
+func TestDrainWaitsForADuel(t *testing.T) {
+	g := start(t)
+	var now atomic.Int64
+	now.Store(time.Date(2026, 11, 15, 12, 0, 0, 0, play.Bulgaria).UnixMilli())
+	g.srv.game.Now = func() time.Time { return time.UnixMilli(now.Load()) }
+	deploy := g.player()
+	ana, bo := g.player(), g.player()
+	ana.call("POST", "/api/guest", map[string]any{})
+	bo.call("POST", "/api/guest", map[string]any{})
+	as := ana.stream("/api/duels/live/events")
+	bo.stream("/api/duels/live/events")
+	as.until(func(v map[string]any) bool { return v["phase"] == "intro" })
+
+	_, st := deploy.call("POST", "/api/drain", nil)
+	if st["ready"] != false || st["duels"] != 1.0 || st["duelsLeft"].(float64) <= drainCap.Seconds() ||
+		st["duelsLeft"].(float64) > live.Longest.Seconds() {
+		t.Fatalf("a duel just begun: %v", st)
+	}
+	for range 6 {
+		now.Store(now.Load() + time.Minute.Milliseconds())
+		_, st = deploy.call("POST", "/api/drain", nil)
+	}
+	if st["ready"] != false || st["duels"] != 1.0 || st["waited"] != 360.0 {
+		t.Fatalf("past drainCap, the duel's time not yet run: %v", st)
 	}
 }
 
