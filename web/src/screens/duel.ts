@@ -8,8 +8,8 @@ import { nextSteps } from "../game/results.ts";
 import { getReady, playRun, shownHere, startScreen } from "../game/run.ts";
 import type { State } from "../game/types.ts";
 import { duelResult, loadDuelResult } from "../kit.ts";
-import { type ApiError, api } from "../lib/api.ts";
-import { type Child, effect, h, onCleanup, signal, slot } from "../lib/dom.ts";
+import { type ApiError, api, errorText } from "../lib/api.ts";
+import { type Child, effect, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { byTap, go, goBack, hold, title } from "../lib/router.ts";
 import { withName } from "../lib/words.ts";
@@ -359,26 +359,23 @@ export function duelOne(params: string[]) {
   const tap = byTap();
   // What comes back once the screen is gone (another page opened meanwhile) does nothing: a game's entry held over
   // that page, or a game started on it, would be another page's.
-  let gone = false;
-  onCleanup(() => {
-    gone = true;
-  });
+  const life = lifetime();
   const load = async () => {
     try {
       const d = await oneDuel(id);
-      if (gone) return;
+      if (life.aborted) return;
       const play = async () => {
         loadDuelResult().catch(() => {}); // the result's screen, on its way while the player plays
         const s = d.runId
           ? await api<State>("GET", `/api/runs/${d.runId}`)
           : (await api<{ duel: number; state?: State }>("POST", `/api/challenges/${d.challenge}/play`, {})).state;
-        if (gone) return;
+        if (life.aborted) return;
         checkWaiting(); // the notice goes
         if (!s) return void load(); // over meanwhile (its time ran out): how it ended
         screen.show(() => playRun(s, (end) => afterDuel(id, end.id), d.opponent?.name));
       };
       const failed = (err: unknown) => {
-        if (!gone) screen.show(() => failure(err, () => void load(), ["/duel", "Към дуелите"]));
+        if (!life.aborted) screen.show(() => failure(err, () => void load(), ["/duel", "Към дуелите"]));
       };
       // Sent to the player and not started: who asks, and the choice (unless said yes to already).
       const yes = accepted === id;
@@ -400,7 +397,7 @@ export function duelOne(params: string[]) {
       // otherwise (another device, back or forward), it waits for „Продължи“.
       if (d.state === "play" && d.runId) {
         const s = await api<State>("GET", `/api/runs/${d.runId}`);
-        if (gone) return;
+        if (life.aborted) return;
         if (yes || tap || (s.question && shownHere(s.id))) return play().catch(failed);
         return screen.show(() =>
           startScreen(
@@ -415,7 +412,7 @@ export function duelOne(params: string[]) {
       told(d.id); // and Начало needn't say that the friend played it
       screen.show(() => duelResult(d));
     } catch (err) {
-      if (gone) return;
+      if (life.aborted) return;
       const code = (err as ApiError).code;
       if (code === "signed_out" || code === "no_duel") return screen.show(() => notHere(() => void load()));
       screen.show(() => failure(err, () => void load(), ["/duel", "Към дуелите"]));
@@ -444,7 +441,7 @@ function asked(d: DuelView, play: () => Promise<void>, declined: () => void): Ch
       {
         class: "btn primary big",
         type: "button",
-        onclick: () => play().catch((err) => error.set((err as ApiError).message)),
+        onclick: () => play().catch((err) => error.set(errorText(err))),
       },
       "Играй",
     ),
@@ -459,7 +456,7 @@ function asked(d: DuelView, play: () => Promise<void>, declined: () => void): Ch
             checkWaiting();
             declined();
           } catch (err) {
-            error.set((err as ApiError).message);
+            error.set(errorText(err));
           }
         },
       },
@@ -474,7 +471,7 @@ function asked(d: DuelView, play: () => Promise<void>, declined: () => void): Ch
 export function afterDuel(id: number, run: number): Child {
   const view = signal<DuelView | null>(null);
   const error = signal("");
-  oneDuel(id).then(view.set, (err) => error.set((err as ApiError).message));
+  oneDuel(id).then(view.set, (err) => error.set(errorText(err)));
   return h("div", null, () => {
     const d = view();
     if (d) return duelResult(d, null, news(run));

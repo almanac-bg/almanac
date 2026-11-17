@@ -5,7 +5,7 @@
   "appendUserAgent": "AlmanacApp",
   "backgroundColor": "#110c20",
   "server": {
-    "url": "https://almanac.bg",
+    "url": "https://almanac.bg/",
     "errorPath": "offline.html"
   },
   "ios": {

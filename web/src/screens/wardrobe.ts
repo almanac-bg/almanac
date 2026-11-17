@@ -2,7 +2,7 @@
 // behind it, and the title under their name. What they wear now shows at the top as others see it; below, one group at
 // a time, everything to choose from, the locked ones with what unlocks them.
 
-import { type ApiError, api } from "../lib/api.ts";
+import { api, errorText } from "../lib/api.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { user } from "../state.ts";
@@ -59,7 +59,7 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
       await api("PATCH", "/api/me/look", body);
       await reload();
     } catch (err) {
-      error.set((err as ApiError).message);
+      error.set(errorText(err));
     }
   };
   return () => {

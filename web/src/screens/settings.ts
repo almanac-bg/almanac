@@ -1,7 +1,7 @@
 // Настройки: the name and tag (saved as they're left), the account and its email, reminders, and the data the game
 // keeps; and this device's sound and access, with a profile or without one.
 
-import { type ApiError, api } from "../lib/api.ts";
+import { type ApiError, api, errorText } from "../lib/api.ts";
 import { inApp } from "../lib/app.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked, when } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
@@ -122,7 +122,7 @@ function nameForm(): Child {
       tag.set(r.user.tag);
       note.set({ text: "Запазено." });
     } catch (err) {
-      note.set({ text: (err as ApiError).message, bad: true });
+      note.set({ text: errorText(err), bad: true });
     } finally {
       busy.set(false);
     }
@@ -317,7 +317,7 @@ function byMail() {
                 prefs.set(await api("PATCH", "/api/mail/prefs", { kind: "streak", on }));
               } catch (err) {
                 prefs.set(was);
-                error.set((err as ApiError).message);
+                error.set(errorText(err));
               }
             },
           ),
@@ -391,7 +391,7 @@ function reminders(): Child {
           prefs.set(await setPushPref(k, v));
         } catch (err) {
           prefs.set(was);
-          error.set((err as ApiError).message);
+          error.set(errorText(err));
         }
       },
     );
@@ -452,7 +452,7 @@ function deleteAccount(): Child {
                   user.set(null);
                   go("/", true);
                 } catch (err) {
-                  error.set((err as ApiError).message);
+                  error.set(errorText(err));
                 }
               },
             },
@@ -489,7 +489,7 @@ function signOutOthers(): Child {
       if (pushable()) pushOn().catch(() => {});
     } catch (err) {
       bad.set(true);
-      said.set((err as ApiError).message);
+      said.set(errorText(err));
     } finally {
       busy.set(false);
     }

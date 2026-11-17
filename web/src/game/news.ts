@@ -14,7 +14,7 @@
 
 import { emblem } from "../art/emblem.ts";
 import { leagueEmblem } from "../art/league.ts";
-import { type ApiError, api } from "../lib/api.ts";
+import { api, errorText } from "../lib/api.ts";
 import { haptic } from "../lib/app.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { place } from "../lib/ordinal.ts";
@@ -288,7 +288,7 @@ function bigOne(
                 await api("PATCH", "/api/me/look", lookBody(unlock, n.avatar));
                 close();
               } catch (err) {
-                error.textContent = (err as ApiError).message;
+                error.textContent = errorText(err);
               }
             },
           },
@@ -572,7 +572,7 @@ function wear(u: Unlock, worn: string): Child {
                   await api("PATCH", "/api/me/look", body);
                   done.set(true);
                 } catch (err) {
-                  error.set((err as ApiError).message);
+                  error.set(errorText(err));
                 }
               },
             },

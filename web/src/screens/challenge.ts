@@ -14,8 +14,8 @@ import { challengeButton, challengeText } from "../game/results.ts";
 import { getReady, playRun, startScreen } from "../game/run.ts";
 import type { State } from "../game/types.ts";
 import { loadDuelResult } from "../kit.ts";
-import { ApiError, api } from "../lib/api.ts";
-import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
+import { ApiError, api, errorText } from "../lib/api.ts";
+import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { byTap, go, goBack, hold, redirect, rename, title } from "../lib/router.ts";
 import { listWords, withName } from "../lib/words.ts";
 import { bulgaria, categories, player, topics, user } from "../state.ts";
@@ -54,11 +54,8 @@ const topicName = (id?: string) => (id ? topics.find((t) => t.id === id)?.name :
 /** Whether the screen is still shown: a reply come once it's gone does nothing (it would open a page over another,
  * or rename its entry). */
 function shown(): () => boolean {
-  let left = false;
-  onCleanup(() => {
-    left = true;
-  });
-  return () => !left;
+  const life = lifetime();
+  return () => !life.aborted;
 }
 
 /** A challenge's link: who sent it and how they did, the viewer's game of it, or (to the one who sent it) who took it. */
@@ -80,7 +77,7 @@ export function challenge([code = ""]: string[]) {
       screen.show(() =>
         (err as ApiError).code === "no_challenge" || (err as ApiError).code === "not_found"
           ? gone("Това предизвикателство вече го няма")
-          : h("p", { class: "bad", role: "alert" }, (err as ApiError).message),
+          : h("p", { class: "bad", role: "alert" }, errorText(err)),
       ),
   );
   return h("div", null, screen);
@@ -123,7 +120,7 @@ function asked(c: Challenge, screen: ReturnType<typeof slot>, here: () => boolea
             screen.show(() => playRun(r.state as State, (end) => afterDuel(r.duel, end.id), c.by.name));
           } catch (err) {
             if (!here()) return;
-            error.set((err as ApiError).message);
+            error.set(errorText(err));
             screen.show(() => asked(c, screen, here));
           }
         },
@@ -262,7 +259,7 @@ export function sendChallenge(s: State, topic?: string): { main: Child; also: Ch
       const of = (ids: number[]) => (friends.peek() ?? []).filter((f) => ids.includes(f.id)).map((f) => f.name);
       sent.set({ to: of(r.sent), not: of(to.filter((id) => !r.sent.includes(id))) });
     } catch (err) {
-      error.set((err as ApiError).message);
+      error.set(errorText(err));
     } finally {
       busy.set(false);
     }

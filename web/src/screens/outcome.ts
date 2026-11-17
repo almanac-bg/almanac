@@ -18,6 +18,7 @@ import type { DuelMark, DuelView, Side } from "./duel.ts";
 // The app's pieces, set as a result is drawn (outcome).
 let {
   api,
+  errorText,
   avatar,
   challengeButton,
   challengeText,
@@ -60,6 +61,7 @@ export interface Steps {
 export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child): Child {
   ({
     api,
+    errorText,
     avatar,
     challengeButton,
     challengeText,
@@ -201,7 +203,7 @@ function befriend(name: string, tag: string): Child {
       const r = await api<{ friends?: boolean }>("POST", "/api/friends/requests", { to: tag });
       said.set(r.friends ? "Вече сте приятели." : "Поканата е изпратена.");
     } catch (err) {
-      said.set((err as { message: string }).message);
+      said.set(errorText(err));
     } finally {
       busy.set(false);
     }

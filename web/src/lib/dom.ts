@@ -33,6 +33,18 @@ export function onCleanup(fn: Cleanup): void {
   current?.cleanups.push(fn);
 }
 
+/**
+ * The current scope's life, as an AbortSignal: aborted when the scope ends. After an await no scope is open (onCleanup
+ * does nothing there), so work a screen starts on its way (a fetch, then a stream opened or a page gone to once it's
+ * back) checks it before each thing it does after one: a screen gone does nothing more. It also stops what takes a
+ * signal (a listener, a fetch) as the scope ends. Outside any scope, it never ends.
+ */
+export function lifetime(): AbortSignal {
+  const life = new AbortController();
+  onCleanup(() => life.abort());
+  return life.signal;
+}
+
 // ---- Signals ----
 
 interface Computation {
@@ -209,7 +221,8 @@ function setAttr(el: HTMLElement, key: string, value: Value): void {
 const urlAttributes = new Set(["href", "src", "srcset", "action", "formaction", "poster", "xlink:href"]);
 
 /** A link to this site (or this page: #…), or to http(s) and mail: never javascript: or data: (srcset: each of its
- * addresses). */
+ * addresses), nor one made to look like the game's (a name and password before the host, a host that only starts with
+ * almanac.bg: the app's web view on an iPhone takes any address that starts as the game's does for its own). */
 export function safeURL(value: string): boolean {
   return value
     .split(",")
@@ -217,7 +230,10 @@ export function safeURL(value: string): boolean {
     .every((url) => {
       if ((url.startsWith("/") && !url.startsWith("//")) || url.startsWith("#")) return true;
       try {
-        return ["https:", "http:", "mailto:"].includes(new URL(url).protocol);
+        const u = new URL(url);
+        if (u.protocol === "mailto:") return true;
+        if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+        return !u.username && !u.password && (u.hostname === "almanac.bg" || !u.hostname.startsWith("almanac.bg"));
       } catch {
         return false;
       }

@@ -24,6 +24,7 @@ let {
   crowdLine,
   deliver,
   effect,
+  errorText,
   duelResult,
   emblem,
   formatNumber,
@@ -32,6 +33,7 @@ let {
   guardLeaving,
   h,
   keepAwake,
+  lifetime,
   loadDuelResult,
   news,
   onCleanup,
@@ -46,6 +48,7 @@ let {
   shareButton,
   signal,
   startScreen,
+  staying,
   timer,
   title,
   topics,
@@ -145,6 +148,7 @@ export function liveDuel(kit: Kit) {
     crowdLine,
     deliver,
     effect,
+    errorText,
     duelResult,
     emblem,
     formatNumber,
@@ -153,6 +157,7 @@ export function liveDuel(kit: Kit) {
     guardLeaving,
     h,
     keepAwake,
+    lifetime,
     loadDuelResult,
     news,
     onCleanup,
@@ -167,6 +172,7 @@ export function liveDuel(kit: Kit) {
     shareButton,
     signal,
     startScreen,
+    staying,
     timer,
     title,
     topics,
@@ -216,10 +222,17 @@ function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
 
   let es: EventSource | null = null;
   const stop = () => es?.close();
+  onCleanup(stop);
   // Over, the result stays: a stream that ends then (the duel forgotten) or drops doesn't take it away.
   const over = () => view.peek()?.phase === "end";
+  // The screen gone before the player was made (a first-time guest): no stream, which would join the queue.
+  const life = lifetime();
+  // Waiting for an opponent, a reload of the page (a new version of the game: fresh.ts) would lose the place in the
+  // queue: it waits for the next screen.
+  staying(() => !!wait.peek() && !view.peek());
   player()
     .then(() => {
+      if (life.aborted) return;
       es = new EventSource(`/api/duels/live/events${rematch ? `?rematch=${rematch.id}` : ""}`);
       es.addEventListener("waiting", (e) => {
         trouble.set("");
@@ -246,7 +259,6 @@ function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
       };
     })
     .catch(() => trouble.set("busy"));
-  onCleanup(stop);
   effect(() => {
     const phase = view()?.phase;
     playing.set(phase === "question" || phase === "reveal");
@@ -453,13 +465,10 @@ function question(view: () => LiveView, first: LiveView): Child {
   const locked = signal(!!q.given);
   const sent = signal(!!q.given);
   const error = signal("");
-  let gone = false;
-  onCleanup(() => {
-    gone = true;
-  });
+  const life = lifetime();
   // An answer that doesn't get through (the line dropped) is sent again while the question is open; one refused for
   // good, not late, frees the options again.
-  const open = () => !gone && view().phase === "question" && view().n === first.n;
+  const open = () => !life.aborted && view().phase === "question" && view().n === first.n;
   const send = async (a: Answer) => {
     locked.set(true);
     error.set("");
@@ -611,7 +620,7 @@ function end(view: () => LiveView, v: LiveView, again: (rematch?: Rematch) => vo
       error.set(
         (err as ApiError).code === "no_duel"
           ? "Резултатът още се записва. Виж го след малко в дуелите си."
-          : (err as ApiError).message,
+          : errorText(err),
       ),
   );
   return h("div", null, () => {

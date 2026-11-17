@@ -1,6 +1,8 @@
-// What the whole app shares: who's playing, and the categories. The server puts both in the page.
+// What the whole app shares: who's playing, and the categories. The server puts both in the page (lib/boot.ts); who's
+// playing is kept true to the session's cookie by fresh.ts.
 
 import { api } from "./lib/api.ts";
+import { boot } from "./lib/boot.ts";
 import { effect, signal, untracked } from "./lib/dom.ts";
 import { play } from "./lib/sound.ts";
 
@@ -20,19 +22,6 @@ export interface Category {
   name: string;
 }
 
-interface Boot {
-  user: User | null;
-  categories: Category[];
-  bulgaria?: boolean;
-  version: string;
-  push: string;
-  phones: string[] | null;
-  hostCss: string;
-  outcomeCss: string;
-}
-
-const boot: Boot = JSON.parse(document.getElementById("boot")?.textContent || "{}");
-
 export const user = signal<User | null>(boot.user ?? null);
 export const categories: Category[] = boot.categories ?? [];
 /** „България“: the questions about Bulgaria from every topic, a topic of its own (play/bulgaria.go). Its tile shows
@@ -40,7 +29,6 @@ export const categories: Category[] = boot.categories ?? [];
 export const bulgaria = { id: "bulgaria", name: "България", open: boot.bulgaria === true };
 /** Every topic a game can be of, the bank's and „България“: for naming a game's topic. */
 export const topics: Category[] = [...categories, bulgaria];
-export const version = boot.version ?? "";
 /** The key browsers subscribe to notifications with ("": none here). */
 export const pushKey = boot.push ?? "";
 /** The platforms the game's app gets notifications on ("ios", "android"). */

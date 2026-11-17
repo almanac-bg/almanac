@@ -1,18 +1,65 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-// The app's bridge, stood in for: it keeps each call to a plugin.
+// The app's bridge, stood in for: it keeps each call to a plugin, and each listener, to tell it of events.
 const calls: string[] = [];
+const listeners = new Map<string, (data: unknown) => void>();
 (globalThis as { Capacitor?: unknown }).Capacitor = {
   getPlatform: () => "ios",
   nativePromise: (plugin: string, method: string, options: Record<string, string> = {}) => {
     calls.push([plugin, method, ...Object.values(options)].join(" "));
     return Promise.resolve();
   },
-  nativeCallback: () => "",
+  nativeCallback: (plugin: string, _method: string, options: { eventName: string }, fn: (data: unknown) => void) => {
+    listeners.set(`${plugin} ${options.eventName}`, fn);
+    return "";
+  },
+};
+// The page, in the app: on Роял.
+(globalThis as { location?: unknown }).location = { origin: "https://almanac.bg", pathname: "/royal", search: "" };
+
+const { backAction, haptic, open, start } = await import("./phone.ts");
+
+/** A Nav that keeps what it was asked to open. */
+const nav = (playing = false) => {
+  const opened: string[] = [];
+  return {
+    opened,
+    navigate: (link: string) => opened.push(link),
+    go: (path: string) => opened.push(path),
+    home: () => false,
+    playing: () => playing,
+    canGoBack: () => true,
+    resumed: () => opened.push("resumed"),
+  };
 };
 
-const { backAction, haptic } = await import("./phone.ts");
+test("a link that starts the app opens once, and the launch's link isn't asked for again", () => {
+  calls.length = 0;
+  const n = nav();
+  start(n, () => {});
+  // The app tells of the link it was started by when it's first listened to, and the phone may tell of it twice.
+  const told = listeners.get("App appUrlOpen");
+  told?.({ url: "https://almanac.bg/hand/abc" });
+  told?.({ url: "https://almanac.bg/hand/abc" });
+  assert.deepEqual(n.opened, ["https://almanac.bg/hand/abc"]);
+  assert.ok(!calls.some((c) => c.includes("getLaunchUrl")), calls.join("\n"));
+  listeners.get("App resume")?.({});
+  assert.deepEqual(n.opened, ["https://almanac.bg/hand/abc", "resumed"]);
+});
+
+test("a notification for the page under way doesn't open it again; another site's link opens nothing", () => {
+  const busy = nav(true);
+  open("/royal", busy); // a Роял reminder tapped in Роял, mid-game
+  open("https://evil.example/royal", busy);
+  open("https://almanac.bg.evil.example/", busy);
+  assert.deepEqual(busy.opened, []);
+  open("/duel/7", busy); // another page: asked of the game first (the router's navigate)
+  const idle = nav(false);
+  open("/mail/off?u=1", idle); // a page of the server's own: the router's navigate loads it as a page
+  assert.deepEqual(busy.opened, ["https://almanac.bg/duel/7"]);
+  assert.deepEqual(idle.opened, ["https://almanac.bg/mail/off?u=1"]);
+});
 
 test("Android's back puts the app away from Начало only, never from a game under way", () => {
   const at = (home: boolean, canGoBack: boolean) => backAction({ home: () => home, canGoBack: () => canGoBack });

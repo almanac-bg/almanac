@@ -23,14 +23,17 @@ export let {
   changeGame,
   computed,
   countdown,
+  deliver,
   crowdLine,
   effect,
+  errorText,
   fact,
   guardLeaving,
   formatNumber,
   hostCss,
   h,
   keepAwake,
+  lifetime,
   mixes,
   news,
   nextSteps,
@@ -133,14 +136,17 @@ export function room(kit: Kit, [code = ""]: string[]) {
     changeGame,
     computed,
     countdown,
+    deliver,
     crowdLine,
     effect,
+    errorText,
     fact,
     guardLeaving,
     formatNumber,
     hostCss,
     h,
     keepAwake,
+    lifetime,
     mixes,
     news,
     nextSteps,
@@ -171,9 +177,9 @@ export function room(kit: Kit, [code = ""]: string[]) {
 
   let es: EventSource | null = null;
   // The screen is gone (another page): what was on its way doesn't join the room or open its stream after it.
-  let left = false;
+  const life = lifetime();
   const connect = () => {
-    if (left) return;
+    if (life.aborted) return;
     es = new EventSource(`/api/rooms/${code}/events`);
     es.onmessage = (e) => {
       trouble.set("");
@@ -200,7 +206,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
   };
   // In the room (again: the name and look as they are now), then its stream.
   const enter = () => {
-    if (left) return;
+    if (life.aborted) return;
     api("POST", `/api/rooms/${code}/join`).then(connect, refused);
   };
   // A wrong code is said at once, before a name is asked or a player made for it.
@@ -208,10 +214,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
     .then(() => player())
     .then((u) => (u.drawn && !named(code) ? naming.set(u) : enter()))
     .catch(refused);
-  onCleanup(() => {
-    left = true;
-    es?.close();
-  });
+  onCleanup(() => es?.close());
 
   // Each phase (and each question) is drawn once; what changes inside it follows the view.
   const key = computed(() => {
@@ -359,7 +362,7 @@ function nameStep(code: string, u: User, done: () => void): Child {
           named(code, true);
           done();
         } catch (err) {
-          error.set((err as ApiError).message);
+          error.set(errorText(err));
         } finally {
           busy.set(false);
         }
@@ -399,7 +402,7 @@ export function choose(view: () => RoomView, code: string): Child {
       await api("POST", `/api/rooms/${code}/settings`, g);
       return "";
     } catch (err) {
-      return (err as ApiError).message;
+      return errorText(err);
     }
   });
 }
@@ -408,7 +411,7 @@ export async function lead(code: string, action: "start" | "next" | "finish", er
   try {
     await api("POST", `/api/rooms/${code}/${action}`);
   } catch (err) {
-    error((err as ApiError).message);
+    error(errorText(err));
   }
 }
 
@@ -460,7 +463,7 @@ export function door(view: () => RoomView, code: string, error: (s: string) => v
     try {
       await api("POST", `/api/rooms/${code}/lock`, { on: !untracked(locked) });
     } catch (err) {
-      error((err as ApiError).message);
+      error(errorText(err));
     }
   };
   return h(
@@ -491,7 +494,7 @@ export function players(view: () => RoomView, code: string, error: (s: string) =
     try {
       await api("POST", `/api/rooms/${code}/remove`, { key: p.key });
     } catch (err) {
-      error((err as ApiError).message);
+      error(errorText(err));
     }
   };
   return h("ul", { class: "players" }, () => {
@@ -543,14 +546,16 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
   const locked = signal(!!q.given);
   const sent = signal(!!q.given);
   const error = signal("");
+  // An answer that doesn't get through (the line dropped, the server restarting) is sent again while the question is
+  // open: the room takes it once.
+  const life = lifetime();
+  const open = () => !life.aborted && view().phase === "question" && view().n === first.n;
   const send = async (a: Answer) => {
     locked.set(true);
-    try {
-      await api("POST", `/api/rooms/${code}/answer`, { n: first.n, answer: a });
-      sent.set(true);
-    } catch (err) {
-      error.set((err as ApiError).message);
-    }
+    const e = await deliver(`/api/rooms/${code}/answer`, { n: first.n, answer: a }, () => untracked(open));
+    if (life.aborted) return;
+    if (e) error.set(e.message);
+    else sent.set(true);
   };
   const asked = ask(q.view, send, locked);
   // More of the question shows as its time runs (the next clue): the server sends it when it's due.
@@ -693,7 +698,7 @@ function end(view: () => RoomView, code: string): Child {
       const r = await api<{ friends?: boolean }>("POST", `/api/rooms/${code}/people`, { key });
       sent.update((s) => ({ ...s, [key]: r.friends ? "Вече сте приятели." : "Поканата е изпратена." }));
     } catch (err) {
-      error.set((err as ApiError).message);
+      error.set(errorText(err));
     }
   };
   const add =

@@ -4,6 +4,7 @@
 import { badgeArt } from "./art/badge.ts";
 import { type DivisionID, emblem } from "./art/emblem.ts";
 import { picture } from "./art/picture.ts";
+import { errorText, passing } from "./lib/api.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { calm } from "./lib/prefs.ts";
 import { path } from "./lib/router.ts";
@@ -638,20 +639,15 @@ export function badge(a: AchievementInfo, earned: boolean, size: "s" | "m" | "l"
   });
 }
 
-/** Whether trying again can help with what went wrong: no line, or the server for a moment (not a „no“ of its own). */
-export function passing(err: unknown): boolean {
-  const status = (err as { status?: number })?.status ?? 0;
-  return status === 0 || status >= 500;
-}
-
-/** A screen that couldn't load, never a dead end: what went wrong; „Опитай пак“ where trying again can help, and the
- * same by itself as the line comes back; and a way on (`way`: Начало, unless the screen is Начало itself: null). */
+/** A screen that couldn't load, never a dead end: what went wrong (lib/api.ts, errorText); „Опитай пак“ where trying
+ * again can help, and the same by itself as the line comes back; and a way on (`way`: Начало, unless the screen is
+ * Начало itself: null). */
 export function failure(
   err: unknown,
   retry?: () => void,
   way: [href: string, label: string] | null = ["/", "Към Начало"],
 ): Child {
-  const message = (err as Error)?.message || "Нещо се обърка. Опитай пак.";
+  const message = errorText(err);
   const again = retry && passing(err) ? retry : null;
   if (again) listen(window, "online", () => again(), { once: true });
   return h(

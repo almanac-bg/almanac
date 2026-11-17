@@ -1,6 +1,6 @@
 // "Something's wrong with this question": a sentence from the player to whoever keeps the bank.
 
-import { type ApiError, api } from "../lib/api.ts";
+import { api, errorText } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 
 export function report(id: string): Child {
@@ -14,7 +14,7 @@ export function report(id: string): Child {
       await api("POST", `/api/questions/${encodeURIComponent(id)}/report`, { text: text.peek() });
       state.set("sent");
     } catch (err) {
-      error.set((err as ApiError).message);
+      error.set(errorText(err));
     }
   };
   return () => {

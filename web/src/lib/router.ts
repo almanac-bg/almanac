@@ -6,6 +6,11 @@
 // all ask first, and only „Излез“ goes on, to where they were going. A game gets an entry of its own when its screen
 // has none behind it in the app (hold): the day's ten on Начало, a game opened by a link from outside; so that back,
 // mid-question, lands on the guard and not outside the game.
+//
+// A page that has fallen behind (a new version of the game out, another account signed in: fresh.ts) opens its next
+// screen by loading the page anew (loadAnew), not in place: a moment between screens, which costs the player nothing.
+// A link from outside the page (a notification, a link opened in the app) goes the way a tapped one does (navigate).
+// A screen whose heading comes after what it loads gets the focus with it (settle), as one drawn at once does.
 
 import { type Child, mount, signal } from "./dom.ts";
 
@@ -26,6 +31,8 @@ export interface Entry {
   y?: number;
   /** A game finished on this page: its result shows again here (a reload, back to it). */
   result?: number;
+  /** Opened by a tap, and loaded anew for it (loadAnew): the page so loaded opens as the tap would have. */
+  tap?: boolean;
 }
 
 /** The path shown now (for navigation to highlight where you are). */
@@ -64,6 +71,11 @@ export function start(target: Element, list: Route[], notFound: () => Child): vo
   }
   if (typeof entry().i !== "number") history.replaceState({ ...entry(), i: 0 }, "");
   at = entry().i ?? 0;
+  // A screen loaded anew for a tap opens as one tapped (once: a reload of it after isn't).
+  if (entry().tap) {
+    tapped = true;
+    history.replaceState({ ...entry(), tap: undefined }, "");
+  }
   addEventListener("popstate", popped);
   document.addEventListener("click", (e) => {
     const a = (e.target as Element).closest?.("a");
@@ -78,7 +90,7 @@ export function start(target: Element, list: Route[], notFound: () => Child): vo
       a.target ||
       a.hasAttribute("download") ||
       a.origin !== location.origin ||
-      !routes.some((r) => r.path.test(a.pathname)) // a page of the server's own (/privacy)
+      !routed(a.pathname) // a page of the server's own (/privacy)
     )
       return;
     e.preventDefault();
@@ -101,8 +113,38 @@ export function start(target: Element, list: Route[], notFound: () => Child): vo
     },
     { passive: true },
   );
-  render(false);
+  render(false, true);
   restore(entry().y);
+}
+
+/** Whether a path is a screen of the app's (else a page of the server's own: /privacy, /mail/off). */
+const routed = (pathname: string): boolean => routes.some((r) => r.path.test(pathname));
+
+/** Opens a link to the game that came from outside the page (a notification tapped, a link opened in the app) as a tap
+ * on a link would: a game under way asks first; a page of the server's own loads as a page. */
+export function navigate(link: string): void {
+  let u: URL;
+  try {
+    u = new URL(link, location.href);
+  } catch {
+    return; // not a link: nothing to open
+  }
+  if (u.origin !== location.origin) return;
+  if (!routed(u.pathname)) {
+    location.assign(u.href);
+    return;
+  }
+  const to = u.pathname + u.search + u.hash;
+  const way = () => go(to);
+  if (!leaving?.(way)) way();
+}
+
+/** Whether the next screen opens by loading the page anew (fresh.ts says when), not in place. */
+let anew: () => boolean = () => false;
+
+/** Has the screens opened from now on load the page anew while `when` says so. */
+export function loadAnew(when: () => boolean): void {
+  anew = when;
 }
 
 /** While leaving the screen would cost the player something (a question with its time running, a live game), a way
@@ -240,7 +282,14 @@ export function release(keep: Partial<Entry> = {}): void {
   else mark(keep);
 }
 
-function render(scrollTop: boolean): void {
+/** Draws the screen of the page shown (`first`: as the page loads). */
+function render(scrollTop: boolean, first = false): void {
+  if (!first && anew()) {
+    // The page fallen behind: this screen comes with the page loaded anew, as it was come to.
+    if (tapped) mark({ tap: true });
+    location.reload();
+    return;
+  }
   path.set(location.pathname);
   let view: () => Child = missing;
   for (const r of routes) {
@@ -253,12 +302,39 @@ function render(scrollTop: boolean): void {
   disposeView?.();
   disposeView = mount(root, view);
   if (scrollTop) scrollTo(0, 0);
-  // Screen readers start at the new screen's heading.
-  const heading = root.querySelector<HTMLElement>("h1");
-  if (heading) {
+  settle();
+}
+
+/** Stops waiting for the heading of the screen before (settle). */
+let unsettled = () => {};
+
+/** Screen readers (and the keyboard) start at the new screen's heading: there now, or, for a screen that draws it once
+ * what it shows has loaded, as it comes (within ten seconds), unless the player has put the focus somewhere meanwhile. */
+function settle(): void {
+  unsettled();
+  const focus = (heading: HTMLElement) => {
     heading.tabIndex = -1;
     heading.focus({ preventScroll: true });
+  };
+  const now = root.querySelector<HTMLElement>("h1");
+  if (now) {
+    focus(now);
+    return;
   }
+  const seen = new MutationObserver(() => {
+    const heading = root.querySelector<HTMLElement>("h1");
+    if (!heading) return;
+    unsettled();
+    const at = document.activeElement;
+    if (!at || at === document.body || !at.isConnected) focus(heading);
+  });
+  const timeout = setTimeout(() => unsettled(), 10_000);
+  unsettled = () => {
+    seen.disconnect();
+    clearTimeout(timeout);
+    unsettled = () => {};
+  };
+  seen.observe(root, { childList: true, subtree: true });
 }
 
 /** Whether the page is being put back where it was scrolled to: its scrolling meanwhile isn't the player's. */

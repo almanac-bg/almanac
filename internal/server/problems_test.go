@@ -139,6 +139,27 @@ func TestReportsLimitedByPlayer(t *testing.T) {
 	}
 }
 
+// Every API answer says the game's version; an error from a page of another one is logged, not told as a problem (the
+// page loads itself anew).
+func TestClientErrorsOfAnotherVersion(t *testing.T) {
+	g := start(t)
+	p := g.player()
+	res, err := p.client.Get(g.url + "/api/health")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if v := res.Header.Get(versionHeader); v != "test" {
+		t.Fatalf("the version on an API answer: %q", v)
+	}
+	p.call("POST", "/api/errors", map[string]string{"message": "old", "where": "x", "version": "v0.0.1"})
+	p.call("POST", "/api/errors", map[string]string{"message": "now", "where": "x", "version": "test"})
+	news, _ := g.srv.problems.take()
+	if len(news) != 1 || news["browser: now at x"] == nil {
+		t.Fatalf("the browsers' kinds: %v", news)
+	}
+}
+
 // Browsers' errors are limited by network and in all, and come into the mail as browsers' kinds.
 func TestClientErrorsLimited(t *testing.T) {
 	g := start(t)

@@ -2,14 +2,15 @@
 // bottom of a phone's), and the screen the router puts under them.
 
 import { loadPictures } from "./art/picture.ts";
+import { keepFresh, resumed } from "./fresh.ts";
 import { later } from "./kit.ts";
-import { type ApiError, api } from "./lib/api.ts";
+import { api, errorText } from "./lib/api.ts";
 import { startApp } from "./lib/app.ts";
 import { type Child, effect, h, mount, signal } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { applyPrefs } from "./lib/prefs.ts";
 import { preparePush } from "./lib/push.ts";
-import { canGoBack, entry, go, path, start } from "./lib/router.ts";
+import { canGoBack, entry, go, navigate, path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
 import { almanac } from "./screens/almanac.ts";
 import { challenge, challengeFriend, newChallenge } from "./screens/challenge.ts";
@@ -47,8 +48,16 @@ const links: [href: string, label: string, icon: string, here: (p: string) => bo
 
 reportErrors();
 applyPrefs();
-// Android's back puts the app away from Начало, unless a game is under way there (the day's ten), which it asks of.
-startApp({ go, home: () => location.pathname === "/" && !entry().game && !playing.peek(), canGoBack });
+keepFresh();
+startApp({
+  navigate,
+  go,
+  // Android's back puts the app away from Начало, unless a game is under way there (the day's ten), which it asks of.
+  home: () => location.pathname === "/" && !entry().game && !playing.peek(),
+  playing: () => playing.peek(),
+  canGoBack,
+  resumed,
+});
 loadPictures().catch(() => {}); // the illustrations, in a file of their own: on their way at once
 
 const root = document.getElementById("app");
@@ -162,7 +171,7 @@ function challengeNotice(c: Challenge): Child {
                   challenges.update((list) => list.filter((x) => x.id !== c.id));
                   checkWaiting();
                 } catch (err) {
-                  error.set((err as ApiError).message);
+                  error.set(errorText(err));
                 }
               },
             },
