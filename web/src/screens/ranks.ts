@@ -5,12 +5,12 @@
 import { emblem } from "../art/emblem.ts";
 import { board, boardRow } from "../game/results.ts";
 import type { Board, Score } from "../game/types.ts";
-import { type ApiError, api } from "../lib/api.ts";
+import { api } from "../lib/api.ts";
 import { type Child, h, type Signal, signal } from "../lib/dom.ts";
 import { type By, boardHash, readBoard } from "../lib/hash.ts";
 import { rename, title } from "../lib/router.ts";
 import { categories, user } from "../state.ts";
-import { type Open, type Standing, segmented, type Tier, toneOf, topicMark } from "../ui.ts";
+import { failure, type Open, type Standing, segmented, type Tier, toneOf, topicMark } from "../ui.ts";
 import { type LeagueView, leagueBoard, loadLeague } from "./league.ts";
 
 interface Ranked {
@@ -71,7 +71,7 @@ export function ranks() {
   const data = signal<Answer | null>(null);
   const day = signal<Day | null>(null);
   const league = signal<LeagueView | null>(null);
-  const error = signal("");
+  const error = signal<unknown>(null);
   // The board asked for now; an older answer arriving late is dropped.
   const current = () => {
     const q = new URLSearchParams({ by: by() });
@@ -81,28 +81,24 @@ export function ranks() {
   };
   // The day's boards come first, and say which of the others the viewer has met: a board of a league or a rating not
   // theirs yet waits (play/unfold.go).
-  api<Day>("GET", "/api/day").then(
-    (d) => {
+  const loadDay = () =>
+    api<Day>("GET", "/api/day").then((d) => {
       day.set(d);
       if (!shows(by.peek(), d.open)) pick(by, "day");
-    },
-    (err) => error.set((err as ApiError).message),
-  );
+    }, error.set);
+  loadDay();
   const load = () => {
     data.set(null);
-    error.set("");
+    error.set(null);
     if (by() === "day") return;
     if (by() === "league") {
-      if (!league.peek()) loadLeague().then(league.set, (err) => error.set((err as ApiError).message));
+      if (!league.peek()) loadLeague().then(league.set, error.set);
       return;
     }
     const asked = current();
-    api<Answer>("GET", `/api/ranks?${asked}`).then(
-      (a) => {
-        if (current() === asked) data.set(a);
-      },
-      (err) => error.set((err as ApiError).message),
-    );
+    api<Answer>("GET", `/api/ranks?${asked}`).then((a) => {
+      if (current() === asked) data.set(a);
+    }, error.set);
   };
   load();
   const pick = <T>(s: Signal<T>, v: T) => {
@@ -173,7 +169,11 @@ export function ranks() {
           : null,
     ),
     (): Child => {
-      if (error()) return h("p", { role: "alert" }, error());
+      if (error())
+        return failure(error(), () => {
+          if (!day.peek()) loadDay();
+          load();
+        });
       if (by() === "day") {
         const t = day();
         if (!t) return h("p", { class: "muted" }, "…");
