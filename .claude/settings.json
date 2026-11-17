@@ -33,6 +33,11 @@
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/main-red.sh",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "nohup \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/tidy.sh >/dev/null 2>&1 &",
+            "timeout": 10
           }
         ]
       }
