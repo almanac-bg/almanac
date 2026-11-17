@@ -56,10 +56,17 @@ import (
 //	MTA_STS_MX          the domain's mail servers, comma-separated, for its MTA-STS policy at mta-sts.<domain>;
 //	                    MTA_STS_MODE testing (the default) or enforce
 //
-// SIGHUP reloads the bank; SIGTERM or SIGINT stop the server after the requests under way finish (a deploy drains it
+// The server plays a copy of BANK_DIR kept beside the database (banks.go: outside development), and starts on the
+// last good copy when BANK_DIR has errors. SIGHUP reloads the bank (deploy/bank.sh), from the moment the program
+// starts (one that comes during the start is taken once it's up); a new bank waits while Роял is on
+// (internal/server/bank.go). SIGTERM or SIGINT stop the server after the requests under way finish (a deploy drains it
 // first: internal/server/drain.go). A new version copies the database as it first starts (store.KeepCopy). Started by
 // systemd's socket (deploy/almanac.socket), it serves on that socket, and ADDR is left aside.
 func serve([]string) error {
+	// First of all: a reload asked while the server starts would kill it (the default for SIGHUP).
+	hup := make(chan os.Signal, 1)
+	signal.Notify(hup, syscall.SIGHUP)
+	defer signal.Stop(hup)
 	dev := os.Getenv("DEV") == "1"
 	if dev {
 		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})))
@@ -131,15 +138,22 @@ func serve([]string) error {
 		return errors.New("SMTP_URL is required (DEV=1 writes mail to the log instead)")
 	}
 
-	bankDir := defaultBankDir()
-	b, problems := bank.Load(bankDir)
-	if b == nil {
-		for _, p := range problems {
-			slog.Error("bank", "problem", p.String())
-		}
-		return fmt.Errorf("the bank in %s has problems", bankDir)
+	banks := keptBanks{src: defaultBankDir()}
+	if !dev {
+		banks.dir = filepath.Join(filepath.Dir(dbPath()), "banks")
 	}
-	slog.Info("bank", "dir", bankDir, "questions", len(b.Questions), "live", len(b.Live("", "")), "overdue", overdue(b))
+	b, problems, commit := banks.take()
+	var refused int // the errors of BANK_DIR's bank, left out for the last good copy
+	if b == nil {
+		logErrors("bank", problems)
+		refused = bank.CountOf(problems).Errors
+		if b = banks.fallback(); b == nil {
+			return fmt.Errorf("the bank in %s has errors, and no good copy of an earlier one is kept", banks.src)
+		}
+		slog.Error("bank: BANK_DIR has errors, so the last good copy is played", "refused", commit, "played", b.Commit)
+	}
+	slog.Info("bank", "dir", b.Dir, "commit", b.Commit, "questions", len(b.Questions), "live", len(b.Live("", "")), "overdue", overdue(b))
+	banks.prune([]*bank.Bank{b})
 
 	backups, err := backupStore()
 	if err != nil {
@@ -175,6 +189,10 @@ func serve([]string) error {
 	if err != nil {
 		return err
 	}
+	if refused > 0 {
+		srv.RefuseBank(commit, refused)
+		srv.Problem("bank: BANK_DIR has errors, so the server started on the last good copy")
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -190,7 +208,7 @@ func serve([]string) error {
 			slog.Error("clean-up", "err", err)
 		}
 	})
-	go reloadOnHangup(ctx, bankDir, srv)
+	go reloadOnHangup(ctx, hup, banks, srv)
 	go srv.Remind(ctx)
 	go srv.KeepDays(ctx)
 	go func() {
@@ -216,27 +234,36 @@ func serve([]string) error {
 	return err
 }
 
-// reloadOnHangup loads the bank again on SIGHUP (after a pull of the private bank). A broken bank is logged and left
-// out: the game keeps the one it has.
-func reloadOnHangup(ctx context.Context, dir string, srv *server.Server) {
-	hup := make(chan os.Signal, 1)
-	signal.Notify(hup, syscall.SIGHUP)
-	defer signal.Stop(hup)
+// reloadOnHangup loads the bank again on SIGHUP (after a pull of the private bank), through a new copy, and offers
+// it to the server: in play at once, or held while Роял is on. A bank with errors is logged and left out: the game
+// keeps the one it has.
+func reloadOnHangup(ctx context.Context, hup <-chan os.Signal, banks keptBanks, srv *server.Server) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-hup:
-			b, problems := bank.Load(dir)
+			b, problems, commit := banks.take()
 			if b == nil {
-				for _, p := range problems {
-					slog.Error("bank reload", "problem", p.String())
-				}
-				slog.Error("bank reload refused: keeping the bank as it was")
+				logErrors("bank reload", problems)
+				slog.Error("bank reload refused: keeping the bank as it was", "commit", commit)
+				srv.RefuseBank(commit, bank.CountOf(problems).Errors)
+				srv.Problem("bank reload refused: the bank has errors")
 				continue
 			}
-			srv.SetBank(b)
-			slog.Info("bank reloaded", "questions", len(b.Questions), "live", len(b.Live("", "")), "overdue", overdue(b))
+			if !srv.OfferBank(b) {
+				slog.Info("bank reloaded", "commit", b.Commit, "questions", len(b.Questions), "live", len(b.Live("", "")), "overdue", overdue(b))
+			}
+			banks.prune(srv.Banks())
+		}
+	}
+}
+
+// logErrors logs a bank's errors (its warnings are bank lint's to list).
+func logErrors(what string, problems []bank.Problem) {
+	for _, p := range problems {
+		if !p.Warning {
+			slog.Error(what, "problem", p.String())
 		}
 	}
 }

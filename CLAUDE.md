@@ -155,8 +155,8 @@ SQLite in `/var/lib/almanac`, and backs it up hourly to R2. Deploys come from CI
 `almanac-deploy vX.Y.Z` (also how to go back: an older version, with `now` after it to skip the wait for play to
 end, within the same minor (`vX.Y.*`: the same migrations); to an older minor, the older version refuses the database and the deploy goes back
 to where it was, so put the copy from before that release back by hand, `/var/lib/almanac/before-vX.Y.Z.db`, with
-`systemctl stop almanac.socket almanac` first, and lose what was played since), `almanac-bank` (pull and reload the
-questions), `journalctl -u almanac` (logs). The `almanac backup` commands need the service's settings:
+`systemctl stop almanac.socket almanac` first, and lose what was played since), `almanac-bank` (check the new
+questions apart, then pull and reload them; while Роял is on they wait for its end), `journalctl -u almanac` (logs). The `almanac backup` commands need the service's settings:
 `systemd-run --pipe --wait -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac backup verify`
 brings the latest copy back and checks it (the server does this itself daily). Health: `https://almanac.bg/api/health`
-shows the live version.
+shows the live version and the bank played (its commit; one held for Роял, one refused).

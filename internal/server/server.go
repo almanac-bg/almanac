@@ -3,7 +3,8 @@
 // It listens on the socket systemd hands it (deploy/almanac.socket), if it's given one, else on Config.Addr: with the
 // socket, connections that come while the server restarts wait for the new one instead of being refused. Before a
 // restart, a deploy drains the server (drain.go), so that the restart cuts no live duel nor a room's game; the rooms
-// themselves are kept over it (Config.RoomsFile).
+// themselves are kept over it (Config.RoomsFile). A bank reloaded while Роял is on waits for the evening to end
+// (bank.go).
 package server
 
 import (
@@ -89,6 +90,7 @@ type Server struct {
 	closing       chan struct{}
 	drain         drain
 	bank          atomic.Pointer[bank.Bank]
+	banks         banks // a bank held for Роял, one refused (bank.go)
 	client        fs.FS
 	limits        *limiter
 	problems      *problems
@@ -166,9 +168,6 @@ func (s *Server) JudgeRuns(ctx context.Context) (int, error) { return s.game.Jud
 
 // KeepDays draws the day's questions ahead, in transactions of their own (play.Game.KeepDays), until ctx ends.
 func (s *Server) KeepDays(ctx context.Context) { s.game.KeepDays(ctx) }
-
-// SetBank swaps in a new bank (a reload): new plays use it, plays under way keep theirs.
-func (s *Server) SetBank(b *bank.Bank) { s.bank.Store(b) }
 
 func (s *Server) Handler() http.Handler { return s.handler }
 
@@ -360,6 +359,7 @@ func (s *Server) Run(ctx context.Context, grace time.Duration) error {
 				return
 			case <-t.C:
 				s.drainStep(nil) // a drain whose deploy stopped asking ends; Роял coming stops one
+				s.bankStep()     // a bank held for Роял goes in as it ends
 			}
 		}
 	}()

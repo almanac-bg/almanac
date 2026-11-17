@@ -1,17 +1,78 @@
 #!/bin/sh
-# Takes the latest questions: pulls the private bank, checks it, and has the game reload it (no restart). As root:
+# Takes the latest questions: fetches the private bank, checks it, and has the game reload it (no restart). As root:
 #
 #   almanac-bank
 #
-# It prints the bank's count (…: N questions (M live)) and its problems counted (…: 0 errors, W warnings (by rule)),
-# and stops before the reload if the check fails, with its errors.
+# It checks the new commit in a copy of its own before the checkout in /srv/almanac-bank moves, so a bank with errors
+# never reaches it: it prints the errors, says which commit it left out, and stops (exit 1), the checkout and the game
+# as they were. A good bank prints its count (…: N questions (M live)) and its problems counted (…: 0 errors, W
+# warnings (by rule)); the checkout moves to it, and the game reloads it: the server plays a copy of its own
+# (cmd/almanac/banks.go), and while Роял is on it holds the new bank until the evening is over
+# (internal/server/bank.go). Then it asks the server (/api/health) what became of it, and its last line says:
+#
+#   live: <commit> <title>      the game plays it
+#   held: <commit> <title>      checked, and in play once Роял is over
+#
+# or, with exit 1, that the server refused it or didn't say. One run at a time: a second waits for the first.
 set -eu
-git -C /srv/almanac-bank pull --ff-only --quiet
-out=$(/usr/local/bin/almanac bank check /srv/almanac-bank 2>&1) || {
+repo=/srv/almanac-bank
+
+exec 9>/run/almanac-bank.lock
+if ! flock -n 9; then
+	echo "another almanac-bank is under way: waiting for it"
+	flock 9
+fi
+
+git -C "$repo" fetch --quiet origin
+new=$(git -C "$repo" rev-parse '@{upstream}')
+title=$(git -C "$repo" log -1 --format='%h %s' "$new")
+
+# The new commit, checked where nothing plays it.
+stage=$(mktemp -d /var/tmp/almanac-bank.XXXXXX)
+trap 'rm -rf "$stage"' EXIT
+git -C "$repo" archive "$new" | tar -x -C "$stage"
+out=$(/usr/local/bin/almanac bank check "$stage" 2>&1) || {
 	echo "$out" | grep -v ': warning: ' | tail -20
-	echo "not reloaded: the bank has errors"
+	echo "not taken: $title has errors; the bank stays at $(git -C "$repo" log -1 --format='%h %s')"
 	exit 1
 }
 echo "$out" | grep -E ' questions \([0-9]+ live\)$| errors, [0-9]+ warnings'
+
+if ! git -C "$repo" merge --ff-only --quiet "$new"; then
+	echo "not taken: the checkout in $repo has changes of its own (git -C $repo status)" >&2
+	exit 1
+fi
+
+# What the server plays, from the machine itself.
+health() { curl -fsSk --max-time 5 --resolve almanac.bg:443:127.0.0.1 https://almanac.bg/api/health 2>/dev/null || true; }
+case $(health) in *'"bank":{"commit":"'"$new"'"'*)
+	echo "live: $title"
+	exit 0
+	;;
+esac
+if ! systemctl is-active --quiet almanac; then
+	echo "the server isn't running: it takes $title as it starts"
+	exit 0
+fi
 systemctl reload almanac
-echo "reloaded: $(git -C /srv/almanac-bank log -1 --format='%h %s')"
+
+# The server copies and loads the bank (a few seconds), then plays it, holds it for Роял, or refuses it.
+for _ in $(seq 60); do
+	sleep 1
+	case $(health) in
+	*'"bank":{"commit":"'"$new"'"'*)
+		echo "live: $title"
+		exit 0
+		;;
+	*'"held":"'"$new"'"'*)
+		echo "held: $title (Роял is on: in play once it's over)"
+		exit 0
+		;;
+	*'"refused":{"commit":"'"$new"'"'*)
+		echo "not taken: the server refused $title (journalctl -u almanac)" >&2
+		exit 1
+		;;
+	esac
+done
+echo "not confirmed: the server doesn't say it plays $title (journalctl -u almanac)" >&2
+exit 1
