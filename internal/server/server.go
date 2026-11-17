@@ -219,6 +219,8 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/runs/{id}/review", s.review)
 	api("POST /api/questions/{id}/report", s.report)
 	api("POST /api/rooms", s.openRoom)
+	api("GET /api/rooms/{code}", s.roomOpen)
+	api("POST /api/rooms/{code}/settings", s.roomSettings)
 	mux.HandleFunc("GET /api/rooms/{code}/events", s.roomEvents)
 	api("POST /api/rooms/{code}/start", s.roomLead((*room.Room).Start))
 	api("POST /api/rooms/{code}/next", s.roomLead((*room.Room).Next))

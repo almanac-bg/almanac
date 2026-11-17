@@ -12,6 +12,7 @@ import {
   api,
   ask,
   avatar,
+  choose,
   computed,
   countdown,
   fact,
@@ -88,6 +89,7 @@ function lobby(view: () => RoomView, code: string): Child {
       players(view, code, error.set),
     ),
     h("button", { class: "btn primary big", onclick: () => lead(code, "start", error.set) }, "Започни"),
+    choose(view, code),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }
@@ -213,7 +215,8 @@ function end(view: () => RoomView, code: string): Child {
       { class: "intro" },
       h("p", { class: "kicker" }, () => `Стая ${spaced(code)} · ${about(view())}`),
       h("h1", null, () => {
-        const [best] = view().players;
+        const [best, next] = view().players;
+        if (best && next?.place === 1) return `${best.name} и ${next.name} делят първото място`;
         return best ? `${best.name} печели` : "Край";
       }),
     ),
@@ -224,6 +227,7 @@ function end(view: () => RoomView, code: string): Child {
       [],
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    choose(view, code),
     h(
       "details",
       { class: "more" },
