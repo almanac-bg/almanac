@@ -1,5 +1,5 @@
 // Начало: where every game starts, on one short screen, and the day is its heart. At the top the player's streak and
-// level (and, once, what came of the days just missed — a broken streak to win back while it can be — or of a duel a friend has played); then the day's ten questions, the same for everyone, once, as the day's issue („Брой 6“, play/issue.go) (left half-way, where the player stopped and the way
+// level (and, once, what came of the days just missed — a broken streak to win back while it can be — or, one line at a time, of a duel a friend has played, a friend's yes to an invite, a live duel left that went on); then the day's ten questions, the same for everyone, once, as the day's issue („Брой 6“, play/issue.go) (left half-way, where the player stopped and the way
 // on, and the streak at stake while they wait; once played, how they went, the result to share, and tomorrow); the
 // day's goals; and every other way to play a tap away: by topic, and — once a first game is finished —
 // with others. The day's boards are in Класации. The game unfolds by the days played (play/unfold.go): a first day has
@@ -33,7 +33,7 @@ import {
   reserveWords,
   stakeLine,
 } from "../ui.ts";
-import { type FriendPlayed, playedLine } from "./duel.ts";
+import { type Accepted, acceptedLine, type FriendPlayed, type Left, leftLine, playedLine } from "./duel.ts";
 import { goalsCard } from "./goals.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
@@ -79,6 +79,9 @@ interface Today {
   invite?: string;
   /** A friend has just played the duel the player started (told once). */
   duel?: FriendPlayed | null;
+  /** A friend said yes to the player's invite, and a live duel they left: each told once (play/lines.go). */
+  accepted?: Accepted | null;
+  left?: Left | null;
 }
 
 export function today() {
@@ -177,7 +180,8 @@ export function today() {
       // A streak that can be won back today, as it stands (the day just played may have done it); else what came of
       // the days just missed, once.
       t.repair ? () => repairCard(fresh().repair) : streakNotice(t),
-      playedLine(t.duel),
+      // Of others, one line at a time: a friend played the duel, said yes to the invite, or the duel left went on.
+      playedLine(t.duel) ?? acceptedLine(t.accepted) ?? leftLine(t.left),
       // On a big screen the day leads the page with the topics under it, and the rest waits in a column beside it
       // (app.css); on a phone the two parts are one column, in this order.
       h(

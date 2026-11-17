@@ -58,7 +58,8 @@ func (s *Server) livePlayer(ctx context.Context, id int64) (live.Player, error) 
 // if nobody comes (while the server drains for a restart, they wait for it, told so, and the stream that ends with
 // the server comes back to the new one by itself). Then the duel as they see it, again after every change, each view
 // with the duel's id: a line that dropped and came back sends it (Last-Event-ID), and follows that duel again, or
-// hears it's gone. Closing it while waiting stops waiting.
+// hears it's gone. Closing it while waiting stops waiting. Opened with ?rematch=<duel>, it asks for a rematch with the
+// other of a duel just over instead (live.Hub.Rematch), and hears "norematch" if it doesn't come about.
 func (s *Server) liveEvents(w http.ResponseWriter, r *http.Request) {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -96,7 +97,13 @@ func (s *Server) liveEvents(w http.ResponseWriter, r *http.Request) {
 			fail("busy")
 			return nil, false
 		}
-		seek := s.live.Seek(p)
+		// ?rematch=<duel>: a new duel with the other of that one (both ask: live.Hub.Rematch); else whoever comes.
+		var seek *live.Seek
+		if again, _ := strconv.ParseInt(r.URL.Query().Get("rematch"), 10, 64); again > 0 {
+			seek = s.live.Rematch(p, again)
+		} else {
+			seek = s.live.Seek(p)
+		}
 		defer seek.Leave() // once it's settled, only the waiting it stops
 		// waiting says how long until a recording, or that the server is about to restart (held: the screen waits,
 		// and finds its duel on the new server).
@@ -132,6 +139,12 @@ func (s *Server) liveEvents(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(seek.Err, play.ErrNobody):
 			fail("nobody")
+			return nil, false
+		case errors.Is(seek.Err, live.ErrNoRematch):
+			fail("norematch")
+			return nil, false
+		case errors.Is(seek.Err, live.ErrPaused):
+			fail("paused")
 			return nil, false
 		case seek.Err != nil:
 			if !errors.Is(seek.Err, live.ErrTooMany) {

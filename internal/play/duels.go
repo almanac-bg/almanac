@@ -92,6 +92,12 @@ type DuelView struct {
 	Rating *DuelRating `json:"rating,omitempty"`
 	// Record is how the player's duels against this opponent went, this one with them: a person, not a recording.
 	Record *Record `json:"record,omitempty"`
+	// YouLeft and TheyLeft are, in a live duel one of the two left under way (it went on without them), how many
+	// questions they had played when they left.
+	YouLeft  *int `json:"youLeft,omitempty"`
+	TheyLeft *int `json:"theyLeft,omitempty"`
+	// Befriend says the other, a person met in a live duel, may be asked to be friends: not a friend yet, nor asked.
+	Befriend bool `json:"befriend,omitempty"`
 
 	// against is the other player (the recorded one's, against a recording), theirRun their run.
 	against, theirRun int64
@@ -814,7 +820,8 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			coalesce(CASE WHEN d.a_id = ?1 THEN d.a_run ELSE d.b_run END, 0),
 			coalesce(CASE WHEN d.a_id <> ?1 THEN d.a_run WHEN d.ghost_run IS NOT NULL THEN d.ghost_run ELSE d.b_run END, 0),
 			coalesce(CASE WHEN d.a_id <> ?1 THEN d.a_id WHEN d.ghost_run IS NOT NULL
-				THEN (SELECT user_id FROM runs WHERE id = d.ghost_run) ELSE d.b_id END, 0)
+				THEN (SELECT user_id FROM runs WHERE id = d.ghost_run) ELSE d.b_id END, 0),
+			CASE WHEN d.a_id = ?1 THEN d.a_left ELSE d.b_left END, CASE WHEN d.a_id = ?1 THEN d.b_left ELSE d.a_left END
 		FROM duels d WHERE (d.a_id = ?1 OR d.b_id = ?1) AND (d.kind = 'friend' OR d.ended_at IS NOT NULL)
 			AND NOT (d.b_id = ?1 AND d.ended_at IS NULL
 				AND (SELECT finished_at FROM runs WHERE id = d.a_run) IS NULL)
@@ -832,10 +839,20 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 	var list []row
 	for rows.Next() {
 		var r row
+		var youLeft, theyLeft sql.NullInt64
 		if err := rows.Scan(&r.v.ID, &r.v.Kind, &r.v.CreatedAt, &r.v.ExpiresAt, &r.v.EndedAt, &r.outcome, &r.mine,
-			&r.rated, &r.v.Delta, &r.myRun, &r.theirRun, &r.theirs); err != nil {
+			&r.rated, &r.v.Delta, &r.myRun, &r.theirRun, &r.theirs, &youLeft, &theyLeft); err != nil {
 			rows.Close()
 			return nil, err
+		}
+		for _, l := range []struct {
+			n  sql.NullInt64
+			to **int
+		}{{youLeft, &r.v.YouLeft}, {theyLeft, &r.v.TheyLeft}} {
+			if l.n.Valid {
+				n := int(l.n.Int64)
+				*l.to = &n
+			}
 		}
 		list = append(list, r)
 	}
@@ -955,6 +972,15 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 			return v, err
 		}
 		v.Record = &r
+		if v.Kind == "live" {
+			// Met by chance: a tap from asking them to be friends, unless they are, or either has asked.
+			err := g.DB.Read.QueryRowContext(ctx, `SELECT NOT (EXISTS (SELECT 1 FROM friends WHERE user_id = ?1 AND friend_id = ?2)
+				OR EXISTS (SELECT 1 FROM friend_requests WHERE (from_id = ?1 AND to_id = ?2) OR (from_id = ?2 AND to_id = ?1)))`,
+				userID, v.against).Scan(&v.Befriend)
+			if err != nil {
+				return v, err
+			}
+		}
 	}
 	return v, nil
 }

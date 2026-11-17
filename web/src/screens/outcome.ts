@@ -34,6 +34,7 @@ let {
   profileHref,
   record,
   reviewParts,
+  signal,
   trail,
   until,
   withName,
@@ -45,9 +46,15 @@ const total = 10;
 /** Seconds, the Bulgarian way: „34,5 с“. */
 const secs = (ms: number) => `${(ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 })} с`;
 
-/** A duel as it stands or ended (`d`, as one duel's view has it); what to do next (`again`: another duel, after a
- * live one; else, after a friend's, a rematch); and what the game earned (`more`). */
-export function outcome(kit: Kit, d: DuelView, again: Child, more: Child): Child {
+/** What to do next, where the screen that shows a result has its own: the gold button, and plain ones beside it. */
+export interface Steps {
+  main: Child;
+  also?: Child[];
+}
+
+/** A duel as it stands or ended (`d`, as one duel's view has it); what to do next (`again`: after a live one, a
+ * rematch and another duel; else, after a friend's, a rematch); and what the game earned (`more`). */
+export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child): Child {
   ({
     api,
     avatar,
@@ -67,12 +74,14 @@ export function outcome(kit: Kit, d: DuelView, again: Child, more: Child): Child
     profileHref,
     record,
     reviewParts,
+    signal,
     trail,
     until,
     withName,
   } = kit);
   const settled = d.state === "won" || d.state === "lost" || d.state === "draw";
-  const next = again ?? rematch(d);
+  const steps = again && typeof again === "object" && "main" in again ? again : null;
+  const next = steps ? steps.main : ((again as Child) ?? rematch(d));
   const questions =
     d.runId && d.you?.done
       ? reviewParts(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${d.runId}/review`)).questions)
@@ -84,7 +93,10 @@ export function outcome(kit: Kit, d: DuelView, again: Child, more: Child): Child
     head,
     // The gold button is another duel where there's one (a live one, or a rematch with the friend), else the way back
     // to the duels; the rest are plain, side by side.
-    nextSteps(next ?? toDuels(true), [questions?.button, next ? toDuels(false) : null]),
+    nextSteps(
+      next ?? toDuels(true),
+      steps ? [questions?.button, ...(steps.also ?? [])] : [questions?.button, next ? toDuels(false) : null],
+    ),
     more,
     questions?.list,
   );
@@ -133,6 +145,7 @@ function hero(d: DuelView): Child {
         ? face(them, them.name, them.tag ?? "", d.state === "lost", settled, d.recorded)
         : h("div", { class: "duel-face" }),
     ),
+    them?.tag && d.befriend ? befriend(them.name, them.tag) : null,
     marks(d, mine, theirs),
     h("p", { class: "duel-line" }, line(d)),
     settled ? meant(d) : null,
@@ -166,6 +179,32 @@ function face(s: Side, label: string, tag: string, won: boolean, shown: boolean,
           h("span", { class: "duel-rights" }, `${s.rights} от ${total} верни`),
         ]
       : [h("b", { class: "duel-points none" }, "–"), h("span", { class: "duel-rights" }, "Тепърва ще играе")],
+  );
+}
+
+/** Under the other, met in a live duel: a tap asks them to be friends (a request, as by their tag). */
+function befriend(name: string, tag: string): Child {
+  const said = signal("");
+  const busy = signal(false);
+  const ask = async () => {
+    busy.set(true);
+    try {
+      const r = await api<{ friends?: boolean }>("POST", "/api/friends/requests", { to: tag });
+      said.set(r.friends ? "Вече сте приятели." : "Поканата е изпратена.");
+    } catch (err) {
+      said.set((err as { message: string }).message);
+    } finally {
+      busy.set(false);
+    }
+  };
+  return h("div", { class: "duel-add" }, () =>
+    said()
+      ? h("p", { class: "muted", role: "status" }, said())
+      : h(
+          "button",
+          { class: "link", type: "button", disabled: busy, "aria-label": `Добави ${name} в приятели`, onclick: ask },
+          "Добави в приятели",
+        ),
   );
 }
 
@@ -233,6 +272,10 @@ function line(d: DuelView): string {
   if (d.state === "wait") return `${them} има време до ${until(d.expiresAt)} Ще ти кажем резултата.`;
   const you = d.you;
   const other = d.opponent;
+  // One left under way: the duel went on without them, and that's what decided it.
+  const after = (n: number) => (n > 0 ? `след ${ordinal(n)}я въпрос` : "още на първия въпрос");
+  if (d.theyLeft !== undefined) return `${them} излезе ${after(d.theyLeft)}.`;
+  if (d.youLeft !== undefined) return `Излезе ${after(d.youLeft)}: дуелът продължи без теб.`;
   if (d.state === "draw") return "Равни точки и равно време.";
   if (you && other && you.points === other.points)
     return `Равни точки: реши времето (${secs(you.ms)} срещу ${secs(other.ms)}).`;

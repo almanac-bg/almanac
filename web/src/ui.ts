@@ -549,9 +549,10 @@ export function standingCard(s: Standing, own = false): Child {
   );
 }
 
-/** A day and an hour, the Bulgarian way: „вт, 13:39 ч.“ (it ends a sentence with its own period). */
+/** A day and an hour, the Bulgarian way, the day in full: „четвъртък, 09:11 ч.“ (it ends a sentence with its own
+ * period). */
 export const until = (ms: number) =>
-  new Intl.DateTimeFormat("bg", { weekday: "short", hour: "2-digit", minute: "2-digit" })
+  new Intl.DateTimeFormat("bg", { weekday: "long", hour: "2-digit", minute: "2-digit" })
     .format(new Date(ms))
     .replace(" ч.", "\u00a0ч."); // never „ч.“ alone on a line
 

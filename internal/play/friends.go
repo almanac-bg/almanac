@@ -95,11 +95,11 @@ func (g *Game) Befriend(ctx context.Context, userID int64, code string) (id int6
 	if id == userID {
 		return 0, "", ErrOwnInvite
 	}
-	return id, name, g.befriend(ctx, userID, id)
+	return id, name, g.befriend(ctx, id, userID)
 }
 
 // befriend makes two players friends (if they aren't yet), settles any requests between them, and awards what that
-// earns them.
+// earns them. a is the one who asked (whose link b opened, or whose request b accepted): told of the yes (AcceptedOf).
 func (g *Game) befriend(ctx context.Context, a, b int64) error {
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.Exec(`DELETE FROM friend_requests WHERE (from_id = ?1 AND (to_id = ?2
@@ -122,7 +122,7 @@ func (g *Game) befriend(ctx context.Context, a, b int64) error {
 			}
 		}
 		now := store.Ms(g.Now())
-		_, err := tx.Exec(`INSERT OR IGNORE INTO friends (user_id, friend_id, since) VALUES (?, ?, ?), (?, ?, ?)`,
+		_, err := tx.Exec(`INSERT OR IGNORE INTO friends (user_id, friend_id, since, asked) VALUES (?, ?, ?, 1), (?, ?, ?, 0)`,
 			a, b, now, b, a, now)
 		return err
 	})
@@ -186,7 +186,7 @@ func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool)
 			return Sent{}, err
 		}
 		if asked {
-			if err := g.befriend(ctx, from, other); err != nil {
+			if err := g.befriend(ctx, other, from); err != nil {
 				return Sent{}, err
 			}
 			return Sent{Friends: true, Name: name}, nil
