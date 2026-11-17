@@ -1,5 +1,6 @@
 // Package account is who plays: guests who start at once, the email code that keeps an account across devices, the
-// sessions that keep a browser signed in, and names.
+// one-time link that brings a game from an app's own browser to the phone's (Handoff), the sessions that keep a
+// browser signed in, and names.
 package account
 
 import (
@@ -231,15 +232,16 @@ func (a *Accounts) SignOut(ctx context.Context, token string) error {
 	return err
 }
 
-// CleanUp drops expired sessions and codes, and guests nobody has used for a while (nothing of theirs can come back:
-// their session is gone).
+// CleanUp drops expired sessions, codes and handoffs, and guests nobody has used for a while (nothing of theirs can
+// come back: their session is gone).
 func (a *Accounts) CleanUp(ctx context.Context) error {
 	now := time.Now()
 	_, err := a.DB.Write.ExecContext(ctx, `
 		DELETE FROM sessions WHERE expires_at <= ?;
 		DELETE FROM email_codes WHERE expires_at <= ?;
+		DELETE FROM handoffs WHERE expires_at <= ?;
 		DELETE FROM users WHERE email IS NULL AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.user_id = users.id);`,
-		store.Ms(now), store.Ms(now))
+		store.Ms(now), store.Ms(now), store.Ms(now))
 	return err
 }
 
@@ -299,9 +301,9 @@ func (a *Accounts) SendCode(ctx context.Context, email string) error {
 }
 
 // Verify checks a code and signs its address in. A wrong one counts a try (WrongCode, with the tries left); the last
-// try used up, the code is dead (ErrCodeTries), as it is once its time is out (ErrCodeExpired). The player who asked (current, maybe nil) is kept when they can be:
-// a guest giving a new address keeps their account; a guest signing in to an account that has the address brings their
-// progress along (Merge) and is gone after.
+// try used up, the code is dead (ErrCodeTries), as it is once its time is out (ErrCodeExpired). The player who asked
+// (current, maybe nil) is kept when they can be: a guest giving a new address keeps their account; a guest signing in
+// to an account that has the address brings their progress along (Merge) and is gone after.
 func (a *Accounts) Verify(ctx context.Context, email, code string, current *User) (User, string, error) {
 	email, err := NormalEmail(email)
 	if err != nil {
@@ -344,12 +346,7 @@ func (a *Accounts) Verify(ctx context.Context, email, code string, current *User
 		case err == nil:
 			owner.Email = email
 			if current != nil && current.Guest() && current.ID != owner.ID {
-				for _, merge := range a.Merge {
-					if err := merge(tx, current.ID, owner.ID); err != nil {
-						return err
-					}
-				}
-				if _, err := tx.Exec(`DELETE FROM users WHERE id = ?`, current.ID); err != nil {
+				if err := a.fold(tx, current.ID, owner.ID); err != nil {
 					return err
 				}
 			}
@@ -377,6 +374,88 @@ func (a *Accounts) Verify(ctx context.Context, email, code string, current *User
 		return User{}, "", err
 	}
 	return u, token, nil
+}
+
+// fold moves what player `from` has into player `to` (Merge), and deletes `from`.
+func (a *Accounts) fold(tx *sql.Tx, from, to int64) error {
+	for _, merge := range a.Merge {
+		if err := merge(tx, from, to); err != nil {
+			return err
+		}
+	}
+	_, err := tx.Exec(`DELETE FROM users WHERE id = ?`, from)
+	return err
+}
+
+// HandoffTTL is how long a handoff's link works (once).
+const HandoffTTL = 30 * time.Minute
+
+// ErrNoHandoff is a handoff's link that doesn't work: used, out of time, or never made.
+var ErrNoHandoff = errors.New("no such handoff")
+
+// Handoff makes the token of a link that brings a player's game to another browser, once, within HandoffTTL: how a
+// game begun in an app's own browser (Messenger, Instagram …), which a guest's game would never leave, moves to the
+// phone's browser. A new one replaces the player's last.
+func (a *Accounts) Handoff(ctx context.Context, userID int64) (string, error) {
+	token, hash := newToken()
+	err := a.DB.Tx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`DELETE FROM handoffs WHERE user_id = ? OR expires_at <= ?`, userID, store.Now()); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`INSERT INTO handoffs (token_hash, user_id, expires_at) VALUES (?, ?, ?)`,
+			hash, userID, store.Ms(time.Now().Add(HandoffTTL)))
+		return err
+	})
+	return token, err
+}
+
+// TakeHandoff signs this browser in by a handoff's token (once), keeping what each side has: the player who made it
+// (from) and the one this browser had (current, maybe nil) become one, as signing in by email makes them. With no one
+// here, it's simply `from`. A guest on either side is folded into the other, an account keeping its own (a guest's
+// game into the account here, or a guest here into the account it brings); two guests become the one here, the
+// game brought along. Two accounts stay as they were: this browser keeps its own. The session token is "" when the
+// browser keeps the one it has.
+func (a *Accounts) TakeHandoff(ctx context.Context, token string, current *User) (User, string, error) {
+	var u User
+	var session string
+	err := a.DB.Tx(ctx, func(tx *sql.Tx) error {
+		var from User
+		var email sql.NullString
+		err := tx.QueryRow(`SELECT u.id, u.name, u.tag, u.email, u.admin FROM handoffs h JOIN users u ON u.id = h.user_id
+			WHERE h.token_hash = ? AND h.expires_at > ?`, hashToken(token), store.Now()).
+			Scan(&from.ID, &from.Name, &from.Tag, &email, &from.Admin)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNoHandoff
+		}
+		if err != nil {
+			return err
+		}
+		from.Email = email.String
+		if _, err := tx.Exec(`DELETE FROM handoffs WHERE token_hash = ?`, hashToken(token)); err != nil {
+			return err
+		}
+		switch {
+		case current == nil:
+			u = from
+		case current.ID == from.ID || (!current.Guest() && !from.Guest()):
+			u = *current
+			return nil
+		case current.Guest() && !from.Guest():
+			if err := a.fold(tx, current.ID, from.ID); err != nil {
+				return err
+			}
+			u = from
+		default: // a guest brought here, to a guest or an account
+			u = *current
+			return a.fold(tx, from.ID, current.ID)
+		}
+		session, err = startSession(tx, u.ID)
+		return err
+	})
+	if err != nil {
+		return User{}, "", err
+	}
+	return u, session, nil
 }
 
 // Rename gives a player a new name (anyone's: names may repeat; the tag tells players apart).

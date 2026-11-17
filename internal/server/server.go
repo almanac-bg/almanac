@@ -201,6 +201,8 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/auth/code", s.sendCode)
 	api("POST /api/auth/verify", s.verify)
 	api("POST /api/auth/signout", s.signOut)
+	api("POST /api/auth/handoff", s.handoff)
+	api("POST /api/auth/hand", s.takeHandoff)
 	api("GET /api/day", s.today)
 	api("POST /api/day", s.startDay)
 	api("GET /api/day/{day}/board", s.board)

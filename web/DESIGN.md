@@ -42,11 +42,15 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   as tall as what's in it), and all of them at once (on a big screen in one row after the topics with „България“ and
   „Втори шанс“, short tiles side by side). Дуел, Роял and Стая open from here and
   have a way back to it (`back()`). A player who hasn't finished a game yet sees only the day and the topics, and a
-  quiet „Имаш профил? Влез“ (a new phone) that opens the sign-in in place: the
+  quiet „Имаш профил? Влез“ (a new phone) that opens the sign-in in place (open from the start, above the day, for a
+  browser signed out that came from the streak's mail, `/?from=mail`): the
   streak and the ways to play with others come after the first game, the level and the goals from the second day
-  played (see First days). A guest who keeps coming back is asked to keep the profile in a small card under the goals,
-  said by what's at stake („Серията ти от 5 дни е само на това устройство…“), the form a tap away behind a plain
-  „Запази с имейл“.
+  played (see First days). From the second day played, a guest is asked to keep the game in one line of the „Утре“
+  card, said by what's at stake („Серията ти от 2 дни е само на това устройство. Запази я с имейл.“), the form opening
+  in place. In an app's own browser (Messenger, Instagram …: `lib/embedded.ts`), where a guest's game would stay, it's
+  asked on the first day, with the way out that carries the game: „Отвори в браузъра“ on Android, „Копирай връзката“
+  (for Safari) on an iPhone (`/hand/<token>`, once, `account.Handoff`). A guest's Профил has „Играеш и на друго
+  устройство? Влез с имейла си“ under the name.
 - **The streak at stake.** While the day's ten wait, a streak (1 day or more: the second day is where a habit is won or
   lost) is at stake: its flame is unlit (`.streak-chip.unlit`, the number still there), and the day's card says what
   the ten make of it („Серия от 5 дни. С днешните въпроси става 6.“); from 18:00, if no reserve day would keep it, that

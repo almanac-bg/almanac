@@ -77,6 +77,7 @@ var playerErrors = map[error]*apiError{
 	account.ErrBadCode:     {http.StatusBadRequest, "bad_code", "Грешен код."},
 	account.ErrCodeExpired: {http.StatusBadRequest, "code_expired", "Кодът е изтекъл. Поискай нов."},
 	account.ErrCodeTries:   {http.StatusBadRequest, "code_tries", "Твърде много опити. Поискай нов код."},
+	account.ErrNoHandoff:   {http.StatusNotFound, "no_handoff", "Тази връзка вече не работи: играта ти остана там, където я започна."},
 	account.ErrBadName:     {http.StatusBadRequest, "bad_name", "Името трябва да е от 2 до 30 букви, цифри или интервали."},
 	account.ErrBadTag:      {http.StatusBadRequest, "bad_tag", "Потребителското име е от 3 до 20 латински букви, цифри или _ и започва с буква."},
 	account.ErrTagTaken:    {http.StatusConflict, "tag_taken", "Това потребителско име е заето. Опитай друго."},
@@ -276,6 +277,52 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) error {
 		_ = s.accounts.SignOut(r.Context(), c.Value)
 	}
 	s.setSession(w, token)
+	return ok(w, map[string]any{"user": u})
+}
+
+// handoff makes the link that brings the player's game to the phone's own browser, once (account.Handoff): from an
+// app's browser (Messenger, Instagram …) where a guest's game would otherwise stay. The link opens the app's page
+// /hand/<token>, which takes it by takeHandoff: a page, so that a link preview fetching it takes nothing.
+func (s *Server) handoff(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	if !s.limits.allow("handoff:"+strconv.FormatInt(u.ID, 10), 20, time.Hour) {
+		return errTooMany
+	}
+	token, err := s.accounts.Handoff(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"url": s.cfg.PublicURL + "/hand/" + token})
+}
+
+// takeHandoff signs this browser in by a handoff's token, the game it brings joined with what's here.
+func (s *Server) takeHandoff(w http.ResponseWriter, r *http.Request) error {
+	var in struct {
+		Token string `json:"token"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	if !s.limits.allow("hand:"+s.clientIP(r), 30, time.Hour) {
+		return errTooMany
+	}
+	current, err := s.user(r)
+	if err != nil {
+		return err
+	}
+	u, token, err := s.accounts.TakeHandoff(r.Context(), in.Token, current)
+	if err != nil {
+		return err
+	}
+	if token != "" {
+		if c, err := r.Cookie(s.cookie); err == nil {
+			_ = s.accounts.SignOut(r.Context(), c.Value)
+		}
+		s.setSession(w, token)
+	}
 	return ok(w, map[string]any{"user": u})
 }
 

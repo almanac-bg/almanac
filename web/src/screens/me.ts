@@ -6,7 +6,7 @@
 
 import { emblem } from "../art/emblem.ts";
 import { type Child, h, signal, when } from "../lib/dom.ts";
-import { title } from "../lib/router.ts";
+import { go, title } from "../lib/router.ts";
 import { user } from "../state.ts";
 import {
   avatar,
@@ -22,6 +22,7 @@ import {
   unlockPicture,
   unlockWords,
 } from "../ui.ts";
+import { haveProfile } from "./keep.ts";
 import { leagueLine } from "./league.ts";
 import { loadProgress, nearest, type Progress } from "./progress.ts";
 import { stats } from "./stats.ts";
@@ -40,6 +41,9 @@ export function me() {
         return [
           profileNav(),
           head(progress),
+          // A guest who has a profile elsewhere signs in here, a tap away; Профил again, as the profile has it.
+          () =>
+            user()?.email ? null : haveProfile(() => go("/me", true), "Играеш и на друго устройство? Влез с имейла си"),
           () => {
             const p = progress();
             return p ? levelCard(p) : null;

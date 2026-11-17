@@ -1,12 +1,10 @@
-// When a guest is asked to keep their profile with an email: once they keep coming back (three days in a row, or
-// level 3), and not again for a week after „По-късно“. Pure, so that it's tested on its own.
+// When a guest is asked to keep their game: from the second day played (a habit begun is worth keeping), or at once
+// in an app's own browser (lib/embedded.ts), which keeps a game from the phone's browser. Pure, so that it's tested on
+// its own.
 
-/** How long „По-късно“ puts the ask off. */
-export const keepLater = 7 * 24 * 60 * 60 * 1000;
-
-/** Whether to ask a player to keep their profile: a guest (no email) who keeps coming back, not put off lately. */
-export function askToKeep(p: { email?: string; streak: number; level: number; laterAt: number; now: number }): boolean {
+/** Whether to ask a player to keep their game: a guest (no email) who has played two days (`days`, as far as it
+ * counts: 1 or 2), or is in an app's own browser (`embedded`). */
+export function askToKeep(p: { email?: string; days: number; embedded: boolean }): boolean {
   if (p.email) return false;
-  if (p.streak < 3 && p.level < 3) return false;
-  return p.now - p.laterAt >= keepLater;
+  return p.days >= 2 || p.embedded;
 }

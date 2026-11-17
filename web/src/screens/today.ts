@@ -12,9 +12,8 @@ import { getReady, playRun, trail } from "../game/run.ts";
 import { dayShareText, percent, rare } from "../game/share.ts";
 import type { Board, Mark, Score, State } from "../game/types.ts";
 import { type ApiError, api, tally } from "../lib/api.ts";
-import { type Child, effect, h, onCleanup, signal, slot } from "../lib/dom.ts";
+import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
-import { askToKeep } from "../lib/keep.ts";
 import { place } from "../lib/ordinal.ts";
 import { needsHomeScreen, pushable, pushOn, turnOn } from "../lib/push.ts";
 import { title } from "../lib/router.ts";
@@ -35,9 +34,10 @@ import {
 } from "../ui.ts";
 import { type FriendPlayed, playedLine } from "./duel.ts";
 import { goalsCard } from "./goals.ts";
+import { haveProfile, keepLine } from "./keep.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
-import { farewell, signIn } from "./settings.ts";
+import { notice } from "./settings.ts";
 import { yearCard } from "./year.ts";
 
 interface Today {
@@ -83,9 +83,12 @@ interface Today {
 
 export function today() {
   title();
-  // A profile just deleted is said once, over the day.
-  let bye = farewell.peek();
-  farewell.set("");
+  // A profile just deleted, or a game just brought here, is said once, over the day.
+  let bye = notice.peek();
+  notice.set("");
+  // The streak's mail links here with ?from=mail (server/streakmail.go): its reader has a profile.
+  const fromMail = new URLSearchParams(location.search).get("from") === "mail";
+  if (fromMail) history.replaceState(history.state, "", "/");
   const screen = slot(() => h("p", { class: "muted" }, "…"));
   const load = async () => {
     try {
@@ -189,6 +192,8 @@ export function today() {
       h(
         "div",
         { class: "home-main" },
+        // Come from the streak's mail to a browser signed out: the way in comes first, open.
+        fromMail && !user.peek()?.email ? haveProfile(load, undefined, true) : null,
         run?.done
           ? summary(
               run,
@@ -224,7 +229,15 @@ export function today() {
               // friends' day, and what the game earned.
               // Just played, the streak waits for the day as it is now, with today in it.
               [
-                tomorrowCard(t.day, () => (just && fresh() === t ? 0 : fresh().streak)),
+                tomorrowCard(
+                  t.day,
+                  () => (just && fresh() === t ? 0 : fresh().streak),
+                  // A guest is asked to keep the game in a line of its own (screens/keep.ts).
+                  keepLine(
+                    () => (fresh().open?.xp ? 2 : 1),
+                    () => fresh().streak,
+                  ),
+                ),
                 () => friendsDay(fresh()),
                 just ? news(run.id, 0, round) : null,
               ],
@@ -233,7 +246,7 @@ export function today() {
             )
           : dayCard(t, start(t), run?.trail ?? [], failed),
         // Before a first game, a player who has a profile already (a new phone) signs in, a tap away.
-        just || t.played || user.peek()?.email ? null : haveProfile(load),
+        just || t.played || user.peek()?.email || fromMail ? null : haveProfile(load),
         // Mid-December into January: the year in the game, a tap away.
         yearCard(),
       ),
@@ -242,9 +255,6 @@ export function today() {
         { class: "home-side" },
         // Just played, the goals it finished are told with its news; a first day has none (play/unfold.go).
         just || !t.open?.xp ? null : goalsCard(),
-        // A guest who keeps coming back is asked to keep their profile, under the goals once the day is played (the
-        // day comes first), and not right after a game, which has its news.
-        just || !run?.done ? null : keepCard(t),
         // The ways to play with others wait for a first game finished: a new player starts with the day and a topic;
         // and Роял, in a player's first week, for its evenings to fill (play.NudgeRoyal).
         just || t.played ? modes(t.royal ? ["duel", "royal", "room"] : ["duel", "room"], "С други") : null,
@@ -502,9 +512,9 @@ function friendsPlayed(t: Today): Child {
 }
 
 /** The day played, right under its result's buttons: tomorrow, in one quiet card. When the next ten come (midnight in
- * Bulgaria), what they make of the streak (`streak`: with today's), and, where it can come and isn't on yet, the
- * reminder's ask. */
-function tomorrowCard(day: string, streak: () => number): Child {
+ * Bulgaria), what they make of the streak (`streak`: with today's), a guest's ask to keep the game (`keep`), and,
+ * where it can come and isn't on yet, the reminder's ask. */
+function tomorrowCard(day: string, streak: () => number, keep: Child): Child {
   const left = signal(untilMidnight());
   const t = setInterval(() => left.set(untilMidnight()), 30_000);
   onCleanup(() => clearInterval(t));
@@ -516,6 +526,7 @@ function tomorrowCard(day: string, streak: () => number): Child {
       const n = streak();
       return `След ${left()}.${n > 0 ? ` Изиграй ги и серията ти става ${n + 1}.` : ""}`;
     }),
+    keep,
     remindAsk(day),
   );
 }
@@ -615,73 +626,4 @@ function remindAsk(day: string): Child {
             ),
             () => error() && h("p", { class: "bad", role: "alert" }, error()),
           ];
-}
-
-/** Where „По-късно“ is kept, on this device. */
-const laterKey = "keep-later";
-
-/** A guest who keeps coming back is asked to keep their profile with an email (lib/keep.ts): a guest's game lives on
- * one device only. A small card under the goals, said by what's at stake; the form opens from its button. „По-късно“
- * asks again in a week. */
-function keepCard(t: Today): Child {
-  const u = user.peek();
-  let laterAt = 0;
-  try {
-    laterAt = Number(localStorage.getItem(laterKey) ?? 0);
-  } catch {
-    // no storage here: ask
-  }
-  // The level counts once it shows.
-  const level = t.open?.xp ? (t.level?.level ?? 1) : 1;
-  if (!u || !askToKeep({ email: u.email, streak: t.streak, level, laterAt, now: Date.now() })) return null;
-  const shown = signal(true);
-  const open = signal(false);
-  const stake =
-    t.streak >= 3
-      ? `Серията ти от ${t.streak} дни е само на това устройство. Ако го смениш, ще я загубиш.`
-      : `Играта ти е само на това устройство. Ако го смениш, ще загубиш ниво ${level} и всичко спечелено.`;
-  const later = () => {
-    try {
-      localStorage.setItem(laterKey, String(Date.now()));
-    } catch {
-      // no storage: just for now
-    }
-    shown.set(false);
-  };
-  return () =>
-    shown() && !user()?.email
-      ? h(
-          "section",
-          { class: "card keep-card" },
-          h("h2", { class: "card-title" }, "Запази профила си"),
-          h("p", { class: "muted" }, stake),
-          () =>
-            open()
-              ? signIn(false)
-              : h(
-                  "div",
-                  { class: "remind-actions" },
-                  h("button", { class: "btn", type: "button", onclick: () => open.set(true) }, "Запази с имейл"),
-                  h("button", { class: "link", type: "button", onclick: later }, "По-късно"),
-                ),
-        )
-      : null;
-}
-
-/** Before a first game: a player who has a profile already (a new phone, another browser) signs in here, the form a tap
- * away. */
-function haveProfile(signedIn: () => void): Child {
-  const open = signal(false);
-  // Signed in: Начало again, as the profile has it.
-  effect(() => {
-    if (open() && user()?.email) signedIn();
-  });
-  return () =>
-    open()
-      ? h("section", { class: "card keep-card" }, h("h2", { class: "card-title" }, "Влез в профила си"), signIn(false))
-      : h(
-          "p",
-          { class: "day-next" },
-          h("button", { class: "link", type: "button", onclick: () => open.set(true) }, "Имаш профил? Влез"),
-        );
 }

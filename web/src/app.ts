@@ -15,6 +15,7 @@ import { almanac } from "./screens/almanac.ts";
 import { challengeFriend, duel, duelOne, playChallenge } from "./screens/duel.ts";
 import { friends } from "./screens/friends.ts";
 import { invite } from "./screens/invite.ts";
+import { handoff } from "./screens/keep.ts";
 import { me } from "./screens/me.ts";
 import { challengeGone, missing } from "./screens/missing.ts";
 import { mistakes } from "./screens/mistakes.ts";
@@ -114,6 +115,7 @@ if (root) {
       { path: /^\/settings$/, view: settings },
       { path: /^\/r\/([0-9]{6})$/, view: later(() => import("./screens/room.ts").then((m) => m.room)) },
       { path: /^\/f\/([a-z0-9]{8})$/, view: invite },
+      { path: /^\/hand\/([A-Za-z0-9_-]{43})$/, view: handoff },
       { path: /^\/me$/, view: me },
       { path: /^\/players\/([A-Za-z0-9_]{3,20})$/, view: playerProfile },
     ],
