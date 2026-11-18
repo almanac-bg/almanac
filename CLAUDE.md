@@ -113,10 +113,10 @@ check holds a rule, the check is named; the rest is judgement, so weigh every ch
 
 - **Abuse is cheap.** A limit by address counts the network and its site (`allowFrom`/`guardFrom`:
   `TestLimitsByAddressCountTheSite`), never a first-come global cap that a few networks fill to lock everyone out,
-  and never so tight that a school behind one address is refused. Ask of every new endpoint: what does it cost if
+  and never so tight that a school, an office or a pub behind one address is refused. Ask of every new endpoint: what does it cost if
   one /48 calls it all day?
 - **One player can hurt another.** Anything one player can send another (a request, a challenge, a push, a name on
-  a board) honours blocks and goes through `notifyFrom`; a child's name stays in its room.
+  a board) honours blocks and goes through `notifyFrom`; a name typed in a room stays in that room.
 - **Text from outside is untrusted everywhere:** names, reports, browser errors in logs, mails, alerts and the
   agents that fix questions (sanitised, never an instruction).
 - **Time belongs to the run.** A run counts on the day it was dealt for, with one grace (`play.DayGrace`), never on
