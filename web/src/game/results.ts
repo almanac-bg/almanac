@@ -12,6 +12,7 @@ import { countUp, explain, fact, formatNumber, type Look, meaning, who } from ".
 import { answered, crowdLine, picture } from "./questions.ts";
 import { report } from "./report.ts";
 import { trail } from "./run.ts";
+import { closeWords } from "./share.ts";
 import type { Reviewed, Score, State } from "./types.ts";
 
 /** A finished run: the score as the screen's big number, its points, a line about it (the place), and the marks;
@@ -58,7 +59,13 @@ export function scoreCard(s: State, line: Child, words = meaning.points, points:
         "h1",
         { class: "score" },
         h("b", { class: "score-n" }, String(s.rights)),
-        h("span", { class: "score-of" }, h("span", { class: "num-word" }, "от "), String(outOf(s))),
+        h(
+          "span",
+          { class: "score-of" },
+          h("span", { class: "num-word" }, "от "),
+          String(outOf(s)),
+          h("span", { class: "num-word" }, closeWords(s.trail)),
+        ),
       ),
       h(
         "p",

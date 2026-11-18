@@ -363,6 +363,39 @@ func TestLevelUpNews(t *testing.T) {
 	}
 }
 
+// A level reached by a week of the league, paid as it ended, was the player's before their next game: that game's
+// news tells its own XP (the week's is in the week's card), and doesn't call the level new.
+func TestLevelNewOnlyByTheGame(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	bo := w.user()
+	w.played(bo, 3) // XP and the league open
+	n, err := w.g.NewsOf(ctx, bo, 0)
+	if err != nil || !n.Open.League {
+		t.Fatalf("before: %+v %v", n, err)
+	}
+	pay := n.To - n.XP // enough for the next level
+	if _, err := w.db.Write.Exec(`INSERT INTO league_results (user_id, week, tier, place, of, points, moved, xp, seen)
+		VALUES (?, '2026-11-02', 0, 1, 5, 900, 1, ?, 0)`, bo, pay); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := w.g.StartTopic(ctx, bo, "")
+	w.play(bo, s.ID, repeat(w.wrong, Length)...)
+	n, err = w.g.NewsOf(ctx, bo, s.ID)
+	var game int
+	_ = w.db.Read.QueryRow(`SELECT xp FROM runs WHERE id = ?`, s.ID).Scan(&game)
+	for _, a := range n.Achievements {
+		game += a.XP
+	}
+	for _, d := range n.Goals {
+		game += d.XP
+	}
+	if lvl, _, _ := LevelOf(n.XP); err != nil || n.League == nil || n.League.XP != pay || n.Earned != game || n.LevelUp ||
+		lvl < 2 {
+		t.Fatalf("a game's news after a week paid a level: earned %d of %d, %+v %v", n.Earned, game, n, err)
+	}
+}
+
 func TestQuestionTime(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()

@@ -18,6 +18,8 @@ export interface Stats {
   reserve: number;
   /** Days in a row to the next reserve day (0: they are full). */
   next: number;
+  /** A broken streak on offer to be won back today (play/repair.go), as Начало offers it. */
+  repair?: { days: number; day: boolean; words: string };
   days: number;
   games: number;
   answers: number;
@@ -107,11 +109,11 @@ export function stats(): Child {
     if (!s) return null;
     if (s.games === 0)
       return [
-        streak(s.streak, s.week, s.saved, s.reserve, s.next, s.best),
+        streak(s.streak, s.week, s.saved, s.reserve, s.next, s.best, s.repair),
         h("p", { class: "muted" }, "Още няма изиграни игри."),
       ];
     return [
-      streak(s.streak, s.week, s.saved, s.reserve, s.next, s.best),
+      streak(s.streak, s.week, s.saved, s.reserve, s.next, s.best, s.repair),
       h(
         "section",
         { class: "card figures" },

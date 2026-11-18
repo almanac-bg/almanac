@@ -16,6 +16,9 @@ type Stats struct {
 	Saved   [7]bool `json:"saved"`   // this week's days a reserve day or a repair kept the streak through
 	Reserve int     `json:"reserve"` // reserve days in hand
 	Next    int     `json:"next"`    // days in a row to the next reserve day (0: they are full)
+	// Repair is a broken streak on offer to be won back today (repair.go), as Начало offers it: the streak shows as
+	// that, not as none.
+	Repair  *Repair `json:"repair,omitempty"`
 	Days    int     `json:"days"`    // days' questions finished
 	Games   int     `json:"games"`   // runs finished, of every kind
 	Answers int     `json:"answers"` // questions answered (or timed out)
@@ -58,6 +61,9 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	}
 	s.Streak, s.Best, s.Reserve, s.Next, s.Saved = streak.Days, streak.Best, streak.Reserve, streak.Next, g.InWeek(slices.Concat(streak.Saved, streak.Mended))
 	if s.Week, err = g.Week(ctx, userID); err != nil {
+		return s, err
+	}
+	if s.Repair, err = g.RepairOf(ctx, userID); err != nil {
 		return s, err
 	}
 	db := g.DB.Read

@@ -6,7 +6,7 @@ import { ordinal } from "../lib/ordinal.ts";
 import { play } from "../lib/sound.ts";
 import { hyphenate } from "../lib/words.ts";
 import { formatNumber } from "../ui.ts";
-import { percent, rare } from "./share.ts";
+import { countedWords, percent, rare, withOwn } from "./share.ts";
 import { optionSizes, overSizes } from "./sizes.ts";
 import type {
   Answer,
@@ -46,14 +46,17 @@ export interface Asked {
   update?(view: View): void;
 }
 
-/** How everyone else did with a question, in one quiet line under its verdict, as each kind of question counts right:
+/** How everyone did with a question, in one quiet line under its verdict, as each kind of question counts right:
  * „Вярно отговарят 34% от играчите днес.“ for the day's ten (its players today), „…на този брой“ for a past issue (that
- * day's players), without either for everyone ever.
+ * day's players), without either for everyone ever; the player among them (withOwn), as on the answers' shares.
  * A right answer few others got stands out, said as the feat it is („Познаха го само 12% от играчите днес.“), and
- * nobody right is said as such, never as „0%“. Nothing while the question has too few answers to say. */
+ * nobody else right is said as such, never as „0%“. Nothing while the question has too few answers to say. A game's
+ * own crowd, counted (Роял's), says how many of its players knew it (countedWords). */
 export function crowdLine(type: View["type"], c: Crowd | undefined, right: boolean): Child {
   if (!c) return null;
-  const s = `${percent(c.right)} от играчите${c.today ? " днес" : c.issue ? " на този брой" : ""}`;
+  if (c.counts) return countedLine(c, right);
+  const all = withOwn(c, -1, right).right;
+  const s = `${percent(all)} от играчите${c.today ? " днес" : c.issue ? " на този брой" : ""}`;
   if (c.right === 0) {
     const none = c.issue
       ? "Никой от играчите на този брой не го позна."
@@ -66,7 +69,7 @@ export function crowdLine(type: View["type"], c: Crowd | undefined, right: boole
           : "Още никой не го е познал.";
     return h("p", { class: right ? "crowd-says rare" : "crowd-says" }, none);
   }
-  if (right && c.right <= rare) return h("p", { class: "crowd-says rare" }, `Познаха го само ${s}.`);
+  if (right && all <= rare) return h("p", { class: "crowd-says rare" }, `Познаха го само ${s}.`);
   const says = {
     choice: `Вярно отговарят ${s}.`,
     truefalse: `Вярно отговарят ${s}.`,
@@ -79,11 +82,19 @@ export function crowdLine(type: View["type"], c: Crowd | undefined, right: boole
   return h("p", { class: "crowd-says" }, says);
 }
 
+/** How a game's own players did, counted (Роял's): „Познаха 3 от 12.“ (countedWords). */
+function countedLine(c: Crowd, right: boolean): Child {
+  const text = countedWords(c, right);
+  return text ? h("p", { class: "crowd-says" }, text) : null;
+}
+
 /** The shares on each answer, where the question has had enough answers to say: each in its place beside the answer
  * now, unseen, so that the answers settle into their place with them (with the right one marked: run.ts, settle) and
  * none grows when they show; and shown by the function returned, a bar behind each answer filling in as long as the
- * share that gave it. A crowd few enough to count (a room's) says how many gave each answer, not what share. */
-function crowdOnAll(buttons: HTMLElement[], c: Crowd | undefined): () => void {
+ * share that gave it. A crowd few enough to count (a room's) says how many gave each answer, not what share. The
+ * player's own answer is among them (withOwn: `mine`, the place they picked, -1 for none). */
+function crowdOnAll(buttons: HTMLElement[], crowd: Crowd | undefined, mine: number): () => void {
+  const c = crowd && withOwn(crowd, mine, false);
   const shares = buttons.flatMap((b, i) => {
     const x = c?.picks?.[i];
     if (!c || x === undefined) return [];
@@ -323,7 +334,7 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
         buttons.forEach((b, i) => {
           if (b !== own) mark(b, i);
         });
-        crowd = crowdOnAll(buttons, reveal.crowd);
+        crowd = crowdOnAll(buttons, reveal.crowd, mine);
         if (reveal.credits?.length) {
           credits.hidden = false;
           credits.replaceChildren(
@@ -813,7 +824,7 @@ function truefalse(
       at(beats.right, () => {
         if (mine !== true) mark(yes, true);
         if (mine !== false) mark(no, false);
-        crowd = crowdOnAll([yes, no], reveal.crowd);
+        crowd = crowdOnAll([yes, no], reveal.crowd, mine === null ? -1 : mine ? 0 : 1);
       });
       at(beats.crowd, () => crowd());
     },
@@ -1271,7 +1282,7 @@ function clues(
         buttons.forEach((b, i) => {
           if (b !== own) mark(b, i);
         });
-        crowd = crowdOnAll(buttons, reveal.crowd);
+        crowd = crowdOnAll(buttons, reveal.crowd, mine);
       });
       at(beats.crowd, () => crowd());
     },

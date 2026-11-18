@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
@@ -63,6 +64,23 @@ func (s *Server) issue(w http.ResponseWriter, r *http.Request) error {
 	if m := p.Mine; m != nil && m.Kind == "past" && m.Done {
 		if out["standing"], err = s.game.PastStandingOf(r.Context(), viewer, m.ID); err != nil {
 			return err
+		}
+	}
+	if viewer != 0 {
+		// What the issue is to the player's streak, if anything (play/repair.go): a day missed by a broken streak on
+		// offer to be won back (repair), or one that won it back (mended: the streak's days now). Its page says so,
+		// not that a past issue is outside the streak. A game just finished has made the repair first (after.go).
+		s.game.AfterWait(r.Context(), viewer)
+		repair, err := s.game.RepairOf(r.Context(), viewer)
+		if err != nil {
+			return err
+		}
+		if repair != nil && slices.ContainsFunc(repair.Missed, func(m play.MissedIssue) bool { return m.Day == day }) {
+			out["repair"] = repair
+		} else if streak, err := s.game.StreakOf(r.Context(), viewer); err != nil {
+			return err
+		} else if slices.Contains(streak.Mended, day) {
+			out["mended"] = streak.Days
 		}
 	}
 	return ok(w, out)

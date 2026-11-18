@@ -15,7 +15,7 @@ import { type DayGold, dayGold, nextGame, streakMarks } from "../game/gold.ts";
 import { news } from "../game/news.ts";
 import { boardRow, hands, landed, nextSteps, shareButton, summary } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting, trail } from "../game/run.ts";
-import { dayShareText, percent, rare } from "../game/share.ts";
+import { closeWords, dayShareText, percent, rare } from "../game/share.ts";
 import { standing } from "../game/standing.ts";
 import type { Board, Mark, Score, State } from "../game/types.ts";
 import { api, errorText, serverNow, tally } from "../lib/api.ts";
@@ -38,6 +38,7 @@ import {
   meter,
   type Open,
   pointsWords,
+  repairWords,
   reserveMeaning,
   reserveWords,
   stakeLine,
@@ -526,6 +527,7 @@ function dayDone(t: Today, run: State, fresh: () => Today, next: () => string): 
       h("b", { class: "day-done-n" }, String(run.rights)),
       h("span", { class: "num-word" }, " от "),
       h("b", { class: "day-done-of" }, String(run.total - (run.void ?? 0))),
+      h("span", { class: "num-word" }, closeWords(run.trail)),
       h("span", { class: "day-done-points" }, `${formatNumber(run.points)} ${run.points === 1 ? "точка" : "точки"}`),
     ),
     crowdSays(t, true),
@@ -601,13 +603,8 @@ function streakNotice(t: Today): Child {
 function repairCard(r: Today["repair"]): Child {
   if (!r) return null;
   tellStreak(`ended:${r.on}`, true);
-  // The issues missed still to play, as the server says them („пропуснатия брой от 17 ноември“), as its mails do.
-  const missed = r.words;
-  const text = !missed
-    ? "Изиграй и днешните въпроси, и серията се връща."
-    : r.day
-      ? `Изиграй и ${missed}, и серията се връща.`
-      : `Изиграй ${missed} и днешния, и серията се връща.`;
+  // The issues missed still to play, as the server says them, as its mails do (repairWords).
+  const text = repairWords(r);
   const first = r.missed.find((m) => !m.done);
   return h(
     "section",

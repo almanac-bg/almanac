@@ -330,13 +330,23 @@ function today(): number {
 
 /** The streak: days in a row with the day's ten, this week's days played (and kept by a reserve day or a repair), the
  * reserve days in hand, (`next`) how many more days in a row earn the next one, and (`best`, Профил's) the longest
- * streak the player has had, when it's longer than this one. */
-export function streak(days: number, week?: boolean[], saved?: boolean[], reserve = 0, next = 0, best = 0): Child {
+ * streak the player has had, when it's longer than this one. A broken streak on offer to be won back today (`repair`,
+ * play/repair.go) shows as Начало's chip has it: its days at stake, unlit, and how to win it back. */
+export function streak(
+  days: number,
+  week?: boolean[],
+  saved?: boolean[],
+  reserve = 0,
+  next = 0,
+  best = 0,
+  repair?: { days: number; day: boolean; words: string },
+): Child {
+  if (repair) days = repair.days + (repair.day ? 1 : 0);
   const unit = days === 1 ? "ден" : "дни";
   const now = today();
   return h(
     "section",
-    { class: days ? "streak" : "streak cold", "aria-label": `Серия: ${days} ${unit}` },
+    { class: days && !repair ? "streak" : "streak cold", "aria-label": `Серия: ${days} ${unit}` },
     picture("flame", "flame"),
     h(
       "div",
@@ -345,11 +355,19 @@ export function streak(days: number, week?: boolean[], saved?: boolean[], reserv
         "div",
         { class: "streak-count" },
         h("b", { class: "streak-num" }, String(days)),
-        h("span", { class: "streak-unit" }, unit),
+        h("span", { class: "streak-unit" }, repair ? `${unit} за връщане` : unit),
       ),
-      h("p", null, days ? "поред с въпросите на деня" : "Изиграй въпросите на деня и започни серия."),
+      h(
+        "p",
+        null,
+        repair
+          ? repairWords(repair)
+          : days
+            ? "поред с въпросите на деня"
+            : "Изиграй въпросите на деня и започни серия.",
+      ),
       // What keeps the streak through a day missed: the reserve days in hand, or the way to the next (play/runs.go).
-      reserve || next
+      !repair && (reserve || next)
         ? h(
             "p",
             { class: "streak-reserve" },
@@ -379,6 +397,13 @@ export function streak(days: number, week?: boolean[], saved?: boolean[], reserv
         )
       : null,
   );
+}
+
+/** How a broken streak is won back today (play/repair.go), as Начало's card says it: the issues missed still to play,
+ * as the server says them („пропуснатия брой от 17 ноември“), and today's ten, if they wait. */
+export function repairWords(r: { day: boolean; words: string }): string {
+  if (!r.words) return "Изиграй и днешните въпроси, и серията се връща.";
+  return r.day ? `Изиграй и ${r.words}, и серията се връща.` : `Изиграй ${r.words} и днешния, и серията се връща.`;
 }
 
 /** Reserve days, counted: 1 резервен ден, 2 резервни дни. */

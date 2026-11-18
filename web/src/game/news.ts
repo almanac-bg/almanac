@@ -7,8 +7,8 @@
 // recordings went (play/recordings.go). The facts it put in Моят Алманах are a line of their own, from the first day:
 // what playing gives that only goes up. Only the biggest of it plays its sound. Only what the player has met is told
 // (play/unfold.go: no XP on a first day); a system met with this game is said first, once, in a line, and so is a
-// broken streak won back (play/repair.go). What really is big (bigOne) is also brought forward in a sheet over the
-// result (feel.ts), its sound playing as it opens. A game that ended without its result on screen has its news told on
+// broken streak won back (play/repair.go). What really is big (bigOne: a streak won back first) is also brought
+// forward in a sheet over the result (feel.ts), its sound playing as it opens. A game that ended without its result on screen has its news told on
 // Начало later (play/told.go), quietly, with no sheet and no sound: under its result, if it's the day's; else under a
 // line that says whose it is.
 
@@ -190,7 +190,8 @@ function loudest(n: News): SoundName | null {
   return null;
 }
 
-/** The one big thing a game brought, for its sheet: a week of the league ended up or on its podium, a division reached,
+/** The one big thing a game brought, for its sheet: a broken streak won back, a week of the league ended up or on its
+ * podium, a division reached,
  * the streak at a round number (`days`, with the reserve day it earned, if it did), a level that unlocks something or
  * is a fifth, an epic or legendary achievement. The smaller news stays in the cards. */
 function bigOne(
@@ -223,6 +224,13 @@ function bigOne(
   };
   const numeral = (text: string) =>
     h("b", { class: "num", style: { font: "900 7.5rem/1 var(--font-numeral)", color: "var(--gold-display)" } }, text);
+  // A broken streak won back with this game: the moment the repair was for, as a streak's round number has.
+  if (n.mended)
+    return {
+      parts: sheet(numeral(String(n.mended)), "Серията ти е върната", `${n.mended} дни поред с въпросите на деня.`),
+      sound: "streak",
+      glow: true,
+    };
   const e = n.league;
   if (e && (e.moved > 0 || e.place <= 3))
     return {

@@ -819,7 +819,8 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
     answered(q.view, asRoom(q), q.given ?? null),
     verdict(kind, r.points, r.missed ? "Времето изтече." : undefined, r.speed, r.inRow),
     knew(first),
-    crowdLine(q.view.type, r.answer.crowd, r.right),
+    // How the room answered is what shows (its options, knew): everyone's ever only while it has nothing of its own.
+    q.split?.crowd ? null : crowdLine(q.view.type, r.answer.crowd, r.right),
     // Held, the answer stays up until who leads moves on: time to read its fact here too, not only on the big screen.
     () => (held() ? fact(r.answer.fact) : null),
     () =>
@@ -845,8 +846,8 @@ export function stillAnswering(v: RoomView): string {
 }
 
 /** The answer as the room shows it: on each option how many in the room gave it (its own crowd, counted, not shared),
- * the bars as long as their share; with nobody in the room, how everyone ever answered, as anywhere. The sentence on
- * everyone (crowdLine) still counts everyone. */
+ * the bars as long as their share; with nobody in the room, how everyone ever answered, as anywhere. Who in the room
+ * knew it says the rest (knew), not a share of everyone ever beside it. */
 export function asRoom(q: NonNullable<RoomView["question"]>): Reveal {
   const r = q.reveal?.answer as Reveal;
   const crowd = q.split?.crowd;

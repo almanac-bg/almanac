@@ -274,12 +274,36 @@ func (h *Hub) render(b *board, t *table, now time.Time) Board {
 			q.Shown = n.at.UnixMilli()
 		} else {
 			since = limit // everything shows with the answer
-			q.Reveal = &RevealView{Answer: d.Reveal(h.game.Crowd(d.Question()))}
+			q.Reveal = &RevealView{Answer: d.Reveal(crowdOf(t, d))}
 		}
 		q.View = bank.ViewAt(d, since)
 		v.Question = q
 	}
 	return v
+}
+
+// crowdOf is how the tournament answered the question whose answer shows, dealt as d: everyone who played it (those
+// who let the time run out too), as the bank counts a crowd. This game's own, never everyone's ever: what shows with
+// the answer beside „В играта: 2 от 2“ is what these players said. Called with mu held.
+func crowdOf(t *table, d bank.Dealt) *bank.Crowd {
+	var tallies []bank.Tally
+	for _, m := range t.members {
+		if !m.inQ {
+			continue
+		}
+		c := bank.Tally{N: 1}
+		if m.answered && m.given != nil {
+			// What they gave is kept as the deal showed it: the bank's terms are what a crowd counts.
+			if g, err := d.Grade(m.given); err == nil {
+				c.Given = g.Given
+			}
+			if m.res.Right {
+				c.Right = 1
+			}
+		}
+		tallies = append(tallies, c)
+	}
+	return bank.CrowdOf(d.Question(), tallies)
 }
 
 // dealt is the question showing (or its answer), if one is.
