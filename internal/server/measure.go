@@ -51,17 +51,18 @@ func inApp(r *http.Request) bool { return strings.Contains(r.UserAgent(), "Alman
 // say what they are.
 var robot = regexp.MustCompile(`(?i)bot|crawl|spider|slurp|preview|externalhit|externalagent|headless|lighthouse`)
 
-// visitsHome is how many visits one home (clientHome) counts in visitEvery: a carrier's address many phones share
-// counts each, and one site can't make a flood of keys.
+// visitsHome is how many visits one home (clientHome) counts in visitEvery: the phones behind a carrier's address
+// count each, up to a busy cell's worth, and one home that changes its user agent at will (a script) counts no more,
+// nor makes a flood of keys.
 const (
-	visitsHome = 300
+	visitsHome = 30
 	visitEvery = 30 * time.Minute
 )
 
 // countVisit counts a page loaded by a person without a profile, by where it landed: once a visitEvery for each
 // landing, from each browser (its user agent) at each home (clientHome), so that reloads and a page's own navigation
-// don't count again, while the phones behind one carrier's address do, each. What tells them apart is kept in
-// memory for the half hour, never stored.
+// don't count again (nor take of the home's visitsHome), while the phones behind one carrier's address do, each.
+// What tells them apart is kept in memory for the half hour, never stored.
 func (s *Server) countVisit(r *http.Request) {
 	if _, err := r.Cookie(s.cookie); err == nil || r.Method != http.MethodGet || r.Header.Get("Sec-Purpose") != "" {
 		return
@@ -72,8 +73,8 @@ func (s *Server) countVisit(r *http.Request) {
 	}
 	where, home := landing(r.URL.Path, inApp(r)), s.clientHome(r)
 	browser := sha256.Sum256([]byte(ua))
-	if !s.limits.allow("visits:"+home, visitsHome, visitEvery) ||
-		!s.limits.allow("visit:"+where+":"+home+":"+hex.EncodeToString(browser[:6]), 1, visitEvery) {
+	if !s.limits.allow("visit:"+where+":"+home+":"+hex.EncodeToString(browser[:6]), 1, visitEvery) ||
+		!s.limits.allow("visits:"+home, visitsHome, visitEvery) {
 		return
 	}
 	_ = s.game.Tally(r.Context(), "visit:"+where, 1)
@@ -116,12 +117,14 @@ func init() {
 }
 
 // tally counts one of what the client counts. Anyone may (a notification is opened before the page knows who's
-// playing), a few times a minute. The day shared counts only from a player who finished it today, as /admin counts
-// the days finished (play.People): its share of them is the game's growth number. The client counts it once a day a
+// playing), a few times a minute. The day shared counts only from a player who finished it, as /admin counts the days
+// finished (play.People): its share of them is the game's growth number. It's the day the client says, today's or
+// yesterday's (a result shared after midnight, its day played late), else today's. The client counts it once a day a
 // device; nothing here tells whose it was.
 func (s *Server) tally(w http.ResponseWriter, r *http.Request) error {
 	var in struct {
 		Key string `json:"key"`
+		Day string `json:"day"` // the day shared (share:day)
 	}
 	if err := readJSON(r, &in); err != nil {
 		return err
@@ -133,10 +136,13 @@ func (s *Server) tally(w http.ResponseWriter, r *http.Request) error {
 		return errTooMany
 	}
 	if in.Key == "share:day" {
-		finished := false
+		day, finished := s.game.Today(), false
+		if in.Day == play.DayShift(day, -1) {
+			day = in.Day
+		}
 		if u, err := s.user(r); err == nil && u != nil {
 			_ = s.db.Read.QueryRowContext(r.Context(), `SELECT EXISTS (SELECT 1 FROM runs WHERE user_id = ? AND kind = 'day'
-				AND day = ? AND finished_at IS NOT NULL AND `+play.People+`)`, u.ID, s.game.Today()).Scan(&finished)
+				AND day = ? AND finished_at IS NOT NULL AND `+play.People+`)`, u.ID, day).Scan(&finished)
 		}
 		if !finished {
 			return ok(w, map[string]bool{"ok": true})
@@ -159,9 +165,12 @@ type rate struct{ N, Of int }
 func (r rate) share() int { return int(math.Round(100 * float64(r.N) / float64(r.Of))) }
 
 // interval is the rate's 90 % interval, in whole percent.
-func (r rate) interval() (lo, hi int) {
+func (r rate) interval() (lo, hi int) { return wilson(float64(r.N)/float64(r.Of), float64(r.Of)) }
+
+// wilson is the 90 % interval of a share p of n (Wilson's), in whole percent: n may be an effective number, fewer than
+// were counted (players).
+func wilson(p, n float64) (lo, hi int) {
 	const z = 1.645
-	n, p := float64(r.Of), float64(r.N)/float64(r.Of)
 	mid, half := p+z*z/(2*n), z*math.Sqrt(p*(1-p)/n+z*z/(4*n*n))
 	d := 1 + z*z/n
 	return max(0, int(math.Round(100*(mid-half)/d))), min(100, int(math.Round(100*(mid+half)/d)))
@@ -187,6 +196,64 @@ func (r rate) HTML() template.HTML {
 	}
 	return template.HTML(fmt.Sprintf(`<span class="%s" title="%s">%d%%<small>%d/%d · %d–%d</small></span>`,
 		class, title, r.share(), r.N, r.Of, lo, hi))
+}
+
+// claims are one player's claims of a kind (reminders, mails), and how many of them they answered by playing.
+type claims struct{ hits, of int }
+
+// players is a rate of claims answered by playing, of several players' claims: one who plays after a reminder plays
+// after the next one too, so a player's claims aren't independent, and the interval is as wide as the players make it
+// (eff: the claims over the design effect, the variance of the ratio by player over the binomial's).
+type players struct {
+	rate
+	Players int
+	eff     float64 // the effective number of claims, for the interval
+}
+
+// byPlayer is the players' claims together.
+func byPlayer(of []claims) players {
+	p := players{Players: len(of)}
+	for _, c := range of {
+		p.N, p.Of = p.N+c.hits, p.Of+c.of
+	}
+	if p.Of == 0 {
+		return p
+	}
+	n, total := float64(len(of)), float64(p.Of)
+	r := float64(p.N) / total
+	switch {
+	case len(of) < 2:
+		p.eff = 1 // one player tells one thing
+	case p.N == 0 || p.N == p.Of:
+		p.eff = n // no spread to measure: as if each player were one claim
+	default:
+		sq := 0.0
+		for _, c := range of {
+			d := float64(c.hits) - r*float64(c.of)
+			sq += d * d
+		}
+		v := n / (n - 1) * sq / (total * total)
+		p.eff = min(total, max(n, r*(1-r)/v)) // never fewer than one claim a player, nor more than all
+	}
+	return p
+}
+
+// HTML is the share as a cell of /admin shows it, with how many players it's of; greyed under fewer players.
+func (p players) HTML() template.HTML {
+	if p.Of == 0 {
+		return `<span class="rate none">—</span>`
+	}
+	lo, hi := wilson(float64(p.N)/float64(p.Of), p.eff)
+	word := "играчи"
+	if p.Players == 1 {
+		word = "играч"
+	}
+	class, title := "rate", fmt.Sprintf("%d от %d, на %d %s; 90%%: от %d до %d%%", p.N, p.Of, p.Players, word, lo, hi)
+	if p.Players < fewer {
+		class, title = "rate few", title+"; малко данни"
+	}
+	return template.HTML(fmt.Sprintf(`<span class="%s" title="%s">%d%%<small>%d/%d · %d–%d</small><small>%d %s</small></span>`,
+		class, title, p.share(), p.N, p.Of, lo, hi, p.Players, word))
 }
 
 // capped is the rate no more than all: a step of the funnel whose players came in earlier than its week's.
@@ -292,7 +359,8 @@ var cohortMeasures = []cohortMeasure{
 }
 
 // cohortHeads are the cohorts' columns as the admin page heads them.
-var cohortHeads = []string{"След 1 ден", "1–7", "2-ра седмица", "5-а седмица", "Денят пак (1–7)"}
+var cohortHeads = []string{"След 1 ден", "1–7", ordinal(2, ordFeminine) + " седмица", ordinal(5, ordFeminine) + " седмица",
+	"Денят пак (1–7)"}
 
 // weekCohort is a group of newcomers and its measures (cohortMeasures).
 type weekCohort struct {
@@ -455,7 +523,7 @@ type deviceRow struct {
 // out (Held).
 type holdoutRow struct {
 	Name       string
-	Sent, Held rate
+	Sent, Held players
 }
 
 // measures is what the admin page tells of the players: the numbers at the top, the charts, the first weeks, the
@@ -476,6 +544,7 @@ type measures struct {
 	Loop, Notices       []loopRow
 	Holdout             []holdoutRow
 	HoldoutShare        int
+	HoldoutFrom         string // its first day, as „19.11.2026“; "" from the start
 	Repeats             rate
 	Streaks             []streakRow
 	Spent               int
@@ -491,6 +560,55 @@ type measures struct {
 type chartRow struct {
 	Day                 string
 	Played, DayFinished int
+}
+
+// funnelSteps are the funnel's steps after the first game: each can be told once its day after the first is over.
+var funnelSteps = []struct {
+	name    string
+	day     int
+	reached func(play.Newcomer) bool
+}{
+	{"Завършили деня на " + ordinal(1, ordMasculine) + " ден", 0, func(n play.Newcomer) bool { return n.DayTen[0] }},
+	{"Втора игра на " + ordinal(1, ordMasculine) + " ден", 0, func(n play.Newcomer) bool { return n.Games >= 2 }},
+	{"Пак на " + ordinal(2, ordMasculine) + " ден", 1, func(n play.Newcomer) bool { return n.Played[1] }},
+	{"Денят в 3 от първите 7 дни", 6, func(n play.Newcomer) bool { return n.DayTens() >= 3 }},
+	{"Пак през " + ordinal(2, ordFeminine) + " седмица", 13, func(n play.Newcomer) bool { return n.BackWithin(7, 13) }},
+	{"Пак през " + ordinal(5, ordFeminine) + " седмица", 34, func(n play.Newcomer) bool { return n.BackWithin(28, 34) }},
+}
+
+// funnelWeek is a week's column of the funnel (measures.Funnel), from its visits, its guests made and its newcomers:
+// from the first game on, of those who played more than a room on their first day.
+func funnelWeek(visits, guests int, news []play.Newcomer) []template.HTML {
+	var week []play.Newcomer
+	for _, n := range news {
+		if !n.RoomOnly {
+			week = append(week, n)
+		}
+	}
+	var finished rate
+	for _, n := range week {
+		if n.Due(0) {
+			finished.Of++
+			if n.FirstFinished {
+				finished.N++
+			}
+		}
+	}
+	cells := []template.HTML{template.HTML(fmt.Sprint(visits)), rate{guests, visits}.capped().HTML(),
+		rate{len(news), guests}.capped().HTML(), template.HTML(fmt.Sprint(len(news) - len(week))), finished.HTML()}
+	for _, st := range funnelSteps {
+		var r rate
+		for _, n := range week {
+			if n.Due(st.day) {
+				r.Of++
+				if st.reached(n) {
+					r.N++
+				}
+			}
+		}
+		cells = append(cells, r.HTML())
+	}
+	return cells
 }
 
 // short is a day as „10.11“.
@@ -567,16 +685,15 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 		}
 	}
 
-	// The numbers at the top: each now, and four weeks before.
-	ago := func(day string) string { return play.DayShift(day, -28) }
+	// The numbers at the top: each now, and four weeks before, of days that are over (today's, under way, would read
+	// low against a whole one): yesterday and the 7 days to it.
 	var dau [2]int
 	var wau [2]int
 	var habit, tens [2]int
 	var stick [2]string
-	for i, day := range []string{today, ago(today)} {
-		dau[i] = act.On(day)
-		wau[i] = act.Within(play.DayShift(day, -6), day)
-		end := play.DayShift(day, -1) // the habit and the days finished over the 7 days before, all over
+	for i, end := range []string{yesterday, play.DayShift(yesterday, -28)} {
+		dau[i] = act.On(end)
+		wau[i] = act.Within(play.DayShift(end, -6), end)
 		if habit[i], err = g.Habit(ctx, end); err != nil {
 			return f, err
 		}
@@ -609,8 +726,8 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 	}
 	num := func(n int) string { return fmt.Sprint(n) }
 	f.Tiles = []tile{
-		{Name: "Играли днес", Value: num(dau[0]), Was: num(dau[1]), Note: "същия ден от седмицата"},
-		{Name: "Играли за 7 дни", Value: num(wau[0]), Was: num(wau[1])},
+		{Name: "Играли вчера", Value: num(dau[0]), Was: num(dau[1]), Note: "същия ден от седмицата"},
+		{Name: "Играли за 7 дни", Value: num(wau[0]), Was: num(wau[1]), Note: "до вчера"},
 		{Name: "Навик", Value: num(habit[0]), Was: num(habit[1]), Note: "денят в поне 3 от последните 7 дни"},
 		{Name: "Завършени дни за 7 дни", Value: num(tens[0]), Was: num(tens[1])},
 		{Name: "Връщане в първата седмица", Value: back[0].String(), Was: back[1].String(), Rate: &back[0],
@@ -666,11 +783,11 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 				}
 			}
 		}
-		curveX = append(curveX, fmt.Sprintf("%d-а", k+1))
+		curveX = append(curveX, ordinal(k+1, ordFeminine))
 		curve = append(curve, r)
 	}
 	f.Curve = rateChart(rateChartSpec{Label: "Играли през седмицата след първата", X: curveX, Rates: curve,
-		First: "2-ра седмица", Last: fmt.Sprintf("%d-а седмица", CurveWeeks+1)})
+		First: ordinal(2, ordFeminine) + " седмица", Last: ordinal(CurveWeeks+1, ordFeminine) + " седмица"})
 	// The cohorts' first weeks, oldest first.
 	var cohortX, cohortDays []string
 	var cohortRates []rate
@@ -689,22 +806,11 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 	}
 
 	// The funnel, week by week of first days.
-	steps := []struct {
-		name    string
-		day     int // the step can be told once this day after the first is over
-		reached func(play.Newcomer) bool
-	}{
-		{"Завършили деня на 1-ия ден", 0, func(n play.Newcomer) bool { return n.DayTen[0] }},
-		{"Втора игра на 1-ия ден", 0, func(n play.Newcomer) bool { return n.Games >= 2 }},
-		{"Пак на 2-ия ден", 1, func(n play.Newcomer) bool { return n.Played[1] }},
-		{"Денят в 3 от първите 7 дни", 6, func(n play.Newcomer) bool { return n.DayTens() >= 3 }},
-		{"Пак през 2-ра седмица", 13, func(n play.Newcomer) bool { return n.BackWithin(7, 13) }},
-		{"Пак през 5-а седмица", 34, func(n play.Newcomer) bool { return n.BackWithin(28, 34) }},
-	}
 	f.Funnel = []funnelRow{{Step: "Посещения без профил"}, {Step: "Започнали игра (дял от посещенията)"},
-		{Step: "Отговорили на въпрос (дял от започналите)"}, {Step: "само в стая на 1-ия ден (не са в редовете долу)", Sub: true},
+		{Step: "Отговорили на въпрос (дял от започналите)"},
+		{Step: "само в стая на " + ordinal(1, ordMasculine) + " ден (не са в редовете долу)", Sub: true},
 		{Step: "Завършили първата си игра"}}
-	for _, st := range steps {
+	for _, st := range funnelSteps {
 		f.Funnel = append(f.Funnel, funnelRow{Step: st.name})
 	}
 	for w := range FunnelWeeks {
@@ -723,32 +829,8 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 				guests += n
 			}
 		}
-		all, week := weekOf(news, monday), weekOf(played, monday)
-		var finished rate
-		for _, n := range all {
-			if n.Due(0) {
-				finished.Of++
-				if n.FirstFinished {
-					finished.N++
-				}
-			}
-		}
-		cells := []template.HTML{template.HTML(fmt.Sprint(visits)), rate{guests, visits}.capped().HTML(),
-			rate{len(all), guests}.capped().HTML(), template.HTML(fmt.Sprint(len(all) - len(week))), finished.HTML()}
-		for _, st := range steps {
-			var r rate
-			for _, n := range week {
-				if n.Due(st.day) {
-					r.Of++
-					if st.reached(n) {
-						r.N++
-					}
-				}
-			}
-			cells = append(cells, r.HTML())
-		}
-		for i := range f.Funnel {
-			f.Funnel[i].Cells = append(f.Funnel[i].Cells, cells[i])
+		for i, cell := range funnelWeek(visits, guests, weekOf(news, monday)) {
+			f.Funnel[i].Cells = append(f.Funnel[i].Cells, cell)
 		}
 	}
 
@@ -808,15 +890,15 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 		}
 		return k
 	}, played)
-	split("Известия до края на 1-ия ден", []string{"Да", "Не"}, func(n play.Newcomer) string { return yesNo(n.Push) }, same, played)
-	split("Приятел до края на 1-ия ден", []string{"Да", "Не"}, func(n play.Newcomer) string { return yesNo(n.Friend) }, same, played)
+	split("Известия до края на "+ordinal(1, ordMasculine)+" ден", []string{"Да", "Не"}, func(n play.Newcomer) string { return yesNo(n.Push) }, same, played)
+	split("Приятел до края на "+ordinal(1, ordMasculine)+" ден", []string{"Да", "Не"}, func(n play.Newcomer) string { return yesNo(n.Friend) }, same, played)
 	split("Първата игра", append(slices.Clone(kindOrder), "other"), func(n play.Newcomer) string {
 		if slices.Contains(kindOrder, n.FirstKind) {
 			return n.FirstKind
 		}
 		return "other"
 	}, func(k string) string { return cmp.Or(kindNames[k], "Друга") }, played)
-	split("Само в стая на 1-ия ден", []string{"Да", "Не"}, func(n play.Newcomer) string { return yesNo(n.RoomOnly) }, same, news)
+	split("Само в стая на "+ordinal(1, ordMasculine)+" ден", []string{"Да", "Не"}, func(n play.Newcomer) string { return yesNo(n.RoomOnly) }, same, news)
 
 	// The weeks' players: new, kept, back, lost.
 	for _, gw := range act.Growth(today, GrowthWeeks) {
@@ -886,6 +968,13 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 	// The reminders against the hold-out (play/experiment.go), since it began.
 	if f.Holdout, err = s.holdout(ctx, today); err != nil {
 		return f, err
+	}
+	began, err := g.ExperimentFrom(ctx, play.HeldReminders)
+	if err != nil {
+		return f, err
+	}
+	if began != "" {
+		f.HoldoutFrom = short(began) + "." + began[:4]
 	}
 
 	// The streaks.
@@ -966,20 +1055,24 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 	return f, nil
 }
 
-// holdout compares the players reminded with those held out of the reminders (play.HeldReminders), since it began
-// (today, not over, not with it): of the day's reminders (not the last word that they stop) and of the day's mails,
-// the days finished after one that day, and within two hours of the notification; of the streaks' mails whose three
-// days are over, those back by then. All the claims, sent or not (reached a device or not): it's the sending that's
-// tried.
+// holdout compares the players reminded with those held out of the reminders (play.HeldReminders), from its first
+// whole day (ExperimentFrom) to yesterday: of the day's notifications (not the last word that they stop), the days
+// finished after one that day, and within two hours of it; of the streaks' mails whose three days are over, those
+// back by then. All the claims, sent or not (reached a device or not): it's the sending that's tried. Counted by
+// player (byPlayer): one who plays after a reminder plays after the next one too.
 func (s *Server) holdout(ctx context.Context, today string) ([]holdoutRow, error) {
+	from, err := s.game.ExperimentFrom(ctx, play.HeldReminders)
+	if err != nil {
+		return nil, err
+	}
 	const people = ` AND d.user_id NOT IN (SELECT id FROM users WHERE admin)`
 	finished := func(within string) string {
 		return `coalesce(sum(EXISTS (SELECT 1 FROM runs r WHERE r.user_id = d.user_id AND r.kind = 'day' AND r.day = d.day
 			AND r.finished_at ` + within + `)), 0)`
 	}
 	rows := []holdoutRow{
-		{Name: "Напомняне за деня: денят изигран след него"}, {Name: "…до 2 часа след него"},
-		{Name: "Писмо за деня: денят изигран след него"}, {Name: "Писмо за серия: пак до 3 дни"},
+		{Name: "Известие за деня: денят изигран след него"}, {Name: "…до 2 часа след него"},
+		{Name: "Писмо за серия: пак до 3 дни"},
 	}
 	for _, q := range []struct {
 		sql  string
@@ -987,22 +1080,23 @@ func (s *Server) holdout(ctx context.Context, today string) ([]holdoutRow, error
 		into []int // the rows each measure after the count goes to
 	}{
 		{`SELECT d.held, count(*), ` + finished(">= d.at") + `, ` + finished("BETWEEN d.at AND d.at + 7200000") + `
-			FROM push_reminded d WHERE NOT d.last AND d.day < ?` + people + ` GROUP BY d.held`, []any{today}, []int{0, 1}},
-		{`SELECT d.held, count(*), ` + finished(">= d.at") + ` FROM day_mails d WHERE d.day < ?` + people + ` GROUP BY d.held`,
-			[]any{today}, []int{2}},
+			FROM push_reminded d WHERE NOT d.last AND d.day >= ? AND d.day < ?` + people + ` GROUP BY d.held, d.user_id`,
+			[]any{from, today}, []int{0, 1}},
 		{`SELECT d.held, count(*), count(*) FILTER (WHERE EXISTS (SELECT 1 FROM runs r WHERE r.user_id = d.user_id
 				AND r.kind = 'day' AND r.finished_at IS NOT NULL AND r.day BETWEEN d.day AND date(d.day, '+2 days')))
-			FROM streak_mails d WHERE d.day <= ?` + people + ` GROUP BY d.held`, []any{play.DayShift(today, -3)}, []int{3}},
+			FROM streak_mails d WHERE d.day >= ? AND d.day <= ?` + people + ` GROUP BY d.held, d.user_id`,
+			[]any{from, play.DayShift(today, -3)}, []int{2}},
 	} {
 		res, err := s.db.Read.QueryContext(ctx, q.sql, q.args...)
 		if err != nil {
 			return nil, err
 		}
+		sent, held := make([][]claims, len(q.into)), make([][]claims, len(q.into)) // by measure, a player each
 		for res.Next() {
-			var held bool
+			var h bool
 			n := 0
 			hits := make([]int, len(q.into))
-			dest := []any{&held, &n}
+			dest := []any{&h, &n}
 			for i := range hits {
 				dest = append(dest, &hits[i])
 			}
@@ -1010,17 +1104,20 @@ func (s *Server) holdout(ctx context.Context, today string) ([]holdoutRow, error
 				res.Close()
 				return nil, err
 			}
-			for i, row := range q.into {
-				if held {
-					rows[row].Held = rate{hits[i], n}
+			for i := range q.into {
+				if h {
+					held[i] = append(held[i], claims{hits[i], n})
 				} else {
-					rows[row].Sent = rate{hits[i], n}
+					sent[i] = append(sent[i], claims{hits[i], n})
 				}
 			}
 		}
 		res.Close()
 		if err := res.Err(); err != nil {
 			return nil, err
+		}
+		for i, row := range q.into {
+			rows[row].Sent, rows[row].Held = byPlayer(sent[i]), byPlayer(held[i])
 		}
 	}
 	return rows, nil

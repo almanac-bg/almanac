@@ -45,10 +45,10 @@ packages' doc comments; this file holds only what must not drift.
 - **Gamification only from what the game really counts:** no invented currencies, no random boxes, never real money.
 - **Sharing:** the day's result ends with the player's own link; the text itself has no invitation words.
 - **A tenth of players get no reminders, to tell what reminders do.** 10 % of players, drawn once by a hash of their
-  id (`play/experiment.go`), are held out of the day's reminder (by notification or by the mail they asked for) and
-  the streak's mail; what they would have had is kept as if sent, by the same rules and hours, and `/admin` compares
-  the two groups with intervals. Without it the reminders' rows only show the habit they're timed to (owner,
-  2026-11-18, review D4). The privacy page says so.
+  id (`play/experiment.go`), are held out of the day's notification and the streak's mail; what they would have had
+  is kept as if sent, by the same rules and hours, and `/admin` compares the two groups with intervals, counted by
+  player. Without it the reminders' rows only show the habit they're timed to (owner, 2026-11-18, review D4). The
+  reminder by mail is never held out: a player asked for it, and gets it (owner, 2026-11-18). The privacy page says so.
 
 ## Questions
 

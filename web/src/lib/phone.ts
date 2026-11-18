@@ -113,13 +113,14 @@ export function start(nav: Nav, opened: (kind: string) => void): void {
 }
 
 /** Shares through the phone's share sheet, and says whether it was shared: closing the sheet without sharing (both
- * phones answer it with a refusal) isn't. */
+ * phones answer it with a refusal) isn't, on an iPhone. Android answers „Copy“ in its sheet with the same refusal, so
+ * there a refusal is taken for a share: a closed sheet counted now and then is less wrong than every copy missed. */
 export async function share(text: string, url?: string): Promise<boolean> {
   return plugin("Share")
     .call("share", { text, url })
     .then(
       () => true,
-      () => false,
+      () => bridge.getPlatform() === "android",
     );
 }
 

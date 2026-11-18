@@ -49,8 +49,8 @@
     scroll-margin-top: var(--space-5);
   }
 
-  /* A laptop and up: two columns, the shorter parts side by side (Навик and Известия, Серии and Честна игра), the
-     wide ones across. */
+  /* A laptop and up: two columns, the shorter parts side by side (Навик, Серии and Честна игра one under the other,
+     beside Известия, the longest: no hole under a short one), the wide ones across. */
   @media (min-width: 64rem) {
     main.admin {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -62,9 +62,16 @@
       grid-column: 1 / -1;
     }
 
-    main.admin > :is(#habit, #notices, #streaks, #fair) {
+    main.admin > :is(.admin-side, #notices) {
       grid-column: auto;
     }
+  }
+
+  .admin-side {
+    display: grid;
+    align-content: start;
+    gap: var(--space-5);
+    min-width: 0;
   }
 
   .admin-nav {

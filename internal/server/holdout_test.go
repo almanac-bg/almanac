@@ -46,16 +46,62 @@ func TestRemindersHeldOut(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r := rows[0]; r.Sent != (rate{1, 3}) || r.Held != (rate{0, 3}) {
+	if r := rows[0]; r.Sent.rate != (rate{1, 3}) || r.Held.rate != (rate{0, 3}) || r.Sent.Players != 1 || r.Held.Players != 1 {
 		t.Fatalf("the day finished after: %+v", r)
 	}
-	if r := rows[1]; r.Sent != (rate{1, 3}) || r.Held != (rate{0, 3}) {
+	if r := rows[1]; r.Sent.rate != (rate{1, 3}) || r.Held.rate != (rate{0, 3}) {
 		t.Fatalf("within two hours: %+v", r)
+	}
+	// Told from the experiment's first whole day (kv, set by the migration that began it): the days before aren't in.
+	if _, err := g.db.Write.Exec(`INSERT INTO kv (key, value) VALUES ('reminders_from', '2030-03-06')`); err != nil {
+		t.Fatal(err)
+	}
+	if rows, err = s.holdout(t.Context(), "2030-03-08"); err != nil {
+		t.Fatal(err)
+	}
+	if r := rows[0]; r.Sent.rate != (rate{0, 1}) || r.Held.rate != (rate{0, 1}) {
+		t.Fatalf("from the 6th: %+v", r)
 	}
 }
 
-// The day's reminder by mail too: claimed for one held out at their hour, never sent, and counted for the back-off.
-func TestDayMailHeldOut(t *testing.T) {
+// The hold-out is counted by player: one player's claims go together, and the interval is as wide as the players
+// make it, not the claims.
+func TestHoldoutByPlayer(t *testing.T) {
+	one := byPlayer([]claims{{10, 20}})
+	many := byPlayer(func() []claims {
+		var out []claims
+		for i := range 20 {
+			out = append(out, claims{i % 2, 1})
+		}
+		return out
+	}())
+	if one.rate != (rate{10, 20}) || many.rate != (rate{10, 20}) || one.Players != 1 || many.Players != 20 {
+		t.Fatalf("one %+v, many %+v", one, many)
+	}
+	width := func(p players) int {
+		lo, hi := wilson(float64(p.N)/float64(p.Of), p.eff)
+		return hi - lo
+	}
+	if width(one) <= width(many) {
+		t.Fatalf("one player's 20 claims (%d) tell as much as 20 players' (%d)", width(one), width(many))
+	}
+	// Players alike (each half their claims) tell more than players apart (each all or none), with as many claims.
+	alike := byPlayer([]claims{{2, 4}, {2, 4}, {2, 4}, {2, 4}})
+	apart := byPlayer([]claims{{4, 4}, {0, 4}, {4, 4}, {0, 4}})
+	if width(alike) >= width(apart) {
+		t.Fatalf("alike %d, apart %d", width(alike), width(apart))
+	}
+	if !strings.Contains(string(many.HTML()), "20 играчи") || !strings.Contains(string(one.HTML()), "<small>1 играч</small>") {
+		t.Fatalf("cells: %s, %s", many.HTML(), one.HTML())
+	}
+	if byPlayer(nil).HTML() != `<span class="rate none">—</span>` {
+		t.Fatal("none")
+	}
+}
+
+// The day's reminder by mail isn't held out (the owner's call): a player who asked for it gets it, though held out of
+// the notification and the streak's mail, and a streak's mail held from them that day leaves the day to it.
+func TestDayMailNotHeldOut(t *testing.T) {
 	g := start(t)
 	s := g.srv
 	day := time.Date(2030, 3, 10, 0, 0, 0, 0, bulgaria())
@@ -69,17 +115,24 @@ func TestDayMailHeldOut(t *testing.T) {
 	}
 	g.finishedDay(id, day.AddDate(0, 0, -1), 10*time.Hour)
 	s.heldOut = func(int64) bool { return true }
-	if n := s.dayMails(t.Context(), day.Add(12*time.Hour)); n != 0 {
+	if _, err := g.db.Write.Exec(`INSERT INTO streak_mails (user_id, day, at, held) VALUES (?, '2030-03-10', 1, 1)`, id); err != nil {
+		t.Fatal(err)
+	}
+	if n := s.dayMails(t.Context(), day.Add(12*time.Hour)); n != 1 {
 		t.Fatalf("mailed %d", n)
 	}
 	g.outbox.Flush(t.Context())
-	var held bool
-	if err := g.db.Read.QueryRow(`SELECT held FROM day_mails WHERE user_id = ? AND day = '2030-03-10'`, id).Scan(&held); err != nil ||
-		!held || len(g.inbox.got) != 0 || g.counted("mail:day:sent") != 0 {
-		t.Fatalf("held %v, %v, sent %d", held, err, len(g.inbox.got))
+	if len(g.inbox.got) != 1 || g.counted("mail:day:sent") != 1 {
+		t.Fatalf("sent %d, counted %d", len(g.inbox.got), g.counted("mail:day:sent"))
 	}
-	if rows, err := s.holdout(t.Context(), "2030-03-11"); err != nil || rows[2].Held != (rate{0, 1}) || rows[2].Sent.Of != 0 {
-		t.Fatalf("the day's mail held: %+v %v", rows, err)
+	// A streak's mail that went is a mail that day: none more.
+	if _, err := g.db.Write.Exec(`UPDATE streak_mails SET held = 0, day = '2030-03-11'`); err != nil {
+		t.Fatal(err)
+	}
+	next := day.AddDate(0, 0, 1)
+	s.game.Now = func() time.Time { return next.Add(12 * time.Hour) }
+	if n := s.dayMails(t.Context(), next.Add(12*time.Hour)); n != 0 {
+		t.Fatalf("mailed %d beside the streak's", n)
 	}
 }
 
@@ -105,6 +158,56 @@ func TestStreakMailHeldOut(t *testing.T) {
 	if err := g.db.Read.QueryRow(`SELECT held FROM streak_mails WHERE user_id = ?`, id).Scan(&held); err != nil || !held ||
 		len(g.inbox.got) != 0 {
 		t.Fatalf("held %v, %v, sent %d", held, err, len(g.inbox.got))
+	}
+}
+
+// The day shared after midnight counts, as yesterday's (its result left open, or its last answer played late); a day
+// older doesn't, nor yesterday's by one who didn't finish it.
+func TestShareAfterMidnight(t *testing.T) {
+	g := start(t)
+	s := g.srv
+	day := time.Date(2030, 3, 20, 0, 0, 0, 0, bulgaria())
+	s.game.Now = func() time.Time { return day.Add(10 * time.Minute) }
+	ana, anaID := g.guest()
+	g.finishedDay(anaID, day.AddDate(0, 0, -1), 23*time.Hour+55*time.Minute)
+	bo, boID := g.guest()
+	g.finishedDay(boID, day.AddDate(0, 0, -2), 20*time.Hour)
+	for _, c := range []struct {
+		p   *player
+		day string
+	}{{ana, "2030-03-19"}, {ana, "2030-03-20"}, {bo, "2030-03-18"}, {bo, "2030-03-19"}} {
+		if status, _ := c.p.call("POST", "/api/tally", map[string]string{"key": "share:day", "day": c.day}); status != 200 {
+			t.Fatalf("tally: %d", status)
+		}
+	}
+	if g.counted("share:day") != 1 {
+		t.Fatalf("shares counted: %d", g.counted("share:day"))
+	}
+}
+
+// Yesterday is told against a whole day four weeks before, not today, under way, against one.
+func TestAdminTilesOfDaysOver(t *testing.T) {
+	g := start(t)
+	s := g.srv
+	day := time.Date(2030, 3, 20, 0, 0, 0, 0, bulgaria())
+	s.game.Now = func() time.Time { return day.Add(9 * time.Hour) }
+	admin := g.player()
+	admin.call("POST", "/api/guest", map[string]any{})
+	_, _ = g.db.Write.Exec(`UPDATE users SET admin = 1`)
+	for range 2 {
+		_, id := g.guest()
+		g.finishedDay(id, day.AddDate(0, 0, -1), 10*time.Hour)
+		_, _ = g.db.Write.Exec(`INSERT INTO active_days (user_id, day) VALUES (?, '2030-03-19')`, id)
+	}
+	res, err := admin.client.Get(g.url + "/admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if !strings.Contains(string(b), `<p class="tile-name">Играли вчера</p>
+<p class="tile-value">2</p>`) {
+		t.Fatalf("the tiles: %s", b[strings.Index(string(b), `class="tiles"`):][:600])
 	}
 }
 

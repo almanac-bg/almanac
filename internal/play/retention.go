@@ -12,23 +12,26 @@ import (
 // version of the game a player met on their first (users.first_version).
 //
 // /admin counts people, one population on the whole page (People, fair.go): a day counts when the player isn't an
-// admin and played a game as a person that day, not at a script's speed nor a throwaway guest's day. That is judged
-// as the days are read (personDays), never as they're kept: a game becomes a shadow only after some of its answers
-// (ShadowScript) or minutes later (ShadowThrowaway, JudgeNets), and may be let out of one. A player who goes leaves
+// admin and played a game as a person that day, not at a script's speed. That is judged as the days are read
+// (personDays), never as they're kept: a game becomes a script's only after some of its answers, and may be let out of
+// it. A player who goes leaves
 // their days as nobody's (Forget), judged as they go: only those that counted are kept.
 //
 // What the players did in their first days, and the daily loop around them, is measured in measure.go.
 
-// markActive keeps that a player played today, and on their first day, the version they met.
+// markActive keeps that a player played today, and on their first day, the version they met: only then (a player from
+// before versions were kept has none, not the one of their next day).
 func (g *Game) markActive(tx *sql.Tx, userID int64) error {
-	res, err := tx.Exec(`INSERT OR IGNORE INTO active_days (user_id, day) VALUES (?, ?)`, userID, g.Today())
+	today := g.Today()
+	res, err := tx.Exec(`INSERT OR IGNORE INTO active_days (user_id, day) VALUES (?, ?)`, userID, today)
 	if err != nil || g.Version == "" {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return nil // not the day's first answer
 	}
-	_, err = tx.Exec(`UPDATE users SET first_version = ? WHERE id = ? AND first_version IS NULL`, g.Version, userID)
+	_, err = tx.Exec(`UPDATE users SET first_version = ?1 WHERE id = ?2 AND first_version IS NULL
+		AND NOT EXISTS (SELECT 1 FROM active_days WHERE user_id = ?2 AND day < ?3)`, g.Version, userID, today)
 	return err
 }
 
