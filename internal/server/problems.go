@@ -286,11 +286,15 @@ func cut(s string, n int) string {
 }
 
 // How many errors browsers may report in an hour: from a network (a school's, behind one address, has many browsers
-// that could all break at once, but each reports 10 at most), and from all of them together, which keeps the log
-// readable when anyone sends floods (a real error is seen in the first few anyway).
+// that could all break at once, but each reports 10 at most), and from a site (a few such networks). Past
+// clientErrorsAll from everyone together, which only floods send, one in clientErrorsSample is logged, and the rest
+// counted in the log's next line: the log stays readable, and a real error is never refused for others' flood
+// (review 2026-11-18, S10). Each still counts as a problem, which has a budget of its own (browserKinds).
 const (
-	clientErrorsNet = 20
-	clientErrorsAll = 300
+	clientErrorsNet    = 20
+	clientErrorsSite   = 5 * clientErrorsNet
+	clientErrorsAll    = 300
+	clientErrorsSample = 20
 )
 
 // clientError takes an error from a player's browser: logged, and counted as a problem. No session is needed: a page
@@ -308,19 +312,28 @@ func (s *Server) clientError(w http.ResponseWriter, r *http.Request) error {
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
-	if !s.allowFrom(r, "client-error", clientErrorsNet, 0, time.Hour) ||
-		!s.limits.allow("client-error", clientErrorsAll, time.Hour) {
+	if !s.guardFrom(r, "client-error", clientErrorsNet, clientErrorsSite, time.Hour) {
 		return errTooMany
 	}
-	slog.Warn("client error", "message", logLine(in.Message, 300), "where", logLine(in.Where, 200),
-		"page", logLine(in.Page, 200), "stack", logLine(in.Stack, 2000), "ua", logLine(r.UserAgent(), 200),
-		"version", logLine(in.Version, 40))
+	if s.guard.allow("client-error", clientErrorsAll, time.Hour) {
+		s.logClientError(r, in.Message, in.Where, in.Page, in.Stack, in.Version, 0)
+	} else if n := s.unlogged.Add(1); n%clientErrorsSample == 0 {
+		s.unlogged.Add(-n)
+		s.logClientError(r, in.Message, in.Where, in.Page, in.Stack, in.Version, int(n)-1)
+	}
 	if in.Version != "" && in.Version != s.cfg.Version {
 		return ok(w, map[string]bool{"ok": true})
 	}
 	site := s.cfg.PublicURL
 	s.problems.note("browser: "+plainKind(in.Message, site, 160)+" at "+plainKind(in.Where, site, 100), fromBrowser)
 	return ok(w, map[string]bool{"ok": true})
+}
+
+// logClientError writes a browser's error to the log, with how many weren't logged before it (past clientErrorsAll).
+func (s *Server) logClientError(r *http.Request, message, where, page, stack, version string, unlogged int) {
+	slog.Warn("client error", "message", logLine(message, 300), "where", logLine(where, 200),
+		"page", logLine(page, 200), "stack", logLine(stack, 2000), "ua", logLine(r.UserAgent(), 200),
+		"version", logLine(version, 40), "unlogged", unlogged)
 }
 
 // logLine is a browser's text for the log: cut, and on one line (a stack's lines joined by " | "), so what a browser

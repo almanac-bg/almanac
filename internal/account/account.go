@@ -20,10 +20,14 @@
 // player's address, mailed to the player: the wrong codes given for an address, from every browser, are counted in
 // the database (Misses within MissesKept), and past them the address's codes are long (LongCodeDigits) instead of
 // refused, so guessing gets nowhere and the player still signs in. Code mails are urgent in the outbox (sent first,
-// dropped once dead), and there are at most CodesAMinute of them, apart for addresses with a profile and new ones.
+// dropped once dead). How many go is bounded so that nobody's flood stops others signing in: each site (a network the
+// server names) has its share of each minute (CodesAMinute, apart for addresses with a profile and new ones), each
+// address a few codes an hour and a day from anywhere (CodesPerAddressHour, counted in the database), and an address
+// mail doesn't reach gets none (mail.Suppressed).
 package account
 
 import (
+	"cmp"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
@@ -100,10 +104,26 @@ const (
 	// about 8 × 10⁷ guesses a year against 10¹²: under 1 in 10 000 for a guesser who takes all of them, all year.
 	LongCodeDigits = 12
 
-	// CodesAMinute is the most codes mailed a minute to addresses with a profile, and apart, to new ones: well past
-	// what players need (a class saving its games at once), well under what one mail worker sends, so that codes never
-	// queue past their time; and a flood of codes to made-up addresses can't stop players with a profile signing in.
-	CodesAMinute = 30
+	// CodesAMinute is how many codes a minute go to addresses with a profile, and apart, to new ones, while every
+	// site has its share: a flood of codes to made-up addresses can't stop players with a profile signing in. A site
+	// (an IPv6 /48, an IPv4 /24: whatever the caller counts as one) takes at most SiteShare of them: most of a class
+	// saving its games at once from its school's one address (the rest the next minute), while no one site takes the
+	// whole minute. Past CodesAMinute, a site's first code of the minute still goes, up to CodesAMinuteMost: so filling
+	// the minute stops nobody else, unless it's done from that many sites at once (review 2026-11-18, S5). The mail
+	// worker sends one at a time, a few a second at best, so in a flood the codes queue: those of a site that asked for
+	// many go after everyone else's (mail.Outbox.Urgent's rank), and they are the ones that die unsent.
+	CodesAMinute     = 30
+	SiteShare        = 20
+	CodesAMinuteMost = 90
+
+	// CodesPerAddressHour and CodesPerAddressDay are the most codes mailed to one address, whoever asks and from
+	// wherever, counted in the database: a player needs one, a second when the first is slow or lost among the spam,
+	// one for each device they sign in on. Nobody can flood an inbox with codes from many networks, nor spend the
+	// domain's good name on it; the price is that someone who knows a player's address can make them wait (an hour,
+	// at worst until the day's codes are a day old) to sign in on a new device, while the codes in their inbox say
+	// so (S5).
+	CodesPerAddressHour = 4
+	CodesPerAddressDay  = 12
 )
 
 // Errors a player may see.
@@ -114,6 +134,8 @@ var (
 	ErrCodeExpired = errors.New("the code expired")
 	ErrCodeTries   = errors.New("the code ran out of tries")
 	ErrCodesBusy   = errors.New("the most codes a minute were mailed")
+	ErrAddressBusy = errors.New("the most codes an hour or a day were mailed to the address")
+	ErrNoMail      = errors.New("mail doesn't reach the address")
 	ErrBadName     = errors.New("bad name")
 	ErrBadTag      = errors.New("bad tag")
 	ErrTagTaken    = errors.New("tag taken")
@@ -147,29 +169,52 @@ type Accounts struct {
 	// for codes by the dozen.
 	Unlimited bool
 
-	// mailed counts the codes mailed this minute, to addresses with a profile [1] and new ones [0] (CodesAMinute):
-	// kept in memory, as a restart losing a minute's count lets through at most a minute's more.
+	// mailed counts the codes mailed this minute, to addresses with a profile [1] and new ones [0], in all and by
+	// site (CodesAMinute): kept in memory, as a restart losing a minute's count lets through at most a minute's more.
 	mu     sync.Mutex
 	minute int64
-	mailed [2]int
+	mailed [2]minuteCount
 }
 
-// mailOne counts a code mailed to an address with a profile or a new one, if this minute has room for it.
-func (a *Accounts) mailOne(profile bool, now time.Time) bool {
+// minuteCount is the codes mailed in a minute to one kind of address: in all, and by the site that asked.
+type minuteCount struct {
+	all    int
+	bySite map[string]int
+}
+
+// mailOne counts a code mailed to an address with a profile or a new one, asked for from a site, if this minute has
+// room for it (CodesAMinute, SiteShare, CodesAMinuteMost), and says how many the site has had this minute with it: its
+// rank, by which the outbox sends codes (the fewest first).
+func (a *Accounts) mailOne(profile bool, site string, now time.Time) (int, bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if m := now.Unix() / 60; m != a.minute {
-		a.minute, a.mailed = m, [2]int{}
+		a.minute, a.mailed = m, [2]minuteCount{}
 	}
-	i := 0
+	c := &a.mailed[0]
 	if profile {
-		i = 1
+		c = &a.mailed[1]
 	}
-	if a.mailed[i] >= CodesAMinute && !a.Unlimited {
-		return false
+	n := c.bySite[site]
+	open := (c.all < CodesAMinute && n < SiteShare) || (c.all < CodesAMinuteMost && n == 0)
+	if !open && !a.Unlimited {
+		return n, false
 	}
-	a.mailed[i]++
-	return true
+	if c.bySite == nil {
+		c.bySite = map[string]int{}
+	}
+	c.all++
+	c.bySite[site] = n + 1
+	return n + 1, true
+}
+
+// addressBusy says whether an address has had its codes for the hour or the day (CodesPerAddressHour,
+// CodesPerAddressDay).
+func addressBusy(tx *sql.Tx, email string, now time.Time) (bool, error) {
+	var hour, day int
+	err := tx.QueryRow(`SELECT count(*) FILTER (WHERE at > ?), count(*) FROM code_mails WHERE email = ? AND at > ?`,
+		store.Ms(now.Add(-time.Hour)), email, store.Ms(now.Add(-24*time.Hour))).Scan(&hour, &day)
+	return hour >= CodesPerAddressHour || day >= CodesPerAddressDay, err
 }
 
 // newToken makes a session token (what the cookie holds) and the hash the database keeps.
@@ -367,7 +412,7 @@ func (a *Accounts) Delete(ctx context.Context, userID int64) error {
 // into an account) comes here. What's theirs goes with them by the schema (ON DELETE CASCADE: sessions, runs and
 // answers, friends, ...); what others keep of them is kept without them, by the schema (SET NULL: the other side of a
 // duel) and by each part of the game's Forget, told first; and their address goes from wherever else it's kept: mail
-// on its way to it, codes, wrong codes counted.
+// on its way to it, codes, wrong codes and codes mailed counted, and whether mail reaches it (mail.Unqueue).
 func (a *Accounts) remove(tx *sql.Tx, id int64) error {
 	var email sql.NullString
 	if err := tx.QueryRow(`SELECT email FROM users WHERE id = ?`, id).Scan(&email); errors.Is(err, sql.ErrNoRows) {
@@ -384,6 +429,7 @@ func (a *Accounts) remove(tx *sql.Tx, id int64) error {
 		for _, q := range []string{
 			`DELETE FROM sign_in_codes WHERE email = ?`,
 			`DELETE FROM code_misses WHERE email = ?`,
+			`DELETE FROM code_mails WHERE email = ?`,
 		} {
 			if _, err := tx.Exec(q, email.String); err != nil {
 				return err
@@ -432,9 +478,9 @@ const cleanBatch = 200
 const EmailRequestDays = 60
 
 // CleanUp drops expired sessions, codes and handoffs, the wrong codes counted for an address once their stretch is
-// over (MissesKept), friend requests to an address older than EmailRequestDays, and the guests nobody can use or
-// does: those whose sessions are gone (nothing of theirs can come back), and those who never played nor have a
-// friend, unseen for IdleGuestDays. Their days played stay counted (play.Retention: active_days keeps no link to a
+// over (MissesKept), the codes mailed counted once a day old, friend requests to an address older than
+// EmailRequestDays, and the guests nobody can use or does: those whose sessions are gone (nothing of theirs can come
+// back), and those who never played nor have a friend, unseen for IdleGuestDays. Their days played stay counted (play.Retention: active_days keeps no link to a
 // player).
 func (a *Accounts) CleanUp(ctx context.Context) error {
 	now := store.Now()
@@ -449,6 +495,10 @@ func (a *Accounts) CleanUp(ctx context.Context) error {
 	}
 	if _, err := a.DB.Write.ExecContext(ctx, `DELETE FROM code_misses WHERE since <= ?`,
 		store.Ms(time.Now().Add(-MissesKept))); err != nil {
+		return err
+	}
+	if _, err := a.DB.Write.ExecContext(ctx, `DELETE FROM code_mails WHERE at <= ?`,
+		store.Ms(time.Now().Add(-24*time.Hour))); err != nil {
 		return err
 	}
 	if _, err := a.DB.Write.ExecContext(ctx, `DELETE FROM friend_requests WHERE to_email IS NOT NULL AND at <= ?`,
@@ -531,11 +581,12 @@ type Asked struct {
 }
 
 // SendCode mails a sign-in code to an address, for the browser that asks (asked: the token it kept from its last
-// code, maybe ""). That browser's last code is replaced, and its mail dropped if it hasn't gone yet; while it's alive
-// and to the same address, not within CodeEvery (TooSoon). Nobody else's code is touched: each browser has its own.
-// The code is long once the address has had Misses wrong codes (LongCodeDigits); past CodesAMinute, none goes
-// (ErrCodesBusy).
-func (a *Accounts) SendCode(ctx context.Context, email, asked string) (Asked, error) {
+// code, maybe ""), from a site (the network the caller counts the browser's share of the minute by). That browser's
+// last code is replaced, and its mail dropped if it hasn't gone yet; while it's alive and to the same address, not
+// within CodeEvery (TooSoon). Nobody else's code is touched: each browser has its own. The code is long once the
+// address has had Misses wrong codes (LongCodeDigits). None goes to an address mail doesn't reach (ErrNoMail), past
+// the address's codes for the hour or the day (ErrAddressBusy), nor past the minute's (ErrCodesBusy).
+func (a *Accounts) SendCode(ctx context.Context, email, asked, site string) (Asked, error) {
 	email, err := NormalEmail(email)
 	if err != nil {
 		return Asked{}, err
@@ -554,16 +605,26 @@ func (a *Accounts) SendCode(ctx context.Context, email, asked string) (Asked, er
 		if err := a.replace(tx, asked, email, out.Digits, now); err != nil {
 			return err
 		}
+		if off, err := mailer.Suppressed(tx, email, now); err != nil || off {
+			return cmp.Or(err, ErrNoMail)
+		}
+		if busy, err := addressBusy(tx, email, now); err != nil || (busy && !a.Unlimited) {
+			return cmp.Or(err, ErrAddressBusy)
+		}
 		var profile bool
 		if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM users WHERE email = ?)`, email).Scan(&profile); err != nil {
 			return err
 		}
-		if !a.mailOne(profile, now) {
+		rank, ok := a.mailOne(profile, site, now)
+		if !ok {
 			return ErrCodesBusy
 		}
 		code := newCode(out.Digits)
-		mail, err := a.Outbox.Urgent(tx, codeMail(email, code), now.Add(CodeTTL))
+		mail, err := a.Outbox.Urgent(tx, codeMail(email, code), now.Add(CodeTTL), rank)
 		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO code_mails (email, at) VALUES (?, ?)`, email, store.Ms(now)); err != nil {
 			return err
 		}
 		_, err = tx.Exec(`INSERT INTO sign_in_codes (asker, email, code_hash, digits, sent_at, expires_at, mail)

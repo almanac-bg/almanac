@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -19,8 +20,16 @@ import (
 // A window ends a period after its first count, and its count with it: the key is forgotten then (swept within a
 // minute). The keys are kept in shards, each under its own lock, so that a sweep holds up a sixteenth of the requests
 // for a sixteenth of the time. There are limitKeys at most: a flood of new keys (a key for each of many networks)
-// pushes out the windows nearest their end, of a few picked at random. A key pushed out starts again from nothing, so
-// under such a flood a limit lets a little more through rather than refuse everyone, and the memory stays what it was.
+// pushes out, of a few windows picked at random, the one with the fewest counts (and of those, the nearest its end).
+// A window that has spent its budget has many counts, and a flood's new keys one each, so a flood pushes out its own
+// keys and other barely used ones, not the spent budgets it would like to start again (review 2026-11-18, S8): to
+// push out a window of n counts, a flood must fill the limiter with windows of n counts, n requests a key. A key
+// pushed out starts again from nothing; the server hears when that happens (onFull), as it means a flood.
+//
+// The server has two limiters (Server.limits, Server.guard): the limits that keep players safe (codes mailed and
+// tried, guests made, room codes missed, reports) are kept apart from the rest, so that no flood of the cheap keys
+// (pages visited, a player's writes) can push them out at all. Their keys are bounded too: a key for a network is
+// made only while its site's budget isn't spent (from), so one site makes no more of them than its budget.
 //
 // The counts outlive a restart (save and restore, Config.LimitsFile): a deploy, several a day, would otherwise give
 // every budget whole again. A crash loses them, which is rare enough.
@@ -30,6 +39,9 @@ type limiter struct {
 	seed   maphash.Seed            // which key goes to which shard
 	most   int                     // keys in a shard at most
 	shards [limitShards]limitShard // by the key's hash
+	// onFull is told when a key is pushed out to make room, at most once a minute (lastFull): nil, nobody.
+	onFull   func()
+	lastFull atomic.Int64
 }
 
 const (
@@ -85,15 +97,30 @@ func (l *limiter) allow(key string, n int, per time.Duration) bool {
 	defer sh.mu.Unlock()
 	sh.sweep(now, time.Minute)
 	w, ok := sh.hits[key]
+	full := false
 	if !ok || now >= w.end {
 		if !ok && len(sh.hits) >= l.most {
-			sh.makeRoom(now, l.most)
+			full = sh.makeRoom(now, l.most)
 		}
 		w = window{end: now + per.Milliseconds()}
 	}
 	w.n++
 	sh.hits[key] = w
+	if full {
+		l.full(now)
+	}
 	return w.n <= n
+}
+
+// full tells onFull that a key was pushed out, unless it was told within the last minute.
+func (l *limiter) full(now int64) {
+	if l.onFull == nil {
+		return
+	}
+	if last := l.lastFull.Load(); now-last < time.Minute.Milliseconds() || !l.lastFull.CompareAndSwap(last, now) {
+		return
+	}
+	l.onFull()
 }
 
 // spent says whether key has had its n in its window already, counting nothing: for a limit on what failed, checked
@@ -136,61 +163,73 @@ func (sh *limitShard) sweep(now int64, every time.Duration) {
 }
 
 // makeRoom makes room for a key in a full shard: the windows that have ended go (if they weren't swept in the last
-// second), else the one nearest its end of a few picked at random (a map's order is). Called with the lock held.
-func (sh *limitShard) makeRoom(now int64, most int) {
+// second), else, of a few picked at random (a map's order is), the one with the fewest counts, and of those the one
+// nearest its end. It says whether a window that hadn't ended was pushed out. Called with the lock held.
+func (sh *limitShard) makeRoom(now int64, most int) bool {
 	sh.sweep(now, time.Second)
 	if len(sh.hits) < most {
-		return
+		return false
 	}
 	var out string
-	var end int64
+	var low window
 	seen := 0
 	for k, w := range sh.hits {
-		if seen == 0 || w.end < end {
-			out, end = k, w.end
+		if seen == 0 || w.n < low.n || (w.n == low.n && w.end < low.end) {
+			out, low = k, w
 		}
 		if seen++; seen == limitSample {
 			break
 		}
 	}
 	delete(sh.hits, out)
+	return true
 }
 
-// kept is a window as a stopping server keeps it.
+// kept is a window as a stopping server keeps it: L is which of the limiters saved together it's of (saveAll).
 type kept struct {
 	Key string `json:"k"`
 	End int64  `json:"e"`
 	N   int    `json:"n"`
+	L   int    `json:"l,omitempty"`
 }
 
 // save writes the windows that haven't ended, one a line, and says how many.
-func (l *limiter) save(w io.Writer) (int, error) {
+func (l *limiter) save(w io.Writer) (int, error) { return saveAll(w, l) }
+
+// restore counts again what save wrote, as far as the windows haven't ended since, and says how many it took.
+func (l *limiter) restore(r io.Reader) (int, error) { return restoreAll(r, l) }
+
+// saveAll writes the windows of several limiters that haven't ended, one a line, each marked with its limiter's
+// place among them, and says how many.
+func saveAll(w io.Writer, ls ...*limiter) (int, error) {
 	bw := bufio.NewWriter(w)
 	enc := json.NewEncoder(bw)
-	now := l.ms()
 	n := 0
-	for i := range l.shards {
-		sh := &l.shards[i]
-		sh.mu.Lock()
-		for k, win := range sh.hits {
-			if win.end <= now {
-				continue
+	for i, l := range ls {
+		now := l.ms()
+		for j := range l.shards {
+			sh := &l.shards[j]
+			sh.mu.Lock()
+			for k, win := range sh.hits {
+				if win.end <= now {
+					continue
+				}
+				if err := enc.Encode(kept{k, win.end, win.n, i}); err != nil {
+					sh.mu.Unlock()
+					return n, err
+				}
+				n++
 			}
-			if err := enc.Encode(kept{k, win.end, win.n}); err != nil {
-				sh.mu.Unlock()
-				return n, err
-			}
-			n++
+			sh.mu.Unlock()
 		}
-		sh.mu.Unlock()
 	}
 	return n, bw.Flush()
 }
 
-// restore counts again what save wrote, as far as the windows haven't ended since, and says how many it took.
-func (l *limiter) restore(r io.Reader) (int, error) {
+// restoreAll counts again what saveAll wrote, each window in the limiter of its place, as far as the windows
+// haven't ended since, and says how many it took.
+func restoreAll(r io.Reader, ls ...*limiter) (int, error) {
 	dec := json.NewDecoder(bufio.NewReader(r))
-	now := l.ms()
 	n := 0
 	for {
 		var k kept
@@ -199,6 +238,11 @@ func (l *limiter) restore(r io.Reader) (int, error) {
 		} else if err != nil {
 			return n, err
 		}
+		if k.L < 0 || k.L >= len(ls) {
+			continue
+		}
+		l := ls[k.L]
+		now := l.ms()
 		if k.Key == "" || k.End <= now || k.N <= 0 {
 			continue
 		}
@@ -222,7 +266,7 @@ func (s *Server) saveLimits() {
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	var n int
 	if err == nil {
-		n, err = s.limits.save(f)
+		n, err = saveAll(f, s.limits, s.guard)
 		if cerr := f.Close(); err == nil {
 			err = cerr
 		}
@@ -250,7 +294,7 @@ func (s *Server) restoreLimits() {
 		slog.Error("restoring limits", "err", err)
 		return
 	}
-	n, err := s.limits.restore(f)
+	n, err := restoreAll(f, s.limits, s.guard)
 	f.Close()
 	os.Remove(s.cfg.LimitsFile)
 	if err != nil {

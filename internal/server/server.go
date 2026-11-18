@@ -107,7 +107,8 @@ type Server struct {
 	bank          atomic.Pointer[bank.Bank]
 	banks         banks // a bank held for Роял, one refused (bank.go)
 	client        fs.FS
-	limits        *limiter
+	limits        *limiter // the limits on floods (limits.go)
+	guard         *limiter // apart, the limits that keep players safe: codes, guests, room codes, reports
 	problems      *problems
 	roomsSaved    roomsSaved
 	reminders     reminders     // who is due the day's reminder when, today (remind.go)
@@ -115,8 +116,9 @@ type Server struct {
 	streakMailing streakMailing // who is due the mail of a streak ended when, today (streakmail.go)
 	secure        bool
 	host          string
-	cookie        string // the session's
-	askCookie     string // the token of the browser a sign-in code is for (account.Asked)
+	cookie        string       // the session's
+	askCookie     string       // the token of the browser a sign-in code is for (account.Asked)
+	unlogged      atomic.Int64 // browsers' errors past clientErrorsAll not logged since the last one (problems.go)
 	handler       http.Handler
 }
 
@@ -134,7 +136,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s := &Server{
 		cfg: cfg, db: d.DB, accounts: d.Accounts, outbox: d.Outbox,
 		client: assets.FS(cfg.Dev),
-		limits: newLimiter(), problems: newProblems(),
+		limits: newLimiter(), guard: newLimiterOf(limitKeys / 2), problems: newProblems(),
 		secure: u.Scheme == "https",
 		host:   strings.ToLower(u.Hostname()),
 	}
@@ -143,7 +145,10 @@ func New(cfg Config, d Deps) (*Server, error) {
 	if s.secure {
 		s.cookie, s.askCookie = "__Host-sid", "__Host-ask"
 	}
-	s.limits.off = cfg.Dev
+	s.limits.off, s.guard.off = cfg.Dev, cfg.Dev
+	// A key pushed out of a full limiter means a flood of keys: the counts pushed out start again (limits.go).
+	s.limits.onFull = func() { s.problems.add("limits: a flood of keys filled the limiter; counts were pushed out") }
+	s.guard.onFull = func() { s.problems.add("limits: a flood of keys filled the guard's limiter; counts were pushed out") }
 	s.bank.Store(d.Bank)
 	s.game = play.New(d.DB, s.bank.Load)
 	if err := s.game.Keep(context.Background(), d.Bank); err != nil { // its versions, before anything is shown
@@ -305,6 +310,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /mail/off", s.mailOff)
 	mux.HandleFunc("GET /admin", s.admin)
 	mux.HandleFunc("POST /admin/reports/{id}/resolve", s.resolve)
+	mux.HandleFunc("POST /admin/players/{id}/reports/resolve", s.resolvePlayer)
 	mux.HandleFunc("GET /.well-known/security.txt", s.securityTxt)
 	mux.HandleFunc("GET /.well-known/apple-app-site-association", s.appleAppSiteAssociation)
 	mux.HandleFunc("GET /.well-known/assetlinks.json", s.assetLinks)
