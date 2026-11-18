@@ -107,7 +107,6 @@ interface LiveView {
       answer: Reveal;
       points: number;
       speed?: number;
-      row?: number;
       inRow?: number;
       right: boolean;
       exact?: boolean;
@@ -544,7 +543,7 @@ function reveal(view: () => LiveView, first: LiveView): Child {
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view, true),
     answered(q.view, r.answer, q.given ?? null),
-    verdict(kind, r.points, r.missed ? "Времето изтече." : undefined, r.speed, r.row, r.inRow),
+    verdict(kind, r.points, r.missed ? "Времето изтече." : undefined, r.speed, r.inRow),
     crowdLine(q.view.type, r.answer.crowd, r.right),
     theirs(first.them, q.view),
     upNext(q.nextMs ?? 0, last ? "Към резултата…" : `Въпрос ${first.n + 2} след малко…`),

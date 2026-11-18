@@ -16,6 +16,7 @@ export const medalPictures: Record<string, string> = {
   streak30: "bonfire",
   streak100: "phoenix",
   streak365: "year",
+  noMiss: "calendar",
   facts100: "book",
   facts1000: "books",
   facts5000: "topic-general",

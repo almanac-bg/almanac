@@ -666,7 +666,7 @@ function question(
       ].map(waiting);
       // The verdict is said once, in plain words, through the run's live region (not its own, made already full, nor
       // its points counting up from nothing).
-      const told = verdict(kind, res.points, undefined, res.speed, res.row, res.inRow);
+      const told = verdict(kind, res.points, undefined, res.speed, res.inRow);
       if (told instanceof HTMLElement) told.removeAttribute("role");
       append(after, [told, crowd, ...rest]);
       settle(page, head, after, asked.node, at, () => {

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log/slog"
 	"strconv"
-	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -162,24 +161,22 @@ func (g *Game) voidQuestion(tx *sql.Tx, day string, n int) error {
 }
 
 // recount counts a run's points and right answers again from its answers, without those to questions that count for
-// nobody: the answers after the first of those earn again as the row they make now (the same score, time and
-// difficulty: Pick.D), and a run done earns AllRight if every answer that counts was right.
+// nobody (theirs go to nothing), and a run done earns AllRight if every answer that counts was right. The others keep
+// what they earned: an answer's points are its own, whatever came before it (worth.go).
 func (g *Game) recount(tx *sql.Tx, r *run) error {
 	type answer struct {
 		n      int
-		score  float64
-		ms     int64
 		right  bool
 		points int
 	}
-	rows, err := tx.Query(`SELECT n, score, ms, is_right, points FROM answers WHERE run_id = ? ORDER BY n`, r.id)
+	rows, err := tx.Query(`SELECT n, is_right, points FROM answers WHERE run_id = ? ORDER BY n`, r.id)
 	if err != nil {
 		return err
 	}
 	var all []answer
 	for rows.Next() {
 		var a answer
-		if err := rows.Scan(&a.n, &a.score, &a.ms, &a.right, &a.points); err != nil {
+		if err := rows.Scan(&a.n, &a.right, &a.points); err != nil {
 			rows.Close()
 			return err
 		}
@@ -189,32 +186,18 @@ func (g *Game) recount(tx *sql.Tx, r *run) error {
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	points, rights, inRow, after := 0, 0, 0, false
+	points, rights := 0, 0
 	for _, a := range all {
-		was := a.points
-		switch {
-		case a.n >= len(r.picks):
-		case r.picks[a.n].Void:
-			a.points, after = 0, true
-		default:
-			if a.right {
-				inRow++
-				rights++
-			} else {
-				inRow = 0
-			}
-			if q, ok := g.question(r.picks[a.n]); ok && after {
-				row := 0
-				if a.right {
-					row = inRow
+		if a.n < len(r.picks) && r.picks[a.n].Void {
+			if a.points != 0 {
+				if _, err := tx.Exec(`UPDATE answers SET points = 0 WHERE run_id = ? AND n = ?`, r.id, a.n); err != nil {
+					return err
 				}
-				a.points = r.picks[a.n].worth(q, a.score, time.Duration(a.ms)*time.Millisecond, row).Points
 			}
+			continue
 		}
-		if a.points != was {
-			if _, err := tx.Exec(`UPDATE answers SET points = ? WHERE run_id = ? AND n = ?`, a.points, r.id, a.n); err != nil {
-				return err
-			}
+		if a.right && a.n < len(r.picks) {
+			rights++
 		}
 		points += a.points
 	}

@@ -94,7 +94,7 @@ interface MovedGoal {
 export function news(
   run: number,
   delay = 0,
-  streak?: { round: Promise<number>; grown: Promise<unknown> },
+  streak?: { round: Promise<number>; reserve?: Promise<boolean>; grown: Promise<unknown> },
   late?: { title?: string },
 ): Child {
   const data = signal<News | null>(null);
@@ -107,7 +107,7 @@ export function news(
           data.set(n);
           if (late) return;
           const kit = feelKit();
-          const top = kit && bigOne(n, (await streak?.round) ?? 0);
+          const top = kit && bigOne(n, (await streak?.round) ?? 0, (await streak?.reserve) ?? false);
           if (!kit || !top) {
             const sound = loudest(n);
             if (sound) play(sound);
@@ -185,11 +185,12 @@ function loudest(n: News): SoundName | null {
 }
 
 /** The one big thing a game brought, for its sheet: a week of the league ended up or on its podium, a division reached,
- * the streak at a round number (`days`), a level that unlocks something or is a fifth, an epic or legendary
- * achievement. The smaller news stays in the cards. */
+ * the streak at a round number (`days`, with the reserve day it earned, if it did), a level that unlocks something or
+ * is a fifth, an epic or legendary achievement. The smaller news stays in the cards. */
 function bigOne(
   n: News,
   days: number,
+  reserve = false,
 ): {
   parts: Element[];
   sound: SoundName;
@@ -237,7 +238,12 @@ function bigOne(
     };
   if (days)
     return {
-      parts: sheet(numeral(String(days)), "Серия", `${days} дни поред с въпросите на деня.`),
+      parts: sheet(
+        numeral(String(days)),
+        "Серия",
+        `${days} дни поред с въпросите на деня.`,
+        reserve ? "Получаваш резервен ден: ако пропуснеш ден, серията остава." : null,
+      ),
       sound: "streak",
       glow: true,
     };
@@ -323,7 +329,7 @@ function opened(system: keyof Open, n: News): Child {
     case "league":
       return line(
         "Ново: лигата. ",
-        "Всяка седмица се състезаваш с група играчи по точките от въпросите на деня. ",
+        "Всяка седмица се състезаваш с група играчи по верните отговори на въпросите на деня. ",
         h("a", { href: "/ranks#league" }, "Виж лигата"),
       );
     default:

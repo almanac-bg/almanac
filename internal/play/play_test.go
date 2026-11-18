@@ -391,7 +391,7 @@ func TestQuestionTime(t *testing.T) {
 		t.Fatalf("a broken answer: %v", err)
 	}
 	res, err := w.g.Answer(ctx, u, s.ID, 0, w.right(s.ID, 0))
-	if err != nil || res.Points != WorthOf(w.question(s.ID, 0), 1, 0, 1).Points || !res.Right || res.State.At != 1 || res.Reveal == nil {
+	if err != nil || res.Points != WorthOf(w.question(s.ID, 0), 1, 0).Points || !res.Right || res.State.At != 1 || res.Reveal == nil {
 		t.Fatalf("the right answer: %+v %v", res, err)
 	}
 
@@ -438,12 +438,12 @@ func TestAnswerAgain(t *testing.T) {
 		out, _ := json.Marshal(r)
 		return string(out)
 	}
-	// Two right in a row: the second's points are made up of its speed and the row, and so are they again.
+	// Two right in a row: the second's points are made up of its speed, and so are they again, with the row it makes.
 	if _, err := answer(0, w.right(s.ID, 0)); err != nil {
 		t.Fatal(err)
 	}
 	first, err := answer(1, w.right(s.ID, 1))
-	if err != nil || !first.Right || first.InRow != 2 || first.Row == 0 {
+	if err != nil || !first.Right || first.InRow != 2 || first.Speed == 0 {
 		t.Fatalf("the first time: %+v %v", first, err)
 	}
 	w.wait(5 * time.Second)
@@ -581,7 +581,7 @@ func TestPictureTime(t *testing.T) {
 	}
 	w.wait(5 * time.Second)
 	res, err := w.g.Answer(ctx, u, s.ID, 0, w.right(s.ID, 0))
-	if err != nil || res.Points != WorthOf(w.question(s.ID, 0), 1, 6*time.Second, 1).Points {
+	if err != nil || res.Points != WorthOf(w.question(s.ID, 0), 1, 6*time.Second).Points {
 		t.Fatalf("answered 6 s after it started: %+v %v", res, err)
 	}
 
@@ -657,9 +657,13 @@ func TestBoardAndStreak(t *testing.T) {
 	}
 }
 
-// Reserve days come from the day itself (the first day played, every seventh in a row) and from a day with all three
-// goals done, two at most; a missed day spends one and the streak holds; with none left it ends, and says so.
-func TestReserveDays(t *testing.T) {
+// The days before the rules of 2026-11-19 earned reserve days as the rules were then: the first day played, every
+// seventh in a row and a day with all three goals done, two at most and no cap a week; a missed day spends one and the
+// streak holds; with none left it ends, and says so.
+func TestReserveDaysBefore(t *testing.T) {
+	rules := ReserveRulesFrom
+	ReserveRulesFrom = "9999-12-31"
+	t.Cleanup(func() { ReserveRulesFrom = rules })
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
@@ -704,6 +708,87 @@ func TestReserveDays(t *testing.T) {
 	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 0 || s.Reserve != 0 || len(s.Saved) != 0 || s.Ended == nil ||
 		*s.Ended != (Ended{Days: 8, On: ended}) || s.Next != ReserveEvery {
 		t.Fatalf("three days missed: %+v (ended %+v)", s, s.Ended)
+	}
+}
+
+// Reserve days come from the day itself (a streak's third day, then every seventh in a row) and from a day with all
+// three goals done: one a week at most, none before the streak's third day, two in hand at most. A missed day spends
+// one and the streak holds; with none left it ends.
+func TestReserveDays(t *testing.T) {
+	rules := ReserveRulesFrom
+	ReserveRulesFrom = ""
+	t.Cleanup(func() { ReserveRulesFrom = rules })
+	w := setup(t) // Thursday, 12 November
+	ctx := t.Context()
+	ana := w.user()
+	day := func() {
+		s, _ := w.g.StartDay(ctx, ana)
+		w.play(ana, s.ID, repeat(w.right, Length)...)
+	}
+	full := func() {
+		day()
+		for i := range GoalsPerDay {
+			_, _ = w.db.Write.Exec(`INSERT OR IGNORE INTO goals_done (user_id, day, goal, at, xp, seen) VALUES (?, ?, ?, 1, 0, 1)`,
+				ana, w.g.Today(), fmt.Sprint("g", i))
+		}
+	}
+	streak := func(what string, days, reserve, next int, week bool, goals string) StreakNow {
+		t.Helper()
+		s, err := w.g.StreakOf(ctx, ana)
+		if err != nil || s.Days != days || s.Reserve != reserve || s.Next != next || s.Week != week ||
+			s.GoalsReserve() != goals {
+			t.Fatalf("%s: %+v, goals %q; want %d days, %d reserve, next in %d, week %v, goals %q (%v)", what, s,
+				s.GoalsReserve(), days, reserve, next, week, goals, err)
+		}
+		return s
+	}
+	full() // the first day, all three goals done: no reserve day yet, and day two keeps its stake
+	streak("Thursday, the first day", 1, 0, 2, false, ReserveSoon)
+	w.wait(24 * time.Hour)
+	streak("Friday, before playing", 1, 0, 2, false, ReserveSoon)
+	full()
+	streak("Friday, the second day", 2, 0, 1, false, ReserveSoon)
+	w.wait(24 * time.Hour)
+	day() // Saturday, the third day in a row: the first reserve day, this week's
+	streak("Saturday, the third day", 3, 1, 4, true, ReserveWeek)
+	w.wait(24 * time.Hour)
+	full() // Sunday, all three goals: this week's reserve day is earned already
+	streak("Sunday, a full day", 4, 1, 3, true, ReserveWeek)
+	w.wait(24 * time.Hour)
+	full() // Monday, a new week: all three goals earn its reserve day
+	streak("Monday, a full day", 5, ReserveMax, 0, true, ReserveFull)
+	w.wait(48 * time.Hour) // Tuesday missed: a reserve day spent
+	day()
+	s := streak("Wednesday, after a day missed", 6, 1, 8, true, ReserveWeek)
+	if len(s.Saved) != 1 || s.Saved[0] != "2026-11-17" || s.Unbroken != 1 {
+		t.Fatalf("the day a reserve day kept: %+v", s)
+	}
+	w.wait(24 * time.Hour)
+	day() // Thursday, the seventh day in a row: this week's reserve day is earned already
+	streak("Thursday, the seventh day", 7, 1, 7, true, ReserveWeek)
+	w.wait(3 * 24 * time.Hour) // Friday spends the last, Saturday ends it
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 0 || s.Reserve != 0 || s.Ended == nil ||
+		*s.Ended != (Ended{Days: 7, On: "2026-11-21"}) || s.Next != ReserveFrom {
+		t.Fatalf("two days missed with one reserve day: %+v (ended %+v)", s, s.Ended)
+	}
+}
+
+// A player keeps the reserve days the rules before 2026-11-19 gave, and earns by today's rules from then.
+func TestReserveDaysKeptOverTheRules(t *testing.T) {
+	rules := ReserveRulesFrom
+	ReserveRulesFrom = "2026-11-14"
+	t.Cleanup(func() { ReserveRulesFrom = rules })
+	w := setup(t) // Thursday, 12 November
+	ctx := t.Context()
+	ana := w.user()
+	w.daysPlayed(ana, 0) // the first day ever, by the old rules: a reserve day
+	if s, _ := w.g.StreakOf(ctx, ana); s.Reserve != 1 || !s.Week {
+		t.Fatalf("a first day, by the old rules: %+v", s)
+	}
+	w.wait(2 * 24 * time.Hour)
+	w.daysPlayed(ana, 1, 0) // Saturday, the third day, by today's rules: this week's reserve day came on Thursday
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 3 || s.Reserve != 1 || s.Next != 4 {
+		t.Fatalf("the third day, by today's rules: %+v", s)
 	}
 }
 
@@ -1930,13 +2015,13 @@ func TestLeagues(t *testing.T) {
 		t.Fatalf("Cy alone in Странджа: %+v", v)
 	}
 
-	// A group of eight in Родопи: the first two go up, the last two down, the rest stay. The second and third have
-	// equal points; the one with more right answers is ahead, though they came later.
+	// A group of eight in Родопи: the first two go up, the last two down, the rest stay. The second has fewer points
+	// than the third, and more right answers: they're ahead, though they came later.
 	monday := "2026-11-16"
 	res, _ := w.db.Write.Exec(`INSERT INTO league_groups (week, tier) VALUES (?, 2)`, monday)
 	group, _ := res.LastInsertId()
 	var eight []int64
-	for i, points := range []int{8000, 7000, 7000, 5000, 4000, 3000, 2000, 1000} {
+	for i, points := range []int{8000, 6500, 7000, 5000, 4000, 3000, 2000, 1000} {
 		p := w.user()
 		eight = append(eight, p)
 		rights, joined := 5, i

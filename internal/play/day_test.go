@@ -274,10 +274,10 @@ func TestRelabelPaysAsShown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := WorthOf(mustQuestion(t, w, "geo-001"), 1, 3*time.Second, 1).Points; res.Points == want {
+	if want := WorthOf(mustQuestion(t, w, "geo-001"), 1, 3*time.Second).Points; res.Points == want {
 		t.Fatalf("paid as relabelled: %d", res.Points)
 	}
-	if p := w.picks(run)[0]; p.D != level || res.Points != p.worth(mustQuestion(t, w, "geo-001"), 1, 3*time.Second, 1).Points {
+	if p := w.picks(run)[0]; p.D != level || res.Points != p.worth(mustQuestion(t, w, "geo-001"), 1, 3*time.Second).Points {
 		t.Fatalf("paid %d, the pick %+v (shown %s)", res.Points, p, level)
 	}
 	_ = ctx

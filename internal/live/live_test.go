@@ -189,7 +189,7 @@ func TestTwoPlayLive(t *testing.T) {
 		}
 		vb := m.View(bo.ID)
 		if vb.Phase != PhaseReveal || vb.Question.Reveal.Right || !vb.Them.Right || vb.Them.Given == nil ||
-			vb.Them.Gained != play.WorthOf(m.dealt[0].Question(), 1, time.Second, 1).Points || vb.Them.Points != vb.Them.Gained {
+			vb.Them.Gained != play.WorthOf(m.dealt[0].Question(), 1, time.Second).Points || vb.Them.Points != vb.Them.Gained {
 			t.Fatalf("after both answered: %+v / %+v", vb.Them, vb.Question.Reveal)
 		}
 		if err := m.Answer(ana.ID, 0, answer(m, true)); err != nil {

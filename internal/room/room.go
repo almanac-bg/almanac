@@ -467,7 +467,6 @@ type savedNow struct {
 	Given  json.RawMessage `json:"given,omitempty"`
 	Gained int             `json:"gained,omitempty"`
 	Speed  int             `json:"speed,omitempty"`
-	Row    int             `json:"row,omitempty"`
 	Right  bool            `json:"right,omitempty"`
 	Exact  bool            `json:"exact,omitempty"`
 }
@@ -514,7 +513,7 @@ func (r *Room) saved(now time.Time) saved {
 					Score: l.score, Points: l.points, Ms: l.ms, At: l.at, Right: l.right})
 			}
 			if r.phase == Question && m.answered {
-				sm.Now = &savedNow{Given: m.given, Gained: m.gained, Speed: m.speed, Row: m.row, Right: m.graded.Right,
+				sm.Now = &savedNow{Given: m.given, Gained: m.gained, Speed: m.speed, Right: m.graded.Right,
 					Exact: m.graded.Exact}
 			}
 		}
@@ -609,7 +608,7 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 					score: a.Score, points: a.Points, ms: a.Ms, at: a.At, right: a.Right})
 			}
 			if r.phase == Question && sm.Now != nil {
-				m.answered, m.given, m.gained, m.speed, m.row = true, sm.Now.Given, sm.Now.Gained, sm.Now.Speed, sm.Now.Row
+				m.answered, m.given, m.gained, m.speed = true, sm.Now.Given, sm.Now.Gained, sm.Now.Speed
 				m.graded = bank.Graded{Right: sm.Now.Right, Exact: sm.Now.Exact, Shown: sm.Now.Given}
 			}
 		}
@@ -730,7 +729,6 @@ type member struct {
 	graded   bank.Graded
 	gained   int
 	speed    int // of gained, for being quick
-	row      int // of gained, for the right answers in a row
 	// Every answer of this game, for the review at its end, and the run it's kept as (Hub.Record).
 	log []loggedAnswer
 	run int64
@@ -933,7 +931,7 @@ func (r *Room) Return(by int64, key int) error {
 	// The question up now counts as answered if they answered it before they went (an answer isn't taken twice).
 	m.answered = r.phase == Question && slices.ContainsFunc(m.log, func(l loggedAnswer) bool { return l.n == r.n && l.given != nil })
 	if !m.answered {
-		m.given, m.graded, m.gained, m.speed, m.row = nil, bank.Graded{}, 0, 0, 0
+		m.given, m.graded, m.gained, m.speed = nil, bank.Graded{}, 0, 0
 	}
 	r.players = append(r.players, m)
 	r.changed()
@@ -1333,7 +1331,7 @@ func (r *Room) bank() *bank.Bank { return r.hub.bank() }
 func (r *Room) show(n int) {
 	r.phase, r.n, r.shownAt = Question, n, time.Now()
 	for _, m := range r.players {
-		m.answered, m.given, m.graded, m.gained, m.speed, m.row = false, nil, bank.Graded{}, 0, 0, 0
+		m.answered, m.given, m.graded, m.gained, m.speed = false, nil, bank.Graded{}, 0, 0
 	}
 	limit := play.Limit(r.dealt[n].Question())
 	r.after(limit+play.Grace, func() { r.reveal() })
@@ -1443,8 +1441,8 @@ func (r *Room) answer(m *member, n int, raw json.RawMessage) error {
 	if err != nil {
 		return ErrAnswer
 	}
-	// Points as in any game (play.WorthOf): for knowing, more for harder questions and right answers in a row, and a
-	// part for being quick.
+	// Points as in any game (play.WorthOf): for knowing, more for harder questions, and a part for being quick. The
+	// right answers in a row are counted for the climb's feel, never for points.
 	m.answered, m.given, m.graded = true, g.Shown, g
 	if g.Right {
 		m.rights++
@@ -1452,8 +1450,8 @@ func (r *Room) answer(m *member, n int, raw json.RawMessage) error {
 	} else {
 		m.inRow = 0
 	}
-	w := play.WorthOf(d.Question(), g.Score, took, m.inRow)
-	m.gained, m.speed, m.row = w.Points, w.Speed, w.Row
+	w := play.WorthOf(d.Question(), g.Score, took)
+	m.gained, m.speed = w.Points, w.Speed
 	m.points += m.gained
 	m.ms += min(took, limit).Milliseconds()
 	m.log = append(m.log, loggedAnswer{questionID: d.Question().Base().ID, shown: g.Shown, points: m.gained, right: g.Right,
@@ -1678,9 +1676,9 @@ type QuestionView struct {
 type RevealView struct {
 	Answer any `json:"answer"`
 	Points int `json:"points"`
-	// Speed is how many of the points were for being quick, and Row how many for the right answers in a row InRow.
+	// Speed is how many of the points were for being quick. InRow is how many right answers in a row the answer
+	// makes, from 2: the climb's feel, worth no points.
 	Speed  int  `json:"speed,omitempty"`
-	Row    int  `json:"row,omitempty"`
 	InRow  int  `json:"inRow,omitempty"`
 	Right  bool `json:"right"`
 	Exact  bool `json:"exact,omitempty"`
@@ -1748,9 +1746,9 @@ func (r *Room) View(viewer int64) View {
 		if me := r.member(viewer); me != nil {
 			q.Given = me.given
 			if r.phase == Reveal {
-				q.Reveal = &RevealView{Answer: d.Reveal(r.hub.crowd(d.Question())), Points: me.gained, Speed: me.speed, Row: me.row,
+				q.Reveal = &RevealView{Answer: d.Reveal(r.hub.crowd(d.Question())), Points: me.gained, Speed: me.speed,
 					Right: me.graded.Right, Exact: me.graded.Exact, Missed: !me.answered}
-				if me.row > 0 {
+				if me.answered && me.graded.Right && me.inRow > 1 {
 					q.Reveal.InRow = me.inRow
 				}
 			}

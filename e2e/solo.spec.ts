@@ -81,7 +81,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // The day's goal is done. (The other two goals are drawn per day, and a run of the day can finish them too.)
   await expect(page.locator(".goal.done").filter({ hasText: "Изиграй въпросите на деня" })).toBeVisible();
 
-  // A third: the league. The day put the player in the week's group, racing on the day's points (a topic's game
+  // A third: the league. The day put the player in the week's group, racing on the day's right answers (a topic's game
   // doesn't); the rating's board waits for a rated game of theirs. The group shows once it has five; until then it's
   // gathering (other tests play the same day, so it may be either).
   await playedBefore(page, 2);
@@ -89,9 +89,9 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.getByRole("tab", { name: "Рейтинг" })).toHaveCount(0);
   await page.getByRole("tab", { name: "Лига" }).click();
   await expect(page.locator(".league-card")).toContainText("Странджа");
-  await expect(page.locator(".league-card")).toContainText("по точките от въпросите на деня");
+  await expect(page.locator(".league-card")).toContainText("от верните отговори на въпросите на деня");
   const mine = page.locator(".league-board .row.me, .league-gathering").first();
-  await expect(mine).toContainText(/точки|Групата ти още се събира/);
+  await expect(mine).toContainText(/верни|Групата ти още се събира/);
   // Профил shows the league too, in a line that is a tap from the group.
   await page.goto("/me");
   await expect(page.locator(".league-link")).toContainText(/място от|Групата ти още се събира/);

@@ -28,7 +28,8 @@ import (
 // serve runs the game, configured by the environment (deploy/env.example shows the server's):
 //
 //	DEV=1               development: the client from disk, mail to the log (and to MAIL_DIR, if set), a fixed secret,
-//	                    no limits, any host; refused with production's settings (devOnly)
+//	                    no limits, any host, reserve days by today's rules from the first day (play.ReserveRulesFrom);
+//	                    refused with production's settings (devOnly)
 //	ADDR                where to listen (:8080)
 //	PUBLIC_URL          the address players use (http://localhost:8080)
 //	DB_PATH             the database file (almanac.db); copies are made beside it
@@ -120,6 +121,9 @@ func serve([]string) error {
 			return errors.New("ROYAL_LOBBY must be like 1m, and no longer than ROYAL_EVERY")
 		}
 		cfg.Royal = royal.Schedule{Every: e, Lobby: lobby}
+	}
+	if dev {
+		play.ReserveRulesFrom = "" // no players from before today's rules of reserve days to keep theirs
 	}
 	if after := os.Getenv("MISTAKES_AFTER"); after != "" && dev {
 		a, err := time.ParseDuration(after)

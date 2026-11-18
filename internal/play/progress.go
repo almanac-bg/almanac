@@ -20,8 +20,8 @@ import (
 //   - XP is for playing: every answer and game (worth.go), the day's goals (goals.go), each achievement (its tier's
 //     XP, once) and the first places of each week's league group (leagues.go). All of it adds up to a level.
 //   - The rating is strength: duels and Роял move it (rating.go); its divisions are what it's worth.
-//   - The week's league is the day's habit: a race on the day's points, added up over the week, a day missed adding
-//     nothing (leagues.go). It's not on XP, which counts how much is played: the player who plays the day every day,
+//   - The week's league is the day's habit: a race on the day's right answers (then points), added up over the week,
+//     a day missed adding nothing (leagues.go). It's not on XP, which counts how much is played: the player who plays the day every day,
 //     and plays it well, wins it, whatever else anyone plays.
 //   - Моят Алманах is what's learned: the fact behind every question answered right (almanac.go). Its achievements
 //     count facts collected (a hundred, a thousand, five thousand, every fact of a topic), never answers given, so
@@ -31,8 +31,8 @@ import (
 // Роял won or first place in a high league each gives an avatar, a frame, a pattern or a title. Whatever unlocks something, the player is told
 // once, at the end of the game that did it (NewsOf), and is shown what comes next (Next): the next level that gives
 // something, the next division, the achievements nearest. Reserve days keep the streak through a missed day (runs.go):
-// the day itself earns them (the first day, every seventh in a row), and so do the day's goals, done all three; the
-// streak makes achievements of its own. A streak that ends anyway can be won back by playing, once a month (repair.go).
+// the day itself earns them (the streak's third day, every seventh in a row), and so do the day's goals, done all
+// three, one a week at most; the streak makes achievements of its own, and a year with no day missed at all one more. A streak that ends anyway can be won back by playing, once a month (repair.go).
 //
 // All of it comes from the game's own records: nothing to buy, nothing made up. A new player meets it a part at a
 // time (unfold.go): all of it counts from the first game, but XP, the league and the rating show as each starts to
@@ -126,7 +126,8 @@ var Achievements = []Achievement{
 	{"rila", "На върха", "Стигни до Рила, най-високата лига.", "", Epic, 1, false},
 
 	{"streak100", "Сто дни", "Играй въпросите на деня сто дни поред.", "flame", Legendary, 100, false},
-	{"streak365", "Цяла година", "Играй въпросите на деня 365 дни поред.", "flame", Legendary, 365, false},
+	{"streak365", "Цяла година", "Стигни серия от 365 дни с въпросите на деня.", "flame", Legendary, 365, false},
+	{"noMiss", "Без нито един пропуск", "Играй въпросите на деня 365 дни един след друг, без резервен ден и без връщане на серия.", "", Legendary, 365, false},
 	{"master5", "Пет теми като петте си пръста", "Стигни до „Майстор“ в пет теми.", "trophy", Legendary, 5, false},
 	{"duel50", "Петдесет победи", "Спечели петдесет дуела.", "shield", Legendary, 50, false},
 	{"facts5000", "Пет хиляди факта", "Събери пет хиляди факта в Алманаха.", "book", Legendary, 5000, false},
@@ -464,7 +465,7 @@ func bulgarianDate(ms string) string { return `date(` + bulgarian(ms) + `, 'unix
 // their records: what Award awards and a profile shows the progress of.
 func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error) {
 	db := g.DB.Read
-	streak, err := g.Streak(ctx, userID)
+	streak, err := g.StreakOf(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -536,7 +537,8 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		return 0
 	}
 	return map[string]int{
-		"streak3": streak, "streak7": streak, "streak30": streak, "streak100": streak, "streak365": streak,
+		"streak3": streak.Days, "streak7": streak.Days, "streak30": streak.Days, "streak100": streak.Days,
+		"streak365": streak.Days, "noMiss": streak.Unbroken,
 		"perfect": one(perfect), "exact": one(exact), "fast": fast,
 		"facts100": facts.n, "facts1000": facts.n, "facts5000": facts.n, "wholeTopic": one(facts.whole),
 		"games100":  games,

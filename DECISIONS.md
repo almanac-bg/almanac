@@ -41,7 +41,15 @@ packages' doc comments; this file holds only what must not drift.
   standings. Rejected: out at the first wrong (most were out by the 5th), lives, a final from zero (luck over
   knowledge).
 - **One challenge**, by a link anyone can open (#402): friend duels and challenges were two near-identical systems.
-- **Leagues race on the day's points**, not XP; reserve days come from the day itself and from goals.
+- **Leagues race on the day's right answers**, not XP: a group ranks by the week's right answers on the day's ten, then
+  its points, then who joined first, as the day's board does (owner, 2026-11-18, review E3). A league's last group,
+  under five, races with the one before it.
+- **Reserve days: one a week at most,** Monday to Sunday, from whichever source comes first (the day itself and the
+  goals); none before a streak's third day, which brings the first, told then. Players kept the reserve days they held
+  when this came in. „Година без пропуск“ is 365 days in a row with no reserve day or repair spent; the streak's year
+  is „Година с Алманаха“ (owner, 2026-11-18, review E4, E11).
+- **Right answers in a row earn no points** (owner, 2026-11-18, review E6): where a miss fell decided close duels and
+  weeks. The climb stays as sound and feel; a game with every answer right still earns its bonus.
 - **The day's goals serve the day,** each one game at most: the day's ten; one more game (a topic's, three questions
   fixed in Втори шанс, or a duel); and a game played well (8 of 10 or more). No goal for how many or how fast, and a
   room's game counts only when someone else played it too (owner, 2026-11-18, review O4: the volume and speed goals
