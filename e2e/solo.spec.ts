@@ -56,7 +56,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // Класации opens on the day's board, the player on it; the league and the rating aren't theirs yet.
   await page.goto("/ranks");
   await expect(page.locator(".board .row.me")).toContainText("/10");
-  await expect(page.getByRole("tab")).toHaveText(["Днес", "Знания", "Всички", "Приятели"]);
+  await expect(page.getByRole("tab")).toHaveText(["Днес", "Вчера", "Знания", "Всички", "Приятели"]);
   // No level on a board's row, and no title the start gives everyone: a row is the place, the name and the score.
   await expect(page.locator(".board .lv")).toHaveCount(0);
   await expect(page.locator(".board")).not.toContainText("Нова искра");

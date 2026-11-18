@@ -184,7 +184,7 @@ function issuesCard(spread: number[], today: number): Child {
             title: `${i} от 10: ${n} ${n === 1 ? "ден" : "дни"}${i === today ? " (днес)" : ""}`,
           },
           h("span", { class: "issues-n" }, n ? String(n) : ""),
-          h("span", { class: "issues-fill", style: { "--share": String(most ? n / most : 0) } }),
+          h("span", { class: "issues-fill", style: { "--tall": String(most ? n / most : 0) } }),
           h("span", { class: "issues-score", "aria-hidden": "true" }, String(i)),
           h("span", { class: "sr" }, `${i} от 10: ${n} ${n === 1 ? "ден" : "дни"}`),
         ),

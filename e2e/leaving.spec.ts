@@ -68,13 +68,13 @@ test("a topic counts in only after a tap; a reload goes back to its question, an
   const score = (await page.locator(".summary .score-n").textContent()) ?? "";
   // The result stays the page's: a reload shows it again, and no new game starts.
   await page.reload();
-  await expect(page.locator(".day-done-n")).toHaveText(score);
+  await expect(page.locator(".summary .score-n")).toHaveText(score);
   await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
   // Back goes to Начало, where the tap was; forward comes to the result again.
   await page.goBack();
   await expect(page.locator(".card.day")).toBeVisible();
   await page.goForward();
-  await expect(page.locator(".day-done-n")).toHaveText(score);
+  await expect(page.locator(".summary .score-n")).toHaveText(score);
 });
 
 test("„Откажи“ on the count of a topic opened from outside comes back to its start, not to Начало", async ({

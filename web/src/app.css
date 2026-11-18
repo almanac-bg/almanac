@@ -1758,7 +1758,7 @@
   }
 
   .issues-fill {
-    height: calc(var(--share, 0) * 6rem);
+    height: calc(var(--tall, 0) * 6rem);
     min-height: 2px;
     margin-inline: 2px;
     border-radius: 4px 4px 0 0;
