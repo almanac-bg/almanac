@@ -503,6 +503,21 @@
     gap: var(--space-3);
   }
 
+  /* A dateline that leads to its day's game: the kicker's look, underlined as a way on. */
+  .almanac-date a {
+    color: inherit;
+  }
+
+  .games-days {
+    display: grid;
+    gap: var(--space-5);
+  }
+
+  .games-day {
+    display: grid;
+    gap: var(--space-2);
+  }
+
   .almanac-date::after {
     content: "";
     flex: 1;
@@ -914,6 +929,12 @@
 
   .board-empty {
     color: var(--text-muted);
+  }
+
+  /* Over yesterday's final board: who won it. */
+  .board-winner {
+    margin: 0;
+    font-weight: 700;
   }
 
   /* Роял's table: those out are dimmer; how far each got on the right. */
@@ -1708,6 +1729,59 @@
     height: 14px;
     border-radius: 5px;
     background: var(--tone, var(--gold));
+  }
+
+  /* ---- Твоите броеве: the days' ten by right answers, a column for each score, today's in gold ---- */
+
+  .issues-bars {
+    display: grid;
+    grid-template-columns: repeat(11, minmax(0, 1fr));
+    grid-template-rows: 8.5rem;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Each column stands on the baseline: its count over its bar, the score under it. */
+  .issues-bar {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    text-align: center;
+  }
+
+  .issues-n {
+    color: var(--text-muted);
+    font: 700 0.75rem / 1rem var(--font-sans);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .issues-fill {
+    height: calc(var(--share, 0) * 6rem);
+    min-height: 2px;
+    margin-inline: 2px;
+    border-radius: 4px 4px 0 0;
+    background: var(--lilac);
+  }
+
+  .issues-bar.today .issues-fill {
+    background: var(--gold);
+  }
+
+  .issues-score {
+    color: var(--text-muted);
+    font: 800 0.875rem / 1.25rem var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .issues-bar.today :is(.issues-score, .issues-n) {
+    color: var(--gold-ink);
+  }
+
+  .issues-line {
+    margin: 0;
+    font-size: 0.875rem;
   }
 
   /* ---- Figures: numbers with what they count ---- */
@@ -3971,6 +4045,40 @@
     font-weight: 500;
   }
 
+  /* Начало on a later visit: the day played as one short card, its score a size down from the result's. */
+  .day-done-score {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--space-2);
+    margin: 0;
+    color: var(--text-muted);
+    font-family: var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .day-done-n {
+    color: var(--text);
+    font-size: 3.5rem;
+    line-height: 3rem;
+    font-weight: 900;
+  }
+
+  .day-done-of {
+    font-size: 1.5rem;
+    font-weight: 800;
+  }
+
+  .day-done-points {
+    margin-left: auto;
+    font: 600 0.9375rem / 1.375rem var(--font-sans);
+  }
+
+  /* While today's ten wait, how yesterday's ended: a quiet line over the day. */
+  .yesterday-line {
+    margin: 0;
+  }
+
   .board {
     display: grid;
     overflow: hidden;
@@ -4712,6 +4820,11 @@
 
   .avatar.l {
     --size: 72px;
+  }
+
+  /* Профил's head before the player's look is known (none seen on this device yet): a plain tile, not a guess. */
+  .avatar.avatar-unknown {
+    background: var(--sunken);
   }
 
   .avatar .lv {

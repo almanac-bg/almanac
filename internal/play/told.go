@@ -17,7 +17,8 @@ import (
 //     on screen (the day's last question let run out with the tab in the background, a game left at its last question,
 //     a Роял whose evening ended) has its news told on Начало instead, once (Untold), and not after some later game.
 //   - What came of the days just missed (a reserve day kept the streak, or it ended) is said once (StreakNotice,
-//     TellStreak); and a broken streak that can be won back is counted as offered once.
+//     TellStreak); and a broken streak that can be won back is counted as offered once. A player back after days away
+//     (BackFrom) is welcomed back once, with the longest streak they've had, in the same way.
 
 // UntoldWithin is how long a game's untold news waits for Начало: older, it's let go (what it earned is the player's
 // all the same, and its achievements are told with the next game's news).
@@ -35,8 +36,27 @@ func (g *Game) Untold(ctx context.Context, userID int64) (int64, error) {
 	return id, err
 }
 
-// streakKey is what a streak notice is kept by: what came of it and the day it's about.
-var streakKey = regexp.MustCompile(`^(kept|ended):\d{4}-\d{2}-\d{2}$`)
+// streakKey is what a streak notice is kept by: what came of it and the day it's about (back: the last day played
+// before a player came back, BackFrom).
+var streakKey = regexp.MustCompile(`^(kept|ended|back):\d{4}-\d{2}-\d{2}$`)
+
+// BackFrom is how many days after the last day played a player who comes back is welcomed back (BackOf): two days
+// missed or more, so further back than a streak's end that Начало tells (StreakNotice).
+const BackFrom = 3
+
+// LastDay is the last day before today that a player finished the day's ten on ("" for none).
+func (g *Game) LastDay(ctx context.Context, userID int64) (string, error) {
+	var day sql.NullString
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT max(day) FROM runs WHERE user_id = ? AND kind = 'day'
+		AND finished_at IS NOT NULL AND day < ?`, userID, g.Today()).Scan(&day)
+	return day.String, err
+}
+
+// Away is whether a player whose last day played before today was this one has been away long enough to be
+// welcomed back (BackFrom).
+func (g *Game) Away(last string) bool {
+	return last != "" && daysBetween(last, g.Today()) >= BackFrom
+}
 
 // ErrNotice is a streak notice that isn't one.
 var ErrNotice = errors.New("no such notice")

@@ -100,8 +100,15 @@ export function topics(): Child {
   );
 }
 
-/** How many questions wait for the player's second chance, and from how many it opens. */
-export const loadMistakes = () => api<{ waiting: number; from: number }>("GET", "/api/mistakes");
+/** How many questions wait for the player's second chance, from how many it opens, and, while too few wait, what's
+ * still to come: how many, and in how many days the first and the last of them come (0: later today). */
+export interface Mistakes {
+  waiting: number;
+  from: number;
+  coming?: { n: number; first: number; last: number };
+}
+
+export const loadMistakes = () => api<Mistakes>("GET", "/api/mistakes");
 
 /** The way into a second chance: the questions the player got wrong, asked again (/mistakes). */
 export function secondChance(waiting: number, left: Child = null): Child {

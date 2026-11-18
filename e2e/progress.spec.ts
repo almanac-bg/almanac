@@ -84,14 +84,14 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
 
 test("just played, a right answer few others got makes „Сподели“ gold", async ({ page }) => {
   test.setTimeout(120_000);
-  // The day as the server would have it with others playing: few right answers of the player's own (worth sharing
-  // only for the rare one), and the right answer a tenth of the others got, told (as the server does) only once the
-  // day is played.
+  // The day as the server would have it with others playing: 4 right answers of the player's own (worth sharing only
+  // for the rare one; one lucky answer in a poorer day isn't), and the right answer a tenth of the others got, told
+  // (as the server does) only once the day is played.
   await page.route("**/api/runs/*", async (route) => {
     if (route.request().method() !== "GET") return route.continue();
     const res = await route.fetch();
     const s = await res.json();
-    if (s.done) s.rights = 0;
+    if (s.done) s.rights = 4;
     await route.fulfill({ response: res, json: s });
   });
   await page.route("**/api/day", async (route) => {

@@ -231,6 +231,7 @@ func (s *Server) routes() http.Handler {
 	api("PATCH /api/me", s.rename)
 	api("DELETE /api/me", s.deleteAccount)
 	api("GET /api/me/stats", s.stats)
+	api("GET /api/me/games", s.games)
 	api("GET /api/me/progress", s.progress)
 	api("POST /api/me/news", s.news)
 	api("POST /api/me/streak-told", s.streakTold)

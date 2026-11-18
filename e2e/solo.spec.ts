@@ -47,7 +47,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(page.locator(".reviewed")).toHaveCount(10);
   await page.reload();
-  await expect(page.locator(".summary")).toBeVisible();
+  await expect(page.locator(".day-done")).toBeVisible();
   await expect(page.getByRole("button", { name: "Започни" })).toHaveCount(0);
   await expect(page.locator(".modes")).toBeVisible();
   // Начало's top tells the streak the day made; the level and the goals come from the second day played.
@@ -309,8 +309,8 @@ test("the day left at its last question comes back done, with what it earned tol
   await expect(page.locator(".summary")).toBeVisible();
   await expect(page.locator(".summary .news-open")).toContainText("са резултатът ти в една игра");
   await page.reload();
-  await expect(page.locator(".summary")).toBeVisible();
-  await expect(page.locator(".summary .trail")).toBeVisible();
+  await expect(page.locator(".day-done")).toBeVisible();
+  await expect(page.locator(".day-done .trail")).toBeVisible();
   await expect(page.locator(".news-open")).toHaveCount(0);
 });
 
@@ -411,7 +411,7 @@ test.describe("on a computer", () => {
     expect(widths.length).toBeGreaterThan(2);
     expect(Math.max(...widths)).toBeLessThanOrEqual(22 * 16);
     await page.reload();
-    await expect(page.locator(".summary")).toBeVisible();
+    await expect(page.locator(".day-done")).toBeVisible();
     const after = await home.boundingBox();
     expect(just && after && Math.abs(just.width - after.width) < 1 && just.width > 48 * 16).toBe(true);
   });

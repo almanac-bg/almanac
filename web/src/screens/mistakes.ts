@@ -9,7 +9,7 @@ import { api } from "../lib/api.ts";
 import { h, signal } from "../lib/dom.ts";
 import { title } from "../lib/router.ts";
 import { user } from "../state.ts";
-import { loadMistakes, run } from "./play.ts";
+import { loadMistakes, type Mistakes, run } from "./play.ts";
 
 export function mistakes() {
   title("Втори шанс");
@@ -24,18 +24,7 @@ export function mistakes() {
       return h(
         "section",
         { class: "screen stack" },
-        h(
-          "div",
-          { class: "intro" },
-          h("h1", null, "Втори шанс"),
-          h(
-            "p",
-            { class: "lead" },
-            m.waiting
-              ? `Втори шанс започва, щом се съберат ${m.from} въпроса. Засега ${m.waiting === 1 ? "чака 1" : `чакат ${m.waiting}`}.`
-              : "Още няма въпроси за втори шанс. Тук идват въпросите, на които сгреши, няколко дни по-късно.",
-          ),
-        ),
+        h("div", { class: "intro" }, h("h1", null, "Втори шанс"), h("p", { class: "lead" }, closedWords(m))),
         h("a", { class: "btn primary big", href: "/" }, "Към Начало"),
       );
     },
@@ -66,4 +55,18 @@ export function mistakes() {
       );
     },
   });
+}
+
+/** Втори шанс with too few questions to play: what's still to come and when (a question got wrong comes a few days
+ * after), from how many it starts, and what waits now. */
+function closedWords(m: Mistakes): string {
+  const c = m.coming;
+  if (!m.waiting && !c?.n)
+    return "Още няма въпроси за втори шанс. Тук идват въпросите, на които сгреши, няколко дни по-късно.";
+  const when = (d: number) => (d <= 0 ? "по-късно днес" : d === 1 ? "утре" : `след ${d} дни`);
+  const coming = c?.n
+    ? `${c.n === 1 ? "Един въпрос ще дойде" : `${c.n} въпроса ще дойдат`} тук ${c.first === c.last ? when(c.last) : c.last === 1 ? "до утре" : `до ${c.last} дни`}. `
+    : "";
+  const now = m.waiting ? ` Засега ${m.waiting === 1 ? "чака 1" : `чакат ${m.waiting}`}.` : "";
+  return `${coming}Втори шанс започва, щом се съберат ${m.from} въпроса.${now}`;
 }

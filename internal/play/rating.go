@@ -97,6 +97,8 @@ type Ranking struct {
 	Top   []Ranked `json:"top"`
 	Place int      `json:"place,omitempty"`
 	Mine  *Ranked  `json:"mine,omitempty"`
+	// Answers is, on the board of knowledge, the viewer's answers while they're short of the board: how far they are.
+	Answers *int `json:"answers,omitempty"`
 }
 
 const (

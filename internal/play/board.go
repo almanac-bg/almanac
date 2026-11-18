@@ -138,7 +138,7 @@ func (g *Game) dayBoard(ctx context.Context, day string) (*countedBoard, error) 
 // countBoard counts a day's board: every fair game of it finished, in order, and the best with who played them, in
 // one read so that the two agree.
 func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error) {
-	start := time.Now()
+	start, final := time.Now(), g.DaySettled(day) // settled before the read: every game of it is in
 	tx, err := g.DB.Read.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return nil, err
@@ -184,22 +184,60 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	d.counted, d.took = time.Now(), time.Since(start)
+	d.counted, d.took, d.final = time.Now(), time.Since(start), final
 	return d, nil
+}
+
+// Yesterday is how the day before ended for a player who played it: its issue, their right answers, and their final
+// place among how many. Начало says it while today's ten wait: the day closes, and the next begins.
+type Yesterday struct {
+	Day     string `json:"day"`
+	Issue   int    `json:"issue"`
+	Rights  int    `json:"rights"`
+	Place   int    `json:"place"`
+	Players int    `json:"players"`
+}
+
+// YesterdayOf is how the day before ended for a player (nil: they didn't finish it, or its board isn't final yet).
+func (g *Game) YesterdayOf(ctx context.Context, userID int64) (*Yesterday, error) {
+	day := DayShift(g.Today(), -1)
+	if !g.DaySettled(day) {
+		return nil, nil
+	}
+	b, err := g.BoardOf(ctx, day, userID)
+	if err != nil || b.Mine == nil {
+		return nil, err
+	}
+	return &Yesterday{Day: day, Issue: Issue(day), Rights: b.Mine.Rights, Place: b.Place, Players: b.Players}, nil
+}
+
+// DaySettled is whether a day's board is final: the day is over, and so is the last of its games that could still be
+// played on (dayLate). Before then the board moves, and its first place isn't the day's winner yet.
+func (g *Game) DaySettled(day string) bool {
+	_, end := dayBounds(day)
+	return g.Now().After(time.UnixMilli(end).Add(dayLate))
 }
 
 // countedBoard is a day's board as counted: its fair games finished, best first, and the best of them as shown.
 type countedBoard struct {
 	counted time.Time     // when, by the machine's clock (not the game's: it's about the server's time)
 	took    time.Duration // how long counting it took
+	final   bool          // counted once its day had settled (DaySettled): no game of it can finish any more
 	runs    []boardRun
 	rights  int // the right answers of all of them
 	top     []Score
 	users   []int64 // who played each of top
 }
 
-// due says whether a board is old enough to be counted again (boardPatience).
+// boardFinalStale is how long a settled day's board is kept: yesterday's is on Начало for every player who played it,
+// and only a name changed or a player gone moves it now.
+const boardFinalStale = time.Minute
+
+// due says whether a board is old enough to be counted again (boardPatience; a settled day's, boardFinalStale).
 func (d *countedBoard) due() bool {
+	if d.final {
+		return time.Since(d.counted) >= boardFinalStale
+	}
 	return time.Since(d.counted) >= min(boardStale, time.Duration(boardPatience)*d.took)
 }
 

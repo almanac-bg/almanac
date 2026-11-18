@@ -1,5 +1,6 @@
-// How a player has done: the streak (and their longest) and this week, their numbers, the facts in their almanac, how
-// well they know each topic (each a way to play it), their latest games (each a way to go over it: /games/<id>).
+// How a player has done: the streak (and their longest) and this week, their numbers, how their days' ten have gone
+// (from the third day played), the facts in their almanac, how well they know each topic (each a way to play it), their
+// latest games (each a way to go over it: /games/<id>) and the way to all of them (/games).
 
 import { picture } from "../art/picture.ts";
 import { type Mastery, masteryCard } from "../game/mastery.ts";
@@ -23,22 +24,30 @@ export interface Stats {
   right: number;
   /** Facts in Моят Алманах. */
   facts: number;
+  /** How the day's ten have gone over the days played: how many days had 0 right, 1, … 10; and today's (-1: not yet). */
+  spread: number[];
+  today: number;
   duels: number;
   won: number;
   mastery: Mastery[];
-  recent: {
-    id: number;
-    kind: "day" | "topic" | "challenge" | "duel" | "royal" | "mistakes" | "room"; // challenge: from when there were challenges
-    day?: string;
-    category?: string;
-    rights: number;
-    total: number;
-    points: number;
-    at: number;
-    opponent?: string;
-    recorded?: boolean;
-    outcome?: "won" | "lost" | "draw";
-  }[];
+  recent: Played[];
+}
+
+/** A finished game, as a list of them has it. */
+export interface Played {
+  id: number;
+  kind: "day" | "topic" | "challenge" | "duel" | "royal" | "mistakes" | "room"; // challenge: from when there were challenges
+  day?: string;
+  /** The day's ten's: the day's issue. */
+  issue?: number;
+  category?: string;
+  rights: number;
+  total: number;
+  points: number;
+  at: number;
+  opponent?: string;
+  recorded?: boolean;
+  outcome?: "won" | "lost" | "draw";
 }
 
 export const loadStats = () => api<Stats>("GET", "/api/me/stats");
@@ -48,10 +57,12 @@ const topicName = (id?: string) => (id ? (topics.find((c) => c.id === id)?.name 
 const date = (ms: number) => new Intl.DateTimeFormat("bg", { day: "numeric", month: "long" }).format(new Date(ms));
 const outcome = { won: "победа", lost: "загуба", draw: "равенство" };
 
-function what(p: Stats["recent"][number]): string {
+/** What a game was, as a list of games says it (its date beside it, or over it): the day's ten by their issue
+ * („Брой 7“). */
+function what(p: Played): string {
   switch (p.kind) {
     case "day":
-      return "Въпросите на деня";
+      return p.issue ? `Брой ${p.issue}` : "Въпросите на деня";
     case "duel":
       // A friend's challenge has its opponent and result once both have played: until then (or if it was declined or
       // ran out), only that it was a duel.
@@ -111,6 +122,8 @@ export function stats(): Child {
           ? figure(`${s.won}/${s.duels}`, "победи в дуели")
           : figure(String(s.days), s.days === 1 ? "изигран ден" : "изиграни дни"),
       ),
+      // From the third day played, how the days' ten have gone: a day's ten is one result, and its spread the progress.
+      s.days >= 3 ? issuesCard(s.spread, s.today) : null,
       s.facts ? almanacLine(s.facts) : null,
       // „Колко знаеш“ once a topic has a first estimate: a first day's one answer a topic tells nothing.
       s.mastery.some((m) => m.sure || m.first) ? masteryCard(s.mastery) : null,
@@ -121,33 +134,66 @@ export function stats(): Child {
         h(
           "ol",
           { class: "games" },
-          s.recent
-            .slice(0, 5)
-            .map((p) =>
-              h(
-                "li",
-                null,
-                h(
-                  "a",
-                  { class: "game", href: `/games/${p.id}` },
-                  h(
-                    "div",
-                    { class: "game-text" },
-                    h("strong", { class: "game-what" }, what(p)),
-                    h("span", { class: "game-when" }, date(p.at)),
-                  ),
-                  h(
-                    "b",
-                    { class: "game-score" },
-                    String(p.rights),
-                    h("span", { class: "num-word" }, " от "),
-                    String(p.total),
-                  ),
-                ),
-              ),
-            ),
+          s.recent.slice(0, 5).map((p) => gameRow(p, date(p.at))),
         ),
+        s.games > 5 ? h("a", { class: "link", href: "/games" }, "Всички игри") : null,
       ),
     ];
   };
+}
+
+/** A game in a list of them: what it was, when (`when`, if said), and its score; a way to go over it. */
+export function gameRow(p: Played, when: string | null): HTMLElement {
+  return h(
+    "li",
+    null,
+    h(
+      "a",
+      { class: "game", href: `/games/${p.id}` },
+      h(
+        "div",
+        { class: "game-text" },
+        h("strong", { class: "game-what" }, what(p)),
+        when ? h("span", { class: "game-when" }, when) : null,
+      ),
+      h("b", { class: "game-score" }, String(p.rights), h("span", { class: "num-word" }, " от "), String(p.total)),
+    ),
+  );
+}
+
+/** „Твоите броеве“: how the day's ten have gone over the days played, a column for each score from 0 to 10 (today's in
+ * gold), how many days had it over each; and the best, the average and how many, in a line. */
+function issuesCard(spread: number[], today: number): Child {
+  const days = spread.reduce((a, n) => a + n, 0);
+  if (!days) return null;
+  const most = Math.max(...spread);
+  const best = spread.reduce((b, n, i) => (n ? i : b), 0);
+  const average = spread.reduce((a, n, i) => a + n * i, 0) / days;
+  return h(
+    "section",
+    { class: "card issues" },
+    h("h2", { class: "card-title" }, "Твоите броеве"),
+    h(
+      "ol",
+      { class: "issues-bars", "aria-label": "Дни по верни отговори" },
+      spread.map((n, i) =>
+        h(
+          "li",
+          {
+            class: i === today ? "issues-bar today" : "issues-bar",
+            title: `${i} от 10: ${n} ${n === 1 ? "ден" : "дни"}${i === today ? " (днес)" : ""}`,
+          },
+          h("span", { class: "issues-n" }, n ? String(n) : ""),
+          h("span", { class: "issues-fill", style: { "--share": String(most ? n / most : 0) } }),
+          h("span", { class: "issues-score", "aria-hidden": "true" }, String(i)),
+          h("span", { class: "sr" }, `${i} от 10: ${n} ${n === 1 ? "ден" : "дни"}`),
+        ),
+      ),
+    ),
+    h(
+      "p",
+      { class: "muted issues-line" },
+      `Най-добър: ${best} от 10 · Средно: ${formatNumber(average, 0.1)} · Изиграни: ${formatNumber(days)}`,
+    ),
+  );
 }

@@ -59,6 +59,49 @@ func (g *Game) waiting(ctx context.Context, q interface {
 	return ids, rows.Err()
 }
 
+// Coming is what will come to a player's second chance: the questions they got wrong (never right) that wait their
+// time still (MistakesAfter), and in how many days, in Bulgaria, the first and the last of them come (0: later today).
+type Coming struct {
+	N     int `json:"n"`
+	First int `json:"first"`
+	Last  int `json:"last"`
+}
+
+// ComingOf is what will come to a player's second chance (Coming): /mistakes says it while there's too little to play.
+func (g *Game) ComingOf(ctx context.Context, userID int64) (Coming, error) {
+	var c Coming
+	after := g.mistakesAfter()
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id, max(a.at) FROM answers a JOIN runs r ON r.id = a.run_id
+		WHERE r.user_id = ? GROUP BY a.question_id HAVING max(a.is_right) = 0 AND max(a.at) > ?`,
+		userID, store.Ms(g.Now().Add(-after)))
+	if err != nil {
+		return c, err
+	}
+	defer rows.Close()
+	b, today := g.Bank(), g.Today()
+	first, last := "", ""
+	for rows.Next() {
+		var id string
+		var at int64
+		if err := rows.Scan(&id, &at); err != nil {
+			return c, err
+		}
+		if q, ok := b.Get(id); !ok || q.Extra().Retired {
+			continue
+		}
+		day := time.UnixMilli(at).Add(after).In(Bulgaria).Format(time.DateOnly)
+		if first == "" || day < first {
+			first = day
+		}
+		last = max(last, day)
+		c.N++
+	}
+	if c.N > 0 {
+		c.First, c.Last = daysBetween(today, first), daysBetween(today, last)
+	}
+	return c, rows.Err()
+}
+
 // Misses is what a game's mistakes will make of the player's second chance: how many of its questions they got wrong
 // and have never got right (each waits MistakesAfter), and how many wait or will in all, those included. The day's
 // result says so when there'll be a game of them (MistakesFrom). It's one pass over the player's own answers (by

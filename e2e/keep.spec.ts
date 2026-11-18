@@ -133,7 +133,7 @@ test.describe("in Messenger's own browser", () => {
     await phone.getByRole("button", { name: "Продължи тук" }).click();
     await expect(phone.getByRole("status").filter({ hasText: "Готово: играта ти е тук." })).toBeVisible();
     await expect(phone).toHaveURL(/\/$/);
-    await expect(phone.locator(".summary .score-n")).toHaveText(rights ?? "");
+    await expect(phone.locator(".day-done-n")).toHaveText(rights ?? "");
     // The game moved: Messenger's browser is signed out of it.
     const left = await page.evaluate(async () => ((await (await fetch("/api/me")).json()) as { user: unknown }).user);
     expect(left).toBeNull();

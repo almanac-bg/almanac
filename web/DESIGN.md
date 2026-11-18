@@ -40,21 +40,32 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   day's issue (`.masthead`: the weekday and „Брой 6“ on a hairline, the date set large, „17 ноември“, a hairline
   under it; then „Десет въпроса за днес“ a size down, what they are, and „Започни“; no pips before play: they'd
   measure nothing yet). The issue is the day's number from the first day of the day's ten (`play/issue.go`, 12
-  November 2026 is Брой 1), the same for everyone. Left half-way, the same card with where the player stopped,
-  „Следва въпрос 4 от 10“, the pips so far, and „Продължи“; or once played, how they went (under the score the issue
-  line, „Брой 6 · 17 ноември“, and the place a way to the day's board, from two players) with the one gold thing to do
-  next right under it (`game/gold.ts`: „Сподели“ for a result worth sharing — 6 of 10, a streak of 3, a right answer
-  few got — not shared yet today; else „Още десет“, to where an open goal points; none while a broken streak is half
-  won back, whose card has „Още една игра“), „Прегледай въпросите“ and a plain „Сподели“ below; just played, the goals
-  still open (`.open-goals`, no card); then tomorrow in one quiet card (`.tomorrow`: when the next ten come, what they
-  make of the streak, and the reminder's ask); a line each for where the day leaves the league („Лига Странджа: 2-ро
-  място от 12 · зона за качване“) and for the questions got wrong that will wait in Втори шанс; before the friends' day
-  and the game's news; the day's goals; the ways to play with others, three in a row (the picture over
+  November 2026 is Брой 1), the same for everyone. While the ten wait, a quiet line over the card says how
+  yesterday's ended for a player who played it, once its board is final („Вчера: 7 от 10 · 41-во място от 312“, a way
+  to Класации' „Вчера“). Left half-way, the same card with where the player stopped, „Следва въпрос 4 от 10“, the pips
+  so far, and „Продължи“; or once played, as it lands, how they went (under the score the issue line, „Брой 6 · 17
+  ноември“, and the way to the day's board; see The place, below) with the one gold thing to do next right under it
+  (`game/gold.ts`: „Сподели“ for a result worth sharing — 6 of 10, the streak on a round number (3, 7, 30, 100, 365), a
+  right answer few got among 4 or more; else „Още десет“, to where an open goal points; none while a broken streak is
+  half won back, whose card comes right under the result with „Още една игра“), „Прегледай въпросите“ and a plain
+  „Сподели“ below; just played, the goals still open (`.open-goals`, no card); then tomorrow in one quiet card
+  (`.tomorrow`: when the next ten come, what they make of the streak, and the reminder's ask); a line each for where
+  the day leaves the league („Лига Странджа: 2-ро място от 12 · зона за качване“) and for the questions got wrong that
+  will wait in Втори шанс; before the friends' day and the game's news. **A later visit** finds the day played, and its
+  moment over: one short card (`.day-done`: the issue line and the place, the score a size down with its points, one
+  line of how it went among everyone, the pips), „Още десет“ gold under it (a share is weighed only as the result
+  lands), „Прегледай въпросите“ (its own page, `/games/<id>`) and „Сподели“ plain; tomorrow, the league's line and
+  Втори шанс's; the friends' day after the ways to play (beside the day on a big screen). A result never on screen
+  (the last question let run out) is the full one, once, with what it earned. Then the day's goals; the ways to play
+  with others, three in a row (the picture over
   the name on a phone); the topics, two by two (five to a row on a big screen, the picture over the name, each tile
   as tall as what's in it), and all of them at once, with „Втори шанс“ right after it while questions wait (on a big
   screen in one row after the topics with „България“, short tiles side by side). The streak's chip shows only a
-  streak: a broken one that can still be won back as its days, unlit, „за връщане“; none at all rather than „0 дни
-  поред“. Дуел, Роял and Стая open from here and
+  streak (or reserve days): a broken one that can still be won back as its days, unlit, „за връщане“ (with today's,
+  once the day is played: what winning it back makes of it, as „Утре“ says too: „Ако върнеш серията днес, утре тя
+  става 9.“); none at all rather than „0 дни поред“, the level's chip taking the row. A player back after days away
+  (the streak ended since the last day played, `play.BackFrom`) is welcomed once, over the day: „Радваме се, че се
+  върна. Най-дългата ти серия е 11 дни. Днес започва нова.“ Дуел, Роял and Стая open from here and
   have a way back to it (`back()`). A player who hasn't finished a game yet sees only the day and the topics, and a
   quiet „Имаш профил? Влез“ (a new phone) that opens the sign-in in place (open from the start, above the day, for a
   browser signed out that came from the streak's mail, `/?from=mail`), and „Влез в стая с код“ in a line under it (a
@@ -73,6 +84,11 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   it ends („Серия от 5 дни. Прекъсва в полунощ, ако не изиграеш днешните.“, `.day-stake`). The day played lights the
   flame as its number rolls on (Motion). A topic's result, while the day waits, has „Към въпросите на деня“ as its gold
   button, the same line under it, and „Още десет“ plain.
+- **The place** on the day's board (`game/standing.ts`) is a way to the board from two players, but not always said:
+  until the league opens (the third day played), only in the better half or first, else the way is plain,
+  „Класацията на деня“ (a new player's first social signal isn't last place). From ten players a share says how it
+  went where the place isn't said, „По-добре от 35% от играчите днес.“; from a hundred it leads for everyone, the
+  place still the way to the board („4312-о място“ alone says nothing). „Средно днес: 5,1 от 10.“ from ten players.
 - **Приятели** (`/friends`): requests, friends, and the ways to add them. With none yet, „Покани с връзка“ is the gold
   button, first (the phone's share sheet, or „Копирано.“: the address itself is never printed), the field by
   потребителско име or имейл under it with „Добави“. A player still with the name drawn for them is asked for theirs
@@ -89,12 +105,18 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   and a profile at its actions' end; the blocked are listed last („Блокирани“, „Отблокирай“). A name field never asks
   the browser for a full name (`autocomplete` nickname or off: `fields.test.ts`); a room asks a player with a drawn
   name for one for that room alone („Име в стаята“: „Вижда се само в тази стая…“).
-- **Класации** (`/ranks`): Днес (the day's board, first), Лига (the player's group this week; `/ranks#league`),
+- **Класации** (`/ranks`): Днес (the day's board, first), Вчера (yesterday's, final, its winner over it: „Брой 6
+  спечели Мария: 10 от 10 за 1:12 мин.“; `/ranks#yesterday`), Лига (the player's group this week; `/ranks#league`),
   Рейтинг and Знания (Лига and Рейтинг once the player has met them); of everyone or of friends (not the league: a group is its own).
+  Empty, a board says what the game knows: among friends with none yet, „Още нямаш приятели…“ and „Покани с връзка“
+  gold; Знания short of its threshold, „Имаш 20 от 100 отговора. Още 80 и влизаш в класацията.“
 - **Профил** (`/me`): its own four places in a switch at the top (`profileNav()`): Общо (the player: level,
-  league (once open and in one), streak, numbers, the facts in the Алманах, mastery (once a topic has a mark; each row
-  a way to play the topic), latest games (each a way to go over it, read-only: `/games/<id>`, the score as its result
-  had it and the questions)), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
+  league (once open and in one), streak, numbers, „Твоите броеве“ from the third day played (`.issues`: a column for
+  each score from 0 to 10, how many days had it, today's in gold; „Най-добър: 9 от 10 · Средно: 6,4 · Изиграни: 23“),
+  the facts in the Алманах, mastery (once a topic has a mark; each row a way to play the topic), latest games (the
+  day's ten as their issue, „Брой 7“, the date under it; each a way to go over it, read-only: `/games/<id>`, the score
+  as its result had it and the questions) and „Всички игри“ (`/games`: every game, by day under its dateline, Всички ·
+  Броеве · Теми · С други, a page at a time)), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
   worn as others see it, then Аватар, Рамка, Фон or Титла, one at a time) and Алманах (`/almanac`). Настройки open
   from the button beside the name, its icon and its word at every width (an icon alone is read by few). The switch names the place, so Награди, Гардероб and Алманах have no heading of
   their own on the screen (it's there for screen readers).
@@ -102,13 +124,16 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   topic's „7 от 24 факта в „История““), what they are in a line, and the questions waiting for a second chance as one
   plain link („17 въпроса чакат втори шанс“: Начало has its tile too); the topics as a quiet row of chips (names
   only) to read one by; then each day under its dateline (`.almanac-date`: „Брой 6 · 17 ноември“, a kicker running
-  into a hairline, with the year once it isn't this one), its facts as entries between hairlines, not cards: the
+  into a hairline, with the year once it isn't this one; a way to that day's game where the player played the day's
+  ten), its facts as entries between hairlines, not cards: the
   topic, the question in a small line, what was learned as the headline (the answer; a statement to judge is its
   own headline, „Невярно:“ before one that isn't so), and the fact. It comes a page at a time, a day going on under
   its head from page to page.
   Общо is a hub, each thing once: the level with what comes next in one card, the league in a line (its group is
-  Класации'), the streak, three numbers in one card, the Алманах in a line („N факта в Алманаха“, a tap from it), mastery,
-  the latest games. Награди opens with the three
+  Класации'), the streak, three numbers in one card, the days' ten (from the third), the Алманах in a line („N факта в Алманаха“, a tap from it), mastery,
+  the latest games and the way to all of them. Its head is the player's own look, as last seen on the device while
+  it loads (never one drawn from the name: that reads as someone else's profile; a plain tile before any). Награди
+  opens with the three
   achievements nearest to done and the earned ones, each in full (`.achievements`/`.achievement`: how it's earned,
   how far along, what it gives); the rest by tier behind „Всички постижения (n)“. Only the achievements of systems
   the player has met, and no XP before it's open.
