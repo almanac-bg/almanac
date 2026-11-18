@@ -95,6 +95,40 @@ test("someone new comes into a game under way by the room's link, not by its cod
   await expect(host.getByText(/от 2\.|Закъснял/).first()).toBeVisible();
 });
 
+test("a room's link opened from a chat: its host is waited for, and back mid-game asks, then leaves for Начало", async ({
+  browser,
+}) => {
+  test.setTimeout(90_000);
+  const host = await (await browser.newContext()).newPage();
+  const guest = await (await browser.newContext()).newPage();
+  await host.goto("/room");
+  await host.getByRole("button", { name: "Всички теми" }).click();
+  await expect(host.getByRole("heading", { name: "С какво име влизаш?" })).toBeVisible();
+  // The guest is in first, the room's link the first page of a new tab, while the host still chooses a name: the host
+  // shows as there, and the start stays the host's.
+  await guest.goto(host.url());
+  await guest.getByLabel("Име").fill("Бояна");
+  await guest.getByRole("button", { name: "Влез" }).click();
+  await expect(guest.getByText(/^Чакаме .+ да започне\.$/)).toBeVisible();
+  await expect(guest.getByRole("button", { name: "Започни" })).toHaveCount(0);
+  await expect(guest.getByText("извън стаята")).toHaveCount(0);
+  await host.getByLabel("Име").fill("Водещ");
+  await host.getByRole("button", { name: "Влез" }).click();
+  await host.getByRole("button", { name: "Започни" }).click();
+  await expect(guest.locator(".question-head")).toContainText("1 от 10", { timeout: 15_000 });
+  // Back mid-game asks first, and „Остани“ plays on; then „Излез“ leaves the game for Начало, not into it again.
+  const asked = guest.getByText("Излизаш от стаята? Играта продължава без теб");
+  await guest.goBack();
+  await expect(asked).toBeVisible();
+  await expect(guest).toHaveURL(/\/r\/\d{6}$/);
+  await guest.getByRole("button", { name: "Остани" }).click();
+  await expect(asked).toBeHidden();
+  await guest.goBack();
+  await guest.getByRole("button", { name: "Излез" }).click();
+  await expect(guest).toHaveURL(/\/$/);
+  await expect(guest.locator(".card.day")).toBeVisible();
+});
+
 test("a room's link with a wrong code says so before asking for a name", async ({ page }) => {
   await page.goto("/r/000000");
   await expect(page.getByRole("heading", { name: "Няма такава стая" })).toBeVisible();
@@ -145,11 +179,11 @@ test("two people asking for a duel play it live", async ({ browser }, info) => {
   test.setTimeout(240_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
-  // Ana asks first and waits; Bo asks, and they meet.
+  // Ana asks first and waits; Bo asks, from a link to live duels opened in a new tab, and they meet.
   await a.goto("/duel");
   await a.getByRole("button", { name: "Намери съперник" }).click();
   await expect(a.getByRole("heading", { name: "Търсим съперник" })).toBeVisible();
-  await b.goto("/duel");
+  await b.goto("/duel/live");
   await b.getByRole("button", { name: "Намери съперник" }).click();
   for (const p of [a, b]) {
     await expect(p.getByRole("heading", { name: "Съперникът е тук" })).toBeVisible();
@@ -185,6 +219,15 @@ test("two people asking for a duel play it live", async ({ browser }, info) => {
         .click();
       await expect(a.locator(".question-head")).toContainText("3 от 10", { timeout: 15_000 });
       await expect(b.locator(".live-doing")).toHaveText("Мисли…"); // and back, to Bo too
+    }
+    // Bo, his page the tab's first, is asked by back too: it doesn't leave the site under him.
+    if (n === 3) {
+      const his = b.getByText("Излизаш от дуела? Той продължава без теб");
+      await b.goBack();
+      await expect(his).toBeVisible();
+      await expect(b).toHaveURL(/\/duel\/live$/);
+      await b.getByRole("button", { name: "Остани" }).click();
+      await expect(his).toBeHidden();
     }
     // Ana answers: Bo sees that she has, not what; then both answers show, side by side.
     await answer(a);

@@ -13,10 +13,11 @@ import { getReady, playRun, shownHere, starting, startScreen } from "../game/run
 import type { State } from "../game/types.ts";
 import { api, errorText } from "../lib/api.ts";
 import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
-import { byTap, entry, go, goBack, hold, mark, title } from "../lib/router.ts";
+import { byTap, entry, goBack, hold, mark, title } from "../lib/router.ts";
 import { bulgaria, type Category, categories, player, user } from "../state.ts";
 import { meter, questions, stakeLine, toneOf, topicMark } from "../ui.ts";
 import { sendChallenge } from "./challenge.ts";
+import { missing } from "./missing.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
 /** The topics as tiles, each with how well the player knows it: a run across all of them first, and the second chance
@@ -150,10 +151,8 @@ export function topic([id = ""]: string[]) {
         ? bulgaria.name
         : undefined
       : categories.find((c) => c.id === category)?.name;
-  if (name === undefined) {
-    go("/", true);
-    return null;
-  }
+  // A topic the game doesn't have (an old link, a topic renamed): said so, with the way to the day's ten.
+  if (name === undefined) return missing();
   title(name);
   const sending = new URLSearchParams(location.search).has("challenge");
   // While the day's ten wait, a topic's result points to them (the habit comes first), with the streak at stake.

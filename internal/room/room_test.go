@@ -694,6 +694,54 @@ func TestSettingsAndRecords(t *testing.T) {
 	})
 }
 
+// A room just opened waits for its host on their way in (choosing a name for it): the first guest in doesn't take the
+// lead meanwhile. Once the host's screen has come and gone, or the wait is over with no screen of theirs, whoever's
+// there leads (review 2026-11-18, B3).
+func TestTheHostIsWaitedFor(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		hub := NewHub(sample(t))
+		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
+		for _, lead := range []bool{false, true} {
+			r, _ := hub.Open(ana, "", Settings{Lead: lead})
+			_ = r.Join(bo, "")
+			sb, _ := r.Follow(bo.ID)
+			<-sb.C
+			if v := r.View(bo.ID); v.CanLead {
+				t.Fatalf("lead %v: a guest leads while the host is on their way in", lead)
+			}
+			if !lead && !r.View(bo.ID).Players[0].Online {
+				t.Fatal("the host on their way in shows as away")
+			}
+			if err := r.Start(bo.ID); !errors.Is(err, ErrNotYours) {
+				t.Fatalf("lead %v: a guest started the game: %v", lead, err)
+			}
+			// In and out again: away at once, the wait over.
+			sa, _ := r.Follow(ana.ID)
+			r.Unfollow(sa)
+			if !r.View(bo.ID).CanLead {
+				t.Fatalf("lead %v: the host gone, nobody else leads", lead)
+			}
+			r.Unfollow(sb)
+		}
+		// A host who never comes: the guests' screens hear when the wait is over, and may lead.
+		r, _ := hub.Open(ana, "", Settings{})
+		_ = r.Join(bo, "")
+		sb, _ := r.Follow(bo.ID)
+		<-sb.C
+		time.Sleep(hostWait)
+		synctest.Wait()
+		select {
+		case <-sb.C:
+		default:
+			t.Fatal("no word as the host's wait ended")
+		}
+		if !r.View(bo.ID).CanLead {
+			t.Fatal("the host never came: nobody else leads")
+		}
+		r.Unfollow(sb)
+	})
+}
+
 // A host leading from a big screen isn't a player, and sets the pace: an answer now, an answer held, the end.
 func TestLeadingHost(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {

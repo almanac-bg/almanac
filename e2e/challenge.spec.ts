@@ -113,6 +113,12 @@ test("a challenge left half-way, its link opened again from outside, waits for �
   await b.getByRole("button", { name: "Започни", exact: true }).click();
   await b.getByRole("button", { name: "Започни сега" }).click();
   await expect(b.locator(".question-head")).toContainText("1 от 10");
+  // The link the tab's first page: the first back asks (the page's address the duel's now), and „Остани“ plays on.
+  const asked = b.getByText("Ако излезеш сега, въпросът остава без отговор.");
+  await b.goBack();
+  await expect(asked).toBeVisible();
+  await expect(b).toHaveURL(/\/duel\/\d+$/);
+  await b.getByRole("button", { name: "Остани" }).click();
   await answer(b);
   await moveOn(b);
   await expect(b.locator(".question-head")).toContainText("2 от 10", { timeout: 10_000 });
@@ -122,6 +128,12 @@ test("a challenge left half-way, its link opened again from outside, waits for �
   await expect(again).toHaveURL(/\/duel\/\d+$/);
   await expect(again.getByRole("button", { name: "Продължи" })).toBeVisible();
   await expect(again.locator(".question-head")).toHaveCount(0);
+  // Back (and „Излез“, if the question's time still runs) leaves the duel for Начало, not for the same duel again.
+  await b.goBack();
+  await expect(asked.or(b.locator(".card.day"))).toBeVisible();
+  if (await asked.isVisible()) await b.getByRole("button", { name: "Излез" }).click();
+  await expect(b).toHaveURL(/\/$/);
+  await expect(b.locator(".card.day")).toBeVisible();
   await a.context().close();
   await bo.close();
 });

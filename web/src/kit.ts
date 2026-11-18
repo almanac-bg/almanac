@@ -51,7 +51,7 @@ import {
   vibrateOn,
 } from "./lib/prefs.ts";
 import { needsHomeScreen, pushable, pushOn, pushPrefs, setPushPref, turnOff, turnOn } from "./lib/push.ts";
-import { byTap, go, goBack, rename, title } from "./lib/router.ts";
+import { byTap, go, goBack, holdWhile, rename, title } from "./lib/router.ts";
 import {
   feelKit,
   liveAudio,
@@ -165,6 +165,7 @@ export const kit = {
   h,
   hands,
   haveProfile,
+  holdWhile,
   hostCss,
   illustration,
   inApp,

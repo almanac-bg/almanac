@@ -30,6 +30,7 @@ let {
   go,
   goBack,
   guardLeaving,
+  holdWhile,
   h,
   keepAwake,
   lifetime,
@@ -153,6 +154,7 @@ export function liveDuel(kit: Kit) {
     go,
     goBack,
     guardLeaving,
+    holdWhile,
     h,
     keepAwake,
     lifetime,
@@ -263,26 +265,27 @@ function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
       });
     })
     .catch(() => trouble.set("busy"));
-  playingWhile(() => {
+  // Under way from the first question to the result.
+  const costs = () => {
     const phase = view()?.phase;
     return phase === "question" || phase === "reveal";
-  });
-  // The screen stays on from the wait for an opponent to the result: a phone asleep drops the duel.
+  };
+  playingWhile(costs);
   // Leaving mid-duel costs it (live.go): the duel goes on without the player, their time running out on each question,
   // and its result counts. Every way out asks first; a leave confirmed is told the server at once, so that the other
-  // isn't kept waiting for this player's line to drop (it goes all the same if that can't be said).
+  // isn't kept waiting for this player's line to drop (it goes all the same if that can't be said). A duel opened from
+  // outside (a link, a notification) has an entry of its own meanwhile (holdWhile), so that back asks too.
+  holdWhile(costs);
   const leaveAsk = guardLeaving(
     "Излизаш от дуела? Той продължава без теб: въпросите остават без отговор, а резултатът се брои.",
-    () => {
-      const phase = view()?.phase;
-      return phase === "question" || phase === "reveal";
-    },
+    costs,
     async (on) => {
       const id = view.peek()?.id;
       if (id) await api("POST", `/api/duels/live/${id}/leave`).catch(() => {});
       on();
     },
   );
+  // The screen stays on from the wait for an opponent to the result: a phone asleep drops the duel.
   keepAwake(() => {
     const phase = view()?.phase;
     return phase ? phase !== "end" && phase !== "off" : wait() !== null;
@@ -325,6 +328,7 @@ function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
         case "intro":
           return intro(v);
         case "question":
+          scrollTo(0, 0); // each question opens at the top, wherever the answer before it was scrolled to
           return question(live, v);
         case "reveal":
           return reveal(live, v);
