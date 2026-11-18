@@ -752,6 +752,42 @@ func TestNames(t *testing.T) {
 	}
 }
 
+// A name or tag that swears is refused however it's written: in Cyrillic or Latin letters, with chat's digits, spaced
+// out, doubled; and the ordinary names a rude root sits inside pass.
+func TestRudeNames(t *testing.T) {
+	a, _, _, _ := setup(t)
+	ctx := t.Context()
+	u, _, _ := a.Guest(ctx)
+	for _, rude := range []string{"Курва", "kurva", "KURRVA", "curva", "Путката", "putka", "П у т к а", "pi4ka",
+		"Пичка", "6ibana", "Шибаняк", "Ебах ти", "ебало", "Мамка ти", "mamka mu", "хуйло", "fuck", "Fucker", "Педал",
+		"Hitler 88", "Хитлер", "сука", "Гъз", "кур", "Pussy cat"} {
+		if !Rude(rude) {
+			t.Errorf("%q isn't rude", rude)
+		}
+		if _, err := NormalName(rude); !errors.Is(err, ErrNameRude) {
+			t.Errorf("%q as a name: %v", rude, err)
+		}
+	}
+	for _, tag := range []string{"kurva_123", "pi4ka", "fuck_you", "the_hitler"} {
+		if _, err := a.Retag(ctx, u.ID, tag); !errors.Is(err, ErrNameRude) {
+			t.Errorf("@%s: %v", tag, err)
+		}
+	}
+	for _, good := range []string{"Курт", "Куртев", "Курбан", "Хлебарка", "Ебру", "Шибил", "Пушкин", "Сукарова",
+		"Педя", "Педро", "Fukuoka", "Пишков", "Гъзаров", "Ivan Kurtev", "Задников", "Мечо Пух", "Лиса 1234",
+		"Петър 4", "Мамка", "Ana 6"} {
+		if Rude(good) {
+			t.Errorf("%q is taken for rude", good)
+		}
+	}
+	// No name a player is given is rude.
+	for _, an := range Animals {
+		if Rude(an.Name) || Rude(an.Tag) {
+			t.Errorf("the drawn %q (@%s) is rude", an.Name, an.Tag)
+		}
+	}
+}
+
 // Whoever keeps the game puts a name that pretends back to a drawn one, tag and all.
 func TestResetName(t *testing.T) {
 	a, _, _, _ := setup(t)

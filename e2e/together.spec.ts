@@ -45,10 +45,15 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
   for (const p of [host, guest])
     await expect(p.getByRole("heading", { name: /печели/ })).toBeVisible({ timeout: 15_000 });
   await expect(host.getByRole("button", { name: "Започни нова игра" })).toBeVisible();
-  // Each can add the other as a friend, a tap beside their name; the day's ten wait for both.
+  // How many each got right, by the place and in every row.
+  await expect(guest.getByText(/^Позна \d от 5 и си на \d-(во|ро) място от 2\.$/)).toBeVisible();
+  await expect(guest.locator(".board .row").first()).toContainText(/\d\/5 ·/);
+  // Each can add the other as a friend, folded under the standings; the day's ten wait for both.
   await expect(guest.getByRole("link", { name: "Към въпросите на деня" })).toBeVisible();
+  await guest.getByText("Добави в приятели").click();
   await guest.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
   await expect(guest.getByText("Поканата е изпратена.")).toBeVisible();
+  await host.getByText("Добави в приятели").click();
   await expect(host.getByRole("button", { name: "Добави Бояна в приятели" })).toBeVisible();
   // Between games the host changes what the room plays: the code and the players stay.
   await expect(guest.getByRole("button", { name: "Промени играта" })).toHaveCount(0);
@@ -137,7 +142,9 @@ test("a room's link with a wrong code says so before asking for a name", async (
   await expect(page.getByLabel("Код на стаята")).toBeVisible();
 });
 
-test("the host sends a player out of a room, and they stay out", async ({ browser }) => {
+test("the host sends a player out of a room, brings them back, asks for another name, and locks it", async ({
+  browser,
+}) => {
   const host = await (await browser.newContext()).newPage();
   const guest = await (await browser.newContext()).newPage();
   await host.goto("/room");
@@ -154,11 +161,28 @@ test("the host sends a player out of a room, and they stay out", async ({ browse
   await host.getByRole("button", { name: "Махни Шегаджия" }).click();
   await host.getByRole("button", { name: "Да, махни Шегаджия" }).click();
   await expect(guest.getByRole("heading", { name: "Водещият те махна от стаята" })).toBeVisible();
-  await expect(host.locator(".players li")).toHaveCount(1);
+  await expect(host.locator(".players li:not(.out)")).toHaveCount(1);
   await guest.reload();
   await expect(guest.getByRole("heading", { name: "Водещият те махна от стаята" })).toBeVisible();
-  // The host locks the room (a class, all in): nobody new comes in until it's open again.
   await expect(host.getByText("Всеки с кода може да влезе.")).toBeVisible();
+  // A slip undone: „Върни“, and they come in again, as they were.
+  await host.getByRole("button", { name: "Върни Шегаджия в стаята" }).click();
+  await guest.getByRole("button", { name: "Влез пак" }).click();
+  await expect(guest.getByText("Чакаме Учител да започне.")).toBeVisible();
+  await expect(host.locator(".players li")).toHaveCount(2);
+  // The host asks for another name: theirs is drawn meanwhile, and the old one isn't taken back.
+  await host.getByRole("button", { name: "Поискай друго име от Шегаджия" }).click();
+  await expect(guest.getByRole("heading", { name: "Водещият помоли за друго име" })).toBeVisible();
+  await expect(host.locator(".players li").last()).not.toContainText("Шегаджия");
+  await guest.getByLabel("Име").fill("шегаджия");
+  await guest.getByRole("button", { name: "Готово" }).click();
+  await expect(guest.getByText("Водещият помоли за друго име. Избери ново.")).toBeVisible();
+  await guest.getByLabel("Име").fill("Ванко");
+  await guest.getByRole("button", { name: "Готово" }).click();
+  await expect(guest.getByText("Чакаме Учител да започне.")).toBeVisible();
+  await expect(host.locator(".players li").last()).toContainText("Ванко");
+  // The host locks the room, everyone in: nobody new comes in until it's open again.
+  await expect(host.getByText("Всички ли са вътре? Заключи стаята и никой нов няма да влезе.")).toBeVisible();
   await host.getByRole("button", { name: "Заключи стаята" }).click();
   await expect(host.getByText("Стаята е заключена: нови играчи не могат да влязат.")).toBeVisible();
   const late = await (await browser.newContext()).newPage();
@@ -170,7 +194,7 @@ test("the host sends a player out of a room, and they stay out", async ({ browse
   await late.getByLabel("Име").fill("Закъснял");
   await late.getByRole("button", { name: "Влез" }).click();
   await expect(late.getByText("Чакаме Учител да започне.")).toBeVisible();
-  await expect(host.locator(".players li")).toHaveCount(2);
+  await expect(host.locator(".players li")).toHaveCount(3);
 });
 
 test("two people asking for a duel play it live", async ({ browser }, info) => {

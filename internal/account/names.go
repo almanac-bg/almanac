@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -16,6 +17,11 @@ import (
 // it looks (a Latin „H“ for „Н“, a „0“ for „О“) and one by how it sounds („almanakh“), with spaces, dots and doubled
 // letters gone, so that „А Л М А Н А Х“ and „Allmanac“ are caught as well. Whoever keeps the game (an admin) may
 // take such a name; and can put any player's name and tag back to the drawn ones (ResetName).
+//
+// Nor is a name or tag rude (Rude): the swear words and slurs a board or a room's big screen would show, in Cyrillic,
+// in Latin letters and in the digits chat writes some letters with („pi4ka“), heard by how they sound, so that
+// „kurva“ and „курва“ are one. The list is a floor, not a wall: what gets past it, a room's host asks to change
+// (room.Room.AskName), and whoever keeps the game resets (ResetName).
 
 var (
 	ErrBadName = errors.New("bad name")
@@ -25,8 +31,10 @@ var (
 	ErrNameLink = errors.New("a name like a web address")
 	// ErrNameReserved is a name or tag that reads as the game's own, or its people's.
 	ErrNameReserved = errors.New("a reserved name")
-	ErrBadTag       = errors.New("bad tag")
-	ErrTagTaken     = errors.New("tag taken")
+	// ErrNameRude is a name or tag that swears or insults (Rude).
+	ErrNameRude = errors.New("a rude name")
+	ErrBadTag   = errors.New("bad tag")
+	ErrTagTaken = errors.New("tag taken")
 )
 
 const (
@@ -52,6 +60,9 @@ func (a *Accounts) Rename(ctx context.Context, userID int64, name string) (strin
 // Retag gives a player a new tag, if it's free.
 func (a *Accounts) Retag(ctx context.Context, userID int64, tag string) (string, error) {
 	tag, err := NormalTag(tag)
+	if err == nil && Rude(tag) {
+		err = ErrNameRude
+	}
 	if err == nil && Reserved(tag) {
 		err = a.unlessAdmin(ctx, userID)
 	}
@@ -112,7 +123,8 @@ func NormalTag(s string) (string, error) {
 
 // NormalName is a name as players see it — 2 to 30 Cyrillic or Latin letters, digits, single spaces, dots, dashes
 // and underscores, at least one letter — or ErrBadName; ErrNameScripts for a word in both scripts, ErrNameLink for a
-// dot between letters. Whether it's free to take is Rename's (Reserved).
+// dot between letters, ErrNameRude for one that swears or insults (Rude). Whether it's free to take is Rename's
+// (Reserved).
 func NormalName(s string) (string, error) {
 	s = strings.Join(strings.Fields(s), " ")
 	n := utf8.RuneCountInString(s)
@@ -145,6 +157,9 @@ func NormalName(s string) (string, error) {
 	}
 	if letters == 0 {
 		return "", ErrBadName
+	}
+	if Rude(s) {
+		return "", ErrNameRude
 	}
 	return s, nil
 }
@@ -265,4 +280,64 @@ func foldMap(m map[string]string) map[rune]string {
 		}
 	}
 	return out
+}
+
+// The rude words, by how each is matched against a name heard (the sound skeleton of each of its words, and of all of
+// them run together, for „п у т к а“): anywhere, at a word's start, or as a whole word. A short root that sits inside
+// ordinary names is matched whole or at a start only („кур“ is in „Куртев“, „еба“ in „Хлебарка“, „шиб“ in „Шибил“,
+// „fuk“ in „Fukuoka“); anywhere is for roots no name has.
+var (
+	rudeAnywhere = []string{
+		"путк", "пизд", "курв", "хуй", "бляд", "шибан", "педераст", "мамкати", "мамкаму", "духач", "хитлер", "нацист",
+		"порн", "asshole", "pussy",
+	}
+	rudeStart = []string{
+		"ебан", "ебал", "ебат", "ебах", "ебеш", "ебем", "ебач", "ебло", "педал", "лайна", "лайно", "fucke", "fucki",
+		"fucks", "motherfuck",
+	}
+	rudeWhole = []string{
+		"кур", "гъз", "сука", "пичка", "пишка", "задник", "еба", "ебе", "еби", "фак", "fuck", "fck", "hui", "huj", "shit",
+		"cunt", "bitch", "whore", "slut", "nigger", "nigga", "nazi",
+	}
+)
+
+// The rude words as heard (their sound skeletons), made once.
+var rudeAnywhereHeard, rudeStartHeard, rudeWholeHeard = heardAll(rudeAnywhere), heardAll(rudeStart), heardAll(rudeWhole)
+
+func heardAll(words []string) []string {
+	out := make([]string, 0, len(words))
+	for _, w := range words {
+		out = append(out, skeletons(w)[1])
+	}
+	return out
+}
+
+// chat writes some Bulgarian letters with the digits that look like them („pi4ka“, „6iban“): a name is heard both as
+// it's written and so.
+var chat = strings.NewReplacer("4", "ч", "6", "ш")
+
+// Rude is whether a name or tag swears or insults: one of the rude words (rudeAnywhere, rudeStart, rudeWhole) heard in
+// it.
+func Rude(name string) bool {
+	for _, form := range []string{name, chat.Replace(name)} {
+		words := strings.FieldsFunc(form, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
+		all := skeletons(strings.Join(words, ""))[1]
+		for _, root := range rudeAnywhereHeard {
+			if strings.Contains(all, root) {
+				return true
+			}
+		}
+		for _, w := range words {
+			heard := skeletons(w)[1]
+			if slices.Contains(rudeWholeHeard, heard) {
+				return true
+			}
+			for _, root := range rudeStartHeard {
+				if strings.HasPrefix(heard, root) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

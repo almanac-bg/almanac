@@ -8,7 +8,6 @@ import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
 import type { ApiError } from "../lib/api.ts";
 import type { Child } from "../lib/dom.ts";
-import type { User } from "../state.ts";
 import type { Tier, VerdictKind } from "../ui.ts";
 import { hosting } from "./host.ts";
 import type { Mix } from "./rooms.ts";
@@ -41,6 +40,7 @@ export let {
   nextSteps,
   onCleanup,
   picture,
+  place,
   play,
   playAnswer,
   player,
@@ -103,6 +103,10 @@ export interface RoomView {
   run?: number;
   /** The secret in the room's link (/r/<code>#<key>): with it, someone new comes in during a game too. */
   key?: string;
+  /** To the host: those sent out, to bring back („Върни“). */
+  out?: Player[];
+  /** The host has asked this player for another name („Смени името“). */
+  askName?: boolean;
 }
 
 export interface Player {
@@ -158,6 +162,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
     nextSteps,
     onCleanup,
     picture,
+    place,
     play,
     playAnswer,
     player,
@@ -181,9 +186,16 @@ export function room(kit: Kit, [code = ""]: string[]) {
   );
   // The room's key, from its link (after #): it takes someone new into a game under way.
   const roomKey = location.hash.slice(1);
-  // A player still with the name drawn for them chooses one first, for this room alone: a class or a pub can't tell
-  // twenty animals apart, and a pupil's name stays in the room (never their name on the boards or their profile).
-  const naming = signal<User | null>(null);
+  // A player still with the name drawn for them chooses one first, for this room alone (the name it starts from): a
+  // room of twenty can't tell twenty animals apart, and a name given here stays in the room (never their name on the
+  // boards or their profile).
+  const naming = signal<string | null>(null);
+  // The host has asked this player for another name: asked again here, outside a game.
+  const asked = computed(() => {
+    const v = view();
+    return !!v?.askName && (v.phase === "lobby" || v.phase === "end");
+  });
+  const inRoom = computed(() => trouble() === "" || trouble() === "reconnecting");
   // Where each player stood at the last answer: how far they've moved since is the room's rank change.
   const places = new Map<number, number>();
 
@@ -222,12 +234,19 @@ export function room(kit: Kit, [code = ""]: string[]) {
   // stream.
   const enter = (name = named(code) ?? "") => {
     if (life.aborted) return;
-    api("POST", `/api/rooms/${code}/join`, name ? { name, key: roomKey } : { key: roomKey }).then(connect, refused);
+    api("POST", `/api/rooms/${code}/join`, name ? { name, key: roomKey } : { key: roomKey }).then(connect, (err) => {
+      // The name this tab had is the one the host asked to change: in without it, and asked for another there.
+      if (name && (err as ApiError).code === "name_again") {
+        named(code, "");
+        return enter("");
+      }
+      refused(err);
+    });
   };
   // A wrong code is said at once, before a name is asked or a player made for it.
   api("GET", `/api/rooms/${code}${roomKey ? `?key=${encodeURIComponent(roomKey)}` : ""}`)
     .then(() => player())
-    .then((u) => (u.drawn && named(code) === null ? naming.set(u) : enter()))
+    .then((u) => (u.drawn && named(code) === null ? naming.set(u.name) : enter()))
     .catch(refused);
 
   // Each phase (and each question) is drawn once; what changes inside it follows the view.
@@ -288,7 +307,10 @@ export function room(kit: Kit, [code = ""]: string[]) {
             "div",
             { class: "stack" },
             h("h1", null, "Водещият те махна от стаята"),
-            h("a", { class: "btn primary", href: "/" }, "Към Начало"),
+            h("p", { class: "lead" }, "Ако водещият те върне, ще можеш да влезеш пак."),
+            nextSteps(h("a", { class: "btn primary", href: "/" }, "Към Начало"), [
+              h("button", { class: "btn", type: "button", onclick: () => location.reload() }, "Влез пак"),
+            ]),
           )
         : null,
     () =>
@@ -340,12 +362,12 @@ export function room(kit: Kit, [code = ""]: string[]) {
         ? h("p", { class: "status", role: "status" }, "Връзката прекъсна. Свързваме се отново…")
         : null,
     () => {
-      const u = naming();
-      return u
+      const drawn = naming();
+      return drawn !== null
         ? nameStep(
             code,
             (name) => api("POST", `/api/rooms/${code}/join`, { name, key: roomKey }),
-            u.name,
+            drawn,
             () => {
               naming.set(null);
               connect();
@@ -354,10 +376,22 @@ export function room(kit: Kit, [code = ""]: string[]) {
           )
         : null;
     },
-    () => {
+    // Asked for another name, over the room's screen (kept as it is underneath): the name it has now to start from.
+    () =>
+      asked() && inRoom()
+        ? nameStep(
+            code,
+            (name) => api("POST", `/api/rooms/${code}/join`, { name, key: roomKey }),
+            untracked(view)?.players.find((p) => p.me)?.name ?? "",
+            () => {},
+            refused,
+            true,
+          )
+        : null,
+    h("div", { class: "room-phase", hidden: asked }, () => {
       const k = key();
       if (trouble() !== "" && trouble() !== "reconnecting") return null;
-      if (!k) return naming() ? null : h("p", { class: "muted" }, "…");
+      if (!k) return naming() !== null ? null : h("p", { class: "muted" }, "…");
       const v = untracked(view) as RoomView;
       // A new game („Нова игра“ goes from the end straight to its first question).
       if (v.phase === "lobby" || (v.phase === "question" && v.n === 0)) places.clear();
@@ -373,7 +407,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
         case "end":
           return end(view as () => RoomView, code);
       }
-    },
+    }),
   );
 }
 
@@ -393,16 +427,17 @@ function named(code: string, now?: string): string | null {
 }
 
 /** One field before the room: the name the others in it will see, the drawn one in it to keep or change. It's the
- * room's alone (roomJoin on the server): not the player's name anywhere else, so a pupil's real name, if a teacher
- * asks for it, never reaches the boards. The field says so, and asks for no more than a first name; and the browser
- * isn't asked to fill in a full one (`autocomplete` off). `join` comes in under it; a name the server won't take is
- * said here, anything else is the room's (`refused`). */
+ * room's alone (roomJoin on the server): not the player's name anywhere else, so a real name given there never
+ * reaches the boards. The field says so, and asks for no more than a first name; and the browser isn't asked to fill
+ * in a full one (`autocomplete` off). `join` comes in under it; a name the server won't take is said here, anything
+ * else is the room's (`refused`). `again`: the host has asked for another name (room.go: AskName). */
 function nameStep(
   code: string,
   join: (name: string) => Promise<unknown>,
   drawn: string,
   done: () => void,
   refused: (err: unknown) => void,
+  again = false,
 ): Child {
   const name = signal(drawn);
   const error = signal("");
@@ -420,7 +455,9 @@ function nameStep(
           named(code, name.peek());
           done();
         } catch (err) {
-          if (["bad_name", "reserved_name"].includes((err as ApiError).code)) return error.set(errorText(err));
+          if (["bad_name", "reserved_name", "name_again"].includes((err as ApiError).code)) {
+            return error.set(errorText(err));
+          }
           named(code, name.peek()); // the room's refusal (locked, full): tried again, under this name
           refused(err);
         } finally {
@@ -432,7 +469,7 @@ function nameStep(
       "div",
       { class: "intro" },
       h("p", { class: "kicker" }, `Стая ${spaced(code)}`),
-      h("h1", null, "С какво име влизаш?"),
+      h("h1", null, again ? "Водещият помоли за друго име" : "С какво име влизаш?"),
     ),
     h(
       "label",
@@ -456,7 +493,7 @@ function nameStep(
         "Вижда се само в тази стая. Стига малкото име или прякор, без фамилия.",
       ),
     ),
-    h("button", { class: "btn primary big", disabled: busy }, "Влез"),
+    h("button", { class: "btn primary big", disabled: busy }, again ? "Готово" : "Влез"),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }
@@ -531,11 +568,20 @@ function lobby(view: () => RoomView, code: string): Child {
 /** The room's link: its code, and its key, which takes someone new into a game under way too. */
 export const link = (v: RoomView, code: string) => `${location.origin}/r/${code}${v.key ? `#${v.key}` : ""}`;
 
-/** The host's lock on the room: locked, nobody new comes in (a class, once it's all there), and whoever is in it
- * comes back as ever. Nothing for anyone else. */
+/** The host's lock on the room: locked, nobody new comes in (once everyone is there), and whoever is in it comes back
+ * as ever. Open, it says when it's time: once others have come in, or that a room led locks itself as it starts.
+ * Nothing for anyone else. */
 export function door(view: () => RoomView, code: string, error: (s: string) => void): Child {
   if (!untracked(view).isHost) return null;
   const locked = computed(() => !!view().locked);
+  const line = computed(() => {
+    const v = view();
+    if (v.locked) return "Стаята е заключена: нови играчи не могат да влязат.";
+    if (v.lead && v.phase === "lobby") return "Всеки с кода може да влезе. Щом започнеш, стаята ще се заключи сама.";
+    return v.players.filter((p) => !p.me).length > 0
+      ? "Всички ли са вътре? Заключи стаята и никой нов няма да влезе."
+      : "Всеки с кода може да влезе.";
+  });
   const toggle = async () => {
     try {
       await api("POST", `/api/rooms/${code}/lock`, { on: !untracked(locked) });
@@ -546,21 +592,32 @@ export function door(view: () => RoomView, code: string, error: (s: string) => v
   return h(
     "div",
     { class: "door" },
-    h("span", { role: "status" }, () =>
-      locked() ? "Стаята е заключена: нови играчи не могат да влязат." : "Всеки с кода може да влезе.",
-    ),
+    h("span", { role: "status" }, line),
     h("button", { class: "btn inline", type: "button", onclick: toggle }, () =>
       locked() ? "Отключи" : "Заключи стаята",
     ),
   );
 }
 
-/** The players as chips; the host has „Махни“ on each of the others, asked twice (a slip would keep them out). */
+/** The players as chips. The host has two things on each of the others: „Смени името“ (the player is asked for
+ * another, theirs drawn meanwhile) and „Махни“, asked twice; and those sent out, each with „Върни“, a slip undone. */
 export function players(view: () => RoomView, code: string, error: (s: string) => void): Child {
   const sure = signal(-1); // the key of the one „Махни“ was tapped on once
   let t = 0;
   onCleanup(() => clearTimeout(t));
-  const remove = async (p: Player) => {
+  const act = async (what: "remove" | "rename" | "return", p: Player) => {
+    const path = {
+      remove: `/api/rooms/${code}/remove`,
+      rename: `/api/rooms/${code}/rename`,
+      return: `/api/rooms/${code}/return`,
+    }[what];
+    try {
+      await api("POST", path, { key: p.key });
+    } catch (err) {
+      error(errorText(err));
+    }
+  };
+  const remove = (p: Player) => {
     clearTimeout(t);
     if (sure.peek() !== p.key) {
       sure.set(p.key);
@@ -568,37 +625,82 @@ export function players(view: () => RoomView, code: string, error: (s: string) =
       return;
     }
     sure.set(-1);
-    try {
-      await api("POST", `/api/rooms/${code}/remove`, { key: p.key });
-    } catch (err) {
-      error(errorText(err));
-    }
+    act("remove", p);
   };
-  return h("ul", { class: "players" }, () => {
-    const v = view();
-    return v.players.map((p) =>
-      h(
-        "li",
-        { class: [!p.online && "away", p.me && "me"].filter(Boolean).join(" ") || undefined },
-        avatar(p.avatar, { size: "s", name: p.name }),
-        p.name,
-        p.me ? " (ти)" : "",
-        p.online ? "" : " — извън стаята",
-        v.isHost && !p.me
-          ? h(
-              "button",
-              {
-                type: "button",
-                class: () => (sure() === p.key ? "link remove bad" : "link remove"),
-                "aria-label": () => `${sure() === p.key ? "Да, махни" : "Махни"} ${p.name}`,
-                onclick: () => remove(p),
-              },
-              () => (sure() === p.key ? "Да, махни" : "Махни"),
-            )
-          : null,
-      ),
-    );
-  });
+  return [
+    h("ul", { class: "players" }, () => {
+      const v = view();
+      // A new name is asked for between games, not in the middle of one.
+      const naming = v.phase === "lobby" || v.phase === "end";
+      return v.players.map((p) =>
+        h(
+          "li",
+          { class: [!p.online && "away", p.me && "me"].filter(Boolean).join(" ") || undefined },
+          avatar(p.avatar, { size: "s", name: p.name }),
+          h("span", { class: "player-name" }, p.name, p.me ? " (ти)" : "", p.online ? "" : " — извън стаята"),
+          v.isHost && !p.me
+            ? h(
+                "span",
+                { class: "player-acts" },
+                naming
+                  ? h(
+                      "button",
+                      {
+                        type: "button",
+                        class: "link remove",
+                        "aria-label": `Поискай друго име от ${p.name}`,
+                        onclick: () => act("rename", p),
+                      },
+                      "Смени името",
+                    )
+                  : null,
+                h(
+                  "button",
+                  {
+                    type: "button",
+                    class: () => (sure() === p.key ? "link remove bad" : "link remove"),
+                    "aria-label": () => `${sure() === p.key ? "Да, махни" : "Махни"} ${p.name}`,
+                    onclick: () => remove(p),
+                  },
+                  () => (sure() === p.key ? "Да, махни" : "Махни"),
+                ),
+              )
+            : null,
+        ),
+      );
+    }),
+    () => {
+      const out = view().out ?? [];
+      if (!out.length) return null;
+      return h(
+        "div",
+        { class: "players-out" },
+        h("p", { class: "muted" }, "Махнати от стаята:"),
+        h(
+          "ul",
+          { class: "players" },
+          out.map((p) =>
+            h(
+              "li",
+              { class: "away out" },
+              avatar(p.avatar, { size: "s", name: p.name }),
+              h("span", { class: "player-name" }, p.name),
+              h(
+                "button",
+                {
+                  type: "button",
+                  class: "link remove",
+                  "aria-label": `Върни ${p.name} в стаята`,
+                  onclick: () => act("return", p),
+                },
+                "Върни",
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  ];
 }
 
 /** A sound as someone comes into the room. */
@@ -688,7 +790,8 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
     answered(q.view, r.answer, q.given ?? null),
     verdict(kind, r.points, r.missed ? "Времето изтече." : undefined, r.speed, r.row, r.inRow),
     crowdLine(q.view.type, r.answer.crowd, r.right),
-    // Held, the answer stays up until who leads moves on.
+    // Held, the answer stays up until who leads moves on: time to read its fact here too, not only on the big screen.
+    () => (held() ? fact(r.answer.fact) : null),
     () =>
       held()
         ? h("p", { class: "status" }, "Водещият ще продължи.")
@@ -700,27 +803,27 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
 }
 
 /** The players by points (the first `top`); after an answer, what it brought each of them and how far they moved; at
- * the end, under a player's name, whatever `extra` adds (the way to add them as a friend). */
-export function standings(
-  view: () => RoomView,
-  gains: boolean,
-  before?: Map<number, number>,
-  extra?: (p: Player) => Child,
-  top = 50,
-): Child {
-  return h("section", { class: "board" }, h("h2", null, "Класиране"), () =>
-    h(
-      "ol",
-      null,
-      view()
-        .players.slice(0, top)
-        .map((p, i) => {
+ * the end, how many each got right („6/10 ·“). Nothing while nobody plays (a room led, everyone answering aloud). */
+export function standings(view: () => RoomView, gains: boolean, before?: Map<number, number>, top = 50): Child {
+  return () => {
+    const v = view();
+    if (!v.players.length) return null;
+    return h(
+      "section",
+      { class: "board" },
+      h("h2", null, "Класиране"),
+      h(
+        "ol",
+        null,
+        v.players.slice(0, top).map((p, i) => {
           const row = boardRow(
             p.place ?? i + 1,
             p.name,
             gains && p.gained
               ? [h("small", { class: "sub" }, `+${formatNumber(p.gained)} · `), formatNumber(p.points)]
-              : formatNumber(p.points),
+              : v.phase === "end"
+                ? [h("small", { class: "sub" }, `${p.rights}/${v.total} · `), formatNumber(p.points)]
+                : formatNumber(p.points),
             { me: p.me, look: p },
           );
           if (!p.online) row.classList.add("away");
@@ -728,11 +831,11 @@ export function standings(
             row.classList.add("moves");
             row.append(move(before.get(p.key), i + 1));
           }
-          if (extra) row.append(h("span", { class: "row-add" }, extra(p)));
           return row;
         }),
-    ),
-  );
+      ),
+    );
+  };
 }
 
 /** Places moved since the last answer: up, down, or none. */
@@ -754,8 +857,7 @@ function end(view: () => RoomView, code: string): Child {
   play(first.players.length > 1 && first.players[0]?.me ? "win" : "end");
   const questions = reviewParts(async () => view().review ?? []);
   const ran = computed(() => view().run ?? 0);
-  // The others to add as friends (not friends yet, nor asked), each a tap under their name, and whether the day's ten
-  // still wait for this player.
+  // The others to add as friends (not friends yet, nor asked), and whether the day's ten still wait for this player.
   const people = signal<{ add: number[]; day: boolean } | null>(null);
   const sent = signal<Record<number, string>>({});
   api<{ add: number[]; day: boolean }>("GET", `/api/rooms/${code}/people`).then(people.set, () => {});
@@ -800,13 +902,21 @@ function end(view: () => RoomView, code: string): Child {
             .join(", ")} и ${top.at(-1)?.name} делят първото място`;
         return top[0] ? `${top[0].name} печели` : "Край";
       }),
+      // How many this player got right, whatever their place: and the place, among others.
+      () => {
+        const v = view();
+        const me = v.players.find((p) => p.me);
+        if (!me) return null;
+        const among = v.players.length > 1 && me.place ? ` и си на ${place(me.place, v.players.length)}` : "";
+        return h("p", { class: "lead" }, `Позна ${me.rights} от ${v.total}${among}.`);
+      },
     ),
     () =>
       view().allRight
         ? h("p", { class: "points-bonus" }, `Всички верни: +${formatNumber(view().allRight ?? 0)} т.`)
         : null,
-    standings(view, false, undefined, add),
-    // Who leads starts the next game (the gold button); everyone else waits for it. The questions to go over, beside.
+    // Who leads starts the next game (the gold button); everyone else waits for it. The questions to go over, beside:
+    // under the result, over the standings, which may be long.
     nextSteps(
       () =>
         view().canLead
@@ -822,6 +932,23 @@ function end(view: () => RoomView, code: string): Child {
       ],
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    standings(view, false),
+    // The others to add as friends, folded: a room of thirty isn't thirty buttons.
+    () =>
+      people()?.add.length
+        ? h(
+            "details",
+            { class: "more" },
+            h("summary", null, "Добави в приятели"),
+            h("ul", { class: "players" }, () =>
+              view()
+                .players.filter((p) => people()?.add.includes(p.key))
+                .map((p) =>
+                  h("li", null, avatar(p.avatar, { size: "s", name: p.name }), h("span", null, p.name), add(p)),
+                ),
+            ),
+          )
+        : null,
     // The host may change what the next game plays, keeping the code and the players.
     first.isHost ? choose(view, code) : null,
     // What the game earned, once it's kept (a moment after its end), as any game tells it.

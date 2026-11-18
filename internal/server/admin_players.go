@@ -18,16 +18,16 @@ import (
 // Players on /admin: whoever keeps the game finds a player by their tag, and puts a name that pretends or offends
 // back to a drawn one (name and tag both: account.ResetName), or suspends the player (account.Suspend: signed out
 // everywhere, and no sign-in after) and lifts it. The page lists the players suspended, and those whose name or tag
-// reads as the game's own (account.Reserved), as names chosen before the check came in may still.
+// reads as the game's own (account.Reserved) or swears (account.Rude), as names chosen before the checks came in may.
 
 // adminPlayer is a player as /admin shows them.
 type adminPlayer struct {
-	ID              int64
-	Name, Tag       string
-	Since           string
-	Email, Admin    bool
-	Suspended       string // since when, if they are
-	Reserved, Drawn bool
+	ID                    int64
+	Name, Tag             string
+	Since                 string
+	Email, Admin          bool
+	Suspended             string // since when, if they are
+	Reserved, Rude, Drawn bool
 }
 
 // adminPlayers is the players' part of /admin: the one asked for (?player=tag), and the lists.
@@ -54,6 +54,7 @@ func (s *Server) adminPlayersOf(ctx context.Context, query string) adminPlayers 
 			p.Suspended = day(suspended.Int64)
 		}
 		p.Reserved = account.Reserved(p.Name) || account.Reserved(p.Tag)
+		p.Rude = account.Rude(p.Name) || account.Rude(p.Tag)
 		p.Drawn = account.User{ID: p.ID, Name: p.Name}.Drawn()
 		return p, err
 	}
@@ -91,7 +92,10 @@ func (s *Server) adminPlayersOf(ctx context.Context, query string) adminPlayers 
 		for rows.Next() {
 			var id int64
 			var name, tag string
-			if rows.Scan(&id, &name, &tag) == nil && (account.Reserved(name) || account.Reserved(tag)) && len(ids) < 100 {
+			if rows.Scan(&id, &name, &tag) != nil || len(ids) >= 100 {
+				continue
+			}
+			if account.Reserved(name) || account.Reserved(tag) || account.Rude(name) || account.Rude(tag) {
 				ids = append(ids, id)
 			}
 		}
@@ -171,13 +175,14 @@ var adminPlayersBody = template.Must(template.New("players").Parse(`
 <section class="reviewed">
 <p>{{template "player" .}}</p>
 {{if .Reserved}}<p class="bad">Името или потребителското име прилича на името на играта.</p>{{end}}
+{{if .Rude}}<p class="bad">Името или потребителското име е грубо.</p>{{end}}
 {{if not .Drawn}}<form method="post" action="/admin/players/{{.ID}}/name"><button class="link">Смени името с изтеглено</button></form>{{end}}
 {{if .Suspended}}<form method="post" action="/admin/players/{{.ID}}/unsuspend"><button class="link">Възстанови профила</button></form>
 {{else if not .Admin}}<form method="post" action="/admin/players/{{.ID}}/suspend"><button class="link">Спри профила</button></form>{{end}}
 </section>
 {{end}}
 {{if .Missing}}<p class="muted">Няма играч с такова потребителско име.</p>{{end}}
-<h3>Имена като на играта ({{len .Reserved}})</h3>
+<h3>Имена като на играта или груби ({{len .Reserved}})</h3>
 {{range .Reserved}}<p>{{template "player" .}} <a href="/admin?player={{.Tag}}#players">Отвори</a></p>
 {{else}}<p class="muted">Няма.</p>{{end}}
 <h3>Спрени профили ({{len .Suspended}})</h3>

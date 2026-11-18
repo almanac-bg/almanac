@@ -4102,8 +4102,7 @@
     color: var(--text-muted);
   }
 
-  /* Under a name: a friend's ten (the friends' day on Начало), or the way to add a player (a room's end). */
-  .row > .row-add,
+  /* Under a name: a friend's ten (the friends' day on Начало). */
   .row > .trail {
     grid-column: 2 / -1;
     max-width: 12rem;
@@ -5787,6 +5786,11 @@
 
   /* ---- Rooms ---- */
 
+  /* The room's phase, as if it were the page's own (hidden while a new name is asked: screens/room.ts). */
+  .room-phase {
+    display: contents;
+  }
+
   .code-big {
     font: 900 3.5rem / 1 var(--font-numeral);
     letter-spacing: 0.08em;
@@ -5833,11 +5837,41 @@
     box-shadow: inset 0 0 0 1.5px var(--accent);
   }
 
-  /* The host's „Махни“: the chip's full height to tap. */
+  /* The host's „Смени името“, „Махни“ and „Върни“: the chip's full height to tap. */
   .players .remove {
     align-self: stretch;
     margin: calc(var(--space-2) * -1) 0 calc(var(--space-2) * -1) var(--space-1);
     font-size: 0.875rem;
+    white-space: nowrap;
+  }
+
+  .player-name {
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+
+  /* The host's buttons on a chip, together: under the name when the two don't fit beside it (a phone, a long name). */
+  .players li:has(> .player-acts) {
+    flex-wrap: wrap;
+  }
+
+  .player-acts {
+    display: inline-flex;
+    align-self: stretch;
+    gap: var(--space-3);
+    margin-left: auto;
+    padding-left: var(--space-1);
+  }
+
+  .player-acts .remove {
+    margin-left: 0;
+  }
+
+  /* Those the host sent out, under the others, to bring back. */
+  .players-out {
+    display: grid;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
   }
 
   /* The host's lock on the room, under its players: who may come in, and the switch beside it (below, on a phone). */
