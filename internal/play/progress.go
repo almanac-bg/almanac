@@ -287,7 +287,7 @@ type Progress struct {
 	Title        string   `json:"title"` // the chosen title's id: one of Titles, or the champion's ("" for none)
 	// TitleByLevel is set while the player hasn't chosen a title (users.title NULL): they wear their level's
 	// (LevelTitle, Title then; "" before „Любопитен ум“), not „Без титла“, which is a choice.
-	TitleByLevel bool `json:"titleByLevel,omitempty"`
+	TitleByLevel bool     `json:"titleByLevel,omitempty"`
 	Shapes       []Shape  `json:"shapes"`
 	Tones        []string `json:"tones"`
 	// Standing is the player's rating and division.
