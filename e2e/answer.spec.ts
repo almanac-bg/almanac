@@ -118,6 +118,10 @@ async function playWatching(
   for (let n = 0; n < 10; n++) {
     await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
     await before?.();
+    // The facts' face is in before the first answer: a panel laid out without it changes height as it comes.
+    await expect
+      .poll(() => page.evaluate(() => document.fonts.check("italic 500 1rem Literata", "Знаеше ли?")))
+      .toBe(true);
     await watch(page);
     await answer(page);
     await page.waitForFunction(() => (window as unknown as { seen: Seen }).seen.done);

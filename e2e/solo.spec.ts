@@ -91,7 +91,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.locator(".league-card")).toContainText("Странджа");
   await expect(page.locator(".league-card")).toContainText("от верните отговори на въпросите на деня");
   const mine = page.locator(".league-board .row.me, .league-gathering").first();
-  await expect(mine).toContainText(/верни|Групата ти още се събира/);
+  await expect(mine).toContainText(/\d+ (верен|верни)|Групата ти още се събира/);
   // Профил shows the league too, in a line that is a tap from the group.
   await page.goto("/me");
   await expect(page.locator(".league-link")).toContainText(/място от|Групата ти още се събира/);

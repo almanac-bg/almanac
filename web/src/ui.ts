@@ -120,6 +120,13 @@ export function fact(text?: string, day?: string): Child {
   );
 }
 
+/** Asks for the facts' face (Literata, app.css) now. It loads only as text in it first shows, and an answer's panel
+ * laid out before it came would change height when it did, after the answers had settled above it (game/run.ts,
+ * settle): the right answer under the panel. A game asks for it as it starts, long before its first fact. */
+export function factFace(): void {
+  document.fonts?.load("italic 500 1rem Literata", "Знаеше ли?").catch(() => {});
+}
+
 /** A box that may scroll on its own (the answer's panel docked at a run's foot, with a long fact: app.css): while it
  * does, the keyboard can reach it to scroll it, a stop of its own; while all of it shows, it's none. */
 export function reachable(box: HTMLElement): void {

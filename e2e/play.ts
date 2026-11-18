@@ -20,9 +20,11 @@ export async function answer(page: Page): Promise<void> {
     const text = (row: ReturnType<typeof rows.first>) => row.locator("span").nth(1);
     const first = (await text(rows.first()).textContent()) ?? "";
     // Dragged by hand, from where the rows are: the page held still (Playwright's own drag scrolls the page under a
-    // button held down, in WebKit, and the row taken moves away from under it). In Chromium (a phone) by a finger held
-    // a moment on the words, as a player does (never only by the grip); elsewhere by the mouse.
-    const touch = page.context().browser()?.browserType().name() === "chromium";
+    // button held down, in WebKit, and the row taken moves away from under it). On a phone in Chromium by a finger held
+    // a moment on the words, as a player does (never only by the grip); elsewhere (a laptop too) by the mouse.
+    const touch =
+      page.context().browser()?.browserType().name() === "chromium" &&
+      (await page.evaluate(() => navigator.maxTouchPoints > 0));
     const [from, to] = [await text(rows.first()).boundingBox(), await rows.last().boundingBox()];
     if (!from || !to) throw new Error("the rows aren't on the screen");
     const [x, y0, y1] = [from.x + from.width / 2, from.y + from.height / 2, to.y + to.height / 2];
@@ -68,13 +70,14 @@ export async function answer(page: Page): Promise<void> {
   }
 }
 
-/** Rests a finger at (x, y0) as long as a long press takes, drags it straight down or up to y1 in steps, and lifts it:
- * real touch events, Chromium only (Playwright has a tap, not a drag, of a finger). */
+/** Rests a finger on a row of a list at (x, y0) till the row is taken up (a long press: as a player waits for it to
+ * lift, however busy the phone), drags it straight down or up to y1 in steps, and lifts it: real touch events,
+ * Chromium only (Playwright has a tap, not a drag, of a finger). */
 async function fingerDrag(page: Page, x: number, y0: number, y1: number): Promise<void> {
   const cdp = await page.context().newCDPSession(page);
   const at = (y: number) => [{ x, y }];
   await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: at(y0) });
-  await page.waitForTimeout(400);
+  await expect(page.locator(".sortable-list .option.dragging")).toHaveCount(1);
   for (let i = 1; i <= 6; i++) {
     await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: at(y0 + ((y1 - y0) * i) / 6) });
   }
@@ -83,9 +86,22 @@ async function fingerDrag(page: Page, x: number, y0: number, y1: number): Promis
 }
 
 /** Scrolls the page to its foot, as a player does to see all of a long answer: on a short screen „Готово“ stays at
- * the screen's foot over what scrolls under it, and at the page's foot it's below the last of it. */
+ * the screen's foot over what scrolls under it, and at the page's foot it's below the last of it. Till the page holds
+ * still there, as a player's hand goes on only then: the head sticks as the page moves past it (run.ts, stays), and a
+ * page a little taller than the screen can come back a little as it does; what's under the hand is measured after. */
 async function uncover(page: Page): Promise<void> {
-  await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+  await page.evaluate(async () => {
+    const frame = () => new Promise((on) => requestAnimationFrame(on));
+    const root = document.documentElement;
+    let last = "";
+    for (let still = 0, frames = 0; still < 3 && frames < 60; frames++) {
+      if (scrollY < root.scrollHeight - innerHeight - 1) scrollTo(0, root.scrollHeight);
+      await frame();
+      const now = `${scrollY} ${root.scrollHeight}`;
+      still = now === last ? still + 1 : 0;
+      last = now;
+    }
+  });
 }
 
 /** Opens a game by its address, as a link from outside the game does (nothing starts by itself: „Започни“ first), and
