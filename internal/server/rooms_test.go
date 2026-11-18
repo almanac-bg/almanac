@@ -99,3 +99,46 @@ func TestRoomAccess(t *testing.T) {
 		t.Fatalf("an open room's code past the address's misses: %d", status)
 	}
 }
+
+// A name asked as a player comes into a room is the room's alone: the others see it there, and nowhere else does the
+// player go by it (their own name stays as it was); coming back without one keeps it.
+func TestRoomName(t *testing.T) {
+	g := start(t)
+	ana, bo := g.player(), g.player()
+	ana.call("POST", "/api/guest", map[string]any{})
+	_, b := bo.call("POST", "/api/guest", map[string]any{})
+	own := b["user"].(map[string]any)["name"].(string)
+	_, out := ana.call("POST", "/api/rooms", map[string]string{"category": ""})
+	code := out["code"].(string)
+	ana.follow(code)
+	names := func() []string {
+		t.Helper()
+		v := ana.stream("/api/rooms/" + code + "/events").until(func(map[string]any) bool { return true })
+		var out []string
+		for _, p := range v["players"].([]any) {
+			out = append(out, p.(map[string]any)["name"].(string))
+		}
+		return out
+	}
+	for _, bad := range []string{"АЛМАНАХ", "Ивaн", "x"} {
+		if status, _ := bo.call("POST", "/api/rooms/"+code+"/join", map[string]string{"name": bad}); status != 400 {
+			t.Errorf("a room name %q: %d", bad, status)
+		}
+	}
+	if status, out := bo.call("POST", "/api/rooms/"+code+"/join", map[string]string{"name": "  Бояна   П. "}); status != 200 {
+		t.Fatalf("join with a name: %d %v", status, out)
+	}
+	if got := names(); len(got) != 2 || got[1] != "Бояна П." {
+		t.Fatalf("the room's names: %v", got)
+	}
+	if _, me := bo.call("GET", "/api/me", nil); me["user"].(map[string]any)["name"] != own {
+		t.Fatalf("Bo's own name changed: %v", me["user"])
+	}
+	// Back without a name (a reload): still Бояна П. in the room.
+	if status, _ := bo.call("POST", "/api/rooms/"+code+"/join", nil); status != 200 {
+		t.Fatal(status)
+	}
+	if got := names(); got[1] != "Бояна П." {
+		t.Fatalf("the room's names after a return: %v", got)
+	}
+}

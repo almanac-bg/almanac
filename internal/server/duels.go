@@ -271,6 +271,7 @@ func (s *Server) declineDuel(w http.ResponseWriter, r *http.Request) error {
 
 // duelNews tells a player of a duel: a friend's challenge waits for them, the result of one played in their own time
 // (a challenge between friends; a live duel's result they've just seen), or someone took their challenge.
+// Through notifyFrom: nothing between two players one of whom has blocked the other, and a day's pushes capped.
 func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 	m := push.Message{URL: fmt.Sprintf("/duel/%d", n.DuelID)}
 	switch n.Kind {
@@ -299,7 +300,7 @@ func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 	default:
 		return
 	}
-	s.notify(context.WithoutCancel(ctx), pushFriends, m, n.To)
+	s.notifyFrom(context.WithoutCancel(ctx), n.FromID, "", m, n.To)
 }
 
 // ranks is a board: by rating, or by knowledge (over every topic, or one); of everyone, or of the viewer and their

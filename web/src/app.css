@@ -4021,6 +4021,11 @@
     margin: 0;
   }
 
+  /* Blocking is there, never in the way: quiet, at the row's end. */
+  .player-block {
+    margin-inline-start: auto;
+  }
+
   /* The name and what's beside it („ти“): the name gives way with an ellipsis, the badge always shows whole. */
   .who-name {
     display: flex;
@@ -5735,8 +5740,23 @@
 
   .invitation-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-4);
+    gap: var(--space-2) var(--space-4);
+  }
+
+  /* A new invite link: a quiet line under the invitation, its own width. */
+  .invite-new {
+    justify-self: start;
+  }
+
+  .invite-renew {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .invite-renew-note {
+    margin: 0;
   }
 
   .small {

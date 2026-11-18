@@ -1,6 +1,7 @@
 package play
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -31,6 +32,9 @@ import (
 // anything else could be chosen to win, a sender's best game sent, or taken knowing the score to beat, or on questions
 // the taker has answered before. Anyone else's moves no rating, and the sender hears of those quietly: one line on
 // Начало for all of them since they last heard (ChallengeNewsOf), and a push at most once a day.
+//
+// Between two players one of whom has blocked the other (blocks.go), a challenge isn't there: neither can see or take
+// the other's, and those taken before the block are left out of what its sender hears.
 //
 // It can be taken for ChallengeFor from when it was sent; sent again, its time starts again. Its questions are played
 // as the sender was shown them (versions.go), so that both played the same game; one that has left the game since as
@@ -181,7 +185,7 @@ func (g *Game) tellAsked(ctx context.Context, sender int64, duels []int64) error
 			return err
 		}
 		if !waiting {
-			g.DuelNews(ctx, DuelNews{To: to, Kind: "asked", From: name, DuelID: id})
+			g.DuelNews(ctx, DuelNews{To: to, Kind: "asked", From: name, FromID: sender, DuelID: id})
 		}
 	}
 	return nil
@@ -317,6 +321,11 @@ func (g *Game) ChallengeOf(ctx context.Context, code string, viewer int64) (Chal
 	if !played && !v.Own {
 		return ChallengeView{}, ErrNoChallenge
 	}
+	if viewer != 0 && !v.Own {
+		if blocked, err := g.Blocked(ctx, viewer, v.userID); err != nil || blocked {
+			return ChallengeView{}, cmp.Or(err, ErrNoChallenge)
+		}
+	}
 	v.Over = !g.Now().Before(time.UnixMilli(v.Expires))
 	look := g.lookOf(v.userID, avatar, title, points)
 	v.Look = &look
@@ -336,12 +345,14 @@ func (g *Game) ChallengeOf(ctx context.Context, code string, viewer int64) (Chal
 	return v, nil
 }
 
-// takers are those who took a challenge, the latest first: not those it was sent to who haven't started, nor said no.
+// takers are those who took a challenge, the latest first: not those it was sent to who haven't started, nor said no,
+// nor anyone its sender has blocked.
 func (g *Game) takers(ctx context.Context, challengeID int64) ([]Taker, error) {
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT u.id, u.name, u.tag, `+lookColumns+`, coalesce(d.outcome, ''), r.rights,
 			r.finished_at IS NOT NULL
-		FROM duels d JOIN users u ON u.id = d.a_id JOIN runs r ON r.id = d.a_run
+		FROM duels d JOIN users u ON u.id = d.a_id JOIN runs r ON r.id = d.a_run JOIN challenges c ON c.id = d.challenge_id
 		WHERE d.challenge_id = ? AND coalesce(d.outcome, '') NOT IN ('declined', 'expired')
+			AND NOT `+blockedBetween("c.user_id", "d.a_id")+`
 		ORDER BY coalesce(d.ended_at, d.created_at) DESC LIMIT 100`, challengeID)
 	if err != nil {
 		return nil, err
@@ -482,7 +493,7 @@ func (g *Game) AskedOf(ctx context.Context, userID int64) ([]Asked, error) {
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, ub.name, d.expires_at, d.a_run IS NOT NULL
 		FROM duels d JOIN users ub ON ub.id = d.b_id JOIN runs rs ON rs.id = d.ghost_run LEFT JOIN runs ra ON ra.id = d.a_run
 		WHERE d.kind = 'challenge' AND d.a_id = ? AND d.ended_at IS NULL AND rs.finished_at IS NOT NULL
-			AND ra.finished_at IS NULL
+			AND ra.finished_at IS NULL AND NOT `+blockedBetween("d.a_id", "d.b_id")+`
 		ORDER BY d.expires_at`, userID)
 	if err != nil {
 		return nil, err
@@ -519,6 +530,7 @@ func (g *Game) FriendPlayedOf(ctx context.Context, userID int64) (*FriendPlayed,
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT d.id, ua.name, d.outcome, rs.points, ra.points
 		FROM duels d JOIN users ua ON ua.id = d.a_id JOIN runs ra ON ra.id = d.a_run JOIN runs rs ON rs.id = d.ghost_run
 		WHERE d.b_id = ? AND d.kind = 'challenge' AND d.outcome IN ('a', 'b', 'draw') AND d.ended_at >= ?
+			AND NOT `+blockedBetween("d.a_id", "d.b_id")+`
 		ORDER BY d.ended_at DESC LIMIT 1`, userID, store.Ms(g.Now().Add(-PlayedRecent))).
 		Scan(&p.DuelID, &p.From, &outcome, &p.You, &p.Them)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -553,7 +565,8 @@ func (g *Game) ChallengeNewsOf(ctx context.Context, userID int64) (*ChallengeNew
 			(SELECT c2.code FROM duels d2 JOIN challenges c2 ON c2.id = d2.challenge_id WHERE c2.user_id = ?1
 				AND d2.outcome LIKE 'ghost_%' ORDER BY d2.ended_at DESC LIMIT 1)
 		FROM duels d JOIN challenges c ON c.id = d.challenge_id JOIN users u ON u.id = d.a_id
-		WHERE c.user_id = ?1 AND d.outcome LIKE 'ghost_%' AND d.ended_at > max(?2, (SELECT challenges_told FROM users WHERE id = ?1))`,
+		WHERE c.user_id = ?1 AND d.outcome LIKE 'ghost_%' AND d.ended_at > max(?2, (SELECT challenges_told FROM users WHERE id = ?1))
+			AND NOT `+blockedBetween("?1", "d.a_id"),
 		userID, store.Ms(g.Now().Add(-LinesRecent))).Scan(&n.Played, &n.Beat, &name, &code)
 	if err != nil || n.Played == 0 {
 		return nil, err
@@ -570,7 +583,7 @@ func (g *Game) challengeTold(ctx context.Context, userID int64) error {
 
 // challengeNews tells the one who sent a challenge that someone (not a friend) took it: a push, at most once a day
 // (the rest wait for Начало's line).
-func (g *Game) challengeNews(ctx context.Context, challengeID int64, taker, outcome string, duelID int64) error {
+func (g *Game) challengeNews(ctx context.Context, challengeID, takerID int64, taker, outcome string, duelID int64) error {
 	if g.DuelNews == nil {
 		return nil
 	}
@@ -589,6 +602,7 @@ func (g *Game) challengeNews(ctx context.Context, challengeID int64, taker, outc
 		return nil
 	}
 	mine := map[string]string{"won": "lost", "lost": "won", "draw": "draw"}[outcome]
-	g.DuelNews(ctx, DuelNews{To: to, Kind: "challenge", From: taker, Outcome: mine, DuelID: duelID, Code: code})
+	g.DuelNews(ctx, DuelNews{To: to, Kind: "challenge", From: taker, FromID: takerID, Outcome: mine, DuelID: duelID,
+		Code: code})
 	return nil
 }

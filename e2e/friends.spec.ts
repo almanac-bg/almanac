@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { playedFair, playRun, startDay } from "./play.ts";
+import { befriendByLink, playedFair, playRun, startDay } from "./play.ts";
 
 test("friends: an invite link, then a challenge between the two", async ({ browser }) => {
   test.setTimeout(180_000);
@@ -12,20 +12,22 @@ test("friends: an invite link, then a challenge between the two", async ({ brows
   const link = await a.locator("[data-invite]").first().getAttribute("data-invite");
   expect(link).toMatch(/^\/f\/[a-z0-9]{8}$/);
 
-  // Bo opens it and accepts: they're friends, both ways.
+  // Bo opens it and asks: a request, Ana's to accept (a link alone makes nobody a friend).
   await b.goto(link ?? "");
   // Ana hasn't played today: her link is to the day's ten (a link may go to a whole group), with being friends under.
   await expect(b.getByRole("heading", { name: /те кани на въпросите на деня$/ })).toBeVisible();
   await b.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
-  await expect(b.getByRole("heading", { name: /Вече сте приятели/ })).toBeVisible();
+  await expect(b.getByText(/^Поканата е изпратена\. Щом .+ я приеме, ставате приятели\.$/)).toBeVisible();
   await a.reload();
+  await expect(a.locator(".friend")).toHaveCount(0);
+  await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
   await expect(a.locator(".friend")).toHaveCount(1);
-  // Ana hears it on Начало too, once, a tap from challenging Bo.
-  await a.goto("/");
-  const yes = a.locator(".streak-notice", { hasText: "прие поканата ти." });
+  // Bo hears of her yes on Начало, once, a tap from challenging Ana.
+  await b.goto("/");
+  const yes = b.locator(".streak-notice", { hasText: "прие поканата ти." });
   await expect(yes.getByRole("link", { name: "Предизвикай" })).toHaveAttribute("href", /^\/challenge\/\d+$/);
-  await a.reload();
-  await expect(a.locator(".day")).toBeVisible();
+  await b.reload();
+  await expect(b.locator(".day")).toBeVisible();
   await expect(yes).toHaveCount(0);
   await a.goto("/friends");
 
@@ -117,9 +119,11 @@ test("friends on the day: a shared link to it, who has played it, and how each w
   await c.goto(link);
   await expect(c.getByRole("heading", { name: `${ana} има ${right} от 10 днес. А ти?` })).toBeVisible();
   await c.getByRole("button", { name: `Добави ${ana} в приятели` }).click();
-  await expect(c.getByText("Вече сте приятели.")).toBeVisible();
+  await expect(c.getByText(`Поканата е изпратена. Щом ${ana} я приеме, ставате приятели.`)).toBeVisible();
   await expect(c.getByRole("button", { name: "Играй въпросите на деня" })).toHaveClass(/primary/);
-  await expect(c.getByRole("button", { name: "Предизвикай" })).toBeVisible();
+  await a.reload();
+  await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
+  await expect(a.locator(".friend")).toHaveCount(1);
   await c.goto("/");
   await expect(c.locator(".day-meta").last()).toHaveText(`${ana} вече изигра днешните въпроси.`);
 
@@ -136,8 +140,10 @@ test("friends on the day: a shared link to it, who has played it, and how each w
     new RegExp(`^Ти: \\d+\\sот\\s10 · ${ana}: ${right}\\sот\\s10$`),
   );
   await card.getByRole("button", { name: `Добави ${ana} в приятели` }).click();
-  await expect(card.getByText("Вече сте приятели.")).toBeVisible();
-  await expect(card.getByRole("button", { name: "Предизвикай" })).toBeVisible();
+  await expect(card.getByText(`Поканата е изпратена. Щом ${ana} я приеме, ставате приятели.`)).toBeVisible();
+  await a.reload();
+  await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
+  await expect(a.locator(".friend")).toHaveCount(2);
 
   // Then, on Начало: both on the friends' day, his own row marked, each with how their ten went.
   await b.goto("/");
@@ -152,13 +158,7 @@ test("a challenge back from a friend's result", async ({ browser }) => {
   test.setTimeout(180_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
-  await a.goto("/friends");
-  await a.locator(".friends").getByRole("button", { name: "Покани приятел" }).click();
-  const link = await a.locator("[data-invite]").first().getAttribute("data-invite");
-  await b.goto(link ?? "");
-  await b.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
-  await expect(b.getByRole("heading", { name: /Вече сте приятели/ })).toBeVisible();
-  await a.reload();
+  await befriendByLink(a, b);
   await a.locator(".friend").getByRole("button", { name: "Предизвикай" }).click();
   await playRun(a);
   await b.goto("/");
@@ -184,13 +184,7 @@ test("a friend can turn a challenge down", async ({ browser }) => {
   test.setTimeout(120_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
-  await a.goto("/friends");
-  await a.locator(".friends").getByRole("button", { name: "Покани приятел" }).click();
-  const link = await a.locator("[data-invite]").first().getAttribute("data-invite");
-  await b.goto(link ?? "");
-  await b.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
-  await expect(b.getByRole("heading", { name: /Вече сте приятели/ })).toBeVisible();
-  await a.reload();
+  await befriendByLink(a, b);
   await a.locator(".friend").getByRole("button", { name: "Предизвикай" }).click();
   await playRun(a);
   // From its own screen…
@@ -247,4 +241,39 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await expect(a.locator(".friend")).toHaveCount(1);
   await b.reload();
   await expect(b.locator(".friend .friend-tag")).toHaveText(` @${tag}`);
+});
+
+test("a block keeps someone away; a new link leaves the old one nobody's", async ({ browser }) => {
+  const a = await (await browser.newContext()).newPage();
+  const b = await (await browser.newContext()).newPage();
+  await a.goto("/friends");
+  await a.locator(".friends").getByRole("button", { name: "Покани приятел" }).click();
+  const link = (await a.locator("[data-invite]").first().getAttribute("data-invite")) ?? "";
+  const ask = async () => {
+    await b.goto(link);
+    await b.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
+    await expect(b.getByText(/^Поканата е изпратена\./)).toBeVisible();
+  };
+  await ask();
+
+  // Ana blocks Bo from his request: it's gone, and he's on her list of the blocked.
+  await a.reload();
+  await a.locator(".invitation").getByRole("button", { name: "Блокирай" }).click();
+  await expect(a.locator(".invitation")).toHaveCount(0);
+  const blocked = a.locator(".stack", { has: a.getByText("Блокирани", { exact: true }) });
+  await expect(blocked.locator("li")).toHaveCount(1);
+  // Bo asks again: he's told it went, as anyone is; nothing reaches Ana.
+  await ask();
+  await a.reload();
+  await expect(a.locator(".invitation")).toHaveCount(0);
+  // Lifted from her list.
+  await blocked.getByRole("button", { name: "Отблокирай" }).click();
+  await expect(a.getByText("Блокирани", { exact: true })).toHaveCount(0);
+
+  // A new link, asked once more first: the old one is nobody's.
+  await a.getByRole("button", { name: "Нова връзка за покана" }).click();
+  await a.getByRole("button", { name: "Направи нова" }).click();
+  await expect(a.locator("[data-invite]").first()).not.toHaveAttribute("data-invite", link);
+  await b.goto(link);
+  await expect(b.getByRole("heading", { name: "Тази покана я няма" })).toBeVisible();
 });

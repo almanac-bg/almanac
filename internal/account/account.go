@@ -8,8 +8,9 @@
 // moves a game, it doesn't share it: the browser it came from is signed out, and the one it comes to becomes it, if it
 // had no game of its own (a link joins no two games: only an email does). When a guest becomes a profile, every
 // other session the guest had ends: only the browser that proved the email is in it. SignOutOthers ends a player's
-// other sessions on demand. A guest who never plays is cleared after a few days unused (CleanUp), so that guests
-// made and dropped don't stay.
+// other sessions on demand. A player suspended by whoever keeps the game (Suspend) loses every session and gets no new
+// one until it's lifted; names are checked against fakes of the game's own (names.go). A guest who never plays is
+// cleared after a few days unused (CleanUp), so that guests made and dropped don't stay.
 //
 // A player goes one way, whether they delete their account, are a guest cleared, a guest folded into an account, or a
 // guest with nothing yet whose browser a game is brought to (remove): what's theirs goes with them, others' history of them stays without them (the game's Forget), and their
@@ -44,8 +45,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
 	mailer "github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/store"
@@ -137,9 +136,6 @@ var (
 	ErrCodesBusy   = errors.New("the most codes a minute were mailed")
 	ErrAddressBusy = errors.New("the most codes an hour or a day were mailed to the address")
 	ErrNoMail      = errors.New("mail doesn't reach the address")
-	ErrBadName     = errors.New("bad name")
-	ErrBadTag      = errors.New("bad tag")
-	ErrTagTaken    = errors.New("tag taken")
 )
 
 // WrongCode is a wrong code that may still be tried again: Left tries remain (ErrBadCode).
@@ -235,7 +231,15 @@ func hashToken(token string) []byte {
 // tied to (push_subs, phones), so that they end with it.
 func SessionKey(token string) []byte { return hashToken(token) }
 
+// startSession signs a browser in as a player: a new session, unless the player is suspended (ErrSuspended).
 func startSession(tx *sql.Tx, userID int64) (string, error) {
+	var suspended bool
+	if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM suspensions WHERE user_id = ?)`, userID).Scan(&suspended); err != nil {
+		return "", err
+	}
+	if suspended {
+		return "", ErrSuspended
+	}
 	token, hash := newToken()
 	now := time.Now()
 	_, err := tx.Exec(`INSERT INTO sessions (token_hash, user_id, created_at, seen_at, expires_at) VALUES (?, ?, ?, ?, ?)`,
@@ -348,21 +352,30 @@ func createUser(tx *sql.Tx, email string) (User, error) {
 	if u.ID == 0 {
 		return User{}, errors.New("no free tag")
 	}
-	a := AnimalOf(u.ID)
-	u.Name = a.Name + " " + digits(3)
-	for range 50 {
-		tag := a.Tag + digits(4)
-		res, err := tx.Exec(`UPDATE OR IGNORE users SET name = ?, tag = ? WHERE id = ?`, u.Name, tag, u.ID)
+	var err error
+	u.Name, u.Tag, err = draw(tx, u.ID)
+	return u, err
+}
+
+// draw gives a player the name and tag drawn for them: their animal (the one their avatar starts as: Animals) and a
+// number. Every tag of the animal taken, the tag is "new" and nine digits.
+func draw(tx *sql.Tx, id int64) (name, tag string, err error) {
+	a := AnimalOf(id)
+	name = a.Name + " " + digits(3)
+	for i := range 60 {
+		tag = a.Tag + digits(4)
+		if i >= 50 {
+			tag = "new" + digits(9)
+		}
+		res, err := tx.Exec(`UPDATE OR IGNORE users SET name = ?, tag = ? WHERE id = ?`, name, tag, id)
 		if err != nil {
-			return User{}, err
+			return "", "", err
 		}
 		if n, _ := res.RowsAffected(); n == 1 {
-			u.Tag = tag
-			return u, nil
+			return name, tag, nil
 		}
 	}
-	_, err := tx.Exec(`UPDATE users SET name = ? WHERE id = ?`, u.Name, u.ID) // every tag of the animal taken: keep "new…"
-	return u, err
+	return "", "", errors.New("no free tag")
 }
 
 // Session finds who a token signs in, and keeps the session alive while it's used.
@@ -1013,80 +1026,6 @@ func (a *Accounts) TakeHandoff(ctx context.Context, token, session string) (User
 		return User{}, "", err
 	}
 	return u, started, nil
-}
-
-// Rename gives a player a new name (anyone's: names may repeat; the tag tells players apart).
-func (a *Accounts) Rename(ctx context.Context, userID int64, name string) (string, error) {
-	name, err := NormalName(name)
-	if err != nil {
-		return "", err
-	}
-	_, err = a.DB.Write.ExecContext(ctx, `UPDATE users SET name = ? WHERE id = ?`, name, userID)
-	return name, err
-}
-
-// Retag gives a player a new tag, if it's free.
-func (a *Accounts) Retag(ctx context.Context, userID int64, tag string) (string, error) {
-	tag, err := NormalTag(tag)
-	if err != nil {
-		return "", err
-	}
-	_, err = a.DB.Write.ExecContext(ctx, `UPDATE users SET tag = ? WHERE id = ?`, tag, userID)
-	if err != nil && strings.Contains(err.Error(), "UNIQUE") {
-		return "", ErrTagTaken
-	}
-	return tag, err
-}
-
-const (
-	NameMin = 2
-	NameMax = 30
-	TagMin  = 3
-	TagMax  = 20
-)
-
-// NormalTag is a tag as it's kept — 3 to 20 latin letters, digits and underscores, starting with a letter,
-// lowercase, without the @ it's written with — or ErrBadTag.
-func NormalTag(s string) (string, error) {
-	s = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(s), "@"))
-	if len(s) < TagMin || len(s) > TagMax || s[0] < 'a' || s[0] > 'z' || reserved[s] {
-		return "", ErrBadTag
-	}
-	for _, r := range s {
-		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '_' {
-			return "", ErrBadTag
-		}
-	}
-	return s, nil
-}
-
-// NormalName is a name as players see it — 2 to 30 letters, digits, single spaces, dots, dashes and underscores — or
-// ErrBadName.
-func NormalName(s string) (string, error) {
-	s = strings.Join(strings.Fields(s), " ")
-	n := utf8.RuneCountInString(s)
-	if n < NameMin || n > NameMax {
-		return "", ErrBadName
-	}
-	letters := 0
-	for _, r := range s {
-		switch {
-		case unicode.IsLetter(r):
-			letters++
-		case unicode.IsDigit(r), r == ' ', r == '.', r == '-', r == '_':
-		default:
-			return "", ErrBadName
-		}
-	}
-	if letters == 0 || reserved[strings.ToLower(s)] {
-		return "", ErrBadName
-	}
-	return s, nil
-}
-
-var reserved = map[string]bool{
-	"алманах": true, "almanac": true, "admin": true, "админ": true, "администратор": true, "administrator": true,
-	"support": true, "help": true, "root": true, "system": true,
 }
 
 // Animal is what a new player starts as, until they choose: a name (with a number), a tag (with digits) and the

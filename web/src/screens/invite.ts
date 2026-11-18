@@ -2,7 +2,8 @@
 // whoever opens it to the day: how its owner did today („Мария има 8 от 10 днес. А ти?“, or „Мария те кани на
 // въпросите на деня“ before they have played), the day's ten played right here, then the day's result as Начало has it (the
 // streak, what it earned, tomorrow), with one card more: the two results side by side and the friendship, a tap away,
-// never by itself (then a duel is a tap away).
+// never by itself. That tap asks the link's owner, who says yes or no in Приятели (play/friends.go: a link shared to a
+// group makes nobody a friend on its own); friends already, a duel is a tap away.
 
 import { shareButton } from "../game/results.ts";
 import { playRun } from "../game/run.ts";
@@ -18,6 +19,8 @@ interface Info {
   by: string;
   own: boolean;
   friends: boolean;
+  /** The one who opened it has asked its owner already: it waits for their yes. */
+  asked?: boolean;
   /** The owner's id, once friends (for a duel). */
   id?: number;
   /** How many right the owner has today, and the one who opened it, once each has played the day's ten. */
@@ -39,8 +42,8 @@ export function invite([code = ""]: string[]) {
     error.set("");
     try {
       await player();
-      const r = await api<{ id: number }>("POST", `/api/invites/${code}`, {});
-      info.set({ ...info.peek(), friends: true, id: r.id });
+      const r = await api<{ id?: number; friends?: boolean }>("POST", `/api/invites/${code}`, {});
+      info.set(r.friends ? { ...info.peek(), friends: true, id: r.id } : { ...info.peek(), asked: true });
       if (!played) screen.show(() => landing()); // its heading says so; after the day, only the card changes
     } catch (err) {
       fail(err);
@@ -66,18 +69,24 @@ export function invite([code = ""]: string[]) {
     }
   };
 
-  /** Being friends: „Добави … в приятели“ until they are, then a challenge a tap away (`gold`: the screen's main
-   * action). */
+  /** Being friends: „Добави … в приятели“ until asked, then that it waits for their yes; friends, a challenge a tap
+   * away (`gold`: the screen's main action). */
   const friendship =
     (gold: boolean): Child =>
     () => {
       const i = info();
-      return i.friends
-        ? [
-            i.their === undefined ? null : h("p", { class: "muted", role: "status" }, "Вече сте приятели."),
-            i.id ? h("button", { class: big(gold), onclick: challenge }, "Предизвикай") : null,
-          ]
-        : h("button", { class: big(gold), onclick: accept }, `Добави ${i.by} в приятели`);
+      if (i.friends)
+        return [
+          i.their === undefined ? null : h("p", { class: "muted", role: "status" }, "Вече сте приятели."),
+          i.id ? h("button", { class: big(gold), onclick: challenge }, "Предизвикай") : null,
+        ];
+      if (i.asked)
+        return h(
+          "p",
+          { class: "muted", role: "status" },
+          `Поканата е изпратена. Щом ${i.by} я приеме, ставате приятели.`,
+        );
+      return h("button", { class: big(gold), onclick: accept }, `Добави ${i.by} в приятели`);
     };
 
   /** The two results side by side, once both have played (a score never broken across lines). */
@@ -148,7 +157,7 @@ export function invite([code = ""]: string[]) {
             { class: "intro" },
             h("p", { class: "kicker" }, "Покана"),
             h("h1", null, "Това е твоята покана"),
-            h("p", { class: "lead" }, "Прати я на приятел: щом я отвори и приеме, ставате приятели."),
+            h("p", { class: "lead" }, "Прати я на приятел. Когато те добави, приеми поканата в Приятели."),
           ),
           shareButton("Прати поканата", () => "Ела да сме приятели в АЛМАНАХ:", location.href, true, undefined, true),
         ),

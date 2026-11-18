@@ -29,27 +29,14 @@ function markAsked(id: number): void {
   }
 }
 
-/** Names the server keeps for itself (account.reserved). */
-const reserved = new Set([
-  "алманах",
-  "almanac",
-  "admin",
-  "админ",
-  "администратор",
-  "administrator",
-  "support",
-  "help",
-  "root",
-  "system",
-]);
-
-/** A name as the server would take it (account.NormalName): its spaces made single, 2 to 30 letters, digits, spaces,
- * dots, dashes or underscores with a letter among them, and not one it keeps; "" if it wouldn't. */
+/** A name in the shape the server takes (account.NormalName): its spaces made single, 2 to 30 letters, digits,
+ * spaces, dots, dashes or underscores with a letter among them; "" if it isn't. The rest (one script a word, no web
+ * address, nothing that reads as the game's own) is the server's to say, in its answer. */
 export function normalName(s: string): string {
   const name = s.trim().replace(/\s+/g, " ");
   const n = [...name].length;
   if (n < 2 || n > 30 || !/^[\p{L}\p{N} ._-]+$/u.test(name) || !/\p{L}/u.test(name)) return "";
-  return reserved.has(name.toLowerCase()) ? "" : name;
+  return name;
 }
 
 /** Before a share by a player still with the name drawn for them, not asked yet on this device: the sheet, and true
@@ -64,7 +51,7 @@ export function askName(share: () => void): boolean {
 function sheet(u: User, share: () => void): void {
   const input = h("input", {
     name: "name",
-    autocomplete: "name",
+    autocomplete: "nickname",
     maxlength: 30,
     value: u.name,
     onfocus: (e: FocusEvent) => (e.target as HTMLInputElement).select(),

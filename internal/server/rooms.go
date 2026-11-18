@@ -11,6 +11,7 @@ package server
 // would let the walkers close every room to the players.
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -136,18 +137,42 @@ func (s *Server) roomOpen(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]bool{"open": true})
 }
 
-// roomJoin is a player coming into a room by its code: once, and again on each return (their name and look as they
-// are now). Unless the host has locked it to anyone new: a locked room counts as a code that missed, for a stranger.
+// roomJoin is a player coming into a room by its code: once, and again on each return (their look as it is now).
+// Unless the host has locked it to anyone new: a locked room counts as a code that missed, for a stranger.
+//
+// A player may come in under a name for this room alone (`name`: a class's pupils, asked as they come in, by the
+// name their teacher knows them by): it's the room's, kept in it and shown only to who's in it, never the player's
+// name anywhere else (not their profile, nor the boards, nor a request from the room's end). Without one, they're in
+// it by the name they had in it before, or their own.
 func (s *Server) roomJoin(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
 		return err
 	}
+	var in struct {
+		Name string `json:"name"`
+	}
+	if r.ContentLength != 0 {
+		if err := readJSON(r, &in); err != nil {
+			return err
+		}
+	}
+	name := ""
+	if in.Name != "" {
+		if name, err = account.NormalName(in.Name); err == nil && account.Reserved(name) && !u.Admin {
+			err = account.ErrNameReserved
+		}
+		if err != nil {
+			return err
+		}
+	}
 	rm, err := s.roomByCode(r, u.ID)
 	if err != nil {
 		return err
 	}
-	if err := rm.Join(s.roomPlayer(r.Context(), u.ID, u.Name)); err != nil {
+	p := s.roomPlayer(r.Context(), u.ID, u.Name)
+	p.Name, p.RoomName = cmp.Or(name, u.Name), name != ""
+	if err := rm.Join(p); err != nil {
 		if errors.Is(err, room.ErrLocked) {
 			s.missed(r, u.ID)
 			return errLocked
@@ -335,7 +360,9 @@ func (s *Server) roomPeople(w http.ResponseWriter, r *http.Request) error {
 		}
 		var known bool
 		if err := s.db.Read.QueryRowContext(r.Context(), `SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ?1 AND friend_id = ?2)
-			OR EXISTS (SELECT 1 FROM friend_requests WHERE from_id = ?1 AND to_id = ?2)`, u.ID, id).Scan(&known); err != nil {
+			OR EXISTS (SELECT 1 FROM friend_requests WHERE from_id = ?1 AND to_id = ?2)
+			OR EXISTS (SELECT 1 FROM blocks WHERE (user_id = ?1 AND blocked_id = ?2) OR (user_id = ?2 AND blocked_id = ?1))`,
+			u.ID, id).Scan(&known); err != nil {
 			return err
 		}
 		if !known {

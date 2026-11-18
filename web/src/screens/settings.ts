@@ -156,14 +156,15 @@ function nameForm(): Child {
         name: "name",
         "aria-label": "Име",
         "aria-describedby": "name-how",
-        autocomplete: "name",
+        autocomplete: "nickname",
         minlength: 2,
         maxlength: 30,
         required: true,
         value: name,
         oninput: (e: Event) => name.set((e.target as HTMLInputElement).value),
       }),
-      h("small", { class: "muted", id: "name-how" }, "Както искаш да те виждат — може и истинското ти име."),
+      // Seen by everyone (the boards, Роял, a link's preview): no more than a player means to show.
+      h("small", { class: "muted", id: "name-how" }, "Вижда се от всички в играта. Прякор или малкото ти име стигат."),
     ),
     h(
       "label",

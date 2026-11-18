@@ -95,9 +95,17 @@ var playerErrors = map[error]*apiError{
 		"Тук вече играеш с профила си. За да добавиш към него играта от другото място, влез с имейла си там, където я започна."},
 	account.ErrHandoffHere: {http.StatusConflict, "handoff_here",
 		"Тук вече имаш своя игра. Двете игри се събират само с имейл: запази тази с имейл, после влез със същия имейл там, където е другата."},
-	account.ErrBadName:  {http.StatusBadRequest, "bad_name", "Името трябва да е от 2 до 30 знака: букви, цифри, интервали, точки или тирета, с поне една буква. Някои имена са запазени."},
-	account.ErrBadTag:   {http.StatusBadRequest, "bad_tag", "Потребителското име трябва да е от 3 до 20 знака: латински букви, цифри или _, като първият е буква."},
-	account.ErrTagTaken: {http.StatusConflict, "tag_taken", "Това потребителско име е заето. Опитай друго."},
+	account.ErrBadName: {http.StatusBadRequest, "bad_name",
+		"Името трябва да е от 2 до 30 знака: букви на кирилица или латиница, цифри, интервали, точки или тирета, с поне една буква."},
+	account.ErrNameScripts: {http.StatusBadRequest, "bad_name",
+		"Пиши всяка дума от името само на кирилица или само на латиница, без да ги смесваш."},
+	account.ErrNameLink:     {http.StatusBadRequest, "bad_name", "След точка в името трябва да има интервал: името не може да е адрес на сайт."},
+	account.ErrNameReserved: {http.StatusBadRequest, "reserved_name", "Това име е запазено за играта. Избери друго."},
+	account.ErrBadTag:       {http.StatusBadRequest, "bad_tag", "Потребителското име трябва да е от 3 до 20 знака: латински букви, цифри или _, като първият е буква."},
+	account.ErrTagTaken:     {http.StatusConflict, "tag_taken", "Това потребителско име е заето. Опитай друго."},
+	account.ErrSuspended:    {http.StatusForbidden, "suspended", "Този профил е спрян от екипа на играта."},
+	play.ErrBlocked:         {http.StatusNotFound, "no_player", "Няма такъв играч."},
+	play.ErrManyBlocks:      {http.StatusConflict, "many_blocks", "Имаш твърде много блокирани играчи."},
 }
 
 // versionHeader names the game's version on every API answer: a page loaded before a deploy sees it's another and

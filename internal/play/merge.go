@@ -40,6 +40,16 @@ var mergeSteps = []mergeStep{
 		SELECT user_id, ?1, since, asked FROM friends WHERE friend_id = ?2 AND user_id <> ?1
 			AND user_id IN (SELECT friend_id FROM friends WHERE user_id = ?1)`},
 	{sql: `DELETE FROM friends WHERE user_id = ?2 OR friend_id = ?2`},
+	// Whom the guest blocked, the account has blocked; who blocked the guest, has blocked the account: the same person.
+	{carries: []string{"blocks.user_id", "blocks.blocked_id"}, sql: `INSERT OR IGNORE INTO blocks (user_id, blocked_id, at)
+		SELECT ?1, blocked_id, at FROM blocks WHERE user_id = ?2 AND blocked_id <> ?1`},
+	{sql: `INSERT OR IGNORE INTO blocks (user_id, blocked_id, at)
+		SELECT user_id, ?1, at FROM blocks WHERE blocked_id = ?2 AND user_id <> ?1`},
+	{sql: `DELETE FROM blocks WHERE user_id = ?2 OR blocked_id = ?2`},
+	{sql: `DELETE FROM friends WHERE (user_id = ?1 AND friend_id IN (SELECT blocked_id FROM blocks WHERE user_id = ?1
+		UNION SELECT user_id FROM blocks WHERE blocked_id = ?1))
+		OR (friend_id = ?1 AND user_id IN (SELECT blocked_id FROM blocks WHERE user_id = ?1
+		UNION SELECT user_id FROM blocks WHERE blocked_id = ?1))`},
 	// Duels against the guest count against the account.
 	{carries: []string{"runs.opponent_id"}, sql: `UPDATE runs SET opponent_id = ?1 WHERE opponent_id = ?2`},
 	// The account's game of a challenge the guest sent would be one against itself: it goes (the game stays).
@@ -213,6 +223,8 @@ var mergeLeft = map[string]string{
 	"users.admin":      "the account's (a guest is never one)",
 	"sessions.user_id": "a guest's sessions end: the browser that signed in gets the account's (account.Verify)",
 	"handoffs.user_id": "a link that moves the guest to another device: nothing to move once it's the account",
+	"suspensions.user_id": "a suspended guest has no session to sign in from, so is never merged; the account's " +
+		"own suspension is its own",
 }
 
 // Merge moves a guest's progress to the account they signed in to (account.Accounts.Merge), where it doesn't clash

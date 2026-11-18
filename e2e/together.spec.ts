@@ -26,6 +26,8 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
   await guest.getByRole("button", { name: "Влез" }).click();
   await expect(host.locator(".players li")).toHaveCount(2);
   await expect(host.locator(".players li").last()).toContainText("Бояна");
+  // That name is the room's alone: her own (on the boards, her profile) stays the one she had.
+  expect(await guest.evaluate(async () => (await (await fetch("/api/me")).json()).user.name)).not.toBe("Бояна");
   await expect(guest.getByText(/Чакаме .* да започне/)).toBeVisible();
   await expect(guest.getByText("История · 5 въпроса · Лесни")).toBeVisible();
   await host.getByRole("button", { name: "Започни" }).click();
