@@ -24,6 +24,14 @@
 // it outside its time. An answer counts if it reaches the server within Grace of its time's end; its time is to when
 // it arrived, from when the player's own screen showed the question, as it says, within bounds (seen.go).
 //
+// No game deals a player again what they've played, in any game, while the bank has questions they haven't: a topic's,
+// a duel's (live, a rematch, a friend's challenge), a room's and Роял's are drawn for all their players, those none of
+// them has seen first, then those the fewest have, and of as many, those no past issue they may still play holds
+// (choose, seenAmong: met first elsewhere, the issue would deal them again); a recording is a game with few of its
+// questions seen. Four repeat by design: the day (the same ten for everyone), a past issue (its day's ten), Втори шанс
+// (what the player missed) and a challenge taken (the sender's ten). TestNothingPlayedAgain holds it, for every way a
+// game starts.
+//
 // A guest who signs in to their account brings everything along (Merge), and a player who goes leaves others'
 // history whole (Forget): merge.go, checked against the schema so that no table of a player's is left out.
 package play

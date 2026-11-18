@@ -208,12 +208,12 @@ func TestGradedAsShown(t *testing.T) {
 // Роял and rooms deal their games as they start, and keep the versions dealt: so does a run of theirs.
 func TestLiveGamesKeepTheirVersions(t *testing.T) {
 	w := setup(t)
-	for _, p := range drawRoyal(w.b, nil, nil, newRand()) {
+	for _, p := range drawRoyal(w.b, nil, nil, nil, newRand()) {
 		if q, _ := w.b.Get(p.ID); p.V == "" || p.V != bank.Version(q) {
 			t.Fatalf("an evening's question without its version: %+v", p)
 		}
 	}
-	for _, p := range DrawRoom(w.b, "", Length, MixMixed, nil, newRand()) {
+	for _, p := range DrawRoom(w.b, "", Length, MixMixed, nil, nil, newRand()) {
 		if q, _ := w.b.Get(p.ID); p.V == "" || p.V != bank.Version(q) {
 			t.Fatalf("a room's question without its version: %+v", p)
 		}

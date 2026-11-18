@@ -25,7 +25,8 @@
 //
 // The hub keeps the evening's clock and the screens following it. Everything a game does goes through the database
 // first (package play), so that a restart of the server picks the game up again where it was. The evening's questions
-// are drawn with their versions (play.Pick.V), dealt so, and every answer graded through the deal shown
+// are drawn as its lobby opens, and again as its games begin, for everyone in it (play.Game.DealRoyal: those none of
+// them has seen first), with their versions (play.Pick.V), dealt so, and every answer graded through the deal shown
 // (play.Game.AnswerRoyal), whatever the bank has become meanwhile. What changes the
 // evening (its clock, a player in or out) goes one at a time (op), and writes to the database outside the lock on
 // what's in memory (mu), which is held only for moments: an answer, or a screen's look, never waits on a write. An
@@ -890,7 +891,7 @@ func (h *Hub) Join(ctx context.Context, p Player) error {
 	if t == nil {
 		if picks == nil {
 			var err error
-			if picks, err = h.game.DrawRoyal(ctx); err != nil {
+			if picks, err = h.game.DrawRoyal(ctx, []int64{p.ID}); err != nil { // drawn again for all as it begins
 				return err
 			}
 		}
@@ -991,6 +992,17 @@ func (h *Hub) begin(ctx context.Context, now time.Time) error {
 		}
 		return h.callOff(ctx, lobbies, now)
 	}
+	// The questions, drawn again for everyone of the lobbies (as the lobby opened, they were drawn for its first
+	// player): those none of them has seen first (play.Game.DealRoyal). A start tried again keeps those it dealt.
+	var players []int64
+	for _, m := range slices.Concat(there, away) {
+		players = append(players, m.ID)
+	}
+	picks, err := h.game.DealRoyal(ctx, h.ids(lobbies), players)
+	if err != nil {
+		return err
+	}
+	h.locked(func() { n.picks, n.dealt = picks, h.deal(picks) })
 	// As many as hold everyone of the lobbies, those away too: a seat is kept for each (nobody there, but some may
 	// come back: a game runs for them).
 	k := (len(there) + len(away) + play.RoyalSize - 1) / play.RoyalSize

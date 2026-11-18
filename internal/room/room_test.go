@@ -232,16 +232,28 @@ func TestRoomsLimits(t *testing.T) {
 	}
 }
 
-// A room deals none of the questions barred (the day's), and takes an answer as late as any game does (play.Grace).
+// A room deals none of the questions barred (the day's), those none of its players has seen before any one has, and
+// takes an answer as late as any game does (play.Grace).
 func TestBarredAndLate(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		b := sample(t)
 		hub := NewHub(b)
-		barred := map[string]bool{}
+		barred, seen, fresh := map[string]bool{}, map[string]int{}, 0
 		for _, q := range b().Live("", "") {
 			barred[q.Base().ID] = q.Base().Category != "science"
+			if !barred[q.Base().ID] {
+				if fresh < play.Length {
+					fresh++
+				} else {
+					seen[q.Base().ID] = 1 // one of them has played it
+				}
+			}
 		}
-		hub.Barred = func(context.Context) (map[string]bool, error) { return barred, nil }
+		var asked []int64
+		hub.Past = func(_ context.Context, players []int64) (map[string]bool, map[string]int, error) {
+			asked = players
+			return barred, seen, nil
+		}
 		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
 		r, _ := hub.Open(ana, "", Settings{})
 		_ = r.Join(bo, "")
@@ -250,9 +262,15 @@ func TestBarredAndLate(t *testing.T) {
 		if err := r.Start(ana.ID); err != nil {
 			t.Fatal(err)
 		}
+		if !slices.Equal(asked, []int64{ana.ID, bo.ID}) {
+			t.Fatalf("drawn for %v, not the room's players", asked)
+		}
 		for _, p := range r.picks {
 			if barred[p.ID] {
 				t.Fatalf("a barred question dealt: %s", p.ID)
+			}
+			if seen[p.ID] > 0 {
+				t.Fatalf("a question a player has seen dealt (%s), with %d none has left", p.ID, fresh)
 			}
 		}
 		if len(r.picks) != play.Length {

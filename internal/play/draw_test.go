@@ -30,9 +30,8 @@ func TestPictureBeforeDifficulty(t *testing.T) {
 		t.Fatal("the sample has no easy picture")
 	}
 	allowed := func(bank.Question) bool { return true }
-	fresh := func(q bank.Question) bool { return !used[q.Base().ID] }
 	for seed := range uint64(20) {
-		q := choose(b.Live("", ""), s, allowed, fresh, nil, rand.New(rand.NewPCG(seed, 1)))
+		q := choose(b.Live("", ""), s, allowed, marked(used), nil, rand.New(rand.NewPCG(seed, 1)))
 		if q == nil || !bank.HasPictures(q) || q.Base().Difficulty == bank.Easy || q.Base().Type != "choice" {
 			t.Fatalf("seed %d: %+v instead of a medium or hard picture", seed, q)
 		}

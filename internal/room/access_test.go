@@ -113,15 +113,15 @@ func TestLockedRoom(t *testing.T) {
 	}
 }
 
-// Starting a game reads the day's questions with no lock held: Playing (every Начало) and the room's screens don't
-// wait on the database meanwhile.
+// Starting a game reads what it's drawn by (the day's questions, those its players have seen) with no lock held:
+// Playing (every Начало) and the room's screens don't wait on the database meanwhile.
 func TestStartWaitsOnNobody(t *testing.T) {
 	hub := NewHub(sample(t))
 	reading, release := make(chan struct{}), make(chan struct{})
-	hub.Barred = func(context.Context) (map[string]bool, error) {
+	hub.Past = func(context.Context, []int64) (map[string]bool, map[string]int, error) {
 		close(reading)
 		<-release
-		return nil, nil
+		return nil, nil, nil
 	}
 	ana := Player{ID: 1, Name: "Ана"}
 	r, _ := hub.Open(ana, "", Settings{})

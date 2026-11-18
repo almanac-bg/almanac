@@ -177,7 +177,7 @@ func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.R
 		if s.typ == "number" {
 			prefer = []func(bank.Question) bool{func(q bank.Question) bool { return estimate(q) && unseen(q) }, estimate, unseen}
 		}
-		if q := choose(b.Live(assigned[i], ""), s, allowed, fresh, prefer, r); q != nil {
+		if q := choose(b.Live(assigned[i], ""), s, allowed, marked(used), prefer, r); q != nil {
 			chosen[i] = q
 			taken[q.Base().ID] = true
 			name(q, 1)
@@ -357,9 +357,12 @@ func newKind(slots []slot, r *rand.Rand) []slot {
 }
 
 // choose picks an allowed question for a slot from pool: one that fits the slot exactly if it can, else as close as it
-// gets — the type kept longest, then the difficulty — and a fresh one before one that isn't; of those, the first of
-// prefer's wishes that any of them meets.
-func choose(pool []bank.Question, s slot, allowed, fresh func(bank.Question) bool, prefer []func(bank.Question) bool, r *rand.Rand) bank.Question {
+// gets — the type kept longest, then the difficulty — and, above the fit, the least stale (stale: 0 for a question new
+// to everyone the game is for, more the more of them have met it). So a question none of them has seen, however
+// loosely it fits, comes before one any has, and one fewer have seen before one more have: nobody is dealt again what
+// they've played while the bank has others. Of those, the first of prefer's wishes that any of them meets.
+func choose(pool []bank.Question, s slot, allowed func(bank.Question) bool, stale func(bank.Question) int,
+	prefer []func(bank.Question) bool, r *rand.Rand) bank.Question {
 	if s.alt != "" && !slices.ContainsFunc(pool, func(q bank.Question) bool { return q.Base().Type == s.typ && allowed(q) }) {
 		s.typ = s.alt
 	}
@@ -379,26 +382,51 @@ func choose(pool []bank.Question, s slot, allowed, fresh func(bank.Question) boo
 		func(q bank.Question) bool { return q.Base().Difficulty == s.difficulty },
 		func(bank.Question) bool { return true },
 	)
-	for _, needFresh := range []bool{true, false} {
-		for _, fit := range fits {
-			var found []bank.Question
-			for _, q := range pool {
-				if allowed(q) && fit(q) && (!needFresh || fresh(q)) {
-					found = append(found, q)
-				}
+	// Each fit's least stale questions; of all, the least stale, the closest fit on a tie.
+	var found []bank.Question
+	least := -1
+	for _, fit := range fits {
+		level := -1
+		var these []bank.Question
+		for _, q := range pool {
+			if !allowed(q) || !fit(q) {
+				continue
 			}
-			for _, wish := range prefer {
-				if best := slices.DeleteFunc(slices.Clone(found), func(q bank.Question) bool { return !wish(q) }); len(best) > 0 {
-					found = best
-					break
-				}
-			}
-			if len(found) > 0 {
-				return found[r.IntN(len(found))]
+			switch n := stale(q); {
+			case level < 0 || n < level:
+				level, these = n, []bank.Question{q}
+			case n == level:
+				these = append(these, q)
 			}
 		}
+		if level >= 0 && (least < 0 || level < least) {
+			least, found = level, these
+		}
+		if least == 0 {
+			break // new to all, and no closer fit is
+		}
 	}
-	return nil
+	for _, wish := range prefer {
+		if best := slices.DeleteFunc(slices.Clone(found), func(q bank.Question) bool { return !wish(q) }); len(best) > 0 {
+			found = best
+			break
+		}
+	}
+	if len(found) == 0 {
+		return nil
+	}
+	return found[r.IntN(len(found))]
+}
+
+// marked is how stale a question is to a draw that only tells one kind from another (choose): 1 for one in ids, else 0.
+func marked(ids map[string]bool) func(bank.Question) int {
+	return func(q bank.Question) int { return b2i(ids[q.Base().ID]) }
+}
+
+// seenCount is how stale a question is to a draw for players (seen: seenAmong): by how many of them have answered it,
+// and then whether a past issue of theirs holds it.
+func seenCount(seen map[string]int) func(bank.Question) int {
+	return func(q bank.Question) int { return seen[q.Base().ID] }
 }
 
 // matches says whether q fits a slot: its difficulty, its type, and (if pictures) its picture.
@@ -411,20 +439,20 @@ func matches(q bank.Question, s slot, typ, pictures bool) bool {
 	return !pictures || s.picture == eitherWay || has == (s.picture == withPicture)
 }
 
-// Draw draws ten questions of a topic ("" for all topics, BulgariaTopic for Bulgaria's from every topic) for a player
-// of an ability there (mastery.go; 0 for one who knows as much as most), questions they haven't seen (seen) before
-// those they have, and never one barred (the day's: DayQuestions). Choices come with a picture or without, whichever
-// is drawn, and the number an estimate where one is left (wishes). Every run goes from easy to hard, its special
-// questions in places drawn within their difficulty (inBands). Topic runs and
-// duels draw this way (a room, DrawRoom). The questions due for review are among the barred (DayQuestions).
-func Draw(b *bank.Bank, category string, ability float64, seen, barred map[string]bool, r *rand.Rand) []Pick {
+// Draw draws ten questions of a topic ("" for all topics, BulgariaTopic for Bulgaria's from every topic) for players
+// of an ability there (mastery.go; 0 for one who knows as much as most): questions none of them has seen before those
+// one has, and so on, and of as many, those no past issue of theirs holds first (seen: seenAmong); never one barred
+// (the day's: DayQuestions). Choices come with a picture or without, whichever is drawn, and the number an estimate
+// where one is left (wishes). Every run goes from easy to hard, its special questions in places drawn within their
+// difficulty (inBands). Topic runs and duels draw this way (a room, DrawRoom). The questions due for review are among
+// the barred (DayQuestions).
+func Draw(b *bank.Bank, category string, ability float64, seen map[string]int, barred map[string]bool, r *rand.Rand) []Pick {
 	pool := topicPool(b, category)
 	taken := map[string]bool{}
 	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] && !barred[q.Base().ID] }
-	fresh := func(q bank.Question) bool { return !seen[q.Base().ID] }
 	var picks []Pick
 	for _, s := range inBands(newKind(topicSlots(ability), r), r) {
-		if q := choose(pool, s, allowed, fresh, wishes(s), r); q != nil {
+		if q := choose(pool, s, allowed, seenCount(seen), wishes(s), r); q != nil {
 			taken[q.Base().ID] = true
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
 		}

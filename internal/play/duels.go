@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log/slog"
 	mrand "math/rand/v2"
+	"slices"
 	"strings"
 	"time"
 
@@ -330,20 +331,22 @@ func (g *Game) EndLive(ctx context.Context) error {
 	return err
 }
 
-// past is what a draw needs from its players' history: the questions they've seen, and how well they know them (on
-// average over the players; in a topic, or all of them for ""). It's read before the write the draw goes into: it grows
-// with every game they've played, and the game's one writer (store.DB.Write) mustn't wait on it.
+// past is what a draw needs from its players' history: the questions they've seen (how many of them has each:
+// seenAmong), and how well they know them (on average over the players; in a topic, or all of them for ""). It's read
+// before the write the draw goes into: it grows with every game they've played, and the game's one writer
+// (store.DB.Write) mustn't wait on it.
 type past struct {
-	seen    map[string]bool
+	seen    map[string]int
 	ability float64
 }
 
 func (g *Game) pastOf(ctx context.Context, category string, users ...int64) (past, error) {
-	p := past{seen: map[string]bool{}}
+	seen, err := g.seenAmong(ctx, users)
+	if err != nil {
+		return past{}, err
+	}
+	p := past{seen: seen}
 	for _, id := range users {
-		if err := seenBy(ctx, g.DB.Read, id, p.seen); err != nil {
-			return p, err
-		}
 		a, err := g.ability(ctx, g.DB.Read, id, category)
 		if err != nil {
 			return p, err
@@ -382,6 +385,67 @@ func seenBy(ctx context.Context, db querier, userID int64, seen map[string]bool)
 		seen[id] = true
 	}
 	return rows.Err()
+}
+
+// SeenWeight is how much more stale (choose) a question one of a game's players has answered is than one a past issue
+// of theirs still holds: any number of the latter come before one of the former.
+const SeenWeight = 1000
+
+// seenAmong is how stale each question is to a game for players (choose: the least first, those missing none): of
+// those any of them has answered (in any game: the day, a past issue, a challenge, a room, Роял), SeenWeight for each
+// of them who has, so that no game deals anyone again what they've played while the bank has questions they haven't;
+// and of those of a past issue one of them may still play (past.go: not finished, on its day or since), one for each,
+// so that a game met before the issue doesn't take its questions from it while there are others.
+func (g *Game) seenAmong(ctx context.Context, players []int64) (map[string]int, error) {
+	stale := map[string]int{}
+	for _, id := range slices.Compact(slices.Sorted(slices.Values(players))) {
+		one := map[string]bool{}
+		if err := seenBy(ctx, g.DB.Read, id, one); err != nil {
+			return nil, err
+		}
+		for q := range one {
+			stale[q] += SeenWeight
+		}
+		held, err := g.heldFor(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		for q := range held {
+			if !one[q] {
+				stale[q]++
+			}
+		}
+	}
+	return stale, nil
+}
+
+// heldFor are the questions of the past issues a player may still play (StartPast): every day from FirstIssue to
+// yesterday whose ten they haven't finished, as the day or as its past issue.
+func (g *Game) heldFor(ctx context.Context, userID int64) (map[string]bool, error) {
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.questions FROM days d WHERE d.day >= ? AND d.day < ?
+		AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.user_id = ? AND r.day = d.day AND r.kind IN ('day', 'past')
+			AND r.finished_at IS NOT NULL)`, FirstIssue, g.Today(), userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	held := map[string]bool{}
+	for rows.Next() {
+		var raw string
+		var picks []Pick
+		if err := rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		if json.Unmarshal([]byte(raw), &picks) != nil {
+			continue
+		}
+		for _, p := range picks {
+			if !p.Void {
+				held[p.ID] = true
+			}
+		}
+	}
+	return held, rows.Err()
 }
 
 type recorded struct {
