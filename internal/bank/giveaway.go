@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode"
 )
 
 // Give-aways across the bank: games mix topics, so one question's words can answer another's. Four rules look for
@@ -16,6 +17,7 @@ import (
 type secret struct {
 	q       Question
 	value   float64
+	unit    string // what it counts (кг), for a number or an order
 	subject map[string]bool
 	what    string // how a report names it: the text, or the order's item
 }
@@ -24,6 +26,7 @@ type secret struct {
 type exposure struct {
 	q       Question
 	value   float64
+	unit    string // the word it shows with („28 килограма“: килограма), or the question's unit
 	context map[string]bool
 	where   string // where it shows: "fact", "text", "item „…“", "answer"
 }
@@ -50,19 +53,19 @@ func secretsOf(q Question) []secret {
 	text := q.Base().Text
 	switch q := q.(type) {
 	case *Number:
-		return []secret{{q, q.Answer, stemSet(text), "the answer"}}
+		return []secret{{q, q.Answer, q.Unit, stemSet(text), "the answer"}}
 	case *Choice:
 		if v, ok := numericAnswer(q.Answer); ok {
-			return []secret{{q, v, stemSet(text), "the answer"}}
+			return []secret{{q, v, "", stemSet(text), "the answer"}}
 		}
 	case *Clues:
 		if v, ok := numericAnswer(q.Answer); ok {
-			return []secret{{q, v, stemSet(append(q.Clues, text)...), "the answer"}}
+			return []secret{{q, v, "", stemSet(append(q.Clues, text)...), "the answer"}}
 		}
 	case *Order:
 		var out []secret
 		for _, it := range q.Items {
-			out = append(out, secret{q, it.Value, stemSet(it.Text), "„" + strings.Trim(it.Text, "„“") + "“"})
+			out = append(out, secret{q, it.Value, q.Unit, stemSet(it.Text), "„" + strings.Trim(it.Text, "„“") + "“"})
 		}
 		return out
 	}
@@ -75,7 +78,7 @@ func exposuresOf(q Question) []exposure {
 	// in: every number a line shows, with its sentence and the question's text around it.
 	in := func(line, where string) {
 		for _, n := range numbersIn(line) {
-			out = append(out, exposure{q, n.value, stemSet(sentenceAt(line, n.start), text), where})
+			out = append(out, exposure{q, n.value, unitAfter(line, n.end), stemSet(sentenceAt(line, n.start), text), where})
 		}
 	}
 	if tf, ok := q.(*TrueFalse); !ok || tf.Answer {
@@ -85,21 +88,21 @@ func exposuresOf(q Question) []exposure {
 	in(q.Extra().Day, "day's line")
 	switch q := q.(type) {
 	case *Number:
-		out = append(out, exposure{q, q.Answer, stemSet(text), "answer"})
+		out = append(out, exposure{q, q.Answer, q.Unit, stemSet(text), "answer"})
 	case *Choice:
 		if v, ok := numericAnswer(q.Answer); ok {
-			out = append(out, exposure{q, v, stemSet(text), "answer"})
+			out = append(out, exposure{q, v, "", stemSet(text), "answer"})
 		}
 	case *Clues:
 		for _, c := range q.Clues {
 			in(c, "clue")
 		}
 		if v, ok := numericAnswer(q.Answer); ok {
-			out = append(out, exposure{q, v, stemSet(append(q.Clues, text)...), "answer"})
+			out = append(out, exposure{q, v, "", stemSet(append(q.Clues, text)...), "answer"})
 		}
 	case *Order:
 		for _, it := range q.Items {
-			out = append(out, exposure{q, it.Value, stemSet(it.Text, text), "item „" + strings.Trim(it.Text, "„“") + "“"})
+			out = append(out, exposure{q, it.Value, q.Unit, stemSet(it.Text, text), "item „" + strings.Trim(it.Text, "„“") + "“"})
 		}
 	case *Match:
 		for _, p := range q.Pairs {
@@ -121,13 +124,20 @@ func exposuresOf(q Question) []exposure {
 // false ones grow (one shared first name).
 const GiveawayFrom = 8.0
 
+// PlainGiveawayFrom is GiveawayFrom for a small or round value (28, 2200: not distinctive), shown with its unit: such
+// a value comes up for many subjects, so the words around it must say more. Measured on the real bank (18 Nov 2026):
+// 49 pairs at GiveawayFrom; under 10 four in five were false (an ostrich's and a bison's 70 км/ч, two 2200 м), from 10
+// most were real (Бейл's 28 кг, the 32 teams of a World Cup, Сати's 840 times).
+const PlainGiveawayFrom = 10.0
+
+// ruleGiveaway: a value one question asks shows in another next to its subject. A distinctive value (a year, 8848)
+// says what it is by itself; a small or round one (28) only with its unit („28 килограма“ for an answer in кг), for
+// numbers like it come up everywhere.
 func ruleGiveaway(l *lintBank) []finding {
 	shows := map[float64][]exposure{}
 	for _, q := range l.live {
 		for _, e := range exposuresOf(q) {
-			if distinctive(e.value) {
-				shows[e.value] = append(shows[e.value], e)
-			}
+			shows[e.value] = append(shows[e.value], e)
 		}
 	}
 	type pair struct{ a, b string }
@@ -135,16 +145,17 @@ func ruleGiveaway(l *lintBank) []finding {
 	var out []finding
 	for _, q := range l.live {
 		for _, s := range secretsOf(q) {
-			if !distinctive(s.value) {
+			plain := !distinctive(s.value)
+			if plain && s.unit == "" {
 				continue
 			}
 			for _, e := range shows[s.value] {
-				if e.q == q {
+				if e.q == q || (plain && !sameUnit(s.unit, e.unit)) {
 					continue
 				}
 				shared, w := l.common(s.subject, e.context, kindStems)
 				k := pair{min(q.Base().ID, e.q.Base().ID), max(q.Base().ID, e.q.Base().ID)} // once a pair, whichever gives which away
-				if w < GiveawayFrom || done[k] {
+				if w < GiveawayFrom || (plain && w < PlainGiveawayFrom) || done[k] {
 					continue
 				}
 				done[k] = true
@@ -156,6 +167,48 @@ func ruleGiveaway(l *lintBank) []finding {
 		}
 	}
 	return out
+}
+
+// unitAfter is the word a number at end of s shows with („28 килограма“: „килограма“; „5,5 м“: „м“), or "".
+func unitAfter(s string, end int) string {
+	rest := strings.TrimLeft(s[end:], " \u00a0")
+	if i := strings.IndexFunc(rest, unicode.IsSpace); i >= 0 {
+		rest = rest[:i]
+	}
+	return strings.TrimRight(rest, ".,;:!?)“\"")
+}
+
+// unitWords are the words a unit is written in, each with the unit's short form: a number's unit is „кг“, a fact
+// says „килограма“.
+var unitWords = []struct{ prefix, unit string }{
+	{"килограм", "кг"}, {"километ", "км"}, {"сантимет", "см"}, {"милимет", "мм"}, {"метр", "м"}, {"метър", "м"},
+	{"минут", "мин"}, {"секунд", "сек"}, {"час", "ч"}, {"тон", "т"}, {"грам", "г"}, {"литр", "л"}, {"литър", "л"},
+	{"милилит", "мл"}, {"процент", "%"}, {"годин", "години"}, {"дни", "дни"}, {"ден", "дни"}, {"денонощ", "дни"},
+	{"градус", "°"},
+}
+
+// sameUnit is whether two units are one: the same short form („кг“, „килограма“), or two forms of one word („точки“,
+// „точка“; „пъти“, „път“: the first three letters).
+func sameUnit(a, b string) bool {
+	norm := func(u string) string {
+		u = strings.ToLower(u)
+		for _, w := range unitWords {
+			if strings.HasPrefix(u, w.prefix) {
+				return w.unit
+			}
+		}
+		return u
+	}
+	a, b = norm(a), norm(b)
+	if a == "" || b == "" {
+		return false
+	}
+	if a == b {
+		return true
+	}
+	ra, rb := []rune(a), []rune(b)
+	letters := func(r []rune) bool { return !slices.ContainsFunc(r, func(c rune) bool { return !unicode.IsLetter(c) }) }
+	return len(ra) >= 3 && len(rb) >= 3 && letters(ra) && letters(rb) && string(ra[:3]) == string(rb[:3])
 }
 
 // kindStems say what kind of value a question asks („През коя година излиза филмът…“, „Кога е роден…“), not whose:

@@ -315,16 +315,27 @@ func ruleDated(q Question) []string {
 	return out
 }
 
-// ruleOwnDate: a true-or-not for a day doesn't name its date. It is dealt on that date, under „На този ден“, so a
-// statement that something falls on it („3 юни е Световният ден на велосипеда.“) answers itself: it states something
-// about the day that the date doesn't give away (who declared it, what it marks). Nor does a choice for a day have
-// its date for the answer („На коя дата…?“ — „13 март“): the player knows what day it is.
+// ruleOwnDate: a true-or-not for a day names no date, and isn't about the day itself. It is dealt on its date, under
+// „На този ден“, so a statement that something falls on it („3 юни е Световният ден на велосипеда.“) answers itself,
+// and so does its mirror, one that puts it on another date („…празнува Коледа на 7 януари.“ on 25 December: the
+// player knows it isn't), or one about the day as such („…са родени в един и същи ден.“). It states something the date
+// doesn't give away (who declared it, what it marks). Nor does a choice for a day have its date for the answer („На
+// коя дата…?“ — „13 март“): the player knows what day it is.
 func ruleOwnDate(q Question) []string {
 	on := q.Extra().On
+	if len(on) == 0 {
+		return nil
+	}
 	switch q := q.(type) {
 	case *TrueFalse:
 		if _, named := namesDate(on, q.Text); named {
 			return []string{"a true-or-not for a day names its date: dealt on it, under „На този ден“, it answers itself"}
+		}
+		if m := anyDate.FindStringSubmatch(q.Text); m != nil {
+			return []string{fmt.Sprintf("a true-or-not for a day names a date (%s): dealt on its own, under „На този ден“, the player knows whether it's today", m[1])}
+		}
+		if m := sameDay.FindStringSubmatch(q.Text); m != nil {
+			return []string{fmt.Sprintf("a true-or-not for a day is about the day itself („%s“): dealt on it, under „На този ден“, it answers itself", m[1])}
 		}
 	case *Choice:
 		if _, named := namesDate(on, q.Answer); named {
@@ -333,6 +344,13 @@ func ruleOwnDate(q Question) []string {
 	}
 	return nil
 }
+
+// anyDate is a date as the bank writes one (7 януари, 1-ви май); sameDay a statement about a day as such („в един и
+// същи ден“, „на този ден“).
+var (
+	anyDate = regexp.MustCompile(`(?:^|[^\d])(\d{1,2}(?:-?\p{L}{1,2})? (?:` + strings.Join(monthNames, "|") + `))(?:[^\p{L}]|$)`)
+	sameDay = regexp.MustCompile(`(?i)((?:един и същи|същия|същият|този|днешния) ден)(?:[^\p{L}]|$)`)
+)
 
 // namesDate says the every-year days of on as a date writes them (16 декември), and whether s names one of them.
 func namesDate(on []string, s string) (dates []string, named bool) {

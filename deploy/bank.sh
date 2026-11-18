@@ -3,8 +3,9 @@
 #
 #   almanac-bank
 #
-# It checks the new commit in a copy of its own before the checkout in /srv/almanac-bank moves, so a bank with errors
-# never reaches it: it prints the errors, says which commit it left out, and stops (exit 1), the checkout and the game
+# It checks the new commit in a copy of its own before the checkout in /srv/almanac-bank moves (against that checkout,
+# the bank the game plays, and the days' questions: `almanac bank check -live -used`), so a bank with errors never
+# reaches it: it prints the errors, says which commit it left out, and stops (exit 1), the checkout and the game
 # as they were. A good bank prints its count (…: N questions (M live)) and its problems counted (…: 0 errors, W
 # warnings (by rule)); the checkout moves to it, and the game reloads it: the server plays a copy of its own
 # (cmd/almanac/banks.go), and while Роял is on it holds the new bank until the evening is over
@@ -27,16 +28,27 @@ git -C "$repo" fetch --quiet origin
 new=$(git -C "$repo" rev-parse '@{upstream}')
 title=$(git -C "$repo" log -1 --format='%h %s' "$new")
 
-# The new commit, checked where nothing plays it.
-stage=$(mktemp -d /var/tmp/almanac-bank.XXXXXX)
-trap 'rm -rf "$stage"' EXIT
+# The new commit, checked where nothing plays it, against the bank the game plays (-live: a national day left with no
+# question fails only if this commit took its last one), counting only the questions a day can still deal (-used: the
+# days' questions, read as the game's user, who owns the database; without them the whole bank counts).
+work=$(mktemp -d /var/tmp/almanac-bank.XXXXXX)
+trap 'rm -rf "$work"' EXIT
+stage=$work/bank
+mkdir "$stage"
 git -C "$repo" archive "$new" | tar -x -C "$stage"
-out=$(/usr/local/bin/almanac bank check "$stage" 2>&1) || {
+set -- -live "$repo"
+if systemd-run --quiet --pipe --wait -p User=almanac -p EnvironmentFile=/etc/almanac/env \
+	/usr/local/bin/almanac bank used >"$work/used" 2>/dev/null; then
+	set -- "$@" -used "$work/used"
+else
+	echo "warning: no days' questions (almanac bank used failed): the whole bank counts"
+fi
+out=$(/usr/local/bin/almanac bank check "$@" "$stage" 2>&1) || {
 	echo "$out" | grep -v ': warning: ' | tail -20
 	echo "not taken: $title has errors; the bank stays at $(git -C "$repo" log -1 --format='%h %s')"
 	exit 1
 }
-echo "$out" | grep -E ' questions \([0-9]+ live\)$| errors, [0-9]+ warnings'
+echo "$out" | grep -E ' questions \([0-9]+ live\)$| errors, [0-9]+ warnings|^warning: '
 
 if ! git -C "$repo" merge --ff-only --quiet "$new"; then
 	echo "not taken: the checkout in $repo has changes of its own (git -C $repo status)" >&2

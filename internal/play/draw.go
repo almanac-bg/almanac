@@ -163,6 +163,11 @@ func drawDay(b *bank.Bank, day string, used, answered map[string]bool, r *rand.R
 	// The questions of the day's date come first: their subjects are kept for them while the places are filled, so that
 	// whichever takes its place, no other question of the day names its subject.
 	dated := candidates(func(q bank.Question) bool { return q.Extra().OnDay(day) })
+	// One of this year's date only (Великден's, „2027-05-02“) before an every year's: passed over, it has lost this
+	// date for good, where an every year's comes back next year.
+	slices.SortStableFunc(dated, func(x, y bank.Question) int {
+		return b2i(!slices.Contains(x.Extra().On, day)) - b2i(!slices.Contains(y.Extra().On, day))
+	})
 	for _, q := range dated {
 		name(q, 1)
 	}

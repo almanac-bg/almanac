@@ -5,8 +5,9 @@ import "slices"
 // The national calendar: the days Bulgaria marks as a nation, each of which „На този ден“ must have a question about
 // Bulgaria for (bank.Tail.On with BG). They are the days a player here expects the game to know, and would share; one
 // left to an actress's birthday or a premiere on television reads as a game made elsewhere. `almanac bank check`
-// fails while one has none, and lists those with fewer than NationalWant. Moving feasts (Великден) aren't here: their
-// questions are dated by the year.
+// lists those with fewer than NationalWant a day can still deal, and fails while one has none (with -live, only when
+// the bank checked has none for a day the live bank has some for: a fix to another question is never held up by a
+// national day already empty). Moving feasts (Великден) aren't here: their questions are dated by the year.
 
 // NationalDay is a day of the national calendar: its date (MM-DD) and what it marks.
 type NationalDay struct {
@@ -37,25 +38,30 @@ var NationalDays = []NationalDay{
 // day never deals a question twice.
 const NationalWant = 2
 
-// NationalCount is a national day with how many live questions about Bulgaria belong to it.
+// NationalCount is a national day with how many live questions about Bulgaria a day of its date can still deal.
 type NationalCount struct {
 	NationalDay
 	N int
 }
 
-// National counts the live questions about Bulgaria (Tail.BG) of each national day, every year's or a year's.
-func (b *Bank) National() []NationalCount {
+// National counts, for each national day, the live questions about Bulgaria (Tail.BG) a day of its date can still
+// deal: every year's or a year's still ahead (on or after today, YYYY-MM-DD), and none the days have had (used: the
+// ids `almanac bank used` prints; nil counts them all), for a day never deals a question twice. A day already drawn
+// for the date has its question: what's left here is for the years after.
+func (b *Bank) National(used map[string]bool, today string) []NationalCount {
 	out := make([]NationalCount, len(NationalDays))
 	for i, d := range NationalDays {
 		out[i].NationalDay = d
 	}
 	for _, q := range b.Live("", "") {
 		t := q.Extra()
-		if !t.BG {
+		if !t.BG || used[q.Base().ID] {
 			continue
 		}
 		for i, d := range NationalDays {
-			if slices.ContainsFunc(t.On, func(on string) bool { return on[len(on)-min(len(on), 5):] == d.On }) {
+			if slices.ContainsFunc(t.On, func(on string) bool {
+				return on[len(on)-min(len(on), 5):] == d.On && (len(on) != 10 || on >= today)
+			}) {
 				out[i].N++
 			}
 		}

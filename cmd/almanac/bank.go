@@ -109,15 +109,18 @@ func defaultBankDir() string {
 
 // bankCheck checks everything the server checks before it plays a bank, the owner's rule that the categories are
 // about the same size (bank.SizeSlack), and that every national day (bank.NationalDays) has a question about Bulgaria
-// for „На този ден“; -sample lets the small public sample pass the last two. It prints every error, and counts the
-// warnings by rule (bank lint lists them); it reports the mix and the sources; the day's runway: how long each place
-// of a day has questions for, where the next batch writes first (with -used, the questions the days have had are
-// taken off: `almanac bank used`), and the dates' („На този ден“); and the subjects that come back. Its last line
-// counts the problems.
+// a day can still deal for „На този ден“; -sample lets the small public sample pass the last two. With -live (the bank
+// this one replaces: almanac-bank passes the checkout the game plays), a national day with none fails only if the live
+// bank has one for it, so an urgent fix isn't held up by a day already empty; that one is warned of. It prints every
+// error, and counts the warnings by rule (bank lint lists them); it reports the mix and the sources; the day's runway:
+// how long each place of a day has questions for, where the next batch writes first (with -used, the questions the
+// days have had are taken off: `almanac bank used`), and the dates' („На този ден“); and the subjects that come back.
+// Its last line counts the problems.
 func bankCheck(args []string) error {
 	fs := flag.NewFlagSet("bank check", flag.ContinueOnError)
 	sample := fs.Bool("sample", false, "the public sample: pass it though its categories aren't the same size and it lacks the national days")
 	from := fs.String("used", "", "a file of the question ids the days have had (almanac bank used)")
+	liveDir := fs.String("live", "", "the bank this one replaces: a national day left with none fails only if it has one there")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -146,8 +149,18 @@ func bankCheck(args []string) error {
 	}
 	fmt.Println(summary(b))
 	fmt.Println(runway(b, used, today()))
-	national, missing := nationalDays(b)
+	var live *bank.Bank
+	if *liveDir != "" {
+		if live, _ = bank.Load(*liveDir); live == nil {
+			fmt.Printf("warning: the live bank in %s doesn't load: no national day is held against it\n", *liveDir)
+		}
+	}
+	national, missing, empty := nationalDays(b, live, *liveDir != "", used, today())
 	fmt.Println(national)
+	if len(empty) > 0 {
+		fmt.Printf("warning: national days with no question about Bulgaria left, as in the live bank: %s (write for them)\n",
+			strings.Join(empty, ", "))
+	}
 	fmt.Println(subjects(b, SubjectsShown))
 	fmt.Println(tally)
 	if *sample {
@@ -158,32 +171,43 @@ func bankCheck(args []string) error {
 			dir, 100*bank.SizeSlack, mean, countList(off))
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("%s: no question about Bulgaria for the national days %s: date one („on“, with „bg“), or write one",
+		return fmt.Errorf("%s: no question about Bulgaria left for the national days %s: date one („on“, with „bg“), or write one",
 			dir, strings.Join(missing, ", "))
 	}
 	return nil
 }
 
-// nationalDays says how many questions about Bulgaria each national day has (bank.National), listing those with fewer
-// than bank.NationalWant, and which have none (those fail `bank check`).
-func nationalDays(b *bank.Bank) (report string, missing []string) {
+// nationalDays says how many questions about Bulgaria a day can still deal each national day has (bank.National),
+// listing those with fewer than bank.NationalWant, and which have none: those fail `bank check` (missing), but with
+// against (-live: the bank this one replaces), only those that have some there; the rest are only warned of (empty).
+// A live bank that didn't load (nil, with against) holds none against it.
+func nationalDays(b, live *bank.Bank, against bool, used play.Used, today string) (report string, missing, empty []string) {
 	var few []string
-	days := b.National()
-	for _, d := range days {
+	days := b.National(used.IDs, today)
+	var before []bank.NationalCount
+	if live != nil {
+		before = live.National(used.IDs, today)
+	}
+	for i, d := range days {
 		switch {
 		case d.N == 0:
-			missing = append(missing, d.On)
+			if !against || (before != nil && before[i].N > 0) {
+				missing = append(missing, d.On)
+			} else {
+				empty = append(empty, d.On)
+			}
 			few = append(few, fmt.Sprintf("%s %s: none", d.On, d.What))
 		case d.N < bank.NationalWant:
 			few = append(few, fmt.Sprintf("%s %s: %d", d.On, d.What, d.N))
 		}
 	}
 	var s strings.Builder
-	fmt.Fprintf(&s, "national days („На този ден“ about Bulgaria): %d of %d with %d or more questions", len(days)-len(few), len(days), bank.NationalWant)
+	fmt.Fprintf(&s, "national days („На този ден“ about Bulgaria, that a day can still deal): %d of %d with %d or more questions",
+		len(days)-len(few), len(days), bank.NationalWant)
 	for _, f := range few {
 		fmt.Fprintf(&s, "\n  %s", f)
 	}
-	return s.String(), missing
+	return s.String(), missing, empty
 }
 
 func countList(cs []bank.CategoryCount) string {

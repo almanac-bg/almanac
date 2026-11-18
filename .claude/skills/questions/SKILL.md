@@ -43,15 +43,17 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
     - all of it holds and the bank with it in loads with no errors, or nothing is written. It reports how many
       questions it added, changed and retired, and the warnings left on them. `-check` only checks; `-checked-by`
       marks the new and changed questions checked today by that process (where the batch doesn't say otherwise);
-  - `go run ./cmd/almanac bank check [-used file] private` checks everything the server checks before it plays a
+  - `go run ./cmd/almanac bank check [-used file] [-live dir] private` checks everything the server checks before it plays a
     bank: the format and **every rule below that code can judge**. It prints every error, then the balance report:
     the difficulty and kind mix, facts, dates and sources (how many have them, and the rest by kind), each
     category's kinds against their share, **the day's runway** — how many days from today each place of a day has
     questions for, and the day it runs out on — and **the dates' supply** („На този ден“: the dates of the year
     ahead with fewer than two questions no day has had), and **the national days** (`bank.NationalDays`: each with
-    how many questions about Bulgaria belong to it). It **fails** on an error, while a category is more than 2% off
-    the mean size (`bank.SizeSlack`), and while a national day has no question about Bulgaria (`-sample` lets the
-    small public sample pass these two), and **warns** of every place under 150 days (`play.RunwayWarn`: the 90 days
+    how many questions about Bulgaria a day can still deal: none a day has had, with `-used`). It **fails** on an
+    error, while a category is more than 2% off the mean size (`bank.SizeSlack`), and while a national day has no
+    question about Bulgaria left (`-sample` lets the small public sample pass these two; with `-live`, the bank the
+    game plays, as `almanac-bank` runs it, only a national day this bank emptied fails, one empty there too is warned
+    of, so an urgent fix is never held up by it), and **warns** of every place under 150 days (`play.RunwayWarn`: the 90 days
     drawn ahead and 60 to write) and of every thin date. Then **the subjects that come back** (listed, never failed): the answers and names
     more than 15 live questions name, by category (`*` over 1% of one); the top 20, all of them with
     `go run ./cmd/almanac bank subjects private`. Its last line counts the errors and the warnings by rule;
@@ -116,9 +118,9 @@ enough to be worth a look, not always.
 | `long-answer` (hint) | The answer isn't half again as long as every wrong option and 10 letters longer |
 | `answer-word` | No clue, and no question text, shares a word with the answer that no wrong option has („Кой е този водопад?“ — „Ниагарският водопад“; „френски лекари“ — „Лекари без граници“) |
 | `dated` | A question for a day (`on`) has its day's line (`day`), ending in a period, and the line names the date („На 3 март 1878 г. …“; a moving feast's names the feast). One whose text names its date may go without it |
-| `own-date` | A true-or-not for a day doesn't name its date, nor has a choice for a day its date for the answer: dealt on it under „На този ден“, „3 юни е Световният ден на велосипеда.“ answers itself |
+| `own-date` | A true-or-not for a day names no date and isn't about the day itself, nor has a choice for a day its date for the answer: dealt on it under „На този ден“, „3 юни е Световният ден на велосипеда.“ answers itself, and so do its mirror („…празнува Коледа на 7 януари.“ on 25 December) and „…са родени в един и същи ден.“ |
 | `decoy` | A match has a decoy |
-| `giveaway` | No question shows a value another asks (a number's answer, a year a choice asks, an order's values) next to the same subject: in its text, options, items, clues, fact, day's line or reveal. Judged by the value and the rare words around it |
+| `giveaway` | No question shows a value another asks (a number's answer, a year a choice asks, an order's values) next to the same subject: in its text, options, items, clues, fact, day's line or reveal. Judged by the value and the rare words around it; a small or round value (28) only with its unit („28 килограма“ for an answer in кг) |
 | `answer-giveaway` (hint) | No question shows a choice's or clues' answer as true (text, clue, fact, day's line, item, pair) in a line that, with its question's text, shares rare words with the asking question's subject („Ариел“ in „бащата на русалката Ариел в анимацията на „Дисни““) |
 | `pair-giveaway` (hint) | No question shows both sides of a medium or hard match's pair within four words („Кучето Лайка“ for Лайка — Куче) |
 | `shared-items` | Two orders share no two items with the same values, nor three items in the same order (one's reveal orders the other); two matches share no pair |
@@ -293,9 +295,10 @@ shows with the answer, over the fact: the player learns why the day. (The owner'
   does ask about its date („Коя държава празнува националния си ден на 1 юли?“) may go without a day's line, and
   should unless the line tells more than the text („На 1 юли 1867 г. е създадена Канадската конфедерация.“ does; „На
   14 март е Денят на числото π.“ after „Кое число празнуват математиците на 14 март?“ only takes a phone's screen).
-- **A true-or-not never names its date** (the `own-date` rule): dealt on it, „3 юни е Световният ден на
-  велосипеда.“ is true by construction. State something about the day that the date doesn't give away: who declared
-  it, what it marks, how it's kept.
+- **A true-or-not never names a date** (the `own-date` rule): dealt on it, „3 юни е Световният ден на
+  велосипеда.“ is true by construction, and „…празнува Коледа на 7 януари.“ on 25 December false by it; „…са родени
+  в един и същи ден.“ on that day answers itself too. State something about the day that the date doesn't give away:
+  who declared it, what it marks, how it's kept.
 - **The fact says something new,** not the date again: the day's line has said it. „Чапман умира на 16 декември.“
   is a wasted fact.
 - Bulgarian events before 1916: the New Style date Bulgaria marks today.

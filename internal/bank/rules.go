@@ -71,7 +71,7 @@ var Rules = []Rule{
 	{Name: "long-answer", Says: "the answer isn't much longer than every wrong option", Hint: true, one: ruleLongAnswer},
 	{Name: "answer-word", Says: "no clue, and no question text, shares a word with the answer that the wrong options don't", one: ruleAnswerWord},
 	{Name: "dated", Says: "a question for a day (on) has its day's line (day), ending in a period and naming the date, unless its text names it", one: ruleDated},
-	{Name: "own-date", Says: "a true-or-not for a day doesn't name its date, nor has a choice for a day its date for the answer: dealt on it, it would answer itself", one: ruleOwnDate},
+	{Name: "own-date", Says: "a true-or-not for a day names no date and isn't about the day itself, nor has a choice for a day its date for the answer: dealt on it, it would answer itself", one: ruleOwnDate},
 	{Name: "decoy", Says: "a match has a decoy", one: ruleDecoy},
 	{Name: "giveaway", Says: "no question shows a value another asks (a year, a number, an order's value) next to the same subject", all: ruleGiveaway},
 	{Name: "answer-giveaway", Says: "no question shows a choice's answer as true next to that question's subject", Hint: true, all: ruleAnswerGiveaway},
