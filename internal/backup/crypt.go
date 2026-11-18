@@ -3,9 +3,12 @@ package backup
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"filippo.io/age"
@@ -20,6 +23,17 @@ var ageMagic = []byte("age-encryption.org/v1\n")
 
 // ErrEncrypted is the error for a copy that's encrypted, brought back without a key that opens it.
 var ErrEncrypted = errors.New("the copy is encrypted: open it with the key kept off the server (-identity)")
+
+// ErrUnencrypted is the error for a copy that isn't encrypted, brought back without asking for one. Anyone with the
+// bucket's key can put a copy there, so only one made unencrypted on purpose is taken unencrypted: a copy from before
+// the copies were encrypted, or from a server without BACKUP_RECIPIENT, named and asked for (-unencrypted).
+var ErrUnencrypted = errors.New("the copy isn't encrypted: if it's one you meant, name it and ask for it (-unencrypted)")
+
+// Opening is how a copy is opened: with the keys that open encrypted copies, and whether an unencrypted one is taken.
+type Opening struct {
+	IDs         []age.Identity
+	Unencrypted bool
+}
 
 // Recipients reads the recipients in s (BACKUP_RECIPIENT): one or more age public keys, separated by spaces, commas
 // or new lines. They must be of one kind (all post-quantum, as backup keys makes them, or all X25519): age won't mix
@@ -99,19 +113,39 @@ func hasX25519(rs []age.Recipient) bool {
 	return false
 }
 
-// opened is what r holds, decrypted if it's an age file (with ids; ErrEncrypted without), as it is if not.
-func opened(r io.Reader, ids []age.Identity) (io.Reader, bool, error) {
+// opened is what r holds, decrypted if it's an age file (with open's keys; ErrEncrypted without), as it is if not and
+// open takes an unencrypted copy (ErrUnencrypted if not).
+func opened(r io.Reader, open Opening) (io.Reader, bool, error) {
 	br := bufio.NewReaderSize(r, 64<<10)
 	head, _ := br.Peek(len(ageMagic))
 	if !bytes.Equal(head, ageMagic) {
+		if !open.Unencrypted {
+			return nil, false, ErrUnencrypted
+		}
 		return br, false, nil
 	}
-	if len(ids) == 0 {
+	if len(open.IDs) == 0 {
 		return nil, true, ErrEncrypted
 	}
-	d, err := age.Decrypt(br, ids...)
+	d, err := age.Decrypt(br, open.IDs...)
 	if err != nil {
 		return nil, true, fmt.Errorf("decrypting: %w", err)
 	}
 	return d, true, nil
+}
+
+// Fingerprint names a set of recipients without spelling them out: the first 16 hex digits of the SHA-256 of their
+// keys, sorted. The same keys, however BACKUP_RECIPIENT lists them, have the same fingerprint.
+func Fingerprint(rs []age.Recipient) string {
+	keys := make([]string, 0, len(rs))
+	for _, r := range rs {
+		if s, ok := r.(fmt.Stringer); ok {
+			keys = append(keys, s.String())
+		} else {
+			keys = append(keys, fmt.Sprintf("%T %v", r, r))
+		}
+	}
+	slices.Sort(keys)
+	sum := sha256.Sum256([]byte(strings.Join(keys, "\n")))
+	return hex.EncodeToString(sum[:8])
 }

@@ -45,10 +45,15 @@ import (
 //	                    APNS_TEAM_ID; without them, none there
 //	FCM_CREDENTIALS_FILE notifications to the app on Android: the Firebase service account's key (.json); without
 //	                    it, none there
-//	BACKUP_ENDPOINT     S3-compatible storage for hourly copies of the database (R2), with BACKUP_BUCKET,
-//	                    BACKUP_ACCESS_KEY, BACKUP_SECRET_KEY, and BACKUP_HEARTBEAT (a monitor's URL, fetched after each)
+//	BACKUP_ENDPOINT     S3-compatible storage for copies of the database every quarter of an hour (R2), with
+//	                    BACKUP_BUCKET, BACKUP_ACCESS_KEY, BACKUP_SECRET_KEY, and BACKUP_HEARTBEAT (a monitor's URL,
+//	                    fetched after each)
 //	BACKUP_RECIPIENT    the age public key the copies are encrypted to (`almanac backup keys`); without it they go
 //	                    unencrypted, and that's a problem told daily
+//
+// Outside development, a setting the game can run without but shouldn't (ALERT_*, BACKUP_ENDPOINT, BACKUP_HEARTBEAT)
+// is a problem told as it starts (missing: unconfigured), or an error in the log when it's the alerts themselves.
+//
 //	OPERATOR_NAME       who runs the game, for the privacy page
 //	CONTACT_EMAIL       where players write about their data (privacy@almanac.bg)
 //	ROYAL_EVERY         development only: a Роял every this long (2m), its lobby open ROYAL_LOBBY (1m) before; else
@@ -97,6 +102,7 @@ func serve([]string) error {
 		RoomsFile:       filepath.Join(filepath.Dir(dbPath()), "rooms.json"),
 		LimitsFile:      filepath.Join(filepath.Dir(dbPath()), "limits.json"),
 		RunningFile:     filepath.Join(filepath.Dir(dbPath()), "running.json"),
+		DBPath:          dbPath(),
 		Dev:             dev,
 		Version:         version,
 	}
@@ -200,6 +206,13 @@ func serve([]string) error {
 		srv.RefuseBank(commit, refused)
 		srv.Problem("bank: BANK_DIR has errors, so the server started on the last good copy")
 	}
+	outbox.Problem = srv.Problem // a dead mail server is told, not only logged
+	if !dev {
+		for _, p := range unconfigured(cfg.Alerts, backups != nil, os.Getenv("BACKUP_HEARTBEAT") != "") {
+			slog.Error("settings", "problem", p)
+			srv.Problem("settings: " + p)
+		}
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -219,6 +232,11 @@ func serve([]string) error {
 		if !dev {
 			if err := store.PruneCopies(dbPath()); err != nil {
 				slog.Error("clean-up: the database's copies", "err", err)
+			}
+			if low, room := store.DiskLow(dbPath()); low {
+				slog.Error("disk: running out of room", "room", room)
+				srv.Problem(fmt.Sprintf("disk: under %.0f%% or 3× the database free: a release with migrations, the backups, "+
+					"then every write will fail; free some (df -h; the log says how much: journalctl -u almanac | grep disk)", store.LowFree*100))
 			}
 		}
 	})
@@ -240,8 +258,6 @@ func serve([]string) error {
 	}
 	if backups != nil {
 		go safe.Loop(ctx, "backups", func(ctx context.Context) { runBackups(ctx, srv) })
-	} else if !dev {
-		slog.Warn("no backups configured (BACKUP_ENDPOINT)")
 	}
 
 	err = srv.Run(ctx, 30*time.Second)
@@ -279,6 +295,22 @@ func reloadOnHangup(ctx context.Context, hup <-chan os.Signal, banks keptBanks, 
 			banks.prune(srv.Banks())
 		}
 	}
+}
+
+// unconfigured says which settings the game runs without but shouldn't: no alerts (nothing it finds wrong is told to
+// anyone; this very problem can only be logged), no backups, or no heartbeat (nothing outside the server hears when
+// the copies stop, or the server with them).
+func unconfigured(alerts server.Alerts, backups, heartbeat bool) []string {
+	var out []string
+	if alerts == (server.Alerts{}) {
+		out = append(out, "no ALERT_EMAIL or ALERT_SLACK: what goes wrong is told to no one")
+	}
+	if !backups {
+		out = append(out, "no BACKUP_ENDPOINT: the database is copied nowhere (README: Резервни копия)")
+	} else if !heartbeat {
+		out = append(out, "no BACKUP_HEARTBEAT: nothing outside the server hears when the copies stop (README: Наблюдение)")
+	}
+	return out
 }
 
 // logErrors logs a bank's errors (its warnings are bank lint's to list).

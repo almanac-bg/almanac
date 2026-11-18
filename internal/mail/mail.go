@@ -13,6 +13,10 @@
 // that the game doesn't keep mailing an address that bounces and lose its good name with the mail providers. A 5xx
 // to anything else (signing in to the mail server, the sender) is the game's own trouble, the same for every message:
 // those are tried again, as a 4xx is.
+//
+// What goes wrong with the mail as a whole is told (Outbox.Problem), not only logged: a message given up after every
+// retry, sign-in codes dropped unsent, several sends in a row failed (Failing, which /api/health shows too, since the
+// mail that tells of problems goes the same way).
 package mail
 
 import (
@@ -36,6 +40,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/store"
@@ -61,9 +66,29 @@ type Outbox struct {
 	Sender Sender
 	From   string // "АЛМАНАХ <no-reply@almanac.bg>"
 	wake   chan struct{}
+	// Problem, if set, is told what goes wrong with the mail as a whole (a kind of problem, without addresses): a
+	// message given up, sign-in codes dropped unsent, failingSends in a row failed. A dead login to the mail server
+	// stops every sign-in on a new device, and the log alone would keep that quiet.
+	Problem func(kind string)
 	// sending is held while a message is picked and sent: the worker (Run) and a Flush (at a shutdown) never send the
 	// same message at once.
 	sending sync.Mutex
+	failing atomic.Int32 // sends failed in a row (not refused for their address)
+}
+
+// failingSends is how many sends in a row may fail before it's told: one address's server may be slow, every
+// message's failing is the game's.
+const failingSends = 3
+
+// Failing says whether the last failingSends sends or more all failed: the mail server isn't taking the game's mail
+// (/api/health says so, for a monitor outside: the mail that would tell of it goes the same way).
+func (o *Outbox) Failing() bool { return o.failing.Load() >= failingSends }
+
+// tell tells a problem, if anyone listens.
+func (o *Outbox) tell(kind string) {
+	if o.Problem != nil {
+		o.Problem(kind)
+	}
 }
 
 func NewOutbox(db *store.DB, sender Sender, from string) *Outbox {
@@ -192,6 +217,7 @@ func (o *Outbox) Flush(ctx context.Context) {
 	if res, err := o.DB.Write.ExecContext(ctx, `DELETE FROM outbox WHERE expires_at <= ?`, store.Now()); err == nil {
 		if n, _ := res.RowsAffected(); n > 0 {
 			slog.Warn("mail dropped: its time was out before it could go", "n", n)
+			o.tell("mail: sign-in codes dropped unsent, their time out: is the mail server taking mail? (journalctl: mail)")
 		}
 	}
 	_, _ = o.DB.Write.ExecContext(ctx, `DELETE FROM mail_suppressed WHERE until <= ?`,
@@ -245,6 +271,14 @@ func (o *Outbox) sendDue(ctx context.Context) bool {
 	var refused *Refused
 	switch {
 	case err == nil:
+		o.failing.Store(0)
+	case !errors.As(err, &refused) || !refused.Address:
+		if o.failing.Add(1) == failingSends {
+			o.tell(fmt.Sprintf("mail: %d sends in a row failed: the mail server, or the game's login to it? (journalctl: mail failed)", failingSends))
+		}
+	}
+	switch {
+	case err == nil:
 		_, err = o.DB.Write.Exec(`DELETE FROM outbox WHERE id = ?`, id)
 	case errors.As(err, &refused):
 		slog.Warn("mail refused, not sent again", "to", m.To, "subject", m.Subject, "err", err, "address", refused.Address)
@@ -256,6 +290,7 @@ func (o *Outbox) sendDue(ctx context.Context) bool {
 		_, err = o.DB.Write.Exec(`DELETE FROM outbox WHERE id = ?`, id)
 	case attempts >= len(retries):
 		slog.Error("mail given up", "to", m.To, "subject", m.Subject, "err", err)
+		o.tell("mail: a message was given up after every retry (journalctl: mail given up)")
 		_, err = o.DB.Write.Exec(`DELETE FROM outbox WHERE id = ?`, id)
 	default:
 		slog.Warn("mail failed, will retry", "to", m.To, "in", retries[attempts], "err", err)

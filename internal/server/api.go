@@ -11,6 +11,7 @@ import (
 	"mime"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
@@ -18,6 +19,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/room"
 	"github.com/almanac-bg/almanac/internal/royal"
+	"github.com/almanac-bg/almanac/internal/store"
 )
 
 // apiError is an error a player can be shown: a code for the client, and the words for the player.
@@ -237,11 +239,65 @@ func (s *Server) clearSession(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{Name: s.cookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.secure, SameSite: http.SameSiteLaxMode})
 }
 
+// health says whether the game is up, for the monitors that poll it (README: Наблюдение) and for a deploy: its
+// version, its bank, whether the database reads and takes writes; and, when its disk runs low or its mail isn't going
+// out, so ("disk": "low", "mail": "failing": the mail that would tell of those may not get out). A server that can't
+// write answers 503, so that a monitor that only looks at the status hears of it: one that reads still plays nothing
+// (every answer is a write). The write is probed at most every probeEvery (a row in kv, through the one writer), and
+// a failed one is a problem told.
 func (s *Server) health(w http.ResponseWriter, r *http.Request) error {
 	if err := s.db.Read.PingContext(r.Context()); err != nil {
 		return err
 	}
-	return ok(w, map[string]any{"ok": true, "version": s.cfg.Version, "bank": s.BankStatus()})
+	writes, low := s.probeWrites(r.Context())
+	out := map[string]any{"ok": writes, "version": s.cfg.Version, "bank": s.BankStatus(), "writes": writes}
+	if low {
+		out["disk"] = "low"
+	}
+	if s.outbox != nil && s.outbox.Failing() {
+		out["mail"] = "failing"
+	}
+	if !writes {
+		writeJSON(w, http.StatusServiceUnavailable, out)
+		return nil
+	}
+	return ok(w, out)
+}
+
+// probeEvery is how long a write probe's answer holds: monitors poll every minute or so, and each probe is a write.
+const probeEvery = 30 * time.Second
+
+// probe is what the last write probe found (health).
+type probe struct {
+	mu     sync.Mutex
+	at     time.Time
+	writes bool
+	low    bool
+}
+
+// probeWrites writes a row, if the last probe is older than probeEvery, and says whether the database took it, and
+// whether its disk is low (store.DiskLow).
+func (s *Server) probeWrites(ctx context.Context) (writes, low bool) {
+	p := &s.probe
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	now := time.Now()
+	if now.Sub(p.at) < probeEvery {
+		return p.writes, p.low
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second) // a probe, once begun, is finished
+	defer cancel()
+	_, err := s.db.Write.ExecContext(ctx, `INSERT INTO kv (key, value) VALUES ('health', ?)
+		ON CONFLICT (key) DO UPDATE SET value = excluded.value`, strconv.FormatInt(now.UnixMilli(), 10))
+	p.at, p.writes = now, err == nil
+	if err != nil {
+		slog.Error("health: the database took no write", "err", err)
+		s.problems.add("health: the database takes no writes (a full disk? journalctl: health)")
+	}
+	if s.cfg.DBPath != "" {
+		p.low, _ = store.DiskLow(s.cfg.DBPath)
+	}
+	return p.writes, p.low
 }
 
 func (s *Server) me(w http.ResponseWriter, r *http.Request) error {
