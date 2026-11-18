@@ -13,7 +13,7 @@ import { getReady, playRun, shownHere, starting, startScreen } from "../game/run
 import type { State } from "../game/types.ts";
 import { api, errorText } from "../lib/api.ts";
 import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
-import { byTap, entry, goBack, hold, mark, title } from "../lib/router.ts";
+import { backOut, byTap, entry, hold, mark, title } from "../lib/router.ts";
 import { bulgaria, type Category, categories, player, user } from "../state.ts";
 import { meter, questions, stakeLine, toneOf, topicMark } from "../ui.ts";
 import { sendChallenge } from "./challenge.ts";
@@ -292,15 +292,18 @@ interface Run {
 }
 
 /** Plays a run (a topic's, a second chance). Opened by a tap, it starts after a short count, which the player can cut
- * short or back out of (back where they came from); come to otherwise (a reload, back or forward, a link from outside),
+ * short or back out of (back where they came from, or to its start come from outside); come to otherwise (a reload, back or forward, a link from outside),
  * nothing starts by itself: the screen says what it is, or where it was left, with „Започни“ or „Продължи“. A game
  * finished here shows its result again; one whose question this tab was showing goes straight back to it, its time
  * running (as one opened by a tap does). */
 export function run(r: Run): Child {
   const screen = slot(() => h("p", { class: "muted" }, "…"));
+  // What „Откажи“ on the count comes back to in a game opened from outside (its own entry held over Начало): the
+  // screen's start, in place (router.ts, backOut).
+  let startHere = async () => {};
   const ready = () => {
     hold();
-    screen.show(() => getReady(r.name, start, () => goBack("/")));
+    screen.show(() => getReady(r.name, start, () => backOut("/", () => void startHere())));
   };
   // Another from a result starts at once: the player is ready.
   const again = () => {
@@ -351,14 +354,17 @@ export function run(r: Run): Child {
       if (life.aborted) return;
       if (closed) return screen.show(() => closed);
     }
+    startHere = async () => {
+      const marks = left ? (await api<State>("GET", `/api/runs/${left.id}`).catch(() => null))?.trail : undefined;
+      if (life.aborted) return;
+      screen.show(() =>
+        startScreen(r.name, r.lead, left ? { at: left.at, total: left.total, marks } : null, () =>
+          left?.open ? start() : ready(),
+        ),
+      );
+    };
     if (tap) return ready();
-    const marks = left ? (await api<State>("GET", `/api/runs/${left.id}`).catch(() => null))?.trail : undefined;
-    if (life.aborted) return;
-    screen.show(() =>
-      startScreen(r.name, r.lead, left ? { at: left.at, total: left.total, marks } : null, () =>
-        left?.open ? start() : ready(),
-      ),
-    );
+    await startHere();
   })();
   return h("div", null, screen);
 }

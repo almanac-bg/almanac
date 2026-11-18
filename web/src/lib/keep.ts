@@ -25,3 +25,47 @@ export function keptWords(before: Who | null | undefined, after: Who): string {
   if (before && !before.email) return `Влезе като ${after.name}. Играта оттук е добавена към профила ти.`;
   return `Влезе като ${after.name}.`;
 }
+
+/** What a device keeps of the day's reminder's asks in Начало's „Утре“ card (screens/today.ts, remindAsk): asked by
+ * notification or, where none can come, by mail (which asks a guest for the email that keeps the game too). */
+export interface RemindAsks {
+  /** How many were said no to: three end the asking (a yes counts as three). */
+  n: number;
+  /** The day of the last answer: never asked twice in a day. */
+  day: string;
+  /** The day each way of asking last showed, counted once a day each (play/measure.go: „pushask:shown“,
+   * „mailask:shown“): a refused notification's ask turned into the mail's is two asks shown. */
+  shown: { push?: string; mail?: string };
+  /** The day the ask by mail was told „Не сега“: it was the ask for the email, so the line to keep the game with one
+   * (screens/keep.ts, keepLine) keeps quiet that day too. */
+  mailNo?: string;
+}
+
+/** The asks as kept (`text`; anything unreadable: none yet). */
+export function remindAsks(text: string | null): RemindAsks {
+  let kept: Partial<RemindAsks> & { shown?: unknown } = {};
+  try {
+    kept = JSON.parse(text ?? "{}") ?? {};
+  } catch {
+    // none, then
+  }
+  // Kept before each way counted apart: one day for whichever showed.
+  const shown = typeof kept.shown === "string" ? { push: kept.shown, mail: kept.shown } : kept.shown;
+  return {
+    n: typeof kept.n === "number" ? kept.n : 0,
+    day: typeof kept.day === "string" ? kept.day : "",
+    shown: shown && typeof shown === "object" ? (shown as RemindAsks["shown"]) : {},
+    mailNo: typeof kept.mailNo === "string" ? kept.mailNo : undefined,
+  };
+}
+
+/** The asks once `by`'s has shown on `day`: null if it was counted already that day. */
+export function remindShown(a: RemindAsks, by: "push" | "mail", day: string): RemindAsks | null {
+  return a.shown[by] === day ? null : { ...a, shown: { ...a.shown, [by]: day } };
+}
+
+/** The asks once `by`'s is answered on `day`: a yes ends them; a no counts, and by mail it covers the ask to keep the
+ * game that day. */
+export function remindAnswered(a: RemindAsks, by: "push" | "mail", day: string, yes: boolean): RemindAsks {
+  return { ...a, n: yes ? 3 : a.n + 1, day, mailNo: !yes && by === "mail" ? day : a.mailNo };
+}

@@ -51,6 +51,51 @@ test("a first day asks for the reminder only, not yet to keep the game; „Не 
   await expect(page.locator(".tomorrow")).not.toContainText("Да ти пишем");
 });
 
+test("„Не сега“ to the reminder by mail is one to the email: the line to keep the game waits for another day", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.goto("/");
+  await daysPlayed(page, 1);
+  await page.reload();
+  await startDay(page);
+  await playRun(page);
+  const tomorrow = page.locator(".tomorrow");
+  await expect(tomorrow).toContainText("Да ти пишем, ако въпросите още те чакат?");
+  await tomorrow.getByRole("button", { name: "Не сега" }).click();
+  await expect(tomorrow).not.toContainText("Да ти пишем");
+  await expect(tomorrow.getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator(".tomorrow")).toBeVisible();
+  await expect(page.locator(".tomorrow").getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
+});
+
+test("the reminder by mail turned on from Настройки says the game is kept, and its switch is on", async ({
+  page,
+}, info) => {
+  test.setTimeout(60_000);
+  const email = `settings-remind-${info.project.name}-${Date.now()}@example.com`;
+  await page.goto("/");
+  await page.evaluate(() => fetch("/api/guest", { method: "POST", body: "{}" }));
+  // The reminder turned on a moment after the email is in: what Настройки asks of the mail meanwhile is older.
+  await page.route("**/api/mail/prefs", async (r) => {
+    if (r.request().method() === "PATCH") await new Promise((done) => setTimeout(done, 800));
+    await r.continue();
+  });
+  await page.goto("/settings");
+  const mail = page.locator("section:has(> h2:text-is('Известия'))");
+  await mail.getByRole("button", { name: "Напомняй ми по имейл" }).click();
+  await mail.getByLabel("Имейл").fill(email);
+  await mail.getByRole("button", { name: "Напомняй ми по имейл" }).click();
+  await expect.poll(() => mailedCode(email)).not.toBe("");
+  await mail.getByLabel("Код").fill(mailedCode(email));
+  await mail.getByRole("button", { name: "Потвърди" }).click();
+  await expect(mail.getByRole("status")).toHaveText(
+    `Готово. Играта ти е запазена с имейла ${email}. Влизай с него от всяко устройство. Ще ти напомняме по имейл, ако въпросите още те чакат.`,
+  );
+  await expect(mail.getByRole("switch", { name: "Напомняне по имейл" })).toHaveAttribute("aria-checked", "true");
+});
+
 test.describe("in Messenger's own browser", () => {
   test.use({
     userAgent:

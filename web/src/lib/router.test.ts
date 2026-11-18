@@ -69,11 +69,27 @@ const root = {
   querySelector: () => heading,
 };
 
+/** Where the page was scrolled to, each time. */
+const scrolls: number[] = [];
+/** The screen's size changing (what loads drawn), while the page is being put back where it was. */
+let resized: (() => void) | null = null;
+
 Object.assign(globalThis, {
   location,
   history,
   scrollY: 0,
-  scrollTo() {},
+  scrollTo(_x: number, y: number) {
+    scrolls.push(y);
+  },
+  ResizeObserver: class {
+    constructor(fn: () => void) {
+      resized = fn;
+    }
+    observe() {}
+    disconnect() {
+      resized = null;
+    }
+  },
   addEventListener(type: string, fn: (e: unknown) => void) {
     windowListeners.set(type, [...(windowListeners.get(type) ?? []), fn]);
   },
@@ -338,4 +354,52 @@ test("a screen that sends the player on as it's drawn: the page it sends to show
   assert.equal(location.pathname, "/friends");
   assert.deepEqual(drawn, ["gone", "Приятели"]);
   assert.equal(showing, "Приятели", "not the screen that sent the player on, empty");
+});
+
+test("a page put back where it was stops being held there once another screen opens, or the player clicks", async () => {
+  const back = async () => {
+    router.go("/settings");
+    Object.assign(globalThis, { scrollY: 500 }); // scrolled down, and on to another page
+    router.go("/friends");
+    Object.assign(globalThis, { scrollY: 0 });
+    history.back();
+    await tick();
+    assert.equal(location.pathname, "/settings");
+    assert.ok(resized, "held where it was while what it loads comes");
+    scrolls.length = 0;
+    resized?.();
+    assert.deepEqual(scrolls, [500]);
+  };
+  await back();
+  // A click on a link to another screen: that screen opens at its top, and stays there as its content comes.
+  router.go("/friends");
+  assert.equal(resized, null, "the page before isn't held any more");
+  assert.deepEqual(scrolls, [500, 0]);
+  // A click anywhere (a mouse's, a finger's) ends the wait too.
+  await back();
+  for (const fn of windowListeners.get("pointerdown") ?? []) fn({});
+  assert.equal(resized, null);
+});
+
+test("„Откажи“ on a game's count: back where it was come from; opened from outside, its start again in place", async () => {
+  const from = location.pathname;
+  router.go("/play/history");
+  router.hold(); // come to by a tap: nothing held
+  let stayed = 0;
+  router.backOut("/", () => stayed++);
+  await tick();
+  assert.equal(location.pathname, from, "back where the tap was");
+  assert.equal(stayed, 0);
+  fromOutside("/play/science");
+  const at = index;
+  router.hold();
+  assert.equal(router.entry().game, true);
+  drawn.length = 0;
+  router.backOut("/", () => stayed++);
+  await tick();
+  assert.equal(stayed, 1, "its start shown again");
+  assert.equal(index, at);
+  assert.equal(location.pathname, "/play/science", "not Начало");
+  assert.equal(router.entry().game, undefined);
+  assert.deepEqual(drawn, [], "nothing drawn over it");
 });

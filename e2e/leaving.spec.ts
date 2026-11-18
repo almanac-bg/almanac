@@ -77,6 +77,25 @@ test("a topic counts in only after a tap; a reload goes back to its question, an
   await expect(page.locator(".summary .score-n")).toHaveText(score);
 });
 
+test("„Откажи“ on the count of a topic opened from outside comes back to its start, not to Начало", async ({
+  page,
+}) => {
+  await page.goto("/play/history");
+  const begin = page.getByRole("button", { name: "Започни", exact: true });
+  for (const out of ["click", "Escape"]) {
+    await begin.click();
+    await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
+    if (out === "click") await page.getByRole("button", { name: "Откажи" }).click();
+    else await page.keyboard.press("Escape");
+    await expect(begin).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
+    await expect(page).toHaveURL(/\/play\/history$/);
+    // The game's own entry given back: the tab's first page again, back from which leaves.
+    await expect.poll(() => page.evaluate(() => history.state?.game)).toBeUndefined();
+    expect(await page.evaluate(() => history.state?.from)).toBeUndefined();
+  }
+});
+
 test("a topic left half-way says so on its tile; another tab waits for „Продължи“", async ({ page, context }) => {
   test.setTimeout(60_000);
   await openGame(page, "/play/history");
@@ -117,10 +136,14 @@ test("the ways back pop the history; back comes to a page and its board where th
   await page.getByRole("link", { name: "Профил" }).first().click();
   await expect(page).toHaveURL(/\/me$/);
   await expect(page.getByRole("link", { name: "Настройки" })).toBeVisible(); // Профил loads on its own (kit.ts)
+  // What Профил loads after it opens, in: scrolled before, the page would move as it comes (the browser keeps what's
+  // in view), and be kept where it moved to.
+  await expect(page.locator(".me-level")).toBeVisible();
+  await expect(page.getByText("Още няма изиграни игри.")).toBeVisible();
   await page.evaluate(() => scrollTo(0, 200));
+  await page.waitForTimeout(400); // kept once it stops
   const y = await page.evaluate(() => scrollY);
   expect(y).toBeGreaterThan(0);
-  await page.waitForTimeout(400); // kept once it stops
   await page.goBack();
   await expect(page).toHaveURL(/\/ranks#knowledge$/);
   await expect(knowledge).toHaveAttribute("aria-selected", "true");
