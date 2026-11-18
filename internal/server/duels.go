@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -76,6 +77,7 @@ func (s *Server) liveEvents(w http.ResponseWriter, r *http.Request) {
 			fail("busy")
 			return nil, false
 		}
+		p.Net = s.netMark(r) // two from one network play a friendly (play/fair.go)
 		// ?rematch=<duel>: a new duel with the other of that one (both ask: live.Hub.Rematch); else whoever comes.
 		var seek *live.Seek
 		if again, _ := strconv.ParseInt(r.URL.Query().Get("rematch"), 10, 64); again > 0 {
@@ -295,7 +297,7 @@ func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 		m.Title = fmt.Sprintf("%s %s", word, n.From)
 		m.Body = ratingWords(n.Delta)
 		if n.Friendly {
-			m.Body = "Дуел без рейтинг: днес вече сте играли."
+			m.Body = cmp.Or(unratedWords[n.Unrated], unratedWords["again"])
 		}
 	default:
 		return

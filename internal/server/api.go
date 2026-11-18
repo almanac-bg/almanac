@@ -60,6 +60,7 @@ var playerErrors = map[error]*apiError{
 	play.ErrChallengeOver:  {http.StatusGone, "challenge_over", "Времето за това предизвикателство изтече."},
 	play.ErrChallengeGone:  {http.StatusGone, "challenge_over", "Въпрос от това предизвикателство се оказа грешен, затова то вече не може да се играе."},
 	play.ErrOwnChallenge:   {http.StatusConflict, "own_challenge", "Това е твоето предизвикателство. Прати го на някого."},
+	play.ErrChallengeHeld:  {http.StatusConflict, "challenge_held", "Това предизвикателство е първо за приятеля, на когото е пратено. Опитай пак, щом го изиграе."},
 	play.ErrNoChallengeRun: {http.StatusBadRequest, "no_challenge_run", "Предизвикателство става само от завършена игра от десет въпроса."},
 	play.ErrManyWaiting:    {http.StatusConflict, "many_challenges", "Три твои предизвикателства вече чакат този приятел. Изчакай да изиграе някое."},
 	play.ErrNobody:         {http.StatusConflict, "nobody", "Точно сега няма с кого да играеш. Опитай след малко."},

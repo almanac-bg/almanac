@@ -22,16 +22,20 @@ import (
 // it's sent to). Or a friend is challenged at once (ChallengeFriend): ten drawn fresh for the two, questions neither
 // has seen first, sent to the friend as soon as the player has played them (sent); the challenge is drawn for that
 // pair (challenges.for_id). A friend it's sent to has their game of it made then, not started (a_run none), and is told
-// once the sender has played: they play it or say no (Decline); after, it can still go to anyone by its link. Sent
-// again to a friend whose turn ran out or who said no, it's theirs to play again. At most MaxWaiting of a sender's
-// challenges wait unstarted on one friend, and a push tells of one only when none of theirs waits already.
+// once the sender has played: they play it or say no (Decline). Until they've done one or the other (or their time
+// ran out), it's held for them: nobody else can take it, by its link or sent to them (ErrChallengeHeld), since one
+// who took it first, the friend in another window among them, would know every answer of the rated duel (review
+// 2026-11-18, S18). After, it can go to anyone by its link. Sent again to a friend whose turn ran out or who said no,
+// it's theirs to play again, and held for them again. At most MaxWaiting of a sender's challenges wait unstarted on
+// one friend, and a push tells of one only when none of theirs waits already.
 //
 // A taker who is the sender's friend plays a duel between the two (b_id is the sender): it counts in the record
 // between them, and its result is told to both. Only a challenge drawn for the pair moves ratings, played by the
-// friend it was drawn for, while they're still friends, the first rated duel of a day between them (ratedToday):
-// anything else could be chosen to win, a sender's best game sent, or taken knowing the score to beat, or on questions
-// the taker has answered before. Anyone else's moves no rating, and the sender hears of those quietly: one line on
-// Начало for all of them since they last heard (ChallengeNewsOf), and a push at most once a day.
+// friend it was drawn for, while they're still friends, the first rated duel of a day between them (ratedToday), if
+// nobody else took it before them (known), and as any duel by the rating's other rules (settleDuel): anything else
+// could be chosen to win, a sender's best game sent, or taken knowing the score to beat, or on questions the taker has
+// answered before. Anyone else's moves no rating, and the sender hears of those quietly: one line on Начало for all of
+// them since they last heard (ChallengeNewsOf), and a push at most once a day.
 //
 // Between two players one of whom has blocked the other (blocks.go), a challenge isn't there: neither can see or take
 // the other's, and those taken before the block are left out of what its sender hears.
@@ -60,7 +64,17 @@ var (
 	// ErrChallengeGone is a challenge with a question that has left the game since as untrue (bank.Tail.Untrue), or
 	// left the bank: it can't be played as it was.
 	ErrChallengeGone = errors.New("a question of the challenge left the game")
+	// ErrChallengeHeld is a challenge drawn for a pair, taken by anyone but the friend it was drawn for while their
+	// game of it is still to play.
+	ErrChallengeHeld = errors.New("the challenge waits for the friend it was drawn for")
 )
+
+// heldFrom is a SQL condition that a challenge (its id) is held from a player (their id): drawn for a pair, and the
+// friend it was drawn for, not that player, still has their game of it to play.
+func heldFrom(challenge, player string) string {
+	return `EXISTS (SELECT 1 FROM challenges hc JOIN duels hd ON hd.challenge_id = hc.id AND hd.a_id = hc.for_id
+		WHERE hc.id = ` + challenge + ` AND hc.for_id <> ` + player + ` AND hd.ended_at IS NULL)`
+}
 
 // Challenge sends one of the player's finished games of ten: its link, made the first time and the same after, and to
 // the friends in `to` (anyone else in it is left out), who are told. Its time to be taken starts again, for the
@@ -130,9 +144,9 @@ func (g *Game) challengeFor(tx *sql.Tx, userID, runID, forID int64) (int64, stri
 type sentTo struct{ duel, friend int64 }
 
 // sendTo sends a challenge (of the sender's game, run) to those of `to` who are the sender's friends with fewer than
-// MaxWaiting of the sender's challenges waiting unstarted: each one's game of it is made, not started, as long as the
-// challenge lasts; or, theirs already and over unplayed (their time ran out, or they said no), open again. Those it
-// reached.
+// MaxWaiting of the sender's challenges waiting unstarted, and from whom it isn't held (heldFrom): each one's game of
+// it is made, not started, as long as the challenge lasts; or, theirs already and over unplayed (their time ran out,
+// or they said no), open again. Those it reached.
 func (g *Game) sendTo(tx *sql.Tx, challengeID, sender, run int64, to []int64) ([]sentTo, error) {
 	var made []sentTo
 	now := store.Ms(g.Now())
@@ -140,7 +154,7 @@ func (g *Game) sendTo(tx *sql.Tx, challengeID, sender, run int64, to []int64) ([
 		var ok bool
 		if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ?1 AND friend_id = ?2)
 				AND (SELECT count(*) FROM duels WHERE a_id = ?2 AND b_id = ?1 AND kind = 'challenge' AND a_run IS NULL
-					AND ended_at IS NULL AND challenge_id <> ?3) < ?4`,
+					AND ended_at IS NULL AND challenge_id <> ?3) < ?4 AND NOT `+heldFrom("?3", "?2"),
 			sender, friend, challengeID, MaxWaiting).Scan(&ok); err != nil {
 			return nil, err
 		}
@@ -245,7 +259,7 @@ func (g *Game) ChallengeFriend(ctx context.Context, userID, friendID int64) (Sta
 		if err != nil {
 			return err
 		}
-		r, err := g.insertRun(tx, userID, "duel", nil, nil, picks)
+		r, err := g.insertRun(ctx, tx, userID, "duel", nil, nil, picks)
 		if err != nil {
 			return err
 		}
@@ -285,6 +299,9 @@ type ChallengeView struct {
 	Expires int64     `json:"expiresAt"`
 	Over    bool      `json:"over,omitempty"`
 	Own     bool      `json:"own,omitempty"`
+	// Held is a challenge the viewer can't take yet: drawn for a pair, and the friend it was drawn for hasn't played
+	// it (ErrChallengeHeld).
+	Held bool `json:"held,omitempty"`
 	// Duel is the viewer's game of it: one they took, or one sent to them.
 	Duel   int64   `json:"duel,omitempty"`
 	Takers []Taker `json:"takers,omitempty"`
@@ -342,6 +359,12 @@ func (g *Game) ChallengeOf(ctx context.Context, code string, viewer int64) (Chal
 			return v, err
 		}
 	}
+	// One who has a game of it already plays it on (one taken before it was held: sent again to the friend).
+	if !v.Own && v.Duel == 0 {
+		if err := g.DB.Read.QueryRowContext(ctx, `SELECT `+heldFrom("?1", "?2"), v.id, viewer).Scan(&v.Held); err != nil {
+			return v, err
+		}
+	}
 	if v.Own {
 		v.Run = v.runID
 		if v.Takers, err = g.takers(ctx, v.id); err != nil {
@@ -393,7 +416,8 @@ func (g *Game) takers(ctx context.Context, challengeID int64) ([]Taker, error) {
 
 // TakeChallenge is the viewer's game of a challenge: made the first time (a duel of theirs against the challenge's
 // game, between the two if they're friends; or, sent to them, theirs started), the same after. One over already (said
-// no to, not played in time, played) has its duel's id and no state.
+// no to, not played in time, played) has its duel's id and no state. ErrChallengeHeld while it's held for the friend
+// it was drawn for.
 func (g *Game) TakeChallenge(ctx context.Context, viewer int64, code string) (State, int64, error) {
 	v, err := g.ChallengeOf(ctx, code, viewer)
 	if err != nil {
@@ -402,6 +426,8 @@ func (g *Game) TakeChallenge(ctx context.Context, viewer int64, code string) (St
 	switch {
 	case v.Own:
 		return State{}, 0, ErrOwnChallenge
+	case v.Held:
+		return State{}, 0, ErrChallengeHeld
 	case v.Duel == 0 && v.Over:
 		return State{}, 0, ErrChallengeOver
 	}
@@ -443,7 +469,7 @@ func (g *Game) TakeChallenge(ctx context.Context, viewer int64, code string) (St
 				return ErrChallengeGone
 			}
 		}
-		r, err := g.insertRun(tx, viewer, "duel", nil, nil, picks)
+		r, err := g.insertRun(ctx, tx, viewer, "duel", nil, nil, picks)
 		if err != nil {
 			return err
 		}

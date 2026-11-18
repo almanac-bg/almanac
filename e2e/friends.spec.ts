@@ -54,6 +54,13 @@ test("friends: an invite link, then a challenge between the two", async ({ brows
   await expect(a.locator(".duel-meant")).toHaveCount(0);
   // The gold way on is to tell Bo: the challenge's link (it brings him to his turn).
   await expect(a.getByRole("button", { name: /^Прати на \S/ })).toHaveClass(/primary/);
+  // Until Bo has played it, its link is his alone: anyone else who opens it is told to wait, so that nobody learns
+  // the answers of a rated duel first (not even Bo in another window).
+  const sent = (await (await a.request.get("/api/duels")).json()).duels as { challenge?: string }[];
+  const other = await (await browser.newContext()).newPage();
+  await other.goto(`/c/${sent[0]?.challenge}`);
+  await expect(other.getByRole("heading", { name: "Още не е твой ред" })).toBeVisible();
+  await other.context().close();
   await b.goto("/");
   const notice = b.locator(".challenge-notice");
   await expect(notice).toContainText("те предизвика");

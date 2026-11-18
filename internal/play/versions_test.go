@@ -67,7 +67,7 @@ func (w *world) runOf(user int64, kind string, ids ...string) int64 {
 	}
 	var id int64
 	err := w.db.Tx(w.t.Context(), func(tx *sql.Tx) error {
-		r, err := w.g.insertRun(tx, user, kind, nil, nil, picks)
+		r, err := w.g.insertRun(w.t.Context(), tx, user, kind, nil, nil, picks)
 		if err != nil {
 			return err
 		}

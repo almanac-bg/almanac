@@ -59,8 +59,9 @@ export interface DuelView {
   friend?: number;
   you?: Side;
   recorded?: boolean;
-  /** Didn't move ratings: the two had a rated duel that day already. */
+  /** Didn't move ratings; `unrated` says why (play.DuelView). */
   friendly?: boolean;
+  unrated?: "again" | "recordings" | "network" | "newcomers" | "known";
   delta?: number;
   runId?: number;
   createdAt: number;

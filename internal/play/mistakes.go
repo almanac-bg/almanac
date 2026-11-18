@@ -139,7 +139,7 @@ func (g *Game) StartMistakes(ctx context.Context, userID int64) (State, error) {
 		for i, id := range ids {
 			picks[i] = Pick{ID: id, Seed: newSeed()}
 		}
-		r, err := g.insertRun(tx, userID, "mistakes", nil, nil, picks)
+		r, err := g.insertRun(ctx, tx, userID, "mistakes", nil, nil, picks)
 		if err != nil {
 			return err
 		}

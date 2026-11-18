@@ -14,7 +14,9 @@
 // goes through the database, so a refresh, a second tab or a restart of the server changes nothing. A run left
 // half-way goes on where it stopped: the day's when the player comes back to it that day (a run of the day's
 // questions ends with its day, DayGrace after: dayOver), a topic's when they start the same topic again that day
-// (StartTopic). A game played quicker than a person plays counts for its player alone (fair.go).
+// (StartTopic). A game played quicker than a person plays counts for its player alone, and so does the day of a
+// throwaway guest who played it before a player on the same network; a game keeps that network for a week, and two
+// players of one network move no rating between them (fair.go).
 //
 // A run played live (a live duel's, a Роял's) moves on its game's clock alone (driver): the game shows each question
 // and takes each answer (ShowLive and AnswerLive, ShowRoyal and AnswerRoyal: graded through the deal it shows), and

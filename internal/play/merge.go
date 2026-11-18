@@ -25,8 +25,10 @@ var mergeSteps = []mergeStep{
 	// ever an account's. A day's run the guest played while the account was there already comes as a shadow
 	// (ShadowGuest, fair.go): the player's own, for their streak and their numbers, never on the others' boards nor in
 	// their league, so that the day played as several guests, and signed in from the best of them, races nobody.
-	{sql: `UPDATE runs SET shadow = ` + strconv.Itoa(ShadowGuest) + ` WHERE user_id = ?2 AND kind = 'day' AND NOT shadow
-		AND started_at >= (SELECT created_at FROM users WHERE id = ?1)`},
+	// (A throwaway guest's day, ShadowThrowaway, is one too: brought to the account, it would be let out of the shadow
+	// as a guest's who came back.)
+	{sql: `UPDATE runs SET shadow = ` + strconv.Itoa(ShadowGuest) + ` WHERE user_id = ?2 AND kind = 'day'
+		AND shadow IN (0, ` + strconv.Itoa(ShadowThrowaway) + `) AND started_at >= (SELECT created_at FROM users WHERE id = ?1)`},
 	{carries: []string{"runs.user_id"}, sql: `UPDATE runs SET user_id = ?1 WHERE user_id = ?2
 		AND NOT (kind = 'day' AND day IN (SELECT day FROM runs WHERE user_id = ?1 AND kind = 'day'))`},
 	// The guest's friends become the account's (the two aren't friends with themselves), as many as the account has
@@ -62,15 +64,17 @@ var mergeSteps = []mergeStep{
 		AND coalesce((SELECT user_id FROM challenges WHERE id = duels.challenge_id), 0) <> ?1`},
 	{sql: `UPDATE duels SET b_id = ?1 WHERE b_id = ?2 AND coalesce(a_id, 0) <> ?1`},
 	{sql: `DELETE FROM duels WHERE a_id = ?2 OR b_id = ?2`},
-	// The rating: the guest's, with its games and peak, if it's the better one of rated games; the higher league (the
-	// account's never goes down: a guest's league is the same player's, of their weeks played as the guest).
-	{carries: []string{"users.rating", "users.rated"}, sql: `UPDATE users SET rating = g.rating, rated = g.rated
-		FROM (SELECT rating, rated FROM users WHERE id = ?2) g
-		WHERE users.id = ?1 AND g.rated > 0 AND (users.rated = 0 OR g.rating > users.rating)`},
-	{carries: []string{"users.peak", "users.peak_seen", "users.league"},
-		sql: `UPDATE users SET peak = max(users.peak, g.peak), peak_seen = max(users.peak_seen, g.peak_seen),
-		league = max(users.league, g.league) FROM (SELECT peak, peak_seen, league FROM users WHERE id = ?2) g
-		WHERE users.id = ?1`},
+	// The rating: the guest's, with its games and peak, only if the account has none of its own (no rated duel yet).
+	// Never the higher of the two: a guest is free to make, so a rating pumped up on throwaway guests would otherwise
+	// become any account's by signing in from the guest (review 2026-11-18, S20). And the higher league (the account's
+	// never goes down: a guest's league is the same player's, of their weeks played as the guest).
+	{carries: []string{"users.rating", "users.rated", "users.peak", "users.peak_seen"},
+		sql: `UPDATE users SET rating = g.rating, rated = g.rated, peak = max(users.peak, g.peak),
+		peak_seen = max(users.peak_seen, g.peak_seen)
+		FROM (SELECT rating, rated, peak, peak_seen FROM users WHERE id = ?2) g
+		WHERE users.id = ?1 AND g.rated > 0 AND users.rated = 0`},
+	{carries: []string{"users.league"}, sql: `UPDATE users SET league = max(users.league, g.league)
+		FROM (SELECT league FROM users WHERE id = ?2) g WHERE users.id = ?1`},
 	// The weeks of the leagues, and the evenings of Роял, the guest played (a week or an evening both played in
 	// stays the account's); and the guest's group of a week the account isn't in one, if it's of the account's league.
 	{carries: []string{"league_results.user_id"}, sql: `UPDATE OR IGNORE league_results SET user_id = ?1 WHERE user_id = ?2`},

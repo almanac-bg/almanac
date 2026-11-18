@@ -297,6 +297,15 @@ function line(d: DuelView): string {
   return `Реши се на ${ordinal(d.decided)}я въпрос.`;
 }
 
+/** Why a duel moved no rating (play.DuelView.Unrated); a notification says the same (server/notify.go). */
+const unratedWords: Record<NonNullable<DuelView["unrated"]>, string> = {
+  again: "Дуел без рейтинг: днес вече сте играли.",
+  recordings: "Срещу запис рейтингът се променя до пет пъти на ден: този дуел е без рейтинг.",
+  network: "Дуел без рейтинг: играете от една и съща мрежа.",
+  newcomers: "Дуел без рейтинг: с нови играчи рейтингът се променя до пет пъти на ден.",
+  known: "Дуел без рейтинг: някой друг вече беше изиграл това предизвикателство.",
+};
+
 /** What the duel meant: where the rating went (from and to, its division and how far to the next), or why it didn't
  * move; and the record against this person. */
 function meant(d: DuelView): Child {
@@ -304,11 +313,7 @@ function meant(d: DuelView): Child {
   const span = r?.next ? r.next.from - r.division.from : 0;
   const share = (n: number) => (span && r ? Math.round((100 * (n - r.division.from)) / span) : 100);
   const delta = r ? r.after - r.before : 0;
-  const why = d.friendly
-    ? d.recorded
-      ? "Срещу запис рейтингът се променя до пет пъти на ден: този дуел е без рейтинг."
-      : "Дуел без рейтинг: днес вече сте играли."
-    : "";
+  const why = d.friendly ? unratedWords[d.unrated ?? (d.recorded ? "recordings" : "again")] : "";
   const rec = d.record;
   const them = d.opponent?.name ?? "";
   return h(

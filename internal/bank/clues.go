@@ -23,10 +23,13 @@ const (
 	// ClueCount is how many clues a question has.
 	ClueCount = 3
 	// ClueEvery is the time between clues: the first shows with the question, the next ClueEvery later, and so on.
+	//
+	// The moment a clue is out is one for both what's shown and what's paid (Steps): a right answer that comes after
+	// a clue was sent is worth that clue's, however soon after. A second's slack for the answer's trip, once allowed,
+	// let a script read the next clue the moment it came and still be paid the clue before it (review 2026-11-18,
+	// S27). A person loses at most the round trip (a tenth or two of a second) on an answer given as the clue was on
+	// its way: the server can't tell it from an answer given with the clue on the screen.
 	ClueEvery = 10 * time.Second
-	// clueSlack is how late an answer may arrive and still count as given before the next clue showed: the trip
-	// from the player's screen (the next clue takes as long to get there).
-	clueSlack = time.Second
 	clueMax   = 110 // a clue: three of them, one under another, on a phone
 )
 
@@ -116,10 +119,7 @@ func (d *dealtClues) ViewAt(since time.Duration) any {
 	for i, b := range d.order {
 		shown[i] = options[b]
 	}
-	out := 1
-	for out < len(d.q.Clues) && since >= time.Duration(out)*ClueEvery {
-		out++
-	}
+	out := d.outBy(since)
 	steps := make([]int64, len(d.q.Clues))
 	for i, s := range d.Steps() {
 		steps[i] = s.Milliseconds()
@@ -152,15 +152,21 @@ func (d *dealtClues) GradeAt(answer json.RawMessage, took time.Duration) (Graded
 	bank := d.order[*a.Pick]
 	g := Graded{Right: bank == 0, Given: mustJSON(ChoiceAnswer{Pick: bank}), Shown: mustJSON(ChoiceAnswer{Pick: *a.Pick})}
 	if g.Right {
-		g.Score = ClueWorth[d.cluesBy(took)-1]
+		g.Score = ClueWorth[min(d.outBy(took), ClueCount)-1]
 	}
 	return g, nil
 }
 
-// cluesBy is how many clues were out when an answer that took took was given (allowing for its trip).
-func (d *dealtClues) cluesBy(took time.Duration) int {
-	n := 1 + int(max(0, took-clueSlack)/ClueEvery)
-	return min(n, len(d.q.Clues), ClueCount)
+// outBy is how many clues are out after since (the first always): those whose step has come. What's shown (ViewAt)
+// and what an answer is worth (GradeAt) both count by it, so they never disagree (ClueEvery).
+func (d *dealtClues) outBy(since time.Duration) int {
+	out := 0
+	for _, s := range d.Steps() {
+		if since >= s {
+			out++
+		}
+	}
+	return max(1, out)
 }
 
 func (d *dealtClues) Reveal(c *Crowd) any {

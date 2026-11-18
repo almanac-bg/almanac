@@ -56,10 +56,11 @@ type DuelNews struct {
 	// Outcome is the one told's: won, lost or draw (with a result).
 	Outcome string
 	Delta   int
-	// Friendly is a result that didn't move ratings (not the first duel of the day between the two, or past the day's
-	// rated duels against recordings).
+	// Friendly is a result that didn't move ratings (Unrated says why).
 	Friendly bool
-	DuelID   int64
+	// Unrated is why a friendly moved no rating (duels.unrated): again, recordings, network, newcomers, known.
+	Unrated string
+	DuelID  int64
 	// Seen is a result the one told has on screen already: they just finished the run that settled the duel.
 	Seen bool
 	// Code is, with Kind "challenge", the challenge a taker played (its link shows the one who sent it who took it).
@@ -79,8 +80,11 @@ type DuelView struct {
 	Friend   int64     `json:"friend,omitempty"`
 	You      *DuelSide `json:"you,omitempty"`
 	Recorded bool      `json:"recorded,omitempty"`
-	// Friendly is a duel that didn't move ratings.
-	Friendly bool `json:"friendly,omitempty"`
+	// Friendly is a duel that didn't move ratings; Unrated says why: again (the two had a rated duel today), recordings
+	// (past the day's rated duels against recordings), network (the two play from one network), newcomers (past the
+	// day's rated duels against new players), known (someone else had played the pair's challenge first).
+	Friendly bool   `json:"friendly,omitempty"`
+	Unrated  string `json:"unrated,omitempty"`
 	// Delta is what the duel did to the player's rating.
 	Delta     int   `json:"delta,omitempty"`
 	RunID     int64 `json:"runId,omitempty"` // the player's run in it, to play or go over
@@ -179,7 +183,7 @@ func (g *Game) StartLive(ctx context.Context, a, b int64) (Live, error) {
 			return err
 		}
 		for i, id := range l.Users {
-			r, err := g.insertRun(tx, id, "duel", nil, nil, l.Picks)
+			r, err := g.insertRun(ctx, tx, id, "duel", nil, nil, l.Picks)
 			if err != nil {
 				return err
 			}
@@ -222,7 +226,7 @@ func (g *Game) StartRecorded(ctx context.Context, userID int64) (Live, error) {
 		if l.Recording, err = recording(tx, rec.id, len(rec.picks)); err != nil {
 			return err
 		}
-		r, err := g.insertRun(tx, userID, "duel", nil, nil, l.Picks)
+		r, err := g.insertRun(ctx, tx, userID, "duel", nil, nil, l.Picks)
 		if err != nil {
 			return err
 		}
@@ -545,13 +549,58 @@ func (g *Game) ratedToday(tx *sql.Tx, a, b int64) (bool, error) {
 	return n > 0, err
 }
 
+const (
+	// NewcomerGames and NewcomerFor make a player new to rated duels (Newcomer): fewer rated duels than the rating
+	// board asks for (MinRatedGames: until then the rating is still finding its level), or an account younger than
+	// three days (a guest is free to make; one kept three days and played ten rated duels has cost its maker more than
+	// a win against it is worth).
+	NewcomerGames = MinRatedGames
+	NewcomerFor   = 3 * 24 * time.Hour
+	// NewcomersRatedPerDay is how many duels against new players move an established player's rating in a day, each
+	// half as far: past it, they're friendlies. Against fresh guests, one a duel, a rating could otherwise be farmed
+	// (review 2026-11-18, S20); five is the same day's measure as against recordings, and more than most play.
+	NewcomersRatedPerDay = 5
+)
+
+// Newcomer says whether a player is new to rated duels: fewer than NewcomerGames of them, or an account younger than
+// NewcomerFor (created: its creation, in ms).
+func (g *Game) Newcomer(rated int, created int64) bool {
+	return rated < NewcomerGames || created > store.Ms(g.Now().Add(-NewcomerFor))
+}
+
+// newcomersRatedToday is how many rated duels an established player has had today (in Bulgaria) against new players.
+func (g *Game) newcomersRatedToday(tx *sql.Tx, userID int64) (int, error) {
+	now := g.Now().In(Bulgaria)
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, Bulgaria)
+	var n int
+	err := tx.QueryRow(`SELECT count(*) FROM duels WHERE rated = 1 AND ended_at >= ?1
+		AND ((a_id = ?2 AND b_new AND NOT a_new) OR (b_id = ?2 AND a_new AND NOT b_new))`, store.Ms(midnight), userID).Scan(&n)
+	return n, err
+}
+
+// takenFirst says whether a pair's challenge (its id) was taken by anyone else before the friend it was drawn for started
+// their game of it (their run): its answers may have reached them.
+func takenFirst(tx *sql.Tx, challengeID, run int64) (bool, error) {
+	var is bool
+	err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM duels o JOIN runs ro ON ro.id = o.a_run
+		WHERE o.challenge_id = ?1 AND o.a_run <> ?2 AND ro.started_at <= (SELECT started_at FROM runs WHERE id = ?2))`,
+		challengeID, run).Scan(&is)
+	return is, err
+}
+
 // settleDuel ends a duel: both played (a result for both), or one played against a game played back (ghost: a
 // recording, or a challenge's sender's game). Two people who both asked to play, a live duel's two or a challenge
 // between friends, both have its result. A live duel's two, or a challenge drawn for the pair played by the friend it
-// was drawn for (still a friend), move their ratings with the first duel of the day between them; one after is a
-// friendly. Any other challenge moves no rating (challenges.go says why). Against a recording only the player has a
-// result, and their rating moves half as far, RecordedRatedPerDay times a day; a challenge taken by anyone but a
-// friend is told to its sender quietly (challengeNews). A duel already ended (both sides finished at once, and the other settled it) is left as it is.
+// was drawn for (still a friend, and nobody else took it first: takenFirst), move their ratings with the first duel of the
+// day between them; one after is a friendly. Any other challenge moves no rating (challenges.go says why). Against a
+// recording only the player has a result, and their rating moves half as far, RecordedRatedPerDay times a day; a
+// challenge taken by anyone but a friend is told to its sender quietly (challengeNews). A duel already ended (both
+// sides finished at once, and the other settled it) is left as it is.
+//
+// Two players aren't two people for sure (review 2026-11-18, S20): a guest is free to make, and a duel lost on purpose
+// is a win for the other. So two who have played from one network lately (sameNet) move no rating between them; and
+// against a new player (Newcomer), an established one's rating moves half as far, NewcomersRatedPerDay times a day
+// (the new one's as any). Whatever moves no rating says why (duels.unrated), and the player is told it.
 func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finished int64) error {
 	type side struct {
 		id             int64
@@ -560,8 +609,11 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 		points, rights int
 		ms             int64
 		rating, rated  int
+		created        int64
+		new            bool // new to rated duels (Newcomer)
 	}
 	var a, b side
+	var unrated string // why it moved no rating
 	var news []DuelNews
 	settled := false
 	var challenge sql.NullInt64 // a challenge's duel: its taker against the one who sent it (challenges.go)
@@ -584,17 +636,19 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 		if ghost {
 			other = "d.ghost_run"
 		}
+		unrated = ""
 		var friends, pair bool
-		err := tx.QueryRow(`SELECT d.a_id, ua.name, ua.rating, ua.rated, ra.id, ra.points, ra.rights, ra.ms,
-				rb.user_id, ub.name, ub.rating, ub.rated, rb.id, rb.points, rb.rights, rb.ms, d.challenge_id, d.b_id IS NOT NULL,
+		err := tx.QueryRow(`SELECT d.a_id, ua.name, ua.rating, ua.rated, ua.created_at, ra.id, ra.points, ra.rights, ra.ms,
+				rb.user_id, ub.name, ub.rating, ub.rated, ub.created_at, rb.id, rb.points, rb.rights, rb.ms, d.challenge_id,
+				d.b_id IS NOT NULL,
 				-- drawn for this pair, and friends still
 				coalesce((SELECT for_id FROM challenges WHERE id = d.challenge_id), 0) = d.a_id
 					AND EXISTS (SELECT 1 FROM friends WHERE user_id = d.a_id AND friend_id = rb.user_id)
 			FROM duels d JOIN users ua ON ua.id = d.a_id JOIN runs ra ON ra.id = d.a_run
 			JOIN runs rb ON rb.id = `+other+` JOIN users ub ON ub.id = rb.user_id
 			WHERE d.id = ? AND d.ended_at IS NULL AND ra.finished_at IS NOT NULL AND rb.finished_at IS NOT NULL`, duelID).
-			Scan(&a.id, &a.name, &a.rating, &a.rated, &a.run, &a.points, &a.rights, &a.ms,
-				&b.id, &b.name, &b.rating, &b.rated, &b.run, &b.points, &b.rights, &b.ms, &challenge, &friends, &pair)
+			Scan(&a.id, &a.name, &a.rating, &a.rated, &a.created, &a.run, &a.points, &a.rights, &a.ms,
+				&b.id, &b.name, &b.rating, &b.rated, &b.created, &b.run, &b.points, &b.rights, &b.ms, &challenge, &friends, &pair)
 		if errors.Is(err, sql.ErrNoRows) {
 			settled = true // the other side's last answer settled it a moment ago: it's done
 			return nil
@@ -616,13 +670,49 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 			if err != nil {
 				return err
 			}
-			rated = n < RecordedRatedPerDay
+			if n >= RecordedRatedPerDay {
+				unrated = "recordings"
+			}
+			rated = unrated == ""
 		default:
+			a.new, b.new = g.Newcomer(a.rated, a.created), g.Newcomer(b.rated, b.created)
+			// The first reason that holds: the pair's game known to the friend, a second duel today, one network,
+			// past the established one's duels against new players today.
 			done, err := g.ratedToday(tx, a.id, b.id)
 			if err != nil {
 				return err
 			}
-			rated = !done
+			knew := false
+			if challenge.Valid {
+				if knew, err = takenFirst(tx, challenge.Int64, a.run); err != nil {
+					return err
+				}
+			}
+			same, err := g.sameNet(tx, a.id, b.id)
+			if err != nil {
+				return err
+			}
+			newcomers := 0
+			if a.new != b.new {
+				established := a.id
+				if a.new {
+					established = b.id
+				}
+				if newcomers, err = g.newcomersRatedToday(tx, established); err != nil {
+					return err
+				}
+			}
+			switch {
+			case knew:
+				unrated = "known"
+			case done:
+				unrated = "again"
+			case same:
+				unrated = "network"
+			case newcomers >= NewcomersRatedPerDay:
+				unrated = "newcomers"
+			}
+			rated = unrated == ""
 		}
 		// More points wins; the same points, the quicker.
 		score := 0.5
@@ -642,14 +732,16 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 			return "draw"
 		}
 		// rate moves a player's rating by a duel (if it counts), and says by how much and to what (null: it didn't).
-		rate := func(s side, against int, score float64) (int, sql.NullInt64, error) {
+		rate := func(s side, against side, score float64) (int, sql.NullInt64, error) {
 			var after sql.NullInt64
 			if !rated {
 				return 0, after, nil
 			}
-			d := eloDelta(s.rating, against, s.rated, score)
+			d := eloDelta(s.rating, against.rating, s.rated, score)
 			if recording {
 				d /= 2 // a recording doesn't play to win: it moves a rating half as far
+			} else if against.new && !s.new {
+				d /= 2 // a new player may be anyone's second account: an established rating moves half as far
 			}
 			err := tx.QueryRow(`UPDATE users SET rating = max(0, rating + ?1), peak = max(peak, rating + ?1), rated = rated + 1
 				WHERE id = ?2 RETURNING rating`, d, s.id).Scan(&after)
@@ -659,7 +751,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 		// opponent_id is a player the duel was against, never a recording's: the year's rival counts only duels
 		// played against a person.
 		opponentID := sql.NullInt64{Int64: b.id, Valid: !recording}
-		da, ra, err := rate(a, b.rating, score)
+		da, ra, err := rate(a, b, score)
 		if err != nil {
 			return err
 		}
@@ -668,17 +760,18 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 			return err
 		}
 		news = append(news, DuelNews{To: a.id, Kind: "result", From: b.name, FromID: b.id, Outcome: outcomeOf(score), Delta: da,
-			Friendly: !rated, DuelID: duelID, Seen: a.run == finished})
+			Friendly: !rated, Unrated: unrated, DuelID: duelID, Seen: a.run == finished})
 		if err := follow(a.id, a.run); err != nil {
 			return err
 		}
 		if !both {
 			outcome = outcomeOf(score)
-			_, err = tx.Exec(`UPDATE duels SET ended_at = ?, outcome = ?, a_delta = ?, a_rating = ?, rated = ? WHERE id = ?`,
-				now, "ghost_"+outcomeOf(score), da, ra, rated, duelID)
+			_, err = tx.Exec(`UPDATE duels SET ended_at = ?, outcome = ?, a_delta = ?, a_rating = ?, rated = ?,
+				unrated = nullif(?, ''), a_new = ?, b_new = ? WHERE id = ?`,
+				now, "ghost_"+outcomeOf(score), da, ra, rated, unrated, a.new, b.new, duelID)
 			return err
 		}
-		db, rb, err := rate(b, a.rating, 1-score)
+		db, rb, err := rate(b, a, 1-score)
 		if err != nil {
 			return err
 		}
@@ -691,13 +784,14 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 			}
 		}
 		news = append(news, DuelNews{To: b.id, Kind: "result", From: a.name, FromID: a.id, Outcome: outcomeOf(1 - score), Delta: db,
-			Friendly: !rated, DuelID: duelID, Seen: b.run == finished})
+			Friendly: !rated, Unrated: unrated, DuelID: duelID, Seen: b.run == finished})
 		if err := follow(b.id, b.run); err != nil {
 			return err
 		}
 		outcome := map[float64]string{1: "a", 0: "b", 0.5: "draw"}[score]
 		_, err = tx.Exec(`UPDATE duels SET ended_at = ?, outcome = ?, a_delta = ?, b_delta = ?, a_rating = ?, b_rating = ?,
-			rated = ? WHERE id = ?`, now, outcome, da, db, ra, rb, rated, duelID)
+			rated = ?, unrated = nullif(?, ''), a_new = ?, b_new = ? WHERE id = ?`,
+			now, outcome, da, db, ra, rb, rated, unrated, a.new, b.new, duelID)
 		return err
 	})
 	if err != nil || settled {
@@ -794,7 +888,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			coalesce(CASE WHEN NOT d.mine THEN d.a_id WHEN d.ghost_run IS NOT NULL
 				THEN (SELECT user_id FROM runs WHERE id = d.ghost_run) ELSE d.b_id END, 0),
 			CASE WHEN d.mine THEN d.a_left ELSE d.b_left END, CASE WHEN d.mine THEN d.b_left ELSE d.a_left END,
-			coalesce(c.code, ''), d.b_id IS NOT NULL, coalesce(c.for_id = d.a_id, 0)
+			coalesce(c.code, ''), d.b_id IS NOT NULL, coalesce(c.for_id = d.a_id, 0), coalesce(d.unrated, '')
 		FROM (SELECT *, coalesce(a_id = ?1, 0) AS mine FROM duels WHERE a_id = ?1 OR b_id = ?1) d
 		LEFT JOIN challenges c ON c.id = d.challenge_id
 		WHERE (d.kind = 'challenge' OR d.ended_at IS NOT NULL)
@@ -808,7 +902,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 	}
 	type row struct {
 		v                       DuelView
-		outcome                 string
+		outcome, unrated        string
 		mine, rated, friends    bool
 		pair                    bool
 		myRun, theirRun, theirs int64
@@ -819,7 +913,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 		var youLeft, theyLeft sql.NullInt64
 		if err := rows.Scan(&r.v.ID, &r.v.Kind, &r.v.CreatedAt, &r.v.ExpiresAt, &r.v.EndedAt, &r.outcome, &r.mine,
 			&r.rated, &r.v.Delta, &r.myRun, &r.theirRun, &r.theirs, &youLeft, &theyLeft, &r.v.Challenge, &r.friends,
-			&r.pair); err != nil {
+			&r.pair, &r.unrated); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -885,6 +979,9 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 		}
 		// Friendly: a duel that could have moved ratings, and didn't (only a challenge drawn for the pair could).
 		v.Friendly = !r.rated && (!challenge || r.pair) && (v.State == "won" || v.State == "lost" || v.State == "draw")
+		if v.Friendly {
+			v.Unrated = r.unrated
+		}
 		out = append(out, v)
 	}
 	return out, nil
