@@ -707,33 +707,6 @@ Feedback fires once, when it's earned, and then the screen is still again:
   rise, the transitions and the steps stop; a result and a sheet show their end state at once, with their sound. The
   timer and the count before a run still move, because they are information.
 
-## Waiting
-
-Never an empty page, and never „…“: a wait looks like what's coming, or doesn't show at all.
-
-- **Between two screens** the one before stays, as it was scrolled, until the next can draw what it's for: its file
-  in and its first answers back (`lib/router.ts`). The place tapped is marked in the bar at once. Past 50ms (a frame or two: a tap answers at once) the next
-  comes as it is, its waits drawn, and a thin `--accent` line runs along the top of the page (`.arriving`, from 200ms
-  in) until it's whole. Back and forward come the same way, to where the page was scrolled.
-- **A wait is drawn in the shape of what comes** (`loading()` in `ui.ts`, `.loading`): quiet blocks (`.bone`, in
-  `--line`; a row of tabs in `--sunken`, a card on `--surface` with its depth), the parts named top to bottom (`title`,
-  `lead`, `tabs`, `head`, `card`, `rows`, `list`, `answers`, `line`), breathing slowly (1.6s; still with less motion).
-  No spinner, no words on the screen: „Зарежда се“ is for screen readers only. A screen that loads on its own
-  (`later()` in `kit.ts`) names its page's shape in `app.ts`; a part that loads inside a screen draws its own.
-- **A short wait shows nothing:** a wait inside a screen (another board, more of a list) shows only after 400ms; one
-  in a screen that came before it was ready shows at once (the router's `aria-busy`).
-- **A place opened again is drawn at once** from what it showed last (`last` and `fresh` in `lib/api.ts`), while the
-  server is asked again; only what has changed is drawn again, so nothing flashes (Начало's day: not for the boards
-  alone, which other players move all day, nor what it tells once). What the player changes (any
-  POST: a game, a setting, a friend) forgets what was kept: the next visit waits for the server, never shows the
-  game before it. Kept half an hour at most, and only for the player who saw it.
-- **Ready before the tap:** the four places' files load once the first screen is drawn and the browser is idle, any
-  other's as a link to it is pointed at, pressed or reached by the keyboard. Nothing of it is in the first screen's
-  budget (`cmd/build`).
-- **Held by checks:** `web/src/loading.test.ts` fails on a „…“ anywhere in the client; `e2e/moves.spec.ts` moves
-  between every place and Профил's own on a slow line, on a phone and a computer, and fails on a frame that's empty or
-  shows „…“, or a place opened again that's waited for.
-
 ## Sound
 
 - **Made in the browser, in code** (`web/src/feel.ts`, loaded with the first touch; the switch and the turns in

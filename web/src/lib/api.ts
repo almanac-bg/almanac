@@ -7,10 +7,6 @@
 // the page's and reported as one. A call that may be sent again (the server takes it twice
 // as once) is tried again while the line or the server is down for a moment (tries): a game's step, an answer
 // (game/answering.ts).
-//
-// The last answer to each GET is kept for a while (last), so that a place opened again draws at once what it showed
-// before while it asks again (fresh); what the player changes (any other call) forgets all of it. A screen opening
-// waits for the GETs it sends (asking: lib/router.ts), but not for one whose kept answer it draws meanwhile.
 
 import { boot } from "./boot.ts";
 import { reportProblem } from "./errors.ts";
@@ -33,42 +29,8 @@ const ours = "Нещо се обърка при нас. Опитай пак.";
  * error's code if it's one. */
 export const hearing: ((res: Response, code: string) => void)[] = [];
 
-/** What hears each GET as it's sent (router.ts, waitFor: a screen opening waits for what it asks for), but one that a
- * screen draws its kept answer for meanwhile (fresh). */
-export const asking: ((answer: Promise<unknown>) => void)[] = [];
-
-type Method = "GET" | "POST" | "PATCH" | "DELETE";
-
-export function api<T>(method: Method, path: string, body?: unknown): Promise<T> {
-  const answer = call<T>(method, path, body);
-  if (method === "GET") for (const hear of asking) hear(answer);
-  return answer;
-}
-
-/** The GETs on their way, by path: asked for again meanwhile (a screen drawn again before its first answers came), one
- * answer for both. */
-const flying = new Map<string, Promise<unknown>>();
-
-function call<T>(method: Method, path: string, body?: unknown): Promise<T> {
-  if (method !== "GET") return send<T>(method, path, body);
-  let answer = flying.get(path) as Promise<T> | undefined;
-  if (!answer) {
-    const sent = send<T>(method, path, body).finally(() => {
-      if (flying.get(path) === sent) flying.delete(path);
-    });
-    answer = sent;
-    flying.set(path, sent);
-  }
-  return answer;
-}
-
-async function send<T>(method: Method, path: string, body?: unknown): Promise<T> {
+export async function api<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<T> {
   if (body === undefined && method !== "GET") body = {};
-  // Something the player changes (a game, a setting, a friend) may change what was kept: none of it is drawn again,
-  // nor an answer asked for meanwhile.
-  const writes = method !== "GET";
-  if (writes) forget();
-  const since = changes;
   let res: Response;
   try {
     res = await fetch(path, {
@@ -93,7 +55,6 @@ async function send<T>(method: Method, path: string, body?: unknown): Promise<T>
   }
   const code: string = res.ok ? "" : (data?.error ?? "server");
   for (const hear of hearing) hear(res, code);
-  if (writes) forget();
   if (!res.ok) throw new ApiError(code, data?.message ?? ours, res.status);
   if (text === null) throw new ApiError("offline", offline);
   // Every answer of the API's is JSON: one that came whole and isn't came from something else on the way (a proxy's
@@ -103,60 +64,7 @@ async function send<T>(method: Method, path: string, body?: unknown): Promise<T>
     reportProblem(`${method} ${path}: ${res.status} without JSON (${type}, ${text.length} characters)`);
     throw new ApiError("server", ours);
   }
-  if (!writes && since === changes) keep(path, data);
   return data as T;
-}
-
-// ---- Kept answers: a place opened again draws at once what it showed last, while it asks the server again. ----
-
-/** The last answer to each GET of this page's, by its path (with its query): its value, its JSON as it came (before
- * a screen had it), and when. */
-const kept = new Map<string, { data: unknown; text: string; at: number }>();
-
-/** How many changes the player has sent (writes): an answer asked for before one isn't kept. */
-let changes = 0;
-
-/** How many answers are kept (the oldest goes first), and for how long one is drawn before what's new: a place opened
- * after that waits for the server, as on its first visit. */
-const keptMost = 40;
-const keptFor = 30 * 60_000;
-
-/** How long an answer is as fresh as the server's (ms): asked for again within it, it's taken as it is (fresh). */
-const moment = 2000;
-
-/** Keeps an answer to GET `path`: one the server gave, or one that came another way (Начало's day, in the page). */
-export function keep(path: string, data: unknown): void {
-  const text = JSON.stringify(data);
-  const was = kept.get(path);
-  kept.delete(path);
-  // The same answer again keeps its value: drawn already, it isn't drawn again (fresh).
-  kept.set(path, was?.text === text ? { ...was, at: Date.now() } : { data, text, at: Date.now() });
-  if (kept.size > keptMost) kept.delete(kept.keys().next().value as string);
-}
-
-/** The last answer to GET `path` on this page (within half an hour, and since the player last changed anything: a
- * game, a setting, a friend), for a screen to draw at once while it asks again (fresh); else undefined. */
-export function last<T>(path: string): T | undefined {
-  const k = kept.get(path);
-  return k && Date.now() - k.at < keptFor ? (k.data as T) : undefined;
-}
-
-/** GET `path` for a screen that drew its last answer (last) meanwhile: the answer, or the very value drawn when it's
- * the same (so that a signal set to it doesn't change, and nothing is drawn again). Asked with an answer kept, it
- * holds no screen up (asking): that screen is drawn already. One the server gave a moment ago is fresh already: not
- * asked again (a screen drawn again for something new it brought, two parts of a page asking for the same). */
-export function fresh<T>(path: string): Promise<T> {
-  const was = last(path);
-  if (was === undefined) return api<T>("GET", path);
-  if (Date.now() - (kept.get(path)?.at ?? 0) < moment) return Promise.resolve(was as T);
-  return call<T>("GET", path).then((data) => (last<T>(path) === was ? (was as T) : data));
-}
-
-/** Forgets every answer kept (a change the player made, another player signed in, or out). */
-export function forget(): void {
-  changes++;
-  kept.clear();
-  flying.clear(); // (one on its way now may answer from before the change)
 }
 
 /** What the player is told of an error: an ApiError's own words; for anything else (a fault of the page's: an answer

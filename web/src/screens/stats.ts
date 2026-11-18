@@ -4,10 +4,10 @@
 
 import { picture } from "../art/picture.ts";
 import { type Mastery, masteryCard } from "../game/mastery.ts";
-import { fresh, last } from "../lib/api.ts";
+import { api } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { topics } from "../state.ts";
-import { figure, formatNumber, loading, streak } from "../ui.ts";
+import { figure, formatNumber, streak } from "../ui.ts";
 
 export interface Stats {
   streak: number;
@@ -50,11 +50,7 @@ export interface Played {
   outcome?: "won" | "lost" | "draw";
 }
 
-/** The player's numbers: the server asked again, while what it said last is drawn (kept). */
-export const loadStats = () => fresh<Stats>("/api/me/stats");
-
-/** What the server said last of the player's numbers, if anything (lib/api.ts, last). */
-export const keptStats = () => last<Stats>("/api/me/stats") ?? null;
+export const loadStats = () => api<Stats>("GET", "/api/me/stats");
 
 const percent = (right: number, of: number) => (of ? Math.round((100 * right) / of) : 0);
 const topicName = (id?: string) => (id ? (topics.find((c) => c.id === id)?.name ?? id) : "Всички теми");
@@ -104,12 +100,11 @@ function almanacLine(facts: number): Child {
  * is Начало's and Класации'); the facts in their almanac; how well they know each topic (once one has a mark); their
  * latest games. */
 export function stats(): Child {
-  const data = signal<Stats | null>(keptStats());
-  const failed = signal(false);
-  loadStats().then(data.set, () => failed.set(true));
+  const data = signal<Stats | null>(null);
+  loadStats().then(data.set, () => {});
   return () => {
     const s = data();
-    if (!s) return failed() ? null : loading("card", "rows");
+    if (!s) return null;
     if (s.games === 0)
       return [
         streak(s.streak, s.week, s.saved, s.reserve, s.next, s.best),
