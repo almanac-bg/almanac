@@ -267,6 +267,12 @@ func (g *Game) ChallengeFriend(ctx context.Context, userID, friendID int64) (Sta
 	return s, duelID, err
 }
 
+// NamedUser is a player as a list names them: a name, and the tag their profile is found by.
+type NamedUser struct {
+	Name string `json:"name"`
+	Tag  string `json:"tag"`
+}
+
 // ChallengeView is a challenge as whoever opens its link sees it.
 type ChallengeView struct {
 	Code string `json:"code"`

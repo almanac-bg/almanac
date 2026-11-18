@@ -321,7 +321,7 @@ func TestUntrueLeavesMastery(t *testing.T) {
 	}
 	w.play(ana, s.ID, repeat(w.right, Length)...)
 	h, _ := w.g.hardness(ctx)
-	topics, _, _ := w.g.abilities(ctx, w.db.Read, h, ana, 0)
+	topics, _, _ := w.g.abilities(ctx, w.db.Read, h, ana, 0, false)
 	all := topics["geography"].answers
 	picked := w.picks(s.ID)
 	w.reload(editedSample(t, func(id string, q map[string]any) {
@@ -339,7 +339,7 @@ func TestUntrueLeavesMastery(t *testing.T) {
 	if _, ok := h.byID[picked[0].ID]; ok {
 		t.Fatal("a question retired as untrue has a hardness")
 	}
-	topics, _, _ = w.g.abilities(ctx, w.db.Read, h, ana, 0)
+	topics, _, _ = w.g.abilities(ctx, w.db.Read, h, ana, 0, false)
 	if got := topics["geography"].answers; got != all-1 {
 		t.Fatalf("answers in the mastery: %d, want %d (the untrue one out, the weak one in)", got, all-1)
 	}

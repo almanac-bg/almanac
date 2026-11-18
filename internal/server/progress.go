@@ -1,7 +1,9 @@
 package server
 
 import (
+	"errors"
 	"net/http"
+	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/play"
@@ -98,9 +100,44 @@ func (s *Server) profile(w http.ResponseWriter, r *http.Request) error {
 	} else if u != nil {
 		viewer = u.ID
 	}
-	p, err := s.game.ProfileOf(r.Context(), tag, viewer)
+	p, err := s.profileOf(r, tag, viewer)
 	if err != nil {
 		return err
 	}
 	return ok(w, p)
+}
+
+// A profile is anyone's to see, signed in or not (play.ProfileOf says what it shows, and the privacy page): what keeps
+// it from being read over and over, or the tags from being walked, is how many a network and its site may look at in
+// an hour, and fewer that miss (a tag nobody has), counted apart where no flood can push them out (Server.guard);
+// past those, no tag is looked up (review 2026-11-18, S12). A class on one network looking at each other's profiles
+// is well within them.
+const (
+	profilesNet       = 300
+	profilesSite      = 1500
+	profileMissesNet  = 30
+	profileMissesSite = 150
+)
+
+// profileOf is play.ProfileOf for a request, under the limits on profiles: errTooMany past them.
+func (s *Server) profileOf(r *http.Request, tag string, viewer int64) (play.Profile, error) {
+	misses := map[string]int{
+		"profilemiss:" + s.clientNet(r):       profileMissesNet,
+		"profilemiss:site:" + s.clientSite(r): profileMissesSite,
+	}
+	for key, n := range misses {
+		if s.guard.spent(key, n) {
+			return play.Profile{}, errTooMany
+		}
+	}
+	if !s.allowFrom(r, "profile", profilesNet, profilesSite, time.Hour) {
+		return play.Profile{}, errTooMany
+	}
+	p, err := s.game.ProfileOf(r.Context(), tag, viewer)
+	if errors.Is(err, play.ErrNoPlayer) {
+		for key, n := range misses {
+			s.guard.allow(key, n, time.Hour)
+		}
+	}
+	return p, err
 }

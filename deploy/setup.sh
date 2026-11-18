@@ -21,10 +21,33 @@ if [ ! -d /srv/almanac-bank/.git ]; then
   git clone git@github.com:almanac-bg/almanac-questions.git /srv/almanac-bank
 fi
 
-# Logs: kept 14 days (the privacy page says so).
+# Logs: the game's are in the journal only, kept 14 days at most (the privacy page says so: a failed request's line
+# has the player's address) and 2 GB at most. rsyslog would copy them to /var/log/syslog, which logrotate keeps for
+# five weeks: it leaves the game's lines out, and those it copied before are taken out of its files.
 install -d /etc/systemd/journald.conf.d
-printf '[Journal]\nMaxRetentionSec=14day\n' > /etc/systemd/journald.conf.d/almanac.conf
+printf '[Journal]\nMaxRetentionSec=14day\nSystemMaxUse=2G\n' > /etc/systemd/journald.conf.d/almanac.conf
 systemctl restart systemd-journald
+journalctl --vacuum-time=14d --vacuum-size=2G >/dev/null
+if [ -d /etc/rsyslog.d ]; then
+  printf '# The game logs to the journal only, kept 14 days there (deploy/setup.sh).\nif $programname == "almanac" then stop\n' \
+    > /etc/rsyslog.d/10-almanac.conf
+  game=' almanac\[[0-9]*\]: '
+  for f in /var/log/syslog*; do
+    [ -f "$f" ] || continue
+    case "$f" in
+    *.gz)
+      if zgrep -q "$game" "$f"; then
+        zcat "$f" | grep -v "$game" | gzip > "$f.tmp"
+        chown --reference="$f" "$f.tmp"
+        chmod --reference="$f" "$f.tmp"
+        mv "$f.tmp" "$f"
+      fi
+      ;;
+    *) sed -i "/$game/d" "$f" ;;
+    esac
+  done
+  systemctl restart rsyslog # after the files changed under it: it writes to them anew
+fi
 
 here=$(dirname "$0")
 install -m 644 "$here/almanac.service" "$here/almanac.socket" /etc/systemd/system/

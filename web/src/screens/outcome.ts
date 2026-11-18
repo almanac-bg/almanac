@@ -342,7 +342,7 @@ function meant(d: DuelView): Child {
       : null,
     why ? h("p", { class: "duel-why" }, why) : null,
     d.recorded && d.opponent
-      ? h("p", { class: "duel-why" }, `Записът е от игра на ${them}: никой не дойде навреме.`)
+      ? h("p", { class: "duel-why" }, "Записът е от истинска игра: никой не дойде навреме.")
       : null,
     rec && them && rec.won + rec.lost + rec.drawn > 0
       ? h(

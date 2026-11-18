@@ -1,15 +1,22 @@
 package play
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"errors"
 	"slices"
+	"time"
+
+	"github.com/almanac-bg/almanac/internal/store"
 )
 
 // A profile is a player as anyone may see them, found by their tag: how they look, their division, their numbers,
 // how well they know each topic, and the achievements they've earned. What only they see stays theirs: their games
-// one by one, achievements not yet earned, their email, their friends.
+// one by one, achievements not yet earned, their email, their friends. Nor does it follow them as they play: its
+// numbers are of the games they finished (not a game under way, answer by answer), and its times are dates, the month
+// they started and the day of each achievement, never the moment (review 2026-11-18, S12). The privacy page says what
+// it shows; the server limits how many anyone looks at (server.profileOf).
 
 // Profile is a player as another sees them, and how the viewer stands with them.
 type Profile struct {
@@ -19,7 +26,7 @@ type Profile struct {
 	Me bool `json:"me,omitempty"`
 	// Avatar comes as a look's does ("shape-tone/frame/backdrop"), with their title and level.
 	Look
-	// Since is when they started playing.
+	// Since is when they started playing: the month (its first day, at noon in Bulgaria).
 	Since    int64    `json:"since"`
 	Standing Standing `json:"standing"`
 	Streak   int      `json:"streak"`
@@ -31,7 +38,8 @@ type Profile struct {
 	Won      int      `json:"won"`
 	// Mastery is how well they know each topic, in the bank's order.
 	Mastery []Mastery `json:"mastery"`
-	// Achievements are those they've earned, the latest first; Of is how many there are in all.
+	// Achievements are those they've earned, the latest first, each with the day (at noon in Bulgaria); Of is how many
+	// there are in all.
 	Achievements []Earned `json:"achievements"`
 	Of           int      `json:"of"`
 	// Friend is how the viewer stands with them: "yes" (friends), "asked" (the viewer asked them), "asks" (they
@@ -43,6 +51,19 @@ type Profile struct {
 	Record *Record `json:"record,omitempty"`
 	// ID is theirs, for calling them to a duel: told only to a friend.
 	ID int64 `json:"id,omitempty"`
+}
+
+// dayOnly is the day of a moment (ms), as noon of it in Bulgaria: the same date wherever a screen shows it, within
+// eleven hours of Bulgaria's time.
+func dayOnly(ms int64) int64 {
+	t := time.UnixMilli(ms).In(Bulgaria)
+	return store.Ms(time.Date(t.Year(), t.Month(), t.Day(), 12, 0, 0, 0, Bulgaria))
+}
+
+// monthOnly is the month of a moment (ms), as noon of its first day in Bulgaria.
+func monthOnly(ms int64) int64 {
+	t := time.UnixMilli(ms).In(Bulgaria)
+	return store.Ms(time.Date(t.Year(), t.Month(), 1, 12, 0, 0, 0, Bulgaria))
 }
 
 // Record is the duels between two players, from one's side.
@@ -82,10 +103,10 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 	if err != nil {
 		return p, err
 	}
-	if p.Answers, p.Right, err = g.answered(ctx, id); err != nil {
+	if p.Answers, p.Right, err = g.answered(ctx, id, true); err != nil {
 		return p, err
 	}
-	if p.Mastery, err = g.MasteryOf(ctx, id); err != nil {
+	if p.Mastery, err = g.knownMastery(ctx, id, true); err != nil {
 		return p, err
 	}
 	earned, err := g.earned(ctx, id)
@@ -98,7 +119,11 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 			p.Achievements = append(p.Achievements, Earned{Achievement: a, At: at, Progress: a.Goal})
 		}
 	}
-	slices.SortStableFunc(p.Achievements, func(a, b Earned) int { return int(b.At - a.At) })
+	slices.SortStableFunc(p.Achievements, func(a, b Earned) int { return cmp.Compare(b.At, a.At) })
+	p.Since = monthOnly(p.Since)
+	for i := range p.Achievements {
+		p.Achievements[i].At = dayOnly(p.Achievements[i].At)
+	}
 	if viewer == 0 || p.Me {
 		return p, nil
 	}
@@ -128,7 +153,7 @@ func (g *Game) relation(ctx context.Context, p *Profile, viewer, id int64) error
 	var request, from int64
 	err := db.QueryRowContext(ctx, `SELECT r.id, r.from_id FROM friend_requests r
 		WHERE (r.from_id = ?1 AND r.to_id = ?2)
-		OR (r.from_id = ?2 AND (r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1)))
+		OR (r.from_id = ?2 AND (r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1)) AND NOT r.declined)
 		ORDER BY r.from_id = ?2 DESC LIMIT 1`, viewer, id).Scan(&request, &from)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil

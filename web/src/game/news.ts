@@ -31,7 +31,6 @@ import {
   meter,
   type Open,
   pointsWords,
-  profileHref,
   tierWords,
   type Unlock,
   unlockPicture,
@@ -64,7 +63,7 @@ interface News {
   open: Open;
   opened?: (keyof Open)[];
   /** Others' duels against the player's recordings, once a day, in a card the rest leaves free. */
-  recordings?: { text: string; players: { name: string; tag: string }[] };
+  recordings?: { text: string };
   /** The streak's days, when a broken streak has just been won back (play/repair.go). */
   mended?: number;
   /** The game's kind: what its points are said to be for. */
@@ -152,24 +151,10 @@ function factsLine(n: number): Child {
   );
 }
 
-/** Others played against recordings of the player's games: how it went, and who, each a tap from their profile. */
+/** Others played against recordings of the player's games: how many, and how it went; never who (a recording is a
+ * stranger's game both ways: play/recordings.go). */
 function recordings(r: NonNullable<News["recordings"]>): Child {
-  return h(
-    "section",
-    { class: "card stack" },
-    h("p", { class: "kicker" }, "Твоите записи"),
-    h("p", null, r.text),
-    h(
-      "details",
-      { class: "more" },
-      h("summary", null, "Кои играха"),
-      h(
-        "ul",
-        { class: "duel-friends" },
-        r.players.map((p) => h("li", null, h("a", { href: profileHref(p.tag) }, p.name))),
-      ),
-    ),
-  );
+  return h("section", { class: "card stack" }, h("p", { class: "kicker" }, "Твоите записи"), h("p", null, r.text));
 }
 
 /** The one biggest thing a game's news holds, if any: a week of the league ended, then a division reached, then a

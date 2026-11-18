@@ -603,6 +603,9 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 			return err
 		}
 		recording := ghost && !challenge.Valid
+		if recording {
+			b.name, _ = RecordedAs(b.id, 0) // kept and told by the animal only, as it played
+		}
 		both = both || (challenge.Valid && friends)
 		var rated bool
 		switch {
@@ -857,6 +860,14 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			v.Opponent = &DuelSide{Name: GoneName, Done: true}
 		}
 		v.Recorded = strings.HasPrefix(r.outcome, "ghost_") && !challenge
+		if v.Recorded && v.Opponent != nil && r.theirs != 0 {
+			level := 0
+			if v.Opponent.Look != nil {
+				level = v.Opponent.Look.Level
+			}
+			name, look := RecordedAs(r.theirs, level)
+			v.Opponent.Name, v.Opponent.Tag, v.Opponent.Look = name, "", &look
+		}
 		won := map[bool]string{true: "a", false: "b"}[r.mine]
 		switch {
 		case r.outcome == won || r.outcome == "ghost_won":

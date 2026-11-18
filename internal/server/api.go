@@ -141,7 +141,7 @@ func (s *Server) apiHandler(h func(http.ResponseWriter, *http.Request) error) ht
 			}
 		}
 		if ae == nil {
-			slog.Error("api", "method", r.Method, "path", r.URL.Path, "err", err)
+			slog.Error("api", "method", r.Method, "route", route(r), "err", err)
 			s.problems.add(fmt.Sprintf("server: %s %s: %v", r.Method, r.Pattern, err))
 			ae = &apiError{http.StatusInternalServerError, "server", "Нещо се обърка при нас. Опитай пак."}
 		}

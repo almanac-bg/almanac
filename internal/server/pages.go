@@ -71,6 +71,11 @@ var shell = template.Must(template.New("shell").Parse(`<!doctype html>
 </html>
 `))
 
+// private is how a page drawn for one person is cached: by their own browser only, and asked again each time it's
+// shown, so that no cache between (Cloudflare's, a proxy's) ever keeps one player's page to give another (review
+// 2026-11-18, S25).
+const private = "private, no-cache"
+
 func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
@@ -119,7 +124,8 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	}
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")
-	h.Set("Cache-Control", "no-cache")
+	h.Set("Cache-Control", private) // the boot JSON has the player in it: their email, whether they're an admin
+	h.Set("Vary", "Cookie")
 	if r.URL.Path != "/" {
 		h.Set("X-Robots-Tag", "noindex") // see robots
 	}
@@ -148,7 +154,7 @@ func (s *Server) preview(r *http.Request) (title, description string) {
 		}
 	case strings.HasPrefix(path, "/players/"):
 		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {
-			if p, err := s.game.ProfileOf(r.Context(), tag, 0); err == nil {
+			if p, err := s.profileOf(r, tag, 0); err == nil {
 				title = p.Name + " (@" + p.Tag + ") в АЛМАНАХ"
 				played := "изиграни игри"
 				if p.Games == 1 {

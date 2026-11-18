@@ -1046,3 +1046,33 @@ func TestCleanUpForgets(t *testing.T) {
 		t.Fatalf("requests kept %v; the game told of %v", requests, told)
 	}
 }
+
+// A question's report (what a player wrote) is kept ReportDays once seen to, then dropped; one not seen to yet stays
+// (the privacy page says so).
+func TestCleanUpReports(t *testing.T) {
+	a, db, _, _ := setup(t)
+	ctx := t.Context()
+	old, recent := store.Ms(time.Now().AddDate(0, 0, -ReportDays-1)), store.Ms(time.Now().AddDate(0, 0, -1))
+	if _, err := db.Write.ExecContext(ctx, `INSERT INTO reports (question_id, text, at, resolved_at) VALUES
+		('q1', 'seen to long ago', ?1, ?1), ('q2', 'seen to lately', ?1, ?2), ('q3', 'waiting', ?1, NULL)`,
+		old, recent); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.CleanUp(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var left []string
+	rows, err := db.Read.QueryContext(ctx, `SELECT question_id FROM reports ORDER BY question_id`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var q string
+		_ = rows.Scan(&q)
+		left = append(left, q)
+	}
+	if strings.Join(left, ",") != "q2,q3" {
+		t.Fatalf("reports left: %v", left)
+	}
+}

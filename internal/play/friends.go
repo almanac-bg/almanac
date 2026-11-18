@@ -287,7 +287,7 @@ func (g *Game) Requests(ctx context.Context, userID int64) (in, out []FriendRequ
 	db := g.DB.Read
 	rows, err := db.QueryContext(ctx, `SELECT r.id, r.at, u.id, u.name, u.tag, `+lookColumns+`
 		FROM friend_requests r JOIN users u ON u.id = r.from_id
-		WHERE (r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1))
+		WHERE (r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1)) AND NOT r.declined
 			AND NOT `+blockedBetween("?1", "r.from_id")+`
 		ORDER BY r.at DESC`, userID)
 	if err != nil {
@@ -332,7 +332,7 @@ func (g *Game) Requests(ctx context.Context, userID int64) (in, out []FriendRequ
 func (g *Game) Accept(ctx context.Context, userID, requestID int64) (name string, err error) {
 	var from int64
 	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.from_id, u.name FROM friend_requests r JOIN users u ON u.id = r.from_id
-		WHERE r.id = ?1 AND (r.to_id = ?2 OR r.to_email = (SELECT email FROM users WHERE id = ?2))
+		WHERE r.id = ?1 AND (r.to_id = ?2 OR r.to_email = (SELECT email FROM users WHERE id = ?2)) AND NOT r.declined
 			AND NOT `+blockedBetween("?2", "r.from_id"), requestID, userID).
 		Scan(&from, &name)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -347,24 +347,39 @@ func (g *Game) Accept(ctx context.Context, userID, requestID int64) (name string
 	return name, g.befriend(ctx, from, userID)
 }
 
-// Withdraw drops a friend request: its sender calls it off, or the one asked says no (the sender isn't told).
+// Withdraw drops a friend request: its sender calls it off, or the one asked says no (the sender isn't told). A no to
+// a request by email leaves it waiting in its sender's list until it runs out (account.EmailRequestDays), as one to an
+// address without a player does: had it gone at once, the sender would know the address has one (review 2026-11-18,
+// S29). The one asked sees it no more.
 func (g *Game) Withdraw(ctx context.Context, userID, requestID int64) error {
-	res, err := g.DB.Write.ExecContext(ctx, `DELETE FROM friend_requests WHERE id = ?1 AND (from_id = ?2 OR to_id = ?2
-		OR to_email = (SELECT email FROM users WHERE id = ?2))`, requestID, userID)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	var n int64
+	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		res, err := tx.Exec(`UPDATE friend_requests SET declined = 1 WHERE id = ?1 AND from_id <> ?2 AND NOT declined
+			AND to_email = (SELECT email FROM users WHERE id = ?2)`, requestID, userID)
+		if err != nil {
+			return err
+		}
+		if n, _ = res.RowsAffected(); n > 0 {
+			return nil
+		}
+		res, err = tx.Exec(`DELETE FROM friend_requests WHERE id = ?1 AND (from_id = ?2 OR to_id = ?2)`, requestID, userID)
+		if err != nil {
+			return err
+		}
+		n, _ = res.RowsAffected()
+		return nil
+	})
+	if err == nil && n == 0 {
 		return ErrNoRequest
 	}
-	return nil
+	return err
 }
 
 // RequestsWaiting is how many friend requests wait for a player's answer (for the dot on Приятели).
 func (g *Game) RequestsWaiting(ctx context.Context, userID int64) (int, error) {
 	var n int
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT count(*) FROM friend_requests r
-		WHERE (r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1))
+		WHERE (r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1)) AND NOT r.declined
 			AND NOT `+blockedBetween("?1", "r.from_id"), userID).Scan(&n)
 	return n, err
 }

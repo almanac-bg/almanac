@@ -132,10 +132,14 @@ type Alerts struct {
 	Email string
 }
 
-// TellProblems tells whatever new problems there are, problemsFirst after the start and every period after, until ctx
-// ends; and then once more, so that what the run found last isn't lost with it (a mail waits in the outbox for the
-// next run, if this one can't send it).
-func (s *Server) TellProblems(ctx context.Context, to Alerts, period time.Duration) {
+// TellProblems tells whatever new problems there are where Config.Alerts says (nowhere: it returns at once),
+// problemsFirst after the start and every period after, until ctx ends; and then once more, so that what the run found
+// last isn't lost with it (a mail waits in the outbox for the next run, if this one can't send it).
+func (s *Server) TellProblems(ctx context.Context, period time.Duration) {
+	to := s.cfg.Alerts
+	if to == (Alerts{}) {
+		return
+	}
 	t := time.NewTimer(min(problemsFirst, period))
 	defer t.Stop()
 	for {
@@ -332,7 +336,7 @@ func (s *Server) clientError(w http.ResponseWriter, r *http.Request) error {
 // logClientError writes a browser's error to the log, with how many weren't logged before it (past clientErrorsAll).
 func (s *Server) logClientError(r *http.Request, message, where, page, stack, version string, unlogged int) {
 	slog.Warn("client error", "message", logLine(message, 300), "where", logLine(where, 200),
-		"page", logLine(page, 200), "stack", logLine(stack, 2000), "ua", logLine(r.UserAgent(), 200),
+		"page", logLine(pageRoute(page), 200), "stack", logLine(stack, 2000), "ua", logLine(r.UserAgent(), 200),
 		"version", logLine(version, 40), "unlogged", unlogged)
 }
 

@@ -3,6 +3,7 @@ package play
 import (
 	"database/sql"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -150,9 +151,12 @@ func TestRecordingsNews(t *testing.T) {
 	duel(gal, w.wrong)
 	duel(bo, w.wrong)
 	r := news()
-	if r == nil || r.Text != "Днес 2 души играха срещу записи на твои игри. Записите ти спечелиха всички дуели." ||
-		len(r.Players) != 2 || r.Players[0].Tag == "" {
+	if r == nil || r.Text != "Днес 2 души играха срещу записи на твои игри. Записите ти спечелиха всички дуели." {
 		t.Fatalf("the recordings' news: %+v", r)
+	}
+	// Who played isn't told: the news is numbers only (S13).
+	if b, _ := json.Marshal(r); strings.Contains(string(b), "players") {
+		t.Fatalf("the recordings' news names who played: %s", b)
 	}
 	if r := news(); r != nil {
 		t.Fatalf("told twice in a day: %+v", r)

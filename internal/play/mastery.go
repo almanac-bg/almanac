@@ -241,11 +241,13 @@ type querier interface {
 
 // abilities goes over a player's answers, oldest first, up to a time (ms; 0 for all of them): their ability in each
 // topic, and over all of them. The answers to a question that turned out untrue (bank.Tail.Untrue: its key was wrong,
-// or stopped being right) say nothing of what a player knows, and are left out.
-func (g *Game) abilities(ctx context.Context, db querier, h *hardnesses, userID, until int64) (map[string]ability, ability, error) {
+// or stopped being right) say nothing of what a player knows, and are left out. Finished says: only those of the games
+// they finished (what others see of them, ProfileOf: never a game under way, answer by answer).
+func (g *Game) abilities(ctx context.Context, db querier, h *hardnesses, userID, until int64, finished bool) (map[string]ability, ability, error) {
 	topics, all := map[string]ability{}, newAbility()
 	rows, err := db.QueryContext(ctx, `SELECT a.question_id, a.score FROM answers a JOIN runs r ON r.id = a.run_id
-		WHERE r.user_id = ?1 AND (?2 = 0 OR a.at <= ?2) ORDER BY a.at, a.run_id, a.n`, userID, until)
+		WHERE r.user_id = ?1 AND (?2 = 0 OR a.at <= ?2) AND (NOT ?3 OR r.finished_at IS NOT NULL)
+		ORDER BY a.at, a.run_id, a.n`, userID, until, finished)
 	if err != nil {
 		return nil, all, err
 	}
@@ -280,7 +282,7 @@ func (g *Game) ability(ctx context.Context, db querier, userID int64, category s
 	if err != nil {
 		return 0, err
 	}
-	topics, all, err := g.abilities(ctx, db, h, userID, 0)
+	topics, all, err := g.abilities(ctx, db, h, userID, 0, false)
 	if category == "" {
 		return all.mean, err
 	}
@@ -293,11 +295,16 @@ func (g *Game) ability(ctx context.Context, db querier, userID int64, category s
 
 // MasteryOf is how well a player knows each topic, in the bank's order (those not played yet too).
 func (g *Game) MasteryOf(ctx context.Context, userID int64) ([]Mastery, error) {
+	return g.knownMastery(ctx, userID, false)
+}
+
+// knownMastery is MasteryOf, or (finished) of the games they finished only (abilities).
+func (g *Game) knownMastery(ctx context.Context, userID int64, finished bool) ([]Mastery, error) {
 	h, err := g.hardness(ctx)
 	if err != nil {
 		return nil, err
 	}
-	topics, _, err := g.abilities(ctx, g.DB.Read, h, userID, 0)
+	topics, _, err := g.abilities(ctx, g.DB.Read, h, userID, 0, finished)
 	if err != nil {
 		return nil, err
 	}
@@ -337,11 +344,11 @@ func (g *Game) MasteryMoves(ctx context.Context, userID, runID int64) ([]Mastery
 		Scan(&first, &last); err != nil || last == 0 {
 		return []MasteryMove{}, err
 	}
-	before, _, err := g.abilities(ctx, g.DB.Read, h, userID, first-1)
+	before, _, err := g.abilities(ctx, g.DB.Read, h, userID, first-1, false)
 	if err != nil {
 		return nil, err
 	}
-	after, _, err := g.abilities(ctx, g.DB.Read, h, userID, last)
+	after, _, err := g.abilities(ctx, g.DB.Read, h, userID, last, false)
 	if err != nil {
 		return nil, err
 	}

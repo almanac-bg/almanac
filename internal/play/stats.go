@@ -61,7 +61,7 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	if err != nil {
 		return s, err
 	}
-	if s.Answers, s.Right, err = g.answered(ctx, userID); err != nil {
+	if s.Answers, s.Right, err = g.answered(ctx, userID, false); err != nil {
 		return s, err
 	}
 	f, err := g.factsOf(ctx, userID)
@@ -93,9 +93,11 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	return s, rows.Err()
 }
 
-// answered is how many questions a player has answered (or let run out of time), and how many of them right.
-func (g *Game) answered(ctx context.Context, userID int64) (answers, right int, err error) {
+// answered is how many questions a player has answered (or let run out of time), and how many of them right; finished:
+// in the games they finished only (what others see of them, ProfileOf: never a game under way, answer by answer).
+func (g *Game) answered(ctx context.Context, userID int64, finished bool) (answers, right int, err error) {
 	err = g.DB.Read.QueryRowContext(ctx, `SELECT count(*), coalesce(sum(a.is_right), 0) FROM answers a
-		JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?`, userID).Scan(&answers, &right)
+		JOIN runs r ON r.id = a.run_id WHERE r.user_id = ? AND (NOT ? OR r.finished_at IS NOT NULL)`, userID, finished).
+		Scan(&answers, &right)
 	return answers, right, err
 }
