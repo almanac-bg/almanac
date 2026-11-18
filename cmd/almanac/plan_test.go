@@ -153,14 +153,52 @@ func TestRunwayReport(t *testing.T) {
 	}
 }
 
-// bank check names the national days with too few questions about Bulgaria, and those with none (which fail it).
+// bank check names the national days with too few questions about Bulgaria, and those with none: they fail it, but
+// against the live bank (-live) only those it has some for.
 func TestNationalDaysReport(t *testing.T) {
 	b, problems := bank.Load("../../bank/sample")
 	if b == nil {
 		t.Fatal(problems)
 	}
-	s, missing := nationalDays(b)
-	if !slices.Contains(missing, "09-06") || !strings.Contains(s, "09-06 the Unification: none") {
-		t.Errorf("missing %v in\n%s", missing, s)
+	s, missing, empty := nationalDays(b, nil, false, play.Used{}, "2026-11-18")
+	if !slices.Contains(missing, "09-06") || len(empty) > 0 || !strings.Contains(s, "09-06 the Unification: none") {
+		t.Errorf("missing %v, empty %v in\n%s", missing, empty, s)
+	}
+	// One question about Bulgaria for the Liberation; once a day has had it, 3 March is empty.
+	before, _ := bank.Load("../../bank/sample")
+	liberation := b.Live("history", "")[0].Base().ID
+	for _, b := range []*bank.Bank{b, before} {
+		q, _ := b.Get(liberation)
+		q.Extra().On, q.Extra().BG = []string{"03-03"}, true
+	}
+	if _, missing, _ := nationalDays(b, nil, false, play.Used{}, "2026-11-18"); slices.Contains(missing, "03-03") {
+		t.Errorf("3 March has %s, but is missing", liberation)
+	}
+	used := play.Used{IDs: map[string]bool{liberation: true}}
+	if _, missing, _ := nationalDays(b, nil, false, used, "2026-11-18"); !slices.Contains(missing, "03-03") {
+		t.Errorf("3 March's only question is used, but it isn't missing: %v", missing)
+	}
+	// Against the live bank: a day that is empty there too only warns; one the new bank emptied fails.
+	_, missing, empty = nationalDays(b, b, true, used, "2026-11-18")
+	if len(missing) > 0 || !slices.Contains(empty, "03-03") || !slices.Contains(empty, "09-06") {
+		t.Errorf("against itself: missing %v, empty %v", missing, empty)
+	}
+	_, missing, empty = nationalDays(b, before, true, used, "2026-11-18")
+	if len(missing) > 0 || !slices.Contains(empty, "03-03") {
+		t.Errorf("against the same bank: missing %v, empty %v", missing, empty)
+	}
+	_, missing, empty = nationalDays(b, before, true, play.Used{}, "2026-11-18")
+	if len(missing) > 0 || slices.Contains(empty, "03-03") {
+		t.Errorf("nothing used: missing %v, empty %v", missing, empty)
+	}
+	q, _ := b.Get(liberation)
+	q.Extra().Retired = true
+	_, missing, empty = nationalDays(b, before, true, play.Used{}, "2026-11-18")
+	if !slices.Contains(missing, "03-03") || !slices.Contains(empty, "09-06") {
+		t.Errorf("3 March's last question retired: missing %v, empty %v", missing, empty)
+	}
+	// A live bank that doesn't load holds nothing against the new one.
+	if _, missing, _ := nationalDays(b, nil, true, play.Used{}, "2026-11-18"); len(missing) > 0 {
+		t.Errorf("no live bank: missing %v", missing)
 	}
 }

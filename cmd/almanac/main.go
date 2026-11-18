@@ -1,7 +1,7 @@
 // Command almanac is the whole game in one program: the server, and the tools that look after it.
 //
 //	almanac serve                       run the game
-//	almanac bank check [-sample] [-used file] [dir]  check a question bank (what a server would refuse), its runway
+//	almanac bank check [-sample] [-used file] [-live dir] [dir]  check a question bank (what a server would refuse), its runway
 //	almanac bank fmt [dir]              rewrite a bank's files in their one format
 //	almanac bank subjects [dir]         the subjects that come back, all of them (check shows the top)
 //	almanac bank calibrate [dir]        the questions whose difficulty disagrees with what players got right (DB_PATH)
@@ -83,5 +83,5 @@ func run(args []string) error {
 }
 
 func usage() error {
-	return fmt.Errorf("usage: almanac serve | bank check [-sample] [-used file] [dir] | bank lint [-rule R,…] [-summary] [dir] | bank fmt [dir] | bank subjects [dir] | bank calibrate [dir] | bank suspects [dir] | bank reports [-resolve ids] | bank used | bank plan [-n N] [-json] [-used file] [dir] | bank add [-check] [-checked-by P] <batch> [dir] | backup now [-force] | backup list | backup restore [-identity F] [-unencrypted] [-into-place [-confirm KEY]] <key|latest> [path] | backup verify [-identity F] [key|latest] | backup proven <code> | backup keys | admin [-remove] <email> | push keys | migrations | version")
+	return fmt.Errorf("usage: almanac serve | bank check [-sample] [-used file] [-live dir] [dir] | bank lint [-rule R,…] [-summary] [dir] | bank fmt [dir] | bank subjects [dir] | bank calibrate [dir] | bank suspects [dir] | bank reports [-resolve ids] | bank used | bank plan [-n N] [-json] [-used file] [dir] | bank add [-check] [-checked-by P] <batch> [dir] | backup now [-force] | backup list | backup restore [-identity F] [-unencrypted] [-into-place [-confirm KEY]] <key|latest> [path] | backup verify [-identity F] [key|latest] | backup proven <code> | backup keys | admin [-remove] <email> | push keys | migrations | version")
 }

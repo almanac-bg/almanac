@@ -144,6 +144,33 @@ func TestDayOfItsDate(t *testing.T) {
 	}
 }
 
+// Of two questions for a date, a day takes the one of that year's date only first: an every year's comes back the
+// next year, the other would have lost its date for good.
+func TestDayTakesItsYearsDateFirst(t *testing.T) {
+	b := biggerSample(t, 20)
+	day := "2027-05-02"
+	var yearly, once bank.Question
+	for _, q := range b.Live("history", "choice") {
+		if q.Base().Difficulty != bank.Medium || bank.HasPictures(q) {
+			continue
+		}
+		if yearly == nil {
+			yearly = q
+		} else if bank.Subjects(q)[0] != bank.Subjects(yearly)[0] {
+			once = q
+			break
+		}
+	}
+	yearly.Extra().On = []string{"05-02"}
+	once.Extra().On = []string{"2027-05-02", "2028-04-16"}
+	for seed := range uint64(30) {
+		picks, _ := drawDay(b, day, map[string]bool{}, nil, rand.New(rand.NewPCG(seed, 7)))
+		if !slices.ContainsFunc(picks, func(p Pick) bool { return p.ID == once.Base().ID }) {
+			t.Fatalf("seed %d: Великден's question passed over for the every year's", seed)
+		}
+	}
+}
+
 // A day names each subject once: no two of its questions share an answer or a quoted title, though the bank has each
 // answer many times over (every sample question copied twenty times), with the question of its date and the
 // Bulgarian ones swapped in, day after day.

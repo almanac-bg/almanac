@@ -189,6 +189,34 @@ func TestRulesOfAQuestion(t *testing.T) {
 		}(), false},
 		// Not dated: a date in a true-or-not is just a fact to know.
 		{"own-date", &TrueFalse{Head: Head{ID: "a", Type: "truefalse", Text: "3 юни е Световният ден на велосипеда."}, Answer: true}, false},
+		// The mirror: dealt on 25 December, another date says it's false.
+		{"own-date", func() Question {
+			q := &TrueFalse{Head: Head{ID: "a", Type: "truefalse", Text: "Българската православна църква празнува Коледа на 7 януари."}}
+			q.On = []string{"12-25"}
+			return q
+		}(), true},
+		{"own-date", func() Question {
+			q := &TrueFalse{Head: Head{ID: "a", Type: "truefalse", Text: "Денят на труда се празнува на 1-ви май в повечето държави."}, Answer: true}
+			q.On = []string{"05-01"}
+			return q
+		}(), true},
+		// About the day itself: dealt on 12 February, both were born on it.
+		{"own-date", func() Question {
+			q := &TrueFalse{Head: Head{ID: "a", Type: "truefalse", Text: "Чарлз Дарвин и Ейбрахам Линкълн са родени в един и същи ден."}, Answer: true}
+			q.On = []string{"02-12"}
+			return q
+		}(), true},
+		// A year, a number, or a weekday's name isn't a date.
+		{"own-date", func() Question {
+			q := &TrueFalse{Head: Head{ID: "a", Type: "truefalse", Text: "Българската православна църква празнува Коледа по юлианския календар от 1968 г. насам."}}
+			q.On = []string{"12-25"}
+			return q
+		}(), false},
+		{"own-date", func() Question {
+			q := &TrueFalse{Head: Head{ID: "a", Type: "truefalse", Text: "Чарлз Дарвин е роден в същата година като Ейбрахам Линкълн."}, Answer: true}
+			q.On = []string{"02-12"}
+			return q
+		}(), false},
 		// A choice may name its date: the date isn't its answer.
 		{"own-date", func() Question {
 			q := choice("a", "Кое число празнуват математиците на 14 март?", "π", "e", "φ", "i")
@@ -234,6 +262,42 @@ func TestGiveaway(t *testing.T) {
 	died := number("lit-1", "През коя година умира Леонардо да Винчи?", 1519, 24, "")
 	if got := found(bankOf(order, died)); len(got) != 1 || !strings.HasPrefix(got[0], "giveaway") {
 		t.Errorf("found %v", got)
+	}
+}
+
+// A small number (28) gives a value away too, shown with its unit in another word („килограма“ for „кг“) next to the
+// same subject; with another unit, or about something else, it doesn't.
+func TestGiveawayOfASmallNumber(t *testing.T) {
+	asks := number("mov-1", "С около колко килограма отслабва Кристиан Бейл за ролята си в „Механикът“?", 28, 8, "кг")
+	var qs []Question
+	for i := range 1500 {
+		qs = append(qs, choice(fmt.Sprintf("gen-%d", i+10), fmt.Sprintf("Въпрос номер %d за нещо?", i), "Едно", "Друго", "Трето", "Четвърто"))
+	}
+	shows := func(fact string) Question {
+		q := choice("mov-2", "Кой играе Батман в „Черният рицар“?", "Кристиан Бейл", "Джордж Клуни", "Вал Килмър", "Бен Афлек")
+		q.Fact = fact
+		return q
+	}
+	for fact, want := range map[string]bool{
+		"За ролята си в „Механикът“ Кристиан Бейл отслабва с около 28 килограма.": true,
+		"За ролята си в „Механикът“ Кристиан Бейл отслабва с около 28 кг.":        true,
+		"На 28 години Кристиан Бейл отслабва за ролята си в „Механикът“.":         false,
+		"Кристиан Бейл е роден в Уелс, а Батман играе в три филма.":               false,
+	} {
+		got := found(bankOf(append([]Question{asks, shows(fact)}, qs...)...))
+		if (len(got) == 1 && strings.HasPrefix(got[0], "giveaway ")) != want || len(got) > 1 {
+			t.Errorf("%q: found %v", fact, got)
+		}
+	}
+	for _, c := range []struct {
+		a, b string
+		same bool
+	}{{"кг", "килограма", true}, {"км", "километра", true}, {"км", "килограма", false}, {"м", "метра", true},
+		{"точки", "точка", true}, {"пъти", "път", true}, {"°C", "°C", true}, {"%", "процента", true}, {"години", "дни", false},
+		{"", "", false}} {
+		if sameUnit(c.a, c.b) != c.same {
+			t.Errorf("sameUnit(%q, %q) = %v", c.a, c.b, !c.same)
+		}
 	}
 }
 
