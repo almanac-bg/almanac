@@ -13,7 +13,7 @@ import { picture } from "../art/picture.ts";
 import { type DayGold, dayGold, nextGame } from "../game/gold.ts";
 import { news } from "../game/news.ts";
 import { boardRow, hands, shareButton, summary } from "../game/results.ts";
-import { getReady, playRun, shownHere, trail } from "../game/run.ts";
+import { getReady, playRun, shownHere, starting, trail } from "../game/run.ts";
 import { dayShareText, percent, rare } from "../game/share.ts";
 import type { Board, Mark, Score, State } from "../game/types.ts";
 import { api, errorText, serverNow, tally } from "../lib/api.ts";
@@ -170,7 +170,7 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
       getReady(
         "Въпросите на деня",
         async () => {
-          screen.show(() => h("p", { class: "muted" }, "…"));
+          screen.show(starting);
           try {
             await player();
             const s = await api<State>("POST", "/api/day", {});

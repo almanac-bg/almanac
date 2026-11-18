@@ -1,7 +1,8 @@
 // A live duel: waiting for someone (or, after 10 seconds, a recording of a real game), the two face to face, then
 // each question for both at the same moment — the other's answer comes in as they give it, and shows with yours —
-// and the result. The server sends the duel as this player sees it after every change; the browser reconnects if
-// the line drops, and comes back to the same duel.
+// and the result. The server sends the duel as this player sees it after every change; the line, should it drop, is
+// opened again (lib/stream.ts), and comes back to the same duel. Each question is answered as in every game
+// (game/answering.ts).
 //
 // It loads on its own, the first time a live duel opens, and is handed the app's pieces (kit.ts): it imports only types.
 
@@ -15,14 +16,12 @@ import type { DuelView } from "./duel.ts";
 // The app's pieces, set as the screen opens (liveDuel).
 let {
   answered,
+  answering,
   api,
-  ask,
   avatar,
   byTap,
   computed,
-  countdown,
   crowdLine,
-  deliver,
   effect,
   errorText,
   duelResult,
@@ -42,13 +41,14 @@ let {
   playAnswer,
   playCount,
   player,
-  playing,
+  playingWhile,
   questionHead,
   readyClock,
   shareButton,
   signal,
   startScreen,
   staying,
+  stream,
   timer,
   title,
   topics,
@@ -139,14 +139,12 @@ const seconds = (ms: number) => `${(ms / 1000).toLocaleString("bg", { maximumFra
 export function liveDuel(kit: Kit) {
   ({
     answered,
+    answering,
     api,
-    ask,
     avatar,
     byTap,
     computed,
-    countdown,
     crowdLine,
-    deliver,
     effect,
     errorText,
     duelResult,
@@ -166,13 +164,14 @@ export function liveDuel(kit: Kit) {
     playAnswer,
     playCount,
     player,
-    playing,
+    playingWhile,
     questionHead,
     readyClock,
     shareButton,
     signal,
     startScreen,
     staying,
+    stream,
     timer,
     title,
     topics,
@@ -220,9 +219,6 @@ function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
   const wait = signal<Wait | null>(null);
   const trouble = signal<Trouble>("");
 
-  let es: EventSource | null = null;
-  const stop = () => es?.close();
-  onCleanup(stop);
   // Over, the result stays: a stream that ends then (the duel forgotten) or drops doesn't take it away.
   const over = () => view.peek()?.phase === "end";
   // The screen gone before the player was made (a first-time guest): no stream, which would join the queue.
@@ -233,37 +229,44 @@ function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
   player()
     .then(() => {
       if (life.aborted) return;
-      es = new EventSource(`/api/duels/live/events${rematch ? `?rematch=${rematch.id}` : ""}`);
-      es.addEventListener("waiting", (e) => {
-        trouble.set("");
-        // A line that dropped while waiting starts the wait again; a duel that ended doesn't come back.
-        if (view.peek()) return stop();
-        wait.set(JSON.parse((e as MessageEvent).data));
+      const ends = (event: Exclude<Trouble, "" | "reconnecting">) => () => {
+        line.close();
+        if (!over()) trouble.set(event);
+      };
+      const line = stream(`/api/duels/live/events${rematch ? `?rematch=${rematch.id}` : ""}`, {
+        life,
+        on: {
+          waiting: (data) => {
+            trouble.set("");
+            // A line that dropped while waiting starts the wait again; a duel that ended doesn't come back.
+            if (view.peek()) return line.close();
+            wait.set(JSON.parse(data));
+          },
+          message: (data) => {
+            trouble.set("");
+            const v: LiveView = JSON.parse(data);
+            view.set(v);
+            // Over, it's still followed for a while: the other may ask for a rematch.
+            if (v.phase === "off") line.close();
+          },
+          closed: ends("closed"),
+          nobody: ends("nobody"),
+          busy: ends("busy"),
+          norematch: ends("norematch"),
+          paused: ends("paused"),
+        },
+        down: (down) => {
+          if (!down) return;
+          if (over()) line.close();
+          else trouble.set("reconnecting");
+        },
       });
-      es.onmessage = (e) => {
-        trouble.set("");
-        const v: LiveView = JSON.parse(e.data);
-        view.set(v);
-        // Over, it's still followed for a while: the other may ask for a rematch.
-        if (v.phase === "off") stop();
-      };
-      for (const event of ["closed", "nobody", "busy", "norematch", "paused"] as const)
-        es.addEventListener(event, () => {
-          stop();
-          if (!over()) trouble.set(event);
-        });
-      es.onerror = () => {
-        if (over()) stop();
-        else if (es?.readyState === EventSource.CLOSED) trouble.set("closed");
-        else trouble.set("reconnecting"); // the browser tries again by itself
-      };
     })
     .catch(() => trouble.set("busy"));
-  effect(() => {
+  playingWhile(() => {
     const phase = view()?.phase;
-    playing.set(phase === "question" || phase === "reveal");
+    return phase === "question" || phase === "reveal";
   });
-  onCleanup(() => playing.set(false));
   // The screen stays on from the wait for an opponent to the result: a phone asleep drops the duel.
   // Leaving mid-duel costs it (live.go): the duel goes on without the player, their time running out on each question,
   // and its result counts. Every way out asks first; a leave confirmed is told the server at once, so that the other
@@ -462,41 +465,20 @@ function question(view: () => LiveView, first: LiveView): Child {
   const q = first.question;
   if (!q) return null;
   if (first.n === 0) play("go"); // the game starts
-  const locked = signal(!!q.given);
-  const sent = signal(!!q.given);
-  const error = signal("");
   const life = lifetime();
-  // An answer that doesn't get through (the line dropped) is sent again while the question is open; one refused for
-  // good, not late, frees the options again.
-  const open = () => !life.aborted && view().phase === "question" && view().n === first.n;
-  const send = async (a: Answer) => {
-    locked.set(true);
-    error.set("");
-    const e = await deliver(`/api/duels/live/${first.id}/answer`, { n: first.n, answer: a }, () => untracked(open));
-    if (!e) return sent.set(true);
-    error.set(e.message);
-    if (e.code !== "not_now" && untracked(open) && left.peek() > 0) {
-      if (asked.node instanceof Element)
-        for (const b of asked.node.querySelectorAll(".picked")) b.classList.remove("picked");
-      locked.set(false);
-    }
-  };
-  const asked = ask(q.view, send, locked);
-  // When the time is up, whatever has been put in (a typed number, things moved into order) is the answer.
-  const left = countdown(q.leftMs, () => {
-    if (locked.peek()) return;
-    const pending = asked.pending();
-    if (pending) send(pending);
-    else locked.set(true);
+  // Answered as in every game (game/answering.ts): sent again while it doesn't get through and the question is open;
+  // in once the server says so, or its view has it.
+  const ans = answering({
+    view: q.view,
+    leftMs: q.leftMs,
+    post: (answer) => api("POST", `/api/duels/live/${first.id}/answer`, { n: first.n, answer }),
+    open: () => !life.aborted && view().phase === "question" && view().n === first.n,
+    inView: () => view().n === first.n && !!view().question?.given,
   });
+  // More of the question shows as its time runs (the next clue), and the clock goes by the server's.
   effect(() => {
     const v = view();
-    if (v.n !== first.n || !v.question || v.phase !== "question") return;
-    // More of the question shows as its time runs (the next clue): the server sends it when it's due.
-    asked.update?.(v.question.view);
-    // The clock goes by the server's.
-    const s = Math.ceil(v.question.leftMs / 1000);
-    if (Math.abs(s - left.peek()) > 1) left.sync(v.question.leftMs);
+    if (v.n === first.n && v.question && v.phase === "question") ans.follow(v.question.view, v.question.leftMs);
   });
   // The other answering is news: a sound of its own, not a tap the player might take for theirs.
   let heard = first.them.answered;
@@ -511,19 +493,19 @@ function question(view: () => LiveView, first: LiveView): Child {
     { class: "question" },
     questionHead(first.n, first.total, topicName(q.category)),
     scoreboard(view, first.total),
-    timer(q.leftMs, q.limitMs, left, locked),
-    h("h1", { class: "ask" }, q.view.text),
+    timer(q.leftMs, q.limitMs, ans.left, ans.stopped),
+    ans.heading,
     picture(q.view, true),
-    asked.node,
+    ans.asked.node,
     () =>
-      sent()
+      ans.taken()
         ? h(
             "p",
             { class: "status", role: "status" },
             view().them.answered ? "Отговорите идват…" : `Отговорът ти е приет. Чакаме ${view().them.name}.`,
           )
         : null,
-    () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    ans.said,
   );
 }
 

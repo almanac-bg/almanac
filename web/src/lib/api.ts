@@ -4,7 +4,8 @@
 // its clock (serverNow), and a session that has ended. What goes wrong is said to the player in Bulgarian, whatever it
 // was (errorText): the server's own words for an error it gave, the line's for no line, and a plain line for anything
 // else, which is a fault of the page's and reported as one. A call that may be sent again (the server takes it twice
-// as once) is tried again while the line or the server is down for a moment (tries, deliver).
+// as once) is tried again while the line or the server is down for a moment (tries): a game's step, an answer
+// (game/answering.ts).
 
 import { reportProblem } from "./errors.ts";
 
@@ -71,31 +72,19 @@ export function passing(err: unknown): boolean {
   return status === 0 || status >= 500;
 }
 
-/** A step of a game sent again, a few times, while it doesn't get through (passing); the server takes a step sent
- * twice as once. `pause` is the wait before the first retry (longer each time). */
-export async function tries<T>(call: () => Promise<T>, pause = 800): Promise<T> {
-  for (let n = 1; ; n++) {
+/** Sends a step of a game again, the same, while it doesn't get through (no line, the server for a moment: passing),
+ * up to `max` times in all, and only while `open()` says it still can go (a live answer: while its question is open);
+ * the server takes a step sent twice as once. Resolves with the reply; else throws what ended it. `pause` is the first
+ * wait between sends (twice as long each time, to eight times as long). */
+export async function tries<T>(
+  call: () => Promise<T>,
+  { open = () => true, pause = 800, max = 3 }: { open?: () => boolean; pause?: number; max?: number } = {},
+): Promise<T> {
+  for (let n = 1, wait = pause; ; n++, wait = Math.min(2 * wait, 8 * pause)) {
     try {
       return await call();
     } catch (err) {
-      if (n >= 3 || !passing(err)) throw err;
-    }
-    await new Promise((on) => setTimeout(on, pause * n));
-  }
-}
-
-/** Sends an answer in a live game (Роял, a live duel, a room): again, the same, while it doesn't get through (no
- * line, the server restarting: no answer, or a 5xx) and open() says its question still takes it. The server takes a
- * second send of an answer it has as the first (a room's says it's too late: not_now). Resolves once it's taken, with
- * the error that ended it if it wasn't. `pause` is the first wait between sends (twice as long each time, to 4 s). */
-export async function deliver(path: string, body: unknown, open: () => boolean, pause = 500): Promise<ApiError | null> {
-  for (let wait = pause; ; wait = Math.min(2 * wait, 8 * pause)) {
-    try {
-      await api("POST", path, body);
-      return null;
-    } catch (err) {
-      const e = err instanceof ApiError ? err : new ApiError("server", errorText(err));
-      if ((e.status > 0 && e.status < 500) || !open()) return e;
+      if (n >= max || !passing(err) || !open()) throw err;
     }
     await new Promise((r) => setTimeout(r, wait));
   }

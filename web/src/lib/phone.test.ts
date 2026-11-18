@@ -70,6 +70,32 @@ test("Android's back puts the app away from Начало only, never from a game
   // A page opened from outside the game (a notification's): to Начало.
   assert.equal(at(false, false), "home");
 });
+
+test("Android's back puts away a sheet open over the page first, wherever it is", () => {
+  const nav = { home: () => true, canGoBack: () => true };
+  assert.equal(backAction(nav, true), "close");
+  assert.equal(backAction({ ...nav, home: () => false }, true), "close");
+  assert.equal(backAction(nav, false), "away");
+});
+
+test("the back button closes the sheet it finds open, and goes nowhere", () => {
+  const closed: string[] = [];
+  const sheet = { close: () => closed.push("sheet") };
+  (globalThis as { document?: unknown }).document = { querySelector: () => sheet };
+  calls.length = 0;
+  const n = nav();
+  start(n, () => {});
+  listeners.get("App backButton")?.({});
+  assert.deepEqual(closed, ["sheet"]);
+  assert.deepEqual(n.opened, []);
+  // No sheet: back a page.
+  (globalThis as { document?: unknown }).document = { querySelector: () => null };
+  (globalThis as { history?: unknown }).history = { back: () => closed.push("back") };
+  listeners.get("App backButton")?.({});
+  assert.deepEqual(closed, ["sheet", "back"]);
+  delete (globalThis as { document?: unknown }).document;
+  delete (globalThis as { history?: unknown }).history;
+});
 const felt = async (kind: Parameters<typeof haptic>[0]) => {
   calls.length = 0;
   haptic(kind);

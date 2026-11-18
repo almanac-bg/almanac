@@ -79,9 +79,11 @@ export function open(link: string, nav: Pick<Nav, "navigate" | "playing">): void
   nav.navigate(u.href);
 }
 
-/** What Android's back button does: from Начало, puts the app away, as other apps do; else back a page (a game under
- * way asks first: router.ts), or, with no page of the game's before it, to Начало. */
-export function backAction(nav: Pick<Nav, "home" | "canGoBack">): "away" | "back" | "home" {
+/** What Android's back button does: a sheet open over the page (a game's news, the name asked for: `sheet`) is put
+ * away, as back does in the phone's own apps; from Начало, it puts the app away, as other apps do; else back a page (a
+ * game under way asks first: router.ts), or, with no page of the game's before it, to Начало. */
+export function backAction(nav: Pick<Nav, "home" | "canGoBack">, sheet = false): "close" | "away" | "back" | "home" {
+  if (sheet) return "close";
   if (nav.home()) return "away";
   return nav.canGoBack() ? "back" : "home";
 }
@@ -95,8 +97,10 @@ export function start(nav: Nav, opened: (kind: string) => void): void {
   app.on("appUrlOpen", (e: { url: string }) => open(e.url, nav));
   // Android's own canGoBack leaves out pages opened without a tap (a notification's): back goes by the game's history.
   app.on("backButton", () => {
-    const what = backAction(nav);
-    if (what === "away") app.call("minimizeApp").catch(() => {});
+    const sheet = document.querySelector<HTMLDialogElement>("dialog[open]");
+    const what = backAction(nav, !!sheet);
+    if (what === "close") sheet?.close();
+    else if (what === "away") app.call("minimizeApp").catch(() => {});
     else if (what === "back") history.back();
     else nav.go("/");
   });

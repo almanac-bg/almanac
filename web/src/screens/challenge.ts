@@ -11,7 +11,7 @@
 // the same way.
 
 import { challengeButton, challengeText } from "../game/results.ts";
-import { getReady, playRun, startScreen } from "../game/run.ts";
+import { getReady, playRun, starting, startScreen } from "../game/run.ts";
 import type { State } from "../game/types.ts";
 import { loadDuelResult } from "../kit.ts";
 import { ApiError, api, errorText } from "../lib/api.ts";
@@ -108,7 +108,7 @@ function asked(c: Challenge, screen: ReturnType<typeof slot>, here: () => boolea
       getReady(
         "Предизвикателство",
         async () => {
-          screen.show(() => h("p", { class: "muted" }, "…"));
+          screen.show(starting);
           try {
             await player();
             loadDuelResult().catch(() => {}); // the result's screen, on its way while the player plays

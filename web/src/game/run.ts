@@ -16,9 +16,10 @@ import { calm, tickOn } from "../lib/prefs.ts";
 import { beforeLeaving, hold, release } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { withName } from "../lib/words.ts";
-import { categories, playing } from "../state.ts";
-import { countUp, fact, failure, formatNumber, inRowChip, type VerdictKind, verdict, verdictWords } from "../ui.ts";
-import { answered, ask, beats, crowdLine, picture, picturesIn, type Stage, spokenAnswer } from "./questions.ts";
+import { categories, playingWhile } from "../state.ts";
+import { countUp, fact, failure, inRowChip, type VerdictKind, verdict } from "../ui.ts";
+import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
+import { answered, beats, crowdLine, picture, picturesIn, type Stage } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Reveal, Shown, State, View } from "./types.ts";
 
 /** Where the run whose question this tab showed last is kept (this tab's, for as long as it's open). */
@@ -99,8 +100,10 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
   onCleanup(() => {
     gone = true;
     if (seen) document.removeEventListener("visibilitychange", seen);
-    playing.set(false);
   });
+  // Under way until its end shows.
+  const over = signal(initial.done);
+  playingWhile(() => !over());
 
   // Where the run stands: its end, a question waiting for its pictures, a question showing, or between questions
   // (the next one opens at once). A question and the end open at the top of the page, not where the answer before
@@ -109,7 +112,7 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
   const at = (s: State) => {
     if (gone) return;
     last = s;
-    playing.set(!s.done);
+    over.set(s.done);
     if (s.done) {
       release({ result: s.id });
       screen.show(() => done(s));
@@ -130,17 +133,8 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
   };
 
   // What a screen reader says as the run goes (an answer's verdict, a clue come out): one live region for the whole
-  // run, there from its start and empty until it speaks, as screen readers reliably read only such a one.
-  const region = h("p", { class: "sr", role: "status" });
-  let speaking = 0;
-  const say = (text: string) => {
-    region.textContent = "";
-    clearTimeout(speaking);
-    speaking = window.setTimeout(() => {
-      region.textContent = text;
-    }, 60);
-  };
-  onCleanup(() => clearTimeout(speaking));
+  // run (answering.ts).
+  const { node: region, say } = liveRegion();
 
   // Back to a run whose last question was given up by leaving: that question's answer first, then on.
   const left = takeGivenUp(initial.id);
@@ -200,18 +194,14 @@ function givenUp(g: GivenUp, total: number, on: () => void): Child {
   );
 }
 
-/** Says something to a screen reader, in the run's live region. */
-type Say = (text: string) => void;
-
 /** Before a run: three seconds to settle in, a ring running out around them, with a way back out (also Esc) and
  * a way to start at once. Each second beeps; the start an octave higher. The game has the whole screen from here (on
- * a phone, the header and the bar of places step aside), and keeps it while its first question comes: should none
- * come (it failed to start), the screen is given back. */
+ * a phone, the header and the bar of places step aside), and keeps it while its first question comes (starting, in
+ * its place): should none come (it failed to start), the screen is given back with what shows instead. */
 export function getReady(what: string, start: () => void, cancel: () => void): Child {
   const seconds = 3;
   const left = signal(seconds);
   let gone = false;
-  let began = false;
   const leave = (fn: () => void) => {
     if (gone) return;
     gone = true;
@@ -220,7 +210,6 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
   };
   const begin = () =>
     leave(() => {
-      began = true;
       play("go");
       start();
     });
@@ -229,14 +218,8 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
     if (left.peek() <= 0) begin();
     else playCount(left.peek());
   }, 1000);
-  playing.set(true);
-  onCleanup(() => {
-    clearInterval(tick);
-    if (!began) return playing.set(false);
-    window.setTimeout(() => {
-      if (!document.querySelector(".run")) playing.set(false);
-    }, 1500);
-  });
+  playingWhile();
+  onCleanup(() => clearInterval(tick));
   playCount(seconds);
   listen(document, "keydown", (e) => {
     if (e.key === "Escape") leave(cancel);
@@ -266,6 +249,13 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
       ),
     ),
   );
+}
+
+/** A game's first question on its way, once its count has run (its run being made, the player first if need be): the
+ * game keeps the whole screen meanwhile (playingWhile), and gives it back if what shows next isn't the game. */
+export function starting(): Child {
+  playingWhile();
+  return h("p", { class: "muted" }, "…");
 }
 
 /** A game come to without a tap (a reload, back or forward, a link from outside): nothing starts by itself. What it is
@@ -507,50 +497,6 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
   );
 }
 
-/** A question's seconds left, counting down with the clock: each second is worked out from when the time ends, so
- * that a busy page (a slow phone, a picture coming in) never leaves them behind it, as a tick every 1000 ms would.
- * `out` runs once, when the time is up; once `stopped`, they stop where they are. */
-export interface Countdown {
-  /** The whole seconds left (tracked). */
-  (): number;
-  /** The seconds left, untracked. */
-  peek(): number;
-  /** Sets the time left (ms) to the server's, when it says otherwise (a question shown again after a restart). */
-  sync(ms: number): void;
-}
-
-export function countdown(ms: number, out?: () => void, stopped?: () => boolean): Countdown {
-  let end = performance.now() + ms;
-  const left = signal(Math.max(0, Math.ceil(ms / 1000)));
-  let t = 0;
-  let done = false;
-  const next = (rest: number) => {
-    t = window.setTimeout(step, rest > 0 ? rest % 1000 || 1000 : 0);
-  };
-  const step = () => {
-    if (stopped?.()) return;
-    const rest = end - performance.now();
-    left.set(Math.max(0, Math.ceil(rest / 1000)));
-    if (rest > 0) next(rest);
-    else if (!done) {
-      done = true;
-      out?.();
-    }
-  };
-  next(ms);
-  onCleanup(() => clearTimeout(t));
-  const c = (() => left()) as Countdown;
-  c.peek = () => left.peek();
-  c.sync = (rest: number) => {
-    end = performance.now() + rest;
-    clearTimeout(t);
-    left.set(Math.max(0, Math.ceil(rest / 1000)));
-    if (rest > 0) done = false; // the question shown again, with time: it can run out again
-    if (!done) next(rest);
-  };
-  return c;
-}
-
 /** How long an answer shows before the game moves on: longer where there's more to read. */
 export function pauseFor(view: View): number {
   return view.type === "choice" || view.type === "truefalse" ? 3000 : 4500;
@@ -590,14 +536,11 @@ function question(
   say: Say,
   taken: (now: State) => void,
 ): Child {
-  const locked = signal(false);
-  const stopped = signal(false); // the clock, once the answer is taken
   const problem = slot();
   const after = h("div", { class: "after", hidden: true });
   let progress = trail(s.trail, s.total, q.n);
-  let sent = false;
-  let sending = false;
   let over = false; // the question's screen gone
+  let leaving = false; // given up by leaving: its answer isn't shown here
   onCleanup(() => {
     over = true;
   });
@@ -634,38 +577,43 @@ function question(
     else shown.push(window.setTimeout(step, ms));
   };
 
-  // An answer goes once; after a failed send, only its retry goes again, and never while it's on its way already (a
-  // tap on „Опитай пак“ and the line coming back at once). The answers lock at the tap; the clock stops once the
-  // answer is taken, as the server takes the time it came in: on a slow line, or none, it runs on in sight while the
-  // answer is sent again quietly (the server gives an answer sent again, its reply lost, as it took it the first
-  // time), and only then says what's wrong, under the question. What went wrong is the question's own (a slot in its
-  // scope): its „Опитай пак“, and its retry as the line comes back, go with the next try and with the question. What
-  // the player chose stays chosen a moment, however quick the line, before the answer shows.
-  const send = async (answer: Answer | null, retry = false) => {
-    if (sending || (sent && !retry)) return;
-    sent = true;
-    sending = true;
-    locked.set(true);
-    problem.show(() => null);
-    const held = answer === null ? 0 : performance.now() + holdMs;
-    let res: Result;
-    try {
-      res = await tries(() => api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer }));
-    } catch (err) {
-      sending = false;
-      if (over) return;
-      if ((err as ApiError).code === "out_of_step") return reload();
-      problem.show(() => failure(err, () => send(answer, true), wayOut(err)));
-      return;
-    }
-    sending = false;
-    if (over) return;
-    stopped.set(true);
-    taken(res.state);
-    const wait = held - performance.now();
-    if (wait > 0 && !calm.peek()) await new Promise((on) => at(wait, () => on(null)));
-    reveal(res, answer);
-  };
+  // The answer, as every game's goes (answering.ts): once, locked at the tap, sent again quietly a few times while it
+  // doesn't get through (the clock running on in sight: it stops once the answer is taken, as the server takes the
+  // time it came in), and only then said under the question, with „Опитай пак“ (tried again by itself as the line
+  // comes back). When the time is up, whatever has been put in (or nothing) is the answer. What the player chose stays
+  // chosen a moment, however quick the line, before the answer shows.
+  let held = 0;
+  const ans = answering<Result>({
+    view: q.view,
+    leftMs: q.leftMs,
+    post: (answer) => {
+      held ||= answer === null ? 1 : performance.now() + holdMs;
+      return api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer });
+    },
+    open: () => !over,
+    tries: 3,
+    sendNone: true,
+    focus: true,
+    say,
+    // Out of step with the server (the run moved on elsewhere): where it stands now.
+    handles: (err) => {
+      if (err.code !== "out_of_step") return false;
+      reload();
+      return true;
+    },
+    taken: async (res, answer) => {
+      if (leaving) return;
+      taken(res.state);
+      const wait = held - performance.now();
+      if (wait > 0 && !calm.peek()) await new Promise((on) => at(wait, () => on(null)));
+      reveal(res, answer);
+    },
+  });
+  const asked = ans.asked;
+  effect(() => {
+    const p = ans.problem();
+    problem.show(() => (p ? failure(p.err, p.retry ?? undefined, wayOut(p.err)) : null));
+  });
 
   // The answer shows in beats (DESIGN.md, Motion): the player's own answer judged, its sound and its pip; the right
   // one (if it wasn't theirs) and the verdict docked at the screen's foot, its points and the tally rising with them;
@@ -716,9 +664,7 @@ function question(
       after.hidden = false;
       page.classList.add("answered");
       room();
-      say(
-        spokenVerdict(kind, res.points, kind === "right" || kind === "exact" ? "" : spokenAnswer(q.view, res.reveal)),
-      );
+      say(spokenVerdict(kind, res.points, q.view, res.reveal));
       advance = window.setTimeout(moveOn, lasts);
       // On a phone the panel docks at the screen's foot and the answers move up above it; where they can't all fit
       // (a picture, a short screen), the page moves just enough to show the right answer. On a big screen the answer
@@ -746,16 +692,14 @@ function question(
     });
   };
 
-  const asked = ask(q.view, (a) => send(a), locked, say);
-
   // More of the question shows as its time runs (the next clue): the server sends it when it's due, not before.
   let more = 0;
   const lookAgain = (ms: number) => {
     more = window.setTimeout(async () => {
-      if (sent) return;
+      if (ans.locked.peek()) return;
       try {
         const now = await api<State>("GET", `/api/runs/${s.id}`);
-        if (sent || now.question?.n !== q.n) return;
+        if (ans.locked.peek() || now.question?.n !== q.n) return;
         asked.update?.(now.question.view);
         if (now.question.moreMs) lookAgain(now.question.moreMs);
       } catch {
@@ -766,30 +710,18 @@ function question(
   if (q.moreMs) lookAgain(q.moreMs);
   onCleanup(() => clearTimeout(more));
 
-  // The time: the seconds left, and when it's up, whatever has been put in (or nothing).
-  const left = countdown(
-    q.leftMs,
-    () => send(asked.pending()),
-    () => stopped.peek(),
-  );
-
   // Leaving while the question's time runs would cost it, as the time runs on the server: a way out (the arrow, back,
   // a place in the header) asks first. Leaving gives the question up, so the run waits between two questions, where
   // the player comes back to it („Продължи“). Once the answer is in, leaving costs nothing and asks nothing.
   const leaveAsk = guardLeaving(
     "Ако излезеш сега, въпросът остава без отговор.",
-    () => !locked(),
+    () => !ans.locked(),
     async (on) => {
-      if (!sent) {
-        sent = true;
-        locked.set(true);
-        try {
-          const res = await api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer: null });
-          if (!res.state.done) keepGivenUp(s.id, q, res.reveal);
-        } catch {
-          // its time runs out on the server all the same
-        }
-      }
+      leaving = true;
+      // Given up (unless an answer is on its way or in): its time runs out on the server all the same if this
+      // doesn't get through.
+      const res = await ans.send(null);
+      if (res && !res.state.done) keepGivenUp(s.id, q, res.reveal);
       on();
     },
   );
@@ -801,12 +733,6 @@ function question(
     e.preventDefault();
     clearTimeout(advance);
     moveOn();
-  });
-
-  // Each question takes the focus as it opens, so a screen reader reads it first (no ring for it: app.css, h1).
-  const heading = h("h1", { class: "ask", tabindex: -1 }, q.view.text);
-  requestAnimationFrame(() => {
-    if (heading.isConnected) heading.focus({ preventScroll: true });
   });
 
   // On a phone the question is a column the screen's height: the head, the pips and the clock at the top, the
@@ -823,9 +749,10 @@ function question(
         versus,
       ),
       progress,
-      timer(q.leftMs, q.limitMs, left, stopped),
+      timer(q.leftMs, q.limitMs, ans.left, ans.stopped),
     ),
-    heading,
+    // It takes the focus as it opens, so a screen reader reads it first (no ring for it: app.css, h1).
+    ans.heading,
     picture(q.view, true),
     h("div", { class: "answering" }, asked.node, problem),
     after,
@@ -897,12 +824,6 @@ function kindOf(r: Result, given: Answer | null): VerdictKind {
   if (r.exact) return "exact";
   if (r.right) return "right";
   return r.points > 0 ? "partial" : "wrong";
-}
-
-/** A verdict as a screen reader says it: „Не е това. Верният отговор е Бийтълс.“, „Вярно! +1040 точки.“ */
-function spokenVerdict(kind: VerdictKind, points: number, answer: string): string {
-  const pts = points > 0 ? `+${formatNumber(points)} ${points === 1 ? "точка" : "точки"}.` : "";
-  return [verdictWords[kind], pts, answer].filter(Boolean).join(" ");
 }
 
 function credit(c: Credit): Child {

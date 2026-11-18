@@ -1,5 +1,9 @@
 // The whole UI layer: build elements with h(), keep state in signals, and let effects update exactly the nodes that
 // show it. A screen builds its DOM once; nothing is diffed or re-rendered wholesale.
+//
+// One part that throws breaks only itself: an effect that throws is reported (failed) and undone as far as it got, and
+// every other effect a change wakes still runs, in that same flush; nothing is thrown at whoever made the change (a
+// live game's stream, setting its view). A cleanup that throws doesn't keep the others from running either.
 
 // ---- Ownership: everything an effect or a screen sets up is undone when its scope ends. ----
 
@@ -11,13 +15,18 @@ interface Scope {
 
 let current: Scope | null = null;
 
-/** Runs fn in a new scope; the returned dispose undoes everything set up inside it. */
+/** Runs fn in a new scope; the returned dispose undoes everything set up inside it. If fn throws, what it set up
+ * before it threw is undone, and the error goes on to the caller. */
 export function scope<T>(fn: () => T): [T, () => void] {
   const s: Scope = { cleanups: [] };
   const parent = current;
   current = s;
   try {
     return [fn(), () => dispose(s)];
+  } catch (err) {
+    current = parent;
+    dispose(s);
+    throw err;
   } finally {
     current = parent;
   }
@@ -25,7 +34,24 @@ export function scope<T>(fn: () => T): [T, () => void] {
 
 function dispose(s: Scope): void {
   const list = s.cleanups.splice(0);
-  for (const fn of list.reverse()) fn();
+  for (const fn of list.reverse()) {
+    try {
+      fn();
+    } catch (err) {
+      failed(err);
+    }
+  }
+}
+
+/** Reports an error of the UI's own (an effect or a cleanup that threw) as the page's errors are (lib/errors.ts hears
+ * them), without throwing it at anyone: the browser's reportError, or, where there is none, thrown on its own. */
+function failed(err: unknown): void {
+  const report = (globalThis as { reportError?: (e: unknown) => void }).reportError;
+  if (typeof report === "function") report(err);
+  else
+    setTimeout(() => {
+      throw err;
+    });
 }
 
 /** Registers fn to run when the current scope ends. */
@@ -114,11 +140,16 @@ export function effect(fn: () => void): void {
     sources: new Set(),
     run() {
       untrack(c);
-      inner?.();
+      const was = inner;
+      inner = null;
+      was?.();
       const prev = tracking;
       tracking = c;
       try {
         [, inner] = scope(fn);
+      } catch (err) {
+        // Undone as far as it got (scope), and told; it runs again when what it read before it threw changes.
+        failed(err);
       } finally {
         tracking = prev;
       }

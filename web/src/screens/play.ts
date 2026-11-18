@@ -9,7 +9,7 @@ import { picture } from "../art/picture.ts";
 import { type Mastery, masteryBadge } from "../game/mastery.ts";
 import { news } from "../game/news.ts";
 import { challengeButton, challengeText, summary } from "../game/results.ts";
-import { getReady, playRun, shownHere, startScreen } from "../game/run.ts";
+import { getReady, playRun, shownHere, starting, startScreen } from "../game/run.ts";
 import type { State } from "../game/types.ts";
 import { api, errorText } from "../lib/api.ts";
 import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
@@ -313,7 +313,7 @@ export function run(r: Run): Child {
   // that page, or its entry marked, would be another page's.
   const life = lifetime();
   const start = async () => {
-    screen.show(() => h("p", { class: "muted" }, "…"));
+    screen.show(starting);
     try {
       await player();
       const s = await r.begin();

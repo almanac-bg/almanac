@@ -137,3 +137,91 @@ test("a slot's views, set after an await, are undone in turn and with the screen
   dispose();
   assert.deepEqual(undone, ["first", "second"]);
 });
+
+/** The errors the UI reported (an effect or a cleanup that threw), as the browser's reportError hears them. */
+const reported: unknown[] = [];
+(globalThis as { reportError?: (e: unknown) => void }).reportError = (e) => reported.push(e);
+
+test("an effect that throws breaks only itself: the others a change wakes run in the same flush, and set() doesn't throw", () => {
+  reported.length = 0;
+  const phase = signal("lobby");
+  const players = signal<string[] | null>([]);
+  const seen: string[] = [];
+  scope(() => {
+    // A part of a live screen that a view it didn't expect breaks (a null where a list was).
+    effect(() => {
+      phase();
+      (players() as string[]).length;
+    });
+    effect(() => seen.push(phase()));
+  });
+  batch(() => {
+    players.set(null);
+    phase.set("question");
+  });
+  phase.set("reveal");
+  players.set([]);
+  phase.set("question");
+  assert.deepEqual(seen, ["lobby", "question", "reveal", "question"]);
+  assert.equal(reported.length, 2); // the two flushes while players was null
+  assert.ok(reported[0] instanceof TypeError);
+});
+
+test("an effect that throws undoes what it set up before it threw, and runs again when what it read changes", () => {
+  reported.length = 0;
+  const a = signal(0);
+  const inner = signal(0);
+  let live = 0;
+  let runs = 0;
+  scope(() =>
+    effect(() => {
+      const n = a();
+      live++;
+      onCleanup(() => live--);
+      effect(() => {
+        inner();
+        runs++;
+      });
+      if (n === 1) throw new Error("a bad view");
+    }),
+  );
+  a.set(1);
+  assert.equal(live, 0); // the run that threw left nothing behind
+  runs = 0;
+  inner.set(1);
+  assert.equal(runs, 0); // nor its nested effect
+  a.set(2);
+  assert.equal(live, 1);
+  inner.set(2);
+  assert.equal(runs, 2); // the new run's, and only it
+  assert.equal(reported.length, 1);
+});
+
+test("a cleanup that throws doesn't keep the others from running", () => {
+  reported.length = 0;
+  const done: string[] = [];
+  const [, dispose] = scope(() => {
+    onCleanup(() => done.push("first"));
+    onCleanup(() => {
+      throw new Error("a listener gone already");
+    });
+    onCleanup(() => done.push("last"));
+  });
+  dispose();
+  assert.deepEqual(done, ["last", "first"]);
+  assert.equal(reported.length, 1);
+});
+
+test("a scope whose builder throws undoes what it set up, and the error goes on", () => {
+  reported.length = 0;
+  let undone = false;
+  assert.throws(() =>
+    scope(() => {
+      onCleanup(() => {
+        undone = true;
+      });
+      throw new Error("no screen");
+    }),
+  );
+  assert.equal(undone, true);
+});
