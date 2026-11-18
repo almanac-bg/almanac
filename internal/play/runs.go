@@ -76,7 +76,8 @@ func (g *Game) DayQuestions(ctx context.Context) (map[string]bool, error) {
 	return barred, err
 }
 
-func (g *Game) insertRun(tx *sql.Tx, userID int64, kind string, day, category any, picks []Pick) (*run, error) {
+// insertRun starts a game for a player, with the network they play from if ctx has it (FromNet, fair.go).
+func (g *Game) insertRun(ctx context.Context, tx *sql.Tx, userID int64, kind string, day, category any, picks []Pick) (*run, error) {
 	data, _ := json.Marshal(picks)
 	res, err := tx.Exec(`INSERT INTO runs (user_id, kind, day, category, questions, started_at)
 		VALUES (?, ?, ?, ?, ?, ?)`, userID, kind, day, category, string(data), store.Ms(g.Now()))
@@ -84,6 +85,9 @@ func (g *Game) insertRun(tx *sql.Tx, userID int64, kind string, day, category an
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
+	if err := g.keepNet(ctx, tx, userID, id); err != nil {
+		return nil, err
+	}
 	return load(tx, userID, id)
 }
 
@@ -100,7 +104,7 @@ func (g *Game) StartDay(ctx context.Context, userID int64) (State, error) {
 			if derr != nil {
 				return derr
 			}
-			r, err = g.insertRun(tx, userID, "day", today, nil, picks)
+			r, err = g.insertRun(ctx, tx, userID, "day", today, nil, picks)
 		}
 		if err != nil {
 			return err
@@ -168,7 +172,7 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 		if len(picks) == 0 {
 			return ErrNoQuestion
 		}
-		r, err := g.insertRun(tx, userID, "topic", nil, category, picks)
+		r, err := g.insertRun(ctx, tx, userID, "topic", nil, category, picks)
 		if err != nil {
 			return err
 		}

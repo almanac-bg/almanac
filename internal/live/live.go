@@ -13,6 +13,10 @@
 // Once a duel between two people is over, either may ask for a rematch (Rematch): the other sees it, and if they ask
 // too within RematchFor, a new duel between the two is made at once.
 //
+// The hub pairs whoever comes; whether a duel moves ratings is the game's to say as it ends (play.settleDuel): two
+// who play from one network (Player.Net, kept with each one's game: play.FromNet) play a friendly, and a new player
+// moves an established one's rating half as far.
+//
 // Every answer goes through the player's own run (internal/play), as in any game: the score, XP, the questions'
 // statistics and the duel's result are kept there, and only the timing lives here, in memory. The run moves on the
 // duel's clock alone: the duel starts each question's time on it at the moment it shows it to both (play.ShowLive) and
@@ -99,6 +103,9 @@ type Player struct {
 	Look     play.Look
 	Rating   int
 	Division play.Division
+	// Net is the network the player asks from (a keyed hash: play.FromNet), kept with their game of the duel: two
+	// from one network play a friendly (play/fair.go). None for a recording's player.
+	Net []byte
 }
 
 // Hub matches players and holds the duels under way.
@@ -245,6 +252,7 @@ func (h *Hub) pair(a, b *Seek) func() {
 	return func() {
 		defer safe.Recover("live: making a duel", a.broken, b.broken)
 		m, err := h.launch([]int64{a.player.ID, b.player.ID}, func(ctx context.Context) (play.Live, [2]Player, error) {
+			ctx = play.FromNet(play.FromNet(ctx, a.player.ID, a.player.Net), b.player.ID, b.player.Net)
 			l, err := h.game.StartLive(ctx, a.player.ID, b.player.ID)
 			return l, [2]Player{a.player, b.player}, err
 		})
@@ -469,7 +477,7 @@ func (h *Hub) expire(s *Seek) {
 	h.starting[s.player.ID] = s
 	h.mu.Unlock()
 	s.settle(h.launch([]int64{s.player.ID}, func(ctx context.Context) (play.Live, [2]Player, error) {
-		l, err := h.game.StartRecorded(ctx, s.player.ID)
+		l, err := h.game.StartRecorded(play.FromNet(ctx, s.player.ID, s.player.Net), s.player.ID)
 		if err != nil {
 			return l, [2]Player{}, err
 		}

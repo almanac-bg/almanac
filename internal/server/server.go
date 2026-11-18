@@ -417,6 +417,15 @@ func (s *Server) run(ctx context.Context, grace time.Duration) error {
 			slog.Error("duels", "err", err)
 		}
 	})
+	go safe.Every(ctx, "fair play: the day's networks", 5*time.Minute, func() {
+		n, err := s.game.JudgeNets(ctx)
+		if err != nil && ctx.Err() == nil {
+			slog.Error("fair play", "err", err)
+		}
+		if n > 0 {
+			s.problems.add("fair play: a day's ten played after several throwaway guests from the same network (/admin)")
+		}
+	})
 	go safe.Every(ctx, "after the runs", time.Minute, func() {
 		if err := s.game.AfterDue(ctx); err != nil && ctx.Err() == nil {
 			slog.Error("after the runs", "err", err)

@@ -721,13 +721,24 @@ func TestClues(t *testing.T) {
 	}
 	right := slices.Index(view.Choices, "Васил Левски")
 	pick := string(mustJSON(ChoiceAnswer{Pick: right}))
-	// A right answer is worth less with each clue it took (allowing a second for its trip); a wrong one nothing.
+	// A right answer is worth less with each clue it took; a wrong one nothing.
 	for took, want := range map[time.Duration]float64{
-		3 * time.Second: 1, ClueEvery + 500*time.Millisecond: 1, ClueEvery + 2*time.Second: 0.6, 25 * time.Second: 0.3, time.Hour: 0.3,
+		3 * time.Second: 1, ClueEvery + 2*time.Second: 0.6, 25 * time.Second: 0.3, time.Hour: 0.3,
 	} {
 		g, err := GradeAt(d, json.RawMessage(pick), took)
 		if err != nil || !g.Right || g.Score != want {
 			t.Errorf("right after %v: %+v %v", took, g, err)
+		}
+	}
+	// What's shown and what's paid agree to the millisecond: an answer that came once the next clue was sent is worth
+	// that clue's, never the one before (a script that read it at once and answered in its trip's second was paid
+	// the first's: review 2026-11-18, S27).
+	worth := []float64{1, 0.6, 0.3}
+	for _, since := range []time.Duration{ClueEvery - time.Millisecond, ClueEvery, ClueEvery + 500*time.Millisecond,
+		ClueEvery + 999*time.Millisecond, 2*ClueEvery - time.Millisecond, 2 * ClueEvery, 2*ClueEvery + 900*time.Millisecond} {
+		g, _ := GradeAt(d, json.RawMessage(pick), since)
+		if out := len(shown(since)); g.Score != worth[out-1] {
+			t.Errorf("after %v: %d clues shown, paid %v", since, out, g.Score)
 		}
 	}
 	if g, _ := GradeAt(d, mustJSON(ChoiceAnswer{Pick: (right + 1) % 4}), time.Second); g.Right || g.Score != 0 {

@@ -138,6 +138,7 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		Royal                                                      play.RoyalPace
 		RoyalMedian                                                string
 		RoyalTurnout, RoyalEvenings                                int
+		Fair                                                       []play.FairSignal
 	}{Questions: len(b.Questions), Live: len(b.Live("", "")), After: play.RetentionDays,
 		RoyalTurnout: play.RoyalTurnout, RoyalEvenings: play.RoyalEvenings}
 	today := s.game.Today()
@@ -174,6 +175,10 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	_ = db.QueryRowContext(ctx, `SELECT count(*), count(email) FROM users`).Scan(&data.Players, &data.WithEmail)
+	// The days played after several throwaway guests from the same network (play.JudgeNets).
+	if data.Fair, err = s.game.FairSignals(ctx, 50); err != nil {
+		slog.Error("admin: fair play", "err", err)
+	}
 	// The day's games by people, and apart those played at a script's speed, which nobody else sees (play/fair.go).
 	_ = db.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE `+play.ByPerson+`), count(*) FILTER (WHERE NOT (`+play.ByPerson+`)) FROM runs
 		WHERE kind = 'day' AND day = ? AND finished_at IS NOT NULL`, today).Scan(&data.DayToday, &data.DayScripted)
@@ -409,6 +414,15 @@ var adminBody = template.Must(template.New("admin").Parse(`
 {{range .Games}}<tr><td class="num">{{.Day}}</td>{{range .Kinds}}<td class="num">{{.}}</td>{{end}}<td class="num">{{.Only}}</td></tr>{{end}}
 </tbody></table></div>
 {{end}}
+
+<h2>Честна игра</h2>
+<p class="muted">Въпросите на деня, изиграни след поне двама гости от същата мрежа, създадени същия ден и изиграли само
+деня: може да са пробвали отговорите. Дните на гостите вече не се виждат на другите (докато не се върнат); денят на
+играча остава, щом не е скрит.</p>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th>Играч</th><th class="num">Верни</th><th class="num">Гости</th><th class="num">Най-добрият гост</th><th>Скрит</th></tr></thead><tbody>
+{{range .Fair}}<tr><td class="num">{{.Day}}</td><td><a href="/admin?player={{.Tag}}">{{.Name}}</a></td><td class="num">{{.Rights}}</td><td class="num">{{.Guests}}</td><td class="num">{{.Best}}</td><td>{{if .Shadow}}да{{else}}не{{end}}</td></tr>
+{{else}}<tr><td colspan="6" class="muted">Няма.</td></tr>{{end}}
+</tbody></table></div>
 
 <h2>Доклади ({{.ReportsOpen}} за {{.QuestionsReported}} {{if eq .QuestionsReported 1}}въпрос{{else}}въпроса{{end}})</h2>
 {{if gt .QuestionsReported (len .Reported)}}<p class="muted">Тук са последно докладваните {{len .Reported}}. Другите се

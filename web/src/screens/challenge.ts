@@ -7,8 +7,9 @@
 // anyone: first who sent it and how they did, and „Започни“ (the count only after that tap); then the game; then the
 // two side by side (screens/outcome.ts), with the way to add the one who sent it as a friend and to send the
 // challenge on. One who has a game of it (played, or sent to them) is at their duel; the one who sent it sees who has
-// taken it. Past its time it says so, and offers the day's ten. A link from the old challenges (six letters) is gone
-// the same way.
+// taken it. Past its time it says so, and offers the day's ten; so does one drawn for a friend who hasn't played it
+// yet (held: nobody else may know its answers first). A link from the old challenges (six letters) is gone the same
+// way.
 
 import { challengeButton, challengeText } from "../game/results.ts";
 import { getReady, playRun, starting, startScreen } from "../game/run.ts";
@@ -32,6 +33,8 @@ interface Challenge {
   expiresAt: number;
   over?: boolean;
   own?: boolean;
+  /** Drawn for a pair: nobody else takes it before the friend it was drawn for has played it. */
+  held?: boolean;
   duel?: number;
   /** To the one who sent it: their game it was sent with. */
   run?: number;
@@ -71,6 +74,10 @@ export function challenge([code = ""]: string[]) {
       if (c.duel) return redirect(`/duel/${c.duel}`);
       if (c.own) return screen.show(() => own(c));
       if (c.over) return screen.show(() => gone("Времето за това предизвикателство изтече"));
+      if (c.held)
+        return screen.show(() =>
+          gone("Още не е твой ред", `${c.by.name} го прати първо на приятел. Щом приятелят го изиграе, ще можеш и ти.`),
+        );
       screen.show(() => asked(c, screen, here));
     },
     (err) =>
@@ -83,8 +90,8 @@ export function challenge([code = ""]: string[]) {
   return h("div", null, screen);
 }
 
-/** A challenge past its time, or gone: the day's ten instead. */
-function gone(heading: string): Child {
+/** A challenge past its time, gone, or not the viewer's to take yet (held for a friend): the day's ten instead. */
+function gone(heading: string, lead = "Десетте въпроса за днес са едни и същи за всички: изиграй ги и сравни."): Child {
   return h(
     "section",
     { class: "screen" },
@@ -93,7 +100,7 @@ function gone(heading: string): Child {
       { class: "intro" },
       h("p", { class: "kicker" }, "Предизвикателство"),
       h("h1", null, heading),
-      h("p", { class: "lead" }, "Десетте въпроса за днес са едни и същи за всички: изиграй ги и сравни."),
+      h("p", { class: "lead" }, lead),
     ),
     h("a", { class: "btn primary big", href: "/" }, "Към въпросите на деня"),
   );

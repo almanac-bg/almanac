@@ -290,6 +290,15 @@ func ratingWords(d int) string {
 	return "Рейтингът ти не се промени."
 }
 
+// unratedWords say why a duel between two people moved no rating (play.DuelView.Unrated), as a notification tells
+// it; the client says the same on the duel's result (screens/outcome.ts).
+var unratedWords = map[string]string{
+	"again":     "Дуел без рейтинг: днес вече сте играли.",
+	"network":   "Дуел без рейтинг: играете от една и съща мрежа.",
+	"newcomers": "Дуел без рейтинг: с нови играчи рейтингът се променя до пет пъти на ден.",
+	"known":     "Дуел без рейтинг: някой друг вече беше изиграл това предизвикателство.",
+}
+
 // problemsSubject is the subject of the mail about new problems: „1 нов проблем“, „3 нови проблема“.
 func problemsSubject(n int) string {
 	if n == 1 {

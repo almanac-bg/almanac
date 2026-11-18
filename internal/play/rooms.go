@@ -178,7 +178,7 @@ func (g *Game) RecordRoom(ctx context.Context, userID int64, p RoomPlay) (int64,
 		if p.Category != "" {
 			category = p.Category
 		}
-		r, err := g.insertRun(tx, userID, "room", nil, category, p.Picks)
+		r, err := g.insertRun(ctx, tx, userID, "room", nil, category, p.Picks)
 		if err != nil {
 			return err
 		}

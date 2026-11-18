@@ -229,7 +229,7 @@ func (g *Game) StartRoyal(ctx context.Context, royalID int64, players []int64) (
 				runs[u] = had.Int64
 				continue
 			}
-			r, err := g.insertRun(tx, u, "royal", nil, nil, picks)
+			r, err := g.insertRun(ctx, tx, u, "royal", nil, nil, picks)
 			if err != nil {
 				return err
 			}
@@ -271,7 +271,7 @@ func (g *Game) EnterRoyal(ctx context.Context, royalID, userID int64) (int64, er
 			royalID, userID, store.Ms(g.Now())); err != nil {
 			return err
 		}
-		r, err := g.insertRun(tx, userID, "royal", nil, nil, picks)
+		r, err := g.insertRun(ctx, tx, userID, "royal", nil, nil, picks)
 		if err != nil {
 			return err
 		}

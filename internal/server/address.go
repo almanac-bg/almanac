@@ -1,12 +1,18 @@
 package server
 
 import (
+	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"net/http"
 	"net/netip"
 	"time"
+
+	"github.com/almanac-bg/almanac/internal/play"
 )
 
-// Where a request comes from, for the limits and the log.
+// Where a request comes from, for the limits, the log, and fair play (netMark: the network a game is started from,
+// as the game keeps it).
 //
 // Behind Cloudflare (Config.TrustCloudflare) the connection is Cloudflare's, and the player's address is in
 // CF-Connecting-IP. That header is taken only from a connection that comes from Cloudflare's own addresses: anyone who
@@ -102,6 +108,24 @@ func (s *Server) clientSite(r *http.Request) string { return site(s.clientAddr(r
 
 // clientHome is what the keys only counted are kept by: the /48 of an IPv6 address, an IPv4 address as it is.
 func (s *Server) clientHome(r *http.Request) string { return network(s.clientAddr(r), 48) }
+
+// netMark is the request's network (clientNet) as a game keeps it (play.FromNet, play/fair.go): a hash keyed with the
+// server's secret, so that the database and its copies hold no address, and two games from one network have one mark.
+// None for an address that is no player's network: unknown, or the machine's own (a test, the developer's).
+func (s *Server) netMark(r *http.Request) []byte {
+	a := s.clientAddr(r)
+	if !a.IsValid() || a.IsLoopback() || a.IsUnspecified() {
+		return nil
+	}
+	h := hmac.New(sha256.New, s.accounts.Secret)
+	h.Write([]byte("net:" + network(a, 64)))
+	return h.Sum(nil)[:12]
+}
+
+// fromNet is the request's context with the network the player plays from (netMark), for the games it starts.
+func (s *Server) fromNet(r *http.Request, userID int64) context.Context {
+	return play.FromNet(r.Context(), userID, s.netMark(r))
+}
 
 // network is the prefix of bits around an IPv6 address, or an IPv4 address as it is.
 func network(a netip.Addr, bits int) string {
