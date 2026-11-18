@@ -2,11 +2,12 @@
 // scoreboard after each.
 //
 // A room is opened by a host, who chooses what it plays (Settings: a topic, how many questions, how hard) and sets
-// the pace (anyone in it may while the host is away); between games the host may choose again (Change), keeping the
-// code and the players. The standings are by points, then by the time the answers took, as in a duel. The host may
-// also send a player out of the room (Remove): they're kept out of it from then on; and lock it (SetLocked), so that
-// nobody new comes in (a class, once it's all there), while those in it still come back to it. A room led from a big
-// screen (a class's) locks itself as its first game starts. A room never deals a question twice, over all its games,
+// the pace (anyone in it may while the host is away; not before the host's screen has come, for a while: hostWait);
+// between games the host may choose again (Change), keeping the code and the players. The standings are by points,
+// then by the time the answers took, as in a duel. The host may also send a player out of the room (Remove): they're
+// kept out of it from then on; and lock it (SetLocked), so that nobody new comes in (a class, once it's all there),
+// while those in it still come back to it. A room led from a big screen (a class's) locks itself as its first game
+// starts. A room never deals a question twice, over all its games,
 // nor one of the day's.
 //
 // Who is in a room is its members (Join) and its host (In): only they follow it, play in it or see who's in it. The
@@ -92,6 +93,10 @@ const (
 	// answer cut off from 0.5): a question waits for them as it would have. A question restored keeps at least as
 	// much of its time, for them to answer it in.
 	comeBack = 8 * time.Second
+	// hostWait is how long a room just opened counts its host as there before any screen of theirs is on it: they're
+	// on their way in (choosing a name for the room, on a slow line), and the first guest in doesn't take the lead
+	// meanwhile. A host who never comes leaves the lead to whoever's there after it.
+	hostWait = 2 * time.Minute
 )
 
 type Phase string
@@ -281,9 +286,25 @@ func (h *Hub) Open(host Player, from string, s Settings) (*Room, error) {
 		return nil, err
 	}
 	r.hostName = host.Name
-	if !s.Lead {
-		r.add(host)
+	back := time.Now().Add(hostWait)
+	if s.Lead {
+		r.hostBack = back
+	} else {
+		r.add(host).back = back
 	}
+	// Still not in by then (no screen of theirs ever on the room): the others' screens look again, and whoever's there
+	// may lead.
+	safe.AfterFunc(hostWait, "room: the host's wait", func() {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		waited := r.hostBack
+		if m := r.member(r.host); m != nil {
+			waited = m.back
+		}
+		if !r.closed && waited.Equal(back) {
+			r.changed()
+		}
+	})
 	return r, nil
 }
 
@@ -654,8 +675,9 @@ type member struct {
 	ms             int64 // the time their answers took, this game: of as many points, the quicker stands first
 	inRow          int   // right answers in a row, the last ones
 	online         int   // their screens on the room
-	// back is, in a room restored after a restart, until when they count as there though no screen of theirs is yet
-	// (comeBack): one was open as the server stopped, and comes back by itself. left is when their last screen went.
+	// back is until when they count as there though no screen of theirs is on the room yet: in a room restored after a
+	// restart (comeBack), one was open as the server stopped, and comes back by itself; in a room just opened, the
+	// host is on their way in (hostWait). left is when their last screen went.
 	back, left time.Time
 	// The question now: whether they've answered, what they gave (as shown), how it went.
 	answered bool
@@ -888,6 +910,12 @@ func (r *Room) Follow(viewer int64) (*Sub, error) {
 	s := &Sub{C: make(chan struct{}, 1), Done: make(chan struct{}), viewer: viewer, n: r.screens}
 	r.subs[s] = struct{}{}
 	if *online++; *online == 1 {
+		// Their screen is here: counted as there by it from now on, not by a wait for it (back).
+		if m := r.member(viewer); m != nil {
+			m.back = time.Time{}
+		} else {
+			r.hostBack = time.Time{}
+		}
 		r.changed()
 	} else {
 		s.C <- struct{}{} // its first look

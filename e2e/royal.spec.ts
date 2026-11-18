@@ -98,9 +98,12 @@ test("Роял: in from the lobby, its music, live to the fifteenth question, th
   const standings = page.getByRole("heading", { name: "Класиране" });
   // The first answer doesn't get through (the line drops as it's sent): it's sent again, and taken.
   await page.route("**/api/royal/answer", (route) => route.abort("connectionreset"), { times: 1 });
+  // On the narrowest phone, the standings under each answer scroll; each question opens at the top all the same.
+  await page.setViewportSize({ width: 320, height: 568 });
   for (let n = 0; n < 15; n++) {
     const asked = page.locator(".question-head").filter({ hasText: `${n + 1} от 15` });
     await expect(asked).toBeVisible({ timeout: 60_000 });
+    expect(await page.evaluate(() => scrollY)).toBe(0);
     if (n === 0) {
       // The first question ends the music.
       expect(await pad()).toEqual({ saws: 4, stops: 8 });
@@ -113,6 +116,7 @@ test("Роял: in from the lobby, its music, live to the fifteenth question, th
     await expect(page.locator(".verdict")).toBeVisible({ timeout: 40_000 });
     if (n === 0) await expect(page.locator(".verdict")).not.toContainText("Времето изтече");
     await expect(page.locator(".royal-table .row.me")).toBeVisible();
+    await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
   }
   // The end: the standings of all, after the fifteenth question.
   await expect(page.locator(".intro").getByText(/верни\./)).toBeVisible({ timeout: 360_000 });
@@ -141,5 +145,12 @@ test("Роял: one who comes late comes in until the third question", async ({ 
   await expect(page.locator(".royal-table .row.me").or(page.locator(".question .option").first())).toBeVisible({
     timeout: 30_000,
   });
+  // Роял opened as the tab's first page (as from its notification): back asks first, and doesn't leave the site.
+  const asked = page.getByText("Излизаш от Роял? Играта продължава без теб");
+  await page.goBack();
+  await expect(asked).toBeVisible();
+  await expect(page).toHaveURL(/\/royal$/);
+  await page.getByRole("button", { name: "Остани" }).click();
+  await expect(asked).toBeHidden();
   await other.close();
 });

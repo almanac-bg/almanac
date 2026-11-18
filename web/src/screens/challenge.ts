@@ -17,7 +17,7 @@ import type { State } from "../game/types.ts";
 import { loadDuelResult } from "../kit.ts";
 import { ApiError, api, errorText } from "../lib/api.ts";
 import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
-import { byTap, go, goBack, hold, redirect, rename, title } from "../lib/router.ts";
+import { byTap, go, goBack, hold, redirect, release, rename, title } from "../lib/router.ts";
 import { listWords, withName } from "../lib/words.ts";
 import { bulgaria, categories, player, topics, user } from "../state.ts";
 import { back, failure, formatNumber, type Look, topicMark, who } from "../ui.ts";
@@ -106,11 +106,17 @@ function gone(heading: string, lead = "Десетте въпроса за дне
   );
 }
 
-/** Who challenges, and how they did: the same ten, a tap away. */
-function asked(c: Challenge, screen: ReturnType<typeof slot>, here: () => boolean): Child {
-  const error = signal("");
+/** Who challenges, and how they did: the same ten, a tap away. The game has an entry of its own from its count on
+ * (router.ts, hold): a link opened from a chat is the tab's first page, and back, mid-game, asks first; „Откажи“ (or a
+ * game that didn't start) gives it back. */
+function asked(c: Challenge, screen: ReturnType<typeof slot>, here: () => boolean, failed = ""): Child {
   const topic = topicName(c.topic);
-  const start = () =>
+  const again = (why = "") => {
+    release();
+    screen.show(() => asked(c, screen, here, why));
+  };
+  const start = () => {
+    hold();
     screen.show(() =>
       getReady(
         "Предизвикателство",
@@ -122,18 +128,18 @@ function asked(c: Challenge, screen: ReturnType<typeof slot>, here: () => boolea
             const r = await api<{ duel: number; state?: State }>("POST", `/api/challenges/${c.code}/play`, {});
             if (!here()) return;
             if (!r.state) return go(`/duel/${r.duel}`, true);
-            // A reload comes back to this duel; the entry keeps its place in the history, and the page it came from.
+            // A reload comes back to this duel; the entry keeps its place in the history, and the page it came from
+            // (the game's end gives that address to the page under it).
             rename(`/duel/${r.duel}`);
             screen.show(() => playRun(r.state as State, (end) => afterDuel(r.duel, end.id), c.by.name));
           } catch (err) {
-            if (!here()) return;
-            error.set(errorText(err));
-            screen.show(() => asked(c, screen, here));
+            if (here()) again(errorText(err));
           }
         },
-        () => screen.show(() => asked(c, screen, here)),
+        () => again(),
       ),
     );
+  };
   return h(
     "section",
     { class: "screen" },
@@ -149,7 +155,7 @@ function asked(c: Challenge, screen: ReturnType<typeof slot>, here: () => boolea
       ),
     ),
     h("button", { class: "btn primary big", type: "button", onclick: start }, "Започни"),
-    () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    failed ? h("p", { class: "bad", role: "alert" }, failed) : null,
   );
 }
 

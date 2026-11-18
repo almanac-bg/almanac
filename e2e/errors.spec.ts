@@ -38,6 +38,12 @@ test("a page that isn't there says so, with a way on", async ({ page }) => {
   await expect(page.getByRole("alert")).toBeVisible();
   await expect(page.getByRole("button", { name: "Опитай пак" })).toHaveCount(0); // no line would make 1999 come
   await expect(page.getByRole("link", { name: "Към Профил" })).toBeVisible();
+
+  // A topic the game doesn't have (an old link): said so, not a blank page.
+  await page.goto("/play/nothing");
+  await expect(page.getByRole("heading", { name: "Тази страница я няма" })).toBeVisible();
+  await page.getByRole("link", { name: "Към въпросите на деня" }).click();
+  await expect(page.locator(".card.day")).toBeVisible();
 });
 
 test("a run offline: the clock runs on while the answer is sent, and the run keeps its frame", async ({

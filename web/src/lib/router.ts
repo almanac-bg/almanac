@@ -4,17 +4,20 @@
 // the page it was opened from, and how far down the page was scrolled; back comes to a page where it was left. A game
 // under way guards its screen (beforeLeaving): a link out, the browser's back (or a phone's) and the game's own arrow
 // all ask first, and only „Излез“ goes on, to where they were going. A game gets an entry of its own when its screen
-// has none behind it in the app (hold): the day's ten on Начало, a game opened by a link from outside; so that back,
-// mid-question, lands on the guard and not outside the game.
+// has none behind it in the app (hold): the day's ten on Начало, a game opened by a link from outside (a room's from a
+// chat, Роял's from its notification); so that back, mid-question, lands on the guard and not outside the game. Under
+// a game opened from outside is Начало, not the game's page again: „Излез“ leaves the game, and a room or a live duel
+// drawn anew would take the player straight back into it.
 //
 // A page that has fallen behind (a new version of the game out, another account signed in: fresh.ts) opens its next
 // screen by loading the page anew (loadAnew), not in place: a moment between screens, which costs the player nothing.
 // A link from outside the page (a notification, a link opened in the app) goes the way a tapped one does (navigate).
+// A screen that sends the player on as it's drawn goes on once it is drawn, so that the page sent to is what shows.
 // A screen whose heading comes after what it loads gets the focus with it (settle), as one drawn at once does. A sheet
 // over the page (a <dialog> on the body, outside any screen: a game's news, the name asked for) goes with the screen
 // it was over.
 
-import { type Child, mount, signal } from "./dom.ts";
+import { type Child, effect, mount, signal } from "./dom.ts";
 
 export interface Route {
   path: RegExp;
@@ -195,10 +198,11 @@ function travel(by: number, then: () => void): void {
   history.go(by);
 }
 
-/** Gives the entry shown another address, the screen staying as it is (a challenge made: a reload comes back to
- * it, not to a new one). A game's own entry so renamed is a page of its own from then on: its end keeps it. */
+/** Gives the entry shown another address, the screen staying as it is (a challenge taken: a reload comes back to
+ * its duel, not to a new one). A game's own entry so renamed stays the game's: its end (release) gives the page under
+ * it that address. */
 export function rename(to: string): void {
-  history.replaceState({ ...entry(), game: undefined }, "", to);
+  history.replaceState(entry(), "", to);
   path.set(location.pathname);
 }
 
@@ -228,6 +232,11 @@ export function redirect(to: string): void {
 /** Opens `to` (`tap`: as a tap does); `under`: from the page under a game's own entry, which keeps where it was
  * scrolled to before the game (hold). */
 function open(to: string, replace: boolean, tap: boolean, under = false): void {
+  // Asked by a screen as it's drawn: once it is, or the screen drawn over the new page would be this one, empty.
+  if (drawing) {
+    queueMicrotask(() => open(to, replace, tap, under));
+    return;
+  }
   const s = entry();
   if (s.game) {
     travel(-1, () => (!replace && s.from === to ? arrive() : open(to, replace, tap, true)));
@@ -268,21 +277,53 @@ export const canGoBack = (): boolean => entry().from !== undefined;
 
 /** Gives a game under way an entry of its own over the page it's played on, unless back from the page stays in the
  * app already (`always`: even then; the day's ten, on Начало, whose back would leave Начало itself): back, mid-game,
- * comes to the game's guard, then to the page under it. */
+ * comes to the game's guard, then to the page under it. A game opened from outside the app (nothing of the app's
+ * before its page) has Начало under it: back and „Излез“ come there, out of the game, and back again leaves. */
 export function hold(always = false): void {
   const s = entry();
   if (s.game || (!always && s.from !== undefined)) return;
-  mark({ y: Math.round(scrollY) });
+  const page = here();
+  const under = s.from === undefined ? "/" : page;
+  if (under === page) mark({ y: Math.round(scrollY) });
+  else history.replaceState({ i: at }, "", under);
   at += 1;
-  history.pushState({ i: at, from: here(), game: true }, "", here());
+  history.pushState({ i: at, from: under, game: true }, "", page);
 }
 
-/** A game over: its entry of its own (hold) goes, back to the page under it, which keeps what's given (its result); the
+/** A game over: its entry of its own (hold) goes, back to the page under it, which takes the game's address (Начало
+ * under a game opened from outside; a challenge's link become its duel) and keeps what's given (its result); the
  * screen stays as it is. */
 export function release(keep: Partial<Entry> = {}): void {
-  if (entry().game) travel(-1, () => mark(keep));
-  else mark(keep);
+  if (!entry().game) {
+    mark(keep);
+    return;
+  }
+  const page = here();
+  travel(-1, () => {
+    try {
+      history.replaceState({ ...entry(), ...keep }, "", page);
+    } catch {
+      // too many writes for a moment: the page under keeps its own address
+    }
+    path.set(location.pathname);
+  });
 }
+
+/** Holds the game's own entry (hold) while `playing` says the screen's game is under way, and gives it back as it
+ * ends (release): a live game's (a room's, Роял's, a live duel's), which starts and ends on its screen, and may start
+ * again there. */
+export function holdWhile(playing: () => boolean): void {
+  let held = false;
+  effect(() => {
+    const now = playing();
+    if (now && !held) hold();
+    else if (!now && held) release();
+    held = now;
+  });
+}
+
+/** Whether a screen is being drawn now (render). */
+let drawing = false;
 
 /** Draws the screen of the page shown (`first`: as the page loads). */
 function render(scrollTop: boolean, first = false): void {
@@ -303,7 +344,12 @@ function render(scrollTop: boolean, first = false): void {
   }
   disposeView?.();
   for (const sheet of document.querySelectorAll?.<HTMLDialogElement>("dialog[open]") ?? []) sheet.close();
-  disposeView = mount(root, view);
+  drawing = true;
+  try {
+    disposeView = mount(root, view);
+  } finally {
+    drawing = false;
+  }
   if (scrollTop) scrollTo(0, 0);
   settle();
 }

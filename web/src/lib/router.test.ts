@@ -1,6 +1,7 @@
 // The router against a tab's history stood in for (entries, back and forward as the browser does them: a popstate a
-// moment later): what back does during a game and after, where a way back goes, a page fallen behind loading anew, a
-// link from outside the page, and the focus on a heading that comes late.
+// moment later): what back does during a game and after (one opened from outside the app too), where a way back goes,
+// a page fallen behind loading anew, a link from outside the page, a screen that sends the player on as it's drawn,
+// and the focus on a heading that comes late.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -59,7 +60,14 @@ let focused: unknown = body;
 let heading: { tabIndex: number; focus: () => void; isConnected: boolean } | null = null;
 let observed: (() => void) | null = null;
 const sheets: { open: boolean; close: () => void }[] = [];
-const root = { replaceChildren() {}, querySelector: () => heading };
+/** What the screen shows: the name of the page drawn last into it. */
+let showing = "";
+const root = {
+  replaceChildren(node: { text?: string }) {
+    showing = node.text ?? "";
+  },
+  querySelector: () => heading,
+};
 
 Object.assign(globalThis, {
   location,
@@ -74,12 +82,13 @@ Object.assign(globalThis, {
     addEventListener() {},
     // The sheets open over the page (a game's news, the name asked for).
     querySelectorAll: (q: string) => (q === "dialog[open]" ? sheets.filter((s) => s.open) : []),
-    createTextNode: () => ({}),
+    createTextNode: (text: string) => ({ text }),
     get activeElement() {
       return focused;
     },
     body,
   },
+  Node: class {},
   MutationObserver: class {
     constructor(fn: () => void) {
       observed = fn;
@@ -96,7 +105,7 @@ const router = await import("./router.ts");
 const drawn: string[] = [];
 const page = (name: string) => () => {
   drawn.push(name);
-  return null;
+  return name;
 };
 router.start(
   root as unknown as Element,
@@ -105,6 +114,16 @@ router.start(
     { path: /^\/play\/([a-z]+)$/, view: page("topic") },
     { path: /^\/friends$/, view: page("Приятели") },
     { path: /^\/settings$/, view: page("Настройки") },
+    { path: /^\/r\/([0-9]+)$/, view: page("room") },
+    // A screen that sends the player on as it's drawn (an old link): the page sent to is what shows.
+    {
+      path: /^\/gone$/,
+      view: () => {
+        drawn.push("gone");
+        router.go("/friends", true);
+        return null;
+      },
+    },
   ],
   page("missing"),
 );
@@ -242,4 +261,81 @@ test("a screen whose heading comes after it loads gets the focus with it, unless
   heading = { tabIndex: 0, isConnected: true, focus: () => (got = true) };
   observed?.();
   assert.equal(got, false);
+});
+
+/** Makes the entry shown a page opened from outside the app (a link from a chat, a notification): the tab's first. */
+function fromOutside(url: string): void {
+  history.replaceState({ i: router.entry().i }, "", url);
+}
+
+test("a game opened from outside has Начало under it: back asks, and „Излез“ leaves the game for Начало", async () => {
+  fromOutside("/r/123456");
+  const at = index;
+  router.holdWhile(() => true);
+  assert.equal(router.entry().game, true);
+  assert.equal(location.pathname, "/r/123456", "the game keeps its address");
+  assert.equal(entries[at]?.url, "/", "Начало under it");
+  let ask: (() => void) | null = null;
+  const unguard = router.beforeLeaving((proceed) => {
+    ask = proceed;
+    return true;
+  });
+  drawn.length = 0;
+  history.back();
+  await tick();
+  await tick();
+  assert.ok(ask, "back asks first");
+  assert.equal(index, at + 1, "the game's entry put back meanwhile");
+  (ask as unknown as () => void)();
+  unguard();
+  await tick();
+  assert.equal(index, at);
+  assert.equal(location.pathname, "/");
+  assert.deepEqual(drawn, ["Начало"], "out of the game, not into it again");
+});
+
+test("a game opened from outside, over: the page under it takes its address, renamed or not, and its result", async () => {
+  fromOutside("/play/history");
+  const at = index;
+  router.hold();
+  router.rename("/duel/7"); // a challenge's link become its duel
+  assert.equal(router.entry().game, true, "still the game's own entry");
+  drawn.length = 0;
+  router.release({ result: 9 });
+  await tick();
+  assert.equal(index, at);
+  assert.equal(location.pathname, "/duel/7");
+  assert.equal(router.entry().result, 9);
+  assert.equal(router.entry().game, undefined);
+  assert.equal(router.entry().from, undefined, "still the first page: back from it leaves");
+  assert.deepEqual(drawn, [], "the result stays on screen as it is");
+});
+
+test("a live game holds its entry while it's under way, and gives it back at its end", async () => {
+  const { signal } = await import("./dom.ts");
+  fromOutside("/r/654321");
+  const at = index;
+  const playing = signal(false);
+  router.holdWhile(playing);
+  assert.equal(index, at, "the lobby holds nothing");
+  playing.set(true);
+  assert.equal(index, at + 1);
+  assert.equal(router.entry().game, true);
+  playing.set(false);
+  await tick();
+  assert.equal(index, at);
+  assert.equal(location.pathname, "/r/654321");
+  playing.set(true); // the next game in the same room
+  assert.equal(router.entry().game, true);
+  playing.set(false);
+  await tick();
+});
+
+test("a screen that sends the player on as it's drawn: the page it sends to shows", async () => {
+  drawn.length = 0;
+  router.go("/gone");
+  await tick();
+  assert.equal(location.pathname, "/friends");
+  assert.deepEqual(drawn, ["gone", "Приятели"]);
+  assert.equal(showing, "Приятели", "not the screen that sent the player on, empty");
 });

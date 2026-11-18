@@ -66,6 +66,7 @@ let {
   avatar,
   back,
   guardLeaving,
+  holdWhile,
   pageArt,
   verdict,
   stream,
@@ -255,6 +256,7 @@ export function royal(kit: Kit) {
     avatar,
     back,
     guardLeaving,
+    holdWhile,
     pageArt,
     verdict,
     stream,
@@ -328,14 +330,16 @@ export function royal(kit: Kit) {
     return v ? `${v.phase}:${v.n}:${v.in}:${v.startsAt}:${v.question?.shown ?? 0}` : "";
   });
   // Leaving the game while in its standings costs it: it goes on without the player, their time running out on each
-  // question, and the place they end in counts. Every way out asks first; one cut, playing on for themselves, isn't
-  // asked.
+  // question, and the place they end in counts. Every way out asks first, back too (Роял opened from its notification
+  // has an entry of its own meanwhile: holdWhile); one cut, playing on for themselves, isn't asked.
+  const costs = () => {
+    const v = view();
+    return !!v && (v.phase === "question" || v.phase === "reveal") && v.in && !v.out;
+  };
+  holdWhile(costs);
   const leaveAsk = guardLeaving(
     "Излизаш от Роял? Играта продължава без теб: въпросите остават без отговор, а мястото ти се брои.",
-    () => {
-      const v = view();
-      return !!v && (v.phase === "question" || v.phase === "reveal") && v.in && !v.out;
-    },
+    costs,
   );
   // Each question's answer, by evening and question: a question drawn again (the server showing it again after a
   // restart) goes on with the answer on its way, or in.
@@ -369,6 +373,7 @@ export function royal(kit: Kit) {
         case "lobby":
           return lobby(live, now, joined);
         case "question":
+          scrollTo(0, 0); // each question opens at the top, its count in sight, wherever the standings were scrolled to
           return [door(live, joined), question(live, v, answers, () => closed)];
         case "reveal":
           return [door(live, joined), reveal(live, v)];

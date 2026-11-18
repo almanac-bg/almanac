@@ -30,6 +30,7 @@ export let {
   errorText,
   fact,
   guardLeaving,
+  holdWhile,
   formatNumber,
   hostCss,
   h,
@@ -146,6 +147,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
     errorText,
     fact,
     guardLeaving,
+    holdWhile,
     formatNumber,
     hostCss,
     h,
@@ -244,13 +246,16 @@ export function room(kit: Kit, [code = ""]: string[]) {
     return phase === "question" || phase === "reveal" || leading();
   });
   // Leaving a game under way costs its questions: it goes on without the player (who may come back to it by the
-  // code). Every way out asks first; a host leading from a big screen plays nothing, and isn't asked.
+  // code). Every way out asks first, back too (the room opened from a chat has an entry of its own meanwhile:
+  // holdWhile); a host leading from a big screen plays nothing, and isn't asked.
+  const costs = () => {
+    const v = view();
+    return !!v && (v.phase === "question" || v.phase === "reveal") && !(v.lead && v.isHost);
+  };
+  holdWhile(costs);
   const leaveAsk = guardLeaving(
     "Излизаш от стаята? Играта продължава без теб, а въпросите остават без отговор.",
-    () => {
-      const v = view();
-      return !!v && (v.phase === "question" || v.phase === "reveal") && !(v.lead && v.isHost);
-    },
+    costs,
   );
   effect(() => document.documentElement.classList.toggle("hosting", leading()));
   onCleanup(() => document.documentElement.classList.remove("hosting"));
@@ -361,6 +366,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
         case "lobby":
           return lobby(view as () => RoomView, code);
         case "question":
+          scrollTo(0, 0); // each question opens at the top, wherever the standings were scrolled to
           return question(view as () => RoomView, code, v);
         case "reveal":
           return reveal(view as () => RoomView, v, places);
