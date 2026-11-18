@@ -75,7 +75,7 @@ type reminders struct {
 const never = 24 * 60
 
 // Remind reminds, every minute, those whose hour has come (remind), and mails those whose streak ended and whom no
-// notification reaches (streakMails).
+// notification reaches (streakMails), and those who asked for the day's reminder by mail (dayMails).
 func (s *Server) Remind(ctx context.Context) {
 	t := time.NewTicker(time.Minute)
 	defer t.Stop()
@@ -87,6 +87,7 @@ func (s *Server) Remind(ctx context.Context) {
 			now := time.Now()
 			s.remind(ctx, now)
 			s.streakMails(ctx, now) // for those no notification reaches (streakmail.go)
+			s.dayMails(ctx, now)    // after it: one mail a day at most (daymail.go)
 		}
 	}
 }

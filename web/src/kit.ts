@@ -67,7 +67,7 @@ import { stream } from "./lib/stream.ts";
 import { issueWords, listWords, withName } from "./lib/words.ts";
 import { dayInBulgaria, yearNow } from "./lib/year.ts";
 import type { DuelView } from "./screens/duel.ts";
-import { haveProfile } from "./screens/keep.ts";
+import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
 import { leagueBoard, leagueLine, loadLeague } from "./screens/league.ts";
 import { clock, coming, dayAndTime, dayWord, whileSeen } from "./screens/modes.ts";
 import type { Steps } from "./screens/outcome.ts";
@@ -171,6 +171,7 @@ export const kit = {
   inApp,
   issueWords,
   keepAwake,
+  keepGame,
   landing,
   leagueBoard,
   leagueEmblem,
@@ -183,6 +184,7 @@ export const kit = {
   loadLeague,
   loadMistakes,
   loadProgress,
+  mailAsk,
   masteryCard,
   meaning,
   meter,

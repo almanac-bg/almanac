@@ -1,15 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
-import { openGame } from "./play.ts";
-
-/** The last sign-in code mailed to `email` (the dev server writes its mail to files). */
-function mailedCode(email: string): string {
-  try {
-    return /\b(\d{6})\b/.exec(readFileSync(`test-results/mail/${email}.txt`, "utf8"))?.[1] ?? "";
-  } catch {
-    return ""; // not sent yet
-  }
-}
+import { mailedCode, openGame } from "./play.ts";
 
 /** Plays a topic's first question in, which makes the page a guest. */
 async function becomeGuest(page: Page) {
@@ -29,12 +20,18 @@ test("a guest keeps their game with a code by email, and can sign out", async ({
   await expect(page.getByText(/прати нов код след \d+ с/)).toBeVisible();
   // A wrong code says so, and counts.
   await page.getByLabel("Код").fill("000000");
-  await page.getByRole("button", { name: "Влез" }).click();
+  await page.getByRole("button", { name: "Потвърди" }).click();
   await expect(page.getByRole("alert")).toHaveText(/^Грешен код\./);
   await page.getByLabel("Код").fill(mailedCode(email));
-  await page.getByRole("button", { name: "Влез" }).click();
+  await page.getByRole("button", { name: "Потвърди" }).click();
   await expect(page.getByText(`Влизаш с ${email}`)).toBeVisible();
-  // With an email and notifications on no device, a streak's end may come by mail: on, and the player's to stop.
+  // What came of it is said: the guest's game is kept.
+  await expect(page.getByRole("status")).toHaveText(
+    `Готово. Играта ти е запазена с имейла ${email}. Влизай с него от всяко устройство.`,
+  );
+  // With an email and notifications on no device, mail: the day's reminder only if asked for, a streak's end on, and
+  // both the player's to switch.
+  await expect(page.getByRole("switch", { name: "Напомняне по имейл" })).toHaveAttribute("aria-checked", "false");
   const mail = page.getByRole("switch", { name: "Имейл, когато серията ти прекъсне" });
   await expect(mail).toHaveAttribute("aria-checked", "true");
   await mail.click();
@@ -43,7 +40,9 @@ test("a guest keeps their game with a code by email, and can sign out", async ({
   await expect(mail).toHaveAttribute("aria-checked", "false");
   // Out of the profile everywhere else; still in here.
   await page.getByRole("button", { name: "Излез от другите устройства" }).click();
-  await expect(page.getByRole("status")).toHaveText("Готово: профилът ти е отворен само на това устройство.");
+  await expect(page.getByRole("status").filter({ hasText: "Готово: профилът" })).toHaveText(
+    "Готово: профилът ти е отворен само на това устройство.",
+  );
   await expect(page.getByText(`Влизаш с ${email}`)).toBeVisible();
   await page.getByRole("button", { name: "Излез", exact: true }).click();
   // Signed out: said so, the way back in, and this device's own settings still here.

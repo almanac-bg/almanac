@@ -17,11 +17,12 @@ import { getReady, playRun, shownHere, starting, trail } from "../game/run.ts";
 import { dayShareText, percent, rare } from "../game/share.ts";
 import type { Board, Mark, Score, State } from "../game/types.ts";
 import { api, errorText, serverNow, tally } from "../lib/api.ts";
+import { inApp } from "../lib/app.ts";
 import { boot } from "../lib/boot.ts";
 import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { place } from "../lib/ordinal.ts";
-import { needsHomeScreen, pushable, pushOn, turnOn } from "../lib/push.ts";
+import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { goBack, hold, release, title } from "../lib/router.ts";
 import { feelKit } from "../lib/sound.ts";
 import { dateWords, issueWords, onDay, weekday } from "../lib/words.ts";
@@ -50,7 +51,7 @@ import {
   playedLine,
 } from "./duel.ts";
 import { type Goals, goalsCard, loadGoals, openGoals } from "./goals.ts";
-import { haveProfile, keepLine } from "./keep.ts";
+import { app, haveProfile, keepLine, keepStake, mailAsk } from "./keep.ts";
 import { leagueNote } from "./league.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
@@ -127,7 +128,7 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
   // A profile just deleted, or a game just brought here, is said once, over the day.
   let bye = notice.peek();
   notice.set("");
-  // The streak's mail links here with ?from=mail (server/streakmail.go): its reader has a profile.
+  // The game's mails link here with ?from=mail (server/streakmail.go, daymail.go): their reader has a profile.
   const fromMail = new URLSearchParams(location.search).get("from") === "mail";
   if (fromMail) history.replaceState(history.state, "", "/");
   const screen = slot(() => h("p", { class: "muted" }, "…"));
@@ -233,8 +234,10 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
         () => undefined,
       ),
     };
-    const said = bye;
+    // Or a profile just signed in to here (haveProfile): what came of it.
+    const said = bye || notice.peek();
     bye = "";
+    notice.set("");
     // The day's goals (shown once XP is open: play/unfold.go; the day just played may open it): what's next after the
     // day, and where another game goes.
     const goals = signal<Goals | null>(null);
@@ -309,8 +312,8 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
                 tomorrowCard(
                   t.day,
                   () => (just && fresh() === t ? 0 : fresh().streak),
-                  // A guest is asked to keep the game in a line of its own (screens/keep.ts).
-                  keepLine(
+                  // A guest is asked to keep the game (screens/keep.ts): what it risks till then.
+                  keepStake(
                     () => (fresh().open?.xp ? 2 : 1),
                     () => fresh().streak,
                   ),
@@ -707,12 +710,14 @@ function friendsPlayed(t: Today): Child {
 }
 
 /** The day played, right under its result's buttons: tomorrow, in one quiet card. When the next ten come (midnight in
- * Bulgaria), what they make of the streak (`streak`: with today's), a guest's ask to keep the game (`keep`), and,
- * where it can come and isn't on yet, the reminder's ask. */
-function tomorrowCard(day: string, streak: () => number, keep: Child): Child {
+ * Bulgaria), what they make of the streak (`streak`: with today's), a guest's ask to keep the game (`stake`: what it
+ * risks till then), and, where it isn't on yet, the reminder's ask, which by mail asks for the email the keeping
+ * would. */
+function tomorrowCard(day: string, streak: () => number, stake: () => string | null): Child {
   const left = signal(untilMidnight());
   const t = setInterval(() => left.set(untilMidnight()), 30_000);
   onCleanup(() => clearInterval(t));
+  const ask = remindAsk(day, stake);
   return h(
     "section",
     { class: "card keep-card tomorrow" },
@@ -721,8 +726,9 @@ function tomorrowCard(day: string, streak: () => number, keep: Child): Child {
       const n = streak();
       return `След ${left()}.${n > 0 ? ` Изиграй ги и серията ти става ${n + 1}.` : ""}`;
     }),
-    keep,
-    remindAsk(day),
+    // The ask by mail asks a guest for the email itself: the line to keep the game steps aside for it.
+    keepLine(stake, ask.mailing),
+    ask.view,
   );
 }
 
@@ -738,17 +744,23 @@ function untilMidnight(): string {
 /** Where the reminder's asks are kept, on this device (notifications are a device's): how many, the last one's day. */
 const remindKey = "almanac.remind-ask";
 
-/** The day played, in its card for tomorrow: shall we remind the player? Asked where notifications can come and aren't
- * on yet, at most three times and never twice in a day; on an iPhone in a browser tab, what it takes. */
-function remindAsk(day: string): Child {
+/** The day played, in its card for tomorrow: shall we remind the player? By notification where one can come and isn't
+ * on yet. Where none can (an iPhone in a browser tab, a browser without them, or one told to refuse them, there and
+ * then too), by mail (keep.ts, mailAsk: a guest's email, proved by its code, keeps the game as well), unless it's on
+ * already; never in an app's own browser, where the way out to the phone's leads (keepLine). At most three times,
+ * and never twice in a day. `mailing`: the ask by mail is asking a guest for an email. */
+function remindAsk(day: string, stake: () => string | null): { view: Child; mailing: () => boolean } {
   let asked = { n: 0, day: "", shown: "" };
   try {
     asked = { ...asked, ...JSON.parse(localStorage.getItem(remindKey) ?? "{}") };
   } catch {
     // no storage here: ask
   }
-  const home = needsHomeScreen();
-  if (asked.n >= 3 || asked.day === day || !(home || pushable())) return null;
+  const refused = () => !inApp && typeof Notification !== "undefined" && Notification.permission === "denied";
+  const by = signal<"push" | "mail" | null>(pushable() && !refused() ? "push" : app ? null : "mail");
+  const state = signal<"ask" | "on" | "gone">("gone");
+  const mailing = () => by() === "mail" && state() === "ask" && !user()?.email;
+  if (asked.n >= 3 || asked.day === day || !by.peek()) return { view: null, mailing };
   const keep = (n: number) => {
     try {
       localStorage.setItem(remindKey, JSON.stringify({ n, day }));
@@ -759,34 +771,42 @@ function remindAsk(day: string): Child {
   // Counted once a day on a device (play/measure.go), however often Начало is drawn.
   const shown = () => {
     if (asked.shown === day) return;
-    tally(home ? "pushask:home" : "pushask:shown");
+    tally(by.peek() === "push" ? "pushask:shown" : "mailask:shown");
     try {
       localStorage.setItem(remindKey, JSON.stringify({ ...asked, shown: day }));
     } catch {
       // counted again next time
     }
   };
-  const state = signal<"ask" | "on" | "gone">(home ? "ask" : "gone");
-  const error = signal("");
-  if (home) shown();
-  else
+  const ask = () => {
+    state.set("ask");
+    shown();
+  };
+  if (by.peek() === "push")
     pushOn().then(
-      (on) => {
-        state.set(on ? "gone" : "ask");
-        if (!on) shown();
-      },
+      (on) => (on ? null : ask()),
       () => {},
     );
+  else if (user.peek()?.email)
+    api<{ day: boolean; can: boolean }>("GET", "/api/mail/prefs").then(
+      (p) => (p.can && !p.day ? ask() : null),
+      () => {},
+    );
+  else ask();
+  const error = signal("");
   const yes = async () => {
     error.set("");
     try {
       const why = await turnOn();
-      if (why) error.set(why);
-      else {
+      if (!why) {
         keep(3);
         state.set("on");
         tally("pushask:yes");
-      }
+      } else if (refused() && !app) {
+        // Told no just now: the mail, then.
+        error.set(why);
+        by.set("mail");
+      } else error.set(why);
     } catch (err) {
       reportProblem(`reminder ask: ${(err as Error).name}: ${(err as Error).message}`);
       error.set("Не успяхме. Опитай пак.");
@@ -795,33 +815,44 @@ function remindAsk(day: string): Child {
   const no = () => {
     keep(asked.n + 1);
     state.set("gone");
-    if (!home) tally("pushask:no");
+    tally(by.peek() === "push" ? "pushask:no" : "mailask:no");
   };
-  return () =>
-    state() === "gone"
-      ? null
-      : state() === "on"
-        ? h(
-            "p",
-            { class: "muted", role: "status" },
-            "Готово. Ще ти напомним около часа, в който играеш, ако въпросите още те чакат.",
-          )
-        : [
-            h(
-              "p",
-              { class: "muted" },
-              home
-                ? "На iPhone напомнянията идват, щом добавиш АЛМАНАХ към началния екран: Сподели → Добави към началния екран."
-                : "Да ти напомним, ако въпросите още те чакат? Веднъж на ден, около часа, в който играеш.",
-            ),
-            h(
-              "div",
-              { class: "remind-actions" },
-              home ? null : h("button", { class: "btn", type: "button", onclick: yes }, "Напомняй ми"),
-              h("button", { class: "link", type: "button", onclick: no }, home ? "Разбрах" : "Не сега"),
-            ),
-            () => error() && h("p", { class: "bad", role: "alert" }, error()),
-          ];
+  const view = () => {
+    if (state() === "gone") return null;
+    if (state() === "on")
+      return h(
+        "p",
+        { class: "muted", role: "status" },
+        "Готово. Ще ти напомним около часа, в който играеш, ако въпросите още те чакат.",
+      );
+    if (by() === "mail")
+      return [
+        () => error() && h("p", { class: "muted" }, error()),
+        mailAsk({
+          stake,
+          no,
+          yes: () => {
+            keep(3);
+            tally("mailask:yes");
+          },
+        }),
+      ];
+    return [
+      h(
+        "p",
+        { class: "muted" },
+        "Да ти напомним, ако въпросите още те чакат? Веднъж на ден, около часа, в който играеш.",
+      ),
+      h(
+        "div",
+        { class: "remind-actions" },
+        h("button", { class: "btn", type: "button", onclick: yes }, "Напомняй ми"),
+        h("button", { class: "link", type: "button", onclick: no }, "Не сега"),
+      ),
+      () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    ];
+  };
+  return { view, mailing };
 }
 
 /** Начало's way in, while the year's look back is fresh. */

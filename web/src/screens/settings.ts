@@ -46,10 +46,13 @@ let {
   user,
   back,
   signIn,
+  mailAsk,
 } = {} as Kit;
 
 /** Signed out just now: said here, where it was done, and only here (Начало, next, doesn't say it again). */
 let signedOut: Signal<boolean>;
+/** What came of a code put in here just now (signIn: a game kept, a profile signed in to), said under the profile. */
+let signedIn: Signal<string>;
 
 export function settings(kit: Kit) {
   ({
@@ -90,10 +93,12 @@ export function settings(kit: Kit) {
     user,
     back,
     signIn,
+    mailAsk,
   } = kit);
   title("Настройки");
   notice.set("");
   signedOut = signal(false);
+  signedIn = signal("");
   return h(
     "section",
     { class: "screen" },
@@ -106,9 +111,9 @@ export function settings(kit: Kit) {
           "div",
           { class: "settings" },
           nameForm(),
+          reminders(),
           sounds(),
           access(),
-          reminders(),
           account(),
           h(
             "section",
@@ -133,7 +138,7 @@ export function settings(kit: Kit) {
                     "Излезе от профила си. Влез пак с имейла си или започни да играеш.",
                   )
                 : h("p", { class: "lead" }, "Още нямаш профил. Влез с имейл или започни да играеш."),
-            signIn(),
+            signIn({ done: (said) => signedIn.set(said) }),
           ),
           sounds(),
           access(),
@@ -207,6 +212,14 @@ function nameForm(): Child {
         "aria-label": "Име",
         "aria-describedby": "name-how",
         autocomplete: "nickname",
+        // Come to change the name (Профил's „Смени го“ under a name drawn): the field, ready for the new one.
+        ref: (el) => {
+          if (location.hash === "#name")
+            queueMicrotask(() => {
+              (el as HTMLInputElement).focus();
+              (el as HTMLInputElement).select();
+            });
+        },
         minlength: 2,
         maxlength: 30,
         required: true,
@@ -261,6 +274,7 @@ function account(): Child {
       () => user()?.email,
       () => [
         h("h2", null, "Профилът ти"),
+        () => signedIn() && h("p", { class: "muted", role: "status" }, signedIn()),
         h(
           "p",
           null,
@@ -272,13 +286,13 @@ function account(): Child {
         signOutOthers(),
       ],
       () => [
-        h("h2", null, "Влез или запази профила си"),
+        h("h2", null, "Запази играта си"),
         h(
           "p",
           { class: "muted" },
           "Засега играта ти се пази само на това устройство. Добави имейл и ще я имаш навсякъде, където влезеш с него. Имаш профил от друго устройство? Влез с неговия имейл и играта оттук ще се добави към профила.",
         ),
-        signIn(),
+        signIn({ enter: "Потвърди", done: (said) => signedIn.set(said) }),
       ],
     ),
   );
@@ -338,13 +352,16 @@ function access(): Child {
   );
 }
 
-/** The mail when a streak ends (server/streakmail.go): a switch, for a player with an email whom no notification
- * reaches, on any device. */
-function byMail() {
-  const prefs = signal<{ streak: boolean; can: boolean } | null>(null);
+/** Mail for whom no notification reaches, on any device (a player with an email, proved by its code): the day's
+ * reminder (server/daymail.go) and the mail when a streak ends (server/streakmail.go), a switch each. A guest where
+ * notifications can't come here (`ask`) is offered the reminder by mail, which keeps their game with the email too
+ * (mailAsk). */
+function byMail(ask: () => boolean) {
+  type Prefs = { streak: boolean; day: boolean; can: boolean };
+  const prefs = signal<Prefs | null>(null);
   const error = signal("");
   const load = () => {
-    if (user.peek()?.email) api<{ streak: boolean; can: boolean }>("GET", "/api/mail/prefs").then(prefs.set, () => {});
+    if (user.peek()?.email) api<Prefs>("GET", "/api/mail/prefs").then(prefs.set, () => {});
     else prefs.set(null);
   };
   // Again as an email is added (a guest signing in here), or the player signs out.
@@ -352,52 +369,66 @@ function byMail() {
     user()?.email;
     untracked(load);
   });
+  const set = (kind: "streak" | "day") => async (on: boolean) => {
+    const was = prefs.peek();
+    if (!was) return;
+    error.set("");
+    prefs.set({ ...was, [kind]: on });
+    try {
+      prefs.set(await api("PATCH", "/api/mail/prefs", { kind, on }));
+    } catch (err) {
+      prefs.set(was);
+      error.set(errorText(err));
+    }
+  };
   const row = () =>
     prefs()?.can
       ? [
           switchRow(
+            "Напомняне по имейл",
+            "Веднъж на ден, около часа, в който играеш, ако въпросите още те чакат.",
+            () => prefs()?.day ?? false,
+            set("day"),
+          ),
+          switchRow(
             "Имейл, когато серията ти прекъсне",
             "Едно писмо, ако серия от 5 дни или повече прекъсне. Най-много едно на 30 дни.",
             () => prefs()?.streak ?? false,
-            async (on) => {
-              const was = prefs.peek();
-              if (!was) return;
-              error.set("");
-              prefs.set({ ...was, streak: on });
-              try {
-                prefs.set(await api("PATCH", "/api/mail/prefs", { kind: "streak", on }));
-              } catch (err) {
-                prefs.set(was);
-                error.set(errorText(err));
-              }
-            },
+            set("streak"),
           ),
           () => error() && h("p", { class: "bad", role: "alert" }, error()),
         ]
-      : null;
-  return { row, load, can: () => !!prefs()?.can };
+      : !user()?.email && ask()
+        ? mailAsk({ folded: true })
+        : null;
+  return { row, load };
 }
 
-/** Notifications: on or off on this device, and which kinds the player gets (on every device they have them on); and
- * for whom no notification reaches, the mail when a streak ends. */
+/** Notifications, always (where they can't come, it says why): on or off on this device, and which kinds the player
+ * gets (on every device they have them on); and for whom no notification reaches, mail (byMail). */
 function reminders(): Child {
-  const mail = byMail();
-  if (needsHomeScreen()) {
+  const head = h("h2", null, "Известия");
+  if (needsHomeScreen() || !pushable()) {
+    const mail = byMail(() => true);
     return h(
       "section",
       { class: "stack" },
-      h("h2", null, "Известия"),
+      head,
       h(
         "p",
         { class: "muted" },
-        "На iPhone известията идват, щом добавиш АЛМАНАХ към началния екран: Сподели → Добави към началния екран. После ги включи оттук.",
+        needsHomeScreen()
+          ? "На iPhone известията идват, щом добавиш АЛМАНАХ към началния екран: Сподели → Добави към началния екран. После ги включи оттук."
+          : "Този браузър не поддържа известия.",
       ),
       mail.row,
     );
   }
-  if (!pushable())
-    return () => (mail.can() ? h("section", { class: "stack" }, h("h2", null, "Известия"), mail.row) : null);
   const on = signal<boolean | null>(null);
+  // Refused by the browser (before, or just now): the mail is offered instead.
+  const denied = () => typeof Notification !== "undefined" && Notification.permission === "denied";
+  const refused = signal(denied());
+  const mail = byMail(() => on() === false && refused());
   const prefs = signal<PushPrefs | null>(null);
   const error = signal("");
   const load = () => pushPrefs().then(prefs.set, () => {});
@@ -416,8 +447,10 @@ function reminders(): Child {
         on.set(false);
       } else {
         const why = await turnOn();
-        if (why) error.set(why);
-        else {
+        if (why) {
+          error.set(why);
+          refused.set(denied());
+        } else {
           on.set(true);
           load();
         }
@@ -449,7 +482,7 @@ function reminders(): Child {
   return h(
     "section",
     { class: "stack" },
-    h("h2", null, "Известия"),
+    head,
     () =>
       on() === null
         ? null

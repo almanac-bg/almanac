@@ -4738,27 +4738,32 @@
     overflow-wrap: break-word;
   }
 
-  /* Настройки, beside the name: a square with its icon. */
-  .icon-btn {
-    display: grid;
+  /* Настройки, beside the name: its icon and its word, at every width (an icon alone is read by few). */
+  .me-settings {
     flex: none;
-    place-items: center;
-    width: 2.75rem;
-    height: 2.75rem;
-    border-radius: var(--radius-md);
-    background: var(--raised);
-    box-shadow:
-      var(--elev-1),
-      inset 0 0 0 1px var(--line-strong);
-    color: var(--text);
+    width: auto;
+    min-height: 2.75rem;
+    padding: var(--space-2) var(--space-3);
+    font-size: 0.9375rem;
   }
 
-  .icon-btn:hover {
-    color: var(--link);
+  .me-settings .i {
+    font-size: 1.25rem;
   }
 
-  .icon-btn-i {
-    font-size: 1.375rem;
+  /* On a narrow phone the name keeps its width: the word goes under the icon, smaller. */
+  @media (max-width: 24rem) {
+    .me-settings {
+      flex-direction: column;
+      gap: 2px;
+      padding: var(--space-2);
+      font-size: 0.75rem;
+    }
+  }
+
+  /* Under a name still drawn: that it was, and the way to change it. */
+  .me-drawn {
+    font-size: 0.875rem;
   }
 
   /* Гардероб: what's worn, as others see it. */

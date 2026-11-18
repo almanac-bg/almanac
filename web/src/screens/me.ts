@@ -1,8 +1,9 @@
 // Профил: who you are in the game — your avatar, name, tag and title; your level and what comes next; your league in a
 // line (its group is Класации'); your streak, numbers, mastery and latest games (the rating's division is the duels'
-// and Роял's, on their screens) — with its own places a tap away at the top (Награди, Гардероб, Алманах) and the
-// settings beside your name. A hub: each thing once, the whole of it a tap away. Each system shows once the player has
-// met it (play/unfold.go): the level from the second day played, the league from the third.
+// and Роял's, on their screens) — with its own places a tap away at the top (Награди, Гардероб, Алманах) and
+// Настройки beside your name, in words. A hub: each thing once, the whole of it a tap away. Each system shows once the
+// player has met it (play/unfold.go): the level from the second day played, the league from the third. A guest is
+// asked to keep their game, from the first one, and the way in for a profile from elsewhere is apart from it.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -20,6 +21,7 @@ let {
   title,
   yearNow,
   user,
+  notice,
   avatar,
   badge,
   explain,
@@ -33,6 +35,7 @@ let {
   unlockPicture,
   unlockWords,
   haveProfile,
+  keepGame,
   leagueLine,
   loadProgress,
   nearest,
@@ -49,6 +52,7 @@ export function me(kit: Kit) {
     title,
     yearNow,
     user,
+    notice,
     avatar,
     badge,
     explain,
@@ -62,12 +66,16 @@ export function me(kit: Kit) {
     unlockPicture,
     unlockWords,
     haveProfile,
+    keepGame,
     leagueLine,
     loadProgress,
     nearest,
     stats,
   } = kit);
   title("Профил");
+  // A game just kept, or a profile signed in to, here (keepGame, haveProfile): said once, at the top.
+  const said = notice.peek();
+  notice.set("");
   return h(
     "section",
     { class: "screen" },
@@ -80,11 +88,25 @@ export function me(kit: Kit) {
         loadProgress().then(progress.set, failed.set);
         return [
           profileNav(),
+          said ? h("p", { class: "muted", role: "status" }, said) : null,
           head(progress),
-          () => (failed() && !progress() ? failure(failed(), () => go("/me", true)) : null),
-          // A guest who has a profile elsewhere signs in here, a tap away; Профил again, as the profile has it.
+          // A name still the one drawn: said so, with the way to change it.
           () =>
-            user()?.email ? null : haveProfile(() => go("/me", true), "Играеш и на друго устройство? Влез с имейла си"),
+            user()?.drawn
+              ? h(
+                  "p",
+                  { class: "me-drawn muted" },
+                  "Това име е избрано наслуки. ",
+                  h("a", { class: "link", href: "/settings#name" }, "Смени го"),
+                )
+              : null,
+          () => (failed() && !progress() ? failure(failed(), () => go("/me", true)) : null),
+          // A guest keeps their game with an email; one who has a profile elsewhere signs in to it, apart, in a smaller
+          // line. Either way, Профил again, as the profile has it.
+          () =>
+            user()?.email
+              ? null
+              : [keepGame(() => go("/me", true)), haveProfile(() => go("/me", true), "Имаш профил? Влез")],
           () => {
             const p = progress();
             return p ? levelCard(p) : null;
@@ -108,7 +130,8 @@ export function me(kit: Kit) {
   );
 }
 
-/** Who you are: your avatar (with its level), your name, the title you wear and your tag; and the settings. */
+/** Who you are: your avatar (with its level), your name, the title you wear and your tag; and Настройки, in words as
+ * well as its picture, at every width. */
 function head(progress: () => Progress | null): Child {
   return h(
     "div",
@@ -136,8 +159,9 @@ function head(progress: () => Progress | null): Child {
     ),
     h(
       "a",
-      { class: "icon-btn", href: "/settings", "aria-label": "Настройки", title: "Настройки" },
-      h("span", { class: "i i-tune icon-btn-i", "aria-hidden": "true" }),
+      { class: "btn me-settings", href: "/settings" },
+      h("span", { class: "i i-tune", "aria-hidden": "true" }),
+      "Настройки",
     ),
   );
 }

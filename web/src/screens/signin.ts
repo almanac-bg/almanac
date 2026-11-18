@@ -1,14 +1,36 @@
 // Signing in by email, with a code: in Настройки, on Начало (a guest who keeps coming back, a player with a profile
-// before a first game), and wherever a game asks for a profile (a duel with a friend).
+// before a first game, the reminder by mail), on Профил, and wherever a game asks for a profile (a duel with a
+// friend). The same code keeps a guest's game with the email, or signs in to the profile the email has (which the
+// guest's game here then joins): what came of it is said (lib/keep.ts, keptWords) to `done`.
 
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal, when } from "../lib/dom.ts";
+import { keptWords } from "../lib/keep.ts";
 import { pushable, pushOn } from "../lib/push.ts";
 import { type User, user } from "../state.ts";
 
-/** Signing in by email, with a code: in Настройки, and on Начало (a guest who keeps coming back, a player with a
- * profile before a first game, where its button is a plain one: `primary` false). */
-export function signIn(primary = true): Child {
+export interface SignInOptions {
+  /** Its first button gold (Настройки), or plain (Начало, a card's). */
+  primary?: boolean;
+  /** The first button's words, which send the code: „Прати ми код“ unless said. */
+  send?: string;
+  /** The line under the first step: what the code is for. */
+  note?: string;
+  /** The button that takes the code: „Влез“ unless said („Потвърди“ where a guest keeps their game). */
+  enter?: string;
+  /** The code taken: what came of it in words (keptWords), and the player now, told before the player is set, so that
+   * what draws the screen anew as they are can say it. */
+  done?: (said: string, now: User) => void;
+}
+
+/** Signing in by email, with a code (SignInOptions). */
+export function signIn({
+  primary = true,
+  send: sendWords = "Прати ми код",
+  note = "Без пароли: всеки път ти пращаме код за вход.",
+  enter = "Влез",
+  done,
+}: SignInOptions = {}): Child {
   const email = signal("");
   const code = signal("");
   const sent = signal(false);
@@ -72,6 +94,7 @@ export function signIn(primary = true): Child {
                 email: email.peek(),
                 code: code.peek(),
               });
+              done?.(keptWords(user.peek(), r.user), r.user);
               user.set(r.user);
               // The browser has a new session, and its notifications went along with it (account.Verify); any it
               // turned on before they were kept with a session are told again, to be kept with this one.
@@ -105,7 +128,7 @@ export function signIn(primary = true): Child {
         () =>
           dead()
             ? h("button", { type: "button", class: "btn primary", onclick: send, disabled: busy }, "Прати нов код")
-            : h("button", { class: "btn primary", disabled: busy }, "Влез"),
+            : h("button", { class: "btn primary", disabled: busy }, enter),
         errorLine,
         h(
           "p",
@@ -148,9 +171,9 @@ export function signIn(primary = true): Child {
             oninput: (e: Event) => email.set((e.target as HTMLInputElement).value),
           }),
         ),
-        h("button", { class: primary ? "btn primary" : "btn", disabled: busy }, "Прати ми код"),
+        h("button", { class: primary ? "btn primary" : "btn", disabled: busy }, sendWords),
         errorLine,
-        h("p", { class: "muted" }, "Без пароли: всеки път ти пращаме код за вход."),
+        h("p", { class: "muted" }, note),
       ),
   );
 }
