@@ -26,7 +26,10 @@
 // Every answer goes through the player's own run (internal/play), as in any game: the score, XP, the questions'
 // statistics and the duel's result are kept there, and only the timing lives here, in memory. The run moves on the
 // duel's clock alone: the duel starts each question's time on it at the moment it shows it to both (play.ShowLive) and
-// hands it each answer with the moment it came (play.AnswerLive); the player can't show, start or answer it
+// hands it each answer with the moment it came (play.AnswerLive), timed from when the player's own screen showed the
+// question, as it says (Seen, kept for each side under the duel's lock; play/seen.go: within bounds, so that a slow
+// line or a picture coming in costs nobody time, and a screen that says it late gains little); the player can't
+// show, start or answer it
 // themselves, so nobody reads a question before the duel shows it. The duel deals its questions as it begins (a
 // recording's as its player was shown them: play.Game.Deal), and each answer is graded through the deal shown,
 // whatever the bank has become meanwhile. The duel's lock is never held across those writes (unlocked): a step of
@@ -83,8 +86,8 @@ const (
 	// not kept is a question let go; a question not shown calls the duel off), and the duel goes on.
 	writeFor = 10 * time.Second
 	// Longest is the most a duel may take, from the moment it's made to its end: its players waited for, then each
-	// question at its longest, its time run out, and its answer shown.
-	Longest = Arrive + play.Length*(play.LongestLimit+play.Grace+longestPause) + slack
+	// question at its longest (shown on a slow screen: play.LongestLag), its time run out, and its answer shown.
+	Longest = Arrive + play.Length*(play.LongestLag+play.LongestLimit+play.Grace+longestPause) + slack
 )
 
 // Band is how far apart two ratings may be for a duel between them (Within; -1: any), once the one who has waited
@@ -744,7 +747,9 @@ type side struct {
 	marks     []play.Mark
 	// sending is their answer to the question now being kept (closed once it's in), nil while none is.
 	sending chan struct{}
-	// The question now: whether they've answered, how long it took, what they gave (as shown) and how it went.
+	// The question now: when their screen showed it (Seen: zero until it says), whether they've answered, how long
+	// it took, what they gave (as shown) and how it went.
+	saw      time.Time
 	answered bool
 	took     time.Duration
 	given    json.RawMessage
@@ -1063,7 +1068,7 @@ func (m *Match) left() time.Duration {
 		left = Arrive - time.Since(m.opened)
 	case PhaseQuestion:
 		q := m.dealt[m.n].Question()
-		left = play.Limit(q) + play.Grace - time.Since(m.shownAt) + pauseFor(q)
+		left = time.Until(m.due()) + play.Grace + pauseFor(q)
 		after++
 	case PhaseReveal:
 		left = m.pause - time.Since(m.revealedAt)
@@ -1071,7 +1076,7 @@ func (m *Match) left() time.Duration {
 	}
 	left = max(0, left)
 	for _, d := range m.dealt[after:] {
-		left += play.Limit(d.Question()) + play.Grace + pauseFor(d.Question())
+		left += play.LagOf(d.Question()) + play.Limit(d.Question()) + play.Grace + pauseFor(d.Question())
 	}
 	return left + slack
 }
@@ -1109,14 +1114,15 @@ func (m *Match) show(n int) {
 	}
 	m.phase, m.n, m.shownAt = PhaseQuestion, n, at
 	for _, s := range m.sides {
-		s.answered, s.took, s.given, s.gained, s.speed, s.inRow, s.right, s.exact = false, 0, nil, 0, 0, 0, false, false
+		s.saw, s.answered, s.took, s.given, s.gained, s.speed, s.inRow, s.right, s.exact = time.Time{}, false, 0, nil, 0, 0,
+			0, false, false
 	}
 	if m.rushed { // won by Claim: nobody answers the rest
 		m.reveal()
 		return
 	}
 	limit := play.Limit(m.dealt[n].Question())
-	m.after(limit+play.Grace, m.reveal)
+	m.timeUp()
 	m.pace(n)
 	// The recording answers when it did.
 	if m.recTimer != nil {
@@ -1139,6 +1145,50 @@ func (m *Match) show(n int) {
 		}, m.broken)
 	}
 	m.changed()
+}
+
+// Seen is a player's screen saying it shows question n now, drawn with its pictures in: their time on it runs from
+// then (play.Saw: no earlier than the duel showed it, no later than play.LagOf after). Only its first word counts,
+// and only while they haven't answered: a screen can't put its start off once it's said, or once its answer is in.
+func (m *Match) Seen(by int64, n int) error {
+	at := time.Now()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s := m.side(by)
+	if s == nil {
+		return ErrNoMatch
+	}
+	if m.phase != PhaseQuestion || n != m.n || !s.saw.IsZero() || s.answered || s.sending != nil {
+		return nil // too late to count, or said already: nothing to do
+	}
+	s.saw = play.Saw(m.shownAt, at, m.dealt[n].Question())
+	if !m.revealDue {
+		m.timeUp()
+	}
+	m.changed() // the clock on its screen goes by its own time
+	return nil
+}
+
+// due is when the question now is up: its Limit after it showed, or after the latest that someone still answering
+// it could have seen it (play.LiveDue: a screen that hasn't said when, at the latest it could). Called with the lock
+// held.
+func (m *Match) due() time.Time {
+	q := m.dealt[m.n].Question()
+	due := m.shownAt.Add(play.Limit(q))
+	for _, s := range m.sides {
+		if s.human() && !s.answered && !s.left && s.online > 0 {
+			if d := play.LiveDue(m.shownAt, s.saw, q); d.After(due) {
+				due = d
+			}
+		}
+	}
+	return due
+}
+
+// timeUp sets the question now to show its answer once its time is up for everyone (due), and the Grace an answer on
+// its way has. Called with the lock held.
+func (m *Match) timeUp() {
+	m.after(max(0, time.Until(m.due())+play.Grace), m.reveal)
 }
 
 // Answer takes a player's answer to question n. Once both have answered, both answers show. An answer sent again (its
@@ -1165,9 +1215,12 @@ func (m *Match) Answer(by int64, n int, raw json.RawMessage) error {
 	if m.phase != PhaseQuestion || n != m.n || s.answered || s.left {
 		return ErrNotNow
 	}
-	took := max(0, at.Sub(m.shownAt))
-	dealt := m.dealt[n]
-	g, err := bank.GradeAt(dealt, raw, took)
+	saw, dealt := s.saw, m.dealt[n]
+	if at.After(play.LiveDue(m.shownAt, saw, dealt.Question()).Add(play.Grace)) { // their own time up, the other's not
+		return ErrNotNow
+	}
+	took := play.LiveTook(m.shownAt, saw, at)
+	g, err := bank.GradeAt(dealt, raw, max(0, at.Sub(m.shownAt))) // what a clue is worth: on the duel's clock
 	if err != nil {
 		return ErrAnswer
 	}
@@ -1176,7 +1229,7 @@ func (m *Match) Answer(by int64, n int, raw json.RawMessage) error {
 	m.unlocked(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), writeFor)
 		defer cancel()
-		res, err = m.hub.game.AnswerLive(ctx, s.ID, s.run, n, raw, at, dealt)
+		res, err = m.hub.game.AnswerLive(ctx, s.ID, s.run, n, raw, at, saw, dealt)
 	})
 	close(s.sending)
 	s.sending = nil
@@ -1209,14 +1262,20 @@ func (m *Match) Answer(by int64, n int, raw json.RawMessage) error {
 }
 
 // maybeReveal shows the answers if nobody is still waited for: a player here (or away only a moment, and not left)
-// who hasn't answered, or a recording whose answer is still to come (not one whose player let the time run out there).
+// who hasn't answered, and whose own time isn't up (play.LiveDue), or a recording whose answer is still to come (not
+// one whose player let the time run out there). Else the question's time is up when it is for those still waited for.
 func (m *Match) maybeReveal() {
+	q := m.dealt[m.n].Question()
 	for _, s := range m.sides {
 		if s.answered || (!s.human() && !s.answers(m.n)) {
 			continue
 		}
+		if s.human() && time.Now().After(play.LiveDue(m.shownAt, s.saw, q).Add(play.Grace)) {
+			continue // their time is up, though the other's wasn't as they answered
+		}
 		if !s.human() || (!s.left && (s.online > 0 || time.Since(s.leftAt) < Away)) {
 			m.changed()
+			m.timeUp()
 			return
 		}
 	}
@@ -1259,7 +1318,7 @@ func (m *Match) reveal() {
 			ctx, cancel := context.WithTimeout(context.Background(), writeFor)
 			defer cancel()
 			for _, s := range absent {
-				if _, err := m.hub.game.AnswerLive(ctx, s.ID, s.run, n, nil, time.Now(), dealt); err != nil &&
+				if _, err := m.hub.game.AnswerLive(ctx, s.ID, s.run, n, nil, time.Now(), s.saw, dealt); err != nil &&
 					!errors.Is(err, play.ErrOutOfStep) {
 					slog.Error("live duel", "duel", m.id, "err", err)
 				}
@@ -1424,9 +1483,11 @@ func (m *Match) View(viewer int64) View {
 		if shown {
 			since = limit // everything shows with the answer
 		}
+		// The viewer's time left runs from when their own screen showed the question (Seen).
+		left := min(limit, time.Until(play.LiveDue(m.shownAt, me.saw, d.Question())))
 		q := &QuestionView{
 			Category: d.Question().Base().Category, View: bank.ViewAt(d, since),
-			LimitMs: limit.Milliseconds(), LeftMs: max(0, (limit - since).Milliseconds()),
+			LimitMs: limit.Milliseconds(), LeftMs: max(0, left.Milliseconds()),
 			Given: me.given,
 		}
 		if shown {

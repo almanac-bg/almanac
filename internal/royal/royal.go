@@ -39,6 +39,11 @@
 // tournament (and those watching the first). The board holds only what's shown: in the lobby, how many are in and the
 // first few; during a question, how many have answered; with its answer, and at the end, the standings.
 //
+// A player's time on a question runs from when their own screen showed it, as it says (Seen, kept with them under mu;
+// play/seen.go: within bounds), so that a slow line or a picture coming in costs nobody seconds at a cut; the
+// question's time is up once it is for everyone still answering it (due). What a screen said is kept in memory only:
+// after a crash, the question showing again is timed from the evening's moment for it, until the screen says again.
+//
 // The clock runs in the background (Step, from the server): a panic there is stopped, and the next step comes as
 // ever (package safe). So the lock on what's in memory is let go however the work under it ends (locked, or a
 // defer), and an answer on its way stops counting as one however its write ends: a panic never leaves the evening
@@ -296,8 +301,9 @@ type member struct {
 	ms      int64     // the time the right ones took
 	rights  int       // questions answered right in all, after a cut too
 	outAt   int
-	// The question now: whether they've answered (or their answer is on its way: sending), what they gave (as
-	// shown), how it went, and the time it took (to when it came).
+	// The question now: when their screen showed it (Seen: zero until it says), whether they've answered (or their
+	// answer is on its way: sending), what they gave (as shown), how it went, and the time it took (to when it came).
+	saw      time.Time
 	answered bool
 	sending  bool
 	given    json.RawMessage
@@ -632,7 +638,7 @@ func (h *Hub) tick(ctx context.Context) error {
 		switch n.phase {
 		case play.RoyalQuestion:
 			d := n.dealt[n.n]
-			if !n.closing && d != nil && now.Sub(n.at) < play.Limit(d.Question())+play.Grace {
+			if !n.closing && d != nil && now.Before(h.due(now).Add(play.Grace)) {
 				if next := bank.NextStep(d, n.paced); next > 0 && now.Sub(n.at) >= n.paced+next {
 					// More of the question shows (its next clue): the screens look again.
 					n.paced += next
@@ -665,12 +671,35 @@ func (h *Hub) tick(ctx context.Context) error {
 	return move()
 }
 
+// due is when the question now is up: its Limit after it showed, or after the latest that someone still answering it,
+// and there, could have seen it (play.LiveDue: a screen that hasn't said when, at the latest it could). Called with mu
+// held.
+func (h *Hub) due(now time.Time) time.Time {
+	n := h.night
+	q := n.dealt[n.n].Question()
+	due := n.at.Add(play.Limit(q))
+	for _, t := range n.tables {
+		for _, m := range t.members {
+			if m.inQ && !m.answered && h.there(m, now) {
+				if d := play.LiveDue(n.at, m.saw, q); d.After(due) {
+					due = d
+				}
+			}
+		}
+	}
+	return due
+}
+
 // allIn says whether everyone playing the question now, at every tournament, has answered it: those cut too, but not
-// one who let the last question they played run out (until they answer again), nor one away.
+// one who let the last question they played run out (until they answer again), nor one away, nor one whose own time
+// on it is up (play.LiveDue: another's may run later).
 func (h *Hub) allIn(now time.Time) bool {
-	for _, t := range h.night.tables {
+	n := h.night
+	d := n.dealt[n.n]
+	for _, t := range n.tables {
 		for _, o := range t.members {
-			if o.inQ && !o.answered && (o.in || !o.idle) && h.there(o, now) {
+			if o.inQ && !o.answered && (o.in || !o.idle) && h.there(o, now) &&
+				(d == nil || !now.After(play.LiveDue(n.at, o.saw, d.Question()).Add(play.Grace))) {
 				return false
 			}
 		}
@@ -761,7 +790,7 @@ func (h *Hub) show(ctx context.Context, tables []*table, k int) error {
 func (h *Hub) question(t *table) {
 	t.wentOut = 0
 	for _, m := range t.members {
-		m.inQ, m.stood, m.answered, m.given, m.res, m.took = true, m.in, false, nil, play.Result{}, 0
+		m.inQ, m.stood, m.saw, m.answered, m.given, m.res, m.took = true, m.in, time.Time{}, false, nil, play.Result{}, 0
 	}
 	h.rank(t)
 }
@@ -1168,6 +1197,7 @@ func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) 
 	var night *night
 	var run int64
 	var d bank.Dealt
+	var saw time.Time
 	var refused error
 	h.locked(func() {
 		t, m = h.mine(id)
@@ -1178,11 +1208,13 @@ func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) 
 			refused = errAgain
 		case m == nil || night.phase != play.RoyalQuestion || night.closing || n != night.n || !m.inQ || m.answered || m.sending:
 			refused = ErrNotNow
+		case night.dealt[n] != nil && at.After(play.LiveDue(night.at, m.saw, night.dealt[n].Question()).Add(play.Grace)):
+			refused = ErrNotNow // their own time is up, though another's isn't yet
 		case len(raw) == 0 || string(raw) == "null":
 			refused = play.ErrBadAnswer
 		default:
 			m.sending, night.sending = true, night.sending+1
-			run, d = m.run, night.dealt[n]
+			run, d, saw = m.run, night.dealt[n], m.saw
 		}
 	})
 	if refused == errAgain {
@@ -1202,7 +1234,7 @@ func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) 
 			if err == nil {
 				// How it went shows to the others with the answer (reveal), not before.
 				m.answered, m.given, m.res, m.idle = true, res.Given, res, false
-				m.took = max(0, at.Sub(night.at).Milliseconds())
+				m.took = play.LiveTook(night.at, saw, at).Milliseconds()
 				h.touch(t)
 				if h.allIn(h.now()) {
 					night.closing = true // the answer shows now: the clock moves on (tick)
@@ -1211,7 +1243,7 @@ func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) 
 			move = night.sending == 0 && night.closing
 		})
 		err = errBroke // until the write says otherwise
-		res, err = h.game.AnswerRoyal(ctx, id, run, n, raw, at, d)
+		res, err = h.game.AnswerRoyal(ctx, id, run, n, raw, at, saw, d)
 	}()
 
 	if err == nil && res.State.Done {
@@ -1224,6 +1256,23 @@ func (h *Hub) Answer(ctx context.Context, id int64, n int, raw json.RawMessage) 
 		return ErrNotNow // the time ran out
 	}
 	return err
+}
+
+// Seen is a player's screen saying it shows question n now, drawn with its pictures in: their time on it runs from
+// then (play.Saw: no earlier than the evening showed it, no later than play.LagOf after). Only its first word counts,
+// and only while they play it and haven't answered: a screen can't put its start off once it's said.
+func (h *Hub) Seen(id int64, n int) {
+	at := h.now()
+	h.locked(func() {
+		_, m := h.mine(id)
+		night := h.night
+		if m == nil || night.phase != play.RoyalQuestion || night.closing || n != night.n || !m.inQ || m.answered ||
+			m.sending || !m.saw.IsZero() || night.dealt[n] == nil {
+			return
+		}
+		m.saw = play.Saw(night.at, at, night.dealt[n].Question())
+		h.tell(id) // the clock on its screens goes by its own time
+	})
 }
 
 // keep is how many go on at t's cut after question k (play.RoyalKeep), 0 if none: none either where it can't put

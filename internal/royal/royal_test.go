@@ -220,8 +220,9 @@ func TestNext(t *testing.T) {
 // onward waits for the answer showing to have shown: on to the next question (or the end).
 func (w *world) onward() { w.wait(CutPause) }
 
-// timeUp waits for the question showing's time to run out.
-func (w *world) timeUp() { w.wait(20*time.Second + play.Grace) }
+// timeUp waits for the question showing's time to run out: its players' screens haven't said when they showed it, so
+// at the latest they could have (play.LiveDue).
+func (w *world) timeUp() { w.wait(20*time.Second + play.SeenLag + play.Grace) }
 
 func TestKeep(t *testing.T) {
 	for _, c := range []struct {
@@ -596,7 +597,8 @@ func TestLate(t *testing.T) {
 		t.Fatal(err)
 	}
 	v := w.view(vi.ID)
-	if !v.In || v.Out || v.Late || v.N != 1 || v.Entered != 2 || v.Question == nil || v.LeftMs != v.Question.LimitMs-5000 {
+	if !v.In || v.Out || v.Late || v.N != 1 || v.Entered != 2 || v.Question == nil ||
+		v.LeftMs != v.Question.LimitMs-5000+play.SeenLag.Milliseconds() { // from the latest her screen could show it
 		t.Fatalf("Vi, late: %+v", v)
 	}
 	// The answer waits for her too.

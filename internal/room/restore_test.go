@@ -50,6 +50,9 @@ func TestARestoredQuestionWaitsForTheScreensComingBack(t *testing.T) {
 		if err := r.Start(ana.ID); err != nil {
 			t.Fatal(err)
 		}
+		for _, p := range []Player{ana, bo, cy} { // their screens show it at once (kept over the restart too)
+			_ = r.Seen(p.ID, 0)
+		}
 		time.Sleep(4 * time.Second)
 		// The server stops: every screen closes, then the rooms are saved.
 		for _, s := range subs[:3] {
@@ -95,7 +98,9 @@ func TestARestoredQuestionWaitsForTheScreensComingBack(t *testing.T) {
 		}
 		time.Sleep(time.Duration(v.Question.LimitMs)*time.Millisecond - time.Second)
 		again, _ := restart(t, next).Get(r.Code())
-		if left := again.View(ana.ID).Question.LeftMs; left != comeBack.Milliseconds() {
+		// Ана's screen hasn't said when it showed this one: her time runs from the latest it could have (play.LiveDue).
+		lag := play.LagOf(again.dealt[1].Question())
+		if left := again.View(ana.ID).Question.LeftMs; left != (comeBack + lag).Milliseconds() {
 			t.Fatalf("a question restored a second before its end: %d ms left", left)
 		}
 	})

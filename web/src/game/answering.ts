@@ -14,12 +14,45 @@
 //   has time. Too late: said, and that's that.
 // - The time is the server's: the clock follows it as the server's view says otherwise (a question shown again after
 //   a restart), and what's been put in when it runs out is the answer.
+// - In a live game, the player's time runs from when their own screen shows the question (onScreen): it's drawn once
+//   its pictures are in, and the server told then, so that a slow line or a picture coming in costs nobody time.
 
 import { ApiError, errorText, passing, tries } from "../lib/api.ts";
 import { type Child, effect, h, lifetime, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
 import { formatNumber, type VerdictKind, verdictWords } from "../ui.ts";
-import { type Asked, ask, spokenAnswer } from "./questions.ts";
+import { type Asked, ask, hasPictures, picturesIn, spokenAnswer } from "./questions.ts";
 import type { Answer, Reveal, View } from "./types.ts";
+
+/** The longest a live question waits for its pictures before it shows all the same (the server allows its time to run
+ * from that much later: play.PicturesFor). */
+export const picturesFor = 2500;
+
+/** A live game's question as it comes on screen (a duel's, a room's, Роял's): drawn (`draw`) once its pictures are in
+ * (picturesFor at most; at once if it has none), and the server told then (`seen`, once), so that the player's time
+ * runs from when they see it, not from when the game showed it (play/seen.go). Until then, a line says it's coming:
+ * the words don't show before the pictures, so nobody reads them off the clock. */
+export function onScreen(view: View, draw: () => Child, seen: () => Promise<unknown>): Child {
+  const life = lifetime();
+  const ready = signal(!hasPictures(view));
+  if (!ready.peek())
+    void picturesIn(view, picturesFor).then(() => {
+      if (!life.aborted) ready.set(true);
+    });
+  let told = false;
+  return () => {
+    if (!ready()) return h("p", { class: "muted coming", role: "status" }, "Въпросът идва…");
+    const node = untracked(draw);
+    if (!told) {
+      told = true;
+      // Once it's on the page (the frame after: the moment it's painted); the word may be lost, and is never sent
+      // again: the server then counts the time from the game's moment for it, as before.
+      setTimeout(() => {
+        if (!life.aborted) seen().catch(() => {});
+      }, 0);
+    }
+    return node;
+  };
+}
 
 /** Says something to a screen reader, in a game's live region. */
 export type Say = (text: string) => void;

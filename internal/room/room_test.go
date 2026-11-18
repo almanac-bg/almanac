@@ -154,7 +154,9 @@ func TestAGamePlayedTogether(t *testing.T) {
 			t.Fatal(err)
 		}
 		r.Unfollow(sc)
-		time.Sleep(play.Limit(r.dealt[1].Question()) + play.Grace + time.Millisecond)
+		// No screen said when it showed the question: their time runs to the latest they could have (play.LiveDue).
+		q1 := r.dealt[1].Question()
+		time.Sleep(play.LagOf(q1) + play.Limit(q1) + play.Grace + time.Millisecond)
 		synctest.Wait()
 		if v := r.View(bo.ID); v.Phase != Reveal || !v.Question.Reveal.Missed {
 			t.Fatalf("after the time ran out: %+v", v)
@@ -389,6 +391,8 @@ func TestRoomsKeptOverARestart(t *testing.T) {
 		sc, _ := playing.Follow(cy.ID)
 		sa, _ := playing.Follow(ana.ID)
 		_ = playing.Start(cy.ID)
+		_ = playing.Seen(cy.ID, 0) // both screens show it at once (kept over the restart too)
+		_ = playing.Seen(ana.ID, 0)
 		time.Sleep(3 * time.Second)
 		if err := playing.Answer(cy.ID, 0, answer(playing, true)); err != nil {
 			t.Fatal(err)

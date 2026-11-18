@@ -499,6 +499,29 @@ func (s *Server) roomBefriend(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, sent)
 }
 
+// roomSeen is a player's screen saying it shows the room's question n now: their time on it runs from then, within
+// bounds (room.Room.Seen).
+func (s *Server) roomSeen(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	rm, err := s.roomFor(r, u)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		N int `json:"n"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	if err := rm.Seen(u.ID, in.N); err != nil {
+		return err
+	}
+	return ok(w, map[string]bool{"ok": true})
+}
+
 func (s *Server) roomAnswer(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {

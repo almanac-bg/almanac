@@ -171,7 +171,7 @@ func TestGradedAsShown(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.wait(2 * time.Second)
-	if res, err := w.g.AnswerLive(ctx, gal, run, 0, truth, w.now, d); err != nil || !res.Right {
+	if res, err := w.g.AnswerLive(ctx, gal, run, 0, truth, w.now, time.Time{}, d); err != nil || !res.Right {
 		t.Fatalf("a live duel's answer: %+v %v", res, err)
 	}
 	// A deal that isn't the run's question is out of step.

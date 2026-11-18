@@ -39,6 +39,7 @@ let {
   nameFirst,
   news,
   onCleanup,
+  onScreen,
   picture,
   play,
   playAnswer,
@@ -166,6 +167,7 @@ export function liveDuel(kit: Kit) {
     nameFirst,
     news,
     onCleanup,
+    onScreen,
     picture,
     play,
     playAnswer,
@@ -542,6 +544,27 @@ function question(view: () => LiveView, first: LiveView, offer: () => Child): Ch
   const q = first.question;
   if (!q) return null;
   if (first.n === 0) play("go"); // the game starts
+  // The player's time runs from when this screen shows it, its pictures in (onScreen).
+  return h(
+    "article",
+    { class: "question" },
+    questionHead(first.n, first.total, topicName(q.category)),
+    scoreboard(view, first.total),
+    offer(),
+    onScreen(
+      q.view,
+      () => asking(view, first),
+      () => api("POST", `/api/duels/live/${first.id}/seen`, { n: first.n }),
+    ),
+  );
+}
+
+/** The question itself, once it's on the screen: its clock, the question, its options, and how the answer goes. */
+function asking(view: () => LiveView, first: LiveView): Child {
+  // Its time left as the server last said, from when this screen shows it.
+  const now = untracked(view);
+  const q = (now.n === first.n && now.phase === "question" ? now.question : null) ?? first.question;
+  if (!q) return null;
   const life = lifetime();
   // Answered as in every game (game/answering.ts): sent again while it doesn't get through and the question is open;
   // in once the server says so, or its view has it.
@@ -560,19 +583,14 @@ function question(view: () => LiveView, first: LiveView, offer: () => Child): Ch
   // The other answering is news while the player still thinks: a sound of its own (feel.ts: them), not a tap the
   // player might take for theirs. Once they've answered, the other's answer brings both answers at once: it would
   // sound over the player's own verdict.
-  let heard = first.them.answered;
+  let heard = now.them.answered;
   effect(() => {
     if (view().them.answered && !heard) {
       heard = true;
       if (!untracked(ans.taken)) play("them");
     }
   });
-  return h(
-    "article",
-    { class: "question" },
-    questionHead(first.n, first.total, topicName(q.category)),
-    scoreboard(view, first.total),
-    offer(),
+  return [
     timer(q.leftMs, q.limitMs, ans.left, ans.stopped),
     ans.heading,
     picture(q.view, true),
@@ -586,7 +604,7 @@ function question(view: () => LiveView, first: LiveView, offer: () => Child): Ch
           )
         : null,
     ans.said,
-  );
+  ];
 }
 
 function reveal(view: () => LiveView, first: LiveView, offer: () => Child): Child {

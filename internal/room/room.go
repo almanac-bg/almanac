@@ -46,6 +46,10 @@
 // all kept yet is kept then. The server saves the rooms every 15 seconds when they've changed, and at once as a game
 // ends and as it's kept (Hub.Saving), so that a crash loses no more than those seconds of a game, and no game's end.
 //
+// A player's time on a question runs from when their own screen showed it, as it says (Seen, kept with them under the
+// room's lock, and saved with it; play/seen.go: within bounds), so that a slow line or a picture coming in costs
+// nobody points or a place; the question's time is up once it is for everyone still answering it (due).
+//
 // A game's clock that panics (package safe stops it) ends its game where it is, each player's game kept (broken).
 package room
 
@@ -439,8 +443,10 @@ type savedMember struct {
 	Refused []string `json:"refused,omitempty"`
 	// Away is a player with no screen on the room: they aren't waited for once it's back. Back is until when they
 	// count as there with none (member.back: the host of a room just opened, on their way in).
-	Away    bool          `json:"away,omitempty"`
-	Back    time.Time     `json:"back,omitzero"`
+	Away bool      `json:"away,omitempty"`
+	Back time.Time `json:"back,omitzero"`
+	// Saw is when their screen showed the question showing (Seen), once it said.
+	Saw     time.Time     `json:"saw,omitzero"`
 	Points  int           `json:"points,omitempty"`
 	Rights  int           `json:"rights,omitempty"`
 	InRow   int           `json:"inRow,omitempty"`
@@ -508,6 +514,9 @@ func (r *Room) saved(now time.Time) saved {
 			Away: away(m.online, m.back, m.left, now), Back: m.back, Asked: m.asked, Refused: m.refused}
 		if played {
 			sm.Points, sm.Rights, sm.InRow, sm.Ms, sm.Run = m.points, m.rights, m.inRow, m.ms, m.run
+			if r.phase == Question {
+				sm.Saw = m.saw
+			}
 			for _, l := range m.log {
 				sm.Answers = append(sm.Answers, savedAnswer{Question: l.questionID, N: l.n, Shown: l.shown, Given: l.given,
 					Score: l.score, Points: l.points, Ms: l.ms, At: l.at, Right: l.right})
@@ -632,7 +641,12 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 				up = min(max(0, sv.SavedAt.Sub(sv.ShownAt)), max(0, limit-comeBack))
 			}
 			r.shownAt = now.Add(-up)
-			r.after(limit+play.Grace-up, func() { r.reveal() })
+			for i, sm := range sv.Players { // each screen's moment, as far after the question's as it was
+				if m := r.players[i]; !sm.Saw.IsZero() && !sv.ShownAt.IsZero() && m.ID == sm.ID {
+					m.saw = play.Saw(r.shownAt, sm.Saw.Add(r.shownAt.Sub(sv.ShownAt)), r.dealt[r.n].Question())
+				}
+			}
+			r.timeUp()
 			r.pace(r.n)
 			r.recheck(comeBack)
 		case Reveal:
@@ -723,7 +737,9 @@ type member struct {
 	// restart (comeBack), one was open as the server stopped, and comes back by itself; in a room just opened, the
 	// host is on their way in (hostWait). left is when their last screen went.
 	back, left time.Time
-	// The question now: whether they've answered, what they gave (as shown), how it went.
+	// The question now: when their screen showed it (Seen: zero until it says), whether they've answered, what they
+	// gave (as shown), how it went.
+	saw      time.Time
 	answered bool
 	given    json.RawMessage
 	graded   bank.Graded
@@ -1331,12 +1347,52 @@ func (r *Room) bank() *bank.Bank { return r.hub.bank() }
 func (r *Room) show(n int) {
 	r.phase, r.n, r.shownAt = Question, n, time.Now()
 	for _, m := range r.players {
-		m.answered, m.given, m.graded, m.gained, m.speed = false, nil, bank.Graded{}, 0, 0
+		m.saw, m.answered, m.given, m.graded, m.gained, m.speed = time.Time{}, false, nil, bank.Graded{}, 0, 0
 	}
-	limit := play.Limit(r.dealt[n].Question())
-	r.after(limit+play.Grace, func() { r.reveal() })
+	r.timeUp()
 	r.pace(n)
 	r.changed()
+}
+
+// due is when the question now is up: its Limit after it showed, or after the latest that someone still answering it,
+// and there, could have seen it (play.LiveDue: a screen that hasn't said when, at the latest it could). Called with
+// the lock held.
+func (r *Room) due() time.Time {
+	q, now := r.dealt[r.n].Question(), time.Now()
+	due := r.shownAt.Add(play.Limit(q))
+	for _, m := range r.players {
+		if !m.answered && m.there(now) {
+			if d := play.LiveDue(r.shownAt, m.saw, q); d.After(due) {
+				due = d
+			}
+		}
+	}
+	return due
+}
+
+// timeUp sets the question now to show its answer once its time is up for everyone (due), and the Grace an answer on
+// its way has. Called with the lock held.
+func (r *Room) timeUp() {
+	r.after(max(0, time.Until(r.due())+play.Grace), func() { r.reveal() })
+}
+
+// Seen is a player's screen saying it shows question n now, drawn with its pictures in: their time on it runs from
+// then (play.Saw: no earlier than the room showed it, no later than play.LagOf after). Only its first word counts,
+// and only while they haven't answered: a screen can't put its start off once it's said.
+func (r *Room) Seen(by int64, n int) error {
+	at := time.Now()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	m := r.member(by)
+	if m == nil {
+		return ErrNoRoom
+	}
+	if r.phase != Question || n != r.n || m.answered || !m.saw.IsZero() {
+		return nil // too late to count, or said already: nothing to do
+	}
+	m.saw = play.Saw(r.shownAt, at, r.dealt[n].Question())
+	r.timeUp()
+	return nil
 }
 
 // recheck shows the answer to the question now at d, should everyone there have answered it by then: as those coming
@@ -1431,13 +1487,14 @@ func (r *Room) answer(m *member, n int, raw json.RawMessage) error {
 	if r.phase != Question || n != r.n {
 		return ErrNotNow
 	}
-	d := r.dealt[n]
+	d, now := r.dealt[n], time.Now()
 	limit := play.Limit(d.Question())
-	took := time.Since(r.shownAt)
-	if took > limit+play.Grace {
+	if now.After(play.LiveDue(r.shownAt, m.saw, d.Question()).Add(play.Grace)) {
 		return ErrNotNow
 	}
-	g, err := bank.GradeAt(d, raw, took)
+	// Their time, from when their screen showed it (Seen); what a clue is worth, on the room's clock.
+	took := play.LiveTook(r.shownAt, m.saw, now)
+	g, err := bank.GradeAt(d, raw, now.Sub(r.shownAt))
 	if err != nil {
 		return ErrAnswer
 	}
@@ -1457,6 +1514,7 @@ func (r *Room) answer(m *member, n int, raw json.RawMessage) error {
 	m.log = append(m.log, loggedAnswer{questionID: d.Question().Base().ID, shown: g.Shown, points: m.gained, right: g.Right,
 		n: n, given: g.Given, score: g.Score, ms: min(took, limit).Milliseconds(), at: time.Now()})
 	if !r.allAnswered() {
+		r.timeUp() // once it is for those still answering: one whose time is up isn't waited for
 		r.changed()
 		return nil
 	}
@@ -1744,7 +1802,9 @@ func (r *Room) View(viewer int64) View {
 			LimitMs: limit.Milliseconds(), LeftMs: max(0, (limit - since).Milliseconds()),
 		}
 		if me := r.member(viewer); me != nil {
-			q.Given = me.given
+			// Their time left, from when their own screen showed it (Seen).
+			left := min(limit, time.Until(play.LiveDue(r.shownAt, me.saw, d.Question())))
+			q.LeftMs, q.Given = max(0, left.Milliseconds()), me.given
 			if r.phase == Reveal {
 				q.Reveal = &RevealView{Answer: d.Reveal(r.hub.crowd(d.Question())), Points: me.gained, Speed: me.speed,
 					Right: me.graded.Right, Exact: me.graded.Exact, Missed: !me.answered}
