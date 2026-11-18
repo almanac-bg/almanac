@@ -107,14 +107,16 @@ func defaultBankDir() string {
 	return "bank/sample"
 }
 
-// bankCheck checks everything the server checks before it plays a bank, and the owner's rule that the categories are
-// about the same size (bank.SizeSlack; -unbalanced lets the small public sample pass). It prints every error, and
-// counts the warnings by rule (bank lint lists them); it reports the mix; the day's runway: how long each place of a
-// day has questions for, where the next batch writes first (with -used, the questions the days have had are
-// taken off: `almanac bank used`); and the subjects that come back. Its last line counts the problems.
+// bankCheck checks everything the server checks before it plays a bank, the owner's rule that the categories are
+// about the same size (bank.SizeSlack), and that every national day (bank.NationalDays) has a question about Bulgaria
+// for „На този ден“; -sample lets the small public sample pass the last two. It prints every error, and counts the
+// warnings by rule (bank lint lists them); it reports the mix and the sources; the day's runway: how long each place
+// of a day has questions for, where the next batch writes first (with -used, the questions the days have had are
+// taken off: `almanac bank used`), and the dates' („На този ден“); and the subjects that come back. Its last line
+// counts the problems.
 func bankCheck(args []string) error {
 	fs := flag.NewFlagSet("bank check", flag.ContinueOnError)
-	unbalanced := fs.Bool("unbalanced", false, "pass a bank whose categories aren't about the same size (the public sample)")
+	sample := fs.Bool("sample", false, "the public sample: pass it though its categories aren't the same size and it lacks the national days")
 	from := fs.String("used", "", "a file of the question ids the days have had (almanac bank used)")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -144,13 +146,44 @@ func bankCheck(args []string) error {
 	}
 	fmt.Println(summary(b))
 	fmt.Println(runway(b, used, today()))
+	national, missing := nationalDays(b)
+	fmt.Println(national)
 	fmt.Println(subjects(b, SubjectsShown))
 	fmt.Println(tally)
-	if off, mean := b.Uneven(); len(off) > 0 && !*unbalanced {
+	if *sample {
+		return nil
+	}
+	if off, mean := b.Uneven(); len(off) > 0 {
 		return fmt.Errorf("%s: categories more than %.0f%% off the mean of %.0f: %s (a batch adds to every category alike)",
 			dir, 100*bank.SizeSlack, mean, countList(off))
 	}
+	if len(missing) > 0 {
+		return fmt.Errorf("%s: no question about Bulgaria for the national days %s: date one („on“, with „bg“), or write one",
+			dir, strings.Join(missing, ", "))
+	}
 	return nil
+}
+
+// nationalDays says how many questions about Bulgaria each national day has (bank.National), listing those with fewer
+// than bank.NationalWant, and which have none (those fail `bank check`).
+func nationalDays(b *bank.Bank) (report string, missing []string) {
+	var few []string
+	days := b.National()
+	for _, d := range days {
+		switch {
+		case d.N == 0:
+			missing = append(missing, d.On)
+			few = append(few, fmt.Sprintf("%s %s: none", d.On, d.What))
+		case d.N < bank.NationalWant:
+			few = append(few, fmt.Sprintf("%s %s: %d", d.On, d.What, d.N))
+		}
+	}
+	var s strings.Builder
+	fmt.Fprintf(&s, "national days („На този ден“ about Bulgaria): %d of %d with %d or more questions", len(days)-len(few), len(days), bank.NationalWant)
+	for _, f := range few {
+		fmt.Fprintf(&s, "\n  %s", f)
+	}
+	return s.String(), missing
 }
 
 func countList(cs []bank.CategoryCount) string {
@@ -247,15 +280,41 @@ func runway(b *bank.Bank, used play.Used, today string) string {
 		}
 		fmt.Fprintf(&s, "  %-34s %5d days, %5d questions, out on %s%s\n", place, r.Days, r.Questions, r.Out, warn)
 	}
-	n, dates := datedLeft(b, used, today)
-	fmt.Fprintf(&s, "  dated („На този ден“, not in the places): %d questions no day has had, for %d of the year's 366 dates", n, dates)
+	n, per := datedLeft(b, used, today)
+	fmt.Fprintf(&s, "  dated („На този ден“, not in the places): %d questions no day has had, for %d of the year's 366 dates", n, len(per))
+	// A day deals a date's question once, so a date with one left is empty a year on: the dates of the year ahead with
+	// fewer than DatedWant, soonest first.
+	var thin []string
+	t, _ := time.Parse(time.DateOnly, today)
+	for i := range 366 {
+		d := t.AddDate(0, 0, i).Format("01-02")
+		if per[d] < DatedWant && !slices.Contains(thin, d) {
+			thin = append(thin, d)
+		}
+	}
+	if len(thin) > 0 {
+		shown := thin[:min(len(thin), DatedShown)]
+		more := ""
+		if len(thin) > len(shown) {
+			more = fmt.Sprintf(" … and %d more", len(thin)-len(shown))
+		}
+		fmt.Fprintf(&s, "\n  warning: %d dates of the year ahead have fewer than %d (the next year's go blank): %s%s",
+			len(thin), DatedWant, strings.Join(shown, ", "), more)
+	}
 	return s.String()
 }
 
+// DatedWant is how many questions no day has had a date should keep, at least: this year's and the next's. DatedShown
+// is how many of those under it `bank check` names.
+const (
+	DatedWant  = 2
+	DatedShown = 12
+)
+
 // datedLeft counts the dated questions no day has had whose date is still to come (every year's, or that year's on
-// or after today), and how many dates of the year they cover.
-func datedLeft(b *bank.Bank, used play.Used, today string) (questions, dates int) {
-	covered := map[string]bool{}
+// or after today), and how many each date of the year (MM-DD) has.
+func datedLeft(b *bank.Bank, used play.Used, today string) (questions int, per map[string]int) {
+	per = map[string]int{}
 	for _, q := range b.Live("", "") {
 		if used.IDs[q.Base().ID] || len(q.Extra().On) == 0 {
 			continue
@@ -265,11 +324,12 @@ func datedLeft(b *bank.Bank, used play.Used, today string) (questions, dates int
 			if len(d) == 10 && d < today {
 				continue
 			}
-			covered[d[len(d)-5:]], counted = true, true
+			per[d[len(d)-5:]]++
+			counted = true
 		}
 		questions += b2i(counted)
 	}
-	return questions, len(covered)
+	return questions, per
 }
 
 func b2i(b bool) int {
@@ -452,6 +512,22 @@ func balance(b *bank.Bank) string {
 		pct(all[bank.Easy], bal.Total), pct(all[bank.Medium], bal.Total), pct(all[bank.Hard], bal.Total))
 	fmt.Fprintf(&s, "facts        %d of %d (%d without)\n", bal.Facts, bal.Total, bal.Total-bal.Facts)
 	fmt.Fprintf(&s, "dates        added on %d, updated on %d (of %d)\n", bal.Added, bal.Updated, bal.Total)
+	// The sources: what the next check of a question starts from. Every question added or changed since
+	// bank.SourcesFrom has them; the rest get theirs in a sourcing pass, the numbers and orders first (their reveal
+	// shows every value as fact).
+	without, sourced := map[string]int{}, 0
+	for _, q := range b.Live("", "") {
+		if len(q.Extra().Sources) > 0 {
+			sourced++
+		} else {
+			without[q.Base().Type]++
+		}
+	}
+	fmt.Fprintf(&s, "sources      %d of %d (%d%%); without, by kind:", sourced, bal.Total, pct(sourced, bal.Total))
+	for _, t := range bank.TypeOrder {
+		fmt.Fprintf(&s, " %s %d", t, without[t])
+	}
+	s.WriteString("\n")
 	kinds := map[string]int{}
 	for _, n := range bal.Types {
 		for t, k := range n {

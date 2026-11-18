@@ -298,6 +298,32 @@ func TestNoGameDealsAQuestionDueForReview(t *testing.T) {
 	}
 }
 
+// A question for a date („На този ден“) waits for it out of every other game, however far off the date is, until a
+// day has dealt it; one whose only date has passed waits no more.
+func TestDatedQuestionsWaitForTheirDate(t *testing.T) {
+	b, problems := bank.Load("../../bank/sample")
+	if b == nil {
+		t.Fatal(problems)
+	}
+	live := b.Live("history", "")
+	yearly, dealt, past, plain, next := live[0], live[1], live[2], live[3], live[4]
+	for _, q := range live[:5] {
+		q.Extra().On = nil
+	}
+	yearly.Extra().On = []string{"12-31"}
+	dealt.Extra().On = []string{"01-01"}
+	past.Extra().On = []string{"2020-04-12"}
+	next.Extra().On = []string{"2027-03-28"}
+	today := "2026-11-18"
+	days := map[string][]Pick{"2026-01-01": {{ID: dealt.Base().ID}}}
+	bars := barsOf(days, today, b)
+	for q, want := range map[bank.Question]bool{yearly: true, dealt: false, past: false, plain: false, next: true} {
+		if id := q.Base().ID; bars.all[id] != want || bars.now[id] {
+			t.Errorf("%s (on %v): kept out %v, want %v, and never as today's", id, q.Extra().On, bars.all[id], want)
+		}
+	}
+}
+
 func mustTx(t *testing.T, w *world) *sql.Tx {
 	t.Helper()
 	tx, err := w.db.Read.Begin()

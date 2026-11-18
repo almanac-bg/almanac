@@ -45,11 +45,14 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
       marks the new and changed questions checked today by that process (where the batch doesn't say otherwise);
   - `go run ./cmd/almanac bank check [-used file] private` checks everything the server checks before it plays a
     bank: the format and **every rule below that code can judge**. It prints every error, then the balance report:
-    the difficulty and kind mix, facts and dates, each category's kinds against their share, and **the day's
-    runway** — how many days from today each place of a day has questions for, and the day it runs out on. It
-    **fails** on an error, and while a category is more than 2% off the mean size (`bank.SizeSlack`; `-unbalanced`
-    lets the small public sample pass), and **warns** of every place under 150 days (`play.RunwayWarn`: the 90 days
-    drawn ahead and 60 to write). Then **the subjects that come back** (listed, never failed): the answers and names
+    the difficulty and kind mix, facts, dates and sources (how many have them, and the rest by kind), each
+    category's kinds against their share, **the day's runway** — how many days from today each place of a day has
+    questions for, and the day it runs out on — and **the dates' supply** („На този ден“: the dates of the year
+    ahead with fewer than two questions no day has had), and **the national days** (`bank.NationalDays`: each with
+    how many questions about Bulgaria belong to it). It **fails** on an error, while a category is more than 2% off
+    the mean size (`bank.SizeSlack`), and while a national day has no question about Bulgaria (`-sample` lets the
+    small public sample pass these two), and **warns** of every place under 150 days (`play.RunwayWarn`: the 90 days
+    drawn ahead and 60 to write) and of every thin date. Then **the subjects that come back** (listed, never failed): the answers and names
     more than 15 live questions name, by category (`*` over 1% of one); the top 20, all of them with
     `go run ./cmd/almanac bank subjects private`. Its last line counts the errors and the warnings by rule;
   - `go run ./cmd/almanac bank lint [-rule giveaway,stale] [-summary] private` lists every problem by rule, with
@@ -79,6 +82,10 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 - **Every question has a fact** („Знаеше ли?“), **the date it was added** and **the date it last changed**
   (`added`, `updated`, both YYYY-MM-DD). The checker refuses a question added since `RulesFrom` (2026-11-14)
   without them.
+- **Every question has its sources,** in time: a question added since `SourcesFrom` (2026-11-17) or changed since
+  `TouchedFrom` (2026-11-19) has the pages it was checked on (`bank check` refuses it without). The older ones get
+  theirs in a sourcing pass (`/fix-questions`), in this order: the numbers and orders (their reveal shows every value
+  as fact), the dated questions and those about Bulgaria, then the rest. `bank check` counts what's left, by kind.
 - Grow by adding: the balance report counts what it takes without dropping anything.
 - **Never retire to make room** (the owner's rule, 2026-11-15). A question is retired only for a fault of its own:
   wrong, stale, weak, or a near-duplicate that gives another away. A batch that adds to some places (say, 250 easy
@@ -102,12 +109,14 @@ enough to be worth a look, not always.
 | `spelling` | A name spelled as `names.json` says (Чингис хан, НАСА, Sony, „Дисни“, Ferrari, Нидерландия, олимпийските игри mid-sentence); a quoted title keeps its own spelling |
 | `stale` | Wording that can stop being true has `reviewBy`: „към 2026 г.“, „все още“, „в момента“, „понастоящем“, the oldest still „действащ“, „държи рекорда“, „рекордьор“, „досега“ |
 | `estimate` | A number question is an estimate: a year, or a quantity of more than 20 of its steps (6,5 млн. on a step of 0,1 is 65). A small count, a phone number, a place in a row is a choice |
+| `anchor` (hint) | An estimate counts what a well-read player can place, not an archive's count: a series' episodes, a hall's seats, a council's members, a dictionary's words, prize money, a fine |
 | `tolerance` | The tolerance follows the formula (below), within half again either way |
 | `order-gap` | An order's measured values (м, км², кг, жители, %, …: `measured` in order.go) stand 10% apart; exact ones (years, counts, coordinates) only differ |
 | `options` | No option stands out by its form: only the answer with a regnal numeral (Симеон I), only the answer in Latin or in Cyrillic letters (bTV among БНТ, Нова), quotes on some options only |
 | `long-answer` (hint) | The answer isn't half again as long as every wrong option and 10 letters longer |
 | `answer-word` | No clue, and no question text, shares a word with the answer that no wrong option has („Кой е този водопад?“ — „Ниагарският водопад“; „френски лекари“ — „Лекари без граници“) |
-| `dated` | A question for a day (`on`) has its day's line (`day`), ending in a period, and the line names the date („На 3 март 1878 г. …“; a moving feast's names the feast) |
+| `dated` | A question for a day (`on`) has its day's line (`day`), ending in a period, and the line names the date („На 3 март 1878 г. …“; a moving feast's names the feast). One whose text names its date may go without it |
+| `own-date` | A true-or-not for a day doesn't name its date, nor has a choice for a day its date for the answer: dealt on it under „На този ден“, „3 юни е Световният ден на велосипеда.“ answers itself |
 | `decoy` | A match has a decoy |
 | `giveaway` | No question shows a value another asks (a number's answer, a year a choice asks, an order's values) next to the same subject: in its text, options, items, clues, fact, day's line or reveal. Judged by the value and the rare words around it |
 | `answer-giveaway` (hint) | No question shows a choice's or clues' answer as true (text, clue, fact, day's line, item, pair) in a line that, with its question's text, shares rare words with the asking question's subject („Ариел“ in „бащата на русалката Ариел в анимацията на „Дисни““) |
@@ -166,16 +175,16 @@ Every question is one JSON object in its category's file:
 | `type`               | `choice`, `number`, `order`, `truefalse`, `match`, `split` or `clues`                    |
 | `difficulty`         | `easy`, `medium` or `hard`                                                               |
 | `text`               | The question: at most 160 characters (60 with a picture), ending in „?“ or „:“           |
-| `fact`               | One or two sentences, at most 200 characters (see below)                                 |
+| `fact`               | One or two sentences, at most 140 characters for a question added since `ShortFactsFrom` (2026-11-19: on a phone it shows whole, under the answer), 200 for the older ones (see below) |
 | `added`, `updated`   | The day it joined the bank; the day it last changed at all                               |
 | `changed`            | The day what it asks last changed (text, answer, options, items, pairs, clues, picture): players' answers from before it don't count in its crowd and calibration. Not for a fix to the fact alone |
-| `sources`            | The pages (https://…) the answer and the fact were confirmed on: what the next check starts from. Never shown to players. Required for a question added since `SourcesFrom` (2026-11-17) |
-| `checked`, `checkedBy` | When it was last checked against its sources, and by what: a process and its model (`"new-questions fable-5.2"`), or for older questions the bank commit that added or last changed it (`"bank 7bb2938"`: its message and report say how). Required since `SourcesFrom` |
+| `sources`            | The pages (https://…) the answer and the fact were confirmed on: what the next check starts from. Never shown to players. Required for a question added since `SourcesFrom` (2026-11-17), or changed since `TouchedFrom` (2026-11-19) |
+| `checked`, `checkedBy` | When it was last checked against its sources, and by what: a process and its model (`"new-questions fable-5.2"`), or for older questions the bank commit that added or last changed it (`"bank 7bb2938"`: its message and report say how). Required with `sources` |
 | `reviewBy`           | For an answer that may stop being true (an office holder, a record): when to check it. From that day no game deals it (`bank check` warns, the server logs it) until it is checked and the date moved |
 | `image`              | A picture (see below)                                                                    |
 | `retired`            | `true`: never dealt again, kept for history and stats; with `retiredWhy` (`wrong`, `stale`, `weak`, `twin`, `giveaway`, `rule`) and `replacedBy` (the id that took its place). A question retired as `wrong` or `stale` also leaves what players learned (Моят Алманах) |
 | `on`                 | The days it belongs to: `"03-03"` every year, `"2027-05-02"` that year only (Великден). On such a day it goes into the day's ten as „На този ден“ |
-| `day`                | With `on`, required: one short line (at most 100 characters, ending in a period) saying what happened on that day and naming the date: „На 16 декември 1982 г. умира Колин Чапман.“ The player reads it with the answer, only when the question is dealt on its date (never before answering: it could give the answer away; never in a topic's game). See „A question for a day“ below |
+| `day`                | With `on`, required (unless the text itself names the date it asks about): one short line (at most 100 characters, ending in a period) saying what happened on that day and naming the date: „На 16 декември 1982 г. умира Колин Чапман.“ The player reads it with the answer, only when the question is dealt on its date (never before answering: it could give the answer away; never in a topic's game). See „A question for a day“ below |
 | `bg`                 | `true` for a question about Bulgaria (people, places, history, culture, language, sport): every day has at least three |
 
 By type:
@@ -243,6 +252,15 @@ By type:
   - text that speaks to the player says „ти“ and is gender-neutral.
 - **Numbers:** something worth estimating (a year, or more than 20 steps) with one accepted value. Pin the source
   where sources differ („според измерването от 2020 г.“). The tolerance is the formula's.
+- **An estimate a player can place.** The day ends on a hard quantity, the moment players remember most, so a number
+  needs an **anchor** a well-read player has (a height, a length, a distance, an age, a duration, a famous total, a
+  size against something known) and a reveal that teaches something. A count kept only in an archive or a document
+  (a series' episodes, a hall's seats, a council's members, a dictionary's words, prize money, a fine, the species in
+  a park's management plan, the walkers on one march) is a guess, not an estimate: the `anchor` hint flags the
+  common ones; the checker judges the rest. Ask such a subject as a choice, or ask what about it can be placed.
+- **It belongs under its topic.** A day takes one question a topic: a question filed under the wrong one („Правец е
+  родното място на кой държавен ръководител?“ under technology, for the computers) takes that topic's place with
+  another's question. Ask of each: would a player of this topic expect it here?
 - **Orders:** exact, sourced values in the same order under every source. Measurements that sources give
   differently (areas, lengths, populations, heights) need at least 10% between neighbours; exact values (years,
   dates) only need to be distinct and undisputed. The reveal shows every value, so none of them may be another
@@ -252,9 +270,11 @@ By type:
 
 ## Writing the fact
 
-- One or two sentences, ending with a period. Something true and surprising **about the answer** that the question
-  didn't say: a cause, a consequence, a number that gives scale, or a misconception put right. Not the answer
-  restated, and not „Интересно е, че…“.
+- One or two sentences, ending with a period, at most 140 characters (about 130 is the aim: on a phone the fact
+  shows under the answer, with the day's line on a dated question). Something true and surprising **about the
+  answer** that the question didn't say: a cause, a consequence, a number that gives scale, or a misconception put
+  right. Not the answer restated, not a fact about something else the question merely mentions (a camel's nostrils
+  under „Има ли животното рога?“), and not „Интересно е, че…“.
 - It must not answer another question in the bank: grep its names and numbers.
 - Claim only what the sources claim, and keep their hedges („според преданието“, „около“).
 
@@ -269,10 +289,25 @@ shows with the answer, over the fact: the player learns why the day. (The owner'
   of a date („На Великден християните празнуват Възкресението Христово.“). It shows only after the answer, so it may
   name what the question asks; it never shows in a topic's game.
 - **The text names the date only when the date is what's asked.** Not „Колин Чапман, починал на 16 декември
-  1982 г., основава коя марка…“, but „Кой основава марката „Лотус“?“: the day's line says the date.
+  1982 г., основава коя марка…“, but „Кой основава марката „Лотус“?“: the day's line says the date. A question that
+  does ask about its date („Коя държава празнува националния си ден на 1 юли?“) may go without a day's line, and
+  should unless the line tells more than the text („На 1 юли 1867 г. е създадена Канадската конфедерация.“ does; „На
+  14 март е Денят на числото π.“ after „Кое число празнуват математиците на 14 март?“ only takes a phone's screen).
+- **A true-or-not never names its date** (the `own-date` rule): dealt on it, „3 юни е Световният ден на
+  велосипеда.“ is true by construction. State something about the day that the date doesn't give away: who declared
+  it, what it marks, how it's kept.
 - **The fact says something new,** not the date again: the day's line has said it. „Чапман умира на 16 декември.“
   is a wasted fact.
 - Bulgarian events before 1916: the New Style date Bulgaria marks today.
+- **A date takes one question a year, and waits for it.** A day never deals a question twice, so a date with one
+  question is blank the year after: `bank check` warns of every date of the year ahead with fewer than two that no day
+  has had, and batches write for the thinnest dates (`bank plan` gives them). Until a day deals it, a dated question
+  is kept out of every other game (topic games, duels, rooms, Роял: `play.waiting`), so it isn't spent early.
+- **The national days come first** (`bank.NationalDays`: the Liberation, the Unification, Independence, Левски's
+  birth and death, Ботев, the 24th of May, the Enlighteners, Гергьовден, the students' day, the feasts): each has
+  questions about Bulgaria on its own theme, two or three of them (`bank check` fails while one has none). A date's
+  questions prefer a story with a Bulgarian or a human angle to a template („Коя държава празнува на … ?“, „Какво
+  отбелязва ООН на …?“): templates stay under a tenth of the dated questions, and never a national day's.
 
 ## Pictures
 
@@ -292,7 +327,8 @@ shows with the answer, over the fact: the player learns why the day. (The owner'
   something else (another subject or answer), retire it (`"retired": true`, `retiredWhy`, `replacedBy`) and add a new
   one with a new id: answers already given and stats point at the old one.
 - Keep `sources` true: add the page a fix rests on, drop one that no longer supports it. A fix checked again against
-  its sources sets `checked` and `checkedBy`.
+  its sources sets `checked` and `checkedBy`. A question without sources gets them with any change, a label's
+  included (`TouchedFrom`): the check you make for the change is the check they record.
 - Don't touch a retired question except to read it.
 - Never take a question out of the bank: retire it. The server refuses a bank that drops an id (`bank.Dropped`).
 - A question of today's ten changed in what it asks, or retired as `wrong` or `stale`, during its day counts for

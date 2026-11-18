@@ -120,6 +120,25 @@ func ruleEstimate(q Question) []string {
 	return nil
 }
 
+// noAnchor are the counts kept in archives that nobody carries a sense of: a series' episodes, a hall's seats, a
+// council's members, a dictionary's words, a prize's money, a fine. An estimate needs an anchor a well-read player
+// has (a year, a height, a distance, an age, a famous total) and a reveal that teaches something; a count like these
+// is a guess, and the day ends on its estimate.
+var noAnchor = regexp.MustCompile(`(?i)(?:^|[^\p{L}])(епизод\p{L}*|серии|съветни\p{L}*|места|документ\p{L}*|стати[ия]|думи|наградн\p{L}*|глоб\p{L}*)(?:[^\p{L}]|$)`)
+
+// ruleAnchor (a hint): an estimate doesn't count what nobody has a sense of (noAnchor).
+func ruleAnchor(q Question) []string {
+	n, ok := q.(*Number)
+	if !ok || n.IsYear() {
+		return nil
+	}
+	text := strings.ReplaceAll(strings.ToLower(n.Text), "населени места", "селища") // places people live in: no seats
+	if m := noAnchor.FindStringSubmatch(text + " " + n.Unit); m != nil {
+		return []string{fmt.Sprintf("„%s“: a count nobody has a sense of is a guess, not an estimate: ask what a well-read player can place", m[1])}
+	}
+	return nil
+}
+
 // The tolerance follows one formula at every difficulty (the owner's rule, 16 Nov 2026): a well-read guess scores
 // about half. Closeness falls from 1 to 0 over the tolerance, so half is half the tolerance away, and the tolerance is
 // twice how far off a well-read guess is:

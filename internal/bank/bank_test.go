@@ -374,6 +374,15 @@ func TestNewQuestionRules(t *testing.T) {
 			"needs checked and checkedBy"},
 		{Tail{Added: SourcesFrom, Fact: "Факт.", Updated: SourcesFrom, Sources: []string{"https://bg.wikipedia.org/wiki/А"},
 			Checked: SourcesFrom, CheckedBy: "new-questions fable-5.2"}, ""},
+		// Since TouchedFrom, a change needs them too.
+		{Tail{Added: "2026-11-01", Fact: "Факт.", Updated: TouchedFrom}, "a question changed since"},
+		{Tail{Added: "2026-11-01", Fact: "Факт.", Updated: TouchedFrom, Sources: []string{"https://bg.wikipedia.org/wiki/А"},
+			Checked: TouchedFrom, CheckedBy: "fix-questions fable-5.2"}, ""},
+		{Tail{Added: "2026-11-01", Fact: "Факт.", Updated: "2026-11-16"}, ""},
+		// Since ShortFactsFrom, a new question's fact shows whole on a phone.
+		{Tail{Added: ShortFactsFrom, Updated: ShortFactsFrom, Fact: strings.Repeat("Дума ", 30) + "край.", Sources: []string{"https://bg.wikipedia.org/wiki/А"},
+			Checked: ShortFactsFrom, CheckedBy: "p"}, "fact is over 140"},
+		{Tail{Added: "2026-11-01", Fact: strings.Repeat("Дума ", 30) + "край."}, ""},
 		{Tail{Sources: []string{"bg.wikipedia.org/wiki/А"}}, "a source is a page's address"},
 		{Tail{Checked: "2026-11-20"}, "checked and checkedBy go together"},
 		{Tail{Added: "2026-11-01", Changed: "2026-11-05", Updated: "2026-11-03"}, "changed is between added and updated"},
