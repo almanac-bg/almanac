@@ -86,17 +86,17 @@ func TestLockedRoom(t *testing.T) {
 	hub := NewHub(sample(t))
 	ana, bo, cy := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}, Player{ID: 3, Name: "Цви"}
 	r, _ := hub.Open(ana, "", Settings{})
-	_ = r.Join(bo)
+	_ = r.Join(bo, "")
 	if err := r.SetLocked(bo.ID, true); !errors.Is(err, ErrNotYours) {
 		t.Fatalf("a player locked the room: %v", err)
 	}
 	if err := r.SetLocked(ana.ID, true); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.Join(cy); !errors.Is(err, ErrLocked) || r.In(cy.ID) {
+	if err := r.Join(cy, ""); !errors.Is(err, ErrLocked) || r.In(cy.ID) {
 		t.Fatalf("someone new in a locked room: %v", err)
 	}
-	if err := r.Join(Player{ID: 2, Name: "Боян"}); err != nil || !r.View(ana.ID).Locked {
+	if err := r.Join(Player{ID: 2, Name: "Боян"}, ""); err != nil || !r.View(ana.ID).Locked {
 		t.Fatalf("a player coming back to a locked room: %v", err)
 	}
 	var saved bytes.Buffer
@@ -104,11 +104,11 @@ func TestLockedRoom(t *testing.T) {
 	next := NewHub(hub.bank)
 	_, _ = next.Restore(&saved)
 	again, _ := next.Get(r.Code())
-	if err := again.Join(cy); !errors.Is(err, ErrLocked) {
+	if err := again.Join(cy, ""); !errors.Is(err, ErrLocked) {
 		t.Fatalf("the lock over a restart: %v", err)
 	}
 	_ = again.SetLocked(ana.ID, false)
-	if err := again.Join(cy); err != nil || !again.In(cy.ID) {
+	if err := again.Join(cy, ""); err != nil || !again.In(cy.ID) {
 		t.Fatalf("someone new once it's open again: %v", err)
 	}
 }

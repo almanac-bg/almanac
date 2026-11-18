@@ -158,3 +158,40 @@ func TestRecordRoom(t *testing.T) {
 		t.Fatal("one answer of ten counts as a perfect game")
 	}
 }
+
+// A room's game is kept once for each player, by its id: kept again (its end played twice, over a crash), it's the
+// run it was kept as, and earns nothing more. A game cut short earns by the questions it was dealt (review 2026-11-18,
+// A14 and S19).
+func TestRecordRoomOnce(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	u, v := w.user(), w.user()
+	picks := DrawRoom(w.b, "", 5, MixMixed, nil, rand.New(rand.NewPCG(5, 6)))
+	cut := RoomPlay{Game: "G1", Picks: picks[:1], Length: 5, Points: 100,
+		Answers: []RoomAnswer{{N: 0, Given: json.RawMessage(`{"pick":0}`), Shown: json.RawMessage(`{"pick":0}`), Score: 1,
+			Right: true, Points: 100, Ms: 3000, At: w.now}}}
+	first, err := w.g.RecordRoom(ctx, u, cut)
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := w.g.RecordRoom(ctx, u, cut)
+	if err != nil || again != first {
+		t.Fatalf("kept again: run %d (first %d), %v", again, first, err)
+	}
+	other, err := w.g.RecordRoom(ctx, v, cut) // another player of the same game
+	if err != nil || other == first {
+		t.Fatalf("another player's game: run %d, %v", other, err)
+	}
+	var runs, xp int
+	_ = w.db.Read.QueryRow(`SELECT count(*), sum(xp) FROM runs WHERE user_id = ? AND kind = 'room'`, u).Scan(&runs, &xp)
+	if runs != 1 || xp != XPAnswer+XPKnown+finishXP("room", 1, 5) {
+		t.Fatalf("%d runs, %d XP", runs, xp)
+	}
+	if _, err := w.g.RecordRoom(ctx, u, RoomPlay{Picks: picks[:1], Answers: cut.Answers}); err != nil {
+		t.Fatal(err)
+	}
+	_ = w.db.Read.QueryRow(`SELECT count(*) FROM runs WHERE user_id = ? AND kind = 'room'`, u).Scan(&runs)
+	if runs != 2 {
+		t.Fatalf("a game with no id is kept as a new one each time: %d runs", runs)
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand/v2"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
@@ -17,7 +18,9 @@ import (
 // A room (package room) is played live, in memory; this is what the game knows of it: how its questions are drawn
 // (DrawRoom), and what each player's game in it counts for once it's over (RecordRoom): a run of its own kind, 'room',
 // that earns XP and counts for the day's goals and the achievements as a topic's game does, and whose answers count as
-// seen. It's on no board of the day and moves no rating; its XP is any game's in the week's league.
+// seen. It's on no board of the day and moves no rating; its XP is any game's in the week's league. A game is kept
+// once for each player (by its id: RoomPlay.Game), and what playing it to its end earns is by the questions it was
+// dealt, not those it was cut to: a game its host ended at the first question earns that question's share.
 
 // Mix is how hard a room's questions are: its host chooses as they open it.
 type Mix string
@@ -127,10 +130,14 @@ func DrawRoom(b *bank.Bank, category string, n int, mix Mix, barred map[string]b
 // RoomPlay is one player's game in a room, as the room kept it: the game's questions, the points it gave them (the
 // room's own, with any bonus), and their answers from the question they came in on.
 type RoomPlay struct {
+	// Game tells the game from every other, in any room ("": none to tell it by, kept as a new one each time).
+	Game     string
 	Category string
-	Picks    []Pick
-	Points   int
-	Answers  []RoomAnswer
+	// Picks are the questions asked; Length how many the game was dealt (more, if its host ended it early).
+	Picks   []Pick
+	Length  int
+	Points  int
+	Answers []RoomAnswer
 }
 
 // RoomAnswer is one answer of a player's game in a room, as the room graded it.
@@ -147,10 +154,26 @@ type RoomAnswer struct {
 
 // RecordRoom keeps a player's game in a room as a finished run, and what it earned them (after.go), and says which
 // run it is. The run has the game's questions; those before the player came in have no answer, and count as nothing
-// (what playing to the end earns is in the share of all the game's questions answered right).
+// (what playing to the end earns is in the share of all the game's questions answered right, of all it was dealt).
+// The same game kept again for the player is the run it was kept as, earning nothing more.
 func (g *Game) RecordRoom(ctx context.Context, userID int64, p RoomPlay) (int64, error) {
 	var runID int64
+	var game any
+	if p.Game != "" {
+		game = p.Game + ":" + strconv.FormatInt(userID, 10)
+	}
+	again := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		if game != nil {
+			err := tx.QueryRow(`SELECT id FROM runs WHERE room_game = ?`, game).Scan(&runID)
+			if err == nil {
+				again = true
+				return nil
+			}
+			if !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+		}
 		var category any
 		if p.Category != "" {
 			category = p.Category
@@ -188,9 +211,9 @@ func (g *Game) RecordRoom(ctx context.Context, userID int64, p RoomPlay) (int64,
 		if _, err := judge(tx, g.Bank(), r.id, p.Picks); err != nil {
 			return err
 		}
-		r.xp = gained + finishXP("room", r.rights, len(p.Picks))
-		if _, err := tx.Exec(`UPDATE runs SET at = ?, points = ?, rights = ?, xp = ?, ms = ?, finished_at = ? WHERE id = ?`,
-			len(p.Picks), p.Points, r.rights, r.xp, r.ms, store.Ms(g.Now()), r.id); err != nil {
+		r.xp = gained + finishXP("room", r.rights, max(p.Length, len(p.Picks)))
+		if _, err := tx.Exec(`UPDATE runs SET at = ?, points = ?, rights = ?, xp = ?, ms = ?, finished_at = ?, room_game = ?
+			WHERE id = ?`, len(p.Picks), p.Points, r.rights, r.xp, r.ms, store.Ms(g.Now()), game, r.id); err != nil {
 			return err
 		}
 		return g.afterDue(tx, r.id)
@@ -198,6 +221,8 @@ func (g *Game) RecordRoom(ctx context.Context, userID int64, p RoomPlay) (int64,
 	if err != nil {
 		return 0, err
 	}
-	g.finished(ctx, userID, runID)
+	if !again { // what follows a run kept before is that run's (after.go): done, or due
+		g.finished(ctx, userID, runID)
+	}
 	return runID, nil
 }

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"io/fs"
 	"log/slog"
@@ -119,6 +120,24 @@ type roomsSaved struct {
 func (s *Server) saveRoomsChanged() {
 	if s.rooms.Changes() != s.roomsSaved.changesNow() {
 		s.saveRooms()
+	}
+}
+
+// saveRoomsSoon saves the rooms whenever the hub says they're worth saving at once (room.Hub.Saving: a game has ended,
+// or been kept), so that a crash can't play a game's end again; a second apart at most, however many games end.
+func (s *Server) saveRoomsSoon(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.rooms.Saving():
+			s.saveRooms()
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Second):
+		}
 	}
 }
 
