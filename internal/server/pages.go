@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
+	"log/slog"
 	"mime"
 	"net/http"
 	"os"
@@ -164,6 +165,13 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := s.user(r)
 	if err != nil {
+		// The browser went away before the answer (a reload over a page still coming: one held through a restart):
+		// nobody to answer, nothing wrong.
+		if r.Context().Err() != nil {
+			w.WriteHeader(499)
+			return
+		}
+		slog.Error("page", "route", route(r), "err", err)
 		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
 	}
