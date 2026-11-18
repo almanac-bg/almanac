@@ -32,7 +32,7 @@ export interface LeagueEnd {
 interface Row extends Look {
   name: string;
   tag: string;
-  /** The week's points on the day's questions (XP in the one week still raced on it). */
+  /** The week's points on the day's questions. */
   points: number;
   me?: boolean;
 }
@@ -40,6 +40,7 @@ interface Row extends Look {
 /** The week as the player sees it: their league and group, or (not in one yet) what puts them in. */
 export interface LeagueView {
   week: string;
+  /** The days left of the week, today too; 0 once it's over, its last games still coming in before it closes. */
   daysLeft: number;
   league: League;
   in: boolean;
@@ -53,15 +54,13 @@ export interface LeagueView {
   pay: [number, number, number];
   /** How many a group needs to be a race: fewer, and nobody goes up or is paid for a place. */
   race: number;
-  /** Whether this week is still raced on XP: the one under way when the league moved to the day's points. */
-  onXP?: boolean;
   last?: LeagueEnd;
 }
 
 export const loadLeague = () => api<LeagueView>("GET", "/api/league");
 
-/** How long is left of the week. */
-const daysLeft = (d: number) => `още ${d} ${d === 1 ? "ден" : "дни"}`;
+/** How long is left of the week: days, or (its days over, minutes before it closes) that it's ending. */
+const daysLeft = (d: number) => (d > 0 ? `още ${d} ${d === 1 ? "ден" : "дни"}` : "седмицата приключва");
 
 /** A week's move, said: up, down, or staying. */
 export function moveWords(e: LeagueEnd): string {
@@ -90,7 +89,7 @@ function head(v: LeagueView, days = true): Child {
 const rulesSeen = "almanac.leagueRules";
 
 /** What the week is, folded under „Как работи лигата“ (open on the first visit): who races, how, and what the end
- * brings; and, in the one week still raced on XP, that it is, in sight. */
+ * brings. */
 function rules(v: LeagueView): Child {
   let first = false;
   try {
@@ -99,25 +98,16 @@ function rules(v: LeagueView): Child {
   } catch {
     // no storage here: folded
   }
-  return [
-    v.onXP
-      ? h(
-          "p",
-          { class: "board-note" },
-          "Тази седмица още се брои по XP. От понеделник лигата е по точките от въпросите на деня.",
-        )
-      : null,
+  return h(
+    "details",
+    { class: "more league-rules", open: first },
+    h("summary", null, "Как работи лигата"),
     h(
-      "details",
-      { class: "more league-rules", open: first },
-      h("summary", null, "Как работи лигата"),
-      h(
-        "p",
-        { class: "board-note" },
-        `Всяка седмица играчите се състезават в групи до 20 души по точките от въпросите на деня. Пропуснат ден носи нула точки. В полунощ срещу понеделник първите се качват в по-висока лига, последните слизат, а първите трима печелят ${v.pay[0]}, ${v.pay[1]} и ${v.pay[2]} XP. В група под ${v.race} души няма нито качване, нито награди.`,
-      ),
+      "p",
+      { class: "board-note" },
+      `Всяка седмица играчите се състезават в групи до 20 души по точките от въпросите на деня. Пропуснат ден носи нула точки. В полунощ срещу понеделник първите се качват в по-висока лига, последните слизат, а първите трима печелят ${v.pay[0]}, ${v.pay[1]} и ${v.pay[2]} XP. В група под ${v.race} души няма нито качване, нито награди.`,
     ),
-  ];
+  );
 }
 
 /** The week as it stands for the player, in two lines: the days left and who goes up („Още 6 дни · първите 5 се
@@ -126,7 +116,7 @@ function rules(v: LeagueView): Child {
 function standing(v: LeagueView): Child {
   const n = v.group.length;
   const at = v.place ?? 0;
-  const pts = (x: number) => (v.onXP ? `${formatNumber(x)} XP` : `${formatNumber(x)} ${x === 1 ? "точка" : "точки"}`);
+  const pts = (x: number) => `${formatNumber(x)} ${x === 1 ? "точка" : "точки"}`;
   const points = (i: number) => v.group[i]?.points ?? 0;
   const mine = points(at - 1);
   const safe = n - v.down; // the last place that doesn't go down
@@ -167,17 +157,15 @@ export function leagueBoard(v: LeagueView): Child {
         gathering(v) ? { class: "league-gathering" } : null,
         gathering(v)
           ? "Групата ти още се събира."
-          : v.onXP
-            ? "Изиграй игра тази седмица и влизаш в група от своята лига."
-            : user.peek()
-              ? "Изиграй въпросите на деня и влизаш в група от своята лига."
-              : "Изиграй въпросите на деня и влизаш в лига: Странджа е първата, Рила е върхът.",
+          : user.peek()
+            ? "Изиграй въпросите на деня и влизаш в група от своята лига."
+            : "Изиграй въпросите на деня и влизаш в лига: Странджа е първата, Рила е върхът.",
       ),
       v.last ? lastWeek(v.last) : null,
       rules(v),
     );
   const n = v.group.length;
-  const unit = (points: number) => (v.onXP ? " XP" : points === 1 ? " точка" : " точки");
+  const unit = (points: number) => (points === 1 ? " точка" : " точки");
   const rows: Child[] = [];
   v.group.forEach((r, i) => {
     if (v.down && i === n - v.down) rows.push(h("li", { class: "league-line down" }, "Оттук слизат"));

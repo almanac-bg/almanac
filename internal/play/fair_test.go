@@ -247,7 +247,7 @@ func TestScriptedDayRacesAlone(t *testing.T) {
 	// The week ends: each is told the place they saw (both first), and the script's player keeps their XP for their
 	// own level.
 	level, _ := w.g.LevelNow(ctx, bot)
-	w.now = time.Date(2026, 11, 16, 0, 5, 0, 0, Bulgaria)
+	w.now = time.Date(2026, 11, 16, 0, 30, 0, 0, Bulgaria)
 	if err := w.g.SettleDue(ctx); err != nil {
 		t.Fatal(err)
 	}

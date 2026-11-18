@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/store"
@@ -18,6 +19,11 @@ import (
 // context of its own that the player leaving doesn't cancel (finished), and the sweep each minute does whatever that
 // left (AfterDue), a few times more, waiting longer each time, before it gives up. All of it may be done again
 // safely: a duel is settled once, an achievement or a goal kept once.
+//
+// What a run earned is judged by the run, never by the clock it's looked at on (played): a run of the day's questions
+// counts for its own day though its last answer came after midnight (DayGrace), and so does the sweep's retry of it
+// hours later. That day's goals and repair are the ones it moves, and that day's week of the leagues is the one it
+// joins, which waits for it before it closes (ensureWeek). A game played across midnight moved the goals of both days.
 //
 // It never fails the request that finished the run: the answer is kept, whatever happens after it.
 //
@@ -56,11 +62,90 @@ func (g *Game) after(ctx context.Context, userID, runID int64) error {
 	if err := g.settleRun(ctx, runID); err != nil {
 		return err
 	}
-	if err := g.afterRun(ctx, userID); err != nil {
+	p, err := g.playedOf(ctx, userID, runID)
+	switch {
+	case errors.Is(err, ErrNoRun): // gone with its player: nothing to keep
+	case err != nil:
+		return err
+	default:
+		if err := g.afterRun(ctx, p); err != nil {
+			return err
+		}
+	}
+	_, err = g.DB.Write.ExecContext(ctx, `DELETE FROM runs_after WHERE run_id = ?`, runID)
+	return err
+}
+
+// played is a finished game as what follows it sees it: whose, what kind, and the days it counts on.
+type played struct {
+	user, run int64
+	kind      string
+	// day is the day it counts for: a run of the day's questions, its own day; any other game, the day it ended.
+	day string
+	// began is the day it began on: a game played across midnight moved that day's goals too.
+	began string
+}
+
+// playedOf is a player's finished run as what follows it sees it (ErrNoRun: no such run of theirs).
+func (g *Game) playedOf(ctx context.Context, userID, runID int64) (played, error) {
+	p := played{user: userID, run: runID}
+	var started int64
+	var finished sql.NullInt64
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT kind, coalesce(day, ''), started_at, finished_at FROM runs
+		WHERE id = ? AND user_id = ?`, runID, userID).Scan(&p.kind, &p.day, &started, &finished)
+	if errors.Is(err, sql.ErrNoRows) {
+		return p, ErrNoRun
+	}
+	if err != nil {
+		return p, err
+	}
+	p.began = dayOf(time.UnixMilli(started))
+	if p.kind != "day" || p.day == "" {
+		end := g.Now()
+		if finished.Valid {
+			end = time.UnixMilli(finished.Int64)
+		}
+		p.day = dayOf(end)
+	}
+	return p, nil
+}
+
+// dayOf is the day a moment is in, in Bulgaria (YYYY-MM-DD).
+func dayOf(t time.Time) string { return t.In(Bulgaria).Format(time.DateOnly) }
+
+// afterRun keeps what a player's game, just finished, earned them, on the days it counts on (played): a broken streak
+// won back (repair.go), achievements, the day's goals, and, for the day's questions, a place in their week's league.
+func (g *Game) afterRun(ctx context.Context, p played) error {
+	for _, day := range unique(p.began, p.day) { // first: the streak it keeps counts for the achievements
+		if err := g.mend(ctx, p.user, day); err != nil {
+			return err
+		}
+	}
+	if _, err := g.Award(ctx, p.user); err != nil {
 		return err
 	}
-	_, err := g.DB.Write.ExecContext(ctx, `DELETE FROM runs_after WHERE run_id = ?`, runID)
-	return err
+	// A goal done is kept, with its XP, whether or not the player looks: on the days the game was played on, and
+	// today, when a duel won has only now been settled.
+	for _, day := range unique(p.began, p.day, g.Today()) {
+		if _, err := g.goalsOn(ctx, p.user, day); err != nil {
+			return err
+		}
+	}
+	if p.kind != "day" {
+		return nil
+	}
+	return g.joinLeague(ctx, p.user, weekOfDay(p.day))
+}
+
+// unique are the days given, each once, in their order.
+func unique(days ...string) []string {
+	var out []string
+	for _, d := range days {
+		if !slices.Contains(out, d) {
+			out = append(out, d)
+		}
+	}
+	return out
 }
 
 // AfterDue does what follows the finished runs that their own requests left undone (cut off by a restart, or failed),

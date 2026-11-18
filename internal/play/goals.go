@@ -19,9 +19,12 @@ import (
 // in a row, how fast, a topic, a type of question, a game nearly without a mistake, duels, Роял); the two drawn are
 // never of one family, nor of a family drawn the day before, and some are about something drawn with them: a topic, a
 // type of question. Each can be done that day: Роял only while the evening's is still ahead (and not for a new player
-// while the evenings are thin: NudgeRoyal), nothing mostly luck. A goal done earns its tier's XP, kept as it's done
-// (whether or not the player looks) and told once, at the end of the game that did it. A day with all three done also
-// earns a reserve day for the streak (runs.go), and counts towards the achievements for full days.
+// while the evenings are thin: NudgeRoyal), nothing mostly luck. What counts on a day is what was played on it, and
+// the day's questions count on their own day, all ten, though the last answers came after midnight (onDay): so a day
+// run begun at 23:58 finishes that day's goals, not the next's. A goal done earns its tier's XP, kept as it's done
+// (whether or not the player looks; after.go keeps the goals of the day a game counts on, whenever that's done) and
+// told once, at the end of the game that did it. A day with all three done also earns a reserve day for the streak
+// (runs.go), and counts towards the achievements for full days.
 
 // Goal is one of the day's goals: what to do, how much of it, and where it's done.
 type Goal struct {
@@ -223,7 +226,13 @@ func dayBounds(day string) (int64, int64) {
 
 // GoalsOf are the player's goals for today, with how far along each is; any newly done is kept, with its XP.
 func (g *Game) GoalsOf(ctx context.Context, userID int64) ([]DayGoal, error) {
-	day := g.Today()
+	return g.goalsOn(ctx, userID, g.Today())
+}
+
+// goalsOn are the player's goals of a day, with how far along each is; any newly done is kept, with its XP. A day
+// past is as it was left (tallyOf): only a run of its questions finished after midnight, within DayGrace, adds to it,
+// and what follows that run keeps the goals it finished (afterRun).
+func (g *Game) goalsOn(ctx context.Context, userID int64, day string) ([]DayGoal, error) {
 	ids, err := g.dayGoals(ctx, userID, day)
 	if err != nil {
 		return nil, err
@@ -305,10 +314,15 @@ func (g *Game) dayGoals(ctx context.Context, userID int64, day string) ([]string
 	return storedGoals(ctx, g.DB.Write, userID, day) // the ones kept, should another look have drawn them first
 }
 
-// GoalsMoved are the player's goals for today that a game (runID) moved without finishing them, with how far along
-// each is now: its news says so, in the card of the goals it finished (a goal finished is told as done).
+// GoalsMoved are the player's goals of the day a game (runID) counts for (played: today's, or yesterday's for the day's
+// questions finished after midnight) that it moved without finishing them, with how far along each is now: its news
+// says so, in the card of the goals it finished (a goal finished is told as done).
 func (g *Game) GoalsMoved(ctx context.Context, userID, runID int64) ([]DayGoal, error) {
-	day := g.Today()
+	p, err := g.playedOf(ctx, userID, runID)
+	if err != nil {
+		return nil, err
+	}
+	day := p.day
 	ids, err := storedGoals(ctx, g.DB.Read, userID, day)
 	if err != nil || len(ids) == 0 {
 		return nil, err
@@ -395,6 +409,14 @@ func (t *tally) distinctTopics() int {
 // fastMs is how quick an answer is for a goal of speed.
 const fastMs = 5000
 
+// onDay is a SQL condition on a run (r): that it's finished and counts on a day, ?2 and ?3 its bounds in ms and ?4
+// its date. A run of the day's questions counts on its own day, though its last answer came after midnight
+// (DayGrace); any other game on the day it ended.
+func onDay(r string) string {
+	return `(` + r + `.finished_at IS NOT NULL AND CASE WHEN ` + r + `.kind = 'day' THEN ` + r + `.day = ?4
+		ELSE ` + r + `.finished_at BETWEEN ?2 AND ?3 END)`
+}
+
 // tallyOf is how far a player's day has got: the games they finished and the answers they gave that day.
 func (g *Game) tallyOf(ctx context.Context, userID int64, day string) (*tally, error) {
 	return g.tallyWithout(ctx, userID, day, 0)
@@ -420,10 +442,10 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'royal' AND started_at BETWEEN ?2 AND ?3 AND id <> ?6),
 		(SELECT coalesce(max(rights), 0) FROM runs WHERE user_id = ?1 AND kind = 'royal' AND started_at BETWEEN ?2 AND ?3
 			AND id <> ?6),
-		(SELECT count(*) FROM runs WHERE user_id = ?1 AND finished_at BETWEEN ?2 AND ?3 AND rights > 0
-			AND rights = json_array_length(questions) AND id <> ?6),
-		(SELECT count(*) FROM runs WHERE user_id = ?1 AND finished_at BETWEEN ?2 AND ?3
-			AND json_array_length(questions) = ?5 AND rights >= ?5 - 2 AND id <> ?6)`, userID, from, to, day, Length, except).
+		(SELECT count(*) FROM runs r WHERE r.user_id = ?1 AND `+onDay("r")+` AND r.rights > 0
+			AND r.rights = json_array_length(r.questions) AND r.id <> ?6),
+		(SELECT count(*) FROM runs r WHERE r.user_id = ?1 AND `+onDay("r")+`
+			AND json_array_length(r.questions) = ?5 AND r.rights >= ?5 - 2 AND r.id <> ?6)`, userID, from, to, day, Length, except).
 		Scan(&t.day, &t.duels, &t.duelWins, &t.friendDuels, &t.royals, &t.royalBest, &t.perfect,
 			&t.eight)
 	if err != nil {
@@ -448,11 +470,13 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	// The day's answers, game by game in their order (for a row); a game begun before midnight counts from it.
+	// The day's answers, game by game in their order (for a row): a game begun before midnight counts from it, but
+	// the day's questions are their own day's, all ten, though the last came after midnight.
 	rows, err = db.QueryContext(ctx, `SELECT a.run_id, a.question_id, a.is_right, a.ms, coalesce(a.given, '')
 		FROM answers a JOIN runs r ON r.id = a.run_id
-		WHERE r.user_id = ? AND r.started_at >= ? AND a.at BETWEEN ? AND ? AND r.id <> ? ORDER BY a.run_id, a.n`,
-		userID, from-24*time.Hour.Milliseconds(), from, to, except)
+		WHERE r.user_id = ?1 AND r.started_at >= ?2 - 86400000 AND r.started_at < ?3 AND r.id <> ?5
+			AND CASE WHEN r.kind = 'day' THEN r.day = ?4 ELSE a.at BETWEEN ?2 AND ?3 END
+		ORDER BY a.run_id, a.n`, userID, from, to, day, except)
 	if err != nil {
 		return nil, err
 	}
