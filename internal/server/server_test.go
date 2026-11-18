@@ -1696,8 +1696,19 @@ func TestProfilesOverHTTP(t *testing.T) {
 func TestOrdinal(t *testing.T) {
 	for n, want := range map[int]string{1: "1-во", 2: "2-ро", 3: "3-то", 4: "4-то", 5: "5-о", 7: "7-о", 11: "11-о",
 		12: "12-о", 20: "20-о", 21: "21-во", 22: "22-ро", 50: "50-о", 100: "100-тно", 101: "101-во", 1000: "1000-но"} {
-		if got := ordinal(n); got != want {
+		if got := ordinal(n, ordNeuter); got != want {
 			t.Errorf("ordinal(%d) = %q, want %q", n, got, want)
+		}
+	}
+	// A week (/admin's): 2-ра седмица, 3-та, 5-а; a day with its article: на 1-вия ден, 2-рия, 3-тия, 5-ия.
+	for n, want := range map[int]string{1: "1-ва", 2: "2-ра", 3: "3-та", 4: "4-та", 5: "5-а", 11: "11-а", 21: "21-ва", 100: "100-тна"} {
+		if got := ordinal(n, ordFeminine); got != want {
+			t.Errorf("ordinal(%d, feminine) = %q, want %q", n, got, want)
+		}
+	}
+	for n, want := range map[int]string{1: "1-вия", 2: "2-рия", 3: "3-тия", 4: "4-тия", 5: "5-ия", 7: "7-ия", 12: "12-ия", 1000: "1000-ния"} {
+		if got := ordinal(n, ordMasculine); got != want {
+			t.Errorf("ordinal(%d, masculine) = %q, want %q", n, got, want)
 		}
 	}
 }

@@ -4,11 +4,12 @@ import { test } from "node:test";
 // The app's bridge, stood in for: it keeps each call to a plugin, and each listener, to tell it of events.
 const calls: string[] = [];
 const listeners = new Map<string, (data: unknown) => void>();
+const phone = { platform: "ios", refuse: false }; // refuse: the plugin answers with a refusal (a sheet closed)
 (globalThis as { Capacitor?: unknown }).Capacitor = {
-  getPlatform: () => "ios",
+  getPlatform: () => phone.platform,
   nativePromise: (plugin: string, method: string, options: Record<string, string> = {}) => {
     calls.push([plugin, method, ...Object.values(options)].join(" "));
-    return Promise.resolve();
+    return phone.refuse ? Promise.reject(new Error("Share canceled")) : Promise.resolve();
   },
   nativeCallback: (plugin: string, _method: string, options: { eventName: string }, fn: (data: unknown) => void) => {
     listeners.set(`${plugin} ${options.eventName}`, fn);
@@ -18,7 +19,7 @@ const listeners = new Map<string, (data: unknown) => void>();
 // The page, in the app: on Роял.
 (globalThis as { location?: unknown }).location = { origin: "https://almanac.bg", pathname: "/royal", search: "" };
 
-const { backAction, haptic, open, start } = await import("./phone.ts");
+const { backAction, haptic, open, share, start } = await import("./phone.ts");
 
 /** A Nav that keeps what it was asked to open. */
 const nav = (playing = false) => {
@@ -115,4 +116,15 @@ test("each moment has its touch", async () => {
   assert.deepEqual(await felt("close"), ["Haptics impact LIGHT"]);
   assert.deepEqual(await felt("streak"), ["Haptics impact MEDIUM"]);
   assert.deepEqual(await felt("big"), ["Haptics notification SUCCESS", "Haptics impact HEAVY"]);
+});
+
+test("a share sheet closed isn't a share on an iPhone; on Android it can't be told from „Copy“, and is one", async () => {
+  phone.refuse = true;
+  assert.equal(await share("Денят"), false);
+  phone.platform = "android";
+  assert.equal(await share("Денят"), true);
+  phone.refuse = false;
+  assert.equal(await share("Денят"), true);
+  phone.platform = "ios";
+  assert.equal(await share("Денят"), true);
 });

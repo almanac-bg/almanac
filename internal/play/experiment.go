@@ -1,8 +1,11 @@
 package play
 
 import (
+	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/binary"
+	"errors"
 	"strconv"
 )
 
@@ -12,11 +15,12 @@ import (
 // bucket is worked out each time it's asked.
 //
 // The one experiment so far (the owner's call, 2026-11-18: DECISIONS.md): HeldReminders, a tenth of the players held
-// out of the day's reminder (a notification or a mail) and the streak's mail. What they would have had is kept as if
-// sent, marked held (push_reminded, day_mails, streak_mails), by the same rules and at the same hour, so /admin
-// compares those reminded with those who weren't, and the difference is the reminder's.
+// out of the day's notification and the streak's mail. What they would have had is kept as if sent, marked held
+// (push_reminded, streak_mails), by the same rules and at the same hour, so /admin compares those reminded with those
+// who weren't, and the difference is the reminder's. The day's reminder by mail isn't in it: a player asks for that
+// one, and gets it (server/daymail.go). /admin tells it from its first whole day (ExperimentFrom).
 
-// HeldReminders is the experiment of the day's reminder (server/remind.go) and the streak's mail
+// HeldReminders is the experiment of the day's notification (server/remind.go) and the streak's mail
 // (server/streakmail.go).
 const HeldReminders = "reminders"
 
@@ -31,3 +35,14 @@ func Bucket(experiment string, userID int64) int {
 
 // HeldOut says whether a player is held out of an experiment: what it tries isn't done for them.
 func HeldOut(experiment string, userID int64) bool { return Bucket(experiment, userID) < Holdout }
+
+// ExperimentFrom is the first day an experiment is told from: its first whole day, kept in kv as "<name>_from" by the
+// migration that began it; "" (from the start) without one, as in a database made after.
+func (g *Game) ExperimentFrom(ctx context.Context, experiment string) (string, error) {
+	var day string
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT value FROM kv WHERE key = ?`, experiment+"_from").Scan(&day)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return day, err
+}

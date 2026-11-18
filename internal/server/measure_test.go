@@ -4,8 +4,11 @@ import (
 	"database/sql"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/almanac-bg/almanac/internal/play"
 )
 
 // counted is what daily_counts holds for a key, all days together.
@@ -65,6 +68,21 @@ func TestVisitsAreCounted(t *testing.T) {
 	}
 }
 
+// One home counts at most visitsHome visits a half hour, however many browsers it says it is; reloads take none of
+// them.
+func TestVisitsOfOneHome(t *testing.T) {
+	g := start(t)
+	for range 5 {
+		g.open("/", phoneBrowser) // reloads
+	}
+	for i := range 2 * visitsHome {
+		g.open("/", strings.Replace(phoneBrowser, "Chrome/130.0", "Chrome/130."+strconv.Itoa(i+1), 1))
+	}
+	if got := g.counted("visit:home"); got != visitsHome {
+		t.Fatalf("one home counted %d visits, want %d", got, visitsHome)
+	}
+}
+
 func TestWhereGuestsCameFrom(t *testing.T) {
 	g := start(t)
 	cameFrom := func(out map[string]any) string {
@@ -118,6 +136,18 @@ func TestTheClientsCounts(t *testing.T) {
 	// The day shared counts only from a player who finished it today (D12): this one hasn't.
 	if g.counted("share:day") != 0 || g.counted("push:open:asked") != 1 || g.counted("visit:home") != 0 {
 		t.Fatal("not counted")
+	}
+}
+
+// The funnel from the first game on is of the newcomers who played more than a room on their first day: one only in a
+// room is told apart, and isn't in the rows below, „Завършили първата си игра“ either.
+func TestFunnelLeavesRoomsOut(t *testing.T) {
+	cells := funnelWeek(10, 4, []play.Newcomer{{RoomOnly: true, FirstFinished: true, Over: 2}, {Over: 2}})
+	if cells[2] != (rate{2, 4}).HTML() || cells[3] != "1" || cells[4] != (rate{0, 1}).HTML() {
+		t.Fatalf("the week: %v", cells[:5])
+	}
+	if len(cells) != 5+len(funnelSteps) {
+		t.Fatalf("%d cells", len(cells))
 	}
 }
 

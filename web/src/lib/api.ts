@@ -129,13 +129,13 @@ pageClock(boot.now);
 /** Now, by the server's clock (as of its last answer): what a day is, in a phone whose clock is off. */
 export const serverNow = (): number => Date.now() + skew;
 
-/** Counts one of something for the admin page (server: /api/tally; play/measure.go): the day shared, the reminder's
- * ask answered. Sent and forgotten: it goes even as the page is left, and a count lost is no matter. */
-export function tally(key: string): void {
+/** Counts one of something for the admin page (server: /api/tally; play/measure.go): the day shared (`day`: which),
+ * the reminder's ask answered. Sent and forgotten: it goes even as the page is left, and a count lost is no matter. */
+export function tally(key: string, day?: string): void {
   fetch("/api/tally", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key }),
+    body: JSON.stringify({ key, day }),
     keepalive: true,
     credentials: "same-origin",
   }).catch(() => {});

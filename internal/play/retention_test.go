@@ -2,6 +2,7 @@ package play
 
 import (
 	"database/sql"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -18,8 +19,9 @@ func (w *world) shadowed(user int64, day string, shadow int) {
 	}
 }
 
-// /admin counts people (review 2026-11-18, D1): not a player at a script's speed, nor a throwaway guest's day, nor an
-// admin; a gone player's days still, as nobody's. Judged as read: a guest let out of the shadow counts from then.
+// /admin counts people (review 2026-11-18, D1): not a player at a script's speed, nor an admin; a gone player's days
+// still, as nobody's. A throwaway guest's day counts whether they come back or not: counted only once back, the
+// newcomers would seem to come back more than they do.
 func TestPeopleDays(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -38,16 +40,16 @@ func TestPeopleDays(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := act.On("2026-11-12"); n != 2 {
-		t.Fatalf("people on the 12th: %d, want Ана and the one gone", n)
+	if n := act.On("2026-11-12"); n != 3 {
+		t.Fatalf("people on the 12th: %d, want Ана, the guest and the one gone", n)
 	}
-	if n := act.Within("2026-11-01", "2026-11-12"); n != 2 {
+	if n := act.Within("2026-11-01", "2026-11-12"); n != 3 {
 		t.Fatalf("people in the days: %d", n)
 	}
 	if act.On("2026-11-10") != 0 || act.first(ana) != "2026-11-11" {
 		t.Fatalf("Ана's first day: %q", act.first(ana))
 	}
-	// The guest comes back (JudgeNets lets their day out): a person, counted.
+	// The guest comes back (JudgeNets lets their day out): counted as before.
 	_, _ = w.db.Write.Exec(`UPDATE runs SET shadow = 0 WHERE user_id = ?`, throwaway)
 	act, _ = w.g.Activity(ctx, "2026-11-01")
 	if n := act.On("2026-11-12"); n != 3 {
@@ -145,6 +147,59 @@ func TestFirstVersion(t *testing.T) {
 	if err := w.db.Read.QueryRow(`SELECT first_version FROM users WHERE id = ?`, ana).Scan(&v); err != nil || v != "v3.9.0" {
 		t.Fatalf("first version: %q %v", v, err)
 	}
+	// One who played before versions were kept met none of them: not the version of their next day.
+	bo := w.user()
+	if _, err := w.db.Write.Exec(`INSERT INTO active_days (user_id, day) VALUES (?, '2026-01-01')`, bo); err != nil {
+		t.Fatal(err)
+	}
+	s, _ = w.g.StartTopic(ctx, bo, "science")
+	w.play(bo, s.ID, w.right)
+	var none sql.NullString
+	if err := w.db.Read.QueryRow(`SELECT first_version FROM users WHERE id = ?`, bo).Scan(&none); err != nil || none.Valid {
+		t.Fatalf("an old player's first version: %v %v", none, err)
+	}
+}
+
+// Migration 0069 takes back the versions stamped on players from before 0068 first served, and keeps the
+// hold-out's first whole day.
+func TestFirstVersionsTakenBack(t *testing.T) {
+	w := setup(t)
+	old, fresh := w.user(), w.user()
+	for _, q := range []string{
+		`INSERT INTO releases (version, at) VALUES ('v3.9.0', 1795015380000)`, // 18 Nov 2026, 17:23 in Bulgaria
+		`INSERT INTO active_days (user_id, day) VALUES (` + strconv.FormatInt(old, 10) + `, '2026-11-10'), (` +
+			strconv.FormatInt(old, 10) + `, '2026-11-19'), (` + strconv.FormatInt(fresh, 10) + `, '2026-11-18')`,
+		`UPDATE users SET first_version = 'v3.9.0'`,
+		`DELETE FROM kv WHERE key = 'reminders_from'`,
+	} {
+		if _, err := w.db.Write.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	body, err := os.ReadFile("../store/migrations/0069_measures_set_right.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Its parts that set data right (the column it drops is gone already).
+	for q := range strings.SplitSeq(string(body), ";\n") {
+		if strings.Contains(q, "day_mails") {
+			continue
+		}
+		if _, err := w.db.Write.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	version := func(id int64) string {
+		var v sql.NullString
+		_ = w.db.Read.QueryRow(`SELECT first_version FROM users WHERE id = ?`, id).Scan(&v)
+		return v.String
+	}
+	if version(old) != "" || version(fresh) != "v3.9.0" {
+		t.Fatalf("old %q, fresh %q", version(old), version(fresh))
+	}
+	if from, err := w.g.ExperimentFrom(t.Context(), HeldReminders); err != nil || from != "2026-11-19" {
+		t.Fatalf("the hold-out from %q, %v", from, err)
+	}
 }
 
 // A game keeps the device it was started on, where ctx says it (D5).
@@ -189,10 +244,9 @@ func TestHoldout(t *testing.T) {
 	}
 }
 
-// personRun names the shadows by their numbers.
+// personRun names the shadow by its number.
 func TestPeopleShadows(t *testing.T) {
-	if !strings.Contains(personRun, "("+strconv.Itoa(ShadowScript)+", "+strconv.Itoa(ShadowThrowaway)+")") ||
-		ShadowGuest == ShadowScript || ShadowGuest == ShadowThrowaway {
+	if personRun != "shadow <> "+strconv.Itoa(ShadowScript) || ShadowGuest == ShadowScript || ShadowThrowaway == ShadowScript {
 		t.Fatalf("personRun: %s", personRun)
 	}
 }

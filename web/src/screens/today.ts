@@ -407,7 +407,7 @@ function dayNext(
         } catch {
           // not kept: gold again next time
         }
-        if (!before) tally("share:day");
+        if (!before) tally("share:day", t.day); // its day: shared after midnight, it's yesterday's
       },
       true, // its link shows whose it is
     );

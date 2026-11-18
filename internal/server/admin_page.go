@@ -14,8 +14,8 @@ import (
 
 // adminSections are /admin's parts, as its menu names them: on /admin, but the questions, on a page of their own.
 var adminSections = []struct{ ID, Name string }{
-	{"back", "Връщане"}, {"path", "Път"}, {"habit", "Навик"}, {"notices", "Известия"}, {"games", "Игри"},
-	{"streaks", "Серии"}, {"fair", "Честна игра"}, {"players", "Играчи"},
+	{"reminders", "Напомняния"}, {"back", "Връщане"}, {"path", "Път"}, {"habit", "Навик"}, {"streaks", "Серии"},
+	{"fair", "Честна игра"}, {"notices", "Известия"}, {"games", "Игри"}, {"players", "Играчи"},
 }
 
 var adminFrame = template.Must(template.New("admin-page").Parse(`<!doctype html>
@@ -67,11 +67,24 @@ var adminBody = template.Must(template.New("admin").Parse(`
 В банката: {{.Questions}} въпроса, {{.Live}} в игра. Роял: {{if .Royal.Nightly}}всяка вечер{{else}}петък, събота и
 неделя{{end}}; медиана на играчите за последните {{.Royal.Evenings}} вечери: {{.RoyalMedian}} (всяка вечер, щом е поне
 {{.RoyalTurnout}} за {{.RoyalEvenings}} вечери).</p>
-<p class="muted">Играч тук е човек: отговорил на въпрос с човешка скорост, без администраторите и без гостите, изиграли
-деня за проба преди своя. Под всеки дял: колко от колко и между какви стойности е с 90 % сигурност. Разлика в рамките на
-тези стойности може да е случайна. В сиво: под 20 души, малко данни.</p>
+<p class="muted">Играч тук е човек: отговорил на въпрос с човешка скорост, без администраторите. Гостите, изиграли деня
+за проба преди своя, са вътре: иначе новите изглеждат по-верни, отколкото са. Под всеки дял: колко от колко и между
+какви стойности е с 90 % сигурност. Разлика в рамките на тези стойности може да е случайна. В сиво: под 20 души, малко
+данни.</p>
 
 {{with .M}}
+<section class="admin-section" id="reminders">
+<h2>Помагат ли напомнянията</h2>
+<p class="muted">{{.HoldoutShare}} % от играчите, избрани по жребий, не получават известието за деня и писмото за
+прекъсната серия: пазим само кога щяха да ги получат. Напомнянето по имейл не е в опита: идва при всеки, който го
+поиска. Ако интервалите на двете групи не се застъпват, разликата е от напомнянията. Броим по играч, затова интервалът
+е толкова тесен, колкото позволяват играчите, а не напомнянията: при малко играчи ще е широк месеци наред.
+{{if .HoldoutFrom}}От {{.HoldoutFrom}}{{else}}От началото на опита{{end}}, без днешния ден.</p>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">Получили</th><th class="num">Без напомняне</th></tr></thead><tbody>
+{{range .Holdout}}<tr><td>{{.Name}}</td><td class="num">{{.Sent.HTML}}</td><td class="num">{{.Held.HTML}}</td></tr>{{end}}
+</tbody></table></div>
+</section>
+
 <section class="admin-section" id="back">
 <h2>Връщане</h2>
 <div class="charts">{{.PlayersChart}}{{.CohortChart}}{{.Curve}}</div>
@@ -119,6 +132,10 @@ var adminBody = template.Must(template.New("admin").Parse(`
 </tbody></table></div>
 </section>
 
+{{end}}
+
+<div class="admin-side">
+{{with .M}}
 <section class="admin-section" id="habit">
 <h2>Навик</h2>
 <p>Завършили деня в поне 3 от последните 7 дни: <strong>{{.Habit}}</strong> от {{.HabitOf}} играли в тези дни.</p>
@@ -129,17 +146,32 @@ var adminBody = template.Must(template.New("admin").Parse(`
 <p>Отговори в деня на въпрос, на който играчът е отговарял преди, за 7 дни: {{.Repeats.HTML}} (трябва да е 0).</p>
 </section>
 
+<section class="admin-section" id="streaks">
+<h2>Серии</h2>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th>Дължина</th><th class="num">Вървят сега</th><th class="num">Прекъснати за 7 дни</th></tr></thead><tbody>
+{{range .Streaks}}<tr><td>{{.Band}}</td><td class="num">{{.Going}}</td><td class="num">{{.Ended}}</td></tr>{{end}}
+</tbody></table></div>
+<p>Резервни дни, похарчени за 7 дни: {{.Spent}}. Върнати серии за 7 дни (от предложените на Начало): {{.Repairs.HTML}}</p>
+</section>
+{{end}}
+
+<section class="admin-section" id="fair">
+<h2>Честна игра</h2>
+<p class="muted">Въпросите на деня, изиграни след поне двама гости от същата мрежа, създадени същия ден и изиграли само
+деня: може да са пробвали отговорите. Дните на гостите вече не се виждат на другите (докато не се върнат); денят на
+играча остава, щом не е скрит.</p>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th>Играч</th><th class="num">Верни</th><th class="num">Гости</th><th class="num">Най-добрият гост</th><th>Скрит</th></tr></thead><tbody>
+{{range .Fair}}<tr><td class="num">{{.Day}}</td><td><a href="/admin?player={{.Tag}}#players">{{.Name}}</a></td><td class="num">{{.Rights}}</td><td class="num">{{.Guests}}</td><td class="num">{{.Best}}</td><td>{{if .Shadow}}да{{else}}не{{end}}</td></tr>
+{{else}}<tr><td colspan="6" class="muted">Няма.</td></tr>{{end}}
+</tbody></table></div>
+</section>
+</div>
+
+{{with .M}}
 <section class="admin-section" id="notices">
 <h2>Известия</h2>
 <div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">7 дни</th><th class="num">28 дни</th></tr></thead><tbody>
 {{range .Notices}}<tr><td>{{if .Sub}}<span class="muted">·</span> {{end}}{{.Name}}</td><td class="num">{{.Week}}</td><td class="num">{{.Month}}</td></tr>{{end}}
-</tbody></table></div>
-<h3>Помагат ли напомнянията</h3>
-<p class="muted">{{.HoldoutShare}} % от играчите не получават напомнянето за деня (известие или писмо) и писмото за
-прекъсната серия: пазим само кога щяха да ги получат. Ако интервалите на двете групи не се застъпват, разликата е от
-напомнянето. При малко играчи интервалът ще е широк месеци наред. От началото на опита, без днешния ден.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">Получили</th><th class="num">Задържани</th></tr></thead><tbody>
-{{range .Holdout}}<tr><td>{{.Name}}</td><td class="num">{{.Sent.HTML}}</td><td class="num">{{.Held.HTML}}</td></tr>{{end}}
 </tbody></table></div>
 </section>
 
@@ -163,27 +195,8 @@ var adminBody = template.Must(template.New("admin").Parse(`
 {{else}}<tr><td colspan="4" class="muted">Няма игри.</td></tr>{{end}}
 </tbody></table></div>
 </section>
-
-<section class="admin-section" id="streaks">
-<h2>Серии</h2>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Дължина</th><th class="num">Вървят сега</th><th class="num">Прекъснати за 7 дни</th></tr></thead><tbody>
-{{range .Streaks}}<tr><td>{{.Band}}</td><td class="num">{{.Going}}</td><td class="num">{{.Ended}}</td></tr>{{end}}
-</tbody></table></div>
-<p>Резервни дни, похарчени за 7 дни: {{.Spent}}. Върнати серии за 7 дни (от предложените на Начало): {{.Repairs.HTML}}</p>
-</section>
-
 {{end}}
 
-<section class="admin-section" id="fair">
-<h2>Честна игра</h2>
-<p class="muted">Въпросите на деня, изиграни след поне двама гости от същата мрежа, създадени същия ден и изиграли само
-деня: може да са пробвали отговорите. Дните на гостите вече не се виждат на другите (докато не се върнат); денят на
-играча остава, щом не е скрит.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th>Играч</th><th class="num">Верни</th><th class="num">Гости</th><th class="num">Най-добрият гост</th><th>Скрит</th></tr></thead><tbody>
-{{range .Fair}}<tr><td class="num">{{.Day}}</td><td><a href="/admin?player={{.Tag}}#players">{{.Name}}</a></td><td class="num">{{.Rights}}</td><td class="num">{{.Guests}}</td><td class="num">{{.Best}}</td><td>{{if .Shadow}}да{{else}}не{{end}}</td></tr>
-{{else}}<tr><td colspan="6" class="muted">Няма.</td></tr>{{end}}
-</tbody></table></div>
-</section>
 `))
 
 var adminQuestionsBody = template.Must(template.New("admin-questions").Parse(`
