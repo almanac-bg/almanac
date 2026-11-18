@@ -67,8 +67,20 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 		}
 		if repair != nil {
 			out["repair"] = repair
-		} else if e := streak.Ended; e != nil && e.On >= recent && e.Days >= 2 && told != "ended:"+e.On {
-			out["ended"] = e
+		} else if e := streak.Ended; e != nil && e.On >= recent && e.Days >= 2 {
+			if told != "ended:"+e.On {
+				out["ended"] = e
+			}
+		} else if e != nil && out["kept"] == nil && streak.Days <= 1 {
+			// Back after days away, the streak ended since the last day played (and not just now: that's told as its
+			// end, above): welcomed back, once, with the longest streak they've had.
+			last, err := s.game.LastDay(ctx, u.ID)
+			if err != nil {
+				return nil, err
+			}
+			if e.On > last && s.game.Away(last) && told != "back:"+last {
+				out["back"] = map[string]any{"last": last, "best": streak.Best}
+			}
 		}
 		if out["week"], err = s.game.Week(ctx, u.ID); err != nil {
 			return nil, err
@@ -119,13 +131,14 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 			out["untold"] = untold
 		}
 		var runID int64
+		done := false
 		err = s.db.Read.QueryRowContext(ctx, `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, u.ID, day).Scan(&runID)
 		if err == nil {
 			st, err := s.game.State(ctx, u.ID, runID)
 			if err != nil {
 				return nil, err
 			}
-			out["run"] = st
+			out["run"], done = st, st.Done
 			if st.Done { // the right answer the fewest others got, for the result shared
 				if out["rarest"], err = s.game.RarestRight(ctx, u.ID, day); err != nil {
 					return nil, err
@@ -142,6 +155,12 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 					return nil, err
 				}
 				out["invite"] = s.cfg.PublicURL + "/f/" + code
+			}
+		}
+		// While today's ten wait, how yesterday's ended for them, once its board is final.
+		if !done {
+			if out["yesterday"], err = s.game.YesterdayOf(ctx, u.ID); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -183,6 +202,8 @@ func (s *Server) startDay(w http.ResponseWriter, r *http.Request) error {
 
 var dayPattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
+// board is a day's board (Класации' „Вчера“): its best and the viewer's place, its issue, whether it's final
+// (play.DaySettled: its first is the day's winner), and the viewer's friends on it.
 func (s *Server) board(w http.ResponseWriter, r *http.Request) error {
 	day := r.PathValue("day")
 	if _, err := time.Parse(time.DateOnly, day); err != nil || !dayPattern.MatchString(day) {
@@ -200,7 +221,13 @@ func (s *Server) board(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	return ok(w, b)
+	out := map[string]any{"board": b, "issue": play.Issue(day), "final": s.game.DaySettled(day)}
+	if u != nil {
+		if out["friends"], err = s.game.FriendsBoard(r.Context(), day, u.ID); err != nil {
+			return err
+		}
+	}
+	return ok(w, out)
 }
 
 func (s *Server) startTopic(w http.ResponseWriter, r *http.Request) error {
@@ -224,7 +251,8 @@ func (s *Server) startTopic(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, st)
 }
 
-// mistakes says how many questions wait for the player's second chance, and from how many it opens.
+// mistakes says how many questions wait for the player's second chance, from how many it opens, and, while there are
+// too few to play, what's still to come (play.Coming).
 func (s *Server) mistakes(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -234,7 +262,13 @@ func (s *Server) mistakes(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	return ok(w, map[string]int{"waiting": n, "from": play.MistakesFrom})
+	out := map[string]any{"waiting": n, "from": play.MistakesFrom}
+	if n < play.MistakesFrom {
+		if out["coming"], err = s.game.ComingOf(r.Context(), u.ID); err != nil {
+			return err
+		}
+	}
+	return ok(w, out)
 }
 
 // startMistakes starts a second chance: the questions the player got wrong, asked again.
@@ -398,4 +432,19 @@ func (s *Server) stats(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return ok(w, st)
+}
+
+// games is a page of the player's finished games, newest first (Профил's „Всички игри“): of a kind (?kind=day, topic
+// or others; none: all), from where the page before ended (?from=, its next).
+func (s *Server) games(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	q := r.URL.Query()
+	page, err := s.game.GamesOf(r.Context(), u.ID, q.Get("kind"), q.Get("from"), play.GamesPage)
+	if err != nil {
+		return err
+	}
+	return ok(w, page)
 }

@@ -1342,7 +1342,7 @@ func TestReminderNamesAFriend(t *testing.T) {
 	playRun(ana, run)
 	_, board := ana.call("GET", "/api/day/"+today+"/board", nil)
 	rights := -1
-	for _, r := range board["top"].([]any) {
+	for _, r := range board["board"].(map[string]any)["top"].([]any) {
 		if r := r.(map[string]any); r["name"] == anaName {
 			rights = int(r["rights"].(float64))
 		}

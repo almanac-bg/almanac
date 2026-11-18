@@ -53,9 +53,11 @@ interface Page {
   all: number;
   of: Record<string, number>;
   next?: string;
+  /** The player's games of the day's ten on the page's days, by day: each day's dateline is the way to its game. */
+  games?: Record<string, number>;
 }
 
-type Counts = Omit<Page, "facts" | "next">;
+type Counts = Omit<Page, "facts" | "next" | "games">;
 
 export function almanac(kit: Kit) {
   ({
@@ -198,15 +200,18 @@ function pages(topic: string, counted: (c: Counts) => void): Child {
   const year = dayInBulgaria().slice(0, 4);
   let day = "";
   let facts: HTMLElement | null = null;
-  const add = (f: Learned) => {
+  const add = (f: Learned, games: Record<string, number> = {}) => {
     if (f.day !== day || !facts) {
       day = f.day;
       facts = h("ol", { class: "almanac-list" }) as HTMLElement;
+      // The day's dateline, a way to that day's game of the day's ten where the player played it.
+      const when = h("time", { datetime: f.day }, dateline(f, year));
+      const game = games[f.day];
       days.append(
         h(
           "section",
           { class: "almanac-day" },
-          h("h2", { class: "kicker almanac-date" }, h("time", { datetime: f.day }, dateline(f, year))),
+          h("h2", { class: "kicker almanac-date" }, game ? h("a", { href: `/games/${game}` }, when) : when),
           facts,
         ),
       );
@@ -237,7 +242,7 @@ function pages(topic: string, counted: (c: Counts) => void): Child {
       (p) => {
         if (life.aborted) return;
         counted(p);
-        for (const f of p.facts) add(f);
+        for (const f of p.facts) add(f, p.games);
         next.set(p.next ?? "");
         busy.set(false);
         // Still near the end (a short page, a tall screen): looked at afresh, it says so again.

@@ -13,9 +13,13 @@ test("a broken streak is won back: the day's ten and one more game, the same day
   await expect(page.locator(".streak-chip")).toContainText("3дни за връщане");
   await startDay(page);
   await playRun(page);
-  // The day played: one game left, and the card has the gold way to it (the result's „Сподели“ is plain then).
+  // The day played: one game left, and the card, under the result, has the gold way to it (the result's „Сподели“ is
+  // plain then). The chip and „Утре“ say what winning it back makes of the streak, not the new one of a day.
   await expect(card).toContainText("Остава още една игра днес и серията се връща.");
+  await expect(page.locator(".summary .keep-card").filter({ hasText: "прекъсна" })).toBeVisible();
   await expect(page.locator(".btn.primary")).toHaveCount(1);
+  await expect(page.locator(".streak-chip")).toContainText("4дни за връщане");
+  await expect(page.locator(".tomorrow")).toContainText("Ако върнеш серията днес, утре тя става 5.");
   await card.getByRole("link", { name: "Още една игра" }).click();
   await expect(page).toHaveURL(/\/play\/[a-z]+$/);
   await page.getByRole("button", { name: "Започни сега" }).click();

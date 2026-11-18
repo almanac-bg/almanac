@@ -31,7 +31,7 @@ import (
 var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/$`),
 	regexp.MustCompile(`^/play/[a-z]+$`),
-	regexp.MustCompile(`^/(duel|royal|room|ranks|rewards|wardrobe|me|friends|settings|almanac|mistakes)$`),
+	regexp.MustCompile(`^/(duel|royal|room|ranks|rewards|wardrobe|me|friends|settings|almanac|mistakes|games)$`),
 	regexp.MustCompile(`^/duel/([0-9]{1,12}|live)$`),
 	regexp.MustCompile(`^/challenge(/[0-9]{1,12})?$`),
 	regexp.MustCompile(`^/c/[a-z0-9]{6,8}$`),
@@ -59,6 +59,7 @@ var screens = []struct {
 	{regexp.MustCompile(`^/wardrobe$`), "wardrobe.js"},
 	{regexp.MustCompile(`^/almanac$`), "almanac.js"},
 	{regexp.MustCompile(`^/year/[0-9]{4}$`), "year.js"},
+	{regexp.MustCompile(`^/games$`), "games.js"},
 	{regexp.MustCompile(`^/games/[0-9]{1,12}$`), "played.js"},
 	{regexp.MustCompile(`^/ranks$`), "ranks.js"},
 	{regexp.MustCompile(`^/friends$`), "friends.js"},

@@ -1,5 +1,5 @@
 // The one gold action after the day's ten (DESIGN.md: one obvious action a screen), decided by what's worth doing
-// next: sharing a result worth sharing, once a day; winning a broken streak back; or another game, where a goal of the
+// next: sharing a result worth sharing, as it lands; winning a broken streak back; or another game, where a goal of the
 // day points. Kept apart from the screens so that the rule can be tested on its own.
 
 /** The day's result as the gold action weighs it. */
@@ -10,8 +10,8 @@ export interface DayDone {
   streak: number;
   /** A right answer few of the day's other players got (share.ts's rare), if known. */
   rare: boolean;
-  /** The day's result was shared already, today. */
-  shared: boolean;
+  /** Played this moment: the result lands now. A later visit finds it played, and another game is what's next. */
+  just: boolean;
   /** A broken streak is half won back: the day's ten played, another game still to play (play/repair.go). */
   repairing: boolean;
 }
@@ -20,12 +20,17 @@ export interface DayDone {
  * has no gold then); or another game („Още десет“). */
 export type DayGold = "share" | "repair" | "next";
 
-/** A result is worth sharing with 6 of 10 or more, with a streak of 3 days or more, or with a right answer few got. */
-export const worthSharing = (d: DayDone): boolean => d.rights >= 6 || d.streak >= 3 || d.rare;
+/** The streak's round numbers (the achievements' and a year): reached, they're the game's big news, worth a share. */
+export const streakMarks = [3, 7, 30, 100, 365];
+
+/** A result is worth sharing with 6 of 10 or more, with the streak on a round number, or with a right answer few got
+ * among 4 or more (one lucky answer in a 2 of 10 is no result to show). */
+export const worthSharing = (d: DayDone): boolean =>
+  d.rights >= 6 || streakMarks.includes(d.streak) || (d.rare && d.rights >= 4);
 
 export function dayGold(d: DayDone): DayGold {
   if (d.repairing) return "repair";
-  if (!d.shared && worthSharing(d)) return "share";
+  if (d.just && worthSharing(d)) return "share";
   return "next";
 }
 

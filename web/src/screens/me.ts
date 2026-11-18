@@ -130,29 +130,72 @@ export function me(kit: Kit) {
   );
 }
 
+/** The player's look as Профил's head shows it, kept on this device by whose it is. */
+interface Look {
+  id: number;
+  avatar: string;
+  frame?: string;
+  backdrop?: string;
+  level?: number;
+  title?: { name: string; tier: string };
+}
+
+const lookKey = "almanac.look";
+
+/** The look last seen on this device for this player (null for none, or another player's). */
+function lastLook(id: number): Look | null {
+  try {
+    const l = JSON.parse(localStorage.getItem(lookKey) ?? "null") as Look | null;
+    return l?.id === id && typeof l.avatar === "string" ? l : null;
+  } catch {
+    return null; // no storage here, or nothing worth reading
+  }
+}
+
+function keepLook(l: Look): void {
+  try {
+    localStorage.setItem(lookKey, JSON.stringify(l));
+  } catch {
+    // not kept: a plain disc while the next Профил loads
+  }
+}
+
 /** Who you are: your avatar (with its level), your name, the title you wear and your tag; and Настройки, in words as
  * well as its picture, at every width. */
 function head(progress: () => Progress | null): Child {
+  // The player's look as their progress has it; until it comes (or if it can't), as it was last seen on this device:
+  // never a look drawn from the name, which reads as someone else's profile; and with none seen yet, a plain disc.
+  const look = (): Look | null => {
+    const p = progress();
+    const id = user.peek()?.id;
+    if (!p) return id ? lastLook(id) : null;
+    const t = p.title ? p.titles.find((a) => a.id === p.title) : undefined;
+    const l: Look = {
+      id: id ?? 0,
+      avatar: p.avatar,
+      frame: p.frame,
+      backdrop: p.backdrop,
+      level: p.open.xp ? p.level : undefined,
+      title: t ? { name: t.name, tier: t.tier } : undefined,
+    };
+    if (id) keepLook(l);
+    return l;
+  };
   return h(
     "div",
     { class: "me-head" },
     () => {
-      const p = progress();
-      return avatar(p?.avatar, {
-        size: "l",
-        level: p?.open.xp ? p.level : undefined,
-        name: user.peek()?.name,
-        frame: p?.frame,
-        backdrop: p?.backdrop,
-      });
+      const l = look();
+      return l
+        ? avatar(l.avatar, { size: "l", level: l.level, name: user.peek()?.name, frame: l.frame, backdrop: l.backdrop })
+        : h("span", { class: "avatar l avatar-unknown", "aria-hidden": "true" });
     },
     h(
       "div",
       { class: "me-head-text" },
       h("h1", null, () => user()?.name ?? "Профил"),
       () => {
-        const p = progress();
-        const t = p?.title ? p.titles.find((a) => a.id === p.title) : undefined;
+        const t = look()?.title;
         return t ? h("span", { class: `me-title t-${t.tier}` }, t.name) : null;
       },
       () => (user()?.tag ? h("span", { class: "me-tag" }, `@${user()?.tag}`) : null),

@@ -47,7 +47,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(page.locator(".reviewed")).toHaveCount(10);
   await page.reload();
-  await expect(page.locator(".summary")).toBeVisible();
+  await expect(page.locator(".day-done")).toBeVisible();
   await expect(page.getByRole("button", { name: "Започни" })).toHaveCount(0);
   await expect(page.locator(".modes")).toBeVisible();
   // Начало's top tells the streak the day made; the level and the goals come from the second day played.
@@ -56,7 +56,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // Класации opens on the day's board, the player on it; the league and the rating aren't theirs yet.
   await page.goto("/ranks");
   await expect(page.locator(".board .row.me")).toContainText("/10");
-  await expect(page.getByRole("tab")).toHaveText(["Днес", "Знания", "Всички", "Приятели"]);
+  await expect(page.getByRole("tab")).toHaveText(["Днес", "Вчера", "Знания", "Всички", "Приятели"]);
   // No level on a board's row, and no title the start gives everyone: a row is the place, the name and the score.
   await expect(page.locator(".board .lv")).toHaveCount(0);
   await expect(page.locator(".board")).not.toContainText("Нова искра");
@@ -309,8 +309,8 @@ test("the day left at its last question comes back done, with what it earned tol
   await expect(page.locator(".summary")).toBeVisible();
   await expect(page.locator(".summary .news-open")).toContainText("са резултатът ти в една игра");
   await page.reload();
-  await expect(page.locator(".summary")).toBeVisible();
-  await expect(page.locator(".summary .trail")).toBeVisible();
+  await expect(page.locator(".day-done")).toBeVisible();
+  await expect(page.locator(".day-done .trail")).toBeVisible();
   await expect(page.locator(".news-open")).toHaveCount(0);
 });
 
@@ -411,7 +411,7 @@ test.describe("on a computer", () => {
     expect(widths.length).toBeGreaterThan(2);
     expect(Math.max(...widths)).toBeLessThanOrEqual(22 * 16);
     await page.reload();
-    await expect(page.locator(".summary")).toBeVisible();
+    await expect(page.locator(".day-done")).toBeVisible();
     const after = await home.boundingBox();
     expect(just && after && Math.abs(just.width - after.width) < 1 && just.width > 48 * 16).toBe(true);
   });

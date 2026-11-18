@@ -33,7 +33,12 @@ const links: [href: string, label: string, icon: string, here: (p: string) => bo
   ["/", "Начало", "home", (p) => /^\/($|play\/|mistakes|duel|royal|room|r\/|f\/)/.test(p)],
   ["/friends", "Приятели", "users", (p) => p === "/friends"],
   ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
-  ["/me", "Профил", "user", (p) => /^\/(me|settings|rewards|wardrobe|almanac|year\/[0-9]{4}|games\/[0-9]+)$/.test(p)],
+  [
+    "/me",
+    "Профил",
+    "user",
+    (p) => /^\/(me|settings|rewards|wardrobe|almanac|year\/[0-9]{4}|games(\/[0-9]+)?)$/.test(p),
+  ],
 ];
 
 reportErrors();
@@ -120,6 +125,7 @@ if (root) {
       { path: /^\/f\/([a-z0-9]{8})$/, view: invite },
       { path: /^\/hand\/([A-Za-z0-9_-]{43})$/, view: handoff },
       { path: /^\/me$/, view: later(() => import("./screens/me.ts").then((m) => m.me)) },
+      { path: /^\/games$/, view: later(() => import("./screens/games.ts").then((m) => m.games)) },
       { path: /^\/games\/([0-9]+)$/, view: later(() => import("./screens/played.ts").then((m) => m.playedGame)) },
       {
         path: /^\/players\/([A-Za-z0-9_]{3,20})$/,

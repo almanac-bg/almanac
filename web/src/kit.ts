@@ -76,7 +76,7 @@ import { loadMistakes } from "./screens/play.ts";
 import { loadProgress, nearest } from "./screens/progress.ts";
 import { changeGame, mixes } from "./screens/rooms.ts";
 import { signIn } from "./screens/signin.ts";
-import { stats } from "./screens/stats.ts";
+import { gameRow, stats } from "./screens/stats.ts";
 import {
   bulgaria,
   categories,
@@ -162,6 +162,7 @@ export const kit = {
   feelKit,
   formatNumber,
   friendRequests,
+  gameRow,
   go,
   goBack,
   guardLeaving,

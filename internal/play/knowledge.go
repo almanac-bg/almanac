@@ -119,7 +119,11 @@ func (g *Game) KnowledgeBoard(ctx context.Context, viewer int64, friends bool, t
 		}
 		placed = placed || k.viewer
 	}
-	return g.rankingOf(ctx, viewer, out, false)
+	r, err := g.rankingOf(ctx, viewer, out, false)
+	if viewer != 0 && mine.answers < least {
+		r.Answers = &mine.answers
+	}
+	return r, err
 }
 
 // knownBy is a player's own mastery in a topic ("" for all), from every answer of theirs.
