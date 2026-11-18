@@ -380,9 +380,13 @@ func (s *Server) deliver(ctx context.Context, j queued) {
 			slog.Warn("push", "err", err, "kind", m.Kind)
 		case errors.As(err, &r):
 			slog.Warn("push", "err", err, "kind", m.Kind)
+			// A device's, mostly; but a 401 or 403 from a browser's service is the game's key it won't take, for all.
+			s.Problem("push: a service refused a device's push: " + plainKind(err.Error(), "", 160))
 		default: // the game's own: says nothing of the device
 			devices[i].fails = -1
 			slog.Warn("push", "err", err, "kind", m.Kind)
+			// Its keys refused (APNs, FCM: 401, 403), its credentials gone: every phone's notifications stop, so it's told.
+			s.Problem("push: the game's own send failed: " + plainKind(err.Error(), "", 160))
 		}
 	}
 	s.pushq.count("push:sent:"+m.Kind, reached)

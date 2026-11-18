@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/almanac-bg/almanac/internal/bank"
@@ -49,7 +50,7 @@ func (s *Server) report(w http.ResponseWriter, r *http.Request) error {
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
-	text := strings.Join(strings.Fields(in.Text), " ")
+	text := PlayerText(in.Text)
 	if n := utf8.RuneCountInString(text); n < 3 || n > 500 {
 		return &apiError{http.StatusBadRequest, "bad_report", "Напиши с няколко думи какво не е наред (до 500 знака)."}
 	}
@@ -68,6 +69,24 @@ func (s *Server) report(w http.ResponseWriter, r *http.Request) error {
 	// Whoever runs the game hears that there are reports, once a day; which, and what they say, is on /admin.
 	s.problems.add("a question was reported (the reports are on /admin)")
 	return ok(w, map[string]bool{"ok": true})
+}
+
+// PlayerText is what a player wrote, as the game keeps it: on one line, its spaces one, and without control or format
+// characters (a terminal's escapes, a bell, the bidi overrides that make text read backwards, zero-width letters).
+// A report goes on to whoever runs `bank reports` in a terminal and to the agents that fix questions: what reaches
+// them is plain words, however it was sent (review 2026-11-18, S17). What's written is still only words of anyone's:
+// those who read it treat it as such.
+func PlayerText(s string) string {
+	s = strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return ' '
+		}
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || unicode.Is(unicode.Co, r) || r == utf8.RuneError {
+			return -1
+		}
+		return r
+	}, s)
+	return strings.Join(strings.Fields(s), " ")
 }
 
 // admin is the page for whoever keeps the game: reports on questions, how each question goes, and players (a name to

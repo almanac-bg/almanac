@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"database/sql"
@@ -17,10 +18,12 @@ import (
 	"os/signal"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+	"unicode"
 
 	"filippo.io/age"
 
@@ -65,14 +68,19 @@ func backupRecipients() ([]age.Recipient, string) {
 //
 //	now [-force] [-json]     make a copy at once (the server makes each of its own so too, -json)
 //	list                     the copies, newest first
-//	restore [-identity F] [-into-place] <key|latest> [path]   write a copy to a new database file and check it; or
-//	                         put it in place of the game's database (DB_PATH), with the game stopped
-//	verify [-identity F] [key|latest]  bring a copy back and check it (the latest day's, if no key is given)
+//	restore [-identity F] [-unencrypted] [-into-place [-confirm KEY]] <key|latest> [path]   write a copy to a new
+//	                         database file and check it; or put it in place of the game's database (DB_PATH), with
+//	                         the game stopped, once its key is typed back (or given as -confirm)
+//	verify [-identity F] [key|latest]  bring a copy back and check it (the latest day's, if no key is given); with the
+//	                         key, off the server, it prints the copy's proof code
+//	proven <code>            record on the server that the key kept off it opened a copy (the code verify printed)
 //	keys                     make the key pair that encrypts the copies (BACKUP_RECIPIENT) and opens them (kept off
 //	                         the server)
 //
 // -identity names a file with the key that opens encrypted copies ("-": read it from the input, so it's never on the
-// server's disk).
+// server's disk). "latest" is only ever an encrypted copy named and stored as the server makes them (backup.Latest):
+// an unencrypted copy (from before the copies were encrypted, or a server without BACKUP_RECIPIENT) is restored only
+// by its name, with -unencrypted, as anyone with the bucket's key could have put one there.
 func backupCommand(args []string) error {
 	if len(args) == 0 {
 		return usage()
@@ -84,6 +92,14 @@ func backupCommand(args []string) error {
 		}
 		fmt.Printf("# The key that opens the copies. Keep it off the server (in a password manager), and never lose it:\n"+
 			"# without it no copy can be opened.\n%s\n\n# For the server's settings (/etc/almanac/env):\nBACKUP_RECIPIENT=%s\n", secret, recipient)
+		return nil
+	}
+	if args[0] == "proven" && len(args) == 2 {
+		p, err := backup.Prove(filepath.Dir(dbPath()), args[1], time.Now())
+		if err != nil {
+			return err
+		}
+		fmt.Printf("recorded: the key kept off the server opens %s (the copies' key %s)\n", p.Key, p.Recipient)
 		return nil
 	}
 	s, err := backupStore()
@@ -101,6 +117,8 @@ func backupCommand(args []string) error {
 	asJSON := fs.Bool("json", false, "log as JSON, and say what was made as JSON (for the server)")
 	identity := fs.String("identity", "", "the file with the key that opens encrypted copies (-: read from the input)")
 	inPlace := fs.Bool("into-place", false, "put the copy in place of the game's database (the game stopped)")
+	unencrypted := fs.Bool("unencrypted", false, "take a copy that isn't encrypted (named, never latest)")
+	confirm := fs.String("confirm", "", "with -into-place: the copy's key, typed back (else it's asked for)")
 	if err := fs.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -109,6 +127,10 @@ func backupCommand(args []string) error {
 	if err != nil {
 		return err
 	}
+	if *unencrypted && len(rest) > 0 && rest[0] == "latest" {
+		return errors.New("-unencrypted takes a copy by its name (backup list), never latest")
+	}
+	open := backup.Opening{IDs: ids, Unencrypted: *unencrypted}
 	switch {
 	case args[0] == "now" && len(rest) == 0:
 		return backupNow(ctx, s, *force, *asJSON)
@@ -119,13 +141,13 @@ func backupCommand(args []string) error {
 		if err != nil {
 			return err
 		}
-		return restoreInPlace(ctx, s, key, dbPath(), ids)
+		return restoreInPlace(ctx, s, key, dbPath(), open, *confirm)
 	case args[0] == "restore" && !*inPlace && len(rest) == 2:
 		key, err := resolveKey(ctx, s, rest[0], "")
 		if err != nil {
 			return err
 		}
-		if err := backup.Restore(ctx, s, key, rest[1], ids...); err != nil {
+		if _, err := backup.Restore(ctx, s, key, rest[1], open); err != nil {
 			return err
 		}
 		counts, err := backup.Check(ctx, rest[1])
@@ -139,7 +161,7 @@ func backupCommand(args []string) error {
 		if len(rest) == 1 {
 			key = rest[0]
 		}
-		return verifyBackup(ctx, s, key, ids)
+		return verifyBackup(ctx, s, key, open)
 	}
 	return usage()
 }
@@ -160,12 +182,17 @@ func identities(path string) ([]age.Identity, error) {
 	return backup.Identities(f)
 }
 
-// resolveKey is key, or the newest copy under prefix if key is "latest".
+// resolveKey is key, or if key is "latest", the newest copy under prefix as the server makes them (backup.Latest):
+// what's newer and isn't one is said, as someone with the bucket's key may have put it there.
 func resolveKey(ctx context.Context, s *backup.Store, key, prefix string) (string, error) {
 	if key != "latest" {
 		return key, nil
 	}
-	return backup.Latest(ctx, s, prefix)
+	key, skipped, err := backup.Latest(ctx, s, prefix)
+	for _, o := range skipped {
+		fmt.Fprintf(os.Stderr, "skipped, not a copy as the server makes them: %q (stored %s)\n", o.Key, o.Modified.UTC().Format(time.RFC3339))
+	}
+	return key, err
 }
 
 // backupNow makes a copy (makeBackup) and says what it made: as JSON for the server that runs it, else in words.
@@ -214,8 +241,9 @@ func makeBackup(ctx context.Context, s *backup.Store, force bool) (*backup.Repor
 	return r, nil
 }
 
-// runBackups makes the server's hourly copies (backup.Run), each by this program as one of its own (`backup now`),
-// at a lower priority than the game's: a copy never takes the processor from play, and its memory is never the game's.
+// runBackups makes the server's copies, every quarter of an hour (backup.Run), each by this program as one of its own
+// (`backup now`), at a lower priority than the game's: a copy never takes the processor from play, and its memory is
+// never the game's.
 // What goes wrong is a problem told (its mail once a day); the heartbeat (BACKUP_HEARTBEAT) is fetched after each copy
 // that made it.
 func runBackups(ctx context.Context, srv *server.Server) {
@@ -363,8 +391,10 @@ func listBackups(ctx context.Context, s *backup.Store) error {
 }
 
 // verifyBackup brings back the copy under key ("latest": the newest under days/) and checks it. An encrypted copy is
-// opened with ids; without them, it's checked as far as it can be without its key: stored whole, as it was sent.
-func verifyBackup(ctx context.Context, s *backup.Store, key string, ids []age.Identity) error {
+// opened with open's keys, where they are (off the server), and its proof code printed, for the server to record
+// (backup proven); without them, it's checked as far as it can be without its key: stored whole, as it was sent, and,
+// where this server's records reach, one this server stored.
+func verifyBackup(ctx context.Context, s *backup.Store, key string, open backup.Opening) error {
 	key, err := resolveKey(ctx, s, key, "days/")
 	if err != nil {
 		return err
@@ -373,42 +403,65 @@ func verifyBackup(ctx context.Context, s *backup.Store, key string, ids []age.Id
 	if dir := filepath.Dir(dbPath()); dirExists(dir) {
 		tmp = dir // where there's room for a database
 	}
-	counts, err := backup.Drill(ctx, s, key, tmp, ids...)
+	back, err := backup.Drill(ctx, s, key, tmp, open)
 	if errors.Is(err, backup.ErrEncrypted) {
 		st, err := backup.Intact(ctx, s, key)
 		if err != nil {
 			return fmt.Errorf("%s: %w", key, err)
 		}
-		fmt.Printf("%s: encrypted, stored whole as it was sent (%s; rows then: %s).\n"+
+		made := "not in this server's record of what it stored (older than it, or another server's)"
+		if ours, known := backup.LoadState(filepath.Dir(dbPath())).Made(key, st.SHA256); ours {
+			made = "stored by this server, these very bytes"
+		} else if known {
+			return fmt.Errorf("%s isn't a copy this server stored, though its records cover that time: someone with the bucket's key put it there", key)
+		}
+		fmt.Printf("%s: encrypted, stored whole as it was sent (%s; rows then: %s), %s.\n"+
 			"To open it and check the database itself, run this where its key is (off the server): backup verify -identity <file> %s\n",
-			key, size(st.Bytes), st.Rows, key)
+			key, size(st.Bytes), st.Rows, made, key)
 		return nil
 	}
 	if err != nil {
 		return fmt.Errorf("%s: %w", key, err)
 	}
-	printCounts(key+" brought back and whole", counts)
+	printCounts(key+" brought back and whole", back.Rows)
+	if back.Proof != "" {
+		fmt.Printf("\nThe key opens it. Its proof code: %s\n"+
+			"Record it on the server, so the server knows the copies open (it asks for this monthly):\n"+
+			"  almanac backup proven %s\n", back.Proof, back.Proof)
+	}
 	return nil
 }
 
 // restoreInPlace puts the copy under key in place of the game's database at path, with the game stopped: brought
-// back beside it and checked first, owned as the directory is (when root restores it), and swapped in at once. The
-// database it replaces is kept beside it (replaced-<when>.db, with its log), in case the copy was the wrong one; the
-// old one's shared memory goes, as it would corrupt the copy.
-func restoreInPlace(ctx context.Context, s *backup.Store, key, path string, ids []age.Identity) error {
+// back beside it and checked first, then shown (its key, when it was stored, its rows) and swapped in only once its
+// key is typed back (or given as confirm), owned as the directory is (when root restores it). The database it
+// replaces is kept beside it (replaced-<when>.db, with its log), in case the copy was the wrong one; the old one's
+// shared memory goes, as it would corrupt the copy.
+func restoreInPlace(ctx context.Context, s *backup.Store, key, path string, open backup.Opening, confirm string) error {
 	if err := gameStopped(); err != nil {
 		return err
 	}
 	dir := filepath.Dir(path)
 	tmp := path + ".restoring"
 	os.Remove(tmp)
-	if err := backup.Restore(ctx, s, key, tmp, ids...); err != nil {
+	restored, err := backup.Restore(ctx, s, key, tmp, open)
+	if err != nil {
 		return err
 	}
 	counts, err := backup.Check(ctx, tmp)
 	if err != nil {
 		os.Remove(tmp)
 		return fmt.Errorf("%s came back damaged, and the database is as it was: %w", key, err)
+	}
+	kind := "encrypted"
+	if !restored.Encrypted {
+		kind = "NOT ENCRYPTED"
+	}
+	fmt.Printf("%q: %s, stored %s, rows as stored %q\n", key, kind, restored.Modified.UTC().Format(time.RFC3339), restored.Meta)
+	printCounts("it holds", counts)
+	if err := confirmed(key, confirm); err != nil {
+		os.Remove(tmp)
+		return err
 	}
 	if err := ownAs(tmp, dir); err != nil {
 		os.Remove(tmp)
@@ -435,6 +488,25 @@ func restoreInPlace(ctx context.Context, s *backup.Store, key, path string, ids 
 	}
 	printCounts(key+" restored in place of "+path+" and whole", counts)
 	fmt.Println("start the game: systemctl start almanac.socket almanac")
+	return nil
+}
+
+// confirmed says whether whoever restores means the copy under key: confirm is that key, or, with none given, it's
+// typed back on the terminal (not the input, which may have carried the secret key).
+func confirmed(key, confirm string) error {
+	if confirm == "" {
+		tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+		if err != nil {
+			return errors.New("no terminal to ask on: give the copy's key as -confirm <key> to put it in place")
+		}
+		defer tty.Close()
+		fmt.Fprintf(tty, "To put this copy in place of the database, type its key (%s): ", key)
+		line, _ := bufio.NewReader(tty).ReadString('\n')
+		confirm = strings.TrimSpace(line)
+	}
+	if confirm != key {
+		return errors.New("not confirmed: the database is as it was")
+	}
 	return nil
 }
 
@@ -472,7 +544,11 @@ func size(n int64) string {
 func printCounts(what string, counts map[string]int64) {
 	fmt.Println(what + ":")
 	for _, t := range slices.Sorted(maps.Keys(counts)) {
-		fmt.Printf("  %-18s %d rows\n", t, counts[t])
+		name := t
+		if strings.ContainsFunc(t, func(r rune) bool { return !unicode.IsGraphic(r) }) {
+			name = strconv.Quote(t) // a copy's table names are what its database says: never escapes to the terminal
+		}
+		fmt.Printf("  %-18s %d rows\n", name, counts[t])
 	}
 }
 

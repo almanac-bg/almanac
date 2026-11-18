@@ -223,10 +223,10 @@ func TestBackUpAndRestore(t *testing.T) {
 	}
 
 	restored := filepath.Join(w.dir, "restored.db")
-	if err := Restore(t.Context(), w.store, r.Keys[0], restored); err != nil {
+	if _, err := Restore(t.Context(), w.store, r.Keys[0], restored, plain); err != nil {
 		t.Fatal(err)
 	}
-	if err := Restore(t.Context(), w.store, r.Keys[0], restored); err == nil {
+	if _, err := Restore(t.Context(), w.store, r.Keys[0], restored, plain); err == nil {
 		t.Fatal("restored over a file that's there")
 	}
 	back, err := sql.Open("sqlite", "file:"+restored+"?mode=ro")
@@ -252,7 +252,8 @@ func TestBackUpAndRestore(t *testing.T) {
 // copy is the first of each UTC day, and it's the one brought back.
 func TestEachCopyIsNew(t *testing.T) {
 	w := newWorld(t)
-	b := w.backer(w.db.Read)
+	owner, _ := age.GenerateX25519Identity()
+	b := w.backer(w.db.Read, owner.Recipient())
 	w.at = time.Date(2026, 11, 15, 21, 30, 0, 0, time.UTC)
 	drilled := 0
 	for range 4 { // 22:30, 23:30, then 00:30 and 01:30 the next day
@@ -267,14 +268,42 @@ func TestEachCopyIsNew(t *testing.T) {
 	if got := w.fake.keys("hours/"); len(got) != 4 {
 		t.Fatalf("hours %v", got)
 	}
-	if got, want := w.fake.keys("days/"), []string{"days/2026-11-15T223000Z.db.gz", "days/2026-11-16T003000Z.db.gz"}; !slices.Equal(got, want) || drilled != 2 {
+	if got, want := w.fake.keys("days/"), []string{"days/2026-11-15T223000Z.db.gz.age", "days/2026-11-16T003000Z.db.gz.age"}; !slices.Equal(got, want) || drilled != 2 {
 		t.Fatalf("days %v, drilled %d", got, drilled)
 	}
-	if s := LoadState(w.dir); s.Day != "2026-11-16" || s.Key != "hours/2026-11-16T013000Z.db.gz" || s.Rows["runs"] != 1 {
+	s := LoadState(w.dir)
+	if s.Day != "2026-11-16" || s.Key != "hours/2026-11-16T013000Z.db.gz.age" || s.Rows["runs"] != 1 || s.DayRows["users"] != 1 || len(s.Sent) != 6 {
 		t.Fatalf("state %+v", s)
 	}
-	if latest, err := Latest(t.Context(), w.store, "days/"); err != nil || latest != "days/2026-11-16T003000Z.db.gz" {
+	if latest, _, err := Latest(t.Context(), w.store, "days/"); err != nil || latest != "days/2026-11-16T003000Z.db.gz.age" {
 		t.Fatalf("latest %q %v", latest, err)
+	}
+	// What this server stored is known for its own; the same name with other bytes, or a name its records cover that
+	// it never stored, isn't.
+	for key, want := range map[string][2]bool{
+		"days/2026-11-16T003000Z.db.gz.age":  {true, true},
+		"hours/2026-11-16T013000Z.db.gz.age": {true, true},
+		"hours/2026-11-16T020000Z.db.gz.age": {false, true},
+		"hours/2026-11-01T000000Z.db.gz.age": {false, false},
+		"hours/latest.db.gz.age":             {false, false},
+	} {
+		sum := hashOf(w.fake.get(key))
+		if made, known := s.Made(key, sum); made != want[0] || known != want[1] {
+			t.Errorf("%s: made %v known %v, want %v", key, made, known, want)
+		}
+	}
+	if made, _ := s.Made("days/2026-11-16T003000Z.db.gz.age", hashOf([]byte("other"))); made {
+		t.Error("other bytes under its name passed for the server's")
+	}
+}
+
+// A copy is made every quarter of an hour, seven minutes past: away from the hour's and Роял's work.
+func TestNextCopy(t *testing.T) {
+	for at, want := range map[string]string{"10:00": "10:07", "10:06": "10:07", "10:07": "10:22", "10:30": "10:37", "10:59": "11:07"} {
+		in, _ := time.Parse("15:04", at)
+		if got := next(in).Format("15:04"); got != want {
+			t.Errorf("after %s: %s, want %s", at, got, want)
+		}
 	}
 }
 
@@ -299,16 +328,16 @@ func TestEncryptedCopies(t *testing.T) {
 	}
 
 	path := filepath.Join(w.dir, "back.db")
-	if err := Restore(t.Context(), w.store, r.Keys[0], path); !errors.Is(err, ErrEncrypted) {
+	if _, err := Restore(t.Context(), w.store, r.Keys[0], path, plain); !errors.Is(err, ErrEncrypted) {
 		t.Fatalf("restored without the key: %v", err)
 	}
 	other, _ := age.GenerateHybridIdentity()
-	if _, err := Drill(t.Context(), w.store, r.Keys[0], w.dir, other); err == nil {
+	if _, err := Drill(t.Context(), w.store, r.Keys[0], w.dir, Opening{IDs: []age.Identity{other}}); err == nil {
 		t.Fatal("opened with another key")
 	}
-	rows, err := Drill(t.Context(), w.store, r.Keys[0], w.dir, owner)
-	if err != nil || rows["users"] != 1 {
-		t.Fatalf("with the key: %v %v", rows, err)
+	back, err := Drill(t.Context(), w.store, r.Keys[0], w.dir, Opening{IDs: []age.Identity{owner}})
+	if err != nil || back.Rows["users"] != 1 || !back.Encrypted || back.Meta == "" {
+		t.Fatalf("with the key: %+v %v", back, err)
 	}
 
 	// Without its key, it's known to be stored as it was sent.
@@ -322,12 +351,13 @@ func TestEncryptedCopies(t *testing.T) {
 	if _, err := Intact(t.Context(), w.store, r.Keys[1]); err == nil {
 		t.Fatal("a changed copy passed")
 	}
-	if _, err := Drill(t.Context(), w.store, r.Keys[1], w.dir, owner); err == nil {
+	if _, err := Drill(t.Context(), w.store, r.Keys[1], w.dir, Opening{IDs: []age.Identity{owner}}); err == nil {
 		t.Fatal("a changed copy opened")
 	}
 }
 
-// A copy from before they were encrypted, under its old name, still comes back.
+// A copy from before they were encrypted, under its old name, still comes back, but only when it's asked for: anyone
+// with the bucket's key could have put it there.
 func TestOldCopiesStillRestore(t *testing.T) {
 	w := newWorld(t)
 	if _, err := w.db.Write.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`); err != nil {
@@ -339,8 +369,12 @@ func TestOldCopiesStillRestore(t *testing.T) {
 	}
 	w.put(t, "days/15.db.gz", file)
 	owner, _ := age.GenerateX25519Identity()
-	if rows, err := Drill(t.Context(), w.store, "days/15.db.gz", w.dir, owner); err != nil || rows["runs"] != 1 {
-		t.Fatalf("%v %v", rows, err)
+	if _, err := Drill(t.Context(), w.store, "days/15.db.gz", w.dir, Opening{IDs: []age.Identity{owner}}); !errors.Is(err, ErrUnencrypted) {
+		t.Fatalf("an unencrypted copy taken with a key: %v", err)
+	}
+	back, err := Drill(t.Context(), w.store, "days/15.db.gz", w.dir, Opening{IDs: []age.Identity{owner}, Unencrypted: true})
+	if err != nil || back.Rows["runs"] != 1 || back.Encrypted || back.Proof != "" {
+		t.Fatalf("%+v %v", back, err)
 	}
 }
 
@@ -412,7 +446,7 @@ func TestTheDrillFails(t *testing.T) {
 	w := newWorld(t)
 
 	// No copy at all.
-	if _, err := Drill(t.Context(), w.store, "days/x.db.gz", w.dir); !errors.Is(err, ErrMissing) {
+	if _, err := Drill(t.Context(), w.store, "days/x.db.gz", w.dir, plain); !errors.Is(err, ErrMissing) {
 		t.Fatalf("a missing copy: %v", err)
 	}
 
@@ -423,13 +457,13 @@ func TestTheDrillFails(t *testing.T) {
 	}
 	whole := w.fake.get(r.Keys[0])
 	w.fake.objs["/backups/cut"] = &object{body: whole[:len(whole)/2]}
-	if _, err := Drill(t.Context(), w.store, "cut", w.dir); err == nil {
+	if _, err := Drill(t.Context(), w.store, "cut", w.dir, plain); err == nil {
 		t.Fatal("a cut copy passed")
 	}
 
 	// A copy whose pages are damaged.
 	w.put(t, "damaged", damaged(t))
-	if _, err := Drill(t.Context(), w.store, "damaged", w.dir); err == nil {
+	if _, err := Drill(t.Context(), w.store, "damaged", w.dir, plain); err == nil {
 		t.Fatal("a damaged copy passed")
 	}
 
@@ -443,7 +477,7 @@ func TestTheDrillFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Drill(t.Context(), w.store, r.Keys[0], w.dir); err == nil || !strings.Contains(err.Error(), "runs is empty") {
+	if _, err := Drill(t.Context(), w.store, r.Keys[0], w.dir, plain); err == nil || !strings.Contains(err.Error(), "runs is empty") {
 		t.Fatalf("an empty copy: %v", err)
 	}
 	left, _ := filepath.Glob(filepath.Join(w.dir, "drill-*"))
@@ -483,7 +517,8 @@ func TestOverdue(t *testing.T) {
 	now := time.Date(2026, 11, 17, 10, 0, 0, 0, time.UTC)
 	for key, age := range map[string]time.Duration{
 		"hours/new":  time.Hour,
-		"hours/old":  5 * 24 * time.Hour,
+		"hours/kept": 8 * 24 * time.Hour,
+		"hours/old":  10 * 24 * time.Hour,
 		"days/fresh": 31 * 24 * time.Hour,
 		"days/old":   40 * 24 * time.Hour,
 	} {
@@ -496,12 +531,101 @@ func TestOverdue(t *testing.T) {
 	}
 }
 
-func TestNextIsHalfPast(t *testing.T) {
-	for at, want := range map[string]string{"10:00": "10:30", "10:29": "10:30", "10:30": "11:30", "10:59": "11:30"} {
-		in, _ := time.Parse("15:04", at)
-		if got := next(in).Format("15:04"); got != want {
-			t.Errorf("after %s: %s, want %s", at, got, want)
+// Recent copies deleted long before HoursKept (the bucket's rule for hours/ still the old two days) are said to be,
+// once the day's copies show copies have been made for longer; not before.
+func TestUnderkept(t *testing.T) {
+	w := newWorld(t)
+	now := time.Date(2026, 11, 30, 10, 0, 0, 0, time.UTC)
+	put := func(key string, age time.Duration) {
+		w.fake.now = now.Add(-age)
+		w.put(t, key, []byte("x"))
+	}
+	put("hours/a", time.Hour)
+	put("hours/b", 2*24*time.Hour)
+	put("days/a", 3*24*time.Hour)
+	if said, err := Lifecycle(t.Context(), w.store, now); err != nil || len(said) != 0 {
+		t.Fatalf("too early to tell: %v %v", said, err)
+	}
+	put("days/b", 9*24*time.Hour)
+	said, err := Lifecycle(t.Context(), w.store, now)
+	if err != nil || len(said) != 1 || !strings.Contains(said[0], "after about 2 days, not 7") {
+		t.Fatalf("%v %v", said, err)
+	}
+	put("hours/c", 7*24*time.Hour)
+	if said, err := Lifecycle(t.Context(), w.store, now); err != nil || len(said) != 0 {
+		t.Fatalf("kept as long as they should be: %v %v", said, err)
+	}
+}
+
+// A table that loses half its rows, or more than doubles by a thousand, is said to; transient tables, small ones and
+// tables new or gone aren't.
+func TestChanges(t *testing.T) {
+	before := map[string]int64{"users": 20, "friends": 400, "achievements": 40, "answers": 3000, "outbox": 900, "old": 100, "sessions": 5000}
+	now := map[string]int64{"users": 9, "friends": 150, "achievements": 2, "answers": 7000, "outbox": 0, "new": 10, "sessions": 1}
+	var said []string
+	for _, c := range Changes(before, now, "the copy before", true) {
+		said = append(said, c.Table)
+	}
+	if want := []string{"answers", "friends", "users"}; !slices.Equal(said, want) {
+		t.Fatalf("said %v, want %v", said, want)
+	}
+	if c := Changes(before, now, "the day's first copy", false); len(c) != 2 || c[0].Table != "friends" || !strings.Contains(c[0].Said, "fell to under half the 400 rows it had in the day's first copy") {
+		t.Fatalf("%+v", c)
+	}
+}
+
+// The tables said to be transient are the game's: a table renamed or dropped isn't left on the list.
+func TestTransientTablesExist(t *testing.T) {
+	w := newWorld(t)
+	for _, name := range transient {
+		var n int
+		if err := w.db.Read.QueryRow(`SELECT count(*) FROM sqlite_schema WHERE type = 'table' AND name = ?`, name).Scan(&n); err != nil || n != 1 {
+			t.Errorf("transient table %s isn't in the schema", name)
 		}
+	}
+}
+
+// A copy that drops half a watched table is sent, and that's said, against the copy before and the day's first; the day's
+// copy says when rows point to rows that aren't there.
+func TestACopyWeighsItsTables(t *testing.T) {
+	w := newWorld(t)
+	b := w.backer(w.db.Read)
+	w.at = time.Date(2026, 11, 15, 10, 0, 0, 0, time.UTC)
+	if _, err := w.db.Write.Exec(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 100)
+		INSERT INTO achievements (user_id, id, at) SELECT 1, 'a' || i, 1 FROM n`); err != nil {
+		t.Fatal(err)
+	}
+	if r, err := b.Once(t.Context()); err != nil || len(r.Warnings) != 0 {
+		t.Fatalf("%+v %v", r, err)
+	}
+	// A slow bleed: each copy a little fewer, never half of the one before, but half the day's first.
+	for _, left := range []int{70, 45} {
+		if _, err := w.db.Write.Exec(`DELETE FROM achievements WHERE CAST(substr(id, 2) AS INTEGER) > ?`, left); err != nil {
+			t.Fatal(err)
+		}
+		r, err := b.Once(t.Context())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if left == 70 && len(r.Warnings) != 0 || left == 45 && (len(r.Warnings) != 1 || !strings.Contains(r.Warnings[0], "achievements fell to under half the 100 rows it had in the day's first copy")) {
+			t.Fatalf("%d left: %v", left, r.Warnings)
+		}
+	}
+	// The next day's first copy finds rows that point nowhere (put there with the foreign keys off).
+	conn, err := w.db.Write.Conn(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{`PRAGMA foreign_keys = OFF`, `INSERT INTO achievements (user_id, id, at) VALUES (99, 'x', 1)`, `PRAGMA foreign_keys = ON`} {
+		if _, err := conn.ExecContext(t.Context(), q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	conn.Close()
+	w.at = time.Date(2026, 11, 16, 0, 0, 0, 0, time.UTC)
+	r, err := b.Once(t.Context())
+	if err != nil || !r.Drilled || !slices.ContainsFunc(r.Warnings, func(s string) bool { return strings.Contains(s, "achievements → users: 1") }) {
+		t.Fatalf("%+v %v", r, err)
 	}
 }
 

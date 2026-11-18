@@ -78,6 +78,8 @@ type Config struct {
 	// LimitsFile is where the limits' counts are kept as the server stops, for its next run to go on counting from
 	// ("": nowhere; a restart then starts every count again).
 	LimitsFile string
+	// DBPath is the database's file, for /api/health to say when its disk runs low ("": not said).
+	DBPath string
 	// Dev serves the client from disk, as the build rewrites it.
 	Dev     bool
 	Version string
@@ -121,6 +123,7 @@ type Server struct {
 	cookie        string       // the session's
 	askCookie     string       // the token of the browser a sign-in code is for (account.Asked)
 	unlogged      atomic.Int64 // browsers' errors past clientErrorsAll not logged since the last one (problems.go)
+	probe         probe        // whether the database takes writes, as /api/health last found (api.go)
 	handler       http.Handler
 }
 

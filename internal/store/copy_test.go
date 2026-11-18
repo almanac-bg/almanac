@@ -109,15 +109,15 @@ func TestKeepCopy(t *testing.T) {
 
 	// No room for a copy and the migrations: an error, and nothing made.
 	set["migrations/0005_x.sql"] = &fstest.MapFile{Data: []byte(`CREATE TABLE x (x INTEGER);`)}
-	defer func(f func(string) (uint64, bool)) { spaceFree = f }(spaceFree)
-	spaceFree = func(string) (uint64, bool) { return 1 << 10, true }
+	defer func(f func(string) (uint64, uint64, bool)) { spaceFree = f }(spaceFree)
+	spaceFree = func(string) (uint64, uint64, bool) { return 1 << 10, 1 << 40, true }
 	if made, err := KeepCopy(path, "v1.2.0"); made || err == nil {
 		t.Fatalf("with no room: made %v, %v", made, err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "before-v1.2.0.db")); err == nil {
 		t.Fatal("copied with no room")
 	}
-	spaceFree = func(string) (uint64, bool) { return 1 << 40, true }
+	spaceFree = func(string) (uint64, uint64, bool) { return 1 << 40, 1 << 41, true }
 
 	// The latest copies are kept.
 	for i := range 6 {
@@ -133,7 +133,7 @@ func TestKeepCopy(t *testing.T) {
 		t.Fatalf("KeepCopy: %v %v", made, err)
 	}
 	left, _ := filepath.Glob(filepath.Join(dir, "before-v*.db"))
-	want := []string{"before-v1.0.4.db", "before-v1.0.5.db", "before-v1.2.0.db"}
+	want := []string{"before-v1.0.5.db", "before-v1.2.0.db"}
 	for i := range want {
 		want[i] = filepath.Join(dir, want[i])
 	}

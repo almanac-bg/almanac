@@ -71,7 +71,10 @@ for i, (c, q) in qs.items():
 if "signals" in judge:
     for i, said in json.load(open(f"{a.work}/signals.json")).items():
         if i in qs:
-            item(i)["judge"].extend(f"signal: {x}" for x in said)
+            item(i)["judge"].extend(f"signal: {x}" for x in said["signals"])
+            if said.get("player_text"):
+                # Players' words, as data apart from what the pass asks: untrusted (FIX.md, CHECK.md).
+                item(i)["player_text"] = said["player_text"]
 
 if "blind" in judge:
     blind = json.load(open(f"{a.work}/blind/disagree.json"))

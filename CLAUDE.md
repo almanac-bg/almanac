@@ -39,7 +39,7 @@ most). A change is judged by whether players come back: the retention numbers in
 | `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: the paths it sends the app for, the client's router's list again; a test holds them equal) |
 | `internal/store` | SQLite; migrations in `internal/store/migrations`, applied once each by name |
 | `internal/bank` | Question types, the bank on disk, its checks |
-| `internal/account`, `mail`, `push`, `backup`, `qr` | Players and sign-in, email, Web Push, hourly backups to R2 (each checked before it's sent, encrypted to a key kept off the server, one brought back daily), QR codes |
+| `internal/account`, `mail`, `push`, `backup`, `qr` | Players and sign-in, email, Web Push, backups to R2 every 15 minutes (each checked before it's sent, encrypted to a key kept off the server, one brought back daily, the owner's key proven monthly: `backup proven`), QR codes |
 | `web/src` | The client, plain TypeScript, no framework: `lib/` (DOM, signals, router), `game/` (questions, a run), `screens/` (one file per page), `ui.ts`, `app.css` |
 | `web/DESIGN.md` | How it looks and speaks: tokens, components, copy rules. Follow it for any UI |
 | `e2e` | The game in real browsers (Playwright) |
@@ -161,7 +161,7 @@ This runs on the owner's own Mac, with other sessions beside you. When your work
 ## Production
 
 One Hetzner server (ARM) behind Cloudflare; the program runs under systemd as `almanac`, serves HTTPS itself, keeps
-SQLite in `/var/lib/almanac`, and backs it up hourly to R2. Deploys come from CI (above). By hand, as root:
+SQLite in `/var/lib/almanac`, and backs it up to R2 every 15 minutes. Deploys come from CI (above). By hand, as root:
 `almanac-deploy vX.Y.Z` (also how to go back: an older version, with `now` after it to skip the wait for play to
 end, within the same minor (`vX.Y.*`: the same migrations); to an older minor, the older version refuses the database and the deploy goes back
 to where it was, so put the copy from before that release back by hand, `/var/lib/almanac/before-vX.Y.Z.db`, with

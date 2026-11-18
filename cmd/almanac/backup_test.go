@@ -15,6 +15,7 @@ import (
 
 	"filippo.io/age"
 
+	"github.com/almanac-bg/almanac/internal/backup"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -155,10 +156,16 @@ func TestBackupsAside(t *testing.T) {
 	if err != nil || !strings.HasSuffix(key, ".age") {
 		t.Fatalf("latest %q %v", key, err)
 	}
-	if err := restoreInPlace(t.Context(), s, key, path, nil); err == nil {
+	if err := restoreInPlace(t.Context(), s, key, path, backup.Opening{}, key); err == nil {
 		t.Fatal("opened without the key")
 	}
-	if err := restoreInPlace(t.Context(), s, key, path, ids); err != nil {
+	if err := restoreInPlace(t.Context(), s, key, path, backup.Opening{IDs: ids}, "latest"); err == nil {
+		t.Fatal("put in place without its key typed back")
+	}
+	if _, err := os.Stat(path + ".restoring"); err == nil {
+		t.Fatal("left the copy beside it")
+	}
+	if err := restoreInPlace(t.Context(), s, key, path, backup.Opening{IDs: ids}, key); err != nil {
 		t.Fatal(err)
 	}
 	back, err := store.Open(path)

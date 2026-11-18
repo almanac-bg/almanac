@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	// KeptCopies is how many of the copies KeepCopy makes are kept: enough to go back a few releases, few enough that
-	// the disk holds them beside the database (each is its size).
-	KeptCopies = 3
+	// KeptCopies is how many of the copies KeepCopy makes are kept: the way back from the latest release that brought
+	// migrations, and from the one before it; each is the database's size, and the disk holds them beside it (and
+	// older points are in the backups).
+	KeptCopies = 2
 	// CopiesKept is how long any copy of the database beside it is kept (before-<version>.db, a copy put aside by
 	// `backup restore -into-place`, one made by hand): a deleted player's data is gone from every copy within a
 	// month, as the privacy page says.
@@ -157,17 +158,41 @@ var spaceFree = freeSpace
 // room says whether the disk has room for a copy of the database at path and its migrations: twice its size, its
 // write-ahead log included.
 func room(path string) error {
+	size := dbSize(path)
+	free, _, ok := spaceFree(filepath.Dir(path))
+	if ok && free < uint64(2*size) {
+		return fmt.Errorf("no room to copy the database before its migrations: %d MB free, %d MB needed", free>>20, (2*size)>>20)
+	}
+	return nil
+}
+
+// dbSize is the size of the database at path, its write-ahead log included.
+func dbSize(path string) int64 {
 	var size int64
 	for _, f := range []string{path, path + "-wal"} {
 		if fi, err := os.Stat(f); err == nil {
 			size += fi.Size()
 		}
 	}
-	free, ok := spaceFree(filepath.Dir(path))
-	if ok && free < uint64(2*size) {
-		return fmt.Errorf("no room to copy the database before its migrations: %d MB free, %d MB needed", free>>20, (2*size)>>20)
+	return size
+}
+
+// LowFree is the share of the disk below which its free space is low (DiskLow).
+const LowFree = 0.15
+
+// DiskLow says whether the disk holding the database at path is running out of room (no, when it can't be told): less
+// than LowFree of it free, or less than three times the database; and how much it has. A release with migrations
+// copies the database first (KeepCopy: room for twice its size, or it doesn't start) and a backup makes a snapshot of
+// it beside it; past that, the next write the game makes fails, and with it the mail that would say so. The server
+// checks hourly (a problem told), and /api/health says it.
+func DiskLow(path string) (low bool, room string) {
+	free, total, ok := spaceFree(filepath.Dir(path))
+	if !ok || total == 0 {
+		return false, ""
 	}
-	return nil
+	size := uint64(dbSize(path))
+	room = fmt.Sprintf("%d MB free of %d MB, the database %d MB", free>>20, total>>20, size>>20)
+	return float64(free) < LowFree*float64(total) || free < 3*size, room
 }
 
 // PruneCopies removes the copies of the database at path that lie beside it (every other *.db file there) once they're

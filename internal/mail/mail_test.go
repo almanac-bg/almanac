@@ -66,12 +66,19 @@ func (f *failing) Send(context.Context, string, Message) error {
 	return errors.New("down")
 }
 
+// A message that fails is tried again, then given up on; the sends failing in a row, and the giving up, are told
+// (without the address), and the outbox says it's failing until a send goes.
 func TestOutboxRetriesThenGivesUp(t *testing.T) {
 	db := storetest.Open(t)
 	f := &failing{}
 	o := NewOutbox(db, f, "a@almanac.bg")
+	var told []string
+	o.Problem = func(kind string) { told = append(told, kind) }
 	_ = db.Tx(t.Context(), func(tx *sql.Tx) error { return o.Enqueue(tx, Message{To: "x@y.bg", Subject: "s", Text: "t"}) })
 	for i := range len(retries) + 1 {
+		if failing := o.Failing(); failing != (i >= failingSends) {
+			t.Fatalf("before attempt %d: failing %v", i+1, failing)
+		}
 		o.Flush(t.Context())
 		var n int
 		_ = db.Read.QueryRow(`SELECT count(*) FROM outbox`).Scan(&n)
@@ -86,6 +93,15 @@ func TestOutboxRetriesThenGivesUp(t *testing.T) {
 	}
 	if f.n != len(retries)+1 {
 		t.Fatalf("%d attempts", f.n)
+	}
+	if len(told) != 2 || !strings.Contains(told[0], "in a row failed") || !strings.Contains(told[1], "given up") ||
+		strings.Contains(strings.Join(told, " "), "x@y.bg") {
+		t.Fatalf("told %q", told)
+	}
+	o.Sender = &kept{}
+	_ = db.Tx(t.Context(), func(tx *sql.Tx) error { return o.Enqueue(tx, Message{To: "x@y.bg", Subject: "s", Text: "t"}) })
+	if o.Flush(t.Context()); o.Failing() {
+		t.Fatal("still failing after a send went")
 	}
 }
 
@@ -110,6 +126,8 @@ func TestOutboxUrgentFirstAndDroppedWhenDead(t *testing.T) {
 	db := storetest.Open(t)
 	k := &kept{}
 	o := NewOutbox(db, k, "a@almanac.bg")
+	var told []string
+	o.Problem = func(kind string) { told = append(told, kind) }
 	err := db.Tx(t.Context(), func(tx *sql.Tx) error {
 		for _, s := range []string{"streak 1", "streak 2"} {
 			if err := o.Enqueue(tx, Message{To: "x@y.bg", Subject: s, Text: "t"}); err != nil {
@@ -134,6 +152,9 @@ func TestOutboxUrgentFirstAndDroppedWhenDead(t *testing.T) {
 	o.Flush(t.Context())
 	if got := strings.Join(k.sent, ", "); got != "code, streak 1, streak 2" {
 		t.Fatalf("sent %s", got)
+	}
+	if len(told) != 1 || !strings.Contains(told[0], "sign-in codes dropped unsent") {
+		t.Fatalf("told %q", told)
 	}
 	var n int
 	_ = db.Read.QueryRow(`SELECT count(*) FROM outbox`).Scan(&n)
