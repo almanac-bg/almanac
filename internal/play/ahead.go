@@ -20,7 +20,8 @@ import (
 // The days ahead: the day's questions are drawn up to Ahead days before their day, and no other game deals them
 // (dayQuestions), so that the day stays one attempt for everyone. Were only today's ten kept out, a question would
 // reach a topic game, a duel, a room or Роял before its own day, and the players who play most would meet more and
-// more of the day as a rerun, with its answer known.
+// more of the day as a rerun, with its answer known. The questions that belong to a date („На този ден“) are kept out
+// the same way however far off their date is, until a day has dealt them (waiting): a date has only a few, one a year.
 //
 // A day ahead is drawn only while every one of its places has a question that fits it just so (none short in drawDay):
 // when a place runs short (the estimates, say), the days stop there, with a warning in the log, and go on as the bank
@@ -79,7 +80,7 @@ func (g *Game) days(tx *sql.Tx) (dayBars, error) {
 	if _, err := g.day(tx, today, b); err != nil && !errors.Is(err, ErrNoQuestion) {
 		return dayBars{}, err
 	}
-	stored, err := storedDays(tx, today)
+	stored, err := storedDays(tx, "")
 	if err != nil {
 		return dayBars{}, err
 	}
@@ -228,14 +229,17 @@ func storedDays(tx *sql.Tx, from string) (map[string][]Pick, error) {
 	return out, rows.Err()
 }
 
-// barsOf are the questions of today and the days after it, and those of the bank due for review today.
+// barsOf are the questions of today and the days after it, those of the bank due for review today, and (in all only)
+// the questions that wait for their date (waiting): days holds the days played too, to tell which have had theirs.
 func barsOf(days map[string][]Pick, today string, b *bank.Bank) dayBars {
 	bars := dayBars{now: map[string]bool{}, all: map[string]bool{}}
+	dealt := map[string]bool{}
 	for day, picks := range days {
-		if day < today {
-			continue
-		}
 		for _, p := range picks {
+			if day < today {
+				dealt[p.ID] = true
+				continue
+			}
 			bars.all[p.ID] = true
 			if day == today {
 				bars.now[p.ID] = true
@@ -245,7 +249,25 @@ func barsOf(days map[string][]Pick, today string, b *bank.Bank) dayBars {
 	for _, id := range Overdue(b, today) {
 		bars.now[id], bars.all[id] = true, true
 	}
+	for _, q := range b.Live("", "") {
+		if id := q.Base().ID; !dealt[id] && waiting(q, today) {
+			bars.all[id] = true
+		}
+	}
 	return bars
+}
+
+// waiting is whether a question belongs to a date still to come (bank.Tail.On: every year's, or that year's from today
+// on): it waits for it, out of every other game, until a day has dealt it. „На този ден“ has a few questions a date,
+// each for one year; a topic game, a duel, a room or Роял that dealt one first would leave its date empty a year sooner,
+// and show its answer before its day.
+func waiting(q bank.Question, today string) bool {
+	for _, d := range q.Extra().On {
+		if len(d) != len(time.DateOnly) || d >= today {
+			return true
+		}
+	}
+	return false
 }
 
 // DaysUsed are the questions the days have had (Used): every day stored, played or drawn ahead. `almanac bank used`

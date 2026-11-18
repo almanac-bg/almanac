@@ -31,6 +31,11 @@ LETTERS = "ABCDEFGH"
 
 
 IMAGES = {}  # a question's id: the folder its pictures are in
+# A question's topic as a player sees it, by its id's prefix (his-: История): the answerer says where one belongs
+# instead, if not there (a day takes one question a topic, so a misfiled one takes another topic's place).
+TOPICS = {}
+for c in json.load(open(f"{a.bank}/categories.json")):
+    TOPICS[c["id"][:3]] = c["name"]
 
 
 def live():
@@ -60,7 +65,7 @@ def picture(im, qid):
 
 def sheet_item(q):
     """The question as asked, and its key in the sheet's own terms."""
-    s = {"id": q["id"], "kind": q["type"], "text": q["text"]}
+    s = {"id": q["id"], "topic": TOPICS.get(q["id"][:3], ""), "kind": q["type"], "text": q["text"]}
     if q.get("image"):
         s["picture"] = picture(q["image"], q["id"])
     t = q["type"]
@@ -150,7 +155,7 @@ for i, k in key.items():
     got = answers.get(i)
     if got is None:
         continue
-    said, sure = got.get("a"), got.get("sure")
+    said, sure, elsewhere = got.get("a"), got.get("sure"), got.get("topic")
     want = k["key"]
     if k["kind"] == "number":
         try:
@@ -170,6 +175,9 @@ for i, k in key.items():
         disagree[i] = f"a model answering without the key, sure: {readable(k['sheet'], said)}"
     elif off:
         unsure += 1
+    if elsewhere and elsewhere != k["sheet"].get("topic"):
+        moved = f"a model answering without the key: it belongs under „{elsewhere}“, not „{k['sheet'].get('topic')}“"
+        disagree[i] = f"{disagree[i]}; {moved}" if i in disagree else moved
 json.dump(disagree, open(f"{out}/disagree.json", "w"), ensure_ascii=False, indent=1)
 print(f"answered {len(answers)} of {len(key)} (missing {len(missing)}); sure and otherwise: {len(disagree)}; "
       f"unsure and otherwise: {unsure}")

@@ -145,9 +145,22 @@ func TestRunwayReport(t *testing.T) {
 		t.Fatal(problems)
 	}
 	s := runway(b, play.Used{}, "2026-11-16")
-	for _, want := range []string{"hard number (estimate)", "about Bulgaria (3 a day)", "out on 2026-", "warning: under 150 days", "dated („На този ден“"} {
+	for _, want := range []string{"hard number (estimate)", "about Bulgaria (3 a day)", "out on 2026-", "warning: under 150 days",
+		"dated („На този ден“", "dates of the year ahead have fewer than 2"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("no %q in\n%s", want, s)
 		}
+	}
+}
+
+// bank check names the national days with too few questions about Bulgaria, and those with none (which fail it).
+func TestNationalDaysReport(t *testing.T) {
+	b, problems := bank.Load("../../bank/sample")
+	if b == nil {
+		t.Fatal(problems)
+	}
+	s, missing := nationalDays(b)
+	if !slices.Contains(missing, "09-06") || !strings.Contains(s, "09-06 the Unification: none") {
+		t.Errorf("missing %v in\n%s", missing, s)
 	}
 }

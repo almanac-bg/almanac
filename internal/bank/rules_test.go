@@ -166,6 +166,45 @@ func TestRulesOfAQuestion(t *testing.T) {
 			q.On = []string{"2027-05-02"}
 			return q
 		}(), true},
+		// A question whose text names its date may go without the day's line; one that doesn't, may not.
+		{"dated", func() Question {
+			q := choice("a", "Коя държава празнува националния си ден на 1 юли?", "Канада", "САЩ", "Мексико", "Куба")
+			q.On = []string{"07-01"}
+			return q
+		}(), false},
+		{"dated", func() Question {
+			q := choice("a", "Коя държава празнува националния си ден на 4 юли?", "САЩ", "Канада", "Мексико", "Куба")
+			q.On = []string{"07-01"}
+			return q
+		}(), true},
+		{"own-date", func() Question {
+			q := &TrueFalse{Head: Head{ID: "a", Type: "truefalse", Text: "3 юни е Световният ден на велосипеда."}, Answer: true}
+			q.On = []string{"06-03"}
+			return q
+		}(), true},
+		{"own-date", func() Question {
+			q := &TrueFalse{Head: Head{ID: "a", Type: "truefalse", Text: "Световният ден на велосипеда е обявен от ЮНЕСКО."}}
+			q.On = []string{"06-03"}
+			return q
+		}(), false},
+		// Not dated: a date in a true-or-not is just a fact to know.
+		{"own-date", &TrueFalse{Head: Head{ID: "a", Type: "truefalse", Text: "3 юни е Световният ден на велосипеда."}, Answer: true}, false},
+		// A choice may name its date: the date isn't its answer.
+		{"own-date", func() Question {
+			q := choice("a", "Кое число празнуват математиците на 14 март?", "π", "e", "φ", "i")
+			q.On = []string{"03-14"}
+			return q
+		}(), false},
+		{"own-date", func() Question {
+			q := choice("a", "На коя дата е обявено извънредното положение?", "13 март", "8 март", "16 март", "20 март")
+			q.On = []string{"03-13"}
+			return q
+		}(), true},
+		{"anchor", number("a", "Колко епизода има сериалът „Стъклен дом“?", 64, 19, "епизода"), true},
+		{"anchor", number("a", "Колко места има зала 1 на НДК?", 3380, 1000, "места"), true},
+		{"anchor", number("a", "Колко населени места в България нямат жители?", 192, 58, ""), false},
+		{"anchor", number("a", "Колко минути продължава филмът „Отнесени от вихъра“?", 238, 71, "минути"), false},
+		{"anchor", number("a", "През коя година излиза първият епизод на „Стъклен дом“?", 2010, 8, ""), false},
 		{"decoy", &Match{Head: Head{ID: "a", Type: "match", Text: "Свържи:"}, Pairs: []MatchPair{{"А", "Б"}}, Tail: Tail{Added: "2026-11-01"}}, true},
 	} {
 		rule, _ := RuleNamed(c.rule)

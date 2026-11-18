@@ -42,7 +42,7 @@ jobs:
       - name: The program
         run: CGO_ENABLED=0 go build -trimpath -o almanac ./cmd/almanac
       - name: The sample bank passes its checks
-        run: ./almanac bank check -unbalanced bank/sample
+        run: ./almanac bank check -sample bank/sample
       # Known vulnerabilities in what the program calls, Go's own library included: a fix is a newer Go in go.mod
       # (setup-go installs exactly that one) or a newer module.
       - name: No known vulnerability reached

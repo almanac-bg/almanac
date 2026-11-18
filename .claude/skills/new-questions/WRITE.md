@@ -23,7 +23,9 @@ never edit it), `<batch>` (this batch's folder) and your category.
   - A `number` is an **estimate**: a year, or a quantity of more than 20 of its steps, with one accepted value and
     the tolerance of the skill's formula (`bank check` says the figure). A small count is a choice in disguise. The
     day ends on a hard number, and only a quantity takes that place (a unit, an answer above 20: the day's draw
-    doesn't end on a year), so a hard `number` cell is a quantity a well-read person can only estimate.
+    doesn't end on a year), so a hard `number` cell is a quantity a well-read person can only estimate, and can
+    estimate: it has an anchor they carry (a height, a distance, an age, a duration, a famous total), never an
+    archive's count (a series' episodes, a hall's seats, a council's members, prize money, the species in a plan).
   - `picture`: an easy choice with a picture (see Pictures).
   - **`dated`**: one question for each of your `dates`, in order (the first `count`, the spares on the rest), each with
     `"on": ["MM-DD"]`. A dated question is a choice without a picture (any difficulty), an easy true-or-not, or a hard
@@ -32,8 +34,9 @@ never edit it), `<batch>` (this batch's folder) and your category.
     ending in a period) that says what happened that day and names the date: `"day": "На 16 декември 1982 г. умира
     Колин Чапман."`. The player reads it with the answer, over the fact, only on that date. So the text names the date
     only when the date is what's asked (not „Колин Чапман, починал на 16 декември 1982 г., основава…“), and the fact
-    says something new, never the date again. Bulgarian events before 1916: the New Style date Bulgaria marks today.
-    If a date truly has nothing worth asking in your category, take the next of your dates and say so in your notes.
+    says something new, never the date again. A true-or-not never names its date: dealt on it, it would answer
+    itself. A story with a Bulgarian or human angle beats a template („Коя държава празнува на …?“): at most one
+    template among your dates. Bulgarian events before 1916: the New Style date Bulgaria marks today. If a date truly has nothing worth asking in your category, take the next of your dates and say so in your notes.
 - **`firstId` … `lastId`**: your ids. Number your questions from `firstId` up, one by one, no gaps.
 - **`avoid`**: subjects your category names too often already. Write away from them; never a question whose answer or
   main subject is one of them.
@@ -43,7 +46,8 @@ never edit it), `<batch>` (this batch's folder) and your category.
   the rest in another cell of yours and say so in your notes; never mark a question `bg` that isn't about Bulgaria.
   Everyday Bulgaria after 2015 is welcome; never news that goes stale (pin what can change to a date and add
   `reviewBy`: from that day no game deals it until it is checked again).
-- Every question: `added` and `updated` = the plan's `date`, a fact.
+- Every question: `added` and `updated` = the plan's `date`, a fact of at most 140 characters about the answer, and a
+  subject that belongs under your category (a player of the topic expects it there).
 - Spread the difficulty honestly by the rubric: a question is labelled for what Bulgarian players know, not for its
   cell. If a question you wrote is easier or harder than its cell, write another one for the cell.
 

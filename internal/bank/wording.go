@@ -291,22 +291,52 @@ var monthNames = []string{"януари", "февруари", "март", "ап�
 
 // ruleDated: a question for a day (on) has the line of its day (Tail.Day), a sentence ending in a period, and the
 // line names the date (16 декември): one of them, for a question of several days. A moving feast's day (Великден: a
-// day of one year, another the next) is named by the feast instead, so its date isn't looked for.
+// day of one year, another the next) is named by the feast instead, so its date isn't looked for. A question whose
+// own text names its date (the date is what it asks about: „Коя държава празнува на 1 юли…?“) may go without the
+// line: the player has read the date, and a line that only says it again takes a phone's screen from the fact.
 func ruleDated(q Question) []string {
 	t := q.Extra()
 	if len(t.On) == 0 {
 		return nil
 	}
 	if t.Day == "" {
+		if _, named := namesDate(t.On, q.Base().Text); named {
+			return nil
+		}
 		return []string{"a question for a day (on) has its day's line (day): what happened on the day, naming it"}
 	}
 	var out []string
 	if !strings.ContainsRune(".!…", ends(t.Day)) {
 		out = append(out, "its day's line ends in a period")
 	}
-	var dates []string
-	named := false
-	for _, d := range t.On {
+	if dates, named := namesDate(t.On, t.Day); len(dates) > 0 && !named {
+		out = append(out, fmt.Sprintf("its day's line doesn't name the date (%s)", strings.Join(dates, " or ")))
+	}
+	return out
+}
+
+// ruleOwnDate: a true-or-not for a day doesn't name its date. It is dealt on that date, under „На този ден“, so a
+// statement that something falls on it („3 юни е Световният ден на велосипеда.“) answers itself: it states something
+// about the day that the date doesn't give away (who declared it, what it marks). Nor does a choice for a day have
+// its date for the answer („На коя дата…?“ — „13 март“): the player knows what day it is.
+func ruleOwnDate(q Question) []string {
+	on := q.Extra().On
+	switch q := q.(type) {
+	case *TrueFalse:
+		if _, named := namesDate(on, q.Text); named {
+			return []string{"a true-or-not for a day names its date: dealt on it, under „На този ден“, it answers itself"}
+		}
+	case *Choice:
+		if _, named := namesDate(on, q.Answer); named {
+			return []string{"a choice for a day has its date for the answer: dealt on it, under „На този ден“, it answers itself"}
+		}
+	}
+	return nil
+}
+
+// namesDate says the every-year days of on as a date writes them (16 декември), and whether s names one of them.
+func namesDate(on []string, s string) (dates []string, named bool) {
+	for _, d := range on {
 		var month, day int
 		if len(d) != 5 {
 			continue
@@ -316,10 +346,7 @@ func ruleDated(q Question) []string {
 		}
 		dates = append(dates, fmt.Sprintf("%d %s", day, monthNames[month-1]))
 		date := regexp.MustCompile(fmt.Sprintf(`(?:^|[^\d])0?%d(?:-?\p{L}{1,2})? %s`, day, monthNames[month-1]))
-		named = named || date.MatchString(t.Day)
+		named = named || date.MatchString(s)
 	}
-	if len(dates) > 0 && !named {
-		out = append(out, fmt.Sprintf("its day's line doesn't name the date (%s)", strings.Join(dates, " or ")))
-	}
-	return out
+	return dates, named
 }

@@ -20,15 +20,19 @@ Your prompt gives you: `<skill>` (this folder), `<repo>` (the game's code), `<ba
 
 1. **The answer:** the marked answer is right under every reliable source; no wrong option is also right, or could be
    argued to be; nothing is outdated (or it is pinned to a date, with `reviewBy`).
-2. **The fact:** true, about the answer, says something the question didn't, claims no more than the sources (their
-   hedges kept: „около“, „според преданието“).
+2. **The fact:** true, about the answer (not about something else the question mentions), says something the
+   question didn't, claims no more than the sources (their hedges kept: „около“, „според преданието“), at most 140
+   characters.
 3. **Dates (`on`):** the date is exactly the day of what the question is about; the `day` line is true, names that
    date and says what happened on it, in one short sentence; the text names the date only if the date is what's
-   asked; the fact says something new, not the date again. Bulgarian events before 1916 on the New Style date
-   Bulgaria marks today.
+   asked; a true-or-not never names it (dealt on its date, it would answer itself); the fact says something new, not
+   the date again. Bulgarian events before 1916 on the New Style date Bulgaria marks today.
 4. **One reading:** the wording can't be read two ways. True-or-not is false by one clear fact, never by a trick,
    and a false one's fact starts with what is true. Numbers are estimates (a year, or more than 20 steps), with one
-   accepted value (or the text pins the source) and the skill's tolerance formula. Orders: exact values, measured ones
+   accepted value (or the text pins the source) and the skill's tolerance formula, and **a well-read player can place
+   them** (an anchor: a height, a distance, an age, a famous total), never an archive's count (episodes, seats, a
+   council's members, prize money): such a number is a DROP or a FIX. **The topic:** it belongs under its category
+   (a player of the topic expects it there). Orders: exact values, measured ones
    10% apart. Matches: one right per left, a tempting decoy that fits no left. Splits: every item in its group only,
    under every source. Clues: hardest to easiest, each true of the answer only, none giving it away by a word.
 5. **The difficulty** fits the rubric for players in Bulgaria. Relabel only within the plan's cells: a question that

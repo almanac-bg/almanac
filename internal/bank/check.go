@@ -37,6 +37,17 @@ const RulesFrom = "2026-11-14"
 // sources, and when and by what it was checked (Tail.Sources, Checked, CheckedBy).
 const SourcesFrom = "2026-11-17"
 
+// TouchedFrom is when a change started needing its sources too: a question changed since then (updated) has them, so
+// that the bank's sources grow with every fix, and the next one starts from where the last was checked.
+const TouchedFrom = "2026-11-19"
+
+// ShortFactsFrom is when a new question's fact became at most shortFactMax characters: on a phone it shows under the
+// answer, with the day's line on a day's date, and a fact that runs past four lines is cut there.
+const ShortFactsFrom = "2026-11-19"
+
+// shortFactMax is the most a fact of a question added since ShortFactsFrom says.
+const shortFactMax = 140
+
 // Problem is something wrong with a bank. A bank with errors is never played; warnings are for whoever keeps it.
 type Problem struct {
 	File string
@@ -91,7 +102,11 @@ func checkQuestion(q Question, today string) (errs []string, warnings []Problem)
 		errs = append(errs, t.Image.check()...)
 	}
 	if t.Fact != "" {
-		errs = append(errs, checkLine("fact", t.Fact, factMax)...)
+		most := factMax
+		if t.Added >= ShortFactsFrom {
+			most = shortFactMax
+		}
+		errs = append(errs, checkLine("fact", t.Fact, most)...)
 	}
 	if t.Day != "" {
 		errs = append(errs, checkLine("day", t.Day, dayMax)...)
@@ -142,6 +157,13 @@ func checkQuestion(q Question, today string) (errs []string, warnings []Problem)
 		}
 		if t.Checked == "" {
 			errs = append(errs, "a question added since "+SourcesFrom+" needs checked and checkedBy")
+		}
+	} else if t.Updated >= TouchedFrom && !t.Retired {
+		if len(t.Sources) == 0 {
+			errs = append(errs, "a question changed since "+TouchedFrom+" needs its sources: the pages the change was checked on")
+		}
+		if t.Checked == "" {
+			errs = append(errs, "a question changed since "+TouchedFrom+" needs checked and checkedBy")
 		}
 	}
 	if t.Added >= RulesFrom && !t.Retired {

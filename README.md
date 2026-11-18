@@ -53,7 +53,7 @@ go vet ./... && go test -race ./...
 npm ci && npm run check && npm test
 npm run e2e                          # играта в Chromium, WebKit и Firefox (BROWSER_PATH: свой Chromium)
 go run ./cmd/almanac bank check      # банката в private/ (пада, ако не е напълно балансирана)
-go run ./cmd/almanac bank check -unbalanced bank/sample   # извадката
+go run ./cmd/almanac bank check -sample bank/sample   # извадката
 ```
 
 Истинската банка е в частното хранилище `almanac-bg/almanac-questions`, клонирано в `private/`. Без нея играта
