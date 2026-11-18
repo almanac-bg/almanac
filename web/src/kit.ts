@@ -120,6 +120,7 @@ import {
   unlockWords,
   until,
   verdict,
+  verdictWords,
   who,
 } from "./ui.ts";
 
@@ -268,6 +269,7 @@ export const kit = {
   upNext,
   user,
   verdict,
+  verdictWords,
   vibrateOn,
   when,
   whileSeen,

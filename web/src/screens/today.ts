@@ -55,7 +55,7 @@ import {
 import { type Goals, goalsCard, loadGoals, openGoals } from "./goals.ts";
 import { app, haveProfile, keepLine, keepStake, mailAsk } from "./keep.ts";
 import { leagueNote } from "./league.ts";
-import { modes } from "./modes.ts";
+import { clock, modes } from "./modes.ts";
 import { topics } from "./play.ts";
 
 export interface Today {
@@ -97,8 +97,9 @@ export interface Today {
   befriended?: boolean;
   /** The day played: the player's invite link, which their shared result ends with. */
   invite?: string;
-  /** A live game the player is in, under way (its screen left): the way back to it. */
-  playing?: { kind: "duel" | "room" | "royal"; code?: string } | null;
+  /** A live game the player is in, under way (its screen left), a room's by its code; or a seat in Роял's lobby, with
+   * its start (`starts`): the way back to it. */
+  playing?: { kind: "duel" | "room" | "royal"; code?: string; starts?: number } | null;
   /** A friend has just played the player's challenge (told once). */
   duel?: FriendPlayed | null;
   /** A friend said yes to the player's invite, and a live duel they left: each told once (play/lines.go). */
@@ -528,8 +529,9 @@ function untold(t: Today, run?: number): Child {
   return news(id, 0, undefined, { title: run ? "" : "От последната ти игра" });
 }
 
-/** A live game the player is in goes on while its screen is away (a duel, a room's game, Роял): one quiet line above
- * the day, and the way back into it (its screen comes back to it by itself). */
+/** A live game the player is in goes on while its screen is away (a duel, a room's game, Роял), or waits for them (a
+ * seat in Роял's lobby, kept while they play something else): one quiet line above the day, and the way back into it
+ * (its screen comes back to it by itself). */
 function playingLine(p: Today["playing"]): Child {
   if (!p) return null;
   const [text, href] =
@@ -537,7 +539,11 @@ function playingLine(p: Today["playing"]): Child {
       ? ["Дуелът ти продължава", "/duel/live"]
       : p.kind === "room"
         ? ["Играта в стаята продължава", `/r/${p.code}`]
-        : ["Роял продължава", "/royal"];
+        : p.starts && p.starts <= Date.now()
+          ? ["Роял чака още играчи", "/royal"]
+          : p.starts
+            ? [`Роял започва в ${clock(p.starts)}`, "/royal"]
+            : ["Роял продължава", "/royal"];
   return h("p", { class: "streak-notice playing-notice", role: "status" }, text, h("a", { href }, "Върни се"));
 }
 

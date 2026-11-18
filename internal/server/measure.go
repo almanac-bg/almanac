@@ -107,6 +107,7 @@ var clientTallies = map[string]bool{
 	"mailask:shown": true, "mailask:yes": true, "mailask:no": true,
 	"repair:offered": true,
 	"share:duel":     true, // a duel's win shared (screens/outcome.ts)
+	"share:royal":    true, // a place on Роял's podium shared (screens/royal.ts)
 }
 
 func init() {

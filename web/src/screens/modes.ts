@@ -1,6 +1,6 @@
 // The ways to play with others, as small cards two by two: each with its picture, its name, a few words about it, and
-// its colour. Роял's card follows the evening: how many said they'd come, and from the lobby's opening, how soon it
-// starts and how many are in.
+// its colour. Роял's card says what it is (a tournament, live: the name alone doesn't), and follows the evening: how
+// many said they'd come, and from the lobby's opening, how soon it starts and how many are in.
 
 import { picture } from "../art/picture.ts";
 import { api } from "../lib/api.ts";
@@ -18,7 +18,7 @@ const all: Record<Mode, { href: string; name: string; about: string; tone: strin
   royal: {
     href: "/royal",
     name: "Роял",
-    about: "На живо в 21:00",
+    about: "В 21:00",
     tone: "tone-gold",
   },
   room: { href: "/room", name: "Стая", about: "С код, за своите хора", tone: "tone-lilac" },
@@ -111,6 +111,8 @@ function royalNow(): () => string {
     if (!t) return all.royal.about;
     const g = t.glance;
     if (g.phase === "lobby") {
+      // Past the start, still in the lobby: too few came, and it waits for more.
+      if (g.startsAt <= now()) return `Чака още играчи${g.in ? ` · ${g.in}\u00a0вътре` : ""}`;
       const min = Math.max(1, Math.ceil((g.startsAt - now()) / 60_000));
       // No breaks inside „12 мин“: the card is narrow.
       return `Започва след ${min}\u00a0мин${g.in ? ` · ${g.in}\u00a0вътре` : ""}`;
@@ -142,6 +144,7 @@ export function modes(which: Mode[], heading?: string): Child {
               "span",
               { class: "mode-text" },
               h("span", { class: "mode-name" }, it.name),
+              m === "royal" ? h("span", { class: "mode-kind" }, "Турнир на живо") : null,
               h("span", { class: "mode-about" }, m === "royal" ? royalNow() : it.about),
             ),
           ),

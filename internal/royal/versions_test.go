@@ -60,7 +60,7 @@ func TestGradedAsDealt(t *testing.T) {
 	current.Store(fixed)
 
 	// The server restarts: the evening is dealt again as it was drawn.
-	w.hub(Evening)
+	w.hub(anyone)
 	if err := w.h.Load(ctx); err != nil {
 		t.Fatal(err)
 	}

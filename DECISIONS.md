@@ -36,10 +36,13 @@ packages' doc comments; this file holds only what must not drift.
   try in the game's texts.
 - **Live means live.** Duels are played at once, with a recording of a real game when nobody comes; Роял is online only,
   at 21:00, Friday to Sunday until the evenings fill. No made-up opponents: no bots answering by a player's rates.
-- **Роял cuts by right answers, then the time of the right ones** (more rights never lose to fewer but faster), after
-  the 5th, 8th, 11th and 14th; it always reaches the 15th. Those cut keep answering on the same clock, off the
-  standings. Rejected: out at the first wrong (most were out by the 5th), lives, a final from zero (luck over
-  knowledge).
+- **Роял cuts by right answers,** after the 5th, 8th, 11th and 14th: everyone level on right answers with the last
+  player through goes through, up to a quarter more than the cut keeps (`play.RoyalThrough`); only past that does the
+  time of the right ones decide among those level. So time decides the final, the places and only a crowded line,
+  never more rights against fewer but faster (owner, 2026-11-18, review M2: the first cut had been a contest of
+  seconds, partly of the network). It always reaches the 15th. Those cut keep answering on the same clock, off the
+  standings, placed as they stood at their cut (not reordered by their total). Rejected: out at the first wrong (most
+  were out by the 5th), lives, a final from zero (luck over knowledge).
 - **One challenge**, by a link anyone can open (#402): friend duels and challenges were two near-identical systems.
 - **Leagues race on the day's right answers**, not XP: a group ranks by the week's right answers on the day's ten, then
   its points, then who joined first, as the day's board does (owner, 2026-11-18, review E3). A league's last group,
