@@ -17,7 +17,7 @@ import { beforeLeaving, hold, release } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { withName } from "../lib/words.ts";
 import { categories, playingWhile } from "../state.ts";
-import { countUp, fact, factFace, failure, inRowChip, reachable, type VerdictKind, verdict } from "../ui.ts";
+import { countUp, fact, factFace, failure, inRowChip, loading, reachable, type VerdictKind, verdict } from "../ui.ts";
 import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
 import { answered, beats, crowdLine, picture, picturesIn, type Stage } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Reveal, Shown, State, View } from "./types.ts";
@@ -256,7 +256,7 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
  * game keeps the whole screen meanwhile (playingWhile), and gives it back if what shows next isn't the game. */
 export function starting(): Child {
   playingWhile();
-  return h("p", { class: "muted" }, "…");
+  return loading("lead", "answers");
 }
 
 /** A game come to without a tap (a reload, back or forward, a link from outside): nothing starts by itself. What it is

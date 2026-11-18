@@ -10,6 +10,7 @@ import type { AchievementInfo, Standing, Tier } from "../ui.ts";
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
 let {
+  loading,
   masteryCard,
   api,
   errorText,
@@ -63,6 +64,7 @@ const day = (ms: number) => new Intl.DateTimeFormat("bg", { day: "numeric", mont
 
 export function playerProfile(kit: Kit, [tag]: string[]): Child {
   ({
+    loading,
     masteryCard,
     api,
     errorText,
@@ -102,7 +104,7 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
         h("a", { class: "btn primary", href: "/ranks" }, "Към класациите"),
       ];
     }
-    if (!p) return h("p", { class: "muted" }, "…");
+    if (!p) return loading("head", "card", "rows");
     return [
       head(p),
       p.me

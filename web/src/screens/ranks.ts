@@ -12,10 +12,12 @@ import type { LeagueView } from "./league.ts";
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
 let {
+  loading,
   emblem,
   board,
   boardRow,
-  api,
+  fresh,
+  last,
   h,
   signal,
   rename,
@@ -91,10 +93,12 @@ const shows = (by: By, open?: Open) => (by === "league" ? !!open?.league : by ==
 
 export function ranks(kit: Kit) {
   ({
+    loading,
     emblem,
     board,
     boardRow,
-    api,
+    fresh,
+    last,
     h,
     signal,
     rename,
@@ -121,11 +125,18 @@ export function ranks(kit: Kit) {
   const by = signal<By>(at.by);
   const friends = signal(at.friends);
   const topic = signal(at.topic);
+  // Opened again, each board as it was last drawn, at once, while the server is asked (fresh); one that can't be asked
+  // again then stays as it was, quietly.
+  const pastOf = (d: Day) => `/api/day/${dayBefore(d.day)}/board`;
+  const kept = last<Day>("/api/day");
   const data = signal<Answer | null>(null);
-  const day = signal<Day | null>(null);
-  const past = signal<Past | null>(null);
-  const league = signal<LeagueView | null>(null);
+  const day = signal<Day | null>(kept ?? null);
+  const past = signal<Past | null>((kept && last<Past>(pastOf(kept))) ?? null);
+  const league = signal<LeagueView | null>(last<LeagueView>("/api/league") ?? null);
   const error = signal<unknown>(null);
+  const failed = (shown: () => unknown) => (err: unknown) => {
+    if (!shown()) error.set(err);
+  };
   // The board asked for now; an older answer arriving late is dropped.
   const current = () => {
     const q = new URLSearchParams({ by: by() });
@@ -137,38 +148,37 @@ export function ranks(kit: Kit) {
   // theirs yet waits (play/unfold.go).
   let dayIn: Promise<Day | undefined> = Promise.resolve(undefined);
   const loadDay = () => {
-    dayIn = api<Day>("GET", "/api/day").then(
+    dayIn = fresh<Day>("/api/day").then(
       (d) => {
         day.set(d);
         if (!shows(by.peek(), d.open)) pick(by, "day");
         return d;
       },
       (err) => {
-        error.set(err);
-        return undefined;
+        failed(day.peek)(err);
+        return day.peek() ?? undefined;
       },
     );
   };
   loadDay();
   const load = () => {
-    data.set(null);
     error.set(null);
     if (by() === "day") return;
     if (by() === "yesterday") {
-      if (!past.peek())
-        dayIn.then((d) => {
-          if (d) api<Past>("GET", `/api/day/${dayBefore(d.day)}/board`).then(past.set, error.set);
-        });
+      dayIn.then((d) => {
+        if (d) fresh<Past>(pastOf(d)).then(past.set, failed(past.peek));
+      });
       return;
     }
     if (by() === "league") {
-      if (!league.peek()) loadLeague().then(league.set, error.set);
+      loadLeague().then(league.set, failed(league.peek));
       return;
     }
     const asked = current();
-    api<Answer>("GET", `/api/ranks?${asked}`).then((a) => {
+    data.set(last<Answer>(`/api/ranks?${asked}`) ?? null);
+    fresh<Answer>(`/api/ranks?${asked}`).then((a) => {
       if (current() === asked) data.set(a);
-    }, error.set);
+    }, failed(data.peek));
   };
   load();
   const pick = <T>(s: Signal<T>, v: T) => {
@@ -246,7 +256,7 @@ export function ranks(kit: Kit) {
         });
       if (by() === "day") {
         const t = day();
-        if (!t) return h("p", { class: "muted" }, "…");
+        if (!t) return loading("rows");
         if (friends())
           return t.friends?.length
             ? board("Днес · приятели", t.friends)
@@ -264,7 +274,7 @@ export function ranks(kit: Kit) {
       }
       if (by() === "yesterday") {
         const p = past();
-        if (!p) return h("p", { class: "muted" }, "…");
+        if (!p) return loading("rows");
         if (friends())
           return p.friends?.length
             ? board(`${issueWords(p.issue, p.board.day)} · приятели`, p.friends)
@@ -285,10 +295,10 @@ export function ranks(kit: Kit) {
       }
       if (by() === "league") {
         const v = league();
-        return v ? leagueBoard(v) : h("p", { class: "muted" }, "…");
+        return v ? leagueBoard(v) : loading("rows");
       }
       const d = data();
-      if (!d) return h("p", { class: "muted" }, "…");
+      if (!d) return loading("rows");
       if (friends() && day()?.befriended === false) return noFriends();
       const among = (name: string) => (friends() ? `${name} · приятели` : name);
       switch (by()) {
@@ -363,7 +373,7 @@ function noFriends(): Child {
     shareButton(
       "Покани с връзка",
       () => "Ела да сме приятели в АЛМАНАХ:",
-      async () => (await api<{ invite: string }>("GET", "/api/friends")).invite,
+      async () => (await fresh<{ invite: string }>("/api/friends")).invite,
       true,
       undefined,
       true,

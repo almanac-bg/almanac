@@ -7,7 +7,7 @@
 
 import { leagueEmblem } from "../art/league.ts";
 import { boardRow } from "../game/results.ts";
-import { api } from "../lib/api.ts";
+import { fresh, last } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { ordinal, place } from "../lib/ordinal.ts";
 import { user } from "../state.ts";
@@ -59,7 +59,8 @@ export interface LeagueView {
   last?: LeagueEnd;
 }
 
-export const loadLeague = () => api<LeagueView>("GET", "/api/league");
+/** The week as it stands: the server asked again, while what it said last is drawn (last). */
+export const loadLeague = () => fresh<LeagueView>("/api/league");
 
 /** How long is left of the week: days, or (its days over, minutes before it closes) that it's ending. */
 const daysLeft = (d: number) => (d > 0 ? `още ${d} ${d === 1 ? "ден" : "дни"}` : "седмицата приключва");
@@ -215,7 +216,7 @@ function lastWeek(e: LeagueEnd): Child {
 /** The day's result: where the week's race stands, in one quiet line, a tap from the group („Лига Странджа: 2-ро място
  * · зона за качване“); nothing while the group is gathering or the player isn't in one. */
 export function leagueNote(): Child {
-  const data = signal<LeagueView | null>(null);
+  const data = signal<LeagueView | null>(last<LeagueView>("/api/league") ?? null);
   loadLeague().then(data.set, () => {});
   return () => {
     const v = data();
@@ -233,7 +234,7 @@ export function leagueNote(): Child {
 /** Профил's line: the league, the place in the group (and its zone; or that it's still gathering) and the days left,
  * a tap from the group (the whole of it is Класации' „Лига“); shown once the player has been in a league. */
 export function leagueLine(): Child {
-  const data = signal<LeagueView | null>(null);
+  const data = signal<LeagueView | null>(last<LeagueView>("/api/league") ?? null);
   loadLeague().then(data.set, () => {});
   return () => {
     const v = data();

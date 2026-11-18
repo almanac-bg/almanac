@@ -26,6 +26,7 @@ let {
   tiers,
   tierWords,
   unlockWords,
+  keptProgress,
   loadProgress,
   nearest,
 } = {} as Kit;
@@ -47,6 +48,7 @@ export function rewards(kit: Kit) {
     tiers,
     tierWords,
     unlockWords,
+    keptProgress,
     loadProgress,
     nearest,
   } = kit);
@@ -60,7 +62,7 @@ export function rewards(kit: Kit) {
     when(
       () => user(),
       () => {
-        const progress = signal<Progress | null>(null);
+        const progress = signal<Progress | null>(keptProgress());
         loadProgress().then(progress.set, () => {});
         return () => {
           const p = progress();

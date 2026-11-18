@@ -6,7 +6,8 @@ import type { Kit } from "../kit.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
-let { reviewed, scoreCard, api, errorText, h, signal, title, issueWords, bulgaria, categories, back } = {} as Kit;
+let { loading, reviewed, scoreCard, api, errorText, h, signal, title, issueWords, bulgaria, categories, back } =
+  {} as Kit;
 
 /** A game as a run of it is: its kind, and the day's day or a topic's topic. */
 type Played = Omit<State, "kind"> & { kind: string };
@@ -34,7 +35,7 @@ function what(s: Played): string {
 }
 
 export function playedGame(kit: Kit, [id = ""]: string[]) {
-  ({ reviewed, scoreCard, api, errorText, h, signal, title, issueWords, bulgaria, categories, back } = kit);
+  ({ loading, reviewed, scoreCard, api, errorText, h, signal, title, issueWords, bulgaria, categories, back } = kit);
   title("Изиграна игра");
   const game = signal<{ s: Played; questions: Reviewed[] } | null>(null);
   const error = signal("");
@@ -47,7 +48,7 @@ export function playedGame(kit: Kit, [id = ""]: string[]) {
   );
   return h("section", { class: "screen" }, back("/me", "Профил"), () => {
     const g = game();
-    if (!g) return error() ? h("p", { role: "alert" }, error()) : h("p", { class: "muted" }, "…");
+    if (!g) return error() ? h("p", { role: "alert" }, error()) : loading("card", "rows");
     // Laid out as a result is (results.ts), without its ways on: it's over.
     return h(
       "section",

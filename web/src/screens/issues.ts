@@ -10,8 +10,22 @@ import type { Child } from "../lib/dom.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
-let { api, h, signal, title, back, failure, runGame, summary, news, formatNumber, dateWords, weekday, ApiError } =
-  {} as Kit;
+let {
+  loading,
+  api,
+  h,
+  signal,
+  title,
+  back,
+  failure,
+  runGame,
+  summary,
+  news,
+  formatNumber,
+  dateWords,
+  weekday,
+  ApiError,
+} = {} as Kit;
 
 /** A past issue, as /api/issues lists it: the player's game of it, of the day itself or since. */
 interface Issue {
@@ -35,7 +49,22 @@ export const pastLine = "Минал брой: не влиза в серията 
 const shareFrom = 10;
 
 export function issues(kit: Kit) {
-  ({ api, h, signal, title, back, failure, runGame, summary, news, formatNumber, dateWords, weekday, ApiError } = kit);
+  ({
+    loading,
+    api,
+    h,
+    signal,
+    title,
+    back,
+    failure,
+    runGame,
+    summary,
+    news,
+    formatNumber,
+    dateWords,
+    weekday,
+    ApiError,
+  } = kit);
   title("Минали броеве");
   const list = signal<Issue[] | null>(null);
   const error = signal<unknown>(null);
@@ -58,7 +87,7 @@ export function issues(kit: Kit) {
     ),
     () => {
       const all = list();
-      if (!all) return error() ? failure(error(), load) : h("p", { class: "muted" }, "…");
+      if (!all) return error() ? failure(error(), load) : loading("rows");
       if (!all.length) return h("p", { class: "muted" }, "Още няма минали броеве. Първият излиза утре.");
       return h(
         "ol",
@@ -96,7 +125,22 @@ function row(i: Issue): Child {
 /** One past issue (/issues/<n>): its game, started after the count or gone on with where it was left; at its end, how
  * it went against the issue's players. One played on its day, today's, or one not out yet, says so instead. */
 export function issue(kit: Kit, [n = ""]: string[]) {
-  ({ api, h, signal, title, back, failure, runGame, summary, news, formatNumber, dateWords, weekday, ApiError } = kit);
+  ({
+    loading,
+    api,
+    h,
+    signal,
+    title,
+    back,
+    failure,
+    runGame,
+    summary,
+    news,
+    formatNumber,
+    dateWords,
+    weekday,
+    ApiError,
+  } = kit);
   const number = Number(n);
   const name = `Брой ${number}`;
   title(name);

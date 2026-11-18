@@ -37,6 +37,7 @@ let {
   haveProfile,
   keepGame,
   leagueLine,
+  keptProgress,
   loadProgress,
   nearest,
   stats,
@@ -68,6 +69,7 @@ export function me(kit: Kit) {
     haveProfile,
     keepGame,
     leagueLine,
+    keptProgress,
     loadProgress,
     nearest,
     stats,
@@ -82,7 +84,7 @@ export function me(kit: Kit) {
     when(
       () => user(),
       () => {
-        const progress = signal<Progress | null>(null);
+        const progress = signal<Progress | null>(keptProgress());
         // Профил that couldn't load (no line): said, with the way to try again (the whole page, afresh).
         const failed = signal<unknown>(null);
         loadProgress().then(progress.set, failed.set);

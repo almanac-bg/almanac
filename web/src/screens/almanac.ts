@@ -9,6 +9,7 @@ import type { Child } from "../lib/dom.ts";
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
 let {
+  loading,
   api,
   errorText,
   h,
@@ -61,6 +62,7 @@ type Counts = Omit<Page, "facts" | "next" | "games">;
 
 export function almanac(kit: Kit) {
   ({
+    loading,
     api,
     errorText,
     h,
@@ -276,7 +278,7 @@ function pages(topic: string, counted: (c: Counts) => void): Child {
     () => (trouble() ? h("p", { role: "alert" }, trouble()) : null),
     when(
       () => next() === null && busy() && !trouble(),
-      () => h("p", { class: "muted" }, "…"),
+      () => loading("rows"),
     ),
     when(
       () => next() || trouble(),

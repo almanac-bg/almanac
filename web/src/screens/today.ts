@@ -18,7 +18,7 @@ import { getReady, playRun, shownHere, starting, trail } from "../game/run.ts";
 import { dayShareText, percent, rare } from "../game/share.ts";
 import { standing } from "../game/standing.ts";
 import type { Board, Mark, Score, State } from "../game/types.ts";
-import { api, errorText, serverNow, tally } from "../lib/api.ts";
+import { api, errorText, fresh, keep, last, serverNow, tally } from "../lib/api.ts";
 import { inApp } from "../lib/app.ts";
 import { boot } from "../lib/boot.ts";
 import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
@@ -35,6 +35,7 @@ import {
   failure,
   formatNumber,
   levelNumber,
+  loading,
   meter,
   type Open,
   pointsWords,
@@ -52,7 +53,7 @@ import {
   leftLine,
   playedLine,
 } from "./duel.ts";
-import { type Goals, goalsCard, loadGoals, openGoals } from "./goals.ts";
+import { type Goals, goalsCard, keptGoals, loadGoals, openGoals } from "./goals.ts";
 import { app, haveProfile, keepLine, keepStake, mailAsk } from "./keep.ts";
 import { leagueNote } from "./league.ts";
 import { clock, modes } from "./modes.ts";
@@ -148,11 +149,23 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
   // The game's mails link here with ?from=mail (server/streakmail.go, daymail.go): their reader has a profile.
   const fromMail = new URLSearchParams(location.search).get("from") === "mail";
   if (fromMail) history.replaceState(history.state, "", "/");
-  const screen = slot(() => h("p", { class: "muted" }, "…"));
+  const screen = slot(() => loading("card", "rows"));
   const load = async () => {
+    // Opened again the same day: the day as it was last drawn, at once, while the server is asked (lib/api.ts, fresh);
+    // nothing new, nothing drawn again. Not a day left mid-question: that waits for the server.
+    const kept = inPage ? undefined : last<Today>("/api/day");
+    const drawn =
+      kept && (!kept.run || kept.run.done) && kept.day === dayInBulgaria(new Date(serverNow())) ? kept : undefined;
+    if (drawn) {
+      day = drawn.day;
+      screen.show(() => home(drawn, drawn.run, false));
+    }
     try {
-      const t = inPage ?? (await api<Today>("GET", "/api/day"));
+      const t = inPage ?? (await (drawn ? fresh<Today>("/api/day") : api<Today>("GET", "/api/day")));
+      // The day in the page is kept as an answer would be: Начало opened again draws it at once.
+      if (inPage) keep("/api/day", inPage);
       inPage = undefined;
+      if (t === drawn) return;
       met(t.open);
       day = t.day;
       const run = t.run;
@@ -162,7 +175,8 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
         screen.show(() => playRun(run, (s) => home(t, s, true)));
       else screen.show(() => home(t, t.run, false));
     } catch (err) {
-      screen.show(() => failure(err, load, null));
+      // (The day drawn from before stays, quietly.)
+      if (!drawn) screen.show(() => failure(err, load, null));
     }
   };
   // The day's ten (or the rest of them) start after the count every game has, which „Откажи“ backs out of: nothing
@@ -265,8 +279,9 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
     // The day's goals (shown once XP is open: play/unfold.go; the day just played may open it): what's next after the
     // day, and where another game goes: a goal's topic, else the newest past issue not played (Минали броеве took the
     // place of the game of every topic), else a topic, a new one each day.
-    const goals = signal<Goals | null>(null);
-    if (user.peek() && (run?.done || t.repair)) loadGoals().then(goals.set, () => {});
+    const asksGoals = !!user.peek() && !!(run?.done || t.repair);
+    const goals = signal<Goals | null>(asksGoals ? keptGoals() : null);
+    if (asksGoals) loadGoals().then(goals.set, () => {});
     const next = () => {
       const past = fresh().past;
       const topic = categories[Number(t.day.replaceAll("-", "")) % categories.length]?.id ?? "";

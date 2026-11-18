@@ -14,6 +14,7 @@ import type { Mix } from "./rooms.ts";
 
 // The app's pieces, set as the screen opens (room); host.ts takes them from here.
 export let {
+  loading,
   answered,
   answering,
   api,
@@ -136,6 +137,7 @@ export const about = (v: RoomView) =>
 
 export function room(kit: Kit, [code = ""]: string[]) {
   ({
+    loading,
     answered,
     answering,
     api,
@@ -392,7 +394,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
     h("div", { class: "room-phase", hidden: asked }, () => {
       const k = key();
       if (trouble() !== "" && trouble() !== "reconnecting") return null;
-      if (!k) return naming() !== null ? null : h("p", { class: "muted" }, "…");
+      if (!k) return naming() !== null ? null : loading("title", "card");
       const v = untracked(view) as RoomView;
       // A new game („Нова игра“ goes from the end straight to its first question).
       if (v.phase === "lobby" || (v.phase === "question" && v.n === 0)) places.clear();
