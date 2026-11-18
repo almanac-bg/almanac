@@ -1787,3 +1787,40 @@ func TestAdminPlayers(t *testing.T) {
 		t.Fatalf("suspending nobody, or an admin: %d", status)
 	}
 }
+
+// A name or tag is checked only when it changes: one a player has from before a check came in (or drawn) doesn't stop
+// them saving the other, nor coming into a room under it.
+func TestOwnNameIsntCheckedAgain(t *testing.T) {
+	g := start(t)
+	p, id := g.guest()
+	if _, err := g.db.Write.Exec(`UPDATE users SET name = 'Курва', tag = 'kurva_1' WHERE id = ?`, id); err != nil {
+		t.Fatal(err)
+	}
+	if status, out := p.call("PATCH", "/api/me", map[string]string{"name": " Курва ", "tag": "fox_saver"}); status != 200 ||
+		name(out) != "Курва" {
+		t.Fatalf("a new tag beside the name had: %d %v", status, out)
+	}
+	if status, out := p.call("PATCH", "/api/me", map[string]string{"name": "Звезда", "tag": "@Kurva_1"}); status != 400 {
+		t.Fatalf("the old tag again, once given up: %d %v", status, out)
+	}
+	if _, err := g.db.Write.Exec(`UPDATE users SET tag = 'kurva_1' WHERE id = ?`, id); err != nil {
+		t.Fatal(err)
+	}
+	if status, out := p.call("PATCH", "/api/me", map[string]string{"name": "Звезда", "tag": "@Kurva_1"}); status != 200 ||
+		name(out) != "Звезда" {
+		t.Fatalf("a new name beside the tag had: %d %v", status, out)
+	}
+	if status, out := p.call("PATCH", "/api/me", map[string]string{"name": "Курва"}); status != 400 {
+		t.Fatalf("a rude name taken anew: %d %v", status, out)
+	}
+	host := g.player()
+	host.call("POST", "/api/guest", map[string]any{})
+	_, out := host.call("POST", "/api/rooms", map[string]string{"category": ""})
+	code := out["code"].(string)
+	if _, err := g.db.Write.Exec(`UPDATE users SET name = 'Курва' WHERE id = ?`, id); err != nil {
+		t.Fatal(err)
+	}
+	if status, out := p.call("POST", "/api/rooms/"+code+"/join", map[string]string{"name": "Курва"}); status != 200 {
+		t.Fatalf("into a room under the name had: %d %v", status, out)
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"mime"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -548,12 +549,14 @@ func (s *Server) rename(w http.ResponseWriter, r *http.Request) error {
 		!s.allowFrom(r, "rename-net", 200, 1000, time.Hour) {
 		return errTooMany
 	}
-	if in.Name != nil {
+	// Each is checked only when it changes: a name or tag the player has (drawn, or taken before a check came in)
+	// doesn't stop them saving the other.
+	if in.Name != nil && strings.Join(strings.Fields(*in.Name), " ") != u.Name {
 		if u.Name, err = s.accounts.Rename(r.Context(), u.ID, *in.Name); err != nil {
 			return err
 		}
 	}
-	if in.Tag != nil {
+	if in.Tag != nil && strings.ToLower(strings.TrimPrefix(strings.TrimSpace(*in.Tag), "@")) != u.Tag {
 		if u.Tag, err = s.accounts.Retag(r.Context(), u.ID, *in.Tag); err != nil {
 			return err
 		}
