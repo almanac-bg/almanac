@@ -7189,6 +7189,13 @@
       max-height: calc(100dvh - 5.5rem - 10rem - 4rem);
     }
 
+    /* A quarter of the row leaves the name beside its letter and mark a short line: smaller, a name of two words
+       („Босна и Херцеговина“) keeps to two lines, not three with its last word broken. */
+    .playing .pic-name {
+      font-size: 0.8125rem;
+      line-height: 1rem;
+    }
+
     /* The topic (or „На този ден“) stays in the small head, beside the tally: there's the width for it. */
     .stuck .kicker {
       display: block;

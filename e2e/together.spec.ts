@@ -212,6 +212,8 @@ test("on a narrow phone, a long name stays beside its avatar and the host's butt
   await guest.getByRole("button", { name: "Влез" }).click();
   const chip = host.locator(".players li").last();
   await expect(chip).toContainText("Александра-Магдалена Петрова");
+  // Measured once the guest's line is up: the list is drawn anew as it comes (the chip „извън стаята“ till then).
+  await expect(chip).not.toHaveClass(/away/);
   const [avatar, name, acts, list] = await Promise.all([
     chip.locator(".avatar").boundingBox(),
     chip.locator(".player-name").boundingBox(),
@@ -328,11 +330,12 @@ test("two people asking for a duel play it live", async ({ browser }, info) => {
     .getByRole("button", { name: /^Добави .+ в приятели$/ })
     .click();
   await expect(a.locator(".duel-add")).toHaveText("Поканата е изпратена.");
-  // Ana asks for a rematch: Bo sees it, asks too, and they're face to face again.
+  // Ana asks for a rematch: Bo sees it over his gold step, her name and the seconds she waits (#470), says yes, and
+  // they're face to face again.
   await a.getByRole("button", { name: "Реванш" }).click();
   await expect(a.getByRole("heading", { name: "Реванш" })).toBeVisible();
-  await expect(b.locator(".rematch-asks")).toHaveText(/иска реванш\.$/);
-  await b.getByRole("button", { name: "Реванш" }).click();
+  await expect(b.locator(".rematch-asks")).toContainText("Ана иска реванш");
+  await b.getByRole("button", { name: "Да, реванш" }).click();
   for (const p of [a, b]) await expect(p.getByRole("heading", { name: "Съперникът е тук" })).toBeVisible();
   await a.goto("/duel");
   await expect(a.locator(".duel-row").first()).toContainText(/Победа|Загуба|Равенство/);

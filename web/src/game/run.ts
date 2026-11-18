@@ -17,7 +17,7 @@ import { beforeLeaving, hold, release } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { withName } from "../lib/words.ts";
 import { categories, playingWhile } from "../state.ts";
-import { countUp, fact, failure, inRowChip, reachable, type VerdictKind, verdict } from "../ui.ts";
+import { countUp, fact, factFace, failure, inRowChip, reachable, type VerdictKind, verdict } from "../ui.ts";
 import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
 import { answered, beats, crowdLine, picture, picturesIn, type Stage } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Reveal, Shown, State, View } from "./types.ts";
@@ -48,6 +48,7 @@ function showing(run: number): void {
 export function playRun(initial: State, done: (s: State) => Child, opponent = ""): Child {
   const screen = slot();
   hold();
+  factFace();
 
   // A step of the run that doesn't get through (no line, the server restarting) is tried again quietly, a few times;
   // then it says so in the run's own frame (its head, its arrow out, its pips), and goes on as the line comes back.
