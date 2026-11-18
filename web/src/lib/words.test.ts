@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dateWords, hyphenate, issueWords, stakeWords, weekday, withName } from "./words.ts";
+import { dateWords, hyphenate, issueWords, stakeWords, weekday, winners, withName } from "./words.ts";
+
+test("a room's winner is told as the one reading it: „Печелиш“ to themself, never their name in the third person", () => {
+  const ani = { name: "Ани" };
+  const me = { name: "Ралица", me: true };
+  assert.equal(winners([ani]), "Ани печели");
+  assert.equal(winners([me]), "Печелиш");
+  assert.equal(winners([ani, { name: "Боби" }]), "Ани и Боби делят първото място");
+  assert.equal(winners([me, ani]), "Делиш първото място с Ани");
+  assert.equal(winners([{ name: "Стефан" }, me, ani]), "Делиш първото място със Стефан и Ани");
+  assert.equal(winners([]), "Край");
+});
 
 test("a day as the game writes it: the date, the month in lower case; with its issue, a dateline", () => {
   assert.equal(dateWords("2026-11-17"), "17 ноември");

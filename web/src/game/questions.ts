@@ -960,7 +960,8 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
       result.replaceChildren(
         ...view.left.map((left, i) => {
           const j = reveal.pairs?.[i] ?? -1;
-          const ok = mine[i] === j;
+          // Nothing given (a big screen's host, who doesn't play): the right pairs alone, none a miss of anyone's.
+          const ok = !given || mine[i] === j;
           const gave = mine[i] ?? -1;
           return h(
             "li",
@@ -1155,7 +1156,7 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
         ...view.items.map((text, i) => {
           const group = reveal.sides?.[i] ?? 0;
           const gave = mine[i] ?? -1;
-          const ok = gave === group;
+          const ok = !given || gave === group; // nothing given: the right groups alone, as for pairs
           return h(
             "li",
             { class: ok ? "option right" : "option missed" },

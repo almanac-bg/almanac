@@ -1842,6 +1842,10 @@
   .tone-mint {
     --tone: var(--right);
   }
+  /* A player gone since (screens/duel.ts): a plain tile, nobody's. */
+  .tone-gone {
+    --tone: var(--line-strong);
+  }
 
   .dot {
     display: inline-block;

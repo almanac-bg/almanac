@@ -132,6 +132,8 @@ type DuelSide struct {
 	Ms     int64  `json:"ms"`
 	Done   bool   `json:"done"`
 	Look   *Look  `json:"look,omitempty"`
+	// Gone is a player who has gone since (play.Forget): their game went with them, so their score isn't known.
+	Gone bool `json:"gone,omitempty"`
 	// Marks are how each question answered went (DuelOf): the player's own as they play, the other's once the duel
 	// has a result.
 	Marks []DuelMark `json:"marks,omitempty"`
@@ -1033,7 +1035,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			}
 		} else {
 			// Every duel has another side (a player, a recording's, a challenge's sender): none is one who's gone.
-			v.Opponent = &DuelSide{Name: GoneName, Done: true}
+			v.Opponent = &DuelSide{Name: GoneName, Done: true, Gone: true}
 		}
 		v.Recorded = strings.HasPrefix(r.outcome, "ghost_") && !challenge
 		if v.Recorded && v.Opponent != nil && r.theirs != 0 {

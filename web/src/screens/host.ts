@@ -42,6 +42,7 @@ import {
   timer,
   untracked,
   upNext,
+  winners,
 } from "./room.ts";
 
 /** The host's screen for the room's phase now. */
@@ -359,15 +360,7 @@ function end(view: () => RoomView, code: string): Child {
       "div",
       { class: "intro" },
       h("p", { class: "kicker" }, () => `Стая ${spaced(code)} · ${about(view())}`),
-      h("h1", null, () => {
-        const top = view().players.filter((p) => p.place === 1);
-        if (top.length > 1)
-          return `${top
-            .slice(0, -1)
-            .map((p) => p.name)
-            .join(", ")} и ${top.at(-1)?.name} делят първото място`;
-        return top[0] ? `${top[0].name} печели` : "Край";
-      }),
+      h("h1", null, () => winners(view().players.filter((p) => p.place === 1))),
     ),
     // The podium, and beside it everyone's place (on a big screen: host.css).
     () =>

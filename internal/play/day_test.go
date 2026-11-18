@@ -188,6 +188,8 @@ func TestDayHoldsStill(t *testing.T) {
 			return editedSample(t, func(id string, q map[string]any) {
 				if id == ids[5] {
 					q["text"], q["changed"], q["updated"] = "Отново: "+q["text"].(string), today, today
+					// A change has its sources, as every one since bank.TouchedFrom must.
+					q["sources"], q["checked"], q["checkedBy"] = []string{"https://example.org/"}, today, "test"
 				}
 			})
 		}, []int{5}},

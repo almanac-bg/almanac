@@ -167,7 +167,7 @@ function hero(d: DuelView): Child {
       face(you, "Ти", "", d.state === "won", true),
       h("span", { class: "duel-colon", "aria-hidden": "true" }, ":"),
       them
-        ? face(them, them.name, them.tag ?? "", d.state === "lost", settled, d.recorded)
+        ? face(them, them.name, them.tag ?? "", d.state === "lost" && !them.gone, settled, d.recorded)
         : h("div", { class: "duel-face" }),
     ),
     them?.tag && d.befriend ? befriend(them.name, them.tag) : null,
@@ -180,7 +180,8 @@ function hero(d: DuelView): Child {
 }
 
 /** One side, face to face: the avatar (with its frame), the name (a way to their profile) and title, and the score;
- * the winner's in gold. The other's score shows only once there's a result: nobody plays knowing what to beat. */
+ * the winner's in gold. The other's score shows only once there's a result: nobody plays knowing what to beat; and
+ * never for a player gone since, whose game went with them. */
 function face(s: Side, label: string, tag: string, won: boolean, shown: boolean, recorded = false): Child {
   const look = s.look ?? {};
   return h(
@@ -198,12 +199,14 @@ function face(s: Side, label: string, tag: string, won: boolean, shown: boolean,
           ? h("span", { class: `who-title t-${look.titleTier ?? "common"}` }, look.title)
           : null,
     ),
-    shown
-      ? [
-          h("b", { class: "duel-points", "data-n": s.points }, formatNumber(s.points)),
-          h("span", { class: "duel-rights" }, `${s.rights} от ${total} верни`),
-        ]
-      : [h("b", { class: "duel-points none" }, "–"), h("span", { class: "duel-rights" }, "Тепърва ще играе")],
+    s.gone
+      ? [h("b", { class: "duel-points none" }, "–"), h("span", { class: "duel-rights" }, "Играчът вече го няма")]
+      : shown
+        ? [
+            h("b", { class: "duel-points", "data-n": s.points }, formatNumber(s.points)),
+            h("span", { class: "duel-rights" }, `${s.rights} от ${total} верни`),
+          ]
+        : [h("b", { class: "duel-points none" }, "–"), h("span", { class: "duel-rights" }, "Тепърва ще играе")],
   );
 }
 
@@ -301,6 +304,7 @@ function line(d: DuelView): string {
       : `${them} има време до ${until(d.expiresAt)} Ще ти кажем резултата.`;
   const you = d.you;
   const other = d.opponent;
+  if (other?.gone) return ""; // their game went with them: nothing to set the player's against
   // One left under way: the duel went on without them, and that's what decided it.
   const after = (n: number) => (n > 0 ? `след ${ordinal(n)}я въпрос` : "още на първия въпрос");
   if (d.theyLeft !== undefined) return `${them} излезе ${after(d.theyLeft)}.`;
@@ -458,9 +462,10 @@ function rematch(d: DuelView): Child {
   );
 }
 
-/** A challenge taken from anyone: send it on, the player's own game the one to beat. */
+/** A challenge taken from anyone: send it on, the player's own game the one to beat (not one whose sender has gone
+ * since: „и ти“ would answer nobody). */
 function sendOn(d: DuelView): Child {
-  if (d.kind !== "challenge" || !d.runId || !d.you?.done) return null;
+  if (d.kind !== "challenge" || !d.runId || !d.you?.done || d.opponent?.gone) return null;
   if (!d.sent && ["won", "lost", "draw"].includes(d.state))
     return challengeButton("Предизвикай и ти", d.runId, () => challengeText(d.you?.rights ?? 0), true);
   return null;
@@ -476,9 +481,9 @@ function sendLink(d: DuelView): Child {
 
 /** A win, shared as the day's result is (game/share.ts): what it was and how it went, and the player's own link;
  * no names and no words of invitation. Not a win against a recording (nobody's loss), nor a challenge taken from
- * anyone, whose own way on is to send it on. */
+ * anyone, whose own way on is to send it on, nor one against a player gone since (no score of theirs to share). */
 function shareWin(d: DuelView): Child {
-  if (d.state !== "won" || d.recorded || !d.you || !d.opponent) return null;
+  if (d.state !== "won" || d.recorded || !d.you || !d.opponent || d.opponent.gone) return null;
   if (d.kind === "challenge" && !d.friend) return null;
   const you = d.you;
   const them = d.opponent;

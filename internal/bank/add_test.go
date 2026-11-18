@@ -130,8 +130,10 @@ func TestAddChangesQuestions(t *testing.T) {
 	added := "gen-" + strconv.Itoa(next)
 	first, second := edited(t, b, "gen-001", func(m map[string]any) {
 		m["text"], m["changed"], m["updated"] = "На коя дата си връзваме мартеници?", today, today
+		m["sources"] = []string{"https://bg.wikipedia.org/wiki/Мартеница"} // a change has its sources (TouchedFrom)
 	}), edited(t, b, "gen-002", func(m map[string]any) {
 		m["fact"], m["updated"], m["difficulty"] = "Празникът е официален от 1990 г.", today, "medium"
+		m["sources"] = []string{"https://bg.wikipedia.org/wiki/Мартеница"}
 	})
 	batch := t.TempDir()
 	write(t, filepath.Join(batch, "general.json"), "["+strings.Trim(first, "[]")+", "+strings.Trim(second, "[]")+`,

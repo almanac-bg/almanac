@@ -65,7 +65,7 @@ import {
   soundOn,
 } from "./lib/sound.ts";
 import { stream } from "./lib/stream.ts";
-import { dateWords, issueWords, listWords, weekday, withName } from "./lib/words.ts";
+import { dateWords, issueWords, listWords, weekday, winners, withName } from "./lib/words.ts";
 import { dayInBulgaria, yearNow } from "./lib/year.ts";
 import type { DuelView } from "./screens/duel.ts";
 import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
@@ -283,6 +283,7 @@ export const kit = {
   when,
   whileSeen,
   who,
+  winners,
   withName,
   yearNow,
   yearShareText,

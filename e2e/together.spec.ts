@@ -43,7 +43,9 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
   }
   // The room moves on by itself, to the standings; the questions and their facts are there at the end.
   for (const p of [host, guest])
-    await expect(p.getByRole("heading", { name: /печели/ })).toBeVisible({ timeout: 15_000 });
+    await expect(p.getByRole("heading", { name: /печели|първото място/i })).toBeVisible({ timeout: 15_000 });
+  // Each reads it as themself: a winner „Печелиш“, never their own name in the third person.
+  await expect(guest.getByRole("heading", { name: /^Бояна / })).toHaveCount(0);
   await expect(host.getByRole("button", { name: "Започни нова игра" })).toBeVisible();
   // How many each got right, by the place and in every row.
   await expect(guest.getByText(/^Позна \d от 5 и си на \d-(во|ро) място от 2\.$/)).toBeVisible();

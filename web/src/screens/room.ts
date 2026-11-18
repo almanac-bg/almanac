@@ -59,6 +59,7 @@ export let {
   upNext,
   user,
   verdict,
+  winners,
 } = {} as Kit;
 
 export interface RoomView {
@@ -186,6 +187,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
     upNext,
     user,
     verdict,
+    winners,
   } = kit);
   title("Стая");
   const view = signal<RoomView | null>(null);
@@ -965,15 +967,7 @@ function end(view: () => RoomView, code: string): Child {
       "div",
       { class: "intro" },
       h("p", { class: "kicker" }, () => `Стая ${spaced(code)} · ${topicName(view().category)}`),
-      h("h1", null, () => {
-        const top = view().players.filter((p) => p.place === 1);
-        if (top.length > 1)
-          return `${top
-            .slice(0, -1)
-            .map((p) => p.name)
-            .join(", ")} и ${top.at(-1)?.name} делят първото място`;
-        return top[0] ? `${top[0].name} печели` : "Край";
-      }),
+      h("h1", null, () => winners(view().players.filter((p) => p.place === 1))),
       // How many this player got right, whatever their place: and the place, among others.
       () => {
         const v = view();
