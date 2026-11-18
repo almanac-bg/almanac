@@ -33,7 +33,8 @@ import (
 // the /48 of an IPv6 address, so that one site can't make thousands of them (S8); an IPv4 address as it is.
 
 // cloudflare are the addresses Cloudflare connects from: https://www.cloudflare.com/ips/ (the same since 2021; checked
-// November 2026).
+// November 2026). The firewalls let only these reach the game: the server's (deploy/nftables.conf) and Hetzner's
+// (deploy/hetzner-firewall.json); a test holds the three equal, and the deploy workflow compares them with Cloudflare's.
 var cloudflare = func() []netip.Prefix {
 	var ps []netip.Prefix
 	for _, s := range []string{

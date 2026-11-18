@@ -27,7 +27,8 @@ import (
 
 // serve runs the game, configured by the environment (deploy/env.example shows the server's):
 //
-//	DEV=1               development: the client from disk, mail to the log (and to MAIL_DIR, if set), a fixed secret
+//	DEV=1               development: the client from disk, mail to the log (and to MAIL_DIR, if set), a fixed secret,
+//	                    no limits, any host; refused with production's settings (devOnly)
 //	ADDR                where to listen (:8080)
 //	PUBLIC_URL          the address players use (http://localhost:8080)
 //	DB_PATH             the database file (almanac.db); copies are made beside it
@@ -62,7 +63,7 @@ import (
 //	CROWD_FROM          development only: how many answers a question needs before how players answered it shows
 //	                    (1); else 10 of the day's players for the day's ten, 20 for everyone's
 //	MTA_STS_MX          the domain's mail servers, comma-separated, for its MTA-STS policy at mta-sts.<domain>;
-//	                    MTA_STS_MODE testing (the default) or enforce
+//	                    MTA_STS_MODE testing (the default), enforce, or none (to take it away)
 //
 // The server plays a copy of BANK_DIR kept beside the database (banks.go: outside development), and starts on the
 // last good copy when BANK_DIR has errors. SIGHUP reloads the bank (deploy/bank.sh), from the moment the program
@@ -105,6 +106,9 @@ func serve([]string) error {
 		DBPath:          dbPath(),
 		Dev:             dev,
 		Version:         version,
+	}
+	if err := devOnly(cfg); err != nil {
+		return err
 	}
 	if every := os.Getenv("ROYAL_EVERY"); every != "" && dev {
 		e, err := time.ParseDuration(every)
@@ -363,4 +367,28 @@ func phones() (*push.Phones, error) {
 		return nil, nil
 	}
 	return &p, nil
+}
+
+// devOnly refuses development's freedoms (DEV=1: no limits, any host, the client from disk, a fixed secret when SECRET
+// is empty) together with any of production's settings: an https PUBLIC_URL, a certificate, Cloudflare in front. A
+// DEV=1 left in the server's environment would otherwise open the game to everyone's floods; this way it doesn't start
+// (and a deploy goes back).
+func devOnly(cfg server.Config) error {
+	if !cfg.Dev {
+		return nil
+	}
+	var prod []string
+	if strings.HasPrefix(strings.ToLower(cfg.PublicURL), "https:") {
+		prod = append(prod, "an https PUBLIC_URL")
+	}
+	if cfg.TLSCert != "" || cfg.TLSKey != "" {
+		prod = append(prod, "TLS_CERT or TLS_KEY")
+	}
+	if cfg.TrustCloudflare {
+		prod = append(prod, "TRUST_CLOUDFLARE")
+	}
+	if len(prod) > 0 {
+		return fmt.Errorf("DEV=1 is for development, not with production's settings: %s", strings.Join(prod, ", "))
+	}
+	return nil
 }
