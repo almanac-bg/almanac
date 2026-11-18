@@ -2,8 +2,9 @@
 //
 // Every answer is heard as well as read (hearing): the server's version on it (a deploy since the page loaded: fresh.ts),
 // its clock (serverNow), and a session that has ended. What goes wrong is said to the player in Bulgarian, whatever it
-// was (errorText): the server's own words for an error it gave, the line's for no line, and a plain line for anything
-// else, which is a fault of the page's and reported as one. A call that may be sent again (the server takes it twice
+// was (errorText): the server's own words for an error it gave, the line's for no line (or an answer cut off on its
+// way, as a page left or reloaded cuts what it was reading), and a plain line for anything else, which is a fault of
+// the page's and reported as one. A call that may be sent again (the server takes it twice
 // as once) is tried again while the line or the server is down for a moment (tries): a game's step, an answer
 // (game/answering.ts).
 
@@ -43,13 +44,24 @@ export async function api<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: 
     throw new ApiError("offline", offline);
   }
   clock(res);
-  const data = await res.json().catch(() => undefined);
+  // The body read whole, or null: cut off on its way (the line dropped; the page stopped or left, as a reload does,
+  // which ends what it was still reading). That is the line's, not a fault of anyone's.
+  const text = await res.text().catch(() => null);
+  let data: { error?: string; message?: string } | undefined;
+  try {
+    data = text === null ? undefined : JSON.parse(text);
+  } catch {
+    // not JSON: said below
+  }
   const code: string = res.ok ? "" : (data?.error ?? "server");
   for (const hear of hearing) hear(res, code);
   if (!res.ok) throw new ApiError(code, data?.message ?? ours, res.status);
-  // Every answer of the API's is JSON: one that isn't came from something else on the way (or the API broke its word).
+  if (text === null) throw new ApiError("offline", offline);
+  // Every answer of the API's is JSON: one that came whole and isn't came from something else on the way (a proxy's
+  // page, a captive portal) or the API broke its word. What it was tells which.
   if (data === undefined) {
-    reportProblem(`${method} ${path}: ${res.status} without JSON`);
+    const type = res.headers.get("Content-Type") || "no type";
+    reportProblem(`${method} ${path}: ${res.status} without JSON (${type}, ${text.length} characters)`);
     throw new ApiError("server", ours);
   }
   return data as T;

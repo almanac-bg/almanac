@@ -1488,6 +1488,14 @@ func TestALeftRequestIsNoProblem(t *testing.T) {
 	if news, _ := g.srv.problems.take(); len(news) != 0 {
 		t.Fatalf("a left request became a problem: %v", news)
 	}
+	// A page left before it came (a reload over it, one held through a restart) is no 500 either.
+	r := httptest.NewRequestWithContext(ctx, "GET", "/", nil)
+	r.AddCookie(&http.Cookie{Name: g.srv.cookie, Value: "a-session"})
+	w = httptest.NewRecorder()
+	g.srv.page(w, r)
+	if w.Code != 499 {
+		t.Fatalf("a left page: %d", w.Code)
+	}
 }
 
 func TestFriendsOverHTTP(t *testing.T) {

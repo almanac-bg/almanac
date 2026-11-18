@@ -3,11 +3,26 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ApiError, api, errorText, hearing, passing, serverNow, tries } from "./api.ts";
 
-/** The server stood in for: each call takes the next answer (a Response, or "down" for no line). */
+// The page the reports name (lib/errors.ts sends none without one).
+(globalThis as { location?: unknown }).location = { pathname: "/" };
+
+/** The problems the page reported (POST /api/errors), as sent. */
+let reported: { message: string }[] = [];
+const sent = () => {
+  reported = [];
+  return reported;
+};
+
+/** The server stood in for: each call takes the next answer (a Response, or "down" for no line); a problem reported
+ * is kept (sent) and takes none. */
 function serve(...answers: (Response | "down")[]): string[] {
   const asked: string[] = [];
   globalThis.fetch = (async (path: string, init: RequestInit) => {
     asked.push(`${init.method} ${path}`);
+    if (path === "/api/errors") {
+      reported.push(JSON.parse(String(init.body)));
+      return new Response("{}");
+    }
     const a = answers.shift() ?? "down";
     if (a === "down") throw new TypeError("Failed to fetch");
     return a;
@@ -25,9 +40,25 @@ test("an answer is its JSON; an error, the server's words for it; no line, the l
   await assert.rejects(api("GET", "/api/day"), (e: ApiError) => e.code === "offline" && e.status === 0);
 });
 
-test("a 2xx that isn't JSON (not the API's) is an error, not null", async () => {
-  serve(new Response("<html>login</html>", { status: 200, headers: { "Content-Type": "text/html" } }));
+test("a 2xx that isn't JSON (not the API's) is an error, not null, and reported with what it was", async () => {
+  const asked = serve(new Response("<html>login</html>", { status: 200, headers: { "Content-Type": "text/html" } }));
+  const reports = sent();
   await assert.rejects(api("GET", "/api/day"), (e: ApiError) => e instanceof ApiError && e.code === "server");
+  assert.deepEqual(asked, ["GET /api/day", "POST /api/errors"]);
+  assert.equal(reports[0]?.message, "GET /api/day: 200 without JSON (text/html, 18 characters)");
+});
+
+test("an answer cut off on its way (a page reloaded under it) is the line's, and not reported", async () => {
+  // Its headers came, its body never whole: the browser stopped reading it, as a reload or a stop does.
+  const cut = new ReadableStream({
+    start(c) {
+      c.enqueue(new TextEncoder().encode('{"waiting":'));
+      c.error(new TypeError("Failed to fetch"));
+    },
+  });
+  const asked = serve(new Response(cut, { status: 200, headers: { "Content-Type": "application/json" } }));
+  await assert.rejects(api("GET", "/api/mistakes"), (e: ApiError) => e.code === "offline" && e.status === 0);
+  assert.deepEqual(asked, ["GET /api/mistakes"]);
 });
 
 test("the player is told an ApiError's words, and a plain Bulgarian line for anything else", () => {

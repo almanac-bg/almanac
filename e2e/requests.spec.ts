@@ -1,0 +1,95 @@
+// What a screen asks the server: each thing once a visit. A part that loads its data as it's made, made again by a
+// render that runs again, asks again each time (the topics' tiles asking for the second chance's count); a page that
+// loads itself anew asks for all of it again. Counted here over the ways a player goes round Начало and the topics, a
+// deploy among them: a visit that asks for anything twice fails, and so does a deploy that loads the page more than once.
+import { expect, type Page, type Request, test } from "@playwright/test";
+import { playRun, startDay } from "./play.ts";
+
+/** What the page asks the server (GETs of the API) while `go` opens a screen, until it's quiet: none in flight, and
+ * none for a moment. */
+async function visit(page: Page, go: () => Promise<unknown>): Promise<string[]> {
+  const asked: string[] = [];
+  let pending = 0;
+  let last = Date.now();
+  const sent = (r: Request) => {
+    pending++;
+    last = Date.now();
+    const u = new URL(r.url());
+    if (r.method() === "GET" && u.pathname.startsWith("/api/")) asked.push(u.pathname);
+  };
+  const done = () => {
+    pending = Math.max(0, pending - 1);
+    last = Date.now();
+  };
+  page.on("request", sent);
+  page.on("requestfinished", done);
+  page.on("requestfailed", done);
+  try {
+    await go();
+    await expect.poll(() => pending === 0 && Date.now() - last > 700, { timeout: 15_000 }).toBe(true);
+  } finally {
+    page.off("request", sent);
+    page.off("requestfinished", done);
+    page.off("requestfailed", done);
+  }
+  return asked;
+}
+
+/** The paths asked more than once. */
+const twice = (asked: string[]) => [...new Set(asked.filter((p, i) => asked.indexOf(p) !== i))];
+
+/** Opens a screen and checks that it asked for nothing twice; returns what it asked. */
+async function once(page: Page, what: string, go: () => Promise<unknown>): Promise<string[]> {
+  const asked = await visit(page, go);
+  expect(twice(asked), `${what} asked twice: ${asked.join(", ")}`).toEqual([]);
+  return asked;
+}
+
+const tab = (page: Page, href: string) => page.locator(`nav.tabs a[href='${href}']`).click();
+
+test("each screen asks the server for each thing once a visit, and a deploy loads the page once", async ({ page }) => {
+  test.slow();
+  await page.goto("/");
+  // A player with the day played, and so with questions missed: Начало asks for all it shows.
+  await startDay(page);
+  await playRun(page);
+  await expect(page.locator(".summary")).toBeVisible();
+
+  const home = (asked: string[]) => {
+    for (const p of ["/api/mistakes", "/api/runs/left", "/api/me/stats", "/api/goals"]) expect(asked).toContain(p);
+  };
+  home(await once(page, "Начало, loaded", () => page.reload()));
+  await once(page, "Приятели", () => tab(page, "/friends"));
+  await once(page, "Класации", () => tab(page, "/ranks"));
+  await once(page, "Профил", () => tab(page, "/me"));
+  home(await once(page, "Начало, from Профил", () => tab(page, "/")));
+  // Начало tapped on Начало opens it afresh: once more, not more than that.
+  home(await once(page, "Начало, tapped again", () => tab(page, "/")));
+  // A topic's tile, its count backed out of: back on Начало.
+  await once(page, "a topic", async () => {
+    await page.locator("a.topic[href='/play/history']").click();
+    await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
+  });
+  home(
+    await once(page, "Начало, the count backed out of", async () => {
+      await page.getByRole("button", { name: "Откажи" }).click();
+      await expect(page).toHaveURL(/\/$/);
+    }),
+  );
+  await once(page, "a topic, loaded", () => page.goto("/play/music"));
+  await once(page, "Втори шанс", () => page.goto("/mistakes"));
+  await once(page, "Моят Алманах", () => page.goto("/almanac"));
+  home(await once(page, "Начало, from Моят Алманах", () => tab(page, "/")));
+
+  // A deploy: the next screen comes with the page loaded anew, once.
+  await page.route("**/api/**", async (route) => {
+    const res = await route.fetch();
+    await route.fulfill({ response: res, headers: { ...res.headers(), "x-almanac-version": "next" } });
+  });
+  await once(page, "Класации, the server's version another", () => tab(page, "/ranks"));
+  let loads = 0;
+  page.on("load", () => loads++);
+  home(await once(page, "Начало, after a deploy", () => tab(page, "/")));
+  await page.waitForTimeout(1500); // a page that went on loading itself would have by now
+  expect(loads).toBe(1);
+});
