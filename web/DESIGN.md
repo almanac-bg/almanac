@@ -198,7 +198,10 @@ wherever it does (`explain()`: the word dotted under, its meaning in a small car
   another. A new player, with only the day and the topics (the ways in are lines under the day), gets one centred
   column; while Роял's lobby is open, Роял sits beside it. Профил's places are 64rem wide: Общо's cards in two columns, read
   top to bottom; more achievements and bigger looks to a row. Every other page is a centred column of 48rem, so no
-  line of text runs too long; a game is 54rem, with bigger type still.
+  line of text runs too long; a game is 54rem, with bigger type still. A run's question (the day, a topic, a
+  challenge) takes the page's width in two columns: the head, the question and its answers on the left, and on the
+  right, from the question's start, the column its answer comes into (see Flow); on a laptop's height a choice of
+  pictures is four across.
 - **A computer** (a fine pointer that hovers) is shown its keys: the answers are marked 1–4 instead of А–Г (the keys
   that give them, the same on every keyboard layout), „Вярно“ and „Невярно“ 1 and 2, the count before a run Enter
   („Започни сега“) and Esc („Откажи“), and an answer shown Enter (on at once). The marks are `.key-hint`.
@@ -518,9 +521,13 @@ takes a token.
   longer than the rest scrolls with the panel, „Напред“ staying at its foot. A phone on its side plays the same,
   the head small from the start (or from when the phone is turned), the topic still in it, the question smaller, a
   choice's answers two by two and a choice of pictures four across, so that they start on the screen; its panel has
-  how everyone answered and „Напред“ on the verdict's row, so the fact under them shows. A big screen shows the
-  answer under the question; the page moves for it, but never the question's first line under the head unless the
-  verdict wouldn't show, „Напред“ staying at the screen's foot.
+  how everyone answered and „Напред“ on the verdict's row, so the fact under them shows. A laptop shows the answer
+  beside the question: the question and its answers stay on the left, where they were asked, and the verdict, how
+  everyone answered, the fact and „Напред“ come into the column on the right, held in sight from the top of the
+  screen, so nothing scrolls for the fact (a fact longer than the screen scrolls in its column, „Напред“ at its foot);
+  the page moves only for a right answer below the screen. A tablet shows the answer under the question; the page
+  moves for it, but never the question's first line under the head unless the verdict wouldn't show, „Напред“
+  staying at the screen's foot.
 - **Leaving a game is free between two questions.** While a question's time runs (on the server, so it can't wait),
   a way out — the arrow, a place in the header — asks first („Ако излезеш сега, въпросът остава без отговор.“,
   „Остани“ or „Излез“), and leaving gives that question up. The game waits where it stopped: the day on Начало with

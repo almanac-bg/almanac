@@ -778,9 +778,11 @@ const settling = { duration: 240, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
 
 /** Brings the answer into place, its panel shown by `show`, in one movement. On a phone the panel docks at the
  * screen's foot (app.css: it's fixed there) and the answers move up above it, the page moving just enough that the
- * right answer (or, for an order or pairs, the answer's top) shows between the head and the panel; on a big screen
- * the panel shows under the answers, and the page moves just enough to show it, short of the question's first line
- * going under the head (but the verdict shows). Where everything ends is worked out
+ * right answer (or, for an order or pairs, the answer's top) shows between the head and the panel; on a laptop the
+ * panel shows beside the question, in sight wherever the page is, and the page moves only if the right answer isn't
+ * (back up to the question's first line, if the answering had moved it away); at a tablet's width the panel shows
+ * under the answers, and the page moves just enough to show it, short of the question's first line going under the
+ * head (but the verdict shows). Where everything ends is worked out
  * first, the page already in its last state and the head at the size it will have there (it stays so meanwhile: a
  * head that changed size as the page moved made it jump), and the page goes there at once; then what moved glides
  * from where it was, the panel rising with it, so the right answer is never under the panel on the way. The right
@@ -798,7 +800,10 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   // The docked panel leaves room for the right answer over it, however tall (app.css).
   if (right) page.style.setProperty("--keep", `${Math.ceil(right.getBoundingClientRect().height)}px`);
   show();
-  const docked = getComputedStyle(after).position === "fixed";
+  // Docked at a phone's foot (fixed), beside the question on a laptop (sticky, in its own column), or under it.
+  const place = getComputedStyle(after).position;
+  const docked = place === "fixed";
+  const beside = place === "sticky";
   const ask = page.querySelector(".ask") ?? key;
   const go = after.querySelector<HTMLElement>(".up-next-go");
   // The verdict's foot as it's laid out, not as it's drawn coming in (app.css: .after > *, enter).
@@ -809,14 +814,18 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
     (verdict.offsetParent === after ? 0 : after.offsetTop) +
     verdict.offsetHeight;
   // What has to show between the head's foot and the bottom, and how far the page moves down (or up) for it. Docked:
-  // the right answer above the panel, its top never under the head. On a big screen: the panel under the answers, to
-  // the screen's foot, but never the question's first line under the head (what doesn't fit is a scroll away,
-  // „Напред“ at the screen's foot meanwhile, app.css), and always the verdict, over „Напред“.
+  // the right answer above the panel, its top never under the head. Beside: the right answer above the screen's foot,
+  // its top never under the head, and the question's first line too where it fits (the panel shows wherever the page
+  // is). Under the answers: the panel, to the screen's foot, but never the question's first line under the head
+  // (what doesn't fit is a scroll away, „Напред“ at the screen's foot meanwhile, app.css), and always the verdict,
+  // over „Напред“.
   const by = (headFoot: number) => {
-    const box = (docked ? key : after).getBoundingClientRect();
+    const box = (docked || beside ? key : after).getBoundingClientRect();
     const foot = docked ? after.getBoundingClientRect().top - 12 : innerHeight - 16;
     const below = box.bottom - foot;
-    const above = (docked ? box : ask.getBoundingClientRect()).top - headFoot - 12;
+    const room = (top: number) => top - headFoot - 12;
+    const above = room(docked ? box.top : ask.getBoundingClientRect().top);
+    if (beside) return below > 0 ? Math.max(0, Math.min(below, room(box.top))) : Math.min(0, Math.max(above, below));
     const least = docked ? 0 : told() - (foot - (go ? go.offsetHeight + 12 : 0));
     if (below > 0) return Math.max(0, least, Math.min(below, above));
     return above < 0 ? Math.max(above, below) : 0;
@@ -845,10 +854,10 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
     rise = Math.max(rise, dy);
     if (Math.abs(dy) >= 1) el.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], settling);
   });
-  if (docked)
+  if (docked || beside)
     after.animate(
       [
-        { transform: `translateY(${Math.max(24, rise)}px)`, opacity: 0 },
+        { transform: `translateY(${beside ? 16 : Math.max(24, rise)}px)`, opacity: 0 },
         { transform: "none", opacity: 1 },
       ],
       settling,

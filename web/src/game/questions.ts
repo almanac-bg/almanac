@@ -76,19 +76,25 @@ export function crowdLine(type: View["type"], c: Crowd | undefined, right: boole
   return h("p", { class: "crowd-says" }, says);
 }
 
-/** Shows on an answer what share of players gave it: a bar behind it, filling in, and the share beside it. */
-function crowdOn(button: HTMLElement, x: number): void {
-  button.classList.add("crowd");
-  button.append(h("span", { class: "value crowd-share" }, percent(x)));
-  requestAnimationFrame(() => button.style.setProperty("--share", `${Math.round(x * 1000) / 10}%`));
-}
-
-/** The shares on each answer, where the question has had enough answers to say. */
-function crowdOnAll(buttons: HTMLElement[], picks: number[] | undefined): void {
-  buttons.forEach((b, i) => {
+/** The shares on each answer, where the question has had enough answers to say: each in its place beside the answer
+ * now, unseen, so that the answers settle into their place with them (with the right one marked: run.ts, settle) and
+ * none grows when they show; and shown by the function returned, a bar behind each answer filling in as long as the
+ * share that gave it. */
+function crowdOnAll(buttons: HTMLElement[], picks: number[] | undefined): () => void {
+  const shares = buttons.flatMap((b, i) => {
     const x = picks?.[i];
-    if (x !== undefined) crowdOn(b, x);
+    if (x === undefined) return [];
+    const share = h("span", { class: "value crowd-share unseen" }, percent(x));
+    b.append(share);
+    return [{ b, share, x }];
   });
+  return () => {
+    for (const { b, share, x } of shares) {
+      b.classList.add("crowd");
+      share.classList.remove("unseen");
+      requestAnimationFrame(() => b.style.setProperty("--share", `${Math.round(x * 1000) / 10}%`));
+    }
+  };
 }
 
 /** Draws a question's answering part; submit sends an answer once, and locked stops input. With the answer it shows
@@ -288,10 +294,12 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
       };
       const own = buttons[mine];
       if (own) mark(own, mine);
+      let crowd = () => {};
       at(beats.right, () => {
         buttons.forEach((b, i) => {
           if (b !== own) mark(b, i);
         });
+        crowd = crowdOnAll(buttons, reveal.crowd?.picks);
         if (reveal.credits?.length) {
           credits.hidden = false;
           credits.replaceChildren(
@@ -304,7 +312,7 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
           );
         }
       });
-      at(beats.crowd, () => crowdOnAll(buttons, reveal.crowd?.picks));
+      at(beats.crowd, () => crowd());
     },
   };
 }
@@ -768,11 +776,13 @@ function truefalse(_view: TrueFalseView, submit: (a: Answer) => void, locked: Si
         b.classList.add(truth === reveal.truth ? "right" : truth === mine ? "wrong" : "dim");
       };
       if (mine !== null) mark(mine ? yes : no, mine);
+      let crowd = () => {};
       at(beats.right, () => {
         if (mine !== true) mark(yes, true);
         if (mine !== false) mark(no, false);
+        crowd = crowdOnAll([yes, no], reveal.crowd?.picks);
       });
-      at(beats.crowd, () => crowdOnAll([yes, no], reveal.crowd?.picks));
+      at(beats.crowd, () => crowd());
     },
   };
 }
@@ -1194,12 +1204,14 @@ function clues(
       };
       const own = buttons[mine];
       if (own) mark(own, mine);
-      at(beats.right, () =>
+      let crowd = () => {};
+      at(beats.right, () => {
         buttons.forEach((b, i) => {
           if (b !== own) mark(b, i);
-        }),
-      );
-      at(beats.crowd, () => crowdOnAll(buttons, reveal.crowd?.picks));
+        });
+        crowd = crowdOnAll(buttons, reveal.crowd?.picks);
+      });
+      at(beats.crowd, () => crowd());
     },
   };
 }

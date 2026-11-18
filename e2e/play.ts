@@ -171,6 +171,21 @@ export async function daysPlayed(page: Page, ...back: number[]): Promise<void> {
   });
 }
 
+/** Deals the player (a guest, made now if there's none) a game of a topic with these questions, in this order,
+ * straight in the test server's database: started now and not finished, it's the game the topic's next start goes on
+ * with (play/runs.go, StartTopic). */
+export async function dealt(page: Page, category: string, ids: string[]): Promise<void> {
+  await inDB(page, (db, id) => {
+    const picks = JSON.stringify(ids.map((q, i) => ({ id: q, seed: i + 1 })));
+    db.prepare("INSERT INTO runs (user_id, kind, category, questions, started_at) VALUES (?, 'topic', ?, ?, ?)").run(
+      id,
+      category,
+      picks,
+      Date.now(),
+    );
+  });
+}
+
 /** Makes the player's games count as a person's for the others (a test plays quicker than a person: play/fair.go),
  * so that their friends see their day. */
 export async function playedFair(page: Page): Promise<void> {

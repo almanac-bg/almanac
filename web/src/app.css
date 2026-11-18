@@ -2765,9 +2765,14 @@
     --crowd-fill: color-mix(in srgb, var(--wrong) 20%, transparent);
   }
 
-  /* The shares fade in as their bars grow. */
+  /* The shares fade in as their bars grow; before, each keeps its room (questions.ts, crowdOnAll). */
   .crowd-share {
     animation: shown 240ms ease-out;
+  }
+
+  .crowd-share.unseen {
+    visibility: hidden;
+    animation: none;
   }
 
   .option.tf .crowd-share {
@@ -6927,8 +6932,8 @@
       line-height: 1.75rem;
     }
 
-    /* Rows of a list (things put in order, pairs) stay a phone's height: all of them and „Готово“ in sight. */
-    .playing :is(.sortable-list, .match, .match-result) .option {
+    /* Rows of a list (things put in order, pairs, groups) stay a phone's height: all of them and „Готово“ in sight. */
+    .playing :is(.sortable-list, .match, .match-result, .split-result) .option {
       min-height: 3.5rem;
       font-size: 1.125rem;
       line-height: 1.5rem;
@@ -6953,7 +6958,7 @@
 
     /* Rows of a list too (more specific from 48rem, above). */
     .playing .option,
-    .playing :is(.sortable-list, .match, .match-result) .option {
+    .playing :is(.sortable-list, .match, .match-result, .split-result) .option {
       min-height: 3rem;
       padding-block: 6px;
       font-size: 1.0625rem;
@@ -7206,6 +7211,56 @@
 
     .playing .option {
       min-height: 4rem;
+    }
+
+    /* A choice of pictures four across, one row: two rows of them would go below the screen. */
+    .run-question .pic-options {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  /* A laptop: the answer beside the question. The question and what answers it stay on the left, where they were
+     asked; the answer (the verdict, how everyone answered, the fact and „Напред“) comes in a column of its own on
+     the right, in sight from the top of the screen however tall the question, so that nothing scrolls for it (run.ts,
+     settle). The column is there from the question's start: nothing moves aside when the answer comes. The rows end
+     in a flexible one, which the answer spans: a long answer makes the page taller, not the question's rows apart.
+     A phone on its side, however wide, docks its answer (above). */
+  @media (min-width: 64rem) and (min-height: 30.0625rem), (min-width: 64rem) and (pointer: fine) {
+    .playing main > :has(.run-question > .after) {
+      max-width: none;
+    }
+
+    .run-question:has(> .after) {
+      grid-template-rows: repeat(4, auto) 1fr;
+      grid-template-columns: minmax(0, 1fr) min(26rem, 38%);
+      column-gap: var(--space-6);
+    }
+
+    .run-question > * {
+      grid-column: 1;
+    }
+
+    /* At most the screen's height under the header (6rem): a fact longer than the rest scrolls in it, „Напред“
+       staying at its foot. Its padding gives the shadows and the glows inside it their room. */
+    .run-question > .after {
+      position: sticky;
+      top: var(--space-4);
+      grid-row: 1 / -1;
+      grid-column: 2;
+      align-self: start;
+      max-height: calc(100dvh - 6rem);
+      margin: calc(-1 * var(--space-2));
+      padding: var(--space-2);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .run-question .after .up-next-go {
+      bottom: 0;
+      box-shadow:
+        var(--elev-1),
+        0 var(--space-2) 0 var(--bg),
+        0 -12px 12px -4px var(--bg);
     }
   }
 
