@@ -143,12 +143,12 @@ func (g *Game) AfterWait(ctx context.Context, userID int64) {
 func (g *Game) Settled(ctx context.Context) {
 	g.AftersDone(ctx)
 	settled := make(chan struct{})
-	go func() {
+	safe.Go("settling the counts", func() {
+		defer close(settled)
 		g.hard.settle()
 		g.crowds.settle()
 		g.known.settle()
-		close(settled)
-	}()
+	})
 	select {
 	case <-settled:
 	case <-ctx.Done():
