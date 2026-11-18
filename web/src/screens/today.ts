@@ -312,21 +312,21 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
           );
         return row;
       },
-      // A streak that can be won back today, as it stands, while the day's ten wait (once played, its card is under
-      // the result: the day just played may have done it); else what came of the days just missed, once.
-      t.repair ? (run?.done ? null : () => repairCard(fresh().repair)) : streakNotice(t),
-      // One line at a time: a live game of the player's going on; of others, a friend played their challenge, said
-      // yes to the invite, the duel left went on, or who else took their challenges.
-      playingLine(t.playing) ??
-        playedLine(t.duel) ??
-        acceptedLine(t.accepted) ??
-        leftLine(t.left) ??
-        challengesLine(t.challenges),
       // On a big screen the day leads the page with the topics under it, and the rest waits in a column beside it
       // (app.css); on a phone the two parts are one column, in this order.
       h(
         "div",
         { class: "home-main" },
+        // A streak that can be won back today, as it stands, while the day's ten wait (once played, its card is under
+        // the result: the day just played may have done it); else what came of the days just missed, once.
+        t.repair ? (run?.done ? null : () => repairCard(fresh().repair)) : streakNotice(t),
+        // One line at a time: a live game of the player's going on; of others, a friend played their challenge, said
+        // yes to the invite, the duel left went on, or who else took their challenges.
+        playingLine(t.playing) ??
+          playedLine(t.duel) ??
+          acceptedLine(t.accepted) ??
+          leftLine(t.left) ??
+          challengesLine(t.challenges),
         // Come from the streak's mail to a browser signed out: the way in comes first, open.
         fromMail && !user.peek()?.email ? haveProfile(load, undefined, true) : null,
         // While today's ten wait, how yesterday's ended: the day before closes as the next begins.
@@ -866,9 +866,9 @@ function tomorrowCard(
     h("p", { class: "muted" }, () => {
       const r = repair();
       if (r?.day && r.missed.some((m) => !m.done))
-        return `След ${left()}. Ако върнеш серията днес, утре тя става ${r.days + 2}.`;
+        return `След ${left()} Ако върнеш серията днес, утре тя става ${r.days + 2}.`;
       const n = streak();
-      return `След ${left()}.${n > 0 ? ` Изиграй ги и серията ти става ${n + 1}.` : ""}`;
+      return `След ${left()}${n > 0 ? ` Изиграй ги и серията ти става ${n + 1}.` : ""}`;
     }),
     // The ask by mail asks a guest for the email itself: the line to keep the game steps aside for it.
     keepLine(stake, ask.mailing),
@@ -881,8 +881,8 @@ function untilMidnight(): string {
   const sofia = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Sofia" }));
   const minutes = 24 * 60 - (sofia.getHours() * 60 + sofia.getMinutes());
   const hours = Math.floor(minutes / 60);
-  if (!hours) return `${minutes} мин`;
-  return minutes % 60 ? `${hours} ч и ${minutes % 60} мин` : `${hours} ч`;
+  if (!hours) return `${minutes} мин.`;
+  return minutes % 60 ? `${hours} ч. и ${minutes % 60} мин.` : `${hours} ч.`;
 }
 
 /** Where the reminder's asks are kept, on this device (notifications are a device's): lib/keep.ts, RemindAsks. */

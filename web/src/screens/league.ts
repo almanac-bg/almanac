@@ -189,7 +189,7 @@ export function leagueBoard(v: LeagueView): Child {
     const score = [
       String(r.rights),
       h("small", { class: "sub" }, ` ${r.rights === 1 ? "верен" : "верни"}`),
-      h("small", { class: "sub league-pts" }, `${formatNumber(r.points)} ${r.points === 1 ? "точка" : "точки"}`),
+      h("small", { class: "sub pts-under" }, `${formatNumber(r.points)} ${r.points === 1 ? "точка" : "точки"}`),
     ];
     const row = boardRow(i + 1, r.name, score, {
       me: r.me,

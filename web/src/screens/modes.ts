@@ -114,8 +114,8 @@ function royalNow(): () => string {
       // Past the start, still in the lobby: too few came, and it waits for more.
       if (g.startsAt <= now()) return `Чака още играчи${g.in ? ` · ${g.in}\u00a0вътре` : ""}`;
       const min = Math.max(1, Math.ceil((g.startsAt - now()) / 60_000));
-      // No breaks inside „12 мин“: the card is narrow.
-      return `Започва след ${min}\u00a0мин${g.in ? ` · ${g.in}\u00a0вътре` : ""}`;
+      // No breaks inside „12 мин.“: the card is narrow.
+      return `Започва след ${min}\u00a0мин.${g.in ? ` · ${g.in}\u00a0вътре` : ""}`;
     }
     if (g.phase === "live") return `Играе се · още ${g.in}\u00a0в играта`;
     if (t.coming > 0) return coming(t);

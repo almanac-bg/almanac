@@ -66,7 +66,12 @@ test("a word breaks by its syllables, as Bulgarian hyphenates", () => {
   );
   // Words under seven letters, numbers, Latin and what's around a word stay as they are; a hyphen of its own is kept.
   assert.equal(breaks("„Хамлет“ — Копола, U2, 1885 г."), "„Хамлет“ — Копола, U2, 1885 г.");
-  assert.equal(breaks("Сент-Екзюпери"), "Сент-Ек-зю-пе-ри");
+  assert.equal(breaks("Сент-екзюпери"), "Сент-ек-зю-пе-ри");
+  // A name after the first word goes to the next line whole, unless it's too long for a line of its own; a first word
+  // (after a quote too) breaks as any.
+  assert.equal(breaks("Майкъл Фарадей, Сент-Екзюпери"), "Майкъл Фарадей, Сент-Екзюпери");
+  assert.equal(breaks("Куентин Тарантино"), "Куен-тин Та-ран-ти-но");
+  assert.equal(breaks("„Списъкът на Шиндлер“"), "„Спи-съ-кът на Шиндлер“");
   // The text reads the same without them.
   assert.equal(hyphenate("Независимостта").replaceAll("\u00ad", ""), "Независимостта");
 });

@@ -42,7 +42,7 @@ test("Роял: „Ще дойда“ before the lobby, and Начало's card 
   const royal = page.locator(".mode.tone-gold .mode-about");
   await expect(async () => {
     await page.reload();
-    await expect(royal).toHaveText(/^Започва след \d+\sмин( · \d+\sвътре)?$/, { timeout: 3_000 });
+    await expect(royal).toHaveText(/^Започва след \d+\sмин\.( · \d+\sвътре)?$/, { timeout: 3_000 });
   }).toPass({ timeout: 60_000 });
 });
 
@@ -75,7 +75,7 @@ test("Роял: in from the lobby, its music, live to the fifteenth question, th
   // A game under way (another engine's) ends before the next lobby opens. In by the lobby's „Влез“, not the door of a
   // game under way (which lets one in late), with time before the start for the music's turns.
   await expect(async () => {
-    // „2:05 мин“, or „42 с“ in the last minute.
+    // „2:05 мин.“, or „42 с“ in the last minute.
     const text = (await page.locator(".royal-count").textContent({ timeout: 2_000 })) ?? "";
     const [m = "0", s = "0"] = text.includes(":") ? text.split(":") : ["0", text];
     expect(Number(m) * 60 + Number.parseInt(s, 10)).toBeGreaterThanOrEqual(12);
@@ -85,7 +85,7 @@ test("Роял: in from the lobby, its music, live to the fifteenth question, th
   await expect(page.getByRole("button", { name: "Излез" })).toBeVisible();
   await expect(page.getByText("Вътре си.")).toBeVisible();
   // Never in a Роял before: how it's played, in a line, in the lobby.
-  await expect(page.getByText(/^Грешката не те изважда: след 5-ия/)).toBeVisible();
+  await expect(page.getByText(/^Грешката не те изважда: след 5\u2011ия/)).toBeVisible();
   // No music with its switch off, though in and touched; with it on (as by default), none before a touch, and from
   // the first one, the lobby's quiet bed.
   await page.waitForTimeout(1000);
@@ -150,7 +150,7 @@ test("Роял: one who comes late comes in until the third question", async ({ 
   await expect(early.getByText("Вътре си.")).toBeVisible();
 
   await page.goto("/royal");
-  const door = page.getByText("Роял вече започна. До 3-тия въпрос още можеш да влезеш.");
+  const door = page.getByText("Роял вече започна. До 3\u2011тия въпрос още можеш да влезеш.");
   await expect(door).toBeVisible({ timeout: 60_000 });
   await page.locator(".card", { has: door }).getByRole("button", { name: "Влез" }).click();
   await meetAs(page);

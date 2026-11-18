@@ -291,7 +291,11 @@ export function reviewed(all: Reviewed[], heading: Child): Child {
           "p",
           { class: "reviewed-head" },
           h("span", { class: "kicker" }, `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""}`),
-          h("span", { class: "reviewed-says" }, it.points > 0 ? `${word} · ${formatNumber(it.points)} т.` : word),
+          h(
+            "span",
+            { class: "reviewed-says" },
+            it.points > 0 ? `${word} · ${formatNumber(it.points)} ${it.points === 1 ? "точка" : "точки"}` : word,
+          ),
         ),
         h("h3", { class: "ask" }, it.view.text),
         picture(it.view),
@@ -322,7 +326,12 @@ export function boardRow(
   );
 }
 
-const scoreOf = (s: Score) => [h("small", { class: "sub" }, `${s.rights}/10 · `), formatNumber(s.points)];
+/** A row's score, as its place is decided: the right answers big, the points that break a tie small under them. */
+const scoreOf = (s: Score) => [
+  String(s.rights),
+  h("small", { class: "sub" }, " от 10"),
+  h("small", { class: "sub pts-under" }, `${formatNumber(s.points)} ${s.points === 1 ? "точка" : "точки"}`),
+];
 
 /** A board of results: the best, and the viewer among them. */
 export function board(title: string, scores: Score[], place?: number, mine?: Score): Child {

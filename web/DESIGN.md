@@ -118,7 +118,10 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   спечели Мария: 10 от 10 за 1:12 мин.“; `/ranks#yesterday`), Лига (the player's group this week; `/ranks#league`),
   Рейтинг and Знания (Лига and Рейтинг once the player has met them); of everyone or of friends (not the league: a group is its own).
   Empty, a board says what the game knows: among friends with none yet, „Още нямаш приятели…“ and „Покани с връзка“
-  gold; Знания short of its threshold, „Имаш 20 от 100 отговора. Още 80 и влизаш в класацията.“
+  gold; Знания short of its threshold, „Имаш 20 от 100 отговора. Още 80 и влизаш в класацията.“ A row of the day's
+  board, as of a league's, says what places it: the right answers big („9 от 10“), the points that break a tie small
+  under them (on a phone under 22.5rem, the score under the name, so that the name shows whole). Every row's avatar
+  has a frame's room round it, framed or not, so that the names line up.
 - **Профил** (`/me`): its own four places in a switch at the top (`profileNav()`): Общо (the player: level,
   league (once open and in one), streak, numbers, „Твоите броеве“ from the third day played (`.issues`: a column for
   each score from 0 to 10, how many days had it, today's in gold; „Най-добър: 9 от 10 · Средно: 6,4 · Изиграни: 23“),
@@ -210,7 +213,8 @@ on a phone 160px wide; it holds that way (`e2e/text.spec.ts`):
   `tight` on `<html>` under 17em and `tighter` under 13.5em (at the usual size even a 320px phone's is 18em). Under
   `tight`: topics and the ways to play one to a row, the streak over the level, a board's score under the name, an
   answer gone over with how it went on a line under its words, „Вярно“ over „Невярно“, switches of choices and
-  Профил's places on two lines. Under `tighter`: the bar of places shows its pictures alone (the names stay for screen
+  Профил's places on two lines, the answers as tall as their words (the four in sight), the reserve days at the
+  streak's far end, and a waiting challenge in one row (who, and „Играй“; „Откажи“ on its page in Дуел). Under `tighter`: the bar of places shows its pictures alone (the names stay for screen
   readers). Not a container query: Chromium doesn't always ask a rem one again as the root's size changes.
 
 ## Wide screens
@@ -222,7 +226,7 @@ on a phone 160px wide; it holds that way (`e2e/text.spec.ts`):
   own, Начало's cards', and a group of them (`.actions`: under a result, Дуел's, the year's) side by side where two
   fit, the plain ones after the gold one and as tall as it, a line about the gold one (or what a share said) under it.
   A pager (the year's cards) stacks: „Напред“ keeps its place, „Назад“ under it. Начало's and a result's quiet lines sit
-  at the left with them, not centred.
+  at the left with them, as on a phone, never centred.
 - **64rem (a laptop):** the page is up to 76rem wide with a 32px gutter. Начало is two columns: the day (or its result,
   „Сподели“ beside „Прегледай въпросите“; just played as after a reload), and under it the topics, five to a row;
   beside them, at most 22rem wide, the streak first, level with the day, on a row of its own with its number big (the
@@ -599,8 +603,9 @@ media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds th
   (`aria-disabled`, not `disabled`, once answered), and where the answering part goes (a pad, a list) „Напред“ takes
   it. A run has one live region, there from its start: it says each verdict once in plain words („Не е това. Вярно
   е: Бийтълс.“, „Вярно! +1040 точки.“) and each clue as it comes, never a countdown.
-- **Touch:** no grey flash on a tap; an answer gives under the finger (98%, the accent edge); hover lifts only where
-  a pointer hovers, so on a phone no answer looks chosen after a tap. Small drawn controls (the arrow out of a stuck
+- **Touch:** no grey flash on a tap; an answer gives under the finger (98%, the accent edge); hover, anything it
+  does, only where a pointer hovers (`@media (hover: hover) and (pointer: fine)`: `hover.test.ts`), so on a phone
+  nothing looks chosen or current after a tap. Small drawn controls (the arrow out of a stuck
   head, „Върни последното“, an order's grip) still have 44px to tap.
 
 ## Game feel

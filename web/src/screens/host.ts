@@ -398,7 +398,7 @@ function podium(view: () => RoomView): Child {
           { class: `p${i + 1}` },
           avatar(p.avatar, { size: "l", name: p.name }),
           h("span", { class: "podium-name" }, p.name),
-          h("span", null, `${formatNumber(p.points)} т.`),
+          h("span", null, `${formatNumber(p.points)} ${p.points === 1 ? "точка" : "точки"}`),
           h("span", { class: "place" }, String(p.place ?? i + 1)),
         );
       }),
