@@ -9,6 +9,7 @@ interface Tone {
   end: number;
 }
 const tones: Tone[] = [];
+const panners: { pan: { value: number } }[] = [];
 const param = () => ({
   value: 0,
   setValueAtTime() {},
@@ -33,6 +34,11 @@ class FakeAudio {
   }
   createDynamicsCompressor() {
     return { ...node(), threshold: param(), ratio: param(), attack: param(), release: param() };
+  }
+  createStereoPanner() {
+    const p = { ...node(), pan: param() };
+    panners.push(p);
+    return p;
   }
   createConvolver() {
     return { ...node(), buffer: null };
@@ -107,6 +113,16 @@ test("every sound is in the one key (but the thud and the bells' inner wobble)",
       assert.ok(tones.length > 0, name);
       for (const t of tones) assert.ok(inKey(t.hz) || inKey(t.hz / 3.5), `${name} +${lift}: ${t.hz.toFixed(1)} Hz`);
     }
+});
+
+test("the other side answering is two low plucks, A4 then F♯4, off to the right: no bell, which is for what's earned", () => {
+  panners.length = 0;
+  play("them");
+  assert.equal(tones.length, 2, "two plucks, and no bell's wobble");
+  assert.ok(near(tones[0]?.hz ?? 0, 440) && near(tones[1]?.hz ?? 0, 369.99), "A4, then F♯4");
+  assert.ok(near((tones[1]?.at ?? 0) - (tones[0]?.at ?? 0), 0.06), "60 ms apart");
+  assert.equal(panners.length, 1);
+  assert.equal(panners[0]?.pan.value, 0.3);
 });
 
 test("the bigger sounds take turns: a level waits for the end to finish", () => {

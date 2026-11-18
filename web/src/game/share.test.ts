@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dayShareText, yearShareText } from "./share.ts";
+import { dayShareText, duelShareText, yearShareText } from "./share.ts";
 import type { Mark } from "./types.ts";
 
 const right: Mark = { points: 1000, right: true };
@@ -93,4 +93,11 @@ test("a year is shared as its days and streak, its answers, its strongest topic 
     yearShareText({ year: 2026, days: 1, streak: 1, answers: 1, right: 0, facts: 0 }),
     ["Моята 2026 в АЛМАНАХ", "1 ден игра", "1 отговор, 0% верни", "almanac.bg"].join("\n"),
   );
+});
+
+test("a duel's win is shared as the day is: what it was and the score, no names and no words of invitation", () => {
+  const text = duelShareText(5820, 1900, 6);
+  assert.equal(text, "АЛМАНАХ · Дуел\nПобеда 5820 : 1900 · 6 от 10 верни");
+  assert.match(duelShareText(12_340, 9870, 9), /^АЛМАНАХ · Дуел\nПобеда 12\s340 : 9870 · 9 от 10 верни$/);
+  assert.doesNotMatch(text, /ела|покан|играй|опитай|можеш|а ти/iu);
 });

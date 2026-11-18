@@ -3400,6 +3400,57 @@
     color: var(--link);
   }
 
+  /* A challenge's link opened (challenge.ts, asked): the one who sent it, face first, and the score to beat in the
+     numeral face; a card in the middle of the page, „Приеми“ under it. */
+  .challenge-asked {
+    width: 100%;
+    max-width: 30rem;
+    margin-inline: auto;
+  }
+
+  .challenge-card {
+    justify-items: center;
+    text-align: center;
+  }
+
+  /* „Приеми“ a hand's width on a wide screen (as every page's button), under the card's middle. */
+  .challenge-asked > .btn {
+    justify-self: center;
+  }
+
+  .challenge-who {
+    font-size: 1.5rem;
+    line-height: 1.875rem;
+    text-wrap: balance;
+  }
+
+  .challenge-score {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: center;
+    gap: var(--space-2);
+  }
+
+  .challenge-points {
+    color: var(--gold-display);
+    font-size: 3rem;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  /* One of the player's own challenges on Дуел: its topic's mark where a duel has the other's face. */
+  .sent-row .topic-mark,
+  .sent-row .dot {
+    flex: none;
+    margin: 0;
+  }
+
+  .sent-row .duel-row-end {
+    flex: none;
+    white-space: nowrap;
+  }
+
   /* A friend's challenge, wherever the player is: who, until when, play or say no. */
   .challenge-notice {
     display: flex;
@@ -3487,10 +3538,16 @@
     }
   }
 
+  /* Both sides in one card, face to face: the player's on the left, the other's mirrored on the right; the points
+     plain, the leader's gold. */
   .live-board {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-3);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-4);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    box-shadow: var(--elev-1);
   }
 
   .live-side {
@@ -3498,41 +3555,82 @@
     align-content: start;
     gap: var(--space-2);
     min-width: 0;
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
-    background: var(--surface);
-    box-shadow: var(--elev-1);
   }
 
-  .live-side.me {
-    box-shadow:
-      var(--elev-1),
-      inset 0 0 0 1px var(--line-strong);
+  .live-side.them {
+    justify-items: end;
+    text-align: right;
   }
 
   /* The points under the name, so that a name has the width (a phone's half). */
   .live-who {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2);
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .live-side.them .live-who {
+    flex-direction: row-reverse;
+  }
+
+  .live-who-text {
+    display: grid;
     min-width: 0;
   }
 
   .live-side-name {
-    flex: 1;
     min-width: 0;
     overflow: hidden;
+    font-size: 0.875rem;
     font-weight: 700;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .live-points {
-    flex-basis: 100%;
-    color: var(--gold-display);
-    font: 900 1.75rem / 1 var(--font-numeral);
+    color: var(--text);
+    font: 900 1.375rem / 1.1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
+    transition: color 200ms;
+  }
+
+  .live-side.ahead .live-points {
+    color: var(--gold-display);
+  }
+
+  /* Each side's answers in two rows of five, big enough to read (half a phone's width is too narrow for ten). */
+  .live-side .trail {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(5, 0.875rem);
+    gap: 3px;
+    max-width: none;
+  }
+
+  /* Wider, the ten in one row, bigger. */
+  @media (min-width: 48rem) {
+    .live-side .trail {
+      grid-template-columns: repeat(10, 1.125rem);
+      gap: 4px;
+    }
+  }
+
+  /* A phone, or a laptop's short screen: while the question's time runs, it has the screen; the marks show with the
+     answer. */
+  @media (max-width: 40rem), (max-height: 45rem) {
+    .live-board.question .trail {
+      display: none;
+    }
+  }
+
+  /* A narrow or short phone: a long question in fewer lines, so that the answers are in sight while the clock runs (a
+     live duel's question doesn't scroll to its answers as a run's does). */
+  @media (max-width: 22.5rem), (max-width: 40rem) and (max-height: 42rem) {
+    .live .ask {
+      font-size: 1.5rem;
+      line-height: 1.875rem;
+    }
   }
 
   .live-doing {
@@ -3542,17 +3640,69 @@
     font-size: 0.8125rem;
   }
 
-  /* A live duel's end against a person: „Реванш“, and over it that the other asks for one. */
+  /* The other gone for good, the player ahead (live.ts, claim): take the win now, or play on. */
+  .live-claim {
+    display: grid;
+    gap: var(--space-3);
+    box-shadow:
+      var(--elev-1),
+      inset 0 0 0 1px var(--gold-ink);
+  }
+
+  .live-claim-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: var(--space-2);
+  }
+
+  /* A live duel's end against a person: „Реванш“, and over it that the other asks for one, with the seconds they wait
+     draining in a ring. */
   .rematch {
     display: grid;
     gap: var(--space-2);
   }
 
   .rematch-asks {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
     margin: 0;
     color: var(--rose-ink);
     font-weight: 800;
-    text-align: center;
+  }
+
+  .rematch-clock {
+    position: relative;
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    color: var(--text);
+  }
+
+  .rematch-ring {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .rematch-track,
+  .rematch-arc {
+    fill: none;
+    stroke-width: 4;
+  }
+
+  .rematch-track {
+    stroke: var(--sunken);
+  }
+
+  .rematch-arc {
+    stroke: var(--rose);
+    stroke-dasharray: 100;
   }
 
   .live-theirs {

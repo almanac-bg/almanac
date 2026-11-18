@@ -23,8 +23,9 @@ import type { SoundName } from "./lib/sound.ts";
  * 5 is D6), when it starts (s), how long it rings (s), and how loud (0–1). */
 type Note = [voice: "b" | "p" | "t" | "s" | "w", step: number, at: number, ring: number, loud: number];
 
-/** A sound: its notes, and whether it has the room (the reverb): only the big moments do. */
-type Cue = { notes: Note[]; room?: boolean };
+/** A sound: its notes, whether it has the room (the reverb): only the big moments do; and where it stands, left (−1)
+ * to right (1), if not in the middle. */
+type Cue = { notes: Note[]; room?: boolean; pan?: number };
 
 /** The motif's steps: D5, A5, F♯5, D6. */
 const motif = [0, 3, 2, 5];
@@ -41,12 +42,14 @@ const cues: Record<SoundName, Cue> = {
   // The player's own touch: a pick, a digit, a move.
   tap: { notes: [["p", 5, 0, 0.04, 0.55]] },
   key: { notes: [["p", 7, 0, 0.03, 0.4]] },
-  // Someone else: the other side answering, a player coming into the room. Soft and falling, unlike a tap.
+  // Someone else: the other side answering, a player coming into the room. Two soft low plucks, falling (A4, F♯4),
+  // off to one side: not a bell, which is for what's earned, and never the player's own tap.
   them: {
     notes: [
-      ["b", 3, 0, 0.18, 0.22],
-      ["b", 2, 0.07, 0.25, 0.18],
+      ["p", -2, 0, 0.1, 0.4],
+      ["p", -3, 0.06, 0.14, 0.32],
     ],
+    pan: 0.3,
   },
   // Before a game: a soft bell for each of the last seconds, then the start an octave up over the root.
   count: { notes: [["b", 3, 0, 0.2, 0.55]] },
@@ -250,8 +253,15 @@ function bell(c: BaseAudioContext, f: number, t: number, ring: number, loud: num
 
 /** Plays a sound from `t0` (in the audio's time), `lift` steps of the scale higher. */
 export function sound(c: BaseAudioContext, name: SoundName, lift: number, t0: number): void {
-  const { dry, room, noise: white } = bus(c);
+  const { dry: middle, room, noise: white } = bus(c);
   const cue = cues[name];
+  let dry: AudioNode = middle;
+  if (cue.pan && typeof c.createStereoPanner === "function") {
+    const side = c.createStereoPanner();
+    side.pan.value = cue.pan;
+    side.connect(middle);
+    dry = side;
+  }
   for (const [voice, step, at, ring, loud] of cue.notes) {
     const t = t0 + at;
     const f = hz(step + lift);

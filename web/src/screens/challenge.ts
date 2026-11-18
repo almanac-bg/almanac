@@ -4,7 +4,7 @@
 // „Предизвикай отново“ on a friend's result): ten drawn for the two, played now, the friend told once they are.
 //
 // Its link (/c/<code>) is for whoever opens it to play the same questions as a duel against it, a guest as well as
-// anyone: first who sent it and how they did, and „Започни“ (the count only after that tap); then the game; then the
+// anyone: first who sent it and the score to beat, and „Приеми“ (the count only after that tap); then the game; then the
 // two side by side (screens/outcome.ts), with the way to add the one who sent it as a friend and to send the
 // challenge on. One who has a game of it (played, or sent to them) is at their duel; the one who sent it sees who has
 // taken it. Past its time it says so, and offers the day's ten; so does one drawn for a friend who hasn't played it
@@ -20,7 +20,7 @@ import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { backOut, byTap, go, hold, redirect, release, rename, title } from "../lib/router.ts";
 import { listWords, withName } from "../lib/words.ts";
 import { bulgaria, categories, player, topics, user } from "../state.ts";
-import { back, failure, formatNumber, type Look, topicMark, who } from "../ui.ts";
+import { avatar, back, failure, formatNumber, type Look, topicMark, who } from "../ui.ts";
 import { afterDuel } from "./duel.ts";
 import { nameFirst } from "./name.ts";
 
@@ -28,6 +28,8 @@ interface Challenge {
   code: string;
   by: { name: string; tag: string };
   look?: Look;
+  /** The sender's game: its points (the score to beat) and right answers. */
+  points: number;
   rights: number;
   total: number;
   topic?: string;
@@ -156,21 +158,29 @@ function asked(c: Challenge, screen: ReturnType<typeof slot>, here: () => boolea
       ),
     );
   };
+  // The score to beat is in points, as the duel is won; with none (a game all wrong), the questions are the challenge.
+  const lead = c.points
+    ? `Надмини ${formatNumber(c.points)} ${c.points === 1 ? "точка" : "точки"} на същите десет въпроса. Около три минути.`
+    : "Изиграй същите десет въпроса и ще видите кой знае повече. Около три минути.";
   return h(
     "section",
-    { class: "screen" },
+    { class: "screen challenge-asked" },
     h(
       "div",
-      { class: "intro" },
-      h("p", { class: "kicker" }, "Предизвикателство"),
-      h("h1", null, `${c.by.name} те предизвиква`),
+      { class: "card hero challenge-card" },
+      h("p", { class: "kicker" }, topic ? `Предизвикателство · ${topic}` : "Предизвикателство"),
+      avatar(c.look?.avatar, { size: "l", level: c.look?.level, name: c.by.name }),
+      h("h1", { class: "challenge-who" }, `${c.by.name} те предизвиква`),
+      c.look?.title ? h("span", { class: `who-title t-${c.look.titleTier ?? "common"}` }, c.look.title) : null,
       h(
         "p",
-        { class: "lead" },
-        `${c.by.name} позна ${c.rights} от ${c.total}${topic ? ` по „${topic}“` : ""}. Изиграй същите десет въпроса и ще видите кой знае повече. Около три минути.`,
+        { class: "challenge-score" },
+        h("b", { class: "challenge-points num" }, formatNumber(c.points)),
+        h("span", { class: "num-word" }, `${c.points === 1 ? "точка" : "точки"} · ${c.rights} от ${c.total} верни`),
       ),
+      h("p", { class: "lead" }, lead),
     ),
-    h("button", { class: "btn primary big", type: "button", onclick: start }, "Започни"),
+    h("button", { class: "btn primary big", type: "button", onclick: start }, "Приеми"),
     failed ? h("p", { class: "bad", role: "alert" }, failed) : null,
   );
 }

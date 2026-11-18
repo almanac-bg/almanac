@@ -46,6 +46,14 @@ export function dayShareText(
     .join("\n");
 }
 
+/** A duel's win as it's shared, in the day's way: „АЛМАНАХ · Дуел“, „Победа 5820 : 1900 · 6 от 10 верни“ (the
+ * points, as the duel was won), and the player's own link (their invite: screens/invite.ts) beside it. No names, the
+ * other's least of all, and no words of invitation. */
+export function duelShareText(mine: number, theirs: number, rights: number, total = 10): string {
+  const n = (x: number) => new Intl.NumberFormat("bg", { useGrouping: x >= 10000 }).format(x);
+  return `АЛМАНАХ · Дуел\nПобеда ${n(mine)} : ${n(theirs)} · ${rights} от ${total} верни`;
+}
+
 /** A count with its noun, one or many, in Bulgarian digits: „1 ден“, „12 дни“, „1 234 отговора“. */
 export const count = (n: number, one: string, many: string) =>
   `${new Intl.NumberFormat("bg", { useGrouping: n >= 10000 }).format(n)} ${n === 1 ? one : many}`;

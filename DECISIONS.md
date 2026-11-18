@@ -47,7 +47,9 @@ packages' doc comments; this file holds only what must not drift.
   room's game counts only when someone else played it too (owner, 2026-11-18, review O4: the volume and speed goals
   sent players into a quarter of an hour of other games, away from the day).
 - **Gamification only from what the game really counts:** no invented currencies, no random boxes, never real money.
-- **Sharing:** the day's result ends with the player's own link; the text itself has no invitation words.
+- **Sharing:** what's shared ends with the player's own link, and the text itself has no invitation words nor anyone
+  else's name: the day's result, and a win (a duel against a person, Роял's first three) in the same style (owner,
+  2026-11-18, review M10).
 - **A tenth of players get no reminders, to tell what reminders do.** 10 % of players, drawn once by a hash of their
   id (`play/experiment.go`), are held out of the day's notification and the streak's mail; what they would have had
   is kept as if sent, by the same rules and hours, and `/admin` compares the two groups with intervals, counted by

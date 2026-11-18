@@ -1360,6 +1360,35 @@ func TestLiveDuels(t *testing.T) {
 	}
 }
 
+// The same points: the quicker wins only by a second or more over the game (TieBand); closer, it's a draw.
+func TestTieBand(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo := w.user(), w.user()
+	duel := func(slower time.Duration) DuelView {
+		t.Helper()
+		l, _ := w.g.StartLive(ctx, ana, bo)
+		// Both as quick, answer for answer (the same points); Ana slower overall by `slower` (her line's).
+		w.play(ana, l.Runs[0], repeat(w.right, Length)...)
+		if _, err := w.db.Write.Exec(`UPDATE runs SET ms = ms + ? WHERE id = ?`, slower.Milliseconds(), l.Runs[0]); err != nil {
+			t.Fatal(err)
+		}
+		w.play(bo, l.Runs[1], repeat(w.right, Length)...)
+		d, err := w.g.DuelOf(ctx, bo, l.DuelID)
+		if err != nil || d.You.Points != d.Opponent.Points {
+			t.Fatalf("not the same points: %+v (%v)", d, err)
+		}
+		w.wait(24 * time.Hour) // each duel rated
+		return d
+	}
+	if d := duel(900 * time.Millisecond); d.State != "draw" {
+		t.Fatalf("0,9 s apart: %+v", d)
+	}
+	if d := duel(1500 * time.Millisecond); d.State != "won" {
+		t.Fatalf("1,5 s apart: %+v", d)
+	}
+}
+
 // One duel's result: how each question went for each side, the question that decided it, where the rating went, and
 // the record between the two.
 func TestDuelOf(t *testing.T) {
@@ -1407,6 +1436,10 @@ func TestDuelOf(t *testing.T) {
 	if d, _ = w.g.DuelOf(ctx, gal, id); d.State != "wait" || len(d.You.Marks) != Length || d.Opponent.Marks != nil ||
 		d.Record != nil || d.Decided != 0 {
 		t.Fatalf("a challenge waiting: %+v", d)
+	}
+	// It's a duel between the two, in Gal's duels: not in her list of challenges sent by a link.
+	if sent, _ := w.g.SentOf(ctx, gal); len(sent) != 0 {
+		t.Fatalf("a challenge drawn for a friend, among those sent: %+v", sent)
 	}
 
 	// Against a recording: its marks, and no record against a recording's player.

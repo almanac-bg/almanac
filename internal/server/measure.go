@@ -106,6 +106,7 @@ var clientTallies = map[string]bool{
 	"share:day": true, "share:challenge": true, "pushask:shown": true, "pushask:yes": true, "pushask:no": true,
 	"mailask:shown": true, "mailask:yes": true, "mailask:no": true,
 	"repair:offered": true,
+	"share:duel":     true, // a duel's win shared (screens/outcome.ts)
 }
 
 func init() {

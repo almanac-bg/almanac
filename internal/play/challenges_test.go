@@ -50,6 +50,12 @@ func TestChallenges(t *testing.T) {
 	if err != nil || v.By.Name == "" || v.Rights != Length/2 || v.Total != Length || v.Over || v.Own {
 		t.Fatalf("as anyone sees it: %+v (%v)", v, err)
 	}
+	// The score to beat is in points, as the duel is won.
+	var points int
+	_ = w.db.Read.QueryRow(`SELECT points FROM runs WHERE id = ?`, s.ID).Scan(&points)
+	if v.Points != points || points == 0 {
+		t.Fatalf("the score to beat: %d, the game's %d", v.Points, points)
+	}
 	ratingOf := func(id int64) (r int) {
 		_ = w.db.Read.QueryRow(`SELECT rating FROM users WHERE id = ?`, id).Scan(&r)
 		return r
@@ -108,6 +114,15 @@ func TestChallenges(t *testing.T) {
 	if n, _ := w.g.ChallengeNewsOf(ctx, ana); n != nil {
 		t.Fatalf("told twice: %+v", n)
 	}
+	// Told, it's still in her list of challenges, with how it went: one won, one lost. Not in Bo's: he took it.
+	sent, err := w.g.SentOf(ctx, ana)
+	if err != nil || len(sent) != 1 || sent[0].Code != code || sent[0].Takers != 2 || sent[0].Won != 1 ||
+		sent[0].Lost != 1 || sent[0].Drawn != 0 || sent[0].Over || sent[0].Rights != Length/2 {
+		t.Fatalf("Ana's challenges: %+v (%v)", sent, err)
+	}
+	if sent, _ := w.g.SentOf(ctx, bo); len(sent) != 0 {
+		t.Fatalf("Bo's challenges: %+v", sent)
+	}
 	// Recordings' news is of strangers' duels against a recording: not of these.
 	if news, _ := w.g.DuelsOf(ctx, ana); len(news) != 0 {
 		t.Fatalf("the takers' duels in Ana's list: %+v", news)
@@ -117,6 +132,9 @@ func TestChallenges(t *testing.T) {
 	w.wait(ChallengeFor + time.Hour)
 	if v, _ := w.g.ChallengeOf(ctx, code, di); !v.Over {
 		t.Fatal("not over")
+	}
+	if sent, _ := w.g.SentOf(ctx, ana); len(sent) != 1 || !sent[0].Over {
+		t.Fatalf("Ana's challenge, over: %+v", sent)
 	}
 	if _, _, err := w.g.TakeChallenge(ctx, di, code); !errors.Is(err, ErrChallengeOver) {
 		t.Fatalf("taken past its time: %v", err)
@@ -130,6 +148,14 @@ func TestChallenges(t *testing.T) {
 	}
 	if _, _, err := w.g.TakeChallenge(ctx, di, code); err != nil {
 		t.Fatalf("sent again: %v", err)
+	}
+	if sent, _ := w.g.SentOf(ctx, ana); len(sent) != 1 || sent[0].Over || sent[0].Takers != 3 {
+		t.Fatalf("Ana's challenge, sent again: %+v", sent)
+	}
+	// Long over, it leaves her list.
+	w.wait(ChallengeFor + SentFor + time.Hour)
+	if sent, _ := w.g.SentOf(ctx, ana); len(sent) != 0 {
+		t.Fatalf("Ana's challenge, long over: %+v", sent)
 	}
 	if _, err := w.g.ChallengeOf(ctx, "nothing1", 0); !errors.Is(err, ErrNoChallenge) {
 		t.Fatalf("no such: %v", err)

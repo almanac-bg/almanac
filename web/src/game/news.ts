@@ -87,7 +87,8 @@ interface MovedGoal {
 
 /** What a game earned, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends).
  * The one big thing among it, if any, is brought forward in a sheet once the result has landed (feel.ts), with its
- * sound then; everything else plays its sound as it comes. The day's ten bring their `streak`: whether it reached one
+ * sound then; else the loudest of the rest sounds then (a goal, an achievement), never before the result's own sound
+ * (a duel's verdict, the end of a game). The day's ten bring their `streak`: whether it reached one
  * of its round numbers (`round`, the big thing then), and its moment in the chips (`grown`), which the sheet waits
  * for, so that it never covers the streak rolling on. Told `late` (on Начало, of a game whose result was never on
  * screen), it's said without a sheet or a sound, under a line that says whose it is (`late.title`), if any. */
@@ -109,8 +110,11 @@ export function news(
           const kit = feelKit();
           const top = kit && bigOne(n, (await streak?.round) ?? 0);
           if (!kit || !top) {
+            // After the result's own moment, whose sound (a duel's verdict, the day's end) comes first.
             const sound = loudest(n);
-            if (sound) play(sound);
+            if (!sound) return;
+            await landed(run);
+            if (!gone) play(sound);
             return;
           }
           await landed(run);

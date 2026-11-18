@@ -47,15 +47,17 @@ test("friends: an invite link, then a challenge between the two", async ({ brows
   await expect(a.locator(".question-head .versus")).toHaveText(/^Дуел (с|със) \S/);
   await playRun(a);
   await expect(a.getByRole("heading", { name: "Твоите десет са изиграни" })).toBeVisible({ timeout: 10_000 });
-  // Until when, in one sentence that ends once („… 13:39 ч. Ще ти кажем …“).
-  await expect(a.locator(".duel-line")).toContainText(/\sч\. Ще ти кажем/);
+  // Sent already, in the game, and until when, in one sentence that ends once („… 13:39 ч. Ще ти кажем …“).
+  await expect(a.locator(".duel-line")).toContainText(/^Изпратено на .+ в играта\. Има време до .+\sч\. Ще ти кажем/);
   // Her side, face to face with Bo's still to come: her score and her ten marks; his row empty, and no result yet.
   await expect(a.locator(".duel-face").first().locator(".duel-points")).toHaveText(/^\d[\d\s]*$/);
   await expect(a.locator(".duel-face").last()).toContainText("Тепърва ще играе");
   await expect(a.locator(".duel-marks .duel-pip:is(.right, .partial, .wrong)")).toHaveCount(10);
   await expect(a.locator(".duel-meant")).toHaveCount(0);
-  // The gold way on is to tell Bo: the challenge's link (it brings him to his turn).
-  await expect(a.getByRole("button", { name: /^Прати на \S/ })).toHaveClass(/primary/);
+  // Nothing's left to do: the gold way is back to the duels, and the challenge's link (it brings him to his turn) is
+  // there to send too, plain.
+  await expect(a.getByRole("link", { name: "Към дуелите" })).toHaveClass(/primary/);
+  await expect(a.getByRole("button", { name: "Прати и връзката" })).not.toHaveClass(/primary/);
   // Until Bo has played it, its link is his alone: anyone else who opens it is told to wait, so that nobody learns
   // the answers of a rated duel first (not even Bo in another window).
   const sent = (await (await a.request.get("/api/duels")).json()).duels as { challenge?: string }[];

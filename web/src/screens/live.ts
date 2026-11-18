@@ -1,6 +1,7 @@
 // A live duel: waiting for someone (or, after 10 seconds, a recording of a real game), the two face to face, then
-// each question for both at the same moment — the other's answer comes in as they give it, and shows with yours —
-// and the result. The server sends the duel as this player sees it after every change; the line, should it drop, is
+// each question for both at the same moment — the other's answer comes in as they give it, and shows with yours (the
+// other gone for good while the player leads, the win is theirs to take at once) — and the result, its rematch kept in
+// sight. The server sends the duel as this player sees it after every change; the line, should it drop, is
 // opened again (lib/stream.ts), and comes back to the same duel. Each question is answered as in every game
 // (game/answering.ts).
 //
@@ -57,6 +58,7 @@ let {
   untracked,
   upNext,
   verdict,
+  when,
 } = {} as Kit;
 
 interface Side {
@@ -77,6 +79,8 @@ interface Side {
   answered: boolean;
   /** Asks for a rematch, the duel over: the other has a moment to ask too. */
   rematch?: boolean;
+  /** How long the player still has to ask too. */
+  rematchMs?: number;
   tookMs?: number;
   /** The other's answer, as shown, once both answers show. */
   given?: Answer;
@@ -181,6 +185,7 @@ export function liveDuel(kit: Kit) {
     untracked,
     upNext,
     verdict,
+    when,
   } = kit);
   title("Дуел");
   // Opened by a tap, the search starts at once; come to otherwise (a reload, back or forward, a link), only to go back
@@ -220,6 +225,8 @@ function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
   const view = signal<LiveView | null>(null);
   const wait = signal<Wait | null>(null);
   const trouble = signal<Trouble>("");
+  // The other gone and the player ahead, they chose to play on rather than take the win: not asked again (claim).
+  const playOn = signal(false);
 
   // Over, the result stays: a stream that ends then (the duel forgotten) or drops doesn't take it away.
   const over = () => view.peek()?.phase === "end";
@@ -332,14 +339,15 @@ function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
       if (k === "waiting") return waiting(wait as () => Wait, rematch);
       const v = untracked(view) as LiveView;
       const live = view as () => LiveView;
+      const offer = () => claim(live, playOn, () => playOn.set(true));
       switch (v.phase) {
         case "intro":
           return intro(v);
         case "question":
           scrollTo(0, 0); // each question opens at the top, wherever the answer before it was scrolled to
-          return question(live, v);
+          return question(live, v, offer);
         case "reveal":
-          return reveal(live, v);
+          return reveal(live, v, offer);
         case "end":
           return end(live, v, again);
         case "off":
@@ -370,7 +378,7 @@ function waiting(wait: () => Wait, rematch?: Rematch): Child {
           : wait().held
             ? "Играта се обновява. Дуелът започва веднага след това."
             : left() > 0
-              ? "Ако никой не дойде до края на броенето, ще играеш срещу запис на истинска игра."
+              ? "Търсим някого близо до твоя рейтинг. Ако никой не дойде до края на броенето, играеш срещу запис на истинска игра."
               : "Намираме ти запис на истинска игра…",
       ),
     ),
@@ -439,28 +447,79 @@ function intro(v: LiveView): Child {
   );
 }
 
-/** Both sides at a glance: points, how each answer went, and how the other is doing on this question. */
+/** Both sides at a glance, face to face in one card (the player's on the left, the other's mirrored on the right):
+ * points, the leader's in gold, how each answer went (two rows of five, big enough to read; on a phone only once an
+ * answer shows, so that the question has the screen while its time runs), and how the other is doing on this one. */
 function scoreboard(view: () => LiveView, total: number): Child {
+  const ahead = (mine: boolean) => {
+    const { you, them } = view();
+    return mine ? you.points > them.points : them.points > you.points;
+  };
   const side = (s: () => Side, mine: boolean) =>
     h(
       "div",
-      { class: mine ? "live-side me" : "live-side" },
+      { class: () => ["live-side", mine ? "me" : "them", ahead(mine) && "ahead"].filter(Boolean).join(" ") },
       h(
         "div",
         { class: "live-who" },
         () => avatar(s().avatar, { size: "s", name: s().name }),
-        h("span", { class: "live-side-name" }, () => (mine ? "Ти" : s().name)),
-        h("b", { class: "live-points" }, () => formatNumber(s().points)),
+        h(
+          "span",
+          { class: "live-who-text" },
+          h("span", { class: "live-side-name" }, () => (mine ? "Ти" : s().name)),
+          h("b", { class: "live-points" }, () => formatNumber(s().points)),
+        ),
       ),
       () => trail(s().trail, total, view().phase === "question" ? view().n : -1),
       mine ? null : () => h("p", { class: "live-doing", role: "status" }, doing(view(), s())),
     );
   return h(
     "section",
-    { class: "live-board", "aria-label": "Резултат" },
+    { class: () => `live-board ${view().phase}`, "aria-label": "Резултат" },
     side(() => view().you, true),
     side(() => view().them, false),
   );
+}
+
+/** The other gone for good while the player leads (live.go, Claim): the win is theirs to take now, the questions left
+ * unanswered by both (and so no XP for them), or to play on for it. Told once it's so, until a choice is made; gone
+ * again if the other comes back, or the lead goes. */
+function claim(view: () => LiveView, dismissed: () => boolean, dismiss: () => void): Child {
+  const busy = signal(false);
+  const error = signal("");
+  const take = async () => {
+    busy.set(true);
+    error.set("");
+    try {
+      await api("POST", `/api/duels/live/${view().id}/claim`);
+      // The duel's end comes with its next view, at once.
+    } catch {
+      error.set("Не стана: дуелът продължава.");
+      busy.set(false);
+    }
+  };
+  return () => {
+    const v = view();
+    const can = !dismissed() && v.them.gone && v.you.points > v.them.points;
+    if (!can) return null;
+    return h(
+      "section",
+      { class: "card live-claim" },
+      h(
+        "p",
+        { class: "live-claim-line", role: "status" },
+        h("strong", null, `${v.them.name} излезе.`),
+        " Победата е твоя.",
+      ),
+      h(
+        "div",
+        { class: "live-claim-actions" },
+        h("button", { class: "btn primary", type: "button", disabled: busy, onclick: take }, "Вземи победата"),
+        h("button", { class: "btn", type: "button", disabled: busy, onclick: dismiss }, "Изиграй докрай"),
+      ),
+      () => (error() ? h("p", { class: "bad", role: "alert" }, error()) : null),
+    );
+  };
 }
 
 /** What the other is doing on the question now: thinking, answered (and how fast), gone for a moment, or gone (the
@@ -473,7 +532,7 @@ function doing(v: LiveView, s: Side): string {
   return "Мисли…";
 }
 
-function question(view: () => LiveView, first: LiveView): Child {
+function question(view: () => LiveView, first: LiveView, offer: () => Child): Child {
   const q = first.question;
   if (!q) return null;
   if (first.n === 0) play("go"); // the game starts
@@ -492,12 +551,14 @@ function question(view: () => LiveView, first: LiveView): Child {
     const v = view();
     if (v.n === first.n && v.question && v.phase === "question") ans.follow(v.question.view, v.question.leftMs);
   });
-  // The other answering is news: a sound of its own, not a tap the player might take for theirs.
+  // The other answering is news while the player still thinks: a sound of its own (feel.ts: them), not a tap the
+  // player might take for theirs. Once they've answered, the other's answer brings both answers at once: it would
+  // sound over the player's own verdict.
   let heard = first.them.answered;
   effect(() => {
     if (view().them.answered && !heard) {
       heard = true;
-      play("them");
+      if (!untracked(ans.taken)) play("them");
     }
   });
   return h(
@@ -505,6 +566,7 @@ function question(view: () => LiveView, first: LiveView): Child {
     { class: "question" },
     questionHead(first.n, first.total, topicName(q.category)),
     scoreboard(view, first.total),
+    offer(),
     timer(q.leftMs, q.limitMs, ans.left, ans.stopped),
     ans.heading,
     picture(q.view, true),
@@ -521,7 +583,7 @@ function question(view: () => LiveView, first: LiveView): Child {
   );
 }
 
-function reveal(view: () => LiveView, first: LiveView): Child {
+function reveal(view: () => LiveView, first: LiveView, offer: () => Child): Child {
   const q = first.question;
   const r = q?.reveal;
   if (!q || !r) return null;
@@ -541,6 +603,7 @@ function reveal(view: () => LiveView, first: LiveView): Child {
     { class: "question" },
     questionHead(first.n, first.total, topicName(q.category)),
     scoreboard(view, first.total),
+    offer(),
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view, true),
     answered(q.view, r.answer, q.given ?? null),
@@ -583,29 +646,51 @@ function end(view: () => LiveView, v: LiveView, again: (rematch?: Rematch) => vo
   const kept = signal<DuelView | null>(null);
   const another = (main: boolean) =>
     h("button", { class: main ? "btn primary big" : "btn", type: "button", onclick: () => again() }, "Още един дуел");
-  // Against a person: „Реванш“, gold (the other sees it asked, and has a moment to ask too), and another duel beside
-  // it; against a recording, another duel.
+  // Against a person: „Реванш“, gold and docked at the screen's foot (the other sees it asked, and has a moment to ask
+  // too), and another duel beside it; against a recording, another duel. The other asking shows over it, with the
+  // seconds they wait, and a ping. Once the other has left the result (and doesn't ask: one who asks waits on another
+  // screen), a rematch can't come about: another duel is the gold way then. A line that drops a moment isn't leaving.
+  const there = signal(true);
+  let gone = 0;
+  effect(() => {
+    const them = view().them;
+    clearTimeout(gone);
+    if (them.online || them.rematch) there.set(true);
+    else gone = window.setTimeout(() => there.set(false), 2000);
+  });
+  onCleanup(() => clearTimeout(gone));
+  const asks = computed(() => !!view().them.rematch);
+  effect(() => {
+    if (asks()) play("ping");
+  });
+  const rematchStep = h(
+    "div",
+    { class: "rematch" },
+    when(asks, () => {
+      const them = view().them;
+      return h(
+        "p",
+        { class: "rematch-asks", role: "status" },
+        rematchClock(them.rematchMs ?? 0),
+        h("span", null, `${them.name} иска реванш`),
+      );
+    }),
+    h(
+      "button",
+      {
+        class: "btn primary big",
+        type: "button",
+        onclick: () => again({ id: v.id, name: v.them.name }),
+      },
+      () => (asks() ? "Да, реванш" : "Реванш"),
+    ),
+  );
   const steps = v.recorded
     ? another(true)
     : {
-        main: h(
-          "div",
-          { class: "rematch" },
-          () =>
-            view().them.rematch
-              ? h("p", { class: "rematch-asks", role: "status" }, `${view().them.name} иска реванш.`)
-              : null,
-          h(
-            "button",
-            {
-              class: "btn primary big",
-              type: "button",
-              onclick: () => again({ id: v.id, name: v.them.name }),
-            },
-            "Реванш",
-          ),
-        ),
-        also: [another(false)],
+        main: () => (there() ? rematchStep : another(true)),
+        also: [() => (there() ? another(false) : null)],
+        dock: true,
       };
   const error = signal("");
   api<{ duel: DuelView }>("GET", `/api/duels/${v.id}`).then(
@@ -622,6 +707,38 @@ function end(view: () => LiveView, v: LiveView, again: (rematch?: Rematch) => vo
     if (d) return duelResult(d, steps, d.runId ? news(d.runId) : null);
     return error() ? problem("Дуелът свърши", error(), () => again()) : h("p", { class: "muted" }, "…");
   });
+}
+
+/** How long the other still waits for the player's yes to a rematch (live.RematchFor in all): the seconds, in a ring
+ * that drains. */
+function rematchClock(ms: number): Child {
+  const all = 15_000;
+  const left = signal(Math.max(0, Math.ceil(ms / 1000)));
+  const tick = setInterval(() => left.update((n) => Math.max(0, n - 1)), 1000);
+  onCleanup(() => clearInterval(tick));
+  const ns = "http://www.w3.org/2000/svg";
+  const ring = document.createElementNS(ns, "svg");
+  ring.setAttribute("viewBox", "0 0 40 40");
+  ring.setAttribute("class", "rematch-ring");
+  ring.setAttribute("aria-hidden", "true");
+  const circle = (cls: string) => {
+    const c = document.createElementNS(ns, "circle");
+    for (const [k, val] of Object.entries({ class: cls, cx: "20", cy: "20", r: "17", pathLength: "100" }))
+      c.setAttribute(k, val);
+    ring.append(c);
+    return c;
+  };
+  circle("rematch-track");
+  circle("rematch-arc").animate(
+    [{ strokeDashoffset: String(100 * (1 - Math.min(ms, all) / all)) }, { strokeDashoffset: "100" }],
+    { duration: Math.max(0, ms), easing: "linear", fill: "forwards" },
+  );
+  return h(
+    "span",
+    { class: "rematch-clock", role: "timer", "aria-label": () => `${left()} ${left() === 1 ? "секунда" : "секунди"}` },
+    ring,
+    h("b", { class: "num" }, () => String(left())),
+  );
 }
 
 /** Nobody to play, not even a recording (a game that has just begun): the friends to challenge, each a tap from a duel

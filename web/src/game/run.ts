@@ -685,13 +685,8 @@ function question(
       const focus = document.activeElement;
       if (!focus || focus === document.body || !focus.isConnected || (focus as HTMLElement).offsetParent === null)
         after.querySelector<HTMLElement>(".up-next-go")?.focus({ preventScroll: true });
-      due = res.state.done
-        ? () => {
-            // A run's result sounds its own end as it lands (results.ts); a duel's, here.
-            if (versus) play("end");
-            reload();
-          }
-        : next;
+      // A run's result sounds its own end as it lands (results.ts), a duel's its verdict (screens/outcome.ts).
+      due = res.state.done ? reload : next;
     });
   };
 
