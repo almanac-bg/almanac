@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
@@ -195,8 +196,8 @@ func (s *Server) roomJoin(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 	}
-	name := ""
-	if in.Name != "" {
+	name := strings.Join(strings.Fields(in.Name), " ")
+	if name != "" && name != u.Name { // the player's own name is theirs already, checked or drawn
 		if name, err = account.NormalName(in.Name); err == nil && account.Reserved(name) && !u.Admin {
 			err = account.ErrNameReserved
 		}

@@ -775,15 +775,37 @@ func TestRudeNames(t *testing.T) {
 	}
 	for _, good := range []string{"Курт", "Куртев", "Курбан", "Хлебарка", "Ебру", "Шибил", "Пушкин", "Сукарова",
 		"Педя", "Педро", "Fukuoka", "Пишков", "Гъзаров", "Ivan Kurtev", "Задников", "Мечо Пух", "Лиса 1234",
-		"Петър 4", "Мамка", "Ana 6"} {
+		"Петър 4", "Мамка", "Ana 6",
+		// Clubs, names and words that sound like a rude one, or have one where a word ends and the next starts.
+		"ФК Левски", "FC Barcelona", "Газ", "Gaz", "Фуксия", "Иван Фукс", "Huy", "Nguyen Huy", "Huynh", "Hu Yang",
+		"Ebi", "Ebbe", "Hui", "Шибанов", "Иван Шибанов", "Cur", "Kunt", "Ebanks", "Кура", "Ебру Гюндеш"} {
 		if Rude(good) {
 			t.Errorf("%q is taken for rude", good)
 		}
+		if _, err := NormalName(good); err != nil {
+			t.Errorf("%q as a name: %v", good, err)
+		}
 	}
-	// No name a player is given is rude.
+	for _, tag := range []string{"fc_levski", "gaz", "huy", "ebbe", "kunt"} {
+		if _, err := a.Retag(ctx, u.ID, tag); err != nil {
+			t.Errorf("@%s: %v", tag, err)
+		}
+	}
+}
+
+// No name or tag a player is drawn is rude, whatever its number (draw): a number on its own isn't letters written
+// with digits („Лисица 381“ isn't „еби“).
+func TestDrawnNamesArentRude(t *testing.T) {
 	for _, an := range Animals {
-		if Rude(an.Name) || Rude(an.Tag) {
-			t.Errorf("the drawn %q (@%s) is rude", an.Name, an.Tag)
+		for n := 100; n <= 999; n++ {
+			if name := fmt.Sprintf("%s %d", an.Name, n); Rude(name) {
+				t.Errorf("the drawn name %q is rude", name)
+			}
+		}
+		for n := 1000; n <= 9999; n++ {
+			if tag := fmt.Sprintf("%s%d", an.Tag, n); Rude(tag) {
+				t.Errorf("the drawn tag @%s is rude", tag)
+			}
 		}
 	}
 }

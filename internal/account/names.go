@@ -19,8 +19,9 @@ import (
 // take such a name; and can put any player's name and tag back to the drawn ones (ResetName).
 //
 // Nor is a name or tag rude (Rude): the swear words and slurs a board or a room's big screen would show, in Cyrillic,
-// in Latin letters and in the digits chat writes some letters with („pi4ka“), heard by how they sound, so that
-// „kurva“ and „курва“ are one. The list is a floor, not a wall: what gets past it, a room's host asks to change
+// in Latin letters and in the digits chat writes some letters with („pi4ka“; a number on its own is only a number),
+// heard by how they sound, so that „kurva“ and „курва“ are one, or seen by how they look, where the sound is also an
+// ordinary name's („Газ“ isn't „гъз“). The list is a floor, not a wall: what gets past it, a room's host asks to change
 // (room.Room.AskName), and whoever keeps the game resets (ResetName).
 
 var (
@@ -282,62 +283,104 @@ func foldMap(m map[string]string) map[rune]string {
 	return out
 }
 
-// The rude words, by how each is matched against a name heard (the sound skeleton of each of its words, and of all of
-// them run together, for „п у т к а“): anywhere, at a word's start, or as a whole word. A short root that sits inside
-// ordinary names is matched whole or at a start only („кур“ is in „Куртев“, „еба“ in „Хлебарка“, „шиб“ in „Шибил“,
-// „fuk“ in „Fukuoka“); anywhere is for roots no name has.
+// The rude words, by how each is matched against a name: anywhere in it, at a word's start, or as a whole word; and
+// heard (the sound skeleton: „kurva“ and „курва“ are one) or seen (the look skeleton, for a root whose sound is an
+// ordinary name's in the other script: „Газ“ and „Gaz“ sound as „гъз“, „Huy“ as „хуй“, „Kunt“ as „cunt“, „Ebbe“ as
+// „ебе“). A short root that sits inside ordinary names is matched whole or at a start only („кур“ is in „Куртев“,
+// „еба“ in „Хлебарка“, „шиб“ in „Шибил“, „fuk“ in „Fukuoka“); anywhere is for roots no name has. Each word of a name
+// is matched, and all its words run together as well: for anywhere roots heard, so that „Мамка ти“ is caught; for the
+// rest only when every word is one letter („П у т к а“), since across words a short root is in many names („Hu Yang“).
 var (
 	rudeAnywhere = []string{
-		"путк", "пизд", "курв", "хуй", "бляд", "шибан", "педераст", "мамкати", "мамкаму", "духач", "хитлер", "нацист",
-		"порн", "asshole", "pussy",
+		"путк", "пизд", "курв", "бляд", "педераст", "мамкати", "мамкаму", "духач", "хитлер", "нацист", "порн", "asshole",
+		"pussy",
 	}
 	rudeStart = []string{
-		"ебан", "ебал", "ебат", "ебах", "ебеш", "ебем", "ебач", "ебло", "педал", "лайна", "лайно", "fucke", "fucki",
-		"fucks", "motherfuck",
+		"шибан", "ебал", "ебат", "ебах", "ебеш", "ебем", "ебач", "ебло", "педал", "лайна", "лайно", "fucke", "fucki",
+		"motherfuck",
 	}
 	rudeWhole = []string{
-		"кур", "гъз", "сука", "пичка", "пишка", "задник", "еба", "ебе", "еби", "фак", "fuck", "fck", "hui", "huj", "shit",
-		"cunt", "bitch", "whore", "slut", "nigger", "nigga", "nazi",
+		"сука", "пичка", "пишка", "задник", "фак", "fuck", "shit", "bitch", "whore", "slut", "nigger", "nigga", "nazi",
 	}
+	seenAnywhere = []string{"хуй"}
+	seenStart    = []string{"ебан", "fucks"}
+	seenWhole    = []string{"кур", "гъз", "еба", "ебе", "еби", "cunt", "huj"}
+	// ordinary are names that start with a rude root, heard: a word of a name that is one of them is no rude word.
+	ordinary = []string{"шибанов", "шибанова"}
 )
 
-// The rude words as heard (their sound skeletons), made once.
-var rudeAnywhereHeard, rudeStartHeard, rudeWholeHeard = heardAll(rudeAnywhere), heardAll(rudeStart), heardAll(rudeWhole)
+// The rude words as heard or seen (their skeletons), made once.
+var (
+	rudeAnywhereHeard, rudeStartHeard, rudeWholeHeard = skeletonAll(rudeAnywhere, 1), skeletonAll(rudeStart, 1),
+		skeletonAll(rudeWhole, 1)
+	rudeAnywhereSeen, rudeStartSeen, rudeWholeSeen = skeletonAll(seenAnywhere, 0), skeletonAll(seenStart, 0),
+		skeletonAll(seenWhole, 0)
+	ordinaryHeard = skeletonAll(ordinary, 1)
+)
 
-func heardAll(words []string) []string {
+// skeletonAll is each word's skeleton: 0 as it looks, 1 as it sounds.
+func skeletonAll(words []string, kind int) []string {
 	out := make([]string, 0, len(words))
 	for _, w := range words {
-		out = append(out, skeletons(w)[1])
+		out = append(out, skeletons(w)[kind])
 	}
 	return out
 }
 
-// chat writes some Bulgarian letters with the digits that look like them („pi4ka“, „6iban“): a name is heard both as
+// chat writes some Bulgarian letters with the digits that look like them („pi4ka“, „6iban“): a word is heard both as
 // it's written and so.
 var chat = strings.NewReplacer("4", "ч", "6", "ш")
 
-// Rude is whether a name or tag swears or insults: one of the rude words (rudeAnywhere, rudeStart, rudeWhole) heard in
-// it.
+// Rude is whether a name or tag swears or insults: one of the rude words heard or seen in it. A number on its own is
+// a number, not letters written with digits: „Лисица 381“ doesn't say „еби“, nor „Котка 617“ „shit“ (digits stand for
+// letters only inside a word with letters, „pi4ka“).
 func Rude(name string) bool {
-	for _, form := range []string{name, chat.Replace(name)} {
-		words := strings.FieldsFunc(form, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
-		all := skeletons(strings.Join(words, ""))[1]
-		for _, root := range rudeAnywhereHeard {
-			if strings.Contains(all, root) {
+	words := strings.FieldsFunc(name, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) })
+	spaced := true // every word one letter: „П у т к а“
+	for _, w := range words {
+		spaced = spaced && utf8.RuneCountInString(w) == 1
+	}
+	for _, chatty := range []bool{false, true} {
+		var heardAll, seenAll strings.Builder
+		for _, w := range words {
+			if !strings.ContainsFunc(w, unicode.IsLetter) {
+				heardAll.WriteString(w)
+				seenAll.WriteString(w)
+				continue
+			}
+			if chatty {
+				w = chat.Replace(w)
+			}
+			sk := skeletons(w)
+			heardAll.WriteString(sk[1])
+			seenAll.WriteString(sk[0])
+			if slices.Contains(ordinaryHeard, sk[1]) {
+				continue
+			}
+			if rudeWord(sk) {
 				return true
 			}
 		}
-		for _, w := range words {
-			heard := skeletons(w)[1]
-			if slices.Contains(rudeWholeHeard, heard) {
-				return true
-			}
-			for _, root := range rudeStartHeard {
-				if strings.HasPrefix(heard, root) {
-					return true
-				}
-			}
+		all := [2]string{single(seenAll.String()), single(heardAll.String())}
+		if spaced && rudeWord(all) || containsAny(all[1], rudeAnywhereHeard) {
+			return true
 		}
 	}
 	return false
+}
+
+// rudeWord is whether a word, by its skeletons, is or holds a rude word.
+func rudeWord(sk [2]string) bool {
+	seen, heard := sk[0], sk[1]
+	return containsAny(heard, rudeAnywhereHeard) || containsAny(seen, rudeAnywhereSeen) ||
+		slices.Contains(rudeWholeHeard, heard) || slices.Contains(rudeWholeSeen, seen) ||
+		hasAnyPrefix(heard, rudeStartHeard) || hasAnyPrefix(seen, rudeStartSeen)
+}
+
+func containsAny(s string, roots []string) bool {
+	return slices.ContainsFunc(roots, func(root string) bool { return strings.Contains(s, root) })
+}
+
+func hasAnyPrefix(s string, roots []string) bool {
+	return slices.ContainsFunc(roots, func(root string) bool { return strings.HasPrefix(s, root) })
 }
