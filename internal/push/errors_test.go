@@ -9,14 +9,17 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
-// is says what kind of failure err is: "ok", "gone", "refused", "busy" (with its wait) or "ours".
+// is says what kind of failure err is: "ok", "gone", "refused", "keys" (the game's refused: busy, with ErrKeys),
+// "busy" (with its wait) or "ours".
 func is(err error) string {
 	var refused *Refused
 	var busy *Busy
@@ -27,6 +30,8 @@ func is(err error) string {
 		return "gone"
 	case errors.As(err, &refused):
 		return "refused"
+	case errors.As(err, &busy) && errors.Is(err, ErrKeys):
+		return "keys"
 	case errors.As(err, &busy):
 		return "busy " + busy.After.String()
 	}
@@ -110,9 +115,16 @@ func TestPhoneAnswers(t *testing.T) {
 	_, p8 := appleKey(t)
 	a, _ := NewApple(p8, "KEY1234567", "TEAM123456", "bg.almanac.app")
 	var collapse string
+	var expired []string // the tokens "ee" came with: the first Apple calls expired
 	apns := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		collapse = r.Header.Get("apns-collapse-id")
 		switch strings.TrimPrefix(r.URL.Path, "/3/device/")[:2] {
+		case "ee":
+			expired = append(expired, r.Header.Get("Authorization"))
+			if len(expired) == 1 {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"reason":"ExpiredProviderToken"}`))
+			}
 		case "aa":
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(`{"reason":"DeviceTokenNotForTopic"}`))
@@ -126,7 +138,8 @@ func TestPhoneAnswers(t *testing.T) {
 	}))
 	defer apns.Close()
 	a.Client, a.Hosts = apns.Client(), []string{apns.URL}
-	for token, want := range map[string]string{"aa": "refused", "bb": "busy 0s", "cc": "ours", "dd": "ok"} {
+	// The game's token refused: made again at once, and if that's refused too, busy for the game's keys.
+	for token, want := range map[string]string{"aa": "refused", "bb": "busy 0s", "cc": "keys", "dd": "ok", "ee": "ok"} {
 		if got := is(a.Send(t.Context(), strings.Repeat(token, 32), Message{Title: "x", Tag: "n7"})); got != want {
 			t.Errorf("apns %s: %s, want %s", token, got, want)
 		}
@@ -134,13 +147,17 @@ func TestPhoneAnswers(t *testing.T) {
 	if collapse != "n7" {
 		t.Fatalf("the collapse id: %q", collapse)
 	}
+	if len(expired) != 2 || expired[0] == expired[1] {
+		t.Fatalf("a token Apple called expired, tried again: %d tries", len(expired))
+	}
 
 	k, _ := rsa.GenerateKey(rand.Reader, 2048)
 	der, _ := x509.MarshalPKCS8PrivateKey(k)
 	var android map[string]any
+	var asked atomic.Int64
 	fcm := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/token" {
-			_, _ = w.Write([]byte(`{"access_token":"ya29.fake","expires_in":3599}`))
+			_, _ = fmt.Fprintf(w, `{"access_token":"ya29.fake%d","expires_in":3599}`, asked.Add(1))
 			return
 		}
 		var body struct {
@@ -158,6 +175,15 @@ func TestPhoneAnswers(t *testing.T) {
 		case "send":
 			w.WriteHeader(http.StatusForbidden)
 			_, _ = w.Write([]byte(`{"error":{"code":403,"status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.firebase.fcm.v1.FcmError","errorCode":"SENDER_ID_MISMATCH"}]}}`))
+		case "deny": // the project may not send
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"error":{"code":403,"status":"PERMISSION_DENIED"}}`))
+		case "auth": // no access token taken
+			w.WriteHeader(http.StatusUnauthorized)
+		case "stal": // only the first access token refused
+			if r.Header.Get("Authorization") == "Bearer ya29.fake1" {
+				w.WriteHeader(http.StatusUnauthorized)
+			}
 		case "busy":
 			w.Header().Set("Retry-After", "30")
 			w.WriteHeader(http.StatusServiceUnavailable)
@@ -172,14 +198,78 @@ func TestPhoneAnswers(t *testing.T) {
 		t.Fatal(err)
 	}
 	g.Client, g.Host = fcm.Client(), fcm.URL
-	for token, want := range map[string]string{
-		"tokn": "gone", "body": "ours", "send": "refused", "busy": "busy 30s", "good": "ok",
+	for _, c := range []struct{ token, want string }{
+		{"stal", "ok"}, {"tokn", "gone"}, {"body", "ours"}, {"send", "refused"}, {"busy", "busy 30s"}, {"good", "ok"},
+		{"deny", "keys"}, {"auth", "keys"},
 	} {
-		if got := is(g.Send(t.Context(), token+"-of-an-android-phone", Message{Title: "x", Tag: "n8"})); got != want {
-			t.Errorf("fcm %s: %s, want %s", token, got, want)
+		if got := is(g.Send(t.Context(), c.token+"-of-an-android-phone", Message{Title: "x", Tag: "n8"})); got != c.want {
+			t.Errorf("fcm %s: %s, want %s", c.token, got, c.want)
 		}
 	}
 	if android["collapse_key"] != "n8" || android["notification"].(map[string]any)["tag"] != "n8" {
 		t.Fatalf("the tag: %v", android)
+	}
+}
+
+// Google's access token is asked for by one send at a time, the others waiting for it, each no longer than its own
+// time allows; Google not answering is busy, its refusing the game's claim is the game's keys refused.
+func TestGoogleToken(t *testing.T) {
+	k, _ := rsa.GenerateKey(rand.Reader, 2048)
+	der, _ := x509.MarshalPKCS8PrivateKey(k)
+	var asked atomic.Int64
+	answer := make(chan int, 1) // the status the token's next asking gets
+	release := make(chan struct{})
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/token" {
+			return // sent
+		}
+		asked.Add(1)
+		<-release
+		if status := <-answer; status != http.StatusOK {
+			w.WriteHeader(status)
+			return
+		}
+		_, _ = w.Write([]byte(`{"access_token":"ya29.fake","expires_in":3599}`))
+	}))
+	defer srv.Close()
+	creds, _ := json.Marshal(map[string]string{"project_id": "p", "client_email": "fcm@p.iam.gserviceaccount.com",
+		"private_key": string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})), "token_uri": srv.URL + "/token"})
+	g, err := NewGoogle(creds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g.Client, g.Host = srv.Client(), srv.URL
+	send := func(ctx context.Context) string {
+		return is(g.Send(ctx, "good-of-an-android-phone", Message{Title: "x"}))
+	}
+
+	// Asked for while Google takes its time: a send whose time runs out goes busy, the rest wait for the one asking.
+	answer <- http.StatusOK
+	results := make(chan string, 20)
+	for range 20 {
+		go func() { results <- send(t.Context()) }()
+	}
+	short, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	if got := send(short); !strings.HasPrefix(got, "busy") {
+		t.Fatalf("a send whose time ran out waiting: %s", got)
+	}
+	close(release)
+	for range 20 {
+		if got := <-results; got != "ok" {
+			t.Fatalf("waiting for the token: %s", got)
+		}
+	}
+	if asked.Load() != 1 {
+		t.Fatalf("asked %d times", asked.Load())
+	}
+
+	// Refused, or not given now.
+	for status, want := range map[int]string{http.StatusBadRequest: "keys", http.StatusServiceUnavailable: "busy 0s"} {
+		g.forget("ya29.fake")
+		answer <- status
+		if got := send(t.Context()); got != want {
+			t.Errorf("the token %d: %s, want %s", status, got, want)
+		}
 	}
 }

@@ -67,9 +67,16 @@ func (g *Game) Count(ctx context.Context) error {
 	now, b := g.Now(), g.Bank()
 	errs := make([]error, 3)
 	var wg sync.WaitGroup
-	wg.Go(func() { _, errs[0] = g.crowds.refresh(ctx, now, b, g.countCrowds) })
-	wg.Go(func() { _, errs[1] = g.hard.refresh(ctx, now, b, g.countHardness) })
-	wg.Go(func() { _, errs[2] = g.known.refresh(ctx, now, b, g.countKnowledge) })
+	// A panic in a count is the count's (errCountBroke: snapshot.go); one around it is stopped here.
+	wg.Go(func() {
+		safe.Do("counting: crowds", func() { _, errs[0] = g.crowds.refresh(ctx, now, b, g.countCrowds) })
+	})
+	wg.Go(func() {
+		safe.Do("counting: hardness", func() { _, errs[1] = g.hard.refresh(ctx, now, b, g.countHardness) })
+	})
+	wg.Go(func() {
+		safe.Do("counting: knowledge", func() { _, errs[2] = g.known.refresh(ctx, now, b, g.countKnowledge) })
+	})
 	wg.Wait()
 	return errors.Join(errs...)
 }

@@ -3,7 +3,8 @@
 // A panic in a request ends that request alone (the server's middleware recovers it); one on any other goroutine ends
 // the whole process, and every live duel, room and Роял with it. So every goroutine the game starts runs through
 // this package: a timer's callback (AfterFunc), a ticker's round (Every), a loop that lives as long as the server
-// (Loop), and work set off on the side (Go, Do). A panic there is stopped (Recover), logged with its stack (once a
+// (Loop), and work set off on the side (Go, Do). A test holds it so (TestGoroutinesGuarded: a `go` or a WaitGroup's Go
+// elsewhere calls into this package, or is named there with why it needn't). A panic there is stopped (Recover), logged with its stack (once a
 // minute for the same work, so a panic that comes back every round doesn't flood the log), and told as a problem
 // (Tell: the server mails it to whoever runs the game). What becomes of the work then is said where it runs:
 //   - a loop starts again, after a pause that grows while it keeps failing (Loop);

@@ -1113,6 +1113,7 @@ func pushWorld(t *testing.T) (*Server, *game, *fakePushService, func(p *player, 
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.game.Now = daytime()
 	ts.Config.Handler = s.Handler()
 	ts.Start()
 	t.Cleanup(ts.Close)

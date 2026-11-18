@@ -22,17 +22,24 @@ import (
 	"github.com/almanac-bg/almanac/internal/store/storetest"
 )
 
-// fakeAPNs takes pushes for iPhones and counts them by token; the tokens in gone are ones Apple no longer knows.
+// fakeAPNs takes pushes for iPhones and counts them by token; the tokens in gone are ones Apple no longer knows; while
+// keys is set, it refuses the game's signed token.
 type fakeAPNs struct {
 	mu   sync.Mutex
 	hits map[string]int
 	gone map[string]bool
+	keys bool
 }
 
 func (f *fakeAPNs) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimPrefix(r.URL.Path, "/3/device/")
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.keys {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"reason":"InvalidProviderToken"}`))
+		return
+	}
 	if f.gone[token] {
 		w.WriteHeader(http.StatusGone)
 		_, _ = w.Write([]byte(`{"reason":"Unregistered"}`))
@@ -70,6 +77,7 @@ func TestPhoneNotifications(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.game.Now = daytime()
 	ts.Config.Handler = s.Handler()
 	ts.Start()
 	t.Cleanup(ts.Close)
@@ -132,6 +140,34 @@ func TestPhoneNotifications(t *testing.T) {
 	_ = db.Read.QueryRow(`SELECT count(*) FROM phones WHERE token = ?`, boPhone).Scan(&left)
 	if left != 0 {
 		t.Fatal("a gone phone kept")
+	}
+
+	// Apple refuses the game's own keys: nothing of the phone, so it isn't counted against; the notification is
+	// tried again, and whoever runs the game is told.
+	fake.mu.Lock()
+	fake.keys = true
+	fake.mu.Unlock()
+	var anaID int64
+	_ = db.Read.QueryRow(`SELECT user_id FROM phones WHERE token = ?`, anaPhone).Scan(&anaID)
+	s.notifySent(t.Context(), pushAsked, push.Message{Title: "Роял", Body: "Започва.", URL: "/royal"}, anaID)
+	var queued, tries, fails int
+	_ = db.Read.QueryRow(`SELECT count(*), coalesce(max(tries), 0) FROM push_queue`).Scan(&queued, &tries)
+	_ = db.Read.QueryRow(`SELECT fails FROM phones WHERE token = ?`, anaPhone).Scan(&fails)
+	news, _ := s.problems.take()
+	told := false
+	for kind := range news {
+		told = told || strings.Contains(kind, "apns refused the game's keys")
+	}
+	if queued != 1 || tries != 1 || fails != 0 || !told {
+		t.Fatalf("keys refused: %d queued (tries %d), the phone's fails %d, told %v", queued, tries, fails, told)
+	}
+	fake.mu.Lock()
+	fake.keys = false
+	fake.mu.Unlock()
+	s.game.Now = func() time.Time { return daytime()().Add(pushBackoff[0] + time.Second) }
+	s.sendQueued(t.Context())
+	if _ = db.Read.QueryRow(`SELECT count(*) FROM push_queue`).Scan(&queued); queued != 0 || fake.count(anaPhone) != 1 {
+		t.Fatalf("keys mended: %d queued, ana's phone %d", queued, fake.count(anaPhone))
 	}
 
 	// Ana turns notifications off on her phone: it's forgotten; Bo can't forget Ana's.

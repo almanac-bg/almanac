@@ -49,6 +49,15 @@ func (s *Server) callSoonSent(ctx context.Context, start time.Time, away, in []i
 	return n
 }
 
+// daytime is a clock that runs from noon today in Bulgaria: nights are quiet (pushes.go), and a test that sends
+// pushes mustn't depend on the hour it's run at.
+func daytime() func() time.Time {
+	start := time.Now()
+	n := start.In(bulgaria())
+	noon := time.Date(n.Year(), n.Month(), n.Day(), 12, 0, 0, 0, bulgaria())
+	return func() time.Time { return noon.Add(time.Since(start)) }
+}
+
 // devicesOf are the endpoints of a player's browsers, as kept.
 func devicesOf(g *game, userID int64) []string {
 	g.t.Helper()
@@ -193,7 +202,7 @@ func TestBusyTriedAgain(t *testing.T) {
 	s, g, fake, subscribe := pushWorld(t)
 	ana, anaID := g.guest()
 	subscribe(ana, "/ana")
-	clock := time.Now()
+	clock := s.game.Now()
 	s.game.Now = func() time.Time { return clock }
 	m := push.Message{Title: "Т", Body: "Т", URL: "/"}
 	fake.answering("/ana", http.StatusServiceUnavailable)
@@ -235,7 +244,7 @@ func TestRefusingDevicesForgotten(t *testing.T) {
 	s, g, fake, subscribe := pushWorld(t)
 	ana, anaID := g.guest()
 	subscribe(ana, "/ana")
-	clock := time.Now()
+	clock := s.game.Now()
 	s.game.Now = func() time.Time { return clock }
 	fake.answering("/ana", http.StatusForbidden)
 	m := push.Message{Title: "Т", Body: "Т", URL: "/"}
@@ -261,7 +270,7 @@ func TestQueueSurvivesRestart(t *testing.T) {
 	bo, boID := g.guest()
 	subscribe(ana, "/ana")
 	subscribe(bo, "/bo")
-	clock := time.Now()
+	clock := s.game.Now()
 	s.game.Now = func() time.Time { return clock }
 	s.notify(t.Context(), pushAsked, push.Message{Title: "Т", Body: "Т", URL: "/"}, anaID, boID)
 
@@ -329,11 +338,13 @@ func TestLeagueNewsQueued(t *testing.T) {
 	}
 }
 
-// slowPush is a push service that takes its time (latency), hangs on /hang/…, refuses /junk/…, and keeps how many
-// it took, at most at once, and when the last.
+// slowPush is a push service that takes its time (latency), hangs on /hang/… (then busy, or taking it if hangOK),
+// refuses /junk/…, and keeps how many it took (/hang/… aside), at most at once, and when the last.
 type slowPush struct {
 	latency, hang  time.Duration
+	hangOK         bool
 	inflight, peak atomic.Int64
+	answered       atomic.Int64 // /hang/… answered
 	sent           atomic.Int64
 	mu             sync.Mutex
 	last           time.Time
@@ -347,6 +358,11 @@ func (f *slowPush) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.HasPrefix(r.URL.Path, "/hang"):
 		time.Sleep(f.hang)
+		f.answered.Add(1)
+		if f.hangOK {
+			w.WriteHeader(http.StatusCreated)
+			return
+		}
 		w.WriteHeader(http.StatusServiceUnavailable)
 	case strings.HasPrefix(r.URL.Path, "/junk"):
 		time.Sleep(f.latency)
@@ -361,28 +377,50 @@ func (f *slowPush) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// crowd is a server whose n players are all due the evening's reminder, each with a browser at a slow push service:
-// the first hangs ones hang, and one more player has junk subscriptions the service refuses (as if kept before the
-// limits).
-func crowd(t testing.TB, n, hangs, junk int, latency, hang time.Duration) (*Server, *slowPush) {
+// crowding is a crowd of players due the evening's reminder: n of them, each with a browser at a push service that
+// takes latency to answer; the first hangs of them at a service that takes hang (its own when apart, else the
+// same); and one more player with junk subscriptions the service refuses (as if kept before the limits).
+type crowding struct {
+	n, hangs, junk int
+	latency, hang  time.Duration
+	apart, hangOK  bool
+}
+
+// crowd is a server with that crowd, and the services: the one everyone's at, and the one the hanging are at (the
+// same, unless apart).
+func crowd(t testing.TB, c crowding) (*Server, *slowPush, *slowPush) {
 	t.Helper()
-	fake := &slowPush{latency: latency, hang: hang}
-	ps := httptest.NewUnstartedServer(fake)
-	ps.EnableHTTP2 = true
-	ps.StartTLS()
-	t.Cleanup(ps.Close)
+	service := func() (*slowPush, *httptest.Server) {
+		fake := &slowPush{latency: c.latency, hang: c.hang, hangOK: c.hangOK}
+		ps := httptest.NewUnstartedServer(fake)
+		ps.EnableHTTP2 = true
+		ps.StartTLS()
+		t.Cleanup(ps.Close)
+		return fake, ps
+	}
+	fake, ps := service()
+	slow, sps := fake, ps
+	if c.apart {
+		slow, sps = service()
+	}
 	pub, priv, _ := push.NewKeys()
 	keys, _ := push.ParseKeys(pub, priv)
+	// One client for both, as in production; the test servers' certificates both trusted.
 	client := ps.Client()
+	if c.apart {
+		pool := client.Transport.(*http.Transport).TLSClientConfig.RootCAs
+		pool.AddCert(sps.Certificate())
+	}
 	client.Timeout = 15 * time.Second // as in production
 	db := storetest.Open(t)
 	out := mail.NewOutbox(db, &inbox{}, "a@almanac.bg")
 	s, err := New(Config{PublicURL: "http://localhost", Push: &push.Sender{Keys: keys, Subject: "mailto:a@b.bg", Client: client,
-		Services: []string{ps.Listener.Addr().String()}}},
+		Services: []string{ps.Listener.Addr().String(), sps.Listener.Addr().String()}}},
 		Deps{DB: db, Accounts: &account.Accounts{DB: db, Outbox: out, Secret: []byte("x")}, Outbox: out, Bank: banktest.Sample(t)})
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.game.Now = daytime()
 	browser, _ := ecdh.P256().GenerateKey(rand.Reader)
 	p256dh := base64.RawURLEncoding.EncodeToString(browser.PublicKey().Bytes())
 	auth := base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef"))
@@ -390,13 +428,13 @@ func crowd(t testing.TB, n, hangs, junk int, latency, hang time.Duration) (*Serv
 	if err != nil {
 		t.Fatal(err)
 	}
-	add := func(path string, user int64) {
+	add := func(endpoint string, user int64) {
 		if _, err := tx.Exec(`INSERT INTO push_subs (endpoint, user_id, p256dh, auth, created_at) VALUES (?, ?, ?, ?, 0)`,
-			ps.URL+path, user, p256dh, auth); err != nil {
+			endpoint, user, p256dh, auth); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for i := range n + 1 {
+	for i := range c.n + 1 {
 		res, err := tx.Exec(`INSERT INTO users (name, tag, created_at, seen_at) VALUES ('Играч', ?, 0, 0)`, fmt.Sprint("p", i))
 		if err != nil {
 			t.Fatal(err)
@@ -404,25 +442,25 @@ func crowd(t testing.TB, n, hangs, junk int, latency, hang time.Duration) (*Serv
 		id, _ := res.LastInsertId()
 		switch {
 		case i == 0:
-			for j := range junk {
-				add(fmt.Sprintf("/junk/%d", j), id)
+			for j := range c.junk {
+				add(ps.URL+fmt.Sprintf("/junk/%d", j), id)
 			}
-		case i <= hangs:
-			add(fmt.Sprintf("/hang/%d", i), id)
+		case i <= c.hangs:
+			add(sps.URL+fmt.Sprintf("/hang/%d", i), id)
 		default:
-			add(fmt.Sprintf("/ok/%d", i), id)
+			add(ps.URL+fmt.Sprintf("/ok/%d", i), id)
 		}
 	}
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	return s, fake
+	return s, fake, slow
 }
 
 // The evening's reminders go out many at once: a slow service, a few devices that hang and a player with many junk
 // subscriptions hold up nobody else.
 func TestRemindersGoOutTogether(t *testing.T) {
-	s, fake := crowd(t, 200, 3, 1000, 50*time.Millisecond, 2*time.Second)
+	s, fake, _ := crowd(t, crowding{n: 200, hangs: 3, junk: 1000, latency: 50 * time.Millisecond, hang: 2 * time.Second})
 	evening := time.Date(2030, 1, 1, 19, 5, 0, 0, bulgaria())
 	begin := time.Now()
 	if n := s.remindSent(t.Context(), evening); n != 201 {
@@ -439,7 +477,9 @@ func TestRemindersGoOutTogether(t *testing.T) {
 	}
 }
 
-// TestScaleRemind measures how long the evening's reminders take (SCALE=players, LATENCY=50ms, HANGS=, JUNK=).
+// TestScaleRemind measures how long the evening's reminders take (SCALE=players, LATENCY=50ms, HANGS=, HANG=3s,
+// JUNK=; APART=1: the hanging ones at a push service of their own, one that's slow or down; HANGOK=1: that answers,
+// slowly, rather than failing).
 func TestScaleRemind(t *testing.T) {
 	n, _ := strconv.Atoi(os.Getenv("SCALE"))
 	if n == 0 {
@@ -447,8 +487,13 @@ func TestScaleRemind(t *testing.T) {
 	}
 	latency, _ := time.ParseDuration(os.Getenv("LATENCY"))
 	hangs, _ := strconv.Atoi(os.Getenv("HANGS"))
+	hang, err := time.ParseDuration(os.Getenv("HANG"))
+	if err != nil {
+		hang = 3 * time.Second
+	}
 	junk, _ := strconv.Atoi(os.Getenv("JUNK"))
-	s, fake := crowd(t, n, hangs, junk, latency, 3*time.Second)
+	apart, hangOK := os.Getenv("APART") != "", os.Getenv("HANGOK") != ""
+	s, fake, _ := crowd(t, crowding{n: n, hangs: hangs, junk: junk, latency: latency, hang: hang, apart: apart, hangOK: hangOK})
 	evening := time.Date(2030, 1, 1, 19, 5, 0, 0, bulgaria())
 	begin := time.Now()
 	queued := s.remind(t.Context(), evening)
@@ -458,7 +503,155 @@ func TestScaleRemind(t *testing.T) {
 	fake.mu.Lock()
 	last := fake.last.Sub(begin)
 	fake.mu.Unlock()
-	t.Logf("players %d latency %v hangs %d junk %d: reminded %d (claimed and queued in %v), delivered %d, all done in %v, last honest push at %v, peak in flight %d",
-		n, latency, hangs, junk, queued, claimed.Round(time.Millisecond), fake.sent.Load(), took.Round(time.Millisecond),
+	t.Logf("players %d latency %v hangs %d (%v, apart %v, answering %v) junk %d: reminded %d (claimed and queued in %v), delivered %d, all done in %v, last honest push at %v, peak in flight %d",
+		n, latency, hangs, hang, apart, hangOK, junk, queued, claimed.Round(time.Millisecond), fake.sent.Load(), took.Round(time.Millisecond),
 		last.Round(time.Millisecond), fake.peak.Load())
+}
+
+// One push service that's slow, or down, holds up no other's: its lane takes its share of the queue (pushlanes.go).
+func TestSlowServiceHoldsUpNoOne(t *testing.T) {
+	// The slow ones first in the queue, answering after 3 s each. Before lanes they held every place, 64 at a time:
+	// the rest began only once 128 of them had answered (9 s at least). Now the rest go at once, whatever the
+	// machine's pace: by the time the last of them is sent, the slow service has answered its first 96 at most.
+	const hang = 3 * time.Second
+	s, fake, slow := crowd(t, crowding{n: 292, hangs: 192, latency: 20 * time.Millisecond, hang: hang, apart: true})
+	if n := s.remind(t.Context(), time.Date(2030, 1, 1, 19, 5, 0, 0, bulgaria())); n != 292 {
+		t.Fatalf("reminded %d", n)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		s.Push(ctx)
+		close(done)
+	}()
+	for deadline := time.Now().Add(10 * hang); fake.sent.Load() < 100 && time.Now().Before(deadline); {
+		time.Sleep(10 * time.Millisecond)
+	}
+	answered := slow.answered.Load()
+	cancel()
+	<-done
+	if fake.sent.Load() != 100 || answered >= 2*laneSends || slow.peak.Load() > laneSends {
+		t.Fatalf("%d sent, after the slow service answered %d; it had %d at once", fake.sent.Load(), answered,
+			slow.peak.Load())
+	}
+}
+
+// Nights are quiet: a notification due from 22:00 to 08:00 waits for the morning, or, of no use by then, goes
+// nowhere; one the player asked for goes when they asked; a day's reminder found due late waits for tomorrow.
+func TestQuietNights(t *testing.T) {
+	s, g, fake, subscribe := pushWorld(t)
+	ana, anaID := g.guest()
+	subscribe(ana, "/ana")
+	at := func(day, hour, minute int) time.Time { return time.Date(2030, 1, day, hour, minute, 0, 0, bulgaria()) }
+	clock := at(7, 23, 30)
+	s.game.Now = func() time.Time { return clock }
+	m := push.Message{Title: "Т", Body: "Т", URL: "/"}
+
+	s.notifySent(t.Context(), pushFriends, m, anaID) // a friend's challenge at 23:30
+	s.notifySent(t.Context(), pushAsked, m, anaID)   // the evening Ana said she'd come to
+	var next int64
+	_ = g.db.Read.QueryRow(`SELECT next_at FROM push_queue`).Scan(&next)
+	if fake.count("/ana") != 1 || next != at(8, 8, 0).UnixMilli() {
+		t.Fatalf("at night: %d sent, the rest at %v", fake.count("/ana"), time.UnixMilli(next).In(bulgaria()))
+	}
+	clock = at(8, 7, 59)
+	s.sendQueued(t.Context())
+	if fake.count("/ana") != 1 {
+		t.Fatal("sent before the morning")
+	}
+	clock = at(8, 8, 0)
+	s.sendQueued(t.Context())
+	if fake.count("/ana") != 2 {
+		t.Fatal("not sent in the morning")
+	}
+
+	// Of no use by the morning: not queued.
+	clock = at(8, 23, 0)
+	err := s.db.Tx(t.Context(), func(tx *sql.Tx) error {
+		n, err := s.queue(t.Context(), tx, notice{kind: pushFriends, m: m, until: at(9, 1, 0)}, anaID)
+		if n != 0 {
+			t.Fatalf("queued %d of no use by the morning", n)
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Queued in the evening, sent in the night (a backlog, a try again): the morning, or, for a day's reminder, never.
+	clock = at(9, 21, 59)
+	err = s.db.Tx(t.Context(), func(tx *sql.Tx) error {
+		if _, err := s.queue(t.Context(), tx, notice{kind: pushFriends, m: m}, anaID); err != nil {
+			return err
+		}
+		_, err := s.queue(t.Context(), tx, notice{kind: pushDay, m: m, day: "2030-01-09", until: at(10, 0, 0)}, anaID)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock = at(9, 22, 1)
+	s.sendQueued(t.Context())
+	var left, tries int
+	_ = g.db.Read.QueryRow(`SELECT count(*), max(next_at), max(tries) FROM push_queue`).Scan(&left, &next, &tries)
+	if fake.count("/ana") != 2 || left != 1 || next != at(10, 8, 0).UnixMilli() || tries != 0 {
+		t.Fatalf("in the night: %d sent, %d left, next at %v, tries %d", fake.count("/ana"), left,
+			time.UnixMilli(next).In(bulgaria()), tries)
+	}
+
+	// The day's reminder of one whose hour came late (just subscribed, the server back after a while): not at
+	// 22:10, but at 21:59.
+	_, _ = g.db.Write.Exec(`DELETE FROM push_queue`)
+	clock = at(11, 22, 10)
+	if n := s.remind(t.Context(), clock); n != 0 {
+		t.Fatalf("reminded at 22:10: %d", n)
+	}
+	clock = at(11, 21, 59)
+	if n := s.remindSent(t.Context(), clock); n != 1 || fake.count("/ana") != 3 {
+		t.Fatalf("reminded at 21:59: %d", n)
+	}
+}
+
+// The night's end, by the clocks of Bulgaria, on the nights they change too.
+func TestMorning(t *testing.T) {
+	for at, want := range map[string]string{
+		"2030-01-07 21:59": "",
+		"2030-01-07 22:00": "2030-01-08 08:00",
+		"2030-01-08 00:00": "2030-01-08 08:00",
+		"2030-01-08 07:59": "2030-01-08 08:00",
+		"2030-01-08 08:00": "",
+		"2030-03-30 23:00": "2030-03-31 08:00", // the clocks go forward that night
+		"2030-10-26 23:00": "2030-10-27 08:00", // and back
+	} {
+		t0, _ := time.ParseInLocation("2006-01-02 15:04", at, bulgaria())
+		got := ""
+		if m := morning(t0); !m.IsZero() {
+			got = m.In(bulgaria()).Format("2006-01-02 15:04")
+		}
+		if got != want {
+			t.Errorf("%s: %q, want %q", at, got, want)
+		}
+	}
+}
+
+// A row of use for only a few minutes more (Роял's call) is taken before older ones that can wait.
+func TestUrgentFirst(t *testing.T) {
+	s, g, _, subscribe := pushWorld(t)
+	ana, anaID := g.guest()
+	subscribe(ana, "/ana")
+	now := s.game.Now()
+	m := push.Message{Title: "Т", Body: "Т", URL: "/"}
+	err := s.db.Tx(t.Context(), func(tx *sql.Tx) error {
+		if _, err := s.queue(t.Context(), tx, notice{kind: pushFriends, m: m}, anaID); err != nil {
+			return err
+		}
+		_, err := s.queue(t.Context(), tx, notice{kind: pushAsked, m: m, until: now.Add(time.Minute)}, anaID)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.claimPushes(t.Context(), 1); err != nil || len(got) != 1 || got[0].kind != pushAsked {
+		t.Fatalf("taken first: %+v %v", got, err)
+	}
 }

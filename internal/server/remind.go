@@ -14,10 +14,11 @@ import (
 )
 
 // The day's reminder: once a day at most, to a player with notifications on who hasn't finished the day's questions,
-// at their own hour (RemindMinute): half an hour before they usually finish the day. Each is claimed in push_reminded
-// and queued (pushes.go) in one transaction, unless the day is played by then, so a restart never sends two nor loses
-// one; it's written as it's sent, and not sent if the player has played the day meanwhile. The claim keeps how many
-// of the player's devices it reached.
+// at their own hour (RemindMinute): half an hour before they usually finish the day; one whose hour has passed (just
+// subscribed, the server back after a while) at once, until the night (quietFrom: pushes.go), never after. Each is
+// claimed in push_reminded and queued (pushes.go) in one transaction, unless the day is played by then, so a restart
+// never sends two nor loses one; it's written as it's sent, and not sent if the player has played the day meanwhile.
+// The claim keeps how many of the player's devices it reached.
 //
 // It stops when it doesn't help: after RemindIgnored reminders reached the player since they last played the day,
 // none more; on the RemindQuietAfter-th day without play, one last word that the reminders stop (with the streak that
@@ -98,8 +99,8 @@ func (s *Server) remind(ctx context.Context, at time.Time) int {
 	}
 	now := at.In(bulgaria())
 	today, minute := now.Format(time.DateOnly), now.Hour()*60+now.Minute()
-	if minute < RemindEarliest {
-		return 0
+	if minute < RemindEarliest || minute >= quietFrom {
+		return 0 // a player found due late (just subscribed, the server back after a while) waits for tomorrow
 	}
 	rows, err := s.db.Read.QueryContext(ctx, `SELECT DISTINCT p.user_id FROM (SELECT user_id FROM push_subs
 		UNION SELECT user_id FROM phones) p WHERE `+wants(pushDay, "p.user_id")+`
