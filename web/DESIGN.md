@@ -712,7 +712,7 @@ Feedback fires once, when it's earned, and then the screen is still again:
 Never an empty page, and never „…“: a wait looks like what's coming, or doesn't show at all.
 
 - **Between two screens** the one before stays, as it was scrolled, until the next can draw what it's for: its file
-  in and its first answers back (`lib/router.ts`). The place tapped is marked in the bar at once. Past 300ms the next
+  in and its first answers back (`lib/router.ts`). The place tapped is marked in the bar at once. Past 50ms (a frame or two: a tap answers at once) the next
   comes as it is, its waits drawn, and a thin `--accent` line runs along the top of the page (`.arriving`, from 200ms
   in) until it's whole. Back and forward come the same way, to where the page was scrolled.
 - **A wait is drawn in the shape of what comes** (`loading()` in `ui.ts`, `.loading`): quiet blocks (`.bone`, in
