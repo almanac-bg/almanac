@@ -4,6 +4,11 @@ package push
 // Apple's push service (APNs: a request over HTTP/2 with a token signed by the team's key), an Android phone through
 // Firebase Cloud Messaging (HTTP v1: an OAuth token for a service account, from Google). The app gives the player's
 // device token to the game, which keeps it like a browser's subscription.
+//
+// Either may refuse the game's own credentials for a while (Apple: a signed token it calls expired, as it does after
+// clock skew; Google: an access token it won't give, or FCM won't take): the token is made or asked for again once, at
+// once, and if that's refused too, the push is Busy with ErrKeys in it (push.go). Google's access token is asked for
+// once, on the side, while every send that needs it waits for it as long as its own time allows.
 
 import (
 	"bytes"
@@ -25,6 +30,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/almanac-bg/almanac/internal/safe"
 )
 
 // Phones sends notifications to the app, on each platform it has a sender for (nil: none there).
@@ -149,9 +156,12 @@ func (a *Apple) token() (string, error) {
 	return a.jwt, nil
 }
 
-func (a *Apple) forget() {
+// forget forgets a token Apple refused, unless another send has made a new one since.
+func (a *Apple) forget(jwt string) {
 	a.mu.Lock()
-	a.jwt = ""
+	if a.jwt == jwt {
+		a.jwt = ""
+	}
 	a.mu.Unlock()
 }
 
@@ -168,7 +178,9 @@ func (a *Apple) Send(ctx context.Context, token string, m Message) error {
 	if err != nil {
 		return err
 	}
-	for _, host := range a.Hosts {
+	renewed := false
+	for i := 0; i < len(a.Hosts); i++ {
+		host := a.Hosts[i]
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, host+"/3/device/"+token, bytes.NewReader(payload))
 		if err != nil {
 			return err
@@ -201,8 +213,16 @@ func (a *Apple) Send(ctx context.Context, token string, m Message) error {
 		case answer.Reason == "DeviceTokenNotForTopic":
 			return &Refused{err} // another app's
 		case answer.Reason == "ExpiredProviderToken" || answer.Reason == "InvalidProviderToken":
-			a.forget()
-			return err
+			a.forget(jwt)
+			if renewed {
+				return keysRefused(err)
+			}
+			if jwt, err = a.token(); err != nil {
+				return err
+			}
+			renewed = true
+			i-- // the same host again, with a new token
+			continue
 		}
 		return answered(res, err)
 	}
@@ -220,6 +240,13 @@ type Google struct {
 	mu     sync.Mutex
 	access string
 	until  time.Time
+	asking *asking // the access token being asked for, if one is
+}
+
+// asking is an access token being asked for of Google: done once it has come, or not (err).
+type asking struct {
+	done chan struct{}
+	err  error
 }
 
 // NewGoogle reads a Firebase service account's key (the JSON file Firebase gives).
@@ -251,14 +278,64 @@ func NewGoogle(credentials []byte) (*Google, error) {
 	return &Google{project: c.Project, email: c.Email, tokenURI: c.TokenURI, key: rk, Host: "https://fcm.googleapis.com"}, nil
 }
 
-// token is an access token for FCM, asked of Google with a claim signed by the service account (kept until a few
-// minutes before it expires).
+// askTimeout is how long asking Google for an access token may take.
+const askTimeout = 15 * time.Second
+
+// token is an access token for FCM, kept until a few minutes before it expires. When there's none, it's asked for of
+// Google once, on the side (within askTimeout, whoever is waiting), and every send that needs it waits for it, each as
+// long as its own ctx lets it.
 func (g *Google) token(ctx context.Context) (string, error) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if g.access != "" && time.Now().Before(g.until) {
-		return g.access, nil
+	for {
+		g.mu.Lock()
+		if g.access != "" && time.Now().Before(g.until) {
+			access := g.access
+			g.mu.Unlock()
+			return access, nil
+		}
+		a := g.asking
+		if a == nil {
+			a = &asking{done: make(chan struct{})}
+			g.asking = a
+			safe.Go("push: asking Google for an access token", func() {
+				access, until, err := "", time.Time{}, error(&Busy{Err: errors.New("fcm token: the asking broke off")})
+				defer func() { // also after a panic: those waiting hear of it, and the next send asks again
+					g.mu.Lock()
+					if err == nil {
+						g.access, g.until = access, until
+					}
+					g.asking, a.err = nil, err
+					g.mu.Unlock()
+					close(a.done)
+				}()
+				ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), askTimeout)
+				defer cancel()
+				access, until, err = g.ask(ctx)
+			})
+		}
+		g.mu.Unlock()
+		select {
+		case <-a.done:
+			if a.err != nil {
+				return "", a.err
+			}
+		case <-ctx.Done():
+			return "", &Busy{Err: fmt.Errorf("fcm token: %w", ctx.Err())}
+		}
 	}
+}
+
+// forget forgets an access token FCM refused, unless another send has asked for a new one since.
+func (g *Google) forget(access string) {
+	g.mu.Lock()
+	if g.access == access {
+		g.access = ""
+	}
+	g.mu.Unlock()
+}
+
+// ask asks Google for an access token, with a claim signed by the service account. Google not answering is Busy; its
+// refusing the claim is the game's keys refused.
+func (g *Google) ask(ctx context.Context) (string, time.Time, error) {
 	now := time.Now()
 	header, _ := json.Marshal(map[string]string{"alg": "RS256", "typ": "JWT"})
 	claims, _ := json.Marshal(map[string]any{
@@ -269,38 +346,37 @@ func (g *Google) token(ctx context.Context) (string, error) {
 	digest := sha256.Sum256([]byte(signing))
 	sig, err := rsa.SignPKCS1v15(rand.Reader, g.key, crypto.SHA256, digest[:])
 	if err != nil {
-		return "", err
+		return "", now, err
 	}
 	form := url.Values{"grant_type": {"urn:ietf:params:oauth:grant-type:jwt-bearer"}, "assertion": {signing + "." + b64.EncodeToString(sig)}}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.tokenURI, strings.NewReader(form.Encode()))
 	if err != nil {
-		return "", err
+		return "", now, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	res, err := client(g.Client).Do(req)
 	if err != nil {
-		return "", err
+		return "", now, &Busy{Err: fmt.Errorf("fcm token: %w", err)}
 	}
 	defer res.Body.Close()
 	var out struct {
 		Token   string `json:"access_token"`
 		Expires int    `json:"expires_in"`
 	}
-	if err := json.NewDecoder(io.LimitReader(res.Body, 1<<16)).Decode(&out); err != nil || res.StatusCode != http.StatusOK || out.Token == "" {
-		return "", fmt.Errorf("fcm token: %s", res.Status)
+	err = json.NewDecoder(io.LimitReader(res.Body, 1<<16)).Decode(&out)
+	switch {
+	case res.StatusCode == http.StatusOK && err == nil && out.Token != "":
+		return out.Token, now.Add(time.Duration(out.Expires)*time.Second - 5*time.Minute), nil
+	case res.StatusCode/100 == 4 && res.StatusCode != http.StatusTooManyRequests:
+		return "", now, keysRefused(fmt.Errorf("fcm token: %s", res.Status))
 	}
-	g.access, g.until = out.Token, now.Add(time.Duration(out.Expires)*time.Second-5*time.Minute)
-	return g.access, nil
+	return "", now, &Busy{After: retryAfter(res.Header.Get("Retry-After")), Err: fmt.Errorf("fcm token: %s", res.Status)}
 }
 
 // Send posts m to an Android phone's token.
 func (g *Google) Send(ctx context.Context, token string, m Message) error {
 	if !googleToken.MatchString(token) {
 		return ErrGone
-	}
-	access, err := g.token(ctx)
-	if err != nil {
-		return err
 	}
 	android := map[string]any{"priority": "HIGH", "ttl": "43200s"}
 	if m.Tag != "" { // shown in place of one with the same tag; held in place of one FCM still holds
@@ -312,6 +388,32 @@ func (g *Google) Send(ctx context.Context, token string, m Message) error {
 		"data":         map[string]string{"url": m.URL, "kind": m.Kind},
 		"android":      android,
 	}})
+	err := g.post(ctx, body)
+	var refused *refusedAccess
+	if errors.As(err, &refused) {
+		g.forget(refused.access)
+		if err = g.post(ctx, body); errors.As(err, &refused) { // with a new one
+			g.forget(refused.access)
+			return keysRefused(refused.err)
+		}
+	}
+	return err
+}
+
+// refusedAccess is an access token FCM didn't take (401).
+type refusedAccess struct {
+	access string
+	err    error
+}
+
+func (r *refusedAccess) Error() string { return r.err.Error() }
+
+// post posts a message to FCM with the access token there is (refusedAccess: one FCM didn't take).
+func (g *Google) post(ctx context.Context, body []byte) error {
+	access, err := g.token(ctx)
+	if err != nil {
+		return err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.Host+"/v1/projects/"+g.project+"/messages:send", bytes.NewReader(body))
 	if err != nil {
 		return err
@@ -357,10 +459,9 @@ func (g *Google) Send(ctx context.Context, token string, m Message) error {
 	case code == "SENDER_ID_MISMATCH":
 		return &Refused{err} // a token of another Firebase project's
 	case res.StatusCode == http.StatusUnauthorized:
-		g.mu.Lock()
-		g.access = ""
-		g.mu.Unlock()
-		return err
+		return &refusedAccess{access: access, err: err}
+	case res.StatusCode == http.StatusForbidden:
+		return keysRefused(err) // the project's: its service account may not send, or FCM's API is off for it
 	}
 	return answered(res, err)
 }

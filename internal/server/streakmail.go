@@ -23,9 +23,10 @@ import (
 
 // The mail when a streak ends: the one word the game sends a player it can't reach otherwise — one with an email and
 // notifications on no device (an iPhone in Safari, say) — when a streak of StreakMailFrom days or more has ended. It
-// goes the day after the day missed that ended it, at the player's own hour (RemindMinute), unless they've played by
-// then; while the streak can still be won back (play/repair.go) it says how. At most one in StreakMailEvery days,
-// claimed in streak_mails before it's queued in the outbox, so a restart never sends two.
+// goes the day after the day missed that ended it, at the player's own hour (RemindMinute), never in the night
+// (quietFrom: pushes.go), unless they've played by then; while the streak can still be won back (play/repair.go) it
+// says how. At most one in StreakMailEvery days, claimed in streak_mails before it's queued in the outbox, so a restart
+// never sends two.
 //
 // The player stops it with a switch in Настройки → Известия, or with the link in the mail, signed so that it needs
 // no sign-in (mailOff); mail programs offer the same as a button of their own (mail.Message.Unsubscribe).
@@ -57,8 +58,8 @@ func (s *Server) streakMails(ctx context.Context, at time.Time) int {
 	}
 	now := at.In(bulgaria())
 	today, minute := now.Format(time.DateOnly), now.Hour()*60+now.Minute()
-	if minute < RemindEarliest {
-		return 0
+	if minute < RemindEarliest || minute >= quietFrom {
+		return 0 // nights are quiet (pushes.go): one found due that late isn't sent
 	}
 	m := &s.streakMailing
 	m.mu.Lock()

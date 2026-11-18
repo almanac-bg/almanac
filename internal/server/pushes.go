@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"slices"
 	"strconv"
@@ -19,9 +20,14 @@ import (
 // Notifications go out through a queue in the database (push_queue): notify saves a row for each player, in its own
 // transaction or in the caller's (the day's reminder with its claim, Роял's call with its, the week's end in the
 // leagues with its places), and Push sends them, pushWorkers players at a time, each player's browsers and phones at
-// once, each send within pushTimeout. So a slow or dead device holds up only its own player's slot, a player has a
-// few devices at most (pushDevices of each kind: notify.go), and the evening's reminders and Роял's call go out in
-// seconds, whoever else is in the queue.
+// once, each send within pushTimeout, through its push service's lane (pushlanes.go). So a slow or dead device holds
+// up only its own player's slot, a slow or dead service only its own lane's share, a player has a few devices at most
+// (pushDevices of each kind: notify.go), and the evening's reminders and Роял's call go out in seconds, whoever else is
+// in the queue. A row that's of use for less than pushUrgent more (Роял's call) is taken before the rest.
+//
+// Nights are quiet: from quietFrom to quietTo in Bulgaria nothing is sent. A row due then waits for the morning, or,
+// if it's of no use by then (until: a day's reminder is the day's), is dropped. The one exception is a notification
+// the player asked for themselves (pushAsked: the evening they said they'd come to), sent when they asked for it.
 //
 // A restart loses nothing: what's queued stays queued. Push, stopping, finishes the sends it has begun and begins no
 // more, so a deploy sends nothing twice. A crash can: a row being sent is leased (its next_at pushLease ahead) and is
@@ -29,16 +35,25 @@ import (
 // tag (push.Message), so that a device shows one sent twice once.
 //
 // A row that reached none of the player's devices because their services were busy is tried again, after what the
-// service asked or pushBackoff, while it's still of use (until). Each device's failures are kept: one gone (404/410,
-// a token its maker no longer knows) is forgotten at once; one refused or unreached at every try for pushForgetAfter,
-// pushForgetTries tries at least, is forgotten then (a week, so that an outage of the service's, or a mistake of the
-// game's own that refuses everyone, forgets nobody before it's seen and mended). Counted by the message's kind
-// (play/measure.go): push:sent, a device reached; push:gone, a device found gone; push:failed, a notification that
-// reached none of the player's devices, though they had some.
+// service asked or pushBackoff, while it's still of use (until); one that reached none because its lanes held it back
+// goes again when they have room, not counted as a try. The game's own keys refused (push.ErrKeys) are busy too, and
+// told as a problem. Each device's failures are kept: one gone (404/410, a token its maker no longer knows) is
+// forgotten at once; one refused or unreached at every try for pushForgetAfter, pushForgetTries tries at least, is
+// forgotten then (a week, so that an outage of the service's, or a mistake of the game's own that refuses everyone,
+// forgets nobody before it's seen and mended). Counted by the message's kind (play/measure.go): push:sent, a device
+// reached; push:gone, a device found gone; push:failed, a notification that reached none of the player's devices,
+// though they had some.
 
 const (
-	// pushWorkers is how many players' notifications are sent at once.
-	pushWorkers = 64
+	// pushWorkers is how many players' notifications are sent at once: enough that every service's lane can be full
+	// (laneSends+laneWaits each) and others still go.
+	pushWorkers = 256
+	// pushUrgent is how near its end a row is taken before the rest.
+	pushUrgent = 5 * time.Minute
+	// pushTick is how often the queue is looked at when nothing else says to.
+	pushTick = 250 * time.Millisecond
+	// quietFrom and quietTo are the night, in minutes of the day in Bulgaria: 22:00 to 08:00.
+	quietFrom, quietTo = 22 * 60, 8 * 60
 	// pushTimeout is how long a send to one device may take (an iPhone's two hosts together).
 	pushTimeout = 5 * time.Second
 	// pushLease is how long a row being sent is held from another try: past it, a crash's row is sent again.
@@ -56,12 +71,52 @@ const (
 // pushBackoff are the waits before a busy row's second and third tries, when the service didn't ask for longer.
 var pushBackoff = []time.Duration{30 * time.Second, 2 * time.Minute}
 
-// pushQueue is the queue's state in memory: a nudge to look at it now, and the counts not yet written.
+// pushQueue is the queue's state in memory: a nudge to look at it now, the counts not yet written, the services'
+// lanes, and until when rows held back by them are to come again (so that sendQueued waits for them).
 type pushQueue struct {
-	once    sync.Once
-	wake    chan struct{}
-	mu      sync.Mutex
-	tallies map[string]int
+	once     sync.Once
+	wake     chan struct{}
+	mu       sync.Mutex
+	tallies  map[string]int
+	lanes    lanes
+	heldTill time.Time
+}
+
+// held keeps that a row was held back by its lanes until at least `at` (on the clock, not the game's).
+func (q *pushQueue) held(at time.Time) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if at.After(q.heldTill) {
+		q.heldTill = at
+	}
+}
+
+// holding says whether a row held back by its lanes is still to come again.
+func (q *pushQueue) holding() bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return time.Now().Before(q.heldTill)
+}
+
+// morning is when the night `at` falls in ends (quietTo in Bulgaria); zero if `at` isn't in the night.
+func morning(at time.Time) time.Time {
+	t := at.In(bulgaria())
+	switch m := t.Hour()*60 + t.Minute(); {
+	case m >= quietFrom:
+		t = t.AddDate(0, 0, 1)
+	case m >= quietTo:
+		return time.Time{}
+	}
+	return time.Date(t.Year(), t.Month(), t.Day(), quietTo/60, quietTo%60, 0, 0, bulgaria())
+}
+
+// quiet is when a notification of a kind due at `at` may be sent: `at`, or the morning after a night; a notification
+// the player asked for is sent when they asked.
+func quiet(kind pushKind, at time.Time) time.Time {
+	if m := morning(at); kind != pushAsked && !m.IsZero() {
+		return m
+	}
+	return at
 }
 
 func (q *pushQueue) woken() chan struct{} {
@@ -125,17 +180,22 @@ func (s *Server) queuer(ctx context.Context, tx *sql.Tx) (*queuer, error) {
 	return &queuer{stmt: stmt, now: s.game.Now()}, err
 }
 
-// add queues n for a player, if they have a device to send it to, and says whether it did.
+// add queues n for a player, if they have a device to send it to and it's of use when it may go (in the night: the
+// morning), and says whether it did.
 func (q *queuer) add(ctx context.Context, n notice, userID int64) (bool, error) {
 	until := n.until
 	if until.IsZero() {
 		until = q.now.Add(pushTTL)
 	}
+	next := quiet(n.kind, q.now)
+	if next.After(until) {
+		return false, nil
+	}
 	m, err := json.Marshal(n.m)
 	if err != nil {
 		return false, err
 	}
-	res, err := q.stmt.ExecContext(ctx, userID, string(n.kind), string(m), n.day, n.needs, q.now.UnixMilli(), until.UnixMilli())
+	res, err := q.stmt.ExecContext(ctx, userID, string(n.kind), string(m), n.day, n.needs, next.UnixMilli(), until.UnixMilli())
 	if err != nil {
 		return false, err
 	}
@@ -185,7 +245,8 @@ func (s *Server) notify(ctx context.Context, kind pushKind, m push.Message, user
 // Push sends what's queued, as it comes, until ctx ends; then it finishes the sends under way and returns.
 func (s *Server) Push(ctx context.Context) { s.pushes(ctx, false) }
 
-// sendQueued sends what's queued and due now, and returns once nothing is left due or under way.
+// sendQueued sends what's queued and due now, and returns once nothing is left due or under way, nor held back by
+// the lanes to come again soon.
 func (s *Server) sendQueued(ctx context.Context) { s.pushes(ctx, true) }
 
 func (s *Server) pushes(ctx context.Context, untilIdle bool) {
@@ -198,8 +259,9 @@ func (s *Server) pushes(ctx context.Context, untilIdle bool) {
 	work := context.WithoutCancel(ctx) // a send begun is finished, within pushTimeout
 	done := make(chan struct{}, pushWorkers)
 	busy := 0
-	tick := time.NewTicker(time.Second)
+	tick := time.NewTicker(pushTick)
 	defer tick.Stop()
+	flushed := time.Now()
 	defer func() {
 		for ; busy > 0; busy-- {
 			<-done
@@ -216,10 +278,11 @@ func (s *Server) pushes(ctx context.Context, untilIdle bool) {
 				busy++
 				go func() {
 					defer func() { done <- struct{}{} }()
-					s.deliver(work, j)
+					// A panic is the row's alone: its lease runs out, and it's tried again.
+					safe.Do("push: a row", func() { s.deliver(work, ctx.Done(), j) })
 				}()
 			}
-			if untilIdle && busy == 0 {
+			if untilIdle && busy == 0 && !s.pushq.holding() {
 				return
 			}
 		}
@@ -229,7 +292,10 @@ func (s *Server) pushes(ctx context.Context, untilIdle bool) {
 			busy--
 		case <-s.pushq.woken():
 		case <-tick.C:
-			s.flushTallies(work)
+			if time.Since(flushed) >= time.Second {
+				s.flushTallies(work)
+				flushed = time.Now()
+			}
 		}
 	}
 }
@@ -244,7 +310,7 @@ type queued struct {
 	tries      int
 }
 
-// claimPushes leases up to n rows that are due, the oldest first.
+// claimPushes leases up to n rows that are due: those of use for less than pushUrgent more first, then the oldest.
 func (s *Server) claimPushes(ctx context.Context, n int) ([]queued, error) {
 	now := s.game.Now().UnixMilli()
 	var due bool
@@ -254,9 +320,9 @@ func (s *Server) claimPushes(ctx context.Context, n int) ([]queued, error) {
 		return nil, err
 	}
 	rows, err := s.db.Write.QueryContext(ctx, `UPDATE push_queue SET next_at = ?1, tries = tries + 1
-		WHERE id IN (SELECT id FROM push_queue WHERE next_at <= ?2 ORDER BY next_at, id LIMIT ?3)
+		WHERE id IN (SELECT id FROM push_queue WHERE next_at <= ?2 ORDER BY until > ?4, next_at, id LIMIT ?3)
 		RETURNING id, user_id, kind, message, coalesce(day, ''), coalesce(needs, ''), until, tries`,
-		now+pushLease.Milliseconds(), now, n)
+		now+pushLease.Milliseconds(), now, n, now+pushUrgent.Milliseconds())
 	if err != nil {
 		return nil, err
 	}
@@ -326,28 +392,88 @@ func (s *Server) devices(ctx context.Context, userID int64, kind pushKind) ([]de
 	return out, rows.Err()
 }
 
-func (s *Server) sendTo(ctx context.Context, d device, m push.Message) error {
-	if d.platform == "" {
-		return s.push.Send(ctx, d.sub, m)
+// service is the push service a device is reached through, which its send goes through the lane of: a browser's
+// Web Push service, Apple's, Google's.
+func (s *Server) service(d device) string {
+	switch d.platform {
+	case "":
+		return s.push.Service(d.sub.Endpoint)
+	case "ios":
+		return "apns"
+	case "android":
+		return "fcm"
 	}
-	return s.phones.Send(ctx, d.platform, d.token, m)
+	return d.platform
+}
+
+// errSendBroke is a send that panicked (stopped and told by package safe): the game's own.
+var errSendBroke = errors.New("push: the send broke off")
+
+// sendTo sends m to a device, in its service's lane.
+func (s *Server) sendTo(ctx context.Context, stop <-chan struct{}, d device, m push.Message) error {
+	return s.pushq.lanes.send(ctx, stop, s.service(d), pushTimeout, func(ctx context.Context) (err error) {
+		if !safe.Do("push: a send", func() {
+			if d.platform == "" {
+				err = s.push.Send(ctx, d.sub, m)
+			} else {
+				err = s.phones.Send(ctx, d.platform, d.token, m)
+			}
+		}) {
+			err = errSendBroke
+		}
+		return err
+	})
+}
+
+// keysRefused tells, as a problem, that a service refused the game's own keys: once a day for each service and answer
+// (problems.go), however many pushes it refuses, since they're tried again quietly.
+func (s *Server) keysRefused(service string, err error) {
+	s.Problem(fmt.Sprintf("push: %s refused the game's keys (APNS_*, FCM_CREDENTIALS_FILE); the notifications are "+
+		"tried again until they're mended: %s", service, plainKind(err.Error(), "", 160)))
 }
 
 // deliver sends a row of the queue to the player's devices, and keeps what came of it: the row done (or tried again
-// later), the devices gone or failing forgotten or counted, a day's reminder's devices reached.
-func (s *Server) deliver(ctx context.Context, j queued) {
-	defer safe.Recover("push: a send") // the row's lease runs out, and it's tried again
+// later), the devices gone or failing forgotten or counted, a day's reminder's devices reached. In the night it sends
+// nothing: the row waits for the morning, or, of no use by then, is done.
+func (s *Server) deliver(ctx context.Context, stop <-chan struct{}, j queued) {
 	now := s.game.Now()
-	m, ok, err := s.message(ctx, j, now)
-	var devices []device
-	if err == nil && ok {
-		devices, err = s.devices(ctx, j.user, j.kind)
+	if at := quiet(j.kind, now); at.After(now) {
+		if at.UnixMilli() <= j.until {
+			s.pushDone(ctx, j, nil, nil, againUntried, at)
+		} else {
+			s.pushDone(ctx, j, nil, nil, 0, now)
+		}
+		return
 	}
+	devices, err := s.devices(ctx, j.user, j.kind)
 	if err != nil {
 		slog.Error("push", "err", err)
 		return // the lease runs out, and it's tried again
 	}
 	if len(devices) == 0 {
+		s.pushDone(ctx, j, nil, nil, 0, now)
+		return
+	}
+	// None of the player's services has room now: held back before its message is made (a reminder's takes reads).
+	services := make([]string, len(devices))
+	for i, d := range devices {
+		services[i] = s.service(d)
+	}
+	if after, paced, ok := s.pushq.lanes.room(services); !ok {
+		if next := quiet(j.kind, now.Add(after)); next.UnixMilli() <= j.until {
+			if paced {
+				s.pushq.held(time.Now().Add(after))
+			}
+			s.pushDone(ctx, j, nil, nil, againUntried, next)
+			return
+		}
+	}
+	m, ok, err := s.message(ctx, j, now)
+	if err != nil {
+		slog.Error("push", "err", err)
+		return // the lease runs out, and it's tried again
+	}
+	if !ok {
 		s.pushDone(ctx, j, nil, nil, 0, now)
 		return
 	}
@@ -357,24 +483,34 @@ func (s *Server) deliver(ctx context.Context, j queued) {
 	var wg sync.WaitGroup
 	for i, d := range devices {
 		wg.Go(func() {
-			ctx, cancel := context.WithTimeout(ctx, pushTimeout)
-			defer cancel()
-			errs[i] = s.sendTo(ctx, d, m)
+			if !safe.Do("push: a device", func() { errs[i] = s.sendTo(ctx, stop, d, m) }) {
+				errs[i] = errSendBroke
+			}
 		})
 	}
 	wg.Wait()
 
 	reached, gone := 0, 0
-	var wait time.Duration
-	busy := false
+	var wait, holdFor time.Duration
+	busy, held, paced := false, false, false
 	for i, err := range errs {
 		var b *push.Busy
 		var r *push.Refused
+		var h *heldBack
 		switch {
 		case err == nil:
 			reached++
 		case errors.Is(err, push.ErrGone):
 			gone++
+		case errors.As(err, &h): // not sent: says nothing of the device, and isn't a try
+			held, holdFor = true, max(holdFor, h.after)
+			paced = paced || h.full
+			devices[i].fails = -1
+		case errors.Is(err, push.ErrKeys) && errors.As(err, &b): // the game's own, for a while: tried again, and told
+			busy, wait = true, max(wait, b.After)
+			devices[i].fails = -1
+			s.keysRefused(s.service(devices[i]), err)
+			slog.Warn("push", "err", err, "kind", m.Kind)
 		case errors.As(err, &b):
 			busy, wait = true, max(wait, b.After)
 			slog.Warn("push", "err", err, "kind", m.Kind)
@@ -385,16 +521,26 @@ func (s *Server) deliver(ctx context.Context, j queued) {
 		default: // the game's own: says nothing of the device
 			devices[i].fails = -1
 			slog.Warn("push", "err", err, "kind", m.Kind)
-			// Its keys refused (APNs, FCM: 401, 403), its credentials gone: every phone's notifications stop, so it's told.
+			// A message it can't send, a send that broke off: told. (Its keys refused are push.ErrKeys, above.)
 			s.Problem("push: the game's own send failed: " + plainKind(err.Error(), "", 160))
 		}
 	}
 	s.pushq.count("push:sent:"+m.Kind, reached)
 	s.pushq.count("push:gone:"+m.Kind, gone)
-	if reached == 0 && busy && j.tries < pushTries {
-		next := now.Add(max(wait, pushBackoff[min(j.tries, len(pushBackoff))-1]))
+	switch {
+	case reached > 0:
+	case busy && j.tries < pushTries: // tried and busy: again after a while, a try spent
+		next := now.Add(max(wait, holdFor, pushBackoff[min(j.tries, len(pushBackoff))-1]))
 		if next.UnixMilli() <= j.until {
-			s.pushDone(ctx, j, devices, errs, -1, next)
+			s.pushDone(ctx, j, devices, errs, again, next)
+			return
+		}
+	case held && !busy: // only held back: again when the lanes have room, no try spent
+		if next := quiet(j.kind, now.Add(holdFor)); next.UnixMilli() <= j.until {
+			if paced {
+				s.pushq.held(time.Now().Add(holdFor)) // soon: sendQueued waits for it
+			}
+			s.pushDone(ctx, j, devices, errs, againUntried, next)
 			return
 		}
 	}
@@ -438,8 +584,15 @@ func (s *Server) message(ctx context.Context, j queued, now time.Time) (push.Mes
 	return s.reminder(ctx, j.day, j.user), true, nil
 }
 
+// What pushDone is told for a row to go again at `at`, in place of the devices it reached: again, a try spent;
+// againUntried, none (held back by its lanes, or by the night).
+const (
+	again        = -1
+	againUntried = -2
+)
+
 // pushDone keeps what came of a row's try, in one write: each device's failures (errs, by devices); then the row
-// done, with the devices it reached (a day's reminder keeps that), or, for reached -1, to be tried again at `at`.
+// done, with the devices it reached (a day's reminder keeps that), or to go again at `at` (again, againUntried).
 func (s *Server) pushDone(ctx context.Context, j queued, devices []device, errs []error, reached int, at time.Time) {
 	ms := at.UnixMilli()
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
@@ -471,7 +624,11 @@ func (s *Server) pushDone(ctx context.Context, j queued, devices []device, errs 
 			}
 		}
 		if reached < 0 {
-			_, err := tx.ExecContext(ctx, `UPDATE push_queue SET next_at = ? WHERE id = ?`, ms, j.id)
+			untried := 0
+			if reached == againUntried {
+				untried = 1 // its claim counted it
+			}
+			_, err := tx.ExecContext(ctx, `UPDATE push_queue SET next_at = ?, tries = tries - ? WHERE id = ?`, ms, untried, j.id)
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM push_queue WHERE id = ?`, j.id); err != nil {

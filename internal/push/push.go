@@ -2,13 +2,15 @@
 // for it (RFC 8291, aes128gcm), sent to its push service with the game's signed name (VAPID, RFC 8292). Only the
 // push services browsers use are posted to (Services), never a redirect: a subscription is whatever a player sends.
 // The game's own app on phones gets its notifications from Apple's and Google's push services instead (phones.go).
-// Standard library only.
+// Standard library only, and package safe for the one goroutine it starts (phones.go).
 //
 // A send that fails says why, the same way for every service, so that the caller knows what to do with the browser
 // or the phone: ErrGone, it's no more (forget it); Refused, the service won't take pushes for it (forget it if that
-// goes on); Busy, the service can't take one now (try again, after what it asked). Any other error is the game's own
-// (its keys, its message) and says nothing of the device. A message's Tag makes a second send of it replace the
-// first, at the service and on the device, so that a notification sent twice shows once.
+// goes on); Busy, the service can't take one now (try again, after what it asked). The game's own keys refused (a
+// signed token Apple calls expired or invalid, an access token Google won't give or FCM won't take) are Busy too,
+// with ErrKeys in them: tried again, since keys are renewed and services mend, and told to whoever runs the game.
+// Any other error is the game's own (its message) and says nothing of the device. A message's Tag makes a second send
+// of it replace the first, at the service and on the device, so that a notification sent twice shows once.
 package push
 
 import (
@@ -140,6 +142,12 @@ type Busy struct {
 func (e *Busy) Error() string { return "busy: " + e.Err.Error() }
 func (e *Busy) Unwrap() error { return e.Err }
 
+// ErrKeys means a service didn't take the game's own credentials: nothing of the device. It comes inside a Busy.
+var ErrKeys = errors.New("the service refused the game's keys")
+
+// keysRefused is a push not taken for the game's keys: Busy, to be tried again, with ErrKeys in it.
+func keysRefused(err error) error { return &Busy{Err: fmt.Errorf("%w: %w", ErrKeys, err)} }
+
 // answered is what a service's status says of a push it didn't take: Busy (429, 5xx, with its Retry-After), or err.
 func answered(res *http.Response, err error) error {
 	if res.StatusCode == http.StatusTooManyRequests || res.StatusCode/100 == 5 {
@@ -197,7 +205,19 @@ func (s *Sender) Check(sub Subscription) error {
 	if err := sub.Check(); err != nil {
 		return err
 	}
-	u, _ := url.Parse(sub.Endpoint)
+	if s.Service(sub.Endpoint) == "" {
+		return ErrNotService
+	}
+	return nil
+}
+
+// Service is the push service an endpoint is at, as Services names it ("": none the game posts to): every host under
+// one domain is one service.
+func (s *Sender) Service(endpoint string) string {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return ""
+	}
 	host := strings.ToLower(u.Host) // with the port, if one is given: a known service is at the default one
 	services := s.Services
 	if services == nil {
@@ -205,10 +225,10 @@ func (s *Sender) Check(sub Subscription) error {
 	}
 	for _, known := range services {
 		if host == known || (strings.HasPrefix(known, ".") && strings.HasSuffix(host, known)) {
-			return nil
+			return known
 		}
 	}
-	return ErrNotService
+	return ""
 }
 
 // Send encrypts m for a subscription and posts it to its push service. A subscription that isn't at a known push

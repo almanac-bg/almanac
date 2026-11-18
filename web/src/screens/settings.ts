@@ -420,6 +420,8 @@ function reminders(): Child {
                       kind("royal", "Роял", "Когато входът се отвори: в 20:45 в дните на Роял."),
                     )
                   : null,
+              // The night's quiet (server/pushes.go): what's due then comes at 8:00.
+              h("p", { class: "muted" }, "Нощем, от 22:00 до 8:00, не идват известия."),
               h("button", { class: "link", onclick: toggle }, "Спри известията тук"),
             ]
           : [
