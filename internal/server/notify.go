@@ -25,12 +25,13 @@ const (
 	pushDevices      = 5
 	pushTellsPerHour = 60
 	pushTellsPerNet  = 600
+	pushTellsPerSite = 3000 // a site (/48, /24) is many networks: five of them at full use, as the other limits count
 )
 
-// mayTell says whether a player may tell a device now (pushTellsPerHour, pushTellsPerNet).
+// mayTell says whether a player may tell a device now (pushTellsPerHour, pushTellsPerNet, pushTellsPerSite).
 func (s *Server) mayTell(r *http.Request, userID int64) bool {
 	return s.limits.allow("push:user:"+strconv.FormatInt(userID, 10), pushTellsPerHour, time.Hour) &&
-		s.limits.allow("push:net:"+s.clientNet(r), pushTellsPerNet, time.Hour)
+		s.allowFrom(r, "push:net", pushTellsPerNet, pushTellsPerSite, time.Hour)
 }
 
 // keepDevice keeps a device told by a session (an upsert into table, keyed by column), and makes it the session's

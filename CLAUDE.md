@@ -106,13 +106,43 @@ client, the server or the sample bank. It catches only what it knows: reading th
 - **The bank** (questions, facts) is changed only through the `questions` skill; a new batch is `/new-questions`; a fix by the rules (what `bank lint` lists) is `/fix-questions`.
 - **Secrets** never go into the repo, a commit or a chat.
 
+## Built to hold
+
+What two independent reviews (November 2026, `../review-2026-11-17/`, `../review-2026-11-18/`) kept finding. Where a
+check holds a rule, the check is named; the rest is judgement, so weigh every change against it.
+
+- **Abuse is cheap.** A limit by address counts the network and its site (`allowFrom`/`guardFrom`:
+  `TestLimitsByAddressCountTheSite`), never a first-come global cap that a few networks fill to lock everyone out,
+  and never so tight that a school behind one address is refused. Ask of every new endpoint: what does it cost if
+  one /48 calls it all day?
+- **One player can hurt another.** Anything one player can send another (a request, a challenge, a push, a name on
+  a board) honours blocks and goes through `notifyFrom`; a child's name stays in its room.
+- **Text from outside is untrusted everywhere:** names, reports, browser errors in logs, mails, alerts and the
+  agents that fix questions (sanitised, never an instruction).
+- **Time belongs to the run.** A run counts on the day it was dealt for, with one grace (`play.DayGrace`), never on
+  "today" when its follow-up happens to run (`midnight_test.go`).
+- **Background work is guarded and waited for:** every goroutine through `safe` (`TestGoroutinesGuarded`); a test
+  waits for the game's background work before its database closes (`Game.Settled`).
+- **Every table that names a player** is carried by a merge and cleared by a deletion
+  (`TestMergeCoversTheSchema`, `TestPlayerColumnsRefer`); every column that refers to another table has its index
+  (`TestForeignKeysIndexed`).
+- **Privacy is what the page says:** nothing new about a player is kept or shown before `privacy.go` says so; logs
+  carry route patterns, and an address only on a failure (`TestRequestLog`).
+- **The owner's time is the scarcest thing.** No new recurring chore for the owner (a key to prove, a console to
+  visit, a mail to read) without asking; a step only the owner can do is one short instruction, done with them.
+- **Fixes bring flaws of their own.** After a wave of fixes or a big feature, a targeted independent review of just
+  that change, before the next wave.
+
 ## Shipping: a merge is a deploy
 
 Fast is the rule: several sessions work at once, and every wait multiplies across them.
 
 - **A pull request waits only for the fast checks** (Server, Client, PR title: two minutes or so). Open it and queue
   the merge in one go — `gh pr merge <n> --auto --squash` — then move on: GitHub merges it when they pass. Don't
-  watch CI, and don't merge `main` into a branch unless GitHub says it conflicts.
+  watch CI, and don't merge `main` into a branch unless GitHub says it conflicts. One thing blocks a merge with
+  every check green: a CodeQL alert of severity *error* (`go/log-injection`, `go/allocation-size-overflow`, even at
+  a "medium" security level). After the checks, `gh api "repos/almanac-bg/almanac/code-scanning/alerts?pr=<n>&state=open"`;
+  fix what it lists in code, never by dismissing it.
 - **A PR's title is plain English** saying what changed; it becomes the commit on main and the release notes' line.
   No format to follow: nothing reads one.
 - **Merging to `main` releases and deploys by itself** (`.github/workflows/deploy.yml`), and nobody decides it: a
