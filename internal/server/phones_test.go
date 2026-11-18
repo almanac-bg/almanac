@@ -78,6 +78,7 @@ func TestPhoneNotifications(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.game.Now = daytime()
+	s.heldOut = func(int64) bool { return false }
 	ts.Config.Handler = s.Handler()
 	ts.Start()
 	t.Cleanup(ts.Close)

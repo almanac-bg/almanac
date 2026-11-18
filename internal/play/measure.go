@@ -1,27 +1,34 @@
 package play
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
 // Measuring the first week (the admin page): not only whether players come back (retention.go), but what they did
-// before they did or didn't. Three sources, none of them kept for this alone but the first:
+// before they did or didn't, and how each part of the game is used. Four sources, none of them kept for this alone but
+// the first two:
 //
 //   - daily_counts: a number a day for each thing counted that no other table keeps (Tally): a visit without a
-//     profile by where it landed ("visit:home"), a guest made ("guest:invite"), a share of the day ("share:day"),
-//     the reminder's ask on Начало ("pushask:shown|yes|no", and by mail "mailask:shown|yes|no"), notifications
-//     sent and opened by kind ("push:sent:day", "push:open:day"), the day's reminders mailed ("mail:day:sent"), the
-//     day's answers and those to a question the player had answered before ("day:answers", "day:seen": none since
-//     the days are drawn ahead, ahead.go), a broken streak's repair offered
-//     on Начало and done ("repair:offered", "repair:done": repair.go). Nobody is in it.
-//   - users.came_from: where a player first came in (Landings), set as their guest is made.
+//     profile by where it landed ("visit:home"), a guest made ("guest:invite"), a share of the day by a player who
+//     finished it ("share:day", once a day a device), the reminder's ask on Начало ("pushask:shown|yes|no", and by
+//     mail "mailask:shown|yes|no"), notifications sent and opened by kind ("push:sent:day", "push:open:day"), the
+//     day's reminders mailed ("mail:day:sent"), the day's answers and those to a question the player had answered
+//     before ("day:answers", "day:seen": none since the days are drawn ahead, ahead.go), a broken streak's repair
+//     offered on Начало and done ("repair:offered", "repair:done": repair.go). Nobody is in it.
+//   - cohort_weeks: a week's newcomers' numbers, frozen once over (server/measure.go). Nobody is in it either.
+//   - users.came_from: where a player first came in (Landings), set as their guest is made; users.first_version, the
+//     version they met (markActive); runs.device, what each game was played on (FromDevice).
 //   - what the game keeps anyway: the days played (active_days), the games (runs), notifications on (push_subs,
-//     phones), friends, the streaks (walkStreak).
+//     phones), friends, the streaks (walkStreak), the reminders and mails sent or held (push_reminded, streak_mails:
+//     experiment.go).
 
 // Landings are where a player can first come in (users.came_from): the front page, a shared day's link, an invite, a
 // room's link, a player's page, the game's app, and anywhere else.
@@ -95,21 +102,27 @@ func WeekOf(day string) string {
 	return t.AddDate(0, 0, -((int(t.Weekday()) + 6) % 7)).Format(time.DateOnly)
 }
 
-// Newcomer is a player in their first days: when they first played (answered a question), where they came from, and
-// what they did then. Day N is N days after the first (day 0).
+// Newcomer is a player in their first weeks: when they first played (answered a question), where they came from, the
+// version they met, and what they did then. Day N is N days after the first (day 0).
 type Newcomer struct {
 	First    string
 	CameFrom string // one of Landings; "" when not known
+	Version  string // the game's version on their first day ("" when not known)
+	Device   string // what their first game was played on (one of Devices; "" when not known)
 	// By the end of the first day: notifications on (a browser or the app); a friend.
 	Push, Friend bool
-	// The kind of the first game ("day", "topic", "duel" …).
-	FirstKind string
-	// Games begun on the first day (with a question answered).
-	Games int
-	// Played on day N (0 to 30).
-	Played [31]bool
-	// Finished the day's ten on day N (0 to 6).
-	DayTen [7]bool
+	// The kind of the first game ("day", "topic", "duel" …), and whether it was finished.
+	FirstKind     string
+	FirstFinished bool
+	// Games begun on the first day (with a question answered); RoomOnly: all of them in a room.
+	Games    int
+	RoomOnly bool
+	// The kinds of games played in the first week (days 0 to 6).
+	Kinds map[string]bool
+	// Played on day N (0 to 90).
+	Played [91]bool
+	// Finished the day's ten on day N (0 to 7).
+	DayTen [8]bool
 	// How many days since the first are over: day N can be told once N < Over (today's, still under way, would read
 	// low).
 	Over int
@@ -120,7 +133,7 @@ func (n Newcomer) Due(day int) bool { return day < n.Over }
 
 // BackWithin says whether the player played on any day from a to b (both in).
 func (n Newcomer) BackWithin(a, b int) bool {
-	for d := a; d <= b; d++ {
+	for d := a; d <= b && d < len(n.Played); d++ {
 		if n.Played[d] {
 			return true
 		}
@@ -131,7 +144,7 @@ func (n Newcomer) BackWithin(a, b int) bool {
 // DayTens is on how many of the first seven days the player finished the day's ten.
 func (n Newcomer) DayTens() int {
 	k := 0
-	for _, d := range n.DayTen {
+	for _, d := range n.DayTen[:7] {
 		if d {
 			k++
 		}
@@ -139,31 +152,42 @@ func (n Newcomer) DayTens() int {
 	return k
 }
 
-// Newcomers are the players whose first day played is on or after `since`, oldest first.
-func (g *Game) Newcomers(ctx context.Context, since string) ([]Newcomer, error) {
-	db := g.DB.Read
-	today := g.Today()
-	rows, err := db.QueryContext(ctx, `SELECT user_id, min(day) d FROM active_days GROUP BY user_id HAVING d >= ?
-		ORDER BY d, user_id`, since)
-	if err != nil {
-		return nil, err
+// DayTenAgain says whether the player finished the day's ten again on any of days 1 to 7.
+func (n Newcomer) DayTenAgain() bool {
+	for _, d := range n.DayTen[1:] {
+		if d {
+			return true
+		}
 	}
+	return false
+}
+
+// Newcomers are the players whose first day played (as Activity reads them: people only) is on or after `since`,
+// oldest first.
+func (g *Game) Newcomers(ctx context.Context, act *Activity, since string) ([]Newcomer, error) {
+	db := g.DB.Read
 	byID := map[int64]*Newcomer{}
 	var ids []int64
-	for rows.Next() {
-		var id int64
-		var first string
-		if err := rows.Scan(&id, &first); err != nil {
-			rows.Close()
-			return nil, err
+	for id := range act.played {
+		first := act.first(id)
+		if first == "" || first < since {
+			continue
 		}
-		byID[id] = &Newcomer{First: first, Over: daysBetween(first, today)}
+		n := &Newcomer{First: first, Over: daysBetween(first, act.Today), Kinds: map[string]bool{}}
+		for d := range n.Played {
+			if i := act.index(DayShift(first, d)); i >= 0 {
+				n.Played[d] = act.played[id][i]
+			}
+		}
+		byID[id] = n
 		ids = append(ids, id)
 	}
-	rows.Close()
-	if err := rows.Err(); err != nil || len(ids) == 0 {
-		return nil, err
+	if len(ids) == 0 {
+		return nil, nil
 	}
+	slices.SortFunc(ids, func(a, b int64) int {
+		return cmp.Or(strings.Compare(byID[a].First, byID[b].First), cmp.Compare(a, b))
+	})
 	who, _ := json.Marshal(ids)
 	// each reads a query's rows about these players (its first argument is them, as JSON); scan reads one row and
 	// says whose it is, and what it tells of them.
@@ -184,48 +208,43 @@ func (g *Game) Newcomers(ctx context.Context, since string) ([]Newcomer, error) 
 		}
 		return rows.Err()
 	}
-	err = each(`SELECT user_id, day FROM active_days WHERE user_id IN (SELECT value FROM json_each(?1))`,
+	err := each(`SELECT id, coalesce(came_from, ''), coalesce(first_version, '') FROM users
+		WHERE id IN (SELECT value FROM json_each(?1))`,
 		func(rows *sql.Rows) (int64, func(*Newcomer), error) {
 			var id int64
-			var day string
-			err := rows.Scan(&id, &day)
-			return id, func(n *Newcomer) {
-				if d := daysBetween(n.First, day); d >= 0 && d < len(n.Played) {
-					n.Played[d] = true
-				}
-			}, err
-		})
-	if err != nil {
-		return nil, err
-	}
-	err = each(`SELECT id, coalesce(came_from, '') FROM users WHERE id IN (SELECT value FROM json_each(?1))`,
-		func(rows *sql.Rows) (int64, func(*Newcomer), error) {
-			var id int64
-			var from string
-			err := rows.Scan(&id, &from)
-			return id, func(n *Newcomer) { n.CameFrom = from }, err
+			var from, version string
+			err := rows.Scan(&id, &from, &version)
+			return id, func(n *Newcomer) { n.CameFrom, n.Version = from, version }, err
 		})
 	if err != nil {
 		return nil, err
 	}
 	sinceMs, _ := dayBounds(since)
-	err = each(`SELECT user_id, kind, coalesce(day, ''), started_at, finished_at IS NOT NULL FROM runs
-		WHERE user_id IN (SELECT value FROM json_each(?1)) AND started_at >= ?2 AND at > 0 ORDER BY started_at`,
+	err = each(`SELECT user_id, kind, coalesce(day, ''), started_at, finished_at IS NOT NULL, coalesce(device, '') FROM runs
+		WHERE user_id IN (SELECT value FROM json_each(?1)) AND started_at >= ?2 AND at > 0 AND `+personRun+`
+		ORDER BY started_at`,
 		func(rows *sql.Rows) (int64, func(*Newcomer), error) {
 			var id, at int64
-			var kind, day string
+			var kind, day, device string
 			var finished bool
-			err := rows.Scan(&id, &kind, &day, &at, &finished)
+			err := rows.Scan(&id, &kind, &day, &at, &finished, &device)
 			return id, func(n *Newcomer) {
-				started := time.UnixMilli(at).In(Bulgaria).Format(time.DateOnly)
-				if started < n.First {
+				started := daysBetween(n.First, time.UnixMilli(at).In(Bulgaria).Format(time.DateOnly))
+				if started < 0 {
 					return
 				}
 				if n.FirstKind == "" {
-					n.FirstKind = kind
+					n.FirstKind, n.FirstFinished = kind, finished
 				}
-				if started == n.First {
+				if started == 0 {
+					n.RoomOnly = kind == "room" && (n.Games == 0 || n.RoomOnly)
 					n.Games++
+					if n.Device == "" {
+						n.Device = device
+					}
+				}
+				if started < 7 {
+					n.Kinds[kind] = true
 				}
 				if d := daysBetween(n.First, day); kind == "day" && finished && d >= 0 && d < len(n.DayTen) {
 					n.DayTen[d] = true
@@ -345,7 +364,7 @@ func (g *Game) StreakHealth(ctx context.Context, days int) (StreakHealth, error)
 	return h, nil
 }
 
-// DayGames are a day's games by people (not those played at a script's speed: fair.go), by kind, and of the players
+// DayGames are a day's games by people (People: fair.go), by kind, and of the players
 // who finished the day's ten, how many played nothing else.
 type DayGames struct {
 	Day           string
@@ -360,7 +379,7 @@ func (g *Game) Games(ctx context.Context, days int) ([]DayGames, error) {
 	from := DayShift(today, -days+1)
 	fromMs, _ := dayBounds(from)
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT user_id, kind, started_at, kind = 'day' AND finished_at IS NOT NULL
-		FROM runs WHERE started_at >= ? AND at > 0 AND `+ByPerson, fromMs)
+		FROM runs WHERE started_at >= ? AND at > 0 AND `+People, fromMs)
 	if err != nil {
 		return nil, err
 	}
@@ -413,4 +432,50 @@ func (g *Game) Games(ctx context.Context, days int) ([]DayGames, error) {
 		}
 	}
 	return out, nil
+}
+
+// Use is how a part of the game is used over some days: by how many players, in how many games (begun, with a
+// question answered), and of those, how many finished.
+type Use struct {
+	Players, Games, Finished int
+}
+
+// Uses are the games of people (People) begun over some days, by kind (ByKind), by the device they were played on
+// (ByDevice; "" where it isn't known), and the day's ten alone by device (DayByDevice).
+type Uses struct {
+	ByKind, ByDevice, DayByDevice map[string]Use
+}
+
+// UsesSince tells the Uses of the games begun from `from` (a day) to now.
+func (g *Game) UsesSince(ctx context.Context, from string) (Uses, error) {
+	u := Uses{ByKind: map[string]Use{}, ByDevice: map[string]Use{}, DayByDevice: map[string]Use{}}
+	fromMs, _ := dayBounds(from)
+	for _, q := range []struct {
+		into         map[string]Use
+		group, where string
+	}{
+		{u.ByKind, "kind", ""},
+		{u.ByDevice, "coalesce(device, '')", ""},
+		{u.DayByDevice, "coalesce(device, '')", " AND kind = 'day'"},
+	} {
+		rows, err := g.DB.Read.QueryContext(ctx, `SELECT `+q.group+`, count(DISTINCT user_id), count(*), count(finished_at)
+			FROM runs WHERE started_at >= ? AND at > 0 AND `+People+q.where+` GROUP BY 1`, fromMs)
+		if err != nil {
+			return u, err
+		}
+		for rows.Next() {
+			var k string
+			var x Use
+			if err := rows.Scan(&k, &x.Players, &x.Games, &x.Finished); err != nil {
+				rows.Close()
+				return u, err
+			}
+			q.into[k] = x
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return u, err
+		}
+	}
+	return u, nil
 }

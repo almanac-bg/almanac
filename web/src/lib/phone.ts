@@ -112,11 +112,15 @@ export function start(nav: Nav, opened: (kind: string) => void): void {
   });
 }
 
-/** Shares through the phone's share sheet (closing it without sharing is fine). */
-export async function share(text: string, url?: string): Promise<void> {
-  await plugin("Share")
+/** Shares through the phone's share sheet, and says whether it was shared: closing the sheet without sharing (both
+ * phones answer it with a refusal) isn't. */
+export async function share(text: string, url?: string): Promise<boolean> {
+  return plugin("Share")
     .call("share", { text, url })
-    .catch(() => {});
+    .then(
+      () => true,
+      () => false,
+    );
 }
 
 /** What the player feels: a light knock for a tap (and for close, and a Роял cut out), a selection tick for each digit

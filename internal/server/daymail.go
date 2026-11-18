@@ -16,7 +16,9 @@ import (
 // questions still wait, in the notification's words (reminder); after RemindIgnored of them since the player last
 // played the day, none more until they play it again. Never on a day the streak's mail goes (streakmail.go): one mail
 // a day at most. Claimed in day_mails before it's queued in the outbox (which lets go of one to an address the mail
-// server refused: mail.Suppressed), so a restart never sends two.
+// server refused: mail.Suppressed), so a restart never sends two. A player held out of the reminders
+// (play.HeldReminders) is claimed the same, marked held, and never mailed: what they would have had, for /admin to
+// compare; a held claim counts as one sent, so the held stop as the mailed do.
 //
 // Asked for on Начало, in the day's „Утре“ card where notifications can't come (screens/today.ts), and in Настройки
 // → Известия, where it's switched off too; or by the signed link in every mail (mailOff). Off without a row
@@ -118,15 +120,16 @@ func (s *Server) dayMail(ctx context.Context, today string, at time.Time, userID
 		"Пишем ти веднъж на ден, около часа, в който играеш, ако въпросите още те чакат. Спри тези писма: " +
 		m.Unsubscribe + "\n"
 	sent := false
+	held := s.heldOut(userID)
 	err = s.db.Tx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.Exec(`INSERT INTO day_mails (user_id, day, at) SELECT ?1, ?2, ?3
+		res, err := tx.Exec(`INSERT INTO day_mails (user_id, day, at, held) SELECT ?1, ?2, ?3, ?4
 			WHERE NOT EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'day' AND day = ?2 AND finished_at IS NOT NULL)
 			AND NOT EXISTS (SELECT 1 FROM streak_mails WHERE user_id = ?1 AND day = ?2)
-			ON CONFLICT DO NOTHING`, userID, today, at.UnixMilli())
+			ON CONFLICT DO NOTHING`, userID, today, at.UnixMilli(), held)
 		if err != nil {
 			return err
 		}
-		if n, _ := res.RowsAffected(); n == 0 {
+		if n, _ := res.RowsAffected(); n == 0 || held {
 			return nil
 		}
 		sent = true

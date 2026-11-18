@@ -37,6 +37,8 @@ func TestVisitsAreCounted(t *testing.T) {
 	g := start(t)
 	g.open("/f/abcd1234", phoneBrowser)
 	g.open("/f/abcd1234", phoneBrowser) // a reload: once a half hour
+	// Another phone behind the same address (a carrier's): a visit of its own.
+	g.open("/f/abcd1234", strings.Replace(phoneBrowser, "Android 14", "Android 13", 1))
 	g.open("/", phoneBrowser)
 	g.open("/players/nobody", phoneBrowser)
 	g.open("/r/123456", phoneBrowser+" AlmanacApp") // the app, wherever it opens
@@ -45,7 +47,7 @@ func TestVisitsAreCounted(t *testing.T) {
 	g.open("/", "WhatsApp/2.24.1 A")
 	g.open("/", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")
 	g.open("/", "facebookexternalhit/1.1")
-	for key, want := range map[string]int{"visit:invite": 1, "visit:home": 1, "visit:player": 1, "visit:app": 1, "visit:other": 0} {
+	for key, want := range map[string]int{"visit:invite": 2, "visit:home": 1, "visit:player": 1, "visit:app": 1, "visit:other": 0} {
 		if got := g.counted(key); got != want {
 			t.Errorf("%s: %d, want %d", key, got, want)
 		}
@@ -113,7 +115,8 @@ func TestTheClientsCounts(t *testing.T) {
 			t.Errorf("%q: %d, want %d", key, status, want)
 		}
 	}
-	if g.counted("share:day") != 1 || g.counted("push:open:asked") != 1 || g.counted("visit:home") != 0 {
+	// The day shared counts only from a player who finished it today (D12): this one hasn't.
+	if g.counted("share:day") != 0 || g.counted("push:open:asked") != 1 || g.counted("visit:home") != 0 {
 		t.Fatal("not counted")
 	}
 }
@@ -129,7 +132,46 @@ func TestLanding(t *testing.T) {
 			t.Errorf("%s (app %v): %s, want %s", c.path, c.app, got, c.want)
 		}
 	}
-	if (rate{3, 0}).String() != "—" || (rate{1, 3}).String() != "1 · 33%" || ratio(1, 3) != "0,3" || ratio(1, 0) != "—" {
+	if ratio(1, 3) != "0,3" || ratio(1, 0) != "—" {
 		t.Fatal("the numbers")
+	}
+}
+
+// A share is rounded, not cut, and told with its 90 % interval (Wilson's), grey under fewer (review 2026-11-18, D2).
+func TestRate(t *testing.T) {
+	for r, want := range map[rate]string{{3, 0}: "—", {2, 3}: "67% (25–92)", {50, 100}: "50% (42–58)", {0, 40}: "0% (0–6)",
+		{40, 40}: "100% (94–100)"} {
+		if got := r.String(); got != want {
+			t.Errorf("%d of %d: %s, want %s", r.N, r.Of, got, want)
+		}
+	}
+	if h := string(rate{5, 10}.HTML()); !strings.Contains(h, `class="rate few"`) || !strings.Contains(h, "5/10") {
+		t.Errorf("a small count: %s", h)
+	}
+	if h := string(rate{50, 100}.HTML()); strings.Contains(h, "few") {
+		t.Errorf("enough: %s", h)
+	}
+	if (rate{12, 10}).capped() != (rate{10, 10}) {
+		t.Error("capped")
+	}
+}
+
+// What a game is played on, as the request tells it (D5).
+func TestClientDevice(t *testing.T) {
+	for ua, want := range map[string]string{
+		phoneBrowser: "phone",
+		"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 AlmanacApp":                "app-ios",
+		"Mozilla/5.0 (Linux; Android 14; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36 AlmanacApp":            "app-android",
+		"Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1":          "tablet",
+		"Mozilla/5.0 (Linux; Android 14; SM-X910) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36":                              "tablet",
+		"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1": "phone",
+		"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15":                      "desktop",
+		"": "",
+	} {
+		r, _ := http.NewRequest("GET", "/", nil)
+		r.Header.Set("User-Agent", ua)
+		if got := clientDevice(r); got != want {
+			t.Errorf("%q: %q, want %q", ua, got, want)
+		}
 	}
 }

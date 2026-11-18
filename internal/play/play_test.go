@@ -2489,6 +2489,7 @@ func TestDayCrowd(t *testing.T) {
 	// The browser tests show a crowd from the first answer (CrowdMin); answers from before a question last changed were
 	// to another question.
 	w.g.CrowdMin = 1
+	w.g.Settled(ctx) // the counts made in the background read the questions this changes
 	third := mustQuestion(t, w, picks[2].ID)
 	third.Extra().Added, third.Extra().Changed, third.Extra().Updated = "2026-11-01", "2026-11-13", "2026-11-13"
 	if c, _ := w.g.dayCrowd(ctx, w.db.Read, "2026-11-12", third, 0); c != nil {
@@ -2516,55 +2517,6 @@ func mustJSON(t *testing.T, v any) []byte {
 		t.Fatal(err)
 	}
 	return b
-}
-
-func TestRetention(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana, bo, guest, owner := w.user(), w.user(), w.user(), w.user()
-	playOne := func(user int64) {
-		s, err := w.g.StartTopic(ctx, user, "science")
-		if err != nil {
-			t.Fatal(err)
-		}
-		w.play(user, s.ID, w.right)
-	}
-	// 12 November: Ана and Бо are new. Ана comes back the next day; Бо doesn't.
-	playOne(ana)
-	playOne(bo)
-	w.wait(24 * time.Hour)
-	playOne(ana)
-	// 13 November: a guest plays, then signs in to a new account that played the same day: one new player, not two.
-	playOne(guest)
-	playOne(owner)
-	if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, guest, owner) }); err != nil {
-		t.Fatal(err)
-	}
-	cohorts, active, err := w.g.Retention(ctx, 30)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if active.Today != 2 || active.Week != 3 || active.Month != 3 {
-		t.Errorf("active: %+v", active)
-	}
-	if len(cohorts) != 2 || cohorts[0].Day != "2026-11-13" || cohorts[0].New != 1 || cohorts[0].Back[0] != -1 {
-		t.Fatalf("cohorts: %+v", cohorts)
-	}
-	// The 12th's day 1 is today: not over, so not counted yet.
-	if c := cohorts[1]; c.Day != "2026-11-12" || c.New != 2 || c.Back[0] != -1 || c.Back[1] != -1 || c.Back[3] != -1 {
-		t.Errorf("the 12th: %+v", c)
-	}
-	// A week on, Бо is back on day 7; Ана's day 3 was missed. Read the day after.
-	w.wait(6 * 24 * time.Hour)
-	playOne(bo)
-	w.wait(24 * time.Hour)
-	cohorts, _, _ = w.g.Retention(ctx, 30)
-	if c := cohorts[len(cohorts)-1]; c.Back[0] != 1 {
-		t.Errorf("day 1, once over: %+v", c)
-	}
-	if c := cohorts[len(cohorts)-1]; c.Back[1] != 0 || c.Back[2] != 1 || c.Back[3] != -1 {
-		t.Errorf("a week on: %+v", c)
-	}
 }
 
 func TestMistakes(t *testing.T) {

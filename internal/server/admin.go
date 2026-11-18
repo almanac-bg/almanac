@@ -23,7 +23,7 @@ import (
 // How many questions may be reported in an hour: by a player (a careful one finds a few in a game), from a network (a
 // class, playing the same day's ten, may all report the same slip), and from a site (a few such networks). No report
 // is refused for what others sent: past reportsAll from everyone in an hour, whoever runs the game hears of a flood
-// (review 2026-11-18, S10), and /admin shows the reports of reportsShown questions at most, a player's all resolved
+// (review 2026-11-18, S10), and /admin/questions shows the reports of reportsShown questions at most, a player's all resolved
 // at once.
 const (
 	reportsPlayer = 20
@@ -59,15 +59,15 @@ func (s *Server) report(w http.ResponseWriter, r *http.Request) error {
 		return errTooMany
 	}
 	if !s.guard.allow("report", reportsAll, time.Hour) {
-		s.problems.add(fmt.Sprintf("reports: over %d questions reported in an hour; a flood? (/admin)", reportsAll))
+		s.problems.add(fmt.Sprintf("reports: over %d questions reported in an hour; a flood? (/admin/questions)", reportsAll))
 	}
 	_, err = s.db.Write.ExecContext(r.Context(), `INSERT INTO reports (question_id, user_id, text, at) VALUES (?, ?, ?, ?)`,
 		id, u.ID, text, store.Now())
 	if err != nil {
 		return err
 	}
-	// Whoever runs the game hears that there are reports, once a day; which, and what they say, is on /admin.
-	s.problems.add("a question was reported (the reports are on /admin)")
+	// Whoever runs the game hears that there are reports, once a day; which, and what they say, is on /admin/questions.
+	s.problems.add("a question was reported (the reports are on /admin/questions)")
 	return ok(w, map[string]bool{"ok": true})
 }
 
@@ -89,11 +89,63 @@ func PlayerText(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-// admin is the page for whoever keeps the game: reports on questions, how each question goes, and players (a name to
-// put right, a player to suspend: admin_players.go). Admins only; to anyone else it isn't there.
+// admin is the page for whoever keeps the game: whether players come back and what they do (measures), fair play,
+// and players (a name to put right, a player to suspend: admin_players.go). The questions are on a page of their own
+// (adminQuestions). Admins only; to anyone else they aren't there.
 func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdmin(r) {
+		http.NotFound(w, r)
+		return
+	}
+	ctx := r.Context()
+	b := s.bank.Load()
+	db := s.db.Read
+	data := struct {
+		Players, WithEmail, DayToday, DayScripted, Questions, Live int
+		M                                                          measures
+		Royal                                                      play.RoyalPace
+		RoyalMedian                                                string
+		RoyalTurnout, RoyalEvenings                                int
+		Fair                                                       []play.FairSignal
+	}{Questions: len(b.Questions), Live: len(b.Live("", "")), RoyalTurnout: play.RoyalTurnout, RoyalEvenings: play.RoyalEvenings}
+	today := s.game.Today()
+	var err error
+	if data.M, err = s.measures(ctx); err != nil {
+		slog.Error("admin: the measures", "err", err)
+	}
+	// How often Роял plays, and the turnout that decides it.
+	data.Royal, _ = s.game.RoyalPaceOf(ctx)
+	data.RoyalMedian = strings.TrimSuffix(decimal(data.Royal.Median), ",0")
+	_ = db.QueryRowContext(ctx, `SELECT count(*), count(email) FROM users`).Scan(&data.Players, &data.WithEmail)
+	// The days played after several throwaway guests from the same network (play.JudgeNets).
+	if data.Fair, err = s.game.FairSignals(ctx, 50); err != nil {
+		slog.Error("admin: fair play", "err", err)
+	}
+	// The day's games by people, and apart those played at a script's speed, which nobody else sees (play/fair.go).
+	_ = db.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE `+play.People+`), count(*) FILTER (WHERE shadow = ?) FROM runs
+		WHERE kind = 'day' AND day = ? AND finished_at IS NOT NULL`, play.ShadowScript, today).Scan(&data.DayToday, &data.DayScripted)
+
+	var body bytes.Buffer
+	if err := adminBody.Execute(&body, data); err != nil {
+		slog.Error("admin", "err", err)
+		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
+		return
+	}
+	body.WriteString(`<section class="admin-section admin-players">`)
+	body.WriteString(string(adminPlayersHTML(s.adminPlayersOf(ctx, r.URL.Query().Get("player")))))
+	body.WriteString(`</section>`)
+	s.adminPage(w, "Управление", template.HTML(body.String()))
+}
+
+// isAdmin says whether the request is an admin's.
+func (s *Server) isAdmin(r *http.Request) bool {
 	u, err := s.user(r)
-	if err != nil || u == nil || !u.Admin {
+	return err == nil && u != nil && u.Admin
+}
+
+// adminQuestions is /admin's page of the questions: reports on them, and how each goes.
+func (s *Server) adminQuestions(w http.ResponseWriter, r *http.Request) {
+	if !s.isAdmin(r) {
 		http.NotFound(w, r)
 		return
 	}
@@ -114,74 +166,11 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		Answers, Right, Share  int
 		Seconds                float64
 	}
-	// A day's new players and how many came back: a cell per day after (RetentionDays).
-	type cell struct {
-		Back, Share int
-		Due         bool // the day hasn't come yet
-	}
-	type cohort struct {
-		Day   string
-		New   int
-		Cells []cell
-	}
 	data := struct {
-		Players, WithEmail, DayToday, DayScripted, Questions, Live int
-		Active                                                     play.Active
-		After                                                      []int
-		Cohorts                                                    []cohort
-		Overall                                                    []cell
-		Reported                                                   []reported
-		ReportsOpen, QuestionsReported                             int
-		Hardest, Easiest                                           []stat
-		Daily                                                      string
-		First                                                      firstWeek
-		Royal                                                      play.RoyalPace
-		RoyalMedian                                                string
-		RoyalTurnout, RoyalEvenings                                int
-		Fair                                                       []play.FairSignal
-	}{Questions: len(b.Questions), Live: len(b.Live("", "")), After: play.RetentionDays,
-		RoyalTurnout: play.RoyalTurnout, RoyalEvenings: play.RoyalEvenings}
-	today := s.game.Today()
-	// How often Роял plays, and the turnout that decides it.
-	data.Royal, _ = s.game.RoyalPaceOf(ctx)
-	data.RoyalMedian = strings.TrimSuffix(strings.Replace(fmt.Sprintf("%.1f", data.Royal.Median), ".", ",", 1), ",0")
-	if cohorts, active, err := s.game.Retention(ctx, play.RetentionDays[len(play.RetentionDays)-1]+10); err == nil {
-		data.Active = active
-		data.Daily = strings.Replace(fmt.Sprintf("%.1f", active.Daily), ".", ",", 1)
-		if data.First, err = s.firstWeek(ctx, active); err != nil {
-			slog.Error("admin: the first week", "err", err)
-		}
-		// Overall: of the players whose day N has come, the share that came back on it.
-		news, backs := make([]int, len(play.RetentionDays)), make([]int, len(play.RetentionDays))
-		for _, c := range cohorts {
-			row := cohort{Day: c.Day, New: c.New}
-			for i, n := range c.Back {
-				if n < 0 {
-					row.Cells = append(row.Cells, cell{Due: true})
-					continue
-				}
-				row.Cells = append(row.Cells, cell{Back: n, Share: 100 * n / c.New})
-				news[i] += c.New
-				backs[i] += n
-			}
-			data.Cohorts = append(data.Cohorts, row)
-		}
-		for i := range news {
-			if news[i] == 0 {
-				data.Overall = append(data.Overall, cell{Due: true})
-				continue
-			}
-			data.Overall = append(data.Overall, cell{Back: backs[i], Share: 100 * backs[i] / news[i]})
-		}
-	}
-	_ = db.QueryRowContext(ctx, `SELECT count(*), count(email) FROM users`).Scan(&data.Players, &data.WithEmail)
-	// The days played after several throwaway guests from the same network (play.JudgeNets).
-	if data.Fair, err = s.game.FairSignals(ctx, 50); err != nil {
-		slog.Error("admin: fair play", "err", err)
-	}
-	// The day's games by people, and apart those played at a script's speed, which nobody else sees (play/fair.go).
-	_ = db.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE `+play.ByPerson+`), count(*) FILTER (WHERE NOT (`+play.ByPerson+`)) FROM runs
-		WHERE kind = 'day' AND day = ? AND finished_at IS NOT NULL`, today).Scan(&data.DayToday, &data.DayScripted)
+		Reported                       []reported
+		ReportsOpen, QuestionsReported int
+		Hardest, Easiest               []stat
+	}{}
 
 	// The questions reported most lately first, reportsShown of them, and of each its first reportsEach reports: a
 	// flood of reports can't make the page too long to load.
@@ -306,12 +295,11 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body bytes.Buffer
-	if err := adminBody.Execute(&body, data); err != nil {
+	if err := adminQuestionsBody.Execute(&body, data); err != nil {
 		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
 	}
-	body.WriteString(string(adminPlayersHTML(s.adminPlayersOf(ctx, r.URL.Query().Get("player")))))
-	s.plain(w, "Управление", template.HTML(body.String()))
+	s.adminPage(w, "Въпроси", template.HTML(body.String()))
 }
 
 // resolve marks a question's reports as seen to; resolvePlayer, every report of one player's (one who floods them).
@@ -341,7 +329,7 @@ func (s *Server) resolveWhere(w http.ResponseWriter, r *http.Request, where stri
 		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/questions", http.StatusSeeOther)
 }
 
 func bulgaria() *time.Location {
@@ -350,105 +338,3 @@ func bulgaria() *time.Location {
 	}
 	return time.UTC
 }
-
-var adminBody = template.Must(template.New("admin").Parse(`
-<p>{{.Players}} играчи ({{.WithEmail}} с имейл). Днес въпросите на деня са изиграли {{.DayToday}}.{{if .DayScripted}}
-По-бързо, отколкото играе човек: {{.DayScripted}} (другите не ги виждат).{{end}}
-В банката: {{.Questions}} въпроса, {{.Live}} в игра.</p>
-<p>Роял: {{if .Royal.Nightly}}всяка вечер{{else}}петък, събота и неделя{{end}}. Медиана на играчите за последните
-{{.Royal.Evenings}} вечери: {{.RoyalMedian}} (всяка вечер, щом е поне {{.RoyalTurnout}} за {{.RoyalEvenings}} вечери).</p>
-
-<h2>Връщат ли се</h2>
-<p>Играли днес: {{.Active.Today}} · за 7 дни: {{.Active.Week}} · за 30 дни: {{.Active.Month}}.
-На ден, средно за последните 7: {{.Daily}} ({{.First.Stick}} от играещите за 30 дни).</p>
-<p class="muted">Новите играчи по седмицата на първата им игра и колко от тях са играли пак точно толкова дни по-късно;
-„1–7“: в който и да е от дните от 1-вия до 7-мия. „Играл“ е отговорил на въпрос. Делът е от тези, за които денят е минал.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Седмица</th><th class="num">Нови</th><th class="num">След 1 ден</th><th class="num">След 7 дни</th><th class="num">1–7</th><th class="num">След 30 дни</th></tr></thead><tbody>
-{{with .First.Overall}}{{if .New}}<tr><td><strong>{{.Week}}</strong></td><td class="num">{{.New}}</td><td class="num">{{.D1}}</td><td class="num">{{.D7}}</td><td class="num">{{.Within}}</td><td class="num">{{.D30}}</td></tr>{{end}}{{end}}
-{{range .First.Cohorts}}<tr><td class="num">{{.Week}}</td><td class="num">{{.New}}</td><td class="num">{{.D1}}</td><td class="num">{{.D7}}</td><td class="num">{{.Within}}</td><td class="num">{{.D30}}</td></tr>
-{{else}}<tr><td colspan="6" class="muted">Още няма нови играчи.</td></tr>{{end}}
-</tbody></table></div>
-<details><summary>По дни</summary>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th class="num">Нови</th>{{range .After}}<th class="num">След {{.}} {{if eq . 1}}ден{{else}}дни{{end}}</th>{{end}}</tr></thead><tbody>
-{{if .Cohorts}}<tr><td><strong>Общо</strong></td><td></td>{{range .Overall}}<td class="num">{{if .Due}}—{{else}}<strong>{{.Share}}%</strong>{{end}}</td>{{end}}</tr>{{end}}
-{{range .Cohorts}}<tr><td class="num">{{.Day}}</td><td class="num">{{.New}}</td>{{range .Cells}}<td class="num">{{if .Due}}—{{else}}{{.Back}} · {{.Share}}%{{end}}</td>{{end}}</tr>
-{{else}}<tr><td colspan="6" class="muted">Още няма нови играчи.</td></tr>{{end}}
-</tbody></table></div>
-</details>
-
-{{with .First}}
-<h2>Първата седмица</h2>
-<p class="muted">Пътят на новия играч, по седмицата (от понеделник) на първия му ден. Посещенията и гостите са от
-същата седмица; оттам нататък делът е от изигралите въпрос, за които денят вече е минал.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th></th>{{range .Weeks}}<th class="num">{{.}}</th>{{end}}</tr></thead><tbody>
-{{range .Funnel}}<tr><td>{{.Step}}</td>{{range .Cells}}<td class="num">{{.}}</td>{{end}}</tr>{{end}}
-</tbody></table></div>
-
-<h2>Кои се връщат</h2>
-<p class="muted">Новите от последните 12 седмици, според първия им ден.</p>
-{{range .Splits}}{{if .Rows}}
-<h3>{{.Name}}</h3>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">Нови</th><th class="num">След 1 ден</th><th class="num">След 7 дни</th><th class="num">1–7</th><th class="num">След 30 дни</th></tr></thead><tbody>
-{{range .Rows}}<tr><td>{{.Week}}</td><td class="num">{{.New}}</td><td class="num">{{.D1}}</td><td class="num">{{.D7}}</td><td class="num">{{.Within}}</td><td class="num">{{.D30}}</td></tr>{{end}}
-</tbody></table></div>
-{{end}}{{end}}
-
-<h2>Всеки ден</h2>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">7 дни</th><th class="num">28 дни</th></tr></thead><tbody>
-{{range .Loop}}<tr><td>{{if .Sub}}<span class="muted">·</span> {{end}}{{.Name}}</td><td class="num">{{.Week}}</td><td class="num">{{.Month}}</td></tr>{{end}}
-</tbody></table></div>
-<p>Отговори в деня на въпрос, на който играчът е отговарял преди, за 7 дни: {{.Repeats}} (трябва да е 0).</p>
-
-<h2>Серии</h2>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Дължина</th><th class="num">Вървят сега</th><th class="num">Прекъснати за 7 дни</th></tr></thead><tbody>
-{{range .Streaks}}<tr><td>{{.Band}}</td><td class="num">{{.Going}}</td><td class="num">{{.Ended}}</td></tr>{{end}}
-</tbody></table></div>
-<p>Резервни дни, похарчени за 7 дни: {{.Spent}}.</p>
-<p>Върнати серии за 7 дни (от предложените на Начало): {{.Repairs}}.</p>
-<p>Писма за прекъсната серия за 7 дни: {{.Mails.Of}}; върнали се до 3 дни: {{.Mails}}.</p>
-
-<h2>Игри</h2>
-<p class="muted">Игрите по вид, без изиграните по-бързо, отколкото играе човек. „Само денят“: от завършилите деня, които не
-са играли нищо друго. Стаите не се пазят и не са тук.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th>{{range .Kinds}}<th class="num">{{.}}</th>{{end}}<th class="num">Само денят</th></tr></thead><tbody>
-{{range .Games}}<tr><td class="num">{{.Day}}</td>{{range .Kinds}}<td class="num">{{.}}</td>{{end}}<td class="num">{{.Only}}</td></tr>{{end}}
-</tbody></table></div>
-{{end}}
-
-<h2>Честна игра</h2>
-<p class="muted">Въпросите на деня, изиграни след поне двама гости от същата мрежа, създадени същия ден и изиграли само
-деня: може да са пробвали отговорите. Дните на гостите вече не се виждат на другите (докато не се върнат); денят на
-играча остава, щом не е скрит.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th>Играч</th><th class="num">Верни</th><th class="num">Гости</th><th class="num">Най-добрият гост</th><th>Скрит</th></tr></thead><tbody>
-{{range .Fair}}<tr><td class="num">{{.Day}}</td><td><a href="/admin?player={{.Tag}}">{{.Name}}</a></td><td class="num">{{.Rights}}</td><td class="num">{{.Guests}}</td><td class="num">{{.Best}}</td><td>{{if .Shadow}}да{{else}}не{{end}}</td></tr>
-{{else}}<tr><td colspan="6" class="muted">Няма.</td></tr>{{end}}
-</tbody></table></div>
-
-<h2>Доклади ({{.ReportsOpen}} за {{.QuestionsReported}} {{if eq .QuestionsReported 1}}въпрос{{else}}въпроса{{end}})</h2>
-{{if gt .QuestionsReported (len .Reported)}}<p class="muted">Тук са последно докладваните {{len .Reported}}. Другите се
-показват, щом тези бъдат прегледани.</p>{{end}}
-{{range .Reported}}
-<section class="reviewed">
-<p class="muted">{{.ID}} · {{.Category}}</p>
-<h3>{{.Text}}</h3>
-<p>Отговор: <strong>{{.Answer}}</strong></p>
-<ul>{{range .Reports}}<li>{{.Line}}{{if .Player}} <form method="post"
-action="/admin/players/{{.Player}}/reports/resolve"><button class="link">Всички от този играч: прегледани</button></form>{{end}}</li>{{end}}</ul>
-{{if gt .More 0}}<p class="muted">И още {{.More}}.</p>{{end}}
-<form method="post" action="/admin/reports/{{.ID}}/resolve"><button class="link">Прегледано</button></form>
-</section>
-{{else}}<p class="muted">Няма нови.</p>{{end}}
-
-<h2>Най-трудните</h2>
-<p class="muted">Въпроси с поне 10 отговора, по дела на верните.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Въпрос</th><th class="num">Отговори</th><th class="num">Верни</th></tr></thead><tbody>
-{{range .Hardest}}<tr><td>{{.ID}} · {{.Text}}<br><span class="muted">{{.Answer}}{{if .Lure}} · най-често грешат с „{{.Lure}}“{{end}}</span></td>
-<td class="num">{{.Answers}}</td><td class="num">{{.Share}}%</td></tr>{{else}}<tr><td colspan="3" class="muted">Още няма достатъчно отговори.</td></tr>{{end}}
-</tbody></table></div>
-
-<h2>Най-лесните</h2>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Въпрос</th><th class="num">Отговори</th><th class="num">Верни</th></tr></thead><tbody>
-{{range .Easiest}}<tr><td>{{.ID}} · {{.Text}}<br><span class="muted">{{.Answer}}</span></td><td class="num">{{.Answers}}</td><td class="num">{{.Share}}%</td></tr>
-{{else}}<tr><td colspan="3" class="muted">Още няма достатъчно отговори.</td></tr>{{end}}
-</tbody></table></div>
-`))

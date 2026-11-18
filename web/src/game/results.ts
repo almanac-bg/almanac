@@ -141,7 +141,8 @@ export function nextSteps(main: Child, others: Child[]): Child {
 
 /** Shares through the phone's own sheet, or copies where there's none (`url`, if any, goes with the text: or made
  * when it's needed, `link`, asked for as the finger comes down so that the share stays within the tap). `shared`,
- * if given, hears of each share: the app's sheet opened, the browser's sheet sent, or the text copied or shown.
+ * if given, hears of each share: a phone's sheet sent (the app's or the browser's; closed without sharing, it's
+ * none), or the text copied or shown.
  * `named`: what's shared carries the player's name (an invite, the day's result with its link), so a player who never
  * chose one is asked for it first (screens/name.ts). */
 export function shareButton(
@@ -162,7 +163,9 @@ export function shareButton(
       return done.set(errorText(err));
     }
     const body = text();
-    if (await appShare(body, url)) return shared?.();
+    const app = await appShare(body, url);
+    if (app === "shared") return shared?.();
+    if (app === "closed") return;
     if (navigator.share) {
       try {
         await navigator.share({ text: body, url });

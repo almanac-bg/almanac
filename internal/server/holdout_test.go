@@ -1,0 +1,188 @@
+package server
+
+import (
+	"io"
+	"strings"
+	"testing"
+	"time"
+)
+
+// A player held out of the reminders (play.HeldReminders) is claimed at their hour as any other and never sent; the
+// held stop as the reminded do; and /admin compares the two groups (review 2026-11-18, D4).
+func TestRemindersHeldOut(t *testing.T) {
+	s, g, fake, subscribe := pushWorld(t)
+	ana, anaID := g.guest()
+	bo, boID := g.guest()
+	subscribe(ana, "/ana")
+	subscribe(bo, "/bo")
+	s.heldOut = func(id int64) bool { return id == boID }
+	day := time.Date(2030, 3, 4, 0, 0, 0, 0, bulgaria())
+	s.game.Now = func() time.Time { return day.Add(12 * time.Hour) }
+	if n := s.remindSent(t.Context(), day.Add(19*time.Hour)); n != 1 || fake.count("/ana") != 1 || fake.count("/bo") != 0 {
+		t.Fatalf("reminded %d (ana %d, bo %d)", n, fake.count("/ana"), fake.count("/bo"))
+	}
+	var held bool
+	if err := g.db.Read.QueryRow(`SELECT held FROM push_reminded WHERE user_id = ? AND day = '2030-03-04'`, boID).
+		Scan(&held); err != nil || !held {
+		t.Fatalf("Bo's claim: held %v, %v", held, err)
+	}
+	// Three days left without play, and both stop: Bo's held claims count as reminders that reached him.
+	for d := 1; d <= 3; d++ {
+		next := day.AddDate(0, 0, d)
+		s.game.Now = func() time.Time { return next.Add(12 * time.Hour) }
+		s.remindSent(t.Context(), next.Add(19*time.Hour))
+	}
+	claims := func(id int64) int {
+		var n int
+		_ = g.db.Read.QueryRow(`SELECT count(*) FROM push_reminded WHERE user_id = ?`, id).Scan(&n)
+		return n
+	}
+	if claims(anaID) != 3 || claims(boID) != 3 || fake.count("/bo") != 0 {
+		t.Fatalf("claims: Ana %d, Bo %d", claims(anaID), claims(boID))
+	}
+	// Ana played a day after one: /admin tells the two groups apart.
+	g.finishedDay(anaID, day.AddDate(0, 0, 1), 20*time.Hour)
+	rows, err := s.holdout(t.Context(), "2030-03-08")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := rows[0]; r.Sent != (rate{1, 3}) || r.Held != (rate{0, 3}) {
+		t.Fatalf("the day finished after: %+v", r)
+	}
+	if r := rows[1]; r.Sent != (rate{1, 3}) || r.Held != (rate{0, 3}) {
+		t.Fatalf("within two hours: %+v", r)
+	}
+}
+
+// The day's reminder by mail too: claimed for one held out at their hour, never sent, and counted for the back-off.
+func TestDayMailHeldOut(t *testing.T) {
+	g := start(t)
+	s := g.srv
+	day := time.Date(2030, 3, 10, 0, 0, 0, 0, bulgaria())
+	s.game.Now = func() time.Time { return day.Add(12 * time.Hour) }
+	_, id := g.guest()
+	if _, err := g.db.Write.Exec(`UPDATE users SET email = 'ana@example.bg' WHERE id = ?`, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.setMailPref(t.Context(), id, mailDay, true); err != nil {
+		t.Fatal(err)
+	}
+	g.finishedDay(id, day.AddDate(0, 0, -1), 10*time.Hour)
+	s.heldOut = func(int64) bool { return true }
+	if n := s.dayMails(t.Context(), day.Add(12*time.Hour)); n != 0 {
+		t.Fatalf("mailed %d", n)
+	}
+	g.outbox.Flush(t.Context())
+	var held bool
+	if err := g.db.Read.QueryRow(`SELECT held FROM day_mails WHERE user_id = ? AND day = '2030-03-10'`, id).Scan(&held); err != nil ||
+		!held || len(g.inbox.got) != 0 || g.counted("mail:day:sent") != 0 {
+		t.Fatalf("held %v, %v, sent %d", held, err, len(g.inbox.got))
+	}
+	if rows, err := s.holdout(t.Context(), "2030-03-11"); err != nil || rows[2].Held != (rate{0, 1}) || rows[2].Sent.Of != 0 {
+		t.Fatalf("the day's mail held: %+v %v", rows, err)
+	}
+}
+
+// The streak's mail too: claimed for one held out, never sent.
+func TestStreakMailHeldOut(t *testing.T) {
+	g := start(t)
+	s := g.srv
+	day := time.Date(2030, 3, 10, 0, 0, 0, 0, bulgaria())
+	s.game.Now = func() time.Time { return day.Add(12 * time.Hour) }
+	_, id := g.guest()
+	if _, err := g.db.Write.Exec(`UPDATE users SET email = 'ana@example.bg' WHERE id = ?`, id); err != nil {
+		t.Fatal(err)
+	}
+	for d := range 5 {
+		g.finishedDay(id, day.AddDate(0, 0, -3-d), 10*time.Hour)
+	}
+	s.heldOut = func(int64) bool { return true }
+	if n := s.streakMails(t.Context(), day.Add(12*time.Hour)); n != 0 {
+		t.Fatalf("mailed %d", n)
+	}
+	g.outbox.Flush(t.Context())
+	var held bool
+	if err := g.db.Read.QueryRow(`SELECT held FROM streak_mails WHERE user_id = ?`, id).Scan(&held); err != nil || !held ||
+		len(g.inbox.got) != 0 {
+		t.Fatalf("held %v, %v, sent %d", held, err, len(g.inbox.got))
+	}
+}
+
+// /admin with players in it: people only (an admin's games aren't), the day shared once by a player who finished it,
+// the charts drawn, a week's cohort frozen once over (D1–D12).
+func TestAdminMeasures(t *testing.T) {
+	g := start(t)
+	s := g.srv
+	day := time.Date(2030, 3, 20, 0, 0, 0, 0, bulgaria()) // a Wednesday
+	clock := day.Add(12 * time.Hour)
+	s.game.Now = func() time.Time { return clock }
+	admin := g.player()
+	_, out := admin.call("POST", "/api/guest", map[string]any{})
+	adminID := int64(out["user"].(map[string]any)["id"].(float64))
+	_, _ = g.db.Write.Exec(`UPDATE users SET admin = 1`)
+	// Players new three weeks back, a phone's; two come back the next day.
+	first := day.AddDate(0, 0, -16) // Monday the 4th
+	var ids []int64
+	for i := range 4 {
+		_, id := g.guest()
+		ids = append(ids, id)
+		at := first.Add(10 * time.Hour)
+		if _, err := g.db.Write.Exec(`INSERT INTO runs (user_id, kind, day, questions, at, started_at, finished_at, device)
+			VALUES (?, 'day', ?, '[]', 10, ?, ?, 'phone')`, id, first.Format(time.DateOnly), at.UnixMilli(), at.UnixMilli()+1); err != nil {
+			t.Fatal(err)
+		}
+		_, _ = g.db.Write.Exec(`INSERT INTO active_days (user_id, day) VALUES (?, ?)`, id, first.Format(time.DateOnly))
+		if i < 2 {
+			g.finishedDay(id, first.AddDate(0, 0, 1), 10*time.Hour)
+			_, _ = g.db.Write.Exec(`INSERT INTO active_days (user_id, day) VALUES (?, ?)`, id, first.AddDate(0, 0, 1).Format(time.DateOnly))
+		}
+	}
+	// The admin played too: not counted.
+	g.finishedDay(adminID, first, 11*time.Hour)
+	_, _ = g.db.Write.Exec(`INSERT INTO active_days (user_id, day) SELECT id, ? FROM users WHERE admin`, first.Format(time.DateOnly))
+
+	body := func() string {
+		res, err := admin.client.Get(g.url + "/admin")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		b, _ := io.ReadAll(res.Body)
+		return string(b)
+	}
+	// The day shared by one who finished it today: counted; by one who didn't: not (the client counts once a device).
+	sharer, sharerID := g.guest()
+	g.finishedDay(sharerID, day, 9*time.Hour)
+	other, _ := g.guest()
+	for _, p := range []*player{sharer, other} {
+		if status, _ := p.call("POST", "/api/tally", map[string]string{"key": "share:day"}); status != 200 {
+			t.Fatalf("tally: %d", status)
+		}
+	}
+	if g.counted("share:day") != 1 {
+		t.Fatalf("shares counted: %d", g.counted("share:day"))
+	}
+	page := body()
+	for _, part := range []string{"<svg", `class="line s1"`, "04.03–10.03", "Телефон", "Денят пак (1–7)"} {
+		if !strings.Contains(page, part) {
+			t.Fatalf("the page has no %q", part)
+		}
+	}
+	var n, total int
+	if err := g.db.Read.QueryRow(`SELECT n, total FROM cohort_weeks WHERE week = '2030-03-04' AND measure = 'd1'`).
+		Scan(&n, &total); err != nil || n != 2 || total != 4 {
+		t.Fatalf("the week frozen: %d of %d, %v", n, total, err)
+	}
+	if err := g.db.Read.QueryRow(`SELECT n FROM cohort_weeks WHERE week = '2030-03-04' AND measure = 'new'`).Scan(&n); err != nil || n != 4 {
+		t.Fatalf("the week's new: %d, %v", n, err)
+	}
+	// Frozen: a merge later takes one of them away, and the week stays as it was.
+	_, _ = g.db.Write.Exec(`DELETE FROM active_days WHERE user_id = ?`, ids[3])
+	if !strings.Contains(body(), `title="Замразени`) {
+		t.Fatal("the frozen week isn't marked")
+	}
+	_ = g.db.Read.QueryRow(`SELECT n FROM cohort_weeks WHERE week = '2030-03-04' AND measure = 'new'`).Scan(&n)
+	if n != 4 {
+		t.Fatalf("the frozen week changed: %d", n)
+	}
+}

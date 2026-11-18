@@ -148,12 +148,15 @@ var mergeSteps = []mergeStep{
 			> substr(users.streak_told, instr(users.streak_told, ':') + 1) THEN g.streak_told ELSE users.streak_told END
 		FROM (SELECT level_seen, unlocks_known, recordings_told, systems_told, streak_told FROM users WHERE id = ?2) g
 		WHERE users.id = ?1`},
-	// The player came in when, and where, the earlier of the two did; and was last seen when the later was.
-	{carries: []string{"users.created_at", "users.came_from", "users.seen_at"},
+	// The player came in when, and where, the earlier of the two did, and met the version that one met; and was last
+	// seen when the later was.
+	{carries: []string{"users.created_at", "users.came_from", "users.first_version", "users.seen_at"},
 		sql: `UPDATE users SET came_from = CASE WHEN g.created_at < users.created_at
 			THEN coalesce(g.came_from, users.came_from) ELSE coalesce(users.came_from, g.came_from) END,
+			first_version = CASE WHEN g.created_at < users.created_at
+				THEN coalesce(g.first_version, users.first_version) ELSE coalesce(users.first_version, g.first_version) END,
 		created_at = min(users.created_at, g.created_at), seen_at = max(users.seen_at, g.seen_at)
-		FROM (SELECT created_at, came_from, seen_at FROM users WHERE id = ?2) g WHERE users.id = ?1`},
+		FROM (SELECT created_at, came_from, first_version, seen_at FROM users WHERE id = ?2) g WHERE users.id = ?1`},
 	// The guest's invite link, if the account has none yet: those it was sent to can still open it.
 	{carries: []string{"users.invite"}, do: func(tx *sql.Tx, to, from int64) error {
 		var invite sql.NullString
@@ -263,8 +266,12 @@ const GoneName = "Изтрит играч"
 //   - The days they played on (active_days, which has no reference to users: the retention counts keep a player who
 //     went, or those who never came back would drop out and make them look better) are kept as a tombstone, the id
 //     made negative: counted still, nobody's. An id is never a player's again (users' AUTOINCREMENT), so a newcomer
-//     never starts with someone else's days.
+//     never starts with someone else's days. Only the days that count for /admin (personDay, retention.go) are kept:
+//     once the player's games are gone, nothing could tell the others apart.
 func Forget(tx *sql.Tx, id int64) error {
+	if err := forgetDaysUncounted(tx, id); err != nil {
+		return err
+	}
 	for _, q := range []string{
 		`DELETE FROM duels WHERE ended_at IS NULL AND (a_id = ?1 OR b_id = ?1
 			OR challenge_id IN (SELECT id FROM challenges WHERE user_id = ?1))`,
@@ -281,4 +288,18 @@ func Forget(tx *sql.Tx, id int64) error {
 		}
 	}
 	return nil
+}
+
+// forgetDaysUncounted lets go of a player's days that /admin doesn't count (personDay): while their games are there to
+// tell.
+func forgetDaysUncounted(tx *sql.Tx, id int64) error {
+	var first, last sql.NullString
+	if err := tx.QueryRow(`SELECT min(day), max(day) FROM active_days WHERE user_id = ?`, id).Scan(&first, &last); err != nil ||
+		!first.Valid {
+		return err
+	}
+	_, err := tx.Exec(`WITH `+boundsCTE+` DELETE FROM active_days WHERE user_id = ?2 AND day NOT IN (
+		SELECT a.day FROM b JOIN active_days a ON a.day = b.day WHERE a.user_id = ?2 AND `+personDay+`)`,
+		dayBoundsJSON(first.String, last.String), id)
+	return err
 }

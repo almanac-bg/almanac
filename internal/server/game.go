@@ -174,7 +174,7 @@ func (s *Server) startDay(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	st, err := s.game.StartDay(s.fromNet(r, u.ID), u.ID)
+	st, err := s.game.StartDay(s.fromClient(r, u.ID), u.ID)
 	if err != nil {
 		return err
 	}
@@ -217,7 +217,7 @@ func (s *Server) startTopic(w http.ResponseWriter, r *http.Request) error {
 	if !s.limits.allow("topic:"+strconv.FormatInt(u.ID, 10), 120, time.Hour) {
 		return errTooMany
 	}
-	st, err := s.game.StartTopic(s.fromNet(r, u.ID), u.ID, in.Category)
+	st, err := s.game.StartTopic(s.fromClient(r, u.ID), u.ID, in.Category)
 	if err != nil {
 		return err
 	}
@@ -246,7 +246,7 @@ func (s *Server) startMistakes(w http.ResponseWriter, r *http.Request) error {
 	if !s.limits.allow("topic:"+strconv.FormatInt(u.ID, 10), 120, time.Hour) {
 		return errTooMany
 	}
-	st, err := s.game.StartMistakes(s.fromNet(r, u.ID), u.ID)
+	st, err := s.game.StartMistakes(s.fromClient(r, u.ID), u.ID)
 	if err != nil {
 		return err
 	}

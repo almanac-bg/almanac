@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"net/http"
 	"net/netip"
+	"strings"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/play"
@@ -123,9 +124,31 @@ func (s *Server) netMark(r *http.Request) []byte {
 	return h.Sum(nil)[:12]
 }
 
-// fromNet is the request's context with the network the player plays from (netMark), for the games it starts.
-func (s *Server) fromNet(r *http.Request, userID int64) context.Context {
-	return play.FromNet(r.Context(), userID, s.netMark(r))
+// fromClient is the request's context with the network the player plays from (netMark) and the device
+// (clientDevice), for the games it starts.
+func (s *Server) fromClient(r *http.Request, userID int64) context.Context {
+	return play.FromDevice(play.FromNet(r.Context(), userID, s.netMark(r)), userID, clientDevice(r))
+}
+
+// clientDevice is what a request comes from, as a game keeps it (play.Devices, runs.device): the game's app by its
+// platform; else a tablet, a phone or a desktop, by the browser's own word (Sec-CH-UA-Mobile, where it gives one) or
+// its user agent. An iPad that asks as a Mac counts as a desktop: nothing in the request tells the two apart.
+func clientDevice(r *http.Request) string {
+	ua := r.UserAgent()
+	switch {
+	case ua == "":
+		return ""
+	case inApp(r) && strings.Contains(ua, "Android"):
+		return "app-android"
+	case inApp(r):
+		return "app-ios"
+	case strings.Contains(ua, "iPad") || strings.Contains(ua, "Tablet") ||
+		strings.Contains(ua, "Android") && !strings.Contains(ua, "Mobile"):
+		return "tablet"
+	case r.Header.Get("Sec-CH-UA-Mobile") == "?1" || strings.Contains(ua, "Mobi") || strings.Contains(ua, "iPhone"):
+		return "phone"
+	}
+	return "desktop"
 }
 
 // network is the prefix of bits around an IPv6 address, or an IPv4 address as it is.

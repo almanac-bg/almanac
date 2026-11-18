@@ -65,6 +65,7 @@ func start(t *testing.T) *game {
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.heldOut = func(int64) bool { return false } // the reminders' tests remind everyone; TestRemindersHeldOut, some
 	ts.Config.Handler = s.Handler()
 	ts.Start()
 	// Run in reverse: the server stops taking requests, then what it started in the background ends, then the
@@ -984,8 +985,8 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 	if status, _ := p.call("POST", "/api/questions/nope-1/report", map[string]string{"text": "няма го"}); status != 404 {
 		t.Fatalf("no such question: %d", status)
 	}
-	page := func() (int, string) {
-		req, _ := http.NewRequest("GET", g.url+"/admin", nil)
+	at := func(path string) (int, string) {
+		req, _ := http.NewRequest("GET", g.url+path, nil)
 		res, err := p.client.Do(req)
 		if err != nil {
 			t.Fatal(err)
@@ -994,16 +995,21 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 		res.Body.Close()
 		return res.StatusCode, string(body)
 	}
-	if status, _ := page(); status != 404 {
-		t.Fatalf("the admin page for a player: %d", status)
+	page := func() (int, string) { return at("/admin/questions") }
+	for _, path := range []string{"/admin", "/admin/questions"} {
+		if status, _ := at(path); status != 404 {
+			t.Fatalf("%s for a player: %d", path, status)
+		}
 	}
 	_, _ = g.db.Write.Exec(`UPDATE users SET admin = 1`)
 	status, body := page()
 	if status != 200 || !strings.Contains(body, "Отговорът е остарял") || !strings.Contains(body, "Мусала") {
 		t.Fatalf("the admin page: %d %s", status, body)
 	}
-	for _, part := range []string{"Първата седмица", "Посещения без профил", "Кои се връщат", "Всеки ден", "Серии", "Игри"} {
-		if !strings.Contains(body, part) {
+	_, main := at("/admin")
+	for _, part := range []string{"Връщане", "Посещения без профил", "Кои се връщат", "Навик", "Помагат ли напомнянията",
+		"Серии", "Части на играта", "Устройства", "Честна игра", "Играчи", `href="/admin/questions"`} {
+		if !strings.Contains(main, part) {
 			t.Fatalf("the admin page has no %q", part)
 		}
 	}
@@ -1114,6 +1120,7 @@ func pushWorld(t *testing.T) (*Server, *game, *fakePushService, func(p *player, 
 		t.Fatal(err)
 	}
 	s.game.Now = daytime()
+	s.heldOut = func(int64) bool { return false } // the reminders' tests remind everyone; TestRemindersHeldOut, some
 	ts.Config.Handler = s.Handler()
 	ts.Start()
 	t.Cleanup(ts.Close)
