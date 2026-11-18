@@ -58,7 +58,12 @@ go vet ./... && go test ./...                                  # the server: abo
 go test -race ./internal/<package>                             # the race detector, on a package you changed that runs things at once
 npm run check && npm test                                      # the client: types, lint, unit tests, language
 npx playwright test -c e2e --project=chromium e2e/<spec>       # the browser specs your change touches (`=`, or the spec reads as a project)
+DEV=1 DB_PATH=/tmp/seeded.db go run ./cmd/almanac seed -state /tmp/personas   # 60 days of 200 players (minutes); prints personas
 ```
+
+A review or a look at a screen is of a game played for a while, not only of a new guest's empty pages: seed a new
+database (then `serve` it with the same `DB_PATH`) and be its personas, a new guest to a Легенда (each one's `sid`
+cookie, or `-state`'s Playwright storage state per persona).
 
 CI runs the race detector on everything (`go test -race ./...`, a minute or two); locally run it where goroutines
 meet (`live`, `room`, `royal`, `server`, or `play` when you touch its locks), not on everything: the SQLite driver is

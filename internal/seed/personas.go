@@ -1,0 +1,284 @@
+package seed
+
+import (
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/almanac-bg/almanac/internal/play"
+)
+
+// finish is the history's last hours: the regular's rating brought into Злато and the legend's into Легенда by more
+// duels where the history left them short (as a player on a run of form plays them), then the clock at the end, and
+// the server's sweeps once more.
+func (w *world) finish() error {
+	w.rewind(w.end.Add(-230 * time.Minute))
+	for _, p := range w.players {
+		switch p.persona {
+		case keyRegular:
+			if err := w.befriended(p, 5); err != nil {
+				return err
+			}
+			if err := w.steer(p, 1050, 1199, 24); err != nil {
+				return err
+			}
+			if err := w.waiting(p); err != nil {
+				return err
+			}
+			if err := w.news(p); err != nil {
+				return err
+			}
+		case keyLegend:
+			if err := w.steer(p, 1500, 1<<20, 60); err != nil {
+				return err
+			}
+			if err := w.news(p); err != nil {
+				return err
+			}
+		}
+	}
+	w.set(w.end)
+	w.g.AftersDone(w.ctx)
+	w.swept = time.Time{}
+	return w.sweep()
+}
+
+// steer plays a player's live duels until their rating is from lo to hi and placed, at most n of them, each against
+// someone placed not met yet: while it's under, they're on form (every answer right, and quick) against the highest
+// rated they'd still beat (who misses some), so that each win counts; while it's over, off form against the strongest.
+func (w *world) steer(p *player, lo, hi, n int) error {
+	skill, pace := p.skill, p.pace
+	defer func() { p.skill, p.pace = skill, pace }()
+	met := map[[2]int64]bool{}
+	for range n {
+		s, err := w.g.StandingOf(w.ctx, p.id)
+		if err != nil {
+			return err
+		}
+		up := s.Rating < lo || !play.Placed(s.Rated)
+		switch {
+		case up:
+			p.skill, p.pace = 1, 2*time.Second
+		case s.Rating > hi:
+			p.skill, p.pace = 0.1, pace
+		default:
+			return nil
+		}
+		var best *player
+		bestRating := 0
+		for _, o := range w.active(w.today()) {
+			if o == p || o.isPersona() || met[pair(p.id, o.id)] || o.joined > w.today()-4 || (up && o.skill > 0.85) {
+				continue
+			}
+			var rated, rating int
+			if err := w.db.Read.QueryRowContext(w.ctx, `SELECT rated, rating FROM users WHERE id = ?`, o.id).
+				Scan(&rated, &rating); err != nil {
+				return err
+			}
+			if rated < play.MinRatedGames {
+				continue
+			}
+			if score := rating; best == nil || (up && score > bestRating) || (!up && o.skill > best.skill) {
+				best, bestRating = o, score
+			}
+		}
+		if best == nil {
+			return nil
+		}
+		met[pair(p.id, best.id)] = true
+		if _, err := w.liveDuel(p, best); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// befriended makes sure a persona has n friends at least, one more asking: whoever they've asked, or else asked by
+// players they don't know yet, the persona saying yes to all but the last.
+func (w *world) befriended(p *player, n int) error {
+	ids, err := w.friendIDs(p)
+	if err != nil || len(ids) >= n {
+		return err
+	}
+	if err := w.friendsOfPersona(p, n-len(ids)+1); err != nil {
+		return err
+	}
+	in, _, err := w.g.Requests(w.ctx, p.id)
+	if err != nil {
+		return err
+	}
+	for i, r := range in {
+		if i == 0 {
+			continue // the newest waits
+		}
+		if _, err := w.g.Accept(w.ctx, p.id, r.ID); err != nil && !errors.Is(err, play.ErrNoRequest) {
+			return err
+		}
+	}
+	return nil
+}
+
+// waiting leaves challenges waiting on both sides of a persona: one a friend sent them (played by the friend, not by
+// them yet), and one they sent a friend.
+func (w *world) waiting(p *player) error {
+	ids, err := w.friendIDs(p)
+	if err != nil || len(ids) == 0 {
+		return err
+	}
+	friend := w.byID[ids[w.r.IntN(len(ids))]]
+	if friend == nil {
+		return nil
+	}
+	for _, c := range []struct{ from, to *player }{{friend, p}, {p, friend}} {
+		s, _, err := w.g.ChallengeFriend(w.as(c.from), c.from.id, c.to.id)
+		if errors.Is(err, play.ErrManyWaiting) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("a challenge waiting: %w", err)
+		}
+		if _, err := w.playRun(c.from, s, -1); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// personas are the players a reviewer can be, each checked to be what it says, with a session to sign in by: the
+// new guest is made now (account.Accounts.Guest), as a browser that's never been here is.
+func (w *world) personas() ([]Persona, error) {
+	if err := w.finish(); err != nil {
+		return nil, err
+	}
+	var out []Persona
+	u, token, err := w.accounts.Guest(w.ctx)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, Persona{Key: keyGuest, ID: u.ID, Name: u.Name, Tag: u.Tag, Token: token,
+		About: "a new guest: nothing played, as a browser that's never been here"})
+	// The lapsed one: whichever of its candidates has a repair on offer now.
+	var lapsed *player
+	for _, p := range w.players {
+		if p.kind == lapsing && p.id != 0 && lapsed == nil {
+			if r, err := w.g.RepairOf(w.ctx, p.id); err != nil {
+				return nil, err
+			} else if r != nil && len(r.Missed) > 0 && !r.Missed[0].Done {
+				lapsed, p.persona = p, keyLapsed
+			}
+		}
+	}
+	if lapsed == nil {
+		return nil, fmt.Errorf("seed: no player's broken streak has its repair on offer")
+	}
+	for _, key := range personaKinds[1:] {
+		var p *player
+		for _, o := range w.players {
+			if o.persona == key && o.id != 0 {
+				p = o
+			}
+		}
+		if p == nil {
+			return nil, fmt.Errorf("seed: no %s persona", key)
+		}
+		if key == keyAdmin {
+			if err := w.exec(`UPDATE users SET admin = 1 WHERE id = ?`, p.id); err != nil {
+				return nil, err
+			}
+		}
+		about, err := w.about(p)
+		if err != nil {
+			return nil, err
+		}
+		token, err := w.token(p.id)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, Persona{Key: key, ID: p.id, Name: p.name, Tag: p.tag, Email: p.email, Token: token,
+			About: about})
+	}
+	return out, nil
+}
+
+// about says what a persona is now, from what the game says of them, and checks it's what they're for.
+func (w *world) about(p *player) (string, error) {
+	ctx := w.ctx
+	streak, err := w.g.StreakOf(ctx, p.id)
+	if err != nil {
+		return "", err
+	}
+	standing, err := w.g.StandingOf(ctx, p.id)
+	if err != nil {
+		return "", err
+	}
+	level, err := w.g.LevelNow(ctx, p.id)
+	if err != nil {
+		return "", err
+	}
+	friends, err := w.g.FriendsOf(ctx, p.id)
+	if err != nil {
+		return "", err
+	}
+	league, err := w.g.LeagueOf(ctx, p.id)
+	if err != nil {
+		return "", err
+	}
+	var days int
+	if err := w.one(&days, `SELECT count(*) FROM active_days WHERE user_id = ?`, p.id); err != nil {
+		return "", err
+	}
+	rating := fmt.Sprintf("rating placing (%d of %d)", standing.Rated, play.MinRatedGames)
+	if play.Placed(standing.Rated) {
+		rating = fmt.Sprintf("%s, rating %d", standing.Division.Name, standing.Rating)
+	}
+	race := "no league group this week"
+	if league.In {
+		race = fmt.Sprintf("league %s, place %d of %d", league.League.Name, league.Place, league.Size)
+	}
+	facts := fmt.Sprintf("%d days played, streak %d (best %d, %d reserve), level %d, %s, %d friends, %s",
+		days, streak.Days, streak.Best, streak.Reserve, level.Level, rating, len(friends), race)
+	fail := func(why string) (string, error) {
+		return "", fmt.Errorf("seed: the %s persona %s: %s", p.persona, why, facts)
+	}
+	switch p.persona {
+	case keyDay2:
+		if days != 1 {
+			return fail("hasn't played exactly one day")
+		}
+		return "day two: played yesterday's ten (a guest), not today's yet; " + facts, nil
+	case keyRegular:
+		if (!w.opt.small && (standing.Division.ID != "gold" || !play.Placed(standing.Rated))) || len(friends) < 3 ||
+			days < min(25, w.opt.Days*2/3) {
+			return fail("isn't a placed Злато player with friends, of a month")
+		}
+		return "a month's regular in Злато, with friends, challenges waiting and the week's league; " + facts, nil
+	case keyLapsed:
+		r, err := w.g.RepairOf(ctx, p.id)
+		if err != nil || r == nil {
+			return fail("has no repair on offer")
+		}
+		return fmt.Sprintf("a streak of %d that broke yesterday (%s missed): its repair on offer, the missed issue to play; %s",
+			r.Days, r.On, facts), nil
+	case keyLegend:
+		if !w.opt.small && (standing.Division.ID != "legend" || !play.Placed(standing.Rated)) {
+			return fail("isn't in Легенда")
+		}
+		var wins int
+		if err := w.one(&wins, `SELECT count(*) FROM royal_players WHERE user_id = ? AND place = 1`, p.id); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("the strongest player: Легенда, a streak from the first day, Роял won %d times; %s", wins, facts), nil
+	case keyHost:
+		var rooms int
+		if err := w.one(&rooms, `SELECT count(*) FROM runs WHERE user_id = ? AND kind = 'room'`, p.id); err != nil {
+			return "", err
+		}
+		if rooms == 0 {
+			return fail("has hosted no room")
+		}
+		return fmt.Sprintf("a room host: a quiz night with friends each Thursday (%d room games); %s", rooms, facts), nil
+	case keyAdmin:
+		return "an admin (/admin), who plays most days; " + facts, nil
+	}
+	return facts, nil
+}
