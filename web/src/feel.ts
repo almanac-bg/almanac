@@ -688,68 +688,77 @@ function roll(el: HTMLElement, from: string, to: string): Promise<void> {
     .finished.then(put, put);
 }
 
-/** The streak one day longer, in its chip (drawn with the new number): after `delay`, the number rolls up from the
- * day before, the flame swells once with a gold glow, and the streak's sound. */
-export function streak(chip: HTMLElement, days: number, delay: number, hands: Hands): void {
+/** The streak one day longer, in its chip (drawn with the new number): once `after` has come (the result has landed),
+ * the number rolls up from the day before (a first streak's words come in with it: never „0 ден поред“), the flame
+ * swells once with a gold glow, and the streak's sound. Resolves once it's over. */
+export async function streak(chip: HTMLElement, days: number, after: Promise<void>, hands: Hands): Promise<void> {
   const n = chip.querySelector<HTMLElement>(".status-n");
-  if (!hands.calm && n) n.textContent = String(days - 1);
-  window.setTimeout(() => {
-    hands.play("streak");
-    if (hands.calm || !n) return;
-    roll(n, String(days - 1), String(days));
-    const gold = token(chip, "--gold");
-    chip.querySelector(".status-flame")?.animate(
-      [
-        { transform: "none", filter: "none" },
-        { transform: "scale(1.25)", filter: `drop-shadow(0 0 10px ${gold})` },
-        { transform: "none", filter: "none" },
-      ],
-      { duration: 600, easing: "ease-in-out" },
-    );
-  }, delay);
+  const words = chip.querySelector<HTMLElement>(".status-text");
+  const first = days === 1 && !!words;
+  const was = first ? "" : String(days - 1);
+  if (!hands.calm && n) {
+    n.textContent = was;
+    if (first) words.style.opacity = "0";
+  }
+  await after;
+  hands.play("streak");
+  if (hands.calm || !n) return;
+  if (first) {
+    words.style.opacity = "";
+    words.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: settleIn });
+  }
+  const gold = token(chip, "--gold");
+  const swell = chip.querySelector(".status-flame")?.animate(
+    [
+      { transform: "none", filter: "none" },
+      { transform: "scale(1.25)", filter: `drop-shadow(0 0 10px ${gold})` },
+      { transform: "none", filter: "none" },
+    ],
+    { duration: 600, easing: "ease-in-out" },
+  );
+  await Promise.all([roll(n, was, String(days)), swell?.finished.catch(() => {})]);
 }
 
-/** The level growing in its chip (drawn as it is now): after `delay`, the bar fills from where it was; a new level
- * fills it to the end, flashes in its lilac, rolls the number and fills again from nothing. */
-export function level(
+/** The level growing in its chip (drawn as it is now): once `after` has come, the bar fills from where it was; a new
+ * level fills it to the end, flashes in its lilac, rolls the number and fills again from nothing. Resolves once it's
+ * over. */
+export async function level(
   chip: HTMLElement,
   from: { level: number; share: number; left: string },
   to: { level: number; share: number; left: string },
-  delay: number,
+  after: Promise<void>,
   hands: Hands,
-): void {
+): Promise<void> {
   const fill = chip.querySelector<HTMLElement>(".meter-fill");
   const n = chip.querySelector<HTMLElement>(".level-num");
   const left = chip.querySelector<HTMLElement>(".status-label");
   if (hands.calm || !fill || !n || (from.level === to.level && from.share >= to.share)) return;
-  if (left) left.textContent = from.left;
   const width = (p: number) => `${Math.max(0, Math.min(100, p))}%`;
-  const grow = (a: number, b: number, ms: number, wait = 0) =>
-    fill.animate([{ width: width(a) }, { width: width(b) }], {
-      duration: ms,
-      delay: wait,
-      easing: settleIn,
-      fill: "both",
-    }).finished;
-  const settle = () => {
+  const grow = (a: number, b: number, ms: number) =>
+    fill.animate([{ width: width(a) }, { width: width(b) }], { duration: ms, easing: settleIn, fill: "both" }).finished;
+  // As it was before the game, until its moment comes.
+  if (left) left.textContent = from.left;
+  n.textContent = String(from.level);
+  fill.style.width = width(from.share);
+  try {
+    await after;
+    if (to.level === from.level) await grow(from.share, to.share, 700);
+    else {
+      const lilac = token(chip, "--lilac");
+      await grow(from.share, 100, 700);
+      await fill.animate([{ background: lilac, boxShadow: `0 0 10px ${lilac}` }, {}], { duration: 200 }).finished;
+      if (left) left.textContent = to.left;
+      await roll(n, String(from.level), String(to.level));
+      await grow(0, to.share, 500);
+    }
+  } catch {
+    // an animation cancelled on its way (the screen gone): straight to the end
+  } finally {
     for (const a of fill.getAnimations()) a.cancel();
+    fill.style.width = width(to.share);
     n.textContent = String(to.level);
     if (left) left.textContent = to.left;
-  };
-  if (to.level === from.level) {
-    grow(from.share, to.share, 700, delay).then(settle, settle);
-    return;
   }
-  n.textContent = String(from.level);
-  const lilac = token(chip, "--lilac");
-  grow(from.share, 100, 700, delay)
-    .then(() => fill.animate([{ background: lilac, boxShadow: `0 0 10px ${lilac}` }, {}], { duration: 200 }).finished)
-    .then(() => {
-      if (left) left.textContent = to.left;
-      return roll(n, String(from.level), String(to.level));
-    })
-    .then(() => grow(0, to.share, 500))
-    .then(settle, settle);
 }
 
 /**

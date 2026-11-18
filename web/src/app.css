@@ -6552,14 +6552,35 @@
       align-self: end;
     }
 
-    /* The day's gold button and a page's own: a hand's width, not the column's. */
-    .day > .btn.primary.big,
-    .screen > .btn.primary.big,
-    .royal-plan > .btn.primary.big {
+    /* A page's buttons are a hand's width (22rem), not the column's, at its left, the gold one first: the day's, a
+       page's own, and a group of them (.actions: under a result, Дуел's, the year's), side by side where two fit, the
+       plain ones after the gold one (a result's .result-actions gives the group its buttons) and as tall as it. A line
+       about the gold one sits under it. */
+    :is(.day, .screen, .royal-plan, .invite, .invite-card) > :is(.btn, .share) {
+      max-width: 22rem;
+    }
+
+    .actions {
+      grid-template-columns: repeat(auto-fill, min(22rem, 100%));
+      grid-auto-flow: row dense;
+      gap: var(--space-3);
+    }
+
+    .actions > .result-actions {
+      display: contents;
+    }
+
+    .actions > :not(.btn, .share, .result-actions, .link) {
+      grid-column: 1 / -1;
       max-width: 22rem;
     }
 
     .day > .day-meta {
+      text-align: left;
+    }
+
+    /* Начало and a result: their quiet lines at the column's left, with its buttons, not centred under them. */
+    :is(.home, .summary) :is(.day-next, .news-xp, .news-open, .news-facts, .news-goal, .news-late) {
       text-align: left;
     }
 
@@ -6600,7 +6621,8 @@
       margin-inline: auto;
     }
 
-    main > :has(> .home) {
+    /* Начало, wherever it's drawn: its own page, or the end of the day's ten played there or on an invite's page. */
+    main > :has(.home) {
       max-width: none;
     }
 
@@ -6632,15 +6654,6 @@
       display: flow-root;
     }
 
-    /* The day's result: „Сподели“ and „Прегледай въпросите“ side by side, the same height. */
-    .home-main .actions {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .home-main .result-actions .btn {
-      min-height: 3.75rem;
-    }
-
     .home-main,
     .home-side {
       display: grid;
@@ -6668,6 +6681,38 @@
 
     .home > .status-row ~ .home-side {
       margin-top: var(--space-5);
+    }
+
+    /* The streak, the habit's reward, leads the column beside the day, level with its result: a row of its own, its
+       number big; the level under it. */
+    .home > .status-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .home > .status-row .streak-chip {
+      min-height: 5.5rem;
+      gap: var(--space-3);
+      padding-inline: var(--space-4);
+    }
+
+    .home > .status-row .streak-chip .status-flame {
+      width: 56px;
+      height: 56px;
+    }
+
+    .home > .status-row .streak-chip .status-n {
+      font-size: 2.5rem;
+      line-height: 2.5rem;
+    }
+
+    .home > .status-row .streak-chip .status-label {
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+    }
+
+    .home > .status-row .status-reserve {
+      top: calc(50% + 32px);
+      left: calc(var(--space-4) + 58px);
     }
 
     .home-side .modes {

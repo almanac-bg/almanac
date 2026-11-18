@@ -12,7 +12,7 @@
 import { picture } from "../art/picture.ts";
 import { type DayGold, dayGold, nextGame } from "../game/gold.ts";
 import { news } from "../game/news.ts";
-import { boardRow, hands, shareButton, summary } from "../game/results.ts";
+import { boardRow, hands, landed, shareButton, summary } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting, trail } from "../game/run.ts";
 import { dayShareText, percent, rare } from "../game/share.ts";
 import type { Board, Mark, Score, State } from "../game/types.ts";
@@ -215,18 +215,24 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
   /** The screen itself: the day as it stands (`run` its result, if played; `just`: played this moment, so what it
    * earned is told once), then the ways to play. */
   function home(t: Today, run: State | null, just: boolean): Child {
-    // Just played: the streak, the level and the place it made, as they are now. The streak grown to one of its round
-    // numbers is the game's big news (news.ts: a sheet of its own); otherwise it rolls on in its chip, after the
-    // result's moment has landed (feel.ts).
+    // Just played: the streak, the level and the place it made, as they are now. The moments come one after another,
+    // never over each other: the result lands, then the streak rolls on in its chip and the level's bar fills (feel.ts),
+    // and only then what's big (news.ts: a sheet), which is the streak itself when it reaches one of its round numbers.
     const fresh = signal<Today>(t);
     const now = just ? api<Today>("GET", "/api/day") : null;
     now?.then(fresh.set, () => {});
-    const round = now?.then(
-      (f) => (f.streak > t.streak && streakMarks.includes(f.streak) ? f.streak : 0),
-      () => 0,
-    );
-    const since = performance.now();
-    let grown = false;
+    let growing: Promise<void> | null = null;
+    const streak = now && {
+      round: now.then(
+        (f) => (f.streak > t.streak && streakMarks.includes(f.streak) ? f.streak : 0),
+        () => 0,
+      ),
+      // Once the day as it is now has come and drawn the chips (signals run at once): their growing, if any.
+      grown: now.then(
+        () => growing ?? undefined,
+        () => undefined,
+      ),
+    };
     const said = bye;
     bye = "";
     // The day's goals (shown once XP is open: play/unfold.go; the day just played may open it): what's next after the
@@ -243,10 +249,13 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
         if (!user() || !(just || t.played)) return null;
         const f = fresh();
         const row = status(f);
-        if (row && f !== t && !grown) {
-          grown = true;
-          grow(row, t, f, Math.max(0, since + 1100 - performance.now()));
-        }
+        if (row && f !== t && !growing && run)
+          growing = grow(
+            row,
+            t,
+            f,
+            landed(run.id).then(() => wait(200)),
+          );
         return row;
       },
       // A streak that can be won back today, as it stands (the day just played may have done it); else what came of
@@ -309,14 +318,17 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
                 () => (fresh().open?.league ? leagueNote() : null),
                 () => missesLine(fresh().misses),
                 elsewhere && run === elsewhere.run ? null : () => friendsDay(fresh()),
-                just ? news(run.id, 0, round) : untold(t, run.id),
+                just ? news(run.id, 0, streak ?? undefined) : untold(t, run.id),
               ],
               pointsWords(t.open),
               just,
             )
           : dayCard(t, start(t), run?.trail ?? [], failed),
-        // Before a first game, a player who has a profile already (a new phone) signs in, a tap away.
+        // Before a first game, a player who has a profile already (a new phone) signs in, a tap away; and a room's code
+        // from a friend works from the first visit: the way in, in a line. Both under the day, so that a new player's
+        // Начало is one column, on a big screen too.
         just || t.played || user.peek()?.email || fromMail ? null : haveProfile(load),
+        just || t.played ? null : h("p", { class: "day-next" }, h("a", { href: "/room" }, "Влез в стая с код")),
         // Mid-December into January: the year in the game, a tap away.
         yearCard(),
       ),
@@ -332,11 +344,9 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
         // its games are on, Роял shows to everyone, a new player too: a full evening is the best way to meet it.
         just || t.played
           ? modes(t.royal ? ["duel", "royal", "room"] : ["duel", "room"], "С други")
-          : [
-              t.royalNow ? modes(["royal"], "С други") : null,
-              // A room's code from a friend or a teacher works from the first visit: the way in, in a line.
-              h("p", { class: "day-next" }, h("a", { href: "/room" }, "Влез в стая с код")),
-            ],
+          : t.royalNow
+            ? modes(["royal"], "С други")
+            : null,
       ),
       topics(),
     );
@@ -552,30 +562,37 @@ const shareOf = (lv?: Today["level"]) =>
 const streakMarks = [3, 7, 30, 100, 365];
 
 /** The streak and the level just grown by the day played (`was` before it, `now` after), moved there in their chips
- * once the result has landed (`delay`): the streak's number rolls on (unless a round one, told in a sheet), the
- * level's bar fills. Without the game's feel loaded, or with less motion, they are simply as they are. */
-function grow(row: HTMLElement, was: Today, now: Today, delay: number): void {
+ * once the result has landed (`after`): the streak's number rolls on (unless a round one, told in a sheet), the
+ * level's bar fills a moment later. Resolves once both are over, for what's big to come after them (news.ts), never
+ * over them. Without the game's feel loaded, or with less motion, they are simply as they are. */
+async function grow(row: HTMLElement, was: Today, now: Today, after: Promise<void>): Promise<void> {
   const kit = feelKit();
   if (!kit) return;
+  const moving: Promise<void>[] = [];
   const streak = row.querySelector<HTMLElement>(".streak-chip");
   if (streak && now.streak === was.streak + 1 && !streakMarks.includes(now.streak)) {
     // The flame stays as it was before the day (unlit, or cold without a streak) until its number rolls on: then it
     // lights, swelling once.
     const off = was.streak ? "unlit" : "cold";
     streak.classList.add(off);
-    setTimeout(() => streak.classList.remove(off), delay);
-    kit.streak(streak, now.streak, delay, hands());
+    after.then(() => streak.classList.remove(off));
+    moving.push(kit.streak(streak, now.streak, after, hands()));
   }
   const chip = row.querySelector<HTMLElement>(".level-chip");
   if (chip && was.level && now.level && now.open?.xp)
-    kit.level(
-      chip,
-      { level: was.level.level, share: shareOf(was.level), left: `още ${was.level.to - was.level.xp} XP` },
-      { level: now.level.level, share: shareOf(now.level), left: `още ${now.level.to - now.level.xp} XP` },
-      delay + 200,
-      hands(),
+    moving.push(
+      kit.level(
+        chip,
+        { level: was.level.level, share: shareOf(was.level), left: `още ${was.level.to - was.level.xp} XP` },
+        { level: now.level.level, share: shareOf(now.level), left: `още ${now.level.to - now.level.xp} XP` },
+        after.then(() => wait(200)),
+        hands(),
+      ),
     );
+  await Promise.all(moving);
 }
+
+const wait = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
 /** The day's ten, not played yet, as the day's issue: its dateline (the weekday and the issue over the date, set
  * large), what they are, and the gold button; or, left half-way (`marks`: how the questions answered went), where the

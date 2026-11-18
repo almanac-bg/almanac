@@ -85,11 +85,17 @@ interface MovedGoal {
 }
 
 /** What a game earned, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends).
- * The one big thing among it, if any (`round`: the streak reached a round number with this game), is brought forward
- * in a sheet once the result has landed (feel.ts), with its sound then; everything else plays its sound as it comes.
- * Told `late` (on Начало, of a game whose result was never on screen), it's said without a sheet or a sound, under a
- * line that says whose it is (`late.title`), if any. */
-export function news(run: number, delay = 0, round?: Promise<number>, late?: { title?: string }): Child {
+ * The one big thing among it, if any, is brought forward in a sheet once the result has landed (feel.ts), with its
+ * sound then; everything else plays its sound as it comes. The day's ten bring their `streak`: whether it reached one
+ * of its round numbers (`round`, the big thing then), and its moment in the chips (`grown`), which the sheet waits
+ * for, so that it never covers the streak rolling on. Told `late` (on Начало, of a game whose result was never on
+ * screen), it's said without a sheet or a sound, under a line that says whose it is (`late.title`), if any. */
+export function news(
+  run: number,
+  delay = 0,
+  streak?: { round: Promise<number>; grown: Promise<unknown> },
+  late?: { title?: string },
+): Child {
   const data = signal<News | null>(null);
   let gone = false;
   const t = setTimeout(
@@ -99,13 +105,14 @@ export function news(run: number, delay = 0, round?: Promise<number>, late?: { t
           data.set(n);
           if (late) return;
           const kit = feelKit();
-          const top = kit && bigOne(n, (await round) ?? 0);
+          const top = kit && bigOne(n, (await streak?.round) ?? 0);
           if (!kit || !top) {
             const sound = loudest(n);
             if (sound) play(sound);
             return;
           }
           await landed(run);
+          await streak?.grown;
           if (gone) return;
           haptic("big");
           kit.sheet(top.parts, top.sound, top.glow, { ...hands(), play: voice }, top.actions);
