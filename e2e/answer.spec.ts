@@ -1,8 +1,11 @@
 // The moment of an answer on a phone, upright and on its side, and on a laptop: the answer comes into place in one
 // movement (run.ts, settle). The head holds still while the page moves, the right answer is never under the panel
 // docking at the screen's foot, and it ends between the two, in sight, its pop waiting for it to get there.
+
+import { readdirSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
-import { answer, moveOn, startDay } from "./play.ts";
+import { answer, dealt, moveOn, startDay } from "./play.ts";
 
 /** What watching an answer come into place saw: how many times the head changed size, in how many frames the right
  * answer was under the panel, and the right answer's way and pop: where it was drawn as the panel showed and where it
@@ -36,7 +39,9 @@ async function watch(page: Page): Promise<void> {
     const frame = (t: number) => {
       const panel = shown();
       const right = document.querySelector(".run-question button.option.right");
-      if (panel && right && right.getBoundingClientRect().bottom > panel.getBoundingClientRect().top + 1)
+      // Under the panel docked at the screen's foot (a phone's: beside the question on a laptop, it's never over it).
+      const docked = panel && getComputedStyle(panel).position === "fixed";
+      if (docked && right && right.getBoundingClientRect().bottom > panel.getBoundingClientRect().top + 1)
         seen.covered++;
       if (panel && !from) from = t;
       if (panel && right) {
@@ -66,14 +71,16 @@ async function watch(page: Page): Promise<void> {
   });
 }
 
-/** Where the right answer of a choice ended: between the head and the panel. */
+/** Where the right answer of a choice ended: between the head and the panel docked at the screen's foot (on a
+ * laptop, the panel beside it: the screen's foot). */
 async function inSight(page: Page): Promise<void> {
   const at = await page.evaluate(() => {
     const box = (s: string) => document.querySelector(s)?.getBoundingClientRect();
     const right = box(".run-question button.option.right");
-    return (
-      right && { top: right.top, bottom: right.bottom, head: box(".question-top")?.bottom, panel: box(".after")?.top }
-    );
+    const panel = document.querySelector(".after");
+    const foot =
+      panel && getComputedStyle(panel).position === "fixed" ? panel.getBoundingClientRect().top : innerHeight;
+    return right && { top: right.top, bottom: right.bottom, head: box(".question-top")?.bottom, panel: foot };
   });
   if (!at) return;
   expect(at.top).toBeGreaterThanOrEqual((at.head ?? 0) - 1);
@@ -96,11 +103,17 @@ async function factInSight(page: Page): Promise<void> {
  * waited until they were there. */
 async function playWatching(
   page: Page,
-  { before, after }: { before?: () => Promise<void>; after?: () => Promise<void> } = {},
+  {
+    before,
+    after,
+    start = async () => {
+      await page.goto("/");
+      await startDay(page);
+    },
+  }: { before?: () => Promise<void>; after?: () => Promise<void>; start?: () => Promise<void> } = {},
 ): Promise<number> {
   test.slow(); // ten questions, each watched to its fact
-  await page.goto("/");
-  await startDay(page);
+  await start();
   let far = 0;
   for (let n = 0; n < 10; n++) {
     await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
@@ -112,8 +125,8 @@ async function playWatching(
     expect(seen.flips, `question ${n + 1}: the head changed size as the answer came into place`).toBeLessThanOrEqual(1);
     expect(seen.covered, `question ${n + 1}: the right answer was under the panel`).toBe(0);
     const r = seen.right;
-    // What shows on a picture later (how everyone answered) doesn't make it taller, out of the room it settled in.
-    if (r?.pic) expect(r.tall[1], `question ${n + 1}: the right answer grew once in place`).toBe(r.tall[0]);
+    // What shows on an answer later (how everyone answered) doesn't make it taller, out of the room it settled in.
+    if (r) expect(r.tall[1], `question ${n + 1}: the right answer grew once in place`).toBe(r.tall[0]);
     if (r && Math.abs(r.to - r.from) > r.height / 2 && r.pop.length === 2) {
       far++;
       expect(r.pop[1], `question ${n + 1}: the right answer popped on its way`).toBe(r.pop[0]);
@@ -232,7 +245,7 @@ async function sideways(page: Page): Promise<void> {
 test.describe("on a laptop", () => {
   test.use({ viewport: { width: 1366, height: 650 }, isMobile: false, hasTouch: false });
 
-  test("„Готово“ and „Отговори“ stay in sight while the clock runs, and the answer comes into place in one movement", async ({
+  test("„Готово“ and „Отговори“ stay in sight while the clock runs, and the answer comes beside the question", async ({
     page,
   }) => {
     await playWatching(page, {
@@ -242,23 +255,114 @@ test.describe("on a laptop", () => {
         const box = await send.boundingBox();
         expect(box && box.y + box.height).toBeLessThanOrEqual(650);
       },
-      // The answer shows under the question, its first line still in sight under the head; the verdict too, over
-      // „Напред“ at the screen's foot.
-      after: async () => {
-        const at = await page.evaluate(() => {
-          const box = (s: string) => document.querySelector(s)?.getBoundingClientRect();
-          return {
-            ask: box(".run-question .ask")?.top ?? 0,
-            head: box(".question-top")?.bottom ?? 0,
-            verdict: box(".after .verdict")?.bottom ?? 0,
-            go: box(".after .up-next-go")?.top ?? 0,
-          };
-        });
-        expect(at.verdict, "the verdict is over „Напред“").toBeLessThanOrEqual(Math.min(at.go, 650) + 1);
-        // The question's first line goes under the head only where the verdict wouldn't show otherwise.
-        if (at.verdict < at.go - 16)
-          expect(at.ask, "the question's first line is under the head").toBeGreaterThanOrEqual(at.head - 1);
-      },
+      after: () => beside(page),
     });
   });
+
+  test("every kind of question has its answer beside it, the fact whole in sight, a day's line and the longest fact too", async ({
+    page,
+  }) => {
+    // A game of one of each kind (the sample's day has no choice of pictures, and a split or clues, not both): its
+    // first choice shown as pictures, as the bank's are, and two answers given a day's line and the longest fact the
+    // bank takes (bank/check.go: 100 and 200 letters), as a question dealt on its own date has.
+    const ids = oneOfEach();
+    const flags = ["f0f6ec7e0b258f30", "703d76f0fe3c120e", "dc6a9216ca85cb89", "087b5a8d2e985d04"];
+    const [pictured, dated] = [1, [6, 9]];
+    await page.route(/\/api\/runs\//, async (route) => {
+      const res = await route.fetch();
+      const s = await res.json().catch(() => null);
+      const answered = route.request().postDataJSON()?.n;
+      if (s?.reveal && answered === pictured) s.reveal.names = ["Литва", "Боливия", "Босна и Херцеговина", "Габон"];
+      if (s?.reveal && dated.includes(answered)) {
+        s.reveal.day = "През 1878 г. в Сан Стефано е подписан мирният договор, с който България се връща на картата.";
+        s.reveal.fact =
+          "Договорът е подписан в предградие на Цариград, а датата му става национален празник едва през 1990 г., " +
+          "след дълги спорове в Народното събрание, и оттогава се чества всяка година с голямо внимание.";
+      }
+      const question = (s?.run ?? s?.state ?? s)?.question;
+      if (question?.n === pictured && question.view?.choices) {
+        delete question.view.choices;
+        question.view.pictures = flags.map((f) => ({
+          src: `/qimg/${f}-600.webp`,
+          srcset: `/qimg/${f}-600.webp 600w, /qimg/${f}.webp 1200w`,
+          w: 1200,
+          h: 720,
+          alt: "Знаме",
+        }));
+      }
+      if (dated.includes(question?.n)) question.onThisDay = true;
+      await route.fulfill({ response: res, json: s });
+    });
+    const kinds = new Set<string>();
+    await playWatching(page, {
+      start: async () => {
+        await page.goto("/");
+        await dealt(page, "history", ids);
+        // The topic's game is under way (dealt), so its page goes on with it.
+        await page.goto("/play/history");
+        await page.getByRole("button", { name: "Продължи", exact: true }).click();
+        await page.getByRole("button", { name: "Започни сега" }).click();
+      },
+      before: async () => {
+        kinds.add(
+          await page.evaluate(() => {
+            const q = document.querySelector(".run-question");
+            const kind = ["pic-options", "picture", "keypad", "sortable-list", "match", "split", "clues", "tf-options"];
+            return kind.find((k) => q?.querySelector(`.${k}`)) ?? "choice";
+          }),
+        );
+      },
+      after: () => beside(page),
+    });
+    expect([...kinds].sort()).toEqual(
+      ["choice", "clues", "keypad", "match", "pic-options", "picture", "sortable-list", "split", "tf-options"].sort(),
+    );
+  });
 });
+
+/** The sample bank's questions, one of each kind, in the order a game deals them here: a choice, a choice (shown as
+ * pictures), a choice under a picture, „Вярно или невярно“, an order, pairs, groups, clues, a number and a choice. */
+function oneOfEach(): string[] {
+  const dir = resolve(import.meta.dirname, "../bank/sample/questions");
+  const all = readdirSync(dir).flatMap(
+    (f) => JSON.parse(readFileSync(resolve(dir, f), "utf8")) as { id: string; type: string; image?: unknown }[],
+  );
+  const of = (type: string, image = false, skip = 0) =>
+    all.filter((q) => q.type === type && !!q.image === image)[skip]?.id ?? "";
+  return [
+    of("choice"),
+    of("choice", false, 1),
+    of("choice", true),
+    of("truefalse"),
+    of("order"),
+    of("match"),
+    of("split"),
+    of("clues"),
+    of("number"),
+    of("choice", false, 2),
+  ];
+}
+
+/** Where the answer ended, on a laptop: in its own column beside the question; the verdict, the fact whole and
+ * „Напред“ in sight on the screen, nothing over them. */
+async function beside(page: Page): Promise<void> {
+  const at = await page.evaluate(() => {
+    const box = (s: string) => document.querySelector(s)?.getBoundingClientRect();
+    const seen = (s: string, x: number, y: number) =>
+      y >= 0 && y <= innerHeight && !!document.elementFromPoint(x, y)?.closest(s);
+    const fact = box(".after .fact");
+    const go = box(".after .up-next-go");
+    const verdict = box(".after .verdict");
+    return {
+      question: box(".run-question .answering")?.right ?? 0,
+      panel: box(".after")?.left ?? 0,
+      verdict: !!verdict && seen(".verdict", verdict.left + 8, verdict.top + verdict.height / 2),
+      fact: !fact || (seen(".fact", fact.left + 8, fact.top + 4) && seen(".fact", fact.left + 8, fact.bottom - 4)),
+      go: !!go && seen(".up-next-go", go.left + go.width / 2, go.top + 4) && go.bottom <= innerHeight,
+    };
+  });
+  expect(at.panel, "the answer is beside the question").toBeGreaterThan(at.question);
+  expect(at.verdict, "the verdict is in sight").toBe(true);
+  expect(at.fact, "the fact is in sight, whole").toBe(true);
+  expect(at.go, "„Напред“ is in sight").toBe(true);
+}
