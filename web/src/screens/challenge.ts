@@ -17,7 +17,7 @@ import type { State } from "../game/types.ts";
 import { loadDuelResult } from "../kit.ts";
 import { ApiError, api, errorText } from "../lib/api.ts";
 import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
-import { byTap, go, goBack, hold, redirect, release, rename, title } from "../lib/router.ts";
+import { backOut, byTap, go, hold, redirect, release, rename, title } from "../lib/router.ts";
 import { listWords, withName } from "../lib/words.ts";
 import { bulgaria, categories, player, topics, user } from "../state.ts";
 import { back, failure, formatNumber, type Look, topicMark, who } from "../ui.ts";
@@ -404,16 +404,18 @@ export function challengeFriend([idText]: string[]) {
               fail(err);
             }
           },
-          () => goBack("/duel"),
+          () => backOut("/duel", startHere),
         ),
       );
     };
+    const startHere = () =>
+      screen.show(() =>
+        startScreen(duelWith(name), `Десет въпроса. Играеш сега, а ${name} има три дни за своя ред.`, null, () =>
+          ready().catch(fail),
+        ),
+      );
     if (tap) return ready();
-    screen.show(() =>
-      startScreen(duelWith(name), `Десет въпроса. Играеш сега, а ${name} има три дни за своя ред.`, null, () =>
-        ready().catch(fail),
-      ),
-    );
+    startHere();
   })().catch(fail);
   return h("div", null, screen);
 }

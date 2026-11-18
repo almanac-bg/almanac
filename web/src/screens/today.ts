@@ -21,6 +21,7 @@ import { inApp } from "../lib/app.ts";
 import { boot } from "../lib/boot.ts";
 import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
+import { type RemindAsks, remindAnswered, remindAsks, remindShown } from "../lib/keep.ts";
 import { place } from "../lib/ordinal.ts";
 import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { goBack, hold, release, title } from "../lib/router.ts";
@@ -750,42 +751,43 @@ function untilMidnight(): string {
   return minutes % 60 ? `${hours} ч и ${minutes % 60} мин` : `${hours} ч`;
 }
 
-/** Where the reminder's asks are kept, on this device (notifications are a device's): how many, the last one's day. */
+/** Where the reminder's asks are kept, on this device (notifications are a device's): lib/keep.ts, RemindAsks. */
 const remindKey = "almanac.remind-ask";
 
 /** The day played, in its card for tomorrow: shall we remind the player? By notification where one can come and isn't
  * on yet. Where none can (an iPhone in a browser tab, a browser without them, or one told to refuse them, there and
  * then too), by mail (keep.ts, mailAsk: a guest's email, proved by its code, keeps the game as well), unless it's on
  * already; never in an app's own browser, where the way out to the phone's leads (keepLine). At most three times,
- * and never twice in a day. `mailing`: the ask by mail is asking a guest for an email. */
+ * and never twice in a day. `mailing`: the ask by mail is asking a guest for an email, or was told „Не сега“ today
+ * (one „Не сега“ is enough for the email asked for both ways). */
 function remindAsk(day: string, stake: () => string | null): { view: Child; mailing: () => boolean } {
-  let asked = { n: 0, day: "", shown: "" };
+  let asked = remindAsks(null);
   try {
-    asked = { ...asked, ...JSON.parse(localStorage.getItem(remindKey) ?? "{}") };
+    asked = remindAsks(localStorage.getItem(remindKey));
   } catch {
     // no storage here: ask
   }
+  const save = (next: RemindAsks) => {
+    asked = next;
+    try {
+      localStorage.setItem(remindKey, JSON.stringify(next));
+    } catch {
+      // not kept: asked (and counted) again next time
+    }
+  };
   const refused = () => !inApp && typeof Notification !== "undefined" && Notification.permission === "denied";
   const by = signal<"push" | "mail" | null>(pushable() && !refused() ? "push" : app ? null : "mail");
   const state = signal<"ask" | "on" | "gone">("gone");
-  const mailing = () => by() === "mail" && state() === "ask" && !user()?.email;
+  const mailNo = signal(asked.mailNo === day);
+  const mailing = () => by() === "mail" && (state() === "ask" || mailNo()) && !user()?.email;
   if (asked.n >= 3 || asked.day === day || !by.peek()) return { view: null, mailing };
-  const keep = (n: number) => {
-    try {
-      localStorage.setItem(remindKey, JSON.stringify({ n, day }));
-    } catch {
-      // not kept: asked again next time
-    }
-  };
-  // Counted once a day on a device (play/measure.go), however often Начало is drawn.
+  // Each way of asking counted once a day on a device (play/measure.go), however often Начало is drawn.
   const shown = () => {
-    if (asked.shown === day) return;
-    tally(by.peek() === "push" ? "pushask:shown" : "mailask:shown");
-    try {
-      localStorage.setItem(remindKey, JSON.stringify({ ...asked, shown: day }));
-    } catch {
-      // counted again next time
-    }
+    const how = by.peek() ?? "mail";
+    const next = remindShown(asked, how, day);
+    if (!next) return;
+    tally(how === "push" ? "pushask:shown" : "mailask:shown");
+    save(next);
   };
   const ask = () => {
     state.set("ask");
@@ -808,13 +810,14 @@ function remindAsk(day: string, stake: () => string | null): { view: Child; mail
     try {
       const why = await turnOn();
       if (!why) {
-        keep(3);
+        save(remindAnswered(asked, "push", day, true));
         state.set("on");
         tally("pushask:yes");
       } else if (refused() && !app) {
-        // Told no just now: the mail, then.
+        // Told no just now: the mail, then, an ask of its own.
         error.set(why);
         by.set("mail");
+        shown();
       } else error.set(why);
     } catch (err) {
       reportProblem(`reminder ask: ${(err as Error).name}: ${(err as Error).message}`);
@@ -822,9 +825,11 @@ function remindAsk(day: string, stake: () => string | null): { view: Child; mail
     }
   };
   const no = () => {
-    keep(asked.n + 1);
+    const how = by.peek() ?? "mail";
+    save(remindAnswered(asked, how, day, false));
+    mailNo.set(how === "mail");
     state.set("gone");
-    tally(by.peek() === "push" ? "pushask:no" : "mailask:no");
+    tally(how === "push" ? "pushask:no" : "mailask:no");
   };
   const view = () => {
     if (state() === "gone") return null;
@@ -841,7 +846,7 @@ function remindAsk(day: string, stake: () => string | null): { view: Child; mail
           stake,
           no,
           yes: () => {
-            keep(3);
+            save(remindAnswered(asked, "mail", day, true));
             tally("mailask:yes");
           },
         }),

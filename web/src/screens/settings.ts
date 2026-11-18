@@ -5,6 +5,7 @@ import type { Kit } from "../kit.ts";
 import type { Child, Signal } from "../lib/dom.ts";
 import type { PushKind, PushPrefs } from "../lib/push.ts";
 import type { User } from "../state.ts";
+import type { MailPrefs } from "./keep.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
@@ -355,13 +356,25 @@ function access(): Child {
 /** Mail for whom no notification reaches, on any device (a player with an email, proved by its code): the day's
  * reminder (server/daymail.go) and the mail when a streak ends (server/streakmail.go), a switch each. A guest where
  * notifications can't come here (`ask`) is offered the reminder by mail, which keeps their game with the email too
- * (mailAsk). */
+ * (mailAsk), which says what came of it above the switches once it's on. */
 function byMail(ask: () => boolean) {
-  type Prefs = { streak: boolean; day: boolean; can: boolean };
+  type Prefs = MailPrefs;
   const prefs = signal<Prefs | null>(null);
   const error = signal("");
+  // Each change here (a switch, the guest's ask turning the reminder on) makes the prefs asked for before it stale:
+  // their answer, coming after, would put a switch back.
+  let asked = 0;
+  const now = (p: Prefs) => {
+    asked++;
+    prefs.set(p);
+  };
   const load = () => {
-    if (user.peek()?.email) api<Prefs>("GET", "/api/mail/prefs").then(prefs.set, () => {});
+    const n = ++asked;
+    if (user.peek()?.email)
+      api<Prefs>("GET", "/api/mail/prefs").then(
+        (p) => n === asked && prefs.set(p),
+        () => {},
+      );
     else prefs.set(null);
   };
   // Again as an email is added (a guest signing in here), or the player signs out.
@@ -373,34 +386,39 @@ function byMail(ask: () => boolean) {
     const was = prefs.peek();
     if (!was) return;
     error.set("");
-    prefs.set({ ...was, [kind]: on });
+    now({ ...was, [kind]: on });
     try {
-      prefs.set(await api("PATCH", "/api/mail/prefs", { kind, on }));
+      now(await api<Prefs>("PATCH", "/api/mail/prefs", { kind, on }));
     } catch (err) {
-      prefs.set(was);
+      now(was);
       error.set(errorText(err));
     }
   };
-  const row = () =>
-    prefs()?.can
-      ? [
-          switchRow(
-            "Напомняне по имейл",
-            "Веднъж на ден, около часа, в който играеш, ако въпросите още те чакат.",
-            () => prefs()?.day ?? false,
-            set("day"),
-          ),
-          switchRow(
-            "Имейл, когато серията ти прекъсне",
-            "Едно писмо, ако серия от 5 дни или повече прекъсне. Най-много едно на 30 дни.",
-            () => prefs()?.streak ?? false,
-            set("streak"),
-          ),
-          () => error() && h("p", { class: "bad", role: "alert" }, error()),
-        ]
-      : !user()?.email && ask()
-        ? mailAsk({ folded: true })
-        : null;
+  // The guest's ask: once it's turning the reminder on (their email given and proved), it stays to say what came of
+  // it (the game kept, the reminder on), over the switches that come with the email.
+  const turning = signal(false);
+  const guestAsk = mailAsk({ folded: true, turning: () => turning.set(true), yes: now });
+  const row: Child = [
+    () => (turning() || (!user()?.email && ask()) ? guestAsk : null),
+    () =>
+      prefs()?.can
+        ? [
+            switchRow(
+              "Напомняне по имейл",
+              "Веднъж на ден, около часа, в който играеш, ако въпросите още те чакат.",
+              () => prefs()?.day ?? false,
+              set("day"),
+            ),
+            switchRow(
+              "Имейл, когато серията ти прекъсне",
+              "Едно писмо, ако серия от 5 дни или повече прекъсне. Най-много едно на 30 дни.",
+              () => prefs()?.streak ?? false,
+              set("streak"),
+            ),
+            () => error() && h("p", { class: "bad", role: "alert" }, error()),
+          ]
+        : null,
+  ];
   return { row, load };
 }
 

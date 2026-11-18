@@ -66,21 +66,32 @@ export function keepLine(stake: () => string | null, quiet: () => boolean): Chil
   ];
 }
 
+/** The mail a player with an email gets (server/streakmail.go, mailPrefs): the day's reminder, the mail when a streak
+ * ends, and whether mail goes to them at all (`can`: an email, and no notification reaching them). */
+export interface MailPrefs {
+  streak: boolean;
+  day: boolean;
+  can: boolean;
+}
+
 /** The day's reminder by mail (server/daymail.go), asked for where no notification can come here. A player with an
  * email turns it on with a tap; a guest gives one, and the code sent to it, which keeps their game too (`stake`,
  * said first, is what it risks till then). What came of it is said in its place. `no`: a „Не сега“ under it
- * (Начало's ask); `folded`: the guest's form a tap away (Настройки, where the profile's own is further down); `yes`:
- * told once it's on. */
+ * (Начало's ask); `folded`: the guest's form a tap away (Настройки, where the profile's own is further down);
+ * `turning`: told as it's being turned on (before a guest's email is set as theirs); `yes`: told once it's on, with
+ * the mail as it is now. */
 export function mailAsk({
   stake,
   no,
   folded = false,
+  turning,
   yes,
 }: {
   stake?: () => string | null;
   no?: () => void;
   folded?: boolean;
-  yes?: () => void;
+  turning?: () => void;
+  yes?: (now: MailPrefs) => void;
 }): Child {
   const said = signal("");
   const error = signal("");
@@ -90,12 +101,13 @@ export function mailAsk({
   const turnOn = async (kept: string) => {
     saving.set(true);
     error.set("");
+    turning?.();
     try {
-      const r = await api<{ day: boolean; can: boolean }>("PATCH", "/api/mail/prefs", { kind: "day", on: true });
+      const r = await api<MailPrefs>("PATCH", "/api/mail/prefs", { kind: "day", on: true });
       said.set(
         `${kept || "Готово."} ${r.can ? "Ще ти напомняме по имейл, ако въпросите още те чакат." : "Напомнянията ще идват като известия, както досега."}`,
       );
-      yes?.();
+      yes?.(r);
     } catch (err) {
       error.set(errorText(err));
     } finally {

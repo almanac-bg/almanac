@@ -268,6 +268,18 @@ export function goBack(fallback: string): void {
   else go(fallback, true);
 }
 
+/** Backs out of a game's count („Откажи“): back where the screen was come to from (goBack); a game holding an entry of
+ * its own (hold: a page opened from outside the app, Начало under it) gives it back instead, and its screen's start
+ * shows again in place (`stay`), not Начало. */
+export function backOut(fallback: string, stay: () => void): void {
+  if (!entry().game) {
+    goBack(fallback);
+    return;
+  }
+  release();
+  stay();
+}
+
 /** Whether the screen shown was opened by a tap in the app, rather than come to by back or forward, a reload or a link
  * from outside: a game counts in only after a tap. */
 export const byTap = (): boolean => tapped;
@@ -327,6 +339,7 @@ let drawing = false;
 
 /** Draws the screen of the page shown (`first`: as the page loads). */
 function render(scrollTop: boolean, first = false): void {
+  stopRestoring(); // the place the screen before was put back at isn't this one's
   if (!first && anew()) {
     // The page fallen behind: this screen comes with the page loaded anew, as it was come to.
     if (tapped) mark({ tap: true });
@@ -390,27 +403,28 @@ function settle(): void {
 let restoring = false;
 let stopRestoring = () => {};
 
+/** What ends the wait to put the page back (restore): the player scrolling, pressing a key, or touching or clicking
+ * anywhere (a click may open another screen, or open something on this one). */
+const playerMoves = ["wheel", "touchstart", "pointerdown", "mousedown", "keydown"];
+
 /** Puts the page back where it was scrolled to (`y`), once it's tall enough, and keeps it there while the screen draws
- * what it loads a moment after it opens: tall enough already, what loads above would otherwise move it (the browser's
- * scroll anchoring). A scroll or a key of the player's, or two seconds, end the wait. */
+ * what it loads after it opens: tall enough already, what loads above would otherwise move it (the browser's scroll
+ * anchoring). A move of the player's (playerMoves), another screen drawn (render), or five seconds end the wait. */
 function restore(y = 0): void {
   stopRestoring();
   scrollTo(0, y);
   if (y <= 0) return;
   restoring = true;
-  const until = performance.now() + 2000;
-  const seen = new ResizeObserver(() => {
-    scrollTo(0, y);
-    if (performance.now() > until) stop();
-  });
+  const seen = new ResizeObserver(() => scrollTo(0, y));
   const stop = () => {
     restoring = false;
     seen.disconnect();
     clearTimeout(timeout);
-    for (const e of ["wheel", "touchstart", "keydown"]) removeEventListener(e, stop);
+    for (const e of playerMoves) removeEventListener(e, stop, true);
+    if (stopRestoring === stop) stopRestoring = () => {};
   };
-  const timeout = setTimeout(stop, 2000);
-  for (const e of ["wheel", "touchstart", "keydown"]) addEventListener(e, stop, { passive: true });
+  const timeout = setTimeout(stop, 5000);
+  for (const e of playerMoves) addEventListener(e, stop, { capture: true, passive: true });
   seen.observe(root);
   stopRestoring = stop;
 }

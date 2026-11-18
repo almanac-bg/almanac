@@ -232,7 +232,7 @@ func (s *Server) mailOffURL(userID int64, kind mailKind) string {
 
 var mailOffPage = template.Must(template.New("off").Parse(`{{if .Done}}
 <p role="status">Готово. {{if .Day}}Няма да ти пишем, когато въпросите на деня те чакат.{{else}}Няма да ти пращаме писма, когато серията ти прекъсне.{{end}}</p>
-<p class="muted">Ако размислиш, включи ги пак от <a href="/settings">Профил → Настройки → Известия</a>.</p>
+<p class="muted">Ако размислиш, включи писмата пак от <a href="/settings">Профил → Настройки → Известия</a>.</p>
 {{else if .Bad}}
 <p>Тази връзка не работи. Писмата можеш да спреш и от <a href="/settings">Профил → Настройки → Известия</a>.</p>
 {{else if .Day}}

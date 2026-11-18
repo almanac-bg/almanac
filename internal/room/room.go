@@ -41,7 +41,8 @@
 // the questions they've dealt, and the game under way or just over as it stands: every answer and point. A game cut
 // by the restart goes on as if it hadn't stopped: the question showing has the time it had left (at least comeBack),
 // and the players whose screens were open count as there for comeBack, while their screens come back by themselves,
-// so that the first answer back doesn't end the question for the others. A game over whose players' games weren't
+// so that the first answer back doesn't end the question for the others; a host on their way in to a room just opened
+// is waited for the rest of hostWait, as before. A game over whose players' games weren't
 // all kept yet is kept then. The server saves the rooms every 15 seconds when they've changed, and at once as a game
 // ends and as it's kept (Hub.Saving), so that a crash loses no more than those seconds of a game, and no game's end.
 //
@@ -297,20 +298,29 @@ func (h *Hub) Open(host Player, from string, s Settings) (*Room, error) {
 	} else {
 		r.add(host).back = back
 	}
-	// Still not in by then (no screen of theirs ever on the room): the others' screens look again, and whoever's there
-	// may lead.
-	safe.AfterFunc(hostWait, "room: the host's wait", func() {
+	r.waitHost(back)
+	return r, nil
+}
+
+// waitHost has the others' screens look again as the host's wait (hostWait) ends at back, the host still not in by
+// then (no screen of theirs ever on the room): whoever's there may lead.
+func (r *Room) waitHost(back time.Time) {
+	safe.AfterFunc(time.Until(back), "room: the host's wait", func() {
 		r.mu.Lock()
 		defer r.mu.Unlock()
-		waited := r.hostBack
-		if m := r.member(r.host); m != nil {
-			waited = m.back
-		}
-		if !r.closed && waited.Equal(back) {
+		if !r.closed && r.hostWaited().Equal(back) {
 			r.changed()
 		}
 	})
-	return r, nil
+}
+
+// hostWaited is until when the host counts as there with no screen of theirs on the room (back). Called with the lock
+// held, or before anyone sees the room.
+func (r *Room) hostWaited() time.Time {
+	if m := r.member(r.host); m != nil {
+		return m.back
+	}
+	return r.hostBack
 }
 
 // Get finds an open room.
@@ -387,12 +397,14 @@ type saved struct {
 	Settings
 	Host     int64  `json:"host"`
 	HostName string `json:"hostName,omitempty"`
-	// HostAway is a host leading with no screen on the room.
-	HostAway bool   `json:"hostAway,omitempty"`
-	Held     bool   `json:"held,omitempty"`
-	Locked   bool   `json:"locked,omitempty"`
-	From     string `json:"from,omitempty"`
-	Phase    Phase  `json:"phase"`
+	// HostAway is a host leading with no screen on the room; HostBack until when one leading counts as there with
+	// none (back: the room just opened, its host on their way in).
+	HostAway bool      `json:"hostAway,omitempty"`
+	HostBack time.Time `json:"hostBack,omitzero"`
+	Held     bool      `json:"held,omitempty"`
+	Locked   bool      `json:"locked,omitempty"`
+	From     string    `json:"from,omitempty"`
+	Phase    Phase     `json:"phase"`
 	// Picks are the game's questions (one under way, or just over), and N the one showing; Game the game's id and
 	// Planned how many questions it was dealt (Finish may have cut Picks short).
 	Picks   []play.Pick `json:"picks,omitempty"`
@@ -425,8 +437,10 @@ type savedMember struct {
 	// Asked is a player the host has asked for another name, and Refused the names taken away (AskName).
 	Asked   bool     `json:"asked,omitempty"`
 	Refused []string `json:"refused,omitempty"`
-	// Away is a player with no screen on the room: they aren't waited for once it's back.
+	// Away is a player with no screen on the room: they aren't waited for once it's back. Back is until when they
+	// count as there with none (member.back: the host of a room just opened, on their way in).
 	Away    bool          `json:"away,omitempty"`
+	Back    time.Time     `json:"back,omitzero"`
 	Points  int           `json:"points,omitempty"`
 	Rights  int           `json:"rights,omitempty"`
 	InRow   int           `json:"inRow,omitempty"`
@@ -481,7 +495,7 @@ func (h *Hub) Save(w io.Writer) error {
 func (r *Room) saved(now time.Time) saved {
 	sv := saved{Code: r.code, Key: r.key, Settings: r.Settings, Host: r.host, HostName: r.hostName, Held: r.held,
 		Locked: r.locked, From: r.from, Phase: r.phase, Opened: r.opened, Active: r.active, Joined: r.joined, SavedAt: now,
-		HostAway: r.Lead && away(r.hostOnline, r.hostBack, r.hostLeft, now)}
+		HostAway: r.Lead && away(r.hostOnline, r.hostBack, r.hostLeft, now), HostBack: r.hostBack}
 	played := r.phase != Lobby
 	if played {
 		sv.Picks, sv.N, sv.Game, sv.Planned = r.picks, r.n, r.gameID, r.planned
@@ -492,7 +506,7 @@ func (r *Room) saved(now time.Time) saved {
 	}
 	for _, m := range r.players {
 		sm := savedMember{ID: m.ID, Key: m.key, Name: m.Name, Here: m.RoomName, Look: m.Look,
-			Away: away(m.online, m.back, m.left, now), Asked: m.asked, Refused: m.refused}
+			Away: away(m.online, m.back, m.left, now), Back: m.back, Asked: m.asked, Refused: m.refused}
 		if played {
 			sm.Points, sm.Rights, sm.InRow, sm.Ms, sm.Run = m.points, m.rights, m.inRow, m.ms, m.run
 			for _, l := range m.log {
@@ -542,7 +556,7 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 		}
 		r.mu.Lock() // as the hub's is: nobody sees the room yet, but its clocks will
 		if sv.Lead && !sv.HostAway {
-			r.hostBack = now.Add(comeBack)
+			r.hostBack = later(now.Add(comeBack), sv.HostBack)
 		}
 		if l, m, err := play.RoomGame(r.Length, r.Mix); err == nil {
 			r.Length, r.Mix = l, m
@@ -584,7 +598,7 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 				m.key = sm.Key
 			}
 			if !sm.Away {
-				m.back = now.Add(comeBack)
+				m.back = later(now.Add(comeBack), sm.Back)
 			}
 			if r.phase == Lobby {
 				continue
@@ -633,6 +647,11 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 				r.record()
 			}
 		}
+		// The host still on their way in (hostWait), as they were before the restart: the rest of the wait, and the
+		// others' screens told as it ends.
+		if back := r.hostWaited(); back.After(now.Add(comeBack)) {
+			r.waitHost(back)
+		}
 		r.mu.Unlock()
 		h.rooms[r.code] = r
 		n++
@@ -657,7 +676,7 @@ type Room struct {
 	// qr is the room's link as a QR code, once drawn (QR).
 	qr string
 	// hostOnline is how many screens the host leading from (Lead) has open: they're no member. hostBack, as a member's
-	// back: until then, after a restart, they count as there.
+	// back: until then (the room just opened, or after a restart) they count as there.
 	hostOnline         int
 	hostBack, hostLeft time.Time
 	// held: an answer stays up until the host moves on (Next), rather than for Pause.
@@ -1085,6 +1104,14 @@ func (m *member) there(now time.Time) bool { return m.online > 0 || now.Before(m
 // theirs on it, nor one a moment ago (comeBack), as every screen closes when the server stops, just before it saves.
 func away(online int, back, left, now time.Time) bool {
 	return online == 0 && !now.Before(back) && now.Sub(left) >= comeBack
+}
+
+// later is the later of two times.
+func later(a, b time.Time) time.Time {
+	if b.After(a) {
+		return b
+	}
+	return a
 }
 
 // changed tells every screen to look again. Called with the lock held.

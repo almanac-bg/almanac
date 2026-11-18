@@ -121,6 +121,39 @@ func TestARestoredHostLeadsOn(t *testing.T) {
 	})
 }
 
+// A host on their way in to a room just opened (hostWait) is waited for the rest of that wait over a restart, not only
+// for comeBack; the others' screens hear as it ends, and may lead from then.
+func TestARestoredRoomWaitsOutItsHostsWait(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		hub := NewHub(sample(t))
+		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
+		for _, lead := range []bool{false, true} {
+			r, _ := hub.Open(ana, "", Settings{Lead: lead})
+			_ = r.Join(bo, "")
+			time.Sleep(hostWait / 2)
+			back, _ := restart(t, hub).Get(r.Code())
+			sb, _ := back.Follow(bo.ID)
+			<-sb.C
+			time.Sleep(hostWait/2 - time.Second)
+			synctest.Wait()
+			if back.View(bo.ID).CanLead {
+				t.Fatalf("lead %v: the host's wait cut short by a restart", lead)
+			}
+			time.Sleep(2 * time.Second)
+			synctest.Wait()
+			select {
+			case <-sb.C:
+			default:
+				t.Fatalf("lead %v: no word as the host's wait ended", lead)
+			}
+			if !back.View(bo.ID).CanLead {
+				t.Fatalf("lead %v: the host never came: nobody else leads", lead)
+			}
+			back.Unfollow(sb)
+		}
+	})
+}
+
 // A room's game is kept once, by its id: a crash just after its end plays the end again from the room saved before it,
 // and the game kept again has the same id (Hub.Record keeps it once); a game over whose players' games weren't kept
 // as the room was saved is kept as it's restored (review 2026-11-18, A14).

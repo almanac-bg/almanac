@@ -11,7 +11,7 @@ import { duelResult, loadDuelResult } from "../kit.ts";
 import { type ApiError, api, errorText } from "../lib/api.ts";
 import { type Child, effect, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
-import { byTap, go, goBack, hold, title } from "../lib/router.ts";
+import { backOut, byTap, go, hold, title } from "../lib/router.ts";
 import { withName } from "../lib/words.ts";
 import { checkWaiting, player, user } from "../state.ts";
 import {
@@ -402,7 +402,7 @@ export function duelOne(params: string[]) {
           getReady(
             duelWith(d.opponent?.name),
             () => void play().catch(failed),
-            () => goBack("/duel"),
+            () => backOut("/duel", () => void load()),
           ),
         );
       }

@@ -123,7 +123,7 @@ func TestStreakMailOff(t *testing.T) {
 	if body := page("POST", forged); !strings.Contains(body, "не работи") {
 		t.Fatalf("a forged link: %s", body)
 	}
-	if body := page("POST", link); !strings.Contains(body, "Готово") {
+	if body := page("POST", link); !strings.Contains(body, "Готово") || !strings.Contains(body, "включи писмата пак") {
 		t.Fatalf("turned off: %s", body)
 	}
 	if _, prefs := ana.call("GET", "/api/mail/prefs", nil); prefs["streak"] != false {
