@@ -461,10 +461,13 @@ takes a token.
 - **On a phone, the answers are at the thumb.** A run's question is a column the screen's height: the head, the pips
   and the clock at the top (kept there as the page scrolls), the question under them, and what answers it at the
   foot — the answers, „Вярно“ and „Невярно“, the pad with „Отговори“, „Готово“ (which stays at hand on a screen too
-  short for the rest). The answer docks at the screen's foot, always in the same place: the verdict, how everyone
-  answered, the fact (scrolling on its own when it's long) and „Напред“ across the width; the answers move up above
-  it, marked, and the page moves only when they can't all fit, just enough to show the right one. A big screen shows
-  the answer under the question, as before.
+  short for the rest, a laptop's too). The answer docks at the screen's foot, always in the same place: the verdict,
+  how everyone answered, the fact whole (on its date, the day's line run on from „На този ден“) and „Напред“ across
+  the width; the answers move up above it, marked, and the page moves only when they can't all fit, just enough to
+  show the right one between the head and the panel. The panel always leaves the right answer that room; a fact
+  longer than the rest scrolls with the panel, „Напред“ staying at its foot. A phone on its side plays the same,
+  the head small from the start, the question smaller and a choice's answers two by two, so that they start on the
+  screen. A big screen shows the answer under the question, as before.
 - **Leaving a game is free between two questions.** While a question's time runs (on the server, so it can't wait),
   a way out — the arrow, a place in the header — asks first („Ако излезеш сега, въпросът остава без отговор.“,
   „Остани“ or „Излез“), and leaving gives that question up. The game waits where it stopped: the day on Начало with
@@ -554,13 +557,16 @@ Feedback fires once, when it's earned, and then the screen is still again:
 - **An answer shows in beats** (a run's: the day, a topic, a challenge; `beats` in `game/questions.ts`), the
   same however quick the line, all within a second: the clock stops at the tap, and what was chosen stays chosen (its
   accent ring) at least 280ms; then the player's own answer is judged (pop or shake), with its sound and touch and its
-  pip filling (0.6→1, 200ms); at 300ms the right answer pops if it wasn't theirs, the rest dim, and the verdict docks
-  (24px up, 240ms) with its points and the tally rising in step; at 550ms the shares of everyone's answers grow behind
-  them, their numbers fading in, and the sentence about them; at 700ms the fact and „Напред“. The page doesn't scroll
-  to them on a phone (the panel comes to the player); on a big screen it does, at 560ms. A run's head (the count, the
+  pip filling (0.6→1, 200ms); at 300ms the right answer is marked if it wasn't theirs, the rest dim, and the verdict
+  docks with its points and the tally rising in step, all of it in one movement (240ms, `run.ts` settle): where
+  everything ends is worked out first, the head at the size it will have there, and the answers glide up from where
+  they were as the panel rises with them (from 24px below, or as far as they move), so the right answer is never
+  under it; brought up from out of sight, it pops once it's there. On a big screen the panel comes under the answers
+  and the page glides to show it the same way. At 550ms the shares of everyone's answers grow behind them, their
+  numbers fading in, and the sentence about them; at 700ms the fact and „Напред“. A run's head (the count, the
   topic, the tally, the clock) and its pips stay at the top of the screen while the question and its answer scroll,
-  smaller once stuck (the clock a thin bar along its edge, the seconds at the pips' end), so the pip and the tally
-  are seen landing. A game played with others (a live duel, a room, Роял) shows its answer at once, when the server
+  smaller once stuck (the clock a thin bar along its edge, the seconds at the pips' end; stuck a few pixels past the
+  top, back only at it, so it never flickers), so the pip and the tally are seen landing. A game played with others (a live duel, a room, Роял) shows its answer at once, when the server
   says.
 - **A result lands, once** (`web/src/feel.ts`, at most 1.6s, a tap anywhere jumps to the end, never again on a
   reload): the pips fill one by one (60ms apart, 85 on the day; each with a pluck a step up the scale for each right
