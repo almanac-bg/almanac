@@ -525,7 +525,7 @@ function status(t: Today): HTMLElement | null {
               "span",
               { class: "status-text" },
               h("b", { class: "status-n" }, String(days)),
-              h("span", { class: "status-label" }, repair ? "дни за връщане" : days === 1 ? "ден поред" : "дни поред"),
+              h("span", { class: "status-label" }, repair ? "дни за връщане" : streakLabel(days)),
             ),
           )
         : null,
@@ -561,6 +561,9 @@ function status(t: Today): HTMLElement | null {
   );
 }
 
+/** The streak's words beside its number. */
+const streakLabel = (n: number) => (n === 1 ? "ден поред" : "дни поред");
+
 /** How far into its level a player is, in percent. */
 const shareOf = (lv?: Today["level"]) =>
   lv && lv.to > lv.from ? Math.round((100 * (lv.xp - lv.from)) / (lv.to - lv.from)) : 0;
@@ -569,21 +572,23 @@ const shareOf = (lv?: Today["level"]) =>
 const streakMarks = [3, 7, 30, 100, 365];
 
 /** The streak and the level just grown by the day played (`was` before it, `now` after), moved there in their chips
- * once the result has landed (`after`): the streak's number rolls on (unless a round one, told in a sheet), the
- * level's bar fills a moment later. Resolves once both are over, for what's big to come after them (news.ts), never
- * over them. Without the game's feel loaded, or with less motion, they are simply as they are. */
+ * once the result has landed (`after`): the streak's number rolls on, the level's bar fills a moment later. Resolves
+ * once both are over, for what's big to come after them (news.ts), never over them: a round streak's sheet opens
+ * right after its number has rolled, so the chip never tells it first. Without the game's feel loaded, or with less
+ * motion, they are simply as they are. */
 async function grow(row: HTMLElement, was: Today, now: Today, after: Promise<void>): Promise<void> {
   const kit = feelKit();
   if (!kit) return;
   const moving: Promise<void>[] = [];
   const streak = row.querySelector<HTMLElement>(".streak-chip");
-  if (streak && now.streak === was.streak + 1 && !streakMarks.includes(now.streak)) {
+  if (streak && now.streak === was.streak + 1) {
     // The flame stays as it was before the day (unlit, or cold without a streak) until its number rolls on: then it
-    // lights, swelling once.
+    // lights, swelling once. A round number rolls on quietly: its sound is the sheet's, a moment later.
     const off = was.streak ? "unlit" : "cold";
     streak.classList.add(off);
     after.then(() => streak.classList.remove(off));
-    moving.push(kit.streak(streak, now.streak, after, hands()));
+    const round = streakMarks.includes(now.streak);
+    moving.push(kit.streak(streak, now.streak, streakLabel, after, round ? { ...hands(), play: () => {} } : hands()));
   }
   const chip = row.querySelector<HTMLElement>(".level-chip");
   if (chip && was.level && now.level && now.open?.xp)

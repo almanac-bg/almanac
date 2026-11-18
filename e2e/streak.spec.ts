@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { daysPlayed, openGame, playRun, startDay } from "./play.ts";
 
 test("a broken streak is won back: the day's ten and one more game, the same day", async ({ page }) => {
@@ -78,4 +78,61 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
   const tomorrow = page.locator(".summary .tomorrow");
   await expect(tomorrow).toContainText("Утре — нови десет");
   await expect(tomorrow).toContainText("Изиграй ги и серията ти става 4.");
+});
+
+/** Keeps every way the streak's chip reads as Начало draws and moves it (its number and words, and „unlit“ while its
+ * flame is), for `heard`. */
+async function watchChip(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const said: string[] = [];
+    (window as unknown as { chipSaid: string[] }).chipSaid = said;
+    new MutationObserver(() => {
+      for (const chip of document.querySelectorAll(".streak-chip")) {
+        const now = `${chip.querySelector(".status-text")?.textContent}${chip.classList.contains("unlit") ? " unlit" : ""}`;
+        if (said.at(-1) !== now) said.push(now);
+      }
+    }).observe(document, { subtree: true, childList: true, characterData: true, attributeFilter: ["class"] });
+  });
+}
+
+/** What the streak's chip has said since last asked. */
+const heard = (page: Page) => page.evaluate(() => (window as unknown as { chipSaid: string[] }).chipSaid.splice(0));
+
+test("the day played rolls the streak on in its chip, its words with its number: never „1 дни поред“", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await watchChip(page);
+  await page.goto("/");
+  await daysPlayed(page, 1);
+  await page.reload();
+  await expect(page.locator(".streak-chip.unlit")).toContainText("1ден поред");
+  await startDay(page);
+  await heard(page);
+  await playRun(page);
+  await expect(page.locator(".streak-chip:not(.unlit) .status-text")).toHaveText("2дни поред");
+  // From the day before, unlit, rolling on (both numbers on their way), to the day played, lit.
+  const said = await heard(page);
+  expect(said).toContain("1ден поред unlit");
+  expect(said).toContain("12дни поред");
+  expect(said.filter((s) => /^1дни/.test(s))).toEqual([]);
+});
+
+test("a round streak is told by its sheet, not first by its chip: the number rolls on just before it", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await watchChip(page);
+  await page.goto("/");
+  await daysPlayed(page, 2, 1);
+  await page.reload();
+  await expect(page.locator(".streak-chip.unlit")).toContainText("2дни поред");
+  await startDay(page);
+  await heard(page);
+  await playRun(page);
+  await expect(page.getByRole("dialog", { name: "3 дни поред с въпросите на деня." })).toBeVisible();
+  const said = await heard(page);
+  expect(said[0]).toBe("2дни поред unlit");
+  expect(said).toContain("23дни поред");
+  expect(said.at(-1)).toBe("3дни поред");
 });

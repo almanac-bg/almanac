@@ -185,9 +185,10 @@ export function year(kit: Kit, [which = ""]: string[]) {
               : null,
             h("a", { class: "btn", href: "/" }, "Към Начало"),
           )
-        : h(
+        : // „Напред“ keeps its place from card to card, „Назад“ under it (never on its right).
+          h(
             "div",
-            { class: "actions" },
+            { class: "actions year-pager" },
             h("button", { class: "btn primary big", type: "button", onclick: () => at.set(i + 1) }, "Напред"),
             i > 0 ? h("button", { class: "btn", type: "button", onclick: () => at.set(i - 1) }, "Назад") : null,
           ),

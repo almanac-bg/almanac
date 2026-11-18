@@ -689,19 +689,29 @@ function roll(el: HTMLElement, from: string, to: string): Promise<void> {
 }
 
 /** The streak one day longer, in its chip (drawn with the new number): once `after` has come (the result has landed),
- * the number rolls up from the day before (a first streak's words come in with it: never „0 ден поред“), the flame
- * swells once with a gold glow, and the streak's sound. Resolves once it's over. */
-export async function streak(chip: HTMLElement, days: number, after: Promise<void>, hands: Hands): Promise<void> {
+ * the number rolls up from the day before (a first streak's words come in with it: never „0 ден поред“), its words
+ * (`label`, of a number) following the number shown, as the level's do: never „1 дни поред“. The flame swells once
+ * with a gold glow, and the streak's sound. Resolves once it's over. */
+export async function streak(
+  chip: HTMLElement,
+  days: number,
+  label: (n: number) => string,
+  after: Promise<void>,
+  hands: Hands,
+): Promise<void> {
   const n = chip.querySelector<HTMLElement>(".status-n");
   const words = chip.querySelector<HTMLElement>(".status-text");
+  const said = chip.querySelector<HTMLElement>(".status-label");
   const first = days === 1 && !!words;
   const was = first ? "" : String(days - 1);
   if (!hands.calm && n) {
     n.textContent = was;
     if (first) words.style.opacity = "0";
+    else if (said) said.textContent = label(days - 1);
   }
   await after;
   hands.play("streak");
+  if (said) said.textContent = label(days);
   if (hands.calm || !n) return;
   if (first) {
     words.style.opacity = "";
