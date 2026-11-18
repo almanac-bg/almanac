@@ -6385,7 +6385,7 @@
 
   /* A screen on its way (router.ts, coming): a thin line along the top of the page, in the accent, running; shown only
      past a moment, so that a quick move between screens never flashes it. */
-  .coming {
+  .arriving {
     position: fixed;
     top: 0;
     right: 0;
@@ -6398,18 +6398,22 @@
     transition: opacity 160ms ease-out;
   }
 
-  .coming.on {
+  .arriving.on {
     opacity: 1;
     transition-delay: 200ms;
   }
 
-  .coming::after {
+  .arriving::after {
     content: "";
     position: absolute;
     inset: 0;
     width: 40%;
     border-radius: var(--radius-full);
     background: var(--accent);
+  }
+
+  /* Running only while a screen is on its way: nothing moves on a page at rest. */
+  .arriving.on::after {
     animation: coming 1.1s ease-in-out infinite;
   }
 
@@ -6813,7 +6817,8 @@
     }
 
     /* The line on its way stays still: the whole of it, quieter. */
-    .coming::after {
+    .arriving::after,
+    .arriving.on::after {
       width: 100%;
       opacity: 0.6;
       animation: none;
@@ -6841,14 +6846,14 @@
   }
 
   /* (A wait and the line on its way keep their moment before they show: it's when, not motion.) */
-  :root.calm *:not(.time-bar, .ready-arc, .loading, .coming),
+  :root.calm *:not(.time-bar, .ready-arc, .loading, .arriving),
   :root.calm *::before,
   :root.calm *::after {
     animation: none;
     transition: none;
   }
 
-  :root.calm .coming::after {
+  :root.calm .arriving::after {
     width: 100%;
     opacity: 0.6;
   }

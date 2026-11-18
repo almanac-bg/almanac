@@ -133,6 +133,24 @@ export interface Today {
 /** The day as Начало's page came with it (server/pages.go): its first draw, without asking; every later one asks. */
 let inPage = boot.day as Today | undefined;
 
+/** What the day tells once (the server says it the first time only): never drawn again from a day kept. */
+const toldOnce: Partial<Today> = {
+  duel: undefined,
+  accepted: undefined,
+  left: undefined,
+  untold: undefined,
+  challenges: undefined,
+  back: undefined,
+};
+
+/** Whether two answers of the day draw the same Начало but for the boards, which other players move on all day. */
+function sameDay(a: Today, b: Today): boolean {
+  // (Nothing and null are the same here: what was told is drawn as nothing.)
+  const drawn = (t: Today) =>
+    JSON.stringify({ ...t, board: null, friends: null, rarest: null }, (_, v) => (v === null ? undefined : v));
+  return drawn(a) === drawn(b);
+}
+
 /** The day's ten played on another page (an invite's): their result there as Начало draws it (`before`: the day as
  * it stood before they were played), with that page's own card under it. */
 export interface PlayedElsewhere {
@@ -151,11 +169,13 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
   if (fromMail) history.replaceState(history.state, "", "/");
   const screen = slot(() => loading("card", "rows"));
   const load = async () => {
-    // Opened again the same day: the day as it was last drawn, at once, while the server is asked (lib/api.ts, fresh);
-    // nothing new, nothing drawn again. Not a day left mid-question: that waits for the server.
+    // Opened again the same day: the day as it was last drawn, at once, while the server is asked (lib/api.ts, fresh),
+    // without what's told only once (said when it came). Not a day left mid-question: that waits for the server.
     const kept = inPage ? undefined : last<Today>("/api/day");
     const drawn =
-      kept && (!kept.run || kept.run.done) && kept.day === dayInBulgaria(new Date(serverNow())) ? kept : undefined;
+      kept && (!kept.run || kept.run.done) && kept.day === dayInBulgaria(new Date(serverNow()))
+        ? { ...kept, ...toldOnce }
+        : undefined;
     if (drawn) {
       day = drawn.day;
       screen.show(() => home(drawn, drawn.run, false));
@@ -165,7 +185,8 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
       // The day in the page is kept as an answer would be: Начало opened again draws it at once.
       if (inPage) keep("/api/day", inPage);
       inPage = undefined;
-      if (t === drawn) return;
+      // Drawn again only for something new: the boards moving on (other players') show on the next visit.
+      if (drawn && sameDay(drawn, t)) return;
       met(t.open);
       day = t.day;
       const run = t.run;

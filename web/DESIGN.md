@@ -698,7 +698,7 @@ Never an empty page, and never „…“: a wait looks like what's coming, or do
 
 - **Between two screens** the one before stays, as it was scrolled, until the next can draw what it's for: its file
   in and its first answers back (`lib/router.ts`). The place tapped is marked in the bar at once. Past 300ms the next
-  comes as it is, its waits drawn, and a thin `--accent` line runs along the top of the page (`.coming`, from 200ms
+  comes as it is, its waits drawn, and a thin `--accent` line runs along the top of the page (`.arriving`, from 200ms
   in) until it's whole. Back and forward come the same way, to where the page was scrolled.
 - **A wait is drawn in the shape of what comes** (`loading()` in `ui.ts`, `.loading`): quiet blocks (`.bone`, in
   `--line`; a row of tabs in `--sunken`, a card on `--surface` with its depth), the parts named top to bottom (`title`,
@@ -708,7 +708,8 @@ Never an empty page, and never „…“: a wait looks like what's coming, or do
 - **A short wait shows nothing:** a wait inside a screen (another board, more of a list) shows only after 400ms; one
   in a screen that came before it was ready shows at once (the router's `aria-busy`).
 - **A place opened again is drawn at once** from what it showed last (`last` and `fresh` in `lib/api.ts`), while the
-  server is asked again; only what has changed is drawn again, so nothing flashes. What the player changes (any
+  server is asked again; only what has changed is drawn again, so nothing flashes (Начало's day: not for the boards
+  alone, which other players move all day, nor what it tells once). What the player changes (any
   POST: a game, a setting, a friend) forgets what was kept: the next visit waits for the server, never shows the
   game before it. Kept half an hour at most, and only for the player who saw it.
 - **Ready before the tap:** the four places' files load once the first screen is drawn and the browser is idle, any

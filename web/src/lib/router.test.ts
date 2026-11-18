@@ -465,13 +465,13 @@ test("the next screen is made off the page: the one before stays, unscrolled, un
   router.go("/ranks");
   assert.equal(router.path(), "/ranks", "the place it's going to is marked at once");
   assert.equal(showing, "Приятели", "the screen before stays");
-  assert.equal(router.coming(), true);
+  assert.equal(router.arriving(), true);
   assert.deepEqual(scrolls, [], "and stays where it was scrolled");
   answer();
   await tick();
   assert.equal(showing, "Класации", "the next comes as soon as it's ready");
   assert.deepEqual(scrolls, [0]);
-  assert.equal(router.coming(), false);
+  assert.equal(router.arriving(), false);
   assert.equal(busy, false);
 });
 
@@ -481,11 +481,11 @@ test("a screen still not ready after a moment comes as it is, its waits shown at
   await new Promise((r) => setTimeout(r, 350));
   assert.equal(showing, "Класации", "not the screen before for long");
   assert.equal(busy, true, "its waits show at once");
-  assert.equal(router.coming(), true, "and the line says it's on its way");
+  assert.equal(router.arriving(), true, "and the line says it's on its way");
   answer();
   await tick();
   assert.equal(busy, false);
-  assert.equal(router.coming(), false);
+  assert.equal(router.arriving(), false);
 });
 
 test("another screen opened while one is on its way: that one never shows", async () => {
@@ -494,7 +494,7 @@ test("another screen opened while one is on its way: that one never shows", asyn
   const before = slow;
   router.go("/settings");
   assert.equal(showing, "Настройки");
-  assert.equal(router.coming(), false);
+  assert.equal(router.arriving(), false);
   before.loading = false;
   answer();
   mutated();

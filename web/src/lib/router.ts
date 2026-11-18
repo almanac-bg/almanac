@@ -22,7 +22,7 @@
 // (waitFor: every GET it sends; lib/api.ts, asking), with no `.loading` left in it. A screen that draws what it kept
 // from its last visit (lib/api.ts, fresh) is ready at once. One still not ready after a moment (patience) comes as it
 // is, its waits drawn in the shape of what comes (ui.ts, loading), and a line along the top of the page says it's on
-// its way (coming) until it's whole. A screen's file loads before it's opened: those of the four places once the first
+// its way (arriving) until it's whole. A screen's file loads before it's opened: those of the four places once the first
 // screen is drawn and the browser is idle, any other's as a link to it is pointed at or pressed (prefetch).
 
 import { type Child, effect, scope, signal, toNode } from "./dom.ts";
@@ -397,7 +397,7 @@ function render(y: number, first = false): void {
     show(c);
     return;
   }
-  coming.set(true);
+  arriving.set(true);
   c.timer = setTimeout(() => show(c), patience);
   c.seen = new MutationObserver(() => check(c));
   c.seen.observe(c.node, { childList: true, subtree: true });
@@ -428,7 +428,7 @@ let next: Coming | null = null;
 const offPage = (): boolean => next !== null && !next.shown;
 
 /** Whether a screen is on its way and not whole yet: the line along the top of the page (app.ts). */
-export const coming = signal(false);
+export const arriving = signal(false);
 
 /** Has the screen on its way wait for this answer (a GET it sent: lib/api.ts, asking; its file: kit.ts, later). */
 export function waitFor(answer: Promise<unknown>): void {
@@ -470,7 +470,7 @@ function show(c: Coming): void {
     return;
   }
   // Its waits show at once (app.css: [aria-busy]), and the line says it's on its way.
-  coming.set(true);
+  arriving.set(true);
   root.setAttribute("aria-busy", "true");
   busy = true;
   c.seen = new MutationObserver(() => check(c));
@@ -487,7 +487,7 @@ function whole(c: Coming): void {
   c.seen?.disconnect();
   if (next !== c) return;
   next = null;
-  coming.set(false);
+  arriving.set(false);
   if (busy) root.removeAttribute("aria-busy");
   busy = false;
 }

@@ -68,7 +68,7 @@ async function watch(page: Page): Promise<void> {
 async function frames(page: Page, path: string, what: string): Promise<{ waited: boolean; after: number }> {
   await expect(page).toHaveURL(new RegExp(`${path}(#.*)?$`));
   // The screen in place and whole: nothing on its way (the line along the top), nothing of it loading.
-  await expect(page.locator(".coming.on")).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.locator(".arriving.on")).toHaveCount(0, { timeout: 15_000 });
   await expect(page.locator("main .loading")).toHaveCount(0, { timeout: 15_000 });
   await page.waitForTimeout(200); // a few frames more: what comes after it's whole
   const { list, moved } = await page.evaluate(() => {

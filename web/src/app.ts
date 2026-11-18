@@ -10,7 +10,7 @@ import { type Child, effect, h, mount, signal } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { applyPrefs } from "./lib/prefs.ts";
 import { preparePush } from "./lib/push.ts";
-import { canGoBack, coming, entry, go, navigate, path, prefetch, start, waitFor } from "./lib/router.ts";
+import { arriving, canGoBack, entry, go, navigate, path, prefetch, start, waitFor } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
 import { challenge, challengeFriend, newChallenge } from "./screens/challenge.ts";
 import { duel, duelOne, playChallenge } from "./screens/duel.ts";
@@ -103,7 +103,7 @@ if (root) {
       ),
     ),
     // A screen on its way and not whole yet: a thin line along the top of the page, after a moment (app.css).
-    h("div", { class: () => (coming() ? "coming on" : "coming"), "aria-hidden": "true" }),
+    h("div", { class: () => (arriving() ? "arriving on" : "arriving"), "aria-hidden": "true" }),
     // A friend's challenge, wherever the player is (but in a game, or on the duels themselves).
     () => {
       const c = challenges()[0];

@@ -45,7 +45,24 @@ export function api<T>(method: Method, path: string, body?: unknown): Promise<T>
   return answer;
 }
 
-async function call<T>(method: Method, path: string, body?: unknown): Promise<T> {
+/** The GETs on their way, by path: asked for again meanwhile (a screen drawn again before its first answers came), one
+ * answer for both. */
+const flying = new Map<string, Promise<unknown>>();
+
+function call<T>(method: Method, path: string, body?: unknown): Promise<T> {
+  if (method !== "GET") return send<T>(method, path, body);
+  let answer = flying.get(path) as Promise<T> | undefined;
+  if (!answer) {
+    const sent = send<T>(method, path, body).finally(() => {
+      if (flying.get(path) === sent) flying.delete(path);
+    });
+    answer = sent;
+    flying.set(path, sent);
+  }
+  return answer;
+}
+
+async function send<T>(method: Method, path: string, body?: unknown): Promise<T> {
   if (body === undefined && method !== "GET") body = {};
   // Something the player changes (a game, a setting, a friend) may change what was kept: none of it is drawn again,
   // nor an answer asked for meanwhile.
@@ -104,6 +121,9 @@ let changes = 0;
 const keptMost = 40;
 const keptFor = 30 * 60_000;
 
+/** How long an answer is as fresh as the server's (ms): asked for again within it, it's taken as it is (fresh). */
+const moment = 2000;
+
 /** Keeps an answer to GET `path`: one the server gave, or one that came another way (Начало's day, in the page). */
 export function keep(path: string, data: unknown): void {
   const text = JSON.stringify(data);
@@ -123,10 +143,12 @@ export function last<T>(path: string): T | undefined {
 
 /** GET `path` for a screen that drew its last answer (last) meanwhile: the answer, or the very value drawn when it's
  * the same (so that a signal set to it doesn't change, and nothing is drawn again). Asked with an answer kept, it
- * holds no screen up (asking): that screen is drawn already. */
+ * holds no screen up (asking): that screen is drawn already. One the server gave a moment ago is fresh already: not
+ * asked again (a screen drawn again for something new it brought, two parts of a page asking for the same). */
 export function fresh<T>(path: string): Promise<T> {
   const was = last(path);
   if (was === undefined) return api<T>("GET", path);
+  if (Date.now() - (kept.get(path)?.at ?? 0) < moment) return Promise.resolve(was as T);
   return call<T>("GET", path).then((data) => (last<T>(path) === was ? (was as T) : data));
 }
 
@@ -134,6 +156,7 @@ export function fresh<T>(path: string): Promise<T> {
 export function forget(): void {
   changes++;
   kept.clear();
+  flying.clear(); // (one on its way now may answer from before the change)
 }
 
 /** What the player is told of an error: an ApiError's own words; for anything else (a fault of the page's: an answer

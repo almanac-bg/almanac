@@ -136,20 +136,28 @@ test("a live answer is sent again while it doesn't get through and its question 
   assert.equal(asked.length, 2);
 });
 
-test("a place opened again draws its last answer at once: the same answer again is the same value, and a change forgets", async () => {
+test("a place opened again draws its last answer at once: the same answer again is the same value, and a change forgets", async (t) => {
   forget();
+  t.mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
+  const later = () => t.mock.timers.tick(5000); // past the moment an answer is as fresh as the server's
   const heard: Promise<unknown>[] = [];
   asking.push((p) => heard.push(p));
   try {
-    serve(json(200, { friends: 1 }), json(200, { friends: 1 }), json(200, { friends: 2 }), json(200, {}));
+    serve(json(200, { friends: 1 }));
     assert.equal(last("/api/friends"), undefined, "nothing kept before the first answer");
     const first = await api("GET", "/api/friends");
     assert.equal(heard.length, 1, "a screen opening waits for a GET");
     assert.equal(last("/api/friends"), first);
-    // Opened again: drawn from what's kept, and not waited for; nothing new, the very same value.
+    // Asked again at once: the answer just given, not asked for again.
+    const asked = serve(json(200, { friends: 1 }), json(200, { friends: 2 }), json(200, {}));
+    assert.equal(await fresh("/api/friends"), first);
+    assert.deepEqual(asked, []);
+    // Opened again later: drawn from what's kept, and not waited for; nothing new, the very same value.
+    later();
     assert.equal(await fresh("/api/friends"), first);
     assert.equal(heard.length, 1);
     // Something new: the new answer, kept in its place.
+    later();
     const second = await fresh("/api/friends");
     assert.deepEqual(second, { friends: 2 });
     assert.equal(last("/api/friends"), second);
@@ -173,4 +181,12 @@ test("an answer asked for before a change isn't kept", async () => {
   release();
   await asked;
   assert.equal(last("/api/me/progress"), undefined);
+});
+
+test("the same GET asked for again while it's on its way is one request, one answer", async () => {
+  forget();
+  const asked = serve(json(200, { n: 1 }), json(200, { n: 2 }));
+  const [a, b] = await Promise.all([api("GET", "/api/goals"), fresh("/api/goals")]);
+  assert.equal(a, b);
+  assert.deepEqual(asked, ["GET /api/goals"]);
 });
