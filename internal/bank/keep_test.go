@@ -135,8 +135,9 @@ func TestCommit(t *testing.T) {
 	}
 }
 
-// A copy keeps the pictures the bank no longer has, for KeepGone after they left: a play may still show the version of
-// a question they were in. Load doesn't count them as left behind.
+// A copy keeps the pictures the bank no longer has, for good: a game is gone over with the version of a question it
+// showed, however long ago (the game keeps every version for good), and the version's pictures with it. Load doesn't
+// count them as left behind.
 func TestCopyKeepsGonePictures(t *testing.T) {
 	from := filepath.Join(t.TempDir(), "bank")
 	if err := os.CopyFS(from, os.DirFS(sample)); err != nil {
@@ -194,7 +195,7 @@ func TestCopyKeepsGonePictures(t *testing.T) {
 			t.Fatalf("a picture kept for plays is told as left behind: %v", p)
 		}
 	}
-	// It goes along to the next copy, with the day it left; and no longer, once that's KeepGone ago.
+	// It goes along to the next copy, with the day it left; and to a copy made years later, still with that day.
 	third := filepath.Join(t.TempDir(), "third")
 	if err := Copy(from, third, second); err != nil {
 		t.Fatal(err)
@@ -203,11 +204,14 @@ func TestCopyKeepsGonePictures(t *testing.T) {
 		t.Fatalf("the day it left: %v", left)
 	}
 	fourth := filepath.Join(t.TempDir(), "fourth", ImagesDir)
-	if err := carry(filepath.Join(third, ImagesDir), fourth, time.Now().Add(KeepGone+24*time.Hour)); err != nil {
+	if err := carry(filepath.Join(third, ImagesDir), fourth, time.Now().AddDate(5, 0, 0)); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(fourth, gone.File)); err == nil {
-		t.Fatal("kept past KeepGone")
+	if _, err := os.Stat(filepath.Join(fourth, gone.File)); err != nil {
+		t.Fatalf("a picture of a version kept is gone from a later copy: %v", err)
+	}
+	if left := Gone(filepath.Dir(fourth)); left[gone.File] != today {
+		t.Fatalf("the day it left, years later: %v", left)
 	}
 }
 

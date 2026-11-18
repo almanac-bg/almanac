@@ -9,7 +9,8 @@
 // nobody reads a question off the clock. Between questions a player reads the answer and its fact for as long as they
 // like; a question of the day's ten dealt on its own date („На този ден“) shows its day's line with them (dealtOn). A
 // question left showing past its time counts as unanswered, whenever the run is next looked at. A question is graded
-// against the version of it that showed, whatever the bank has become meanwhile (versions.go). Everything a run does
+// against the version of it that showed, whatever the bank has become meanwhile (versions.go); the day's ten hold
+// still for their day, and one found wrong during it counts for nobody that day (day.go). Everything a run does
 // goes through the database, so a refresh, a second tab or a restart of the server changes nothing. A run left
 // half-way goes on where it stopped: the day's when the player comes back to it that day (a run of the day's
 // questions ends with its day, DayGrace after: dayOver), a topic's when they start the same topic again that day
@@ -32,6 +33,7 @@ import (
 	"errors"
 	"log/slog"
 	"math/rand/v2"
+	"strconv"
 	"sync"
 	"time"
 	_ "time/tzdata" // Bulgaria's days, wherever the server runs
@@ -130,11 +132,17 @@ func New(db *store.DB, b func() *bank.Bank) *Game {
 func (g *Game) Today() string { return g.Now().In(Bulgaria).Format(time.DateOnly) }
 
 // Pick is a question as a run holds it: which one, how it's dealt, and, once it's shown, which version of it showed
-// (bank.Version: versions.go).
+// (bank.Version: versions.go) and how hard it was then; the day's ten hold those from the day's start (day.go).
 type Pick struct {
 	ID   string `json:"id"`
 	Seed uint64 `json:"seed"`
 	V    string `json:"v,omitempty"`
+	// D is the difficulty the question pays at (worth): its label as it showed, so that one relabelled meanwhile pays
+	// the same for the same answer.
+	D bank.Difficulty `json:"d,omitempty"`
+	// Void is a question of the day's ten that counts for nobody that day (day.go): found untrue, or changed, while
+	// the day was played.
+	Void bool `json:"void,omitempty"`
 }
 
 // run is a run as the database has it.
@@ -268,9 +276,11 @@ type State struct {
 	Day      string `json:"day,omitempty"`
 	Category string `json:"category,omitempty"`
 	Total    int    `json:"total"`
-	At       int    `json:"at"`
-	Points   int    `json:"points"`
-	Rights   int    `json:"rights"`
+	// Void is how many of the Total count for nobody (day.go): the run is of Total − Void questions.
+	Void   int `json:"void,omitempty"`
+	At     int `json:"at"`
+	Points int `json:"points"`
+	Rights int `json:"rights"`
 	// AllRight is what the game earned at its end for every answer right (in Points), once it's done.
 	AllRight int `json:"allRight,omitempty"`
 	// Trail is how each answered question went, in order.
@@ -280,11 +290,12 @@ type State struct {
 	Done     bool   `json:"done"`
 }
 
-// Mark is how one answer went.
+// Mark is how one answer went, or that its question counts for nobody (Void: day.go), answered or not.
 type Mark struct {
 	Points  int  `json:"points"`
 	Right   bool `json:"right"`
 	Partial bool `json:"partial,omitempty"`
+	Void    bool `json:"void,omitempty"`
 }
 
 // Shown is the question on screen, with the time it has left.
@@ -326,29 +337,30 @@ type Result struct {
 // state builds what a player sees of a run.
 func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 	s := State{
-		ID: r.id, Kind: r.kind, Day: r.day, Category: r.category,
-		Total: len(r.picks), At: r.at, Points: r.points, Rights: r.rights, Done: r.finished, Trail: []Mark{},
+		ID: r.id, Kind: r.kind, Day: r.day, Category: r.category, Total: len(r.picks), Void: len(r.picks) - r.counted(),
+		At: r.at, Points: r.points, Rights: r.rights, Done: r.finished,
 	}
 	if r.finished && r.allRight() {
 		s.AllRight = AllRight
 	}
-	rows, err := tx.Query(`SELECT points, is_right FROM answers WHERE run_id = ? ORDER BY n`, r.id)
+	rows, err := tx.Query(`SELECT n, points, is_right FROM answers WHERE run_id = ? ORDER BY n`, r.id)
 	if err != nil {
 		return s, err
 	}
 	defer rows.Close()
+	var marks []markAt
 	for rows.Next() {
-		var m Mark
-		if err := rows.Scan(&m.Points, &m.Right); err != nil {
+		var a markAt
+		if err := rows.Scan(&a.n, &a.m.Points, &a.m.Right); err != nil {
 			return s, err
 		}
-		m.Partial = m.Points > 0 && !m.Right
-		s.Trail = append(s.Trail, m)
+		marks = append(marks, a)
 	}
 	if err := rows.Err(); err != nil {
 		return s, err
 	}
-	if r.shownAt.Valid && !r.finished {
+	s.Trail = trailOf(r.picks, r.at, marks)
+	if r.shownAt.Valid && !r.finished && !r.voidNow() {
 		d, ok := g.deal(r.picks[r.at])
 		if ok {
 			limit := Limit(d.Question())
@@ -367,12 +379,16 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 	return s, nil
 }
 
-// settle counts a question whose time ran out as unanswered (or one gone from the bank as skipped), so the run can
-// go on. It reports whether that ended the run: then, once the transaction is done, the caller follows it with
-// finished, as an answer that ends a run does.
+// settle counts a question whose time ran out as unanswered (or one gone from the bank as skipped), and passes over
+// one that counts for nobody (day.go), so the run can go on. It reports whether that ended the run: then, once the
+// transaction is done, the caller follows it with finished, as an answer that ends a run does.
 func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
 	if !g.settles(r) {
 		return false, nil
+	}
+	if r.voidNow() {
+		err := g.passVoid(tx, r)
+		return err == nil && r.finished, err
 	}
 	d, ok := g.deal(r.picks[r.at])
 	ms := int64(0)
@@ -383,9 +399,16 @@ func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
 	return err == nil && r.finished, err
 }
 
-// settles says whether settle has anything to do: a question showing past its time, or gone from the bank.
+// settles says whether settle has anything to do: a question showing past its time, or gone from the bank; or one that
+// counts for nobody, where the run stands.
 func (g *Game) settles(r *run) bool {
-	if r.finished || !r.shownAt.Valid {
+	if r.finished {
+		return false
+	}
+	if r.voidNow() {
+		return true
+	}
+	if !r.shownAt.Valid {
 		return false
 	}
 	d, ok := g.deal(r.picks[r.at])
@@ -424,6 +447,7 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 	}
 	r.ms += ms
 	r.shownAt = sql.NullInt64{}
+	r.skipVoid()
 	// A Роял run goes on after a wrong answer: who goes on is the tournament's to say, at its cuts (RevealRoyal).
 	if r.at >= len(r.picks) {
 		return g.finish(tx, r)
@@ -436,7 +460,7 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 // finish ends a run where it is: what playing it to its end earns, and a game right throughout its bonus; and notes
 // that what follows it is due (after.go), but for a Роял's, whose evening keeps what it earned (AfterRoyal).
 func (g *Game) finish(tx *sql.Tx, r *run) error {
-	if err := g.finishOf(tx, r, len(r.picks)); err != nil {
+	if err := g.finishOf(tx, r, r.counted()); err != nil {
 		return err
 	}
 	if r.kind == "royal" {
@@ -458,15 +482,35 @@ func (g *Game) finishOf(tx *sql.Tx, r *run, total int) error {
 	return err
 }
 
-// allRight is whether a run went through all of its questions, each answered right.
-func (r *run) allRight() bool { return r.at == len(r.picks) && r.rights == len(r.picks) }
+// allRight is whether a run went through all of its questions, each that counts answered right.
+func (r *run) allRight() bool {
+	return r.at == len(r.picks) && r.counted() > 0 && r.rights == r.counted()
+}
 
-// rightsInRow is how many right answers a run's last ones are in a row.
-func rightsInRow(tx *sql.Tx, runID int64) (int, error) {
-	var n int
-	err := tx.QueryRow(`SELECT count(*) FROM answers WHERE run_id = ?
-		AND n > coalesce((SELECT max(n) FROM answers WHERE run_id = ? AND NOT is_right), -1)`, runID, runID).Scan(&n)
-	return n, err
+// rightsInRow is how many right answers a run's last ones are in a row: one that counts for nobody (day.go) neither
+// adds to a row nor breaks it.
+func rightsInRow(tx *sql.Tx, r *run) (int, error) {
+	rows, err := tx.Query(`SELECT n, is_right FROM answers WHERE run_id = ? ORDER BY n DESC`, r.id)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	inRow := 0
+	for rows.Next() {
+		var n int
+		var right bool
+		if err := rows.Scan(&n, &right); err != nil {
+			return 0, err
+		}
+		switch {
+		case n < len(r.picks) && r.picks[n].Void:
+		case !right:
+			return inRow, nil
+		default:
+			inRow++
+		}
+	}
+	return inRow, rows.Err()
 }
 
 // read runs fn in a transaction of the read pool: what it reads is one moment's, and it waits on no write.
@@ -585,21 +629,25 @@ func (g *Game) Start(ctx context.Context, userID, runID int64, n int) (State, er
 }
 
 // showAt shows the question now, d (nil: none to show, gone from the bank), its time starting at t: the run keeps
-// which version of it shows (Pick.V), so that it's graded against that one, whatever the bank becomes meanwhile.
+// which version of it shows (Pick.V), so that it's graded against that one, whatever the bank becomes meanwhile, and
+// how hard it is (Pick.D), so that it pays as it showed. A pick that holds them already (the day's, from the day's
+// start) keeps them.
 func (r *run) showAt(tx *sql.Tx, t time.Time, d bank.Dealt) error {
 	if d == nil {
 		return r.startAt(tx, t)
 	}
-	v := bank.Version(d.Question())
-	if v == r.picks[r.at].V {
+	p := &r.picks[r.at]
+	v, level := bank.Version(d.Question()), d.Question().Base().Difficulty
+	if v == p.V && p.D != "" {
 		return r.startAt(tx, t)
 	}
 	at := store.Ms(t)
-	if _, err := tx.Exec(`UPDATE runs SET shown_at = ?, questions = json_set(questions, '$[' || ? || '].v', ?) WHERE id = ?`,
-		at, r.at, v, r.id); err != nil {
+	path := "$[" + strconv.Itoa(r.at) + "]"
+	if _, err := tx.Exec(`UPDATE runs SET shown_at = ?, questions = json_set(questions, ?, ?, ?, ?) WHERE id = ?`,
+		at, path+".v", v, path+".d", string(level), r.id); err != nil {
 		return err
 	}
-	r.picks[r.at].V = v
+	p.V, p.D = v, level
 	r.shownAt = sql.NullInt64{Int64: at, Valid: true}
 	return nil
 }
@@ -645,7 +693,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 			res, d, err = g.again(tx, r, n)
 			return err
 		}
-		if r.finished || n != r.at {
+		if r.finished || n != r.at || r.voidNow() {
 			return ErrOutOfStep
 		}
 		defer func() { finished = r.finished }()
@@ -676,12 +724,12 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 		}
 		inRow := 0
 		if gr.Right {
-			if inRow, err = rightsInRow(tx, r.id); err != nil {
+			if inRow, err = rightsInRow(tx, r); err != nil {
 				return err
 			}
 			inRow++
 		}
-		w := WorthOf(d.Question(), gr.Score, took, inRow)
+		w := r.picks[r.at].worth(d.Question(), gr.Score, took, inRow)
 		res.Points, res.Speed, res.Row = w.Points, w.Speed, w.Row
 		if inRow > 1 {
 			res.InRow = inRow
@@ -746,7 +794,7 @@ func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
 	}
 	inRow := 0
 	if res.Right {
-		if inRow, err = rightsInRow(tx, r.id); err != nil { // the run's last answer: the row it made
+		if inRow, err = rightsInRow(tx, r); err != nil { // the run's last answer: the row it made
 			return res, nil, err
 		}
 		if inRow > 1 {
@@ -755,7 +803,7 @@ func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
 	}
 	// How the points were made up, as far as they can be worked out again (the time kept is to the end of the
 	// question's time at most).
-	if w := WorthOf(d.Question(), res.Score, took, inRow); w.Points == res.Points {
+	if w := r.picks[n].worth(d.Question(), res.Score, took, inRow); w.Points == res.Points {
 		res.Speed, res.Row = w.Speed, w.Row
 	}
 	res.Learned = r.kind == "mistakes" && res.Right && d.Question().Extra().Fact != ""
@@ -775,6 +823,8 @@ type Reviewed struct {
 	Given    json.RawMessage `json:"given"` // as shown; null: no answer
 	Points   int             `json:"points"`
 	Right    bool            `json:"right"`
+	// Void is an answer to a question that counts for nobody (day.go): its points taken out.
+	Void bool `json:"void,omitempty"`
 }
 
 // Review goes over a finished run, question by question (an unfinished one would give answers away).
@@ -819,6 +869,7 @@ func (g *Game) Review(ctx context.Context, userID, runID int64) ([]Reviewed, err
 			return nil, err
 		}
 		it.Category, it.View, it.Reveal = d.Question().Base().Category, d.View(), bank.RevealOn(d, crowd, r.dealtOn())
+		it.Void = r.picks[it.N].Void
 		out = append(out, it)
 	}
 	return out, nil

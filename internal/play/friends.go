@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -548,21 +549,34 @@ func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Sc
 			ids = append(ids, run)
 		}
 	}
-	marks, err := g.DB.Read.QueryContext(ctx, `SELECT run_id, points, is_right FROM answers
+	// The day's questions say which count for nobody (day.go), the same in every run of the day.
+	var stored string
+	var picks []Pick
+	if err := g.DB.Read.QueryRowContext(ctx, `SELECT questions FROM days WHERE day = ?`, day).Scan(&stored); err == nil {
+		_ = json.Unmarshal([]byte(stored), &picks)
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+	marks, err := g.DB.Read.QueryContext(ctx, `SELECT run_id, n, points, is_right FROM answers
 		WHERE run_id IN (`+strings.Repeat("?, ", len(ids)-1)+`?) ORDER BY run_id, n`, ids...)
 	if err != nil {
 		return nil, err
 	}
 	defer marks.Close()
+	of := map[int64][]markAt{}
 	for marks.Next() {
 		var run int64
-		var m Mark
-		if err := marks.Scan(&run, &m.Points, &m.Right); err != nil {
+		var a markAt
+		if err := marks.Scan(&run, &a.n, &a.m.Points, &a.m.Right); err != nil {
 			return nil, err
 		}
-		m.Partial = m.Points > 0 && !m.Right
-		i := at[run]
-		board[i].Trail = append(board[i].Trail, m)
+		of[run] = append(of[run], a)
 	}
-	return board, marks.Err()
+	if err := marks.Err(); err != nil {
+		return nil, err
+	}
+	for run, i := range at {
+		board[i].Trail = trailOf(picks, len(picks), of[run])
+	}
+	return board, nil
 }

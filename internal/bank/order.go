@@ -101,6 +101,25 @@ func (q *Order) key() string {
 	return fold(q.Text) + "|" + q.Image.file() + "|" + strings.Join(items, "|")
 }
 
+func (q *Order) asked() map[string]any {
+	type item struct {
+		Text  string  `json:"text"`
+		Value float64 `json:"value"`
+	}
+	var items []item // null for none, [] for an empty list, as the type writes them
+	if q.Items != nil {
+		items = make([]item, 0, len(q.Items))
+	}
+	for _, it := range q.Items {
+		items = append(items, item{it.Text, it.Value})
+	}
+	form := map[string]any{"items": items, "direction": q.Direction}
+	if q.Unit != "" {
+		form["unit"] = q.Unit
+	}
+	return form
+}
+
 func (q *Order) words() []string {
 	w := []string{q.Text}
 	for _, it := range q.Items {

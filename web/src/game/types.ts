@@ -145,6 +145,8 @@ export interface Mark {
   points: number;
   right: boolean;
   partial?: boolean;
+  /** A question of the day that counts for nobody: found wrong, or changed, during its day (play/day.go). */
+  void?: boolean;
 }
 
 export interface Shown {
@@ -167,6 +169,8 @@ export interface State {
   day?: string;
   category?: string;
   total: number;
+  /** How many of the `total` count for nobody (Mark.void): the game is of `total − void` questions. */
+  void?: number;
   at: number;
   points: number;
   rights: number;
@@ -201,6 +205,8 @@ export interface Reviewed {
   given: Answer | null;
   points: number;
   right: boolean;
+  /** An answer to a question that counts for nobody (Mark.void): its points taken out. */
+  void?: boolean;
 }
 
 export interface Score {

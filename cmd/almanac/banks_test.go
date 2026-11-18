@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -56,6 +58,24 @@ func TestKeptBanks(t *testing.T) {
 		t.Fatalf("the fallback: %v", b)
 	}
 	os.Remove(stray)
+
+	// A pull that takes a question out of the bank, rather than retire it: refused, as one with errors.
+	file := filepath.Join(src, bank.QuestionsDir, "geography.json")
+	was, _ := os.ReadFile(file)
+	var qs []map[string]any
+	if err := json.Unmarshal(was, &qs); err != nil {
+		t.Fatal(err)
+	}
+	gone := qs[0]["id"].(string)
+	data, _ := json.Marshal(qs[1:])
+	os.WriteFile(file, data, 0o644)
+	if b, problems, _ := k.take(); b != nil || !slices.ContainsFunc(problems, func(p bank.Problem) bool { return p.ID == gone && !p.Warning }) {
+		t.Fatalf("a bank without %s: %v %v", gone, b, problems)
+	}
+	if kept := k.kept(); len(kept) != 1 || kept[0].dir != a.Dir {
+		t.Fatalf("kept after a question dropped: %v", kept)
+	}
+	os.WriteFile(file, was, 0o644)
 
 	// Copies of more commits (d twice, as after a restart): the newest keepBanks of different commits stay, and those
 	// held, however old.

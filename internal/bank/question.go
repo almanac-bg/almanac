@@ -3,7 +3,9 @@
 //
 // Every type lives in its own file (choice.go, number.go, order.go, truefalse.go, match.go, split.go, clues.go) and plugs in through the
 // same three steps: it checks itself, deals itself for one play (shuffled, without its answer), and grades what a
-// player gave. Adding a type is a new file here and its renderer in the web client; nothing else changes. With the
+// player gave; and it writes out what it asks, field by field, which its versions are told apart by (version.go).
+// Adding a type is a new file here, a version of it pinned (TestPinnedVersions), and its renderer in the web client;
+// nothing else changes. With the
 // answer a deal also shows how players have answered the question so far (crowd.go), in its own order. What a question
 // names (subjects.go) keeps a day to one question of a subject, and tells the bank's keepers which subjects come back.
 // A batch goes in whole or not at all (add.go): its new questions, its changes to questions the bank has, and its
@@ -132,6 +134,9 @@ type Question interface {
 	check() []string
 	// key says when two questions are the same question (the bank allows no duplicates).
 	key() string
+	// asked is what the question asks besides its type, text and picture, field by field, as its Version hashes it
+	// (version.go): its answer, options, items, pairs, clues, groups; each picture as its file.
+	asked() map[string]any
 	// words is every text a player sees, the answer included (for the giveaway checks).
 	words() []string
 }

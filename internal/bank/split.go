@@ -75,6 +75,21 @@ func (q *Split) key() string {
 	return fold(q.Text) + "|" + q.Image.file() + "|" + strings.Join(items, "|")
 }
 
+func (q *Split) asked() map[string]any {
+	type item struct {
+		Text  string `json:"text"`
+		Group int    `json:"group"`
+	}
+	var items []item // null for none, [] for an empty list, as the type writes them
+	if q.Items != nil {
+		items = make([]item, 0, len(q.Items))
+	}
+	for _, it := range q.Items {
+		items = append(items, item{it.Text, it.Group})
+	}
+	return map[string]any{"groups": q.Groups, "items": items}
+}
+
 func (q *Split) words() []string {
 	w := []string{q.Text, q.Groups[0], q.Groups[1]}
 	for _, it := range q.Items {

@@ -66,8 +66,8 @@ wrong is fixed the same way:
 5. **Apply each run**: `python3 -I <skill>/merge.py <work> <bank> <chunks…>` (the checked chunks into
    `<work>/batch/`, their waivers into `<bank>/waivers.json`), then `bank add -checked-by "fix-questions fable-5.2"
    <work>/batch <bank>`, `bank fmt`, `bank check` (no errors). A changed question's old picture stays on disk: `git rm` the files
-   `bank lint -rule picture <bank>` says no question uses (the server keeps them in its copies of the bank for 30 days,
-   for plays still showing the version before: bank.KeepGone). A changed picture is a new file: its name is its
+   `bank lint -rule picture <bank>` says no question uses (the server keeps them in its copies of the bank for good,
+   as a game is gone over with the version it showed: bank/keep.go). A changed picture is a new file: its name is its
    content's hash, and `bank check` refuses one that isn't. If `bank add` refuses, read why: a chunk whose new
    question collides with another's, or a change that made a new problem, goes back to its checker's notes; leave
    that chunk out (`merge.py` with the others) and fix it in the next round.

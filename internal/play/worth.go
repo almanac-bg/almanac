@@ -54,12 +54,29 @@ type Worth struct {
 // WorthOf is what an answer of a score to a question, given after took, earns: in a run, and in a room. inRow is
 // how many right answers in a row it makes, itself counted (0 for one that isn't right).
 func WorthOf(q bank.Question, score float64, took time.Duration, inRow int) Worth {
+	return worthAt(q, q.Base().Difficulty, score, took, inRow)
+}
+
+// worth is what an answer to a pick earns (WorthOf), at the difficulty the pick showed at (Pick.D): a question
+// relabelled while it's in play (calibration moves labels, and never the version) pays the same for the same answer,
+// in a run, between a challenge's two players, and all day long on the day's ten. A pick from before it was kept pays
+// at the question's label.
+func (p Pick) worth(q bank.Question, score float64, took time.Duration, inRow int) Worth {
+	level := p.D
+	if _, ok := weight[level]; !ok {
+		level = q.Base().Difficulty
+	}
+	return worthAt(q, level, score, took, inRow)
+}
+
+// worthAt is what an answer earns, the question taken as of a difficulty.
+func worthAt(q bank.Question, level bank.Difficulty, score float64, took time.Duration, inRow int) Worth {
 	h := q.Base()
 	k, ok := kinds[h.Type]
 	if !ok {
 		k = 1
 	}
-	full := score * MaxPoints * weight[h.Difficulty] * k
+	full := score * MaxPoints * weight[level] * k
 	base := tens(full * (1 - SpeedShare))
 	quick := tens(full * (1 - SpeedShare + SpeedShare*speed(took, Limit(q))))
 	points := tens(full * (1 - SpeedShare + SpeedShare*speed(took, Limit(q))) * (1 + rowBonus(inRow)))

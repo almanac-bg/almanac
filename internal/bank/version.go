@@ -9,10 +9,17 @@ import (
 )
 
 // A question changes now and then while it's in play: its answer fixed, an option reworded, a decoy added, its picture
-// swapped. Its Version says which of its versions it is, by what it asks (notAsked aside: its labels, fact and dates),
+// swapped. Its Version says which of its versions it is, by what it asks (not its labels, fact and dates: notAsked),
 // so that a play can be graded against the version it showed, and its answers counted only with those to the same
 // version (the game keeps every version it has played: play.Game.Keep). Two versions with the same Version deal and
 // grade alike, seed for seed.
+//
+// A version is hashed from a form of what the question asks written out field by field (each type's asked, with its
+// type, text and picture), never from the type's Go struct as it happens to encode: a field a type gains changes no
+// version, until a question sets it. Versions are kept for ever (question_versions, runs' Pick.V), so one that moved
+// would lose every play, review, challenge and recording of the version it was. TestPinnedVersions pins them; a type
+// changed on purpose so that they move needs a migration that rewrites the versions kept. TestEveryFieldClassed holds
+// each field of every type to be either in the form (one that tells versions apart) or in notAsked.
 
 // Version is which version of a question this is: a hash of what it asks, 16 hex digits.
 func Version(q Question) string {
@@ -22,42 +29,36 @@ func Version(q Question) string {
 	return versionOf(q)
 }
 
-// versionOf works a question's Version out: its fields as JSON, without those that aren't what it asks, and each
-// picture as its file (its name is its content's hash).
+// versionOf works a question's Version out: its form (askedForm) as JSON, its keys in order.
 func versionOf(q Question) string {
-	data, err := json.Marshal(q)
-	var fields map[string]json.RawMessage
-	if err == nil {
-		err = json.Unmarshal(data, &fields)
-	}
+	data, err := json.Marshal(askedForm(q))
 	if err != nil {
 		return ""
 	}
-	for k := range fields {
-		if notAsked[k] {
-			delete(fields, k)
-		}
-	}
-	if im := q.Extra().Image; im != nil {
-		fields["image"], _ = json.Marshal(im.File)
-	}
-	if c, ok := q.(*Choice); ok && len(c.Pictures) > 0 {
-		files := make([]string, len(c.Pictures))
-		for i, p := range c.Pictures {
-			files[i] = p.File
-		}
-		fields["pictures"], _ = json.Marshal(files)
-	}
-	data, _ = json.Marshal(fields) // a map's keys in order
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:8])
+}
+
+// askedForm is what a question asks, as its version is hashed from: its type and text, its picture as the file it is
+// (its name is its content's hash: who took it, its size and description are its labels), and what its type asks
+// (asked). A field the form gains goes in only where it's set, so that the versions of questions without it stay.
+func askedForm(q Question) map[string]any {
+	h, t := q.Base(), q.Extra()
+	form := q.asked()
+	form["type"], form["text"] = h.Type, h.Text
+	if t.Image != nil {
+		form["image"] = t.Image.File
+	}
+	return form
 }
 
 // Encode is a question as one JSON value, everything it holds: what Decode reads back (its category aside).
 func Encode(q Question) ([]byte, error) { return json.Marshal(q) }
 
 // Decode reads a question Encode wrote, of a category: a version kept from an earlier bank, to deal and grade as it
-// was. Its type must be one the game knows.
+// was. Its type must be one the game knows. Its version is worked out again from what it reads, never taken on trust:
+// a field renamed since it was kept reads back as another version, which the game refuses (play: pastVersion), rather
+// than as the same one without what it asked.
 func Decode(data []byte, category string) (Question, error) {
 	var probe struct {
 		Type string `json:"type"`

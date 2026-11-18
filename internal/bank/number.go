@@ -66,6 +66,14 @@ func (q *Number) check() []string {
 
 func (q *Number) key() string { return fold(q.Text) + "|" + q.Image.file() }
 
+func (q *Number) asked() map[string]any {
+	form := map[string]any{"answer": q.Answer, "step": q.Step, "scale": q.Scale, "tolerance": q.Tolerance}
+	if q.Unit != "" {
+		form["unit"] = q.Unit
+	}
+	return form
+}
+
 func (q *Number) words() []string { return []string{q.Text, formatNumber(q.Answer, q.Step)} }
 
 // Closeness is how close a guess is: 1 spot on, down to 0 a tolerance away (on a log scale, a tolerance-fold).

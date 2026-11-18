@@ -83,6 +83,25 @@ func (q *Match) key() string {
 	return fold(q.Text) + "|" + q.Image.file() + "|" + strings.Join(lefts, "|")
 }
 
+func (q *Match) asked() map[string]any {
+	type pair struct {
+		Left  string `json:"left"`
+		Right string `json:"right"`
+	}
+	var pairs []pair // null for none, [] for an empty list, as the type writes them
+	if q.Pairs != nil {
+		pairs = make([]pair, 0, len(q.Pairs))
+	}
+	for _, p := range q.Pairs {
+		pairs = append(pairs, pair{p.Left, p.Right})
+	}
+	form := map[string]any{"pairs": pairs}
+	if q.Decoy != "" {
+		form["decoy"] = q.Decoy
+	}
+	return form
+}
+
 func (q *Match) words() []string {
 	w := []string{q.Text}
 	for _, pr := range q.Pairs {
