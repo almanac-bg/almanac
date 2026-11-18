@@ -159,7 +159,9 @@ test("a first invite asks for a name the friends would know, once", async ({ pag
   await invite.click();
   await sheet.getByLabel("Име").fill("Х");
   await sheet.getByRole("button", { name: "Сподели" }).click();
-  await expect(sheet.getByRole("alert")).toHaveText("Името е от 2 до 30 букви, цифри или интервали.");
+  await expect(sheet.getByRole("alert")).toHaveText(
+    "Името е от 2 до 30 знака: букви, цифри, интервали, точки или тирета.",
+  );
   await sheet.getByLabel("Име").fill("Светулка");
   await sheet.getByRole("button", { name: "Сподели" }).click();
   await expect(sheet).toHaveCount(0);

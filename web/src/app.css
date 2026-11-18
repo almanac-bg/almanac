@@ -4701,16 +4701,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .avatar.s .lv {
-    right: -5px;
-    bottom: -5px;
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
-    font-size: 0.625rem;
-    line-height: 16px;
-  }
-
   .avatar.l .lv {
     min-width: 28px;
     height: 28px;

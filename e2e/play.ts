@@ -205,6 +205,16 @@ async function inDB(page: Page, f: (db: DatabaseSync, id: number) => void): Prom
   }
 }
 
+/** A player still with the name drawn for them, about to meet others for the first time on this device (a live duel,
+ * Роял, a challenge: screens/name.ts), is asked for a name first: given `name`, or kept as drawn („Не сега“). */
+export async function meetAs(page: Page, name?: string): Promise<void> {
+  const sheet = page.getByRole("dialog", { name: "Как да те виждат останалите?" });
+  if (!name) return sheet.getByRole("button", { name: "Не сега" }).click();
+  await sheet.getByRole("textbox", { name: "Име" }).fill(name);
+  await sheet.getByRole("button", { name: "Готово" }).click();
+  await expect(sheet).toBeHidden();
+}
+
 /** Two players made friends the way an invite link does it: `a`'s link (a player is made for them the first time),
  * opened by `b`, who asks; then `a` says yes in Приятели. A link alone never makes a friend. */
 export async function befriendByLink(a: Page, b: Page): Promise<void> {

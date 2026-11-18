@@ -75,10 +75,12 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   button, the same line under it, and „Още десет“ plain.
 - **Приятели** (`/friends`): requests, friends, and the ways to add them. With none yet, „Покани с връзка“ is the gold
   button, first (the phone's share sheet, or „Копирано.“: the address itself is never printed), the field by
-  потребителско име or имейл under it with „Добави“. What's shared that carries the player's name (an invite, the
-  day's result with its link) asks a player still with the name drawn for them for theirs first, once on a device: a
-  sheet from the bottom (`.sheet`, `screens/name.ts`), „Как да те познаят приятелите?“, the drawn name in its one
-  field, „Сподели“ gold, „Не сега“ quiet (it shares with the drawn name). An invite (`/f/…`) is to the day's ten
+  потребителско име or имейл under it with „Добави“. A player still with the name drawn for them is asked for theirs
+  once on a device, the first time others would see it: a sheet from the bottom (`.sheet`, `screens/name.ts`), the
+  drawn name in its one field, „Не сега“ quiet (on with the drawn name). Before a first live duel, Роял's lobby, or a
+  challenge taken or sent to a friend: „Как да те виждат останалите?“, „Готово“ gold. Before what's shared that
+  carries the name (an invite, the day's result with its link): „Как да те познаят приятелите?“, „Сподели“ gold.
+  Never in a room, which asks for a name of its own. An invite (`/f/…`) is to the day's ten
   („Мария има 8 от 10 днес. А ти?“, or „Мария те кани на днешните 10“ before she has played); played there, the day's
   result is Начало's, with one card more first (`.invite-card`: the two results side by side and „Добави Мария в
   приятели“). That tap is a request Мария accepts („Поканата е изпратена. Щом Мария я приеме, ставате приятели.“):
@@ -120,7 +122,8 @@ played, a rated game), never by the date. The server says which are open (`open`
 - **The first day:** the day's result and its points, the streak, the topics, the ways to play with others, and the
   achievements the day earned with what they unlock (but what a level unlocks). No XP, level, goals, league or
   rating anywhere.
-- **The second day played:** XP, the level (Начало's chip, Профил's card, the avatar's number) and the day's goals.
+- **The second day played:** XP, the level (Начало's chip, Профил's card, the number on a large avatar,
+  anyone's) and the day's goals; never on a board's row, where it would read as a second place.
 - **The third:** the week's league (Профил's line, Класации' „Лига“). A week that ended before is let go untold.
 - **The first duel or Роял that moves the rating:** the rating and its division (Дуел, Роял, Класации' „Рейтинг“).
 - **Роял, while its evenings are thin** (the median of the last 7 under 8 players): in a player's first 7 days it
@@ -314,8 +317,9 @@ takes a token.
     date, `.fact-day` heads the same card, „На този ден“ and what happened that day in plain type, a hairline under
     it, the „?“ moving down to the fact. Only with the answer, never before it, never in a topic's game).
 - **Progress:**
-  - `.avatar` (a picture on a tile of its tone `tone-…`, sizes `s` and `l`, the level in `.lv`), drawn by `avatar()`.
-  - `.who` (avatar, name, `.who-title`) for a player on a board or a list, drawn by `who()`.
+  - `.avatar` (a picture on a tile of its tone `tone-…`, sizes `s` and `l`, the level in `.lv` once XP is open),
+    drawn by `avatar()`.
+  - `.who` (avatar without the level, name, `.who-title`) for a player on a board or a list, drawn by `who()`.
   - `.level-card` (with `up` for a new level), `.unlock` (a new achievement, a division reached, a week of the league ended),
     `.unlocks`/`.unlock-row` (what a game unlocked, drawn by `unlockPicture()`), `.next` (what comes next), `.badge-mark`.
   - `.achievements`/`.achievement` (and `locked`), `.worn`
@@ -513,7 +517,7 @@ Every element that looks like a game measures something the game already counts:
 | Friends      | The day's board among you and your friends, once a friend has played                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Класации                     |
 | Level        | All the XP a player has earned; each level takes 150 more than the last (300 for the first); lilac (its bars, the disc on an avatar)                                                                                                                                                                                                                                                                                                                                                                                                                                    | Начало, Профил, avatars      |
 | Achievements | 33 facts of a player's games in four tiers (обикновени, редки, епични, легендарни), each saying how it's earned; announced once                                                                                                                                                                                                                                                                                                                                                                                                                                         | Result, Профил               |
-| Titles       | Words for the player and their knowledge, worn under their name, never only a deed, one tap's luck or the hour: a ladder by level („Нова искра“ at 1 … „Жив алманах“ at 50, worn until the player chooses another, the newest reached), some achievements of how someone plays („Светкавица“: five right in a game, each under 3 s), a topic's mastery („Майстор · История“, „Светило · История“), and the rating and the league (divisions, a Роял won, Рила's champion counted). In their tier's colour; yours first, the locked ones by group with what unlocks them | Boards, friends, rooms       |
+| Titles       | Words for the player and their knowledge, worn under their name, never only a deed, one tap's luck or the hour: a ladder by level („Нова искра“ at 1, by choice … „Жив алманах“ at 50; the newest reached is worn until one is chosen), some achievements of how someone plays („Светкавица“: five right in a game, each under 3 s), a topic's mastery („Майстор · История“, „Светило · История“), and the rating and the league (divisions, a Роял won, Рила's champion counted). In their tier's colour; yours first, the locked ones by group with what unlocks them | Boards, friends, rooms       |
 | Avatars      | A picture on a tone: nine animals free, emblems unlocked by achievements (the crown at level 10)                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Everywhere a player is       |
 
 Feedback fires once, when it's earned, and then the screen is still again:

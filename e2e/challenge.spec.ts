@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { answer, moveOn, openGame, playRun } from "./play.ts";
+import { answer, meetAs, moveOn, openGame, playRun } from "./play.ts";
 
 /** What the page shares, kept instead of the phone's sheet. */
 async function catchShares(page: Page): Promise<void> {
@@ -52,6 +52,9 @@ test("a challenge: made on Дуел, one link, a stranger plays it as a guest, b
   await expect(b.locator(".lead")).toContainText(/позна \d+ от 10 по „История“/);
   await expect(b.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
   await b.getByRole("button", { name: "Започни", exact: true }).click();
+  // Ana will see who took it: a name of his own first, then the count.
+  await expect(b.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
+  await meetAs(b, "Бо");
   await b.getByRole("button", { name: "Започни сега" }).click();
   await playRun(b);
   await expect(b.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 10_000 });
@@ -67,12 +70,10 @@ test("a challenge: made on Дуел, one link, a stranger plays it as a guest, b
     .click();
   await expect(b.locator(".duel-add")).toHaveText("Поканата е изпратена.");
   await expect(b.getByRole("button", { name: "Предизвикай и ти" })).toHaveClass(/primary/);
+  // Named already: shared at once, with no question.
   await b.getByRole("button", { name: "Предизвикай и ти" }).click();
-  await b
-    .getByRole("dialog", { name: "Как да те познаят приятелите?" })
-    .getByRole("button", { name: "Сподели" })
-    .click();
   await expect.poll(async () => (await shared(b))?.url ?? "").toMatch(/\/c\/[a-z0-9]{8}$/);
+  await expect(b.getByRole("dialog")).toHaveCount(0);
   expect(new URL((await shared(b))?.url ?? "").pathname).not.toBe(path);
 
   // Opened again, it's his result, not a second game.
@@ -84,6 +85,7 @@ test("a challenge: made on Дуел, one link, a stranger plays it as a guest, b
   await a.goto(path);
   await expect(a.getByRole("heading", { name: /^\d+ от 10 по „История“$/ })).toBeVisible();
   await expect(a.locator(".duel-row")).toHaveCount(1);
+  await expect(a.locator(".duel-row .who-name")).toHaveText("Бо");
   await a.goto("/");
   const line = a.locator(".streak-notice", { hasText: "изигра предизвикателството ти" });
   await expect(line.getByRole("link", { name: "Виж" })).toHaveAttribute("href", path);
@@ -111,6 +113,7 @@ test("a challenge left half-way, its link opened again from outside, waits for �
   const b = await bo.newPage();
   await b.goto(path);
   await b.getByRole("button", { name: "Започни", exact: true }).click();
+  await meetAs(b);
   await b.getByRole("button", { name: "Започни сега" }).click();
   await expect(b.locator(".question-head")).toContainText("1 от 10");
   // The link the tab's first page: the first back asks (the page's address the duel's now), and „Остани“ plays on.

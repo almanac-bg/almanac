@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { answer, openGame, playRun } from "./play.ts";
+import { answer, meetAs, openGame, playRun } from "./play.ts";
 
 // The test server runs a Роял every half minute (playwright.config.ts). The three engines' runs of this test may well
 // meet in the same one, as players do. A wrong answer puts nobody out: the game always runs its fifteen questions,
@@ -79,6 +79,7 @@ test("Роял: in from the lobby, its music, live to the fifteenth question, th
     expect(Number(m) * 60 + Number.parseInt(s, 10)).toBeGreaterThanOrEqual(12);
   }).toPass({ timeout: 300_000 });
   await page.locator(".screen > button", { hasText: "Влез" }).click();
+  await meetAs(page);
   await expect(page.getByRole("button", { name: "Излез" })).toBeVisible();
   await expect(page.getByText("Вътре си.")).toBeVisible();
   // Never in a Роял before: how it's played, in a line, in the lobby.
@@ -135,12 +136,14 @@ test("Роял: one who comes late comes in until the third question", async ({ 
   // Someone is in at the start, so that a game runs.
   await early.goto("/royal");
   await early.locator(".screen > button", { hasText: "Влез" }).click({ timeout: 300_000 });
+  await meetAs(early);
   await expect(early.getByText("Вътре си.")).toBeVisible();
 
   await page.goto("/royal");
   const door = page.getByText("Роял вече започна. До 3-тия въпрос още можеш да влезеш.");
   await expect(door).toBeVisible({ timeout: 60_000 });
   await page.locator(".card", { has: door }).getByRole("button", { name: "Влез" }).click();
+  await meetAs(page);
   await expect(door).toBeHidden();
   await expect(page.locator(".royal-table .row.me").or(page.locator(".question .option").first())).toBeVisible({
     timeout: 30_000,

@@ -70,6 +70,7 @@ import type { DuelView } from "./screens/duel.ts";
 import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
 import { leagueBoard, leagueLine, loadLeague } from "./screens/league.ts";
 import { clock, coming, dayAndTime, dayWord, whileSeen } from "./screens/modes.ts";
+import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
 import { loadMistakes } from "./screens/play.ts";
 import { loadProgress, nearest } from "./screens/progress.ts";
@@ -82,6 +83,7 @@ import {
   friendRequests,
   hostCss,
   notice,
+  opened,
   outcomeCss,
   player,
   playingWhile,
@@ -190,12 +192,14 @@ export const kit = {
   meter,
   mixes,
   musicOn,
+  nameFirst,
   nearest,
   needsHomeScreen,
   news,
   nextSteps,
   notice,
   onCleanup,
+  opened,
   ordinal,
   pageArt,
   picture,

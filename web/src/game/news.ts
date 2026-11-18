@@ -20,6 +20,7 @@ import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { place } from "../lib/ordinal.ts";
 import { feelKit, play, type SoundName, voice } from "../lib/sound.ts";
 import { type LeagueEnd, moveWords } from "../screens/league.ts";
+import { met } from "../state.ts";
 import {
   type AchievementInfo,
   avatar,
@@ -102,6 +103,7 @@ export function news(
     () =>
       api<News>("POST", "/api/me/news", { run }).then(
         async (n) => {
+          met(n.open);
           data.set(n);
           if (late) return;
           const kit = feelKit();

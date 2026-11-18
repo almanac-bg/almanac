@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { befriendByLink, playedFair, playRun, startDay } from "./play.ts";
+import { befriendByLink, meetAs, playedFair, playRun, startDay } from "./play.ts";
 
 test("friends: an invite link, then a challenge between the two", async ({ browser }) => {
   test.setTimeout(180_000);
@@ -31,8 +31,10 @@ test("friends: an invite link, then a challenge between the two", async ({ brows
   await expect(yes).toHaveCount(0);
   await a.goto("/friends");
 
-  // A tap by mistake costs nothing: the count-in comes first, and „Откажи“ goes back with nothing made.
+  // A tap by mistake costs nothing: the count-in comes first (after her name, asked the first time she meets
+  // others), and „Откажи“ goes back with nothing made.
   await a.locator(".friend").getByRole("button", { name: "Предизвикай" }).click();
+  await meetAs(a);
   await expect(a.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await a.getByRole("button", { name: "Откажи" }).click();
   await expect(a.locator(".friend")).toHaveCount(1);
@@ -65,6 +67,7 @@ test("friends: an invite link, then a challenge between the two", async ({ brows
   const notice = b.locator(".challenge-notice");
   await expect(notice).toContainText("те предизвика");
   await notice.getByRole("button", { name: "Играй" }).click();
+  await meetAs(b);
   await expect(b.locator(".question-head .versus")).toHaveText(/^Дуел (с|със) \S/);
   await playRun(b);
   await expect(b.locator(".challenge-notice")).toHaveCount(0);
@@ -167,9 +170,11 @@ test("a challenge back from a friend's result", async ({ browser }) => {
   const b = await (await browser.newContext()).newPage();
   await befriendByLink(a, b);
   await a.locator(".friend").getByRole("button", { name: "Предизвикай" }).click();
+  await meetAs(a);
   await playRun(a);
   await b.goto("/");
   await b.locator(".challenge-notice").getByRole("button", { name: "Играй" }).click();
+  await meetAs(b);
   await playRun(b);
   await expect(b.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 10_000 });
 
@@ -193,6 +198,7 @@ test("a friend can turn a challenge down", async ({ browser }) => {
   const b = await (await browser.newContext()).newPage();
   await befriendByLink(a, b);
   await a.locator(".friend").getByRole("button", { name: "Предизвикай" }).click();
+  await meetAs(a);
   await playRun(a);
   // From its own screen…
   await b.goto("/duel");

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { answer } from "./play.ts";
+import { answer, meetAs } from "./play.ts";
 
 test("a room for two: lobby, its questions together, the standings, a game kept", async ({ browser }) => {
   // Five easy questions with the room's 6-second pause after each, in two browsers at once.
@@ -203,12 +203,16 @@ test("two people asking for a duel play it live", async ({ browser }, info) => {
   test.setTimeout(240_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
-  // Ana asks first and waits; Bo asks, from a link to live duels opened in a new tab, and they meet.
+  // Ana asks first and waits; Bo asks, from a link to live duels opened in a new tab, and they meet. Each, the first
+  // time, is asked for a name of their own first: Ana gives hers, Bo keeps his drawn one.
   await a.goto("/duel");
   await a.getByRole("button", { name: "Намери съперник" }).click();
+  await meetAs(a, "Ана");
   await expect(a.getByRole("heading", { name: "Търсим съперник" })).toBeVisible();
   await b.goto("/duel/live");
   await b.getByRole("button", { name: "Намери съперник" }).click();
+  await meetAs(b);
+  await expect(b.locator(".live-face .live-name", { hasText: "Ана" })).toBeVisible();
   for (const p of [a, b]) {
     await expect(p.getByRole("heading", { name: "Съперникът е тук" })).toBeVisible();
     // The seconds to the first question, seen as they're heard: big, in the screen, above the tabs.

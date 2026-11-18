@@ -27,7 +27,7 @@ import { goBack, hold, release, title } from "../lib/router.ts";
 import { feelKit } from "../lib/sound.ts";
 import { dateWords, issueWords, onDay, weekday } from "../lib/words.ts";
 import { dayInBulgaria, yearNow } from "../lib/year.ts";
-import { notice, player, playing, user } from "../state.ts";
+import { met, notice, player, playing, user } from "../state.ts";
 import {
   explain,
   failure,
@@ -136,6 +136,7 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
     try {
       const t = inPage ?? (await api<Today>("GET", "/api/day"));
       inPage = undefined;
+      met(t.open);
       day = t.day;
       const run = t.run;
       // A question this tab was showing has its time running (a reload): straight back into it. Otherwise (another

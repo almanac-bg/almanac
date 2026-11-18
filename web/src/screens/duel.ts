@@ -26,6 +26,7 @@ import {
   until,
   who,
 } from "../ui.ts";
+import { nameFirst } from "./name.ts";
 import { signIn } from "./signin.ts";
 
 /** How one question of a duel went for one side: its points, right or partly (some points, not right), how long it
@@ -378,13 +379,24 @@ export function duelOne(params: string[]) {
       const failed = (err: unknown) => {
         if (!life.aborted) screen.show(() => failure(err, () => void load(), ["/duel", "Към дуелите"]));
       };
-      // Sent to the player and not started: who asks, and the choice (unless said yes to already).
+      // Sent to the player and not started: who asks, and the choice (unless said yes to already). Taken, the one who
+      // sent it sees who took it: a name of the player's own first, if they still have the one drawn for them.
       const yes = accepted === id;
       accepted = 0;
+      const named = async () => (await nameFirst()) && !life.aborted;
       if (d.state === "play" && !d.runId && !yes)
-        return screen.show(() => asked(d, play, () => screen.show(() => duelResult({ ...d, state: "declined" }))));
+        return screen.show(() =>
+          asked(
+            d,
+            async () => {
+              if (await named()) await play();
+            },
+            () => screen.show(() => duelResult({ ...d, state: "declined" })),
+          ),
+        );
       // Said yes from the notice, not started yet: the count-in first, with a way back (the challenge stays).
       if (d.state === "play" && !d.runId) {
+        if (!(await named())) return;
         hold();
         return screen.show(() =>
           getReady(
