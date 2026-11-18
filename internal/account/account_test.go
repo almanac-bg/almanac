@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math/rand/v2"
 	"regexp"
 	"strings"
 	"testing"
@@ -38,7 +40,7 @@ var codePattern = regexp.MustCompile(`\b(\d{4} \d{4} \d{4}|\d{6})\b`)
 // signs in with.
 func code(t *testing.T, a *Accounts, out *mailer.Outbox, in *inbox, email string) Proof {
 	t.Helper()
-	asked, err := a.SendCode(t.Context(), email, "")
+	asked, err := a.SendCode(t.Context(), email, "", "site")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,7 +398,7 @@ func TestCodesLimits(t *testing.T) {
 	ctx := t.Context()
 	c := code(t, a, out, in, "y@example.com")
 	var soon TooSoon
-	if _, err := a.SendCode(ctx, "y@example.com", c.Asked); !errors.Is(err, ErrTooSoon) || !errors.As(err, &soon) ||
+	if _, err := a.SendCode(ctx, "y@example.com", c.Asked, "site"); !errors.Is(err, ErrTooSoon) || !errors.As(err, &soon) ||
 		soon.Wait <= 0 || soon.Wait > CodeEvery {
 		t.Fatalf("a second code at once: %v", err)
 	}
@@ -418,7 +420,7 @@ func TestCodesLimits(t *testing.T) {
 		t.Fatalf("the right code after %d wrong tries: %v", CodeTries, err)
 	}
 	// A dead code holds no new one back, in the same browser.
-	asked, err := a.SendCode(ctx, "y@example.com", c.Asked)
+	asked, err := a.SendCode(ctx, "y@example.com", c.Asked, "site")
 	if err != nil {
 		t.Fatalf("a new code once the last is dead: %v", err)
 	}
@@ -427,12 +429,12 @@ func TestCodesLimits(t *testing.T) {
 		t.Fatalf("the new code: %v", err)
 	}
 	// Nor does a live one to another address: an address mistyped is put right at once.
-	typo, _ := a.SendCode(ctx, "z@exampel.com", "")
-	if _, err := a.SendCode(ctx, "z@example.com", typo.Token); err != nil {
+	typo, _ := a.SendCode(ctx, "z@exampel.com", "", "site")
+	if _, err := a.SendCode(ctx, "z@example.com", typo.Token, "site"); err != nil {
 		t.Fatalf("a code to the address put right: %v", err)
 	}
 	for _, bad := range []string{"", "no", "a@b", "a b@c.d", "<a@b.c>"} {
-		if _, err := a.SendCode(ctx, bad, ""); !errors.Is(err, ErrBadEmail) {
+		if _, err := a.SendCode(ctx, bad, "", "site"); !errors.Is(err, ErrBadEmail) {
 			t.Errorf("%q: %v", bad, err)
 		}
 	}
@@ -474,6 +476,7 @@ func TestMissesLengthenCodes(t *testing.T) {
 	ctx := t.Context()
 	mine := code(t, a, out, in, "me@example.com")
 	for i := 0; i < Misses; {
+		_, _ = db.Write.Exec(`DELETE FROM code_mails`) // as if over hours: not what's tried here (TestCodesPerAddress)
 		theirs := code(t, a, out, in, "me@example.com")
 		for range min(CodeTries, Misses-i) {
 			guess := theirs
@@ -486,7 +489,7 @@ func TestMissesLengthenCodes(t *testing.T) {
 		t.Fatalf("a short code past the misses: %v", err)
 	}
 	a = &Accounts{DB: db, Outbox: out, Secret: a.Secret} // as after a restart
-	asked, err := a.SendCode(ctx, "me@example.com", mine.Asked)
+	asked, err := a.SendCode(ctx, "me@example.com", mine.Asked, "site")
 	if err != nil || asked.Digits != LongCodeDigits {
 		t.Fatalf("the code after the misses: %+v %v", asked, err)
 	}
@@ -506,6 +509,7 @@ func TestMissesLengthenCodes(t *testing.T) {
 	if _, err := db.Write.Exec(`UPDATE code_misses SET since = ?`, store.Ms(time.Now().Add(-MissesKept))); err != nil {
 		t.Fatal(err)
 	}
+	_, _ = db.Write.Exec(`DELETE FROM code_mails`)
 	if c := code(t, a, out, in, "me@example.com"); len(c.Code) != CodeDigits {
 		t.Fatalf("a code once the stretch is over: %q", c.Code)
 	}
@@ -523,12 +527,12 @@ func TestMissesLengthenCodes(t *testing.T) {
 func TestNewCodeDropsTheLastMail(t *testing.T) {
 	a, db, out, in := setup(t)
 	ctx := t.Context()
-	first, err := a.SendCode(ctx, "me@example.com", "")
+	first, err := a.SendCode(ctx, "me@example.com", "", "site")
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, _ = db.Write.Exec(`UPDATE sign_in_codes SET sent_at = 0`) // past the wait between codes
-	second, err := a.SendCode(ctx, "me@example.com", first.Token)
+	second, err := a.SendCode(ctx, "me@example.com", first.Token, "site")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -552,10 +556,10 @@ func TestCodesAMinute(t *testing.T) {
 	for {
 		minute := time.Now().Unix() / 60
 		a.mu.Lock()
-		a.minute, a.mailed = minute, [2]int{CodesAMinute, 1}
+		a.minute, a.mailed = minute, [2]minuteCount{{all: CodesAMinuteMost}, {all: 1}}
 		a.mu.Unlock()
-		_, flooded := a.SendCode(ctx, "new@example.com", "")
-		_, profile := a.SendCode(ctx, "me@example.com", "")
+		_, flooded := a.SendCode(ctx, "new@example.com", "", "site")
+		_, profile := a.SendCode(ctx, "me@example.com", "", "site")
 		if time.Now().Unix()/60 != minute {
 			continue // the minute turned meanwhile: again
 		}
@@ -563,6 +567,100 @@ func TestCodesAMinute(t *testing.T) {
 			t.Fatalf("a new address past the most a minute: %v; one with a profile: %v", flooded, profile)
 		}
 		return
+	}
+}
+
+// A minute's codes are shared fairly: a site takes SiteShare at most; once a few sites have filled the minute, every
+// other site's first code still goes, up to CodesAMinuteMost; and each code's rank is how many its site had (review
+// 2026-11-18, S5).
+func TestCodesAMinuteShared(t *testing.T) {
+	a := &Accounts{}
+	now := time.Date(2026, 11, 18, 12, 0, 0, 0, time.UTC)
+	for i := range SiteShare {
+		if rank, ok := a.mailOne(false, "flood", now); !ok || rank != i+1 {
+			t.Fatalf("code %d of a site: %d, %v", i+1, rank, ok)
+		}
+	}
+	if _, ok := a.mailOne(false, "flood", now); ok {
+		t.Fatal("a site took more than its share")
+	}
+	for i := SiteShare; i < CodesAMinute; i++ {
+		a.mailOne(false, fmt.Sprint("flood", i/SiteShare), now)
+	}
+	if _, ok := a.mailOne(false, "flood1", now); ok {
+		t.Fatal("past CodesAMinute, a site's second code went")
+	}
+	for i := CodesAMinute; i < CodesAMinuteMost; i++ {
+		if rank, ok := a.mailOne(false, fmt.Sprint("player", i), now); !ok || rank != 1 {
+			t.Fatalf("past CodesAMinute, a site's first code: %d, %v", rank, ok)
+		}
+	}
+	if _, ok := a.mailOne(false, "late", now); ok {
+		t.Fatal("past CodesAMinuteMost, a code went")
+	}
+	if _, ok := a.mailOne(true, "late", now); !ok {
+		t.Fatal("the codes to addresses with a profile were held up by the new ones'")
+	}
+	if _, ok := a.mailOne(false, "flood", now.Add(time.Minute)); !ok {
+		t.Fatal("the next minute didn't start anew")
+	}
+}
+
+// An address gets at most CodesPerAddressHour codes an hour and CodesPerAddressDay a day, whoever asks for them and
+// from wherever (review 2026-11-18, S5); they're counted in the database, forgotten a day after, and with the player.
+func TestCodesPerAddress(t *testing.T) {
+	a, db, _, _ := setup(t)
+	ctx := t.Context()
+	send := func() error {
+		_, err := a.SendCode(ctx, "me@example.com", "", fmt.Sprint("site", rand.Int()))
+		return err
+	}
+	for i := range CodesPerAddressHour {
+		if err := send(); err != nil {
+			t.Fatalf("code %d: %v", i+1, err)
+		}
+	}
+	if err := send(); !errors.Is(err, ErrAddressBusy) {
+		t.Fatalf("past the hour's: %v", err)
+	}
+	// An hour on, more go, until the day's are spent.
+	for sent := CodesPerAddressHour; sent < CodesPerAddressDay; {
+		_, _ = db.Write.Exec(`UPDATE code_mails SET at = at - ?`, time.Hour.Milliseconds())
+		for i := 0; i < CodesPerAddressHour && sent < CodesPerAddressDay; i++ {
+			if err := send(); err != nil {
+				t.Fatalf("code %d of the day: %v", sent+1, err)
+			}
+			sent++
+		}
+	}
+	_, _ = db.Write.Exec(`UPDATE code_mails SET at = at - ?`, time.Hour.Milliseconds())
+	if err := send(); !errors.Is(err, ErrAddressBusy) {
+		t.Fatalf("past the day's: %v", err)
+	}
+	if _, err := a.SendCode(ctx, "other@example.com", "", "site"); err != nil {
+		t.Fatalf("another address: %v", err)
+	}
+	_, _ = db.Write.Exec(`UPDATE code_mails SET at = at - ?`, (24 * time.Hour).Milliseconds())
+	if err := a.CleanUp(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	_ = db.Read.QueryRow(`SELECT count(*) FROM code_mails`).Scan(&n)
+	if n != 0 {
+		t.Fatalf("%d codes counted a day on", n)
+	}
+	if err := send(); err != nil {
+		t.Fatalf("a day on: %v", err)
+	}
+}
+
+// No code goes to an address the mail server refused: the player is told to check it.
+func TestNoCodeToASuppressedAddress(t *testing.T) {
+	a, db, _, _ := setup(t)
+	_, _ = db.Write.Exec(`INSERT INTO mail_suppressed (email, until, times, reason) VALUES (?, ?, 1, '550 5.1.1')`,
+		"gone@example.com", store.Ms(time.Now().Add(time.Hour)))
+	if _, err := a.SendCode(t.Context(), "Gone@Example.com", "", "site"); !errors.Is(err, ErrNoMail) {
+		t.Fatalf("to a suppressed address: %v", err)
 	}
 }
 
@@ -720,7 +818,7 @@ func TestDeleteForgetsTheAddress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.SendCode(ctx, "gone@example.com", ""); err != nil {
+	if _, err := a.SendCode(ctx, "gone@example.com", "", "site"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Write.ExecContext(ctx, `INSERT INTO code_misses (email, misses, since)
@@ -741,12 +839,13 @@ func TestDeleteForgetsTheAddress(t *testing.T) {
 	if err := a.Delete(ctx, profile.ID); err != nil {
 		t.Fatal(err)
 	}
-	var users, codes, misses int
+	var users, codes, misses, mailed int
 	_ = db.Read.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM users), (SELECT count(*) FROM sign_in_codes),
-		(SELECT count(*) FROM code_misses)`).Scan(&users, &codes, &misses)
+		(SELECT count(*) FROM code_misses), (SELECT count(*) FROM code_mails)`).Scan(&users, &codes, &misses, &mailed)
 	out.Flush(ctx)
-	if users != 0 || codes != 0 || misses != 0 || len(told) != 1 || told[0] != profile.ID {
-		t.Fatalf("after: %d players, %d codes, %d misses; the game told of %v", users, codes, misses, told)
+	if users != 0 || codes != 0 || misses != 0 || mailed != 0 || len(told) != 1 || told[0] != profile.ID {
+		t.Fatalf("after: %d players, %d codes, %d misses, %d codes mailed counted; the game told of %v", users, codes,
+			misses, mailed, told)
 	}
 	if len(in.got) != 1 || in.got[0].To != "other@example.com" {
 		t.Fatalf("mail sent after: %+v", in.got)

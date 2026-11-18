@@ -173,16 +173,49 @@ func TestCodeIsTheBrowsers(t *testing.T) {
 		g.srv.Handler().ServeHTTP(w, r)
 		return w.Code
 	}
-	for i := range 5 {
-		if status := ask("198.51.100.1", "victim@example.com"); status != 200 {
-			t.Fatalf("code %d from one network: %d", i+1, status)
+	// One address gets a few codes an hour, from whatever networks ask (review 2026-11-18, S5): nobody floods an inbox.
+	for i := range account.CodesPerAddressHour {
+		if status := ask(fmt.Sprintf("198.51.%d.1", 100+i), "victim@example.com"); status != 200 {
+			t.Fatalf("code %d to one address: %d", i+1, status)
 		}
 	}
-	if status := ask("198.51.100.1", "victim@example.com"); status != 429 {
-		t.Fatalf("a sixth code to one address from one network: %d", status)
+	if status := ask("203.0.113.1", "victim@example.com"); status != 429 {
+		t.Fatalf("a code past the address's hour, from yet another network: %d", status)
 	}
-	if status := ask("198.51.100.2", "victim@example.com"); status != 200 {
-		t.Fatalf("the player's own code, after another network's: %d", status)
+	if status := ask("203.0.113.1", "other@example.com"); status != 200 {
+		t.Fatalf("a code to another address: %d", status)
+	}
+}
+
+// A class behind its school's one IPv4 address (or a carrier's) asks for its codes at once (review 2026-11-18, S9):
+// a site's share of a minute (account.SiteShare) goes, and the rest the next minute, each told to try again then.
+func TestCodesForAClass(t *testing.T) {
+	g := start(t)
+	ask := func(email string) int {
+		r := httptest.NewRequest("POST", g.url+"/api/auth/code", strings.NewReader(`{"email":"`+email+`"}`))
+		r.RemoteAddr = "198.51.100.1:1234"
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("Sec-Fetch-Site", "same-origin")
+		w := httptest.NewRecorder()
+		g.srv.Handler().ServeHTTP(w, r)
+		return w.Code
+	}
+	for {
+		minute := time.Now().Unix() / 60
+		i := 0
+		for ; i < account.SiteShare; i++ {
+			if status := ask(fmt.Sprintf("pupil%d@example.com", i)); status != 200 {
+				break
+			}
+		}
+		next := ask("late@example.com")
+		if time.Now().Unix()/60 != minute {
+			continue // the minute turned meanwhile: again
+		}
+		if i < account.SiteShare || next != http.StatusServiceUnavailable {
+			t.Fatalf("%d of a class's codes went at once, then %d", i, next)
+		}
+		return
 	}
 }
 

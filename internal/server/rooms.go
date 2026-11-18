@@ -4,8 +4,11 @@ package server
 // and from then on everything of the room (its stream, the game, its people, its QR code) is theirs, and its host's;
 // to anyone else the room isn't there (404, as for a code nobody has), so that nothing tells them it's open. A code
 // is six digits, easy to say to a class; what keeps codes from being walked is that a code given that isn't open, or
-// is a locked room's, counts against the player and their address (roomByCode), and past a few an hour, no code is
-// looked up for them at all.
+// is a locked room's, counts against the player, their network and their site (roomByCode: an IPv6 /48 or an IPv4
+// /24, so that the 65,536 /64s of one /48 don't each get a budget: review 2026-11-18, S3), and past a few an hour, no
+// code is looked up for them at all. The misses of everyone together are only counted: past roomMissesAll an hour
+// whoever runs the game hears of it, as many networks walking the codes at once would look; refusing everyone then
+// would let the walkers close every room to the players.
 
 import (
 	"context"
@@ -13,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -29,12 +33,16 @@ var roomCode = regexp.MustCompile(`^[0-9]{6}$`)
 // errLocked is someone new at a room its host has locked.
 var errLocked = &apiError{http.StatusForbidden, "locked", "Стаята е заключена: нови играчи не могат да влязат."}
 
-// How many codes given in an hour may miss (no room open under them, or a locked one), for a player and for an
-// address (a school's, many players behind it), before none is looked up: typos are a few, walking the codes is
-// thousands.
+// How many codes given in an hour may miss (no room open under them, or a locked one), for a player, for a network (a
+// school's, many players behind it) and for a site (a few such networks), before none is looked up: typos are a few,
+// walking the codes is thousands. A site walks at most roomMissesSite codes an hour: with ten rooms open, a day of it
+// (7,200 of the 900,000 codes) comes on one about once in twelve days. roomMissesAll is when the misses of everyone
+// are heard of.
 const (
 	roomMissesPlayer  = 20
 	roomMissesAddress = 100
+	roomMissesSite    = 300
+	roomMissesAll     = 2000
 )
 
 func (s *Server) roomOf(r *http.Request) (*room.Room, error) {
@@ -45,19 +53,25 @@ func (s *Server) roomOf(r *http.Request) (*room.Room, error) {
 	return s.rooms.Get(code)
 }
 
-// roomMisses are the limits on codes that miss for a request: its address's, and its player's (0: none).
+// roomMisses are the limits on codes that miss for a request: its site's, its network's, and its player's (0: none).
 func (s *Server) roomMisses(r *http.Request, userID int64) map[string]int {
-	keys := map[string]int{"roommiss:" + s.clientNet(r): roomMissesAddress}
+	keys := map[string]int{
+		"roommiss:site:" + s.clientSite(r): roomMissesSite,
+		"roommiss:" + s.clientNet(r):       roomMissesAddress,
+	}
 	if userID != 0 {
 		keys["roommiss:user:"+strconv.FormatInt(userID, 10)] = roomMissesPlayer
 	}
 	return keys
 }
 
-// missed counts a code that missed.
+// missed counts a code that missed, and tells whoever runs the game once the misses of everyone are many.
 func (s *Server) missed(r *http.Request, userID int64) {
 	for key, n := range s.roomMisses(r, userID) {
-		s.limits.allow(key, n, time.Hour)
+		s.guard.allow(key, n, time.Hour)
+	}
+	if !s.guard.allow("roommiss:all", roomMissesAll, time.Hour) {
+		s.problems.add(fmt.Sprintf("rooms: over %d room codes missed in an hour; someone walking the codes?", roomMissesAll))
 	}
 }
 
@@ -65,7 +79,7 @@ func (s *Server) missed(r *http.Request, userID int64) {
 // codes that miss: once it's spent, no code is looked up, so that the answer then tells nothing.
 func (s *Server) roomByCode(r *http.Request, userID int64) (*room.Room, error) {
 	for key, n := range s.roomMisses(r, userID) {
-		if s.limits.spent(key, n) {
+		if s.guard.spent(key, n) {
 			return nil, errTooMany
 		}
 	}
@@ -143,12 +157,33 @@ func (s *Server) roomJoin(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]bool{"ok": true})
 }
 
+// How many times a minute a room's stream may be opened: by a player (a screen or two, reconnecting when the line
+// drops), from a network (a class, all reconnecting at once after a deploy), and from a site. Each open and close is
+// told to every screen of the room, so a player opening thousands would hold up the room's game (review 2026-11-18,
+// S6).
+const (
+	roomStreamsPlayer = 20
+	roomStreamsNet    = 300
+	roomStreamsSite   = 5 * roomStreamsNet
+)
+
 // roomEvents streams a room to the screen of a player in it (roomJoin first), or of its host (Server-Sent Events):
-// the room as they see it, again after every change. The browser reconnects by itself if the line drops.
+// the room as they see it, again after every change. The browser reconnects by itself if the line drops; past the
+// streams a minute (roomStreamsPlayer), it's told to wait a while before it does.
 func (s *Server) roomEvents(w http.ResponseWriter, r *http.Request) {
 	u, err := s.mustUser(r)
 	if err != nil {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "signed_out"})
+		return
+	}
+	h := w.Header()
+	h.Set("Content-Type", "text/event-stream")
+	h.Set("Cache-Control", "no-store")
+	h.Set("X-Accel-Buffering", "no")
+	if !s.limits.allow("roomstream:user:"+strconv.FormatInt(u.ID, 10), roomStreamsPlayer, time.Minute) ||
+		!s.allowFrom(r, "roomstream", roomStreamsNet, roomStreamsSite, time.Minute) {
+		// The browser tries again by itself, after this long: its screen says it's reconnecting meanwhile.
+		fmt.Fprintf(w, "retry: %d\n\n", 15_000+rand.N(15_000))
 		return
 	}
 	rm, err := s.roomOf(r)
@@ -156,10 +191,6 @@ func (s *Server) roomEvents(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		sub, err = rm.Follow(u.ID) // only for who's in it
 	}
-	h := w.Header()
-	h.Set("Content-Type", "text/event-stream")
-	h.Set("Cache-Control", "no-store")
-	h.Set("X-Accel-Buffering", "no")
 	if err != nil {
 		// Said in the stream, which is all a browser's EventSource can read: no such room (any more), or not one this
 		// player is in.

@@ -20,11 +20,17 @@ import (
 )
 
 // How many questions may be reported in an hour: by a player (a careful one finds a few in a game), from a network (a
-// class, playing the same day's ten, may all report the same slip), and by everyone together (a guard on the table).
+// class, playing the same day's ten, may all report the same slip), and from a site (a few such networks). No report
+// is refused for what others sent: past reportsAll from everyone in an hour, whoever runs the game hears of a flood
+// (review 2026-11-18, S10), and /admin shows the reports of reportsShown questions at most, a player's all resolved
+// at once.
 const (
 	reportsPlayer = 20
 	reportsNet    = 60
+	reportsSite   = 5 * reportsNet
 	reportsAll    = 600
+	reportsShown  = 100
+	reportsEach   = 20 // reports shown of one question
 )
 
 // report takes what a player says is wrong with a question.
@@ -47,9 +53,12 @@ func (s *Server) report(w http.ResponseWriter, r *http.Request) error {
 	if n := utf8.RuneCountInString(text); n < 3 || n > 500 {
 		return &apiError{http.StatusBadRequest, "bad_report", "Напиши с няколко думи какво не е наред (до 500 знака)."}
 	}
-	if !s.limits.allow("report:"+strconv.FormatInt(u.ID, 10), reportsPlayer, time.Hour) ||
-		!s.allowFrom(r, "report", reportsNet, 0, time.Hour) || !s.limits.allow("report", reportsAll, time.Hour) {
+	if !s.guard.allow("report:"+strconv.FormatInt(u.ID, 10), reportsPlayer, time.Hour) ||
+		!s.guardFrom(r, "report", reportsNet, reportsSite, time.Hour) {
 		return errTooMany
+	}
+	if !s.guard.allow("report", reportsAll, time.Hour) {
+		s.problems.add(fmt.Sprintf("reports: over %d questions reported in an hour; a flood? (/admin)", reportsAll))
 	}
 	_, err = s.db.Write.ExecContext(r.Context(), `INSERT INTO reports (question_id, user_id, text, at) VALUES (?, ?, ?, ?)`,
 		id, u.ID, text, store.Now())
@@ -72,9 +81,14 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	b := s.bank.Load()
 	db := s.db.Read
+	type report struct {
+		Line   string
+		Player int64 // 0: the player is gone
+	}
 	type reported struct {
 		ID, Category, Text, Answer string
-		Reports                    []string
+		Reports                    []report
+		More                       int // reports of it not shown (reportsEach)
 	}
 	type stat struct {
 		ID, Text, Answer, Lure string
@@ -98,6 +112,7 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		Cohorts                                                    []cohort
 		Overall                                                    []cell
 		Reported                                                   []reported
+		ReportsOpen, QuestionsReported                             int
 		Hardest, Easiest                                           []stat
 		Daily                                                      string
 		First                                                      firstWeek
@@ -144,27 +159,42 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	_ = db.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE NOT scripted), count(*) FILTER (WHERE scripted) FROM runs
 		WHERE kind = 'day' AND day = ? AND finished_at IS NOT NULL`, today).Scan(&data.DayToday, &data.DayScripted)
 
-	rows, err := db.QueryContext(ctx, `SELECT r.question_id, r.text, coalesce(u.name, '—'), r.at FROM reports r
-		LEFT JOIN users u ON u.id = r.user_id WHERE r.resolved_at IS NULL ORDER BY r.question_id, r.at`)
+	// The questions reported most lately first, reportsShown of them, and of each its first reportsEach reports: a
+	// flood of reports can't make the page too long to load.
+	_ = db.QueryRowContext(ctx, `SELECT count(*), count(DISTINCT question_id) FROM reports WHERE resolved_at IS NULL`).
+		Scan(&data.ReportsOpen, &data.QuestionsReported)
+	rows, err := db.QueryContext(ctx, `WITH shown AS (
+			SELECT question_id, max(at) AS last, count(*) AS n FROM reports WHERE resolved_at IS NULL
+			GROUP BY question_id ORDER BY last DESC LIMIT ?1),
+		open AS (
+			SELECT r.question_id, r.text, r.user_id, r.at,
+				row_number() OVER (PARTITION BY r.question_id ORDER BY r.at) AS i
+			FROM reports r JOIN shown USING (question_id) WHERE r.resolved_at IS NULL)
+		SELECT o.question_id, o.text, coalesce(u.name, '—'), coalesce(o.user_id, 0), o.at, s.n FROM open o
+		JOIN shown s USING (question_id) LEFT JOIN users u ON u.id = o.user_id
+		WHERE o.i <= ?2 ORDER BY s.last DESC, o.question_id, o.at`, reportsShown, reportsEach)
 	if err == nil {
 		byID := map[string]*reported{}
 		var order []string
 		for rows.Next() {
 			var id, text, name string
-			var at int64
-			if rows.Scan(&id, &text, &name, &at) != nil {
+			var player, at int64
+			var n int
+			if rows.Scan(&id, &text, &name, &player, &at, &n) != nil {
 				continue
 			}
 			rp := byID[id]
 			if rp == nil {
-				rp = &reported{ID: id}
+				rp = &reported{ID: id, More: n}
 				if q, ok := b.Get(id); ok {
 					rp.Category, rp.Text, rp.Answer = q.Base().Category, q.Base().Text, bank.KeeperText(q)
 				}
 				byID[id] = rp
 				order = append(order, id)
 			}
-			rp.Reports = append(rp.Reports, time.UnixMilli(at).In(bulgaria()).Format("02.01 15:04")+" · "+name+": "+text)
+			rp.More--
+			line := time.UnixMilli(at).In(bulgaria()).Format("02.01 15:04") + " · " + name + ": " + text
+			rp.Reports = append(rp.Reports, report{Line: line, Player: player})
 		}
 		rows.Close()
 		for _, id := range order {
@@ -259,15 +289,29 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	s.plain(w, "Управление", template.HTML(body.String()))
 }
 
-// resolve marks a question's reports as seen to.
+// resolve marks a question's reports as seen to; resolvePlayer, every report of one player's (one who floods them).
 func (s *Server) resolve(w http.ResponseWriter, r *http.Request) {
+	s.resolveWhere(w, r, `question_id = ?`, r.PathValue("id"))
+}
+
+func (s *Server) resolvePlayer(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	s.resolveWhere(w, r, `user_id = ?`, id)
+}
+
+// resolveWhere marks the open reports that match as seen to, for an admin; to anyone else it isn't there.
+func (s *Server) resolveWhere(w http.ResponseWriter, r *http.Request, where string, arg any) {
 	u, err := s.user(r)
 	if err != nil || u == nil || !u.Admin {
 		http.NotFound(w, r)
 		return
 	}
-	_, err = s.db.Write.ExecContext(r.Context(), `UPDATE reports SET resolved_at = ? WHERE question_id = ? AND resolved_at IS NULL`,
-		store.Now(), r.PathValue("id"))
+	_, err = s.db.Write.ExecContext(r.Context(), `UPDATE reports SET resolved_at = ? WHERE `+where+` AND resolved_at IS NULL`,
+		store.Now(), arg)
 	if err != nil {
 		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
@@ -346,13 +390,17 @@ var adminBody = template.Must(template.New("admin").Parse(`
 </tbody></table></div>
 {{end}}
 
-<h2>Доклади ({{len .Reported}})</h2>
+<h2>Доклади ({{.ReportsOpen}} за {{.QuestionsReported}} {{if eq .QuestionsReported 1}}въпрос{{else}}въпроса{{end}})</h2>
+{{if gt .QuestionsReported (len .Reported)}}<p class="muted">Тук са последно докладваните {{len .Reported}}. Другите се
+показват, щом тези бъдат прегледани.</p>{{end}}
 {{range .Reported}}
 <section class="reviewed">
 <p class="muted">{{.ID}} · {{.Category}}</p>
 <h3>{{.Text}}</h3>
 <p>Отговор: <strong>{{.Answer}}</strong></p>
-<ul>{{range .Reports}}<li>{{.}}</li>{{end}}</ul>
+<ul>{{range .Reports}}<li>{{.Line}}{{if .Player}} <form method="post"
+action="/admin/players/{{.Player}}/reports/resolve"><button class="link">Всички от този играч: прегледани</button></form>{{end}}</li>{{end}}</ul>
+{{if gt .More 0}}<p class="muted">И още {{.More}}.</p>{{end}}
 <form method="post" action="/admin/reports/{{.ID}}/resolve"><button class="link">Прегледано</button></form>
 </section>
 {{else}}<p class="muted">Няма нови.</p>{{end}}

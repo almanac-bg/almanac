@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -84,7 +85,11 @@ var playerErrors = map[error]*apiError{
 	account.ErrCodeExpired: {http.StatusBadRequest, "code_expired", "Кодът вече не важи. Поискай нов."},
 	account.ErrCodeTries:   {http.StatusBadRequest, "code_tries", "Твърде много опити. Поискай нов код."},
 	account.ErrCodesBusy:   {http.StatusServiceUnavailable, "codes_busy", "Точно сега пращаме много кодове. Опитай пак след минута."},
-	account.ErrNoHandoff:   {http.StatusNotFound, "no_handoff", "Тази връзка вече не работи: играта ти остана там, където я започна."},
+	account.ErrAddressBusy: {http.StatusTooManyRequests, "address_busy",
+		"Вече пратихме няколко кода на този адрес. Провери пощата си, и папката за спам, или опитай пак по-късно."},
+	account.ErrNoMail: {http.StatusBadRequest, "no_mail",
+		"Писмата ни до този адрес не стигат. Провери дали е изписан вярно или опитай с друг."},
+	account.ErrNoHandoff: {http.StatusNotFound, "no_handoff", "Тази връзка вече не работи: играта ти остана там, където я започна."},
 	account.ErrHandoffSignedIn: {http.StatusConflict, "handoff_signed_in",
 		"Тук вече играеш с профила си. За да добавиш към него играта от другото място, влез с имейла си там, където я започна."},
 	account.ErrBadName:  {http.StatusBadRequest, "bad_name", "Името трябва да е от 2 до 30 знака: букви, цифри, интервали, точки или тирета, с поне една буква. Някои имена са запазени."},
@@ -96,12 +101,18 @@ var playerErrors = map[error]*apiError{
 // loads itself anew at a moment that costs the player nothing (web/src/fresh.ts).
 const versionHeader = "X-Almanac-Version"
 
-// apiHandler runs an API handler: its error becomes a JSON answer, an unexpected one a 500 that's logged.
+// apiHandler runs an API handler: its error becomes a JSON answer, an unexpected one a 500 that's logged. A write
+// past its rate (mayWrite) isn't run.
 func (s *Server) apiHandler(h func(http.ResponseWriter, *http.Request) error) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set(versionHeader, s.cfg.Version)
-		err := h(w, r)
+		var err error
+		if s.mayWrite(r) {
+			err = h(w, r)
+		} else {
+			err = errTooMany
+		}
 		if err == nil {
 			return
 		}
@@ -125,6 +136,34 @@ func (s *Server) apiHandler(h func(http.ResponseWriter, *http.Request) error) ht
 		}
 		writeJSON(w, ae.status, map[string]string{"error": ae.code, "message": ae.message})
 	})
+}
+
+// How many writes (any API request but a GET) may come in writesPer: from a browser's session, from a network, and
+// from a site (address.go). Every write takes the database's one writer, so one client sending thousands a second
+// would make everyone's slow (review 2026-11-18, S11). A player answers, taps and moves on at a few a second at
+// most; a school's network has a few classes in rooms, fifty answers at once each; a site, a few such networks. The
+// rest of the limits are per action; this is the floor under all of them.
+const (
+	writesPer     = 10 * time.Second
+	writesSession = 100
+	writesNet     = 600
+	writesSite    = 2000
+)
+
+// mayWrite counts a write (a request that isn't a GET or a HEAD) against its session's, network's and site's rate
+// (writesSession, writesNet, writesSite), and says whether it's within them. The session is kept by its token's hash,
+// never the token itself: the counts are saved to a file over a restart.
+func (s *Server) mayWrite(r *http.Request) bool {
+	if r.Method == http.MethodGet || r.Method == http.MethodHead {
+		return true
+	}
+	if token := s.session(r); token != "" {
+		key := account.SessionKey(token)
+		if !s.limits.allow("write:session:"+base64.RawURLEncoding.EncodeToString(key[:12]), writesSession, writesPer) {
+			return false
+		}
+	}
+	return s.allowFrom(r, "write", writesNet, writesSite, writesPer)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -217,9 +256,10 @@ func (s *Server) guest(w http.ResponseWriter, r *http.Request) error {
 		return ok(w, map[string]any{"user": u})
 	}
 	// A school or a pub comes from one network (an IPv4 address, an IPv6 /64), and a mobile carrier puts many phones
-	// behind one IPv4 address: two rooms' worth of new players an hour (room.MaxPlayers), and a site's /48 (a big
-	// school's, a company's) five times that. A guest that never plays is cleared in a few days (account.CleanUp).
-	if !s.allowFrom(r, "guest", guestsNet, guestsSite, time.Hour) {
+	// behind one IPv4 address: two rooms' worth of new players an hour (room.MaxPlayers), and a site (an IPv6 /48: a
+	// big school's, a company's; an IPv4 /24) five times that. A guest that never plays is cleared in a few days
+	// (account.CleanUp).
+	if !s.guardFrom(r, "guest", guestsNet, guestsSite, time.Hour) {
 		return errTooMany
 	}
 	// Where the player came in: the path the client was first opened at (an old client sends nothing).
@@ -238,6 +278,18 @@ func (s *Server) guest(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"user": u})
 }
 
+// How many codes may be asked for in an hour, from a network and from a site, and tried: a class saving its games at
+// once, from its school's one address, and a carrier's address with many phones behind it, each asking again when the
+// mail is slow (review 2026-11-18, S9), and a few tries each. What one network asks for can't flood anyone's inbox
+// (account.CodesPerAddressHour) nor stop others' codes (account.SiteShare), so these only bound the mail a network
+// makes the game send.
+const (
+	codesNet   = 60
+	codesSite  = 5 * codesNet
+	verifyNet  = 150
+	verifySite = 5 * verifyNet
+)
+
 func (s *Server) sendCode(w http.ResponseWriter, r *http.Request) error {
 	var in struct {
 		Email string `json:"email"`
@@ -249,18 +301,18 @@ func (s *Server) sendCode(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	// Each code is a mail: 10 an hour from a network, 50 from a site's /48; to one address, 5 an hour from a network.
-	// Only from a network: what others ask for with a player's address never uses up what the player may ask for.
-	if !s.allowFrom(r, "code", 10, 50, time.Hour) || !s.allowFrom(r, "code-to:"+email, 5, 0, time.Hour) {
+	if !s.guardFrom(r, "code", codesNet, codesSite, time.Hour) {
 		return errTooMany
 	}
-	asked, err := s.accounts.SendCode(r.Context(), email, s.asked(r))
+	// The site's share of the minute's codes (account.CodesAMinute), and how many go to the address from anywhere
+	// (account.CodesPerAddressHour), are counted in SendCode.
+	asked, err := s.accounts.SendCode(r.Context(), email, s.asked(r), s.clientSite(r))
 	if soon := (account.TooSoon{}); errors.As(err, &soon) {
 		return &apiError{http.StatusTooManyRequests, "too_soon",
 			fmt.Sprintf("Току-що ти пратихме код. Нов можеш да поискаш след %d с.", seconds(soon.Wait))}
 	}
 	if errors.Is(err, account.ErrCodesBusy) {
-		s.problems.add("sign-in codes: the most a minute were asked for (account.CodesAMinute); a flood?")
+		s.problems.add("sign-in codes: a site past its share of the minute (account.SiteShare, CodesAMinuteMost); a flood?")
 	}
 	if err != nil {
 		return err
@@ -304,7 +356,7 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) error {
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
-	if !s.allowFrom(r, "verify", 30, 0, time.Hour) {
+	if !s.guardFrom(r, "verify", verifyNet, verifySite, time.Hour) {
 		return errTooMany
 	}
 	// Only by the browser the code is for (its ask cookie). Its session is replaced by a new one (account.Verify),
@@ -350,7 +402,8 @@ func (s *Server) takeHandoff(w http.ResponseWriter, r *http.Request) error {
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
-	if !s.allowFrom(r, "hand", 30, 0, time.Hour) {
+	// From a phone's browser: behind a carrier's address, many phones (codesNet).
+	if !s.guardFrom(r, "hand", codesNet, codesSite, time.Hour) {
 		return errTooMany
 	}
 	u, token, err := s.accounts.TakeHandoff(r.Context(), in.Token, s.session(r))
@@ -403,7 +456,7 @@ func (s *Server) rename(w http.ResponseWriter, r *http.Request) error {
 	}
 	// By player, and loosely by address: a whole class names itself as it comes into a room, from one network.
 	if !s.limits.allow("rename:"+strconv.FormatInt(u.ID, 10), 20, time.Hour) ||
-		!s.allowFrom(r, "rename-net", 200, 0, time.Hour) {
+		!s.allowFrom(r, "rename-net", 200, 1000, time.Hour) {
 		return errTooMany
 	}
 	if in.Name != nil {

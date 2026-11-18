@@ -2,9 +2,17 @@
 // until it goes out, so a slow or failing mail server never holds up a player, and nothing is lost on a restart.
 //
 // A message worth sending only for a while (a sign-in code: Urgent) goes before every other, and is dropped unsent once
-// its time is out, so that a queue of other mail, or a flood of codes, never delivers a code that no longer works. One
-// message is sent at a time, and once the mail server has taken it (its DATA accepted) it counts as sent, whatever
-// happens after: a mail goes once.
+// its time is out, so that a queue of other mail, or a flood of codes, never delivers a code that no longer works.
+// Urgent messages go by their rank, the lowest first: a code asked for from a network that asked for many this minute
+// waits for everyone else's (account.SendCode). One message is sent at a time, and once the mail server has taken it
+// (its DATA accepted) it counts as sent, whatever happens after: a mail goes once.
+//
+// A message the mail server refuses for good (a 5xx answer to its recipient or its content: Refused) is not sent
+// again. When the refusal is of the address itself (no such mailbox or domain), the address is suppressed: no mail
+// goes to it for SuppressFirst, or SuppressAgain if it was refused before (as the provider blocks it on its side), so
+// that the game doesn't keep mailing an address that bounces and lose its good name with the mail providers. A 5xx
+// to anything else (signing in to the mail server, the sender) is the game's own trouble, the same for every message:
+// those are tried again, as a 4xx is.
 package mail
 
 import (
@@ -22,6 +30,7 @@ import (
 	"mime/quotedprintable"
 	"net"
 	"net/smtp"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -61,8 +70,12 @@ func NewOutbox(db *store.DB, sender Sender, from string) *Outbox {
 	return &Outbox{DB: db, Sender: sender, From: from, wake: make(chan struct{}, 1)}
 }
 
-// Enqueue saves a message to send, inside the caller's transaction: it goes out only if the transaction commits.
+// Enqueue saves a message to send, inside the caller's transaction: it goes out only if the transaction commits. A
+// message to a suppressed address (Suppressed) is let go unsaved.
 func (o *Outbox) Enqueue(tx *sql.Tx, m Message) error {
+	if off, err := Suppressed(tx, m.To, time.Now()); err != nil || off {
+		return err
+	}
 	body, err := json.Marshal(m)
 	if err != nil {
 		return err
@@ -73,26 +86,87 @@ func (o *Outbox) Enqueue(tx *sql.Tx, m Message) error {
 }
 
 // Urgent saves a message worth sending only until a time (a sign-in code), inside the caller's transaction: it goes
-// out before any other mail, and is dropped unsent once that time is past. It says the message's id, for Drop.
-func (o *Outbox) Urgent(tx *sql.Tx, m Message, until time.Time) (int64, error) {
+// out before any other mail, the urgent of the lowest rank first, and is dropped unsent once that time is past. It
+// says the message's id, for Drop.
+func (o *Outbox) Urgent(tx *sql.Tx, m Message, until time.Time, rank int) (int64, error) {
 	body, err := json.Marshal(m)
 	if err != nil {
 		return 0, err
 	}
 	now := store.Now()
-	res, err := tx.Exec(`INSERT INTO outbox (message, next_at, created_at, urgent, expires_at) VALUES (?, ?, ?, 1, ?)`,
-		string(body), now, now, store.Ms(until))
+	res, err := tx.Exec(`INSERT INTO outbox (message, next_at, created_at, urgent, expires_at, rank)
+		VALUES (?, ?, ?, 1, ?, ?)`, string(body), now, now, store.Ms(until), rank)
 	if err != nil {
 		return 0, err
 	}
 	return res.LastInsertId()
 }
 
-// Unqueue takes every message to an address out of the queue, inside the caller's transaction: the player there
-// has deleted their account.
+// Unqueue takes every message to an address out of the queue, and forgets whether mail reaches it, inside the
+// caller's transaction: the player there has deleted their account.
 func Unqueue(tx *sql.Tx, to string) error {
-	_, err := tx.Exec(`DELETE FROM outbox WHERE json_extract(message, '$.to') = ?`, to)
+	if _, err := tx.Exec(`DELETE FROM outbox WHERE json_extract(message, '$.to') = ?`, to); err != nil {
+		return err
+	}
+	_, err := tx.Exec(`DELETE FROM mail_suppressed WHERE email = ?`, to)
 	return err
+}
+
+// How long an address the mail server refused is suppressed: the first time, and again if it was refused within
+// SuppressKept of its last suppression's end (as Scaleway's own blocklist does: two days, then a month). An address
+// refused once by mistake (a mail server's bad day) is reachable again soon; one that keeps bouncing, for a month.
+const (
+	SuppressFirst = 48 * time.Hour
+	SuppressAgain = 30 * 24 * time.Hour
+	SuppressKept  = 30 * 24 * time.Hour
+)
+
+// Suppressed says whether no mail goes to an address now: the mail server refused it (Refused.Address).
+func Suppressed(tx *sql.Tx, to string, now time.Time) (bool, error) {
+	var off bool
+	err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM mail_suppressed WHERE email = ? AND until > ?)`, to, store.Ms(now)).
+		Scan(&off)
+	return off, err
+}
+
+// suppress keeps mail from going to an address the mail server refused: for SuppressFirst, or SuppressAgain if it's
+// still remembered from before (SuppressKept).
+func (o *Outbox) suppress(to, why string, now time.Time) error {
+	_, err := o.DB.Write.Exec(`INSERT INTO mail_suppressed (email, until, times, reason) VALUES (?1, ?2, 1, ?4)
+		ON CONFLICT (email) DO UPDATE SET until = ?3, times = times + 1, reason = ?4`,
+		to, store.Ms(now.Add(SuppressFirst)), store.Ms(now.Add(SuppressAgain)), why)
+	return err
+}
+
+// Refused is a mail server's refusal, for good, of one message (a 5xx answer to its recipient or its content):
+// sending it again won't help. Address says it's a refusal of the address itself: no such mailbox or domain, or a
+// mailbox disabled.
+type Refused struct {
+	Code    int
+	Msg     string
+	Address bool
+}
+
+func (e *Refused) Error() string { return fmt.Sprintf("refused: %d %s", e.Code, e.Msg) }
+
+// refusal is a mail server's answer to a message's recipient (rcpt) or its content, as Refused if it refuses for good;
+// else the error as it was.
+func refusal(err error, rcpt bool) error {
+	var te *textproto.Error
+	if !errors.As(err, &te) || te.Code < 500 || te.Code > 599 {
+		return err
+	}
+	return &Refused{Code: te.Code, Msg: te.Msg, Address: rcpt && addressRefused(te.Code, te.Msg)}
+}
+
+// addressRefused says whether a 5xx to a recipient refuses the address itself: by its enhanced status (RFC 3463),
+// 5.1.x (a bad mailbox, domain or address) or 5.2.1 (a mailbox disabled); without one, 550, 551 or 553. A refusal by
+// policy (5.7.x: a spam filter, a block on the sender) says nothing of the address.
+func addressRefused(code int, msg string) bool {
+	if f := strings.Fields(msg); len(f) > 0 && strings.Count(f[0], ".") == 2 && strings.HasPrefix(f[0], "5.") {
+		return strings.HasPrefix(f[0], "5.1.") || f[0] == "5.2.1"
+	}
+	return code == 550 || code == 551 || code == 553
 }
 
 // Drop takes a message out of the queue if it hasn't gone yet: a code replaced by a newer one.
@@ -113,13 +187,15 @@ func (o *Outbox) Wake() {
 var retries = []time.Duration{10 * time.Second, time.Minute, 5 * time.Minute, 30 * time.Minute, 2 * time.Hour}
 
 // Flush sends whatever is due now (before a shutdown, and in tests), the urgent first, once the mail out of time is
-// dropped.
+// dropped (and the suppressions long over forgotten).
 func (o *Outbox) Flush(ctx context.Context) {
 	if res, err := o.DB.Write.ExecContext(ctx, `DELETE FROM outbox WHERE expires_at <= ?`, store.Now()); err == nil {
 		if n, _ := res.RowsAffected(); n > 0 {
 			slog.Warn("mail dropped: its time was out before it could go", "n", n)
 		}
 	}
+	_, _ = o.DB.Write.ExecContext(ctx, `DELETE FROM mail_suppressed WHERE until <= ?`,
+		store.Ms(time.Now().Add(-SuppressKept)))
 	for o.sendDue(ctx) {
 	}
 }
@@ -139,7 +215,8 @@ func (o *Outbox) Run(ctx context.Context) {
 	}
 }
 
-// sendDue sends the message due first (the urgent before the rest, then the oldest), and says whether there was one.
+// sendDue sends the message due first (the urgent before the rest, by rank, then the oldest), and says whether there
+// was one.
 func (o *Outbox) sendDue(ctx context.Context) bool {
 	o.sending.Lock()
 	defer o.sending.Unlock()
@@ -148,7 +225,7 @@ func (o *Outbox) sendDue(ctx context.Context) bool {
 	var attempts int
 	now := store.Now()
 	err := o.DB.Write.QueryRowContext(ctx, `SELECT id, message, attempts FROM outbox
-		WHERE next_at <= ? AND (expires_at IS NULL OR expires_at > ?) ORDER BY urgent DESC, next_at LIMIT 1`, now, now,
+		WHERE next_at <= ? AND (expires_at IS NULL OR expires_at > ?) ORDER BY urgent DESC, rank, next_at LIMIT 1`, now, now,
 	).Scan(&id, &body, &attempts)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) && ctx.Err() == nil {
@@ -165,8 +242,17 @@ func (o *Outbox) sendDue(ctx context.Context) bool {
 	sendCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	err = o.Sender.Send(sendCtx, o.From, m)
 	cancel()
+	var refused *Refused
 	switch {
 	case err == nil:
+		_, err = o.DB.Write.Exec(`DELETE FROM outbox WHERE id = ?`, id)
+	case errors.As(err, &refused):
+		slog.Warn("mail refused, not sent again", "to", m.To, "subject", m.Subject, "err", err, "address", refused.Address)
+		if refused.Address {
+			if err := o.suppress(m.To, refused.Error(), time.Now()); err != nil {
+				slog.Error("outbox: suppressing an address", "err", err)
+			}
+		}
 		_, err = o.DB.Write.Exec(`DELETE FROM outbox WHERE id = ?`, id)
 	case attempts >= len(retries):
 		slog.Error("mail given up", "to", m.To, "subject", m.Subject, "err", err)
@@ -252,17 +338,17 @@ func (s *SMTP) Send(ctx context.Context, from string, m Message) error {
 		return err
 	}
 	if err := c.Rcpt(m.To); err != nil {
-		return err
+		return refusal(err, true)
 	}
 	w, err := c.Data()
 	if err != nil {
-		return err
+		return refusal(err, false)
 	}
 	if _, err := w.Write(Compose(from, m, time.Now())); err != nil {
 		return err
 	}
 	if err := w.Close(); err != nil {
-		return err
+		return refusal(err, false)
 	}
 	// The server has taken the message: it's sent. A failed goodbye after that isn't a failed send, which would send
 	// the message again.

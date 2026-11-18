@@ -44,8 +44,9 @@ func inApp(r *http.Request) bool { return strings.Contains(r.UserAgent(), "Alman
 // say what they are.
 var robot = regexp.MustCompile(`(?i)bot|crawl|spider|slurp|preview|externalhit|externalagent|headless|lighthouse`)
 
-// countVisit counts a page loaded by a person without a profile, by where it landed: once an address an half hour
-// for each landing, so that reloads and a page's own navigation don't count again.
+// countVisit counts a page loaded by a person without a profile, by where it landed: once a home an half hour for
+// each landing (clientHome: an IPv6 /48, so that one site can't make a flood of keys), so that reloads and a page's
+// own navigation don't count again.
 func (s *Server) countVisit(r *http.Request) {
 	if _, err := r.Cookie(s.cookie); err == nil || r.Method != http.MethodGet || r.Header.Get("Sec-Purpose") != "" {
 		return
@@ -55,7 +56,7 @@ func (s *Server) countVisit(r *http.Request) {
 		return
 	}
 	where := landing(r.URL.Path, inApp(r))
-	if !s.limits.allow("visit:"+where+":"+s.clientNet(r), 1, 30*time.Minute) {
+	if !s.limits.allow("visit:"+where+":"+s.clientHome(r), 1, 30*time.Minute) {
 		return
 	}
 	_ = s.game.Tally(r.Context(), "visit:"+where, 1)
@@ -101,7 +102,7 @@ func (s *Server) tally(w http.ResponseWriter, r *http.Request) error {
 	if !clientTallies[in.Key] {
 		return errBadRequest
 	}
-	if !s.allowFrom(r, "tally", 30, 0, time.Hour) {
+	if !s.allowFrom(r, "tally", 30, 150, time.Hour) {
 		return errTooMany
 	}
 	if err := s.game.Tally(r.Context(), in.Key, 1); err != nil {

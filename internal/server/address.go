@@ -17,8 +17,14 @@ import (
 // A limit counts by a network, not by an address (clientNet): an IPv4 address as it is, since one is costly and many
 // players may be behind it (a school's, a carrier's); an IPv6 address by its /64, since whoever has one address has
 // the /64 around it to choose from, 2^64 of them, and a /64 is what one home, one school's network or one phone is
-// given. For what costs most (a new guest, a code mailed), a wider limit counts the /48 too (clientSite): a site's,
-// 65,536 /64s.
+// given. Wherever a key can be farmed (anything anyone may do without a profile, and every write), a wider limit
+// counts the site too (clientSite): an IPv6 /48, the 65,536 /64s one customer is given at most, and an IPv4 /24, the
+// block one owner of many addresses rents (review 2026-11-18, S3, S11). Its budget is a few networks', so a school or
+// a company fits under it. Behind a carrier's NAT (thousands of phones behind a few addresses of a /24), each address
+// has a school's budget, never one player's, and the /24 a few schools' (S9).
+//
+// The keys of what many may do at no cost and that is only counted (a page visited) are kept by home (clientHome):
+// the /48 of an IPv6 address, so that one site can't make thousands of them (S8); an IPv4 address as it is.
 
 // cloudflare are the addresses Cloudflare connects from: https://www.cloudflare.com/ips/ (the same since 2021; checked
 // November 2026).
@@ -91,14 +97,11 @@ func (s *Server) clientIP(r *http.Request) string {
 // clientNet is the network a limit on an address counts by: an IPv4 address, or the /64 of an IPv6 one.
 func (s *Server) clientNet(r *http.Request) string { return network(s.clientAddr(r), 64) }
 
-// clientSite is the wider network of an IPv6 address, its /48, for the limits on what costs most; "" for IPv4.
-func (s *Server) clientSite(r *http.Request) string {
-	a := s.clientAddr(r)
-	if !a.Is6() {
-		return ""
-	}
-	return network(a, 48)
-}
+// clientSite is the wider network a limit counts by as well: the /48 of an IPv6 address, the /24 of an IPv4 one.
+func (s *Server) clientSite(r *http.Request) string { return site(s.clientAddr(r)) }
+
+// clientHome is what the keys only counted are kept by: the /48 of an IPv6 address, an IPv4 address as it is.
+func (s *Server) clientHome(r *http.Request) string { return network(s.clientAddr(r), 48) }
 
 // network is the prefix of bits around an IPv6 address, or an IPv4 address as it is.
 func network(a netip.Addr, bits int) string {
@@ -112,14 +115,40 @@ func network(a netip.Addr, bits int) string {
 	return p.String()
 }
 
-// allowFrom counts one of what from the request's network, and says whether that's within n a period; and, for a
-// request over IPv6 with site above 0, within site a period from its /48 too.
+// site is the /48 around an IPv6 address, or the /24 around an IPv4 one.
+func site(a netip.Addr) string {
+	if !a.IsValid() {
+		return "unknown"
+	}
+	bits := 48
+	if a.Is4() {
+		bits = 24
+	}
+	p, _ := a.Prefix(bits)
+	return p.String()
+}
+
+// allowFrom counts one of what from the request's network, and says whether that's within n a period; and, with
+// site above 0, within site a period from its site too (clientSite). For the limits that keep players safe, guardFrom.
 func (s *Server) allowFrom(r *http.Request, what string, n, site int, per time.Duration) bool {
-	if !s.limits.allow(what+":"+s.clientNet(r), n, per) {
+	return s.from(s.limits, r, what, n, site, per)
+}
+
+// guardFrom is allowFrom in the guard's limiter (Server.guard), which no flood of other keys can push a count out of.
+func (s *Server) guardFrom(r *http.Request, what string, n, site int, per time.Duration) bool {
+	return s.from(s.guard, r, what, n, site, per)
+}
+
+// from counts one of what from the request's network and site in l. Once the site's budget is spent, nothing more is
+// counted, so no new key is made for a network of it: one site makes at most site keys a period, however many of its
+// networks it sends from.
+func (s *Server) from(l *limiter, r *http.Request, what string, n, site int, per time.Duration) bool {
+	wide := what + ":site:" + s.clientSite(r)
+	if site > 0 && l.spent(wide, site) {
 		return false
 	}
-	if wide := s.clientSite(r); site > 0 && wide != "" {
-		return s.limits.allow(what+":site:"+wide, site, per)
+	if !l.allow(what+":"+s.clientNet(r), n, per) {
+		return false
 	}
-	return true
+	return site <= 0 || l.allow(wide, site, per)
 }
