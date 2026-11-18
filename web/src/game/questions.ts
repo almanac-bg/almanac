@@ -7,6 +7,7 @@ import { play } from "../lib/sound.ts";
 import { hyphenate } from "../lib/words.ts";
 import { formatNumber } from "../ui.ts";
 import { percent, rare } from "./share.ts";
+import { optionSizes, overSizes } from "./sizes.ts";
 import type {
   Answer,
   ChoiceView,
@@ -151,11 +152,6 @@ export function spokenAnswer(view: View, reveal: Reveal): string {
   }
 }
 
-/** How the question's picture and a choice's pictures are drawn: the size each takes on the screen, for the browser
- * to pick a file by. */
-const overSizes = "(max-width: 36rem) 100vw, 36rem";
-const optionSizes = "(max-width: 36rem) 46vw, 18rem";
-
 /** The least a question's picture is drawn at, however little room the screen has. */
 const pictureFloor = 128;
 
@@ -169,7 +165,7 @@ export function picture(view: View, fit = false): Child {
     class: "picture",
     src: im.src,
     srcset: im.srcset,
-    sizes: overSizes,
+    sizes: overSizes(im),
     width: im.w,
     height: im.h,
     alt: im.alt,
@@ -199,8 +195,8 @@ export function picture(view: View, fit = false): Child {
  * each is decoded (or has failed), or after `ms` at most. */
 export function picturesIn(view: View, ms: number): Promise<void> {
   const files: [Picture, string][] = [];
-  if (view.image) files.push([view.image, overSizes]);
-  if (view.type === "choice") for (const p of view.pictures ?? []) files.push([p, optionSizes]);
+  if (view.image) files.push([view.image, overSizes(view.image)]);
+  if (view.type === "choice") for (const p of view.pictures ?? []) files.push([p, optionSizes(p)]);
   const loads = files.map(([p, sizes]) => {
     const img = new Image();
     img.sizes = sizes;
@@ -257,7 +253,7 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
               class: "pic-option-img",
               src: option.src,
               srcset: option.srcset,
-              sizes: optionSizes,
+              sizes: optionSizes(option),
               width: option.w,
               height: option.h,
               alt: "",

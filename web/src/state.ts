@@ -51,6 +51,10 @@ export async function player(): Promise<User> {
   return r.user;
 }
 
+/** What became of the profile just now, said once where the player lands, on Начало: deleted (Настройки), or a game
+ * brought from another browser (screens/keep.ts). */
+export const notice = signal("");
+
 /** How many friend requests wait for the player's answer. */
 export const friendRequests = signal(0);
 
@@ -96,9 +100,21 @@ export const challenges = signal<Challenge[]>([]);
 /** Looks again, now, whether something waits for the player (after they've answered a challenge, say). */
 export let checkWaiting: () => Promise<void> = async () => {};
 
-/** Asks every half minute, while the page is in view, whether a friend has challenged the player, or someone asks
- * to be friends; and again each time a game ends, so a challenge just played doesn't stay on the notice. */
+/** How long between two looks for what waits for the player: half a minute, twice as long after each that found
+ * nothing new, up to five minutes. */
+const lookEvery = 30_000;
+const lookAtMost = 300_000;
+
+/** Looks, while the page is in view and no game is under way, whether a friend has challenged the player, or someone
+ * asks to be friends: every half minute, less often while nothing changes (lookEvery); and again at once each time
+ * the page comes back into view, and each time a game ends, so a challenge just played doesn't stay on the notice. */
 export function watchWaiting(): void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let quiet = 0; // looks in a row that found nothing new
+  const later = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => checkWaiting(), Math.min(lookEvery * 2 ** quiet, lookAtMost));
+  };
   checkWaiting = async () => {
     if (!user.peek()) {
       // Signed out, or the account deleted: its challenges and requests go with it.
@@ -106,22 +122,28 @@ export function watchWaiting(): void {
       friendRequests.set(0);
       return;
     }
-    if (document.hidden) return;
+    // Hidden, or in a game (whose end looks again): no asking, nor any sound over a question.
+    if (document.hidden || playing.peek()) return;
     try {
       const r = await api<{ requests: number; challenges: Challenge[] }>("GET", "/api/friends/invites");
       const known = new Set(challenges.peek().map((c) => c.id));
       const news = r.requests > friendRequests.peek() || r.challenges.some((c) => !known.has(c.id));
+      const same = !news && r.requests === friendRequests.peek() && r.challenges.length === known.size;
+      quiet = same ? Math.min(quiet + 1, 4) : 0;
       if (news && !playing.peek()) play("ping"); // never over a question
       friendRequests.set(r.requests);
       challenges.set(r.challenges);
     } catch {
       // Offline for a moment: the next look will tell.
     }
+    later();
   };
   effect(() => {
     user();
     if (!playing()) untracked(checkWaiting);
   });
-  setInterval(checkWaiting, 30_000);
-  document.addEventListener("visibilitychange", () => checkWaiting());
+  document.addEventListener("visibilitychange", () => {
+    quiet = 0;
+    checkWaiting();
+  });
 }

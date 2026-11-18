@@ -1,14 +1,12 @@
 // A game played, gone over: from Профил's „Последни игри“, how it went and each of its questions with the answer, the
 // fact behind it and how others answered, read-only (/games/<id>). The way back is to Профил.
 
-import { reviewed, scoreCard } from "../game/results.ts";
 import type { Reviewed, State } from "../game/types.ts";
-import { api, errorText } from "../lib/api.ts";
-import { h, signal } from "../lib/dom.ts";
-import { title } from "../lib/router.ts";
-import { issueWords } from "../lib/words.ts";
-import { bulgaria, categories } from "../state.ts";
-import { back } from "../ui.ts";
+import type { Kit } from "../kit.ts";
+
+// The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
+// only types.
+let { reviewed, scoreCard, api, errorText, h, signal, title, issueWords, bulgaria, categories, back } = {} as Kit;
 
 /** A game as a run of it is: its kind, and the day's day or a topic's topic. */
 type Played = Omit<State, "kind"> & { kind: string };
@@ -33,7 +31,8 @@ function what(s: Played): string {
   }
 }
 
-export function playedGame([id = ""]: string[]) {
+export function playedGame(kit: Kit, [id = ""]: string[]) {
+  ({ reviewed, scoreCard, api, errorText, h, signal, title, issueWords, bulgaria, categories, back } = kit);
   title("Изиграна игра");
   const game = signal<{ s: Played; questions: Reviewed[] } | null>(null);
   const error = signal("");

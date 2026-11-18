@@ -11,6 +11,10 @@ export interface Boot {
   phones: string[] | null;
   hostCss: string;
   outcomeCss: string;
+  /** The server's clock as it drew the page (lib/api.ts holds the page's clock to it until an answer comes). */
+  now: number;
+  /** Начало's day, in its page only (GET /api/day's answer: screens/today.ts draws it at once, the first time). */
+  day?: unknown;
 }
 
 export const boot: Partial<Boot> =

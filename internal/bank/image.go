@@ -10,12 +10,17 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
+	"sync"
 )
 
 // Image is a picture over the question (a flag, a landmark, a painting), with its licence: free licences only. The file
-// is in images/ next to the questions, its longer side up to ImageSide, with a half-size copy beside it (<name>-600.webp).
-// Its name is a hash of its content, so it says nothing about the answer.
+// is in images/ next to the questions, its longer side up to ImageSide, with smaller copies beside it: one at half its
+// size (<name>-600.webp), for a choice's pictures, and one at three quarters (<name>-900.webp), which a screen of two
+// pixels to a point takes (an everyday phone's, a laptop's) at about half the bytes of the whole. The three-quarter
+// copy came in November 2026: a picture without it yet is offered in the other two sizes (one with it is checked as
+// the others are). Its name is a hash of its content, so it says nothing about the answer.
 type Image struct {
 	File string `json:"file"`
 	W    int    `json:"w"`
@@ -31,8 +36,14 @@ type Image struct {
 	Source string `json:"source"`
 }
 
+// mediums are the pictures found with their three-quarter copy (checkFiles), by file. A file is named by its content,
+// so one found with its copy has it for good: a version of a question kept from an earlier bank (Decode) offers it
+// too, and deals as the bank's own does.
+var mediums sync.Map
+
 const (
-	// ImageSide is a picture's longer side at most (a smaller original keeps its size); the small copy has half of it.
+	// ImageSide is a picture's longer side at most (a smaller original keeps its size); its copies have three quarters
+	// of it and half of it.
 	ImageSide    = 1200
 	ImageMinSide = 600
 	// ImageMaxBytes is the most one file may weigh.
@@ -57,7 +68,22 @@ func (im *Image) file() string {
 // Small is the half-size copy's file name.
 func (im *Image) Small() string { return strings.TrimSuffix(im.File, ".webp") + "-600.webp" }
 
-// ImageView is a picture as a player gets it: both sizes to pick from, its shape, and what it shows.
+// Medium is the three-quarter copy's file name.
+func (im *Image) Medium() string { return strings.TrimSuffix(im.File, ".webp") + "-900.webp" }
+
+// pictureFile is one of a picture's files, and its size.
+type pictureFile struct {
+	name string
+	w, h int
+}
+
+// files are the picture's files: the picture, and its copies, biggest first.
+func (im *Image) files() []pictureFile {
+	return []pictureFile{{im.File, im.W, im.H}, {im.Medium(), im.W * 3 / 4, im.H * 3 / 4}, {im.Small(), im.W / 2, im.H / 2}}
+}
+
+// ImageView is a picture as a player gets it: its three sizes to pick from (the browser takes the one its screen
+// needs, by how big web/src/game/questions.ts says it's drawn), its shape, and what it shows.
 type ImageView struct {
 	Src    string `json:"src"`
 	SrcSet string `json:"srcset"`
@@ -70,10 +96,15 @@ func (im *Image) view() *ImageView {
 	if im == nil {
 		return nil
 	}
-	small := ImagePath + im.Small()
+	var set []string
+	for _, f := range slices.Backward(im.files()) {
+		if _, found := mediums.Load(im.File); f.name != im.Medium() || found {
+			set = append(set, fmt.Sprintf("%s%s %dw", ImagePath, f.name, f.w))
+		}
+	}
 	return &ImageView{
-		Src:    small,
-		SrcSet: fmt.Sprintf("%s %dw, %s%s %dw", small, im.W/2, ImagePath, im.File, im.W),
+		Src:    ImagePath + im.Small(),
+		SrcSet: strings.Join(set, ", "),
 		W:      im.W,
 		H:      im.H,
 		Alt:    im.Alt,
@@ -135,9 +166,10 @@ func (im *Image) check() []string {
 	return p
 }
 
-// checkFiles finds what's wrong with the picture's files in dir: both sizes there, light enough, the shape the
-// question says, and the picture named by its content (the first 16 hex digits of its SHA-256), as it's served:
-// cached for good, and found by its name in an earlier bank's copy while a play still shows it there.
+// checkFiles finds what's wrong with the picture's files in dir: each size there (the three-quarter copy where it is: it
+// notes whether), light enough, the shape the question says, and the picture named by its content (the first 16 hex
+// digits of its SHA-256), as it's served: cached for good, and found by its name in an earlier bank's copy while a
+// play still shows it there.
 func (im *Image) checkFiles(dir string) []string {
 	var p []string
 	if imageFile.MatchString(im.File) {
@@ -145,16 +177,17 @@ func (im *Image) checkFiles(dir string) []string {
 			p = append(p, fmt.Sprintf("%s isn't named by its content (%s.webp): a picture changed is a new file", im.File, sum))
 		}
 	}
-	for _, f := range []struct {
-		name string
-		w, h int
-	}{{im.File, im.W, im.H}, {im.Small(), im.W / 2, im.H / 2}} {
+	for _, f := range im.files() {
 		path := filepath.Join(dir, f.name)
 		info, err := os.Stat(path)
+		if err != nil && f.name == im.Medium() {
+			continue
+		}
 		if err != nil {
 			p = append(p, "missing picture "+f.name)
 			continue
 		}
+		before := len(p)
 		if info.Size() > ImageMaxBytes {
 			p = append(p, fmt.Sprintf("%s weighs %d bytes, over %d", f.name, info.Size(), ImageMaxBytes))
 		}
@@ -164,6 +197,9 @@ func (im *Image) checkFiles(dir string) []string {
 			p = append(p, fmt.Sprintf("%s: %v", f.name, err))
 		case abs(w-f.w) > 1 || abs(h-f.h) > 1:
 			p = append(p, fmt.Sprintf("%s is %d×%d, not %d×%d", f.name, w, h, f.w, f.h))
+		}
+		if f.name == im.Medium() && len(p) == before {
+			mediums.Store(im.File, true)
 		}
 	}
 	return p

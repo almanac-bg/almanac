@@ -59,7 +59,7 @@ export function dayWord(ms: number, now: number): string {
 }
 
 /** When an evening is, in words: „днес в 21:00“, „утре в 21:00“, „в петък в 21:00“. */
-export const when = (ms: number, now: number) => `${dayWord(ms, now)} в ${clock(ms)}`;
+export const dayAndTime = (ms: number, now: number) => `${dayWord(ms, now)} в ${clock(ms)}`;
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -117,7 +117,7 @@ function royalNow(): () => string {
     }
     if (g.phase === "live") return `Играе се · още ${g.in}\u00a0в играта`;
     if (t.coming > 0) return coming(t);
-    return g.nightly ? "Всяка вечер в 21:00" : cap(when(g.next, now()));
+    return g.nightly ? "Всяка вечер в 21:00" : cap(dayAndTime(g.next, now()));
   };
 }
 

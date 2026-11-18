@@ -10,9 +10,9 @@ import { type Child, effect, h, signal, slot, when } from "../lib/dom.ts";
 import { embedded, outsideLink } from "../lib/embedded.ts";
 import { askToKeep } from "../lib/keep.ts";
 import { go, title } from "../lib/router.ts";
-import { type User, user } from "../state.ts";
+import { notice, type User, user } from "../state.ts";
 import { failure } from "../ui.ts";
-import { notice, signIn } from "./settings.ts";
+import { signIn } from "./signin.ts";
 
 /** This page's app browser, if it's in one (never in the game's own app). */
 const app = inApp ? null : embedded;

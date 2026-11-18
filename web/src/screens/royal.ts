@@ -74,7 +74,7 @@ let {
   clock,
   coming,
   dayWord,
-  when,
+  dayAndTime,
   whileSeen,
   errorText,
   lifetime,
@@ -263,7 +263,7 @@ export function royal(kit: Kit) {
     clock,
     coming,
     dayWord,
-    when,
+    dayAndTime,
     whileSeen,
     errorText,
     lifetime,
@@ -497,7 +497,7 @@ function plan(main = false): Child {
                 "p",
                 null,
                 notified()
-                  ? `Записа се. Ще ти напомним ${when(opensAt, t.glance.now)}.`
+                  ? `Записа се. Ще ти напомним ${dayAndTime(opensAt, t.glance.now)}.`
                   : "Записа се. Ела тук, щом входът се отвори.",
               ),
               h(
@@ -1003,7 +1003,7 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
         ),
       ),
     ),
-    h("p", { class: "muted" }, () => `Следващият Роял: ${when(view().next, now())}.`),
+    h("p", { class: "muted" }, () => `Следващият Роял: ${dayAndTime(view().next, now())}.`),
     // What next, in gold: the day's ten if they still wait, else „Ще дойда“ to the next evening.
     () => {
       const d = dayWaits();

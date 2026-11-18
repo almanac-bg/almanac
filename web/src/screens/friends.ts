@@ -3,12 +3,32 @@
 // asks, or a friend, can be blocked from here: they're gone, and can't ask again (play/blocks.go); the blocked are
 // listed last, to lift it.
 
-import { shareButton } from "../game/results.ts";
-import { api, errorText } from "../lib/api.ts";
-import { type Child, h, onCleanup, type Signal, signal, when } from "../lib/dom.ts";
-import { go, title } from "../lib/router.ts";
-import { friendRequests, player, user } from "../state.ts";
-import { avatar, failure, formatNumber, pageArt, profileHref, record, type Tier } from "../ui.ts";
+import type { Kit } from "../kit.ts";
+import type { Child, Signal } from "../lib/dom.ts";
+import type { Tier } from "../ui.ts";
+
+// The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
+// only types.
+let {
+  shareButton,
+  api,
+  errorText,
+  h,
+  onCleanup,
+  signal,
+  when,
+  go,
+  title,
+  friendRequests,
+  player,
+  user,
+  avatar,
+  failure,
+  formatNumber,
+  pageArt,
+  profileHref,
+  record,
+} = {} as Kit;
 
 interface Friend {
   id: number;
@@ -40,7 +60,27 @@ interface Friends {
 }
 
 /** Приятели, one of the main places. */
-export function friends(): Child {
+export function friends(kit: Kit): Child {
+  ({
+    shareButton,
+    api,
+    errorText,
+    h,
+    onCleanup,
+    signal,
+    when,
+    go,
+    title,
+    friendRequests,
+    player,
+    user,
+    avatar,
+    failure,
+    formatNumber,
+    pageArt,
+    profileHref,
+    record,
+  } = kit);
   title("Приятели");
   return h("section", { class: "screen" }, friendsCard());
 }

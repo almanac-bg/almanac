@@ -1,11 +1,25 @@
 // Настройки: the name and tag (saved as they're left), the account and its email, reminders, and the data the game
 // keeps; and this device's sound and access, with a profile or without one.
 
-import { type ApiError, api, errorText } from "../lib/api.ts";
-import { inApp } from "../lib/app.ts";
-import { type Child, computed, effect, h, onCleanup, signal, untracked, when } from "../lib/dom.ts";
-import { reportProblem } from "../lib/errors.ts";
-import {
+import type { Kit } from "../kit.ts";
+import type { Child, Signal } from "../lib/dom.ts";
+import type { PushKind, PushPrefs } from "../lib/push.ts";
+import type { User } from "../state.ts";
+
+// The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
+// only types.
+let {
+  api,
+  errorText,
+  inApp,
+  computed,
+  effect,
+  h,
+  onCleanup,
+  signal,
+  untracked,
+  when,
+  reportProblem,
   bigText,
   calm,
   musicOn,
@@ -16,34 +30,70 @@ import {
   setVibrate,
   tickOn,
   vibrateOn,
-} from "../lib/prefs.ts";
-import {
   needsHomeScreen,
-  type PushKind,
-  type PushPrefs,
   pushable,
   pushOn,
   pushPrefs,
   setPushPref,
   turnOff,
   turnOn,
-} from "../lib/push.ts";
-import { go, title } from "../lib/router.ts";
-import { quietWhenSilent, setSound, soundOn } from "../lib/sound.ts";
-import { type User, user } from "../state.ts";
-import { back } from "../ui.ts";
-
-/** What became of the profile just now, said once where the player lands, on Начало: deleted, or a game brought from
- * another browser. */
-export const notice = signal("");
+  go,
+  title,
+  quietWhenSilent,
+  setSound,
+  soundOn,
+  notice,
+  user,
+  back,
+  signIn,
+} = {} as Kit;
 
 /** Signed out just now: said here, where it was done, and only here (Начало, next, doesn't say it again). */
-const signedOut = signal(false);
+let signedOut: Signal<boolean>;
 
-export function settings() {
+export function settings(kit: Kit) {
+  ({
+    api,
+    errorText,
+    inApp,
+    computed,
+    effect,
+    h,
+    onCleanup,
+    signal,
+    untracked,
+    when,
+    reportProblem,
+    bigText,
+    calm,
+    musicOn,
+    setBigText,
+    setCalm,
+    setMusic,
+    setTick,
+    setVibrate,
+    tickOn,
+    vibrateOn,
+    needsHomeScreen,
+    pushable,
+    pushOn,
+    pushPrefs,
+    setPushPref,
+    turnOff,
+    turnOn,
+    go,
+    title,
+    quietWhenSilent,
+    setSound,
+    soundOn,
+    notice,
+    user,
+    back,
+    signIn,
+  } = kit);
   title("Настройки");
   notice.set("");
-  signedOut.set(false);
+  signedOut = signal(false);
   return h(
     "section",
     { class: "screen" },
@@ -501,153 +551,4 @@ function signOutOthers(): Child {
     h("button", { class: "link", onclick: run, disabled: busy }, "Излез от другите устройства"),
     () => said() && h("p", { class: bad() ? "bad" : "muted", role: "status" }, said()),
   ];
-}
-
-/** Signing in by email, with a code: in Настройки, and on Начало (a guest who keeps coming back, a player with a
- * profile before a first game, where its button is a plain one: `primary` false). */
-export function signIn(primary = true): Child {
-  const email = signal("");
-  const code = signal("");
-  const sent = signal(false);
-  // How long the code sent is: the server says (account.CodeDigits, or LongCodeDigits).
-  const digits = signal(6);
-  const busy = signal(false);
-  const error = signal("");
-  // The code sent can't be used any more (its tries used up, or its time): a new one is the way on.
-  const dead = signal(false);
-  // The seconds until another code may go (account.CodeEvery), counted down beside „прати нов код“.
-  const wait = signal(0);
-  let ticking: ReturnType<typeof setInterval> | undefined;
-  const countDown = (seconds: number) => {
-    clearInterval(ticking);
-    const until = Date.now() + seconds * 1000;
-    const tick = () => {
-      wait.set(Math.max(0, Math.ceil((until - Date.now()) / 1000)));
-      if (!wait.peek()) clearInterval(ticking);
-    };
-    tick();
-    ticking = setInterval(tick, 1000);
-  };
-  onCleanup(() => clearInterval(ticking));
-
-  const run = async (fn: () => Promise<void>) => {
-    busy.set(true);
-    error.set("");
-    try {
-      await fn();
-    } catch (err) {
-      const e = err as ApiError;
-      error.set(e.message);
-      if (e.code === "code_tries" || e.code === "code_expired") dead.set(true);
-    } finally {
-      busy.set(false);
-    }
-  };
-  const send = () =>
-    run(async () => {
-      const r = await api<{ again?: number; digits?: number }>("POST", "/api/auth/code", { email: email.peek() });
-      countDown(r.again ?? 60);
-      digits.set(r.digits ?? 6);
-      code.set("");
-      dead.set(false);
-      sent.set(true);
-    });
-
-  const errorLine = () => error() && h("p", { class: "bad", role: "alert" }, error());
-
-  return when(
-    () => sent(),
-    () =>
-      h(
-        "form",
-        {
-          class: "stack",
-          onsubmit: (e: SubmitEvent) => {
-            e.preventDefault();
-            run(async () => {
-              const r = await api<{ user: User }>("POST", "/api/auth/verify", {
-                email: email.peek(),
-                code: code.peek(),
-              });
-              user.set(r.user);
-              // The browser has a new session, and its notifications went along with it (account.Verify); any it
-              // turned on before they were kept with a session are told again, to be kept with this one.
-              if (pushable()) pushOn().catch(() => {});
-            });
-          },
-        },
-        h("p", null, "Пратихме код на ", h("strong", null, email.peek()), ". Въведи го тук:"),
-        h(
-          "label",
-          { class: "field" },
-          h("span", null, "Код"),
-          h("input", {
-            // A long code (past many wrong ones for the address: account.LongCodeDigits) in a smaller hand, to fit.
-            class: () => (digits() > 6 ? "code long" : "code"),
-            inputmode: "numeric",
-            autocomplete: "one-time-code",
-            pattern: () => `[0-9]{${digits()}}`,
-            required: true,
-            value: code,
-            // Only the digits, however it was typed or pasted (a long code comes in fours, with spaces).
-            oninput: (e: Event) => {
-              const el = e.target as HTMLInputElement;
-              el.value = el.value.replace(/\D/g, "").slice(0, digits.peek());
-              code.set(el.value);
-            },
-            ref: (el) => queueMicrotask(() => el.focus()),
-          }),
-        ),
-        // A dead code takes no more tries: the way on is a new one, at once.
-        () =>
-          dead()
-            ? h("button", { type: "button", class: "btn primary", onclick: send, disabled: busy }, "Прати нов код")
-            : h("button", { class: "btn primary", disabled: busy }, "Влез"),
-        errorLine,
-        h(
-          "p",
-          { class: "muted" },
-          () =>
-            dead()
-              ? null
-              : [
-                  "Няма го? Виж в спама или ",
-                  h(
-                    "button",
-                    { type: "button", class: "link", onclick: send, disabled: () => busy() || wait() > 0 },
-                    "прати нов код",
-                  ),
-                  () => (wait() ? ` след ${wait()} с` : ""),
-                  ". ",
-                ],
-          h("button", { type: "button", class: "link", onclick: () => sent.set(false) }, "Смени имейла"),
-        ),
-      ),
-    () =>
-      h(
-        "form",
-        {
-          class: "stack",
-          onsubmit: (e: SubmitEvent) => {
-            e.preventDefault();
-            send();
-          },
-        },
-        h(
-          "label",
-          { class: "field" },
-          h("span", null, "Имейл"),
-          h("input", {
-            type: "email",
-            autocomplete: "email",
-            required: true,
-            value: email.peek(),
-            oninput: (e: Event) => email.set((e.target as HTMLInputElement).value),
-          }),
-        ),
-        h("button", { class: primary ? "btn primary" : "btn", disabled: busy }, "Прати ми код"),
-        errorLine,
-        h("p", { class: "muted" }, "Без пароли: всеки път ти пращаме код за вход."),
-      ),
-  );
 }

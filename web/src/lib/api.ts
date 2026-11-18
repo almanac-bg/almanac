@@ -7,6 +7,7 @@
 // as once) is tried again while the line or the server is down for a moment (tries): a game's step, an answer
 // (game/answering.ts).
 
+import { boot } from "./boot.ts";
 import { reportProblem } from "./errors.ts";
 
 export class ApiError extends Error {
@@ -100,6 +101,18 @@ function clock(res: Response): void {
   const off = date + 500 - Date.now(); // the server's second, half gone on average
   skew = Math.abs(off) < 2000 ? 0 : off;
 }
+
+/** Sets the clock first from the page itself, before any answer has come: the server's time as it drew the page
+ * (lib/boot.ts), held against when the page's first byte came. Начало's day comes in the page (server/pages.go), and
+ * a question it shows has its time by the server's clock. */
+function pageClock(now: number | undefined): void {
+  if (!now || typeof performance === "undefined") return;
+  const page = performance.getEntriesByType?.("navigation")[0] as PerformanceNavigationTiming | undefined;
+  if (!page || page.responseStart <= 0) return;
+  const off = now - (performance.timeOrigin + page.responseStart);
+  skew = Math.abs(off) < 2000 ? 0 : off;
+}
+pageClock(boot.now);
 
 /** Now, by the server's clock (as of its last answer): what a day is, in a phone whose clock is off. */
 export const serverNow = (): number => Date.now() + skew;

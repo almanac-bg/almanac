@@ -2,22 +2,31 @@
 // know each topic, the achievements they've earned; and what you can do with them — ask to be friends, answer their
 // asking, call them to a duel, or block them (and lift it).
 
-import { type Mastery, masteryCard } from "../game/mastery.ts";
-import { api, errorText } from "../lib/api.ts";
-import { type Child, h, signal } from "../lib/dom.ts";
-import { go, title } from "../lib/router.ts";
-import { friendRequests, player, user } from "../state.ts";
-import {
-  type AchievementInfo,
+import type { Mastery } from "../game/mastery.ts";
+import type { Kit } from "../kit.ts";
+import type { Child } from "../lib/dom.ts";
+import type { AchievementInfo, Standing, Tier } from "../ui.ts";
+
+// The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
+// only types.
+let {
+  masteryCard,
+  api,
+  errorText,
+  h,
+  signal,
+  go,
+  title,
+  friendRequests,
+  player,
+  user,
   avatar,
   badge,
   record,
-  type Standing,
   standingCard,
   stat,
-  type Tier,
   tierWords,
-} from "../ui.ts";
+} = {} as Kit;
 
 interface Profile {
   name: string;
@@ -51,7 +60,25 @@ const month = (ms: number) =>
   new Intl.DateTimeFormat("bg", { month: "long", year: "numeric" }).format(new Date(ms)).replace(/\s(?=г\.)/, " ");
 const day = (ms: number) => new Intl.DateTimeFormat("bg", { day: "numeric", month: "long" }).format(new Date(ms));
 
-export function playerProfile([tag]: string[]): Child {
+export function playerProfile(kit: Kit, [tag]: string[]): Child {
+  ({
+    masteryCard,
+    api,
+    errorText,
+    h,
+    signal,
+    go,
+    title,
+    friendRequests,
+    player,
+    user,
+    avatar,
+    badge,
+    record,
+    standingCard,
+    stat,
+    tierWords,
+  } = kit);
   title(`@${tag}`);
   const profile = signal<Profile | null>(null);
   const error = signal("");

@@ -116,6 +116,7 @@ test("the ways back pop the history; back comes to a page and its board where th
   await expect(page).toHaveURL(/\/ranks#knowledge$/);
   await page.getByRole("link", { name: "Профил" }).first().click();
   await expect(page).toHaveURL(/\/me$/);
+  await expect(page.getByRole("link", { name: "Настройки" })).toBeVisible(); // Профил loads on its own (kit.ts)
   await page.evaluate(() => scrollTo(0, 200));
   const y = await page.evaluate(() => scrollY);
   expect(y).toBeGreaterThan(0);

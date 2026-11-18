@@ -12,25 +12,15 @@ import { applyPrefs } from "./lib/prefs.ts";
 import { preparePush } from "./lib/push.ts";
 import { canGoBack, entry, go, navigate, path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
-import { almanac } from "./screens/almanac.ts";
 import { challenge, challengeFriend, newChallenge } from "./screens/challenge.ts";
 import { duel, duelOne, playChallenge } from "./screens/duel.ts";
-import { friends } from "./screens/friends.ts";
 import { invite } from "./screens/invite.ts";
 import { handoff } from "./screens/keep.ts";
-import { me } from "./screens/me.ts";
 import { missing } from "./screens/missing.ts";
 import { mistakes } from "./screens/mistakes.ts";
 import { topic } from "./screens/play.ts";
-import { playedGame } from "./screens/played.ts";
-import { playerProfile } from "./screens/player.ts";
-import { ranks } from "./screens/ranks.ts";
-import { rewards } from "./screens/rewards.ts";
 import { rooms } from "./screens/rooms.ts";
-import { settings } from "./screens/settings.ts";
 import { today } from "./screens/today.ts";
-import { wardrobe } from "./screens/wardrobe.ts";
-import { year } from "./screens/year.ts";
 import { type Challenge, challenges, checkWaiting, friendRequests, playing, watchWaiting } from "./state.ts";
 import { until } from "./ui.ts";
 
@@ -117,21 +107,24 @@ if (root) {
       { path: /^\/challenge$/, view: newChallenge },
       { path: /^\/challenge\/([0-9]+)$/, view: challengeFriend },
       { path: /^\/royal$/, view: later(() => import("./screens/royal.ts").then((m) => m.royal)) },
-      { path: /^\/almanac$/, view: almanac },
+      { path: /^\/almanac$/, view: later(() => import("./screens/almanac.ts").then((m) => m.almanac)) },
       { path: /^\/mistakes$/, view: mistakes },
-      { path: /^\/year\/([0-9]{4})$/, view: year },
+      { path: /^\/year\/([0-9]{4})$/, view: later(() => import("./screens/year.ts").then((m) => m.year)) },
       { path: /^\/room$/, view: rooms },
-      { path: /^\/ranks$/, view: ranks },
-      { path: /^\/rewards$/, view: rewards },
-      { path: /^\/wardrobe$/, view: wardrobe },
-      { path: /^\/friends$/, view: friends },
-      { path: /^\/settings$/, view: settings },
+      { path: /^\/ranks$/, view: later(() => import("./screens/ranks.ts").then((m) => m.ranks)) },
+      { path: /^\/rewards$/, view: later(() => import("./screens/rewards.ts").then((m) => m.rewards)) },
+      { path: /^\/wardrobe$/, view: later(() => import("./screens/wardrobe.ts").then((m) => m.wardrobe)) },
+      { path: /^\/friends$/, view: later(() => import("./screens/friends.ts").then((m) => m.friends)) },
+      { path: /^\/settings$/, view: later(() => import("./screens/settings.ts").then((m) => m.settings)) },
       { path: /^\/r\/([0-9]{6})$/, view: later(() => import("./screens/room.ts").then((m) => m.room)) },
       { path: /^\/f\/([a-z0-9]{8})$/, view: invite },
       { path: /^\/hand\/([A-Za-z0-9_-]{43})$/, view: handoff },
-      { path: /^\/me$/, view: me },
-      { path: /^\/games\/([0-9]+)$/, view: playedGame },
-      { path: /^\/players\/([A-Za-z0-9_]{3,20})$/, view: playerProfile },
+      { path: /^\/me$/, view: later(() => import("./screens/me.ts").then((m) => m.me)) },
+      { path: /^\/games\/([0-9]+)$/, view: later(() => import("./screens/played.ts").then((m) => m.playedGame)) },
+      {
+        path: /^\/players\/([A-Za-z0-9_]{3,20})$/,
+        view: later(() => import("./screens/player.ts").then((m) => m.playerProfile)),
+      },
     ],
     missing,
   );

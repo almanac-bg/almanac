@@ -17,6 +17,7 @@ import { getReady, playRun, shownHere, starting, trail } from "../game/run.ts";
 import { dayShareText, percent, rare } from "../game/share.ts";
 import type { Board, Mark, Score, State } from "../game/types.ts";
 import { api, errorText, serverNow, tally } from "../lib/api.ts";
+import { boot } from "../lib/boot.ts";
 import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { place } from "../lib/ordinal.ts";
@@ -24,8 +25,8 @@ import { needsHomeScreen, pushable, pushOn, turnOn } from "../lib/push.ts";
 import { goBack, hold, release, title } from "../lib/router.ts";
 import { feelKit } from "../lib/sound.ts";
 import { dateWords, issueWords, onDay, weekday } from "../lib/words.ts";
-import { dayInBulgaria } from "../lib/year.ts";
-import { player, playing, user } from "../state.ts";
+import { dayInBulgaria, yearNow } from "../lib/year.ts";
+import { notice, player, playing, user } from "../state.ts";
 import {
   explain,
   failure,
@@ -53,8 +54,6 @@ import { haveProfile, keepLine } from "./keep.ts";
 import { leagueNote } from "./league.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
-import { notice } from "./settings.ts";
-import { yearCard } from "./year.ts";
 
 export interface Today {
   day: string;
@@ -112,6 +111,9 @@ export interface Today {
   challenges?: ChallengeNews | null;
 }
 
+/** The day as Начало's page came with it (server/pages.go): its first draw, without asking; every later one asks. */
+let inPage = boot.day as Today | undefined;
+
 /** The day's ten played on another page (an invite's): their result there as Начало draws it (`before`: the day as
  * it stood before they were played), with that page's own card under it. */
 export interface PlayedElsewhere {
@@ -131,7 +133,8 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
   const screen = slot(() => h("p", { class: "muted" }, "…"));
   const load = async () => {
     try {
-      const t = await api<Today>("GET", "/api/day");
+      const t = inPage ?? (await api<Today>("GET", "/api/day"));
+      inPage = undefined;
       day = t.day;
       const run = t.run;
       // A question this tab was showing has its time running (a reload): straight back into it. Otherwise (another
@@ -802,4 +805,17 @@ function remindAsk(day: string): Child {
             ),
             () => error() && h("p", { class: "bad", role: "alert" }, error()),
           ];
+}
+
+/** Начало's way in, while the year's look back is fresh. */
+export function yearCard(): Child {
+  const { year, fresh } = yearNow();
+  if (!year || !fresh || !user.peek()) return null;
+  return h(
+    "a",
+    { class: "card year-card", href: `/year/${year}` },
+    h("p", { class: "kicker" }, "Годината ти в играта"),
+    h("strong", null, `Твоята ${year}`),
+    h("span", { class: "muted" }, "Дни, отговори, научени факти и още. Виж ги."),
+  );
 }
