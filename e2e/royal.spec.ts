@@ -18,6 +18,8 @@ test("Роял: „Ще дойда“ before the lobby, and Начало's card 
     await expect(page.locator(".modes .mode")).toHaveCount(1, { timeout: 3_000 });
     await expect(page.locator(".mode.tone-gold .mode-about")).toHaveText(/^Започва след|^Играе се/);
   }).toPass({ timeout: 60_000 });
+  // Роял's card says what it is: its name alone doesn't.
+  await expect(page.locator(".mode.tone-gold .mode-kind")).toHaveText("Турнир на живо");
   // Начало shows the ways to play with others once a first game is finished.
   await openGame(page, "/play/history");
   await playRun(page);
@@ -116,11 +118,19 @@ test("Роял: in from the lobby, its music, live to the fifteenth question, th
     // The answer shows once everyone playing has answered (or the time is up), with the standings.
     await expect(page.locator(".verdict")).toBeVisible({ timeout: 40_000 });
     if (n === 0) await expect(page.locator(".verdict")).not.toContainText("Времето изтече");
+    // Роял counts right answers and their time, not points: the verdict has none.
+    await expect(page.locator(".verdict .verdict-pts")).toHaveCount(0);
     await expect(page.locator(".royal-table .row.me")).toBeVisible();
     await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
   }
-  // The end: the standings of all, after the fifteenth question.
-  await expect(page.locator(".intro").getByText(/верни\./)).toBeVisible({ timeout: 360_000 });
+  // The end: the standings of all, after the fifteenth question (a place on the podium, met with another engine's
+  // run, comes first as a sheet over them, with its share).
+  await expect(page.locator(".intro").getByText(/ верни/)).toBeVisible({ timeout: 360_000 });
+  const podium = page.locator("dialog[open]");
+  if (await podium.isVisible()) {
+    await expect(podium.getByRole("button", { name: "Сподели" })).toBeVisible();
+    await podium.getByRole("button", { name: "Продължи" }).click();
+  }
   await expect(standings).toBeVisible();
   await expect(page.locator(".royal-table .row.me")).toBeVisible();
   await expect(page.getByText(/Следващият Роял:/)).toBeVisible();

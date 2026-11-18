@@ -331,3 +331,25 @@ func (s *Server) callSoon(ctx context.Context, start time.Time, away, in []int64
 		return map[pushKind][]int64{pushAsked: to}, nil
 	})
 }
+
+// callShort calls once more when the start came with too few there for a game (royal.Schedule.Least), while the lobby
+// waits for more (until): those in it whose screen isn't on it (away), and those who said they'd come and aren't in it
+// (in is everyone who is). Once an evening, whatever restarts the server. It says how many it called.
+func (s *Server) callShort(ctx context.Context, start, until time.Time, away, in []int64) int {
+	m := push.Message{Title: "Роял чака още играчи",
+		Body: "Влез до " + until.In(play.Bulgaria).Format("15:04") + ", за да започне играта.", URL: "/royal"}
+	return s.call(ctx, "royal_called_short", until, m, func(tx *sql.Tx) (map[pushKind][]int64, error) {
+		planned, err := planners(ctx, tx, `SELECT user_id FROM royal_plans WHERE day = ?`, eveningOf(start.UnixMilli()))
+		if err != nil {
+			return nil, err
+		}
+		to := slices.Clone(away)
+		for _, id := range planned {
+			if !slices.Contains(in, id) {
+				to = append(to, id)
+			}
+		}
+		slog.Info("royal called, short", "away", len(away), "coming", len(to)-len(away))
+		return map[pushKind][]int64{pushAsked: to}, nil
+	})
+}

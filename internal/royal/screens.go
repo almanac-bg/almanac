@@ -29,9 +29,12 @@ type Board struct {
 	Next int64 `json:"next"`
 	// Nightly says there's one every evening (else on its days: Friday to Sunday).
 	Nightly bool `json:"nightly,omitempty"`
-	Length  int  `json:"length"`
-	Round   int  `json:"round"`
-	Size    int  `json:"size"`
+	// Wait, in the lobby, is until when it waits for more, the start having come with fewer than Least there.
+	Wait   int64 `json:"wait,omitempty"`
+	Least  int   `json:"least,omitempty"`
+	Length int   `json:"length"`
+	Round  int   `json:"round"`
+	Size   int   `json:"size"`
 	// Tables is how many tournaments there are this evening.
 	Tables  int `json:"tables"`
 	N       int `json:"n"`
@@ -65,6 +68,8 @@ type Own struct {
 	Rights int `json:"rights,omitempty"`
 	// Late says the viewer, not in, may still come in: the games have begun, and the door is open (Late).
 	Late bool `json:"late,omitempty"`
+	// Off says the viewer was in the lobby of this evening, called off: too few came (Schedule.Least).
+	Off bool `json:"off,omitempty"`
 	// Me is the viewer as the board would show them (the lobby's few may not, nor a question's board).
 	Me *PlayerView `json:"me,omitempty"`
 	// LeftMs is how long the question showing has left; NextMs, while its answer shows, how long until the game
@@ -81,12 +86,15 @@ type Own struct {
 	Delta int   `json:"delta,omitempty"`
 }
 
-// CutView is a cut of the game: after which question (counted from 1), how many of those who began go on, and the
-// line, as the standings are now: the score of the last who'd go on (nil: everyone in would).
+// CutView is a cut of the game: after which question (counted from 1), how many of those who began go on (and all
+// level with the last of them on right answers, up to play.RoyalCap), and the line, as the standings are now: the
+// score of the last who'd go on (nil: everyone in would). Timed says the time decides at the line, among those level
+// on right answers with it (more of them than the cap); else right answers alone do.
 type CutView struct {
 	After int        `json:"after"`
 	Keep  int        `json:"keep"`
 	Line  *ScoreView `json:"line,omitempty"`
+	Timed bool       `json:"timed,omitempty"`
 	// Now says it's the answer showing that the cut comes with: those behind the line are out.
 	Now bool `json:"now,omitempty"`
 	// Then is, with Now, the cut after it (after which question, counted from 1; 0: none, the final is next).
@@ -106,9 +114,11 @@ type PlayerView struct {
 	Name string `json:"name"`
 	Tag  string `json:"tag"`
 	In   bool   `json:"in"`
-	// Reached is how many they've answered right (as of the last answer shown), and Ms the time those took.
+	// Reached is how many they've answered right (as of the last answer shown; to their cut, once out), and Ms the
+	// time those took; Rights, how many in all, those after a cut too.
 	Reached int   `json:"reached"`
 	Ms      int64 `json:"ms"`
+	Rights  int   `json:"rights"`
 	// Rank is where they stand now (those level share it): the place, once it's ended. Goes says they'd go on at the
 	// next cut as they stand (those level with its line too), or have gone on at the cut the answer showing comes with.
 	Rank int  `json:"rank"`
@@ -136,13 +146,16 @@ type RevealView struct {
 	Answer any `json:"answer"`
 }
 
-// MineView is how the viewer's answer went.
+// MineView is how the viewer's answer went: Ms is the time it took (as it came), and InRow the right answers in a
+// row it makes (two or more), as in any game.
 type MineView struct {
-	Points int  `json:"points"`
-	Speed  int  `json:"speed,omitempty"`
-	Right  bool `json:"right"`
-	Exact  bool `json:"exact,omitempty"`
-	Missed bool `json:"missed,omitempty"`
+	Points int   `json:"points"`
+	Speed  int   `json:"speed,omitempty"`
+	Right  bool  `json:"right"`
+	Exact  bool  `json:"exact,omitempty"`
+	Missed bool  `json:"missed,omitempty"`
+	Ms     int64 `json:"ms,omitempty"`
+	InRow  int   `json:"inRow,omitempty"`
 }
 
 // board is a Board as it's sent, made again only after a change (ver).
@@ -190,7 +203,7 @@ func (h *Hub) look(viewer int64) ([]byte, time.Duration) {
 			b.made = b.ver
 		}
 		data = b.data
-		own = h.own(t, m, now)
+		own = h.own(viewer, t, m, now)
 		if h.night == nil || h.night.phase == play.RoyalLobby || m == nil {
 			pace = idle
 		}
@@ -209,6 +222,11 @@ func (h *Hub) render(b *board, t *table, now time.Time) Board {
 	}
 	v.StartsAt, v.OpensAt, v.Tables = n.start.UnixMilli(), n.opens(h.sched).UnixMilli(), len(n.tables)
 	v.Next, v.Nightly = h.sched.Next(now).UnixMilli(), h.sched.Nightly(now)
+	if !n.off.IsZero() {
+		// Called off: what's ahead is the next evening.
+		next := h.sched.Next(now)
+		v.StartsAt, v.OpensAt = next.UnixMilli(), next.Add(-h.sched.Lobby).UnixMilli()
+	}
 	switch {
 	case b == &h.none:
 		if n.told && !n.held {
@@ -216,7 +234,10 @@ func (h *Hub) render(b *board, t *table, now time.Time) Board {
 		}
 		return v
 	case b == &h.lobby:
-		v.Phase = play.RoyalLobby
+		v.Phase, v.Least = play.RoyalLobby, h.sched.Least
+		if n.short {
+			v.Wait = n.start.Add(h.sched.Wait).UnixMilli()
+		}
 		for _, x := range n.tables {
 			v.Left += len(x.members)
 			for _, m := range x.members {
@@ -271,12 +292,13 @@ func (h *Hub) dealt() bank.Dealt {
 }
 
 // own is the viewer's own part: they're m, at t (nil: not in). Called with mu held.
-func (h *Hub) own(t *table, m *member, now time.Time) Own {
+func (h *Hub) own(viewer int64, t *table, m *member, now time.Time) Own {
 	o := Own{Now: now.UnixMilli()}
 	n := h.night
 	if n == nil {
 		return o
 	}
+	o.Off = n.offFor[viewer]
 	if m == nil {
 		o.Late = t != nil && n.phase != play.RoyalLobby && n.open()
 	} else {
@@ -301,7 +323,8 @@ func (h *Hub) own(t *table, m *member, now time.Time) Own {
 		o.Given = m.given
 		if n.phase == play.RoyalReveal {
 			r := m.res
-			o.Mine = &MineView{Points: r.Points, Speed: r.Speed, Right: r.Right, Exact: r.Exact, Missed: !m.answered}
+			o.Mine = &MineView{Points: r.Points, Speed: r.Speed, Right: r.Right, Exact: r.Exact, Missed: !m.answered,
+				Ms: m.took, InRow: r.InRow}
 		}
 	}
 	return o
@@ -310,7 +333,7 @@ func (h *Hub) own(t *table, m *member, now time.Time) Own {
 // player is m as a board shows them (in the lobby, with whether they're on the screen).
 func (h *Hub) player(m *member, lobby bool) PlayerView {
 	p := PlayerView{Look: m.Look, Key: m.key, Name: m.Name, Tag: m.Tag, In: m.in, Reached: m.reached, Ms: m.ms,
-		Rank: m.rank, Goes: m.goes, OutAt: m.outAt, Place: m.place, Delta: m.delta}
+		Rights: m.rights, Rank: m.rank, Goes: m.goes, OutAt: m.outAt, Place: m.place, Delta: m.delta}
 	if lobby {
 		p.Online = len(h.screens[m.ID]) > 0
 	}

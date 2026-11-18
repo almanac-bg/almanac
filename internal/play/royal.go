@@ -18,12 +18,13 @@ import (
 // Роял is played live in the evening (Friday to Sunday, every evening once those fill: RoyalPaceOf): up to RoyalSize
 // players on the same RoyalLength questions at the same moment, easy to hard in three rounds. A wrong answer puts
 // nobody out by itself: the game is cut, at RoyalCuts, to those ahead (the most right answers, and of as many, the
-// quickest right ones: RoyalAhead), each cut keeping a share of those who began, and the last question is the final
-// of RoyalFinal. Everyone in has a chance at every question until a cut, and the game always reaches its last
-// question. Those cut keep answering to its end, off the standings: their answers go into their own run (XP, goals,
-// their count of right answers), never into a place or the rating. Those still in at the end place first, by the
-// same order; those cut after them, the later cut ahead, each by how they stood at it; the places move their ratings
-// against everyone else in it.
+// quickest right ones: RoyalAhead), each cut keeping a share of those who began and everyone level on right answers
+// with the last of them (RoyalThrough: the time decides at a cut only past a quarter more), and the last question is
+// the final of RoyalFinal (or of those level with them). Everyone in has a chance at every question until a cut, and
+// the game always reaches its last question. Those cut keep answering to its end, off the standings: their answers go
+// into their own run (XP, goals, their count of right answers), never into a place or the rating. Those still in at
+// the end place first, by the same order; those cut after them, the later cut ahead, each by how they stood at it;
+// the places move their ratings against everyone else in it.
 //
 // The game itself is run by package royal, which keeps the clock; this is what it keeps in the database: the
 // tournaments and where each is, who's in them, and each player's run of answers (so that what a Роял earns is
@@ -65,6 +66,32 @@ func RoyalKeep(n, entered int) int {
 		}
 	}
 	return 0
+}
+
+// RoyalCap is the most a cut that keeps keep lets go on: a quarter more, rounded up (3 of 2, 4 of 3, 38 of 30).
+func RoyalCap(keep int) int { return keep + (keep+3)/4 }
+
+// RoyalThrough is how many of scores (in their order, RoyalAhead) a cut that keeps keep lets go on: the first keep,
+// and everyone with as many right answers as the last of them, so that a cut is decided by right answers, not by
+// seconds. Only where that would let more than RoyalCap(keep) go on does the time decide among those level on right
+// answers at the line (timed): the quicker go on, up to the cap, and those level with the last of them in time too.
+func RoyalThrough(scores []RoyalScore, keep int) (through int, timed bool) {
+	if keep <= 0 || len(scores) <= keep {
+		return len(scores), false
+	}
+	line := scores[keep-1].Rights
+	level := keep
+	for level < len(scores) && scores[level].Rights == line {
+		level++
+	}
+	if level <= RoyalCap(keep) {
+		return level, false
+	}
+	through = RoyalCap(keep)
+	for through < level && RoyalAhead(scores[through], scores[through-1]) == 0 {
+		through++
+	}
+	return through, through < level
 }
 
 // RoyalScore is how a player stands in a tournament: their right answers, and the time the right ones took.
@@ -330,8 +357,9 @@ type RoyalShown struct {
 }
 
 // RevealRoyal shows the answer to the question now: those who haven't answered it (the time ran out on them, or
-// they're gone) have it recorded as missed. Those a cut puts out are those behind the last who goes on (all level
-// with them go on too); they keep their runs, and answer on; their standing is kept as it was at their cut.
+// they're gone) have it recorded as missed. Those a cut puts out are those behind the last who goes on (RoyalThrough:
+// all level with them on right answers go on too, up to its cap); they keep their runs, and answer on; their standing
+// is kept as it was at their cut.
 func (g *Game) RevealRoyal(ctx context.Context, royalID int64) (RoyalShown, error) {
 	var rv RoyalShown
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
@@ -396,12 +424,9 @@ func (g *Game) RevealRoyal(ctx context.Context, royalID int64) (RoyalShown, erro
 			return err
 		}
 		slices.SortStableFunc(rv.Scores, RoyalAhead)
-		if keep := RoyalKeep(n, entered); keep > 0 && len(rv.Scores) > keep {
-			line := rv.Scores[keep-1]
-			for _, s := range rv.Scores[keep:] {
-				if RoyalAhead(s, line) <= 0 {
-					continue // level with the last who goes on
-				}
+		if keep := RoyalKeep(n, entered); keep > 0 {
+			through, _ := RoyalThrough(rv.Scores, keep)
+			for _, s := range rv.Scores[through:] {
 				rv.Out = append(rv.Out, s.User)
 				if _, err := tx.Exec(`UPDATE royal_players SET out_at = ? WHERE royal_id = ? AND user_id = ?`,
 					n, royalID, s.User); err != nil {

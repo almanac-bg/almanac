@@ -281,10 +281,12 @@ func (s *Server) left(w http.ResponseWriter, r *http.Request) error {
 }
 
 // Playing is a live game the player is in, under way now, which their screen may have left: a live duel, a room's
-// game (by its code) or tonight's Роял. Only one is said, in that order: a player is rarely in two.
+// game (by its code) or tonight's Роял. Only one is said, in that order: a player is rarely in two. A seat in Роял's
+// lobby is one too, with its start (Starts): it's kept while the player plays something else (royal.Hub.Waiting).
 type Playing struct {
-	Kind string `json:"kind"` // "duel", "room" or "royal"
-	Code string `json:"code,omitempty"`
+	Kind   string `json:"kind"` // "duel", "room" or "royal"
+	Code   string `json:"code,omitempty"`
+	Starts int64  `json:"starts,omitempty"`
 }
 
 // playing is the live game a player is in now, if any.
@@ -296,6 +298,9 @@ func (s *Server) playing(id int64) *Playing {
 		return &Playing{Kind: "room", Code: s.rooms.Playing(id)}
 	case s.royal.Playing(id):
 		return &Playing{Kind: "royal"}
+	}
+	if start, ok := s.royal.Waiting(id); ok {
+		return &Playing{Kind: "royal", Starts: start.UnixMilli()}
 	}
 	return nil
 }

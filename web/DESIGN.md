@@ -264,9 +264,12 @@ takes a token.
   `.almanac-a`, `.almanac-untrue`, `.almanac-fact`).
 - **Page openers** lead with the thing, not its rules: Роял's next evening is its start in big numerals
   (`.royal-when`), the time to it under it (`.royal-countdown`) and „Ще дойда“ gold, the rules folded in „Как се
-  играе“ (and, in the lobby, in one line for one who hasn't played a Роял, and what two or three in it make of the
-  cuts; in the game, the player's place only from the first answer on, „На 2-ро място си“; at its end the day's ten in
-  gold if they wait, else „Ще дойда“); the league's card says the week as it stands (`.league-now`: „Още 6 дни · първите 5 се качват“, and the
+  играе“ (and, in the lobby, in one line for one who hasn't played a Роял, and what one, two or three in it make of
+  the cuts; in the game, the player's place only from the first answer on, „На 2-ро място си“, and the next cut's
+  line in right answers, „продължават тези с поне 3 верни“, the seconds only where they decide; the verdict with the
+  answer's time, never points, which Роял doesn't count; one only watching sees the options as answered ones and „Гледаш“
+  above the question; at its end each row's right answers in all, and for one cut, „отпадна след 5-ия · с 2 верни“, the
+  podium in a sheet with „Сподели“, then the day's ten in gold if they wait, else „Ще дойда“); the league's card says the week as it stands (`.league-now`: „Още 6 дни · първите 5 се качват“, and the
   gap worth playing for, `.league-gap`: „До 3-то място: 300 точки.“, „Водиш с 120 точки.“, „Още 80 точки и излизаш
   от зоната за слизане.“), its rules folded in „Как работи лигата“ (open the first time, on that device). A lead is
   one sentence.
@@ -534,7 +537,7 @@ Every element that looks like a game measures something the game already counts:
 | Rank change  | Places moved since the previous answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Room boards                  |
 | Duels        | Live with whoever comes (a recording of a real game if nobody does in 10 s), or a challenge in their own time: won of played; between two friends, their record („3 : 2“)                                                                                                                                                                                                                                                                                                                                                                                               | Дуел, Профил                 |
 | Rating       | Elo from 1000, moved by duels and Роял; shown as a division (Бронз → Легенда) with its generated emblem                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Дуел, Роял, Профил, Класации |
-| Роял         | Live at 21:00 Friday to Sunday, every evening once those fill (lobby from 20:45): up to 50 on the same question at once, 15 in three rounds; cut after 5, 8, 11, 14 by right answers (then speed), the last a final of three; those cut play on, off the standings                                                                                                                                                                                                                                                                                                      | Роял, Класации               |
+| Роял         | Live at 21:00 Friday to Sunday, every evening once those fill (lobby from 20:45): up to 50 on the same question at once, 15 in three rounds; cut after 5, 8, 11, 14 by right answers (all level with the line go on, up to a quarter more; speed only past that), the last a final of three; those cut play on, off the standings; it takes two (fewer at the start, the lobby waits 5 minutes, then the evening is off)                                                                                                                                                | Роял, Класации               |
 | Goals        | Three a day, kept all day: the day's questions (50 XP), one drawn (100) and a harder one (150), of two families not drawn the day before, each one that can be done that day (Роял only while the evening's is ahead, and as on Начало for a new player); each a link to where it's done, told at the game's end                                                                                                                                                                                                                                                        | Начало, result               |
 | League       | A race every week (Monday to Sunday) on the day's right answers (on equal ones, its points), added up day by day, in a group of up to 20 of the player's league (a last group under 5 races with the one before): Странджа, Средна гора, Родопи, Стара планина, Пирин, Рила. At the week's end the first go up (5 of a full group), the last go down, and the first three earn 300, 200 and 100 XP; first place in Рила is a title that counts („Двукратен шампион на Рила“)                                                                                            | Класации, Профил             |
 | Boards       | The day's ten, the week's league group, rating (10 rated games or more) and knowledge (mastery, the share of the questions known, after 100 answers, or 30 in a topic), of everyone or of friends                                                                                                                                                                                                                                                                                                                                                                       | Класации                     |
@@ -644,7 +647,8 @@ Feedback fires once, when it's earned, and then the screen is still again:
     second for the last five, a step higher each (a question of 10 seconds sounds only those five). „Тиктакане“
     turns it off;
   - `count` for each second of the count before a run, `go` at its start;
-  - `end` when a run's result opens (`perfect` for ten of ten), `win` or `lose` at a duel's or Роял's end;
+  - `end` when a run's result opens (`perfect` for ten of ten), `win` or `lose` at a duel's end; at Роял's, `win` for
+    the first, `through` for the podium (2nd–3rd, not last), `lose` for one cut, `end` for the other finalists;
   - `through` or `out` with Роял's cut;
   - `level`, `achievement` or `goal` with the news: only the biggest thing told plays;
   - `ping` when a game or a duel starts, or a friend calls to a duel, or the other asks for a rematch;
@@ -653,10 +657,11 @@ Feedback fires once, when it's earned, and then the screen is still again:
   - the news's sound (`level`, `achievement`, `goal`) only once the result's own has played.
 - **Nothing plays** for navigation, hovering or decoration.
 - **Music only in Роял's lobby**, for those in, waiting for 21:00 (none in the day or a topic: people play those on the
-  bus or among others): a quiet bed in the key, four bars at 64 a minute (a pad of detuned saws under a slow filter, a
-  soft bell every two bars), 24 dB under the sounds. In the last ten seconds it opens up and rises into the start; the
-  first question ends it with the motif's first two notes, in place of `go`. It follows „Звуци“ and has its own switch,
-  „Музика в Роял“ (on by default, kept on the device).
+  bus or among others): a quiet bed in the key, four bars at 64 a minute (a pad of detuned saws and a triangle an
+  octave up, for a phone's speaker, under a slow filter at 1.6 kHz; a soft bell from D5 to D6 every two bars), 24 dB
+  under the sounds as heard. In the last ten seconds (of the wait for more, if the start came with too few) it opens
+  up and rises into the start; the first question ends it with the motif's first two notes, in place of `go`. It
+  follows „Звуци“ and has its own switch, „Музика в Роял“ (on by default, kept on the device).
 - **On by default**, with one switch in Профил („Звуци“) that's kept on the device. The audio starts on the
   player's first touch, as browsers require; a sound that isn't allowed yet is skipped, never queued.
 - **Touch, in the app** (`web/src/lib/phone.ts`, sound or not; „Вибрация“ in Настройки → Звук, only in the app, on by

@@ -191,6 +191,9 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.royal.News = s.royalNews
 	s.royal.Opened = func(ctx context.Context, start time.Time) { s.callRoyal(ctx, start) }
 	s.royal.Soon = func(ctx context.Context, start time.Time, away, in []int64) { s.callSoon(ctx, start, away, in) }
+	s.royal.Short = func(ctx context.Context, start, until time.Time, away, in []int64) {
+		s.callShort(ctx, start, until, away, in)
+	}
 	s.push = cfg.Push
 	s.phones = cfg.Phones
 	s.rooms = room.NewHub(s.bank.Load)

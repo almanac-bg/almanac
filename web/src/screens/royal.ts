@@ -1,17 +1,26 @@
-// Роял: at 21:00, live, Friday to Sunday (every evening once those fill). Up to fifty players on the same fifteen
-// questions at the same moment, easy to hard in three rounds. A wrong answer puts nobody out: after questions 5, 8, 11
-// and 14 those with the most right go on (of as many, the quicker), and the last question is a final of three; those
-// cut play on to the end for themselves, off the standings (each right answer still earns its XP). Each answer shows
-// with the standings and the next cut's line; the answer a cut comes with shows it as a card (gold for those who go
-// on, plain for those it puts out), its line drawn into the standings, and the time where it tells players apart.
+// Роял: an evening's tournament, live at 21:00, Friday to Sunday (every evening once those fill). Up to fifty players
+// on the same fifteen questions at the same moment, easy to hard in three rounds. A wrong answer puts nobody out:
+// after questions 5, 8, 11 and 14 those with the most right go on, and everyone with as many as the last of them (the
+// time decides among those only past a quarter more: play.RoyalThrough), and the last question is a final of three
+// (or of those level); those cut play on to the end for themselves, off the standings (each right answer still earns
+// its XP). Each answer shows with the standings and the next cut's line, in right answers (the seconds only where they
+// decide); the answer a cut comes with shows it as a card (gold, rising on the cut's sound, for those who go on;
+// plain, fading in, for those it puts out), its line drawn into the standings. The verdict shows the answer's time, not
+// points: Роял counts right answers and seconds.
 // The lobby opens a quarter of an hour before, with the friends who said they'd come; whoever is on this screen at
-// the start plays, and those who come late may still come in until the third question's answer shows. The screen is
-// kept on in the lobby and the game. The lobby tells one who hasn't played a Роял how it's played, in a line, and what
-// two or three in it make of the cuts; the end leads on to the day's ten if they wait, else to the next evening.
+// the start plays (the seat is kept while the player is away: Начало has the way back), and those who come late may
+// still come in until the third question's answer shows. It takes two: fewer there at 21:00, the lobby waits five
+// minutes for more, and the evening is off if none come (told to those who were in, with a live duel to play instead).
+// The screen is kept on in the lobby and the game. The lobby tells one who hasn't played a Роял how it's played, in a
+// line, and what one, two or three in it make of the cuts; the end leads on to the day's ten if they wait, else to the
+// next evening. A place on the podium (one not last) is big news: a sheet with the avatar, the place and „Сподели“ (the
+// result and the player's own link, the day's way: no words of invitation); the end sounds `win` for the first,
+// `through` for the podium, `lose` for one cut, `end` for the rest.
 //
 // Those in hear a quiet bed of music while they wait in the lobby (feel.ts: the game's only music), after a touch has
-// started the sound, with „Звуци“ and „Музика в Роял“ on; it rises in the last ten seconds, and the first question
-// ends it with the motif's first two notes.
+// started the sound, with „Звуци“ and „Музика в Роял“ on; it rises in the last ten seconds (of the wait for more, if
+// the start came with too few), and the first question ends it with the motif's first two notes. A right answer's
+// sound climbs with the right answers in a row, as in every game.
 //
 // The server sends the evening as this player sees it after every change; the line, should it drop, is opened again
 // (lib/stream.ts), and a screen too many for the server is told so and comes back in a while. Each question is
@@ -70,6 +79,11 @@ let {
   holdWhile,
   pageArt,
   verdict,
+  verdictWords,
+  feelKit,
+  hands,
+  shareButton,
+  tally,
   stream,
   who,
   standingCard,
@@ -99,6 +113,11 @@ interface Evening {
   size: number;
   /** Every evening (else Friday to Sunday). */
   nightly?: boolean;
+  /** In the lobby, until when it waits for more: the start came with fewer there than `least`. */
+  wait?: number;
+  least?: number;
+  /** The player was in this evening's lobby, and it was called off: too few came. */
+  off?: boolean;
   /** In this tournament (its lobby, or its game); cut out of its standings (they play on). */
   in: boolean;
   out: boolean;
@@ -137,17 +156,29 @@ interface Evening {
   nextMs?: number;
   /** The player's answer, once given, and how it went, once the answer shows (if they were in for it). */
   given?: Answer;
-  mine?: { points: number; speed?: number; right: boolean; exact?: boolean; missed?: boolean };
+  mine?: {
+    points: number;
+    speed?: number;
+    right: boolean;
+    exact?: boolean;
+    missed?: boolean;
+    /** The time it took, and the right answers in a row it makes (two or more). */
+    ms?: number;
+    inRow?: number;
+  };
   runId?: number;
   place?: number;
   delta?: number;
 }
 
-/** A cut of the game: after which question, how many go on, and the line (the last who'd go on, as it stands). */
+/** A cut of the game: after which question, how many go on (and all level with the last of them on right answers, up
+ * to a quarter more), and the line (the last who'd go on, as it stands); `timed`: the seconds decide at the line, more
+ * being level on right answers than the cut takes. */
 interface Cut {
   after: number;
   keep: number;
   line?: Score;
+  timed?: boolean;
   /** It's the answer showing that the cut comes with; then, the cut after it (none: the final's next). */
   now?: boolean;
   then?: number;
@@ -163,9 +194,11 @@ interface Player {
   name: string;
   tag: string;
   in: boolean;
-  /** Right answers so far, and the time they took (which tells apart those with as many). */
+  /** Right answers so far (to their cut, once out), and the time they took (which tells apart those with as many);
+   * `rights`, all of them, those after a cut too. */
   reached: number;
   ms: number;
+  rights: number;
   /** Where they stand now (those level share it). */
   rank: number;
   /** They'd go on at the next cut as they stand (or have, at the cut showing). */
@@ -210,9 +243,6 @@ function reach(p: Player | Past["players"][number], length: number): string {
 
 /** Seconds, to a tenth: „41,3 с“. */
 const seconds = (ms: number) => `${(ms / 1000).toFixed(1).replace(".", ",")} с`;
-
-/** A score in words: „4 верни, 41,3 с“. */
-const scored = (s: Score) => `${rights(s.rights)}, ${seconds(s.ms)}`;
 
 /** „8-ия въпрос“. */
 const nth = (n: number) => `${ordinal(n)}я въпрос`;
@@ -262,6 +292,11 @@ export function royal(kit: Kit) {
     holdWhile,
     pageArt,
     verdict,
+    verdictWords,
+    feelKit,
+    hands,
+    shareButton,
+    tally,
     stream,
     who,
     standingCard,
@@ -397,13 +432,13 @@ function hush(begin: boolean): void {
   music = null;
 }
 
-/** What Роял is, in a sentence: when, and how many on how many questions. */
+/** What Роял is, in a sentence: a tournament, live; when, and how many on how many questions. */
 const about = (nightly?: boolean) =>
-  `${nightly ? "Всяка вечер" : "Петък, събота и неделя"} в 21:00. До 50 души, 15 въпроса.`;
+  `Турнир на живо ${nightly ? "всяка вечер" : "в петък, събота и неделя"} в 21:00. До 50 души, 15 въпроса.`;
 
-/** How it's played, folded under the evening: the cuts, and the final. */
+/** How it's played, folded under the evening: what it is, the cuts, and the final. */
 const rules =
-  "Всички получават един и същ въпрос в един и същ миг. Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни, а при равни — по-бързите. Последния въпрос играят трима. Отпадналите играят до края за себе си.";
+  "Роял е вечерен турнир на живо: всички получават един и същ въпрос в един и същ миг. Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни отговори и всички, които имат колкото последния от тях. Само ако така биха продължили с над една четвърт повече, между равните решава времето. Последния въпрос играят трима (или равните с тях), а при равни верни печели по-бързият. Отпадналите играят до края за себе си. Започва, щом сте поне двама.";
 
 /** How long until a moment, in words: „След 3 ч и 12 мин“; in the last hour to the second („След 12:05 мин“); nothing
  * a day or more ahead (the day says it). */
@@ -416,10 +451,12 @@ function until(ms: number): string {
 }
 
 /** Before the lobby opens: the next evening's start, large, and the time to it; „Ще дойда“; how it's played, folded;
- * your rating, and how your last ones went. */
+ * your rating, and how your last ones went. To one whose evening was called off (too few came), that first, with a
+ * live duel to play instead (the gold way; „Ще дойда“ plain then). */
 function soon(view: () => Evening, now: Signal<number>): Child {
   const past = signal<{ royals: Past[]; standing: Standing } | null>(null);
   if (user.peek()) api<{ royals: Past[]; standing: Standing }>("GET", "/api/royal").then(past.set, () => {});
+  const off = untracked(view).off;
   return h(
     "div",
     { class: "screen" },
@@ -431,6 +468,19 @@ function soon(view: () => Evening, now: Signal<number>): Child {
       h("h1", null, "Роял"),
       h("p", { class: "lead" }, () => about(view().nightly)),
     ),
+    off
+      ? h(
+          "section",
+          { class: "card hero stack royal-off", role: "status" },
+          h("h2", null, "Тази вечер сме малко"),
+          h(
+            "p",
+            null,
+            `Не дойде втори играч, а Роял започва, щом сте поне двама. Следващият е ${dayAndTime(untracked(view).next, untracked(view).now)}.`,
+          ),
+          h("a", { class: "btn primary big", href: "/duel" }, "Дуел на живо"),
+        )
+      : null,
     h(
       "section",
       { class: "card hero royal-next" },
@@ -444,7 +494,7 @@ function soon(view: () => Evening, now: Signal<number>): Child {
         until(view().startsAt - now()),
       ),
       h("p", { class: "muted" }, () => `Входът се отваря в ${clock(view().opensAt)}.`),
-      plan(true),
+      plan(!off),
     ),
     h("details", { class: "more" }, h("summary", null, "Как се играе"), h("p", null, rules)),
     () => {
@@ -614,13 +664,16 @@ function entry(joined: () => void, out?: boolean): Child[] {
 
 /** The rules in a line, for the lobby of one who hasn't played a Роял yet. */
 const firstRules =
-  "Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни, а при равни — по-бързите.";
+  "Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни и всички равни с тях. Времето решава кой печели.";
 
-/** A lobby of two or three, as it is: what that makes of the cuts (play.RoyalKeep keeps at least two). */
-const small: Record<number, string> = {
-  2: "Засега сте двама: без отсявания, играете и петнадесетте въпроса.",
-  3: "Засега сте трима: след 5-ия въпрос продължават двама, до края.",
-};
+/** A lobby of one, two or three, as it is: whether it can start (the evening's `least`), and what two or three make of
+ * the cuts (play.RoyalKeep keeps at least two, and those level with them). */
+function small(n: number, least = 0): string {
+  if (n < least) return "Засега в залата си само ти: Роял започва, щом сте поне двама.";
+  if (n === 2) return "Засега сте двама: без отсявания, играете и петнадесетте въпроса.";
+  if (n === 3) return "Засега сте трима: след 5-ия въпрос продължават двамата с повече верни (при равни — и тримата).";
+  return "";
+}
 
 /** Whether the player hasn't played a Роял yet (or isn't a player yet): the lobby tells them how it's played. */
 function firstTimer(): Signal<boolean> {
@@ -641,24 +694,33 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
   const notified = signal(false);
   if (v0.in) pushOn().then(notified.set, () => {});
   // Those in hear the music while they wait (and when the sound or the music is turned off, it fades), and the last
-  // three seconds.
+  // three seconds. Its build goes to the start, or, the start come with too few, to the wait's end: begun again then.
+  let bound = 0;
   effect(() => {
     now(); // each second: the first touch, which lets the sound start, may come at any time
     if (!soundOn() || !musicOn() || !v0.in) return hush(false);
+    const end = untracked(view).wait ?? v0.startsAt;
+    if (music && bound !== end) hush(false);
     const live = music ? null : liveAudio();
     if (!live) return;
     music = live.feel.bed(live.audio);
-    music.until(live.audio.currentTime + (v0.startsAt - untracked(now)) / 1000);
+    bound = end;
+    music.until(live.audio.currentTime + (end - untracked(now)) / 1000);
   });
   // Leaving the lobby for anything but the game ends it (the game's first question ends it its own way).
   onCleanup(() => untracked(view).phase !== "question" && hush(false));
+  // The last three seconds to the start: not while it waits for more (one who comes starts it at once).
   let heard = 0;
   effect(() => {
     const s = Math.ceil((view().startsAt - now()) / 1000);
-    if (s === heard || !untracked(view).in) return;
+    if (s === heard || !untracked(view).in || untracked(view).wait) return;
     heard = s;
     playCount(s);
   });
+  // Until when the lobby waits for more (0: it doesn't): the start came with too few.
+  const waitsUntil = computed(() => view().wait ?? 0);
+  // Time enough to play a topic meanwhile: the seat is kept (Начало has the way back).
+  const meanwhile = computed(() => view().in && !view().wait && view().startsAt - now() > 3 * 60_000);
   return h(
     "div",
     { class: "screen" },
@@ -666,27 +728,50 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
       "div",
       { class: "intro" },
       back("/", "Начало"),
-      h(
-        "h1",
-        null,
-        "Роял започва след ",
-        h("span", { class: "royal-count" }, () => left(view().startsAt - now(), true)),
-      ),
-      h("p", { class: "lead" }, () =>
-        v0.in
-          ? notified()
-            ? "Вътре си. Ако излезеш от екрана, ще ти напомним минута преди началото."
-            : `Вътре си. Остани на този екран до ${clock(v0.startsAt)}.`
-          : `В ${clock(v0.startsAt)} всички получават първия въпрос едновременно. Закъснелите влизат до 3-тия въпрос.`,
-      ),
+      () => {
+        const wait = waitsUntil();
+        // The start came with too few: the lobby waits for more, until its end.
+        if (wait)
+          return [
+            h(
+              "h1",
+              null,
+              "Роял чака още играчи: ",
+              h("span", { class: "royal-count" }, () => left(wait - now(), true)),
+            ),
+            h(
+              "p",
+              { class: "lead" },
+              v0.in
+                ? `Започваме, щом сте поне двама. Ако до ${clock(wait)} не дойде никой, тази вечер няма Роял.`
+                : "Влез: играта започва, щом сте поне двама.",
+            ),
+          ];
+        return [
+          h(
+            "h1",
+            null,
+            "Роял започва след ",
+            h("span", { class: "royal-count" }, () => left(view().startsAt - now(), true)),
+          ),
+          h("p", { class: "lead" }, () =>
+            v0.in
+              ? notified()
+                ? "Вътре си. Можеш да поиграеш нещо друго: ще ти напомним минута преди началото."
+                : `Вътре си. Мястото ти се пази: можеш да поиграеш нещо друго и да се върнеш за ${clock(v0.startsAt)}.`
+              : `В ${clock(v0.startsAt)} всички получават първия въпрос едновременно. Закъснелите влизат до 3-тия въпрос.`,
+          ),
+        ];
+      },
       // How it's played, in a line, for one who hasn't played a Роял yet; and how few are in, if few are.
       () => (newcomer() ? h("p", { class: "muted" }, firstRules) : null),
       () => {
-        const n = view().left;
-        return n === 2 || n === 3 ? h("p", { class: "muted" }, small[n]) : null;
+        const line = waitsUntil() ? "" : small(view().left, view().least);
+        return line ? h("p", { class: "muted" }, line) : null;
       },
     ),
     entry(joined, v0.in),
+    () => (meanwhile() ? h("a", { class: "btn", href: "/" }, "Изиграй тема, докато чакаш") : null),
     () => {
       const v = view();
       if (!v.left) return h("p", { class: "muted" }, "Още никой не е влязъл.");
@@ -694,7 +779,7 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
       const few = [...(v.me ? [v.me] : []), ...v.players.filter((p) => !p.me)].slice(0, 12);
       return h(
         "section",
-        { class: "card" },
+        { class: "card royal-lobby" },
         h("h2", { class: "section-title" }, `Вътре: ${v.left}`),
         chips(few.map((p) => ({ ...p, in: !!p.online || !!p.me }))),
         v.left > few.length ? h("p", { class: "muted" }, `и още ${v.left - few.length}`) : null,
@@ -744,7 +829,12 @@ function standing(view: () => Evening): Child {
         ? `Извън класирането: отпадна след ${nth(me.outAt + 1)}.`
         : first
           ? null
-          : `На ${ordinal(me.rank, "n")} място си: ${rights(me.reached)}, ${seconds(me.ms)}.`;
+          : `На ${ordinal(me.rank, "n")} място си: ${rights(me.reached)}${
+              // The seconds where they tell the player from another with as many (none before a right answer).
+              me.reached && v.players.some((p) => !p.me && p.in && p.reached === me.reached)
+                ? `, ${seconds(me.ms)}`
+                : ""
+            }.`;
     const wins = "Печели този с най-много верни, а при равни — по-бързият.";
     let line: string;
     // No cut ahead that could put anyone out (two players, or a few left after an earlier cut): the game goes to its
@@ -754,10 +844,7 @@ function standing(view: () => Evening): Child {
     else if (!c) line = `Финал: ${wins.charAt(0).toLowerCase()}${wins.slice(1)}`;
     else if (c.now) line = "";
     else if (!c.line) line = `След ${nth(c.after)} продължават първите ${c.keep}: засега всички.`;
-    else
-      line = `След ${nth(c.after)} продължават първите ${c.keep}. Чертата: ${scored(c.line)}${
-        me?.in ? (me.goes ? " — засега продължаваш." : " — под нея си.") : ""
-      }`;
+    else line = cutLine(c, c.line, me);
     return [
       h("p", { class: "royal-left" }, `В играта: ${v.left} от ${v.entered}`),
       where ? h("p", { class: "royal-me" }, where) : null,
@@ -766,14 +853,29 @@ function standing(view: () => Evening): Child {
   });
 }
 
-/** What a cut did, as its answer shows: a card for the one it lets through or puts out, a line for the others. */
+/** The next cut's line, in words a glance takes in: who goes on, in right answers (the seconds only where they
+ * decide, more being level at it than the cut takes), and where the player stands against it, if in. */
+function cutLine(c: Cut, at: Score, me?: Player): string {
+  const who = c.timed
+    ? `След ${nth(c.after)} продължават тези с повече от ${rights(at.rights)}, а от тези с ${at.rights} — по-бързите (до ${seconds(at.ms)}).`
+    : `След ${nth(c.after)} продължават тези с поне ${rights(at.rights)}.`;
+  if (!me?.in) return who;
+  if (me.goes) return `${who} Засега си вътре.`;
+  const need = at.rights - me.reached;
+  if (need <= 0) return `${who} Засега си под чертата: при равни верни решава времето.`;
+  return `${who} Засега ти ${need === 1 ? "трябва още един верен отговор" : `трябват още ${need} верни`}.`;
+}
+
+/** What a cut did, as its answer shows: a card for the one it lets through or puts out, a line for the others. The
+ * card comes on the cut's sound, a moment after the answer's own (app.css: rising, for one through; fading in, for
+ * one out). */
 function cutSaid(v: Evening): Child {
   const c = v.cut;
   if (!c?.now || v.entered === 1) return null;
   const me = v.me;
   const card = (through: boolean, head: string, line: string) => {
-    // The cut sounds a moment after the answer's own sound: through, or out.
-    setTimeout(() => play(through ? "through" : "out"), 500);
+    const beat = setTimeout(() => play(through ? "through" : "out"), 500);
+    onCleanup(() => clearTimeout(beat)); // gone before it: no sound over the next screen
     return h(
       "section",
       { class: through ? "card royal-cut through" : "card royal-cut", role: "status" },
@@ -791,8 +893,9 @@ function cutSaid(v: Evening): Child {
     return card(
       false,
       `Отпадаш след ${nth(v.n + 1)}.`,
+      // Out level on right answers with the last who went on: the seconds decided, more being level than the cut takes.
       // XP said only to one who has met it (play/unfold.go).
-      `Вече си извън класирането. Играй до края за себе си${opened.peek().xp ? ": всеки верен отговор носи XP" : ""}.`,
+      `${me.reached === c.line?.rights ? "При равни верни продължиха по-бързите. " : ""}Вече си извън класирането. Играй до края за себе си${opened.peek().xp ? ": всеки верен отговор носи XP" : ""}.`,
     );
   return h(
     "p",
@@ -802,9 +905,9 @@ function cutSaid(v: Evening): Child {
 }
 
 /** The time a player's right answers took, under them, where it tells them from a neighbour with as many (5 верни,
- * 41,2 с); none where it doesn't. */
+ * 41,2 с; across a cut's line too, where the seconds decided it); none where it doesn't, nor with none right. */
 function timed(p: Player, ps: Player[], i: number): Child {
-  const level = (o?: Player) => o && o.outAt === p.outAt && o.reached === p.reached;
+  const level = (o?: Player) => p.reached > 0 && o && o.reached === p.reached;
   return level(ps[i - 1]) || level(ps[i + 1]) ? h("span", { class: "muted" }, seconds(p.ms)) : null;
 }
 
@@ -844,7 +947,7 @@ function standings(v: Evening): Child {
           { class: "royal-reach" },
           h("span", null, rights(p.reached)),
           timed(p, all, i),
-          p.in ? null : h("span", { class: "muted" }, `до ${ordinal(p.outAt + 1)}я`),
+          p.in ? null : h("span", { class: "muted" }, `отпадна след ${ordinal(p.outAt + 1)}я`),
         ),
       ),
     );
@@ -896,9 +999,15 @@ function question(view: () => Evening, first: Evening, answers: Map<string, Answ
     const v = view();
     if (v.n === first.n && v.question && v.phase === "question") ans.follow(v.question.view, v.leftMs);
   });
+  // One only watching (not in, the door shut) is told so above the question, with the next evening; their options
+  // look as answered ones do (app.css: .watching).
+  const watching = !plays && !first.late;
   return h(
     "article",
-    { class: "question" },
+    { class: watching ? "question watching" : "question" },
+    watching
+      ? h("p", { class: "royal-watch" }, `Гледаш. Следващият Роял е ${dayAndTime(first.next, first.now)}.`)
+      : null,
     head(first),
     timer(first.leftMs, q.limitMs, ans.left, ans.stopped), // a watcher's clock runs to the end
     ans.heading,
@@ -911,7 +1020,7 @@ function question(view: () => Evening, first: Evening, answers: Map<string, Answ
       return h(
         "p",
         { class: "status", role: "status" },
-        !plays ? "Гледаш. " : v.out ? "Извън класирането. " : "",
+        !plays ? (watching ? "" : "Гледаш. ") : v.out ? "Извън класирането. " : "",
         ans.taken() ? "Отговорът ти е приет. " : "",
         `Отговориха ${done} от ${v.playing}.`,
       );
@@ -928,7 +1037,8 @@ function reveal(view: () => Evening, first: Evening): Child {
   // How the player's answer went (none: they weren't in for it).
   const m = first.mine;
   const kind: VerdictKind = m?.missed ? "time" : m?.exact ? "exact" : m?.right ? "right" : "wrong";
-  if (m) playAnswer(kind, m.right ? 1 : 0);
+  // The right answers in a row lift the sound, as in every game.
+  if (m) playAnswer(kind, m.inRow ?? (m.right ? 1 : 0));
   return h(
     "article",
     { class: "question" },
@@ -936,7 +1046,16 @@ function reveal(view: () => Evening, first: Evening): Child {
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view, true),
     answered(q.view, r.answer, m ? (first.given ?? null) : null),
-    m ? verdict(kind, m.points, m.missed ? "Времето изтече." : undefined, m.speed) : null,
+    // No points: Роял counts right answers, and the time of the right ones.
+    m
+      ? verdict(
+          kind,
+          0,
+          m.right && m.ms ? `${verdictWords[kind]} · ${seconds(m.ms)}` : verdictWords[kind],
+          0,
+          m.inRow ?? 0,
+        )
+      : null,
     crowdLine(q.view.type, r.answer.crowd, !!m?.right),
     cutSaid(first),
     standing(view),
@@ -945,11 +1064,81 @@ function reveal(view: () => Evening, first: Evening): Child {
   );
 }
 
+/** The evening's date, as a share says it: „18 ноември“. */
+const dateOf = (ms: number) =>
+  new Date(ms).toLocaleDateString("bg", { day: "numeric", month: "long", timeZone: "Europe/Sofia" });
+
+/** A place on the podium as it's shared, the day's way (game/share.ts): the evening, the place and the right answers,
+ * and the player's own link, fetched as the finger comes down (their invite: whoever opens it is brought to the game).
+ * Gold in the sheet; plain under the standings, where the gold is what's next. */
+function podiumShare(first: Evening, me: Player, primary: boolean): Child {
+  let made: Promise<string> | null = null;
+  const link = () => {
+    made ??= api<{ invite: string }>("GET", "/api/friends").then(
+      (r) => r.invite,
+      (err) => {
+        made = null;
+        throw err;
+      },
+    );
+    return made;
+  };
+  const text = () =>
+    [
+      `АЛМАНАХ · Роял, ${dateOf(first.startsAt)}`,
+      `${place(me.place ?? 1, first.entered)} · ${me.rights} от ${first.length} верни`,
+    ].join("\n");
+  return shareButton("Сподели", text, link, primary, () => tally("share:royal"));
+}
+
+/** Where the podium's sheet was shown last, on this device: the evening's start (once an evening, not again on a
+ * reload of its standings). */
+const podiumKey = "almanac.royalPodium";
+
+/** A place on the podium (the first three, one not last) as big news: a sheet over the standings with the avatar, the
+ * place, the right answers and „Сподели“ (feel.ts), its sound (`win` for the first, else `through`) as it opens, once
+ * an evening. It says whether it opened: without the feel loaded, or shown before, the end sounds by itself. */
+function podium(first: Evening, me: Player): boolean {
+  const feel = feelKit();
+  if (!feel) return false;
+  try {
+    if (localStorage.getItem(podiumKey) === String(first.startsAt)) return false;
+    localStorage.setItem(podiumKey, String(first.startsAt));
+  } catch {
+    // no storage here: shown, as far as this device knows, for the first time
+  }
+  const pic = avatar(me.avatar, { size: "l", name: me.name });
+  pic.style.setProperty("--size", "112px");
+  const won = me.place === 1;
+  const parts = [
+    pic,
+    h("p", { class: "kicker" }, won ? "Печелиш Роял!" : "Роял"),
+    h(
+      "strong",
+      { id: "moment-name", style: { "font-size": "2.125rem", "line-height": "2.5rem" } },
+      place(me.place ?? 1, first.entered),
+    ),
+    h("p", { class: "muted" }, `${me.rights} от ${first.length} верни`),
+  ] as Element[];
+  // The sheet's buttons as wide as it, as its own „Продължи“ is.
+  const share = podiumShare(first, me, true) as HTMLElement;
+  share.style.setProperty("width", "100%");
+  share.querySelector("button")?.style.setProperty("width", "100%");
+  void feel.sheet(parts, won ? "win" : "through", won, hands(), (close) => [
+    share,
+    h("button", { class: "btn", type: "button", style: { width: "100%" }, onclick: close }, "Продължи"),
+  ]);
+  return true;
+}
+
 function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
   const me = first.me;
   const [best] = first.players;
   const won = me?.place === 1 && first.entered > 1;
-  if (me) play(won ? "win" : "end");
+  // On the podium: the first three, one not last (the second of two isn't).
+  const top = !!me?.place && me.place <= 3 && me.place < first.entered;
+  // The end's sound: the podium's comes with its sheet; one cut hears they lost, the rest the motif.
+  if (me && !(top && podium(first, me))) play(won ? "win" : top ? "through" : me.outAt >= 0 ? "lose" : "end");
   // Whether the day's ten still wait for the player (null: not known yet).
   const dayWaits = signal<boolean | null>(user.peek() ? null : true);
   if (user.peek())
@@ -982,14 +1171,16 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
             "p",
             { class: "lead" },
             me.outAt >= 0
-              ? // Cut, they played on: all their right answers, those after the cut too.
-                `Общо: ${first.rights ?? me.reached} от ${first.length} верни.`
+              ? // Cut, they played on: all their right answers, those after the cut too, and those it went by.
+                `Общо: ${me.rights} от ${first.length} верни (${me.reached} до отпадането след ${nth(me.outAt + 1)}).`
               : me.reached >= first.length
                 ? `Всичките ${first.length} верни.`
                 : `${me.reached} от ${first.n + 1} верни.`,
             first.entered >= 3 && first.delta ? ` Рейтинг: ${signed(first.delta)}.` : "",
           )
         : null,
+      // The podium's result to share (its sheet has it first): plain here, the gold is what's next.
+      me && top ? podiumShare(first, me, false) : null,
     ),
     h(
       "section",
@@ -1004,10 +1195,14 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
             { class: ["row", (p.place ?? 9) <= 3 && `p${p.place}`, p.me && "me"].filter(Boolean).join(" ") },
             h("span", { class: "place" }, String(p.place ?? "")),
             who(p.name, p, p.me ? h("span", { class: "you" }, "ти") : null, p.name, p.tag),
+            // All their right answers; for one cut, where, and with how many then (what placed them).
             h(
               "span",
               { class: "royal-reach" },
-              h("span", { class: "muted" }, reach(p, first.length)),
+              h("span", { class: "muted" }, p.rights >= first.length ? `всичките ${first.length}!` : rights(p.rights)),
+              // Two short lines: a narrow phone's row holds them beside the name.
+              p.outAt >= 0 ? h("span", { class: "muted" }, `отпадна след ${ordinal(p.outAt + 1)}я`) : null,
+              p.outAt >= 0 ? h("span", { class: "muted" }, `с ${rights(p.reached)}`) : null,
               timed(p, all, i),
               delta(p.delta),
             ),

@@ -39,7 +39,7 @@ func setup(t testing.TB) *world {
 	w := &world{t: t, db: db, now: time.Date(2026, 11, 14, 20, 0, 0, 0, play.Bulgaria)}
 	w.g = play.New(db, func() *bank.Bank { return b })
 	w.g.Now = w.clock
-	w.hub(Evening)
+	w.hub(anyone)
 	// What the games earned is kept before the database closes.
 	t.Cleanup(func() {
 		for _, h := range w.hubs {
@@ -49,6 +49,14 @@ func setup(t testing.TB) *world {
 	})
 	return w
 }
+
+// anyone is the evening as Evening, but begun by whoever is there, one too: most tests here are of what comes after
+// the start (TestTooFew has the rule of how many it takes).
+var anyone = func() Schedule {
+	s := Evening
+	s.Least = 0
+	return s
+}()
 
 // hub is a new hub (a restart of the server: Load).
 func (w *world) hub(s Schedule) {
@@ -277,7 +285,8 @@ func TestEvening(t *testing.T) {
 	if v.Phase != play.RoyalQuestion || v.N != 0 || v.Entered != 3 || v.Question == nil || v.LeftMs != v.Question.LimitMs {
 		t.Fatalf("the start: %+v", v)
 	}
-	if v.Cut == nil || v.Cut.After != 5 || v.Cut.Keep != 2 || v.Cut.Now || v.Cut.Line == nil {
+	// Everyone level on right answers (none yet), and three within its cap: all would go on, so no line yet.
+	if v.Cut == nil || v.Cut.After != 5 || v.Cut.Keep != 2 || v.Cut.Now || v.Cut.Line != nil {
 		t.Fatalf("the first cut, ahead: %+v", v.Cut)
 	}
 	if _, m := w.h.mine(zed.ID); m != nil {
@@ -718,7 +727,7 @@ func TestRestart(t *testing.T) {
 	shown := w.view(bo.ID).Question.Shown
 
 	w.set(w.now.Add(30 * time.Second))
-	w.hub(Evening)
+	w.hub(anyone)
 	if err := w.h.Load(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -742,7 +751,7 @@ func TestRestart(t *testing.T) {
 		t.Fatalf("the standings after a restart: %+v", p)
 	}
 	// Another restart while the answer shows: the game goes on.
-	w.hub(Evening)
+	w.hub(anyone)
 	if err := w.h.Load(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -847,7 +856,7 @@ func TestMissed(t *testing.T) {
 	if len(r) != 1 || r[0].Players[0].Place != 1 || r[0].Players[0].Reached != 1 || len(told) != 1 {
 		t.Fatalf("the missed evening, ended: %+v %+v", r, told)
 	}
-	w.hub(Evening)
+	w.hub(anyone)
 	if err := w.h.Load(ctx); err != nil || w.h.night != nil {
 		t.Fatalf("an ended evening picked up: %v", err)
 	}
@@ -981,7 +990,7 @@ func TestRestartOut(t *testing.T) {
 	w.give(bo, true) // question 6, out
 	w.give(ana, true)
 
-	w.hub(Evening)
+	w.hub(anyone)
 	if err := w.h.Load(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -1006,7 +1015,7 @@ func TestRestartOut(t *testing.T) {
 func TestDays(t *testing.T) {
 	w := setup(t) // Saturday, 14 November
 	nightly := false
-	sched := Evening
+	sched := anyone
 	sched.On = func(t time.Time) bool {
 		d := t.In(play.Bulgaria).Weekday()
 		return nightly || d == time.Friday || d == time.Saturday || d == time.Sunday
@@ -1311,7 +1320,7 @@ func TestRestartInReveal(t *testing.T) {
 	}
 	given := w.view(ana.ID).Given
 
-	w.hub(Evening)
+	w.hub(anyone)
 	if err := w.h.Load(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -1440,7 +1449,7 @@ func TestRestartAStepApart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w.hub(Evening)
+	w.hub(anyone)
 	if err := w.h.Load(ctx); err != nil {
 		t.Fatal(err)
 	}

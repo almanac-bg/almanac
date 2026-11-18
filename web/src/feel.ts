@@ -332,20 +332,22 @@ const chords = [
 ];
 
 /** The music in Роял's lobby, the only music in the game: a quiet bed in the game's key, four bars at 64 a minute
- * going round. A pad of two detuned saws for each note of a chord, low-passed at 900 Hz with the filter slowly
- * breathing; a soft bell of the scale every two bars, picked at random; all in the room, 24 dB under the sounds. In
- * its last ten seconds the filter opens to 3 kHz and a rush of noise rises into the start. */
+ * going round. A pad of two detuned saws for each note of a chord, and a softer triangle an octave up (what a phone's
+ * small speaker can play: the saws' roots are under it), low-passed at 1.6 kHz with the filter slowly breathing; a
+ * soft bell of the scale (D5 to D6) every two bars, picked at random; all in the room, 24 dB under the sounds
+ * (at a third of this level it sat 31 dB and more under them, lost on a phone). In its last ten seconds the
+ * filter opens to 3 kHz and a rush of noise rises into the start. */
 export function bed(c: BaseAudioContext): Bed {
   const { dry, room, noise: white } = bus(c);
   const t0 = c.currentTime + 0.05;
   const level = c.createGain();
   level.gain.setValueAtTime(0.0001, t0);
-  level.gain.exponentialRampToValueAtTime(0.033, t0 + 3); // 24 dB under a cue (rms): fades in over three seconds
+  level.gain.exponentialRampToValueAtTime(0.1, t0 + 3); // 24 dB under a cue (rms): fades in over three seconds
   level.connect(dry);
   level.connect(room);
   const filter = c.createBiquadFilter();
   filter.type = "lowpass";
-  filter.frequency.value = 900;
+  filter.frequency.value = 1600;
   filter.Q.value = 0.7;
   filter.connect(level);
   const sway = c.createGain(); // the filter breathing: ±250 Hz, once in 14 s
@@ -360,6 +362,13 @@ export function bed(c: BaseAudioContext): Bed {
     o.detune.value = i % 2 ? 7 : -7;
     return o;
   });
+  // The octave up: the chord's two notes again, as triangles, under the saws' level.
+  const highs = [0, 1].map((i) => {
+    const voice = c.createGain();
+    voice.gain.value = 0.12;
+    voice.connect(filter);
+    return osc(c, 2 * hz(chords[0]?.[i] ?? 0), t0, t0 + 3600, voice, "triangle");
+  });
   // The bars, laid a little ahead as they come.
   let next = t0;
   let n = 0;
@@ -367,7 +376,8 @@ export function bed(c: BaseAudioContext): Bed {
     while (next < c.currentTime + 1.5 * bar) {
       const chord = chords[n % chords.length] ?? [0, 0];
       for (const [i, o] of saws.entries()) o.frequency.setTargetAtTime(hz(chord[i >> 1] ?? 0), next, 0.3);
-      if (n % 2 === 0) bell(c, hz(Math.floor(Math.random() * 6) - 3), next + bar / 4, 2.5, 0.35, [level]);
+      for (const [i, o] of highs.entries()) o.frequency.setTargetAtTime(2 * hz(chord[i] ?? 0), next, 0.3);
+      if (n % 2 === 0) bell(c, hz(Math.floor(Math.random() * 6)), next + bar / 4, 2.5, 0.35, [level]);
       next += bar;
       n++;
     }
@@ -379,7 +389,7 @@ export function bed(c: BaseAudioContext): Bed {
     until(at) {
       const from = Math.max(c.currentTime + 0.05, at - 10);
       if (at <= from) return;
-      filter.frequency.setValueAtTime(900, from);
+      filter.frequency.setValueAtTime(1600, from);
       filter.frequency.exponentialRampToValueAtTime(3000, at);
       rush?.stop();
       rush = c.createBufferSource();
@@ -392,7 +402,7 @@ export function bed(c: BaseAudioContext): Bed {
       band.frequency.exponentialRampToValueAtTime(5000, at);
       const swell = c.createGain();
       swell.gain.setValueAtTime(0.0001, from);
-      swell.gain.exponentialRampToValueAtTime(1.5, at);
+      swell.gain.exponentialRampToValueAtTime(0.6, at);
       rush.connect(band).connect(swell).connect(level);
       rush.start(from);
     },
@@ -403,7 +413,7 @@ export function bed(c: BaseAudioContext): Bed {
       level.gain.cancelScheduledValues(t);
       level.gain.setValueAtTime(Math.max(level.gain.value, 0.0001), t);
       level.gain.exponentialRampToValueAtTime(0.0001, end);
-      for (const o of [...saws, lfo]) o.stop(end + 0.1);
+      for (const o of [...saws, ...highs, lfo]) o.stop(end + 0.1);
       rush?.stop(end + 0.1);
       if (begin)
         for (const [i, s] of motif.slice(0, 2).entries()) bell(c, hz(s), t + i * 0.11, 0.4 + i * 0.3, 0.55, [dry]);
