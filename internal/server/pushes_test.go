@@ -344,6 +344,7 @@ type slowPush struct {
 	latency, hang  time.Duration
 	hangOK         bool
 	inflight, peak atomic.Int64
+	answered       atomic.Int64 // /hang/… answered
 	sent           atomic.Int64
 	mu             sync.Mutex
 	last           time.Time
@@ -357,6 +358,7 @@ func (f *slowPush) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.HasPrefix(r.URL.Path, "/hang"):
 		time.Sleep(f.hang)
+		f.answered.Add(1)
 		if f.hangOK {
 			w.WriteHeader(http.StatusCreated)
 			return
@@ -508,30 +510,29 @@ func TestScaleRemind(t *testing.T) {
 
 // One push service that's slow, or down, holds up no other's: its lane takes its share of the queue (pushlanes.go).
 func TestSlowServiceHoldsUpNoOne(t *testing.T) {
-	// The slow ones first in the queue, answering after 3 s: before lanes they held every place, 64 at a time, and
-	// the last of the rest went after 9 s at least. Now the rest are all sent before the first of them answers.
+	// The slow ones first in the queue, answering after 3 s each. Before lanes they held every place, 64 at a time:
+	// the rest began only once 128 of them had answered (9 s at least). Now the rest go at once, whatever the
+	// machine's pace: by the time the last of them is sent, the slow service has answered its first 96 at most.
 	const hang = 3 * time.Second
 	s, fake, slow := crowd(t, crowding{n: 292, hangs: 192, latency: 20 * time.Millisecond, hang: hang, apart: true})
 	if n := s.remind(t.Context(), time.Date(2030, 1, 1, 19, 5, 0, 0, bulgaria())); n != 292 {
 		t.Fatalf("reminded %d", n)
 	}
-	begin := time.Now()
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
 	go func() {
 		s.Push(ctx)
 		close(done)
 	}()
-	for deadline := time.Now().Add(2 * hang); fake.sent.Load() < 100 && time.Now().Before(deadline); {
+	for deadline := time.Now().Add(10 * hang); fake.sent.Load() < 100 && time.Now().Before(deadline); {
 		time.Sleep(10 * time.Millisecond)
 	}
+	answered := slow.answered.Load()
 	cancel()
 	<-done
-	fake.mu.Lock()
-	last := fake.last.Sub(begin)
-	fake.mu.Unlock()
-	if fake.sent.Load() != 100 || last >= hang || slow.peak.Load() > laneSends {
-		t.Fatalf("%d sent, the last after %v; the slow service had %d at once", fake.sent.Load(), last, slow.peak.Load())
+	if fake.sent.Load() != 100 || answered >= 2*laneSends || slow.peak.Load() > laneSends {
+		t.Fatalf("%d sent, after the slow service answered %d; it had %d at once", fake.sent.Load(), answered,
+			slow.peak.Load())
 	}
 }
 
