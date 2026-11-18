@@ -26,9 +26,11 @@ import (
 // ProofEvery.
 
 const (
-	// ProofGrace is how long a new key may go unproven, and ProofEvery how long a proof holds.
+	// ProofGrace is how long a new key may go unproven, and ProofEvery how long a proof holds. The key can't drift on
+	// its own (a new BACKUP_RECIPIENT is a new key, unproven at once), so a proof is asked again only to learn that the
+	// secret key is still kept: once a year, a chore the owner can bear, not a monthly one.
 	ProofGrace = 7 * 24 * time.Hour
-	ProofEvery = 30 * 24 * time.Hour
+	ProofEvery = 365 * 24 * time.Hour
 	// provenFile is the last proof, beside the database.
 	provenFile = "backup-proven.json"
 )
