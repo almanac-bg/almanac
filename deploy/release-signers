@@ -1,5 +1,5 @@
 # The keys whose signature a release needs before almanac-deploy runs it (ssh-keygen -Y verify), installed as
-# /etc/almanac/release-signers. While no key is named here, releases are taken on their checksum alone. To set it up,
+# /etc/almanac/release-signers. While no key is named here, no release is taken at all. To set it up,
 # on the owner's computer, never on the server:
 #
 #   ssh-keygen -t ed25519 -N '' -C almanac-release -f release-signing

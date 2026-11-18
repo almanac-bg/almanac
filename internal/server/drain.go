@@ -17,10 +17,15 @@ import (
 // (deploy/deploy.sh) asks the server to drain first, with POST /api/drain from the machine itself, again every few
 // seconds while it waits. Draining, the server starts no live duel (whoever asks for one waits, told why, and finds
 // it on the new server) and no game in a room, and says it's ready once nothing is under way: each live duel waited
-// for to its end, by its own clock (live.Hub.Left: however long its questions, live.Longest at most), the rooms' games
-// for drainCap at most (a game cut then goes on after the restart, where it was: room.Hub.Restore). Around Роял, from drainLead before its lobby opens until its games are over, it doesn't drain
-// at all: the restart waits for the evening to pass. A drain nobody asks about for drainLease ends by itself (a deploy
-// that died midway), and DELETE /api/drain ends it at once.
+// for to its end, by its own clock (live.Hub.UnderWay: however long its questions, live.Longest at most), the rooms'
+// games for drainCap at most (a game cut then goes on after the restart, where it was: room.Hub.Restore). Around Роял,
+// from drainLead before its lobby opens until its games are over, it doesn't drain at all: the restart waits for the
+// evening to pass. A drain nobody asks about for drainLease ends by itself (a deploy that died midway), and DELETE
+// /api/drain ends it at once.
+//
+// The answer never waits on a game: a duel busy at the moment it's asked counts as under way, for all of a duel, so a
+// deploy hears back at once even at the evening's peak. A deploy that hears nothing (a timeout, an error) asks again,
+// and never takes that for ready; only a server too old to drain answers it 404 (deploy.sh).
 const (
 	// drainCap is the longest a restart waits for the rooms' games under way.
 	drainCap = 5 * time.Minute
@@ -80,12 +85,9 @@ func (s *Server) drainStep(asked *bool) DrainStatus {
 		s.rooms.Resume()
 		slog.Info("drain over", "asked", wanted, "royal", royal)
 	}
-	st := DrainStatus{Duels: s.live.UnderWay(), Rooms: s.rooms.UnderWay(), Royal: royal}
-	left := time.Duration(0)
-	if st.Duels > 0 {
-		left = s.live.Left()
-		st.DuelsLeft = int(left.Round(time.Second).Seconds())
-	}
+	duels, left := s.live.UnderWay()
+	st := DrainStatus{Duels: duels, Rooms: s.rooms.UnderWay(), Royal: royal}
+	st.DuelsLeft = int(left.Round(time.Second).Seconds())
 	if !d.since.IsZero() {
 		waited := now.Sub(d.since)
 		st.Waited = int(waited.Seconds())

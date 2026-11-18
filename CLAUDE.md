@@ -44,7 +44,7 @@ most). A change is judged by whether players come back: the retention numbers in
 | `web/DESIGN.md` | How it looks and speaks: tokens, components, copy rules. Follow it for any UI |
 | `e2e` | The game in real browsers (Playwright) |
 | `bank/sample` | A public sample of the questions; the real bank is private (`private/`, the `questions` skill) |
-| `deploy` | The server's service and scripts (`deploy.sh` = `almanac-deploy`) |
+| `deploy` | The server's service and scripts (`deploy.sh` = `almanac-deploy`), played out against stubs in `deploy_test.go` |
 | `mobile` | The app for iPhone and Android: the site in the phone's web view (Capacitor), with notifications; `mobile/README.md` |
 
 Each Go package starts with a doc comment that says what it is and how it works: read it before changing the
@@ -116,15 +116,16 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
 - **A PR's title is plain English** saying what changed; it becomes the commit on main and the release notes' line.
   No format to follow: nothing reads one.
 - **Merging to `main` releases and deploys by itself** (`.github/workflows/deploy.yml`), and nobody decides it: a
-  merge that changes the program (its build's hash differs from the last release's) is released, one that doesn't
-  (tests, docs, tooling) isn't. The version counts up its minor when the release brings a new migration, its patch
+  merge that changes the program (its build's hash differs from the last release's) is released, once main as merged
+  passes the server's and the client's checks, one that doesn't (tests, docs, tooling) isn't. The version counts up its minor when the release brings a new migration, its patch
   otherwise: one minor, one schema. A major is the owner's call only (the workflow run by hand). `almanac-deploy` restarts the server only when
   that cuts no play: it drains it first (no new live duel or room game; those under way finish: a duel by its own
   clock, seven minutes at the most, a room's game five), and waits out Роял (from 20:37 to the end of its games), so
   a deploy may take a while to go live, and several merges meanwhile go out as one. Connections wait in systemd's socket through the restart; rooms are kept
   over it; a version that brings a migration copies the database before it, and the deploy goes back by itself,
   program and database copy both, if it isn't healthy. Every run deploys the latest release if it isn't live, so a
-  failed deploy is tried again by the next merge. No tags by hand, no ssh to deploy. A change to `deploy/` reaches the
+  failed deploy is tried again by the next merge; one that went back isn't, nor (if it never came up after it began
+  to migrate) a release that brings that migration unchanged: change what failed. No tags by hand, no ssh to deploy. A change to `deploy/` reaches the
   server only by hand, as root, the way `deploy/setup.sh` installs it (then `systemctl daemon-reload` for a unit);
   until then the Deploy run is red. Anything new kept in memory must survive a restart or count as under way
   (`internal/server/drain.go`).
@@ -164,8 +165,8 @@ SQLite in `/var/lib/almanac`, and backs it up hourly to R2. Deploys come from CI
 `almanac-deploy vX.Y.Z` (also how to go back: an older version, with `now` after it to skip the wait for play to
 end, within the same minor (`vX.Y.*`: the same migrations); to an older minor, the older version refuses the database and the deploy goes back
 to where it was, so put the copy from before that release back by hand, `/var/lib/almanac/before-vX.Y.Z.db`, with
-`systemctl stop almanac.socket almanac` first, and lose what was played since; a release from before signatures
-that isn't in `/usr/local/lib/almanac` any more needs `ALMANAC_UNSIGNED=1` before it), `almanac-bank` (check the new
+`systemctl stop almanac.socket almanac` first, and lose what was played since; a release is taken only signed, so
+one from before signatures only while it's kept in `/usr/local/lib/almanac`, the five used latest), `almanac-bank` (check the new
 questions apart, then pull and reload them; while Роял is on they wait for its end), `journalctl -u almanac` (logs). The `almanac backup` commands need the service's settings:
 `systemd-run --pipe --wait -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac backup verify`
 brings the latest copy back and checks it (the server does this itself daily). Health: `https://almanac.bg/api/health`

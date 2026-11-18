@@ -5,8 +5,9 @@
 #
 # and what it may ask (the SSH command):
 #
-#   vX.Y.Z   almanac-deploy with that version: a signed release made live (deploy.sh), or left as it is if it's live;
-#            not one that went back for not being healthy (below)
+#   vX.Y.Z   almanac-deploy with that version, as CI (deploy.sh ci): a signed release made live, or left as it is if
+#            it's live; not one that went back for not being healthy, nor one that brings that one's migration
+#            unchanged (deploy.sh says why: every merge would cut play twice for a release that fails the same way)
 #   check    the SHA-256 of the deploy files installed here, by their names in the repository (deploy/…), for CI to
 #            compare with its own (sha256sum -c): a difference means deploy/setup.sh's steps are due
 set -eu
@@ -35,11 +36,4 @@ if ! printf '%s\n' "$asked" | grep -Exq 'v(0|[1-9][0-9]{0,5})(\.(0|[1-9][0-9]{0,
 	echo "only a version, like v2.21.1, or check" >&2
 	exit 1
 fi
-# One that went back for not being healthy isn't tried again from here: every merge would cut play twice for a
-# release that fails the same way. A new release goes out; this one again only by hand (almanac-deploy vX.Y.Z).
-if [ -f "/var/lib/almanac-deploy/unhealthy-$asked" ]; then
-	cat "/var/lib/almanac-deploy/unhealthy-$asked" >&2
-	echo "not tried again from CI: a new release goes out, or almanac-deploy $asked by hand" >&2
-	exit 1
-fi
-exec /usr/local/sbin/almanac-deploy "$asked"
+exec /usr/local/sbin/almanac-deploy "$asked" ci

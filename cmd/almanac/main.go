@@ -18,14 +18,17 @@
 //	almanac backup keys                 make the key pair the copies are encrypted to (BACKUP_RECIPIENT) and opened with
 //	almanac admin [-remove] <email>     make a player an admin (the /admin page), or no longer one
 //	almanac push keys                   make a key pair for notifications (PUSH_PUBLIC_KEY, PUSH_PRIVATE_KEY)
+//	almanac migrations                  the program's migrations: each one's SHA-256 and name (deploy/deploy.sh)
 //	almanac version
 package main
 
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/almanac-bg/almanac/internal/push"
+	"github.com/almanac-bg/almanac/internal/store"
 )
 
 // version is set when a release is built (-ldflags "-X main.version=…").
@@ -60,6 +63,15 @@ func run(args []string) error {
 			fmt.Printf("PUSH_PUBLIC_KEY=%s\nPUSH_PRIVATE_KEY=%s\n", pub, priv)
 			return nil
 		}
+	case "migrations":
+		if len(args) == 1 {
+			lines, err := store.MigrationSums()
+			if err != nil {
+				return err
+			}
+			fmt.Println(strings.Join(lines, "\n"))
+			return nil
+		}
 	case "version":
 		fmt.Println(version)
 		return nil
@@ -68,5 +80,5 @@ func run(args []string) error {
 }
 
 func usage() error {
-	return fmt.Errorf("usage: almanac serve | bank check [-unbalanced] [-used file] [dir] | bank lint [-rule R,…] [-summary] [dir] | bank fmt [dir] | bank subjects [dir] | bank calibrate [dir] | bank suspects [dir] | bank reports [-resolve ids] | bank used | bank plan [-n N] [-json] [-used file] [dir] | bank add [-check] [-checked-by P] <batch> [dir] | backup now [-force] | backup list | backup restore [-identity F] [-into-place] <key|latest> [path] | backup verify [-identity F] [key|latest] | backup keys | admin [-remove] <email> | push keys | version")
+	return fmt.Errorf("usage: almanac serve | bank check [-unbalanced] [-used file] [dir] | bank lint [-rule R,…] [-summary] [dir] | bank fmt [dir] | bank subjects [dir] | bank calibrate [dir] | bank suspects [dir] | bank reports [-resolve ids] | bank used | bank plan [-n N] [-json] [-used file] [dir] | bank add [-check] [-checked-by P] <batch> [dir] | backup now [-force] | backup list | backup restore [-identity F] [-into-place] <key|latest> [path] | backup verify [-identity F] [key|latest] | backup keys | admin [-remove] <email> | push keys | migrations | version")
 }

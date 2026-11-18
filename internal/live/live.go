@@ -21,7 +21,7 @@
 // whatever the bank has become meanwhile. A restart cuts the duels under way off; they end
 // without a result (play.EndLive). So before one, the server pauses the hub (Pause): no new duel starts, not even with
 // a recording; those asking go on waiting, told why (Seek.Held), and find their duel once the server is back, while
-// the duels under way (UnderWay) play to their end, which each can tell (Left: Longest at most); a rematch waiting for
+// the duels under way (UnderWay) play to their end, which each can tell (Longest at most); a rematch waiting for
 // its yes is called off, told so (ErrPaused), as its duel would be lost. Resume undoes it.
 //
 // A duel's clock that panics (package safe stops it, and the process goes on) calls its duel off without a result, as
@@ -375,31 +375,15 @@ func (h *Hub) Resume() {
 	}
 }
 
-// UnderWay is how many duels a restart would cut now: those being played, and those being made.
-func (h *Hub) UnderWay() int {
+// UnderWay is how many duels a restart would cut now (those being played, and those being made), and how long they
+// may still take, at most: the longest of them, by its own clock (Match.left). Nothing more starts while the hub is
+// paused, so a restart that waits that long cuts no duel. A deploy asks it every few seconds (server's drain), so it
+// never waits on a duel: one busy at the moment (its lock held, as while it keeps an answer) counts as under way, for
+// all of a duel (Longest), and is seen as it is next time.
+func (h *Hub) UnderWay() (n int, left time.Duration) {
 	h.mu.Lock()
-	n := len(h.starting)
-	all := make([]*Match, 0, len(h.matches))
-	for _, m := range h.matches {
-		all = append(all, m)
-	}
-	h.mu.Unlock()
-	for _, m := range all {
-		m.mu.Lock()
-		if !m.over() {
-			n++
-		}
-		m.mu.Unlock()
-	}
-	return n
-}
-
-// Left is how long the duels under way may still take, at most: the longest of them, by its own clock (Match.left).
-// Nothing more starts while the hub is paused, so a restart that waits that long cuts no duel.
-func (h *Hub) Left() time.Duration {
-	h.mu.Lock()
-	var left time.Duration
-	if len(h.starting) > 0 { // being made: all of a duel to come
+	n = len(h.starting)
+	if n > 0 { // being made: all of a duel to come
 		left = Longest
 	}
 	all := make([]*Match, 0, len(h.matches))
@@ -408,11 +392,18 @@ func (h *Hub) Left() time.Duration {
 	}
 	h.mu.Unlock()
 	for _, m := range all {
-		m.mu.Lock()
-		left = max(left, m.left())
+		if !m.mu.TryLock() {
+			n++
+			left = Longest
+			continue
+		}
+		if !m.over() {
+			n++
+			left = max(left, m.left())
+		}
 		m.mu.Unlock()
 	}
-	return left
+	return n, left
 }
 
 // Playing says whether a player is in a duel under way: one whose screen went may come back to it (Seek finds it).
