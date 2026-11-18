@@ -122,8 +122,13 @@ export async function moveOn(page: Page): Promise<void> {
   await expect(page.locator(".verdict")).toBeVisible();
   // The answer shows in steps: the way on comes with the fact, a moment after the verdict.
   await expect(page.locator(".after .up-next").or(page.locator(".summary"))).toBeVisible();
+  // This answer's own button, and only it: the game moves on by itself a few seconds after it shows, and a tap that
+  // comes later (a busy machine) must not wait for the next question's button and press that one, which would skip
+  // the next question unanswered.
   const go = page.locator(".after").getByRole("button", { name: /^(Напред|Към резултата)$/ });
-  if (await go.isVisible()) await go.click().catch(() => {}); // gone already: the game moved on
+  const button = (await go.count()) ? await go.elementHandle({ timeout: 1000 }).catch(() => null) : null;
+  await button?.click({ timeout: 5000 }).catch(() => {}); // gone already: the game moved on
+  await button?.dispose();
 }
 
 /** Makes the player (a guest, made now if there's none) one who finished a game on each of the `days` days before
