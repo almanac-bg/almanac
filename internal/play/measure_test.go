@@ -61,8 +61,20 @@ func TestDayAnswersSeenBefore(t *testing.T) {
 		VALUES (?, 0, ?, 1, 0, 1, 3000, 0)`, old, w.picks(s.ID)[0].ID); err != nil {
 		t.Fatal(err)
 	}
+	// And the second one in a game this morning, which another player's day doesn't count for her.
+	now := w.now.UnixMilli()
+	res, _ = w.db.Write.Exec(`INSERT INTO runs (user_id, kind, category, questions, started_at) VALUES (?, 'topic', '', '[]', ?)`,
+		ana, now)
+	morning, _ := res.LastInsertId()
+	if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, score, points, is_right, ms, at)
+		VALUES (?, 0, ?, 1, 0, 1, 3000, ?)`, morning, w.picks(s.ID)[1].ID, now); err != nil {
+		t.Fatal(err)
+	}
+	bo := w.user()
+	b, _ := w.g.StartDay(ctx, bo)
+	w.play(bo, b.ID, repeat(w.right, Length)...)
 	w.play(ana, s.ID, repeat(w.right, Length)...)
-	if got, _ := w.g.Tallies(ctx, w.g.Today(), w.g.Today()); got["day:answers"] != Length || got["day:seen"] != 1 {
+	if got, _ := w.g.Tallies(ctx, w.g.Today(), w.g.Today()); got["day:answers"] != 2*Length || got["day:seen"] != 2 {
 		t.Fatalf("the day's answers: %v", got)
 	}
 }

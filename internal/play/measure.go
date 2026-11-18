@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"time"
+
+	"github.com/almanac-bg/almanac/internal/store"
 )
 
 // Measuring the first week (the admin page): not only whether players come back (retention.go), but what they did
@@ -45,10 +47,16 @@ func (g *Game) tallyDayAnswer(tx *sql.Tx, r *run) error {
 		return err
 	}
 	var seen bool
-	// From the player's own games (CROSS JOIN keeps that order): the question's answers grow with the day's players,
-	// and every day answer would otherwise walk all of them.
-	err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM runs o CROSS JOIN answers a ON a.run_id = o.id
-		WHERE o.user_id = ? AND o.id <> ? AND a.question_id = ?)`, r.userID, r.id, r.picks[r.at].ID).Scan(&seen)
+	// It's in the one write, so it never walks a history: not the question's answers of the day (they grow with its
+	// players), nor all the player's (they grow with the player). It reads the question's answers from before its day
+	// (a question of the day is drawn from those nobody has answered: none, unless something went wrong), and the
+	// player's games begun since the day before (CROSS JOIN keeps that order): a few.
+	dayStart, _ := time.ParseInLocation(time.DateOnly, r.day, Bulgaria)
+	err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM answers a INDEXED BY answers_question JOIN runs o ON o.id = a.run_id
+			WHERE a.question_id = ?3 AND a.at < ?4 AND o.user_id = ?1)
+		OR EXISTS (SELECT 1 FROM runs o CROSS JOIN answers a ON a.run_id = o.id
+			WHERE o.user_id = ?1 AND o.started_at >= ?5 AND o.id <> ?2 AND a.question_id = ?3)`,
+		r.userID, r.id, r.picks[r.at].ID, store.Ms(dayStart), store.Ms(dayStart.AddDate(0, 0, -1))).Scan(&seen)
 	if err != nil || !seen {
 		return err
 	}

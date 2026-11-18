@@ -51,7 +51,7 @@ type versionCrowd struct {
 // answers (or before the first count, or for a version the count didn't have). A count that's out of date, or of
 // another bank, starts a new one in the background.
 func (g *Game) Crowd(q bank.Question) *bank.Crowd {
-	s := g.crowds.peek(g.Now(), g.Bank(), CrowdFresh, g.countCrowds)
+	s := g.crowds.peek(g.Now(), g.Bank(), g.crowdCounter())
 	if s == nil {
 		return nil
 	}
@@ -62,20 +62,21 @@ func (g *Game) Crowd(q bank.Question) *bank.Crowd {
 }
 
 // Count counts what's kept counted for everyone (the questions' crowds and hardness, the boards of knowledge), the
-// three at once, and waits for them: the server's first counts, made as it starts so that no player waits on them.
+// three at once, and waits for them: the server's first counts, made as it starts. Until they're in, what was kept of
+// the last ones (snapshot.go) is shown, so no player waits on them unless none was ever kept.
 func (g *Game) Count(ctx context.Context) error {
 	now, b := g.Now(), g.Bank()
 	errs := make([]error, 3)
 	var wg sync.WaitGroup
 	// A panic in a count is the count's (errCountBroke: snapshot.go); one around it is stopped here.
 	wg.Go(func() {
-		safe.Do("counting: crowds", func() { _, errs[0] = g.crowds.refresh(ctx, now, b, g.countCrowds) })
+		safe.Do("counting: crowds", func() { _, errs[0] = g.crowds.refresh(ctx, now, b, g.crowdCounter()) })
 	})
 	wg.Go(func() {
-		safe.Do("counting: hardness", func() { _, errs[1] = g.hard.refresh(ctx, now, b, g.countHardness) })
+		safe.Do("counting: hardness", func() { _, errs[1] = g.hard.refresh(ctx, now, b, g.hardCounter()) })
 	})
 	wg.Go(func() {
-		safe.Do("counting: knowledge", func() { _, errs[2] = g.known.refresh(ctx, now, b, g.countKnowledge) })
+		safe.Do("counting: knowledge", func() { _, errs[2] = g.known.refresh(ctx, now, b, g.knowCounter()) })
 	})
 	wg.Wait()
 	return errors.Join(errs...)
@@ -83,21 +84,53 @@ func (g *Game) Count(ctx context.Context) error {
 
 // CountCrowds counts every question's crowd now, and waits for it: tests, and tools.
 func (g *Game) CountCrowds(ctx context.Context) error {
-	_, err := g.crowds.refresh(ctx, g.Now(), g.Bank(), g.countCrowds)
+	_, err := g.crowds.refresh(ctx, g.Now(), g.Bank(), g.crowdCounter())
 	return err
 }
 
+// savedCrowd is a question's crowd as the database keeps it (snapshot.go): of which version.
+type savedCrowd struct {
+	Version string
+	Crowd   *bank.Crowd
+}
+
+// crowdCounter counts the crowds, and keeps them as they are.
+func (g *Game) crowdCounter() counter[crowds] {
+	return counter[crowds]{db: g.DB, name: "crowds", fresh: CrowdFresh, count: g.countCrowds,
+		keep: func(c crowds) ([]byte, error) {
+			kept := make(map[string]savedCrowd, len(c))
+			for id, k := range c {
+				kept[id] = savedCrowd{k.version, k.c}
+			}
+			return gobbed(kept)
+		},
+		take: func(raw []byte, _ *bank.Bank) (crowds, error) {
+			kept, err := ungobbed[map[string]savedCrowd](raw)
+			if err != nil {
+				return nil, err
+			}
+			c := make(crowds, len(kept))
+			for id, k := range kept {
+				c[id] = versionCrowd{k.Version, k.Crowd}
+			}
+			return c, nil
+		}}
+}
+
 func (g *Game) countCrowds(ctx context.Context, now time.Time, b *bank.Bank) (crowds, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, version, given, is_right, at FROM answers WHERE `+FairAnswers)
+	// Which of each question's answers count (versions.go), worked out before the answers are read: what it reads,
+	// it reads on a read connection of its own, and the count holds one already.
+	of := make(map[string]Counted, len(b.Questions)) // the questions in the bank, and in play
+	for _, q := range b.Questions {
+		if !q.Extra().Retired {
+			of[q.Base().ID] = g.CountedOf(q)
+		}
+	}
+	rows, err := g.DB.Scan.QueryContext(ctx, `SELECT question_id, version, given, is_right, at FROM answers WHERE `+FairAnswers)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	type which struct {
-		counted Counted
-		live    bool // in the bank, and in play
-	}
-	of := map[string]which{} // which of each question's answers count (versions.go)
 	tallies := map[string]map[string]*bank.Tally{}
 	var id []byte
 	for rows.Next() {
@@ -108,14 +141,8 @@ func (g *Game) countCrowds(ctx context.Context, now time.Time, b *bank.Bank) (cr
 		if err := rows.Scan(&id, &version, &given, &right, &at); err != nil {
 			return nil, err
 		}
-		w, ok := of[string(id)] // no copy of the id for a lookup
-		if !ok {
-			if q, live := b.Get(string(id)); live && !q.Extra().Retired {
-				w = which{g.CountedOf(q), true}
-			}
-			of[string(id)] = w
-		}
-		if !w.live || !w.counted.Counts(version, at) {
+		counted, live := of[string(id)] // no copy of the id for a lookup
+		if !live || !counted.Counts(version, at) {
 			continue
 		}
 		byGiven := tallies[string(id)]

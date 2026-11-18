@@ -189,7 +189,7 @@ func memory() (*DB, error) {
 	w.SetMaxIdleConns(1)
 	w.SetConnMaxIdleTime(0)
 	w.SetConnMaxLifetime(0)
-	return &DB{Write: w, Read: w}, nil
+	return &DB{Write: w, Read: w, Scan: w}, nil
 }
 
 // copySchema makes the schema of from (its tables, indexes, triggers and views, without a row) in to, an empty

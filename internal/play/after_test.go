@@ -118,3 +118,57 @@ func TestAnsweredQuestions(t *testing.T) {
 		t.Fatalf("answered %v, want %v", got, want)
 	}
 }
+
+// The last answer of a game doesn't wait for what follows it (the achievements measured again, the goals, the
+// league): that's done in the background, and the game's news waits for it instead, so it still tells all of it.
+func TestTheLastAnswerDoesntWaitForWhatFollows(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	w.g.later.by, w.g.later.slots = map[int64]*later{}, make(chan struct{}, 1)
+	w.g.later.slots <- struct{}{} // every worker busy: nothing that follows a run can start
+	s, err := w.g.StartDay(ctx, ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for n := range Length {
+		st, err := w.g.Show(ctx, ana, s.ID)
+		if err == nil && st.Question != nil && st.Question.StartsMs > 0 {
+			_, err = w.g.Start(ctx, ana, s.ID, n)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		res, err := w.g.Answer(ctx, ana, s.ID, n, w.right(s.ID, n))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n == Length-1 && !res.State.Done {
+			t.Fatal("the day not done")
+		}
+	}
+	if n := w.count(`SELECT count(*) FROM runs_after`); n != 1 {
+		t.Fatalf("%d left to do after the run, not 1: it was done before the answer went back", n)
+	}
+	if n := w.count(`SELECT count(*) FROM achievements WHERE user_id = ?`, ana); n != 0 {
+		t.Fatalf("%d achievements before what follows the run was done", n)
+	}
+	waiting, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer cancel()
+	w.g.AfterWait(waiting, ana) // the news waits for it (here, for as long as it's let)
+	if waiting.Err() == nil {
+		t.Fatal("nothing to wait for")
+	}
+
+	<-w.g.later.slots // a worker free
+	news, err := w.g.NewsOf(ctx, ana, s.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(news.Achievements) == 0 || w.count(`SELECT count(*) FROM goals_done WHERE user_id = ?`, ana) == 0 {
+		t.Fatalf("the news before what the game earned was kept: %+v", news)
+	}
+	if n := w.count(`SELECT count(*) FROM runs_after`); n != 0 {
+		t.Fatalf("%d left to do after the news", n)
+	}
+}

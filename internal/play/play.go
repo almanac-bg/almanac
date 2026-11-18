@@ -122,6 +122,10 @@ type Game struct {
 	daysAhead daysCache             // today's questions and the days ahead's (ahead.go)
 	known     snapshot[knowledge]   // everyone's answers, for the boards of knowledge (knowledge.go)
 	versions  versions              // the questions' versions kept (versions.go)
+
+	later  laters                  // what follows the runs just finished, under way (after.go)
+	skills memo[skillsKey, skills] // each player's abilities, kept while their games stand (memo.go)
+	misses memo[[2]int64, [2]int]  // what each player's mistakes make of a second chance (mistakes.go)
 }
 
 func New(db *store.DB, b func() *bank.Bank) *Game {

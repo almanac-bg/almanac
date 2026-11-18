@@ -377,7 +377,10 @@ func TestCountsStandOverAReload(t *testing.T) {
 		t.Fatal("not counted again for the new bank")
 	}
 
-	// The first count, its waiter gone: it goes on, and the next finds it.
+	// The first count of a server with none kept, its waiter gone: it goes on, and the next finds it.
+	if _, err := w.db.Write.Exec(`DELETE FROM counts`); err != nil {
+		t.Fatal(err)
+	}
 	fresh := &Game{DB: w.db, Bank: w.g.Bank, Now: w.g.Now}
 	if _, err := fresh.knowledge(gone); !errors.Is(err, context.Canceled) {
 		t.Fatalf("waiting with a request gone: %v", err)

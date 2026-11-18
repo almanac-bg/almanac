@@ -31,7 +31,7 @@ const SuspectTruth = 0.35
 // Suspects counts the crowds now and lists the suspects, the most answered first.
 func (g *Game) Suspects(ctx context.Context) ([]Suspect, error) {
 	b := g.Bank()
-	by, err := g.crowds.refresh(ctx, g.Now(), b, g.countCrowds)
+	by, err := g.crowds.refresh(ctx, g.Now(), b, g.crowdCounter())
 	if err != nil {
 		return nil, err
 	}
