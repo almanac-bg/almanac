@@ -31,11 +31,14 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
   await expect(guest.getByText(/Чакаме .* да започне/)).toBeVisible();
   await expect(guest.getByText("История · 5 въпроса · Лесни")).toBeVisible();
   await host.getByRole("button", { name: "Започни" }).click();
+  // Бояна's first answer doesn't get through (the line drops as it's sent): it's sent again, and taken.
+  await guest.route("**/api/rooms/*/answer", (route) => route.abort("connectionreset"), { times: 1 });
   for (let n = 0; n < 5; n++) {
     for (const p of [host, guest])
       await expect(p.locator(".question-head")).toContainText(`${n + 1} от 5`, { timeout: 15_000 });
-    await answer(host);
     await answer(guest);
+    if (n === 0) await expect(guest.getByText(/^Отговорът ти е приет\./)).toBeVisible();
+    await answer(host);
     for (const p of [host, guest]) await expect(p.locator(".verdict")).toBeVisible();
   }
   // The room moves on by itself, to the standings; the questions and their facts are there at the end.

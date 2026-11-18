@@ -13,11 +13,14 @@
 // started the sound, with „Звуци“ and „Музика в Роял“ on; it rises in the last ten seconds, and the first question
 // ends it with the motif's first two notes.
 //
-// The server sends the evening as this player sees it after every change; the browser reconnects if the line drops,
-// and an answer that doesn't get through is sent again while its question is open (a restart of the server shows the
-// question again, drawn anew). It loads on its own, the first time it's opened, and is handed the app's pieces (kit.ts).
+// The server sends the evening as this player sees it after every change; the line, should it drop, is opened again
+// (lib/stream.ts), and a screen too many for the server is told so and comes back in a while. Each question is
+// answered as in every game (game/answering.ts): an answer that doesn't get through is sent again while its question
+// is open, the same answer as the server shows the question again after a restart (drawn anew). It loads on its own,
+// the first time it's opened, and is handed the app's pieces (kit.ts).
 
 import type { Bed } from "../feel.ts";
+import type { AnswerState } from "../game/answering.ts";
 import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
 import type { Child, Signal } from "../lib/dom.ts";
@@ -28,10 +31,9 @@ import type { Tonight } from "./modes.ts";
 // imports only types.
 let {
   answered,
-  ask,
-  countdown,
+  answering,
+  answerState,
   crowdLine,
-  deliver,
   picture,
   review,
   questionHead,
@@ -59,13 +61,14 @@ let {
   soundOn,
   categories,
   player,
-  playing,
+  playingWhile,
   user,
   avatar,
   back,
   guardLeaving,
   pageArt,
   verdict,
+  stream,
   who,
   standingCard,
   clock,
@@ -217,10 +220,9 @@ const delta = (d?: number) => (d ? h("span", { class: d > 0 ? "delta up" : "delt
 export function royal(kit: Kit) {
   ({
     answered,
-    ask,
-    countdown,
+    answering,
+    answerState,
     crowdLine,
-    deliver,
     picture,
     review,
     questionHead,
@@ -248,13 +250,14 @@ export function royal(kit: Kit) {
     soundOn,
     categories,
     player,
-    playing,
+    playingWhile,
     user,
     avatar,
     back,
     guardLeaving,
     pageArt,
     verdict,
+    stream,
     who,
     standingCard,
     clock,
@@ -267,49 +270,50 @@ export function royal(kit: Kit) {
   } = kit);
   title("Роял");
   const view = signal<Evening | null>(null);
-  const trouble = signal(false);
+  // The line: dropped (being opened again), or a screen too many for the server (it says when to come back).
+  const trouble = signal<"" | "down" | "busy">("");
   // The server's clock less this one's: the countdowns go by the server's.
   let skew = 0;
   const now = signal(Date.now());
   const tick = setInterval(() => now.set(Date.now() + skew), 1000);
   onCleanup(() => clearInterval(tick));
 
-  let es: EventSource | null = null;
   // The stream follows the evening as whoever is signed in sees it: again once someone who only looked becomes a
   // player, by joining. Never once the screen is gone: joining answers after a wait, by when the player may have left.
   const life = lifetime();
   let as = user.peek()?.id ?? 0;
-  const connect = () => {
-    if (life.aborted) return;
-    es?.close();
-    es = new EventSource("/api/royal/events");
-    es.onmessage = (e) => {
-      const v = JSON.parse(e.data) as Evening;
-      // The board is everyone's: the player is told apart by their key.
-      for (const p of v.players) p.me = p.key === v.me?.key;
-      if (v.me) v.me.me = true;
-      skew = v.now - Date.now();
-      now.set(v.now);
-      trouble.set(false);
-      view.set(v);
-    };
-    es.onerror = () => trouble.set(true); // the browser tries again by itself
-  };
+  const line = stream("/api/royal/events", {
+    life,
+    on: {
+      message: (data) => {
+        const v = JSON.parse(data) as Evening;
+        // The board is everyone's: the player is told apart by their key.
+        for (const p of v.players) p.me = p.key === v.me?.key;
+        if (v.me) v.me.me = true;
+        skew = v.now - Date.now();
+        now.set(v.now);
+        trouble.set("");
+        view.set(v);
+      },
+      // A screen too many (the player's, the network's, or all): the browser comes back after the server's wait.
+      busy: () => trouble.set("busy"),
+    },
+    down: (down) => {
+      if (down) trouble.update((t) => t || "down");
+    },
+  });
   const joined = () => {
     const id = user.peek()?.id ?? 0;
     if (id !== as && !life.aborted) {
       as = id;
-      connect();
+      line.reopen();
     }
   };
-  connect();
-  onCleanup(() => es?.close());
 
-  effect(() => {
+  playingWhile(() => {
     const phase = view()?.phase;
-    playing.set(phase === "question" || phase === "reveal");
+    return phase === "question" || phase === "reveal";
   });
-  onCleanup(() => playing.set(false));
   onCleanup(() => hush(false));
   // The screen stays on while the evening needs it: in the lobby, once in, and through the game.
   keepAwake(() => {
@@ -333,8 +337,9 @@ export function royal(kit: Kit) {
       return !!v && (v.phase === "question" || v.phase === "reveal") && v.in && !v.out;
     },
   );
-  // The question an answer is on its way to (-1: none), for the question drawn again meanwhile.
-  const out = signal(-1);
+  // Each question's answer, by evening and question: a question drawn again (the server showing it again after a
+  // restart) goes on with the answer on its way, or in.
+  const answers = new Map<string, AnswerState>();
   let closed = false;
   onCleanup(() => {
     closed = true;
@@ -343,7 +348,17 @@ export function royal(kit: Kit) {
     "div",
     { class: "screen" },
     leaveAsk,
-    () => (trouble() ? h("p", { class: "status", role: "status" }, "Връзката прекъсна. Свързваме се отново…") : null),
+    () => {
+      const t = trouble();
+      if (!t) return null;
+      return h(
+        "p",
+        { class: "status", role: "status" },
+        t === "busy"
+          ? "Твърде много екрани следят Роял в момента. Свързваме се отново след малко…"
+          : "Връзката прекъсна. Свързваме се отново…",
+      );
+    },
     () => {
       if (!key()) return h("p", { class: "muted" }, "…");
       const v = untracked(view) as Evening;
@@ -354,7 +369,7 @@ export function royal(kit: Kit) {
         case "lobby":
           return lobby(live, now, joined);
         case "question":
-          return [door(live, joined), question(live, v, out, () => closed)];
+          return [door(live, joined), question(live, v, answers, () => closed)];
         case "reveal":
           return [door(live, joined), reveal(live, v)];
         case "end":
@@ -836,68 +851,47 @@ function standings(v: Evening): Child {
   return h("section", { class: "board league-board royal-table" }, h("h2", null, "Класиране"), h("ol", null, rows));
 }
 
-/** A question, to answer while its time runs. An answer that doesn't get through is sent again while the question is
- * open (out: the question an answer is on its way to, for this question drawn again meanwhile, as the server shows it
- * again after a restart); one refused for good frees the options again. */
-function question(view: () => Evening, first: Evening, out: Signal<number>, gone: () => boolean): Child {
+/** A question, to answer while its time runs (game/answering.ts). An answer that doesn't get through is sent again
+ * while the question is open, the same when the server shows the question again after a restart (gone: the screen
+ * is; `answers`: each question's answer, kept for the question drawn anew); one refused for good frees the options
+ * again. A watcher (not in) sees the options, and the clock run to the end. */
+function question(view: () => Evening, first: Evening, answers: Map<string, AnswerState>, gone: () => boolean): Child {
   const q = first.question;
   if (!q) return null;
+  const key = `${first.startsAt}:${first.n}`;
+  const state = answers.get(key) ?? answerState();
+  answers.set(key, state);
   // The game starts: with the music's end, or a sound of its own (not again for the question drawn anew).
   if (music) hush(first.n === 0);
-  else if (first.n === 0 && first.in && !first.given && out.peek() !== 0) play("go");
+  else if (first.n === 0 && first.in && !first.given && state.step.peek() === "") play("go");
   // Those cut play on, off the standings.
   const plays = first.in;
-  // The server has this player's answer (sent from here, or before the question was drawn again).
-  const taken = () => {
-    const v = view();
-    return v.phase === "question" && v.n === first.n && !!v.given;
-  };
-  const tapped = signal(false);
-  const sent = signal(false);
-  const locked = signal(true);
-  const error = signal("");
-  // The question still takes the answer, as far as this screen knows.
-  const open = () => !gone() && !taken() && view().phase === "question" && view().n === first.n;
-  const send = async (a: Answer) => {
-    tapped.set(true);
-    error.set("");
-    out.set(first.n);
-    const e = await deliver("/api/royal/answer", { n: first.n, answer: a }, () => untracked(open));
-    if (out.peek() === first.n) out.set(-1);
-    if (!e) return sent.set(true);
-    error.set(e.message);
-    if (e.code !== "not_now" && untracked(open)) {
-      // Refused, not late: the options are free again.
-      if (asked.node instanceof Element)
-        for (const b of asked.node.querySelectorAll(".picked")) b.classList.remove("picked");
-      tapped.set(false);
-    }
-  };
-  const asked = ask(q.view, send, locked);
-  // When the time is up, whatever has been put in (a typed number, things moved into order) is the answer.
-  const secs = countdown(first.leftMs, () => {
-    if (!plays || tapped.peek() || out.peek() === first.n || untracked(taken)) return;
-    const pending = asked.pending();
-    if (pending) send(pending);
+  const ans = answering({
+    view: q.view,
+    leftMs: first.leftMs,
+    post: (answer) => api("POST", "/api/royal/answer", { n: first.n, answer }),
+    open: () => !gone() && view().phase === "question" && view().n === first.n,
+    // The server has this player's answer (sent from here, or before the question was drawn again).
+    inView: () => {
+      const v = view();
+      return v.phase === "question" && v.n === first.n && !!v.given;
+    },
+    plays,
+    state,
   });
+  // More of the question shows as its time runs (the next clue), and the clock goes by the server's.
   effect(() => {
     const v = view();
-    if (v.n !== first.n || !v.question || v.phase !== "question") return;
-    // More of the question shows as its time runs (the next clue): the server sends it when it's due.
-    asked.update?.(v.question.view);
-    // The clock goes by the server's.
-    const s = Math.ceil(v.leftMs / 1000);
-    if (Math.abs(s - secs.peek()) > 1) secs.sync(v.leftMs);
+    if (v.n === first.n && v.question && v.phase === "question") ans.follow(v.question.view, v.leftMs);
   });
-  effect(() => locked.set(!plays || tapped() || out() === first.n || taken() || secs() <= 0));
   return h(
     "article",
     { class: "question" },
     head(first),
-    timer(first.leftMs, q.limitMs, secs, plays ? locked : signal(false)), // a watcher's clock runs to the end
-    h("h1", { class: "ask" }, q.view.text),
+    timer(first.leftMs, q.limitMs, ans.left, ans.stopped), // a watcher's clock runs to the end
+    ans.heading,
     picture(q.view, true),
-    asked.node,
+    ans.asked.node,
     () => {
       const v = view();
       // The answer waits for everyone playing, those cut too.
@@ -906,11 +900,11 @@ function question(view: () => Evening, first: Evening, out: Signal<number>, gone
         "p",
         { class: "status", role: "status" },
         !plays ? "Гледаш. " : v.out ? "Извън класирането. " : "",
-        sent() || taken() ? "Отговорът ти е приет. " : "",
+        ans.taken() ? "Отговорът ти е приет. " : "",
         `Отговориха ${done} от ${v.playing}.`,
       );
     },
-    () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    ans.said,
     standing(view),
   );
 }

@@ -1,5 +1,6 @@
 // A room: the lobby, then each question for everyone at once, its answer with the scores, and the final standings.
-// The server sends the room as this player sees it after every change; the browser reconnects if the line drops.
+// The server sends the room as this player sees it after every change; the line, should it drop, is opened again
+// (lib/stream.ts). Each question is answered as in every game (game/answering.ts).
 //
 // It loads on its own, the first time a room opens, and is handed the app's pieces (kit.ts): it imports only types.
 
@@ -15,6 +16,7 @@ import type { Mix } from "./rooms.ts";
 // The app's pieces, set as the screen opens (room); host.ts takes them from here.
 export let {
   answered,
+  answering,
   api,
   ask,
   avatar,
@@ -23,7 +25,6 @@ export let {
   changeGame,
   computed,
   countdown,
-  deliver,
   crowdLine,
   effect,
   errorText,
@@ -42,11 +43,12 @@ export let {
   play,
   playAnswer,
   player,
-  playing,
+  playingWhile,
   questionHead,
   reviewParts,
   shareButton,
   signal,
+  stream,
   timer,
   title,
   untracked,
@@ -130,6 +132,7 @@ export const about = (v: RoomView) =>
 export function room(kit: Kit, [code = ""]: string[]) {
   ({
     answered,
+    answering,
     api,
     ask,
     avatar,
@@ -138,7 +141,6 @@ export function room(kit: Kit, [code = ""]: string[]) {
     changeGame,
     computed,
     countdown,
-    deliver,
     crowdLine,
     effect,
     errorText,
@@ -157,11 +159,12 @@ export function room(kit: Kit, [code = ""]: string[]) {
     play,
     playAnswer,
     player,
-    playing,
+    playingWhile,
     questionHead,
     reviewParts,
     shareButton,
     signal,
+    stream,
     timer,
     title,
     untracked,
@@ -182,30 +185,31 @@ export function room(kit: Kit, [code = ""]: string[]) {
   // Where each player stood at the last answer: how far they've moved since is the room's rank change.
   const places = new Map<number, number>();
 
-  let es: EventSource | null = null;
   // The screen is gone (another page): what was on its way doesn't join the room or open its stream after it.
   const life = lifetime();
   const connect = () => {
     if (life.aborted) return;
-    es = new EventSource(`/api/rooms/${code}/events`);
-    es.onmessage = (e) => {
-      trouble.set("");
-      view.set(JSON.parse(e.data));
+    // The room is gone, the host sent this player out, or this player opened it on another screen: the server says
+    // so, and the line isn't opened again. A line that only dropped is (lib/stream.ts), however it dropped.
+    const ends = (why: "gone" | "removed" | "moved") => () => {
+      line.close();
+      trouble.set(why);
     };
-    // The room is gone, the host sent this player out, or this player opened it on another screen: no reconnecting.
-    for (const [event, why] of [
-      ["closed", "gone"],
-      ["removed", "removed"],
-      ["moved", "moved"],
-    ] as const)
-      es.addEventListener(event, () => {
-        es?.close();
-        trouble.set(why);
-      });
-    es.onerror = () => {
-      if (es?.readyState === EventSource.CLOSED) trouble.set(trouble.peek() || "gone");
-      else trouble.set("reconnecting"); // the browser tries again by itself
-    };
+    const line = stream(`/api/rooms/${code}/events`, {
+      life,
+      on: {
+        message: (data) => {
+          trouble.set("");
+          view.set(JSON.parse(data));
+        },
+        closed: ends("gone"),
+        removed: ends("removed"),
+        moved: ends("moved"),
+      },
+      down: (down) => {
+        if (down) trouble.set("reconnecting");
+      },
+    });
   };
   // Why the room won't have this player, by the server's word for it.
   const refused = (err: unknown) => {
@@ -223,18 +227,16 @@ export function room(kit: Kit, [code = ""]: string[]) {
     .then(() => player())
     .then((u) => (u.drawn && named(code) === null ? naming.set(u) : enter()))
     .catch(refused);
-  onCleanup(() => es?.close());
 
   // Each phase (and each question) is drawn once; what changes inside it follows the view.
   const key = computed(() => {
     const v = view();
     return v ? `${v.phase}:${v.n}` : "";
   });
-  effect(() => {
+  playingWhile(() => {
     const phase = view()?.phase;
-    playing.set(phase === "question" || phase === "reveal");
+    return phase === "question" || phase === "reveal";
   });
-  onCleanup(() => playing.set(false));
   // The screen stays on through a game's questions; a big screen led from, all the time it shows the room.
   const leading = computed(() => !!(view()?.lead && view()?.isHost));
   keepAwake(() => {
@@ -466,9 +468,16 @@ export function choose(view: () => RoomView, code: string): Child {
   });
 }
 
+/** What who leads the room does: starts a game, moves it on, ends it. Each path is written whole, as the server has it
+ * (routes_test.go holds the client's paths to the server's). */
 export async function lead(code: string, action: "start" | "next" | "finish", error: (s: string) => void) {
+  const path = {
+    start: `/api/rooms/${code}/start`,
+    next: `/api/rooms/${code}/next`,
+    finish: `/api/rooms/${code}/finish`,
+  }[action];
   try {
-    await api("POST", `/api/rooms/${code}/${action}`);
+    await api("POST", path);
   } catch (err) {
     error(errorText(err));
   }
@@ -605,59 +614,41 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
   const q = first.question;
   if (!q) return null;
   if (first.n === 0) play("go"); // the game starts
-  const locked = signal(!!q.given);
-  // The answer is in once the server says so: by its reply, or by the room (its view has it), should the reply be lost.
-  const replied = signal(false);
-  const sent = computed(() => replied() || (view().n === first.n && !!view().question?.given));
-  const error = signal("");
-  // An answer that doesn't get through (the line dropped, the server restarting) is sent again while the question is
-  // open: the room takes it once, and a second time says it's in.
+  // Answered as in every game (game/answering.ts): sent again while it doesn't get through (the line dropped, the
+  // server restarting) and the question is open, the room taking it once; in once the server says so, by its reply or
+  // by the room's view, should the reply be lost.
   const life = lifetime();
-  const open = () => !life.aborted && view().phase === "question" && view().n === first.n;
-  const send = async (a: Answer) => {
-    locked.set(true);
-    error.set("");
-    const e = await deliver(`/api/rooms/${code}/answer`, { n: first.n, answer: a }, () => untracked(open));
-    if (life.aborted) return;
-    if (!e) replied.set(true);
-    else if (!untracked(sent)) {
-      error.set(e.message);
-      // An answer the question can't take may be given again, while there's time; a late one can't.
-      if (e.code !== "not_now" && untracked(open)) locked.set(false);
-    }
-  };
-  const asked = ask(q.view, send, locked);
-  // More of the question shows as its time runs (the next clue): the server sends it when it's due.
+  const ans = answering({
+    view: q.view,
+    leftMs: q.leftMs,
+    post: (answer) => api("POST", `/api/rooms/${code}/answer`, { n: first.n, answer }),
+    open: () => !life.aborted && view().phase === "question" && view().n === first.n,
+    inView: () => view().n === first.n && !!view().question?.given,
+  });
+  // More of the question shows as its time runs (the next clue), and the clock goes by the server's.
   effect(() => {
     const v = view();
-    if (v.n === first.n && v.question) asked.update?.(v.question.view);
-  });
-  // When the time is up, whatever has been put in (a typed number, things moved into order) is the answer.
-  const left = countdown(q.leftMs, () => {
-    if (locked.peek()) return;
-    const pending = asked.pending();
-    if (pending) send(pending);
-    else locked.set(true);
+    if (v.n === first.n && v.question && v.phase === "question") ans.follow(v.question.view, v.question.leftMs);
   });
   return h(
     "article",
     { class: "question" },
     head(first),
-    timer(q.leftMs, q.limitMs, left, locked),
-    h("h1", { class: "ask" }, q.view.text),
+    timer(q.leftMs, q.limitMs, ans.left, ans.stopped),
+    ans.heading,
     picture(q.view, true),
-    asked.node,
+    ans.asked.node,
     () => {
       const v = view();
       const done = v.players.filter((p) => p.answered).length;
       return h(
         "p",
         { class: "status", role: "status" },
-        sent() ? "Отговорът ти е приет. " : "",
+        ans.taken() ? "Отговорът ти е приет. " : "",
         `Отговориха ${done} от ${v.players.filter((p) => p.online || p.answered).length}.`,
       );
     },
-    () => error() && !sent() && h("p", { class: "bad", role: "alert" }, error()),
+    ans.said,
   );
 }
 

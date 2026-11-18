@@ -1,7 +1,7 @@
 // Talking to the server, against a fetch stood in for: what an answer becomes, and what is sent again.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ApiError, api, deliver, errorText, hearing, passing, serverNow, tries } from "./api.ts";
+import { ApiError, api, errorText, hearing, passing, serverNow, tries } from "./api.ts";
 
 /** The server stood in for: each call takes the next answer (a Response, or "down" for no line). */
 function serve(...answers: (Response | "down")[]): string[] {
@@ -66,33 +66,41 @@ test("the server's clock, from its answers: a phone's a day off is set right, on
 
 test("a game's step is tried three times while the line or the server is down, and not again after a „no“", async () => {
   let asked = serve("down", json(503, {}), json(200, { at: 3 }));
-  assert.deepEqual(await tries(() => api("POST", "/api/runs/1/show"), 1), { at: 3 });
+  assert.deepEqual(await tries(() => api("POST", "/api/runs/1/show"), { pause: 1 }), { at: 3 });
   assert.equal(asked.length, 3);
   asked = serve("down", "down", "down", json(200, {}));
   await assert.rejects(
-    tries(() => api("POST", "/api/runs/1/show"), 1),
+    tries(() => api("POST", "/api/runs/1/show"), { pause: 1 }),
     { code: "offline" },
   );
   assert.equal(asked.length, 3);
   asked = serve(json(409, { error: "out_of_step" }), json(200, {}));
   await assert.rejects(
-    tries(() => api("POST", "/api/runs/1/answer"), 1),
+    tries(() => api("POST", "/api/runs/1/answer"), { pause: 1 }),
     { code: "out_of_step" },
   );
   assert.equal(asked.length, 1);
 });
 
 test("a live answer is sent again while it doesn't get through and its question is open, and not after", async () => {
+  const send = () => api("POST", "/api/rooms/1/answer", {});
+  const live = (open: () => boolean) => tries(send, { open, pause: 1, max: Number.POSITIVE_INFINITY });
   let asked = serve("down", json(502, {}), "down", json(200, { ok: true }));
-  assert.equal(await deliver("/api/rooms/1/answer", {}, () => true, 1), null);
+  assert.deepEqual(await live(() => true), { ok: true });
   assert.equal(asked.length, 4);
   // A „no“ of the server's (too late) ends it at once.
   asked = serve(json(409, { error: "not_now", message: "Вече е късно за това." }));
-  assert.equal((await deliver("/api/rooms/1/answer", {}, () => true, 1))?.code, "not_now");
+  await assert.rejects(
+    live(() => true),
+    { code: "not_now" },
+  );
   assert.equal(asked.length, 1);
   // The question gone meanwhile: no more sends.
   let open = 2;
   asked = serve("down", "down", "down", "down");
-  assert.equal((await deliver("/api/rooms/1/answer", {}, () => --open > 0, 1))?.code, "offline");
+  await assert.rejects(
+    live(() => --open > 0),
+    { code: "offline" },
+  );
   assert.equal(asked.length, 2);
 });

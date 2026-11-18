@@ -10,7 +10,9 @@
 // A page that has fallen behind (a new version of the game out, another account signed in: fresh.ts) opens its next
 // screen by loading the page anew (loadAnew), not in place: a moment between screens, which costs the player nothing.
 // A link from outside the page (a notification, a link opened in the app) goes the way a tapped one does (navigate).
-// A screen whose heading comes after what it loads gets the focus with it (settle), as one drawn at once does.
+// A screen whose heading comes after what it loads gets the focus with it (settle), as one drawn at once does. A sheet
+// over the page (a <dialog> on the body, outside any screen: a game's news, the name asked for) goes with the screen
+// it was over.
 
 import { type Child, mount, signal } from "./dom.ts";
 
@@ -300,6 +302,7 @@ function render(scrollTop: boolean, first = false): void {
     }
   }
   disposeView?.();
+  for (const sheet of document.querySelectorAll?.<HTMLDialogElement>("dialog[open]") ?? []) sheet.close();
   disposeView = mount(root, view);
   if (scrollTop) scrollTo(0, 0);
   settle();

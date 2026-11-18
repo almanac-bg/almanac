@@ -6,6 +6,7 @@
 
 import { emblem } from "./art/emblem.ts";
 import { recover, staying } from "./fresh.ts";
+import { answering, answerState, countdown } from "./game/answering.ts";
 import { news } from "./game/news.ts";
 import { answered, ask, crowdLine, picture } from "./game/questions.ts";
 import {
@@ -19,8 +20,8 @@ import {
   reviewParts,
   shareButton,
 } from "./game/results.ts";
-import { countdown, guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
-import { ApiError, api, deliver, errorText } from "./lib/api.ts";
+import { guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
+import { ApiError, api, errorText } from "./lib/api.ts";
 import { keepAwake } from "./lib/awake.ts";
 import { type Child, computed, effect, h, lifetime, onCleanup, signal, untracked } from "./lib/dom.ts";
 import { ordinal, place } from "./lib/ordinal.ts";
@@ -28,12 +29,13 @@ import { musicOn } from "./lib/prefs.ts";
 import { pushable, pushOn, turnOn } from "./lib/push.ts";
 import { byTap, go, goBack, title } from "./lib/router.ts";
 import { feelKit, liveAudio, loadFeel, play, playAnswer, playCount, soundOn } from "./lib/sound.ts";
+import { stream } from "./lib/stream.ts";
 import { withName } from "./lib/words.ts";
 import type { DuelView } from "./screens/duel.ts";
 import { clock, coming, dayWord, when, whileSeen } from "./screens/modes.ts";
 import type { Steps } from "./screens/outcome.ts";
 import { changeGame, mixes } from "./screens/rooms.ts";
-import { categories, hostCss, outcomeCss, player, playing, topics, user } from "./state.ts";
+import { categories, hostCss, outcomeCss, player, playingWhile, topics, user } from "./state.ts";
 import {
   avatar,
   back,
@@ -54,6 +56,8 @@ import {
 
 export const kit = {
   answered,
+  answering,
+  answerState,
   api,
   ask,
   avatar,
@@ -70,7 +74,6 @@ export const kit = {
   computed,
   countdown,
   crowdLine,
-  deliver,
   effect,
   errorText,
   duelResult,
@@ -106,7 +109,7 @@ export const kit = {
   playAnswer,
   playCount,
   player,
-  playing,
+  playingWhile,
   profileHref,
   pushable,
   pushOn,
@@ -121,6 +124,7 @@ export const kit = {
   standingCard,
   staying,
   startScreen,
+  stream,
   timer,
   title,
   topics,

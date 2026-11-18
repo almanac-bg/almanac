@@ -58,6 +58,7 @@ const body = { isConnected: true };
 let focused: unknown = body;
 let heading: { tabIndex: number; focus: () => void; isConnected: boolean } | null = null;
 let observed: (() => void) | null = null;
+const sheets: { open: boolean; close: () => void }[] = [];
 const root = { replaceChildren() {}, querySelector: () => heading };
 
 Object.assign(globalThis, {
@@ -71,6 +72,8 @@ Object.assign(globalThis, {
   removeEventListener() {},
   document: {
     addEventListener() {},
+    // The sheets open over the page (a game's news, the name asked for).
+    querySelectorAll: (q: string) => (q === "dialog[open]" ? sheets.filter((s) => s.open) : []),
     createTextNode: () => ({}),
     get activeElement() {
       return focused;
@@ -107,6 +110,23 @@ router.start(
 );
 const tick = () => new Promise((r) => setTimeout(r, 5));
 const urls = () => entries.slice(0, index + 1).map((e) => e.url);
+
+test("a sheet open over a page goes with it, by a link or by back", async () => {
+  const sheet = () => {
+    const s = { open: true, close: () => (s.open = false) };
+    sheets.push(s);
+    return s;
+  };
+  const news = sheet();
+  router.go("/friends");
+  assert.equal(news.open, false);
+  const name = sheet();
+  history.back();
+  await tick();
+  assert.equal(location.pathname, "/");
+  assert.equal(name.open, false);
+  sheets.length = 0;
+});
 
 test("a tap opens a page over the one it's tapped on; back comes to that one again", async () => {
   drawn.length = 0;

@@ -3,7 +3,7 @@
 
 import { api } from "./lib/api.ts";
 import { boot } from "./lib/boot.ts";
-import { effect, signal, untracked } from "./lib/dom.ts";
+import { effect, onCleanup, signal, untracked } from "./lib/dom.ts";
 import { play } from "./lib/sound.ts";
 
 export interface User {
@@ -54,8 +54,32 @@ export async function player(): Promise<User> {
 /** How many friend requests wait for the player's answer. */
 export const friendRequests = signal(0);
 
-/** A game is under way on the screen: nothing else asks for the player's attention then. */
-export const playing = signal(false);
+/** How many parts of the screen hold that a game is under way (playingWhile), and whether any does. */
+let holds = 0;
+const held = signal(false);
+
+/** A game is under way on the screen: nothing else asks for the player's attention then (a friend's challenge, its
+ * ping), the header and the bar of places step aside on a phone, and the page isn't loaded anew under it (fresh.ts).
+ * Only read: what shows a game holds it (playingWhile). */
+export const playing: (() => boolean) & { peek(): boolean } = Object.assign(() => held(), { peek: () => held.peek() });
+
+/** Holds that a game is under way for as long as the current scope lasts and `now` says so: a game's count, the
+ * moment its first question is on its way, its questions, a live game's. Each part holds it for itself, and it's let
+ * go once none does: a part handing the screen to the next (the count to the question) takes it again before the
+ * moment is over, so the header doesn't come back between them. */
+export function playingWhile(now: () => boolean = () => true): void {
+  effect(() => {
+    if (!now()) return;
+    holds++;
+    held.set(true);
+    onCleanup(() => {
+      holds--;
+      queueMicrotask(() => {
+        if (!holds) held.set(false);
+      });
+    });
+  });
+}
 
 /** A friend's challenge waiting for the player: who, and until when. */
 export interface Challenge {
