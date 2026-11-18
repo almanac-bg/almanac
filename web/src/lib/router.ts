@@ -390,17 +390,18 @@ function settle(): void {
 let restoring = false;
 let stopRestoring = () => {};
 
-/** Puts the page back where it was scrolled to (`y`), once it's tall enough: a screen draws what it loads a moment
- * after it opens. A scroll or a key of the player's, or two seconds, end the wait. */
+/** Puts the page back where it was scrolled to (`y`), once it's tall enough, and keeps it there while the screen draws
+ * what it loads a moment after it opens: tall enough already, what loads above would otherwise move it (the browser's
+ * scroll anchoring). A scroll or a key of the player's, or two seconds, end the wait. */
 function restore(y = 0): void {
   stopRestoring();
   scrollTo(0, y);
-  if (y <= 0 || Math.abs(scrollY - y) < 2) return;
+  if (y <= 0) return;
   restoring = true;
   const until = performance.now() + 2000;
   const seen = new ResizeObserver(() => {
     scrollTo(0, y);
-    if (Math.abs(scrollY - y) < 2 || performance.now() > until) stop();
+    if (performance.now() > until) stop();
   });
   const stop = () => {
     restoring = false;

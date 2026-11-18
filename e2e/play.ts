@@ -1,4 +1,5 @@
 // Playing, as a player would: answer whatever question is showing.
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { expect, type Page } from "@playwright/test";
@@ -217,4 +218,13 @@ export async function befriendByLink(a: Page, b: Page): Promise<void> {
   await a.reload();
   await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
   await expect(a.locator(".friend")).not.toHaveCount(0);
+}
+
+/** The last sign-in code mailed to `email` (the test server writes its mail to files). */
+export function mailedCode(email: string): string {
+  try {
+    return /\b(\d{6})\b/.exec(readFileSync(`test-results/mail/${email}.txt`, "utf8"))?.[1] ?? "";
+  } catch {
+    return ""; // not sent yet
+  }
 }

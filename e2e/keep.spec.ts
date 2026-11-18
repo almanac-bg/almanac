@@ -1,28 +1,54 @@
 // Keeping a guest's game: asked in the day's „Утре“ card from the second day, at once in an app's own browser (with
-// the way out to the phone's browser, the game with it); and the way in for a player with a profile elsewhere.
+// the way out to the phone's browser, the game with it); where no notification can come (as in these tests: the
+// test server has no keys for them), by the reminder by mail, which asks for the email from the first day; on
+// Профил from the first game; and the way in for a player with a profile elsewhere.
 import { expect, test } from "@playwright/test";
-import { daysPlayed, playRun, startDay } from "./play.ts";
+import { daysPlayed, mailedCode, playRun, startDay } from "./play.ts";
 
-test("from the second day a guest is asked, in one line under the result, to keep the game", async ({ page }) => {
+test("from the second day, where no notification comes, the reminder by mail asks for the email and keeps the game", async ({
+  page,
+}, info) => {
   test.setTimeout(90_000);
+  const email = `remind-${info.project.name}-${Date.now()}@example.com`;
   await page.goto("/");
   await daysPlayed(page, 1);
   await page.reload();
   await startDay(page);
   await playRun(page);
   const tomorrow = page.locator(".tomorrow");
-  await expect(tomorrow).toContainText("Серията ти от 2 дни е само на това устройство. Запази я с имейл.");
-  await tomorrow.getByRole("button", { name: "Запази я с имейл" }).click();
-  await expect(tomorrow.getByLabel("Имейл")).toBeVisible();
+  await expect(tomorrow).toContainText("Серията ти от 2 дни е само на това устройство.");
+  await expect(tomorrow).toContainText("Да ти пишем, ако въпросите още те чакат?");
+  // One ask for the email, not two.
+  await expect(tomorrow.getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
+  await tomorrow.getByLabel("Имейл").fill(email);
+  await tomorrow.getByRole("button", { name: "Напомняй ми по имейл" }).click();
+  await expect.poll(() => mailedCode(email)).not.toBe("");
+  await tomorrow.getByLabel("Код").fill(mailedCode(email));
+  await tomorrow.getByRole("button", { name: "Потвърди" }).click();
+  await expect(tomorrow.getByRole("status")).toHaveText(
+    `Готово. Играта ти е запазена с имейла ${email}. Влизай с него от всяко устройство. Ще ти напомняме по имейл, ако въпросите още те чакат.`,
+  );
+  await expect(tomorrow).not.toContainText("само на това устройство");
+  // Настройки has it on, the player's to switch off.
+  await page.goto("/settings");
+  await expect(page.getByRole("switch", { name: "Напомняне по имейл" })).toHaveAttribute("aria-checked", "true");
 });
 
-test("a first day asks nothing", async ({ page }) => {
+test("a first day asks for the reminder only, not yet to keep the game; „Не сега“ holds for the day", async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   await page.goto("/");
   await startDay(page);
   await playRun(page);
+  const tomorrow = page.locator(".tomorrow");
+  await expect(tomorrow).toContainText("Да ти пишем, ако въпросите още те чакат?");
+  await expect(tomorrow).not.toContainText("само на това устройство");
+  await tomorrow.getByRole("button", { name: "Не сега" }).click();
+  await expect(tomorrow).not.toContainText("Да ти пишем");
+  await page.reload();
   await expect(page.locator(".tomorrow")).toBeVisible();
-  await expect(page.locator(".tomorrow")).not.toContainText("само на това устройство");
+  await expect(page.locator(".tomorrow")).not.toContainText("Да ти пишем");
 });
 
 test.describe("in Messenger's own browser", () => {
@@ -147,13 +173,43 @@ test("a first invite asks for a name the friends would know, once", async ({ pag
   await expect.poll(shares).toBe(4);
 });
 
-test("a guest's Профил has the way in for a profile from elsewhere", async ({ page }) => {
+test("a guest's Профил asks to keep the game and says it's kept; the way in for a profile from elsewhere is apart", async ({
+  page,
+}, info) => {
+  const email = `keep-${info.project.name}-${Date.now()}@example.com`;
   await page.goto("/");
   await daysPlayed(page, 1);
   await page.goto("/me");
-  await page.getByRole("button", { name: "Играеш и на друго устройство? Влез с имейла си" }).click();
+  await page.getByRole("button", { name: "Имаш профил? Влез" }).click();
   await expect(page.getByRole("heading", { name: "Влез в профила си" })).toBeVisible();
-  await expect(page.getByLabel("Имейл")).toBeVisible();
+  await page.goto("/me");
+  await expect(page.getByText("Играта ти е само на това устройство.")).toBeVisible();
+  await page.getByRole("button", { name: "Запази я с имейл" }).click();
+  await expect(page.getByRole("heading", { name: "Запази играта си" })).toBeVisible();
+  await page.getByLabel("Имейл").fill(email);
+  await page.getByRole("button", { name: "Прати ми код" }).click();
+  await expect.poll(() => mailedCode(email)).not.toBe("");
+  await page.getByLabel("Код").fill(mailedCode(email));
+  await page.getByRole("button", { name: "Потвърди" }).click();
+  await expect(page.getByRole("status")).toHaveText(
+    `Готово. Играта ти е запазена с имейла ${email}. Влизай с него от всяко устройство.`,
+  );
+  await expect(page.getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Имаш профил? Влез" })).toHaveCount(0);
+});
+
+test("Профил names Настройки in words, and a name still drawn leads to the field to change it", async ({ page }) => {
+  await page.goto("/");
+  await daysPlayed(page, 1);
+  await page.goto("/me");
+  await expect(page.getByText("Това име е избрано наслуки.")).toBeVisible();
+  await expect(page.locator(".me-settings")).toHaveText("Настройки");
+  await page.getByRole("link", { name: "Смени го" }).click();
+  await expect(page.getByLabel("Име", { exact: true })).toBeFocused();
+  // Известия are there wherever notifications can't come, and say why.
+  await expect(page.locator("section.stack", { has: page.getByRole("heading", { name: "Известия" }) })).toContainText(
+    /Този браузър не поддържа известия\.|към началния екран/,
+  );
 });
 
 test("come from the streak's mail, signed out: the way in comes first", async ({ page }) => {

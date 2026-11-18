@@ -118,6 +118,7 @@ type Server struct {
 	reminders     reminders     // who is due the day's reminder when, today (remind.go)
 	pushq         pushQueue     // the notifications' queue, as Push sends it (pushes.go)
 	streakMailing streakMailing // who is due the mail of a streak ended when, today (streakmail.go)
+	dayMailing    reminders     // who is due the day's reminder by mail when, today (daymail.go)
 	secure        bool
 	host          string
 	cookie        string       // the session's

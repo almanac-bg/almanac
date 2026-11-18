@@ -38,7 +38,8 @@ const (
 	StreakMailEvery = 30
 )
 
-// mailKind is a kind of mail a player may turn off (mail_prefs). A kind with no row is on.
+// mailKind is a kind of mail a player may turn on or off (mail_prefs). The streak's mail is on without a row; the
+// day's reminder by mail (daymail.go) off, as it goes only to whoever asked for it.
 type mailKind string
 
 const mailStreak mailKind = "streak"
@@ -139,7 +140,8 @@ func (s *Server) streakMail(ctx context.Context, today string, at time.Time, use
 	sent := false
 	err = s.db.Tx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.Exec(`INSERT INTO streak_mails (user_id, day, at) SELECT ?1, ?2, ?3
-			WHERE NOT EXISTS (SELECT 1 FROM streak_mails WHERE user_id = ?1 AND day > ?4) ON CONFLICT DO NOTHING`,
+			WHERE NOT EXISTS (SELECT 1 FROM streak_mails WHERE user_id = ?1 AND day > ?4)
+			AND NOT EXISTS (SELECT 1 FROM day_mails WHERE user_id = ?1 AND day = ?2) ON CONFLICT DO NOTHING`,
 			userID, today, at.UnixMilli(), play.DayShift(today, -StreakMailEvery))
 		if err != nil {
 			return err
@@ -199,11 +201,11 @@ func (s *Server) streakMailOf(ctx context.Context, today string, userID int64) (
 	return m, true, nil
 }
 
-// wantsMail says whether a player gets a kind of mail (on, unless they've turned it off).
+// wantsMail says whether a player gets a kind of mail: as they chose, else the streak's on and the day's off.
 func (s *Server) wantsMail(ctx context.Context, userID int64, kind mailKind) (bool, error) {
 	var on bool
-	err := s.db.Read.QueryRowContext(ctx, `SELECT coalesce((SELECT wanted FROM mail_prefs WHERE user_id = ? AND kind = ?), 1)`,
-		userID, kind).Scan(&on)
+	err := s.db.Read.QueryRowContext(ctx, `SELECT coalesce((SELECT wanted FROM mail_prefs WHERE user_id = ? AND kind = ?), ?)`,
+		userID, kind, kind == mailStreak).Scan(&on)
 	return on, err
 }
 
@@ -227,10 +229,13 @@ func (s *Server) mailOffURL(userID int64, kind mailKind) string {
 }
 
 var mailOffPage = template.Must(template.New("off").Parse(`{{if .Done}}
-<p role="status">Готово. Няма да ти пращаме писма, когато серията ти прекъсне.</p>
+<p role="status">Готово. {{if .Day}}Няма да ти пишем, когато въпросите на деня те чакат.{{else}}Няма да ти пращаме писма, когато серията ти прекъсне.{{end}}</p>
 <p class="muted">Ако размислиш, включи ги пак от <a href="/settings">Профил → Настройки → Известия</a>.</p>
 {{else if .Bad}}
 <p>Тази връзка не работи. Писмата можеш да спреш и от <a href="/settings">Профил → Настройки → Известия</a>.</p>
+{{else if .Day}}
+<p>Пишем ти веднъж на ден, около часа, в който играеш, ако въпросите на деня още те чакат.</p>
+<form method="post"><button class="btn" type="submit">Спри писмата</button></form>
 {{else}}
 <p>Пращаме ти писмо, когато прекъсне серия от поне {{.From}} дни, и само ако не получаваш известия.</p>
 <form method="post"><button class="btn" type="submit">Спри писмата</button></form>
@@ -244,8 +249,9 @@ func (s *Server) mailOff(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	id, err := strconv.ParseInt(q.Get("u"), 10, 64)
 	kind := mailKind(q.Get("k"))
-	good := err == nil && kind == mailStreak && hmac.Equal([]byte(q.Get("s")), []byte(s.mailSign(id, kind)))
-	data := map[string]any{"Bad": !good, "From": StreakMailFrom}
+	good := err == nil && (kind == mailStreak || kind == mailDay) &&
+		hmac.Equal([]byte(q.Get("s")), []byte(s.mailSign(id, kind)))
+	data := map[string]any{"Bad": !good, "From": StreakMailFrom, "Day": kind == mailDay}
 	if good && r.Method == http.MethodPost {
 		if err := s.setMailPref(r.Context(), id, kind, false); err != nil {
 			slog.Error("mail off", "err", err)
@@ -259,8 +265,8 @@ func (s *Server) mailOff(w http.ResponseWriter, r *http.Request) {
 	s.plain(w, "Писма от АЛМАНАХ", template.HTML(body.String()))
 }
 
-// mailPrefs is the player's mail by kind: whether they get it, and whether they can (an email, and notifications on
-// no device: the mail is for whom nothing else reaches).
+// mailPrefs is the player's mail by kind (the streak's, the day's reminder): whether they get it, and whether they
+// can (an email, and notifications on no device: the mail is for whom nothing else reaches).
 func (s *Server) mailPrefs(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -274,15 +280,20 @@ func (s *Server) mailPrefsOf(ctx context.Context, w http.ResponseWriter, userID 
 	if err != nil {
 		return err
 	}
+	day, err := s.wantsMail(ctx, userID, mailDay)
+	if err != nil {
+		return err
+	}
 	var reachable bool
 	if err := s.db.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM push_subs WHERE user_id = ?1)
 		OR EXISTS (SELECT 1 FROM phones WHERE user_id = ?1)`, userID).Scan(&reachable); err != nil {
 		return err
 	}
-	return ok(w, map[string]bool{"streak": on, "can": email && !reachable})
+	return ok(w, map[string]bool{"streak": on, "day": day, "can": email && !reachable})
 }
 
-// setMailPrefs turns a kind of mail on or off for the player.
+// setMailPrefs turns a kind of mail on or off for the player: on only with an email, which only the sign-in code
+// sets (account.Verify).
 func (s *Server) setMailPrefs(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -295,7 +306,7 @@ func (s *Server) setMailPrefs(w http.ResponseWriter, r *http.Request) error {
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
-	if in.Kind != mailStreak {
+	if (in.Kind != mailStreak && in.Kind != mailDay) || (in.Kind == mailDay && in.On && u.Email == "") {
 		return errBadRequest
 	}
 	if err := s.setMailPref(r.Context(), u.ID, in.Kind, in.On); err != nil {

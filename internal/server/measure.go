@@ -75,10 +75,11 @@ func (s *Server) cameFrom(ctx context.Context, userID int64, path string, app bo
 }
 
 // clientTallies are what the client counts (play/measure.go): the day shared, the reminder's ask on Начало (shown,
-// yes, no; and on an iPhone in a browser, the way to the home screen shown), a notification opened, by kind, a broken
-// streak's repair offered (play/repair.go).
+// yes, no; by notification, or by mail where none can come), a notification opened, by kind, a broken streak's repair
+// offered (play/repair.go).
 var clientTallies = map[string]bool{
-	"share:day": true, "share:challenge": true, "pushask:shown": true, "pushask:yes": true, "pushask:no": true, "pushask:home": true,
+	"share:day": true, "share:challenge": true, "pushask:shown": true, "pushask:yes": true, "pushask:no": true,
+	"mailask:shown": true, "mailask:yes": true, "mailask:no": true,
 	"repair:offered": true,
 }
 
@@ -380,7 +381,11 @@ func (s *Server) firstWeek(ctx context.Context, active play.Active) (firstWeek, 
 	row("Покана за напомняне, показана", false, func(w window) string { return fmt.Sprint(w.t["pushask:shown"]) })
 	row("„Напомняй ми“", true, func(w window) string { return rate{w.t["pushask:yes"], w.t["pushask:shown"]}.String() })
 	row("„Не сега“", true, func(w window) string { return rate{w.t["pushask:no"], w.t["pushask:shown"]}.String() })
-	row("На iPhone: пътят към началния екран", true, func(w window) string { return fmt.Sprint(w.t["pushask:home"]) })
+	// Where notifications can't come (an iPhone in a browser, one without them), the reminder by mail (daymail.go).
+	row("Покана за напомняне по имейл, показана", false, func(w window) string { return fmt.Sprint(w.t["mailask:shown"]) })
+	row("„Напомняй ми по имейл“", true, func(w window) string { return rate{w.t["mailask:yes"], w.t["mailask:shown"]}.String() })
+	row("„Не сега“", true, func(w window) string { return rate{w.t["mailask:no"], w.t["mailask:shown"]}.String() })
+	row("Писма „Въпросите на деня те чакат“, изпратени", true, func(w window) string { return fmt.Sprint(w.t["mail:day:sent"]) })
 	for _, k := range pushNames {
 		row("Известия „"+k.name+"“, изпратени", false, func(w window) string { return fmt.Sprint(w.t["push:sent:"+k.kind]) })
 		row("отворени", true, func(w window) string { return rate{w.t["push:open:"+k.kind], w.t["push:sent:"+k.kind]}.String() })

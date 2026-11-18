@@ -14,9 +14,10 @@ import (
 //
 //   - daily_counts: a number a day for each thing counted that no other table keeps (Tally): a visit without a
 //     profile by where it landed ("visit:home"), a guest made ("guest:invite"), a share of the day ("share:day"),
-//     the reminder's ask on Начало ("pushask:shown|yes|no|home"), notifications sent and opened by kind
-//     ("push:sent:day", "push:open:day"), the day's answers and those to a question the player had answered before
-//     ("day:answers", "day:seen": none since the days are drawn ahead, ahead.go), a broken streak's repair offered
+//     the reminder's ask on Начало ("pushask:shown|yes|no", and by mail "mailask:shown|yes|no"), notifications
+//     sent and opened by kind ("push:sent:day", "push:open:day"), the day's reminders mailed ("mail:day:sent"), the
+//     day's answers and those to a question the player had answered before ("day:answers", "day:seen": none since
+//     the days are drawn ahead, ahead.go), a broken streak's repair offered
 //     on Начало and done ("repair:offered", "repair:done": repair.go). Nobody is in it.
 //   - users.came_from: where a player first came in (Landings), set as their guest is made.
 //   - what the game keeps anyway: the days played (active_days), the games (runs), notifications on (push_subs,

@@ -94,7 +94,7 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   a way to play the topic), latest games (each a way to go over it, read-only: `/games/<id>`, the score as its result
   had it and the questions)), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
   worn as others see it, then Аватар, Рамка, Фон or Титла, one at a time) and Алманах (`/almanac`). Настройки open
-  from the icon beside the name. The switch names the place, so Награди, Гардероб and Алманах have no heading of
+  from the button beside the name, its icon and its word at every width (an icon alone is read by few). The switch names the place, so Награди, Гардероб and Алманах have no heading of
   their own on the screen (it's there for screen readers).
   **Моят Алманах** reads as an almanac, by day, newest first: the count in the numeral face („42 факта досега“, or a
   topic's „7 от 24 факта в „История““), what they are in a line, and the questions waiting for a second chance as one
@@ -250,7 +250,7 @@ takes a token.
 - **Layout:** `.screen`, `.stack`, `.intro`, `.title-row`, `.card` (with `.card-head` and `.card-title`) and
   `.card.hero`.
 - **Getting around:** `.tabs` (the four places), `.back` (drawn by `back()`), `.subnav` (Профил's places, drawn by
-  `profileNav()`), `.icon-btn` (a square with an icon and its name for screen readers) and `.more` (a `details` that
+  `profileNav()`), `.me-settings` (Настройки: an icon and its word, the word under the icon on a narrow phone) and `.more` (a `details` that
   folds what's rarely needed; what it holds is spaced as a section's parts).
 - **Начало:** `.status` with `.streak-chip` and `.level-chip`; `.card.hero.day` opening with `.masthead`
   (`.masthead-line`, `.masthead-date`) over `.day-title`; `.modes .mode` and `.topics .topic` (`.topic-all` across
