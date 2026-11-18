@@ -1,11 +1,37 @@
-/* A room led from a big screen („Само водя“, screens/host.ts): a class's board, a pub's TV, read from across the
-   room. Loaded only on that screen; the rest of a room is app.css's. On a phone it's one column, as everything. */
+/* A room led from a big screen („Само водя“, screens/host.ts): a TV in a pub, a projector, read from across the room.
+   Loaded only on that screen; the rest of a room is app.css's. Led, the room is the whole screen: the header and the
+   places' bar step aside (Начало is a link over the lobby and the end). On a big screen a question and its answer are
+   one screen high, sized by its height (vh), with the host's controls always at its foot: nothing scrolls. On a phone
+   it's one column, as everything. */
 
 @layer app {
-  /* The whole width, whatever the page's column. */
-  .hosting #app,
+  .hosting #app > .top,
+  .hosting .tabs,
+  .hosting .game-leave {
+    display: none;
+  }
+
+  .hosting #app {
+    max-width: 100rem;
+    padding-bottom: max(var(--space-5), env(safe-area-inset-bottom));
+  }
+
   .hosting main > * {
     max-width: 100rem;
+  }
+
+  /* The line goes out of sight mid-game: said over the screen, which doesn't move for it. */
+  .hosting .reconnecting {
+    position: fixed;
+    top: var(--space-3);
+    left: 50%;
+    z-index: 20;
+    transform: translateX(-50%);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-full);
+    background: var(--raised);
+    box-shadow: var(--elev-2);
+    color: var(--text);
   }
 
   .host {
@@ -17,6 +43,31 @@
     display: grid;
     gap: var(--space-5);
     align-items: start;
+  }
+
+  /* Over the lobby and the end: back to Начало, Night or Day, the whole screen. */
+  .host-tools,
+  .host-tools-end {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .host-tools {
+    justify-content: space-between;
+  }
+
+  .host-tools .segmented {
+    width: auto;
+  }
+
+  .host-tools .segmented button {
+    padding-inline: var(--space-4);
+  }
+
+  .host-tools .btn {
+    width: auto;
   }
 
   .host-qr {
@@ -32,6 +83,34 @@
     line-height: 1.75rem;
   }
 
+  .host-players-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+
+  .host-players-head .section-title {
+    margin: 0;
+  }
+
+  /* The host's buttons on a chip, shown: a finger's room each. */
+  .host .players .remove {
+    min-height: 44px;
+  }
+
+  .host-start {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .host-foot {
+    display: grid;
+    gap: var(--space-3);
+  }
+
   .host-controls {
     display: flex;
     flex-wrap: wrap;
@@ -45,13 +124,16 @@
 
   .host-controls .btn[aria-pressed="true"] {
     background: var(--accent);
-    color: var(--on-fill);
+    border-color: var(--accent);
+    color: var(--on-accent);
   }
 
-  /* The first three, on their steps: second, first, third. */
+  /* The first three, on their steps (as many as there are): second, first, third. */
   .podium {
+    --steps: 3;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--steps), minmax(0, 14rem));
+    justify-content: center;
     align-items: end;
     gap: var(--space-3);
     margin: 0;
@@ -60,11 +142,20 @@
     text-align: center;
   }
 
+  .podium.steps-1 {
+    --steps: 1;
+  }
+
+  .podium.steps-2 {
+    --steps: 2;
+  }
+
   .podium li {
     display: grid;
     justify-items: center;
-    gap: var(--space-2);
+    gap: var(--space-1);
     min-width: 0;
+    line-height: 1.25;
     font-weight: 800;
   }
 
@@ -99,53 +190,358 @@
     color: var(--on-fill);
   }
 
-  /* A big screen: the code and the question as large as a room reads them, the answer beside the first five. */
+  /* A big screen, read from across the room. */
   @media (min-width: 64rem) {
-    .host-row {
-      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-      gap: var(--space-7);
+    .hosting #app {
+      max-width: none;
+      padding: 0 clamp(24px, 4vw, 80px);
     }
 
-    /* No phones in the room: no standings beside the answer, which takes the width. */
-    .host-row.host-answer:not(:has(> .board)) {
-      grid-template-columns: minmax(0, 1fr);
+    .hosting main > * {
+      max-width: none;
+    }
+
+    .host-lobby,
+    .host-end {
+      padding-block: clamp(16px, 3vh, 40px);
+    }
+
+    .host-row {
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+      gap: clamp(24px, 4vw, 80px);
     }
 
     .host .code-big {
-      font-size: 8rem;
+      font-size: clamp(4rem, min(9vw, 17vh), 10rem);
+    }
+
+    .host-lobby h1 {
+      font-size: clamp(2.5rem, 6vh, 4rem);
+      line-height: 1.1;
     }
 
     .host-join {
-      font-size: 2rem;
-      line-height: 2.5rem;
+      font-size: clamp(1.375rem, 3.4vh, 2.25rem);
+      line-height: 1.3;
+    }
+
+    .host-qr {
+      width: min(100%, 42vh);
+    }
+
+    .host .kicker {
+      font-size: clamp(0.875rem, 1.9vh, 1.375rem);
+      line-height: 1.3;
+    }
+
+    .host .section-title {
+      font-size: clamp(0.875rem, 1.9vh, 1.25rem);
+    }
+
+    /* Each in the room, big enough to find oneself from the back: no titles, no level. */
+    .host .players {
+      gap: var(--space-3);
+    }
+
+    .host .players li {
+      gap: var(--space-3);
+      padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+      font-size: clamp(1.25rem, 2.8vh, 2rem);
+    }
+
+    .host .players .avatar,
+    .host .board .avatar {
+      --size: clamp(36px, 5vh, 56px);
+    }
+
+    .host .players .remove {
+      font-size: 1rem;
+    }
+
+    .host .avatar .lv,
+    .host .who-title {
+      display: none;
+    }
+
+    .host-start {
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+    }
+
+    .host-start .btn.big {
+      width: auto;
+      min-width: 18rem;
+      font-size: clamp(1.25rem, 2.6vh, 1.75rem);
+    }
+
+    /* A question and its answer: the screen's height, the head over it, the controls under it, all in sight. */
+    .host-ask,
+    .host-reveal {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: clamp(12px, 2.5vh, 32px);
+      height: 100dvh;
+      padding-block: clamp(12px, 2.5vh, 32px);
+    }
+
+    .host-top {
+      display: grid;
+      gap: clamp(8px, 1.5vh, 16px);
+    }
+
+    .host .count-n {
+      font-size: clamp(2.25rem, 6vh, 4.5rem);
+      line-height: 1;
+    }
+
+    .host .count-of {
+      font-size: clamp(1.25rem, 3vh, 2.25rem);
+      line-height: 1;
+    }
+
+    .host .track {
+      height: clamp(8px, 1.3vh, 14px);
+    }
+
+    .host .secs {
+      font-size: clamp(2rem, 6.5vh, 5rem);
+    }
+
+    .host .secs small {
+      font-size: clamp(0.875rem, 2.4vh, 1.75rem);
+    }
+
+    /* What's asked fills what's left; too much of it (a long order, a picture and four more) scrolls within, the
+       controls still in sight. */
+    .host-stage {
+      display: grid;
+      align-content: center;
+      gap: clamp(12px, 2.5vh, 32px);
+      min-height: 0;
+      overflow: auto;
     }
 
     .host .ask {
-      font-size: 3rem;
-      line-height: 3.5rem;
+      font-size: clamp(2rem, 5.5vh, 4.5rem);
+      line-height: 1.15;
+      text-wrap: balance;
     }
 
-    .host .option {
-      min-height: 6rem;
-      font-size: 1.75rem;
-      line-height: 2.25rem;
+    .host .picture {
+      max-height: 30vh;
     }
 
-    .host .status {
-      font-size: 1.5rem;
+    .host .options {
+      gap: clamp(8px, 1.5vh, 16px);
     }
 
-    .podium .place {
-      height: 8rem;
-      font-size: 3rem;
+    .host-ask .options:not(.sortable-list, .split-items) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .podium .p1 .place {
-      height: 14rem;
+    .host :is(.options, .match) .option {
+      min-height: clamp(4rem, 11vh, 8.5rem);
+      padding: var(--space-3) var(--space-5) var(--space-3) var(--space-3);
+      font-size: clamp(1.375rem, 3.6vh, 2.75rem);
+      line-height: 1.2;
     }
 
-    .podium .p2 .place {
-      height: 11rem;
+    .host .letter {
+      width: clamp(36px, 6vh, 72px);
+      height: clamp(36px, 6vh, 72px);
+      font-size: clamp(1rem, 3vh, 2rem);
+    }
+
+    .host .pic-options {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .host .pic-option-img {
+      max-height: 34vh;
+    }
+
+    .host .option.tf {
+      min-height: clamp(6rem, 22vh, 14rem);
+      font-size: clamp(1.75rem, 5vh, 3.5rem);
+    }
+
+    .host .clue {
+      font-size: clamp(1.125rem, 2.8vh, 2rem);
+    }
+
+    .host .crowd-share {
+      font-size: inherit;
+      font-weight: 800;
+    }
+
+    /* The answer: the question a size smaller, the room's word on it, the fact; the first five beside. */
+    .host-reveal .host-stage {
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+      align-items: center;
+      gap: clamp(24px, 3vw, 64px);
+    }
+
+    /* No phones in the room: no standings beside the answer, which takes the width. */
+    .host-reveal .host-stage:not(:has(> .board)) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .host-reveal .stack {
+      gap: clamp(8px, 1.8vh, 20px);
+    }
+
+    .host-reveal .ask {
+      font-size: clamp(1.5rem, 4vh, 3.25rem);
+    }
+
+    .host-reveal .picture {
+      max-height: 22vh;
+    }
+
+    .host-reveal :is(.options, .match) .option {
+      min-height: clamp(3rem, 7vh, 5.5rem);
+      font-size: clamp(1.125rem, 2.8vh, 2.125rem);
+    }
+
+    /* With a picture over them, a question's answers a row's height less. */
+    .host-ask .host-stage:has(> .picture) :is(.options, .match) .option {
+      min-height: clamp(3.5rem, 8vh, 6rem);
+    }
+
+    .host-reveal .option.tf {
+      min-height: clamp(4rem, 12vh, 8rem);
+      font-size: clamp(1.5rem, 3.6vh, 2.5rem);
+    }
+
+    .host-reveal .options:not(.sortable-list, .match-result, .split-result) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .host-reveal .pic-options {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .host-reveal .pic-option-img {
+      max-height: 20vh;
+    }
+
+    .host .room-knew {
+      font-size: clamp(1.25rem, 3.2vh, 2.25rem);
+    }
+
+    .host .fact {
+      padding: clamp(12px, 2vh, 24px) clamp(16px, 2vw, 32px);
+    }
+
+    .host .fact h2 {
+      font-size: clamp(0.75rem, 1.6vh, 1.125rem);
+      line-height: 1.3;
+    }
+
+    .host .fact p {
+      font-size: clamp(1.125rem, 2.8vh, 2rem);
+      line-height: 1.4;
+    }
+
+    .host .board h2 {
+      font-size: clamp(0.75rem, 1.6vh, 1.125rem);
+    }
+
+    .host .board .row {
+      grid-template-columns: clamp(32px, 5vh, 52px) minmax(0, 1fr) auto;
+      padding: clamp(8px, 1.4vh, 16px) var(--space-5);
+      font-size: clamp(1.125rem, 2.8vh, 2rem);
+    }
+
+    .host .board .row.moves {
+      grid-template-columns: clamp(32px, 5vh, 52px) minmax(0, 1fr) auto 3rem;
+    }
+
+    .host .board .place {
+      width: clamp(32px, 5vh, 52px);
+      height: clamp(32px, 5vh, 52px);
+      font-size: clamp(1.125rem, 2.8vh, 1.75rem);
+    }
+
+    .host .board .who-name {
+      font-size: inherit;
+      line-height: 1.25;
+    }
+
+    .host .board .pts {
+      font-size: clamp(1.375rem, 3.4vh, 2.5rem);
+    }
+
+    .host .board .sub {
+      font-size: clamp(0.875rem, 2vh, 1.375rem);
+    }
+
+    .host-foot {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: var(--space-3) clamp(16px, 3vw, 48px);
+    }
+
+    .host-foot .status,
+    .host-foot .up-next {
+      font-size: clamp(1.25rem, 3vh, 2.25rem);
+      line-height: 1.25;
+    }
+
+    .host-foot .up-next .track {
+      height: 6px;
+    }
+
+    .host-controls {
+      flex-wrap: nowrap;
+    }
+
+    .host-controls .btn {
+      flex: none;
+      min-width: 9rem;
+      min-height: clamp(3rem, 6vh, 4.5rem);
+      font-size: clamp(1rem, 2.2vh, 1.5rem);
+    }
+
+    .host-foot > .bad {
+      grid-column: 1 / -1;
+    }
+
+    /* The podium as tall as the screen allows, everyone's place beside it (a long list scrolls on its own). */
+    .host-result {
+      align-items: end;
+    }
+
+    .host-result .board {
+      max-height: 55vh;
+      overflow: auto;
+    }
+
+    .host-end h1 {
+      font-size: clamp(2rem, 5vh, 3.5rem);
+      line-height: 1.15;
+    }
+
+    .podium {
+      grid-template-columns: repeat(var(--steps), minmax(0, 18rem));
+      font-size: clamp(1.125rem, 2.6vh, 1.75rem);
+    }
+
+    .host .podium .avatar.l {
+      --size: clamp(56px, 9vh, 96px);
+    }
+
+    .host .podium .place {
+      height: clamp(4rem, 12vh, 8rem);
+      font-size: clamp(2rem, 6vh, 4rem);
+    }
+
+    .host .podium .p1 .place {
+      height: clamp(6rem, 20vh, 14rem);
+    }
+
+    .host .podium .p2 .place {
+      height: clamp(5rem, 16vh, 11rem);
     }
   }
 }

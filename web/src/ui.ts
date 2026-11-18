@@ -6,7 +6,7 @@ import { type DivisionID, emblem } from "./art/emblem.ts";
 import { picture } from "./art/picture.ts";
 import { errorText, passing } from "./lib/api.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
-import { calm } from "./lib/prefs.ts";
+import { calm, type Scheme, scheme, setScheme } from "./lib/prefs.ts";
 import { path } from "./lib/router.ts";
 import { stakeWords } from "./lib/words.ts";
 import { hourInBulgaria } from "./lib/year.ts";
@@ -103,6 +103,17 @@ export function segmented<T>(
       ),
     ),
   );
+}
+
+/** How the game looks on this device (prefs.ts: scheme): as the device is set, or Night or Day whatever it says. Not
+ * „Тема“: in the game that's what questions are about. */
+export function schemeSwitch(): Child {
+  const schemes: [Scheme, string][] = [
+    ["device", "Автоматично"],
+    ["night", "Нощ"],
+    ["day", "Ден"],
+  ];
+  return segmented("Изглед", schemes, scheme, setScheme, false, true);
 }
 
 /** The fact behind an answer; over it, for a question of the day's ten dealt on its date, what happened that day

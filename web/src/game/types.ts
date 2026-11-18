@@ -121,6 +121,8 @@ export interface Crowd {
   today?: boolean;
   /** A question of a past issue: that day's players (play/past.go). */
   issue?: boolean;
+  /** Few enough to count (a room's own, set by the room's screen): each answer says how many gave it, not what share. */
+  counts?: boolean;
 }
 
 /** Typed guesses around a number's answer: equal parts of lo–hi (on a log scale if log), and the shares beyond. */

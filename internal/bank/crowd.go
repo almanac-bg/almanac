@@ -158,6 +158,18 @@ type CrowdView struct {
 	Issue   bool      `json:"issue,omitempty"`
 }
 
+// In is the crowd as deal d shows it: a choice's picks in the order its options are shown (as Dealt.Reveal has it).
+// Nil when it counts no answers.
+func (c *Crowd) In(d Dealt) *CrowdView {
+	switch d := d.(type) {
+	case *dealtChoice:
+		return c.view(d.order)
+	case *dealtClues:
+		return c.view(d.order)
+	}
+	return c.view(nil)
+}
+
 // view is the crowd as shown, its picks put in the deal's order (order[i] is the bank's place of what's shown at i;
 // nil keeps the bank's order).
 func (c *Crowd) view(order []int) *CrowdView {

@@ -10,10 +10,16 @@
   }
 
   @media (prefers-color-scheme: light) {
-    :root {
+    :root:not([data-scheme="night"]) {
       --series-1: #5b3fd1;
       --series-2: #b77400;
     }
+  }
+
+  /* The same, chosen whatever the device says (prefs.ts: scheme; scheme.test.ts holds the two equal). */
+  :root[data-scheme="day"] {
+    --series-1: #5b3fd1;
+    --series-2: #b77400;
   }
 
   #app.admin-app {
