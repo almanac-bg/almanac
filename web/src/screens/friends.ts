@@ -434,7 +434,9 @@ function row(f: Friend, challenge: () => void, remove: () => void, block: () => 
       h(
         "span",
         { class: "friend-day" },
-        f.today ? `${f.today.rights} от 10 · ${formatNumber(f.today.points)} т.` : "Днес още няма резултат",
+        f.today
+          ? `${f.today.rights} от 10 · ${formatNumber(f.today.points)} ${f.today.points === 1 ? "точка" : "точки"}`
+          : "Днес още няма резултат",
       ),
     ),
     played

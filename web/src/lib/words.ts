@@ -65,12 +65,17 @@ const onset = /^[бвгдзкпстфхжшчц][рл]$/;
 /** Where a word may break at a line's end, as soft hyphens, by the Bulgarian rules: by syllables; one consonant
  * between two vowels goes to the next line („ма-ма“); of two or more, the last does, or the last two where they begin
  * a syllable together („сес-тра“), so two of the same part („мост-та“); „ь“ never starts a line, „дж“ and „дз“ stay
- * together, and no line keeps or takes a single letter; a word under seven letters fits any column whole. The browser
- * breaks a word there, with a hyphen, only where it doesn't fit (a narrow column at 320 px), instead of at any letter:
- * no browser knows Bulgarian hyphenation itself. */
+ * together, and no line keeps or takes a single letter; a word under seven letters fits any column whole. A name
+ * after the first word (a capital: „Майкъл Фарадей“) goes to the next line whole rather than „Фара-дей“, unless it's
+ * too long for a line of its own in the narrowest column (nine letters or more: „Куентин Таран-тино“); a first word
+ * starts its line, so it breaks only where it's wider than the line, capital or not. The browser breaks a word there,
+ * with a hyphen, only where it doesn't fit (a narrow column at 320 px), instead of at any letter: no browser knows
+ * Bulgarian hyphenation itself. */
 export function hyphenate(text: string): string {
-  return text.replace(/[а-яѝ]{7,}/gi, (word) => {
+  return text.replace(/[а-яѝ]{7,}/gi, (word, at: number) => {
     const w = word.toLowerCase();
+    const first = !/[\p{L}\p{N}]/u.test(text.slice(0, at));
+    if (!first && word.charAt(0) !== w.charAt(0) && word.length < 9) return word;
     let out = "";
     let from = 0;
     let prev = -1;

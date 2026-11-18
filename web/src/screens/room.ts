@@ -980,7 +980,7 @@ function end(view: () => RoomView, code: string): Child {
     ),
     () =>
       view().allRight
-        ? h("p", { class: "points-bonus" }, `Всички верни: +${formatNumber(view().allRight ?? 0)} т.`)
+        ? h("p", { class: "points-bonus" }, `Всички верни: +${formatNumber(view().allRight ?? 0)} точки`)
         : null,
     // Who leads starts the next game (the gold button); everyone else waits for it. The questions to go over, beside:
     // under the result, over the standings, which may be long.

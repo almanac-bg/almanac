@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ordinal } from "./ordinal.ts";
 
-test("ordinals are written as Bulgarian spells them", () => {
+test("ordinals are written as Bulgarian spells them, the hyphen one that never breaks a line („3-|тия“)", () => {
+  assert.equal(ordinal(3, "n"), "3\u2011то");
   const m = [1, 2, 3, 4, 5, 7, 8, 10, 11, 12, 14, 20, 21, 22, 23, 24, 50, 100, 101, 111, 200, 1000];
   assert.deepEqual(
-    m.map((n) => ordinal(n)),
+    m.map((n) => ordinal(n).replace("\u2011", "-")),
     [
       "1-ви",
       "2-ри",
@@ -32,11 +33,11 @@ test("ordinals are written as Bulgarian spells them", () => {
     ],
   );
   assert.deepEqual(
-    [1, 2, 3, 5].map((n) => ordinal(n, "n")),
+    [1, 2, 3, 5].map((n) => ordinal(n, "n").replace("\u2011", "-")),
     ["1-во", "2-ро", "3-то", "5-о"],
   );
   assert.deepEqual(
-    [1, 4, 6].map((n) => ordinal(n, "f")),
+    [1, 4, 6].map((n) => ordinal(n, "f").replace("\u2011", "-")),
     ["1-ва", "4-та", "6-а"],
   );
 });

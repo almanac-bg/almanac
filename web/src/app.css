@@ -470,9 +470,14 @@
     white-space: nowrap;
   }
 
-  .tabs a:hover,
   .tabs a[aria-current="page"] {
     color: var(--text);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .tabs a:hover {
+      color: var(--text);
+    }
   }
 
   /* Where the player is: the place in full text, marked in the accent (gold is for the right answer, not for here). */
@@ -672,8 +677,10 @@
     color: var(--text-muted);
   }
 
-  a.goal-name:hover {
-    color: var(--link);
+  @media (hover: hover) and (pointer: fine) {
+    a.goal-name:hover {
+      color: var(--link);
+    }
   }
 
   .goal-mark {
@@ -893,10 +900,12 @@
     transition: box-shadow 160ms;
   }
 
-  .place-link:hover {
-    box-shadow:
-      var(--elev-2),
-      inset 0 0 0 1px var(--line);
+  @media (hover: hover) and (pointer: fine) {
+    .place-link:hover {
+      box-shadow:
+        var(--elev-2),
+        inset 0 0 0 1px var(--line);
+    }
   }
 
   .place-link-text {
@@ -941,14 +950,6 @@
 
   .league-board .row.down {
     box-shadow: inset 3px 0 0 var(--wrong);
-  }
-
-  /* A row's points, under its right answers: they decide only a tie. */
-  .league-pts {
-    display: block;
-    margin-top: 3px;
-    font-size: 0.75rem;
-    text-align: right;
   }
 
   .league-line {
@@ -1190,11 +1191,13 @@
       box-shadow 160ms ease;
   }
 
-  .mode:hover {
-    box-shadow:
-      var(--elev-1),
-      inset 0 0 0 1px var(--tone);
-    transform: translateY(-1px);
+  @media (hover: hover) and (pointer: fine) {
+    .mode:hover {
+      box-shadow:
+        var(--elev-1),
+        inset 0 0 0 1px var(--tone);
+      transform: translateY(-1px);
+    }
   }
 
   .mode-pic {
@@ -1410,10 +1413,16 @@
     gap: var(--space-1) var(--space-3);
   }
 
+  /* Начало and a result end in quiet lines (the league, Втори шанс, a way in, what the game brought): one list at the
+     column's left, with its buttons, in one style (the news' lines: below). */
   .day-next {
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9375rem;
+    line-height: 1.375rem;
+  }
+
+  :is(.home, .summary) :is(.news-xp, .news-open, .news-facts, .news-goal, .news-late) {
+    text-align: left;
   }
 
   /* The day's result, just played: the goals still open, as what's next, quietly (no card), and under a topic's result
@@ -1459,8 +1468,10 @@
     text-decoration: none;
   }
 
-  .back:hover {
-    color: var(--text);
+  @media (hover: hover) and (pointer: fine) {
+    .back:hover {
+      color: var(--text);
+    }
   }
 
   .back-i {
@@ -1621,6 +1632,10 @@
       transform: translateY(-1px);
       box-shadow: var(--elev-2);
     }
+
+    .btn.primary:hover:not(:disabled) {
+      box-shadow: var(--glow-gold);
+    }
   }
 
   .btn:active:not(:disabled) {
@@ -1639,10 +1654,6 @@
     border-color: transparent;
     background: var(--gold);
     color: var(--on-fill);
-    box-shadow: var(--glow-gold);
-  }
-
-  .btn.primary:hover:not(:disabled) {
     box-shadow: var(--glow-gold);
   }
 
@@ -3561,8 +3572,10 @@
     text-decoration: none;
   }
 
-  .duel-row:hover {
-    border-color: var(--line-strong);
+  @media (hover: hover) and (pointer: fine) {
+    .duel-row:hover {
+      border-color: var(--line-strong);
+    }
   }
 
   .duel-row.s-play {
@@ -4565,10 +4578,40 @@
     white-space: nowrap;
   }
 
+  /* A division's emblem before a rating: in its box, apart from the number. */
+  .pts > .emblem {
+    margin-right: var(--space-2);
+  }
+
   /* What goes with a board's number („от 10“, „точки“, „7/10 ·“): in words' type, small and muted. */
   .sub {
     color: var(--text-muted);
     font: 700 0.8125rem / 1 var(--font-sans);
+  }
+
+  /* A row's points, under its right answers (the day's board, a league's): they decide only a tie. */
+  .pts-under {
+    display: block;
+    margin-top: 3px;
+    text-align: right;
+  }
+
+  /* A narrow phone: such a score under the name, so that the name shows whole, the points beside the right answers. */
+  @media (max-width: 22.5rem) {
+    .row:has(.pts-under) {
+      grid-template-columns: 32px minmax(0, 1fr);
+      row-gap: var(--space-1);
+    }
+
+    .row:has(.pts-under) > :nth-child(n + 3) {
+      grid-column: 2;
+      justify-self: end;
+    }
+
+    .pts-under {
+      display: inline;
+      margin-left: var(--space-2);
+    }
   }
 
   .row.me {
@@ -4593,9 +4636,11 @@
     text-decoration: none;
   }
 
-  a.who:hover .who-name,
-  a.friend-name:hover {
-    text-decoration: underline;
+  @media (hover: hover) and (pointer: fine) {
+    a.who:hover .who-name,
+    a.friend-name:hover {
+      text-decoration: underline;
+    }
   }
 
   /* On a board's row, the row's height to tap (44px), the row not the taller for it. */
@@ -4749,11 +4794,13 @@
     padding-left: var(--space-2);
   }
 
-  .topic:hover {
-    transform: translateY(-1px);
-    box-shadow:
-      var(--elev-2),
-      inset 0 0 0 1px var(--line-strong);
+  @media (hover: hover) and (pointer: fine) {
+    .topic:hover {
+      transform: translateY(-1px);
+      box-shadow:
+        var(--elev-2),
+        inset 0 0 0 1px var(--line-strong);
+    }
   }
 
   .topic-pic {
@@ -4935,9 +4982,11 @@
       border-color 160ms ease;
   }
 
-  .chip:hover {
-    border-color: var(--line-strong);
-    transform: translateY(-1px);
+  @media (hover: hover) and (pointer: fine) {
+    .chip:hover {
+      border-color: var(--line-strong);
+      transform: translateY(-1px);
+    }
   }
 
   /* In the 26px slot a topic's picture has, so every chip's words start at one inset. */
@@ -5085,7 +5134,8 @@
     pointer-events: none;
   }
 
-  .avatar.framed {
+  /* A frame's room round the avatar: on a list the same for every row, framed or not, so that the names line up. */
+  .avatar:is(.framed, .s, .friend > *) {
     margin: calc(var(--size) * 0.12);
   }
 
@@ -5275,12 +5325,14 @@
     min-width: 0;
   }
 
+  /* A long name wraps in its column, never under what's beside it. */
   .me-head h1 {
     font-size: calc(13px + 0.8125rem);
-    overflow-wrap: break-word;
+    overflow-wrap: anywhere;
   }
 
-  /* Настройки, beside the name: its icon and its word, at every width (an icon alone is read by few). */
+  /* Настройки, its icon and its word (an icon alone is read by few): beside the name on a big screen; on a phone a row
+     of its own under it, so that the name has the width. */
   .me-settings {
     flex: none;
     width: auto;
@@ -5293,13 +5345,13 @@
     font-size: 1.25rem;
   }
 
-  /* On a narrow phone the name keeps its width: the word goes under the icon, smaller. */
-  @media (max-width: 24rem) {
+  @media (max-width: 40rem) {
+    .me-head {
+      flex-wrap: wrap;
+    }
+
     .me-settings {
-      flex-direction: column;
-      gap: 2px;
-      padding: var(--space-2);
-      font-size: 0.75rem;
+      flex: 1 1 100%;
     }
   }
 
@@ -5359,53 +5411,12 @@
     font-weight: 700;
   }
 
-  /* The XP a game brought and the level, a line under the result (when no new level has a card). */
-  .news-xp {
-    margin: 0;
-    color: var(--text-muted);
-    font-weight: 600;
-    text-align: center;
-  }
-
-  .news-xp b {
-    color: var(--text);
-    font: 900 1.25rem / 1 var(--font-numeral);
-  }
-
-  /* A system met with this game (play/unfold.go), said once: a quiet line, what it is in a few words. */
-  .news-open {
-    margin: 0;
-    color: var(--text-muted);
-    font-size: 0.9375rem;
-    line-height: 1.375rem;
-    text-align: center;
-    text-wrap: pretty;
-  }
-
-  .news-open b {
-    color: var(--text);
-  }
-
-  /* The facts a game put in Моят Алманах (news.ts): a line from the first day, what playing gives that only goes up,
-     a tap from them. */
-  .news-facts {
-    margin: 0;
-    color: var(--text-muted);
-    font-weight: 600;
-    text-align: center;
-  }
-
-  .news-facts a {
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .news-facts b {
-    color: var(--text);
-    font: 900 1.25rem / 1 var(--font-numeral);
-  }
-
-  /* A day's goal a game moved without finishing it, when it finished none: a line, not a card. */
+  /* A game's news in lines (news.ts), each in one quiet style: a system met with this game (play/unfold.go), said
+     once in a few words; the facts it put in Моят Алманах, a tap from them; the XP it brought and the level (when no
+     new level has a card); a day's goal it moved without finishing one. */
+  .news-xp,
+  .news-open,
+  .news-facts,
   .news-goal {
     margin: 0;
     color: var(--text-muted);
@@ -5415,9 +5426,15 @@
     text-wrap: pretty;
   }
 
+  :is(.news-xp, .news-open, .news-facts) b,
   .news-goal-n {
     color: var(--text);
     font-weight: 700;
+  }
+
+  .news-facts a {
+    color: inherit;
+    text-decoration: none;
   }
 
   /* News told late, on Начало (play/told.go): whose it is, over it. */
@@ -5700,8 +5717,10 @@
     cursor: pointer;
   }
 
-  button.title-pick:hover {
-    border-color: var(--line-strong);
+  @media (hover: hover) and (pointer: fine) {
+    button.title-pick:hover {
+      border-color: var(--line-strong);
+    }
   }
 
   .title-pick[aria-pressed="true"] {
@@ -6374,7 +6393,7 @@
   }
 
   /* A frame sits in the tile's 8 round the avatar, so every player's tile is one height. */
-  .players .avatar.framed {
+  .players .avatar:is(.framed, .s) {
     margin: 0;
   }
 
@@ -6518,8 +6537,10 @@
     color: var(--text-muted);
   }
 
-  a.mastery-topic:hover {
-    color: var(--link);
+  @media (hover: hover) and (pointer: fine) {
+    a.mastery-topic:hover {
+      color: var(--link);
+    }
   }
 
   /* On a row, the picture starts at the card's edge like the words under it (a chip pulls it in instead). */
@@ -6592,10 +6613,12 @@
     text-decoration: none;
   }
 
-  a.game:hover {
-    box-shadow:
-      var(--elev-2),
-      inset 0 0 0 1px var(--line-strong);
+  @media (hover: hover) and (pointer: fine) {
+    a.game:hover {
+      box-shadow:
+        var(--elev-2),
+        inset 0 0 0 1px var(--line-strong);
+    }
   }
 
   .game-text {
@@ -7200,11 +7223,6 @@
       text-align: left;
     }
 
-    /* Начало and a result: their quiet lines at the column's left, with its buttons, not centred under them. */
-    :is(.home, .summary) :is(.day-next, .news-xp, .news-open, .news-facts, .news-goal, .news-late) {
-      text-align: left;
-    }
-
     .masthead-date {
       font-size: 3.5rem;
     }
@@ -7670,10 +7688,58 @@
     row-gap: var(--space-1);
   }
 
+  /* The head's rows closer, an answer as tall as its words (a finger's room still): the four answers in sight. */
+  .tight .question-top {
+    gap: var(--space-2);
+  }
+
+  .tight .option {
+    min-height: 0;
+    padding-block: 6px;
+    line-height: 1.375rem;
+  }
+
   /* Side by side no more: the streak over the level, the figures one under another. */
   .tight .status-row,
   .tight .figures {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The reserve days at the streak's far end: by the flame, the badge (which grows with the text) would cover it. */
+  .tight .status-reserve {
+    top: 50%;
+    left: auto;
+    right: var(--space-3);
+    translate: 0 -50%;
+  }
+
+  /* A line over the day, its way on („Виж“) after its last word, not pushed out of the screen by its longest one. */
+  .tight .streak-notice {
+    display: block;
+  }
+
+  .tight .streak-notice > a {
+    margin-left: var(--space-2);
+  }
+
+  /* A challenge waiting, in one row, so that the day is on the first screen: who, and „Играй“ (until when, and
+     „Откажи“, on its page in Дуел). */
+  .tight .challenge-notice {
+    flex-wrap: nowrap;
+  }
+
+  .tight .challenge-text {
+    min-width: 0;
+  }
+
+  .tight .challenge-text > .muted,
+  .tight .challenge-actions > :nth-child(2) {
+    display: none;
+  }
+
+  /* The streak and the level as tall as what they say. */
+  .tight .status-item {
+    min-height: 0;
   }
 
   /* A board's row: the place and the player, the score under the name. */
@@ -7710,20 +7776,14 @@
     padding-inline: var(--space-3);
   }
 
-  /* Профил's head, a game played: what's beside the name goes under it („Настройки“ a row of its own, the name kept
-     whole beside the avatar). */
+  /* Профил's head, a game played: what's beside the name goes under it („Настройки“ a row of its own). */
   .tight .me-head,
   .tight .game {
     flex-wrap: wrap;
   }
 
-  .tight .me-head h1 {
-    overflow-wrap: break-word;
-  }
-
   .tight .me-settings {
     flex: 1 1 100%;
-    flex-direction: row;
   }
 
   .tight .game-score {

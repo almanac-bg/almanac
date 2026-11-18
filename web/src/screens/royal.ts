@@ -227,11 +227,11 @@ interface Past {
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
 
 /** Time left in the last hour, with its unit, so that it never reads as hours: „20 с“ in the last minute; before it,
- * whole minutes („3 мин“), or to the second (`ticking`: „2:05 мин“) where the count runs before the player's eyes. */
+ * whole minutes („3 мин.“), or to the second (`ticking`: „2:05 мин.“) where the count runs before the player's eyes. */
 function left(ms: number, ticking = false): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
   if (s < 60) return `${s} с`;
-  return ticking ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} мин` : `${Math.ceil(s / 60)} мин`;
+  return ticking ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} мин.` : `${Math.ceil(s / 60)} мин.`;
 }
 
 const rights = (n: number) => `${n} ${n === 1 ? "верен" : "верни"}`;
@@ -259,7 +259,7 @@ export function seconds(ms: number, apart: number[] = []): string {
 /** The times of the players with as many right as `n`. */
 const levelTimes = (ps: Player[], n: number) => ps.filter((p) => p.reached === n).map((p) => p.ms);
 
-/** „8-ия въпрос“. */
+/** „8-ия въпрос“ (with a hyphen that never breaks: lib/ordinal.ts). */
 const nth = (n: number) => `${ordinal(n)}я въпрос`;
 
 const signed = (d: number) => `${d > 0 ? "+" : ""}${d}`;
@@ -454,16 +454,16 @@ const about = (nightly?: boolean) =>
 
 /** How it's played, folded under the evening: what it is, the cuts, and the final. */
 const rules =
-  "Роял е вечерен турнир на живо: всички получават един и същ въпрос в един и същ миг. Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни отговори и всички, които имат колкото последния от тях. Само ако така биха продължили с над една четвърт повече, между равните решава времето. Последния въпрос играят трима (или равните с тях), а при равни верни печели по-бързият. Времето ти тече от мига, в който въпросът се появи на твоя екран: бавната връзка не ти отнема секунди. Отпадналите играят до края за себе си. Започва, щом сте поне двама.";
+  "Роял е вечерен турнир на живо: всички получават един и същ въпрос в един и същ миг. Грешката не те изважда: след 5\u2011ия, 8\u2011ия, 11\u2011ия и 14\u2011ия въпрос продължават тези с повече верни отговори и всички, които имат колкото последния от тях. Само ако така биха продължили с над една четвърт повече, между равните решава времето. Последния въпрос играят трима (или равните с тях), а при равни верни печели по-бързият. Времето ти тече от мига, в който въпросът се появи на твоя екран: бавната връзка не ти отнема секунди. Отпадналите играят до края за себе си. Започва, щом сте поне двама.";
 
-/** How long until a moment, in words: „След 3 ч и 12 мин“; in the last hour to the second („След 12:05 мин“); nothing
+/** How long until a moment, in words: „След 3 ч. и 12 мин.“; in the last hour to the second („След 12:05 мин.“); nothing
  * a day or more ahead (the day says it). */
 function until(ms: number): string {
   if (ms >= 24 * 3600_000) return "";
   if (ms < 3600_000) return `След ${left(ms, true)}`;
   const minutes = Math.ceil(ms / 60_000);
   const hours = Math.floor(minutes / 60);
-  return minutes % 60 ? `След ${hours} ч и ${minutes % 60} мин` : `След ${hours} ч`;
+  return minutes % 60 ? `След ${hours} ч. и ${minutes % 60} мин.` : `След ${hours} ч.`;
 }
 
 /** Before the lobby opens: the next evening's start, large, and the time to it; „Ще дойда“; how it's played, folded;
@@ -680,14 +680,15 @@ function entry(joined: () => void, out?: boolean): Child[] {
 
 /** The rules in a line, for the lobby of one who hasn't played a Роял yet. */
 const firstRules =
-  "Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни и всички равни с тях. Времето решава кой печели.";
+  "Грешката не те изважда: след 5\u2011ия, 8\u2011ия, 11\u2011ия и 14\u2011ия въпрос продължават тези с повече верни и всички равни с тях. Времето решава кой печели.";
 
 /** A lobby of one, two or three, as it is: whether it can start (the evening's `least`), and what two or three make of
  * the cuts (play.RoyalKeep keeps at least two, and those level with them). */
 function small(n: number, least = 0): string {
   if (n < least) return "Засега в залата си само ти: Роял започва, щом сте поне двама.";
   if (n === 2) return "Засега сте двама: без отсявания, играете и петнадесетте въпроса.";
-  if (n === 3) return "Засега сте трима: след 5-ия въпрос продължават двамата с повече верни (при равни — и тримата).";
+  if (n === 3)
+    return "Засега сте трима: след 5\u2011ия въпрос продължават двамата с повече верни (при равни — и тримата).";
   return "";
 }
 
@@ -775,7 +776,7 @@ function lobby(view: () => Evening, now: Signal<number>, joined: () => void): Ch
               ? notified()
                 ? "Вътре си. Можеш да поиграеш нещо друго: ще ти напомним минута преди началото."
                 : `Вътре си. Мястото ти се пази: можеш да поиграеш нещо друго и да се върнеш за ${clock(v0.startsAt)}.`
-              : `В ${clock(v0.startsAt)} всички получават първия въпрос едновременно. Закъснелите влизат до 3-тия въпрос.`,
+              : `В ${clock(v0.startsAt)} всички получават първия въпрос едновременно. Закъснелите влизат до 3\u2011тия въпрос.`,
           ),
         ];
       },
@@ -811,7 +812,7 @@ function door(view: () => Evening, joined: () => void): Child {
       ? h(
           "section",
           { class: "card stack" },
-          h("p", null, "Роял вече започна. До 3-тия въпрос още можеш да влезеш."),
+          h("p", null, "Роял вече започна. До 3\u2011тия въпрос още можеш да влезеш."),
           entry(joined),
         )
       : null;

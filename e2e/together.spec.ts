@@ -48,7 +48,7 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
   await expect(guest.getByRole("heading", { name: /^Бояна / })).toHaveCount(0);
   await expect(host.getByRole("button", { name: "Започни нова игра" })).toBeVisible();
   // How many each got right, by the place and in every row.
-  await expect(guest.getByText(/^Позна \d от 5 и си на \d-(во|ро) място от 2\.$/)).toBeVisible();
+  await expect(guest.getByText(/^Позна \d от 5 и си на \d\u2011(во|ро) място от 2\.$/)).toBeVisible();
   await expect(guest.locator(".board .row").first()).toContainText(/\d\/5 ·/);
   // Each can add the other as a friend, folded under the standings; the day's ten wait for both.
   await expect(guest.getByRole("link", { name: "Към въпросите на деня" })).toBeVisible();
