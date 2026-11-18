@@ -34,7 +34,7 @@ func setup(t *testing.T) *world {
 	b := banktest.Sample(t)
 	w := &world{t: t, db: db, g: play.New(db, func() *bank.Bank { return b })}
 	w.hub = NewHub(w.g, func(_ context.Context, id int64) (Player, error) {
-		return Player{ID: id, Name: fmt.Sprint("Играч ", id)}, nil
+		return Player{ID: id, Name: fmt.Sprint("Играч ", id), Tag: fmt.Sprint("player", id)}, nil
 	})
 	return w
 }
@@ -282,6 +282,15 @@ func TestAgainstARecording(t *testing.T) {
 		// A duel's game: over all the topics, so no topic is named.
 		if !v.Recorded || v.Topic != "" || v.Phase != PhaseQuestion || !v.Them.Online || v.Them.Answered {
 			t.Fatalf("against a recording: %+v", v)
+		}
+		// A stranger's game, unnamed: the animal its player started as, no tag (play.RecordedAs).
+		unnamed := false
+		for _, id := range []int64{ana.ID, bo.ID} {
+			name, look := play.RecordedAs(id, 0)
+			unnamed = unnamed || (v.Them.Name == name && v.Them.Avatar == look.Avatar)
+		}
+		if !unnamed || v.Them.Tag != "" || v.Them.Title != "" {
+			t.Fatalf("the recording's player: %+v", v.Them)
 		}
 		// The recording answers when its player did (2.5 s in), right.
 		time.Sleep(2600 * time.Millisecond)

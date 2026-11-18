@@ -93,6 +93,7 @@ func serve([]string) error {
 		MTASTSMode:      os.Getenv("MTA_STS_MODE"),
 		Operator:        os.Getenv("OPERATOR_NAME"),
 		Contact:         env("CONTACT_EMAIL", "privacy@almanac.bg"),
+		Alerts:          server.Alerts{Slack: os.Getenv("ALERT_SLACK"), Email: os.Getenv("ALERT_EMAIL")},
 		RoomsFile:       filepath.Join(filepath.Dir(dbPath()), "rooms.json"),
 		LimitsFile:      filepath.Join(filepath.Dir(dbPath()), "limits.json"),
 		RunningFile:     filepath.Join(filepath.Dir(dbPath()), "running.json"),
@@ -234,8 +235,8 @@ func serve([]string) error {
 			slog.Error("counting", "err", err)
 		}
 	})
-	if to := (server.Alerts{Slack: os.Getenv("ALERT_SLACK"), Email: os.Getenv("ALERT_EMAIL")}); to != (server.Alerts{}) {
-		go safe.Loop(ctx, "telling problems", func(ctx context.Context) { srv.TellProblems(ctx, to, time.Hour) })
+	if cfg.Alerts != (server.Alerts{}) {
+		go safe.Loop(ctx, "telling problems", func(ctx context.Context) { srv.TellProblems(ctx, time.Hour) })
 	}
 	if backups != nil {
 		go safe.Loop(ctx, "backups", func(ctx context.Context) { runBackups(ctx, srv) })

@@ -128,7 +128,7 @@ func (g *Game) knownBy(ctx context.Context, userID int64, topic string) (known, 
 	if err != nil {
 		return known{}, err
 	}
-	topics, all, err := g.abilities(ctx, g.DB.Read, h, userID, 0)
+	topics, all, err := g.abilities(ctx, g.DB.Read, h, userID, 0, false)
 	if err != nil {
 		return known{}, err
 	}

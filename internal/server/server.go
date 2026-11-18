@@ -67,6 +67,8 @@ type Config struct {
 	Phones *push.Phones
 	// Operator is who runs the game, and Contact their address (the privacy page, security.txt).
 	Operator, Contact string
+	// Alerts is where problems are told (TellProblems); the privacy page names Slack when it's one of them.
+	Alerts Alerts
 	// RoomsFile is where the rooms open are kept, every few seconds and as the server stops, for its next run to open
 	// again ("": nowhere).
 	RoomsFile string

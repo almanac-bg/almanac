@@ -5,21 +5,26 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// RecordingsNews is what others' duels against the player's recordings came to (duels.go): how many played, how many
-// the recordings won, and who played, each a tap from their profile. It's told quietly, with a game's news and never in
-// a push: once a day at most, from one duel up, and only while the news has room for it (NewsCards).
-type RecordingsNews struct {
-	Text    string      `json:"text"`
-	Players []NamedUser `json:"players"`
+// A recording is a stranger's game, and goes both ways unnamed (review 2026-11-18, S13). The one playing against it
+// sees it as the animal its player started as, in that animal's avatar (RecordedAs): no name, tag, title or frame, no
+// way to their profile; their answers and how long each took are the recording itself. The recorded player hears what
+// others' duels against their recordings came to (RecordingsNews), in numbers: never who played.
+
+// RecordedAs is how the player of a recording shows to the one playing against it: the animal they started as
+// (account.AnimalOf), and its avatar, with their level.
+func RecordedAs(userID int64, level int) (string, Look) {
+	return account.AnimalOf(userID).Name, Look{Avatar: DefaultAvatar(userID), Level: level}
 }
 
-// NamedUser is a player as a list names them: a name, and the tag their profile is found by.
-type NamedUser struct {
-	Name string `json:"name"`
-	Tag  string `json:"tag"`
+// RecordingsNews is what others' duels against the player's recordings came to (duels.go): how many people played
+// how many, and how many the recordings won. It's told quietly, with a game's news and never in a push: once a day at
+// most, from one duel up, and only while the news has room for it (NewsCards).
+type RecordingsNews struct {
+	Text string `json:"text"`
 }
 
 // NewsCards is how many cards a game's news shows at most (web/src/game/news.ts): the goals, the one biggest event,
@@ -54,8 +59,8 @@ func (g *Game) recordingsNews(tx *sql.Tx, userID int64) (*RecordingsNews, error)
 	if told >= store.Ms(midnight) {
 		return nil, nil
 	}
-	rows, err := tx.Query(`SELECT d.a_id, u.name, u.tag, d.outcome, d.ended_at
-		FROM runs r JOIN duels d ON d.ghost_run = r.id JOIN users u ON u.id = d.a_id
+	rows, err := tx.Query(`SELECT d.a_id, d.outcome, d.ended_at
+		FROM runs r JOIN duels d ON d.ghost_run = r.id
 		WHERE r.user_id = ? AND d.ended_at > ? AND d.outcome IN ('ghost_won', 'ghost_lost', 'ghost_draw') AND d.challenge_id IS NULL
 		ORDER BY d.ended_at DESC`, userID, max(told, store.Ms(midnight.AddDate(0, 0, -1))))
 	if err != nil {
@@ -68,9 +73,8 @@ func (g *Game) recordingsNews(tx *sql.Tx, userID int64) (*RecordingsNews, error)
 	first, last := int64(0), int64(0)
 	for rows.Next() {
 		var id, at int64
-		var p NamedUser
 		var outcome string
-		if err := rows.Scan(&id, &p.Name, &p.Tag, &outcome, &at); err != nil {
+		if err := rows.Scan(&id, &outcome, &at); err != nil {
 			return nil, err
 		}
 		games++
@@ -81,10 +85,7 @@ func (g *Game) recordingsNews(tx *sql.Tx, userID int64) (*RecordingsNews, error)
 			last = at
 		}
 		first = at
-		if !seen[id] {
-			seen[id] = true
-			n.Players = append(n.Players, p)
-		}
+		seen[id] = true
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -96,7 +97,7 @@ func (g *Game) recordingsNews(tx *sql.Tx, userID int64) (*RecordingsNews, error)
 		return nil, err
 	}
 	today := store.Ms(midnight)
-	n.Text = recordingsWords(first >= today, last >= today, len(n.Players), games, won)
+	n.Text = recordingsWords(first >= today, last >= today, len(seen), games, won)
 	return &n, nil
 }
 

@@ -491,6 +491,10 @@ const cleanBatch = 200
 // else's, given by a player, and not kept for good.
 const EmailRequestDays = 60
 
+// ReportDays is how long a question's report (what a player wrote of it) is kept once it has been seen to: a while,
+// for a fix to be looked at again, and then not at all (the privacy page says so).
+const ReportDays = 30
+
 // hasGame is a SQL condition on a player (u) that they have something of their own to lose: a game of any kind, a
 // friend, a friend request sent or waiting. A guest without one is nobody yet: one made and dropped (CleanUp), or a
 // browser a game is brought to (TakeHandoff).
@@ -501,7 +505,7 @@ const hasGame = `(EXISTS (SELECT 1 FROM runs r WHERE r.user_id = u.id)
 
 // CleanUp drops expired sessions, codes and handoffs, the wrong codes counted for an address once their stretch is
 // over (MissesKept), the codes mailed counted once a day old, friend requests to an address older than
-// EmailRequestDays, and the guests nobody can use or does: those whose sessions are gone (nothing of theirs can come
+// EmailRequestDays, questions' reports seen to more than ReportDays ago, and the guests nobody can use or does: those whose sessions are gone (nothing of theirs can come
 // back), and those who never played nor have a friend, unseen for IdleGuestDays. Their days played stay counted, as
 // nobody's (play.Forget).
 func (a *Accounts) CleanUp(ctx context.Context) error {
@@ -525,6 +529,10 @@ func (a *Accounts) CleanUp(ctx context.Context) error {
 	}
 	if _, err := a.DB.Write.ExecContext(ctx, `DELETE FROM friend_requests WHERE to_email IS NOT NULL AND at <= ?`,
 		store.Ms(time.Now().AddDate(0, 0, -EmailRequestDays))); err != nil {
+		return err
+	}
+	if _, err := a.DB.Write.ExecContext(ctx, `DELETE FROM reports WHERE resolved_at <= ?`,
+		store.Ms(time.Now().AddDate(0, 0, -ReportDays))); err != nil {
 		return err
 	}
 	idle := store.Ms(time.Now().AddDate(0, 0, -IdleGuestDays))

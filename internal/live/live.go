@@ -1,5 +1,6 @@
 // Package live plays duels live: a player asks for a duel and is matched with whoever else is asking, or, if
-// nobody comes in Wait, with a recording of a real player's earlier game. Both see the same question at the same
+// nobody comes in Wait, with a recording of a real player's earlier game (shown unnamed, as the animal its player
+// started as: play.RecordedAs). Both see the same question at the same
 // moment and each other's answers come in; after each question both answers show, then the next comes. One whose
 // screen goes is waited for a while (Away), then the duel goes on without them (gone), their time running out on each
 // question; one who says they leave (Leave: asked on their screen, and confirmed) is gone at once, and the other told
@@ -465,6 +466,9 @@ func (h *Hub) expire(s *Seek) {
 			return l, [2]Player{}, err
 		}
 		rec, err := h.who(ctx, l.Users[1])
+		// A stranger's game: shown as the animal its player started as, nothing that leads to them (play.RecordedAs).
+		rec.Name, rec.Look = play.RecordedAs(l.Users[1], rec.Look.Level)
+		rec.Tag = ""
 		return l, [2]Player{s.player, rec}, err
 	}))
 }
