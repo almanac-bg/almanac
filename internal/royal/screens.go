@@ -401,6 +401,10 @@ func (h *Hub) earn() {
 	}
 }
 
+// Earned waits until what the players' games earned is kept (AfterRoyal, in the background): for a caller that reads it
+// next, as the seeding of a database does.
+func (h *Hub) Earned() { h.after.done.Wait() }
+
 func (a *after) busy() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
