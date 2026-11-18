@@ -352,3 +352,23 @@ func TestDuelsOutlivePlayers(t *testing.T) {
 		t.Fatalf("after Бо went: %q", got)
 	}
 }
+
+// A deploy marks a failed release by its migrations' sums (deploy/deploy.sh): a line each, its SHA-256 and its name
+// as sha256sum writes them, in order, so a migration changed in any way is another line.
+func TestMigrationSums(t *testing.T) {
+	migrations = fstest.MapFS{
+		"migrations/0002_b.sql": {Data: []byte("CREATE TABLE b (x INTEGER) STRICT;\n")},
+		"migrations/0001_a.sql": {Data: []byte("CREATE TABLE a (x INTEGER) STRICT;\n")},
+	}
+	t.Cleanup(func() { migrations = embedded })
+	lines, err := MigrationSums()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{
+		"a03c80479578052d47a7b93adbc448eb9a64ca4beb6cce21e318510dcadfc12a  0001_a.sql",
+		"9fb189c02992a1b4227a0afb29f532f9e8589a75d6a16eac1ade4854b1dcd92b  0002_b.sql",
+	}; !slices.Equal(lines, want) {
+		t.Fatalf("%q, not %q", lines, want)
+	}
+}

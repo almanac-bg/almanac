@@ -9,16 +9,22 @@
 # Every run then deploys the latest release, new or not: almanac-deploy leaves a version that is live already as it
 # is, so a deploy that didn't happen (cut off, timed out, a download that failed) is tried again by the next run, or by
 # re-running this one, and a run is green only when the latest release is live. One that went back for not being
-# healthy isn't tried again (it would fail the same way, cutting play twice each merge): the runs stay red until a new
-# release goes out.
+# healthy isn't tried again (it would fail the same way, cutting play twice each merge), and if it never came up after
+# it began to migrate, neither is a release that brings that migration unchanged (deploy/deploy.sh): the runs stay red
+# until a release goes out that changes what failed (or someone deploys one by hand), and a session is told as it
+# starts (.claude/hooks/main-red.sh).
 #
-# The jobs hold only what they need, and code from the repository never runs where a key is: the plan and the test
-# and the build read the repository (and nothing more); the release runs nothing of the repository's, only GitHub's
-# own actions and gh, and holds the rights to publish (a release, its provenance) and the key that signs the program;
-# the deploy holds the key to the server, and runs only on main. The keys are secrets of the `production` environment
+# A release is published only once main, as merged, passes the checks a pull request does, the server's (vet, tests
+# with the race detector) and the client's (types, lint, unit tests): each pull request passed them on its own base,
+# but two that pass apart can break together, and the client is bundled without its types checked.
+#
+# The jobs hold only what they need, and code from the repository never runs where a key is: the plan, the tests and
+# the build read the repository (and nothing more); the release runs nothing of the repository's, only GitHub's own
+# actions and gh, and holds the rights to publish (a release, its provenance) and the key that signs the program; the
+# deploy holds the key to the server, and runs only on main. The keys are secrets of the `production` environment
 # (which only main may use), so only the release and the deploy see them: DEPLOY_KEY, which the server lets run only
 # deploy/deploy-ci.sh; RELEASE_SIGNING_KEY, whose public half is in deploy/release-signers, which almanac-deploy checks
-# before it runs anything (a server whose release-signers names a key refuses a release without its signature).
+# before it runs anything: the server refuses a release without its signature, so without the key nothing is released.
 #
 # almanac-deploy waits for a moment the restart cuts no play: the games under way (seven minutes at most), and Роял's
 # evening (from 20:37, about half an hour), so the deploy may wait that long; merges meanwhile queue behind it, and the
@@ -97,7 +103,7 @@ jobs:
           echo "Releasing v$major.$minor.$patch: $why." >> "$GITHUB_STEP_SUMMARY"
 
   test:
-    name: Tested
+    name: Tested (the server)
     needs: plan
     if: needs.plan.outputs.release
     runs-on: ubuntu-24.04
@@ -113,6 +119,25 @@ jobs:
           go-version-file: go.mod
       - run: go run ./cmd/build
       - run: go vet ./... && go test -race ./...
+
+  client:
+    name: Tested (the client)
+    needs: plan
+    if: needs.plan.outputs.release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm test
 
   # A checkout of its own: nothing the tests did reaches what is built.
   build:
@@ -152,7 +177,7 @@ jobs:
   # Nothing of the repository's runs here: GitHub's actions, ssh-keygen and gh only.
   release:
     name: Published
-    needs: [plan, test, build]
+    needs: [plan, test, client, build]
     if: needs.plan.outputs.release
     environment: production
     runs-on: ubuntu-24.04
@@ -175,8 +200,8 @@ jobs:
           SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
         run: |
           if [ -z "$SIGNING_KEY" ]; then
-            echo "::warning::No RELEASE_SIGNING_KEY: the release goes out unsigned (deploy/release-signers says how to set it up)."
-            exit 0
+            echo "::error::No RELEASE_SIGNING_KEY: the server takes no release without its signature (deploy/release-signers says how to set it up)."
+            exit 1
           fi
           key="$RUNNER_TEMP/signing"
           (umask 077 && printf '%s\n' "$SIGNING_KEY" > "$key")
@@ -187,16 +212,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.plan.outputs.release }}
         run: |
-          assets=(almanac-linux-arm64 almanac-linux-arm64.sha256 program.sha256)
-          if [ -f almanac-linux-arm64.sig ]; then assets+=(almanac-linux-arm64.sig); fi
-          gh release create "$TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --generate-notes
+          gh release create "$TAG" almanac-linux-arm64 almanac-linux-arm64.sig almanac-linux-arm64.sha256 program.sha256 \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --generate-notes
 
   deploy:
     name: Deployed
     needs: [plan, release]
-    # The latest release: the new one once it's published, else the last one (live already, or tried again).
+    # The latest release: the new one once it's published, else the last one (live already, or tried again). Not once
+    # the run is cancelled (a skipped release isn't a cancelled one).
     if: >-
-      always() && github.ref == 'refs/heads/main' && needs.plan.result == 'success' && needs.plan.outputs.deploy != '' &&
+      !cancelled() && github.ref == 'refs/heads/main' && needs.plan.result == 'success' && needs.plan.outputs.deploy != '' &&
       (needs.release.result == 'success' || (needs.plan.outputs.release == '' && needs.release.result == 'skipped'))
     environment: production
     runs-on: ubuntu-24.04

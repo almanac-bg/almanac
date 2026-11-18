@@ -582,9 +582,17 @@ func TestPaused(t *testing.T) {
 		m := sa.Match
 		fa, _ := m.Follow(ana.ID)
 		fb, _ := m.Follow(bo.ID)
-		if n := w.hub.UnderWay(); n != 1 {
+		if n, _ := w.hub.UnderWay(); n != 1 {
 			t.Fatalf("under way: %d", n)
 		}
+		// A duel busy at the moment (its lock held, as while it keeps an answer) doesn't hold up whoever asks: it
+		// counts as under way, for all of a duel.
+		m.mu.Lock()
+		if n, left := w.hub.UnderWay(); n != 1 || left != Longest {
+			m.mu.Unlock()
+			t.Fatalf("a busy duel: %d under way, %v left", n, left)
+		}
+		m.mu.Unlock()
 
 		w.hub.Pause()
 		sc := w.hub.Seek(cy)
@@ -610,7 +618,7 @@ func TestPaused(t *testing.T) {
 		}
 		m.Unfollow(fa)
 		m.Unfollow(fb)
-		if n := w.hub.UnderWay(); n != 0 {
+		if n, _ := w.hub.UnderWay(); n != 0 {
 			t.Fatalf("under way after the end: %d", n)
 		}
 
@@ -747,7 +755,7 @@ func TestNoPeekAhead(t *testing.T) {
 func TestLeft(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		w := setup(t)
-		if l := w.hub.Left(); l != 0 {
+		if _, l := w.hub.UnderWay(); l != 0 {
 			t.Fatalf("nothing under way, %v left", l)
 		}
 		ana, bo := w.user(), w.user()
@@ -758,14 +766,14 @@ func TestLeft(t *testing.T) {
 		fb, _ := m.Follow(bo.ID)
 		defer m.Unfollow(fa)
 		defer m.Unfollow(fb)
-		left := w.hub.Left()
+		_, left := w.hub.UnderWay()
 		if left <= 0 || left > Longest {
 			t.Fatalf("a duel just made: %v left (Longest %v)", left, Longest)
 		}
 		end := time.Now().Add(left)
 		// Nobody answers: each question takes all its time, and its answer shows after.
 		for v := next(m, ana.ID); v.Phase != PhaseEnd; v = next(m, ana.ID) {
-			now := w.hub.Left()
+			_, now := w.hub.UnderWay()
 			if now <= 0 || now > left || time.Now().Add(now).After(end) {
 				t.Fatalf("question %d (%s): %v left, after %v", v.N, v.Phase, now, left)
 			}
@@ -774,7 +782,7 @@ func TestLeft(t *testing.T) {
 		if time.Now().After(end) {
 			t.Fatalf("the duel ended %v after it said it would at the latest", time.Since(end))
 		}
-		if l := w.hub.Left(); l != 0 {
+		if _, l := w.hub.UnderWay(); l != 0 {
 			t.Fatalf("over, %v left", l)
 		}
 	})

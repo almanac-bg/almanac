@@ -15,6 +15,7 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"embed"
 	"errors"
@@ -166,6 +167,26 @@ func migrationNames() ([]string, error) {
 	}
 	slices.Sort(names)
 	return names, nil
+}
+
+// MigrationSums is this program's migrations, in order, one line each as sha256sum writes it: the SHA-256 of its text,
+// two spaces, its name (`almanac migrations`). A deploy that went back for a release that never came up, after it
+// began to migrate, keeps the lines of the migrations it brought (deploy/deploy.sh), and CI tries no release with one
+// of them again unchanged: the next patch would carry it and fail the same way.
+func MigrationSums() ([]string, error) {
+	names, err := migrationNames()
+	if err != nil {
+		return nil, err
+	}
+	lines := make([]string, len(names))
+	for i, name := range names {
+		text, err := fs.ReadFile(migrations, "migrations/"+name)
+		if err != nil {
+			return nil, err
+		}
+		lines[i] = fmt.Sprintf("%x  %s", sha256.Sum256(text), name)
+	}
+	return lines, nil
 }
 
 // migrationsTable keeps the names of the migrations a database has had.
