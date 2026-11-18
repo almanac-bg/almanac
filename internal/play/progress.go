@@ -285,6 +285,9 @@ type Progress struct {
 	Achievements []Earned `json:"achievements"`
 	Avatar       string   `json:"avatar"`
 	Title        string   `json:"title"` // the chosen title's id: one of Titles, or the champion's ("" for none)
+	// TitleByLevel is set while the player hasn't chosen a title (users.title NULL): they wear their level's
+	// (LevelTitle, Title then; "" before „Любопитен ум“), not „Без титла“, which is a choice.
+	TitleByLevel bool     `json:"titleByLevel,omitempty"`
 	Shapes       []Shape  `json:"shapes"`
 	Tones        []string `json:"tones"`
 	// Standing is the player's rating and division.
@@ -397,7 +400,7 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 	}
 	p.Avatar, p.Title = avatar.String, title.String
 	if !title.Valid {
-		p.Title = LevelTitle(p.Level)
+		p.Title, p.TitleByLevel = LevelTitle(p.Level), true
 	}
 	if p.Avatar == "" {
 		p.Avatar = DefaultAvatar(userID)

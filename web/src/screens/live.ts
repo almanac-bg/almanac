@@ -229,8 +229,14 @@ function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
   // queue: it waits for the next screen.
   staying(() => !!wait.peek() && !view.peek());
   // A first duel asks for a name of the player's own first, if they still have the one drawn for them (name.ts): the
-  // other side sees it.
-  nameFirst()
+  // other side sees it. Only before a new search: never over a clock running, on coming back to a duel under way (a
+  // reload, „Върни се“, another device: the ask is per device), nor for a rematch.
+  const underWay = () =>
+    api<{ playing: { kind: string } | null }>("GET", "/api/playing").then(
+      (p) => p.playing?.kind === "duel",
+      () => false,
+    );
+  (rematch ? Promise.resolve(true) : nameFirst(underWay))
     .then((on) => {
       if (!on || life.aborted) return;
       const ends = (event: Exclude<Trouble, "" | "reconnecting">) => () => {
