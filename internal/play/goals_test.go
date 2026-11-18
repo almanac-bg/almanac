@@ -37,31 +37,25 @@ func TestGoalDraws(t *testing.T) {
 	w := setup(t)
 	seen := map[string]bool{}
 	for seed := range uint64(3000) {
-		friends := seed%2 == 0
-		yesterday := drawGoals(seed+1_000_000, w.b, friends, true, nil)
-		ids := drawGoals(seed, w.b, friends, seed%3 != 0, yesterday)
-		if len(ids) != GoalsPerDay || ids[0] != "day" || !slices.Equal(ids, drawGoals(seed, w.b, friends, seed%3 != 0, yesterday)) {
+		mistakes := seed%2 == 0
+		yesterday := drawGoals(seed+1_000_000, w.b, true, nil)
+		ids := drawGoals(seed, w.b, mistakes, yesterday)
+		if len(ids) != GoalsPerDay || ids[0] != "day" || !slices.Equal(ids, drawGoals(seed, w.b, mistakes, yesterday)) {
 			t.Fatalf("seed %d: %v", seed, ids)
 		}
-		before := map[string]bool{}
-		for _, id := range yesterday[1:] {
-			_, k, _, _ := goalOf(w.b, id)
-			before[k.family] = true
-		}
+		_, before, _, _ := goalOf(w.b, yesterday[1])
 		families := map[string]bool{}
 		for n, id := range ids[1:] {
 			goal, k, _, ok := goalOf(w.b, id)
 			switch {
 			case !ok || k.tier != n+1 || strings.Contains(goal.Name, "{}") || strings.Contains(goal.Href, "{}"):
 				t.Fatalf("seed %d: goal %q is %+v (tier %d)", seed, id, goal, k.tier)
-			case families[k.family] || before[k.family]:
+			case families[k.family] || (k.tier == 1 && k.family == before.family):
 				t.Fatalf("seed %d: %v after %v, a family twice", seed, ids, yesterday)
-			case k.friends && !friends:
-				t.Fatalf("seed %d: %q for a player without friends", seed, id)
+			case k.mistakes && !mistakes:
+				t.Fatalf("seed %d: %q with no game of Втори шанс waiting", seed, id)
 			case k.retired:
 				t.Fatalf("seed %d: %q is retired", seed, id)
-			case k.evening && seed%3 == 0:
-				t.Fatalf("seed %d: %q after the evening's Роял", seed, id)
 			}
 			families[k.family] = true
 			seen[k.id] = true
@@ -132,15 +126,11 @@ func TestGoals(t *testing.T) {
 		t.Fatalf("the level others see: %d, not %d", look.Level, n.Level)
 	}
 
-	// The next day's are of other families; only the last two days are kept.
-	families := map[string]bool{}
-	for _, d := range goals[1:] {
-		_, k, _, _ := goalOf(w.b, d.ID)
-		families[k.family] = true
-	}
+	// The next day's game is of another family; only the last two days are kept.
+	_, drawn, _, _ := goalOf(w.b, goals[1].ID)
 	w.wait(24 * time.Hour)
 	for _, d := range w.goalsOf(ana) {
-		if _, k, _, _ := goalOf(w.b, d.ID); families[k.family] || d.Done {
+		if _, k, _, _ := goalOf(w.b, d.ID); (k.tier == 1 && k.family == drawn.family) || d.Done {
 			t.Fatalf("the next day's goal %+v, after %v", d, goals)
 		}
 	}
@@ -249,5 +239,30 @@ func TestGoalDuelWonAgainstARecording(t *testing.T) {
 	tl, err := w.g.tallyOf(ctx, ana, w.g.Today())
 	if err != nil || tl.duelWins != 1 {
 		t.Fatalf("duel wins %+v (%v), want 1", tl, err)
+	}
+}
+
+// Three questions fixed in Втори шанс: right answers there, and only there. A topic's game of eight right or more is
+// the game played well.
+func TestGoalSecondChance(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	s, _ := w.g.StartTopic(ctx, ana, "general")
+	w.play(ana, s.ID, repeat(w.wrong, Length)...)
+	w.wait(MistakesAfter)
+	w.setGoals(ana, "day", "mended3", "eight")
+	s, _ = w.g.StartTopic(ctx, ana, "history")
+	w.play(ana, s.ID, append(repeat(w.right, 8), w.wrong, w.wrong)...)
+	if g := w.goalsOf(ana); g["mended3"].Progress != 0 || !g["eight"].Done || g["mended3"].Href != "/mistakes" {
+		t.Fatalf("after a topic's game: %+v", g)
+	}
+	m, err := w.g.StartMistakes(ctx, ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(ana, m.ID, w.right, w.wrong, w.right, w.right)
+	if g := w.goalsOf(ana); g["mended3"].Progress != 3 || !g["mended3"].Done {
+		t.Fatalf("three fixed: %+v", g["mended3"])
 	}
 }

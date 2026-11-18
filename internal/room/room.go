@@ -1543,11 +1543,18 @@ func (r *Room) record() {
 		play play.RoomPlay
 	}
 	var games []kept
+	players := 0 // who played the game, kept already or not: one played alone counts for less (play.RoomPlay)
+	for _, m := range r.players {
+		if slices.ContainsFunc(m.log, func(l loggedAnswer) bool { return l.given != nil }) {
+			players++
+		}
+	}
 	for _, m := range r.players {
 		if m.run != 0 {
 			continue
 		}
-		p := play.RoomPlay{Game: r.gameID, Category: r.Category, Picks: r.picks, Length: r.planned, Points: m.points}
+		p := play.RoomPlay{Game: r.gameID, Category: r.Category, Picks: r.picks, Length: r.planned, Points: m.points,
+			Players: players}
 		given := false
 		for _, l := range m.log {
 			p.Answers = append(p.Answers, play.RoomAnswer{N: l.n, Given: l.given, Shown: l.shown, Score: l.score,

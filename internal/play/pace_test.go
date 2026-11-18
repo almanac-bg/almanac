@@ -1,7 +1,6 @@
 package play
 
 import (
-	"slices"
 	"testing"
 	"time"
 )
@@ -83,8 +82,8 @@ func TestRoyalPace(t *testing.T) {
 	}
 }
 
-// A player in their first week isn't pointed at Роял while its last seven evenings were thin: no goal of it, no card
-// on Начало. One who has played longer is, and so is one who has found it; once the evenings fill, everyone is.
+// A player in their first week isn't pointed at Роял while its last seven evenings were thin: no card on Начало. One
+// who has played longer is, and so is one who has found it; once the evenings fill, everyone is.
 func TestNudgeRoyal(t *testing.T) {
 	w := setup(t) // Thursday, 12 November
 	ctx := t.Context()
@@ -106,21 +105,6 @@ func TestNudgeRoyal(t *testing.T) {
 		}
 		return yes
 	}
-	// Of many players' goals for the evening, how many are Роял's.
-	royalGoals := func(players []int64) int {
-		t.Helper()
-		n := 0
-		for _, u := range players {
-			ids, err := w.g.dayGoals(ctx, u, w.g.Today())
-			if err != nil {
-				t.Fatal(err)
-			}
-			if slices.Contains(ids, "royal") {
-				n++
-			}
-		}
-		return n
-	}
 	players := func(n int, one func() int64) []int64 {
 		var us []int64
 		for range n {
@@ -128,13 +112,10 @@ func TestNudgeRoyal(t *testing.T) {
 		}
 		return us
 	}
-	newcomers, regulars := players(100, fresh), players(100, w.user) // w.user's are of long ago
+	newcomers, regulars := players(2, fresh), players(1, w.user) // w.user's are of long ago
 
 	if nudged(newcomers[0]) || !nudged(regulars[0]) {
 		t.Fatal("with no evenings held, a new player is pointed at Роял, or one of long ago isn't")
-	}
-	if n, m := royalGoals(newcomers), royalGoals(regulars); n != 0 || m == 0 {
-		t.Fatalf("Роял's goal drawn for %d new players (none, while thin) and %d of long ago (some)", n, m)
 	}
 	// One who said they'd come has found it.
 	if _, err := w.db.Write.Exec(`INSERT INTO royal_plans (day, user_id) VALUES (?, ?)`, w.g.Today(), newcomers[1]); err != nil {
@@ -154,7 +135,7 @@ func TestNudgeRoyal(t *testing.T) {
 		w.evening(w.now.AddDate(0, 0, -d), eight)
 	}
 	w.wait(24 * time.Hour) // the pace is worked out once a day
-	if !nudged(fresh()) || royalGoals(players(100, fresh)) == 0 {
+	if !nudged(fresh()) {
 		t.Fatal("full evenings, and a new player still isn't pointed at Роял")
 	}
 	if p, _ := w.g.RoyalPaceOf(ctx); p.Recent != RoyalTurnout || p.Nightly {

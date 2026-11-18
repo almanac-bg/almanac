@@ -115,7 +115,7 @@ func TestRecordRoom(t *testing.T) {
 		}
 		all = append(all, a)
 	}
-	run, err := w.g.RecordRoom(ctx, u, RoomPlay{Picks: picks, Points: 5000, Answers: all})
+	run, err := w.g.RecordRoom(ctx, u, RoomPlay{Picks: picks, Points: 5000, Answers: all, Players: 2})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,8 +139,13 @@ func TestRecordRoom(t *testing.T) {
 		t.Fatalf("the news: %+v %v", news, err)
 	}
 	tally, _ := w.g.tallyOf(ctx, u, w.g.Today())
-	if tally.right != rights {
-		t.Fatalf("the day's goals counted %d right answers of %d", tally.right, rights)
+	if tally.right != rights || tally.eight != 1 {
+		t.Fatalf("the day's goals counted %d right answers of %d, %d games of 8 or more", tally.right, rights, tally.eight)
+	}
+	var players int
+	_ = w.db.Read.QueryRow(`SELECT players FROM runs WHERE id = ?`, run).Scan(&players)
+	if players != 2 {
+		t.Fatalf("kept with %d players", players)
 	}
 
 	// One who came in for the last question alone: a game of ten with one answer, no game without a mistake.
@@ -193,5 +198,69 @@ func TestRecordRoomOnce(t *testing.T) {
 	_ = w.db.Read.QueryRow(`SELECT count(*) FROM runs WHERE user_id = ? AND kind = 'room'`, u).Scan(&runs)
 	if runs != 2 {
 		t.Fatalf("a game with no id is kept as a new one each time: %d runs", runs)
+	}
+}
+
+// A room's game played alone earns its XP, but counts for no goal of the day and not towards „Сто игри“; with someone
+// else it counts, and towards „Сто игри“ only with ten questions or more (review 2026-11-18, E10).
+func TestRoomAlone(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	all := func(picks []Pick) []RoomAnswer {
+		var out []RoomAnswer
+		for n, p := range picks {
+			q, _ := w.b.Get(p.ID)
+			d := q.Deal(p.Seed)
+			raw, _ := json.Marshal(d.Reveal(nil))
+			var rv map[string]any
+			_ = json.Unmarshal(raw, &rv)
+			a := map[string]any{}
+			for _, k := range []string{"pick", "value", "order", "truth", "pairs", "sides", "answer"} {
+				if v, ok := rv[k]; ok {
+					a[k] = v
+				}
+			}
+			given, _ := json.Marshal(a)
+			g, err := bank.GradeAt(d, given, 4_000_000_000)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out = append(out, RoomAnswer{N: n, Given: given, Shown: g.Shown, Score: g.Score, Right: g.Right, Ms: 4000,
+				At: w.now})
+		}
+		return out
+	}
+	games := func(u int64) int {
+		m, err := w.g.measure(ctx, u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m["games100"]
+	}
+	ten := DrawRoom(w.b, "", 10, MixEasy, nil, rand.New(rand.NewPCG(7, 8)))
+	five := DrawRoom(w.b, "", 5, MixEasy, nil, rand.New(rand.NewPCG(9, 10)))
+
+	alone := w.user()
+	run, err := w.g.RecordRoom(ctx, alone, RoomPlay{Game: "A", Picks: ten, Length: 10, Answers: all(ten), Players: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var xp int
+	_ = w.db.Read.QueryRow(`SELECT xp FROM runs WHERE id = ?`, run).Scan(&xp)
+	if tl, _ := w.g.tallyOf(ctx, alone, w.g.Today()); xp == 0 || tl.right != 0 || tl.eight != 0 || games(alone) != 0 {
+		t.Fatalf("a room alone: %d XP, tally %+v, %d games", xp, tl, games(alone))
+	}
+
+	two := w.user()
+	for _, p := range []RoomPlay{
+		{Game: "B", Picks: ten, Length: 10, Answers: all(ten), Players: 2},
+		{Game: "C", Picks: five, Length: 5, Answers: all(five), Players: 2},
+	} {
+		if _, err := w.g.RecordRoom(ctx, two, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if tl, _ := w.g.tallyOf(ctx, two, w.g.Today()); tl.eight != 1 || tl.right != 15 || games(two) != 1 {
+		t.Fatalf("rooms of two: tally %+v, %d games", tl, games(two))
 	}
 }

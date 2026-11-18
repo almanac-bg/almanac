@@ -42,6 +42,10 @@ packages' doc comments; this file holds only what must not drift.
   knowledge).
 - **One challenge**, by a link anyone can open (#402): friend duels and challenges were two near-identical systems.
 - **Leagues race on the day's points**, not XP; reserve days come from the day itself and from goals.
+- **The day's goals serve the day,** each one game at most: the day's ten; one more game (a topic's, three questions
+  fixed in Втори шанс, or a duel); and a game played well (8 of 10 or more). No goal for how many or how fast, and a
+  room's game counts only when someone else played it too (owner, 2026-11-18, review O4: the volume and speed goals
+  sent players into a quarter of an hour of other games, away from the day).
 - **Gamification only from what the game really counts:** no invented currencies, no random boxes, never real money.
 - **Sharing:** the day's result ends with the player's own link; the text itself has no invitation words.
 - **A tenth of players get no reminders, to tell what reminders do.** 10 % of players, drawn once by a hash of their

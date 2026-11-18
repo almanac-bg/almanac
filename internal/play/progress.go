@@ -85,7 +85,9 @@ const (
 var AchievementXP = map[Tier]int{Common: 50, Rare: 150, Epic: 400, Legendary: 1000}
 
 // Speed is an achievement („Пет за миг“) and a title („Светкавица“) only as a way of playing: five right answers in one
-// game, each in under three seconds. One quick tap is luck; five in a game are a player's pace.
+// game, each in under three seconds. One quick tap is luck; five in a game are a player's pace. It's hidden, found and
+// not chased (review 2026-11-18, E2): XP is never for being quick (worth.go), and a goal or a list of the nearest
+// achievements that points at speed asks a slow reader for what they can't give.
 const (
 	FastRights = 5
 	FastMs     = 3000
@@ -106,7 +108,7 @@ var Achievements = []Achievement{
 	{"allTopics", "Обиколка", "Изиграй поне една игра по всяка тема.", "compass", Rare, 10, false},
 	{"friends5", "Цяла компания", "Събери пет приятели в играта.", "heart", Rare, 5, false},
 	{"friendWin", "Между приятели", "Победи приятел в дуел.", "heart", Rare, 1, false},
-	{"fast", "Пет за миг", "Отговори вярно пет пъти в една игра, всеки път за по-малко от три секунди.", "bolt", Rare, FastRights, false},
+	{"fast", "Пет за миг", "Отговори вярно пет пъти в една игра, всеки път за по-малко от три секунди.", "bolt", Rare, FastRights, true},
 	{"nightOwl", "След полунощ", "Отговори на въпрос между полунощ и четири сутринта.", "owl", Rare, 1, true},
 	{"earlyBird", "Преди седем", "Изиграй въпросите на деня преди седем сутринта.", "sun", Rare, 1, true},
 	{"lastSecond", "В последния миг", "Отговори вярно в последната секунда.", "hourglass", Rare, 1, true},
@@ -469,7 +471,8 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 	var games, duelsWon, friends, topicsPlayed, types, fullDays, fast int
 	var perfect, friendWin, nightOwl, earlyBird, topicPerfect, royalWin, leagueUp, leagueFirst, rila bool
 	err = db.QueryRowContext(ctx, `SELECT
-		(SELECT count(*) FROM runs WHERE user_id = ?1 AND finished_at IS NOT NULL),
+		(SELECT count(*) FROM runs r WHERE r.user_id = ?1 AND r.finished_at IS NOT NULL AND `+together("r")+`
+			AND (r.kind <> 'room' OR json_array_length(r.questions) >= `+strconv.Itoa(Length)+`)),
 		(SELECT count(*) FROM `+duelResults+` WHERE outcome = 'won'),
 		(SELECT count(*) FROM friends WHERE user_id = ?1),
 		(SELECT count(DISTINCT category) FROM runs WHERE user_id = ?1 AND kind = 'topic' AND finished_at IS NOT NULL

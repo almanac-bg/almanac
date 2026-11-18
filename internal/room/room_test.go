@@ -474,10 +474,12 @@ func TestABrokenClockEndsTheGame(t *testing.T) {
 		hub := NewHub(sample(t))
 		var mu sync.Mutex
 		kept := 0
+		players := map[int]bool{} // how many each kept game says played it
 		hub.Record = func(_ context.Context, user int64, p play.RoomPlay) (int64, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			kept++
+			players[p.Players] = true
 			if kept == 1 {
 				panic("keeping the first player's game") // stopped: the others' are kept still
 			}
@@ -506,8 +508,8 @@ func TestABrokenClockEndsTheGame(t *testing.T) {
 		}
 		mu.Lock()
 		defer mu.Unlock()
-		if kept != 2 {
-			t.Fatalf("%d games kept", kept)
+		if kept != 2 || len(players) != 1 || !players[2] {
+			t.Fatalf("%d games kept, played by %v", kept, players)
 		}
 		r.mu.Lock()
 		defer r.mu.Unlock()
