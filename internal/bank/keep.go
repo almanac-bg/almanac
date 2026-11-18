@@ -2,6 +2,7 @@ package bank
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -14,13 +15,11 @@ import (
 // fails its check would be there for the next start to refuse. It plays a copy of its own, made by Copy as it starts
 // and at each reload, and keeps the last few good ones to start from when the checkout has errors.
 //
-// A copy's pictures only grow: one the bank no longer has (its question changed, or left) stays in the copies for
-// KeepGone after it left, as a play may still show the version of the question it was in (the game keeps every
-// version it played), and images/.gone says since when each such has gone.
-
-// KeepGone is how long a picture the bank no longer has stays in its copies: longer than any play shows a question's
-// earlier version (a challenge's time, a game gone over after).
-const KeepGone = 30 * 24 * time.Hour
+// A copy's pictures only grow: one the bank no longer has (its question changed, or left) stays in every copy after,
+// for good, and images/.gone says since when each such has gone. The game keeps every version of a question it played,
+// for good (play: question_versions), and a game is gone over (its review) with the version it showed, however long
+// ago: so the version's pictures stay as long as the version does. Their names are their contents' hashes, and only a
+// picture changed or left adds one: a few a month, against the thousands the bank has.
 
 // GoneFile lists the pictures a copy keeps that the bank no longer has, a line each: the file and the day it left.
 const GoneFile = ".gone"
@@ -28,8 +27,8 @@ const GoneFile = ".gone"
 // Copy copies the bank in from into to (a new directory): the files Load reads and nothing else (not the repository,
 // nor a batch's reports). A picture that like (an earlier copy, "" for none) already has, by the same name and size, is
 // linked rather than copied: names are hashes of the content, so a copy costs the questions' text and the new pictures
-// only. Those like has that the bank no longer does come along for KeepGone after they left (GoneFile). Load reads the
-// copy as it would read from.
+// only. Those like has that the bank no longer does come along, for good, with the day they left (GoneFile). Load
+// reads the copy as it would read from.
 func Copy(from, to, like string) error {
 	if err := os.Mkdir(to, 0o755); err != nil {
 		return err
@@ -72,7 +71,7 @@ func Copy(from, to, like string) error {
 }
 
 // carry brings the pictures an earlier copy has (in from) and the bank no longer does into a new copy's (to), linked,
-// until KeepGone after they left, and lists them in to's GoneFile.
+// and lists them in to's GoneFile with the day each left (now, for one that left with this copy).
 func carry(from, to string, now time.Time) error {
 	entries, err := os.ReadDir(from)
 	if errors.Is(err, os.ErrNotExist) {
@@ -94,11 +93,8 @@ func carry(from, to string, now time.Time) error {
 			continue // the bank has it
 		}
 		day, ok := left[name]
-		if !ok {
+		if _, err := time.Parse(time.DateOnly, day); !ok || err != nil {
 			day = today // left with this copy
-		}
-		if d, err := time.Parse(time.DateOnly, day); err != nil || now.Sub(d) >= KeepGone {
-			continue
 		}
 		if err := os.MkdirAll(to, 0o755); err != nil {
 			return err
@@ -114,6 +110,34 @@ func carry(from, to string, now time.Time) error {
 		return nil
 	}
 	return os.WriteFile(filepath.Join(to, GoneFile), []byte(strings.Join(lines, "")), 0o644)
+}
+
+// Dropped are the questions the bank in dir (an earlier copy) has that b doesn't, as errors. A question leaves play by
+// being retired, never by going from the bank: players' answers, reviews and stats, the day's ten, and Моят Алманах
+// point at it by its id for good, and a retired question stays so that they keep its text. A server doesn't play a
+// bank that drops one (cmd/almanac): it keeps the one it has.
+func Dropped(dir string, b *Bank) []Problem {
+	var out []Problem
+	files, _ := filepath.Glob(filepath.Join(dir, QuestionsDir, "*.json"))
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		var ids []struct {
+			ID string `json:"id"`
+		}
+		if json.Unmarshal(data, &ids) != nil {
+			continue
+		}
+		for _, q := range ids {
+			if _, ok := b.byID[q.ID]; !ok && q.ID != "" {
+				out = append(out, Problem{File: filepath.Join(QuestionsDir, filepath.Base(f)), ID: q.ID,
+					Msg: "the bank had this question and it's gone: retire it instead (retired, retiredWhy), never take it out"})
+			}
+		}
+	}
+	return out
 }
 
 // Gone are the pictures a copy of the bank in dir keeps that the bank no longer has, by file, with the day each left

@@ -284,7 +284,8 @@ func changeFaults(old, q Question, category, today string) []string {
 // notAsked are a question's fields that aren't what it asks: its labels (difficulty, days, Bulgaria), the fact and
 // the day's line, its dates, sources and retirement. Players' answers from before a change to them were to the same
 // question (Tail.Changed). Every other field is what it asks: the text, the answer and options, items, pairs, decoy,
-// clues, groups, a number's unit, step, scale and tolerance, an order's direction, the type, a picture.
+// clues, groups, a number's unit, step, scale and tolerance, an order's direction, the type, a picture; each type's
+// asked writes those out for its Version (version.go), and TestEveryFieldClassed holds every field to one or the other.
 var notAsked = map[string]bool{
 	"id": true, "difficulty": true, "fact": true, "day": true, "on": true, "bg": true, "sources": true,
 	"added": true, "changed": true, "updated": true, "checked": true, "checkedBy": true, "reviewBy": true,

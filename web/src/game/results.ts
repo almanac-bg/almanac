@@ -29,7 +29,7 @@ export function summary(
   const questions = reviewParts(
     async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${s.id}/review`)).questions,
   );
-  const perfect = s.total > 0 && s.rights === s.total;
+  const perfect = outOf(s) > 0 && s.rights === outOf(s);
   const hero = scoreCard(s, line, words, moment ? formatNumber(s.points) : countUp(s.points));
   if (moment) land(hero, s.id, perfect, s.kind === "day");
   return h(
@@ -45,7 +45,7 @@ export function summary(
 /** A finished game's score, as its result has it: the right answers big, its points (`points`: as they're drawn),
  * a line about it, and the marks. */
 export function scoreCard(s: State, line: Child, words = meaning.points, points: Child = formatNumber(s.points)) {
-  const perfect = s.total > 0 && s.rights === s.total;
+  const perfect = outOf(s) > 0 && s.rights === outOf(s);
   return h(
     "div",
     { class: "card hero" },
@@ -58,7 +58,7 @@ export function scoreCard(s: State, line: Child, words = meaning.points, points:
         "h1",
         { class: "score" },
         h("b", { class: "score-n" }, String(s.rights)),
-        h("span", { class: "score-of" }, h("span", { class: "num-word" }, "от "), String(s.total)),
+        h("span", { class: "score-of" }, h("span", { class: "num-word" }, "от "), String(outOf(s))),
       ),
       h(
         "p",
@@ -73,6 +73,9 @@ export function scoreCard(s: State, line: Child, words = meaning.points, points:
     trail(s.trail, s.total),
   );
 }
+
+/** How many questions a game's right answers are out of: all but those that count for nobody (Mark.void). */
+const outOf = (s: State) => s.total - (s.void ?? 0);
 
 /** What the game's feel (feel.ts) needs of the app, as it is now. */
 export const hands = () => ({ calm: calm.peek(), play, format: (n: number) => formatNumber(n) });
@@ -262,13 +265,15 @@ export function reviewed(all: Reviewed[], heading: Child): Child {
     { class: "review" },
     heading,
     all.map((it) => {
-      const [kind, word] = it.right
-        ? ["right", "Вярно"]
-        : it.points > 0
-          ? ["close", "Близо"]
-          : it.given
-            ? ["wrong", "Грешно"]
-            : ["wrong", "Без отговор"];
+      const [kind, word] = it.void
+        ? ["void", "Не се брои"]
+        : it.right
+          ? ["right", "Вярно"]
+          : it.points > 0
+            ? ["close", "Близо"]
+            : it.given
+              ? ["wrong", "Грешно"]
+              : ["wrong", "Без отговор"];
       return h(
         "article",
         { class: `reviewed ${kind}` },

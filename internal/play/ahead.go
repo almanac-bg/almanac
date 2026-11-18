@@ -41,9 +41,10 @@ import (
 // day or the bank has changed), never in a player's: a game that rolls back can't take them with it. A player's game
 // only reads them (days); today's, if it isn't drawn yet, is drawn there as it always was.
 
-// DayRules names the day's draw as it is: change it whenever drawDay draws differently, and the days after tomorrow
-// are drawn again by the new rules.
-const DayRules = "2026-11-16 picture-first, on, bg, estimate topic, review, one subject"
+// DayRules names the day's draw as it is, and the days after tomorrow are drawn again whenever it changes. It ends with
+// what drawDay makes of a fixed bank on fixed days and seeds (TestDayRulesNameTheDraw): a change to how a day is drawn
+// fails that test until DayRules says so, rather than reach the days drawn ahead a season late.
+const DayRules = "2026-11-18 shapes within bands (#387), picture-first, on, bg, estimate topic, review, one subject; draw e1012d851a1cb6f5"
 
 // Ahead is how many days ahead of today the day's questions are drawn.
 const Ahead = 90
@@ -75,7 +76,7 @@ func (g *Game) days(tx *sql.Tx) (dayBars, error) {
 	if day == today && drawnFrom == b {
 		return bars, nil
 	}
-	if _, err := g.day(tx, today); err != nil && !errors.Is(err, ErrNoQuestion) {
+	if _, err := g.day(tx, today, b); err != nil && !errors.Is(err, ErrNoQuestion) {
 		return dayBars{}, err
 	}
 	stored, err := storedDays(tx, today)
@@ -133,12 +134,16 @@ func (g *Game) EnsureDays(ctx context.Context) error {
 	return nil
 }
 
-// drawAhead draws today if it isn't yet, the days after tomorrow again if the rules or the bank's dated and Bulgarian
-// questions changed since they were drawn, a day ahead again if a question of it left the bank or is due for review by
-// then, and the days missing up to Ahead (while none is short, else it warns in the log); it says what today and the
-// days ahead hold. Of the questions that fit, those not answered (by anyone) come first.
+// drawAhead draws today if it isn't yet, voids today's questions the bank no longer plays as the day began (day.go),
+// draws the days after tomorrow again if the rules or the bank's dated and Bulgarian questions changed since they were
+// drawn, a day ahead again if a question of it left the bank or is due for review by then, and the days missing up to
+// Ahead (while none is short, else it warns in the log); it says what today and the days ahead hold. Of the questions
+// that fit, those not answered (by anyone) come first.
 func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank, answered map[string]bool) (dayBars, error) {
-	if _, err := g.day(tx, today); err != nil && !errors.Is(err, ErrNoQuestion) {
+	if _, err := g.day(tx, today, b); err != nil && !errors.Is(err, ErrNoQuestion) {
+		return dayBars{}, err
+	}
+	if err := g.voidDay(tx, today, b); err != nil {
 		return dayBars{}, err
 	}
 	d, _ := time.Parse(time.DateOnly, today)

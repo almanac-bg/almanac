@@ -294,6 +294,10 @@ shows with the answer, over the fact: the player learns why the day. (The owner'
 - Keep `sources` true: add the page a fix rests on, drop one that no longer supports it. A fix checked again against
   its sources sets `checked` and `checkedBy`.
 - Don't touch a retired question except to read it.
+- Never take a question out of the bank: retire it. The server refuses a bank that drops an id (`bank.Dropped`).
+- A question of today's ten changed in what it asks, or retired as `wrong` or `stale`, during its day counts for
+  nobody that day (`internal/play/day.go`): everyone's day is then of the other nine. Fix it all the same; a polish
+  that can wait (a clearer wording) waits for tomorrow.
 
 ## The workflow
 

@@ -334,13 +334,13 @@ function wayOut(err: unknown): [href: string, label: string] | null {
 
 /** A run's progress: a pip for each question, marked by how it went (and the one being asked, if any). */
 export function trail(marks: Mark[], total: number, now = -1): HTMLElement {
-  const words: Record<string, string> = { right: "вярно", partial: "близо", wrong: "грешно" };
+  const words: Record<string, string> = { right: "вярно", partial: "близо", wrong: "грешно", void: "не се брои" };
   return h(
     "ol",
     { class: "trail", "aria-label": `${marks.length} от ${total} въпроса` },
     Array.from({ length: total }, (_, i) => {
       const m = marks[i];
-      const how = !m ? (i === now ? "now" : "") : m.right ? "right" : m.partial ? "partial" : "wrong";
+      const how = !m ? (i === now ? "now" : "") : m.void ? "void" : m.right ? "right" : m.partial ? "partial" : "wrong";
       return h("li", { class: how || undefined, title: how && how !== "now" ? `${i + 1}: ${words[how]}` : null });
     }),
   );

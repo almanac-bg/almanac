@@ -22,6 +22,15 @@ test("a streak of one day isn't told, and a question not answered is a red squar
   );
 });
 
+test("a question that counts for nobody that day has no square, and the result is out of the others", () => {
+  const out: Mark = { points: 0, right: true, void: true };
+  const trail = [right, right, out, right, close, right, right, right, right, wrong];
+  assert.equal(
+    dayShareText("2026-11-14", 3, trail, 10, 1),
+    ["АЛМАНАХ · Брой 3 · 14 ноември", "7 от 9", "🟩🟩🟩🟨🟩🟩🟩🟩⬜", "almanac.bg"].join("\n"),
+  );
+});
+
 test("nothing in it gives an answer away: only the date (a day before the first issue has none), numbers, squares and the site", () => {
   const text = dayShareText(
     "2026-05-09",

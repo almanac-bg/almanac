@@ -79,6 +79,18 @@ func (q *Choice) key() string {
 	return k
 }
 
+func (q *Choice) asked() map[string]any {
+	form := map[string]any{"answer": q.Answer, "wrong": q.Wrong}
+	if len(q.Pictures) > 0 {
+		files := make([]string, len(q.Pictures))
+		for i, p := range q.Pictures {
+			files[i] = p.File
+		}
+		form["pictures"] = files
+	}
+	return form
+}
+
 func (q *Choice) words() []string { return append([]string{q.Text}, q.options()...) }
 
 func (q *Choice) Deal(seed uint64) Dealt {

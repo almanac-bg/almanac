@@ -14,7 +14,8 @@ export function percent(x: number): string {
 export const rare = 0.25;
 
 /** The day's result to share: „АЛМАНАХ · Брой 3 · 14 ноември“ (the day's issue, play/issue.go), „8 от 10 · серия 12“
- * (the streak from two days), a square for each of the ten (🟩 right, 🟨 close, ⬜ wrong or not answered), the right
+ * (the streak from two days), a square for each of the ten that counts (🟩 right, 🟨 close, ⬜ wrong or not answered; one
+ * that counts for nobody, Mark.void, has none, and the result is out of the others), the right
  * answer the fewest of the day's other players got, if few did (`rarest`: its place and their share right: „Познах
  * въпрос 7, който знаят само 12%“), and the player's link (their invite), or „almanac.bg“ without one. `day` is
  * YYYY-MM-DD. */
@@ -27,18 +28,16 @@ export function dayShareText(
   rarest?: { n: number; right: number } | null,
   link = "almanac.bg",
 ): string {
-  const rights = trail.filter((m) => m.right).length;
-  const squares = Array.from({ length: total }, (_, i) => {
-    const m = trail[i];
-    return m?.right ? "🟩" : m?.partial ? "🟨" : "⬜";
-  }).join("");
+  const counted = Array.from({ length: total }, (_, i) => trail[i]).filter((m) => !m?.void);
+  const rights = counted.filter((m) => m?.right).length;
+  const squares = counted.map((m) => (m?.right ? "🟩" : m?.partial ? "🟨" : "⬜")).join("");
   const few =
     rarest && rarest.right <= rare
       ? `Познах въпрос ${rarest.n + 1}, който ${rarest.right ? `знаят само ${percent(rarest.right)}` : "не знае никой друг"}`
       : "";
   return [
     `АЛМАНАХ · ${issueWords(issue, day)}`,
-    streak > 1 ? `${rights} от ${total} · серия ${streak}` : `${rights} от ${total}`,
+    streak > 1 ? `${rights} от ${counted.length} · серия ${streak}` : `${rights} от ${counted.length}`,
     squares,
     few,
     link,

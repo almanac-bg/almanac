@@ -77,6 +77,10 @@ func (q *Clues) key() string {
 	return k
 }
 
+func (q *Clues) asked() map[string]any {
+	return map[string]any{"clues": q.Clues, "answer": q.Answer, "wrong": q.Wrong}
+}
+
 func (q *Clues) words() []string {
 	return append(append([]string{q.Text}, q.Clues...), q.options()...)
 }

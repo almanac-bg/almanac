@@ -528,7 +528,9 @@ func TestPictureTime(t *testing.T) {
 	u := w.user()
 	s, _ := w.g.StartDay(ctx, u)
 	picks := w.picks(s.ID)
-	picks[0].ID, picks[1].ID, picks[2].ID = "geo-901", "geo-902", "geo-903"
+	for i, id := range []string{"geo-901", "geo-902", "geo-903"} {
+		picks[i] = Pick{ID: id, Seed: picks[i].Seed} // another question: none of the day's version
+	}
 	raw, _ := json.Marshal(picks)
 	if _, err := w.db.Write.Exec(`UPDATE runs SET questions = ? WHERE id = ?`, string(raw), s.ID); err != nil {
 		t.Fatal(err)

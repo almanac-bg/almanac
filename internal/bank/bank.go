@@ -47,6 +47,16 @@ type Bank struct {
 	byID      map[string]Question
 }
 
+// Of is a bank of these questions as they are (read with Decode), unchecked: a fixture a test builds in code, where
+// Load would want every rule of a real bank met (pictures on disk, sources, facts).
+func Of(categories []Category, questions []Question) *Bank {
+	b := &Bank{Categories: categories, Questions: questions, byID: map[string]Question{}}
+	for _, q := range questions {
+		b.byID[q.Base().ID] = q
+	}
+	return b
+}
+
 // Get finds a question by id, retired ones too (history keeps pointing at them).
 func (b *Bank) Get(id string) (Question, bool) {
 	q, ok := b.byID[id]

@@ -28,6 +28,8 @@ func (q *TrueFalse) check() []string {
 
 func (q *TrueFalse) key() string { return fold(q.Text) + "|" + q.Image.file() }
 
+func (q *TrueFalse) asked() map[string]any { return map[string]any{"answer": q.Answer} }
+
 func (q *TrueFalse) words() []string { return []string{q.Text} }
 
 func (q *TrueFalse) Deal(uint64) Dealt { return &dealtTrueFalse{q} }

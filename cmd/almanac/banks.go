@@ -33,14 +33,14 @@ const (
 )
 
 // take loads the bank in BANK_DIR through a new copy. A bank with errors comes back nil with its problems, and
-// leaves no copy. If no copy can be made (a full disk), BANK_DIR itself is loaded, the error logged.
+// leaves no copy; so does one that drops a question the newest good copy has (bank.Dropped). If no copy can be made (a full disk), BANK_DIR itself is loaded, the error logged.
 func (k keptBanks) take() (b *bank.Bank, problems []bank.Problem, commit string) {
 	if k.dir == "" {
 		return k.direct()
 	}
 	for try := 0; ; try++ {
 		commit = bank.Commit(k.src)
-		part, err := k.copy(commit)
+		part, like, err := k.copy(commit)
 		if err != nil {
 			slog.Error("bank: no copy made, so the bank is played from BANK_DIR itself", "err", err)
 			return k.direct()
@@ -52,6 +52,12 @@ func (k keptBanks) take() (b *bank.Bank, problems []bank.Problem, commit string)
 		if b, problems = bank.Load(part); b == nil {
 			os.RemoveAll(part)
 			return nil, problems, commit
+		}
+		if like != "" {
+			if dropped := bank.Dropped(like, b); len(dropped) > 0 {
+				os.RemoveAll(part) // a question goes by retiring, never from the bank: refused, as a bank with errors
+				return nil, append(problems, dropped...), commit
+			}
 		}
 		final := strings.TrimSuffix(part, partSuffix)
 		if err := os.Rename(part, final); err != nil {
@@ -74,25 +80,25 @@ func (k keptBanks) direct() (*bank.Bank, []bank.Problem, string) {
 	return b, problems, commit
 }
 
-// copy makes a copy of BANK_DIR, still to be checked (its name ends in partSuffix).
-func (k keptBanks) copy(commit string) (string, error) {
+// copy makes a copy of BANK_DIR, still to be checked (its name ends in partSuffix), from the newest good copy (like:
+// "" for none).
+func (k keptBanks) copy(commit string) (part, like string, err error) {
 	if err := os.MkdirAll(k.dir, 0o700); err != nil {
-		return "", err
+		return "", "", err
 	}
 	name := time.Now().UTC().Format(keptStamp)
 	if commit != "" {
 		name += "-" + commit
 	}
-	var like string
 	if kept := k.kept(); len(kept) > 0 {
 		like = kept[0].dir
 	}
-	part := filepath.Join(k.dir, name+partSuffix)
+	part = filepath.Join(k.dir, name+partSuffix)
 	if err := bank.Copy(k.src, part, like); err != nil {
 		os.RemoveAll(part)
-		return "", err
+		return "", "", err
 	}
-	return part, nil
+	return part, like, nil
 }
 
 // keptBank is a good copy: where it is, and its commit ("" when not known).

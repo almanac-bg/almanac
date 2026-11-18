@@ -13,13 +13,17 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// day reads a day's questions, drawing them the first time the day is asked for.
-func (g *Game) day(tx *sql.Tx, day string) ([]Pick, error) {
+// day reads a day's questions, drawing them the first time the day is asked for; on the day itself, each kept as it
+// is as the day begins (pinDay).
+func (g *Game) day(tx *sql.Tx, day string, b *bank.Bank) ([]Pick, error) {
 	var stored string
 	err := tx.QueryRow(`SELECT questions FROM days WHERE day = ?`, day).Scan(&stored)
 	if err == nil {
 		var picks []Pick
-		return picks, json.Unmarshal([]byte(stored), &picks)
+		if err := json.Unmarshal([]byte(stored), &picks); err != nil {
+			return nil, err
+		}
+		return g.pinDay(tx, day, picks, b)
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
@@ -41,13 +45,15 @@ func (g *Game) day(tx *sql.Tx, day string) ([]Pick, error) {
 		}
 	}
 	rows.Close()
-	picks, _ := drawDay(g.Bank(), day, used, nil, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+	picks, _ := drawDay(b, day, used, nil, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 	if len(picks) == 0 {
 		return nil, ErrNoQuestion
 	}
 	data, _ := json.Marshal(picks)
-	_, err = tx.Exec(`INSERT INTO days (day, questions) VALUES (?, ?)`, day, string(data))
-	return picks, err
+	if _, err = tx.Exec(`INSERT INTO days (day, questions) VALUES (?, ?)`, day, string(data)); err != nil {
+		return nil, err
+	}
+	return g.pinDay(tx, day, picks, b)
 }
 
 // dayQuestions are the questions of today and of the days drawn ahead (ahead.go): no other game deals them (Draw,
@@ -90,7 +96,7 @@ func (g *Game) StartDay(ctx context.Context, userID int64) (State, error) {
 		today := g.Today()
 		r, err := scanRun(tx.QueryRow(`SELECT `+runColumns+` FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, userID, today))
 		if errors.Is(err, ErrNoRun) {
-			picks, derr := g.day(tx, today)
+			picks, derr := g.day(tx, today, g.Bank())
 			if derr != nil {
 				return derr
 			}
