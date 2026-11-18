@@ -2,16 +2,34 @@
 // own group), by rating (with its division), and by knowledge (over every topic, or one) — among everyone, or among
 // you and your friends.
 
-import { emblem } from "../art/emblem.ts";
-import { board, boardRow } from "../game/results.ts";
 import type { Board, Score } from "../game/types.ts";
-import { api } from "../lib/api.ts";
-import { type Child, h, type Signal, signal } from "../lib/dom.ts";
+import type { Kit } from "../kit.ts";
+import type { Child, Signal } from "../lib/dom.ts";
 import { type By, boardHash, readBoard } from "../lib/hash.ts";
-import { rename, title } from "../lib/router.ts";
-import { categories, user } from "../state.ts";
-import { failure, formatNumber, type Open, type Standing, segmented, type Tier, toneOf, topicMark } from "../ui.ts";
-import { type LeagueView, leagueBoard, loadLeague } from "./league.ts";
+import type { Open, Standing, Tier } from "../ui.ts";
+import type { LeagueView } from "./league.ts";
+
+// The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
+// only types.
+let {
+  emblem,
+  board,
+  boardRow,
+  api,
+  h,
+  signal,
+  rename,
+  title,
+  categories,
+  user,
+  failure,
+  formatNumber,
+  segmented,
+  toneOf,
+  topicMark,
+  leagueBoard,
+  loadLeague,
+} = {} as Kit;
 
 interface Ranked {
   name: string;
@@ -57,7 +75,26 @@ const tabs: [By, string][] = [
  * them. */
 const shows = (by: By, open?: Open) => (by === "league" ? !!open?.league : by === "rating" ? !!open?.rating : true);
 
-export function ranks() {
+export function ranks(kit: Kit) {
+  ({
+    emblem,
+    board,
+    boardRow,
+    api,
+    h,
+    signal,
+    rename,
+    title,
+    categories,
+    user,
+    failure,
+    formatNumber,
+    segmented,
+    toneOf,
+    topicMark,
+    leagueBoard,
+    loadLeague,
+  } = kit);
   title("Класации");
   // Which board, among whom and of which topic, in the address (lib/hash.ts): back to the page, a reload or a link
   // opens the same one („#league“; „#friends“, the day's among friends, from Начало's „Всички“).

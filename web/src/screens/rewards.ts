@@ -3,26 +3,53 @@
 // Гардероб. It follows the unfolding (play/unfold.go): the server leaves out the achievements of a system the player
 // hasn't met and says no XP before XP is open, and „Как се печели“ speaks only of what they've met.
 
-import { picture } from "../art/picture.ts";
-import { type Child, h, signal, when } from "../lib/dom.ts";
-import { title } from "../lib/router.ts";
-import { listWords } from "../lib/words.ts";
-import { user } from "../state.ts";
-import {
-  type AchievementInfo,
+import type { Kit } from "../kit.ts";
+import type { Child } from "../lib/dom.ts";
+import type { AchievementInfo, Open } from "../ui.ts";
+import type { Progress } from "./progress.ts";
+
+// The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
+// only types.
+let {
+  illustration: picture,
+  h,
+  signal,
+  when,
+  title,
+  listWords,
+  user,
   badge,
   meaning,
   meter,
-  type Open,
   profileNav,
   rewardWords,
   tiers,
   tierWords,
   unlockWords,
-} from "../ui.ts";
-import { loadProgress, nearest, type Progress } from "./progress.ts";
+  loadProgress,
+  nearest,
+} = {} as Kit;
 
-export function rewards() {
+export function rewards(kit: Kit) {
+  ({
+    illustration: picture,
+    h,
+    signal,
+    when,
+    title,
+    listWords,
+    user,
+    badge,
+    meaning,
+    meter,
+    profileNav,
+    rewardWords,
+    tiers,
+    tierWords,
+    unlockWords,
+    loadProgress,
+    nearest,
+  } = kit);
   title("Награди");
   return h(
     "section",
@@ -153,7 +180,7 @@ function rewardMark(a: AchievementInfo): Child {
 
 /** How it all fits together, in a few lines, of the systems the player has met (all of them told to nobody signed in
  * would be a tour): what points are, what earns XP, what the rating and the league are for, what unlocks what. */
-export function howItWorks(open?: Open): Child {
+function howItWorks(open?: Open): Child {
   const item = (head: string, text: string) => h("li", null, h("b", null, head), text);
   return h(
     "details",

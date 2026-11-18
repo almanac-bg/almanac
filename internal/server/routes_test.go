@@ -12,6 +12,33 @@ import (
 	"testing"
 )
 
+// clientRoute is a route of the client's router (web/src/app.ts), on one line or more: its path, and the file of its
+// screen when it loads on its own (later(() => import("./screens/<file>.ts")…)).
+var clientRoute = regexp.MustCompile(`\{\s*path: /(.+?)/,\s*view: (?:later\(\(\) => import\("\./screens/(\w+)\.ts"\))?`)
+
+// The pages whose screen loads on its own ask for its file at once (screens, in pages.go): each such route of the
+// client's must be one of them, with its file, and no other page may ask for one.
+func TestScreensMatchTheClient(t *testing.T) {
+	src, err := os.ReadFile("../../web/src/app.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lazy := 0
+	for _, m := range clientRoute.FindAllStringSubmatch(string(src), -1) {
+		p, want := example(t, regexp.MustCompile(m[1])), ""
+		if m[2] != "" {
+			lazy++
+			want = m[2] + ".js"
+		}
+		if got := screenOf(p); got != want {
+			t.Errorf("%s (e.g. %s): the page asks for %q, but its screen is in %q (\"\": app.js): change screens in pages.go", m[1], p, got, want)
+		}
+	}
+	if lazy < len(screens) {
+		t.Errorf("app.ts loads %d screens on their own, pages.go knows %d: has the router's table changed shape? Change this test with it", lazy, len(screens))
+	}
+}
+
 // The client's router (web/src/app.ts) and appPaths are two lists of the same paths: one draws a screen for a path, the
 // other sends the app for it. A path only the client knows is a 404 on a reload or a shared link; one only the server
 // knows is a page with nothing on it. Each path of either list must be a path of the other.
@@ -21,7 +48,7 @@ func TestAppPathsMatchTheClient(t *testing.T) {
 		t.Fatal(err)
 	}
 	var client []*regexp.Regexp
-	for _, m := range regexp.MustCompile(`\{ path: /(.+?)/, view:`).FindAllStringSubmatch(string(src), -1) {
+	for _, m := range clientRoute.FindAllStringSubmatch(string(src), -1) {
 		client = append(client, regexp.MustCompile(m[1]))
 	}
 	if len(client) < 10 {

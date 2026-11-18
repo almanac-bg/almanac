@@ -25,8 +25,14 @@ func FS(dev bool) fs.FS {
 	return sub
 }
 
-// ManifestFile maps each entry point to the file the build gave it (app.js → assets/app-3F2A9C.js).
+// ManifestFile maps each entry point to the file the build gave it (app.js → assets/app-3F2A9C.js), a screen loaded on
+// its own by its file's name (settings.js), and each font by its own (sofia-sans.woff2).
 const ManifestFile = "manifest.json"
+
+// FirstFonts are the fonts the first paint of any page draws in, which the page asks for at once (server/pages.go),
+// before its style says it needs them; the rest load as text in them shows. cmd/build counts them in the first
+// screen's budget.
+var FirstFonts = []string{"sofia-sans.woff2"}
 
 // Manifest reads the build's manifest; empty if the client hasn't been built.
 func Manifest(fsys fs.FS) map[string]string {

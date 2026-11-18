@@ -69,10 +69,11 @@ file page) come from the file's page. Look at every picture yourself (the Read t
 
 Making the files: download the original from upload.wikimedia.org (nothing but image files, nothing from anywhere
 else) into `<batch>/write/<category>/raw/`, then make a webp whose longer side is at most 1200 px (keep a smaller
-original's size, at least 600 px) and one at half that size: `cwebp -q 80 -resize <w> <h> in -o out.webp`. Name the
-big one `<first 16 hex digits of the sha256 of its bytes>.webp` and the small one `<same>-600.webp`, each at most
-150 kB (lower `-q` until it is), both in `<batch>/write/<category>/images/`; `w` and `h` in the question are the big
-file's. Delete `raw/` when you're done.
+original's size, at least 600 px), one at three quarters of that size and one at half (each side rounded down):
+`cwebp -q 80 -m 6 -resize <w> <h> in -o out.webp`. Name the big one `<first 16 hex digits of the sha256 of its
+bytes>.webp`, the three-quarter one `<same>-900.webp` and the half one `<same>-600.webp`, each at most 150 kB (lower `-q`
+until it is), all three in `<batch>/write/<category>/images/`; `w` and `h` in the question are the big file's. Delete
+`raw/` when you're done.
 
 ## Deliver
 

@@ -31,7 +31,7 @@ most). A change is judged by whether players come back: the retention numbers in
 | Path | What |
 | --- | --- |
 | `cmd/almanac` | The program: `serve`, `bank check/fmt`, `backup now/list/restore/verify/keys` |
-| `cmd/build` | Builds the client into `internal/assets/dist` (esbuild; a size ceiling against accidents) |
+| `cmd/build` | Builds the client into `internal/assets/dist` (esbuild; precompressed; the first screen's budget, and ceilings against accidents) |
 | `internal/play` | The game's rules and data: runs, scoring (`worth.go`), duels, friends, rating, leagues, goals, progress |
 | `internal/live` | Live duels: matchmaking, the shared clock, recordings |
 | `internal/royal` | Роял, live in the evening (Friday to Sunday until the evenings fill) |

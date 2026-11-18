@@ -2,61 +2,65 @@
    The tokens are the design system's (АЛМАНАХ Modern); every colour below is one of them. The rules for using
    them: web/DESIGN.md. */
 
-/* ---- Fonts: our own files (the CSP allows no others, and players' browsers ask no one else for anything). ---- */
+/* ---- Fonts: our own files (the CSP allows no others, and players' browsers ask no one else for anything). Each
+   family is two files (web/src/fonts/subset.sh, whose ranges these are, word for word): one with all a page of
+   Bulgarian needs (Cyrillic, Latin letters and digits, the marks the texts use), the other with the rest of Latin,
+   Greek and other signs, loaded only where one shows. The weights are only those used here. Sofia Sans is asked for
+   by the page itself at once (server/pages.go: assets.FirstFonts). ---- */
 
 @font-face {
   font-family: "Sofia Sans";
   font-style: normal;
   font-weight: 400 900;
   font-display: swap;
-  src: url("./fonts/sofia-sans-cyrillic.woff2") format("woff2");
-  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+  src: url("./fonts/sofia-sans.woff2") format("woff2");
+  unicode-range:
+    U+0020-007E, U+00A0, U+00A7, U+00A9, U+00AB, U+00AD, U+00AE, U+00B0-00B3, U+00B7, U+00B9, U+00BB-00BE, U+00D7, U+00F7, U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2009, U+2010-2015, U+2018-201E, U+2022, U+2026, U+202F, U+2030, U+2032-2033, U+2039-203A, U+20AC, U+2116, U+2190-2193, U+2212;
 }
 @font-face {
   font-family: "Sofia Sans";
   font-style: normal;
   font-weight: 400 900;
   font-display: swap;
-  src: url("./fonts/sofia-sans-latin.woff2") format("woff2");
+  src: url("./fonts/sofia-sans-rest.woff2") format("woff2");
   unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F,
-    U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    U+00A1-00A6, U+00A8, U+00AA, U+00AC, U+00AF, U+00B4-00B6, U+00B8, U+00BA, U+00BF-00D6, U+00D8-00F6, U+00F8-024F, U+0259, U+02B0-02FF, U+0300, U+0302-036F, U+0370-03FF, U+0460-048F, U+0492-04AF, U+04B2-052F, U+1E00-1EFF, U+2000-2008, U+200B-200F, U+2016-2017, U+201F-2021, U+2023-2025, U+2027-202E, U+2031, U+2034-2038, U+203B-209F, U+20A0-20AB, U+20AD-20CF, U+2100-2115, U+2117-218F, U+2194-21FF, U+2200-2211, U+2213-22FF, U+FB00-FB06;
 }
 @font-face {
   font-family: "Sofia Sans Extra Condensed";
   font-style: normal;
   font-weight: 600 900;
   font-display: swap;
-  src: url("./fonts/sofia-sans-extra-condensed-cyrillic.woff2") format("woff2");
-  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+  src: url("./fonts/sofia-sans-extra-condensed.woff2") format("woff2");
+  unicode-range:
+    U+0020-007E, U+00A0, U+00A7, U+00A9, U+00AB, U+00AD, U+00AE, U+00B0-00B3, U+00B7, U+00B9, U+00BB-00BE, U+00D7, U+00F7, U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2009, U+2010-2015, U+2018-201E, U+2022, U+2026, U+202F, U+2030, U+2032-2033, U+2039-203A, U+20AC, U+2116, U+2190-2193, U+2212;
 }
 @font-face {
   font-family: "Sofia Sans Extra Condensed";
   font-style: normal;
   font-weight: 600 900;
   font-display: swap;
-  src: url("./fonts/sofia-sans-extra-condensed-latin.woff2") format("woff2");
+  src: url("./fonts/sofia-sans-extra-condensed-rest.woff2") format("woff2");
   unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F,
-    U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    U+00A1-00A6, U+00A8, U+00AA, U+00AC, U+00AF, U+00B4-00B6, U+00B8, U+00BA, U+00BF-00D6, U+00D8-00F6, U+00F8-024F, U+0259, U+02B0-02FF, U+0300, U+0302-036F, U+0370-03FF, U+0460-048F, U+0492-04AF, U+04B2-052F, U+1E00-1EFF, U+2000-2008, U+200B-200F, U+2016-2017, U+201F-2021, U+2023-2025, U+2027-202E, U+2031, U+2034-2038, U+203B-209F, U+20A0-20AB, U+20AD-20CF, U+2100-2115, U+2117-218F, U+2194-21FF, U+2200-2211, U+2213-22FF, U+FB00-FB06;
 }
 @font-face {
   font-family: "Literata";
   font-style: italic;
   font-weight: 500;
   font-display: swap;
-  src: url("./fonts/literata-italic-cyrillic.woff2") format("woff2");
-  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+  src: url("./fonts/literata-italic.woff2") format("woff2");
+  unicode-range:
+    U+0020-007E, U+00A0, U+00A7, U+00A9, U+00AB, U+00AD, U+00AE, U+00B0-00B3, U+00B7, U+00B9, U+00BB-00BE, U+00D7, U+00F7, U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2009, U+2010-2015, U+2018-201E, U+2022, U+2026, U+202F, U+2030, U+2032-2033, U+2039-203A, U+20AC, U+2116, U+2190-2193, U+2212;
 }
 @font-face {
   font-family: "Literata";
   font-style: italic;
   font-weight: 500;
   font-display: swap;
-  src: url("./fonts/literata-italic-latin.woff2") format("woff2");
+  src: url("./fonts/literata-italic-rest.woff2") format("woff2");
   unicode-range:
-    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F,
-    U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    U+00A1-00A6, U+00A8, U+00AA, U+00AC, U+00AF, U+00B4-00B6, U+00B8, U+00BA, U+00BF-00D6, U+00D8-00F6, U+00F8-024F, U+0259, U+02B0-02FF, U+0300, U+0302-036F, U+0370-03FF, U+0460-048F, U+0492-04AF, U+04B2-052F, U+1E00-1EFF, U+2000-2008, U+200B-200F, U+2016-2017, U+201F-2021, U+2023-2025, U+2027-202E, U+2031, U+2034-2038, U+203B-209F, U+20A0-20AB, U+20AD-20CF, U+2100-2115, U+2117-218F, U+2194-21FF, U+2200-2211, U+2213-22FF, U+FB00-FB06;
 }
 
 /* The share of players who gave an answer, as a bar that fills in behind it (.option.crowd): registered, so that it
@@ -382,9 +386,8 @@
     padding: 6px max(var(--space-2), env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom))
       max(var(--space-2), env(safe-area-inset-left));
     border-top: 1px solid var(--line);
-    background: color-mix(in srgb, var(--surface) 92%, transparent);
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
+    /* Solid: a blur under a fixed bar costs a weak phone's GPU every frame of a scroll, for next to nothing seen. */
+    background: var(--surface);
   }
 
   .tabs a {
@@ -6424,8 +6427,6 @@
       padding: 0;
       border: 0;
       background: none;
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
     }
 
     .tabs a {

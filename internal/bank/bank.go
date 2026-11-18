@@ -198,7 +198,9 @@ func Load(dir string) (*Bank, []Problem) {
 	}
 	for _, q := range b.Questions {
 		for _, im := range picturesOf(q) {
-			used[im.File], used[im.Small()] = true, true
+			for _, f := range im.files() {
+				used[f.name] = true
+			}
 		}
 	}
 	if images, err := os.ReadDir(filepath.Join(dir, ImagesDir)); err == nil {

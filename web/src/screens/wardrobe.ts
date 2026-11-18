@@ -2,12 +2,27 @@
 // behind it, and the title under their name. What they wear now shows at the top as others see it; below, one group at
 // a time, everything to choose from, the locked ones with what unlocks them.
 
-import { api, errorText } from "../lib/api.ts";
-import { type Child, h, signal, when } from "../lib/dom.ts";
-import { title } from "../lib/router.ts";
-import { user } from "../state.ts";
-import { avatar, profileNav, shapeNames, tierWords, toneNames } from "../ui.ts";
-import { type Cosmetic, loadProgress, type Progress, type TitleView } from "./progress.ts";
+import type { Kit } from "../kit.ts";
+import type { Child } from "../lib/dom.ts";
+import type { Cosmetic, Progress, TitleView } from "./progress.ts";
+
+// The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
+// only types.
+let {
+  api,
+  errorText,
+  h,
+  signal,
+  when,
+  title,
+  user,
+  avatar,
+  profileNav,
+  shapeNames,
+  tierWords,
+  toneNames,
+  loadProgress,
+} = {} as Kit;
 
 type Part = "avatar" | "frame" | "backdrop" | "title";
 
@@ -26,7 +41,22 @@ const titleGroups: [TitleView["group"], string][] = [
   ["rank", "С рейтинга, Роял и лигата"],
 ];
 
-export function wardrobe() {
+export function wardrobe(kit: Kit) {
+  ({
+    api,
+    errorText,
+    h,
+    signal,
+    when,
+    title,
+    user,
+    avatar,
+    profileNav,
+    shapeNames,
+    tierWords,
+    toneNames,
+    loadProgress,
+  } = kit);
   title("Гардероб");
   return h(
     "section",

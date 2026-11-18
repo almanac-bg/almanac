@@ -1,19 +1,30 @@
 // „Твоята 2026“: a player's year in the game, one card at a time — the days they played and their longest streak,
 // their answers, their strongest topic, the facts they learned (and the first of them), their duels and who they
 // played most, their best Роял, the highest league they reached, the XP of it all — and, at the end, a few lines to
-// share. It opens on Начало from mid-December into January (yearCard) and stays in Профил after (yearLink).
+// share. It opens on Начало from mid-December into January (screens/today.ts) and stays in Профил after (screens/me.ts).
 
-import { leagueEmblem } from "../art/league.ts";
-import { shareButton } from "../game/results.ts";
-import { count, yearShareText } from "../game/share.ts";
-import { api } from "../lib/api.ts";
-import { type Child, h, signal } from "../lib/dom.ts";
-import { ordinal } from "../lib/ordinal.ts";
-import { title } from "../lib/router.ts";
-import { yearNow } from "../lib/year.ts";
-import { categories, user } from "../state.ts";
-import { fact, failure, formatNumber } from "../ui.ts";
+import type { Kit } from "../kit.ts";
+import type { Child } from "../lib/dom.ts";
 import type { League } from "./league.ts";
+
+// The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
+// only types.
+let {
+  leagueEmblem,
+  shareButton,
+  count,
+  yearShareText,
+  api,
+  h,
+  signal,
+  ordinal,
+  title,
+  categories,
+  user,
+  fact,
+  failure,
+  formatNumber,
+} = {} as Kit;
 
 interface Year {
   year: number;
@@ -37,25 +48,6 @@ interface Year {
 
 /** A topic's name, by its id. */
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? id;
-
-/** Начало's way in, while the year's look back is fresh. */
-export function yearCard(): Child {
-  const { year, fresh } = yearNow();
-  if (!year || !fresh || !user.peek()) return null;
-  return h(
-    "a",
-    { class: "card year-card", href: `/year/${year}` },
-    h("p", { class: "kicker" }, "Годината ти в играта"),
-    h("strong", null, `Твоята ${year}`),
-    h("span", { class: "muted" }, "Дни, отговори, научени факти и още. Виж ги."),
-  );
-}
-
-/** Профил's way in, once a year's look back has opened. */
-export function yearLink(): Child {
-  const { year } = yearNow();
-  return year ? h("a", { class: "link", href: `/year/${year}` }, `Твоята ${year}`) : null;
-}
 
 /** One card of the year: a word above, a big figure, and what it means. */
 function slide(kicker: string, big: Child, ...more: Child[]): Child {
@@ -137,7 +129,23 @@ function slides(y: Year): Child[] {
   return out;
 }
 
-export function year([which = ""]: string[]) {
+export function year(kit: Kit, [which = ""]: string[]) {
+  ({
+    leagueEmblem,
+    shareButton,
+    count,
+    yearShareText,
+    api,
+    h,
+    signal,
+    ordinal,
+    title,
+    categories,
+    user,
+    fact,
+    failure,
+    formatNumber,
+  } = kit);
   const n = Number(which);
   title(`Твоята ${n}`);
   const data = signal<Year | null>(null);

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"regexp"
@@ -8,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/play"
 )
 
@@ -19,6 +21,16 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	out, err := s.todayOf(r.Context(), u)
+	if err != nil {
+		return err
+	}
+	return ok(w, out)
+}
+
+// todayOf is the day screen's state for u (nil: a visitor), as GET /api/day sends it and the page of Начало has it
+// in its boot (pages.go).
+func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, error) {
 	day := s.game.Today()
 	out := map[string]any{"day": day, "issue": play.Issue(day), "streak": 0, "run": nil}
 	// Роял's lobby open or its games under way: Начало shows it to everyone then, new players too (it's the best
@@ -28,10 +40,10 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	var viewer int64
 	if u != nil {
 		viewer = u.ID
-		s.game.AfterWait(r.Context(), u.ID) // a game just finished: what it earned (a streak won back, goals) is in
-		streak, err := s.game.StreakOf(r.Context(), u.ID)
+		s.game.AfterWait(ctx, u.ID) // a game just finished: what it earned (a streak won back, goals) is in
+		streak, err := s.game.StreakOf(ctx, u.ID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		out["streak"], out["reserve"] = streak.Days, streak.Reserve
 		out["saved"] = s.game.InWeek(slices.Concat(streak.Saved, streak.Mended)) // kept, by a reserve day or a repair
@@ -40,41 +52,41 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 		// reserve day kept the streak; or none was left and it ended, and it can be won back today (play/repair.go),
 		// or a new one begins.
 		recent := s.game.Now().In(play.Bulgaria).AddDate(0, 0, -3).Format(time.DateOnly)
-		told, err := s.game.StreakTold(r.Context(), u.ID)
+		told, err := s.game.StreakTold(ctx, u.ID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		// A reserve day spent before a repair was part of the streak that ended: what the player heard of was the end.
 		if n, m := len(streak.Saved), len(streak.Mended); n > 0 && streak.Saved[n-1] >= recent &&
 			(m == 0 || streak.Saved[n-1] > streak.Mended[m-1]) && told != "kept:"+streak.Saved[n-1] {
 			out["kept"] = streak.Saved[n-1]
 		}
-		repair, err := s.game.RepairOf(r.Context(), u.ID)
+		repair, err := s.game.RepairOf(ctx, u.ID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if repair != nil {
 			out["repair"] = repair
 		} else if e := streak.Ended; e != nil && e.On >= recent && e.Days >= 2 && told != "ended:"+e.On {
 			out["ended"] = e
 		}
-		if out["week"], err = s.game.Week(r.Context(), u.ID); err != nil {
-			return err
+		if out["week"], err = s.game.Week(ctx, u.ID); err != nil {
+			return nil, err
 		}
-		if out["level"], err = s.game.LevelNow(r.Context(), u.ID); err != nil {
-			return err
+		if out["level"], err = s.game.LevelNow(ctx, u.ID); err != nil {
+			return nil, err
 		}
 		// Whether they've finished a game of any kind yet: until then Начало is the day and the topics only.
 		var played bool
-		if err := s.db.Read.QueryRowContext(r.Context(), `SELECT EXISTS (SELECT 1 FROM runs WHERE user_id = ? AND finished_at IS NOT NULL)`, u.ID).
+		if err := s.db.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM runs WHERE user_id = ? AND finished_at IS NOT NULL)`, u.ID).
 			Scan(&played); err != nil {
-			return err
+			return nil, err
 		}
 		out["played"] = played
 		// Whether Роял is among the ways to play with others: not for a new player while its evenings are thin.
-		nudge, err := s.game.NudgeRoyal(r.Context(), u.ID)
+		nudge, err := s.game.NudgeRoyal(ctx, u.ID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		// A live game they're in, under way: Начало has the way back to it.
 		if p := s.playing(u.ID); p != nil {
@@ -82,79 +94,79 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 		}
 		out["royal"] = nudge || royalNow
 		// A friend has played the duel they started: told on Начало, once (by the client), above the day.
-		if out["duel"], err = s.game.FriendPlayedOf(r.Context(), u.ID); err != nil {
-			return err
+		if out["duel"], err = s.game.FriendPlayedOf(ctx, u.ID); err != nil {
+			return nil, err
 		}
 		// A friend said yes to their invite, and what came of a live duel they left: each told once (POST /api/told).
-		if out["accepted"], err = s.game.AcceptedOf(r.Context(), u.ID); err != nil {
-			return err
+		if out["accepted"], err = s.game.AcceptedOf(ctx, u.ID); err != nil {
+			return nil, err
 		}
-		if out["left"], err = s.game.LeftOf(r.Context(), u.ID); err != nil {
-			return err
+		if out["left"], err = s.game.LeftOf(ctx, u.ID); err != nil {
+			return nil, err
 		}
 		// Who took the player's challenges since they last heard: one line for all of them.
-		if out["challenges"], err = s.game.ChallengeNewsOf(r.Context(), u.ID); err != nil {
-			return err
+		if out["challenges"], err = s.game.ChallengeNewsOf(ctx, u.ID); err != nil {
+			return nil, err
 		}
 		// Which of the game's systems they've met: Начало shows the level and the goals once XP is open.
-		if out["open"], err = s.game.OpenOf(r.Context(), u.ID); err != nil {
-			return err
+		if out["open"], err = s.game.OpenOf(ctx, u.ID); err != nil {
+			return nil, err
 		}
 		// A game that ended without its result on screen: its news is told on Начало, once (play/told.go).
-		if untold, err := s.game.Untold(r.Context(), u.ID); err != nil {
-			return err
+		if untold, err := s.game.Untold(ctx, u.ID); err != nil {
+			return nil, err
 		} else if untold != 0 {
 			out["untold"] = untold
 		}
 		var runID int64
-		err = s.db.Read.QueryRowContext(r.Context(), `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, u.ID, day).Scan(&runID)
+		err = s.db.Read.QueryRowContext(ctx, `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, u.ID, day).Scan(&runID)
 		if err == nil {
-			st, err := s.game.State(r.Context(), u.ID, runID)
+			st, err := s.game.State(ctx, u.ID, runID)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			out["run"] = st
 			if st.Done { // the right answer the fewest others got, for the result shared
-				if out["rarest"], err = s.game.RarestRight(r.Context(), u.ID, day); err != nil {
-					return err
+				if out["rarest"], err = s.game.RarestRight(ctx, u.ID, day); err != nil {
+					return nil, err
 				}
 				// The questions it got wrong will wait for a second chance: said when there'll be a game of them.
-				if missed, all, err := s.game.Misses(r.Context(), u.ID, runID); err != nil {
-					return err
+				if missed, all, err := s.game.Misses(ctx, u.ID, runID); err != nil {
+					return nil, err
 				} else if missed > 0 && all >= play.MistakesFrom {
 					out["misses"] = map[string]int{"n": missed, "days": int(play.MistakesAfter.Hours() / 24)}
 				}
 				// The shared result ends with the player's invite link: it brings whoever opens it to the day.
-				code, err := s.game.InviteCode(r.Context(), u.ID)
+				code, err := s.game.InviteCode(ctx, u.ID)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				out["invite"] = s.cfg.PublicURL + "/f/" + code
 			}
 		}
 	}
-	board, err := s.game.BoardOf(r.Context(), day, viewer)
+	board, err := s.game.BoardOf(ctx, day, viewer)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	out["board"] = board
 	if u != nil {
-		friends, err := s.game.FriendsBoard(r.Context(), day, u.ID)
+		friends, err := s.game.FriendsBoard(ctx, day, u.ID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		out["friends"] = friends
 		// No friend has played yet: whether there's any, for the result to ask a player with none to invite one.
 		if friends == nil {
 			var any bool
-			if err := s.db.Read.QueryRowContext(r.Context(), `SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ?)`, u.ID).
+			if err := s.db.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ?)`, u.ID).
 				Scan(&any); err != nil {
-				return err
+				return nil, err
 			}
 			out["befriended"] = any
 		}
 	}
-	return ok(w, out)
+	return out, nil
 }
 
 func (s *Server) startDay(w http.ResponseWriter, r *http.Request) error {

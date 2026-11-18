@@ -26,7 +26,7 @@ import {
   until,
   who,
 } from "../ui.ts";
-import { signIn } from "./settings.ts";
+import { signIn } from "./signin.ts";
 
 /** How one question of a duel went for one side: its points, right or partly (some points, not right), how long it
  * took, and whether nothing was given. */

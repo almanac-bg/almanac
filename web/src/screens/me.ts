@@ -4,11 +4,22 @@
 // settings beside your name. A hub: each thing once, the whole of it a tap away. Each system shows once the player has
 // met it (play/unfold.go): the level from the second day played, the league from the third.
 
-import { emblem } from "../art/emblem.ts";
-import { type Child, h, signal, when } from "../lib/dom.ts";
-import { go, title } from "../lib/router.ts";
-import { user } from "../state.ts";
-import {
+import type { Kit } from "../kit.ts";
+import type { Child } from "../lib/dom.ts";
+import type { Unlock } from "../ui.ts";
+import type { Progress } from "./progress.ts";
+
+// The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
+// only types.
+let {
+  emblem,
+  h,
+  signal,
+  when,
+  go,
+  title,
+  yearNow,
+  user,
   avatar,
   badge,
   explain,
@@ -19,17 +30,43 @@ import {
   profileHref,
   profileNav,
   rewardWords,
-  type Unlock,
   unlockPicture,
   unlockWords,
-} from "../ui.ts";
-import { haveProfile } from "./keep.ts";
-import { leagueLine } from "./league.ts";
-import { loadProgress, nearest, type Progress } from "./progress.ts";
-import { stats } from "./stats.ts";
-import { yearLink } from "./year.ts";
+  haveProfile,
+  leagueLine,
+  loadProgress,
+  nearest,
+  stats,
+} = {} as Kit;
 
-export function me() {
+export function me(kit: Kit) {
+  ({
+    emblem,
+    h,
+    signal,
+    when,
+    go,
+    title,
+    yearNow,
+    user,
+    avatar,
+    badge,
+    explain,
+    failure,
+    levelNumber,
+    meaning,
+    meter,
+    profileHref,
+    profileNav,
+    rewardWords,
+    unlockPicture,
+    unlockWords,
+    haveProfile,
+    leagueLine,
+    loadProgress,
+    nearest,
+    stats,
+  } = kit);
   title("Профил");
   return h(
     "section",
@@ -201,4 +238,10 @@ function levelXP(level: number): number {
   let from = 0;
   for (let l = 1, step = 300; l < level; l++, step += 150) from += step;
   return from;
+}
+
+/** Профил's way in, once a year's look back has opened. */
+function yearLink(): Child {
+  const { year } = yearNow();
+  return year ? h("a", { class: "link", href: `/year/${year}` }, `Твоята ${year}`) : null;
 }
