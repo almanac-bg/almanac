@@ -2086,6 +2086,18 @@
     z-index: 1;
   }
 
+  /* „Напред“ too, under an answer that shows whole only scrolled (a laptop's height: run.ts, settle keeps the
+     question's first line in sight): at the screen's foot until the panel's own foot comes up to it, the page going on
+     under it to the screen's edge. */
+  .run-question .after .up-next-go {
+    position: sticky;
+    bottom: var(--space-4);
+    z-index: 1;
+    box-shadow:
+      var(--elev-1),
+      0 var(--space-4) 0 var(--bg);
+  }
+
   .after > * {
     animation: enter 200ms ease-out;
   }
@@ -2812,6 +2824,19 @@
     font-size: 0.9375rem;
     font-weight: 700;
     line-height: 1.25rem;
+  }
+
+  /* The share that gave a picture, on its corner: the tile keeps its height as the shares come, the answer having
+     settled in its place by then (run.ts, settle). */
+  .option.pic-option .crowd-share {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-xs);
+    background: var(--raised);
+    box-shadow: var(--elev-1);
+    font-size: 1rem;
   }
 
   .pic-credits {
@@ -6659,11 +6684,33 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .playing .option {
+    /* Rows of a list too (more specific from 48rem, above). */
+    .playing .option,
+    .playing :is(.sortable-list, .match, .match-result) .option {
       min-height: 3rem;
       padding-block: 6px;
       font-size: 1.0625rem;
       line-height: 1.5rem;
+    }
+
+    /* A choice of pictures four across, one row: with the answer, the right one fits between the head and the
+       panel at its least (the panel's room for them, 5.5rem and 10rem, above), with its name in two lines. */
+    .playing .pic-options {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .playing .pic-option-img {
+      max-height: calc(100dvh - 5.5rem - 10rem - 4rem);
+    }
+
+    /* The topic (or „На този ден“) stays in the small head, beside the tally: there's the width for it. */
+    .stuck .kicker {
+      display: block;
+    }
+
+    .stuck .head-side {
+      grid-auto-flow: column;
+      align-items: center;
     }
 
     /* „Вярно“ and „Невярно“ a line each, how many gave it beside the word. */
@@ -6680,9 +6727,37 @@
       padding-block: 4px;
     }
 
-    /* The answer's panel as wide as the question: its lines longer, fewer of them. */
+    /* The answer's panel as wide as the question, its lines longer, fewer of them; how everyone answered and
+       „Напред“ on the verdict's row, so the fact under them has what's left of the height. */
     .run-question .after {
+      grid-template-columns: auto minmax(0, 1fr) auto;
       max-width: 54rem;
+    }
+
+    .run-question .after > * {
+      grid-column: 1 / -1;
+    }
+
+    .run-question .after > .verdict {
+      grid-row: 1;
+      grid-column: 1;
+    }
+
+    .run-question .after > .crowd-says {
+      grid-row: 1;
+      grid-column: 2;
+      align-self: center;
+    }
+
+    .run-question .after .up-next-go {
+      top: 0;
+      bottom: auto;
+      grid-row: 1;
+      grid-column: 3;
+      align-self: center;
+      width: auto;
+      min-width: 12rem;
+      box-shadow: var(--elev-1);
     }
   }
 

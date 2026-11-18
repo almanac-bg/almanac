@@ -306,7 +306,8 @@ takes a token.
     names the group it's going to), `.split-sides` (the two groups as `.option.split-side`), `.split-pips` and
     `.split-back`; afterwards `.split-result`.
   - A choice of pictures: `.options.pic-options` (two by two), each `.option.pic-option` a picture with its letter
-    (`.pic-letter`) and, once answered, its name (`.pic-name`); the pictures' credits in `.pic-credits`.
+    (`.pic-letter`) and, once answered, its name (`.pic-name`) and the share that gave it on its corner (it doesn't
+    grow); the pictures' credits in `.pic-credits`.
   - „Подсказки“: `.clues`, a `.clue` per clue with what a right answer is worth then (`.clue-worth`); the last one
     out is `now` (a gold edge: progress), the ones before it `past`, the ones to come `locked` (counting down).
   - How everyone else answered, once a question has enough answers: `.option.crowd` (a bar behind an answer as long
@@ -471,8 +472,11 @@ takes a token.
   the width; the answers move up above it, marked, and the page moves only when they can't all fit, just enough to
   show the right one between the head and the panel. The panel always leaves the right answer that room; a fact
   longer than the rest scrolls with the panel, „Напред“ staying at its foot. A phone on its side plays the same,
-  the head small from the start, the question smaller and a choice's answers two by two, so that they start on the
-  screen. A big screen shows the answer under the question, as before.
+  the head small from the start (or from when the phone is turned), the topic still in it, the question smaller, a
+  choice's answers two by two and a choice of pictures four across, so that they start on the screen; its panel has
+  how everyone answered and „Напред“ on the verdict's row, so the fact under them shows. A big screen shows the
+  answer under the question; the page moves for it, but never the question's first line under the head unless the
+  verdict wouldn't show, „Напред“ staying at the screen's foot.
 - **Leaving a game is free between two questions.** While a question's time runs (on the server, so it can't wait),
   a way out — the arrow, a place in the header — asks first („Ако излезеш сега, въпросът остава без отговор.“,
   „Остани“ or „Излез“), and leaving gives that question up. The game waits where it stopped: the day on Начало with
