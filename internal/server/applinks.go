@@ -24,7 +24,7 @@ var androidCerts = []string{"87:68:23:BC:F3:84:76:EE:87:B4:A0:19:27:C9:50:E4:4D:
 var appLinks = []string{
 	"/", "/play/*", "/duel", "/duel/*", "/challenge", "/challenge/*", "/c/*", "/r/*", "/f/*", "/hand/*",
 	"/year/*", "/games/*", "/players/*", "/royal", "/room", "/ranks", "/rewards", "/wardrobe", "/me", "/friends",
-	"/settings", "/almanac", "/mistakes",
+	"/settings", "/almanac", "/mistakes", "/issues", "/issues/*",
 }
 
 func (s *Server) appleAppSiteAssociation(w http.ResponseWriter, _ *http.Request) {

@@ -16,6 +16,8 @@ function what(s: Played): string {
   switch (s.kind) {
     case "day":
       return s.day ? `Въпросите на деня · ${issueWords(undefined, s.day)}` : "Въпросите на деня";
+    case "past":
+      return s.day ? `Минал брой · ${issueWords(undefined, s.day)}` : "Минал брой";
     case "mistakes":
       return "Втори шанс";
     case "duel":

@@ -289,9 +289,9 @@ var landingNames = map[string]string{
 var (
 	kindNames = map[string]string{
 		"day": "Денят", "topic": "Тема", "duel": "Дуел", "challenge": "Предизвикателство", "royal": "Роял",
-		"mistakes": "Грешки", "room": "Стая",
+		"mistakes": "Грешки", "room": "Стая", "past": "Минал брой",
 	}
-	kindOrder = []string{"day", "topic", "duel", "challenge", "royal", "mistakes", "room"}
+	kindOrder = []string{"day", "past", "topic", "duel", "challenge", "royal", "mistakes", "room"}
 )
 
 // kindName is a kind of game as the admin page says it.

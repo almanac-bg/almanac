@@ -47,20 +47,23 @@ export interface Asked {
 }
 
 /** How everyone else did with a question, in one quiet line under its verdict, as each kind of question counts right:
- * „Вярно отговарят 34% от играчите днес.“ for the day's ten (its players today), without „днес“ for everyone ever.
+ * „Вярно отговарят 34% от играчите днес.“ for the day's ten (its players today), „…на този брой“ for a past issue (that
+ * day's players), without either for everyone ever.
  * A right answer few others got stands out, said as the feat it is („Познаха го само 12% от играчите днес.“), and
  * nobody right is said as such, never as „0%“. Nothing while the question has too few answers to say. */
 export function crowdLine(type: View["type"], c: Crowd | undefined, right: boolean): Child {
   if (!c) return null;
-  const s = `${percent(c.right)} от играчите${c.today ? " днес" : ""}`;
+  const s = `${percent(c.right)} от играчите${c.today ? " днес" : c.issue ? " на този брой" : ""}`;
   if (c.right === 0) {
-    const none = right
-      ? c.today
-        ? "Днес само ти го позна."
-        : "Досега само ти го позна."
-      : c.today
-        ? "Днес още никой не го е познал."
-        : "Още никой не го е познал.";
+    const none = c.issue
+      ? "Никой от играчите на този брой не го позна."
+      : right
+        ? c.today
+          ? "Днес само ти го позна."
+          : "Досега само ти го позна."
+        : c.today
+          ? "Днес още никой не го е познал."
+          : "Още никой не го е познал.";
     return h("p", { class: right ? "crowd-says rare" : "crowd-says" }, none);
   }
   if (right && c.right <= rare) return h("p", { class: "crowd-says rare" }, `Познаха го само ${s}.`);

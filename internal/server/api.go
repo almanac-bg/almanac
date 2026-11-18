@@ -47,6 +47,8 @@ var playerErrors = map[error]*apiError{
 	play.ErrBadAnswer:      {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
 	play.ErrNoQuestion:     {http.StatusServiceUnavailable, "no_questions", "В момента няма въпроси за игра."},
 	play.ErrDayOver:        {http.StatusGone, "day_over", "Денят на тази игра свърши. Днешните въпроси те чакат в Начало."},
+	play.ErrNoIssue:        {http.StatusNotFound, "no_issue", "Този брой още не е минал или го няма."},
+	play.ErrIssuePlayed:    {http.StatusConflict, "issue_played", "Този брой го изигра в деня му."},
 	play.ErrNoYear:         {http.StatusNotFound, "no_year", "Тази година още не е започнала."},
 	play.ErrNoMistakes:     {http.StatusConflict, "no_mistakes", "Още няма достатъчно въпроси за втори шанс."},
 	play.ErrNoInvite:       {http.StatusNotFound, "no_invite", "Няма такава покана. Може връзката да е грешна."},

@@ -810,7 +810,7 @@ function nobody(again: () => void): Child {
     h(
       "div",
       { class: "result-actions" },
-      h("a", { class: "btn", href: "/play/all" }, "Играй по тема"),
+      h("a", { class: "btn", href: "/" }, "Към Начало"),
       h("button", { class: "btn", type: "button", onclick: again }, "Опитай пак"),
     ),
   );

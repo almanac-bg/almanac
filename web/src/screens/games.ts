@@ -77,6 +77,8 @@ export function games(kit: Kit) {
     back("/me", "Профил"),
     h("h1", null, "Всички игри"),
     segmented("Кои игри", kinds, kind, pick),
+    // Among the issues, the way to those gone by (screens/issues.ts).
+    () => (kind() === "day" ? h("p", { class: "day-next" }, h("a", { href: "/issues" }, "Минали броеве")) : null),
     () => {
       const all = list();
       if (!all) return error() ? failure(error(), () => more(true)) : h("p", { class: "muted" }, "…");

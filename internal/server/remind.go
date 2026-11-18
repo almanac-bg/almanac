@@ -79,7 +79,8 @@ type reminders struct {
 const never = 24 * 60
 
 // Remind reminds, every minute, those whose hour has come (remind), and mails those whose streak ended and whom no
-// notification reaches (streakMails), and those who asked for the day's reminder by mail (dayMails).
+// notification reaches (streakMails), and those who asked for the day's reminder by mail (dayMails); in December, it
+// tells each player their year (yearWords).
 func (s *Server) Remind(ctx context.Context) {
 	t := time.NewTicker(time.Minute)
 	defer t.Stop()
@@ -92,6 +93,7 @@ func (s *Server) Remind(ctx context.Context) {
 			s.remind(ctx, now)
 			s.streakMails(ctx, now) // for those no notification reaches (streakmail.go)
 			s.dayMails(ctx, now)    // after it: one mail a day at most (daymail.go)
+			s.yearWords(ctx, now)   // in December (yearword.go)
 		}
 	}
 }
@@ -293,7 +295,7 @@ func (s *Server) reminder(ctx context.Context, today string, userID int64) push.
 	streak, _ := s.game.Streak(ctx, userID)
 	if streak == 0 {
 		if r, _ := s.game.RepairOf(ctx, userID); r != nil {
-			m.Body = fmt.Sprintf("Серията ти от %s прекъсна. Върни я днес: въпросите на деня и още една игра.", days(r.Days))
+			m.Body = fmt.Sprintf("Серията ти от %s прекъсна. Върни я днес: %s.", days(r.Days), repairWords(r))
 			return m
 		}
 	}

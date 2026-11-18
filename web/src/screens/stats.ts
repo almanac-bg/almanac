@@ -36,9 +36,9 @@ export interface Stats {
 /** A finished game, as a list of them has it. */
 export interface Played {
   id: number;
-  kind: "day" | "topic" | "challenge" | "duel" | "royal" | "mistakes" | "room"; // challenge: from when there were challenges
+  kind: "day" | "past" | "topic" | "challenge" | "duel" | "royal" | "mistakes" | "room"; // challenge: from when there were challenges
   day?: string;
-  /** The day's ten's: the day's issue. */
+  /** The day's ten's (and a past issue's: screens/issues.ts): the day's issue. */
   issue?: number;
   category?: string;
   rights: number;
@@ -63,6 +63,8 @@ function what(p: Played): string {
   switch (p.kind) {
     case "day":
       return p.issue ? `Брой ${p.issue}` : "Въпросите на деня";
+    case "past":
+      return `Минал брой ${p.issue}`;
     case "duel":
       // A friend's challenge has its opponent and result once both have played: until then (or if it was declined or
       // ran out), only that it was a duel.

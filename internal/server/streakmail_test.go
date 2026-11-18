@@ -36,6 +36,7 @@ func TestStreakMail(t *testing.T) {
 		return id
 	}
 	player("ana@example.bg", 5)
+	g.issueOn("2030-03-09")          // the day missed: its issue wins the streak back
 	bo := player("bo@example.bg", 5) // notifications on a phone
 	if _, err := g.db.Write.Exec(`INSERT INTO phones (token, user_id, platform, created_at) VALUES ('t', ?, 'ios', 0)`, bo); err != nil {
 		t.Fatal(err)
@@ -83,7 +84,7 @@ func TestStreakMail(t *testing.T) {
 		}
 		byTo[m.To] = m.Text
 	}
-	if !strings.Contains(byTo["ana@example.bg"], "Изиграй ги днес заедно с още една игра и серията ти ще се върне.") {
+	if !strings.Contains(byTo["ana@example.bg"], "Върни серията днес: изиграй пропуснатия брой от 9 март и днешния.") {
 		t.Fatalf("Ana's, with the repair on offer: %q", byTo["ana@example.bg"])
 	}
 	if !strings.Contains(byTo["ha@example.bg"], "Днес можеш да започнеш нова серия.") {

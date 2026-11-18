@@ -43,70 +43,11 @@ func (w *world) daysAgo(n int) string {
 	return w.now.In(Bulgaria).AddDate(0, 0, -n).Format(time.DateOnly)
 }
 
-// A streak of three that ended yesterday (its reserve day spent the day before) is offered back; the day's questions
-// and one more game, today, win it back: the day missed counts as kept, the streak goes on, the news says so once.
-func TestRepair(t *testing.T) {
+// The offer waits a second day, not a third, and never after a day played since (won back: past_test.go).
+func TestRepairWindow(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	ana := w.user()
-	w.daysPlayed(ana, 5, 4, 3) // three days, and the first day's reserve, spent on the 2nd day back
-	s, _ := w.g.StreakOf(ctx, ana)
-	if s.Days != 0 || s.Ended == nil || *s.Ended != (Ended{Days: 3, On: w.daysAgo(1)}) {
-		t.Fatalf("before: %+v", s)
-	}
-	r, err := w.g.RepairOf(ctx, ana)
-	if err != nil || r == nil || *r != (Repair{Days: 3, On: w.daysAgo(1)}) {
-		t.Fatalf("offered: %+v %v", r, err)
-	}
-	w.playDay(ana)
-	if r, _ := w.g.RepairOf(ctx, ana); r == nil || !r.Day || r.Other {
-		t.Fatalf("after the day: %+v", r)
-	}
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 1 {
-		t.Fatalf("the day alone starts a new streak: %+v", s)
-	}
-	w.topic(ana)
-	s, _ = w.g.StreakOf(ctx, ana)
-	if s.Days != 4 || s.Ended != nil || !slices.Equal(s.Mended, []string{w.daysAgo(1)}) ||
-		!slices.Equal(s.Saved, []string{w.daysAgo(2)}) {
-		t.Fatalf("won back: %+v", s)
-	}
-	if r, _ := w.g.RepairOf(ctx, ana); r != nil {
-		t.Fatalf("offered again once done: %+v", r)
-	}
-	if n, _ := w.g.NewsOf(ctx, ana, 0); n.Mended != 4 {
-		t.Fatalf("news: mended %d", n.Mended)
-	}
-	if n, _ := w.g.NewsOf(ctx, ana, 0); n.Mended != 0 {
-		t.Fatalf("told twice: %d", n.Mended)
-	}
-	if c, _ := w.g.Tallies(ctx, w.g.Today(), w.g.Today()); c["repair:done"] != 1 {
-		t.Fatalf("counted: %v", c)
-	}
-	// It goes on as any streak: tomorrow's day makes five.
-	w.wait(24 * time.Hour)
-	w.playDay(ana)
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 5 || len(s.Mended) != 1 {
-		t.Fatalf("the day after: %+v", s)
-	}
-}
-
-// Two days missed are won back as well, the other game first; the offer waits a second day, not a third, and never
-// after a day played since.
-func TestRepairTwoDays(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana, bo, vi := w.user(), w.user(), w.user()
-	w.daysPlayed(ana, 6, 5, 4) // the reserve spent 3 days ago, ended 2 days ago, missed yesterday too
-	w.topic(ana)
-	if r, _ := w.g.RepairOf(ctx, ana); r == nil || r.On != w.daysAgo(2) || r.Day || !r.Other {
-		t.Fatalf("two days missed, the other game played: %+v", r)
-	}
-	w.playDay(ana)
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 4 || !slices.Equal(s.Mended, []string{w.daysAgo(2), w.daysAgo(1)}) {
-		t.Fatalf("two days won back: %+v", s)
-	}
-
+	bo, vi := w.user(), w.user()
 	w.daysPlayed(bo, 7, 6, 5) // ended 3 days ago: too long
 	if r, _ := w.g.RepairOf(ctx, bo); r != nil {
 		t.Fatalf("three days missed: %+v", r)

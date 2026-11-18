@@ -262,10 +262,10 @@ func (r *run) dayOver(now time.Time) bool {
 	return now.After(closes)
 }
 
-// dealtOn is the day a run's questions are dealt for, as „На този ден“ goes: the day's questions' date, "" for any
-// other game (a question that belongs to a date is that day's only in the day's ten).
+// dealtOn is the day a run's questions are dealt for, as „На този ден“ goes: the day's questions' date (a past
+// issue's too: past.go), "" for any other game (a question that belongs to a date is that day's only in the day's ten).
 func (r *run) dealtOn() string {
-	if r.kind == "day" {
+	if r.kind == "day" || r.kind == "past" {
 		return r.day
 	}
 	return ""

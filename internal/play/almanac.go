@@ -125,10 +125,11 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, topic, from string, 
 	return out, err
 }
 
-// dayGames are a player's finished games of the day's ten from one day to another, by day.
+// dayGames are a player's finished games of the day's ten from one day to another, by day: played on the day, or since
+// as a past issue (past.go).
 func (g *Game) dayGames(ctx context.Context, userID int64, from, to string) (map[string]int64, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT day, id FROM runs WHERE user_id = ? AND kind = 'day'
-		AND day BETWEEN ? AND ? AND finished_at IS NOT NULL`, userID, from, to)
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT day, id FROM runs WHERE user_id = ? AND kind IN ('day', 'past')
+		AND day BETWEEN ? AND ? AND finished_at IS NOT NULL ORDER BY kind = 'day'`, userID, from, to)
 	if err != nil {
 		return nil, err
 	}

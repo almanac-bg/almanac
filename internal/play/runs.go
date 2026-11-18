@@ -215,25 +215,29 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 	return s, err
 }
 
-// LeftRun is a game of the player's own left unfinished today, to come back to: a topic's (its category, "" for all
-// of them) or a second chance's; how far it got (At answered, of Total), and whether a question is showing now, its
-// time running (Open).
+// LeftRun is a game of the player's own left unfinished, to come back to: a topic's today (its category, "" for all
+// of them: a challenge's), a second chance's today, or a past issue's (its Day and Issue: past.go); how far it got (At answered,
+// of Total), and whether a question is showing now, its time running (Open).
 type LeftRun struct {
 	ID       int64  `json:"id"`
 	Kind     string `json:"kind"`
 	Category string `json:"category"`
+	Day      string `json:"day,omitempty"`
+	Issue    int    `json:"issue,omitempty"`
 	At       int    `json:"at"`
 	Total    int    `json:"total"`
 	Open     bool   `json:"open,omitempty"`
 }
 
-// Left are the games of the player's own left unfinished today that StartTopic and StartMistakes would go on with:
-// the latest of each topic, and the latest second chance, the latest first. One whose clock has just run out on its
-// last question ends now, as it would at its next look, and isn't among them.
+// Left are the games of the player's own left unfinished that StartTopic, StartMistakes and StartPast would go on
+// with: the latest of each topic and the latest second chance, today's; and each past issue's, whenever it was left;
+// the latest first. One whose clock has just run out on its last question ends now, as it would at its next look, and
+// isn't among them.
 func (g *Game) Left(ctx context.Context, userID int64) ([]LeftRun, error) {
 	today, _ := time.ParseInLocation(time.DateOnly, g.Today(), Bulgaria)
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT max(id) FROM runs WHERE user_id = ? AND kind IN ('topic', 'mistakes')
-		AND finished_at IS NULL AND started_at >= ? GROUP BY kind, coalesce(category, '') ORDER BY 1 DESC`,
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT max(id) FROM runs WHERE user_id = ? AND finished_at IS NULL
+		AND (kind IN ('topic', 'mistakes') AND started_at >= ? OR kind = 'past')
+		GROUP BY kind, coalesce(category, ''), coalesce(day, '') ORDER BY 1 DESC`,
 		userID, store.Ms(today))
 	if err != nil {
 		return nil, err
@@ -258,7 +262,8 @@ func (g *Game) Left(ctx context.Context, userID int64) ([]LeftRun, error) {
 			return nil, err
 		}
 		if !s.Done {
-			left = append(left, LeftRun{ID: s.ID, Kind: s.Kind, Category: s.Category, At: s.At, Total: s.Total, Open: s.Question != nil})
+			left = append(left, LeftRun{ID: s.ID, Kind: s.Kind, Category: s.Category, Day: s.Day, Issue: Issue(s.Day),
+				At: s.At, Total: s.Total, Open: s.Question != nil})
 		}
 	}
 	return left, nil

@@ -122,7 +122,7 @@ test("after the day: one gold thing to do next, the goals still open, and Про
   const gold = page.locator(".btn.primary");
   await expect(gold).toHaveCount(1);
   if ((await gold.textContent())?.includes("Още десет")) {
-    await expect(gold).toHaveAttribute("href", /^\/play\/[a-z]+$/);
+    await expect(gold).toHaveAttribute("href", /^\/(play\/[a-z]+|issues\/\d+)$/); // a goal's topic, a past issue
     await expect(page.getByRole("button", { name: "Сподели" })).not.toHaveClass(/primary/);
   }
   // The goals still open, each the way to where it's done; the day's own is done.
