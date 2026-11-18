@@ -237,36 +237,74 @@ func TestHandoff(t *testing.T) {
 		t.Fatalf("one of the last %d: %+v %v", HandoffsKept, u, err)
 	}
 
-	// A guest brought to a browser with a guest of its own: the one here keeps both games, but not the
-	// notifications of the browser the link came from.
+	// The page says whose game a link brings, and on how many days it was played, before anything is taken.
+	if _, err := db.Write.Exec(`INSERT INTO active_days (user_id, day) VALUES (?1, '2026-11-16'), (?1, '2026-11-17')`,
+		guest.ID); err != nil {
+		t.Fatal(err)
+	}
+	token, _ = a.Handoff(ctx, guest.ID)
+	if h, err := a.LookHandoff(ctx, token, ""); err != nil || h != (Handing{Name: guest.Name, Days: 2}) {
+		t.Fatalf("what the link brings: %+v %v", h, err)
+	}
+
+	// A guest brought to a browser with a guest who has nothing yet: the browser becomes the guest brought, with its
+	// own notifications (not those of the browser the link came from), and the guest it was goes. Nothing is joined.
 	here, hereSession, _ := a.Guest(ctx)
 	notified(t, db, guest.ID, moved, "came")
 	notified(t, db, here.ID, hereSession, "here")
-	token, _ = a.Handoff(ctx, guest.ID)
-	u, session, err = a.TakeHandoff(ctx, token, hereSession)
-	if err != nil || u.ID != here.ID || session != "" || exists(guest.ID) ||
-		merged[len(merged)-1] != [2]int64{guest.ID, here.ID} {
-		t.Fatalf("a guest to a guest: %+v %q %v %v", u, session, err, merged)
+	if h, err := a.LookHandoff(ctx, token, hereSession); err != nil || h.Name != guest.Name {
+		t.Fatalf("what the link brings to a guest with nothing: %+v %v", h, err)
 	}
-	if d := devices(t, db, here.ID); d != "here" {
+	u, session, err = a.TakeHandoff(ctx, token, hereSession)
+	if err != nil || u.ID != guest.ID || session == "" || exists(here.ID) || len(merged) > 0 {
+		t.Fatalf("a guest to a guest with nothing: %+v %q %v %v", u, session, err, merged)
+	}
+	if d := devices(t, db, guest.ID); d != "here" {
 		t.Fatalf("notified after a guest came to a guest: %s", d)
 	}
-	if s, _ := a.Session(ctx, hereSession); s == nil || s.ID != here.ID {
+	if s, _ := a.Session(ctx, session); s == nil || s.ID != guest.ID {
 		t.Fatalf("the browser the game came to is %+v", s)
+	}
+
+	// A guest brought to a browser with a game of its own: not joined (two games are, only by an email), so that a
+	// link from someone else brings nothing of theirs (their friends) into it; the link still works where it was meant
+	// to.
+	other, otherSession, _ := a.Guest(ctx)
+	if _, err := db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at) VALUES (?, 'topic', '[]', 0)`,
+		other.ID); err != nil {
+		t.Fatal(err)
+	}
+	token, _ = a.Handoff(ctx, guest.ID)
+	if _, err := a.LookHandoff(ctx, token, otherSession); !errors.Is(err, ErrHandoffHere) {
+		t.Fatalf("what the link brings to a game: %v", err)
+	}
+	if _, _, err = a.TakeHandoff(ctx, token, otherSession); !errors.Is(err, ErrHandoffHere) || !exists(other.ID) {
+		t.Fatalf("a guest to a guest's game: %v", err)
+	}
+	if s, _ := a.Session(ctx, otherSession); s == nil || s.ID != other.ID {
+		t.Fatalf("the browser with a game is %+v", s)
+	}
+	if s, _ := a.Session(ctx, session); s == nil || s.ID != guest.ID {
+		t.Fatal("a link refused still took the game from where it was")
 	}
 
 	// A guest brought to a profile: not joined (only signing in by email joins them), and the link still works for
 	// the browser it was meant for.
 	owner, ownerSession, _ := a.Verify(ctx, code(t, a, out, in, "h@example.com"), "")
-	token, _ = a.Handoff(ctx, here.ID)
-	if _, _, err = a.TakeHandoff(ctx, token, ownerSession); !errors.Is(err, ErrHandoffSignedIn) || !exists(here.ID) {
+	if _, err := a.LookHandoff(ctx, token, ownerSession); !errors.Is(err, ErrHandoffSignedIn) {
+		t.Fatalf("what the link brings to a profile: %v", err)
+	}
+	if _, _, err = a.TakeHandoff(ctx, token, ownerSession); !errors.Is(err, ErrHandoffSignedIn) || !exists(guest.ID) {
 		t.Fatalf("a guest to a profile: %v", err)
 	}
-	if s, _ := a.Session(ctx, hereSession); s == nil {
+	if s, _ := a.Session(ctx, session); s == nil {
 		t.Fatal("a link refused still took the game from where it was")
 	}
-	if u, _, err := a.TakeHandoff(ctx, token, ""); err != nil || u.ID != here.ID {
+	if u, _, err := a.TakeHandoff(ctx, token, ""); err != nil || u.ID != guest.ID {
 		t.Fatalf("the link after: %+v %v", u, err)
+	}
+	if _, err := a.LookHandoff(ctx, token, ""); !errors.Is(err, ErrNoHandoff) {
+		t.Fatalf("a link taken, looked at: %v", err)
 	}
 
 	// A profile makes no link: one would sign in whoever it reached.
@@ -849,6 +887,22 @@ func TestDeleteForgetsTheAddress(t *testing.T) {
 	}
 	if len(in.got) != 1 || in.got[0].To != "other@example.com" {
 		t.Fatalf("mail sent after: %+v", in.got)
+	}
+}
+
+// A player's id is never another's: the newest player deleted, the next to come gets a new one, so that nothing kept
+// by the id (active_days, a limit's key) becomes theirs (review 2026-11-18, S15).
+func TestIDsNeverReused(t *testing.T) {
+	a, _, _, _ := setup(t)
+	ctx := t.Context()
+	first, _, _ := a.Guest(ctx)
+	newest, _, _ := a.Guest(ctx)
+	if err := a.Delete(ctx, newest.ID); err != nil {
+		t.Fatal(err)
+	}
+	next, _, err := a.Guest(ctx)
+	if err != nil || next.ID <= newest.ID || next.ID == first.ID {
+		t.Fatalf("after %d and %d, %d gone: %d (%v)", first.ID, newest.ID, newest.ID, next.ID, err)
 	}
 }
 

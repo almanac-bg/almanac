@@ -351,7 +351,7 @@ func (g *Game) Games(ctx context.Context, days int) ([]DayGames, error) {
 	from := DayShift(today, -days+1)
 	fromMs, _ := dayBounds(from)
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT user_id, kind, started_at, kind = 'day' AND finished_at IS NOT NULL
-		FROM runs WHERE started_at >= ? AND at > 0 AND NOT scripted`, fromMs)
+		FROM runs WHERE started_at >= ? AND at > 0 AND `+ByPerson, fromMs)
 	if err != nil {
 		return nil, err
 	}

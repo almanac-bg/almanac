@@ -245,7 +245,7 @@ func (g *Game) countDayCrowd(ctx context.Context, db querier, day string, q bank
 	// that order, which the planner wouldn't choose without statistics (it would go through every day's runs).
 	rows, err := db.QueryContext(ctx, `SELECT a.given, count(*), sum(a.is_right) FROM answers a CROSS JOIN runs r ON r.id = a.run_id
 		WHERE a.question_id = ? AND a.at >= ? AND (a.version = ? OR a.version IS NULL AND a.at >= ?)
-			AND r.kind = 'day' AND r.day = ? AND r.user_id <> ? AND NOT r.scripted
+			AND r.kind = 'day' AND r.day = ? AND r.user_id <> ? AND NOT r.shadow
 		GROUP BY a.given`,
 		q.Base().ID, start.UnixMilli(), counted.Version, counted.From, day, userID)
 	if err != nil {

@@ -322,8 +322,14 @@ function stuckAt(s: State, err: unknown, retry: () => void): Child {
     "article",
     { class: "question run-question" },
     h("div", { class: "question-top" }, questionHead(s.at, s.total, ""), trail(s.trail, s.total, s.at)),
-    failure(err, retry, null),
+    failure(err, retry, wayOut(err)),
   );
+}
+
+/** Where a run that can't go on leads: a day's run past its day (play.ErrDayOver), to Начало and today's questions;
+ * otherwise nowhere but the run's own arrow out. */
+function wayOut(err: unknown): [href: string, label: string] | null {
+  return (err as ApiError).code === "day_over" ? ["/", "Към Начало"] : null;
 }
 
 /** A run's progress: a pip for each question, marked by how it went (and the one being asked, if any). */
@@ -649,7 +655,7 @@ function question(
       sending = false;
       if (over) return;
       if ((err as ApiError).code === "out_of_step") return reload();
-      problem.show(() => failure(err, () => send(answer, true), null));
+      problem.show(() => failure(err, () => send(answer, true), wayOut(err)));
       return;
     }
     sending = false;

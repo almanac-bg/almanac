@@ -236,6 +236,14 @@ func TestHandoffLink(t *testing.T) {
 		t.Fatalf("the page: %v %v", res, err)
 	}
 	browser := g.player()
+	// What it brings shows first, whose it is, and nothing is taken by it.
+	if status, out := browser.call("POST", "/api/auth/hand/look", map[string]string{"token": token}); status != 200 ||
+		out["game"].(map[string]any)["name"] != guest {
+		t.Fatalf("looked at: %d %v", status, out)
+	}
+	if _, out := app.call("GET", "/api/me", nil); name(out) != guest {
+		t.Fatalf("a look took the game: the app's browser is %v", out)
+	}
 	if status, out := browser.call("POST", "/api/auth/hand", map[string]string{"token": token}); status != 200 ||
 		name(out) != guest {
 		t.Fatalf("taken: %d %v", status, out)

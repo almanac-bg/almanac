@@ -37,14 +37,18 @@ func (w *world) game(user int64, pace func(int) time.Duration, answers ...func(i
 	return s.ID
 }
 
-func (w *world) scripted(runID int64) bool {
+// shadow is why a run is a shadow (0: it isn't one).
+func (w *world) shadow(runID int64) int {
 	w.t.Helper()
-	var is bool
-	if err := w.db.Read.QueryRow(`SELECT scripted FROM runs WHERE id = ?`, runID).Scan(&is); err != nil {
+	var why int
+	if err := w.db.Read.QueryRow(`SELECT shadow FROM runs WHERE id = ?`, runID).Scan(&why); err != nil {
 		w.t.Fatal(err)
 	}
-	return is
+	return why
 }
+
+// scripted is whether a run is marked as played at a script's speed.
+func (w *world) scripted(runID int64) bool { return w.shadow(runID) == ShadowScript }
 
 // A run is marked as a script's by the third answer under its Floor, and stays marked; a quick person's two, and
 // questions given up at once, don't mark it.
@@ -291,7 +295,7 @@ func TestScriptedOutOfBoardsAndStatistics(t *testing.T) {
 	// Calibration counts CalibrateFrom answers of people.
 	id := w.b.Live("", "choice")[0].Base().ID
 	for i := range CalibrateFrom {
-		res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, scripted) VALUES (?, 'topic', '[]', 0, 1)`, bot)
+		res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, shadow) VALUES (?, 'topic', '[]', 0, 1)`, bot)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -314,7 +318,7 @@ func TestScriptedOutOfBoardsAndStatistics(t *testing.T) {
 		return 0
 	}
 	before := calibrated()
-	if _, err := w.db.Write.Exec(`UPDATE runs SET scripted = 0 WHERE questions = '[]'`); err != nil {
+	if _, err := w.db.Write.Exec(`UPDATE runs SET shadow = 0 WHERE questions = '[]'`); err != nil {
 		t.Fatal(err)
 	}
 	if after := calibrated(); before != 0 || after < CalibrateFrom {
@@ -347,16 +351,18 @@ func TestScriptedBackfill(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// The database as it was before the mark, then the migration.
-	if _, err := w.db.Write.Exec(`DROP INDEX runs_scripted; DROP TABLE runs_unjudged; ALTER TABLE runs DROP COLUMN scripted`); err != nil {
+	// The database as it was before the mark, then the migration (and the one that renamed its column since).
+	if _, err := w.db.Write.Exec(`DROP INDEX runs_shadow; DROP TABLE runs_unjudged; ALTER TABLE runs DROP COLUMN shadow`); err != nil {
 		t.Fatal(err)
 	}
-	body, err := os.ReadFile("../store/migrations/0035_scripted.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := w.db.Write.Exec(string(body)); err != nil {
-		t.Fatal(err)
+	for _, name := range []string{"0035_scripted.sql", "0058_runs_shadow.sql"} {
+		body, err := os.ReadFile("../store/migrations/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.db.Write.Exec(string(body)); err != nil {
+			t.Fatal(name, err)
+		}
 	}
 	if w.scripted(script) || w.scripted(sorted) {
 		t.Fatal("marked before the bank judged")

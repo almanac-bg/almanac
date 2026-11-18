@@ -17,9 +17,11 @@ import (
 // can make it a script's, and once it is, it stays one, however the run ends (by its last answer, by its time, with
 // its Роял, or left half-way). The runs played before the mark were judged once, as the server started (JudgeRuns).
 //
-// A marked run (runs.scripted) is a shadow: its player sees it as any other game, with its score, and their place
-// among the others as if it were in, and nothing tells them otherwise; for everyone else it isn't there. It's left out
-// of:
+// A marked run is a shadow (runs.shadow, ShadowScript): its player sees it as any other game, with its score, and
+// their place among the others as if it were in, and nothing tells them otherwise; for everyone else it isn't there.
+// One other run is a shadow, for another reason (ShadowGuest): a day's run a guest played and brought to an account
+// that was there already, signing in (merge.go). Whoever played the day as several guests could otherwise sign in
+// from the best of them, and the day's one game would be the best of many. It's left out of:
 //   - the day's board, its count of players and its places, and friends' results of the day (BoardOf, FriendsBoard,
 //     FriendsOf; fairFor);
 //   - the week's league: a day's run at a script's speed counts in its player's own view of the race, never against
@@ -32,6 +34,19 @@ import (
 // What it isn't left out of: the player's own numbers (their profile, level, achievements, goals, streak), which are
 // theirs; and the rating, one number everyone sees, which a duel or a Роял moves as it ends (a live game is played
 // in front of the others anyway).
+
+// Why a run is a shadow (runs.shadow; 0: it isn't one).
+const (
+	// ShadowScript is a run played at a script's speed (scriptPaced).
+	ShadowScript = 1
+	// ShadowGuest is a day's run a guest brought to an account that was there when it was played (merge.go).
+	ShadowGuest = 2
+)
+
+// ByPerson is a SQL condition on a run (its columns, unaliased) that a person played it: one at a script's speed
+// wasn't. A guest's day brought to an account was, and counts with the games people played (/admin's), once: only one
+// game of a day is ever an account's.
+const ByPerson = `shadow <> 1`
 
 // Floor is the least time a person takes to answer a question of its kind, as the server times it (from when it
 // showed the question to when the answer came, so the trip to the server and back is in it too). Seeing four options
@@ -73,7 +88,7 @@ func scriptPaced(b *bank.Bank, picks []Pick, times map[int]int64) bool {
 // judgeAnswer marks a run as played at a script's speed if the answer just kept (to question r.at, in ms) makes it
 // one: only a quick answer can.
 func (g *Game) judgeAnswer(tx *sql.Tx, r *run, gr bank.Graded, ms int64) error {
-	if r.scripted || gr.Given == nil {
+	if r.shadow || gr.Given == nil {
 		return nil
 	}
 	b := g.Bank()
@@ -81,7 +96,7 @@ func (g *Game) judgeAnswer(tx *sql.Tx, r *run, gr bank.Graded, ms int64) error {
 		return nil
 	}
 	var err error
-	r.scripted, err = judge(tx, b, r.id, r.picks)
+	r.shadow, err = judge(tx, b, r.id, r.picks)
 	return err
 }
 
@@ -105,7 +120,7 @@ func judge(tx *sql.Tx, b *bank.Bank, runID int64, picks []Pick) (bool, error) {
 	if err := rows.Err(); err != nil || !scriptPaced(b, picks, times) {
 		return false, err
 	}
-	_, err = tx.Exec(`UPDATE runs SET scripted = 1 WHERE id = ?`, runID)
+	_, err = tx.Exec(`UPDATE runs SET shadow = ? WHERE id = ?`, ShadowScript, runID)
 	return true, err
 }
 
@@ -155,12 +170,11 @@ func (g *Game) JudgeRuns(ctx context.Context) (int, error) {
 	return marked, err
 }
 
-// FairAnswers is a SQL condition on an answer (its run_id) that leaves out the answers of runs played at a script's
-// speed: what a question's statistics count is how people answer it.
-const FairAnswers = `run_id NOT IN (SELECT id FROM runs WHERE scripted)`
+// FairAnswers is a SQL condition on an answer (its run_id) that leaves out the answers of shadow runs: what a
+// question's statistics count is how people answer it, each once at a day's questions.
+const FairAnswers = `run_id NOT IN (SELECT id FROM runs WHERE shadow)`
 
-// fairFor is a SQL condition on a run (its alias) that leaves it out unless it was played at a person's speed or it's
-// the viewer's own (a SQL expression; 0 for nobody signed in): a board as the viewer sees it.
+// fairFor is a SQL condition on a run (its alias) that leaves it out if it's a shadow, unless it's the viewer's own (a SQL expression; 0 for nobody signed in): a board as the viewer sees it.
 func fairFor(run, viewer string) string {
-	return `(NOT ` + run + `.scripted OR ` + run + `.user_id = ` + viewer + `)`
+	return `(NOT ` + run + `.shadow OR ` + run + `.user_id = ` + viewer + `)`
 }

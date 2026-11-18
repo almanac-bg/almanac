@@ -146,7 +146,7 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 	defer tx.Rollback() //nolint:errcheck // a read: nothing to keep
 	d := &countedBoard{}
 	rows, err := tx.QueryContext(ctx, `SELECT id, rights, points, ms FROM runs WHERE kind = 'day' AND day = ?
-		AND finished_at IS NOT NULL AND NOT scripted ORDER BY `+dayOrder, day)
+		AND finished_at IS NOT NULL AND NOT shadow ORDER BY `+dayOrder, day)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +164,7 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 	}
 	rows, err = tx.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+`
 		FROM runs r JOIN users u ON u.id = r.user_id
-		WHERE r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND NOT r.scripted
+		WHERE r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND NOT r.shadow
 		ORDER BY `+dayOrderOf("r")+` LIMIT ?`, day, BoardTop)
 	if err != nil {
 		return nil, err

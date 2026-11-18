@@ -20,9 +20,11 @@ import (
 // playing the day, every day, and playing it well.
 //
 // When the week ends the first of each group go up a league and the last go down (moves: how many, by the group's
-// size); the first three are paid XP (LeaguePay), and everyone is told how their week ended. A group of fewer than
-// RaceSize isn't a race: nobody in it moves or is paid for a place, its first place unlocks nothing, and its players
-// see only that it's still gathering. A week not played changes nothing.
+// size); the first three are paid XP (LeaguePay), and everyone is told how their week ended. Only a week played in a
+// player's own league moves them down: a guest who signs in brings a group only of the account's league (merge.go),
+// and an account raised to a guest's higher league meanwhile keeps it, or goes higher. A group of fewer than RaceSize
+// isn't a race: nobody in it moves or is paid for a place, its first place unlocks nothing, and its players see only
+// that it's still gathering. A week not played changes nothing.
 //
 // A day's run played at a script's speed (fair.go) races for its player alone: its points are in the week as they see
 // it, and in the place they're told and paid for at its end, never in anyone else's (standingsFor).
@@ -254,7 +256,10 @@ func (g *Game) ensureWeek(ctx context.Context) error {
 			return err
 		}
 		defer result.Close()
-		move, err := tx.PrepareContext(ctx, `UPDATE users SET league = ? WHERE id = ?`)
+		// A player moves from the group's league, or stays in their own if it's higher (raised since they joined the
+		// group: a guest's of a higher league brought to the account), unless the week takes them higher still.
+		move, err := tx.PrepareContext(ctx, `UPDATE users SET league = CASE WHEN league > ?1 THEN max(league, ?2) ELSE ?2 END
+			WHERE id = ?3 RETURNING league`)
 		if err != nil {
 			return err
 		}
@@ -285,11 +290,12 @@ func (g *Game) ensureWeek(ctx context.Context) error {
 				if _, err := result.Exec(open, s.user, gr.tier, i+1, n, s.points, moved, pay); err != nil {
 					return err
 				}
-				if _, err := move.Exec(gr.tier+moved, s.user); err != nil {
+				var league int
+				if err := move.QueryRowContext(ctx, gr.tier, gr.tier+moved, s.user).Scan(&league); err != nil {
 					return err
 				}
 				news = append(news, LeagueNews{To: s.user, Week: open, From: leagueOf(gr.tier),
-					Now: leagueOf(gr.tier + moved), Place: i + 1, Of: n, XP: pay})
+					Now: leagueOf(league), Place: i + 1, Of: n, XP: pay})
 			}
 		}
 		if _, err = tx.Exec(`UPDATE league_week SET id = ?, on_xp = 0`, now); err != nil || g.LeagueNews == nil {
@@ -331,26 +337,31 @@ func (g *Game) joinLeague(ctx context.Context, userID int64) error {
 		if in || !ok {
 			return nil
 		}
-		var group int64
-		err = tx.QueryRow(`SELECT g.id FROM league_groups g WHERE g.week = ? AND g.tier = ?
-			AND (SELECT count(*) FROM league_members m WHERE m.group_id = g.id) < ? ORDER BY g.id LIMIT 1`,
-			week, tier, GroupSize).Scan(&group)
-		if errors.Is(err, sql.ErrNoRows) {
-			res, err := tx.Exec(`INSERT INTO league_groups (week, tier) VALUES (?, ?)`, week, tier)
-			if err != nil {
-				return err
-			}
-			group, err = res.LastInsertId()
-			if err != nil {
-				return err
-			}
-		} else if err != nil {
+		return placeInLeague(tx, week, tier, userID, store.Ms(g.Now()))
+	})
+}
+
+// placeInLeague puts a player in a group of a week's league (tier), as of joined (ms): the first group of it with
+// room, or a new one.
+func placeInLeague(tx *sql.Tx, week string, tier int, userID, joined int64) error {
+	var group int64
+	err := tx.QueryRow(`SELECT g.id FROM league_groups g WHERE g.week = ? AND g.tier = ?
+		AND (SELECT count(*) FROM league_members m WHERE m.group_id = g.id) < ? ORDER BY g.id LIMIT 1`,
+		week, tier, GroupSize).Scan(&group)
+	if errors.Is(err, sql.ErrNoRows) {
+		res, err := tx.Exec(`INSERT INTO league_groups (week, tier) VALUES (?, ?)`, week, tier)
+		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(`INSERT INTO league_members (week, user_id, group_id, joined_at) VALUES (?, ?, ?, ?)`,
-			week, userID, group, store.Ms(g.Now()))
+		if group, err = res.LastInsertId(); err != nil {
+			return err
+		}
+	} else if err != nil {
 		return err
-	})
+	}
+	_, err = tx.Exec(`INSERT INTO league_members (week, user_id, group_id, joined_at) VALUES (?, ?, ?, ?)`,
+		week, userID, group, joined)
+	return err
 }
 
 // LeagueView is a player's week as they see it: their league, the days left, and their group, each with the week's

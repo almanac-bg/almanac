@@ -43,6 +43,7 @@ var playerErrors = map[error]*apiError{
 	play.ErrOutOfStep:      {http.StatusConflict, "out_of_step", "Играта е продължила другаде. Зареждаме я наново."},
 	play.ErrBadAnswer:      {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
 	play.ErrNoQuestion:     {http.StatusServiceUnavailable, "no_questions", "В момента няма въпроси за игра."},
+	play.ErrDayOver:        {http.StatusGone, "day_over", "Денят на тази игра свърши. Днешните въпроси те чакат в Начало."},
 	play.ErrNoYear:         {http.StatusNotFound, "no_year", "Тази година още не е започнала."},
 	play.ErrNoMistakes:     {http.StatusConflict, "no_mistakes", "Още няма достатъчно въпроси за втори шанс."},
 	play.ErrNoInvite:       {http.StatusNotFound, "no_invite", "Няма такава покана. Може връзката да е грешна."},
@@ -92,6 +93,8 @@ var playerErrors = map[error]*apiError{
 	account.ErrNoHandoff: {http.StatusNotFound, "no_handoff", "Тази връзка вече не работи: играта ти остана там, където я започна."},
 	account.ErrHandoffSignedIn: {http.StatusConflict, "handoff_signed_in",
 		"Тук вече играеш с профила си. За да добавиш към него играта от другото място, влез с имейла си там, където я започна."},
+	account.ErrHandoffHere: {http.StatusConflict, "handoff_here",
+		"Тук вече имаш своя игра. Двете игри се събират само с имейл: запази тази с имейл, после влез със същия имейл там, където е другата."},
 	account.ErrBadName:  {http.StatusBadRequest, "bad_name", "Името трябва да е от 2 до 30 знака: букви, цифри, интервали, точки или тирета, с поне една буква. Някои имена са запазени."},
 	account.ErrBadTag:   {http.StatusBadRequest, "bad_tag", "Потребителското име трябва да е от 3 до 20 знака: латински букви, цифри или _, като първият е буква."},
 	account.ErrTagTaken: {http.StatusConflict, "tag_taken", "Това потребителско име е заето. Опитай друго."},
@@ -393,8 +396,28 @@ func (s *Server) handoff(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"url": s.cfg.PublicURL + "/hand/" + token})
 }
 
-// takeHandoff brings the game of a handoff's token to this browser, joined with what's here, and takes it from the
-// browser it came from (account.TakeHandoff): posted from /hand/<token> once the player taps to bring it.
+// lookHandoff says whose game a handoff's token brings to this browser, and on how many days it was played
+// (account.LookHandoff), or why it can't come here: asked by /hand/<token> as it opens, so that the player sees what
+// the tap would bring (a link from someone else is theirs), and taking nothing.
+func (s *Server) lookHandoff(w http.ResponseWriter, r *http.Request) error {
+	var in struct {
+		Token string `json:"token"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	if !s.allowFrom(r, "handlook", 60, 300, time.Hour) {
+		return errTooMany
+	}
+	h, err := s.accounts.LookHandoff(r.Context(), in.Token, s.session(r))
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"game": h})
+}
+
+// takeHandoff brings the game of a handoff's token to this browser, in place of a guest with nothing yet, and takes
+// it from the browser it came from (account.TakeHandoff): posted from /hand/<token> once the player taps to bring it.
 func (s *Server) takeHandoff(w http.ResponseWriter, r *http.Request) error {
 	var in struct {
 		Token string `json:"token"`

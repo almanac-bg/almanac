@@ -5,13 +5,14 @@
 // A session is one browser's (or one phone's app's): nobody else gets it. The notifications turned on in a browser
 // (push_subs and phones) are tied to the session that turned them on, and end with it. A browser signing in by email
 // (Verify) gets a new session in place of the one it had, and its notifications go along to the new one. A handoff
-// moves a game, it doesn't share it: the browser it came from is signed out. When a guest becomes a profile, every
+// moves a game, it doesn't share it: the browser it came from is signed out, and the one it comes to becomes it, if it
+// had no game of its own (a link joins no two games: only an email does). When a guest becomes a profile, every
 // other session the guest had ends: only the browser that proved the email is in it. SignOutOthers ends a player's
 // other sessions on demand. A guest who never plays is cleared after a few days unused (CleanUp), so that guests
 // made and dropped don't stay.
 //
-// A player goes one way, whether they delete their account, are a guest cleared, or a guest folded into an account
-// (remove): what's theirs goes with them, others' history of them stays without them (the game's Forget), and their
+// A player goes one way, whether they delete their account, are a guest cleared, a guest folded into an account, or a
+// guest with nothing yet whose browser a game is brought to (remove): what's theirs goes with them, others' history of them stays without them (the game's Forget), and their
 // address goes from everywhere it's kept.
 //
 // A sign-in code is the browser's that asked for it (SendCode gives it a token, which it keeps in a cookie): only that
@@ -409,7 +410,7 @@ func (a *Accounts) Delete(ctx context.Context, userID int64) error {
 }
 
 // remove deletes a player, inside the caller's transaction: every way a player goes (Delete, CleanUp, a guest folded
-// into an account) comes here. What's theirs goes with them by the schema (ON DELETE CASCADE: sessions, runs and
+// into an account, a guest a game is brought to: TakeHandoff) comes here. What's theirs goes with them by the schema (ON DELETE CASCADE: sessions, runs and
 // answers, friends, ...); what others keep of them is kept without them, by the schema (SET NULL: the other side of a
 // duel) and by each part of the game's Forget, told first; and their address goes from wherever else it's kept: mail
 // on its way to it, codes, wrong codes and codes mailed counted, and whether mail reaches it (mail.Unqueue).
@@ -477,11 +478,19 @@ const cleanBatch = 200
 // else's, given by a player, and not kept for good.
 const EmailRequestDays = 60
 
+// hasGame is a SQL condition on a player (u) that they have something of their own to lose: a game of any kind, a
+// friend, a friend request sent or waiting. A guest without one is nobody yet: one made and dropped (CleanUp), or a
+// browser a game is brought to (TakeHandoff).
+const hasGame = `(EXISTS (SELECT 1 FROM runs r WHERE r.user_id = u.id)
+	OR EXISTS (SELECT 1 FROM friends f WHERE f.user_id = u.id)
+	OR EXISTS (SELECT 1 FROM friend_requests q WHERE q.from_id = u.id)
+	OR EXISTS (SELECT 1 FROM friend_requests q WHERE q.to_id = u.id))`
+
 // CleanUp drops expired sessions, codes and handoffs, the wrong codes counted for an address once their stretch is
 // over (MissesKept), the codes mailed counted once a day old, friend requests to an address older than
 // EmailRequestDays, and the guests nobody can use or does: those whose sessions are gone (nothing of theirs can come
-// back), and those who never played nor have a friend, unseen for IdleGuestDays. Their days played stay counted (play.Retention: active_days keeps no link to a
-// player).
+// back), and those who never played nor have a friend, unseen for IdleGuestDays. Their days played stay counted, as
+// nobody's (play.Forget).
 func (a *Accounts) CleanUp(ctx context.Context) error {
 	now := store.Now()
 	for _, q := range []string{
@@ -511,11 +520,7 @@ func (a *Accounts) CleanUp(ctx context.Context) error {
 		args  []any
 	}{
 		{`NOT EXISTS (SELECT 1 FROM sessions s WHERE s.user_id = u.id)`, nil},
-		{`u.seen_at < ? AND u.created_at < ?
-			AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.user_id = u.id)
-			AND NOT EXISTS (SELECT 1 FROM friends f WHERE f.user_id = u.id)
-			AND NOT EXISTS (SELECT 1 FROM friend_requests q WHERE q.from_id = u.id)
-			AND NOT EXISTS (SELECT 1 FROM friend_requests q WHERE q.to_id = u.id)`, []any{idle, idle}},
+		{`u.seen_at < ? AND u.created_at < ? AND NOT ` + hasGame, []any{idle, idle}},
 	} {
 		for {
 			var n int
@@ -876,7 +881,18 @@ var (
 	// link (a link from someone else would join their game, and their phone, to this profile), only by signing in
 	// with the email where the game is.
 	ErrHandoffSignedIn = errors.New("a handoff to a profile")
+	// ErrHandoffHere is a guest's game brought to a browser with a guest's game of its own (hasGame): two games
+	// aren't joined by a link either (someone else's would bring its friends into this one), only by an email, kept
+	// in one and signed in to in the other.
+	ErrHandoffHere = errors.New("a handoff to a game")
 )
+
+// Handing is the game a handoff's link brings, as the page that takes it shows it before the tap (LookHandoff): whose
+// it is, and how many days it was played on, so that a link from someone else is seen to be theirs.
+type Handing struct {
+	Name string `json:"name"`
+	Days int    `json:"days"`
+}
 
 // Handoff makes the token of a link that brings a guest's game to another browser, once, within HandoffTTL: how a
 // game begun in an app's own browser (Messenger, Instagram …), which a guest's game would never leave, moves to the
@@ -906,33 +922,70 @@ func (a *Accounts) Handoff(ctx context.Context, userID int64) (string, error) {
 	return token, err
 }
 
+// handing reads, for a handoff's token taken in the browser of session (its token, maybe ""), the guest whose game it
+// brings (from) and who the browser is (current, nil for no one), or why it can't be taken there: the link doesn't
+// work (ErrNoHandoff), the browser is a profile's (ErrHandoffSignedIn), or a guest's with a game of their own
+// (ErrHandoffHere). Opened where it was made, current is from.
+func handing(tx *sql.Tx, token, session string) (from User, current *User, err error) {
+	var email sql.NullString
+	err = tx.QueryRow(`SELECT u.id, u.name, u.tag, u.email, u.admin FROM handoffs h JOIN users u ON u.id = h.user_id
+		WHERE h.token_hash = ? AND h.expires_at > ?`, hashToken(token), store.Now()).
+		Scan(&from.ID, &from.Name, &from.Tag, &email, &from.Admin)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && email.Valid) { // a profile's (made before only guests'): none
+		return from, nil, ErrNoHandoff
+	}
+	if err != nil {
+		return from, nil, err
+	}
+	if current, err = sessionUser(tx, session); err != nil || current == nil || current.ID == from.ID {
+		return from, current, err
+	}
+	if !current.Guest() {
+		return from, current, ErrHandoffSignedIn // the link stays good, for the browser it was meant for
+	}
+	var own bool
+	if err := tx.QueryRow(`SELECT `+hasGame+` FROM users u WHERE u.id = ?`, current.ID).Scan(&own); err != nil {
+		return from, current, err
+	}
+	if own {
+		return from, current, ErrHandoffHere // the link stays good here too
+	}
+	return from, current, nil
+}
+
+// LookHandoff says what game a handoff's token brings to the browser of session, before it's taken (Handing), or
+// why it can't be taken there (handing's errors). It takes nothing: the page asks it as it opens.
+func (a *Accounts) LookHandoff(ctx context.Context, token, session string) (Handing, error) {
+	var h Handing
+	tx, err := a.DB.Read.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return h, err
+	}
+	defer tx.Rollback() //nolint:errcheck // a read: nothing to keep
+	from, _, err := handing(tx, token, session)
+	if err != nil {
+		return h, err
+	}
+	h.Name = from.Name
+	err = tx.QueryRow(`SELECT count(*) FROM active_days WHERE user_id = ?`, from.ID).Scan(&h.Days)
+	return h, err
+}
+
 // TakeHandoff brings the game of the guest who made a handoff's token (from) to the browser of session (its token,
 // maybe ""), once. The game moves, it isn't shared: every session `from` had ends, with the notifications of its
 // browsers and its other links, so the browser it came from is signed out (whoever made a link that reached someone
-// else keeps no way into the game it gave away). With no one here, the browser becomes `from`, with a new session;
-// with a guest here, the game brought along is folded into it, as signing in by email joins them. A profile here
-// isn't joined by a link (ErrHandoffSignedIn). The session token is "" when the browser keeps the one it has.
+// else keeps no way into the game it gave away). The browser becomes `from`, with a new session, and keeps its own
+// notifications; a guest it was, who had nothing yet (hasGame), goes. A browser with a game of its own, a profile's
+// or a guest's, isn't joined to another by a link (ErrHandoffSignedIn, ErrHandoffHere): what the link brings is
+// shown first (LookHandoff), and two games are joined only by signing in with an email. The session token is ""
+// when the browser keeps the one it has (opened where it was made).
 func (a *Accounts) TakeHandoff(ctx context.Context, token, session string) (User, string, error) {
 	var u User
 	var started string
 	err := a.DB.Tx(ctx, func(tx *sql.Tx) error {
-		var from User
-		var email sql.NullString
-		err := tx.QueryRow(`SELECT u.id, u.name, u.tag, u.email, u.admin FROM handoffs h JOIN users u ON u.id = h.user_id
-			WHERE h.token_hash = ? AND h.expires_at > ?`, hashToken(token), store.Now()).
-			Scan(&from.ID, &from.Name, &from.Tag, &email, &from.Admin)
-		if errors.Is(err, sql.ErrNoRows) || (err == nil && email.Valid) { // a profile's (made before only guests'): none
-			return ErrNoHandoff
-		}
+		from, current, err := handing(tx, token, session)
 		if err != nil {
 			return err
-		}
-		current, err := sessionUser(tx, session)
-		if err != nil {
-			return err
-		}
-		if current != nil && current.ID != from.ID && !current.Guest() {
-			return ErrHandoffSignedIn // the link stays good, for the browser it was meant for
 		}
 		if current != nil && current.ID == from.ID { // opened where it was made: nothing moves
 			_, err := tx.Exec(`DELETE FROM handoffs WHERE token_hash = ?`, hashToken(token))
@@ -946,13 +999,15 @@ func (a *Accounts) TakeHandoff(ctx context.Context, token, session string) (User
 		if _, err := tx.Exec(`DELETE FROM handoffs WHERE user_id = ?`, from.ID); err != nil {
 			return err
 		}
+		u = from
 		if current == nil {
-			u = from
 			started, err = startSession(tx, u.ID)
 			return err
 		}
-		u = *current
-		return a.fold(tx, from.ID, current.ID)
+		if started, err = moveSession(tx, session, u.ID); err != nil {
+			return err
+		}
+		return a.remove(tx, current.ID)
 	})
 	if err != nil {
 		return User{}, "", err

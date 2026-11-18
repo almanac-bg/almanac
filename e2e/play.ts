@@ -168,7 +168,7 @@ export async function daysPlayed(page: Page, ...back: number[]): Promise<void> {
 /** Makes the player's games count as a person's for the others (a test plays quicker than a person: play/fair.go),
  * so that their friends see their day. */
 export async function playedFair(page: Page): Promise<void> {
-  await inDB(page, (db, id) => db.prepare("UPDATE runs SET scripted = 0 WHERE user_id = ?").run(id));
+  await inDB(page, (db, id) => db.prepare("UPDATE runs SET shadow = 0 WHERE user_id = ?").run(id));
 }
 
 /** Makes the player one who has answered these questions right (in a game of nothing), straight in the test server's

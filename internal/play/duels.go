@@ -300,10 +300,15 @@ func (g *Game) DropLive(ctx context.Context, duelID int64) error {
 }
 
 // EndLive ends every live duel still under way without a result: run when the server starts, as live duels are
-// played in its memory and a restart cuts them off.
+// played in its memory and a restart cuts them off. One played to its end, both sides (or the player's, against a
+// recording), wasn't cut off, only not settled yet (the server stopped between its last answer and its result): it's
+// left to be settled as any finished run's duel is (AfterDue, SettleDue), with its result.
 func (g *Game) EndLive(ctx context.Context) error {
 	_, err := g.DB.Write.ExecContext(ctx, `UPDATE duels SET ended_at = ?, outcome = 'expired'
-		WHERE kind = 'live' AND ended_at IS NULL`, store.Ms(g.Now()))
+		WHERE kind = 'live' AND ended_at IS NULL AND NOT (
+			coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = duels.a_run), 0)
+			AND (ghost_run IS NOT NULL OR coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = duels.b_run), 0)))`,
+		store.Ms(g.Now()))
 	return err
 }
 
@@ -399,7 +404,7 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 			CASE WHEN r.kind = 'topic' THEN coalesce(r.category, '') ELSE '' END,
 			(SELECT count(*) FROM answers a WHERE a.run_id = r.id AND a.given IS NULL)
 		FROM runs r JOIN users u ON u.id = r.user_id
-		WHERE r.kind IN ('topic', 'duel') AND r.finished_at IS NOT NULL AND NOT r.scripted AND r.user_id <> ?
+		WHERE r.kind IN ('topic', 'duel') AND r.finished_at IS NOT NULL AND NOT r.shadow AND r.user_id <> ?
 			AND json_array_length(r.questions) = ?
 			AND NOT EXISTS (SELECT 1 FROM duels d WHERE d.ended_at IS NULL
 				AND (d.a_run = r.id OR d.b_run = r.id OR (d.kind = 'challenge' AND d.ghost_run = r.id)))
