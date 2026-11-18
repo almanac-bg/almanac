@@ -126,8 +126,9 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
   program and database copy both, if it isn't healthy. Every run deploys the latest release if it isn't live, so a
   failed deploy is tried again by the next merge; one that went back isn't, nor (if it never came up after it began
   to migrate) a release that brings that migration unchanged: change what failed. No tags by hand, no ssh to deploy. A change to `deploy/` reaches the
-  server only by hand, as root, the way `deploy/setup.sh` installs it (then `systemctl daemon-reload` for a unit);
-  until then the Deploy run is red. Anything new kept in memory must survive a restart or count as under way
+  server only by hand, as root, the way `deploy/setup.sh` installs it (then `systemctl daemon-reload` for a unit; a
+  changed firewall or sshd file goes back by itself in ten minutes unless `almanac-harden confirm` comes from a new
+  ssh login: `deploy/harden.sh`); until then the Deploy run is red. Anything new kept in memory must survive a restart or count as under way
   (`internal/server/drain.go`).
 - **The browser tests run after the merge, on `main`** (about 15 minutes, all three engines). They hold nothing up;
   if one fails, whoever sees it fixes it, at once (a session is told as it starts: `.claude/hooks/main-red.sh`).

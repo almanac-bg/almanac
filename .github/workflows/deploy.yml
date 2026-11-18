@@ -30,8 +30,9 @@
 # evening (from 20:37, about half an hour), so the deploy may wait that long; merges meanwhile queue behind it, and the
 # newest of them goes out next, with all of theirs. It runs on the server as a unit of its own: cancelling this run
 # doesn't stop it, and it goes back by itself if the new version isn't healthy. Last, the run compares the server's
-# deploy files (its units and scripts, installed by deploy/setup.sh, by hand) with the repository's, and fails on a
-# difference, so a change to deploy/ that hasn't reached the server can't pass for shipped.
+# deploy files (its units, scripts and host settings, installed by deploy/setup.sh, by hand; the firewall's and ssh's
+# only while in force) with the repository's, and fails on a difference, so a change to deploy/ that hasn't reached
+# the server can't pass for shipped; and it compares Cloudflare's addresses with the ones the firewall lets in.
 name: Deploy
 
 on:
@@ -260,7 +261,20 @@ jobs:
         run: |
           ssh almanac check > installed.sha256
           if ! sha256sum -c installed.sha256; then
-            echo "::error::The server's deploy files differ from deploy/ (above): install them as deploy/setup.sh does."
+            echo "::error::The server's deploy files differ from deploy/, or the firewall and ssh's settings aren't in force (above): install them as deploy/setup.sh does, and confirm (almanac-harden confirm) from a new login."
+            exit 1
+          fi
+      # The firewall lets the game be reached only from Cloudflare's addresses (deploy/nftables.conf; the server trusts
+      # the same, internal/server/address.go): one Cloudflare adds would leave the players it carries outside.
+      - name: Cloudflare's addresses are the firewall's
+        if: ${{ !cancelled() }}
+        run: |
+          set -o pipefail
+          { curl -fsS --retry 3 https://www.cloudflare.com/ips-v4; echo; curl -fsS --retry 3 https://www.cloudflare.com/ips-v6; echo; } |
+            grep . | sort > cloudflare.txt
+          sed -n '/set cloudflare[46] {/,/}/p' deploy/nftables.conf | grep -oE '[0-9a-f.:]+/[0-9]+' | sort > firewall.txt
+          if ! diff firewall.txt cloudflare.txt; then
+            echo "::error::Cloudflare's addresses (>) differ from deploy/nftables.conf's (<): change them there, in internal/server/address.go and deploy/hetzner-firewall.json, and install them."
             exit 1
           fi
       - name: The key, gone

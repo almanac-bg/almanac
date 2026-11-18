@@ -132,6 +132,9 @@ func New(cfg Config, d Deps) (*Server, error) {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return nil, errors.New("PUBLIC_URL must be like https://almanac.bg")
 	}
+	if _, ok := mtaSTSMaxAge[cfg.MTASTSMode]; cfg.MTASTSMode != "" && !ok {
+		return nil, errors.New("MTA_STS_MODE must be testing, enforce or none")
+	}
 	if cfg.Operator == "" {
 		cfg.Operator = "екипа на АЛМАНАХ" // "Играта се поддържа от …"
 	}
