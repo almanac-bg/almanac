@@ -57,8 +57,8 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   поред“. Дуел, Роял and Стая open from here and
   have a way back to it (`back()`). A player who hasn't finished a game yet sees only the day and the topics, and a
   quiet „Имаш профил? Влез“ (a new phone) that opens the sign-in in place (open from the start, above the day, for a
-  browser signed out that came from the streak's mail, `/?from=mail`), and „Влез в стая с код“ in a line (a room's
-  code from a friend or a teacher works from the first visit); Роял too while its lobby is open or it's on: the
+  browser signed out that came from the streak's mail, `/?from=mail`), and „Влез в стая с код“ in a line under it (a
+  room's code someone gave works from the first visit); Роял too while its lobby is open or it's on: the
   streak and the ways to play with others come after the first game, the level and the goals from the second day
   played (see First days). From the second day played, a guest is asked to keep the game in one line of the „Утре“
   card, said by what's at stake („Серията ти от 2 дни е само на това устройство. Запази я с имейл.“), the form opening
@@ -157,12 +157,17 @@ wherever it does (`explain()`: the word dotted under, its meaning in a small car
 
 - **48rem (a tablet):** the column grows to 48rem; the places move into the header; in a game the question and its
   answers are bigger, and a choice's answers sit two by two (a list stays one column: an order, pairs, groups). The
-  number's field and pad stay a phone's width. A page's picture sits beside its heading and lead, not over them;
-  the day's gold button and a page's own are a hand's width (22rem), not the column's.
+  number's field and pad stay a phone's width. A page's picture sits beside its heading and lead, not over them.
+  A page's buttons are a hand's width (22rem), not the column's, at its left, the gold one first: the day's, a page's
+  own, and a group of them (`.actions`: under a result, Дуел's, the year's) side by side where two fit, the plain ones
+  after the gold one and as tall as it, a line about the gold one under it. Начало's and a result's quiet lines sit
+  at the left with them, not centred.
 - **64rem (a laptop):** the page is up to 76rem wide with a 32px gutter. Начало is two columns: the day (or its result,
-  „Сподели“ beside „Прегледай въпросите“), and under it the topics, five to a row; beside them, at most 22rem wide,
-  the streak and the level, the goals and the ways to play with others, one under another. A new player, with only
-  the day and the topics, gets one centred column. Профил's places are 64rem wide: Общо's cards in two columns, read
+  „Сподели“ beside „Прегледай въпросите“; just played as after a reload), and under it the topics, five to a row;
+  beside them, at most 22rem wide, the streak first, level with the day, on a row of its own with its number big (the
+  habit's reward is no small chip in a corner), then the level, the goals and the ways to play with others, one under
+  another. A new player, with only the day and the topics (the ways in are lines under the day), gets one centred
+  column; while Роял's lobby is open, Роял sits beside it. Профил's places are 64rem wide: Общо's cards in two columns, read
   top to bottom; more achievements and bigger looks to a row. Every other page is a centred column of 48rem, so no
   line of text runs too long; a game is 54rem, with bigger type still.
 - **A computer** (a fine pointer that hovers) is shown its keys: the answers are marked 1–4 instead of А–Г (the keys
@@ -560,10 +565,10 @@ Feedback fires once, when it's earned, and then the screen is still again:
 - **A result lands, once** (`web/src/feel.ts`, at most 1.6s, a tap anywhere jumps to the end, never again on a
   reload): the pips fill one by one (60ms apart, 85 on the day; each with a pluck a step up the scale for each right
   answer before it, so a good game climbs, and a muted thud for a wrong one); as the last fills (at 700ms, about 0.9s
-  on the day) the score lands (1.15→1) with the motif and the points count up; on the day, at 1.1s the streak's
-  number rolls from the day before with the flame, unlit till then, lighting and swelling once and its sound, and the
-  level's bar fills in its chip (a new level:
-  to the end, a lilac flash, the number rolls, it fills again). Ten of ten: the pips sweep gold, „Всички верни“ and the
+  on the day) the score lands (1.15→1) with the motif and the points count up; on the day, once it has landed, the
+  streak's number rolls from the day before (a first streak's comes in from nothing, never „0“) with the flame, unlit
+  till then, lighting and swelling once and its sound, and the level's bar fills in its chip (a new level: to the end,
+  a lilac flash, the number rolls, it fills again). Ten of ten: the pips sweep gold, „Всички верни“ and the
   rosette as a seal, drawn petal by petal, the gold one last. All typographic: no particles.
 - **A duel's result lands, once** (feel.ts `duel`, at most 1.6s, a tap jumps to the end, never again on that
   device): the verdict waits while the marks fill pair by pair (75ms apart, a pluck for each of the player's right
@@ -572,7 +577,8 @@ Feedback fires once, when it's earned, and then the screen is still again:
   turning gold, with `win`, `lose` or `end`; then what it meant fades in, the rating's bar filling from where it was.
 - **The big news is a sheet**, at most one a game, only for what really is big: a week of the league ended up or on
   its podium, a division reached, the streak at 3, 7, 30, 100 or 365 days, a level that unlocks something or is a
-  fifth, an epic or legendary achievement. It opens once the result has landed, slides up (320ms) over the dimmed
+  fifth, an epic or legendary achievement. It opens once the result has landed (on the day, once the streak and the
+  level have grown in their chips too: one moment after another, never one over another), slides up (320ms) over the dimmed
   result, its picture landing; its sound plays as it opens; „Продължи“, a tap beside it or Esc puts it away, never by
   itself. The news cards under the result stay as they are: the sheet is the headline brought forward, not a fourth
   card. A new level's sheet has its number as the hero (120px, in the levels' lilac) over „Ново ниво“, then what it

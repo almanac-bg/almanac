@@ -373,4 +373,36 @@ test.describe("on a computer", () => {
       .evaluateAll((li) => new Set(li.map((e) => Math.round(e.getBoundingClientRect().top))).size);
     expect(rows).toBe(2);
   });
+
+  test("Начало: a new player's one column, and the day's result as wide at once as after a reload", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.goto("/");
+    await expect(page.locator(".day")).toBeVisible();
+    // The ways in for a new player are lines under the day, not a column of their own: only Роял, while its lobby is
+    // open, fills the column beside it.
+    await expect(page.locator(".home-main").getByRole("link", { name: "Влез в стая с код" })).toBeVisible();
+    const home = page.locator("section.home");
+    const side = await page.locator(".home-side > *").count();
+    const alone = (await home.boundingBox())?.width ?? 0;
+    expect(side ? alone > 48 * 16 : alone <= 48 * 16).toBe(true);
+    await startDay(page);
+    await playRun(page);
+    await expect(page.locator(".summary")).toBeVisible();
+    // Just played, Начало takes the width (it's drawn where the game was), as it does after a reload.
+    await expect(page.locator(".streak-chip")).toContainText("1");
+    const just = await home.boundingBox();
+    const result = await page.locator(".summary .hero").boundingBox();
+    const streak = await page.locator(".streak-chip").boundingBox();
+    // The streak leads the column beside the result, level with it.
+    expect(result && streak && streak.x > result.x + result.width && Math.abs(streak.y - result.y) < 2).toBe(true);
+    // The gold button is a hand's width, not the column's.
+    const gold = await page.locator(".summary .actions .btn.primary").boundingBox();
+    expect(gold && gold.width <= 22 * 16 + 1).toBe(true);
+    await page.reload();
+    await expect(page.locator(".summary")).toBeVisible();
+    const after = await home.boundingBox();
+    expect(just && after && Math.abs(just.width - after.width) < 1 && just.width > 48 * 16).toBe(true);
+  });
 });
