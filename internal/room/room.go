@@ -102,6 +102,8 @@ var (
 type Player struct {
 	ID   int64
 	Name string
+	// RoomName is a name for this room alone (Join), not the player's own.
+	RoomName bool
 	// Look is how they show (avatar, title, level).
 	Look play.Look
 }
@@ -330,6 +332,7 @@ type savedMember struct {
 	ID      int64         `json:"id"`
 	Key     int           `json:"key"`
 	Name    string        `json:"name"`
+	Here    bool          `json:"here,omitempty"` // a name for this room alone (Player.RoomName)
 	Look    play.Look     `json:"look"`
 	Points  int           `json:"points,omitempty"`
 	Rights  int           `json:"rights,omitempty"`
@@ -393,7 +396,7 @@ func (r *Room) saved() saved {
 		sv.Used = append(sv.Used, id)
 	}
 	for _, m := range r.players {
-		sm := savedMember{ID: m.ID, Key: m.key, Name: m.Name, Look: m.Look}
+		sm := savedMember{ID: m.ID, Key: m.key, Name: m.Name, Here: m.RoomName, Look: m.Look}
 		if played {
 			sm.Points, sm.Rights, sm.InRow, sm.Ms, sm.Run = m.points, m.rights, m.inRow, m.ms, m.run
 			for _, l := range m.log {
@@ -465,7 +468,7 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 			}
 		}
 		for _, sm := range sv.Players {
-			m := r.add(Player{ID: sm.ID, Name: sm.Name, Look: sm.Look})
+			m := r.add(Player{ID: sm.ID, Name: sm.Name, RoomName: sm.Here, Look: sm.Look})
 			if sv.Joined > 0 { // saved since keys are kept: each as it was
 				m.key = sm.Key
 			}
@@ -618,8 +621,9 @@ func (r *Room) member(id int64) *member {
 	return nil
 }
 
-// Join puts a player in the room (once; again only brings their name and look up to date), unless the host has
-// locked it to anyone new. Joining a room mid-game is fine, from the next answer on.
+// Join puts a player in the room (once; again only brings their name and look up to date, though a name for this room
+// alone, Player.RoomName, stays until another is given), unless the host has locked it to anyone new. Joining a room
+// mid-game is fine, from the next answer on.
 func (r *Room) Join(p Player) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -635,6 +639,9 @@ func (r *Room) Join(p Player) error {
 		return nil
 	}
 	if m := r.member(p.ID); m != nil {
+		if m.RoomName && !p.RoomName {
+			p.Name, p.RoomName = m.Name, true
+		}
 		m.Player = p // a new name or look shows from now on
 		r.changed()
 		return nil

@@ -50,6 +50,9 @@ type DuelNews struct {
 	To   int64
 	Kind string // asked, result, challenge
 	From string // the other player's name
+	// FromID is the other player (of a recording, the player recorded): nothing is told between two one of whom has
+	// blocked the other.
+	FromID int64
 	// Outcome is the one told's: won, lost or draw (with a result).
 	Outcome string
 	Delta   int
@@ -661,7 +664,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 			b.name, opponentID, recording, outcomeOf(score), a.run); err != nil {
 			return err
 		}
-		news = append(news, DuelNews{To: a.id, Kind: "result", From: b.name, Outcome: outcomeOf(score), Delta: da,
+		news = append(news, DuelNews{To: a.id, Kind: "result", From: b.name, FromID: b.id, Outcome: outcomeOf(score), Delta: da,
 			Friendly: !rated, DuelID: duelID, Seen: a.run == finished})
 		if err := follow(a.id, a.run); err != nil {
 			return err
@@ -684,7 +687,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 				return err
 			}
 		}
-		news = append(news, DuelNews{To: b.id, Kind: "result", From: a.name, Outcome: outcomeOf(1 - score), Delta: db,
+		news = append(news, DuelNews{To: b.id, Kind: "result", From: a.name, FromID: a.id, Outcome: outcomeOf(1 - score), Delta: db,
 			Friendly: !rated, DuelID: duelID, Seen: b.run == finished})
 		if err := follow(b.id, b.run); err != nil {
 			return err
@@ -698,7 +701,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 		return err
 	}
 	if challenge.Valid && !both {
-		if err := g.challengeNews(ctx, challenge.Int64, a.name, outcome, duelID); err != nil {
+		if err := g.challengeNews(ctx, challenge.Int64, a.id, a.name, outcome, duelID); err != nil {
 			return err
 		}
 	}

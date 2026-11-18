@@ -70,8 +70,8 @@ func (s *Server) report(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]bool{"ok": true})
 }
 
-// admin is the page for whoever keeps the game: reports on questions, and how each question goes. Admins only; to
-// anyone else it isn't there.
+// admin is the page for whoever keeps the game: reports on questions, how each question goes, and players (a name to
+// put right, a player to suspend: admin_players.go). Admins only; to anyone else it isn't there.
 func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	u, err := s.user(r)
 	if err != nil || u == nil || !u.Admin {
@@ -286,6 +286,7 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
 	}
+	body.WriteString(string(adminPlayersHTML(s.adminPlayersOf(ctx, r.URL.Query().Get("player")))))
 	s.plain(w, "Управление", template.HTML(body.String()))
 }
 

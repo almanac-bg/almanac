@@ -1,9 +1,11 @@
 // Friends (Приятели): who asks to be friends, each friend with their day and your record against them, and the ways to
-// make more: by their tag or email, or your invite link.
+// make more: by their tag or email, or your invite link (a new one at a tap, the old one then nobody's). Anyone who
+// asks, or a friend, can be blocked from here: they're gone, and can't ask again (play/blocks.go); the blocked are
+// listed last, to lift it.
 
 import { shareButton } from "../game/results.ts";
 import { api, errorText } from "../lib/api.ts";
-import { type Child, h, onCleanup, signal, when } from "../lib/dom.ts";
+import { type Child, h, onCleanup, type Signal, signal, when } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { friendRequests, player, user } from "../state.ts";
 import { avatar, failure, formatNumber, pageArt, profileHref, record, type Tier } from "../ui.ts";
@@ -34,6 +36,7 @@ interface Friends {
   invite: string;
   friends: Friend[];
   requests: { in: Request[]; out: Request[] };
+  blocked: { name: string; tag: string }[];
 }
 
 /** Приятели, one of the main places. */
@@ -49,6 +52,8 @@ function friendsCard(): Child {
   // The list that couldn't load (with nothing of it shown yet): the failure, and the way to try again.
   const failed = signal<unknown>(null);
   const editing = signal(false);
+  // Asking whether to make a new invite link: kept here, so that the list drawn again (every 15 s) doesn't drop it.
+  const asking = signal(false);
 
   const load = async () => {
     if (!user.peek()) return;
@@ -94,6 +99,22 @@ function friendsCard(): Child {
       await api("DELETE", `/api/friends/requests/${r.id}`);
       await load();
     });
+  const block = (tag: string) =>
+    act(async () => {
+      await api("POST", "/api/blocks", { tag });
+      await load();
+    });
+  const unblock = (tag: string) =>
+    act(async () => {
+      await api("DELETE", `/api/blocks/${tag}`);
+      await load();
+    });
+  const renew = () =>
+    act(async () => {
+      const r = await api<{ invite: string }>("POST", "/api/friends/invite", {});
+      const d = data.peek();
+      if (d) data.set({ ...d, invite: r.invite });
+    });
   // Made once: what it says after a request stays while the list around it is drawn again.
   const adder = addFriend(load);
 
@@ -126,6 +147,9 @@ function friendsCard(): Child {
               { class: "invitation-actions" },
               h("button", { class: "btn rose inline", type: "button", onclick: () => accept(r) }, "Приеми"),
               h("button", { class: "link", type: "button", onclick: () => drop(r) }, "Откажи"),
+              r.tag
+                ? h("button", { class: "link muted", type: "button", onclick: () => block(r.tag ?? "") }, "Блокирай")
+                : null,
             ),
           ),
         ),
@@ -167,6 +191,7 @@ function friendsCard(): Child {
                     f,
                     () => challenge(f),
                     () => remove(f),
+                    () => block(f.tag),
                     editing,
                   ),
                 ),
@@ -178,7 +203,7 @@ function friendsCard(): Child {
                   "Още нямаш приятели тук. Прати им покана или ги добави по потребителско име или имейл.",
                 ),
                 // No friends yet: the invitation is the one thing to do here, gold, first.
-                invite(d.invite, true),
+                invite(d.invite, true, renew, asking),
               ],
         ];
       },
@@ -214,7 +239,26 @@ function friendsCard(): Child {
                 ),
               )
             : null,
-          d.friends.length ? invite(d.invite, false) : null,
+          d.friends.length ? invite(d.invite, false, renew, asking) : null,
+          d.blocked.length
+            ? h(
+                "div",
+                { class: "stack small-gap" },
+                h("p", { class: "kicker" }, "Блокирани"),
+                h(
+                  "ul",
+                  { class: "waiting" },
+                  d.blocked.map((b) =>
+                    h(
+                      "li",
+                      null,
+                      h("span", null, b.name, h("span", { class: "muted" }, ` @${b.tag}`)),
+                      h("button", { class: "link muted", type: "button", onclick: () => unblock(b.tag) }, "Отблокирай"),
+                    ),
+                  ),
+                ),
+              )
+            : null,
         ];
       },
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
@@ -223,12 +267,46 @@ function friendsCard(): Child {
 }
 
 /** The player's invitation, by the phone's share sheet (or copied: „Копирано.“), never printed as a raw address; gold
- * while there are no friends yet. The link itself is on the element for the browser tests (`data-invite`). */
-function invite(url: string, primary: boolean): Child {
+ * while there are no friends yet. The link itself is on the element for the browser tests (`data-invite`). Under it,
+ * a new link in its place (`renew`), asked once more first: every link sent or shared before stops working. */
+function invite(url: string, primary: boolean, renew: () => Promise<void>, asking: Signal<boolean>): Child {
   return h(
     "div",
-    { class: "invite", "data-invite": new URL(url).pathname },
+    { class: "invite stack small-gap", "data-invite": new URL(url).pathname },
     shareButton("Покани с връзка", () => "Ела да сме приятели в АЛМАНАХ:", url, primary, undefined, true),
+    () =>
+      asking()
+        ? h(
+            "div",
+            { class: "invite-renew", role: "group", "aria-label": "Нова връзка за покана" },
+            h(
+              "p",
+              { class: "muted small invite-renew-note" },
+              "Старата връзка ще спре да работи, включително в споделените ти резултати.",
+            ),
+            h(
+              "div",
+              { class: "invitation-actions" },
+              h(
+                "button",
+                {
+                  class: "btn inline",
+                  type: "button",
+                  onclick: async () => {
+                    await renew();
+                    asking.set(false);
+                  },
+                },
+                "Направи нова",
+              ),
+              h("button", { class: "link", type: "button", onclick: () => asking.set(false) }, "Отказ"),
+            ),
+          )
+        : h(
+            "button",
+            { class: "link muted small invite-new", type: "button", onclick: () => asking.set(true) },
+            "Нова връзка за покана",
+          ),
   );
 }
 
@@ -295,8 +373,9 @@ function addFriend(reload: () => Promise<void>): Child {
   );
 }
 
-/** A friend: their name, their day, the duels between you, and a challenge now (or, while editing, removing them). */
-function row(f: Friend, challenge: () => void, remove: () => void, editing: () => boolean): Child {
+/** A friend: their name, their day, the duels between you, and a challenge now (or, while editing, removing or blocking
+ * them). */
+function row(f: Friend, challenge: () => void, remove: () => void, block: () => void, editing: () => boolean): Child {
   const played = f.won + f.lost + f.drawn;
   return h(
     "li",
@@ -331,7 +410,12 @@ function row(f: Friend, challenge: () => void, remove: () => void, editing: () =
       : null,
     () =>
       editing()
-        ? h("button", { class: "link muted", type: "button", onclick: remove }, "Премахни")
+        ? h(
+            "span",
+            { class: "invitation-actions friend-act" },
+            h("button", { class: "link muted", type: "button", onclick: remove }, "Премахни"),
+            h("button", { class: "link muted", type: "button", onclick: block }, "Блокирай"),
+          )
         : h("button", { class: "btn inline friend-act", type: "button", onclick: challenge }, "Предизвикай"),
   );
 }

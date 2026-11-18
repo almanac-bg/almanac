@@ -180,7 +180,8 @@ type pushKind string
 const (
 	// pushDay is the reminder of the day's questions, at the player's own hour (remind.go).
 	pushDay pushKind = "day"
-	// pushFriends is word from people and of games played: a friend accepts a link or calls to a duel, how a duel
+	// pushFriends is word from people and of games played: someone asks to be friends by one's link, a friend calls
+	// to a duel (those from people go through notifyFrom: capped, never from one blocked), how a duel
 	// or a Роял played in one's own absence ended, how a week in the league ended.
 	pushFriends pushKind = "friends"
 	// pushRoyal is the call to every evening's Роял as its lobby opens. Off by default: saying „Ще дойда“ calls a

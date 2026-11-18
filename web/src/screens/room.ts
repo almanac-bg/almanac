@@ -170,7 +170,8 @@ export function room(kit: Kit, [code = ""]: string[]) {
   title("Стая");
   const view = signal<RoomView | null>(null);
   const trouble = signal<"" | "reconnecting" | "gone" | "full" | "removed" | "locked" | "busy">("");
-  // A player still with the name drawn for them chooses one first: a class or a pub can't tell twenty animals apart.
+  // A player still with the name drawn for them chooses one first, for this room alone: a class or a pub can't tell
+  // twenty animals apart, and a pupil's name stays in the room (never their name on the boards or their profile).
   const naming = signal<User | null>(null);
   // Where each player stood at the last answer: how far they've moved since is the room's rank change.
   const places = new Map<number, number>();
@@ -204,15 +205,16 @@ export function room(kit: Kit, [code = ""]: string[]) {
     const why = { full: "full", removed: "removed", locked: "locked", too_many: "busy" } as const;
     trouble.set(why[(err as ApiError).code as keyof typeof why] ?? "gone");
   };
-  // In the room (again: the name and look as they are now), then its stream.
-  const enter = () => {
+  // In the room (again: the look as it is now; the name it had there, or the one chosen for it in this tab), then its
+  // stream.
+  const enter = (name = named(code) ?? "") => {
     if (life.aborted) return;
-    api("POST", `/api/rooms/${code}/join`).then(connect, refused);
+    api("POST", `/api/rooms/${code}/join`, name ? { name } : undefined).then(connect, refused);
   };
   // A wrong code is said at once, before a name is asked or a player made for it.
   api("GET", `/api/rooms/${code}`)
     .then(() => player())
-    .then((u) => (u.drawn && !named(code) ? naming.set(u) : enter()))
+    .then((u) => (u.drawn && named(code) === null ? naming.set(u) : enter()))
     .catch(refused);
   onCleanup(() => es?.close());
 
@@ -302,10 +304,16 @@ export function room(kit: Kit, [code = ""]: string[]) {
     () => {
       const u = naming();
       return u
-        ? nameStep(code, u, () => {
-            naming.set(null);
-            enter();
-          })
+        ? nameStep(
+            code,
+            (name) => api("POST", `/api/rooms/${code}/join`, { name }),
+            u.name,
+            () => {
+              naming.set(null);
+              connect();
+            },
+            refused,
+          )
         : null;
     },
     () => {
@@ -330,20 +338,34 @@ export function room(kit: Kit, [code = ""]: string[]) {
   );
 }
 
-/** Whether the player has been asked for a name in this room already (in this tab): a reload doesn't ask again. */
-function named(code: string, now = false): boolean {
+/** The name the player chose for this room in this tab (`now`: chosen now), "" if they were asked for none (a host who
+ * only leads: rooms.ts marks the room named), or null if not asked yet: a reload doesn't ask again, and comes back
+ * under it (a locked room tried again, a room the server lost over a restart). */
+function named(code: string, now?: string): string | null {
   try {
-    if (now) sessionStorage.setItem(`named:${code}`, "1");
-    return sessionStorage.getItem(`named:${code}`) === "1";
+    if (now !== undefined) {
+      sessionStorage.setItem(`named:${code}`, "1");
+      sessionStorage.setItem(`room-name:${code}`, now);
+    }
+    return sessionStorage.getItem(`named:${code}`) === "1" ? (sessionStorage.getItem(`room-name:${code}`) ?? "") : null;
   } catch {
-    return now;
+    return now ?? null;
   }
 }
 
-/** One field before the room: the name the others will see, the drawn one in it to keep or change. It's the
- * player's name from now on, as in Настройки. */
-function nameStep(code: string, u: User, done: () => void): Child {
-  const name = signal(u.name);
+/** One field before the room: the name the others in it will see, the drawn one in it to keep or change. It's the
+ * room's alone (roomJoin on the server): not the player's name anywhere else, so a pupil's real name, if a teacher
+ * asks for it, never reaches the boards. The field says so, and asks for no more than a first name; and the browser
+ * isn't asked to fill in a full one (`autocomplete` off). `join` comes in under it; a name the server won't take is
+ * said here, anything else is the room's (`refused`). */
+function nameStep(
+  code: string,
+  join: (name: string) => Promise<unknown>,
+  drawn: string,
+  done: () => void,
+  refused: (err: unknown) => void,
+): Child {
+  const name = signal(drawn);
   const error = signal("");
   const busy = signal(false);
   return h(
@@ -355,14 +377,13 @@ function nameStep(code: string, u: User, done: () => void): Child {
         error.set("");
         busy.set(true);
         try {
-          if (name.peek().trim() !== u.name) {
-            const r = await api<{ user: User }>("PATCH", "/api/me", { name: name.peek() });
-            user.set(r.user);
-          }
-          named(code, true);
+          await join(name.peek());
+          named(code, name.peek());
           done();
         } catch (err) {
-          error.set(errorText(err));
+          if (["bad_name", "reserved_name"].includes((err as ApiError).code)) return error.set(errorText(err));
+          named(code, name.peek()); // the room's refusal (locked, full): tried again, under this name
+          refused(err);
         } finally {
           busy.set(false);
         }
@@ -377,10 +398,12 @@ function nameStep(code: string, u: User, done: () => void): Child {
     h(
       "label",
       { class: "field" },
-      h("span", null, "Име"),
+      h("span", null, "Име в стаята"),
       h("input", {
-        name: "name",
-        autocomplete: "name",
+        name: "room-name",
+        autocomplete: "off",
+        autocapitalize: "words",
+        "aria-describedby": "room-name-how",
         minlength: 2,
         maxlength: 30,
         required: true,
@@ -388,6 +411,11 @@ function nameStep(code: string, u: User, done: () => void): Child {
         onfocus: (e: FocusEvent) => (e.target as HTMLInputElement).select(),
         oninput: (e: Event) => name.set((e.target as HTMLInputElement).value),
       }),
+      h(
+        "small",
+        { class: "muted", id: "room-name-how" },
+        "Вижда се само в тази стая. Стига малкото име или прякор, без фамилия.",
+      ),
     ),
     h("button", { class: "btn primary big", disabled: busy }, "Влез"),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),

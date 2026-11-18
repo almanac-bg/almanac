@@ -81,7 +81,12 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   field, „Сподели“ gold, „Не сега“ quiet (it shares with the drawn name). An invite (`/f/…`) is to the day's ten
   („Мария има 8 от 10 днес. А ти?“, or „Мария те кани на днешните 10“ before she has played); played there, the day's
   result is Начало's, with one card more first (`.invite-card`: the two results side by side and „Добави Мария в
-  приятели“).
+  приятели“). That tap is a request Мария accepts („Поканата е изпратена. Щом Мария я приеме, ставате приятели.“):
+  a link never makes a friend alone. Under the invitation, quiet, „Нова връзка за покана“ (asked once more: the old
+  link stops working). A request has „Блокирай“ quiet beside „Приеми“ and „Откажи“, as a friend has under „Промени“
+  and a profile at its actions' end; the blocked are listed last („Блокирани“, „Отблокирай“). A name field never asks
+  the browser for a full name (`autocomplete` nickname or off: `fields.test.ts`); a room asks a player with a drawn
+  name for one for that room alone („Име в стаята“: „Вижда се само в тази стая…“).
 - **Класации** (`/ranks`): Днес (the day's board, first), Лига (the player's group this week; `/ranks#league`),
   Рейтинг and Знания (Лига and Рейтинг once the player has met them); of everyone or of friends (not the league: a group is its own).
 - **Профил** (`/me`): its own four places in a switch at the top (`profileNav()`): Общо (the player: level,

@@ -11,10 +11,14 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// Friends are two players who joined up: through one's invite link (sent, or at the end of their shared day's result:
-// it brings whoever opens it to the day, and offers the friendship with a tap), or a request by tag, by email or from
-// a room's end that the other accepted. Each sees how the other did on the day's questions, they keep a record of their duels, and either can
-// call the other to a duel.
+// Friends are two players who joined up: one asked and the other said yes. Asked by tag, by email, from a room's end,
+// or by opening the other's invite link (sent, or at the end of their shared day's result: it brings whoever opens it
+// to the day, and offers to ask its owner with a tap). Never without both: a link opened is a request its owner
+// accepts (AskByInvite), unless they had asked first, so that a link shared with a whole group, or passed on, makes
+// nobody a friend of its owner on its own, and one unfriended can't come back by it. Its owner can make a new link at
+// any time (NewInviteCode): the old one is then nobody's. A block keeps two players apart (blocks.go). Each friend
+// sees how the other did on the day's questions, they keep a record of their duels, and either can call the other to
+// a duel.
 
 var (
 	ErrNoInvite     = errors.New("no such invite")
@@ -44,7 +48,8 @@ func newInviteCode() string {
 	return string(b)
 }
 
-// InviteCode is the code of a player's invite link, made the first time they ask for it and the same ever after.
+// InviteCode is the code of a player's invite link, made the first time they ask for it and the same after, until they
+// make a new one (NewInviteCode).
 func (g *Game) InviteCode(ctx context.Context, userID int64) (string, error) {
 	for range 3 {
 		var code sql.NullString
@@ -58,6 +63,22 @@ func (g *Game) InviteCode(ctx context.Context, userID int64) (string, error) {
 		// Another tab may make one at the same moment: the first one kept wins, and the loop reads it.
 		if _, err := g.DB.Write.ExecContext(ctx, `UPDATE users SET invite = ? WHERE id = ? AND invite IS NULL`,
 			newInviteCode(), userID); err != nil && !strings.Contains(err.Error(), "UNIQUE") {
+			return "", err
+		}
+	}
+	return "", errors.New("no free invite code")
+}
+
+// NewInviteCode gives a player a new invite link in place of the one they had: the old one is nobody's from then on
+// (a link shared further than they meant). The new code.
+func (g *Game) NewInviteCode(ctx context.Context, userID int64) (string, error) {
+	for range 3 {
+		code := newInviteCode()
+		_, err := g.DB.Write.ExecContext(ctx, `UPDATE users SET invite = ? WHERE id = ?`, code, userID)
+		if err == nil {
+			return code, nil
+		}
+		if !strings.Contains(err.Error(), "UNIQUE") {
 			return "", err
 		}
 	}
@@ -85,23 +106,37 @@ func (g *Game) DayRights(ctx context.Context, userID int64, day string, viewer i
 	return rights, err == nil, err
 }
 
-// Befriend makes a player and the owner of an invite link friends (and changes nothing if they already are). It
-// returns the friend.
-func (g *Game) Befriend(ctx context.Context, userID int64, code string) (id int64, name string, err error) {
+// AskByInvite is a player who opened an invite link asking its owner to be friends: a request, as by their tag, that
+// the owner accepts or not (or friends at once, if the owner had asked them first). The owner's id and name, and what
+// came of it.
+func (g *Game) AskByInvite(ctx context.Context, userID int64, code string) (id int64, name string, sent Sent, err error) {
 	id, name, err = g.Inviter(ctx, code)
 	if err != nil {
-		return 0, "", err
+		return 0, "", Sent{}, err
 	}
 	if id == userID {
-		return 0, "", ErrOwnInvite
+		return 0, "", Sent{}, ErrOwnInvite
 	}
-	return id, name, g.befriend(ctx, id, userID)
+	var tag string
+	if err := g.DB.Read.QueryRowContext(ctx, `SELECT tag FROM users WHERE id = ?`, id).Scan(&tag); err != nil {
+		return 0, "", Sent{}, err
+	}
+	sent, err = g.Request(ctx, userID, tag, false)
+	return id, name, sent, err
 }
 
 // befriend makes two players friends (if they aren't yet), settles any requests between them, and awards what that
-// earns them. a is the one who asked (whose link b opened, or whose request b accepted): told of the yes (AcceptedOf).
+// earns them. a is the one who asked (whose request b accepted): told of the yes (AcceptedOf). ErrBlocked if one of
+// them has blocked the other.
 func (g *Game) befriend(ctx context.Context, a, b int64) error {
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		var blocked bool
+		if err := tx.QueryRow(`SELECT `+blockedBetween("?1", "?2"), a, b).Scan(&blocked); err != nil {
+			return err
+		}
+		if blocked {
+			return ErrBlocked
+		}
 		if _, err := tx.Exec(`DELETE FROM friend_requests WHERE (from_id = ?1 AND (to_id = ?2
 			OR to_email = (SELECT email FROM users WHERE id = ?2))) OR (from_id = ?2 AND (to_id = ?1
 			OR to_email = (SELECT email FROM users WHERE id = ?1)))`, a, b); err != nil {
@@ -141,11 +176,15 @@ func (g *Game) befriend(ctx context.Context, a, b int64) error {
 type Sent struct {
 	Friends bool   `json:"friends,omitempty"`
 	Name    string `json:"name,omitempty"` // whom it went to, when asked by tag (an email's owner stays unknown)
+	// New is a request to a player (To) made now, not one sent before and waiting still: theirs to hear of.
+	New bool  `json:"-"`
+	To  int64 `json:"-"`
 }
 
 // Request asks a player to be friends: by their tag, or by an email address. An email request waits for whoever has
 // the address, or signs in with it later, and the sender learns nothing about whether anyone does. to is already a
-// normal tag or email (account.NormalTag, account.NormalEmail); byEmail says which.
+// normal tag or email (account.NormalTag, account.NormalEmail); byEmail says which. Between two players one of whom
+// has blocked the other, it's kept nowhere, though the sender is told it went.
 func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool) (Sent, error) {
 	var mine sql.NullString // the sender's email: requests to it are to them
 	if err := g.DB.Read.QueryRowContext(ctx, `SELECT email FROM users WHERE id = ?`, from).Scan(&mine); err != nil {
@@ -176,6 +215,19 @@ func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool)
 	if other == from {
 		return Sent{}, ErrOwnInvite
 	}
+	// Whoever the request is to (by email, the address's owner, though the sender isn't told), one blocked by the
+	// other: as if sent.
+	var blocked bool
+	if err := g.DB.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM users u WHERE (u.id = ?2 OR (?3 AND u.email = ?4))
+		AND `+blockedBetween("?1", "u.id")+`)`, from, other, byEmail, to).Scan(&blocked); err != nil {
+		return Sent{}, err
+	}
+	if blocked {
+		if byEmail {
+			name = ""
+		}
+		return Sent{Name: name}, nil
+	}
 	if other != 0 {
 		if _, err := g.Friend(ctx, from, other); err == nil {
 			return Sent{Friends: true, Name: name}, nil
@@ -192,12 +244,14 @@ func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool)
 			return Sent{Friends: true, Name: name}, nil
 		}
 	}
+	var waiting bool // sent before, and waiting still
 	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var n int
-		if err := tx.QueryRow(`SELECT count(*) FROM friend_requests WHERE from_id = ?`, from).Scan(&n); err != nil {
+		if err := tx.QueryRow(`SELECT count(*), coalesce(sum(to_id = ?2), 0) > 0 FROM friend_requests WHERE from_id = ?1`,
+			from, other).Scan(&n, &waiting); err != nil {
 			return err
 		}
-		if n >= MaxRequests {
+		if n >= MaxRequests && !waiting {
 			return ErrManyRequests
 		}
 		now := store.Ms(g.Now())
@@ -211,9 +265,9 @@ func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool)
 		return err
 	})
 	if byEmail {
-		name = ""
+		return Sent{}, err
 	}
-	return Sent{Name: name}, err
+	return Sent{Name: name, New: !waiting, To: other}, err
 }
 
 // FriendRequest is a friend request as one of the two sees it: who asked (to the one asked), or whom it went to (to
@@ -233,7 +287,8 @@ func (g *Game) Requests(ctx context.Context, userID int64) (in, out []FriendRequ
 	db := g.DB.Read
 	rows, err := db.QueryContext(ctx, `SELECT r.id, r.at, u.id, u.name, u.tag, `+lookColumns+`
 		FROM friend_requests r JOIN users u ON u.id = r.from_id
-		WHERE r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1)
+		WHERE (r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1))
+			AND NOT `+blockedBetween("?1", "r.from_id")+`
 		ORDER BY r.at DESC`, userID)
 	if err != nil {
 		return nil, nil, err
@@ -277,7 +332,8 @@ func (g *Game) Requests(ctx context.Context, userID int64) (in, out []FriendRequ
 func (g *Game) Accept(ctx context.Context, userID, requestID int64) (name string, err error) {
 	var from int64
 	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.from_id, u.name FROM friend_requests r JOIN users u ON u.id = r.from_id
-		WHERE r.id = ?1 AND (r.to_id = ?2 OR r.to_email = (SELECT email FROM users WHERE id = ?2))`, requestID, userID).
+		WHERE r.id = ?1 AND (r.to_id = ?2 OR r.to_email = (SELECT email FROM users WHERE id = ?2))
+			AND NOT `+blockedBetween("?2", "r.from_id"), requestID, userID).
 		Scan(&from, &name)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrNoRequest
@@ -307,9 +363,18 @@ func (g *Game) Withdraw(ctx context.Context, userID, requestID int64) error {
 // RequestsWaiting is how many friend requests wait for a player's answer (for the dot on Приятели).
 func (g *Game) RequestsWaiting(ctx context.Context, userID int64) (int, error) {
 	var n int
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT count(*) FROM friend_requests
-		WHERE to_id = ?1 OR to_email = (SELECT email FROM users WHERE id = ?1)`, userID).Scan(&n)
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT count(*) FROM friend_requests r
+		WHERE (r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1))
+			AND NOT `+blockedBetween("?1", "r.from_id"), userID).Scan(&n)
 	return n, err
+}
+
+// Asked is whether a player's request to another waits for their answer.
+func (g *Game) Asked(ctx context.Context, from, to int64) (bool, error) {
+	var asked bool
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM friend_requests WHERE from_id = ? AND to_id = ?)`,
+		from, to).Scan(&asked)
+	return asked, err
 }
 
 // Unfriend ends a friendship, for both.

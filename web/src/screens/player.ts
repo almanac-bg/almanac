@@ -1,12 +1,12 @@
 // Another player's profile, by their tag (/players/tag): how they look, their division, their numbers, how well they
 // know each topic, the achievements they've earned; and what you can do with them — ask to be friends, answer their
-// asking, call them to a duel.
+// asking, call them to a duel, or block them (and lift it).
 
 import { type Mastery, masteryCard } from "../game/mastery.ts";
 import { api, errorText } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
-import { friendRequests, player } from "../state.ts";
+import { friendRequests, player, user } from "../state.ts";
 import {
   type AchievementInfo,
   avatar,
@@ -39,7 +39,7 @@ interface Profile {
   mastery: Mastery[];
   achievements: AchievementInfo[];
   of: number;
-  friend?: "yes" | "asked" | "asks";
+  friend?: "yes" | "asked" | "asks" | "blocked";
   request?: number;
   record?: { won: number; lost: number; drawn: number };
   id?: number;
@@ -111,7 +111,8 @@ function head(p: Profile): Child {
 }
 
 /** What the viewer can do with them: as friends, a duel (and the duels between the two so far); else ask to be
- * friends, or answer their asking. The one thing to do is the gold button; accepting is rose, as everywhere. */
+ * friends, or answer their asking. The one thing to do is the gold button; accepting is rose, as everywhere. Last, a
+ * quiet „Блокирай“; blocked, only the way to lift it. */
 function actions(p: Profile, reload: () => Promise<unknown>): Child {
   const busy = signal(false);
   const note = signal<{ text: string; bad?: boolean } | null>(null);
@@ -130,6 +131,25 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
     h("button", { class: `btn inline ${cls}`, type: "button", disabled: busy, onclick: () => act(fn) }, label);
 
   let body: Child;
+  if (p.friend === "blocked") {
+    return h(
+      "section",
+      { class: "card player-actions" },
+      h(
+        "p",
+        { class: "player-relation muted" },
+        "Блокиран профил: не може да те добавя в приятели и да те предизвиква.",
+      ),
+      button("Отблокирай", "", async () => {
+        await api("DELETE", `/api/blocks/${p.tag}`);
+        await reload();
+      }),
+      () => {
+        const n = note();
+        return n && h("p", { class: "bad", role: "alert" }, n.text);
+      },
+    );
+  }
   if (p.friend === "yes") {
     const r = p.record ?? { won: 0, lost: 0, drawn: 0 };
     const played = r.won + r.lost + r.drawn;
@@ -179,10 +199,33 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
       }),
     ];
   }
-  return h("section", { class: "card player-actions" }, body, () => {
-    const n = note();
-    return n && h("p", { class: n.bad ? "bad" : "muted", role: n.bad ? "alert" : "status" }, n.text);
-  });
+  return h(
+    "section",
+    { class: "card player-actions" },
+    body,
+    () => {
+      const n = note();
+      return n && h("p", { class: n.bad ? "bad" : "muted", role: n.bad ? "alert" : "status" }, n.text);
+    },
+    // Only a player can block (one not signed in has nobody to keep away).
+    () =>
+      user()
+        ? h(
+            "button",
+            {
+              class: "link muted small player-block",
+              type: "button",
+              disabled: busy,
+              onclick: () =>
+                act(async () => {
+                  await api("POST", "/api/blocks", { tag: p.tag });
+                  await reload();
+                }),
+            },
+            "Блокирай",
+          )
+        : null,
+  );
 }
 
 /** Their numbers: the streak, how much and how well they've played, their duels. */

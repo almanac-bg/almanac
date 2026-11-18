@@ -714,10 +714,100 @@ func TestNames(t *testing.T) {
 	if _, err := a.Rename(ctx, two.ID, "Иван Петров"); err != nil {
 		t.Fatalf("a name someone else has: %v", err)
 	}
-	for _, bad := range []string{"А", "123", "Алманах", "<script>", "Иван!", "абвгдежзийклмнопрстуфхцчшщъьюяю"} {
+	for _, bad := range []string{"А", "123", "<script>", "Иван!", "абвгдежзийклмнопрстуфхцчшщъьюяю",
+		strings.Repeat("ﷺ", 3), "Ꙭꙮꙮ", "名前です", "Ἀλέξανδρος", "Иван​Петров"} {
 		if _, err := NormalName(bad); !errors.Is(err, ErrBadName) {
-			t.Errorf("%q passed", bad)
+			t.Errorf("%q: %v", bad, err)
 		}
+	}
+	// A word in two scripts is how a fake looks real; a dot between letters, a web address.
+	for bad, want := range map[string]error{"АЛМAНAХ": ErrNameScripts, "Ивaн": ErrNameScripts,
+		"almanac.bg": ErrNameLink, "free-coins.com": ErrNameLink, "Д.Петров": ErrNameLink} {
+		if _, err := NormalName(bad); !errors.Is(err, want) {
+			t.Errorf("%q: %v, want %v", bad, err, want)
+		}
+	}
+	for _, good := range []string{"Иван Петров", "Ана-Мария", "Д. Петров", "José Ivanov", "Петър 2", "Лисица 123",
+		"Мечо_Пух", "Иван Ivanov", "Модерна", "Алма", "Хамлет"} {
+		if _, err := NormalName(good); err != nil || Reserved(good) {
+			t.Errorf("%q: %v, reserved %v", good, err, Reserved(good))
+		}
+	}
+	// Whatever reads as the game or its people, however it's written.
+	for _, fake := range []string{"Алманах", "АЛМАНАХ", "Екипът на АЛМАНАХ", "ALMAHAX", "А Л М А Н А Х", "Allmanac",
+		"4lm4n4h", "Almanakh", "Админ", "Adm1n", "Главен администратор", "Модератор", "Поддръжка", "support", "Help"} {
+		if !Reserved(fake) {
+			t.Errorf("%q isn't reserved", fake)
+		}
+		if _, err := a.Rename(ctx, one.ID, fake); err == nil {
+			t.Errorf("%q taken as a name", fake)
+		}
+	}
+	// Whoever keeps the game may take such a name.
+	if _, err := a.DB.Write.Exec(`UPDATE users SET admin = 1 WHERE id = ?`, two.ID); err != nil {
+		t.Fatal(err)
+	}
+	if name, err := a.Rename(ctx, two.ID, "АЛМАНАХ"); err != nil || name != "АЛМАНАХ" {
+		t.Fatalf("an admin's name: %q %v", name, err)
+	}
+}
+
+// Whoever keeps the game puts a name that pretends back to a drawn one, tag and all.
+func TestResetName(t *testing.T) {
+	a, _, _, _ := setup(t)
+	ctx := t.Context()
+	u, token, _ := a.Guest(ctx)
+	if _, err := a.Rename(ctx, u.ID, "Иван"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Retag(ctx, u.ID, "ivan"); err != nil {
+		t.Fatal(err)
+	}
+	name, tag, err := a.ResetName(ctx, u.ID)
+	if err != nil || !strings.HasPrefix(name, AnimalOf(u.ID).Name+" ") || !strings.HasPrefix(tag, AnimalOf(u.ID).Tag) {
+		t.Fatalf("reset: %q @%s %v", name, tag, err)
+	}
+	if s, _ := a.Session(ctx, token); s == nil || s.Name != name || s.Tag != tag || !s.Drawn() {
+		t.Fatalf("the player after: %+v", s)
+	}
+	if _, _, err := a.ResetName(ctx, 1<<40); err == nil {
+		t.Fatal("reset nobody")
+	}
+}
+
+// A suspended player is signed out everywhere and can't sign in again until it's lifted.
+func TestSuspend(t *testing.T) {
+	a, _, out, in := setup(t)
+	ctx := t.Context()
+	u, token, _ := a.Guest(ctx)
+	if _, _, err := a.Verify(ctx, code(t, a, out, in, "ana@example.com"), token); err != nil {
+		t.Fatal(err)
+	}
+	signedIn, _, _ := a.Verify(ctx, code(t, a, out, in, "ana@example.com"), "")
+	if signedIn.ID != u.ID {
+		t.Fatalf("signed in as %d, not %d", signedIn.ID, u.ID)
+	}
+	if err := a.Suspend(ctx, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	if on, _, err := a.Suspended(ctx, u.ID); !on || err != nil {
+		t.Fatalf("suspended: %v %v", on, err)
+	}
+	var sessions int
+	if err := a.DB.Read.QueryRow(`SELECT count(*) FROM sessions WHERE user_id = ?`, u.ID).Scan(&sessions); err != nil || sessions != 0 {
+		t.Fatalf("%d sessions left: %v", sessions, err)
+	}
+	if _, _, err := a.Verify(ctx, code(t, a, out, in, "ana@example.com"), ""); !errors.Is(err, ErrSuspended) {
+		t.Fatalf("a suspended player signed in: %v", err)
+	}
+	if err := a.Suspend(ctx, 1<<40); err == nil {
+		t.Fatal("suspended nobody")
+	}
+	if err := a.Unsuspend(ctx, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, token, err := a.Verify(ctx, code(t, a, out, in, "ana@example.com"), ""); err != nil || token == "" {
+		t.Fatalf("lifted, no sign-in: %v", err)
 	}
 }
 
@@ -738,9 +828,14 @@ func TestTags(t *testing.T) {
 	if _, err := a.Retag(ctx, one.ID, "otsirh"); err != nil {
 		t.Fatalf("one's own tag again: %v", err)
 	}
-	for _, bad := range []string{"ab", "1abc", "иван", "a b c", "admin", "a.b.c", "abcdefghijklmnopqrstu"} {
+	for _, bad := range []string{"ab", "1abc", "иван", "a b c", "a.b.c", "abcdefghijklmnopqrstu"} {
 		if _, err := NormalTag(bad); !errors.Is(err, ErrBadTag) {
 			t.Errorf("%q passed", bad)
+		}
+	}
+	for _, fake := range []string{"admin", "almanac_team", "almanakh", "the_admin1", "support"} {
+		if _, err := a.Retag(ctx, two.ID, fake); !errors.Is(err, ErrNameReserved) {
+			t.Errorf("%q: %v", fake, err)
 		}
 	}
 	if u, _ := a.Session(ctx, token); u == nil || u.Tag != "otsirh" {

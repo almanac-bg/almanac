@@ -941,17 +941,28 @@ func TestFriends(t *testing.T) {
 	if again, _ := w.g.InviteCode(ctx, ana); err != nil || len(code) != 8 || again != code {
 		t.Fatalf("Ana's invite: %q, again %q, %v", code, again, err)
 	}
-	if _, _, err := w.g.Befriend(ctx, ana, code); !errors.Is(err, ErrOwnInvite) {
+	if _, _, _, err := w.g.AskByInvite(ctx, ana, code); !errors.Is(err, ErrOwnInvite) {
 		t.Fatalf("befriended oneself: %v", err)
 	}
-	if _, _, err := w.g.Befriend(ctx, bo, "nosuchcd"); !errors.Is(err, ErrNoInvite) {
+	if _, _, _, err := w.g.AskByInvite(ctx, bo, "nosuchcd"); !errors.Is(err, ErrNoInvite) {
 		t.Fatalf("a made-up invite: %v", err)
 	}
-	if id, _, err := w.g.Befriend(ctx, bo, code); err != nil || id != ana {
-		t.Fatalf("Bo befriends Ana: %d %v", id, err)
+	// Bo opens Ana's link: a request, Ana's to accept; asked again, the same one, nothing new to tell her.
+	if id, _, sent, err := w.g.AskByInvite(ctx, bo, code); err != nil || id != ana || sent.Friends || !sent.New || sent.To != ana {
+		t.Fatalf("Bo asks Ana by her link: %d %+v %v", id, sent, err)
 	}
-	if _, _, err := w.g.Befriend(ctx, bo, code); err != nil {
-		t.Fatalf("befriending again: %v", err)
+	if _, _, sent, err := w.g.AskByInvite(ctx, bo, code); err != nil || sent.New || sent.Friends {
+		t.Fatalf("asking again: %+v %v", sent, err)
+	}
+	if _, err := w.g.Friend(ctx, ana, bo); !errors.Is(err, ErrNotFriends) {
+		t.Fatalf("friends by a link alone: %v", err)
+	}
+	in, _, _ := w.g.Requests(ctx, ana)
+	if len(in) != 1 {
+		t.Fatalf("Ana's requests: %+v", in)
+	}
+	if _, err := w.g.Accept(ctx, ana, in[0].ID); err != nil {
+		t.Fatal(err)
 	}
 	for _, p := range [][2]int64{{ana, bo}, {bo, ana}} {
 		if _, err := w.g.Friend(ctx, p[0], p[1]); err != nil {
@@ -1632,14 +1643,10 @@ func (w *world) code(duel int64) string {
 	return code
 }
 
-// befriend makes two players friends, as accepting an invite link would.
+// befriend makes two players friends: a asked, b said yes.
 func (w *world) befriend(a, b int64) {
 	w.t.Helper()
-	code, err := w.g.InviteCode(w.t.Context(), a)
-	if err == nil {
-		_, _, err = w.g.Befriend(w.t.Context(), b, code)
-	}
-	if err != nil {
+	if err := w.g.befriend(w.t.Context(), a, b); err != nil {
 		w.t.Fatal(err)
 	}
 }
