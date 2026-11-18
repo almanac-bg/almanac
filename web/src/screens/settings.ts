@@ -1,5 +1,5 @@
 // Настройки: the name and tag (saved as they're left), the account and its email, reminders, and the data the game
-// keeps; and this device's sound and access, with a profile or without one.
+// keeps; and this device's look (Night or Day), sound and access, with a profile or without one.
 
 import type { Kit } from "../kit.ts";
 import type { Child, Signal } from "../lib/dom.ts";
@@ -22,6 +22,7 @@ let {
   when,
   reportProblem,
   textSize,
+  schemeSwitch,
   calm,
   musicOn,
   setTextSize,
@@ -70,6 +71,7 @@ export function settings(kit: Kit) {
     when,
     reportProblem,
     textSize,
+    schemeSwitch,
     calm,
     musicOn,
     setTextSize,
@@ -115,6 +117,7 @@ export function settings(kit: Kit) {
           { class: "settings" },
           nameForm(),
           reminders(),
+          looks(),
           sounds(),
           access(),
           account(),
@@ -143,6 +146,7 @@ export function settings(kit: Kit) {
                 : h("p", { class: "lead" }, "Още нямаш профил. Влез с имейл или започни да играеш."),
             signIn({ done: (said) => signedIn.set(said) }),
           ),
+          looks(),
           sounds(),
           access(),
         ),
@@ -345,6 +349,19 @@ function sounds(): Child {
     switchRow("Музика в Роял", "Тиха музика, докато чакаш началото.", musicOn, setMusic),
     // The phone's touch: only in the app, where it's felt.
     inApp ? switchRow("Вибрация", "При отговорите и наградите.", vibrateOn, setVibrate) : null,
+  );
+}
+
+/** Изглед: Night or Day, for this device; as the device is set until chosen. Not in the app, which looks as the phone
+ * does (prefs.ts: scheme). */
+function looks(): Child {
+  if (inApp) return null;
+  return h(
+    "section",
+    null,
+    h("h2", null, "Изглед"),
+    h("p", { class: "muted" }, "Важи за това устройство."),
+    schemeSwitch(),
   );
 }
 

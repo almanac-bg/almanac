@@ -1011,3 +1011,69 @@ func TestReturnAndAskName(t *testing.T) {
 		synctest.Wait()
 	})
 }
+
+// As an answer shows, the room sees how it answered: its own crowd (who had the question, the share right, a choice's
+// picks), and who got it right, the quickest first; the host leading sees it too.
+func TestTheRoomsSplit(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		hub := NewHub(sample(t))
+		host := Player{ID: 1, Name: "Водещ"}
+		r, _ := hub.Open(host, "", Settings{Lead: true})
+		sh, _ := r.Follow(host.ID)
+		var subs []*Sub
+		for id := int64(2); id <= 5; id++ {
+			_ = r.Join(Player{ID: id, Name: "Играч"}, "")
+			s, _ := r.Follow(id)
+			subs = append(subs, s)
+		}
+		if err := r.Start(host.ID); err != nil {
+			t.Fatal(err)
+		}
+		if r.View(2).Question.Split != nil {
+			t.Fatal("a split before the answer shows")
+		}
+		// 3 right at 1 s, 2 right at 2 s, 4 wrong, 5 lets the time run out.
+		time.Sleep(time.Second)
+		_ = r.Answer(3, 0, answer(r, true))
+		time.Sleep(time.Second)
+		_ = r.Answer(2, 0, answer(r, true))
+		_ = r.Answer(4, 0, answer(r, false))
+		_ = r.Next(host.ID) // the answer now
+		key := func(id int64) int {
+			for k, m := range r.Players() {
+				if m == id {
+					return k
+				}
+			}
+			return -1
+		}
+		for _, viewer := range []int64{host.ID, 2, 5} {
+			v := r.View(viewer)
+			s := v.Question.Split
+			if v.Phase != Reveal || s == nil {
+				t.Fatalf("no split for %d: %+v", viewer, v.Question)
+			}
+			if !slices.Equal(s.Right, []int{key(3), key(2)}) {
+				t.Fatalf("who got it right, for %d: %v", viewer, s.Right)
+			}
+			c := s.Crowd
+			if c == nil || c.Answers != 4 || c.Right != 0.5 {
+				t.Fatalf("the room's crowd, for %d: %+v", viewer, c)
+			}
+			if c.Picks != nil {
+				sum := 0.0
+				for _, p := range c.Picks {
+					sum += p
+				}
+				if sum != 0.75 { // three picked, one of four let the time run out
+					t.Fatalf("the room's picks: %v", c.Picks)
+				}
+			}
+		}
+		for _, s := range subs {
+			r.Unfollow(s)
+		}
+		r.Unfollow(sh)
+		synctest.Wait()
+	})
+}

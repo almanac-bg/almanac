@@ -4,7 +4,7 @@
 //
 // It loads on its own, the first time a room opens, and is handed the app's pieces (kit.ts): it imports only types.
 
-import type { Answer, Reveal, Reviewed, View } from "../game/types.ts";
+import type { Answer, Crowd, Reveal, Reviewed, View } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
 import type { ApiError } from "../lib/api.ts";
 import type { Child } from "../lib/dom.ts";
@@ -36,6 +36,7 @@ export let {
   h,
   keepAwake,
   lifetime,
+  listWords,
   mixes,
   news,
   nextSteps,
@@ -49,6 +50,7 @@ export let {
   playingWhile,
   questionHead,
   reviewParts,
+  schemeSwitch,
   shareButton,
   signal,
   stream,
@@ -91,6 +93,9 @@ export interface RoomView {
       exact?: boolean;
       missed?: boolean;
     };
+    /** How the room answered it, once the answer shows (room.go: Split): its own crowd, and who got it right, the
+     * quickest first, by their keys. */
+    split?: { crowd?: Crowd; right: number[] };
   };
   /** Once the game is over: what this player's game earned for every answer right (in their points). */
   allRight?: number;
@@ -159,6 +164,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
     h,
     keepAwake,
     lifetime,
+    listWords,
     mixes,
     news,
     nextSteps,
@@ -172,6 +178,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
     playingWhile,
     questionHead,
     reviewParts,
+    schemeSwitch,
     shareButton,
     signal,
     stream,
@@ -362,7 +369,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
         : null,
     () =>
       trouble() === "reconnecting"
-        ? h("p", { class: "status", role: "status" }, "Връзката прекъсна. Свързваме се отново…")
+        ? h("p", { class: "status reconnecting", role: "status" }, "Връзката прекъсна. Свързваме се отново…")
         : null,
     () => {
       const drawn = naming();
@@ -603,8 +610,14 @@ export function door(view: () => RoomView, code: string, error: (s: string) => v
 }
 
 /** The players as chips. The host has two things on each of the others: „Смени името“ (the player is asked for
- * another, theirs drawn meanwhile) and „Махни“, asked twice; and those sent out, each with „Върни“, a slip undone. */
-export function players(view: () => RoomView, code: string, error: (s: string) => void): Child {
+ * another, theirs drawn meanwhile) and „Махни“, asked twice; and those sent out, each with „Върни“, a slip undone.
+ * `manage`: whether the host's hands show now (a big screen keeps them folded: host.ts). */
+export function players(
+  view: () => RoomView,
+  code: string,
+  error: (s: string) => void,
+  manage: () => boolean = () => true,
+): Child {
   const sure = signal(-1); // the key of the one „Махни“ was tapped on once
   let t = 0;
   onCleanup(() => clearTimeout(t));
@@ -635,6 +648,7 @@ export function players(view: () => RoomView, code: string, error: (s: string) =
       const v = view();
       // A new name is asked for between games, not in the middle of one.
       const naming = v.phase === "lobby" || v.phase === "end";
+      const hands = v.isHost && manage();
       return v.players.map((p) =>
         h(
           "li",
@@ -645,7 +659,7 @@ export function players(view: () => RoomView, code: string, error: (s: string) =
             avatar(p.avatar, { size: "s", name: p.name }),
             h("span", { class: "player-name" }, p.name, p.me ? " (ти)" : "", p.online ? "" : " — извън стаята"),
           ),
-          v.isHost && !p.me
+          hands && !p.me
             ? h(
                 "span",
                 { class: "player-acts" },
@@ -678,7 +692,7 @@ export function players(view: () => RoomView, code: string, error: (s: string) =
     }),
     () => {
       const out = view().out ?? [];
-      if (!out.length) return null;
+      if (!out.length || !manage()) return null;
       return h(
         "div",
         { class: "players-out" },
@@ -769,16 +783,8 @@ function asking(view: () => RoomView, code: string, first: RoomView): Child {
     ans.heading,
     picture(q.view, true),
     ans.asked.node,
-    () => {
-      const v = view();
-      const done = v.players.filter((p) => p.answered).length;
-      return h(
-        "p",
-        { class: "status", role: "status" },
-        ans.taken() ? "Отговорът ти е приет. " : "",
-        `Отговориха ${done} от ${v.players.filter((p) => p.online || p.answered).length}.`,
-      );
-    },
+    () =>
+      h("p", { class: "status", role: "status" }, ans.taken() ? "Отговорът ти е приет. " : "", stillAnswering(view())),
     ans.said,
   ];
 }
@@ -810,8 +816,9 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
     head(first),
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view, true),
-    answered(q.view, r.answer, q.given ?? null),
+    answered(q.view, asRoom(q), q.given ?? null),
     verdict(kind, r.points, r.missed ? "Времето изтече." : undefined, r.speed, r.inRow),
+    knew(first),
     crowdLine(q.view.type, r.answer.crowd, r.right),
     // Held, the answer stays up until who leads moves on: time to read its fact here too, not only on the big screen.
     () => (held() ? fact(r.answer.fact) : null),
@@ -823,6 +830,50 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
           ),
     standings(view, true, before),
   );
+}
+
+/** How many have answered the question showing, of those in the room for it; and, once only a few are left (and this
+ * player isn't one of them), who they are: „Отговориха 6 от 8. Чакаме Ани и Боби.“ Nothing with nobody in the room
+ * (a room led with no phones). */
+export function stillAnswering(v: RoomView): string {
+  const playing = v.players.filter((p) => p.online || p.answered);
+  if (!playing.length) return "";
+  const done = playing.filter((p) => p.answered).length;
+  const left = playing.filter((p) => !p.answered);
+  const names = done > 0 && left.length <= 3 && !left.some((p) => p.me) ? left.map((p) => p.name) : [];
+  return `Отговориха ${done} от ${playing.length}.${names.length ? ` Чакаме ${listWords(names)}.` : ""}`;
+}
+
+/** The answer as the room shows it: on each option how many in the room gave it (its own crowd, counted, not shared),
+ * the bars as long as their share; with nobody in the room, how everyone ever answered, as anywhere. The sentence on
+ * everyone (crowdLine) still counts everyone. */
+export function asRoom(q: NonNullable<RoomView["question"]>): Reveal {
+  const r = q.reveal?.answer as Reveal;
+  const crowd = q.split?.crowd;
+  return crowd ? { ...r, crowd: { ...crowd, counts: true } } : r;
+}
+
+/** Who in the room knew the answer showing, the quickest first: „Познаха 5 от 8: Ани, Боби и още 3.“, „Само Ани
+ * позна.“, „Всички познаха.“, „Никой не позна.“ This player is „ти“. Nothing for a room of one, whose verdict says
+ * it. */
+export function knew(v: RoomView): Child {
+  const s = v.question?.split;
+  const had = s?.crowd?.answers ?? 0;
+  if (!s || had < 2) return null;
+  const names = s.right.map((k) => {
+    const p = v.players.find((x) => x.key === k);
+    return p?.me ? "ти" : (p?.name ?? "");
+  });
+  const n = names.length;
+  const text =
+    n === 0
+      ? "Никой не позна."
+      : n === had
+        ? "Всички познаха."
+        : n === 1
+          ? `Само ${names[0]} позна.`
+          : `Познаха ${n} от ${had}: ${n <= 3 ? listWords(names) : `${names.slice(0, 2).join(", ")} и още ${n - 2}`}.`;
+  return h("p", { class: "room-knew" }, text);
 }
 
 /** The players by points (the first `top`); after an answer, what it brought each of them and how far they moved; at

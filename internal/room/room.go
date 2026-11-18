@@ -4,7 +4,8 @@
 // A room is opened by a host, who chooses what it plays (Settings: a topic, how many questions, how hard) and sets
 // the pace (anyone in it may while the host is away; not before the host's screen has come, for a while: hostWait);
 // between games the host may choose again (Change), keeping the code and the players. The standings are by points,
-// then by the time the answers took, as in a duel. The host may also send a player out of the room (Remove): they're
+// then by the time the answers took, as in a duel; with each answer, everyone in the room sees how the room answered
+// it (Split: what each option got, who knew it). The host may also send a player out of the room (Remove): they're
 // kept out of it from then on, unless the host brings them back (Return: a slip undone); ask a player for another
 // name (AskName: theirs in the room goes back to a drawn one, and no name taken away is taken again while the room
 // is open); and lock it (SetLocked), so that nobody new comes in (once everyone is there), while those in it still
@@ -1737,6 +1738,18 @@ type QuestionView struct {
 	Given json.RawMessage `json:"given,omitempty"`
 	// Reveal is the answer, once it shows, with how the viewer's went.
 	Reveal *RevealView `json:"reveal,omitempty"`
+	// Split is how the room answered it, once the answer shows (Room.split): the same for everyone in the room.
+	Split *Split `json:"split,omitempty"`
+}
+
+// Split is how the room itself answered the question whose answer shows: its crowd, as the bank counts one
+// (bank.CrowdOf: how many had the question, the share right, a choice's picks in the order shown, where a number's
+// guesses fell), over those in the room for it (who answered, and who was there and didn't); and who got it right,
+// the quickest first, by their keys (PlayerView.Key). So that the room sees what it said („половината казаха
+// Китай“) and who knew it. Nothing kept: it's counted from the answers the room holds.
+type Split struct {
+	Crowd *bank.CrowdView `json:"crowd,omitempty"`
+	Right []int           `json:"right"`
 }
 
 type RevealView struct {
@@ -1825,6 +1838,7 @@ func (r *Room) View(viewer int64) View {
 			q.Reveal = &RevealView{Answer: d.Reveal(r.hub.crowd(d.Question()))}
 		}
 		if r.phase == Reveal {
+			q.Split = r.split(d, now)
 			q.LeftMs = 0
 			if !r.held {
 				q.NextMs = max(1, (Pause - time.Since(r.revealedAt)).Milliseconds())
@@ -1839,6 +1853,38 @@ func (r *Room) View(viewer int64) View {
 		}
 	}
 	return v
+}
+
+// split is how the room answered the question showing, dealt as d (Split). Called with the lock held.
+func (r *Room) split(d bank.Dealt, now time.Time) *Split {
+	type right struct {
+		key int
+		ms  int64
+	}
+	var tallies []bank.Tally
+	var rights []right
+	for _, m := range r.players {
+		i := slices.IndexFunc(m.log, func(l loggedAnswer) bool { return l.n == r.n && l.given != nil })
+		if i < 0 {
+			if m.there(now) {
+				tallies = append(tallies, bank.Tally{N: 1}) // there, and let the time run out
+			}
+			continue
+		}
+		l := m.log[i]
+		t := bank.Tally{Given: l.given, N: 1}
+		if l.right {
+			t.Right = 1
+			rights = append(rights, right{m.key, l.ms})
+		}
+		tallies = append(tallies, t)
+	}
+	slices.SortStableFunc(rights, func(a, b right) int { return cmp.Compare(a.ms, b.ms) })
+	s := &Split{Crowd: bank.CrowdOf(d.Question(), tallies).In(d), Right: make([]int, 0, len(rights))}
+	for _, x := range rights {
+		s.Right = append(s.Right, x.key)
+	}
+	return s
 }
 
 // review is the game's questions with how m answered each. The answer log holds one entry per question from the one

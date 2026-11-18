@@ -82,12 +82,16 @@ export function crowdLine(type: View["type"], c: Crowd | undefined, right: boole
 /** The shares on each answer, where the question has had enough answers to say: each in its place beside the answer
  * now, unseen, so that the answers settle into their place with them (with the right one marked: run.ts, settle) and
  * none grows when they show; and shown by the function returned, a bar behind each answer filling in as long as the
- * share that gave it. */
-function crowdOnAll(buttons: HTMLElement[], picks: number[] | undefined): () => void {
+ * share that gave it. A crowd few enough to count (a room's) says how many gave each answer, not what share. */
+function crowdOnAll(buttons: HTMLElement[], c: Crowd | undefined): () => void {
   const shares = buttons.flatMap((b, i) => {
-    const x = picks?.[i];
-    if (x === undefined) return [];
-    const share = h("span", { class: "value crowd-share unseen" }, percent(x));
+    const x = c?.picks?.[i];
+    if (!c || x === undefined) return [];
+    const share = h(
+      "span",
+      { class: "value crowd-share unseen" },
+      c.counts ? String(Math.round(x * c.answers)) : percent(x),
+    );
     b.append(share);
     return [{ b, share, x }];
   });
@@ -103,28 +107,31 @@ function crowdOnAll(buttons: HTMLElement[], picks: number[] | undefined): () => 
 /** Draws a question's answering part; submit sends an answer once, and locked stops input. With the answer it shows
  * how everyone else has answered each option (once the question has had enough answers to say); the sentence that
  * sums it up goes under the verdict (crowdLine). `say` tells a screen reader what changes as the question runs (a
- * clue come out), in the game's live region; without it, the question keeps one of its own. */
+ * clue come out), in the game's live region; without it, the question keeps one of its own. `display`: drawn to be
+ * looked at, never answered here (a big screen's, a review's): no keys, no line on how to answer, no „Готово“, no
+ * grips; the clues still come out as their time comes. */
 export function ask(
   view: View,
   submit: (a: Answer) => void,
   locked: Signal<boolean>,
   say?: (s: string) => void,
+  display = false,
 ): Asked {
   switch (view.type) {
     case "choice":
-      return choice(view, submit, locked);
+      return choice(view, submit, locked, display);
     case "number":
       return number(view, submit, locked);
     case "order":
-      return order(view, submit, locked);
+      return order(view, submit, locked, display);
     case "truefalse":
-      return truefalse(view, submit, locked);
+      return truefalse(view, submit, locked, display);
     case "match":
-      return match(view, submit, locked);
+      return match(view, submit, locked, display);
     case "split":
-      return split(view, submit, locked);
+      return split(view, submit, locked, display);
     case "clues":
-      return clues(view, submit, locked, say);
+      return clues(view, submit, locked, say, display);
   }
 }
 
@@ -132,7 +139,7 @@ export function ask(
  * answer). „Вярно“ and „Невярно“ carry no ✓ while asked; here the right one says it is, for whoever can't tell
  * colours. */
 export function answered(view: View, reveal: Reveal, given: Answer | null): Child {
-  const a = ask(view, () => {}, signal(true));
+  const a = ask(view, () => {}, signal(true), undefined, true);
   a.reveal(reveal, given);
   if (a.node instanceof Element)
     a.node.querySelector(".option.tf.right")?.append(h("small", { class: "tf-right" }, "верният отговор"));
@@ -227,9 +234,13 @@ export function picturesIn(view: View, ms: number): Promise<void> {
   });
 }
 
-/** What marks each answer: on a computer the key that gives it (1–4, the same on every keyboard layout, Latin or
- * Cyrillic), on a touch screen a letter. */
-const letters = matchMedia("(hover: hover) and (pointer: fine)").matches ? ["1", "2", "3", "4"] : ["А", "Б", "В", "Г"];
+/** What marks each answer, on every screen: a letter, so that a room's big screen and its phones (and whoever leads
+ * it, saying „Б“) name the same answer. */
+const letters = ["А", "Б", "В", "Г"];
+
+/** The key that gives an answer, beside it while it's asked (shown on a computer only: app.css): 1–4, the same on
+ * every keyboard layout, Latin or Cyrillic. */
+const keyHint = (key: string) => h("kbd", { class: "key-hint", "aria-hidden": "true" }, key);
 
 /** Keys 1–4 press the answer they mark, while the question waits for one (never in a field, never with a modifier). */
 function answerKeys(buttons: HTMLElement[], locked: Signal<boolean>): void {
@@ -242,7 +253,7 @@ function answerKeys(buttons: HTMLElement[], locked: Signal<boolean>): void {
 /** The ✓ or ✕ on a revealed answer (its colour and words say the same). */
 const sign = () => h("span", { class: "sign", "aria-hidden": "true" });
 
-function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
+function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<boolean>, display: boolean): Asked {
   const pictures = view.pictures;
   const names = pictures?.map(() => h("span", { class: "pic-name" })) ?? [];
   const buttons = (pictures ?? view.choices ?? []).map((option, i) =>
@@ -261,7 +272,11 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
         },
       },
       typeof option === "string"
-        ? [h("span", { class: "letter", "aria-hidden": "true" }, letters[i]), h("span", null, option)]
+        ? [
+            h("span", { class: "letter", "aria-hidden": "true" }, letters[i]),
+            h("span", null, option),
+            display ? null : keyHint(String(i + 1)),
+          ]
         : [
             h("img", {
               class: "pic-option-img",
@@ -278,11 +293,12 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
               { class: "pic-foot" },
               h("span", { class: "letter pic-letter", "aria-hidden": "true" }, letters[i]),
               names[i],
+              display ? null : keyHint(String(i + 1)),
             ),
           ],
     ),
   );
-  answerKeys(buttons, locked);
+  if (!display) answerKeys(buttons, locked);
   const credits = h("p", { class: "credit pic-credits", hidden: true });
   return {
     node: h("div", null, h("div", { class: pictures ? "options pic-options" : "options" }, buttons), credits),
@@ -307,7 +323,7 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
         buttons.forEach((b, i) => {
           if (b !== own) mark(b, i);
         });
-        crowd = crowdOnAll(buttons, reveal.crowd?.picks);
+        crowd = crowdOnAll(buttons, reveal.crowd);
         if (reveal.credits?.length) {
           credits.hidden = false;
           credits.replaceChildren(
@@ -517,7 +533,7 @@ const STILL = 8;
  * there (a screen reader's way too); or it's dragged into place: with a mouse from anywhere on it, with a finger by its
  * grip at once or from anywhere else once held a moment (a finger that moves at once scrolls the page, as it expects);
  * or moved with the arrow keys. */
-function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
+function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<boolean>, display: boolean): Asked {
   const how = `order-how-${++orders}`;
   const n = view.items.length;
   const arrangement = view.items.map((_, i) => i); // the item at each place
@@ -539,7 +555,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
       },
       h("span", { class: "letter", "aria-hidden": "true" }),
       h("span", null, text),
-      h("span", { class: "grip", "aria-hidden": "true" }),
+      display ? null : h("span", { class: "grip", "aria-hidden": "true" }),
     ),
   );
   const list = h("ol", { class: "options sortable-list" });
@@ -706,20 +722,23 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
     },
     "Готово",
   );
-  const hint = h(
-    "p",
-    { class: "hint", id: how },
-    "Докосни едно, после мястото му, или го плъзни.",
-    h("span", { class: "sr" }, " Стрелките нагоре и надолу също го местят."),
-  );
+  const hint = display
+    ? h("p", { class: "hint", id: how, hidden: true })
+    : h(
+        "p",
+        { class: "hint", id: how },
+        "Докосни едно, после мястото му, или го плъзни.",
+        h("span", { class: "sr" }, " Стрелките нагоре и надолу също го местят."),
+      );
   return {
-    node: h("div", { class: "stack" }, hint, list, said, done),
+    node: h("div", { class: "stack" }, hint, list, said, display ? null : done),
     pending: () => (moved ? { order: [...arrangement] } : null),
     // The right order, as the answer; on each thing, whether the player had it in its place, and if not, where.
     // Nothing put in order (the time ran out first): the right order alone.
     reveal(reveal, given) {
       // The line over the list stays, saying what it shows now, so the answers don't move under the player's eye.
       hint.replaceChildren("Правилният ред:");
+      hint.hidden = false;
       done.hidden = true;
       const mine = given && "order" in given ? given.order : null;
       const unit = reveal.unit ? ` ${reveal.unit}` : "";
@@ -747,7 +766,12 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
 }
 
 /** „Вярно или невярно“: two answers, side by side (keys 1 and 2 too). */
-function truefalse(_view: TrueFalseView, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
+function truefalse(
+  _view: TrueFalseView,
+  submit: (a: Answer) => void,
+  locked: Signal<boolean>,
+  display: boolean,
+): Asked {
   const pick = (truth: boolean) => {
     if (locked.peek()) return;
     (truth ? yes : no).classList.add("picked");
@@ -764,15 +788,16 @@ function truefalse(_view: TrueFalseView, submit: (a: Answer) => void, locked: Si
         onclick: () => pick(truth),
       },
       h("span", null, truth ? "Вярно" : "Невярно"),
-      h("kbd", { class: "key-hint", "aria-hidden": "true" }, truth ? "1" : "2"),
+      display ? null : keyHint(truth ? "1" : "2"),
     );
   const yes = button(true);
   const no = button(false);
-  listen(document, "keydown", (e: KeyboardEvent) => {
-    if (locked.peek() || e.metaKey || e.ctrlKey || e.target instanceof HTMLTextAreaElement) return;
-    if (e.key === "1") pick(true);
-    else if (e.key === "2") pick(false);
-  });
+  if (!display)
+    listen(document, "keydown", (e: KeyboardEvent) => {
+      if (locked.peek() || e.metaKey || e.ctrlKey || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === "1") pick(true);
+      else if (e.key === "2") pick(false);
+    });
   return {
     node: h("div", { class: "tf-options" }, yes, no),
     pending: () => null,
@@ -788,7 +813,7 @@ function truefalse(_view: TrueFalseView, submit: (a: Answer) => void, locked: Si
       at(beats.right, () => {
         if (mine !== true) mark(yes, true);
         if (mine !== false) mark(no, false);
-        crowd = crowdOnAll([yes, no], reveal.crowd?.picks);
+        crowd = crowdOnAll([yes, no], reveal.crowd);
       });
       at(beats.crowd, () => crowd());
     },
@@ -800,7 +825,7 @@ const pairTones = ["tone-gold", "tone-sky", "tone-rose", "tone-lilac"];
 
 /** „Свържи“: tap a thing on the left, then its pair on the right (or the other way round); a line joins them. A
  * joined one tapped again comes apart. */
-function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
+function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<boolean>, display: boolean): Asked {
   const pairs = signal<number[]>(view.left.map(() => -1)); // for each left, its right (-1: none yet)
   const chosen = signal<{ side: "left" | "right"; i: number } | null>(null);
   const said = h("p", { class: "sr", "aria-live": "polite" });
@@ -916,17 +941,18 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
   const spare = view.right.length > view.left.length;
   const hint = h(
     "p",
-    { class: "hint" },
+    { class: "hint", hidden: display },
     "Докосни нещо отляво, после двойката му отдясно.",
     spare ? " Едно отдясно е без двойка." : null,
   );
   const result = h("ol", { class: "options match-result", hidden: true });
   const decoy = h("p", { class: "hint match-decoy", hidden: true });
   return {
-    node: h("div", { class: "stack" }, hint, grid, said, done, result, decoy),
+    node: h("div", { class: "stack" }, hint, grid, said, display ? null : done, result, decoy),
     pending: () => (pairs.peek().some((j) => j !== -1) ? { pairs: [...pairs.peek()] } : null),
     reveal(reveal, given) {
       hint.replaceChildren("Правилните двойки:");
+      hint.hidden = false;
       grid.hidden = true;
       done.hidden = true;
       result.hidden = false;
@@ -965,7 +991,7 @@ const flingAt = 72;
 
 /** „Раздели“: the things one by one on a card, each sent to its group by a swipe left or right, a tap on the group, or
  * the arrow keys. The last one sent sends the answer; until then the last one can be taken back. */
-function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
+function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<boolean>, display: boolean): Asked {
   const n = view.items.length;
   const sides = signal<number[]>([]); // the groups the items were sent to, in order
   const said = h("p", { class: "sr", "aria-live": "polite" });
@@ -1066,14 +1092,15 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
       card.addEventListener("pointercancel", drop);
     });
   };
-  listen(document, "keydown", (e: KeyboardEvent) => {
-    if (locked.peek() || e.metaKey || e.ctrlKey || e.target instanceof HTMLTextAreaElement) return;
-    if (e.key === "ArrowLeft") send(0);
-    else if (e.key === "ArrowRight") send(1);
-    else if (e.key === "Backspace") back();
-    else return;
-    e.preventDefault();
-  });
+  if (!display)
+    listen(document, "keydown", (e: KeyboardEvent) => {
+      if (locked.peek() || e.metaKey || e.ctrlKey || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === "ArrowLeft") send(0);
+      else if (e.key === "ArrowRight") send(1);
+      else if (e.key === "Backspace") back();
+      else return;
+      e.preventDefault();
+    });
   lay();
   const hint = h(
     "p",
@@ -1082,15 +1109,37 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
     h("span", { class: "sr" }, " или натисни групата му отдолу"),
     ".",
   );
-  const board = h(
-    "div",
-    { class: "split" },
-    hint,
-    deck,
-    h("div", { class: "split-sides" }, sideButton(0), sideButton(1)),
-    h("div", { class: "split-foot" }, pips, undo),
-    said,
-  );
+  // Looked at, not answered: the two groups and every thing to put in them, all at once.
+  const board = display
+    ? h(
+        "div",
+        { class: "split split-shown" },
+        h(
+          "div",
+          { class: "split-sides", "aria-hidden": "true" },
+          view.groups.map((g, side) =>
+            h(
+              "span",
+              { class: `option split-side ${side === 0 ? "to-left" : "to-right"}` },
+              h("span", { class: "split-label" }, hyphenate(g)),
+            ),
+          ),
+        ),
+        h(
+          "ul",
+          { class: "options split-items", "aria-label": `${view.groups[0]} или ${view.groups[1]}?` },
+          view.items.map((text) => h("li", { class: "option" }, hyphenate(text))),
+        ),
+      )
+    : h(
+        "div",
+        { class: "split" },
+        hint,
+        deck,
+        h("div", { class: "split-sides" }, sideButton(0), sideButton(1)),
+        h("div", { class: "split-foot" }, pips, undo),
+        said,
+      );
   const result = h("ol", { class: "options split-result", hidden: true });
   return {
     node: h("div", null, board, result),
@@ -1136,6 +1185,7 @@ function clues(
   submit: (a: Answer) => void,
   locked: Signal<boolean>,
   say?: (s: string) => void,
+  display = false,
 ): Asked {
   let now = view;
   // A clue come out is said once (the list itself only counts down, and says nothing every second).
@@ -1166,8 +1216,10 @@ function clues(
     });
   };
   paint();
+  // Shown only (a big screen), the clues still come: it's never locked out of them by an answer of its own.
+  const open = () => display || !locked.peek();
   const tick = setInterval(() => {
-    if (!locked.peek()) paint();
+    if (open()) paint();
   }, 1000);
   onCleanup(() => clearInterval(tick));
   const buttons = view.choices.map((text, i) =>
@@ -1186,14 +1238,15 @@ function clues(
       },
       h("span", { class: "letter", "aria-hidden": "true" }, letters[i]),
       h("span", null, text),
+      display ? null : keyHint(String(i + 1)),
     ),
   );
-  answerKeys(buttons, locked);
+  if (!display) answerKeys(buttons, locked);
   return {
     node: h("div", { class: "stack" }, list, said, h("div", { class: "options" }, buttons)),
     pending: () => null,
     update(next) {
-      if (next.type !== "clues" || next.clues.length <= now.clues.length || locked.peek()) return;
+      if (next.type !== "clues" || next.clues.length <= now.clues.length || !open()) return;
       now = next;
       paint();
       play("key");
@@ -1217,7 +1270,7 @@ function clues(
         buttons.forEach((b, i) => {
           if (b !== own) mark(b, i);
         });
-        crowd = crowdOnAll(buttons, reveal.crowd?.picks);
+        crowd = crowdOnAll(buttons, reveal.crowd);
       });
       at(beats.crowd, () => crowd());
     },

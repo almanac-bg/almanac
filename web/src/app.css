@@ -72,7 +72,7 @@
 }
 
 @layer app {
-  /* ---- Tokens: Night (the first theme), then Day for light systems. ---- */
+  /* ---- Tokens: Night (the first look), then Day: for a light system, or chosen (data-scheme: prefs.ts). ---- */
 
   :root {
     color-scheme: dark light;
@@ -178,7 +178,7 @@
   }
 
   @media (prefers-color-scheme: light) {
-    :root {
+    :root:not([data-scheme="night"]) {
       --bg: #f5f3fa;
       --surface: #ffffff;
       --raised: #ffffff;
@@ -218,6 +218,57 @@
       --glow-gold: 0 1px 0 #b7860b, 0 8px 22px -8px #f59e0bb3;
       --glow-right: 0 0 0 1px #3ddc97, 0 8px 22px -10px #0a7a4a80;
     }
+  }
+
+  /* Night or Day chosen (Настройки, a big screen: prefs.ts, scheme) whatever the device says: the browser's own parts
+     (scrollbars, fields) go with it, and Day's tokens, the same as above (scheme.test.ts holds them equal). */
+  :root[data-scheme="night"] {
+    color-scheme: dark;
+  }
+
+  :root[data-scheme="day"] {
+    color-scheme: light;
+  }
+
+  :root[data-scheme="day"] {
+    --bg: #f5f3fa;
+    --surface: #ffffff;
+    --raised: #ffffff;
+    --sunken: #ebe7f4;
+    --hero: #fffbf2;
+    --line: #dfd9ec;
+    --edge: #c4bcd9;
+    --line-strong: #8a82a6;
+    --text: #140f26;
+    --text-muted: #5d5677;
+    --accent: #5b3fd1;
+    --on-accent: #ffffff;
+    --gold-ink: #8a5800;
+    --gold-display: #b77400;
+    --flame: #f59e0b;
+    --right-ink: #086b3f;
+    --wrong-ink: #bf3018;
+    --sky-ink: #1f63a8;
+    --rose-ink: #b12a72;
+    --div-bronze: #b8743d;
+    --div-silver: #9aa4b6;
+    --div-platinum: #3fb5a0;
+    --div-diamond: #3c9be0;
+    --div-legend: #8b5cf6;
+    --lg-0: #2f9a4a;
+    --lg-1: #13917c;
+    --lg-2: #2d7fd0;
+    --lg-3: #5b4fd6;
+    --lg-4: #7d5ad8;
+    --lg-5: #2f8fc4;
+    --tier-common: #9aa6ba;
+    --tier-common-ink: #5d5677;
+    --locked: #cdc7dc;
+    --tier-epic-ink: #6a35d6;
+    --elev-1: 0 1px 2px #140f2614, 0 2px 8px #140f260d;
+    --elev-2: 0 2px 6px #140f2612, 0 18px 40px -16px #140f2638;
+    --glow-gold: 0 1px 0 #b7860b, 0 8px 22px -8px #f59e0bb3;
+    --glow-right: 0 0 0 1px #3ddc97, 0 8px 22px -10px #0a7a4a80;
   }
 
   /* ---- Base ---- */
@@ -2883,6 +2934,21 @@
     font-weight: 600;
   }
 
+  /* Who in a room knew it (screens/room.ts): the room's own word, under the verdict, over everyone's. */
+  .room-knew {
+    margin: 0;
+    font-weight: 700;
+    line-height: 1.375rem;
+  }
+
+  .verdict + .room-knew {
+    margin-top: calc(-1 * var(--space-2));
+  }
+
+  .room-knew + .crowd-says {
+    margin-top: calc(-1 * var(--space-3));
+  }
+
   /* Where everyone's guesses at a number fell. */
   .spread {
     display: grid;
@@ -4892,14 +4958,24 @@
   /* Day: on a white card the light inks and the tinted disc wash out (a flask, the streak's flame, a common medal),
      so they take more of the tone. */
   @media (prefers-color-scheme: light) {
-    .pic {
+    :where(:root:not([data-scheme="night"])) .pic {
       --k4: color-mix(in srgb, var(--tone, var(--gold)) 72%, #fff);
       --k5: color-mix(in srgb, var(--tone, var(--gold)) 32%, #fff);
     }
 
-    .kt {
+    :where(:root:not([data-scheme="night"])) .kt {
       opacity: 0.26;
     }
+  }
+
+  /* The same, chosen whatever the device says (prefs.ts: scheme; scheme.test.ts holds the two equal). */
+  :where(:root[data-scheme="day"]) .pic {
+    --k4: color-mix(in srgb, var(--tone, var(--gold)) 72%, #fff);
+    --k5: color-mix(in srgb, var(--tone, var(--gold)) 32%, #fff);
+  }
+
+  :where(:root[data-scheme="day"]) .kt {
+    opacity: 0.26;
   }
 
   /* A picture fills its box unless its own class sizes it (no weight here, so that one always wins). */
@@ -7696,6 +7772,16 @@
       background: color-mix(in srgb, var(--on-fill) 12%, transparent);
       box-shadow: none;
       color: inherit;
+    }
+
+    /* An answer's key at its far end, beside the letter all screens mark it with; gone once the answer shows. */
+    .option:not(.tf) > .key-hint,
+    .pic-option .pic-foot > .key-hint {
+      margin-left: auto;
+    }
+
+    .option:is(.right, .wrong, .dim) .key-hint {
+      display: none;
     }
 
     .up-next-label {

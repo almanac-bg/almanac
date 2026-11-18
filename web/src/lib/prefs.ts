@@ -1,6 +1,7 @@
-// What the player has set for this device: less motion, the text's size, whether the clock ticks, Роял's music, and (in
-// the app) the phone's touch. Kept in the browser (like the sounds' switch), and put on the page: less motion as a
-// class on <html>, which the CSS reads, the text's size as <html>'s own (everything is sized from it, in rem).
+// What the player has set for this device: Night or Day, less motion, the text's size, whether the clock ticks, Роял's
+// music, and (in the app) the phone's touch. Kept in the browser (like the sounds' switch), and put on the page: Night
+// or Day as `data-scheme` and less motion as a class on <html>, which the CSS reads, the text's size as <html>'s own
+// (everything is sized from it, in rem).
 
 import { signal } from "./dom.ts";
 
@@ -90,12 +91,53 @@ export function setVibrate(on: boolean): void {
   keep("almanac.vibrate", on);
 }
 
+/** How the game looks on this device: as the device is set (Night or Day by its own setting), or Night or Day
+ * whatever it's set to (a big screen in a lit room reads better by Day). On the page as `data-scheme` on <html>
+ * (app.css); none for the device's. */
+export type Scheme = "device" | "night" | "day";
+
+/** In the app, the game looks as the phone does: the phone's bar over it (its clock, its battery) follows the phone's
+ * own setting, and on the other look it would be dark on dark or light on light. */
+const native = !!(globalThis as { Capacitor?: { isNativePlatform(): boolean } }).Capacitor?.isNativePlatform();
+
+function readScheme(): Scheme {
+  if (native) return "device";
+  try {
+    const v = localStorage.getItem("almanac.scheme");
+    return v === "night" || v === "day" ? v : "device";
+  } catch {
+    return "device";
+  }
+}
+
+export const scheme = signal<Scheme>(readScheme());
+
+/** The browser's own bar (a phone's, over the page), in the page's colour: --bg's, by Night and by Day. */
+const barColour = { night: "#110c20", day: "#f5f3fa" };
+
 function apply(): void {
   const root = document.documentElement;
   root.classList.toggle("calm", calm.peek());
+  const chosen = scheme.peek();
+  if (chosen === "device") root.removeAttribute("data-scheme");
+  else root.dataset.scheme = chosen;
+  for (const m of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+    m.content = chosen === "device" ? barColour[m.media.includes("light") ? "day" : "night"] : barColour[chosen];
+  }
   const scale = rootScale(textSize.peek(), systemText);
   root.style.fontSize = scale === 1 ? "" : `${Math.round(scale * 1000) / 10}%`;
   measure();
+}
+
+export function setScheme(v: Scheme): void {
+  scheme.set(v);
+  try {
+    if (v === "device") localStorage.removeItem("almanac.scheme");
+    else localStorage.setItem("almanac.scheme", v);
+  } catch {
+    // Not kept: the choice holds for this visit.
+  }
+  apply();
 }
 
 /** How wide the page's column is in the text's own size (em): with large text on a phone, few words to a line. Under
