@@ -15,6 +15,11 @@ test("a broken streak is won back: the missed issue and today's", async ({ page 
   await expect(card).toContainText(`Изиграй пропуснатия брой от ${date} и днешния, и серията се връща.`);
   // At stake, not gone: the chip has the streak's days to win back, not „0 дни поред“.
   await expect(page.locator(".streak-chip")).toContainText("3дни за връщане");
+  // Профил says the same: the streak at stake, not „0 дни“ and a new one to begin.
+  await page.goto("/me");
+  await expect(page.locator(".streak")).toContainText("3дни за връщане");
+  await expect(page.locator(".streak")).toContainText(`Изиграй пропуснатия брой от ${date} и днешния`);
+  await page.goto("/");
   await startDay(page);
   await playRun(page);
   // The day played: the missed issue left, and the card, under the result, has the gold way to it (the result's
@@ -28,6 +33,11 @@ test("a broken streak is won back: the missed issue and today's", async ({ page 
   await expect(page).toHaveURL(new RegExp(`/issues/${missed.issue}$`));
   await page.getByRole("button", { name: "Започни сега" }).click();
   await playRun(page);
+  // The moment the repair was for: the result's sheet, and its line says the issue brought the streak back (not that
+  // a past issue is outside it).
+  const back = page.getByRole("dialog", { name: "4 дни поред с въпросите на деня." });
+  await expect(back).toContainText("Серията ти е върната");
+  await expect(page.locator(".past-line")).toHaveText("С този брой серията ти се върна: 4 дни.");
   await expect(page.locator(".news-open")).toContainText("Серията ти е върната: 4 дни.");
   // Back on Начало: the streak goes on, and nothing more is said of it.
   await page.goto("/");

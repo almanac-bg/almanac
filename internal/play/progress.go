@@ -615,7 +615,8 @@ type News struct {
 	From         int        `json:"from"`
 	To           int        `json:"to"`
 	LevelUp      bool       `json:"levelUp,omitempty"`
-	// Earned is the XP all this brings: the game just played, and the goals, achievements and week told with it.
+	// Earned is the XP the game just played brings: its own, and the goals and achievements told with it. A week of
+	// the league ended tells its pay in its own card (LeagueEnd.XP): it was the player's before the game.
 	Earned int `json:"earned"`
 	// Division is a division the player's rating has reached for the first time; with Placed, the one it's in as its
 	// first MinRatedGames games have just set it (rating.go): none is told before.
@@ -721,6 +722,7 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 	have := w.unlocks()
 	n.XP = total
 	n.Level, n.From, n.To = LevelOf(total)
+	runXP := n.Earned // the game's own, before its goals and achievements
 	b := g.Bank()
 	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var avatar sql.NullString
@@ -823,15 +825,6 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 		for _, d := range n.Goals {
 			n.Earned += d.XP
 		}
-		// Every week not told yet pays (one is told: the latest), once the league is open.
-		var weeks int
-		if err := tx.QueryRow(`SELECT coalesce(sum(xp), 0) FROM league_results WHERE user_id = ? AND NOT seen`, userID).
-			Scan(&weeks); err != nil {
-			return err
-		}
-		if open.League {
-			n.Earned += weeks
-		}
 		// While the rating is being set, no division is told, and the peak seen is kept at -1: the first news after
 		// it's set tells the division it's in, and the peak from then on.
 		if Placed(rated) && open.Rating {
@@ -842,13 +835,26 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 				n.Division = &d
 			}
 		}
-		// A level is told once XP is: one reached before waits for it.
+		// A level is told once XP is: one reached before waits for it. Else it's new only if what this news tells
+		// took the player to it (the games told with it, their goals and achievements): one reached by what was
+		// never told as news (a week's pay) was on their level already, and isn't said to be new after a game that
+		// didn't reach it.
 		level := 0
 		if open.XP {
 			level = n.Level
 		}
-		n.LevelUp = seen < level
 		n.Opened = opened(open, systems)
+		if seen < level && !slices.Contains(n.Opened, "xp") {
+			var games int
+			if err := tx.QueryRow(`SELECT coalesce(sum(xp), 0) FROM runs WHERE user_id = ?1 AND NOT told
+				AND finished_at IS NOT NULL AND (?2 = 0 OR finished_at <= ?2)`, userID, finished).Scan(&games); err != nil {
+				return err
+			}
+			if before, _, _ := LevelOf(total - games - (n.Earned - runXP)); before >= level {
+				seen = level
+			}
+		}
+		n.LevelUp = seen < level
 		// Others' duels against the player's recordings take a card the rest leaves free: they wait for one.
 		if n.cards() < NewsCards {
 			if n.Recordings, err = g.recordingsNews(tx, userID); err != nil {

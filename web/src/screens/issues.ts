@@ -1,7 +1,8 @@
 // Минали броеве (play/past.go): every past day's ten, newest first, each played once by whoever didn't finish them on
 // their day (/issues), and one of them (/issues/<n>) played as the day's players played it, then told against them
 // („По-добре от 64% от играчите на този брой“). A past issue is outside the streak, the league and the day's goals,
-// and says so. It's also how a broken streak is won back: the missed issue and today's (screens/today.ts, repairCard).
+// and says so. It's also how a broken streak is won back: the missed issue and today's (screens/today.ts, repairCard),
+// whose result says that instead (streakLine).
 // Opened from Начало's tile, from „Още десет“ after the day, from Всички игри and from Моят Алманах's datelines.
 
 import type { State } from "../game/types.ts";
@@ -30,6 +31,28 @@ interface Standing {
 
 /** What every past issue is, said where one is played. */
 export const pastLine = "Минал брой: не влиза в серията и в лигата.";
+
+/** One past issue, as /api/issues/<n> has it: with how the player's game of it went against the day's players, and
+ * what it is to their streak (server/past.go): the day missed by a broken streak on offer to be won back (`repair`, as
+ * Начало has it), or one that won it back (`mended`: the streak's days now). */
+interface IssueOf {
+  issue: Issue;
+  standing?: Standing;
+  repair?: { days: number; day: boolean; missed: { issue: number; done: boolean }[]; words: string };
+  mended?: number;
+}
+
+/** What a past issue's result says of the streak: that it's outside it (pastLine), but for the missed day of a broken
+ * streak (play/repair.go), which brings it back with today's ten (and any other day missed), or brought it back. */
+export function streakLine(k: Pick<IssueOf, "repair" | "mended">): string {
+  if (k.mended) return `С този брой серията ти се върна: ${k.mended} дни.`;
+  const r = k.repair;
+  if (!r) return pastLine;
+  // The issues missed still to play, as the server says them („пропуснатия брой от 17 ноември“), and today's ten.
+  const left = [r.day ? "" : "днешните въпроси", r.words].filter(Boolean);
+  if (!left.length) return `Серията ти от ${r.days} дни се връща.`;
+  return `Този брой връща серията ти от ${r.days} дни заедно с ${left.join(" и ")}.`;
+}
 
 /** From how many of the day's players a share of them is worth saying (as the day's own: game/standing.ts). */
 const shareFrom = 10;
@@ -102,9 +125,13 @@ export function issue(kit: Kit, [n = ""]: string[]) {
   title(name);
   const finished = (s: State, just: boolean): Child => {
     const standing = signal<Standing | null>(null);
+    const streak = signal<Pick<IssueOf, "repair" | "mended"> | null>(null);
     const next = signal<{ run: State | null; past?: { day: string; issue: number } | null } | null>(null);
-    api<{ standing?: Standing }>("GET", `/api/issues/${number}`).then(
-      (r) => standing.set(r.standing ?? null),
+    api<IssueOf>("GET", `/api/issues/${number}`).then(
+      (r) => {
+        standing.set(r.standing ?? null);
+        streak.set(r);
+      },
       () => {},
     );
     api<{ run: State | null; past?: { day: string; issue: number } | null }>("GET", "/api/day").then(
@@ -118,7 +145,10 @@ export function issue(kit: Kit, [n = ""]: string[]) {
         s,
         [
           h("div", { class: "day-line" }, h("span", { class: "kicker" }, `${name} · ${dateWords(s.day ?? "")}`)),
-          h("p", { class: "muted past-line" }, pastLine),
+          () => {
+            const k = streak();
+            return k ? h("p", { class: "muted past-line" }, streakLine(k)) : null;
+          },
           () => against(standing()),
         ],
         {

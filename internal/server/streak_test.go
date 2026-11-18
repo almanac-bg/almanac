@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -51,6 +52,11 @@ func TestStreakEndedOnTheDay(t *testing.T) {
 		missed[0].(map[string]any)["day"] != yesterday || missed[0].(map[string]any)["done"] != false {
 		t.Fatalf("a streak of three, ended yesterday: %v, %v", today["repair"], today["ended"])
 	}
+	// The missed issue's page knows it's the repair's (not „outside the streak“, as other past issues are).
+	missedIssue := fmt.Sprintf("/api/issues/%d", play.Issue(yesterday))
+	if _, one := ana.call("GET", missedIssue, nil); one["repair"] == nil || one["mended"] != nil {
+		t.Fatalf("the missed issue, its repair on offer: %v", one)
+	}
 	// The day's reminder says how to win it back.
 	if m := g.srv.reminder(t.Context(), g.srv.game.Today(), anaID); m.Body !=
 		"Серията ти от 3 дни прекъсна. Върни я днес: изиграй пропуснатия брой от "+play.DateWords(yesterday)+" и днешния." {
@@ -80,6 +86,13 @@ func TestStreakEndedOnTheDay(t *testing.T) {
 	_, today = ana.call("GET", "/api/day", nil)
 	if today["streak"] != 4.0 || today["repair"] != nil || today["ended"] != nil || today["kept"] != nil {
 		t.Fatalf("won back: streak %v, repair %v, ended %v, kept %v", today["streak"], today["repair"], today["ended"], today["kept"])
+	}
+	if _, one := ana.call("GET", missedIssue, nil); one["repair"] != nil || one["mended"] != 4.0 {
+		t.Fatalf("the missed issue, the streak won back: %v", one)
+	}
+	if _, other := ana.call("GET", fmt.Sprintf("/api/issues/%d", play.Issue(yesterday)-1), nil); other["mended"] != nil ||
+		other["repair"] != nil {
+		t.Fatalf("another issue: %v", other)
 	}
 
 	bo, boID := g.guest()

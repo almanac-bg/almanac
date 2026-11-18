@@ -937,6 +937,43 @@ func TestTwo(t *testing.T) {
 	}
 }
 
+// What shows with an answer is how this game's players answered it, all of them, never everyone's ever: two in it,
+// one right, one wrong, and the wrong one's pick has them.
+func TestCrowdIsTheGames(t *testing.T) {
+	w := setup(t)
+	ana, bo := w.player(), w.player()
+	w.start(ana, bo)
+	wrong := w.answer(bo, false)
+	w.give(ana, true)
+	if err := w.h.Answer(t.Context(), bo.ID, 0, wrong); err != nil {
+		t.Fatal(err)
+	}
+	v := w.view(bo.ID)
+	if v.Phase != play.RoyalReveal || v.Question == nil || v.Question.Reveal == nil {
+		t.Fatalf("the answer isn't showing: %+v", v)
+	}
+	raw, _ := json.Marshal(v.Question.Reveal.Answer)
+	var shown struct {
+		Crowd *bank.CrowdView `json:"crowd"`
+	}
+	_ = json.Unmarshal(raw, &shown)
+	var given struct {
+		Pick  *int  `json:"pick"`
+		Truth *bool `json:"truth"`
+	}
+	_ = json.Unmarshal(wrong, &given)
+	at := 0
+	switch {
+	case given.Pick != nil:
+		at = *given.Pick
+	case given.Truth != nil && !*given.Truth:
+		at = 1
+	}
+	if c := shown.Crowd; c == nil || c.Answers != 2 || c.Right != 0.5 || len(c.Picks) <= at || c.Picks[at] != 0.5 {
+		t.Fatalf("the game's crowd: %s", raw)
+	}
+}
+
 // Near: from lead before the lobby opens until the evening's games are over.
 func TestNear(t *testing.T) {
 	w := setup(t)

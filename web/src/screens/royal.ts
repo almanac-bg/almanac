@@ -1065,13 +1065,16 @@ function reveal(view: () => Evening, first: Evening): Child {
   const kind: VerdictKind = m?.missed ? "time" : m?.exact ? "exact" : m?.right ? "right" : "wrong";
   // The right answers in a row lift the sound, as in every game.
   if (m) playAnswer(kind, m.inRow ?? (m.right ? 1 : 0));
+  // How the game's own players answered (royal/screens.go: everyone who had the question then), counted: on each
+  // option how many gave it, and under the verdict how many knew it.
+  const crowd = r.answer.crowd && { ...r.answer.crowd, counts: true };
   return h(
     "article",
     { class: "question" },
     head(first),
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view, true),
-    answered(q.view, r.answer, m ? (first.given ?? null) : null),
+    answered(q.view, { ...r.answer, crowd }, m ? (first.given ?? null) : null),
     // No points: Роял counts right answers, and the time of the right ones.
     m
       ? verdict(
@@ -1082,7 +1085,7 @@ function reveal(view: () => Evening, first: Evening): Child {
           m.inRow ?? 0,
         )
       : null,
-    crowdLine(q.view.type, r.answer.crowd, !!m?.right),
+    crowdLine(q.view.type, crowd, !!m?.right),
     cutSaid(first),
     standing(view),
     upNext(first.nextMs ?? 0, first.last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),
