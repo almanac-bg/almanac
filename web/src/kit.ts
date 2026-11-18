@@ -31,8 +31,8 @@ import {
   shareButton,
 } from "./game/results.ts";
 import { guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
-import { count, yearShareText } from "./game/share.ts";
-import { ApiError, api, errorText } from "./lib/api.ts";
+import { count, duelShareText, yearShareText } from "./game/share.ts";
+import { ApiError, api, errorText, tally } from "./lib/api.ts";
 import { inApp } from "./lib/app.ts";
 import { keepAwake } from "./lib/awake.ts";
 import { type Child, computed, effect, h, lifetime, onCleanup, signal, slot, untracked, when } from "./lib/dom.ts";
@@ -151,6 +151,7 @@ export const kit = {
   dayInBulgaria,
   dayAndTime,
   dayWord,
+  duelShareText,
   duelResult,
   effect,
   emblem,
@@ -246,6 +247,7 @@ export const kit = {
   stats,
   staying,
   stream,
+  tally,
   tickOn,
   tiers,
   tierWords,

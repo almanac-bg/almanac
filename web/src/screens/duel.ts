@@ -1,7 +1,8 @@
 // Дуел: two players, the same ten questions. Your division and rating; a live duel with whoever comes (screens/
 // live.ts), or „Предизвикай“: a game sent to friends and anyone, played in their own time (screens/challenge.ts); the
-// challenges that are your turn, those waiting on friends, and how the last duels went. One duel's screen plays the
-// player's turn, or shows how it stands or ended (screens/outcome.ts, loaded on its own: kit.ts).
+// challenges that are your turn, those waiting on friends, the challenges you sent (each a tap from its page: who took
+// it, its link), and how the last duels went. One duel's screen plays the player's turn, or shows how it stands or
+// ended (screens/outcome.ts, loaded on its own: kit.ts).
 
 import { news } from "../game/news.ts";
 import { nextSteps } from "../game/results.ts";
@@ -13,7 +14,7 @@ import { type Child, effect, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { backOut, byTap, go, hold, title } from "../lib/router.ts";
 import { withName } from "../lib/words.ts";
-import { checkWaiting, player, user } from "../state.ts";
+import { checkWaiting, player, topics, user } from "../state.ts";
 import {
   back,
   type Division,
@@ -23,6 +24,7 @@ import {
   type Standing,
   standingCard,
   type Tier,
+  topicMark,
   until,
   who,
 } from "../ui.ts";
@@ -81,6 +83,23 @@ export interface DuelView {
   /** A challenge's: its code, and whether the player sent it (else they take it). */
   challenge?: string;
   sent?: boolean;
+  /** With a win: the player's own link, for the win shared. */
+  invite?: string;
+}
+
+/** One of the player's challenges (play.SentChallenge): its topic, their game's score, who took it and how it went for
+ * the player, and until when it can be taken. */
+interface Sent {
+  code: string;
+  topic?: string;
+  points: number;
+  rights: number;
+  takers: number;
+  won: number;
+  lost: number;
+  drawn: number;
+  expiresAt: number;
+  over?: boolean;
 }
 
 /** One of the player's duels, as its screen shows it. */
@@ -132,10 +151,53 @@ function duelRow(d: DuelView): Child {
   );
 }
 
+/** How the player's challenge went for them, once anyone has played it to the end: „водиш с 2 : 1“. */
+function sentRecord(c: Sent): string {
+  if (!c.won && !c.lost && !c.drawn) return "";
+  const score = `${c.won} : ${c.lost}`;
+  const lead = c.won > c.lost ? `водиш с ${score}` : c.won < c.lost ? `изоставаш с ${score}` : `равни сте ${score}`;
+  return c.drawn ? `${lead} (и ${c.drawn} ${c.drawn === 1 ? "равенство" : "равенства"})` : lead;
+}
+
+/** One of the player's challenges as a row, a tap from its page (who took it, the link to send again): its topic,
+ * how many took it and how it went, and until when it can be taken (or that it can't any more). */
+function sentRow(c: Sent): Child {
+  const name = c.topic ? (topics.find((t) => t.id === c.topic)?.name ?? "") : "Всички теми";
+  const took = c.takers === 0 ? "Още никой" : c.takers === 1 ? "Изигра го 1" : `Изиграха го ${formatNumber(c.takers)}`;
+  // Until when, by its day alone: the hour is on its page.
+  const day = new Intl.DateTimeFormat("bg", { weekday: "long" }).format(new Date(c.expiresAt));
+  return h(
+    "li",
+    null,
+    h(
+      "a",
+      { class: "duel-row sent-row", href: `/c/${c.code}` },
+      h(
+        "span",
+        { class: "who" },
+        topicMark(c.topic ?? ""),
+        h(
+          "span",
+          { class: "who-text" },
+          h("span", { class: "who-name" }, h("span", { class: "who-label" }, name)),
+          h("span", { class: "muted" }, [`${c.rights} от 10`, sentRecord(c)].filter(Boolean).join(" · ")),
+        ),
+      ),
+      h(
+        "span",
+        { class: "duel-row-end" },
+        h("strong", { class: "duel-state" }, took),
+        h("span", { class: "muted" }, c.over ? "Изтече" : `до ${day}`),
+      ),
+    ),
+  );
+}
+
 export function duel() {
   title("Дуел");
-  const data = signal<{ duels: DuelView[]; standing: Standing } | null>(null);
-  if (user.peek()) api<{ duels: DuelView[]; standing: Standing }>("GET", "/api/duels").then(data.set, () => {});
+  const data = signal<{ duels: DuelView[]; standing: Standing; challenges?: Sent[] } | null>(null);
+  if (user.peek())
+    api<{ duels: DuelView[]; standing: Standing; challenges?: Sent[] }>("GET", "/api/duels").then(data.set, () => {});
   return h(
     "section",
     { class: "screen" },
@@ -170,24 +232,38 @@ export function duel() {
     },
     () => {
       const list = data()?.duels ?? [];
+      const sent = data()?.challenges ?? [];
       const turn = list.filter((d) => d.state === "play");
       const waiting = list.filter((d) => d.state === "wait");
-      const done = list.filter((d) => d.endedAt);
+      const open = sent.filter((c) => !c.over);
+      // What's over, the latest first: the duels by when they ended, the challenges by when their time ran out.
+      const done = [
+        ...list.filter((d) => d.endedAt).map((d) => ({ at: d.endedAt ?? 0, row: duelRow(d) })),
+        ...sent.filter((c) => c.over).map((c) => ({ at: c.expiresAt, row: sentRow(c) })),
+      ]
+        .sort((a, b) => b.at - a.at)
+        .slice(0, 20);
       return [
-        turn.length ? section("Твой ред", turn) : null,
-        waiting.length ? section("Ред на другите", waiting) : null,
-        done.length ? section("История", done.slice(0, 20)) : null,
+        turn.length ? section("Твой ред", turn.map(duelRow)) : null,
+        waiting.length ? section("Ред на другите", waiting.map(duelRow)) : null,
+        open.length ? section("Твоите предизвикателства", open.map(sentRow)) : null,
+        done.length
+          ? section(
+              "История",
+              done.map((d) => d.row),
+            )
+          : null,
       ];
     },
   );
 }
 
-function section(heading: string, list: DuelView[]): Child {
+function section(heading: string, rows: Child[]): Child {
   return h(
     "section",
     { class: "stack" },
     h("h2", { class: "section-title" }, heading),
-    h("ul", { class: "duel-list" }, list.map(duelRow)),
+    h("ul", { class: "duel-list" }, rows),
   );
 }
 

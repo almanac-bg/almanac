@@ -37,6 +37,9 @@ import (
 // answered before. Anyone else's moves no rating, and the sender hears of those quietly: one line on Начало for all of
 // them since they last heard (ChallengeNewsOf), and a push at most once a day.
 //
+// The sender finds their challenges again in a list of them (SentOf), with who took each and how it went, for as
+// long as each can be taken and two weeks after (SentFor): a link shared into a chat isn't lost once its news is told.
+//
 // Between two players one of whom has blocked the other (blocks.go), a challenge isn't there: neither can see or take
 // the other's, and those taken before the block are left out of what its sender hears.
 //
@@ -290,9 +293,11 @@ type NamedUser struct {
 // ChallengeView is a challenge as whoever opens its link sees it.
 type ChallengeView struct {
 	Code string `json:"code"`
-	// By is who sent it, and how their game went: right answers of Total, in a topic ("" for all of them).
+	// By is who sent it, and how their game went: its points (the score to beat: a duel is won on points), right
+	// answers of Total, in a topic ("" for all of them).
 	By      NamedUser `json:"by"`
 	Look    *Look     `json:"look,omitempty"`
+	Points  int       `json:"points"`
 	Rights  int       `json:"rights"`
 	Total   int       `json:"total"`
 	Topic   string    `json:"topic,omitempty"`
@@ -330,10 +335,10 @@ func (g *Game) ChallengeOf(ctx context.Context, code string, viewer int64) (Chal
 	var points int
 	var played bool
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT c.id, c.user_id, c.run_id, c.expires_at, u.name, u.tag, `+lookColumns+`,
-			r.rights, json_array_length(r.questions), coalesce(r.category, ''), r.finished_at IS NOT NULL
+			r.rights, json_array_length(r.questions), coalesce(r.category, ''), r.finished_at IS NOT NULL, r.points
 		FROM challenges c JOIN users u ON u.id = c.user_id JOIN runs r ON r.id = c.run_id WHERE c.code = ?`, code).
 		Scan(&v.id, &v.userID, &v.runID, &v.Expires, &v.By.Name, &v.By.Tag, &avatar, &title, &points, &v.Rights, &v.Total,
-			&category, &played)
+			&category, &played, &v.Points)
 	if errors.Is(err, sql.ErrNoRows) {
 		return v, ErrNoChallenge
 	}
@@ -637,4 +642,56 @@ func (g *Game) challengeNews(ctx context.Context, challengeID, takerID int64, ta
 	g.DuelNews(ctx, DuelNews{To: to, Kind: "challenge", From: taker, FromID: takerID, Outcome: mine, DuelID: duelID,
 		Code: code})
 	return nil
+}
+
+// SentFor is how long a player's challenge stays in their list (SentOf) after its time to be taken ran out.
+const SentFor = 14 * 24 * time.Hour
+
+// SentChallenge is one of a player's challenges as their list of them has it: what it was (a topic, or "" for all of
+// them; their game's points and right answers), how many have taken it and how it went for the player against them
+// (won, lost, drawn: of those who played it to the end), and until when it can be taken (Over once that's past).
+type SentChallenge struct {
+	Code    string `json:"code"`
+	Topic   string `json:"topic,omitempty"`
+	Points  int    `json:"points"`
+	Rights  int    `json:"rights"`
+	Takers  int    `json:"takers"`
+	Won     int    `json:"won"`
+	Lost    int    `json:"lost"`
+	Drawn   int    `json:"drawn"`
+	Expires int64  `json:"expiresAt"`
+	Over    bool   `json:"over,omitempty"`
+}
+
+// SentOf are the challenges a player has sent (their game played), the latest sent first: those that can still be
+// taken, and those whose time ran out within SentFor, so that one sent by a link is found again once its news has
+// been told. Not one drawn for a friend (ChallengeFriend): that's a duel between the two, in the list of duels. Takers are counted as the challenge's own page lists them (takers): not those who said no or let it run
+// out, nor anyone the player has blocked or been blocked by.
+func (g *Game) SentOf(ctx context.Context, userID int64) ([]SentChallenge, error) {
+	now := g.Now()
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT c.code, coalesce(r.category, ''), r.points, r.rights, c.expires_at,
+			count(d.id),
+			coalesce(sum(d.outcome IN ('b', 'ghost_lost')), 0),
+			coalesce(sum(d.outcome IN ('a', 'ghost_won')), 0),
+			coalesce(sum(d.outcome IN ('draw', 'ghost_draw')), 0)
+		FROM challenges c JOIN runs r ON r.id = c.run_id
+		LEFT JOIN duels d ON d.challenge_id = c.id AND d.a_run IS NOT NULL
+			AND coalesce(d.outcome, '') NOT IN ('declined', 'expired') AND NOT `+blockedBetween("c.user_id", "d.a_id")+`
+		WHERE c.user_id = ? AND c.for_id IS NULL AND r.finished_at IS NOT NULL AND c.expires_at > ?
+		GROUP BY c.id ORDER BY c.expires_at DESC LIMIT 20`, userID, store.Ms(now.Add(-SentFor)))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []SentChallenge{}
+	for rows.Next() {
+		var s SentChallenge
+		if err := rows.Scan(&s.Code, &s.Topic, &s.Points, &s.Rights, &s.Expires, &s.Takers, &s.Won, &s.Lost,
+			&s.Drawn); err != nil {
+			return nil, err
+		}
+		s.Over = !now.Before(time.UnixMilli(s.Expires))
+		out = append(out, s)
+	}
+	return out, rows.Err()
 }

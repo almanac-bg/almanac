@@ -44,14 +44,17 @@ test("a challenge: made on Дуел, one link, a stranger plays it as a guest, b
   const path = new URL(share?.url ?? "").pathname;
   expect(path).toMatch(/^\/c\/[a-z0-9]{8}$/);
 
-  // Bo, never here before, opens it: who and how they did, and the count only after his tap.
+  // Bo, never here before, opens it: who, the score to beat in points (a duel is won on points) and the right answers,
+  // and the count only after his tap.
   const b = await (await browser.newContext()).newPage();
   await catchShares(b);
   await b.goto(path);
   await expect(b.getByRole("heading", { name: /те предизвиква$/ })).toBeVisible();
-  await expect(b.locator(".lead")).toContainText(/позна \d+ от 10 по „История“/);
+  await expect(b.locator(".challenge-card .kicker")).toHaveText("Предизвикателство · История");
+  await expect(b.locator(".challenge-score")).toHaveText(/^[\d\s]+точк[аи] · \d+ от 10 верни$/);
+  await expect(b.locator(".challenge-card .lead")).toContainText(/^(Надмини [\d\s]+ точк|Изиграй същите)/);
   await expect(b.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
-  await b.getByRole("button", { name: "Започни", exact: true }).click();
+  await b.getByRole("button", { name: "Приеми", exact: true }).click();
   // Ana will see who took it: a name of his own first, then the count.
   await expect(b.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
   await meetAs(b, "Бо");
@@ -92,6 +95,12 @@ test("a challenge: made on Дуел, one link, a stranger plays it as a guest, b
   await a.reload();
   await expect(a.locator(".day")).toBeVisible();
   await expect(line).toHaveCount(0);
+  // Told, it's still found on Дуел, among her challenges: who took it and how it went, a tap from its page.
+  await a.goto("/duel");
+  const mine = a.locator("section", { has: a.getByRole("heading", { name: "Твоите предизвикателства" }) });
+  await expect(mine.locator(".sent-row")).toHaveAttribute("href", path);
+  await expect(mine.locator(".sent-row")).toContainText("Изигра го 1");
+  await expect(mine.locator(".sent-row")).toContainText(/(водиш|изоставаш|равни сте) /);
 });
 
 test("a challenge left half-way, its link opened again from outside, waits for „Продължи“", async ({ browser }) => {
@@ -112,7 +121,7 @@ test("a challenge left half-way, its link opened again from outside, waits for �
   const bo = await browser.newContext();
   const b = await bo.newPage();
   await b.goto(path);
-  await b.getByRole("button", { name: "Започни", exact: true }).click();
+  await b.getByRole("button", { name: "Приеми", exact: true }).click();
   await meetAs(b);
   await b.getByRole("button", { name: "Започни сега" }).click();
   await expect(b.locator(".question-head")).toContainText("1 от 10");

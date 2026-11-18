@@ -15,7 +15,8 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// Duels are two players on the same ten questions; more points wins, the same points the quicker.
+// Duels are two players on the same ten questions; more points wins, the same points the quicker by a second or more
+// (TieBand), and anything closer is a draw.
 //
 // A duel with whoever comes is played live, both on each question at the same moment (internal/live runs it; here
 // it's made, and settled once both runs are done). If nobody comes in time, it's played against a recording of a
@@ -36,6 +37,10 @@ const (
 	// LiveFor is how long a live duel may take before it counts as cut off (the server restarted under it): ten
 	// questions at their longest, with the pauses between, take well under it.
 	LiveFor = 20 * time.Minute
+	// TieBand is how much quicker (ms, over the whole game) one of two with the same points must be to win: less is a
+	// draw. A game's time is taken where the server sees each answer arrive, so a slower line is slower on every one
+	// of them; under a second, it's the line more than the player.
+	TieBand = 1000
 )
 
 var (
@@ -110,6 +115,8 @@ type DuelView struct {
 	// Challenge is, for a challenge's duel, its code (challenges.go); Sent says the player sent it (else they took it).
 	Challenge string `json:"challenge,omitempty"`
 	Sent      bool   `json:"sent,omitempty"`
+	// Invite is, with a win, the player's own link (their invite), for the win shared (set by the server).
+	Invite string `json:"invite,omitempty"`
 
 	// against is the other player (the recorded one's, against a recording), theirRun their run.
 	against, theirRun int64
@@ -714,12 +721,12 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 			}
 			rated = unrated == ""
 		}
-		// More points wins; the same points, the quicker.
+		// More points wins; the same points, the quicker by TieBand or more; else it's a draw.
 		score := 0.5
 		switch {
-		case a.points > b.points || (a.points == b.points && a.ms < b.ms):
+		case a.points > b.points || (a.points == b.points && a.ms <= b.ms-TieBand):
 			score = 1
-		case a.points < b.points || (a.points == b.points && a.ms > b.ms):
+		case a.points < b.points || (a.points == b.points && a.ms >= b.ms+TieBand):
 			score = 0
 		}
 		outcomeOf := func(s float64) string {

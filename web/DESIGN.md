@@ -351,16 +351,30 @@ takes a token.
   „Тепърва ще играе“, until they have; under a person met in a live duel, not a friend yet, „Добави в приятели“,
   `.duel-add`); the duel question by question (`.duel-marks`: the player's row over the
   other's, each beside a small avatar; the quicker of two right answers ringed in gold, `.fast`, said once under
-  them; a gold band behind the question that decided it); one line of what decided it (`.duel-line`: „Реши се на
-  8-ия въпрос.“, „Реши се на последния въпрос.“, „Мария водеше от първия въпрос до края.“, „Равни точки: реши
-  времето (…)“; one who left a live duel under way, „Мария излезе след 4-тия въпрос.“; while waiting, until when, the
-  weekday in full); and what it meant under a hairline (`.duel-meant`: the division's emblem,
+  them; a gold band behind the question that decided it); one line of what decided it (`.duel-line`: „Водеше от
+  8-ия въпрос до края.“, „Мария водеше от първия въпрос до края.“, „Реши го последният въпрос.“, „Равни точки: реши
+  времето (…)“, a second or more apart, „Равни точки и под секунда разлика във времето.“ for a draw; one who left a
+  live duel under way, „Мария излезе след 4-тия въпрос.“; while waiting, „Изпратено на Мария в играта.“ and until
+  when, the weekday in full); and what it meant under a hairline (`.duel-meant`: the division's emblem,
   its name and the change, its bar, „Рейтинг 1062 → 1080 · 70 до Злато“; why it didn't move; the record against
   this person, „Срещу Мария 3 : 2“, in rose). Then the next steps: „Реванш“, gold, right after a live one against a
-  person (the other sees „Мария иска реванш.“ over theirs, `.rematch-asks`, and has 15 seconds to ask too), with „Още
-  един дуел“ beside it; „Още един дуел“ gold after one against a recording; „Предизвикай обратно“ gold after a
-  challenge between friends; else „Към дуелите“. A duel without a result (turned down, not played in time, cut off) is
-  its heading and a line, and the player's own game if they played it (`.duel-mine`).
+  person, docked at the screen's foot (`.duel-dock`, over the bar of places, until its place comes up: the other has
+  only 15 seconds); the other asking shows over it („Мария иска реванш“ with the seconds left draining in a rose ring,
+  `.rematch-asks`, and a ping), the button „Да, реванш“; once the other has left the result, „Още един дуел“ takes the
+  gold. „Още един дуел“ gold after one against a recording; „Предизвикай обратно“ gold after a challenge between
+  friends; „Към дуелите“ gold after a friend's challenge sent and waiting („Прати и връзката“ plain beside it); else
+  „Към дуелите“. A win against a person has a plain „Сподели“ (the day's style: „АЛМАНАХ · Дуел“, „Победа 5820 : 1900 ·
+  6 от 10 верни“, the player's own link; no names). A duel without a result (turned down, not played in time, cut off)
+  is its heading and a line, and the player's own game if they played it (`.duel-mine`).
+- **A live duel under way** (`screens/live.ts`): the board (`.live-board`), one card with the two face to face, the
+  player on the left and the other mirrored on the right: avatar, name, points (plain; the leader's gold), each side's
+  marks in two rows of five (one row of ten from 48rem; on a phone, or a short laptop, only while an answer shows), and
+  what the other is doing („Мисли…“, „Отговори за 4,2 с“, „Излезе от дуела.“). The other gone for good while the
+  player leads: a card under the board, „Мария излезе. Победата е твоя.“, „Вземи победата“ gold (the rest unanswered by
+  both: no XP for them) and „Изиграй докрай“, asked once. Waiting: „Търсим някого близо до твоя рейтинг.“
+- **A challenge's link** (`/c/<code>`, `.challenge-card`): one card in the middle, the sender's avatar big, „Мария те
+  предизвиква“, the title, the score to beat in the numeral face („6420 точки · 7 от 10 верни“: a duel is won on
+  points), „Надмини 6420 точки на същите десет въпроса. Около три минути.“; „Приеми“ gold under it.
 - **A challenge** („Предизвикателство“, `screens/challenge.ts`): a game of ten sent to friends and, by its link
   (`/c/<code>`), to anyone; a friend's duel is a challenge sent to a friend. Made on Дуел by „Предизвикай“ (plain, under
   „Намери съперник“): a topic or all of them as chips (`/challenge`), its ten, then at the result „Кого
@@ -371,13 +385,17 @@ takes a token.
   в АЛМАНАХ. Можеш ли повече?“). A friend it's sent to hears once the sender has played: a notice wherever they are
   („Мария те предизвика“, „Играй“ and „Откажи“) and a push (none while another of the sender's waits on them; three
   at most wait unstarted); three days to play it. Sent to them again after their time ran out or they said no, it's
-  theirs again; the send step names only those it reached. While it waits, the sender's result has „Прати на Мария“
-  gold: the same link brings the friend to their turn. A friend's game of it is a duel between the two (their record),
+  theirs again; the send step names only those it reached. While it waits, the sender's result says „Изпратено на
+  Мария в играта.“, „Към дуелите“ gold and „Прати и връзката“ plain (the same link brings the friend to their turn). A
+  friend's game of it is a duel between the two (their record),
   its result told to both; only one drawn for the two, played by that friend, moves ratings (the first of the day).
-  Anyone else's moves no rating. Opened: who sent it and how they did, „Започни“ (the count after that tap), then the duel's result
+  Anyone else's moves no rating. Opened: who sent it and the score to beat (the card above), „Приеми“ (the count after
+  that tap), then the duel's result
   („Предизвикателство от Мария“, „Добави в приятели“ under a stranger, „Предизвикай и ти“ gold). Opened again, the
   taker's result; by the one who sent it, who took it and „Прати го пак“; past its three days, or gone, it says so
-  and offers the day's ten.
+  and offers the day's ten. The sender finds their challenges again on Дуел, „Твоите предизвикателства“ (`.sent-row`:
+  the topic's mark and name, their score, „водиш с 2 : 1“, „Изиграха го 3“, until which day; a tap to its page), and
+  those whose time ran out in „История“ with the duels, for two weeks.
 - **Friends:** `.card.friends`, `.invitation` (a friend request, accepted with `.btn.rose`), `.friend-list`/`.friend`
   (with `.friend-day` and `.record`) and `.invite-link`.
 - **In code:**
@@ -629,7 +647,10 @@ Feedback fires once, when it's earned, and then the screen is still again:
   - `end` when a run's result opens (`perfect` for ten of ten), `win` or `lose` at a duel's or Роял's end;
   - `through` or `out` with Роял's cut;
   - `level`, `achievement` or `goal` with the news: only the biggest thing told plays;
-  - `ping` when a game or a duel starts, or a friend calls to a duel.
+  - `ping` when a game or a duel starts, or a friend calls to a duel, or the other asks for a rematch;
+  - `them`, the other side answering in a live duel (only while the player hasn't: after, it would sound over their
+    verdict) or a player coming into a room: two soft low plucks, A4 then F♯4, off to the right, never a bell;
+  - the news's sound (`level`, `achievement`, `goal`) only once the result's own has played.
 - **Nothing plays** for navigation, hovering or decoration.
 - **Music only in Роял's lobby**, for those in, waiting for 21:00 (none in the day or a topic: people play those on the
   bus or among others): a quiet bed in the key, four bars at 64 a minute (a pad of detuned saws under a slow filter, a

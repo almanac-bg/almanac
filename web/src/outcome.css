@@ -269,6 +269,33 @@
     font: 900 2rem / 1 var(--font-numeral);
   }
 
+  /* The gold way kept at the screen's foot, over the bar of places on a phone (Steps.dock: a live duel's rematch, which
+     has only a moment), until its own place under the result comes up to it. */
+  .duel-dock {
+    position: sticky;
+    bottom: calc(4.5rem + env(safe-area-inset-bottom));
+    z-index: 2;
+    display: grid;
+    margin-inline: calc(-1 * var(--space-2));
+    padding: var(--space-2);
+    border-radius: var(--radius-lg);
+    background: var(--bg);
+    box-shadow: 0 0 0 var(--space-2) var(--bg);
+  }
+
+  /* Wide, it stands under the result's middle, its button a hand's width (as every page's). */
+  @media (min-width: 48rem) {
+    .duel-dock {
+      bottom: var(--space-4);
+      justify-items: center;
+    }
+
+    .duel-dock .rematch,
+    .duel-dock > .btn {
+      width: min(22rem, 100%);
+    }
+  }
+
   @media (max-width: 22rem) {
     .duel-marks {
       gap: 5px;

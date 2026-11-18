@@ -22,6 +22,7 @@ let {
   avatar,
   challengeButton,
   challengeText,
+  duelShareText,
   emblem,
   explain,
   feelKit,
@@ -38,7 +39,9 @@ let {
   profileHref,
   record,
   reviewParts,
+  shareButton,
   signal,
+  tally,
   trail,
   until,
   withName,
@@ -50,10 +53,12 @@ const total = 10;
 /** Seconds, the Bulgarian way: „34,5 с“. */
 const secs = (ms: number) => `${(ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 })} с`;
 
-/** What to do next, where the screen that shows a result has its own: the gold button, and plain ones beside it. */
+/** What to do next, where the screen that shows a result has its own: the gold button, and plain ones beside it;
+ * `dock`: the gold one kept at the screen's foot, in sight however long the result is. */
 export interface Steps {
   main: Child;
   also?: Child[];
+  dock?: boolean;
 }
 
 /** A duel as it stands or ended (`d`, as one duel's view has it); what to do next (`again`: after a live one, a
@@ -65,6 +70,7 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
     avatar,
     challengeButton,
     challengeText,
+    duelShareText,
     emblem,
     explain,
     feelKit,
@@ -81,7 +87,9 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
     profileHref,
     record,
     reviewParts,
+    shareButton,
     signal,
+    tally,
     trail,
     until,
     withName,
@@ -96,15 +104,22 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
       ? reviewParts(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${d.runId}/review`)).questions)
       : null;
   const head = settled || d.state === "wait" ? hero(d) : plain(d);
+  const share = shareWin(d);
+  // Docked, the gold way stays at the screen's foot while the result above it is read (a live duel's rematch, which
+  // has only a moment: `Steps.dock`).
+  const dock = steps?.dock ? h("div", { class: "duel-dock" }, steps.main) : null;
   return h(
     "section",
     { class: "screen" },
     head,
+    dock,
     // The gold button is another duel where there's one (a live one, or a challenge back to the friend), else the
     // way back to the duels; the rest are plain, side by side.
     nextSteps(
-      next ?? toDuels(true),
-      steps ? [questions?.button, ...(steps.also ?? [])] : [questions?.button, challenge, next ? toDuels(false) : null],
+      dock ? null : (next ?? toDuels(true)),
+      steps
+        ? [share, questions?.button, ...(steps.also ?? [])]
+        : [share, sendLink(d), questions?.button, challenge, next ? toDuels(false) : null],
     ),
     more,
     questions?.list,
@@ -238,7 +253,7 @@ function marks(d: DuelView, mine: DuelMark[], theirs: DuelMark[]): Child {
   const label = [
     `Въпрос по въпрос. Ти: ${rights(mine)} от ${total} верни`,
     theirs.length ? `; ${them}: ${rights(theirs)} от ${total} верни` : "",
-    d.decided ? `; реши се на ${ordinal(d.decided)}я въпрос` : "",
+    d.decided ? `; ${d.state === "won" ? "ти" : them} водеше от ${ordinal(d.decided)}я въпрос до края` : "",
   ].join("");
   // Small beside the marks: the avatar alone, without its frame.
   const bare = (s?: Side) => s?.look?.avatar?.split("/")[0];
@@ -276,25 +291,27 @@ function marks(d: DuelView, mine: DuelMark[], theirs: DuelMark[]): Child {
   ];
 }
 
-/** What decided the duel: the question after which the winner led to the end, or the time on even points; while it
- * waits, until when the friend has. */
+/** What decided the duel: the question from which the winner led to the end, or the time on even points (a second
+ * apart or more: closer is a draw, play.TieBand); while it waits, that it's sent and until when the friend has. */
 function line(d: DuelView): string {
   const them = d.opponent?.name ?? "Приятелят ти";
-  if (d.state === "wait") return `${them} има време до ${until(d.expiresAt)} Ще ти кажем резултата.`;
+  if (d.state === "wait")
+    return d.sent
+      ? `Изпратено на ${them} в играта. Има време до ${until(d.expiresAt)} Ще ти кажем резултата.`
+      : `${them} има време до ${until(d.expiresAt)} Ще ти кажем резултата.`;
   const you = d.you;
   const other = d.opponent;
   // One left under way: the duel went on without them, and that's what decided it.
   const after = (n: number) => (n > 0 ? `след ${ordinal(n)}я въпрос` : "още на първия въпрос");
   if (d.theyLeft !== undefined) return `${them} излезе ${after(d.theyLeft)}.`;
   if (d.youLeft !== undefined) return `Излезе ${after(d.youLeft)}: дуелът продължи без теб.`;
-  if (d.state === "draw") return "Равни точки и равно време.";
+  if (d.state === "draw") return "Равни точки и под секунда разлика във времето.";
   if (you && other && you.points === other.points)
     return `Равни точки: реши времето (${secs(you.ms)} срещу ${secs(other.ms)}).`;
   if (!d.decided) return "";
-  if (d.decided >= total) return "Реши се на последния въпрос.";
-  if (d.decided === 1)
-    return d.state === "won" ? "Водеше от първия въпрос до края." : `${them} водеше от първия въпрос до края.`;
-  return `Реши се на ${ordinal(d.decided)}я въпрос.`;
+  if (d.decided >= total) return "Реши го последният въпрос.";
+  const from = d.decided === 1 ? "първия" : `${ordinal(d.decided)}я`;
+  return d.state === "won" ? `Водеше от ${from} въпрос до края.` : `${them} водеше от ${from} въпрос до края.`;
 }
 
 /** Why a duel moved no rating (play.DuelView.Unrated); a notification says the same (server/notify.go). */
@@ -418,21 +435,38 @@ function rematch(d: DuelView): Child {
   );
 }
 
-/** A challenge sent to a friend, waiting for them: the gold way is to send it to them where they talk (its link
- * brings them to their turn; anyone else it reaches can take it too). A challenge taken from anyone: send it on, the
- * player's own game the one to beat. */
+/** A challenge taken from anyone: send it on, the player's own game the one to beat. */
 function sendOn(d: DuelView): Child {
   if (d.kind !== "challenge" || !d.runId || !d.you?.done) return null;
-  if (d.sent && d.state === "wait")
-    return challengeButton(
-      `Прати на ${d.opponent?.name ?? "приятеля си"}`,
-      d.runId,
-      () => "Изиграх предизвикателството в АЛМАНАХ. Ти си наред.",
-      true,
-    );
   if (!d.sent && ["won", "lost", "draw"].includes(d.state))
     return challengeButton("Предизвикай и ти", d.runId, () => challengeText(d.you?.rights ?? 0), true);
   return null;
+}
+
+/** A challenge sent to a friend, waiting for them: it's in the game for them already (the line says so), so this is
+ * plain, beside the way back to the duels: its link too, sent where they talk (it brings them to their turn; anyone
+ * else it reaches can take it once they've played). */
+function sendLink(d: DuelView): Child {
+  if (d.kind !== "challenge" || !d.runId || !d.you?.done || !d.sent || d.state !== "wait") return null;
+  return challengeButton("Прати и връзката", d.runId, () => "Изиграх предизвикателството в АЛМАНАХ. Ти си наред.");
+}
+
+/** A win, shared as the day's result is (game/share.ts): what it was and how it went, and the player's own link;
+ * no names and no words of invitation. Not a win against a recording (nobody's loss), nor a challenge taken from
+ * anyone, whose own way on is to send it on. */
+function shareWin(d: DuelView): Child {
+  if (d.state !== "won" || d.recorded || !d.you || !d.opponent) return null;
+  if (d.kind === "challenge" && !d.friend) return null;
+  const you = d.you;
+  const them = d.opponent;
+  return shareButton(
+    "Сподели",
+    () => duelShareText(you.points, them.points, you.rights),
+    d.invite,
+    false,
+    () => tally("share:duel"),
+    true, // its link shows whose it is
+  );
 }
 
 /** The player's own ten of a challenge between friends, as a challenge to anyone: plain, beside the gold way on. */

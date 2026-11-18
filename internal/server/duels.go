@@ -222,7 +222,28 @@ func (s *Server) liveLeave(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]bool{"ok": true})
 }
 
-// duels lists the player's duels, with their rating.
+// liveClaim is a player taking the win of a live duel the other has left for good, while they lead (live.Match.Claim):
+// it ends at once.
+func (s *Server) liveClaim(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		return live.ErrNoMatch
+	}
+	m, err := s.live.Get(id)
+	if err != nil {
+		return err
+	}
+	if err := m.Claim(u.ID); err != nil {
+		return err
+	}
+	return ok(w, map[string]bool{"ok": true})
+}
+
+// duels lists the player's duels, with their rating, and the challenges they sent (play.SentOf).
 func (s *Server) duels(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -236,7 +257,11 @@ func (s *Server) duels(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	return ok(w, map[string]any{"duels": list, "standing": st})
+	sent, err := s.game.SentOf(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"duels": list, "standing": st, "challenges": sent})
 }
 
 // duelOne is one of the player's duels, with what its result says (play.DuelOf).
@@ -252,6 +277,14 @@ func (s *Server) duelOne(w http.ResponseWriter, r *http.Request) error {
 	d, err := s.game.DuelOf(r.Context(), u.ID, id)
 	if err != nil {
 		return err
+	}
+	// A win is shared as the day's result is: with the player's own link (their invite).
+	if d.State == "won" {
+		code, err := s.game.InviteCode(r.Context(), u.ID)
+		if err != nil {
+			return err
+		}
+		d.Invite = s.cfg.PublicURL + "/f/" + code
 	}
 	return ok(w, map[string]any{"duel": d})
 }

@@ -84,7 +84,7 @@ test("a challenge: a double tap is one guest and one ask; a name refused after a
     if (r.method() === "POST" && new URL(r.url()).pathname === "/api/guest") guests++;
   });
   await b.goto(path);
-  await b.getByRole("button", { name: "Започни", exact: true }).dblclick();
+  await b.getByRole("button", { name: "Приеми", exact: true }).dblclick();
   const sheet = b.getByRole("dialog", { name: "Как да те виждат останалите?" });
   await expect(sheet).toBeVisible();
   await expect(b.getByRole("dialog")).toHaveCount(1);
