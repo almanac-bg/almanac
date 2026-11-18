@@ -339,12 +339,12 @@ function invite(url: string, primary: boolean, renew: () => Promise<void>, askin
                 },
                 "Направи нова",
               ),
-              h("button", { class: "link", type: "button", onclick: () => asking.set(false) }, "Отказ"),
+              h("button", { class: "link tap", type: "button", onclick: () => asking.set(false) }, "Отказ"),
             ),
           )
         : h(
             "button",
-            { class: "link muted small invite-new", type: "button", onclick: () => asking.set(true) },
+            { class: "link muted small tap invite-new", type: "button", onclick: () => asking.set(true) },
             "Нова връзка за покана",
           ),
   );

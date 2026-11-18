@@ -117,7 +117,7 @@ export function me(kit: Kit) {
           yearLink(),
           () =>
             user()?.tag
-              ? h("a", { class: "link muted", href: profileHref(user()?.tag ?? "") }, "Как те виждат другите")
+              ? h("a", { class: "link muted tap", href: profileHref(user()?.tag ?? "") }, "Как те виждат другите")
               : null,
         ];
       },
@@ -312,7 +312,7 @@ function levelCard(p: Progress): Child {
           ),
         ]
       : null,
-    h("a", { class: "link", href: "/rewards" }, "Всички постижения"),
+    h("a", { class: "link tap", href: "/rewards" }, "Всички постижения"),
   );
 }
 

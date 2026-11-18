@@ -971,7 +971,7 @@ function remindAsk(day: string, stake: () => string | null): { view: Child; mail
         "div",
         { class: "remind-actions" },
         h("button", { class: "btn", type: "button", onclick: yes }, "Напомняй ми"),
-        h("button", { class: "link", type: "button", onclick: no }, "Не сега"),
+        h("button", { class: "link tap", type: "button", onclick: no }, "Не сега"),
       ),
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
     ];

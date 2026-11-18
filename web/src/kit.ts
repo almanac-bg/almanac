@@ -39,14 +39,14 @@ import { type Child, computed, effect, h, lifetime, onCleanup, signal, slot, unt
 import { reportProblem } from "./lib/errors.ts";
 import { ordinal, place } from "./lib/ordinal.ts";
 import {
-  bigText,
   calm,
   musicOn,
-  setBigText,
   setCalm,
   setMusic,
+  setTextSize,
   setTick,
   setVibrate,
+  textSize,
   tickOn,
   vibrateOn,
 } from "./lib/prefs.ts";
@@ -133,7 +133,7 @@ export const kit = {
   avatar,
   back,
   badge,
-  bigText,
+  textSize,
   board,
   boardRow,
   bulgaria,
@@ -231,7 +231,7 @@ export const kit = {
   rewardWords,
   scoreCard,
   segmented,
-  setBigText,
+  setTextSize,
   setCalm,
   setMusic,
   setPushPref,
