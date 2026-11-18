@@ -1,0 +1,348 @@
+/* /admin (server/admin_page.go): a page for whoever keeps the game, loaded only there; the rest is app.css's. Wide on
+   a desktop, up to 90rem: the numbers at the top in a grid, the charts side by side. On a phone, one column: the
+   numbers first, the long tables folded, and a table wider than the screen fades at the edge it goes on to. */
+
+@layer app {
+  :root {
+    /* The charts' two series: checked for colour blindness and contrast on both surfaces (the dataviz validator). */
+    --series-1: #8b6cf0;
+    --series-2: #c77f0a;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --series-1: #5b3fd1;
+      --series-2: #b77400;
+    }
+  }
+
+  #app.admin-app {
+    max-width: 90rem;
+  }
+
+  main.admin {
+    display: grid;
+    gap: var(--space-5);
+    min-width: 0;
+  }
+
+  main.admin > * {
+    max-width: none;
+    margin-inline: 0;
+    min-width: 0;
+  }
+
+  .admin h2 {
+    font-size: 1.375rem;
+  }
+
+  .admin h3 {
+    margin-top: var(--space-3);
+    font-size: 1.0625rem;
+  }
+
+  .admin-section {
+    display: grid;
+    align-content: start;
+    gap: var(--space-3);
+    min-width: 0;
+    scroll-margin-top: var(--space-5);
+  }
+
+  /* A laptop and up: two columns, the shorter parts side by side (Навик and Известия, Серии and Честна игра), the
+     wide ones across. */
+  @media (min-width: 64rem) {
+    main.admin {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+      column-gap: var(--space-7);
+    }
+
+    main.admin > * {
+      grid-column: 1 / -1;
+    }
+
+    main.admin > :is(#habit, #notices, #streaks, #fair) {
+      grid-column: auto;
+    }
+  }
+
+  .admin-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-4);
+    font-weight: 600;
+  }
+
+  .admin-nav a[aria-current] {
+    color: var(--text);
+  }
+
+  .admin details {
+    border-top: 1px solid var(--line);
+    padding-top: var(--space-2);
+  }
+
+  .admin summary {
+    cursor: pointer;
+    font-weight: 600;
+    padding-block: var(--space-1);
+  }
+
+  .admin details[open] > summary {
+    margin-bottom: var(--space-2);
+  }
+
+  /* The numbers at the top. */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: var(--space-3);
+  }
+
+  .tile {
+    display: grid;
+    align-content: start;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+  }
+
+  .tile p {
+    margin: 0;
+  }
+
+  .tile-name {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+  }
+
+  .tile-value {
+    font: 800 2rem / 1.1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tile-was,
+  .tile-note {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+  }
+
+  /* A share and, under it, of how many and its interval; grey when there's too little to tell. */
+  .rate {
+    display: inline-grid;
+    justify-items: end;
+    font-weight: 700;
+  }
+
+  .tile .rate {
+    justify-items: start;
+  }
+
+  .rate small {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1rem;
+    white-space: nowrap;
+  }
+
+  .tile-value .rate small {
+    font-family: var(--font-sans);
+  }
+
+  .rate.few {
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  .frozen {
+    color: var(--text-muted);
+  }
+
+  /* Tables: one wider than its box scrolls sideways, and a shade at the edge says there's more (it scrolls with the
+     content at the ends, so it goes when there's no more). */
+  .table-scroll {
+    overflow-x: auto;
+    background:
+      linear-gradient(to right, var(--bg) 30%, transparent) left / 2rem 100% no-repeat local,
+      linear-gradient(to left, var(--bg) 30%, transparent) right / 2rem 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--text) 22%, transparent), transparent) left /
+      0.75rem 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--text) 22%, transparent), transparent) right /
+      0.75rem 100% no-repeat scroll;
+  }
+
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    padding: var(--space-2) var(--space-3) var(--space-2) 0;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .admin-table th {
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .admin-table .num {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .admin-table tr.total td {
+    font-weight: 700;
+  }
+
+  /* The charts. */
+  .charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+    gap: var(--space-5);
+  }
+
+  .chart {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    min-width: 0;
+  }
+
+  .chart figcaption {
+    font-weight: 700;
+  }
+
+  .chart .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-4);
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+
+  .chart .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .chart .swatch {
+    width: 1rem;
+    height: 0;
+    border-top: 2px solid var(--series-1);
+  }
+
+  .chart .swatch.s2 {
+    border-top: 2px dashed var(--series-2);
+  }
+
+  .chart .plot {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--space-2);
+  }
+
+  .chart .scale {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 11rem;
+    margin-block: -0.5rem;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .chart svg {
+    display: block;
+    width: 100%;
+    height: 10rem;
+    overflow: visible;
+  }
+
+  .chart .ends {
+    grid-column: 2;
+    display: flex;
+    justify-content: space-between;
+    margin: var(--space-1) 0 0;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  .chart .grid {
+    stroke: var(--line);
+    stroke-width: 1;
+  }
+
+  .chart .line {
+    fill: none;
+    stroke: var(--series-1);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  .chart .line.s2 {
+    stroke: var(--series-2);
+    stroke-dasharray: 5 3;
+  }
+
+  .chart .band {
+    fill: var(--series-1);
+    fill-opacity: 0.16;
+  }
+
+  .chart .point {
+    stroke: var(--series-1);
+    stroke-width: 8;
+    stroke-linecap: round;
+  }
+
+  .chart .point.few {
+    stroke-opacity: 0.45;
+  }
+
+  .chart .release {
+    stroke: var(--text-muted);
+    stroke-width: 1.5;
+  }
+
+  .chart .hover {
+    fill: transparent;
+  }
+
+  .chart .hover:hover {
+    fill: color-mix(in srgb, var(--text) 8%, transparent);
+  }
+
+  /* /admin/questions: the reports, then the hardest and easiest side by side. */
+  .admin-pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr));
+    gap: var(--space-5);
+  }
+
+  .reports {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 26rem), 1fr));
+    gap: var(--space-4);
+  }
+}

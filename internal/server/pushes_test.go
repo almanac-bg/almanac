@@ -421,6 +421,7 @@ func crowd(t testing.TB, c crowding) (*Server, *slowPush, *slowPush) {
 		t.Fatal(err)
 	}
 	s.game.Now = daytime()
+	s.heldOut = func(int64) bool { return false }
 	browser, _ := ecdh.P256().GenerateKey(rand.Reader)
 	p256dh := base64.RawURLEncoding.EncodeToString(browser.PublicKey().Bytes())
 	auth := base64.RawURLEncoding.EncodeToString([]byte("0123456789abcdef"))

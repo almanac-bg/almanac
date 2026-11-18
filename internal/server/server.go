@@ -106,16 +106,18 @@ type Server struct {
 	push     *push.Sender
 	phones   *push.Phones
 	// closing ends the streams (rooms, Роял) when the server stops, so that it needn't wait for them.
-	closing       chan struct{}
-	drain         drain
-	bank          atomic.Pointer[bank.Bank]
-	banks         banks // a bank held for Роял, one refused (bank.go)
-	client        fs.FS
-	limits        *limiter // the limits on floods (limits.go)
-	guard         *limiter // apart, the limits that keep players safe: codes, guests, room codes, reports
-	problems      *problems
-	roomsSaved    roomsSaved
-	reminders     reminders     // who is due the day's reminder when, today (remind.go)
+	closing    chan struct{}
+	drain      drain
+	bank       atomic.Pointer[bank.Bank]
+	banks      banks // a bank held for Роял, one refused (bank.go)
+	client     fs.FS
+	limits     *limiter // the limits on floods (limits.go)
+	guard      *limiter // apart, the limits that keep players safe: codes, guests, room codes, reports
+	problems   *problems
+	roomsSaved roomsSaved
+	reminders  reminders // who is due the day's reminder when, today (remind.go)
+	// heldOut says whether a player is held out of the reminders (play.HeldReminders: remind.go, streakmail.go).
+	heldOut       func(userID int64) bool
 	pushq         pushQueue     // the notifications' queue, as Push sends it (pushes.go)
 	streakMailing streakMailing // who is due the mail of a streak ended when, today (streakmail.go)
 	dayMailing    reminders     // who is due the day's reminder by mail when, today (daymail.go)
@@ -160,6 +162,13 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.guard.onFull = func() { s.problems.add("limits: a flood of keys filled the guard's limiter; counts were pushed out") }
 	s.bank.Store(d.Bank)
 	s.game = play.New(d.DB, s.bank.Load)
+	s.heldOut = func(id int64) bool { return play.HeldOut(play.HeldReminders, id) }
+	if strings.HasPrefix(cfg.Version, "v") { // a release, not a developer's build
+		s.game.Version = cfg.Version
+		if err := s.released(context.Background()); err != nil {
+			return nil, err
+		}
+	}
 	if err := s.game.Keep(context.Background(), d.Bank); err != nil { // its versions, before anything is shown
 		return nil, err
 	}
@@ -324,6 +333,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /mail/off", s.mailOff)
 	mux.HandleFunc("POST /mail/off", s.mailOff)
 	mux.HandleFunc("GET /admin", s.admin)
+	mux.HandleFunc("GET /admin/questions", s.adminQuestions)
 	mux.HandleFunc("POST /admin/reports/{id}/resolve", s.resolve)
 	mux.HandleFunc("POST /admin/players/{id}/reports/resolve", s.resolvePlayer)
 	mux.HandleFunc("POST /admin/players/{id}/{act}", s.adminPlayerAct)
@@ -430,6 +440,11 @@ func (s *Server) run(ctx context.Context, grace time.Duration) error {
 		}
 		if n > 0 {
 			s.problems.add("fair play: a day's ten played after several throwaway guests from the same network (/admin)")
+		}
+	})
+	go safe.Every(ctx, "measures: the weeks over", 15*time.Minute, func() {
+		if err := s.freezeWeeks(ctx); err != nil && ctx.Err() == nil {
+			slog.Error("measures", "err", err)
 		}
 	})
 	go safe.Every(ctx, "after the runs", time.Minute, func() {

@@ -32,11 +32,11 @@ export function startApp(nav: import("./phone.ts").Nav): void {
     );
 }
 
-/** Shares through the app's share sheet: false where there's no app. */
-export async function appShare(text: string, url?: string): Promise<boolean> {
-  if (!inApp) return false;
-  await (await phone()).share(text, url);
-  return true;
+/** Shares through the app's share sheet: "shared", or "closed" when the player closed it without sharing; null where
+ * there's no app. */
+export async function appShare(text: string, url?: string): Promise<"shared" | "closed" | null> {
+  if (!inApp) return null;
+  return (await (await phone()).share(text, url)) ? "shared" : "closed";
 }
 
 /** What the player feels (phone.ts says how each is felt): in the app only (a page can't on an iPhone, and a phone's

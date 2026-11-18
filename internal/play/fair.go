@@ -62,10 +62,16 @@ const (
 	ShadowThrowaway = 3
 )
 
-// ByPerson is a SQL condition on a run (its columns, unaliased) that a person played it: one at a script's speed
-// wasn't. A guest's day brought to an account was, and counts with the games people played (/admin's), once: only one
-// game of a day is ever an account's.
-const ByPerson = `shadow <> 1`
+// People is a SQL condition on a run (its columns, unaliased) that /admin counts it as a player's game: one population
+// on the whole page, the same that its days played are (retention.go, personDays). Not one at a script's speed
+// (ShadowScript), nor a throwaway guest's day (ShadowThrowaway: someone's try at the day, not a player; one who comes
+// back is let out of the shadow, and counts), nor an admin's (whoever keeps the game, trying it). A guest's day
+// brought to an account (ShadowGuest) was a person's, and counts, once: only one game of a day is ever an account's.
+const People = personRun + ` AND user_id NOT IN (SELECT id FROM users WHERE admin)`
+
+// personRun is People without the admins: the shadows that aren't a person's game (1: ShadowScript, 3:
+// ShadowThrowaway; TestPeopleShadows holds the numbers).
+const personRun = `shadow NOT IN (1, 3)`
 
 // Floor is the least time a person takes to answer a question of its kind, as the server times it (from when it
 // showed the question to when the answer came, so the trip to the server and back is in it too). Seeing four options

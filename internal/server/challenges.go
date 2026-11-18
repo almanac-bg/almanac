@@ -53,7 +53,7 @@ func (s *Server) challengeFriend(w http.ResponseWriter, r *http.Request) error {
 	if !s.limits.allow("challenge:"+strconv.FormatInt(u.ID, 10), 60, time.Hour) {
 		return errTooMany
 	}
-	st, duel, err := s.game.ChallengeFriend(s.fromNet(r, u.ID), u.ID, id)
+	st, duel, err := s.game.ChallengeFriend(s.fromClient(r, u.ID), u.ID, id)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (s *Server) takeChallenge(w http.ResponseWriter, r *http.Request) error {
 	if !challengeCode.MatchString(code) {
 		return errNotFound
 	}
-	st, id, err := s.game.TakeChallenge(s.fromNet(r, u.ID), u.ID, code)
+	st, id, err := s.game.TakeChallenge(s.fromClient(r, u.ID), u.ID, code)
 	if err != nil {
 		return err
 	}

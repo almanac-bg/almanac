@@ -109,6 +109,9 @@ type Game struct {
 	// CrowdMin, if set, is how many answers a question needs before how players answered it shows, the day's
 	// players' and everyone's (CrowdFrom, DayCrowdFrom when 0; the browser tests make it 1).
 	CrowdMin int
+	// Version is the game's version as released (the server's; "" in tests and a developer's build): the version a
+	// player met is kept with them on their first day played (users.first_version, retention.go).
+	Version string
 
 	weekMu sync.RWMutex // held while a week of the leagues closes (ensureWeek); read while a player joins one
 	week   string       // the leagues' week open, once ensureWeek has seen it

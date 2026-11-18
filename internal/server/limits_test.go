@@ -315,7 +315,7 @@ func TestAdminReportsBounded(t *testing.T) {
 		}
 	}
 	page := func() string {
-		res, err := p.client.Get(g.url + "/admin")
+		res, err := p.client.Get(g.url + "/admin/questions")
 		if err != nil {
 			t.Fatal(err)
 		}

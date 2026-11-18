@@ -462,6 +462,9 @@ func TestForgetLeavesTheDaysAsNobodys(t *testing.T) {
 	accounts := &account.Accounts{DB: w.db, Forget: []func(*sql.Tx, int64) error{Forget}}
 	gone := w.user()
 	w.playDay(gone)
+	// A day played only at a script's speed doesn't count (D1): once the games are gone, nothing could tell it, so it
+	// goes with them.
+	w.stored(gone, "topic", "2026-11-10", true, true)
 	if err := accounts.Delete(ctx, gone); err != nil {
 		t.Fatal(err)
 	}
@@ -471,8 +474,8 @@ func TestForgetLeavesTheDaysAsNobodys(t *testing.T) {
 	if n := w.count(`SELECT count(*) FROM active_days WHERE user_id = ?`, -gone); n != 1 {
 		t.Fatalf("%d days kept as nobody's", n)
 	}
-	if _, a, err := w.g.Retention(ctx, 1); err != nil || a.Today != 1 {
-		t.Fatalf("played today: %+v %v", a, err)
+	if a, err := w.g.Activity(ctx, w.g.Today()); err != nil || a.On(w.g.Today()) != 1 {
+		t.Fatalf("played today: %v", err)
 	}
 }
 

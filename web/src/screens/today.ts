@@ -398,12 +398,15 @@ function dayNext(
       undefined,
       primary,
       () => {
-        tally("share:day");
+        // Counted once a day on a device (/admin's share of the days finished that were shared), however often sent.
+        let before = false;
         try {
+          before = localStorage.getItem(sharedKey) === t.day;
           localStorage.setItem(sharedKey, t.day);
         } catch {
           // not kept: gold again next time
         }
+        if (!before) tally("share:day");
       },
       true, // its link shows whose it is
     );

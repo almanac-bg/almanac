@@ -101,7 +101,11 @@ func TestNewcomers(t *testing.T) {
 	_, _ = w.db.Write.Exec(`INSERT INTO friends (user_id, friend_id, since) VALUES (?, ?, ?)`, ana, bo, evening)
 
 	w.now = time.Date(2026, 11, 20, 10, 0, 0, 0, Bulgaria)
-	news, err := w.g.Newcomers(ctx, "2026-11-10")
+	act, err := w.g.Activity(ctx, "2026-10-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	news, err := w.g.Newcomers(ctx, act, "2026-11-10")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +114,8 @@ func TestNewcomers(t *testing.T) {
 	}
 	a, b := news[0], news[1]
 	if a.First != "2026-11-12" || a.Over != 8 || a.Games != 2 || a.FirstKind != "day" || a.CameFrom != "" ||
-		!a.Played[0] || !a.Played[1] || a.Played[2] || !a.Played[7] || a.DayTens() != 3 || a.Push || a.Friend {
+		!a.Played[0] || !a.Played[1] || a.Played[2] || !a.Played[7] || a.DayTens() != 3 || a.Push || a.Friend ||
+		!a.FirstFinished || a.RoomOnly || !a.Kinds["topic"] || !a.DayTenAgain() {
 		t.Fatalf("Ana: %+v", a)
 	}
 	if !a.Due(7) || a.Due(8) || !a.BackWithin(1, 7) || a.BackWithin(4, 6) {

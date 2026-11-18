@@ -106,6 +106,13 @@ type Player struct {
 	// Net is the network the player asks from (a keyed hash: play.FromNet), kept with their game of the duel: two
 	// from one network play a friendly (play/fair.go). None for a recording's player.
 	Net []byte
+	// Device is what the player plays on (play.FromDevice), kept with their game for /admin.
+	Device string
+}
+
+// from is ctx with the network and the device the player plays from, for their game of a duel.
+func (p Player) from(ctx context.Context) context.Context {
+	return play.FromDevice(play.FromNet(ctx, p.ID, p.Net), p.ID, p.Device)
 }
 
 // Hub matches players and holds the duels under way.
@@ -252,7 +259,7 @@ func (h *Hub) pair(a, b *Seek) func() {
 	return func() {
 		defer safe.Recover("live: making a duel", a.broken, b.broken)
 		m, err := h.launch([]int64{a.player.ID, b.player.ID}, func(ctx context.Context) (play.Live, [2]Player, error) {
-			ctx = play.FromNet(play.FromNet(ctx, a.player.ID, a.player.Net), b.player.ID, b.player.Net)
+			ctx = b.player.from(a.player.from(ctx))
 			l, err := h.game.StartLive(ctx, a.player.ID, b.player.ID)
 			return l, [2]Player{a.player, b.player}, err
 		})
@@ -477,7 +484,7 @@ func (h *Hub) expire(s *Seek) {
 	h.starting[s.player.ID] = s
 	h.mu.Unlock()
 	s.settle(h.launch([]int64{s.player.ID}, func(ctx context.Context) (play.Live, [2]Player, error) {
-		l, err := h.game.StartRecorded(play.FromNet(ctx, s.player.ID, s.player.Net), s.player.ID)
+		l, err := h.game.StartRecorded(s.player.from(ctx), s.player.ID)
 		if err != nil {
 			return l, [2]Player{}, err
 		}

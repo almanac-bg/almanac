@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"maps"
 	mrand "math/rand/v2"
 	"slices"
 	"time"
@@ -76,11 +77,40 @@ func (g *Game) DayQuestions(ctx context.Context) (map[string]bool, error) {
 	return barred, err
 }
 
-// insertRun starts a game for a player, with the network they play from if ctx has it (FromNet, fair.go).
+// Devices are what a game can be started on, as runs.device keeps them: for /admin to tell phones, desktops and the
+// app apart.
+var Devices = []string{"phone", "tablet", "desktop", "app-ios", "app-android"}
+
+// devicesKey keeps in a context the device each of its players plays on (FromDevice), by player.
+type devicesKey struct{}
+
+// FromDevice is ctx with the device a player plays on (one of Devices): a game started for them in it keeps it
+// (runs.device). Nothing for "" (one that can't be told).
+func FromDevice(ctx context.Context, userID int64, device string) context.Context {
+	if device == "" {
+		return ctx
+	}
+	was, _ := ctx.Value(devicesKey{}).(map[int64]string)
+	devices := make(map[int64]string, len(was)+1)
+	maps.Copy(devices, was)
+	devices[userID] = device
+	return context.WithValue(ctx, devicesKey{}, devices)
+}
+
+// deviceOf is the device a player plays on in ctx (FromDevice), or none (nil).
+func deviceOf(ctx context.Context, userID int64) any {
+	if d, _ := ctx.Value(devicesKey{}).(map[int64]string); d[userID] != "" {
+		return d[userID]
+	}
+	return nil
+}
+
+// insertRun starts a game for a player, with the network they play from if ctx has it (FromNet, fair.go), and the
+// device (FromDevice).
 func (g *Game) insertRun(ctx context.Context, tx *sql.Tx, userID int64, kind string, day, category any, picks []Pick) (*run, error) {
 	data, _ := json.Marshal(picks)
-	res, err := tx.Exec(`INSERT INTO runs (user_id, kind, day, category, questions, started_at)
-		VALUES (?, ?, ?, ?, ?, ?)`, userID, kind, day, category, string(data), store.Ms(g.Now()))
+	res, err := tx.Exec(`INSERT INTO runs (user_id, kind, day, category, questions, started_at, device)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`, userID, kind, day, category, string(data), store.Ms(g.Now()), deviceOf(ctx, userID))
 	if err != nil {
 		return nil, err
 	}
