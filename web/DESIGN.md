@@ -46,8 +46,10 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   so far, and „Продължи“; or once played, as it lands, how they went (under the score the issue line, „Брой 6 · 17
   ноември“, and the way to the day's board; see The place, below) with the one gold thing to do next right under it
   (`game/gold.ts`: „Сподели“ for a result worth sharing — 6 of 10, the streak on a round number (3, 7, 30, 100, 365), a
-  right answer few got among 4 or more; else „Още десет“, to where an open goal points; none while a broken streak is
-  half won back, whose card comes right under the result with „Още една игра“), „Прегледай въпросите“ and a plain
+  right answer few got among 4 or more; else „Още десет“, to where an open goal of a topic points, or the newest past issue not played;
+  none while a broken streak is half won back, whose card comes right under the result with „Изиграй брой 6“: the
+  missed issue, gold once the day is played, plain before; „Изиграй пропуснатия брой от 17 ноември и днешния, и
+  серията се връща.“), „Прегледай въпросите“ and a plain
   „Сподели“ below; just played, the goals still open (`.open-goals`, no card); then tomorrow in one quiet card
   (`.tomorrow`: when the next ten come, what they make of the streak, and the reminder's ask); a line each for where
   the day leaves the league („Лига Странджа: 2-ро място от 12 · зона за качване“) and for the questions got wrong that
@@ -59,8 +61,15 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   (the last question let run out) is the full one, once, with what it earned. Then the day's goals; the ways to play
   with others, three in a row (the picture over
   the name on a phone); the topics, two by two (five to a row on a big screen, the picture over the name, each tile
-  as tall as what's in it), and all of them at once, with „Втори шанс“ right after it while questions wait (on a big
-  screen in one row after the topics with „България“, short tiles side by side). The streak's chip shows only a
+  as tall as what's in it), and Минали броеве across the row before them (the newest issue not played, „Брой 6 · 17
+  ноември“, or where one was left), with „Втори шанс“ right after it while questions wait (on a big screen in one row
+  after the topics with „България“, short tiles side by side). **Минали броеве** (`/issues`): every past day's ten,
+  newest first, as game rows (the issue and its date; the score once played, a way to go over it; else „Изиграй“ or
+  „Продължи · въпрос 4“), the line „Минал брой: не влиза в серията и в лигата.“ under the lead; an issue
+  (`/issues/6`) plays as a topic does, and its result has that line under the issue line and how it went against the
+  day's players („По-добре от 64% от играчите на този брой.“ from ten of them, „Средно на този брой: 6,4 от 10.“),
+  the day's ten gold while they wait, else the next issue not played. Opened also from Всички игри' Броеве and from
+  Моят Алманах's datelines of days not played. The streak's chip shows only a
   streak (or reserve days): a broken one that can still be won back as its days, unlit, „за връщане“ (with today's,
   once the day is played: what winning it back makes of it, as „Утре“ says too: „Ако върнеш серията днес, утре тя
   става 9.“); none at all rather than „0 дни поред“, the level's chip taking the row. A player back after days away

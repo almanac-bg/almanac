@@ -194,7 +194,7 @@ func (s *Server) streakMailOf(ctx context.Context, today string, userID int64) (
 		Unsubscribe: s.mailOffURL(userID, mailStreak)}
 	m.Text = "Въпросите на деня те чакат на almanac.bg. "
 	if repair != nil {
-		m.Text += "Изиграй ги днес заедно с още една игра и серията ти ще се върне."
+		m.Text += "Върни серията днес: " + repairWords(repair) + "."
 	} else {
 		m.Text += "Днес можеш да започнеш нова серия."
 	}
@@ -203,11 +203,25 @@ func (s *Server) streakMailOf(ctx context.Context, today string, userID int64) (
 	return m, true, nil
 }
 
-// wantsMail says whether a player gets a kind of mail: as they chose, else the streak's on and the day's off.
+// repairWords is what's left of a streak's repair (play/repair.go), as the game's word says it: „изиграй
+// пропуснатия брой от 17 ноември и днешния“.
+func repairWords(r *play.Repair) string {
+	missed := r.MissedWords()
+	switch {
+	case missed == "":
+		return "изиграй днешните въпроси"
+	case r.Day:
+		return "изиграй " + missed
+	}
+	return "изиграй " + missed + " и днешния"
+}
+
+// wantsMail says whether a player gets a kind of mail: as they chose, else the streak's and the year's on, the day's
+// off.
 func (s *Server) wantsMail(ctx context.Context, userID int64, kind mailKind) (bool, error) {
 	var on bool
 	err := s.db.Read.QueryRowContext(ctx, `SELECT coalesce((SELECT wanted FROM mail_prefs WHERE user_id = ? AND kind = ?), ?)`,
-		userID, kind, kind == mailStreak).Scan(&on)
+		userID, kind, kind == mailStreak || kind == mailYear).Scan(&on)
 	return on, err
 }
 
@@ -230,11 +244,16 @@ func (s *Server) mailOffURL(userID int64, kind mailKind) string {
 	return s.cfg.PublicURL + "/mail/off?" + q.Encode()
 }
 
-var mailOffPage = template.Must(template.New("off").Parse(`{{if .Done}}
+var mailOffPage = template.Must(template.New("off").Parse(`{{if and .Done .Year}}
+<p role="status">Готово. Няма да ти пращаме писмо с годината ти в играта.</p>
+{{else if .Done}}
 <p role="status">Готово. {{if .Day}}Няма да ти пишем, когато въпросите на деня те чакат.{{else}}Няма да ти пращаме писма, когато серията ти прекъсне.{{end}}</p>
 <p class="muted">Ако размислиш, включи писмата пак от <a href="/settings">Профил → Настройки → Известия</a>.</p>
 {{else if .Bad}}
 <p>Тази връзка не работи. Писмата можеш да спреш и от <a href="/settings">Профил → Настройки → Известия</a>.</p>
+{{else if .Year}}
+<p>Веднъж в годината, през декември, ти пращаме писмо с годината ти в играта.</p>
+<form method="post"><button class="btn" type="submit">Спри писмата</button></form>
 {{else if .Day}}
 <p>Пишем ти веднъж на ден, около часа, в който играеш, ако въпросите на деня още те чакат.</p>
 <form method="post"><button class="btn" type="submit">Спри писмата</button></form>
@@ -251,9 +270,9 @@ func (s *Server) mailOff(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	id, err := strconv.ParseInt(q.Get("u"), 10, 64)
 	kind := mailKind(q.Get("k"))
-	good := err == nil && (kind == mailStreak || kind == mailDay) &&
+	good := err == nil && (kind == mailStreak || kind == mailDay || kind == mailYear) &&
 		hmac.Equal([]byte(q.Get("s")), []byte(s.mailSign(id, kind)))
-	data := map[string]any{"Bad": !good, "From": StreakMailFrom, "Day": kind == mailDay}
+	data := map[string]any{"Bad": !good, "From": StreakMailFrom, "Day": kind == mailDay, "Year": kind == mailYear}
 	if good && r.Method == http.MethodPost {
 		if err := s.setMailPref(r.Context(), id, kind, false); err != nil {
 			slog.Error("mail off", "err", err)

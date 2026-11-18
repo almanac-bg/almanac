@@ -120,6 +120,7 @@ type Server struct {
 	heldOut       func(userID int64) bool
 	pushq         pushQueue     // the notifications' queue, as Push sends it (pushes.go)
 	streakMailing streakMailing // who is due the mail of a streak ended when, today (streakmail.go)
+	yearWording   yearWording   // who is due the year's word when, today, in December (yearword.go)
 	dayMailing    reminders     // who is due the day's reminder by mail when, today (daymail.go)
 	secure        bool
 	host          string
@@ -261,6 +262,9 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/day", s.startDay)
 	api("GET /api/day/{day}/board", s.board)
 	api("POST /api/topic", s.startTopic)
+	api("GET /api/issues", s.issues)
+	api("GET /api/issues/{n}", s.issue)
+	api("POST /api/issues/{n}", s.startIssue)
 	api("GET /api/mistakes", s.mistakes)
 	api("POST /api/mistakes", s.startMistakes)
 	api("GET /api/runs/left", s.left)

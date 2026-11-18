@@ -29,7 +29,7 @@ import { goBack, hold, release, title } from "../lib/router.ts";
 import { feelKit } from "../lib/sound.ts";
 import { dateWords, issueWords, onDay, weekday } from "../lib/words.ts";
 import { dayInBulgaria, yearNow } from "../lib/year.ts";
-import { met, notice, player, playing, user } from "../state.ts";
+import { categories, met, notice, player, playing, user } from "../state.ts";
 import {
   explain,
   failure,
@@ -56,7 +56,7 @@ import { type Goals, goalsCard, loadGoals, openGoals } from "./goals.ts";
 import { app, haveProfile, keepLine, keepStake, mailAsk } from "./keep.ts";
 import { leagueNote } from "./league.ts";
 import { clock, modes } from "./modes.ts";
-import { topics } from "./play.ts";
+import { type PastNext, topics } from "./play.ts";
 
 export interface Today {
   day: string;
@@ -73,9 +73,18 @@ export interface Today {
   kept?: string;
   /** A streak that just ended (the last 3 days): its days, and the day missed that ended it. */
   ended?: { days: number; on: string };
-  /** A streak that just ended and can be won back today (play/repair.go): its days, the day missed that ended it, and
-   * whether today's ten and another game are played. */
-  repair?: { days: number; on: string; day: boolean; other: boolean };
+  /** A streak that just ended and can be won back today (play/repair.go): its days, the day missed that ended it,
+   * whether today's ten are played, and each issue missed, played since or not (`open`: playable yet), and those
+   * still to play as a sentence says them (`words`: „пропуснатия брой от 17 ноември“; "" for none). */
+  repair?: {
+    days: number;
+    on: string;
+    day: boolean;
+    missed: { day: string; issue: number; done: boolean; open: boolean }[];
+    words: string;
+  };
+  /** The newest past issue the player hasn't played (play.LatestPast): where „Още десет“ goes after the day. */
+  past?: PastNext | null;
   /** The player's level, from all their XP (for a player). */
   level?: { level: number; xp: number; from: number; to: number };
   /** Whether the player has finished a game of any kind: until then Начало is the day and the topics only. */
@@ -254,16 +263,24 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
     bye = "";
     notice.set("");
     // The day's goals (shown once XP is open: play/unfold.go; the day just played may open it): what's next after the
-    // day, and where another game goes.
+    // day, and where another game goes: a goal's topic, else the newest past issue not played (Минали броеве took the
+    // place of the game of every topic), else a topic, a new one each day.
     const goals = signal<Goals | null>(null);
     if (user.peek() && (run?.done || t.repair)) loadGoals().then(goals.set, () => {});
-    const next = () => nextGame(fresh().open?.xp ? (goals()?.goals ?? []) : []);
+    const next = () => {
+      const past = fresh().past;
+      const topic = categories[Number(t.day.replaceAll("-", "")) % categories.length]?.id ?? "";
+      return nextGame(
+        fresh().open?.xp ? (goals()?.goals ?? []) : [],
+        past ? `/issues/${past.issue}` : `/play/${topic}`,
+      );
+    };
     // The day played: in full as it lands (or on its invite's page, or when its result was never on screen: what it
     // earned is told with it); on a later visit, one short card (dayDone), with the ways to play right under it.
     const full = !!run?.done && (just || !!elsewhere || t.untold === run.id);
     // Once played, a streak to win back has its card under the result, as it stands (the day just played may have
     // done it, or half of it).
-    const repairing = t.repair ? () => repairCard(fresh().repair, next) : null;
+    const repairing = t.repair ? () => repairCard(fresh().repair) : null;
     const tomorrow = run?.done
       ? tomorrowCard(
           t.day,
@@ -296,7 +313,7 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
       },
       // A streak that can be won back today, as it stands, while the day's ten wait (once played, its card is under
       // the result: the day just played may have done it); else what came of the days just missed, once.
-      t.repair ? (run?.done ? null : () => repairCard(fresh().repair, next)) : streakNotice(t),
+      t.repair ? (run?.done ? null : () => repairCard(fresh().repair)) : streakNotice(t),
       // One line at a time: a live game of the player's going on; of others, a friend played their challenge, said
       // yes to the invite, the duel left went on, or who else took their challenges.
       playingLine(t.playing) ??
@@ -384,7 +401,7 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
         // A later visit: the friends' day after the ways to play (beside the day on a big screen).
         run?.done && !full ? () => friendsDay(fresh()) : null,
       ),
-      topics(),
+      topics(t.past),
     );
   }
 }
@@ -411,7 +428,7 @@ function dayNext(
       streak: just ? t.streak + 1 : t.streak,
       rare: !!d.rarest && d.rarest.right <= rare,
       just,
-      repairing: !!t.repair && !t.repair.other,
+      repairing: !!t.repair?.missed.some((m) => !m.done),
     });
   const gold = signal<DayGold | null>(now ? null : weigh(t));
   now?.then(
@@ -577,24 +594,33 @@ function streakNotice(t: Today): Child {
   return h("p", { class: "streak-notice", role: "status" }, picture(t.kept ? "shield" : "flame", "reserve-pic"), text);
 }
 
-/** A streak just ended that can be won back today (play/repair.go): the day's ten and one more game, and what's left of
- * them, by midnight. Half done (the day's ten played), the card has the gold action: the other game, where a goal
- * points (`next`). Shown while it's on offer; told as the streak's end (so that it isn't said later that it ended),
- * and counted as offered, once, on the server. */
-function repairCard(r: Today["repair"], next: () => string): Child {
+/** A streak just ended that can be won back today (play/repair.go): the day missed, played as its past issue
+ * (screens/issues.ts), and today's ten, and what's left of them. The missed issue is the card's way: plain while the
+ * day's ten wait (their card has the gold „Започни“), gold once they're played. Shown while it's on offer; told as the
+ * streak's end (so that it isn't said later that it ended), and counted as offered, once, on the server. */
+function repairCard(r: Today["repair"]): Child {
   if (!r) return null;
   tellStreak(`ended:${r.on}`, true);
-  const left = r.day
-    ? "Остава още една игра днес и серията се връща."
-    : r.other
-      ? "Изиграй въпросите на деня до полунощ и серията се връща."
-      : "Върни я до полунощ: въпросите на деня и още една игра.";
+  // The issues missed still to play, as the server says them („пропуснатия брой от 17 ноември“), as its mails do.
+  const missed = r.words;
+  const text = !missed
+    ? "Изиграй и днешните въпроси, и серията се връща."
+    : r.day
+      ? `Изиграй и ${missed}, и серията се връща.`
+      : `Изиграй ${missed} и днешния, и серията се връща.`;
+  const first = r.missed.find((m) => !m.done);
   return h(
     "section",
-    { class: "card keep-card" },
+    { class: "card keep-card repair-card" },
     h("h2", null, `Серията ти от ${r.days} дни прекъсна`),
-    h("p", { class: "muted" }, left),
-    r.day && !r.other ? () => h("a", { class: "btn primary big", href: next() }, "Още една игра") : null,
+    h("p", { class: "muted" }, text),
+    first
+      ? h(
+          "a",
+          { class: r.day ? "btn primary big" : "btn", href: `/issues/${first.issue}` },
+          `Изиграй брой ${first.issue}`,
+        )
+      : null,
   );
 }
 
@@ -842,7 +868,8 @@ function tomorrowCard(
     h("h2", { class: "card-title" }, "Утре — нови десет"),
     h("p", { class: "muted" }, () => {
       const r = repair();
-      if (r?.day && !r.other) return `След ${left()}. Ако върнеш серията днес, утре тя става ${r.days + 2}.`;
+      if (r?.day && r.missed.some((m) => !m.done))
+        return `След ${left()}. Ако върнеш серията днес, утре тя става ${r.days + 2}.`;
       const n = streak();
       return `След ${left()}.${n > 0 ? ` Изиграй ги и серията ти става ${n + 1}.` : ""}`;
     }),

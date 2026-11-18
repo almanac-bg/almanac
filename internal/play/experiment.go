@@ -15,10 +15,11 @@ import (
 // bucket is worked out each time it's asked.
 //
 // The one experiment so far (the owner's call, 2026-11-18: DECISIONS.md): HeldReminders, a tenth of the players held
-// out of the day's notification and the streak's mail. What they would have had is kept as if sent, marked held
-// (push_reminded, streak_mails), by the same rules and at the same hour, so /admin compares those reminded with those
-// who weren't, and the difference is the reminder's. The day's reminder by mail isn't in it: a player asks for that
-// one, and gets it (server/daymail.go). /admin tells it from its first whole day (ExperimentFrom).
+// out of the day's notification and the streak's mail (and the year's notification). What they would have had is kept
+// as if sent, marked held (push_reminded, streak_mails, year_words), by the same rules and at the same hour, so /admin
+// compares those reminded with those who weren't, and the difference is the reminder's. The day's reminder by mail
+// isn't in it: a player asks for that one, and gets it (server/daymail.go); nor is the year's word by mail. /admin
+// tells it from its first whole day (ExperimentFrom).
 
 // HeldReminders is the experiment of the day's notification (server/remind.go) and the streak's mail
 // (server/streakmail.go).

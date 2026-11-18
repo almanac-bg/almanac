@@ -227,56 +227,57 @@ func TestGoalsAcrossMidnight(t *testing.T) {
 }
 
 // A repair is the games' day's, not the clock's: the day's questions begun before midnight and finished after it win
-// the streak back with a game played before midnight; and so does a game begun before midnight and finished within
-// DayGrace after it, with the day's questions played before.
+// the streak back with the missed issue played before midnight; and so does the missed issue begun before midnight
+// and finished after it (past the grace too: a game counts on the day it began as well), with the day's questions
+// played before. Begun after midnight, the next day is a day played since, and the offer is over.
 func TestRepairAcrossMidnight(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	ana, bo := w.user(), w.user()
+	ana, bo, gal, dan := w.user(), w.user(), w.user(), w.user()
 	w.at(15, 12, 0, 0)
-	w.daysPlayed(ana, 5, 4, 3) // a streak of three, ended yesterday
-	w.daysPlayed(bo, 5, 4, 3)
-	if r, _ := w.g.RepairOf(ctx, ana); r == nil {
-		t.Fatal("no repair on offer")
+	missed := "2026-11-14"
+	w.issueOn(missed)
+	for _, p := range []int64{ana, bo, gal, dan} {
+		w.daysPlayed(p, 5, 4, 3) // a streak of three, ended yesterday
 	}
-	// Ana: a topic's game at 23:50, the day's questions from 23:58 to 00:02.
-	w.at(15, 23, 50, 0)
-	w.topic(ana)
+	if r, _ := w.g.RepairOf(ctx, ana); r == nil || len(r.Missed) != 1 || r.Missed[0].Day != missed {
+		t.Fatalf("on offer: %+v", r)
+	}
+	right := func(int) func(int64, int) json.RawMessage { return w.right }
+	// Ana: the missed issue at 23:30, the day's questions from 23:58 to 00:02.
+	w.at(15, 23, 30, 0)
+	w.past(ana, missed, right)
 	w.sundayLate(ana)
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 4 || !slices.Equal(s.Mended, []string{"2026-11-14"}) {
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 4 || !slices.Equal(s.Mended, []string{missed}) {
 		t.Fatalf("Ana's repair across midnight: %+v", s)
 	}
-	// Bo: the day's questions at 23:50, a topic's game from 23:58 to 00:02.
+	// Bo and Gal: the day's questions at 23:50, the missed issue from 23:58 to 00:02, or to past the grace.
+	for _, p := range []struct {
+		user  int64
+		after time.Duration
+	}{{bo, 2 * time.Minute}, {gal, DayGrace + time.Minute}} {
+		w.at(15, 23, 50, 0)
+		w.playDay(p.user)
+		w.at(15, 23, 58, 0)
+		s, err := w.g.StartPast(ctx, p.user, missed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.playOn(p.user, s.ID, 0, repeat(w.right, Length/2)...)
+		w.at(16, 0, 0, 0)
+		w.wait(p.after)
+		w.playOn(p.user, s.ID, Length/2, repeat(w.right, Length-Length/2)...)
+		if s, _ := w.g.StreakOf(ctx, p.user); s.Days != 4 || !slices.Equal(s.Mended, []string{missed}) {
+			t.Fatalf("a repair across midnight, %v after it: %+v", p.after, s)
+		}
+	}
+	// Dan: the day's questions on Sunday, the missed issue begun on Monday: Sunday was a day played since.
 	w.at(15, 23, 50, 0)
-	w.playDay(bo)
-	w.at(15, 23, 58, 0)
-	s, err := w.g.StartTopic(ctx, bo, "history")
-	if err != nil {
-		t.Fatal(err)
-	}
-	n := len(w.picks(s.ID))
-	w.playOn(bo, s.ID, 0, repeat(w.right, n/2)...)
-	w.at(16, 0, 2, 0)
-	w.playOn(bo, s.ID, n/2, repeat(w.right, n-n/2)...)
-	if s, _ := w.g.StreakOf(ctx, bo); s.Days != 4 || !slices.Equal(s.Mended, []string{"2026-11-14"}) {
-		t.Fatalf("Bo's repair across midnight: %+v", s)
-	}
-	// A game finished past the grace is the next day's alone.
-	gal := w.user()
-	w.at(15, 12, 0, 0)
-	w.daysPlayed(gal, 5, 4, 3)
-	w.at(15, 23, 50, 0)
-	w.playDay(gal)
-	w.at(15, 23, 58, 0)
-	s, err = w.g.StartTopic(ctx, gal, "history")
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.at(16, 0, 0, 0)
-	w.wait(DayGrace + time.Minute)
-	w.playOn(gal, s.ID, 0, repeat(w.right, n)...)
-	if s, _ := w.g.StreakOf(ctx, gal); len(s.Mended) != 0 {
-		t.Fatalf("a game finished past the grace mended Sunday: %+v", s)
+	w.playDay(dan)
+	w.at(16, 9, 0, 0)
+	w.past(dan, missed, right)
+	if s, _ := w.g.StreakOf(ctx, dan); len(s.Mended) != 0 {
+		t.Fatalf("mended the day after: %+v", s)
 	}
 }
 

@@ -114,6 +114,8 @@ if (root) {
       { path: /^\/royal$/, view: later(() => import("./screens/royal.ts").then((m) => m.royal)) },
       { path: /^\/almanac$/, view: later(() => import("./screens/almanac.ts").then((m) => m.almanac)) },
       { path: /^\/mistakes$/, view: mistakes },
+      { path: /^\/issues$/, view: later(() => import("./screens/issues.ts").then((m) => m.issues)) },
+      { path: /^\/issues\/([0-9]{1,5})$/, view: later(() => import("./screens/issues.ts").then((m) => m.issue)) },
       { path: /^\/year\/([0-9]{4})$/, view: later(() => import("./screens/year.ts").then((m) => m.year)) },
       { path: /^\/room$/, view: rooms },
       { path: /^\/ranks$/, view: later(() => import("./screens/ranks.ts").then((m) => m.ranks)) },

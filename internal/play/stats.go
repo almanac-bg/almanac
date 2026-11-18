@@ -127,7 +127,7 @@ type Games struct {
 // gameKinds are the games a list of them can be narrowed to: the day's ten, games of topics (a second chance is
 // one), and games with others.
 var gameKinds = map[string]string{
-	"day":    `AND kind = 'day'`,
+	"day":    `AND kind IN ('day', 'past')`,
 	"topic":  `AND kind IN ('topic', 'mistakes')`,
 	"others": `AND kind IN ('duel', 'challenge', 'royal', 'room')`,
 }
@@ -161,7 +161,7 @@ func (g *Game) GamesOf(ctx context.Context, userID int64, kind, from string, lim
 		if p.Outcome != "" && p.Opponent == "" {
 			p.Opponent = GoneName // a duel's result keeps no name of a player who has gone (Forget)
 		}
-		if p.Kind == "day" {
+		if p.Kind == "day" || p.Kind == "past" {
 			p.Issue = Issue(p.Day)
 		}
 		out.Games = append(out.Games, p)

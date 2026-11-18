@@ -119,6 +119,8 @@ export interface Crowd {
   guesses?: Spread;
   /** A question of the day's ten: its players today, not everyone ever. */
   today?: boolean;
+  /** A question of a past issue: that day's players (play/past.go). */
+  issue?: boolean;
 }
 
 /** Typed guesses around a number's answer: equal parts of lo–hi (on a log scale if log), and the shares beyond. */

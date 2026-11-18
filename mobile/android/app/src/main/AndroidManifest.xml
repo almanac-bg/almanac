@@ -50,6 +50,8 @@
                 <data android:path="/settings" />
                 <data android:path="/almanac" />
                 <data android:path="/mistakes" />
+                <data android:path="/issues" />
+                <data android:pathPrefix="/issues/" />
             </intent-filter>
         </activity>
 

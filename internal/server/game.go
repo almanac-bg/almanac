@@ -157,6 +157,10 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 				out["invite"] = s.cfg.PublicURL + "/f/" + code
 			}
 		}
+		// The newest past issue they haven't played (play/past.go): where „Още десет“ goes after the day.
+		if out["past"], err = s.game.LatestPast(ctx, u.ID); err != nil {
+			return nil, err
+		}
 		// While today's ten wait, how yesterday's ended for them, once its board is final.
 		if !done {
 			if out["yesterday"], err = s.game.YesterdayOf(ctx, u.ID); err != nil {

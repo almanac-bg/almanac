@@ -197,21 +197,24 @@ function dateline(f: Learned, year: string): string {
  * that ends it (which tries again after a failed fetch). */
 function pages(topic: string, counted: (c: Counts) => void): Child {
   const days = h("div", { class: "almanac-days" });
-  const year = dayInBulgaria().slice(0, 4);
+  const today = dayInBulgaria();
+  const year = today.slice(0, 4);
   let day = "";
   let facts: HTMLElement | null = null;
   const add = (f: Learned, games: Record<string, number> = {}) => {
     if (f.day !== day || !facts) {
       day = f.day;
       facts = h("ol", { class: "almanac-list" }) as HTMLElement;
-      // The day's dateline, a way to that day's game of the day's ten where the player played it.
+      // The day's dateline, a way to that day's game of the day's ten where the player played it (on the day, or since
+      // as a past issue); else, a day gone by, to its past issue, to play it (screens/issues.ts).
       const when = h("time", { datetime: f.day }, dateline(f, year));
       const game = games[f.day];
+      const href = game ? `/games/${game}` : f.issue && f.day < today ? `/issues/${f.issue}` : "";
       days.append(
         h(
           "section",
           { class: "almanac-day" },
-          h("h2", { class: "kicker almanac-date" }, game ? h("a", { href: `/games/${game}` }, when) : when),
+          h("h2", { class: "kicker almanac-date" }, href ? h("a", { href }, when) : when),
           facts,
         ),
       );

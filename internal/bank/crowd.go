@@ -20,7 +20,8 @@ type Crowd struct {
 	// Guesses is, for a number, where the typed numbers fell.
 	Guesses *Spread
 	// Today is a crowd of the day's ten: the players of that day only, not everyone who ever had the question.
-	Today bool
+	// Issue is that crowd for a past issue played later (play/past.go): the players of its day.
+	Today, Issue bool
 }
 
 // Spread is where typed numbers fell around a number's answer: in SpreadBins equal parts of the range where a guess
@@ -154,6 +155,7 @@ type CrowdView struct {
 	Picks   []float64 `json:"picks,omitempty"`
 	Guesses *Spread   `json:"guesses,omitempty"`
 	Today   bool      `json:"today,omitempty"`
+	Issue   bool      `json:"issue,omitempty"`
 }
 
 // view is the crowd as shown, its picks put in the deal's order (order[i] is the bank's place of what's shown at i;
@@ -162,7 +164,7 @@ func (c *Crowd) view(order []int) *CrowdView {
 	if c == nil || c.Answers == 0 {
 		return nil
 	}
-	v := &CrowdView{Answers: c.Answers, Right: c.Right, Picks: c.Picks, Guesses: c.Guesses, Today: c.Today}
+	v := &CrowdView{Answers: c.Answers, Right: c.Right, Picks: c.Picks, Guesses: c.Guesses, Today: c.Today, Issue: c.Issue}
 	if order != nil && len(c.Picks) == len(order) {
 		v.Picks = make([]float64, len(order))
 		for i, b := range order {

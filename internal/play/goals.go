@@ -23,7 +23,7 @@ import (
 // day, and paid for speed, which XP never does (worth.go). What counts on a day is what was played on it, and the day's
 // questions count on their own day, all ten, though the last answers came after midnight (onDay): so a day run begun
 // at 23:58 finishes that day's goals, not the next's. A room's game counts only when someone else played it too: alone,
-// with easy questions, it's a shortcut. A goal done earns its tier's XP, kept as it's done (whether or not the player
+// with easy questions, it's a shortcut; a past issue never does (past.go). A goal done earns its tier's XP, kept as it's done (whether or not the player
 // looks; after.go keeps the goals of the day a game counts on, whenever that's done) and told once, at the end of the
 // game that did it. A day with all three done also earns a reserve day for the streak (runs.go), and counts towards
 // the achievements for full days.
@@ -68,18 +68,18 @@ var goalKinds = []goalKind{
 		reached: func(t *tally, _ string) int { return t.duels }},
 
 	{id: "eight", family: "eight", tier: 2, target: 1, name: "Отговори вярно на поне 8 от 10 въпроса в една игра",
-		href: "/play/all", reached: func(t *tally, _ string) int { return t.eight }},
+		reached: func(t *tally, _ string) int { return t.eight }},
 
 	// Retired: goals no longer drawn, kept for a day they were drawn for. How many right, in a row or how fast took
 	// several games away from the day, and paid for speed (owner, 2026-11-18); the rest gave way to the kinds above.
 	// Before that: the evening Роял rarely lasts to a fifth question; a game without a mistake, or a number to the
 	// unit, is mostly luck.
 	{id: "right20", family: "right", tier: 1, target: 20, retired: true, name: "Отговори вярно на 20 въпроса",
-		href: "/play/all", reached: func(t *tally, _ string) int { return t.right }},
+		reached: func(t *tally, _ string) int { return t.right }},
 	{id: "row5", family: "row", tier: 1, target: 5, retired: true, name: "Отговори вярно на 5 въпроса поред",
-		href: "/play/all", reached: func(t *tally, _ string) int { return t.row }},
+		reached: func(t *tally, _ string) int { return t.row }},
 	{id: "fast5", family: "fast", tier: 1, target: 5, retired: true,
-		name: "Отговори вярно 5 пъти, всеки път за по-малко от 5 секунди", href: "/play/all",
+		name:    "Отговори вярно 5 пъти, всеки път за по-малко от 5 секунди",
 		reached: func(t *tally, _ string) int { return t.fast }},
 	{id: "know", family: "topic", tier: 1, target: 5, about: "topic", retired: true,
 		name: "Отговори вярно на 5 въпроса по тема „{}“", href: "/play/{}",
@@ -87,28 +87,28 @@ var goalKinds = []goalKind{
 	{id: "topics2", family: "topic", tier: 1, target: 2, retired: true, name: "Изиграй игри по две различни теми",
 		reached: func(t *tally, _ string) int { return t.distinctTopics() }},
 	{id: "type", family: "type", tier: 1, target: 3, about: "type", retired: true, name: "Отговори вярно на 3 въпроса {}",
-		href: "/play/all", reached: func(t *tally, ty string) int { return t.rightOf[ty] }},
+		reached: func(t *tally, ty string) int { return t.rightOf[ty] }},
 	{id: "friendDuel", family: "duel", tier: 1, target: 1, retired: true, name: "Изиграй предизвикателство с приятел",
 		href: "/friends", reached: func(t *tally, _ string) int { return t.friendDuels }},
 	{id: "royal", family: "royal", tier: 1, target: 1, retired: true, name: "Влез в Роял довечера", href: "/royal",
 		reached: func(t *tally, _ string) int { return t.royals }},
 	{id: "right30", family: "right", tier: 2, target: 30, retired: true, name: "Отговори вярно на 30 въпроса",
-		href: "/play/all", reached: func(t *tally, _ string) int { return t.right }},
+		reached: func(t *tally, _ string) int { return t.right }},
 	{id: "fast8", family: "fast", tier: 2, target: 8, retired: true,
-		name: "Отговори вярно 8 пъти, всеки път за по-малко от 5 секунди", href: "/play/all",
+		name:    "Отговори вярно 8 пъти, всеки път за по-малко от 5 секунди",
 		reached: func(t *tally, _ string) int { return t.fast }},
 	{id: "topics3", family: "topic", tier: 2, target: 3, retired: true, name: "Изиграй игри по три различни теми",
 		reached: func(t *tally, _ string) int { return t.distinctTopics() }},
 	{id: "duelWin", family: "duel", tier: 2, target: 1, retired: true, name: "Спечели дуел", href: "/duel",
 		reached: func(t *tally, _ string) int { return t.duelWins }},
 	{id: "right40", family: "right", tier: 2, target: 40, retired: true, name: "Отговори вярно на 40 въпроса",
-		href: "/play/all", reached: func(t *tally, _ string) int { return t.right }},
+		reached: func(t *tally, _ string) int { return t.right }},
 	{id: "fast12", family: "fast", tier: 2, target: 12, retired: true,
-		name: "Отговори вярно 12 пъти, всеки път за по-малко от 5 секунди", href: "/play/all",
+		name:    "Отговори вярно 12 пъти, всеки път за по-малко от 5 секунди",
 		reached: func(t *tally, _ string) int { return t.fast }},
 	{id: "perfect", family: "perfect", tier: 2, target: 1, retired: true, name: "Изиграй цяла игра без грешка",
-		href: "/play/all", reached: func(t *tally, _ string) int { return t.perfect }},
-	{id: "exact", family: "type", tier: 2, target: 1, retired: true, name: "Познай число точно", href: "/play/all",
+		reached: func(t *tally, _ string) int { return t.perfect }},
+	{id: "exact", family: "type", tier: 2, target: 1, retired: true, name: "Познай число точно",
 		reached: func(t *tally, _ string) int { return t.exact }},
 	{id: "royal5", family: "royal", tier: 2, target: 5, retired: true, name: "Отговори вярно на 5 въпроса в Роял",
 		href: "/royal", reached: func(t *tally, _ string) int { return t.royalBest }},
@@ -408,10 +408,10 @@ const fastMs = 5000
 
 // onDay is a SQL condition on a run (r): that it's finished and counts on a day, ?2 and ?3 its bounds in ms and ?4
 // its date. A run of the day's questions counts on its own day, though its last answer came after midnight
-// (DayGrace); any other game on the day it ended.
+// (DayGrace); any other game on the day it ended; a past issue never (past.go: outside the day's goals).
 func onDay(r string) string {
-	return `(` + r + `.finished_at IS NOT NULL AND CASE WHEN ` + r + `.kind = 'day' THEN ` + r + `.day = ?4
-		ELSE ` + r + `.finished_at BETWEEN ?2 AND ?3 END)`
+	return `(` + r + `.finished_at IS NOT NULL AND ` + r + `.kind <> 'past'
+		AND CASE WHEN ` + r + `.kind = 'day' THEN ` + r + `.day = ?4 ELSE ` + r + `.finished_at BETWEEN ?2 AND ?3 END)`
 }
 
 // tallyOf is how far a player's day has got: the games they finished and the answers they gave that day.
@@ -473,6 +473,7 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 		FROM answers a JOIN runs r ON r.id = a.run_id
 		WHERE r.user_id = ?1 AND r.started_at >= ?2 - 86400000 AND r.started_at < ?3 AND r.id <> ?5
 			AND `+together("r")+`
+			AND r.kind <> 'past'
 			AND CASE WHEN r.kind = 'day' THEN r.day = ?4 ELSE a.at BETWEEN ?2 AND ?3 END
 		ORDER BY a.run_id, a.n`, userID, from, to, day, except)
 	if err != nil {

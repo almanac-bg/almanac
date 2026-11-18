@@ -6540,6 +6540,14 @@
     white-space: nowrap;
   }
 
+  /* Минали броеве (issues.ts): an issue not played yet, or left half-way, says the way on where a score would be. */
+  .issue-go {
+    color: var(--link);
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-align: right;
+  }
+
   .settings {
     display: grid;
     gap: var(--space-5);

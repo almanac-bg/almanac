@@ -29,6 +29,7 @@ import {
   reviewParts,
   scoreCard,
   shareButton,
+  summary,
 } from "./game/results.ts";
 import { guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
 import { count, duelShareText, yearShareText } from "./game/share.ts";
@@ -64,7 +65,7 @@ import {
   soundOn,
 } from "./lib/sound.ts";
 import { stream } from "./lib/stream.ts";
-import { issueWords, listWords, withName } from "./lib/words.ts";
+import { dateWords, issueWords, listWords, weekday, withName } from "./lib/words.ts";
 import { dayInBulgaria, yearNow } from "./lib/year.ts";
 import type { DuelView } from "./screens/duel.ts";
 import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
@@ -72,7 +73,7 @@ import { leagueBoard, leagueLine, loadLeague } from "./screens/league.ts";
 import { clock, coming, dayAndTime, dayWord, whileSeen } from "./screens/modes.ts";
 import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
-import { loadMistakes } from "./screens/play.ts";
+import { loadMistakes, run as runGame } from "./screens/play.ts";
 import { loadProgress, nearest } from "./screens/progress.ts";
 import { changeGame, mixes } from "./screens/rooms.ts";
 import { signIn } from "./screens/signin.ts";
@@ -127,6 +128,7 @@ import {
 export const kit = {
   answered,
   answering,
+  ApiError,
   answerState,
   api,
   ask,
@@ -151,6 +153,7 @@ export const kit = {
   crowdLine,
   dayInBulgaria,
   dayAndTime,
+  dateWords,
   dayWord,
   duelShareText,
   duelResult,
@@ -229,6 +232,7 @@ export const kit = {
   reviewed,
   reviewParts,
   rewardWords,
+  runGame,
   scoreCard,
   segmented,
   setTextSize,
@@ -250,6 +254,7 @@ export const kit = {
   stats,
   staying,
   stream,
+  summary,
   tally,
   tickOn,
   tiers,
@@ -272,6 +277,7 @@ export const kit = {
   verdict,
   verdictWords,
   vibrateOn,
+  weekday,
   when,
   whileSeen,
   who,
