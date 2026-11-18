@@ -24,6 +24,10 @@ packages' doc comments; this file holds only what must not drift.
 
 - **The day's ten questions are the heart;** everything else serves them or stays out of the way. A new system replaces
   one or proves it's needed (CLAUDE.md, Direction).
+- **For everyone, not for a group.** The game is made for any player, not tailored to one audience (children,
+  classrooms, schools): no levels, question pools, filters, reports or texts that exist for one group. Rooms serve
+  anyone who plays together, whether family, friends, a pub or a class, with the same rules for all (owner,
+  2026-11-18, after the product review's classroom items).
 - **Points, XP and rating are kept apart** (`play/worth.go`). The word stays **XP**, not „опит“: „опит“ already means a
   try in the game's texts.
 - **Live means live.** Duels are played at once, with a recording of a real game when nobody comes; Роял is online only,
