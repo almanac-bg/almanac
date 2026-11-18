@@ -2059,8 +2059,8 @@ func TestTitles(t *testing.T) {
 
 	// Until they choose, a player wears their level's title, the newest as the level grows: none at the start (the
 	// first, everyone's, would only mark them new on every board), though it's theirs to choose.
-	if look, _ := w.g.LookOf(ctx, ana); look.Title != "" || p.Title != "" {
-		t.Fatalf("a new player's title: %+v %q", look, p.Title)
+	if look, _ := w.g.LookOf(ctx, ana); look.Title != "" || p.Title != "" || !p.TitleByLevel {
+		t.Fatalf("a new player's title: %+v %q, by level %v", look, p.Title, p.TitleByLevel)
 	}
 	if err := w.g.SetLook(ctx, ana, nil, ptr("spark")); err != nil {
 		t.Fatalf("the first title, chosen: %v", err)
@@ -2101,8 +2101,8 @@ func TestTitles(t *testing.T) {
 	if look, _ := w.g.LookOf(ctx, ana); look.Title != "" {
 		t.Fatalf("no title, chosen: %+v", look)
 	}
-	if p, _ := w.g.ProgressOf(ctx, ana); p.Title != "" {
-		t.Fatalf("no title, chosen, in the wardrobe: %q", p.Title)
+	if p, _ := w.g.ProgressOf(ctx, ana); p.Title != "" || p.TitleByLevel {
+		t.Fatalf("no title, chosen, in the wardrobe: %q, by level %v", p.Title, p.TitleByLevel)
 	}
 	if err := w.g.SetLook(ctx, ana, nil, ptr("passion")); err != nil {
 		t.Fatalf("level 5's title: %v", err)

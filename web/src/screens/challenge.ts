@@ -117,12 +117,20 @@ function asked(c: Challenge, screen: ReturnType<typeof slot>, here: () => boolea
     screen.show(() => asked(c, screen, here, why));
   };
   // The one who sent it sees who took it: a name of the player's own first, if they still have the one drawn for them
-  // (name.ts); then the count, the game's entry held from it.
-  const start = () =>
-    nameFirst().then(
-      (on) => on && here() && count(),
-      (err) => here() && screen.show(() => asked(c, screen, here, errorText(err))),
-    );
+  // (name.ts); then the count, the game's entry held from it. One start at a time: a double tap is one guest, one ask.
+  let busy = false;
+  const start = () => {
+    if (busy) return;
+    busy = true;
+    nameFirst()
+      .then(
+        (on) => on && here() && count(),
+        (err) => here() && screen.show(() => asked(c, screen, here, errorText(err))),
+      )
+      .finally(() => {
+        busy = false;
+      });
+  };
   const count = () => {
     hold();
     screen.show(() =>

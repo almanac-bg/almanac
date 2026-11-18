@@ -107,7 +107,7 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
           h("strong", { class: "worn-name" }, user()?.name ?? ""),
           worn
             ? h("span", { class: `me-title t-${worn.tier}` }, worn.name)
-            : h("span", { class: "muted small" }, "Без титла"),
+            : h("span", { class: "muted small" }, p.titleByLevel ? "Още без титла" : "Без титла"),
         ),
       ),
       h(
@@ -252,7 +252,13 @@ function titles(p: Progress, set: (body: { title: string }) => void): Child {
         null,
         h(
           "button",
-          { class: "title-pick", type: "button", "aria-pressed": !p.title, onclick: () => set({ title: "" }) },
+          // Pressed only when chosen: a player who hasn't chosen wears their level's title as it comes.
+          {
+            class: "title-pick",
+            type: "button",
+            "aria-pressed": !p.title && !p.titleByLevel,
+            onclick: () => set({ title: "" }),
+          },
           h("span", { class: "title-name" }, "Без титла"),
         ),
       ),

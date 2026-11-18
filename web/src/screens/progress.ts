@@ -12,6 +12,8 @@ export interface Progress {
   achievements: AchievementInfo[];
   avatar: string;
   title: string;
+  /** No title chosen yet: the level's is worn (`title`; "" before „Любопитен ум“), not „Без титла“, a choice. */
+  titleByLevel?: boolean;
   shapes: { shape: string; locked?: boolean; how?: string }[];
   tones: string[];
   standing: Standing;

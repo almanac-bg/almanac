@@ -51,13 +51,22 @@ export const outcomeCss = boot.outcomeCss ?? "";
  * invite, a shared day, a room …), whatever pages they went through before their first game. */
 const landing = location.pathname;
 
+/** A guest on its way: one, however many ask for the player meanwhile (a double tap on a first „Започни“). */
+let making: Promise<User> | null = null;
+
 /** The player, made a guest first if they have no account yet (the first time they play). */
-export async function player(): Promise<User> {
+export function player(): Promise<User> {
   const u = user.peek();
-  if (u) return u;
-  const r = await api<{ user: User }>("POST", "/api/guest", { from: landing });
-  user.set(r.user);
-  return r.user;
+  if (u) return Promise.resolve(u);
+  making ??= api<{ user: User }>("POST", "/api/guest", { from: landing })
+    .then((r) => {
+      user.set(r.user);
+      return r.user;
+    })
+    .finally(() => {
+      making = null;
+    });
+  return making;
 }
 
 /** What became of the profile just now, said once where the player lands, on Начало: deleted (Настройки), or a game

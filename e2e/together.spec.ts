@@ -257,6 +257,21 @@ test("two people asking for a duel play it live", async ({ browser }, info) => {
       await b.getByRole("button", { name: "Остани" }).click();
       await expect(his).toBeHidden();
     }
+    // Bo, still with his drawn name, left and back by „Върни се“ as if on a device never asked (its ask is its own):
+    // no name asked over the clock; nor, after, for the rematch.
+    if (n === 4) {
+      await b.evaluate(() => localStorage.removeItem("almanac.nameAsked"));
+      await b.getByRole("link", { name: "Към Начало", exact: true }).click();
+      await b.getByRole("button", { name: "Излез" }).click();
+      await expect(b).toHaveURL(/\/$/);
+      await b
+        .getByRole("status")
+        .filter({ hasText: "Дуелът ти продължава" })
+        .getByRole("link", { name: "Върни се" })
+        .click();
+      await expect(b.locator(".question-head")).toContainText("5 от 10", { timeout: 15_000 });
+      await expect(b.getByRole("dialog")).toHaveCount(0);
+    }
     // Ana answers: Bo sees that she has, not what; then both answers show, side by side.
     await answer(a);
     await expect(b.locator(".live-doing")).toContainText("Отговори за");
