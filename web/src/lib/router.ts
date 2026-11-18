@@ -403,8 +403,11 @@ function render(y: number, first = false): void {
   c.seen.observe(c.node, { childList: true, subtree: true });
 }
 
-/** How long the screen before stays while the next gets ready (ms): past it, the next comes as it is, its waits drawn. */
-const patience = 300;
+/** How long the screen before stays while the next gets ready (ms): past it, the next comes as it is, its waits drawn
+ * in the page's shape. A tap must answer at once: anything past a frame or two reads as a tap that didn't take (the
+ * owner, 2026-11-18: „цъкаш, и чакаш, и нищо не се случва“), so this only spares a flash of waits for a screen that is
+ * a moment from whole; never a wait the player can see. */
+const patience = 50;
 
 /** How long a screen come before it was ready is waited for to be whole (ms): past it, it's left as it is. */
 const longest = 10_000;
