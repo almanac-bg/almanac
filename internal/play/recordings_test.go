@@ -60,11 +60,63 @@ func TestRecordingsOverAllTopicsFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// A game over all the topics by a player near her: it comes before the history game, even with every one of its
-	// questions seen and none of the other's.
+	// A game over all the topics by a player near her: it comes before the history game while she hasn't seen it.
 	nearAll := game(near, "")
-	if rec := pick(all(nearAll)); rec == nil || rec.id != nearAll || rec.topic != "" {
+	if rec := pick(nil); rec == nil || rec.id != nearAll || rec.topic != "" {
 		t.Fatalf("got %+v, want the game over all topics %d (history %d, far %d)", rec, nearAll, history, farAll)
+	}
+	// With every one of its questions seen (the same ten again), it comes after every game she hasn't: the history
+	// game by the player near her.
+	if rec := pick(all(nearAll)); rec == nil || rec.id != history {
+		t.Fatalf("got %+v, want the history game %d, not the ten she has seen (%d)", rec, history, nearAll)
+	}
+	// Only seen games left: the one with the fewest seen still plays, rather than nobody.
+	seen := all(nearAll)
+	for id := range all(history) {
+		seen[id] = true
+	}
+	for id := range all(farAll) {
+		seen[id] = true
+	}
+	if rec := pick(seen); rec == nil {
+		t.Fatal("every game seen: still one to play, got none")
+	}
+}
+
+// A friend's challenge, once both have played it, is no recording for the one who took it: the same ten questions
+// again. Another real game comes first, however far its player's rating.
+func TestRecordingsNotTheSameTenAgain(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	friend, far, ana := w.user(), w.user(), w.user()
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1000 WHERE id IN (?, ?)`, friend, ana)
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1600 WHERE id = ?`, far)
+	game := func(user int64) int64 {
+		s, err := w.g.StartTopic(ctx, user, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.play(user, s.ID, append(repeat(w.right, 6), repeat(w.wrong, Length-6)...)...)
+		w.wait(time.Minute)
+		return s.ID
+	}
+	other := game(far)
+	friends := game(friend)
+	// Ana has seen the friend's ten (she played them as his challenge).
+	seen := map[string]bool{}
+	for _, p := range w.picks(friends) {
+		seen[p.ID] = true
+	}
+	var rec *recorded
+	if err := w.db.Tx(ctx, func(tx *sql.Tx) error {
+		var err error
+		rec, err = w.g.recordedRun(tx, ana, seen)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if rec == nil || rec.id != other {
+		t.Fatalf("got %+v, want the game she hasn't seen %d, not the friend's ten again %d", rec, other, friends)
 	}
 }
 

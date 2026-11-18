@@ -398,6 +398,7 @@ const (
 	RecordingBand   = 150
 	RecordingRights = 3
 	RecordingMissed = 2
+	RecordingSeen   = 3
 )
 
 // recordedRun is another player's finished run of ten questions (none still played against: a duel's, a challenge's),
@@ -407,7 +408,9 @@ const (
 // is within RecordingBand of the player's, the one with the fewest questions the player has seen (seen, read before
 // the write) or a day ahead holds (ahead.go: a game played before those days were drawn may have them), the latest
 // first. Short of such, the nearest it gets: any real game, then any game. At each of these, a game over all the topics (a duel's) comes before one in a
-// single topic, which the duel's player didn't choose. Nil if there's none.
+// single topic, which the duel's player didn't choose. Above all of it, a game with more than RecordingSeen of its
+// questions seen by the player comes after every game with fewer: the same ten again (a friend's challenge the player
+// has just played, then the friend's game as a recording) is no duel, however near the rating. Nil if there's none.
 func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*recorded, error) {
 	days, err := g.days(tx)
 	if err != nil {
@@ -433,9 +436,10 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 	defer rows.Close()
 	b := g.Bank()
 	// The best of each kind: in the band and real (0, 1), real (2, 3), any (4, 5), each over all the topics first,
-	// then in one; each the fewest seen, the latest first.
-	var best [6]*recorded
-	var fewest [6]int
+	// then in one; each the fewest seen, the latest first. Those with more than RecordingSeen seen: the same six after
+	// all of them (6–11).
+	var best [12]*recorded
+	var fewest [12]int
 	for i := range fewest {
 		fewest[i] = Length + 1
 	}
@@ -467,6 +471,9 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 		one := 0 // a single topic's game: after the games over all of them
 		if topic != "" {
 			one = 1
+		}
+		if n > RecordingSeen {
+			one += 6 // mostly seen: after every game the player hasn't
 		}
 		for level, fits := range [3]bool{real && abs(rating-mine) <= RecordingBand, real, true} {
 			if kind := 2*level + one; fits && n < fewest[kind] {
