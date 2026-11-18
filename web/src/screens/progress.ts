@@ -25,12 +25,14 @@ export interface Progress {
   backdrop: string;
   frames: Cosmetic[];
   backdrops: Cosmetic[];
-  /** What comes next: the next level that unlocks something, and the division above the rating. */
+  /** What comes next: the next level that unlocks something, the division above the rating (once it's set), and the
+   * next title of the days on which the day's questions were played. */
   next: {
     level?: number;
     levelUnlocks: Unlock[];
     division?: Division;
     divisionUnlocks: Unlock[];
+    days?: { title: Unlock; days: number; have: number };
   };
   /** What the first achievement of a tier unlocks, of what the player doesn't have yet. */
   tierUnlocks: Partial<Record<Tier, Unlock[]>>;
@@ -56,8 +58,9 @@ export const loadProgress = () =>
 
 /** A title as the wardrobe lists it: yours to wear, or locked with what unlocks it. */
 export interface TitleView extends TitleRef {
-  /** Where it comes from: the level, an achievement, a topic's mastery, or the rating and the league (a division, Роял, first place in a high league). */
-  group: "level" | "achievement" | "topic" | "rank";
+  /** Where it comes from: the level, the days of the day's questions, an achievement, a topic's mastery, or the rating
+   * and the league (a division, Роял, first place in a high league). */
+  group: "level" | "days" | "achievement" | "topic" | "rank";
   locked?: boolean;
   how?: string;
 }

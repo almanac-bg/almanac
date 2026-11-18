@@ -43,10 +43,18 @@ test("every achievement has a picture of its own, and every medal is drawn", () 
   for (const tier of ["common", "rare", "epic", "legendary"]) assert.ok(pictures[`badge-${tier}`], `badge ${tier}`);
 });
 
-test("every frame and division is drawn", () => {
+test("every frame and division is drawn, and every pattern has its style", () => {
   const wardrobe = read("internal/play/wardrobe.go");
+  const css = read("web/src/app.css");
   const frames = wardrobe.slice(wardrobe.indexOf("var Frames"), wardrobe.indexOf("var Backdrops"));
-  for (const [, id] of frames.matchAll(/\{"([a-z0-9]+)", "/g)) assert.ok(pictures[`frame-${id}`], `frame ${id}`);
+  for (const [, id] of frames.matchAll(/\{"([a-z0-9]+)", "/g)) {
+    assert.ok(pictures[`frame-${id}`], `frame ${id}`);
+    assert.match(css, new RegExp(`\\.fr-${id}\\b`), `frame ${id} has no tone in app.css (.fr-${id})`);
+  }
+  const backdrops = wardrobe.slice(wardrobe.indexOf("var Backdrops"), wardrobe.indexOf("// wardrobe is"));
+  const ids = [...backdrops.matchAll(/\{"([a-z0-9]+)", "/g)].map((m) => m[1] ?? "");
+  assert.ok(ids.length >= 5);
+  for (const id of ids) assert.match(css, new RegExp(`\\.bd-${id} \\{`), `pattern ${id} has no style in app.css`);
   for (const d of ["bronze", "silver", "gold", "platinum", "diamond", "legend"])
     assert.ok(pictures[`division-${d}`], `division ${d}`);
 });

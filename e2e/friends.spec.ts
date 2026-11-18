@@ -75,8 +75,8 @@ test("friends: an invite link, then a challenge between the two", async ({ brows
   await expect(b.locator(".challenge-notice")).toHaveCount(0);
   await expect(b.getByRole("heading", { name: /Победа|Загуба|Равенство/ })).toBeVisible({ timeout: 10_000 });
   await expect(b.locator(".duel-head .kicker")).toHaveText(/^Предизвикателство от \S/);
-  // The duel question by question, both rows; the first rated duel moves the rating, said with its division; and
-  // the record between the two, this duel in it.
+  // The duel question by question, both rows; the first rated duel moves the rating, said with how far its setting has
+  // come (no division yet); and the record between the two, this duel in it.
   await expect(b.locator(".duel-marks .duel-pip:is(.right, .partial, .wrong)")).toHaveCount(20);
   await expect(b.locator(".duel-face .duel-points")).toHaveCount(2);
   const state = (await b.locator(".duel-verdict").textContent()) ?? "";

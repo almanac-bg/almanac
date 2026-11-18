@@ -8,8 +8,10 @@ import (
 	"strconv"
 )
 
-// Rating is a player's strength in duels: Elo, from 1000, moved by every duel that counts. It shows as a division. It
-// has no seasons: the weekly race is the leagues' (leagues.go), on playing, not on strength.
+// Rating is a player's strength in duels: Elo, from 1000, moved by every duel that counts. It shows as a division once
+// it's set: its first MinRatedGames games place it (Placed), and until then it says so, „Рейтингът се определя · 4 от
+// 10“, not „Бронз“ from a win or two. It has no seasons: the weekly race is the leagues' (leagues.go), on playing, not
+// on strength.
 
 // StartRating is where every player starts.
 const StartRating = 1000
@@ -22,16 +24,22 @@ type Division struct {
 	From int    `json:"from"`
 }
 
-// Divisions from the lowest up; each begins at From. Everyone starts in Бронз; a few wins make Сребро, and each
-// division after takes more (Elo keeps the average near the start, so the top ones stay rare).
+// Divisions from the lowest up; each begins at From. Elo keeps the average near the start (duels are zero-sum), so
+// the bands are set by the share of players in each, not by the start: a placed player of average strength is in
+// Сребро, about a third are below it in Бронз, and each division above takes more, the top ones rare. With Сребро
+// from above the start (it was 1050), more than half of all players read „Бронз“ after every duel for good (review
+// 2026-11-18, E5); /admin's share of players by division says whether the bands still fit.
 var Divisions = []Division{
 	{"bronze", "Бронз", 0},
-	{"silver", "Сребро", 1050},
-	{"gold", "Злато", 1150},
-	{"platinum", "Платина", 1300},
-	{"diamond", "Диамант", 1450},
-	{"legend", "Легенда", 1600},
+	{"silver", "Сребро", 900},
+	{"gold", "Злато", 1050},
+	{"platinum", "Платина", 1200},
+	{"diamond", "Диамант", 1350},
+	{"legend", "Легенда", 1500},
 }
+
+// Placed says whether a rating is set, from so many rated games: until then it shows no division.
+func Placed(rated int) bool { return rated >= MinRatedGames }
 
 // DivisionOf is the division a rating is in, and where the next one starts (0 at the top).
 func DivisionOf(rating int) (Division, int) {
@@ -68,14 +76,26 @@ type Standing struct {
 	Division Division `json:"division"`
 	// Next is the rating the next division starts at (0 at the top).
 	Next int `json:"next"`
+	// Of is how many rated games place the rating (MinRatedGames), while it's still being set (not Placed): then it
+	// shows as „Рейтингът се определя · Rated от Of“, not by its division. 0 once placed.
+	Of int `json:"of,omitempty"`
+}
+
+// standingAt is a rating from so many rated games, as a player sees it.
+func standingAt(rating, rated int) Standing {
+	s := Standing{Rating: rating, Rated: rated}
+	s.Division, s.Next = DivisionOf(rating)
+	if !Placed(rated) {
+		s.Of = MinRatedGames
+	}
+	return s
 }
 
 // StandingOf reads a player's rating.
 func (g *Game) StandingOf(ctx context.Context, userID int64) (Standing, error) {
-	var s Standing
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT rating, rated FROM users WHERE id = ?`, userID).Scan(&s.Rating, &s.Rated)
-	s.Division, s.Next = DivisionOf(s.Rating)
-	return s, err
+	var rating, rated int
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT rating, rated FROM users WHERE id = ?`, userID).Scan(&rating, &rated)
+	return standingAt(rating, rated), err
 }
 
 // Ranked is a player on a board: who they are, and the number the board is by (a rating, or the percent of a topic
@@ -119,7 +139,8 @@ func among(friends bool) string {
 	return ` AND (u.id = ?2 OR u.id IN (SELECT friend_id FROM friends WHERE user_id = ?2))`
 }
 
-// MinRatedGames is how many rated games put a player on the rating's board: a win or two isn't a rating yet.
+// MinRatedGames is how many rated games set a rating (Placed), and put a player on the rating's board and in a
+// division: a win or two isn't a rating yet.
 const MinRatedGames = 10
 
 // onRatingBoard is who's on the rating's board, as the index of it (users_rated) says it: SQLite uses an index of

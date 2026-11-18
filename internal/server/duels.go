@@ -17,7 +17,8 @@ import (
 	"github.com/almanac-bg/almanac/internal/push"
 )
 
-// livePlayer is a player as a live duel shows them: name, tag, look and rating.
+// livePlayer is a player as a live duel shows them: name, tag, look and rating, and its division once it's placed
+// (play.Placed; none while it's still being set).
 func (s *Server) livePlayer(ctx context.Context, id int64) (live.Player, error) {
 	var p live.Player
 	err := s.db.Read.QueryRowContext(ctx, `SELECT name, tag FROM users WHERE id = ?`, id).Scan(&p.Name, &p.Tag)
@@ -29,7 +30,10 @@ func (s *Server) livePlayer(ctx context.Context, id int64) (live.Player, error) 
 		return p, err
 	}
 	st, err := s.game.StandingOf(ctx, id)
-	p.Rating, p.Division = st.Rating, st.Division
+	p.Rating = st.Rating
+	if st.Of == 0 {
+		p.Division = st.Division
+	}
 	return p, err
 }
 

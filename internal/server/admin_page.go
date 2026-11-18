@@ -15,7 +15,7 @@ import (
 // adminSections are /admin's parts, as its menu names them: on /admin, but the questions, on a page of their own.
 var adminSections = []struct{ ID, Name string }{
 	{"reminders", "Напомняния"}, {"back", "Връщане"}, {"path", "Път"}, {"habit", "Навик"}, {"streaks", "Серии"},
-	{"fair", "Честна игра"}, {"notices", "Известия"}, {"games", "Игри"}, {"players", "Играчи"},
+	{"fair", "Честна игра"}, {"notices", "Известия"}, {"games", "Игри"}, {"divisions", "Дивизии"}, {"players", "Играчи"},
 }
 
 var adminFrame = template.Must(template.New("admin-page").Parse(`<!doctype html>
@@ -196,6 +196,16 @@ var adminBody = template.Must(template.New("admin").Parse(`
 </tbody></table></div>
 </section>
 {{end}}
+
+<section class="admin-section" id="divisions">
+<h2>Дивизии</h2>
+<p class="muted">Играчите с определен рейтинг (поне 10 игри с рейтинг) по дивизии. Границите са сложени така, че около
+една трета да е в Бронз, а средният играч в Сребро; ако делът се отмести много, границите се местят. Още се определя
+рейтингът на {{.Placing}}.</p>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th>Дивизия</th><th class="num">От рейтинг</th><th class="num">Играчи</th><th class="num">Дял</th></tr></thead><tbody>
+{{range .Divisions}}<tr><td>{{.Name}}</td><td class="num">{{.From}}</td><td class="num">{{.Players}}</td><td class="num">{{.Share}}</td></tr>{{end}}
+</tbody></table></div>
+</section>
 
 `))
 

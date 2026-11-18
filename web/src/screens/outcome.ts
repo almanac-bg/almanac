@@ -336,32 +336,55 @@ function meant(d: DuelView): Child {
   return h(
     "div",
     { class: "duel-meant" },
-    r
+    r?.of
       ? h(
           "div",
-          { class: `duel-rating d-${r.division.id}` },
-          emblem(r.division.id, "m"),
+          { class: "duel-rating placing" },
+          emblem("bronze", "m"),
           h(
             "div",
             { class: "duel-rating-text" },
             h(
               "p",
               { class: "duel-rating-top" },
-              h("strong", null, r.division.name),
+              h("strong", null, "Рейтингът се определя"),
               h("b", { class: delta > 0 ? "delta up" : "delta down" }, `${delta > 0 ? "+" : ""}${delta}`),
             ),
-            meter(share(r.after), r.next ? `${share(r.after)}% до ${r.next.name}` : "Най-високата дивизия"),
+            meter(Math.round((100 * (r.rated ?? 0)) / r.of), `${r.rated ?? 0} от ${r.of} игри с рейтинг`),
             h(
               "p",
-              { class: "duel-rating-line", "data-from": share(r.before), "data-to": share(r.after) },
+              { class: "duel-rating-line" },
               explain("Рейтинг", meaning.rating),
-              ` ${r.before} → ${r.after}`,
-              // Kept on one line: „70 до Злато“.
-              r.next ? ` · ${r.next.from - r.after} до ${r.next.name}` : " · най-високата дивизия",
+              ` ${r.before} → ${r.after} · ${r.rated ?? 0} от ${r.of} игри`,
             ),
           ),
         )
-      : null,
+      : r
+        ? h(
+            "div",
+            { class: `duel-rating d-${r.division.id}` },
+            emblem(r.division.id, "m"),
+            h(
+              "div",
+              { class: "duel-rating-text" },
+              h(
+                "p",
+                { class: "duel-rating-top" },
+                h("strong", null, r.division.name),
+                h("b", { class: delta > 0 ? "delta up" : "delta down" }, `${delta > 0 ? "+" : ""}${delta}`),
+              ),
+              meter(share(r.after), r.next ? `${share(r.after)}% до ${r.next.name}` : "Най-високата дивизия"),
+              h(
+                "p",
+                { class: "duel-rating-line", "data-from": share(r.before), "data-to": share(r.after) },
+                explain("Рейтинг", meaning.rating),
+                ` ${r.before} → ${r.after}`,
+                // Kept on one line: „70 до Злато“.
+                r.next ? ` · ${r.next.from - r.after} до ${r.next.name}` : " · най-високата дивизия",
+              ),
+            ),
+          )
+        : null,
     why ? h("p", { class: "duel-why" }, why) : null,
     d.recorded && d.opponent
       ? h("p", { class: "duel-why" }, "Записът е от истинска игра: никой не дойде навреме.")

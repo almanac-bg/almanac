@@ -69,7 +69,7 @@ func TestXP(t *testing.T) {
 		kind          string
 		rights, total int
 		want          int
-	}{{"topic", 10, 10, 50}, {"topic", 3, 10, 15}, {"topic", 0, 10, 0}, {"day", 10, 10, 100}, {"day", 0, 10, 50},
+	}{{"topic", 10, 10, 50}, {"topic", 3, 10, 15}, {"topic", 0, 10, 0}, {"day", 10, 10, 200}, {"day", 0, 10, 150},
 		{"mistakes", 5, 5, 50}, {"royal", 0, 15, 0}} {
 		if got := finishXP(c.kind, c.rights, c.total); got != c.want {
 			t.Errorf("a %s game's end, %d of %d right: %d XP, want %d", c.kind, c.rights, c.total, got, c.want)

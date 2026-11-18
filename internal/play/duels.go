@@ -153,6 +153,10 @@ type DuelRating struct {
 	After    int       `json:"after"`
 	Division Division  `json:"division"`
 	Next     *Division `json:"next,omitempty"`
+	// Rated and Of are the player's rated games and how many place the rating, while it's still being set (Standing):
+	// then the duel tells how far placing has come, not a division.
+	Rated int `json:"rated,omitempty"`
+	Of    int `json:"of,omitempty"`
 }
 
 // Live is a live duel just made: the questions, and each side's player and run. Against a recording, the second
@@ -1059,6 +1063,13 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 		if r.Division, next = DivisionOf(r.After); next != 0 {
 			n, _ := DivisionOf(next)
 			r.Next = &n
+		}
+		var rated int
+		if err := g.DB.Read.QueryRowContext(ctx, `SELECT rated FROM users WHERE id = ?`, userID).Scan(&rated); err != nil {
+			return v, err
+		}
+		if !Placed(rated) { // as it stands now: a duel looked at later, once placed, shows its division
+			r.Rated, r.Of = rated, MinRatedGames
 		}
 		v.Rating = &r
 	}

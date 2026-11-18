@@ -3329,6 +3329,16 @@
     font: 900 1.5rem / 1.75rem var(--font-sans);
   }
 
+  /* A rating still being set (play/rating.go): no division's colour yet, its crest greyed. */
+  .placing {
+    --div: var(--text-muted);
+  }
+
+  .placing .emblem {
+    filter: grayscale(1);
+    opacity: 0.55;
+  }
+
   /* Tabs that switch what a screen shows. */
   .segmented {
     display: flex;
@@ -4903,8 +4913,17 @@
     --tone: var(--div-gold);
   }
 
-  .fr-dots {
+  .fr-dots,
+  .fr-constellation {
     --tone: var(--sky);
+  }
+
+  .fr-embroidery {
+    --tone: var(--rose);
+  }
+
+  .fr-sparks {
+    --tone: var(--lilac);
   }
 
   .fr-gem {
@@ -4925,6 +4944,7 @@
 
   .fr-halo,
   .fr-sun,
+  .fr-sparks,
   .fr-peak5 {
     filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tone) 60%, transparent));
   }
@@ -4967,6 +4987,53 @@
     background-size:
       calc(var(--size) / 4) calc(var(--size) / 4),
       calc(var(--size) / 3) calc(var(--size) / 3);
+  }
+
+  /* The patterns of the levels past 12 (play/wardrobe.go): waves, a zigzag, diamonds, rings, a glow. */
+  .bd-waves {
+    background-image: radial-gradient(
+      circle at 50% 100%,
+      transparent 42%,
+      color-mix(in srgb, var(--on-fill) 16%, transparent) 43% 52%,
+      transparent 53%
+    );
+    background-size: calc(var(--size) / 4) calc(var(--size) / 8);
+  }
+
+  .bd-zigzag {
+    background-image:
+      linear-gradient(135deg, color-mix(in srgb, var(--on-fill) 15%, transparent) 25%, transparent 25%),
+      linear-gradient(225deg, color-mix(in srgb, var(--on-fill) 15%, transparent) 25%, transparent 25%);
+    background-size: calc(var(--size) / 5) calc(var(--size) / 5);
+  }
+
+  .bd-diamonds {
+    background-image: conic-gradient(
+      from 45deg,
+      color-mix(in srgb, var(--on-fill) 15%, transparent) 25%,
+      transparent 25% 50%,
+      color-mix(in srgb, var(--on-fill) 15%, transparent) 50% 75%,
+      transparent 75%
+    );
+    background-size: calc(var(--size) / 4) calc(var(--size) / 4);
+  }
+
+  .bd-rings {
+    background-image: repeating-radial-gradient(
+      circle at 50% 50%,
+      color-mix(in srgb, var(--on-fill) 15%, transparent) 0 1.5px,
+      transparent 1.5px calc(var(--size) / 12)
+    );
+  }
+
+  .bd-glow {
+    background-image:
+      radial-gradient(circle at 50% 42%, color-mix(in srgb, white 45%, transparent), transparent 60%),
+      repeating-conic-gradient(
+        from 0deg at 50% 42%,
+        color-mix(in srgb, white 12%, transparent) 0 6deg,
+        transparent 6deg 18deg
+      );
   }
 
   .avatar.s {

@@ -36,6 +36,7 @@ const parts: [Part, string][] = [
 /** The groups of titles still locked, as headed. */
 const titleGroups: [TitleView["group"], string][] = [
   ["level", "С нивата"],
+  ["days", "С дните с въпросите на деня"],
   ["achievement", "С постиженията"],
   ["topic", "С майсторството в темите"],
   ["rank", "С рейтинга, Роял и лигата"],
