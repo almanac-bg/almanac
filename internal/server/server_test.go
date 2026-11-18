@@ -67,6 +67,9 @@ func start(t *testing.T) *game {
 	}
 	ts.Config.Handler = s.Handler()
 	ts.Start()
+	// Run in reverse: the server stops taking requests, then what it started in the background ends, then the
+	// database closes (storetest).
+	t.Cleanup(func() { s.game.Settled(context.Background()) })
 	t.Cleanup(ts.Close)
 	return &game{t: t, srv: s, db: db, url: ts.URL, outbox: out, inbox: in}
 }

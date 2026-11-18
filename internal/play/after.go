@@ -137,6 +137,24 @@ func (g *Game) AfterWait(ctx context.Context, userID int64) {
 	}
 }
 
+// Settled waits until nothing the game started in the background is still under way: the follow-ups of runs
+// (AftersDone) and the counts over everyone's answers (snapshot), or until ctx is done. A test calls it before its
+// database closes, so no count writes into a database (or a folder) that is going away.
+func (g *Game) Settled(ctx context.Context) {
+	g.AftersDone(ctx)
+	settled := make(chan struct{})
+	safe.Go("settling the counts", func() {
+		defer close(settled)
+		g.hard.settle()
+		g.crowds.settle()
+		g.known.settle()
+	})
+	select {
+	case <-settled:
+	case <-ctx.Done():
+	}
+}
+
 // AftersDone waits until every follow-up under way in the background is done, or ctx is (a server stopping; tests):
 // one cut off is the sweep's after the restart.
 func (g *Game) AftersDone(ctx context.Context) {
