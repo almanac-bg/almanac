@@ -28,6 +28,7 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	var viewer int64
 	if u != nil {
 		viewer = u.ID
+		s.game.AfterWait(r.Context(), u.ID) // a game just finished: what it earned (a streak won back, goals) is in
 		streak, err := s.game.StreakOf(r.Context(), u.ID)
 		if err != nil {
 			return err

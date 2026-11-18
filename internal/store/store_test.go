@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -163,6 +164,25 @@ func TestReadsKeepTheirConnections(t *testing.T) {
 	if s := db.Read.Stats(); s.MaxIdleClosed != 0 || s.OpenConnections != opened || opened != readers {
 		t.Fatalf("after four bursts of %d reads: %d open (%d after the first), %d closed as idle", readers,
 			s.OpenConnections, opened, s.MaxIdleClosed)
+	}
+}
+
+// The read pool is about as big as the cores, not a multiple of them (the driver's allocator is one lock); the long
+// reads over a whole table have a pool of their own, read-only too.
+func TestPools(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "game.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if n := db.Read.Stats().MaxOpenConnections; n != max(4, runtime.NumCPU()+2) {
+		t.Fatalf("%d readers on %d cores", n, runtime.NumCPU())
+	}
+	if n := db.Scan.Stats().MaxOpenConnections; n != scanners || db.Scan == db.Read {
+		t.Fatalf("%d for the long reads", n)
+	}
+	if _, err := db.Scan.Exec(`CREATE TABLE t (x INTEGER)`); err == nil {
+		t.Fatal("the long reads' pool writes")
 	}
 }
 

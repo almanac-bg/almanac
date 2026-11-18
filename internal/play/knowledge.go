@@ -162,9 +162,47 @@ func (g *Game) friendsOf(ctx context.Context, userID int64) (map[int64]bool, err
 }
 
 // knowledge is the last count of everyone's answers (snapshot.go): counted again in the background once it's knowFresh
-// old, or the bank has changed, and waited for only before the server's first.
+// old, or the bank has changed, and waited for only by a server that has never counted it.
 func (g *Game) knowledge(ctx context.Context) (knowledge, error) {
-	return g.known.get(ctx, g.Now(), g.Bank(), knowFresh, g.countKnowledge)
+	return g.known.get(ctx, g.Now(), g.Bank(), g.knowCounter())
+}
+
+// savedKnown is a player's mastery in a topic as the database keeps it (snapshot.go).
+type savedKnown struct {
+	ID      int64
+	Answers int
+	Share   float64
+}
+
+// knowCounter counts the boards of knowledge, and keeps them as they are.
+func (g *Game) knowCounter() counter[knowledge] {
+	return counter[knowledge]{db: g.DB, name: "knowledge", fresh: knowFresh, count: g.countKnowledge,
+		keep: func(k knowledge) ([]byte, error) {
+			kept := make(map[string][]savedKnown, len(k))
+			for topic, list := range k {
+				out := make([]savedKnown, len(list))
+				for i, x := range list {
+					out[i] = savedKnown{x.id, x.answers, x.share}
+				}
+				kept[topic] = out
+			}
+			return gobbed(kept)
+		},
+		take: func(raw []byte, _ *bank.Bank) (knowledge, error) {
+			kept, err := ungobbed[map[string][]savedKnown](raw)
+			if err != nil {
+				return nil, err
+			}
+			k := make(knowledge, len(kept))
+			for topic, list := range kept {
+				out := make([]known, len(list))
+				for i, x := range list {
+					out[i] = known{id: x.ID, answers: x.Answers, share: x.Share}
+				}
+				k[topic] = out
+			}
+			return k, nil
+		}}
 }
 
 // given is an answer as a count of knowledge goes over it: when, in which run and place (its order among a player's,
@@ -212,7 +250,7 @@ func (g *Game) countKnowledge(ctx context.Context, now time.Time, b *bank.Bank) 
 		}
 		by[""] = append(by[""], knownFrom(user, all, h.byTopic[""]))
 	}
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT r.user_id, r.id, a.n, a.at, a.question_id, a.score
+	rows, err := g.DB.Scan.QueryContext(ctx, `SELECT r.user_id, r.id, a.n, a.at, a.question_id, a.score
 		FROM runs r INDEXED BY runs_user CROSS JOIN answers a ON a.run_id = r.id WHERE NOT r.shadow`)
 	if err != nil {
 		return nil, err

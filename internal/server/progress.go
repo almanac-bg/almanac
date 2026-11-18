@@ -15,6 +15,7 @@ func (s *Server) progress(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	s.game.AfterWait(r.Context(), u.ID) // a game just finished: what it earned is in
 	p, err := s.game.ProgressOf(r.Context(), u.ID)
 	if err != nil {
 		return err

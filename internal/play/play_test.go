@@ -163,6 +163,7 @@ func (w *world) live(runID int64) bool {
 func (w *world) show(user, runID int64) State {
 	w.t.Helper()
 	ctx := w.t.Context()
+	defer w.g.AftersDone(ctx) // a run its clock ended
 	if w.live(runID) {
 		s, err := w.g.State(ctx, user, runID)
 		if err == nil {
@@ -184,8 +185,10 @@ func (w *world) show(user, runID int64) State {
 	return s
 }
 
-// answer answers a run's question n now, as its player does; a live duel's, through its duel.
+// answer answers a run's question n now, as its player does; a live duel's, through its duel. What follows a run it
+// ends is done when it returns (after.go: in the background), as a test reads it next.
 func (w *world) answer(user, runID int64, n int, a json.RawMessage) (Result, error) {
+	defer w.g.AftersDone(w.t.Context())
 	if w.live(runID) {
 		return w.g.AnswerLive(w.t.Context(), user, runID, n, a, w.now, w.dealt(runID, n))
 	}

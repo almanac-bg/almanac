@@ -8,6 +8,13 @@
 // connections open between requests: opening one sets it up and reads the whole schema, which under load would cost
 // more than the reads themselves.
 //
+// The pool is about as big as the machine has cores, and no bigger: the driver's memory is one allocator behind one
+// lock for the whole process, so reads that sort or fill a page cache do no more side by side than the cores can, and
+// past a few at once they do less (measured: a sort over a player's answers peaked at two at once, and fell by a
+// quarter at sixteen). Waiting for a connection is the gate that keeps them at their best. The reads that go over a
+// whole table (the counts over everyone's answers) take seconds, and have a small pool of their own (Scan), so they
+// never take the connections the requests need, however many cores there are (two, on the server).
+//
 // The query planner chooses by the tables' statistics (ANALYZE): Open brings them up to date, and so does every hour
 // after (PRAGMA optimize, which looks again only at tables that have grown or shrunk a lot). A read connection reads
 // them when it opens, so the pool's are renewed hourly too.
@@ -43,8 +50,14 @@ var migrations fs.FS = embedded
 type DB struct {
 	Write *sql.DB
 	Read  *sql.DB
-	stop  context.CancelFunc // ends keepOptimized
+	// Scan is for the long reads that go over a whole table, in the background (scanners at once).
+	Scan *sql.DB
+	stop context.CancelFunc // ends keepOptimized
 }
+
+// scanners is how many long reads over a whole table go at once: the counts are three, and they wait for each
+// other's turn rather than for the requests'.
+const scanners = 2
 
 // optimizeEvery is how often the statistics are looked at again, and how long a read connection is kept (so that it
 // plans by them).
@@ -82,15 +95,22 @@ func Open(path string) (*DB, error) {
 		w.Close()
 		return nil, err
 	}
-	// More readers than cores: a long read (a big day's board being counted) mustn't keep the quick ones waiting. All
-	// of them are kept open while in use (database/sql would keep two, and open the rest anew for each burst); a
-	// few minutes idle closes one, and with it what its cache holds.
-	readers := max(8, 4*runtime.NumCPU())
-	r.SetMaxOpenConns(readers)
-	r.SetMaxIdleConns(readers)
-	r.SetConnMaxIdleTime(5 * time.Minute)
-	r.SetConnMaxLifetime(optimizeEvery)
-	db := &DB{Write: w, Read: r}
+	scan, err := sql.Open("sqlite", dsn+"&mode=ro")
+	if err != nil {
+		w.Close()
+		r.Close()
+		return nil, err
+	}
+	// As many readers as cores, and two over for a read that waits on the disk, at least four: a read waits for a
+	// connection rather than for the allocator's lock. All of them are kept open while in use (database/sql would keep
+	// two, and open the rest anew for each burst); a few minutes idle closes one, and with it what its cache holds.
+	for pool, n := range map[*sql.DB]int{r: max(4, runtime.NumCPU()+2), scan: scanners} {
+		pool.SetMaxOpenConns(n)
+		pool.SetMaxIdleConns(n)
+		pool.SetConnMaxIdleTime(5 * time.Minute)
+		pool.SetConnMaxLifetime(optimizeEvery)
+	}
+	db := &DB{Write: w, Read: r, Scan: scan}
 	if err := db.migrate(); err != nil {
 		db.Close()
 		return nil, err
@@ -127,7 +147,13 @@ func (db *DB) Close() error {
 	if db.stop != nil {
 		db.stop()
 	}
-	return errors.Join(db.Read.Close(), db.Write.Close())
+	err := db.Write.Close()
+	for _, pool := range []*sql.DB{db.Read, db.Scan} {
+		if pool != nil && pool != db.Write {
+			err = errors.Join(err, pool.Close())
+		}
+	}
+	return err
 }
 
 // migrate applies every migration in migrations/ the database hasn't had yet, in the order of their names

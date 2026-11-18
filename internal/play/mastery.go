@@ -21,8 +21,9 @@ import (
 // the answers, and fades a little with each one, so that what a player knows now counts more than what they knew a
 // year ago. The same ability over all topics shapes a run of all of them, and a duel.
 //
-// Nothing is stored: a player's answers are gone over again whenever it's asked for, against the questions'
-// hardness as last counted, so it's always as good as the answers and the bank allow. Questions retired as untrue
+// Nothing is stored: a player's answers are gone over again whenever it's asked for and they've moved since (memo.go:
+// kept in memory while they stand), against the questions' hardness as last counted, so it's always as good as the
+// answers and the bank allow. Questions retired as untrue
 // count for nothing.
 
 // MasteryTier is a band of mastery with a name: a player is in it from From percent of a topic known.
@@ -171,9 +172,22 @@ func (h *hardnesses) of(q bank.Question) float64 {
 // hardness is how hard each question is: what its label says, and, the more answers it has, what they say (people's:
 // FairAnswers; to it as it is now: versions.go). Answers change it slowly, and working it out goes over every answer
 // anyone has given, so it's kept (snapshot.go) and counted again every hardnessFresh in the background: a game waits
-// only for the server's first count.
+// only for the first count of a server that has none kept.
 func (g *Game) hardness(ctx context.Context) (*hardnesses, error) {
-	return g.hard.get(ctx, g.Now(), g.Bank(), hardnessFresh, g.countHardness)
+	return g.hard.get(ctx, g.Now(), g.Bank(), g.hardCounter())
+}
+
+// hardCounter counts the hardness, and keeps of it each question's (the topics' lists are the bank's to make).
+func (g *Game) hardCounter() counter[*hardnesses] {
+	return counter[*hardnesses]{db: g.DB, name: "hardness", fresh: hardnessFresh, count: g.countHardness,
+		keep: func(h *hardnesses) ([]byte, error) { return gobbed(h.byID) },
+		take: func(raw []byte, b *bank.Bank) (*hardnesses, error) {
+			byID, err := ungobbed[map[string]float64](raw)
+			if err != nil {
+				return nil, err
+			}
+			return hardnessFor(b, byID), nil
+		}}
 }
 
 // countHardness works the hardnesses out from the answers, as of now, for a bank. A question retired as untrue
@@ -192,7 +206,7 @@ func (g *Game) countHardness(ctx context.Context, now time.Time, b *bank.Bank) (
 	}
 	// Summed here, not by GROUP BY: SQLite would sort every answer by its question for it, or go through them in the
 	// question's index and look each one's score up, both many times slower than reading them as they lie.
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, version, score, at FROM answers WHERE `+FairAnswers)
+	rows, err := g.DB.Scan.QueryContext(ctx, `SELECT question_id, version, score, at FROM answers WHERE `+FairAnswers)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +227,7 @@ func (g *Game) countHardness(ctx context.Context, now time.Time, b *bank.Bank) (
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	h := &hardnesses{byID: make(map[string]float64, len(b.Questions)), byTopic: map[string][]float64{}}
+	byID := make(map[string]float64, len(b.Questions))
 	for _, q := range b.Questions {
 		head := q.Base()
 		t := answered[head.ID]
@@ -226,13 +240,24 @@ func (g *Game) countHardness(ctx context.Context, now time.Time, b *bank.Bank) (
 			seen := min(max((t.sum/float64(t.n)-luck)/(1-luck), 0.02), 0.98) // above chance, as calibrate.go
 			known = (float64(t.n)*seen + hardnessPrior*known) / float64(t.n+hardnessPrior)
 		}
-		h.byID[head.ID] = hardnessOf(known)
-		if !q.Extra().Retired {
-			h.byTopic[head.Category] = append(h.byTopic[head.Category], h.byID[head.ID])
-			h.byTopic[""] = append(h.byTopic[""], h.byID[head.ID])
-		}
+		byID[head.ID] = hardnessOf(known)
 	}
-	return h, nil
+	return hardnessFor(b, byID), nil
+}
+
+// hardnessFor is the hardness of each question as counted (byID), with the live questions' of a bank by topic: those
+// the count didn't have (the bank changed since) by their label.
+func hardnessFor(b *bank.Bank, byID map[string]float64) *hardnesses {
+	h := &hardnesses{byID: byID, byTopic: map[string][]float64{}}
+	for _, q := range b.Questions {
+		if q.Extra().Untrue() || q.Extra().Retired {
+			continue
+		}
+		head, v := q.Base(), h.of(q)
+		h.byTopic[head.Category] = append(h.byTopic[head.Category], v)
+		h.byTopic[""] = append(h.byTopic[""], v)
+	}
+	return h
 }
 
 type querier interface {
@@ -243,7 +268,33 @@ type querier interface {
 // topic, and over all of them. The answers to a question that turned out untrue (bank.Tail.Untrue: its key was wrong,
 // or stopped being right) say nothing of what a player knows, and are left out. Finished says: only those of the games
 // they finished (what others see of them, ProfileOf: never a game under way, answer by answer).
+// All of them, read on the read pool, are kept for the player's games as they stand (memo.go): a profile, a draw and
+// an achievement's measure each ask for them, and they move only as the player plays.
 func (g *Game) abilities(ctx context.Context, db querier, h *hardnesses, userID, until int64, finished bool) (map[string]ability, ability, error) {
+	b := g.Bank()
+	if until != 0 || db != g.DB.Read {
+		return g.goOver(ctx, db, h, b, userID, until, finished)
+	}
+	v, err := memoized(ctx, g, &g.skills, skillsKey{userID, finished}, userID, b, h, func() (skills, error) {
+		topics, all, err := g.goOver(ctx, db, h, b, userID, 0, finished)
+		return skills{topics, all}, err
+	})
+	return v.topics, v.all, err
+}
+
+// skills are a player's abilities, kept (memo.go): their games' (finished: those they finished only).
+type skills struct {
+	topics map[string]ability
+	all    ability
+}
+
+type skillsKey struct {
+	user     int64
+	finished bool
+}
+
+// goOver goes over a player's answers (abilities), for a bank.
+func (g *Game) goOver(ctx context.Context, db querier, h *hardnesses, b *bank.Bank, userID, until int64, finished bool) (map[string]ability, ability, error) {
 	topics, all := map[string]ability{}, newAbility()
 	rows, err := db.QueryContext(ctx, `SELECT a.question_id, a.score FROM answers a JOIN runs r ON r.id = a.run_id
 		WHERE r.user_id = ?1 AND (?2 = 0 OR a.at <= ?2) AND (NOT ?3 OR r.finished_at IS NOT NULL)
@@ -252,7 +303,6 @@ func (g *Game) abilities(ctx context.Context, db querier, h *hardnesses, userID,
 		return nil, all, err
 	}
 	defer rows.Close()
-	b := g.Bank()
 	for rows.Next() {
 		var id string
 		var score float64

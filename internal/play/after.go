@@ -5,9 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"runtime"
 	"slices"
+	"sync"
 	"time"
 
+	"github.com/almanac-bg/almanac/internal/safe"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -15,10 +18,12 @@ import (
 // starts and the friends it was sent to are told (sent), its duel is settled once both sides have played
 // (settleRun), and what it earned is kept (afterRun: a streak mended, achievements, the day's goals, a place in the
 // week's league). The transaction that finishes the run notes that it's due (runs_after, afterDue), so none of it is
-// lost to a closed connection or a restart in between: the request that finished the run does it at once, on a
-// context of its own that the player leaving doesn't cancel (finished), and the sweep each minute does whatever that
-// left (AfterDue), a few times more, waiting longer each time, before it gives up. All of it may be done again
-// safely: a duel is settled once, an achievement or a goal kept once.
+// lost to a closed connection or a restart in between: the request that finished the run settles it at once, on a
+// context of its own that the player leaving doesn't cancel (finished: the result shows the duel's outcome), and
+// hands the rest to the background (afterLater), so that the last answer doesn't wait for every achievement to be
+// measured again; the game's news waits for it instead (AfterWait: NewsOf, Начало), and gets it as soon as it's
+// done. The sweep each minute does whatever that left (AfterDue), a few times more, waiting longer each time, before
+// it gives up. All of it may be done again safely: a duel is settled once, an achievement or a goal kept once.
 //
 // What a run earned is judged by the run, never by the clock it's looked at on (played): a run of the day's questions
 // counts for its own day though its last answer came after midnight (DayGrace), and so does the sweep's retry of it
@@ -46,14 +51,111 @@ func (g *Game) afterDue(tx *sql.Tx, runID int64) error {
 	return err
 }
 
-// finished does what follows a run that has just ended (by an answer, by its clock in settle, or kept from a room),
-// before the answer or the run goes back, so that the screen with the result can tell of it. The player leaving
-// doesn't cut it short, and what fails is left to the sweep (AfterDue).
+// finished does what follows a run that has just ended (by an answer, by its clock in settle, or kept from a room):
+// its duel or challenge settled before the answer or the run goes back, so that the screen with the result has it,
+// and the rest in the background (afterLater). The player leaving doesn't cut it short, and what fails is left to the
+// sweep (AfterDue).
 func (g *Game) finished(ctx context.Context, userID, runID int64) {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), afterFor)
+	settle, cancel := context.WithTimeout(context.WithoutCancel(ctx), afterFor)
 	defer cancel()
-	if err := g.after(ctx, userID, runID); err != nil {
-		slog.Error("after a run", "run", runID, "err", err)
+	err := g.settleRun(settle, runID)
+	if err != nil {
+		slog.Error("after a run: settling it", "run", runID, "err", err)
+	}
+	g.afterLater(userID, runID, err == nil)
+}
+
+// afterWorkers is how many runs' follow-ups are done at once in the background: each is a few reads over the
+// player's history and a few writes, and the database does them no faster side by side than its cores (and the read
+// pool's few more: store.Open), so the rest wait their turn rather than slow the requests down.
+var afterWorkers = max(4, runtime.NumCPU())
+
+// laters are the follow-ups of runs under way in the background (afterLater), by player: how many, and a channel
+// closed once the last of them is done.
+type laters struct {
+	mu    sync.Mutex
+	by    map[int64]*later
+	slots chan struct{} // afterWorkers of them
+}
+
+type later struct {
+	n    int
+	done chan struct{}
+}
+
+// afterLater does what follows a run (after; but its settling, once settled) in the background, afterWorkers at
+// once, within afterFor.
+func (g *Game) afterLater(userID, runID int64, settled bool) {
+	l := &g.later
+	l.mu.Lock()
+	if l.by == nil {
+		l.by, l.slots = map[int64]*later{}, make(chan struct{}, max(1, afterWorkers))
+	}
+	w := l.by[userID]
+	if w == nil {
+		w = &later{done: make(chan struct{})}
+		l.by[userID] = w
+	}
+	w.n++
+	slots := l.slots
+	l.mu.Unlock()
+	safe.Go("after a run", func() {
+		defer func() {
+			l.mu.Lock()
+			defer l.mu.Unlock()
+			if w.n--; w.n == 0 {
+				close(w.done)
+				delete(l.by, userID)
+			}
+		}()
+		slots <- struct{}{}
+		defer func() { <-slots }()
+		ctx, cancel := context.WithTimeout(context.Background(), afterFor)
+		defer cancel()
+		do := g.after
+		if settled {
+			do = g.afterSettled
+		}
+		if err := do(ctx, userID, runID); err != nil {
+			slog.Error("after a run", "run", runID, "err", err)
+		}
+	})
+}
+
+// AfterWait waits until what follows the player's runs just finished is done (afterLater), or ctx is: what reads
+// what a game earned (its news, Начало) reads it whole. Nothing to wait for, it doesn't.
+func (g *Game) AfterWait(ctx context.Context, userID int64) {
+	g.later.mu.Lock()
+	w := g.later.by[userID]
+	g.later.mu.Unlock()
+	if w == nil {
+		return
+	}
+	select {
+	case <-w.done:
+	case <-ctx.Done():
+	}
+}
+
+// AftersDone waits until every follow-up under way in the background is done, or ctx is (a server stopping; tests):
+// one cut off is the sweep's after the restart.
+func (g *Game) AftersDone(ctx context.Context) {
+	for {
+		g.later.mu.Lock()
+		var w *later
+		for _, x := range g.later.by {
+			w = x
+			break
+		}
+		g.later.mu.Unlock()
+		if w == nil {
+			return
+		}
+		select {
+		case <-w.done:
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
@@ -62,6 +164,12 @@ func (g *Game) after(ctx context.Context, userID, runID int64) error {
 	if err := g.settleRun(ctx, runID); err != nil {
 		return err
 	}
+	return g.afterSettled(ctx, userID, runID)
+}
+
+// afterSettled does what follows a finished run once it's settled (a challenge's friends told twice would hear of it
+// twice), and crosses it off.
+func (g *Game) afterSettled(ctx context.Context, userID, runID int64) error {
 	p, err := g.playedOf(ctx, userID, runID)
 	switch {
 	case errors.Is(err, ErrNoRun): // gone with its player: nothing to keep

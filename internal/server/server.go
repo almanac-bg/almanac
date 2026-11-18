@@ -432,6 +432,9 @@ func (s *Server) run(ctx context.Context, grace time.Duration) error {
 	err = srv.Shutdown(shutdown)
 	s.saveRooms()
 	s.saveLimits()
+	// What follows the runs the last requests finished, in the background: given the rest of the grace (one cut off is
+	// the sweep's after the restart).
+	s.game.AftersDone(shutdown)
 	return err
 }
 

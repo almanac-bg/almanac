@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -61,8 +62,19 @@ func (g *Game) waiting(ctx context.Context, q interface {
 // Misses is what a game's mistakes will make of the player's second chance: how many of its questions they got wrong
 // and have never got right (each waits MistakesAfter), and how many wait or will in all, those included. The day's
 // result says so when there'll be a game of them (MistakesFrom). It's one pass over the player's own answers (by
-// runs_user), never over a question's answers by everyone: Начало asks it on every visit once the day is done.
+// runs_user), never over a question's answers by everyone; and Начало asks it on every visit once the day is done, so
+// it's kept until the player plays again (memo.go).
 func (g *Game) Misses(ctx context.Context, userID, runID int64) (missed, all int, err error) {
+	b := g.Bank()
+	v, err := memoized(ctx, g, &g.misses, [2]int64{userID, runID}, userID, b, nil, func() ([2]int, error) {
+		missed, all, err := g.countMisses(ctx, b, userID, runID)
+		return [2]int{missed, all}, err
+	})
+	return v[0], v[1], err
+}
+
+// countMisses goes over the player's answers for Misses.
+func (g *Game) countMisses(ctx context.Context, b *bank.Bank, userID, runID int64) (missed, all int, err error) {
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id, max(a.run_id = ?) FROM answers a
 		JOIN runs r ON r.id = a.run_id WHERE r.user_id = ? GROUP BY a.question_id HAVING max(a.is_right) = 0`,
 		runID, userID)
@@ -70,7 +82,6 @@ func (g *Game) Misses(ctx context.Context, userID, runID int64) (missed, all int
 		return 0, 0, err
 	}
 	defer rows.Close()
-	b := g.Bank()
 	for rows.Next() {
 		var id string
 		var here bool

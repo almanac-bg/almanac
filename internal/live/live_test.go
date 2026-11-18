@@ -594,7 +594,7 @@ func TestPaused(t *testing.T) {
 		if n, _ := w.hub.UnderWay(); n != 1 {
 			t.Fatalf("under way: %d", n)
 		}
-		// A duel busy at the moment (its lock held, as while it keeps an answer) doesn't hold up whoever asks: it
+		// A duel busy at the moment (its lock held, as while it takes an answer in) doesn't hold up whoever asks: it
 		// counts as under way, for all of a duel.
 		m.mu.Lock()
 		if n, left := w.hub.UnderWay(); n != 1 || left != Longest {
@@ -849,6 +849,69 @@ func TestABrokenClock(t *testing.T) {
 		sv.settle(nil, nil) // a second settle changes nothing
 		if sv.Err == nil {
 			t.Fatal("settled twice")
+		}
+	})
+}
+
+// The duel's lock is never held across a write to the database: while the database is busy with something else, the
+// screens, the other player and the server's drain go on; and an answer that came in time, still being kept as its
+// question's time runs out, counts, the answer shown once it's in.
+func TestAWriteHoldsNoScreen(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := setup(t)
+		ana, bo := w.user(), w.user()
+		sa, sb := w.hub.Seek(ana), w.hub.Seek(bo)
+		<-sa.Done()
+		<-sb.Done()
+		m := sa.Match
+		fa, _ := m.Follow(ana.ID)
+		fb, _ := m.Follow(bo.ID)
+		defer m.Unfollow(fa)
+		defer m.Unfollow(fb)
+		v := next(m, ana.ID)
+		if v.Phase != PhaseQuestion {
+			t.Fatalf("the first question: %+v", v)
+		}
+		right := answer(m, true)
+
+		// A second before the question's time is up, the database's one writer is busy: Ana's answer waits for it.
+		time.Sleep(time.Duration(v.Question.LimitMs)*time.Millisecond - time.Second)
+		ctx := context.Background()
+		conn, err := w.db.Write.Conn(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tx, err := conn.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		answered := make(chan error, 1)
+		go func() { answered <- m.Answer(ana.ID, 0, right) }()
+		synctest.Wait()
+		if v := m.View(bo.ID); v.Phase != PhaseQuestion || v.Them.Answered { // Bo's screen isn't held up
+			t.Fatalf("what Bo sees while Ana's answer is kept: %+v", v)
+		}
+		if n, left := w.hub.UnderWay(); n != 1 || left == Longest {
+			t.Fatalf("%d duels under way, %v left", n, left)
+		}
+		// The question's time runs out meanwhile: its answer waits for Ana's.
+		time.Sleep(time.Second + play.Grace + time.Second)
+		synctest.Wait()
+		if v := m.View(bo.ID); v.Phase != PhaseQuestion {
+			t.Fatalf("the answer shown before Ana's was in: %+v", v)
+		}
+
+		if err := tx.Rollback(); err != nil {
+			t.Fatal(err)
+		}
+		conn.Close()
+		if err := <-answered; err != nil {
+			t.Fatal(err)
+		}
+		synctest.Wait()
+		v = m.View(bo.ID)
+		if v.Phase != PhaseReveal || !v.Them.Right || v.Them.Gained == 0 || !v.Question.Reveal.Missed {
+			t.Fatalf("the answer once Ana's was in: %+v / %+v", v.Them, v.Question.Reveal)
 		}
 	})
 }
