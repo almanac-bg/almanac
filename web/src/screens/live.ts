@@ -16,7 +16,6 @@ import type { DuelView } from "./duel.ts";
 
 // The app's pieces, set as the screen opens (liveDuel).
 let {
-  loading,
   answered,
   answering,
   api,
@@ -145,7 +144,6 @@ const seconds = (ms: number) => `${(ms / 1000).toLocaleString("bg", { maximumFra
 
 export function liveDuel(kit: Kit) {
   ({
-    loading,
     answered,
     answering,
     api,
@@ -205,7 +203,7 @@ export function liveDuel(kit: Kit) {
   const again = (rematch?: Rematch) => round.update((r) => ({ n: Math.max(1, r.n + 1), rematch }));
   return h("div", null, () => {
     const r = round();
-    if (r.n < 0) return loading("title", "card");
+    if (r.n < 0) return h("p", { class: "muted" }, "…");
     if (!r.n)
       return startScreen(
         "Дуел на живо",
@@ -339,7 +337,7 @@ function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
         );
       if (t === "closed" && untracked(view)?.phase !== "end")
         return problem("Дуелът прекъсна", "Без резултат: рейтингът не се променя.", anew);
-      if (!k) return loading("title", "card");
+      if (!k) return h("p", { class: "muted" }, "…");
       if (k === "waiting") return waiting(wait as () => Wait, rematch);
       const v = untracked(view) as LiveView;
       const live = view as () => LiveView;
@@ -731,7 +729,7 @@ function end(view: () => LiveView, v: LiveView, again: (rematch?: Rematch) => vo
   return h("div", null, () => {
     const d = kept();
     if (d) return duelResult(d, steps, d.runId ? news(d.runId) : null);
-    return error() ? problem("Дуелът свърши", error(), () => again()) : loading("card", "rows");
+    return error() ? problem("Дуелът свърши", error(), () => again()) : h("p", { class: "muted" }, "…");
   });
 }
 

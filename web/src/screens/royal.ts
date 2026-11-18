@@ -39,7 +39,6 @@ import type { Tonight } from "./modes.ts";
 // The app's pieces, set as the screen opens (royal): it loads on its own, the first time it's opened (kit.ts), and
 // imports only types.
 let {
-  loading,
   answered,
   answering,
   answerState,
@@ -254,7 +253,6 @@ const delta = (d?: number) => (d ? h("span", { class: d > 0 ? "delta up" : "delt
 
 export function royal(kit: Kit) {
   ({
-    loading,
     answered,
     answering,
     answerState,
@@ -407,7 +405,7 @@ export function royal(kit: Kit) {
       );
     },
     () => {
-      if (!key()) return loading("title", "card");
+      if (!key()) return h("p", { class: "muted" }, "…");
       const v = untracked(view) as Evening;
       const live = view as () => Evening;
       switch (v.phase) {

@@ -33,7 +33,7 @@ import {
 } from "./game/results.ts";
 import { guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
 import { count, duelShareText, yearShareText } from "./game/share.ts";
-import { ApiError, api, errorText, fresh, last, tally } from "./lib/api.ts";
+import { ApiError, api, errorText, tally } from "./lib/api.ts";
 import { inApp } from "./lib/app.ts";
 import { keepAwake } from "./lib/awake.ts";
 import { type Child, computed, effect, h, lifetime, onCleanup, signal, slot, untracked, when } from "./lib/dom.ts";
@@ -52,7 +52,7 @@ import {
   vibrateOn,
 } from "./lib/prefs.ts";
 import { needsHomeScreen, pushable, pushOn, pushPrefs, setPushPref, turnOff, turnOn } from "./lib/push.ts";
-import { byTap, go, goBack, holdWhile, rename, title, waitFor } from "./lib/router.ts";
+import { byTap, go, goBack, holdWhile, rename, title } from "./lib/router.ts";
 import {
   feelKit,
   liveAudio,
@@ -74,7 +74,7 @@ import { clock, coming, dayAndTime, dayWord, whileSeen } from "./screens/modes.t
 import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
 import { loadMistakes, run as runGame } from "./screens/play.ts";
-import { keptProgress, loadProgress, nearest } from "./screens/progress.ts";
+import { loadProgress, nearest } from "./screens/progress.ts";
 import { changeGame, mixes } from "./screens/rooms.ts";
 import { signIn } from "./screens/signin.ts";
 import { gameRow, stats } from "./screens/stats.ts";
@@ -100,7 +100,6 @@ import {
   failure,
   formatNumber,
   levelNumber,
-  loading,
   meaning,
   meter,
   pageArt,
@@ -109,7 +108,6 @@ import {
   questions,
   record,
   rewardWords,
-  type Shape,
   schemeSwitch,
   segmented,
   shapeNames,
@@ -167,8 +165,6 @@ export const kit = {
   fact,
   failure,
   feelKit,
-  fresh,
-  last,
   formatNumber,
   friendRequests,
   gameRow,
@@ -190,14 +186,12 @@ export const kit = {
   leagueEmblem,
   leagueLine,
   levelNumber,
-  loading,
   lifetime,
   listWords,
   liveAudio,
   loadDuelResult,
   loadLeague,
   loadMistakes,
-  keptProgress,
   loadProgress,
   mailAsk,
   masteryCard,
@@ -348,41 +342,17 @@ export function duelResult(d: DuelView, again: Child | Steps = null, more: Child
             "Виж резултата",
           ),
         )
-      : loading("card", "rows");
+      : h("p", { class: "muted" }, "…");
   };
 }
 
-type Screen = (kit: Kit, params: string[]) => Child;
-
-/** A screen in a file of its own, loaded the first time it's needed: opened (the screen before stays meanwhile:
- * router.ts, waitFor; its wait in the shape of the page, `shape`, if it takes long), or before, as a link to it is
- * pointed at, or the browser is idle (prefetch). One that can't load says so; a file that doesn't come while the
- * server answers is one of a version gone by: the page loads anew for it (fresh.ts). */
-export function later(
-  load: () => Promise<Screen>,
-  ...shape: Shape[]
-): ((params: string[]) => Child) & {
-  prefetch: () => void;
-} {
-  let made: Screen | null = null;
-  let coming: Promise<Screen> | null = null;
-  // Once, and again after a load that failed.
-  const get = () =>
-    (coming ??= load().then(
-      (s) => (made = s),
-      (err) => {
-        coming = null;
-        throw err;
-      },
-    ));
-  const view = (params: string[]): Child => {
-    const s = made;
-    if (s) return untracked(() => s(kit, params));
-    const screen = signal<Screen | null>(null);
+/** A screen that loads the first time it's opened: a line while it comes, and one if it can't. A file that doesn't
+ * come while the server answers is one of a version gone by: the page loads anew for it (fresh.ts). */
+export function later(load: () => Promise<(kit: Kit, params: string[]) => Child>): (params: string[]) => Child {
+  return (params) => {
+    const screen = signal<((kit: Kit, params: string[]) => Child) | null>(null);
     const failed = signal(false);
-    const file = get();
-    waitFor(file);
-    file.then(
+    load().then(
       (s) => screen.set(s),
       async () => {
         if (!(await recover())) failed.set(true);
@@ -395,8 +365,7 @@ export function later(
         ? failure(new ApiError("offline", "Страницата не се зареди. Провери интернета си и опитай пак."), () =>
             location.reload(),
           )
-        : loading(...shape);
+        : h("p", { class: "muted" }, "…");
     };
   };
-  return Object.assign(view, { prefetch: () => void get().catch(() => {}) });
 }

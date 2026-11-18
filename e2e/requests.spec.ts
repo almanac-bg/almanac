@@ -38,18 +38,11 @@ async function visit(page: Page, go: () => Promise<unknown>): Promise<string[]> 
 /** The paths asked more than once. */
 const twice = (asked: string[]) => [...new Set(asked.filter((p, i) => asked.indexOf(p) !== i))];
 
-/** What the two screens before asked: an answer the page had a moment ago is as fresh as the server's, and isn't asked
- * for again (lib/api.ts, fresh). */
-let before: string[][] = [];
-
-/** Opens a screen and checks that it asked for nothing twice; returns what it asked, with what the two screens before
- * it asked a moment ago. */
+/** Opens a screen and checks that it asked for nothing twice; returns what it asked. */
 async function once(page: Page, what: string, go: () => Promise<unknown>): Promise<string[]> {
   const asked = await visit(page, go);
   expect(twice(asked), `${what} asked twice: ${asked.join(", ")}`).toEqual([]);
-  const fresh = [asked, ...before].flat();
-  before = [asked, ...before].slice(0, 2);
-  return fresh;
+  return asked;
 }
 
 const tab = (page: Page, href: string) => page.locator(`nav.tabs a[href='${href}']`).click();
@@ -93,8 +86,6 @@ test("each screen asks the server for each thing once a visit, and a deploy load
     const res = await route.fetch();
     await route.fulfill({ response: res, headers: { ...res.headers(), "x-almanac-version": "next" } });
   });
-  // (Past the moment what Начало just asked for is as fresh as the server's: Класации asks again, and hears it.)
-  await page.waitForTimeout(2100);
   await once(page, "Класации, the server's version another", () => tab(page, "/ranks"));
   let loads = 0;
   page.on("load", () => loads++);

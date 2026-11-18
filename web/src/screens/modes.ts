@@ -3,7 +3,7 @@
 // many said they'd come, and from the lobby's opening, how soon it starts and how many are in.
 
 import { picture } from "../art/picture.ts";
-import { fresh, last } from "../lib/api.ts";
+import { api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 
 type Mode = "duel" | "royal" | "room";
@@ -90,12 +90,11 @@ export function coming(t: Tonight): string {
 
 /** What Роял's card says now: the evening's live state, or how many are coming, or when it is. */
 function royalNow(): () => string {
-  // What it said last, at once (lib/api.ts, last): Начало opened again doesn't wait for it.
-  const tonight = signal<Tonight | null>(last<Tonight>("/api/royal/tonight") ?? null);
+  const tonight = signal<Tonight | null>(null);
   const now = signal(Date.now());
   let skew = 0;
   const load = () =>
-    fresh<Tonight>("/api/royal/tonight").then(
+    api<Tonight>("GET", "/api/royal/tonight").then(
       (t) => {
         skew = t.glance.now - Date.now();
         now.set(t.glance.now);

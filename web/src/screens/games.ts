@@ -7,7 +7,7 @@ import type { Played } from "./stats.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
-let { loading, api, h, signal, title, back, segmented, rename, failure, gameRow } = {} as Kit;
+let { api, h, signal, title, back, segmented, rename, failure, gameRow } = {} as Kit;
 
 type Kind = "" | "day" | "topic" | "others";
 
@@ -35,13 +35,13 @@ const dateline = (ms: number) =>
   }).format(new Date(ms));
 
 export function games(kit: Kit) {
-  ({ loading, api, h, signal, title, back, segmented, rename, failure, gameRow } = kit);
+  ({ api, h, signal, title, back, segmented, rename, failure, gameRow } = kit);
   title("Всички игри");
   const kind = signal<Kind>(kinds.find(([k]) => k && `#${k}` === location.hash)?.[0] ?? "");
   const list = signal<Played[] | null>(null);
   const next = signal<string | undefined>(undefined);
   const error = signal<unknown>(null);
-  const asking = signal(false);
+  const loading = signal(false);
   // The list asked for now: an answer to an older one arriving late is dropped.
   let asked = 0;
   const more = async (fresh: boolean) => {
@@ -49,7 +49,7 @@ export function games(kit: Kit) {
     const q = new URLSearchParams();
     if (kind.peek()) q.set("kind", kind.peek());
     if (!fresh && next.peek()) q.set("from", next.peek() ?? "");
-    asking.set(true);
+    loading.set(true);
     error.set(null);
     try {
       const page = await api<Page>("GET", `/api/me/games?${q}`);
@@ -59,7 +59,7 @@ export function games(kit: Kit) {
     } catch (err) {
       if (mine === asked) error.set(err);
     } finally {
-      if (mine === asked) asking.set(false);
+      if (mine === asked) loading.set(false);
     }
   };
   more(true);
@@ -81,7 +81,7 @@ export function games(kit: Kit) {
     () => (kind() === "day" ? h("p", { class: "day-next" }, h("a", { href: "/issues" }, "Минали броеве")) : null),
     () => {
       const all = list();
-      if (!all) return error() ? failure(error(), () => more(true)) : loading("rows");
+      if (!all) return error() ? failure(error(), () => more(true)) : h("p", { class: "muted" }, "…");
       if (!all.length) return h("p", { class: "muted" }, "Още няма такива игри.");
       // By day, newest first: each day's games under its dateline.
       const days: { day: string; at: number; games: Played[] }[] = [];
@@ -110,7 +110,7 @@ export function games(kit: Kit) {
     },
     () =>
       list() && next()
-        ? h("button", { class: "btn", type: "button", disabled: asking(), onclick: () => more(false) }, "Още игри")
+        ? h("button", { class: "btn", type: "button", disabled: loading(), onclick: () => more(false) }, "Още игри")
         : null,
     () => (list() && error() ? h("p", { class: "bad", role: "alert" }, "Не успяхме. Опитай пак.") : null),
   );

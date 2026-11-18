@@ -20,7 +20,7 @@ import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { backOut, byTap, go, hold, redirect, release, rename, title } from "../lib/router.ts";
 import { listWords, withName } from "../lib/words.ts";
 import { bulgaria, categories, player, topics, user } from "../state.ts";
-import { avatar, back, failure, formatNumber, type Look, loading, topicMark, who } from "../ui.ts";
+import { avatar, back, failure, formatNumber, type Look, topicMark, who } from "../ui.ts";
 import { afterDuel } from "./duel.ts";
 import { nameFirst } from "./name.ts";
 
@@ -67,7 +67,7 @@ function shown(): () => boolean {
 /** A challenge's link: who sent it and how they did, the viewer's game of it, or (to the one who sent it) who took it. */
 export function challenge([code = ""]: string[]) {
   title("Предизвикателство");
-  const screen = slot(() => loading("title", "card"));
+  const screen = slot(() => h("p", { class: "muted" }, "…"));
   const here = shown();
   api<Challenge>("GET", `/api/challenges/${code}`).then(
     (c) => {
@@ -305,7 +305,7 @@ export function sendChallenge(s: State, topic?: string): { main: Child; also: Ch
   };
   const main = () => {
     const list = friends();
-    if (!list) return loading("rows");
+    if (!list) return h("p", { class: "muted" }, "…");
     if (!list.length) return challengeButton("Прати", s.id, text, true);
     const done = sent();
     if (done)
@@ -371,7 +371,7 @@ const duelWith = (name?: string) => (name ? `Дуел ${withName(name)}` : "Ду
 export function challengeFriend([idText]: string[]) {
   title("Предизвикателство");
   const id = Number(idText);
-  const screen = slot(() => loading("title", "card"));
+  const screen = slot(() => h("p", { class: "muted" }, "…"));
   const tap = byTap();
   const here = shown();
   const fail = (err: unknown) => {

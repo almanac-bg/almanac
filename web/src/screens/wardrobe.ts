@@ -9,7 +9,6 @@ import type { Cosmetic, Progress, TitleView } from "./progress.ts";
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
 let {
-  loading,
   api,
   errorText,
   h,
@@ -22,7 +21,6 @@ let {
   shapeNames,
   tierWords,
   toneNames,
-  keptProgress,
   loadProgress,
 } = {} as Kit;
 
@@ -46,7 +44,6 @@ const titleGroups: [TitleView["group"], string][] = [
 
 export function wardrobe(kit: Kit) {
   ({
-    loading,
     api,
     errorText,
     h,
@@ -59,7 +56,6 @@ export function wardrobe(kit: Kit) {
     shapeNames,
     tierWords,
     toneNames,
-    keptProgress,
     loadProgress,
   } = kit);
   title("Гардероб");
@@ -72,7 +68,7 @@ export function wardrobe(kit: Kit) {
     when(
       () => user(),
       () => {
-        const progress = signal<Progress | null>(keptProgress());
+        const progress = signal<Progress | null>(null);
         const load = () => loadProgress().then(progress.set, () => {});
         load();
         return look(progress, load);
@@ -99,7 +95,7 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
   };
   return () => {
     const p = progress();
-    if (!p) return loading("head", "card");
+    if (!p) return h("p", { class: "muted" }, "…");
     const worn = p.title ? p.titles.find((t) => t.id === p.title) : undefined;
     return [
       h(

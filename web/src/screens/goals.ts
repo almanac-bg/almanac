@@ -5,7 +5,7 @@
 // still open, quietly, as what's next.
 
 import { picture } from "../art/picture.ts";
-import { fresh, last } from "../lib/api.ts";
+import { api } from "../lib/api.ts";
 import { type Child, h, type Signal, signal } from "../lib/dom.ts";
 import { user } from "../state.ts";
 import { meter, reserveWords } from "../ui.ts";
@@ -31,11 +31,7 @@ export interface Goals {
   reserveBy: "" | "full" | "week" | "soon";
 }
 
-/** The day's goals: the server asked again, while what it said last is drawn (keptGoals). */
-export const loadGoals = () => fresh<Goals>("/api/goals");
-
-/** What the server said last of the day's goals, if anything (lib/api.ts, last). */
-export const keptGoals = () => last<Goals>("/api/goals") ?? null;
+export const loadGoals = () => api<Goals>("GET", "/api/goals");
 
 /** A goal: its mark, its name (until done, the way to where it's done), the XP it earns, and how far along. */
 function goalRow(g: DayGoal): Child {
@@ -71,7 +67,7 @@ export function openGoals(goals: Signal<Goals | null>): Child {
 /** Начало's card: today's three goals, how far along each is, the XP each earns, and (until done) the way to it. */
 export function goalsCard(): Child {
   if (!user.peek()) return null;
-  const data = signal<Goals | null>(keptGoals());
+  const data = signal<Goals | null>(null);
   loadGoals().then(data.set, () => {});
   return () => {
     const d = data();
