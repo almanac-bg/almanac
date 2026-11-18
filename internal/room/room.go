@@ -6,9 +6,9 @@
 // between games the host may choose again (Change), keeping the code and the players. The standings are by points,
 // then by the time the answers took, as in a duel. The host may also send a player out of the room (Remove): they're
 // kept out of it from then on, unless the host brings them back (Return: a slip undone); ask a player for another
-// name (AskName: theirs in the room goes back to a drawn one, and the name taken away isn't taken again); and lock it
-// (SetLocked), so that nobody new comes in (once everyone is there), while those in it still come back to it. A room
-// led from a big screen locks itself as its first game starts. A room never deals a question twice, over all its
+// name (AskName: theirs in the room goes back to a drawn one, and no name taken away is taken again while the room
+// is open); and lock it (SetLocked), so that nobody new comes in (once everyone is there), while those in it still
+// come back to it. A room led from a big screen locks itself as its first game starts. A room never deals a question twice, over all its
 // games, nor one of the day's.
 //
 // Who is in a room is its members (Join) and its host (In): only they follow it, play in it or see who's in it. The
@@ -346,14 +346,15 @@ func (h *Hub) Pause() { h.paused.Store(true) }
 // Resume undoes Pause.
 func (h *Hub) Resume() { h.paused.Store(false) }
 
-// UnderWay is how many rooms have a game being played: what a restart would cut.
+// UnderWay is how many rooms have a game being played: what a restart would cut. An answer held for the host
+// („Задръж“) isn't: a restart brings it back as it was (Restore), and it may wait for as long as the host talks.
 func (h *Hub) UnderWay() int {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	n := 0
 	for _, r := range h.rooms {
 		r.mu.Lock()
-		if r.underWay() {
+		if r.underWay() && !(r.phase == Reveal && r.held && r.recording == 0) {
 			n++
 		}
 		r.mu.Unlock()
@@ -421,9 +422,9 @@ type savedMember struct {
 	Name string    `json:"name"`
 	Here bool      `json:"here,omitempty"` // a name for this room alone (Player.RoomName)
 	Look play.Look `json:"look"`
-	// Asked is a player the host has asked for another name, and Dropped the name taken away (AskName).
-	Asked   bool   `json:"asked,omitempty"`
-	Dropped string `json:"dropped,omitempty"`
+	// Asked is a player the host has asked for another name, and Refused the names taken away (AskName).
+	Asked   bool     `json:"asked,omitempty"`
+	Refused []string `json:"refused,omitempty"`
 	// Away is a player with no screen on the room: they aren't waited for once it's back.
 	Away    bool          `json:"away,omitempty"`
 	Points  int           `json:"points,omitempty"`
@@ -491,7 +492,7 @@ func (r *Room) saved(now time.Time) saved {
 	}
 	for _, m := range r.players {
 		sm := savedMember{ID: m.ID, Key: m.key, Name: m.Name, Here: m.RoomName, Look: m.Look,
-			Away: away(m.online, m.back, m.left, now), Asked: m.asked, Dropped: m.dropped}
+			Away: away(m.online, m.back, m.left, now), Asked: m.asked, Refused: m.refused}
 		if played {
 			sm.Points, sm.Rights, sm.InRow, sm.Ms, sm.Run = m.points, m.rights, m.inRow, m.ms, m.run
 			for _, l := range m.log {
@@ -509,7 +510,7 @@ func (r *Room) saved(now time.Time) saved {
 		sv.Out = append(sv.Out, id)
 		if m != nil {
 			sv.Removed = append(sv.Removed, savedMember{ID: m.ID, Key: m.key, Name: m.Name, Here: m.RoomName, Look: m.Look,
-				Asked: m.asked, Dropped: m.dropped})
+				Asked: m.asked, Refused: m.refused})
 		}
 	}
 	return sv
@@ -553,7 +554,7 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 		}
 		for _, sm := range sv.Removed {
 			r.out[sm.ID] = &member{Player: Player{ID: sm.ID, Name: sm.Name, RoomName: sm.Here, Look: sm.Look}, key: sm.Key,
-				asked: sm.Asked, dropped: sm.Dropped}
+				asked: sm.Asked, refused: sm.Refused}
 		}
 		for _, id := range sv.Used {
 			r.used[id] = true
@@ -578,7 +579,7 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 		}
 		for _, sm := range sv.Players {
 			m := r.add(Player{ID: sm.ID, Name: sm.Name, RoomName: sm.Here, Look: sm.Look})
-			m.asked, m.dropped = sm.Asked, sm.Dropped
+			m.asked, m.refused = sm.Asked, sm.Refused
 			if sv.Joined > 0 { // saved since keys are kept: each as it was
 				m.key = sm.Key
 			}
@@ -696,9 +697,10 @@ type member struct {
 	ms             int64 // the time their answers took, this game: of as many points, the quicker stands first
 	inRow          int   // right answers in a row, the last ones
 	online         int   // their screens on the room
-	// asked: the host has asked them for another name (AskName), and dropped is the name taken away, not taken again.
+	// asked: the host has asked them for another name (AskName); refused are the names taken away, not taken again
+	// while the room is open.
 	asked   bool
-	dropped string
+	refused []string
 	// back is until when they count as there though no screen of theirs is on the room yet: in a room restored after a
 	// restart (comeBack), one was open as the server stopped, and comes back by itself; in a room just opened, the
 	// host is on their way in (hostWait). left is when their last screen went.
@@ -780,7 +782,7 @@ func (r *Room) Key() string { return r.key }
 // alone, Player.RoomName, stays until another is given), with the key they have of it ("": the code alone). Someone
 // new comes in unless the host has locked it, and during a game only with the key: joining mid-game is fine, from the
 // next answer on, for whom the room's link was sent. A player the host asked for another name (AskName) keeps the one
-// drawn for them until they give one, and can't give back the name taken away (ErrNameAgain).
+// drawn for them until they give one, and can't give back a name taken away, then or later (ErrNameAgain).
 func (r *Room) Join(p Player, key string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -793,11 +795,11 @@ func (r *Room) Join(p Player, key string) error {
 		return nil
 	}
 	if m := r.member(p.ID); m != nil {
-		if m.asked && p.RoomName {
-			if strings.EqualFold(p.Name, m.dropped) {
+		if p.RoomName {
+			if slices.ContainsFunc(m.refused, func(n string) bool { return strings.EqualFold(n, p.Name) }) {
 				return ErrNameAgain
 			}
-			m.asked, m.dropped = false, ""
+			m.asked = false
 		}
 		if m.RoomName && !p.RoomName {
 			p.Name, p.RoomName = m.Name, true
@@ -935,8 +937,8 @@ func (r *Room) AskName(by int64, key int, drawn string) error {
 		return ErrNotNow
 	}
 	m := r.players[i]
-	if !m.asked {
-		m.dropped = m.Name
+	if !m.asked { // asked again before giving another: the name now is the drawn one, not theirs
+		m.refused = append(m.refused, m.Name)
 	}
 	m.Name, m.RoomName, m.asked = drawn, true, true
 	r.changed()
@@ -1446,10 +1448,12 @@ func (r *Room) counted(m *member, n int) bool {
 }
 
 // allAnswered is whether everyone in the room now (there: just after a restart, those coming back too) has answered
-// the question showing.
+// the question showing. A room where nobody has answered hasn't, though nobody is there: one led with no phones, or
+// whose screens haven't come back after a restart, waits for the question's time.
 func (r *Room) allAnswered() bool {
 	now := time.Now()
-	return !slices.ContainsFunc(r.players, func(p *member) bool { return p.there(now) && !p.answered })
+	return slices.ContainsFunc(r.players, func(p *member) bool { return p.answered }) &&
+		!slices.ContainsFunc(r.players, func(p *member) bool { return p.there(now) && !p.answered })
 }
 
 func (r *Room) reveal() {

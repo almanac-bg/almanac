@@ -636,8 +636,12 @@ export function players(view: () => RoomView, code: string, error: (s: string) =
         h(
           "li",
           { class: [!p.online && "away", p.me && "me"].filter(Boolean).join(" ") || undefined },
-          avatar(p.avatar, { size: "s", name: p.name }),
-          h("span", { class: "player-name" }, p.name, p.me ? " (ти)" : "", p.online ? "" : " — извън стаята"),
+          h(
+            "span",
+            { class: "player-who" },
+            avatar(p.avatar, { size: "s", name: p.name }),
+            h("span", { class: "player-name" }, p.name, p.me ? " (ти)" : "", p.online ? "" : " — извън стаята"),
+          ),
           v.isHost && !p.me
             ? h(
                 "span",
