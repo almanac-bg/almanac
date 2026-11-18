@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
 )
@@ -285,4 +286,229 @@ func holding(t *testing.T, w *world, s string) []string {
 		}
 	}
 	return where
+}
+
+// fold folds a guest into an account as signing in does: Merge, then the guest goes.
+func (w *world) fold(guest, owner int64) {
+	w.t.Helper()
+	err := w.db.Tx(w.t.Context(), func(tx *sql.Tx) error {
+		if err := Merge(tx, guest, owner); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`DELETE FROM users WHERE id = ?`, guest)
+		return err
+	})
+	if err != nil {
+		w.t.Fatal(err)
+	}
+}
+
+// since makes a player one who came d before now.
+func (w *world) since(user int64, d time.Duration) {
+	w.t.Helper()
+	if _, err := w.db.Write.Exec(`UPDATE users SET created_at = ? WHERE id = ?`, w.now.Add(-d).UnixMilli(), user); err != nil {
+		w.t.Fatal(err)
+	}
+}
+
+// league is a player's league (its tier).
+func (w *world) league(user int64) int {
+	w.t.Helper()
+	return w.count(`SELECT league FROM users WHERE id = ?`, user)
+}
+
+// A player back on a new device, who plays the day as a guest before signing in, keeps their league: the guest's
+// group, of the lowest league, isn't the account's, and the account races the week in one of its own (review
+// 2026-11-18, A1: Пирин went to Странджа). A guest's group of the account's league comes along; and an account raised
+// to a guest's higher league keeps it, whatever group it raced in.
+func TestMergeKeepsTheAccountsLeague(t *testing.T) {
+	w := setup(t) // Thursday, 12 November
+	ctx := t.Context()
+	owner, guest := w.user(), w.user()
+	w.since(owner, 60*24*time.Hour)
+	w.since(guest, time.Hour)
+	if _, err := w.db.Write.Exec(`UPDATE users SET league = 4 WHERE id = ?`, owner); err != nil {
+		t.Fatal(err)
+	}
+	w.dayGame(guest, nil)
+	if v, _ := w.g.LeagueOf(ctx, guest); !v.In || v.League.Tier != 0 {
+		t.Fatalf("the guest's week: %+v", v)
+	}
+	w.fold(guest, owner)
+	if v, err := w.g.LeagueOf(ctx, owner); err != nil || !v.In || v.League.Tier != 4 {
+		t.Fatalf("the account's week after signing in: %+v %v", v, err)
+	}
+	w.now = time.Date(2026, 11, 16, 10, 0, 0, 0, Bulgaria)
+	if err := w.g.SettleDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if tier := w.league(owner); tier != 4 {
+		t.Fatalf("the account's league after the week: %d, not Пирин", tier)
+	}
+
+	// A guest in a group of the account's league brings it.
+	owner2, guest2 := w.user(), w.user()
+	w.since(owner2, 60*24*time.Hour)
+	w.since(guest2, time.Hour)
+	w.dayGame(guest2, nil)
+	group := w.count(`SELECT group_id FROM league_members WHERE user_id = ?`, guest2)
+	w.fold(guest2, owner2)
+	if now := w.count(`SELECT coalesce(max(group_id), 0) FROM league_members WHERE user_id = ?`, owner2); now != group {
+		t.Fatalf("the guest's group %d, the account's %d", group, now)
+	}
+
+	// An account in a group already, raised to a guest's higher league: the week's end keeps it there.
+	owner3, guest3 := w.user(), w.user()
+	w.since(owner3, 60*24*time.Hour)
+	w.dayGame(owner3, nil)
+	if _, err := w.db.Write.Exec(`UPDATE users SET league = 3 WHERE id = ?`, guest3); err != nil {
+		t.Fatal(err)
+	}
+	w.fold(guest3, owner3)
+	if tier := w.league(owner3); tier != 3 {
+		t.Fatalf("raised to the guest's league: %d", tier)
+	}
+	w.now = time.Date(2026, 11, 23, 10, 0, 0, 0, Bulgaria)
+	if err := w.g.SettleDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if tier := w.league(owner3); tier != 3 {
+		t.Fatalf("the raised account's league after the week: %d", tier)
+	}
+}
+
+// The day's ten played as several guests, and signed in from the best of them, races nobody: a guest's day brought
+// to an account that was there already counts for the player alone, a shadow (review 2026-11-18, S4). It's theirs
+// still (their streak, their board), and the account has the day: no other guest's comes after it, nor a game of its
+// own. A guest's day from before the account was there is a day like any other.
+func TestMergeShadowsAGuestsDay(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	day := w.g.Today()
+	owner, scout, best, rival := w.user(), w.user(), w.user(), w.user()
+	w.since(owner, 30*24*time.Hour)
+	w.dayGame(scout, nil, repeat(w.wrong, Length)...)
+	run := w.dayGame(best, nil)
+	w.dayGame(rival, nil, repeat(w.wrong, Length)...)
+	w.fold(best, owner)
+	if w.shadow(run) != ShadowGuest {
+		t.Fatalf("the guest's day brought to the account: shadow %d", w.shadow(run))
+	}
+	if b, err := w.g.BoardOf(ctx, day, rival); err != nil || b.Players != 2 {
+		t.Fatalf("the board as another sees it: %+v %v", b, err)
+	}
+	if b, err := w.g.BoardOf(ctx, day, owner); err != nil || b.Place != 1 || b.Mine == nil {
+		t.Fatalf("the board as the account sees it: %+v %v", b, err)
+	}
+	if s, err := w.g.Streak(ctx, owner); err != nil || s != 1 {
+		t.Fatalf("the account's streak: %d %v", s, err)
+	}
+	w.fold(scout, owner)
+	if n := w.count(`SELECT count(*) FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, owner, day); n != 1 {
+		t.Fatalf("the account has %d games of the day", n)
+	}
+	if s, err := w.g.StartDay(ctx, owner); err != nil || s.ID != run || !s.Done {
+		t.Fatalf("the account's day after: %+v %v", s, err)
+	}
+
+	// A guest who played before the account was made (kept with an email elsewhere later) brings a day like any.
+	early, later := w.user(), w.user()
+	first := w.dayGame(early, nil)
+	w.since(later, -time.Minute)
+	w.fold(early, later)
+	if w.shadow(first) != 0 {
+		t.Fatalf("a day from before the account: shadow %d", w.shadow(first))
+	}
+}
+
+// A guest's friends come to the account only as far as it has room (MaxFriends), the latest first, both ways.
+func TestMergeFriendsWithinMax(t *testing.T) {
+	w := setup(t)
+	owner, guest := w.user(), w.user()
+	befriend := func(a, b int64, since int) {
+		if _, err := w.db.Write.Exec(`INSERT INTO friends (user_id, friend_id, since) VALUES (?1, ?2, ?3), (?2, ?1, ?3)`,
+			a, b, since); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := range MaxFriends - 2 {
+		befriend(owner, w.user(), i)
+	}
+	both := w.user()
+	befriend(owner, both, 0)
+	befriend(guest, both, 0)
+	old, newer, newest := w.user(), w.user(), w.user()
+	befriend(guest, old, 1)
+	befriend(guest, newer, 2)
+	befriend(guest, newest, 3)
+	w.fold(guest, owner)
+	friends := func(a, b int64) bool {
+		return w.count(`SELECT count(*) FROM friends WHERE user_id = ? AND friend_id = ?`, a, b) == 1
+	}
+	if n := w.count(`SELECT count(*) FROM friends WHERE user_id = ?`, owner); n != MaxFriends {
+		t.Fatalf("the account has %d friends", n)
+	}
+	if !friends(owner, newest) || !friends(newest, owner) || friends(owner, newer) || friends(newer, owner) ||
+		friends(owner, old) || !friends(owner, both) || !friends(both, owner) {
+		t.Fatal("the friends the guest brought")
+	}
+}
+
+// The days a player who goes played on are kept for the retention counts, as nobody's: a tombstone (review
+// 2026-11-18, S15).
+func TestForgetLeavesTheDaysAsNobodys(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	accounts := &account.Accounts{DB: w.db, Forget: []func(*sql.Tx, int64) error{Forget}}
+	gone := w.user()
+	w.playDay(gone)
+	if err := accounts.Delete(ctx, gone); err != nil {
+		t.Fatal(err)
+	}
+	if n := w.count(`SELECT count(*) FROM active_days WHERE user_id = ?`, gone); n != 0 {
+		t.Fatalf("%d days still the player's", n)
+	}
+	if n := w.count(`SELECT count(*) FROM active_days WHERE user_id = ?`, -gone); n != 1 {
+		t.Fatalf("%d days kept as nobody's", n)
+	}
+	if _, a, err := w.g.Retention(ctx, 1); err != nil || a.Today != 1 {
+		t.Fatalf("played today: %+v %v", a, err)
+	}
+}
+
+// Every column named for a player is a reference to users (what's theirs goes with them, by the schema, or is kept
+// without them), or is listed here with why not: an id kept without one could become someone else's.
+func TestPlayerColumnsRefer(t *testing.T) {
+	unlinked := map[string]string{
+		"active_days.user_id": "kept after a player goes, for the retention counts, as a tombstone (Forget)",
+	}
+	w := setup(t)
+	rows, err := w.db.Read.Query(`SELECT m.name || '.' || c.name FROM sqlite_schema m, pragma_table_info(m.name) c
+		WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
+			AND (c.name IN ('user_id', 'player_id') OR c.name LIKE '%\_user\_id' ESCAPE '\')
+			AND NOT EXISTS (SELECT 1 FROM pragma_foreign_key_list(m.name) f WHERE f."from" = c.name AND f."table" = 'users')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	seen := map[string]bool{}
+	for rows.Next() {
+		var col string
+		if err := rows.Scan(&col); err != nil {
+			t.Fatal(err)
+		}
+		seen[col] = true
+		if unlinked[col] == "" {
+			t.Errorf("%s names a player without a reference to users: make it one (REFERENCES users (id)), or list "+
+				"it here with why not, and see that Forget leaves nothing of the player's there", col)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	for col := range unlinked {
+		if !seen[col] {
+			t.Errorf("%s, listed without a reference, has one or is gone", col)
+		}
+	}
 }

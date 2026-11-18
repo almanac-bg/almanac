@@ -11,8 +11,9 @@
 // question left showing past its time counts as unanswered, whenever the run is next looked at. A question is graded
 // against the version of it that showed, whatever the bank has become meanwhile (versions.go). Everything a run does
 // goes through the database, so a refresh, a second tab or a restart of the server changes nothing. A run left
-// half-way goes on where it stopped: the day's when the player comes back to it, a topic's when they start the same
-// topic again that day (StartTopic). A game played quicker than a person plays counts for its player alone (fair.go).
+// half-way goes on where it stopped: the day's when the player comes back to it that day (a run of the day's
+// questions ends with its day, DayGrace after: dayOver), a topic's when they start the same topic again that day
+// (StartTopic). A game played quicker than a person plays counts for its player alone (fair.go).
 //
 // A run played live (a live duel's, a Роял's) moves on its game's clock alone (driver): the game shows each question
 // and takes each answer (ShowLive and AnswerLive, ShowRoyal and AnswerRoyal: graded through the deal it shows), and
@@ -78,6 +79,8 @@ var (
 	ErrOutOfStep  = errors.New("not the question now")
 	ErrBadAnswer  = errors.New("an answer the question can't take")
 	ErrNoQuestion = errors.New("no questions to play")
+	// ErrDayOver is a run of the day's questions played on after its day (dayOver).
+	ErrDayOver = errors.New("the run's day is over")
 )
 
 // Game plays runs.
@@ -146,11 +149,11 @@ type run struct {
 	xp             int
 	ms             int64
 	finished       bool
-	scripted       bool // played at a script's speed (fair.go)
+	shadow         bool // counts for its player alone (fair.go)
 }
 
 const runColumns = `id, user_id, kind, coalesce(day, ''), coalesce(category, ''), questions,
-	at, shown_at, points, rights, xp, ms, finished_at IS NOT NULL, scripted`
+	at, shown_at, points, rights, xp, ms, finished_at IS NOT NULL, shadow <> 0`
 
 type scanner interface{ Scan(...any) error }
 
@@ -158,7 +161,7 @@ func scanRun(row scanner) (*run, error) {
 	var r run
 	var picks string
 	err := row.Scan(&r.id, &r.userID, &r.kind, &r.day, &r.category, &picks,
-		&r.at, &r.shownAt, &r.points, &r.rights, &r.xp, &r.ms, &r.finished, &r.scripted)
+		&r.at, &r.shownAt, &r.points, &r.rights, &r.xp, &r.ms, &r.finished, &r.shadow)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoRun
 	}
@@ -196,8 +199,9 @@ func (r *run) driver(tx *sql.Tx) (driver, error) {
 	return byPlayer, nil
 }
 
-// loadBy reads a player's run that by moves on: another's (a live game's, when by is its player) is out of step.
-func loadBy(tx *sql.Tx, userID, runID int64, by driver) (*run, error) {
+// loadBy reads a player's run that by moves on: another's (a live game's, when by is its player) is out of step, and
+// a day's whose day is over (dayOver) is over.
+func (g *Game) loadBy(tx *sql.Tx, userID, runID int64, by driver) (*run, error) {
 	r, err := load(tx, userID, runID)
 	if err != nil {
 		return nil, err
@@ -209,7 +213,31 @@ func loadBy(tx *sql.Tx, userID, runID int64, by driver) (*run, error) {
 	if d != by {
 		return nil, ErrOutOfStep
 	}
+	if r.dayOver(g.Now()) {
+		return nil, ErrDayOver
+	}
 	return r, nil
+}
+
+// DayGrace is how long after its day a run of the day's questions can still be played on: one begun before midnight
+// is finished after it, at a player's pace, between its questions too.
+const DayGrace = 15 * time.Minute
+
+// dayOver is whether a run of the day's questions can't be played on any more: its day ended DayGrace ago, and no
+// question shown before then is still in its time. It stays as it was left: unfinished, it counts for nothing (the
+// streak, the day's board, the week's league), and nothing more of it shows. So a day can't be kept open (a run
+// started and left) and played days later, its answers known by then, to keep a streak or move a past board.
+func (r *run) dayOver(now time.Time) bool {
+	if r.kind != "day" || r.finished {
+		return false
+	}
+	_, end := dayBounds(r.day)
+	closes := time.UnixMilli(end).Add(DayGrace)
+	if shown := time.UnixMilli(r.shownAt.Int64); r.shownAt.Valid && shown.Before(closes) &&
+		shown.Add(LongestLimit+Grace).After(closes) {
+		closes = shown.Add(LongestLimit + Grace)
+	}
+	return now.After(closes)
 }
 
 // dealtOn is the day a run's questions are dealt for, as „На този ден“ goes: the day's questions' date, "" for any
@@ -489,7 +517,7 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 	var s State
 	ended := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		r, err := loadBy(tx, userID, runID, byPlayer)
+		r, err := g.loadBy(tx, userID, runID, byPlayer)
 		if err != nil {
 			return err
 		}
@@ -520,7 +548,7 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 // players, pictures or not (the duel keeps the time). It's out of step if the run isn't at n, or d isn't its question.
 func (g *Game) ShowLive(ctx context.Context, userID, runID int64, n int, at time.Time, d bank.Dealt) error {
 	return g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		r, err := loadBy(tx, userID, runID, byDuel)
+		r, err := g.loadBy(tx, userID, runID, byDuel)
 		if err != nil {
 			return err
 		}
@@ -535,7 +563,7 @@ func (g *Game) ShowLive(ctx context.Context, userID, runID int64, n int, at time
 func (g *Game) Start(ctx context.Context, userID, runID int64, n int) (State, error) {
 	var s State
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		r, err := loadBy(tx, userID, runID, byPlayer)
+		r, err := g.loadBy(tx, userID, runID, byPlayer)
 		if err != nil {
 			return err
 		}
@@ -605,7 +633,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 	finished := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var err error
-		if r, err = loadBy(tx, userID, runID, by); err != nil {
+		if r, err = g.loadBy(tx, userID, runID, by); err != nil {
 			return err
 		}
 		if n == r.at-1 && by == byPlayer {

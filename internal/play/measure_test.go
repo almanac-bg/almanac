@@ -18,7 +18,7 @@ func (w *world) stored(user int64, kind, day string, finished, scripted bool) {
 	if kind == "day" {
 		dayCol = day
 	}
-	if _, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, day, questions, at, started_at, finished_at, scripted)
+	if _, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, day, questions, at, started_at, finished_at, shadow)
 		VALUES (?, ?, ?, '[]', 1, ?, ?, ?)`, user, kind, dayCol, at.UnixMilli(), end, scripted); err != nil {
 		w.t.Fatal(err)
 	}

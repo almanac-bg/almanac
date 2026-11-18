@@ -48,10 +48,17 @@ test.describe("in Messenger's own browser", () => {
       const r = await fetch("/api/auth/handoff", { method: "POST", body: "{}" });
       return ((await r.json()) as { url: string }).url;
     });
+    const name = await page.evaluate(
+      async () => ((await (await fetch("/api/me")).json()) as { user: { name: string } }).user.name,
+    );
     const phone = await browser.newPage();
     await phone.goto(url);
     // Nothing is taken until the player taps for it: a link that opens by itself, or someone else's, brings nothing.
-    await expect(phone.getByText("ще продължи тук. Там вече няма да я има.")).toBeVisible();
+    // The page says whose game it is, and on how many days it was played, so that someone else's is seen to be theirs.
+    await expect(phone.locator(".lead")).toHaveText(
+      `Играта на ${name} ще продължи тук. Там, където е започната, вече няма да я има.`,
+    );
+    await expect(phone.getByText("1 ден игра. Продължи само ако играта е твоя.")).toBeVisible();
     await phone.getByRole("button", { name: "Продължи тук" }).click();
     await expect(phone.getByRole("status").filter({ hasText: "Готово: играта ти е тук." })).toBeVisible();
     await expect(phone).toHaveURL(/\/$/);
@@ -61,8 +68,8 @@ test.describe("in Messenger's own browser", () => {
     expect(left).toBeNull();
     const late = await browser.newPage();
     await late.goto(url);
-    await late.getByRole("button", { name: "Продължи тук" }).click();
-    await expect(late.getByRole("status")).toContainText("Тази връзка вече не работи");
+    await expect(late.getByRole("alert")).toContainText("Тази връзка вече не работи");
+    await expect(late.getByRole("button", { name: "Продължи тук" })).toHaveCount(0);
     await phone.close();
     await late.close();
   });

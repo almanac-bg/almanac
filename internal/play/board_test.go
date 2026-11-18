@@ -213,7 +213,7 @@ func TestDayRights(t *testing.T) {
 			t.Fatalf("as %d sees it: %d %v %v", viewer, n, played, err)
 		}
 	}
-	if _, err := w.db.Write.ExecContext(ctx, `UPDATE runs SET scripted = 1 WHERE id = ?`, s.ID); err != nil {
+	if _, err := w.db.Write.ExecContext(ctx, `UPDATE runs SET shadow = 1 WHERE id = ?`, s.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, played, _ := w.g.DayRights(ctx, ana, today, bo); played {

@@ -156,7 +156,7 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = db.QueryRowContext(ctx, `SELECT count(*), count(email) FROM users`).Scan(&data.Players, &data.WithEmail)
 	// The day's games by people, and apart those played at a script's speed, which nobody else sees (play/fair.go).
-	_ = db.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE NOT scripted), count(*) FILTER (WHERE scripted) FROM runs
+	_ = db.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE `+play.ByPerson+`), count(*) FILTER (WHERE NOT (`+play.ByPerson+`)) FROM runs
 		WHERE kind = 'day' AND day = ? AND finished_at IS NOT NULL`, today).Scan(&data.DayToday, &data.DayScripted)
 
 	// The questions reported most lately first, reportsShown of them, and of each its first reportsEach reports: a

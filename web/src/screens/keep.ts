@@ -6,11 +6,12 @@
 
 import { type ApiError, api, errorText } from "../lib/api.ts";
 import { inApp } from "../lib/app.ts";
-import { type Child, effect, h, signal, when } from "../lib/dom.ts";
+import { type Child, effect, h, signal, slot, when } from "../lib/dom.ts";
 import { embedded, outsideLink } from "../lib/embedded.ts";
 import { askToKeep } from "../lib/keep.ts";
 import { go, title } from "../lib/router.ts";
 import { type User, user } from "../state.ts";
+import { failure } from "../ui.ts";
 import { notice, signIn } from "./settings.ts";
 
 /** This page's app browser, if it's in one (never in the game's own app). */
@@ -134,9 +135,17 @@ export function haveProfile(signedIn: () => void, label = "Имаш профил
         );
 }
 
+/** The game a handoff's link brings (account.Handing): whose, and on how many days it was played. */
+interface Handing {
+  name: string;
+  days: number;
+}
+
 /** /hand/<token>: a game brought from an app's own browser (keepLine), taken here once, when the player taps for it
  * (a link that opens by itself, as the app does with one, or that someone else sent, takes nothing on its own); then
- * Начало, which says so. The game moves: where it was, it's gone (account.TakeHandoff). */
+ * Начало, which says so. The game moves: where it was, it's gone (account.TakeHandoff). The page says first whose
+ * game it is, and on how many days it was played, so that a link from someone else is seen to be theirs; or why it
+ * can't come here (a profile here, or a game of this browser's own: two games are joined only by an email). */
 export function handoff([token = ""]: string[]) {
   title("Продължи играта тук");
   const busy = signal(false);
@@ -154,20 +163,33 @@ export function handoff([token = ""]: string[]) {
       },
     );
   };
-  return h(
-    "section",
-    { class: "screen" },
-    h("div", { class: "intro" }, h("h1", null, "Продължи играта тук")),
+  const offer = (game: Handing) =>
     h(
       "div",
       { class: "stack" },
-      h("p", { class: "lead" }, () =>
-        user()
-          ? "Играта, която започна на друго място, ще се добави към тази тук. Там вече няма да я има."
-          : "Играта, която започна на друго място, ще продължи тук. Там вече няма да я има.",
+      h(
+        "p",
+        { class: "lead" },
+        "Играта на ",
+        h("strong", null, game.name),
+        " ще продължи тук. Там, където е започната, вече няма да я има.",
+      ),
+      h(
+        "p",
+        { class: "muted" },
+        game.days > 0 ? `${game.days} ${game.days === 1 ? "ден" : "дни"} игра. ` : "",
+        "Продължи само ако играта е твоя.",
       ),
       h("button", { class: "btn primary", type: "button", onclick: take, disabled: busy }, "Продължи тук"),
       h("a", { class: "link tap", href: "/" }, "Откажи"),
-    ),
-  );
+    );
+  const screen = slot(() => h("p", { class: "muted" }, "…"));
+  const look = () => {
+    api<{ game: Handing }>("POST", "/api/auth/hand/look", { token }).then(
+      (r) => screen.show(() => offer(r.game)),
+      (err) => screen.show(() => failure(err, look)),
+    );
+  };
+  look();
+  return h("section", { class: "screen" }, h("div", { class: "intro" }, h("h1", null, "Продължи играта тук")), screen);
 }

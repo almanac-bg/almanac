@@ -360,7 +360,7 @@ func (s *Server) firstWeek(ctx context.Context, active play.Active) (firstWeek, 
 		}
 		win[i].t = t
 		if err := s.db.Read.QueryRowContext(ctx, `SELECT count(*) FROM runs WHERE kind = 'day' AND day BETWEEN ? AND ?
-			AND finished_at IS NOT NULL AND NOT scripted`, from, today).Scan(&win[i].dayTens); err != nil {
+			AND finished_at IS NOT NULL AND `+play.ByPerson, from, today).Scan(&win[i].dayTens); err != nil {
 			return f, err
 		}
 		// The day's reminders that reached the player (remind.go), and the days finished within two hours of one.

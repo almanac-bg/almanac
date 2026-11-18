@@ -2,6 +2,7 @@ package play
 
 import (
 	"database/sql"
+	"strconv"
 )
 
 // A guest who signs in to an account they have already brings their game along (Merge), and a player who goes
@@ -20,14 +21,24 @@ type mergeStep struct {
 }
 
 var mergeSteps = []mergeStep{
-	// All the guest's runs but a day the account has played itself, which stays the account's.
+	// All the guest's runs but a day the account has played itself, which stays the account's: one game of a day is
+	// ever an account's. A day's run the guest played while the account was there already comes as a shadow
+	// (ShadowGuest, fair.go): the player's own, for their streak and their numbers, never on the others' boards nor in
+	// their league, so that the day played as several guests, and signed in from the best of them, races nobody.
+	{sql: `UPDATE runs SET shadow = ` + strconv.Itoa(ShadowGuest) + ` WHERE user_id = ?2 AND kind = 'day' AND NOT shadow
+		AND started_at >= (SELECT created_at FROM users WHERE id = ?1)`},
 	{carries: []string{"runs.user_id"}, sql: `UPDATE runs SET user_id = ?1 WHERE user_id = ?2
 		AND NOT (kind = 'day' AND day IN (SELECT day FROM runs WHERE user_id = ?1 AND kind = 'day'))`},
-	// The guest's friends become the account's (the two aren't friends with themselves).
-	{carries: []string{"friends.user_id", "friends.friend_id"}, sql: `INSERT OR IGNORE INTO friends (user_id, friend_id, since, asked)
-		SELECT ?1, friend_id, since, asked FROM friends WHERE user_id = ?2 AND friend_id <> ?1`},
+	// The guest's friends become the account's (the two aren't friends with themselves), as many as the account has
+	// room for (MaxFriends), the latest first: a guest's game brought along can't give it more friends than befriending
+	// could.
+	{carries: []string{"friends.user_id", "friends.friend_id"}, sql: `INSERT INTO friends (user_id, friend_id, since, asked)
+		SELECT ?1, friend_id, since, asked FROM friends WHERE user_id = ?2 AND friend_id <> ?1
+			AND friend_id NOT IN (SELECT friend_id FROM friends WHERE user_id = ?1)
+		ORDER BY since DESC LIMIT max(0, ` + strconv.Itoa(MaxFriends) + ` - (SELECT count(*) FROM friends WHERE user_id = ?1))`},
 	{sql: `INSERT OR IGNORE INTO friends (user_id, friend_id, since, asked)
-		SELECT user_id, ?1, since, asked FROM friends WHERE friend_id = ?2 AND user_id <> ?1`},
+		SELECT user_id, ?1, since, asked FROM friends WHERE friend_id = ?2 AND user_id <> ?1
+			AND user_id IN (SELECT friend_id FROM friends WHERE user_id = ?1)`},
 	{sql: `DELETE FROM friends WHERE user_id = ?2 OR friend_id = ?2`},
 	// Duels against the guest count against the account.
 	{carries: []string{"runs.opponent_id"}, sql: `UPDATE runs SET opponent_id = ?1 WHERE opponent_id = ?2`},
@@ -41,7 +52,8 @@ var mergeSteps = []mergeStep{
 		AND coalesce((SELECT user_id FROM challenges WHERE id = duels.challenge_id), 0) <> ?1`},
 	{sql: `UPDATE duels SET b_id = ?1 WHERE b_id = ?2 AND coalesce(a_id, 0) <> ?1`},
 	{sql: `DELETE FROM duels WHERE a_id = ?2 OR b_id = ?2`},
-	// The rating: the guest's, with its games and peak, if it's the better one of rated games; the higher league.
+	// The rating: the guest's, with its games and peak, if it's the better one of rated games; the higher league (the
+	// account's never goes down: a guest's league is the same player's, of their weeks played as the guest).
 	{carries: []string{"users.rating", "users.rated"}, sql: `UPDATE users SET rating = g.rating, rated = g.rated
 		FROM (SELECT rating, rated FROM users WHERE id = ?2) g
 		WHERE users.id = ?1 AND g.rated > 0 AND (users.rated = 0 OR g.rating > users.rating)`},
@@ -50,9 +62,9 @@ var mergeSteps = []mergeStep{
 		league = max(users.league, g.league) FROM (SELECT peak, peak_seen, league FROM users WHERE id = ?2) g
 		WHERE users.id = ?1`},
 	// The weeks of the leagues, and the evenings of Роял, the guest played (a week or an evening both played in
-	// stays the account's); this week's group, if the account isn't in one.
+	// stays the account's); and the guest's group of a week the account isn't in one, if it's of the account's league.
 	{carries: []string{"league_results.user_id"}, sql: `UPDATE OR IGNORE league_results SET user_id = ?1 WHERE user_id = ?2`},
-	{carries: []string{"league_members.user_id"}, sql: `UPDATE OR IGNORE league_members SET user_id = ?1 WHERE user_id = ?2`},
+	{carries: []string{"league_members.user_id"}, do: mergeLeague},
 	{carries: []string{"royal_players.user_id"}, sql: `UPDATE OR IGNORE royal_players SET user_id = ?1 WHERE user_id = ?2`},
 	// The days the guest played on were the account's player's: the same person, so not a player who left.
 	{carries: []string{"active_days.user_id"},
@@ -141,6 +153,57 @@ var mergeSteps = []mergeStep{
 	}},
 }
 
+// mergeLeague carries the guest's groups of the leagues to the account (to, from: Merge's), where the account isn't in
+// one that week: only a group of the account's league, so that a guest's week never moves the account, which is
+// often someone back on a new device, playing a day before signing in. A group of another league stays with the guest
+// (and goes with them); in the week under way the account then races in one of its own league, from when the guest
+// joined theirs, with the day's runs it has now: the week's end moves a player from the group they raced in
+// (ensureWeek).
+func mergeLeague(tx *sql.Tx, to, from int64) error {
+	var league int
+	var week sql.NullString
+	if err := tx.QueryRow(`SELECT league, (SELECT id FROM league_week) FROM users WHERE id = ?`, to).
+		Scan(&league, &week); err != nil {
+		return err
+	}
+	rows, err := tx.Query(`SELECT m.week, g.tier, m.joined_at FROM league_members m JOIN league_groups g ON g.id = m.group_id
+		WHERE m.user_id = ?1 AND NOT EXISTS (SELECT 1 FROM league_members o WHERE o.user_id = ?2 AND o.week = m.week)`,
+		from, to)
+	if err != nil {
+		return err
+	}
+	type membership struct {
+		week   string
+		tier   int
+		joined int64
+	}
+	var list []membership
+	for rows.Next() {
+		var m membership
+		if err := rows.Scan(&m.week, &m.tier, &m.joined); err != nil {
+			rows.Close()
+			return err
+		}
+		list = append(list, m)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, m := range list {
+		switch {
+		case m.tier == league:
+			_, err = tx.Exec(`UPDATE league_members SET user_id = ? WHERE user_id = ? AND week = ?`, to, from, m.week)
+		case m.week == week.String:
+			err = placeInLeague(tx, m.week, league, to, m.joined)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // mergeLeft are the references to a player that Merge leaves with the guest, to go with them, and why.
 var mergeLeft = map[string]string{
 	"users.id":         "the account's",
@@ -180,6 +243,10 @@ const GoneName = "Изтрит играч"
 //   - A duel only they had (against a recording, a challenge that wasn't a friend's, or the other gone before) goes.
 //   - Their name goes from others' games against them, or against their recordings and challenges.
 //   - Friend requests to their address go.
+//   - The days they played on (active_days, which has no reference to users: the retention counts keep a player who
+//     went, or those who never came back would drop out and make them look better) are kept as a tombstone, the id
+//     made negative: counted still, nobody's. An id is never a player's again (users' AUTOINCREMENT), so a newcomer
+//     never starts with someone else's days.
 func Forget(tx *sql.Tx, id int64) error {
 	for _, q := range []string{
 		`DELETE FROM duels WHERE ended_at IS NULL AND (a_id = ?1 OR b_id = ?1
@@ -190,6 +257,7 @@ func Forget(tx *sql.Tx, id int64) error {
 		`UPDATE runs SET opponent = NULL WHERE id IN (SELECT d.a_run FROM runs g JOIN duels d ON d.ghost_run = g.id
 			WHERE g.user_id = ?1)`,
 		`DELETE FROM friend_requests WHERE to_email = (SELECT email FROM users WHERE id = ?1)`,
+		`UPDATE OR REPLACE active_days SET user_id = -user_id WHERE user_id = ?1`,
 	} {
 		if _, err := tx.Exec(q, id); err != nil {
 			return err

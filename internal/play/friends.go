@@ -351,7 +351,7 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	db := g.DB.Read
 	rows, err := db.QueryContext(ctx, `SELECT u.id, u.name, u.tag, f.since, r.points, r.rights, r.ms, `+lookColumns+`
 		FROM friends f JOIN users u ON u.id = f.friend_id
-		LEFT JOIN runs r ON r.user_id = u.id AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND NOT r.scripted
+		LEFT JOIN runs r ON r.user_id = u.id AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND NOT r.shadow
 		WHERE f.user_id = ?`, g.Today(), userID)
 	if err != nil {
 		return nil, err

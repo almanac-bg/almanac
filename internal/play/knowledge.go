@@ -213,7 +213,7 @@ func (g *Game) countKnowledge(ctx context.Context, now time.Time, b *bank.Bank) 
 		by[""] = append(by[""], knownFrom(user, all, h.byTopic[""]))
 	}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT r.user_id, r.id, a.n, a.at, a.question_id, a.score
-		FROM runs r INDEXED BY runs_user CROSS JOIN answers a ON a.run_id = r.id WHERE NOT r.scripted`)
+		FROM runs r INDEXED BY runs_user CROSS JOIN answers a ON a.run_id = r.id WHERE NOT r.shadow`)
 	if err != nil {
 		return nil, err
 	}
