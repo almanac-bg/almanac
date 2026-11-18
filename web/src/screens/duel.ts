@@ -49,9 +49,16 @@ export interface Side {
   ms: number;
   done: boolean;
   look?: { avatar?: string; title?: string; titleTier?: Tier; level?: number };
+  /** A player who has gone since (play.DuelSide.Gone): their game went with them, so their score isn't known. */
+  gone?: boolean;
   /** How each question went (one duel's view): the player's own as they play, the other's once there's a result. */
   marks?: DuelMark[];
 }
+
+/** A duel as its screens show it: a player gone since shows as nobody's, a plain tile without an animal (no avatar of
+ * theirs, nor one drawn from a name that isn't theirs). */
+const shown = (d: DuelView): DuelView =>
+  d.opponent?.gone ? { ...d, opponent: { ...d.opponent, look: { avatar: "-gone" } } } : d;
 
 export interface DuelView {
   id: number;
@@ -104,7 +111,7 @@ interface Sent {
 }
 
 /** One of the player's duels, as its screen shows it. */
-const oneDuel = async (id: number) => (await api<{ duel: DuelView }>("GET", `/api/duels/${id}`)).duel;
+const oneDuel = async (id: number) => shown((await api<{ duel: DuelView }>("GET", `/api/duels/${id}`)).duel);
 
 const words: Record<DuelView["state"], string> = {
   play: "Твой ред",
@@ -131,7 +138,9 @@ function duelRow(d: DuelView): Child {
           : `${them?.name ?? "Някой"} те чака`
         : d.state === "declined" || d.state === "expired"
           ? "Без резултат"
-          : `${formatNumber(d.you?.points ?? 0)} : ${formatNumber(them?.points ?? 0)}${d.recorded ? " · срещу запис" : ""}${d.friendly ? " · без рейтинг" : ""}`;
+          : them?.gone
+            ? "Играчът вече го няма" // their game went with them: no score of theirs to set beside the player's
+            : `${formatNumber(d.you?.points ?? 0)} : ${formatNumber(them?.points ?? 0)}${d.recorded ? " · срещу запис" : ""}${d.friendly ? " · без рейтинг" : ""}`;
   return h(
     "li",
     null,
@@ -198,7 +207,10 @@ export function duel() {
   title("Дуел");
   const data = signal<{ duels: DuelView[]; standing: Standing; challenges?: Sent[] } | null>(null);
   if (user.peek())
-    api<{ duels: DuelView[]; standing: Standing; challenges?: Sent[] }>("GET", "/api/duels").then(data.set, () => {});
+    api<{ duels: DuelView[]; standing: Standing; challenges?: Sent[] }>("GET", "/api/duels").then(
+      (r) => data.set({ ...r, duels: r.duels.map(shown) }),
+      () => {},
+    );
   return h(
     "section",
     { class: "screen" },

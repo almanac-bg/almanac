@@ -6,7 +6,8 @@
 //
 //   - before others see them (nameFirst): a first live duel (screens/live.ts: before a new search, never on coming
 //     back to a duel under way nor for a rematch), going into Роял's lobby (screens/royal.ts), taking a challenge or
-//     challenging a friend (screens/challenge.ts, screens/duel.ts). Never in a room: a room asks for a name of its
+//     challenging a friend (screens/challenge.ts, screens/duel.ts), asking an invite's owner to be friends
+//     (screens/invite.ts: the request carries the name). Never in a room: a room asks for a name of its
 //     own, kept in the room (screens/room.ts). The name is saved before the game goes on (the others see it), and one
 //     refused is said in the sheet, to change. Esc or a tap beside the sheet is „Не сега“ there: the player tapped to
 //     play, and the game goes on (put away with its screen, by going elsewhere, it's no answer). One sheet at a time:

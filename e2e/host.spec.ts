@@ -80,7 +80,8 @@ test("a host leads a room from a big screen and doesn't play", async ({ browser 
   await host.getByRole("button", { name: "Да, приключи" }).click();
   await expect(host.getByRole("heading", { name: "Бояна печели" })).toBeVisible();
   await expect(host.locator(".podium li.p1")).toContainText("Бояна");
-  await expect(guest.getByRole("heading", { name: "Бояна печели" })).toBeVisible();
+  // To Бояна herself, her win is hers: never her name in the third person.
+  await expect(guest.getByRole("heading", { name: "Печелиш" })).toBeVisible();
   await guest.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(guest.locator(".reviewed")).toHaveCount(2);
 });
@@ -178,4 +179,84 @@ test("a big screen shows a question and its answer whole, the controls in sight,
   await host.getByRole("button", { name: "Приключи" }).click();
   await host.getByRole("button", { name: "Да, приключи" }).click();
   await expect(host.getByRole("button", { name: "Започни нова игра" })).toBeInViewport();
+});
+
+test("a big screen shows the room alone: none of the host's own notices, and a match's right pairs whole", async ({
+  browser,
+}) => {
+  const host = await (await browser.newContext({ viewport: { width: 1366, height: 650 } })).newPage();
+  // A friend has challenged the host: the notice is on every page of theirs, but never on the room's big screen.
+  await host.route("**/api/friends/invites", (route) =>
+    route.fulfill({
+      json: { requests: 0, challenges: [{ id: 999_999, from: "Петя Стоянова", expiresAt: Date.now() + 3_600_000 }] },
+    }),
+  );
+  const code = await leadRoom(host);
+  await host.goto("/");
+  await expect(host.locator(".challenge-notice")).toContainText("Петя Стоянова те предизвика");
+  await host.goto(`/r/${code}`);
+  await expect(host.getByText("Още никой не е влязъл.")).toBeVisible();
+  await expect(host.locator(".challenge-notice")).toBeHidden();
+
+  // A pairs question's answer, as the room has it (its stream, played back): the host gave none, so each right pair
+  // shows plain, as the right one, never as the host's miss; and its fact whole above the controls.
+  const view = {
+    code,
+    phase: "reveal",
+    host: "",
+    isHost: true,
+    canLead: true,
+    lead: true,
+    held: true,
+    category: "science",
+    length: 5,
+    mix: "mixed",
+    n: 5,
+    total: 10,
+    players: [
+      { key: 1, name: "Капитанът", points: 800, rights: 1, online: true, answered: true, place: 1, gained: 800 },
+      { key: 2, name: "Ралица Христозова", points: 0, rights: 0, online: true, answered: true, place: 2 },
+    ],
+    question: {
+      category: "science",
+      limitMs: 30_000,
+      leftMs: 0,
+      view: {
+        type: "match",
+        text: "Свържи химичния елемент с групата, към която спада:",
+        left: ["Калций", "Неон", "Флуор", "Натрий"],
+        right: ["Алкалоземен метал", "Благороден газ", "Халоген", "Алкален метал", "Преходен метал"],
+      },
+      reveal: {
+        answer: {
+          id: "x",
+          pairs: [0, 1, 2, 3],
+          decoy: 4,
+          fact: "Алкалните метали реагират с вода толкова бурно, че натрият се пази под керосин.",
+        },
+        points: 0,
+        right: false,
+      },
+    },
+  };
+  await host.route(`**/api/rooms/${code}/events`, (route) =>
+    route.fulfill({ contentType: "text/event-stream", body: `retry: 600000\ndata: ${JSON.stringify(view)}\n\n` }),
+  );
+  await host.reload();
+  const pairs = host.locator(".host-reveal .match-result .option");
+  await expect(pairs).toHaveCount(4);
+  await expect(host.locator(".host-reveal .match-result .option.right")).toHaveCount(4);
+  await expect(host.locator(".host-reveal .match-gave")).toHaveCount(0);
+  const fact = host.locator(".host-reveal .fact");
+  await expect(fact).toBeInViewport({ ratio: 1 });
+  const [factBottom, footTop] = await Promise.all([
+    fact.evaluate((e) => e.getBoundingClientRect().bottom),
+    host.locator(".host-foot").evaluate((e) => e.getBoundingClientRect().top),
+  ]);
+  expect(factBottom, "the fact ends above the controls").toBeLessThanOrEqual(footTop);
+  expect(
+    await host.locator(".host-stage").evaluate((e) => e.scrollHeight - e.clientHeight),
+    "nothing hidden in the stage",
+  ).toBeLessThanOrEqual(0);
+  await expect(host.locator(".challenge-notice")).toBeHidden();
 });

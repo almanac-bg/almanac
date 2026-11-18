@@ -242,8 +242,22 @@ function reach(p: Player | Past["players"][number], length: number): string {
   return rights(p.reached);
 }
 
-/** Seconds, to a tenth: „41,3 с“. */
-const seconds = (ms: number) => `${(ms / 1000).toFixed(1).replace(".", ",")} с`;
+/** Seconds, to a tenth („41,3 с“), or to a hundredth (`apart`: times of others with as many right, any of which a
+ * tenth would show the same as another of them, „41,27 с“): where the seconds decide between players, they never
+ * read as a tie that they weren't. */
+export function seconds(ms: number, apart: number[] = []): string {
+  const tenths = new Map<number, number>();
+  const close = [ms, ...apart].some((t) => {
+    const was = tenths.get(Math.round(t / 100));
+    tenths.set(Math.round(t / 100), t);
+    return was !== undefined && was !== t;
+  });
+  const d = close ? 2 : 1;
+  return `${(Math.round(ms / 10 ** (3 - d)) / 10 ** d).toFixed(d).replace(".", ",")} с`;
+}
+
+/** The times of the players with as many right as `n`. */
+const levelTimes = (ps: Player[], n: number) => ps.filter((p) => p.reached === n).map((p) => p.ms);
 
 /** „8-ия въпрос“. */
 const nth = (n: number) => `${ordinal(n)}я въпрос`;
@@ -834,7 +848,13 @@ function standing(view: () => Evening): Child {
           : `На ${ordinal(me.rank, "n")} място си: ${rights(me.reached)}${
               // The seconds where they tell the player from another with as many (none before a right answer).
               me.reached && v.players.some((p) => !p.me && p.in && p.reached === me.reached)
-                ? `, ${seconds(me.ms)}`
+                ? `, ${seconds(
+                    me.ms,
+                    levelTimes(
+                      v.players.filter((p) => p.in),
+                      me.reached,
+                    ),
+                  )}`
                 : ""
             }.`;
     const wins = "Печели този с най-много верни, а при равни — по-бързият.";
@@ -859,7 +879,7 @@ function standing(view: () => Evening): Child {
  * decide, more being level at it than the cut takes), and where the player stands against it, if in. */
 function cutLine(c: Cut, at: Score, me?: Player): string {
   const who = c.timed
-    ? `След ${nth(c.after)} продължават тези с повече от ${rights(at.rights)}, а от тези с ${at.rights} — по-бързите (до ${seconds(at.ms)}).`
+    ? `След ${nth(c.after)} продължават тези с повече от ${rights(at.rights)}, а от тези с ${at.rights} — по-бързите (до ${seconds(at.ms, me?.in && me.reached === at.rights ? [me.ms] : [])}).`
     : `След ${nth(c.after)} продължават тези с поне ${rights(at.rights)}.`;
   if (!me?.in) return who;
   if (me.goes) return `${who} Засега си вътре.`;
@@ -907,10 +927,13 @@ function cutSaid(v: Evening): Child {
 }
 
 /** The time a player's right answers took, under them, where it tells them from a neighbour with as many (5 верни,
- * 41,2 с; across a cut's line too, where the seconds decided it); none where it doesn't, nor with none right. */
+ * 41,2 с; across a cut's line too, where the seconds decided it, to a hundredth where a tenth wouldn't tell them
+ * apart); none where it doesn't, nor with none right. */
 function timed(p: Player, ps: Player[], i: number): Child {
   const level = (o?: Player) => p.reached > 0 && o && o.reached === p.reached;
-  return level(ps[i - 1]) || level(ps[i + 1]) ? h("span", { class: "muted" }, seconds(p.ms)) : null;
+  return level(ps[i - 1]) || level(ps[i + 1])
+    ? h("span", { class: "muted" }, seconds(p.ms, levelTimes(ps, p.reached)))
+    : null;
 }
 
 /** Which rows of the standings show, as an answer does (a few seconds to look): all of a short board; of a long one,

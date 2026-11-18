@@ -279,7 +279,7 @@ export async function meetAs(page: Page, name?: string): Promise<void> {
 }
 
 /** Two players made friends the way an invite link does it: `a`'s link (a player is made for them the first time),
- * opened by `b`, who asks; then `a` says yes in Приятели. A link alone never makes a friend. */
+ * opened by `b`, who asks (his name asked first, kept as drawn); then `a` says yes in Приятели. A link alone never makes a friend. */
 export async function befriendByLink(a: Page, b: Page): Promise<void> {
   await a.goto("/friends");
   const make = a.locator(".friends").getByRole("button", { name: "Покани приятел" });
@@ -287,6 +287,7 @@ export async function befriendByLink(a: Page, b: Page): Promise<void> {
   const link = await a.locator("[data-invite]").first().getAttribute("data-invite");
   await b.goto(link ?? "");
   await b.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
+  await meetAs(b); // the request carries his name: asked first (screens/name.ts)
   await expect(b.getByText(/^Поканата е изпратена\. Щом .+ я приеме, ставате приятели\.$/)).toBeVisible();
   await a.reload();
   await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();

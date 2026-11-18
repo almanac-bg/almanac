@@ -13,6 +13,7 @@ import { type Child, h, signal, slot } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { withName } from "../lib/words.ts";
 import { player, user } from "../state.ts";
+import { nameFirst } from "./name.ts";
 import { type Today, today } from "./today.ts";
 
 interface Info {
@@ -41,7 +42,8 @@ export function invite([code = ""]: string[]) {
   const accept = async () => {
     error.set("");
     try {
-      await player();
+      // The request carries the player's name: one of their own first, as before a challenge (screens/name.ts).
+      if (!(await nameFirst())) return;
       const r = await api<{ id?: number; friends?: boolean }>("POST", `/api/invites/${code}`, {});
       info.set(r.friends ? { ...info.peek(), friends: true, id: r.id } : { ...info.peek(), asked: true });
       if (!played) screen.show(() => landing()); // its heading says so; after the day, only the card changes
@@ -109,6 +111,9 @@ export function invite([code = ""]: string[]) {
   const landing = (): Child => {
     const i = info.peek();
     const mine = i.mine;
+    // Asked already, the day played and nothing to set side by side: that it waits for their yes, said once, and the
+    // way on is the player's day.
+    const waiting = !i.friends && !!i.asked && mine !== undefined && !both(mine);
     // Before its owner has played, the link is still to the day's ten: never „иска да сте приятели“ to a group chat.
     const heading =
       i.their !== undefined && mine === undefined
@@ -118,7 +123,9 @@ export function invite([code = ""]: string[]) {
             ? `Вече сте приятели ${withName(i.by)}`
             : mine === undefined
               ? `${i.by} те кани на въпросите на деня`
-              : `${i.by} иска да сте приятели`);
+              : waiting
+                ? `Чакаш ${i.by} да приеме`
+                : `${i.by} иска да сте приятели`);
     return h(
       "section",
       { class: "screen" },
@@ -132,14 +139,16 @@ export function invite([code = ""]: string[]) {
           { class: "lead" },
           mine === undefined
             ? `Десет въпроса за днес, едни и същи за всички.${user() ? "" : " Без регистрация: играеш веднага."}`
-            : "Приятелите виждат резултатите си един на друг и се предизвикват.",
+            : waiting
+              ? "Поканата е изпратена. Щом я приеме, ставате приятели и ще виждате резултатите си един на друг."
+              : "Приятелите виждат резултатите си един на друг и се предизвикват.",
         ),
       ),
       // The day's ten first, while they wait; then being friends.
       mine === undefined
         ? h("button", { class: "btn primary big", onclick: playDay }, "Играй въпросите на деня")
         : null,
-      friendship(mine !== undefined),
+      waiting ? h("a", { class: "btn primary big", href: "/" }, "Към Начало") : friendship(mine !== undefined),
       alert,
     );
   };

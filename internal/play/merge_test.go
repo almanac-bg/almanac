@@ -218,7 +218,8 @@ func TestForgetKeepsOthersHistory(t *testing.T) {
 		if d.ID == waiting {
 			t.Fatal("a challenge to Bo still waits")
 		}
-		if d.Opponent == nil || d.Opponent.Name != GoneName {
+		// Their game went with them: said so (their score isn't known), never a 0 they didn't score.
+		if d.Opponent == nil || d.Opponent.Name != GoneName || !d.Opponent.Gone {
 			t.Fatalf("the other in a duel with Bo: %+v", d.Opponent)
 		}
 		states = append(states, d.State)
@@ -226,7 +227,8 @@ func TestForgetKeepsOthersHistory(t *testing.T) {
 	if slices.Sort(states); !slices.Equal(states, []string{"lost", "won"}) {
 		t.Fatalf("Ana's duels: %v", states)
 	}
-	if d, err := w.g.DuelOf(ctx, ana, l.DuelID); err != nil || d.State != "won" || d.Opponent.Name != GoneName {
+	if d, err := w.g.DuelOf(ctx, ana, l.DuelID); err != nil || d.State != "won" || d.Opponent.Name != GoneName ||
+		!d.Opponent.Gone {
 		t.Fatalf("the live duel: %+v (%v)", d, err)
 	}
 	for _, p := range after.Recent {

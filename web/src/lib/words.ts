@@ -10,6 +10,15 @@ export function listWords(list: string[]): string {
   return list.length > 1 ? `${list.slice(0, -1).join(", ")} и ${list.at(-1)}` : (list[0] ?? "");
 }
 
+/** Who won a room's game (those first, `me` the one reading): „Ани печели“, „Ани и Боби делят първото място“; to a
+ * winner themself, „Печелиш“, „Делиш първото място с Боби“, never their own name in the third person. */
+export function winners(first: { name: string; me?: boolean }[]): string {
+  const others = listWords(first.filter((p) => !p.me).map((p) => p.name));
+  if (first.some((p) => p.me)) return others ? `Делиш първото място ${withName(others)}` : "Печелиш";
+  if (first.length > 1) return `${others} делят първото място`;
+  return others ? `${others} печели` : "Край";
+}
+
 /** On a day of the week, as Bulgarian says it: „в събота“, „във вторник“ (`day` YYYY-MM-DD). */
 export function onDay(day: string): string {
   const name = new Intl.DateTimeFormat("bg", { weekday: "long", timeZone: "UTC" }).format(new Date(`${day}T12:00:00Z`));

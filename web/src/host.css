@@ -5,7 +5,9 @@
    it's one column, as everything. */
 
 @layer app {
-  .hosting #app > .top,
+  /* The room alone: the header, and anything of the host's own the app puts over a page (a friend's challenge), seen
+     by the whole room on a big screen, step aside too. */
+  .hosting #app > :not(main),
   .hosting .tabs,
   .hosting .game-leave {
     display: none;
