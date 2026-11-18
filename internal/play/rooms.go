@@ -17,8 +17,9 @@ import (
 
 // A room (package room) is played live, in memory; this is what the game knows of it: how its questions are drawn
 // (DrawRoom), and what each player's game in it counts for once it's over (RecordRoom): a run of its own kind, 'room',
-// that earns XP and counts for the day's goals and the achievements as a topic's game does, and whose answers count as
-// seen. It's on no board of the day and moves no rating; its XP is any game's in the week's league. A game is kept
+// that earns XP and whose answers count as seen. It counts for the day's goals and the achievements as a topic's game
+// does only when someone else played it too (together), and for „Сто игри“ only with Length questions or more: alone,
+// on easy questions, a room was a shortcut to both (review 2026-11-18, E10). It's on no board of the day and moves no rating; its XP is any game's in the week's league. A game is kept
 // once for each player (by its id: RoomPlay.Game), and what playing it to its end earns is by the questions it was
 // dealt, not those it was cut to: a game its host ended at the first question earns that question's share.
 
@@ -138,6 +139,14 @@ type RoomPlay struct {
 	Length  int
 	Points  int
 	Answers []RoomAnswer
+	// Players is how many played the game: gave an answer in it, this player too.
+	Players int
+}
+
+// together is a SQL condition on a run (r): that it isn't a room's game played alone. A room's game kept before its
+// players were (NULL) counts, as it did then.
+func together(r string) string {
+	return `(` + r + `.kind <> 'room' OR coalesce(` + r + `.players, 2) > 1)`
 }
 
 // RoomAnswer is one answer of a player's game in a room, as the room graded it.
@@ -212,8 +221,9 @@ func (g *Game) RecordRoom(ctx context.Context, userID int64, p RoomPlay) (int64,
 			return err
 		}
 		r.xp = gained + finishXP("room", r.rights, max(p.Length, len(p.Picks)))
-		if _, err := tx.Exec(`UPDATE runs SET at = ?, points = ?, rights = ?, xp = ?, ms = ?, finished_at = ?, room_game = ?
-			WHERE id = ?`, len(p.Picks), p.Points, r.rights, r.xp, r.ms, store.Ms(g.Now()), game, r.id); err != nil {
+		if _, err := tx.Exec(`UPDATE runs SET at = ?, points = ?, rights = ?, xp = ?, ms = ?, finished_at = ?, room_game = ?,
+			players = ? WHERE id = ?`, len(p.Picks), p.Points, r.rights, r.xp, r.ms, store.Ms(g.Now()), game,
+			max(p.Players, 1), r.id); err != nil {
 			return err
 		}
 		return g.afterDue(tx, r.id)

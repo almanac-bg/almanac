@@ -1,7 +1,7 @@
-// The day's goals: three a day — the day's questions, a goal drawn for the player and a harder one — each worth XP
-// once done (more for the harder), and each a way to where it's done. All three done earn a reserve day (so does every
-// seventh day in a row), which keeps the streak through a day missed. Начало has them in a card; the day's result,
-// just played, has those still open, quietly, as what's next.
+// The day's goals: three a day, each one game at most — the day's questions, another game drawn for the player, and a
+// game played well (8 of 10) — each worth XP once done, and each a way to where it's done (play/goals.go). All three
+// done earn a reserve day (so does every seventh day in a row), which keeps the streak through a day missed. Начало has
+// them in a card; the day's result, just played, has those still open, quietly, as what's next.
 
 import { picture } from "../art/picture.ts";
 import { api } from "../lib/api.ts";

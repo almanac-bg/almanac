@@ -839,8 +839,8 @@ func (g *Game) RoyalPlans(ctx context.Context, day string, userID int64) (n int,
 //
 // And whom the game points at it (NudgeRoyal): a first live game that feels empty teaches that nobody plays it, so
 // while the median of the last RoyalRecent evenings is under RoyalTurnout, a player in their first RoyalNewDays days
-// isn't drawn the goal of a Роял, nor shown it among the ways to play with others on Начало (one who has found it
-// keeps it: who has been in one, or said they'd come).
+// isn't shown it among the ways to play with others on Начало (one who has found it keeps it: who has been in one,
+// or said they'd come).
 const (
 	RoyalTurnout  = 8
 	RoyalEvenings = 14
@@ -916,8 +916,8 @@ func median(of []int) float64 {
 	return float64(s[k/2])
 }
 
-// NudgeRoyal says whether the game points the player at the evening's Роял (its goal, its place among the ways to play
-// with others): always, but in their first RoyalNewDays days while the last RoyalRecent evenings were thin, unless
+// NudgeRoyal says whether the game points the player at the evening's Роял (its place among the ways to play with
+// others): always, but in their first RoyalNewDays days while the last RoyalRecent evenings were thin, unless
 // they've found it already (been in one, or said they'd come).
 func (g *Game) NudgeRoyal(ctx context.Context, userID int64) (bool, error) {
 	p, err := g.RoyalPaceOf(ctx)
