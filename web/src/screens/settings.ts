@@ -21,10 +21,10 @@ let {
   untracked,
   when,
   reportProblem,
-  bigText,
+  textSize,
   calm,
   musicOn,
-  setBigText,
+  setTextSize,
   setCalm,
   setMusic,
   setTick,
@@ -48,6 +48,7 @@ let {
   back,
   signIn,
   mailAsk,
+  segmented,
 } = {} as Kit;
 
 /** Signed out just now: said here, where it was done, and only here (Начало, next, doesn't say it again). */
@@ -68,10 +69,10 @@ export function settings(kit: Kit) {
     untracked,
     when,
     reportProblem,
-    bigText,
+    textSize,
     calm,
     musicOn,
-    setBigText,
+    setTextSize,
     setCalm,
     setMusic,
     setTick,
@@ -95,6 +96,7 @@ export function settings(kit: Kit) {
     back,
     signIn,
     mailAsk,
+    segmented,
   } = kit);
   title("Настройки");
   notice.set("");
@@ -120,7 +122,7 @@ export function settings(kit: Kit) {
             "section",
             null,
             h("h2", null, "Данните ти"),
-            h("p", null, h("a", { class: "link", href: "/privacy" }, "Какво пазим и защо")),
+            h("p", null, h("a", { class: "link tap", href: "/privacy" }, "Какво пазим и защо")),
             deleteAccount(),
           ),
         ),
@@ -299,12 +301,16 @@ function account(): Child {
   );
 }
 
-/** A setting kept on this device: its name, what it does, and a switch. */
+let switches = 0;
+
+/** A setting kept on this device: its name, what it does, and a switch. The whole row is the switch's to tap (a
+ * label), not only its knob. */
 function switchRow(label: string, about: string, on: () => boolean, set: (v: boolean) => void): Child {
+  const said = `switch-about-${++switches}`;
   return h(
-    "div",
+    "label",
     { class: "switch-row" },
-    h("span", { class: "switch-text" }, h("b", null, label), h("span", { class: "muted" }, about)),
+    h("span", { class: "switch-text" }, h("b", null, label), h("span", { class: "muted", id: said }, about)),
     h(
       "button",
       {
@@ -313,6 +319,7 @@ function switchRow(label: string, about: string, on: () => boolean, set: (v: boo
         role: "switch",
         "aria-checked": on,
         "aria-label": label,
+        "aria-describedby": said,
         onclick: () => set(!on()),
       },
       h("span", { class: "switch-knob", "aria-hidden": "true" }),
@@ -341,7 +348,7 @@ function sounds(): Child {
   );
 }
 
-/** Достъпност: less motion and bigger text, for this device. */
+/** Достъпност: less motion and the text's size, for this device. */
 function access(): Child {
   return h(
     "section",
@@ -349,7 +356,28 @@ function access(): Child {
     h("h2", null, "Достъпност"),
     h("p", { class: "muted" }, "Важи за това устройство."),
     switchRow("По-малко движение", "Без анимации; часовникът пак тече.", calm, setCalm),
-    switchRow("По-едър текст", "Всичко малко по-голямо.", bigText, setBigText),
+    h(
+      "div",
+      { class: "text-size" },
+      h(
+        "span",
+        { class: "switch-text", "aria-hidden": "true" },
+        h("b", null, "Размер на текста"),
+        h("span", { class: "muted" }, "„Обичаен“ е размерът от настройките на устройството."),
+      ),
+      segmented(
+        "Размер на текста",
+        [
+          ["normal", "Обичаен"],
+          ["big", "Едър"],
+          ["bigger", "Много едър"],
+        ],
+        textSize,
+        setTextSize,
+        false,
+        true,
+      ),
+    ),
   );
 }
 

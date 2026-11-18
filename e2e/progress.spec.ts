@@ -75,11 +75,12 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await page.reload();
   await expect(page.getByRole("switch", { name: "Звуци" })).toHaveAttribute("aria-checked", "false");
 
-  // Достъпност: bigger text and less motion stay on this device too.
-  await page.getByRole("switch", { name: "По-едър текст" }).click();
-  await expect(page.getByRole("switch", { name: "По-едър текст" })).toHaveAttribute("aria-checked", "true");
+  // Достъпност: less motion and the text's size stay on this device too (the sizes: text.spec.ts).
+  await page.getByRole("switch", { name: "По-малко движение" }).click();
+  await page.getByRole("radio", { name: "Едър", exact: true }).click();
   await page.reload();
-  await expect(page.locator("html")).toHaveClass(/big-text/);
+  await expect(page.locator("html")).toHaveClass(/calm/);
+  await expect(page.getByRole("radio", { name: "Едър", exact: true })).toHaveAttribute("aria-checked", "true");
 });
 
 test("just played, a right answer few others got makes „Сподели“ gold", async ({ page }) => {

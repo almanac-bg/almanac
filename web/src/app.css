@@ -240,6 +240,8 @@
     background: var(--bg);
     color: var(--text);
     font: 400 1rem / 1.5 var(--font-sans);
+    /* A word too long for its line (large text on a narrow phone) breaks rather than runs off the screen. */
+    overflow-wrap: break-word;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -259,8 +261,10 @@
     margin: 0;
   }
 
+  /* Display type (a title, the date, the question, a big number) grows at half the rate the text does: as set at the
+     usual size (half in px, half in rem), and never the width of a phone at twice it (Large text, at the end). */
   h1 {
-    font-size: 2.125rem;
+    font-size: calc(17px + 1.0625rem);
     line-height: 1.06;
     font-weight: 800;
     letter-spacing: -0.03em;
@@ -273,7 +277,7 @@
   }
 
   h2 {
-    font-size: 1.625rem;
+    font-size: calc(13px + 0.8125rem);
     line-height: 1.08;
     font-weight: 800;
     letter-spacing: -0.02em;
@@ -372,6 +376,9 @@
     font-weight: 900;
     letter-spacing: 0.12em;
     text-decoration: none;
+    /* A finger's height to tap (44px), the header not the taller for it. */
+    padding-block: 6px;
+    margin-block: -6px;
   }
 
   /* The four main places: a bar at the bottom of a phone's screen, a row in the header on a big one. */
@@ -382,7 +389,7 @@
     left: 0;
     z-index: 10;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     padding: 6px max(var(--space-2), env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom))
       max(var(--space-2), env(safe-area-inset-left));
     border-top: 1px solid var(--line);
@@ -395,6 +402,8 @@
     display: grid;
     justify-items: center;
     gap: 2px;
+    min-height: 44px;
+    align-content: center;
     padding: 6px 0 4px;
     border-radius: var(--radius-sm);
     color: var(--text-muted);
@@ -590,7 +599,7 @@
   .goal {
     position: relative;
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 4px var(--space-3);
   }
@@ -761,7 +770,7 @@
   }
 
   .year-big {
-    font: 900 3.5rem / 1 var(--font-numeral);
+    font: 900 min(calc(28px + 1.75rem), 15vw + 8px) / 1 var(--font-numeral);
     overflow-wrap: anywhere;
   }
 
@@ -1292,7 +1301,7 @@
   }
 
   .masthead-date {
-    font-size: 2.75rem;
+    font-size: calc(22px + 1.375rem);
     line-height: 1;
     font-weight: 800;
     letter-spacing: -0.035em;
@@ -1429,6 +1438,7 @@
     font: 800 0.875rem / 1 var(--font-sans);
     text-decoration: none;
     white-space: nowrap;
+    position: relative;
   }
 
   .subnav a[aria-current="page"] {
@@ -1460,6 +1470,8 @@
   .share,
   .review {
     display: grid;
+    /* One column, never wider than the page: a long word in it breaks (large text) instead of widening it. */
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-4);
   }
 
@@ -1469,6 +1481,7 @@
 
   .intro {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-3);
   }
 
@@ -1630,8 +1643,12 @@
     text-decoration-thickness: 1px;
   }
 
-  /* A link on its own line that's tapped, not read in a sentence: a finger's height. */
-  .link.tap {
+  /* A link on its own line that's tapped, not read in a sentence: a finger's height. A way on in a line of its own
+     (`.day-next`: „Имаш профил? Влез“, „Влез в стая с код“) is one too. */
+  .link.tap,
+  .day-next > :is(a, .link):only-child {
+    display: inline-flex;
+    align-items: center;
     justify-self: start;
     min-height: 2.75rem;
   }
@@ -1905,7 +1922,7 @@
 
   .streak {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     gap: var(--space-2) var(--space-4);
     padding: var(--space-4);
@@ -2100,8 +2117,8 @@
   }
 
   .count-n {
-    font-size: 2.25rem;
-    line-height: 2.25rem;
+    font-size: calc(18px + 1.125rem);
+    line-height: 1;
     font-weight: 900;
   }
 
@@ -2379,8 +2396,8 @@
   /* 24 above the question: the game's count and clock apart from what's asked. */
   .ask {
     margin-top: var(--space-2);
-    font-size: 1.75rem;
-    line-height: 2.125rem;
+    font-size: calc(14px + 0.875rem);
+    line-height: 1.2143;
     font-weight: 700;
     letter-spacing: -0.01em;
   }
@@ -2404,6 +2421,7 @@
 
   .options {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);
   }
 
@@ -2414,6 +2432,7 @@
     align-items: center;
     gap: var(--space-3);
     width: 100%;
+    min-width: 0;
     min-height: 3.75rem;
     padding: 10px var(--space-4) 10px 10px;
     border: 1px solid var(--edge);
@@ -2676,7 +2695,7 @@
 
   .keypad {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--space-2);
   }
 
@@ -2785,7 +2804,7 @@
   /* „Вярно или невярно“: two answers side by side. */
   .tf-options {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-2);
   }
 
@@ -2930,7 +2949,7 @@
 
   /* A choice of pictures: two by two, each picture with its letter, and its name once answered. */
   .pic-options {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .option.pic-option {
@@ -2993,6 +3012,7 @@
   /* „Подсказки“: the clues one under another, each with what a right answer is worth while it's the last one out. */
   .clues {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);
     margin: 0;
     padding: 0;
@@ -3418,6 +3438,7 @@
     color: var(--text-muted);
     font: 800 0.875rem / 1 var(--font-sans);
     cursor: pointer;
+    position: relative;
   }
 
   .segmented button[aria-selected="true"],
@@ -3434,8 +3455,17 @@
   }
 
   .segmented.small button {
-    min-height: 2rem;
+    min-height: 2.25rem;
     font-size: 0.8125rem;
+  }
+
+  /* A choice in a switch, or a place in Профил, has the pill's whole height to tap (44px and more), its padding
+     too. */
+  .segmented button::after,
+  .subnav a::after {
+    content: "";
+    position: absolute;
+    inset: calc(-1 * var(--space-1)) 0;
   }
 
   /* Duels as rows: the other player, how it stands, the rating it moved. */
@@ -3645,7 +3675,7 @@
 
   .live-faces {
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     gap: var(--space-3);
     text-align: center;
@@ -3984,6 +4014,7 @@
 
   .verdict {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-3);
   }
@@ -4009,8 +4040,8 @@
 
   .verdict-word {
     color: var(--wrong-ink);
-    font-size: 1.625rem;
-    line-height: 1.75rem;
+    font-size: calc(13px + 0.8125rem);
+    line-height: 1.077;
     font-weight: 800;
     letter-spacing: -0.02em;
   }
@@ -4018,7 +4049,7 @@
   .verdict-pts {
     margin-left: auto;
     color: var(--gold-display);
-    font: 900 2.5rem / 1 var(--font-numeral);
+    font: 900 calc(20px + 1.25rem) / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     text-shadow: 0 0 18px color-mix(in srgb, var(--gold) 50%, transparent);
     animation: rise 520ms cubic-bezier(0.2, 1.2, 0.4, 1);
@@ -4122,14 +4153,15 @@
       inset 0 0 0 1px var(--line);
   }
 
-  /* A „?“ set in the card's top corner, whole, in the heading's colour: the text keeps clear of it. */
+  /* A „?“ set in the card's top corner, whole, in the heading's colour: the text keeps clear of it. Drawn, not read: its
+     size in px, as at the usual text, whatever the text's. */
   .fact::before {
     content: "?";
     position: absolute;
     top: var(--space-4);
     right: var(--space-4);
     color: color-mix(in srgb, var(--accent) 30%, transparent);
-    font: 900 4.5rem / 1 var(--font-numeral);
+    font: 900 72px / 1 var(--font-numeral);
     pointer-events: none;
   }
 
@@ -4222,8 +4254,8 @@
   }
 
   .score-n {
-    font-size: 7.5rem;
-    line-height: 6rem;
+    font-size: calc(60px + 3.75rem);
+    line-height: 0.8;
     font-weight: 900;
     letter-spacing: -0.01em;
   }
@@ -4268,6 +4300,10 @@
     font-size: 1.125rem;
     line-height: 1.625rem;
     font-weight: 500;
+    /* The line's own height to read, a finger's (44px) to tap. */
+    display: inline-block;
+    padding-block: 9px;
+    margin-block: -9px;
   }
 
   /* Начало on a later visit: the day played as one short card, its score a size down from the result's. */
@@ -4414,6 +4450,11 @@
     white-space: nowrap;
   }
 
+  /* Large text on a phone (at the end): a name on two lines rather than cut to its first letters. */
+  .tight .who-name {
+    white-space: normal;
+  }
+
   /* A name keeps its own figures: only the numbers of a row line up in columns. */
   .row .who-name {
     font-variant-numeric: normal;
@@ -4485,6 +4526,12 @@
   a.who:hover .who-name,
   a.friend-name:hover {
     text-decoration: underline;
+  }
+
+  /* On a board's row, the row's height to tap (44px), the row not the taller for it. */
+  .row a.who {
+    padding-block: 8px;
+    margin-block: -8px;
   }
 
   .delta {
@@ -4792,6 +4839,7 @@
   @media (min-width: 48rem), (hover: hover) and (pointer: fine) {
     .chips.scroll {
       flex-wrap: wrap;
+      white-space: normal;
       overflow-x: visible;
       margin-inline: 0;
       padding: 0;
@@ -5148,7 +5196,7 @@
   }
 
   .me-head h1 {
-    font-size: 1.625rem;
+    font-size: calc(13px + 0.8125rem);
     overflow-wrap: break-word;
   }
 
@@ -5475,6 +5523,7 @@
 
   .tier {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-3);
   }
 
@@ -5493,7 +5542,7 @@
 
   .achievement-progress {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: var(--space-2);
     margin: 4px 0 2px;
@@ -6000,7 +6049,7 @@
   /* The colours in the avatars' columns, each over the one under it. */
   .tones {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(max(48px, 2.75rem), 1fr));
     justify-items: center;
     gap: var(--space-2);
   }
@@ -6235,6 +6284,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
+    max-width: 100%;
     min-height: 2.75rem;
     padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
     border-radius: var(--radius-md);
@@ -6612,16 +6662,22 @@
     transition: none;
   }
 
-  :root.big-text {
-    font-size: 112.5%;
-  }
-
-  /* A switch: a row with words on the left and a knob on the right. */
+  /* A switch: a row with words on the left and a knob on the right, all of it the switch's to tap (a label). */
   .switch-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-4);
+    min-height: 44px;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* The text's size: its name and what „Обичаен“ is, the three sizes under them. */
+  .text-size {
+    display: grid;
+    gap: var(--space-3);
   }
 
   .switch-text {
@@ -6716,8 +6772,8 @@
     /* A narrow phone: a long question in four lines at most. */
     @media (max-width: 22.5rem) {
       .run-question .ask {
-        font-size: 1.5rem;
-        line-height: 1.875rem;
+        font-size: calc(12px + 0.75rem);
+        line-height: 1.25;
       }
     }
 
@@ -6889,6 +6945,8 @@
       padding: var(--space-2);
       font-size: 0.875rem;
       line-height: 1.25rem;
+      /* 44px to tap, the header no taller for it. */
+      margin-block: -4px;
     }
 
     .tabs .i {
@@ -6962,14 +7020,14 @@
     .tabs a[aria-current="page"]::after {
       top: auto;
       right: var(--space-2);
-      bottom: 1px;
+      bottom: 5px;
       left: var(--space-2);
       width: auto;
       border-radius: 3px;
     }
 
     .tabs a.news::before {
-      top: 6px;
+      top: 10px;
       left: auto;
       right: 2px;
       box-shadow: 0 0 0 2px var(--bg);
@@ -7443,6 +7501,169 @@
       justify-content: space-between;
       gap: var(--space-2);
     }
+  }
+
+  /* ---- Large text on a phone ----
+     The text at up to twice its size (the player's „Размер на текста“, the phone's own size: prefs.ts) on a phone
+     320px wide: nothing scrolls sideways, nothing hides under another (e2e/text.spec.ts). What has room wraps by
+     itself; these are the rows that give way to columns once the page's column holds too few words across: `tight`
+     on <html> under 17em, `tighter` under 13.5em (lib/prefs.ts measures it; at the text's usual size even the
+     narrowest phone's column is 18em, so none of this applies). */
+
+  /* The bar of places: its pictures alone once a place's name no longer fits its quarter (the names stay, for screen
+     readers); a name that still doesn't fit (a phone that enlarges the text itself) is cut, never run into the next. */
+  .tab-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tighter .tabs a {
+    align-content: center;
+    min-height: 44px;
+  }
+
+  .tighter .tabs .tab-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  /* Topics one to a row once a topic's longest word no longer fits half the column; the ways to play too, each its
+     picture beside its name. */
+  .tight .topics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tight .modes {
+    grid-auto-flow: row;
+  }
+
+  .tight .mode {
+    flex-direction: row;
+    gap: var(--space-3);
+    text-align: left;
+  }
+
+  /* A title's long word („предизвикателство“) breaks where it must, wherever the title sits. */
+  .tight h1,
+  .tight h2 {
+    overflow-wrap: anywhere;
+    hyphens: auto;
+  }
+
+  /* A run's head: the count on its line, the topic and the points under it once they don't fit beside it. */
+  .tight .question-head {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  /* Side by side no more: the streak over the level, the figures one under another. */
+  .tight .status-row,
+  .tight .figures {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* A board's row: the place and the player, the score under the name. */
+  .tight .row,
+  .tight .row.moves {
+    grid-template-columns: 32px minmax(0, 1fr);
+    row-gap: var(--space-1);
+  }
+
+  .tight .row > :nth-child(n + 3) {
+    grid-column: 2;
+    justify-self: end;
+  }
+
+  /* A name on two lines rather than cut to its first letters (its words wrap: .who-name, above). */
+  .tight .who-label {
+    overflow-wrap: anywhere;
+  }
+
+  /* Choices in a switch, or the places in Профил, go on to a second line rather than out of the screen. */
+  .tight .segmented,
+  .tight .subnav {
+    flex-wrap: wrap;
+    border-radius: var(--radius-lg);
+  }
+
+  .tight .subnav {
+    overflow-x: visible;
+  }
+
+  .tight .segmented button,
+  .tight .subnav a {
+    flex: 1 1 auto;
+    padding-inline: var(--space-3);
+  }
+
+  /* Профил's head, a game played: what's beside the name goes under it („Настройки“ a row of its own, the name kept
+     whole beside the avatar). */
+  .tight .me-head,
+  .tight .game {
+    flex-wrap: wrap;
+  }
+
+  .tight .me-head h1 {
+    overflow-wrap: break-word;
+  }
+
+  .tight .me-settings {
+    flex: 1 1 100%;
+    flex-direction: row;
+  }
+
+  .tight .game-score {
+    margin-left: auto;
+  }
+
+  /* An answer gone over: its words on the first line beside its letter, how it went (✓, ✕, the share who gave it,
+     the place it had) on a line under them, at the end. */
+  .tight .option:is(.right, .wrong, .dim, .missed, .crowd):has(> .letter) {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .tight .option:is(.right, .wrong, .dim, .missed, .crowd):has(> .letter) > span:nth-child(2):not(.sign) {
+    flex-basis: calc(100% - 36px - var(--space-3));
+  }
+
+  .tight .option:is(.right, .wrong, .dim, .missed, .crowd):has(> .letter) > .sign {
+    margin-left: auto;
+  }
+
+  .tight .option > .sign + .value {
+    margin-left: 0;
+  }
+
+  /* „Вярно“ over „Невярно“, each a row. */
+  .tight .tf-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tight .option.tf {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    min-height: 3.75rem;
+    text-align: left;
+  }
+
+  /* „Свържи“: the columns closer, their words breaking where they must. */
+  .tight .match {
+    column-gap: var(--space-5);
+  }
+
+  .tight .option.match-item > span:nth-child(2) {
+    overflow-wrap: anywhere;
+  }
+
+  /* A result's plain buttons keep their words on one line while they can, then wrap them. */
+  .tight .result-actions .btn {
+    white-space: normal;
   }
 }
 

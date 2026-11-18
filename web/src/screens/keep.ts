@@ -120,7 +120,7 @@ export function mailAsk({
       { class: "muted" },
       `Да ти пишем${to ? ` на ${to}` : ""}, ако въпросите още те чакат? Веднъж на ден, около часа, в който играеш.`,
     );
-  const nope = () => (no ? h("button", { class: "link", type: "button", onclick: no }, "Не сега") : null);
+  const nope = () => (no ? h("button", { class: "link tap", type: "button", onclick: no }, "Не сега") : null);
   return [
     () => {
       if (said()) return h("p", { class: "muted", role: "status" }, said());

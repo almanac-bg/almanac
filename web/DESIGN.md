@@ -28,7 +28,7 @@ three when you add or change a screen.
   to, and never piles up an entry; back comes to a page scrolled where it was. A game left half-way says so where it
   starts (its tile: „Продължи · въпрос 4 от 10“; a live game, one line on Начало: „Дуелът ти продължава · Върни се“).
 - **Phone first.** The layout is one column, at most 40rem wide, with a 16px gutter. Every screen fits a 320px phone
-  without scrolling sideways.
+  without scrolling sideways, with the text at its usual size and at twice it (see Large text).
 - **A big screen uses its width** (see Wide screens), and never changes how a phone looks: its rules live in
   `min-width` blocks.
 
@@ -179,7 +179,30 @@ wherever it does (`explain()`: the word dotted under, its meaning in a small car
   sections, 16 inside a card and between a section's title and what it heads, 8 between tiles of one grid.
 - **Cards** have 16 of padding (`.card`), the hero 20.
 - **Tiles** (a way to play, a topic) are a picture at 44–48px beside the name, at least 68px high, two to a row.
-- **Touch targets** are at least 44px high; the bar's are its full height.
+- **Touch targets** are at least 44px high; the bar's are its full height. A link on its own line is `.link.tap` (a
+  way on in `.day-next` is one by itself); what is drawn smaller gets its room around it (a pill's padding through
+  `::after`, a row's or the header's height through padding and a negative margin), so the layout doesn't change for
+  it. A link inside a sentence is read where it is, the line's height. `e2e/text.spec.ts` tries each control with a
+  finger's reach.
+
+## Large text
+
+The text grows with the phone's own setting (Android's web view and browsers do it themselves; on an iPhone, the app
+asks WebKit for the size the phone gives body text, `-apple-system-body`: `lib/app.ts`) and with „Размер на текста“
+in Настройки → Достъпност („Обичаен“, „Едър“ 125%, „Много едър“ 150%: `lib/prefs.ts`), the two multiplied, at most
+twice the usual. Everything is sized in rem from `<html>`, so a screen at twice the text on a 320px phone is a screen
+on a phone 160px wide; it holds that way (`e2e/text.spec.ts`):
+
+- **Display type grows at half the rate** (titles, the date, the question, the big numbers): set as half px, half rem
+  (`calc(17px + 1.0625rem)` for 34px), the same at the usual size. A drawn mark (the fact's „?“) keeps its px.
+- **Nothing is wider than its column:** one-column grids are `minmax(0, 1fr)`, not `1fr` or `auto` (a long word
+  breaks, `overflow-wrap`, rather than widening the page); a row of things wraps (`.verdict`, a run's head).
+- **Rows give way to columns** once the column holds few words: `lib/prefs.ts` measures the column in em and puts
+  `tight` on `<html>` under 17em and `tighter` under 13.5em (at the usual size even a 320px phone's is 18em). Under
+  `tight`: topics and the ways to play one to a row, the streak over the level, a board's score under the name, an
+  answer gone over with how it went on a line under its words, „Вярно“ over „Невярно“, switches of choices and
+  Профил's places on two lines. Under `tighter`: the bar of places shows its pictures alone (the names stay for screen
+  readers). Not a container query: Chromium doesn't always ask a rem one again as the root's size changes.
 
 ## Wide screens
 
@@ -314,7 +337,8 @@ takes a token.
     meter 6, a row card 12 by 16 inside; every number of a size is from the scale.
   - `.field` and `input.code`; `.join` for an input with its button.
   - `.segmented` (`segmented()` in `ui.ts`): tabs that switch what a screen shows, or, as radios, a setting's few
-    choices (a room's „Въпроси“ and „Трудност“). Never a native select, radio or checkbox.
+    choices (a room's „Въпроси“ and „Трудност“, „Размер на текста“). Never a native select, radio or checkbox. A setting
+    that is on or off is a `switchRow` in Настройки: the whole row (a label) is its to tap.
   - `.tag` and `.chip`; `.chips.scroll` for a row of chips that scrolls sideways on a phone (the page itself never does);
     with a mouse or on a tablet and up it wraps, every chip in sight.
 - **Numbers:** `.figures`/`.figure`, `.stats`/`.stat`, `.streak` (with `.week`), `.games`/`.game`.
@@ -747,7 +771,8 @@ mountains and a medal — are drawn by hand as paths in `web/src/art/pictures.ts
 
 ## Before a UI change ships
 
-- **Look at it** in both themes, at 320px and 390px wide, and at 1024px and 1440px. Nothing may scroll sideways, and keyboard focus must show.
+- **Look at it** in both themes, at 320px and 390px wide, and at 1024px and 1440px; and on a phone at twice the text
+  (Large text). Nothing may scroll sideways, and keyboard focus must show.
 - **Run the checks:** `npm run check`, then the browser specs the change touches (`npx playwright test -c e2e
   --project=chromium e2e/<spec>`), and `e2e/a11y.spec.ts`, the accessibility checks.
 - **Keep it light:** `go run ./cmd/build` says how big each file is, gzipped. What a change adds should be worth its

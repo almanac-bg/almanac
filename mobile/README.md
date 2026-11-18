@@ -11,7 +11,11 @@ adds what a page can't do well on a phone, through Capacitor's plugins, which th
 - **links** to the game's pages on almanac.bg opened in the app (the site's `/.well-known/apple-app-site-association`
   and `assetlinks.json`, `internal/server/applinks.go`; Android's list of them is in `AndroidManifest.xml`, kept the
   same by a test); the server's own pages (privacy, a mail's „no more of these“) stay in the browser;
-- a page of its own when there's no connection (`www/offline.html`).
+- a page of its own when there's no connection (`www/offline.html`);
+- the phone's **text size** on an iPhone, whose web view doesn't follow it by itself: the page reads it from WebKit
+  (`-apple-system-body`) and sizes itself by it (`lib/app.ts`), again as the app comes back to the front. No plugin,
+  so no new build; Android's web view follows the phone's size by itself. Checked on a simulator or a phone: Settings →
+  Display & Brightness → Text Size, then back to the app.
 
 A new build is needed only when this folder changes (a plugin, the icon, the native settings, the links it opens).
 The page that has been open for days in the app's web view loads itself anew after a deploy, at a moment that costs no

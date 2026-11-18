@@ -4,7 +4,7 @@
 // game opened in the app. All of that is in phone.ts, loaded only in the app; in a browser nothing here does anything.
 
 import { tally } from "./api.ts";
-import { vibrateOn } from "./prefs.ts";
+import { setSystemText, vibrateOn } from "./prefs.ts";
 
 const bridge = (globalThis as { Capacitor?: { isNativePlatform(): boolean; getPlatform(): string } }).Capacitor;
 
@@ -25,11 +25,42 @@ export const phone = () => {
 /** Starts what the app adds to the game (notifications and links that open a page, the back button). A notification
  * tapped is counted by its kind. */
 export function startApp(nav: import("./phone.ts").Nav): void {
+  if (platform === "ios") followPhoneText();
   if (inApp)
     phone().then(
       (p) => p.start(nav, (kind) => tally(`push:open:${kind}`)),
       () => {},
     );
+}
+
+/** The size the phone gives body text at its usual setting (iOS's Large). */
+const iosBody = 17;
+
+/** An iPhone's web view keeps a page's text at its own size whatever the phone's text size (Settings → Display &
+ * Brightness → Text Size, and Accessibility's larger sizes). The page asks WebKit for the size the phone gives body
+ * text now (-apple-system-body) and sizes itself by it (prefs.ts, at most twice the usual, with the player's own step
+ * on top), again each time the app comes to the front: the size is changed in the phone's settings, away from the
+ * app. Android's web view follows the phone's size by itself. */
+function followPhoneText(): void {
+  const probe = document.createElement("span");
+  probe.style.font = "-apple-system-body";
+  probe.style.position = "absolute";
+  probe.style.visibility = "hidden";
+  const measure = () => {
+    document.body.append(probe);
+    const px = Number.parseFloat(getComputedStyle(probe).fontSize);
+    probe.remove();
+    if (px > 0) setSystemText(phoneScale(px));
+  };
+  measure();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") measure();
+  });
+}
+
+/** The phone's body text size as a share of its usual, from a little smaller (its smallest sizes) to twice. */
+export function phoneScale(px: number): number {
+  return Math.min(2, Math.max(0.8, px / iosBody));
 }
 
 /** Shares through the app's share sheet: "shared", or "closed" when the player closed it without sharing; null where
