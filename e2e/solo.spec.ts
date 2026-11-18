@@ -381,15 +381,20 @@ test.describe("on a computer", () => {
     page,
   }) => {
     test.setTimeout(120_000);
-    await page.goto("/");
+    // Роял's lobby closed (the test server opens one every few minutes): only it would fill the column beside the day.
+    // Asked for, not in the page, so that Начало is drawn from the answer changed here.
+    await page.route(/\/api\/day$/, async (route) => {
+      const response = await route.fetch();
+      await route.fulfill({ response, json: { ...(await response.json()), royalNow: false } });
+    });
+    await page.goto("/ranks");
+    await page.getByRole("link", { name: "Начало" }).click();
     await expect(page.locator(".day")).toBeVisible();
-    // The ways in for a new player are lines under the day, not a column of their own: only Роял, while its lobby is
-    // open, fills the column beside it.
+    // The ways in for a new player are lines under the day, not a column of their own: one centred column.
     await expect(page.locator(".home-main").getByRole("link", { name: "Влез в стая с код" })).toBeVisible();
     const home = page.locator("section.home");
-    const side = await page.locator(".home-side > *").count();
-    const alone = (await home.boundingBox())?.width ?? 0;
-    expect(side ? alone > 48 * 16 : alone <= 48 * 16).toBe(true);
+    await expect(page.locator(".home-side > *")).toHaveCount(0);
+    expect((await home.boundingBox())?.width).toBeLessThanOrEqual(48 * 16);
     await startDay(page);
     await playRun(page);
     await expect(page.locator(".summary")).toBeVisible();
@@ -400,9 +405,11 @@ test.describe("on a computer", () => {
     const streak = await page.locator(".streak-chip").boundingBox();
     // The streak leads the column beside the result, level with it.
     expect(result && streak && streak.x > result.x + result.width && Math.abs(streak.y - result.y) < 2).toBe(true);
-    // The gold button is a hand's width, not the column's.
-    const gold = await page.locator(".summary .actions .btn.primary").boundingBox();
-    expect(gold && gold.width <= 22 * 16 + 1).toBe(true);
+    // The buttons are a hand's width, not the column's: the gold one, and those in the cards under the result
+    // (tomorrow's reminder).
+    const widths = await page.locator(".home-main .btn").evaluateAll((all) => all.map((b) => b.clientWidth));
+    expect(widths.length).toBeGreaterThan(2);
+    expect(Math.max(...widths)).toBeLessThanOrEqual(22 * 16);
     await page.reload();
     await expect(page.locator(".summary")).toBeVisible();
     const after = await home.boundingBox();

@@ -6583,6 +6583,28 @@
       max-width: 22rem;
     }
 
+    /* A share button gives the group its button, and what it said („Копирано.“) a row of its own under them, so the
+       button beside it keeps its height. */
+    .actions > .share,
+    .actions > .result-actions > .share {
+      display: contents;
+    }
+
+    .actions .share > p {
+      grid-column: 1 / -1;
+    }
+
+    /* The year's cards: „Напред“ in one place, „Назад“ under it. */
+    .actions.year-pager {
+      grid-template-columns: min(22rem, 100%);
+    }
+
+    /* Начало's cards (a streak to win back, tomorrow and its reminder, keeping the game): their buttons a hand's
+       width too. */
+    .home .keep-card .btn {
+      max-width: 22rem;
+    }
+
     .day > .day-meta {
       text-align: left;
     }

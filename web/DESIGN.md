@@ -162,8 +162,9 @@ wherever it does (`explain()`: the word dotted under, its meaning in a small car
   answers are bigger, and a choice's answers sit two by two (a list stays one column: an order, pairs, groups). The
   number's field and pad stay a phone's width. A page's picture sits beside its heading and lead, not over them.
   A page's buttons are a hand's width (22rem), not the column's, at its left, the gold one first: the day's, a page's
-  own, and a group of them (`.actions`: under a result, Дуел's, the year's) side by side where two fit, the plain ones
-  after the gold one and as tall as it, a line about the gold one under it. Начало's and a result's quiet lines sit
+  own, Начало's cards', and a group of them (`.actions`: under a result, Дуел's, the year's) side by side where two
+  fit, the plain ones after the gold one and as tall as it, a line about the gold one (or what a share said) under it.
+  A pager (the year's cards) stacks: „Напред“ keeps its place, „Назад“ under it. Начало's and a result's quiet lines sit
   at the left with them, not centred.
 - **64rem (a laptop):** the page is up to 76rem wide with a 32px gutter. Начало is two columns: the day (or its result,
   „Сподели“ beside „Прегледай въпросите“; just played as after a reload), and under it the topics, five to a row;
