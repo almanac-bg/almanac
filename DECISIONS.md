@@ -28,6 +28,10 @@ packages' doc comments; this file holds only what must not drift.
   classrooms, schools): no levels, question pools, filters, reports or texts that exist for one group. Rooms serve
   anyone who plays together, whether family, friends, a pub or a class, with the same rules for all (owner,
   2026-11-18, after the product review's classroom items).
+- **Accessibility for special needs comes later, not now.** No new work for screen readers, extra time, pausing the
+  pace or similar needs until the owner calls for it; what the game already has (contrast, labels, the axe checks)
+  stays and isn't broken. Layout that breaks for ordinary players (large system text, small tap targets) is not this:
+  it's fixed as any bug (owner, 2026-11-18).
 - **Points, XP and rating are kept apart** (`play/worth.go`). The word stays **XP**, not „опит“: „опит“ already means a
   try in the game's texts.
 - **Live means live.** Duels are played at once, with a recording of a real game when nobody comes; Роял is online only,
