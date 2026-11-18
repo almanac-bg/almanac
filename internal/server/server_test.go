@@ -731,6 +731,10 @@ func TestARoomOverHTTP(t *testing.T) {
 		t.Fatalf("no question: %v", v)
 	}
 	for _, p := range []*player{ana, bo} {
+		// The screen says it shows the question (its time runs from then), as the client does once it's drawn.
+		if status, out := p.call("POST", "/api/rooms/"+code+"/seen", map[string]any{"n": 0}); status != 200 {
+			t.Fatalf("the screen's word: %d %v", status, out)
+		}
 		if status, out := p.call("POST", "/api/rooms/"+code+"/answer", map[string]any{"n": 0, "answer": nil}); status != 400 {
 			t.Fatalf("an empty answer: %d %v", status, out)
 		}
@@ -931,6 +935,10 @@ func TestALiveDuelOverHTTP(t *testing.T) {
 		answer = map[string]any{"truth": true}
 	case "match":
 		answer = map[string]any{"pairs": []int{0, 1, 2, 3}}
+	}
+	// Ana's screen says it shows the question (her time runs from then), as the client does once it's drawn.
+	if status, out := ana.call("POST", fmt.Sprintf("/api/duels/live/%d/seen", id), map[string]any{"n": 0}); status != 200 {
+		t.Fatalf("Ana's screen's word: %d %v", status, out)
 	}
 	if status, out := ana.call("POST", path, map[string]any{"n": 0, "answer": answer}); status != 200 {
 		t.Fatalf("Ana's answer: %d %v", status, out)

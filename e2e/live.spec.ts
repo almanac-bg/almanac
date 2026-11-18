@@ -201,3 +201,55 @@ test("the result keeps „Реванш“ in sight; the other asking shows over 
   await expect(dock.getByRole("button", { name: "Още един дуел" })).toBeVisible({ timeout: 5000 });
   await expect(page.getByRole("button", { name: "Реванш" })).toHaveCount(0);
 });
+
+// A question is drawn once its pictures are in, and the server told then: the player's time runs from the moment the
+// question is on their screen, so that a slow line or a picture coming in costs no time (play/seen.go). Until then, a
+// line says it's coming, and nothing of the question shows (review 2026-11-18, M1).
+test("a question shows once its picture is in, and the server is told the moment it does", async ({ page }) => {
+  await into(page);
+  const seen: unknown[] = [];
+  await page.route("**/api/duels/live/7/seen", (r) => {
+    seen.push(r.request().postDataJSON());
+    return r.fulfill({ json: { ok: true } });
+  });
+  // The picture comes in only when the test lets it.
+  let letIn = () => {};
+  const held = new Promise<void>((done) => {
+    letIn = done;
+  });
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  await page.route("**/test-flag.png*", async (r) => {
+    await held;
+    await r.fulfill({ body: png, contentType: "image/png" });
+  });
+  const flag = { src: "/test-flag.png", srcset: "/test-flag.png 1200w", w: 1200, h: 800, alt: "" };
+  const duel = (n: number, view: unknown, them = {}) => ({
+    id: 7,
+    phase: "question",
+    n,
+    total: 10,
+    you: side("Ти", 0),
+    them: side("Котка 713", 0, them),
+    question: { ...question, view, leftMs: 20_000 },
+  });
+  await push(page, duel(0, { ...question.view, text: "Чие е това знаме?", image: flag }));
+  await expect(page.locator(".coming")).toHaveText("Въпросът идва…");
+  await expect(page.locator(".ask")).toHaveCount(0);
+  await page.waitForTimeout(300);
+  expect(seen).toEqual([]);
+  letIn();
+  await expect(page.locator(".ask")).toHaveText("Чие е това знаме?");
+  await expect(page.locator(".coming")).toHaveCount(0);
+  await expect.poll(() => seen).toEqual([{ n: 0 }]);
+
+  // One with no pictures shows at once, and says so once, however often the view comes.
+  await push(page, duel(1, question.view));
+  await expect(page.locator(".ask")).toHaveText("Кой е първият български цар?");
+  await expect.poll(() => seen).toEqual([{ n: 0 }, { n: 1 }]);
+  await push(page, duel(1, question.view, { answered: true }));
+  await page.waitForTimeout(300);
+  expect(seen).toHaveLength(2);
+});

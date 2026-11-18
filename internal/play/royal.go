@@ -444,11 +444,12 @@ func (g *Game) RevealRoyal(ctx context.Context, royalID int64) (RoyalShown, erro
 }
 
 // AnswerRoyal grades a player's answer to a tournament's question n, the one showing (whether they're still in or
-// play on after a cut), which arrived at at (its time is to then), against the question as the evening deals it (d).
+// play on after a cut), which arrived at at (its time is to then, from when their screen showed it, saw: Saw), against
+// the question as the evening deals it (d).
 // Who goes on is RevealRoyal's to say, once the answer shows, and the crowd shows then too, to everyone at once (none
 // comes with the result). What the game earned, if this answer ended it (State.Done), is AfterRoyal's.
-func (g *Game) AnswerRoyal(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time, d bank.Dealt) (Result, error) {
-	return g.answer(ctx, userID, runID, n, answer, at, byRoyal, d)
+func (g *Game) AnswerRoyal(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at, saw time.Time, d bank.Dealt) (Result, error) {
+	return g.answer(ctx, userID, runID, n, answer, at, saw, byRoyal, d)
 }
 
 // AfterRoyal keeps what a player's Роял earned them once its game is over for them: all a game earns (afterRun, on

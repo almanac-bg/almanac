@@ -895,7 +895,7 @@ func TestAWriteHoldsNoScreen(t *testing.T) {
 			t.Fatalf("%d duels under way, %v left", n, left)
 		}
 		// The question's time runs out meanwhile: its answer waits for Ana's.
-		time.Sleep(time.Second + play.Grace + time.Second)
+		time.Sleep(time.Second + play.SeenLag + play.Grace + time.Second) // Ana's screen never said when it showed it
 		synctest.Wait()
 		if v := m.View(bo.ID); v.Phase != PhaseQuestion {
 			t.Fatalf("the answer shown before Ana's was in: %+v", v)

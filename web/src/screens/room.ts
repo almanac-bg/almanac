@@ -39,6 +39,7 @@ export let {
   news,
   nextSteps,
   onCleanup,
+  onScreen,
   picture,
   place,
   play,
@@ -160,6 +161,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
     news,
     nextSteps,
     onCleanup,
+    onScreen,
     picture,
     place,
     play,
@@ -725,6 +727,25 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
   const q = first.question;
   if (!q) return null;
   if (first.n === 0) play("go"); // the game starts
+  // The player's time runs from when this screen shows it, its pictures in (onScreen).
+  return h(
+    "article",
+    { class: "question" },
+    head(first),
+    onScreen(
+      q.view,
+      () => asking(view, code, first),
+      () => api("POST", `/api/rooms/${code}/seen`, { n: first.n }),
+    ),
+  );
+}
+
+/** The question itself, once it's on the screen: its clock, the question, its options, and who has answered. */
+function asking(view: () => RoomView, code: string, first: RoomView): Child {
+  // Its time left as the server last said, from when this screen shows it.
+  const now = untracked(view);
+  const q = (now.n === first.n && now.phase === "question" ? now.question : null) ?? first.question;
+  if (!q) return null;
   // Answered as in every game (game/answering.ts): sent again while it doesn't get through (the line dropped, the
   // server restarting) and the question is open, the room taking it once; in once the server says so, by its reply or
   // by the room's view, should the reply be lost.
@@ -741,10 +762,7 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
     const v = view();
     if (v.n === first.n && v.question && v.phase === "question") ans.follow(v.question.view, v.question.leftMs);
   });
-  return h(
-    "article",
-    { class: "question" },
-    head(first),
+  return [
     timer(q.leftMs, q.limitMs, ans.left, ans.stopped),
     ans.heading,
     picture(q.view, true),
@@ -760,7 +778,7 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
       );
     },
     ans.said,
-  );
+  ];
 }
 
 function reveal(view: () => RoomView, first: RoomView, places: Map<number, number>): Child {

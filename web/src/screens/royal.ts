@@ -54,6 +54,7 @@ let {
   effect,
   h,
   onCleanup,
+  onScreen,
   signal,
   untracked,
   ordinal,
@@ -267,6 +268,7 @@ export function royal(kit: Kit) {
     effect,
     h,
     onCleanup,
+    onScreen,
     signal,
     untracked,
     ordinal,
@@ -438,7 +440,7 @@ const about = (nightly?: boolean) =>
 
 /** How it's played, folded under the evening: what it is, the cuts, and the final. */
 const rules =
-  "Роял е вечерен турнир на живо: всички получават един и същ въпрос в един и същ миг. Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни отговори и всички, които имат колкото последния от тях. Само ако така биха продължили с над една четвърт повече, между равните решава времето. Последния въпрос играят трима (или равните с тях), а при равни верни печели по-бързият. Отпадналите играят до края за себе си. Започва, щом сте поне двама.";
+  "Роял е вечерен турнир на живо: всички получават един и същ въпрос в един и същ миг. Грешката не те изважда: след 5-ия, 8-ия, 11-ия и 14-ия въпрос продължават тези с повече верни отговори и всички, които имат колкото последния от тях. Само ако така биха продължили с над една четвърт повече, между равните решава времето. Последния въпрос играят трима (или равните с тях), а при равни верни печели по-бързият. Времето ти тече от мига, в който въпросът се появи на твоя екран: бавната връзка не ти отнема секунди. Отпадналите играят до края за себе си. Започва, щом сте поне двама.";
 
 /** How long until a moment, in words: „След 3 ч и 12 мин“; in the last hour to the second („След 12:05 мин“); nothing
  * a day or more ahead (the day says it). */
@@ -981,9 +983,43 @@ function question(view: () => Evening, first: Evening, answers: Map<string, Answ
   else if (first.n === 0 && first.in && !first.given && state.step.peek() === "") play("go");
   // Those cut play on, off the standings.
   const plays = first.in;
+  // One only watching (not in, the door shut) is told so above the question, with the next evening; their options
+  // look as answered ones do (app.css: .watching).
+  const watching = !plays && !first.late;
+  // The player's time runs from when this screen shows it, its pictures in (onScreen).
+  return h(
+    "article",
+    { class: watching ? "question watching" : "question" },
+    watching
+      ? h("p", { class: "royal-watch" }, `Гледаш. Следващият Роял е ${dayAndTime(first.next, first.now)}.`)
+      : null,
+    head(first),
+    onScreen(
+      q.view,
+      () => asking(view, first, state, gone, watching),
+      () => (plays ? api("POST", "/api/royal/seen", { n: first.n }) : Promise.resolve()),
+    ),
+    standing(view),
+  );
+}
+
+/** The question itself, once it's on the screen: its clock, the question, its options, and who has answered. */
+function asking(
+  view: () => Evening,
+  first: Evening,
+  state: AnswerState,
+  gone: () => boolean,
+  watching: boolean,
+): Child {
+  const q = first.question;
+  if (!q) return null;
+  const plays = first.in;
+  // Its time left as the server last said, from when this screen shows it.
+  const now = untracked(view);
+  const leftMs = now.n === first.n && now.phase === "question" ? now.leftMs : first.leftMs;
   const ans = answering({
     view: q.view,
-    leftMs: first.leftMs,
+    leftMs,
     post: (answer) => api("POST", "/api/royal/answer", { n: first.n, answer }),
     open: () => !gone() && view().phase === "question" && view().n === first.n,
     // The server has this player's answer (sent from here, or before the question was drawn again).
@@ -999,17 +1035,8 @@ function question(view: () => Evening, first: Evening, answers: Map<string, Answ
     const v = view();
     if (v.n === first.n && v.question && v.phase === "question") ans.follow(v.question.view, v.leftMs);
   });
-  // One only watching (not in, the door shut) is told so above the question, with the next evening; their options
-  // look as answered ones do (app.css: .watching).
-  const watching = !plays && !first.late;
-  return h(
-    "article",
-    { class: watching ? "question watching" : "question" },
-    watching
-      ? h("p", { class: "royal-watch" }, `Гледаш. Следващият Роял е ${dayAndTime(first.next, first.now)}.`)
-      : null,
-    head(first),
-    timer(first.leftMs, q.limitMs, ans.left, ans.stopped), // a watcher's clock runs to the end
+  return [
+    timer(leftMs, q.limitMs, ans.left, ans.stopped), // a watcher's clock runs to the end
     ans.heading,
     picture(q.view, true),
     ans.asked.node,
@@ -1026,8 +1053,7 @@ function question(view: () => Evening, first: Evening, answers: Map<string, Answ
       );
     },
     ans.said,
-    standing(view),
-  );
+  ];
 }
 
 function reveal(view: () => Evening, first: Evening): Child {

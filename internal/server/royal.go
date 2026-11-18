@@ -150,6 +150,23 @@ func (s *Server) royalAnswer(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]bool{"ok": true})
 }
 
+// royalSeen is a player's screen saying it shows the evening's question n now: their time on it runs from then, within
+// bounds (royal.Hub.Seen).
+func (s *Server) royalSeen(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		N int `json:"n"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	s.royal.Seen(u.ID, in.N)
+	return ok(w, map[string]bool{"ok": true})
+}
+
 // royals lists the last tournaments the player was in, with their rating.
 func (s *Server) royals(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)

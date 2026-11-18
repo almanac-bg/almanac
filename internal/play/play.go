@@ -22,7 +22,7 @@
 // and takes each answer (ShowLive and AnswerLive, ShowRoyal and AnswerRoyal: graded through the deal it shows), and
 // the player's own Show, Start and Answer refuse it, so that nobody sees a question before the others do, nor answers
 // it outside its time. An answer counts if it reaches the server within Grace of its time's end; its time is to when
-// it arrived.
+// it arrived, from when the player's own screen showed the question, as it says, within bounds (seen.go).
 //
 // A guest who signs in to their account brings everything along (Merge), and a player who goes leaves others'
 // history whole (Forget): merge.go, checked against the schema so that no table of a player's is left out.
@@ -421,7 +421,14 @@ func (g *Game) settles(r *run) bool {
 		return false
 	}
 	d, ok := g.deal(r.picks[r.at])
-	return !ok || g.Now().Sub(time.UnixMilli(r.shownAt.Int64)) > Limit(d.Question())+Grace
+	if !ok {
+		return true
+	}
+	late := Limit(d.Question()) + Grace
+	if r.kind == "duel" || r.kind == "royal" { // a live game's may be timed from its player's screen (LiveDue)
+		late += LagOf(d.Question())
+	}
+	return g.Now().Sub(time.UnixMilli(r.shownAt.Int64)) > late
 }
 
 // record keeps an answer, and the points and XP it earned, and moves the run to the next question (or its end).
@@ -676,19 +683,21 @@ func (r *run) startAt(tx *sql.Tx, t time.Time) error {
 // taken the first time, as it was, and changes nothing (again). One before the question's time runs (still waiting for
 // its pictures), or to a run a live game moves on (driver), is out of step.
 func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage) (Result, error) {
-	return g.answer(ctx, userID, runID, n, answer, g.Now(), byPlayer, nil)
+	return g.answer(ctx, userID, runID, n, answer, g.Now(), time.Time{}, byPlayer, nil)
 }
 
 // AnswerLive grades a player's answer to question n of their live duel, which arrived at at, against the question as
-// the duel shows it (d): its time is to then, whatever it waited for after (the duel busy with the other's answer).
-func (g *Game) AnswerLive(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time, d bank.Dealt) (Result, error) {
-	return g.answer(ctx, userID, runID, n, answer, at, byDuel, d)
+// the duel shows it (d): its time is from when the player's screen showed it (saw: Saw; zero, not said: from the
+// duel's moment) to when it came, whatever it waited for after (the duel busy with the other's answer).
+func (g *Game) AnswerLive(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at, saw time.Time, d bank.Dealt) (Result, error) {
+	return g.answer(ctx, userID, runID, n, answer, at, saw, byDuel, d)
 }
 
 // answer grades an answer that arrived at at, to a run that by moves on: its player's, or the live game's it's played
-// in, which keeps its pace (and takes an answer sent again itself), and grades against the deal it shows (shown).
-// Otherwise it's graded against the version the run showed (Pick.V).
-func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time, by driver, shown bank.Dealt) (Result, error) {
+// in, which keeps its pace (and takes an answer sent again itself), and grades against the deal it shows (shown); its
+// time runs from when the player's screen showed it (saw: seen.go). Otherwise it's graded against the version the
+// run showed (Pick.V).
+func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at, saw time.Time, by driver, shown bank.Dealt) (Result, error) {
 	var res Result
 	var r *run
 	var d bank.Dealt
@@ -715,19 +724,26 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 		if !ok || !r.shownAt.Valid {
 			return ErrOutOfStep
 		}
-		took := at.Sub(time.UnixMilli(r.shownAt.Int64))
-		if took < 0 && by == byPlayer { // still waiting for its pictures: its words aren't on screen yet
+		// The time on the game's clock (a clue's worth goes by it), and the player's own: in a live game, from when
+		// their screen showed the question (seen.go).
+		shownAt := time.UnixMilli(r.shownAt.Int64)
+		since := at.Sub(shownAt)
+		if since < 0 && by == byPlayer { // still waiting for its pictures: its words aren't on screen yet
 			return ErrOutOfStep
 		}
-		took = max(0, took)
+		since = max(0, since)
 		limit := Limit(d.Question())
+		took, due := since, shownAt.Add(limit)
+		if by != byPlayer {
+			took, due = LiveTook(shownAt, saw, at), LiveDue(shownAt, saw, d.Question())
+		}
 		var gr bank.Graded
 		switch {
-		case took > limit+Grace:
+		case at.Sub(due) > Grace:
 			res.TimedOut = true
 		case len(answer) == 0 || string(answer) == "null":
 		default:
-			if gr, err = bank.GradeAt(d, answer, took); err != nil {
+			if gr, err = bank.GradeAt(d, answer, since); err != nil {
 				return ErrBadAnswer
 			}
 		}

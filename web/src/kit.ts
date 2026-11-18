@@ -12,7 +12,7 @@ import { emblem } from "./art/emblem.ts";
 import { leagueEmblem } from "./art/league.ts";
 import { picture as illustration } from "./art/picture.ts";
 import { recover, staying } from "./fresh.ts";
-import { answering, answerState, countdown } from "./game/answering.ts";
+import { answering, answerState, countdown, onScreen } from "./game/answering.ts";
 import { masteryCard } from "./game/mastery.ts";
 import { news } from "./game/news.ts";
 import { answered, ask, crowdLine, picture } from "./game/questions.ts";
@@ -202,6 +202,7 @@ export const kit = {
   nextSteps,
   notice,
   onCleanup,
+  onScreen,
   opened,
   ordinal,
   pageArt,

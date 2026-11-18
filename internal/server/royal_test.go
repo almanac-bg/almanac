@@ -20,6 +20,10 @@ func TestRoyalStream(t *testing.T) {
 	if v["phase"] == nil || v["now"] == nil || v["in"] != false {
 		t.Fatalf("the evening: %v", v)
 	}
+	// A screen's word that it shows a question, with none showing (or the player not in): nothing to do.
+	if status, out := ana.call("POST", "/api/royal/seen", map[string]any{"n": 0}); status != 200 {
+		t.Fatalf("a screen's word with no question: %d %v", status, out)
+	}
 	for range 4 { // royal.maxOfPlayer, with the first
 		ana.stream("/api/royal/events").until(func(map[string]any) bool { return true })
 	}

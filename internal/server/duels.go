@@ -205,6 +205,33 @@ func (s *Server) liveAnswer(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]bool{"ok": true})
 }
 
+// liveSeen is a player's screen saying it shows a live duel's question n now: their time on it runs from then, within
+// bounds (live.Match.Seen).
+func (s *Server) liveSeen(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		return live.ErrNoMatch
+	}
+	m, err := s.live.Get(id)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		N int `json:"n"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	if err := m.Seen(u.ID, in.N); err != nil {
+		return err
+	}
+	return ok(w, map[string]bool{"ok": true})
+}
+
 // liveLeave is a player leaving a live duel under way, as they confirmed on its screen: it goes on without them at
 // once, the other told so (live.Match.Leave).
 func (s *Server) liveLeave(w http.ResponseWriter, r *http.Request) error {

@@ -315,7 +315,11 @@ func (h *Hub) own(viewer int64, t *table, m *member, now time.Time) Own {
 	}
 	limit, since := play.Limit(d.Question()), now.Sub(n.at)
 	if n.phase == play.RoyalQuestion {
-		o.LeftMs = max(0, (limit - since).Milliseconds())
+		left := limit - since
+		if m != nil && m.inQ { // from when their own screen showed it (Seen)
+			left = min(limit, play.LiveDue(n.at, m.saw, d.Question()).Sub(now))
+		}
+		o.LeftMs = max(0, left.Milliseconds())
 	} else {
 		o.NextMs = max(1, (h.pause() - since).Milliseconds())
 	}

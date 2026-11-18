@@ -190,7 +190,7 @@ func (w *world) show(user, runID int64) State {
 func (w *world) answer(user, runID int64, n int, a json.RawMessage) (Result, error) {
 	defer w.g.AftersDone(w.t.Context())
 	if w.live(runID) {
-		return w.g.AnswerLive(w.t.Context(), user, runID, n, a, w.now, w.dealt(runID, n))
+		return w.g.AnswerLive(w.t.Context(), user, runID, n, a, w.now, time.Time{}, w.dealt(runID, n))
 	}
 	return w.g.Answer(w.t.Context(), user, runID, n, a)
 }
