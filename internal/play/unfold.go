@@ -16,7 +16,8 @@ import (
 //     another's avatar either), what the level unlocks, and the day's goals that pay it.
 //   - From the third day played (LeagueFromDay): the week's league, a race on the day's right answers added up over
 //     the week, which means little before the habit has begun.
-//   - From the first game that moved the rating (a duel, a Роял): the rating and its division.
+//   - From the first game that moved the rating (a duel, a Роял): the rating, being set; its division once it is
+//     (rating.go, Placed).
 //
 // Nothing waits to be earned, only to be shown: XP, achievements, unlocks, the league's group and the rating all count
 // from the first game, and what was held is told when its system opens (NewsOf), not lost. Each system is told once,

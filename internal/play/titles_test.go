@@ -7,21 +7,39 @@ import (
 	"testing"
 )
 
-// The level's titles name devotion; intellect is mastery's: „Всезнание“ for „Експерт“ in every topic, „Оракул“ for
-// „Светило“ in three, and „Гениален ум“ is gone.
+// The level's titles name zeal and stamina; loyalty is the days' (on which the day's questions were played); intellect
+// is mastery's: „Всезнание“ for „Експерт“ in every topic, „Оракул“ for „Светило“ in three, and „Гениален ум“ is gone.
 func TestTitlesOfDevotion(t *testing.T) {
 	w := setup(t)
-	byLevel := map[int]string{}
+	byLevel, byDays := map[int]string{}, map[int]string{}
 	for _, x := range Titles {
-		if x.Group == TitleLevel {
+		switch x.Group {
+		case TitleLevel:
 			byLevel[x.by.level] = x.Name
+		case TitleDays:
+			byDays[x.by.days] = x.Name
 		}
 	}
-	for level, name := range map[int]string{8: "Постоянство", 12: "Ненаситно любопитство", 16: "Всеотдайност",
-		20: "Упоритост", 25: "Вярност към Алманаха", 30: "Дълголетие", 35: "Издръжливост", 40: "Стълб на Алманаха"} {
+	for level, name := range map[int]string{1: "Нова искра", 12: "Ненаситно любопитство", 16: "Жажда за знание",
+		20: "Упоритост", 30: "Маратон на въпросите", 35: "Издръжливост", 50: "Вечна искра"} {
 		if byLevel[level] != name {
 			t.Fatalf("level %d's title: %q, want %q", level, byLevel[level], name)
 		}
+	}
+	for days, name := range map[int]string{14: "Постоянство", 30: "Всеотдайност", 100: "Вярност към Алманаха",
+		365: "Стълб на Алманаха", 1000: "Жив алманах"} {
+		if byDays[days] != name {
+			t.Fatalf("%d days' title: %q, want %q", days, byDays[days], name)
+		}
+	}
+	// Locked, a title of the days says how many it takes, and how many the player has.
+	ten := wardrobe{days: 10}.titleViews(Titles)
+	if i := slices.IndexFunc(ten, func(v TitleView) bool { return v.ID == "persistence" }); i < 0 || !ten[i].Locked ||
+		ten[i].How != "14 дни с въпросите на деня, засега 10" || ten[i].Group != TitleDays {
+		t.Fatalf("„Постоянство“ at 10 days: %+v", ten[max(i, 0)])
+	}
+	if !(wardrobe{days: 14}).wears(Titles, "persistence") || (wardrobe{level: 50}).wears(Titles, "persistence") {
+		t.Fatal("„Постоянство“ isn't the days'")
 	}
 	all := w.g.titles()
 	for _, gone := range []string{"Ерудиция", "Гениален ум", "Извор на знания", "Жива библиотека", "Вековна мъдрост"} {
@@ -190,5 +208,59 @@ func TestDefaultAvatars(t *testing.T) {
 	}
 	if len(pairs) != int(n) {
 		t.Fatalf("%d of %d shapes and tones given", len(pairs), n)
+	}
+}
+
+// Past level 12 the ladder never goes quiet for long: every few levels unlock something, to level 50 (review
+// 2026-11-18, E8).
+func TestLevelLadderNeverQuiet(t *testing.T) {
+	w := wardrobe{titles: Titles}
+	last := 12
+	for level := 13; level <= 50; level++ {
+		if len(w.unlocksBy(func(u unlock) bool { return u.level == level })) > 0 || level == CrownLevel {
+			if level-last > 3 {
+				t.Errorf("nothing unlocks between levels %d and %d", last, level)
+			}
+			last = level
+		}
+	}
+	if last != 50 {
+		t.Errorf("the ladder ends at %d", last)
+	}
+}
+
+// Whoever wore a title of the days by the level, without the days, wears the level's again, and is told of it once
+// the days unlock it; with the days, they keep it.
+func TestDaysTitlesMigration(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	short, enough := w.user(), w.user()
+	w.daysPlayed(enough, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14)
+	w.daysPlayed(short, 1, 2, 3)
+	for _, u := range []int64{short, enough} {
+		if _, err := w.db.Write.Exec(`UPDATE users SET title = 'persistence' WHERE id = ?`, u); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.db.Write.Exec(`INSERT INTO unlocks_told (user_id, id) VALUES (?, 'title:persistence:Постоянство')`,
+			u); err != nil {
+			t.Fatal(err)
+		}
+	}
+	body, err := os.ReadFile("../store/migrations/0071_days_titles.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.db.Write.Exec(string(body)); err != nil {
+		t.Fatal(err)
+	}
+	for u, want := range map[int64]string{short: "", enough: "Постоянство"} {
+		if look, err := w.g.LookOf(ctx, u); err != nil || look.Title != want {
+			t.Fatalf("wears %q after the migration, want %q (%v)", look.Title, want, err)
+		}
+	}
+	var told int
+	_ = w.db.Read.QueryRow(`SELECT count(*) FROM unlocks_told WHERE id = 'title:persistence:Постоянство'`).Scan(&told)
+	if told != 1 {
+		t.Fatalf("%d told of „Постоянство“", told)
 	}
 }

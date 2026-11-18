@@ -799,13 +799,23 @@ func TestUnlocks(t *testing.T) {
 	ctx := t.Context()
 	ana, old := w.user(), w.user()
 	_, _ = w.g.NewsOf(ctx, ana, 0)
-	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1200, peak = 1200, rated = 1 WHERE id = ?`, ana)
+	// While the rating is being set, no division is told, nor what one unlocks, nor what comes next.
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1180, peak = 1180, rated = ? WHERE id = ?`, MinRatedGames-1, ana)
+	if n, _ := w.g.NewsOf(ctx, ana, 0); n.Division != nil || len(n.Unlocks) != 0 {
+		t.Fatalf("news while placing: %+v", n)
+	}
+	if p, _ := w.g.ProgressOf(ctx, ana); p.Next.Division != nil || p.Standing.Of != MinRatedGames ||
+		p.Standing.Rated != MinRatedGames-1 {
+		t.Fatalf("progress while placing: %+v %+v", p.Next, p.Standing)
+	}
+	// Set: the division it's in now is told (not the peak's), with what it unlocks.
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1100, rated = ? WHERE id = ?`, MinRatedGames, ana)
 	n, err := w.g.NewsOf(ctx, ana, 0)
 	got := []string{}
 	for _, u := range n.Unlocks {
 		got = append(got, u.Kind+":"+u.ID+" "+u.From)
 	}
-	if err != nil || n.Division == nil || n.Division.ID != "gold" ||
+	if err != nil || n.Division == nil || n.Division.ID != "gold" || !n.Placed ||
 		!slices.Equal(got, []string{"title:goldStandard дивизия Злато", "backdrop:stars дивизия Злато"}) {
 		t.Fatalf("gold reached: %v %+v %v", got, n.Division, err)
 	}
@@ -844,11 +854,12 @@ func TestUnlocks(t *testing.T) {
 	}
 
 	// A player from before: what they have is taken in untold.
-	_, _ = w.db.Write.Exec(`UPDATE users SET unlocks_known = 0, peak = 1500, peak_seen = 1500, rated = 1 WHERE id = ?`, old)
+	_, _ = w.db.Write.Exec(`UPDATE users SET unlocks_known = 0, peak = 1400, peak_seen = 1400, rated = ? WHERE id = ?`,
+		MinRatedGames, old)
 	if n, _ := w.g.NewsOf(ctx, old, 0); len(n.Unlocks) != 0 || n.Division != nil {
 		t.Fatalf("a player from before: %+v", n)
 	}
-	_, _ = w.db.Write.Exec(`UPDATE users SET peak = 1700 WHERE id = ?`, old)
+	_, _ = w.db.Write.Exec(`UPDATE users SET peak = 1600 WHERE id = ?`, old)
 	if n, _ := w.g.NewsOf(ctx, old, 0); n.Division == nil || n.Division.ID != "legend" || len(n.Unlocks) != 2 {
 		t.Fatalf("a player from before, reaching Легенда: %+v", n)
 	}
@@ -1172,7 +1183,7 @@ func TestProgress(t *testing.T) {
 	for _, a := range n.Achievements {
 		ids = append(ids, a.ID)
 	}
-	// (A perfect day earns 20 XP an answer and 100 for the day, 300, and the goals it finished more: the first level.)
+	// (A perfect day earns 20 XP an answer and 200 for the day, 400, and the goals it finished more: the first level.)
 	// (and each achievement its tier's XP).
 	goals := 0
 	for _, d := range n.Goals {
@@ -1185,7 +1196,7 @@ func TestProgress(t *testing.T) {
 		}
 	}
 	if lvl, from, _ := LevelOf(n.XP); err != nil || !slices.Contains(ids, "perfect") || goals < GoalXP[0] ||
-		n.XP != 300+goals || lvl < 2 ||
+		n.XP != 400+goals || lvl < 2 ||
 		n.Level != lvl || n.From != from || !n.LevelUp {
 		t.Fatalf("news after a perfect day: %+v %v", n, err)
 	}
@@ -1490,8 +1501,8 @@ func TestDuelOf(t *testing.T) {
 		!d.You.Marks[0].Right || d.You.Marks[0].Ms == 0 || d.Opponent.Marks[0].Right || d.Decided != 1 {
 		t.Fatalf("Ana's duel: %+v %v", d, err)
 	}
-	if r := d.Rating; r == nil || r.Before != StartRating || r.After != StartRating+d.Delta || r.Division.ID != "bronze" ||
-		r.Next == nil || r.Next.ID != "silver" {
+	if r := d.Rating; r == nil || r.Before != StartRating || r.After != StartRating+d.Delta || r.Division.ID != "silver" ||
+		r.Next == nil || r.Next.ID != "gold" || r.Rated != 1 || r.Of != MinRatedGames {
 		t.Fatalf("Ana's rating: %+v", d.Rating)
 	}
 	if d.Record == nil || *d.Record != (Record{Won: 1}) {
@@ -1785,7 +1796,8 @@ func TestRatingAndDivisions(t *testing.T) {
 		rating int
 		id     string
 		next   int
-	}{{0, "bronze", 1050}, {1000, "bronze", 1050}, {1050, "silver", 1150}, {1599, "diamond", 1600}, {2400, "legend", 0}} {
+	}{{0, "bronze", 900}, {899, "bronze", 900}, {StartRating, "silver", 1050}, {1050, "gold", 1200}, {1499, "diamond", 1500},
+		{2400, "legend", 0}} {
 		if d, next := DivisionOf(c.rating); d.ID != c.id || next != c.next {
 			t.Errorf("DivisionOf(%d) = %s, next %d", c.rating, d.ID, next)
 		}
@@ -2206,7 +2218,8 @@ func TestTitles(t *testing.T) {
 		t.Fatalf("level 5's news: %v %+v %v", told, n, err)
 	}
 	if p, _ := w.g.ProgressOf(ctx, ana); p.Next.Level != 6 || len(p.Next.LevelUnlocks) != 1 ||
-		p.Next.LevelUnlocks[0].ID != "stripes" || p.Next.Division == nil || p.Next.Division.ID != "silver" {
+		p.Next.LevelUnlocks[0].ID != "stripes" || p.Next.Division != nil || p.Next.Days == nil ||
+		p.Next.Days.Title.ID != "persistence" || p.Next.Days.Days != 14 {
 		t.Fatalf("what's next at level 5: %+v", p.Next)
 	}
 	if look, _ := w.g.LookOf(ctx, ana); look.Title != "Страст към викторините" {

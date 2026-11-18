@@ -180,7 +180,8 @@ export const meaning = {
   dayBoard: " При равен брой верни в класацията на деня решават точките.",
   xp: "XP печелиш с всяка игра, цел и постижение. Трупа се и вдига нивото ти.",
   league: " В лигата за седмицата първо решават верните отговори на въпросите на деня, после точките.",
-  rating: "Рейтингът е силата ти в дуелите и в Роял: расте с победа, пада със загуба. От него зависи дивизията ти.",
+  rating:
+    "Рейтингът е силата ти в дуелите и в Роял: расте с победа, пада със загуба. Първите 10 игри с рейтинг го определят, после от него зависи дивизията ти.",
 };
 
 /** The day's points' words: the day's board they place on, and the league once it's open, where (added up over the
@@ -536,10 +537,32 @@ export interface Standing {
   rated: number;
   division: Division;
   next: number;
+  /** How many rated games set the rating, while it's still being set: then it has no division yet (play/rating.go). */
+  of?: number;
 }
 
-/** A division: its emblem and name, the rating (yours: `own`, a tap from what it means), and how far to the next. */
+/** A division: its emblem and name, the rating (yours: `own`, a tap from what it means), and how far to the next.
+ * While the rating is still being set, how far that has come instead: no division from a win or two. */
 export function standingCard(s: Standing, own = false): Child {
+  if (s.of)
+    return h(
+      "section",
+      { class: "card standing placing" },
+      emblem("bronze", "l"),
+      h(
+        "div",
+        { class: "standing-text" },
+        h("p", { class: "kicker" }, "Дивизия"),
+        h("strong", { class: "standing-name" }, "Рейтингът се определя"),
+        h(
+          "span",
+          { class: "muted" },
+          own ? explain("Рейтинг", meaning.rating) : "Рейтинг",
+          ` ${s.rating} · ${s.rated} от ${s.of} игри`,
+        ),
+        meter(Math.round((100 * s.rated) / s.of), `${s.rated} от ${s.of} игри с рейтинг`),
+      ),
+    );
   const span = s.next ? s.next - s.division.from : 0;
   const share = span ? Math.round((100 * (s.rating - s.division.from)) / span) : 100;
   return h(

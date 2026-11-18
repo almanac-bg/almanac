@@ -1129,6 +1129,43 @@ const summit = (place: number): Layer[] => {
       .map(([x, y]): Layer => ["k5", C(x, y, 2)]),
   ];
 };
+/** A rhombus standing on its point, as a path. */
+const rhomb = (x: number, y: number, r: number) =>
+  `M${x} ${n(y - r)}L${n(x + r)} ${y}L${x} ${n(y + r)}L${n(x - r)} ${y}Z`;
+
+// The levels past 12 (play/wardrobe.go): a ring of stars, an embroidered band, a ring of sparks.
+frames.constellation = [
+  ...band(3, 2.4),
+  ...around(3, 8).flatMap(([x, y], i): Layer[] => {
+    const R = i % 2 ? 2.8 : 4.4;
+    return [
+      lift(star(x, y, R, n(R * 0.45)), 0.8),
+      ["k4", star(x, y, R, n(R * 0.45))],
+      ["kw", C(n(x - R * 0.15), n(y - R * 0.2), n(R * 0.18))],
+    ];
+  }),
+];
+frames.embroidery = [
+  ...band(3, 3.4),
+  ...around(3, 16).flatMap(([x, y], i): Layer[] =>
+    i % 2
+      ? [["k5", C(x, y, 1.1)]]
+      : [
+          ["k1", rhomb(x, y, 3)],
+          ["k4", rhomb(x, y, 1.5)],
+        ],
+  ),
+];
+frames.sparks = [
+  ...band(3.4, 2.6),
+  ...around(3.4, 8).flatMap(([x, y], i): Layer[] => {
+    const R = i % 2 ? 3.4 : 5.6;
+    return [
+      ["k4", sparkle(x, y, R)],
+      ["kw", sparkle(x, y, n(R * 0.45))],
+    ];
+  }),
+];
 frames.peak5 = summit(1);
 frames.peak4 = summit(2);
 frames.peak3 = summit(3);

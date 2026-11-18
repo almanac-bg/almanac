@@ -11,11 +11,14 @@ import (
 
 // Titles: a few words worn under a player's name wherever they show. A title says something of the player and their
 // knowledge („Любопитен ум“, „Оракул“, „Майстор · История“), never only a deed („Три поред“ is an achievement). They
-// come four ways, each its own group:
+// come five ways, each its own group:
 //
-//   - the level: a ladder from „Нова искра“ at the start to „Жив алманах“ at level 50, so that there's always a next
-//     one in sight (worn by itself from „Любопитен ум“ on: LevelTitle). A level is time played, so its titles name devotion („Постоянство“, „Вярност към Алманаха“), not
-//     intellect: a claim to knowing is mastery's to give;
+//   - the level: a ladder from „Нова искра“ at the start to „Вечна искра“ at level 50, so that there's always a next
+//     one in sight (worn by itself from „Любопитен ум“ on: LevelTitle). A level is how much is played, so its titles
+//     name zeal and stamina („Ненаситно любопитство“, „Маратон на въпросите“): not intellect, which is mastery's to
+//     give, nor loyalty, which a grinder reaches in weeks;
+//   - the days: loyalty, by the days on which the day's questions were played, from „Постоянство“ at 14 to „Жив
+//     алманах“ at 1000 (review 2026-11-18, E8), told as it nears („засега 87“);
 //   - an achievement: only those that say how someone plays („Светкавица“ for five quick right answers in a game,
 //     „Неугасим пламък“), never one tap's luck or the hour on the clock (what „След полунощ“ or „В последния миг“
 //     earn is an avatar);
@@ -31,7 +34,7 @@ type Title struct {
 	ID    string
 	Name  string
 	Tier  Tier
-	Group string // TitleLevel, TitleAchievement, TitleTopic or TitleRank
+	Group string // TitleLevel, TitleDays, TitleAchievement, TitleTopic or TitleRank
 	by    unlock
 	about string // what unlocks it, when the unlock can't say (a topic's)
 }
@@ -39,13 +42,15 @@ type Title struct {
 // The groups titles come in, as Награди lists the locked ones.
 const (
 	TitleLevel       = "level"
+	TitleDays        = "days"
 	TitleAchievement = "achievement"
 	TitleTopic       = "topic"
 	TitleRank        = "rank"
 )
 
 // Titles are every title but the topics' (made from the bank's topics) and the champion's: the rating's, the level's
-// ladder, then the achievements', each group from the first a player is likely to earn.
+// ladder, the days', then the achievements', each group from the first a player is likely to earn. An id stays with
+// its name: the days' were the level's once (migration 0071 took them from whoever hadn't the days).
 var Titles = []Title{
 	{"goldStandard", "Чисто злато", Rare, TitleRank, unlock{division: "gold"}, ""},
 	{"diamondMind", "Диамантен ум", Epic, TitleRank, unlock{division: "diamond"}, ""},
@@ -55,16 +60,23 @@ var Titles = []Title{
 	{"spark", "Нова искра", Common, TitleLevel, unlock{level: 1}, ""},
 	{"curious", "Любопитен ум", Common, TitleLevel, unlock{level: 3}, ""},
 	{"passion", "Страст към викторините", Common, TitleLevel, unlock{level: 5}, ""},
-	{"persistence", "Постоянство", Rare, TitleLevel, unlock{level: 8}, ""},
 	{"insatiable", "Ненаситно любопитство", Rare, TitleLevel, unlock{level: 12}, ""},
-	{"devotion", "Всеотдайност", Rare, TitleLevel, unlock{level: 16}, ""},
+	{"thirst", "Жажда за знание", Rare, TitleLevel, unlock{level: 16}, ""},
 	{"grit", "Упоритост", Epic, TitleLevel, unlock{level: 20}, ""},
-	{"loyalty", "Вярност към Алманаха", Epic, TitleLevel, unlock{level: 25}, ""},
-	{"longevity", "Дълголетие", Epic, TitleLevel, unlock{level: 30}, ""},
+	{"onAndOn", "Въпрос след въпрос", Epic, TitleLevel, unlock{level: 24}, ""},
+	{"marathon", "Маратон на въпросите", Epic, TitleLevel, unlock{level: 30}, ""},
 	{"endurance", "Издръжливост", Epic, TitleLevel, unlock{level: 35}, ""},
-	{"keeper", "Стълб на Алманаха", Legendary, TitleLevel, unlock{level: 40}, ""},
-	{"chronicler", "Летопис на дните", Legendary, TitleLevel, unlock{level: 45}, ""},
-	{"almanac", "Жив алманах", Legendary, TitleLevel, unlock{level: 50}, ""},
+	{"ceaseless", "Неспирно търсене", Legendary, TitleLevel, unlock{level: 40}, ""},
+	{"tireless", "Неуморен ум", Legendary, TitleLevel, unlock{level: 45}, ""},
+	{"eternalSpark", "Вечна искра", Legendary, TitleLevel, unlock{level: 50}, ""},
+
+	{"persistence", "Постоянство", Rare, TitleDays, unlock{days: 14}, ""},
+	{"devotion", "Всеотдайност", Rare, TitleDays, unlock{days: 30}, ""},
+	{"loyalty", "Вярност към Алманаха", Epic, TitleDays, unlock{days: 100}, ""},
+	{"longevity", "Дълголетие", Epic, TitleDays, unlock{days: 200}, ""},
+	{"keeper", "Стълб на Алманаха", Legendary, TitleDays, unlock{days: 365}, ""},
+	{"chronicler", "Летопис на дните", Legendary, TitleDays, unlock{days: 500}, ""},
+	{"almanac", "Жив алманах", Legendary, TitleDays, unlock{days: 1000}, ""},
 
 	{"everyDay", "Всеки ден по малко", Rare, TitleAchievement, unlock{achieved: "streak7"}, ""},
 	{"speedDemon", "Светкавица", Rare, TitleAchievement, unlock{achieved: "fast"}, ""},
@@ -157,6 +169,9 @@ func (w wardrobe) titleViews(all []Title) []TitleView {
 		v := TitleView{TitleRef: t.ref(), Group: t.Group}
 		if !w.has(t.by) {
 			v.Locked, v.How = true, t.how()
+			if t.by.days > 0 && w.days > 0 {
+				v.How += ", засега " + strconv.Itoa(w.days)
+			}
 		}
 		list = append(list, v)
 	}

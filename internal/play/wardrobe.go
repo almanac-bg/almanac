@@ -19,11 +19,13 @@ type Cosmetic struct {
 	How    string `json:"how,omitempty"`
 }
 
-// unlock is what makes a cosmetic or a title a player's: a level, an achievement of a tier (any one), one
-// achievement, a division reached (by the highest rating), first place in a week of a league or a higher one (its
-// tier + 1), Роял won some times, or a mastery tier (or higher) in a topic or in some number of topics.
+// unlock is what makes a cosmetic or a title a player's: a level, days on which the day's questions were played, an
+// achievement of a tier (any one), one achievement, a division reached (by the highest rating), first place in a week
+// of a league or a higher one (its tier + 1), Роял won some times, or a mastery tier (or higher) in a topic or in some
+// number of topics.
 type unlock struct {
 	level    int
+	days     int
 	tier     Tier
 	achieved string
 	division string
@@ -42,11 +44,15 @@ type cosmetic struct {
 	by       unlock
 }
 
-// Frames, from the plainest.
+// Frames, from the plainest. The level's come every few levels past 12, between its titles and patterns, so that the
+// ladder never goes quiet for long (review 2026-11-18, E8).
 var Frames = []cosmetic{
 	{"ring", "Пръстен", unlock{level: 2}},
 	{"double", "Двоен пръстен", unlock{level: 5}},
 	{"dots", "Мъниста", unlock{level: 8}},
+	{"constellation", "Съзвездие", unlock{level: 18}},
+	{"embroidery", "Шевица", unlock{level: 27}},
+	{"sparks", "Искри", unlock{level: 38}},
 	{"flames", "Пламъци", unlock{achieved: "streak30"}},
 	{"laurel", "Лавров венец", unlock{tier: Legendary}},
 	{"gem", "Кристал", unlock{division: "diamond"}},
@@ -62,16 +68,24 @@ var Backdrops = []cosmetic{
 	{"dots", "Точици", unlock{level: 3}},
 	{"stripes", "Ивици", unlock{level: 6}},
 	{"grid", "Мрежа", unlock{level: 12}},
+	{"waves", "Вълни", unlock{level: 14}},
+	{"zigzag", "Зигзаг", unlock{level: 22}},
+	{"diamonds", "Ромбове", unlock{level: 32}},
+	{"rings", "Кръгове", unlock{level: 42}},
+	{"glow", "Сияние", unlock{level: 48}},
 	{"rays", "Лъчи", unlock{tier: Epic}},
 	{"stars", "Звезди", unlock{division: "gold"}},
 }
 
-// wardrobe is what a player has done that unlocks things: their level, achievements, highest rating, their places
-// first places in each league, the Роял tournaments they've won, and their mastery tier in each topic they're sure in.
+// wardrobe is what a player has done that unlocks things: their level, the days they played the day's questions,
+// achievements, highest rating, their first places in each league, the Роял tournaments they've won, and their
+// mastery tier in each topic they're sure in.
 type wardrobe struct {
 	level   int
+	days    int
 	earned  map[string]int64
-	peak    int
+	peak    int   // the highest rating, once placed (0 before)
+	placed  bool  // the rating is set (Placed)
 	firsts  []int // weeks ended first in a group, by the league's tier
 	royals  int
 	mastery map[string]int
@@ -83,6 +97,8 @@ func (w wardrobe) has(u unlock) bool {
 	switch {
 	case u.level > 0:
 		return w.level >= u.level
+	case u.days > 0:
+		return w.days >= u.days
 	case u.achieved != "":
 		_, ok := w.earned[u.achieved]
 		return ok
@@ -126,6 +142,8 @@ func (u unlock) how() string {
 	switch {
 	case u.level > 0:
 		return "ниво " + strconv.Itoa(u.level)
+	case u.days > 0:
+		return strconv.Itoa(u.days) + " дни с въпросите на деня"
 	case u.achieved != "":
 		a, _ := achievementByID(u.achieved)
 		return "постижението „" + a.Name + "“"
@@ -182,8 +200,16 @@ func (g *Game) wardrobeOf(ctx context.Context, userID int64) (wardrobe, error) {
 	if w.earned, err = g.earned(ctx, userID); err != nil {
 		return w, err
 	}
-	if err = g.DB.Read.QueryRowContext(ctx, `SELECT peak FROM users WHERE id = ?`, userID).Scan(&w.peak); err != nil {
+	if err = g.DB.Read.QueryRowContext(ctx, `SELECT count(*) FROM runs WHERE user_id = ? AND kind = 'day'
+		AND finished_at IS NOT NULL`, userID).Scan(&w.days); err != nil {
 		return w, err
+	}
+	var rated int
+	if err = g.DB.Read.QueryRowContext(ctx, `SELECT peak, rated FROM users WHERE id = ?`, userID).Scan(&w.peak, &rated); err != nil {
+		return w, err
+	}
+	if w.placed = Placed(rated); !w.placed {
+		w.peak = 0 // no division while the rating is being set, nor what one unlocks
 	}
 	if w.firsts, err = g.leagueFirsts(ctx, userID); err != nil {
 		return w, err
@@ -366,12 +392,22 @@ func (w wardrobe) tierUnlocks() map[Tier][]Unlock {
 }
 
 // Next is what comes next for a player: the next level that unlocks something, and what; the division above their
-// rating, and what reaching it first unlocks.
+// rating (once it's set), and what reaching it first unlocks.
 type Next struct {
 	Level           int       `json:"level,omitempty"` // 0: no level ahead unlocks anything
 	LevelUnlocks    []Unlock  `json:"levelUnlocks"`
 	Division        *Division `json:"division,omitempty"` // nil at the top
 	DivisionUnlocks []Unlock  `json:"divisionUnlocks"`
+	// Days is the next title of the days' (nil once all are the player's): what it is, how many days it takes, and
+	// how many the player has.
+	Days *NextDays `json:"days,omitempty"`
+}
+
+// NextDays is the next title the days on which the day's questions were played unlock.
+type NextDays struct {
+	Title Unlock `json:"title"`
+	Days  int    `json:"days"`
+	Have  int    `json:"have"`
 }
 
 // next is what comes next for a player with this rating.
@@ -386,7 +422,14 @@ func (w wardrobe) next(rating int) Next {
 			n.Level, n.LevelUnlocks = l, at
 		}
 	}
-	if _, from := DivisionOf(rating); from > 0 {
+	for _, t := range w.titles {
+		if t.by.days > w.days {
+			n.Days = &NextDays{Title: Unlock{Kind: "title", ID: t.ID, Name: t.Name, Tier: t.Tier, From: t.by.how()},
+				Days: t.by.days, Have: w.days}
+			break
+		}
+	}
+	if _, from := DivisionOf(rating); from > 0 && w.placed {
 		d, _ := DivisionOf(from)
 		n.Division = &d
 		for _, u := range w.unlocksBy(func(u unlock) bool { return u.division == d.ID }) {

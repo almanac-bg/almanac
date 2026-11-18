@@ -52,8 +52,10 @@ interface News {
   levelUp?: boolean;
   /** The XP all this brought: the game just played, and the goals, achievements and week told with it. */
   earned: number;
-  /** A division the rating has reached for the first time. */
+  /** A division the rating has reached for the first time; with `placed`, the one it's in as its first games have
+   * just set it (play/rating.go). */
   division?: Division;
+  placed?: boolean;
   /** Everything newly unlocked to wear, whatever unlocked it. */
   unlocks: Unlock[];
   /** The avatar worn (shape-tone): an unlocked shape is put on in its tone. */
@@ -144,7 +146,7 @@ export function news(
       top === "level" || !n.open.xp ? null : xpLine(n),
       n.goals.length ? goalsDone(n.goals, moved) : moved.length ? movedLine(moved) : null,
       top === "league" && n.league ? leagueEnded(n.league) : null,
-      top === "division" && n.division ? divisionReached(n.division) : null,
+      top === "division" && n.division ? divisionReached(n.division, n.placed) : null,
       top === "level" ? levelCard(n.level, n.xp, n.from, n.to, true, n.earned) : null,
       fresh(n),
       n.recordings ? recordings(n.recordings) : null,
@@ -236,7 +238,12 @@ function bigOne(
   const d = n.division;
   if (d)
     return {
-      parts: sheet(big(emblem(d.id, "l")), "Нова дивизия", d.name, `Рейтинг ${d.from} и нагоре.`),
+      parts: sheet(
+        big(emblem(d.id, "l")),
+        n.placed ? "Рейтингът ти е определен" : "Нова дивизия",
+        d.name,
+        `Рейтинг ${d.from} и нагоре.`,
+      ),
       sound: "level",
       glow: false,
     };
@@ -436,8 +443,8 @@ function leagueEnded(e: LeagueEnd): Child {
   );
 }
 
-/** A division the rating has reached for the first time. */
-function divisionReached(d: Division): Child {
+/** A division the rating has reached for the first time, or the one it's in as it's set (`placed`). */
+function divisionReached(d: Division, placed?: boolean): Child {
   return h(
     "section",
     { class: `card unlock d-${d.id}` },
@@ -445,7 +452,7 @@ function divisionReached(d: Division): Child {
     h(
       "div",
       { class: "unlock-text" },
-      h("p", { class: "kicker" }, "Нова дивизия"),
+      h("p", { class: "kicker" }, placed ? "Рейтингът ти е определен" : "Нова дивизия"),
       h("strong", null, d.name),
       h("span", { class: "muted" }, `Рейтинг ${d.from} и нагоре.`),
     ),

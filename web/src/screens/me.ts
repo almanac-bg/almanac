@@ -167,14 +167,15 @@ function head(progress: () => Progress | null): Child {
 }
 
 /** The level, and what comes next: the XP to the next level and what the next that unlocks something brings, the
- * division above, and the two achievements nearest — so that every way of playing shows where it leads. Before XP is
- * open (a first day), the achievements only. */
+ * division above, the next title of the days with the day's questions („ден 87 от 100“), and the two achievements
+ * nearest — so that every way of playing shows where it leads. Before XP is open (a first day), the achievements only. */
 function levelCard(p: Progress): Child {
   const { next } = p;
   const xp = p.open.xp;
   const near = nearest(p.achievements, 2);
   const share = p.to > p.from ? Math.round((100 * (p.xp - p.from)) / (p.to - p.from)) : 0;
   const division = next.division && p.standing.rated ? next.division : undefined;
+  const days = xp ? next.days : undefined;
   const items = (list: Unlock[]) =>
     list.map((u) => h("span", { class: "next-unlock" }, unlockPicture(u, p.avatar), unlockWords(u)));
   return h(
@@ -207,7 +208,7 @@ function levelCard(p: Progress): Child {
           items(next.levelUnlocks),
         )
       : null,
-    division || near.length
+    division || days || near.length
       ? [
           h("h2", { class: "kicker" }, "Следва"),
           h(
@@ -230,6 +231,21 @@ function levelCard(p: Progress): Child {
                     next.divisionUnlocks.length
                       ? h("span", { class: "next-unlocks" }, items(next.divisionUnlocks))
                       : null,
+                  ),
+                )
+              : null,
+            days
+              ? h(
+                  "li",
+                  { class: "next-row" },
+                  unlockPicture(days.title, p.avatar),
+                  h(
+                    "span",
+                    { class: "next-text" },
+                    h("strong", null, unlockWords(days.title)),
+                    h("span", { class: "muted" }, `${days.days} дни с въпросите на деня`),
+                    meter(Math.round((100 * days.have) / days.days), `ден ${days.have} от ${days.days}`),
+                    h("span", { class: "next-reward" }, `ден ${days.have} от ${days.days}`),
                   ),
                 )
               : null,

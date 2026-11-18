@@ -69,7 +69,8 @@ interface Side {
   titleTier?: Tier;
   level?: number;
   rating: number;
-  division: "bronze" | "silver" | "gold" | "platinum" | "diamond" | "legend";
+  /** Their division; "" while their rating is still being set (play/rating.go). */
+  division: "bronze" | "silver" | "gold" | "platinum" | "diamond" | "legend" | "";
   points: number;
   rights: number;
   trail: Mark[];
@@ -129,7 +130,7 @@ interface Wait {
 }
 
 const topicName = (id: string) => topics.find((c) => c.id === id)?.name ?? "";
-const divisionNames: Record<Side["division"], string> = {
+const divisionNames: Record<Exclude<Side["division"], "">, string> = {
   bronze: "Бронз",
   silver: "Сребро",
   gold: "Злато",
@@ -413,11 +414,17 @@ function intro(v: LiveView): Child {
   const card = (s: Side, label: string) =>
     h(
       "div",
-      { class: `live-face d-${s.division}` },
+      { class: s.division ? `live-face d-${s.division}` : "live-face" },
       avatar(s.avatar, { size: "l", level: s.level, name: s.name }),
       h("strong", { class: "live-name" }, s.name),
       h("span", { class: "kicker" }, label),
-      h("span", { class: "live-division" }, emblem(s.division, "s"), `${divisionNames[s.division]} · ${s.rating}`),
+      h(
+        "span",
+        { class: "live-division" },
+        s.division
+          ? [emblem(s.division, "s"), `${divisionNames[s.division]} · ${s.rating}`]
+          : `Рейтинг ${s.rating} · още се определя`,
+      ),
     );
   return h(
     "div",

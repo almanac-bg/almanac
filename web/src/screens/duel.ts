@@ -73,7 +73,8 @@ export interface DuelView {
   /** One duel's view says more of its result: the question (from 1) after which the winner led to the end (none: the
    * points were even), where the rating went, and the player's record against this opponent (a person). */
   decided?: number;
-  rating?: { before: number; after: number; division: Division; next?: Division };
+  /** Where the rating went; while it's still being set, how many rated games of how many it's from (no division). */
+  rating?: { before: number; after: number; division: Division; next?: Division; rated?: number; of?: number };
   record?: { won: number; lost: number; drawn: number };
   /** A live duel one of the two left under way (it went on without them): how many questions they had played. */
   youLeft?: number;

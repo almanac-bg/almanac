@@ -617,8 +617,10 @@ type News struct {
 	LevelUp      bool       `json:"levelUp,omitempty"`
 	// Earned is the XP all this brings: the game just played, and the goals, achievements and week told with it.
 	Earned int `json:"earned"`
-	// Division is a division the player's rating has reached for the first time.
+	// Division is a division the player's rating has reached for the first time; with Placed, the one it's in as its
+	// first MinRatedGames games have just set it (rating.go): none is told before.
 	Division *Division `json:"division,omitempty"`
+	Placed   bool      `json:"placed,omitempty"`
 	// Unlocks are what the player may wear now and hasn't been told of: titles, frames, patterns, avatars.
 	Unlocks []Unlock `json:"unlocks"`
 	// Avatar is the avatar worn (shape-tone), for an unlocked shape to be put on in it.
@@ -722,11 +724,11 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 	b := g.Bank()
 	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var avatar sql.NullString
-		var seen, peak, peakSeen int
+		var seen, peak, peakSeen, rating, rated int
 		var known bool
 		var systems string
-		if err := tx.QueryRow(`SELECT avatar, level_seen, peak, peak_seen, unlocks_known, systems_told FROM users WHERE id = ?`,
-			userID).Scan(&avatar, &seen, &peak, &peakSeen, &known, &systems); err != nil {
+		if err := tx.QueryRow(`SELECT avatar, level_seen, peak, peak_seen, rating, rated, unlocks_known, systems_told
+			FROM users WHERE id = ?`, userID).Scan(&avatar, &seen, &peak, &peakSeen, &rating, &rated, &known, &systems); err != nil {
 			return err
 		}
 		n.Avatar = cmp.Or(avatar.String, DefaultAvatar(userID))
@@ -830,8 +832,15 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 		if open.League {
 			n.Earned += weeks
 		}
-		if d, _ := DivisionOf(peak); d.From > peakSeen && open.Rating {
-			n.Division = &d
+		// While the rating is being set, no division is told, and the peak seen is kept at -1: the first news after
+		// it's set tells the division it's in, and the peak from then on.
+		if Placed(rated) && open.Rating {
+			if peakSeen < 0 {
+				d, _ := DivisionOf(rating)
+				n.Division, n.Placed = &d, true
+			} else if d, _ := DivisionOf(peak); d.From > peakSeen {
+				n.Division = &d
+			}
 		}
 		// A level is told once XP is: one reached before waits for it.
 		level := 0
@@ -851,10 +860,11 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 			`UPDATE league_results SET seen = 1 WHERE user_id = ?1 AND NOT seen`,
 			`UPDATE streak_repairs SET told = 1 WHERE user_id = ?1 AND NOT told`,
 			`UPDATE runs SET told = 1 WHERE user_id = ?1 AND NOT told AND finished_at <= ?4`,
-			`UPDATE users SET level_seen = max(level_seen, ?2), peak_seen = max(peak_seen, peak), unlocks_known = 1,
+			`UPDATE users SET level_seen = max(level_seen, ?2), unlocks_known = 1,
+				peak_seen = CASE WHEN rated >= ?5 THEN max(peak_seen, peak) ELSE -1 END,
 				systems_told = trim(systems_told || ' ' || ?3) WHERE id = ?1`,
 		} {
-			if _, err := tx.Exec(q, userID, level, strings.Join(n.Opened, " "), finished); err != nil {
+			if _, err := tx.Exec(q, userID, level, strings.Join(n.Opened, " "), finished, MinRatedGames); err != nil {
 				return err
 			}
 		}

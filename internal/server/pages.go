@@ -262,7 +262,11 @@ func (s *Server) preview(r *http.Request) (title, description string) {
 				if p.Games == 1 {
 					played = "изиграна игра"
 				}
-				description = fmt.Sprintf("Ниво %d · %s · %d %s.", p.Level, p.Standing.Division.Name, p.Games, played)
+				division := "" // none while the rating is still being set
+				if p.Standing.Of == 0 {
+					division = p.Standing.Division.Name + " · "
+				}
+				description = fmt.Sprintf("Ниво %d · %s%d %s.", p.Level, division, p.Games, played)
 			}
 		}
 	case strings.HasPrefix(path, "/r/"):
