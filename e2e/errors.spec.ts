@@ -4,11 +4,11 @@ import { expect, test } from "@playwright/test";
 import { answer, moveOn, openGame } from "./play.ts";
 
 test("Начало and Класации that can't load try again, by a tap or as the line comes back", async ({ page }) => {
-  // Начало's page comes with the day in it: the day is asked for when Начало is opened from another screen.
-  await page.goto("/");
-  await expect(page.locator(".card.day")).toBeVisible();
+  // Начало's page comes with the day in it, and Начало opened again draws the day it drew last (lib/api.ts, last): the
+  // day is asked for, with nothing to draw meanwhile, when Начало is first opened from another page.
+  await page.goto("/friends");
+  await expect(page.getByRole("heading", { name: "Приятели" })).toBeVisible();
   await page.route("**/api/day", (route) => route.abort("internetdisconnected"));
-  await page.locator("nav.tabs").getByRole("link", { name: "Класации" }).click();
   await page.locator("nav.tabs").getByRole("link", { name: "Начало" }).click();
   await expect(page.getByRole("alert")).toContainText("Няма връзка");
   await page.unroute("**/api/day");

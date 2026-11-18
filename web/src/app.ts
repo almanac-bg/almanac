@@ -4,13 +4,13 @@
 import { loadPictures } from "./art/picture.ts";
 import { keepFresh, resumed } from "./fresh.ts";
 import { later } from "./kit.ts";
-import { api, errorText } from "./lib/api.ts";
+import { api, asking, errorText, forget } from "./lib/api.ts";
 import { startApp } from "./lib/app.ts";
 import { type Child, effect, h, mount, signal } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { applyPrefs } from "./lib/prefs.ts";
 import { preparePush } from "./lib/push.ts";
-import { canGoBack, entry, go, navigate, path, start } from "./lib/router.ts";
+import { arriving, canGoBack, entry, go, navigate, path, prefetch, start, waitFor } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
 import { challenge, challengeFriend, newChallenge } from "./screens/challenge.ts";
 import { duel, duelOne, playChallenge } from "./screens/duel.ts";
@@ -21,7 +21,7 @@ import { mistakes } from "./screens/mistakes.ts";
 import { topic } from "./screens/play.ts";
 import { rooms } from "./screens/rooms.ts";
 import { today } from "./screens/today.ts";
-import { type Challenge, challenges, checkWaiting, friendRequests, playing, watchWaiting } from "./state.ts";
+import { type Challenge, challenges, checkWaiting, friendRequests, playing, user, watchWaiting } from "./state.ts";
 import { until } from "./ui.ts";
 
 /**
@@ -54,6 +54,15 @@ startApp({
   resumed,
 });
 loadPictures().catch(() => {}); // the illustrations, in a file of their own: on their way at once
+// A screen opening waits for what it asks the server for (router.ts). What was kept of the server's answers (lib/api.ts,
+// last) is no one's once the player is someone else, or no one.
+asking.push(waitFor);
+let who = user.peek()?.id;
+effect(() => {
+  const id = user()?.id;
+  if (id !== who) forget();
+  who = id;
+});
 
 const root = document.getElementById("app");
 if (root) {
@@ -93,6 +102,8 @@ if (root) {
         ),
       ),
     ),
+    // A screen on its way and not whole yet: a thin line along the top of the page, after a moment (app.css).
+    h("div", { class: () => (arriving() ? "arriving on" : "arriving"), "aria-hidden": "true" }),
     // A friend's challenge, wherever the player is (but in a game, or on the duels themselves).
     () => {
       const c = challenges()[0];
@@ -107,40 +118,94 @@ if (root) {
       { path: /^\/play\/([a-z]+)$/, view: topic },
       { path: /^\/c\/([a-z0-9]{6,8})$/, view: challenge },
       { path: /^\/duel$/, view: duel },
-      { path: /^\/duel\/live$/, view: later(() => import("./screens/live.ts").then((m) => m.liveDuel)) },
+      {
+        path: /^\/duel\/live$/,
+        view: later(() => import("./screens/live.ts").then((m) => m.liveDuel), "title", "card"),
+      },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
       { path: /^\/challenge$/, view: newChallenge },
       { path: /^\/challenge\/([0-9]+)$/, view: challengeFriend },
-      { path: /^\/royal$/, view: later(() => import("./screens/royal.ts").then((m) => m.royal)) },
-      { path: /^\/almanac$/, view: later(() => import("./screens/almanac.ts").then((m) => m.almanac)) },
+      { path: /^\/royal$/, view: later(() => import("./screens/royal.ts").then((m) => m.royal), "title", "card") },
+      {
+        path: /^\/almanac$/,
+        view: later(() => import("./screens/almanac.ts").then((m) => m.almanac), "title", "tabs", "rows"),
+      },
       { path: /^\/mistakes$/, view: mistakes },
-      { path: /^\/issues$/, view: later(() => import("./screens/issues.ts").then((m) => m.issues)) },
-      { path: /^\/issues\/([0-9]{1,5})$/, view: later(() => import("./screens/issues.ts").then((m) => m.issue)) },
-      { path: /^\/year\/([0-9]{4})$/, view: later(() => import("./screens/year.ts").then((m) => m.year)) },
+      { path: /^\/issues$/, view: later(() => import("./screens/issues.ts").then((m) => m.issues), "title", "rows") },
+      {
+        path: /^\/issues\/([0-9]{1,5})$/,
+        view: later(() => import("./screens/issues.ts").then((m) => m.issue), "title", "card", "rows"),
+      },
+      {
+        path: /^\/year\/([0-9]{4})$/,
+        view: later(() => import("./screens/year.ts").then((m) => m.year), "title", "card", "rows"),
+      },
       { path: /^\/room$/, view: rooms },
-      { path: /^\/ranks$/, view: later(() => import("./screens/ranks.ts").then((m) => m.ranks)) },
-      { path: /^\/rewards$/, view: later(() => import("./screens/rewards.ts").then((m) => m.rewards)) },
-      { path: /^\/wardrobe$/, view: later(() => import("./screens/wardrobe.ts").then((m) => m.wardrobe)) },
-      { path: /^\/friends$/, view: later(() => import("./screens/friends.ts").then((m) => m.friends)) },
-      { path: /^\/settings$/, view: later(() => import("./screens/settings.ts").then((m) => m.settings)) },
-      { path: /^\/r\/([0-9]{6})$/, view: later(() => import("./screens/room.ts").then((m) => m.room)) },
+      {
+        path: /^\/ranks$/,
+        view: later(() => import("./screens/ranks.ts").then((m) => m.ranks), "title", "tabs", "rows"),
+      },
+      {
+        path: /^\/rewards$/,
+        view: later(() => import("./screens/rewards.ts").then((m) => m.rewards), "tabs", "title", "card", "rows"),
+      },
+      {
+        path: /^\/wardrobe$/,
+        view: later(() => import("./screens/wardrobe.ts").then((m) => m.wardrobe), "tabs", "head", "card"),
+      },
+      {
+        path: /^\/friends$/,
+        view: later(() => import("./screens/friends.ts").then((m) => m.friends), "title", "rows"),
+      },
+      {
+        path: /^\/settings$/,
+        view: later(() => import("./screens/settings.ts").then((m) => m.settings), "title", "card", "card"),
+      },
+      {
+        path: /^\/r\/([0-9]{6})$/,
+        view: later(() => import("./screens/room.ts").then((m) => m.room), "title", "card"),
+      },
       { path: /^\/f\/([a-z0-9]{8})$/, view: invite },
       { path: /^\/hand\/([A-Za-z0-9_-]{43})$/, view: handoff },
-      { path: /^\/me$/, view: later(() => import("./screens/me.ts").then((m) => m.me)) },
-      { path: /^\/games$/, view: later(() => import("./screens/games.ts").then((m) => m.games)) },
-      { path: /^\/games\/([0-9]+)$/, view: later(() => import("./screens/played.ts").then((m) => m.playedGame)) },
+      {
+        path: /^\/me$/,
+        view: later(() => import("./screens/me.ts").then((m) => m.me), "tabs", "head", "card", "rows"),
+      },
+      {
+        path: /^\/games$/,
+        view: later(() => import("./screens/games.ts").then((m) => m.games), "title", "tabs", "rows"),
+      },
+      {
+        path: /^\/games\/([0-9]+)$/,
+        view: later(() => import("./screens/played.ts").then((m) => m.playedGame), "title", "card", "rows"),
+      },
       {
         path: /^\/players\/([A-Za-z0-9_]{3,20})$/,
-        view: later(() => import("./screens/player.ts").then((m) => m.playerProfile)),
+        view: later(() => import("./screens/player.ts").then((m) => m.playerProfile), "head", "card", "rows"),
       },
     ],
     missing,
   );
+  // The four places' files, once the first screen is drawn and the browser has nothing else to do: a tap on one
+  // draws it at once (Начало's is app.js itself).
+  whenIdle(() => {
+    for (const [href] of links) prefetch(href);
+  });
   // In a game, a phone's bar of places steps aside (app.css): the question gets the screen.
   effect(() => document.documentElement.classList.toggle("playing", playing()));
   watchWaiting();
   prepareSound();
   preparePush();
+}
+
+/** Runs `fn` once the page has loaded and the browser is idle (where it can't say: a moment after the load). */
+function whenIdle(fn: () => void): void {
+  const idle = () => {
+    if ("requestIdleCallback" in window) requestIdleCallback(() => fn(), { timeout: 3000 });
+    else setTimeout(fn, 1000);
+  };
+  if (document.readyState === "complete") idle();
+  else addEventListener("load", idle, { once: true });
 }
 
 /** A friend has challenged the player: who, until when, and play it or say no. */

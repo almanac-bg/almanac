@@ -1,6 +1,6 @@
 // A player's progress as the server keeps it: the level, every achievement, and what they may look like.
 
-import { api } from "../lib/api.ts";
+import { fresh, last } from "../lib/api.ts";
 import { met } from "../state.ts";
 import type { AchievementInfo, Division, Open, Standing, Tier, TitleRef, Unlock } from "../ui.ts";
 
@@ -50,11 +50,15 @@ export interface Cosmetic {
 
 /** Who you are in the game: your avatar with your level, your name, your title. */
 
+/** The player's progress: the server asked again, while what it said last is drawn (keptProgress). */
 export const loadProgress = () =>
-  api<Progress>("GET", "/api/me/progress").then((p) => {
+  fresh<Progress>("/api/me/progress").then((p) => {
     met(p.open);
     return p;
   });
+
+/** What the server said last of the player's progress, if anything (lib/api.ts, last). */
+export const keptProgress = () => last<Progress>("/api/me/progress") ?? null;
 
 /** A title as the wardrobe lists it: yours to wear, or locked with what unlocks it. */
 export interface TitleView extends TitleRef {

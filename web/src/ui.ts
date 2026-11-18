@@ -682,6 +682,54 @@ export function failure(
   );
 }
 
+/** A part of what a wait stands in for, drawn in its shape: the page's title, a lead line, a row of tabs, a player's
+ * head (an avatar and two lines), a card, a card of rows (a board, a list), the rows alone (in a card already), a
+ * question's answers, a line. */
+export type Shape = "title" | "lead" | "tabs" | "head" | "card" | "rows" | "list" | "answers" | "line";
+
+const bone = (cls = "") => h("span", { class: `bone ${cls}`.trim() });
+
+const list = () => [0, 1, 2, 3].map(() => h("span", { class: "bone-row" }, bone("bone-dot"), bone(), bone("bone-num")));
+
+const shapes: Record<Shape, () => Child> = {
+  title: () => bone("bone-title"),
+  lead: () => h("span", { class: "bone-lines" }, bone(), bone("bone-short")),
+  tabs: () => bone("bone-tabs"),
+  head: () =>
+    h(
+      "span",
+      { class: "bone-head" },
+      bone("bone-avatar"),
+      h("span", { class: "bone-lines" }, bone(), bone("bone-short")),
+    ),
+  card: () => h("span", { class: "bone-card" }, bone("bone-short"), bone(), bone("bone-big")),
+  rows: () => h("span", { class: "bone-card" }, list()),
+  list: () => h("span", { class: "bone-list" }, list()),
+  answers: () =>
+    h(
+      "span",
+      { class: "bone-answers" },
+      [0, 1, 2, 3].map(() => bone("bone-answer")),
+    ),
+  line: () => bone("bone-short"),
+};
+
+/** What's on its way, while it loads: quiet blocks in the shape of what comes (`parts`, top to bottom), never a word or
+ * „…“. Drawn after a moment (app.css), so that a short wait shows nothing; at once on a screen that came before it was
+ * ready (router.ts). A screen opening waits while it has one (router.ts, ready). */
+export function loading(...parts: Shape[]): Child {
+  return h(
+    "div",
+    { class: "loading" },
+    h("span", { class: "sr" }, "Зарежда се"),
+    h(
+      "span",
+      { class: "bones", "aria-hidden": "true" },
+      (parts.length ? parts : ["line" as Shape]).map((p) => shapes[p]()),
+    ),
+  );
+}
+
 /** The way back to where a screen is reached from (a way to play, from Начало; Настройки, from Профил): back in the
  * history when that's the page before, else that page in place of this one (router.ts, leave), never a new entry. */
 export function back(href: string, label: string): Child {

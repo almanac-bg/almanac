@@ -20,6 +20,7 @@ import {
   type Division,
   failure,
   formatNumber,
+  loading,
   pageArt,
   type Standing,
   standingCard,
@@ -434,7 +435,7 @@ function notHere(signedIn: () => void): Child {
 export function duelOne(params: string[]) {
   title("Дуел");
   const id = Number(params[0]);
-  const screen = slot(() => h("p", { class: "muted" }, "…"));
+  const screen = slot(() => loading("title", "card"));
   const tap = byTap();
   // What comes back once the screen is gone (another page opened meanwhile) does nothing: a game's entry held over
   // that page, or a game started on it, would be another page's.
@@ -565,7 +566,7 @@ export function afterDuel(id: number, run: number): Child {
   return h("div", null, () => {
     const d = view();
     if (d) return duelResult(d, null, news(run));
-    return error() ? h("p", { class: "bad", role: "alert" }, error()) : h("p", { class: "muted" }, "…");
+    return error() ? h("p", { class: "bad", role: "alert" }, error()) : loading("card", "rows");
   });
 }
 

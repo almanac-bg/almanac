@@ -13,7 +13,7 @@ import { embedded, outsideLink } from "../lib/embedded.ts";
 import { askToKeep } from "../lib/keep.ts";
 import { go, title } from "../lib/router.ts";
 import { notice, type User, user } from "../state.ts";
-import { failure } from "../ui.ts";
+import { failure, loading } from "../ui.ts";
 import { signIn } from "./signin.ts";
 
 /** This page's app browser, if it's in one (never in the game's own app). */
@@ -124,7 +124,7 @@ export function mailAsk({
   return [
     () => {
       if (said()) return h("p", { class: "muted", role: "status" }, said());
-      if (saving()) return h("p", { class: "muted" }, "…");
+      if (saving()) return loading("line");
       const to = email();
       if (to)
         return [
@@ -329,7 +329,7 @@ export function handoff([token = ""]: string[]) {
       h("button", { class: "btn primary", type: "button", onclick: take, disabled: busy }, "Продължи тук"),
       h("a", { class: "link tap", href: "/" }, "Откажи"),
     );
-  const screen = slot(() => h("p", { class: "muted" }, "…"));
+  const screen = slot(() => loading("title", "card"));
   const look = () => {
     api<{ game: Handing }>("POST", "/api/auth/hand/look", { token }).then(
       (r) => screen.show(() => offer(r.game)),

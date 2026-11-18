@@ -13,6 +13,7 @@ import { type Child, h, signal, slot } from "../lib/dom.ts";
 import { go, title } from "../lib/router.ts";
 import { withName } from "../lib/words.ts";
 import { player, user } from "../state.ts";
+import { loading } from "../ui.ts";
 import { type Today, today } from "./today.ts";
 
 interface Info {
@@ -30,7 +31,7 @@ interface Info {
 
 export function invite([code = ""]: string[]) {
   title("Покана");
-  const screen = slot(() => h("p", { class: "muted" }, "…"));
+  const screen = slot(() => loading("title", "card"));
   const error = signal("");
   const info = signal<Info>({ by: "", own: false, friends: false });
   const fail = (err: unknown) => error.set(errorText(err));

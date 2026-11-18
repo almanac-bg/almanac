@@ -11,6 +11,9 @@ import type { Tier } from "../ui.ts";
 // only types.
 let {
   shareButton,
+  fresh,
+  last,
+  loading,
   api,
   errorText,
   h,
@@ -63,6 +66,9 @@ interface Friends {
 export function friends(kit: Kit): Child {
   ({
     shareButton,
+    fresh,
+    last,
+    loading,
     api,
     errorText,
     h,
@@ -87,7 +93,8 @@ export function friends(kit: Kit): Child {
 
 /** The page's title (with the way to change the list, once there are friends), then the friends card itself. */
 function friendsCard(): Child {
-  const data = signal<Friends | null>(null);
+  // Opened again: the list as it was last drawn, at once, while the server is asked (fresh).
+  const data = signal<Friends | null>(user.peek() ? (last<Friends>("/api/friends") ?? null) : null);
   const error = signal("");
   // The list that couldn't load (with nothing of it shown yet): the failure, and the way to try again.
   const failed = signal<unknown>(null);
@@ -98,7 +105,7 @@ function friendsCard(): Child {
   const load = async () => {
     if (!user.peek()) return;
     try {
-      const f = await api<Friends>("GET", "/api/friends");
+      const f = await fresh<Friends>("/api/friends");
       failed.set(null);
       data.set(f);
       friendRequests.set(f.requests.in.length);
@@ -197,9 +204,9 @@ function friendsCard(): Child {
         const d = data();
         if (!d && failed()) return failure(failed(), () => void load());
         if (!d) {
-          // Not a player yet: the link is made once they are.
+          // Not a player yet: the link is made once they are. A player: the list on its way.
           return user()
-            ? null
+            ? loading("list")
             : [
                 h(
                   "p",

@@ -1,7 +1,7 @@
 // The router against a tab's history stood in for (entries, back and forward as the browser does them: a popstate a
 // moment later): what back does during a game and after (one opened from outside the app too), where a way back goes,
 // a page fallen behind loading anew, a link from outside the page, a screen that sends the player on as it's drawn,
-// and the focus on a heading that comes late.
+// the focus on a heading that comes late, and a screen made off the page while the one before stays until it's ready.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -58,15 +58,32 @@ const history = {
 const body = { isConnected: true };
 let focused: unknown = body;
 let heading: { tabIndex: number; focus: () => void; isConnected: boolean } | null = null;
-let observed: (() => void) | null = null;
+/** What watches the page for changes (a heading that comes late: settle; a page on its way: ready). */
+const observers = new Set<() => void>();
+/** The page changed: each watch sees it. */
+const mutated = () => {
+  for (const fn of [...observers]) fn();
+};
+class Node {}
 const sheets: { open: boolean; close: () => void }[] = [];
-/** What the screen shows: the name of the page drawn last into it. */
+/** What the screen shows: the name of the page drawn last into it (a page on its way: its parts, which say whether it
+ * still loads). */
 let showing = "";
+let shown: { text?: string; querySelector?: (q: string) => unknown } | null = null;
+/** Whether the screen shown came before it was ready (aria-busy). */
+let busy = false;
 const root = {
   replaceChildren(node: { text?: string }) {
+    shown = node;
     showing = node.text ?? "";
   },
-  querySelector: () => heading,
+  querySelector: (q: string) => (q === "h1" ? heading : (shown?.querySelector?.(q) ?? null)),
+  setAttribute: (name: string) => {
+    if (name === "aria-busy") busy = true;
+  },
+  removeAttribute: (name: string) => {
+    if (name === "aria-busy") busy = false;
+  },
 };
 
 /** Where the page was scrolled to, each time. */
@@ -104,17 +121,36 @@ Object.assign(globalThis, {
     },
     body,
   },
-  Node: class {},
+  Node,
   MutationObserver: class {
+    fn: () => void;
     constructor(fn: () => void) {
-      observed = fn;
+      this.fn = fn;
     }
-    observe() {}
+    observe() {
+      observers.add(this.fn);
+    }
     disconnect() {
-      observed = null;
+      observers.delete(this.fn);
     }
   },
 });
+
+/** A screen's parts that load what they show: „…loading“ until it's in (a GET answered, its file come). */
+class Parts extends Node {
+  text: string;
+  loading = true;
+  constructor(text: string) {
+    super();
+    this.text = text;
+  }
+  querySelector(q: string) {
+    return q === ".loading" && this.loading ? {} : null;
+  }
+}
+/** The slow page's parts, and its answer from the server, kept back until the test gives it. */
+let slow = new Parts("");
+let answer = () => {};
 
 const router = await import("./router.ts");
 
@@ -131,6 +167,24 @@ router.start(
     { path: /^\/friends$/, view: page("Приятели") },
     { path: /^\/settings$/, view: page("Настройки") },
     { path: /^\/r\/([0-9]+)$/, view: page("room") },
+    // A page that asks the server for what it shows, and draws its wait meanwhile.
+    {
+      path: /^\/ranks$/,
+      view: () => {
+        drawn.push("Класации");
+        slow = new Parts("Класации");
+        const parts = slow;
+        router.waitFor(
+          new Promise<void>((done) => {
+            answer = () => {
+              parts.loading = false;
+              done();
+            };
+          }),
+        );
+        return parts as unknown as string; // a node, as the page's are
+      },
+    },
     // A screen that sends the player on as it's drawn (an old link): the page sent to is what shows.
     {
       path: /^\/gone$/,
@@ -263,10 +317,10 @@ test("a screen whose heading comes after it loads gets the focus with it, unless
   heading = null;
   focused = body;
   router.go("/friends");
-  assert.ok(observed, "waits for the heading");
+  assert.ok(observers.size, "waits for the heading");
   let got = false;
   heading = { tabIndex: 0, isConnected: true, focus: () => (got = true) };
-  observed?.();
+  mutated();
   assert.ok(got);
   assert.equal(heading.tabIndex, -1);
   // The player tapped into something meanwhile: the focus stays there.
@@ -275,7 +329,7 @@ test("a screen whose heading comes after it loads gets the focus with it, unless
   focused = { isConnected: true };
   got = false;
   heading = { tabIndex: 0, isConnected: true, focus: () => (got = true) };
-  observed?.();
+  mutated();
   assert.equal(got, false);
 });
 
@@ -402,4 +456,48 @@ test("„Откажи“ on a game's count: back where it was come from; opened 
   assert.equal(location.pathname, "/play/science", "not Начало");
   assert.equal(router.entry().game, undefined);
   assert.deepEqual(drawn, [], "nothing drawn over it");
+});
+
+test("the next screen is made off the page: the one before stays, unscrolled, until what it asked for is in", async () => {
+  router.go("/friends");
+  assert.equal(showing, "Приятели");
+  scrolls.length = 0;
+  router.go("/ranks");
+  assert.equal(router.path(), "/ranks", "the place it's going to is marked at once");
+  assert.equal(showing, "Приятели", "the screen before stays");
+  assert.equal(router.arriving(), true);
+  assert.deepEqual(scrolls, [], "and stays where it was scrolled");
+  answer();
+  await tick();
+  assert.equal(showing, "Класации", "the next comes as soon as it's ready");
+  assert.deepEqual(scrolls, [0]);
+  assert.equal(router.arriving(), false);
+  assert.equal(busy, false);
+});
+
+test("a screen still not ready after a moment comes as it is, its waits shown at once, until it's whole", async () => {
+  router.go("/friends");
+  router.go("/ranks");
+  await new Promise((r) => setTimeout(r, 350));
+  assert.equal(showing, "Класации", "not the screen before for long");
+  assert.equal(busy, true, "its waits show at once");
+  assert.equal(router.arriving(), true, "and the line says it's on its way");
+  answer();
+  await tick();
+  assert.equal(busy, false);
+  assert.equal(router.arriving(), false);
+});
+
+test("another screen opened while one is on its way: that one never shows", async () => {
+  router.go("/friends");
+  router.go("/ranks");
+  const before = slow;
+  router.go("/settings");
+  assert.equal(showing, "Настройки");
+  assert.equal(router.arriving(), false);
+  before.loading = false;
+  answer();
+  mutated();
+  await tick();
+  assert.equal(showing, "Настройки");
 });

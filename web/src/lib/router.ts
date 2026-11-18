@@ -16,12 +16,21 @@
 // A screen whose heading comes after what it loads gets the focus with it (settle), as one drawn at once does. A sheet
 // over the page (a <dialog> on the body, outside any screen: a game's news, the name asked for) goes with the screen
 // it was over.
+//
+// Between two screens there's never an empty page. The next screen is made off the page while the one before stays,
+// and takes its place once it can draw what it's for (ready): its file in (kit.ts, later) and its first answers back
+// (waitFor: every GET it sends; lib/api.ts, asking), with no `.loading` left in it. A screen that draws what it kept
+// from its last visit (lib/api.ts, fresh) is ready at once. One still not ready after a moment (patience) comes as it
+// is, its waits drawn in the shape of what comes (ui.ts, loading), and a line along the top of the page says it's on
+// its way (arriving) until it's whole. A screen's file loads before it's opened: those of the four places once the first
+// screen is drawn and the browser is idle, any other's as a link to it is pointed at or pressed (prefetch).
 
-import { type Child, effect, mount, signal } from "./dom.ts";
+import { type Child, effect, scope, signal, toNode } from "./dom.ts";
 
 export interface Route {
   path: RegExp;
-  view: (params: string[]) => Child;
+  /** The screen; `prefetch`, if it has one, loads its file before it's opened. */
+  view: ((params: string[]) => Child) & { prefetch?: () => void };
 }
 
 /** What the app keeps in an entry of the tab's history. */
@@ -105,6 +114,16 @@ export function start(target: Element, list: Route[], notFound: () => Child): vo
     const way = a.hasAttribute("data-back") ? () => leave(to) : () => go(to);
     if (!leaving?.(way)) way();
   });
+  // A link pointed at, pressed or reached by the keyboard: its screen's file is on its way before the click.
+  for (const type of ["pointerdown", "mouseover", "focusin"])
+    document.addEventListener(
+      type,
+      (e) => {
+        const a = (e.target as Element).closest?.("a");
+        if (a && a.origin === location.origin) prefetch(a.pathname);
+      },
+      { passive: true },
+    );
   // How far down the page is, kept in its entry as it scrolls (a moment after it stops: a browser allows only so many
   // writes to the history).
   let still = 0;
@@ -113,17 +132,22 @@ export function start(target: Element, list: Route[], notFound: () => Child): vo
     () => {
       clearTimeout(still);
       still = window.setTimeout(() => {
-        if (!restoring) mark({ y: Math.round(scrollY) });
+        // The page scrolled under a screen on its way is the one before's: not this entry's.
+        if (!restoring && !offPage()) mark({ y: Math.round(scrollY) });
       }, 200);
     },
     { passive: true },
   );
-  render(false, true);
-  restore(entry().y);
+  render(entry().y ?? 0, true);
 }
 
 /** Whether a path is a screen of the app's (else a page of the server's own: /privacy, /mail/off). */
 const routed = (pathname: string): boolean => routes.some((r) => r.path.test(pathname));
+
+/** Loads the file of a path's screen, if it has one of its own and it isn't in yet (a link to it pointed at). */
+export function prefetch(pathname: string): void {
+  routes.find((r) => r.path.test(pathname))?.view.prefetch?.();
+}
 
 /** Opens a link to the game that came from outside the page (a notification tapped, a link opened in the app) as a tap
  * on a link would: a game under way asks first; a page of the server's own loads as a page. */
@@ -188,8 +212,7 @@ function popped(): void {
 /** A page come to by back or forward: drawn again where it was scrolled to. */
 function arrive(): void {
   tapped = false;
-  render(false);
-  restore(entry().y);
+  render(entry().y ?? 0);
 }
 
 /** Moves `by` entries through the history, doing `then` once there (not drawing the page unless `then` does). */
@@ -245,12 +268,13 @@ function open(to: string, replace: boolean, tap: boolean, under = false): void {
   const here_ = here();
   if (replace) history.replaceState({ i: at, from: s.from }, "", to);
   else if (to !== here_) {
-    if (!under) mark({ y: Math.round(scrollY) });
+    // (Not while a screen is on its way: the page scrolled is the one before's, not this entry's.)
+    if (!under && !offPage()) mark({ y: Math.round(scrollY) });
     at += 1;
     history.pushState({ i: at, from: here_ }, "", to);
   }
   tapped = tap;
-  render(true);
+  render(0);
 }
 
 /** Goes to `to` the way back: back in the history if it's the page before, else opening it in place of this one (a
@@ -337,8 +361,9 @@ export function holdWhile(playing: () => boolean): void {
 /** Whether a screen is being drawn now (render). */
 let drawing = false;
 
-/** Draws the screen of the page shown (`first`: as the page loads). */
-function render(scrollTop: boolean, first = false): void {
+/** Draws the screen of the page shown, scrolled to `y` (`first`: as the page loads): made off the page while the screen
+ * before stays, it takes its place once it's ready, or after a moment (patience) as it is. */
+function render(y: number, first = false): void {
   stopRestoring(); // the place the screen before was put back at isn't this one's
   if (!first && anew()) {
     // The page fallen behind: this screen comes with the page loaded anew, as it was come to.
@@ -355,16 +380,125 @@ function render(scrollTop: boolean, first = false): void {
       break;
     }
   }
-  disposeView?.();
+  drop();
   for (const sheet of document.querySelectorAll?.<HTMLDialogElement>("dialog[open]") ?? []) sheet.close();
+  const c: Coming = { node: null as unknown as Node, dispose: () => {}, y, asked: 0, shown: false, seen: null };
+  next = c;
   drawing = true;
   try {
-    disposeView = mount(root, view);
+    [c.node, c.dispose] = scope(() => toNode(view()));
+  } catch (err) {
+    next = null;
+    throw err;
   } finally {
     drawing = false;
   }
-  if (scrollTop) scrollTo(0, 0);
+  if (first || ready(c)) {
+    show(c);
+    return;
+  }
+  arriving.set(true);
+  c.timer = setTimeout(() => show(c), patience);
+  c.seen = new MutationObserver(() => check(c));
+  c.seen.observe(c.node, { childList: true, subtree: true });
+}
+
+/** How long the screen before stays while the next gets ready (ms): past it, the next comes as it is, its waits drawn. */
+const patience = 300;
+
+/** How long a screen come before it was ready is waited for to be whole (ms): past it, it's left as it is. */
+const longest = 10_000;
+
+/** A screen on its way: its parts (off the page until it's shown), what undoes it, where it's to be scrolled to, how
+ * many of its answers are still out, whether it's shown, and its timer and watch. */
+interface Coming {
+  node: Node;
+  dispose: () => void;
+  y: number;
+  asked: number;
+  shown: boolean;
+  timer?: ReturnType<typeof setTimeout>;
+  seen: MutationObserver | null;
+}
+
+/** The screen on its way, until it's whole. */
+let next: Coming | null = null;
+
+/** Whether a screen is being made off the page, the one before still shown. */
+const offPage = (): boolean => next !== null && !next.shown;
+
+/** Whether a screen is on its way and not whole yet: the line along the top of the page (app.ts). */
+export const arriving = signal(false);
+
+/** Has the screen on its way wait for this answer (a GET it sent: lib/api.ts, asking; its file: kit.ts, later). */
+export function waitFor(answer: Promise<unknown>): void {
+  const c = next;
+  if (!c) return;
+  c.asked++;
+  const back = () => {
+    c.asked--;
+    // Once what it was waited for has drawn what it brought: the answer's own handlers come first.
+    queueMicrotask(() => check(c));
+  };
+  answer.then(back, back);
+}
+
+/** Whether a screen can show what it's for: none of its answers out, and nothing of it still loading. */
+function ready(c: Coming): boolean {
+  return c.asked === 0 && !((c.shown ? root : c.node) as ParentNode).querySelector?.(".loading");
+}
+
+function check(c: Coming): void {
+  if (next !== c || !ready(c)) return;
+  if (c.shown) whole(c);
+  else show(c);
+}
+
+/** Puts the screen on its way in place of the one before, scrolled where it goes; watched until it's whole. */
+function show(c: Coming): void {
+  clearTimeout(c.timer);
+  c.seen?.disconnect();
+  c.seen = null;
+  disposeView?.();
+  disposeView = c.dispose;
+  root.replaceChildren(c.node);
+  c.shown = true;
+  restore(c.y);
   settle();
+  if (ready(c)) {
+    whole(c);
+    return;
+  }
+  // Its waits show at once (app.css: [aria-busy]), and the line says it's on its way.
+  arriving.set(true);
+  root.setAttribute("aria-busy", "true");
+  busy = true;
+  c.seen = new MutationObserver(() => check(c));
+  c.seen.observe(root, { childList: true, subtree: true });
+  c.timer = setTimeout(() => whole(c), longest);
+}
+
+/** Whether the screen shown came before it was ready, and isn't whole yet (aria-busy). */
+let busy = false;
+
+/** The screen on its way is whole (or waited for long enough): no more watching. */
+function whole(c: Coming): void {
+  clearTimeout(c.timer);
+  c.seen?.disconnect();
+  if (next !== c) return;
+  next = null;
+  arriving.set(false);
+  if (busy) root.removeAttribute("aria-busy");
+  busy = false;
+}
+
+/** Gives up the screen on its way for another: undone if it never showed; shown, it's the screen shown now, undone
+ * when the next one takes its place. */
+function drop(): void {
+  const c = next;
+  if (!c) return;
+  if (!c.shown) c.dispose();
+  whole(c);
 }
 
 /** Stops waiting for the heading of the screen before (settle). */

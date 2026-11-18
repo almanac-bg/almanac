@@ -276,7 +276,7 @@ export function append(parent: Node, children: Child[]): void {
   for (const child of children) parent.appendChild(toNode(child));
 }
 
-function toNode(child: Child): Node {
+export function toNode(child: Child): Node {
   if (child == null || child === false) return document.createTextNode("");
   if (child instanceof Node) return child;
   if (Array.isArray(child)) {

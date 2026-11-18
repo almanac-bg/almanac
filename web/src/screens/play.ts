@@ -11,24 +11,26 @@ import { news } from "../game/news.ts";
 import { challengeButton, challengeText, summary } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting, startScreen } from "../game/run.ts";
 import type { State } from "../game/types.ts";
-import { api, errorText } from "../lib/api.ts";
+import { api, errorText, fresh, last } from "../lib/api.ts";
 import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { backOut, byTap, entry, hold, mark, title } from "../lib/router.ts";
 import { issueWords } from "../lib/words.ts";
 import { bulgaria, type Category, categories, player, user } from "../state.ts";
-import { meter, questions, stakeLine, toneOf, topicMark } from "../ui.ts";
+import { loading, meter, questions, stakeLine, toneOf, topicMark } from "../ui.ts";
 import { sendChallenge } from "./challenge.ts";
 import { missing } from "./missing.ts";
-import { loadStats, type Stats } from "./stats.ts";
+import { keptStats, loadStats, type Stats } from "./stats.ts";
 
 /** The topics as tiles, each with how well the player knows it: Минали броеве first (`past`: the newest issue the
  * player hasn't played), and the second chance right after it while questions wait for one (at the end of the list it
  * went unseen); „България“ across them after the topics (no mastery of its own: its answers count in their own
  * topics). A game left half-way says so on its tile, where it goes on from. */
 export function topics(past?: PastNext | null): Child {
-  const stats = signal<Stats | null>(null);
-  const waiting = signal(0);
-  const left = signal<LeftRun[]>([]);
+  const stats = signal<Stats | null>(keptStats());
+  // What was drawn last, at once (lib/api.ts, last), while the server is asked again.
+  const kept = last<Mistakes>("/api/mistakes");
+  const waiting = signal(kept && kept.waiting >= kept.from ? kept.waiting : 0);
+  const left = signal<LeftRun[]>(last<{ runs: LeftRun[] }>("/api/runs/left")?.runs ?? []);
   if (user.peek()) {
     loadStats().then(stats.set, () => {});
     loadMistakes().then(
@@ -126,7 +128,7 @@ export interface Mistakes {
   coming?: { n: number; first: number; last: number };
 }
 
-export const loadMistakes = () => api<Mistakes>("GET", "/api/mistakes");
+export const loadMistakes = () => fresh<Mistakes>("/api/mistakes");
 
 /** The way into a second chance: the questions the player got wrong, asked again (/mistakes). */
 export function secondChance(waiting: number, left: Child = null): Child {
@@ -247,7 +249,7 @@ const othersShown = 3;
 /** Under a topic's result, a way to another, a tap away (Начало's tiles are a scroll from there): the ones the player
  * has played least first, so that the game goes round what they know; under a game of all of them, the topics. */
 function otherTopics(current: string): Child {
-  const stats = signal<Stats | null>(null);
+  const stats = signal<Stats | null>(keptStats());
   loadStats().then(stats.set, () => {});
   return () => {
     const answers = (id: string) => stats()?.mastery.find((m) => m.category === id)?.answers ?? 0;
@@ -306,7 +308,7 @@ export interface LeftRun {
 /** The games the player left unfinished today (none for one who hasn't played). */
 export async function loadLeft(): Promise<LeftRun[]> {
   if (!user.peek()) return [];
-  return (await api<{ runs: LeftRun[] }>("GET", "/api/runs/left")).runs;
+  return (await fresh<{ runs: LeftRun[] }>("/api/runs/left")).runs;
 }
 
 /** A run of the player's own, as its screen plays it: what it's called and is (`name`, `lead`), how it starts
@@ -328,7 +330,7 @@ interface Run {
  * finished here shows its result again; one whose question this tab was showing goes straight back to it, its time
  * running (as one opened by a tap does). */
 export function run(r: Run): Child {
-  const screen = slot(() => h("p", { class: "muted" }, "…"));
+  const screen = slot(() => loading("title", "card"));
   // What „Откажи“ on the count comes back to in a game opened from outside (its own entry held over Начало): the
   // screen's start, in place (router.ts, backOut).
   let startHere = async () => {};

@@ -10,6 +10,7 @@ import type { League } from "./league.ts";
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
 let {
+  loading,
   leagueEmblem,
   shareButton,
   count,
@@ -131,6 +132,7 @@ function slides(y: Year): Child[] {
 
 export function year(kit: Kit, [which = ""]: string[]) {
   ({
+    loading,
     leagueEmblem,
     shareButton,
     count,
@@ -160,7 +162,7 @@ export function year(kit: Kit, [which = ""]: string[]) {
     if (!user()) return h("p", { class: "muted" }, "Изиграй първите си въпроси и годината ти ще се събира тук.");
     if (error()) return failure(error(), load, ["/me", "Към Профил"]);
     const y = data();
-    if (!y) return h("p", { class: "muted" }, "…");
+    if (!y) return loading("card", "rows");
     const all = slides(y);
     const i = Math.min(at(), all.length - 1);
     const last = i === all.length - 1;

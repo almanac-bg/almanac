@@ -1,7 +1,7 @@
 // Talking to the server, against a fetch stood in for: what an answer becomes, and what is sent again.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ApiError, api, errorText, hearing, passing, serverNow, tries } from "./api.ts";
+import { ApiError, api, asking, errorText, forget, fresh, hearing, last, passing, serverNow, tries } from "./api.ts";
 
 // The page the reports name (lib/errors.ts sends none without one).
 (globalThis as { location?: unknown }).location = { pathname: "/" };
@@ -134,4 +134,59 @@ test("a live answer is sent again while it doesn't get through and its question 
     { code: "offline" },
   );
   assert.equal(asked.length, 2);
+});
+
+test("a place opened again draws its last answer at once: the same answer again is the same value, and a change forgets", async (t) => {
+  forget();
+  t.mock.timers.enable({ apis: ["Date"], now: 1_000_000 });
+  const later = () => t.mock.timers.tick(5000); // past the moment an answer is as fresh as the server's
+  const heard: Promise<unknown>[] = [];
+  asking.push((p) => heard.push(p));
+  try {
+    serve(json(200, { friends: 1 }));
+    assert.equal(last("/api/friends"), undefined, "nothing kept before the first answer");
+    const first = await api("GET", "/api/friends");
+    assert.equal(heard.length, 1, "a screen opening waits for a GET");
+    assert.equal(last("/api/friends"), first);
+    // Asked again at once: the answer just given, not asked for again.
+    const asked = serve(json(200, { friends: 1 }), json(200, { friends: 2 }), json(200, {}));
+    assert.equal(await fresh("/api/friends"), first);
+    assert.deepEqual(asked, []);
+    // Opened again later: drawn from what's kept, and not waited for; nothing new, the very same value.
+    later();
+    assert.equal(await fresh("/api/friends"), first);
+    assert.equal(heard.length, 1);
+    // Something new: the new answer, kept in its place.
+    later();
+    const second = await fresh("/api/friends");
+    assert.deepEqual(second, { friends: 2 });
+    assert.equal(last("/api/friends"), second);
+    // A change of the player's (a POST): nothing kept is drawn again.
+    await api("POST", "/api/friends/requests/1/accept");
+    assert.equal(last("/api/friends"), undefined);
+  } finally {
+    asking.pop();
+  }
+});
+
+test("an answer asked for before a change isn't kept", async () => {
+  forget();
+  let release = () => {};
+  globalThis.fetch = (async (_: string, init: RequestInit) => {
+    if (init.method === "GET") await new Promise<void>((r) => (release = r));
+    return json(200, { n: 1 });
+  }) as typeof fetch;
+  const asked = api("GET", "/api/me/progress");
+  await api("PATCH", "/api/me", { name: "Мария" });
+  release();
+  await asked;
+  assert.equal(last("/api/me/progress"), undefined);
+});
+
+test("the same GET asked for again while it's on its way is one request, one answer", async () => {
+  forget();
+  const asked = serve(json(200, { n: 1 }), json(200, { n: 2 }));
+  const [a, b] = await Promise.all([api("GET", "/api/goals"), fresh("/api/goals")]);
+  assert.equal(a, b);
+  assert.deepEqual(asked, ["GET /api/goals"]);
 });
