@@ -104,9 +104,10 @@ func roomSlots(n int, mix Mix) []slot {
 }
 
 // DrawRoom draws a room's game: n questions of a topic ("" for all) in a mix, never one barred (the day's, those due
-// for review: DayQuestions; and those the room has dealt already), a number an estimate where one is left (wishes). A
-// mix that leaves out a difficulty never deals it, even if that makes the game shorter; the types give way first.
-func DrawRoom(b *bank.Bank, category string, n int, mix Mix, barred map[string]bool, r *rand.Rand) []Pick {
+// for review: DayQuestions; and those the room has dealt already), those none of its players has seen first, then
+// those the fewest have (seen: RoomPast, seenAmong), a number an estimate where one is left (wishes). A mix that
+// leaves out a difficulty never deals it, even if that makes the game shorter; the types give way first.
+func DrawRoom(b *bank.Bank, category string, n int, mix Mix, barred map[string]bool, seen map[string]int, r *rand.Rand) []Pick {
 	pool := b.Live(category, "")
 	switch mix {
 	case MixEasy:
@@ -116,16 +117,28 @@ func DrawRoom(b *bank.Bank, category string, n int, mix Mix, barred map[string]b
 	}
 	taken := map[string]bool{}
 	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] && !barred[q.Base().ID] }
-	fresh := func(bank.Question) bool { return true }
 	var picks []Pick
 	for _, s := range newKind(roomSlots(n, mix), r) {
-		if q := choose(pool, s, allowed, fresh, wishes(s), r); q != nil {
+		if q := choose(pool, s, allowed, seenCount(seen), wishes(s), r); q != nil {
 			taken[q.Base().ID] = true
 			// A room deals its game as it starts, and keeps it: the version too.
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64(), V: bank.Version(q)})
 		}
 	}
 	return picks
+}
+
+// RoomPast is what a room's next game is drawn by (DrawRoom), read from the database before the room deals it: the
+// questions no room deals now (barred: DayQuestions), and how stale each question is to its players, those in it as
+// the game starts (seen: seenAmong: how many of them have answered it, in any game; a past issue of theirs holds it).
+func (g *Game) RoomPast(ctx context.Context, players []int64) (barred map[string]bool, seen map[string]int, err error) {
+	if barred, err = g.DayQuestions(ctx); err != nil {
+		return nil, nil, err
+	}
+	if seen, err = g.seenAmong(ctx, players); err != nil {
+		return nil, nil, err
+	}
+	return barred, seen, nil
 }
 
 // RoomPlay is one player's game in a room, as the room kept it: the game's questions, the points it gave them (the

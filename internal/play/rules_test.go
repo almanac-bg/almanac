@@ -70,7 +70,7 @@ func TestDayQuestionsKeptOut(t *testing.T) {
 		if n := overlap(l.Picks, today); n != 0 {
 			t.Fatalf("a duel dealt %d of today's questions", n)
 		}
-		picks, err := w.g.DrawRoyal(ctx)
+		picks, err := w.g.DrawRoyal(ctx, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

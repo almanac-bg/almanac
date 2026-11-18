@@ -137,7 +137,9 @@ func royalSlots() []slot {
 	return slots
 }
 
-func drawRoyal(b *bank.Bank, seen, barred map[string]bool, r *mrand.Rand) []Pick {
+// drawRoyal draws an evening's questions: those none of its players has seen first, then those the fewest have (seen:
+// seenAmong), and of as many, one no evening of the last month had (evenings) before one that had.
+func drawRoyal(b *bank.Bank, seen map[string]int, evenings, barred map[string]bool, r *mrand.Rand) []Pick {
 	var pool []bank.Question
 	for _, q := range b.Live("", "") {
 		if t := q.Base().Type; (t == "choice" || t == "truefalse") && !barred[q.Base().ID] {
@@ -146,10 +148,10 @@ func drawRoyal(b *bank.Bank, seen, barred map[string]bool, r *mrand.Rand) []Pick
 	}
 	taken := map[string]bool{}
 	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] }
-	fresh := func(q bank.Question) bool { return !seen[q.Base().ID] }
+	stale := func(q bank.Question) int { return 2*seen[q.Base().ID] + b2i(evenings[q.Base().ID]) }
 	var picks []Pick
 	for _, s := range royalSlots() {
-		if q := choose(pool, s, allowed, fresh, nil, r); q != nil {
+		if q := choose(pool, s, allowed, stale, nil, r); q != nil {
 			taken[q.Base().ID] = true
 			// The version too, from the start: the evening deals its questions once, and its every run plays them so.
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64(), V: bank.Version(q)})
@@ -158,16 +160,22 @@ func drawRoyal(b *bank.Bank, seen, barred map[string]bool, r *mrand.Rand) []Pick
 	return picks
 }
 
-// DrawRoyal draws an evening's questions, leaving out (while there are others) those of the last month's evenings,
-// and the day's and those due for review (DayQuestions).
-func (g *Game) DrawRoyal(ctx context.Context) ([]Pick, error) {
+// DrawRoyal draws an evening's questions for those who'll play them (players): those none of them has seen first,
+// then those the fewest have, and of as many, one none of the last month's evenings played before one that did (one
+// drawn for a lobby that never began wasn't); never the day's nor those due for review (DayQuestions). As its lobby
+// opens, the evening is drawn for its first player; as its games begin, again for everyone in it (DealRoyal).
+func (g *Game) DrawRoyal(ctx context.Context, players []int64) ([]Pick, error) {
 	barred, err := g.DayQuestions(ctx)
 	if err != nil {
 		return nil, err
 	}
-	seen := map[string]bool{}
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT DISTINCT questions FROM royals WHERE created_at > ?`,
-		store.Ms(g.Now().Add(-31*24*time.Hour)))
+	seen, err := g.seenAmong(ctx, players)
+	if err != nil {
+		return nil, err
+	}
+	evenings := map[string]bool{}
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT DISTINCT questions FROM royals WHERE created_at > ? AND phase <> ?`,
+		store.Ms(g.Now().Add(-31*24*time.Hour)), RoyalLobby)
 	if err != nil {
 		return nil, err
 	}
@@ -180,16 +188,49 @@ func (g *Game) DrawRoyal(ctx context.Context) ([]Pick, error) {
 		}
 		_ = json.Unmarshal([]byte(s), &picks)
 		for _, p := range picks {
-			seen[p.ID] = true
+			evenings[p.ID] = true
 		}
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	picks := drawRoyal(g.Bank(), seen, barred, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+	picks := drawRoyal(g.Bank(), seen, evenings, barred, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 	if len(picks) < RoyalLength {
 		return nil, ErrNoQuestion
+	}
+	return picks, nil
+}
+
+// DealRoyal draws an evening's questions again as its games begin, for everyone in its lobbies (players: DrawRoyal),
+// and keeps them as its tournaments' (royals, every one of the evening still in its lobby): drawn as the lobby opened,
+// they were drawn for its first player alone, and nobody has seen them since. Once one of its tournaments has dealt
+// them (a start tried before gave someone a run of them), they stay as they are, and they're what it returns.
+func (g *Game) DealRoyal(ctx context.Context, royals, players []int64) ([]Pick, error) {
+	picks, err := g.DrawRoyal(ctx, players)
+	if err != nil {
+		return nil, err
+	}
+	ids, _ := json.Marshal(royals)
+	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		var dealt string
+		err := tx.QueryRow(`SELECT r.questions FROM royals r WHERE r.id IN (SELECT value FROM json_each(?1))
+			AND EXISTS (SELECT 1 FROM royal_players p WHERE p.royal_id = r.id AND p.run_id IS NOT NULL)
+			ORDER BY r.id LIMIT 1`, string(ids)).Scan(&dealt)
+		if err == nil {
+			picks = nil
+			return json.Unmarshal([]byte(dealt), &picks)
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		data, _ := json.Marshal(picks)
+		_, err = tx.Exec(`UPDATE royals SET questions = ?1 WHERE id IN (SELECT value FROM json_each(?2)) AND phase = ?3`,
+			string(data), string(ids), RoyalLobby)
+		return err
+	})
+	if err != nil {
+		return nil, err
 	}
 	return picks, nil
 }

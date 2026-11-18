@@ -53,7 +53,7 @@ func TestDrawRoom(t *testing.T) {
 	r := rand.New(rand.NewPCG(1, 2))
 	barred := map[string]bool{}
 	for _, mix := range []Mix{MixEasy, MixHard} {
-		picks := DrawRoom(w.b, "", 20, mix, barred, r)
+		picks := DrawRoom(w.b, "", 20, mix, barred, nil, r)
 		if len(picks) != 20 {
 			t.Fatalf("%s: %d questions", mix, len(picks))
 		}
@@ -70,7 +70,7 @@ func TestDrawRoom(t *testing.T) {
 	}
 	// A small topic runs out: the game is shorter, never easier than its mix.
 	for range 10 {
-		for _, p := range DrawRoom(w.b, "history", 20, MixHard, barred, r) {
+		for _, p := range DrawRoom(w.b, "history", 20, MixHard, barred, nil, r) {
 			q, _ := w.b.Get(p.ID)
 			if barred[p.ID] || q.Base().Difficulty == bank.Easy {
 				t.Fatalf("%s: dealt again, or easy", p.ID)
@@ -86,7 +86,7 @@ func TestRecordRoom(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	u, late := w.user(), w.user()
-	picks := DrawRoom(w.b, "", 10, MixMixed, nil, rand.New(rand.NewPCG(3, 4)))
+	picks := DrawRoom(w.b, "", 10, MixMixed, nil, nil, rand.New(rand.NewPCG(3, 4)))
 	right := func(n int) RoomAnswer {
 		q, _ := w.b.Get(picks[n].ID)
 		d := q.Deal(picks[n].Seed)
@@ -171,7 +171,7 @@ func TestRecordRoomOnce(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	u, v := w.user(), w.user()
-	picks := DrawRoom(w.b, "", 5, MixMixed, nil, rand.New(rand.NewPCG(5, 6)))
+	picks := DrawRoom(w.b, "", 5, MixMixed, nil, nil, rand.New(rand.NewPCG(5, 6)))
 	cut := RoomPlay{Game: "G1", Picks: picks[:1], Length: 5, Points: 100,
 		Answers: []RoomAnswer{{N: 0, Given: json.RawMessage(`{"pick":0}`), Shown: json.RawMessage(`{"pick":0}`), Score: 1,
 			Right: true, Points: 100, Ms: 3000, At: w.now}}}
@@ -237,8 +237,8 @@ func TestRoomAlone(t *testing.T) {
 		}
 		return m["games100"]
 	}
-	ten := DrawRoom(w.b, "", 10, MixEasy, nil, rand.New(rand.NewPCG(7, 8)))
-	five := DrawRoom(w.b, "", 5, MixEasy, nil, rand.New(rand.NewPCG(9, 10)))
+	ten := DrawRoom(w.b, "", 10, MixEasy, nil, nil, rand.New(rand.NewPCG(7, 8)))
+	five := DrawRoom(w.b, "", 5, MixEasy, nil, nil, rand.New(rand.NewPCG(9, 10)))
 
 	alone := w.user()
 	run, err := w.g.RecordRoom(ctx, alone, RoomPlay{Game: "A", Picks: ten, Length: 10, Answers: all(ten), Players: 1})

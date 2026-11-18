@@ -161,8 +161,9 @@ type Hub struct {
 	bank    func() *bank.Bank
 	// Crowd, if set, is how players have answered a question, this version of it (shown with its answer).
 	Crowd func(q bank.Question) *bank.Crowd
-	// Barred, if set, are the questions no room may deal now (the day's: play.Game.DayQuestions).
-	Barred func(context.Context) (map[string]bool, error)
+	// Past, if set, is what a room's next game is drawn by, for its players (play.Game.RoomPast): the questions no
+	// room may deal now (the day's), and how many of the players have seen each question (those none has come first).
+	Past func(ctx context.Context, players []int64) (barred map[string]bool, seen map[string]int, err error)
 	// Record, if set, keeps a player's game in a room once it's over, and says as which run (play.Game.RecordRoom).
 	// The same game (RoomPlay.Game) kept again is kept once: the run it was kept as.
 	Record func(ctx context.Context, userID int64, p play.RoomPlay) (int64, error)
@@ -1169,31 +1170,38 @@ func (r *Room) mayLead(id int64) bool {
 }
 
 // Start begins a game: new questions, everyone from nought. From the lobby, or again after the end; in a room led,
-// with nobody's phone in it too (everyone answers aloud). The day's questions (Hub.Barred, from the database) are read with no lock held, between a first look
-// and a second: nothing that reads the room, or the hub, waits on the database.
+// with nobody's phone in it too (everyone answers aloud). What the game is drawn by (Hub.Past, from the database: the
+// day's questions, and those its players have seen) is read with no lock held, between a first look and a second:
+// nothing that reads the room, or the hub, waits on the database.
 func (r *Room) Start(by int64) error {
 	r.mu.Lock()
 	err := r.startable(by)
+	players := make([]int64, 0, len(r.players))
+	for _, m := range r.players {
+		players = append(players, m.ID)
+	}
 	r.mu.Unlock()
 	if err != nil {
 		return err
 	}
 	barred := map[string]bool{}
-	if r.hub.Barred != nil {
+	var seen map[string]int
+	if r.hub.Past != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		day, err := r.hub.Barred(ctx)
+		day, s, err := r.hub.Past(ctx, players)
 		cancel()
 		if err != nil {
 			return err
 		}
 		maps.Copy(barred, day)
+		seen = s
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if err := r.startable(by); err != nil { // as it is now: another may have started it meanwhile
 		return err
 	}
-	return r.start(barred)
+	return r.start(barred, seen)
 }
 
 // startable says why by can't start a game now, if they can't. Called with the lock held.
@@ -1305,11 +1313,11 @@ func (r *Room) finish() {
 }
 
 // start deals a new game: the room's settings, none of barred (the day's questions), none of the room's earlier
-// games'. Called with the lock held.
-func (r *Room) start(barred map[string]bool) error {
+// games', those none of its players has seen first (seen: how many of them have each). Called with the lock held.
+func (r *Room) start(barred map[string]bool, seen map[string]int) error {
 	b := r.bank()
 	maps.Copy(barred, r.used)
-	picks := play.DrawRoom(b, r.Category, r.Length, r.Mix, barred, mrand.New(mrand.NewPCG(mrand.Uint64(), mrand.Uint64())))
+	picks := play.DrawRoom(b, r.Category, r.Length, r.Mix, barred, seen, mrand.New(mrand.NewPCG(mrand.Uint64(), mrand.Uint64())))
 	var dealt []bank.Dealt
 	for _, p := range picks {
 		q, ok := b.Get(p.ID)

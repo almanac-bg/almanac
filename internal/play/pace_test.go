@@ -16,7 +16,7 @@ func (w *world) evening(day time.Time, players []int64) {
 	if len(players) == 0 {
 		return
 	}
-	picks, err := w.g.DrawRoyal(ctx)
+	picks, err := w.g.DrawRoyal(ctx, nil)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -149,7 +149,7 @@ func TestStartRoyalAgain(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	a, b := w.user(), w.user()
-	picks, err := w.g.DrawRoyal(ctx)
+	picks, err := w.g.DrawRoyal(ctx, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
