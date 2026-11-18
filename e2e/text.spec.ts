@@ -104,7 +104,7 @@ test.describe("twice the text on a 320px phone", () => {
     await fits(page, "the day's result");
     for (const path of ["/", "/ranks", "/me", "/rewards", "/wardrobe", "/friends", "/settings", "/room", "/duel"]) {
       await page.goto(path);
-      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+      await expect(page.locator("#main h1, #main h2").first()).toBeVisible();
       await fits(page, path);
     }
   });
@@ -180,7 +180,7 @@ test.describe("a finger's room", () => {
     test.setTimeout(90_000);
     for (const path of ["/", "/settings", "/me", "/ranks", "/room", "/wardrobe", "/friends"]) {
       await page.goto(path);
-      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+      await expect(page.locator("#main h1, #main h2").first()).toBeVisible();
       expect(await smallTargets(page), path).toEqual([]);
     }
   });

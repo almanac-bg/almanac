@@ -486,7 +486,7 @@
   }
 
   .almanac-n {
-    font: 900 3.25rem / 1 var(--font-numeral);
+    font: 900 calc(26px + 1.625rem) / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
   }
 
@@ -957,7 +957,7 @@
   }
 
   .royal-when {
-    font: 900 4.5rem / 0.9 var(--font-numeral);
+    font: 900 calc(36px + 2.25rem) / 0.9 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
   }
@@ -1900,7 +1900,7 @@
   }
 
   .stat-value {
-    font: 900 3.25rem / 0.95 var(--font-numeral);
+    font: 900 calc(26px + 1.625rem) / 0.95 var(--font-numeral);
     letter-spacing: -0.01em;
     font-variant-numeric: tabular-nums;
   }
@@ -1955,7 +1955,7 @@
 
   .streak-num {
     color: var(--gold-display);
-    font: 900 3.25rem / 0.9 var(--font-numeral);
+    font: 900 calc(26px + 1.625rem) / 0.9 var(--font-numeral);
     font-variant-numeric: tabular-nums;
   }
 
@@ -3573,7 +3573,7 @@
   }
 
   .ready-n {
-    font: 900 4.5rem / 1 var(--font-numeral);
+    font: 900 calc(36px + 2.25rem) / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
   }
 
@@ -3621,7 +3621,7 @@
 
   .challenge-points {
     color: var(--gold-display);
-    font-size: 3rem;
+    font-size: calc(24px + 1.5rem);
     font-weight: 900;
     line-height: 1;
   }
@@ -3668,7 +3668,7 @@
   .live-count {
     margin: 0;
     color: var(--rose-ink);
-    font: 900 7.5rem / 1 var(--font-numeral);
+    font: 900 calc(60px + 3.75rem) / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     text-align: center;
   }
@@ -3721,7 +3721,7 @@
     }
 
     .live-intro .ready-n {
-      font-size: 3.25rem;
+      font-size: calc(26px + 1.625rem);
     }
   }
 
@@ -3838,7 +3838,7 @@
 
   .live-claim-actions {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
     gap: var(--space-2);
   }
 
@@ -4320,8 +4320,8 @@
 
   .day-done-n {
     color: var(--text);
-    font-size: 3.5rem;
-    line-height: 3rem;
+    font-size: calc(28px + 1.75rem);
+    line-height: 0.857;
     font-weight: 900;
   }
 
@@ -6264,7 +6264,7 @@
   }
 
   .code-big {
-    font: 900 3.5rem / 1 var(--font-numeral);
+    font: 900 calc(28px + 1.75rem) / 1 var(--font-numeral);
     letter-spacing: 0.08em;
     font-variant-numeric: tabular-nums;
   }
@@ -6353,7 +6353,7 @@
   @media (min-width: 64rem) {
     .royal-lobby .players {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 7.5rem), 1fr));
     }
 
     .royal-lobby .players li {
@@ -7535,6 +7535,11 @@
      picture beside its name. */
   .tight .topics {
     grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: auto;
+  }
+
+  .tight .topic {
+    min-height: 68px;
   }
 
   .tight .modes {
