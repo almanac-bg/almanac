@@ -98,6 +98,8 @@ export interface RoomView {
   locked?: boolean;
   /** Once the game is over and kept: this player's game as a run, whose news tells what it earned. */
   run?: number;
+  /** The secret in the room's link (/r/<code>#<key>): with it, someone new comes in during a game too. */
+  key?: string;
 }
 
 export interface Player {
@@ -169,7 +171,11 @@ export function room(kit: Kit, [code = ""]: string[]) {
   } = kit);
   title("Стая");
   const view = signal<RoomView | null>(null);
-  const trouble = signal<"" | "reconnecting" | "gone" | "full" | "removed" | "locked" | "busy">("");
+  const trouble = signal<"" | "reconnecting" | "gone" | "full" | "removed" | "locked" | "busy" | "started" | "moved">(
+    "",
+  );
+  // The room's key, from its link (after #): it takes someone new into a game under way.
+  const roomKey = location.hash.slice(1);
   // A player still with the name drawn for them chooses one first, for this room alone: a class or a pub can't tell
   // twenty animals apart, and a pupil's name stays in the room (never their name on the boards or their profile).
   const naming = signal<User | null>(null);
@@ -186,10 +192,11 @@ export function room(kit: Kit, [code = ""]: string[]) {
       trouble.set("");
       view.set(JSON.parse(e.data));
     };
-    // The room is gone (closed, or the server restarted), or the host sent this player out: no reconnecting.
+    // The room is gone, the host sent this player out, or this player opened it on another screen: no reconnecting.
     for (const [event, why] of [
       ["closed", "gone"],
       ["removed", "removed"],
+      ["moved", "moved"],
     ] as const)
       es.addEventListener(event, () => {
         es?.close();
@@ -202,17 +209,17 @@ export function room(kit: Kit, [code = ""]: string[]) {
   };
   // Why the room won't have this player, by the server's word for it.
   const refused = (err: unknown) => {
-    const why = { full: "full", removed: "removed", locked: "locked", too_many: "busy" } as const;
+    const why = { full: "full", removed: "removed", locked: "locked", too_many: "busy", started: "started" } as const;
     trouble.set(why[(err as ApiError).code as keyof typeof why] ?? "gone");
   };
   // In the room (again: the look as it is now; the name it had there, or the one chosen for it in this tab), then its
   // stream.
   const enter = (name = named(code) ?? "") => {
     if (life.aborted) return;
-    api("POST", `/api/rooms/${code}/join`, name ? { name } : undefined).then(connect, refused);
+    api("POST", `/api/rooms/${code}/join`, name ? { name, key: roomKey } : { key: roomKey }).then(connect, refused);
   };
   // A wrong code is said at once, before a name is asked or a player made for it.
-  api("GET", `/api/rooms/${code}`)
+  api("GET", `/api/rooms/${code}${roomKey ? `?key=${encodeURIComponent(roomKey)}` : ""}`)
     .then(() => player())
     .then((u) => (u.drawn && named(code) === null ? naming.set(u) : enter()))
     .catch(refused);
@@ -288,6 +295,30 @@ export function room(kit: Kit, [code = ""]: string[]) {
           )
         : null,
     () =>
+      trouble() === "started"
+        ? h(
+            "div",
+            { class: "stack" },
+            h("h1", null, "Играта вече започна"),
+            h(
+              "p",
+              { class: "lead" },
+              "По време на игра нови играчи влизат с връзката към стаята. Помоли за нея или опитай пак след края на играта.",
+            ),
+            h("button", { class: "btn primary big", type: "button", onclick: () => location.reload() }, "Опитай пак"),
+          )
+        : null,
+    () =>
+      trouble() === "moved"
+        ? h(
+            "div",
+            { class: "stack" },
+            h("h1", null, "Стаята е отворена на друг екран"),
+            h("p", { class: "lead" }, "Играеш от другия екран. Можеш да продължиш и тук."),
+            h("button", { class: "btn primary big", type: "button", onclick: () => location.reload() }, "Продължи тук"),
+          )
+        : null,
+    () =>
       trouble() === "busy"
         ? h(
             "div",
@@ -306,7 +337,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
       return u
         ? nameStep(
             code,
-            (name) => api("POST", `/api/rooms/${code}/join`, { name }),
+            (name) => api("POST", `/api/rooms/${code}/join`, { name, key: roomKey }),
             u.name,
             () => {
               naming.set(null);
@@ -464,7 +495,7 @@ function lobby(view: () => RoomView, code: string): Child {
       h("h1", null, "Стая ", h("span", { class: "code-big" }, spaced(code))),
       h("p", { class: "lead" }, "Дай кода на другите или им прати връзката."),
     ),
-    shareButton("Прати връзката", () => "Ела да играем заедно в АЛМАНАХ:", `${location.origin}/r/${code}`, false),
+    shareButton("Прати връзката", () => "Ела да играем заедно в АЛМАНАХ:", link(untracked(view), code), false),
     h(
       "section",
       { class: "card" },
@@ -481,6 +512,9 @@ function lobby(view: () => RoomView, code: string): Child {
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }
+
+/** The room's link: its code, and its key, which takes someone new into a game under way too. */
+export const link = (v: RoomView, code: string) => `${location.origin}/r/${code}${v.key ? `#${v.key}` : ""}`;
 
 /** The host's lock on the room: locked, nobody new comes in (a class, once it's all there), and whoever is in it
  * comes back as ever. Nothing for anyone else. */
@@ -572,18 +606,25 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
   if (!q) return null;
   if (first.n === 0) play("go"); // the game starts
   const locked = signal(!!q.given);
-  const sent = signal(!!q.given);
+  // The answer is in once the server says so: by its reply, or by the room (its view has it), should the reply be lost.
+  const replied = signal(false);
+  const sent = computed(() => replied() || (view().n === first.n && !!view().question?.given));
   const error = signal("");
   // An answer that doesn't get through (the line dropped, the server restarting) is sent again while the question is
-  // open: the room takes it once.
+  // open: the room takes it once, and a second time says it's in.
   const life = lifetime();
   const open = () => !life.aborted && view().phase === "question" && view().n === first.n;
   const send = async (a: Answer) => {
     locked.set(true);
+    error.set("");
     const e = await deliver(`/api/rooms/${code}/answer`, { n: first.n, answer: a }, () => untracked(open));
     if (life.aborted) return;
-    if (e) error.set(e.message);
-    else sent.set(true);
+    if (!e) replied.set(true);
+    else if (!untracked(sent)) {
+      error.set(e.message);
+      // An answer the question can't take may be given again, while there's time; a late one can't.
+      if (e.code !== "not_now" && untracked(open)) locked.set(false);
+    }
   };
   const asked = ask(q.view, send, locked);
   // More of the question shows as its time runs (the next clue): the server sends it when it's due.
@@ -616,7 +657,7 @@ function question(view: () => RoomView, code: string, first: RoomView): Child {
         `Отговориха ${done} от ${v.players.filter((p) => p.online || p.answered).length}.`,
       );
     },
-    () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    () => error() && !sent() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }
 

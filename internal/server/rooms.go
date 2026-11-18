@@ -8,7 +8,9 @@ package server
 // /24, so that the 65,536 /64s of one /48 don't each get a budget: review 2026-11-18, S3), and past a few an hour, no
 // code is looked up for them at all. The misses of everyone together are only counted: past roomMissesAll an hour
 // whoever runs the game hears of it, as many networks walking the codes at once would look; refusing everyone then
-// would let the walkers close every room to the players.
+// would let the walkers close every room to the players. And a code alone takes nobody new into a game under way:
+// that takes the room's link, whose key (room.Room.Key) no one can guess; a code that finds a game under way counts as
+// a miss too, so that walking the codes finds no game to come into.
 
 import (
 	"cmp"
@@ -31,8 +33,31 @@ import (
 
 var roomCode = regexp.MustCompile(`^[0-9]{6}$`)
 
-// errLocked is someone new at a room its host has locked.
-var errLocked = &apiError{http.StatusForbidden, "locked", "Стаята е заключена: нови играчи не могат да влязат."}
+// errLocked is someone new at a room its host has locked; errStarted, at a game under way, with the code alone.
+var (
+	errLocked  = &apiError{http.StatusForbidden, "locked", "Стаята е заключена: нови играчи не могат да влязат."}
+	errStarted = &apiError{http.StatusForbidden, "started",
+		"Играта вече започна. Нови играчи влизат с връзката към стаята или след края на играта."}
+)
+
+// roomLink is the room's link: its code, and its key after # (a browser never sends it, so that no log keeps it).
+func (s *Server) roomLink(rm *room.Room) string {
+	return s.cfg.PublicURL + "/r/" + rm.Code() + "#" + rm.Key()
+}
+
+// refused is why a room doesn't take someone (room.Room.Admits, Join), as a player is told it: a refusal of someone
+// new (a locked room, a game under way) counts as a code that missed (roomByCode).
+func (s *Server) refused(r *http.Request, userID int64, err error) error {
+	switch {
+	case errors.Is(err, room.ErrLocked):
+		s.missed(r, userID)
+		return errLocked
+	case errors.Is(err, room.ErrStarted):
+		s.missed(r, userID)
+		return errStarted
+	}
+	return err
+}
 
 // How many codes given in an hour may miss (no room open under them, or a locked one), for a player, for a network (a
 // school's, many players behind it) and for a site (a few such networks), before none is looked up: typos are a few,
@@ -125,20 +150,32 @@ func (s *Server) openRoom(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	return ok(w, map[string]string{"code": rm.Code(), "url": s.cfg.PublicURL + "/r/" + rm.Code()})
+	return ok(w, map[string]string{"code": rm.Code(), "url": s.roomLink(rm)})
 }
 
-// roomOpen says whether a room is open under a code, to anyone who asks (before a name is asked or a player made for
-// it): a wrong code is told at once. A code that misses counts against the address (roomByCode).
+// roomOpen says whether a room under a code would take whoever asks (before a name is asked or a player made for it,
+// so maybe nobody signed in yet), with the room's key if they have its link (?key=): a wrong code is told at once, and
+// so are a locked room and a game under way. A code that misses counts against the address (roomByCode).
 func (s *Server) roomOpen(w http.ResponseWriter, r *http.Request) error {
-	if _, err := s.roomByCode(r, 0); err != nil {
+	var id int64
+	if u, err := s.user(r); err != nil {
 		return err
+	} else if u != nil {
+		id = u.ID
+	}
+	rm, err := s.roomByCode(r, id)
+	if err != nil {
+		return err
+	}
+	if err := rm.Admits(id, r.URL.Query().Get("key")); err != nil {
+		return s.refused(r, id, err)
 	}
 	return ok(w, map[string]bool{"open": true})
 }
 
-// roomJoin is a player coming into a room by its code: once, and again on each return (their look as it is now).
-// Unless the host has locked it to anyone new: a locked room counts as a code that missed, for a stranger.
+// roomJoin is a player coming into a room by its code (and its key, from its link: {"key"}): once, and again on each
+// return (their look as it is now). Unless the host has locked it to anyone new, or a game is under way and they have
+// the code alone: either counts as a code that missed, for a stranger.
 //
 // A player may come in under a name for this room alone (`name`: a class's pupils, asked as they come in, by the
 // name their teacher knows them by): it's the room's, kept in it and shown only to who's in it, never the player's
@@ -151,6 +188,7 @@ func (s *Server) roomJoin(w http.ResponseWriter, r *http.Request) error {
 	}
 	var in struct {
 		Name string `json:"name"`
+		Key  string `json:"key"`
 	}
 	if r.ContentLength != 0 {
 		if err := readJSON(r, &in); err != nil {
@@ -172,14 +210,30 @@ func (s *Server) roomJoin(w http.ResponseWriter, r *http.Request) error {
 	}
 	p := s.roomPlayer(r.Context(), u.ID, u.Name)
 	p.Name, p.RoomName = cmp.Or(name, u.Name), name != ""
-	if err := rm.Join(p); err != nil {
-		if errors.Is(err, room.ErrLocked) {
-			s.missed(r, u.ID)
-			return errLocked
-		}
-		return err
+	if err := rm.Join(p, in.Key); err != nil {
+		return s.refused(r, u.ID, err)
 	}
 	return ok(w, map[string]bool{"ok": true})
+}
+
+// How many games may be started in an hour, by one player (who leads a room) and from a network and a site (a school,
+// many rooms in it): a game a minute, for anyone playing; so that starting and ending games at once, over and over,
+// earns no more than playing them (review 2026-11-18, S19).
+const (
+	roomStartsPlayer = 60
+	roomStartsNet    = 300
+	roomStartsSite   = 1000
+)
+
+// roomStart is who leads a room starting a game in it (room.Room.Start), within the starts an hour.
+func (s *Server) roomStart(w http.ResponseWriter, r *http.Request) error {
+	return s.roomAct(func(rm *room.Room, by int64) error {
+		if !s.limits.allow("roomstart:user:"+strconv.FormatInt(by, 10), roomStartsPlayer, time.Hour) ||
+			!s.allowFrom(r, "roomstart", roomStartsNet, roomStartsSite, time.Hour) {
+			return errTooMany
+		}
+		return rm.Start(by)
+	})(w, r)
 }
 
 // How many times a minute a room's stream may be opened: by a player (a screen or two, reconnecting when the line
@@ -194,7 +248,8 @@ const (
 
 // roomEvents streams a room to the screen of a player in it (roomJoin first), or of its host (Server-Sent Events):
 // the room as they see it, again after every change. The browser reconnects by itself if the line drops; past the
-// streams a minute (roomStreamsPlayer), it's told to wait a while before it does.
+// streams a minute (roomStreamsPlayer), or the screens a room holds (room.ErrBusy), it's told to wait a while before
+// it does. A screen closed for one more of the player's is told so (moved), and doesn't reconnect.
 func (s *Server) roomEvents(w http.ResponseWriter, r *http.Request) {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -205,16 +260,21 @@ func (s *Server) roomEvents(w http.ResponseWriter, r *http.Request) {
 	h.Set("Content-Type", "text/event-stream")
 	h.Set("Cache-Control", "no-store")
 	h.Set("X-Accel-Buffering", "no")
+	// The browser tries again by itself, after this long: its screen says it's reconnecting meanwhile.
+	later := func() { fmt.Fprintf(w, "retry: %d\n\n", 15_000+rand.N(15_000)) }
 	if !s.limits.allow("roomstream:user:"+strconv.FormatInt(u.ID, 10), roomStreamsPlayer, time.Minute) ||
 		!s.allowFrom(r, "roomstream", roomStreamsNet, roomStreamsSite, time.Minute) {
-		// The browser tries again by itself, after this long: its screen says it's reconnecting meanwhile.
-		fmt.Fprintf(w, "retry: %d\n\n", 15_000+rand.N(15_000))
+		later()
 		return
 	}
 	rm, err := s.roomOf(r)
 	var sub *room.Sub
 	if err == nil {
 		sub, err = rm.Follow(u.ID) // only for who's in it
+	}
+	if errors.Is(err, room.ErrBusy) {
+		later()
+		return
 	}
 	if err != nil {
 		// Said in the stream, which is all a browser's EventSource can read: no such room (any more), or not one this
@@ -239,9 +299,12 @@ func (s *Server) roomEvents(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		case <-sub.Done:
-			if sub.Removed() {
+			switch {
+			case sub.Removed():
 				send("event: removed\ndata: {}\n\n")
-			} else {
+			case sub.Moved():
+				send("event: moved\ndata: {}\n\n")
+			default:
 				send("event: closed\ndata: {}\n\n")
 			}
 			return
@@ -303,8 +366,8 @@ func (s *Server) roomLock(w http.ResponseWriter, r *http.Request) error {
 	return s.roomAct(func(rm *room.Room, by int64) error { return rm.SetLocked(by, in.On) })(w, r)
 }
 
-// roomQR is the room's link as a QR code, for its host's big screen: drawn here, so that no outside service sees the
-// code, once for the room, and only for who's in it.
+// roomQR is the room's link (with its key: roomLink) as a QR code, for its host's big screen: drawn here, so that no
+// outside service sees the code, once for the room, and only for who's in it.
 func (s *Server) roomQR(w http.ResponseWriter, r *http.Request) {
 	u, err := s.mustUser(r)
 	var rm *room.Room
@@ -315,8 +378,8 @@ func (s *Server) roomQR(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	svg, err := rm.QR(func(code string) (string, error) {
-		c, err := qr.Encode(s.cfg.PublicURL + "/r/" + code)
+	svg, err := rm.QR(func(string) (string, error) {
+		c, err := qr.Encode(s.roomLink(rm))
 		if err != nil {
 			return "", err
 		}

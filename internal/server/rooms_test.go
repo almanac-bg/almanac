@@ -8,6 +8,76 @@ import (
 	"testing"
 )
 
+// During a game, someone new comes in by the room's link (its key after #), not by the code alone, which counts as a
+// miss; a player back comes in by the code as ever (review 2026-11-18, S3).
+func TestComingIntoAGameUnderWay(t *testing.T) {
+	g := start(t)
+	ana, eve := g.player(), g.player()
+	ana.call("POST", "/api/guest", map[string]any{})
+	eve.call("POST", "/api/guest", map[string]any{})
+	_, out := ana.call("POST", "/api/rooms", map[string]any{"length": 5})
+	code := out["code"].(string)
+	url, key, _ := strings.Cut(out["url"].(string), "#")
+	if !strings.HasSuffix(url, "/r/"+code) || len(key) < 16 {
+		t.Fatalf("the room's link: %v", out["url"])
+	}
+	as := ana.follow(code)
+	if v := as.until(func(map[string]any) bool { return true }); v["key"] != key {
+		t.Fatalf("the key in the host's view: %v", v["key"])
+	}
+	if status, _ := ana.call("POST", "/api/rooms/"+code+"/start", nil); status != 200 {
+		t.Fatal(status)
+	}
+	if status, out := eve.call("GET", "/api/rooms/"+code, nil); status != 403 || out["error"] != "started" {
+		t.Fatalf("by the code alone, mid-game: %d %v", status, out)
+	}
+	if status, out := eve.call("POST", "/api/rooms/"+code+"/join", map[string]any{}); status != 403 || out["error"] != "started" {
+		t.Fatalf("joining by the code alone, mid-game: %d %v", status, out)
+	}
+	if status, _ := eve.call("GET", "/api/rooms/"+code+"?key="+key, nil); status != 200 {
+		t.Fatalf("by the link, mid-game: %d", status)
+	}
+	if status, _ := eve.call("POST", "/api/rooms/"+code+"/join", map[string]any{"key": key}); status != 200 {
+		t.Fatalf("joining by the link, mid-game: %d", status)
+	}
+	if status, _ := eve.call("GET", "/api/rooms/"+code, nil); status != 200 {
+		t.Fatalf("a player back, by the code: %d", status)
+	}
+}
+
+// One screen more than a player's cap closes their oldest, which is told it moved (S6); and starting games is limited,
+// so that starting and ending them over and over earns nothing (S19).
+func TestRoomScreensAndStarts(t *testing.T) {
+	g := start(t)
+	ana := g.player()
+	ana.call("POST", "/api/guest", map[string]any{})
+	_, out := ana.call("POST", "/api/rooms", map[string]any{"length": 5})
+	code := out["code"].(string)
+	first := ana.follow(code)
+	first.until(func(map[string]any) bool { return true })
+	for range 5 { // maxScreensEach in all
+		ana.stream("/api/rooms/" + code + "/events")
+	}
+	for {
+		line, err := first.r.ReadString('\n')
+		if err != nil {
+			t.Fatalf("the oldest screen wasn't told it moved: %v", err)
+		}
+		if strings.HasPrefix(line, "event: moved") {
+			break
+		}
+	}
+
+	for i := range roomStartsPlayer {
+		if status, _ := ana.call("POST", "/api/rooms/"+code+"/start", nil); status == 429 {
+			t.Fatalf("start %d refused", i+1)
+		}
+	}
+	if status, out := ana.call("POST", "/api/rooms/"+code+"/start", nil); status != 429 {
+		t.Fatalf("past the starts an hour: %d %v", status, out)
+	}
+}
+
 // A room is its players' and its host's: to a stranger it isn't there, the same 404 as a code nobody has, until they
 // join by its code; a locked room takes nobody new; and codes that miss run out, so that the codes can't be walked.
 func TestRoomAccess(t *testing.T) {

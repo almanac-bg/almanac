@@ -70,6 +70,28 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
     .toBe("room");
 });
 
+test("someone new comes into a game under way by the room's link, not by its code alone", async ({ browser }) => {
+  const host = await (await browser.newContext()).newPage();
+  const opened = host.waitForResponse((r) => r.url().endsWith("/api/rooms") && r.request().method() === "POST");
+  await host.goto("/room");
+  await host.getByRole("button", { name: "Всички теми" }).click();
+  const { url } = await (await opened).json();
+  await host.getByRole("button", { name: "Влез" }).click();
+  await host.getByRole("button", { name: "Започни" }).click();
+  await expect(host.locator(".question")).toBeVisible();
+  const late = await (await browser.newContext()).newPage();
+  await late.goto(host.url()); // the code alone
+  await expect(late.getByRole("heading", { name: "Играта вече започна" })).toBeVisible();
+  await expect(late.getByLabel("Име")).toHaveCount(0);
+  await late.goto(new URL(url).pathname + new URL(url).hash); // the room's link
+  await late.reload();
+  await late.getByLabel("Име").fill("Закъснял");
+  await late.getByRole("button", { name: "Влез" }).click();
+  await expect(late.locator(".question, .reveal, .board").first()).toBeVisible();
+  // The host's screen counts them in: of two now, or by name on the board once the answer shows.
+  await expect(host.getByText(/от 2\.|Закъснял/).first()).toBeVisible();
+});
+
 test("a room's link with a wrong code says so before asking for a name", async ({ page }) => {
   await page.goto("/r/000000");
   await expect(page.getByRole("heading", { name: "Няма такава стая" })).toBeVisible();
@@ -104,11 +126,12 @@ test("the host sends a player out of a room, and they stay out", async ({ browse
   await expect(host.getByText("Стаята е заключена: нови играчи не могат да влязат.")).toBeVisible();
   const late = await (await browser.newContext()).newPage();
   await late.goto(host.url());
-  await late.getByLabel("Име").fill("Закъснял");
-  await late.getByRole("button", { name: "Влез" }).click();
+  // Said at once, before a name is asked.
   await expect(late.getByRole("heading", { name: "Стаята е заключена" })).toBeVisible();
   await host.getByRole("button", { name: "Отключи" }).click();
   await late.getByRole("button", { name: "Опитай пак" }).click();
+  await late.getByLabel("Име").fill("Закъснял");
+  await late.getByRole("button", { name: "Влез" }).click();
   await expect(late.getByText("Чакаме Учител да започне.")).toBeVisible();
   await expect(host.locator(".players li")).toHaveCount(2);
 });

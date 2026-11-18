@@ -254,7 +254,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/rooms/{code}/join", s.roomJoin)
 	api("POST /api/rooms/{code}/settings", s.roomSettings)
 	mux.HandleFunc("GET /api/rooms/{code}/events", s.roomEvents)
-	api("POST /api/rooms/{code}/start", s.roomAct((*room.Room).Start))
+	api("POST /api/rooms/{code}/start", s.roomStart)
 	api("POST /api/rooms/{code}/next", s.roomAct((*room.Room).Next))
 	api("POST /api/rooms/{code}/finish", s.roomAct((*room.Room).Finish))
 	api("POST /api/rooms/{code}/hold", s.roomHold)
@@ -404,6 +404,7 @@ func (s *Server) run(ctx context.Context, grace time.Duration) error {
 		s.bankStep()     // a bank held for Роял goes in as it ends
 	})
 	go safe.Every(ctx, "rooms: saving", roomsEvery, s.saveRoomsChanged)
+	go safe.Loop(ctx, "rooms: saving a game's end", s.saveRoomsSoon)
 	go safe.Every(ctx, "rooms: sweeping", time.Minute, s.rooms.Sweep)
 	go safe.Every(ctx, "live: sweeping", time.Minute, s.live.Sweep)
 	go safe.Every(ctx, "duels: settling", time.Minute, func() {

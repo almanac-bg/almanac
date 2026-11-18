@@ -5,14 +5,19 @@
 // the pace (anyone in it may while the host is away); between games the host may choose again (Change), keeping the
 // code and the players. The standings are by points, then by the time the answers took, as in a duel. The host may
 // also send a player out of the room (Remove): they're kept out of it from then on; and lock it (SetLocked), so that
-// nobody new comes in (a class, once it's all there), while those in it still come back to it. A room never deals a
-// question twice, over all its games, nor one of the day's.
+// nobody new comes in (a class, once it's all there), while those in it still come back to it. A room led from a big
+// screen (a class's) locks itself as its first game starts. A room never deals a question twice, over all its games,
+// nor one of the day's.
 //
 // Who is in a room is its members (Join) and its host (In): only they follow it, play in it or see who's in it. The
-// code is all it takes to join, so that a class or a party gets in by saying six digits; what keeps codes from being
-// walked is the server's (a wrong code counts against whoever gave it). How many rooms are open is capped three
-// ways, so that nobody can fill the hub and shut rooms for everyone: a host keeps at most MaxHosted (a new one closes
-// their oldest), an address opens at most maxFrom, and the hub holds maxRooms at most, a guard for memory alone.
+// code is all it takes to join while no game is under way, so that a class or a party gets in by saying six digits;
+// during a game, someone new needs the room's link (Key: the code and a secret no one can guess), so that a code
+// guessed or overheard doesn't bring a stranger into the middle of a game. What keeps codes from being walked is the
+// server's (a wrong code counts against whoever gave it). How many rooms are open is capped three ways, so that
+// nobody can fill the hub and shut rooms for everyone: a host keeps at most MaxHosted (a new one closes their
+// oldest), an address opens at most maxFrom, and the hub holds maxRooms at most, a guard for memory alone. A room's
+// screens are capped too (maxScreensEach for one player, maxScreens in all), and only a player's first screen opened
+// or last closed is news to the others (whether they're there), so that opening screens costs the room nothing.
 //
 // A host may also lead from a big screen (Settings.Lead: a class's board, a pub's TV) rather than play: they're no
 // member, on no board, and no question waits for them; their screen gets each answer with its fact, and they set the
@@ -20,16 +25,21 @@
 // it is). A held answer is a game under way, as any.
 //
 // As a game ends, each player's game in it is kept in the database as a run of theirs (Hub.Record: XP, goals,
-// achievements, questions seen), outside the room's lock; the room counts as under way until that's done.
+// achievements, questions seen), outside the room's lock; the room counts as under way until that's done. Each game
+// has an id of its own (RoomPlay.Game), so that a game kept again (the same end played twice, over a crash) is kept
+// once. What a game earns is by the questions it was dealt, not those it was cut to (Finish): a game ended at its
+// first question earns a game's share of one question, and no bonus for all right.
 //
 // Rooms live in memory: they're for playing now, and close on their own when nobody's left. A restart would end
 // them, so the server keeps them over one: it pauses the hub first (Pause: no new game starts in any room, and the
 // games under way, UnderWay, play to their end, for as long as the server waits), and saves the rooms (Save) for the
 // next run of the server to open again (Restore), with their code, settings, host and players (and those sent out),
 // the questions they've dealt, and the game under way or just over as it stands: every answer and point. A game cut
-// by the restart goes on where it was, the question showing shown again with its time from the start (Restore). The
-// server saves the rooms every few seconds too (Changes says when there's something new), so that a crash loses no
-// more than those seconds. A player's screen comes back to its room by itself.
+// by the restart goes on as if it hadn't stopped: the question showing has the time it had left (at least comeBack),
+// and the players whose screens were open count as there for comeBack, while their screens come back by themselves,
+// so that the first answer back doesn't end the question for the others. A game over whose players' games weren't
+// all kept yet is kept then. The server saves the rooms every 15 seconds when they've changed, and at once as a game
+// ends and as it's kept (Hub.Saving), so that a crash loses no more than those seconds of a game, and no game's end.
 //
 // A game's clock that panics (package safe stops it) ends its game where it is, each player's game kept (broken).
 package room
@@ -38,6 +48,7 @@ import (
 	"cmp"
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -69,6 +80,18 @@ const (
 	// maxRooms caps the rooms open at once, so that nothing fills the server's memory with them: far above what the
 	// caps per host and per address leave to anyone.
 	maxRooms = 10_000
+	// maxScreensEach is how many screens one player (or the host leading) follows a room on at once: a phone, a
+	// laptop, a tab left open. One more closes their oldest (Sub.Moved), most likely a line that died unnoticed.
+	maxScreensEach = 5
+	// maxScreens is how many screens a room holds in all: two a player, and the host's. Past it, someone with no
+	// screen on the room yet comes in in place of the oldest screen of whoever has the most; anyone else waits
+	// (ErrBusy).
+	maxScreens = 2*MaxPlayers + maxScreensEach
+	// comeBack is how long a room restored after a restart (Restore) counts the players whose screens were open as
+	// there still, while the screens come back by themselves (a browser reconnects in 1.5 to 6 seconds, and resends an
+	// answer cut off from 0.5): a question waits for them as it would have. A question restored keeps at least as
+	// much of its time, for them to answer it in.
+	comeBack = 8 * time.Second
 )
 
 type Phase string
@@ -96,6 +119,11 @@ var (
 	ErrNoPlayers = errors.New("nobody to play")
 	// ErrLocked is someone new coming into a room its host has locked (SetLocked).
 	ErrLocked = errors.New("the room is locked")
+	// ErrStarted is someone new coming into a room by its code alone while a game is under way in it: then it takes
+	// the room's link (Key).
+	ErrStarted = errors.New("a game is under way: the room's link is needed")
+	// ErrBusy is a screen more than the room holds (maxScreens).
+	ErrBusy = errors.New("too many screens on the room")
 )
 
 // Player is someone in a room.
@@ -122,10 +150,30 @@ type Hub struct {
 	// Barred, if set, are the questions no room may deal now (the day's: play.Game.DayQuestions).
 	Barred func(context.Context) (map[string]bool, error)
 	// Record, if set, keeps a player's game in a room once it's over, and says as which run (play.Game.RecordRoom).
+	// The same game (RoomPlay.Game) kept again is kept once: the run it was kept as.
 	Record func(ctx context.Context, userID int64, p play.RoomPlay) (int64, error)
+	// saving says a game has ended, or been kept: the rooms are worth saving at once (Saving).
+	saving chan struct{}
 }
 
-func NewHub(b func() *bank.Bank) *Hub { return &Hub{rooms: map[string]*Room{}, bank: b} }
+func NewHub(b func() *bank.Bank) *Hub {
+	return &Hub{rooms: map[string]*Room{}, bank: b, saving: make(chan struct{}, 1)}
+}
+
+// Saving says when the rooms are worth saving at once, not on the next round: a game has ended (a crash replaying
+// its end would show its last question again), or its players' games have been kept.
+func (h *Hub) Saving() <-chan struct{} { return h.saving }
+
+// saveSoon tells Saving. Called with any lock held: it never waits.
+func (h *Hub) saveSoon() {
+	select {
+	case h.saving <- struct{}{}:
+	default:
+	}
+}
+
+// secret is a random string no one can guess: a room's key, a game's id.
+func secret() string { return rand.Text()[:16] }
 
 // crowd is how players have answered a question, if the hub knows.
 func (h *Hub) crowd(q bank.Question) *bank.Crowd {
@@ -160,7 +208,7 @@ func (h *Hub) newRoom(host int64, from string, s Settings) (*Room, error) {
 			continue
 		}
 		r := &Room{
-			code: code, Settings: s, host: host, from: from, phase: Lobby, hub: h, subs: map[*Sub]struct{}{},
+			code: code, key: secret(), Settings: s, host: host, from: from, phase: Lobby, hub: h, subs: map[*Sub]struct{}{},
 			out: map[int64]bool{}, used: map[string]bool{}, opened: time.Now(), active: time.Now(),
 		}
 		h.rooms[code] = r
@@ -308,19 +356,30 @@ func (h *Hub) Playing(id int64) string {
 // saved is a room as Save keeps it.
 type saved struct {
 	Code string `json:"code"`
+	Key  string `json:"key"`
 	Settings
 	Host     int64  `json:"host"`
 	HostName string `json:"hostName,omitempty"`
+	// HostAway is a host leading with no screen on the room.
+	HostAway bool   `json:"hostAway,omitempty"`
 	Held     bool   `json:"held,omitempty"`
 	Locked   bool   `json:"locked,omitempty"`
 	From     string `json:"from,omitempty"`
 	Phase    Phase  `json:"phase"`
-	// Picks are the game's questions (one under way, or just over), and N the one showing.
-	Picks   []play.Pick   `json:"picks,omitempty"`
-	N       int           `json:"n,omitempty"`
-	Players []savedMember `json:"players"`
-	Out     []int64       `json:"out,omitempty"`
-	Used    []string      `json:"used,omitempty"`
+	// Picks are the game's questions (one under way, or just over), and N the one showing; Game the game's id and
+	// Planned how many questions it was dealt (Finish may have cut Picks short).
+	Picks   []play.Pick `json:"picks,omitempty"`
+	N       int         `json:"n,omitempty"`
+	Game    string      `json:"game,omitempty"`
+	Planned int         `json:"planned,omitempty"`
+	// ShownAt and RevealedAt are when the question, or its answer, showed; SavedAt when the room was saved: the time
+	// it had had then is what it has had after a restart.
+	ShownAt    time.Time     `json:"shownAt,omitzero"`
+	RevealedAt time.Time     `json:"revealedAt,omitzero"`
+	SavedAt    time.Time     `json:"savedAt,omitzero"`
+	Players    []savedMember `json:"players"`
+	Out        []int64       `json:"out,omitempty"`
+	Used       []string      `json:"used,omitempty"`
 	// Joined is how many have joined: the next one's key. Kept so that keys stay as the screens know them over a
 	// restart (a player sent out leaves a gap).
 	Joined int       `json:"joined,omitempty"`
@@ -329,11 +388,13 @@ type saved struct {
 }
 
 type savedMember struct {
-	ID      int64         `json:"id"`
-	Key     int           `json:"key"`
-	Name    string        `json:"name"`
-	Here    bool          `json:"here,omitempty"` // a name for this room alone (Player.RoomName)
-	Look    play.Look     `json:"look"`
+	ID   int64     `json:"id"`
+	Key  int       `json:"key"`
+	Name string    `json:"name"`
+	Here bool      `json:"here,omitempty"` // a name for this room alone (Player.RoomName)
+	Look play.Look `json:"look"`
+	// Away is a player with no screen on the room: they aren't waited for once it's back.
+	Away    bool          `json:"away,omitempty"`
 	Points  int           `json:"points,omitempty"`
 	Rights  int           `json:"rights,omitempty"`
 	InRow   int           `json:"inRow,omitempty"`
@@ -377,26 +438,29 @@ func (h *Hub) Save(w io.Writer) error {
 	for _, r := range rooms {
 		r.mu.Lock()
 		if !r.closed {
-			out = append(out, r.saved())
+			out = append(out, r.saved(time.Now()))
 		}
 		r.mu.Unlock()
 	}
 	return json.NewEncoder(w).Encode(out)
 }
 
-// saved is the room as Save keeps it. Called with the lock held.
-func (r *Room) saved() saved {
-	sv := saved{Code: r.code, Settings: r.Settings, Host: r.host, HostName: r.hostName, Held: r.held, Locked: r.locked,
-		From: r.from, Phase: r.phase, Opened: r.opened, Active: r.active, Joined: r.joined}
+// saved is the room as Save keeps it, now. Called with the lock held.
+func (r *Room) saved(now time.Time) saved {
+	sv := saved{Code: r.code, Key: r.key, Settings: r.Settings, Host: r.host, HostName: r.hostName, Held: r.held,
+		Locked: r.locked, From: r.from, Phase: r.phase, Opened: r.opened, Active: r.active, Joined: r.joined, SavedAt: now,
+		HostAway: r.Lead && away(r.hostOnline, r.hostBack, r.hostLeft, now)}
 	played := r.phase != Lobby
 	if played {
-		sv.Picks, sv.N = r.picks, r.n
+		sv.Picks, sv.N, sv.Game, sv.Planned = r.picks, r.n, r.gameID, r.planned
+		sv.ShownAt, sv.RevealedAt = r.shownAt, r.revealedAt
 	}
 	for id := range r.used {
 		sv.Used = append(sv.Used, id)
 	}
 	for _, m := range r.players {
-		sm := savedMember{ID: m.ID, Key: m.key, Name: m.Name, Here: m.RoomName, Look: m.Look}
+		sm := savedMember{ID: m.ID, Key: m.key, Name: m.Name, Here: m.RoomName, Look: m.Look,
+			Away: away(m.online, m.back, m.left, now)}
 		if played {
 			sm.Points, sm.Rights, sm.InRow, sm.Ms, sm.Run = m.points, m.rights, m.inRow, m.ms, m.run
 			for _, l := range m.log {
@@ -416,10 +480,12 @@ func (r *Room) saved() saved {
 	return sv
 }
 
-// Restore opens again the rooms Save kept, and says how many. A game under way goes on where it was: the question
-// showing shows again, with its time from the start for whoever hadn't answered it (an answer given stays), and an
-// answer showing shows again for its Pause. A room whose game's questions the bank no longer has as they were shown
-// comes back to its lobby; one whose code is taken meanwhile doesn't come back.
+// Restore opens again the rooms Save kept, and says how many. A game under way goes on as if it hadn't stopped: the
+// question showing shows again with the time it had left (at least comeBack) for whoever hadn't answered it (an
+// answer given stays), and an answer showing shows again for its Pause; whoever had a screen on the room counts as
+// there for comeBack, while it comes back. A game over is kept for whoever's game wasn't yet (Hub.Record keeps a game
+// once). A room whose game's questions the bank no longer has as they were shown comes back to its lobby; one whose
+// code is taken meanwhile doesn't come back.
 func (h *Hub) Restore(rd io.Reader) (int, error) {
 	var in []saved
 	if err := json.NewDecoder(rd).Decode(&in); err != nil {
@@ -428,15 +494,19 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 	b := h.bank()
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	n := 0
+	n, now := 0, time.Now()
 	for _, sv := range in {
 		if _, taken := h.rooms[sv.Code]; taken || (len(sv.Players) == 0 && !sv.Lead) || len(h.rooms) >= maxRooms {
 			continue
 		}
 		r := &Room{
-			code: sv.Code, Settings: sv.Settings, host: sv.Host, hostName: sv.HostName, held: sv.Held, locked: sv.Locked,
-			from: sv.From, phase: Lobby, hub: h, subs: map[*Sub]struct{}{}, out: map[int64]bool{}, used: map[string]bool{},
-			opened: sv.Opened, active: sv.Active,
+			code: sv.Code, key: cmp.Or(sv.Key, secret()), Settings: sv.Settings, host: sv.Host, hostName: sv.HostName,
+			held: sv.Held, locked: sv.Locked, from: sv.From, phase: Lobby, hub: h, subs: map[*Sub]struct{}{},
+			out: map[int64]bool{}, used: map[string]bool{}, opened: sv.Opened, active: sv.Active,
+		}
+		r.mu.Lock() // as the hub's is: nobody sees the room yet, but its clocks will
+		if sv.Lead && !sv.HostAway {
+			r.hostBack = now.Add(comeBack)
 		}
 		if l, m, err := play.RoomGame(r.Length, r.Mix); err == nil {
 			r.Length, r.Mix = l, m
@@ -472,6 +542,9 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 			if sv.Joined > 0 { // saved since keys are kept: each as it was
 				m.key = sm.Key
 			}
+			if !sm.Away {
+				m.back = now.Add(comeBack)
+			}
 			if r.phase == Lobby {
 				continue
 			}
@@ -488,18 +561,38 @@ func (h *Hub) Restore(rd io.Reader) (int, error) {
 		r.joined = max(r.joined, sv.Joined)
 		if r.phase != Lobby {
 			r.game = 1
+			r.gameID, r.planned = sv.Game, sv.Planned
+			if r.gameID == "" { // saved before games had ids: kept as a new one
+				r.gameID = secret()
+			}
+			if r.planned < len(r.dealt) {
+				r.planned = len(r.dealt)
+			}
 		}
-		switch r.phase { // the clock goes on: from the start of what shows
+		switch r.phase { // the clock goes on where it was
 		case Question:
-			r.shownAt = time.Now()
-			r.after(play.Limit(r.dealt[r.n].Question())+play.Grace, func() { r.reveal() })
+			// The time the question had had as it was saved, less at least comeBack before its end: the time it had left
+			// is the time it has. The answers given since count their time from then.
+			limit, up := play.Limit(r.dealt[r.n].Question()), time.Duration(0)
+			if !sv.ShownAt.IsZero() && !sv.SavedAt.IsZero() {
+				up = min(max(0, sv.SavedAt.Sub(sv.ShownAt)), max(0, limit-comeBack))
+			}
+			r.shownAt = now.Add(-up)
+			r.after(limit+play.Grace-up, func() { r.reveal() })
 			r.pace(r.n)
+			r.recheck(comeBack)
 		case Reveal:
-			r.revealedAt = time.Now()
+			// The answer shows again for its Pause, which the screens coming back need as much as anyone.
+			r.revealedAt = now
 			if !r.held {
 				r.after(Pause, func() { r.next() })
 			}
+		case End:
+			if sv.Game != "" { // a game whose end may not all have been kept: kept now (once, by its id)
+				r.record()
+			}
 		}
+		r.mu.Unlock()
 		h.rooms[r.code] = r
 		n++
 	}
@@ -512,6 +605,8 @@ type Room struct {
 	mu   sync.Mutex
 	hub  *Hub
 	code string
+	// key is the secret in the room's link (Key): who has it comes in during a game too.
+	key string
 	Settings
 	host     int64  // who opened it
 	from     string // the address it was opened from
@@ -520,8 +615,10 @@ type Room struct {
 	locked bool
 	// qr is the room's link as a QR code, once drawn (QR).
 	qr string
-	// hostOnline is how many screens the host leading from (Lead) has open: they're no member.
-	hostOnline int
+	// hostOnline is how many screens the host leading from (Lead) has open: they're no member. hostBack, as a member's
+	// back: until then, after a restart, they count as there.
+	hostOnline         int
+	hostBack, hostLeft time.Time
 	// held: an answer stays up until the host moves on (Next), rather than for Pause.
 	held    bool
 	players []*member // in the order they joined
@@ -530,6 +627,10 @@ type Room struct {
 	used    map[string]bool // every question its games have dealt: none comes again
 	phase   Phase
 	game    int // the games begun: a game's runs are kept for it alone
+	// gameID tells the game under way (or just over) from every other, in any room: it's kept once (RoomPlay.Game).
+	gameID string
+	// planned is how many questions the game was dealt: what it earns is by them, though it's cut short (Finish).
+	planned int
 	// recording is how many games are being kept in the database (Hub.Record), after their end: under way still.
 	recording  int
 	picks      []play.Pick
@@ -540,6 +641,7 @@ type Room struct {
 	timer      *time.Timer
 	paceTimer  *time.Timer // the next clue of the question now (bank.Paced)
 	subs       map[*Sub]struct{}
+	screens    uint64 // screens opened on the room: the next one's place in the order (Sub.n)
 	opened     time.Time
 	active     time.Time
 	closed     bool
@@ -551,7 +653,10 @@ type member struct {
 	points, rights int
 	ms             int64 // the time their answers took, this game: of as many points, the quicker stands first
 	inRow          int   // right answers in a row, the last ones
-	online         int
+	online         int   // their screens on the room
+	// back is, in a room restored after a restart, until when they count as there though no screen of theirs is yet
+	// (comeBack): one was open as the server stopped, and comes back by itself. left is when their last screen went.
+	back, left time.Time
 	// The question now: whether they've answered, what they gave (as shown), how it went.
 	answered bool
 	given    json.RawMessage
@@ -621,17 +726,19 @@ func (r *Room) member(id int64) *member {
 	return nil
 }
 
+// Key is the secret in the room's link (the code, then the key: /r/<code>#<key>), for who's in the room to pass on:
+// with it, someone new comes in during a game too (Join). Set as the room opens, and never changed.
+func (r *Room) Key() string { return r.key }
+
 // Join puts a player in the room (once; again only brings their name and look up to date, though a name for this room
-// alone, Player.RoomName, stays until another is given), unless the host has locked it to anyone new. Joining a room
-// mid-game is fine, from the next answer on.
-func (r *Room) Join(p Player) error {
+// alone, Player.RoomName, stays until another is given), with the key they have of it ("": the code alone). Someone
+// new comes in unless the host has locked it, and during a game only with the key: joining mid-game is fine, from the
+// next answer on, for whom the room's link was sent.
+func (r *Room) Join(p Player, key string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.closed {
-		return ErrNoRoom
-	}
-	if r.out[p.ID] {
-		return ErrRemoved
+	if err := r.admits(p.ID, key); err != nil {
+		return err
 	}
 	if p.ID == r.host && r.Lead { // leading, not playing
 		r.hostName = p.Name
@@ -646,16 +753,40 @@ func (r *Room) Join(p Player) error {
 		r.changed()
 		return nil
 	}
-	if r.locked {
-		return ErrLocked
-	}
-	if len(r.players) >= MaxPlayers {
-		return ErrFull
-	}
 	r.add(p)
 	r.changed()
 	return nil
 }
+
+// Admits says why someone (0: nobody signed in yet, so someone new) couldn't come into the room now with the key they
+// have of it, if they couldn't: as Join would say, changing nothing.
+func (r *Room) Admits(id int64, key string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.admits(id, key)
+}
+
+// admits is Admits. Called with the lock held.
+func (r *Room) admits(id int64, key string) error {
+	switch {
+	case r.closed:
+		return ErrNoRoom
+	case id != 0 && r.out[id]:
+		return ErrRemoved
+	case id != 0 && (id == r.host || r.member(id) != nil):
+		return nil // back
+	case r.locked:
+		return ErrLocked
+	case r.playing() && subtle.ConstantTimeCompare([]byte(key), []byte(r.key)) != 1:
+		return ErrStarted
+	case len(r.players) >= MaxPlayers:
+		return ErrFull
+	}
+	return nil
+}
+
+// playing is whether a game is being played: a question or its answer up. Called with the lock held.
+func (r *Room) playing() bool { return r.phase == Question || r.phase == Reveal }
 
 // add puts a player in the room, under the next key. Called with the lock held (or before anyone can see the room).
 func (r *Room) add(p Player) *member {
@@ -708,39 +839,63 @@ func (r *Room) SetLocked(by int64, on bool) error {
 	return nil
 }
 
-// Sub is a screen following a room: C says the room changed (read View then), Done that the room is gone, or that
-// the host sent its player out (Removed).
+// Sub is a screen following a room: C says the room changed (read View then), Done that the room is gone, that the
+// host sent its player out (Removed), or that the player opened it on one screen too many (Moved).
 type Sub struct {
-	C       chan struct{}
-	Done    chan struct{}
-	viewer  int64
-	removed bool // set before Done is closed
+	C      chan struct{}
+	Done   chan struct{}
+	viewer int64
+	n      uint64 // its place in the order the room's screens opened
+	// Why Done was closed, set before it is.
+	removed, moved bool
 }
 
 // Removed says, once Done is closed, whether it was for the host sending the player out.
 func (s *Sub) Removed() bool { return s.removed }
 
-// Follow is a player's screen following the room (Join first), or the leading host's.
+// Moved says, once Done is closed, whether it was for the room opened on another screen (maxScreensEach, maxScreens).
+func (s *Sub) Moved() bool { return s.moved }
+
+// Follow is a player's screen following the room (Join first), or the leading host's. One screen more than
+// maxScreensEach closes their oldest; past maxScreens in all, someone with no screen on the room yet comes in in place
+// of the oldest screen of whoever has the most, and anyone else is told ErrBusy. Only a player's first screen is news
+// to the others (they're there now): any other is this screen's alone.
 func (r *Room) Follow(viewer int64) (*Sub, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	m := r.member(viewer)
-	leads := viewer == r.host && r.Lead
-	if (m == nil && !leads) || r.closed {
+	online := r.screensOf(viewer)
+	if online == nil || r.closed {
 		return nil, ErrNoRoom
 	}
-	s := &Sub{C: make(chan struct{}, 1), Done: make(chan struct{}), viewer: viewer}
-	r.subs[s] = struct{}{}
-	if leads {
-		r.hostOnline++
-	} else {
-		m.online++
+	switch {
+	case *online >= maxScreensEach:
+		r.drop(r.oldest(viewer))
+	case len(r.subs) >= maxScreens:
+		counts := map[int64]int{}
+		most := int64(0)
+		for s := range r.subs {
+			counts[s.viewer]++
+			if counts[s.viewer] > counts[most] {
+				most = s.viewer
+			}
+		}
+		if *online > 0 || counts[most] < 2 {
+			return nil, ErrBusy
+		}
+		r.drop(r.oldest(most))
 	}
-	r.changed()
+	r.screens++
+	s := &Sub{C: make(chan struct{}, 1), Done: make(chan struct{}), viewer: viewer, n: r.screens}
+	r.subs[s] = struct{}{}
+	if *online++; *online == 1 {
+		r.changed()
+	} else {
+		s.C <- struct{}{} // its first look
+	}
 	return s, nil
 }
 
-// Unfollow is a screen gone (closed, offline).
+// Unfollow is a screen gone (closed, offline). Only a player's last screen is news to the others: they're away now.
 func (r *Room) Unfollow(s *Sub) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -748,12 +903,63 @@ func (r *Room) Unfollow(s *Sub) {
 		return
 	}
 	delete(r.subs, s)
-	if m := r.member(s.viewer); m != nil {
-		m.online--
-	} else if s.viewer == r.host && r.Lead {
-		r.hostOnline--
+	if online := r.screensOf(s.viewer); online != nil {
+		if *online--; *online == 0 {
+			if m := r.member(s.viewer); m != nil {
+				m.left = time.Now()
+			} else {
+				r.hostLeft = time.Now()
+			}
+			r.changed()
+		}
 	}
-	r.changed()
+}
+
+// screensOf is the count of a viewer's screens on the room: a member's, or the leading host's (nil: neither, so
+// none of theirs may follow it). Called with the lock held.
+func (r *Room) screensOf(viewer int64) *int {
+	if m := r.member(viewer); m != nil {
+		return &m.online
+	}
+	if viewer == r.host && r.Lead {
+		return &r.hostOnline
+	}
+	return nil
+}
+
+// oldest is a viewer's screen opened first. Called with the lock held.
+func (r *Room) oldest(viewer int64) *Sub {
+	var first *Sub
+	for s := range r.subs {
+		if s.viewer == viewer && (first == nil || s.n < first.n) {
+			first = s
+		}
+	}
+	return first
+}
+
+// drop closes a screen to make way for another (Moved): its viewer has others still, so it's news to nobody. Called
+// with the lock held.
+func (r *Room) drop(s *Sub) {
+	if s == nil {
+		return
+	}
+	s.moved = true
+	close(s.Done)
+	delete(r.subs, s)
+	if online := r.screensOf(s.viewer); online != nil {
+		*online--
+	}
+}
+
+// there says whether a player is in the room now: a screen of theirs on it, or, just after a restart, one that was
+// and is coming back (back). Called with the lock held.
+func (m *member) there(now time.Time) bool { return m.online > 0 || now.Before(m.back) }
+
+// away says, as the room is saved, whether a player is to be waited for no more once it's restored: no screen of
+// theirs on it, nor one a moment ago (comeBack), as every screen closes when the server stops, just before it saves.
+func away(online int, back, left, now time.Time) bool {
+	return online == 0 && !now.Before(back) && now.Sub(left) >= comeBack
 }
 
 // changed tells every screen to look again. Called with the lock held.
@@ -788,9 +994,10 @@ func (r *Room) mayLead(id int64) bool {
 	if id == r.host {
 		return true
 	}
-	away := r.hostOnline == 0
+	now := time.Now()
+	away := r.hostOnline == 0 && !now.Before(r.hostBack)
 	if h := r.member(r.host); h != nil {
-		away = h.online == 0
+		away = !h.there(now)
 	}
 	return r.member(id) != nil && away
 }
@@ -951,11 +1158,17 @@ func (r *Room) start(barred map[string]bool) error {
 	if len(dealt) == 0 {
 		return play.ErrNoQuestion
 	}
+	// A room led from a big screen is a class's, or a pub's: all in as its first game starts, it locks itself, so
+	// that nobody walking the codes comes in mid-game (the host may open it again).
+	if r.Lead && len(r.used) == 0 {
+		r.locked = true
+	}
 	r.picks, r.dealt = picks, dealt
 	for _, p := range picks {
 		r.used[p.ID] = true
 	}
 	r.game++
+	r.gameID, r.planned = secret(), len(dealt)
 	for _, m := range r.players {
 		m.points, m.rights, m.inRow, m.ms, m.log, m.run = 0, 0, 0, 0, nil, 0
 	}
@@ -975,6 +1188,19 @@ func (r *Room) show(n int) {
 	r.after(limit+play.Grace, func() { r.reveal() })
 	r.pace(n)
 	r.changed()
+}
+
+// recheck shows the answer to the question now at d, should everyone there have answered it by then: as those coming
+// back after a restart stop counting (comeBack), the others may be all. Called with the lock held.
+func (r *Room) recheck(d time.Duration) {
+	n, game := r.n, r.gameID
+	safe.AfterFunc(d, "room: a restored question", func() {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		if !r.closed && r.phase == Question && r.n == n && r.gameID == game && r.allAnswered() {
+			r.reveal()
+		}
+	}, r.broken)
 }
 
 // pace tells every screen to look again as more of question n shows (its next clue), while it's still up.
@@ -1050,7 +1276,10 @@ func (r *Room) Answer(by int64, n int, raw json.RawMessage) error {
 }
 
 func (r *Room) answer(m *member, n int, raw json.RawMessage) error {
-	if r.phase != Question || n != r.n || m.answered {
+	if r.counted(m, n) {
+		return nil // sent again, its reply lost on the way: it counted the first time, and stays as it was
+	}
+	if r.phase != Question || n != r.n {
 		return ErrNotNow
 	}
 	d := r.dealt[n]
@@ -1086,9 +1315,19 @@ func (r *Room) answer(m *member, n int, raw json.RawMessage) error {
 	return nil
 }
 
-// allAnswered is whether everyone in the room now has answered the question showing.
+// counted is whether m's answer to question n of the game is in already. Called with the lock held.
+func (r *Room) counted(m *member, n int) bool {
+	if r.phase == Question && n == r.n && m.answered {
+		return true
+	}
+	return r.phase != Lobby && slices.ContainsFunc(m.log, func(l loggedAnswer) bool { return l.n == n && l.given != nil })
+}
+
+// allAnswered is whether everyone in the room now (there: just after a restart, those coming back too) has answered
+// the question showing.
 func (r *Room) allAnswered() bool {
-	return !slices.ContainsFunc(r.players, func(p *member) bool { return p.online > 0 && !p.answered })
+	now := time.Now()
+	return !slices.ContainsFunc(r.players, func(p *member) bool { return p.there(now) && !p.answered })
 }
 
 func (r *Room) reveal() {
@@ -1120,21 +1359,28 @@ func (r *Room) next() {
 	r.end()
 }
 
-// end is the game over: its bonus for every answer right, and each player's game kept.
+// end is the game over: its bonus for every answer right, and each player's game kept. The rooms are saved at once:
+// a crash then can't play the end again.
 func (r *Room) end() {
 	r.phase = End
 	for _, m := range r.players {
-		if m.rights == len(r.dealt) {
+		if r.allRight(m) {
 			m.points += play.AllRight
 		}
 	}
 	r.record()
 	r.changed()
+	r.hub.saveSoon()
 }
 
+// allRight is whether m answered every question of the game right: every one it was dealt, so that a game cut short
+// (Finish) isn't all right for the one question asked. Called with the lock held.
+func (r *Room) allRight(m *member) bool { return r.planned > 0 && m.rights >= r.planned }
+
 // record keeps each player's game just over (Hub.Record), once it's over, outside the room's lock: a player who gave
-// no answer has nothing to keep. The room counts as under way until it's done (a restart waits for it), and each
-// player's screen hears of their run.
+// no answer has nothing to keep, nor one whose game is kept already (a room restored, its end kept before). The room
+// counts as under way until it's done (a restart waits for it), and each player's screen hears of their run. Called
+// with the lock held.
 func (r *Room) record() {
 	if r.hub.Record == nil {
 		return
@@ -1145,7 +1391,10 @@ func (r *Room) record() {
 	}
 	var games []kept
 	for _, m := range r.players {
-		p := play.RoomPlay{Category: r.Category, Picks: r.picks, Points: m.points}
+		if m.run != 0 {
+			continue
+		}
+		p := play.RoomPlay{Game: r.gameID, Category: r.Category, Picks: r.picks, Length: r.planned, Points: m.points}
 		given := false
 		for _, l := range m.log {
 			p.Answers = append(p.Answers, play.RoomAnswer{N: l.n, Given: l.given, Shown: l.shown, Score: l.score,
@@ -1186,6 +1435,7 @@ func (r *Room) record() {
 			}
 		}
 		r.changed()
+		r.hub.saveSoon()
 	})
 }
 
@@ -1213,6 +1463,8 @@ type View struct {
 	Held bool `json:"held,omitempty"`
 	// Locked is a room nobody new comes into (Room.SetLocked).
 	Locked bool `json:"locked,omitempty"`
+	// Key is the secret in the room's link (Room.Key), for who's in it to pass on.
+	Key string `json:"key,omitempty"`
 }
 
 // ReviewedView is one question of a finished game, as the viewer answered it (as play.Reviewed is for a run).
@@ -1283,9 +1535,13 @@ func (r *Room) View(viewer int64) View {
 	if h := r.member(r.host); h != nil {
 		v.Host = h.Name
 	}
+	if viewer == r.host || r.member(viewer) != nil {
+		v.Key = r.key
+	}
+	now := time.Now()
 	for _, m := range r.players {
 		p := PlayerView{
-			Key: m.key, Look: m.Look, Name: m.Name, Points: m.points, Rights: m.rights, Online: m.online > 0, Answered: m.answered,
+			Key: m.key, Look: m.Look, Name: m.Name, Points: m.points, Rights: m.rights, Online: m.there(now), Answered: m.answered,
 			Me: m.ID == viewer, ms: m.ms,
 		}
 		if r.phase == Reveal {
@@ -1337,7 +1593,7 @@ func (r *Room) View(viewer int64) View {
 	}
 	if me := r.member(viewer); me != nil && r.phase == End {
 		v.Review, v.Run = r.review(me), me.run
-		if me.rights == len(r.dealt) {
+		if r.allRight(me) {
 			v.AllRight = play.AllRight
 		}
 	}

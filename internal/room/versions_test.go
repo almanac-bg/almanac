@@ -16,7 +16,7 @@ func TestRestoredAsDealt(t *testing.T) {
 		hub := NewHub(bank)
 		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
 		over, _ := hub.Open(ana, "", Settings{})
-		_ = over.Join(bo)
+		_ = over.Join(bo, "")
 		_ = over.Start(ana.ID)
 		for over.View(ana.ID).Phase != End {
 			if v := over.View(ana.ID); v.Phase == Question && !v.Players[0].Answered {

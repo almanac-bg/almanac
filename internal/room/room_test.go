@@ -90,7 +90,7 @@ func TestAGamePlayedTogether(t *testing.T) {
 		if _, err := hub.Get(r.Code()); err != nil || len(r.Code()) != 6 {
 			t.Fatalf("code %q: %v", r.Code(), err)
 		}
-		_ = r.Join(bo)
+		_ = r.Join(bo, "")
 		sa, _ := r.Follow(ana.ID)
 		sb, _ := r.Follow(bo.ID)
 		if v := r.View(bo.ID); v.Phase != Lobby || len(v.Players) != 2 || v.CanLead || !r.View(ana.ID).CanLead {
@@ -115,8 +115,13 @@ func TestAGamePlayedTogether(t *testing.T) {
 		if err := r.Answer(ana.ID, 0, answer(r, true)); err != nil {
 			t.Fatal(err)
 		}
-		if err := r.Answer(ana.ID, 0, answer(r, true)); !errors.Is(err, ErrNotNow) {
-			t.Fatalf("a second answer: %v", err)
+		// Sent again (its reply lost on the way), it's taken as the first, and changes nothing (review 2026-11-18, A20).
+		points := r.View(ana.ID).Players[0].Points
+		if err := r.Answer(ana.ID, 0, answer(r, false)); err != nil || r.View(ana.ID).Players[0].Points != points {
+			t.Fatalf("an answer sent again: %v", err)
+		}
+		if err := r.Answer(ana.ID, 1, answer(r, true)); !errors.Is(err, ErrNotNow) {
+			t.Fatalf("an answer to a question not up: %v", err)
 		}
 		if r.View(ana.ID).Phase != Question {
 			t.Fatal("the answer showed before Bo answered")
@@ -138,9 +143,10 @@ func TestAGamePlayedTogether(t *testing.T) {
 		if v := r.View(bo.ID); v.Phase != Question || v.N != 1 {
 			t.Fatalf("the room didn't move on by itself: %+v", v)
 		}
-		// Cy comes now, answers this one and goes: their review has it in its place, nothing before it.
+		// Cy comes now (by the room's link: mid-game, the code alone isn't enough), answers this one and goes: their
+		// review has it in its place, nothing before it.
 		cy := Player{ID: 3, Name: "Цв"}
-		if err := r.Join(cy); err != nil {
+		if err := r.Join(cy, r.Key()); err != nil {
 			t.Fatal(err)
 		}
 		sc, _ := r.Follow(cy.ID)
@@ -189,7 +195,7 @@ func TestScreensHearOfChanges(t *testing.T) {
 		r, _ := hub.Open(Player{ID: 1, Name: "Ана"}, "", Settings{Category: "history"})
 		s, _ := r.Follow(1)
 		<-s.C // following is a change
-		_ = r.Join(Player{ID: 2, Name: "Бо"})
+		_ = r.Join(Player{ID: 2, Name: "Бо"}, "")
 		select {
 		case <-s.C:
 		default:
@@ -212,11 +218,11 @@ func TestRoomsLimits(t *testing.T) {
 	}
 	r, _ := hub.Open(Player{ID: 1, Name: "Ана"}, "", Settings{})
 	for i := range MaxPlayers - 1 {
-		if err := r.Join(Player{ID: int64(i + 2), Name: "Играч"}); err != nil {
+		if err := r.Join(Player{ID: int64(i + 2), Name: "Играч"}, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := r.Join(Player{ID: 999, Name: "Още един"}); !errors.Is(err, ErrFull) {
+	if err := r.Join(Player{ID: 999, Name: "Още един"}, ""); !errors.Is(err, ErrFull) {
 		t.Fatalf("player %d: %v", MaxPlayers+1, err)
 	}
 	if err := r.Answer(1, 0, json.RawMessage(`{"pick":0}`)); !errors.Is(err, ErrNotNow) {
@@ -236,7 +242,7 @@ func TestBarredAndLate(t *testing.T) {
 		hub.Barred = func(context.Context) (map[string]bool, error) { return barred, nil }
 		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
 		r, _ := hub.Open(ana, "", Settings{})
-		_ = r.Join(bo)
+		_ = r.Join(bo, "")
 		sa, _ := r.Follow(ana.ID)
 		sb, _ := r.Follow(bo.ID)
 		if err := r.Start(ana.ID); err != nil {
@@ -364,9 +370,9 @@ func TestRoomsKeptOverARestart(t *testing.T) {
 		hub := NewHub(bank)
 		ana, bo, cy := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}, Player{ID: 3, Name: "Цви"}
 		lobby, _ := hub.Open(ana, "", Settings{})
-		_ = lobby.Join(bo)
+		_ = lobby.Join(bo, "")
 		over, _ := hub.Open(bo, "", Settings{})
-		_ = over.Join(cy)
+		_ = over.Join(cy, "")
 		playing, _ := hub.Open(cy, "", Settings{})
 		_ = over.Start(bo.ID)
 		sb, _ := over.Follow(bo.ID)
@@ -379,7 +385,7 @@ func TestRoomsKeptOverARestart(t *testing.T) {
 		}
 		over.Unfollow(sb)
 		// The game being played: Цви has answered the first question, Ана (on screen too) not yet.
-		_ = playing.Join(ana)
+		_ = playing.Join(ana, "")
 		sc, _ := playing.Follow(cy.ID)
 		sa, _ := playing.Follow(ana.ID)
 		_ = playing.Start(cy.ID)
@@ -429,7 +435,7 @@ func TestRoomsKeptOverARestart(t *testing.T) {
 		v := r.View(cy.ID)
 		if v.Phase != Question || v.N != 0 || len(v.Players) != 2 || !v.IsHost || v.Question.Given == nil ||
 			v.Players[0].Name != "Цви" || !v.Players[0].Answered || v.Players[0].Points != playingBefore.Players[0].Points ||
-			v.Players[0].Points == 0 || v.Players[1].Answered || v.Question.LeftMs != v.Question.LimitMs {
+			v.Players[0].Points == 0 || v.Players[1].Answered || v.Question.LeftMs != v.Question.LimitMs-3000 {
 			t.Fatalf("the game being played, restored:\n%+v\nwas\n%+v", v, playingBefore)
 		}
 		if _, err := r.Follow(ana.ID); err != nil {
@@ -479,7 +485,7 @@ func TestABrokenClockEndsTheGame(t *testing.T) {
 		}
 		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
 		r, _ := hub.Open(ana, "", Settings{})
-		_ = r.Join(bo)
+		_ = r.Join(bo, "")
 		sa, _ := r.Follow(ana.ID)
 		sb, _ := r.Follow(bo.ID)
 		defer r.Unfollow(sa)
@@ -518,8 +524,8 @@ func TestRemove(t *testing.T) {
 		hub := NewHub(sample(t))
 		ana, bo, cy := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}, Player{ID: 3, Name: "Цви"}
 		r, _ := hub.Open(ana, "", Settings{})
-		_ = r.Join(bo)
-		_ = r.Join(cy)
+		_ = r.Join(bo, "")
+		_ = r.Join(cy, "")
 		sa, _ := r.Follow(ana.ID)
 		sb, _ := r.Follow(bo.ID)
 		sc, _ := r.Follow(cy.ID)
@@ -561,7 +567,7 @@ func TestRemove(t *testing.T) {
 		if v := r.View(ana.ID); v.Phase != Reveal || len(v.Players) != 2 {
 			t.Fatalf("after Цви went: %+v", v)
 		}
-		if err := r.Join(cy); !errors.Is(err, ErrRemoved) {
+		if err := r.Join(cy, ""); !errors.Is(err, ErrRemoved) {
 			t.Fatalf("Цви came back: %v", err)
 		}
 		// The others keep their keys.
@@ -581,7 +587,7 @@ func TestRemove(t *testing.T) {
 			t.Fatal(err)
 		}
 		again, _ := next.Get(r.Code())
-		if err := again.Join(cy); !errors.Is(err, ErrRemoved) {
+		if err := again.Join(cy, ""); !errors.Is(err, ErrRemoved) {
 			t.Fatalf("Цви came back after a restart: %v", err)
 		}
 		// Keys stay as the screens know them, the gap Цви left included: a host's „Махни“ on a key shown before the
@@ -590,7 +596,11 @@ func TestRemove(t *testing.T) {
 		if after := again.Players(); len(after) != len(before) || after[1] != before[1] || after[2] != 0 {
 			t.Fatalf("keys after a restart: %v, before %v", after, before)
 		}
-		if err := again.Join(Player{ID: 4, Name: "Дея"}); err != nil {
+		// A game under way: someone new comes in by the room's link, not by its code alone.
+		if err := again.Join(Player{ID: 4, Name: "Дея"}, ""); !errors.Is(err, ErrStarted) {
+			t.Fatalf("by the code alone, mid-game: %v", err)
+		}
+		if err := again.Join(Player{ID: 4, Name: "Дея"}, r.Key()); err != nil {
 			t.Fatal(err)
 		}
 		if after := again.Players(); after[3] != 4 || after[2] != 0 {
@@ -629,7 +639,7 @@ func TestSettingsAndRecords(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_ = r.Join(bo)
+		_ = r.Join(bo, "")
 		sa, _ := r.Follow(ana.ID)
 		sb, _ := r.Follow(bo.ID)
 		if v := r.View(bo.ID); v.Length != 5 || v.Mix != play.MixEasy {
@@ -697,8 +707,8 @@ func TestLeadingHost(t *testing.T) {
 		if err := r.Start(ana.ID); !errors.Is(err, ErrNoPlayers) {
 			t.Fatalf("a game for nobody: %v", err)
 		}
-		_ = r.Join(ana) // the host's screen joining again changes nothing
-		_ = r.Join(bo)
+		_ = r.Join(ana, "") // the host's screen joining again changes nothing
+		_ = r.Join(bo, "")
 		sb, _ := r.Follow(bo.ID)
 		if v := r.View(ana.ID); len(v.Players) != 1 || !v.IsHost || !v.Lead || v.Host != "Учител" {
 			t.Fatalf("the host's lobby: %+v", v)
