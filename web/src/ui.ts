@@ -59,16 +59,9 @@ export function inRowChip(n: number): HTMLElement | null {
   );
 }
 
-/** How an answer went: its sign, the word, the right answers in a row it makes, and the points it brought (and how
- * many of them for being quick, and for the row). */
-export function verdict(
-  kind: VerdictKind,
-  points: number,
-  words = verdictWords[kind],
-  speed = 0,
-  row = 0,
-  inRow = 0,
-): Child {
+/** How an answer went: its sign, the word, the right answers in a row it makes (the climb's feel: the row earns no
+ * points, play/worth.go), and the points it brought (and how many of them for being quick). */
+export function verdict(kind: VerdictKind, points: number, words = verdictWords[kind], speed = 0, inRow = 0): Child {
   return h(
     "div",
     { class: `verdict ${kind}`, role: "status" },
@@ -80,7 +73,6 @@ export function verdict(
           { class: "verdict-pts" },
           countUp(points, 0, "+"),
           speed > 0 ? h("small", { class: "verdict-part" }, `${formatNumber(speed)} за бързина`) : null,
-          row > 0 ? h("small", { class: "verdict-part row" }, `${formatNumber(row)} за ${inRow} поред`) : null,
         )
       : null,
   );
@@ -182,16 +174,17 @@ export interface Open {
 /** The game's three numbers, each in a few words: what one game scored, what playing earns, how strong a player is.
  * Kept apart on purpose (play/worth.go), so each is said where it first shows and a tap from wherever it does. */
 export const meaning = {
-  points: "Точките са резултатът ти в една игра: за верните отговори, за бързината и за верните поред.",
+  points:
+    "Точките са резултатът ти в една игра: за верните отговори (по-трудните носят повече) и за бързината. Игра без грешка носи още точки накрая. Верните поред не носят повече точки.",
   /** The day's board: said of the day's points only (a topic's game has no board). */
   dayBoard: " При равен брой верни в класацията на деня решават точките.",
   xp: "XP печелиш с всяка игра, цел и постижение. Трупа се и вдига нивото ти.",
-  league: " Точките от въпросите на деня за седмицата те класират в лигата.",
+  league: " В лигата за седмицата първо решават верните отговори на въпросите на деня, после точките.",
   rating: "Рейтингът е силата ти в дуелите и в Роял: расте с победа, пада със загуба. От него зависи дивизията ти.",
 };
 
-/** The day's points' words: the day's board they place on, and the league once it's open, which races on them, added
- * up over the week. */
+/** The day's points' words: the day's board they place on, and the league once it's open, where (added up over the
+ * week) they decide between as many right answers. */
 export const pointsWords = (open?: Open) => meaning.points + meaning.dayBoard + (open?.league ? meaning.league : "");
 
 let explained = 0;

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/store"
@@ -13,18 +14,24 @@ import (
 
 // Leagues are a race every week on the day's questions. A week runs Monday to Sunday in Bulgaria. A player's first
 // finished run of the day's questions in a week puts them in a group of up to GroupSize players of their league,
-// filled in the order they come; the group races on the points each scores on the day's questions that week, added up
-// day by day. Points add up across games nowhere else (worth.go): here they're the same questions for everyone in the
-// group, and a day missed adds nothing. On equal points more right answers go first, then who came first. Whatever
-// else a player plays (topics, duels, Роял) is theirs for XP and the rating, never the league's: what wins a week is
-// playing the day, every day, and playing it well.
+// filled in the order they come; the group races on the right answers each gives to the day's questions that week,
+// added up day by day, as the day's own board does (board.go): more right answers never lose to fewer but faster
+// (owner, 2026-11-18, review E3). On equal right answers the week's points decide, then who came first. Points add up
+// across games nowhere else (worth.go): here they're the same questions for everyone in the group, and a day missed
+// adds nothing. Whatever else a player plays (topics, duels, Роял) is theirs for XP and the rating, never the league's:
+// what wins a week is playing the day, every day, and playing it well.
 //
-// When the week ends the first of each group go up a league and the last go down (moves: how many, by the group's
+// Groups fill in the order players come, so a league's last group may be small. A group of fewer than RaceSize races
+// with the group before it in its league (races): one race, one standings, its places, moves and pay counted over both,
+// so that nobody spends a week alone in a group that's only gathering (review E7). Only a league's one group can be
+// too small for a race; then it is no race: nobody in it moves or is paid for a place, its first place unlocks nothing,
+// and its players see only that it's still gathering.
+//
+// When the week ends the first of each race go up a league and the last go down (moves: how many, by the race's
 // size); the first three are paid XP (LeaguePay), and everyone is told how their week ended. Only a week played in a
 // player's own league moves them down: a guest who signs in brings a group only of the account's league (merge.go),
-// and an account raised to a guest's higher league meanwhile keeps it, or goes higher. A group of fewer than RaceSize
-// isn't a race: nobody in it moves or is paid for a place, its first place unlocks nothing, and its players see only
-// that it's still gathering. A week not played changes nothing.
+// and an account raised to a guest's higher league meanwhile keeps it, or goes higher. A week not played changes
+// nothing.
 //
 // A week is its days' runs, whenever they finish: Sunday's questions begun before midnight are Sunday's, though
 // finished after it (DayGrace). So a week closes only once no run of its last day can still be answered (weekLate,
@@ -34,7 +41,7 @@ import (
 // week before closed, what followed a run cut off) is seated by the close, the closing week's before its places are
 // counted, the new week's in their new league once it opens (seatPlayed).
 //
-// The close is written a few groups at a time (closeBatch), each group's places, moves, pay and news in one write
+// The close is written a few races at a time (closeBatch), each race's places, moves, pay and news in one write
 // with them, so that it never holds the single writer for long at the day's busiest minute; cut off half-way, it goes
 // on where it stopped, nothing kept or told twice, and the next week opens once all of it is kept.
 //
@@ -68,14 +75,15 @@ var TopLeague = len(Leagues) - 1
 // leagueOf is the league of a tier, kept within the leagues there are.
 func leagueOf(tier int) League { return Leagues[max(0, min(tier, TopLeague))] }
 
-// GroupSize is how many race in a group: enough for a race, few enough to know the names.
+// GroupSize is how many a group takes: enough for a race, few enough to know the names. A race is a group, or (its
+// league's last, gathering) two: up to GroupSize + RaceSize - 1.
 const GroupSize = 20
 
-// RaceSize is how many a group needs to be a race: fewer, and nobody moves or is paid for a place, and the group isn't
-// shown.
+// RaceSize is how many a race needs: fewer (a league's one group, small), and nobody moves or is paid for a place, and
+// the group isn't shown.
 const RaceSize = 5
 
-// LeaguePay is what the first three places of a week pay, in a group of RaceSize or more.
+// LeaguePay is what the first three places of a week pay, in a race of RaceSize or more.
 var LeaguePay = [3]int{300, 200, 100}
 
 // weekLate is how long after its end a week closes: once no run of its last day can still be answered (dayLate), and
@@ -161,7 +169,7 @@ type LeagueNews struct {
 	XP    int
 }
 
-// standing is a player's place in a group: who, the week's points and right answers as the others see them, theirs
+// standing is a player's place in a race: who, the week's points and right answers as the others see them, theirs
 // as they see them (with their runs played at a script's speed), and when they came.
 type standing struct {
 	user                 int64
@@ -170,16 +178,27 @@ type standing struct {
 	joined               int64
 }
 
-// groupStandings are a group's players by the week's points as the others see them, the first first (on equal points,
-// more right answers, then who came first).
-func groupStandings(ctx context.Context, q querier, week string, group int64) ([]standing, error) {
+// byPlace orders standings the first first: more right answers, then more points, then who came first.
+func byPlace(a, b standing) int {
+	return cmp.Or(cmp.Compare(b.rights, a.rights), cmp.Compare(b.points, a.points), cmp.Compare(a.joined, b.joined),
+		cmp.Compare(a.user, b.user))
+}
+
+// raceStandings are a race's players (its groups': leagueRace) by the week as the others see it, the first first
+// (byPlace).
+func raceStandings(ctx context.Context, q querier, week string, groups []int64) ([]standing, error) {
 	sum := func(column, viewer string) string {
 		return `coalesce((SELECT sum(r.` + column + `) FROM runs r WHERE ` + weekDays("m.user_id") + ` AND ` +
 			fairFor("r", viewer) + `), 0)`
 	}
-	rows, err := q.QueryContext(ctx, `SELECT m.user_id, `+sum("points", "0")+` AS points, `+sum("rights", "0")+` AS rights, `+
+	in := strings.Repeat(", ?", len(groups))[2:]
+	args := weekArgs(week)
+	for _, id := range groups {
+		args = append(args, id)
+	}
+	rows, err := q.QueryContext(ctx, `SELECT m.user_id, `+sum("points", "0")+`, `+sum("rights", "0")+`, `+
 		sum("points", "m.user_id")+`, `+sum("rights", "m.user_id")+`, m.joined_at FROM league_members m
-		WHERE m.group_id = ?3 ORDER BY points DESC, rights DESC, m.joined_at, m.user_id`, append(weekArgs(week), group)...)
+		WHERE m.group_id IN (`+in+`)`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -192,11 +211,12 @@ func groupStandings(ctx context.Context, q querier, week string, group int64) ([
 		}
 		out = append(out, s)
 	}
+	slices.SortFunc(out, byPlace)
 	return out, rows.Err()
 }
 
-// standingsFor is a group's standings as one of its players sees them: their own points with everything they played,
-// everyone else's as the others see them. A player whose runs are all a person's sees the group as everyone does.
+// standingsFor is a race's standings as one of its players sees them: their own week with everything they played,
+// everyone else's as the others see it. A player whose runs are all a person's sees the race as everyone does.
 func standingsFor(list []standing, viewer int64) []standing {
 	out := slices.Clone(list)
 	for i := range out {
@@ -204,11 +224,51 @@ func standingsFor(list []standing, viewer int64) []standing {
 			out[i].points, out[i].rights = out[i].ownPoints, out[i].ownRights
 		}
 	}
-	slices.SortStableFunc(out, func(a, b standing) int {
-		return cmp.Or(cmp.Compare(b.points, a.points), cmp.Compare(b.rights, a.rights), cmp.Compare(a.joined, b.joined),
-			cmp.Compare(a.user, b.user))
-	})
+	slices.SortStableFunc(out, byPlace)
 	return out
+}
+
+// leagueRace is who race together in a week: a group, or a league's last group (of fewer than RaceSize) with the one
+// before it; their league's tier, and how many they are.
+type leagueRace struct {
+	groups     []int64
+	tier, size int
+}
+
+// races are a week's groups (by league, then as they opened) as they race: a group of fewer than RaceSize joins the
+// race before it in its league, if there is one.
+func races(groups []leagueGroup) []leagueRace {
+	var out []leagueRace
+	for _, gr := range groups {
+		if last := len(out) - 1; last >= 0 && out[last].tier == gr.tier && gr.size < RaceSize {
+			out[last].groups = append(out[last].groups, gr.id)
+			out[last].size += gr.size
+			continue
+		}
+		out = append(out, leagueRace{groups: []int64{gr.id}, tier: gr.tier, size: gr.size})
+	}
+	return out
+}
+
+// weekGroups are a week's groups, of one league (tier 0 and up) or all (-1), by league and then as they opened, with
+// how many are in each.
+func weekGroups(ctx context.Context, q querier, week string, tier int) ([]leagueGroup, error) {
+	rows, err := q.QueryContext(ctx, `SELECT g.id, g.tier, (SELECT count(*) FROM league_members m
+		WHERE m.group_id = g.id) FROM league_groups g WHERE g.week = ?1 AND (?2 < 0 OR g.tier = ?2)
+		ORDER BY g.tier, g.id`, week, tier)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var groups []leagueGroup
+	for rows.Next() {
+		var gr leagueGroup
+		if err := rows.Scan(&gr.id, &gr.tier, &gr.size); err != nil {
+			return nil, err
+		}
+		groups = append(groups, gr)
+	}
+	return groups, rows.Err()
 }
 
 // ensureWeek closes the week open if it's due (weekDue), and any after it that are due too (the server was off), and
@@ -261,50 +321,38 @@ type leagueGroup struct {
 	tier, size int
 }
 
-// closeWeek ends a week of the leagues: whoever played it is seated (seatPlayed), every group's places are kept, the
-// leagues move and the places pay, and each player's news is handed on (LeagueNews), a few groups at a time
-// (closeGroups); then the next week opens. Done again after a failure, it goes on where it stopped.
+// closeWeek ends a week of the leagues: whoever played it is seated (seatPlayed), every race's places are kept, the
+// leagues move and the places pay, and each player's news is handed on (LeagueNews), a few races at a time
+// (closeRaces), a race's groups always together; then the next week opens. Done again after a failure, it goes on
+// where it stopped.
 func (g *Game) closeWeek(ctx context.Context, week string) error {
 	if err := g.seatPlayed(ctx, week); err != nil {
 		return err
 	}
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT g.id, g.tier, (SELECT count(*) FROM league_members m
-		WHERE m.group_id = g.id) FROM league_groups g WHERE g.week = ? ORDER BY g.id`, week)
+	groups, err := weekGroups(ctx, g.DB.Read, week, -1)
 	if err != nil {
 		return err
 	}
-	var groups []leagueGroup
-	for rows.Next() {
-		var gr leagueGroup
-		if err := rows.Scan(&gr.id, &gr.tier, &gr.size); err != nil {
-			rows.Close()
-			return err
-		}
-		groups = append(groups, gr)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	for len(groups) > 0 {
+	list := races(groups)
+	for len(list) > 0 {
 		n, size := 0, 0
-		for n < len(groups) && (n == 0 || size+groups[n].size <= closeBatch) {
-			size += groups[n].size
+		for n < len(list) && (n == 0 || size+list[n].size <= closeBatch) {
+			size += list[n].size
 			n++
 		}
-		if err := g.closeGroups(ctx, week, groups[:n]); err != nil {
+		if err := g.closeRaces(ctx, week, list[:n]); err != nil {
 			return err
 		}
-		groups = groups[n:]
+		list = list[n:]
 	}
 	_, err = g.DB.Write.ExecContext(ctx, `UPDATE league_week SET id = ? WHERE id = ?`, nextWeek(week), week)
 	return err
 }
 
-// closeGroups keeps how a week ended for some of its groups, in one write: each player's place, the league they move
+// closeRaces keeps how a week ended for some of its races, in one write: each player's place, the league they move
 // to, what the place pays, and their news (LeagueNews), kept with them or not at all. A place kept already (a close
 // cut off after it) is left as it is, and not told again.
-func (g *Game) closeGroups(ctx context.Context, week string, groups []leagueGroup) error {
+func (g *Game) closeRaces(ctx context.Context, week string, list []leagueRace) error {
 	return g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		result, err := tx.PrepareContext(ctx, `INSERT OR IGNORE INTO league_results
 			(week, user_id, tier, place, of, points, moved, xp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -312,7 +360,7 @@ func (g *Game) closeGroups(ctx context.Context, week string, groups []leagueGrou
 			return err
 		}
 		defer result.Close()
-		// A player moves from the group's league, or stays in their own if it's higher (raised since they joined the
+		// A player moves from the race's league, or stays in their own if it's higher (raised since they joined the
 		// group: a guest's of a higher league brought to the account), unless the week takes them higher still.
 		move, err := tx.PrepareContext(ctx, `UPDATE users SET league = CASE WHEN league > ?1 THEN max(league, ?2) ELSE ?2 END
 			WHERE id = ?3 RETURNING league`)
@@ -321,30 +369,30 @@ func (g *Game) closeGroups(ctx context.Context, week string, groups []leagueGrou
 		}
 		defer move.Close()
 		var news []LeagueNews
-		for _, gr := range groups {
-			list, err := groupStandings(ctx, tx, week, gr.id)
+		for _, race := range list {
+			standings, err := raceStandings(ctx, tx, week, race.groups)
 			if err != nil {
 				return err
 			}
-			n := len(list)
+			n := len(standings)
 			up, down := moves(n)
-			// Each one's place is in the group as they see it (standingsFor): for those who played as people, the
+			// Each one's place is in the race as they see it (standingsFor): for those who played as people, the
 			// same for all.
-			for _, member := range list {
-				seen := standingsFor(list, member.user)
+			for _, member := range standings {
+				seen := standingsFor(standings, member.user)
 				i := slices.IndexFunc(seen, func(s standing) bool { return s.user == member.user })
 				s := seen[i]
 				moved, pay := 0, 0
 				switch {
-				case i < up && s.points > 0 && gr.tier < TopLeague:
+				case i < up && s.points > 0 && race.tier < TopLeague:
 					moved = 1
-				case i >= n-down && gr.tier > 0:
+				case i >= n-down && race.tier > 0:
 					moved = -1
 				}
 				if n >= RaceSize && i < len(LeaguePay) {
 					pay = LeaguePay[i]
 				}
-				res, err := result.ExecContext(ctx, week, s.user, gr.tier, i+1, n, s.points, moved, pay)
+				res, err := result.ExecContext(ctx, week, s.user, race.tier, i+1, n, s.points, moved, pay)
 				if err != nil {
 					return err
 				}
@@ -356,10 +404,10 @@ func (g *Game) closeGroups(ctx context.Context, week string, groups []leagueGrou
 					continue
 				}
 				var league int
-				if err := move.QueryRowContext(ctx, gr.tier, gr.tier+moved, s.user).Scan(&league); err != nil {
+				if err := move.QueryRowContext(ctx, race.tier, race.tier+moved, s.user).Scan(&league); err != nil {
 					return err
 				}
-				news = append(news, LeagueNews{To: s.user, Week: week, From: leagueOf(gr.tier),
+				news = append(news, LeagueNews{To: s.user, Week: week, From: leagueOf(race.tier),
 					Now: leagueOf(league), Place: i + 1, Of: n, XP: pay})
 			}
 		}
@@ -473,8 +521,9 @@ func placeInLeague(tx *sql.Tx, week string, tier int, userID, joined int64) erro
 	return err
 }
 
-// LeagueView is a player's week as they see it: their league, the days left, and their group, each with the week's
-// points, the first going up and the last going down; or, not in it yet, what puts them in.
+// LeagueView is a player's week as they see it: their league, the days left, and their race (their group, or two:
+// races), each with the week's right answers and points, the first going up and the last going down; or, not in it
+// yet, what puts them in.
 type LeagueView struct {
 	Week string `json:"week"`
 	// DaysLeft is how many days of the week are left, today too: 0 once it's over, its last runs still coming in
@@ -483,7 +532,8 @@ type LeagueView struct {
 	League   League `json:"league"`
 	// In is whether the player is in a group this week (the day's questions finished put them in).
 	In bool `json:"in"`
-	// Size is how many are in the group; Group is who, once it's a race (RaceSize): until then it's gathering.
+	// Size is how many race with the player (their group's race); Group is who, once it's a race (RaceSize): until
+	// then it's gathering.
 	Size  int         `json:"size"`
 	Group []LeagueRow `json:"group"`
 	Place int         `json:"place,omitempty"`
@@ -492,16 +542,17 @@ type LeagueView struct {
 	Up   int    `json:"up"`
 	Down int    `json:"down"`
 	Pay  [3]int `json:"pay"`
-	// Race is how many a group needs to be a race (RaceSize).
+	// Race is how many a race needs (RaceSize).
 	Race int `json:"race"`
 	// Last is how the player's last week ended, if they played one.
 	Last *LeagueEnd `json:"last,omitempty"`
 }
 
-// LeagueRow is a player in a group: who, and the week's points.
+// LeagueRow is a player in a race: who, and the week's right answers and points.
 type LeagueRow struct {
 	Name   string `json:"name"`
 	Tag    string `json:"tag"`
+	Rights int    `json:"rights"`
 	Points int    `json:"points"`
 	Me     bool   `json:"me,omitempty"`
 	Look
@@ -557,7 +608,17 @@ func (g *Game) LeagueOf(ctx context.Context, userID int64) (LeagueView, error) {
 		return v, err
 	}
 	v.League = leagueOf(tier)
-	list, err := groupStandings(ctx, db, week, group.Int64)
+	groups, err := weekGroups(ctx, db, week, tier)
+	if err != nil {
+		return v, err
+	}
+	race := leagueRace{groups: []int64{group.Int64}}
+	for _, r := range races(groups) {
+		if slices.Contains(r.groups, group.Int64) {
+			race = r
+		}
+	}
+	list, err := raceStandings(ctx, db, week, race.groups)
 	if err != nil {
 		return v, err
 	}
@@ -576,7 +637,7 @@ func (g *Game) LeagueOf(ctx context.Context, userID int64) (LeagueView, error) {
 	for i, s := range list {
 		var avatar, title string
 		var xp int
-		row := LeagueRow{Points: s.points, Me: s.user == userID}
+		row := LeagueRow{Rights: s.rights, Points: s.points, Me: s.user == userID}
 		if err := db.QueryRowContext(ctx, `SELECT u.name, u.tag, `+lookColumns+` FROM users u WHERE u.id = ?`, s.user).
 			Scan(&row.Name, &row.Tag, &avatar, &title, &xp); err != nil {
 			return v, err

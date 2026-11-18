@@ -230,6 +230,12 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
         (f) => (f.streak > t.streak && streakMarks.includes(f.streak) ? f.streak : 0),
         () => 0,
       ),
+      // A reserve day the day's ten just earned (play/runs.go: the streak's third day, the first), told with the
+      // streak's round number.
+      reserve: now.then(
+        (f) => (f.reserve ?? 0) > (t.reserve ?? 0),
+        () => false,
+      ),
       // Once the day as it is now has come and drawn the chips (signals run at once): their growing, if any.
       grown: now.then(
         () => growing ?? undefined,

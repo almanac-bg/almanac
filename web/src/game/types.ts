@@ -183,9 +183,9 @@ export interface State {
 
 export interface Result {
   points: number;
-  /** How many of the points were for being quick, and how many for the right answers in a row (`inRow`, from 2). */
+  /** How many of the points were for being quick; how many right answers in a row the answer makes (`inRow`, from 2:
+   * the climb's feel, worth no points). */
   speed?: number;
-  row?: number;
   inRow?: number;
   score: number;
   right: boolean;

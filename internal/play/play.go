@@ -326,9 +326,9 @@ type Shown struct {
 // Result is what an answer earned, the answer itself, and the run after it.
 type Result struct {
 	Points int `json:"points"`
-	// Speed is how many of the points were for being quick, and Row how many for the right answers in a row InRow.
+	// Speed is how many of the points were for being quick. InRow is how many right answers in a row the answer
+	// makes, from 2: heard and seen as the run's climb, worth no points (worth.go).
 	Speed    int     `json:"speed,omitempty"`
-	Row      int     `json:"row,omitempty"`
 	InRow    int     `json:"inRow,omitempty"`
 	Score    float64 `json:"score"`
 	Right    bool    `json:"right"`
@@ -738,8 +738,8 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 			}
 			inRow++
 		}
-		w := r.picks[r.at].worth(d.Question(), gr.Score, took, inRow)
-		res.Points, res.Speed, res.Row = w.Points, w.Speed, w.Row
+		w := r.picks[r.at].worth(d.Question(), gr.Score, took)
+		res.Points, res.Speed = w.Points, w.Speed
 		if inRow > 1 {
 			res.InRow = inRow
 		}
@@ -801,9 +801,9 @@ func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
 	} else {
 		res.TimedOut = took >= Limit(d.Question())
 	}
-	inRow := 0
 	if res.Right {
-		if inRow, err = rightsInRow(tx, r); err != nil { // the run's last answer: the row it made
+		inRow, err := rightsInRow(tx, r) // the run's last answer: the row it made
+		if err != nil {
 			return res, nil, err
 		}
 		if inRow > 1 {
@@ -812,8 +812,8 @@ func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
 	}
 	// How the points were made up, as far as they can be worked out again (the time kept is to the end of the
 	// question's time at most).
-	if w := r.picks[n].worth(d.Question(), res.Score, took, inRow); w.Points == res.Points {
-		res.Speed, res.Row = w.Speed, w.Row
+	if w := r.picks[n].worth(d.Question(), res.Score, took); w.Points == res.Points {
+		res.Speed = w.Speed
 	}
 	res.Learned = r.kind == "mistakes" && res.Right && d.Question().Extra().Fact != ""
 	res.State, err = g.state(tx, r)

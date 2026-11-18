@@ -644,7 +644,6 @@ type side struct {
 	given    json.RawMessage
 	gained   int
 	speed    int
-	row      int // of gained, for the right answers in a row
 	inRow    int // right answers in a row, this one counted
 	right    bool
 	exact    bool
@@ -966,7 +965,7 @@ func (m *Match) show(n int) {
 	}
 	m.phase, m.n, m.shownAt = PhaseQuestion, n, at
 	for _, s := range m.sides {
-		s.answered, s.took, s.given, s.gained, s.speed, s.row, s.inRow, s.right, s.exact = false, 0, nil, 0, 0, 0, 0, false, false
+		s.answered, s.took, s.given, s.gained, s.speed, s.inRow, s.right, s.exact = false, 0, nil, 0, 0, 0, false, false
 	}
 	limit := play.Limit(m.dealt[n].Question())
 	m.after(limit+play.Grace, m.reveal)
@@ -1051,7 +1050,7 @@ func (m *Match) Answer(by int64, n int, raw json.RawMessage) error {
 		return err
 	}
 	s.answered, s.took, s.given = true, took, g.Shown
-	s.gained, s.speed, s.row, s.inRow, s.right, s.exact = res.Points, res.Speed, res.Row, res.InRow, res.Right, res.Exact
+	s.gained, s.speed, s.inRow, s.right, s.exact = res.Points, res.Speed, res.InRow, res.Right, res.Exact
 	if res.TimedOut {
 		s.given = nil
 	}
@@ -1238,8 +1237,7 @@ type RevealView struct {
 	Points int `json:"points"`
 	// Speed is how many of the points were for being quick.
 	Speed int `json:"speed,omitempty"`
-	// Row is how many of the points were for the right answers in a row InRow.
-	Row    int  `json:"row,omitempty"`
+	// InRow is how many right answers in a row the answer makes, from 2: the climb's feel, worth no points.
 	InRow  int  `json:"inRow,omitempty"`
 	Right  bool `json:"right"`
 	Exact  bool `json:"exact,omitempty"`
@@ -1276,7 +1274,7 @@ func (m *Match) View(viewer int64) View {
 		if shown {
 			q.LeftMs = 0
 			q.NextMs = max(1, (m.pause - time.Since(m.revealedAt)).Milliseconds())
-			q.Reveal = &RevealView{Answer: d.Reveal(m.hub.game.Crowd(d.Question())), Points: me.gained, Speed: me.speed, Row: me.row, InRow: me.inRow,
+			q.Reveal = &RevealView{Answer: d.Reveal(m.hub.game.Crowd(d.Question())), Points: me.gained, Speed: me.speed, InRow: me.inRow,
 				Right: me.right, Exact: me.exact, Missed: !me.answered}
 		}
 		v.Question = q

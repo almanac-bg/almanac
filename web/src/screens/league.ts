@@ -1,6 +1,7 @@
-// The week's league: every week, a race on the day's points added up over the week, in a group of up to twenty of
-// their league — when the week ends the first go up a league and the last go down, and the first three are paid XP
-// (play/leagues.go). A group isn't a race until it has five: until then it's gathering, and shows nobody. Класации has
+// The week's league: every week, a race on the day's right answers added up over the week (on equal ones, the
+// points), in a group of up to twenty of their league — when the week ends the first go up a league and the last go
+// down, and the first three are paid XP (play/leagues.go). A league's last group, under five, races with the one
+// before it; a league's one group under five isn't a race: it's gathering, and shows nobody. Класации has
 // the group („Лига“); Профил a line with where the player stands, once they've been in a league; and the day's result
 // a quiet line of where the day just played leaves them.
 
@@ -32,7 +33,8 @@ export interface LeagueEnd {
 interface Row extends Look {
   name: string;
   tag: string;
-  /** The week's points on the day's questions. */
+  /** The week's right answers on the day's questions, which place a row, and its points, which decide a tie. */
+  rights: number;
   points: number;
   me?: boolean;
 }
@@ -44,7 +46,7 @@ export interface LeagueView {
   daysLeft: number;
   league: League;
   in: boolean;
-  /** How many are in the group; who (`group`) once it's a race (`race` or more), none while it's gathering. */
+  /** How many race with the player; who (`group`) once it's a race (`race` or more), none while it's gathering. */
   size: number;
   group: Row[];
   place?: number;
@@ -105,27 +107,42 @@ function rules(v: LeagueView): Child {
     h(
       "p",
       { class: "board-note" },
-      `Всяка седмица играчите се състезават в групи до 20 души по точките от въпросите на деня. Пропуснат ден носи нула точки. В полунощ срещу понеделник първите се качват в по-висока лига, последните слизат, а първите трима печелят ${v.pay[0]}, ${v.pay[1]} и ${v.pay[2]} XP. В група под ${v.race} души няма нито качване, нито награди.`,
+      `Всяка седмица играчите се състезават в групи до 20 души. Мястото ти в групата се решава от верните отговори на въпросите на деня за седмицата, а при равенство от точките. Пропуснат ден не носи нищо. В полунощ срещу понеделник първите се качват в по-висока лига, последните слизат, а първите трима печелят ${v.pay[0]}, ${v.pay[1]} и ${v.pay[2]} XP. Група под ${v.race} души се състезава с групата преди нея. Ако е единствената в лигата, няма нито качване, нито награди.`,
     ),
   );
 }
 
+/** The right answers or points between two rows (`a` ahead of `b`, or level), said: the right answers when they
+ * differ, else the points; "" when both are level. */
+function lead(a: Pick<Row, "rights" | "points">, b: Pick<Row, "rights" | "points">): string {
+  const rights = a.rights - b.rights;
+  if (rights) return rights === 1 ? "1 верен отговор" : `${rights} верни отговора`;
+  const points = a.points - b.points;
+  if (points > 0) return `${formatNumber(points)} ${points === 1 ? "точка" : "точки"}`;
+  return "";
+}
+
 /** The week as it stands for the player, in two lines: the days left and who goes up („Още 6 дни · първите 5 се
- * качват“); and the gap that's worth playing for: the lead over the second, the points to the place above, or out of
- * the zone that goes down. */
+ * качват“); and the gap that's worth playing for: the lead over the second, the right answers (or, level on them, the
+ * points) to the place above, or out of the zone that goes down. */
 function standing(v: LeagueView): Child {
   const n = v.group.length;
   const at = v.place ?? 0;
-  const pts = (x: number) => `${formatNumber(x)} ${x === 1 ? "точка" : "точки"}`;
-  const points = (i: number) => v.group[i]?.points ?? 0;
-  const mine = points(at - 1);
+  const mine = v.group[at - 1];
   const safe = n - v.down; // the last place that doesn't go down
   let gap = "";
-  if (at === 1 && n > 1) gap = mine > points(1) ? `Водиш с ${pts(mine - points(1))}.` : "Наравно с 2-ро място.";
-  else if (at > safe && safe > 0) gap = `Още ${pts(points(safe - 1) - mine + 1)} и излизаш от зоната за слизане.`;
-  else if (at > 1) {
-    const above = points(at - 2) - mine;
-    gap = above > 0 ? `До ${ordinal(at - 1, "n")} място: ${pts(above)}.` : `Наравно с ${ordinal(at - 1, "n")} място.`;
+  const second = v.group[1];
+  if (mine && at === 1 && second) {
+    const by = lead(mine, second);
+    gap = by ? `Водиш с ${by}.` : "Наравно с 2-ро място.";
+  } else if (mine && at > safe && safe > 0) {
+    // Out of the zone for sure: one right answer more than the last safe place has.
+    const need = (v.group[safe - 1]?.rights ?? 0) - mine.rights + 1;
+    gap = `Още ${need === 1 ? "1 верен отговор" : `${need} верни отговора`} и излизаш от зоната за слизане.`;
+  } else if (mine && at > 1) {
+    const above = v.group[at - 2];
+    const by = above ? lead(above, mine) : "";
+    gap = by ? `До ${ordinal(at - 1, "n")} място: ${by}.` : `Наравно с ${ordinal(at - 1, "n")} място.`;
   }
   const days = daysLeft(v.daysLeft);
   return h(
@@ -165,11 +182,16 @@ export function leagueBoard(v: LeagueView): Child {
       rules(v),
     );
   const n = v.group.length;
-  const unit = (points: number) => (points === 1 ? " точка" : " точки");
   const rows: Child[] = [];
   v.group.forEach((r, i) => {
     if (v.down && i === n - v.down) rows.push(h("li", { class: "league-line down" }, "Оттук слизат"));
-    const row = boardRow(i + 1, r.name, [formatNumber(r.points), h("small", { class: "sub" }, unit(r.points))], {
+    // The right answers, which place the row, and the points under them, which decide a tie.
+    const score = [
+      String(r.rights),
+      h("small", { class: "sub" }, ` ${r.rights === 1 ? "верен" : "верни"}`),
+      h("small", { class: "sub league-pts" }, `${formatNumber(r.points)} ${r.points === 1 ? "точка" : "точки"}`),
+    ];
+    const row = boardRow(i + 1, r.name, score, {
       me: r.me,
       look: r,
       tag: r.tag,

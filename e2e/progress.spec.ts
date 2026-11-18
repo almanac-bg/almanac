@@ -32,14 +32,14 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
 
   await page.goto("/rewards");
   // A second day's: XP and the goals are met, the league isn't, so its three achievements wait (play/unfold.go).
-  await expect(page.getByRole("heading", { name: /Постижения · \d+ от 30/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Постижения · \d+ от 31/ })).toBeVisible();
   await expect(page.locator(".how")).not.toContainText("Лиги");
   // The nearest to done and the earned ones first; the rest by tier a tap away, each in full: how it's earned, how
   // far along, what it gives.
   await expect(page.getByRole("heading", { name: "Най-близо" })).toBeVisible();
   await expect(page.getByRole("heading", { name: /Легендарни/ })).toBeHidden();
   await page.getByText(/^Останалите постижения \(\d+\)$/).click();
-  await expect(page.getByRole("heading", { name: "Легендарни · 0 от 6" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Легендарни · 0 от 7" })).toBeVisible();
   const row = (name: string) => page.locator(".achievement", { hasText: name }).last();
   await expect(row("Петдесет победи")).toContainText("Спечели петдесет дуела.");
   // Progress towards a goal (a bar, no ring), a reward in sight, and the hidden ones kept secret.

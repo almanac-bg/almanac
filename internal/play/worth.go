@@ -9,19 +9,22 @@ import (
 
 // Points are a game's score: what each answer earned, added up within one game, to compare players who played the
 // same questions (a duel, the day's, a room). They're added up across games in one place only, the week's league
-// (leagues.go): the day's points over a week, the same questions for everyone in it. What a player earns by playing
+// (leagues.go): the day's points over a week, the same questions for everyone in it, deciding between as many right
+// answers. What a player earns by playing
 // is XP (xp), and how strong they are is their rating.
 //
 // An answer earns
 //
-//	MaxPoints × difficulty × kind × score × (1 − SpeedShare + SpeedShare × speed) × row
+//	MaxPoints × difficulty × kind × score × (1 − SpeedShare + SpeedShare × speed)
 //
 // rounded to tens, where score is what the answer was worth (0–1, luck taken out: bank.Graded), difficulty pays more
 // for harder questions, kind pays half for a true-or-not (half of guesses come out right: a guess at one is worth
 // what a guess at a choice of four is), and speed is how quick it came: full in the first QuickPart of the
 // question's time, then less, down to nothing at the end. Speed is at most SpeedShare of an answer, so that knowing
-// counts the most and looking an answer up costs. Row is for right answers in a row: from the second, each earns
-// RowStep more, up to RowMax more. A game whose every answer was right earns AllRight more at its end.
+// counts the most and looking an answer up costs. A game whose every answer was right earns AllRight more at its end.
+// Right answers in a row earn nothing more (owner, 2026-11-18, review E6): with a bonus for the row, where a miss fell
+// decided close duels and weeks of the league, more than a right answer to an easy question did. The row is still
+// heard and seen (the run's climb, „3 поред“), as feel only.
 //
 // The numbers are big on purpose: a right answer is worth a thousand, a good game ten thousand. It's the same game
 // whatever the scale, and earning a lot feels better.
@@ -32,9 +35,6 @@ const (
 	// QuickPart is the part of a question's time an answer may take and still earn all of its speed: time to read,
 	// and to get through a slow line.
 	QuickPart = 0.25
-	// RowStep is how much more each right answer in a row earns, from the second; RowMax is the most it comes to.
-	RowStep = 0.1
-	RowMax  = 0.5
 	// AllRight is what a game earns at its end when every answer was right.
 	AllRight = 2000
 )
@@ -44,33 +44,31 @@ var (
 	kinds  = map[string]float64{"truefalse": 0.5}
 )
 
-// Worth is what an answer earned: its points, how many of them are for speed, and how many for the row it's in.
+// Worth is what an answer earned: its points, and how many of them are for speed.
 type Worth struct {
 	Points int
 	Speed  int
-	Row    int
 }
 
-// WorthOf is what an answer of a score to a question, given after took, earns: in a run, and in a room. inRow is
-// how many right answers in a row it makes, itself counted (0 for one that isn't right).
-func WorthOf(q bank.Question, score float64, took time.Duration, inRow int) Worth {
-	return worthAt(q, q.Base().Difficulty, score, took, inRow)
+// WorthOf is what an answer of a score to a question, given after took, earns: in a run, and in a room.
+func WorthOf(q bank.Question, score float64, took time.Duration) Worth {
+	return worthAt(q, q.Base().Difficulty, score, took)
 }
 
 // worth is what an answer to a pick earns (WorthOf), at the difficulty the pick showed at (Pick.D): a question
 // relabelled while it's in play (calibration moves labels, and never the version) pays the same for the same answer,
 // in a run, between a challenge's two players, and all day long on the day's ten. A pick from before it was kept pays
 // at the question's label.
-func (p Pick) worth(q bank.Question, score float64, took time.Duration, inRow int) Worth {
+func (p Pick) worth(q bank.Question, score float64, took time.Duration) Worth {
 	level := p.D
 	if _, ok := weight[level]; !ok {
 		level = q.Base().Difficulty
 	}
-	return worthAt(q, level, score, took, inRow)
+	return worthAt(q, level, score, took)
 }
 
 // worthAt is what an answer earns, the question taken as of a difficulty.
-func worthAt(q bank.Question, level bank.Difficulty, score float64, took time.Duration, inRow int) Worth {
+func worthAt(q bank.Question, level bank.Difficulty, score float64, took time.Duration) Worth {
 	h := q.Base()
 	k, ok := kinds[h.Type]
 	if !ok {
@@ -78,14 +76,8 @@ func worthAt(q bank.Question, level bank.Difficulty, score float64, took time.Du
 	}
 	full := score * MaxPoints * weight[level] * k
 	base := tens(full * (1 - SpeedShare))
-	quick := tens(full * (1 - SpeedShare + SpeedShare*speed(took, Limit(q))))
-	points := tens(full * (1 - SpeedShare + SpeedShare*speed(took, Limit(q))) * (1 + rowBonus(inRow)))
-	return Worth{Points: points, Speed: quick - base, Row: points - quick}
-}
-
-// rowBonus is how much more an answer earns for the right answers in a row it makes.
-func rowBonus(inRow int) float64 {
-	return min(RowMax, RowStep*float64(max(0, inRow-1)))
+	points := tens(full * (1 - SpeedShare + SpeedShare*speed(took, Limit(q))))
+	return Worth{Points: points, Speed: points - base}
 }
 
 // tens rounds points to tens.

@@ -79,7 +79,8 @@ var Titles = []Title{
 	{"encyclopedia", "Ходеща енциклопедия", Legendary, TitleAchievement, unlock{achieved: "master5"}, ""},
 	{"razor", "Ум като бръснач", Legendary, TitleAchievement, unlock{achieved: "duel50"}, ""},
 	{"sunrises", "Сто изгрева", Legendary, TitleAchievement, unlock{achieved: "streak100"}, ""},
-	{"fullYear", "Година без пропуск", Legendary, TitleAchievement, unlock{achieved: "streak365"}, ""},
+	{"almanacYear", "Година с Алманаха", Legendary, TitleAchievement, unlock{achieved: "streak365"}, ""},
+	{"fullYear", "Година без пропуск", Legendary, TitleAchievement, unlock{achieved: "noMiss"}, ""},
 }
 
 // acrossTopics are mastery's titles over several topics, after each topic's own: the claims to knowing a lot, which

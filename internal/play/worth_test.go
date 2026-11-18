@@ -21,36 +21,30 @@ func TestWorth(t *testing.T) {
 	}
 	choice := q("choice", bank.Medium) // 20 s: all the speed in the first 5
 	for _, c := range []struct {
-		q                  bank.Question
-		score              float64
-		took               time.Duration
-		inRow              int
-		points, speed, row int
+		q             bank.Question
+		score         float64
+		took          time.Duration
+		points, speed int
 	}{
-		{choice, 1, 0, 1, 1000, 250, 0},
-		{choice, 1, 5 * time.Second, 1, 1000, 250, 0},
-		{choice, 1, 12500 * time.Millisecond, 1, 880, 130, 0},
-		{choice, 1, 20 * time.Second, 1, 750, 0, 0},
-		{choice, 1, 21 * time.Second, 1, 750, 0, 0}, // within the grace
-		{choice, 0, 0, 0, 0, 0, 0},
-		{q("choice", bank.Easy), 1, 0, 1, 800, 200, 0},
-		{q("choice", bank.Hard), 1, 0, 1, 1200, 300, 0},
-		{q("truefalse", bank.Medium), 1, 0, 1, 500, 120, 0},
-		{q("number", bank.Hard), 0.5, 30 * time.Second, 0, 450, 0, 0},
-		// Right answers in a row: a tenth more from the second, up to a half more.
-		{choice, 1, 0, 2, 1100, 250, 100},
-		{choice, 1, 20 * time.Second, 3, 900, 0, 150},
-		{choice, 1, 0, 6, 1500, 250, 500},
-		{choice, 1, 0, 9, 1500, 250, 500},
+		{choice, 1, 0, 1000, 250},
+		{choice, 1, 5 * time.Second, 1000, 250},
+		{choice, 1, 12500 * time.Millisecond, 880, 130},
+		{choice, 1, 20 * time.Second, 750, 0},
+		{choice, 1, 21 * time.Second, 750, 0}, // within the grace
+		{choice, 0, 0, 0, 0},
+		{q("choice", bank.Easy), 1, 0, 800, 200},
+		{q("choice", bank.Hard), 1, 0, 1200, 300},
+		{q("truefalse", bank.Medium), 1, 0, 500, 120},
+		{q("number", bank.Hard), 0.5, 30 * time.Second, 450, 0},
 	} {
-		w := WorthOf(c.q, c.score, c.took, c.inRow)
-		if w.Points != c.points || w.Speed != c.speed || w.Row != c.row {
-			t.Errorf("%s %s, %v after %v, %d in a row: %+v, want %d (%d for speed, %d for the row)", c.q.Base().Type,
-				c.q.Base().Difficulty, c.score, c.took, c.inRow, w, c.points, c.speed, c.row)
+		w := WorthOf(c.q, c.score, c.took)
+		if w.Points != c.points || w.Speed != c.speed {
+			t.Errorf("%s %s, %v after %v: %+v, want %d (%d for speed)", c.q.Base().Type, c.q.Base().Difficulty,
+				c.score, c.took, w, c.points, c.speed)
 		}
 	}
 	// A guess at a true-or-not is worth what one at a choice of four is.
-	if tf, ch := 0.5*float64(WorthOf(q("truefalse", bank.Medium), 1, 0, 1).Points), 0.25*float64(WorthOf(choice, 1, 0, 1).Points); tf != ch {
+	if tf, ch := 0.5*float64(WorthOf(q("truefalse", bank.Medium), 1, 0).Points), 0.25*float64(WorthOf(choice, 1, 0).Points); tf != ch {
 		t.Errorf("a guess: %v at a true-or-not, %v at a choice", tf, ch)
 	}
 }
@@ -98,7 +92,8 @@ func TestXP(t *testing.T) {
 	}
 }
 
-// A run counts right answers in a row: a wrong one starts the row again, and a game right throughout earns AllRight.
+// A run counts right answers in a row, for the climb's feel only: a wrong one starts the row again, the row earns no
+// more points than the same answers apart (worth.go), and a game right throughout earns AllRight.
 func TestRowsInARun(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -119,8 +114,11 @@ func TestRowsInARun(t *testing.T) {
 		inRow int
 	}{{w.right, 0}, {w.right, 2}, {w.right, 3}, {w.wrong, 0}, {w.right, 0}, {w.right, 2}} {
 		res := answer(s.ID, n, c.how)
-		if res.InRow != c.inRow || (c.inRow > 0) != (res.Row > 0) {
-			t.Fatalf("answer %d: %d in a row, %d points for it; want %d in a row", n, res.InRow, res.Row, c.inRow)
+		if res.InRow != c.inRow {
+			t.Fatalf("answer %d: %d in a row; want %d", n, res.InRow, c.inRow)
+		}
+		if want := w.picks(s.ID)[n].worth(w.question(s.ID, n), 1, time.Second).Points; res.Right && res.Points != want {
+			t.Fatalf("answer %d, %d in a row: %d points, want %d as any right answer", n, res.InRow, res.Points, want)
 		}
 	}
 	for n := 6; n < Length; n++ {

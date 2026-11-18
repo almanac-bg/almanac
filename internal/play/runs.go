@@ -265,17 +265,30 @@ func (g *Game) Left(ctx context.Context, userID int64) ([]LeftRun, error) {
 }
 
 // ReserveMax is how many reserve days a player can keep. A day missed spends one, so the streak holds through it. They
-// come from the day itself, so that a player who plays only the day's ten has them too: one with the first day ever
-// played, one on every ReserveEvery-th day in a row; and from a day with all three goals done.
+// come from the day itself, so that a player who plays only the day's ten has them too: the first on the streak's
+// ReserveFrom-th day, then one on every ReserveEvery-th day in a row; and from a day with all three goals done. At most
+// one a week, Monday to Sunday, from whichever comes first (ReserveWeek), and none before a streak's ReserveFrom-th
+// day: a streak „поред“ hides at most a day a week, and day two still has its stake (owner, 2026-11-18, review E4 and
+// E11).
 const ReserveMax = 2
 
-// ReserveEvery is how many days in a row earn a reserve day.
+// ReserveEvery is how many days in a row earn a reserve day, after the first.
 const ReserveEvery = 7
+
+// ReserveFrom is the streak's day that earns its first reserve day, and before which nothing earns one.
+const ReserveFrom = 3
+
+// ReserveRulesFrom is the first day whose reserve days are earned as above. The days before it earned them as the rules
+// were then (one with the first day ever played, every ReserveEvery-th day in a row and every day with all three goals,
+// with no weekly cap), so that nobody lost a reserve day they held when the rules changed. A variable: development,
+// with no players from before to keep, and the tests take today's rules from the start ("").
+var ReserveRulesFrom = "2026-11-19"
 
 // StreakNow is a player's streak: the days in a row they've finished the day's questions (up to today, or yesterday
 // while today isn't played yet), the reserve days they have, the days a reserve kept the streak through and those a
-// repair kept it through (repair.go), how many more days in a row earn the next reserve day (0 with ReserveMax in
-// hand), the last streak that ended, if one did, and the longest the player has had (this one, maybe).
+// repair kept it through (repair.go), how many more days in a row earn the next reserve day by themselves (0 with
+// ReserveMax in hand), whether this week's reserve day is earned, the last streak that ended, if one did, and the
+// longest the player has had (this one, maybe).
 type StreakNow struct {
 	Days    int      `json:"days"`
 	Best    int      `json:"best"`
@@ -283,7 +296,38 @@ type StreakNow struct {
 	Saved   []string `json:"saved"`
 	Mended  []string `json:"mended"`
 	Next    int      `json:"next"`
+	Week    bool     `json:"week"`
 	Ended   *Ended   `json:"ended,omitempty"`
+	// Unbroken is how many days in a row, one after another, the player has finished the day's questions with no
+	// reserve day or repair between them: „Година без пропуск“ (progress.go).
+	Unbroken int `json:"-"`
+	// today is whether today's are finished.
+	today bool
+}
+
+// What the day's goals, done all three, would bring the streak (StreakNow.GoalsReserve).
+const (
+	ReserveByGoals = ""     // a reserve day
+	ReserveFull    = "full" // nothing: the reserve days are all in hand
+	ReserveWeek    = "week" // nothing more: this week's is earned
+	ReserveSoon    = "soon" // nothing yet: the streak is under ReserveFrom days, today's counted
+)
+
+// GoalsReserve is what the day's goals, done all three today, would bring the streak (ReserveByGoals…).
+func (s StreakNow) GoalsReserve() string {
+	days := s.Days
+	if !s.today {
+		days++ // the day's questions are a goal: done, they're a day of the streak
+	}
+	switch {
+	case s.Reserve >= ReserveMax:
+		return ReserveFull
+	case s.Week:
+		return ReserveWeek
+	case days < ReserveFrom:
+		return ReserveSoon
+	}
+	return ReserveByGoals
 }
 
 // Ended is a streak that ended: how many days it had, and the day that ended it (the first day missed with no reserve
@@ -363,22 +407,28 @@ func (g *Game) streakDays(ctx context.Context, userID int64) (streakHistory, err
 func walkStreak(h streakHistory, today string, saw func(day string, spent bool, ended int)) StreakNow {
 	s := StreakNow{Saved: []string{}, Mended: []string{}}
 	d, _ := time.Parse(time.DateOnly, h.first)
+	var earned time.Time // the Monday of the week the last reserve day was earned in
 	for day := h.first; day <= today; day = d.Format(time.DateOnly) {
 		switch {
 		case h.played[day]:
 			s.Days++
+			s.Unbroken++
 			s.Best = max(s.Best, s.Days)
-			if day == h.first || s.Days%ReserveEvery == 0 || h.full[day] {
-				s.Reserve = min(ReserveMax, s.Reserve+1)
+			s.today = day == today
+			if s.Reserve < ReserveMax && earns(day, d, s.Days, day == h.first, h.full[day], earned) {
+				s.Reserve++
+				earned = monday(d)
 			}
 		case day == today: // not played yet: the streak runs to yesterday
 		case s.Days > 0 && s.Reserve > 0:
 			s.Reserve--
+			s.Unbroken = 0
 			s.Saved = append(s.Saved, day)
 			if saw != nil {
 				saw(day, true, 0)
 			}
 		case s.Days > 0 && h.mends(day):
+			s.Unbroken = 0
 			s.Mended = append(s.Mended, day)
 		default:
 			if s.Days > 0 {
@@ -387,15 +437,40 @@ func walkStreak(h streakHistory, today string, saw func(day string, spent bool, 
 					saw(day, false, s.Days)
 				}
 			}
-			s.Days, s.Saved, s.Mended = 0, s.Saved[:0], s.Mended[:0]
+			s.Days, s.Unbroken, s.Saved, s.Mended = 0, 0, s.Saved[:0], s.Mended[:0]
 		}
 		d = d.AddDate(0, 0, 1)
 	}
+	end, _ := time.Parse(time.DateOnly, today)
+	s.Week = !earned.IsZero() && earned.Equal(monday(end))
 	if s.Reserve < ReserveMax {
-		s.Next = ReserveEvery - s.Days%ReserveEvery
+		// The next day the day's questions alone would earn one on, played every day from the next to be played.
+		next := end
+		if s.today {
+			next = next.AddDate(0, 0, 1)
+		}
+		for k := 1; k <= 3*ReserveEvery; k++ {
+			at := next.AddDate(0, 0, k-1)
+			if earns(at.Format(time.DateOnly), at, s.Days+k, false, false, earned) {
+				s.Next = k
+				break
+			}
+		}
 	}
 	return s
 }
+
+// earns is whether a day played earns a reserve day (ReserveMax): as the day (d) of the streak it's on (days), the
+// first day ever played or not, with all three goals done or not, the last reserve day earned in the week of a Monday.
+func earns(day string, d time.Time, days int, first, full bool, earned time.Time) bool {
+	if day < ReserveRulesFrom {
+		return first || days%ReserveEvery == 0 || full
+	}
+	return days >= ReserveFrom && (days == ReserveFrom || days%ReserveEvery == 0 || full) && !earned.Equal(monday(d))
+}
+
+// monday is the Monday of a day's week.
+func monday(d time.Time) time.Time { return d.AddDate(0, 0, -((int(d.Weekday()) + 6) % 7)) }
 
 // Streak is how many days in a row a player has finished the day's questions, reserve days kept (StreakOf).
 func (g *Game) Streak(ctx context.Context, userID int64) (int, error) {

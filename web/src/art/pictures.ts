@@ -678,6 +678,16 @@ const avatars: Record<string, Layer[]> = {
     ["k5", flame(32, 44, 22, 7)],
     ["kw", flame(32, 44, 11, 3.6)],
   ],
+  // A year with no day missed: a calendar page, every day on it marked.
+  calendar: [
+    lift("M14 14H50Q54 14 54 18V53Q54 57 50 57H14Q10 57 10 53V18Q10 14 14 14Z"),
+    ["k5", "M14 14H50Q54 14 54 18V53Q54 57 50 57H14Q10 57 10 53V18Q10 14 14 14Z"],
+    ["kw", "M13 25H51V53Q51 54 50 54H14Q13 54 13 53Z"],
+    ["k2", "M14 14H50Q54 14 54 18V24H10V18Q10 14 14 14Z"],
+    ["l0", "M21 8.5V18M43 8.5V18", 'stroke-width="3.6"'],
+    ["k3", [18, 25, 32, 39, 46].flatMap((x) => [30, 37, 44, 51].map((y) => C(x, y, 2.6))).join("")],
+    ["k5", sparkle(55, 9, 4.4)],
+  ],
   books: [
     lift("M10 47H54V57H10ZM14 37H50V47H14ZM12 27.5H48V37H12Z"),
     ["k1", "M11.5 47H52.5Q54 47 54 48.5V55.5Q54 57 52.5 57H11.5Q10 57 10 55.5V48.5Q10 47 11.5 47Z"],

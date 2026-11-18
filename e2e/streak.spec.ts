@@ -4,7 +4,7 @@ import { daysPlayed, openGame, playRun, startDay } from "./play.ts";
 test("a broken streak is won back: the day's ten and one more game, the same day", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/");
-  // Three days, the first day's reserve spent on the day after them, and yesterday missed too: the streak ended.
+  // Three days, the third's reserve spent on the day after them, and yesterday missed too: the streak ended.
   await daysPlayed(page, 5, 4, 3);
   await page.reload();
   const card = page.locator(".keep-card").filter({ hasText: "Серията ти от 3 дни прекъсна" });
@@ -51,11 +51,11 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
 }) => {
   test.setTimeout(120_000);
   await page.goto("/");
-  // Two days, to yesterday; the first earned a reserve day, so nothing ends at midnight, whatever the hour.
-  await daysPlayed(page, 2, 1);
+  // Three days, to yesterday; the third earned a reserve day, so nothing ends at midnight, whatever the hour.
+  await daysPlayed(page, 3, 2, 1);
   await page.reload();
-  await expect(page.locator(".streak-chip.unlit")).toContainText("2");
-  await expect(page.locator(".day .day-stake")).toHaveText("Серия от 2 дни. С днешните въпроси става 3.");
+  await expect(page.locator(".streak-chip.unlit")).toContainText("3");
+  await expect(page.locator(".day .day-stake")).toHaveText("Серия от 3 дни. С днешните въпроси става 4.");
   // The reserve day, a tap from what it's for.
   await page.locator(".status-reserve .explain").click();
   await expect(page.getByRole("note")).toHaveText("Резервен ден: пази серията, ако пропуснеш ден.");
@@ -67,17 +67,17 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
   await page.keyboard.press("Escape");
   const day = page.getByRole("link", { name: "Към въпросите на деня" });
   await expect(day).toHaveClass(/primary/);
-  await expect(page.locator(".actions .day-stake")).toHaveText("Серия от 2 дни. С днешните въпроси става 3.");
+  await expect(page.locator(".actions .day-stake")).toHaveText("Серия от 3 дни. С днешните въпроси става 4.");
   await expect(page.getByRole("button", { name: "Още десет" })).not.toHaveClass(/primary/);
   await day.click();
   await startDay(page);
   await playRun(page);
   // Played: the flame lit, and tomorrow under the result's buttons (and the goals still open).
-  await expect(page.locator(".streak-chip")).toContainText("3");
+  await expect(page.locator(".streak-chip")).toContainText("4");
   await expect(page.locator(".streak-chip.unlit")).toHaveCount(0);
   const tomorrow = page.locator(".summary .tomorrow");
   await expect(tomorrow).toContainText("Утре — нови десет");
-  await expect(tomorrow).toContainText("Изиграй ги и серията ти става 4.");
+  await expect(tomorrow).toContainText("Изиграй ги и серията ти става 5.");
 });
 
 /** Keeps every way the streak's chip reads as Начало draws and moves it (its number and words, and „unlit“ while its
@@ -124,13 +124,17 @@ test("a round streak is told by its sheet, not first by its chip: the number rol
   test.setTimeout(120_000);
   await watchChip(page);
   await page.goto("/");
+  // Two days: no reserve day yet, so the second's stake is real; the third brings the first, told with its sheet.
   await daysPlayed(page, 2, 1);
   await page.reload();
   await expect(page.locator(".streak-chip.unlit")).toContainText("2дни поред");
+  await expect(page.locator(".status-reserve")).toHaveCount(0);
   await startDay(page);
   await heard(page);
   await playRun(page);
-  await expect(page.getByRole("dialog", { name: "3 дни поред с въпросите на деня." })).toBeVisible();
+  const sheet = page.getByRole("dialog", { name: "3 дни поред с въпросите на деня." });
+  await expect(sheet).toBeVisible();
+  await expect(sheet).toContainText("Получаваш резервен ден: ако пропуснеш ден, серията остава.");
   const said = await heard(page);
   expect(said[0]).toBe("2дни поред unlit");
   expect(said).toContain("23дни поред");

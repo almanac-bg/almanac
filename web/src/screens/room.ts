@@ -84,7 +84,6 @@ export interface RoomView {
       answer: Reveal;
       points: number;
       speed?: number;
-      row?: number;
       inRow?: number;
       right: boolean;
       exact?: boolean;
@@ -792,7 +791,7 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
     h("h1", { class: "ask" }, q.view.text),
     picture(q.view, true),
     answered(q.view, r.answer, q.given ?? null),
-    verdict(kind, r.points, r.missed ? "Времето изтече." : undefined, r.speed, r.row, r.inRow),
+    verdict(kind, r.points, r.missed ? "Времето изтече." : undefined, r.speed, r.inRow),
     crowdLine(q.view.type, r.answer.crowd, r.right),
     // Held, the answer stays up until who leads moves on: time to read its fact here too, not only on the big screen.
     () => (held() ? fact(r.answer.fact) : null),

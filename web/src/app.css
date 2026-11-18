@@ -868,6 +868,14 @@
     box-shadow: inset 3px 0 0 var(--wrong);
   }
 
+  /* A row's points, under its right answers: they decide only a tie. */
+  .league-pts {
+    display: block;
+    margin-top: 3px;
+    font-size: 0.75rem;
+    text-align: right;
+  }
+
   .league-line {
     padding: var(--space-1) var(--space-3);
     font-size: 0.75rem;
@@ -3725,10 +3733,6 @@
     text-align: right;
     text-shadow: none;
     white-space: nowrap;
-  }
-
-  .verdict-part.row {
-    color: var(--gold-ink);
   }
 
   .verdict-says {
