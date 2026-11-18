@@ -36,7 +36,7 @@ func TestStreakMail(t *testing.T) {
 		return id
 	}
 	player("ana@example.bg", 5)
-	g.issueOn("2030-03-09") // the day missed: its issue wins the streak back
+	g.issueOn("2030-03-09")          // the day missed: its issue wins the streak back
 	bo := player("bo@example.bg", 5) // notifications on a phone
 	if _, err := g.db.Write.Exec(`INSERT INTO phones (token, user_id, platform, created_at) VALUES ('t', ?, 'ios', 0)`, bo); err != nil {
 		t.Fatal(err)
