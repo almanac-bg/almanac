@@ -100,6 +100,7 @@ func TestRoomAccess(t *testing.T) {
 		{"POST", "/start", nil}, {"POST", "/next", nil}, {"POST", "/finish", nil},
 		{"POST", "/hold", map[string]any{"on": true}}, {"POST", "/lock", map[string]any{"on": true}},
 		{"POST", "/settings", map[string]any{}}, {"POST", "/remove", map[string]any{"key": 1}},
+		{"POST", "/return", map[string]any{"key": 1}}, {"POST", "/rename", map[string]any{"key": 1}},
 	} {
 		mine, _ := eve.call(c.method, "/api/rooms/"+code+c.path, c.body)
 		none, _ := eve.call(c.method, "/api/rooms/999999"+c.path, c.body)
@@ -190,7 +191,7 @@ func TestRoomName(t *testing.T) {
 		}
 		return out
 	}
-	for _, bad := range []string{"АЛМАНАХ", "Ивaн", "x"} {
+	for _, bad := range []string{"АЛМАНАХ", "Ивaн", "x", "Курва"} {
 		if status, _ := bo.call("POST", "/api/rooms/"+code+"/join", map[string]string{"name": bad}); status != 400 {
 			t.Errorf("a room name %q: %d", bad, status)
 		}
@@ -210,5 +211,28 @@ func TestRoomName(t *testing.T) {
 	}
 	if got := names(); got[1] != "Бояна П." {
 		t.Fatalf("the room's names after a return: %v", got)
+	}
+	// The host asks Bo for another name: Bo's animal's meanwhile, Bo is told, and the name taken away isn't taken back.
+	if status, _ := bo.call("POST", "/api/rooms/"+code+"/rename", map[string]any{"key": 1}); status != 403 {
+		t.Fatalf("a player asked for a name: %d", status)
+	}
+	if status, out := ana.call("POST", "/api/rooms/"+code+"/rename", map[string]any{"key": 1}); status != 200 {
+		t.Fatalf("rename: %d %v", status, out)
+	}
+	if got := names(); !strings.HasPrefix(own, got[1]+" ") {
+		t.Fatalf("Bo's name in the room, asked: %v (own %q)", got, own)
+	}
+	if v := bo.stream("/api/rooms/" + code + "/events").until(func(map[string]any) bool { return true }); v["askName"] != true {
+		t.Fatalf("Bo isn't asked: %v", v)
+	}
+	if status, out := bo.call("POST", "/api/rooms/"+code+"/join", map[string]string{"name": "Бояна П."}); status != 400 ||
+		out["error"] != "name_again" {
+		t.Fatalf("the name taken away, again: %d %v", status, out)
+	}
+	if status, _ := bo.call("POST", "/api/rooms/"+code+"/join", map[string]string{"name": "Боби"}); status != 200 {
+		t.Fatal(status)
+	}
+	if got := names(); got[1] != "Боби" {
+		t.Fatalf("the new name: %v", got)
 	}
 }

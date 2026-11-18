@@ -177,8 +177,8 @@ func (s *Server) roomOpen(w http.ResponseWriter, r *http.Request) error {
 // return (their look as it is now). Unless the host has locked it to anyone new, or a game is under way and they have
 // the code alone: either counts as a code that missed, for a stranger.
 //
-// A player may come in under a name for this room alone (`name`: a class's pupils, asked as they come in, by the
-// name their teacher knows them by): it's the room's, kept in it and shown only to who's in it, never the player's
+// A player may come in under a name for this room alone (`name`: asked as they come in, the name the others there
+// know them by): it's the room's, kept in it and shown only to who's in it, never the player's
 // name anywhere else (not their profile, nor the boards, nor a request from the room's end). Without one, they're in
 // it by the name they had in it before, or their own.
 func (s *Server) roomJoin(w http.ResponseWriter, r *http.Request) error {
@@ -403,6 +403,31 @@ func (s *Server) roomRemove(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return s.roomAct(func(rm *room.Room, by int64) error { return rm.Remove(by, in.Key) })(w, r)
+}
+
+// roomReturn is the host bringing back a player they sent out, by the key they had (room.Room.Return).
+func (s *Server) roomReturn(w http.ResponseWriter, r *http.Request) error {
+	var in struct {
+		Key int `json:"key"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	return s.roomAct(func(rm *room.Room, by int64) error { return rm.Return(by, in.Key) })(w, r)
+}
+
+// roomRename is the host asking a player (by their key) for another name (room.Room.AskName): theirs in the room is
+// their animal's meanwhile, as a new player's is drawn.
+func (s *Server) roomRename(w http.ResponseWriter, r *http.Request) error {
+	var in struct {
+		Key int `json:"key"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	return s.roomAct(func(rm *room.Room, by int64) error {
+		return rm.AskName(by, in.Key, account.AnimalOf(rm.Players()[in.Key]).Name)
+	})(w, r)
 }
 
 // roomPeople is what a room's end offers its player: whom of the others to add as friends (their keys: not friends

@@ -776,9 +776,6 @@ func TestALeadingHostOverHTTP(t *testing.T) {
 	_, out := ana.call("POST", "/api/rooms", map[string]any{"lead": true, "length": 5})
 	code, _ := out["code"].(string)
 	as := ana.follow(code)
-	if status, out := ana.call("POST", "/api/rooms/"+code+"/start", nil); status != 409 || out["error"] != "no_players" {
-		t.Fatalf("a game with nobody: %d %v", status, out)
-	}
 	bs := bo.follow(code)
 	v := as.until(func(v map[string]any) bool { return len(v["players"].([]any)) == 1 })
 	if v["isHost"] != true || v["lead"] != true {

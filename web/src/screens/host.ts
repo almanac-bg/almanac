@@ -1,8 +1,9 @@
 // A room as its host sees it when they lead it from a big screen („Само водя“: a class's board, a pub's TV) and
 // don't play: the code to come in by, with its link as a QR code; each question large, with its clock and how many
 // have answered; the answer with its fact and the first five; the podium. And the pace: „Напред“ (the answer now, or
-// the next question), „Задръж“ (each answer stays up until „Напред“, to talk it over), „Приключи“. The players' phones
-// are as in any room. Part of room.ts's file, loaded with it; its style (host.css) loads the first time it shows.
+// the next question), „Задръж“ (each answer stays up until „Напред“, to talk it over: on from the start), „Приключи“.
+// The players' phones are as in any room; and there may be none: everyone answers aloud. Part of room.ts's file,
+// loaded with it; its style (host.css) loads the first time it shows.
 
 import type { Child } from "../lib/dom.ts";
 import {
@@ -86,7 +87,14 @@ function lobby(view: () => RoomView, code: string): Child {
       "section",
       { class: "card" },
       h("h2", { class: "section-title" }, () => `Играчи (${view().players.length})`),
-      () => (view().players.length ? null : h("p", { class: "muted" }, "Още никой не е влязъл.")),
+      () =>
+        view().players.length
+          ? null
+          : h(
+              "p",
+              { class: "muted" },
+              "Още никой не е влязъл. Може да играете и без телефони: всички отговарят на глас, а „Напред“ показва отговора.",
+            ),
       players(view, code, error.set),
       door(view, code, error.set),
     ),
@@ -96,8 +104,9 @@ function lobby(view: () => RoomView, code: string): Child {
   );
 }
 
-/** How many have answered, of those in the room. */
+/** How many have answered, of those in the room (none, with no phones in it). */
 function answeredLine(v: RoomView): Child {
+  if (!v.players.length) return null;
   const done = v.players.filter((p) => p.answered).length;
   return h(
     "p",
@@ -148,7 +157,7 @@ function reveal(view: () => RoomView, code: string, first: RoomView, places: Map
     head(first),
     h(
       "div",
-      { class: "host-row" },
+      { class: "host-row host-answer" },
       h(
         "div",
         { class: "stack" },
@@ -157,7 +166,7 @@ function reveal(view: () => RoomView, code: string, first: RoomView, places: Map
         answered(q.view, r.answer, null),
         r.answer.fact ? fact(r.answer.fact) : null,
       ),
-      standings(view, true, before, undefined, 5),
+      standings(view, true, before, 5),
     ),
     () =>
       held()

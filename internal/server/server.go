@@ -270,6 +270,8 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/rooms/{code}/qr", s.roomQR)
 	api("POST /api/rooms/{code}/answer", s.roomAnswer)
 	api("POST /api/rooms/{code}/remove", s.roomRemove)
+	api("POST /api/rooms/{code}/return", s.roomReturn)
+	api("POST /api/rooms/{code}/rename", s.roomRename)
 	api("GET /api/rooms/{code}/people", s.roomPeople)
 	api("POST /api/rooms/{code}/people", s.roomBefriend)
 	api("GET /api/duels", s.duels)
