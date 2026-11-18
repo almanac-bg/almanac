@@ -101,6 +101,8 @@ func route(r *http.Request) string {
 
 // pageRoute is a page's path as the log names it: its first part, with "/…" for the rest.
 func pageRoute(path string) string {
+	// What anyone asked for, on one line of its own (the JSON log escapes it as well).
+	path = strings.ReplaceAll(strings.ReplaceAll(path, "\n", ""), "\r", "")
 	first, rest, _ := strings.Cut(strings.TrimPrefix(path, "/"), "/")
 	if c := cut(first, 40); c != first {
 		first = c + "…"
