@@ -117,7 +117,7 @@ export function segmented<T>(
  * („На този ден“). Nothing when there's neither. */
 export function fact(text?: string, day?: string): Child {
   if (!text && !day) return null;
-  const box = h(
+  return h(
     "aside",
     {
       class: day ? (text ? "fact dated" : "fact dated alone") : "fact",
@@ -126,13 +126,11 @@ export function fact(text?: string, day?: string): Child {
     day ? h("div", { class: "fact-day" }, h("h2", null, "На този ден"), h("p", null, day)) : null,
     text ? [h("h2", null, "Знаеше ли?"), h("p", null, text)] : null,
   );
-  if (box instanceof HTMLElement) reachable(box);
-  return box;
 }
 
-/** A box that may scroll on its own (a long fact docked at a run's foot, app.css): while it does, the keyboard can
- * reach it to scroll it, a stop of its own; while all of it shows, it's none. */
-function reachable(box: HTMLElement): void {
+/** A box that may scroll on its own (the answer's panel docked at a run's foot, with a long fact: app.css): while it
+ * does, the keyboard can reach it to scroll it, a stop of its own; while all of it shows, it's none. */
+export function reachable(box: HTMLElement): void {
   const check = () => {
     if (box.scrollHeight > box.clientHeight + 1) box.tabIndex = 0;
     else box.removeAttribute("tabindex");

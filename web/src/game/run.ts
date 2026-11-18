@@ -17,7 +17,7 @@ import { beforeLeaving, hold, release } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { withName } from "../lib/words.ts";
 import { categories, playingWhile } from "../state.ts";
-import { countUp, fact, failure, inRowChip, type VerdictKind, verdict } from "../ui.ts";
+import { countUp, fact, failure, inRowChip, reachable, type VerdictKind, verdict } from "../ui.ts";
 import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
 import { answered, beats, crowdLine, picture, picturesIn, type Stage } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Reveal, Shown, State, View } from "./types.ts";
@@ -538,6 +538,7 @@ function question(
 ): Child {
   const problem = slot();
   const after = h("div", { class: "after", hidden: true });
+  reachable(after);
   let progress = trail(s.trail, s.total, q.n);
   let over = false; // the question's screen gone
   let leaving = false; // given up by leaving: its answer isn't shown here
@@ -619,7 +620,13 @@ function question(
   // one (if it wasn't theirs) and the verdict docked at the screen's foot, its points and the tally rising with them;
   // how everyone else answered; the fact, and the way on. With less motion, all at once.
   const reveal = (res: Result, answer: Answer | null) => {
-    asked.reveal(res.reveal, answer, at);
+    // The question's own steps on the right answer's beat (the right one marked) are taken with the panel's, in the
+    // same frame, so that the answer comes into place in one movement (settle).
+    const marks: (() => void)[] = [];
+    asked.reveal(res.reveal, answer, (ms, step) => {
+      if (ms === beats.right && !calm.peek()) marks.push(step);
+      else at(ms, step);
+    });
     const now = trail(res.state.trail, s.total);
     now.children[q.n]?.classList.add("fresh");
     progress.replaceWith(now);
@@ -636,6 +643,7 @@ function question(
     let crowd: Child = null;
     let rest: Child[] = [];
     at(beats.right, () => {
+      for (const step of marks) step();
       tally(score, res.state.points, s.points, res.inRow ?? 0);
       crowd = waiting(crowdLine(q.view.type, res.reveal.crowd, res.right));
       rest = [
@@ -661,18 +669,13 @@ function question(
       const told = verdict(kind, res.points, undefined, res.speed, res.row, res.inRow);
       if (told instanceof HTMLElement) told.removeAttribute("role");
       append(after, [told, crowd, ...rest]);
-      after.hidden = false;
-      page.classList.add("answered");
-      room();
+      settle(page, head, after, asked.node, at, () => {
+        after.hidden = false;
+        page.classList.add("answered");
+        room();
+      });
       say(spokenVerdict(kind, res.points, q.view, res.reveal));
       advance = window.setTimeout(moveOn, lasts);
-      // On a phone the panel docks at the screen's foot and the answers move up above it; where they can't all fit
-      // (a picture, a short screen), the page moves just enough to show the right answer. On a big screen the answer
-      // shows under the question, and the page moves to it.
-      at(dockMs, () => {
-        if (docked()) uncover(asked.node, after);
-        else after.scrollIntoView({ block: "nearest", behavior: calm.peek() ? "auto" : "smooth" });
-      });
     });
     at(beats.crowd, () => shows(crowd));
     at(beats.fact, () => {
@@ -737,20 +740,21 @@ function question(
 
   // On a phone the question is a column the screen's height: the head, the pips and the clock at the top, the
   // question under them, and what answers it at the foot, under the thumb (app.css).
+  const head = stays(
+    questionHead(
+      q.n,
+      s.total,
+      q.onThisDay ? `${topicName(q.category)} · На този ден` : topicName(q.category),
+      score,
+      versus,
+    ),
+    progress,
+    timer(q.leftMs, q.limitMs, ans.left, ans.stopped),
+  );
   const page = h(
     "article",
     { class: "question run-question" },
-    stays(
-      questionHead(
-        q.n,
-        s.total,
-        q.onThisDay ? `${topicName(q.category)} · На този ден` : topicName(q.category),
-        score,
-        versus,
-      ),
-      progress,
-      timer(q.leftMs, q.limitMs, ans.left, ans.stopped),
-    ),
+    head.node,
     // It takes the focus as it opens, so a screen reader reads it first (no ring for it: app.css, h1).
     ans.heading,
     picture(q.view, true),
@@ -764,12 +768,6 @@ function question(
 /** How long what the player chose stays chosen before the answer shows, however quick the line. */
 const holdMs = 280;
 
-/** How long the answer's panel takes to dock at a phone's foot (app.css), the answers moving up with it. */
-const dockMs = 260;
-
-/** Whether the answer docks at the screen's foot: a phone's width (app.css). */
-const docked = () => matchMedia("(max-width: 47.99rem)").matches;
-
 /** A part of the answer's panel, in its place but not shown yet; and shown. */
 function waiting<T extends Child>(part: T): T {
   if (part instanceof HTMLElement) part.classList.add("unseen");
@@ -780,43 +778,140 @@ function shows(part: Child): void {
   if (part instanceof HTMLElement) part.classList.remove("unseen");
 }
 
-/** Moves the page just enough that the answer (the right one, for a question of options) shows between the head and
- * the panel docked at the foot, when they can't all fit on the screen. */
-function uncover(answers: Child, panel: HTMLElement): void {
-  if (!(answers instanceof Element)) return;
-  const key = answers.querySelector("button.option.right") ?? answers;
-  const head = document.querySelector(".question-top")?.getBoundingClientRect().bottom ?? 0;
+/** How the answer comes into place: the panel's and the page's one movement (DESIGN.md, Motion). */
+const settling = { duration: 240, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
+
+/** Brings the answer into place, its panel shown by `show`, in one movement. On a phone the panel docks at the
+ * screen's foot (app.css: it's fixed there) and the answers move up above it, the page moving just enough that the
+ * right answer (or, for an order or pairs, the answer's top) shows between the head and the panel; on a big screen
+ * the panel shows under the answers, and the page moves just enough to show it. Where everything ends is worked out
+ * first, the page already in its last state and the head at the size it will have there (it stays so meanwhile: a
+ * head that changed size as the page moved made it jump), and the page goes there at once; then what moved glides
+ * from where it was, the panel rising with it, so the right answer is never under the panel on the way. The right
+ * answer brought up from out of sight pops once it's there. With less motion, it's all simply there. */
+function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Child, at: Stage, show: () => void): void {
+  const parts = [...page.children].filter(
+    (el): el is HTMLElement =>
+      el instanceof HTMLElement && el !== head.node && el !== after && getComputedStyle(el).display !== "none",
+  );
+  const first = parts.map((el) => el.getBoundingClientRect().top);
+  const was = scrollY;
+  const right = answers instanceof Element ? answers.querySelector("button.option.right") : null;
+  const key = right ?? (answers instanceof Element ? answers : after);
+  const keyWas = key.getBoundingClientRect().top;
+  // The docked panel leaves room for the right answer over it, however tall (app.css).
+  if (right) page.style.setProperty("--keep", `${Math.ceil(right.getBoundingClientRect().height)}px`);
+  show();
+  const docked = getComputedStyle(after).position === "fixed";
+  // What has to show (the right answer above the docked panel; the panel under the answers, to the screen's foot),
+  // between the head's foot and the bottom: how far the page moves down (or up) for it, never so far that its top
+  // goes under the head.
+  const by = (headFoot: number) => {
+    const box = (docked ? key : after).getBoundingClientRect();
+    const foot = docked ? after.getBoundingClientRect().top - 12 : innerHeight - 16;
+    const below = box.bottom - foot;
+    const above = box.top - headFoot - 12;
+    if (below > 0) return Math.max(0, Math.min(below, above));
+    return above < 0 ? Math.max(above, below) : 0;
+  };
+  const most = Math.max(0, document.documentElement.scrollHeight - innerHeight);
+  const to = (d: number) => Math.round(Math.min(Math.max(was + d, 0), most));
+  head.hold(true);
+  // The head's foot where it is, while it isn't stuck (it moves with the page); if the page moves past it, it's
+  // stuck, and smaller, and its foot is the bottom of what's left of it at the screen's top.
+  let y = to(by(head.node.getBoundingClientRect().bottom));
+  if (head.stuckAt(y - was)) {
+    head.stick(true);
+    y = to(by(head.node.offsetHeight - 1));
+  }
+  head.stick(head.stuckAt(y - was));
+  if (y !== was) scrollTo({ top: y, behavior: "instant" });
+  at(settling.duration, () => head.hold(false));
+  if (calm.peek()) return;
+  // From where it was, each part that moved glides to where it is; the panel, new, rises with the answers (from a
+  // little below its place if they didn't move); on a big screen it comes with the page.
+  let rise = 0;
+  parts.forEach((el, i) => {
+    const dy = (first[i] ?? 0) - el.getBoundingClientRect().top;
+    rise = Math.max(rise, dy);
+    if (Math.abs(dy) >= 1) el.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], settling);
+  });
+  if (docked)
+    after.animate(
+      [
+        { transform: `translateY(${Math.max(24, rise)}px)`, opacity: 0 },
+        { transform: "none", opacity: 1 },
+      ],
+      settling,
+    );
+  else if (y !== was) after.animate([{ transform: `translateY(${y - was}px)` }, { transform: "none" }], settling);
+  // The right answer's pop waits for it to arrive where it shows, when it comes from far.
   const box = key.getBoundingClientRect();
-  const by = Math.min(box.bottom - (panel.getBoundingClientRect().top - 12), box.top - head - 12);
-  if (by > 0) scrollBy({ top: by, behavior: calm.peek() ? "auto" : "smooth" });
+  if (Math.abs(keyWas - box.top) > box.height / 2) {
+    const pops = key.getAnimations().filter((a) => a instanceof CSSAnimation && a.animationName === "pop");
+    for (const a of pops) a.pause();
+    at(settling.duration, () => {
+      for (const a of pops) a.play();
+    });
+  }
 }
 
-/** The top of a question (its count, topic and tally, and the pips), kept in view at the top of the screen while the
- * question and its answer scroll, and smaller there. The room it gives up stays as a margin, so nothing under it jumps.
- * It sits a pixel above the screen's edge when stuck, which is how it knows. */
-function stays(...parts: Child[]): HTMLElement {
-  const top = h("div", { class: "question-top" }, parts);
-  const seen = new IntersectionObserver(
-    ([e]) => {
-      const stuck = !!e && e.intersectionRatio < 1 && e.boundingClientRect.top < 0;
-      if (stuck === top.classList.contains("stuck")) return;
-      if (!stuck) {
-        top.classList.remove("stuck");
-        top.style.marginBottom = "";
-        return;
-      }
-      // Smaller, measured with its whole height still kept below it: the page is never shorter for a moment, which
-      // on a page only a little taller than the screen could pull the scroll back up, out from under the finger.
-      const tall = top.offsetHeight;
-      top.style.marginBottom = `${tall}px`;
-      top.classList.add("stuck");
-      top.style.marginBottom = `${tall - top.offsetHeight}px`;
+/** A run's head (stays). */
+interface Head {
+  node: HTMLElement;
+  /** Holds it as it is (or lets it go): it doesn't change size while the answer comes into place. */
+  hold(on: boolean): void;
+  /** Makes it stuck, and smaller, or not. */
+  stick(on: boolean): void;
+  /** Whether the page moved by `dy` from where it is would have it stuck. */
+  stuckAt(dy: number): boolean;
+}
+
+/** The top of a question (its count, topic and tally, the pips and the clock), kept in view at the top of the screen
+ * while the question and its answer scroll, and smaller there. The room it gives up stays as a margin, so nothing
+ * under it jumps. It's stuck once the page has moved a few pixels past it, and comes back only near the page's top:
+ * a page moving by a pixel or two at the edge doesn't make it flicker. On a short screen (a phone on its side,
+ * app.css: --small) it's small from the start, with no room kept. */
+function stays(...parts: Child[]): Head {
+  const node = h("div", { class: "question-top" }, parts);
+  let held = false;
+  let small = false;
+  const stuck = () => node.classList.contains("stuck");
+  const stick = (on: boolean) => {
+    if (on === stuck() || (small && !on)) return;
+    if (!on) {
+      node.classList.remove("stuck");
+      node.style.marginBottom = "";
+      return;
+    }
+    // Smaller, measured with its whole height still kept below it: the page is never shorter for a moment, which
+    // on a page only a little taller than the screen could pull the scroll back up, out from under the finger.
+    const tall = node.offsetHeight;
+    node.style.marginBottom = `${tall}px`;
+    node.classList.add("stuck");
+    node.style.marginBottom = small ? "" : `${tall - node.offsetHeight}px`;
+  };
+  // Where its top would be, were it not stuck: the question's, which nothing above moves.
+  const edge = () => node.parentElement?.getBoundingClientRect().top ?? 0;
+  const stuckAt = (dy: number) => small || edge() - dy < (stuck() ? -2 : -8);
+  const check = () => {
+    if (!held && node.isConnected) stick(stuckAt(0));
+  };
+  requestAnimationFrame(() => {
+    small = node.isConnected && getComputedStyle(node).getPropertyValue("--small").trim() === "1";
+    check();
+  });
+  listen(window, "scroll", check, { passive: true });
+  listen(window, "resize", check);
+  return {
+    node,
+    hold: (on) => {
+      held = on;
+      check();
     },
-    { threshold: 1 },
-  );
-  seen.observe(top);
-  onCleanup(() => seen.disconnect());
-  return top;
+    stick,
+    stuckAt,
+  };
 }
 
 function kindOf(r: Result, given: Answer | null): VerdictKind {
