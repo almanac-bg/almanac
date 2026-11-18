@@ -45,6 +45,7 @@ func setup(t testing.TB) *world {
 		for _, h := range w.hubs {
 			h.after.done.Wait()
 		}
+		w.g.Settled(context.Background()) // and what the game counts in the background, before the database closes
 	})
 	return w
 }
