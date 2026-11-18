@@ -197,6 +197,34 @@ test("the host sends a player out of a room, brings them back, asks for another 
   await expect(host.locator(".players li")).toHaveCount(3);
 });
 
+test("on a narrow phone, a long name stays beside its avatar and the host's buttons go under it", async ({
+  browser,
+}) => {
+  const host = await (await browser.newContext({ viewport: { width: 320, height: 640 } })).newPage();
+  const guest = await (await browser.newContext()).newPage();
+  await host.goto("/room");
+  await host.getByRole("button", { name: "Всички теми" }).click();
+  await expect(host).toHaveURL(/\/r\/\d{6}$/);
+  await host.getByLabel("Име").fill("Учител");
+  await host.getByRole("button", { name: "Влез" }).click();
+  await guest.goto(host.url());
+  await guest.getByLabel("Име").fill("Александра-Магдалена Петрова");
+  await guest.getByRole("button", { name: "Влез" }).click();
+  const chip = host.locator(".players li").last();
+  await expect(chip).toContainText("Александра-Магдалена Петрова");
+  const [avatar, name, acts, list] = await Promise.all([
+    chip.locator(".avatar").boundingBox(),
+    chip.locator(".player-name").boundingBox(),
+    chip.locator(".player-acts").boundingBox(),
+    host.locator(".players").boundingBox(),
+  ]);
+  if (!avatar || !name || !acts || !list) throw new Error("the chip isn't on the screen");
+  expect(name.x).toBeGreaterThanOrEqual(avatar.x + avatar.width);
+  expect(name.y).toBeLessThan(avatar.y + avatar.height);
+  expect(acts.y).toBeGreaterThanOrEqual(name.y + name.height - 1);
+  expect(acts.x + acts.width).toBeLessThanOrEqual(list.x + list.width + 0.5);
+});
+
 test("two people asking for a duel play it live", async ({ browser }, info) => {
   // Matching is the server's, the same for every engine; and duels in two engines at once would match across them.
   test.skip(info.project.name !== "chromium", "one engine is enough");

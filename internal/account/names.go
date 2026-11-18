@@ -292,19 +292,24 @@ func foldMap(m map[string]string) map[rune]string {
 // rest only when every word is one letter („П у т к а“), since across words a short root is in many names („Hu Yang“).
 var (
 	rudeAnywhere = []string{
-		"путк", "пизд", "курв", "бляд", "педераст", "мамкати", "мамкаму", "духач", "хитлер", "нацист", "порн", "asshole",
-		"pussy",
+		"путк", "пизд", "курв", "бляд", "педераст", "мамкати", "мамкаму", "мамицата", "сукинсин", "пачавр", "духач",
+		"хитлер", "нацист", "порн", "asshole", "pussy",
 	}
 	rudeStart = []string{
 		"шибан", "ебал", "ебат", "ебах", "ебеш", "ебем", "ебач", "ебло", "педал", "лайна", "лайно", "fucke", "fucki",
-		"motherfuck",
+		"fuckyou", "fuckoff", "motherfuck", "shithead",
 	}
+	// A whole word with its forms: Bulgarian's plural and article (-и, -ът, -та), English plural (-s, -es).
 	rudeWhole = []string{
-		"сука", "пичка", "пишка", "задник", "фак", "fuck", "shit", "bitch", "whore", "slut", "nigger", "nigga", "nazi",
+		"сука", "суки", "суката", "кучка", "кучки", "кучката", "пичка", "пички", "пичката", "пишка", "пишки",
+		"пишката", "задник", "задника", "задникът", "задници", "фак", "fuck", "shit", "shits", "bitch", "bitches",
+		"whore", "whores", "slut", "sluts", "nigger", "niggers", "nigga", "niggas", "nazi", "nazis",
 	}
 	seenAnywhere = []string{"хуй"}
 	seenStart    = []string{"ебан", "fucks"}
-	seenWhole    = []string{"кур", "гъз", "еба", "ебе", "еби", "cunt", "huj"}
+	seenWhole    = []string{
+		"кур", "курът", "курове", "гъз", "гъза", "гъзът", "гъзове", "еба", "ебе", "еби", "cunt", "cunts", "huj",
+	}
 	// ordinary are names that start with a rude root, heard: a word of a name that is one of them is no rude word.
 	ordinary = []string{"шибанов", "шибанова"}
 )

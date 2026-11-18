@@ -760,7 +760,10 @@ func TestRudeNames(t *testing.T) {
 	u, _, _ := a.Guest(ctx)
 	for _, rude := range []string{"Курва", "kurva", "KURRVA", "curva", "Путката", "putka", "П у т к а", "pi4ka",
 		"Пичка", "6ibana", "Шибаняк", "Ебах ти", "ебало", "Мамка ти", "mamka mu", "хуйло", "fuck", "Fucker", "Педал",
-		"Hitler 88", "Хитлер", "сука", "Гъз", "кур", "Pussy cat"} {
+		"Hitler 88", "Хитлер", "сука", "Гъз", "кур", "Pussy cat",
+		// Spaced out, run together with another word, with an ending, and the rest of the bypasses found.
+		"F U C K", "С У К А", "s h i t", "Fuckyou", "Fuckoff", "Shithead", "bitches", "Cunts", "Niggers", "Whores",
+		"Курът", "Гъзът", "Сукин син", "Кучка", "Пачавра", "Мамицата", "Суката"} {
 		if !Rude(rude) {
 			t.Errorf("%q isn't rude", rude)
 		}
@@ -768,7 +771,7 @@ func TestRudeNames(t *testing.T) {
 			t.Errorf("%q as a name: %v", rude, err)
 		}
 	}
-	for _, tag := range []string{"kurva_123", "pi4ka", "fuck_you", "the_hitler"} {
+	for _, tag := range []string{"kurva_123", "pi4ka", "fuck_you", "the_hitler", "fuckyou", "shithead"} {
 		if _, err := a.Retag(ctx, u.ID, tag); !errors.Is(err, ErrNameRude) {
 			t.Errorf("@%s: %v", tag, err)
 		}
@@ -778,7 +781,8 @@ func TestRudeNames(t *testing.T) {
 		"Петър 4", "Мамка", "Ana 6",
 		// Clubs, names and words that sound like a rude one, or have one where a word ends and the next starts.
 		"ФК Левски", "FC Barcelona", "Газ", "Gaz", "Фуксия", "Иван Фукс", "Huy", "Nguyen Huy", "Huynh", "Hu Yang",
-		"Ebi", "Ebbe", "Hui", "Шибанов", "Иван Шибанов", "Cur", "Kunt", "Ebanks", "Кура", "Ебру Гюндеш"} {
+		"Ebi", "Ebbe", "Hui", "Шибанов", "Иван Шибанов", "Cur", "Kunt", "Ebanks", "Кура", "Ебру Гюндеш", "Сукин",
+		"Мамица", "Кучков", "Shitara", "Fuchs", "Ф У К С", "Курта"} {
 		if Rude(good) {
 			t.Errorf("%q is taken for rude", good)
 		}

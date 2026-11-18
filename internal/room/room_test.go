@@ -823,13 +823,12 @@ func TestLeadingHost(t *testing.T) {
 }
 
 // A led room plays with no phones in it: everyone answers aloud, each question runs its time (or „Напред“ shows the
-// answer), and each answer waits for the host.
+// answer), also over a restart, and each answer waits for the host, which a restart doesn't wait for.
 func TestLeadNoPhones(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		hub := NewHub(sample(t))
+		first := NewHub(sample(t))
 		host := Player{ID: 1, Name: "Водещ"}
-		r, _ := hub.Open(host, "", Settings{Lead: true, Length: 5})
-		s, _ := r.Follow(host.ID)
+		r, _ := first.Open(host, "", Settings{Lead: true, Length: 5})
 		if err := r.Start(host.ID); err != nil {
 			t.Fatalf("a game with no phones: %v", err)
 		}
@@ -837,10 +836,30 @@ func TestLeadNoPhones(t *testing.T) {
 		if v.Phase != Question || len(v.Players) != 0 {
 			t.Fatalf("the first question: %+v", v)
 		}
-		time.Sleep(time.Duration(v.Question.LimitMs)*time.Millisecond + play.Grace + time.Millisecond)
+		limit := time.Duration(v.Question.LimitMs) * time.Millisecond
+		// A restart in the middle of the question: it keeps its time, though no phone is there to answer.
+		time.Sleep(limit / 4)
+		var saved bytes.Buffer
+		_ = first.Save(&saved)
+		hub := NewHub(sample(t))
+		_, _ = hub.Restore(&saved)
+		r, _ = hub.Get(r.Code())
+		s, _ := r.Follow(host.ID)
+		time.Sleep(comeBack + time.Second)
+		synctest.Wait()
+		if v := r.View(host.ID); v.Phase != Question {
+			t.Fatalf("the question after a restart, with no phones: %s", v.Phase)
+		}
+		if n := hub.UnderWay(); n != 1 {
+			t.Fatalf("a question showing, under way: %d", n)
+		}
+		time.Sleep(limit + play.Grace)
 		synctest.Wait()
 		if v := r.View(host.ID); v.Phase != Reveal || v.Question.Reveal == nil || v.Question.NextMs != 0 {
 			t.Fatalf("the time ran out: %+v", v)
+		}
+		if n := hub.UnderWay(); n != 0 {
+			t.Fatalf("an answer held for the host, under way: %d", n)
 		}
 		time.Sleep(3 * Pause)
 		synctest.Wait()
@@ -929,6 +948,21 @@ func TestReturnAndAskName(t *testing.T) {
 		}
 		if v := again.View(bo.ID); v.AskName || v.Players[1].Name != "Боби" {
 			t.Fatalf("a new name: %+v", v)
+		}
+		// Nor after the next one, while the room is open: asked again, neither name taken away comes back.
+		if err := again.Join(Player{ID: bo.ID, Name: "Грубиян", RoomName: true}, ""); !errors.Is(err, ErrNameAgain) {
+			t.Fatalf("the first name taken away, after the next: %v", err)
+		}
+		if err := again.AskName(ana.ID, boKey, "Мечка"); err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range []string{"Грубиян", "боби"} {
+			if err := again.Join(Player{ID: bo.ID, Name: name, RoomName: true}, ""); !errors.Is(err, ErrNameAgain) {
+				t.Fatalf("%q, taken away before: %v", name, err)
+			}
+		}
+		if err := again.Join(Player{ID: bo.ID, Name: "Бо", RoomName: true}, ""); err != nil {
+			t.Fatal(err)
 		}
 		// Not during a game.
 		if err := again.Start(ana.ID); err != nil {
