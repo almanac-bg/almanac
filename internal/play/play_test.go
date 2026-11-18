@@ -2057,9 +2057,19 @@ func TestTitles(t *testing.T) {
 		t.Fatalf("a division's title: %+v", v)
 	}
 
-	// Until they choose, a player wears their level's title: the first from the start, the newest as the level grows.
-	if look, _ := w.g.LookOf(ctx, ana); look.Title != "Нова искра" || p.Title != "spark" {
+	// Until they choose, a player wears their level's title, the newest as the level grows: none at the start (the
+	// first, everyone's, would only mark them new on every board), though it's theirs to choose.
+	if look, _ := w.g.LookOf(ctx, ana); look.Title != "" || p.Title != "" {
 		t.Fatalf("a new player's title: %+v %q", look, p.Title)
+	}
+	if err := w.g.SetLook(ctx, ana, nil, ptr("spark")); err != nil {
+		t.Fatalf("the first title, chosen: %v", err)
+	}
+	if look, _ := w.g.LookOf(ctx, ana); look.Title != "Нова искра" {
+		t.Fatalf("the first title, chosen: %+v", look)
+	}
+	if _, err := w.db.Write.Exec(`UPDATE users SET title = NULL WHERE id = ?`, ana); err != nil {
+		t.Fatal(err)
 	}
 
 	// A level's title, told when the level is.

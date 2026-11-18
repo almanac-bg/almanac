@@ -54,6 +54,14 @@ func TestNachaloHasTheDayInItsPage(t *testing.T) {
 	if day, ok := bootOf(t, p, "/ranks")["day"]; ok {
 		t.Errorf("/ranks has the day in it: %v", day)
 	}
+	// Every page says which of the game's systems the player has met: a first day's has no XP (an avatar shows no
+	// level); a visitor's says nothing.
+	if open, _ := bootOf(t, p, "/ranks")["open"].(map[string]any); open == nil || open["xp"] != false {
+		t.Errorf("a first day's page: open %v", open)
+	}
+	if open, ok := bootOf(t, visitor, "/ranks")["open"]; ok {
+		t.Errorf("a visitor's page: open %v", open)
+	}
 }
 
 // A page asks at once for its style, its script, its first font and, where its screen loads on its own, that screen's

@@ -35,13 +35,13 @@ let {
   keepAwake,
   lifetime,
   loadDuelResult,
+  nameFirst,
   news,
   onCleanup,
   picture,
   play,
   playAnswer,
   playCount,
-  player,
   playingWhile,
   questionHead,
   readyClock,
@@ -159,13 +159,13 @@ export function liveDuel(kit: Kit) {
     keepAwake,
     lifetime,
     loadDuelResult,
+    nameFirst,
     news,
     onCleanup,
     picture,
     play,
     playAnswer,
     playCount,
-    player,
     playingWhile,
     questionHead,
     readyClock,
@@ -223,14 +223,16 @@ function session(again: (rematch?: Rematch) => void, rematch?: Rematch): Child {
 
   // Over, the result stays: a stream that ends then (the duel forgotten) or drops doesn't take it away.
   const over = () => view.peek()?.phase === "end";
-  // The screen gone before the player was made (a first-time guest): no stream, which would join the queue.
+  // The screen gone before the player was made (a first-time guest) and named: no stream, which would join the queue.
   const life = lifetime();
   // Waiting for an opponent, a reload of the page (a new version of the game: fresh.ts) would lose the place in the
   // queue: it waits for the next screen.
   staying(() => !!wait.peek() && !view.peek());
-  player()
-    .then(() => {
-      if (life.aborted) return;
+  // A first duel asks for a name of the player's own first, if they still have the one drawn for them (name.ts): the
+  // other side sees it.
+  nameFirst()
+    .then((on) => {
+      if (!on || life.aborted) return;
       const ends = (event: Exclude<Trouble, "" | "reconnecting">) => () => {
         line.close();
         if (!over()) trouble.set(event);

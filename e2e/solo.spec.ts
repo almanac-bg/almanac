@@ -57,6 +57,9 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.goto("/ranks");
   await expect(page.locator(".board .row.me")).toContainText("/10");
   await expect(page.getByRole("tab")).toHaveText(["Днес", "Знания", "Всички", "Приятели"]);
+  // No level on a board's row, and no title the start gives everyone: a row is the place, the name and the score.
+  await expect(page.locator(".board .lv")).toHaveCount(0);
+  await expect(page.locator(".board")).not.toContainText("Нова искра");
   await page.goto("/me");
   await expect(page.locator(".streak")).toBeVisible();
   await expect(page.locator(".me-level-bar, .league-link")).toHaveCount(0);

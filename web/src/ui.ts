@@ -10,7 +10,7 @@ import { calm } from "./lib/prefs.ts";
 import { path } from "./lib/router.ts";
 import { stakeWords } from "./lib/words.ts";
 import { hourInBulgaria } from "./lib/year.ts";
-import { categories } from "./state.ts";
+import { categories, opened } from "./state.ts";
 
 export type VerdictKind = "exact" | "right" | "partial" | "wrong" | "time";
 
@@ -468,8 +468,9 @@ function fromName(name: string): string {
 }
 
 /** An avatar: a picture on a tile of its tone, and from the wardrobe a pattern behind it and a frame around it, with
- * the level beside it when given. `id` is "shape-tone", or "shape-tone/frame/backdrop" as the server sends a look.
- * For the eye: the name and level are said in words nearby. */
+ * the level beside it when given, once the viewer has met XP (play/unfold.go: a first day shows nobody's level).
+ * `id` is "shape-tone", or "shape-tone/frame/backdrop" as the server sends a look. For the eye: the name and level are
+ * said in words nearby. */
 export function avatar(
   id: string | undefined,
   opts: { size?: "s" | "l"; level?: number; name?: string; frame?: string; backdrop?: string } = {},
@@ -488,19 +489,20 @@ export function avatar(
     },
     picture(shape, "avatar-pic"),
     frame ? picture(`frame-${frame}`, `avatar-frame fr-${frame}`) : null,
-    opts.level ? h("b", { class: "lv" }, String(opts.level)) : null,
+    opts.level && opened.peek().xp ? h("b", { class: "lv" }, String(opts.level)) : null,
   );
 }
 
 /** Where a player's profile is: by their tag. */
 export const profileHref = (tag: string) => `/players/${tag}`;
 
-/** A player on a board or a list: their avatar, name and title; with their tag, a link to their profile. */
+/** A player on a board or a list: their avatar, name and title; with their tag, a link to their profile. No level: on
+ * a board it would be a second number beside the place, and the profile has it, a tap away. */
 export function who(name: Child, look: Look = {}, extra: Child = null, plainName = "", tag = ""): Child {
   return h(
     tag ? "a" : "span",
     tag ? { class: "who", href: profileHref(tag) } : { class: "who" },
-    avatar(look.avatar, { size: "s", level: look.level, name: plainName }),
+    avatar(look.avatar, { size: "s", name: plainName }),
     h(
       "span",
       { class: "who-text" },

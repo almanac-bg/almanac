@@ -15,6 +15,8 @@ export interface Boot {
   now: number;
   /** Начало's day, in its page only (GET /api/day's answer: screens/today.ts draws it at once, the first time). */
   day?: unknown;
+  /** Which of the game's systems the player has met (play/unfold.go): none before a first game. */
+  open?: import("../ui.ts").Open;
 }
 
 export const boot: Partial<Boot> =

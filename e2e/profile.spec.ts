@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { playRun } from "./play.ts";
+import { meetAs, playRun } from "./play.ts";
 
 test("a player's profile: asked to be friends, then a challenge from it", async ({ browser }) => {
   test.setTimeout(120_000);
@@ -19,6 +19,9 @@ test("a player's profile: asked to be friends, then a challenge from it", async 
   await expect(b.getByRole("heading", { level: 1, name: ana.name })).toBeVisible();
   await expect(b.locator(".me-tag")).toHaveText(`@${ana.tag}`);
   await expect(b.locator(".stats")).toContainText("изиграна игра");
+  // Bo hasn't met XP (a first day: play/unfold.go): no level on her avatar, nor in words.
+  await expect(b.locator(".me-head .lv")).toHaveCount(0);
+  await expect(b.locator(".me-head")).not.toContainText("Ниво");
   await expect(b.getByRole("heading", { name: "Колко знае" })).toBeVisible();
 
   // He asks to be friends; she sees it on his profile and accepts there.
@@ -36,6 +39,7 @@ test("a player's profile: asked to be friends, then a challenge from it", async 
   // Friends now: a challenge from her profile.
   await b.reload();
   await b.locator(".player-actions").getByRole("button", { name: "Предизвикай" }).click();
+  await meetAs(b);
   await expect(b.locator("article.question")).toBeVisible();
 
   // Her own profile, as others see it, says so.

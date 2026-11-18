@@ -22,6 +22,7 @@ import { listWords, withName } from "../lib/words.ts";
 import { bulgaria, categories, player, topics, user } from "../state.ts";
 import { back, failure, formatNumber, type Look, topicMark, who } from "../ui.ts";
 import { afterDuel } from "./duel.ts";
+import { nameFirst } from "./name.ts";
 
 interface Challenge {
   code: string;
@@ -115,7 +116,14 @@ function asked(c: Challenge, screen: ReturnType<typeof slot>, here: () => boolea
     release();
     screen.show(() => asked(c, screen, here, why));
   };
-  const start = () => {
+  // The one who sent it sees who took it: a name of the player's own first, if they still have the one drawn for them
+  // (name.ts); then the count, the game's entry held from it.
+  const start = () =>
+    nameFirst().then(
+      (on) => on && here() && count(),
+      (err) => here() && screen.show(() => asked(c, screen, here, errorText(err))),
+    );
+  const count = () => {
     hold();
     screen.show(() =>
       getReady(
@@ -369,7 +377,10 @@ export function challengeFriend([idText]: string[]) {
         ),
       );
     loadDuelResult().catch(() => {}); // the result's screen, on its way while the player plays
-    const ready = () => {
+    // The friend sees who challenged them: a name of the player's own first, if they still have the one drawn for them
+    // (name.ts).
+    const ready = async () => {
+      if (!(await nameFirst()) || !here()) return;
       hold();
       screen.show(() =>
         getReady(
@@ -391,7 +402,9 @@ export function challengeFriend([idText]: string[]) {
     };
     if (tap) return ready();
     screen.show(() =>
-      startScreen(duelWith(name), `Десет въпроса. Играеш сега, а ${name} има три дни за своя ред.`, null, ready),
+      startScreen(duelWith(name), `Десет въпроса. Играеш сега, а ${name} има три дни за своя ред.`, null, () =>
+        ready().catch(fail),
+      ),
     );
   })().catch(fail);
   return h("div", null, screen);

@@ -61,6 +61,7 @@ let {
   soundOn,
   categories,
   player,
+  nameFirst,
   playingWhile,
   user,
   avatar,
@@ -79,6 +80,7 @@ let {
   whileSeen,
   errorText,
   lifetime,
+  opened,
 } = {} as Kit;
 
 type Phase = "soon" | "lobby" | "question" | "reveal" | "end";
@@ -251,6 +253,7 @@ export function royal(kit: Kit) {
     soundOn,
     categories,
     player,
+    nameFirst,
     playingWhile,
     user,
     avatar,
@@ -269,6 +272,7 @@ export function royal(kit: Kit) {
     whileSeen,
     errorText,
     lifetime,
+    opened,
   } = kit);
   title("Роял");
   const view = signal<Evening | null>(null);
@@ -587,6 +591,8 @@ function entry(joined: () => void, out?: boolean): Child[] {
     error.set("");
     busy.set(true);
     try {
+      // In, the others see the player: a name of their own first, if they still have the one drawn for them (name.ts).
+      if (!out && !(await nameFirst())) return;
       await player();
       await api(out ? "DELETE" : "POST", "/api/royal", out ? undefined : {});
       joined();
@@ -785,7 +791,8 @@ function cutSaid(v: Evening): Child {
     return card(
       false,
       `Отпадаш след ${nth(v.n + 1)}.`,
-      "Вече си извън класирането. Играй до края за себе си: всеки верен отговор носи XP.",
+      // XP said only to one who has met it (play/unfold.go).
+      `Вече си извън класирането. Играй до края за себе си${opened.peek().xp ? ": всеки верен отговор носи XP" : ""}.`,
     );
   return h(
     "p",

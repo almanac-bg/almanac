@@ -109,7 +109,7 @@ export function stats(): Child {
         figure(String(s.games), s.games === 1 ? "изиграна игра" : "изиграни игри"),
         s.duels > 0
           ? figure(`${s.won}/${s.duels}`, "победи в дуели")
-          : figure(String(s.days), s.days === 1 ? "изигран брой" : "изиграни броя"),
+          : figure(String(s.days), s.days === 1 ? "изигран ден" : "изиграни дни"),
       ),
       s.facts ? almanacLine(s.facts) : null,
       // „Колко знаеш“ once a topic has a first estimate: a first day's one answer a topic tells nothing.

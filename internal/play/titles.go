@@ -14,7 +14,7 @@ import (
 // come four ways, each its own group:
 //
 //   - the level: a ladder from „Нова искра“ at the start to „Жив алманах“ at level 50, so that there's always a next
-//     one in sight. A level is time played, so its titles name devotion („Постоянство“, „Вярност към Алманаха“), not
+//     one in sight (worn by itself from „Любопитен ум“ on: LevelTitle). A level is time played, so its titles name devotion („Постоянство“, „Вярност към Алманаха“), not
 //     intellect: a claim to knowing is mastery's to give;
 //   - an achievement: only those that say how someone plays („Светкавица“ for five quick right answers in a game,
 //     „Неугасим пламък“), never one tap's luck or the hour on the clock (what „След полунощ“ or „В последния миг“
@@ -200,15 +200,16 @@ func (g *Game) titleOf(id string) (string, Tier) {
 }
 
 // unchosen is the title of a player who hasn't chosen one (users.title NULL), as lookColumns read it: they wear their
-// level's (LevelTitle), so that a new player's „Нова искра“ shows from the first game and grows with the level. „Без
-// титла“ is a choice, kept as "".
+// level's (LevelTitle), which grows with the level. „Без титла“ is a choice, kept as "".
 const unchosen = "~level"
 
-// LevelTitle is the newest title of the level's ladder a player at this level has reached.
+// LevelTitle is the title a player who hasn't chosen one wears at this level: the newest of the level's ladder they've
+// reached past its first, "" before that. „Нова искра“ is everyone's from the first game, so worn by itself it would
+// only mark a player new on every board row; it's worn by choice (the unfold: a new player isn't shown the level).
 func LevelTitle(level int) string {
 	id := ""
 	for _, t := range Titles {
-		if t.Group == TitleLevel && t.by.level <= level {
+		if t.Group == TitleLevel && t.by.level > 1 && t.by.level <= level {
 			id = t.ID
 		}
 	}

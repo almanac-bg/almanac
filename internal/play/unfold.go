@@ -12,8 +12,8 @@ import (
 //
 //   - From the first game: the game's points (how well it went, and the day's board), the streak, the topics, and the
 //     achievements a game earns with what they unlock (but what the level unlocks).
-//   - From the second day played (XPFromDay): XP, with the level it makes, what the level unlocks, and the day's goals
-//     that pay it.
+//   - From the second day played (XPFromDay): XP, with the level it makes (anyone's: a first day sees no level on
+//     another's avatar either), what the level unlocks, and the day's goals that pay it.
 //   - From the third day played (LeagueFromDay): the week's league, a race on the day's points added up over the
 //     week, which means little before the habit has begun.
 //   - From the first game that moved the rating (a duel, a Роял): the rating and its division.

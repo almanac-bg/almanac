@@ -26,6 +26,7 @@ let {
   standingCard,
   stat,
   tierWords,
+  opened,
 } = {} as Kit;
 
 interface Profile {
@@ -78,6 +79,7 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
     standingCard,
     stat,
     tierWords,
+    opened,
   } = kit);
   title(`@${tag}`);
   const profile = signal<Profile | null>(null);
@@ -132,7 +134,12 @@ function head(p: Profile): Child {
       h("h1", null, p.name),
       h("span", { class: "me-tag" }, `@${p.tag}`),
       p.title ? h("span", { class: `me-title t-${p.titleTier ?? "common"}` }, p.title) : null,
-      h("span", { class: "muted small" }, `Ниво ${p.level} · играе от ${month(p.since)}`),
+      // The level once the viewer has met XP (play/unfold.go), as their avatar shows it.
+      h(
+        "span",
+        { class: "muted small" },
+        `${opened.peek().xp ? `Ниво ${p.level} · играе` : "Играе"} от ${month(p.since)}`,
+      ),
     ),
   );
 }
@@ -265,7 +272,7 @@ function numbers(p: Profile): Child {
     stat(`${percent(p.right, p.answers)}%`, "верни отговори", "mint"),
     p.duels > 0
       ? stat(`${p.won}/${p.duels}`, "спечелени дуела", "rose")
-      : stat(String(p.days), p.days === 1 ? "изигран брой" : "изиграни броя"),
+      : stat(String(p.days), p.days === 1 ? "изигран ден" : "изиграни дни"),
     stat(String(p.games), p.games === 1 ? "изиграна игра" : "изиграни игри"),
   );
 }
