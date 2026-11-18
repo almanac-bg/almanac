@@ -377,8 +377,8 @@ func (s *Server) year(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, y)
 }
 
-// leagueNews queues, in the transaction that ends a week of the leagues, the word to each player of how their week
-// ended: sent once the league is theirs to see (play/unfold.go), as the queue sends it (pushes.go).
+// leagueNews queues, in the write of a week's close that keeps their places (a few groups' at a time), the word to
+// each player of how their week ended: sent once the league is theirs to see (play/unfold.go), as the queue sends it (pushes.go).
 func (s *Server) leagueNews(ctx context.Context, tx *sql.Tx, news []play.LeagueNews) error {
 	if s.push == nil && s.phones == nil {
 		return nil

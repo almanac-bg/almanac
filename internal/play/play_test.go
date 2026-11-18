@@ -1842,7 +1842,7 @@ func TestLeagues(t *testing.T) {
 	ana, bo, cy := w.user(), w.user(), w.user()
 	w.played(ana, LeagueFromDay-1) // the league's open to Ana: her week's end is told
 	if v, err := w.g.LeagueOf(ctx, ana); err != nil || v.In || v.League.Name != "Странджа" || v.DaysLeft != 4 ||
-		v.Week != "2026-11-09" || v.OnXP {
+		v.Week != "2026-11-09" {
 		t.Fatalf("before a game: %+v %v", v, err)
 	}
 	// A topic's game, however good, puts nobody in the league: the day's questions do.
@@ -1878,8 +1878,9 @@ func TestLeagues(t *testing.T) {
 	}
 
 	// The week ends: Ana and Bo go up with first and second place's XP, the third stays with third's; told once.
-	// The news is kept with the week's end, or neither is: a failure to keep it ends nothing, and it's done again.
-	w.now = time.Date(2026, 11, 16, 0, 5, 0, 0, Bulgaria)
+	// The news is kept with the places, or neither is: a failure to keep it ends nothing, and it's done again. The week
+	// closes once Sunday's last runs are in (weekLate), minutes into Monday.
+	w.now = time.Date(2026, 11, 16, 0, 30, 0, 0, Bulgaria)
 	w.g.LeagueNews = func(context.Context, *sql.Tx, []LeagueNews) error { return errors.New("no room") }
 	if err := w.g.SettleDue(ctx); err == nil {
 		t.Fatal("the week ended without its news")
@@ -1953,7 +1954,7 @@ func TestLeagues(t *testing.T) {
 		_, _ = w.db.Write.Exec(`UPDATE users SET league = 5 WHERE id = ?`, p)
 		day(p, map[bool]int{true: Length, false: 5 - i}[i == 0])
 	}
-	w.now = time.Date(2026, 11, 23, 0, 5, 0, 0, Bulgaria)
+	w.now = time.Date(2026, 11, 23, 0, 30, 0, 0, Bulgaria)
 	if err := w.g.SettleDue(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -2001,49 +2002,6 @@ func TestLeagues(t *testing.T) {
 	if b, err := w.g.RatingBoard(ctx, bo, false); err != nil || len(b.Top) != 1 || b.Top[0].Value != 1300 ||
 		b.Top[0].Division == nil || b.Place != 0 {
 		t.Fatalf("the rating's board: %+v %v", b, err)
-	}
-}
-
-// The week under way when the race moved to the day's points ends as it began, on XP; the next is on points.
-func TestLeagueWeekOnXP(t *testing.T) {
-	w := setup(t) // Thursday, 12 November
-	ctx := t.Context()
-	if _, err := w.g.LeagueOf(ctx, 0); err != nil { // the week under way
-		t.Fatal(err)
-	}
-	if _, err := w.db.Write.Exec(`UPDATE league_week SET on_xp = 1`); err != nil {
-		t.Fatal(err)
-	}
-	// Ana plays two topics' games all right, Bo the day all wrong, three more a topic's game all wrong: in by XP,
-	// Ana ahead on it.
-	ana, bo := w.user(), w.user()
-	w.game(ana, nil)
-	w.game(ana, nil)
-	w.dayGame(bo, nil, repeat(w.wrong, Length)...)
-	for range RaceSize - 2 {
-		w.game(w.user(), nil, repeat(w.wrong, Length)...)
-	}
-	v, err := w.g.LeagueOf(ctx, ana)
-	if err != nil || !v.OnXP || !v.In || v.Size != RaceSize || v.Place != 1 || v.Group[0].Points < 2*XPFinish {
-		t.Fatalf("the week on XP: %+v %v", v, err)
-	}
-	w.now = time.Date(2026, 11, 16, 0, 5, 0, 0, Bulgaria)
-	if err := w.g.SettleDue(ctx); err != nil {
-		t.Fatal(err)
-	}
-	var place, points int
-	if err := w.db.Read.QueryRow(`SELECT place, points FROM league_results WHERE user_id = ?`, ana).Scan(&place, &points); err != nil ||
-		place != 1 || points != v.Group[0].Points {
-		t.Fatalf("Ana's week on XP ended: place %d, %d XP, %v", place, points, err)
-	}
-	// The next week is on points: a topic's game puts nobody in, the day's questions do.
-	w.game(ana, nil)
-	if v, _ := w.g.LeagueOf(ctx, ana); v.OnXP || v.In {
-		t.Fatalf("the week after: %+v", v)
-	}
-	w.dayGame(ana, nil)
-	if v, _ := w.g.LeagueOf(ctx, ana); !v.In || v.Size != 1 {
-		t.Fatalf("the day in the week after: %+v", v)
 	}
 }
 

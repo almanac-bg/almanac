@@ -426,12 +426,21 @@ func (g *Game) AnswerRoyal(ctx context.Context, userID, runID int64, n int, answ
 	return g.answer(ctx, userID, runID, n, answer, at, byRoyal, d)
 }
 
-// AfterRoyal keeps what a player's Роял earned them once its game is over for them: all a game earns (afterRun) if
-// their run has just ended (ended), else what their place earned (the achievements). The hub calls it off the
+// AfterRoyal keeps what a player's Роял earned them once its game is over for them: all a game earns (afterRun, on
+// their latest Роял's run) if their run has just ended (ended), else what their place earned (the achievements). The hub calls it off the
 // evening's clock: it goes over the player's history, and a tournament's end is fifty of them at once.
 func (g *Game) AfterRoyal(ctx context.Context, userID int64, ended bool) error {
 	if ended {
-		return g.afterRun(ctx, userID)
+		var runID int64
+		if err := g.DB.Read.QueryRowContext(ctx, `SELECT id FROM runs WHERE user_id = ? AND kind = 'royal'
+			ORDER BY started_at DESC LIMIT 1`, userID).Scan(&runID); err != nil {
+			return err
+		}
+		p, err := g.playedOf(ctx, userID, runID)
+		if err != nil {
+			return err
+		}
+		return g.afterRun(ctx, p)
 	}
 	_, err := g.Award(ctx, userID)
 	return err

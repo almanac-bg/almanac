@@ -96,8 +96,8 @@ type Game struct {
 	RoyalNews func(context.Context, RoyalNews)
 	// RoyalAt, if set, is when the next Роял starts after a moment: a day's goals draw Роял only while it's ahead.
 	RoyalAt func(time.Time) time.Time
-	// LeagueNews, if set, is told of every place when a week of the leagues ends, inside the transaction that ends it:
-	// what it keeps there (a notification queued) is kept with the week's end, or not at all.
+	// LeagueNews, if set, is told of every place when a week of the leagues ends, inside the write that keeps those
+	// places (closeGroups): what it keeps there (a notification queued) is kept with them, or not at all.
 	LeagueNews func(context.Context, *sql.Tx, []LeagueNews) error
 	// MistakesAfter is how long a missed question waits for its second chance (MistakesAfter when 0; the browser
 	// tests make it seconds).
@@ -106,8 +106,8 @@ type Game struct {
 	// players' and everyone's (CrowdFrom, DayCrowdFrom when 0; the browser tests make it 1).
 	CrowdMin int
 
-	weekMu sync.Mutex
-	week   string // the leagues' week being played, once ensureWeek has seen it
+	weekMu sync.RWMutex // held while a week of the leagues closes (ensureWeek); read while a player joins one
+	week   string       // the leagues' week open, once ensureWeek has seen it
 
 	paceMu sync.Mutex
 	pace   RoyalPace // how often Роял plays, as of paceDay (RoyalPaceOf)
@@ -222,6 +222,11 @@ func (g *Game) loadBy(tx *sql.Tx, userID, runID int64, by driver) (*run, error) 
 // DayGrace is how long after its day a run of the day's questions can still be played on: one begun before midnight
 // is finished after it, at a player's pace, between its questions too.
 const DayGrace = 15 * time.Minute
+
+// dayLate is the most after its day that a run of the day's questions can still be answered: DayGrace, and the time of
+// a question shown just before it ends (dayOver). Whatever is counted by the day waits for it: the week of the
+// leagues closes after it (ensureWeek), so that a day run finished after midnight counts in its own week.
+const dayLate = DayGrace + LongestLimit + Grace
 
 // dayOver is whether a run of the day's questions can't be played on any more: its day ended DayGrace ago, and no
 // question shown before then is still in its time. It stays as it was left: unfinished, it counts for nothing (the
@@ -756,21 +761,6 @@ func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
 	res.Learned = r.kind == "mistakes" && res.Right && d.Question().Extra().Fact != ""
 	res.State, err = g.state(tx, r)
 	return res, d, err
-}
-
-// afterRun keeps what a player's game, just finished, earned them: a broken streak won back (repair.go), achievements,
-// the day's goals, and a place in the week's league.
-func (g *Game) afterRun(ctx context.Context, userID int64) error {
-	if err := g.mend(ctx, userID); err != nil { // first: the streak it keeps counts for the achievements
-		return err
-	}
-	if _, err := g.Award(ctx, userID); err != nil {
-		return err
-	}
-	if _, err := g.GoalsOf(ctx, userID); err != nil { // a goal done is kept, with its XP, whether or not the player looks
-		return err
-	}
-	return g.joinLeague(ctx, userID)
 }
 
 // newSeed is a deal's seed.
