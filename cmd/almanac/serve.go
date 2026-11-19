@@ -39,8 +39,7 @@ import (
 //	MAIL_FROM           "АЛМАНАХ <no-reply@almanac.bg>"
 //	TLS_CERT, TLS_KEY   serve HTTPS with this certificate (behind Cloudflare: its origin certificate)
 //	TRUST_CLOUDFLARE=1  take players' addresses from Cloudflare's header, on connections from Cloudflare's addresses
-//	ALERT_SLACK         a Slack incoming webhook where new kinds of problems are told (hourly, each kind once a day)
-//	ALERT_EMAIL         where they are mailed instead (no ALERT_SLACK), or when Slack can't be reached
+//	ALERT_EMAIL         where new kinds of problems are mailed (hourly, each kind once a day)
 //	PUSH_PUBLIC_KEY,    notifications (Web Push): the VAPID key pair `almanac push keys` makes; without them,
 //	PUSH_PRIVATE_KEY    no notifications
 //	APNS_KEY_FILE       notifications to the app on iPhones: the team's APNs key (.p8), with APNS_KEY_ID and
@@ -100,7 +99,7 @@ func serve([]string) error {
 		MTASTSMode:      os.Getenv("MTA_STS_MODE"),
 		Operator:        os.Getenv("OPERATOR_NAME"),
 		Contact:         env("CONTACT_EMAIL", "privacy@almanac.bg"),
-		Alerts:          server.Alerts{Slack: os.Getenv("ALERT_SLACK"), Email: os.Getenv("ALERT_EMAIL")},
+		Alerts:          server.Alerts{Email: os.Getenv("ALERT_EMAIL")},
 		RoomsFile:       filepath.Join(filepath.Dir(dbPath()), "rooms.json"),
 		LimitsFile:      filepath.Join(filepath.Dir(dbPath()), "limits.json"),
 		RunningFile:     filepath.Join(filepath.Dir(dbPath()), "running.json"),
@@ -311,7 +310,7 @@ func reloadOnHangup(ctx context.Context, hup <-chan os.Signal, banks keptBanks, 
 func unconfigured(alerts server.Alerts, backups, heartbeat bool) []string {
 	var out []string
 	if alerts == (server.Alerts{}) {
-		out = append(out, "no ALERT_EMAIL or ALERT_SLACK: what goes wrong is told to no one")
+		out = append(out, "no ALERT_EMAIL: what goes wrong is told to no one")
 	}
 	if !backups {
 		out = append(out, "no BACKUP_ENDPOINT: the database is copied nowhere (README: Резервни копия)")

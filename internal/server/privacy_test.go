@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,7 +10,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 )
 
 // lockedBuffer is a log written from several goroutines.
@@ -123,22 +121,4 @@ func TestProfileMisses(t *testing.T) {
 	if status, _ := g.from("198.51.100.9", "GET", "/api/players/"+tag, ""); status != 200 {
 		t.Fatalf("another network: %d", status)
 	}
-}
-
-// The privacy page names Slack among those who see anything only while problems are told there.
-func TestPrivacyNamesSlackWhenTold(t *testing.T) {
-	g := start(t)
-	page := func() string {
-		_, body := g.from("203.0.113.1", "GET", "/privacy", "")
-		return body
-	}
-	if strings.Contains(page(), "Slack") {
-		t.Fatal("Slack named, with no Slack to tell problems in")
-	}
-	g.srv.cfg.Alerts.Slack = "https://hooks.slack.com/services/x"
-	if body := page(); !strings.Contains(body, "Slack (САЩ)") {
-		t.Fatalf("Slack not named while problems go there:\n%s", body)
-	}
-	g.srv.cfg.Alerts = Alerts{}
-	g.srv.TellProblems(context.Background(), time.Hour) // nowhere to tell: returns at once
 }

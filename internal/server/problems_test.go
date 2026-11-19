@@ -1,12 +1,8 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 )
@@ -182,70 +178,13 @@ func TestClientErrorsLimited(t *testing.T) {
 	}
 }
 
-// Problems go to Slack as plain text when there is a channel for it (no mail then), and by mail when Slack can't be
-// reached: nothing is lost.
-func TestProblemsToSlack(t *testing.T) {
+// Problems are mailed to the address set, once each new kind.
+func TestProblemsByMail(t *testing.T) {
 	g := start(t)
-	var (
-		mu     sync.Mutex
-		posted []map[string]any
-		fail   bool
-	)
-	hook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		defer mu.Unlock()
-		if fail {
-			http.Error(w, "no_service", http.StatusInternalServerError)
-			return
-		}
-		var in map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-			t.Error(err)
-		}
-		posted = append(posted, in)
-	}))
-	defer hook.Close()
-	to := Alerts{Slack: hook.URL, Email: "alerts@almanac.bg"}
-
 	g.srv.Problem("backup: upload failed")
-	g.srv.problems.note("browser: <!channel> <https://evil.example|click> & more", fromBrowser)
-	g.srv.tellProblems(t.Context(), to)
-	g.outbox.Flush(t.Context())
-	if len(posted) != 1 || len(g.inbox.got) != 0 {
-		t.Fatalf("posted %d, mailed %d", len(posted), len(g.inbox.got))
-	}
-	text, _ := posted[0]["text"].(string)
-	if posted[0]["mrkdwn"] != false || !strings.Contains(text, "backup: upload failed") || !strings.Contains(text, "АЛМАНАХ: 2 нови проблема") {
-		t.Fatalf("posted %v", posted[0])
-	}
-	if strings.ContainsAny(text, "<>") || !strings.Contains(text, "&lt;!channel&gt;") {
-		t.Fatalf("a browser's text could format in Slack: %q", text)
-	}
-
-	// Slack down: the same goes by mail.
-	mu.Lock()
-	fail = true
-	mu.Unlock()
-	g.srv.Problem("backup: another")
-	g.srv.tellProblems(t.Context(), to)
-	g.outbox.Flush(t.Context())
-	if len(posted) != 1 || len(g.inbox.got) != 1 || !strings.Contains(g.inbox.got[0].Text, "backup: another") {
-		t.Fatalf("posted %d, mailed %+v", len(posted), g.inbox.got)
-	}
-
-	// No Slack at all: by mail, as before.
-	g.srv.Problem("backup: third")
 	g.srv.tellProblems(t.Context(), Alerts{Email: "alerts@almanac.bg"})
 	g.outbox.Flush(t.Context())
-	if len(g.inbox.got) != 2 {
-		t.Fatalf("mailed %d", len(g.inbox.got))
-	}
-}
-
-// A failed post never says the webhook, which is a secret.
-func TestSlackErrorHidesWebhook(t *testing.T) {
-	err := postSlack(t.Context(), "http://127.0.0.1:1/services/T000/B000/secretpart", "x")
-	if err == nil || strings.Contains(err.Error(), "secretpart") {
-		t.Fatalf("err %v", err)
+	if len(g.inbox.got) != 1 || !strings.Contains(g.inbox.got[0].Text, "backup: upload failed") {
+		t.Fatalf("mailed %+v", g.inbox.got)
 	}
 }
