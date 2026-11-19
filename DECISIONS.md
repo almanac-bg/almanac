@@ -36,6 +36,11 @@ packages' doc comments; this file holds only what must not drift.
   try in the game's texts.
 - **Live means live.** Duels are played at once, with a recording of a real game when nobody comes; Роял is online only,
   at 21:00, Friday to Sunday until the evenings fill. No made-up opponents: no bots answering by a player's rates.
+- **A recording shows who played it.** Against a recording, the player sees the real player as anywhere in the game
+  (name, profile, avatar, frame, title, level, rating), labelled „Запис“, never as an anonymous animal: a duel is
+  against someone (owner, 2026-11-19, undoing review S13's unnamed recordings). The other way stays numbers only: the
+  recorded player hears how many played their games and how it went, never who. Two players one of whom has blocked
+  the other are never dealt each other's games. The privacy page says so.
 - **Роял cuts by right answers,** after the 5th, 8th, 11th and 14th: everyone level on right answers with the last
   player through goes through, up to a quarter more than the cut keeps (`play.RoyalThrough`); only past that does the
   time of the right ones decide among those level. So time decides the final, the places and only a crowded line,

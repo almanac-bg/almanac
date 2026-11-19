@@ -167,7 +167,7 @@ function hero(d: DuelView): Child {
       face(you, "Ти", "", d.state === "won", true),
       h("span", { class: "duel-colon", "aria-hidden": "true" }, ":"),
       them
-        ? face(them, them.name, them.tag ?? "", d.state === "lost" && !them.gone, settled, d.recorded)
+        ? face(them, them.name, them.tag ?? "", d.state === "lost" && !them.gone, settled)
         : h("div", { class: "duel-face" }),
     ),
     them?.tag && d.befriend ? befriend(them.name, them.tag) : null,
@@ -182,7 +182,7 @@ function hero(d: DuelView): Child {
 /** One side, face to face: the avatar (with its frame), the name (a way to their profile) and title, and the score;
  * the winner's in gold. The other's score shows only once there's a result: nobody plays knowing what to beat; and
  * never for a player gone since, whose game went with them. */
-function face(s: Side, label: string, tag: string, won: boolean, shown: boolean, recorded = false): Child {
+function face(s: Side, label: string, tag: string, won: boolean, shown: boolean): Child {
   const look = s.look ?? {};
   return h(
     "div",
@@ -193,11 +193,7 @@ function face(s: Side, label: string, tag: string, won: boolean, shown: boolean,
     h(
       "span",
       { class: "duel-title" },
-      recorded
-        ? h("span", { class: "kicker" }, "Запис")
-        : look.title
-          ? h("span", { class: `who-title t-${look.titleTier ?? "common"}` }, look.title)
-          : null,
+      look.title ? h("span", { class: `who-title t-${look.titleTier ?? "common"}` }, look.title) : null,
     ),
     s.gone
       ? [h("b", { class: "duel-points none" }, "–"), h("span", { class: "duel-rights" }, "Играчът вече го няма")]

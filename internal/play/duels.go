@@ -23,9 +23,9 @@ import (
 // it's made, and settled once both runs are done). If nobody comes in time, it's played against a recording of a
 // real player's earlier game on the same questions (a duel's, or else a topic's, which the player is told; never the
 // day's, and none with today's questions in it), a real one by a player of about their rating, played at a person's
-// speed and not a script's (recordedRun, fair.go): only the player's rating moves, and half as far, as the recorded one
-// didn't ask to play nor plays to win; and only RecordedRatedPerDay such duels a day move it. The recorded player hears
-// of it quietly, once a day, with a game's news (RecordingsNews).
+// speed and not a script's (recordedRun, fair.go), and shown by who played it (recordings.go): only the player's
+// rating moves, and half as far, as the recorded one didn't ask to play nor plays to win; and only RecordedRatedPerDay
+// such duels a day move it. The recorded player hears of it quietly, once a day, with a game's news (RecordingsNews).
 //
 // A friend, or anyone, is challenged in their own time: a challenge (challenges.go), each taker's game of it a duel
 // of kind challenge, played against the sender's game as one against a recording is; one taken by a friend is a duel
@@ -468,7 +468,7 @@ const (
 )
 
 // recordedRun is another player's finished run of ten questions (none still played against: a duel's, a challenge's),
-// all still in play as it played them (asPlayed: none retired, none changed since), none of today's and none due
+// by a player neither of the two has blocked (blocks.go), all still in play as it played them (asPlayed: none retired, none changed since), none of today's and none due
 // for review (dayBars.now; a day's run never), played at a person's speed (not marked a script's: fair.go), to play
 // against: a real game (RecordingRights right or more, RecordingMissed not answered at most), by a player whose rating
 // is within RecordingBand of the player's, the one with the fewest questions the player has seen (seen, read before
@@ -491,8 +491,8 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 			CASE WHEN r.kind = 'topic' THEN coalesce(r.category, '') ELSE '' END,
 			(SELECT count(*) FROM answers a WHERE a.run_id = r.id AND a.given IS NULL)
 		FROM runs r JOIN users u ON u.id = r.user_id
-		WHERE r.kind IN ('topic', 'duel') AND r.finished_at IS NOT NULL AND NOT r.shadow AND r.user_id <> ?
-			AND json_array_length(r.questions) = ?
+		WHERE r.kind IN ('topic', 'duel') AND r.finished_at IS NOT NULL AND NOT r.shadow AND r.user_id <> ?1
+			AND json_array_length(r.questions) = ?2 AND NOT `+blockedBetween("r.user_id", "?1")+`
 			AND NOT EXISTS (SELECT 1 FROM duels d WHERE d.ended_at IS NULL
 				AND (d.a_run = r.id OR d.b_run = r.id OR (d.kind = 'challenge' AND d.ghost_run = r.id)))
 		ORDER BY r.finished_at DESC LIMIT 200`, userID, Length)
@@ -741,9 +741,6 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 			return err
 		}
 		recording := ghost && !challenge.Valid
-		if recording {
-			b.name, _ = RecordedAs(b.id, 0) // kept and told by the animal only, as it played
-		}
 		both = both || (challenge.Valid && friends)
 		var rated bool
 		switch {
@@ -1038,14 +1035,6 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			v.Opponent = &DuelSide{Name: GoneName, Done: true, Gone: true}
 		}
 		v.Recorded = strings.HasPrefix(r.outcome, "ghost_") && !challenge
-		if v.Recorded && v.Opponent != nil && r.theirs != 0 {
-			level := 0
-			if v.Opponent.Look != nil {
-				level = v.Opponent.Look.Level
-			}
-			name, look := RecordedAs(r.theirs, level)
-			v.Opponent.Name, v.Opponent.Tag, v.Opponent.Look = name, "", &look
-		}
 		won := map[bool]string{true: "a", false: "b"}[r.mine]
 		switch {
 		case r.outcome == won || r.outcome == "ghost_won":

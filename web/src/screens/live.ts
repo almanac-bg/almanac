@@ -531,11 +531,13 @@ function claim(view: () => LiveView, dismissed: () => boolean, dismiss: () => vo
 }
 
 /** What the other is doing on the question now: thinking, answered (and how fast), gone for a moment, or gone (the
- * duel goes on without them). */
+ * duel goes on without them). A recording shows who played it (play/recordings.go), so it says it's one whenever it
+ * hasn't an answer to show: never „Мисли…“, as if they were here now. */
 function doing(v: LiveView, s: Side): string {
   if (s.gone) return "Излезе от дуела.";
+  if (v.phase === "question" && s.answered) return `Отговори за ${seconds(s.tookMs ?? 0)}`;
+  if (v.recorded) return "Запис";
   if (v.phase !== "question") return "";
-  if (s.answered) return `Отговори за ${seconds(s.tookMs ?? 0)}`;
   if (!s.online) return "Връзката на съперника прекъсна…";
   return "Мисли…";
 }

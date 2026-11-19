@@ -2,14 +2,10 @@ package play
 
 import (
 	"errors"
-	"fmt"
 	"os"
-	"regexp"
-	"slices"
+	"strings"
 	"testing"
 	"time"
-
-	"github.com/almanac-bg/almanac/internal/account"
 )
 
 // A profile, anyone's to see, doesn't follow a player as they play: its numbers are of the games they finished, and
@@ -76,12 +72,16 @@ func TestProfileShowsNoGameUnderWay(t *testing.T) {
 	}
 }
 
-// A recording is a stranger's game: the one playing against it sees the animal its player started as, never their
-// name or tag, during the duel and after it (review 2026-11-18, S13).
-func TestRecordingsUnnamed(t *testing.T) {
+// A recording shows who played it, as anyone shows anywhere in the game: their name, tag and look, during the duel
+// (internal/live) and after it, labelled a recording (owner, 2026-11-19).
+func TestRecordingsNamed(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	owner, gal := w.user(), w.user()
+	if _, err := w.db.Write.Exec(`UPDATE users SET name = 'Мария', avatar = 'bear-2', frame = 'laurel' WHERE id = ?`,
+		owner); err != nil {
+		t.Fatal(err)
+	}
 	s, err := w.g.StartTopic(ctx, owner, "")
 	if err != nil {
 		t.Fatal(err)
@@ -94,61 +94,81 @@ func TestRecordingsUnnamed(t *testing.T) {
 	w.play(gal, l.Runs[0], repeat(w.wrong, Length)...)
 	w.wait(time.Minute)
 
-	animal := account.AnimalOf(owner).Name
+	look, err := w.g.LookOf(ctx, owner)
+	if err != nil || !strings.HasPrefix(look.Avatar, "bear-2/laurel") {
+		t.Fatalf("the owner's look: %+v %v", look, err)
+	}
+	var ownerTag string
+	if err := w.db.Read.QueryRow(`SELECT tag FROM users WHERE id = ?`, owner).Scan(&ownerTag); err != nil {
+		t.Fatal(err)
+	}
 	duels, err := w.g.DuelsOf(ctx, gal)
 	if err != nil || len(duels) != 1 {
 		t.Fatalf("Gal's duels: %+v %v", duels, err)
 	}
 	d := duels[0]
-	if !d.Recorded || d.Opponent == nil || d.Opponent.Name != animal || d.Opponent.Tag != "" ||
-		d.Opponent.Look == nil || d.Opponent.Look.Avatar != DefaultAvatar(owner) || d.Opponent.Look.Title != "" {
+	if !d.Recorded || d.Opponent == nil || d.Opponent.Name != "Мария" || d.Opponent.Tag != ownerTag ||
+		d.Opponent.Look == nil || *d.Opponent.Look != look {
 		t.Fatalf("the recording, as Gal's duels show it: %+v %+v", d, d.Opponent)
 	}
 	one, err := w.g.DuelOf(ctx, gal, d.ID)
-	if err != nil || one.Opponent.Name != animal || one.Opponent.Tag != "" || one.Befriend || one.Record != nil {
+	if err != nil || !one.Recorded || one.Opponent.Name != "Мария" || one.Opponent.Tag != ownerTag ||
+		*one.Opponent.Look != look || one.Record != nil {
 		t.Fatalf("the duel's result: %+v %v", one, err)
 	}
 	st, err := w.g.StatsOf(ctx, gal)
-	if err != nil || len(st.Recent) == 0 || st.Recent[0].Opponent != animal || !st.Recent[0].Recorded {
+	if err != nil || len(st.Recent) == 0 || st.Recent[0].Opponent != "Мария" || !st.Recent[0].Recorded {
 		t.Fatalf("Gal's games: %+v %v", st.Recent, err)
 	}
 
-	// A duel played before kept the recorded player's name: the migration puts the animal in its place.
-	if _, err := w.db.Write.Exec(`UPDATE runs SET opponent = 'Мария' WHERE id = ?`, l.Runs[0]); err != nil {
+	// A duel played while recordings went unnamed kept the animal: the migration puts the player's name back.
+	if _, err := w.db.Write.Exec(`UPDATE runs SET opponent = 'Лисица' WHERE id = ?`, l.Runs[0]); err != nil {
 		t.Fatal(err)
 	}
-	sql, err := os.ReadFile("../store/migrations/0061_recordings_unnamed.sql")
+	sql, err := os.ReadFile("../store/migrations/0074_recordings_named.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := w.db.Write.Exec(string(sql)); err != nil {
 		t.Fatal(err)
 	}
-	if st, _ := w.g.StatsOf(ctx, gal); st.Recent[0].Opponent != animal {
+	if st, _ := w.g.StatsOf(ctx, gal); st.Recent[0].Opponent != "Мария" {
 		t.Fatalf("after the migration: %q", st.Recent[0].Opponent)
 	}
 }
 
-// The migration that takes the names off the duels played against recordings before names the animals as
-// account.AnimalOf does.
-func TestRecordingsUnnamedMigration(t *testing.T) {
-	sql, err := os.ReadFile("../store/migrations/0061_recordings_unnamed.sql")
+// Two players one of whom has blocked the other are never dealt each other's games as recordings, whichever blocked.
+func TestRecordingsHonourBlocks(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	owner, gal := w.user(), w.user()
+	s, err := w.g.StartTopic(ctx, owner, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var names []string
-	for _, m := range regexp.MustCompile(`WHEN (\d) THEN '([^']+)'|ELSE '([^']+)'`).FindAllStringSubmatch(string(sql), -1) {
-		if m[1] != "" && m[1] != fmt.Sprint(len(names)) {
-			t.Fatalf("the animals out of order at %s", m[0])
+	w.play(owner, s.ID, repeat(w.right, Length)...)
+	w.wait(time.Minute)
+	tags := map[int64]string{}
+	for _, id := range []int64{owner, gal} {
+		var t0 string
+		if err := w.db.Read.QueryRow(`SELECT tag FROM users WHERE id = ?`, id).Scan(&t0); err != nil {
+			t.Fatal(err)
 		}
-		names = append(names, m[2]+m[3])
+		tags[id] = t0
 	}
-	var want []string
-	for _, a := range account.Animals {
-		want = append(want, a.Name)
+	for _, b := range [][2]int64{{gal, owner}, {owner, gal}} {
+		if _, err := w.g.Block(ctx, b[0], tags[b[1]]); err != nil {
+			t.Fatal(err)
+		}
+		if l, err := w.g.StartRecorded(ctx, gal); !errors.Is(err, ErrNobody) {
+			t.Fatalf("player %d blocked %d, and Gal was dealt %+v (%v)", b[0], b[1], l, err)
+		}
+		if err := w.g.Unblock(ctx, b[0], tags[b[1]]); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if !slices.Equal(names, want) || !regexp.MustCompile(`% `+fmt.Sprint(len(want))+`\b`).Match(sql) {
-		t.Fatalf("the migration's animals %v, account.Animals %v", names, want)
+	if l, err := w.g.StartRecorded(ctx, gal); err != nil || l.Users[1] != owner {
+		t.Fatalf("no block between them: %+v %v", l, err)
 	}
 }
 
