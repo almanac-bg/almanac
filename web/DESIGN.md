@@ -377,6 +377,8 @@ media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds th
     most), a muted `.coming` „Въпросът идва…“ in its place meanwhile, and the player's time runs from then.
   - `.options .option`, with the states `picked`, `placed`, `right`, `wrong` and `dim`; and `missed`, a row of a right
     answer the player didn't have (an order, pairs, groups): plain, with a hollow ✕ and „ти: …“ for what they gave.
+    A choice's (`.choices`) keep the room at their end from the start for what the answer brings there, the share
+    that gave each and its ✓ or ✕ at the far end (where a computer's key waits): nothing re-wraps as they come.
   - „Раздели“: `.split` with `.split-deck` (the thing now on a `.split-card`, the next one `under` it; dragged, it
     names the group it's going to), `.split-sides` (the two groups as `.option.split-side`), `.split-pips` and
     `.split-back`; afterwards `.split-result`.
@@ -676,9 +678,11 @@ Feedback fires once, when it's earned, and then the screen is still again:
   accent ring) at least 280ms; then the player's own answer is judged (pop or shake), with its sound and touch and its
   pip filling (0.6→1, 200ms); at 300ms the right answer is marked if it wasn't theirs, the rest dim, and the verdict
   docks with its points and the tally rising in step, all of it in one movement (240ms, `run.ts` settle): where
-  everything ends is worked out first, the head at the size it will have there, and the answers glide up from where
-  they were as the panel rises with them (from 24px below, or as far as they move), so the right answer is never
-  under it; brought up from out of sight, it pops once it's there. On a big screen the panel comes under the answers
+  everything ends is worked out first, the head at the size it will have there (made smaller, its count, tally, pips
+  and arrow glide to it in the same movement), and the answers glide up from where they were as the panel, opaque
+  (only its transform moves: nothing shows through it), rises with them (from 24px below, or as far as they move), so
+  the right answer is never under it; brought up from out of sight, it pops once it's there. The tally's line is
+  there from the first question, before there are points, so the head never grows when they come. On a big screen the panel comes under the answers
   and the page glides to show it the same way. At 550ms the shares of everyone's answers grow behind them, their
   numbers fading in, and the sentence about them; at 700ms the fact and „Напред“. A run's head (the count, the
   topic, the tally, the clock) and its pips stay at the top of the screen while the question and its answer scroll,
@@ -701,8 +705,9 @@ Feedback fires once, when it's earned, and then the screen is still again:
 - **The big news is a sheet**, at most one a game, only for what really is big: a week of the league ended up or on
   its podium, a division reached, the streak at 3, 7, 30, 100 or 365 days, a level that unlocks something or is a
   fifth, an epic or legendary achievement. It opens once the result has landed (on the day, once the streak and the
-  level have grown in their chips too: one moment after another, never one over another), slides up (320ms) over the dimmed
-  result, its picture landing; its sound plays as it opens; „Продължи“, a tap beside it or Esc puts it away, never by
+  level have grown in their chips too: one moment after another, never one over another), slides up (320ms), opaque,
+  over the result dimming behind it (only the dimming fades), its picture landing; its sound plays as it opens;
+  „Продължи“, a tap beside it or Esc puts it away, sliding back down (200ms) as the result brightens, never by
   itself. The news cards under the result stay as they are: the sheet is the headline brought forward, not a fourth
   card. A new level's sheet has its number as the hero (120px, in the levels' lilac) over „Ново ниво“, then what it
   brings as a gift („Получаваш рамка „Пръстен“.“) over the player's avatar wearing it; with something to wear, „Сложи“

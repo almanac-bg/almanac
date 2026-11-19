@@ -786,14 +786,18 @@ const settling = { duration: 240, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
  * head (but the verdict shows). Where everything ends is worked out
  * first, the page already in its last state and the head at the size it will have there (it stays so meanwhile: a
  * head that changed size as the page moved made it jump), and the page goes there at once; then what moved glides
- * from where it was, the panel rising with it, so the right answer is never under the panel on the way. The right
- * answer brought up from out of sight pops once it's there. With less motion, it's all simply there. */
+ * from where it was (a head made smaller, its parts too, from their size then), the panel rising with it, opaque, so
+ * the right answer is never under the panel on the way, nor shows through it. The right answer brought up from out
+ * of sight pops once it's there. With less motion, it's all simply there. */
 function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Child, at: Stage, show: () => void): void {
   const parts = [...page.children].filter(
     (el): el is HTMLElement =>
       el instanceof HTMLElement && el !== head.node && el !== after && getComputedStyle(el).display !== "none",
   );
   const first = parts.map((el) => el.getBoundingClientRect().top);
+  // The head's own parts, where they are: stuck, it's smaller, and they go there in the same movement.
+  const headParts = [...head.node.querySelectorAll<HTMLElement>(".game-leave, .count, .tally, .trail")];
+  const headWas = headParts.map((el) => el.getBoundingClientRect());
   const was = scrollY;
   const right = answers instanceof Element ? answers.querySelector("button.option.right") : null;
   const key = right ?? (answers instanceof Element ? answers : after);
@@ -855,12 +859,25 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
     rise = Math.max(rise, dy);
     if (Math.abs(dy) >= 1) el.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], settling);
   });
+  // A head made smaller (stuck) has its count, tally, pips and arrow go from where they were, at their size then.
+  headParts.forEach((el, i) => {
+    const [a, b] = [headWas[i], el.getBoundingClientRect()];
+    if (!a || !b.width || !b.height) return;
+    const [dx, dy, sx, sy] = [a.left - b.left, a.top - b.top, a.width / b.width, a.height / b.height];
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) return;
+    const from = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`;
+    el.animate(
+      [
+        { transform: from, transformOrigin: "0 0" },
+        { transform: "none", transformOrigin: "0 0" },
+      ],
+      settling,
+    );
+  });
+  // The panel, opaque, slides: it never shows the answers through it.
   if (docked || beside)
     after.animate(
-      [
-        { transform: `translateY(${beside ? 16 : Math.max(24, rise)}px)`, opacity: 0 },
-        { transform: "none", opacity: 1 },
-      ],
+      [{ transform: `translateY(${beside ? 16 : Math.max(24, rise)}px)` }, { transform: "none" }],
       settling,
     );
   else if (y !== was) after.animate([{ transform: `translateY(${y - was}px)` }, { transform: "none" }], settling);

@@ -149,6 +149,7 @@ test("a round streak is told by its sheet, not first by its chip: the number rol
   await expect(page.locator(".status-reserve")).toHaveCount(0);
   await startDay(page);
   await heard(page);
+  await watchSheet(page);
   await playRun(page);
   const sheet = page.getByRole("dialog", { name: "3 дни поред с въпросите на деня." });
   await expect(sheet).toBeVisible();
@@ -157,4 +158,42 @@ test("a round streak is told by its sheet, not first by its chip: the number rol
   expect(said[0]).toBe("2дни поред unlit");
   expect(said).toContain("23дни поред");
   expect(said.at(-1)).toBe("3дни поред");
+  // It came up opaque, nothing of the result showing through it, and goes back down, the page staying where it was.
+  await page.waitForTimeout(500);
+  const scrolled = await page.evaluate(() => scrollY);
+  await sheet.getByRole("button", { name: "Продължи" }).click();
+  await expect(sheet).toBeHidden();
+  const seen = await page.evaluate(() => (window as unknown as { sheetSeen: SheetSeen }).sheetSeen);
+  expect(seen.through, "frames with the sheet see-through").toBe(0);
+  expect(seen.away, "frames of the sheet sliding away, still open").toBeGreaterThan(1);
+  expect(await page.evaluate(() => scrollY)).toBe(scrolled);
 });
+
+/** What a frame-by-frame look at the big-news sheet saw: in how many frames it was see-through (it or its panel less
+ * than opaque), and in how many it was still open, its panel lower than it came to rest, going away. */
+interface SheetSeen {
+  through: number;
+  away: number;
+}
+
+async function watchSheet(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const seen: SheetSeen = { through: 0, away: 0 };
+    (window as unknown as { sheetSeen: SheetSeen }).sheetSeen = seen;
+    let rest = Number.POSITIVE_INFINITY;
+    let opened = false;
+    const frame = () => {
+      const box = document.querySelector("dialog[open]");
+      const panel = box?.firstElementChild;
+      if (box && panel) {
+        opened = true;
+        const top = panel.getBoundingClientRect().top;
+        if (Number(getComputedStyle(box).opacity) < 1 || Number(getComputedStyle(panel).opacity) < 1) seen.through++;
+        if (top > rest + 1) seen.away++;
+        else rest = Math.min(rest, top);
+      } else if (opened) return;
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  });
+}

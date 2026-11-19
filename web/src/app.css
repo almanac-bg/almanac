@@ -2209,11 +2209,6 @@
     margin-left: auto;
   }
 
-  /* No points yet: the topic sits on the head's bottom edge, level with „от 10“. */
-  .tally:empty {
-    display: none;
-  }
-
   /* A duel with a friend: with whom, over the topic, in the duels' colour. */
   .question-head .versus {
     margin-bottom: -4px;
@@ -2371,11 +2366,14 @@
     flex: 1;
   }
 
-  /* A run's tally while it's played: the right answers in a row, and the points so far. */
+  /* A run's tally while it's played: the right answers in a row, and the points so far. Its line is there from the
+     first question, before there are points, as tall as the taller of the two (the chip): the head never grows when
+     they come. */
   .tally {
     display: flex;
     align-items: center;
     gap: var(--space-2);
+    min-height: 1.4375rem;
   }
 
   .tally-points {
@@ -2929,6 +2927,23 @@
     0% {
       opacity: 0;
     }
+  }
+
+  /* A choice's answers keep the room at their end from the start for what the answer brings there (questions.ts): how
+     many gave each, and its ✓ or ✕ at the far end, where the key waits on a computer. Nothing re-wraps as they come. */
+  .choices > .option {
+    padding-right: calc(var(--space-4) + 28px + var(--space-2) + 2.125rem + var(--space-3));
+  }
+
+  .choices > .option > :is(.sign, .crowd-share, .key-hint) {
+    position: absolute;
+    top: 50%;
+    right: var(--space-4);
+    translate: 0 -50%;
+  }
+
+  .choices > .option > .crowd-share {
+    right: calc(var(--space-4) + 28px + var(--space-2));
   }
 
   .crowd-says {

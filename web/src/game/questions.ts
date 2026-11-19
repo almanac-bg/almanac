@@ -312,7 +312,7 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
   if (!display) answerKeys(buttons, locked);
   const credits = h("p", { class: "credit pic-credits", hidden: true });
   return {
-    node: h("div", null, h("div", { class: pictures ? "options pic-options" : "options" }, buttons), credits),
+    node: h("div", null, h("div", { class: pictures ? "options pic-options" : "options choices" }, buttons), credits),
     pending: () => null,
     reveal(reveal, given, at = atOnce) {
       const mine = given && "pick" in given ? given.pick : -1;
@@ -1255,7 +1255,7 @@ function clues(
   );
   if (!display) answerKeys(buttons, locked);
   return {
-    node: h("div", { class: "stack" }, list, said, h("div", { class: "options" }, buttons)),
+    node: h("div", { class: "stack" }, list, said, h("div", { class: "options choices" }, buttons)),
     pending: () => null,
     update(next) {
       if (next.type !== "clues" || next.clues.length <= now.clues.length || !open()) return;
