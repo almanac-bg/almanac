@@ -83,8 +83,8 @@ func TestRecordingsOverAllTopicsFirst(t *testing.T) {
 	}
 }
 
-// A friend's challenge, once both have played it, is no recording for the one who took it: the same ten questions
-// again. Another real game comes first, however far its player's rating.
+// A game whose ten the player has just played (a duel's other side, say) is no recording for them: the same ten
+// questions again. Another real game comes first, however far its player's rating.
 func TestRecordingsNotTheSameTenAgain(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -102,7 +102,7 @@ func TestRecordingsNotTheSameTenAgain(t *testing.T) {
 	}
 	other := game(far)
 	friends := game(friend)
-	// Ana has seen the friend's ten (she played them as his challenge).
+	// Ana has seen the friend's ten (she played them in a duel against him).
 	seen := map[string]bool{}
 	for _, p := range w.picks(friends) {
 		seen[p.ID] = true
