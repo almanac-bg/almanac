@@ -42,8 +42,6 @@ export const topics: Category[] = [...categories, bulgaria];
 export const pushKey = boot.push ?? "";
 /** The platforms the game's app gets notifications on ("ios", "android"). */
 export const phonePlatforms: string[] = boot.phones ?? [];
-/** The style of a room's screen when its host leads it from a big screen (host.css): loaded only then. */
-export const hostCss = boot.hostCss ?? "";
 /** The style of a duel's result (outcome.css): loaded with it (kit.ts). */
 export const outcomeCss = boot.outcomeCss ?? "";
 

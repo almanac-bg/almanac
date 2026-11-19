@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"slices"
 	"sync"
 	"testing"
@@ -194,7 +195,7 @@ func TestAGamePlayedTogether(t *testing.T) {
 func TestScreensHearOfChanges(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
-		r, _ := hub.Open(Player{ID: 1, Name: "Ана"}, "", Settings{Category: "history"})
+		r, _ := hub.Open(Player{ID: 1, Name: "Ана"}, "", Settings{Categories: []string{"history"}})
 		s, _ := r.Follow(1)
 		<-s.C // following is a change
 		_ = r.Join(Player{ID: 2, Name: "Бо"}, "")
@@ -215,7 +216,7 @@ func TestScreensHearOfChanges(t *testing.T) {
 
 func TestRoomsLimits(t *testing.T) {
 	hub := NewHub(sample(t))
-	if _, err := hub.Open(Player{ID: 1, Name: "Ана"}, "", Settings{Category: "astrology"}); !errors.Is(err, play.ErrNoTopic) {
+	if _, err := hub.Open(Player{ID: 1, Name: "Ана"}, "", Settings{Categories: []string{"astrology"}}); !errors.Is(err, play.ErrNoTopic) {
 		t.Fatalf("an unknown topic: %v", err)
 	}
 	r, _ := hub.Open(Player{ID: 1, Name: "Ана"}, "", Settings{})
@@ -725,32 +726,30 @@ func TestTheHostIsWaitedFor(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
 		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
-		for _, lead := range []bool{false, true} {
-			r, _ := hub.Open(ana, "", Settings{Lead: lead})
-			_ = r.Join(bo, "")
-			sb, _ := r.Follow(bo.ID)
-			<-sb.C
-			if v := r.View(bo.ID); v.CanLead {
-				t.Fatalf("lead %v: a guest leads while the host is on their way in", lead)
-			}
-			if !lead && !r.View(bo.ID).Players[0].Online {
-				t.Fatal("the host on their way in shows as away")
-			}
-			if err := r.Start(bo.ID); !errors.Is(err, ErrNotYours) {
-				t.Fatalf("lead %v: a guest started the game: %v", lead, err)
-			}
-			// In and out again: away at once, the wait over.
-			sa, _ := r.Follow(ana.ID)
-			r.Unfollow(sa)
-			if !r.View(bo.ID).CanLead {
-				t.Fatalf("lead %v: the host gone, nobody else leads", lead)
-			}
-			r.Unfollow(sb)
+		first, _ := hub.Open(ana, "", Settings{})
+		_ = first.Join(bo, "")
+		sb, _ := first.Follow(bo.ID)
+		<-sb.C
+		if v := first.View(bo.ID); v.CanLead {
+			t.Fatal("a guest leads while the host is on their way in")
 		}
+		if !first.View(bo.ID).Players[0].Online {
+			t.Fatal("the host on their way in shows as away")
+		}
+		if err := first.Start(bo.ID); !errors.Is(err, ErrNotYours) {
+			t.Fatalf("a guest started the game: %v", err)
+		}
+		// In and out again: away at once, the wait over.
+		sa, _ := first.Follow(ana.ID)
+		first.Unfollow(sa)
+		if !first.View(bo.ID).CanLead {
+			t.Fatal("the host gone, nobody else leads")
+		}
+		first.Unfollow(sb)
 		// A host who never comes: the guests' screens hear when the wait is over, and may lead.
 		r, _ := hub.Open(ana, "", Settings{})
 		_ = r.Join(bo, "")
-		sb, _ := r.Follow(bo.ID)
+		sb, _ = r.Follow(bo.ID)
 		<-sb.C
 		time.Sleep(hostWait)
 		synctest.Wait()
@@ -763,145 +762,6 @@ func TestTheHostIsWaitedFor(t *testing.T) {
 			t.Fatal("the host never came: nobody else leads")
 		}
 		r.Unfollow(sb)
-	})
-}
-
-// A host leading from a big screen isn't a player, and sets the pace: an answer now, an answer held, the end.
-func TestLeadingHost(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		hub := NewHub(sample(t))
-		ana, bo := Player{ID: 1, Name: "Учител"}, Player{ID: 2, Name: "Бо"}
-		r, _ := hub.Open(ana, "", Settings{Lead: true})
-		sa, err := r.Follow(ana.ID)
-		if err != nil {
-			t.Fatalf("the host's screen: %v", err)
-		}
-		if !r.View(ana.ID).Held {
-			t.Fatal("a led room doesn't hold its answers from the start")
-		}
-		_ = r.Join(ana, "") // the host's screen joining again changes nothing
-		_ = r.Join(bo, "")
-		sb, _ := r.Follow(bo.ID)
-		if v := r.View(ana.ID); len(v.Players) != 1 || !v.IsHost || !v.Lead || v.Host != "Учител" {
-			t.Fatalf("the host's lobby: %+v", v)
-		}
-		if v := r.View(bo.ID); v.CanLead || v.Host != "Учител" {
-			t.Fatalf("Bo's lobby: %+v", v)
-		}
-		if err := r.Start(ana.ID); err != nil {
-			t.Fatal(err)
-		}
-		// Bo answers: the answer shows at once, with the answer (and its fact) on the host's screen.
-		_ = r.Answer(bo.ID, 0, answer(r, true))
-		if v := r.View(ana.ID); v.Phase != Reveal || v.Question.Reveal == nil || v.Question.Reveal.Answer == nil {
-			t.Fatalf("the answer on the big screen: %+v", v.Question)
-		}
-		// Held, the answer stays up past Pause until the host moves on.
-		if err := r.Hold(bo.ID, true); !errors.Is(err, ErrNotYours) {
-			t.Fatalf("a player held: %v", err)
-		}
-		_ = r.Hold(ana.ID, true)
-		time.Sleep(2 * Pause)
-		synctest.Wait()
-		if v := r.View(bo.ID); v.Phase != Reveal || !v.Held || v.Question.NextMs != 0 {
-			t.Fatalf("held: %+v", v)
-		}
-		_ = r.Next(ana.ID)
-		if v := r.View(bo.ID); v.Phase != Question || v.N != 1 {
-			t.Fatalf("after Напред: %s %d", v.Phase, v.N)
-		}
-		// Напред on a question shows its answer now; let go, the room moves on by itself again.
-		_ = r.Next(ana.ID)
-		_ = r.Hold(ana.ID, false)
-		time.Sleep(Pause + time.Millisecond)
-		synctest.Wait()
-		if v := r.View(bo.ID); v.Phase != Question || v.N != 2 {
-			t.Fatalf("let go: %s %d", v.Phase, v.N)
-		}
-		// Away, the host leaves the pace to whoever's there.
-		r.Unfollow(sa)
-		if !r.View(bo.ID).CanLead {
-			t.Fatal("nobody may lead while the host is away")
-		}
-		sa, _ = r.Follow(ana.ID)
-		if err := r.Finish(ana.ID); err != nil {
-			t.Fatal(err)
-		}
-		if v := r.View(bo.ID); v.Phase != End || v.Total != 3 || len(v.Review) != 3 {
-			t.Fatalf("ended on the third question: %s, %d questions", v.Phase, v.Total)
-		}
-		// Kept over a restart, the host still leading.
-		var saved bytes.Buffer
-		_ = hub.Save(&saved)
-		next := NewHub(sample(t))
-		if n, _ := next.Restore(&saved); n != 1 {
-			t.Fatalf("restored %d", n)
-		}
-		again, _ := next.Get(r.Code())
-		if v := again.View(ana.ID); !v.Lead || !v.IsHost || len(v.Players) != 1 || v.Host != "Учител" {
-			t.Fatalf("restored: %+v", v)
-		}
-		r.Unfollow(sa)
-		r.Unfollow(sb)
-	})
-}
-
-// A led room plays with no phones in it: everyone answers aloud, each question runs its time (or „Напред“ shows the
-// answer), also over a restart, and each answer waits for the host, which a restart doesn't wait for.
-func TestLeadNoPhones(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		first := NewHub(sample(t))
-		host := Player{ID: 1, Name: "Водещ"}
-		r, _ := first.Open(host, "", Settings{Lead: true, Length: 5})
-		if err := r.Start(host.ID); err != nil {
-			t.Fatalf("a game with no phones: %v", err)
-		}
-		v := r.View(host.ID)
-		if v.Phase != Question || len(v.Players) != 0 {
-			t.Fatalf("the first question: %+v", v)
-		}
-		limit := time.Duration(v.Question.LimitMs) * time.Millisecond
-		// A restart in the middle of the question: it keeps its time, though no phone is there to answer.
-		time.Sleep(limit / 4)
-		var saved bytes.Buffer
-		_ = first.Save(&saved)
-		hub := NewHub(sample(t))
-		_, _ = hub.Restore(&saved)
-		r, _ = hub.Get(r.Code())
-		s, _ := r.Follow(host.ID)
-		time.Sleep(comeBack + time.Second)
-		synctest.Wait()
-		if v := r.View(host.ID); v.Phase != Question {
-			t.Fatalf("the question after a restart, with no phones: %s", v.Phase)
-		}
-		if n := hub.UnderWay(); n != 1 {
-			t.Fatalf("a question showing, under way: %d", n)
-		}
-		time.Sleep(limit + play.Grace)
-		synctest.Wait()
-		if v := r.View(host.ID); v.Phase != Reveal || v.Question.Reveal == nil || v.Question.NextMs != 0 {
-			t.Fatalf("the time ran out: %+v", v)
-		}
-		if n := hub.UnderWay(); n != 0 {
-			t.Fatalf("an answer held for the host, under way: %d", n)
-		}
-		time.Sleep(3 * Pause)
-		synctest.Wait()
-		if v := r.View(host.ID); v.Phase != Reveal || v.N != 0 {
-			t.Fatalf("the answer didn't wait for the host: %s %d", v.Phase, v.N)
-		}
-		_ = r.Next(host.ID)
-		_ = r.Next(host.ID)
-		if v := r.View(host.ID); v.Phase != Reveal || v.N != 1 {
-			t.Fatalf("„Напред“ twice: %s %d", v.Phase, v.N)
-		}
-		if err := r.Finish(host.ID); err != nil {
-			t.Fatal(err)
-		}
-		if v := r.View(host.ID); v.Phase != End || len(v.Players) != 0 {
-			t.Fatalf("the end: %+v", v)
-		}
-		r.Unfollow(s)
 	})
 }
 
@@ -1013,12 +873,12 @@ func TestReturnAndAskName(t *testing.T) {
 }
 
 // As an answer shows, the room sees how it answered: its own crowd (who had the question, the share right, a choice's
-// picks), and who got it right, the quickest first; the host leading sees it too.
+// picks), and who got it right, the quickest first.
 func TestTheRoomsSplit(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
-		host := Player{ID: 1, Name: "Водещ"}
-		r, _ := hub.Open(host, "", Settings{Lead: true})
+		host := Player{ID: 1, Name: "Ана"}
+		r, _ := hub.Open(host, "", Settings{})
 		sh, _ := r.Follow(host.ID)
 		var subs []*Sub
 		for id := int64(2); id <= 5; id++ {
@@ -1032,13 +892,16 @@ func TestTheRoomsSplit(t *testing.T) {
 		if r.View(2).Question.Split != nil {
 			t.Fatal("a split before the answer shows")
 		}
-		// 3 right at 1 s, 2 right at 2 s, 4 wrong, 5 lets the time run out.
+		// 3 right at 1 s, 2 right at 2 s, 4 and the host wrong, 5 lets the time run out.
+		limit := time.Duration(r.View(2).Question.LimitMs) * time.Millisecond
 		time.Sleep(time.Second)
 		_ = r.Answer(3, 0, answer(r, true))
 		time.Sleep(time.Second)
 		_ = r.Answer(2, 0, answer(r, true))
 		_ = r.Answer(4, 0, answer(r, false))
-		_ = r.Next(host.ID) // the answer now
+		_ = r.Answer(host.ID, 0, answer(r, false))
+		time.Sleep(limit + play.Grace)
+		synctest.Wait()
 		key := func(id int64) int {
 			for k, m := range r.Players() {
 				if m == id {
@@ -1057,7 +920,7 @@ func TestTheRoomsSplit(t *testing.T) {
 				t.Fatalf("who got it right, for %d: %v", viewer, s.Right)
 			}
 			c := s.Crowd
-			if c == nil || c.Answers != 4 || c.Right != 0.5 {
+			if c == nil || c.Answers != 5 || c.Right != 0.4 {
 				t.Fatalf("the room's crowd, for %d: %+v", viewer, c)
 			}
 			if c.Picks != nil {
@@ -1065,7 +928,7 @@ func TestTheRoomsSplit(t *testing.T) {
 				for _, p := range c.Picks {
 					sum += p
 				}
-				if sum != 0.75 { // three picked, one of four let the time run out
+				if math.Abs(sum-0.8) > 1e-9 { // four picked, one of five let the time run out
 					t.Fatalf("the room's picks: %v", c.Picks)
 				}
 			}

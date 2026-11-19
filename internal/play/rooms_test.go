@@ -53,7 +53,7 @@ func TestDrawRoom(t *testing.T) {
 	r := rand.New(rand.NewPCG(1, 2))
 	barred := map[string]bool{}
 	for _, mix := range []Mix{MixEasy, MixHard} {
-		picks := DrawRoom(w.b, "", 20, mix, barred, nil, r)
+		picks := DrawRoom(w.b, nil, 20, mix, barred, nil, r)
 		if len(picks) != 20 {
 			t.Fatalf("%s: %d questions", mix, len(picks))
 		}
@@ -70,7 +70,7 @@ func TestDrawRoom(t *testing.T) {
 	}
 	// A small topic runs out: the game is shorter, never easier than its mix.
 	for range 10 {
-		for _, p := range DrawRoom(w.b, "history", 20, MixHard, barred, nil, r) {
+		for _, p := range DrawRoom(w.b, []string{"history"}, 20, MixHard, barred, nil, r) {
 			q, _ := w.b.Get(p.ID)
 			if barred[p.ID] || q.Base().Difficulty == bank.Easy {
 				t.Fatalf("%s: dealt again, or easy", p.ID)
@@ -80,13 +80,55 @@ func TestDrawRoom(t *testing.T) {
 	}
 }
 
+// A room of several topics draws across them evenly: as many questions of each as of another, give or take one; all
+// of them (none chosen) too. What its players haven't seen comes before even: a topic they've seen all of gives its
+// places to the others.
+func TestDrawRoomTopics(t *testing.T) {
+	w := setup(t)
+	r := rand.New(rand.NewPCG(11, 12))
+	counts := func(picks []Pick) map[string]int {
+		out := map[string]int{}
+		for _, p := range picks {
+			q, _ := w.b.Get(p.ID)
+			out[q.Base().Category]++
+		}
+		return out
+	}
+	two := []string{"history", "geography"}
+	for range 20 {
+		if c := counts(DrawRoom(w.b, two, 10, MixMixed, nil, nil, r)); len(c) != 2 || c["history"] != 5 || c["geography"] != 5 {
+			t.Fatalf("two topics, ten questions: %v", c)
+		}
+		if c := counts(DrawRoom(w.b, two, 5, MixMixed, nil, nil, r)); c["history"]+c["geography"] != 5 ||
+			max(c["history"], c["geography"]) != 3 {
+			t.Fatalf("two topics, five questions: %v", c)
+		}
+		c := counts(DrawRoom(w.b, nil, 20, MixMixed, nil, nil, r))
+		if len(c) != len(w.b.Categories) {
+			t.Fatalf("all topics: %v", c)
+		}
+		for topic, n := range c {
+			if n != 2 {
+				t.Fatalf("all topics, twenty questions: %s has %d", topic, n)
+			}
+		}
+	}
+	seen := map[string]int{}
+	for _, q := range w.b.Live("history", "") {
+		seen[q.Base().ID] = 1
+	}
+	if c := counts(DrawRoom(w.b, two, 10, MixMixed, nil, seen, r)); c["geography"] != 10 {
+		t.Fatalf("history all seen, yet dealt: %v", c)
+	}
+}
+
 // A player's game in a room is kept as a run of its own: it earns XP and counts for goals and achievements, its
 // answers are seen, and it's on no board of the day.
 func TestRecordRoom(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	u, late := w.user(), w.user()
-	picks := DrawRoom(w.b, "", 10, MixMixed, nil, nil, rand.New(rand.NewPCG(3, 4)))
+	picks := DrawRoom(w.b, nil, 10, MixMixed, nil, nil, rand.New(rand.NewPCG(3, 4)))
 	right := func(n int) RoomAnswer {
 		q, _ := w.b.Get(picks[n].ID)
 		d := q.Deal(picks[n].Seed)
@@ -171,7 +213,7 @@ func TestRecordRoomOnce(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	u, v := w.user(), w.user()
-	picks := DrawRoom(w.b, "", 5, MixMixed, nil, nil, rand.New(rand.NewPCG(5, 6)))
+	picks := DrawRoom(w.b, nil, 5, MixMixed, nil, nil, rand.New(rand.NewPCG(5, 6)))
 	cut := RoomPlay{Game: "G1", Picks: picks[:1], Length: 5, Points: 100,
 		Answers: []RoomAnswer{{N: 0, Given: json.RawMessage(`{"pick":0}`), Shown: json.RawMessage(`{"pick":0}`), Score: 1,
 			Right: true, Points: 100, Ms: 3000, At: w.now}}}
@@ -237,8 +279,8 @@ func TestRoomAlone(t *testing.T) {
 		}
 		return m["games100"]
 	}
-	ten := DrawRoom(w.b, "", 10, MixEasy, nil, nil, rand.New(rand.NewPCG(7, 8)))
-	five := DrawRoom(w.b, "", 5, MixEasy, nil, nil, rand.New(rand.NewPCG(9, 10)))
+	ten := DrawRoom(w.b, nil, 10, MixEasy, nil, nil, rand.New(rand.NewPCG(7, 8)))
+	five := DrawRoom(w.b, nil, 5, MixEasy, nil, nil, rand.New(rand.NewPCG(9, 10)))
 
 	alone := w.user()
 	run, err := w.g.RecordRoom(ctx, alone, RoomPlay{Game: "A", Picks: ten, Length: 10, Answers: all(ten), Players: 1})

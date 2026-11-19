@@ -23,7 +23,7 @@ test("Роял's line answered by an error page is opened again, and the evening
 
 test("a room's line answered by an error page is opened again: the room is there, not gone", async ({ page }) => {
   await page.goto("/room");
-  await page.getByRole("button", { name: "История" }).click();
+  await page.getByRole("button", { name: "Отвори стаята" }).click();
   await expect(page).toHaveURL(/\/r\/\d{6}$/);
   await expect(page.getByRole("heading", { name: "С какво име влизаш?" })).toBeVisible();
   let refused = 0;

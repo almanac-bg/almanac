@@ -86,7 +86,7 @@ func TestRoomAccess(t *testing.T) {
 	for _, p := range []*player{ana, bo, eve} {
 		p.call("POST", "/api/guest", map[string]any{})
 	}
-	_, out := ana.call("POST", "/api/rooms", map[string]string{"category": ""})
+	_, out := ana.call("POST", "/api/rooms", map[string]any{})
 	code := out["code"].(string)
 	bo.follow(code)
 
@@ -97,8 +97,7 @@ func TestRoomAccess(t *testing.T) {
 	}{
 		{"GET", "/people", nil}, {"POST", "/people", map[string]any{"key": 0}},
 		{"POST", "/answer", map[string]any{"n": 0, "answer": map[string]any{"pick": 0}}},
-		{"POST", "/start", nil}, {"POST", "/next", nil}, {"POST", "/finish", nil},
-		{"POST", "/hold", map[string]any{"on": true}}, {"POST", "/lock", map[string]any{"on": true}},
+		{"POST", "/start", nil}, {"POST", "/lock", map[string]any{"on": true}},
 		{"POST", "/settings", map[string]any{}}, {"POST", "/remove", map[string]any{"key": 1}},
 		{"POST", "/return", map[string]any{"key": 1}}, {"POST", "/rename", map[string]any{"key": 1}},
 	} {
@@ -179,7 +178,7 @@ func TestRoomName(t *testing.T) {
 	ana.call("POST", "/api/guest", map[string]any{})
 	_, b := bo.call("POST", "/api/guest", map[string]any{})
 	own := b["user"].(map[string]any)["name"].(string)
-	_, out := ana.call("POST", "/api/rooms", map[string]string{"category": ""})
+	_, out := ana.call("POST", "/api/rooms", map[string]any{})
 	code := out["code"].(string)
 	ana.follow(code)
 	names := func() []string {

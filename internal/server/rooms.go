@@ -1,8 +1,7 @@
 package server
 
 // Rooms over HTTP (internal/room). Who may do what in a room is one rule: a player joins it by its code (roomJoin),
-// and from then on everything of the room (its stream, the game, its people, its QR code) is theirs, and its host's;
-// to anyone else the room isn't there (404, as for a code nobody has), so that nothing tells them it's open. A code
+// and from then on everything of the room (its stream, the game, its people) is theirs; to anyone else the room isn't there (404, as for a code nobody has), so that nothing tells them it's open. A code
 // is six digits, easy to say to a class; what keeps codes from being walked is that a code given that isn't open, or
 // is a locked room's, counts against the player, their network and their site (roomByCode: an IPv6 /48 or an IPv4
 // /24, so that the 65,536 /64s of one /48 don't each get a budget: review 2026-11-18, S3), and past a few an hour, no
@@ -18,7 +17,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand/v2"
 	"net/http"
 	"regexp"
@@ -28,7 +26,6 @@ import (
 
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/play"
-	"github.com/almanac-bg/almanac/internal/qr"
 	"github.com/almanac-bg/almanac/internal/room"
 )
 
@@ -117,7 +114,7 @@ func (s *Server) roomByCode(r *http.Request, userID int64) (*room.Room, error) {
 	return rm, err
 }
 
-// roomFor finds the room under the request's code for a player in it (or its host): to anyone else there's no room.
+// roomFor finds the room under the request's code for a player in it: to anyone else there's no room.
 func (s *Server) roomFor(r *http.Request, u *account.User) (*room.Room, error) {
 	rm, err := s.roomOf(r)
 	if err != nil || !rm.In(u.ID) {
@@ -217,16 +214,15 @@ func (s *Server) roomJoin(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]bool{"ok": true})
 }
 
-// How many games may be started in an hour, by one player (who leads a room) and from a network and a site (a school,
-// many rooms in it): a game a minute, for anyone playing; so that starting and ending games at once, over and over,
-// earns no more than playing them (review 2026-11-18, S19).
+// How many games may be started in an hour, by one player (who starts a room's games) and from a network and a site
+// (a school, many rooms in it): a game a minute, for anyone playing (review 2026-11-18, S19).
 const (
 	roomStartsPlayer = 60
 	roomStartsNet    = 300
 	roomStartsSite   = 1000
 )
 
-// roomStart is who leads a room starting a game in it (room.Room.Start), within the starts an hour.
+// roomStart is who may start a room's game starting one (room.Room.Start), within the starts an hour.
 func (s *Server) roomStart(w http.ResponseWriter, r *http.Request) error {
 	return s.roomAct(func(rm *room.Room, by int64) error {
 		if !s.limits.allow("roomstart:user:"+strconv.FormatInt(by, 10), roomStartsPlayer, time.Hour) ||
@@ -247,7 +243,7 @@ const (
 	roomStreamsSite   = 5 * roomStreamsNet
 )
 
-// roomEvents streams a room to the screen of a player in it (roomJoin first), or of its host (Server-Sent Events):
+// roomEvents streams a room to the screen of a player in it (roomJoin first; Server-Sent Events):
 // the room as they see it, again after every change. The browser reconnects by itself if the line drops; past the
 // streams a minute (roomStreamsPlayer), or the screens a room holds (room.ErrBusy), it's told to wait a while before
 // it does. A screen closed for one more of the player's is told so (moved), and doesn't reconnect.
@@ -317,8 +313,8 @@ func (s *Server) roomEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// roomAct is something a player in a room does in it (act decides whether they may): starting a game, moving it on,
-// ending it, choosing the next, holding the answers, locking the room.
+// roomAct is something a player in a room does in it (act decides whether they may): starting a game, choosing the
+// next, locking the room, sending a player out or bringing them back.
 func (s *Server) roomAct(act func(*room.Room, int64) error) func(http.ResponseWriter, *http.Request) error {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		u, err := s.mustUser(r)
@@ -345,17 +341,6 @@ func (s *Server) roomSettings(w http.ResponseWriter, r *http.Request) error {
 	return s.roomAct(func(rm *room.Room, by int64) error { return rm.Change(by, in) })(w, r)
 }
 
-// roomHold is who leads keeping each answer up until they move on, or letting the room move on by itself again.
-func (s *Server) roomHold(w http.ResponseWriter, r *http.Request) error {
-	var in struct {
-		On bool `json:"on"`
-	}
-	if err := readJSON(r, &in); err != nil {
-		return err
-	}
-	return s.roomAct(func(rm *room.Room, by int64) error { return rm.Hold(by, in.On) })(w, r)
-}
-
 // roomLock is the host locking the room to anyone new, or opening it again (room.Room.SetLocked).
 func (s *Server) roomLock(w http.ResponseWriter, r *http.Request) error {
 	var in struct {
@@ -365,34 +350,6 @@ func (s *Server) roomLock(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return s.roomAct(func(rm *room.Room, by int64) error { return rm.SetLocked(by, in.On) })(w, r)
-}
-
-// roomQR is the room's link (with its key: roomLink) as a QR code, for its host's big screen: drawn here, so that no
-// outside service sees the code, once for the room, and only for who's in it.
-func (s *Server) roomQR(w http.ResponseWriter, r *http.Request) {
-	u, err := s.mustUser(r)
-	var rm *room.Room
-	if err == nil {
-		rm, err = s.roomFor(r, u)
-	}
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	svg, err := rm.QR(func(string) (string, error) {
-		c, err := qr.Encode(s.roomLink(rm))
-		if err != nil {
-			return "", err
-		}
-		return c.SVG(), nil
-	})
-	if err != nil {
-		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "image/svg+xml")
-	w.Header().Set("Cache-Control", "private, max-age=86400")
-	_, _ = io.WriteString(w, svg)
 }
 
 // roomRemove is the host sending a player out of the room, by their key.

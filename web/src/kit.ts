@@ -12,10 +12,10 @@ import { emblem } from "./art/emblem.ts";
 import { leagueEmblem } from "./art/league.ts";
 import { picture as illustration } from "./art/picture.ts";
 import { recover, staying } from "./fresh.ts";
-import { answering, answerState, countdown, onScreen } from "./game/answering.ts";
+import { answering, answerState, onScreen } from "./game/answering.ts";
 import { masteryCard } from "./game/mastery.ts";
 import { news } from "./game/news.ts";
-import { answered, ask, crowdLine, picture } from "./game/questions.ts";
+import { answered, crowdLine, picture } from "./game/questions.ts";
 import {
   board,
   boardRow,
@@ -82,7 +82,6 @@ import {
   bulgaria,
   categories,
   friendRequests,
-  hostCss,
   notice,
   opened,
   outcomeCss,
@@ -132,7 +131,6 @@ export const kit = {
   ApiError,
   answerState,
   api,
-  ask,
   avatar,
   back,
   badge,
@@ -150,7 +148,6 @@ export const kit = {
   coming,
   computed,
   count,
-  countdown,
   crowdLine,
   dayInBulgaria,
   dayAndTime,
@@ -175,7 +172,6 @@ export const kit = {
   hands,
   haveProfile,
   holdWhile,
-  hostCss,
   illustration,
   inApp,
   issueWords,

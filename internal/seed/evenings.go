@@ -215,7 +215,11 @@ func (w *world) playRooms(rooms []room) error {
 			if err != nil {
 				return err
 			}
-			picks := play.DrawRoom(w.b, category, length, rm.mix, barred, seen, w.r)
+			var topics []string
+			if category != "" {
+				topics = []string{category}
+			}
+			picks := play.DrawRoom(w.b, topics, length, rm.mix, barred, seen, w.r)
 			if len(picks) == 0 {
 				continue
 			}

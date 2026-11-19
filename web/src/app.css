@@ -220,7 +220,7 @@
     }
   }
 
-  /* Night or Day chosen (Настройки, a big screen: prefs.ts, scheme) whatever the device says: the browser's own parts
+  /* Night or Day chosen (Настройки: prefs.ts, scheme) whatever the device says: the browser's own parts
      (scrollbars, fields) go with it, and Day's tokens, the same as above (scheme.test.ts holds them equal). */
   :root[data-scheme="night"] {
     color-scheme: dark;

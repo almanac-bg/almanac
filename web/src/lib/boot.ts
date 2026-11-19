@@ -9,7 +9,6 @@ export interface Boot {
   version: string;
   push: string;
   phones: string[] | null;
-  hostCss: string;
   outcomeCss: string;
   /** The server's clock as it drew the page (lib/api.ts holds the page's clock to it until an answer comes). */
   now: number;

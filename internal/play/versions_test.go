@@ -213,7 +213,7 @@ func TestLiveGamesKeepTheirVersions(t *testing.T) {
 			t.Fatalf("an evening's question without its version: %+v", p)
 		}
 	}
-	for _, p := range DrawRoom(w.b, "", Length, MixMixed, nil, nil, newRand()) {
+	for _, p := range DrawRoom(w.b, nil, Length, MixMixed, nil, nil, newRand()) {
 		if q, _ := w.b.Get(p.ID); p.V == "" || p.V != bank.Version(q) {
 			t.Fatalf("a room's question without its version: %+v", p)
 		}

@@ -119,7 +119,7 @@ function crowdOnAll(buttons: HTMLElement[], crowd: Crowd | undefined, mine: numb
  * how everyone else has answered each option (once the question has had enough answers to say); the sentence that
  * sums it up goes under the verdict (crowdLine). `say` tells a screen reader what changes as the question runs (a
  * clue come out), in the game's live region; without it, the question keeps one of its own. `display`: drawn to be
- * looked at, never answered here (a big screen's, a review's): no keys, no line on how to answer, no „Готово“, no
+ * looked at, never answered here (a review's): no keys, no line on how to answer, no „Готово“, no
  * grips; the clues still come out as their time comes. */
 export function ask(
   view: View,
@@ -245,8 +245,7 @@ export function picturesIn(view: View, ms: number): Promise<void> {
   });
 }
 
-/** What marks each answer, on every screen: a letter, so that a room's big screen and its phones (and whoever leads
- * it, saying „Б“) name the same answer. */
+/** What marks each answer, on every screen: a letter, so that everyone at a table (saying „Б“) names the same answer. */
 const letters = ["А", "Б", "В", "Г"];
 
 /** The key that gives an answer, beside it while it's asked (shown on a computer only: app.css): 1–4, the same on
@@ -971,7 +970,7 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
       result.replaceChildren(
         ...view.left.map((left, i) => {
           const j = reveal.pairs?.[i] ?? -1;
-          // Nothing given (a big screen's host, who doesn't play): the right pairs alone, none a miss of anyone's.
+          // Nothing given (the time ran out): the right pairs alone, none a miss of anyone's.
           const ok = !given || mine[i] === j;
           const gave = mine[i] ?? -1;
           return h(
@@ -1228,7 +1227,7 @@ function clues(
     });
   };
   paint();
-  // Shown only (a big screen), the clues still come: it's never locked out of them by an answer of its own.
+  // Shown only (display), the clues still come: it's never locked out of them by an answer of its own.
   const open = () => display || !locked.peek();
   const tick = setInterval(() => {
     if (open()) paint();
