@@ -872,6 +872,9 @@ func TestAWriteHoldsNoScreen(t *testing.T) {
 			t.Fatalf("the first question: %+v", v)
 		}
 		right := answer(m, true)
+		m.mu.Lock()
+		q := m.dealt[0].Question()
+		m.mu.Unlock()
 
 		// A second before the question's time is up, the database's one writer is busy: Ana's answer waits for it.
 		time.Sleep(time.Duration(v.Question.LimitMs)*time.Millisecond - time.Second)
@@ -893,11 +896,15 @@ func TestAWriteHoldsNoScreen(t *testing.T) {
 		if n, left := w.hub.UnderWay(); n != 1 || left == Longest {
 			t.Fatalf("%d duels under way, %v left", n, left)
 		}
-		// The question's time runs out meanwhile: its answer waits for Ana's.
-		time.Sleep(time.Second + play.SeenLag + play.Grace + time.Second) // Ana's screen never said when it showed it
+		// The question's time runs out meanwhile: its answer waits for Ana's. Neither screen said when it showed the
+		// question, so its time runs to the latest they could have (play.LiveDue): later for one with pictures.
+		time.Sleep(time.Second + play.LagOf(q) + play.Grace + time.Second)
 		synctest.Wait()
-		if v := m.View(bo.ID); v.Phase != PhaseQuestion {
-			t.Fatalf("the answer shown before Ana's was in: %+v", v)
+		m.mu.Lock()
+		held := m.revealDue
+		m.mu.Unlock()
+		if v := m.View(bo.ID); v.Phase != PhaseQuestion || !held {
+			t.Fatalf("the answer shown before Ana's was in (or the time not run out: %v): %+v", held, v)
 		}
 
 		if err := tx.Rollback(); err != nil {
