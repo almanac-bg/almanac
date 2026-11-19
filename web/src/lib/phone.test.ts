@@ -118,13 +118,14 @@ test("each moment has its touch", async () => {
   assert.deepEqual(await felt("big"), ["Haptics notification SUCCESS", "Haptics impact HEAVY"]);
 });
 
-test("a share sheet closed isn't a share on an iPhone; on Android it can't be told from „Copy“, and is one", async () => {
+test("a room's link goes through the phone's share sheet, and a sheet closed without sending is no fault", async () => {
+  calls.length = 0;
+  await share("Ела", "https://almanac.bg/r/123456");
   phone.refuse = true;
-  assert.equal(await share("Денят"), false);
-  phone.platform = "android";
-  assert.equal(await share("Денят"), true);
+  await share("Ела", "https://almanac.bg/r/123456");
   phone.refuse = false;
-  assert.equal(await share("Денят"), true);
-  phone.platform = "ios";
-  assert.equal(await share("Денят"), true);
+  assert.deepEqual(calls, [
+    "Share share Ела https://almanac.bg/r/123456",
+    "Share share Ела https://almanac.bg/r/123456",
+  ]);
 });

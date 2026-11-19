@@ -22,7 +22,7 @@ var androidCerts = []string{"87:68:23:BC:F3:84:76:EE:87:B4:A0:19:27:C9:50:E4:4D:
 // it. An iPhone has them from here, Android from the app's AndroidManifest.xml; applinks_test.go keeps the three lists
 // one. A page the server draws itself is none of them, or the app would show it as a page it doesn't know.
 var appLinks = []string{
-	"/", "/play/*", "/duel", "/duel/*", "/challenge", "/challenge/*", "/c/*", "/r/*", "/f/*", "/hand/*",
+	"/", "/play/*", "/duel", "/duel/*", "/r/*", "/hand/*",
 	"/games/*", "/players/*", "/royal", "/room", "/ranks", "/rewards", "/wardrobe", "/me", "/friends",
 	"/settings", "/almanac", "/mistakes",
 }

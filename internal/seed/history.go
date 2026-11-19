@@ -5,7 +5,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -175,30 +174,13 @@ func (w *world) visit(s session, online []*player, met map[[2]int64]bool) error 
 	if err := w.answerRequests(p); err != nil {
 		return fmt.Errorf("requests: %w", err)
 	}
-	if err := w.asked(p); err != nil {
-		return fmt.Errorf("challenges: %w", err)
-	}
-	if err := w.openLinks(p); err != nil {
-		return fmt.Errorf("links: %w", err)
-	}
 	if s.day {
 		if err := w.dayRun(p); err != nil {
 			return err
 		}
 	}
 	for range min(4, w.count(p.topics)) {
-		st, err := w.topicRun(p)
-		if err != nil {
-			return err
-		}
-		if st.Done && st.Total == play.Length && w.chance(p.social*0.25) {
-			if err := w.challenge(p, st.ID); err != nil {
-				return err
-			}
-		}
-	}
-	if w.chance(p.social * 0.08) {
-		if err := w.challengeFriend(p); err != nil {
+		if _, err := w.topicRun(p); err != nil {
 			return err
 		}
 	}

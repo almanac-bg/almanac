@@ -653,7 +653,7 @@ type DoneGoal struct {
 // for none), it also counts that game's XP and the facts it put in the almanac, the goals it moved, and, for a topic's
 // game, how it moved their mastery; that game is told then, and so is every one finished before it (Untold). It waits
 // first for what the games just finished earned to be kept (after.go: in the background), and awards, so that
-// whatever ended meanwhile (a friend's challenge, a Роял, a week of the leagues) is in it. What belongs to a system
+// whatever ended meanwhile (a duel, a Роял, a week of the leagues) is in it. What belongs to a system
 // the player hasn't met yet (unfold.go) waits for it: a new level, what a level unlocks, an achievement of the goals or
 // of the league; what can't wait (a day's goals, a week ended) is let go untold, its XP kept.
 func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {

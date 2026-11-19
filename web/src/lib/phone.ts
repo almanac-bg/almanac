@@ -112,16 +112,12 @@ export function start(nav: Nav, opened: (kind: string) => void): void {
   });
 }
 
-/** Shares through the phone's share sheet, and says whether it was shared: closing the sheet without sharing (both
- * phones answer it with a refusal) isn't, on an iPhone. Android answers „Copy“ in its sheet with the same refusal, so
- * there a refusal is taken for a share: a closed sheet counted now and then is less wrong than every copy missed. */
-export async function share(text: string, url?: string): Promise<boolean> {
-  return plugin("Share")
+/** Sends a link through the phone's share sheet (a room's: screens/room.ts). The sheet closed without sending is
+ * answered with a refusal, which is nothing to say. */
+export async function share(text: string, url: string): Promise<void> {
+  await plugin("Share")
     .call("share", { text, url })
-    .then(
-      () => true,
-      () => bridge.getPlatform() === "android",
-    );
+    .catch(() => {});
 }
 
 /** What the player feels: a light knock for a tap (and for close, and a Роял cut out), a selection tick for each digit

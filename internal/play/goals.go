@@ -88,8 +88,6 @@ var goalKinds = []goalKind{
 		reached: func(t *tally, _ string) int { return t.distinctTopics() }},
 	{id: "type", family: "type", tier: 1, target: 3, about: "type", retired: true, name: "Отговори вярно на 3 въпроса {}",
 		reached: func(t *tally, ty string) int { return t.rightOf[ty] }},
-	{id: "friendDuel", family: "duel", tier: 1, target: 1, retired: true, name: "Изиграй предизвикателство с приятел",
-		href: "/friends", reached: func(t *tally, _ string) int { return t.friendDuels }},
 	{id: "royal", family: "royal", tier: 1, target: 1, retired: true, name: "Влез в Роял довечера", href: "/royal",
 		reached: func(t *tally, _ string) int { return t.royals }},
 	{id: "right30", family: "right", tier: 2, target: 30, retired: true, name: "Отговори вярно на 30 въпроса",
@@ -385,11 +383,11 @@ func keptGoals(ctx context.Context, db *sql.DB, userID int64, day string) (map[s
 
 // tally is how far a player's day has got, by every measure a goal has.
 type tally struct {
-	day, duels, duelWins, friendDuels, royals, royalBest, perfect, eight int
-	right, fast, row, exact, mended                                      int
-	topics                                                               map[string]int // topic games, by topic ("": all of them)
-	rightIn                                                              map[string]int // right answers, by topic
-	rightOf                                                              map[string]int // right answers, by type of question
+	day, duels, duelWins, royals, royalBest, perfect, eight int
+	right, fast, row, exact, mended                         int
+	topics                                                  map[string]int // topic games, by topic ("": all of them)
+	rightIn                                                 map[string]int // right answers, by topic
+	rightOf                                                 map[string]int // right answers, by type of question
 }
 
 // distinctTopics is how many topics the day's topic games were of.
@@ -425,17 +423,12 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 	from, to := dayBounds(day)
 	t := &tally{topics: map[string]int{}, rightIn: map[string]int{}, rightOf: map[string]int{}}
 	db := g.DB.Read
-	// A duel won counts the day it ends (a challenge may end days after its sender played); against a recording too.
-	// A duel with a friend is a challenge between the two, the player's game in it played that day (the sender's, or
-	// the taker's). Роял counts the day it's entered.
+	// A duel won counts the day it ends; against a recording too. Роял counts the day it's entered.
 	err := db.QueryRowContext(ctx, `SELECT
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'day' AND day = ?4 AND finished_at IS NOT NULL AND id <> ?6),
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'duel' AND finished_at BETWEEN ?2 AND ?3 AND id <> ?6),
 		(SELECT count(*) FROM duels WHERE ended_at BETWEEN ?2 AND ?3 AND (?6 = 0 OR ?6 NOT IN (coalesce(a_run, -1), coalesce(b_run, -1)))
 			AND ((a_id = ?1 AND outcome IN ('a', 'ghost_won')) OR (b_id = ?1 AND outcome = 'b'))),
-		(SELECT count(DISTINCT r.id) FROM duels d JOIN runs r ON r.id = CASE WHEN d.a_id = ?1 THEN d.a_run ELSE d.ghost_run END
-			WHERE d.kind = 'challenge' AND d.b_id IS NOT NULL AND (d.a_id = ?1 OR d.b_id = ?1)
-				AND r.finished_at BETWEEN ?2 AND ?3 AND r.id <> ?6),
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'royal' AND started_at BETWEEN ?2 AND ?3 AND id <> ?6),
 		(SELECT coalesce(max(rights), 0) FROM runs WHERE user_id = ?1 AND kind = 'royal' AND started_at BETWEEN ?2 AND ?3
 			AND id <> ?6),
@@ -443,7 +436,7 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 			AND r.rights = json_array_length(r.questions) AND r.id <> ?6),
 		(SELECT count(*) FROM runs r WHERE r.user_id = ?1 AND `+onDay("r")+` AND `+together("r")+`
 			AND json_array_length(r.questions) = ?5 AND r.rights >= ?5 - 2 AND r.id <> ?6)`, userID, from, to, day, Length, except).
-		Scan(&t.day, &t.duels, &t.duelWins, &t.friendDuels, &t.royals, &t.royalBest, &t.perfect,
+		Scan(&t.day, &t.duels, &t.duelWins, &t.royals, &t.royalBest, &t.perfect,
 			&t.eight)
 	if err != nil {
 		return nil, err

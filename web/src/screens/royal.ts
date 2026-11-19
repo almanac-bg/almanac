@@ -13,9 +13,8 @@
 // minutes for more, and the evening is off if none come (told to those who were in, with a live duel to play instead).
 // The screen is kept on in the lobby and the game. The lobby tells one who hasn't played a Роял how it's played, in a
 // line, and what one, two or three in it make of the cuts; the end leads on to the day's ten if they wait, else to the
-// next evening. A place on the podium (one not last) is big news: a sheet with the avatar, the place and „Сподели“ (the
-// result and the player's own link, the day's way: no words of invitation); the end sounds `win` for the first,
-// `through` for the podium, `lose` for one cut, `end` for the rest.
+// next evening. A place on the podium (one not last) is big news: a sheet with the avatar, the place and the right
+// answers; the end sounds `win` for the first, `through` for the podium, `lose` for one cut, `end` for the rest.
 //
 // Those in hear a quiet bed of music while they wait in the lobby (feel.ts: the game's only music), after a touch has
 // started the sound, with „Звуци“ and „Музика в Роял“ on; it rises in the last ten seconds (of the wait for more, if
@@ -83,8 +82,6 @@ let {
   verdictWords,
   feelKit,
   hands,
-  shareButton,
-  tally,
   stream,
   who,
   standingCard,
@@ -311,8 +308,6 @@ export function royal(kit: Kit) {
     verdictWords,
     feelKit,
     hands,
-    shareButton,
-    tally,
     stream,
     who,
     standingCard,
@@ -1117,39 +1112,12 @@ function reveal(view: () => Evening, first: Evening): Child {
   );
 }
 
-/** The evening's date, as a share says it: „18 ноември“. */
-const dateOf = (ms: number) =>
-  new Date(ms).toLocaleDateString("bg", { day: "numeric", month: "long", timeZone: "Europe/Sofia" });
-
-/** A place on the podium as it's shared, the day's way (game/share.ts): the evening, the place and the right answers,
- * and the player's own link, fetched as the finger comes down (their invite: whoever opens it is brought to the game).
- * Gold in the sheet; plain under the standings, where the gold is what's next. */
-function podiumShare(first: Evening, me: Player, primary: boolean): Child {
-  let made: Promise<string> | null = null;
-  const link = () => {
-    made ??= api<{ invite: string }>("GET", "/api/friends").then(
-      (r) => r.invite,
-      (err) => {
-        made = null;
-        throw err;
-      },
-    );
-    return made;
-  };
-  const text = () =>
-    [
-      `АЛМАНАХ · Роял, ${dateOf(first.startsAt)}`,
-      `${place(me.place ?? 1, first.entered)} · ${me.rights} от ${first.length} верни`,
-    ].join("\n");
-  return shareButton("Сподели", text, link, primary, () => tally("share:royal"));
-}
-
 /** Where the podium's sheet was shown last, on this device: the evening's start (once an evening, not again on a
  * reload of its standings). */
 const podiumKey = "almanac.royalPodium";
 
 /** A place on the podium (the first three, one not last) as big news: a sheet over the standings with the avatar, the
- * place, the right answers and „Сподели“ (feel.ts), its sound (`win` for the first, else `through`) as it opens, once
+ * place and the right answers (feel.ts), its sound (`win` for the first, else `through`) as it opens, once
  * an evening. It says whether it opened: without the feel loaded, or shown before, the end sounds by itself. */
 function podium(first: Evening, me: Player): boolean {
   const feel = feelKit();
@@ -1173,14 +1141,7 @@ function podium(first: Evening, me: Player): boolean {
     ),
     h("p", { class: "muted" }, `${me.rights} от ${first.length} верни`),
   ] as Element[];
-  // The sheet's buttons as wide as it, as its own „Продължи“ is.
-  const share = podiumShare(first, me, true) as HTMLElement;
-  share.style.setProperty("width", "100%");
-  share.querySelector("button")?.style.setProperty("width", "100%");
-  void feel.sheet(parts, won ? "win" : "through", won, hands(), (close) => [
-    share,
-    h("button", { class: "btn", type: "button", style: { width: "100%" }, onclick: close }, "Продължи"),
-  ]);
+  void feel.sheet(parts, won ? "win" : "through", won, hands());
   return true;
 }
 
@@ -1232,8 +1193,6 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
             first.entered >= 3 && first.delta ? ` Рейтинг: ${signed(first.delta)}.` : "",
           )
         : null,
-      // The podium's result to share (its sheet has it first): plain here, the gold is what's next.
-      me && top ? podiumShare(first, me, false) : null,
     ),
     h(
       "section",

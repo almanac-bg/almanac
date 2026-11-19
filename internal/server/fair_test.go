@@ -3,9 +3,6 @@ package server
 import (
 	"bytes"
 	"net/http/httptest"
-	"os"
-	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/almanac-bg/almanac/internal/account"
@@ -37,25 +34,5 @@ func TestNetMark(t *testing.T) {
 	s.accounts = &account.Accounts{Secret: []byte("another")}
 	if bytes.Equal(mark("[2001:db8:1:2::5]:443"), home) {
 		t.Fatal("the mark doesn't depend on the secret")
-	}
-}
-
-// Why a duel moved no rating is said the same in a notification (unratedWords) and on its result in the client
-// (screens/outcome.ts), every reason the game gives.
-func TestUnratedWordsMatchTheClient(t *testing.T) {
-	src, err := os.ReadFile("../../web/src/screens/outcome.ts")
-	if err != nil {
-		t.Fatal(err)
-	}
-	client := strings.Join(strings.Fields(string(src)), " ")
-	for _, why := range []string{"again", "network", "newcomers", "known"} {
-		words, ok := unratedWords[why]
-		if !ok {
-			t.Errorf("no words for %q", why)
-			continue
-		}
-		if !strings.Contains(client, why+": "+strconv.Quote(words)) {
-			t.Errorf("the client says %q otherwise, or not at all: %s", why, words)
-		}
 	}
 }

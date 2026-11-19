@@ -15,7 +15,6 @@ let {
   errorText,
   h,
   signal,
-  go,
   title,
   friendRequests,
   player,
@@ -68,7 +67,6 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
     errorText,
     h,
     signal,
-    go,
     title,
     friendRequests,
     player,
@@ -169,11 +167,7 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
     return h(
       "section",
       { class: "card player-actions" },
-      h(
-        "p",
-        { class: "player-relation muted" },
-        "Блокиран профил: не може да те добавя в приятели и да те предизвиква.",
-      ),
+      h("p", { class: "player-relation muted" }, "Блокиран профил: не може да те добавя в приятели."),
       button("Отблокирай", "", async () => {
         await api("DELETE", `/api/blocks/${p.tag}`);
         await reload();
@@ -194,7 +188,6 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
         "Приятели сте.",
         played ? h("span", { class: "muted" }, ` Дуели помежду ви: ${record(r.won, r.lost, r.drawn)}.`) : null,
       ),
-      button("Предизвикай", "primary", async () => go(`/challenge/${p.id}`)),
     ];
   } else if (p.friend === "asks") {
     body = [
@@ -220,11 +213,7 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
     ];
   } else {
     body = [
-      h(
-        "p",
-        { class: "player-relation muted" },
-        "Като приятели виждате резултатите си за деня и се предизвиквате на дуел.",
-      ),
+      h("p", { class: "player-relation muted" }, "Като приятели виждате резултатите си за деня."),
       button("Добави приятел", "primary", async () => {
         await player(); // not a player yet: a guest first, as on the first game
         const r = await api<{ friends?: boolean; name?: string }>("POST", "/api/friends/requests", { to: p.tag });

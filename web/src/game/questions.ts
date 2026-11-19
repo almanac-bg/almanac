@@ -6,7 +6,7 @@ import { ordinal } from "../lib/ordinal.ts";
 import { play } from "../lib/sound.ts";
 import { hyphenate } from "../lib/words.ts";
 import { formatNumber } from "../ui.ts";
-import { countedWords, percent, rare, withOwn } from "./share.ts";
+import { countedWords, percent, rare, withOwn } from "./numbers.ts";
 import { optionSizes, overSizes } from "./sizes.ts";
 import type {
   Answer,

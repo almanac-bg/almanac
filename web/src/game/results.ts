@@ -1,18 +1,16 @@
-// The end of a game: how it went, then what to do next (the way to share it, the questions to go over with their
-// answers), laid out the same on every result screen.
+// The end of a game: how it went, then what to do next (another game, the questions to go over with their answers),
+// laid out the same on every result screen.
 
-import { api, errorText, tally } from "../lib/api.ts";
-import { appShare } from "../lib/app.ts";
+import { api, errorText } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
 import { feelKit, play } from "../lib/sound.ts";
-import { askName } from "../screens/name.ts";
 import { categories } from "../state.ts";
 import { countUp, explain, fact, formatNumber, type Look, meaning, who } from "../ui.ts";
+import { closeWords } from "./numbers.ts";
 import { answered, crowdLine, picture } from "./questions.ts";
 import { report } from "./report.ts";
 import { trail } from "./run.ts";
-import { closeWords } from "./share.ts";
 import type { Reviewed, Score, State } from "./types.ts";
 
 /** A finished run: the score as the screen's big number, its points, a line about it (the place), and the marks;
@@ -144,89 +142,6 @@ function seal(): SVGElement {
 export function nextSteps(main: Child, others: Child[]): Child {
   const rest = others.filter(Boolean);
   return h("div", { class: "actions" }, main, rest.length ? h("div", { class: "result-actions" }, rest) : null);
-}
-
-/** Shares through the phone's own sheet, or copies where there's none (`url`, if any, goes with the text: or made
- * when it's needed, `link`, asked for as the finger comes down so that the share stays within the tap). `shared`,
- * if given, hears of each share: a phone's sheet sent (the app's or the browser's; closed without sharing, it's
- * none), or the text copied or shown.
- * `named`: what's shared carries the player's name (an invite, the day's result with its link), so a player who never
- * chose one is asked for it first (screens/name.ts). */
-export function shareButton(
-  label: string,
-  text: () => string,
-  to?: string | (() => Promise<string>),
-  primary = true,
-  shared?: () => void,
-  named = false,
-): Child {
-  const done = signal("");
-  const link = typeof to === "function" ? to : null;
-  const share = async () => {
-    let url: string | undefined;
-    try {
-      url = link ? await link() : (to as string | undefined);
-    } catch (err) {
-      return done.set(errorText(err));
-    }
-    const body = text();
-    const app = await appShare(body, url);
-    if (app === "shared") return shared?.();
-    if (app === "closed") return;
-    if (navigator.share) {
-      try {
-        await navigator.share({ text: body, url });
-        return shared?.();
-      } catch (err) {
-        if ((err as DOMException).name === "AbortError") return;
-      }
-    }
-    shared?.();
-    try {
-      await navigator.clipboard.writeText(url ? `${body}\n${url}` : body);
-      done.set("Копирано.");
-    } catch {
-      done.set(url ?? body);
-    }
-  };
-  return h(
-    "div",
-    { class: "share" },
-    h(
-      "button",
-      {
-        class: primary ? "btn primary big" : "btn",
-        onpointerdown: () => void link?.().catch(() => {}),
-        onclick: () => {
-          if (!(named && askName(share))) share();
-        },
-      },
-      label,
-    ),
-    () => done() && h("p", { class: "muted", role: "status" }, done()),
-  );
-}
-
-/** What a challenge says as it's shared: the score, the topic if it was one's, and a plain question. */
-export const challengeText = (rights: number, topic?: string) =>
-  `Познах ${rights} от 10${topic ? ` по „${topic}“` : ""} в АЛМАНАХ. Можеш ли повече?`;
-
-/** A challenge to anyone (play/challenges.go): the link to a finished game of ten (`run`), made as the finger comes
- * down and shared as it lifts, with `text` (the score and a question, plain, never a boast). The same link brings a
- * friend it was sent to to their turn. */
-export function challengeButton(label: string, run: number, text: () => string, primary = false): Child {
-  let made: Promise<string> | null = null;
-  const link = () => {
-    made ??= api<{ url: string }>("POST", "/api/challenges", { run }).then(
-      (r) => r.url,
-      (err) => {
-        made = null;
-        throw err;
-      },
-    );
-    return made;
-  };
-  return shareButton(label, text, link, primary, () => tally("share:challenge"), true);
 }
 
 /** Going over a game, once it's over: each question, the answer, what was given, the fact behind it, and a word

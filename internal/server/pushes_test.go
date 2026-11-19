@@ -548,7 +548,7 @@ func TestQuietNights(t *testing.T) {
 	s.game.Now = func() time.Time { return clock }
 	m := push.Message{Title: "Т", Body: "Т", URL: "/"}
 
-	s.notifySent(t.Context(), pushFriends, m, anaID) // a friend's challenge at 23:30
+	s.notifySent(t.Context(), pushFriends, m, anaID) // a friend request at 23:30
 	s.notifySent(t.Context(), pushAsked, m, anaID)   // the evening Ana said she'd come to
 	var next int64
 	_ = g.db.Read.QueryRow(`SELECT next_at FROM push_queue`).Scan(&next)

@@ -314,7 +314,7 @@ test("a game opened from outside, over: the page under it takes its address, ren
   fromOutside("/play/history");
   const at = index;
   router.hold();
-  router.rename("/duel/7"); // a challenge's link become its duel
+  router.rename("/duel/7"); // given another address while it plays
   assert.equal(router.entry().game, true, "still the game's own entry");
   drawn.length = 0;
   router.release({ result: 9 });

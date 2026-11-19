@@ -12,7 +12,7 @@ their reasons: read it before changing what a player sees or how the game plays,
 ## The game, in a paragraph
 
 Ten questions a day, the same for everyone (Начало); games by topic that follow what a player knows; live duels with
-whoever comes (a recording of a real game if nobody does) and friends challenged in their own time (anyone, by a challenge's link: `play/challenges.go`); Роял at 21:00
+whoever comes (a recording of a real game if nobody does); Роял at 21:00
 Friday to Sunday (every evening once those fill), up to 50 live on 15 questions, cut by right answers after the 5th, 8th, 11th and 14th; rooms with a code for playing together; friends,
 levels (XP), achievements, titles, avatars, a rating with divisions, and weekly leagues. Points are a game's score,
 XP is what playing earns, rating is strength: kept apart on purpose (`internal/play/worth.go`), and joined in one
@@ -21,7 +21,7 @@ new player meets a part at a time, as each starts to matter (`internal/play/unfo
 
 ## Direction
 
-The day's ten questions are the heart of the game: the habit a player comes back for, the result they share. Everything
+The day's ten questions are the heart of the game: the habit a player comes back for. Everything
 else serves it or stays out of its way. The game already has many systems; a new one must replace something or prove
 it's needed, and quiet beats loud (a new player sees the day and the topics first, a game's news is three cards at
 most). A change is judged by whether players come back: the retention numbers in `/admin`.
@@ -120,8 +120,8 @@ check holds a rule, the check is named; the rest is judgement, so weigh every ch
   `TestLimitsByAddressCountTheSite`), never a first-come global cap that a few networks fill to lock everyone out,
   and never so tight that a school, an office or a pub behind one address is refused. Ask of every new endpoint: what does it cost if
   one /48 calls it all day?
-- **One player can hurt another.** Anything one player can send another (a request, a challenge, a push, a name on
-  a board) honours blocks and goes through `notifyFrom`; a name typed in a room stays in that room.
+- **One player can hurt another.** Anything one player can send another (a request, a push, a name on a board)
+  honours blocks and goes through `notifyFrom`; a name typed in a room stays in that room.
 - **Text from outside is untrusted everywhere:** names, reports, browser errors in logs, mails, alerts and the
   agents that fix questions (sanitised, never an instruction).
 - **Time belongs to the run.** A run counts on the day it was dealt for, with one grace (`play.DayGrace`), never on

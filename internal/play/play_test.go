@@ -153,7 +153,7 @@ func (w *world) play(user, runID int64, answers ...func(int64, int) json.RawMess
 // live says whether a run is a live duel's, which its duel moves on (internal/live), not its player.
 func (w *world) live(runID int64) bool {
 	var live bool
-	_ = w.db.Read.QueryRow(`SELECT EXISTS (SELECT 1 FROM duels WHERE kind = 'live' AND (a_run = ?1 OR b_run = ?1))`,
+	_ = w.db.Read.QueryRow(`SELECT EXISTS (SELECT 1 FROM duels WHERE a_run = ?1 OR b_run = ?1)`,
 		runID).Scan(&live)
 	return live
 }
@@ -549,33 +549,6 @@ func TestAnswerAgain(t *testing.T) {
 	again, err = w.g.Answer(ctx, u, s.ID, Length-1, w.right(s.ID, Length-1))
 	if err != nil || !again.State.Done || plain(again) != plain(last) || xp() != before {
 		t.Fatalf("the last answer sent again: %+v %v (XP %d, was %d)", again, err, xp(), before)
-	}
-}
-
-// A challenge taken and left half-way is the taker's duel to go on with: there (a reload, its link again), and among
-// their duels.
-func TestChallengeHalfPlayed(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana, bo := w.user(), w.user()
-	s, _ := w.g.StartTopic(ctx, ana, "")
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	code, _, err := w.g.Challenge(ctx, ana, s.ID, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	bs, duel, err := w.g.TakeChallenge(ctx, bo, code)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(bo, bs.ID, w.right, w.wrong)
-	d, err := w.g.DuelOf(ctx, bo, duel)
-	if err != nil || d.State != "play" || d.RunID != bs.ID || d.Kind != "challenge" {
-		t.Fatalf("the duel half-played: %+v %v", d, err)
-	}
-	all, err := w.g.DuelsOf(ctx, bo)
-	if err != nil || !slices.ContainsFunc(all, func(v DuelView) bool { return v.ID == duel }) {
-		t.Fatalf("among Bo's duels: %+v %v", all, err)
 	}
 }
 
@@ -1089,25 +1062,19 @@ func TestFriends(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana, bo, vi := w.user(), w.user(), w.user()
-	code, err := w.g.InviteCode(ctx, ana)
-	if again, _ := w.g.InviteCode(ctx, ana); err != nil || len(code) != 8 || again != code {
-		t.Fatalf("Ana's invite: %q, again %q, %v", code, again, err)
+	var anaTag string
+	if err := w.db.Read.QueryRow(`SELECT tag FROM users WHERE id = ?`, ana).Scan(&anaTag); err != nil {
+		t.Fatal(err)
 	}
-	if _, _, _, err := w.g.AskByInvite(ctx, ana, code); !errors.Is(err, ErrOwnInvite) {
-		t.Fatalf("befriended oneself: %v", err)
+	// Bo asks Ana by her tag: a request, Ana's to accept; asked again, the same one, nothing new to tell her.
+	if sent, err := w.g.Request(ctx, bo, anaTag, false); err != nil || sent.Friends || !sent.New || sent.To != ana {
+		t.Fatalf("Bo asks Ana: %+v %v", sent, err)
 	}
-	if _, _, _, err := w.g.AskByInvite(ctx, bo, "nosuchcd"); !errors.Is(err, ErrNoInvite) {
-		t.Fatalf("a made-up invite: %v", err)
-	}
-	// Bo opens Ana's link: a request, Ana's to accept; asked again, the same one, nothing new to tell her.
-	if id, _, sent, err := w.g.AskByInvite(ctx, bo, code); err != nil || id != ana || sent.Friends || !sent.New || sent.To != ana {
-		t.Fatalf("Bo asks Ana by her link: %d %+v %v", id, sent, err)
-	}
-	if _, _, sent, err := w.g.AskByInvite(ctx, bo, code); err != nil || sent.New || sent.Friends {
+	if sent, err := w.g.Request(ctx, bo, anaTag, false); err != nil || sent.New || sent.Friends {
 		t.Fatalf("asking again: %+v %v", sent, err)
 	}
 	if _, err := w.g.Friend(ctx, ana, bo); !errors.Is(err, ErrNotFriends) {
-		t.Fatalf("friends by a link alone: %v", err)
+		t.Fatalf("friends by a request alone: %v", err)
 	}
 	in, _, _ := w.g.Requests(ctx, ana)
 	if len(in) != 1 {
@@ -1143,16 +1110,12 @@ func TestFriends(t *testing.T) {
 	}
 
 	// A duel between them counts in the record, from each side, and in their stats.
-	as, duel, err := w.g.ChallengeFriend(ctx, ana, bo)
+	l, err := w.g.StartLive(ctx, ana, bo)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.play(ana, as.ID, repeat(w.right, Length)...)
-	bs, err := w.take(bo, duel)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(bo, bs.ID, repeat(w.wrong, Length)...)
+	w.play(ana, l.Runs[0], repeat(w.right, Length)...)
+	w.play(bo, l.Runs[1], repeat(w.wrong, Length)...)
 	if st, _ := w.g.StatsOf(ctx, bo); st.Duels != 1 || st.Won != 0 || st.Recent[0].Kind != "duel" {
 		t.Fatalf("Bo's stats after a duel: %+v", st)
 	}
@@ -1359,7 +1322,7 @@ func TestFriendRequests(t *testing.T) {
 	if _, err := w.g.Request(ctx, ana, "nosuchplayer", false); !errors.Is(err, ErrNoPlayer) {
 		t.Fatalf("an unknown tag: %v", err)
 	}
-	if _, err := w.g.Request(ctx, ana, tag(ana), false); !errors.Is(err, ErrOwnInvite) {
+	if _, err := w.g.Request(ctx, ana, tag(ana), false); !errors.Is(err, ErrSelf) {
 		t.Fatalf("asked oneself: %v", err)
 	}
 	if sent, err := w.g.Request(ctx, ana, tag(bo), false); err != nil || sent.Friends || sent.Name != "Играч" {
@@ -1418,8 +1381,6 @@ func TestLiveDuels(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana, bo, gal := w.user(), w.user(), w.user()
-	var told []DuelNews
-	w.g.DuelNews = func(_ context.Context, n DuelNews) { told = append(told, n) }
 	rating := func(id int64) int {
 		s, _ := w.g.StandingOf(ctx, id)
 		return s.Rating
@@ -1445,12 +1406,9 @@ func TestLiveDuels(t *testing.T) {
 	w.play(bo, l.Runs[1], repeat(w.wrong, Length)...)
 	da, _ := w.g.DuelsOf(ctx, ana)
 	db, _ := w.g.DuelsOf(ctx, bo)
-	if len(da) != 1 || da[0].Kind != "live" || da[0].State != "won" || db[0].State != "lost" || da[0].Friendly ||
+	if len(da) != 1 || da[0].State != "won" || db[0].State != "lost" || da[0].Friendly ||
 		da[0].Delta <= 0 || rating(ana) != StartRating+da[0].Delta || rating(bo) != StartRating+db[0].Delta {
 		t.Fatalf("the result: %+v / %+v", da, db)
-	}
-	if len(told) != 2 || told[0].Kind != "result" || told[0].Friendly {
-		t.Fatalf("told: %+v", told)
 	}
 
 	// Again the same day: a friendly, the result kept but no rating moved.
@@ -1576,19 +1534,6 @@ func TestDuelOf(t *testing.T) {
 		t.Fatalf("a friendly: %+v", d)
 	}
 
-	// A friend's challenge while it waits: the player's own marks, nothing of the friend's.
-	w.befriend(gal, vi)
-	s, id, _ := w.g.ChallengeFriend(ctx, gal, vi)
-	w.play(gal, s.ID, repeat(w.right, Length)...)
-	if d, _ = w.g.DuelOf(ctx, gal, id); d.State != "wait" || len(d.You.Marks) != Length || d.Opponent.Marks != nil ||
-		d.Record != nil || d.Decided != 0 {
-		t.Fatalf("a challenge waiting: %+v", d)
-	}
-	// It's a duel between the two, in Gal's duels: not in her list of challenges sent by a link.
-	if sent, _ := w.g.SentOf(ctx, gal); len(sent) != 0 {
-		t.Fatalf("a challenge drawn for a friend, among those sent: %+v", sent)
-	}
-
 	// Against a recording: its marks, and no record against a recording's player.
 	l, err = w.g.StartRecorded(ctx, vi)
 	if err != nil {
@@ -1635,197 +1580,6 @@ func TestDecided(t *testing.T) {
 	if got := decided(marks(100, 100), marks(300, 0), 200+AllRight, 300); got != 2 {
 		t.Errorf("turned by the bonus: decided on %d", got)
 	}
-}
-
-// A friend challenged at once: ten drawn for the two, the friend told once the challenger has played, three days from
-// then to play them or say no; a duel between the two, which moves both ratings the first time in a day.
-func TestFriendChallenge(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana, vi, stranger := w.user(), w.user(), w.user()
-	var told []DuelNews
-	w.g.DuelNews = func(_ context.Context, n DuelNews) { told = append(told, n) }
-	if _, _, err := w.g.ChallengeFriend(ctx, ana, stranger); !errors.Is(err, ErrNotFriends) {
-		t.Fatalf("challenged a stranger: %v", err)
-	}
-	w.befriend(ana, vi)
-
-	// Ana plays first; Vi can't before, and hears of it only once Ana has finished.
-	s, id, err := w.g.ChallengeFriend(ctx, ana, vi)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := w.take(vi, id); !errors.Is(err, ErrNoChallenge) {
-		t.Fatalf("Vi played before Ana: %v", err)
-	}
-	if c, _ := w.g.AskedOf(ctx, vi); len(c) != 0 {
-		t.Fatalf("Vi challenged before Ana played: %+v", c)
-	}
-	if d, _ := w.g.DuelsOf(ctx, vi); len(d) != 0 {
-		t.Fatalf("in Vi's list before Ana played: %+v", d)
-	}
-	if d, _ := w.g.DuelsOf(ctx, ana); len(d) != 1 || d[0].State != "play" || !d[0].Sent {
-		t.Fatalf("Ana's turn: %+v", d)
-	}
-	w.wait(time.Hour)
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	if len(told) != 1 || told[0].To != vi || told[0].Kind != "asked" || told[0].DuelID != id {
-		t.Fatalf("Vi wasn't told: %+v", told)
-	}
-	// Her three days start now, not when Ana began.
-	c, _ := w.g.AskedOf(ctx, vi)
-	if len(c) != 1 || c[0].ID != id || c[0].ExpiresAt != w.now.Add(ChallengeFor).UnixMilli() || c[0].Started {
-		t.Fatalf("Vi's challenge: %+v", c)
-	}
-	if d, _ := w.g.DuelsOf(ctx, vi); d[0].State != "play" || d[0].Opponent.Points != 0 || d[0].Friend != ana {
-		t.Fatalf("Vi sees Ana's score before playing: %+v", d[0])
-	}
-	if d, _ := w.g.DuelOf(ctx, ana, id); d.State != "wait" || d.Kind != "challenge" || !d.Sent || d.Friend != vi {
-		t.Fatalf("Ana waits: %+v", d)
-	}
-	// Taken, it's the same ten as Ana's; a second take is the same game.
-	vs, err := w.take(vi, id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if w.picks(vs.ID)[0] != w.picks(s.ID)[0] {
-		t.Fatal("other questions")
-	}
-	if again, _ := w.take(vi, id); again.ID != vs.ID {
-		t.Fatal("a second game")
-	}
-	if c, _ := w.g.AskedOf(ctx, vi); len(c) != 1 || !c[0].Started {
-		t.Fatalf("Vi's challenge, started: %+v", c)
-	}
-	told = nil
-	w.play(vi, vs.ID, repeat(w.wrong, Length)...)
-	dv, _ := w.g.DuelOf(ctx, vi, id)
-	da, _ := w.g.DuelOf(ctx, ana, id)
-	if dv.State != "lost" || dv.Delta >= 0 || dv.Rating == nil || dv.Friendly || *dv.Record != (Record{Lost: 1}) {
-		t.Fatalf("Vi's result: %+v", dv)
-	}
-	if da.State != "won" || da.Delta <= 0 || da.Rating == nil || *da.Record != (Record{Won: 1}) || da.Opponent.Points != 0 ||
-		len(da.Opponent.Marks) != Length {
-		t.Fatalf("Ana's result: %+v", da)
-	}
-	// Both told: Vi has it on screen; Ana is pushed, and Начало tells her who played.
-	results := map[int64]bool{}
-	for _, n := range told {
-		if n.Kind == "result" {
-			results[n.To] = n.Seen
-		}
-	}
-	if seen, ok := results[vi]; !ok || !seen {
-		t.Fatalf("Vi's result told: %+v", told)
-	}
-	if seen, ok := results[ana]; !ok || seen {
-		t.Fatalf("Ana's result told: %+v", told)
-	}
-	if p, _ := w.g.FriendPlayedOf(ctx, ana); p == nil || p.DuelID != id || p.State != "won" || p.You == 0 {
-		t.Fatalf("Ana's line: %+v", p)
-	}
-	if n, _ := w.g.ChallengeNewsOf(ctx, ana); n != nil {
-		t.Fatalf("a friend's game in the line for anyone's: %+v", n)
-	}
-	if st, _ := w.g.StatsOf(ctx, ana); st.Duels != 1 || st.Won != 1 {
-		t.Fatalf("Ana's stats: %+v", st)
-	}
-
-	// Challenged back the same day: a friendly, the record grows, the ratings don't move.
-	s, back, _ := w.g.ChallengeFriend(ctx, vi, ana)
-	w.play(vi, s.ID, repeat(w.right, Length)...)
-	as, _ := w.take(ana, back)
-	w.play(ana, as.ID, repeat(w.wrong, Length)...)
-	if d, _ := w.g.DuelOf(ctx, ana, back); d.State != "lost" || !d.Friendly || d.Rating != nil ||
-		*d.Record != (Record{Won: 1, Lost: 1}) {
-		t.Fatalf("a friendly: %+v", d)
-	}
-	// Taken by its link by another of Vi's friends: it was drawn for Ana, not for Bo, so a duel between the two,
-	// unrated, and no friendly either (it never could have counted).
-	bo := w.user()
-	w.befriend(vi, bo)
-	bs, bd, err := w.g.TakeChallenge(ctx, bo, w.code(back))
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(bo, bs.ID, repeat(w.right, Length)...)
-	if d, _ := w.g.DuelOf(ctx, bo, bd); d.Friend != vi || d.Rating != nil || d.Delta != 0 || d.Friendly {
-		t.Fatalf("Bo's game of Ana's challenge: %+v", d)
-	}
-
-	// A friend may say no (only to theirs, only before they start); one not played in time ends without a result.
-	s, no, _ := w.g.ChallengeFriend(ctx, ana, vi)
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	if err := w.g.Decline(ctx, ana, no); !errors.Is(err, ErrNoDuel) {
-		t.Fatalf("Ana said no for Vi: %v", err)
-	}
-	if err := w.g.Decline(ctx, vi, no); err != nil {
-		t.Fatal(err)
-	}
-	if _, d, err := w.g.TakeChallenge(ctx, vi, w.code(no)); err != nil || d != no {
-		t.Fatalf("its link, after no: %d %v", d, err)
-	}
-	s, late, _ := w.g.ChallengeFriend(ctx, ana, vi)
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	w.wait(ChallengeFor - time.Minute)
-	if err := w.g.SettleDue(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if c, _ := w.g.AskedOf(ctx, vi); len(c) != 1 || c[0].ID != late {
-		t.Fatalf("expired early: %+v", c)
-	}
-	w.wait(2 * time.Minute)
-	if err := w.g.SettleDue(ctx); err != nil {
-		t.Fatal(err)
-	}
-	states := map[int64]string{}
-	d, _ := w.g.DuelsOf(ctx, ana)
-	for _, x := range d {
-		states[x.ID] = x.State
-	}
-	if states[no] != "declined" || states[late] != "expired" {
-		t.Fatalf("Ana's duels: %v", states)
-	}
-	if c, _ := w.g.AskedOf(ctx, vi); len(c) != 0 {
-		t.Fatalf("still waiting: %+v", c)
-	}
-
-	// The next day, drawn for the two, but no longer friends when it's played: unrated.
-	w.wait(24 * time.Hour)
-	s, gone, _ := w.g.ChallengeFriend(ctx, ana, vi)
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	vs, err = w.take(vi, gone)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := w.g.Unfriend(ctx, vi, ana); err != nil {
-		t.Fatal(err)
-	}
-	w.play(vi, vs.ID, repeat(w.wrong, Length)...)
-	if d, _ := w.g.DuelOf(ctx, vi, gone); d.State != "lost" || d.Rating != nil || d.Delta != 0 {
-		t.Fatalf("after unfriending: %+v", d)
-	}
-}
-
-// take is a player's game of a challenge sent to them (their duel of it), started as its notice's „Играй“ does.
-func (w *world) take(user, duel int64) (State, error) {
-	w.t.Helper()
-	s, id, err := w.g.TakeChallenge(w.t.Context(), user, w.code(duel))
-	if err == nil && id != duel {
-		err = fmt.Errorf("another duel: %d, not %d", id, duel)
-	}
-	return s, err
-}
-
-// code is the code of the challenge a duel is a game of.
-func (w *world) code(duel int64) string {
-	w.t.Helper()
-	var code string
-	if err := w.db.Read.QueryRow(`SELECT c.code FROM duels d JOIN challenges c ON c.id = d.challenge_id WHERE d.id = ?`, duel).
-		Scan(&code); err != nil {
-		w.t.Fatal(err)
-	}
-	return code
 }
 
 // befriend makes two players friends: a asked, b said yes.

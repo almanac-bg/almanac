@@ -17,11 +17,11 @@ import (
 // the first two:
 //
 //   - daily_counts: a number a day for each thing counted that no other table keeps (Tally): a visit without a
-//     profile by where it landed ("visit:home"), a guest made ("guest:invite"), a share of the day by a player who
-//     finished it ("share:day", once a day a device), the reminder's ask on Начало ("pushask:shown|yes|no", and by
-//     mail "mailask:shown|yes|no"), notifications sent and opened by kind ("push:sent:day", "push:open:day"), the
-//     day's reminders mailed ("mail:day:sent"), the day's answers and those to a question the player had answered
-//     before ("day:answers", "day:seen": none since the days are drawn ahead, ahead.go). Nobody is in it.
+//     profile by where it landed ("visit:home"), a guest made ("guest:room"), the reminder's ask on Начало
+//     ("pushask:shown|yes|no", and by mail "mailask:shown|yes|no"), notifications sent and opened by kind
+//     ("push:sent:day", "push:open:day"), the day's reminders mailed ("mail:day:sent"), the day's answers and those
+//     to a question the player had answered before ("day:answers", "day:seen": none since the days are drawn ahead,
+//     ahead.go). Nobody is in it.
 //   - cohort_weeks: a week's newcomers' numbers, frozen once over (server/measure.go). Nobody is in it either.
 //   - users.came_from: where a player first came in (Landings), set as their guest is made; users.first_version, the
 //     version they met (markActive); runs.device, what each game was played on (FromDevice).
@@ -29,9 +29,9 @@ import (
 //     phones), friends, the streaks (walkStreak), the reminders and mails sent or held (push_reminded, streak_mails:
 //     experiment.go).
 
-// Landings are where a player can first come in (users.came_from): the front page, a shared day's link, an invite, a
-// room's link, a player's page, the game's app, and anywhere else.
-var Landings = []string{"home", "share", "invite", "room", "player", "app", "other"}
+// Landings are where a player can first come in (users.came_from): the front page, a room's link, a player's page,
+// the game's app, and anywhere else.
+var Landings = []string{"home", "room", "player", "app", "other"}
 
 // Tally counts n of something today (daily_counts).
 func (g *Game) Tally(ctx context.Context, key string, n int) error {

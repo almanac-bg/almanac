@@ -9,11 +9,9 @@ import (
 )
 
 // A player may block another (Block): a stranger who keeps asking, a friend they no longer want near. From then on
-// the two are no friends, and neither reaches the other: a request between them (by tag, by email, from a room, by
-// opening the other's invite link) is kept nowhere, though its sender is told it went, as any (a block isn't
-// announced); neither can take the other's challenge, nor sees the other among those who took theirs; and no push
-// from one goes to the other (the server asks Blocked). Blocking ends what waited between them: requests, and
-// challenges not started. Only the one who blocked can lift it (Unblock); lifted, the two are strangers again.
+// the two are no friends, and neither reaches the other: a request between them (by tag, by email, from a room) is
+// kept nowhere, though its sender is told it went, as any (a block isn't announced); and no push from one goes to the
+// other (the server asks Blocked). Blocking ends the requests that waited between them. Only the one who blocked can lift it (Unblock); lifted, the two are strangers again.
 
 // MaxBlocks is how many players one may block: far more than anyone needs, a bound on the table.
 const MaxBlocks = 1000
@@ -84,9 +82,6 @@ func (g *Game) Block(ctx context.Context, userID int64, tag string) (string, err
 			`DELETE FROM friend_requests WHERE (from_id = ?1 AND (to_id = ?2
 				OR to_email = (SELECT email FROM users WHERE id = ?2))) OR (from_id = ?2 AND (to_id = ?1
 				OR to_email = (SELECT email FROM users WHERE id = ?1)))`,
-			// Challenges between the two not started yet: over, as if said no to.
-			`UPDATE duels SET outcome = 'declined', ended_at = ?3 WHERE kind = 'challenge' AND a_run IS NULL
-				AND ended_at IS NULL AND ((a_id = ?1 AND b_id = ?2) OR (a_id = ?2 AND b_id = ?1))`,
 		} {
 			if _, err := tx.Exec(q, userID, other, now); err != nil {
 				return err

@@ -109,7 +109,7 @@ const cues: Record<SoundName, Cue> = {
     ],
     room: true,
   },
-  // Something new: an opponent found, a friend's challenge or request.
+  // Something new: an opponent found, a friend's request.
   ping: {
     notes: [
       ["b", 7, 0, 0.2, 0.35],

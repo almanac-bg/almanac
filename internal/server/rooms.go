@@ -453,6 +453,7 @@ func (s *Server) roomBefriend(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	s.toldOfRequest(r.Context(), u, sent)
 	return ok(w, sent)
 }
 

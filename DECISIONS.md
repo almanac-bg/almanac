@@ -51,7 +51,6 @@ packages' doc comments; this file holds only what must not drift.
   seconds, partly of the network). It always reaches the 15th. Those cut keep answering on the same clock, off the
   standings, placed as they stood at their cut (not reordered by their total). Rejected: out at the first wrong (most
   were out by the 5th), lives, a final from zero (luck over knowledge).
-- **One challenge**, by a link anyone can open (#402): friend duels and challenges were two near-identical systems.
 - **Leagues race on the day's right answers**, not XP: a group ranks by the week's right answers on the day's ten, then
   its points, then who joined first, as the day's board does (owner, 2026-11-18, review E3). A league's last group,
   under five, races with the one before it.
@@ -62,7 +61,9 @@ packages' doc comments; this file holds only what must not drift.
   2026-11-18, review E4, E11; 2026-11-19).
 - **Removed to keep the game simple** (owner, 2026-11-19): sharing, invitations by link, challenges, past days'
   questions (the archive of past issues, and going over a game after its day), winning a broken streak back, and the
-  year's report. Don't bring any of them back, or something in their place, without the owner's call.
+  year's report. Friends are added by username or email; duels are live (against a recording when nobody comes, with
+  a rematch after), and only they move a rating. Don't bring any of them back, or something in their place, without
+  the owner's call.
 - **Right answers in a row earn no points** (owner, 2026-11-18, review E6): where a miss fell decided close duels and
   weeks. The climb stays as sound and feel; a game with every answer right still earns its bonus.
 - **The day's goals serve the day,** each one game at most: the day's ten; one more game (a topic's, three questions
@@ -70,9 +71,6 @@ packages' doc comments; this file holds only what must not drift.
   room's game counts only when someone else played it too (owner, 2026-11-18, review O4: the volume and speed goals
   sent players into a quarter of an hour of other games, away from the day).
 - **Gamification only from what the game really counts:** no invented currencies, no random boxes, never real money.
-- **Sharing:** what's shared ends with the player's own link, and the text itself has no invitation words nor anyone
-  else's name: the day's result, and a win (a duel against a person, Роял's first three) in the same style (owner,
-  2026-11-18, review M10).
 - **A tenth of players get no reminders, to tell what reminders do.** 10 % of players, drawn once by a hash of their
   id (`play/experiment.go`), are held out of the day's notification and the streak's mail; what they would have had
   is kept as if sent, by the same rules and hours, and `/admin` compares the two groups with intervals, counted by

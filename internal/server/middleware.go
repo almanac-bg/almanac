@@ -53,7 +53,7 @@ func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 //
 // The route is the pattern the request matched ("/api/rooms/{code}/join"), or for a page its first part ("/hand/…"),
 // never the path itself: a path carries what the log has no need of, a handoff's token, the code of a room, a
-// challenge or an invite, a player's tag (review 2026-11-18, S23). The address goes only with a request that failed (a
+// player's tag (review 2026-11-18, S23). The address goes only with a request that failed (a
 // refusal, a limit, something missing, an error): that's what tracing abuse needs, and a player playing leaves none in
 // the log (I6). The log is kept 14 days (deploy/setup.sh), as the privacy page says.
 func (s *Server) logged(next http.Handler) http.Handler {
@@ -81,10 +81,10 @@ func (s *Server) logged(next http.Handler) http.Handler {
 
 // polled are the routes a page asks every so often while it's open (or a monitor does): logged only when they fail.
 var polled = map[string]bool{
-	"GET /api/health":          true,
-	"GET /api/friends":         true,
-	"GET /api/friends/invites": true,
-	"GET /api/royal/tonight":   true,
+	"GET /api/health":           true,
+	"GET /api/friends":          true,
+	"GET /api/friends/requests": true,
+	"GET /api/royal/tonight":    true,
 }
 
 // route is a request as the log names it: the pattern it matched, without its method; or, for a page (and whatever

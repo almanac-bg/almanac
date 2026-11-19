@@ -14,12 +14,11 @@ import { recover, staying } from "./fresh.ts";
 import { answering, answerState, onScreen } from "./game/answering.ts";
 import { masteryCard } from "./game/mastery.ts";
 import { news } from "./game/news.ts";
+import { count } from "./game/numbers.ts";
 import { answered, crowdLine, picture } from "./game/questions.ts";
 import {
   board,
   boardRow,
-  challengeButton,
-  challengeText,
   hands,
   landing,
   nextSteps,
@@ -27,13 +26,11 @@ import {
   reviewed,
   reviewParts,
   scoreCard,
-  shareButton,
   summary,
 } from "./game/results.ts";
 import { guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
-import { count, duelShareText } from "./game/share.ts";
-import { ApiError, api, errorText, tally } from "./lib/api.ts";
-import { inApp } from "./lib/app.ts";
+import { ApiError, api, errorText } from "./lib/api.ts";
+import { appShare, inApp } from "./lib/app.ts";
 import { keepAwake } from "./lib/awake.ts";
 import { dayInBulgaria } from "./lib/day.ts";
 import { type Child, computed, effect, h, lifetime, onCleanup, signal, slot, untracked, when } from "./lib/dom.ts";
@@ -118,7 +115,6 @@ import {
   topicMark,
   unlockPicture,
   unlockWords,
-  until,
   verdict,
   verdictWords,
   who,
@@ -130,6 +126,7 @@ export const kit = {
   ApiError,
   answerState,
   api,
+  appShare,
   avatar,
   back,
   badge,
@@ -140,8 +137,6 @@ export const kit = {
   byTap,
   calm,
   categories,
-  challengeButton,
-  challengeText,
   changeGame,
   clock,
   coming,
@@ -151,7 +146,6 @@ export const kit = {
   dayInBulgaria,
   dayAndTime,
   dayWord,
-  duelShareText,
   duelResult,
   effect,
   emblem,
@@ -237,7 +231,6 @@ export const kit = {
   setTick,
   setVibrate,
   shapeNames,
-  shareButton,
   signal,
   signIn,
   slot,
@@ -249,7 +242,6 @@ export const kit = {
   staying,
   stream,
   summary,
-  tally,
   tickOn,
   tiers,
   tierWords,
@@ -264,7 +256,6 @@ export const kit = {
   turnOn,
   unlockPicture,
   unlockWords,
-  until,
   untracked,
   upNext,
   user,

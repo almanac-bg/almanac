@@ -30,17 +30,17 @@ func (w *world) stored(user int64, kind, day string, finished, scripted bool) {
 func TestTallies(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	for _, key := range []string{"share:day", "share:day", "visit:home"} {
+	for _, key := range []string{"pushask:shown", "pushask:shown", "visit:home"} {
 		if err := w.g.Tally(ctx, key, 1); err != nil {
 			t.Fatal(err)
 		}
 	}
 	w.wait(24 * time.Hour)
-	_ = w.g.Tally(ctx, "share:day", 3)
-	if got, _ := w.g.Tallies(ctx, "2026-11-12", "2026-11-13"); got["share:day"] != 5 || got["visit:home"] != 1 {
+	_ = w.g.Tally(ctx, "pushask:shown", 3)
+	if got, _ := w.g.Tallies(ctx, "2026-11-12", "2026-11-13"); got["pushask:shown"] != 5 || got["visit:home"] != 1 {
 		t.Fatalf("two days: %v", got)
 	}
-	if got, _ := w.g.Tallies(ctx, "2026-11-13", "2026-11-13"); got["share:day"] != 3 || got["visit:home"] != 0 {
+	if got, _ := w.g.Tallies(ctx, "2026-11-13", "2026-11-13"); got["pushask:shown"] != 3 || got["visit:home"] != 0 {
 		t.Fatalf("the second day: %v", got)
 	}
 }
@@ -93,7 +93,7 @@ func TestNewcomers(t *testing.T) {
 	w.stored(ana, "topic", "2026-11-19", false, false)
 	// Bo came by an invite, began with a topic, turned notifications on and made a friend the same day.
 	w.stored(bo, "topic", "2026-11-13", false, false)
-	_, _ = w.db.Write.Exec(`UPDATE users SET came_from = 'invite' WHERE id = ?`, bo)
+	_, _ = w.db.Write.Exec(`UPDATE users SET came_from = 'room' WHERE id = ?`, bo)
 	evening := time.Date(2026, 11, 13, 21, 0, 0, 0, Bulgaria).UnixMilli()
 	_, _ = w.db.Write.Exec(`INSERT INTO push_subs (endpoint, user_id, p256dh, auth, created_at) VALUES ('e', ?, 'p', 'a', ?)`, bo, evening)
 	_, _ = w.db.Write.Exec(`INSERT INTO friends (user_id, friend_id, since) VALUES (?, ?, ?)`, bo, ana, evening)
@@ -121,7 +121,7 @@ func TestNewcomers(t *testing.T) {
 	if !a.Due(7) || a.Due(8) || !a.BackWithin(1, 7) || a.BackWithin(4, 6) {
 		t.Fatalf("Ana's days: %+v", a)
 	}
-	if b.First != "2026-11-13" || b.Over != 7 || b.Games != 1 || b.FirstKind != "topic" || b.CameFrom != "invite" ||
+	if b.First != "2026-11-13" || b.Over != 7 || b.Games != 1 || b.FirstKind != "topic" || b.CameFrom != "room" ||
 		!b.Push || !b.Friend || b.DayTens() != 0 || b.Due(7) {
 		t.Fatalf("Bo: %+v", b)
 	}

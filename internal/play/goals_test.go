@@ -202,25 +202,20 @@ func TestGoalsOfOthers(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana, vi := w.user(), w.user()
-	w.befriend(ana, vi)
 	w.played(vi, XPFromDay-1)
 
-	w.setGoals(vi, "day", "friendDuel", "duelWin")
+	w.setGoals(vi, "day", "duel", "duelWin")
 
-	// A friend's challenge: played by both; the one who wins has won a duel the day it ends.
-	s, id, err := w.g.ChallengeFriend(ctx, vi, ana)
+	// A live duel against Ana: the one who wins has won a duel the day it ends.
+	l, err := w.g.StartLive(ctx, vi, ana)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.play(vi, s.ID, repeat(w.right, Length)...)
-	if g := w.goalsOf(vi); !g["friendDuel"].Done || g["duelWin"].Done {
+	w.play(vi, l.Runs[0], repeat(w.right, Length)...)
+	if g := w.goalsOf(vi); !g["duel"].Done || g["duelWin"].Done {
 		t.Fatalf("Vi before Ana played: %+v", g)
 	}
-	as, err := w.take(ana, id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(ana, as.ID, repeat(w.wrong, Length)...)
+	w.play(ana, l.Runs[1], repeat(w.wrong, Length)...)
 	if n, _ := w.g.NewsOf(ctx, vi, 0); !slices.Contains(n.Goals, DoneGoal{Name: "Спечели дуел", XP: GoalXP[2]}) {
 		t.Fatalf("Vi's duel won: %+v", n.Goals)
 	}
@@ -232,8 +227,8 @@ func TestGoalDuelWonAgainstARecording(t *testing.T) {
 	ctx := t.Context()
 	ana := w.user()
 	now := w.g.Now().UnixMilli()
-	if _, err := w.db.Write.Exec(`INSERT INTO duels (kind, questions, a_id, created_at, expires_at, ended_at, outcome)
-		VALUES ('live', '[]', ?, ?, ?, ?, 'ghost_won')`, ana, now, now, now); err != nil {
+	if _, err := w.db.Write.Exec(`INSERT INTO duels (questions, a_id, created_at, expires_at, ended_at, outcome)
+		VALUES ('[]', ?, ?, ?, ?, 'ghost_won')`, ana, now, now, now); err != nil {
 		t.Fatal(err)
 	}
 	tl, err := w.g.tallyOf(ctx, ana, w.g.Today())

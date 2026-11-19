@@ -63,7 +63,7 @@ func TestVersion(t *testing.T) {
 
 // pinnedVersions are questions as the game keeps them (question_versions: Encode), each with the Version it was kept
 // under, one or more of every type. A version is how a play finds what it showed again, after the bank moved on and
-// over a restart: if one of these moves, every version kept moves with it, and every play, review, challenge and
+// over a restart: if one of these moves, every version kept moves with it, and every play, review and
 // recording of them is lost (play: pastVersion refuses a version that reads back as another). They're written out
 // here, not taken from the sample bank, which changes.
 var pinnedVersions = []struct{ body, version string }{

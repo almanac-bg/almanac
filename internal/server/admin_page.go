@@ -142,7 +142,6 @@ var adminBody = template.Must(template.New("admin").Parse(`
 <div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">7 дни</th><th class="num">28 дни</th></tr></thead><tbody>
 {{range .Loop}}<tr><td>{{if .Sub}}<span class="muted">·</span> {{end}}{{.Name}}</td><td class="num">{{.Week}}</td><td class="num">{{.Month}}</td></tr>{{end}}
 </tbody></table></div>
-<p class="muted">Споделянето се брои веднъж на ден от устройство и само от завършил деня.</p>
 <p>Отговори в деня на въпрос, на който играчът е отговарял преди, за 7 дни: {{.Repeats.HTML}} (трябва да е 0).</p>
 </section>
 

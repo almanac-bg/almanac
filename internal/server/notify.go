@@ -181,9 +181,9 @@ type pushKind string
 const (
 	// pushDay is the reminder of the day's questions, at the player's own hour (remind.go).
 	pushDay pushKind = "day"
-	// pushFriends is word from people and of games played: someone asks to be friends by one's link, a friend calls
-	// to a duel (those from people go through notifyFrom: capped, never from one blocked), how a duel
-	// or a Роял played in one's own absence ended, how a week in the league ended.
+	// pushFriends is word from people and of games played: someone asks to be friends (from people, it goes through
+	// notifyFrom: capped, never from one blocked), how a Роял played in one's own absence ended, how a week in the
+	// league ended.
 	pushFriends pushKind = "friends"
 	// pushRoyal is the call to every evening's Роял as its lobby opens. Off by default: saying „Ще дойда“ calls a
 	// player to that one evening anyway.
@@ -289,15 +289,6 @@ func ratingWords(d int) string {
 		return fmt.Sprintf("Рейтинг: −%d.", -d)
 	}
 	return "Рейтингът ти не се промени."
-}
-
-// unratedWords say why a duel between two people moved no rating (play.DuelView.Unrated), as a notification tells
-// it; the client says the same on the duel's result (screens/outcome.ts).
-var unratedWords = map[string]string{
-	"again":     "Дуел без рейтинг: днес вече сте играли.",
-	"network":   "Дуел без рейтинг: играете от една и съща мрежа.",
-	"newcomers": "Дуел без рейтинг: с нови играчи рейтингът се променя до пет пъти на ден.",
-	"known":     "Дуел без рейтинг: някой друг вече беше изиграл това предизвикателство.",
 }
 
 // problemsSubject is the subject of the mail about new problems: „1 нов проблем“, „3 нови проблема“.

@@ -168,58 +168,6 @@ test.describe("in Messenger's own browser on an older iPhone, with no clipboard 
   });
 });
 
-test("a first invite asks for a name the friends would know, once", async ({ page }) => {
-  // What the page shares, counted instead of the phone's sheet.
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "share", {
-      configurable: true,
-      value: async () => {
-        const w = window as unknown as { shares?: number };
-        w.shares = (w.shares ?? 0) + 1;
-      },
-    });
-  });
-  const shares = () => page.evaluate(() => (window as unknown as { shares?: number }).shares ?? 0);
-  await page.goto("/friends");
-  await page.locator(".friends").getByRole("button", { name: "Покани приятел" }).click();
-  const invite = page.getByRole("button", { name: "Покани с връзка" });
-  await invite.click();
-  const sheet = page.getByRole("dialog", { name: "Как да те познаят приятелите?" });
-  await expect(sheet.getByLabel("Име")).toHaveValue(/ \d{3}$/);
-  // Esc (or a tap beside the sheet) is no answer: nothing shared, and asked again next time.
-  await page.keyboard.press("Escape");
-  await expect(sheet).toHaveCount(0);
-  expect(await shares()).toBe(0);
-  await invite.click();
-  // „Не сега“: the invite goes as it is, with the drawn name, and this device isn't asked again.
-  await sheet.getByRole("button", { name: "Не сега" }).click();
-  await expect(sheet).toHaveCount(0);
-  await expect.poll(shares).toBe(1);
-  await invite.click();
-  await expect.poll(shares).toBe(2);
-  await expect(sheet).toHaveCount(0);
-
-  // Asked again (as on another device): a name chosen goes with the invite.
-  await page.evaluate(() => localStorage.removeItem("almanac.nameAsked"));
-  await invite.click();
-  await sheet.getByLabel("Име").fill("Х");
-  await sheet.getByRole("button", { name: "Сподели" }).click();
-  await expect(sheet.getByRole("alert")).toHaveText(
-    "Името е от 2 до 30 знака: букви, цифри, интервали, точки или тирета.",
-  );
-  await sheet.getByLabel("Име").fill("Светулка");
-  await sheet.getByRole("button", { name: "Сподели" }).click();
-  await expect(sheet).toHaveCount(0);
-  await expect.poll(shares).toBe(3);
-  await expect
-    .poll(() => page.evaluate(async () => (await (await fetch("/api/me")).json()).user.name))
-    .toBe("Светулка");
-  // Named: the next invite goes at once.
-  await invite.click();
-  await expect(sheet).toHaveCount(0);
-  await expect.poll(shares).toBe(4);
-});
-
 test("a guest's Профил asks to keep the game and says it's kept; the way in for a profile from elsewhere is apart", async ({
   page,
 }, info) => {

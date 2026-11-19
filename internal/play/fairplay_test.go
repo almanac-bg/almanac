@@ -1,13 +1,11 @@
 package play
 
 import (
-	"context"
-	"errors"
 	"testing"
 	"time"
 )
 
-// Fair play by network, by newcomers, and in a pair's challenge (review 2026-11-18, S4, S18, S20).
+// Fair play by network and by newcomers (review 2026-11-18, S4, S20).
 
 // netDay is a player's day's ten, played from a network (fair.go, FromNet): all right, or all wrong.
 func (w *world) netDay(user int64, net string, right bool) int64 {
@@ -130,103 +128,17 @@ func TestThrowawayGuestsBeforeAPlayer(t *testing.T) {
 	}
 }
 
-// A pair's challenge is held for the friend it was drawn for: nobody else takes it, by its link or sent to them,
-// until the friend has played it or said no. Then anyone may; and if anyone did before the friend's game (sent to
-// them again), that game moves no rating (S18).
-func TestPairChallengeHeldForTheFriend(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana, bo, cy, di := w.user(), w.user(), w.user(), w.user()
-	w.befriend(ana, bo)
-	w.befriend(ana, di)
-	as, duel, err := w.g.ChallengeFriend(ctx, ana, bo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(ana, as.ID, append(repeat(w.right, Length/2), repeat(w.wrong, Length-Length/2)...)...)
-	code := w.code(duel)
-	if v, err := w.g.ChallengeOf(ctx, code, cy); err != nil || !v.Held {
-		t.Fatalf("as a stranger sees it: %+v %v", v, err)
-	}
-	if v, err := w.g.ChallengeOf(ctx, code, 0); err != nil || !v.Held {
-		t.Fatalf("as nobody signed in sees it: %+v %v", v, err)
-	}
-	if v, err := w.g.ChallengeOf(ctx, code, bo); err != nil || v.Held || v.Duel != duel {
-		t.Fatalf("as the friend sees it: %+v %v", v, err)
-	}
-	if _, _, err := w.g.TakeChallenge(ctx, cy, code); !errors.Is(err, ErrChallengeHeld) {
-		t.Fatalf("a stranger took it: %v", err)
-	}
-	if _, sent, err := w.g.Challenge(ctx, ana, as.ID, []int64{di}); err != nil || len(sent) != 0 {
-		t.Fatalf("sent on to another friend while held: %v %v", sent, err)
-	}
-
-	// Bo says no: anyone may take it now. Cy does, and plays it.
-	if err := w.g.Decline(ctx, bo, duel); err != nil {
-		t.Fatal(err)
-	}
-	cs, _, err := w.g.TakeChallenge(ctx, cy, code)
-	if err != nil {
-		t.Fatalf("after Bo said no: %v", err)
-	}
-	w.play(cy, cs.ID, repeat(w.right, Length)...)
-
-	// Sent to Bo again, it's held for him again (not from Cy, who has his game); he plays it, and it moves no rating:
-	// Cy could have told him every answer.
-	if _, sent, err := w.g.Challenge(ctx, ana, as.ID, []int64{bo}); err != nil || len(sent) != 1 {
-		t.Fatalf("sent again: %v %v", sent, err)
-	}
-	if v, _ := w.g.ChallengeOf(ctx, code, di); !v.Held {
-		t.Fatal("not held again")
-	}
-	if v, _ := w.g.ChallengeOf(ctx, code, cy); v.Held || v.Duel == 0 {
-		t.Fatalf("held from Cy, who played it: %+v", v)
-	}
-	bs, err := w.take(bo, duel)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(bo, bs.ID, repeat(w.right, Length)...)
-	d, err := w.g.DuelOf(ctx, bo, duel)
-	if err != nil || d.State != "won" || !d.Friendly || d.Unrated != "known" || d.Rating != nil {
-		t.Fatalf("Bo's game after Cy's: %+v %v", d, err)
-	}
-
-	// A pair's challenge the friend plays first moves ratings, and is anyone's after.
-	w.wait(24 * time.Hour)
-	as, duel, err = w.g.ChallengeFriend(ctx, ana, bo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(ana, as.ID, repeat(w.wrong, Length)...)
-	bs, err = w.take(bo, duel)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(bo, bs.ID, repeat(w.right, Length)...)
-	if d, err := w.g.DuelOf(ctx, bo, duel); err != nil || d.Friendly || d.Rating == nil {
-		t.Fatalf("Bo's game, first: %+v %v", d, err)
-	}
-	if _, _, err := w.g.TakeChallenge(ctx, cy, w.code(duel)); err != nil {
-		t.Fatalf("after Bo played: %v", err)
-	}
-}
-
-// pairDuel is a challenge between two friends, a's from netA and b's from netB ("": none), b winning it: b's duel.
+// pairDuel is a live duel between two players, a's from netA and b's from netB ("": none), b winning it: b's duel.
 func (w *world) pairDuel(a, b int64, netA, netB string) DuelView {
 	w.t.Helper()
 	ctx := w.t.Context()
-	as, duel, err := w.g.ChallengeFriend(FromNet(ctx, a, []byte(netA)), a, b)
+	l, err := w.g.StartLive(FromNet(FromNet(ctx, a, []byte(netA)), b, []byte(netB)), a, b)
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	w.play(a, as.ID, repeat(w.wrong, Length)...)
-	bs, _, err := w.g.TakeChallenge(FromNet(ctx, b, []byte(netB)), b, w.code(duel))
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	w.play(b, bs.ID, repeat(w.right, Length)...)
-	d, err := w.g.DuelOf(ctx, b, duel)
+	w.play(a, l.Runs[0], repeat(w.wrong, Length)...)
+	w.play(b, l.Runs[1], repeat(w.right, Length)...)
+	d, err := w.g.DuelOf(ctx, b, l.DuelID)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -238,19 +150,9 @@ func (w *world) pairDuel(a, b int64, netA, netB string) DuelView {
 func TestNoRatingFromOneNetwork(t *testing.T) {
 	w := setup(t)
 	ana, bo := w.user(), w.user()
-	w.befriend(ana, bo)
-	var told []DuelNews
-	w.g.DuelNews = func(_ context.Context, n DuelNews) {
-		if n.Kind == "result" {
-			told = append(told, n)
-		}
-	}
 	d := w.pairDuel(ana, bo, "home", "home")
 	if !d.Friendly || d.Unrated != "network" || d.Rating != nil || w.count(`SELECT rating FROM users WHERE id = ?`, bo) != StartRating {
 		t.Fatalf("from one network: %+v", d)
-	}
-	if len(told) != 2 || told[0].Unrated != "network" || !told[0].Friendly {
-		t.Fatalf("told: %+v", told)
 	}
 	// The next day, Bo from his phone's network: the home network of yesterday is past SameNetFor.
 	w.wait(SameNetFor + time.Hour)
@@ -276,7 +178,6 @@ func TestNewcomersMoveRatingLess(t *testing.T) {
 	rating := func(id int64) int { return w.count(`SELECT rating FROM users WHERE id = ?`, id) }
 	for i := range NewcomersRatedPerDay + 1 {
 		alt := w.user()
-		w.befriend(ana, alt)
 		before := rating(ana)
 		d := w.pairDuel(alt, ana, "", "")
 		if i == NewcomersRatedPerDay {

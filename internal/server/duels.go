@@ -1,7 +1,6 @@
 package server
 
 import (
-	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -274,7 +273,7 @@ func (s *Server) liveClaim(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]bool{"ok": true})
 }
 
-// duels lists the player's duels, with their rating, and the challenges they sent (play.SentOf).
+// duels lists the player's duels, with their rating.
 func (s *Server) duels(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -288,11 +287,7 @@ func (s *Server) duels(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	sent, err := s.game.SentOf(r.Context(), u.ID)
-	if err != nil {
-		return err
-	}
-	return ok(w, map[string]any{"duels": list, "standing": st, "challenges": sent})
+	return ok(w, map[string]any{"duels": list, "standing": st})
 }
 
 // duelOne is one of the player's duels, with what its result says (play.DuelOf).
@@ -309,65 +304,7 @@ func (s *Server) duelOne(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	// A win is shared as the day's result is: with the player's own link (their invite).
-	if d.State == "won" {
-		code, err := s.game.InviteCode(r.Context(), u.ID)
-		if err != nil {
-			return err
-		}
-		d.Invite = s.cfg.PublicURL + "/f/" + code
-	}
 	return ok(w, map[string]any{"duel": d})
-}
-
-// declineDuel says no to a friend's challenge sent to the player, before they've started it.
-func (s *Server) declineDuel(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		return play.ErrNoDuel
-	}
-	if err := s.game.Decline(r.Context(), u.ID, id); err != nil {
-		return err
-	}
-	return ok(w, map[string]bool{"ok": true})
-}
-
-// duelNews tells a player of a duel: a friend's challenge waits for them, the result of one played in their own time
-// (a challenge between friends; a live duel's result they've just seen), or someone took their challenge.
-// Through notifyFrom: nothing between two players one of whom has blocked the other, and a day's pushes capped.
-func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
-	m := push.Message{URL: fmt.Sprintf("/duel/%d", n.DuelID)}
-	switch n.Kind {
-	case "asked":
-		m.Title = n.From + " те предизвика"
-		m.Body = fmt.Sprintf("Десет въпроса, когато ти е удобно: имаш %d дни.", int(play.ChallengeFor.Hours()/24))
-	case "challenge": // someone took the player's challenge (play.challengeNews: once a day at most)
-		m.URL = "/c/" + n.Code
-		m.Title = n.From + " изигра предизвикателството ти"
-		m.Body = map[string]string{"won": "Ти печелиш.", "lost": "Победата е за " + n.From + ".", "draw": "Равенство."}[n.Outcome] +
-			" Виж кой още го е изиграл."
-	case "result":
-		if n.Seen {
-			return
-		}
-		var kind string
-		if err := s.db.Read.QueryRowContext(ctx, `SELECT kind FROM duels WHERE id = ?`, n.DuelID).Scan(&kind); err != nil || kind != "challenge" {
-			return
-		}
-		word := map[string]string{"won": "Победа срещу", "lost": "Загуба срещу", "draw": "Равенство с"}[n.Outcome]
-		m.Title = fmt.Sprintf("%s %s", word, n.From)
-		m.Body = ratingWords(n.Delta)
-		if n.Friendly {
-			m.Body = cmp.Or(unratedWords[n.Unrated], unratedWords["again"])
-		}
-	default:
-		return
-	}
-	s.notifyFrom(context.WithoutCancel(ctx), n.FromID, "", m, n.To)
 }
 
 // ranks is a board: by rating, or by knowledge (over every topic, or one); of everyone, or of the viewer and their

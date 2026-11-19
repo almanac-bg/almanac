@@ -83,18 +83,10 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(page.getByRole("radio", { name: "Едър", exact: true })).toHaveAttribute("aria-checked", "true");
 });
 
-test("just played, a right answer few others got makes „Сподели“ gold", async ({ page }) => {
+test("just played, a right answer few others got is told in gold", async ({ page }) => {
   test.setTimeout(120_000);
-  // The day as the server would have it with others playing: 4 right answers of the player's own (worth sharing only
-  // for the rare one; one lucky answer in a poorer day isn't), and the right answer a tenth of the others got, told
-  // (as the server does) only once the day is played.
-  await page.route("**/api/runs/*", async (route) => {
-    if (route.request().method() !== "GET") return route.continue();
-    const res = await route.fetch();
-    const s = await res.json();
-    if (s.done) s.rights = 4;
-    await route.fulfill({ response: res, json: s });
-  });
+  // The day as the server would have it with others playing: the right answer a tenth of the others got, told (as
+  // the server does) only once the day is played.
   await page.route("**/api/day", async (route) => {
     if (route.request().method() !== "GET") return route.continue();
     const res = await route.fetch();
@@ -105,7 +97,9 @@ test("just played, a right answer few others got makes „Сподели“ gold
   await page.goto("/");
   await startDay(page);
   await playRun(page);
-  await expect(page.locator(".summary").getByRole("button", { name: "Сподели" })).toHaveClass(/primary/);
+  await expect(page.locator(".summary .crowd-says.rare")).toHaveText(
+    "Позна въпрос 1: днес го знаят само 10% от играчите.",
+  );
   await expect(page.locator(".summary .btn.primary")).toHaveCount(1);
 });
 
@@ -118,13 +112,11 @@ test("after the day: one gold thing to do next, the goals still open, and Про
   await page.reload();
   await startDay(page);
   await playRun(page);
-  // One gold action: „Сподели“ for a result worth it, else another game (and „Сподели“ plain beside the review).
+  // One gold action: another game.
   const gold = page.locator(".btn.primary");
   await expect(gold).toHaveCount(1);
-  if ((await gold.textContent())?.includes("Още десет")) {
-    await expect(gold).toHaveAttribute("href", /^\/play\/[a-z]+$/); // a goal's topic, else the day's own
-    await expect(page.getByRole("button", { name: "Сподели" })).not.toHaveClass(/primary/);
-  }
+  await expect(gold).toHaveText("Още десет");
+  await expect(gold).toHaveAttribute("href", /^\/play\/[a-z]+$/); // a goal's topic, else the day's own
   // The goals still open, each the way to where it's done; the day's own is done.
   const open = page.locator(".open-goals");
   await expect(open).toBeVisible();

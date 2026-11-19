@@ -45,8 +45,8 @@ export const phonePlatforms: string[] = boot.phones ?? [];
 /** The style of a duel's result (outcome.css): loaded with it (kit.ts). */
 export const outcomeCss = boot.outcomeCss ?? "";
 
-/** Where the page was first opened: a new guest says it, so the admin page can tell where players come from (an
- * invite, a shared day, a room …), whatever pages they went through before their first game. */
+/** Where the page was first opened: a new guest says it, so the admin page can tell where players come from (a
+ * room, a player's page …), whatever pages they went through before their first game. */
 const landing = location.pathname;
 
 /** A guest on its way: one, however many ask for the player meanwhile (a double tap on a first „Започни“). */
@@ -78,8 +78,8 @@ export const friendRequests = signal(0);
 let holds = 0;
 const held = signal(false);
 
-/** A game is under way on the screen: nothing else asks for the player's attention then (a friend's challenge, its
- * ping), the header and the bar of places step aside on a phone, and the page isn't loaded anew under it (fresh.ts).
+/** A game is under way on the screen: nothing else asks for the player's attention then (a friend's request's ping),
+ * the header and the bar of places step aside on a phone, and the page isn't loaded anew under it (fresh.ts).
  * Only read: what shows a game holds it (playingWhile). */
 export const playing: (() => boolean) & { peek(): boolean } = Object.assign(() => held(), { peek: () => held.peek() });
 
@@ -101,19 +101,7 @@ export function playingWhile(now: () => boolean = () => true): void {
   });
 }
 
-/** A friend's challenge waiting for the player: who, and until when. */
-export interface Challenge {
-  id: number;
-  from: string;
-  expiresAt: number;
-  /** Begun and not finished. */
-  started?: boolean;
-}
-
-/** The friends' challenges waiting for the player, the soonest to run out first. */
-export const challenges = signal<Challenge[]>([]);
-
-/** Looks again, now, whether something waits for the player (after they've answered a challenge, say). */
+/** Looks again, now, whether something waits for the player (after they've answered a request, say). */
 export let checkWaiting: () => Promise<void> = async () => {};
 
 /** How long between two looks for what waits for the player: half a minute, twice as long after each that found
@@ -121,9 +109,9 @@ export let checkWaiting: () => Promise<void> = async () => {};
 const lookEvery = 30_000;
 const lookAtMost = 300_000;
 
-/** Looks, while the page is in view and no game is under way, whether a friend has challenged the player, or someone
- * asks to be friends: every half minute, less often while nothing changes (lookEvery); and again at once each time
- * the page comes back into view, and each time a game ends, so a challenge just played doesn't stay on the notice. */
+/** Looks, while the page is in view and no game is under way, whether someone asks to be friends: every half minute,
+ * less often while nothing changes (lookEvery); and again at once each time the page comes back into view, and each
+ * time a game ends. */
 export function watchWaiting(): void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let quiet = 0; // looks in a row that found nothing new
@@ -133,22 +121,18 @@ export function watchWaiting(): void {
   };
   checkWaiting = async () => {
     if (!user.peek()) {
-      // Signed out, or the account deleted: its challenges and requests go with it.
-      challenges.set([]);
+      // Signed out, or the account deleted: its requests go with it.
       friendRequests.set(0);
       return;
     }
     // Hidden, or in a game (whose end looks again): no asking, nor any sound over a question.
     if (document.hidden || playing.peek()) return;
     try {
-      const r = await api<{ requests: number; challenges: Challenge[] }>("GET", "/api/friends/invites");
-      const known = new Set(challenges.peek().map((c) => c.id));
-      const news = r.requests > friendRequests.peek() || r.challenges.some((c) => !known.has(c.id));
-      const same = !news && r.requests === friendRequests.peek() && r.challenges.length === known.size;
-      quiet = same ? Math.min(quiet + 1, 4) : 0;
+      const r = await api<{ requests: number }>("GET", "/api/friends/requests");
+      const news = r.requests > friendRequests.peek();
+      quiet = r.requests === friendRequests.peek() ? Math.min(quiet + 1, 4) : 0;
       if (news && !playing.peek()) play("ping"); // never over a question
       friendRequests.set(r.requests);
-      challenges.set(r.challenges);
     } catch {
       // Offline for a moment: the next look will tell.
     }

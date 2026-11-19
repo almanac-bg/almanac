@@ -19,8 +19,8 @@ import (
 )
 
 // What the server counts for the admin page (play/measure.go): visits without a profile by where they landed, the
-// guests made and where they came from, what the client tells (/api/tally: the day shared, the reminder's ask
-// answered, a notification opened), and the versions served (releases). And how /admin reads it all (measures): one
+// guests made and where they came from, what the client tells (/api/tally: the reminder's ask answered, a
+// notification opened), and the versions served (releases). And how /admin reads it all (measures): one
 // population, people (play.People), each share with its interval, so that a difference within the noise isn't taken
 // for a change.
 
@@ -31,10 +31,6 @@ func landing(path string, app bool) string {
 		return "app"
 	case path == "/":
 		return "home"
-	case strings.HasPrefix(path, "/s/"):
-		return "share"
-	case strings.HasPrefix(path, "/f/"):
-		return "invite"
 	case strings.HasPrefix(path, "/r/"), path == "/room":
 		return "room"
 	case strings.HasPrefix(path, "/players/"):
@@ -99,13 +95,11 @@ func (s *Server) released(ctx context.Context) error {
 	return err
 }
 
-// clientTallies are what the client counts (play/measure.go): the day shared, the reminder's ask on Начало (shown,
-// yes, no; by notification, or by mail where none can come), a notification opened, by kind.
+// clientTallies are what the client counts (play/measure.go): the reminder's ask on Начало (shown, yes, no; by
+// notification, or by mail where none can come), a notification opened, by kind.
 var clientTallies = map[string]bool{
-	"share:day": true, "share:challenge": true, "pushask:shown": true, "pushask:yes": true, "pushask:no": true,
+	"pushask:shown": true, "pushask:yes": true, "pushask:no": true,
 	"mailask:shown": true, "mailask:yes": true, "mailask:no": true,
-	"share:duel":  true, // a duel's win shared (screens/outcome.ts)
-	"share:royal": true, // a place on Роял's podium shared (screens/royal.ts)
 }
 
 func init() {
@@ -117,14 +111,10 @@ func init() {
 }
 
 // tally counts one of what the client counts. Anyone may (a notification is opened before the page knows who's
-// playing), a few times a minute. The day shared counts only from a player who finished it, as /admin counts the days
-// finished (play.People): its share of them is the game's growth number. It's the day the client says, today's or
-// yesterday's (a result shared after midnight, its day played late), else today's. The client counts it once a day a
-// device; nothing here tells whose it was.
+// playing), a few times a minute; nothing here tells whose it was.
 func (s *Server) tally(w http.ResponseWriter, r *http.Request) error {
 	var in struct {
 		Key string `json:"key"`
-		Day string `json:"day"` // the day shared (share:day)
 	}
 	if err := readJSON(r, &in); err != nil {
 		return err
@@ -134,19 +124,6 @@ func (s *Server) tally(w http.ResponseWriter, r *http.Request) error {
 	}
 	if !s.allowFrom(r, "tally", 30, 150, time.Hour) {
 		return errTooMany
-	}
-	if in.Key == "share:day" {
-		day, finished := s.game.Today(), false
-		if in.Day == play.DayShift(day, -1) {
-			day = in.Day
-		}
-		if u, err := s.user(r); err == nil && u != nil {
-			_ = s.db.Read.QueryRowContext(r.Context(), `SELECT EXISTS (SELECT 1 FROM runs WHERE user_id = ? AND kind = 'day'
-				AND day = ? AND finished_at IS NOT NULL AND `+play.People+`)`, u.ID, day).Scan(&finished)
-		}
-		if !finished {
-			return ok(w, map[string]bool{"ok": true})
-		}
 	}
 	if err := s.game.Tally(r.Context(), in.Key, 1); err != nil {
 		return err
@@ -278,7 +255,7 @@ func decimal(x float64) string { return strings.Replace(fmt.Sprintf("%.1f", x), 
 
 // landingNames are the landings as the admin page says them.
 var landingNames = map[string]string{
-	"home": "Началната страница", "share": "Споделен ден", "invite": "Покана", "room": "Стая",
+	"home": "Началната страница", "room": "Стая",
 	"player": "Профил на играч", "app": "Приложението", "other": "Друга страница", "": "Не се знае",
 }
 
@@ -286,10 +263,10 @@ var landingNames = map[string]string{
 // here comes after, by its own name).
 var (
 	kindNames = map[string]string{
-		"day": "Денят", "topic": "Тема", "duel": "Дуел", "challenge": "Предизвикателство", "royal": "Роял",
+		"day": "Денят", "topic": "Тема", "duel": "Дуел", "royal": "Роял",
 		"mistakes": "Грешки", "room": "Стая",
 	}
-	kindOrder = []string{"day", "topic", "duel", "challenge", "royal", "mistakes", "room"}
+	kindOrder = []string{"day", "topic", "duel", "royal", "mistakes", "room"}
 )
 
 // kindName is a kind of game as the admin page says it.
@@ -909,7 +886,6 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 	type window struct {
 		t       map[string]int
 		dayTens int
-		shares  int // newcomers who came in by a shared day
 	}
 	var win [2]window
 	for i, days := range []int{7, 28} {
@@ -922,11 +898,6 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 		if win[i].dayTens, err = dayTens(from, today); err != nil {
 			return f, err
 		}
-		for _, n := range news {
-			if n.First >= from && n.CameFrom == "share" {
-				win[i].shares++
-			}
-		}
 	}
 	text := func(s string) template.HTML { return template.HTML(template.HTMLEscapeString(s)) }
 	into := &f.Loop
@@ -937,13 +908,6 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 		return func(w window) template.HTML { return text(fmt.Sprint(w.t[key])) }
 	}
 	row("Завършени дни", false, func(w window) template.HTML { return text(fmt.Sprint(w.dayTens)) })
-	row("Споделили (дял от завършилите деня)", true, func(w window) template.HTML {
-		return rate{w.t["share:day"], w.dayTens}.capped().HTML()
-	})
-	row("Посещения от споделен ден на споделяне", true, func(w window) template.HTML {
-		return text(ratio(w.t["visit:share"], w.t["share:day"]))
-	})
-	row("Нови играчи от споделен ден", true, func(w window) template.HTML { return text(fmt.Sprint(w.shares)) })
 	into = &f.Notices
 	row("Покана за напомняне, показана", false, count("pushask:shown"))
 	row("„Напомняй ми“", true, func(w window) template.HTML { return rate{w.t["pushask:yes"], w.t["pushask:shown"]}.HTML() })

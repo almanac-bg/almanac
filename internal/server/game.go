@@ -95,19 +95,11 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 			out["playing"] = p
 		}
 		out["royal"] = nudge || royalNow
-		// A friend has played the duel they started: told on Начало, once (by the client), above the day.
-		if out["duel"], err = s.game.FriendPlayedOf(ctx, u.ID); err != nil {
-			return nil, err
-		}
-		// A friend said yes to their invite, and what came of a live duel they left: each told once (POST /api/told).
+		// A friend said yes to their request, and what came of a live duel they left: each told once (POST /api/told).
 		if out["accepted"], err = s.game.AcceptedOf(ctx, u.ID); err != nil {
 			return nil, err
 		}
 		if out["left"], err = s.game.LeftOf(ctx, u.ID); err != nil {
-			return nil, err
-		}
-		// Who took the player's challenges since they last heard: one line for all of them.
-		if out["challenges"], err = s.game.ChallengeNewsOf(ctx, u.ID); err != nil {
 			return nil, err
 		}
 		// Which of the game's systems they've met: Начало shows the level and the goals once XP is open.
@@ -139,12 +131,6 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 				} else if missed > 0 && all >= play.MistakesFrom {
 					out["misses"] = map[string]int{"n": missed, "days": int(play.MistakesAfter.Hours() / 24)}
 				}
-				// The shared result ends with the player's invite link: it brings whoever opens it to the day.
-				code, err := s.game.InviteCode(ctx, u.ID)
-				if err != nil {
-					return nil, err
-				}
-				out["invite"] = s.cfg.PublicURL + "/f/" + code
 			}
 		}
 		// While today's ten wait, how yesterday's ended for them, once its board is final.
@@ -165,7 +151,7 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 			return nil, err
 		}
 		out["friends"] = friends
-		// No friend has played yet: whether there's any, for the result to ask a player with none to invite one.
+		// No friend has played yet: whether there's any, for the boards to ask a player with none to add one.
 		if friends == nil {
 			var any bool
 			if err := s.db.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ?)`, u.ID).

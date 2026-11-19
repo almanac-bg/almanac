@@ -175,7 +175,6 @@ func New(cfg Config, d Deps) (*Server, error) {
 	// Every panic stopped in the work done in the background (package safe), anywhere in the program, is told as
 	// one of this server's problems: there is one server in the program.
 	safe.Tell(s.problems.add)
-	s.game.DuelNews = s.duelNews
 	s.game.RoyalNews = s.royalNews
 	s.game.LeagueNews = s.leagueNews
 	s.game.MistakesAfter = cfg.MistakesAfter
@@ -292,7 +291,6 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/duels/live/{id}/answer", s.liveAnswer)
 	api("POST /api/duels/live/{id}/leave", s.liveLeave)
 	api("POST /api/duels/live/{id}/claim", s.liveClaim)
-	api("DELETE /api/duels/{id}", s.declineDuel)
 	api("GET /api/ranks", s.ranks)
 	api("GET /api/players/{tag}", s.profile)
 	mux.HandleFunc("GET /api/royal/events", s.royalEvents)
@@ -308,21 +306,14 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/league", s.league)
 	api("GET /api/goals", s.goals)
 	api("GET /api/friends", s.friends)
-	api("GET /api/friends/invites", s.duelInvites)
+	api("GET /api/friends/requests", s.requestsWaiting)
 	api("POST /api/friends/requests", s.requestFriend)
 	api("POST /api/friends/requests/{id}/accept", s.answerRequest(true))
 	api("DELETE /api/friends/requests/{id}", s.answerRequest(false))
 	api("DELETE /api/friends/{id}", s.unfriend)
-	api("POST /api/friends/invite", s.newInvite)
 	api("POST /api/blocks", s.block)
 	api("DELETE /api/blocks/{tag}", s.unblock)
 	api("POST /api/told", s.told)
-	api("POST /api/challenges", s.challengeLink)
-	api("POST /api/friends/{id}/challenge", s.challengeFriend)
-	api("GET /api/challenges/{code}", s.challengeView)
-	api("POST /api/challenges/{code}/play", s.takeChallenge)
-	api("GET /api/invites/{code}", s.inviteInfo)
-	api("POST /api/invites/{code}", s.askInvite)
 	mux.Handle("/api/", s.apiHandler(func(http.ResponseWriter, *http.Request) error { return errNotFound }))
 
 	mux.HandleFunc("GET /qimg/{file}", s.picture)

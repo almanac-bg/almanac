@@ -210,8 +210,8 @@ const (
 	// NetsKept is how long a game's network is kept: a week, the league's race that a day counts in, and well over
 	// SameNetFor and the two days JudgeNets looks at.
 	NetsKept = 7 * 24 * time.Hour
-	// SameNetFor is how close together two players' games from one network make them one network's: a day, the time
-	// a challenge between them is mostly taken in (and only the first duel of a day between two is rated anyway).
+	// SameNetFor is how close together two players' games from one network make them one network's: a day (only the
+	// first duel of a day between two is rated anyway).
 	SameNetFor = 24 * time.Hour
 	// ThrowawayFew is how many throwaway guests' days from one network, before a player's own, make the pattern: one
 	// is a friend who tried the game on the player's wifi; two in a day before the player plays is a habit.

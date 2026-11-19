@@ -196,7 +196,7 @@ func TestFriendsBoardTrails(t *testing.T) {
 	}
 }
 
-// A player's day as an invite link tells it: nothing before it's finished; its right answers after, to anyone; a game
+// A player's day as a room tells it: nothing before it's finished; its right answers after, to anyone; a game
 // played at a script's speed to its player alone.
 func TestDayRights(t *testing.T) {
 	w := setup(t)

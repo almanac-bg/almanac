@@ -1,10 +1,8 @@
-// A duel's result, the most dramatic moment in the game, for every way a duel ends (a challenge, between friends or
-// taken by anyone; a live one, against a recording): the two face to face with their scores, the winner in gold and the
-// other plain; the duel question by question, the two rows of marks aligned, the quicker of two right answers ringed,
-// and the question that decided it; what it meant (the rating from and to, in its division, and the record against
-// this person); and what to do next. A challenge sent to a friend, waiting for them, shows the player's own side, and
-// until when; one turned down, not played in time or cut off says so. The first time it shows, it lands as a moment
-// (feel.ts: duel), never again.
+// A duel's result, the most dramatic moment in the game, for every way a live duel ends (against a person, or against
+// a recording): the two face to face with their scores, the winner in gold and the other plain; the duel question by
+// question, the two rows of marks aligned, the quicker of two right answers ringed, and the question that decided it;
+// what it meant (the rating from and to, in its division, and the record against this person); and what to do next.
+// One cut off says so. The first time it shows, it lands as a moment (feel.ts: duel), never again.
 //
 // It loads on its own, with its style (outcome.css) and the game's feel, the first time a duel's result shows (kit.ts:
 // duelResult; asked for as a duel starts, so it's in by its end), and is handed the app's pieces: it imports only types.
@@ -20,14 +18,10 @@ let {
   api,
   errorText,
   avatar,
-  challengeButton,
-  challengeText,
-  duelShareText,
   emblem,
   explain,
   feelKit,
   formatNumber,
-  go,
   h,
   hands,
   landing,
@@ -39,11 +33,8 @@ let {
   profileHref,
   record,
   reviewParts,
-  shareButton,
   signal,
-  tally,
   trail,
-  until,
   withName,
 } = {} as Kit;
 
@@ -61,21 +52,17 @@ export interface Steps {
   dock?: boolean;
 }
 
-/** A duel as it stands or ended (`d`, as one duel's view has it); what to do next (`again`: after a live one, a
- * rematch and another duel; else, after a challenge between friends, one back); and what the game earned (`more`). */
+/** A duel as it ended (`d`, as one duel's view has it); what to do next (`again`: right after it, a rematch and
+ * another duel; else the way back to the duels); and what the game earned (`more`). */
 export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child): Child {
   ({
     api,
     errorText,
     avatar,
-    challengeButton,
-    challengeText,
-    duelShareText,
     emblem,
     explain,
     feelKit,
     formatNumber,
-    go,
     h,
     hands,
     landing,
@@ -87,24 +74,17 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
     profileHref,
     record,
     reviewParts,
-    shareButton,
     signal,
-    tally,
     trail,
-    until,
     withName,
   } = kit);
-  const settled = d.state === "won" || d.state === "lost" || d.state === "draw";
   const steps = again && typeof again === "object" && "main" in again ? again : null;
-  const next = steps ? steps.main : ((again as Child) ?? rematch(d) ?? sendOn(d));
-  // A challenge between friends: anyone else may be challenged with the player's game of it too.
-  const challenge = !steps && d.kind === "challenge" && d.friend && d.state !== "wait" ? challengeAnyone(d) : null;
+  const next = steps ? steps.main : (again as Child);
   const questions =
     d.runId && d.you?.done
       ? reviewParts(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${d.runId}/review`)).questions)
       : null;
-  const head = settled || d.state === "wait" ? hero(d) : plain(d);
-  const share = shareWin(d);
+  const head = d.state === "expired" ? plain(d) : hero(d);
   // Docked, the gold way stays at the screen's foot while the result above it is read (a live duel's rematch, which
   // has only a moment: `Steps.dock`).
   const dock = steps?.dock ? h("div", { class: "duel-dock" }, steps.main) : null;
@@ -113,45 +93,37 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
     { class: "screen" },
     head,
     dock,
-    // The gold button is another duel where there's one (a live one, or a challenge back to the friend), else the
-    // way back to the duels; the rest are plain, side by side.
+    // The gold button is another duel where there's one, else the way back to the duels; the rest are plain, side by
+    // side.
     nextSteps(
       dock ? null : (next ?? toDuels(true)),
-      steps
-        ? [share, questions?.button, ...(steps.also ?? [])]
-        : [share, sendLink(d), questions?.button, challenge, next ? toDuels(false) : null],
+      steps ? [questions?.button, ...(steps.also ?? [])] : [questions?.button, next ? toDuels(false) : null],
     ),
     more,
     questions?.list,
   );
 }
 
-/** „Дуел на живо с Мария“, „Дуел срещу запис“, „Предизвикателство от Мария“ or (the one who sent it)
- * „Предизвикателство към Мария“. */
+/** „Дуел на живо с Мария“ or „Дуел срещу запис“. */
 function kicker(d: DuelView): string {
   if (d.recorded) return "Дуел срещу запис";
   const them = d.opponent?.name;
-  if (d.kind === "challenge") return them ? `Предизвикателство ${d.sent ? "към" : "от"} ${them}` : "Предизвикателство";
   return them ? `Дуел на живо ${withName(them)}` : "Дуел";
 }
 
 const headings: Record<DuelView["state"], string> = {
-  play: "Дуел",
-  wait: "Твоите десет са изиграни",
   won: "Победа",
   lost: "Загуба",
   draw: "Равенство",
-  declined: "Предизвикателството е отказано",
-  expired: "Времето за предизвикателството изтече",
+  expired: "Дуелът прекъсна",
 };
 
-/** A duel with a result, or a challenge waiting for the friend: the card that holds it, landing once as a moment. */
+/** A duel with a result: the card that holds it, landing once as a moment. */
 function hero(d: DuelView): Child {
-  const settled = d.state !== "wait";
   const you = d.you as Side;
   const them = d.opponent;
   const mine = you?.marks ?? [];
-  const theirs = settled ? (them?.marks ?? []) : [];
+  const theirs = them?.marks ?? [];
   const card = h(
     "section",
     { class: `card hero duel-end s-${d.state}`, "aria-labelledby": "duel-verdict" },
@@ -164,25 +136,22 @@ function hero(d: DuelView): Child {
     h(
       "div",
       { class: "duel-faces" },
-      face(you, "Ти", "", d.state === "won", true),
+      face(you, "Ти", "", d.state === "won"),
       h("span", { class: "duel-colon", "aria-hidden": "true" }, ":"),
-      them
-        ? face(them, them.name, them.tag ?? "", d.state === "lost" && !them.gone, settled)
-        : h("div", { class: "duel-face" }),
+      them ? face(them, them.name, them.tag ?? "", d.state === "lost" && !them.gone) : h("div", { class: "duel-face" }),
     ),
     them?.tag && d.befriend ? befriend(them.name, them.tag) : null,
     marks(d, mine, theirs),
     h("p", { class: "duel-line" }, line(d)),
-    settled ? meant(d) : null,
+    meant(d),
   ) as HTMLElement;
   land(card, d, mine, theirs);
   return card;
 }
 
 /** One side, face to face: the avatar (with its frame), the name (a way to their profile) and title, and the score;
- * the winner's in gold. The other's score shows only once there's a result: nobody plays knowing what to beat; and
- * never for a player gone since, whose game went with them. */
-function face(s: Side, label: string, tag: string, won: boolean, shown: boolean): Child {
+ * the winner's in gold. Never the score of a player gone since, whose game went with them. */
+function face(s: Side, label: string, tag: string, won: boolean): Child {
   const look = s.look ?? {};
   return h(
     "div",
@@ -197,17 +166,14 @@ function face(s: Side, label: string, tag: string, won: boolean, shown: boolean)
     ),
     s.gone
       ? [h("b", { class: "duel-points none" }, "–"), h("span", { class: "duel-rights" }, "Играчът вече го няма")]
-      : shown
-        ? [
-            h("b", { class: "duel-points", "data-n": s.points }, formatNumber(s.points)),
-            h("span", { class: "duel-rights" }, `${s.rights} от ${total} верни`),
-          ]
-        : [h("b", { class: "duel-points none" }, "–"), h("span", { class: "duel-rights" }, "Тепърва ще играе")],
+      : [
+          h("b", { class: "duel-points", "data-n": s.points }, formatNumber(s.points)),
+          h("span", { class: "duel-rights" }, `${s.rights} от ${total} верни`),
+        ],
   );
 }
 
-/** Under the other, met in a live duel or by a challenge: a tap asks them to be friends (a request, as by their
- * tag). */
+/** Under the other, met in a live duel: a tap asks them to be friends (a request, as by their tag). */
 function befriend(name: string, tag: string): Child {
   const said = signal("");
   const busy = signal(false);
@@ -291,13 +257,9 @@ function marks(d: DuelView, mine: DuelMark[], theirs: DuelMark[]): Child {
 }
 
 /** What decided the duel: the question from which the winner led to the end, or the time on even points (a second
- * apart or more: closer is a draw, play.TieBand); while it waits, that it's sent and until when the friend has. */
+ * apart or more: closer is a draw, play.TieBand). */
 function line(d: DuelView): string {
-  const them = d.opponent?.name ?? "Приятелят ти";
-  if (d.state === "wait")
-    return d.sent
-      ? `Изпратено на ${them} в играта. Има време до ${until(d.expiresAt)} Ще ти кажем резултата.`
-      : `${them} има време до ${until(d.expiresAt)} Ще ти кажем резултата.`;
+  const them = d.opponent?.name ?? "Съперникът";
   const you = d.you;
   const other = d.opponent;
   if (other?.gone) return ""; // their game went with them: nothing to set the player's against
@@ -320,7 +282,6 @@ const unratedWords: Record<NonNullable<DuelView["unrated"]>, string> = {
   recordings: "Срещу запис рейтингът се променя до пет пъти на ден: този дуел е без рейтинг.",
   network: "Дуел без рейтинг: играете от една и съща мрежа.",
   newcomers: "Дуел без рейтинг: с нови играчи рейтингът се променя до пет пъти на ден.",
-  known: "Дуел без рейтинг: някой друг вече беше изиграл това предизвикателство.",
 };
 
 /** What the duel meant: where the rating went (from and to, its division and how far to the next), or why it didn't
@@ -411,24 +372,16 @@ function meant(d: DuelView): Child {
   );
 }
 
-/** A duel without a result (turned down, not played in time, cut off): what happened, and the player's own game if
- * they played it. */
+/** A duel cut off without a result: what happened, and the player's own game if they played it. */
 function plain(d: DuelView): Child {
-  const live = d.kind === "live";
-  const them = d.opponent?.name ?? "Приятелят ти";
-  const heading = d.state === "expired" && live ? "Дуелът прекъсна" : headings[d.state];
-  const lead =
-    d.state === "expired" && !live && d.you?.done
-      ? `${them} не изигра предизвикателството навреме. Без резултат: рейтингът не се променя.`
-      : "Без резултат: рейтингът не се променя.";
   const you = d.you;
   return [
     h(
       "div",
       { class: "intro" },
       h("p", { class: "kicker" }, kicker(d)),
-      h("h1", null, heading),
-      h("p", { class: "lead" }, lead),
+      h("h1", null, headings[d.state]),
+      h("p", { class: "lead" }, "Без резултат: рейтингът не се променя."),
     ),
     you?.done
       ? h(
@@ -447,62 +400,10 @@ function plain(d: DuelView): Child {
   ];
 }
 
-/** A challenge between friends with a result: „Предизвикай отново“ challenges the friend again (the count-in first,
- * with a way back). */
-function rematch(d: DuelView): Child {
-  if (d.kind !== "challenge" || !d.friend || !["won", "lost", "draw"].includes(d.state)) return null;
-  return h(
-    "button",
-    { class: "btn primary big", type: "button", onclick: () => go(`/challenge/${d.friend}`) },
-    "Предизвикай отново",
-  );
-}
-
-/** A challenge taken from anyone: send it on, the player's own game the one to beat (not one whose sender has gone
- * since: „и ти“ would answer nobody). */
-function sendOn(d: DuelView): Child {
-  if (d.kind !== "challenge" || !d.runId || !d.you?.done || d.opponent?.gone) return null;
-  if (!d.sent && ["won", "lost", "draw"].includes(d.state))
-    return challengeButton("Предизвикай и ти", d.runId, () => challengeText(d.you?.rights ?? 0), true);
-  return null;
-}
-
-/** A challenge sent to a friend, waiting for them: it's in the game for them already (the line says so), so this is
- * plain, beside the way back to the duels: its link too, sent where they talk (it brings them to their turn; anyone
- * else it reaches can take it once they've played). */
-function sendLink(d: DuelView): Child {
-  if (d.kind !== "challenge" || !d.runId || !d.you?.done || !d.sent || d.state !== "wait") return null;
-  return challengeButton("Прати и връзката", d.runId, () => "Изиграх предизвикателството в АЛМАНАХ. Ти си наред.");
-}
-
-/** A win, shared as the day's result is (game/share.ts): what it was and how it went, and the player's own link;
- * no names and no words of invitation. Not a win against a recording (nobody's loss), nor a challenge taken from
- * anyone, whose own way on is to send it on, nor one against a player gone since (no score of theirs to share). */
-function shareWin(d: DuelView): Child {
-  if (d.state !== "won" || d.recorded || !d.you || !d.opponent || d.opponent.gone) return null;
-  if (d.kind === "challenge" && !d.friend) return null;
-  const you = d.you;
-  const them = d.opponent;
-  return shareButton(
-    "Сподели",
-    () => duelShareText(you.points, them.points, you.rights),
-    d.invite,
-    false,
-    () => tally("share:duel"),
-    true, // its link shows whose it is
-  );
-}
-
-/** The player's own ten of a challenge between friends, as a challenge to anyone: plain, beside the gold way on. */
-function challengeAnyone(d: DuelView): Child {
-  if (!d.runId || !d.you?.done) return null;
-  return challengeButton("Предизвикай", d.runId, () => challengeText(d.you?.rights ?? 0));
-}
-
 const toDuels = (main: boolean) => h("a", { class: main ? "btn primary big" : "btn", href: "/duel" }, "Към дуелите");
 
-/** Where the results already landed are kept, on this device: a duel's lands once (as each state of it: waiting,
- * then its result), never again on a reload or a visit back. */
+/** Where the results already landed are kept, on this device: a duel's lands once, never again on a reload or a visit
+ * back. */
 const landedKey = "almanac.duelsLanded";
 
 function firstTime(key: string): boolean {

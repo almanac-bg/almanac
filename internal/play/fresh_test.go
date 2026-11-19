@@ -22,23 +22,21 @@ import (
 // of them), each with the game below that holds it to the rule (TestNothingPlayedAgain), or why it's a repeat by
 // design. A new way fails the test until it's here.
 var freshFor = map[string]string{
-	"StartTopic":      "a topic",
-	"Draw":            "a topic",
-	"StartLive":       "a live duel",
-	"StartRecorded":   "a recording",
-	"ChallengeFriend": "a friend's challenge",
-	"RecordRoom":      "a room",
-	"DrawRoom":        "a room",
-	"StartRoyal":      "Роял",
-	"EnterRoyal":      "Роял",
-	"DrawRoyal":       "Роял",
-	"DealRoyal":       "Роял",
-	"drawRoyal":       "Роял",
+	"StartTopic":    "a topic",
+	"Draw":          "a topic",
+	"StartLive":     "a live duel",
+	"StartRecorded": "a recording",
+	"RecordRoom":    "a room",
+	"DrawRoom":      "a room",
+	"StartRoyal":    "Роял",
+	"EnterRoyal":    "Роял",
+	"DrawRoyal":     "Роял",
+	"DealRoyal":     "Роял",
+	"drawRoyal":     "Роял",
 	// By design:
 	"StartDay":      "by design: the day's ten are the same for everyone",
 	"drawDay":       "by design: the day's ten are the same for everyone",
 	"StartMistakes": "by design: Втори шанс asks again what the player missed",
-	"TakeChallenge": "by design: a challenge is the sender's ten, question for question",
 }
 
 // TestNothingPlayedAgain holds the rule across every way a game starts: a player who has just played a game, starting
@@ -47,7 +45,7 @@ var freshFor = map[string]string{
 // that none has. A recording is a whole game, someone else's: one with at most RecordingSeen of its questions seen
 // while there's such a game. The player has played most of the bank before (all but three topics), so that a draw
 // that didn't prefer what they haven't seen would deal it again almost surely. Repeats by design (freshFor) are the
-// day (the same for everyone), Втори шанс (what they missed) and a challenge taken (the sender's ten).
+// day (the same for everyone) and Втори шанс (what they missed).
 func TestNothingPlayedAgain(t *testing.T) {
 	t.Run("every way is here", func(t *testing.T) {
 		ways := choosers(t)
@@ -88,21 +86,6 @@ func TestNothingPlayedAgain(t *testing.T) {
 			l, err := f.w.g.StartRecorded(f.ctx(), f.ana)
 			f.must(err)
 			f.w.play(f.ana, l.Runs[0], repeat(f.w.right, Length)...)
-		}},
-		{"a friend's challenge, sent", func(f *fresh) {
-			s, _, err := f.w.g.ChallengeFriend(f.ctx(), f.ana, f.bo)
-			f.must(err)
-			f.w.play(f.ana, s.ID, repeat(f.w.right, Length)...)
-		}},
-		{"a challenge, taken", func(f *fresh) { // the owner's case: then the sender's game came back as a recording
-			s, err := f.w.g.StartTopic(f.ctx(), f.bo, "")
-			f.must(err)
-			f.w.play(f.bo, s.ID, append(repeat(f.w.right, 6), repeat(f.w.wrong, Length-6)...)...)
-			code, _, err := f.w.g.Challenge(f.ctx(), f.bo, s.ID, nil)
-			f.must(err)
-			mine, _, err := f.w.g.TakeChallenge(f.ctx(), f.ana, code)
-			f.must(err)
-			f.w.play(f.ana, mine.ID, repeat(f.w.right, Length)...)
 		}},
 		{"a room", func(f *fresh) {
 			picks := f.room()
@@ -164,11 +147,6 @@ func TestNothingPlayedAgain(t *testing.T) {
 			return l.Picks, anyQuestion, []int64{f.ana, f.bo}
 		}},
 		{"a recording", nil},
-		{"a friend's challenge", func(f *fresh) ([]Pick, func(bank.Question) bool, []int64) {
-			s, _, err := f.w.g.ChallengeFriend(f.ctx(), f.ana, f.bo)
-			f.must(err)
-			return f.w.picks(s.ID), anyQuestion, []int64{f.ana, f.bo}
-		}},
 		{"a room", func(f *fresh) ([]Pick, func(bank.Question) bool, []int64) {
 			return f.room(), anyQuestion, []int64{f.ana, f.bo}
 		}},
@@ -340,7 +318,7 @@ func (f *fresh) recordingsSeen(seen, barred map[string]bool) int {
 	rows, err := f.w.db.Read.Query(`SELECT r.questions FROM runs r WHERE r.kind IN ('topic', 'duel')
 		AND r.finished_at IS NOT NULL AND r.user_id <> ? AND json_array_length(r.questions) = ?
 		AND NOT EXISTS (SELECT 1 FROM duels d WHERE d.ended_at IS NULL
-			AND (d.a_run = r.id OR d.b_run = r.id OR (d.kind = 'challenge' AND d.ghost_run = r.id)))`, f.ana, Length)
+			AND (d.a_run = r.id OR d.b_run = r.id))`, f.ana, Length)
 	f.must(err)
 	defer rows.Close()
 	best := Length + 1
