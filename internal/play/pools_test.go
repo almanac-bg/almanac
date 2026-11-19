@@ -26,7 +26,7 @@ func TestReadsNeverNest(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.play(bo, topic.ID, repeat(w.right, Length)...)
-	if _, _, err := w.g.ChallengeFriend(ctx, ana, bo); err != nil {
+	if _, err := w.g.StartLive(ctx, ana, bo); err != nil {
 		t.Fatal(err)
 	}
 	reads := map[string]func(context.Context) error{

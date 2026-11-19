@@ -731,7 +731,7 @@
     margin: 0;
   }
 
-  /* One question over the page, in a sheet from the bottom (screens/name.ts: a name before the first share). */
+  /* One question over the page, in a sheet from the bottom (screens/name.ts: a name before others first see it). */
   .sheet {
     position: fixed;
     inset: 0;
@@ -1368,20 +1368,8 @@
     margin: 0;
   }
 
-  .other-topics a.chip,
-  .challenge-topics a.chip {
+  .other-topics a.chip {
     text-decoration: none;
-  }
-
-  /* A game played to be sent as a challenge: the friends to send it to, each a tap, over the gold way. */
-  .send {
-    display: grid;
-    gap: var(--space-3);
-  }
-
-  .send .kicker,
-  .send-done {
-    margin: 0;
   }
 
   /* The way back from a screen reached from a main place. */
@@ -1459,7 +1447,7 @@
   .question,
   .after,
   .actions,
-  .share,
+  .send-link,
   .review {
     display: grid;
     /* One column, never wider than the page: a long word in it breaks (large text) instead of widening it. */
@@ -2059,7 +2047,7 @@
     box-shadow: inset 0 0 0 1.5px var(--right-ink);
   }
 
-  /* As the shared text has them (game/share.ts: 🟩 🟨 ⬜): right filled, the strongest; close a hollow gold ring;
+  /* Right filled, the strongest; close a hollow gold ring;
      wrong quiet, the ground of a question not yet played with a muted ✕. The red is the answer's, in the moment. */
   .trail li.partial {
     --i: var(--i-near);
@@ -3495,8 +3483,7 @@
   }
 
   /* Duels as rows: the other player, how it stands, the rating it moved. */
-  .duel-list,
-  .duel-friends {
+  .duel-list {
     display: grid;
     gap: var(--space-2);
     margin: 0;
@@ -3523,11 +3510,6 @@
     }
   }
 
-  .duel-row.s-play {
-    border-color: var(--rose);
-    box-shadow: 0 0 0 1px var(--rose);
-  }
-
   .duel-row-end {
     display: grid;
     justify-items: end;
@@ -3546,13 +3528,6 @@
 
   .s-lost .duel-state {
     color: var(--wrong-ink);
-  }
-
-  .duel-friends li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
   }
 
   /* Before a run: a ring running out around the seconds left, and a way to start at once or back out. */
@@ -3613,83 +3588,6 @@
   /* A game left half-way today, on its tile: where it goes on from, in the accent (where the player is). */
   .topic-left {
     color: var(--link);
-  }
-
-  /* A challenge's link opened (challenge.ts, asked): the one who sent it, face first, and the score to beat in the
-     numeral face; a card in the middle of the page, „Приеми“ under it. */
-  .challenge-asked {
-    width: 100%;
-    max-width: 30rem;
-    margin-inline: auto;
-  }
-
-  .challenge-card {
-    justify-items: center;
-    text-align: center;
-  }
-
-  /* „Приеми“ a hand's width on a wide screen (as every page's button), under the card's middle. */
-  .challenge-asked > .btn {
-    justify-self: center;
-  }
-
-  .challenge-who {
-    font-size: 1.5rem;
-    line-height: 1.875rem;
-    text-wrap: balance;
-  }
-
-  .challenge-score {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: center;
-    gap: var(--space-2);
-  }
-
-  .challenge-points {
-    color: var(--gold-display);
-    font-size: calc(24px + 1.5rem);
-    font-weight: 900;
-    line-height: 1;
-  }
-
-  /* One of the player's own challenges on Дуел: its topic's mark where a duel has the other's face. */
-  .sent-row .topic-mark,
-  .sent-row .dot {
-    flex: none;
-    margin: 0;
-  }
-
-  .sent-row .duel-row-end {
-    flex: none;
-    white-space: nowrap;
-  }
-
-  /* A friend's challenge, wherever the player is: who, until when, play or say no. */
-  .challenge-notice {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2) var(--space-3);
-    max-width: 40rem;
-    margin: 0 auto var(--space-4);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-md);
-    background: color-mix(in srgb, var(--rose) 16%, var(--surface));
-    box-shadow: inset 0 0 0 1px var(--rose-ink);
-  }
-
-  .challenge-text {
-    display: grid;
-    gap: 2px;
-    margin: 0;
-  }
-
-  .challenge-actions {
-    display: flex;
-    gap: var(--space-2);
   }
 
   /* A live duel: the wait, the two face to face, the board above each question, the other's answer. */
@@ -6126,7 +6024,7 @@
     list-style: none;
   }
 
-  /* Short of room (a phone's 320px), the way to challenge a friend goes under the row, at its end. */
+  /* Short of room (a phone's 320px), removing or blocking a friend (while editing) goes under the row, at its end. */
   .friend {
     display: flex;
     flex-wrap: wrap;
@@ -6269,20 +6167,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2) var(--space-4);
-  }
-
-  /* A new invite link: a quiet line under the invitation, its own width. */
-  .invite-new {
-    justify-self: start;
-  }
-
-  .invite-renew {
-    display: grid;
-    gap: var(--space-2);
-  }
-
-  .invite-renew-note {
-    margin: 0;
   }
 
   .small {
@@ -7115,7 +6999,7 @@
        page's own, and a group of them (.actions: under a result, Дуел's), side by side where two fit, the
        plain ones after the gold one (a result's .result-actions gives the group its buttons) and as tall as it. A line
        about the gold one sits under it. */
-    :is(.day, .screen, .royal-plan, .invite, .invite-card) > :is(.btn, .share) {
+    :is(.day, .screen, .royal-plan) > :is(.btn, .send-link) {
       max-width: 22rem;
     }
 
@@ -7129,20 +7013,9 @@
       display: contents;
     }
 
-    .actions > :not(.btn, .share, .result-actions, .link) {
+    .actions > :not(.btn, .result-actions, .link) {
       grid-column: 1 / -1;
       max-width: 22rem;
-    }
-
-    /* A share button gives the group its button, and what it said („Копирано.“) a row of its own under them, so the
-       button beside it keeps its height. */
-    .actions > .share,
-    .actions > .result-actions > .share {
-      display: contents;
-    }
-
-    .actions .share > p {
-      grid-column: 1 / -1;
     }
 
     /* Начало's cards (tomorrow and its reminder, keeping the game): their buttons a hand's width too. */
@@ -7292,13 +7165,12 @@
       padding-inline: max(var(--space-6), env(safe-area-inset-left)) max(var(--space-6), env(safe-area-inset-right));
     }
 
-    main > *,
-    .challenge-notice {
+    main > * {
       max-width: 48rem;
       margin-inline: auto;
     }
 
-    /* Начало, wherever it's drawn: its own page, or the end of the day's ten played there or on an invite's page. */
+    /* Начало, wherever it's drawn: its own page, or the end of the day's ten played there. */
     main > :has(.home) {
       max-width: none;
     }
@@ -7606,7 +7478,7 @@
     text-align: left;
   }
 
-  /* A title's long word („предизвикателство“) breaks where it must, wherever the title sits. */
+  /* A title's long word breaks where it must, wherever the title sits. */
   .tight h1,
   .tight h2 {
     overflow-wrap: anywhere;
@@ -7651,21 +7523,6 @@
 
   .tight .streak-notice > a {
     margin-left: var(--space-2);
-  }
-
-  /* A challenge waiting, in one row, so that the day is on the first screen: who, and „Играй“ (until when, and
-     „Откажи“, on its page in Дуел). */
-  .tight .challenge-notice {
-    flex-wrap: nowrap;
-  }
-
-  .tight .challenge-text {
-    min-width: 0;
-  }
-
-  .tight .challenge-text > .muted,
-  .tight .challenge-actions > :nth-child(2) {
-    display: none;
   }
 
   /* The streak and the level as tall as what they say. */

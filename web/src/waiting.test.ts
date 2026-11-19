@@ -1,6 +1,6 @@
-// What waits for the player (a friend's challenge, someone asking to be friends) is asked for while the page is in
-// view and no game is under way: every half minute, less often while nothing changes, and at once as the page comes
-// back into view or a game ends.
+// What waits for the player (someone asking to be friends) is asked for while the page is in view and no game is
+// under way: every half minute, less often while nothing changes, and at once as the page comes back into view or a
+// game ends.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { scope } from "./lib/dom.ts";
@@ -13,7 +13,7 @@ const page = {
 };
 Object.assign(globalThis, { location: { pathname: "/" }, document: page });
 let asked: number = 0;
-let answer = { requests: 0, challenges: [] as { id: number }[] };
+let answer = { requests: 0 };
 globalThis.fetch = async () => {
   asked++;
   return new Response(JSON.stringify(answer), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -40,7 +40,7 @@ test("asks less often while nothing changes, never in a game or out of view, and
     assert.equal(asked, before + 1, `asked again after ${wait / 1000} s`);
   }
   // Something new: back to every half minute.
-  answer = { requests: 1, challenges: [] };
+  answer = { requests: 1 };
   await after(300_000);
   const news: number = asked;
   await after(30_000);

@@ -242,7 +242,7 @@ async function inDB(page: Page, f: (db: DatabaseSync, id: number) => void): Prom
 }
 
 /** A player still with the name drawn for them, about to meet others for the first time on this device (a live duel,
- * Роял, a challenge: screens/name.ts), is asked for a name first: given `name`, or kept as drawn („Не сега“). */
+ * Роял: screens/name.ts), is asked for a name first: given `name`, or kept as drawn („Не сега“). */
 export async function meetAs(page: Page, name?: string): Promise<void> {
   const sheet = page.getByRole("dialog", { name: "Как да те виждат останалите?" });
   if (!name) return sheet.getByRole("button", { name: "Не сега" }).click();
@@ -251,17 +251,19 @@ export async function meetAs(page: Page, name?: string): Promise<void> {
   await expect(sheet).toBeHidden();
 }
 
-/** Two players made friends the way an invite link does it: `a`'s link (a player is made for them the first time),
- * opened by `b`, who asks (his name asked first, kept as drawn); then `a` says yes in Приятели. A link alone never makes a friend. */
-export async function befriendByLink(a: Page, b: Page): Promise<void> {
-  await a.goto("/friends");
-  const make = a.locator(".friends").getByRole("button", { name: "Покани приятел" });
-  if (await make.count()) await make.click();
-  const link = await a.locator("[data-invite]").first().getAttribute("data-invite");
-  await b.goto(link ?? "");
-  await b.getByRole("button", { name: /^Добави .+ в приятели$/ }).click();
-  await meetAs(b); // the request carries his name: asked first (screens/name.ts)
-  await expect(b.getByText(/^Поканата е изпратена\. Щом .+ я приеме, ставате приятели\.$/)).toBeVisible();
+/** Two players made friends the one way there is: `b` asks `a` by `a`'s username (each made a player first, if not
+ * yet), and `a` says yes in Приятели. */
+export async function befriend(a: Page, b: Page): Promise<void> {
+  for (const p of [a, b]) {
+    await p.goto("/friends");
+    const make = p.locator(".friends").getByRole("button", { name: "Добави приятел" });
+    if (await make.count()) await make.click();
+    await expect(p.getByLabel("Потребителско име или имейл на приятел")).toBeVisible();
+  }
+  const tag = await a.evaluate(async () => (await (await fetch("/api/me")).json()).user.tag as string);
+  await b.getByLabel("Потребителско име или имейл на приятел").fill(`@${tag}`);
+  await b.getByRole("button", { name: "Добави", exact: true }).click();
+  await expect(b.getByText(/^Поканата до .+ е изпратена\.$/)).toBeVisible();
   await a.reload();
   await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
   await expect(a.locator(".friend")).not.toHaveCount(0);

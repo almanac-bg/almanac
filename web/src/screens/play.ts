@@ -1,13 +1,12 @@
 // Теми: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays the same
 // game. The tiles live on Начало (Втори шанс first while questions wait for one, then each topic, and one for „България“, the questions about Bulgaria from every topic, while
 // the bank has them); a run of one is /play/<topic>, whose result offers ten more at once, and another topic a tap
-// away. Played to be sent as a challenge (/play/<topic>?challenge, from Дуел's „Предизвикай“; all the topics at once,
-// /play/all?challenge, only so), its result sends it instead (screens/challenge.ts).
+// away.
 
 import { picture } from "../art/picture.ts";
 import { type Mastery, masteryBadge } from "../game/mastery.ts";
 import { news } from "../game/news.ts";
-import { challengeButton, challengeText, summary } from "../game/results.ts";
+import { summary } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting, startScreen } from "../game/run.ts";
 import type { State } from "../game/types.ts";
 import { api, errorText } from "../lib/api.ts";
@@ -15,7 +14,6 @@ import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { backOut, byTap, entry, hold, mark, title } from "../lib/router.ts";
 import { bulgaria, type Category, categories, player, user } from "../state.ts";
 import { meter, questions, stakeLine, toneOf, topicMark } from "../ui.ts";
-import { sendChallenge } from "./challenge.ts";
 import { missing } from "./missing.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
@@ -132,14 +130,9 @@ function tile(c: Category, m: Mastery | undefined, left: Child): Child {
   );
 }
 
-export function topic([id = ""]: string[]) {
-  const category = id === "all" ? "" : id;
-  const sending = new URLSearchParams(location.search).has("challenge");
-  // All the topics at once are a challenge's only.
+export function topic([category = ""]: string[]) {
   const name = !category
-    ? sending
-      ? "Всички теми"
-      : undefined
+    ? undefined
     : category === bulgaria.id
       ? bulgaria.open
         ? bulgaria.name
@@ -160,9 +153,7 @@ export function topic([id = ""]: string[]) {
   if (user.peek()) ask();
   return run({
     name,
-    lead: sending
-      ? "Десет въпроса, от лесен към труден. После ги пращаш като предизвикателство."
-      : "Десет въпроса по темата, от лесен към труден.",
+    lead: "Десет въпроса по темата, от лесен към труден.",
     begin: async () => {
       const s = await api<State>("POST", "/api/topic", { category });
       ask();
@@ -178,13 +169,11 @@ export function topic([id = ""]: string[]) {
         summary(
           s,
           h("div", { class: "day-line" }, h("span", { class: "kicker" }, name)),
-          sending
-            ? sendChallenge(s, category ? name : undefined)
-            : {
-                main: () => nextOf(day(), again).main,
-                also: [() => nextOf(day(), again).also, challenged(s, category ? name : undefined)],
-              },
-          just ? [sending ? null : otherTopics(category), news(s.id)] : [sending ? null : otherTopics(category)],
+          {
+            main: () => nextOf(day(), again).main,
+            also: [() => nextOf(day(), again).also],
+          },
+          just ? [otherTopics(category), news(s.id)] : [otherTopics(category)],
           undefined,
           just,
         ),
@@ -210,7 +199,7 @@ function nextOf(d: DayWaits | null, again: () => void): { main: Child; also: Chi
 const othersShown = 3;
 
 /** Under a topic's result, a way to another, a tap away (Начало's tiles are a scroll from there): the ones the player
- * has played least first, so that the game goes round what they know; under a game of all of them, the topics. */
+ * has played least first, so that the game goes round what they know. */
 function otherTopics(current: string): Child {
   const stats = signal<Stats | null>(null);
   loadStats().then(stats.set, () => {});
@@ -234,12 +223,6 @@ function otherTopics(current: string): Child {
       ),
     );
   };
-}
-
-/** A topic's game of ten, as a challenge to anyone (play/challenges.go): „Предизвикай“, plain, after the rest. */
-function challenged(s: State, topic?: string): Child {
-  if (s.total !== 10) return null;
-  return challengeButton("Предизвикай", s.id, () => challengeText(s.rights, topic));
 }
 
 /** The day's ten, while they wait for the player: the streak (to yesterday) and the reserve days in hand. */

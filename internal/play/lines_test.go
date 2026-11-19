@@ -7,14 +7,14 @@ import (
 	"time"
 )
 
-// The one who asked hears once that the other said yes: by their link, or their request; not the one who said yes,
-// not after a duel between them says they know, nor once it's old news.
+// The one who asked hears once that the other said yes to their request; not the one who said yes, nor once it's old
+// news.
 func TestAccepted(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana, bo, cy, di := w.user(), w.user(), w.user(), w.user()
 
-	// Bo opens Ana's link: Ana hears of it, Bo doesn't.
+	// Bo says yes to Ana: Ana hears of it, Bo doesn't.
 	w.befriend(ana, bo)
 	a, err := w.g.AcceptedOf(ctx, ana)
 	if err != nil || a == nil || a.ID != bo || a.Line != fmt.Sprintf("friend:%d", bo) {
@@ -47,15 +47,8 @@ func TestAccepted(t *testing.T) {
 	if a, _ := w.g.AcceptedOf(ctx, ana); a != nil {
 		t.Fatalf("Ana said yes to Cy: %+v", a)
 	}
-	// Cy challenges her before hearing it: no need to say it then.
-	if _, _, err := w.g.ChallengeFriend(ctx, cy, ana); err != nil {
-		t.Fatal(err)
-	}
-	if a, _ := w.g.AcceptedOf(ctx, cy); a != nil {
-		t.Fatalf("after a duel: %+v", a)
-	}
 
-	// Di opens Bo's link; a week later it's old news.
+	// Di says yes to Bo; a week later it's old news.
 	w.befriend(bo, di)
 	w.wait(LinesRecent + time.Hour)
 	if a, _ := w.g.AcceptedOf(ctx, bo); a != nil {

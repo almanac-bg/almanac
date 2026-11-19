@@ -63,11 +63,11 @@ export function phoneScale(px: number): number {
   return Math.min(2, Math.max(0.8, px / iosBody));
 }
 
-/** Shares through the app's share sheet: "shared", or "closed" when the player closed it without sharing; null where
- * there's no app. */
-export async function appShare(text: string, url?: string): Promise<"shared" | "closed" | null> {
-  if (!inApp) return null;
-  return (await (await phone()).share(text, url)) ? "shared" : "closed";
+/** Sends a link through the app's share sheet (a room's), and says whether it could: not where there's no app. */
+export async function appShare(text: string, url: string): Promise<boolean> {
+  if (!inApp) return false;
+  await (await phone()).share(text, url);
+  return true;
 }
 
 /** What the player feels (phone.ts says how each is felt): in the app only (a page can't on an iPhone, and a phone's

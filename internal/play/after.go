@@ -14,12 +14,11 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// After a run: once its last answer is kept, a run has more to do, each in a write of its own: a challenge's time
-// starts and the friends it was sent to are told (sent), its duel is settled once both sides have played
-// (settleRun), and what it earned is kept (afterRun: achievements, the day's goals, a place in the week's league).
-// The transaction that finishes the run notes that it's due (runs_after, afterDue), so none of it is lost to a closed
-// connection or a restart in between: the request that finished the run settles it at once, on a
-// context of its own that the player leaving doesn't cancel (finished: the result shows the duel's outcome), and
+// After a run: once its last answer is kept, a run has more to do, each in a write of its own: its duel is settled
+// once both sides have played (settleRun), and what it earned is kept (afterRun: achievements, the day's goals, a
+// place in the week's league). The transaction that finishes the run notes that it's due (runs_after, afterDue), so
+// none of it is lost to a closed connection or a restart in between: the request that finished the run settles it at
+// once, on a context of its own that the player leaving doesn't cancel (finished: the result shows the duel's outcome), and
 // hands the rest to the background (afterLater), so that the last answer doesn't wait for every achievement to be
 // measured again; the game's news waits for it instead (AfterWait: NewsOf, Начало), and gets it as soon as it's
 // done. The sweep each minute does whatever that left (AfterDue), a few times more, waiting longer each time, before
@@ -52,7 +51,7 @@ func (g *Game) afterDue(tx *sql.Tx, runID int64) error {
 }
 
 // finished does what follows a run that has just ended (by an answer, by its clock in settle, or kept from a room):
-// its duel or challenge settled before the answer or the run goes back, so that the screen with the result has it,
+// its duel settled before the answer or the run goes back, so that the screen with the result has it,
 // and the rest in the background (afterLater). The player leaving doesn't cut it short, and what fails is left to the
 // sweep (AfterDue).
 func (g *Game) finished(ctx context.Context, userID, runID int64) {
@@ -185,8 +184,7 @@ func (g *Game) after(ctx context.Context, userID, runID int64) error {
 	return g.afterSettled(ctx, userID, runID)
 }
 
-// afterSettled does what follows a finished run once it's settled (a challenge's friends told twice would hear of it
-// twice), and crosses it off.
+// afterSettled does what follows a finished run once it's settled, and crosses it off.
 func (g *Game) afterSettled(ctx context.Context, userID, runID int64) error {
 	p, err := g.playedOf(ctx, userID, runID)
 	switch {

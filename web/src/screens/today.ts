@@ -1,21 +1,21 @@
 // Начало: where every game starts, on one short screen, and the day is its heart. At the top the player's streak and
 // level (and, once, what came of the days just missed — a reserve day spent, a streak ended, or a welcome back after
-// days away — or, one line at a time, of a duel a friend has played, a friend's yes to an invite, a live duel left
-// that went on); then the day's ten questions, the same for everyone, once, as the day's issue
+// days away — or, one line at a time, of a friend's yes to a request, a live duel left that went on); then the day's
+// ten questions, the same for everyone, once, as the day's issue
 // („Брой 6“, play/issue.go) (while they wait, how yesterday's ended; left half-way, where the player stopped and the
 // way on, and the streak at stake while they wait; once played, as it lands, how they went and the one gold thing to
-// do next (game/gold.ts: the result to share, when it's worth it; else another game, where a goal points), the goals
+// do next (game/gold.ts: another game, where a goal points), the goals
 // still open, tomorrow, and where the day leaves the league and the second chance; on a later visit, the day played in
 // one short card, another game the gold thing to do); the day's goals; and every other way to play a tap away: by
 // topic, and — once a first game is finished — with others. The day's boards are in Класации. The game unfolds by the
 // days played (play/unfold.go): a first day has the streak without the level, and no goals.
 
 import { picture } from "../art/picture.ts";
-import { type DayGold, dayGold, nextGame, streakMarks } from "../game/gold.ts";
+import { nextGame, streakMarks } from "../game/gold.ts";
 import { news } from "../game/news.ts";
-import { boardRow, hands, landed, nextSteps, shareButton, summary } from "../game/results.ts";
+import { closeWords, percent, rare } from "../game/numbers.ts";
+import { boardRow, hands, landed, nextSteps, summary } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting, trail } from "../game/run.ts";
-import { closeWords, dayShareText, percent, rare } from "../game/share.ts";
 import { standing } from "../game/standing.ts";
 import type { Board, Mark, Score, State } from "../game/types.ts";
 import { api, errorText, serverNow, tally } from "../lib/api.ts";
@@ -42,16 +42,7 @@ import {
   reserveWords,
   stakeLine,
 } from "../ui.ts";
-import {
-  type Accepted,
-  acceptedLine,
-  type ChallengeNews,
-  challengesLine,
-  type FriendPlayed,
-  type Left,
-  leftLine,
-  playedLine,
-} from "./duel.ts";
+import { type Accepted, acceptedLine, type Left, leftLine } from "./duel.ts";
 import { type Goals, goalsCard, loadGoals, openGoals } from "./goals.ts";
 import { app, haveProfile, keepLine, keepStake, mailAsk } from "./keep.ts";
 import { leagueNote } from "./league.ts";
@@ -92,14 +83,10 @@ export interface Today {
   friends?: Score[] | null;
   /** While no friend has played: whether the player has any friends at all. */
   befriended?: boolean;
-  /** The day played: the player's invite link, which their shared result ends with. */
-  invite?: string;
   /** A live game the player is in, under way (its screen left), a room's by its code; or a seat in Роял's lobby, with
    * its start (`starts`): the way back to it. */
   playing?: { kind: "duel" | "room" | "royal"; code?: string; starts?: number } | null;
-  /** A friend has just played the player's challenge (told once). */
-  duel?: FriendPlayed | null;
-  /** A friend said yes to the player's invite, and a live duel they left: each told once (play/lines.go). */
+  /** A friend said yes to the player's request, and a live duel they left: each told once (play/lines.go). */
   accepted?: Accepted | null;
   left?: Left | null;
   /** A game that ended without its result on screen (the day's last question let run out, a game left at its end):
@@ -108,8 +95,6 @@ export interface Today {
   /** The day played: how many of its questions got wrong will wait for a second chance, in how many days (sent when
    * there'll be a game of them: play.MistakesFrom). */
   misses?: { n: number; days: number };
-  /** Who took the player's challenges since they last heard (play/challenges.go). */
-  challenges?: ChallengeNews | null;
   /** While today's ten wait: how yesterday's ended for the player, once its board is final (play.YesterdayOf). */
   yesterday?: { day: string; issue: number; rights: number; place: number; players: number } | null;
   /** Back after days away, the streak ended since (play.BackFrom): the last day played and the longest streak, said
@@ -120,15 +105,7 @@ export interface Today {
 /** The day as Начало's page came with it (server/pages.go): its first draw, without asking; every later one asks. */
 let inPage = boot.day as Today | undefined;
 
-/** The day's ten played on another page (an invite's): their result there as Начало draws it (`before`: the day as
- * it stood before they were played), with that page's own card under it. */
-export interface PlayedElsewhere {
-  before: Today;
-  run: State;
-  card: () => Child;
-}
-
-export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
+export function today() {
   title();
   // A profile just deleted, or a game just brought here, is said once, over the day.
   let bye = notice.peek();
@@ -213,10 +190,7 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
     document.removeEventListener("visibilitychange", newDay);
     clearInterval(every);
   });
-  if (elsewhere) {
-    day = elsewhere.before.day;
-    screen.show(() => home(elsewhere.before, elsewhere.run, true));
-  } else load();
+  load();
   return h("div", null, screen);
 
   /** The screen itself: the day as it stands (`run` its result, if played; `just`: played this moment, so what it
@@ -258,9 +232,9 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
       const topic = categories[Number(t.day.replaceAll("-", "")) % categories.length]?.id ?? "";
       return nextGame(fresh().open?.xp ? (goals()?.goals ?? []) : [], `/play/${topic}`);
     };
-    // The day played: in full as it lands (or on its invite's page, or when its result was never on screen: what it
+    // The day played: in full as it lands (or when its result was never on screen: what it
     // earned is told with it); on a later visit, one short card (dayDone), with the ways to play right under it.
-    const full = !!run?.done && (just || !!elsewhere || t.untold === run.id);
+    const full = !!run?.done && (just || t.untold === run.id);
     const tomorrow = run?.done
       ? tomorrowCard(
           t.day,
@@ -297,13 +271,9 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
         { class: "home-main" },
         // What came of the days just missed, once.
         streakNotice(t),
-        // One line at a time: a live game of the player's going on; of others, a friend played their challenge, said
-        // yes to the invite, the duel left went on, or who else took their challenges.
-        playingLine(t.playing) ??
-          playedLine(t.duel) ??
-          acceptedLine(t.accepted) ??
-          leftLine(t.left) ??
-          challengesLine(t.challenges),
+        // One line at a time: a live game of the player's going on; of others, a friend said yes to their request, or
+        // the duel left went on.
+        playingLine(t.playing) ?? acceptedLine(t.accepted) ?? leftLine(t.left),
         // Come from the streak's mail to a browser signed out: the way in comes first, open.
         fromMail && !user.peek()?.email ? haveProfile(load, undefined, true) : null,
         // While today's ten wait, how yesterday's ended: the day before closes as the next begins.
@@ -311,7 +281,7 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
         run?.done && !full
           ? [
               // A later visit: the day played as one short card, and the ways to play right under it.
-              dayDone(t, run, fresh, next),
+              dayDone(t, run, next),
               tomorrow,
               () => (fresh().open?.league ? leagueNote() : null),
               () => missesLine(fresh().misses),
@@ -330,20 +300,18 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
                     return lines.some(Boolean) ? h("div", null, lines) : null;
                   },
                 ],
-                // Right under it, what to do next: one gold action (game/gold.ts), „Сподели“ plain when it isn't.
-                dayNext(t, run, just, fresh, next, now),
+                // Right under it, what to do next: one gold action (game/gold.ts).
+                dayNext(next),
                 // The goals still open, just played (else they're in their card); tomorrow (when the next ten come,
                 // the streak, the reminder); where the day leaves the league, and what waits for a second chance; then
-                // the friends' day, and what the game earned (a day whose result was never on screen: told now, once). Just played, the streak waits for
-                // the day as it is now, with today in it. Played on an invite's page, that page's card comes first, in
-                // place of the friends' day.
+                // the friends' day, and what the game earned (a day whose result was never on screen: told now, once).
+                // Just played, the streak waits for the day as it is now, with today in it.
                 [
-                  elsewhere && run === elsewhere.run ? elsewhere.card() : null,
                   just ? () => (fresh().open?.xp ? openGoals(goals) : null) : null,
                   tomorrow,
                   () => (fresh().open?.league ? leagueNote() : null),
                   () => missesLine(fresh().misses),
-                  elsewhere && run === elsewhere.run ? null : () => friendsDay(fresh()),
+                  () => friendsDay(fresh()),
                   just ? news(run.id, 0, streak ?? undefined) : untold(t, run.id),
                 ],
                 pointsWords(t.open),
@@ -379,60 +347,10 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
   }
 }
 
-/** Where the day's result was shared last, on this device: /admin counts a day's share once on a device. */
-const sharedKey = "almanac.sharedDay";
-
-/** What to do next under the day's result: the one gold action (game/gold.ts) — „Сподели“ for a result worth sharing,
- * as it lands (`just`); else another game, to where a goal points (`next`) — and „Сподели“ plain when it isn't gold. The rule is weighed once, as the result is drawn,
- * so that the gold doesn't move under the player's thumb; just played, once the day as it is now is in (`now`), as
- * the right answer few others got is known only once the day is played (and if it doesn't come, on what's known). */
-function dayNext(
-  t: Today,
-  run: State,
-  just: boolean,
-  fresh: () => Today,
-  next: () => string,
-  now: Promise<Today> | null,
-): { main: Child; also?: Child[] } {
-  const weigh = (d: Today) =>
-    dayGold({
-      rights: run.rights,
-      streak: just ? t.streak + 1 : t.streak,
-      rare: !!d.rarest && d.rarest.right <= rare,
-      just,
-    });
-  const gold = signal<DayGold | null>(now ? null : weigh(t));
-  now?.then(
-    (d) => gold.set(weigh(d)),
-    () => gold.set(weigh(t)),
-  );
-  const share = (primary: boolean) =>
-    shareButton(
-      "Сподели",
-      () => dayShareText(t.day, t.issue, run.trail, run.total, fresh().streak, fresh().rarest, fresh().invite),
-      undefined,
-      primary,
-      () => {
-        // Counted once a day on a device (/admin's share of the days finished that were shared), however often sent.
-        let before = false;
-        try {
-          before = localStorage.getItem(sharedKey) === t.day;
-          localStorage.setItem(sharedKey, t.day);
-        } catch {
-          // not kept: gold again next time
-        }
-        if (!before) tally("share:day", t.day); // its day: shared after midnight, it's yesterday's
-      },
-      true, // its link shows whose it is
-    );
-  return {
-    main: () => {
-      const g = gold();
-      if (g === "share") return share(true);
-      return g === "next" ? () => h("a", { class: "btn primary big", href: next() }, "Още десет") : null;
-    },
-    also: [() => (gold() && gold() !== "share" ? share(false) : null)],
-  };
+/** What to do next under the day's result: the one gold action (game/gold.ts), another game, to where a goal points
+ * (`next`). */
+function dayNext(next: () => string): { main: Child } {
+  return { main: () => h("a", { class: "btn primary big", href: next() }, "Още десет") };
 }
 
 /** The day played: how many of its questions got wrong will wait for a second chance, and when, in a quiet line. */
@@ -483,10 +401,9 @@ function yesterdayLine(t: Today): Child {
 }
 
 /** The day played, on a later visit (its moment is over): one short card — its dateline and place, the score and its
- * points, the pips — with the gold way to another game under it, „Сподели“ plain, and the questions gone over on their
- * own page. */
-function dayDone(t: Today, run: State, fresh: () => Today, next: () => string): Child {
-  const ways = dayNext(t, run, false, fresh, next, null);
+ * points, the pips — with the gold way to another game under it, and the questions gone over on their own page. */
+function dayDone(t: Today, run: State, next: () => string): Child {
+  const ways = dayNext(next);
   return h(
     "section",
     { class: "card day-done" },
@@ -502,10 +419,7 @@ function dayDone(t: Today, run: State, fresh: () => Today, next: () => string): 
     ),
     crowdSays(t, true),
     trail(run.trail, run.total),
-    nextSteps(ways.main, [
-      h("a", { class: "btn", href: `/games/${run.id}` }, "Прегледай въпросите"),
-      ...(ways.also ?? []),
-    ]),
+    nextSteps(ways.main, [h("a", { class: "btn", href: `/games/${run.id}` }, "Прегледай въпросите")]),
   );
 }
 
@@ -725,8 +639,7 @@ function dayCard(t: Today, start: () => void, marks: Mark[], error: string): Chi
   );
 }
 
-/** The right answer of the day played that the fewest of its other players got, told in gold if few did: the line
- * the shared result carries, on the screen. */
+/** The right answer of the day played that the fewest of its other players got, told in gold if few did. */
 function rareLine(r?: { n: number; right: number } | null): Child {
   if (!r || r.right > rare) return null;
   const who = r.right ? `го знаят само ${percent(r.right)} от играчите` : "не го знае никой друг";
@@ -734,7 +647,7 @@ function rareLine(r?: { n: number; right: number } | null): Child {
 }
 
 /** The friends' day beside the result: the best five (the player's own row in place of the fifth if further down),
- * each with how their ten went, and the way to them all; for a player without friends, one quiet line to invite one.
+ * each with how their ten went, and the way to them all; for a player without friends, one quiet line to add one.
  * Shown once the day as fetched has the player on it. */
 function friendsDay(t: Today): Child {
   const all = t.friends ?? [];
@@ -743,7 +656,7 @@ function friendsDay(t: Today): Child {
       ? h(
           "p",
           { class: "day-next" },
-          h("a", { href: "/friends" }, "Покани приятел и сравнявайте резултатите си всеки ден."),
+          h("a", { href: "/friends" }, "Добави приятел и сравнявайте резултатите си всеки ден."),
         )
       : null;
   const mine = all.findIndex((s) => s.me);

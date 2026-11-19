@@ -1,23 +1,20 @@
 // Friends (Приятели): who asks to be friends, each friend with their day and your record against them, and the ways to
-// make more: by their tag or email, or your invite link (a new one at a tap, the old one then nobody's). Anyone who
-// asks, or a friend, can be blocked from here: they're gone, and can't ask again (play/blocks.go); the blocked are
-// listed last, to lift it.
+// make more: by their tag or email. Anyone who asks, or a friend, can be blocked from here: they're gone, and can't ask
+// again (play/blocks.go); the blocked are listed last, to lift it.
 
 import type { Kit } from "../kit.ts";
-import type { Child, Signal } from "../lib/dom.ts";
+import type { Child } from "../lib/dom.ts";
 import type { Tier } from "../ui.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
 let {
-  shareButton,
   api,
   errorText,
   h,
   onCleanup,
   signal,
   when,
-  go,
   title,
   friendRequests,
   player,
@@ -53,7 +50,6 @@ interface Request {
 }
 
 interface Friends {
-  invite: string;
   friends: Friend[];
   requests: { in: Request[]; out: Request[] };
   blocked: { name: string; tag: string }[];
@@ -62,14 +58,12 @@ interface Friends {
 /** Приятели, one of the main places. */
 export function friends(kit: Kit): Child {
   ({
-    shareButton,
     api,
     errorText,
     h,
     onCleanup,
     signal,
     when,
-    go,
     title,
     friendRequests,
     player,
@@ -92,8 +86,6 @@ function friendsCard(): Child {
   // The list that couldn't load (with nothing of it shown yet): the failure, and the way to try again.
   const failed = signal<unknown>(null);
   const editing = signal(false);
-  // Asking whether to make a new invite link: kept here, so that the list drawn again (every 15 s) doesn't drop it.
-  const asking = signal(false);
 
   const load = async () => {
     if (!user.peek()) return;
@@ -122,8 +114,6 @@ function friendsCard(): Child {
       error.set(errorText(err));
     }
   };
-  // A friend challenged: ten played now, and they play theirs when they can.
-  const challenge = (f: Friend) => act(async () => go(`/challenge/${f.id}`));
   const remove = (f: Friend) =>
     act(async () => {
       await api("DELETE", `/api/friends/${f.id}`);
@@ -148,12 +138,6 @@ function friendsCard(): Child {
     act(async () => {
       await api("DELETE", `/api/blocks/${tag}`);
       await load();
-    });
-  const renew = () =>
-    act(async () => {
-      const r = await api<{ invite: string }>("POST", "/api/friends/invite", {});
-      const d = data.peek();
-      if (d) data.set({ ...d, invite: r.invite });
     });
   // Made once: what it says after a request stays while the list around it is drawn again.
   const adder = addFriend(load);
@@ -197,15 +181,11 @@ function friendsCard(): Child {
         const d = data();
         if (!d && failed()) return failure(failed(), () => void load());
         if (!d) {
-          // Not a player yet: the link is made once they are.
+          // Not a player yet: friends are added once they are.
           return user()
             ? null
             : [
-                h(
-                  "p",
-                  { class: "muted" },
-                  "Покани приятели: ще виждате резултатите си за деня и ще се предизвиквате на дуел.",
-                ),
+                h("p", { class: "muted" }, "Добави приятели: ще виждате резултатите си за деня."),
                 h(
                   "button",
                   {
@@ -217,7 +197,7 @@ function friendsCard(): Child {
                         await load();
                       }),
                   },
-                  "Покани приятел",
+                  "Добави приятел",
                 ),
               ];
         }
@@ -229,22 +209,13 @@ function friendsCard(): Child {
                 d.friends.map((f) =>
                   row(
                     f,
-                    () => challenge(f),
                     () => remove(f),
                     () => block(f.tag),
                     editing,
                   ),
                 ),
               )
-            : [
-                h(
-                  "p",
-                  { class: "muted" },
-                  "Още нямаш приятели тук. Прати им покана или ги добави по потребителско име или имейл.",
-                ),
-                // No friends yet: the invitation is the one thing to do here, gold, first.
-                invite(d.invite, true, renew, asking),
-              ],
+            : h("p", { class: "muted" }, "Още нямаш приятели тук. Добави ги по потребителско име или имейл."),
         ];
       },
       // Outside the blocks drawn again on each look (every 15 s): drawn again, its field would lose the focus mid-word.
@@ -279,7 +250,6 @@ function friendsCard(): Child {
                 ),
               )
             : null,
-          d.friends.length ? invite(d.invite, false, renew, asking) : null,
           d.blocked.length
             ? h(
                 "div",
@@ -304,50 +274,6 @@ function friendsCard(): Child {
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
     ),
   ];
-}
-
-/** The player's invitation, by the phone's share sheet (or copied: „Копирано.“), never printed as a raw address; gold
- * while there are no friends yet. The link itself is on the element for the browser tests (`data-invite`). Under it,
- * a new link in its place (`renew`), asked once more first: every link sent or shared before stops working. */
-function invite(url: string, primary: boolean, renew: () => Promise<void>, asking: Signal<boolean>): Child {
-  return h(
-    "div",
-    { class: "invite stack small-gap", "data-invite": new URL(url).pathname },
-    shareButton("Покани с връзка", () => "Ела да сме приятели в АЛМАНАХ:", url, primary, undefined, true),
-    () =>
-      asking()
-        ? h(
-            "div",
-            { class: "invite-renew", role: "group", "aria-label": "Нова връзка за покана" },
-            h(
-              "p",
-              { class: "muted small invite-renew-note" },
-              "Старата връзка ще спре да работи, включително в споделените ти резултати.",
-            ),
-            h(
-              "div",
-              { class: "invitation-actions" },
-              h(
-                "button",
-                {
-                  class: "btn inline",
-                  type: "button",
-                  onclick: async () => {
-                    await renew();
-                    asking.set(false);
-                  },
-                },
-                "Направи нова",
-              ),
-              h("button", { class: "link tap", type: "button", onclick: () => asking.set(false) }, "Отказ"),
-            ),
-          )
-        : h(
-            "button",
-            { class: "link muted small tap invite-new", type: "button", onclick: () => asking.set(true) },
-            "Нова връзка за покана",
-          ),
-  );
 }
 
 /** Asking someone to be friends: by their tag (@tag) or their email. */
@@ -413,9 +339,8 @@ function addFriend(reload: () => Promise<void>): Child {
   );
 }
 
-/** A friend: their name, their day, the duels between you, and a challenge now (or, while editing, removing or blocking
- * them). */
-function row(f: Friend, challenge: () => void, remove: () => void, block: () => void, editing: () => boolean): Child {
+/** A friend: their name, their day, the duels between you (and, while editing, removing or blocking them). */
+function row(f: Friend, remove: () => void, block: () => void, editing: () => boolean): Child {
   const played = f.won + f.lost + f.drawn;
   return h(
     "li",
@@ -458,6 +383,6 @@ function row(f: Friend, challenge: () => void, remove: () => void, block: () => 
             h("button", { class: "link muted", type: "button", onclick: remove }, "Премахни"),
             h("button", { class: "link muted", type: "button", onclick: block }, "Блокирай"),
           )
-        : h("button", { class: "btn inline friend-act", type: "button", onclick: challenge }, "Предизвикай"),
+        : null,
   );
 }

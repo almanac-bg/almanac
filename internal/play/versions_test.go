@@ -73,7 +73,7 @@ func (w *world) runOf(user int64, kind string, ids ...string) int64 {
 		}
 		id = r.id
 		if kind == "duel" {
-			_, err = tx.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, created_at, expires_at) VALUES ('live', '[]', ?, ?, 0, ?)`,
+			_, err = tx.Exec(`INSERT INTO duels (questions, a_id, a_run, created_at, expires_at) VALUES ('[]', ?, ?, 0, ?)`,
 				user, id, store.Ms(w.now.Add(time.Hour)))
 		}
 		return err
@@ -217,51 +217,6 @@ func TestLiveGamesKeepTheirVersions(t *testing.T) {
 		if q, _ := w.b.Get(p.ID); p.V == "" || p.V != bank.Version(q) {
 			t.Fatalf("a room's question without its version: %+v", p)
 		}
-	}
-}
-
-// A challenge is the same game for its taker, question for question as its sender was shown them, whatever the bank
-// has become; one with a question retired since as untrue can't be taken.
-func TestChallengeAsSent(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	w.reload(w.b)
-	ana, bo, cy := w.user(), w.user(), w.user()
-	s, err := w.g.StartTopic(ctx, ana, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	code, _, err := w.g.Challenge(ctx, ana, s.ID, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	sent := w.picks(s.ID)
-	reworded := editedSample(t, func(id string, q map[string]any) {
-		if id == sent[0].ID {
-			q["text"] = "Вярно ли е, че " + strings.ToLower(q["text"].(string)[:2]) + q["text"].(string)[2:]
-		}
-	})
-	w.reload(reworded)
-	st, _, err := w.g.TakeChallenge(ctx, bo, code)
-	if err != nil {
-		t.Fatal(err)
-	}
-	st = w.show(bo, st.ID)
-	q, _ := w.b.Get(sent[0].ID)
-	if strings.Contains(string(mustJSON(t, st.Question.View)), "Вярно ли е, че") || w.picks(st.ID)[0].V != sent[0].V ||
-		w.picks(st.ID)[0].V == bank.Version(q) {
-		t.Fatalf("the taker is shown another version: %s", mustJSON(t, st.Question.View))
-	}
-
-	untrue := editedSample(t, func(id string, q map[string]any) {
-		if id == sent[3].ID {
-			q["retired"], q["retiredWhy"] = true, "wrong"
-		}
-	})
-	w.reload(untrue)
-	if _, _, err := w.g.TakeChallenge(ctx, cy, code); !errors.Is(err, ErrChallengeGone) {
-		t.Fatalf("a challenge with a question gone untrue: %v", err)
 	}
 }
 

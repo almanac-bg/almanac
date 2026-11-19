@@ -16,6 +16,7 @@ let {
   answered,
   answering,
   api,
+  appShare,
   avatar,
   boardRow,
   categories,
@@ -44,7 +45,6 @@ let {
   playingWhile,
   questionHead,
   reviewParts,
-  shareButton,
   signal,
   stream,
   timer,
@@ -138,6 +138,7 @@ export function room(kit: Kit, [code = ""]: string[]) {
     answered,
     answering,
     api,
+    appShare,
     avatar,
     boardRow,
     categories,
@@ -166,7 +167,6 @@ export function room(kit: Kit, [code = ""]: string[]) {
     playingWhile,
     questionHead,
     reviewParts,
-    shareButton,
     signal,
     stream,
     timer,
@@ -533,7 +533,7 @@ function lobby(view: () => RoomView, code: string): Child {
       h("h1", null, "Стая ", h("span", { class: "code-big" }, spaced(code))),
       h("p", { class: "lead" }, "Дай кода на другите или им прати връзката."),
     ),
-    shareButton("Прати връзката", () => "Ела да играем заедно в АЛМАНАХ:", link(untracked(view), code), false),
+    sendLink(link(untracked(view), code)),
     h(
       "section",
       { class: "card" },
@@ -548,6 +548,35 @@ function lobby(view: () => RoomView, code: string): Child {
     waiting(view, "започне"),
     untracked(view).isHost ? choose(view, code) : null,
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
+  );
+}
+
+/** „Прати връзката“: the room's link through the phone's own sheet (the app's, or the browser's), or copied where
+ * there's none, or shown where it can't be copied. */
+function sendLink(url: string): Child {
+  const done = signal("");
+  const text = "Ела да играем заедно в АЛМАНАХ:";
+  const send = async () => {
+    if (await appShare(text, url)) return;
+    if (navigator.share) {
+      try {
+        return await navigator.share({ text, url });
+      } catch (err) {
+        if ((err as DOMException).name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      done.set("Копирано.");
+    } catch {
+      done.set(url);
+    }
+  };
+  return h(
+    "div",
+    { class: "send-link" },
+    h("button", { class: "btn", onclick: () => void send() }, "Прати връзката"),
+    () => done() && h("p", { class: "muted", role: "status" }, done()),
   );
 }
 

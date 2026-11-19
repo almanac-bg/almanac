@@ -25,10 +25,10 @@
 // it arrived, from when the player's own screen showed the question, as it says, within bounds (seen.go).
 //
 // No game deals a player again what they've played, in any game, while the bank has questions they haven't: a topic's,
-// a duel's (live, a rematch, a friend's challenge), a room's and Роял's are drawn for all their players, those none of
-// them has seen first, then those the fewest have (choose, seenAmong); a recording is a game with few of its questions
-// seen. Three repeat by design: the day (the same ten for everyone), Втори шанс (what the player missed) and a
-// challenge taken (the sender's ten). TestNothingPlayedAgain holds it, for every way a game starts.
+// a duel's (live, a rematch), a room's and Роял's are drawn for all their players, those none of them has seen first,
+// then those the fewest have (choose, seenAmong); a recording is a game with few of its questions seen. Two repeat by
+// design: the day (the same ten for everyone) and Втори шанс (what the player missed). TestNothingPlayedAgain holds
+// it, for every way a game starts.
 //
 // A guest who signs in to their account brings everything along (Merge), and a player who goes leaves others'
 // history whole (Forget): merge.go, checked against the schema so that no table of a player's is left out.
@@ -102,8 +102,6 @@ type Game struct {
 	Bank func() *bank.Bank
 	// Now is the clock (tests set their own).
 	Now func() time.Time
-	// DuelNews, if set, is told of a duel to tell a player about: a friend asks, a result (a push, say).
-	DuelNews func(context.Context, DuelNews)
 	// RoyalNews, if set, is told of each place when a tournament ends.
 	RoyalNews func(context.Context, RoyalNews)
 	// RoyalAt, if set, is when the next Роял starts after a moment: a day's goals draw Роял only while it's ahead.
@@ -214,7 +212,7 @@ func (r *run) driver(tx *sql.Tx) (driver, error) {
 		return byRoyal, nil
 	case "duel":
 		var live bool
-		err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM duels WHERE kind = 'live' AND (a_run = ?1 OR b_run = ?1))`,
+		err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM duels WHERE a_run = ?1 OR b_run = ?1)`,
 			r.id).Scan(&live)
 		if live {
 			return byDuel, err

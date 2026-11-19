@@ -54,14 +54,10 @@ var mergeSteps = []mergeStep{
 		UNION SELECT user_id FROM blocks WHERE blocked_id = ?1))`},
 	// Duels against the guest count against the account.
 	{carries: []string{"runs.opponent_id"}, sql: `UPDATE runs SET opponent_id = ?1 WHERE opponent_id = ?2`},
-	// The account's game of a challenge the guest sent would be one against itself: it goes (the game stays).
+	// The guest's duels are the account's. One between the two goes with the guest: what's left of the guest's duels
+	// then.
 	{carries: []string{"duels.a_id", "duels.b_id"},
-		sql: `DELETE FROM duels WHERE a_id = ?1 AND challenge_id IN (SELECT id FROM challenges WHERE user_id = ?2)`},
-	// The guest's duels are the account's, those waiting too, and the challenges sent to the guest. One between the
-	// two goes with the guest, as does the guest's game of a challenge the account sent, or took too (one game of a
-	// challenge each): what's left of the guest's duels then.
-	{sql: `UPDATE OR IGNORE duels SET a_id = ?1 WHERE a_id = ?2 AND coalesce(b_id, 0) <> ?1
-		AND coalesce((SELECT user_id FROM challenges WHERE id = duels.challenge_id), 0) <> ?1`},
+		sql: `UPDATE duels SET a_id = ?1 WHERE a_id = ?2 AND coalesce(b_id, 0) <> ?1`},
 	{sql: `UPDATE duels SET b_id = ?1 WHERE b_id = ?2 AND coalesce(a_id, 0) <> ?1`},
 	{sql: `DELETE FROM duels WHERE a_id = ?2 OR b_id = ?2`},
 	// The rating: the guest's, with its games and peak, only if the account has none of its own (no rated duel yet).
@@ -122,19 +118,10 @@ var mergeSteps = []mergeStep{
 		sql: `UPDATE OR IGNORE friend_requests SET from_id = ?1 WHERE from_id = ?2 AND (to_id IS NULL OR to_id <> ?1)`},
 	{sql: `UPDATE OR IGNORE friend_requests SET to_id = ?1 WHERE to_id = ?2 AND from_id <> ?1`},
 	{sql: `DELETE FROM friend_requests WHERE from_id = ?2 OR to_id = ?2`},
-	// The guest's challenges, with every taker's duel on them, and those drawn for the guest and a friend (one drawn
-	// for the two of them is nobody's pair now).
-	{carries: []string{"challenges.user_id"}, sql: `UPDATE challenges SET user_id = ?1 WHERE user_id = ?2`},
-	{carries: []string{"challenges.for_id"}, sql: `UPDATE challenges SET for_id = ?1 WHERE for_id = ?2`},
-	{sql: `UPDATE challenges SET for_id = NULL WHERE user_id = ?1 AND for_id = ?1`},
 	// The questions the guest reported, still theirs.
 	{carries: []string{"reports.user_id"}, sql: `UPDATE reports SET user_id = ?1 WHERE user_id = ?2`},
-	// What the guest has been told, so that nothing is told twice: of challenges, of Начало's lines, of levels and
-	// unlocks, of the parts of the game opened, of the duels against their recordings, of their streak.
-	{carries: []string{"users.challenges_told", "users.challenge_pushed"},
-		sql: `UPDATE users SET challenges_told = max(users.challenges_told, g.challenges_told),
-		challenge_pushed = max(users.challenge_pushed, g.challenge_pushed)
-		FROM (SELECT challenges_told, challenge_pushed FROM users WHERE id = ?2) g WHERE users.id = ?1`},
+	// What the guest has been told, so that nothing is told twice: of Начало's lines, of levels and unlocks, of the
+	// parts of the game opened, of the duels against their recordings, of their streak.
 	{carries: []string{"home_lines.user_id"},
 		sql: `INSERT OR IGNORE INTO home_lines (user_id, what, at) SELECT ?1, what, at FROM home_lines WHERE user_id = ?2`},
 	{carries: []string{"users.level_seen", "users.unlocks_known", "users.recordings_told", "users.systems_told",
@@ -156,18 +143,6 @@ var mergeSteps = []mergeStep{
 				THEN coalesce(g.first_version, users.first_version) ELSE coalesce(users.first_version, g.first_version) END,
 		created_at = min(users.created_at, g.created_at), seen_at = max(users.seen_at, g.seen_at)
 		FROM (SELECT created_at, came_from, first_version, seen_at FROM users WHERE id = ?2) g WHERE users.id = ?1`},
-	// The guest's invite link, if the account has none yet: those it was sent to can still open it.
-	{carries: []string{"users.invite"}, do: func(tx *sql.Tx, to, from int64) error {
-		var invite sql.NullString
-		if err := tx.QueryRow(`SELECT invite FROM users WHERE id = ?`, from).Scan(&invite); err != nil || !invite.Valid {
-			return err
-		}
-		if _, err := tx.Exec(`UPDATE users SET invite = NULL WHERE id = ?`, from); err != nil {
-			return err
-		}
-		_, err := tx.Exec(`UPDATE users SET invite = ? WHERE id = ? AND invite IS NULL`, invite, to)
-		return err
-	}},
 }
 
 // mergeLeague carries the guest's groups of the leagues to the account (to, from: Merge's), where the account isn't in
@@ -258,9 +233,9 @@ const GoneName = "Изтрит играч"
 // before), as it was without them: a duel's result stays the other's, without the player's name or game (the schema
 // sets the player to none there, ON DELETE SET NULL); what was theirs alone, or nobody's once they're gone, goes.
 //
-//   - Their duels without a result yet go, with their challenges' (nobody can finish them).
-//   - A duel only they had (against a recording, a challenge that wasn't a friend's, or the other gone before) goes.
-//   - Their name goes from others' games against them, or against their recordings and challenges.
+//   - Their duels without a result yet go (nobody can finish them).
+//   - A duel only they had (against a recording, or the other gone before) goes.
+//   - Their name goes from others' games against them, or against their recordings.
 //   - Friend requests to their address go.
 //   - The days they played on (active_days, which has no reference to users: the retention counts keep a player who
 //     went, or those who never came back would drop out and make them look better) are kept as a tombstone, the id
@@ -272,8 +247,7 @@ func Forget(tx *sql.Tx, id int64) error {
 		return err
 	}
 	for _, q := range []string{
-		`DELETE FROM duels WHERE ended_at IS NULL AND (a_id = ?1 OR b_id = ?1
-			OR challenge_id IN (SELECT id FROM challenges WHERE user_id = ?1))`,
+		`DELETE FROM duels WHERE ended_at IS NULL AND (a_id = ?1 OR b_id = ?1)`,
 		`DELETE FROM duels WHERE a_id = ?1 AND b_id IS NULL`,
 		`DELETE FROM duels WHERE b_id = ?1 AND a_id IS NULL`,
 		`UPDATE runs SET opponent = NULL WHERE opponent_id = ?1`,

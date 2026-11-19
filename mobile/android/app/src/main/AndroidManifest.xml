@@ -31,11 +31,7 @@
                 <data android:pathPrefix="/play/" />
                 <data android:path="/duel" />
                 <data android:pathPrefix="/duel/" />
-                <data android:path="/challenge" />
-                <data android:pathPrefix="/challenge/" />
-                <data android:pathPrefix="/c/" />
                 <data android:pathPrefix="/r/" />
-                <data android:pathPrefix="/f/" />
                 <data android:pathPrefix="/hand/" />
                 <data android:pathPrefix="/games/" />
                 <data android:pathPrefix="/players/" />

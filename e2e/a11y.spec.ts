@@ -71,7 +71,7 @@ for (const scheme of ["light", "dark"] as const) {
   });
 }
 
-// The day played: its result, the news it brought and the way to share it.
+// The day played: its result, the news it brought and the way on.
 for (const scheme of ["light", "dark"] as const) {
   test(`the day's result is accessible (${scheme})`, async ({ page }) => {
     test.setTimeout(120_000);
@@ -79,7 +79,7 @@ for (const scheme of ["light", "dark"] as const) {
     await page.goto("/");
     await startDay(page);
     await playRun(page);
-    await expect(page.getByRole("button", { name: "Сподели" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Още десет" })).toBeVisible();
     // A first day's news: what points are, in a line (play/unfold.go).
     await expect(page.locator(".news-open")).toBeVisible();
     const { violations } = await new AxeBuilder({ page }).analyze();
@@ -87,7 +87,7 @@ for (const scheme of ["light", "dark"] as const) {
   });
 }
 
-// A duel's result, as one won against a friend has it (the server's answer for it made here): the two face to face, the
+// A duel's result, as one won live against a person has it (the server's answer for it made here): the two face to face, the
 // duel question by question with the quicker answers ringed and the deciding one marked, the rating and the record.
 for (const scheme of ["light", "dark"] as const) {
   test(`a duel's result is accessible (${scheme})`, async ({ page }) => {
@@ -104,16 +104,12 @@ for (const scheme of ["light", "dark"] as const) {
     });
     const duel = {
       id: 1,
-      kind: "challenge",
-      challenge: "abcdefgh",
       state: "won",
-      friend: 2,
       you: side("Заек 817", "", [1300, 1100, 0, 1500, 1200, 0, 1400, 1250, 1100, 1000]),
       opponent: { ...side("Мария", "maria", [1200, 0, 1500, 1600, 1300, 0, 1500, 0, 1000, 0], 500), ms: 50_000 },
       delta: 18,
       runId: 1,
       createdAt: Date.now(),
-      expiresAt: Date.now(),
       endedAt: Date.now(),
       decided: 8,
       rating: {

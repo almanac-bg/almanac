@@ -161,30 +161,6 @@ func TestStreakMailHeldOut(t *testing.T) {
 	}
 }
 
-// The day shared after midnight counts, as yesterday's (its result left open, or its last answer played late); a day
-// older doesn't, nor yesterday's by one who didn't finish it.
-func TestShareAfterMidnight(t *testing.T) {
-	g := start(t)
-	s := g.srv
-	day := time.Date(2030, 3, 20, 0, 0, 0, 0, bulgaria())
-	s.game.Now = func() time.Time { return day.Add(10 * time.Minute) }
-	ana, anaID := g.guest()
-	g.finishedDay(anaID, day.AddDate(0, 0, -1), 23*time.Hour+55*time.Minute)
-	bo, boID := g.guest()
-	g.finishedDay(boID, day.AddDate(0, 0, -2), 20*time.Hour)
-	for _, c := range []struct {
-		p   *player
-		day string
-	}{{ana, "2030-03-19"}, {ana, "2030-03-20"}, {bo, "2030-03-18"}, {bo, "2030-03-19"}} {
-		if status, _ := c.p.call("POST", "/api/tally", map[string]string{"key": "share:day", "day": c.day}); status != 200 {
-			t.Fatalf("tally: %d", status)
-		}
-	}
-	if g.counted("share:day") != 1 {
-		t.Fatalf("shares counted: %d", g.counted("share:day"))
-	}
-}
-
 // Yesterday is told against a whole day four weeks before, not today, under way, against one.
 func TestAdminTilesOfDaysOver(t *testing.T) {
 	g := start(t)
@@ -211,8 +187,8 @@ func TestAdminTilesOfDaysOver(t *testing.T) {
 	}
 }
 
-// /admin with players in it: people only (an admin's games aren't), the day shared once by a player who finished it,
-// the charts drawn, a week's cohort frozen once over (D1–D12).
+// /admin with players in it: people only (an admin's games aren't), the charts drawn, a week's cohort frozen once
+// over (D1–D12).
 func TestAdminMeasures(t *testing.T) {
 	g := start(t)
 	s := g.srv
@@ -252,18 +228,6 @@ func TestAdminMeasures(t *testing.T) {
 		defer res.Body.Close()
 		b, _ := io.ReadAll(res.Body)
 		return string(b)
-	}
-	// The day shared by one who finished it today: counted; by one who didn't: not (the client counts once a device).
-	sharer, sharerID := g.guest()
-	g.finishedDay(sharerID, day, 9*time.Hour)
-	other, _ := g.guest()
-	for _, p := range []*player{sharer, other} {
-		if status, _ := p.call("POST", "/api/tally", map[string]string{"key": "share:day"}); status != 200 {
-			t.Fatalf("tally: %d", status)
-		}
-	}
-	if g.counted("share:day") != 1 {
-		t.Fatalf("shares counted: %d", g.counted("share:day"))
 	}
 	page := body()
 	for _, part := range []string{"<svg", `class="line s1"`, "04.03–10.03", "Телефон", "Денят пак (1–7)"} {

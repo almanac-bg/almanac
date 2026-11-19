@@ -22,9 +22,6 @@ func (w *world) finish() error {
 			if err := w.steer(p, 1050, 1199, 24); err != nil {
 				return err
 			}
-			if err := w.waiting(p); err != nil {
-				return err
-			}
 			if err := w.news(p); err != nil {
 				return err
 			}
@@ -149,32 +146,6 @@ func (w *world) befriended(p *player, n int) error {
 	return nil
 }
 
-// waiting leaves challenges waiting on both sides of a persona: one a friend sent them (played by the friend, not by
-// them yet), and one they sent a friend.
-func (w *world) waiting(p *player) error {
-	ids, err := w.friendIDs(p)
-	if err != nil || len(ids) == 0 {
-		return err
-	}
-	friend := w.byID[ids[w.r.IntN(len(ids))]]
-	if friend == nil {
-		return nil
-	}
-	for _, c := range []struct{ from, to *player }{{friend, p}, {p, friend}} {
-		s, _, err := w.g.ChallengeFriend(w.as(c.from), c.from.id, c.to.id)
-		if errors.Is(err, play.ErrManyWaiting) {
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("a challenge waiting: %w", err)
-		}
-		if _, err := w.playRun(c.from, s, -1); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // personas are the players a reviewer can be, each checked to be what it says, with a session to sign in by: the
 // new guest is made now (account.Accounts.Guest), as a browser that's never been here is.
 func (w *world) personas() ([]Persona, error) {
@@ -293,7 +264,7 @@ func (w *world) about(p *player) (string, error) {
 			days < min(25, w.opt.Days*2/3) {
 			return fail("isn't a placed Злато player with friends, of a month")
 		}
-		return "a month's regular in Злато, with friends, challenges waiting and the week's league; " + facts, nil
+		return "a month's regular in Злато, with friends and the week's league; " + facts, nil
 	case keyLapsed:
 		e, err := w.endedYesterday(p)
 		if err != nil || e == nil {

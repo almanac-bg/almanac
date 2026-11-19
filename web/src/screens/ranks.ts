@@ -30,7 +30,6 @@ let {
   leagueBoard,
   loadLeague,
   issueWords,
-  shareButton,
 } = {} as Kit;
 
 interface Ranked {
@@ -109,7 +108,6 @@ export function ranks(kit: Kit) {
     leagueBoard,
     loadLeague,
     issueWords,
-    shareButton,
   } = kit);
   title("Класации");
   // Which board, among whom and of which topic, in the address (lib/hash.ts): back to the page, a reload or a link
@@ -354,20 +352,13 @@ function winner(p: Past): Child {
   );
 }
 
-/** Among friends, with none yet: what the board would be, and the way to invite one (the player's own link). */
+/** Among friends, with none yet: what the board would be, and the way to add one (Приятели). */
 function noFriends(): Child {
   return h(
     "div",
     { class: "board-empty stack" },
-    h("p", null, "Още нямаш приятели. Покани някого и сравнявайте резултатите си всеки ден."),
-    shareButton(
-      "Покани с връзка",
-      () => "Ела да сме приятели в АЛМАНАХ:",
-      async () => (await api<{ invite: string }>("GET", "/api/friends")).invite,
-      true,
-      undefined,
-      true,
-    ),
+    h("p", null, "Още нямаш приятели. Добави някого и сравнявайте резултатите си всеки ден."),
+    h("a", { class: "btn primary big", href: "/friends" }, "Добави приятел"),
   );
 }
 

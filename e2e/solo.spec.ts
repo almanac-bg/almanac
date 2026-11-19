@@ -3,12 +3,6 @@ import { answer, moveOn, openGame, playedBefore, playRun, startDay } from "./pla
 
 test("the day: ten questions, the result, the review, and one try only", async ({ page }) => {
   test.setTimeout(120_000);
-  // The phone's share sheet, stood in for: what it was given is kept.
-  await page.addInitScript(() => {
-    navigator.share = async (data?: ShareData) => {
-      (window as unknown as { shared: string }).shared = data?.text ?? "";
-    };
-  });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Десет въпроса за днес" })).toBeVisible();
   // A new player sees the day and the topics: duels and rooms come after a first game (a room's code is a line), Роял
@@ -31,19 +25,8 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // After the day, the other ways to play are right there: with others, and by topic.
   await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toBeVisible();
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
-  // The result is shared without its answers: the day's issue and date, the score, a square for each question (and a
-  // right answer few of the day's other players got, if there's one: other tests play the same day), and the player's
-  // own link to it.
-  await page.getByRole("button", { name: "Сподели" }).click();
-  // The first share by a player still with the name drawn for them asks for theirs, once: kept as it is here.
-  const sheet = page.getByRole("dialog", { name: "Как да те познаят приятелите?" });
-  await expect(sheet.getByLabel("Име")).toHaveValue(/ \d{3}$/);
-  await sheet.getByRole("button", { name: "Сподели" }).click();
-  await expect(sheet).toHaveCount(0);
-  const shared = await page.evaluate(() => (window as unknown as { shared: string }).shared);
-  expect(shared).toMatch(
-    /^АЛМАНАХ · Брой \d+ · \d{1,2} \p{L}+\n\d+ от 10\n[🟩🟨⬜]{10}\n(Познах въпрос \d+, който .+\n)?http:\/\/127\.0\.0\.1:\d+\/f\/[a-z0-9]{8}$/u,
-  );
+  // One gold way on under the result: another game.
+  await expect(page.locator(".summary .btn.primary")).toHaveText("Още десет");
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(page.locator(".reviewed")).toHaveCount(10);
   await page.reload();
@@ -310,13 +293,6 @@ test("the day left at its last question comes back done, with what it earned tol
   await expect(page.locator(".day-done")).toBeVisible();
   await expect(page.locator(".day-done .trail")).toBeVisible();
   await expect(page.locator(".news-open")).toHaveCount(0);
-});
-
-test("a challenge link that's gone (an old one) says so and offers the day", async ({ page }) => {
-  await page.goto("/c/abc234");
-  await expect(page.getByRole("heading", { name: "Това предизвикателство вече го няма" })).toBeVisible();
-  await page.getByRole("link", { name: "Към въпросите на деня" }).click();
-  await expect(page.locator(".card.day")).toBeVisible();
 });
 
 test.describe("on a computer", () => {

@@ -66,26 +66,15 @@ func TestMergeCoversTheSchema(t *testing.T) {
 	}
 }
 
-// What else of a guest comes to the account: a challenge drawn for the guest and a friend, the questions they
-// reported, their notifications on the way, their look and what they've been told, their invite link, and when they
-// came.
+// What else of a guest comes to the account: the questions they reported, their notifications on the way, their look
+// and what they've been told, and when they came.
 func TestMergeCarriesTheRest(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	guest, owner, friend := w.user(), w.user(), w.user()
-	w.befriend(friend, guest)
-	fs, duel, err := w.g.ChallengeFriend(ctx, friend, guest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(friend, fs.ID, repeat(w.right, Length)...)
-	invite, err := w.g.InviteCode(ctx, guest)
-	if err != nil {
-		t.Fatal(err)
-	}
+	guest, owner := w.user(), w.user()
 	for _, q := range []string{
 		`UPDATE users SET frame = 'gold', backdrop = 'waves', level_seen = 7, unlocks_known = 1, recordings_told = 50,
-			systems_told = 'duel league', streak_told = 'kept:2026-11-12', came_from = 'invite', created_at = 5,
+			systems_told = 'duel league', streak_told = 'kept:2026-11-12', came_from = 'room', created_at = 5,
 			seen_at = 900 WHERE id = ?2`,
 		`UPDATE users SET level_seen = 3, recordings_told = 80, systems_told = 'royal', streak_told = 'ended:2026-11-01',
 			came_from = 'home', created_at = 10, seen_at = 100 WHERE id = ?1`,
@@ -105,42 +94,27 @@ func TestMergeCarriesTheRest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var forID, reports, reminded, queued int
-	var frame, backdrop, systems, streak, came, inviteNow string
+	var reports, reminded, queued int
+	var frame, backdrop, systems, streak, came string
 	var level, recordings, created, seen int
-	if err := w.db.Read.QueryRow(`SELECT coalesce((SELECT c.for_id FROM duels d JOIN challenges c ON c.id = d.challenge_id
-			WHERE d.id = ?2), 0),
+	if err := w.db.Read.QueryRow(`SELECT
 		(SELECT count(*) FROM reports WHERE user_id = ?1), (SELECT count(*) FROM push_reminded WHERE user_id = ?1),
 		(SELECT count(*) FROM push_queue WHERE user_id = ?1),
-		frame, backdrop, systems_told, streak_told, came_from, coalesce(invite, ''), level_seen, recordings_told,
-		created_at, seen_at FROM users WHERE id = ?1`, owner, duel).Scan(&forID, &reports, &reminded, &queued,
-		&frame, &backdrop, &systems, &streak, &came, &inviteNow, &level, &recordings, &created, &seen); err != nil {
+		frame, backdrop, systems_told, streak_told, came_from, level_seen, recordings_told,
+		created_at, seen_at FROM users WHERE id = ?1`, owner).Scan(&reports, &reminded, &queued,
+		&frame, &backdrop, &systems, &streak, &came, &level, &recordings, &created, &seen); err != nil {
 		t.Fatal(err)
 	}
-	if forID != int(owner) || reports != 1 || reminded != 2 || queued != 2 {
-		t.Fatalf("drawn for %d, %d reports, reminded on %d days, %d pushes on the way", forID, reports, reminded, queued)
+	if reports != 1 || reminded != 2 || queued != 2 {
+		t.Fatalf("%d reports, reminded on %d days, %d pushes on the way", reports, reminded, queued)
 	}
 	if frame != "gold" || backdrop != "waves" || level != 7 || recordings != 80 || systems != "royal duel league" ||
 		streak != "kept:2026-11-12" {
 		t.Fatalf("look and told: %s %s, level %d, recordings %d, %q, %q", frame, backdrop, level, recordings, systems, streak)
 	}
-	if came != "invite" || created != 5 || seen != 900 || inviteNow != invite {
-		t.Fatalf("came from %q at %d, seen %d, invite %q (the guest's %q)", came, created, seen, inviteNow, invite)
+	if came != "room" || created != 5 || seen != 900 {
+		t.Fatalf("came from %q at %d, seen %d", came, created, seen)
 	}
-	// The challenge drawn for the pair is still theirs: played, it moves ratings.
-	w.play(owner, mustTake(t, w, owner, duel), repeat(w.wrong, Length)...)
-	if d, err := w.g.DuelOf(ctx, owner, duel); err != nil || d.Friendly || d.Delta == 0 {
-		t.Fatalf("the pair's challenge after the merge: %+v (%v)", d, err)
-	}
-}
-
-func mustTake(t *testing.T, w *world, user, duel int64) int64 {
-	t.Helper()
-	s, err := w.take(user, duel)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return s.ID
 }
 
 // A player who deletes their account takes what's theirs, and nothing of others': the other side of each duel keeps
@@ -155,40 +129,26 @@ func TestForgetKeepsOthersHistory(t *testing.T) {
 	}
 	accounts := &account.Accounts{DB: w.db, Forget: []func(*sql.Tx, int64) error{Forget}}
 
-	// Ana beats Bo live; Bo's challenge, as a friend, she loses; hers, Bo hasn't played yet.
+	// Ana beats Bo live; the next day Bo beats her; a third duel between them is under way.
 	l, err := w.g.StartLive(ctx, ana, bo)
 	if err != nil {
 		t.Fatal(err)
 	}
 	w.play(ana, l.Runs[0], repeat(w.right, Length)...)
 	w.play(bo, l.Runs[1], repeat(w.wrong, Length)...)
-	w.befriend(ana, bo)
-	bs, sent, err := w.g.ChallengeFriend(ctx, bo, ana)
+	w.wait(24 * time.Hour)
+	again, err := w.g.StartLive(ctx, bo, ana)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.play(bo, bs.ID, repeat(w.right, Length)...)
-	w.play(ana, mustTake(t, w, ana, sent), repeat(w.wrong, Length)...)
-	as, waiting, err := w.g.ChallengeFriend(ctx, ana, bo)
+	w.play(bo, again.Runs[0], repeat(w.right, Length)...)
+	w.play(ana, again.Runs[1], repeat(w.wrong, Length)...)
+	under, err := w.g.StartLive(ctx, ana, bo)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.play(ana, as.ID, repeat(w.right, Length)...)
-	// Bo took Cy's challenge by its link; Cy asked Bo to be friends by his address; a mail to him is on its way.
-	cs, err := w.g.StartTopic(ctx, cy, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(cy, cs.ID, repeat(w.right, Length)...)
-	code, _, err := w.g.Challenge(ctx, cy, cs.ID, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	bt, _, err := w.g.TakeChallenge(ctx, bo, code)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(bo, bt.ID, repeat(w.wrong, Length)...)
+	w.play(ana, under.Runs[0], repeat(w.right, Length)...)
+	// Cy asked Bo to be friends by his address; a mail to him is on its way.
 	if _, err := w.g.Request(ctx, cy, email, true); err != nil {
 		t.Fatal(err)
 	}
@@ -214,10 +174,10 @@ func TestForgetKeepsOthersHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	var states []string
+	if n := w.count(`SELECT count(*) FROM duels WHERE id = ?`, under.DuelID); n != 0 {
+		t.Fatal("the duel under way with Bo is still there")
+	}
 	for _, d := range duels {
-		if d.ID == waiting {
-			t.Fatal("a challenge to Bo still waits")
-		}
 		// Their game went with them: said so (their score isn't known), never a 0 they didn't score.
 		if d.Opponent == nil || d.Opponent.Name != GoneName || !d.Opponent.Gone {
 			t.Fatalf("the other in a duel with Bo: %+v", d.Opponent)
@@ -236,7 +196,7 @@ func TestForgetKeepsOthersHistory(t *testing.T) {
 			t.Fatalf("Ana's game against Bo, after: %+v", p)
 		}
 	}
-	// Nothing anywhere has his name or address; and Cy's challenge has no game of his.
+	// Nothing anywhere has his name or address.
 	for _, s := range []string{name, email} {
 		if where := holding(t, w, s); len(where) > 0 {
 			t.Errorf("%q is still in %v", s, where)

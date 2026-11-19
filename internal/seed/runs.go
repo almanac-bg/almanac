@@ -170,11 +170,6 @@ func (w *world) dayRun(p *player) error {
 	}
 	if s.Done {
 		p.played[w.day] = true
-		if w.chance(0.12) {
-			if err := w.g.Tally(w.ctx, "share:day", 1); err != nil {
-				return err
-			}
-		}
 	}
 	return nil
 }

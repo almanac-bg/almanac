@@ -37,7 +37,7 @@ test("a player who comes back: yesterday told, the day played one short card, an
   // Just played: the result in full.
   await expect(page.locator(".summary")).toBeVisible();
   await expect(page.locator(".yesterday-line")).toHaveCount(0);
-  // A later visit: one short card, another game the gold thing to do, „Сподели“ plain, the questions on their page.
+  // A later visit: one short card, another game the gold thing to do, the questions on their page.
   await page.reload();
   const card = page.locator(".day-done");
   await expect(card).toBeVisible();
@@ -46,7 +46,7 @@ test("a player who comes back: yesterday told, the day played one short card, an
   const gold = page.locator(".btn.primary");
   await expect(gold).toHaveCount(1);
   await expect(gold).toHaveText("Още десет");
-  await expect(card.getByRole("button", { name: "Сподели" })).not.toHaveClass(/primary/);
+
   await card.getByRole("link", { name: "Прегледай въпросите" }).click();
   await expect(page).toHaveURL(/\/games\/\d+$/);
   await expect(page.locator(".review")).toBeVisible();

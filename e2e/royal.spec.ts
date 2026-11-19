@@ -124,11 +124,10 @@ test("Роял: in from the lobby, its music, live to the fifteenth question, th
     await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
   }
   // The end: the standings of all, after the fifteenth question (a place on the podium, met with another engine's
-  // run, comes first as a sheet over them, with its share).
+  // run, comes first as a sheet over them).
   await expect(page.locator(".intro").getByText(/ верни/)).toBeVisible({ timeout: 360_000 });
   const podium = page.locator("dialog[open]");
   if (await podium.isVisible()) {
-    await expect(podium.getByRole("button", { name: "Сподели" })).toBeVisible();
     await podium.getByRole("button", { name: "Продължи" }).click();
   }
   await expect(standings).toBeVisible();

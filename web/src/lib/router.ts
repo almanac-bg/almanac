@@ -198,9 +198,8 @@ function travel(by: number, then: () => void): void {
   history.go(by);
 }
 
-/** Gives the entry shown another address, the screen staying as it is (a challenge taken: a reload comes back to
- * its duel, not to a new one). A game's own entry so renamed stays the game's: its end (release) gives the page under
- * it that address. */
+/** Gives the entry shown another address, the screen staying as it is (a board's choice: a reload comes back to it).
+ * A game's own entry so renamed stays the game's: its end (release) gives the page under it that address. */
 export function rename(to: string): void {
   history.replaceState(entry(), "", to);
   path.set(location.pathname);
@@ -221,12 +220,6 @@ export function mark(patch: Partial<Entry>): void {
  * the path it was opened over is that page itself). */
 export function go(to: string, replace = false): void {
   open(to, replace, true);
-}
-
-/** Opens `to` in place of the page shown, as that page was come to (a tap, or not): a page that is another's now (a
- * challenge already taken, its duel), where a game starts only as it would have on the page asked for. */
-export function redirect(to: string): void {
-  open(to, true, tapped);
 }
 
 /** Opens `to` (`tap`: as a tap does); `under`: from the page under a game's own entry, which keeps where it was
@@ -303,8 +296,7 @@ export function hold(always = false): void {
 }
 
 /** A game over: its entry of its own (hold) goes, back to the page under it, which takes the game's address (Начало
- * under a game opened from outside; a challenge's link become its duel) and keeps what's given (its result); the
- * screen stays as it is. */
+ * under a game opened from outside) and keeps what's given (its result); the screen stays as it is. */
 export function release(keep: Partial<Entry> = {}): void {
   if (!entry().game) {
     mark(keep);

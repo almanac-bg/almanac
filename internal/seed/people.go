@@ -28,7 +28,7 @@ type player struct {
 	topics float64       // topic games on a day they play, on average
 	duels  float64       // live duels
 	royal  float64       // the chance they come to an evening's Роял
-	social float64       // how readily they make friends and challenge them
+	social float64       // how readily they make friends
 
 	profile int // the day they give an email (-1: a guest throughout)
 	named   bool
@@ -36,7 +36,6 @@ type player struct {
 	device  string
 	net     []byte
 	circle  int // the group of people they know
-	invite  int64
 
 	played map[int]bool // the days they played the day's ten
 	last   int64        // their last game finished, its news not told yet
@@ -82,7 +81,7 @@ func (w *world) cast(n int) {
 	}
 	// The personas played in the history (the new guest comes at the end: personas).
 	add(&player{kind: keyDay2, persona: keyDay2, joined: last - 1, until: -1, rate: 1, skill: 0.6, topics: 0.6,
-		profile: -1, from: "share", hour: 19})
+		profile: -1, from: "home", hour: 19})
 	add(&player{kind: keyRegular, persona: keyRegular, joined: last - 29, until: -1, rate: 1, skill: 0.78, topics: 1.2,
 		duels: 1.6, royal: 0.5, social: 1, profile: last - 26, named: true, hour: 8, pace: 6 * time.Second})
 	add(&player{kind: keyLegend, persona: keyLegend, joined: 0, until: -1, rate: 1, skill: 0.95, topics: 1.5,
@@ -154,13 +153,9 @@ func (w *world) pickDevice() string {
 
 func (w *world) pickLanding() string {
 	switch x := w.r.Float64(); {
-	case x < 0.45:
+	case x < 0.75:
 		return "home"
-	case x < 0.65:
-		return "share"
-	case x < 0.80:
-		return "invite"
-	case x < 0.88:
+	case x < 0.87:
 		return "room"
 	case x < 0.93:
 		return "player"
@@ -192,9 +187,6 @@ func (w *world) arrive(p *player) error {
 	}
 	if p.named {
 		w.name(p)
-	}
-	if p.from == "invite" {
-		w.invited(p)
 	}
 	return nil
 }

@@ -28,7 +28,6 @@ let {
   duelResult,
   emblem,
   formatNumber,
-  go,
   goBack,
   guardLeaving,
   holdWhile,
@@ -47,7 +46,6 @@ let {
   playingWhile,
   questionHead,
   readyClock,
-  shareButton,
   signal,
   startScreen,
   staying,
@@ -156,7 +154,6 @@ export function liveDuel(kit: Kit) {
     duelResult,
     emblem,
     formatNumber,
-    go,
     goBack,
     guardLeaving,
     holdWhile,
@@ -175,7 +172,6 @@ export function liveDuel(kit: Kit) {
     playingWhile,
     questionHead,
     readyClock,
-    shareButton,
     signal,
     startScreen,
     staying,
@@ -767,11 +763,9 @@ function rematchClock(ms: number): Child {
   );
 }
 
-/** Nobody to play, not even a recording (a game that has just begun): the friends to challenge, each a tap from a duel
- * in their own time; with none, the invite to send; and a topic's game, alone, meanwhile. */
+/** Nobody to play, not even a recording (a game that has just begun): try again, or a topic's game, alone, meanwhile
+ * (on Начало). */
 function nobody(again: () => void): Child {
-  const mine = signal<{ invite: string; friends: { id: number; name: string }[] } | null>(null);
-  api<{ invite: string; friends: { id: number; name: string }[] }>("GET", "/api/friends").then(mine.set, () => {});
   return h(
     "div",
     { class: "stack" },
@@ -779,42 +773,14 @@ function nobody(again: () => void): Child {
       "div",
       { class: "intro" },
       h("h1", null, "Точно сега няма с кого"),
-      h("p", { class: "lead" }, () =>
-        mine()?.friends.length
-          ? "Никой не търси дуел, а записи на игри още няма. Предизвикай приятел: играеш сега, а приятелят ти — когато може."
-          : "Никой не търси дуел, а записи на игри още няма. Покани приятел или изиграй игра по тема.",
+      h(
+        "p",
+        { class: "lead" },
+        "Никой не търси дуел, а записи на игри още няма. Опитай пак след малко или изиграй игра по тема.",
       ),
     ),
-    () => {
-      const m = mine();
-      if (!m) return null;
-      if (!m.friends.length)
-        return shareButton("Покани приятел", () => "Ела да сме приятели в АЛМАНАХ:", m.invite, true, undefined, true);
-      return h(
-        "ul",
-        { class: "duel-friends" },
-        m.friends
-          .slice(0, 5)
-          .map((f) =>
-            h(
-              "li",
-              null,
-              h("strong", null, f.name),
-              h(
-                "button",
-                { class: "btn inline", type: "button", onclick: () => go(`/challenge/${f.id}`) },
-                "Предизвикай",
-              ),
-            ),
-          ),
-      );
-    },
-    h(
-      "div",
-      { class: "result-actions" },
-      h("a", { class: "btn", href: "/" }, "Към Начало"),
-      h("button", { class: "btn", type: "button", onclick: again }, "Опитай пак"),
-    ),
+    h("button", { class: "btn primary big", type: "button", onclick: again }, "Опитай пак"),
+    h("a", { class: "btn", href: "/" }, "Към Начало"),
   );
 }
 

@@ -17,7 +17,7 @@ import (
 // A version is hashed from a form of what the question asks written out field by field (each type's asked, with its
 // type, text and picture), never from the type's Go struct as it happens to encode: a field a type gains changes no
 // version, until a question sets it. Versions are kept for ever (question_versions, runs' Pick.V), so one that moved
-// would lose every play, review, challenge and recording of the version it was. TestPinnedVersions pins them; a type
+// would lose every play, review and recording of the version it was. TestPinnedVersions pins them; a type
 // changed on purpose so that they move needs a migration that rewrites the versions kept. TestEveryFieldClassed holds
 // each field of every type to be either in the form (one that tells versions apart) or in notAsked.
 

@@ -336,7 +336,8 @@ func TestDuelsOutlivePlayers(t *testing.T) {
 		return s
 	}
 	before := []string{row(1), row(2)}
-	if err := db.migrate(); err != nil {
+	// 0055 and none after: 0077 takes the challenges away.
+	if err := db.migrateTo(migrationsThrough("0055_duels_outlive_players.sql")); err != nil {
 		t.Fatal(err)
 	}
 	if after := []string{row(1), row(2)}; !slices.Equal(before, after) || after[0] == "" {

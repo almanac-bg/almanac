@@ -2,7 +2,6 @@ package play
 
 import (
 	"errors"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -119,21 +118,6 @@ func TestRecordingsNamed(t *testing.T) {
 	st, err := w.g.StatsOf(ctx, gal)
 	if err != nil || len(st.Recent) == 0 || st.Recent[0].Opponent != "Мария" || !st.Recent[0].Recorded {
 		t.Fatalf("Gal's games: %+v %v", st.Recent, err)
-	}
-
-	// A duel played while recordings went unnamed kept the animal: the migration puts the player's name back.
-	if _, err := w.db.Write.Exec(`UPDATE runs SET opponent = 'Лисица' WHERE id = ?`, l.Runs[0]); err != nil {
-		t.Fatal(err)
-	}
-	sql, err := os.ReadFile("../store/migrations/0074_recordings_named.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := w.db.Write.Exec(string(sql)); err != nil {
-		t.Fatal(err)
-	}
-	if st, _ := w.g.StatsOf(ctx, gal); st.Recent[0].Opponent != "Мария" {
-		t.Fatalf("after the migration: %q", st.Recent[0].Opponent)
 	}
 }
 

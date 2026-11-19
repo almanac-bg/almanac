@@ -13,9 +13,8 @@ import (
 )
 
 // Lines are what Начало tells a player once, in a line above the day, of what others did with them while they were
-// away: a friend said yes to their invite (AcceptedOf: a tap from challenging them), or what came of a live duel they
-// left (LeftOf: it went on without them), or who took their challenges (ChallengeNewsOf, told as "challenges"). Each
-// is told once wherever the player is signed in (Told keeps it), and only while it's news (LinesRecent).
+// away: a friend said yes to their request (AcceptedOf), or what came of a live duel they left (LeftOf: it went on
+// without them). Each is told once wherever the player is signed in (Told keeps it), and only while it's news (LinesRecent).
 
 // LinesRecent is how long a line waits to be told: past it, it's old news.
 const LinesRecent = 7 * 24 * time.Hour
@@ -26,7 +25,7 @@ var lineKey = regexp.MustCompile(`^(friend|left):([0-9]{1,12})$`)
 // ErrNoLine is a line that isn't one of the game's.
 var ErrNoLine = errors.New("no such line")
 
-// Accepted is a friend who said yes to the player's invite (their link, or their request).
+// Accepted is a friend who said yes to the player's request.
 type Accepted struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
@@ -34,15 +33,13 @@ type Accepted struct {
 	Line string `json:"line"`
 }
 
-// AcceptedOf is the latest friend who said yes to the player in the last LinesRecent and hasn't been told of yet, nor
-// challenged since (that says they know); or nil.
+// AcceptedOf is the latest friend who said yes to the player in the last LinesRecent and hasn't been told of yet; or
+// nil.
 func (g *Game) AcceptedOf(ctx context.Context, userID int64) (*Accepted, error) {
 	var a Accepted
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT f.friend_id, u.name FROM friends f JOIN users u ON u.id = f.friend_id
 		WHERE f.user_id = ?1 AND f.asked = 1 AND f.since >= ?2
 			AND NOT EXISTS (SELECT 1 FROM home_lines WHERE user_id = ?1 AND what = 'friend:' || f.friend_id)
-			AND NOT EXISTS (SELECT 1 FROM duels WHERE kind = 'challenge' AND b_id = ?1 AND a_id = f.friend_id
-				AND created_at >= f.since)
 		ORDER BY f.since DESC LIMIT 1`, userID, store.Ms(g.Now().Add(-LinesRecent))).Scan(&a.ID, &a.Name)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -76,7 +73,7 @@ func (g *Game) LeftOf(ctx context.Context, userID int64) (*Left, error) {
 			coalesce(CASE WHEN d.a_id = ?1 THEN d.a_delta ELSE d.b_delta END, 0)
 		FROM duels d JOIN users u ON u.id = CASE WHEN d.a_id = ?1 THEN d.b_id ELSE d.a_id END
 		WHERE (d.a_id = ?1 AND d.a_left IS NOT NULL OR d.b_id = ?1 AND d.b_left IS NOT NULL)
-			AND d.kind = 'live' AND d.outcome IN ('a', 'b', 'draw') AND d.ended_at >= ?2
+			AND d.outcome IN ('a', 'b', 'draw') AND d.ended_at >= ?2
 			AND NOT EXISTS (SELECT 1 FROM home_lines WHERE user_id = ?1 AND what = 'left:' || d.id)
 		ORDER BY d.ended_at DESC LIMIT 1`, userID, store.Ms(g.Now().Add(-LinesRecent))).
 		Scan(&l.DuelID, &mine, &outcome, &l.Them, &l.After, &l.Delta)
@@ -101,9 +98,6 @@ func (g *Game) LeftOf(ctx context.Context, userID int64) (*Left, error) {
 
 // Told keeps a line as told to the player: it isn't told again, on any device.
 func (g *Game) Told(ctx context.Context, userID int64, line string) error {
-	if line == "challenges" { // who took their challenges, so far (ChallengeNewsOf)
-		return g.challengeTold(ctx, userID)
-	}
 	m := lineKey.FindStringSubmatch(line)
 	if m == nil {
 		return ErrNoLine
@@ -133,6 +127,6 @@ func (g *Game) LeftLive(ctx context.Context, duelID, userID int64, after int) er
 	_, err := g.DB.Write.ExecContext(ctx, `UPDATE duels SET
 			a_left = CASE WHEN a_id = ?2 THEN ?3 ELSE a_left END,
 			b_left = CASE WHEN b_id = ?2 THEN ?3 ELSE b_left END
-		WHERE id = ?1 AND kind = 'live'`, duelID, userID, after)
+		WHERE id = ?1`, duelID, userID, after)
 	return err
 }

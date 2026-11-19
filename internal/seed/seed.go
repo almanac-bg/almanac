@@ -4,13 +4,13 @@
 // It plays the history through the game's own functions, on a clock of its own that walks from Options.Days ago to
 // now: players arrive (account.Accounts.Guest, named and given an email by some), play the day's ten and topics
 // (play.Game: Show, Start, Answer), second chances, live duels with each other and against recordings (StartLive,
-// ShowLive, AnswerLive), challenges sent, taken, declined and left to run out, rooms (RecordRoom, as the room's own
-// game grades), and Роял evenings with their cuts and podiums (royal.Hub, stepped on the same clock); they ask each
-// other to be friends, accept, say no, block, invite, choose their look. Whatever follows from that, the game works
-// out itself: scores, streaks, reserve days, goals, XP and levels, achievements and titles, ratings and divisions
-// (newcomers still placing too), the weeks of the leagues with their groups, places and moves, the facts of Моят
-// Алманах, the mistakes waiting. Only what no game function writes is written directly: when a player came and was
-// last seen, their email, their mail and notification preferences, the sessions of the personas, and /admin's
+// ShowLive, AnswerLive), rooms (RecordRoom, as the room's own game grades), and Роял evenings with their cuts and
+// podiums (royal.Hub, stepped on the same clock); they ask each other to be friends, accept, say no, block, choose
+// their look. Whatever follows from that, the game works out itself: scores, streaks, reserve days, goals, XP and
+// levels, achievements and titles, ratings and divisions (newcomers still placing too), the weeks of the leagues
+// with their groups, places and moves, the facts of Моят Алманах, the mistakes waiting. Only what no game function
+// writes is written directly: when a player came and was last seen, their email, their mail and notification
+// preferences, the sessions of the personas, and /admin's
 // tallies of visits and asks.
 //
 // Players play at once, not one after another: each visit begins at its own time (rewind), the clock put back if the
@@ -164,7 +164,6 @@ type world struct {
 	friends map[[2]int64]bool // who has asked whom, either way (the lower id first)
 	blocked map[[2]int64]bool // who has blocked whom, either way (the lower id first): never met live
 	swept   time.Time         // the last time the server's sweeps ran (sweep)
-	links   []link            // challenges shared as links, for others to open
 	day     int               // the day being played, from 0
 	nets    int
 	rooms   int

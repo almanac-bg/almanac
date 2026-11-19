@@ -21,7 +21,6 @@ import (
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/assets"
 	"github.com/almanac-bg/almanac/internal/bank"
-	"github.com/almanac-bg/almanac/internal/play"
 )
 
 // The app is one page: the server sends it for every path the app knows (and a 404 with it for the rest, which the
@@ -33,11 +32,8 @@ var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/play/[a-z]+$`),
 	regexp.MustCompile(`^/(duel|royal|room|ranks|rewards|wardrobe|me|friends|settings|almanac|mistakes|games)$`),
 	regexp.MustCompile(`^/duel/([0-9]{1,12}|live)$`),
-	regexp.MustCompile(`^/challenge(/[0-9]{1,12})?$`),
-	regexp.MustCompile(`^/c/[a-z0-9]{6,8}$`),
 	regexp.MustCompile(`^/r/[0-9]{6}$`),
 	regexp.MustCompile(`^/games/[0-9]{1,12}$`),
-	regexp.MustCompile(`^/f/[a-z0-9]{8}$`),
 	regexp.MustCompile(`^/hand/[A-Za-z0-9_-]{43}$`),
 	regexp.MustCompile(`^/players/[A-Za-z0-9_]{3,20}$`),
 }
@@ -233,25 +229,11 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(out.Bytes())
 }
 
-// preview is what a link to this page shows when it's shared (Viber, Messenger, WhatsApp): an invite (the link a
-// shared day's result ends with) says whose it is and how they did today; a room, its code.
+// preview is what a link to this page shows when it's sent (Viber, Messenger, WhatsApp): a player's page, whose it
+// is; a room, its code.
 func (s *Server) preview(r *http.Request) (title, description string) {
 	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми, дуели и Роял на живо, стаи с приятели. Всеки отговор носи по нещо ново."
 	switch path := r.URL.Path; {
-	case strings.HasPrefix(path, "/f/"):
-		if id, name, err := s.game.Inviter(r.Context(), strings.TrimPrefix(path, "/f/")); err == nil {
-			// The link is to the day's ten, and often to a group: an invitation to them, not to be friends.
-			title = name + " те кани на въпросите на деня в АЛМАНАХ"
-			if n, played, err := s.game.DayRights(r.Context(), id, s.game.Today(), 0); err == nil && played {
-				title = fmt.Sprintf("%s: %d от %d в АЛМАНАХ днес", name, n, play.Length)
-			}
-			description = "Десет въпроса за днес, едни и същи за всички. Колко ще познаеш ти?"
-		}
-	case strings.HasPrefix(path, "/c/"):
-		if c, err := s.game.ChallengeOf(r.Context(), strings.TrimPrefix(path, "/c/"), 0); err == nil && !c.Over {
-			title = c.By.Name + " те предизвиква в АЛМАНАХ"
-			description = fmt.Sprintf("%s позна %d от %d. Изиграй същите въпроси и сравнете.", c.By.Name, c.Rights, c.Total)
-		}
 	case strings.HasPrefix(path, "/players/"):
 		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {
 			if p, err := s.profileOf(r, tag, 0); err == nil {
@@ -278,8 +260,7 @@ func (s *Server) preview(r *http.Request) (title, description string) {
 }
 
 // Search engines get the front page and the privacy notice, and nothing else: every other page is the game itself,
-// the same empty page until it starts, or something of one player's or one game's (a room, an invite, a duel, a
-// profile), so those say "noindex". The API is closed to them. Both files carry the site's own address, so they're
+// the same empty page until it starts, or something of one player's or one game's (a room, a duel, a profile), so those say "noindex". The API is closed to them. Both files carry the site's own address, so they're
 // drawn here, not kept in web/public.
 var indexed = []string{"/", "/privacy"}
 

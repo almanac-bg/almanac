@@ -38,10 +38,10 @@ const phoneBrowser = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML,
 
 func TestVisitsAreCounted(t *testing.T) {
 	g := start(t)
-	g.open("/f/abcd1234", phoneBrowser)
-	g.open("/f/abcd1234", phoneBrowser) // a reload: once a half hour
+	g.open("/r/654321", phoneBrowser)
+	g.open("/r/654321", phoneBrowser) // a reload: once a half hour
 	// Another phone behind the same address (a carrier's): a visit of its own.
-	g.open("/f/abcd1234", strings.Replace(phoneBrowser, "Android 14", "Android 13", 1))
+	g.open("/r/654321", strings.Replace(phoneBrowser, "Android 14", "Android 13", 1))
 	g.open("/", phoneBrowser)
 	g.open("/players/nobody", phoneBrowser)
 	g.open("/r/123456", phoneBrowser+" AlmanacApp") // the app, wherever it opens
@@ -50,7 +50,7 @@ func TestVisitsAreCounted(t *testing.T) {
 	g.open("/", "WhatsApp/2.24.1 A")
 	g.open("/", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")
 	g.open("/", "facebookexternalhit/1.1")
-	for key, want := range map[string]int{"visit:invite": 2, "visit:home": 1, "visit:player": 1, "visit:app": 1, "visit:other": 0} {
+	for key, want := range map[string]int{"visit:room": 2, "visit:home": 1, "visit:player": 1, "visit:app": 1, "visit:other": 0} {
 		if got := g.counted(key); got != want {
 			t.Errorf("%s: %d, want %d", key, got, want)
 		}
@@ -94,8 +94,8 @@ func TestWhereGuestsCameFrom(t *testing.T) {
 		}
 		return from.String
 	}
-	for path, want := range map[string]string{"/r/123456": "room", "/f/abcd1234": "invite", "/s/abcd1234": "share",
-		"/": "home", "/players/ana": "player", "/royal": "other"} {
+	for path, want := range map[string]string{"/r/123456": "room", "/f/abcd1234": "other", "/": "home",
+		"/players/ana": "player", "/royal": "other"} {
 		_, out := g.player().call("POST", "/api/guest", map[string]any{"from": path})
 		if got := cameFrom(out); got != want {
 			t.Errorf("from %s: %q, want %q", path, got, want)
@@ -127,13 +127,12 @@ func TestWhereGuestsCameFrom(t *testing.T) {
 func TestTheClientsCounts(t *testing.T) {
 	g := start(t)
 	p := g.player() // no profile needed: a notification is opened before the page knows who plays
-	for key, want := range map[string]int{"share:day": 200, "pushask:yes": 200, "push:open:day": 200,
+	for key, want := range map[string]int{"share:day": 400, "pushask:yes": 200, "push:open:day": 200,
 		"push:open:asked": 200, "push:open:news": 400, "visit:home": 400, "": 400} {
 		if status, _ := p.call("POST", "/api/tally", map[string]string{"key": key}); status != want {
 			t.Errorf("%q: %d, want %d", key, status, want)
 		}
 	}
-	// The day shared counts only from a player who finished it today (D12): this one hasn't.
 	if g.counted("share:day") != 0 || g.counted("push:open:asked") != 1 || g.counted("visit:home") != 0 {
 		t.Fatal("not counted")
 	}
@@ -156,8 +155,7 @@ func TestLanding(t *testing.T) {
 		path string
 		app  bool
 		want string
-	}{{"/", false, "home"}, {"/", true, "app"}, {"/f/x", false, "invite"}, {"/s/x", false, "share"},
-		{"/room", false, "room"}, {"/r/123456", false, "room"}, {"/players/x", false, "player"}, {"/duel", false, "other"}} {
+	}{{"/", false, "home"}, {"/", true, "app"}, {"/f/x", false, "other"}, {"/room", false, "room"}, {"/r/123456", false, "room"}, {"/players/x", false, "player"}, {"/duel", false, "other"}} {
 		if got := landing(c.path, c.app); got != c.want {
 			t.Errorf("%s (app %v): %s, want %s", c.path, c.app, got, c.want)
 		}

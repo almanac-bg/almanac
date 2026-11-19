@@ -2,7 +2,6 @@ package play
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -12,18 +11,13 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// Friends are two players who joined up: one asked and the other said yes. Asked by tag, by email, from a room's end,
-// or by opening the other's invite link (sent, or at the end of their shared day's result: it brings whoever opens it
-// to the day, and offers to ask its owner with a tap). Never without both: a link opened is a request its owner
-// accepts (AskByInvite), unless they had asked first, so that a link shared with a whole group, or passed on, makes
-// nobody a friend of its owner on its own, and one unfriended can't come back by it. Its owner can make a new link at
-// any time (NewInviteCode): the old one is then nobody's. A block keeps two players apart (blocks.go). Each friend
-// sees how the other did on the day's questions, they keep a record of their duels, and either can call the other to
-// a duel.
+// Friends are two players who joined up: one asked and the other said yes. Asked by tag, by email, or from a room's
+// end; never without both. A block keeps two players apart (blocks.go). Each friend sees how the other did on the day's
+// questions, and they keep a record of their duels.
 
 var (
-	ErrNoInvite     = errors.New("no such invite")
-	ErrOwnInvite    = errors.New("one's own invite")
+	// ErrSelf is a player asking themselves to be friends.
+	ErrSelf         = errors.New("one's own request")
 	ErrNotFriends   = errors.New("not friends")
 	ErrManyFriends  = errors.New("too many friends")
 	ErrNoPlayer     = errors.New("no player with that tag")
@@ -37,67 +31,8 @@ const MaxRequests = 50
 // MaxFriends is how many friends a player may have: plenty for the people they know, too few for a list of strangers.
 const MaxFriends = 200
 
-// inviteLetters make the codes of invite links: no 0, o, 1 or l, which are easy to mix up when read out.
-const inviteLetters = "abcdefghijkmnpqrstuvwxyz23456789"
-
-func newInviteCode() string {
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	for i := range b {
-		b[i] = inviteLetters[int(b[i])%len(inviteLetters)] // 256 is a multiple of 32: no letter more likely
-	}
-	return string(b)
-}
-
-// InviteCode is the code of a player's invite link, made the first time they ask for it and the same after, until they
-// make a new one (NewInviteCode).
-func (g *Game) InviteCode(ctx context.Context, userID int64) (string, error) {
-	for range 3 {
-		var code sql.NullString
-		err := g.DB.Read.QueryRowContext(ctx, `SELECT invite FROM users WHERE id = ?`, userID).Scan(&code)
-		if err != nil {
-			return "", err
-		}
-		if code.Valid {
-			return code.String, nil
-		}
-		// Another tab may make one at the same moment: the first one kept wins, and the loop reads it.
-		if _, err := g.DB.Write.ExecContext(ctx, `UPDATE users SET invite = ? WHERE id = ? AND invite IS NULL`,
-			newInviteCode(), userID); err != nil && !strings.Contains(err.Error(), "UNIQUE") {
-			return "", err
-		}
-	}
-	return "", errors.New("no free invite code")
-}
-
-// NewInviteCode gives a player a new invite link in place of the one they had: the old one is nobody's from then on
-// (a link shared further than they meant). The new code.
-func (g *Game) NewInviteCode(ctx context.Context, userID int64) (string, error) {
-	for range 3 {
-		code := newInviteCode()
-		_, err := g.DB.Write.ExecContext(ctx, `UPDATE users SET invite = ? WHERE id = ?`, code, userID)
-		if err == nil {
-			return code, nil
-		}
-		if !strings.Contains(err.Error(), "UNIQUE") {
-			return "", err
-		}
-	}
-	return "", errors.New("no free invite code")
-}
-
-// Inviter is whose invite link a code is.
-func (g *Game) Inviter(ctx context.Context, code string) (id int64, name string, err error) {
-	err = g.DB.Read.QueryRowContext(ctx, `SELECT id, name FROM users WHERE invite = ?`, code).Scan(&id, &name)
-	if errors.Is(err, sql.ErrNoRows) {
-		err = ErrNoInvite
-	}
-	return id, name, err
-}
-
 // DayRights is how many of a day's ten a player got right, once they've finished it (played false before), as a viewer
-// sees it (0: nobody signed in): a game played at a script's speed is its player's alone (fairFor). It's what an
-// invite link says of its owner's day, and of the day of the one who opens it.
+// sees it (0: nobody signed in): a game played at a script's speed is its player's alone (fairFor).
 func (g *Game) DayRights(ctx context.Context, userID int64, day string, viewer int64) (rights int, played bool, err error) {
 	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.rights FROM runs r WHERE r.user_id = ? AND r.kind = 'day' AND r.day = ?
 		AND r.finished_at IS NOT NULL AND `+fairFor("r", "?"), userID, day, viewer).Scan(&rights)
@@ -105,25 +40,6 @@ func (g *Game) DayRights(ctx context.Context, userID int64, day string, viewer i
 		return 0, false, nil
 	}
 	return rights, err == nil, err
-}
-
-// AskByInvite is a player who opened an invite link asking its owner to be friends: a request, as by their tag, that
-// the owner accepts or not (or friends at once, if the owner had asked them first). The owner's id and name, and what
-// came of it.
-func (g *Game) AskByInvite(ctx context.Context, userID int64, code string) (id int64, name string, sent Sent, err error) {
-	id, name, err = g.Inviter(ctx, code)
-	if err != nil {
-		return 0, "", Sent{}, err
-	}
-	if id == userID {
-		return 0, "", Sent{}, ErrOwnInvite
-	}
-	var tag string
-	if err := g.DB.Read.QueryRowContext(ctx, `SELECT tag FROM users WHERE id = ?`, id).Scan(&tag); err != nil {
-		return 0, "", Sent{}, err
-	}
-	sent, err = g.Request(ctx, userID, tag, false)
-	return id, name, sent, err
 }
 
 // befriend makes two players friends (if they aren't yet), settles any requests between them, and awards what that
@@ -196,7 +112,7 @@ func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool)
 	var err error
 	if byEmail {
 		if mine.Valid && to == mine.String {
-			return Sent{}, ErrOwnInvite
+			return Sent{}, ErrSelf
 		}
 		// Told only to someone this address's owner has already asked: they know each other.
 		err = g.DB.Read.QueryRowContext(ctx, `SELECT u.id, u.name FROM users u JOIN friend_requests r ON r.from_id = u.id
@@ -214,7 +130,7 @@ func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool)
 		return Sent{}, err
 	}
 	if other == from {
-		return Sent{}, ErrOwnInvite
+		return Sent{}, ErrSelf
 	}
 	// Whoever the request is to (by email, the address's owner, though the sender isn't told), one blocked by the
 	// other: as if sent.
@@ -343,7 +259,7 @@ func (g *Game) Accept(ctx context.Context, userID, requestID int64) (name string
 		return "", err
 	}
 	if from == userID {
-		return "", ErrOwnInvite
+		return "", ErrSelf
 	}
 	return name, g.befriend(ctx, from, userID)
 }

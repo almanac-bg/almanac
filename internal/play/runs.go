@@ -216,8 +216,8 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 }
 
 // LeftRun is a game of the player's own left unfinished, to come back to: a topic's today (its category, "" for all
-// of them: a challenge's), or a second chance's today; how far it got (At answered, of Total), and whether a question
-// is showing now, its time running (Open).
+// of them), or a second chance's today; how far it got (At answered, of Total), and whether a question is showing
+// now, its time running (Open).
 type LeftRun struct {
 	ID       int64  `json:"id"`
 	Kind     string `json:"kind"`

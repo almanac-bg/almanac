@@ -28,11 +28,9 @@ test("Начало and Класации that can't load try again, by a tap or a
 test("a page that isn't there says so, with a way on", async ({ page }) => {
   await page.goto("/");
   await page.evaluate(() => fetch("/api/guest", { method: "POST", body: "{}" }));
-  await page.goto("/challenge/999999");
-  await expect(page.getByText("с този играч още не сте приятели")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
-  await page.getByRole("link", { name: "Към приятелите" }).click();
-  await expect(page).toHaveURL(/\/friends$/);
+  // An old link of something the game no longer has (a challenge's): said so, with the way to the day.
+  await page.goto("/c/abc234");
+  await expect(page.getByRole("heading", { name: "Тази страница я няма" })).toBeVisible();
 
   // A topic the game doesn't have (an old link): said so, not a blank page.
   await page.goto("/play/nothing");

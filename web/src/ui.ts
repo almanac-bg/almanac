@@ -603,18 +603,6 @@ export function standingCard(s: Standing, own = false): Child {
   );
 }
 
-/** A day and an hour, the Bulgarian way, the day in full: „четвъртък, 09:11 ч.“ (it ends a sentence with its own
- * period). */
-export function until(ms: number): string {
-  const at = new Date(ms);
-  // Each part on its own, the „ч.“ ours: the browsers' own Bulgarian differs (Safari leaves it out).
-  const day = new Intl.DateTimeFormat("bg", { weekday: "long" }).format(at);
-  const time = new Intl.DateTimeFormat("bg", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
-    .format(at)
-    .replace(/\s*ч\.$/, "");
-  return `${day}, ${time} ч.`; // never „ч.“ alone on a line
-}
-
 /** Something to wear, unlocked (or to be): a title, a frame, a pattern or an avatar's shape, and what unlocks it. */
 export interface Unlock {
   kind: "title" | "frame" | "backdrop" | "avatar";

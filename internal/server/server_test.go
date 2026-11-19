@@ -473,7 +473,7 @@ func TestSearchEngines(t *testing.T) {
 	if res, _ := get("/privacy"); res.Header.Get("X-Robots-Tag") != "" {
 		t.Errorf("/privacy: X-Robots-Tag %q", res.Header.Get("X-Robots-Tag"))
 	}
-	for _, path := range []string{"/me", "/ranks", "/play/history", "/r/123456", "/f/abcd1234", "/players/someone", "/nowhere"} {
+	for _, path := range []string{"/me", "/ranks", "/play/history", "/r/123456", "/players/someone", "/nowhere"} {
 		res, body := get(path)
 		if res.Header.Get("X-Robots-Tag") != "noindex" || strings.Contains(body, "canonical") {
 			t.Errorf("%s: X-Robots-Tag %q", path, res.Header.Get("X-Robots-Tag"))
@@ -1139,12 +1139,16 @@ func (g *game) guest() (*player, int64) {
 	return p, int64(id)
 }
 
-// befriend makes two players friends: b opens a's invite link and asks, and a says yes.
+// befriend makes two players friends: b asks a by their tag, and a says yes.
 func befriend(a, b *player) {
-	_, mine := a.call("GET", "/api/friends", nil)
-	link := mine["invite"].(string)
-	b.call("POST", "/api/invites/"+link[strings.LastIndex(link, "/")+1:], nil)
+	b.call("POST", "/api/friends/requests", map[string]string{"to": "@" + tagOf(a)})
 	acceptAll(a)
+}
+
+// tagOf is a player's tag.
+func tagOf(p *player) string {
+	_, me := p.call("GET", "/api/me", nil)
+	return me["user"].(map[string]any)["tag"].(string)
 }
 
 // acceptAll says yes to every friend request waiting for a player.
@@ -1195,8 +1199,8 @@ func TestNotifications(t *testing.T) {
 		t.Fatal("reminded before the hour")
 	}
 
-	// Bo opens Ana's invite link and asks to be friends: Ana hears of it, once however often he asks; she accepts.
-	// Ana challenges Bo and plays hers: Bo hears of it.
+	// Bo asks Ana to be friends by her tag: Ana hears of it, once however often he asks, and sees it waiting; she
+	// accepts.
 	pushes := func(path string, want int) {
 		t.Helper()
 		s.sendQueued(t.Context()) // queued by the request, before it answered
@@ -1204,24 +1208,17 @@ func TestNotifications(t *testing.T) {
 			t.Fatalf("%s: %d pushes, want %d", path, got, want)
 		}
 	}
-	_, mine := ana.call("GET", "/api/friends", nil)
-	link := mine["invite"].(string)
 	for range 3 {
-		bo.call("POST", "/api/invites/"+link[strings.LastIndex(link, "/")+1:], nil)
+		bo.call("POST", "/api/friends/requests", map[string]string{"to": "@" + tagOf(ana)})
 	}
 	pushes("/ana", 1)
+	if _, w := ana.call("GET", "/api/friends/requests", nil); w["requests"] != 1.0 {
+		t.Fatalf("Ana's requests waiting: %v", w)
+	}
 	acceptAll(ana)
 	pushes("/ana", 1)
-	_, mine = ana.call("GET", "/api/friends", nil)
-	boID := int64(mine["friends"].([]any)[0].(map[string]any)["id"].(float64))
-	_, duel := ana.call("POST", fmt.Sprintf("/api/friends/%d/challenge", boID), nil)
-	if _, w := bo.call("GET", "/api/friends/invites", nil); len(w["challenges"].([]any)) != 0 {
-		t.Fatalf("Bo challenged before Ana played: %v", w)
-	}
-	playRun(ana, duel["state"].(map[string]any))
-	pushes("/bo", 2)
-	if _, w := bo.call("GET", "/api/friends/invites", nil); len(w["challenges"].([]any)) != 1 {
-		t.Fatalf("Bo's challenges: %v", w)
+	if _, w := ana.call("GET", "/api/friends/requests", nil); w["requests"] != 0.0 {
+		t.Fatalf("Ana's requests waiting, after: %v", w)
 	}
 }
 
@@ -1378,45 +1375,8 @@ func TestLinkPreviews(t *testing.T) {
 	}
 	p := g.player()
 	p.call("POST", "/api/guest", map[string]any{})
-	_, me := p.call("GET", "/api/me", nil)
-	_, run := p.call("POST", "/api/topic", map[string]string{"category": "music"})
-	id := strconv.Itoa(int(run["id"].(float64)))
-	for n := range 10 {
-		p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
-		p.call("POST", "/api/runs/"+id+"/start", map[string]any{"n": n}) // its pictures in, if it has any
-		p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": nil})
-	}
-	_, friends := p.call("GET", "/api/friends", nil)
-	link := friends["invite"].(string)
-	who := me["user"].(map[string]any)["name"].(string)
-	if body := page(link[len(g.url):]); !strings.Contains(body, `og:title" content="`+who+` те кани на въпросите на деня в АЛМАНАХ"`) ||
-		!strings.Contains(body, `og:description" content="Десет въпроса за днес, едни и същи за всички. Колко ще познаеш ти?"`) {
-		t.Fatalf("the invite's preview:\n%s", body[:min(len(body), 1500)])
-	}
-	// Once its owner has played the day, their link (the one their shared result ends with) says how they did.
-	_, day := p.call("POST", "/api/day", map[string]any{})
-	id = strconv.Itoa(int(day["id"].(float64)))
-	for n := range 10 {
-		p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
-		p.call("POST", "/api/runs/"+id+"/start", map[string]any{"n": n}) // its pictures in, if it has any
-		p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": nil})
-	}
-	if _, today := p.call("GET", "/api/day", nil); today["invite"] != link {
-		t.Fatalf("the day's link to share: %v, not %s", today["invite"], link)
-	}
-	if body := page(link[len(g.url):]); !strings.Contains(body, `og:title" content="`+who+`: 0 от 10 в АЛМАНАХ днес"`) {
-		t.Fatalf("the invite's preview, its owner's day played:\n%s", body[:min(len(body), 1500)])
-	}
-	// The one who opens it hears how its owner did, and, once played, how they did themselves.
-	other := g.player()
-	other.call("POST", "/api/guest", map[string]any{})
-	code := link[strings.LastIndex(link, "/")+1:]
-	if _, info := other.call("GET", "/api/invites/"+code, nil); info["their"] != 0.0 || info["mine"] != nil ||
-		info["friends"] != false {
-		t.Fatalf("the invite as another sees it: %v", info)
-	}
 	_, room := p.call("POST", "/api/rooms", map[string]any{})
-	code = room["code"].(string)
+	code := room["code"].(string)
 	if body := page("/r/" + code); !strings.Contains(body, "Ела в стая "+code[:3]+" "+code[3:]) {
 		t.Fatal("the room's preview")
 	}
@@ -1459,48 +1419,26 @@ func TestFriendsOverHTTP(t *testing.T) {
 	ana, bo := g.player(), g.player()
 	_, a := ana.call("POST", "/api/guest", map[string]any{})
 	bo.call("POST", "/api/guest", map[string]any{})
-	_, mine := ana.call("GET", "/api/friends", nil)
-	link, _ := mine["invite"].(string)
-	code := link[strings.LastIndex(link, "/")+1:]
-	if !strings.HasSuffix(link, "/f/"+code) || len(code) != 8 {
-		t.Fatalf("Ana's invite link: %q", link)
+	anaTag := a["user"].(map[string]any)["tag"].(string)
+	if status, out := ana.call("POST", "/api/friends/requests", map[string]string{"to": "@" + anaTag}); status != http.StatusConflict ||
+		out["error"] != "self" {
+		t.Fatalf("Ana asks herself: %d %v", status, out)
 	}
-	if _, info := ana.call("GET", "/api/invites/"+code, nil); info["own"] != true {
-		t.Fatalf("Ana's own link: %v", info)
+	if status, _ := bo.call("POST", "/api/friends/requests", map[string]string{"to": "@nosuchplayer"}); status != http.StatusNotFound {
+		t.Fatalf("an unknown tag: %d", status)
 	}
-	if _, info := bo.call("GET", "/api/invites/"+code, nil); info["by"] != name(a) || info["own"] != false {
-		t.Fatalf("Ana's link, as Bo sees it: %v", info)
-	}
-	if status, _ := bo.call("POST", "/api/invites/nosuchcd", nil); status != http.StatusNotFound {
-		t.Fatalf("a made-up link: %d", status)
-	}
-	// Bo asks by her link: a request, waiting for Ana's yes.
-	if status, out := bo.call("POST", "/api/invites/"+code, nil); status != http.StatusOK || out["name"] != name(a) ||
-		out["asked"] != true || out["friends"] != nil || out["id"] != nil {
+	// Bo asks by her tag: a request, waiting for Ana's yes.
+	if status, out := bo.call("POST", "/api/friends/requests", map[string]string{"to": "@" + anaTag}); status != http.StatusOK ||
+		out["name"] != name(a) || out["friends"] != nil {
 		t.Fatalf("Bo asks: %d %v", status, out)
 	}
-	if _, info := bo.call("GET", "/api/invites/"+code, nil); info["asked"] != true || info["friends"] != false {
-		t.Fatalf("Ana's link, Bo having asked: %v", info)
-	}
-	if _, mine := ana.call("GET", "/api/friends", nil); len(mine["friends"].([]any)) != 0 {
-		t.Fatalf("friends by a link alone: %v", mine)
+	if _, mine := ana.call("GET", "/api/friends", nil); len(mine["friends"].([]any)) != 0 || mine["invite"] != nil {
+		t.Fatalf("friends by a request alone: %v", mine)
 	}
 	acceptAll(ana)
-	_, mine = ana.call("GET", "/api/friends", nil)
-	friends, _ := mine["friends"].([]any)
-	if len(friends) != 1 {
+	_, mine := ana.call("GET", "/api/friends", nil)
+	if friends, _ := mine["friends"].([]any); len(friends) != 1 {
 		t.Fatalf("Ana's friends: %v", mine)
-	}
-	boID := int64(friends[0].(map[string]any)["id"].(float64))
-	if _, info := bo.call("GET", "/api/invites/"+code, nil); info["friends"] != true || info["id"] == nil {
-		t.Fatalf("Ana's link, as her friend Bo sees it: %v", info)
-	}
-
-	// Strangers can't ask each other.
-	vi := g.player()
-	vi.call("POST", "/api/guest", map[string]any{})
-	if status, _ := vi.call("POST", fmt.Sprintf("/api/friends/%d/challenge", boID), nil); status != http.StatusNotFound {
-		t.Fatalf("a stranger challenged Bo: %d", status)
 	}
 	if status, _ := bo.call("DELETE", fmt.Sprintf("/api/friends/%d", int64(a["user"].(map[string]any)["id"].(float64))), nil); status != http.StatusOK {
 		t.Fatalf("unfriending: %d", status)
@@ -1508,21 +1446,12 @@ func TestFriendsOverHTTP(t *testing.T) {
 	if _, his := bo.call("GET", "/api/friends", nil); len(his["friends"].([]any)) != 0 {
 		t.Fatalf("still friends: %v", his)
 	}
-	// Unfriended, the link doesn't bring Bo back: it asks again.
-	if _, out := bo.call("POST", "/api/invites/"+code, nil); out["asked"] != true {
-		t.Fatalf("Bo by the link after: %v", out)
+	// Unfriended, asking again is a request again, not the friendship back.
+	if _, out := bo.call("POST", "/api/friends/requests", map[string]string{"to": "@" + anaTag}); out["friends"] != nil {
+		t.Fatalf("Bo asks after: %v", out)
 	}
 	if _, mine := ana.call("GET", "/api/friends", nil); len(mine["friends"].([]any)) != 0 {
-		t.Fatalf("back by the link alone: %v", mine)
-	}
-
-	// Ana makes a new link: the old one is nobody's.
-	status, fresh := ana.call("POST", "/api/friends/invite", map[string]any{})
-	if status != http.StatusOK || fresh["invite"] == link || !strings.Contains(fresh["invite"].(string), "/f/") {
-		t.Fatalf("a new link: %d %v", status, fresh)
-	}
-	if status, _ := vi.call("POST", "/api/invites/"+code, nil); status != http.StatusNotFound {
-		t.Fatalf("the old link: %d", status)
+		t.Fatalf("back by a request alone: %v", mine)
 	}
 
 	// Ana blocks Bo: his request goes, and his asking again reaches nothing; she sees him on her list, and lifts it.
@@ -1531,9 +1460,9 @@ func TestFriendsOverHTTP(t *testing.T) {
 	if status, out := ana.call("POST", "/api/blocks", map[string]string{"tag": "@" + boTag}); status != 200 || out["name"] == nil {
 		t.Fatalf("block: %d %v", status, out)
 	}
-	newCode := fresh["invite"].(string)[strings.LastIndex(fresh["invite"].(string), "/")+1:]
-	if status, out := bo.call("POST", "/api/invites/"+newCode, nil); status != http.StatusOK || out["asked"] != true {
-		t.Fatalf("Bo, blocked, by the new link: %d %v", status, out)
+	if status, out := bo.call("POST", "/api/friends/requests", map[string]string{"to": "@" + anaTag}); status != http.StatusOK ||
+		out["friends"] != nil {
+		t.Fatalf("Bo, blocked, asks: %d %v", status, out)
 	}
 	_, mine = ana.call("GET", "/api/friends", nil)
 	if in := mine["requests"].(map[string]any)["in"].([]any); len(in) != 0 {
@@ -1553,21 +1482,19 @@ func TestFriendsOverHTTP(t *testing.T) {
 	}
 }
 
-// Pushes that others cause are capped for whoever gets them: strangers asking by a link, one each, at most
+// Pushes that others cause are capped for whoever gets them: strangers asking to be friends, one each, at most
 // peoplePushes a day; and none from one who's blocked.
 func TestPeoplePushesCapped(t *testing.T) {
 	s, g, fake, subscribe := pushWorld(t)
 	ana := g.player()
 	ana.call("POST", "/api/guest", map[string]any{})
 	subscribe(ana, "/ana")
-	_, mine := ana.call("GET", "/api/friends", nil)
-	link := mine["invite"].(string)
-	code := link[strings.LastIndex(link, "/")+1:]
+	asks := map[string]string{"to": "@" + tagOf(ana)}
 	// A stranger Ana blocked asks: nothing.
 	cy := g.player()
 	_, c := cy.call("POST", "/api/guest", map[string]any{})
 	ana.call("POST", "/api/blocks", map[string]string{"tag": c["user"].(map[string]any)["tag"].(string)})
-	cy.call("POST", "/api/invites/"+code, nil)
+	cy.call("POST", "/api/friends/requests", asks)
 	s.sendQueued(t.Context())
 	if got := fake.count("/ana"); got != 0 {
 		t.Fatalf("a push from one blocked: %d", got)
@@ -1575,7 +1502,7 @@ func TestPeoplePushesCapped(t *testing.T) {
 	for range peoplePushes + 5 {
 		p := g.player()
 		p.call("POST", "/api/guest", map[string]any{})
-		p.call("POST", "/api/invites/"+code, nil)
+		p.call("POST", "/api/friends/requests", asks)
 	}
 	s.sendQueued(t.Context())
 	if got := fake.count("/ana"); got != peoplePushes {

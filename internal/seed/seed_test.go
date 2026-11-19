@@ -61,9 +61,8 @@ func TestSeededGame(t *testing.T) {
 	for what, q := range map[string]string{
 		"day runs":         `SELECT count(*) FROM runs WHERE kind = 'day' AND finished_at IS NOT NULL`,
 		"topic runs":       `SELECT count(*) FROM runs WHERE kind = 'topic'`,
-		"live duels":       `SELECT count(*) FROM duels WHERE kind = 'live' AND b_id IS NOT NULL AND outcome IN ('a', 'b', 'draw')`,
-		"recorded duels":   `SELECT count(*) FROM duels WHERE kind = 'live' AND ghost_run IS NOT NULL`,
-		"challenges taken": `SELECT count(*) FROM duels WHERE kind = 'challenge' AND outcome IN ('a', 'b', 'draw', 'ghost_won', 'ghost_lost', 'ghost_draw')`,
+		"live duels":       `SELECT count(*) FROM duels WHERE b_id IS NOT NULL AND outcome IN ('a', 'b', 'draw')`,
+		"recorded duels":   `SELECT count(*) FROM duels WHERE ghost_run IS NOT NULL`,
 		"friends":          `SELECT count(*) FROM friends`,
 		"requests waiting": `SELECT count(*) FROM friend_requests WHERE NOT declined`,
 		"achievements":     `SELECT count(*) FROM achievements`,
@@ -121,7 +120,7 @@ func TestSeededGame(t *testing.T) {
 		"POST /api/me/news", "/api/day", "/api/day/" + yesterday + "/board", "/api/mistakes", "/api/runs/left",
 		"/api/playing", "/api/duels", "/api/ranks", "/api/ranks?among=friends", "/api/ranks?by=knowledge",
 		"/api/royal", "/api/royal/tonight", "/api/almanac", "/api/league", "/api/goals", "/api/friends",
-		"/api/friends/invites", "/api/push/prefs", "/api/mail/prefs"}
+		"/api/friends/requests", "/api/push/prefs", "/api/mail/prefs"}
 	for _, p := range personas {
 		for _, path := range append(screens, "/api/players/"+p.Tag) {
 			if code, v := get(p, path); code != http.StatusOK {

@@ -161,15 +161,12 @@ test("the result keeps „Реванш“ in sight; the other asking shows over 
   };
   const duel = {
     id: 7,
-    kind: "live",
     state: "won",
     opponent: them,
     you: { name: "Мечка", points: 4500, rights: 5, ms: 50_000, done: true, marks },
     createdAt: Date.now(),
-    expiresAt: Date.now(),
     endedAt: Date.now(),
     decided: 1,
-    invite: "http://127.0.0.1/f/abcdefgh",
   };
   await page.route("**/api/duels/7", (r) => r.fulfill({ json: { duel } }));
   const end = (more: Record<string, unknown>) => ({
@@ -186,8 +183,7 @@ test("the result keeps „Реванш“ in sight; the other asking shows over 
   const dock = page.locator(".duel-dock");
   await expect(dock.getByRole("button", { name: "Реванш" })).toBeInViewport();
   await expect(dock.getByRole("button", { name: "Реванш" })).toHaveClass(/primary/);
-  // A win is shared, plain beside it.
-  await expect(page.getByRole("button", { name: "Сподели" })).not.toHaveClass(/primary/);
+
   // The other asks: who, and the seconds they wait, over a gold yes.
   await push(page, end({ rematch: true, rematchMs: 12_000 }));
   await expect(dock.locator(".rematch-asks")).toContainText("Котка 713 иска реванш");

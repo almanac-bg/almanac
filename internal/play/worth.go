@@ -57,7 +57,7 @@ func WorthOf(q bank.Question, score float64, took time.Duration) Worth {
 
 // worth is what an answer to a pick earns (WorthOf), at the difficulty the pick showed at (Pick.D): a question
 // relabelled while it's in play (calibration moves labels, and never the version) pays the same for the same answer,
-// in a run, between a challenge's two players, and all day long on the day's ten. A pick from before it was kept pays
+// in a run, between a duel's two players, and all day long on the day's ten. A pick from before it was kept pays
 // at the question's label.
 func (p Pick) worth(q bank.Question, score float64, took time.Duration) Worth {
 	level := p.D

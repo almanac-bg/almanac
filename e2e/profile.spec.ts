@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { meetAs, playRun } from "./play.ts";
+import { playRun } from "./play.ts";
 
-test("a player's profile: asked to be friends, then a challenge from it", async ({ browser }) => {
+test("a player's profile: asked to be friends from it, and friends there", async ({ browser }) => {
   test.setTimeout(120_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
@@ -36,11 +36,9 @@ test("a player's profile: asked to be friends, then a challenge from it", async 
   await a.getByRole("button", { name: "Приеми" }).click();
   await expect(a.getByText("Приятели сте.")).toBeVisible();
 
-  // Friends now: a challenge from her profile.
+  // Friends now, on his side too.
   await b.reload();
-  await b.locator(".player-actions").getByRole("button", { name: "Предизвикай" }).click();
-  await meetAs(b);
-  await expect(b.locator("article.question")).toBeVisible();
+  await expect(b.locator(".player-actions")).toContainText("Приятели сте.");
 
   // Her own profile, as others see it, says so.
   await a.goto(`/players/${ana.tag}`);

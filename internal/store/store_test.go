@@ -514,97 +514,42 @@ func TestLiveDuels(t *testing.T) {
 	db.Close()
 }
 
-// One challenge (0050): each friend's duel becomes the friend's game of a challenge of the challenger's game, the sides
-// turned round; those under way go on where they were, those over keep their result; a challenge's link already made
-// keeps its code, and its takers their games; live duels stay as they were.
-func TestOneChallenge(t *testing.T) {
-	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0050_one_challenge.sql")
+// No challenges (0077): their duels go, with them; live duels stay as they were, kind or challenge aside; the games
+// stay (one of the first challenges' a game of every topic); a player who came by a shared day or an invite came
+// from elsewhere, and the counts of shares go.
+func TestNoChallenges(t *testing.T) {
+	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0077_no_challenges_invites_shares.sql")
 	for _, q := range []string{
-		`INSERT INTO users (id, name, tag, created_at, seen_at) VALUES (1, 'Ана', 'ana', 1, 1), (2, 'Бо', 'bo', 1, 1),
-			(3, 'Ци', 'cy', 1, 1)`,
+		`INSERT INTO users (id, name, tag, created_at, seen_at, invite, came_from) VALUES
+			(1, 'Ана', 'ana', 1, 1, 'abcdefgh', 'share'), (2, 'Бо', 'bo', 1, 1, NULL, 'invite'), (3, 'Ци', 'cy', 1, 1, NULL, 'room')`,
 		`INSERT INTO runs (id, user_id, kind, questions, started_at, finished_at) VALUES
-			(10, 1, 'duel', '[]', 1, 2), (11, 2, 'duel', '[]', 3, 4), (12, 1, 'duel', '[]', 1, 2), (13, 1, 'duel', '[]', 1, NULL),
-			(14, 1, 'duel', '[]', 1, 2), (15, 2, 'duel', '[]', 3, NULL), (16, 1, 'duel', '[]', 1, 2), (17, 3, 'duel', '[]', 3, 4),
-			(18, 1, 'duel', '[]', 1, 2), (19, 2, 'duel', '[]', 1, 2)`,
-		`INSERT INTO challenges (id, code, user_id, run_id, created_at, expires_at) VALUES (1, 'abcdefgh', 1, 16, 2, 50)`,
-		// over: Ana won, rated; Bo's turn; Ana still playing; Bo half-way; Bo's turn on a game shared by its link, and
-		// Cy's game of that link; a live duel; one without the challenger's game.
-		`INSERT INTO duels (id, kind, questions, a_id, a_run, b_id, b_run, created_at, expires_at, ended_at, outcome,
-				a_delta, b_delta, rated, a_rating, b_rating) VALUES
-			(1, 'friend', '[]', 1, 10, 2, 11, 1, 9, 4, 'a', 20, -20, 1, 1020, 980),
-			(2, 'friend', '[]', 1, 12, 2, NULL, 1, 90, NULL, NULL, NULL, NULL, 1, NULL, NULL),
-			(3, 'friend', '[]', 1, 13, 2, NULL, 1, 80, NULL, NULL, NULL, NULL, 1, NULL, NULL),
-			(4, 'friend', '[]', 1, 14, 2, 15, 1, 70, NULL, NULL, NULL, NULL, 1, NULL, NULL),
-			(5, 'friend', '[]', 1, 16, 2, NULL, 1, 60, NULL, NULL, NULL, NULL, 1, NULL, NULL),
-			(7, 'live', '[]', 1, 18, 2, 19, 1, 9, 4, 'b', -10, 10, 1, 990, 1010),
-			(8, 'friend', '[]', 1, NULL, 2, NULL, 1, 9, NULL, NULL, NULL, NULL, 1, NULL, NULL)`,
-		`INSERT INTO duels (id, kind, questions, a_id, a_run, ghost_run, challenge_id, created_at, expires_at, ended_at,
-				outcome, rated) VALUES (6, 'friend', '[]', 3, 17, 16, 1, 3, 9, 4, 'ghost_won', 0)`,
+			(10, 1, 'duel', '[]', 1, 2), (11, 2, 'duel', '[]', 1, 2), (12, 2, 'topic', '[]', 1, 2), (13, 3, 'duel', '[]', 1, 2),
+			(14, 3, 'challenge', '[]', 1, 2)`,
+		`INSERT INTO challenges (id, code, user_id, run_id, created_at, expires_at) VALUES (1, 'abcdefgh', 2, 12, 2, 50)`,
+		`INSERT INTO duels (id, kind, questions, a_id, a_run, b_id, b_run, ghost_run, challenge_id, created_at,
+				expires_at, ended_at, outcome, a_delta, b_delta, rated, a_rating, b_rating, unrated) VALUES
+			(1, 'live', '[1]', 1, 10, 2, 11, NULL, NULL, 1, 9, 4, 'a', 20, -20, 1, 1020, 980, NULL),
+			(2, 'challenge', '[2]', 3, 13, NULL, NULL, 12, 1, 3, 9, 5, 'ghost_won', NULL, NULL, 0, NULL, NULL, 'known'),
+			(3, 'live', '[3]', 3, 13, NULL, NULL, 12, NULL, 3, 9, 6, 'ghost_lost', -5, NULL, 1, 995, NULL, NULL)`,
+		`INSERT INTO daily_counts (day, key, n) VALUES ('2026-11-18', 'share:day', 3), ('2026-11-18', 'visit:invite', 2),
+			('2026-11-18', 'visit:home', 5)`,
 	} {
 		if _, err := db.Write.Exec(q); err != nil {
 			t.Fatal(q, err)
 		}
 	}
-	if err := db.migrate(); err != nil {
+	if err := db.migrateTo(migrationsThrough("0077_no_challenges_invites_shares.sql")); err != nil {
 		t.Fatal(err)
 	}
-	// kind, taker and their game, sender (b), the game played against, the challenge's game, outcome, deltas,
-	// ratings, expiry
-	want := map[int64]string{
-		1: "challenge 2 11 1 10 10 b -20 20 980 1020 9",
-		2: "challenge 2 0 1 12 12 - 0 0 0 0 90",
-		3: "challenge 2 0 1 13 13 - 0 0 0 0 80",
-		4: "challenge 2 15 1 14 14 - 0 0 0 0 70",
-		5: "challenge 2 0 1 16 16 - 0 0 0 0 60",
-		6: "challenge 3 17 0 16 16 ghost_won 0 0 0 0 9",
-		7: "live 1 18 2 0 0 b -10 10 990 1010 9",
-	}
-	rows, err := db.Read.Query(`SELECT d.id, d.kind, d.a_id, coalesce(d.a_run, 0), coalesce(d.b_id, 0),
-			coalesce(d.ghost_run, 0), coalesce(c.run_id, 0), coalesce(d.outcome, '-'), coalesce(d.a_delta, 0),
-			coalesce(d.b_delta, 0), coalesce(d.a_rating, 0), coalesce(d.b_rating, 0), d.expires_at
-		FROM duels d LEFT JOIN challenges c ON c.id = d.challenge_id`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := map[int64]string{}
-	for rows.Next() {
-		var id, a, aRun, b, ghost, of, ad, bd, ar, br, exp int64
-		var kind, outcome string
-		if err := rows.Scan(&id, &kind, &a, &aRun, &b, &ghost, &of, &outcome, &ad, &bd, &ar, &br, &exp); err != nil {
-			t.Fatal(err)
-		}
-		got[id] = fmt.Sprintf("%s %d %d %d %d %d %s %d %d %d %d %d", kind, a, aRun, b, ghost, of, outcome, ad, bd, ar, br, exp)
-	}
-	rows.Close()
-	if len(got) != len(want) {
-		t.Fatalf("duels after: %v", got)
-	}
-	for id, w := range want {
-		if got[id] != w {
-			t.Errorf("duel %d: %q, want %q", id, got[id], w)
-		}
-	}
-	// A challenge for each challenger's game, drawn for the pair (Bo), with a code like an invite's; the one shared
-	// already keeps its own, lasting as long as its duel.
-	codes, err := db.Read.Query(`SELECT run_id, code, user_id, expires_at, coalesce(for_id, 0) FROM challenges
-		ORDER BY run_id`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer codes.Close()
-	var list []string
-	for codes.Next() {
-		var run, user, exp, pair int64
-		var code string
-		_ = codes.Scan(&run, &code, &user, &exp, &pair)
-		if len(code) != 8 || strings.Trim(code, "abcdefghijkmnpqrstuvwxyz23456789") != "" || user != 1 || pair != 2 ||
-			(run == 16 && code != "abcdefgh") {
-			t.Errorf("challenge of %d: %q by %d for %d", run, code, user, pair)
-		}
-		list = append(list, fmt.Sprintf("%d %d", run, exp))
-	}
-	if fmt.Sprint(list) != "[10 9 12 90 13 80 14 70 16 60]" {
-		t.Errorf("challenges: %v", list)
+	var duels, runs, from, counts string
+	_ = db.Read.QueryRow(`SELECT group_concat(concat_ws(' ', id, questions, a_id, a_run, b_id, b_run, ghost_run, outcome,
+		a_delta, b_delta, rated, a_rating, b_rating), ', ') FROM (SELECT * FROM duels ORDER BY id)`).Scan(&duels)
+	_ = db.Read.QueryRow(`SELECT group_concat(id || kind || coalesce(category, '-'), ' ') FROM (SELECT * FROM runs ORDER BY id)`).Scan(&runs)
+	_ = db.Read.QueryRow(`SELECT group_concat(came_from, ' ') FROM (SELECT came_from FROM users ORDER BY id)`).Scan(&from)
+	_ = db.Read.QueryRow(`SELECT group_concat(key, ' ') FROM daily_counts`).Scan(&counts)
+	if duels != "1 [1] 1 10 2 11 a 20 -20 1 1020 980, 3 [3] 3 13 12 ghost_lost -5 1 995" || runs != "10duel- 11duel- 12topic- 13duel- 14topic" ||
+		from != "other other room" || counts != "visit:home" {
+		t.Fatalf("duels %q, runs %q, came from %q, counts %q", duels, runs, from, counts)
 	}
 	db.Close()
 }
@@ -620,6 +565,19 @@ func openBefore(t *testing.T, path, name string) *DB {
 		}
 	}
 	return openAt(t, path, n)
+}
+
+// migrationsThrough is how many migrations there are up to the named one, with it: to migrate a test's database with
+// it and none after.
+func migrationsThrough(name string) int {
+	files, _ := fs.Glob(migrations, "migrations/*.sql")
+	n := 0
+	for _, f := range files {
+		if strings.TrimPrefix(f, "migrations/") <= name {
+			n++
+		}
+	}
+	return n
 }
 
 // Titles by play (0046): „Под две секунди“ is kept only by who meets „Пет за миг“'s rule (five right in one game, each

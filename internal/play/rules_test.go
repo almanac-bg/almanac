@@ -1,7 +1,6 @@
 package play
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -91,9 +90,6 @@ func TestRunEndedByTheClock(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana, vi, gal := w.user(), w.user(), w.user()
-	var told []DuelNews
-	w.g.DuelNews = func(_ context.Context, n DuelNews) { told = append(told, n) }
-	w.befriend(ana, vi)
 	// lastRunsOut plays a run to its last question, shows it and lets its time run out; the next look ends the run.
 	lastRunsOut := func(user, runID int64, answer func(int64, int) json.RawMessage) {
 		w.play(user, runID, repeat(answer, Length-1)...)
@@ -114,39 +110,21 @@ func TestRunEndedByTheClock(t *testing.T) {
 		t.Fatal("a day ended by the clock earned nothing")
 	}
 
-	// Ana's challenge ends on the clock: Vi hears of it.
-	s, id, err := w.g.ChallengeFriend(ctx, ana, vi)
+	// A live duel between Ana and Vi has its result; settled again (both sides at once): nothing more, and no error.
+	live, err := w.g.StartLive(ctx, ana, vi)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Not Vi's turn while Ana is still playing: nothing to play yet.
-	if d, _ := w.g.DuelsOf(ctx, vi); len(d) != 0 {
-		t.Fatalf("Vi sees a challenge Ana hasn't played: %+v", d)
+	w.play(ana, live.Runs[0], repeat(w.right, Length)...)
+	w.play(vi, live.Runs[1], repeat(w.wrong, Length)...)
+	if d, _ := w.g.DuelsOf(ctx, vi); len(d) != 1 || d[0].State != "lost" {
+		t.Fatalf("Vi's duel: %+v", d)
 	}
-	lastRunsOut(ana, s.ID, w.right)
-	// Ana's run of the open challenge is no recording for Vi to learn its answers from.
-	if _, err := w.g.StartRecorded(ctx, vi); !errors.Is(err, ErrNobody) {
-		t.Fatalf("a recording from an open challenge: %v", err)
+	if err := w.g.settleDuel(ctx, live.DuelID, false, 0); err != nil {
+		t.Fatalf("a duel settled twice: %v", err)
 	}
-	if len(told) != 1 || told[0].To != vi || told[0].Kind != "asked" {
-		t.Fatalf("Vi wasn't told: %+v", told)
-	}
-	// So does Vi's: the duel has its result, told to both.
-	vs, err := w.take(vi, id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	lastRunsOut(vi, vs.ID, w.wrong)
-	if d, _ := w.g.DuelsOf(ctx, vi); d[0].State != "lost" || len(told) != 3 {
-		t.Fatalf("Vi's duel: %+v, told %+v", d[0], told)
-	}
-	// Vi has the result on screen (their run settled it); Ana hears of it.
-	if told[1].To != vi || !told[1].Seen || told[2].To != ana || told[2].Seen {
-		t.Fatalf("who has seen the result: %+v", told[1:])
-	}
-	// Settled again (both sides at once): nothing more, and no error.
-	if err := w.g.settleDuel(ctx, id, false, 0); err != nil || len(told) != 3 {
-		t.Fatalf("a duel settled twice: %v, told %d", err, len(told))
+	if d, _ := w.g.DuelsOf(ctx, vi); len(d) != 1 || d[0].State != "lost" {
+		t.Fatalf("Vi's duel, settled twice: %+v", d)
 	}
 
 	// Against a recording, too.
@@ -183,7 +161,7 @@ func TestRunEndedByTheClock(t *testing.T) {
 func TestMergeBringsProgress(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	guest, owner, friend := w.user(), w.user(), w.user()
+	guest, owner := w.user(), w.user()
 	merge := func(from, to int64) {
 		t.Helper()
 		if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, from, to) }); err != nil {
@@ -192,8 +170,8 @@ func TestMergeBringsProgress(t *testing.T) {
 		_, _ = w.db.Write.Exec(`DELETE FROM users WHERE id = ?`, from) // as signing in does
 	}
 
-	// The guest: a better rating, a higher league, a week's result, an evening of Роял won, a challenge waiting on
-	// a friend, and goals: today's (the account has its own) and yesterday's (it has none).
+	// The guest: a better rating, a higher league, a week's result, an evening of Роял won, and goals: today's (the
+	// account has its own) and yesterday's (it has none).
 	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1180, rated = 12, peak = 1200, league = 3 WHERE id = ?`, guest)
 	_, _ = w.db.Write.Exec(`UPDATE users SET league = 1 WHERE id = ?`, owner)
 	_, _ = w.db.Write.Exec(`INSERT INTO league_results (week, user_id, tier, place, of, points, moved, xp)
@@ -203,11 +181,6 @@ func TestMergeBringsProgress(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, _ = w.db.Write.Exec(`INSERT INTO royal_players (royal_id, user_id, joined_at, place) VALUES (?, ?, 0, 1)`, royal, guest)
-	w.befriend(guest, friend)
-	s, duel, err := w.g.ChallengeFriend(ctx, guest, friend)
-	if err != nil {
-		t.Fatal(err)
-	}
 	if _, err := w.g.GoalsOf(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
@@ -220,20 +193,14 @@ func TestMergeBringsProgress(t *testing.T) {
 	}
 	merge(guest, owner)
 
-	var rating, rated, peak, league, results, royals, sender int
+	var rating, rated, peak, league, results, royals int
 	_ = w.db.Read.QueryRow(`SELECT rating, rated, peak, league,
 			(SELECT count(*) FROM league_results WHERE user_id = u.id),
-			(SELECT count(*) FROM royal_players WHERE user_id = u.id AND place = 1),
-			(SELECT b_id FROM duels WHERE id = ?)
-		FROM users u WHERE id = ?`, duel, owner).Scan(&rating, &rated, &peak, &league, &results, &royals, &sender)
-	if rating != 1180 || rated != 12 || peak != 1200 || league != 3 || results != 1 || royals != 1 || sender != int(owner) {
-		t.Fatalf("the account after: rating %d (%d games, peak %d), league %d, %d weeks, %d evenings won, sent by %d",
-			rating, rated, peak, league, results, royals, sender)
-	}
-	// The challenge is the account's to finish, and its friend's to play then.
-	w.play(owner, s.ID, repeat(w.right, Length)...)
-	if c, _ := w.g.AskedOf(ctx, friend); len(c) != 1 || c[0].ID != duel {
-		t.Fatalf("the friend's challenge: %+v", c)
+			(SELECT count(*) FROM royal_players WHERE user_id = u.id AND place = 1)
+		FROM users u WHERE id = ?`, owner).Scan(&rating, &rated, &peak, &league, &results, &royals)
+	if rating != 1180 || rated != 12 || peak != 1200 || league != 3 || results != 1 || royals != 1 {
+		t.Fatalf("the account after: rating %d (%d games, peak %d), league %d, %d weeks, %d evenings won",
+			rating, rated, peak, league, results, royals)
 	}
 	goals := func(day string) (n int) {
 		_ = w.db.Read.QueryRow(`SELECT count(*) FROM goals_done WHERE user_id = ? AND day = ? AND goal IN ('a', 'b', 'c')`,
