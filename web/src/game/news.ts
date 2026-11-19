@@ -166,8 +166,8 @@ function factsLine(n: number): Child {
   );
 }
 
-/** Others played against recordings of the player's games: how many, and how it went; never who (a recording is a
- * stranger's game both ways: play/recordings.go). */
+/** Others played against recordings of the player's games: how many, and how it went; never who (they see the
+ * player, the player hears numbers: play/recordings.go). */
 function recordings(r: NonNullable<News["recordings"]>): Child {
   return h("section", { class: "card stack" }, h("p", { class: "kicker" }, "Твоите записи"), h("p", null, r.text));
 }

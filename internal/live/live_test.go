@@ -283,13 +283,12 @@ func TestAgainstARecording(t *testing.T) {
 		if !v.Recorded || v.Topic != "" || v.Phase != PhaseQuestion || !v.Them.Online || v.Them.Answered {
 			t.Fatalf("against a recording: %+v", v)
 		}
-		// A stranger's game, unnamed: the animal its player started as, no tag (play.RecordedAs).
-		unnamed := false
+		// The recording shows who played it, as anyone shows: their name and tag (play/recordings.go).
+		named := false
 		for _, id := range []int64{ana.ID, bo.ID} {
-			name, look := play.RecordedAs(id, 0)
-			unnamed = unnamed || (v.Them.Name == name && v.Them.Avatar == look.Avatar)
+			named = named || (v.Them.Name == fmt.Sprint("Играч ", id) && v.Them.Tag == fmt.Sprint("player", id))
 		}
-		if !unnamed || v.Them.Tag != "" || v.Them.Title != "" {
+		if !named {
 			t.Fatalf("the recording's player: %+v", v.Them)
 		}
 		// The recording answers when its player did (2.5 s in), right.

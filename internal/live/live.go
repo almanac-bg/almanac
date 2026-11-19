@@ -1,14 +1,14 @@
-// Package live plays duels live: a player asks for a duel and is matched with whoever else is asking, or, if
-// nobody comes in Wait, with a recording of a real player's earlier game (shown unnamed, as the animal its player
-// started as: play.RecordedAs). Both see the same question at the same
-// moment and each other's answers come in; after each question both answers show, then the next comes. One whose
-// screen goes is waited for a while (Away), then the duel goes on without them (gone), their time running out on each
-// question; one who says they leave (Leave: asked on their screen, and confirmed) is gone at once, and the other told
-// so. A recording isn't waited for where its player let the time run out. A player who isn't there when the
-// first question is due (never came, or left as the duel was found) is waited for until Arrive; after it, the duel is
-// called off and leaves nothing (play.DropLive), so leaving the wait at its last second never costs a lost duel. An
-// answer sent again (its reply lost on the way) is taken as the first. One who left for good is named on the result
-// (play.LeftLive: after which question). Either way, one who comes back to the duel is in it again.
+// Package live plays duels live: a player asks for a duel and is matched with whoever else is asking, or, if nobody
+// comes in Wait, with a recording of a real player's earlier game (shown as who played it, labelled a recording:
+// play/recordings.go). Both see the same question at the same moment and each other's answers come in; after each
+// question both answers show, then the next comes. One whose screen goes is waited for a while (Away), then the duel
+// goes on without them (gone), their time running out on each question; one who says they leave (Leave: asked on their
+// screen, and confirmed) is gone at once, and the other told so. A recording isn't waited for where its player let the
+// time run out. A player who isn't there when the first question is due (never came, or left as the duel was found) is
+// waited for until Arrive; after it, the duel is called off and leaves nothing (play.DropLive), so leaving the wait at
+// its last second never costs a lost duel. An answer sent again (its reply lost on the way) is taken as the first. One
+// who left for good is named on the result (play.LeftLive: after which question). Either way, one who comes back to the
+// duel is in it again.
 //
 // One who stays while the other is gone (left, or away past Away) and leads on points may take the win at once
 // (Claim): the questions left are played out in a moment, unanswered by both, and the duel ends as it would have, the
@@ -595,10 +595,7 @@ func (h *Hub) expire(s *Seek) {
 		if err != nil {
 			return l, [2]Player{}, err
 		}
-		rec, err := h.who(ctx, l.Users[1])
-		// A stranger's game: shown as the animal its player started as, nothing that leads to them (play.RecordedAs).
-		rec.Name, rec.Look = play.RecordedAs(l.Users[1], rec.Look.Level)
-		rec.Tag = ""
+		rec, err := h.who(ctx, l.Users[1]) // who played it, as anyone shows (play/recordings.go)
 		return l, [2]Player{s.player, rec}, err
 	}))
 }
