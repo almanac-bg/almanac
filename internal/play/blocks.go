@@ -38,6 +38,25 @@ func (g *Game) Blocked(ctx context.Context, a, b int64) (bool, error) {
 	return blocked, err
 }
 
+// BlockedWith are the players one of whom a player has blocked or been blocked by: never met live (internal/live).
+func (g *Game) BlockedWith(ctx context.Context, userID int64) (map[int64]bool, error) {
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT blocked_id FROM blocks WHERE user_id = ?1
+		UNION SELECT user_id FROM blocks WHERE blocked_id = ?1`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]bool{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
 // Block blocks the player with a tag (a normal one: account.NormalTag), for the player userID: friends no more, and
 // what waited between them gone. Their name.
 func (g *Game) Block(ctx context.Context, userID int64, tag string) (string, error) {
