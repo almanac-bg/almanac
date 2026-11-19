@@ -21,8 +21,7 @@ import (
 //     finished it ("share:day", once a day a device), the reminder's ask on Начало ("pushask:shown|yes|no", and by
 //     mail "mailask:shown|yes|no"), notifications sent and opened by kind ("push:sent:day", "push:open:day"), the
 //     day's reminders mailed ("mail:day:sent"), the day's answers and those to a question the player had answered
-//     before ("day:answers", "day:seen": none since the days are drawn ahead, ahead.go), a broken streak's repair
-//     offered on Начало and done ("repair:offered", "repair:done": repair.go). Nobody is in it.
+//     before ("day:answers", "day:seen": none since the days are drawn ahead, ahead.go). Nobody is in it.
 //   - cohort_weeks: a week's newcomers' numbers, frozen once over (server/measure.go). Nobody is in it either.
 //   - users.came_from: where a player first came in (Landings), set as their guest is made; users.first_version, the
 //     version they met (markActive); runs.device, what each game was played on (FromDevice).

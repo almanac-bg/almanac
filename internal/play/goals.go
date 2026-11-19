@@ -23,7 +23,7 @@ import (
 // day, and paid for speed, which XP never does (worth.go). What counts on a day is what was played on it, and the day's
 // questions count on their own day, all ten, though the last answers came after midnight (onDay): so a day run begun
 // at 23:58 finishes that day's goals, not the next's. A room's game counts only when someone else played it too: alone,
-// with easy questions, it's a shortcut; a past issue never does (past.go). A goal done earns its tier's XP, kept as it's done (whether or not the player
+// with easy questions, it's a shortcut. A goal done earns its tier's XP, kept as it's done (whether or not the player
 // looks; after.go keeps the goals of the day a game counts on, whenever that's done) and told once, at the end of the
 // game that did it. A day with all three done also earns a reserve day for the streak (runs.go), and counts towards
 // the achievements for full days.
@@ -408,9 +408,9 @@ const fastMs = 5000
 
 // onDay is a SQL condition on a run (r): that it's finished and counts on a day, ?2 and ?3 its bounds in ms and ?4
 // its date. A run of the day's questions counts on its own day, though its last answer came after midnight
-// (DayGrace); any other game on the day it ended; a past issue never (past.go: outside the day's goals).
+// (DayGrace); any other game on the day it ended.
 func onDay(r string) string {
-	return `(` + r + `.finished_at IS NOT NULL AND ` + r + `.kind <> 'past'
+	return `(` + r + `.finished_at IS NOT NULL
 		AND CASE WHEN ` + r + `.kind = 'day' THEN ` + r + `.day = ?4 ELSE ` + r + `.finished_at BETWEEN ?2 AND ?3 END)`
 }
 
@@ -473,7 +473,6 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 		FROM answers a JOIN runs r ON r.id = a.run_id
 		WHERE r.user_id = ?1 AND r.started_at >= ?2 - 86400000 AND r.started_at < ?3 AND r.id <> ?5
 			AND `+together("r")+`
-			AND r.kind <> 'past'
 			AND CASE WHEN r.kind = 'day' THEN r.day = ?4 ELSE a.at BETWEEN ?2 AND ?3 END
 		ORDER BY a.run_id, a.n`, userID, from, to, day, except)
 	if err != nil {

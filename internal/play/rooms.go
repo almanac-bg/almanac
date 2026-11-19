@@ -130,7 +130,7 @@ func DrawRoom(b *bank.Bank, category string, n int, mix Mix, barred map[string]b
 
 // RoomPast is what a room's next game is drawn by (DrawRoom), read from the database before the room deals it: the
 // questions no room deals now (barred: DayQuestions), and how stale each question is to its players, those in it as
-// the game starts (seen: seenAmong: how many of them have answered it, in any game; a past issue of theirs holds it).
+// the game starts (seen: seenAmong: how many of them have answered it, in any game).
 func (g *Game) RoomPast(ctx context.Context, players []int64) (barred map[string]bool, seen map[string]int, err error) {
 	if barred, err = g.DayQuestions(ctx); err != nil {
 		return nil, nil, err

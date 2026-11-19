@@ -23,8 +23,8 @@ var androidCerts = []string{"87:68:23:BC:F3:84:76:EE:87:B4:A0:19:27:C9:50:E4:4D:
 // one. A page the server draws itself is none of them, or the app would show it as a page it doesn't know.
 var appLinks = []string{
 	"/", "/play/*", "/duel", "/duel/*", "/challenge", "/challenge/*", "/c/*", "/r/*", "/f/*", "/hand/*",
-	"/year/*", "/games/*", "/players/*", "/royal", "/room", "/ranks", "/rewards", "/wardrobe", "/me", "/friends",
-	"/settings", "/almanac", "/mistakes", "/issues", "/issues/*",
+	"/games/*", "/players/*", "/royal", "/room", "/ranks", "/rewards", "/wardrobe", "/me", "/friends",
+	"/settings", "/almanac", "/mistakes",
 }
 
 func (s *Server) appleAppSiteAssociation(w http.ResponseWriter, _ *http.Request) {

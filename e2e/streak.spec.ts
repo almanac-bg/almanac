@@ -1,52 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
-import { daysPlayed, openGame, pastIssue, playRun, startDay } from "./play.ts";
+import { daysPlayed, openGame, playRun, startDay } from "./play.ts";
 
-test("a broken streak is won back: the missed issue and today's", async ({ page }) => {
-  test.setTimeout(120_000);
-  await page.goto("/");
-  // Three days, the third's reserve spent on the day after them, and yesterday missed too: the streak ended.
-  await daysPlayed(page, 5, 4, 3);
-  const missed = await pastIssue(page, 1);
-  const date = new Intl.DateTimeFormat("bg", { day: "numeric", month: "long", timeZone: "UTC" }).format(
-    new Date(`${missed.day}T12:00:00Z`),
-  );
-  await page.reload();
-  const card = page.locator(".keep-card").filter({ hasText: "Серията ти от 3 дни прекъсна" });
-  await expect(card).toContainText(`Изиграй пропуснатия брой от ${date} и днешния, и серията се връща.`);
-  // At stake, not gone: the chip has the streak's days to win back, not „0 дни поред“.
-  await expect(page.locator(".streak-chip")).toContainText("3дни за връщане");
-  // Профил says the same: the streak at stake, not „0 дни“ and a new one to begin.
-  await page.goto("/me");
-  await expect(page.locator(".streak")).toContainText("3дни за връщане");
-  await expect(page.locator(".streak")).toContainText(`Изиграй пропуснатия брой от ${date} и днешния`);
-  await page.goto("/");
-  await startDay(page);
-  await playRun(page);
-  // The day played: the missed issue left, and the card, under the result, has the gold way to it (the result's
-  // „Сподели“ is plain then). The chip and „Утре“ say what winning it back makes of the streak, not the new one of a day.
-  await expect(card).toContainText(`Изиграй и пропуснатия брой от ${date}, и серията се връща.`);
-  await expect(page.locator(".summary .keep-card").filter({ hasText: "прекъсна" })).toBeVisible();
-  await expect(page.locator(".btn.primary")).toHaveCount(1);
-  await expect(page.locator(".streak-chip")).toContainText("4дни за връщане");
-  await expect(page.locator(".tomorrow")).toContainText("Ако върнеш серията днес, утре тя става 5.");
-  await card.getByRole("link", { name: `Изиграй брой ${missed.issue}` }).click();
-  await expect(page).toHaveURL(new RegExp(`/issues/${missed.issue}$`));
-  await page.getByRole("button", { name: "Започни сега" }).click();
-  await playRun(page);
-  // The moment the repair was for: the result's sheet, and its line says the issue brought the streak back (not that
-  // a past issue is outside it).
-  const back = page.getByRole("dialog", { name: "4 дни поред с въпросите на деня." });
-  await expect(back).toContainText("Серията ти е върната");
-  await expect(page.locator(".past-line")).toHaveText("С този брой серията ти се върна: 4 дни.");
-  await expect(page.locator(".news-open")).toContainText("Серията ти е върната: 4 дни.");
-  // Back on Начало: the streak goes on, and nothing more is said of it.
-  await page.goto("/");
-  await expect(page.locator(".streak-chip")).toContainText("4");
-  await expect(page.locator(".keep-card").filter({ hasText: "прекъсна" })).toHaveCount(0);
-  await expect(page.locator(".streak-notice")).toHaveCount(0);
-});
-
-test("a streak too short to win back is only said to have ended, once", async ({ page }) => {
+test("a streak that ended is said to have ended, once", async ({ page }) => {
   await page.goto("/");
   await daysPlayed(page, 4, 3);
   await page.reload();

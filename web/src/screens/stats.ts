@@ -1,10 +1,11 @@
 // How a player has done: the streak (and their longest) and this week, their numbers, how their days' ten have gone
 // (from the third day played), the facts in their almanac, how well they know each topic (each a way to play it), their
-// latest games (each a way to go over it: /games/<id>) and the way to all of them (/games).
+// latest games (today's each a way to go over it: /games/<id>) and the way to all of them (/games).
 
 import { picture } from "../art/picture.ts";
 import { type Mastery, masteryCard } from "../game/mastery.ts";
 import { api } from "../lib/api.ts";
+import { dayInBulgaria } from "../lib/day.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { topics } from "../state.ts";
 import { figure, formatNumber, streak } from "../ui.ts";
@@ -18,8 +19,6 @@ export interface Stats {
   reserve: number;
   /** Days in a row to the next reserve day (0: they are full). */
   next: number;
-  /** A broken streak on offer to be won back today (play/repair.go), as Начало offers it. */
-  repair?: { days: number; day: boolean; words: string };
   days: number;
   games: number;
   answers: number;
@@ -38,9 +37,9 @@ export interface Stats {
 /** A finished game, as a list of them has it. */
 export interface Played {
   id: number;
-  kind: "day" | "past" | "topic" | "challenge" | "duel" | "royal" | "mistakes" | "room"; // challenge: from when there were challenges
+  kind: "day" | "topic" | "challenge" | "duel" | "royal" | "mistakes" | "room"; // challenge: from when there were challenges
   day?: string;
-  /** The day's ten's (and a past issue's: screens/issues.ts): the day's issue. */
+  /** The day's ten's: the day's issue. */
   issue?: number;
   category?: string;
   rights: number;
@@ -65,8 +64,6 @@ function what(p: Played): string {
   switch (p.kind) {
     case "day":
       return p.issue ? `Брой ${p.issue}` : "Въпросите на деня";
-    case "past":
-      return `Минал брой ${p.issue}`;
     case "duel":
       // A friend's challenge has its opponent and result once both have played: until then (or if it was declined or
       // ran out), only that it was a duel.
@@ -109,11 +106,11 @@ export function stats(): Child {
     if (!s) return null;
     if (s.games === 0)
       return [
-        streak(s.streak, s.week, s.saved, s.reserve, s.next, s.best, s.repair),
+        streak(s.streak, s.week, s.saved, s.reserve, s.next, s.best),
         h("p", { class: "muted" }, "Още няма изиграни игри."),
       ];
     return [
-      streak(s.streak, s.week, s.saved, s.reserve, s.next, s.best, s.repair),
+      streak(s.streak, s.week, s.saved, s.reserve, s.next, s.best),
       h(
         "section",
         { class: "card figures" },
@@ -146,14 +143,16 @@ export function stats(): Child {
   };
 }
 
-/** A game in a list of them: what it was, when (`when`, if said), and its score; a way to go over it. */
+/** A game in a list of them: what it was, when (`when`, if said), and its score; one of today's, a way to go over it
+ * (a game is gone over on its day only: play.Review). */
 export function gameRow(p: Played, when: string | null): HTMLElement {
+  const today = dayInBulgaria(new Date(p.at)) === dayInBulgaria();
   return h(
     "li",
     null,
     h(
-      "a",
-      { class: "game", href: `/games/${p.id}` },
+      today ? "a" : "div",
+      today ? { class: "game", href: `/games/${p.id}` } : { class: "game" },
       h(
         "div",
         { class: "game-text" },

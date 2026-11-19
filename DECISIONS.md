@@ -54,13 +54,12 @@ packages' doc comments; this file holds only what must not drift.
   under five, races with the one before it.
 - **Reserve days: one a week at most,** Monday to Sunday, from whichever source comes first (the day itself and the
   goals); none before a streak's third day, which brings the first, told then. Players kept the reserve days they held
-  when this came in. „Година без пропуск“ is 365 days in a row with no reserve day or repair spent; the streak's year
-  is „Година с Алманаха“ (owner, 2026-11-18, review E4, E11).
-- **Минали броеве replaced „Всички теми“,** and is how a broken streak is won back. Any past day's ten can be played
-  once, after its day, by whoever didn't finish them on it: scored as a topic's game, outside the day's board, the
-  streak, the league and the goals, and told against that day's players. A streak that just ended comes back by
-  playing the missed issue and today's, not „one more game“ of any kind (owner, 2026-11-18, review O9, R4: a new
-  system replaces one; the game of every topic stays only as a challenge's choice).
+  when this came in. Reserve days are the only thing that keeps a streak: one that ends isn't won back. „Година без
+  пропуск“ is 365 days in a row with no reserve day spent; the streak's year is „Година с Алманаха“ (owner,
+  2026-11-18, review E4, E11; 2026-11-19).
+- **Removed to keep the game simple** (owner, 2026-11-19): sharing, invitations by link, challenges, past days'
+  questions (the archive of past issues, and going over a game after its day), winning a broken streak back, and the
+  year's report. Don't bring any of them back, or something in their place, without the owner's call.
 - **Right answers in a row earn no points** (owner, 2026-11-18, review E6): where a miss fell decided close duels and
   weeks. The climb stays as sound and feel; a game with every answer right still earns its bonus.
 - **The day's goals serve the day,** each one game at most: the day's ten; one more game (a topic's, three questions
@@ -72,12 +71,11 @@ packages' doc comments; this file holds only what must not drift.
   else's name: the day's result, and a win (a duel against a person, Роял's first three) in the same style (owner,
   2026-11-18, review M10).
 - **A tenth of players get no reminders, to tell what reminders do.** 10 % of players, drawn once by a hash of their
-  id (`play/experiment.go`), are held out of the day's notification, the streak's mail and the year's notification
-  (once a year in December, „Твоята 2026 в АЛМАНАХ“, to a player with 7 days or more that year: owner, review R8);
-  what they would have had is kept as if sent, by the same rules and hours, and `/admin` compares the two groups with
-  intervals, counted by player. Without it the reminders' rows only show the habit they're timed to (owner,
-  2026-11-18, review D4). The reminder by mail is never held out: a player asked for it, and gets it (owner,
-  2026-11-18); nor is the year's word by mail. The privacy page says so.
+  id (`play/experiment.go`), are held out of the day's notification and the streak's mail; what they would have had
+  is kept as if sent, by the same rules and hours, and `/admin` compares the two groups with intervals, counted by
+  player. Without it the reminders' rows only show the habit they're timed to (owner, 2026-11-18, review D4). The
+  reminder by mail is never held out: a player asked for it, and gets it (owner, 2026-11-18). The privacy page says
+  so.
 
 ## Questions
 

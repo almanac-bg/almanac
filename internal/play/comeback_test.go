@@ -178,26 +178,3 @@ func TestComingToSecondChance(t *testing.T) {
 		t.Fatalf("waiting: %d", n)
 	}
 }
-
-// Моят Алманах's days lead to their games of the day's ten, where the player played them.
-func TestAlmanacDaysLeadToTheirGames(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana := w.user()
-	var id string
-	for _, q := range w.b.Live("", "") {
-		if q.Extra().Fact != "" {
-			id = q.Base().ID
-			break
-		}
-	}
-	w.knowsAt(ana, time.Date(2026, 11, 15, 12, 0, 0, 0, Bulgaria).UnixMilli(), id)
-	page, err := w.g.AlmanacOf(ctx, ana, "", "", AlmanacPage)
-	if err != nil || len(page.Facts) != 1 || len(page.Games) != 0 {
-		t.Fatalf("a fact from a topic's game, no day's ten that day: %+v, %v", page, err)
-	}
-	game := w.dayPlayed(ana, "2026-11-15", 6)
-	if page, err = w.g.AlmanacOf(ctx, ana, "", "", AlmanacPage); err != nil || page.Games["2026-11-15"] != game {
-		t.Fatalf("the day's game: %v, want %d, %v", page.Games, game, err)
-	}
-}

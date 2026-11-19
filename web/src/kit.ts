@@ -1,7 +1,7 @@
 // app.js holds what a daily visit uses: Начало, a game, the screens a game leads to. A screen a daily visit doesn't
 // open loads on its own, the first time it's opened: the room's (screens/room.ts), Роял's (royal.ts), a live duel's
 // (live.ts) and a duel's result (outcome.ts), only for those who play there; and Профил's places, the boards and the
-// friends (me, settings, rewards, wardrobe, almanac, year, played, ranks, friends, player). Each is handed the app's
+// friends (me, settings, rewards, wardrobe, almanac, played, ranks, friends, player). Each is handed the app's
 // pieces it uses from here, and imports nothing of the app but types: a module it imported would be one app.js
 // imports too, and esbuild would split every such module into a shared file that each page then loads first
 // (cmd/build fails if there is one). What only such a screen uses (lib/hash.ts, the boards') it imports itself. So a
@@ -9,7 +9,6 @@
 // first screen's budget (cmd/build).
 
 import { emblem } from "./art/emblem.ts";
-import { leagueEmblem } from "./art/league.ts";
 import { picture as illustration } from "./art/picture.ts";
 import { recover, staying } from "./fresh.ts";
 import { answering, answerState, countdown, onScreen } from "./game/answering.ts";
@@ -32,10 +31,11 @@ import {
   summary,
 } from "./game/results.ts";
 import { guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
-import { count, duelShareText, yearShareText } from "./game/share.ts";
+import { count, duelShareText } from "./game/share.ts";
 import { ApiError, api, errorText, tally } from "./lib/api.ts";
 import { inApp } from "./lib/app.ts";
 import { keepAwake } from "./lib/awake.ts";
+import { dayInBulgaria } from "./lib/day.ts";
 import { type Child, computed, effect, h, lifetime, onCleanup, signal, slot, untracked, when } from "./lib/dom.ts";
 import { reportProblem } from "./lib/errors.ts";
 import { ordinal, place } from "./lib/ordinal.ts";
@@ -65,15 +65,14 @@ import {
   soundOn,
 } from "./lib/sound.ts";
 import { stream } from "./lib/stream.ts";
-import { dateWords, issueWords, listWords, weekday, winners, withName } from "./lib/words.ts";
-import { dayInBulgaria, yearNow } from "./lib/year.ts";
+import { issueWords, listWords, weekday, winners, withName } from "./lib/words.ts";
 import type { DuelView } from "./screens/duel.ts";
 import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
 import { leagueBoard, leagueLine, loadLeague } from "./screens/league.ts";
 import { clock, coming, dayAndTime, dayWord, whileSeen } from "./screens/modes.ts";
 import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
-import { loadMistakes, run as runGame } from "./screens/play.ts";
+import { loadMistakes } from "./screens/play.ts";
 import { loadProgress, nearest } from "./screens/progress.ts";
 import { changeGame, mixes } from "./screens/rooms.ts";
 import { signIn } from "./screens/signin.ts";
@@ -154,7 +153,6 @@ export const kit = {
   crowdLine,
   dayInBulgaria,
   dayAndTime,
-  dateWords,
   dayWord,
   duelShareText,
   duelResult,
@@ -183,7 +181,6 @@ export const kit = {
   keepGame,
   landing,
   leagueBoard,
-  leagueEmblem,
   leagueLine,
   levelNumber,
   lifetime,
@@ -233,7 +230,6 @@ export const kit = {
   reviewed,
   reviewParts,
   rewardWords,
-  runGame,
   schemeSwitch,
   scoreCard,
   segmented,
@@ -285,8 +281,6 @@ export const kit = {
   who,
   winners,
   withName,
-  yearNow,
-  yearShareText,
 };
 
 export type Kit = typeof kit;

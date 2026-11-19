@@ -216,28 +216,25 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 }
 
 // LeftRun is a game of the player's own left unfinished, to come back to: a topic's today (its category, "" for all
-// of them: a challenge's), a second chance's today, or a past issue's (its Day and Issue: past.go); how far it got (At answered,
-// of Total), and whether a question is showing now, its time running (Open).
+// of them: a challenge's), or a second chance's today; how far it got (At answered, of Total), and whether a question
+// is showing now, its time running (Open).
 type LeftRun struct {
 	ID       int64  `json:"id"`
 	Kind     string `json:"kind"`
 	Category string `json:"category"`
-	Day      string `json:"day,omitempty"`
-	Issue    int    `json:"issue,omitempty"`
 	At       int    `json:"at"`
 	Total    int    `json:"total"`
 	Open     bool   `json:"open,omitempty"`
 }
 
-// Left are the games of the player's own left unfinished that StartTopic, StartMistakes and StartPast would go on
-// with: the latest of each topic and the latest second chance, today's; and each past issue's, whenever it was left;
-// the latest first. One whose clock has just run out on its last question ends now, as it would at its next look, and
+// Left are the games of the player's own left unfinished that StartTopic and StartMistakes would go on with: the latest
+// of each topic and the latest second chance, today's; the latest first. One whose clock has just run out on its last question ends now, as it would at its next look, and
 // isn't among them.
 func (g *Game) Left(ctx context.Context, userID int64) ([]LeftRun, error) {
 	today, _ := time.ParseInLocation(time.DateOnly, g.Today(), Bulgaria)
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT max(id) FROM runs WHERE user_id = ? AND finished_at IS NULL
-		AND (kind IN ('topic', 'mistakes') AND started_at >= ? OR kind = 'past')
-		GROUP BY kind, coalesce(category, ''), coalesce(day, '') ORDER BY 1 DESC`,
+		AND kind IN ('topic', 'mistakes') AND started_at >= ?
+		GROUP BY kind, coalesce(category, '') ORDER BY 1 DESC`,
 		userID, store.Ms(today))
 	if err != nil {
 		return nil, err
@@ -262,8 +259,7 @@ func (g *Game) Left(ctx context.Context, userID int64) ([]LeftRun, error) {
 			return nil, err
 		}
 		if !s.Done {
-			left = append(left, LeftRun{ID: s.ID, Kind: s.Kind, Category: s.Category, Day: s.Day, Issue: Issue(s.Day),
-				At: s.At, Total: s.Total, Open: s.Question != nil})
+			left = append(left, LeftRun{ID: s.ID, Kind: s.Kind, Category: s.Category, At: s.At, Total: s.Total, Open: s.Question != nil})
 		}
 	}
 	return left, nil
@@ -290,21 +286,19 @@ const ReserveFrom = 3
 var ReserveRulesFrom = "2026-11-19"
 
 // StreakNow is a player's streak: the days in a row they've finished the day's questions (up to today, or yesterday
-// while today isn't played yet), the reserve days they have, the days a reserve kept the streak through and those a
-// repair kept it through (repair.go), how many more days in a row earn the next reserve day by themselves (0 with
-// ReserveMax in hand), whether this week's reserve day is earned, the last streak that ended, if one did, and the
-// longest the player has had (this one, maybe).
+// while today isn't played yet), the reserve days they have, the days a reserve kept the streak through, how many more
+// days in a row earn the next reserve day by themselves (0 with ReserveMax in hand), whether this week's reserve day
+// is earned, the last streak that ended, if one did, and the longest the player has had (this one, maybe).
 type StreakNow struct {
 	Days    int      `json:"days"`
 	Best    int      `json:"best"`
 	Reserve int      `json:"reserve"`
 	Saved   []string `json:"saved"`
-	Mended  []string `json:"mended"`
 	Next    int      `json:"next"`
 	Week    bool     `json:"week"`
 	Ended   *Ended   `json:"ended,omitempty"`
 	// Unbroken is how many days in a row, one after another, the player has finished the day's questions with no
-	// reserve day or repair between them: „Година без пропуск“ (progress.go).
+	// reserve day between them: „Година без пропуск“ (progress.go).
 	Unbroken int `json:"-"`
 	// today is whether today's are finished.
 	today bool
@@ -343,44 +337,28 @@ type Ended struct {
 }
 
 // StreakOf is a player's streak, from every day they've played: each day played adds to it (and may earn a reserve
-// day: ReserveMax), each day missed spends a reserve day, is kept by a repair (repair.go), or ends the streak.
+// day: ReserveMax), each day missed spends a reserve day or ends the streak.
 func (g *Game) StreakOf(ctx context.Context, userID int64) (StreakNow, error) {
 	h, err := g.streakDays(ctx, userID)
 	if err != nil || h.first == "" {
-		return StreakNow{Saved: []string{}, Mended: []string{}}, err
+		return StreakNow{Saved: []string{}}, err
 	}
 	return walkStreak(h, g.Today(), nil), nil
 }
 
 // streakHistory is what a streak is made of: the days a player finished the day's questions on (first: the first of
-// them, "" for none), the days they did all three goals on, and the days they won a broken streak back on (repair.go).
+// them, "" for none), and the days they did all three goals on.
 type streakHistory struct {
-	played, full, mended map[string]bool
-	first                string
-}
-
-// mends says whether a repair keeps the streak through a day missed: one made on a day played soon after it
-// (RepairWithin), with nothing played between.
-func (h streakHistory) mends(missed string) bool {
-	for k := 1; k <= RepairWithin; k++ {
-		day := DayShift(missed, k)
-		if h.mended[day] {
-			return true
-		}
-		if h.played[day] {
-			return false
-		}
-	}
-	return false
+	played, full map[string]bool
+	first        string
 }
 
 // streakDays are a player's days as the streak counts them (streakHistory), over the last ten years.
 func (g *Game) streakDays(ctx context.Context, userID int64) (streakHistory, error) {
-	h := streakHistory{played: map[string]bool{}, full: map[string]bool{}, mended: map[string]bool{}}
+	h := streakHistory{played: map[string]bool{}, full: map[string]bool{}}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT day, 0 FROM runs WHERE user_id = ?1 AND kind = 'day'
 			AND finished_at IS NOT NULL AND day >= ?2
-		UNION ALL SELECT day, 1 FROM goals_done WHERE user_id = ?1 AND day >= ?2 GROUP BY day HAVING count(*) >= ?3
-		UNION ALL SELECT day, 2 FROM streak_repairs WHERE user_id = ?1 AND day >= ?2`,
+		UNION ALL SELECT day, 1 FROM goals_done WHERE user_id = ?1 AND day >= ?2 GROUP BY day HAVING count(*) >= ?3`,
 		userID, g.Now().In(Bulgaria).AddDate(-10, 0, 0).Format(time.DateOnly), GoalsPerDay)
 	if err != nil {
 		return h, err
@@ -388,20 +366,17 @@ func (g *Game) streakDays(ctx context.Context, userID int64) (streakHistory, err
 	defer rows.Close()
 	for rows.Next() {
 		var day string
-		var what int
-		if err := rows.Scan(&day, &what); err != nil {
+		var full bool
+		if err := rows.Scan(&day, &full); err != nil {
 			return h, err
 		}
-		switch what {
-		case 1:
+		if full {
 			h.full[day] = true
-		case 2:
-			h.mended[day] = true
-		default:
-			h.played[day] = true
-			if h.first == "" || day < h.first {
-				h.first = day
-			}
+			continue
+		}
+		h.played[day] = true
+		if h.first == "" || day < h.first {
+			h.first = day
 		}
 	}
 	return h, rows.Err()
@@ -410,7 +385,7 @@ func (g *Game) streakDays(ctx context.Context, userID int64) (streakHistory, err
 // walkStreak goes over a player's days from the first played to today, as StreakOf tells them. saw, if set, hears of
 // each day a reserve day kept the streak through (spent), and of each day that ended a streak (ended: the days it had).
 func walkStreak(h streakHistory, today string, saw func(day string, spent bool, ended int)) StreakNow {
-	s := StreakNow{Saved: []string{}, Mended: []string{}}
+	s := StreakNow{Saved: []string{}}
 	d, _ := time.Parse(time.DateOnly, h.first)
 	var earned time.Time // the Monday of the week the last reserve day was earned in
 	for day := h.first; day <= today; day = d.Format(time.DateOnly) {
@@ -432,9 +407,6 @@ func walkStreak(h streakHistory, today string, saw func(day string, spent bool, 
 			if saw != nil {
 				saw(day, true, 0)
 			}
-		case s.Days > 0 && h.mends(day):
-			s.Unbroken = 0
-			s.Mended = append(s.Mended, day)
 		default:
 			if s.Days > 0 {
 				s.Ended = &Ended{Days: s.Days, On: day}
@@ -442,7 +414,7 @@ func walkStreak(h streakHistory, today string, saw func(day string, spent bool, 
 					saw(day, false, s.Days)
 				}
 			}
-			s.Days, s.Unbroken, s.Saved, s.Mended = 0, 0, s.Saved[:0], s.Mended[:0]
+			s.Days, s.Unbroken, s.Saved = 0, 0, s.Saved[:0]
 		}
 		d = d.AddDate(0, 0, 1)
 	}

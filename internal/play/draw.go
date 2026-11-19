@@ -423,8 +423,7 @@ func marked(ids map[string]bool) func(bank.Question) int {
 	return func(q bank.Question) int { return b2i(ids[q.Base().ID]) }
 }
 
-// seenCount is how stale a question is to a draw for players (seen: seenAmong): by how many of them have answered it,
-// and then whether a past issue of theirs holds it.
+// seenCount is how stale a question is to a draw for players (seen: seenAmong): by how many of them have answered it.
 func seenCount(seen map[string]int) func(bank.Question) int {
 	return func(q bank.Question) int { return seen[q.Base().ID] }
 }
@@ -441,8 +440,7 @@ func matches(q bank.Question, s slot, typ, pictures bool) bool {
 
 // Draw draws ten questions of a topic ("" for all topics, BulgariaTopic for Bulgaria's from every topic) for players
 // of an ability there (mastery.go; 0 for one who knows as much as most): questions none of them has seen before those
-// one has, and so on, and of as many, those no past issue of theirs holds first (seen: seenAmong); never one barred
-// (the day's: DayQuestions). Choices come with a picture or without, whichever is drawn, and the number an estimate
+// one has, and so on (seen: seenAmong); never one barred (the day's: DayQuestions). Choices come with a picture or without, whichever is drawn, and the number an estimate
 // where one is left (wishes). Every run goes from easy to hard, its special questions in places drawn within their
 // difficulty (inBands). Topic runs and duels draw this way (a room, DrawRoom). The questions due for review are among
 // the barred (DayQuestions).

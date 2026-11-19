@@ -1,7 +1,6 @@
 package seed
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -187,16 +186,6 @@ func (w *world) visit(s session, online []*player, met map[[2]int64]bool) error 
 			return err
 		}
 	}
-	if w.missed(p) {
-		if err := w.pastRun(p, true); err != nil {
-			return err
-		}
-	} else if p.persona != keyDay2 && w.chance(map[bool]float64{true: 0.7, false: 0.15 + p.topics*0.1}[w.day-p.joined < 4]) {
-		// The issues before they came, most of all as they come (Начало's first tile), and those missed after.
-		if err := w.pastRun(p, false); err != nil {
-			return err
-		}
-	}
 	for range min(4, w.count(p.topics)) {
 		st, err := w.topicRun(p)
 		if err != nil {
@@ -245,55 +234,6 @@ func (w *world) visit(s session, online []*player, met map[[2]int64]bool) error 
 		}
 	}
 	return w.sweep()
-}
-
-// missed says whether a player's broken streak waits for its repair, today: they play what it needs (the issue
-// missed, and today's), most of them; the lapsed persona not.
-func (w *world) missed(p *player) bool {
-	if p.kind == lapsing || w.chance(0.4) {
-		return false
-	}
-	r, err := w.g.RepairOf(w.ctx, p.id)
-	return err == nil && r != nil
-}
-
-// pastRun is a past issue played: the one a repair needs (repair), else one the player hasn't played.
-func (w *world) pastRun(p *player, repair bool) error {
-	issues, err := w.g.PastIssues(w.ctx, p.id)
-	if err != nil {
-		return fmt.Errorf("past issues: %w", err)
-	}
-	var day string
-	if repair {
-		if r, err := w.g.RepairOf(w.ctx, p.id); err == nil && r != nil {
-			for _, m := range r.Missed {
-				if !m.Done && m.Open {
-					day = m.Day
-				}
-			}
-		}
-	}
-	for _, is := range issues {
-		if day == "" && (is.Mine == nil || (is.Mine.Kind == "past" && !is.Mine.Done)) && w.chance(0.5) {
-			day = is.Day
-		}
-	}
-	if day == "" {
-		return nil
-	}
-	s, err := w.g.StartPast(w.as(p), p.id, day)
-	if errors.Is(err, play.ErrNoIssue) || errors.Is(err, play.ErrIssuePlayed) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("past issue %s: %w", day, err)
-	}
-	stop := -1
-	if !repair && w.chance(0.05) {
-		stop = w.r.IntN(play.Length)
-	}
-	_, err = w.playRun(p, s, stop)
-	return err
 }
 
 // tallies are what /admin counts each day of what no table keeps: notifications sent and opened, mails sent.

@@ -84,7 +84,6 @@ var mergeSteps = []mergeStep{
 	{carries: []string{"active_days.user_id"},
 		sql: `INSERT OR IGNORE INTO active_days (user_id, day) SELECT ?1, day FROM active_days WHERE user_id = ?2`},
 	{sql: `DELETE FROM active_days WHERE user_id = ?2`},
-	{carries: []string{"streak_repairs.user_id"}, sql: `UPDATE OR IGNORE streak_repairs SET user_id = ?1 WHERE user_id = ?2`},
 	// What the guest earned is the account's too.
 	{carries: []string{"achievements.user_id"}, sql: `INSERT OR IGNORE INTO achievements (user_id, id, at, seen, xp)
 		SELECT ?1, id, at, seen, xp FROM achievements WHERE user_id = ?2`},
@@ -105,7 +104,6 @@ var mergeSteps = []mergeStep{
 		SELECT ?1, kind, wanted FROM mail_prefs WHERE user_id = ?2`},
 	{carries: []string{"streak_mails.user_id"}, sql: `UPDATE OR IGNORE streak_mails SET user_id = ?1 WHERE user_id = ?2`},
 	{carries: []string{"day_mails.user_id"}, sql: `UPDATE OR IGNORE day_mails SET user_id = ?1 WHERE user_id = ?2`},
-	{carries: []string{"year_words.user_id"}, sql: `UPDATE OR IGNORE year_words SET user_id = ?1 WHERE user_id = ?2`},
 	// So are the guest's goals of a day the account has none for: those drawn, and those finished (with their XP). A
 	// day both had goals for keeps the account's, so that it's never more than a day's goals.
 	{carries: []string{"goals_done.user_id"}, sql: `INSERT OR IGNORE INTO goals_done (user_id, day, goal, at, xp, seen)

@@ -61,7 +61,6 @@ func TestSeededGame(t *testing.T) {
 	for what, q := range map[string]string{
 		"day runs":         `SELECT count(*) FROM runs WHERE kind = 'day' AND finished_at IS NOT NULL`,
 		"topic runs":       `SELECT count(*) FROM runs WHERE kind = 'topic'`,
-		"past issues":      `SELECT count(*) FROM runs WHERE kind = 'past'`,
 		"live duels":       `SELECT count(*) FROM duels WHERE kind = 'live' AND b_id IS NOT NULL AND outcome IN ('a', 'b', 'draw')`,
 		"recorded duels":   `SELECT count(*) FROM duels WHERE kind = 'live' AND ghost_run IS NOT NULL`,
 		"challenges taken": `SELECT count(*) FROM duels WHERE kind = 'challenge' AND outcome IN ('a', 'b', 'draw', 'ghost_won', 'ghost_lost', 'ghost_draw')`,
@@ -122,8 +121,7 @@ func TestSeededGame(t *testing.T) {
 		"POST /api/me/news", "/api/day", "/api/day/" + yesterday + "/board", "/api/mistakes", "/api/runs/left",
 		"/api/playing", "/api/duels", "/api/ranks", "/api/ranks?among=friends", "/api/ranks?by=knowledge",
 		"/api/royal", "/api/royal/tonight", "/api/almanac", "/api/league", "/api/goals", "/api/friends",
-		"/api/friends/invites", "/api/push/prefs", "/api/mail/prefs", "/api/issues",
-		fmt.Sprintf("/api/year/%d", time.Now().In(play.Bulgaria).Year())}
+		"/api/friends/invites", "/api/push/prefs", "/api/mail/prefs"}
 	for _, p := range personas {
 		for _, path := range append(screens, "/api/players/"+p.Tag) {
 			if code, v := get(p, path); code != http.StatusOK {
@@ -142,9 +140,10 @@ func TestSeededGame(t *testing.T) {
 				t.Errorf("%s: a duel: %d %v", p.Key, code, v)
 			}
 		}
-		var run int64
-		_ = db.Read.QueryRow(`SELECT coalesce(max(id), 0) FROM runs WHERE user_id = ? AND finished_at IS NOT NULL`,
-			p.ID).Scan(&run)
+		var run int64 // today's: a game is gone over on its day
+		today, _ := time.ParseInLocation(time.DateOnly, time.Now().In(play.Bulgaria).Format(time.DateOnly), play.Bulgaria)
+		_ = db.Read.QueryRow(`SELECT coalesce(max(id), 0) FROM runs WHERE user_id = ? AND finished_at >= ?`,
+			p.ID, today.UnixMilli()).Scan(&run)
 		if run != 0 {
 			if code, v := get(p, fmt.Sprintf("/api/runs/%d/review", run)); code != http.StatusOK {
 				t.Errorf("%s: a game gone over: %d %v", p.Key, code, v)
@@ -161,8 +160,8 @@ func TestSeededGame(t *testing.T) {
 		t.Errorf("the new guest has played %d days", days)
 	}
 	_, day := get(by[keyLapsed], "/api/day")
-	if day["repair"] == nil {
-		t.Errorf("the lapsed persona has no repair on Начало: %v", day)
+	if day["ended"] == nil {
+		t.Errorf("the lapsed persona's streak isn't told as ended on Начало: %v", day)
 	}
 	_, league := get(by[keyRegular], "/api/league")
 	if league["in"] != true {

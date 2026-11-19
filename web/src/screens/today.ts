@@ -1,7 +1,7 @@
 // Начало: where every game starts, on one short screen, and the day is its heart. At the top the player's streak and
-// level (and, once, what came of the days just missed — a broken streak to win back while it can be, with the way to,
-// or a welcome back after days away — or, one line at a time, of a duel a friend has played, a friend's yes to an
-// invite, a live duel left that went on); then the day's ten questions, the same for everyone, once, as the day's issue
+// level (and, once, what came of the days just missed — a reserve day spent, a streak ended, or a welcome back after
+// days away — or, one line at a time, of a duel a friend has played, a friend's yes to an invite, a live duel left
+// that went on); then the day's ten questions, the same for everyone, once, as the day's issue
 // („Брой 6“, play/issue.go) (while they wait, how yesterday's ended; left half-way, where the player stopped and the
 // way on, and the streak at stake while they wait; once played, as it lands, how they went and the one gold thing to
 // do next (game/gold.ts: the result to share, when it's worth it; else another game, where a goal points), the goals
@@ -21,6 +21,7 @@ import type { Board, Mark, Score, State } from "../game/types.ts";
 import { api, errorText, serverNow, tally } from "../lib/api.ts";
 import { inApp } from "../lib/app.ts";
 import { boot } from "../lib/boot.ts";
+import { dayInBulgaria } from "../lib/day.ts";
 import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { type RemindAsks, remindAnswered, remindAsks, remindShown } from "../lib/keep.ts";
@@ -28,7 +29,6 @@ import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { goBack, hold, release, title } from "../lib/router.ts";
 import { feelKit } from "../lib/sound.ts";
 import { dateWords, issueWords, onDay, weekday } from "../lib/words.ts";
-import { dayInBulgaria, yearNow } from "../lib/year.ts";
 import { categories, met, notice, player, playing, user } from "../state.ts";
 import {
   explain,
@@ -38,7 +38,6 @@ import {
   meter,
   type Open,
   pointsWords,
-  repairWords,
   reserveMeaning,
   reserveWords,
   stakeLine,
@@ -57,7 +56,7 @@ import { type Goals, goalsCard, loadGoals, openGoals } from "./goals.ts";
 import { app, haveProfile, keepLine, keepStake, mailAsk } from "./keep.ts";
 import { leagueNote } from "./league.ts";
 import { clock, modes } from "./modes.ts";
-import { type PastNext, topics } from "./play.ts";
+import { topics } from "./play.ts";
 
 export interface Today {
   day: string;
@@ -74,18 +73,6 @@ export interface Today {
   kept?: string;
   /** A streak that just ended (the last 3 days): its days, and the day missed that ended it. */
   ended?: { days: number; on: string };
-  /** A streak that just ended and can be won back today (play/repair.go): its days, the day missed that ended it,
-   * whether today's ten are played, and each issue missed, played since or not (`open`: playable yet), and those
-   * still to play as a sentence says them (`words`: „пропуснатия брой от 17 ноември“; "" for none). */
-  repair?: {
-    days: number;
-    on: string;
-    day: boolean;
-    missed: { day: string; issue: number; done: boolean; open: boolean }[];
-    words: string;
-  };
-  /** The newest past issue the player hasn't played (play.LatestPast): where „Още десет“ goes after the day. */
-  past?: PastNext | null;
   /** The player's level, from all their XP (for a player). */
   level?: { level: number; xp: number; from: number; to: number };
   /** Whether the player has finished a game of any kind: until then Начало is the day and the topics only. */
@@ -264,24 +251,16 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
     bye = "";
     notice.set("");
     // The day's goals (shown once XP is open: play/unfold.go; the day just played may open it): what's next after the
-    // day, and where another game goes: a goal's topic, else the newest past issue not played (Минали броеве took the
-    // place of the game of every topic), else a topic, a new one each day.
+    // day, and where another game goes: a goal's topic, else a topic, a new one each day.
     const goals = signal<Goals | null>(null);
-    if (user.peek() && (run?.done || t.repair)) loadGoals().then(goals.set, () => {});
+    if (user.peek() && run?.done) loadGoals().then(goals.set, () => {});
     const next = () => {
-      const past = fresh().past;
       const topic = categories[Number(t.day.replaceAll("-", "")) % categories.length]?.id ?? "";
-      return nextGame(
-        fresh().open?.xp ? (goals()?.goals ?? []) : [],
-        past ? `/issues/${past.issue}` : `/play/${topic}`,
-      );
+      return nextGame(fresh().open?.xp ? (goals()?.goals ?? []) : [], `/play/${topic}`);
     };
     // The day played: in full as it lands (or on its invite's page, or when its result was never on screen: what it
     // earned is told with it); on a later visit, one short card (dayDone), with the ways to play right under it.
     const full = !!run?.done && (just || !!elsewhere || t.untold === run.id);
-    // Once played, a streak to win back has its card under the result, as it stands (the day just played may have
-    // done it, or half of it).
-    const repairing = t.repair ? () => repairCard(fresh().repair) : null;
     const tomorrow = run?.done
       ? tomorrowCard(
           t.day,
@@ -291,7 +270,6 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
             () => (fresh().open?.xp ? 2 : 1),
             () => fresh().streak,
           ),
-          () => fresh().repair,
         )
       : null;
     return h(
@@ -317,9 +295,8 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
       h(
         "div",
         { class: "home-main" },
-        // A streak that can be won back today, as it stands, while the day's ten wait (once played, its card is under
-        // the result: the day just played may have done it); else what came of the days just missed, once.
-        t.repair ? (run?.done ? null : () => repairCard(fresh().repair)) : streakNotice(t),
+        // What came of the days just missed, once.
+        streakNotice(t),
         // One line at a time: a live game of the player's going on; of others, a friend played their challenge, said
         // yes to the invite, the duel left went on, or who else took their challenges.
         playingLine(t.playing) ??
@@ -335,7 +312,6 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
           ? [
               // A later visit: the day played as one short card, and the ways to play right under it.
               dayDone(t, run, fresh, next),
-              repairing,
               tomorrow,
               () => (fresh().open?.league ? leagueNote() : null),
               () => missesLine(fresh().misses),
@@ -356,15 +332,13 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
                 ],
                 // Right under it, what to do next: one gold action (game/gold.ts), „Сподели“ plain when it isn't.
                 dayNext(t, run, just, fresh, next, now),
-                // A streak half won back, its card with the gold way on; the goals still open, just played (else
-                // they're in their card); tomorrow (when the next ten come, the streak, the reminder); where the day
-                // leaves the league, and what waits for a second chance; then the friends' day, and what the game
-                // earned (a day whose result was never on screen: told now, once). Just played, the streak waits for
+                // The goals still open, just played (else they're in their card); tomorrow (when the next ten come,
+                // the streak, the reminder); where the day leaves the league, and what waits for a second chance; then
+                // the friends' day, and what the game earned (a day whose result was never on screen: told now, once). Just played, the streak waits for
                 // the day as it is now, with today in it. Played on an invite's page, that page's card comes first, in
                 // place of the friends' day.
                 [
                   elsewhere && run === elsewhere.run ? elsewhere.card() : null,
-                  repairing,
                   just ? () => (fresh().open?.xp ? openGoals(goals) : null) : null,
                   tomorrow,
                   () => (fresh().open?.league ? leagueNote() : null),
@@ -381,8 +355,6 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
         // Начало is one column, on a big screen too.
         just || t.played || user.peek()?.email || fromMail ? null : haveProfile(load),
         just || t.played ? null : h("p", { class: "day-next" }, h("a", { href: "/room" }, "Влез в стая с код")),
-        // Mid-December into January: the year in the game, a tap away.
-        yearCard(),
       ),
       h(
         "div",
@@ -402,7 +374,7 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
         // A later visit: the friends' day after the ways to play (beside the day on a big screen).
         run?.done && !full ? () => friendsDay(fresh()) : null,
       ),
-      topics(t.past),
+      topics(),
     );
   }
 }
@@ -411,8 +383,7 @@ export function today(_: string[] = [], elsewhere?: PlayedElsewhere) {
 const sharedKey = "almanac.sharedDay";
 
 /** What to do next under the day's result: the one gold action (game/gold.ts) — „Сподели“ for a result worth sharing,
- * as it lands (`just`); else another game, to where a goal points (`next`); none while a broken streak is half won
- * back, whose card has it — and „Сподели“ plain when it isn't gold. The rule is weighed once, as the result is drawn,
+ * as it lands (`just`); else another game, to where a goal points (`next`) — and „Сподели“ plain when it isn't gold. The rule is weighed once, as the result is drawn,
  * so that the gold doesn't move under the player's thumb; just played, once the day as it is now is in (`now`), as
  * the right answer few others got is known only once the day is played (and if it doesn't come, on what's known). */
 function dayNext(
@@ -429,7 +400,6 @@ function dayNext(
       streak: just ? t.streak + 1 : t.streak,
       rare: !!d.rarest && d.rarest.right <= rare,
       just,
-      repairing: !!t.repair?.missed.some((m) => !m.done),
     });
   const gold = signal<DayGold | null>(now ? null : weigh(t));
   now?.then(
@@ -513,8 +483,8 @@ function yesterdayLine(t: Today): Child {
 }
 
 /** The day played, on a later visit (its moment is over): one short card — its dateline and place, the score and its
- * points, the pips — with the gold way to another game under it (or none while a broken streak is half won back, whose
- * card has it), „Сподели“ plain, and the questions gone over on their own page. */
+ * points, the pips — with the gold way to another game under it, „Сподели“ plain, and the questions gone over on their
+ * own page. */
 function dayDone(t: Today, run: State, fresh: () => Today, next: () => string): Child {
   const ways = dayNext(t, run, false, fresh, next, null);
   return h(
@@ -569,12 +539,11 @@ function playingLine(p: Today["playing"]): Child {
 /** The streak notices told on this page: the server keeps them as told (play.TellStreak), and each is said once. */
 const toldHere = new Set<string>();
 
-/** Keeps a streak notice as told, on the server, so that no other device (or private window) tells it again; a broken
- * streak on offer to be won back (`repair`) counts as offered then, once. */
-function tellStreak(key: string, repair = false): boolean {
+/** Keeps a streak notice as told, on the server, so that no other device (or private window) tells it again. */
+function tellStreak(key: string): boolean {
   if (toldHere.has(key)) return false;
   toldHere.add(key);
-  api("POST", "/api/me/streak-told", { key, repair }).catch(() => toldHere.delete(key));
+  api("POST", "/api/me/streak-told", { key }).catch(() => toldHere.delete(key));
   return true;
 }
 
@@ -596,41 +565,14 @@ function streakNotice(t: Today): Child {
   return h("p", { class: "streak-notice", role: "status" }, picture(t.kept ? "shield" : "flame", "reserve-pic"), text);
 }
 
-/** A streak just ended that can be won back today (play/repair.go): the day missed, played as its past issue
- * (screens/issues.ts), and today's ten, and what's left of them. The missed issue is the card's way: plain while the
- * day's ten wait (their card has the gold „Започни“), gold once they're played. Shown while it's on offer; told as the
- * streak's end (so that it isn't said later that it ended), and counted as offered, once, on the server. */
-function repairCard(r: Today["repair"]): Child {
-  if (!r) return null;
-  tellStreak(`ended:${r.on}`, true);
-  // The issues missed still to play, as the server says them, as its mails do (repairWords).
-  const text = repairWords(r);
-  const first = r.missed.find((m) => !m.done);
-  return h(
-    "section",
-    { class: "card keep-card repair-card" },
-    h("h2", null, `Серията ти от ${r.days} дни прекъсна`),
-    h("p", { class: "muted" }, text),
-    first
-      ? h(
-          "a",
-          { class: r.day ? "btn primary big" : "btn", href: `/issues/${first.issue}` },
-          `Изиграй брой ${first.issue}`,
-        )
-      : null,
-  );
-}
-
 /** The streak and (once XP is open: a first day has the streak only) the level, side by side: each a tap from Профил,
  * where there's more of both. The reserve days sit on the flame's corner, each a tap from what they're for, so the
  * streak's words keep the chip's width (half a phone's, or the side column's on a wide screen). While the day's ten
  * wait, the streak is at stake: its flame unlit, its number still there, until the day played lights it (grow). */
 function status(t: Today): HTMLElement | null {
-  // A streak broken that can still be won back is at stake, not gone: its days, unlit, today's with them once the day
-  // is played (what winning it back makes of it). A plain „0 дни поред“ reads as a scold: without a streak (nor a
-  // reserve day) there's no chip, and the level takes the row, until the day played starts one.
-  const repair = t.repair ? t.repair.days + (t.repair.day ? 1 : 0) : 0;
-  const days = repair || t.streak;
+  // A plain „0 дни поред“ reads as a scold: without a streak (nor a reserve day) there's no chip, and the level takes
+  // the row, until the day played starts one.
+  const days = t.streak;
   const lv = t.open?.xp ? t.level : undefined;
   if (!days && !lv) return null;
   const share = shareOf(lv);
@@ -645,7 +587,7 @@ function status(t: Today): HTMLElement | null {
             ? h(
                 "a",
                 {
-                  class: `status-item streak-chip${repair ? " unlit repair" : t.run?.done ? "" : " unlit"}`,
+                  class: `status-item streak-chip${t.run?.done ? "" : " unlit"}`,
                   href: "/me",
                 },
                 h("span", { class: "status-icon" }, picture("flame", "flame status-flame")),
@@ -653,7 +595,7 @@ function status(t: Today): HTMLElement | null {
                   "span",
                   { class: "status-text" },
                   h("b", { class: "status-n" }, String(days)),
-                  h("span", { class: "status-label" }, repair ? "дни за връщане" : streakLabel(days)),
+                  h("span", { class: "status-label" }, streakLabel(days)),
                 ),
               )
             : null,
@@ -707,8 +649,7 @@ async function grow(row: HTMLElement, was: Today, now: Today, after: Promise<voi
   if (!kit) return;
   const moving: Promise<void>[] = [];
   const streak = row.querySelector<HTMLElement>(".streak-chip");
-  // A streak half won back keeps its days at stake on the chip (status): nothing rolls on until it's won back.
-  if (streak && now.streak === was.streak + 1 && !now.repair) {
+  if (streak && now.streak === was.streak + 1) {
     // The flame stays as it was before the day (unlit, or cold without a streak) until its number rolls on: then it
     // lights, swelling once. A round number rolls on quietly: its sound is the sheet's, a moment later.
     const off = was.streak ? "unlit" : "cold";
@@ -846,15 +787,9 @@ function friendsPlayed(t: Today): Child {
 }
 
 /** The day played, right under its result's buttons: tomorrow, in one quiet card. When the next ten come (midnight in
- * Bulgaria), what they make of the streak (`streak`: with today's; or, half won back, `repair`, what it will be if it's
- * won back today), a guest's ask to keep the game (`stake`: what it risks till then), and, where it isn't on yet, the
+ * Bulgaria), what they make of the streak (`streak`: with today's), a guest's ask to keep the game (`stake`: what it risks till then), and, where it isn't on yet, the
  * reminder's ask, which by mail asks for the email the keeping would. */
-function tomorrowCard(
-  day: string,
-  streak: () => number,
-  stake: () => string | null,
-  repair: () => Today["repair"],
-): Child {
+function tomorrowCard(day: string, streak: () => number, stake: () => string | null): Child {
   const left = signal(untilMidnight());
   const t = setInterval(() => left.set(untilMidnight()), 30_000);
   onCleanup(() => clearInterval(t));
@@ -864,9 +799,6 @@ function tomorrowCard(
     { class: "card keep-card tomorrow" },
     h("h2", { class: "card-title" }, "Утре — нови десет"),
     h("p", { class: "muted" }, () => {
-      const r = repair();
-      if (r?.day && r.missed.some((m) => !m.done))
-        return `След ${left()} Ако върнеш серията днес, утре тя става ${r.days + 2}.`;
       const n = streak();
       return `След ${left()}${n > 0 ? ` Изиграй ги и серията ти става ${n + 1}.` : ""}`;
     }),
@@ -1001,17 +933,4 @@ function remindAsk(day: string, stake: () => string | null): { view: Child; mail
     ];
   };
   return { view, mailing };
-}
-
-/** Начало's way in, while the year's look back is fresh. */
-export function yearCard(): Child {
-  const { year, fresh } = yearNow();
-  if (!year || !fresh || !user.peek()) return null;
-  return h(
-    "a",
-    { class: "card year-card", href: `/year/${year}` },
-    h("p", { class: "kicker" }, "Годината ти в играта"),
-    h("strong", null, `Твоята ${year}`),
-    h("span", { class: "muted" }, "Дни, отговори, научени факти и още. Виж ги."),
-  );
 }

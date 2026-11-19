@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"regexp"
-	"slices"
 	"strconv"
 	"time"
 
@@ -40,34 +39,25 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 	var viewer int64
 	if u != nil {
 		viewer = u.ID
-		s.game.AfterWait(ctx, u.ID) // a game just finished: what it earned (a streak won back, goals) is in
+		s.game.AfterWait(ctx, u.ID) // a game just finished: what it earned (goals, achievements) is in
 		streak, err := s.game.StreakOf(ctx, u.ID)
 		if err != nil {
 			return nil, err
 		}
 		out["streak"], out["reserve"] = streak.Days, streak.Reserve
-		out["saved"] = s.game.InWeek(slices.Concat(streak.Saved, streak.Mended)) // kept, by a reserve day or a repair
+		out["saved"] = s.game.InWeek(streak.Saved) // kept, by a reserve day
 		out["next"] = streak.Next
 		// What came of the days just missed, told on Начало once (play.TellStreak: the client says when it has): a
-		// reserve day kept the streak; or none was left and it ended, and it can be won back today (play/repair.go),
-		// or a new one begins.
+		// reserve day kept the streak; or none was left and it ended, and a new one begins.
 		recent := s.game.Now().In(play.Bulgaria).AddDate(0, 0, -3).Format(time.DateOnly)
 		told, err := s.game.StreakTold(ctx, u.ID)
 		if err != nil {
 			return nil, err
 		}
-		// A reserve day spent before a repair was part of the streak that ended: what the player heard of was the end.
-		if n, m := len(streak.Saved), len(streak.Mended); n > 0 && streak.Saved[n-1] >= recent &&
-			(m == 0 || streak.Saved[n-1] > streak.Mended[m-1]) && told != "kept:"+streak.Saved[n-1] {
+		if n := len(streak.Saved); n > 0 && streak.Saved[n-1] >= recent && told != "kept:"+streak.Saved[n-1] {
 			out["kept"] = streak.Saved[n-1]
 		}
-		repair, err := s.game.RepairOf(ctx, u.ID)
-		if err != nil {
-			return nil, err
-		}
-		if repair != nil {
-			out["repair"] = repair
-		} else if e := streak.Ended; e != nil && e.On >= recent && e.Days >= 2 {
+		if e := streak.Ended; e != nil && e.On >= recent && e.Days >= 2 {
 			if told != "ended:"+e.On {
 				out["ended"] = e
 			}
@@ -156,10 +146,6 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 				}
 				out["invite"] = s.cfg.PublicURL + "/f/" + code
 			}
-		}
-		// The newest past issue they haven't played (play/past.go): where „Още десет“ goes after the day.
-		if out["past"], err = s.game.LatestPast(ctx, u.ID); err != nil {
-			return nil, err
 		}
 		// While today's ten wait, how yesterday's ended for them, once its board is final.
 		if !done {

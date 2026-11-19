@@ -100,14 +100,12 @@ func (s *Server) released(ctx context.Context) error {
 }
 
 // clientTallies are what the client counts (play/measure.go): the day shared, the reminder's ask on Начало (shown,
-// yes, no; by notification, or by mail where none can come), a notification opened, by kind, a broken streak's repair
-// offered (play/repair.go).
+// yes, no; by notification, or by mail where none can come), a notification opened, by kind.
 var clientTallies = map[string]bool{
 	"share:day": true, "share:challenge": true, "pushask:shown": true, "pushask:yes": true, "pushask:no": true,
 	"mailask:shown": true, "mailask:yes": true, "mailask:no": true,
-	"repair:offered": true,
-	"share:duel":     true, // a duel's win shared (screens/outcome.ts)
-	"share:royal":    true, // a place on Роял's podium shared (screens/royal.ts)
+	"share:duel":  true, // a duel's win shared (screens/outcome.ts)
+	"share:royal": true, // a place on Роял's podium shared (screens/royal.ts)
 }
 
 func init() {
@@ -289,9 +287,9 @@ var landingNames = map[string]string{
 var (
 	kindNames = map[string]string{
 		"day": "Денят", "topic": "Тема", "duel": "Дуел", "challenge": "Предизвикателство", "royal": "Роял",
-		"mistakes": "Грешки", "room": "Стая", "past": "Минал брой",
+		"mistakes": "Грешки", "room": "Стая",
 	}
-	kindOrder = []string{"day", "past", "topic", "duel", "challenge", "royal", "mistakes", "room"}
+	kindOrder = []string{"day", "topic", "duel", "challenge", "royal", "mistakes", "room"}
 )
 
 // kindName is a kind of game as the admin page says it.
@@ -550,7 +548,6 @@ type measures struct {
 	Repeats             rate
 	Streaks             []streakRow
 	Spent               int
-	Repairs             rate
 	Kinds               []string // the kinds of games played in the last 7 days, by name
 	Games               []gamesRow
 	Features            []featureRow
@@ -965,7 +962,6 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 		row("не стигнали до никое устройство", true, count("push:failed:"+k.kind))
 	}
 	f.Repeats = rate{win[0].t["day:seen"], win[0].t["day:answers"]}
-	f.Repairs = rate{win[0].t["repair:done"], win[0].t["repair:offered"]}
 
 	// The reminders against the hold-out (play/experiment.go), since it began.
 	if f.Holdout, err = s.holdout(ctx, today); err != nil {

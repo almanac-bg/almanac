@@ -119,8 +119,6 @@ export interface Crowd {
   guesses?: Spread;
   /** A question of the day's ten: its players today, not everyone ever. */
   today?: boolean;
-  /** A question of a past issue: that day's players (play/past.go). */
-  issue?: boolean;
   /** Few enough to count (a room's own, set by the room's screen): each answer says how many gave it, not what share. */
   counts?: boolean;
 }

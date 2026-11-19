@@ -10,7 +10,7 @@ import (
 )
 
 // A streak of five ended yesterday: one mail, at the player's hour, to a player with an email whom no notification
-// reaches; it says how to win the streak back while that can be done. Never twice, nor to anyone else.
+// reaches. Never twice, nor to anyone else.
 func TestStreakMail(t *testing.T) {
 	g := start(t)
 	s := g.srv
@@ -36,7 +36,6 @@ func TestStreakMail(t *testing.T) {
 		return id
 	}
 	player("ana@example.bg", 5)
-	g.issueOn("2030-03-09")          // the day missed: its issue wins the streak back
 	bo := player("bo@example.bg", 5) // notifications on a phone
 	if _, err := g.db.Write.Exec(`INSERT INTO phones (token, user_id, platform, created_at) VALUES ('t', ?, 'ios', 0)`, bo); err != nil {
 		t.Fatal(err)
@@ -49,10 +48,6 @@ func TestStreakMail(t *testing.T) {
 	}
 	gi := player("gi@example.bg", 5) // back today before their hour
 	g.finishedDay(gi, day, 8*time.Hour)
-	ha := player("ha@example.bg", 5) // a repair ten days ago: none on offer now
-	if _, err := g.db.Write.Exec(`INSERT INTO streak_repairs (user_id, day, told) VALUES (?, '2030-02-28', 1)`, ha); err != nil {
-		t.Fatal(err)
-	}
 	fe := player("fe@example.bg", 5) // mailed 29 days ago
 	if _, err := g.db.Write.Exec(`INSERT INTO streak_mails (user_id, day, at) VALUES (?, '2030-02-09', 0)`, fe); err != nil {
 		t.Fatal(err)
@@ -61,7 +56,7 @@ func TestStreakMail(t *testing.T) {
 	if n := s.streakMails(t.Context(), at(9, 29)); n != 0 {
 		t.Fatalf("before their hour: %d", n)
 	}
-	if n := s.streakMails(t.Context(), at(9, 30)); n != 2 {
+	if n := s.streakMails(t.Context(), at(9, 30)); n != 1 {
 		t.Fatalf("at their hour: %d", n)
 	}
 	if n := s.streakMails(t.Context(), at(9, 31)); n != 0 {
@@ -72,7 +67,7 @@ func TestStreakMail(t *testing.T) {
 		t.Fatalf("after a restart: %d", n)
 	}
 	g.outbox.Flush(t.Context())
-	if len(g.inbox.got) != 2 || g.counted("mail:streak:sent") != 2 {
+	if len(g.inbox.got) != 1 || g.counted("mail:streak:sent") != 1 {
 		t.Fatalf("sent %+v, counted %d", g.inbox.got, g.counted("mail:streak:sent"))
 	}
 	byTo := map[string]string{}
@@ -84,11 +79,8 @@ func TestStreakMail(t *testing.T) {
 		}
 		byTo[m.To] = m.Text
 	}
-	if !strings.Contains(byTo["ana@example.bg"], "Върни серията днес: изиграй пропуснатия брой от 9 март и днешния.") {
-		t.Fatalf("Ana's, with the repair on offer: %q", byTo["ana@example.bg"])
-	}
-	if !strings.Contains(byTo["ha@example.bg"], "Днес можеш да започнеш нова серия.") {
-		t.Fatalf("Ha's, with no repair on offer: %q", byTo["ha@example.bg"])
+	if !strings.Contains(byTo["ana@example.bg"], "Днес можеш да започнеш нова серия.") {
+		t.Fatalf("Ana's: %q", byTo["ana@example.bg"])
 	}
 }
 

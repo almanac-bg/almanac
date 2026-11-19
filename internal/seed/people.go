@@ -91,8 +91,8 @@ func (w *world) cast(n int) {
 		royal: 0.2, social: 1, profile: 4, named: true, hour: 18, from: "room"})
 	add(&player{kind: keyAdmin, persona: keyAdmin, joined: 0, until: -1, rate: 0.9, skill: 0.7, topics: 0.8,
 		duels: 0.5, royal: 0.3, social: 0.5, profile: 0, named: true, hour: 9})
-	// Those who might be the lapsed one: streaks that end yesterday, by whichever reserve days they hold then
-	// (lapse); the one whose repair is on offer at the end is the persona.
+	// Those who might be the lapsed one: streaks that end yesterday, by whichever reserve days they hold then; the
+	// first whose streak did is the persona.
 	for i := range 4 {
 		add(&player{kind: lapsing, joined: last - 12 - 4*i, until: -1, rate: 1, skill: 0.62, topics: 0.4,
 			duels: 0.3, social: 0.5, profile: last - 10, named: true, hour: 21})

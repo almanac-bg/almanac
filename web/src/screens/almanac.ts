@@ -53,11 +53,9 @@ interface Page {
   all: number;
   of: Record<string, number>;
   next?: string;
-  /** The player's games of the day's ten on the page's days, by day: each day's dateline is the way to its game. */
-  games?: Record<string, number>;
 }
 
-type Counts = Omit<Page, "facts" | "next" | "games">;
+type Counts = Omit<Page, "facts" | "next">;
 
 export function almanac(kit: Kit) {
   ({
@@ -197,24 +195,18 @@ function dateline(f: Learned, year: string): string {
  * that ends it (which tries again after a failed fetch). */
 function pages(topic: string, counted: (c: Counts) => void): Child {
   const days = h("div", { class: "almanac-days" });
-  const today = dayInBulgaria();
-  const year = today.slice(0, 4);
+  const year = dayInBulgaria().slice(0, 4);
   let day = "";
   let facts: HTMLElement | null = null;
-  const add = (f: Learned, games: Record<string, number> = {}) => {
+  const add = (f: Learned) => {
     if (f.day !== day || !facts) {
       day = f.day;
       facts = h("ol", { class: "almanac-list" }) as HTMLElement;
-      // The day's dateline, a way to that day's game of the day's ten where the player played it (on the day, or since
-      // as a past issue); else, a day gone by, to its past issue, to play it (screens/issues.ts).
-      const when = h("time", { datetime: f.day }, dateline(f, year));
-      const game = games[f.day];
-      const href = game ? `/games/${game}` : f.issue && f.day < today ? `/issues/${f.issue}` : "";
       days.append(
         h(
           "section",
           { class: "almanac-day" },
-          h("h2", { class: "kicker almanac-date" }, href ? h("a", { href }, when) : when),
+          h("h2", { class: "kicker almanac-date" }, h("time", { datetime: f.day }, dateline(f, year))),
           facts,
         ),
       );
@@ -245,7 +237,7 @@ function pages(topic: string, counted: (c: Counts) => void): Child {
       (p) => {
         if (life.aborted) return;
         counted(p);
-        for (const f of p.facts) add(f, p.games);
+        for (const f of p.facts) add(f);
         next.set(p.next ?? "");
         busy.set(false);
         // Still near the end (a short page, a tall screen): looked at afresh, it says so again.

@@ -427,23 +427,6 @@ func (s *Server) league(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, v)
 }
 
-// year is the player's look back at a year in the game.
-func (s *Server) year(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	year, err := strconv.Atoi(r.PathValue("year"))
-	if err != nil {
-		return errNotFound
-	}
-	y, err := s.game.YearOf(r.Context(), u.ID, year)
-	if err != nil {
-		return err
-	}
-	return ok(w, y)
-}
-
 // leagueNews queues, in the write of a week's close that keeps their places (a few groups' at a time), the word to
 // each player of how their week ended: sent once the league is theirs to see (play/unfold.go), as the queue sends it (pushes.go).
 func (s *Server) leagueNews(ctx context.Context, tx *sql.Tx, news []play.LeagueNews) error {

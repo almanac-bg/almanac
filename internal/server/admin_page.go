@@ -151,7 +151,7 @@ var adminBody = template.Must(template.New("admin").Parse(`
 <div class="table-scroll"><table class="admin-table"><thead><tr><th>Дължина</th><th class="num">Вървят сега</th><th class="num">Прекъснати за 7 дни</th></tr></thead><tbody>
 {{range .Streaks}}<tr><td>{{.Band}}</td><td class="num">{{.Going}}</td><td class="num">{{.Ended}}</td></tr>{{end}}
 </tbody></table></div>
-<p>Резервни дни, похарчени за 7 дни: {{.Spent}}. Върнати серии за 7 дни (от предложените на Начало): {{.Repairs.HTML}}</p>
+<p>Резервни дни, похарчени за 7 дни: {{.Spent}}.</p>
 </section>
 {{end}}
 
