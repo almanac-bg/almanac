@@ -214,6 +214,13 @@ func (w *world) visit(s session, online []*player, met map[[2]int64]bool) error 
 			return err
 		}
 	}
+	// The legend's last evenings before today: on form, so that the history leaves it near Легенда whatever the draw
+	// (finish brings it the rest of the way; one evening's opponents may not be enough on their own).
+	if p.persona == keyLegend && w.day >= w.today()-3 && w.day < w.today() {
+		if err := w.steer(p, 1500, 1<<20, 20); err != nil {
+			return err
+		}
+	}
 	if w.chance(0.3) {
 		if err := w.mistakesRun(p); err != nil {
 			return err
