@@ -37,7 +37,6 @@
                 <data android:pathPrefix="/r/" />
                 <data android:pathPrefix="/f/" />
                 <data android:pathPrefix="/hand/" />
-                <data android:pathPrefix="/year/" />
                 <data android:pathPrefix="/games/" />
                 <data android:pathPrefix="/players/" />
                 <data android:path="/royal" />
@@ -50,8 +49,6 @@
                 <data android:path="/settings" />
                 <data android:path="/almanac" />
                 <data android:path="/mistakes" />
-                <data android:path="/issues" />
-                <data android:pathPrefix="/issues/" />
             </intent-filter>
         </activity>
 

@@ -201,16 +201,11 @@ func (g *Game) crowdFrom(from int) int {
 	return from
 }
 
-// crowdOf is how other players have answered a question of a run, the version it showed: for the day's ten (and a
-// past issue's: past.go), that day's players, once enough of them have; otherwise everyone, as last counted.
+// crowdOf is how other players have answered a question of a run, the version it showed: for the day's ten, that day's
+// players, once enough of them have; otherwise everyone, as last counted.
 func (g *Game) crowdOf(ctx context.Context, db querier, r *run, q bank.Question) (*bank.Crowd, error) {
-	if r.kind == "day" || r.kind == "past" {
+	if r.kind == "day" {
 		c, err := g.dayCrowd(ctx, db, r.day, q, r.userID)
-		if c != nil && r.kind == "past" { // the issue's players, not today's (a copy: a kept crowd is shared)
-			past := *c
-			past.Today, past.Issue = false, true
-			return &past, nil
-		}
 		if c != nil || err != nil {
 			return c, err
 		}

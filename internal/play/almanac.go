@@ -42,8 +42,6 @@ type Almanac struct {
 	All   int            `json:"all"`
 	Of    map[string]int `json:"of"`
 	Next  string         `json:"next,omitempty"`
-	// Games are the player's games of the day's ten on the page's days, by day: each day's dateline is the way to it.
-	Games map[string]int64 `json:"games,omitempty"`
 }
 
 // factsIn is how many facts each topic has: its live questions with a fact.
@@ -119,31 +117,7 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, topic, from string, 
 	if last := len(out.Facts) - 1; more && last >= 0 {
 		out.Next = strconv.FormatInt(out.Facts[last].At, 10) + ":" + out.Facts[last].ID
 	}
-	if n := len(out.Facts); n > 0 {
-		out.Games, err = g.dayGames(ctx, userID, out.Facts[n-1].Day, out.Facts[0].Day)
-	}
-	return out, err
-}
-
-// dayGames are a player's finished games of the day's ten from one day to another, by day: played on the day, or since
-// as a past issue (past.go).
-func (g *Game) dayGames(ctx context.Context, userID int64, from, to string) (map[string]int64, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT day, id FROM runs WHERE user_id = ? AND kind IN ('day', 'past')
-		AND day BETWEEN ? AND ? AND finished_at IS NOT NULL ORDER BY kind = 'day'`, userID, from, to)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	games := map[string]int64{}
-	for rows.Next() {
-		var day string
-		var id int64
-		if err := rows.Scan(&day, &id); err != nil {
-			return nil, err
-		}
-		games[day] = id
-	}
-	return games, rows.Err()
+	return out, nil
 }
 
 // facts are how many facts a player's almanac has, and whether it has every fact of a topic (of the topic's live

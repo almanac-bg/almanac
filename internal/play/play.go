@@ -26,11 +26,9 @@
 //
 // No game deals a player again what they've played, in any game, while the bank has questions they haven't: a topic's,
 // a duel's (live, a rematch, a friend's challenge), a room's and Роял's are drawn for all their players, those none of
-// them has seen first, then those the fewest have, and of as many, those no past issue they may still play holds
-// (choose, seenAmong: met first elsewhere, the issue would deal them again); a recording is a game with few of its
-// questions seen. Four repeat by design: the day (the same ten for everyone), a past issue (its day's ten), Втори шанс
-// (what the player missed) and a challenge taken (the sender's ten). TestNothingPlayedAgain holds it, for every way a
-// game starts.
+// them has seen first, then those the fewest have (choose, seenAmong); a recording is a game with few of its questions
+// seen. Three repeat by design: the day (the same ten for everyone), Втори шанс (what the player missed) and a
+// challenge taken (the sender's ten). TestNothingPlayedAgain holds it, for every way a game starts.
 //
 // A guest who signs in to their account brings everything along (Merge), and a player who goes leaves others'
 // history whole (Forget): merge.go, checked against the schema so that no table of a player's is left out.
@@ -93,6 +91,8 @@ var (
 	ErrNoQuestion = errors.New("no questions to play")
 	// ErrDayOver is a run of the day's questions played on after its day (dayOver).
 	ErrDayOver = errors.New("the run's day is over")
+	// ErrReviewOver is a game gone over after its day (Review).
+	ErrReviewOver = errors.New("the game's review is over")
 )
 
 // Game plays runs.
@@ -270,10 +270,10 @@ func (r *run) dayOver(now time.Time) bool {
 	return now.After(closes)
 }
 
-// dealtOn is the day a run's questions are dealt for, as „На този ден“ goes: the day's questions' date (a past
-// issue's too: past.go), "" for any other game (a question that belongs to a date is that day's only in the day's ten).
+// dealtOn is the day a run's questions are dealt for, as „На този ден“ goes: the day's questions' date, "" for any
+// other game (a question that belongs to a date is that day's only in the day's ten).
 func (r *run) dealtOn() string {
-	if r.kind == "day" || r.kind == "past" {
+	if r.kind == "day" {
 		return r.day
 	}
 	return ""
@@ -860,7 +860,9 @@ type Reviewed struct {
 	Void bool `json:"void,omitempty"`
 }
 
-// Review goes over a finished run, question by question (an unfinished one would give answers away).
+// Review goes over a finished run, question by question (an unfinished one would give answers away), on its own day
+// only (ErrReviewOver after): a game is gone over right after it, not looked up again days later (the owner's call,
+// 19 Nov 2026: past days' questions aren't kept to go back to).
 func (g *Game) Review(ctx context.Context, userID, runID int64) ([]Reviewed, error) {
 	r, err := scanRun(g.DB.Read.QueryRowContext(ctx, `SELECT `+runColumns+` FROM runs WHERE id = ? AND user_id = ?`, runID, userID))
 	if err != nil {
@@ -868,6 +870,15 @@ func (g *Game) Review(ctx context.Context, userID, runID int64) ([]Reviewed, err
 	}
 	if !r.finished {
 		return nil, ErrOutOfStep
+	}
+	var ended int64
+	if err := g.DB.Read.QueryRowContext(ctx, `SELECT finished_at FROM runs WHERE id = ?`, r.id).Scan(&ended); err != nil {
+		return nil, err
+	}
+	// Until the end of the day it ended on, in Bulgaria, and DayGrace at least: one ended at 23:59 is gone over after.
+	_, dayEnd := dayBounds(dayOf(time.UnixMilli(ended)))
+	if now := store.Ms(g.Now()); now >= max(dayEnd, ended+DayGrace.Milliseconds()) {
+		return nil, ErrReviewOver
 	}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT n, shown, points, is_right FROM answers WHERE run_id = ? ORDER BY n`, r.id)
 	if err != nil {

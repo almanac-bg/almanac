@@ -37,20 +37,17 @@ var freshFor = map[string]string{
 	// By design:
 	"StartDay":      "by design: the day's ten are the same for everyone",
 	"drawDay":       "by design: the day's ten are the same for everyone",
-	"StartPast":     "by design: a past issue is its day's ten, as its day dealt them",
 	"StartMistakes": "by design: Втори шанс asks again what the player missed",
 	"TakeChallenge": "by design: a challenge is the sender's ten, question for question",
 }
 
 // TestNothingPlayedAgain holds the rule across every way a game starts: a player who has just played a game, starting
-// any other kind (or the same again: a rematch), is dealt questions they haven't seen while the bank has them, and of
-// those, none a past issue they may still play holds while there are others (met first elsewhere, the issue would
-// deal it again). Live duels, rooms and Роял are drawn for all their players: none of them has seen a question dealt
-// while some are left that none has. A recording is a whole game, someone else's: one with at most RecordingSeen of its questions seen
+// any other kind (or the same again: a rematch), is dealt questions they haven't seen while the bank has them. Live
+// duels, rooms and Роял are drawn for all their players: none of them has seen a question dealt while some are left
+// that none has. A recording is a whole game, someone else's: one with at most RecordingSeen of its questions seen
 // while there's such a game. The player has played most of the bank before (all but three topics), so that a draw
 // that didn't prefer what they haven't seen would deal it again almost surely. Repeats by design (freshFor) are the
-// day (the same for everyone), a past issue (its day's ten), Втори шанс (what they missed) and a challenge taken (the
-// sender's ten).
+// day (the same for everyone), Втори шанс (what they missed) and a challenge taken (the sender's ten).
 func TestNothingPlayedAgain(t *testing.T) {
 	t.Run("every way is here", func(t *testing.T) {
 		ways := choosers(t)
@@ -137,11 +134,6 @@ func TestNothingPlayedAgain(t *testing.T) {
 			_, err := f.w.g.SettleRoyal(f.ctx(), id)
 			f.must(err)
 		}},
-		{"a past issue", func(f *fresh) {
-			s, err := f.w.g.StartPast(f.ctx(), f.ana, FirstIssue)
-			f.must(err)
-			f.w.play(f.ana, s.ID, repeat(f.w.right, len(f.w.picks(s.ID)))...)
-		}},
 		{"Втори шанс", func(f *fresh) {
 			s, err := f.w.g.StartMistakes(f.ctx(), f.ana)
 			f.must(err)
@@ -225,31 +217,15 @@ func TestNothingPlayedAgain(t *testing.T) {
 						left++
 					}
 				}
-				// Of those, what no past issue of theirs holds.
-				held := f.held(players)
-				clean := 0
-				for _, q := range f.w.b.Live("", "") {
-					if pool(q) && !barred[q.Base().ID] && !held[q.Base().ID] && !slices.ContainsFunc(players,
-						func(u int64) bool { return f.seenBy[u][q.Base().ID] }) {
-						clean++
-					}
-				}
-				again, taken := 0, 0
+				again := 0
 				for _, p := range picks {
-					switch {
-					case slices.ContainsFunc(players, func(u int64) bool { return f.seenBy[u][p.ID] }):
+					if slices.ContainsFunc(players, func(u int64) bool { return f.seenBy[u][p.ID] }) {
 						again++
-					case held[p.ID]:
-						taken++
 					}
 				}
 				if want := max(0, len(picks)-left); again > want {
 					t.Fatalf("%d of %d questions played already by its players (%d left that none has seen)",
 						again, len(picks), left)
-				}
-				if want := max(0, len(picks)-clean); again+taken > want {
-					t.Fatalf("%d of %d questions from a past issue its players may still play (%d left that none "+
-						"has seen nor any issue holds)", taken, len(picks), clean)
 				}
 				if len(picks) == 0 {
 					t.Fatal("no questions")
@@ -264,8 +240,7 @@ var freshTopics = []string{"geography", "history", "science"}
 
 func anyQuestion(bank.Question) bool { return true }
 
-// fresh is a world for TestNothingPlayedAgain, the day after the first issue (neither Ана nor Бо played it: a past
-// issue for each): Ана, who has played every question but those of freshTopics (some wrong, days ago: a Втори шанс
+// fresh is a world for TestNothingPlayedAgain, the day after the first issue (neither Ана nor Бо played it): Ана, who has played every question but those of freshTopics (some wrong, days ago: a Втори шанс
 // waits), and her friend Бо; two others' games of one topic each, in two of freshTopics, to play against as
 // recordings.
 type fresh struct {
@@ -332,29 +307,6 @@ func (f *fresh) seen(u int64) map[string]bool {
 	}
 	f.seenBy[u] = out
 	return out
-}
-
-// held are the questions of the past issues any of players may still play (StartPast): the first issue's, while they
-// haven't finished it.
-func (f *fresh) held(players []int64) map[string]bool {
-	f.t.Helper()
-	held := map[string]bool{}
-	for _, u := range players {
-		var done bool
-		f.must(f.w.db.Read.QueryRow(`SELECT EXISTS (SELECT 1 FROM runs WHERE user_id = ? AND day = ?
-			AND kind IN ('day', 'past') AND finished_at IS NOT NULL)`, u, FirstIssue).Scan(&done))
-		if done {
-			continue
-		}
-		var raw string
-		f.must(f.w.db.Read.QueryRow(`SELECT questions FROM days WHERE day = ?`, FirstIssue).Scan(&raw))
-		var picks []Pick
-		f.must(json.Unmarshal([]byte(raw), &picks))
-		for _, p := range picks {
-			held[p.ID] = true
-		}
-	}
-	return held
 }
 
 // room draws a room's game for Ана and Бо, as a room does (room.Room.start).

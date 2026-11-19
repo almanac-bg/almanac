@@ -17,8 +17,8 @@ import (
 //     on screen (the day's last question let run out with the tab in the background, a game left at its last question,
 //     a Роял whose evening ended) has its news told on Начало instead, once (Untold), and not after some later game.
 //   - What came of the days just missed (a reserve day kept the streak, or it ended) is said once (StreakNotice,
-//     TellStreak); and a broken streak that can be won back is counted as offered once. A player back after days away
-//     (BackFrom) is welcomed back once, with the longest streak they've had, in the same way.
+//     TellStreak). A player back after days away (BackFrom) is welcomed back once, with the longest streak they've
+//     had, in the same way.
 
 // UntoldWithin is how long a game's untold news waits for Начало: older, it's let go (what it earned is the player's
 // all the same, and its achievements are told with the next game's news).
@@ -71,9 +71,8 @@ func (g *Game) StreakTold(ctx context.Context, userID int64) (string, error) {
 	return key, err
 }
 
-// TellStreak keeps a streak notice as told: fresh is whether it wasn't before. A broken streak offered to be won back
-// (repair) is told as its end, so that the player doesn't hear later that it ended; and counted as offered, once.
-func (g *Game) TellStreak(ctx context.Context, userID int64, key string, repair bool) (fresh bool, err error) {
+// TellStreak keeps a streak notice as told: fresh is whether it wasn't before.
+func (g *Game) TellStreak(ctx context.Context, userID int64, key string) (fresh bool, err error) {
 	if !streakKey.MatchString(key) {
 		return false, ErrNotice
 	}
@@ -83,8 +82,5 @@ func (g *Game) TellStreak(ctx context.Context, userID int64, key string, repair 
 		return false, err
 	}
 	n, _ := res.RowsAffected()
-	if n > 0 && repair {
-		err = g.Tally(ctx, "repair:offered", 1)
-	}
-	return n > 0, err
+	return n > 0, nil
 }

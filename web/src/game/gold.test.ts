@@ -7,7 +7,6 @@ const day = (d: Partial<DayDone>): DayDone => ({
   streak: 1,
   rare: false,
   just: true,
-  repairing: false,
   ...d,
 });
 
@@ -29,13 +28,12 @@ test("a streak between its round numbers, or one lucky answer in a poor day, is 
   assert.equal(dayGold(day({ rights: 2, rare: true })), "next", "2 of 10 with a rare one");
 });
 
-test("otherwise gold goes to what's next: a streak to win back, or another game", () => {
+test("otherwise gold goes to another game", () => {
   assert.equal(dayGold(day({ rights: 2 })), "next", "2 of 10");
-  assert.equal(dayGold(day({ rights: 10, repairing: true })), "repair", "the repair's game first");
 });
 
 test("another game goes where an open goal of a topic points, else to what's next otherwise", () => {
-  assert.equal(nextGame([], "/issues/8"), "/issues/8");
+  assert.equal(nextGame([], "/play/music"), "/play/music");
   assert.equal(
     nextGame(
       [
@@ -43,7 +41,7 @@ test("another game goes where an open goal of a topic points, else to what's nex
         { href: "/play/music", done: true },
         { href: "/play/history", done: false },
       ],
-      "/issues/8",
+      "/play/music",
     ),
     "/play/history",
   );

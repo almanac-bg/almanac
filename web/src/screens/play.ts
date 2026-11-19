@@ -1,6 +1,5 @@
 // Теми: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays the same
-// game. The tiles live on Начало (Минали броеве first, the days gone by: screens/issues.ts; Втори шанс beside it while
-// questions wait for one, then each topic, and one for „България“, the questions about Bulgaria from every topic, while
+// game. The tiles live on Начало (Втори шанс first while questions wait for one, then each topic, and one for „България“, the questions about Bulgaria from every topic, while
 // the bank has them); a run of one is /play/<topic>, whose result offers ten more at once, and another topic a tap
 // away. Played to be sent as a challenge (/play/<topic>?challenge, from Дуел's „Предизвикай“; all the topics at once,
 // /play/all?challenge, only so), its result sends it instead (screens/challenge.ts).
@@ -14,18 +13,16 @@ import type { State } from "../game/types.ts";
 import { api, errorText } from "../lib/api.ts";
 import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { backOut, byTap, entry, hold, mark, title } from "../lib/router.ts";
-import { issueWords } from "../lib/words.ts";
 import { bulgaria, type Category, categories, player, user } from "../state.ts";
 import { meter, questions, stakeLine, toneOf, topicMark } from "../ui.ts";
 import { sendChallenge } from "./challenge.ts";
 import { missing } from "./missing.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
-/** The topics as tiles, each with how well the player knows it: Минали броеве first (`past`: the newest issue the
- * player hasn't played), and the second chance right after it while questions wait for one (at the end of the list it
- * went unseen); „България“ across them after the topics (no mastery of its own: its answers count in their own
- * topics). A game left half-way says so on its tile, where it goes on from. */
-export function topics(past?: PastNext | null): Child {
+/** The topics as tiles, each with how well the player knows it: the second chance first while questions wait for one
+ * (at the end of the list it went unseen); „България“ across them after the topics (no mastery of its own: its answers
+ * count in their own topics). A game left half-way says so on its tile, where it goes on from. */
+export function topics(): Child {
   const stats = signal<Stats | null>(null);
   const waiting = signal(0);
   const left = signal<LeftRun[]>([]);
@@ -49,15 +46,6 @@ export function topics(past?: PastNext | null): Child {
     h("ul", { class: "topics" }, () => {
       const mine = stats()?.mastery ?? [];
       return [
-        // First, where a thumb lands first: the days gone by, the day's own kind of game (screens/issues.ts).
-        h(
-          "li",
-          { class: "topic-all" },
-          pastTile(
-            past,
-            left().find((r) => r.kind === "past"),
-          ),
-        ),
         waiting() || goesOn("mistakes")
           ? h("li", { class: "topic-all" }, secondChance(waiting(), goesOn("mistakes")))
           : null,
@@ -92,29 +80,6 @@ export function topics(past?: PastNext | null): Child {
           : null,
       ];
     }),
-  );
-}
-
-/** The newest past issue a player hasn't played (play.LatestPast): its day and number. */
-export interface PastNext {
-  day: string;
-  issue: number;
-}
-
-/** Минали броеве's tile (screens/issues.ts): where a past issue was left, the way back to it; else the newest not played
- * yet; else what the place is. */
-function pastTile(past: PastNext | null | undefined, left: LeftRun | undefined): Child {
-  const meta = left?.issue
-    ? h(
-        "span",
-        { class: "topic-meta topic-left" },
-        `Продължи брой ${left.issue} · въпрос ${left.at + 1} от ${left.total}`,
-      )
-    : h("span", { class: "topic-meta" }, past ? issueWords(past.issue, past.day) : "Въпросите на всеки минал ден");
-  return h(
-    "a",
-    { href: left?.issue ? `/issues/${left.issue}` : "/issues", class: "topic tone-gold" },
-    h("span", { class: "topic-text" }, h("span", { class: "topic-name" }, "Минали броеве"), meta),
   );
 }
 
@@ -170,7 +135,7 @@ function tile(c: Category, m: Mastery | undefined, left: Child): Child {
 export function topic([id = ""]: string[]) {
   const category = id === "all" ? "" : id;
   const sending = new URLSearchParams(location.search).has("challenge");
-  // All the topics at once are a challenge's only (Минали броеве replaced the game of them all: screens/issues.ts).
+  // All the topics at once are a challenge's only.
   const name = !category
     ? sending
       ? "Всички теми"
@@ -293,11 +258,8 @@ async function dayWaits(): Promise<DayWaits | null> {
  * whether its question is showing, its time running. */
 export interface LeftRun {
   id: number;
-  kind: "topic" | "mistakes" | "past";
+  kind: "topic" | "mistakes";
   category: string;
-  /** A past issue's day and number (screens/issues.ts). */
-  day?: string;
-  issue?: number;
   at: number;
   total: number;
   open?: boolean;

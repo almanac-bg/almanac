@@ -2,7 +2,6 @@ package play
 
 import (
 	"context"
-	"slices"
 	"strconv"
 	"strings"
 )
@@ -13,12 +12,9 @@ type Stats struct {
 	Streak  int     `json:"streak"`
 	Best    int     `json:"best"`    // the longest streak the player has had (StreakNow)
 	Week    [7]bool `json:"week"`    // this week's days played, Monday first
-	Saved   [7]bool `json:"saved"`   // this week's days a reserve day or a repair kept the streak through
+	Saved   [7]bool `json:"saved"`   // this week's days a reserve day kept the streak through
 	Reserve int     `json:"reserve"` // reserve days in hand
 	Next    int     `json:"next"`    // days in a row to the next reserve day (0: they are full)
-	// Repair is a broken streak on offer to be won back today (repair.go), as Начало offers it: the streak shows as
-	// that, not as none.
-	Repair  *Repair `json:"repair,omitempty"`
 	Days    int     `json:"days"`    // days' questions finished
 	Games   int     `json:"games"`   // runs finished, of every kind
 	Answers int     `json:"answers"` // questions answered (or timed out)
@@ -59,11 +55,8 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	if err != nil {
 		return s, err
 	}
-	s.Streak, s.Best, s.Reserve, s.Next, s.Saved = streak.Days, streak.Best, streak.Reserve, streak.Next, g.InWeek(slices.Concat(streak.Saved, streak.Mended))
+	s.Streak, s.Best, s.Reserve, s.Next, s.Saved = streak.Days, streak.Best, streak.Reserve, streak.Next, g.InWeek(streak.Saved)
 	if s.Week, err = g.Week(ctx, userID); err != nil {
-		return s, err
-	}
-	if s.Repair, err = g.RepairOf(ctx, userID); err != nil {
 		return s, err
 	}
 	db := g.DB.Read
@@ -133,7 +126,7 @@ type Games struct {
 // gameKinds are the games a list of them can be narrowed to: the day's ten, games of topics (a second chance is
 // one), and games with others.
 var gameKinds = map[string]string{
-	"day":    `AND kind IN ('day', 'past')`,
+	"day":    `AND kind = 'day'`,
 	"topic":  `AND kind IN ('topic', 'mistakes')`,
 	"others": `AND kind IN ('duel', 'challenge', 'royal', 'room')`,
 }
@@ -167,7 +160,7 @@ func (g *Game) GamesOf(ctx context.Context, userID int64, kind, from string, lim
 		if p.Outcome != "" && p.Opponent == "" {
 			p.Opponent = GoneName // a duel's result keeps no name of a player who has gone (Forget)
 		}
-		if p.Kind == "day" || p.Kind == "past" {
+		if p.Kind == "day" {
 			p.Issue = Issue(p.Day)
 		}
 		out.Games = append(out.Games, p)

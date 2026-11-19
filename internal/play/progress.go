@@ -32,7 +32,7 @@ import (
 // once, at the end of the game that did it (NewsOf), and is shown what comes next (Next): the next level that gives
 // something, the next division, the achievements nearest. Reserve days keep the streak through a missed day (runs.go):
 // the day itself earns them (the streak's third day, every seventh in a row), and so do the day's goals, done all
-// three, one a week at most; the streak makes achievements of its own, and a year with no day missed at all one more. A streak that ends anyway can be won back by playing, once a month (repair.go).
+// three, one a week at most; the streak makes achievements of its own, and a year with no day missed at all one more.
 //
 // All of it comes from the game's own records: nothing to buy, nothing made up. A new player meets it a part at a
 // time (unfold.go): all of it counts from the first game, but XP, the league and the rating show as each starts to
@@ -127,7 +127,7 @@ var Achievements = []Achievement{
 
 	{"streak100", "Сто дни", "Играй въпросите на деня сто дни поред.", "flame", Legendary, 100, false},
 	{"streak365", "Цяла година", "Стигни серия от 365 дни с въпросите на деня.", "flame", Legendary, 365, false},
-	{"noMiss", "Без нито един пропуск", "Играй въпросите на деня 365 дни един след друг, без резервен ден и без връщане на серия.", "", Legendary, 365, false},
+	{"noMiss", "Без нито един пропуск", "Играй въпросите на деня 365 дни един след друг, без резервен ден.", "", Legendary, 365, false},
 	{"master5", "Пет теми като петте си пръста", "Стигни до „Майстор“ в пет теми.", "trophy", Legendary, 5, false},
 	{"duel50", "Петдесет победи", "Спечели петдесет дуела.", "shield", Legendary, 50, false},
 	{"facts5000", "Пет хиляди факта", "Събери пет хиляди факта в Алманаха.", "book", Legendary, 5000, false},
@@ -603,9 +603,8 @@ func (g *Game) anyExact(ctx context.Context, userID int64) (bool, error) {
 // the day's goals done (with their XP), a week of the leagues ended (with what it paid), their level (whether it's gone up), a
 // division reached for the first time, and everything they've unlocked to wear, whatever unlocked it. The client
 // tells it in three cards at most (web/src/game/news.ts): the goals, the one biggest event, and what's new to wear; a
-// card left free may tell, once a day, how others' duels against the player's recordings went (recordings.go); a
-// broken streak won back is a line of its own (repair.go). Only what's open to the player is told (unfold.go): the
-// rest waits for its system to open.
+// card left free may tell, once a day, how others' duels against the player's recordings went (recordings.go). Only
+// what's open to the player is told (unfold.go): the rest waits for its system to open.
 type News struct {
 	Achievements []Earned   `json:"achievements"`
 	Goals        []DoneGoal `json:"goals"`
@@ -634,8 +633,6 @@ type News struct {
 	// Recordings is what others' duels against the player's recordings came to, once a day, in a card the rest
 	// leaves free (recordings.go).
 	Recordings *RecordingsNews `json:"recordings,omitempty"`
-	// Mended is the streak's days, when a broken streak has just been won back (repair.go): said in a line, once.
-	Mended int `json:"mended,omitempty"`
 	// Kind is the game's kind ("day", "topic", …): what its points are said to be for.
 	Kind string `json:"kind,omitempty"`
 	// Facts is how many facts the game put in the player's almanac (almanac.go): told from the first day, before XP
@@ -705,19 +702,6 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 	w, err := g.wardrobeOf(ctx, userID)
 	if err != nil {
 		return n, err
-	}
-	// A streak won back: told with the streak as it is now.
-	var mended bool
-	if err := g.DB.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM streak_repairs WHERE user_id = ? AND NOT told)`,
-		userID).Scan(&mended); err != nil {
-		return n, err
-	}
-	if mended {
-		s, err := g.StreakOf(ctx, userID)
-		if err != nil {
-			return n, err
-		}
-		n.Mended = s.Days
 	}
 	have := w.unlocks()
 	n.XP = total
@@ -864,7 +848,6 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 		for _, q := range []string{
 			`UPDATE goals_done SET seen = 1 WHERE user_id = ?1 AND NOT seen`,
 			`UPDATE league_results SET seen = 1 WHERE user_id = ?1 AND NOT seen`,
-			`UPDATE streak_repairs SET told = 1 WHERE user_id = ?1 AND NOT told`,
 			`UPDATE runs SET told = 1 WHERE user_id = ?1 AND NOT told AND finished_at <= ?4`,
 			`UPDATE users SET level_seen = max(level_seen, ?2), unlocks_known = 1,
 				peak_seen = CASE WHEN rated >= ?5 THEN max(peak_seen, peak) ELSE -1 END,

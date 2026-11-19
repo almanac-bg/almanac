@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { closeWords, countedWords, dayShareText, duelShareText, percent, withOwn, yearShareText } from "./share.ts";
+import { closeWords, countedWords, dayShareText, duelShareText, percent, withOwn } from "./share.ts";
 import type { Mark } from "./types.ts";
 
 const right: Mark = { points: 1000, right: true };
@@ -75,24 +75,6 @@ test("it ends with the player's own link, when there is one, and still has no wo
   assert.equal(text.split("\n").at(-1), link);
   assert.equal(text.split("\n").length, 5);
   assert.doesNotMatch(text, /ела|покан|играй|опитай|можеш|а ти/iu);
-});
-
-test("a year is shared as its days and streak, its answers, its strongest topic and facts, and the site", () => {
-  assert.equal(
-    yearShareText({ year: 2026, days: 42, streak: 12, answers: 1234, right: 839, topic: "История", facts: 312 }),
-    [
-      "Моята 2026 в АЛМАНАХ",
-      "42 дни игра · серия 12",
-      "1234 отговора, 68% верни",
-      "Най-силна тема: История",
-      "312 факта в Алманаха",
-      "almanac.bg",
-    ].join("\n"),
-  );
-  assert.equal(
-    yearShareText({ year: 2026, days: 1, streak: 1, answers: 1, right: 0, facts: 0 }),
-    ["Моята 2026 в АЛМАНАХ", "1 ден игра", "1 отговор, 0% верни", "almanac.bg"].join("\n"),
-  );
 });
 
 test("a duel's win is shared as the day is: what it was and the score, no names and no words of invitation", () => {

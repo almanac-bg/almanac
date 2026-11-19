@@ -226,61 +226,6 @@ func TestGoalsAcrossMidnight(t *testing.T) {
 	}
 }
 
-// A repair is the games' day's, not the clock's: the day's questions begun before midnight and finished after it win
-// the streak back with the missed issue played before midnight; and so does the missed issue begun before midnight
-// and finished after it (past the grace too: a game counts on the day it began as well), with the day's questions
-// played before. Begun after midnight, the next day is a day played since, and the offer is over.
-func TestRepairAcrossMidnight(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana, bo, gal, dan := w.user(), w.user(), w.user(), w.user()
-	w.at(15, 12, 0, 0)
-	missed := "2026-11-14"
-	w.issueOn(missed)
-	for _, p := range []int64{ana, bo, gal, dan} {
-		w.daysPlayed(p, 5, 4, 3) // a streak of three, ended yesterday
-	}
-	if r, _ := w.g.RepairOf(ctx, ana); r == nil || len(r.Missed) != 1 || r.Missed[0].Day != missed {
-		t.Fatalf("on offer: %+v", r)
-	}
-	right := func(int) func(int64, int) json.RawMessage { return w.right }
-	// Ana: the missed issue at 23:30, the day's questions from 23:58 to 00:02.
-	w.at(15, 23, 30, 0)
-	w.past(ana, missed, right)
-	w.sundayLate(ana)
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 4 || !slices.Equal(s.Mended, []string{missed}) {
-		t.Fatalf("Ana's repair across midnight: %+v", s)
-	}
-	// Bo and Gal: the day's questions at 23:50, the missed issue from 23:58 to 00:02, or to past the grace.
-	for _, p := range []struct {
-		user  int64
-		after time.Duration
-	}{{bo, 2 * time.Minute}, {gal, DayGrace + time.Minute}} {
-		w.at(15, 23, 50, 0)
-		w.playDay(p.user)
-		w.at(15, 23, 58, 0)
-		s, err := w.g.StartPast(ctx, p.user, missed)
-		if err != nil {
-			t.Fatal(err)
-		}
-		w.playOn(p.user, s.ID, 0, repeat(w.right, Length/2)...)
-		w.at(16, 0, 0, 0)
-		w.wait(p.after)
-		w.playOn(p.user, s.ID, Length/2, repeat(w.right, Length-Length/2)...)
-		if s, _ := w.g.StreakOf(ctx, p.user); s.Days != 4 || !slices.Equal(s.Mended, []string{missed}) {
-			t.Fatalf("a repair across midnight, %v after it: %+v", p.after, s)
-		}
-	}
-	// Dan: the day's questions on Sunday, the missed issue begun on Monday: Sunday was a day played since.
-	w.at(15, 23, 50, 0)
-	w.playDay(dan)
-	w.at(16, 9, 0, 0)
-	w.past(dan, missed, right)
-	if s, _ := w.g.StreakOf(ctx, dan); len(s.Mended) != 0 {
-		t.Fatalf("mended the day after: %+v", s)
-	}
-}
-
 // A week closes a few groups at a time (closeBatch), each write with its places, moves and news; one cut off half-way
 // goes on where it stopped, nothing kept or told twice, and the next week opens only once all of it is kept.
 func TestWeekClosesInBatches(t *testing.T) {

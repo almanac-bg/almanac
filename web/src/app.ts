@@ -33,12 +33,7 @@ const links: [href: string, label: string, icon: string, here: (p: string) => bo
   ["/", "Начало", "home", (p) => /^\/($|play\/|mistakes|duel|royal|room|r\/|f\/)/.test(p)],
   ["/friends", "Приятели", "users", (p) => p === "/friends"],
   ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
-  [
-    "/me",
-    "Профил",
-    "user",
-    (p) => /^\/(me|settings|rewards|wardrobe|almanac|year\/[0-9]{4}|games(\/[0-9]+)?)$/.test(p),
-  ],
+  ["/me", "Профил", "user", (p) => /^\/(me|settings|rewards|wardrobe|almanac|games(\/[0-9]+)?)$/.test(p)],
 ];
 
 reportErrors();
@@ -114,9 +109,6 @@ if (root) {
       { path: /^\/royal$/, view: later(() => import("./screens/royal.ts").then((m) => m.royal)) },
       { path: /^\/almanac$/, view: later(() => import("./screens/almanac.ts").then((m) => m.almanac)) },
       { path: /^\/mistakes$/, view: mistakes },
-      { path: /^\/issues$/, view: later(() => import("./screens/issues.ts").then((m) => m.issues)) },
-      { path: /^\/issues\/([0-9]{1,5})$/, view: later(() => import("./screens/issues.ts").then((m) => m.issue)) },
-      { path: /^\/year\/([0-9]{4})$/, view: later(() => import("./screens/year.ts").then((m) => m.year)) },
       { path: /^\/room$/, view: rooms },
       { path: /^\/ranks$/, view: later(() => import("./screens/ranks.ts").then((m) => m.ranks)) },
       { path: /^\/rewards$/, view: later(() => import("./screens/rewards.ts").then((m) => m.rewards)) },

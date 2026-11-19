@@ -334,6 +334,30 @@ func TestOnThisDay(t *testing.T) {
 	}
 }
 
+// A game is gone over on the day it ended (one ended just before midnight, right after it too), never days later.
+func TestReviewOnItsDay(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	w.at(15, 23, 50, 0)
+	s, err := w.g.StartTopic(ctx, ana, "history")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(ana, s.ID, repeat(w.right, len(w.picks(s.ID)))...)
+	if r, err := w.g.Review(ctx, ana, s.ID); err != nil || len(r) == 0 {
+		t.Fatalf("right after it: %d, %v", len(r), err)
+	}
+	w.at(16, 0, 1, 0)
+	if _, err := w.g.Review(ctx, ana, s.ID); err != nil {
+		t.Fatalf("just after midnight: %v", err)
+	}
+	w.at(16, 12, 0, 0)
+	if _, err := w.g.Review(ctx, ana, s.ID); !errors.Is(err, ErrReviewOver) {
+		t.Fatalf("the day after: %v", err)
+	}
+}
+
 // The first level comes with the run that passes 300 XP, in the news once.
 func TestLevelUpNews(t *testing.T) {
 	w := setup(t)
@@ -1014,15 +1038,9 @@ func TestMergeKeepsTheAccountsDay(t *testing.T) {
 	// The guest said they'd come to tonight's Роял, and chose no word from friends.
 	_ = w.g.PlanRoyal(ctx, "2026-11-14", guest, true)
 	_, _ = w.db.Write.Exec(`INSERT INTO push_prefs (user_id, kind, wanted) VALUES (?, 'friends', 0)`, guest)
-	// And won a streak back on the day before.
-	_, _ = w.db.Write.Exec(`INSERT INTO streak_repairs (user_id, day) VALUES (?, '2026-11-11')`, guest)
 	err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, guest, owner) })
 	if err != nil {
 		t.Fatal(err)
-	}
-	var repairs int
-	if err := w.db.Read.QueryRow(`SELECT count(*) FROM streak_repairs WHERE user_id = ?`, owner).Scan(&repairs); err != nil || repairs != 1 {
-		t.Fatalf("the guest's repair: %d %v", repairs, err)
 	}
 	if n, mine, _ := w.g.RoyalPlans(ctx, "2026-11-14", owner); n != 1 || !mine {
 		t.Fatalf("the guest's plan: %d, %v", n, mine)
@@ -2748,39 +2766,5 @@ func TestMistakes(t *testing.T) {
 	w.show(ana, s.ID)
 	if res, _ := w.g.Answer(ctx, ana, s.ID, 0, w.right(s.ID, 0)); res.Learned {
 		t.Error("learned in a topic run")
-	}
-}
-
-func TestYear(t *testing.T) {
-	w := setup(t) // Thursday, 12 November 2026
-	ctx := t.Context()
-	ana, bo := w.user(), w.user()
-	if _, err := w.g.YearOf(ctx, ana, 2027); !errors.Is(err, ErrNoYear) {
-		t.Fatalf("a year not started: %v", err)
-	}
-	if y, err := w.g.YearOf(ctx, ana, 2026); err != nil || y.Days != 0 || y.League != nil || y.First != nil {
-		t.Fatalf("a year without a game: %+v %v", y, err)
-	}
-	// Three days in a row of the day's questions, a gap, then one more; a topic game of right answers.
-	for _, gap := range []int{0, 1, 1, 2} {
-		w.wait(time.Duration(gap) * 24 * time.Hour)
-		s, err := w.g.StartDay(ctx, ana)
-		if err != nil {
-			t.Fatal(err)
-		}
-		w.play(ana, s.ID, repeat(w.wrong, Length)...)
-	}
-	s, _ := w.g.StartTopic(ctx, ana, "history")
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	y, err := w.g.YearOf(ctx, ana, 2026)
-	if err != nil || y.Days != 4 || y.Streak != 3 || y.Games != 5 || y.Answers != 5*Length || y.Right != Length ||
-		y.XP <= 0 || y.League == nil || y.League.Name != "Странджа" {
-		t.Fatalf("Ana's year: %+v %v", y, err)
-	}
-	if y.Facts == 0 || y.First == nil || y.First.Fact == "" {
-		t.Fatalf("the facts of Ana's year: %+v", y)
-	}
-	if b, _ := w.g.YearOf(ctx, bo, 2026); b.Days != 0 || b.Games != 0 {
-		t.Fatalf("Bo's year has Ana's games: %+v", b)
 	}
 }

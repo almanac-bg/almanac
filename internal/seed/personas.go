@@ -157,19 +157,19 @@ func (w *world) personas() ([]Persona, error) {
 	}
 	out = append(out, Persona{Key: keyGuest, ID: u.ID, Name: u.Name, Tag: u.Tag, Token: token,
 		About: "a new guest: nothing played, as a browser that's never been here"})
-	// The lapsed one: whichever of its candidates has a repair on offer now.
+	// The lapsed one: whichever of its candidates' streaks ended yesterday, as Начало tells it.
 	var lapsed *player
 	for _, p := range w.players {
 		if p.kind == lapsing && p.id != 0 && lapsed == nil {
-			if r, err := w.g.RepairOf(w.ctx, p.id); err != nil {
+			if e, err := w.endedYesterday(p); err != nil {
 				return nil, err
-			} else if r != nil && len(r.Missed) > 0 && !r.Missed[0].Done {
+			} else if e != nil {
 				lapsed, p.persona = p, keyLapsed
 			}
 		}
 	}
 	if lapsed == nil {
-		return nil, fmt.Errorf("seed: no player's broken streak has its repair on offer")
+		return nil, fmt.Errorf("seed: no player's streak ended yesterday")
 	}
 	for _, key := range personaKinds[1:] {
 		var p *player
@@ -201,6 +201,17 @@ func (w *world) personas() ([]Persona, error) {
 }
 
 // about says what a persona is now, from what the game says of them, and checks it's what they're for.
+// endedYesterday is a player's streak that ended yesterday, as Начало tells it (two days or more: server/game.go), nil
+// for none.
+func (w *world) endedYesterday(p *player) (*play.Ended, error) {
+	s, err := w.g.StreakOf(w.ctx, p.id)
+	if err != nil || s.Days != 0 || s.Ended == nil || s.Ended.Days < 2 ||
+		s.Ended.On != play.DayShift(w.g.Today(), -1) {
+		return nil, err
+	}
+	return s.Ended, nil
+}
+
 func (w *world) about(p *player) (string, error) {
 	ctx := w.ctx
 	streak, err := w.g.StreakOf(ctx, p.id)
@@ -253,12 +264,11 @@ func (w *world) about(p *player) (string, error) {
 		}
 		return "a month's regular in Злато, with friends, challenges waiting and the week's league; " + facts, nil
 	case keyLapsed:
-		r, err := w.g.RepairOf(ctx, p.id)
-		if err != nil || r == nil {
-			return fail("has no repair on offer")
+		e, err := w.endedYesterday(p)
+		if err != nil || e == nil {
+			return fail("has no streak that ended yesterday")
 		}
-		return fmt.Sprintf("a streak of %d that broke yesterday (%s missed): its repair on offer, the missed issue to play; %s",
-			r.Days, r.On, facts), nil
+		return fmt.Sprintf("a streak of %d that broke yesterday (%s missed), told on Начало; %s", e.Days, e.On, facts), nil
 	case keyLegend:
 		if !w.opt.small && (standing.Division.ID != "legend" || !play.Placed(standing.Rated)) {
 			return fail("isn't in Легенда")

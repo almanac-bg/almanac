@@ -19,7 +19,6 @@ let {
   when,
   go,
   title,
-  yearNow,
   user,
   notice,
   avatar,
@@ -50,7 +49,6 @@ export function me(kit: Kit) {
     when,
     go,
     title,
-    yearNow,
     user,
     notice,
     avatar,
@@ -114,7 +112,6 @@ export function me(kit: Kit) {
           // The league once it's open (play/unfold.go): from the third day played.
           () => (progress()?.open.league ? leagueLine() : null),
           stats(),
-          yearLink(),
           () =>
             user()?.tag
               ? h("a", { class: "link muted tap", href: profileHref(user()?.tag ?? "") }, "Как те виждат другите")
@@ -321,10 +318,4 @@ function levelXP(level: number): number {
   let from = 0;
   for (let l = 1, step = 300; l < level; l++, step += 150) from += step;
   return from;
-}
-
-/** Профил's way in, once a year's look back has opened. */
-function yearLink(): Child {
-  const { year } = yearNow();
-  return year ? h("a", { class: "link", href: `/year/${year}` }, `Твоята ${year}`) : null;
 }

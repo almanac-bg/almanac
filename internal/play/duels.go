@@ -389,15 +389,9 @@ func seenBy(ctx context.Context, db querier, userID int64, seen map[string]bool)
 	return rows.Err()
 }
 
-// SeenWeight is how much more stale (choose) a question one of a game's players has answered is than one a past issue
-// of theirs still holds: any number of the latter come before one of the former.
-const SeenWeight = 1000
-
 // seenAmong is how stale each question is to a game for players (choose: the least first, those missing none): of
-// those any of them has answered (in any game: the day, a past issue, a challenge, a room, Роял), SeenWeight for each
-// of them who has, so that no game deals anyone again what they've played while the bank has questions they haven't;
-// and of those of a past issue one of them may still play (past.go: not finished, on its day or since), one for each,
-// so that a game met before the issue doesn't take its questions from it while there are others.
+// those any of them has answered (in any game: the day, a room, Роял…), one for each of them who has, so that no game
+// deals anyone again what they've played while the bank has questions they haven't.
 func (g *Game) seenAmong(ctx context.Context, players []int64) (map[string]int, error) {
 	stale := map[string]int{}
 	for _, id := range slices.Compact(slices.Sorted(slices.Values(players))) {
@@ -406,48 +400,10 @@ func (g *Game) seenAmong(ctx context.Context, players []int64) (map[string]int, 
 			return nil, err
 		}
 		for q := range one {
-			stale[q] += SeenWeight
-		}
-		held, err := g.heldFor(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		for q := range held {
-			if !one[q] {
-				stale[q]++
-			}
+			stale[q]++
 		}
 	}
 	return stale, nil
-}
-
-// heldFor are the questions of the past issues a player may still play (StartPast): every day from FirstIssue to
-// yesterday whose ten they haven't finished, as the day or as its past issue.
-func (g *Game) heldFor(ctx context.Context, userID int64) (map[string]bool, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.questions FROM days d WHERE d.day >= ? AND d.day < ?
-		AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.user_id = ? AND r.day = d.day AND r.kind IN ('day', 'past')
-			AND r.finished_at IS NOT NULL)`, FirstIssue, g.Today(), userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	held := map[string]bool{}
-	for rows.Next() {
-		var raw string
-		var picks []Pick
-		if err := rows.Scan(&raw); err != nil {
-			return nil, err
-		}
-		if json.Unmarshal([]byte(raw), &picks) != nil {
-			continue
-		}
-		for _, p := range picks {
-			if !p.Void {
-				held[p.ID] = true
-			}
-		}
-	}
-	return held, rows.Err()
 }
 
 type recorded struct {

@@ -46,10 +46,8 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   so far, and „Продължи“; or once played, as it lands, how they went (under the score the issue line, „Брой 6 · 17
   ноември“, and the way to the day's board; see The place, below) with the one gold thing to do next right under it
   (`game/gold.ts`: „Сподели“ for a result worth sharing — 6 of 10, the streak on a round number (3, 7, 30, 100, 365), a
-  right answer few got among 4 or more; else „Още десет“, to where an open goal of a topic points, or the newest past issue not played;
-  none while a broken streak is half won back, whose card comes right under the result with „Изиграй брой 6“: the
-  missed issue, gold once the day is played, plain before; „Изиграй пропуснатия брой от 17 ноември и днешния, и
-  серията се връща.“), „Прегледай въпросите“ and a plain
+  right answer few got among 4 or more; else „Още десет“, to where an open goal of a topic points, or a topic, a new
+  one each day), „Прегледай въпросите“ (a game is gone over on its own day only, `play.Review`) and a plain
   „Сподели“ below; just played, the goals still open (`.open-goals`, no card); then tomorrow in one quiet card
   (`.tomorrow`: when the next ten come, what they make of the streak, and the reminder's ask); a line each for where
   the day leaves the league („Лига Странджа: 2-ро място от 12 · зона за качване“) and for the questions got wrong that
@@ -61,18 +59,11 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   (the last question let run out) is the full one, once, with what it earned. Then the day's goals; the ways to play
   with others, three in a row (the picture over
   the name on a phone); the topics, two by two (five to a row on a big screen, the picture over the name, each tile
-  as tall as what's in it), and Минали броеве across the row before them (the newest issue not played, „Брой 6 · 17
-  ноември“, or where one was left), with „Втори шанс“ right after it while questions wait (on a big screen in one row
-  after the topics with „България“, short tiles side by side). **Минали броеве** (`/issues`): every past day's ten,
-  newest first, as game rows (the issue and its date; the score once played, a way to go over it; else „Изиграй“ or
-  „Продължи · въпрос 4“), the line „Минал брой: не влиза в серията и в лигата.“ under the lead; an issue
-  (`/issues/6`) plays as a topic does, and its result has that line under the issue line and how it went against the
-  day's players („По-добре от 64% от играчите на този брой.“ from ten of them, „Средно на този брой: 6,4 от 10.“),
-  the day's ten gold while they wait, else the next issue not played. Opened also from Всички игри' Броеве and from
-  Моят Алманах's datelines of days not played. The streak's chip shows only a
-  streak (or reserve days): a broken one that can still be won back as its days, unlit, „за връщане“ (with today's,
-  once the day is played: what winning it back makes of it, as „Утре“ says too: „Ако върнеш серията днес, утре тя
-  става 9.“); none at all rather than „0 дни поред“, the level's chip taking the row. A player back after days away
+  as tall as what's in it), with „Втори шанс“ across the row before them while questions wait (on a big screen in one
+  row after the topics with „България“, short tiles side by side). A day gone by isn't played again, nor its
+  questions gone over: the day is today's (owner, 19 Nov 2026). The streak's chip shows only a streak (or reserve
+  days); none at all rather than „0 дни поред“, the level's chip taking the row. A streak that ended is said once,
+  over the day („Серията ти от 5 дни прекъсна. Днес започва нова.“): it isn't won back. A player back after days away
   (the streak ended since the last day played, `play.BackFrom`) is welcomed once, over the day: „Радваме се, че се
   върна. Най-дългата ти серия е 11 дни. Днес започва нова.“ Дуел, Роял and Стая open from here and
   have a way back to it (`back()`). A player who hasn't finished a game yet sees only the day and the topics, and a
@@ -126,9 +117,9 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   league (once open and in one), streak, numbers, „Твоите броеве“ from the third day played (`.issues`: a column for
   each score from 0 to 10, how many days had it, today's in gold; „Най-добър: 9 от 10 · Средно: 6,4 · Изиграни: 23“),
   the facts in the Алманах, mastery (once a topic has a mark; each row a way to play the topic), latest games (the
-  day's ten as their issue, „Брой 7“, the date under it; each a way to go over it, read-only: `/games/<id>`, the score
-  as its result had it and the questions) and „Всички игри“ (`/games`: every game, by day under its dateline, Всички ·
-  Броеве · Теми · С други, a page at a time)), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
+  day's ten as their issue, „Брой 7“, the date under it; today's each a way to go over it, read-only: `/games/<id>`,
+  the score as its result had it and the questions; those of days gone by plain rows) and „Всички игри“ (`/games`:
+  every game, by day under its dateline, Всички · Броеве · Теми · С други, a page at a time)), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
   worn as others see it, then Аватар, Рамка, Фон or Титла, one at a time) and Алманах (`/almanac`). Настройки open
   from the button beside the name, its icon and its word at every width (an icon alone is read by few). The switch names the place, so Награди, Гардероб and Алманах have no heading of
   their own on the screen (it's there for screen readers).
@@ -136,8 +127,7 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   topic's „7 от 24 факта в „История““), what they are in a line, and the questions waiting for a second chance as one
   plain link („17 въпроса чакат втори шанс“: Начало has its tile too); the topics as a quiet row of chips (names
   only) to read one by; then each day under its dateline (`.almanac-date`: „Брой 6 · 17 ноември“, a kicker running
-  into a hairline, with the year once it isn't this one; a way to that day's game where the player played the day's
-  ten), its facts as entries between hairlines, not cards: the
+  into a hairline, with the year once it isn't this one), its facts as entries between hairlines, not cards: the
   topic, the question in a small line, what was learned as the headline (the answer; a statement to judge is its
   own headline, „Невярно:“ before one that isn't so), and the fact. It comes a page at a time, a day going on under
   its head from page to page.
@@ -223,9 +213,8 @@ on a phone 160px wide; it holds that way (`e2e/text.spec.ts`):
   answers are bigger, and a choice's answers sit two by two (a list stays one column: an order, pairs, groups). The
   number's field and pad stay a phone's width. A page's picture sits beside its heading and lead, not over them.
   A page's buttons are a hand's width (22rem), not the column's, at its left, the gold one first: the day's, a page's
-  own, Начало's cards', and a group of them (`.actions`: under a result, Дуел's, the year's) side by side where two
-  fit, the plain ones after the gold one and as tall as it, a line about the gold one (or what a share said) under it.
-  A pager (the year's cards) stacks: „Напред“ keeps its place, „Назад“ under it. Начало's and a result's quiet lines sit
+  own, Начало's cards', and a group of them (`.actions`: under a result, Дуел's) side by side where two fit, the plain
+  ones after the gold one and as tall as it, a line about the gold one (or what a share said) under it. Начало's and a result's quiet lines sit
   at the left with them, as on a phone, never centred.
 - **64rem (a laptop):** the page is up to 76rem wide with a 32px gutter. Начало is two columns: the day (or its result,
   „Сподели“ beside „Прегледай въпросите“; just played as after a reload), and under it the topics, five to a row;

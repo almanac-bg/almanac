@@ -179,8 +179,6 @@ test("„България“: the questions about Bulgaria from every topic, a t
 
 test("a topic's count can be backed out of, or cut short", async ({ page }) => {
   await page.goto("/");
-  // Минали броеве is the first tile, where a thumb reaches first (it took the place of all the topics at once).
-  await expect(page.locator(".topics li").first()).toContainText("Минали броеве");
   await page.locator(".topics").getByRole("link", { name: "История" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await page.getByRole("button", { name: "Откажи" }).click();

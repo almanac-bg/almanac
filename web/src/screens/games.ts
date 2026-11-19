@@ -1,5 +1,5 @@
-// Всички игри (/games): every game a player has finished, newest first, by day under its dateline, each a way to go over
-// it (/games/<id>); the day's ten, games of topics or games with others alone, by a switch; a page at a time („Още
+// Всички игри (/games): every game a player has finished, newest first, by day under its dateline, today's each a way
+// to go over it (/games/<id>); the day's ten, games of topics or games with others alone, by a switch; a page at a time („Още
 // игри“). From Профил, under its latest five.
 
 import type { Kit } from "../kit.ts";
@@ -77,8 +77,6 @@ export function games(kit: Kit) {
     back("/me", "Профил"),
     h("h1", null, "Всички игри"),
     segmented("Кои игри", kinds, kind, pick),
-    // Among the issues, the way to those gone by (screens/issues.ts).
-    () => (kind() === "day" ? h("p", { class: "day-next" }, h("a", { href: "/issues" }, "Минали броеве")) : null),
     () => {
       const all = list();
       if (!all) return error() ? failure(error(), () => more(true)) : h("p", { class: "muted" }, "…");

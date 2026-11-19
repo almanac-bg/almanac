@@ -187,33 +187,6 @@ export async function daysPlayed(page: Page, ...back: number[]): Promise<void> {
   });
 }
 
-/** Makes the day `back` days before today (in Bulgaria) a past issue, straight in the test server's database: its ten
- * are those of the last day drawn ahead; and `others` players who finished it then, the i-th with i right (of ten,
- * in turn), for it to be told against. Returns its day and number. */
-export async function pastIssue(page: Page, back: number, others = 0): Promise<{ day: string; issue: number }> {
-  const bulgaria = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" });
-  const day = bulgaria.format(Date.now() - back * 24 * 60 * 60 * 1000);
-  await inDB(page, (db) => {
-    db.prepare(
-      "INSERT OR IGNORE INTO days (day, questions) SELECT ?, questions FROM days ORDER BY day DESC LIMIT 1",
-    ).run(day);
-    const user = db.prepare("INSERT INTO users (name, tag, created_at, seen_at) VALUES (?, ?, 0, 0)");
-    const run =
-      db.prepare(`INSERT INTO runs (user_id, kind, day, questions, rights, points, ms, started_at, finished_at)
-      VALUES (?, 'day', ?, '[{"id":""}]', ?, ?, 30000, 0, 1)`);
-    for (let i = 0; i < others; i++) {
-      const id = user.run(`Играч ${i + 1}`, `past${back}x${i}${Date.now() % 100000}`).lastInsertRowid;
-      run.run(id, day, i % 11, (i % 11) * 500);
-    }
-  });
-  // Its number, as the game counts them (play/issue.go).
-  const issue = await page.evaluate(async (day) => {
-    const r = (await (await fetch("/api/issues")).json()) as { issues: { day: string; issue: number }[] };
-    return r.issues.find((i) => i.day === day)?.issue ?? 0;
-  }, day);
-  return { day, issue };
-}
-
 /** Deals the player (a guest, made now if there's none) a game of a topic with these questions, in this order,
  * straight in the test server's database: started now and not finished, it's the game the topic's next start goes on
  * with (play/runs.go, StartTopic). */

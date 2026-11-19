@@ -1,5 +1,7 @@
-// A game played, gone over: from Профил's „Последни игри“, how it went and each of its questions with the answer, the
-// fact behind it and how others answered, read-only (/games/<id>). The way back is to Профил.
+// A game played, gone over on its day: from the day's card on Начало, or today's games in Профил's „Последни игри“,
+// how it went and each of its questions with the answer, the fact behind it and how others answered, read-only
+// (/games/<id>). A game of a day gone by isn't gone over again (play.Review): the page says so. The way back is to
+// Профил.
 
 import type { Reviewed, State } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
@@ -16,8 +18,6 @@ function what(s: Played): string {
   switch (s.kind) {
     case "day":
       return s.day ? `Въпросите на деня · ${issueWords(undefined, s.day)}` : "Въпросите на деня";
-    case "past":
-      return s.day ? `Минал брой · ${issueWords(undefined, s.day)}` : "Минал брой";
     case "mistakes":
       return "Втори шанс";
     case "duel":

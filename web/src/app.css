@@ -568,11 +568,6 @@
     gap: var(--space-3);
   }
 
-  /* A dateline that leads to its day's game: the kicker's look, underlined as a way on. */
-  .almanac-date a {
-    color: inherit;
-  }
-
   .games-days {
     display: grid;
     gap: var(--space-5);
@@ -777,66 +772,6 @@
   /* The quiet way out, centred under the gold button. */
   .sheet-skip {
     justify-self: center;
-  }
-  /* A year in the game (screens/year.ts): one card at a time under a row of pips, a big figure in each. */
-  /* A way in, not a card of parts: its three lines read as one. */
-  .card.year-card {
-    display: grid;
-    gap: var(--space-1);
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .year-card strong {
-    font: 900 1.5rem / 1.75rem var(--font-sans);
-  }
-
-  .year-pips {
-    display: flex;
-    gap: var(--space-1);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .year-pips li {
-    flex: 1;
-    height: 4px;
-    border-radius: var(--radius-full);
-    background: var(--line);
-  }
-
-  .year-pips li.on {
-    background: var(--gold);
-  }
-
-  .year-story {
-    display: grid;
-    min-height: 22rem;
-    align-content: center;
-  }
-
-  .year-slide {
-    display: grid;
-    gap: var(--space-3);
-    justify-items: center;
-    text-align: center;
-  }
-
-  .year-slide p {
-    margin: 0;
-  }
-
-  .year-big {
-    font: 900 min(calc(28px + 1.75rem), 15vw + 8px) / 1 var(--font-numeral);
-    overflow-wrap: anywhere;
-  }
-
-  .year-league {
-    display: grid;
-    justify-items: center;
-    gap: var(--space-2);
-    font: 900 2rem / 1.1 var(--font-sans);
   }
 
   /* The week's league (screens/league.ts): its mountain and name, the player's place, the zones of the group. */
@@ -1280,11 +1215,6 @@
     line-height: 1rem;
     font-weight: 700;
     white-space: nowrap;
-  }
-
-  /* A broken streak's days still to win back: the longer words may take two lines on a narrow phone. */
-  .streak-chip.repair .status-label {
-    white-space: normal;
   }
 
   .status-icon {
@@ -6658,14 +6588,6 @@
     white-space: nowrap;
   }
 
-  /* Минали броеве (issues.ts): an issue not played yet, or left half-way, says the way on where a score would be. */
-  .issue-go {
-    color: var(--link);
-    font-size: 0.875rem;
-    font-weight: 700;
-    text-align: right;
-  }
-
   .settings {
     display: grid;
     gap: var(--space-5);
@@ -7190,7 +7112,7 @@
     }
 
     /* A page's buttons are a hand's width (22rem), not the column's, at its left, the gold one first: the day's, a
-       page's own, and a group of them (.actions: under a result, Дуел's, the year's), side by side where two fit, the
+       page's own, and a group of them (.actions: under a result, Дуел's), side by side where two fit, the
        plain ones after the gold one (a result's .result-actions gives the group its buttons) and as tall as it. A line
        about the gold one sits under it. */
     :is(.day, .screen, .royal-plan, .invite, .invite-card) > :is(.btn, .share) {
@@ -7223,13 +7145,7 @@
       grid-column: 1 / -1;
     }
 
-    /* The year's cards: „Напред“ in one place, „Назад“ under it. */
-    .actions.year-pager {
-      grid-template-columns: min(22rem, 100%);
-    }
-
-    /* Начало's cards (a streak to win back, tomorrow and its reminder, keeping the game): their buttons a hand's
-       width too. */
+    /* Начало's cards (tomorrow and its reminder, keeping the game): their buttons a hand's width too. */
     .home .keep-card .btn {
       max-width: 22rem;
     }

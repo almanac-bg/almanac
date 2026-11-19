@@ -16,9 +16,9 @@ import (
 
 // After a run: once its last answer is kept, a run has more to do, each in a write of its own: a challenge's time
 // starts and the friends it was sent to are told (sent), its duel is settled once both sides have played
-// (settleRun), and what it earned is kept (afterRun: a streak mended, achievements, the day's goals, a place in the
-// week's league). The transaction that finishes the run notes that it's due (runs_after, afterDue), so none of it is
-// lost to a closed connection or a restart in between: the request that finished the run settles it at once, on a
+// (settleRun), and what it earned is kept (afterRun: achievements, the day's goals, a place in the week's league).
+// The transaction that finishes the run notes that it's due (runs_after, afterDue), so none of it is lost to a closed
+// connection or a restart in between: the request that finished the run settles it at once, on a
 // context of its own that the player leaving doesn't cancel (finished: the result shows the duel's outcome), and
 // hands the rest to the background (afterLater), so that the last answer doesn't wait for every achievement to be
 // measured again; the game's news waits for it instead (AfterWait: NewsOf, Начало), and gets it as soon as it's
@@ -27,8 +27,8 @@ import (
 //
 // What a run earned is judged by the run, never by the clock it's looked at on (played): a run of the day's questions
 // counts for its own day though its last answer came after midnight (DayGrace), and so does the sweep's retry of it
-// hours later. That day's goals and repair are the ones it moves, and that day's week of the leagues is the one it
-// joins, which waits for it before it closes (ensureWeek). A game played across midnight moved the goals of both days.
+// hours later. That day's goals are the ones it moves, and that day's week of the leagues is the one it joins, which
+// waits for it before it closes (ensureWeek). A game played across midnight moved the goals of both days.
 //
 // It never fails the request that finished the run: the answer is kept, whatever happens after it.
 //
@@ -239,14 +239,9 @@ func (g *Game) playedOf(ctx context.Context, userID, runID int64) (played, error
 // dayOf is the day a moment is in, in Bulgaria (YYYY-MM-DD).
 func dayOf(t time.Time) string { return t.In(Bulgaria).Format(time.DateOnly) }
 
-// afterRun keeps what a player's game, just finished, earned them, on the days it counts on (played): a broken streak
-// won back (repair.go), achievements, the day's goals, and, for the day's questions, a place in their week's league.
+// afterRun keeps what a player's game, just finished, earned them, on the days it counts on (played): achievements,
+// the day's goals, and, for the day's questions, a place in their week's league.
 func (g *Game) afterRun(ctx context.Context, p played) error {
-	for _, day := range unique(p.began, p.day) { // first: the streak it keeps counts for the achievements
-		if err := g.mend(ctx, p.user, day); err != nil {
-			return err
-		}
-	}
 	if _, err := g.Award(ctx, p.user); err != nil {
 		return err
 	}
