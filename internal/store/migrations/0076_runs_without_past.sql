@@ -1,4 +1,4 @@
--- rebuild: runs take no past issue any more (0074), and mail by kind no year's word. A past issue's finished game
+-- rebuild: runs take no past issue any more (0075), and mail by kind no year's word. A past issue's finished game
 -- stays as a game of every topic (kind 'topic', no day): what it earned stays the player's. SQLite changes a CHECK
 -- only by rebuilding; what points to runs stays (store.go). Every column is copied, and the indexes are made again as
 -- they are now, but the one that kept a past issue to one game a player.
