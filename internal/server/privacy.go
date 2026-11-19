@@ -96,8 +96,7 @@ var privacyBody = template.Must(template.New("privacy").Parse(`
 от заявки, броим и колко идват от всяка мрежа (без пълния адрес), за около час. За честната игра пазим 7 дни с
 всяка игра и знак на мрежата, от която е започната (не адреса): по него дуел между двама от една и съща мрежа е без
 рейтинг и виждаме, когато въпросите на деня са играни много пъти от една мрежа. Когато нещо в играта се
-повреди, до нас стига кратко описание на повредата{{if .Slack}} в Slack, а ако той не е достъпен — по имейл{{else}}
-по имейл{{end}}.</li>
+повреди, до нас стига кратко описание на повредата по имейл.</li>
 </ul>
 <p>Основанието е, че без тези данни играта не може да работи (чл. 6, ал. 1, б. „б“ от Общия регламент относно защитата на данните), а за
 техническите записи, писмото при прекъсната серия, годината ти в играта и опита с напомнянията — законният ни интерес да
@@ -114,8 +113,7 @@ var privacyBody = template.Must(template.New("privacy").Parse(`
 <li>Cloudflare — мрежата пред сървъра и резервните копия, в ЕС.</li>
 <li>Scaleway (Франция) — изпраща имейлите.</li>
 <li>Apple и Google — доставят известията в приложението на телефона, ако ги включиш там.</li>
-{{if .Slack}}<li>Slack (САЩ) — до него стигат кратките описания на повредите в сървъра.</li>
-{{end}}</ul>
+</ul>
 
 <h2>Деца и училища</h2>
 <p>Играта е за всички, и за ученици. Не ни трябват истинско име, възраст или училище: гостът играе без имейл, с име на
@@ -138,12 +136,11 @@ var privacyBody = template.Must(template.New("privacy").Parse(`
 <p class="muted">Последна промяна: 18 ноември 2026 г.</p>
 `))
 
-// privacy is the privacy notice. It says what the code does (a test holds parts of it to the code), and names Slack
-// among those who see anything only while problems are told there (Config.Alerts).
+// privacy is the privacy notice. It says what the code does (a test holds parts of it to the code).
 func (s *Server) privacy(w http.ResponseWriter, r *http.Request) {
 	var body bytes.Buffer
 	_ = privacyBody.Execute(&body, map[string]any{
-		"Operator": s.cfg.Operator, "Contact": s.cfg.Contact, "Slack": s.cfg.Alerts.Slack != "",
+		"Operator": s.cfg.Operator, "Contact": s.cfg.Contact,
 	})
 	s.plain(w, "Какво пазим и защо", template.HTML(body.String()))
 }
