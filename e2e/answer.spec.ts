@@ -13,7 +13,15 @@ import { answer, dealt, moveOn, startDay } from "./play.ts";
  * and a little later. */
 interface Seen {
   flips: number;
+  /** Of them, made in one frame: the head's count not gliding to its new size with the rest. */
+  snaps: number;
   covered: number;
+  /** Frames with the panel less than opaque: the answers under it showing through. */
+  through: number;
+  /** A choice's answers that changed height from the question to its fact (re-wrapped as their ends filled). */
+  rewrapped: number;
+  /** The tally's height as asked and as it ended (its line is kept before there are points). */
+  tally: number[];
   done: boolean;
   right?: { from: number; to: number; height: number; tall: number[]; pic: boolean; pop: number[] };
 }
@@ -24,14 +32,20 @@ interface Seen {
 async function watch(page: Page): Promise<void> {
   await page.evaluate(() => {
     const w = window as unknown as { seen: Seen };
-    const seen: Seen = { flips: 0, covered: 0, done: false };
+    const tally = () => document.querySelector<HTMLElement>(".question-top .tally")?.offsetHeight ?? 0;
+    const seen: Seen = { flips: 0, snaps: 0, covered: 0, through: 0, rewrapped: 0, tally: [tally()], done: false };
     w.seen = seen;
     const head = document.querySelector(".question-top");
     const shown = () => document.querySelector(".run-question .after:not([hidden])");
+    const choices = [...document.querySelectorAll<HTMLElement>(".run-question .choices > .option")];
+    const tall = choices.map((o) => o.offsetHeight);
     let stuck = head?.classList.contains("stuck");
     const changes = new MutationObserver(() => {
       const now = head?.classList.contains("stuck");
-      if (now !== stuck && shown()) seen.flips++;
+      if (now !== stuck && shown()) {
+        seen.flips++;
+        if (!head?.querySelector(".count")?.getAnimations().length) seen.snaps++;
+      }
       stuck = now;
     });
     if (head) changes.observe(head, { attributes: true, attributeFilter: ["class"] });
@@ -43,6 +57,7 @@ async function watch(page: Page): Promise<void> {
       const docked = panel && getComputedStyle(panel).position === "fixed";
       if (docked && right && right.getBoundingClientRect().bottom > panel.getBoundingClientRect().top + 1)
         seen.covered++;
+      if (panel && Number(getComputedStyle(panel).opacity) < 1) seen.through++;
       if (panel && !from) from = t;
       if (panel && right) {
         const box = right.getBoundingClientRect();
@@ -63,6 +78,8 @@ async function watch(page: Page): Promise<void> {
         seen.right.tall[1] = tall;
       }
       if (from && t - from > 1000) {
+        seen.rewrapped = choices.filter((o, i) => o.offsetHeight !== tall[i]).length;
+        seen.tally.push(tally());
         seen.done = true;
         changes.disconnect();
       } else requestAnimationFrame(frame);
@@ -127,7 +144,12 @@ async function playWatching(
     await page.waitForFunction(() => (window as unknown as { seen: Seen }).seen.done);
     const seen = await page.evaluate(() => (window as unknown as { seen: Seen }).seen);
     expect(seen.flips, `question ${n + 1}: the head changed size as the answer came into place`).toBeLessThanOrEqual(1);
+    expect(seen.snaps, `question ${n + 1}: the head changed size in one frame`).toBe(0);
     expect(seen.covered, `question ${n + 1}: the right answer was under the panel`).toBe(0);
+    expect(seen.through, `question ${n + 1}: the answers showed through the panel`).toBe(0);
+    expect(seen.rewrapped, `question ${n + 1}: answers re-wrapped as the answer showed`).toBe(0);
+    expect(seen.tally[1], `question ${n + 1}: the head grew with the points`).toBe(seen.tally[0]);
+    expect(seen.tally[0], `question ${n + 1}: the tally's line isn't kept`).toBeGreaterThan(0);
     const r = seen.right;
     // What shows on an answer later (how everyone answered) doesn't make it taller, out of the room it settled in.
     if (r) expect(r.tall[1], `question ${n + 1}: the right answer grew once in place`).toBe(r.tall[0]);
@@ -148,6 +170,17 @@ test.describe("upright", () => {
   test("an answer comes into place in one movement, the right one in sight between the head and the panel", async ({
     page,
   }) => {
+    // The choices' words as long as many of the bank's (the sample's are short), each about a line on a phone: what
+    // the answer brings to their ends (✓ or ✕, how many gave it) never makes one wrap. The server judges the pick.
+    const long = ["Шутър от първо лице", "Стратегия в реално време", "Платформър", "Ролева игра"];
+    await page.route(/\/api\/(day$|runs\/)/, async (route) => {
+      const res = await route.fetch();
+      const s = await res.json().catch(() => null);
+      const view = (s?.run ?? s?.state ?? s)?.question?.view;
+      if (view?.type === "choice" && view.choices)
+        view.choices = view.choices.map((c: string, i: number) => long[i] ?? c);
+      await route.fulfill({ response: res, json: s });
+    });
     const far = await playWatching(page, { after: () => factInSight(page) });
     // Some right answers come from far: the panel docks where they were.
     expect(far).toBeGreaterThan(0);

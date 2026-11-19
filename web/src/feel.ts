@@ -792,11 +792,12 @@ export async function level(
 }
 
 /**
- * The sheet for the one big thing a game brought, over the result (at most one a game): it slides up from the bottom
- * over a dimmed screen, its picture lands (and, `glow`, glows once), and its sound plays as it opens. „Продължи“, a tap
- * beside it or Esc puts it away; it never goes by itself. `parts` are its picture, kicker, name and lines, drawn by the
- * app (the name with the id "moment-name"). `actions`, if given, are its own buttons in place of „Продължи“ (the first
- * focused), each told how to put the sheet away. Resolves once it's put away.
+ * The sheet for the one big thing a game brought, over the result (at most one a game): it slides up from the bottom,
+ * opaque, over the screen dimming behind it, its picture lands (and, `glow`, glows once), and its sound plays as it
+ * opens. „Продължи“, a tap beside it or Esc puts it away, sliding back down; it never goes by itself. `parts` are its
+ * picture, kicker, name and lines, drawn by the app (the name with the id "moment-name"). `actions`, if given, are its
+ * own buttons in place of „Продължи“ (the first focused), each told how to put the sheet away. Resolves once it's put
+ * away.
  */
 export function sheet(
   parts: Element[],
@@ -805,26 +806,30 @@ export function sheet(
   hands: Hands,
   actions?: (close: () => void) => HTMLElement[],
 ): Promise<void> {
+  // The name's sheet's look (app.css, .sheet), its words centred.
   const box = document.createElement("dialog");
+  box.className = "sheet";
   box.setAttribute("aria-labelledby", "moment-name");
-  box.style.cssText =
-    "position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:0;border:0;" +
-    "display:flex;align-items:flex-end;justify-content:center;color:var(--text);" +
-    "background:color-mix(in srgb,var(--bg) 40%,transparent)";
   const panel = document.createElement("section");
-  panel.className = "card";
-  panel.style.cssText =
-    "display:grid;justify-items:center;gap:var(--space-3);width:min(100%,28rem);margin:0;text-align:center;" +
-    "padding:var(--space-6) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom));" +
-    "border-radius:var(--radius-xl) var(--radius-xl) 0 0;box-shadow:var(--elev-2)";
+  panel.className = "card sheet-panel";
+  panel.style.cssText = "justify-items:center;gap:var(--space-3);text-align:center";
   const go = document.createElement("button");
   go.type = "button";
   go.className = "btn primary big";
   go.style.cssText = "width:100%;margin-top:var(--space-3)";
   go.textContent = "Продължи";
-  const own = actions?.(() => {
-    if (box.open) box.close();
-  });
+  // Put away, it slides back down as the screen under it brightens again; with less motion, at once.
+  let going = false;
+  const close = () => {
+    if (!box.open || going) return;
+    going = true;
+    if (hands.calm) return box.close();
+    const away = { duration: 200, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" } as const;
+    box.animate([{}, { backgroundColor: "transparent" }], away);
+    const shut = () => box.close();
+    panel.animate([{ transform: "none" }, { transform: "translateY(100%)" }], away).finished.then(shut, shut);
+  };
+  const own = actions?.(close);
   const buttons = own?.length ? own : [go];
   panel.append(...parts, ...buttons);
   box.append(panel);
@@ -834,7 +839,8 @@ export function sheet(
   hands.play(sound);
   const [picture] = parts;
   if (!hands.calm) {
-    box.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
+    // Only what's behind it dims in: the sheet is opaque all the way up, nothing shows through it.
+    box.animate([{ backgroundColor: "transparent" }, {}], { duration: 200 });
     panel.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 320, easing: settleIn });
     picture?.animate([{ transform: "scale(0.6)" }, { transform: "none" }], {
       duration: 420,
@@ -850,12 +856,14 @@ export function sheet(
     }
   }
   return new Promise((resolve) => {
-    const close = () => {
-      if (box.open) box.close();
-    };
     box.addEventListener("close", () => {
       box.remove();
       resolve();
+    });
+    // Esc puts it away the same way (a second Esc meanwhile is the browser's: at once).
+    box.addEventListener("cancel", (e) => {
+      e.preventDefault();
+      close();
     });
     go.addEventListener("click", close);
     box.addEventListener("click", (e) => {
