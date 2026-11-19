@@ -186,8 +186,7 @@ function loudest(n: News): SoundName | null {
   return null;
 }
 
-/** The one big thing a game brought, for its sheet: a broken streak won back, a week of the league ended up or on its
- * podium, a division reached,
+/** The one big thing a game brought, for its sheet: a week of the league ended up or on its podium, a division reached,
  * the streak at a round number (`days`, with the reserve day it earned, if it did), a level that unlocks something or
  * is a fifth, an epic or legendary achievement. The smaller news stays in the cards. */
 function bigOne(

@@ -17,8 +17,8 @@ import (
 //     on screen (the day's last question let run out with the tab in the background, a game left at its last question,
 //     a Роял whose evening ended) has its news told on Начало instead, once (Untold), and not after some later game.
 //   - What came of the days just missed (a reserve day kept the streak, or it ended) is said once (StreakNotice,
-//     TellStreak); and a broken streak that can be won back is counted as offered once. A player back after days away
-//     (BackFrom) is welcomed back once, with the longest streak they've had, in the same way.
+//     TellStreak). A player back after days away (BackFrom) is welcomed back once, with the longest streak they've
+//     had, in the same way.
 
 // UntoldWithin is how long a game's untold news waits for Начало: older, it's let go (what it earned is the player's
 // all the same, and its achievements are told with the next game's news).
