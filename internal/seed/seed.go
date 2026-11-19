@@ -120,6 +120,7 @@ func Seed(ctx context.Context, db *store.DB, b *bank.Bank, o Options) ([]Persona
 		accounts: &account.Accounts{DB: db},
 		byID:     map[int64]*player{},
 		friends:  map[[2]int64]bool{},
+		blocked:  map[[2]int64]bool{},
 	}
 	w.g = play.New(db, func() *bank.Bank { return b })
 	w.g.Now = w.clock
@@ -161,6 +162,7 @@ type world struct {
 	players []*player
 	byID    map[int64]*player
 	friends map[[2]int64]bool // who has asked whom, either way (the lower id first)
+	blocked map[[2]int64]bool // who has blocked whom, either way (the lower id first): never met live
 	swept   time.Time         // the last time the server's sweeps ran (sweep)
 	links   []link            // challenges shared as links, for others to open
 	day     int               // the day being played, from 0

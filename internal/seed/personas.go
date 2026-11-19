@@ -44,12 +44,32 @@ func (w *world) finish() error {
 }
 
 // steer plays a player's live duels until their rating is from lo to hi and placed, at most n of them, each against
-// someone placed not met yet: while it's under, they're on form (every answer right, and quick) against the highest
-// rated they'd still beat (who misses some), so that each win counts; while it's over, off form against the strongest.
+// someone placed whose duel with them would move ratings (not met yet today: play.ratedToday). While it's under, they
+// play the highest rated, who has an off day (misses most, and is slow) while the player is on form (every answer
+// right, and quick): each win counts for as much as a win can, so a few close the gap whatever the history left. While
+// it's over, the player is off form against the strongest.
 func (w *world) steer(p *player, lo, hi, n int) error {
 	skill, pace := p.skill, p.pace
 	defer func() { p.skill, p.pace = skill, pace }()
-	met := map[[2]int64]bool{}
+	met := map[int64]bool{}
+	now := w.clock().In(play.Bulgaria)
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, play.Bulgaria)
+	rows, err := w.db.Read.QueryContext(w.ctx, `SELECT a_id + b_id - ?1 FROM duels WHERE rated = 1 AND b_id IS NOT NULL
+		AND ended_at >= ?2 AND (a_id = ?1 OR b_id = ?1)`, p.id, midnight.UnixMilli())
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		met[id] = true
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return err
+	}
 	for range n {
 		s, err := w.g.StandingOf(w.ctx, p.id)
 		if err != nil {
@@ -66,8 +86,9 @@ func (w *world) steer(p *player, lo, hi, n int) error {
 		}
 		var best *player
 		bestRating := 0
-		for _, o := range w.active(w.today()) {
-			if o == p || o.isPersona() || met[pair(p.id, o.id)] || o.joined > w.today()-4 || (up && o.skill > 0.85) {
+		day := min(w.day, w.today())
+		for _, o := range w.active(day) {
+			if o == p || o.isPersona() || met[o.id] || o.joined > day-4 || w.blocked[pair(p.id, o.id)] {
 				continue
 			}
 			var rated, rating int
@@ -78,19 +99,29 @@ func (w *world) steer(p *player, lo, hi, n int) error {
 			if rated < play.MinRatedGames {
 				continue
 			}
-			if score := rating; best == nil || (up && score > bestRating) || (!up && o.skill > best.skill) {
-				best, bestRating = o, score
+			if best == nil || (up && rating > bestRating) || (!up && o.skill > best.skill) {
+				best, bestRating = o, rating
 			}
 		}
 		if best == nil {
 			return nil
 		}
-		met[pair(p.id, best.id)] = true
-		if _, err := w.liveDuel(p, best); err != nil {
+		met[best.id] = true
+		if err := w.offDay(best, up, func() error { _, err := w.liveDuel(p, best); return err }); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// offDay plays fn with a player off form if off: missing most answers, and slow.
+func (w *world) offDay(p *player, off bool, fn func() error) error {
+	if off {
+		skill, pace := p.skill, p.pace
+		p.skill, p.pace = 0.3, max(pace, 8*time.Second)
+		defer func() { p.skill, p.pace = skill, pace }()
+	}
+	return fn()
 }
 
 // befriended makes sure a persona has n friends at least, one more asking: whoever they've asked, or else asked by

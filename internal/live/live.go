@@ -19,9 +19,11 @@
 //
 // The hub pairs two whose ratings are close (Bands): within a narrow band at first, wider as the one who came first
 // waits on, and anyone at all for the last seconds of Wait, before a recording. Live means live: a person close enough
-// beats a recording, and a stranger beats a long wait. Whether a duel moves ratings is the game's to say as it ends
-// (play.settleDuel): two who play from one network (Player.Net, kept with each one's game: play.FromNet) play a
-// friendly, and a new player moves an established one's rating half as far.
+// beats a recording, and a stranger beats a long wait. Never two one of whom has blocked the other (play.BlockedWith,
+// read as each asks, so a block made before the later of the two asked holds): they wait on for someone else, and
+// a recording never deals them each other either (play.recordedRun). Whether a duel moves ratings is the game's to
+// say as it ends (play.settleDuel): two who play from one network (Player.Net, kept with each one's game:
+// play.FromNet) play a friendly, and a new player moves an established one's rating half as far.
 //
 // Every answer goes through the player's own run (internal/play), as in any game: the score, XP, the questions'
 // statistics and the duel's result are kept there, and only the timing lives here, in memory. The run moves on the
@@ -173,6 +175,8 @@ type Seek struct {
 	told   chan struct{} // held changed
 	// rematch is the duel a rematch is asked for after (0: a duel with whoever comes).
 	rematch int64
+	// shuns are the players this one has blocked or been blocked by (play.BlockedWith), as they asked: never met.
+	shuns   map[int64]bool
 	done    chan struct{}
 	settled sync.Once
 	Match   *Match
@@ -226,6 +230,12 @@ func (s *Seek) broken() { s.settle(nil, errBroken) }
 // wait (and get a recording after Wait). While the hub is paused, they wait, held, for as long as it is. Leave it
 // when the screen goes.
 func (h *Hub) Seek(p Player) *Seek {
+	shuns, err := h.game.BlockedWith(context.Background(), p.ID)
+	if err != nil {
+		s := newSeek(h, p)
+		s.settle(nil, err)
+		return s
+	}
 	h.mu.Lock()
 	if m := h.playing[p.ID]; m != nil {
 		h.mu.Unlock()
@@ -246,6 +256,7 @@ func (h *Hub) Seek(p Player) *Seek {
 		}
 	}
 	s := newSeek(h, p)
+	s.shuns = shuns
 	s.since = time.Now()
 	s.until = s.since.Add(h.wait)
 	if !h.paused {
@@ -278,8 +289,12 @@ func (h *Hub) band(waited time.Duration) int {
 	return within
 }
 
-// fits says two who wait may play each other now: their ratings within the band of the longer wait of the two.
+// fits says two who wait may play each other now: neither has blocked the other, and their ratings are within the
+// band of the longer wait of the two.
 func (h *Hub) fits(a, b *Seek, now time.Time) bool {
+	if a.shuns[b.player.ID] || b.shuns[a.player.ID] {
+		return false
+	}
 	first := a.since
 	if b.since.Before(first) {
 		first = b.since
