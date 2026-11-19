@@ -1,5 +1,6 @@
-// Стая: a room for many at once — on everyone's phone, around a table or across a classroom. Here one is opened, or
-// joined by its code (checked before anything is asked); and its host chooses again between games (changeGame).
+// Стая: a room for many at once — on everyone's phone, around a table or across a classroom. Here one is opened (how
+// many questions, how hard, and its topics: all of them unless some are chosen), or joined by its code (checked before
+// anything is asked); and its host chooses again between games (changeGame).
 
 import { type ApiError, api, errorText } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
@@ -22,42 +23,25 @@ export function rooms() {
   const code = signal("");
   const length = signal(10);
   const mix = signal<Mix>("mixed");
-  // The host plays too, or leads from a big screen (host.ts) and doesn't.
-  const leads = signal(false);
-  const open = async (category: string) => {
+  const topics = signal<string[]>([]); // none: all of them
+  const busy = signal(false);
+  const open = async () => {
     error.set("");
+    busy.set(true);
     try {
       await player();
       const r = await api<{ code: string }>("POST", "/api/rooms", {
-        category,
+        categories: topics.peek(),
         length: length.peek(),
         mix: mix.peek(),
-        lead: leads.peek(),
       });
-      // A host who only leads isn't in the room as a player: no name to ask for.
-      if (leads.peek())
-        try {
-          sessionStorage.setItem(`named:${r.code}`, "1");
-        } catch {
-          // asked, then: the lesser loss
-        }
       go(`/r/${r.code}`);
     } catch (err) {
       error.set(errorText(err));
+    } finally {
+      busy.set(false);
     }
   };
-  // Opening a room is an action, not a place: a button per topic.
-  const topic = (id: string, name: string): Child =>
-    h(
-      "li",
-      null,
-      h(
-        "button",
-        { class: `chip ${id ? toneOf(id) : "tone-gold"}`, type: "button", onclick: () => open(id) },
-        topicMark(id),
-        name,
-      ),
-    );
   return h(
     "section",
     { class: "screen" },
@@ -118,11 +102,7 @@ export function rooms() {
       "section",
       { class: "card" },
       h("h2", { class: "card-title" }, "Отвори нова стая"),
-      h(
-        "p",
-        { class: "muted" },
-        "Избери колко въпроса и колко трудни, после тема: с нея стаята се отваря. Дай кода на другите.",
-      ),
+      h("p", { class: "muted" }, "Избери колко въпроса, колко трудни и от кои теми. После дай кода на другите."),
       setting(
         "Въпроси",
         segmented(
@@ -135,53 +115,29 @@ export function rooms() {
         ),
       ),
       setting("Трудност", segmented("Трудност", mixes, mix, mix.set, false, true)),
-      setting(
-        "Ти",
-        segmented(
-          "Ти",
-          [
-            [false, "Играя и аз"],
-            [true, "Само водя (за голям екран)"],
-          ],
-          leads,
-          leads.set,
-          false,
-          true,
-        ),
-      ),
-      h(
-        "ul",
-        { class: "chips" },
-        topic("", "Всички теми"),
-        categories.map((c) => topic(c.id, c.name)),
-      ),
+      setting("Теми", topicChoice(topics, topics.set)),
+      h("button", { class: "btn primary big", type: "button", disabled: busy, onclick: open }, "Отвори стаята"),
     ),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }
 
-/** What a room plays: a topic ("" for all), how many questions, how hard. */
+/** What a room plays: its topics (none: all of them), how many questions, how hard. */
 export interface Game {
-  category: string;
+  categories: string[];
   length: number;
   mix: Mix;
 }
 
-/** Between a room's games, its host chooses again what it plays, the code and the players kept: how many questions and
- * how hard, then the topic, a tap on which makes it the next game's (`change`, which says what went wrong, if
- * anything). Folded: the next game as it was is one tap away. */
-export function changeGame(now: Game, change: (g: Game) => Promise<string>): Child {
-  const length = signal(now.length);
-  const mix = signal<Mix>(now.mix);
-  const category = signal(now.category);
-  const error = signal("");
-  const pick = async (id: string) => {
-    error.set(await change({ category: id, length: length.peek(), mix: mix.peek() }));
-    if (!error.peek()) category.set(id);
+/** A room's topics to choose: „Всички теми“, on while none is chosen (and a tap on it chooses none again), then each
+ * topic, a tap choosing it or letting it go. Every topic chosen is all of them. */
+function topicChoice(now: () => string[], choose: (ids: string[]) => void): Child {
+  const toggle = (id: string) => {
+    const was = now();
+    const ids = was.includes(id) ? was.filter((x) => x !== id) : [...was, id];
+    choose(ids.length === categories.length ? [] : categories.map((c) => c.id).filter((c) => ids.includes(c)));
   };
-  const again = (g: Partial<Game>) =>
-    change({ category: category.peek(), length: length.peek(), mix: mix.peek(), ...g });
-  const topic = (id: string, name: string): Child =>
+  const chip = (id: string, name: string, on: () => boolean, tap: () => void): Child =>
     h(
       "li",
       null,
@@ -190,13 +146,51 @@ export function changeGame(now: Game, change: (g: Game) => Promise<string>): Chi
         {
           class: `chip ${id ? toneOf(id) : "tone-gold"}`,
           type: "button",
-          "aria-pressed": () => String(category() === id),
-          onclick: () => pick(id),
+          "aria-pressed": () => String(on()),
+          onclick: tap,
         },
         topicMark(id),
         name,
       ),
     );
+  return h(
+    "div",
+    { role: "group", "aria-label": "Теми" },
+    h(
+      "ul",
+      { class: "chips" },
+      chip(
+        "",
+        "Всички теми",
+        () => now().length === 0,
+        () => choose([]),
+      ),
+      categories.map((c) =>
+        chip(
+          c.id,
+          c.name,
+          () => now().includes(c.id),
+          () => toggle(c.id),
+        ),
+      ),
+    ),
+  );
+}
+
+/** Between a room's games, its host chooses again what it plays, the code and the players kept: how many questions,
+ * how hard and its topics, each tap making it the next game's (`change`, which says what went wrong, if anything).
+ * Folded: the next game as it was is one tap away. */
+export function changeGame(now: Game, change: (g: Game) => Promise<string>): Child {
+  const length = signal(now.length);
+  const mix = signal<Mix>(now.mix);
+  const topics = signal(now.categories);
+  const error = signal("");
+  const pick = async (ids: string[]) => {
+    error.set(await change({ categories: ids, length: length.peek(), mix: mix.peek() }));
+    if (!error.peek()) topics.set(ids);
+  };
+  const again = (g: Partial<Game>) =>
+    change({ categories: topics.peek(), length: length.peek(), mix: mix.peek(), ...g });
   return h(
     "details",
     { class: "more" },
@@ -229,12 +223,7 @@ export function changeGame(now: Game, change: (g: Game) => Promise<string>): Chi
         true,
       ),
     ),
-    h(
-      "ul",
-      { class: "chips" },
-      topic("", "Всички теми"),
-      categories.map((c) => topic(c.id, c.name)),
-    ),
+    setting("Теми", topicChoice(topics, pick)),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }

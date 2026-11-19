@@ -3,6 +3,7 @@ package room
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 	"testing"
@@ -132,30 +133,87 @@ func TestARestoredRoomWaitsOutItsHostsWait(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
 		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
-		for _, lead := range []bool{false, true} {
-			r, _ := hub.Open(ana, "", Settings{Lead: lead})
-			_ = r.Join(bo, "")
-			time.Sleep(hostWait / 2)
-			back, _ := restart(t, hub).Get(r.Code())
-			sb, _ := back.Follow(bo.ID)
-			<-sb.C
-			time.Sleep(hostWait/2 - time.Second)
-			synctest.Wait()
-			if back.View(bo.ID).CanLead {
-				t.Fatalf("lead %v: the host's wait cut short by a restart", lead)
-			}
-			time.Sleep(2 * time.Second)
-			synctest.Wait()
-			select {
-			case <-sb.C:
-			default:
-				t.Fatalf("lead %v: no word as the host's wait ended", lead)
-			}
-			if !back.View(bo.ID).CanLead {
-				t.Fatalf("lead %v: the host never came: nobody else leads", lead)
-			}
-			back.Unfollow(sb)
+		r, _ := hub.Open(ana, "", Settings{})
+		_ = r.Join(bo, "")
+		time.Sleep(hostWait / 2)
+		back, _ := restart(t, hub).Get(r.Code())
+		sb, _ := back.Follow(bo.ID)
+		<-sb.C
+		time.Sleep(hostWait/2 - time.Second)
+		synctest.Wait()
+		if back.View(bo.ID).CanLead {
+			t.Fatal("the host's wait cut short by a restart")
 		}
+		time.Sleep(2 * time.Second)
+		synctest.Wait()
+		select {
+		case <-sb.C:
+		default:
+			t.Fatal("no word as the host's wait ended")
+		}
+		if !back.View(bo.ID).CanLead {
+			t.Fatal("the host never came: nobody else leads")
+		}
+		back.Unfollow(sb)
+	})
+}
+
+// A room saved by an older server, its host leading it from a big screen (no player in it), an answer held for them
+// and one topic, comes back as a room of today: its game goes on at the room's own pace, anyone in it starts the
+// next, the host who didn't play isn't in it, and it plays every topic. One with nobody in it doesn't come back.
+func TestAnOldRoomComesBack(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		hub := NewHub(sample(t))
+		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
+		r, _ := hub.Open(ana, "", Settings{Categories: []string{"history"}, Length: 5})
+		_ = r.Join(bo, "")
+		sa, _ := r.Follow(ana.ID)
+		sb, _ := r.Follow(bo.ID)
+		_ = r.Start(ana.ID)
+		_ = r.Answer(ana.ID, 0, answer(r, true))
+		_ = r.Answer(bo.ID, 0, answer(r, false))
+		if v := r.View(ana.ID); v.Phase != Reveal {
+			t.Fatalf("the answer: %s", v.Phase)
+		}
+		var buf bytes.Buffer
+		_ = hub.Save(&buf)
+		r.Unfollow(sa)
+		r.Unfollow(sb)
+		var rooms []map[string]any
+		if err := json.Unmarshal(buf.Bytes(), &rooms); err != nil || len(rooms) != 1 {
+			t.Fatalf("saved: %v %d", err, len(rooms))
+		}
+		old := rooms[0]
+		// As an older server saved a room led from a big screen: its host no player, an answer held, one topic.
+		old["host"], old["hostName"], old["lead"], old["held"] = 99, "Учител", true, true
+		old["hostBack"], old["category"] = time.Now().Add(time.Minute), "history"
+		delete(old, "categories")
+		empty := map[string]any{"code": "123456", "key": "k", "host": 98, "lead": true, "held": true, "phase": "lobby",
+			"players": nil, "opened": time.Now(), "active": time.Now(), "length": 10, "mix": "mixed"}
+		raw, _ := json.Marshal([]map[string]any{old, empty})
+		next := NewHub(hub.bank)
+		if n, err := next.Restore(bytes.NewReader(raw)); err != nil || n != 1 {
+			t.Fatalf("restored %d: %v", n, err)
+		}
+		back, err := next.Get(r.Code())
+		if err != nil {
+			t.Fatal(err)
+		}
+		v := back.View(bo.ID)
+		if v.Phase != Reveal || v.Question.NextMs <= 0 || v.Categories != nil || v.Length != 5 || len(v.Players) != 2 {
+			t.Fatalf("restored: %+v", v)
+		}
+		if back.In(99) || !back.View(ana.ID).CanLead || !v.CanLead {
+			t.Fatal("the host who led is in it, or nobody may start the next game")
+		}
+		// The answer isn't held: the room moves on by itself.
+		time.Sleep(Pause + time.Second)
+		synctest.Wait()
+		if v := back.View(bo.ID); v.Phase != Question || v.N != 1 {
+			t.Fatalf("after the answer: %s %d", v.Phase, v.N)
+		}
+		back.broken() // ends the game where it is, as a broken clock does: nothing left running
+		synctest.Wait()
 	})
 }
 
@@ -212,7 +270,7 @@ func TestAGameKeptOnceOverACrash(t *testing.T) {
 		ended, _ := hub.Open(Player{ID: 2, Name: "Бо"}, "", Settings{Length: 5})
 		_ = ended.Start(2)
 		_ = ended.Answer(2, 0, answer(ended, true))
-		_ = ended.Finish(2)
+		ended.broken() // ended where it is
 		next := NewHub(hub.bank)
 		var saved bytes.Buffer
 		_ = hub.Save(&saved)
@@ -240,8 +298,8 @@ func TestAGameKeptOnceOverACrash(t *testing.T) {
 	})
 }
 
-// A game its host ends early earns by the questions it was dealt: one question right of five isn't all right, and
-// the game kept says it was dealt five (review 2026-11-18, S19).
+// A game cut short (its clock broke: broken) earns by the questions it was dealt: one question right of five isn't all
+// right, and the game kept says it was dealt five (review 2026-11-18, S19).
 func TestAGameCutShortIsNotAllRight(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
@@ -258,9 +316,7 @@ func TestAGameCutShortIsNotAllRight(t *testing.T) {
 		_ = r.Start(ana.ID)
 		_ = r.Answer(ana.ID, 0, answer(r, true))
 		points := r.View(ana.ID).Players[0].Points
-		if err := r.Finish(ana.ID); err != nil {
-			t.Fatal(err)
-		}
+		r.broken()
 		synctest.Wait()
 		v := r.View(ana.ID)
 		if v.Phase != End || v.Total != 1 || v.AllRight != 0 || v.Players[0].Points != points {
@@ -353,23 +409,10 @@ func TestScreensCapped(t *testing.T) {
 	}
 }
 
-// A room led from a big screen (a class's) locks itself as its first game starts; someone new comes into a game
-// under way only by the room's link (S3).
+// Someone new comes into a game under way only by the room's link (S3).
 func TestComingInMidGame(t *testing.T) {
 	hub := NewHub(sample(t))
-	ana, bo, cy := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}, Player{ID: 3, Name: "Цви"}
-	class, _ := hub.Open(ana, "", Settings{Lead: true})
-	_ = class.Join(bo, "")
-	if err := class.Start(ana.ID); err != nil {
-		t.Fatal(err)
-	}
-	if err := class.Join(cy, class.Key()); !errors.Is(err, ErrLocked) || !class.View(ana.ID).Locked {
-		t.Fatalf("a class's room once its game started: %v", err)
-	}
-	if err := class.Join(bo, ""); err != nil {
-		t.Fatalf("a player back in a class's room: %v", err)
-	}
-
+	bo, cy := Player{ID: 2, Name: "Бо"}, Player{ID: 3, Name: "Цви"}
 	party, _ := hub.Open(bo, "", Settings{})
 	if v := party.View(bo.ID); v.Key == "" || v.Key != party.Key() || party.View(cy.ID).Key != "" {
 		t.Fatal("the room's key, to who's in it alone")
@@ -387,7 +430,7 @@ func TestComingInMidGame(t *testing.T) {
 	if err := party.Join(cy, party.Key()); err != nil {
 		t.Fatalf("by the link: %v", err)
 	}
-	_ = party.Finish(bo.ID)
+	party.broken() // the game over
 	if err := party.Admits(0, ""); err != nil {
 		t.Fatalf("by the code between games: %v", err)
 	}

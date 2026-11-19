@@ -9,29 +9,24 @@ import type { Kit } from "../kit.ts";
 import type { ApiError } from "../lib/api.ts";
 import type { Child } from "../lib/dom.ts";
 import type { Tier, VerdictKind } from "../ui.ts";
-import { hosting } from "./host.ts";
 import type { Mix } from "./rooms.ts";
 
-// The app's pieces, set as the screen opens (room); host.ts takes them from here.
-export let {
+// The app's pieces, set as the screen opens (room).
+let {
   answered,
   answering,
   api,
-  ask,
   avatar,
   boardRow,
   categories,
   changeGame,
   computed,
-  countdown,
   crowdLine,
   effect,
   errorText,
-  fact,
   guardLeaving,
   holdWhile,
   formatNumber,
-  hostCss,
   h,
   keepAwake,
   lifetime,
@@ -49,7 +44,6 @@ export let {
   playingWhile,
   questionHead,
   reviewParts,
-  schemeSwitch,
   shareButton,
   signal,
   stream,
@@ -57,7 +51,6 @@ export let {
   title,
   untracked,
   upNext,
-  user,
   verdict,
   winners,
 } = {} as Kit;
@@ -68,7 +61,8 @@ export interface RoomView {
   host: string;
   isHost: boolean;
   canLead: boolean;
-  category: string;
+  /** Its topics (none: all of them). */
+  categories: string[] | null;
   /** Questions a game, and how hard. */
   length: number;
   mix: Mix;
@@ -99,10 +93,6 @@ export interface RoomView {
   };
   /** Once the game is over: what this player's game earned for every answer right (in their points). */
   allRight?: number;
-  /** The host leads from a big screen, and doesn't play (host.ts). */
-  lead?: boolean;
-  /** Each answer stays up until who leads moves on („Задръж“). */
-  held?: boolean;
   /** Nobody new comes in: the host has locked the room (door). */
   locked?: boolean;
   /** Once the game is over and kept: this player's game as a run, whose news tells what it earned. */
@@ -134,32 +124,31 @@ export interface Player {
   level?: number;
 }
 
-export const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "Всички теми";
-export const spaced = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
-/** What the room plays: its topic, how many questions and how hard. */
-export const about = (v: RoomView) =>
-  `${topicName(v.category)} · ${v.length} въпроса · ${mixes.find(([m]) => m === v.mix)?.[1] ?? ""}`;
+const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
+/** A room's topics in words: „Всички теми“, „История“, „История и География“, up to three by name; more, how many. */
+const topicNames = (ids: string[] | null) =>
+  !ids?.length ? "Всички теми" : ids.length > 3 ? `${ids.length} теми` : listWords(ids.map(topicName));
+const spaced = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
+/** What the room plays: its topics, how many questions and how hard. */
+const about = (v: RoomView) =>
+  `${topicNames(v.categories)} · ${v.length} въпроса · ${mixes.find(([m]) => m === v.mix)?.[1] ?? ""}`;
 
 export function room(kit: Kit, [code = ""]: string[]) {
   ({
     answered,
     answering,
     api,
-    ask,
     avatar,
     boardRow,
     categories,
     changeGame,
     computed,
-    countdown,
     crowdLine,
     effect,
     errorText,
-    fact,
     guardLeaving,
     holdWhile,
     formatNumber,
-    hostCss,
     h,
     keepAwake,
     lifetime,
@@ -177,7 +166,6 @@ export function room(kit: Kit, [code = ""]: string[]) {
     playingWhile,
     questionHead,
     reviewParts,
-    schemeSwitch,
     shareButton,
     signal,
     stream,
@@ -185,7 +173,6 @@ export function room(kit: Kit, [code = ""]: string[]) {
     title,
     untracked,
     upNext,
-    user,
     verdict,
     winners,
   } = kit);
@@ -268,26 +255,23 @@ export function room(kit: Kit, [code = ""]: string[]) {
     const phase = view()?.phase;
     return phase === "question" || phase === "reveal";
   });
-  // The screen stays on through a game's questions; a big screen led from, all the time it shows the room.
-  const leading = computed(() => !!(view()?.lead && view()?.isHost));
+  // The screen stays on through a game's questions.
   keepAwake(() => {
     const phase = view()?.phase;
-    return phase === "question" || phase === "reveal" || leading();
+    return phase === "question" || phase === "reveal";
   });
   // Leaving a game under way costs its questions: it goes on without the player (who may come back to it by the
   // code). Every way out asks first, back too (the room opened from a chat has an entry of its own meanwhile:
-  // holdWhile); a host leading from a big screen plays nothing, and isn't asked.
+  // holdWhile).
   const costs = () => {
     const v = view();
-    return !!v && (v.phase === "question" || v.phase === "reveal") && !(v.lead && v.isHost);
+    return !!v && (v.phase === "question" || v.phase === "reveal");
   };
   holdWhile(costs);
   const leaveAsk = guardLeaving(
     "Излизаш от стаята? Играта продължава без теб, а въпросите остават без отговор.",
     costs,
   );
-  effect(() => document.documentElement.classList.toggle("hosting", leading()));
-  onCleanup(() => document.documentElement.classList.remove("hosting"));
   return h(
     "div",
     { class: "screen" },
@@ -405,7 +389,6 @@ export function room(kit: Kit, [code = ""]: string[]) {
       const v = untracked(view) as RoomView;
       // A new game („Нова игра“ goes from the end straight to its first question).
       if (v.phase === "lobby" || (v.phase === "question" && v.n === 0)) places.clear();
-      if (v.lead && v.isHost) return hosting(view as () => RoomView, code, v, places);
       switch (v.phase) {
         case "lobby":
           return lobby(view as () => RoomView, code);
@@ -421,9 +404,9 @@ export function room(kit: Kit, [code = ""]: string[]) {
   );
 }
 
-/** The name the player chose for this room in this tab (`now`: chosen now), "" if they were asked for none (a host who
- * only leads: rooms.ts marks the room named), or null if not asked yet: a reload doesn't ask again, and comes back
- * under it (a locked room tried again, a room the server lost over a restart). */
+/** The name the player chose for this room in this tab (`now`: chosen now), "" if they were asked for none, or null
+ * if not asked yet: a reload doesn't ask again, and comes back under it (a locked room tried again, a room the server
+ * lost over a restart). */
 function named(code: string, now?: string): string | null {
   try {
     if (now !== undefined) {
@@ -509,9 +492,9 @@ function nameStep(
 }
 
 /** The host's way to change what the room plays next (rooms.ts: changeGame). */
-export function choose(view: () => RoomView, code: string): Child {
+function choose(view: () => RoomView, code: string): Child {
   const v = untracked(view);
-  return changeGame({ category: v.category, length: v.length, mix: v.mix }, async (g) => {
+  return changeGame({ categories: v.categories ?? [], length: v.length, mix: v.mix }, async (g) => {
     try {
       await api("POST", `/api/rooms/${code}/settings`, g);
       return "";
@@ -521,16 +504,10 @@ export function choose(view: () => RoomView, code: string): Child {
   });
 }
 
-/** What who leads the room does: starts a game, moves it on, ends it. Each path is written whole, as the server has it
- * (routes_test.go holds the client's paths to the server's). */
-export async function lead(code: string, action: "start" | "next" | "finish", error: (s: string) => void) {
-  const path = {
-    start: `/api/rooms/${code}/start`,
-    next: `/api/rooms/${code}/next`,
-    finish: `/api/rooms/${code}/finish`,
-  }[action];
+/** Who may start the room's next game starts it. */
+async function start(code: string, error: (s: string) => void) {
   try {
-    await api("POST", path);
+    await api("POST", `/api/rooms/${code}/start`);
   } catch (err) {
     error(errorText(err));
   }
@@ -539,8 +516,7 @@ export async function lead(code: string, action: "start" | "next" | "finish", er
 function waiting(view: () => RoomView, what: string): Child {
   return () => {
     const v = view();
-    // A host who only leads (a big screen) is „водещият“, not a name the players don't know.
-    return v.canLead ? null : h("p", { class: "status" }, `Чакаме ${v.lead ? "водещия" : v.host} да ${what}.`);
+    return v.canLead ? null : h("p", { class: "status" }, `Чакаме ${v.host} да ${what}.`);
   };
 }
 
@@ -567,7 +543,7 @@ function lobby(view: () => RoomView, code: string): Child {
     ),
     () =>
       view().canLead
-        ? h("button", { class: "btn primary big", onclick: () => lead(code, "start", error.set) }, "Започни")
+        ? h("button", { class: "btn primary big", onclick: () => start(code, error.set) }, "Започни")
         : null,
     waiting(view, "започне"),
     untracked(view).isHost ? choose(view, code) : null,
@@ -576,18 +552,16 @@ function lobby(view: () => RoomView, code: string): Child {
 }
 
 /** The room's link: its code, and its key, which takes someone new into a game under way too. */
-export const link = (v: RoomView, code: string) => `${location.origin}/r/${code}${v.key ? `#${v.key}` : ""}`;
+const link = (v: RoomView, code: string) => `${location.origin}/r/${code}${v.key ? `#${v.key}` : ""}`;
 
 /** The host's lock on the room: locked, nobody new comes in (once everyone is there), and whoever is in it comes back
- * as ever. Open, it says when it's time: once others have come in, or that a room led locks itself as it starts.
- * Nothing for anyone else. */
-export function door(view: () => RoomView, code: string, error: (s: string) => void): Child {
+ * as ever. Open, it says when it's time: once others have come in. Nothing for anyone else. */
+function door(view: () => RoomView, code: string, error: (s: string) => void): Child {
   if (!untracked(view).isHost) return null;
   const locked = computed(() => !!view().locked);
   const line = computed(() => {
     const v = view();
     if (v.locked) return "Стаята е заключена: нови играчи не могат да влязат.";
-    if (v.lead && v.phase === "lobby") return "Всеки с кода може да влезе. Щом започнеш, стаята ще се заключи сама.";
     return v.players.filter((p) => !p.me).length > 0
       ? "Всички ли са вътре? Заключи стаята и никой нов няма да влезе."
       : "Всеки с кода може да влезе.";
@@ -610,14 +584,8 @@ export function door(view: () => RoomView, code: string, error: (s: string) => v
 }
 
 /** The players as chips. The host has two things on each of the others: „Смени името“ (the player is asked for
- * another, theirs drawn meanwhile) and „Махни“, asked twice; and those sent out, each with „Върни“, a slip undone.
- * `manage`: whether the host's hands show now (a big screen keeps them folded: host.ts). */
-export function players(
-  view: () => RoomView,
-  code: string,
-  error: (s: string) => void,
-  manage: () => boolean = () => true,
-): Child {
+ * another, theirs drawn meanwhile) and „Махни“, asked twice; and those sent out, each with „Върни“, a slip undone. */
+function players(view: () => RoomView, code: string, error: (s: string) => void): Child {
   const sure = signal(-1); // the key of the one „Махни“ was tapped on once
   let t = 0;
   onCleanup(() => clearTimeout(t));
@@ -648,7 +616,7 @@ export function players(
       const v = view();
       // A new name is asked for between games, not in the middle of one.
       const naming = v.phase === "lobby" || v.phase === "end";
-      const hands = v.isHost && manage();
+      const hands = v.isHost;
       return v.players.map((p) =>
         h(
           "li",
@@ -692,7 +660,7 @@ export function players(
     }),
     () => {
       const out = view().out ?? [];
-      if (!out.length || !manage()) return null;
+      if (!out.length) return null;
       return h(
         "div",
         { class: "players-out" },
@@ -725,7 +693,7 @@ export function players(
 }
 
 /** A sound as someone comes into the room. */
-export function joins(view: () => RoomView): void {
+function joins(view: () => RoomView): void {
   let seen = untracked(view).players.length;
   effect(() => {
     const n = view().players.length;
@@ -735,7 +703,7 @@ export function joins(view: () => RoomView): void {
 }
 
 /** Which question, and its topic. */
-export function head(v: RoomView): Child {
+function head(v: RoomView): Child {
   return questionHead(v.n, v.total, topicName(v.question?.category ?? ""));
 }
 
@@ -794,7 +762,6 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
   const r = q?.reveal;
   if (!q || !r) return null;
   const last = first.n + 1 >= first.total;
-  const held = computed(() => !!view().held); // only a change of it draws the line again
   const kind: VerdictKind = r.missed
     ? "time"
     : r.exact
@@ -821,22 +788,17 @@ function reveal(view: () => RoomView, first: RoomView, places: Map<number, numbe
     knew(first),
     // How the room answered is what shows (its options, knew): everyone's ever only while it has nothing of its own.
     q.split?.crowd ? null : crowdLine(q.view.type, r.answer.crowd, r.right),
-    // Held, the answer stays up until who leads moves on: time to read its fact here too, not only on the big screen.
-    () => (held() ? fact(r.answer.fact) : null),
-    () =>
-      held()
-        ? h("p", { class: "status" }, "Водещият ще продължи.")
-        : untracked(() =>
-            upNext(view().question?.nextMs ?? 0, last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),
-          ),
+    untracked(() =>
+      upNext(view().question?.nextMs ?? 0, last ? "Към класирането…" : `Въпрос ${first.n + 2} след малко…`),
+    ),
     standings(view, true, before),
   );
 }
 
 /** How many have answered the question showing, of those in the room for it; and, once only a few are left (and this
- * player isn't one of them), who they are: „Отговориха 6 от 8. Чакаме Ани и Боби.“ Nothing with nobody in the room
- * (a room led with no phones). */
-export function stillAnswering(v: RoomView): string {
+ * player isn't one of them), who they are: „Отговориха 6 от 8. Чакаме Ани и Боби.“ Nothing with nobody there (their
+ * screens not back yet after a restart). */
+function stillAnswering(v: RoomView): string {
   const playing = v.players.filter((p) => p.online || p.answered);
   if (!playing.length) return "";
   const done = playing.filter((p) => p.answered).length;
@@ -848,7 +810,7 @@ export function stillAnswering(v: RoomView): string {
 /** The answer as the room shows it: on each option how many in the room gave it (its own crowd, counted, not shared),
  * the bars as long as their share; with nobody in the room, how everyone ever answered, as anywhere. Who in the room
  * knew it says the rest (knew), not a share of everyone ever beside it. */
-export function asRoom(q: NonNullable<RoomView["question"]>): Reveal {
+function asRoom(q: NonNullable<RoomView["question"]>): Reveal {
   const r = q.reveal?.answer as Reveal;
   const crowd = q.split?.crowd;
   return crowd ? { ...r, crowd: { ...crowd, counts: true } } : r;
@@ -857,7 +819,7 @@ export function asRoom(q: NonNullable<RoomView["question"]>): Reveal {
 /** Who in the room knew the answer showing, the quickest first: „Познаха 5 от 8: Ани, Боби и още 3.“, „Само Ани
  * позна.“, „Всички познаха.“, „Никой не позна.“ This player is „ти“. Nothing for a room of one, whose verdict says
  * it. */
-export function knew(v: RoomView): Child {
+function knew(v: RoomView): Child {
   const s = v.question?.split;
   const had = s?.crowd?.answers ?? 0;
   if (!s || had < 2) return null;
@@ -877,12 +839,11 @@ export function knew(v: RoomView): Child {
   return h("p", { class: "room-knew" }, text);
 }
 
-/** The players by points (the first `top`); after an answer, what it brought each of them and how far they moved; at
- * the end, how many each got right („6/10 ·“). Nothing while nobody plays (a room led, everyone answering aloud). */
-export function standings(view: () => RoomView, gains: boolean, before?: Map<number, number>, top = 50): Child {
+/** The players by points; after an answer, what it brought each of them and how far they moved; at the end, how many
+ * each got right („6/10 ·“). */
+function standings(view: () => RoomView, gains: boolean, before?: Map<number, number>): Child {
   return () => {
     const v = view();
-    if (!v.players.length) return null;
     return h(
       "section",
       { class: "board" },
@@ -890,7 +851,7 @@ export function standings(view: () => RoomView, gains: boolean, before?: Map<num
       h(
         "ol",
         null,
-        v.players.slice(0, top).map((p, i) => {
+        v.players.map((p, i) => {
           const row = boardRow(
             p.place ?? i + 1,
             p.name,
@@ -967,7 +928,7 @@ function end(view: () => RoomView, code: string): Child {
     h(
       "div",
       { class: "intro" },
-      h("p", { class: "kicker" }, () => `Стая ${spaced(code)} · ${topicName(view().category)}`),
+      h("p", { class: "kicker" }, () => `Стая ${spaced(code)} · ${topicNames(view().categories)}`),
       h("h1", null, () => winners(view().players.filter((p) => p.place === 1))),
       // How many this player got right, whatever their place: and the place, among others.
       () => {
@@ -987,11 +948,7 @@ function end(view: () => RoomView, code: string): Child {
     nextSteps(
       () =>
         view().canLead
-          ? h(
-              "button",
-              { class: "btn primary big", onclick: () => lead(code, "start", error.set) },
-              "Започни нова игра",
-            )
+          ? h("button", { class: "btn primary big", onclick: () => start(code, error.set) }, "Започни нова игра")
           : waiting(view, "започне нова игра"),
       [
         questions.button,

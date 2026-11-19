@@ -713,13 +713,17 @@ func TestARoomOverHTTP(t *testing.T) {
 	ana, bo := g.player(), g.player()
 	ana.call("POST", "/api/guest", map[string]any{})
 	bo.call("POST", "/api/guest", map[string]any{})
-	status, out := ana.call("POST", "/api/rooms", map[string]string{"category": ""})
+	status, out := ana.call("POST", "/api/rooms", map[string]any{"categories": []string{"geography", "history"}})
 	code, _ := out["code"].(string)
 	if status != 200 || len(code) != 6 {
 		t.Fatalf("open: %d %v", status, out)
 	}
 	as, bs := ana.follow(code), bo.follow(code)
-	as.until(func(v map[string]any) bool { return len(v["players"].([]any)) == 2 })
+	// Its topics as the bank has them, in its order.
+	if v := as.until(func(v map[string]any) bool { return len(v["players"].([]any)) == 2 }); fmt.Sprint(v["categories"]) !=
+		"[history geography]" {
+		t.Fatalf("the room's topics: %v", v["categories"])
+	}
 	if status, _ := bo.call("POST", "/api/rooms/"+code+"/start", map[string]any{}); status != 403 {
 		t.Fatalf("a guest started: %d", status)
 	}
@@ -772,66 +776,6 @@ func TestARoomOverHTTP(t *testing.T) {
 	}
 }
 
-// A host who leads from a big screen: not a player, the answer on their screen, and the pace theirs.
-func TestALeadingHostOverHTTP(t *testing.T) {
-	g := start(t)
-	ana, bo := g.player(), g.player()
-	ana.call("POST", "/api/guest", map[string]any{})
-	bo.call("POST", "/api/guest", map[string]any{})
-	_, out := ana.call("POST", "/api/rooms", map[string]any{"lead": true, "length": 5})
-	code, _ := out["code"].(string)
-	as := ana.follow(code)
-	bs := bo.follow(code)
-	v := as.until(func(v map[string]any) bool { return len(v["players"].([]any)) == 1 })
-	if v["isHost"] != true || v["lead"] != true {
-		t.Fatalf("the host's lobby: %v", v)
-	}
-	if status, _ := ana.call("POST", "/api/rooms/"+code+"/start", nil); status != 200 {
-		t.Fatalf("start: %d", status)
-	}
-	if status, _ := ana.call("POST", "/api/rooms/"+code+"/hold", map[string]any{"on": true}); status != 200 {
-		t.Fatalf("hold: %d", status)
-	}
-	// Bo alone answers (nothing, here: gives up), and the answer shows at once: no question waits for the host.
-	if status, _ := ana.call("POST", "/api/rooms/"+code+"/next", nil); status != 200 {
-		t.Fatalf("next: %d", status)
-	}
-	v = as.until(func(v map[string]any) bool { return v["phase"] == "reveal" })
-	q := v["question"].(map[string]any)
-	if q["reveal"].(map[string]any)["answer"] == nil || q["nextMs"] != nil || v["held"] != true {
-		t.Fatalf("the answer on the big screen, held: %v", q)
-	}
-	ana.call("POST", "/api/rooms/"+code+"/next", nil)
-	bs.until(func(v map[string]any) bool { return v["phase"] == "question" && v["n"] == 1.0 })
-	if status, _ := bo.call("POST", "/api/rooms/"+code+"/finish", nil); status != 403 {
-		t.Fatalf("a player ended the game: %d", status)
-	}
-	ana.call("POST", "/api/rooms/"+code+"/finish", nil)
-	if v := bs.until(func(v map[string]any) bool { return v["phase"] == "end" }); v["total"] != 2.0 {
-		t.Fatalf("ended at the second question: %v", v["total"])
-	}
-	res, err := ana.client.Get(g.url + "/api/rooms/" + code + "/qr")
-	if err != nil {
-		t.Fatal(err)
-	}
-	body, _ := io.ReadAll(res.Body)
-	res.Body.Close()
-	if res.Header.Get("Content-Type") != "image/svg+xml" || !strings.HasPrefix(string(body), "<svg") {
-		t.Fatalf("the QR code: %s %.40s", res.Header.Get("Content-Type"), body)
-	}
-	// Only for who's in the room: drawn for nobody else, nor for a code no room has.
-	for _, path := range []string{"/api/rooms/" + code + "/qr", "/api/rooms/999999/qr"} {
-		res, err := http.Get(g.url + path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		res.Body.Close()
-		if res.StatusCode != 404 {
-			t.Fatalf("a stranger's QR code %s: %d", path, res.StatusCode)
-		}
-	}
-}
-
 // A room's end offers each player the others to add as friends (not friends yet, nor asked), and the day's ten while
 // they wait.
 func TestRoomPeople(t *testing.T) {
@@ -840,7 +784,7 @@ func TestRoomPeople(t *testing.T) {
 	for _, p := range []*player{ana, bo, cy} {
 		p.call("POST", "/api/guest", map[string]any{})
 	}
-	_, out := ana.call("POST", "/api/rooms", map[string]string{"category": ""})
+	_, out := ana.call("POST", "/api/rooms", map[string]any{})
 	code := out["code"].(string)
 	as := ana.follow(code)
 	bo.follow(code)
@@ -1471,7 +1415,7 @@ func TestLinkPreviews(t *testing.T) {
 		info["friends"] != false {
 		t.Fatalf("the invite as another sees it: %v", info)
 	}
-	_, room := p.call("POST", "/api/rooms", map[string]string{"category": ""})
+	_, room := p.call("POST", "/api/rooms", map[string]any{})
 	code = room["code"].(string)
 	if body := page("/r/" + code); !strings.Contains(body, "Ела в стая "+code[:3]+" "+code[3:]) {
 		t.Fatal("the room's preview")
@@ -1834,7 +1778,7 @@ func TestOwnNameIsntCheckedAgain(t *testing.T) {
 	}
 	host := g.player()
 	host.call("POST", "/api/guest", map[string]any{})
-	_, out := host.call("POST", "/api/rooms", map[string]string{"category": ""})
+	_, out := host.call("POST", "/api/rooms", map[string]any{})
 	code := out["code"].(string)
 	if _, err := g.db.Write.Exec(`UPDATE users SET name = 'Курва' WHERE id = ?`, id); err != nil {
 		t.Fatal(err)

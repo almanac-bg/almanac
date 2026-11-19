@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { answer, meetAs } from "./play.ts";
 
-test("a room for two: lobby, its questions together, the standings, a game kept", async ({ browser }) => {
+test("a room for two on two topics: lobby, its questions together, the standings, a game kept", async ({ browser }) => {
   // Five easy questions with the room's 6-second pause after each, in two browsers at once.
   test.setTimeout(180_000);
   const host = await (await browser.newContext()).newPage();
@@ -9,7 +9,13 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
   await host.goto("/room");
   await host.getByRole("radio", { name: "5", exact: true }).click();
   await host.getByRole("radio", { name: "Лесни" }).click();
-  await host.getByRole("button", { name: "История" }).click();
+  // All topics until some are chosen; a topic chosen and chosen again lets it go.
+  const topics = host.getByRole("group", { name: "Теми" });
+  await expect(topics.getByRole("button", { name: "Всички теми" })).toHaveAttribute("aria-pressed", "true");
+  for (const name of ["История", "География", "Музика", "Музика"]) await topics.getByRole("button", { name }).click();
+  await expect(topics.getByRole("button", { name: "Всички теми" })).toHaveAttribute("aria-pressed", "false");
+  await expect(topics.getByRole("button", { name: "Музика" })).toHaveAttribute("aria-pressed", "false");
+  await host.getByRole("button", { name: "Отвори стаята" }).click();
   await expect(host).toHaveURL(/\/r\/\d{6}$/);
   const code = host.url().slice(-6);
   // A new player has a drawn name: the room asks for one first (kept as it is here).
@@ -29,13 +35,15 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
   // That name is the room's alone: her own (on the boards, her profile) stays the one she had.
   expect(await guest.evaluate(async () => (await (await fetch("/api/me")).json()).user.name)).not.toBe("Бояна");
   await expect(guest.getByText(/Чакаме .* да започне/)).toBeVisible();
-  await expect(guest.getByText("История · 5 въпроса · Лесни")).toBeVisible();
+  await expect(guest.getByText("История и География · 5 въпроса · Лесни")).toBeVisible();
   await host.getByRole("button", { name: "Започни" }).click();
   // Бояна's first answer doesn't get through (the line drops as it's sent): it's sent again, and taken.
   await guest.route("**/api/rooms/*/answer", (route) => route.abort("connectionreset"), { times: 1 });
   for (let n = 0; n < 5; n++) {
-    for (const p of [host, guest])
+    for (const p of [host, guest]) {
       await expect(p.locator(".question-head")).toContainText(`${n + 1} от 5`, { timeout: 15_000 });
+      await expect(p.locator(".question-head")).toContainText(/История|География/);
+    }
     await answer(guest);
     if (n === 0) await expect(guest.getByText(/^Отговорът ти е приет\./)).toBeVisible();
     await answer(host);
@@ -63,6 +71,7 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
   const change = host.locator("details.more", { hasText: "Промени играта" });
   await change.getByRole("radio", { name: "10", exact: true }).click();
   await expect(change.getByRole("button", { name: "История" })).toHaveAttribute("aria-pressed", "true");
+  await expect(change.getByRole("button", { name: "География" })).toHaveAttribute("aria-pressed", "true");
   await change.getByRole("button", { name: "Всички теми" }).click();
   await expect(change.getByRole("button", { name: "Всички теми" })).toHaveAttribute("aria-pressed", "true");
   await expect(change.getByRole("button", { name: "История" })).toHaveAttribute("aria-pressed", "false");
@@ -80,11 +89,44 @@ test("a room for two: lobby, its questions together, the standings, a game kept"
     .toBe("room");
 });
 
+test("the room sees how it answered: who's still answering, what each answer got, who knew it", async ({ browser }) => {
+  test.setTimeout(120_000);
+  const [host, ana, bo] = await Promise.all([1, 2, 3].map(async () => (await browser.newContext()).newPage()));
+  await host.goto("/room");
+  await host.getByRole("button", { name: "Отвори стаята" }).click();
+  await host.getByLabel("Име").fill("Домакин");
+  await host.getByRole("button", { name: "Влез" }).click();
+  for (const [page, name] of [
+    [ana, "Ася"],
+    [bo, "Боян"],
+  ] as const) {
+    await page.goto(host.url());
+    await page.getByLabel("Име").fill(name);
+    await page.getByRole("button", { name: "Влез" }).click();
+    await expect(page.getByText("Чакаме Домакин да започне.")).toBeVisible();
+  }
+  await host.getByRole("button", { name: "Започни" }).click();
+  await expect(host.getByText("Отговориха 0 от 3.")).toBeVisible();
+  await answer(host);
+  await answer(ana);
+  // Few are left: by name, to each who isn't one of them.
+  await expect(host.getByText("Отговориха 2 от 3. Чакаме Боян.")).toBeVisible();
+  await expect(ana.getByText("Отговориха 2 от 3. Чакаме Боян.")).toBeVisible();
+  await expect(bo.getByText("Отговориха 2 от 3.", { exact: true })).toBeVisible();
+  await answer(bo);
+  // The same answer from all three: each answer's count in the room (where there are answers to count), and its word.
+  for (const page of [host, ana, bo]) {
+    await expect(page.locator(".room-knew")).toHaveText(/^(Всички познаха|Никой не позна)\.$/);
+    const counts = page.locator(".crowd-share");
+    if (await counts.count()) await expect(counts.first()).toHaveText("3");
+  }
+});
+
 test("someone new comes into a game under way by the room's link, not by its code alone", async ({ browser }) => {
   const host = await (await browser.newContext()).newPage();
   const opened = host.waitForResponse((r) => r.url().endsWith("/api/rooms") && r.request().method() === "POST");
   await host.goto("/room");
-  await host.getByRole("button", { name: "Всички теми" }).click();
+  await host.getByRole("button", { name: "Отвори стаята" }).click();
   const { url } = await (await opened).json();
   await host.getByRole("button", { name: "Влез" }).click();
   await host.getByRole("button", { name: "Започни" }).click();
@@ -109,7 +151,7 @@ test("a room's link opened from a chat: its host is waited for, and back mid-gam
   const host = await (await browser.newContext()).newPage();
   const guest = await (await browser.newContext()).newPage();
   await host.goto("/room");
-  await host.getByRole("button", { name: "Всички теми" }).click();
+  await host.getByRole("button", { name: "Отвори стаята" }).click();
   await expect(host.getByRole("heading", { name: "С какво име влизаш?" })).toBeVisible();
   // The guest is in first, the room's link the first page of a new tab, while the host still chooses a name: the host
   // shows as there, and the start stays the host's.
@@ -150,7 +192,7 @@ test("the host sends a player out of a room, brings them back, asks for another 
   const host = await (await browser.newContext()).newPage();
   const guest = await (await browser.newContext()).newPage();
   await host.goto("/room");
-  await host.getByRole("button", { name: "Всички теми" }).click();
+  await host.getByRole("button", { name: "Отвори стаята" }).click();
   await expect(host).toHaveURL(/\/r\/\d{6}$/);
   await host.getByLabel("Име").fill("Учител");
   await host.getByRole("button", { name: "Влез" }).click();
@@ -205,7 +247,7 @@ test("on a narrow phone, a long name stays beside its avatar and the host's butt
   const host = await (await browser.newContext({ viewport: { width: 320, height: 640 } })).newPage();
   const guest = await (await browser.newContext()).newPage();
   await host.goto("/room");
-  await host.getByRole("button", { name: "Всички теми" }).click();
+  await host.getByRole("button", { name: "Отвори стаята" }).click();
   await expect(host).toHaveURL(/\/r\/\d{6}$/);
   await host.getByLabel("Име").fill("Учител");
   await host.getByRole("button", { name: "Влез" }).click();

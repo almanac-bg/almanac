@@ -239,16 +239,15 @@ on a phone 160px wide; it holds that way (`e2e/text.spec.ts`):
   right, from the question's start, the column its answer comes into (see Flow); on a laptop's height a choice of
   pictures is four across.
 - **A computer** (a fine pointer that hovers) is shown its keys: beside each answer's letter its key, 1–4 (the same
-  on every keyboard layout; the letter stays А–Г on every screen, so a room's big screen and its phones name an answer
-  alike), „Вярно“ and „Невярно“ 1 and 2, the count before a run Enter („Започни сега“) and Esc („Откажи“), an answer
-  shown Enter (on at once), and a host's keys on a big screen. The marks are `.key-hint`, only where a key works: never
-  on a question gone over or one shown to be looked at (`ask(…, display)`: a big screen's, a review's), nor on an
-  answer once it shows.
+  on every keyboard layout; the letter stays А–Г on every screen), „Вярно“ and „Невярно“ 1 and 2, the count before a
+  run Enter („Започни сега“) and Esc („Откажи“), and an answer shown Enter (on at once). The marks are `.key-hint`,
+  only where a key works: never on a question gone over or one shown to be looked at (`ask(…, display)`: a review's),
+  nor on an answer once it shows.
 
 ## Colour
 
 Night is on `:root`; Day replaces it under `prefers-color-scheme: light`, unless Night is chosen, and wherever Day
-is chosen („Изглед“ in Настройки and over a big screen's lobby: `data-scheme` on `<html>`, `lib/prefs.ts`; not in
+is chosen („Изглед“ in Настройки: `data-scheme` on `<html>`, `lib/prefs.ts`; not in
 the app, which follows the phone). So each Day rule is written twice, `:root:not([data-scheme="night"])` under the
 media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds them equal). Never call this choice
 „Тема“: in the game a „тема“ is what questions are about. A rule never holds a literal colour: it takes a token.
@@ -413,20 +412,15 @@ media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds th
   opened (the button takes the player there). Each question gone over is a card of its own (`.reviewed`, a band in
   its verdict's colour on top): its number and topic as a kicker with „Вярно“, „Близо“ or „Грешно“ beside them, the
   question the strongest line, the answers marked, and the fact a quiet note under them.
+- **A room** is opened on `/room`: „Въпроси“ and „Трудност“ (`.segmented`), then „Теми“, the topics as chips that
+  toggle (`aria-pressed`): „Всички теми“ on until a topic is chosen, a tap on it choosing all again, and every topic
+  chosen is all of them; then „Отвори стаята“, the gold button. Its host plays in it as everyone does. What it plays
+  reads „История и География · 10 въпроса · Смесени“ (up to three topics by name, more as „4 теми“).
 - **A room between games:** its host may change what it plays (folded, „Промени играта“: the questions, how hard,
-  the topic, the code and the players kept); the standings go by points, then by the time the answers took, and those
-  level on both share a place. A host who only leads isn't asked for a name, and the players wait for „водещия“. A
-  wrong code is said before anything is asked: in place on `/room`, and on `/r/<code>` with „Опитай друг код“.
-- **A room led from a big screen** (`host.css`, loaded only there), read from across a room: the header and the
-  places' bar step aside (a „Начало“ link over the lobby and the end, with „Изглед“ and „Цял екран“). From 64rem a
-  question and its answer are one screen high (`.host-ask`, `.host-reveal`: the head, `.host-stage`, and the
-  `.host-foot` with the line and `.host-controls` always in sight; nothing scrolls), every size set by the screen's
-  height; the answers as the phones mark them, to look at (no keys, hint, grips or „Готово“); with the answer, what
-  each option got in the room, „Познаха 3 от 8: …“ (`.room-knew`, on the phones too) and the fact, the first five
-  beside. The host's hands on the players (another name, „Махни“, „Върни“, the lock) fold under „Управлявай
-  играчите“. The keys: →, PageDown, Space or Enter „Напред“, H „Задръж“, F the whole screen (a presentation clicker
-  sends the first). The end: the podium, as many steps as players up to three, beside the standings. `.host`,
-  `.host-row`, `.host-tools`, `.host-qr`, `.host-join`, `.host-players`, `.host-start`, `.host-controls`, `.podium`.
+  the topics, the code and the players kept); the standings go by points, then by the time the answers took, and
+  those level on both share a place. With each answer, what each option got in the room and „Познаха 3 от 8: …“
+  (`.room-knew`). A wrong code is said before anything is asked: in place on `/room`, and on `/r/<code>` with
+  „Опитай друг код“.
 - **A duel's result** (`screens/outcome.ts` with `outcome.css`, loaded as a duel starts), one card (`.duel-end`) for
   a result or a challenge still waiting for the friend it was sent to: the kicker („Дуел на живо с Мария“, „Дуел срещу
   запис“, „Предизвикателство от Мария“, to the one who sent it „Предизвикателство към Мария“) and the verdict
@@ -561,9 +555,8 @@ media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds th
   player most wants it. It stays 3 seconds (4.5 for anything but a choice or „Вярно или невярно“: there's more to
   look at) and the time to read the fact and the day's line (1.2 seconds and a little for each letter, 9 at most),
   with a line filling as it waits; „Напред“, always there (Enter on a computer; „Към резултата“ after the last), goes
-  on at once. A room shows each answer with its standings for 6 seconds, and on each option how many in the room gave it (a
-  host who leads it from a big screen, „Само водя“, has „Напред“, „Задръж“ and „Приключи“, and the fact with the
-  answer: the room talks it over); Роял the same, 10 seconds with a cut; a live duel
+  on at once. A room shows each answer with its standings for 6 seconds, and on each option how many in the room gave
+  it; Роял the same, 10 seconds with a cut; a live duel
   shows both answers for 4 seconds (6 for anything but a choice or „Вярно или невярно“). A question never opens in a
   tab that's out of sight.
 - **A game has the whole screen.** On a phone the header and the bar of places step aside from the count before a

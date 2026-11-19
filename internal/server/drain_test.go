@@ -42,13 +42,13 @@ func TestDrain(t *testing.T) {
 	ana, bo := g.player(), g.player()
 	ana.call("POST", "/api/guest", map[string]any{})
 	bo.call("POST", "/api/guest", map[string]any{})
-	_, out := ana.call("POST", "/api/rooms", map[string]string{"category": ""})
+	_, out := ana.call("POST", "/api/rooms", map[string]any{})
 	code := out["code"].(string)
 	ana.follow(code)
 	if status, out := ana.call("POST", "/api/rooms/"+code+"/start", nil); status != 200 {
 		t.Fatalf("start: %d %v", status, out)
 	}
-	_, out = bo.call("POST", "/api/rooms", map[string]string{"category": ""})
+	_, out = bo.call("POST", "/api/rooms", map[string]any{})
 	other := out["code"].(string)
 	bo.follow(other)
 	if st := drain(); st["ready"] != false || st["rooms"] != 1.0 {
@@ -94,7 +94,7 @@ func TestDrain(t *testing.T) {
 	if st := drain(); st["ready"] != false || st["royal"] != true || st["waited"] != 0.0 {
 		t.Fatalf("near Роял: %v", st)
 	}
-	if status, _ := ana.call("POST", "/api/rooms", map[string]string{"category": ""}); status != 200 {
+	if status, _ := ana.call("POST", "/api/rooms", map[string]any{}); status != 200 {
 		t.Fatalf("a room near Роял: %d", status)
 	}
 
@@ -149,7 +149,7 @@ func TestRoomsOverARestart(t *testing.T) {
 	}
 	ana := g.player()
 	ana.call("POST", "/api/guest", map[string]any{})
-	_, out := ana.call("POST", "/api/rooms", map[string]string{"category": ""})
+	_, out := ana.call("POST", "/api/rooms", map[string]any{})
 	code := out["code"].(string)
 	g.srv.saveRoomsChanged() // a room opened: saved
 	if data, err := os.ReadFile(file); err != nil || !strings.Contains(string(data), code) {

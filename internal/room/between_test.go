@@ -2,6 +2,7 @@ package room
 
 import (
 	"errors"
+	"slices"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -46,28 +47,36 @@ func TestTiesByTime(t *testing.T) {
 	})
 }
 
-// Between games the host chooses again what the room plays; the code and the players stay.
+// Between games the host chooses again what the room plays (its topics, kept once each in the bank's order; all of
+// them is none); the code and the players stay. A game's questions are its topics', as many of each as of the other.
 func TestChangeBetweenGames(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		hub := NewHub(sample(t))
 		ana, bo := Player{ID: 1, Name: "Ана"}, Player{ID: 2, Name: "Бо"}
 		r, _ := hub.Open(ana, "", Settings{Length: 5, Mix: play.MixEasy})
 		_ = r.Join(bo, "")
-		topic := hub.bank().Categories[0].ID
-		if err := r.Change(bo.ID, Settings{Category: topic, Length: 10}); !errors.Is(err, ErrNotYours) {
+		var every []string
+		for _, c := range hub.bank().Categories {
+			every = append(every, c.ID)
+		}
+		topics := every[:2]
+		if err := r.Change(bo.ID, Settings{Categories: topics, Length: 10}); !errors.Is(err, ErrNotYours) {
 			t.Fatalf("a guest changed it: %v", err)
 		}
-		if err := r.Change(ana.ID, Settings{Category: "nothing"}); !errors.Is(err, play.ErrNoTopic) {
+		if err := r.Change(ana.ID, Settings{Categories: []string{topics[0], "nothing"}}); !errors.Is(err, play.ErrNoTopic) {
 			t.Fatalf("no such topic: %v", err)
+		}
+		if err := r.Change(ana.ID, Settings{Categories: every}); err != nil || r.View(bo.ID).Categories != nil {
+			t.Fatalf("every topic: %v %v", err, r.View(bo.ID).Categories)
 		}
 		if err := r.Change(ana.ID, Settings{Length: 7}); !errors.Is(err, play.ErrRoomGame) {
 			t.Fatalf("seven questions: %v", err)
 		}
-		if err := r.Change(ana.ID, Settings{Category: topic, Length: 10, Lead: true}); err != nil {
+		if err := r.Change(ana.ID, Settings{Categories: []string{topics[1], topics[0], topics[1]}, Length: 10}); err != nil {
 			t.Fatal(err)
 		}
 		v := r.View(bo.ID)
-		if v.Category != topic || v.Length != 10 || v.Mix != play.MixMixed || v.Lead || len(v.Players) != 2 {
+		if !slices.Equal(v.Categories, topics) || v.Length != 10 || v.Mix != play.MixMixed || len(v.Players) != 2 {
 			t.Fatalf("after the change: %+v", v)
 		}
 		sa, _ := r.Follow(ana.ID)
@@ -80,8 +89,17 @@ func TestChangeBetweenGames(t *testing.T) {
 		if err := r.Change(ana.ID, Settings{}); !errors.Is(err, ErrNotNow) {
 			t.Fatalf("changed under way: %v", err)
 		}
-		if v := r.View(ana.ID); v.Total != 10 || v.Question.Category != topic {
-			t.Fatalf("the game: %d questions, of %q", v.Total, v.Question.Category)
+		if v := r.View(ana.ID); v.Total != 10 {
+			t.Fatalf("the game: %d questions", v.Total)
+		}
+		of := map[string]int{}
+		r.mu.Lock()
+		for _, d := range r.dealt {
+			of[d.Question().Base().Category]++
+		}
+		r.mu.Unlock()
+		if len(of) != 2 || of[topics[0]] != 5 || of[topics[1]] != 5 {
+			t.Fatalf("the game's topics: %v", of)
 		}
 	})
 }

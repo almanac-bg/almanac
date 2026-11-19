@@ -21,7 +21,8 @@ import (
 // does only when someone else played it too (together), and for „Сто игри“ only with Length questions or more: alone,
 // on easy questions, a room was a shortcut to both (review 2026-11-18, E10). It's on no board of the day and moves no rating; its XP is any game's in the week's league. A game is kept
 // once for each player (by its id: RoomPlay.Game), and what playing it to its end earns is by the questions it was
-// dealt, not those it was cut to: a game its host ended at the first question earns that question's share.
+// dealt, not those it was cut to: a game cut short at its first question (its clock broke: room.broken) earns that
+// question's share.
 
 // Mix is how hard a room's questions are: its host chooses as they open it.
 type Mix string
@@ -103,23 +104,52 @@ func roomSlots(n int, mix Mix) []slot {
 	return slots
 }
 
-// DrawRoom draws a room's game: n questions of a topic ("" for all) in a mix, never one barred (the day's, those due
-// for review: DayQuestions; and those the room has dealt already), those none of its players has seen first, then
-// those the fewest have (seen: RoomPast, seenAmong), a number an estimate where one is left (wishes). A mix that
-// leaves out a difficulty never deals it, even if that makes the game shorter; the types give way first.
-func DrawRoom(b *bank.Bank, category string, n int, mix Mix, barred map[string]bool, seen map[string]int, r *rand.Rand) []Pick {
-	pool := b.Live(category, "")
-	switch mix {
-	case MixEasy:
-		pool = slices.DeleteFunc(slices.Clone(pool), func(q bank.Question) bool { return q.Base().Difficulty == bank.Hard })
-	case MixHard:
-		pool = slices.DeleteFunc(slices.Clone(pool), func(q bank.Question) bool { return q.Base().Difficulty == bank.Easy })
+// DrawRoom draws a room's game: n questions of its topics (none: all of them) in a mix, as many of each topic as of
+// another, give or take one (which topics have the one more, and where each topic's questions fall, is drawn); never
+// one barred (the day's, those due for review: DayQuestions; and those the room has dealt already), those none of its
+// players has seen first, then those the fewest have (seen: RoomPast, seenAmong), a number an estimate where one is
+// left (wishes). Fresh comes before even: a topic with nothing left that its players haven't seen gives its place to
+// one that has. A mix that leaves out a difficulty never deals it, even if that makes the game shorter; the types give
+// way first.
+func DrawRoom(b *bank.Bank, categories []string, n int, mix Mix, barred map[string]bool, seen map[string]int, r *rand.Rand) []Pick {
+	if len(categories) == 0 {
+		for _, c := range b.Categories {
+			categories = append(categories, c.ID)
+		}
+		if len(categories) == 0 {
+			return nil
+		}
 	}
+	var pool []bank.Question
+	pools := map[string][]bank.Question{}
+	for _, q := range b.Live("", "") {
+		c, d := q.Base().Category, q.Base().Difficulty
+		if !slices.Contains(categories, c) || (mix == MixEasy && d == bank.Hard) || (mix == MixHard && d == bank.Easy) {
+			continue
+		}
+		pool = append(pool, q)
+		pools[c] = append(pools[c], q)
+	}
+	// Each question's topic: the topics in turn, from a drawn one, then shuffled over the game.
+	order := slices.Clone(categories)
+	r.Shuffle(len(order), func(i, j int) { order[i], order[j] = order[j], order[i] })
+	topics := make([]string, n)
+	for i := range topics {
+		topics[i] = order[i%len(order)]
+	}
+	r.Shuffle(len(topics), func(i, j int) { topics[i], topics[j] = topics[j], topics[i] })
 	taken := map[string]bool{}
 	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] && !barred[q.Base().ID] }
+	stale := seenCount(seen)
 	var picks []Pick
-	for _, s := range newKind(roomSlots(n, mix), r) {
-		if q := choose(pool, s, allowed, seenCount(seen), wishes(s), r); q != nil {
+	for i, s := range newKind(roomSlots(n, mix), r) {
+		q := choose(pools[topics[i]], s, allowed, stale, wishes(s), r)
+		if q == nil || stale(q) > 0 { // the topic has nothing fresh left: any of the room's topics, if one has
+			if o := choose(pool, s, allowed, stale, wishes(s), r); o != nil && (q == nil || stale(o) < stale(q)) {
+				q = o
+			}
+		}
+		if q != nil {
 			taken[q.Base().ID] = true
 			// A room deals its game as it starts, and keeps it: the version too.
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64(), V: bank.Version(q)})
@@ -145,9 +175,10 @@ func (g *Game) RoomPast(ctx context.Context, players []int64) (barred map[string
 // room's own, with any bonus), and their answers from the question they came in on.
 type RoomPlay struct {
 	// Game tells the game from every other, in any room ("": none to tell it by, kept as a new one each time).
-	Game     string
+	Game string
+	// Category is the room's one topic ("" for several, or all).
 	Category string
-	// Picks are the questions asked; Length how many the game was dealt (more, if its host ended it early).
+	// Picks are the questions asked; Length how many the game was dealt (more, if it was cut short).
 	Picks   []Pick
 	Length  int
 	Points  int

@@ -18,7 +18,7 @@ import (
 // letters gone, so that „А Л М А Н А Х“ and „Allmanac“ are caught as well. Whoever keeps the game (an admin) may
 // take such a name; and can put any player's name and tag back to the drawn ones (ResetName).
 //
-// Nor is a name or tag rude (Rude): the swear words and slurs a board or a room's big screen would show, in Cyrillic,
+// Nor is a name or tag rude (Rude): the swear words and slurs a board or a room would show, in Cyrillic,
 // in Latin letters and in the digits chat writes some letters with („pi4ka“; a number on its own is only a number),
 // heard by how they sound, so that „kurva“ and „курва“ are one, or seen by how they look, where the sound is also an
 // ordinary name's („Газ“ isn't „гъз“). The list is a floor, not a wall: what gets past it, a room's host asks to change

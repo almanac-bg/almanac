@@ -361,7 +361,7 @@ func (f *fresh) held(players []int64) map[string]bool {
 func (f *fresh) room() []Pick {
 	barred, seen, err := f.w.g.RoomPast(f.ctx(), []int64{f.ana, f.bo})
 	f.must(err)
-	return DrawRoom(f.w.b, "", Length, MixMixed, barred, seen, rand.New(rand.NewPCG(1, 2)))
+	return DrawRoom(f.w.b, nil, Length, MixMixed, barred, seen, rand.New(rand.NewPCG(1, 2)))
 }
 
 // royal opens an evening's Роял for Бо (its first in), Ана comes too, and its games begin, as the hub does them
