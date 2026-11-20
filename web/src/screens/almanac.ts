@@ -50,7 +50,7 @@ interface Learned {
   /** A statement that isn't so: its answer is the statement, said untrue. */
   untrue?: boolean;
   fact: string;
-  /** Written in ink (right in its issue, met there first), else in pencil (play/ink.go). */
+  /** Written in ink (right in its issue, met there first), else in grey, as met (play/ink.go). */
   ink?: boolean;
   at: number;
   /** Where it was learned: the day's ten (its issue), a chapter's game, a duel. */
@@ -67,7 +67,6 @@ interface Page {
   ink: Record<string, number>;
   ranks?: Rank[];
   seal?: Rank;
-  held?: boolean;
   since?: string;
 }
 
@@ -151,15 +150,8 @@ export function almanac(kit: Kit): Child {
           "div",
           { class: "figures-row" },
           figure(s ? formatNumber(s.streak) : "…", s?.streak === 1 ? "ден поред" : "дни поред"),
-          figure(p.seal ? p.seal.name : "—", p.seal ? `печат: ${nameOf(p.seal.chapter)}` : "звание"),
+          figure(p.seal ? p.seal.name : "—", p.seal ? `печат: ${nameOf(p.seal.chapter)}` : "печат"),
         ),
-        p.held
-          ? h(
-              "p",
-              { class: "small" },
-              "Званията от Тетрадка нагоре идват, когато отговорите ти в броевете не са налучкване.",
-            )
-          : null,
       ),
       contents(p),
     ];
@@ -175,7 +167,7 @@ function contents(p: Page): Child {
       "div",
       { class: "sect-head" },
       h("h2", null, "Съдържание"),
-      h("span", { class: "sect-note" }, "мастилото и званието на всяка глава"),
+      h("span", { class: "sect-note" }, "мастилото и печатът на всяка глава"),
     ),
     h(
       "ol",
@@ -422,7 +414,7 @@ function scale(r?: Rank): Child {
     return h(
       "div",
       { class: "know" },
-      h("p", { class: "know-words" }, "Всеки верен отговор в броя на деня записва факт с мастило и носи звание."),
+      h("p", { class: "know-words" }, "Всеки верен отговор в броя на деня записва факт с мастило."),
     );
   const left = Math.max(1, r.nextAt - r.ink);
   return h(
@@ -459,7 +451,7 @@ function whence(f: Learned): string {
 function entry(f: Learned, first: boolean): Child {
   return h(
     "li",
-    { class: [`entry t-${f.category}`, first && "first", !f.ink && "pencil"].filter(Boolean).join(" ") },
+    { class: [`entry t-${f.category}`, first && "first", !f.ink && "met"].filter(Boolean).join(" ") },
     h("p", { class: "entry-when" }, whence(f)),
     h("p", { class: "entry-word" }, f.untrue ? h("span", { class: "entry-untrue" }, "Невярно: ") : null, f.answer),
     f.question ? h("p", { class: "entry-q" }, f.question) : null,

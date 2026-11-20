@@ -79,7 +79,7 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 		return p, err
 	}
 	p.Best = streak.Best
-	if p.Ranks, _, err = g.RanksOf(ctx, id); err != nil {
+	if p.Ranks, err = g.RanksOf(ctx, id); err != nil {
 		return p, err
 	}
 	var chosen sql.NullString

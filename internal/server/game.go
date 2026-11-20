@@ -142,7 +142,7 @@ func (s *Server) startDay(w http.ResponseWriter, r *http.Request) error {
 	}
 	ctx := s.fromClient(r, u.ID)
 	if s.playedHere(r, s.game.Today()) {
-		// This browser started today's issue already, as someone else: a run begun now writes pencil (handoff.go).
+		// This browser started today's issue already, as someone else: a run begun now writes grey (handoff.go).
 		ctx = play.SecondPlay(ctx, u.ID)
 	}
 	st, err := s.game.StartDay(ctx, u.ID)

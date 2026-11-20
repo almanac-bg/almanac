@@ -418,10 +418,8 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, number bool, ms int64)
 	if err := g.judgeAnswer(tx, r, gr, ms); err != nil {
 		return err
 	}
-	if gr.Right {
-		if err := g.writeFact(tx, r, now); err != nil {
-			return err
-		}
+	if err := g.writeFact(tx, r, now, gr.Right); err != nil {
+		return err
 	}
 	r.tie.add(r.at, gr.Score, gr.Right, number)
 	r.at++

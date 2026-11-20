@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// The ladder: Бележка 1, Страница 5, Тетрадка 15, Тефтер 40, Книга 100, Летопис 250, then „Летопис · N“ for each
+// The ladder: Бележка 1, Страница 5, Тетрадка 15, Книга 40, Том 100, Летопис 250, then „Летопис · N“ for each
 // further 100; the seal fills in quarters between two ranks.
 func TestRankLadder(t *testing.T) {
 	for _, c := range []struct {
@@ -15,7 +15,7 @@ func TestRankLadder(t *testing.T) {
 		name       string
 	}{
 		{0, 0, ""}, {1, 1, "Бележка"}, {4, 1, "Бележка"}, {5, 2, "Страница"}, {14, 2, "Страница"}, {15, 3, "Тетрадка"},
-		{39, 3, "Тетрадка"}, {40, 4, "Тефтер"}, {99, 4, "Тефтер"}, {100, 5, "Книга"}, {249, 5, "Книга"},
+		{39, 3, "Тетрадка"}, {40, 4, "Книга"}, {99, 4, "Книга"}, {100, 5, "Том"}, {249, 5, "Том"},
 		{250, 6, "Летопис"}, {349, 6, "Летопис"}, {350, 7, "Летопис · 2"}, {450, 8, "Летопис · 3"},
 	} {
 		if l := RankAt(c.ink); l != c.level || RankName(l) != c.name {
@@ -78,7 +78,7 @@ func (w *world) countRanks(user int64) {
 // rankIn is a player's kept rank in a chapter.
 func (w *world) rankIn(user int64, chapter string) ChapterRank {
 	w.t.Helper()
-	ranks, _, err := w.g.RanksOf(w.t.Context(), user)
+	ranks, err := w.g.RanksOf(w.t.Context(), user)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -112,9 +112,8 @@ func (w *world) guessed(othersRight int) []answered {
 	return all
 }
 
-// A rank is kept when a day's issue finishes, from the chapter's ink; nothing on view. From Тетрадка up only answers
-// that aren't guesses earn it: a blind tapper, right as often as guessing is, stops at Страница (Held), where a
-// player who knows them goes on; a rank held never falls.
+// A rank is kept when a day's issue finishes, from the chapter's ink; nothing on view. There's no check of guessing: a
+// blind tapper climbs by their ink as anyone does, only slowly; a rank held never falls.
 func TestRanksFromInk(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -130,22 +129,11 @@ func TestRanksFromInk(t *testing.T) {
 	for _, u := range []int64{tapper, reader} {
 		w.countRanks(u)
 	}
-	if r := w.rankIn(reader, "geography"); r.Level != 3 || r.Name != "Тетрадка" || r.Ink != 20 || r.Quarter != 0 ||
-		r.Next != "Тефтер" || r.NextAt != 40 {
-		t.Fatalf("a reader's geography: %+v", r)
-	}
-	if _, held, _ := w.g.RanksOf(ctx, reader); held {
-		t.Fatal("a reader held as a guesser")
-	}
-	gs, _ := w.g.guessing(ctx, tapper)
-	if gs.Fair || gs.Answers != 80 || gs.Rights != 20 {
-		t.Fatalf("the tapper's answers: %+v", gs)
-	}
-	if r := w.rankIn(tapper, "geography"); r.Level != 2 || r.Quarter != 3 {
-		t.Fatalf("a tapper's geography: %+v", r)
-	}
-	if _, held, _ := w.g.RanksOf(ctx, tapper); !held {
-		t.Fatal("the tapper isn't said to be held")
+	for _, u := range []int64{tapper, reader} {
+		if r := w.rankIn(u, "geography"); r.Level != 3 || r.Name != "Тетрадка" || r.Ink != 20 || r.Quarter != 0 ||
+			r.Next != "Книга" || r.NextAt != 40 {
+			t.Fatalf("player %d's geography: %+v", u, r)
+		}
 	}
 	// The facts under a rank found untrue: the ink falls, the rank doesn't.
 	var some []string
@@ -164,7 +152,7 @@ func TestRanksFromInk(t *testing.T) {
 	}
 }
 
-// The day's issue finishing counts the ranks; a game of a chapter doesn't (it writes pencil). A rank risen is told
+// The day's issue finishing counts the ranks; a game of a chapter doesn't (it writes grey). A rank risen is told
 // once, as one with any other, with the art Страница brings; Бележка alone is never told.
 func TestRanksToldOnce(t *testing.T) {
 	w := setup(t)
@@ -179,7 +167,7 @@ func TestRanksToldOnce(t *testing.T) {
 	if n.Rose != nil {
 		t.Fatalf("Бележка told: %+v", n.Rose)
 	}
-	ranks, _, _ := w.g.RanksOf(ctx, ana)
+	ranks, _ := w.g.RanksOf(ctx, ana)
 	some := 0
 	for _, r := range ranks {
 		some += r.Level
@@ -207,10 +195,10 @@ func TestRanksToldOnce(t *testing.T) {
 		t.Fatalf("told twice: %+v", n.Rose)
 	}
 	// A chapter's game writes pencil: no rank moves.
-	before, _, _ := w.g.RanksOf(ctx, ana)
+	before, _ := w.g.RanksOf(ctx, ana)
 	topic := w.game(ana, nil)
 	w.g.AfterWait(ctx, ana)
-	after, _, _ := w.g.RanksOf(ctx, ana)
+	after, _ := w.g.RanksOf(ctx, ana)
 	for i := range before {
 		if before[i] != after[i] {
 			t.Fatalf("a chapter's game (%d) moved a rank: %+v to %+v", topic, before[i], after[i])

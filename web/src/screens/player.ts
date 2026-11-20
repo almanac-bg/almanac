@@ -183,7 +183,7 @@ function ranks(p: Profile): Child {
   return h(
     "section",
     { class: "card stack" },
-    h("p", { class: "kicker" }, "Звания"),
+    h("p", { class: "kicker" }, "Печати"),
     h(
       "ul",
       { class: "rows" },

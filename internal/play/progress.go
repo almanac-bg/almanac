@@ -107,16 +107,16 @@ func (g *Game) Played(ctx context.Context, userID int64) (bool, error) {
 	return played, err
 }
 
-// News is what a game brought, told once: the facts it wrote in the Алманах in ink (Ink, a count), and whether it
-// wrote any in pencil (Pencil: listed, never counted: ink.go); the ranks risen since the player was last told (Rose,
-// as one: rank.go), or, after a day's issue, the chapter nearest its next rank (Step); whether the guessing check holds
-// the ranks (Held); and, once a day, what others' duels against the player's recordings came to (recordings.go).
+// News is what a game brought, told once: the facts it wrote in the Алманах in ink (Ink, a count: ink.go), and, of a
+// day's issue, how many of its right answers were to questions met before (MetBefore: in grey already, „1 вече
+// срещан“; grey is never counted otherwise); the ranks risen since the player was last told (Rose, as one: rank.go),
+// or, after a day's issue, the chapter nearest its next rank (Step); and, once a day, what others' duels against the
+// player's recordings came to (recordings.go).
 type News struct {
 	Ink        int             `json:"ink,omitempty"`
-	Pencil     bool            `json:"pencil,omitempty"`
+	MetBefore  int             `json:"metBefore,omitempty"`
 	Rose       *Rose           `json:"rose,omitempty"`
 	Step       *Step           `json:"step,omitempty"`
-	Held       bool            `json:"held,omitempty"`
 	Recordings *RecordingsNews `json:"recordings,omitempty"`
 }
 
@@ -138,14 +138,13 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 		case err != nil:
 			return n, err
 		default:
-			if n.Ink, n.Pencil, err = g.InkIn(ctx, userID, runID); err != nil {
+			var met int
+			if n.Ink, met, err = g.InkIn(ctx, userID, runID); err != nil {
 				return n, err
 			}
 			if kind == "day" {
+				n.MetBefore = met
 				if n.Step, err = g.StepOf(ctx, userID); err != nil {
-					return n, err
-				}
-				if _, n.Held, err = g.RanksOf(ctx, userID); err != nil {
 					return n, err
 				}
 			}

@@ -4,26 +4,22 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"math"
 	"slices"
 	"strconv"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
 
-// Ranks (DECISIONS.md, „The direction“): a player's rank in a chapter says how much of it their book holds in ink
-// (ink.go), named for the book, not the person: Бележка at 1, Страница at 5, Тетрадка at 15, Тефтер at 40, Книга at
-// 100, Летопис at 250, then „Летопис · 2“ at 350 and another for each further 100 (RankAt). The ranks are the only
-// levels, titles and unlocks the game has.
+// The seal (DECISIONS.md, „The direction“, as the Fable review amended it): a player's seal in a chapter says how much
+// of it their book holds in ink (ink.go). Its states are named for the book, not the person: Бележка at 1, Страница
+// at 5, Тетрадка at 15, Книга at 40, Том at 100, Летопис at 250, then „Летопис · 2“ at 350 and another for each
+// further 100 (RankAt). Beside a name only the seal shows, never its word: the word is the Алманах's and a rank-up's.
+// The seals are the only levels, titles and unlocks the game has. In code a seal's state is its rank.
 //
 // A rank is kept, never worked out on view (ranks): it's counted as a day's issue is finished (afterRun: only the
 // issue writes ink), and it never falls, whatever the bank does to the facts under it later. With it is kept the
-// chapter's ink as counted and how far it is to the next rank in quarters (Quarter): the seal, which is the rank drawn,
-// fills in quarters between ranks.
-//
-// From Тетрадка up a rank is earned only by answers that aren't guesses: the player's answers in the day's issues, all
-// chapters pooled, must be right GuessSD standard deviations above what guessing gets, kind by kind (Guessing). Short
-// of it, the ranks stop at Страница (Held says so); a rank already held stays.
+// chapter's ink as counted and how far it is to the next rank in quarters (Quarter): the seal fills in quarters
+// between ranks. There's no check of guessing: a tapper climbs as slowly as their ink does.
 //
 // A rank risen is told once, with the game's news (NewsOf: Rose), several at once as one; Бележка, the first, never.
 // At Страница a chapter's art becomes the player's to wear as their avatar (progress.go: SetAvatar); the animals are
@@ -38,7 +34,7 @@ type Rank struct {
 
 // Ranks are the ladder's named steps (level 1 to 6); past the last, each further LetopisEvery is another „Летопис“.
 var Ranks = []Rank{
-	{"Бележка", 1}, {"Страница", 5}, {"Тетрадка", 15}, {"Тефтер", 40}, {"Книга", 100}, {"Летопис", 250},
+	{"Бележка", 1}, {"Страница", 5}, {"Тетрадка", 15}, {"Книга", 40}, {"Том", 100}, {"Летопис", 250},
 }
 
 const (
@@ -46,10 +42,6 @@ const (
 	LetopisEvery = 100
 	// RankArt is the level whose chapter's art the player may wear (Страница).
 	RankArt = 2
-	// RankGuarded is the first level the guessing check guards (Тетрадка).
-	RankGuarded = 3
-	// GuessSD is how many standard deviations above guessing a player's day answers must be (Guessing).
-	GuessSD = 3
 )
 
 // RankAt is the level a chapter's ink makes: 0 none, 1 Бележка … 6 Летопис, 7 „Летопис · 2“ and on.
@@ -114,54 +106,10 @@ func chapterRank(chapter string, level, quarter, ink int) ChapterRank {
 
 // rightChance is the chance a guess at a question of each kind is right (not its score: calibrate.go's chance): one of
 // four options; one of two; an order of four, one of 24; four pairs, one of 24; a split of four or five, about one
-// of 16; a number typed blind, next to none.
+// of 16; a number typed blind, next to none. What a recording is expected to be, by a player's mastery
+// (expectedRights), counts the guesses so.
 var rightChance = map[string]float64{"choice": 0.25, "clues": 0.25, "truefalse": 0.5, "order": 1.0 / 24,
 	"match": 1.0 / 24, "split": 1.0 / 16, "number": 0.02}
-
-// Guessing is how a player's answers in the day's issues stand against guessing, all chapters pooled: the right
-// answers, and what guessing every one would get (Expected, with its standard deviation SD, kind by kind). Fair is
-// whether they're GuessSD standard deviations above it: what ranks from Тетрадка up need. Only answers given count
-// (one let run out isn't a guess), in games not a script's.
-type Guessing struct {
-	Answers  int     `json:"answers"`
-	Rights   int     `json:"rights"`
-	Expected float64 `json:"expected"`
-	SD       float64 `json:"sd"`
-	Fair     bool    `json:"fair"`
-}
-
-// guessing reads a player's Guessing.
-func (g *Game) guessing(ctx context.Context, userID int64) (Guessing, error) {
-	var out Guessing
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id, a.is_right FROM answers a JOIN runs r ON r.id = a.run_id
-		WHERE r.user_id = ? AND r.kind = 'day' AND a.given IS NOT NULL AND `+shadowWrites+` AND NOT `+voidAt, userID)
-	if err != nil {
-		return out, err
-	}
-	defer rows.Close()
-	b := g.Bank()
-	variance := 0.0
-	for rows.Next() {
-		var id string
-		var right bool
-		if err := rows.Scan(&id, &right); err != nil {
-			return out, err
-		}
-		p := rightChance["choice"]
-		if q, ok := b.Get(id); ok {
-			if c, ok := rightChance[q.Base().Type]; ok {
-				p = c
-			}
-		}
-		out.Answers++
-		out.Rights += b2i(right)
-		out.Expected += p
-		variance += p * (1 - p)
-	}
-	out.SD = math.Sqrt(variance)
-	out.Fair = out.Answers > 0 && float64(out.Rights) >= out.Expected+GuessSD*out.SD
-	return out, rows.Err()
-}
 
 // keptRank is a chapter's rank as the ranks table keeps it.
 type keptRank struct {
@@ -188,9 +136,8 @@ func ranksOf(ctx context.Context, db querier, userID int64) (map[string]keptRank
 }
 
 // countRanks counts a player's ranks again from their book's ink, as a day's issue finishes (afterRun): each chapter
-// of the bank's at the rank its ink makes, never lower than it was; from RankGuarded up only if their answers aren't
-// guesses (Guessing). A rank risen waits to be told (told below level); one counted as the ranks began (quiet) is told
-// already.
+// of the bank's at the rank its ink makes, never lower than it was. A rank risen waits to be told (told below level);
+// one counted as the ranks began (quiet) is told already.
 func (g *Game) countRanks(ctx context.Context, userID int64, day string, quiet bool) error {
 	ink, err := g.InkOf(ctx, userID)
 	if err != nil {
@@ -200,23 +147,9 @@ func (g *Game) countRanks(ctx context.Context, userID int64, day string, quiet b
 	if err != nil {
 		return err
 	}
-	fair := true
-	for _, c := range g.Bank().Categories {
-		if RankAt(ink[c.ID]) >= RankGuarded && kept[c.ID].level < RankAt(ink[c.ID]) {
-			gs, err := g.guessing(ctx, userID)
-			if err != nil {
-				return err
-			}
-			fair = gs.Fair
-			break
-		}
-	}
 	for _, c := range g.Bank().Categories {
 		n := ink[c.ID]
 		level := RankAt(n)
-		if !fair && level >= RankGuarded {
-			level = RankGuarded - 1
-		}
 		was, ok := kept[c.ID]
 		level = max(level, was.level)
 		if level == 0 {
@@ -241,23 +174,18 @@ func (g *Game) countRanks(ctx context.Context, userID int64, day string, quiet b
 	return nil
 }
 
-// RanksOf are a player's ranks, as kept, by the bank's chapters (those with none at level 0), and whether the
-// guessing check holds them at Страница now (Held: their ink would make Тетрадка or more somewhere, and their answers
-// don't pass Guessing).
-func (g *Game) RanksOf(ctx context.Context, userID int64) (ranks []ChapterRank, held bool, err error) {
+// RanksOf are a player's ranks, as kept, by the bank's chapters (those with none at level 0).
+func (g *Game) RanksOf(ctx context.Context, userID int64) ([]ChapterRank, error) {
 	kept, err := ranksOf(ctx, g.DB.Read, userID)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	ranks = []ChapterRank{}
+	ranks := []ChapterRank{}
 	for _, c := range g.Bank().Categories {
 		k := kept[c.ID]
 		ranks = append(ranks, chapterRank(c.ID, k.level, k.quarter, k.ink))
-		if k.level == RankGuarded-1 && k.ink >= RankFrom(RankGuarded) {
-			held = true
-		}
 	}
-	return ranks, held, nil
+	return ranks, nil
 }
 
 // ErrNoSeal is a seal of a chapter the player has no rank in.
@@ -276,7 +204,7 @@ func (g *Game) SealOf(ctx context.Context, userID int64) (*Seal, error) {
 		}
 		return nil, err
 	}
-	ranks, _, err := g.RanksOf(ctx, userID)
+	ranks, err := g.RanksOf(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

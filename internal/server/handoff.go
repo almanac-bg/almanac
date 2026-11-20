@@ -147,7 +147,7 @@ func osFamily(ua string) string {
 // The day's questions played in this browser: a cookie holds the day this browser last started them, whoever it was
 // signed in as, and stays through a sign-out and a handoff (it's no session's). A game brought into a browser that
 // played the day already (by a handoff, or a sign-in after a sign-out) has the day's answers in sight there, so its
-// play of the issue that day is its second (playedHere): the game writes pencil for it, not ink (DECISIONS.md, the
+// play of the issue that day is its second (playedHere): the game writes grey for it, not ink (DECISIONS.md, the
 // direction: ink is the first meeting in the issue).
 
 // playedKept is how long the cookie lasts: the day, and its grace past midnight.

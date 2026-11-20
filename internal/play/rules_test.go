@@ -178,7 +178,7 @@ func TestMergeBringsProgress(t *testing.T) {
 		}
 	}
 	merge(guest, owner)
-	ranks, _, _ := w.g.RanksOf(ctx, owner)
+	ranks, _ := w.g.RanksOf(ctx, owner)
 	for _, r := range ranks {
 		want := map[string]int{"geography": 3, "history": 2}[r.Chapter]
 		if r.Level != want {

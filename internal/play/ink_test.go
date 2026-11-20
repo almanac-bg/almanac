@@ -60,10 +60,11 @@ func (w *world) met(user int64, id string) {
 	}
 }
 
-// The day's issue writes in ink each right answer to a question the player meets there first; a wrong one writes
-// nothing; a question met before (even answered wrong) writes pencil; any other game writes pencil; and a fact is
-// written once: pencil never turns to ink. The book's ink, by chapter, and a game's news say the same.
-func TestInkAndPencil(t *testing.T) {
+// The day's issue writes in ink each right answer to a question the player meets there first; a wrong one is in the
+// book in grey, as met; a question met before (even answered wrong) is grey; any other game writes grey, right or not;
+// and a fact is written once: grey never turns to ink. The book's ink, by chapter, and a game's news say the same, the
+// news with the issue's right answers met before („1 вече срещан“).
+func TestInkAndGrey(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
@@ -82,11 +83,11 @@ func TestInkAndPencil(t *testing.T) {
 		switch n {
 		case 1:
 			if !written || ink {
-				t.Errorf("met before its issue, right in it: written %v, ink %v; want pencil", written, ink)
+				t.Errorf("met before its issue, right in it: written %v, ink %v; want grey", written, ink)
 			}
 		case 2:
-			if written {
-				t.Errorf("wrong in the issue: written")
+			if !written || ink {
+				t.Errorf("wrong in the issue: written %v, ink %v; want grey", written, ink)
 			}
 		default:
 			if !ink {
@@ -95,7 +96,8 @@ func TestInkAndPencil(t *testing.T) {
 		}
 	}
 	news, err := w.g.NewsOf(ctx, ana, s.ID)
-	if err != nil || news.Ink != w.inkShown(picks, 0, 3, 4, 5, 6, 7, 8, 9) || !news.Pencil {
+	if err != nil || news.Ink != w.inkShown(picks, 0, 3, 4, 5, 6, 7, 8, 9) ||
+		news.MetBefore != w.inkShown(picks, 1) {
 		t.Fatalf("the day's news: %+v %v", news, err)
 	}
 	ink, err := w.g.InkOf(ctx, ana)
@@ -103,19 +105,19 @@ func TestInkAndPencil(t *testing.T) {
 		t.Fatalf("the book's ink: %v %v, want %d", ink, err, news.Ink)
 	}
 
-	// Another game: pencil only; and the issue's wrong one, right now, is pencil.
+	// Another game: grey only, right or wrong; and the issue's wrong one, right now, stays grey.
 	topic, err := w.g.StartTopic(ctx, ana, "history")
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.play(ana, topic.ID, repeat(w.right, Length)...)
+	w.play(ana, topic.ID, append(repeat(w.right, Length/2), repeat(w.wrong, Length/2)...)...)
 	book = w.book(ana)
 	for _, p := range w.picks(topic.ID) {
 		if ink, written := book[p.ID]; !written || ink {
-			t.Errorf("a topic's right answer: written %v, ink %v", written, ink)
+			t.Errorf("a topic's answer: written %v, ink %v", written, ink)
 		}
 	}
-	if n, _ := w.g.NewsOf(ctx, ana, topic.ID); n.Ink != 0 || !n.Pencil {
+	if n, _ := w.g.NewsOf(ctx, ana, topic.ID); n.Ink != 0 || n.MetBefore != 0 {
 		t.Fatalf("a topic's news: %+v", n)
 	}
 	if again, _ := w.g.InkOf(ctx, ana); !maps.Equal(again, ink) {
@@ -229,7 +231,7 @@ func TestFactsAsTheRule(t *testing.T) {
 
 // The issue played a second time in one browser (SecondPlay) writes pencil only, as the answers then and by the
 // whole rule; a topic's game is no second play of anything.
-func TestSecondPlayWritesPencil(t *testing.T) {
+func TestSecondPlayWritesGrey(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
@@ -264,4 +266,30 @@ func TestMergeKeepsAGuestsInk(t *testing.T) {
 	if got := w.book(owner); !maps.Equal(got, want) || len(got) == 0 {
 		t.Fatalf("the account's book: %v, the guest's was %v", got, want)
 	}
+}
+
+// A question of the day voided in the middle of its day (day.go) takes back what its answers wrote: the book has it no
+// more, as the whole rule would have it.
+func TestVoidTakesBackItsFact(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	w.reload(w.b)
+	ana := w.user()
+	s := w.dayAs(ana, -1, func(int) func(int64, int) json.RawMessage { return w.right })
+	target := w.picks(s.ID)[4].ID
+	if !w.book(ana)[target] {
+		t.Fatal("not in ink before")
+	}
+	w.reload(editedSample(t, func(id string, q map[string]any) {
+		if id == target {
+			q["retired"], q["retiredWhy"] = true, "wrong"
+		}
+	}))
+	if err := w.g.EnsureDays(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, there := w.book(ana)[target]; there {
+		t.Fatal("the void question's fact stayed")
+	}
+	w.consistent(ana)
 }
