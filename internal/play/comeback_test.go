@@ -21,41 +21,6 @@ func (w *world) dayPlayed(user int64, day string, rights int) int64 {
 	return id
 }
 
-// Yesterday ends for the player who played it: their right answers and final place, once its last games can't be
-// played on any more; never for one who didn't play it.
-func TestYesterdayEnds(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	w.now = time.Date(2026, 11, 20, 0, 10, 0, 0, Bulgaria)
-	yesterday := "2026-11-19"
-	ana, bo, cy, dee := w.user(), w.user(), w.user(), w.user()
-	w.dayPlayed(ana, yesterday, 7)
-	w.dayPlayed(bo, yesterday, 9)
-	w.dayPlayed(cy, yesterday, 3)
-	if w.g.DaySettled(yesterday) {
-		t.Fatal("settled ten minutes after midnight: a game begun before it may still be played on")
-	}
-	if y, err := w.g.YesterdayOf(ctx, ana); err != nil || y != nil {
-		t.Fatalf("before it's final: %+v, %v", y, err)
-	}
-	w.now = time.Date(2026, 11, 20, 8, 0, 0, 0, Bulgaria)
-	y, err := w.g.YesterdayOf(ctx, ana)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := (Yesterday{Day: yesterday, Issue: Issue(yesterday), Rights: 7, Place: 2, Players: 3}); y == nil || *y != want {
-		t.Fatalf("yesterday: %+v, want %+v", y, want)
-	}
-	if y, err := w.g.YesterdayOf(ctx, dee); err != nil || y != nil {
-		t.Fatalf("not played: %+v, %v", y, err)
-	}
-	// Its board, counted once settled, is final: kept a while, not counted on every look.
-	d, err := w.g.dayBoard(ctx, yesterday)
-	if err != nil || !d.final || d.due() {
-		t.Fatalf("yesterday's board: final %v, due %v, %v", d != nil && d.final, d != nil && d.due(), err)
-	}
-}
-
 // A player back after days away is welcomed by the last day they played; one who played yesterday isn't away.
 func TestAway(t *testing.T) {
 	w := setup(t)
@@ -78,7 +43,7 @@ func TestAway(t *testing.T) {
 	}
 }
 
-// All of a player's games, a page at a time, newest first, of a kind or all; and the day's ten spread by right answers.
+// All of a player's games, a page at a time, newest first, of a kind or all.
 func TestGamesPaged(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -135,13 +100,6 @@ func TestGamesPaged(t *testing.T) {
 	s, err := w.g.StatsOf(ctx, ana)
 	if err != nil {
 		t.Fatal(err)
-	}
-	sum := 0
-	for _, n := range s.Spread {
-		sum += n
-	}
-	if sum != days || s.Today != 8 || s.Spread[0] != 2 || s.Spread[8] != 1+1 {
-		t.Fatalf("the spread: %v (%d days, want %d), today %d", s.Spread, sum, days, s.Today)
 	}
 	if len(s.Recent) != RecentGames {
 		t.Fatalf("Профил's latest: %d", len(s.Recent))

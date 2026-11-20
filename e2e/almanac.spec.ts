@@ -50,16 +50,16 @@ test("Моят Алманах comes a page at a time, the next as the list's end
     await expect(cards).toHaveCount(n);
   }
   await expect(page.getByRole("button", { name: "Още факти" })).toHaveCount(0);
-  // All learned today: one day, its head once, its facts going on under it from page to page.
-  await expect(page.locator(".almanac-day")).toHaveCount(1);
-  // A topic starts again from its newest, with no more than it has.
+  // One list, no datelines.
+  await expect(page.locator(".almanac-list")).toHaveCount(1);
+  // A topic starts again from its first, with no more than it has.
   await page.getByRole("button", { name: /^.*География/ }).click();
   const geography = facts.filter((id) => id.startsWith("geo-")).length;
   await expect(cards).toHaveCount(Math.min(geography, 30));
   await expect(page.locator(".almanac-topic").first()).toContainText("География");
 });
 
-test("Моят Алманах reads by day, newest first, each under its issue and date; a statement is its own headline", async ({
+test("Моят Алманах reads in the order the facts were learned, with no datelines; a statement is its own headline", async ({
   page,
 }) => {
   await page.goto("/");
@@ -67,26 +67,19 @@ test("Моят Алманах reads by day, newest first, each under its issue a
   await knows(page, ["his-002", "geo-961"], Date.now() - 2 * day);
   await knows(page, ["his-960"], Date.now());
   await page.goto("/almanac");
-  const days = page.locator(".almanac-day");
-  await expect(days).toHaveCount(2);
-  // The newest day first, under its dateline („Брой 6 · 17 ноември“), its issue two after the other's.
-  const heads = page.locator(".almanac-date");
-  await expect(heads.first()).toHaveText(/^Брой \d+ · \d{1,2} \p{L}+$/u);
-  const issue = async (n: number) => Number((await heads.nth(n).textContent())?.match(/Брой (\d+)/)?.[1]);
-  expect((await issue(0)) - (await issue(1))).toBe(2);
-  await expect(days.first().locator(".almanac-item")).toHaveCount(1);
-  await expect(days.last().locator(".almanac-item")).toHaveCount(2);
+  const items = page.locator(".almanac-item");
+  await expect(items).toHaveCount(3);
+  // The first learned first, the latest last, and no dateline over any.
+  await expect(page.locator("time")).toHaveCount(0);
   // A true statement is the headline, with no question over it; an untrue one says so.
-  const truth = days.first().locator(".almanac-item");
+  const truth = items.last(); // learned today, the last
   await expect(truth.locator(".almanac-q")).toHaveCount(0);
   await expect(truth.locator(".almanac-a")).toHaveText("Българската държава на Балканите е основана през 681 г.");
-  await expect(days.last().locator(".almanac-a", { hasText: "Дунав" })).toHaveText(
+  await expect(page.locator(".almanac-a", { hasText: "Дунав" })).toHaveText(
     "Невярно: Дунав се влива в Черно море на българска земя.",
   );
   // A question's answer is the headline, the question a small line over it.
-  const asked = days
-    .last()
-    .locator(".almanac-item")
-    .filter({ has: page.locator(".almanac-q") });
+  const asked = items.filter({ has: page.locator(".almanac-q") });
   await expect(asked).toHaveCount(1);
+  await expect(items.first().locator(".almanac-q")).toHaveCount(1); // learned first
 });

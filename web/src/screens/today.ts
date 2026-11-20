@@ -2,7 +2,7 @@
 // level (and, once, what came of the days just missed — a reserve day spent, a streak ended, or a welcome back after
 // days away — or, one line at a time, of a friend's yes to a request, a live duel left that went on); then the day's
 // ten questions, the same for everyone, once, as the day's issue
-// („Брой 6“, play/issue.go) (while they wait, how yesterday's ended; left half-way, where the player stopped and the
+// („Брой 6“, play/issue.go) (left half-way, where the player stopped and the
 // way on, and the streak at stake while they wait; once played, as it lands, how they went and the one gold thing to
 // do next (game/gold.ts: another game, where a goal points), the goals
 // still open, tomorrow, and where the day leaves the league and the second chance; on a later visit, the day played in
@@ -95,8 +95,6 @@ export interface Today {
   /** The day played: how many of its questions got wrong will wait for a second chance, in how many days (sent when
    * there'll be a game of them: play.MistakesFrom). */
   misses?: { n: number; days: number };
-  /** While today's ten wait: how yesterday's ended for the player, once its board is final (play.YesterdayOf). */
-  yesterday?: { day: string; issue: number; rights: number; place: number; players: number } | null;
   /** Back after days away, the streak ended since (play.BackFrom): the last day played and the longest streak, said
    * once. */
   back?: { last: string; best: number };
@@ -276,8 +274,6 @@ export function today() {
         playingLine(t.playing) ?? acceptedLine(t.accepted) ?? leftLine(t.left),
         // Come from the streak's mail to a browser signed out: the way in comes first, open.
         fromMail && !user.peek()?.email ? haveProfile(load, undefined, true) : null,
-        // While today's ten wait, how yesterday's ended: the day before closes as the next begins.
-        run?.done ? null : yesterdayLine(t),
         run?.done && !full
           ? [
               // A later visit: the day played as one short card, and the ways to play right under it.
@@ -381,23 +377,6 @@ function crowdSays(t: Today, one = false): Child {
     avg && !(one && lead) ? h("p", { class: "crowd-says" }, `Средно днес: ${formatNumber(avg, 0.1)} от 10.`) : null,
   ].filter(Boolean);
   return lines.length ? lines : null;
-}
-
-/** While today's ten wait, how yesterday's ended for the player, in one quiet line: a way to that day's final board
- * (Класации' „Вчера“), with the place where it's worth saying (game/standing.ts). */
-function yesterdayLine(t: Today): Child {
-  const y = t.yesterday;
-  if (!y) return null;
-  const at = standing(y.place, y.players, !t.open?.league)?.place;
-  return h(
-    "p",
-    { class: "day-next yesterday-line" },
-    h(
-      "a",
-      { href: "/ranks#yesterday" },
-      at ? `Вчера: ${y.rights} от 10 · ${at}` : `Вчера: ${y.rights} от 10 · Как завърши брой ${y.issue}`,
-    ),
-  );
 }
 
 /** The day played, on a later visit (its moment is over): one short card — its dateline and place, the score and its

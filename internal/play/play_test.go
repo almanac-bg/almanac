@@ -1650,8 +1650,8 @@ func TestAlmanac(t *testing.T) {
 	}
 }
 
-// The almanac comes a page at a time, by topic or of all: every fact once, newest first, whatever is learned between
-// one page and the next; the counts are of the whole.
+// The almanac comes a page at a time, by topic or of all: every fact once, in the order learned, whatever is learned
+// between one page and the next (it comes at the end); the counts are of the whole.
 func TestAlmanacPages(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -1686,7 +1686,6 @@ func TestAlmanacPages(t *testing.T) {
 		return nil
 	}
 	want := slices.Clone(ids)
-	slices.Reverse(want)
 	if got := all("", 4, func() {}); !slices.Equal(got, want) {
 		t.Fatalf("all, by fours:\n%v\nwant\n%v", got, want)
 	}
@@ -1702,7 +1701,7 @@ func TestAlmanacPages(t *testing.T) {
 	if got := all("history", 3, func() {}); len(history) == 0 || !slices.Equal(got, history) {
 		t.Fatalf("history, by threes: %v, want %v", got, history)
 	}
-	// A fact learned while the player scrolls is at the top of the next look, not in the pages under way.
+	// A fact learned while the player scrolls comes at the end, after the pages under way.
 	var fresh string
 	for _, q := range w.b.Live("general", "") {
 		if q.Extra().Fact != "" {
@@ -1716,12 +1715,12 @@ func TestAlmanacPages(t *testing.T) {
 			learned = true
 			w.knowsAt(ana, 1000, fresh)
 		}
-	}); !slices.Equal(got, want) {
+	}); !slices.Equal(got, append(slices.Clone(want), fresh)) {
 		t.Fatalf("pages with a fact learned between them: %v", got)
 	}
-	if a, _ := w.g.AlmanacOf(ctx, ana, "", "", 1); len(a.Facts) != 1 || a.Facts[0].ID != fresh || a.All != len(ids)+1 ||
+	if a, _ := w.g.AlmanacOf(ctx, ana, "", "", 1); len(a.Facts) != 1 || a.Facts[0].ID != ids[0] || a.All != len(ids)+1 ||
 		a.Have["general"] != 1 {
-		t.Fatalf("the newest fact first: %+v", a)
+		t.Fatalf("the first fact learned first: %+v", a)
 	}
 }
 

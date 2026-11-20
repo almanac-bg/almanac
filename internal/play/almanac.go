@@ -4,7 +4,6 @@ import (
 	"context"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -14,10 +13,9 @@ import (
 // achievements of their own (a hundred, a thousand, five thousand, and every fact of a topic), and Профил says how
 // many there are.
 
-// Learned is one fact in a player's almanac: the question, its answer, and the fact behind it; and the day it was
-// learned (first answered right, in Bulgaria) with that day's issue (Issue), which head a day's facts. A statement to
-// judge true or not has no question: its answer is the statement itself, Untrue if it isn't so (the bank keeps no
-// corrected one).
+// Learned is one fact in a player's almanac: the question, its answer, and the fact behind it; and when it was learned
+// (first answered right). A statement to judge true or not has no question: its answer is the statement itself, Untrue
+// if it isn't so (the bank keeps no corrected one).
 type Learned struct {
 	ID       string `json:"id"`
 	Category string `json:"category"`
@@ -26,15 +24,13 @@ type Learned struct {
 	Untrue   bool   `json:"untrue,omitempty"`
 	Fact     string `json:"fact"`
 	At       int64  `json:"at"`
-	Day      string `json:"day"`
-	Issue    int    `json:"issue,omitempty"`
 }
 
 // AlmanacPage is how many facts a page of Моят Алманах shows: a few screens' worth on a phone. The collection grows
 // to thousands, so it comes a page at a time, as the player scrolls.
 const AlmanacPage = 30
 
-// Almanac is a page of a player's collection (of one topic, or of all), newest first; how many facts they have, by
+// Almanac is a page of a player's collection (of one topic, or of all), in the order it was learned, the first first; how many facts they have, by
 // topic and in all; how many each topic has in all; and where the next page starts (none after the last).
 type Almanac struct {
 	Facts []Learned      `json:"facts"`
@@ -56,12 +52,12 @@ func factsIn(b *bank.Bank) map[string]int {
 }
 
 // learned calls fn with every question a player has answered right that has a fact (a retired one too: what was
-// learned stays, unless it wasn't so: a question retired as wrong or stale, bank.Tail.Untrue), newest first, with when
-// it was first answered right.
+// learned stays, unless it wasn't so: a question retired as wrong or stale, bank.Tail.Untrue), in the order they were
+// learned, with when each was first answered right.
 func (g *Game) learned(ctx context.Context, userID int64, fn func(q bank.Question, at int64)) error {
 	b := g.Bank()
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id, min(a.at) FROM answers a JOIN runs r ON r.id = a.run_id
-		WHERE r.user_id = ? AND a.is_right GROUP BY a.question_id ORDER BY min(a.at) DESC, a.question_id DESC`, userID)
+		WHERE r.user_id = ? AND a.is_right GROUP BY a.question_id ORDER BY min(a.at), a.question_id`, userID)
 	if err != nil {
 		return err
 	}
@@ -81,9 +77,8 @@ func (g *Game) learned(ctx context.Context, userID int64, fn func(q bank.Questio
 
 // learnedAs is a learned question as its almanac shows it.
 func learnedAs(q bank.Question, at int64) Learned {
-	day := time.UnixMilli(at).In(Bulgaria).Format(time.DateOnly)
 	l := Learned{ID: q.Base().ID, Category: q.Base().Category, Question: q.Base().Text, Answer: bank.AnswerText(q),
-		Fact: q.Extra().Fact, At: at, Day: day, Issue: Issue(day)}
+		Fact: q.Extra().Fact, At: at}
 	if tf, ok := q.(*bank.TrueFalse); ok {
 		l.Question, l.Answer, l.Untrue = "", tf.Text, !tf.Answer
 	}
@@ -91,8 +86,8 @@ func learnedAs(q bank.Question, at int64) Learned {
 }
 
 // AlmanacOf reads a page of a player's collection: up to limit facts of a topic ("": of all), the first after from (the
-// Next of the page before; "": from the newest). Next is when and which fact the page ends on, since facts are in that
-// order (learned, newest first), so a fact learned meanwhile never moves the next page.
+// Next of the page before; "": from the first). Next is when and which fact the page ends on, since facts are in that
+// order (as learned), so a fact learned meanwhile only adds to the end.
 func (g *Game) AlmanacOf(ctx context.Context, userID int64, topic, from string, limit int) (Almanac, error) {
 	out := Almanac{Facts: []Learned{}, Have: map[string]int{}, Of: factsIn(g.Bank())}
 	fromAt, fromID, paged := strings.Cut(from, ":")
@@ -104,7 +99,7 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, topic, from string, 
 		out.All++
 		out.Have[category]++
 		switch {
-		case topic != "" && category != topic, paged && (at > after || at == after && id >= fromID):
+		case topic != "" && category != topic, paged && (at < after || at == after && id <= fromID):
 		case len(out.Facts) == limit:
 			more = true
 		default:

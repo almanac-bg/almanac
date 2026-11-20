@@ -5,7 +5,6 @@ import (
 	"os"
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -94,9 +93,9 @@ func TestFactsCollected(t *testing.T) {
 	}
 }
 
-// The almanac reads by day: each fact says the day it was learned, in Bulgaria, and that day's issue; a statement is
-// its own headline (no question), marked if it isn't so.
-func TestAlmanacByDay(t *testing.T) {
+// The almanac reads in the order the facts were learned; a statement is its own headline (no question), marked if it
+// isn't so.
+func TestAlmanacEntries(t *testing.T) {
 	w := setup(t)
 	ana := w.user()
 	var truth, untruth, choice string
@@ -116,23 +115,23 @@ func TestAlmanacByDay(t *testing.T) {
 	if truth == "" || untruth == "" || choice == "" {
 		t.Fatal("the sample lacks a true statement, an untrue one or a choice, each with a fact")
 	}
-	// 23:30 in Sofia on the 16th is the 16th there, though it's the 16th's 21:30 in UTC; 00:30 is the 17th.
-	late := time.Date(2026, 11, 16, 23, 30, 0, 0, Bulgaria).UnixMilli()
-	early := time.Date(2026, 11, 17, 0, 30, 0, 0, Bulgaria).UnixMilli()
-	w.knowsAt(ana, late, choice)
-	w.knowsAt(ana, early, truth, untruth)
+	w.knowsAt(ana, 2000, truth, untruth)
+	w.knowsAt(ana, 1000, choice)
 	alm, err := w.g.AlmanacOf(t.Context(), ana, "", "", AlmanacPage)
 	if err != nil || len(alm.Facts) != 3 {
 		t.Fatalf("%d facts (%v)", len(alm.Facts), err)
+	}
+	if got := []string{alm.Facts[0].ID, alm.Facts[1].ID, alm.Facts[2].ID}; !slices.Equal(got, []string{choice, truth, untruth}) {
+		t.Fatalf("not in the order learned: %v", got)
 	}
 	byID := map[string]Learned{}
 	for _, f := range alm.Facts {
 		byID[f.ID] = f
 	}
-	if f := byID[choice]; f.Day != "2026-11-16" || f.Issue != 5 || f.Question == "" {
-		t.Fatalf("a choice learned late on the 16th: %+v", f)
+	if f := byID[choice]; f.Question == "" {
+		t.Fatalf("a choice: %+v", f)
 	}
-	if f := byID[truth]; f.Day != "2026-11-17" || f.Issue != 6 || f.Question != "" || f.Untrue {
+	if f := byID[truth]; f.Question != "" || f.Untrue {
 		t.Fatalf("a true statement: %+v", f)
 	}
 	if f := byID[untruth]; f.Question != "" || !f.Untrue || f.Answer == "Невярно" {

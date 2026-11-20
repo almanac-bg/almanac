@@ -1,9 +1,9 @@
 // Класации' board in the page's address, after the #: which board, among whom, and (for knowledge) which topic, so
 // that back to the page, a reload or a link opens the same one. „#league“, „#friends“ (the day's, among friends),
-// „#yesterday“ (the day before's, final: Начало's line of how it ended), „#rating/friends“, „#knowledge/history“;
+// „#rating/friends“, „#knowledge/history“;
 // nothing for the day's board of everyone.
 
-export type By = "day" | "yesterday" | "league" | "rating" | "knowledge";
+export type By = "day" | "league" | "rating" | "knowledge";
 
 export interface Board {
   by: By;
@@ -11,7 +11,7 @@ export interface Board {
   topic: string;
 }
 
-const boards: By[] = ["day", "yesterday", "league", "rating", "knowledge"];
+const boards: By[] = ["day", "league", "rating", "knowledge"];
 
 /** The board an address's hash names (`topics`: the topics there are); the day's of everyone for one it doesn't. */
 export function readBoard(hash: string, topics: string[]): Board {

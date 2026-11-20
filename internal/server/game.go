@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"regexp"
 	"strconv"
 	"time"
 
@@ -113,14 +112,13 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 			out["untold"] = untold
 		}
 		var runID int64
-		done := false
 		err = s.db.Read.QueryRowContext(ctx, `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, u.ID, day).Scan(&runID)
 		if err == nil {
 			st, err := s.game.State(ctx, u.ID, runID)
 			if err != nil {
 				return nil, err
 			}
-			out["run"], done = st, st.Done
+			out["run"] = st
 			if st.Done { // the right answer the fewest others got, for the result shared
 				if out["rarest"], err = s.game.RarestRight(ctx, u.ID, day); err != nil {
 					return nil, err
@@ -131,12 +129,6 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 				} else if missed > 0 && all >= play.MistakesFrom {
 					out["misses"] = map[string]int{"n": missed, "days": int(play.MistakesAfter.Hours() / 24)}
 				}
-			}
-		}
-		// While today's ten wait, how yesterday's ended for them, once its board is final.
-		if !done {
-			if out["yesterday"], err = s.game.YesterdayOf(ctx, u.ID); err != nil {
-				return nil, err
 			}
 		}
 	}
@@ -174,36 +166,6 @@ func (s *Server) startDay(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return ok(w, st)
-}
-
-var dayPattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
-
-// board is a day's board (Класации' „Вчера“): its best and the viewer's place, its issue, whether it's final
-// (play.DaySettled: its first is the day's winner), and the viewer's friends on it.
-func (s *Server) board(w http.ResponseWriter, r *http.Request) error {
-	day := r.PathValue("day")
-	if _, err := time.Parse(time.DateOnly, day); err != nil || !dayPattern.MatchString(day) {
-		return errNotFound
-	}
-	u, err := s.user(r)
-	if err != nil {
-		return err
-	}
-	var viewer int64
-	if u != nil {
-		viewer = u.ID
-	}
-	b, err := s.game.BoardOf(r.Context(), day, viewer)
-	if err != nil {
-		return err
-	}
-	out := map[string]any{"board": b, "issue": play.Issue(day), "final": s.game.DaySettled(day)}
-	if u != nil {
-		if out["friends"], err = s.game.FriendsBoard(r.Context(), day, u.ID); err != nil {
-			return err
-		}
-	}
-	return ok(w, out)
 }
 
 func (s *Server) startTopic(w http.ResponseWriter, r *http.Request) error {
