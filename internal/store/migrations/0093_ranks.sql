@@ -20,3 +20,7 @@ CREATE TABLE ranks_due (
 INSERT INTO ranks_due (user_id) SELECT DISTINCT user_id FROM facts WHERE ink;
 
 ALTER TABLE users ADD COLUMN seal TEXT;
+
+-- The issue played a second time in one browser (the browser started it before as someone else: a sign-out, a
+-- handoff) writes pencil, not ink: its answers were in sight there (play/ink.go).
+ALTER TABLE runs ADD COLUMN pencil INTEGER NOT NULL DEFAULT 0;

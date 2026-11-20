@@ -114,14 +114,14 @@ func (g *Game) Played(ctx context.Context, userID int64) (bool, error) {
 // topic's game only), the milestones noted in the book since the player was last told (Notes), and, once a day, what
 // others' duels against the player's recordings came to (recordings.go).
 type News struct {
-	Ink        int             `json:"ink,omitempty"`
-	Pencil     bool            `json:"pencil,omitempty"`
-	Mastery    *MasteryMove    `json:"mastery,omitempty"`
+	Ink     int          `json:"ink,omitempty"`
+	Pencil  bool         `json:"pencil,omitempty"`
+	Mastery *MasteryMove `json:"mastery,omitempty"`
 	// Rose is the ranks risen since the player was last told, as one (rank.go); Step, after a day's issue, the
 	// chapter nearest its next rank (when no rank rose); Held, whether the guessing check holds the ranks.
-	Rose *Rose `json:"rose,omitempty"`
-	Step *Step `json:"step,omitempty"`
-	Held bool  `json:"held,omitempty"`
+	Rose       *Rose           `json:"rose,omitempty"`
+	Step       *Step           `json:"step,omitempty"`
+	Held       bool            `json:"held,omitempty"`
 	Notes      []Note          `json:"notes"`
 	Recordings *RecordingsNews `json:"recordings,omitempty"`
 }

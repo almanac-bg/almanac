@@ -17,7 +17,8 @@ import (
 // person's own game (fair.go: their own numbers are theirs): a guest's day brought to an account (ShadowGuest) is
 // written by the same rule, so that the issue played a second time, in another browser, is pencil; and a throwaway
 // guest's day (ShadowThrowaway) is the guest's own book. A question that counts for nobody in its day (Pick.Void,
-// day.go) writes nothing either. A fact is written once: ink stays ink, and pencil never turns to ink.
+// day.go) writes nothing either. The issue played a second time in one browser (runs.pencil: SecondPlay, the day's
+// answers in sight there) writes pencil. A fact is written once: ink stays ink, and pencil never turns to ink.
 //
 // The book keeps what was written (facts: the player, the question, ink or pencil, when, and the game), so that a
 // chapter's ink is a count, never a walk over every answer. It's written as each right answer is kept (record:
@@ -39,7 +40,7 @@ var factsRule = `WITH met AS (
 		SELECT a.question_id, min(a.at) AS at FROM answers a JOIN runs r ON r.id = a.run_id
 		WHERE r.user_id = ?1 GROUP BY a.question_id),
 	rights AS (
-		SELECT a.question_id, a.at, a.run_id, r.kind = 'day' AND a.at = m.at AS ink
+		SELECT a.question_id, a.at, a.run_id, r.kind = 'day' AND NOT r.pencil AND a.at = m.at AS ink
 		FROM answers a JOIN runs r ON r.id = a.run_id JOIN met m ON m.question_id = a.question_id
 		WHERE r.user_id = ?1 AND a.is_right AND ` + shadowWrites + ` AND NOT ` + voidAt + `),
 	ranked AS (
@@ -65,7 +66,7 @@ func (g *Game) writeFact(tx *sql.Tx, r *run, at int64) error {
 		return nil
 	}
 	ink := false
-	if r.kind == "day" {
+	if r.kind == "day" && !r.pencil {
 		met, err := metBefore(tx, r, p.ID)
 		if err != nil {
 			return err

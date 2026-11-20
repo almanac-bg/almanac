@@ -207,7 +207,7 @@ const factsRule = `WITH met AS (
 		SELECT a.question_id, min(a.at) AS at FROM answers a JOIN runs r ON r.id = a.run_id
 		WHERE r.user_id = ?1 GROUP BY a.question_id),
 	rights AS (
-		SELECT a.question_id, a.at, a.run_id, r.kind = 'day' AND a.at = m.at AS ink
+		SELECT a.question_id, a.at, a.run_id, r.kind = 'day' AND NOT r.pencil AND a.at = m.at AS ink
 		FROM answers a JOIN runs r ON r.id = a.run_id JOIN met m ON m.question_id = a.question_id
 		WHERE r.user_id = ?1 AND a.is_right AND r.shadow <> 1 AND NOT coalesce(json_extract(r.questions, '$[' || a.n || '].void'), 0)),
 	ranked AS (

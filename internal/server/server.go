@@ -144,6 +144,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.bank.Store(d.Bank)
 	s.game = play.New(d.DB, s.bank.Load)
 	s.heldOut = func(id int64) bool { return play.HeldOut(play.HeldReminders, id) }
+	s.nearestStep = s.stepOf
 	if strings.HasPrefix(cfg.Version, "v") { // a release, not a developer's build
 		s.game.Version = cfg.Version
 		if err := s.released(context.Background()); err != nil {
