@@ -574,11 +574,7 @@
     padding: var(--space-4) var(--space-4) var(--space-5);
     border-radius: var(--radius-lg);
     background:
-      radial-gradient(
-        120% 70% at 100% 0%,
-        color-mix(in srgb, var(--tone) 14%, transparent),
-        transparent 70%
-      ),
+      radial-gradient(120% 70% at 100% 0%, color-mix(in srgb, var(--tone) 14%, transparent), transparent 70%),
       var(--surface);
     box-shadow:
       var(--elev-1),
@@ -590,16 +586,6 @@
     align-items: center;
     gap: var(--space-2);
     color: color-mix(in srgb, var(--tone) 75%, var(--text));
-  }
-
-  .almanac-topic .topic-mark {
-    width: 32px;
-    height: 32px;
-    margin: 0;
-    padding: 4px;
-    border-radius: var(--radius-full);
-    background: color-mix(in srgb, var(--tone) 18%, transparent);
-    box-shadow: none;
   }
 
   .almanac-qa {
@@ -1394,6 +1380,17 @@
     width: 26px;
     height: 26px;
     margin: -4px 0 -4px -4px;
+  }
+
+  /* On a card of Моят Алманах: on a disc of its topic's colour. */
+  .almanac-topic .topic-mark {
+    width: 32px;
+    height: 32px;
+    margin: 0;
+    padding: 4px;
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--tone) 18%, transparent);
+    box-shadow: none;
   }
 
   .title-row {
