@@ -735,9 +735,13 @@
     background: transparent;
   }
 
+  /* Taller than the screen (large text on a small phone), it scrolls, its button at the foot reachable. */
   .sheet-panel {
     width: min(100%, 28rem);
+    max-height: 100%;
     margin: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: var(--space-6) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom));
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     box-shadow: var(--elev-2);
@@ -3136,6 +3140,13 @@
   .option.match-item > span:nth-child(2) {
     min-width: 0;
     overflow-wrap: break-word;
+  }
+
+  /* A word of a cell that may break (questions.ts, wholeWords): to the next line whole where it fits there, broken at
+     its syllables only where it's wider than the cell. */
+  .word {
+    display: inline-block;
+    max-width: 100%;
   }
 
   .option.match-item .letter {
@@ -7866,17 +7877,19 @@
   }
 
   /* An answer gone over: its words on the first line beside its letter, how it went (✓, ✕, the share who gave it,
-     the place it had) on a line under them, at the end. */
-  .tight .option:is(.right, .wrong, .dim, .missed, .crowd):has(> .letter) {
+     the place it had, an order's values) on a line under them, at the end. */
+  .tight .option:is(.right, .wrong, .dim, .missed, .crowd, :has(> .value)):has(> .letter) {
     flex-wrap: wrap;
     row-gap: var(--space-1);
   }
 
-  .tight .option:is(.right, .wrong, .dim, .missed, .crowd):has(> .letter) > span:nth-child(2):not(.sign) {
+  .tight
+    .option:is(.right, .wrong, .dim, .missed, .crowd, :has(> .value)):has(> .letter)
+    > span:nth-child(2):not(.sign) {
     flex-basis: calc(100% - 36px - var(--space-3));
   }
 
-  .tight .option:is(.right, .wrong, .dim, .missed, .crowd):has(> .letter) > .sign {
+  .tight .option:is(.right, .wrong, .dim, .missed, .crowd, :has(> .value)):has(> .letter) > .sign {
     margin-left: auto;
   }
 
@@ -7904,6 +7917,50 @@
 
   .tight .option.match-item > span:nth-child(2) {
     overflow-wrap: anywhere;
+  }
+
+  /* Fewer words still: a pair's mark over its words, which take the cell's whole width (a word broken only where
+     it's wider than the cell, never „Шве|ция“). */
+  .tighter .option.match-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+    padding-right: 10px;
+  }
+
+  .tighter .option.match-item > span:nth-child(2) {
+    align-self: stretch;
+    overflow-wrap: break-word;
+  }
+
+  /* A choice keeps the room for what the answer brings (its share, its ✓ or ✕) at its foot, not at its end: its
+     words have the row's width, and nothing re-wraps as they come. */
+  .tighter .choices > .option {
+    padding-right: var(--space-4);
+    padding-bottom: calc(10px + 28px + var(--space-1));
+  }
+
+  .tighter .choices > .option > :is(.sign, .crowd-share, .key-hint) {
+    top: auto;
+    bottom: 10px;
+    translate: none;
+  }
+
+  /* A run's answer under the answers, as on a tablet, not docked at the screen's foot: there, at this size, it
+     would leave no room for the right answer (a whole order) and its fact both. The page scrolls to it (run.ts,
+     settle), „Напред“ at the screen's foot meanwhile. */
+  .tighter .run-question {
+    padding-bottom: 0;
+  }
+
+  .tighter .run-question .after {
+    position: relative;
+    z-index: auto;
+    max-height: none;
+    margin: var(--space-4) 0 0;
+    padding: var(--space-4);
+    overflow: visible;
+    border-radius: var(--radius-lg);
   }
 
   /* A result's plain buttons keep their words on one line while they can, then wrap them. */

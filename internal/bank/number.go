@@ -223,7 +223,8 @@ func decimals(step float64) int {
 func formatNumber(v, step float64) string { return strconv.FormatFloat(v, 'f', decimals(step), 64) }
 
 // sayNumber is a number as the game writes it to players (web/src/ui.ts formatNumber): a decimal comma, no more
-// decimals than step has and none trailing, and a space between thousands from 10 000 up.
+// decimals than step has and none trailing, a space between thousands from 10 000 up, and the minus sign „−“ (never a
+// hyphen) before one below zero.
 func sayNumber(v, step float64) string {
 	s := formatNumber(v, step)
 	if strings.Contains(s, ".") {
@@ -231,7 +232,7 @@ func sayNumber(v, step float64) string {
 	}
 	sign, s := "", strings.TrimPrefix(s, "-")
 	if v < 0 && s != "0" {
-		sign = "-"
+		sign = "−"
 	}
 	whole, frac, _ := strings.Cut(s, ".")
 	if len(whole) > 4 {

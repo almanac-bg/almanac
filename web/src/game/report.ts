@@ -7,8 +7,15 @@ export function report(id: string): Child {
   const state = signal<"closed" | "open" | "sent">("closed");
   const text = signal("");
   const error = signal("");
+  let field: HTMLTextAreaElement | undefined;
   const send = async (e: SubmitEvent) => {
     e.preventDefault();
+    // Said the game's way, not in the browser's bubble (in the browser's language, English as often as not).
+    if (!text.peek().trim()) {
+      error.set("Напиши какво не е наред.");
+      field?.focus();
+      return;
+    }
     error.set("");
     try {
       await api("POST", `/api/questions/${encodeURIComponent(id)}/report`, { text: text.peek() });
@@ -35,9 +42,14 @@ export function report(id: string): Child {
               value: text.peek(),
               rows: 3,
               maxlength: 500,
-              required: true,
-              oninput: (e: Event) => text.set((e.target as HTMLTextAreaElement).value),
-              ref: (el) => queueMicrotask(() => el.focus()),
+              oninput: (e: Event) => {
+                text.set((e.target as HTMLTextAreaElement).value);
+                error.set("");
+              },
+              ref: (el) => {
+                field = el as HTMLTextAreaElement;
+                queueMicrotask(() => el.focus());
+              },
             }),
           ),
           h("button", { class: "btn" }, "Прати"),

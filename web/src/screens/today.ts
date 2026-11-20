@@ -319,8 +319,9 @@ export function today() {
         // The ways to play with others wait for a first game finished: a new player starts with the day and a topic;
         // and Роял, in a player's first week, for its evenings to fill (play.NudgeRoyal). While its lobby is open or
         // its games are on, Роял shows to everyone, a new player too: a full evening is the best way to meet it.
+        // Just played, as the player now is (a first game made them a player: the day fetched before it didn't know).
         just || t.played
-          ? modes(t.royal ? ["duel", "royal"] : ["duel"], "С други")
+          ? () => modes(fresh().royal ? ["duel", "royal"] : ["duel"], "С други")
           : t.royalNow
             ? modes(["royal"], "С други")
             : null,

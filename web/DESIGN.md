@@ -187,7 +187,12 @@ on a phone 160px wide; it holds that way (`e2e/text.spec.ts`):
   answer gone over with how it went on a line under its words, „Вярно“ over „Невярно“, switches of choices and
   Профил's places on two lines, the answers as tall as their words (the four in sight), the reserve days at the
   streak's far end. Under `tighter`: the bar of places shows its pictures alone (the names stay for screen
-  readers). Not a container query: Chromium doesn't always ask a rem one again as the root's size changes.
+  readers); a pair's mark sits over its words; a choice keeps the room for its share and its ✓ or ✕ at its foot,
+  not its end; and a run's answer comes under the answers, as on a tablet, not docked at the screen's foot (there it
+  would leave no room for the right answer and its fact both).
+- **A word breaks only where it's wider than its cell,** at its syllables where the game knows them (a pair, a thing
+  to sort, a group: `wholeWords()` in `game/questions.ts`), never „Каралий-|чев“ where „Каралийчев“ fits the next line,
+  nor „Шве|ция“. Every control is a scroll away and every answer can be read (`e2e/text.spec.ts`). Not a container query: Chromium doesn't always ask a rem one again as the root's size changes.
 
 ## Wide screens
 
@@ -569,6 +574,7 @@ Feedback fires once, when it's earned, and then the screen is still again:
 - **Numbers the Bulgarian way:**
   - a space between thousands from 10 000 up („1380“, „12 500“);
   - a decimal comma;
+  - the minus sign „−“ below zero, never a hyphen („−89,2 °C“, as the pad has it; `formatNumber()`);
   - a unit after a space („15 с“);
   - ordinals with the ending the dictionary gives (`lib/ordinal.ts`): „1-ви“, „2-ри“, „3-ти“, „4-ти“, „5-и“, „12-и“,
     „21-ви“, and „3-то място“;

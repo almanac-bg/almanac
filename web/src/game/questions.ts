@@ -46,6 +46,15 @@ export interface Asked {
   update?(view: View): void;
 }
 
+/** A cell's words (a pair, a thing to sort, a group): each that may break (hyphenate) held whole in a `.word`, so that
+ * it goes to the next line whole where it fits there („Ангел / Каралийчев“, not „Ангел Каралий-/чев“), and breaks, at
+ * its syllables, only where it's wider than the cell itself. */
+function wholeWords(text: string): Child {
+  return hyphenate(text)
+    .split(/(\S*­\S*)/)
+    .map((part, i) => (i % 2 ? h("span", { class: "word" }, part) : part));
+}
+
 /** How everyone did with a question, in one quiet line under its verdict, as each kind of question counts right:
  * „Вярно отговарят 34% от играчите днес.“ for the day's ten (its players today), without „днес“ for everyone ever;
  * the player among them (withOwn), as on the answers' shares. A right answer few others got stands out, said as the feat it is („Познаха го само 12% от играчите днес.“), and
@@ -890,7 +899,7 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
         const k = pairOf();
         return k >= 0 ? String(k + 1) : "";
       }),
-      h("span", null, hyphenate(text)),
+      h("span", null, wholeWords(text)),
     );
   };
   const lefts = view.left.map((t, i) => cell("left", i, t));
@@ -1046,7 +1055,7 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
         "span",
         { class: "split-label" },
         side === 0 ? h("span", { class: "split-arrow", "aria-hidden": "true" }, "← ") : null,
-        hyphenate(view.groups[side] ?? ""),
+        wholeWords(view.groups[side] ?? ""),
         side === 1 ? h("span", { class: "split-arrow", "aria-hidden": "true" }, " →") : null,
       ),
     );
@@ -1059,7 +1068,7 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
     const cards: HTMLElement[] = [];
     const nextText = view.items[at + 1];
     if (nextText !== undefined)
-      cards.push(h("div", { class: "split-card under", "aria-hidden": "true" }, hyphenate(nextText)));
+      cards.push(h("div", { class: "split-card under", "aria-hidden": "true" }, wholeWords(nextText)));
     const text = view.items[at];
     if (text !== undefined) {
       const card = h(
@@ -1067,7 +1076,7 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
         { class: "split-card top" },
         h("span", { class: "split-lean on-left", "aria-hidden": "true" }, view.groups[0]),
         h("span", { class: "split-lean on-right", "aria-hidden": "true" }, view.groups[1]),
-        h("span", { class: "split-text" }, hyphenate(text)),
+        h("span", { class: "split-text" }, wholeWords(text)),
       );
       drag(card);
       cards.push(card);
@@ -1129,14 +1138,14 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
             h(
               "span",
               { class: `option split-side ${side === 0 ? "to-left" : "to-right"}` },
-              h("span", { class: "split-label" }, hyphenate(g)),
+              h("span", { class: "split-label" }, wholeWords(g)),
             ),
           ),
         ),
         h(
           "ul",
           { class: "options split-items", "aria-label": `${view.groups[0]} или ${view.groups[1]}?` },
-          view.items.map((text) => h("li", { class: "option" }, hyphenate(text))),
+          view.items.map((text) => h("li", { class: "option" }, wholeWords(text))),
         ),
       )
     : h(

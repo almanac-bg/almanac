@@ -831,7 +831,7 @@ func TestAnswerTextIsBulgarian(t *testing.T) {
 	}{
 		{&Number{Answer: 40075, Step: 1, Unit: "км"}, "40 075 км"},
 		{&Number{Answer: 6.5, Step: 0.1, Unit: "млн."}, "6,5 млн."},
-		{&Number{Answer: -273.15, Step: 0.01}, "-273,15"},
+		{&Number{Answer: -273.15, Step: 0.01}, "−273,15"},
 		{&Number{Answer: 1876, Step: 1}, "1876"},
 		{&Match{Pairs: []MatchPair{{Left: "Франция", Right: "Париж"}}, Decoy: "Сидни"}, "Франция — Париж"},
 	} {

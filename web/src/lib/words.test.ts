@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dateWords, hyphenate, issueWords, stakeWords, weekday, withName } from "./words.ts";
+import { dateWords, formatNumber, hyphenate, issueWords, stakeWords, weekday, withName } from "./words.ts";
 
 test("a day as the game writes it: the date, the month in lower case; with its issue, a dateline", () => {
   assert.equal(dateWords("2026-11-17"), "17 ноември");
@@ -72,4 +72,13 @@ test("a streak at stake says what the day's ten make of it, and from 18:00 that 
   assert.equal(stakeWords(5, 0, 18), "Серия от 5 дни. Прекъсва в полунощ, ако не изиграеш въпросите на деня.");
   // A reserve day would keep it: nothing ends at midnight.
   assert.equal(stakeWords(5, 1, 23), "Серия от 5 дни. С днешните въпроси става 6.");
+});
+
+test("a number the Bulgarian way: a space between thousands from 10 000, a decimal comma, a minus sign, not a hyphen", () => {
+  assert.equal(formatNumber(1380), "1380");
+  assert.equal(formatNumber(12500), "12\u00a0500");
+  assert.equal(formatNumber(6.25, 0.1), "6,3");
+  assert.equal(formatNumber(-89.2, 0.1), "−89,2");
+  assert.equal(formatNumber(-12500), "−12\u00a0500");
+  assert.equal(formatNumber(-18), "−18");
 });
