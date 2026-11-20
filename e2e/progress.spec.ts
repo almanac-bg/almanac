@@ -13,10 +13,8 @@ test("a topic's game tells how well the topic is known, and the avatar is anyone
   await expect(page.locator(".mastery-line")).toContainText("Първа оценка");
   await expect(page.locator(".screen")).not.toContainText(/XP|[Нн]иво \d|[Пп]остижени/);
 
-  // The avatar, a tap from Профил: every animal, none locked.
+  // The avatar, on Профил: every animal, none locked.
   await page.goto("/me");
-  await page.getByRole("link", { name: "Смени аватара" }).first().click();
-  await expect(page).toHaveURL(/\/avatar$/);
   await expect(page.locator(".pick")).toHaveCount(15);
   await page.getByRole("button", { name: "Рис", exact: true }).click();
   await expect(page.getByRole("button", { name: "Рис", exact: true })).toHaveAttribute("aria-pressed", "true");
@@ -82,14 +80,11 @@ test("after the day: one gold thing to do next, and Профил leading back to
   await expect(gold).toHaveText("Сподели резултата");
   await expect(page.locator(".open-goals, .goal")).toHaveCount(0);
 
-  // A topic, then Профил: the topic known leads back to it, the games played to going over them.
+  // A topic, then Профил: its games, each of today's a way to go over it.
   await openGame(page, "/play/history");
   await playRun(page);
   await page.goto("/me");
-  await expect(page.locator(".mastery-row a.mastery-topic", { hasText: "История" })).toHaveAttribute(
-    "href",
-    "/play/history",
-  );
+  await page.getByRole("link", { name: "Всички игри" }).click();
   await page.locator("a.game").first().click();
   await expect(page).toHaveURL(/\/games\/\d+$/);
   await expect(page.locator(".day-line")).toContainText("История");

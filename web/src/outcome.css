@@ -1,29 +1,22 @@
 /* A duel's result (screens/outcome.ts): the two face to face, the duel question by question, what it meant. Loaded
-   with it, the first time a duel's result shows; the rest of the page is app.css's. */
+   with it, the first time a duel's result shows; the rest of the page is app.css's. The edition's: a page, not a card;
+   the verdict in the serif, the two scores big in the numerals with the colon between, the marks as the day's trail. */
 
 @layer app {
-  .duel-end {
-    text-align: center;
+  .duel-end.card.hero {
+    gap: var(--space-5);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .duel-head {
     display: grid;
-    gap: var(--space-1);
-  }
-
-  /* The two, face to face: the avatar, the name and title, the score; the winner's in gold. */
-  .duel-faces {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    align-items: start;
     gap: var(--space-2);
-  }
-
-  .duel-face {
-    display: grid;
-    justify-items: center;
-    gap: 2px;
-    min-width: 0;
+    padding-bottom: var(--space-4);
+    border-bottom: 1.5px solid var(--ink);
   }
 
   /* Beside the marks (below): small. */
@@ -32,41 +25,82 @@
     margin: 0;
   }
 
-  .duel-face .avatar {
-    margin-bottom: var(--space-3);
-    transition: box-shadow 200ms;
+  .duel-verdict {
+    font: 600 calc(18px + 1.125rem) / 1.1 var(--font-serif);
+    letter-spacing: -0.02em;
   }
 
-  .duel-face.win .avatar {
-    box-shadow: var(--glow-gold);
+  .s-won .duel-verdict {
+    color: var(--right-ink);
+  }
+
+  .s-lost .duel-verdict {
+    color: var(--wrong-ink);
+  }
+
+  /* The two, face to face: the avatar and the name over each score, the player's on the left, the other's on the
+     right; the loser's score quieter. */
+  .duel-faces {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: end;
+    gap: var(--space-3);
+  }
+
+  .duel-face {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    justify-items: start;
+    gap: var(--space-1) var(--space-2);
+    min-width: 0;
+  }
+
+  .duel-face .avatar {
+    grid-row: 1;
+    width: 44px;
+    height: 44px;
   }
 
   .duel-name {
+    grid-row: 1;
     max-width: 100%;
     overflow: hidden;
     color: var(--text);
-    font-size: 1.0625rem;
-    font-weight: 800;
+    font-size: 0.9375rem;
+    font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .duel-title {
-    display: grid;
-    justify-items: center;
-    min-height: 1rem;
-    max-width: 100%;
+  .duel-points,
+  .duel-rights {
+    grid-column: 1 / -1;
+  }
+
+  /* The other's side mirrored: its avatar and name at the right edge, its score too. */
+  .duel-face:last-child {
+    grid-template-columns: minmax(0, 1fr) auto;
+    justify-items: end;
+  }
+
+  .duel-face:last-child .avatar {
+    grid-column: 2;
+  }
+
+  .duel-face:last-child .duel-name {
+    grid-column: 1;
   }
 
   .duel-points {
-    margin-top: var(--space-1);
-    font: 900 3rem / 1 var(--font-numeral);
+    margin-top: var(--space-2);
+    font: 800 min(calc(32px + 2rem), 15vw) / 0.9 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     transition: color 200ms;
   }
 
-  .duel-face.win .duel-points {
-    color: var(--gold-display);
+  .duel-face:not(.win) .duel-points {
+    color: var(--ink-2);
   }
 
   .duel-points.none {
@@ -78,12 +112,12 @@
     font-size: 0.8125rem;
   }
 
-  /* Level with the scores, over the line under them. */
+  /* Level with the scores, between them. */
   .duel-colon {
-    align-self: end;
-    margin-bottom: 1.6rem;
-    color: var(--text-muted);
-    font: 900 2rem / 1 var(--font-numeral);
+    align-self: center;
+    margin-top: var(--space-6);
+    color: var(--gold-ink);
+    font: 800 2rem / 1 var(--font-numeral);
   }
 
   /* Question by question: the player's marks over the other's, a band behind the question that decided it. */
@@ -91,62 +125,43 @@
     display: grid;
     grid-template-columns: 24px repeat(10, minmax(0, 1fr));
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     width: 100%;
-    max-width: 26rem;
-    margin: var(--space-2) auto 0;
+    max-width: 28rem;
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--rule);
   }
 
   .duel-who {
     display: grid;
   }
 
+  /* As the day's trail: right in ink, wrong an open square, close an open one with a mark of ink. */
   .duel-pip {
     z-index: 1;
-    display: grid;
-    place-items: center;
     aspect-ratio: 1;
-    border-radius: var(--radius-xs);
-    background: var(--sunken);
-    color: var(--on-fill);
-  }
-
-  .duel-pip::before {
-    content: "";
-    width: 60%;
-    height: 60%;
-    background: currentColor;
-    -webkit-mask: var(--i) center / contain no-repeat;
-    mask: var(--i) center / contain no-repeat;
-  }
-
-  .duel-pip:not(.right, .partial, .wrong)::before {
-    content: none;
+    border-radius: 2px;
+    background: var(--rule);
   }
 
   .duel-pip.right {
-    --i: var(--i-check);
-    background: var(--right);
-    box-shadow: inset 0 0 0 1.5px var(--right-ink);
+    background: var(--ink);
   }
 
-  /* The marks as on the day's trail: close a hollow gold ring, wrong quiet. */
   .duel-pip.partial {
-    --i: var(--i-near);
-    background: transparent;
-    color: var(--gold-ink);
-    box-shadow: inset 0 0 0 1.5px var(--gold-ink);
+    background: linear-gradient(var(--ink), var(--ink)) center / 40% 40% no-repeat;
+    box-shadow: inset 0 0 0 1.5px var(--ink);
   }
 
   .duel-pip.wrong {
-    --i: var(--i-cross);
-    color: var(--text-muted);
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--ink);
   }
 
-  /* The quicker of two right answers. */
+  /* The quicker of two right answers: ringed in gold. */
   .duel-pip.fast,
   .duel-key-ring {
-    outline: 2px solid var(--gold-ink);
+    outline: 2px solid var(--gold);
     outline-offset: 2px;
   }
 
@@ -154,15 +169,14 @@
     align-self: stretch;
     margin: -5px -3px;
     border-radius: var(--radius-sm);
-    background: color-mix(in srgb, var(--gold) 16%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold-ink) 45%, transparent);
+    background: color-mix(in srgb, var(--gold) 14%, transparent);
   }
 
   .duel-key {
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: var(--space-2);
+    margin-top: calc(-1 * var(--space-2));
     color: var(--text-muted);
     font-size: 0.75rem;
   }
@@ -170,15 +184,15 @@
   .duel-key-ring {
     width: 10px;
     height: 10px;
-    border-radius: 3px;
-    background: var(--right);
+    border-radius: 2px;
+    background: var(--ink);
     outline-offset: 1px;
   }
 
   .duel-line {
     color: var(--text-muted);
-    font-weight: 700;
-    text-wrap: balance;
+    font-size: 0.9375rem;
+    text-wrap: pretty;
   }
 
   .duel-line:empty {
@@ -190,8 +204,7 @@
     display: grid;
     gap: var(--space-3);
     padding-top: var(--space-4);
-    border-top: 1px solid var(--line);
-    text-align: start;
+    border-top: 1px solid var(--rule);
   }
 
   .duel-record {
@@ -199,15 +212,12 @@
     align-items: baseline;
     justify-content: space-between;
     gap: var(--space-3);
+    font-weight: 600;
   }
 
   .duel-why {
     color: var(--text-muted);
     font-size: 0.8125rem;
-  }
-
-  .duel-record {
-    font-weight: 700;
   }
 
   .duel-record-end {
@@ -216,8 +226,7 @@
   }
 
   .duel-record-n {
-    color: var(--rose-ink);
-    font: 900 1.5rem / 1 var(--font-numeral);
+    font: 800 1.5rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
   }
 
@@ -227,16 +236,6 @@
   }
 
   .duel-mine-n {
-    font: 900 2rem / 1 var(--font-numeral);
-  }
-
-  @media (max-width: 22rem) {
-    .duel-marks {
-      gap: 5px;
-    }
-
-    .duel-points {
-      font-size: 2.5rem;
-    }
+    font: 800 2rem / 1 var(--font-numeral);
   }
 }

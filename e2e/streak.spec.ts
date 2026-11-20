@@ -16,9 +16,8 @@ test("Профил keeps the longest streak, under the one going on, and says wh
   await page.goto("/");
   await daysPlayed(page, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 2, 1);
   await page.goto("/me");
-  await expect(page.locator(".streak .streak-num")).toHaveText("2");
-  await expect(page.locator(".streak")).toContainText("Най-дълга серия: 12 дни");
-  await expect(page.locator(".streak")).toContainText("Един пропуснат ден в седмицата не прекъсва серията.");
+  await expect(page.locator(".me-figures .fig-n")).toHaveText(["2", "12", "14"]);
+  await expect(page.locator(".me-intro")).toContainText("Един пропуснат ден в седмицата не прекъсва серията.");
 });
 
 test("a streak at stake: unlit till the day lights it, pointed to from a topic, tomorrow under the result", async ({

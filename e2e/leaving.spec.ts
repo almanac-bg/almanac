@@ -154,8 +154,8 @@ test("the ways back pop the history; back comes to a page and its board where th
   await expect(page.getByRole("link", { name: "Настройки" })).toBeVisible(); // Профил loads on its own (kit.ts)
   // What Профил loads after it opens, in: scrolled before, the page would move as it comes (the browser keeps what's
   // in view), and be kept where it moved to.
-  await expect(page.locator(".streak")).toBeVisible();
-  await expect(page.getByText("Още няма изиграни игри.")).toBeVisible();
+  await expect(page.locator(".me-figures")).toBeVisible();
+  await expect(page.locator(".pick")).toHaveCount(15);
   await page.evaluate(() => scrollTo(0, 200));
   await page.waitForTimeout(400); // kept once it stops
   const y = await page.evaluate(() => scrollY);

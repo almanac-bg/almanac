@@ -42,12 +42,13 @@ import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
 import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
 import { signIn } from "./screens/signin.ts";
-import { gameRow, loadStats, stats } from "./screens/stats.ts";
+import { gameRow, loadStats } from "./screens/stats.ts";
 import {
   bulgaria,
   categories,
   duelsWaiting,
   friendRequests,
+  look,
   notice,
   outcomeCss,
   player,
@@ -168,6 +169,7 @@ export const kit = {
   setSound,
   setTick,
   setLook,
+  look,
   shapeNames,
   signal,
   signIn,
@@ -176,7 +178,6 @@ export const kit = {
   startDuel,
   startScreen,
   stat,
-  stats,
   summary,
   tickOn,
   timer,
