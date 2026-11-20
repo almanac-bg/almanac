@@ -96,9 +96,10 @@ There are three places: **Днес** (`/`), **Алманах** (`/almanac`) and 
   - „България днес“ (`.bulgaria-today`, from ten players): how many got each count of right answers, with the
     player's bar in ink marked „ти“ and the average dashed; then the average, the tens, and the share that knew the
     hardest question.
-  - The rarest right answer, as the book has it (`.rarest`): its chapter and how few knew it, the answer as a
-    headword, the question, the fact, and „Записано в Алманаха, глава „…““. It is a right answer, so it is in the
-    book.
+  - An entry the day's right answers wrote, as the book has it (`.rarest`): from ten players „Най-рядкото ти
+    попадение“, its chapter and how few knew it; with fewer, „Днес в Алманаха ти“, the hardest, its chapter and
+    „въпрос 8“, nothing of others. Then the answer as a headword, the question, the fact, and „Записано в Алманаха,
+    глава „…““. It is a right answer, so it is in the book; a game with none shows nothing here.
   - Tomorrow (`.tomorrow`): the next issue's date set large, when it comes and the streak it makes; then a guest's ask
     to keep the game, or the reminder's ask.
 - **Алманах** (`/almanac`, `screens/almanac.ts`), the player's book, a spread on a big screen:
@@ -217,7 +218,7 @@ The text grows with the browser's own setting and with „Размер на те
   as on a phone, never centred.
 - **56.25rem (900px):** the places are spreads (above):
   - Днес: the issue on the left page with „В броя“ under it; the streak, the friends' day and the book on the right.
-  - The day's result: the score on the left; България's day and the rarest right answer on the right.
+  - The day's result: the score on the left; България's day and the day's entry on the right.
   - The cover: the date on the left page, the issue on the right.
   - The Алманах: the book's title, figures and notes on the left, the contents on the right. A chapter: four columns
     for its head, eight for its entries.

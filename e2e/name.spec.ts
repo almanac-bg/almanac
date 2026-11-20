@@ -44,7 +44,9 @@ test("before a first duel sent to a friend: a slow save is waited for, a refused
   expect(me.user?.name ?? me.name).toBe("Ана Слаба");
 });
 
-// The second tap lands beside the sheet the first one opened: „Не сега“, and on into the one duel.
+// The second tap lands where the first did. On a tall phone (the Pixel's) that's beside the sheet the first one opened:
+// „Не сега“, and on into the duel. On a shorter one (the iPhone's) the sheet rises over the button, and the second tap
+// is on the sheet, which waits for its answer. Either way: one sheet, and one duel.
 test("a double tap on a first duel is one duel", async ({ browser }) => {
   test.setTimeout(120_000);
   const page = await friends(browser);
@@ -53,7 +55,10 @@ test("a double tap on a first duel is one duel", async ({ browser }) => {
     if (r.method() === "POST" && new URL(r.url()).pathname === "/api/duels") duels++;
   });
   await page.getByRole("button", { name: /^Дуел/ }).dblclick();
+  const sheet = page.getByRole("dialog");
+  expect(await sheet.count()).toBeLessThanOrEqual(1);
+  if (await sheet.isVisible()) await sheet.getByRole("button", { name: "Не сега" }).click();
   await expect(page).toHaveURL(/\/duel\/\d+$/);
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(sheet).toHaveCount(0);
   expect(duels).toBe(1);
 });

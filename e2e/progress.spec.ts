@@ -40,32 +40,41 @@ test("a topic's game tells how well the topic is known, and the avatar is anyone
   await expect(page.getByRole("radio", { name: "Едър", exact: true })).toHaveAttribute("aria-checked", "true");
 });
 
-test("just played, the rarest right answer is told as the book has it", async ({ page }) => {
-  test.setTimeout(120_000);
-  // The day as the server would have it with others playing: the right answer a tenth of the others got, told (as
-  // the server does) only once the day is played.
-  await page.route("**/api/day", async (route) => {
-    if (route.request().method() !== "GET") return route.continue();
-    const res = await route.fetch();
-    const t = await res.json();
-    if (t.run?.done)
-      t.rarest = {
-        n: 0,
-        right: 0.1,
-        fact: { category: "history", question: "Кой въпрос?", answer: "Този отговор", fact: "Ето защо." },
-      };
-    await route.fulfill({ response: res, json: t });
+// The day as the server would have it, the entry its right answers wrote told (as the server does) only once the day
+// is played: with others playing, the right answer a tenth of them got; with too few, the hardest, nothing of others.
+for (const { crowd, head, kicker } of [
+  { crowd: true, head: "Най-рядкото ти попадение", kicker: "История · знаят го 10%" },
+  { crowd: false, head: "Днес в Алманаха ти", kicker: "История · въпрос 8" },
+]) {
+  test(`just played, an entry of the day is told as the book has it (${crowd ? "a crowd" : "no crowd"})`, async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.route("**/api/day", async (route) => {
+      if (route.request().method() !== "GET") return route.continue();
+      const res = await route.fetch();
+      const t = await res.json();
+      if (t.run?.done)
+        t.entry = {
+          n: 7,
+          crowd,
+          right: crowd ? 0.1 : 0,
+          fact: { category: "history", question: "Кой въпрос?", answer: "Този отговор", fact: "Ето защо." },
+        };
+      await route.fulfill({ response: res, json: t });
+    });
+    await page.goto("/");
+    await startDay(page);
+    await playRun(page);
+    const entry = page.locator(".summary .rarest");
+    await expect(entry.locator("h2")).toHaveText(head);
+    await expect(entry.locator(".rarest-kicker")).toHaveText(kicker);
+    await expect(entry.locator(".entry-word")).toHaveText("Този отговор");
+    await expect(entry.locator(".entry-q")).toHaveText("Кой въпрос?");
+    await expect(entry.locator(".filed")).toHaveText("Записано в Алманаха, глава „История“");
+    await expect(page.locator(".summary .btn.primary")).toHaveCount(1);
   });
-  await page.goto("/");
-  await startDay(page);
-  await playRun(page);
-  const rarest = page.locator(".summary .rarest");
-  await expect(rarest.locator(".rarest-kicker")).toHaveText("История · знаят го 10%");
-  await expect(rarest.locator(".entry-word")).toHaveText("Този отговор");
-  await expect(rarest.locator(".entry-q")).toHaveText("Кой въпрос?");
-  await expect(rarest.locator(".filed")).toHaveText("Записано в Алманаха, глава „История“");
-  await expect(page.locator(".summary .btn.primary")).toHaveCount(1);
-});
+}
 
 test("after the day: one gold thing to do next, and Профил leading back to play", async ({ page }) => {
   test.setTimeout(120_000);
