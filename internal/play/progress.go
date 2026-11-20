@@ -97,11 +97,13 @@ func (g *Game) Played(ctx context.Context, userID int64) (bool, error) {
 	return played, err
 }
 
-// News is what a game brought, told once: the facts it put in the Алманах, how it moved a topic's mastery when that's
-// news (a topic's game only), the milestones noted in the book since the player was last told (Notes), and, once a
-// day, what others' duels against the player's recordings came to (recordings.go).
+// News is what a game brought, told once: the facts it wrote in the Алманах in ink (Ink, a count), and whether it
+// wrote any in pencil (Pencil: listed, never counted: ink.go), how it moved a topic's mastery when that's news (a
+// topic's game only), the milestones noted in the book since the player was last told (Notes), and, once a day, what
+// others' duels against the player's recordings came to (recordings.go).
 type News struct {
-	Facts      int             `json:"facts,omitempty"`
+	Ink        int             `json:"ink,omitempty"`
+	Pencil     bool            `json:"pencil,omitempty"`
 	Mastery    *MasteryMove    `json:"mastery,omitempty"`
 	Notes      []Note          `json:"notes"`
 	Recordings *RecordingsNews `json:"recordings,omitempty"`
@@ -125,7 +127,7 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 		case err != nil:
 			return n, err
 		default:
-			if n.Facts, err = g.learnedIn(ctx, userID, runID); err != nil {
+			if n.Ink, n.Pencil, err = g.InkIn(ctx, userID, runID); err != nil {
 				return n, err
 			}
 			if kind == "topic" {

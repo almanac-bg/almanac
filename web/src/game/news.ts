@@ -25,8 +25,10 @@ export interface Note {
 }
 
 interface News {
-  /** The facts the game put in Моят Алманах. */
-  facts?: number;
+  /** The facts the game wrote in the Алманах in ink (play.News.Ink), and whether it wrote any in pencil (never
+   * counted). */
+  ink?: number;
+  pencil?: boolean;
   /** How a topic's game moved its mastery, when that's news (play.masteryTold). */
   mastery?: MasteryMove;
   /** The milestones noted in the book with this news, oldest first, each told once. */
@@ -70,7 +72,7 @@ export function news(run: number, delay = 0, late?: { title?: string }): Child {
     const n = data();
     if (!n) return null;
     const parts = [
-      n.facts ? factsLine(n.facts) : null,
+      n.ink || n.pencil ? factsLine(n.ink ?? 0) : null,
       masteryLine(n.mastery),
       n.notes?.length ? notesLine(n.notes) : null,
       n.recordings ? recordings(n.recordings) : null,
@@ -81,12 +83,16 @@ export function news(run: number, delay = 0, late?: { title?: string }): Child {
   };
 }
 
-/** The facts a game put in Моят Алманах, a tap from them. */
-function factsLine(n: number): Child {
+/** What a game wrote in the Алманах, a tap from it: the ink counted („+6 с мастило“), pencil only said. */
+function factsLine(ink: number): Child {
   return h(
     "p",
     { class: "news-facts" },
-    h("a", { href: "/almanac" }, h("b", { class: "num" }, `+${n}`), ` ${n === 1 ? "факт" : "факта"} в Алманаха`),
+    h(
+      "a",
+      { href: "/almanac" },
+      ink ? [h("b", { class: "num" }, `+${ink}`), " с мастило в Алманаха"] : "Записано с молив в Алманаха",
+    ),
   );
 }
 

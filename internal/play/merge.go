@@ -57,6 +57,9 @@ var mergeSteps = []mergeStep{
 	// day the account has judged too stays the account's; one either played isn't missed.
 	{carries: []string{"streak_missed.user_id"}, sql: `INSERT OR IGNORE INTO streak_missed (user_id, day, kept)
 		SELECT ?1, day, kept FROM streak_missed WHERE user_id = ?2`},
+	// The guest's book is written again with the account's, from all their games now (Merge: rewriteFacts), so that a
+	// question met first by either is ink once at most.
+	{carries: []string{"facts.user_id"}, sql: `DELETE FROM facts WHERE user_id IN (?1, ?2)`},
 	// The notes in the guest's book are the account's too (a milestone both reached keeps the account's day).
 	{carries: []string{"notes.user_id"}, sql: `INSERT OR IGNORE INTO notes (user_id, day, kind, n, topic, told)
 		SELECT ?1, day, kind, n, topic, told FROM notes WHERE user_id = ?2`},
@@ -124,7 +127,7 @@ func Merge(tx *sql.Tx, from, to int64) error {
 			return err
 		}
 	}
-	return nil
+	return rewriteFacts(tx, to)
 }
 
 // GoneName is how a player who's gone (deleted, or a guest cleared) shows in others' history.

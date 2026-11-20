@@ -13,18 +13,20 @@ function sampleFacts(): string[] {
   );
 }
 
-test("the book's contents: a chapter a row with its facts, and the book counting them", async ({ page }) => {
-  // Every fact of the sample's „Кино и телевизия“, and one of „История“.
+test("the book's contents: a chapter a row with its ink, and no count of it all", async ({ page }) => {
+  // Every fact of the sample's „Кино и телевизия“ in ink, and one of „История“ in pencil.
   await page.goto("/");
-  await knows(page, ["mov-300", "mov-302", "mov-960", "mov-961", "mov-962", "mov-963", "mov-964", "his-002"]);
+  await knows(page, ["mov-300", "mov-302", "mov-960", "mov-961", "mov-962", "mov-963", "mov-964"], Date.now(), true);
+  await knows(page, ["his-002"]);
 
   await page.goto("/almanac");
-  await expect(page.locator(".fig").nth(1)).toContainText("8факта");
+  await expect(page.locator(".figures-row")).not.toContainText("факта");
   // Ten topics, „Микс“ and „България“: twelve chapters, each a way into its own.
   const rows = page.locator(".toc-row");
   await expect(rows).toHaveCount(12);
   await expect(rows.nth(4)).toContainText("Кино и телевизия");
-  await expect(rows.nth(4)).toContainText("7 факта");
+  await expect(rows.nth(4)).toContainText("7 с мастило");
+  await expect(rows.nth(2)).toContainText("0 с мастило");
   await expect(rows.nth(10)).toContainText("Микс");
   await expect(rows.nth(11)).toContainText("България");
   await rows.nth(4).getByRole("link").click();

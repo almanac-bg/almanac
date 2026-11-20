@@ -1083,7 +1083,7 @@ func TestAlmanac(t *testing.T) {
 	ctx := t.Context()
 	ana := w.user()
 	a, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage})
-	if err != nil || len(a.Facts) != 0 || a.All != 0 || len(a.Of) == 0 || a.Next != "" {
+	if err != nil || len(a.Facts) != 0 || a.Found != 0 || len(a.Ink) != 0 || a.Next != "" {
 		t.Fatalf("an empty almanac: %+v %v", a, err)
 	}
 	s, _ := w.g.StartTopic(ctx, ana, "general")
@@ -1094,19 +1094,19 @@ func TestAlmanac(t *testing.T) {
 			t.Fatalf("a learned fact: %+v", f)
 		}
 	}
-	if len(a.Facts) == 0 || a.All != len(a.Facts) || a.Have["general"] != a.All {
-		t.Fatalf("ten right answers in „general“: %d facts of %d, %v", len(a.Facts), a.All, a.Have)
+	if len(a.Facts) == 0 || a.Found != len(a.Facts) || len(a.Ink) != 0 {
+		t.Fatalf("ten right answers in „general“, in pencil: %d facts of %d, ink %v", len(a.Facts), a.Found, a.Ink)
 	}
 	// What was learned stays when its question leaves play, unless it wasn't so.
 	n := len(a.Facts)
 	q := mustQuestion(t, w, a.Facts[0].ID)
 	q.Extra().Retired, q.Extra().RetiredWhy = true, "weak"
-	if a, _ = w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage}); a.All != n {
-		t.Fatalf("a question retired as weak left the almanac: %d of %d", a.All, n)
+	if a, _ = w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage}); a.Found != n {
+		t.Fatalf("a question retired as weak left the almanac: %d of %d", a.Found, n)
 	}
 	q.Extra().RetiredWhy = "wrong"
-	if a, _ = w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage}); a.All != n-1 || len(a.Facts) != n-1 {
-		t.Fatalf("a question retired as wrong stayed learned: %d of %d", a.All, n)
+	if a, _ = w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage}); a.Found != n-1 || len(a.Facts) != n-1 {
+		t.Fatalf("a question retired as wrong stayed learned: %d of %d", a.Found, n)
 	}
 }
 
@@ -1131,8 +1131,8 @@ func TestAlmanacPages(t *testing.T) {
 		from := ""
 		for range len(ids) + 1 {
 			a, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Topic: topic, From: from, Limit: size})
-			if err != nil || len(a.Facts) > size || a.All < len(ids) {
-				t.Fatalf("a page of %d: %d facts of %d (%v)", size, len(a.Facts), a.All, err)
+			if err != nil || len(a.Facts) > size {
+				t.Fatalf("a page of %d: %d facts of %d (%v)", size, len(a.Facts), a.Found, err)
 			}
 			for _, f := range a.Facts {
 				got = append(got, f.ID)
@@ -1189,7 +1189,7 @@ func TestAlmanacPages(t *testing.T) {
 		t.Fatalf("pages with a fact learned between them: %v", got)
 	}
 	if a, _ := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: 1}); len(a.Facts) != 1 || a.Facts[0].ID != fresh ||
-		a.All != len(ids)+1 || a.Have["general"] != 1 || a.Have[MixTopic] != len(ids)+1 || a.Facts[0].Kind != "topic" {
+		a.Found != len(ids)+1 || a.Facts[0].Ink || a.Facts[0].Kind != "topic" {
 		t.Fatalf("the latest fact first: %+v", a)
 	}
 	// Found by its words, as they're written or not: a word of its answer finds it, in its chapter and in all.
@@ -1206,7 +1206,7 @@ func TestAlmanacPages(t *testing.T) {
 			}
 		}
 	}
-	if a, _ := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Search: "щщщщщ", Limit: AlmanacPage}); len(a.Facts) != 0 || a.All == 0 {
+	if a, _ := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Search: "щщщщщ", Limit: AlmanacPage}); len(a.Facts) != 0 || a.Found != 0 {
 		t.Fatalf("a search that finds nothing: %+v", a)
 	}
 }
