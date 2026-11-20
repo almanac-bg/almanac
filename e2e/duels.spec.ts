@@ -42,7 +42,7 @@ test("a duel with a friend: played first and sent, played back when they can, th
   // Bo: a dot on Приятели, one line on Начало, the duel his to play, a tap away.
   await b.goto("/");
   await expect(b.locator(".streak-notice")).toContainText("Ана те покани на дуел.");
-  await expect(b.locator("nav.tabs a[href='/friends']")).toHaveClass(/news/);
+  await expect(b.locator("nav.places-foot a[href='/friends']")).toHaveClass(/news/);
   await b.locator(".streak-notice").getByRole("link", { name: "Играй" }).click();
   await countIn(b);
   await playSecond(b, "Ана");

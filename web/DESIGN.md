@@ -1,40 +1,57 @@
 # Design
 
-АЛМАНАХ looks like a modern magazine that keeps score: Night first, gold for the one right answer, numbers as the
-heroes, and game feel drawn only from what the game really counts. This file holds the rules. The values live in
-`web/src/app.css` (the tokens at its top), and the pieces several screens share live in `web/src/ui.ts`. Follow all
-three when you add or change a screen.
+АЛМАНАХ looks like the edition (DECISIONS.md, „The edition“): a publication a player keeps, not a generic game app.
+Every day is an issue („Брой 9 · 20 ноември“); the player's progress is a book (chapters, entries, notes). Paper
+first with a night of its own, serif headlines, numerals as the heroes, colour only where it means something, one
+obvious action per screen, and game feel drawn only from what the game really counts. This file holds the rules. The
+values live in `web/src/app.css` (the tokens at its top), and the pieces several screens share live in `web/src/ui.ts`.
+Follow all three when you add or change a screen. Screens not yet in the edition's look speak its colours through the
+old tokens' names (`--bg`, `--surface`, `--text`… at the top of app.css), until each is redrawn.
 
 ## Principles
 
-- **One obvious action per screen**, and it is the gold button: `.btn.primary`, plus `big` for a screen's main
-  action. Everything else is a plain `.btn` or a `.link`.
-- **Gold means the one right answer**, as in the logo: the primary action, the current game's progress (the
-  clock's last ten seconds, the current pip), the streak, and reward just earned (points, first place, an exact
-  answer). Nothing else: where the player is takes the accent, and nothing is gold for decoration.
-- **Numbers are the heroes.** Scores, places, the streak and the timer use the numeral face, with
-  tabular figures.
+- **A publication, not an app.** The structure is typographic: mastheads, ruled sections, a dateline, columns, a
+  table of contents with leaders, a score sheet. No cards, no shadows, no gradients, no glows.
+- **One obvious action per screen:** `.btn.primary`, a full-width bar of ink by day and lamp-gold by night
+  (Започни, Напред, Сподели резултата, Играй главата). Everything else is a text link (`.link`) or an outlined
+  button (`.btn`).
+- **Colour only where it means something:** right (green), wrong (red), the one action, a chapter's own colour as a
+  small accent (its kicker, its picture, its track), and the gold petal of the mark (today, in the streak's week, the
+  caret). Everything else is ink on paper in three strengths.
+- **Numbers are the heroes.** The date, the score, the streak, the share of a chapter known: set huge in the
+  numeral face, tabular. Words around them are small and plain.
 - **Game feel comes only from data the game has** (see Game feel below). No currencies, shops, unlocks or made-up
   numbers: what adds up across games is the Алманах (the facts collected, how well each topic is known) and the
   streak, and a note in the book is a fact of the player's games (DECISIONS.md, „The redesign“).
-- **Few taps.** Every game starts one tap from Начало (the count before a topic's run starts by itself). Only a
-  tap starts one: a game come to otherwise (a reload, back or forward, a link from outside) waits on a still screen
-  (`startScreen()`, `.start-screen`: what it is, or where it was left with its pips, and „Започни“ or „Продължи“).
-  A screen shows what it's for first and its details after, and folds away what's rarely needed (how a game is
-  played, the rest of a list) instead of listing it.
+- **Few taps.** Every game starts one tap from where it's offered. Only a tap starts one: a game come to otherwise (a
+  reload, back or forward, a link from outside) waits on a still screen (`startScreen()`, `.start-screen`: what it
+  is, or where it was left with its pips, and „Започни“ or „Продължи“).
 - **Leaving asks.** While leaving costs something (a question with its time running), every
   way out (a link, the browser's or a phone's back, the game's arrow) asks first, saying what it costs
   (`guardLeaving()`). A way back (`back()`, a game's arrow) goes back in the history when that's the page it points
   to, and never piles up an entry; back comes to a page scrolled where it was. A game left half-way says so where it
-  starts (its tile: „Продължи · въпрос 4 от 10“; a duel, its row in Приятели: „Довърши своята игра“).
-- **Phone first.** The layout is one column, at most 40rem wide, with a 16px gutter. Every screen fits a 320px phone
-  without scrolling sideways, with the text at its usual size and at twice it (see Large text).
-- **A big screen uses its width** (see Wide screens), and never changes how a phone looks: its rules live in
-  `min-width` blocks.
+  starts (a duel, its row in Приятели: „Довърши своята игра“).
+- **Phone first.** Every screen fits a 320px phone without scrolling sideways, with the text at its usual size and
+  at twice it (see Large text), a 20px gutter.
+- **A big screen is a spread, not a stretched phone:** from 56.25rem (900px) the gutter is 48px and the page up to
+  1270px, two "pages" side by side divided by a vertical hairline; its rules live in `min-width` blocks and never
+  change how a phone looks.
 
 ## Places
 
-Four main places, in a bar at the bottom of a phone (in the header on a big screen). Nothing else goes in the bar.
+Three places (DECISIONS.md, „The redesign“): **Днес** (`/`), **Алманах** (`/almanac`) and **Приятели** (`/friends`).
+Профил and Настройки open from the player's avatar in the bar's corner (`/me`, `/settings`). Nothing else gets a
+place.
+
+- **The frame** (`app.ts`): the bar (`.frame .bar`): the rosette (`rosette()`, three ink petals and one gold) and
+  „АЛМАНАХ“ in Literata, spaced capitals, a way to Днес; on a big screen the three places as words (`.places`, the
+  current one bold with a 3px ink underline), the issue on the right („Брой 9 · 20 ноември“, `.bar-issue`, except
+  on Днес, whose dateline says it) and the avatar (`.bar-me`, 32px, round); without a profile (or on a new
+  visitor's cover) „Вход“ there instead (`.bar-in`, to Профил's way in). The double rule under it (2px and 1px,
+  2px apart). On a phone the three places are words at the foot (`.places-foot`, no icons; the current one bold
+  with a 3px ink tab on its top rule; a dot on Приятели while someone asks to be friends). The frame steps aside
+  while a game is under way (`html.playing`), and the places on a new visitor's cover (`html.cover`: Днес before any
+  game begun).
 
 - **Начало** (`/`): the day first. The streak (a way to Профил); the day's ten as the
   day's issue (`.masthead`: the weekday and „Брой 6“ on a hairline, the date set large, „17 ноември“, a hairline
@@ -101,23 +118,15 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   with the drawn name). Before a first duel sent to a friend: „Как да те виждат останалите?“, „Готово“ gold.
   A name field never asks
   the browser for a full name (`autocomplete` nickname or off: `fields.test.ts`).
-- **Класации** (`/ranks`): Днес (the day's board, first) and Знания; of
-  everyone or of friends.
-  Empty, a board says what the game knows: among friends with none yet, „Още нямаш приятели…“ and „Добави приятел“
-  gold (to Приятели); Знания short of its threshold, „Имаш 20 от 100 отговора. Още 80 и влизаш в класацията.“ A row of the day's
-  board says what places it: the right answers big („9 от 10“), the points that break a tie small
-  under them (on a phone under 22.5rem, the score under the name, so that the name shows whole).
-- **Профил** (`/me`): its own two places in a switch at the top (`profileNav()`): Общо (the player: streak,
+- **Профил** (`/me`, from the avatar in the bar): the player (streak,
   numbers,
   the facts in the Алманах, mastery (once a topic has a mark; each row a way to play the topic), latest games (the
   day's ten as their issue, „Брой 7“, the date under it; today's each a way to go over it, read-only: `/games/<id>`,
   the score as its result had it and the questions; those of days gone by plain rows) and „Всички игри“ (`/games`:
-  every game, by day under its dateline, Всички · Броеве · Теми · С други, a page at a time)) and Алманах
-  (`/almanac`). Настройки open from the button beside the name, its icon and its word at every width (an icon alone
+  every game, by day under its dateline, Всички · Броеве · Теми · С други, a page at a time)). Настройки open from the button beside the name, its icon and its word at every width (an icon alone
   is read by few). The avatar is a tap from choosing another (`/avatar`, „Смени аватара“ under the name too): what's
-  worn as others see it, then the six colours and the fifteen animals, every one anyone's from the first day, a tap
-  wearing it. The switch names the place, so Алманах has no heading of its own on the screen (it's there for screen
-  readers).
+  worn as others see it, then the fifteen animals, each in its own colours, every one anyone's from the first day, a
+  tap wearing it.
   **Моят Алманах** reads as one list, in the order the facts were learned, the first first: the count in the numeral face („42 факта досега“, or a
   topic's „7 от 24 факта в „История““), and what they are in a line; the notes the book keeps of the player's
   milestones („Отбелязано“: a streak of 7, 30, 100 or 365 days, a first ten of ten, a chapter complete, each with its
@@ -210,75 +219,72 @@ on a phone 160px wide; it holds that way (`e2e/text.spec.ts`):
 
 ## Colour
 
-Night is on `:root`; Day replaces it under `prefers-color-scheme: light`, unless Night is chosen, and wherever Day
-is chosen („Изглед“ in Настройки: `data-scheme` on `<html>`, `lib/prefs.ts`; not in
-the app, which follows the phone). So each Day rule is written twice, `:root:not([data-scheme="night"])` under the
-media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds them equal). Never call this choice
-„Тема“: in the game a „тема“ is what questions are about. A rule never holds a literal colour: it takes a token.
+Day (paper) is on `:root`; Night replaces it under `prefers-color-scheme: dark`, unless Day is chosen, and wherever
+Night is chosen („Изглед“ in Настройки: `data-scheme` on `<html>`, `lib/prefs.ts`). So each Night rule is written
+twice, `:root:not([data-scheme="day"])` under the media query and `:root[data-scheme="night"]` outside it
+(`scheme.test.ts` holds them equal). Night is not the day inverted: a deep blue-black page under a lamp, so the one
+action turns lamp-gold and the numerals paper-white. Never call this choice „Тема“: in the game a „тема“ is what
+questions are about. A rule never holds a literal colour: it takes a token.
 
-- **Grounds, back to front:** `--bg` (the page), `--surface` (cards that hold information), `--hero` (the one hero
-  card: the surface in Night, a warm white in Day, so the day outranks the tiles), `--raised` (things you press:
-  buttons, answers) and `--sunken` (tracks, wells, inputs, a question not played yet). Set them apart with depth
-  (`--elev-1`, `--elev-2`) and `--line`, not with borders; an answer's edge is `--edge` (the line in Night, stronger
-  in Day, where white answers sit on a light page).
-- **Text:** `--text` and `--text-muted`. Links, focus and the player's own choice use `--accent` (`--link`).
-- **Fills:** `--gold`, `--lilac`, `--right`, `--wrong`, `--sky`, `--rose`, `--silver` and `--bronze`, always with
-  `--on-fill` text on them. A meaning set as text uses its `-ink` twin: `--gold-ink`, `--right-ink`, `--wrong-ink`,
-  `--sky-ink` or `--rose-ink`. Gold as a big number (24px and up, or 22px bold: the streak, points just earned, the
-  winner's score) and as the time bar is `--gold-display`: gold in both themes, where `--gold-ink`, made for small
-  words, turns brown in Day.
-- **What each colour means:**
-  - `gold`: the one right answer (see Principles).
-  - `accent`: where the player is (the place in the bar, a line under it in the header, never a glow), their own
-    choice.
-  - `right`: a right answer.
-  - `wrong`: a wrong answer, the last five seconds, deleting.
-  - `rose`: duels and friends (an invitation to a duel, the record between two friends).
-  - `silver` and `bronze`: second and third place.
-- **Topics** keep one colour everywhere: `toneOf(category)` in `ui.ts` gives gold, lilac, sky, rose or mint, in
-  the bank's order. Each also has its picture (see Pictures).
-- **Right, close and wrong never rest on hue alone.** Each also gets ✓, ∼ or ✕, the word, and a filled or hollow
-  mark. Wherever they're marked after the moment (the pips of a run, a result, Начало's day played, a duel's marks,
-  the review), they look the same: right filled in `--right` with ✓, the strongest; close
-  hollow, a `--gold-ink` ring with ∼; wrong quiet, the `--sunken` of a question not played yet with a muted ✕. The red
-  is the answer card's, in the moment, and the verdict's. „Вярно или невярно“ is the one exception on the answers themselves: a ✓ or ✕ on „Вярно“ and „Невярно“ reads
-  as the answer's own word, so they have none, before or after; the verdict under them carries the mark and the word,
-  and gone over later (a review), the right one says „верният отговор“ under its word.
-- **Contrast:** text holds at least 4.5:1 on its ground in both themes. `e2e/a11y.spec.ts` checks this with axe.
+| Token                                      | Day                               | Night                             | Use                                               |
+| ------------------------------------------ | --------------------------------- | --------------------------------- | ------------------------------------------------- |
+| `--paper`                                  | `#f6f1e7`                         | `#121620`                         | the page                                          |
+| `--paper-2`                                | `#ede6d8`                         | `#1a1f2b`                         | the player's own row, a pressed option, a well    |
+| `--paper-3`                                | `#e3dac8`                         | `#242a38`                         | a pressed key                                     |
+| `--ink`                                    | `#1c1915`                         | `#eee7d8`                         | text, headings, numerals, filled squares          |
+| `--ink-2`                                  | `#4a443b`                         | `#c4bcad`                         | decks, secondary text                             |
+| `--ink-3`                                  | `#675f53`                         | `#9c9586`                         | kickers, meta, labels                             |
+| `--rule`                                   | `#d9cfbd`                         | `#2a3040`                         | hairlines between rows, tracks                    |
+| `--rule-2`                                 | `#8f8169`                         | `#68728a`                         | control outlines (an option's ring, a switch off) |
+| `--rule-ink`                               | `#1c1915`                         | `#c4bcad`                         | section rules, the double rule                    |
+| `--action` / `--on-action`                 | `#1c1915` / `#f6f1e7`             | `#e8b84b` / `#17130a`             | the one action                                    |
+| `--right` / `--right-ink` / `--right-wash` | `#2f8a57` / `#1e6a43` / `#e2eedf` | `#5fc08e` / `#7fd3a6` / `#173127` | a right answer: its mark, its words, its row      |
+| `--wrong` / `--wrong-ink` / `--wrong-wash` | `#c2493a` / `#a8372a` / `#f6e2db` | `#e9796a` / `#f2907f` / `#38201f` | the same for a wrong one                          |
+| `--gold` / `--gold-ink`                    | `#d9a21b` / `#855b00`             | `#e8b84b`                         | the mark's petal, today's square, the caret       |
+
+- **Chapters** keep one colour everywhere, the cloth of each chapter's binding (`--t-<topic>`, set as `--t` by
+  `.t-<topic>`; text-safe on paper and paper-2 in both themes): general `#87600f`/`#d9ae55`, science
+  `#1f6e76`/`#6cc0c8`, history `#8c3a2e`/`#e08c7d`, geography `#4f682a`/`#a9c277`, movies `#7a4580`/`#c99ace`, music
+  `#3b55a0`/`#94a9ec`, sports `#9a481b`/`#ee9a68`, technology `#43648a`/`#91b2d8`, literature `#9c3f60`/`#e596b2`,
+  nature `#376e41`/`#8ccb95`, Микс `#57514a`/`#bdb6ac`, България `#2e6b4c`/`#7cc59e`. A chapter's drawn picture takes
+  its colour as `--tone`, so a picture always sits in its chapter.
+- **Right and wrong never rest on hue alone:** a ✓ or ✗ in a disc, a filled or an open square, and the words.
+- **Contrast:** text holds at least 4.5:1 on `--paper` and `--paper-2` in both themes, control lines 3:1.
+  `e2e/a11y.spec.ts` checks text with axe.
 
 ## Type
 
-- **Faces:**
-  - Sofia Sans for words (`--font-sans`).
-  - Sofia Sans Extra Condensed for numbers (`--font-numeral`).
-  - Literata italic for the „Знаеше ли?“ facts and nothing else (`--font-serif`).
-- **Our own files:** the faces are served from `web/src/fonts` (SIL OFL 1.1). Never load a font from another host;
-  the CSP allows `font-src 'self'` only.
-- **Bulgarian forms:** the page is `lang="bg"`, so Cyrillic takes its Bulgarian forms (д, т, л). That is intended.
-- **Scale:**
-  - `h1` 34px (40px on wide screens), 800 weight, -0.03em tracking.
-  - `h2` 26px.
-  - The question (`.ask`) 28/34 (24/30 at 320px), 700 weight.
-  - Body 16/24; `.lead` 18/26 in muted.
-  - `.kicker` 12px, 800 weight, capitals with 0.14em tracking, for the date, the topic and section titles.
-  - The day's date on Начало (`.masthead-date`) 44px (56px on wide screens), 800 weight: the one place words are set
-    this large, as an issue's dateline.
-- **Numerals:** 120px for the result, 36px for the question count, 52px for stats and the streak, 32px for figures
-  and points. The numeral face is for digits only: Cyrillic words read badly in it at display
-  size. A word beside a big number (7 „от“ 10, a board's „точки“) is in the words' face, small, muted, on the number's
-  baseline (`.num-word`, `.sub`).
+- **Faces**, our own files in `web/src/fonts` (SIL OFL 1.1; never a font from another host: the CSP allows
+  `font-src 'self'` only), each cut to a file for Bulgarian and one for the rest (`subset.sh`, `fonts.test.ts`):
+  - Literata roman 400–700 (`--font-serif`): headlines, the question, the name in the bar, facts and entries.
+  - Literata italic 500: decks, the month beside a date, a question under its answer, notes.
+  - Sofia Sans 400–900 (`--font-sans`): interface text, buttons, kickers, labels. With `lang="bg"` it draws the
+    Bulgarian letter forms (д, л, т); keep them.
+  - Sofia Sans Extra Condensed 600–900 (`--font-numeral`): every numeral that matters, with tabular figures. It is
+    for digits only: a word beside a big number (7 „от“ 10) is in the words' face, small, on its baseline
+    (`.num-word`).
+- **Scale** (phone / big screen; display type grows at half the rate the text does: Large text):
+  - the hero numeral (the date, the score) 132–200 / 260–400px, 800, line 0.8;
+  - a big figure (the streak, a chapter's share) 64–84px, 800;
+  - `h1` 34 / 54px, Literata 600, −0.012em; the question 25 / 40px; `h2` 25 / 32px; a section's heading 20px;
+  - a deck (`.deck`, `.lead`) 18 / 21px, Literata italic 500, `--ink-2`;
+  - body serif (facts, notes) 16.5–19px, line 1.5; UI 16px, an option 19 / 21px;
+  - small and meta (`.small`) 14px, `--ink-3`; a kicker (`.kicker`) 12px, 700, capitals with 0.14em;
+  - the name in the bar 15 / 17px, Literata 600 capitals with 0.2em.
 - **Case:** sentence case everywhere. Capitals come only through `.kicker` and `.tag`.
 
 ## Shape and depth
 
-- **Radii:** `--radius-md` for buttons, answers and inputs; `--radius-lg` for cards; `--radius-xl` for the one hero
-  card; `--radius-full` for tracks, pills and place discs; `--radius-xs` for trail pips and a question's picture (a
-  flag's corners stay square).
-- **Depth:** `--elev-1` at rest, `--elev-2` on hover or for the hero card.
-- **Glows are rewards:** `--glow-gold` on the primary button, first place and an exact answer; `--glow-right` on a
-  right answer. Nothing else glows: not the place in the bar.
-- **Focus:** one rule for everything (`:focus-visible`): a 2px `--accent` outline, 2px off the edge. An outline
-  follows the corners and no component's own shadow can cover it, so a component never sets its own.
+- **Space** on a 4px base: 4 · 8 · 12 · 16 · 24 · 32 · 48 · 64 (`--space-1` … `--space-8`). A section is 48px from
+  the last; inside, 8–16.
+- **Rules:** a hairline (1px `--rule`) between rows; an ink rule (1px `--rule-ink`) under a section's heading; the
+  double rule (2px and 1px, 2px apart) under the bar and a masthead; a 2px ink underline for a field or the typed
+  number.
+- **Corners:** 3px on buttons and controls (`--radius`), 2px on squares, round for avatars and marks. Nothing else
+  is rounded.
+- **No depth:** no shadows, no glows. What's raised is said by a rule or a wash.
+- **Focus:** one rule for everything (`:focus-visible`): a 2px ink outline, 2px off the edge. A field shows its
+  focus by its underline turning gold.
 
 ## The pieces
 
@@ -487,12 +493,12 @@ Every element that looks like a game measures something the game already counts:
 | Streak   | Days in a row with the day's ten, one missed day a week forgiven; the strip is this week's days played (`week` in `/api/me/stats`)                                                                                                          | Начало, Профил             |
 | Points   | One game's score, per answer and per run, from the server (with the parts for speed and for the row); a right answer about 1000; never added up across games                                                                                | Verdict, result, day board |
 | In a row | Right answers in a row within a game, from the second (the flame and „3 поред“); each earns a tenth more, up to a half                                                                                                                      | Question head, verdict     |
-| Place    | Place on the day's board („12-и от 318 днес“)                                                                                                                                                                                               | Начало, Класации, Профил   |
+| Place    | Place on the day's board („12-и от 318 днес“)                                                                                                                                                                                               | Днес, Приятели             |
 | Mastery  | Share of a topic's questions a player knows, from every answer weighed by its question's hardness (play/mastery.go); told after 10 answers, in six tiers: Новак, Любител (35%), Познавач (50%), Експерт (65%), Майстор (78%), Светило (90%) | Игра, Профил, result       |
 | Notes    | Milestones noted in the book once each: a streak of 7, 30, 100 or 365 days, a first ten of ten on the day's questions, a chapter complete (every fact of a topic); with their day                                                           | Result, Моят Алманах       |
 | Duels    | Each on one's own time, with a friend (who has three days to play the same ten) or against a real recorded game: won of played; between two people, their record („3 : 2“)                                                                  | Приятели, Профил           |
-| Boards   | The day's ten and knowledge (mastery, the share of the questions known, after 100 answers, or 30 in a topic), of everyone or of friends                                                                                                     | Класации                   |
-| Friends  | The day's board among you and your friends, once a friend has played                                                                                                                                                                        | Класации                   |
+| Boards   | The day's ten, of all of България or of friends                                                                                                                                                                                             | Приятели                   |
+| Friends  | The day's board among you and your friends, once a friend has played                                                                                                                                                                        | Приятели                   |
 | Avatars  | A picture on a tone: fifteen animals and six colours, every one anyone's from the first day                                                                                                                                                 | Everywhere a player is     |
 
 Feedback fires once, when it's earned, and then the screen is still again:

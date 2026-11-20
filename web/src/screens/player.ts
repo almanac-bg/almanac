@@ -53,7 +53,7 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
       return [
         h("h1", null, "Няма такъв профил"),
         h("p", { class: "lead" }, error()),
-        h("a", { class: "btn primary", href: "/ranks" }, "Към класациите"),
+        h("a", { class: "btn primary", href: "/friends" }, "Към приятелите"),
       ];
     }
     if (!p) return h("p", { class: "muted" }, "…");

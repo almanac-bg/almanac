@@ -41,9 +41,10 @@ import (
 // screen a daily visit doesn't open loads on its own (web/src/kit.ts) and doesn't count here.
 const firstScreen = 110 << 10
 
-// fontCeiling is how big the fonts a page of Bulgarian may need together may grow: each family's first file (the
-// second, <family>-rest, loads only where a letter of another language shows: web/src/fonts/subset.sh).
-const fontCeiling = 100 << 10
+// fontCeiling is how big the fonts a page of Bulgarian may need together may grow: each face's first file (the
+// second, <face>-rest, loads only where a letter of another language shows: web/src/fonts/subset.sh). Four faces
+// since the edition (Literata roman for headlines and facts): about 124 kB in November 2026.
+const fontCeiling = 140 << 10
 
 // ceiling is how big, brotli-compressed, every script and stylesheet together may grow: about two and a half times the
 // game in November 2026. Growing with the game never reaches it; something pulled in by mistake does. Past it, find

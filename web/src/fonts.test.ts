@@ -25,15 +25,16 @@ function cut(name: string): string {
   return m[1].replace(/\\\n/g, "").replace(/,/g, ", ");
 }
 
+// A face is a family in a style: Literata's roman and its italic are two faces, each with its own two files.
 const faces = [...css.matchAll(/@font-face \{([^}]*)\}/g)].map(([, body = ""]) => ({
-  family: body.match(/font-family: "([^"]+)"/)?.[1] ?? "",
+  family: `${body.match(/font-family: "([^"]+)"/)?.[1] ?? ""} ${body.match(/font-style: ([a-z]+)/)?.[1] ?? "normal"}`,
   file: body.match(/url\("\.\/fonts\/([a-z-]+)\.woff2"\)/)?.[1] ?? "",
   range: (body.match(/unicode-range:\s*([^;]+);/)?.[1] ?? "").replace(/\s+/g, " ").trim(),
 }));
 
-test("each family is a file for Bulgarian and one for the rest, with the ranges they were cut to", () => {
+test("each face is a file for Bulgarian and one for the rest, with the ranges they were cut to", () => {
   const families = new Set(faces.map((f) => f.family));
-  assert.ok(families.size >= 3, "the style has fewer font families than it did: change this test with it");
+  assert.ok(families.size >= 4, "the style has fewer font faces than it did: change this test with it");
   for (const family of families) {
     const files = faces.filter((f) => f.family === family);
     assert.equal(files.length, 2, `${family}: ${files.length} files`);

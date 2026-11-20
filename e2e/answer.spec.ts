@@ -266,7 +266,7 @@ test.describe("on its side", () => {
 /** A question on a phone on its side: the header and the bar of places step aside, as upright; the head is small,
  * the topic still in it; a choice's answers start on the screen; rows of a list are a phone's on its side. */
 async function sideways(page: Page): Promise<void> {
-  await expect(page.locator(".tabs")).toBeHidden();
+  await expect(page.locator(".places-foot")).toBeHidden();
   await expect(page.locator(".question-top")).toHaveClass(/stuck/);
   await expect(page.locator(".question-head .kicker").last()).toBeVisible();
   const tops = await page

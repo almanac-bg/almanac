@@ -22,8 +22,8 @@ var plainPage = template.Must(template.New("page").Parse(`<!doctype html>
 </head>
 <body>
 <div id="app">
-<header class="top"><a class="name" href="/"><img class="mark" src="/favicon.svg" alt="" width="32" height="32">АЛМАНАХ</a><nav class="tabs" aria-label="Основно"><a href="/">Начало</a><a href="/friends">Приятели</a><a href="/ranks">Класации</a><a href="/me">Профил</a></nav></header>
-<main class="screen prose">
+<header class="frame"><div class="bar"><a class="brand" href="/"><svg class="rosette" viewBox="5 5 54 54" aria-hidden="true"><path class="petal gold" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(-45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(135 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(225 32 32)"/></svg>АЛМАНАХ</a><nav class="places" aria-label="Основно"><a href="/">Днес</a><a href="/almanac">Алманах</a><a href="/friends">Приятели</a></nav></div></header>
+<main id="main" class="screen prose">
 <h1>{{.Title}}</h1>
 {{.Body}}
 </main>
@@ -50,7 +50,8 @@ var privacyBody = template.Must(template.New("privacy").Parse(`
 Настройки → Известия. Друго не пращаме.</li>
 <li><strong>Игрите ти</strong>: кои въпроси ти се паднаха, какво отговори и за колко време — за резултатите,
 серията и класациите, и за да виждаме кои въпроси са лесни, трудни или сгрешени. С всяка игра пазим и на какво е
-започната: телефон, таблет или компютър (без марка и модел), за да виждаме къде играта върви добре.</li>
+започната: телефон, таблет или компютър (без марка и модел), за да виждаме къде играта върви добре. Класацията на деня
+(имената и резултатите от днешния брой) виждат само играчите, които вече са го изиграли.</li>
 <li><strong>Записите на игрите ти</strong> — в дуел срещу запис играчът играе същите десет въпроса като в завършена
 игра на друг човек. Така друг играч, дори непознат, може да играе срещу твоя игра по тема или дуел.
 Той те вижда, както те виждат навсякъде в играта: името, потребителското име и аватара ти,

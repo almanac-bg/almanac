@@ -112,7 +112,7 @@ func TestSeededGame(t *testing.T) {
 	}
 	screens := []string{"/api/me", "/api/me/stats", "/api/me/games", "/api/me/games?kind=duel",
 		"POST /api/me/news", "/api/day", "/api/runs/left",
-		"/api/duels", "/api/ranks", "/api/ranks?among=friends", "/api/ranks?topic=history",
+		"/api/duels",
 		"/api/almanac", "/api/friends",
 		"/api/friends/requests", "/api/push/prefs", "/api/mail/prefs"}
 	for _, p := range personas {

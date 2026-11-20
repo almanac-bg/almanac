@@ -24,7 +24,6 @@ let {
   user,
   formatNumber,
   pageArt,
-  profileNav,
   toneOf,
   topicMark,
   notedWords,
@@ -70,7 +69,6 @@ export function almanac(kit: Kit) {
     user,
     formatNumber,
     pageArt,
-    profileNav,
     toneOf,
     topicMark,
     notedWords,
@@ -91,11 +89,9 @@ export function almanac(kit: Kit) {
   return h(
     "section",
     { class: "screen almanac" },
-    // Профил's switch names the place: the heading is for screen readers then, and the page opens on what's in it.
-    () => (user() ? profileNav() : null),
     () =>
       user()
-        ? h("h1", { class: "sr" }, "Моят Алманах")
+        ? h("h1", null, "Моят Алманах")
         : h(
             "div",
             { class: "intro" },

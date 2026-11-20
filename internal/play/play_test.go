@@ -1032,13 +1032,13 @@ func TestAlmanac(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
-	a, err := w.g.AlmanacOf(ctx, ana, "", "", AlmanacPage)
+	a, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage})
 	if err != nil || len(a.Facts) != 0 || a.All != 0 || len(a.Of) == 0 || a.Next != "" {
 		t.Fatalf("an empty almanac: %+v %v", a, err)
 	}
 	s, _ := w.g.StartTopic(ctx, ana, "general")
 	w.play(ana, s.ID, repeat(w.right, Length)...)
-	a, _ = w.g.AlmanacOf(ctx, ana, "", "", AlmanacPage)
+	a, _ = w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage})
 	for _, f := range a.Facts {
 		if f.Fact == "" || f.Answer == "" || f.Category == "" {
 			t.Fatalf("a learned fact: %+v", f)
@@ -1051,17 +1051,17 @@ func TestAlmanac(t *testing.T) {
 	n := len(a.Facts)
 	q := mustQuestion(t, w, a.Facts[0].ID)
 	q.Extra().Retired, q.Extra().RetiredWhy = true, "weak"
-	if a, _ = w.g.AlmanacOf(ctx, ana, "", "", AlmanacPage); a.All != n {
+	if a, _ = w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage}); a.All != n {
 		t.Fatalf("a question retired as weak left the almanac: %d of %d", a.All, n)
 	}
 	q.Extra().RetiredWhy = "wrong"
-	if a, _ = w.g.AlmanacOf(ctx, ana, "", "", AlmanacPage); a.All != n-1 || len(a.Facts) != n-1 {
+	if a, _ = w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage}); a.All != n-1 || len(a.Facts) != n-1 {
 		t.Fatalf("a question retired as wrong stayed learned: %d of %d", a.All, n)
 	}
 }
 
-// The almanac comes a page at a time, by topic or of all: every fact once, in the order learned, whatever is learned
-// between one page and the next (it comes at the end); the counts are of the whole.
+// The almanac comes a page at a time, by chapter or of all: every fact once, the latest learned first, whatever is
+// learned between one page and the next (it comes at the top, on the next look); the counts are of the whole.
 func TestAlmanacPages(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -1080,7 +1080,7 @@ func TestAlmanacPages(t *testing.T) {
 		var got []string
 		from := ""
 		for range len(ids) + 1 {
-			a, err := w.g.AlmanacOf(ctx, ana, topic, from, size)
+			a, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Topic: topic, From: from, Limit: size})
 			if err != nil || len(a.Facts) > size || a.All < len(ids) {
 				t.Fatalf("a page of %d: %d facts of %d (%v)", size, len(a.Facts), a.All, err)
 			}
@@ -1096,6 +1096,7 @@ func TestAlmanacPages(t *testing.T) {
 		return nil
 	}
 	want := slices.Clone(ids)
+	slices.Reverse(want)
 	if got := all("", 4, func() {}); !slices.Equal(got, want) {
 		t.Fatalf("all, by fours:\n%v\nwant\n%v", got, want)
 	}
@@ -1111,7 +1112,7 @@ func TestAlmanacPages(t *testing.T) {
 	if got := all("history", 3, func() {}); len(history) == 0 || !slices.Equal(got, history) {
 		t.Fatalf("history, by threes: %v, want %v", got, history)
 	}
-	// A fact learned while the player scrolls comes at the end, after the pages under way.
+	// A fact learned while the player scrolls comes at the top: the pages under way go on as they were.
 	var fresh string
 	for _, q := range w.b.Live("general", "") {
 		if q.Extra().Fact != "" {
@@ -1125,12 +1126,29 @@ func TestAlmanacPages(t *testing.T) {
 			learned = true
 			w.knowsAt(ana, 1000, fresh)
 		}
-	}); !slices.Equal(got, append(slices.Clone(want), fresh)) {
+	}); !slices.Equal(got, want) {
 		t.Fatalf("pages with a fact learned between them: %v", got)
 	}
-	if a, _ := w.g.AlmanacOf(ctx, ana, "", "", 1); len(a.Facts) != 1 || a.Facts[0].ID != ids[0] || a.All != len(ids)+1 ||
-		a.Have["general"] != 1 {
-		t.Fatalf("the first fact learned first: %+v", a)
+	if a, _ := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: 1}); len(a.Facts) != 1 || a.Facts[0].ID != fresh ||
+		a.All != len(ids)+1 || a.Have["general"] != 1 || a.Have[MixTopic] != len(ids)+1 || a.Facts[0].Kind != "topic" {
+		t.Fatalf("the latest fact first: %+v", a)
+	}
+	// Found by its words, as they're written or not: a word of its answer finds it, in its chapter and in all.
+	f := mustQuestion(t, w, ids[0])
+	word := strings.ToUpper(strings.Fields(bank.AnswerText(f))[0])
+	for _, topic := range []string{"", f.Base().Category, MixTopic} {
+		a, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Topic: topic, Search: word, Limit: AlmanacPage})
+		if err != nil || !slices.ContainsFunc(a.Facts, func(l Learned) bool { return l.ID == ids[0] }) {
+			t.Fatalf("searched %q in %q: %+v %v", word, topic, a.Facts, err)
+		}
+		for _, l := range a.Facts {
+			if !strings.Contains(strings.ToLower(l.Question+" "+l.Answer+" "+l.Fact), strings.ToLower(word)) {
+				t.Fatalf("searched %q, found %+v", word, l)
+			}
+		}
+	}
+	if a, _ := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Search: "щщщщщ", Limit: AlmanacPage}); len(a.Facts) != 0 || a.All == 0 {
+		t.Fatalf("a search that finds nothing: %+v", a)
 	}
 }
 

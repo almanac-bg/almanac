@@ -1,6 +1,7 @@
-// Day is written twice in each stylesheet: for a light system (unless Night is chosen), and chosen whatever the system
-// says (prefs.ts: scheme). The two must say the same, or Day chosen looks unlike Day by the device; and no rule may ask
-// the system alone, or Night chosen on a light system would come out half Day.
+// A look not the first is written twice in each stylesheet: for a system set to it (unless the other is chosen), and
+// chosen whatever the system says (prefs.ts: scheme). Night is app.css's second look (Day, paper, is its first); the
+// admin's page is the other way round. The two must say the same, or Night chosen looks unlike Night by the device;
+// and no rule may ask the system alone, or Day chosen on a dark system would come out half Night.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -24,15 +25,20 @@ function rules(css: string, from: number): Map<string, string> {
   }
 }
 
+/** The look a system's setting asks for, as the page names it when chosen (data-scheme), and the other one. */
+const looks = { light: ["day", "night"], dark: ["night", "day"] } as const;
+
 for (const sheet of sheets) {
   const css = readFileSync(new URL(`./${sheet}`, import.meta.url), "utf8");
-  const light = [...css.matchAll(/@media \(prefers-color-scheme: light\) \{/g)];
+  const blocks = [...css.matchAll(/@media \(prefers-color-scheme: (light|dark)\) \{/g)];
 
-  test(`${sheet}: Day chosen is Day by the device`, () => {
-    for (const m of light) {
+  test(`${sheet}: a look chosen is the look by the device`, () => {
+    for (const m of blocks) {
+      const [look, other] = looks[m[1] as "light" | "dark"];
+      const unlessOther = `:root:not([data-scheme="${other}"])`;
       for (const [selector, body] of rules(css, (m.index ?? 0) + m[0].length)) {
-        assert.match(selector, /:root:not\(\[data-scheme="night"\]\)/, `${sheet}: "${selector}" ignores Night chosen`);
-        const chosen = selector.replaceAll(':root:not([data-scheme="night"])', ':root[data-scheme="day"]');
+        assert.ok(selector.includes(unlessOther), `${sheet}: "${selector}" ignores ${other} chosen`);
+        const chosen = selector.replaceAll(unlessOther, `:root[data-scheme="${look}"]`);
         const twins = [
           ...css.matchAll(new RegExp(`\\n  ${chosen.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\{([^}]*)\\}`, "g")),
         ];

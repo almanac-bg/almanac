@@ -29,6 +29,39 @@ func bootOf(t *testing.T, p *player, path string) map[string]any {
 	return v
 }
 
+// The day's board names its players only to one who has finished the day: a visitor, a new player's cover and the
+// page a shared day's link opens carry how many played, never who (a score shared beside the names would say whose
+// it is).
+func TestDayBoardNamesOnlyThoseWhoPlayedIt(t *testing.T) {
+	g := start(t)
+	ana, _ := g.guest()
+	_, run := ana.call("POST", "/api/day", map[string]any{})
+	playRun(ana, run)
+	top := func(day map[string]any) []any {
+		b, _ := day["board"].(map[string]any)
+		if b == nil {
+			t.Fatalf("no board: %v", day)
+		}
+		list, _ := b["top"].([]any)
+		return list
+	}
+	visitor := g.player()
+	if day, _ := bootOf(t, visitor, "/")["day"].(map[string]any); len(top(day)) != 0 {
+		t.Fatalf("a visitor's Начало names who played: %v", top(day))
+	}
+	_, day := visitor.call("GET", "/api/day", nil)
+	if len(top(day)) != 0 || day["board"].(map[string]any)["players"] != float64(1) {
+		t.Fatalf("a visitor's day: %v", day["board"])
+	}
+	bo, _ := g.guest()
+	if _, day := bo.call("GET", "/api/day", nil); len(top(day)) != 0 {
+		t.Fatalf("before the day is played: %v", top(day))
+	}
+	if _, day := ana.call("GET", "/api/day", nil); len(top(day)) != 1 {
+		t.Fatalf("once it's played: %v", top(day))
+	}
+}
+
 // Начало's page has the day in it, as GET /api/day has it: the page draws it without asking first. Other pages don't
 // carry it. Every page has the server's clock, for the page's own until an answer comes.
 func TestNachaloHasTheDayInItsPage(t *testing.T) {
@@ -51,12 +84,12 @@ func TestNachaloHasTheDayInItsPage(t *testing.T) {
 	if now, _ := boot["now"].(float64); time.Since(time.UnixMilli(int64(now))).Abs() > time.Minute {
 		t.Errorf("the page's clock: %v", boot["now"])
 	}
-	if day, ok := bootOf(t, p, "/ranks")["day"]; ok {
-		t.Errorf("/ranks has the day in it: %v", day)
+	if day, ok := bootOf(t, p, "/friends")["day"]; ok {
+		t.Errorf("/friends has the day in it: %v", day)
 	}
 	// Nothing of the game waits to be met: no page says what's open (play/progress.go).
 	for _, who := range []*player{p, visitor} {
-		if open, ok := bootOf(t, who, "/ranks")["open"]; ok {
+		if open, ok := bootOf(t, who, "/friends")["open"]; ok {
 			t.Errorf("a page says what's open: %v", open)
 		}
 	}

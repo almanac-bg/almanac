@@ -87,7 +87,7 @@ function almanacLine(facts: number): Child {
 }
 
 /** Профил's numbers (`load`: the stats, asked for already by whoever shows them): the streak and this week; how well and how much they've played, in one card (the day's place
- * is Начало's and Класации'); the facts in their almanac; how well they know each topic (once one has a mark); their
+ * is Днес's and Приятели'); the facts in their almanac; how well they know each topic (once one has a mark); their
  * latest games. */
 export function stats(load: Promise<Stats> = loadStats()): Child {
   const data = signal<Stats | null>(null);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dateWords, formatNumber, hyphenate, issueWords, stakeWords, weekday, withWord } from "./words.ts";
+import { dateWords, formatNumber, hyphenate, issueOf, issueWords, stakeWords, weekday, withWord } from "./words.ts";
 
 test("a day as the game writes it: the date, the month in lower case; with its issue, a dateline", () => {
   assert.equal(dateWords("2026-11-17"), "17 ноември");
@@ -9,6 +9,13 @@ test("a day as the game writes it: the date, the month in lower case; with its i
   assert.equal(issueWords(6, "2026-11-17"), "Брой 6 · 17 ноември");
   assert.equal(issueWords(0, "2026-11-11"), "11 ноември");
   assert.equal(issueWords(undefined, "2026-11-11"), "11 ноември");
+});
+
+test("a day's issue, as the server counts it (play.Issue)", () => {
+  assert.equal(issueOf("2026-11-12"), 1);
+  assert.equal(issueOf("2026-11-20"), 9);
+  assert.equal(issueOf("2027-03-29"), 138); // across the clocks' change
+  assert.equal(issueOf("2026-11-11"), 0);
 });
 
 test("„със“ before an с or a з, „с“ before anything else", () => {

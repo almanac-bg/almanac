@@ -33,15 +33,15 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // Начало's top tells the streak the day made, and only that.
   await expect(page.locator(".streak-chip")).toContainText("1");
   await expect(page.locator(".status-row .status-item")).toHaveCount(1);
-  // Класации opens on the day's board, the player on it.
-  await page.goto("/ranks");
-  await expect(page.locator(".board .row.me")).toContainText(/\d от 10\d[\d\s]* точки$/);
-  await expect(page.getByRole("tab")).toHaveText(["Днес", "Знания", "Всички", "Приятели"]);
+  // Приятели has the day's board: of friends (none yet), and of all България, the player on it.
+  await page.goto("/friends");
+  await expect(page.getByRole("tab")).toHaveText(["Приятели", "България"]);
+  await page.getByRole("tab", { name: "България" }).click();
+  await expect(page.locator(".day-board .rank-row.me")).toContainText(/\d от 10\s*[\d\s]+$/);
   // A row is the place, the name and the score: no level, no title.
-  await expect(page.locator(".board .lv, .board .who-title")).toHaveCount(0);
+  await expect(page.locator(".day-board .lv, .day-board .who-title")).toHaveCount(0);
   await page.goto("/me");
   await expect(page.locator(".streak")).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Профил" }).getByRole("link")).toHaveText(["Общо", "Алманах"]);
 
   // A second game tells what points are no more: once is enough.
   await openGame(page, "/play/history");
@@ -218,7 +218,7 @@ test("the day left after its third question waits on Начало, and goes on f
   const day = page.locator(".card.day");
   await expect(day).toContainText("Следва въпрос 4 от 10.");
   await expect(day.locator(".trail li:is(.right, .partial, .wrong)")).toHaveCount(3);
-  await expect(page.locator(".tabs")).toBeVisible();
+  await expect(page.locator(".places-foot")).toBeVisible();
   await expect(page.locator(".topics")).toBeVisible();
   // The card waits: no question's time starts behind it, a reload included.
   await page.waitForTimeout(4000);
@@ -358,8 +358,8 @@ test.describe("on a computer", () => {
     page,
   }) => {
     test.setTimeout(120_000);
-    await page.goto("/ranks");
-    await page.getByRole("link", { name: "Начало" }).click();
+    await page.goto("/friends");
+    await page.getByRole("link", { name: "Днес" }).click();
     await expect(page.locator(".day")).toBeVisible();
     // The way in for a player with a profile is a line under the day, not a column of its own: one centred column.
     await expect(page.locator(".home-main").getByRole("button", { name: "Имаш профил? Влез" })).toBeVisible();

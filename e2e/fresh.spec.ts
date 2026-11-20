@@ -26,14 +26,14 @@ test("a page loaded before a deploy opens its next screen by loading anew, and n
   expect(await marked(page)).toBe(true);
 
   // Out of the game, to another screen: it comes with the page loaded anew.
-  await page.goto("/ranks");
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await page.goto("/friends");
+  // Its day's board is an answer of the server's: the page is behind.
+  await expect(page.locator(".day-board :is(.rank-row, .board-empty)").first()).toBeVisible();
   await mark(page);
-  await page.getByRole("tab", { name: "Знания" }).click(); // an answer of the server's: the page is behind
   const loaded = page.waitForEvent("load");
-  await page.locator("nav.tabs a[href='/friends']").click();
+  await page.locator("nav.places-foot a[href='/almanac']").click();
   await loaded;
-  await expect(page).toHaveURL(/\/friends$/);
+  await expect(page).toHaveURL(/\/almanac$/);
   expect(await marked(page)).toBe(false);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 });
@@ -41,15 +41,15 @@ test("a page loaded before a deploy opens its next screen by loading anew, and n
 test("a screen's own file gone with a deploy: the page loads anew for it, once", async ({ page }) => {
   let refused = 0;
   await page.route(
-    "**/assets/ranks-*.js",
+    "**/assets/friends-*.js",
     (route) => {
       refused++;
       return route.fulfill({ status: 404, body: "" });
     },
     { times: 1 },
   );
-  await page.goto("/ranks");
-  await expect(page.getByRole("heading", { name: "Класации" })).toBeVisible();
+  await page.goto("/friends");
+  await expect(page.getByRole("heading", { name: "Приятели", level: 1 })).toBeVisible();
   expect(refused).toBe(1);
   await expect(page.getByRole("alert")).toHaveCount(0);
 });

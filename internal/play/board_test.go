@@ -224,7 +224,8 @@ func TestDayRights(t *testing.T) {
 	}
 }
 
-// The day's average shows once DayCrowdFrom have finished the day, to a tenth.
+// The day's average shows once DayCrowdFrom have finished the day, to a tenth, and how many got each count of right
+// answers with it.
 func TestBoardAverage(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -247,8 +248,14 @@ func TestBoardAverage(t *testing.T) {
 		if i < DayCrowdFrom-1 && b.Average != 0 {
 			t.Fatalf("an average of %d players: %v", i+1, b.Average)
 		}
+		if i < DayCrowdFrom-1 && b.Spread != nil {
+			t.Fatalf("the spread of %d players: %v", i+1, b.Spread)
+		}
 		if i == DayCrowdFrom-1 && b.Average != 2.9 {
 			t.Fatalf("the average of %d players: %v", i+1, b.Average)
+		}
+		if want := []int{2, 2, 1, 1, 1, 1, 1, 1, 0, 0, 0}; i == DayCrowdFrom-1 && !slices.Equal(b.Spread, want) {
+			t.Fatalf("the spread: %v, want %v", b.Spread, want)
 		}
 	}
 }

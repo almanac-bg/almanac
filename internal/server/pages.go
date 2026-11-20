@@ -31,7 +31,7 @@ import (
 var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/$`),
 	regexp.MustCompile(`^/play/[a-z]+$`),
-	regexp.MustCompile(`^/(ranks|avatar|me|friends|settings|almanac|games)$`),
+	regexp.MustCompile(`^/(avatar|me|friends|settings|almanac|games)$`),
 	regexp.MustCompile(`^/duel/([0-9]{1,12}|new)$`),
 	regexp.MustCompile(`^/games/[0-9]{1,12}$`),
 	regexp.MustCompile(`^/hand/[A-Za-z0-9_-]{43}$`),
@@ -52,7 +52,6 @@ var screens = []struct {
 	{regexp.MustCompile(`^/almanac$`), "almanac.js"},
 	{regexp.MustCompile(`^/games$`), "games.js"},
 	{regexp.MustCompile(`^/games/[0-9]{1,12}$`), "played.js"},
-	{regexp.MustCompile(`^/ranks$`), "ranks.js"},
 	{regexp.MustCompile(`^/friends$`), "friends.js"},
 	{regexp.MustCompile(`^/players/[A-Za-z0-9_]{3,20}$`), "player.js"},
 }
@@ -120,8 +119,8 @@ var shell = template.Must(template.New("shell").Parse(`<!doctype html>
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="bg_BG">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#f5f3fa" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#110c20" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f1e7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121620" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -183,7 +182,13 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		"outcomeCss": m["outcome.css"],       // a duel's result: its style, loaded with it
 		"now":        time.Now().UnixMilli(), // the clock the page keeps until the API's first answer (lib/api.ts)
 	}
-	// Начало draws the day as the page comes, without asking for it first: a round trip less on every visit. Should
+	// The player's avatar, in the corner of every page (web/src/app.ts): without it, the corner would wait on a question.
+	if u != nil {
+		if look, err := s.game.LookOf(r.Context(), u.ID); err == nil {
+			start["avatar"] = look.Avatar
+		}
+	}
+	// Днес draws the day as the page comes, without asking for it first: a round trip less on every visit. Should
 	// it fail, the page asks for it as any other.
 	// A shared day's link is Начало too, with the day shared: its issue, its date and its shape.
 	if (r.URL.Path == "/" || isShared) && r.Method == http.MethodGet {
