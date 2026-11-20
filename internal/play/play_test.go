@@ -1,6 +1,7 @@
 package play
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -29,6 +31,9 @@ type world struct {
 	next  int64
 	// pace, if set, is how long a player takes over question n (three seconds otherwise).
 	pace func(n int) time.Duration
+	// inPlay is the bank the game plays, swapped as the server swaps it on a reload (one atomic pointer): a test puts
+	// a bank in play with use or swap, never by setting Game.Bank while the game's background work may read it.
+	inPlay atomic.Pointer[bank.Bank]
 }
 
 func setup(t *testing.T) *world {
@@ -39,14 +44,33 @@ func setup(t *testing.T) *world {
 	if b == nil {
 		t.Fatal(problems)
 	}
-	w := &world{t: t, db: db, b: b, now: time.Date(2026, 11, 12, 10, 0, 0, 0, Bulgaria)}
-	w.g = &Game{DB: db, Bank: func() *bank.Bank { return b }, Now: func() time.Time {
+	w := &world{t: t, db: db, now: time.Date(2026, 11, 12, 10, 0, 0, 0, Bulgaria)}
+	w.use(b)
+	w.g = w.newGame()
+	return w
+}
+
+// newGame is a game on the world's database, bank in play and clock, as a server (or one started again) makes it. Its
+// background work (the follow-ups of runs, the counts) is waited for as the test ends, before its database closes:
+// none writes into a database, or a folder, that is going away.
+func (w *world) newGame() *Game {
+	g := &Game{DB: w.db, Bank: w.inPlay.Load, Now: func() time.Time {
 		w.clock.Lock()
 		defer w.clock.Unlock()
 		return w.now
 	}}
-	return w
+	w.t.Cleanup(func() { g.Settled(context.Background()) })
+	return g
 }
+
+// use makes b the world's bank (w.b) and puts it in play.
+func (w *world) use(b *bank.Bank) {
+	w.b = b
+	w.swap(b)
+}
+
+// swap puts b in play, w.b left as it was.
+func (w *world) swap(b *bank.Bank) { w.inPlay.Store(b) }
 
 func (w *world) user() int64 {
 	w.t.Helper()

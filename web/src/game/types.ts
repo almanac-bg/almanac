@@ -177,6 +177,18 @@ export interface State {
   trail: Mark[];
   question?: Shown;
   done: boolean;
+  /** In a duel played second, how the other side's answers went as far as the player has come (play.State.Against):
+   * each question answered; of the one shown, only when they answered it (`ms`), if they did. */
+  against?: TheirMark[];
+}
+
+/** How a question of a duel went for the other side (play.DuelMark), as the player's run has it: their points wait for
+ * the end. */
+export interface TheirMark {
+  right?: boolean;
+  partial?: boolean;
+  missed?: boolean;
+  ms: number;
 }
 
 export interface Result {

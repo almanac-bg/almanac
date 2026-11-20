@@ -3,6 +3,7 @@ package play
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"testing"
 	"time"
 )
@@ -83,5 +84,58 @@ func TestAfterRetryAcrossMidnight(t *testing.T) {
 			t.Fatalf("player %d: the week noted on Sunday %d, on Monday %d", u, week(u, "2026-11-15"),
 				week(u, "2026-11-16"))
 		}
+	}
+}
+
+// Yesterday's run still being played just after midnight (within DayGrace) leaves yesterday open: the streak isn't
+// told as forgiven or ended at 00:03 for a day that counts once it's finished at 00:05; once the grace is over, it's
+// missed.
+func TestStreakWaitsForYesterdaysRun(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo, cy := w.user(), w.user(), w.user()
+	w.at(15, 23, 50, 0)
+	w.daysPlayed(ana, 6, 5, 4, 3, 2) // Monday to Friday; Saturday missed: the week's day forgiven
+	w.daysPlayed(bo, 6, 5, 4, 3, 2, 1)
+	w.daysPlayed(cy, 6, 5, 4, 3, 2)
+	half := func(user int64) int64 {
+		w.at(15, 23, 58, 0)
+		s, err := w.g.StartDay(ctx, user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.playOn(user, s.ID, 0, repeat(w.right, Length/2)...)
+		return s.ID
+	}
+	aRun, bRun := half(ana), half(bo)
+	half(cy)
+	streak := func(user int64) StreakNow {
+		t.Helper()
+		s, err := w.g.StreakOf(ctx, user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	w.at(16, 0, 3, 0)
+	if s := streak(ana); s.Days != 5 || s.Ended != nil || !slices.Equal(s.Forgiven, []string{"2026-11-14"}) {
+		t.Fatalf("Ana at 00:03, Sunday's run under way: %+v", s)
+	}
+	if s := streak(bo); s.Days != 6 || s.Ended != nil || len(s.Forgiven) != 0 {
+		t.Fatalf("Bo at 00:03, Sunday's run under way: %+v", s)
+	}
+	w.at(16, 0, 5, 0)
+	w.playOn(ana, aRun, Length/2, repeat(w.right, Length-Length/2)...)
+	w.playOn(bo, bRun, Length/2, repeat(w.right, Length-Length/2)...)
+	if s := streak(ana); s.Days != 6 || s.Ended != nil {
+		t.Fatalf("Ana, Sunday finished at 00:05: %+v", s)
+	}
+	if s := streak(bo); s.Days != 7 || len(s.Forgiven) != 0 {
+		t.Fatalf("Bo, Sunday finished at 00:05: %+v", s)
+	}
+	// Cy left Sunday's run unfinished: past the grace, Sunday is missed, the week's second, and the streak ends.
+	w.at(16, 0, 30, 0)
+	if s := streak(cy); s.Days != 0 || s.Ended == nil || s.Ended.On != "2026-11-15" || s.Ended.Days != 5 {
+		t.Fatalf("Cy, Sunday left past the grace: %+v", s)
 	}
 }

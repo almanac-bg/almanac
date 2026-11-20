@@ -63,7 +63,7 @@ func TestBulgariaTopic(t *testing.T) {
 			}
 		}
 	}
-	w.g.Bank = func() *bank.Bank { return b2 }
+	w.swap(b2)
 	if err := w.g.EnsureDays(ctx); err != nil {
 		t.Fatal(err)
 	}

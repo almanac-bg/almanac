@@ -286,8 +286,8 @@ func TestRelabelPaysAsShown(t *testing.T) {
 }
 
 // A day with a question void is a game of the nine that count wherever it's counted: nine of nine right is all right
-// (the achievement, the goal), a row goes over it, a result is told out of nine (the boards, the friends, the games played), the rarest
-// right answer is never the void one, and an answer sent again just before the void one gets its reply again.
+// (its bonus, a first ten of ten in the book), a row goes over it, a result is told out of nine (the boards, the
+// friends, the games played), the rarest right answer is never the void one, and an answer sent again just before the void one gets its reply again.
 func TestVoidDayIsOfNine(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()

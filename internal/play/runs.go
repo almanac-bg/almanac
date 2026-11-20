@@ -281,17 +281,15 @@ func (g *Game) Left(ctx context.Context, userID int64) ([]LeftRun, error) {
 const MostForgiven = 2
 
 // StreakNow is a player's streak: the days in a row they've finished the day's questions (up to today, or yesterday
-// while today isn't played yet), the days missed that it forgave, whether this week still has its day to forgive
-// (Spare), the last streak that ended, if one did, and the longest the player has had (this one, maybe).
+// while today isn't played yet; and a day still being played just after its midnight, within DayGrace, is played
+// yet neither), the days missed that it forgave, whether this week still has its day to forgive (Spare), the last
+// streak that ended, if one did, and the longest the player has had (this one, maybe).
 type StreakNow struct {
 	Days     int      `json:"days"`
 	Best     int      `json:"best"`
 	Forgiven []string `json:"forgiven"`
 	Spare    bool     `json:"spare"`
 	Ended    *Ended   `json:"ended,omitempty"`
-	// Unbroken is how many days in a row, one after another, the player has finished the day's questions with no
-	// day forgiven between them: „Година без пропуск“ (progress.go).
-	Unbroken int `json:"-"`
 }
 
 // Ended is a streak that ended: how many days it had, and the day that ended it (the second day missed in a week).
@@ -311,11 +309,13 @@ func (g *Game) StreakOf(ctx context.Context, userID int64) (StreakNow, error) {
 }
 
 // streakHistory is what a streak is made of: the days a player finished the day's questions on (first: the first of
-// them, "" for none), and the days missed before today's rule, as they were judged then (kept: true, ended: false).
+// them, "" for none), the days missed before today's rule, as they were judged then (kept: true, ended: false), and
+// yesterday, if its run is still being played (open: within DayGrace of its midnight, it may count yet).
 type streakHistory struct {
 	played map[string]bool
 	missed map[string]bool
 	first  string
+	open   string
 }
 
 // streakDays are a player's days as the streak counts them (streakHistory), over the last ten years.
@@ -344,7 +344,25 @@ func (g *Game) streakDays(ctx context.Context, userID int64) (streakHistory, err
 			h.first = day
 		}
 	}
-	return h, rows.Err()
+	if err := rows.Err(); err != nil {
+		return h, err
+	}
+	// Yesterday's run, unfinished but not over (dayOver: its DayGrace, or a question shown before it ended still in
+	// its time): the day isn't missed yet, as it counts if it's finished now.
+	now := g.Now()
+	r := run{kind: "day", day: DayShift(now.In(Bulgaria).Format(time.DateOnly), -1)}
+	err = g.DB.Read.QueryRowContext(ctx, `SELECT shown_at FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?
+		AND finished_at IS NULL`, userID, r.day).Scan(&r.shownAt)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return h, nil
+	case err != nil:
+		return h, err
+	}
+	if !r.dayOver(now) {
+		h.open = r.day
+	}
+	return h, nil
 }
 
 // walkStreak goes over a player's days from the first played to today, as StreakOf tells them. saw, if set, hears of
@@ -357,9 +375,8 @@ func walkStreak(h streakHistory, today string, saw func(day string, forgiven boo
 		switch {
 		case h.played[day]:
 			s.Days++
-			s.Unbroken++
 			s.Best = max(s.Best, s.Days)
-		case day == today || s.Days == 0: // not played yet (the streak runs to yesterday), or no streak to keep
+		case day == today || day == h.open || s.Days == 0: // not played yet (it may be still), or no streak to keep
 		default:
 			kept, judged := h.missed[day]
 			if !judged {
@@ -367,7 +384,6 @@ func walkStreak(h streakHistory, today string, saw func(day string, forgiven boo
 			}
 			if kept {
 				used = monday(d)
-				s.Unbroken = 0
 				s.Forgiven = append(s.Forgiven, day)
 				if saw != nil {
 					saw(day, true, 0)
@@ -378,7 +394,7 @@ func walkStreak(h streakHistory, today string, saw func(day string, forgiven boo
 			if saw != nil {
 				saw(day, false, s.Days)
 			}
-			s.Days, s.Unbroken, s.Forgiven = 0, 0, s.Forgiven[:0]
+			s.Days, s.Forgiven = 0, s.Forgiven[:0]
 		}
 		d = d.AddDate(0, 0, 1)
 	}

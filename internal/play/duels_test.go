@@ -122,10 +122,9 @@ func TestFriendDuel(t *testing.T) {
 	if wt, _ := w.g.DuelsWaiting(ctx, bo); wt == nil || wt.ID != id || wt.N != 1 {
 		t.Fatalf("waiting for Bo: %+v", wt)
 	}
-	// Bo's turn: Ana's marks come for his screen, their points left for the end.
+	// Bo's turn: nothing of how Ana's answers went before he plays them (they come with his run, as far as he goes).
 	d, err := w.g.DuelOf(ctx, bo, id)
-	if err != nil || d.State != DuelYours || len(d.Opponent.Marks) != Length || d.Opponent.Marks[0].Points != 0 ||
-		!d.Opponent.Marks[0].Right || d.Opponent.Points != 0 || len(d.You.Marks) != 0 {
+	if err != nil || d.State != DuelYours || len(d.Opponent.Marks) != 0 || d.Opponent.Points != 0 || len(d.You.Marks) != 0 {
 		t.Fatalf("Bo's turn: %+v %v", d, err)
 	}
 
@@ -308,7 +307,7 @@ func TestRecordingDuel(t *testing.T) {
 	}
 	d, err := w.g.DuelOf(ctx, gal, id)
 	if err != nil || !d.Recorded || d.Topic != "history" || d.State != DuelYours || d.Opponent.ID != owner ||
-		len(d.Opponent.Marks) != Length || d.Opponent.Marks[0].Ms == 0 || d.Opponent.Marks[0].Points != 0 {
+		len(d.Opponent.Marks) != 0 {
 		t.Fatalf("against a recording: %+v %v", d, err)
 	}
 	run := w.playSide(gal, id, repeat(w.wrong, Length))
@@ -326,6 +325,62 @@ func TestRecordingDuel(t *testing.T) {
 }
 
 // The same points: the quicker wins only by a second or more over the game (TieBand); closer, it's a draw.
+// Played second, the other side's answers come with the run as far as the player has come, and no further: of the
+// question shown, only when they answered it; how it went for them, once the player's own answer is in; their
+// points, at the end. The one who plays first hears nothing of the other's (there's nothing yet).
+func TestDuelTheOtherAsFarAsYouGo(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo := w.user(), w.user()
+	w.befriend(ana, bo)
+	id, err := w.g.DuelFriend(ctx, ana, bo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	aRun := w.playSide(ana, id, nil)
+	if s := w.show(ana, aRun); s.Against != nil {
+		t.Fatalf("played first, the other's: %+v", s.Against)
+	}
+	w.play(ana, aRun, repeat(w.right, Length)...)
+
+	run := w.playSide(bo, id, nil)
+	if s, err := w.g.State(ctx, bo, run); err != nil || len(s.Against) != 0 {
+		t.Fatalf("before the first question: %+v %v", s.Against, err)
+	}
+	for n := range 3 {
+		s := w.show(bo, run)
+		if len(s.Against) != n+1 || s.Against[n] != (DuelMark{Ms: s.Against[n].Ms}) || s.Against[n].Ms == 0 {
+			t.Fatalf("question %d shown, the other's: %+v", n+1, s.Against)
+		}
+		w.wait(3 * time.Second)
+		res, err := w.answer(bo, run, n, w.wrong(run, n))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if a := res.State.Against; len(a) != n+1 || !a[n].Right || a[n].Points != 0 || a[n].Ms == 0 {
+			t.Fatalf("question %d answered, the other's: %+v", n+1, a)
+		}
+	}
+	// Nothing of it in the duel either, until its end.
+	if d, err := w.g.DuelOf(ctx, bo, id); err != nil || len(d.Opponent.Marks) != 0 {
+		t.Fatalf("the duel mid-run: %+v %v", d.Opponent, err)
+	}
+	for n := 3; n < Length; n++ {
+		w.show(bo, run)
+		w.wait(3 * time.Second)
+		res, err := w.answer(bo, run, n, w.wrong(run, n))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if a := res.State.Against; len(a) != n+1 || !a[n].Right { // the last one too, as the run ends
+			t.Fatalf("question %d answered, the other's: %+v", n+1, a)
+		}
+	}
+	if d, err := w.g.DuelOf(ctx, bo, id); err != nil || len(d.Opponent.Marks) != Length || d.Opponent.Marks[0].Points == 0 {
+		t.Fatalf("the duel's end: %+v %v", d.Opponent, err)
+	}
+}
+
 func TestTieBand(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()

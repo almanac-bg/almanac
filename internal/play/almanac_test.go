@@ -31,7 +31,7 @@ func (w *world) knowsAt(user, at int64, ids ...string) {
 	}
 }
 
-// The almanac's achievements count facts collected: a question with a fact, answered right once, whatever came
+// The almanac counts the facts collected: a question with a fact, answered right once, whatever came
 // before or after; a wrong answer or a time-out counts nothing, and neither does a question without a fact.
 func TestFactsCollected(t *testing.T) {
 	w := setup(t)

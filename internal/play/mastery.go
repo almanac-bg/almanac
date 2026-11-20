@@ -265,8 +265,8 @@ type querier interface {
 // topic, and over all of them. The answers to a question that turned out untrue (bank.Tail.Untrue: its key was wrong,
 // or stopped being right) say nothing of what a player knows, and are left out. Finished says: only those of the games
 // they finished (what others see of them, ProfileOf: never a game under way, answer by answer).
-// All of them, read on the read pool, are kept for the player's games as they stand (memo.go): a profile, a draw and
-// an achievement's measure each ask for them, and they move only as the player plays.
+// All of them, read on the read pool, are kept for the player's games as they stand (memo.go): a profile, the book's
+// chapters, a game's result and a duel's draw each ask for them, and they move only as the player plays.
 func (g *Game) abilities(ctx context.Context, db querier, h *hardnesses, userID, until int64, finished bool) (map[string]ability, ability, error) {
 	b := g.Bank()
 	if until != 0 || db != g.DB.Read {
