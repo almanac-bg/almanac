@@ -107,7 +107,9 @@ test("a round streak is told by its sheet, not first by its chip: the number rol
   await watchSheet(page);
   await playRun(page);
   const sheet = page.getByRole("dialog", { name: "3 дни поред с въпросите на деня." });
-  await expect(sheet).toBeVisible();
+  // It waits for the result to land and the chips to grow (a new level here: its bar fills, its number rolls, it fills
+  // again), about four seconds, longer on a slow machine.
+  await expect(sheet).toBeVisible({ timeout: 10_000 });
   await expect(sheet).toContainText("Получаваш резервен ден: ако пропуснеш ден, серията остава.");
   const said = await heard(page);
   expect(said[0]).toBe("2дни поред unlit");
@@ -120,35 +122,43 @@ test("a round streak is told by its sheet, not first by its chip: the number rol
   await expect(sheet).toBeHidden();
   const seen = await page.evaluate(() => (window as unknown as { sheetSeen: SheetSeen }).sheetSeen);
   expect(seen.through, "frames with the sheet see-through").toBe(0);
-  expect(seen.away, "frames of the sheet sliding away, still open").toBeGreaterThan(1);
+  expect(seen.away, "the sheet, put away: still open, sliding down").toEqual({ open: true, sliding: true });
   expect(await page.evaluate(() => scrollY)).toBe(scrolled);
 });
 
-/** What a frame-by-frame look at the big-news sheet saw: in how many frames it was see-through (it or its panel less
- * than opaque), and in how many it was still open, its panel lower than it came to rest, going away. */
+/** What a look at the big-news sheet saw: in how many frames it was see-through (it or its panel less than opaque),
+ * and, as „Продължи“ was tapped, whether it was still open with its panel sliding down. The slide is read off its
+ * animation, not counted in frames: a slow machine (WebKit on CI) may draw none of its 200 ms. */
 interface SheetSeen {
   through: number;
-  away: number;
+  away?: { open: boolean; sliding: boolean };
 }
 
 async function watchSheet(page: Page): Promise<void> {
   await page.evaluate(() => {
-    const seen: SheetSeen = { through: 0, away: 0 };
+    const seen: SheetSeen = { through: 0 };
     (window as unknown as { sheetSeen: SheetSeen }).sheetSeen = seen;
-    let rest = Number.POSITIVE_INFINITY;
     let opened = false;
     const frame = () => {
       const box = document.querySelector("dialog[open]");
       const panel = box?.firstElementChild;
       if (box && panel) {
         opened = true;
-        const top = panel.getBoundingClientRect().top;
         if (Number(getComputedStyle(box).opacity) < 1 || Number(getComputedStyle(panel).opacity) < 1) seen.through++;
-        if (top > rest + 1) seen.away++;
-        else rest = Math.min(rest, top);
       } else if (opened) return;
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
+    // A tap on its button bubbles here after the sheet's own handlers have run: what they left.
+    document.addEventListener("click", (e) => {
+      const box = (e.target as Element).closest("dialog.sheet");
+      const panel = box?.firstElementChild;
+      if (!(box instanceof HTMLDialogElement) || !panel || seen.away) return;
+      const sliding = panel.getAnimations().some((a) => {
+        const frames = (a.effect as KeyframeEffect | null)?.getKeyframes() ?? [];
+        return a.playState === "running" && frames.at(-1)?.transform === "translateY(100%)";
+      });
+      seen.away = { open: box.open, sliding };
+    });
   });
 }
