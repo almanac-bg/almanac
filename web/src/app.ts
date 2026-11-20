@@ -100,6 +100,7 @@ if (root) {
       { path: /^\/duel\/new$/, view: duelNew },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
       { path: /^\/almanac$/, view: later(() => import("./screens/almanac.ts").then((m) => m.almanac)) },
+      { path: /^\/almanac\/([a-z]+)$/, view: later(() => import("./screens/almanac.ts").then((m) => m.chapter)) },
       { path: /^\/avatar$/, view: later(() => import("./screens/avatar.ts").then((m) => m.avatarChoice)) },
       { path: /^\/friends$/, view: later(() => import("./screens/friends.ts").then((m) => m.friends)) },
       { path: /^\/settings$/, view: later(() => import("./screens/settings.ts").then((m) => m.settings)) },

@@ -31,6 +31,7 @@ import (
 var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/$`),
 	regexp.MustCompile(`^/play/[a-z]+$`),
+	regexp.MustCompile(`^/almanac/[a-z]+$`),
 	regexp.MustCompile(`^/(avatar|me|friends|settings|almanac|games)$`),
 	regexp.MustCompile(`^/duel/([0-9]{1,12}|new)$`),
 	regexp.MustCompile(`^/games/[0-9]{1,12}$`),
@@ -49,7 +50,7 @@ var screens = []struct {
 	{regexp.MustCompile(`^/me$`), "me.js"},
 	{regexp.MustCompile(`^/settings$`), "settings.js"},
 	{regexp.MustCompile(`^/avatar$`), "avatar.js"},
-	{regexp.MustCompile(`^/almanac$`), "almanac.js"},
+	{regexp.MustCompile(`^/almanac(/[a-z]+)?$`), "almanac.js"},
 	{regexp.MustCompile(`^/games$`), "games.js"},
 	{regexp.MustCompile(`^/games/[0-9]{1,12}$`), "played.js"},
 	{regexp.MustCompile(`^/friends$`), "friends.js"},
@@ -245,6 +246,11 @@ func (s *Server) there(r *http.Request) bool {
 	switch {
 	case strings.HasPrefix(p, "/play/"):
 		return s.game.IsTopic(strings.TrimPrefix(p, "/play/"))
+	case strings.HasPrefix(p, "/almanac/"):
+		// A chapter of the book: every topic's, „Микс“, and „България“ even while its game is closed (its facts are
+		// the player's all the same).
+		t := strings.TrimPrefix(p, "/almanac/")
+		return t == play.BulgariaTopic || s.game.IsTopic(t)
 	case strings.HasPrefix(p, "/duel/") && p != "/duel/new":
 		id, _ := strconv.ParseInt(strings.TrimPrefix(p, "/duel/"), 10, 64)
 		yes, err = s.game.DuelExists(ctx, id)

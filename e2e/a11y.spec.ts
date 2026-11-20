@@ -14,6 +14,7 @@ for (const scheme of ["light", "dark"] as const) {
       "/friends",
       "/settings",
       "/almanac",
+      "/almanac/history",
       "/privacy",
       "/play/geography",
     ]) {
