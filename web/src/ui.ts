@@ -9,8 +9,10 @@ import { hourInBulgaria } from "./lib/day.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { calm, type Scheme, scheme, setScheme } from "./lib/prefs.ts";
 import { path } from "./lib/router.ts";
-import { stakeWords } from "./lib/words.ts";
+import { formatNumber, stakeWords } from "./lib/words.ts";
 import { categories, opened } from "./state.ts";
+
+export { formatNumber };
 
 export type VerdictKind = "exact" | "right" | "partial" | "wrong" | "time";
 
@@ -21,12 +23,6 @@ export const verdictWords: Record<VerdictKind, string> = {
   wrong: "Не е това.",
   time: "Времето изтече.",
 };
-
-/** A number as people write it in Bulgarian: a space between thousands from 10 000 up, a decimal comma. */
-export function formatNumber(n: number, step = 1): string {
-  const decimals = Math.max(0, (String(step).split(".")[1] ?? "").length);
-  return new Intl.NumberFormat("bg", { maximumFractionDigits: decimals, useGrouping: Math.abs(n) >= 10000 }).format(n);
-}
 
 /** Points rising to `to` from `from`, once (at once where there's to be less motion); `prefix` goes before them. */
 export function countUp(to: number, from = 0, prefix = ""): HTMLElement {

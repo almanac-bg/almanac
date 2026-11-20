@@ -29,6 +29,26 @@ test("the browser's back asks in the day's ten, opened from outside, and never l
   await expect(page).toHaveURL(/\/$/);
 });
 
+test("the browser's back in a topic asks, its address kept while it does; „Излез“ comes to Начало", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator(".topics").getByRole("link", { name: "История" }).click();
+  await page.getByRole("button", { name: "Започни сега" }).click();
+  await expect(page.locator(".question-head")).toContainText("1 от 10");
+  // Back once, then again while it asks: the game's address stays, the question with it.
+  for (let i = 0; i < 2; i++) {
+    await page.goBack();
+    await expect(page.getByText(asked)).toBeVisible();
+    await page.waitForTimeout(300);
+    await expect(page).toHaveURL(/\/play\/history$/);
+    await expect(page.locator(".question-head")).toContainText("1 от 10");
+  }
+  await page.getByRole("button", { name: "Излез" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toContainText("Продължи");
+});
+
 test("a topic counts in only after a tap; a reload goes back to its question, and keeps its result", async ({
   page,
 }) => {

@@ -114,7 +114,7 @@ var Achievements = []Achievement{
 	{"master", "Като петте си пръста", "Стигни до „Майстор“ в една тема.", "cap", Epic, 1, false},
 	{"duel10", "Десет победи", "Спечели десет дуела.", "blades", Epic, 10, false},
 	{"topicPerfect", "Тема без грешка", "Отговори вярно и на десетте въпроса в игра по тема.", "spark", Epic, 1, true},
-	{"allTypes", "Всеки вид въпрос", "Отговори вярно на всеки вид въпрос: с четири отговора, с число, с подреждане, „Вярно или невярно“ и с двойки.", "clover", Epic, 5, true},
+	{"allTypes", "Всеки вид въпрос", "Отговори вярно на всеки вид въпрос: с четири отговора, с число, с подреждане, „Вярно или невярно“, с двойки, с две групи и с подсказки.", "clover", Epic, len(bank.Types()), true},
 	{"royalWin", "Вечерта е твоя", "Спечели Роял.", "", Epic, 1, false},
 	{"fullDays30", "Тридесет пълни дни", "Изпълни и трите цели за деня в тридесет различни дни.", "", Epic, 30, false},
 
@@ -483,11 +483,13 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		(SELECT count(DISTINCT category) FROM runs WHERE user_id = ?1 AND kind = 'topic' AND finished_at IS NOT NULL
 			AND category NOT IN ('`+MixTopic+`', ?3)),
 		(SELECT count(*) FROM (SELECT DISTINCT CASE
-				WHEN json_type(a.given, '$.pick') IS NOT NULL THEN 'choice'
+				WHEN json_type(a.given, '$.pick') IS NOT NULL THEN
+					CASE WHEN a.question_id IN (SELECT value FROM json_each(?5)) THEN 'clues' ELSE 'choice' END
 				WHEN json_type(a.given, '$.value') IS NOT NULL THEN 'number'
 				WHEN json_type(a.given, '$.order') IS NOT NULL THEN 'order'
 				WHEN json_type(a.given, '$.truth') IS NOT NULL THEN 'truefalse'
-				WHEN json_type(a.given, '$.pairs') IS NOT NULL THEN 'match' END AS t
+				WHEN json_type(a.given, '$.pairs') IS NOT NULL THEN 'match'
+				WHEN json_type(a.given, '$.sides') IS NOT NULL THEN 'split' END AS t
 			FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?1 AND a.is_right) WHERE t IS NOT NULL),
 		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'day' AND finished_at IS NOT NULL
 			AND rights = `+countedOf("questions")+`),
@@ -502,7 +504,7 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		(SELECT count(*) FROM (SELECT day FROM goals_done WHERE user_id = ?1 GROUP BY day HAVING count(*) >= ?2)),
 		EXISTS (SELECT 1 FROM royal_players p WHERE p.user_id = ?1 AND p.place = 1
 			AND (SELECT count(*) FROM royal_players o WHERE o.royal_id = p.royal_id) > 1)`,
-		userID, GoalsPerDay, BulgariaTopic, FastMs).
+		userID, GoalsPerDay, BulgariaTopic, FastMs, cluesIDs(g.Bank())).
 		Scan(&games, &duelsWon, &friends, &topicsPlayed, &types, &perfect, &fast, &nightOwl, &earlyBird,
 			&topicPerfect, &fullDays, &royalWin)
 	if err != nil {
@@ -549,6 +551,19 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		"topicPerfect": one(topicPerfect), "allTypes": types,
 		"fullDay": fullDays, "fullDays30": fullDays, "royalWin": one(royalWin),
 	}, nil
+}
+
+// cluesIDs are the bank's questions with clues, as a JSON array: their answer is a pick, as a choice's is, so only the
+// question tells the two kinds apart (allTypes counts each kind of question the bank has).
+func cluesIDs(b *bank.Bank) string {
+	var ids []string
+	for _, q := range b.Questions {
+		if q.Base().Type == "clues" {
+			ids = append(ids, q.Base().ID)
+		}
+	}
+	out, _ := json.Marshal(ids)
+	return string(out)
 }
 
 // anyLastSecond is whether a player has ever answered right in a question's last second.

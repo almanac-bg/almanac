@@ -1,7 +1,9 @@
 // Large text and a finger's room: the text at twice its size (a phone's own setting, or the game's „Размер на
 // текста“ with it) on the narrowest phone scrolls nowhere sideways, and every control on its own has 44px to tap.
+import { readdirSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
-import { startDay } from "./play.ts";
+import { dealt, startDay } from "./play.ts";
 
 /** The text at `percent` of its size from the page's start, as a phone set to large text gives it (a style the page's
  * own rules can't undo; CSP lets the test add it). */
@@ -106,6 +108,116 @@ test.describe("twice the text on a 320px phone", () => {
       await page.goto(path);
       await expect(page.locator("#main h1, #main h2").first()).toBeVisible();
       await fits(page, path);
+    }
+  });
+});
+
+/** What of `selector` can't be seen whole at any scroll of `scroller` (the page, or a box that may scroll on its own:
+ * an answer's panel): its top, middle and foot each come into sight, over everything else, at some scroll. Quick enough
+ * to run while an answer shows (nothing waits for a frame: a scroll lays the page out when it's next asked). */
+async function outOfReach(page: Page, selector: string, scroller?: string): Promise<string[]> {
+  return page.evaluate(
+    ([selector, scroller]) => {
+      const own = scroller ? document.querySelector<HTMLElement>(scroller) : null;
+      const box = own && own.scrollHeight > own.clientHeight + 1 ? own : null; // else the page scrolls it
+      const items = [...document.querySelectorAll<HTMLElement>(selector)].filter((e) => e.getClientRects().length);
+      const max = box ? box.scrollHeight - box.clientHeight : document.documentElement.scrollHeight - innerHeight;
+      const was = box ? box.scrollTop : scrollY;
+      const to = (y: number) => (box ? box.scrollTo(0, y) : scrollTo(0, y));
+      const seen = new Map(items.map((e) => [e, new Set<number>()]));
+      for (let y = 0; y <= max + 8; y += 8) {
+        to(Math.min(y, max));
+        for (const e of items) {
+          const r = e.getBoundingClientRect();
+          [r.top + 4, r.top + r.height / 2, r.bottom - 4].forEach((at, i) => {
+            if (at < 0 || at > innerHeight) return;
+            const hit = document.elementFromPoint(r.left + r.width / 2, at);
+            if (hit && (hit === e || e.contains(hit))) seen.get(e)?.add(i);
+          });
+        }
+      }
+      to(was);
+      return items
+        .filter((e) => (seen.get(e)?.size ?? 0) < 3)
+        .map((e) => `${e.className}: ${(e.textContent ?? "").trim().slice(0, 24)}`);
+    },
+    [selector, scroller ?? ""] as const,
+  );
+}
+
+/** The words of six letters or fewer broken across two lines in `selector` (none ever is: a word breaks only where
+ * it's wider than its cell, and at the usual size or twice it, six letters fit any). */
+async function brokenWords(page: Page, selector: string): Promise<string[]> {
+  return page.evaluate((selector) => {
+    const out: string[] = [];
+    for (const cell of document.querySelectorAll(selector)) {
+      const walk = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+      for (let node = walk.nextNode(); node; node = walk.nextNode()) {
+        for (const m of (node.textContent ?? "").matchAll(/[\p{L}\p{N}­]+/gu)) {
+          const word = m[0].replaceAll("­", "");
+          if (word.length > 6) continue;
+          const range = document.createRange();
+          range.setStart(node, m.index);
+          range.setEnd(node, m.index + m[0].length);
+          const tops = new Set([...range.getClientRects()].filter((r) => r.width).map((r) => Math.round(r.top)));
+          if (tops.size > 1) out.push(word);
+        }
+      }
+    }
+    return out;
+  }, selector);
+}
+
+/** The sample bank's questions, one of each kind: a choice (the one with the longest answer), „Вярно или невярно“,
+ * an order, pairs, groups, clues and a number. */
+function eachKind(): string[] {
+  const dir = resolve(import.meta.dirname, "../bank/sample/questions");
+  type Q = { id: string; type: string; image?: unknown; answer?: unknown; wrong?: string[] };
+  const all = readdirSync(dir).flatMap((f) => JSON.parse(readFileSync(resolve(dir, f), "utf8")) as Q[]);
+  const longest = (q: Q) => Math.max(...[String(q.answer), ...(q.wrong ?? [])].map((o) => o.length));
+  const choice = all.filter((q) => q.type === "choice" && !q.image).sort((a, b) => longest(b) - longest(a))[0];
+  return [
+    choice?.id ?? "",
+    ...["truefalse", "order", "match", "split", "clues", "number"].map(
+      (type) => all.find((q) => q.type === type && !q.image)?.id ?? "",
+    ),
+  ];
+}
+
+test.describe("every kind of question at twice the text on a 320px phone", () => {
+  test.use({ viewport: { width: 320, height: 640 }, bypassCSP: true });
+
+  test("its controls in reach, its words whole, its answer in sight", async ({ page }) => {
+    test.setTimeout(180_000);
+    await textAt(page, 200);
+    await page.goto("/");
+    const ids = eachKind();
+    await dealt(page, "history", ids);
+    await page.goto("/play/history");
+    await page.getByRole("button", { name: "Продължи", exact: true }).click();
+    await page.getByRole("button", { name: "Започни сега" }).click();
+    const cells = "article.question :is(.options .option, .match-item, .split-side, .split-card.top)";
+    for (let n = 0; n < ids.length; n++) {
+      await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${ids.length}`, { timeout: 10_000 });
+      await expect(page.locator("article.question .answering")).toBeVisible();
+      await page.waitForTimeout(300);
+      // Each control is a scroll away, never only under „Готово“, „Отговори“ or the head.
+      const controls = `article.question :is(.keypad button, .match-item, .split-side, .split-back:not([hidden]),
+        .options .option, .answering .btn)`;
+      expect(await outOfReach(page, controls), `question ${n + 1}'s controls`).toEqual([]);
+      expect(await brokenWords(page, cells), `question ${n + 1}'s words`).toEqual([]);
+      await answerAnyhow(page);
+      await expect(page.locator(".after .up-next-go")).toBeVisible({ timeout: 40_000 });
+      await page.waitForTimeout(800); // the answer's beats
+      // The answer: the panel's parts a scroll of the panel away, „Напред“ at its foot over none of them; the answers
+      // (the right one, the whole order) a scroll of the page away, above the panel.
+      expect(await outOfReach(page, ".after > :not(.up-next)", ".after"), `answer ${n + 1}'s panel`).toEqual([]);
+      expect(await outOfReach(page, "article.question .options .option"), `answer ${n + 1}'s answers`).toEqual([]);
+      expect(await brokenWords(page, cells), `answer ${n + 1}'s words`).toEqual([]);
+      await page
+        .locator(".after .up-next-go")
+        .dispatchEvent("click")
+        .catch(() => {}); // moved on by itself
     }
   });
 });

@@ -310,7 +310,7 @@ function meant(d: DuelView): Child {
               "p",
               { class: "duel-rating-top" },
               h("strong", null, "Рейтингът се определя"),
-              h("b", { class: delta > 0 ? "delta up" : "delta down" }, `${delta > 0 ? "+" : ""}${delta}`),
+              h("b", { class: delta > 0 ? "delta up" : "delta down" }, `${delta > 0 ? "+" : ""}${formatNumber(delta)}`),
             ),
             meter(Math.round((100 * (r.rated ?? 0)) / r.of), `${r.rated ?? 0} от ${r.of} игри с рейтинг`),
             h(
@@ -333,7 +333,11 @@ function meant(d: DuelView): Child {
                 "p",
                 { class: "duel-rating-top" },
                 h("strong", null, r.division.name),
-                h("b", { class: delta > 0 ? "delta up" : "delta down" }, `${delta > 0 ? "+" : ""}${delta}`),
+                h(
+                  "b",
+                  { class: delta > 0 ? "delta up" : "delta down" },
+                  `${delta > 0 ? "+" : ""}${formatNumber(delta)}`,
+                ),
               ),
               meter(share(r.after), r.next ? `${share(r.after)}% до ${r.next.name}` : "Най-високата дивизия"),
               h(

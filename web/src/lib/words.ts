@@ -22,6 +22,15 @@ function readsWithS(digits: string): boolean {
   return lead === 7;
 }
 
+/** A number as people write it in Bulgarian: a space between thousands from 10 000 up, a decimal comma, and the minus
+ * sign „−“ below zero (as the pad has it), never a hyphen. */
+export function formatNumber(n: number, step = 1): string {
+  const decimals = Math.max(0, (String(step).split(".")[1] ?? "").length);
+  return new Intl.NumberFormat("bg", { maximumFractionDigits: decimals, useGrouping: Math.abs(n) >= 10000 })
+    .format(n)
+    .replace("-", "−");
+}
+
 /** Several things in a sentence, as Bulgarian lists them: „Мария, Бо и Ци“. */
 export function listWords(list: string[]): string {
   return list.length > 1 ? `${list.slice(0, -1).join(", ")} и ${list.at(-1)}` : (list[0] ?? "");
@@ -77,8 +86,9 @@ const onset = /^[бвгдзкпстфхжшчц][рл]$/;
  * after the first word (a capital: „Майкъл Фарадей“) goes to the next line whole rather than „Фара-дей“, unless it's
  * too long for a line of its own in the narrowest column (nine letters or more: „Куентин Таран-тино“); a first word
  * starts its line, so it breaks only where it's wider than the line, capital or not. The browser breaks a word there,
- * with a hyphen, only where it doesn't fit (a narrow column at 320 px), instead of at any letter: no browser knows
- * Bulgarian hyphenation itself. */
+ * with a hyphen, instead of at any letter: no browser knows Bulgarian hyphenation itself. It fills a line as far as a
+ * soft hyphen lets it, so a cell holds each such word whole (questions.ts, wholeWords): broken only where it's wider
+ * than the cell (a narrow column at 320 px), never where it would fit on the next line. */
 export function hyphenate(text: string): string {
   return text.replace(/[а-яѝ]{7,}/gi, (word, at: number) => {
     const w = word.toLowerCase();

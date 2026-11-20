@@ -111,7 +111,11 @@ function duelRow(d: DuelView): Child {
         h("strong", { class: "duel-state" }, words[d.state]),
         h("span", { class: "muted" }, line),
         d.delta
-          ? h("span", { class: d.delta > 0 ? "delta up" : "delta down" }, `${d.delta > 0 ? "+" : ""}${d.delta}`)
+          ? h(
+              "span",
+              { class: d.delta > 0 ? "delta up" : "delta down" },
+              `${d.delta > 0 ? "+" : ""}${formatNumber(d.delta)}`,
+            )
           : null,
       ),
     ),
