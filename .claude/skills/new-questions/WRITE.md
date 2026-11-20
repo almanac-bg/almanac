@@ -24,8 +24,12 @@ never edit it), `<batch>` (this batch's folder) and your category.
     the tolerance of the skill's formula (`bank check` says the figure). A small count is a choice in disguise. The
     day ends on a hard number, and only a quantity takes that place (a unit, an answer above 20: the day's draw
     doesn't end on a year), so a hard `number` cell is a quantity a well-read person can only estimate, and can
-    estimate: it has an anchor they carry (a height, a distance, an age, a duration, a famous total), never an
-    archive's count (a series' episodes, a hall's seats, a council's members, prize money, the species in a plan).
+    estimate: it has an anchor they carry (a height, a distance, an age, a duration, a famous total), named in its text
+    or fact, never an archive's count (a series' episodes, a hall's seats, a council's members, prize money, the
+    species in a plan, a composer's works, a player's goals or awards, the times something was done: the `countable`
+    rule refuses them). On an offset scale (°C, °, points, a rating) the tolerance is judged, under 1/5 of the answer;
+    and the text shows no number near the answer, in figures or in a name („Стоте дни“).
+  - An easy `truefalse` is a common misconception put plainly, never a truism nobody can miss.
   - `picture`: an easy choice with a picture (see Pictures).
   - **`dated`**: one question for each of your `dates`, in order (the first `count`, the spares on the rest), each with
     `"on": ["MM-DD"]`. A dated question is a choice without a picture (any difficulty), an easy true-or-not, or a hard

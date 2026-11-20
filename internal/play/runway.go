@@ -15,7 +15,8 @@ import (
 //     `almanac bank used`, which gives question ids and nothing else);
 //   - none that belongs to a date („На този ден“): it can go on its own date only, and a day takes one at most;
 //   - none due for review by the first day still to draw (overdue: no game deals it);
-//   - for the number, estimates only (a unit, more than 20): the day finishes on one, and a day without one is short.
+//   - for the number, estimates only (bank.Bank.Estimate: a unit, more than 20, no count of a list unless waived): the
+//     day finishes on one, and a day without one is short.
 //
 // The questions about Bulgaria have a runway of their own (BulgariaRunway): every day takes BGFloor at least. The
 // days already drawn ahead count as covered: a place's runway runs from today through the drawn days, then as many
@@ -102,7 +103,7 @@ func DayRunway(b *bank.Bank, used Used, today string) []Runway {
 		n := 0
 		for _, k := range kinds {
 			for _, q := range b.Live("", k) {
-				if used.left(q, start) && fitsPlace(q, s, k) {
+				if used.left(q, start) && fitsPlace(b, q, s, k) {
 					n++
 				}
 			}
@@ -124,9 +125,9 @@ func BulgariaRunway(b *bank.Bank, used Used, today string) Runway {
 		}
 		if slices.ContainsFunc(daySlots, func(s slot) bool {
 			if s.typ == newKinds[0] {
-				return slices.ContainsFunc(newKinds, func(k string) bool { return fitsPlace(q, s, k) })
+				return slices.ContainsFunc(newKinds, func(k string) bool { return fitsPlace(b, q, s, k) })
 			}
-			return fitsPlace(q, s, s.typ)
+			return fitsPlace(b, q, s, s.typ)
 		}) {
 			n++
 		}
@@ -135,6 +136,6 @@ func BulgariaRunway(b *bank.Bank, used Used, today string) Runway {
 }
 
 // fitsPlace is whether q fits a place of a day just so, as kind k: the number only with an estimate.
-func fitsPlace(q bank.Question, s slot, k string) bool {
-	return matches(q, slot{s.difficulty, k, s.picture, ""}, true, true) && (k != "number" || estimate(q))
+func fitsPlace(b *bank.Bank, q bank.Question, s slot, k string) bool {
+	return matches(q, slot{s.difficulty, k, s.picture, ""}, true, true) && (k != "number" || b.Estimate(q))
 }

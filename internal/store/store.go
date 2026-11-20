@@ -30,6 +30,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/url"
+	"os"
 	"regexp"
 	"runtime"
 	"slices"
@@ -141,6 +142,29 @@ func (db *DB) keepOptimized(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// OpenReadOnly opens the database at path to read it only: no migration, no statistics, no write (its one pool is
+// read-only and query_only), so that a command run beside the server on its live database (`almanac bank days`, `bank
+// used`) can't change it, however old or new the program is. A database that isn't there is an error, never a new one.
+func OpenReadOnly(path string) (*DB, error) {
+	if _, err := os.Stat(path); err != nil {
+		return nil, err
+	}
+	pragmas := url.Values{}
+	for _, p := range []string{"busy_timeout(5000)", "query_only(1)"} {
+		pragmas.Add("_pragma", p)
+	}
+	r, err := sql.Open("sqlite", "file:"+path+"?mode=ro&"+pragmas.Encode())
+	if err != nil {
+		return nil, err
+	}
+	r.SetMaxOpenConns(2)
+	if err := r.Ping(); err != nil {
+		r.Close()
+		return nil, err
+	}
+	return &DB{Write: r, Read: r, Scan: r}, nil
 }
 
 func (db *DB) Close() error {

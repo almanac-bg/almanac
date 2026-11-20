@@ -44,6 +44,16 @@ What the rules ask (the questions skill has the details):
   may be the one to change; change whichever loses least, and only one of the two.
 - **same-identity**: keep the better of the two, replace the other (`why`: twin).
 - **estimate**: see replace above. **tolerance**: set the formula's value (the questions skill).
+- **countable** (a number that counts a list's items: works, awards, articles, seats, goals, times): ask what about
+  the subject a player can place (a year, a size, a duration), or make it a choice; replace it if it then asks
+  something else. Only a true anchor everyone has (the Bible's 66 books) stays, as a waiver whose `why` names it.
+- **offset-scale**: judge the tolerance a well-read guess misses by, under 1/5 of the answer (an Elo of 2 816: 60–100
+  points), linear. **own-number**: reword so the text shows no number near the answer, or ask the subject another
+  way („Стоте дни“: from which island Napoleon returns).
+- **present**: pin the career, show or office to its years („От 2018 до 2023 г. се бие в UFC“), or set `reviewBy`
+  if it is still so and may change.
+- **twin**: give one of the two other options of the same kind (or replace the weaker, `why`: twin): the change goes
+  to the newer one unless the older is the weaker.
 - **stale**: pin it to a date („към 2026 г.“) and add `reviewBy`, or reword to what doesn't change.
 - **dated**: write the `day` line (what happened on that day, naming it: „На 16 декември 1982 г. умира Колин
   Чапман.“). Take the date out of the text unless the date is what's asked. If the fact only repeated the date, write a
@@ -63,6 +73,11 @@ What the rules ask (the questions skill has the details):
   notes and judge the question on the sources alone. A **suspect**: most players answered otherwise; find out who's right, as for **blind**. A **review**:
   what it says may have stopped being true; confirm it now and set a new `reviewBy` (a year or two on), or reword it to
   what doesn't change, or replace it (`why`: stale). Nothing wrong: keep, and say the source.
+- **judge: days** (a question of an issue to come: the item says the day): judge it whole by the questions skill,
+  as a player meets it that day: the answer and every option right today under every source; the fact true and not
+  restated; nothing stale; an easy true-or-not a common misconception, never a truism; the day's last number with an
+  anchor a well-read player has, named in its text or fact; no twin or subject again within the week (`<work>/days.txt`
+  shows them); filed under the right topic. Nothing wrong: keep, and say the source.
 - **judge: easy-picture** (an easy choice with a picture, the day's second place): the picture must be the question
   (a place, a face, a species, a work, something people confuse), never "name this everyday object", and a quarter of
   Bulgarian adults still miss it. If it's trivial, replace it with a good one in the same cell; pictures as in

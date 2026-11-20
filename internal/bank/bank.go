@@ -45,6 +45,8 @@ type Bank struct {
 	// Questions are every question, retired ones too, by category in the order of Categories, then as in its file.
 	Questions []Question
 	byID      map[string]Question
+	// waived are the rules the bank's waivers lift, by question: [id, rule].
+	waived map[[2]string]bool
 }
 
 // Of is a bank of these questions as they are (read with Decode), unchecked: a fixture a test builds in code, where

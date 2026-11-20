@@ -8,6 +8,7 @@
 //	almanac bank suspects [dir]         the questions whose players' answers speak against the key (DB_PATH)
 //	almanac bank reports [-resolve ids] the players' open reports of questions, as JSON lines; or mark them resolved (DB_PATH)
 //	almanac bank used                   the question ids the days have had, for -used (DB_PATH; nothing of a player's)
+//	almanac bank days [-n N] [-from D] [-json] [dir]  the next N days' tens as drawn (DB_PATH, read-only), to review them
 //	almanac bank plan [-n N] [-json] [-used file] [dir]  plan a batch of N new questions a category, where the day needs them most
 //	almanac bank add [-check] [-checked-by P] <batch> [dir]  add, change and retire a checked batch: all of it or nothing (-check: only check)
 //	almanac backup now [-force]         copy the database to the backups at once
@@ -87,5 +88,5 @@ func run(args []string) error {
 }
 
 func usage() error {
-	return fmt.Errorf("usage: almanac serve | bank check [-sample] [-used file] [-live dir] [dir] | bank lint [-rule R,…] [-summary] [dir] | bank fmt [dir] | bank subjects [dir] | bank calibrate [dir] | bank suspects [dir] | bank reports [-resolve ids] | bank used | bank plan [-n N] [-json] [-used file] [dir] | bank add [-check] [-checked-by P] <batch> [dir] | backup now [-force] | backup list | backup restore [-identity F] [-unencrypted] [-into-place [-confirm KEY]] <key|latest> [path] | backup verify [-identity F] [key|latest] | backup proven <code> | backup keys | admin [-remove] <email> | seed [-players N] [-days N] [-seed N] [-state dir] (DEV=1, a new DB_PATH) | push keys | migrations | version")
+	return fmt.Errorf("usage: almanac serve | bank check [-sample] [-used file] [-live dir] [dir] | bank lint [-rule R,…] [-summary] [dir] | bank fmt [dir] | bank subjects [dir] | bank calibrate [dir] | bank suspects [dir] | bank reports [-resolve ids] | bank used | bank days [-n N] [-from day] [-json] [dir] | bank plan [-n N] [-json] [-used file] [dir] | bank add [-check] [-checked-by P] <batch> [dir] | backup now [-force] | backup list | backup restore [-identity F] [-unencrypted] [-into-place [-confirm KEY]] <key|latest> [path] | backup verify [-identity F] [key|latest] | backup proven <code> | backup keys | admin [-remove] <email> | seed [-players N] [-days N] [-seed N] [-state dir] (DEV=1, a new DB_PATH) | push keys | migrations | version")
 }

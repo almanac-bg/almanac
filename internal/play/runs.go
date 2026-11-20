@@ -29,24 +29,17 @@ func (g *Game) day(tx *sql.Tx, day string, b *bank.Bank) ([]Pick, error) {
 	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
-	used := map[string]bool{}
-	rows, err := tx.Query(`SELECT questions FROM days`)
+	days, err := storedDays(tx, "")
 	if err != nil {
 		return nil, err
 	}
-	for rows.Next() {
-		var s string
-		var picks []Pick
-		if err := rows.Scan(&s); err != nil || json.Unmarshal([]byte(s), &picks) != nil {
-			rows.Close()
-			return nil, errors.Join(err, errors.New("a stored day can't be read"))
-		}
+	used := map[string]bool{}
+	for _, picks := range days {
 		for _, p := range picks {
 			used[p.ID] = true
 		}
 	}
-	rows.Close()
-	picks, _ := drawDay(b, day, used, nil, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+	picks, _ := drawDay(b, day, used, nil, recentSubjects(b, days, day), mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 	if len(picks) == 0 {
 		return nil, ErrNoQuestion
 	}

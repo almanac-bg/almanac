@@ -51,6 +51,40 @@ func TestOpenMigratesAndReopens(t *testing.T) {
 	}
 }
 
+// A read-only opening reads a live database (the server's, open beside it) and changes nothing: no write goes
+// through, none is made for it, and a database that isn't there isn't made.
+func TestOpenReadOnly(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "game.db")
+	if _, err := OpenReadOnly(path); err == nil {
+		t.Fatal("opened a database that isn't there")
+	}
+	if _, err := os.Stat(path); err == nil {
+		t.Fatal("made a database to read")
+	}
+	live, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer live.Close()
+	if _, err := live.Write.Exec(`INSERT INTO kv (key, value) VALUES ('k', 'v')`); err != nil {
+		t.Fatal(err)
+	}
+	db, err := OpenReadOnly(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var v string
+	if err := db.Read.QueryRow(`SELECT value FROM kv WHERE key = 'k'`).Scan(&v); err != nil || v != "v" {
+		t.Fatalf("read %q, %v", v, err)
+	}
+	for _, pool := range []*sql.DB{db.Write, db.Read, db.Scan} {
+		if _, err := pool.Exec(`DELETE FROM kv`); err == nil {
+			t.Fatal("a write went through")
+		}
+	}
+}
+
 func TestRefusesNewerDatabase(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "game.db")
 	db, err := Open(path)

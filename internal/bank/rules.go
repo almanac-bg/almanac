@@ -1,6 +1,7 @@
 package bank
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"os"
@@ -21,7 +22,13 @@ import (
 // always. A true exception is waived by the bank's WaiversFile, with its reason.
 
 // StrictFrom is when the rules below became errors for new questions: a question added since then passes all of them.
+// A rule added later is strict from its own day (Rule.From), so that the questions added between are warned of, not
+// refused with a bank that loaded the day before.
 const StrictFrom = "2026-11-17"
+
+// AuditFrom is when the rules the days' audit asked for (countable, offset-scale, own-number, present, twin) became
+// errors for new questions.
+const AuditFrom = "2026-11-21"
 
 // WaiversFile lists, in a bank's directory, the questions a rule doesn't hold for, and why: [{"id", "rule", "why"}].
 // It belongs to the bank (its ids are that bank's questions), so the private bank keeps its own.
@@ -41,6 +48,8 @@ type Rule struct {
 	Says string
 	// Hint: never an error, even for a new question (the check is a heuristic: it finds what to look at).
 	Hint bool
+	// From is when the rule became an error for new questions (StrictFrom if empty).
+	From string
 	// one judges a question by itself (nil for a rule over the bank).
 	one func(q Question) []string
 	// all judges the bank's live questions together.
@@ -63,9 +72,13 @@ var Rules = []Rule{
 	{Name: "language", Says: "Bulgarian words, not the Russian words and loanwords in language.json", one: ruleLanguage},
 	{Name: "spelling", Says: "a name spelled one way, as names.json says", one: ruleSpelling},
 	{Name: "stale", Says: "wording that can stop being true („към 2026 г.“, „все още“, a record held) has reviewBy", one: ruleStale},
+	{Name: "present", Says: "a career, a show or an office told as now (играе за, води предаването, е президент на), with no year, has reviewBy", From: AuditFrom, one: ruleStalePresent},
 	{Name: "estimate", Says: "a number question is an estimate: a year, or a quantity over 20 of its steps (a small count is a choice)", one: ruleEstimate},
 	{Name: "anchor", Says: "an estimate counts what a well-read player can place, not an archive's count (episodes, seats, words, prize money)", Hint: true, one: ruleAnchor},
+	{Name: "countable", Says: "a number doesn't count a list's items (works, awards, articles, seats, goals, times) unless a waiver names its anchor", From: AuditFrom, one: ruleCountable},
 	{Name: "tolerance", Says: "a number's tolerance follows the formula (Tolerance): a well-read guess scores about half", one: ruleTolerance},
+	{Name: "offset-scale", Says: "on an offset scale (°C, degrees, points, a rating) the tolerance is judged, never the formula's 3/10", From: AuditFrom, one: ruleOffsetScale},
+	{Name: "own-number", Says: "a number question's text or a name in it shows no number within the tolerance of its answer („Стоте дни“)", From: AuditFrom, one: ruleOwnNumber},
 	{Name: "order-gap", Says: "an order's measured values are 10% apart from their neighbours; exact ones (years, counts) only differ", one: ruleOrderGap},
 	{Name: "options", Says: "no option stands out by its form: only the answer with a regnal numeral, in another script, or in quotes", one: ruleOptions},
 	{Name: "long-answer", Says: "the answer isn't much longer than every wrong option", Hint: true, one: ruleLongAnswer},
@@ -77,6 +90,7 @@ var Rules = []Rule{
 	{Name: "answer-giveaway", Says: "no question shows a choice's answer as true next to that question's subject", Hint: true, all: ruleAnswerGiveaway},
 	{Name: "pair-giveaway", Says: "no question shows both sides of a medium or hard match's pair close together", Hint: true, all: rulePairGiveaway},
 	{Name: "shared-items", Says: "two orders share no items in one order or with one value, two matches no pair: one's reveal answers the other", all: ruleSharedItems},
+	{Name: "twin", Says: "two choices over one set of options don't ask the same answer, or each other's answers mirrored", From: AuditFrom, all: ruleTwin},
 	{Name: "same-identity", Says: "a \"who or what is this\" answer (a picture choice, clues) is asked once", all: ruleSameIdentity},
 }
 
@@ -114,10 +128,11 @@ func readWaivers(dir string) ([]Waiver, error) {
 
 // lint runs every rule over a loaded bank's live questions and says what it found: errors for what a question added
 // since StrictFrom breaks, warnings for the rest, nothing for what a waiver covers. where says each question's file
-// and line.
+// and line. The bank keeps what the waivers lift (Bank.Estimate reads it).
 func (b *Bank) lint(waivers []Waiver, where map[string]Problem) []Problem {
 	var out []Problem
 	waived := map[[2]string]bool{}
+	b.waived = waived
 	for _, w := range waivers {
 		at := Problem{File: WaiversFile, ID: w.ID}
 		q, ok := b.Get(w.ID)
@@ -149,10 +164,10 @@ func (b *Bank) lint(waivers []Waiver, where map[string]Problem) []Problem {
 				return
 			}
 		}
-		strict := false
+		strict, from := false, cmp.Or(r.From, StrictFrom)
 		for _, id := range f.ids {
 			q, _ := b.Get(id)
-			strict = strict || q.Extra().Added >= StrictFrom
+			strict = strict || q.Extra().Added >= from
 		}
 		at := where[f.ids[0]]
 		out = append(out, Problem{File: at.File, Line: at.Line, ID: f.ids[0], Msg: f.msg, Rule: r.Name, Warning: r.Hint || !strict})

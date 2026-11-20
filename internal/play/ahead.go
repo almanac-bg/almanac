@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	mrand "math/rand/v2"
 	"slices"
 	"sync"
@@ -45,7 +46,7 @@ import (
 // DayRules names the day's draw as it is, and the days after tomorrow are drawn again whenever it changes. It ends with
 // what drawDay makes of a fixed bank on fixed days and seeds (TestDayRulesNameTheDraw): a change to how a day is drawn
 // fails that test until DayRules says so, rather than reach the days drawn ahead a season late.
-const DayRules = "2026-11-18 shapes within bands (#387), picture-first, on, bg, estimate topic, review, one subject; draw e1012d851a1cb6f5"
+const DayRules = "2026-11-20 the number last, a week apart (recent subjects), estimates count no list; draw 23ab9debaea5283c"
 
 // Ahead is how many days ahead of today the day's questions are drawn.
 const Ahead = 90
@@ -192,7 +193,7 @@ func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank, answered map[st
 		if _, ok := all[day]; ok {
 			continue
 		}
-		picks, short := drawDay(b, day, used, answered, r)
+		picks, short := drawDay(b, day, used, answered, recentSubjects(b, all, day), r)
 		if len(short) > 0 {
 			// A place has run short: the days ahead stop here until the bank grows.
 			slog.Warn("days ahead stop short: the bank needs questions for the day", "day", day, "short", short)
@@ -287,6 +288,39 @@ func (g *Game) DaysUsed(ctx context.Context) (Used, error) {
 		}
 	}
 	return used, err
+}
+
+// Drawn is a day's ten as drawn: its date, and its questions in the day's order.
+type Drawn struct {
+	Day   string `json:"day"`
+	Picks []Pick `json:"picks"`
+}
+
+// DaysDrawn are the days stored from `from` on, n of them at most, in order: the issues to come, as `almanac bank
+// days` prints them for a review before they go live. Question ids and days, nothing of a player's. With them, the
+// Recent days before `from`, so that a review can tell a subject that comes back within a week (recentSubjects).
+func (g *Game) DaysDrawn(ctx context.Context, from string, n int) (before, days []Drawn, err error) {
+	tx, err := g.DB.Read.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, nil, err
+	}
+	defer tx.Rollback() //nolint:errcheck // a read: nothing to keep
+	d, err := time.Parse(time.DateOnly, from)
+	if err != nil {
+		return nil, nil, err
+	}
+	stored, err := storedDays(tx, d.AddDate(0, 0, -Recent).Format(time.DateOnly))
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, day := range slices.Sorted(maps.Keys(stored)) {
+		if day < from {
+			before = append(before, Drawn{day, stored[day]})
+		} else if len(days) < n {
+			days = append(days, Drawn{day, stored[day]})
+		}
+	}
+	return before, days, nil
 }
 
 // drawnBy names what the days ahead were drawn by: the rules, and the bank's dated and Bulgarian questions.

@@ -582,3 +582,73 @@ func ruleSameIdentity(l *lintBank) []finding {
 	}
 	return out
 }
+
+// TwinShared is how many options two choices (or clues) share, of their four, to be twins (ruleTwin), each of them
+// offered by TwinRare questions at most: options many questions offer (the countries, the planets, the
+// continents) are a kind's whole list, and two questions over them ask different things.
+const (
+	TwinShared = 3
+	TwinRare   = 4
+)
+
+// ruleTwin: two choices (or clues) over one set of options ask one thing twice, whichever way round: the same answer
+// (one reworded), or each one's answer among the other's wrong options (Карлоф or Лугоши, asked twice nine days
+// apart: whoever met one has the other half answered). The same-identity rule holds "who is this" answers asked
+// twice whatever their options.
+func ruleTwin(l *lintBank) []finding {
+	type asking struct {
+		q       Question
+		answer  string
+		options map[string]bool
+	}
+	var qs []asking
+	by := map[string][]int{} // an option's key: the questions that offer it
+	for _, q := range l.live {
+		var opts []string
+		switch q := q.(type) {
+		case *Choice:
+			opts = q.options()
+		case *Clues:
+			opts = q.options()
+		default:
+			continue
+		}
+		a := asking{q: q, answer: subjectKey(opts[0]), options: map[string]bool{}}
+		for _, o := range opts {
+			k := subjectKey(o)
+			if !a.options[k] {
+				a.options[k] = true
+				by[k] = append(by[k], len(qs))
+			}
+		}
+		qs = append(qs, a)
+	}
+	var out []finding
+	for i, a := range qs {
+		shared := map[int]int{}
+		for k := range a.options {
+			if len(by[k]) > TwinRare {
+				continue // an option offered everywhere (a country, a planet) makes no twin
+			}
+			for _, j := range by[k] {
+				if j > i {
+					shared[j]++
+				}
+			}
+		}
+		for j, n := range shared {
+			b := qs[j]
+			if n < TwinShared || !b.options[a.answer] || !a.options[b.answer] {
+				continue
+			}
+			how := "mirrored: each one's answer is a wrong option of the other"
+			if a.answer == b.answer {
+				how = "the same answer"
+			}
+			out = append(out, finding{ids: l.newer(a.q, b.q), msg: fmt.Sprintf("%s and %s share %d options, %s: give one other options, or keep the better one",
+				a.q.Base().ID, b.q.Base().ID, n, how)})
+		}
+	}
+	slices.SortFunc(out, func(a, b finding) int { return strings.Compare(a.ids[0]+a.ids[1], b.ids[0]+b.ids[1]) })
+	return out
+}

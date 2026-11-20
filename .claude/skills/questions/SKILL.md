@@ -25,6 +25,13 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
   - `almanac bank used`, on the server, prints the question ids the days have had (played and drawn ahead) and the
     last day drawn, nothing of a player's; fetch it into a file for `-used` (the `new-questions` skill shows the ssh
     line);
+  - `almanac bank days [-n 30] [-from YYYY-MM-DD] [-json]`, on the server, prints the issues to come: the next N days'
+    tens as the game has drawn them (`play.Ahead`, 90 days ahead), each question with its answer, options, fact, what
+    lint finds and a subject that came back within a week. It only reads the database (`-json`: the days and their ids
+    alone, for a work list). Run it as the game's user with its settings, as `bank used`:
+    `ssh -i ~/.ssh/hetzner -o BatchMode=yes root@2.31.121.12 systemd-run --pipe --wait -p User=almanac -p
+    EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac bank days -n 30 > <work>/days.txt` (it reads the bank the
+    game plays, `BANK_DIR`); it is what the weekly pre-check reads (below);
   - `go run ./cmd/almanac bank plan [-n N] [-json] [-used file] private` plans a batch of N a topic: the cells to
     write (the day's shortest runway first, at most a third of the batch in one place), how many about Bulgaria (30%,
     per cell: `bg`), the dates with the fewest questions left, the ids and the subjects to avoid;
@@ -73,7 +80,7 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
   `bank check` prints, for each place of a day, how many days from today it has questions for, counted as the day
   takes them: only the questions a day can still take (with `-used`, none the days played or
   drawn ahead have had; without it, the whole bank, which overstates it), never a dated one (it waits for its date;
-  those are counted apart), never one due for review, and for the hard number only the estimates. The questions about
+  those are counted apart), never one due for review, and for the hard number only the estimates (never an unwaived count of a list: `countable`). The questions about
   Bulgaria have their own line (a day takes three). The days are drawn 90 days ahead (`play.Ahead`), and only while
   every place has a question that fits it: a place that runs out stops them. **Every batch writes for the shortest
   runway first**, and no place may stay under 150 days (it warns: 90 drawn ahead, 60 to write the batch). Never by
@@ -97,8 +104,9 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 
 `bank check` judges these on every live question (`internal/bank/rules.go` lists them; `bank lint` shows each one's
 findings). **A question added since `bank.StrictFrom` (2026-11-17) must pass all of them: a finding is an error and
-the bank isn't played** (`bank add` refuses the batch). Older questions are warned of until a content pass fixes
-them. A finding about two questions is an error if either is new. The *hints* only ever warn: they are right often
+the bank isn't played** (`bank add` refuses the batch); a rule added since is an error from its own day (the days'
+audit's, marked † below: from `bank.AuditFrom`, 2026-11-21). Older questions are warned of until a content pass
+fixes them. A finding about two questions is an error if either is new. The *hints* only ever warn: they are right often
 enough to be worth a look, not always.
 
 | Rule | What it holds |
@@ -110,9 +118,13 @@ enough to be worth a look, not always.
 | `language` | None of the Russian words or loanwords in `language.json` |
 | `spelling` | A name spelled as `names.json` says (Чингис хан, НАСА, Sony, „Дисни“, Ferrari, Нидерландия, олимпийските игри mid-sentence); a quoted title keeps its own spelling |
 | `stale` | Wording that can stop being true has `reviewBy`: „към 2026 г.“, „все още“, „в момента“, „понастоящем“, the oldest still „действащ“, „държи рекорда“, „рекордьор“, „досега“ |
+| `present` † | A career, a show or an office told as now, in a line with no time of its own, has `reviewBy` or a year: „Бие се в UFC“, „шоуто се записва всяка вечер“, „е председател на фондацията“. A line with a year, „когато“, a span (колко години), an order (първият) or a life that ended reads as the past |
 | `estimate` | A number question is an estimate: a year, or a quantity of more than 20 of its steps (6,5 млн. on a step of 0,1 is 65). A small count, a phone number, a place in a row is a choice |
+| `countable` † | A number doesn't count the items of a list (a composer's works, awards, a text's articles or clauses, seats, spectators, goals, points, the times something was done: `listWords` in estimate.go): nobody has counted them, so it's a guess. Ask it as a choice, or ask what can be placed; a true anchor (a famous total: the Bible's 66 books) is a waiver whose `why` names it. The day's hard number never takes one unwaived |
 | `anchor` (hint) | An estimate counts what a well-read player can place, not an archive's count: a series' episodes, a hall's seats, a council's members, a dictionary's words, prize money, a fine |
 | `tolerance` | The tolerance follows the formula (below), within half again either way |
+| `offset-scale` † | On a scale with no zero of its own (°C, an angle or a latitude in °, points, a rating such as Elo) the tolerance is judged: under 1/5 of the answer, never the formula's 3/10 (Topalov's Elo of 2 816 with 840 is a gift); linear |
+| `own-number` † | A number question's text, and a name it quotes, shows no number (in figures or words) within the tolerance of its answer: „Стоте дни“ asked as 110 with 33 answers itself |
 | `order-gap` | An order's measured values (м, км², кг, жители, %, …: `measured` in order.go) stand 10% apart; exact ones (years, counts, coordinates) only differ |
 | `options` | No option stands out by its form: only the answer with a regnal numeral (Симеон I), only the answer in Latin or in Cyrillic letters (bTV among БНТ, Нова), quotes on some options only |
 | `long-answer` (hint) | The answer isn't half again as long as every wrong option and 10 letters longer |
@@ -125,6 +137,7 @@ enough to be worth a look, not always.
 | `pair-giveaway` (hint) | No question shows both sides of a medium or hard match's pair within four words („Кучето Лайка“ for Лайка — Куче) |
 | `shared-items` | Two orders share no two items with the same values, nor three items in the same order (one's reveal orders the other); two matches share no pair |
 | `same-identity` | A "who or what is this" answer (a picture choice, clues) is asked once |
+| `twin` † | Two choices (or clues) over one set of options — three of four shared, each offered by few questions — ask one thing twice: the same answer, or mirrored (Карлоф or Лугоши, each the other's wrong option). Give one other options, or keep the better one |
 
 **A true exception** (a proverb to finish ends without „?“; a question about the word „таг“ itself) goes into the
 bank's `waivers.json`, with its reason: `[{"id": "gen-085", "rule": "ending", "why": "поговорка за довършване"}]`.
@@ -148,8 +161,10 @@ By kind:
 
 - **Choice:** the options decide as much as the question. Close options make the same question harder; reword or
   change them rather than mislabel.
-- **True or not:** easy is a famous fact stated plainly; hard is a plausible detail (true or false) that only an
-  enthusiast can tell. Never hard by a trick of wording.
+- **True or not:** easy is a common misconception put plainly, true or false, that three of four adults still get
+  right („Мълнията не удря два пъти на едно място.“), never a truism nobody can miss („Слънцето е звезда.“: a free
+  point teaches nothing; the days' audit found a third of the easy ones were). Hard is a plausible detail (true or
+  false) that only an enthusiast can tell. Never hard by a trick of wording.
 - **Number:** easy is a number everyone has met (1878, the height of Мусала); hard is a figure only an enthusiast
   can place. The tolerance doesn't follow the label: it is one formula at every difficulty (see the format).
 - **Order:** easy has familiar things with values far apart (centuries); hard has values close together, or
@@ -206,7 +221,8 @@ By type:
   - a quantity, linear: 3/10 of the answer (15% off scores half; within 6% counts right);
   - a year: 3·∛(years since it), at least 3 (1990: 10; 1878: 16; 1519: 24; 681: 33);
   - a log scale: 3;
-  - a temperature: by judgement (the formula has no proportion for it).
+  - an offset scale (°C, °, points, a rating): by judgement, under 1/5 of the answer (the formula's proportion means
+    nothing where the scale's zero is arbitrary).
 
   `bank check` takes a tolerance within half again of the formula, and says the formula's figure when it isn't.
 - **`order`:** four `items` (`text` at most 45 characters and an exact `value`), `direction` (`asc` or `desc`) and
@@ -242,24 +258,27 @@ By type:
   (games mix topics). Grep the bank for the answer and the key words before adding.
 - **Nothing goes stale.** No „сегашният“, „последният“ or „най-новият“ unless pinned to a date („към 2026 г.“), and
   add `reviewBy` for anything that can change (the `stale` rule finds the wording that needs it).
-- **No near-duplicates.** Grep the bank for the subject first. The checker only catches identical texts.
+- **No near-duplicates.** Grep the bank for the subject first. The checker catches identical texts, and the same
+  options asked twice (`twin`); the rest is yours.
 - **No subject everywhere.** A subject (Наполеон, „Титаник“, „Дисни“) stays under 1% of a category: past that, a
   player who plays daily meets it again and again. Write away from the subjects `bank subjects` marks with `*`, and
   never a second "who or what is this" question with an answer one already has (the `same-identity` rule): keep the
   better of the two and replace the other in its place. A day holds one question of each subject (same answer or quoted
-  title) by itself.
+  title) by itself, and, where the bank lets it, none the week before had (`play.Recent`).
 - **Bulgarian, as the bank writes it:**
   - „…“ quotes, a spaced dash —, „г.“ after a year (`bank fmt` holds it to the year with a no-break space);
   - established spellings (Нидерландия, not Холандия), one way for one name: `names.json`;
   - text that speaks to the player says „ти“ and is gender-neutral.
 - **Numbers:** something worth estimating (a year, or more than 20 steps) with one accepted value. Pin the source
   where sources differ („според измерването от 2020 г.“). The tolerance is the formula's.
-- **An estimate a player can place.** The day ends on a hard quantity, the moment players remember most, so a number
-  needs an **anchor** a well-read player has (a height, a length, a distance, an age, a duration, a famous total, a
+- **An estimate a player can place.** The day ends on a hard quantity (the draw puts it last), the moment players
+  remember most, so a number needs an **anchor** a well-read player has, and **its text or its fact names it**
+  („…висок колкото 30-етажна сграда“, „…на около 2 000 км от Москва“), so that the reveal places the answer against
+  something the player knows (a height, a length, a distance, an age, a duration, a famous total, a
   size against something known) and a reveal that teaches something. A count kept only in an archive or a document
   (a series' episodes, a hall's seats, a council's members, a dictionary's words, prize money, a fine, the species in
   a park's management plan, the walkers on one march) is a guess, not an estimate: the `anchor` hint flags the
-  common ones; the checker judges the rest. Ask such a subject as a choice, or ask what about it can be placed.
+  common ones and the `countable` rule the counts of a list; the checker judges the rest. Ask such a subject as a choice, or ask what about it can be placed.
 - **It belongs under its topic.** A day takes one question a topic: a question filed under the wrong one („Правец е
   родното място на кой държавен ръководител?“ under technology, for the computers) takes that topic's place with
   another's question. Ask of each: would a player of this topic expect it here?
@@ -311,6 +330,16 @@ shows with the answer, over the fact: the player learns why the day. (The owner'
   questions about Bulgaria on its own theme, two or three of them (`bank check` fails while one has none). A date's
   questions prefer a story with a Bulgarian or a human angle to a template („Коя държава празнува на … ?“, „Какво
   отбелязва ООН на …?“): templates stay under a tenth of the dated questions, and never a national day's.
+
+## The weekly pre-check
+
+The days are drawn 90 days ahead, so every issue can be read before anyone plays it. Once a week (a session's job,
+never the owner's), the next 14–30 days are read and fixed through `/fix-questions` with `--judge days` (its „The
+pre-check“): `bank days -n 30 -json` from the server gives the work list, `bank days -n 30` the issues to read whole.
+Each question is judged by everything above, not only what lint finds: a wrong or stale answer or fact, a truism among
+the easy true-or-not, a closing number without its anchor, a twin or a subject again within the week, a question
+filed under the wrong topic. A fix changes the question in place, so its day keeps it; a retired one leaves its day,
+which the server draws again.
 
 ## Pictures
 

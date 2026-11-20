@@ -147,15 +147,16 @@ func ruleAnchor(q Question) []string {
 //   - a year: 3·∛(years since it), at least 3 (1939: 13; 1519: 24; 681: 33): a well-read person knows the recent
 //     closer than the distant;
 //   - a log scale: a factor of 3 (a guess √3 times off scores half);
-//   - a temperature (°C, linear): none, a degree's worth has no proportion to the answer; set by the rubric.
+//   - an offset scale (°C, an angle, a rating's points: OffsetScale): none, a degree's or a point's worth has no
+//     proportion to the answer; judged, within OffsetShare of it (ruleOffsetScale).
 //
 // A tolerance within ToleranceSlack of the formula holds: the formula rounded the way a person rounds it.
 const ToleranceSlack = 1.5
 
-// Tolerance is what the formula says a number question's tolerance is, two figures kept; 0 for a temperature.
+// Tolerance is what the formula says a number question's tolerance is, two figures kept; 0 for an offset scale.
 func Tolerance(q *Number) float64 {
 	switch {
-	case q.Signed():
+	case OffsetScale(q) && !q.IsYear():
 		return 0
 	case q.Scale == "log":
 		return 3
