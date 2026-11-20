@@ -1,7 +1,6 @@
 package play
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -387,20 +386,20 @@ func TestLevelUpNews(t *testing.T) {
 	}
 }
 
-// A level reached by a week of the league, paid as it ended, was the player's before their next game: that game's
-// news tells its own XP (the week's is in the week's card), and doesn't call the level new.
+// A level reached by XP no news told (an achievement kept as told) was the player's before their next game: that
+// game's news tells its own XP, and doesn't call the level new.
 func TestLevelNewOnlyByTheGame(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	bo := w.user()
-	w.played(bo, 3) // XP and the league open
+	w.played(bo, XPFromDay)
 	n, err := w.g.NewsOf(ctx, bo, 0)
-	if err != nil || !n.Open.League {
+	if err != nil || !n.Open.XP {
 		t.Fatalf("before: %+v %v", n, err)
 	}
 	pay := n.To - n.XP // enough for the next level
-	if _, err := w.db.Write.Exec(`INSERT INTO league_results (user_id, week, tier, place, of, points, moved, xp, seen)
-		VALUES (?, '2026-11-02', 0, 1, 5, 900, 1, ?, 0)`, bo, pay); err != nil {
+	if _, err := w.db.Write.Exec(`INSERT INTO achievements (user_id, id, at, xp, seen) VALUES (?, 'games100', 1, ?, 1)`,
+		bo, pay); err != nil {
 		t.Fatal(err)
 	}
 	s, _ := w.g.StartTopic(ctx, bo, MixTopic)
@@ -414,9 +413,8 @@ func TestLevelNewOnlyByTheGame(t *testing.T) {
 	for _, d := range n.Goals {
 		game += d.XP
 	}
-	if lvl, _, _ := LevelOf(n.XP); err != nil || n.League == nil || n.League.XP != pay || n.Earned != game || n.LevelUp ||
-		lvl < 2 {
-		t.Fatalf("a game's news after a week paid a level: earned %d of %d, %+v %v", n.Earned, game, n, err)
+	if lvl, _, _ := LevelOf(n.XP); err != nil || n.Earned != game || n.LevelUp || lvl < 2 {
+		t.Fatalf("a game's news after XP untold made a level: earned %d of %d, %+v %v", n.Earned, game, n, err)
 	}
 }
 
@@ -871,8 +869,8 @@ func TestUnlocks(t *testing.T) {
 			if a.XP != AchievementXP[Epic] || len(a.Rewards) != 1 || a.Rewards[0].ID != "duelInstinct" {
 				t.Fatalf("duel10's rewards: %+v", a.Rewards)
 			}
-		case "friend1", "friendWin":
-			// The heart is the first's in the list, not friendWin's.
+		case "friend1", "friends5":
+			// The heart is the first's in the list, not friends5's.
 			if heart := len(a.Rewards) == 1 && a.Rewards[0].ID == "heart"; heart != (a.ID == "friend1") {
 				t.Fatalf("%s's rewards: %+v", a.ID, a.Rewards)
 			}
@@ -1159,8 +1157,8 @@ func TestProgress(t *testing.T) {
 	if err != nil || p.Level != 1 || p.Avatar != DefaultAvatar(ana) || p.Achievements[0].At != 0 {
 		t.Fatalf("a new player's progress: %+v %v", p, err)
 	}
-	// Before the second day, Награди follows the unfolding: no XP said, and no achievement of the day's goals or the
-	// league; from it, the goals' and XP; from the third, the league's too.
+	// Before the second day, Награди follows the unfolding: no XP said, and no achievement of the day's goals; from
+	// it, the goals' and XP.
 	hiddenNow := func(p Progress) int {
 		n := 0
 		for _, a := range Achievements {
@@ -1170,15 +1168,12 @@ func TestProgress(t *testing.T) {
 		}
 		return n
 	}
-	if hiddenNow(p) != 5 || slices.ContainsFunc(p.Achievements, func(e Earned) bool { return e.XP != 0 }) {
+	if hiddenNow(p) != 2 || slices.ContainsFunc(p.Achievements, func(e Earned) bool { return e.XP != 0 }) {
 		t.Fatalf("a first day's achievements: %d hidden, %+v", hiddenNow(p), p.Achievements)
 	}
-	for _, c := range []struct{ days, hidden int }{{XPFromDay, 3}, {LeagueFromDay, 0}} {
-		w.played(ana, c.days)
-		p, _ := w.g.ProgressOf(ctx, ana)
-		if hiddenNow(p) != c.hidden || p.Achievements[0].XP != AchievementXP[p.Achievements[0].Tier] {
-			t.Fatalf("day %d's achievements: %d hidden, %+v", c.days, hiddenNow(p), p.Achievements[0])
-		}
+	w.played(ana, XPFromDay)
+	if p, _ := w.g.ProgressOf(ctx, ana); hiddenNow(p) != 0 || p.Achievements[0].XP != AchievementXP[p.Achievements[0].Tier] {
+		t.Fatalf("day %d's achievements: %d hidden, %+v", XPFromDay, hiddenNow(p), p.Achievements[0])
 	}
 	for _, s := range p.Shapes {
 		if locked := slices.Contains(Unlockable, s.Shape); s.Locked != locked || (locked && s.How == "") {
@@ -1280,7 +1275,6 @@ func TestProgress(t *testing.T) {
 		{nil, ptr("persistence"), false}, // level 8
 		{nil, ptr("royalCrown"), false},
 		{nil, ptr("master-science"), false},
-		{nil, ptr("champion"), false},
 		{nil, ptr("nosuch"), false},
 	} {
 		if err := w.g.SetLook(ctx, ana, c.avatar, c.title); (err == nil) != c.ok {
@@ -1751,199 +1745,6 @@ func TestWardrobe(t *testing.T) {
 	}
 }
 
-func TestLeagues(t *testing.T) {
-	for _, c := range []struct{ n, up, down int }{{1, 0, 0}, {2, 0, 0}, {4, 0, 0}, {5, 2, 0}, {8, 2, 2}, {9, 3, 2}, {10, 5, 2},
-		{14, 5, 3}, {15, 5, 5}, {20, 5, 5}} {
-		if up, down := moves(c.n); up != c.up || down != c.down {
-			t.Fatalf("a group of %d: %d up, %d down", c.n, up, down)
-		}
-	}
-	if weekOf(time.Date(2026, 11, 12, 10, 0, 0, 0, Bulgaria)) != "2026-11-09" ||
-		weekOf(time.Date(2026, 11, 15, 23, 59, 0, 0, Bulgaria)) != "2026-11-09" ||
-		weekOf(time.Date(2026, 11, 16, 0, 0, 0, 0, Bulgaria)) != "2026-11-16" {
-		t.Fatal("a week runs Monday to Sunday, in Bulgaria")
-	}
-	for _, c := range []struct {
-		n    int
-		want string
-	}{{1, "Купата на Рила"}, {3, "Три купи на Рила"}, {12, "12 купи на Рила"}} {
-		if name, tier := ChampionTitle(c.n); name != c.want || tier != Legendary {
-			t.Fatalf("champion %d times: %q", c.n, name)
-		}
-	}
-
-	w := setup(t) // Thursday, 12 November
-	ctx := t.Context()
-	// day plays the day's ten with so many right, the rest wrong.
-	day := func(user int64, rights int) {
-		w.dayGame(user, nil, append(repeat(w.right, rights), repeat(w.wrong, Length-rights)...)...)
-	}
-	ana, bo, cy := w.user(), w.user(), w.user()
-	w.played(ana, LeagueFromDay-1) // the league's open to Ana: her week's end is told
-	if v, err := w.g.LeagueOf(ctx, ana); err != nil || v.In || v.League.Name != "Странджа" || v.DaysLeft != 4 ||
-		v.Week != "2026-11-09" {
-		t.Fatalf("before a game: %+v %v", v, err)
-	}
-	// A topic's game, however good, puts nobody in the league: the day's questions do.
-	s, err := w.g.StartTopic(ctx, cy, "science")
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(cy, s.ID, repeat(w.right, Length)...)
-	if v, _ := w.g.LeagueOf(ctx, cy); v.In {
-		t.Fatal("a topic's game put a player in the league")
-	}
-	// Bo plays the day all right, Ana with seven: a group of two is still gathering, and shows nobody.
-	day(bo, Length)
-	day(ana, 7)
-	if v, _ := w.g.LeagueOf(ctx, ana); !v.In || v.Size != 2 || len(v.Group) != 0 || v.Place != 0 || v.Up != 0 {
-		t.Fatalf("a group of two: %+v", v)
-	}
-	// Three more with one right each: five race, Bo ahead.
-	for range RaceSize - 2 {
-		day(w.user(), 1)
-	}
-	v, err := w.g.LeagueOf(ctx, ana)
-	if err != nil || !v.In || v.Size != RaceSize || len(v.Group) != RaceSize || v.Place != 2 || !v.Group[1].Me ||
-		v.Group[0].Points <= v.Group[1].Points || v.Group[1].Points <= v.Group[2].Points || v.Up != 2 || v.Down != 0 ||
-		v.Group[0].Name == "" {
-		t.Fatalf("Ana's Thursday: %+v %v", v, err)
-	}
-	// Friday: Ana plays the day all right, and Bo misses it: a day missed adds nothing, and Ana goes ahead.
-	w.now = time.Date(2026, 11, 13, 10, 0, 0, 0, Bulgaria)
-	day(ana, Length)
-	if v, _ := w.g.LeagueOf(ctx, ana); v.Place != 1 || !v.Group[0].Me || v.Group[1].Tag != "player2" {
-		t.Fatalf("Ana's Friday: %+v", v)
-	}
-
-	// The week ends: Ana and Bo go up with first and second place's XP, the third stays with third's; told once.
-	// The news is kept with the places, or neither is: a failure to keep it ends nothing, and it's done again. The week
-	// closes once Sunday's last runs are in (weekLate), minutes into Monday.
-	w.now = time.Date(2026, 11, 16, 0, 30, 0, 0, Bulgaria)
-	w.g.LeagueNews = func(context.Context, *sql.Tx, []LeagueNews) error { return errors.New("no room") }
-	if err := w.g.SettleDue(ctx); err == nil {
-		t.Fatal("the week ended without its news")
-	}
-	var results int
-	if _ = w.db.Read.QueryRow(`SELECT count(*) FROM league_results`).Scan(&results); results != 0 {
-		t.Fatalf("the week ended without its news: %d places kept", results)
-	}
-	var told []LeagueNews
-	w.g.LeagueNews = func(_ context.Context, _ *sql.Tx, n []LeagueNews) error { told = append(told, n...); return nil }
-	if err := w.g.SettleDue(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if len(told) != RaceSize || told[0].To != ana || told[0].Place != 1 || told[0].Of != RaceSize ||
-		told[0].XP != LeaguePay[0] || told[0].Now.Tier != 1 || told[1].To != bo || told[1].XP != LeaguePay[1] ||
-		told[1].Now.Tier != 1 || told[2].XP != LeaguePay[2] || told[2].Now.Tier != 0 || told[3].XP != 0 {
-		t.Fatalf("the week's news: %+v", told)
-	}
-	if err := w.g.SettleDue(ctx); err != nil || len(told) != RaceSize {
-		t.Fatalf("a week ended twice: %v", err)
-	}
-	n, err := w.g.NewsOf(ctx, ana, 0)
-	if err != nil || n.League == nil || n.League.Place != 1 || n.League.Moved != 1 || n.League.Now.Name != "Средна гора" ||
-		n.Earned < LeaguePay[0] || !slices.ContainsFunc(n.Achievements, func(a Earned) bool { return a.ID == "leagueUp" }) ||
-		!slices.ContainsFunc(n.Achievements, func(a Earned) bool { return a.ID == "leagueFirst" }) {
-		t.Fatalf("Ana's news: %+v %v", n, err)
-	}
-	if again, _ := w.g.NewsOf(ctx, ana, 0); again.League != nil {
-		t.Fatalf("a week told twice: %+v", again.League)
-	}
-	if v, _ := w.g.LeagueOf(ctx, ana); v.In || v.League.Tier != 1 || v.Last == nil || v.Last.Place != 1 {
-		t.Fatalf("Ana's new week: %+v", v)
-	}
-	// Ana and Bo race in Средна гора now, and Cy in Странджа: two and one, no race.
-	day(ana, 2)
-	day(bo, 1)
-	day(cy, 1)
-	if v, _ := w.g.LeagueOf(ctx, bo); !v.In || v.Size != 2 || v.League.Tier != 1 || v.Up != 0 {
-		t.Fatalf("Ana and Bo in Средна гора: %+v", v)
-	}
-	if v, _ := w.g.LeagueOf(ctx, cy); !v.In || v.Size != 1 || v.League.Tier != 0 || v.Up != 0 {
-		t.Fatalf("Cy alone in Странджа: %+v", v)
-	}
-
-	// A group of eight in Родопи: the first two go up, the last two down, the rest stay. The second has fewer points
-	// than the third, and more right answers: they're ahead, though they came later.
-	monday := "2026-11-16"
-	res, _ := w.db.Write.Exec(`INSERT INTO league_groups (week, tier) VALUES (?, 2)`, monday)
-	group, _ := res.LastInsertId()
-	var eight []int64
-	for i, points := range []int{8000, 6500, 7000, 5000, 4000, 3000, 2000, 1000} {
-		p := w.user()
-		eight = append(eight, p)
-		rights, joined := 5, i
-		if i == 1 {
-			rights, joined = 6, 10
-		}
-		_, _ = w.db.Write.Exec(`UPDATE users SET league = 2 WHERE id = ?`, p)
-		_, _ = w.db.Write.Exec(`INSERT INTO league_members (week, user_id, group_id, joined_at) VALUES (?, ?, ?, ?)`,
-			monday, p, group, joined)
-		if _, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, day, questions, started_at, finished_at, points, rights)
-			VALUES (?, 'day', '2026-11-17', '[]', 0, 1, ?, ?)`, p, points, rights); err != nil {
-			t.Fatal(err)
-		}
-	}
-	// And five in Рила: the first is its champion, and can go no higher.
-	top1, top2 := w.user(), w.user()
-	w.played(top1, LeagueFromDay-1)
-	rila := []int64{top1, top2, w.user(), w.user(), w.user()}
-	for i, p := range rila {
-		_, _ = w.db.Write.Exec(`UPDATE users SET league = 5 WHERE id = ?`, p)
-		day(p, map[bool]int{true: Length, false: 5 - i}[i == 0])
-	}
-	w.now = time.Date(2026, 11, 23, 0, 30, 0, 0, Bulgaria)
-	if err := w.g.SettleDue(ctx); err != nil {
-		t.Fatal(err)
-	}
-	// Ana, first of two in Средна гора, goes nowhere, is paid nothing, and is no group's first for it.
-	var moved, paid int
-	_ = w.db.Read.QueryRow(`SELECT moved, xp FROM league_results WHERE user_id = ? AND week = ?`, ana, monday).Scan(&moved, &paid)
-	if firsts, _ := w.g.leagueFirsts(ctx, ana); moved != 0 || paid != 0 || firsts[1] != 0 || firsts[0] != 1 {
-		t.Fatalf("a group of two: moved %d, paid %d, firsts %v", moved, paid, firsts)
-	}
-	for i, p := range eight {
-		var tier int
-		_ = w.db.Read.QueryRow(`SELECT league FROM users WHERE id = ?`, p).Scan(&tier)
-		want := map[bool]int{true: 3}[i < 2] + map[bool]int{true: 2}[i >= 2 && i < 6] + map[bool]int{true: 1}[i >= 6]
-		if tier != want {
-			t.Fatalf("place %d of eight is in league %d, not %d", i+1, tier, want)
-		}
-	}
-	var tier int
-	_ = w.db.Read.QueryRow(`SELECT league FROM users WHERE id = ?`, top1).Scan(&tier)
-	if tier != TopLeague {
-		t.Fatalf("Рила's first went to league %d", tier)
-	}
-	// Рила's first may wear the champion's title and the top frame; the second may not.
-	if err := w.g.SetLook(ctx, top1, nil, ptr("champion"), ptr("peak5"), nil); err != nil {
-		t.Fatalf("the champion's look: %v", err)
-	}
-	if err := w.g.SetLook(ctx, top2, nil, ptr("champion"), nil, nil); !errors.Is(err, ErrNotYours) {
-		t.Fatalf("the champion's title, second: %v", err)
-	}
-	if err := w.g.SetLook(ctx, top2, nil, nil, ptr("peak3"), nil); !errors.Is(err, ErrNotYours) {
-		t.Fatalf("a peak's frame without a first place: %v", err)
-	}
-	if look, _ := w.g.LookOf(ctx, top1); look.Title != "Купата на Рила" || !strings.Contains(look.Avatar, "/peak5/") {
-		t.Fatalf("the champion's look: %+v", look)
-	}
-	n, _ = w.g.NewsOf(ctx, top1, 0)
-	if !slices.ContainsFunc(n.Achievements, func(a Earned) bool { return a.ID == "rila" }) ||
-		!slices.ContainsFunc(n.Unlocks, func(u Unlock) bool { return u.ID == championID && u.Name == "Купата на Рила" }) {
-		t.Fatalf("the champion's news: %+v", n)
-	}
-
-	// The rating's board: everyone with enough rated games, by rating.
-	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1300, rated = ? WHERE id = ?`, MinRatedGames, ana)
-	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1500, rated = 3 WHERE id = ?`, bo)
-	if b, err := w.g.RatingBoard(ctx, bo, false); err != nil || len(b.Top) != 1 || b.Top[0].Value != 1300 ||
-		b.Top[0].Division == nil || b.Place != 0 {
-		t.Fatalf("the rating's board: %+v %v", b, err)
-	}
-}
-
 func TestTitles(t *testing.T) {
 	// Titles are their own: each unlocked by something there is, none an achievement's name.
 	ids := map[string]bool{}
@@ -1966,8 +1767,7 @@ func TestTitles(t *testing.T) {
 	w.played(ana, XPFromDay)
 	p, _ := w.g.ProgressOf(ctx, ana)
 	topics := len(w.g.Bank().Categories)*len(topicTiers) + len(acrossTopics)
-	if len(p.Titles) != 1+len(Titles)+topics || p.Titles[0].ID != championID || p.Titles[0].Name != "Купата на Рила" ||
-		p.Titles[0].How != championHow {
+	if len(p.Titles) != len(Titles)+topics {
 		t.Fatalf("a new player's titles: %+v", p.Titles)
 	}
 	byID := map[string]TitleView{}

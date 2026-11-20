@@ -2,10 +2,8 @@ package server
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -13,7 +11,6 @@ import (
 
 	"github.com/almanac-bg/almanac/internal/live"
 	"github.com/almanac-bg/almanac/internal/play"
-	"github.com/almanac-bg/almanac/internal/push"
 )
 
 // livePlayer is a player as a live duel shows them: name, tag, look and rating, and its division once it's placed
@@ -308,7 +305,7 @@ func (s *Server) duelOne(w http.ResponseWriter, r *http.Request) error {
 }
 
 // ranks is a board: by rating, or by knowledge (over every topic, or one); of everyone, or of the viewer and their
-// friends (?among=friends). The week's league is its own (league).
+// friends (?among=friends).
 func (s *Server) ranks(w http.ResponseWriter, r *http.Request) error {
 	viewer := int64(0)
 	if u, err := s.user(r); err == nil && u != nil {
@@ -348,58 +345,6 @@ func (s *Server) almanac(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return ok(w, a)
-}
-
-// league is the week's league as the viewer sees it: their group, or (not in one yet, or nobody signed in) what puts
-// them in.
-func (s *Server) league(w http.ResponseWriter, r *http.Request) error {
-	viewer := int64(0)
-	if u, err := s.user(r); err == nil && u != nil {
-		viewer = u.ID
-	}
-	v, err := s.game.LeagueOf(r.Context(), viewer)
-	if err != nil {
-		return err
-	}
-	return ok(w, v)
-}
-
-// leagueNews queues, in the write of a week's close that keeps their places (a few groups' at a time), the word to
-// each player of how their week ended: sent once the league is theirs to see (play/unfold.go), as the queue sends it (pushes.go).
-func (s *Server) leagueNews(ctx context.Context, tx *sql.Tx, news []play.LeagueNews) error {
-	if s.push == nil && s.phones == nil {
-		return nil
-	}
-	q, err := s.queuer(ctx, tx)
-	if err != nil {
-		return err
-	}
-	defer q.close()
-	for _, n := range news {
-		m := push.Message{URL: "/ranks#league", Title: "Седмицата в лигата свърши", Body: leagueWords(n)}
-		if _, err := q.add(ctx, notice{kind: pushFriends, m: m, needs: "league"}, n.To); err != nil {
-			return err
-		}
-	}
-	s.pushq.poke() // what's queued is seen once the week's end is in, at the latest the next second
-	return nil
-}
-
-// leagueWords is how a player's week in the league ended: „1-во място от 8 в лига Странджа. Качваш се в лига …“
-func leagueWords(n play.LeagueNews) string {
-	body := fmt.Sprintf("%s в лига %s.", place(n.Place, n.Of), n.From.Name)
-	switch {
-	case n.Now.Tier > n.From.Tier:
-		body += " Качваш се в лига " + n.Now.Name + "."
-	case n.Now.Tier < n.From.Tier:
-		body += " Слизаш в лига " + n.Now.Name + "."
-	default:
-		body += " Оставаш в лига " + n.Now.Name + "."
-	}
-	if n.XP > 0 {
-		body += fmt.Sprintf(" +%d XP.", n.XP)
-	}
-	return body
 }
 
 // goals are the player's goals for today.

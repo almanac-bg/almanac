@@ -1,6 +1,6 @@
 // What a game earned, said once, at its end, in three cards at most: the day's goals it finished (with their XP, and
 // how far it took those it moved: a goal moved alone is a line, not a card); the one biggest thing that happened (a
-// week of the league ended, a division reached, a new level), or else a line of the XP it brought and the level; and
+// division reached, a new level), or else a line of the XP it brought and the level; and
 // „Ново за теб“: achievements and everything they unlocked to wear (each a tap from being worn), three rows at most,
 // the highest tier first, the rest a tap away; with how a topic's game moved its mastery, said only when it's news (a
 // share gone down isn't: Профил has it); in a card left free, once a day, how others' duels against the player's
@@ -12,25 +12,22 @@
 // line that says whose it is.
 
 import { emblem } from "../art/emblem.ts";
-import { leagueEmblem } from "../art/league.ts";
 import { api, errorText } from "../lib/api.ts";
 import { haptic } from "../lib/app.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
-import { place } from "../lib/ordinal.ts";
 import { feelKit, play, type SoundName, voice } from "../lib/sound.ts";
-import { type LeagueEnd, moveWords } from "../screens/league.ts";
 import { met } from "../state.ts";
 import {
   type AchievementInfo,
   avatar,
   badge,
   type Division,
+  dayPointsWords,
   explain,
   levelNumber,
   meaning,
   meter,
   type Open,
-  pointsWords,
   tierWords,
   type Unlock,
   unlockPicture,
@@ -42,14 +39,12 @@ import { hands, landed } from "./results.ts";
 interface News {
   achievements: AchievementInfo[];
   goals: { name: string; xp: number }[];
-  /** How the player's last week in the league ended, not told yet. */
-  league?: LeagueEnd;
   level: number;
   xp: number;
   from: number;
   to: number;
   levelUp?: boolean;
-  /** The XP all this brought: the game just played, and the goals, achievements and week told with it. */
+  /** The XP all this brought: the game just played, and the goals and achievements told with it. */
   earned: number;
   /** A division the rating has reached for the first time; with `placed`, the one it's in as its first games have
    * just set it (play/rating.go). */
@@ -141,7 +136,6 @@ export function news(
       n.facts ? factsLine(n.facts) : null,
       top === "level" || !n.open.xp ? null : xpLine(n),
       n.goals.length ? goalsDone(n.goals, moved) : moved.length ? movedLine(moved) : null,
-      top === "league" && n.league ? leagueEnded(n.league) : null,
       top === "division" && n.division ? divisionReached(n.division, n.placed) : null,
       top === "level" ? levelCard(n.level, n.xp, n.from, n.to, true, n.earned) : null,
       fresh(n),
@@ -168,10 +162,8 @@ function recordings(r: NonNullable<News["recordings"]>): Child {
   return h("section", { class: "card stack" }, h("p", { class: "kicker" }, "Твоите записи"), h("p", null, r.text));
 }
 
-/** The one biggest thing a game's news holds, if any: a week of the league ended, then a division reached, then a
- * new level. */
-function headline(n: News): "league" | "division" | "level" | null {
-  if (n.league) return "league";
+/** The one biggest thing a game's news holds, if any: a division reached, then a new level. */
+function headline(n: News): "division" | "level" | null {
   if (n.division) return "division";
   if (n.levelUp) return "level";
   return null;
@@ -186,7 +178,7 @@ function loudest(n: News): SoundName | null {
   return null;
 }
 
-/** The one big thing a game brought, for its sheet: a week of the league ended up or on its podium, a division reached,
+/** The one big thing a game brought, for its sheet: a division reached,
  * the streak at a round number (`days`, with the reserve day it earned, if it did), a level that unlocks something or
  * is a fifth, an epic or legendary achievement. The smaller news stays in the cards. */
 function bigOne(
@@ -219,18 +211,6 @@ function bigOne(
   };
   const numeral = (text: string) =>
     h("b", { class: "num", style: { font: "900 7.5rem/1 var(--font-numeral)", color: "var(--gold-display)" } }, text);
-  const e = n.league;
-  if (e && (e.moved > 0 || e.place <= 3))
-    return {
-      parts: sheet(
-        big(leagueEmblem(e.now.tier, "l")),
-        "Седмицата в лигата свърши",
-        `${place(e.place, e.of)} в ${e.from.name}`,
-        `${moveWords(e)}${e.xp ? ` · +${e.xp} XP` : ""}`,
-      ),
-      sound: "level",
-      glow: false,
-    };
   const d = n.division;
   if (d)
     return {
@@ -328,17 +308,11 @@ function opened(system: keyof Open, n: News): Child {
       // One line: the rest is a tap away, on the word (with the day's board only after the day's ten: it's theirs).
       return line(
         "",
-        explain(h("b", null, "Точките"), n.kind === "day" ? pointsWords(n.open) : meaning.points),
+        explain(h("b", null, "Точките"), n.kind === "day" ? dayPointsWords : meaning.points),
         " са резултатът ти в една игра.",
       );
     case "xp":
       return line("Ново: XP и цели за деня. ", meaning.xp);
-    case "league":
-      return line(
-        "Ново: лигата. ",
-        "Всяка седмица се състезаваш с група играчи по верните отговори на въпросите на деня. ",
-        h("a", { href: "/ranks#league" }, "Виж лигата"),
-      );
     default:
       return line("Ново: рейтинг. ", meaning.rating);
   }
@@ -419,22 +393,6 @@ function movedLine(moved: MovedGoal[]): Child {
       h("span", { class: "news-goal-n" }, `Цел: ${g.progress} от ${g.target}`),
       " · ",
       g.href ? h("a", { href: g.href }, g.name) : g.name,
-    ),
-  );
-}
-
-/** A week of the league ended: the place in the group, where it takes the player, and the XP the place paid. */
-function leagueEnded(e: LeagueEnd): Child {
-  return h(
-    "section",
-    { class: `card unlock league-end lg-${e.now.tier}` },
-    leagueEmblem(e.now.tier, "m"),
-    h(
-      "div",
-      { class: "unlock-text" },
-      h("p", { class: "kicker" }, "Седмицата в лигата свърши"),
-      h("strong", null, `${place(e.place, e.of)} в ${e.from.name}`),
-      h("span", { class: "unlock-reward" }, `${moveWords(e)}${e.xp ? ` · +${e.xp} XP` : ""}`),
     ),
   );
 }

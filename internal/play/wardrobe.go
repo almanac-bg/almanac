@@ -7,8 +7,8 @@ import (
 )
 
 // The wardrobe: besides the avatar's shape and tone and the title (titles.go), a frame around the avatar and a pattern behind
-// it. Each is unlocked by something the player has done — a level, an achievement, a division reached, first place
-// in a week of the higher leagues — and shows wherever they do. Every unlock, of any of them, is an Unlock: what NewsOf tells once, an
+// it. Each is unlocked by something the player has done — a level, an achievement, a division reached, a Роял won —
+// and shows wherever they do. Every unlock, of any of them, is an Unlock: what NewsOf tells once, an
 // achievement lists as its reward, and Next shows ahead. The art is drawn in the client (web/src/art).
 
 // Cosmetic is a frame or a pattern as a player may pick it: free, unlocked, or locked with what unlocks it.
@@ -20,16 +20,14 @@ type Cosmetic struct {
 }
 
 // unlock is what makes a cosmetic or a title a player's: a level, days on which the day's questions were played, an
-// achievement of a tier (any one), one achievement, a division reached (by the highest rating), first place in a week
-// of a league or a higher one (its tier + 1), Роял won some times, or a mastery tier (or higher) in a topic or in some
-// number of topics.
+// achievement of a tier (any one), one achievement, a division reached (by the highest rating), Роял won some times,
+// or a mastery tier (or higher) in a topic or in some number of topics.
 type unlock struct {
 	level    int
 	days     int
 	tier     Tier
 	achieved string
 	division string
-	first    int
 	royal    int
 	topic    string
 	topics   int // how many topics (everyTopic: all the bank's) at a mastery tier or higher
@@ -58,9 +56,6 @@ var Frames = []cosmetic{
 	{"gem", "Кристал", unlock{division: "diamond"}},
 	{"halo", "Ореол", unlock{division: "legend"}},
 	{"sun", "Слънце", unlock{achieved: "streak365"}},
-	{"peak3", "Връх Ботев", unlock{first: 4}},
-	{"peak4", "Връх Вихрен", unlock{first: 5}},
-	{"peak5", "Връх Мусала", unlock{first: 6}},
 }
 
 // Backdrops, the patterns behind the avatar's shape, from the plainest.
@@ -78,15 +73,14 @@ var Backdrops = []cosmetic{
 }
 
 // wardrobe is what a player has done that unlocks things: their level, the days they played the day's questions,
-// achievements, highest rating, their first places in each league, the Роял tournaments they've won, and their
+// achievements, highest rating, the Роял tournaments they've won, and their
 // mastery tier in each topic they're sure in.
 type wardrobe struct {
 	level   int
 	days    int
 	earned  map[string]int64
-	peak    int   // the highest rating, once placed (0 before)
-	placed  bool  // the rating is set (Placed)
-	firsts  []int // weeks ended first in a group, by the league's tier
+	peak    int  // the highest rating, once placed (0 before)
+	placed  bool // the rating is set (Placed)
 	royals  int
 	mastery map[string]int
 	titles  []Title           // every title there is (the game's: topics come from the bank)
@@ -110,13 +104,6 @@ func (w wardrobe) has(u unlock) bool {
 	case u.division != "":
 		i := slices.IndexFunc(Divisions, func(d Division) bool { return d.ID == u.division })
 		return i >= 0 && w.peak >= Divisions[i].From
-	case u.first > 0:
-		for tier := u.first - 1; tier < len(w.firsts); tier++ {
-			if w.firsts[tier] > 0 {
-				return true
-			}
-		}
-		return false
 	case u.royal > 0:
 		return w.royals >= u.royal
 	case u.topic != "":
@@ -156,11 +143,6 @@ func (u unlock) how() string {
 				return "дивизия " + d.Name
 			}
 		}
-	case u.first > 0:
-		if u.first-1 >= TopLeague {
-			return "първо място за седмица в " + leagueOf(u.first-1).Name
-		}
-		return "първо място за седмица в " + leagueOf(u.first-1).Name + " или по-висока лига"
 	case u.topics == everyTopic:
 		return "„" + MasteryTiers[u.mastery].Name + "“ във всички теми"
 	case u.topics > 0:
@@ -211,9 +193,6 @@ func (g *Game) wardrobeOf(ctx context.Context, userID int64) (wardrobe, error) {
 	if w.placed = Placed(rated); !w.placed {
 		w.peak = 0 // no division while the rating is being set, nor what one unlocks
 	}
-	if w.firsts, err = g.leagueFirsts(ctx, userID); err != nil {
-		return w, err
-	}
 	if w.royals, err = g.royalWins(ctx, userID); err != nil {
 		return w, err
 	}
@@ -244,7 +223,7 @@ type Unlock struct {
 	byLevel int
 }
 
-// key is what's kept of an unlock once told. The champion's title is told again with each week won, by its new name.
+// key is what's kept of an unlock once told.
 func (u Unlock) key() string { return u.Kind + ":" + u.ID + ":" + u.Name }
 
 // from says what unlocks something, as a phrase after „с“.
@@ -280,14 +259,6 @@ func (w wardrobe) first(pass func(Achievement) bool) string {
 	return id
 }
 
-// champion is how many weeks a player has ended first in the top league.
-func (w wardrobe) champion() int {
-	if len(w.firsts) > TopLeague {
-		return w.firsts[TopLeague]
-	}
-	return 0
-}
-
 // shapeOpen is whether a player has an avatar's shape.
 func (w wardrobe) shapeOpen(shape string) bool {
 	if shape == "crown" {
@@ -296,13 +267,9 @@ func (w wardrobe) shapeOpen(shape string) bool {
 	return w.first(func(a Achievement) bool { return a.Icon == shape }) != ""
 }
 
-// unlocks are everything a player has unlocked: titles (the champion's by how many times), frames, patterns, shapes.
+// unlocks are everything a player has unlocked: titles, frames, patterns, shapes.
 func (w wardrobe) unlocks() []Unlock {
 	var out []Unlock
-	if won := w.champion(); won > 0 {
-		name, tier := ChampionTitle(won)
-		out = append(out, Unlock{Kind: "title", ID: championID, Name: name, Tier: tier, From: championHow})
-	}
 	for _, t := range w.titles {
 		if w.has(t.by) {
 			out = append(out, Unlock{Kind: "title", ID: t.ID, Name: t.Name, Tier: t.Tier, From: w.from(t.by),
@@ -441,7 +408,7 @@ func (w wardrobe) next(rating int) Next {
 	return n
 }
 
-// numberWords are the numbers to ten, as a phrase says them before „теми“ or „купи“.
+// numberWords are the numbers to ten, as a phrase says them before „теми“.
 var numberWords = []string{"", "една", "две", "три", "четири", "пет", "шест", "седем", "осем", "девет", "десет"}
 
 // inWords is a number in words, past ten in digits.

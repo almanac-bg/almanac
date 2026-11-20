@@ -53,9 +53,6 @@ packages' doc comments; this file holds only what must not drift.
   seconds, partly of the network). It always reaches the 15th. Those cut keep answering on the same clock, off the
   standings, placed as they stood at their cut (not reordered by their total). Rejected: out at the first wrong (most
   were out by the 5th), lives, a final from zero (luck over knowledge).
-- **Leagues race on the day's right answers**, not XP: a group ranks by the week's right answers on the day's ten, then
-  its points, then who joined first, as the day's board does (owner, 2026-11-18, review E3). A league's last group,
-  under five, races with the one before it.
 - **Reserve days: one a week at most,** Monday to Sunday, from whichever source comes first (the day itself and the
   goals); none before a streak's third day, which brings the first, told then. Players kept the reserve days they held
   when this came in. Reserve days are the only thing that keeps a streak: one that ends isn't won back. „Година без
@@ -64,12 +61,12 @@ packages' doc comments; this file holds only what must not drift.
 - **Removed to keep the game simple** (owner, 2026-11-19): sharing, invitations by link, challenges, past days'
   questions (the archive of past issues, and going over a game after its day), winning a broken streak back, and the
   year's report; and on 20 Nov, Профил's chart of the days („Твоите броеве“), Начало's line of how yesterday ended,
-  Класации' „Вчера“ and Втори шанс (the questions got wrong, asked again days later). Моят Алманах is one list in
-  the order the facts were learned, with no datelines. Friends are added by username or email; duels are live
-  (against a recording when nobody comes, with a rematch after), and only they move a rating. Don't bring any of them back, or something in their place, without
-  the owner's call.
-- **Right answers in a row earn no points** (owner, 2026-11-18, review E6): where a miss fell decided close duels and
-  weeks. The climb stays as sound and feel; a game with every answer right still earns its bonus.
+  Класации' „Вчера“, Втори шанс (the questions got wrong, asked again days later) and the weekly leagues. Моят
+  Алманах is one list in the order the facts were learned, with no datelines. Friends are added by username or email;
+  duels are live (against a recording when nobody comes, with a rematch after), and only they move a rating. Don't
+  bring any of them back, or something in their place, without the owner's call.
+- **Right answers in a row earn no points** (owner, 2026-11-18, review E6): where a miss fell decided close duels.
+  The climb stays as sound and feel; a game with every answer right still earns its bonus.
 - **The day's goals serve the day,** each one game at most: the day's ten; one more game (a topic's or a duel); and a
   game played well (8 of 10 or more). No goal for how many or how fast, and a
   room's game counts only when someone else played it too (owner, 2026-11-18, review O4: the volume and speed goals

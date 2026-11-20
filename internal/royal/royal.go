@@ -31,7 +31,7 @@
 // evening (its clock, a player in or out) goes one at a time (op), and writes to the database outside the lock on
 // what's in memory (mu), which is held only for moments: an answer, or a screen's look, never waits on a write. An
 // answer goes to the database by itself, outside both; the clock moves on only once the answers on their way are in.
-// What a game earned its players (achievements, goals, the league) is kept after, off the clock, one player at a time
+// What a game earned its players (achievements, goals) is kept after, off the clock, one player at a time
 // (after).
 //
 // A screen is sent what its tournament's board shows (Board: the lobby before the start, the evening before that),

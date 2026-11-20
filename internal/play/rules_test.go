@@ -100,13 +100,13 @@ func TestRunEndedByTheClock(t *testing.T) {
 		}
 	}
 
-	// Ana's day ends on the clock, and counts for her week in the league.
+	// Ana's day ends on the clock, and counts for her streak.
 	day, err := w.g.StartDay(ctx, ana)
 	if err != nil {
 		t.Fatal(err)
 	}
 	lastRunsOut(ana, day.ID, w.right)
-	if v, _ := w.g.LeagueOf(ctx, ana); !v.In {
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 1 {
 		t.Fatal("a day ended by the clock earned nothing")
 	}
 
@@ -170,12 +170,9 @@ func TestMergeBringsProgress(t *testing.T) {
 		_, _ = w.db.Write.Exec(`DELETE FROM users WHERE id = ?`, from) // as signing in does
 	}
 
-	// The guest: a better rating, a higher league, a week's result, an evening of Роял won, and goals: today's (the
-	// account has its own) and yesterday's (it has none).
-	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1180, rated = 12, peak = 1200, league = 3 WHERE id = ?`, guest)
-	_, _ = w.db.Write.Exec(`UPDATE users SET league = 1 WHERE id = ?`, owner)
-	_, _ = w.db.Write.Exec(`INSERT INTO league_results (week, user_id, tier, place, of, points, moved, xp)
-		VALUES ('2026-11-02', ?, 2, 1, 8, 900, 1, 300)`, guest)
+	// The guest: a better rating, an evening of Роял won, and goals: today's (the account has its own) and
+	// yesterday's (it has none).
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1180, rated = 12, peak = 1200 WHERE id = ?`, guest)
 	royal, err := w.g.NewRoyal(ctx, w.now, w.picks(mustStart(t, w, guest)))
 	if err != nil {
 		t.Fatal(err)
@@ -193,14 +190,12 @@ func TestMergeBringsProgress(t *testing.T) {
 	}
 	merge(guest, owner)
 
-	var rating, rated, peak, league, results, royals int
-	_ = w.db.Read.QueryRow(`SELECT rating, rated, peak, league,
-			(SELECT count(*) FROM league_results WHERE user_id = u.id),
+	var rating, rated, peak, royals int
+	_ = w.db.Read.QueryRow(`SELECT rating, rated, peak,
 			(SELECT count(*) FROM royal_players WHERE user_id = u.id AND place = 1)
-		FROM users u WHERE id = ?`, owner).Scan(&rating, &rated, &peak, &league, &results, &royals)
-	if rating != 1180 || rated != 12 || peak != 1200 || league != 3 || results != 1 || royals != 1 {
-		t.Fatalf("the account after: rating %d (%d games, peak %d), league %d, %d weeks, %d evenings won",
-			rating, rated, peak, league, results, royals)
+		FROM users u WHERE id = ?`, owner).Scan(&rating, &rated, &peak, &royals)
+	if rating != 1180 || rated != 12 || peak != 1200 || royals != 1 {
+		t.Fatalf("the account after: rating %d (%d games, peak %d), %d evenings won", rating, rated, peak, royals)
 	}
 	goals := func(day string) (n int) {
 		_ = w.db.Read.QueryRow(`SELECT count(*) FROM goals_done WHERE user_id = ? AND day = ? AND goal IN ('a', 'b', 'c')`,
@@ -213,11 +208,11 @@ func TestMergeBringsProgress(t *testing.T) {
 
 	// A guest with a worse rating leaves the account's as it is.
 	worse := w.user()
-	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 900, rated = 30, peak = 1000, league = 0 WHERE id = ?`, worse)
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 900, rated = 30, peak = 1000 WHERE id = ?`, worse)
 	merge(worse, owner)
-	_ = w.db.Read.QueryRow(`SELECT rating, rated, peak, league FROM users WHERE id = ?`, owner).Scan(&rating, &rated, &peak, &league)
-	if rating != 1180 || rated != 12 || peak != 1200 || league != 3 {
-		t.Fatalf("a worse guest's rating: %d (%d games, peak %d), league %d", rating, rated, peak, league)
+	_ = w.db.Read.QueryRow(`SELECT rating, rated, peak FROM users WHERE id = ?`, owner).Scan(&rating, &rated, &peak)
+	if rating != 1180 || rated != 12 || peak != 1200 {
+		t.Fatalf("a worse guest's rating: %d (%d games, peak %d)", rating, rated, peak)
 	}
 }
 

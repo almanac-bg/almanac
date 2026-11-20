@@ -26,8 +26,6 @@ import (
 // from the best of them, and the day's one game would be the best of many. It's left out of:
 //   - the day's board, its count of players and its places, and friends' results of the day (BoardOf, FriendsBoard,
 //     FriendsOf; fairFor);
-//   - the week's league: a day's run at a script's speed counts in its player's own view of the race, never against
-//     the others in it (standingsFor);
 //   - the Знания board (KnowledgeBoard);
 //   - the questions' statistics: how players answered each (crowd.go), how hard each is (hardness, Calibrate) and
 //     /admin's tallies (FairAnswers);
@@ -207,8 +205,8 @@ func fairFor(run, viewer string) string {
 }
 
 const (
-	// NetsKept is how long a game's network is kept: a week, the league's race that a day counts in, and well over
-	// SameNetFor and the two days JudgeNets looks at.
+	// NetsKept is how long a game's network is kept: a week, well over SameNetFor and the two days JudgeNets looks
+	// at.
 	NetsKept = 7 * 24 * time.Hour
 	// SameNetFor is how close together two players' games from one network make them one network's: a day (only the
 	// first duel of a day between two is rated anyway).

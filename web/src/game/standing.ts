@@ -1,10 +1,10 @@
 // Where the day played leaves a player among everyone who played it, as Начало says it under the result. A place is a
 // way to the day's board, but not every place is worth leading with: a new player's first social signal shouldn't be
-// „30-о място от 31“ (the day goes from easy to hard, so a poor first day is common, and the second day is where the
-// habit is won or lost), and among thousands „4312-о място“ says nothing. So, until the league opens (the third day
-// played, play/unfold.go), the place shows only in the better half (or first); otherwise the way to the board is
-// plain, „Класацията на деня“, and from ten players a share says how it went, „По-добре от 35% от играчите днес.“ From
-// a hundred players a day the share leads for everyone, and the place stays the way to the board.
+// „30-о място от 31“ (the day goes from easy to hard, so a poor first day is common), and among thousands „4312-о
+// място“ says nothing. So, until XP opens (the second day played, play/unfold.go), the place shows only in the better
+// half (or first); otherwise the way to the board is plain, „Класацията на деня“, and from ten players a share says how
+// it went, „По-добре от 35% от играчите днес.“ From a hundred players a day the share leads for everyone, and the place
+// stays the way to the board.
 
 import { place } from "../lib/ordinal.ts";
 
@@ -19,7 +19,7 @@ export interface Standing {
 export const shareFrom = 10;
 export const shareLeads = 100;
 
-/** The standing of a player in `at` place of `players` (`early`: before the league has opened for them); null without
+/** The standing of a player in `at` place of `players` (`early`: before XP has opened for them); null without
  * someone to be placed among: „1-во място от 1“ says nothing. */
 export function standing(at: number | undefined, players: number, early: boolean): Standing | null {
   if (!at || players < 2) return null;

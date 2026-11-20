@@ -5,7 +5,7 @@
 // („Брой 6“, play/issue.go) (left half-way, where the player stopped and the
 // way on, and the streak at stake while they wait; once played, as it lands, how they went and the one gold thing to
 // do next (game/gold.ts: another game, where a goal points), the goals
-// still open, tomorrow, and where the day leaves the league; on a later visit, the day played in
+// still open and tomorrow; on a later visit, the day played in
 // one short card, another game the gold thing to do); the day's goals; and every other way to play a tap away: by
 // topic, and — once a first game is finished — with others. The day's boards are in Класации. The game unfolds by the
 // days played (play/unfold.go): a first day has the streak without the level, and no goals.
@@ -31,13 +31,13 @@ import { feelKit } from "../lib/sound.ts";
 import { dateWords, issueWords, onDay, weekday } from "../lib/words.ts";
 import { categories, met, notice, player, playing, user } from "../state.ts";
 import {
+  dayPointsWords,
   explain,
   failure,
   formatNumber,
   levelNumber,
   meter,
   type Open,
-  pointsWords,
   reserveMeaning,
   reserveWords,
   stakeLine,
@@ -45,7 +45,6 @@ import {
 import { type Accepted, acceptedLine, type Left, leftLine } from "./duel.ts";
 import { type Goals, goalsCard, loadGoals, openGoals } from "./goals.ts";
 import { app, haveProfile, keepLine, keepStake, mailAsk } from "./keep.ts";
-import { leagueNote } from "./league.ts";
 import { clock, modes } from "./modes.ts";
 import { topics } from "./play.ts";
 
@@ -276,7 +275,6 @@ export function today() {
               // A later visit: the day played as one short card, and the ways to play right under it.
               dayDone(t, run, next),
               tomorrow,
-              () => (fresh().open?.league ? leagueNote() : null),
             ]
           : run?.done
             ? summary(
@@ -295,17 +293,16 @@ export function today() {
                 // Right under it, what to do next: one gold action (game/gold.ts).
                 dayNext(next),
                 // The goals still open, just played (else they're in their card); tomorrow (when the next ten come,
-                // the streak, the reminder); where the day leaves the league; then the friends' day, and what the game
-                // earned (a day whose result was never on screen: told now, once). Just played, the streak waits for
-                // the day as it is now, with today in it.
+                // the streak, the reminder); then the friends' day, and what the game earned (a day whose result
+                // was never on screen: told now, once). Just played, the streak waits for the day as it is now, with
+                // today in it.
                 [
                   just ? () => (fresh().open?.xp ? openGoals(goals) : null) : null,
                   tomorrow,
-                  () => (fresh().open?.league ? leagueNote() : null),
                   () => friendsDay(fresh()),
                   just ? news(run.id, 0, streak ?? undefined) : untold(t, run.id),
                 ],
-                pointsWords(t.open),
+                dayPointsWords,
                 just,
               )
             : dayCard(t, start(t), run?.trail ?? [], failed),
@@ -347,14 +344,14 @@ function dayNext(next: () => string): { main: Child } {
 /** The day played among everyone (game/standing.ts): the way to the day's board, said by the place where it's worth
  * saying. */
 function placeLink(t: Today): Child {
-  const s = standing(t.board.place, t.board.players, !t.open?.league);
+  const s = standing(t.board.place, t.board.players, !t.open?.xp);
   return s ? h("a", { class: "place-line", href: "/ranks" }, s.place ? `${s.place} днес` : "Класацията на деня") : null;
 }
 
 /** How the day played went among everyone: the share of players it did better than, where that's said
  * (game/standing.ts), and, from ten players, how many right is usual today (`one`: only the first of them). */
 function crowdSays(t: Today, one = false): Child {
-  const lead = standing(t.board.place, t.board.players, !t.open?.league)?.lead;
+  const lead = standing(t.board.place, t.board.players, !t.open?.xp)?.lead;
   const avg = t.board.average;
   const lines = [
     lead ? h("p", { class: "crowd-says" }, lead) : null,

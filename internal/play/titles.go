@@ -4,9 +4,6 @@ import (
 	"context"
 	"slices"
 	"strconv"
-	"strings"
-	"unicode"
-	"unicode/utf8"
 )
 
 // Titles: a few words worn under a player's name wherever they show. A title says something of the player and their
@@ -24,8 +21,7 @@ import (
 //     earn is an avatar);
 //   - mastery: „Майстор · …“ and „Светило · …“ for reaching that mastery in a topic, „Всезнание“ for „Експерт“ in
 //     every topic and „Оракул“ for „Светило“ in three;
-//   - the rating and the leagues: a division reached, a Роял won, and first place in a week of Рила, which counts
-//     how many times („Три купи на Рила“).
+//   - the rating: a division reached, and a Роял won.
 //
 // Each has a tier, the colour it's worn in.
 
@@ -48,7 +44,7 @@ const (
 	TitleRank        = "rank"
 )
 
-// Titles are every title but the topics' (made from the bank's topics) and the champion's: the rating's, the level's
+// Titles are every title but the topics' (made from the bank's topics): the rating's, the level's
 // ladder, the days', then the achievements', each group from the first a player is likely to earn. An id stays with
 // its name: the days' were the level's once (migration 0071 took them from whoever hadn't the days).
 var Titles = []Title{
@@ -151,20 +147,9 @@ type TitleView struct {
 	How    string `json:"how,omitempty"`
 }
 
-// championHow says what wins the champion's title.
-const championHow = "първо място за седмица в Рила"
-
-// titleViews are every title, as a player with this wardrobe may wear them: the champion's first (named by how many
-// times it's won), then the rest.
+// titleViews are every title, as a player with this wardrobe may wear them.
 func (w wardrobe) titleViews(all []Title) []TitleView {
-	list := make([]TitleView, 0, 1+len(all))
-	won := w.champion()
-	v := TitleView{TitleRef: TitleRef{ID: championID}, Group: TitleRank}
-	v.Name, v.Tier = ChampionTitle(won)
-	if won == 0 {
-		v.Locked, v.How = true, championHow
-	}
-	list = append(list, v)
+	list := make([]TitleView, 0, len(all))
 	for _, t := range all {
 		v := TitleView{TitleRef: t.ref(), Group: t.Group}
 		if !w.has(t.by) {
@@ -190,26 +175,16 @@ func (t Title) how() string {
 	return t.by.how()
 }
 
-// wears is whether a player with this wardrobe may wear a title: one they've unlocked, or the champion's, won.
+// wears is whether a player with this wardrobe may wear a title: one they've unlocked.
 func (w wardrobe) wears(all []Title, id string) bool {
-	if i := slices.IndexFunc(all, func(t Title) bool { return t.ID == id }); i >= 0 {
-		return w.has(all[i].by)
-	}
-	return id == championID && w.champion() > 0
+	i := slices.IndexFunc(all, func(t Title) bool { return t.ID == id })
+	return i >= 0 && w.has(all[i].by)
 }
 
-// titleOf is the name a title is shown by, and its tier ("" for none): a title's id, or the champion's as lookColumns
-// read it ("champion:3": three times).
+// titleOf is the name a title is shown by, and its tier ("" for none).
 func (g *Game) titleOf(id string) (string, Tier) {
 	if id == "" {
 		return "", ""
-	}
-	if rest, ok := strings.CutPrefix(id, championID+":"); ok {
-		times, _ := strconv.Atoi(rest)
-		if times < 1 {
-			return "", ""
-		}
-		return ChampionTitle(times)
 	}
 	t, _ := g.titleByID(id)
 	return t.Name, t.Tier
@@ -230,21 +205,6 @@ func LevelTitle(level int) string {
 		}
 	}
 	return id
-}
-
-// championID is the champion's title, as a player wears it: first place in a week of the top league.
-const championID = "champion"
-
-// ChampionTitle is the champion's title, won n times: „Купата на Рила“, „Три купи на Рила“ (a cup won, not „шампион“,
-// so that it's the same for anyone who wears it).
-func ChampionTitle(n int) (string, Tier) {
-	top := " на " + Leagues[TopLeague].Name
-	if n <= 1 {
-		return "Купата" + top, Legendary
-	}
-	w := inWords(n)
-	first, size := utf8.DecodeRuneInString(w)
-	return string(unicode.ToUpper(first)) + w[size:] + " купи" + top, Legendary
 }
 
 // royalWins is how many Роял tournaments a player has won (first place, with someone else in it).

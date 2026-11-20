@@ -19,7 +19,7 @@ import (
 // (DrawRoom), and what each player's game in it counts for once it's over (RecordRoom): a run of its own kind, 'room',
 // that earns XP and whose answers count as seen. It counts for the day's goals and the achievements as a topic's game
 // does only when someone else played it too (together), and for „Сто игри“ only with Length questions or more: alone,
-// on easy questions, a room was a shortcut to both (review 2026-11-18, E10). It's on no board of the day and moves no rating; its XP is any game's in the week's league. A game is kept
+// on easy questions, a room was a shortcut to both (review 2026-11-18, E10). It's on no board of the day and moves no rating. A game is kept
 // once for each player (by its id: RoomPlay.Game), and what playing it to its end earns is by the questions it was
 // dealt, not those it was cut to: a game cut short at its first question (its clock broke: room.broken) earns that
 // question's share.

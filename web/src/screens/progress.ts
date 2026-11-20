@@ -17,8 +17,7 @@ export interface Progress {
   shapes: { shape: string; locked?: boolean; how?: string }[];
   tones: string[];
   standing: Standing;
-  /** Every title, the champion's first (named by how many times it's won): yours, or locked with what
-   * unlocks it. */
+  /** Every title: yours, or locked with what unlocks it. */
   titles: TitleView[];
   /** The wardrobe: the frame and pattern worn ("" for none), and all there are. */
   frame: string;
@@ -59,7 +58,7 @@ export const loadProgress = () =>
 /** A title as the wardrobe lists it: yours to wear, or locked with what unlocks it. */
 export interface TitleView extends TitleRef {
   /** Where it comes from: the level, the days of the day's questions, an achievement, a topic's mastery, or the rating
-   * and the league (a division, Роял, first place in a high league). */
+   * and Роял (a division, a Роял won). */
   group: "level" | "days" | "achievement" | "topic" | "rank";
   locked?: boolean;
   how?: string;

@@ -14,23 +14,17 @@ import (
 //     achievements a game earns with what they unlock (but what the level unlocks).
 //   - From the second day played (XPFromDay): XP, with the level it makes (anyone's: a first day sees no level on
 //     another's avatar either), what the level unlocks, and the day's goals that pay it.
-//   - From the third day played (LeagueFromDay): the week's league, a race on the day's right answers added up over
-//     the week, which means little before the habit has begun.
 //   - From the first game that moved the rating (a duel, a Роял): the rating, being set; its division once it is
 //     (rating.go, Placed).
 //
-// Nothing waits to be earned, only to be shown: XP, achievements, unlocks, the league's group and the rating all count
+// Nothing waits to be earned, only to be shown: XP, achievements, unlocks and the rating all count
 // from the first game, and what was held is told when its system opens (NewsOf), not lost. Each system is told once,
 // quietly, as it opens: a line in that game's news (News.Opened). A topic's mastery needs no rule here: it shows as a
 // first estimate once a topic has a few answers (Mastery.First), and with its tier once its mark is sure
 // (Mastery.Sure). Награди (ProgressOf) shows the achievements of the systems open, and their XP once XP is.
 
-const (
-	// XPFromDay is the day played that XP, the level and the day's goals show from.
-	XPFromDay = 2
-	// LeagueFromDay is the day played that the week's league shows from.
-	LeagueFromDay = 3
-)
+// XPFromDay is the day played that XP, the level and the day's goals show from.
+const XPFromDay = 2
 
 // Open is which of the game's systems a player has met: what their screens show.
 type Open struct {
@@ -38,18 +32,16 @@ type Open struct {
 	Points bool `json:"points"`
 	// XP is what playing earns, with the level and the day's goals.
 	XP bool `json:"xp"`
-	// League is the week's race on the day's right answers.
-	League bool `json:"league"`
 	// Rating is strength in duels and Роял, with its division.
 	Rating bool `json:"rating"`
 }
 
 // Systems are the systems a player meets, in the order they usually come, by the names News.Opened tells them by.
-var Systems = []string{"points", "xp", "league", "rating"}
+var Systems = []string{"points", "xp", "rating"}
 
 // OpenTo is what a player who has played on so many days, and had so many games that moved their rating, has met.
 func OpenTo(days, rated int) Open {
-	return Open{Points: days >= 1, XP: days >= XPFromDay, League: days >= LeagueFromDay, Rating: rated > 0}
+	return Open{Points: days >= 1, XP: days >= XPFromDay, Rating: rated > 0}
 }
 
 // has is whether a system, by name, is open.
@@ -59,8 +51,6 @@ func (o Open) has(system string) bool {
 		return o.Points
 	case "xp":
 		return o.XP
-	case "league":
-		return o.League
 	case "rating":
 		return o.Rating
 	}
@@ -79,18 +69,16 @@ func openOf(ctx context.Context, db interface {
 	err := db.QueryRowContext(ctx, `SELECT
 		(SELECT count(*) FROM (SELECT DISTINCT `+bulgarianDate("finished_at")+` FROM runs
 			WHERE user_id = ?1 AND finished_at IS NOT NULL LIMIT ?2)),
-		coalesce((SELECT rated FROM users WHERE id = ?1), 0)`, userID, LeagueFromDay).Scan(&days, &rated)
+		coalesce((SELECT rated FROM users WHERE id = ?1), 0)`, userID, XPFromDay).Scan(&days, &rated)
 	return OpenTo(days, rated), err
 }
 
 // systemOf is the system an achievement belongs to, held while it's closed ("" for one told from the first game): a
-// day's goals done are XP's, a league's places the league's.
+// day's goals done are XP's.
 func systemOf(id string) string {
 	switch id {
 	case "fullDay", "fullDays30":
 		return "xp"
-	case "leagueUp", "leagueFirst", "rila":
-		return "league"
 	}
 	return ""
 }

@@ -978,13 +978,13 @@ function standings(v: Evening): Child {
       rows.push(
         h(
           "li",
-          { class: c.now ? "league-line up now" : "league-line up" },
+          { class: c.now ? "cut-line now" : "cut-line" },
           c.now ? "Дотук продължават" : `Дотук продължават след ${nth(c.after)}`,
         ),
       );
     }
   });
-  return h("section", { class: "board league-board royal-table" }, h("h2", null, "Класиране"), h("ol", null, rows));
+  return h("section", { class: "board royal-table" }, h("h2", null, "Класиране"), h("ol", null, rows));
 }
 
 /** A question, to answer while its time runs (game/answering.ts). An answer that doesn't get through is sent again

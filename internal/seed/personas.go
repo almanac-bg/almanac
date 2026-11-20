@@ -232,10 +232,6 @@ func (w *world) about(p *player) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	league, err := w.g.LeagueOf(ctx, p.id)
-	if err != nil {
-		return "", err
-	}
 	var days int
 	if err := w.one(&days, `SELECT count(*) FROM active_days WHERE user_id = ?`, p.id); err != nil {
 		return "", err
@@ -244,12 +240,8 @@ func (w *world) about(p *player) (string, error) {
 	if play.Placed(standing.Rated) {
 		rating = fmt.Sprintf("%s, rating %d", standing.Division.Name, standing.Rating)
 	}
-	race := "no league group this week"
-	if league.In {
-		race = fmt.Sprintf("league %s, place %d of %d", league.League.Name, league.Place, league.Size)
-	}
-	facts := fmt.Sprintf("%d days played, streak %d (best %d, %d reserve), level %d, %s, %d friends, %s",
-		days, streak.Days, streak.Best, streak.Reserve, level.Level, rating, len(friends), race)
+	facts := fmt.Sprintf("%d days played, streak %d (best %d, %d reserve), level %d, %s, %d friends",
+		days, streak.Days, streak.Best, streak.Reserve, level.Level, rating, len(friends))
 	fail := func(why string) (string, error) {
 		return "", fmt.Errorf("seed: the %s persona %s: %s", p.persona, why, facts)
 	}
@@ -264,7 +256,7 @@ func (w *world) about(p *player) (string, error) {
 			days < min(25, w.opt.Days*2/3) {
 			return fail("isn't a placed Злато player with friends, of a month")
 		}
-		return "a month's regular in Злато, with friends and the week's league; " + facts, nil
+		return "a month's regular in Злато, with friends; " + facts, nil
 	case keyLapsed:
 		e, err := w.endedYesterday(p)
 		if err != nil || e == nil {

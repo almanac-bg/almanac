@@ -31,7 +31,7 @@ func (n News) cards() int {
 	c := 0
 	for _, has := range []bool{
 		len(n.Goals) > 0,
-		n.League != nil || n.Division != nil || n.LevelUp,
+		n.Division != nil || n.LevelUp,
 		len(n.Achievements) > 0 || len(n.Unlocks) > 0 || len(n.Mastery) > 0,
 	} {
 		if has {

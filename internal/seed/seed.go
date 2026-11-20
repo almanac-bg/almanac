@@ -7,8 +7,8 @@
 // ShowLive, AnswerLive), rooms (RecordRoom, as the room's own game grades), and Роял evenings with their cuts and
 // podiums (royal.Hub, stepped on the same clock); they ask each other to be friends, accept, say no, block, choose
 // their look. Whatever follows from that, the game works out itself: scores, streaks, reserve days, goals, XP and
-// levels, achievements and titles, ratings and divisions (newcomers still placing too), the weeks of the leagues
-// with their groups, places and moves, the facts of Моят Алманах. Only what no game function
+// levels, achievements and titles, ratings and divisions (newcomers still placing too), the facts of Моят Алманах.
+// Only what no game function
 // writes is written directly: when a player came and was last seen, their email, their mail and notification
 // preferences, the sessions of the personas, and /admin's
 // tallies of visits and asks.
@@ -235,7 +235,7 @@ func (w *world) count(mean float64) int {
 }
 
 // sweep does what the server does every few minutes in the background, as the clock passes: duels and tournaments
-// whose time is up, a week of the leagues closing, what follows runs, the days drawn ahead, the throwaway guests.
+// whose time is up, what follows runs, the days drawn ahead, the throwaway guests.
 func (w *world) sweep() error {
 	if w.clock().Sub(w.swept) < 10*time.Minute {
 		return nil

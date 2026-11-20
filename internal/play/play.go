@@ -105,18 +105,12 @@ type Game struct {
 	RoyalNews func(context.Context, RoyalNews)
 	// RoyalAt, if set, is when the next Роял starts after a moment: a day's goals draw Роял only while it's ahead.
 	RoyalAt func(time.Time) time.Time
-	// LeagueNews, if set, is told of every place when a week of the leagues ends, inside the write that keeps those
-	// places (closeGroups): what it keeps there (a notification queued) is kept with them, or not at all.
-	LeagueNews func(context.Context, *sql.Tx, []LeagueNews) error
 	// CrowdMin, if set, is how many answers a question needs before how players answered it shows, the day's
 	// players' and everyone's (CrowdFrom, DayCrowdFrom when 0; the browser tests make it 1).
 	CrowdMin int
 	// Version is the game's version as released (the server's; "" in tests and a developer's build): the version a
 	// player met is kept with them on their first day played (users.first_version, retention.go).
 	Version string
-
-	weekMu sync.RWMutex // held while a week of the leagues closes (ensureWeek); read while a player joins one
-	week   string       // the leagues' week open, once ensureWeek has seen it
 
 	paceMu sync.Mutex
 	pace   RoyalPace // how often Роял plays, as of paceDay (RoyalPaceOf)
@@ -242,13 +236,12 @@ func (g *Game) loadBy(tx *sql.Tx, userID, runID int64, by driver) (*run, error) 
 const DayGrace = 15 * time.Minute
 
 // dayLate is the most after its day that a run of the day's questions can still be answered: DayGrace, and the time of
-// a question shown just before it ends (dayOver). Whatever is counted by the day waits for it: the week of the
-// leagues closes after it (ensureWeek), so that a day run finished after midnight counts in its own week.
+// a question shown just before it ends (dayOver).
 const dayLate = DayGrace + LongestLimit + Grace
 
 // dayOver is whether a run of the day's questions can't be played on any more: its day ended DayGrace ago, and no
 // question shown before then is still in its time. It stays as it was left: unfinished, it counts for nothing (the
-// streak, the day's board, the week's league), and nothing more of it shows. So a day can't be kept open (a run
+// streak, the day's board), and nothing more of it shows. So a day can't be kept open (a run
 // started and left) and played days later, its answers known by then, to keep a streak or move a past board.
 func (r *run) dayOver(now time.Time) bool {
 	if r.kind != "day" || r.finished {

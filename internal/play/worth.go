@@ -8,10 +8,8 @@ import (
 )
 
 // Points are a game's score: what each answer earned, added up within one game, to compare players who played the
-// same questions (a duel, the day's, a room). They're added up across games in one place only, the week's league
-// (leagues.go): the day's points over a week, the same questions for everyone in it, deciding between as many right
-// answers. What a player earns by playing
-// is XP (xp), and how strong they are is their rating.
+// same questions (a duel, the day's, a room), never added up across games. What a player earns by playing is XP (xp),
+// and how strong they are is their rating.
 //
 // An answer earns
 //
@@ -23,7 +21,7 @@ import (
 // question's time, then less, down to nothing at the end. Speed is at most SpeedShare of an answer, so that knowing
 // counts the most and looking an answer up costs. A game whose every answer was right earns AllRight more at its end.
 // Right answers in a row earn nothing more (owner, 2026-11-18, review E6): with a bonus for the row, where a miss fell
-// decided close duels and weeks of the league, more than a right answer to an easy question did. The row is still
+// decided close duels, more than a right answer to an easy question did. The row is still
 // heard and seen (the run's climb, „3 поред“), as feel only.
 //
 // The numbers are big on purpose: a right answer is worth a thousand, a good game ten thousand. It's the same game
@@ -98,8 +96,7 @@ func speed(took, limit time.Duration) float64 {
 // for being quick or drawing harder questions, so that someone still learning a topic, or reading slowly, goes up as
 // surely as anyone. The day's questions earn XPDay for coming, whatever the score: the day is the habit, worth about
 // two other games (at 50 it was a quarter of an engaged player's XP, and a day-only player's ladder went quiet for
-// months: review 2026-11-18, E8). The day's goals, achievements and a week's first places in the league earn more
-// (progress.go).
+// months: review 2026-11-18, E8). The day's goals and achievements earn more (progress.go).
 const (
 	// XPAnswer is what any answer given earns (one left to run out of time, or given up on, earns nothing)…
 	XPAnswer = 2
