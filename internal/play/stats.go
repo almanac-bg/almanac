@@ -119,4 +119,3 @@ func (g *Game) GamesOf(ctx context.Context, userID int64, kind, from string, lim
 	}
 	return out, rows.Err()
 }
-
