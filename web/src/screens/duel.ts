@@ -1,5 +1,5 @@
 // Дуел: two players on the same ten questions, each on their own time (play/duels.go). With a friend: the player plays
-// first, and the friend, told, plays the same ten when they can (three days); whoever plays second sees both at once.
+// first, and the friend, told, plays the same ten when they can (seven days); whoever plays second sees both at once.
 // Or against a recording: a real player's finished game, its answers shown as they came. A duel is played as any
 // game is (game/run.ts), with the other's answers beside the player's once they've given theirs. Приятели lists the
 // duels (duelLists: theirs to play, waiting, played); „Нов дуел“ (/duel/new) starts one; one duel's page (/duel/<id>)

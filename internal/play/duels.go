@@ -43,9 +43,8 @@ const (
 	// TieBand is how much quicker (ms, over the whole game) one of two with the same right answers, and nothing else to
 	// break the tie, must be to win: less is a draw.
 	TieBand = 1000
-	// DuelFor is how long a friend has to play a duel sent to them, a week (DECISIONS.md, „The direction“: from when it
-	// was sent, SentAt), and the first
-	// side to play theirs (from its start).
+	// DuelFor is how long a friend has to play a duel sent to them, a week from when it was sent (DECISIONS.md, „The
+	// direction“), and how long the first side has to play theirs, from its start.
 	DuelFor = 7 * 24 * time.Hour
 	// DuelsToOne is how many duels a player may have open with one friend they sent them to (sent or being played,
 	// not played back yet): a friend isn't buried under a pile, and the pair's record isn't one player's alone.
