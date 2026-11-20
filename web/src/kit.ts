@@ -1,6 +1,6 @@
 // app.js holds what a daily visit uses: Начало, a game, the screens a game leads to. A screen a daily visit doesn't
-// open loads on its own, the first time it's opened: a live duel's (live.ts) and a duel's result (outcome.ts), only
-// for those who play there; and Профил's places, the boards and the
+// open loads on its own, the first time it's opened: a duel's result (outcome.ts), only for those who play there; and
+// Профил's places, the boards and the
 // friends (me, settings, avatar, almanac, played, ranks, friends, player). Each is handed the app's
 // pieces it uses from here, and imports nothing of the app but types: a module it imported would be one app.js
 // imports too, and esbuild would split every such module into a shared file that each page then loads first
@@ -8,10 +8,9 @@
 // release that doesn't change such a screen leaves its file as it was, cached; and app.js stays small, within the
 // first screen's budget (cmd/build).
 
-import { emblem } from "./art/emblem.ts";
 import { picture as illustration } from "./art/picture.ts";
-import { recover, staying } from "./fresh.ts";
-import { answering, onScreen } from "./game/answering.ts";
+import { recover } from "./fresh.ts";
+import { answering } from "./game/answering.ts";
 import { masteryCard } from "./game/mastery.ts";
 import { news, notedWords } from "./game/news.ts";
 import { count } from "./game/numbers.ts";
@@ -29,18 +28,16 @@ import {
 } from "./game/results.ts";
 import { guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
 import { ApiError, api, errorText } from "./lib/api.ts";
-import { keepAwake } from "./lib/awake.ts";
 import { dayInBulgaria } from "./lib/day.ts";
 import { type Child, computed, effect, h, lifetime, onCleanup, signal, slot, untracked, when } from "./lib/dom.ts";
 import { reportProblem } from "./lib/errors.ts";
 import { ordinal } from "./lib/ordinal.ts";
 import { calm, setCalm, setTextSize, setTick, textSize, tickOn } from "./lib/prefs.ts";
 import { needsHomeScreen, pushable, pushOn, pushPrefs, setPushPref, turnOff, turnOn } from "./lib/push.ts";
-import { byTap, go, goBack, holdWhile, rename, title } from "./lib/router.ts";
+import { byTap, go, goBack, rename, title } from "./lib/router.ts";
 import { feelKit, loadFeel, play, playAnswer, playCount, quietWhenSilent, setSound, soundOn } from "./lib/sound.ts";
-import { stream } from "./lib/stream.ts";
 import { issueWords, listWords, weekday, withWord } from "./lib/words.ts";
-import type { DuelView } from "./screens/duel.ts";
+import { type DuelView, duelLists, startDuel } from "./screens/duel.ts";
 import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
 import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
@@ -49,6 +46,7 @@ import { gameRow, loadStats, stats } from "./screens/stats.ts";
 import {
   bulgaria,
   categories,
+  duelsWaiting,
   friendRequests,
   notice,
   outcomeCss,
@@ -74,7 +72,6 @@ import {
   schemeSwitch,
   segmented,
   shapeNames,
-  standingCard,
   stat,
   toneNames,
   toneOf,
@@ -100,9 +97,10 @@ export const kit = {
   count,
   crowdLine,
   dayInBulgaria,
+  duelLists,
   duelResult,
+  duelsWaiting,
   effect,
-  emblem,
   errorText,
   explain,
   fact,
@@ -117,10 +115,8 @@ export const kit = {
   h,
   hands,
   haveProfile,
-  holdWhile,
   illustration,
   issueWords,
-  keepAwake,
   keepGame,
   landing,
   lifetime,
@@ -138,7 +134,6 @@ export const kit = {
   notedWords,
   notice,
   onCleanup,
-  onScreen,
   ordinal,
   pageArt,
   picture,
@@ -174,12 +169,10 @@ export const kit = {
   signIn,
   slot,
   soundOn,
-  standingCard,
+  startDuel,
   startScreen,
   stat,
   stats,
-  staying,
-  stream,
   summary,
   tickOn,
   timer,

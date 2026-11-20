@@ -108,13 +108,6 @@
     --rose-ink: #ff9fd0;
     --silver: #cfc8e3;
     --bronze: #e8a46c;
-    /* Divisions: each emblem's colour (art/pictures.ts). */
-    --div-bronze: #d08f5b;
-    --div-silver: #c9d1df;
-    --div-gold: var(--gold);
-    --div-platinum: #7fe0cf;
-    --div-diamond: #79c7ff;
-    --div-legend: #c4a3ff;
     --on-fill: #140f26;
     --link: var(--accent);
     --elev-1: inset 0 1px 0 #ffffff0f, 0 2px 8px #00000066;
@@ -180,11 +173,6 @@
       --wrong-ink: #bf3018;
       --sky-ink: #1f63a8;
       --rose-ink: #b12a72;
-      --div-bronze: #b8743d;
-      --div-silver: #9aa4b6;
-      --div-platinum: #3fb5a0;
-      --div-diamond: #3c9be0;
-      --div-legend: #8b5cf6;
       --elev-1: 0 1px 2px #140f2614, 0 2px 8px #140f260d;
       --elev-2: 0 2px 6px #140f2612, 0 18px 40px -16px #140f2638;
       --glow-gold: 0 1px 0 #b7860b, 0 8px 22px -8px #f59e0bb3;
@@ -222,11 +210,6 @@
     --wrong-ink: #bf3018;
     --sky-ink: #1f63a8;
     --rose-ink: #b12a72;
-    --div-bronze: #b8743d;
-    --div-silver: #9aa4b6;
-    --div-platinum: #3fb5a0;
-    --div-diamond: #3c9be0;
-    --div-legend: #8b5cf6;
     --elev-1: 0 1px 2px #140f2614, 0 2px 8px #140f260d;
     --elev-2: 0 2px 6px #140f2612, 0 18px 40px -16px #140f2638;
     --glow-gold: 0 1px 0 #b7860b, 0 8px 22px -8px #f59e0bb3;
@@ -2379,7 +2362,7 @@
     text-align: center;
   }
 
-  /* Gone over (a review, a live game's answer): the right one of the two says so in words, not by colour alone. */
+  /* Gone over (a review): the right one of the two says so in words, not by colour alone. */
   .tf-right {
     font: 700 0.75rem / 1 var(--font-sans);
     letter-spacing: 0.04em;
@@ -2902,79 +2885,6 @@
     font-weight: 700;
   }
 
-  /* Division emblems (art/emblem.ts): a crest in the division's colour. */
-  .d-bronze {
-    --div: var(--div-bronze);
-  }
-  .d-silver {
-    --div: var(--div-silver);
-  }
-  .d-gold {
-    --div: var(--div-gold);
-  }
-  .d-platinum {
-    --div: var(--div-platinum);
-  }
-  .d-diamond {
-    --div: var(--div-diamond);
-  }
-  .d-legend {
-    --div: var(--div-legend);
-  }
-
-  .emblem {
-    --tone: var(--div);
-    display: inline-grid;
-    flex: none;
-    width: 40px;
-    height: 40px;
-    vertical-align: middle;
-  }
-
-  .emblem-s {
-    width: 22px;
-    height: 22px;
-  }
-
-  .emblem-l {
-    width: 72px;
-    height: 72px;
-  }
-
-  .emblem.d-diamond,
-  .emblem.d-legend {
-    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--div) 55%, transparent));
-  }
-
-  /* A player's division: the emblem, the name in its colour, the rating and the way to the next. */
-  .standing {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-  }
-
-  .standing-text {
-    display: grid;
-    flex: 1;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .standing-name {
-    color: color-mix(in srgb, var(--div) 80%, var(--text));
-    font: 900 1.5rem / 1.75rem var(--font-sans);
-  }
-
-  /* A rating still being set (play/rating.go): no division's colour yet, its crest greyed. */
-  .placing {
-    --div: var(--text-muted);
-  }
-
-  .placing .emblem {
-    filter: grayscale(1);
-    opacity: 0.55;
-  }
-
   /* Tabs that switch what a screen shows. */
   .segmented {
     display: flex;
@@ -3046,6 +2956,14 @@
     text-decoration: none;
   }
 
+  /* A friend to start a duel with (/duel/new): a row like a duel's, the whole width a button. */
+  .duel-pick {
+    width: 100%;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
   @media (hover: hover) and (pointer: fine) {
     .duel-row:hover {
       border-color: var(--line-strong);
@@ -3062,6 +2980,11 @@
 
   .duel-state {
     font-size: 0.9375rem;
+  }
+
+  /* „Покани“ on a friend's row in /duel/new: what the tap does, in the link's colour. */
+  .duel-invite {
+    color: var(--link);
   }
 
   .s-won .duel-state {
@@ -3132,284 +3055,25 @@
     color: var(--link);
   }
 
-  /* A live duel: the wait, the two face to face, the board above each question, the other's answer. */
-  .live-count {
+  /* A friend's duel just played first: sent, and how long the friend has (screens/duel.ts). */
+  .duel-sent {
     margin: 0;
-    color: var(--rose-ink);
-    font: 900 calc(60px + 3.75rem) / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-    text-align: center;
-  }
-
-  .live-faces {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    align-items: center;
-    gap: var(--space-3);
-    text-align: center;
-  }
-
-  .live-face {
-    display: grid;
-    justify-items: center;
-    gap: var(--space-1);
-    min-width: 0;
-  }
-
-  .live-name {
-    max-width: 100%;
-    overflow: hidden;
-    font-size: 1.125rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .live-division {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
     color: var(--text-muted);
-    font-size: 0.8125rem;
-  }
-
-  .live-vs {
-    color: var(--text-muted);
-    font-weight: 800;
-  }
-
-  /* The seconds to the first question, under the two: smaller on a short phone, so they stay above the tabs. */
-  .live-intro .ready-clock {
-    justify-self: center;
-  }
-
-  @media (max-height: 700px) {
-    .live-intro .ready-clock {
-      width: 120px;
-      height: 120px;
-    }
-
-    .live-intro .ready-n {
-      font-size: calc(26px + 1.625rem);
-    }
-  }
-
-  /* Both sides in one card, face to face: the player's on the left, the other's mirrored on the right; the points
-     plain, the leader's gold. */
-  .live-board {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: var(--space-4);
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
-    background: var(--surface);
-    box-shadow: var(--elev-1);
-  }
-
-  .live-side {
-    display: grid;
-    align-content: start;
-    gap: var(--space-2);
-    min-width: 0;
-  }
-
-  .live-side.them {
-    justify-items: end;
-    text-align: right;
-  }
-
-  /* The points under the name, so that a name has the width (a phone's half). */
-  .live-who {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    max-width: 100%;
-    min-width: 0;
-  }
-
-  .live-side.them .live-who {
-    flex-direction: row-reverse;
-  }
-
-  .live-who-text {
-    display: grid;
-    min-width: 0;
-  }
-
-  .live-side-name {
-    min-width: 0;
-    overflow: hidden;
     font-size: 0.875rem;
-    font-weight: 700;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
-  .live-points {
-    color: var(--text);
-    font: 900 1.375rem / 1.1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-    transition: color 200ms;
-  }
-
-  .live-side.ahead .live-points {
-    color: var(--gold-display);
-  }
-
-  /* Each side's answers in two rows of five, big enough to read (half a phone's width is too narrow for ten). */
-  .live-side .trail {
-    grid-auto-flow: row;
-    grid-template-columns: repeat(5, 0.875rem);
-    gap: 3px;
-    max-width: none;
-  }
-
-  /* Wider, the ten in one row, bigger. */
-  @media (min-width: 48rem) {
-    .live-side .trail {
-      grid-template-columns: repeat(10, 1.125rem);
-      gap: 4px;
-    }
-  }
-
-  /* A phone, or a laptop's short screen: while the question's time runs, it has the screen; the marks show with the
-     answer. */
-  @media (max-width: 40rem), (max-height: 45rem) {
-    .live-board.question .trail {
-      display: none;
-    }
-  }
-
-  /* A narrow or short phone: a long question in fewer lines, so that the answers are in sight while the clock runs (a
-     live duel's question doesn't scroll to its answers as a run's does). */
-  @media (max-width: 22.5rem), (max-width: 40rem) and (max-height: 42rem) {
-    .live .ask {
-      font-size: 1.5rem;
-      line-height: 1.875rem;
-    }
-  }
-
-  .live-doing {
-    min-height: 1.25rem;
-    margin: 0;
-    color: var(--text-muted);
-    font-size: 0.8125rem;
-  }
-
-  /* The other gone for good, the player ahead (live.ts, claim): take the win now, or play on. */
-  .live-claim {
-    display: grid;
-    gap: var(--space-3);
-    box-shadow:
-      var(--elev-1),
-      inset 0 0 0 1px var(--gold-ink);
-  }
-
-  .live-claim-actions {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
-    gap: var(--space-2);
-  }
-
-  /* A live duel's end against a person: „Реванш“, and over it that the other asks for one, with the seconds they wait
-     draining in a ring. */
-  .rematch {
-    display: grid;
-    gap: var(--space-2);
-  }
-
-  .rematch-asks {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-    margin: 0;
-    color: var(--rose-ink);
-    font-weight: 800;
-  }
-
-  .rematch-clock {
-    position: relative;
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    color: var(--text);
-  }
-
-  .rematch-ring {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    transform: rotate(-90deg);
-  }
-
-  .rematch-track,
-  .rematch-arc {
-    fill: none;
-    stroke-width: 4;
-  }
-
-  .rematch-track {
-    stroke: var(--sunken);
-  }
-
-  .rematch-arc {
-    stroke: var(--rose);
-    stroke-dasharray: 100;
-  }
-
-  .live-theirs {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2);
+  /* Played second in a duel: how the question went for the other, under the player's own verdict (run.ts). */
+  .their-line {
     margin: 0;
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-md);
     background: var(--surface);
-  }
-
-  .live-theirs-how {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    color: var(--wrong-ink);
+    color: var(--text-muted);
     font-weight: 700;
   }
 
-  .live-theirs-sign {
-    --i: var(--i-cross);
-    width: 14px;
-    height: 14px;
-    background: currentColor;
-    -webkit-mask: var(--i) center / contain no-repeat;
-    mask: var(--i) center / contain no-repeat;
-  }
-
-  .live-theirs.h-right .live-theirs-how {
+  .their-line.right {
     color: var(--right-ink);
-  }
-
-  .live-theirs.h-right .live-theirs-sign {
-    --i: var(--i-check);
-  }
-
-  .live-theirs.h-partial .live-theirs-how,
-  .live-theirs.h-missed .live-theirs-how {
-    color: var(--text-muted);
-  }
-
-  .live-theirs.h-partial .live-theirs-sign,
-  .live-theirs.h-missed .live-theirs-sign {
-    display: none;
-  }
-
-  .live-theirs-points {
-    margin-left: auto;
-    color: var(--gold-display);
-    font: 900 1.5rem / 1 var(--font-numeral);
   }
 
   /* The game moving on by itself: a line filling while the answer shows. */
@@ -4247,16 +3911,8 @@
     border-radius: inherit;
     background: var(--tone, var(--accent));
   }
-  .standing .meter {
-    margin-top: var(--space-2);
-  }
-
   .topic .meter {
     grid-column: 1 / -1;
-  }
-
-  .standing .meter-fill {
-    background: var(--div);
   }
 
   .chips {

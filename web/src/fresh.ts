@@ -5,14 +5,13 @@
 // Every API answer says the server's version (X-Almanac-Version: server/api.go); a session the server says has ended
 // ends here too; and each tab tells the others of the player it has (a BroadcastChannel). A page that has fallen behind
 // (stale) loads itself anew at the next moment that costs the player nothing: the next screen opened (router.ts,
-// loadAnew: that screen is going anyway), or the page come back into view while no game is under way (playing) and no
-// screen holds it (staying: a live duel's wait for an opponent). Back after a while away (a phone's app brought back),
-// the page asks the server first (GET /api/me) whether it's behind. A screen's own file that doesn't load is most
+// loadAnew: that screen is going anyway), or the page come back into view while no game is under way (playing). Back
+// after a while away (a phone's app brought back), the page asks the server first (GET /api/me) whether it's behind. A screen's own file that doesn't load is most
 // likely one of a version gone by: the page loads anew for it, once (recover).
 
 import { api, hearing } from "./lib/api.ts";
 import { version } from "./lib/boot.ts";
-import { effect, onCleanup, signal } from "./lib/dom.ts";
+import { effect, signal } from "./lib/dom.ts";
 import { loadAnew } from "./lib/router.ts";
 import { playing, type User, user } from "./state.ts";
 
@@ -23,18 +22,8 @@ const behind = (why: "version" | "session") => {
   if (!stale.peek()) stale.set(why);
 };
 
-/** What would be lost to a reload now, as each screen says (staying). */
-const holds = new Set<() => boolean>();
-
-/** While `costs` says so, a reload of the page would cost the player something the screen can't bring back (a place in
- * the queue for a duel): the page waits for the next screen to load anew. For as long as the screen lasts. */
-export function staying(costs: () => boolean): void {
-  holds.add(costs);
-  onCleanup(() => holds.delete(costs));
-}
-
-/** A moment a reload costs nothing: no game under way, no screen that holds the page. */
-const quiet = () => !playing.peek() && ![...holds].some((costs) => costs());
+/** A moment a reload costs nothing: no game under way. */
+const quiet = () => !playing.peek();
 
 /** Loads the page anew if it's behind and the moment is quiet. */
 function catchUp(): void {

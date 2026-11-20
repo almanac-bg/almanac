@@ -8,7 +8,7 @@ for (const scheme of ["light", "dark"] as const) {
     test.use({ colorScheme: scheme });
     for (const path of [
       "/",
-      "/duel",
+      "/duel/new",
       "/ranks",
       "/avatar",
       "/me",
@@ -84,8 +84,8 @@ for (const scheme of ["light", "dark"] as const) {
   });
 }
 
-// A duel's result, as one won live against a person has it (the server's answer for it made here): the two face to face, the
-// duel question by question with the quicker answers ringed and the deciding one marked, the rating and the record.
+// A duel's result, as one won against a friend has it (the server's answer for it made here): the two face to face,
+// the duel question by question with the quicker answers ringed and the deciding one marked, and the record.
 for (const scheme of ["light", "dark"] as const) {
   test(`a duel's result is accessible (${scheme})`, async ({ page }) => {
     const mark = (points: number, ms: number) => ({ points, right: points > 0, ms });
@@ -104,18 +104,14 @@ for (const scheme of ["light", "dark"] as const) {
       state: "won",
       you: side("Заек 817", "", [1300, 1100, 0, 1500, 1200, 0, 1400, 1250, 1100, 1000]),
       opponent: { ...side("Мария", "maria", [1200, 0, 1500, 1600, 1300, 0, 1500, 0, 1000, 0], 500), ms: 50_000 },
-      delta: 18,
       runId: 1,
+      first: true,
       createdAt: Date.now(),
       endedAt: Date.now(),
       decided: 8,
-      rating: {
-        before: 1062,
-        after: 1080,
-        division: { id: "silver", name: "Сребро", from: 1050 },
-        next: { id: "gold", name: "Злато", from: 1150 },
-      },
       record: { won: 3, lost: 2, drawn: 1 },
+      friend: true,
+      them: 2,
     };
     await page.emulateMedia({ colorScheme: scheme });
     await page.route("**/api/duels/1", (r) => r.fulfill({ json: { duel } }));

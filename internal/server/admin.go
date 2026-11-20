@@ -3,12 +3,10 @@ package server
 import (
 	"bytes"
 	"cmp"
-	"context"
 	"database/sql"
 	"fmt"
 	"html/template"
 	"log/slog"
-	"math"
 	"net/http"
 	"slices"
 	"strconv"
@@ -106,8 +104,6 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		Players, WithEmail, DayToday, DayScripted, Questions, Live int
 		M                                                          measures
 		Fair                                                       []play.FairSignal
-		Divisions                                                  []divisionShare
-		Placing                                                    int
 	}{Questions: len(b.Questions), Live: len(b.Live("", ""))}
 	today := s.game.Today()
 	var err error
@@ -123,10 +119,6 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	_ = db.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE `+play.People+`), count(*) FILTER (WHERE shadow = ?) FROM runs
 		WHERE kind = 'day' AND day = ? AND finished_at IS NOT NULL`, play.ShadowScript, today).Scan(&data.DayToday, &data.DayScripted)
 
-	if data.Divisions, data.Placing, err = s.divisionShares(ctx); err != nil {
-		slog.Error("admin: divisions", "err", err)
-	}
-
 	var body bytes.Buffer
 	if err := adminBody.Execute(&body, data); err != nil {
 		slog.Error("admin", "err", err)
@@ -137,51 +129,6 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	body.WriteString(string(adminPlayersHTML(s.adminPlayersOf(ctx, r.URL.Query().Get("player")))))
 	body.WriteString(`</section>`)
 	s.adminPage(w, "Управление", template.HTML(body.String()))
-}
-
-// divisionShare is how many placed players a division has, and their share of all placed.
-type divisionShare struct {
-	play.Division
-	Players int
-	Share   string
-}
-
-// divisionShares are the placed players (play.Placed) in each division, and how many are still being placed: whether
-// the bands still split players as play.Divisions says they should (about a third below Сребро).
-func (s *Server) divisionShares(ctx context.Context) ([]divisionShare, int, error) {
-	out := make([]divisionShare, len(play.Divisions))
-	for i, d := range play.Divisions {
-		out[i].Division = d
-	}
-	rows, err := s.db.Read.QueryContext(ctx, `SELECT rating, rated FROM users WHERE rated > 0 AND NOT admin`)
-	if err != nil {
-		return out, 0, err
-	}
-	defer rows.Close()
-	placing, placed := 0, 0
-	for rows.Next() {
-		var rating, rated int
-		if err := rows.Scan(&rating, &rated); err != nil {
-			return out, 0, err
-		}
-		if !play.Placed(rated) {
-			placing++
-			continue
-		}
-		d, _ := play.DivisionOf(rating)
-		for i := range out {
-			if out[i].ID == d.ID {
-				out[i].Players++
-			}
-		}
-		placed++
-	}
-	for i := range out {
-		if placed > 0 {
-			out[i].Share = strconv.Itoa(int(math.Round(100*float64(out[i].Players)/float64(placed)))) + " %"
-		}
-	}
-	return out, placing, rows.Err()
 }
 
 // isAdmin says whether the request is an admin's.

@@ -49,14 +49,6 @@ var mergeSteps = []mergeStep{
 		sql: `UPDATE duels SET a_id = ?1 WHERE a_id = ?2 AND coalesce(b_id, 0) <> ?1`},
 	{sql: `UPDATE duels SET b_id = ?1 WHERE b_id = ?2 AND coalesce(a_id, 0) <> ?1`},
 	{sql: `DELETE FROM duels WHERE a_id = ?2 OR b_id = ?2`},
-	// The rating: the guest's, with its games, only if the account has none of its own (no rated duel yet). Never the
-	// higher of the two: a guest is free to make, so
-	// a rating pumped up on throwaway guests would otherwise become any account's by signing in from the guest (review
-	// 2026-11-18, S20).
-	{carries: []string{"users.rating", "users.rated"},
-		sql: `UPDATE users SET rating = g.rating, rated = g.rated
-		FROM (SELECT rating, rated FROM users WHERE id = ?2) g
-		WHERE users.id = ?1 AND g.rated > 0 AND users.rated = 0`},
 	// The days the guest played on were the account's player's: the same person, so not a player who left.
 	{carries: []string{"active_days.user_id"},
 		sql: `INSERT OR IGNORE INTO active_days (user_id, day) SELECT ?1, day FROM active_days WHERE user_id = ?2`},
@@ -142,8 +134,7 @@ const GoneName = "Изтрит играч"
 // before), as it was without them: a duel's result stays the other's, without the player's name or game (the schema
 // sets the player to none there, ON DELETE SET NULL); what was theirs alone, or nobody's once they're gone, goes.
 //
-//   - A duel under way with another player, or against their recording, stays the other's: they forfeit it, and it's
-//     the other's win once played to its end (forfeit).
+//   - A duel not over yet goes, theirs or another's against their recording: nothing of it is played by both.
 //   - A duel only they had (against a recording, or the other gone before) goes.
 //   - Their name goes from others' games against them, or against their recordings.
 //   - Friend requests to their address go.
@@ -157,6 +148,8 @@ func Forget(tx *sql.Tx, id int64) error {
 		return err
 	}
 	for _, q := range []string{
+		`DELETE FROM duels WHERE ended_at IS NULL AND (a_id = ?1 OR b_id = ?1
+			OR ghost_run IN (SELECT id FROM runs WHERE user_id = ?1))`,
 		`DELETE FROM duels WHERE a_id = ?1 AND b_id IS NULL`,
 		`DELETE FROM duels WHERE b_id = ?1 AND a_id IS NULL`,
 		`UPDATE runs SET opponent = NULL WHERE opponent_id = ?1`,

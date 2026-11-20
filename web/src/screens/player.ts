@@ -1,15 +1,13 @@
-// Another player's profile, by their tag (/players/tag): how they look, their division, their numbers, how well they
+// Another player's profile, by their tag (/players/tag): how they look, their numbers, how well they
 // know each topic; and how you stand with them — ask to be friends, or answer their asking.
 
 import type { Mastery } from "../game/mastery.ts";
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
-import type { Standing } from "../ui.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
-let { masteryCard, api, errorText, h, signal, title, friendRequests, user, avatar, record, standingCard, stat } =
-  {} as Kit;
+let { masteryCard, api, errorText, h, signal, title, friendRequests, user, avatar, record, stat } = {} as Kit;
 
 interface Profile {
   name: string;
@@ -17,7 +15,6 @@ interface Profile {
   me?: boolean;
   avatar: string;
   since: number;
-  standing: Standing;
   streak: number;
   days: number;
   games: number;
@@ -37,7 +34,7 @@ const month = (ms: number) =>
   new Intl.DateTimeFormat("bg", { month: "long", year: "numeric" }).format(new Date(ms)).replace(/\s(?=г\.)/, " ");
 
 export function playerProfile(kit: Kit, [tag]: string[]): Child {
-  ({ masteryCard, api, errorText, h, signal, title, friendRequests, user, avatar, record, standingCard, stat } = kit);
+  ({ masteryCard, api, errorText, h, signal, title, friendRequests, user, avatar, record, stat } = kit);
   title(`@${tag}`);
   const profile = signal<Profile | null>(null);
   const error = signal("");
@@ -65,7 +62,6 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
       p.me
         ? h("p", { class: "muted" }, "Така те виждат другите. ", h("a", { href: "/me" }, "Към профила ти"))
         : actions(p, load),
-      p.standing.rated ? standingCard(p.standing) : null,
       numbers(p),
       // Only the topics they've played: the rest would only say they haven't.
       p.mastery.some((m) => m.answers)

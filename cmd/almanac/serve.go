@@ -58,8 +58,7 @@ import (
 //
 // The server plays a copy of BANK_DIR kept beside the database (banks.go: outside development), and starts on the
 // last good copy when BANK_DIR has errors. SIGHUP reloads the bank (deploy/bank.sh), from the moment the program
-// starts (one that comes during the start is taken once it's up). SIGTERM or SIGINT stop the server after the requests under way finish (a deploy drains it
-// first: internal/server/drain.go). A version that brings a migration copies the database as it first starts, before
+// starts (one that comes during the start is taken once it's up). SIGTERM or SIGINT stop the server after the requests under way finish. A version that brings a migration copies the database as it first starts, before
 // migrating it (store.KeepCopy); one without makes no copy, and starts at once. Started by systemd's socket
 // (deploy/almanac.socket), it serves on that socket, and ADDR is left aside.
 func serve([]string) error {

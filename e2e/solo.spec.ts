@@ -36,7 +36,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // Класации opens on the day's board, the player on it.
   await page.goto("/ranks");
   await expect(page.locator(".board .row.me")).toContainText(/\d от 10\d[\d\s]* точки$/);
-  await expect(page.getByRole("tab")).toHaveText(["Днес", "Рейтинг", "Знания", "Всички", "Приятели"]);
+  await expect(page.getByRole("tab")).toHaveText(["Днес", "Знания", "Всички", "Приятели"]);
   // A row is the place, the name and the score: no level, no title.
   await expect(page.locator(".board .lv, .board .who-title")).toHaveCount(0);
   await page.goto("/me");

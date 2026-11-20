@@ -31,8 +31,8 @@ import (
 var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/$`),
 	regexp.MustCompile(`^/play/[a-z]+$`),
-	regexp.MustCompile(`^/(duel|ranks|avatar|me|friends|settings|almanac|games)$`),
-	regexp.MustCompile(`^/duel/([0-9]{1,12}|live)$`),
+	regexp.MustCompile(`^/(ranks|avatar|me|friends|settings|almanac|games)$`),
+	regexp.MustCompile(`^/duel/([0-9]{1,12}|new)$`),
 	regexp.MustCompile(`^/games/[0-9]{1,12}$`),
 	regexp.MustCompile(`^/hand/[A-Za-z0-9_-]{43}$`),
 	regexp.MustCompile(`^/players/[A-Za-z0-9_]{3,20}$`),
@@ -46,7 +46,6 @@ var screens = []struct {
 	path *regexp.Regexp
 	file string
 }{
-	{regexp.MustCompile(`^/duel/live$`), "live.js"},
 	{regexp.MustCompile(`^/me$`), "me.js"},
 	{regexp.MustCompile(`^/settings$`), "settings.js"},
 	{regexp.MustCompile(`^/avatar$`), "avatar.js"},
@@ -241,7 +240,7 @@ func (s *Server) there(r *http.Request) bool {
 	switch {
 	case strings.HasPrefix(p, "/play/"):
 		return s.game.IsTopic(strings.TrimPrefix(p, "/play/"))
-	case strings.HasPrefix(p, "/duel/") && p != "/duel/live":
+	case strings.HasPrefix(p, "/duel/") && p != "/duel/new":
 		id, _ := strconv.ParseInt(strings.TrimPrefix(p, "/duel/"), 10, 64)
 		yes, err = s.game.DuelExists(ctx, id)
 	case strings.HasPrefix(p, "/players/"):
@@ -274,11 +273,7 @@ func (s *Server) preview(r *http.Request, shared play.Share) (title, description
 				if p.Games == 1 {
 					played = "изиграна игра"
 				}
-				division := "" // none while the rating is still being set
-				if p.Standing.Of == 0 {
-					division = p.Standing.Division.Name + " · "
-				}
-				description = fmt.Sprintf("%s%d %s.", division, p.Games, played)
+				description = fmt.Sprintf("%d %s.", p.Games, played)
 			}
 		}
 	}

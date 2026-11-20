@@ -65,6 +65,9 @@ export const notice = signal("");
 /** How many friend requests wait for the player's answer. */
 export const friendRequests = signal(0);
 
+/** How many friends' duels wait for the player to play them. */
+export const duelsWaiting = signal(0);
+
 /** How many parts of the screen hold that a game is under way (playingWhile), and whether any does. */
 let holds = 0;
 const held = signal(false);
@@ -75,7 +78,7 @@ const held = signal(false);
 export const playing: (() => boolean) & { peek(): boolean } = Object.assign(() => held(), { peek: () => held.peek() });
 
 /** Holds that a game is under way for as long as the current scope lasts and `now` says so: a game's count, the
- * moment its first question is on its way, its questions, a live game's. Each part holds it for itself, and it's let
+ * moment its first question is on its way, its questions. Each part holds it for itself, and it's let
  * go once none does: a part handing the screen to the next (the count to the question) takes it again before the
  * moment is over, so the header doesn't come back between them. */
 export function playingWhile(now: () => boolean = () => true): void {
@@ -100,7 +103,8 @@ export let checkWaiting: () => Promise<void> = async () => {};
 const lookEvery = 30_000;
 const lookAtMost = 300_000;
 
-/** Looks, while the page is in view and no game is under way, whether someone asks to be friends: every half minute,
+/** Looks, while the page is in view and no game is under way, whether someone asks to be friends or a friend's duel
+ * waits: every half minute,
  * less often while nothing changes (lookEvery); and again at once each time the page comes back into view, and each
  * time a game ends. */
 export function watchWaiting(): void {
@@ -112,18 +116,22 @@ export function watchWaiting(): void {
   };
   checkWaiting = async () => {
     if (!user.peek()) {
-      // Signed out, or the account deleted: its requests go with it.
+      // Signed out, or the account deleted: its requests and duels go with it.
       friendRequests.set(0);
+      duelsWaiting.set(0);
       return;
     }
     // Hidden, or in a game (whose end looks again): no asking, nor any sound over a question.
     if (document.hidden || playing.peek()) return;
     try {
-      const r = await api<{ requests: number }>("GET", "/api/friends/requests");
-      const news = r.requests > friendRequests.peek();
-      quiet = r.requests === friendRequests.peek() ? Math.min(quiet + 1, 4) : 0;
+      const r = await api<{ requests: number; duels?: number }>("GET", "/api/friends/requests");
+      const duels = r.duels ?? 0;
+      const news = r.requests > friendRequests.peek() || duels > duelsWaiting.peek();
+      const same = r.requests === friendRequests.peek() && duels === duelsWaiting.peek();
+      quiet = same ? Math.min(quiet + 1, 4) : 0;
       if (news && !playing.peek()) play("ping"); // never over a question
       friendRequests.set(r.requests);
+      duelsWaiting.set(duels);
     } catch {
       // Offline for a moment: the next look will tell.
     }

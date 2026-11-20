@@ -78,22 +78,6 @@
     font-size: 0.8125rem;
   }
 
-  /* Under the other's face: asking them to be friends (a person met in a live duel). */
-  .duel-add {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    margin-top: calc(-1 * var(--space-2));
-  }
-
-  .duel-add > * {
-    grid-column: 3;
-    justify-self: center;
-    min-height: 44px;
-    margin: 0;
-    font-size: 0.875rem;
-    text-align: center;
-  }
-
   /* Level with the scores, over the line under them. */
   .duel-colon {
     align-self: end;
@@ -201,7 +185,7 @@
     display: none;
   }
 
-  /* What it meant: the rating from and to in its division, and the record against this person. */
+  /* What it meant: the record against this person, or whose game the recording was. */
   .duel-meant {
     display: grid;
     gap: var(--space-3);
@@ -210,24 +194,6 @@
     text-align: start;
   }
 
-  .duel-rating {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
-
-  .duel-rating .meter-fill {
-    background: var(--div);
-  }
-
-  .duel-rating-text {
-    display: grid;
-    flex: 1;
-    gap: var(--space-1);
-    min-width: 0;
-  }
-
-  .duel-rating-top,
   .duel-record {
     display: flex;
     align-items: baseline;
@@ -235,11 +201,6 @@
     gap: var(--space-3);
   }
 
-  .duel-rating-top .delta {
-    font: 900 1.25rem / 1 var(--font-numeral);
-  }
-
-  .duel-rating-line,
   .duel-why {
     color: var(--text-muted);
     font-size: 0.8125rem;
@@ -267,33 +228,6 @@
 
   .duel-mine-n {
     font: 900 2rem / 1 var(--font-numeral);
-  }
-
-  /* The gold way kept at the screen's foot, over the bar of places on a phone (Steps.dock: a live duel's rematch, which
-     has only a moment), until its own place under the result comes up to it. */
-  .duel-dock {
-    position: sticky;
-    bottom: calc(4.5rem + env(safe-area-inset-bottom));
-    z-index: 2;
-    display: grid;
-    margin-inline: calc(-1 * var(--space-2));
-    padding: var(--space-2);
-    border-radius: var(--radius-lg);
-    background: var(--bg);
-    box-shadow: 0 0 0 var(--space-2) var(--bg);
-  }
-
-  /* Wide, it stands under the result's middle, its button a hand's width (as every page's). */
-  @media (min-width: 48rem) {
-    .duel-dock {
-      bottom: var(--space-4);
-      justify-items: center;
-    }
-
-    .duel-dock .rematch,
-    .duel-dock > .btn {
-      width: min(22rem, 100%);
-    }
   }
 
   @media (max-width: 22rem) {

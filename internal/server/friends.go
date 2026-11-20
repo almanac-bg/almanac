@@ -13,7 +13,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/push"
 )
 
-// Pushes that other players cause (a friend request) are what a stranger could turn into a flood: so one from one
+// Pushes that other players cause (a friend request, a duel sent or played back) are what a stranger could turn into a flood: so one from one
 // player goes once a day at most (asking again after a no included), and a player gets at most peoplePushes of them a
 // day, whoever they're from.
 const peoplePushes = 20
@@ -139,21 +139,29 @@ func (s *Server) answerRequest(accept bool) func(http.ResponseWriter, *http.Requ
 	}
 }
 
-// requestsWaiting says how many friend requests wait for the player: light enough for a page to ask every half
-// minute, to show there's something waiting.
+// requestsWaiting says how many friend requests, and friends' duels, wait for the player: light enough for a page to
+// ask every half minute, to show there's something waiting in Приятели.
 func (s *Server) requestsWaiting(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
 	if err != nil {
 		return err
 	}
 	if u == nil {
-		return ok(w, map[string]int{"requests": 0})
+		return ok(w, map[string]int{"requests": 0, "duels": 0})
 	}
 	n, err := s.game.RequestsWaiting(r.Context(), u.ID)
 	if err != nil {
 		return err
 	}
-	return ok(w, map[string]int{"requests": n})
+	duels, err := s.game.DuelsWaiting(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
+	waiting := 0
+	if duels != nil {
+		waiting = duels.N
+	}
+	return ok(w, map[string]int{"requests": n, "duels": waiting})
 }
 
 func (s *Server) friendOf(r *http.Request) (int64, error) {

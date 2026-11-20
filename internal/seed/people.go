@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
-	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -26,7 +25,7 @@ type player struct {
 	pace   time.Duration // how long an answer takes them, about
 	hour   int           // when in the day they usually play
 	topics float64       // topic games on a day they play, on average
-	duels  float64       // live duels
+	duels  float64       // duels started (with a friend, or against a recording)
 	social float64       // how readily they make friends
 
 	profile int // the day they give an email (-1: a guest throughout)
@@ -321,10 +320,3 @@ func (w *world) active(i int) []*player {
 
 // isPersona is whether a player is one of the personas, or might be (the lapsed one's candidates).
 func (p *player) isPersona() bool { return p.persona != "" || p.kind == lapsing }
-
-// level is a player's strength as the duels' pairing reads it.
-func (w *world) rating(p *player) int {
-	r := play.StartRating
-	_ = w.one(&r, `SELECT rating FROM users WHERE id = ?`, p.id)
-	return r
-}

@@ -198,68 +198,76 @@ func (w *world) topicRun(p *player) (play.State, error) {
 	return s, nil
 }
 
-// liveDuel is a live duel between two players here now, or against a recording (b nil), played as internal/live
-// plays it: each question shown to both at one moment, each answering at their pace.
-func (w *world) liveDuel(a, b *player) (int64, error) {
-	var l play.Live
-	var err error
-	if b != nil {
-		l, err = w.g.StartLive(w.as(b), a.id, b.id)
-		if err == nil {
-			// Both sides' networks: the duel's runs keep them.
-			_ = w.exec(`UPDATE runs SET device = ? WHERE id = ?`, b.device, l.Runs[1])
-		}
-	} else {
-		l, err = w.g.StartRecorded(w.as(a), a.id)
-	}
-	if errors.Is(err, play.ErrNobody) || errors.Is(err, play.ErrNoQuestion) {
-		return 0, nil
+// friendDuel is a duel a player starts with a friend: their side played, so it's sent (play.Game.DuelFriend). Past
+// the game's limits, it isn't started.
+func (w *world) friendDuel(p, o *player) error {
+	id, err := w.g.DuelFriend(w.as(p), p.id, o.id)
+	if errors.Is(err, play.ErrDuelsToOne) || errors.Is(err, play.ErrDuelsADay) || errors.Is(err, play.ErrNoQuestion) {
+		return nil
 	}
 	if err != nil {
-		return 0, fmt.Errorf("duel: %w", err)
+		return fmt.Errorf("duel: %w", err)
 	}
-	sides := []*player{a}
-	runs := []int64{l.Runs[0]}
-	if b != nil {
-		sides, runs = append(sides, b), append(runs, l.Runs[1])
+	return w.playDuel(p, id)
+}
+
+// recordingDuel is a duel against a recording of another player's game (play.Game.DuelRecording), if there's one.
+func (w *world) recordingDuel(p *player) error {
+	id, err := w.g.DuelRecording(w.as(p), p.id)
+	if errors.Is(err, play.ErrNobody) || errors.Is(err, play.ErrNoQuestion) {
+		return nil
 	}
-	for n, pick := range l.Picks {
-		d, ok := w.g.Deal(pick)
-		if !ok {
-			return l.DuelID, fmt.Errorf("duel: can't deal %s", pick.ID)
-		}
-		at := w.clock()
-		for i, p := range sides {
-			if err := w.g.ShowLive(w.as(p), p.id, runs[i], n, at, d); err != nil {
-				return l.DuelID, fmt.Errorf("duel: show %d: %w", n, err)
-			}
-		}
-		took := make([]time.Duration, len(sides))
-		for i, p := range sides {
-			took[i] = w.took(p, d)
-		}
-		order := []int{0}
-		if len(sides) == 2 {
-			order = []int{0, 1}
-			if took[1] < took[0] {
-				order = []int{1, 0}
-			}
-		}
-		for _, i := range order {
-			p := sides[i]
-			w.set(at.Add(took[i]))
-			if _, err := w.g.AnswerLive(w.as(p), p.id, runs[i], n, answerTo(d, w.right(p, d)), at.Add(took[i]),
-				time.Time{}, d); err != nil {
-				return l.DuelID, fmt.Errorf("duel: answer %d: %w", n, err)
-			}
-		}
-		w.wait(w.between(4*time.Second, 7*time.Second))
+	if err != nil {
+		return fmt.Errorf("duel: %w", err)
 	}
-	a.last = runs[0]
-	if b != nil { // the one who came for the duel sees its result now
-		if _, err := w.g.NewsOf(w.as(b), b.id, runs[1]); err != nil {
-			return l.DuelID, err
+	return w.playDuel(p, id)
+}
+
+// playDuel plays the player's side of a duel to its end.
+func (w *world) playDuel(p *player, id int64) error {
+	run, err := w.g.PlayDuel(w.ctx, p.id, id)
+	if err != nil {
+		return fmt.Errorf("duel %d: %w", id, err)
+	}
+	s, err := w.g.State(w.as(p), p.id, run)
+	if err != nil {
+		return fmt.Errorf("duel %d: %w", id, err)
+	}
+	if _, err := w.playRun(p, s, -1); err != nil {
+		return fmt.Errorf("duel %d: %w", id, err)
+	}
+	return nil
+}
+
+// duelsWaiting are the duels a player's friends sent them, played as they come by: most of them, the rest left for
+// later (some to lapse).
+func (w *world) duelsWaiting(p *player) error {
+	d, err := w.g.DuelsOf(w.ctx, p.id)
+	if err != nil {
+		return err
+	}
+	for _, v := range d.Yours {
+		if !v.First && w.chance(0.3) {
+			continue
+		}
+		if err := w.playDuel(p, v.ID); err != nil {
+			return err
 		}
 	}
-	return l.DuelID, nil
+	return nil
+}
+
+// friendToDuel is one of the player's friends to send a duel to, at random; nil for none.
+func (w *world) friendToDuel(p *player) (*player, error) {
+	ids, err := w.friendIDs(p)
+	if err != nil || len(ids) == 0 {
+		return nil, err
+	}
+	id := ids[w.r.IntN(len(ids))]
+	for _, o := range w.players {
+		if o.id == id {
+			return o, nil
+		}
+	}
+	return nil, nil
 }

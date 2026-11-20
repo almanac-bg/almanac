@@ -32,7 +32,7 @@ test("a game is under way while any part holds it, without a gap as one hands th
   dispose();
 });
 
-test("a live game holds it only while its view says it's under way, and lets go with its screen", async () => {
+test("a part holds it only while it says the game is under way, and lets go with its screen", async () => {
   const phase = signal("lobby");
   const [, dispose] = scope(() => playingWhile(() => phase() === "question"));
   assert.equal(playing.peek(), false);

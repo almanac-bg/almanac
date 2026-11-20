@@ -2,7 +2,6 @@ package play
 
 import (
 	"errors"
-	"strings"
 	"testing"
 	"time"
 )
@@ -93,60 +92,46 @@ func TestDayRunEndsWithItsDay(t *testing.T) {
 	}
 }
 
-// A live duel played to its end, its result not settled yet when the server stopped (between the last answer and
-// the result), isn't cut off: as the server starts again, EndLive leaves it, and it's settled with its result (review
-// 2026-11-18, A13). One cut off half-way ends without one.
-func TestEndLiveLeavesFinishedDuels(t *testing.T) {
+// A duel played to its end whose result wasn't kept (the server stopped between the last answer and the result) is
+// settled by the sweep, with its result (review 2026-11-18, A13); so is a friend's duel whose sending wasn't.
+func TestDuelsSettledAfterAStop(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana, bo, gal := w.user(), w.user(), w.user()
-	l, err := w.g.StartLive(ctx, ana, bo)
+	s, err := w.g.StartTopic(ctx, bo, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.play(ana, l.Runs[0], repeat(w.right, Length)...)
-	w.play(bo, l.Runs[1], repeat(w.wrong, Length)...)
-
-	// Gal against a recording, all right; the result fails to be kept, as if the server stopped there.
-	rec, err := w.g.StartRecorded(ctx, gal)
+	w.play(bo, s.ID, repeat(w.wrong, Length)...)
+	w.wait(time.Minute)
+	w.befriend(ana, bo)
+	// Gal against a recording, all right, and Ana's side of a duel with Bo: neither is kept past its last answer.
+	rec, err := w.g.DuelRecording(ctx, gal)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := w.db.Write.Exec(`CREATE TEMP TRIGGER stop BEFORE UPDATE OF ended_at ON duels
+	sent, err := w.g.DuelFriend(ctx, ana, bo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.db.Write.Exec(`CREATE TEMP TRIGGER stop BEFORE UPDATE OF ended_at, sent_at ON duels
 		BEGIN SELECT RAISE(ABORT, 'stopped'); END`); err != nil {
 		t.Fatal(err)
 	}
-	w.play(gal, rec.Runs[0], repeat(w.right, Length)...)
+	w.playSide(gal, rec, repeat(w.right, Length))
+	w.playSide(ana, sent, repeat(w.right, Length))
 	if _, err := w.db.Write.Exec(`DROP TRIGGER stop`); err != nil {
-		t.Fatal(err)
-	}
-	// And one cut off half-way.
-	cut, err := w.g.StartLive(ctx, ana, gal)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(ana, cut.Runs[0], repeat(w.right, 3)...)
-
-	if err := w.g.EndLive(ctx); err != nil {
 		t.Fatal(err)
 	}
 	w.wait(time.Hour)
 	if err := w.g.AfterDue(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.g.SettleDue(ctx); err != nil {
-		t.Fatal(err)
+	if d, _ := w.g.DuelOf(ctx, gal, rec); d.State != DuelWon {
+		t.Fatalf("the duel finished before the stop: %+v", d)
 	}
-	outcome := func(id int64) string {
-		var o string
-		_ = w.db.Read.QueryRow(`SELECT coalesce(outcome, '') FROM duels WHERE id = ?`, id).Scan(&o)
-		return o
-	}
-	if o := outcome(rec.DuelID); !strings.HasPrefix(o, "ghost_") {
-		t.Fatalf("the duel finished before the restart: %q", o)
-	}
-	if o := outcome(cut.DuelID); o != "expired" {
-		t.Fatalf("the duel cut off: %q", o)
+	if d, _ := w.g.DuelOf(ctx, bo, sent); d.State != DuelYours {
+		t.Fatalf("the duel sent before the stop: %+v", d)
 	}
 	if n := w.count(`SELECT count(*) FROM runs_after`); n != 0 {
 		t.Fatalf("%d runs still to follow up", n)

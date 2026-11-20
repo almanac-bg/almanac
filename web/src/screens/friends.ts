@@ -1,8 +1,10 @@
-// Friends (Приятели): who asks to be friends, each friend with their day and your record against them, and the ways to
+// Friends (Приятели): the duels (a friend's waiting for you, yours waiting for them, those played: screens/duel.ts),
+// who asks to be friends, each friend with their day, your record against them and a duel a tap away, and the ways to
 // make more: by their tag or email.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
+import type { Duels } from "./duel.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
@@ -15,6 +17,10 @@ let {
   when,
   title,
   friendRequests,
+  duelsWaiting,
+  duelLists,
+  startDuel,
+  go,
   player,
   user,
   avatar,
@@ -61,6 +67,10 @@ export function friends(kit: Kit): Child {
     when,
     title,
     friendRequests,
+    duelsWaiting,
+    duelLists,
+    startDuel,
+    go,
     player,
     user,
     avatar,
@@ -78,6 +88,7 @@ export function friends(kit: Kit): Child {
 /** The page's title (with the way to change the list, once there are friends), then the friends card itself. */
 function friendsCard(): Child {
   const data = signal<Friends | null>(null);
+  const duels = signal<Duels | null>(null);
   const error = signal("");
   // The list that couldn't load (with nothing of it shown yet): the failure, and the way to try again.
   const failed = signal<unknown>(null);
@@ -86,17 +97,20 @@ function friendsCard(): Child {
   const load = async () => {
     if (!user.peek()) return;
     try {
-      const f = await api<Friends>("GET", "/api/friends");
+      const [f, d] = await Promise.all([api<Friends>("GET", "/api/friends"), api<Duels>("GET", "/api/duels")]);
       failed.set(null);
       data.set(f);
+      duels.set(d);
       friendRequests.set(f.requests.in.length);
+      duelsWaiting.set(d.yours.filter((x) => !x.first).length);
     } catch (err) {
       // A look again that failed, with the list on the screen, waits for the next one quietly.
       if (!data.peek()) failed.set(err);
     }
   };
   load();
-  // Friend requests come and go (someone asks, or takes it back): look again while the screen is open.
+  // Friend requests and duels come and go (someone asks, or takes it back; a friend plays): look again while the
+  // screen is open.
   const every = setInterval(() => {
     if (!document.hidden) load();
   }, 15_000);
@@ -125,6 +139,12 @@ function friendsCard(): Child {
       await api("DELETE", `/api/friends/requests/${r.id}`);
       await load();
     });
+  // A duel with a friend: started (theirs to play once the player has), and played on its page.
+  const challenge = (f: Friend) =>
+    act(async () => {
+      const d = await startDuel({ friend: f.id });
+      if (d) go(`/duel/${d.id}`);
+    });
   // Made once: what it says after a request stays while the list around it is drawn again.
   const adder = addFriend(load);
 
@@ -137,6 +157,23 @@ function friendsCard(): Child {
           )
         : null,
     ),
+    // The duels: theirs to play first; a new one a tap away once there are friends to play.
+    () => {
+      const d = duels();
+      const any = d && d.yours.length + d.theirs.length + d.played.length > 0;
+      if (!d || (!any && !data()?.friends.length)) return null;
+      return h(
+        "section",
+        { class: "stack duels" },
+        h(
+          "div",
+          { class: "title-row" },
+          h("h2", { class: "section-title" }, "Дуели"),
+          h("a", { class: "btn inline", href: "/duel/new" }, "Нов дуел"),
+        ),
+        any ? duelLists(d) : h("p", { class: "muted" }, "Десет въпроса, всеки по свое време. Покани приятел."),
+      );
+    },
     h(
       "section",
       { class: "card friends" },
@@ -188,7 +225,14 @@ function friendsCard(): Child {
           ? h(
               "ol",
               { class: "friend-list" },
-              d.friends.map((f) => row(f, () => remove(f), editing)),
+              d.friends.map((f) =>
+                row(
+                  f,
+                  () => remove(f),
+                  () => challenge(f),
+                  editing,
+                ),
+              ),
             )
           : h("p", { class: "muted" }, "Още нямаш приятели тук. Добави ги по потребителско име или имейл.");
       },
@@ -298,7 +342,7 @@ function addFriend(reload: () => Promise<void>): Child {
 }
 
 /** A friend: their name, their day, the duels between you (and, while editing, removing them). */
-function row(f: Friend, remove: () => void, editing: () => boolean): Child {
+function row(f: Friend, remove: () => void, challenge: () => void, editing: () => boolean): Child {
   const played = f.won + f.lost + f.drawn;
   return h(
     "li",
@@ -333,6 +377,17 @@ function row(f: Friend, remove: () => void, editing: () => boolean): Child {
         )
       : null,
     () =>
-      editing() ? h("button", { class: "link muted friend-act", type: "button", onclick: remove }, "Премахни") : null,
+      editing()
+        ? h("button", { class: "link muted friend-act", type: "button", onclick: remove }, "Премахни")
+        : h(
+            "button",
+            {
+              class: "btn inline friend-act",
+              type: "button",
+              "aria-label": `Дуел ${withWord(f.name)}`,
+              onclick: challenge,
+            },
+            "Дуел",
+          ),
   );
 }

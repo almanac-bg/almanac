@@ -19,8 +19,8 @@ import (
 // deals that version, from the bank in play while it's still that, else as the game kept it. The game keeps every
 // version of every question it has played (question_versions, Keep), so this holds over a restart too, and for good:
 // a game is gone over (Review) with the versions it showed however long ago, and the bank's copies keep their
-// pictures for as long (bank.Copy). A live game (a live duel) shows the questions it dealt as it began, and
-// grades through them (ShowLive and AnswerLive take the deal shown). What a question pays is pinned with its version:
+// pictures for as long (bank.Copy). A duel's second side is dealt the first's picks, versions and all, so the two
+// play the same ten. What a question pays is pinned with its version:
 // its difficulty as it showed (Pick.D: worth), as a relabel doesn't make another version. The day's ten are pinned
 // as their day begins, the same for everyone that day, and one changed or found untrue during it counts for nobody
 // (day.go).

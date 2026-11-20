@@ -12,8 +12,8 @@ import (
 // Progress is one measure: the player's Алманах, a chapter per topic with the facts they've collected in it
 // (almanac.go) and how much of it they know (mastery.go), and the streak, the habit (runs.go). Nothing else adds up
 // across games (owner, 2026-11-20, DECISIONS.md „The redesign“): no XP, no levels, no day's goals, no achievements, no
-// titles, nothing to unlock. Points are one game's score (worth.go); the rating, until duels are rebuilt, is
-// strength in duels (rating.go).
+// titles, nothing to unlock, no rating. Points are one game's score (worth.go); a duel's is its record between two
+// people (duels.go).
 //
 // What a game brings is told once, at its end (NewsOf): the facts it put in the Алманах, how it moved a topic's
 // mastery when that's news (a first estimate, a tier reached), and the milestones it reached. Those are noted in the

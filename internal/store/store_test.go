@@ -832,3 +832,44 @@ func TestOneMeasure(t *testing.T) {
 	}
 	db.Close()
 }
+
+// Duels on one's own time (0088): each says which kind it is (with a person, against a recording), a recording's
+// outcome is a's or b's as a person's is, a duel the server cut off under way ends without a result, the rating's moves
+// and who left under way go, and so do the players' ratings and Начало's lines of a live duel left.
+func TestDuelsOwnTime(t *testing.T) {
+	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0088_duels_own_time.sql")
+	for _, q := range []string{
+		`INSERT INTO users (id, name, tag, created_at, seen_at, rating, rated) VALUES (1, 'Ана', 'ana', 1, 1, 1100, 12),
+			(2, 'Бо', 'bo', 1, 1, 900, 3)`,
+		`INSERT INTO runs (id, user_id, kind, questions, started_at, finished_at) VALUES (10, 1, 'duel', '[]', 1, 2),
+			(11, 2, 'duel', '[]', 1, 2), (12, 2, 'topic', '[]', 1, 2), (13, 1, 'duel', '[]', 3, NULL)`,
+		`INSERT INTO duels (id, questions, a_id, a_run, b_id, b_run, ghost_run, created_at, expires_at, ended_at, outcome,
+			a_delta, b_delta, rated, a_left) VALUES
+			(1, '[]', 1, 10, 2, 11, NULL, 5, 9, 7, 'a', 12, -12, 1, NULL),
+			(2, '[]', 2, 11, NULL, NULL, 12, 6, 9, 8, 'ghost_lost', 0, NULL, 0, NULL),
+			(3, '[]', 1, 13, 2, NULL, NULL, 7, 9, NULL, NULL, NULL, NULL, 1, 4)`,
+		`INSERT INTO home_lines (user_id, what, at) VALUES (1, 'left:3', 1), (1, 'friend:2', 1)`,
+	} {
+		if _, err := db.Write.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	if err := db.migrateTo(migrationsThrough("0088_duels_own_time.sql")); err != nil {
+		t.Fatal(err)
+	}
+	var duels, lines string
+	_ = db.Read.QueryRow(`SELECT group_concat(concat_ws(' ', id, kind, outcome, coalesce(sent_at, '-'), ended_at), ', ')
+		FROM (SELECT * FROM duels ORDER BY id)`).Scan(&duels)
+	_ = db.Read.QueryRow(`SELECT group_concat(what, ' ') FROM home_lines`).Scan(&lines)
+	if duels != "1 person a 5 7, 2 recording b - 8, 3 person expired 7 7" || lines != "friend:2" {
+		t.Fatalf("duels %q, lines %q", duels, lines)
+	}
+	for _, column := range []string{"users.rating", "users.rated", "duels.a_delta", "duels.rated", "duels.a_left"} {
+		table, name, _ := strings.Cut(column, ".")
+		var n int
+		if _ = db.Read.QueryRow(`SELECT count(*) FROM pragma_table_info(?) WHERE name = ?`, table, name).Scan(&n); n != 0 {
+			t.Errorf("%s is still there", column)
+		}
+	}
+	db.Close()
+}

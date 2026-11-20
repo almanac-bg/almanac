@@ -128,7 +128,7 @@ func TestAPIPathsMatchTheServer(t *testing.T) {
 		mux.HandleFunc(m[1], func(http.ResponseWriter, *http.Request) {})
 		routes++
 	}
-	if routes < 50 {
+	if routes < 40 {
 		t.Fatalf("found %d API routes in server.go: has the way routes are made changed? Change this test with it", routes)
 	}
 

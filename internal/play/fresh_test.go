@@ -25,20 +25,21 @@ import (
 var freshFor = map[string]string{
 	"StartTopic":    "a topic",
 	"Draw":          "a topic",
-	"StartLive":     "a live duel",
-	"StartRecorded": "a recording",
+	"DuelFriend":    "a friend's duel",
+	"DuelRecording": "a recording",
 	// By design:
 	"StartDay": "by design: the day's ten are the same for everyone",
 	"drawDay":  "by design: the day's ten are the same for everyone",
+	"PlayDuel": "by design: a duel's second side plays the first's ten",
 }
 
 // TestNothingPlayedAgain holds the rule across every way a game starts: a player who has just played a game, starting
-// any other kind (or the same again: a rematch), is dealt questions they haven't seen while the bank has them. Live
-// duels are drawn for all their players: none of them has seen a question dealt while some are left
+// any other kind (or the same again: a rematch), is dealt questions they haven't seen while the bank has them. A
+// friend's duel is drawn for both its players: none of them has seen a question dealt while some are left
 // that none has. A recording is a whole game, someone else's: one with at most RecordingSeen of its questions seen
 // while there's such a game. The player has played most of the bank before (all but three topics), so that a draw
-// that didn't prefer what they haven't seen would deal it again almost surely. The repeat by design (freshFor) is the
-// day (the same for everyone).
+// that didn't prefer what they haven't seen would deal it again almost surely. The repeats by design (freshFor) are the
+// day (the same for everyone), and a duel's second side (the same ten as the first).
 func TestNothingPlayedAgain(t *testing.T) {
 	t.Run("every way is here", func(t *testing.T) {
 		ways := choosers(t)
@@ -69,21 +70,21 @@ func TestNothingPlayedAgain(t *testing.T) {
 			f.must(err)
 			f.w.play(f.ana, s.ID, repeat(f.w.right, Length)...)
 		}},
-		{"a live duel", func(f *fresh) {
-			l, err := f.w.g.StartLive(f.ctx(), f.ana, f.bo)
+		{"a friend's duel", func(f *fresh) {
+			id, err := f.w.g.DuelFriend(f.ctx(), f.ana, f.bo)
 			f.must(err)
-			f.w.play(f.ana, l.Runs[0], repeat(f.w.right, Length)...)
-			f.w.play(f.bo, l.Runs[1], repeat(f.w.wrong, Length)...)
+			f.w.playSide(f.ana, id, repeat(f.w.right, Length))
+			f.w.playSide(f.bo, id, repeat(f.w.wrong, Length))
 		}},
 		{"a recording", func(f *fresh) {
-			l, err := f.w.g.StartRecorded(f.ctx(), f.ana)
+			id, err := f.w.g.DuelRecording(f.ctx(), f.ana)
 			f.must(err)
-			f.w.play(f.ana, l.Runs[0], repeat(f.w.right, Length)...)
+			f.w.playSide(f.ana, id, repeat(f.w.right, Length))
 		}},
 	}
 
 	// The games held to the rule: what each deals the player, of which questions (pool), drawn for whom (players).
-	// After a live duel, a live duel again is a rematch (live.Hub.Rematch: StartLive). A recording is checked apart.
+	// After a friend's duel, a friend's duel again is a rematch. A recording is checked apart.
 	type next struct {
 		name string
 		deal func(f *fresh) (picks []Pick, pool func(bank.Question) bool, players []int64)
@@ -99,10 +100,10 @@ func TestNothingPlayedAgain(t *testing.T) {
 			f.must(err)
 			return f.w.picks(s.ID), func(q bank.Question) bool { return q.Base().Category == freshTopics[0] }, []int64{f.ana}
 		}},
-		{"a live duel", func(f *fresh) ([]Pick, func(bank.Question) bool, []int64) {
-			l, err := f.w.g.StartLive(f.ctx(), f.ana, f.bo)
+		{"a friend's duel", func(f *fresh) ([]Pick, func(bank.Question) bool, []int64) {
+			id, err := f.w.g.DuelFriend(f.ctx(), f.ana, f.bo)
 			f.must(err)
-			return l.Picks, anyQuestion, []int64{f.ana, f.bo}
+			return f.w.picks(f.w.playSide(f.ana, id, nil)), anyQuestion, []int64{f.ana, f.bo}
 		}},
 		{"a recording", nil},
 	}
@@ -124,9 +125,9 @@ func TestNothingPlayedAgain(t *testing.T) {
 				if next.deal == nil { // a recording: whole games, someone else's
 					seenNow := f.seen(f.ana)
 					best := f.recordingsSeen(seenNow, barred)
-					l, err := f.w.g.StartRecorded(f.ctx(), f.ana)
+					id, err := f.w.g.DuelRecording(f.ctx(), f.ana)
 					f.must(err)
-					n := count(l.Picks, seenNow)
+					n := count(f.w.picks(f.w.playSide(f.ana, id, nil)), seenNow)
 					if best <= RecordingSeen && n > RecordingSeen {
 						t.Fatalf("a recording with %d of its questions played already, while one with %d is there", n, best)
 					}

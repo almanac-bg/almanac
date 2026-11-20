@@ -206,17 +206,6 @@ func days(n int) string {
 	return fmt.Sprintf("%d дни", n)
 }
 
-// ratingWords is how a rating moved, with a real minus sign as the client writes it: „Рейтинг: +12.“, „Рейтинг: −8.“
-func ratingWords(d int) string {
-	switch {
-	case d > 0:
-		return fmt.Sprintf("Рейтинг: +%d.", d)
-	case d < 0:
-		return fmt.Sprintf("Рейтинг: −%d.", -d)
-	}
-	return "Рейтингът ти не се промени."
-}
-
 // problemsSubject is the subject of the mail about new problems: „1 нов проблем“, „3 нови проблема“.
 func problemsSubject(n int) string {
 	if n == 1 {

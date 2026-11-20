@@ -14,17 +14,10 @@
 // half-way goes on where it stopped: the day's when the player comes back to it that day (a run of the day's
 // questions ends with its day, DayGrace after: dayOver), a topic's when they start the same topic again that day
 // (StartTopic). A game played quicker than a person plays counts for its player alone, and so does the day of a
-// throwaway guest who played it before a player on the same network; a game keeps that network for a week, and two
-// players of one network move no rating between them (fair.go).
-//
-// A run played live (a live duel's) moves on its game's clock alone (driver): the game shows each question and takes
-// each answer (ShowLive and AnswerLive: graded through the deal it shows), and
-// the player's own Show, Start and Answer refuse it, so that nobody sees a question before the others do, nor answers
-// it outside its time. An answer counts if it reaches the server within Grace of its time's end; its time is to when
-// it arrived, from when the player's own screen showed the question, as it says, within bounds (seen.go).
+// throwaway guest who played it before a player on the same network; a game keeps that network for a week (fair.go).
 //
 // No game deals a player again what they've played, in any game, while the bank has questions they haven't: a topic's,
-// a duel's (live, a rematch) are drawn for all their players, those none of them has seen first,
+// a duel's are drawn for all their players, those none of them has seen first,
 // then those the fewest have (choose, seenAmong); a recording is a game with few of its questions seen. One repeats by
 // design: the day (the same ten for everyone). TestNothingPlayedAgain holds it, for every way a game starts.
 //
@@ -105,6 +98,8 @@ type Game struct {
 	// Version is the game's version as released (the server's; "" in tests and a developer's build): the version a
 	// player met is kept with them on their first day played (users.first_version, retention.go).
 	Version string
+	// DuelNews, if set, tells a player a duel's news another player caused (duels.go: sent to them, or played back).
+	DuelNews func(context.Context, DuelNews)
 
 	hard      snapshot[*hardnesses] // how hard each question is (mastery.go)
 	crowds    snapshot[crowds]      // how players have answered each question (crowd.go)
@@ -172,42 +167,11 @@ func scanRun(row scanner) (*run, error) {
 	return &r, json.Unmarshal([]byte(picks), &r.picks)
 }
 
-// driver is who moves a run on: its player (Show, Start, Answer), or the live game it's played in, on that game's
-// clock: its live duel (ShowLive, AnswerLive).
-type driver int
-
-const (
-	byPlayer driver = iota
-	byDuel
-)
-
-// driver says who moves a run on. A live duel's run is its duel's for good: one cut off (the server restarted under
-// it) stays where it stopped, never played on alone, as its duel ended without a result.
-func (r *run) driver(tx *sql.Tx) (driver, error) {
-	if r.kind != "duel" {
-		return byPlayer, nil
-	}
-	var live bool
-	err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM duels WHERE a_run = ?1 OR b_run = ?1)`, r.id).Scan(&live)
-	if live {
-		return byDuel, err
-	}
-	return byPlayer, err
-}
-
-// loadBy reads a player's run that by moves on: another's (a live game's, when by is its player) is out of step, and
-// a day's whose day is over (dayOver) is over.
-func (g *Game) loadBy(tx *sql.Tx, userID, runID int64, by driver) (*run, error) {
+// loadPlayed reads a player's run to play on: a day's whose day is over (dayOver) is over.
+func (g *Game) loadPlayed(tx *sql.Tx, userID, runID int64) (*run, error) {
 	r, err := load(tx, userID, runID)
 	if err != nil {
 		return nil, err
-	}
-	d, err := r.driver(tx)
-	if err != nil {
-		return nil, err
-	}
-	if d != by {
-		return nil, ErrOutOfStep
 	}
 	if r.dayOver(g.Now()) {
 		return nil, ErrDayOver
@@ -400,9 +364,6 @@ func (g *Game) settles(r *run) bool {
 		return true
 	}
 	late := Limit(d.Question()) + Grace
-	if r.kind == "duel" { // a live game's may be timed from its player's screen (LiveDue)
-		late += LagOf(d.Question())
-	}
 	return g.Now().Sub(time.UnixMilli(r.shownAt.Int64)) > late
 }
 
@@ -540,12 +501,12 @@ func (g *Game) State(ctx context.Context, userID, runID int64) (State, error) {
 }
 
 // Show puts the next question on screen and starts its time (the one already showing keeps its time); a question
-// with pictures, PictureWait later at most (Start). A run a live game moves on is out of step (driver).
+// with pictures, PictureWait later at most (Start).
 func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 	var s State
 	ended := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		r, err := g.loadBy(tx, userID, runID, byPlayer)
+		r, err := g.loadPlayed(tx, userID, runID)
 		if err != nil {
 			return err
 		}
@@ -571,27 +532,11 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 	return s, err
 }
 
-// ShowLive puts question n of a live duel's run on screen, as the duel deals it (d: the version it shows, whatever the
-// bank has become since the duel began), its time starting at at: the duel's own moment for it, the same for both
-// players, pictures or not (the duel keeps the time). It's out of step if the run isn't at n, or d isn't its question.
-func (g *Game) ShowLive(ctx context.Context, userID, runID int64, n int, at time.Time, d bank.Dealt) error {
-	return g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		r, err := g.loadBy(tx, userID, runID, byDuel)
-		if err != nil {
-			return err
-		}
-		if r.finished || r.at != n || d == nil || d.Question().Base().ID != r.picks[n].ID {
-			return ErrOutOfStep
-		}
-		return r.showAt(tx, at, d)
-	})
-}
-
 // Start starts the time of question n, shown and waiting for its pictures, now that the player's screen has them in.
 func (g *Game) Start(ctx context.Context, userID, runID int64, n int) (State, error) {
 	var s State
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		r, err := g.loadBy(tx, userID, runID, byPlayer)
+		r, err := g.loadPlayed(tx, userID, runID)
 		if err != nil {
 			return err
 		}
@@ -644,33 +589,23 @@ func (r *run) startAt(tx *sql.Tx, t time.Time) error {
 // Answer grades an answer to question n, the one showing. A null answer gives up on it. An answer to the question just
 // answered (the one before, past any that count for nobody the run went on over: day.go) is one sent again, its reply lost on the way (a line that dropped, a server restarting): it gets the answer
 // taken the first time, as it was, and changes nothing (again). One before the question's time runs (still waiting for
-// its pictures), or to a run a live game moves on (driver), is out of step.
+// its pictures) is out of step.
 func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage) (Result, error) {
-	return g.answer(ctx, userID, runID, n, answer, g.Now(), time.Time{}, byPlayer, nil)
+	return g.answer(ctx, userID, runID, n, answer, g.Now())
 }
 
-// AnswerLive grades a player's answer to question n of their live duel, which arrived at at, against the question as
-// the duel shows it (d): its time is from when the player's screen showed it (saw: Saw; zero, not said: from the
-// duel's moment) to when it came, whatever it waited for after (the duel busy with the other's answer).
-func (g *Game) AnswerLive(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at, saw time.Time, d bank.Dealt) (Result, error) {
-	return g.answer(ctx, userID, runID, n, answer, at, saw, byDuel, d)
-}
-
-// answer grades an answer that arrived at at, to a run that by moves on: its player's, or the live game's it's played
-// in, which keeps its pace (and takes an answer sent again itself), and grades against the deal it shows (shown); its
-// time runs from when the player's screen showed it (saw: seen.go). Otherwise it's graded against the version the
-// run showed (Pick.V).
-func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at, saw time.Time, by driver, shown bank.Dealt) (Result, error) {
+// answer grades an answer that arrived at at, against the version of its question the run showed (Pick.V).
+func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time) (Result, error) {
 	var res Result
 	var r *run
 	var d bank.Dealt
 	finished := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var err error
-		if r, err = g.loadBy(tx, userID, runID, by); err != nil {
+		if r, err = g.loadPlayed(tx, userID, runID); err != nil {
 			return err
 		}
-		if by == byPlayer && r.justBefore(n) {
+		if r.justBefore(n) {
 			res, d, err = g.again(tx, r, n)
 			return err
 		}
@@ -678,28 +613,17 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 			return ErrOutOfStep
 		}
 		defer func() { finished = r.finished }()
-		ok := false
-		if shown != nil {
-			d, ok = shown, shown.Question().Base().ID == r.picks[r.at].ID
-		} else {
-			d, ok = g.deal(r.picks[r.at])
-		}
-		if !ok || !r.shownAt.Valid {
+		var ok bool
+		if d, ok = g.deal(r.picks[r.at]); !ok || !r.shownAt.Valid {
 			return ErrOutOfStep
 		}
-		// The time on the game's clock (a clue's worth goes by it), and the player's own: in a live game, from when
-		// their screen showed the question (seen.go).
 		shownAt := time.UnixMilli(r.shownAt.Int64)
 		since := at.Sub(shownAt)
-		if since < 0 && by == byPlayer { // still waiting for its pictures: its words aren't on screen yet
+		if since < 0 { // still waiting for its pictures: its words aren't on screen yet
 			return ErrOutOfStep
 		}
-		since = max(0, since)
 		limit := Limit(d.Question())
 		took, due := since, shownAt.Add(limit)
-		if by != byPlayer {
-			took, due = LiveTook(shownAt, saw, at), LiveDue(shownAt, saw, d.Question())
-		}
 		var gr bank.Graded
 		switch {
 		case at.Sub(due) > Grace:

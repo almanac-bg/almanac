@@ -32,8 +32,7 @@ import (
 //   - the recordings a duel is played against (recordedRun).
 //
 // What it isn't left out of: the player's own numbers (their profile, Алманах, streak), which are
-// theirs; and the rating, one number everyone sees, which a duel moves as it ends (a live game is played
-// in front of the others anyway).
+// theirs; and a duel, which is between two who know each other (or the player's alone, against a recording).
 //
 // A third reason (ShadowThrowaway) is the day played as throwaway guests to read its answers, or to try it several
 // times, before the player plays it as themselves. Each game is kept with the network it was started from (FromNet,
@@ -46,9 +45,6 @@ import (
 // their day is let out of the shadow; a guest who never does sees nothing; more than ThrowawayMost guests are a group
 // playing together (a class, a carrier's shared address), and are left alone; and the player's own day is never
 // touched. A guest's day brought into the account by signing in is a shadow already (ShadowGuest).
-//
-// The network is the rating's too (duels.go, settleDuel): two players who have played from one network within
-// SameNetFor move no rating between them (a family's duels are friendlies; two windows of one person's, too).
 
 // Why a run is a shadow (runs.shadow; 0: it isn't one).
 const (
@@ -205,12 +201,9 @@ func fairFor(run, viewer string) string {
 }
 
 const (
-	// NetsKept is how long a game's network is kept: three days, over SameNetFor and the two days JudgeNets looks at
-	// (a game of yesterday's begun at its start is judged up to 48 hours later), and no longer.
+	// NetsKept is how long a game's network is kept: three days, over the two days JudgeNets looks at (a game of
+	// yesterday's begun at its start is judged up to 48 hours later), and no longer.
 	NetsKept = 3 * 24 * time.Hour
-	// SameNetFor is how close together two players' games from one network make them one network's: a day (only the
-	// first duel of a day between two is rated anyway).
-	SameNetFor = 24 * time.Hour
 	// ThrowawayFew is how many throwaway guests' days from one network, before a player's own, make the pattern: one
 	// is a friend who tried the game on the player's wifi; two in a day before the player plays is a habit.
 	ThrowawayFew = 2
@@ -252,16 +245,6 @@ func (g *Game) keepNet(ctx context.Context, tx *sql.Tx, userID, runID int64) err
 	}
 	_, err := tx.Exec(`INSERT OR IGNORE INTO run_nets (run_id, net, at) VALUES (?, ?, ?)`, runID, net, store.Ms(g.Now()))
 	return err
-}
-
-// sameNet says whether two players have each started a game from one network in the last SameNetFor.
-func (g *Game) sameNet(tx *sql.Tx, a, b int64) (bool, error) {
-	since := store.Ms(g.Now().Add(-SameNetFor))
-	var same bool
-	err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM runs ra JOIN run_nets na ON na.run_id = ra.id
-			JOIN run_nets nb ON nb.net = na.net AND nb.at >= ?3 JOIN runs rb ON rb.id = nb.run_id
-		WHERE ra.user_id = ?1 AND ra.started_at >= ?3 AND na.at >= ?3 AND rb.user_id = ?2)`, a, b, since).Scan(&same)
-	return same, err
 }
 
 // JudgeNets lets go of the networks kept past NetsKept, lets a guest who came back out of the shadow, and judges

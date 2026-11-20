@@ -1,7 +1,6 @@
 // The pieces several screens draw with: the verdict and the fact, the streak, numbers with what they count, and each
 // topic's colour. The stylesheet draws them; these only say what to draw.
 
-import { type DivisionID, emblem } from "./art/emblem.ts";
 import { picture } from "./art/picture.ts";
 import { errorText, passing } from "./lib/api.ts";
 import { hourInBulgaria } from "./lib/day.ts";
@@ -169,15 +168,13 @@ export function topicMark(category: string): Child {
     : h("span", { class: "dot", "aria-hidden": "true" });
 }
 
-/** The game's two numbers, each in a few words: what one game scored, and how strong a player is in duels. Kept
- * apart on purpose (play/worth.go), so each is said where it first shows and a tap from wherever it does. */
+/** What the game's numbers mean, in a few words: what one game scored, said where it first shows and a tap from
+ * wherever it does (play/worth.go). */
 export const meaning = {
   points:
     "Точките са резултатът ти в една игра: за верните отговори (по-трудните носят повече) и за бързината. Игра без грешка носи още точки накрая. Верните поред не носят повече точки.",
   /** The day's board: said of the day's points only (a topic's game has no board). */
   dayBoard: " При равен брой верни в класацията на деня решават точките.",
-  rating:
-    "Рейтингът е силата ти в дуелите: расте с победа, пада със загуба. Първите 10 игри с рейтинг го определят, после от него зависи дивизията ти.",
 };
 
 /** The day's points' words: with the day's board they place on. */
@@ -451,67 +448,6 @@ export function who(name: Child, look: Look = {}, extra: Child = null, plainName
       { class: "who-text" },
       // The name gives way (an ellipsis) so that what's beside it („ти“) always shows whole.
       h("span", { class: "who-name" }, h("span", { class: "who-label" }, name), extra),
-    ),
-  );
-}
-
-/** A band of rating, and where it starts. */
-export interface Division {
-  id: DivisionID;
-  name: string;
-  from: number;
-}
-
-/** A player's rating, how many rated games it's from, its division, and where the next one starts (0 at the top). */
-export interface Standing {
-  rating: number;
-  rated: number;
-  division: Division;
-  next: number;
-  /** How many rated games set the rating, while it's still being set: then it has no division yet (play/rating.go). */
-  of?: number;
-}
-
-/** A division: its emblem and name, the rating (yours: `own`, a tap from what it means), and how far to the next.
- * While the rating is still being set, how far that has come instead: no division from a win or two. */
-export function standingCard(s: Standing, own = false): Child {
-  if (s.of)
-    return h(
-      "section",
-      { class: "card standing placing" },
-      emblem("bronze", "l"),
-      h(
-        "div",
-        { class: "standing-text" },
-        h("p", { class: "kicker" }, "Дивизия"),
-        h("strong", { class: "standing-name" }, "Рейтингът се определя"),
-        h(
-          "span",
-          { class: "muted" },
-          own ? explain("Рейтинг", meaning.rating) : "Рейтинг",
-          ` ${s.rating} · ${s.rated} от ${s.of} игри`,
-        ),
-        meter(Math.round((100 * s.rated) / s.of), `${s.rated} от ${s.of} игри с рейтинг`),
-      ),
-    );
-  const span = s.next ? s.next - s.division.from : 0;
-  const share = span ? Math.round((100 * (s.rating - s.division.from)) / span) : 100;
-  return h(
-    "section",
-    { class: `card standing d-${s.division.id}` },
-    emblem(s.division.id, "l"),
-    h(
-      "div",
-      { class: "standing-text" },
-      h("p", { class: "kicker" }, "Дивизия"),
-      h("strong", { class: "standing-name" }, s.division.name),
-      h(
-        "span",
-        { class: "muted" },
-        own ? explain("Рейтинг", meaning.rating) : "Рейтинг",
-        ` ${s.rating}${s.next ? ` · ${s.next - s.rating} до следващата` : ""}`,
-      ),
-      s.next ? meter(share, `${share}% от пътя до следващата дивизия`) : null,
     ),
   );
 }

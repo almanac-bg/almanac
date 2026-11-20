@@ -58,7 +58,7 @@ packages' doc comments; this file holds only what must not drift.
   stays and isn't broken. Layout that breaks for ordinary players (large system text, small tap targets) is not this:
   it's fixed as any bug (owner, 2026-11-18).
 - **A recording shows who played it.** Against a recording, the player sees the real player as anywhere in the game
-  (name, profile, avatar, rating), labelled „Запис“, never as an anonymous animal: a duel is
+  (name, profile, avatar), labelled „Запис“, never as an anonymous animal: a duel is
   against someone (owner, 2026-11-19, undoing review S13's unnamed recordings). The other way stays numbers only: the
   recorded player hears how many played their games and how it went, never who. The privacy page says so.
 - **Removed to keep the game simple** (owner, 2026-11-19; sharing and friends' duels came back with the redesign): past days'
@@ -67,9 +67,8 @@ packages' doc comments; this file holds only what must not drift.
   Класации' „Вчера“, Втори шанс (the questions got wrong, asked again days later), the weekly leagues, rooms
   (playing together with a code; the games played in them stay the players'), and blocking players (a request can
   still be declined, a friend removed). Моят
-  Алманах is one list in the order the facts were learned, with no datelines. Friends are added by username or email;
-  duels are live (against a recording when nobody comes, with a rematch after), and only they move a rating. Don't
-  bring any of them back, or something in their place, without the owner's call.
+  Алманах is one list in the order the facts were learned, with no datelines. Friends are added by username or email.
+  Don't bring any of them back, or something in their place, without the owner's call.
 - **Right answers in a row earn no points** (owner, 2026-11-18, review E6): where a miss fell decided close duels.
   The climb stays as sound and feel; a game with every answer right still earns its bonus.
 - **Gamification only from what the game really counts:** no invented currencies, no random boxes, never real money.

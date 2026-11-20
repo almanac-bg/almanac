@@ -104,7 +104,7 @@ test.describe("twice the text on a 320px phone", () => {
     }
     await expect(page.locator(".summary")).toBeVisible({ timeout: 10_000 });
     await fits(page, "the day's result");
-    for (const path of ["/", "/ranks", "/me", "/avatar", "/friends", "/settings", "/duel"]) {
+    for (const path of ["/", "/ranks", "/me", "/avatar", "/friends", "/settings", "/duel/new"]) {
       await page.goto(path);
       await expect(page.locator("#main h1, #main h2").first()).toBeVisible();
       await fits(page, path);

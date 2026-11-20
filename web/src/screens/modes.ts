@@ -8,9 +8,9 @@ type Mode = "duel";
 
 const all: Record<Mode, { href: string; name: string; about: string; tone: string }> = {
   duel: {
-    href: "/duel",
+    href: "/duel/new",
     name: "Дуел",
-    about: "Един срещу един",
+    about: "С приятел или срещу запис",
     tone: "tone-rose",
   },
 };

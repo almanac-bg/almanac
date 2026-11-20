@@ -16,8 +16,6 @@ import (
 var unguarded = map[string]string{
 	"internal/server/server.go: func() { errs <- srv.Serve(ln) }()": "net/http stops a handler's panic itself; Serve " +
 		"doesn't panic",
-	"internal/live/live.go: start()": "Hub.pair's starts: a duel's guards itself (safe.Recover), the other only " +
-		"settles two seeks",
 }
 
 // Every goroutine the program starts runs through this package (its doc): a `go` statement, or a WaitGroup's Go,

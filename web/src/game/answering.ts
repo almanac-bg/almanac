@@ -1,58 +1,22 @@
-// Answering a question, the same in every game: a run (run.ts) and a live duel (screens/live.ts, handed it by
-// kit.ts). The question's widget is questions.ts's; this is what's around it:
+// Answering a question, the same in every game (run.ts). The question's widget is questions.ts's; this is what's
+// around it:
 //
-// - In a run, the question takes the focus as it opens, so that a screen reader reads it first, and what's said as it
-//   goes (a clue come out, an answer's verdict) is said in one live region (liveRegion), there from the run's start.
-//   The live games don't, yet: new work for screen readers waits for the owner's call (DECISIONS.md).
+// - The question takes the focus as it opens, so that a screen reader reads it first, and what's said as it goes (a
+//   clue come out, an answer's verdict) is said in one live region (liveRegion), there from the run's start.
 // - The options lock at the tap, and an answer goes once: never a second while one is on its way or in.
-// - An answer that doesn't get through (no line, the server for a moment) is sent again, the same: while the question
-//   takes it (a live game), or a few times and then said, with „Опитай пак“ (a run). The server takes an answer sent
-//   again, its reply lost, as the first.
-// - It's in once the server says so: by its reply, or by its view of the game (a live game), should the reply be lost.
-//   The clock stops then: the server took the time it came in.
+// - An answer that doesn't get through (no line, the server for a moment) is sent again, the same, a few times and then
+//   said, with „Опитай пак“. The server takes an answer sent again, its reply lost, as the first.
+// - It's in once the server says so, by its reply. The clock stops then: the server took the time it came in.
 // - Refused (a „no“ of the server's, not that it's too late): said, and the options are free again while the question
 //   has time. Too late: said, and that's that.
 // - The time is the server's: the clock follows it as the server's view says otherwise (a question shown again after
 //   a restart), and what's been put in when it runs out is the answer.
-// - In a live game, the player's time runs from when their own screen shows the question (onScreen): it's drawn once
-//   its pictures are in, and the server told then, so that a slow line or a picture coming in costs nobody time.
 
 import { ApiError, errorText, passing, tries } from "../lib/api.ts";
-import { type Child, effect, h, lifetime, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
+import { effect, h, lifetime, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
 import { formatNumber, type VerdictKind, verdictWords } from "../ui.ts";
-import { type Asked, ask, hasPictures, picturesIn, spokenAnswer } from "./questions.ts";
+import { type Asked, ask, spokenAnswer } from "./questions.ts";
 import type { Answer, Reveal, View } from "./types.ts";
-
-/** The longest a live question waits for its pictures before it shows all the same (the server allows its time to run
- * from that much later: play.PicturesFor). */
-export const picturesFor = 2500;
-
-/** A live game's question as it comes on screen (a duel's): drawn (`draw`) once its pictures are in
- * (picturesFor at most; at once if it has none), and the server told then (`seen`, once), so that the player's time
- * runs from when they see it, not from when the game showed it (play/seen.go). Until then, a line says it's coming:
- * the words don't show before the pictures, so nobody reads them off the clock. */
-export function onScreen(view: View, draw: () => Child, seen: () => Promise<unknown>): Child {
-  const life = lifetime();
-  const ready = signal(!hasPictures(view));
-  if (!ready.peek())
-    void picturesIn(view, picturesFor).then(() => {
-      if (!life.aborted) ready.set(true);
-    });
-  let told = false;
-  return () => {
-    if (!ready()) return h("p", { class: "muted coming", role: "status" }, "Въпросът идва…");
-    const node = untracked(draw);
-    if (!told) {
-      told = true;
-      // Once it's on the page (the frame after: the moment it's painted); the word may be lost, and is never sent
-      // again: the server then counts the time from the game's moment for it, as before.
-      setTimeout(() => {
-        if (!life.aborted) seen().catch(() => {});
-      }, 0);
-    }
-    return node;
-  };
-}
 
 /** Says something to a screen reader, in a game's live region. */
 export type Say = (text: string) => void;
@@ -144,18 +108,16 @@ export interface AnswerSpec<R> {
   leftMs: number;
   /** Sends the answer once (null: none, the time up or the question given up); resolves with the server's reply. */
   post: (answer: Answer | null) => Promise<R>;
-  /** Whether the question still takes an answer, as far as this screen knows (a live game: its view still on it). An
-   * answer that doesn't get through is sent again only while it does. */
+  /** Whether the question still takes an answer, as far as this screen knows. An answer that doesn't get through is
+   * sent again only while it does. */
   open: () => boolean;
-  /** Whether the server's view of the game has the player's answer (a live game): in, its reply lost or not. */
-  inView?: () => boolean;
-  /** How many times an answer is tried before what's wrong is said, with „Опитай пак“ (a run); none: again and again
-   * while the question is open (a live game, whose question moves on by itself). */
+  /** How many times an answer is tried before what's wrong is said, with „Опитай пак“; none: again and again while
+   * the question is open. */
   tries?: number;
-  /** When the time runs out with nothing put in, that's sent as no answer (a run: its answer shows at once); else the
-   * options just lock (a live game: the server moves on by itself). */
+  /** When the time runs out with nothing put in, that's sent as no answer (its answer shows at once); else the options
+   * just lock. */
   sendNone?: boolean;
-  /** The answer is in, by the server's reply (not by its view): what it said, and the answer. */
+  /** The answer is in, by the server's reply: what it said, and the answer. */
   taken?: (reply: R, answer: Answer | null) => void;
   /** An error the screen deals with itself (a run out of step: it loads again); true if it did. */
   handles?: (err: ApiError) => boolean;
@@ -172,7 +134,7 @@ export interface Answering<R> {
   asked: Asked;
   /** No answer can be given now: one is on its way or in, or the time is up. */
   locked: Signal<boolean>;
-  /** The answer is in (by the server's reply or its view). */
+  /** The answer is in (by the server's reply). */
   taken: () => boolean;
   /** The clock stopped: the answer is in. */
   stopped: Signal<boolean>;
@@ -180,10 +142,6 @@ export interface Answering<R> {
   left: Countdown;
   /** What went wrong with the answer, while it's not in (null: nothing). */
   problem: () => Problem | null;
-  /** What went wrong, in a line under the question (a live game's). */
-  said: Child;
-  /** Takes the server's view of the question as it comes: the next clue, and its time left (the clock goes by it). */
-  follow(view: View, leftMs: number): void;
   /** Sends an answer as a tap does (and as leaving gives the question up: null), unless one is on its way or in.
    * Resolves with the reply if this send is the one taken. */
   send(answer: Answer | null): Promise<R | undefined>;
@@ -192,12 +150,11 @@ export interface Answering<R> {
 /** Asks a question and sees its answer through (above). */
 export function answering<R>(spec: AnswerSpec<R>): Answering<R> {
   const st = { step: signal<Step>(""), problem: signal<Problem | null>(null) };
-  const inView = spec.inView ?? (() => false);
   const life = lifetime();
-  const taken = () => st.step() === "taken" || inView();
+  const taken = () => st.step() === "taken";
 
   const send = (answer: Answer | null): Promise<R | undefined> => {
-    if (st.step.peek() !== "" || untracked(inView)) return Promise.resolve(undefined);
+    if (st.step.peek() !== "") return Promise.resolve(undefined);
     return go(answer);
   };
   const go = async (answer: Answer | null): Promise<R | undefined> => {
@@ -205,8 +162,8 @@ export function answering<R>(spec: AnswerSpec<R>): Answering<R> {
     st.problem.set(null);
     try {
       const reply = await tries(() => spec.post(answer), {
-        // Not again once the question has moved on, nor once the server's view has it.
-        open: () => untracked(spec.open) && !untracked(inView),
+        // Not again once the question has moved on.
+        open: () => untracked(spec.open),
         pause: spec.tries ? 800 : 500,
         max: spec.tries ?? Number.POSITIVE_INFINITY,
       });
@@ -215,11 +172,6 @@ export function answering<R>(spec: AnswerSpec<R>): Answering<R> {
       return reply;
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError("server", errorText(e));
-      // In by the server's view, its reply lost: in all the same.
-      if (untracked(inView)) {
-        st.step.set("taken");
-        return undefined;
-      }
       if (!life.aborted && spec.handles?.(err)) return undefined;
       const late = err.code === "not_now" || !untracked(spec.open);
       const retry = !late && passing(err) ? () => void go(answer) : null;
@@ -269,15 +221,6 @@ export function answering<R>(spec: AnswerSpec<R>): Answering<R> {
     stopped,
     left,
     problem,
-    said: () => {
-      const p = problem();
-      return p ? h("p", { class: "bad", role: "alert" }, p.err.message) : null;
-    },
-    follow(view, leftMs) {
-      asked.update?.(view);
-      if (untracked(taken)) return;
-      if (Math.abs(Math.ceil(leftMs / 1000) - left.peek()) > 1) left.sync(leftMs);
-    },
     send,
   };
 }

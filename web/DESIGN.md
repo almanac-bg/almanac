@@ -22,11 +22,11 @@ three when you add or change a screen.
   (`startScreen()`, `.start-screen`: what it is, or where it was left with its pips, and „Започни“ or „Продължи“).
   A screen shows what it's for first and its details after, and folds away what's rarely needed (how a game is
   played, the rest of a list) instead of listing it.
-- **Leaving asks.** While leaving costs something (a question with its time running, a live game under way), every
+- **Leaving asks.** While leaving costs something (a question with its time running), every
   way out (a link, the browser's or a phone's back, the game's arrow) asks first, saying what it costs
   (`guardLeaving()`). A way back (`back()`, a game's arrow) goes back in the history when that's the page it points
   to, and never piles up an entry; back comes to a page scrolled where it was. A game left half-way says so where it
-  starts (its tile: „Продължи · въпрос 4 от 10“; a live game, one line on Начало: „Дуелът ти продължава · Върни се“).
+  starts (its tile: „Продължи · въпрос 4 от 10“; a duel, its row in Приятели: „Довърши своята игра“).
 - **Phone first.** The layout is one column, at most 40rem wide, with a 16px gutter. Every screen fits a 320px phone
   without scrolling sideways, with the text at its usual size and at twice it (see Large text).
 - **A big screen uses its width** (see Wide screens), and never changes how a phone looks: its rules live in
@@ -90,15 +90,18 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   answer, never a name. The link opens Начало: while it's that day, „Споделен резултат“, the score and its pips over
   „Колко ще познаеш ти?“ and „Започни“, the same ten; after, „Брой 8 вече мина. Ето днешния.“ Its preview is the card
   (`internal/card`): the edition's paper, whatever the theme.
-- **Приятели** (`/friends`): requests, friends, and the one way to add them: the field by потребителско име or
-  имейл, „Добави“. A request is accepted or not („Поканата до Мария е изпратена.“): nobody becomes a friend alone. A
-  friend's row is their name, their day and the duels between you; „Промени“ shows „Премахни“. A
+- **Приятели** (`/friends`): the duels (`.duels`: „Твой ред“, a friend's waiting for the player, or their own to
+  finish; „Чакаш“, sent and not played yet; „Изиграни“, the score and the record, „общо 5 на 3“; each a `.duel-row`
+  to its page, with how long is left, „още 2 дни“, and „Нов дуел“ beside the heading), requests, friends, and the one
+  way to add them: the field by потребителско име or имейл, „Добави“. A request is accepted or not („Поканата до
+  Мария е изпратена.“): nobody becomes a friend alone. A friend's row is their name, their day, the duels between you
+  and „Дуел“ (a duel with them, a tap away); „Промени“ shows „Премахни“ instead. A
   player still with the name drawn for them is asked for theirs once on a device, the first time others would see
   it: a sheet from the bottom (`.sheet`, `screens/name.ts`), the drawn name in its one field, „Не сега“ quiet (on
-  with the drawn name). Before a first live duel: „Как да те виждат останалите?“, „Готово“ gold.
+  with the drawn name). Before a first duel sent to a friend: „Как да те виждат останалите?“, „Готово“ gold.
   A name field never asks
   the browser for a full name (`autocomplete` nickname or off: `fields.test.ts`).
-- **Класации** (`/ranks`): Днес (the day's board, first), Рейтинг and Знания; of
+- **Класации** (`/ranks`): Днес (the day's board, first) and Знания; of
   everyone or of friends.
   Empty, a board says what the game knows: among friends with none yet, „Още нямаш приятели…“ and „Добави приятел“
   gold (to Приятели); Знания short of its threshold, „Имаш 20 от 100 отговора. Още 80 и влизаш в класацията.“ A row of the day's
@@ -137,18 +140,14 @@ A new player meets the game a part at a time, by what they've done, never by the
   first game's news, `.news-open`), the streak, the topics. Before a first game finished, Начало is the day and the
   topics only.
 - **After a first game:** the ways to play with others.
-- **The rating** shows once a duel has moved it (`standing.rated`), with its division once it's set.
 - **A topic's first estimate** (10 answers): „Колко знаеш“ on Профил and the topic's tile say „първа оценка · 74%“,
   a game's news „Първа оценка: знаеш около 74% от темата“, a share and no tier; the tier („Експерт“) comes with a sure
   mark (30 answers).
 
-**The two numbers** are kept apart (`play/worth.go`) and each says what it is where it first shows, and a tap from
-wherever it does (`explain()`: the word dotted under, its meaning in a small card over the page; the words are
-`meaning` in `ui.ts`):
-
-- **точки:** one game's score (right answers, speed, right in a row); the day's board is by them (after the right
-  answers);
-- **рейтинг:** strength in duels, up with a win, down with a loss; the division is by it.
+**Points** say what they are where they first show, and a tap from wherever they do (`explain()`: the word dotted
+under, its meaning in a small card over the page; the words are `meaning` in `ui.ts`): one game's score (right
+answers, speed); the day's board is by them (after the right answers). There's no rating: a duel's is its record
+between two people.
 
 ## Space and size
 
@@ -244,7 +243,7 @@ media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds th
   hollow, a `--gold-ink` ring with ∼; wrong quiet, the `--sunken` of a question not played yet with a muted ✕. The red
   is the answer card's, in the moment, and the verdict's. „Вярно или невярно“ is the one exception on the answers themselves: a ✓ or ✕ on „Вярно“ and „Невярно“ reads
   as the answer's own word, so they have none, before or after; the verdict under them carries the mark and the word,
-  and gone over later (a review, a live game's answer), the right one says „верният отговор“ under its word.
+  and gone over later (a review), the right one says „верният отговор“ under its word.
 - **Contrast:** text holds at least 4.5:1 on its ground in both themes. `e2e/a11y.spec.ts` checks this with axe.
 
 ## Type
@@ -325,8 +324,7 @@ media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds th
   - `.picture` over a question, its box the picture's own (no wider than the column), a hairline `--line` inside its
     edge so a white flag holds on a white card, on `--sunken` while it loads: while it's asked, `picture(view, true)` keeps it low enough for the question, the
     picture and the whole answering part to fit on the screen (no less than 128px); a question's time starts once
-    its pictures are in. In a live game (a duel) the question shows only once they're in (2.5 s at
-    most), a muted `.coming` „Въпросът идва…“ in its place meanwhile, and the player's time runs from then.
+    its pictures are in.
   - `.options .option`, with the states `picked`, `placed`, `right`, `wrong` and `dim`; and `missed`, a row of a right
     answer the player didn't have (an order, pairs, groups): plain, with a hollow ✕ and „ти: …“ for what they gave.
     A choice's (`.choices`) keep the room at their end from the start for what the answer brings there, the share
@@ -362,31 +360,28 @@ media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds th
   its verdict's colour on top): its number and topic as a kicker with „Вярно“, „Близо“ or „Грешно“ beside them, the
   question the strongest line, the answers marked, and the fact a quiet note under them.
 - **A duel's result** (`screens/outcome.ts` with `outcome.css`, loaded as a duel starts), one card (`.duel-end`): the
-  kicker („Дуел на живо с Мария“, „Дуел срещу запис“) and the verdict (`.duel-verdict`: „Победа“, „Загуба“,
+  kicker („Дуел с Мария“, „Дуел срещу запис“) and the verdict (`.duel-verdict`: „Победа“, „Загуба“,
   „Равенство“); the two face to face
   (`.duel-face`: the big avatar, the name a way to the profile, „Запис“ for a recording, the points and
   the right answers; the winner's points gold and its avatar glowing, the other's plain; a player gone since, a dash
-  and „Играчът вече го няма“; under a person met in a live duel, not a friend yet, „Добави в приятели“,
-  `.duel-add`); the duel question by question (`.duel-marks`: the player's row over the
+  and „Играчът вече го няма“); the duel question by question (`.duel-marks`: the player's row over the
   other's, each beside a small avatar; the quicker of two right answers ringed in gold, `.fast`, said once under
   them; a gold band behind the question that decided it); one line of what decided it (`.duel-line`: „Водеше от
   8-ия въпрос до края.“, „Мария водеше от първия въпрос до края.“, „Реши го последният въпрос.“, „Равни точки: реши
-  времето (…)“, a second or more apart, „Равни точки и под секунда разлика във времето.“ for a draw; one who left a
-  live duel under way, „Мария излезе след 4-тия въпрос.“); and what it meant under a hairline (`.duel-meant`: the division's emblem,
-  its name and the change, its bar, „Рейтинг 1062 → 1080 · 70 до Злато“; why it didn't move; the record against
-  this person, „Срещу Мария 3 : 2“, in rose). Then the next steps: „Реванш“, gold, right after a live one against a
-  person, docked at the screen's foot (`.duel-dock`, over the bar of places, until its place comes up: the other has
-  only 15 seconds); the other asking shows over it („Мария иска реванш“ with the seconds left draining in a rose ring,
-  `.rematch-asks`, and a ping), the button „Да, реванш“; once the other has left the result, „Още един дуел“ takes the
-  gold. „Още един дуел“ gold after one against a recording; opened later from Дуел, „Към дуелите“. A duel cut off
-  without a result is its heading („Дуелът прекъсна“) and a line, and the player's own game if they played it
-  (`.duel-mine`).
-- **A live duel under way** (`screens/live.ts`): the board (`.live-board`), one card with the two face to face, the
-  player on the left and the other mirrored on the right: avatar, name, points (plain; the leader's gold), each side's
-  marks in two rows of five (one row of ten from 48rem; on a phone, or a short laptop, only while an answer shows), and
-  what the other is doing („Мисли…“, „Отговори за 4,2 с“, „Излезе от дуела.“). The other gone for good while the
-  player leads: a card under the board, „Мария излезе. Победата е твоя.“, „Вземи победата“ gold (the rest unanswered by
-  both) and „Изиграй докрай“, asked once. Waiting: „Търсим някого близо до твоя рейтинг.“
+  времето (…)“, a second or more apart, „Равни точки и под секунда разлика във времето.“ for a draw); and what it
+  meant under a hairline (`.duel-meant`: the record against this person, „Срещу Мария 3 : 2“, in rose; against a
+  recording, whose game it was, „Записът е от истинска игра на Мария.“). Then the next steps: „Реванш“ gold (a new
+  duel the other way round: the player plays first), or „Още един срещу запис“; „Към Приятели“ plain. A duel that
+  lapsed is its heading („Дуелът изтече“) and who didn't play it in time („Мария не изигра дуела за трите дни.“), and
+  the player's own game if they played it (`.duel-mine`).
+- **A duel played** (`screens/duel.ts`): as any game (`game/run.ts`), „Дуел с Мария“ over each question
+  (`.question-head .versus`). Played second (or against a recording), the other's answer shows as they gave it: the
+  line over the question turns „Мария отговори“ at the moment they did (with the sound `them`), and once the
+  player's own answer is in, how it went for them under the verdict (`.their-line`: „Мария: вярно за 4,2 с“, in the
+  right answer's green; „грешно“, „близо“, „без отговор“ muted). Their points wait for the end. Played first, the
+  result is the player's own (`summary`), a line in its card under the duel's name that it's sent (`.duel-sent`:
+  „Изпратен. Мария ще изиграе същите десет въпроса: има време още 3 дни.“). „Нов дуел“ (`/duel/new`): each friend a row („Покани“), and „Играй срещу
+  запис“.
 - **Friends:** `.card.friends`, `.invitation` (a friend request, accepted with `.btn.rose`), `.friend-list`/`.friend`
   (with `.friend-day` and `.record`).
 - **In code:**
@@ -404,7 +399,8 @@ media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds th
   - `.modes`, `.topics` and `.streak-chip`
   - `.news-open`, `.news-facts`, `.news-note`, `.mastery-line`, `.almanac-notes` and `.explain`
   - `.duel-head`, `.duel-verdict`, `.duel-face`, `.duel-points`, `.duel-marks .duel-pip`, `.duel-line`,
-    `.duel-rating-line` and `.duel-record`
+    `.duel-meant` and `.duel-record`
+  - `.duels`, `.duel-row`, `.duel-sent`, `.their-line` and `.question-head .versus`
 
 ## What a game brings
 
@@ -423,13 +419,11 @@ media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds th
 - **The streak** forgives a missed day a week by itself, said under it in Профил (`.streak-note`, the day forgiven
   on the week's strip: `.week li.forgiven`); a day forgiven, or a streak that ended, is said once on Начало
   (`.streak-notice`; told once on the server, not once per device), as is, one at a time, what others did meanwhile:
-  a friend said yes to a request („Мария прие поканата ти за приятелство.“ and „Приятели“), or a live duel left went
-  on without the player.
+  a friend said yes to a request („Мария прие поканата ти за приятелство.“ and „Приятели“). While a friend's duel
+  waits for the player, Начало says so in the same quiet line, first („Мария те покани на дуел.“ and „Играй“; „2 дуела
+  те чакат.“ and „Приятели“), and Приятели has a dot in the bar.
 - **Every avatar is free:** fifteen animals (`play.Shapes`), each in any of six colours (the theme's five and
   „естествени цветове“, `.tone-natural`: every part in its own colour).
-- **Division emblems** are pictures (`division-<id>`): a silhouette per division — Бронз a plain shield, Сребро a
-  chevron, Злато wings, Платина a star, Диамант a cut gem, Легенда a crowned shield of stars with rays — in `--div-*`
-  colours (`art/emblem.ts` places them).
 
 ## Flow
 
@@ -438,7 +432,7 @@ media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds th
   player most wants it. It stays 3 seconds (4.5 for anything but a choice or „Вярно или невярно“: there's more to
   look at) and the time to read the fact and the day's line (1.2 seconds and a little for each letter, 9 at most),
   with a line filling as it waits; „Напред“, always there (Enter on a computer; „Към резултата“ after the last), goes
-  on at once. A live duel shows both answers for 4 seconds (6 for anything but a choice or „Вярно или невярно“). A question never opens in a
+  on at once. A question never opens in a
   tab that's out of sight.
 - **A game has the whole screen.** On a phone the header and the bar of places step aside from the count before a
   run, and while a question or its answer shows (an arrow before the count goes home), so the pad and the verdict fit
@@ -496,9 +490,8 @@ Every element that looks like a game measures something the game already counts:
 | Place    | Place on the day's board („12-и от 318 днес“)                                                                                                                                                                                               | Начало, Класации, Профил   |
 | Mastery  | Share of a topic's questions a player knows, from every answer weighed by its question's hardness (play/mastery.go); told after 10 answers, in six tiers: Новак, Любител (35%), Познавач (50%), Експерт (65%), Майстор (78%), Светило (90%) | Игра, Профил, result       |
 | Notes    | Milestones noted in the book once each: a streak of 7, 30, 100 or 365 days, a first ten of ten on the day's questions, a chapter complete (every fact of a topic); with their day                                                           | Result, Моят Алманах       |
-| Duels    | Live with whoever comes (a recording of a real game if nobody does in 10 s): won of played; between two friends, their record („3 : 2“)                                                                                                     | Дуел, Профил               |
-| Rating   | Elo from 1000, moved by duels; shown as a division (Бронз → Легенда) with its generated emblem                                                                                                                                              | Дуел, Профил, Класации     |
-| Boards   | The day's ten, rating (10 rated games or more) and knowledge (mastery, the share of the questions known, after 100 answers, or 30 in a topic), of everyone or of friends                                                                    | Класации                   |
+| Duels    | Each on one's own time, with a friend (who has three days to play the same ten) or against a real recorded game: won of played; between two people, their record („3 : 2“)                                                                  | Приятели, Профил           |
+| Boards   | The day's ten and knowledge (mastery, the share of the questions known, after 100 answers, or 30 in a topic), of everyone or of friends                                                                                                     | Класации                   |
 | Friends  | The day's board among you and your friends, once a friend has played                                                                                                                                                                        | Класации                   |
 | Avatars  | A picture on a tone: fifteen animals and six colours, every one anyone's from the first day                                                                                                                                                 | Everywhere a player is     |
 
@@ -553,8 +546,7 @@ Feedback fires once, when it's earned, and then the screen is still again:
   numbers fading in, and the sentence about them; at 700ms the fact and „Напред“. A run's head (the count, the
   topic, the tally, the clock) and its pips stay at the top of the screen while the question and its answer scroll,
   smaller once stuck (the clock a thin bar along its edge, the seconds at the pips' end; stuck a few pixels past the
-  top, back only at it, so it never flickers), so the pip and the tally are seen landing. A game played with others (a live duel) shows its answer at once, when the server
-  says.
+  top, back only at it, so it never flickers), so the pip and the tally are seen landing.
 - **A result lands, once** (`web/src/feel.ts`, at most 1.6s, a tap anywhere jumps to the end, never again on a
   reload): the pips fill one by one (60ms apart, 85 on the day; each with a pluck a step up the scale for each right
   answer before it, so a good game climbs, and a muted thud for a wrong one); as the last fills (at 700ms, about 0.9s
@@ -566,7 +558,7 @@ Feedback fires once, when it's earned, and then the screen is still again:
   device): the verdict waits while the marks fill pair by pair (75ms apart, a pluck for each of the player's right
   ones, a thud for each not), the two scores counting up with them so the lead changes hands as it did, the band of
   the deciding question lighting as it's reached; at about 0.9s the verdict rises and the scores land, the winner's
-  turning gold, with `win`, `lose` or `end`; then what it meant fades in, the rating's bar filling from where it was.
+  turning gold, with `win`, `lose` or `end`; then what it meant (the record) fades in.
 - **The big news is a sheet**, at most one a game, only for a note in the book: the streak at 7, 30, 100 or 365 days,
   a first ten of ten, a chapter complete. It opens once the result has landed (on the day, once the streak has rolled
   on in its chip too: one moment after another, never one over another), slides up (320ms), opaque,
@@ -602,9 +594,9 @@ Feedback fires once, when it's earned, and then the screen is still again:
   - `count` for each second of the count before a run, `go` at its start;
   - `end` when a run's result opens (`perfect` for ten of ten), `win` or `lose` at a duel's end;
   - `note` (three bells rising) with a note in the book, as its sheet opens;
-  - `ping` when a game or a duel starts, or a friend calls to a duel, or the other asks for a rematch;
-  - `them`, the other side answering in a live duel (only while the player hasn't: after, it would sound over their
-    verdict): two soft low plucks, A4 then F♯4, off to the right, never a bell;
+  - `ping` when something new waits in Приятели: a friend's request, a friend's duel;
+  - `them`, the other side of a duel answering as they did, played second (only while the player hasn't: after, it
+    would sound over their verdict): two soft low plucks, A4 then F♯4, off to the right, never a bell;
   - the note's sound only once the result's own has played.
 - **Nothing plays** for navigation, hovering or decoration.
 - **No music:** people play on the bus or among others.
@@ -613,13 +605,13 @@ Feedback fires once, when it's earned, and then the screen is still again:
 
 ## Pictures
 
-The game's illustrations — the avatars, the topics, the ways to play, the division emblems, Рила (for „България“) and
+The game's illustrations — the avatars, the topics, the ways to play, Рила (for „България“) and
 the streak's flame — are drawn by hand as paths in `web/src/art/pictures.ts`, and placed with `picture(id)` from
 `art/picture.ts`. They load as a file of their own once the game starts, so the first screen never waits for them.
 
 - **One style:** flat shapes with depth, no outlines, lit from the top left. Depth comes from a lit half and a shaded
   half, a soft shadow set down and right (`lift`), and a light on the top-left edge, never from gradients.
-- **One ramp:** a picture is painted from one tone — the topic's, the avatar's, the mode's, the division's —
+- **One ramp:** a picture is painted from one tone — the topic's, the avatar's, the mode's —
   in its inks: `k0` night ink, `k1` deep, `k2` shade, `k3` the tone, `k4` light, `k5` pale, `kw` white; `ks` a shadow
   and `kh` a light laid over, `kt` a tint of the tone for a ground; `l0`–`l5` the same inks as strokes. `.pic` in
   `app.css` mixes them from `--tone`, so a picture follows its tone and the theme with no colour of its own.
@@ -633,7 +625,7 @@ the streak's flame — are drawn by hand as paths in `web/src/art/pictures.ts`, 
   ball, a gamepad, a quill in its inkwell, a butterfly), on its tile and, small, on its chips; one per way to play
   (crossed swords, a crown in laurel, an open door) on its card and over its page, and over Приятели (two friends
   side by side, the fox and the bear, heads leaning together: the avatars are the players' faces) and Моят Алманах (a
-  book); the streak's flame; the divisions' crests.
+  book); the streak's flame.
 - **A new picture** is drawn on the 64 × 64 grid in the same inks and looked at beside the others, at its smallest
   size (an avatar at 28px) and in both themes, before it ships.
 
