@@ -20,8 +20,9 @@ recorded game). The streak is the habit and forgives two missed days a week. The
 else adds up but ink and the streak. DECISIONS.md, „The direction“, is final: it lists the player's nouns and the rule
 every later change passes.
 
-**Being built (from 20 Nov 2026).** Until each part lands the code still has points, visible mastery, the book's notes
-and „the edition“ look; don't extend them.
+**Being built (from 20 Nov 2026).** The server's part has landed (no points, ink and pencil, ranks and the seal,
+mastery hidden, two forgiven days a week, freshness); the client still has „the edition“ look until the mockups are
+approved; don't extend it.
 
 ## Direction
 
@@ -36,7 +37,7 @@ most). A change is judged by whether players come back: the retention numbers in
 | --- | --- |
 | `cmd/almanac` | The program: `serve`, `bank check/fmt`, `backup now/list/restore/verify/keys` |
 | `cmd/build` | Builds the client into `internal/assets/dist` (esbuild; precompressed; the first screen's budget, and ceilings against accidents) |
-| `internal/play` | The game's rules and data: runs, scoring (`worth.go`), the streak (`runs.go`), the Алманах and its notes (`progress.go`), duels on one's own time (`duels.go`: a friend's, a recording's), friends |
+| `internal/play` | The game's rules and data: runs and their scores (`play.go`, `board.go`), the streak (`runs.go`), the Алманах, its ink and seals (`almanac.go`, `ink.go`, `rank.go`), duels on one's own time (`duels.go`: a friend's, a recording's), friends |
 | `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: the paths it sends the app for, the client's router's list again; a test holds them equal) |
 | `internal/store` | SQLite; migrations in `internal/store/migrations`, applied once each by name |
 | `internal/bank` | Question types, the bank on disk, its checks |

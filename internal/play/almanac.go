@@ -15,9 +15,10 @@ import (
 
 // The Алманах is a player's book: a chapter per topic, and „Микс“ (every topic) and „България“ (the questions about
 // Bulgaria from every topic) as pages of their own. A chapter holds the fact behind every question the player has
-// answered right, each written in ink or in pencil (ink.go), and says one number, its ink.
+// met, in ink where it was a right answer in the issue the first time they met it, else in grey (ink.go), and says one
+// number, its ink.
 
-// Learned is one fact in a player's almanac: the question, its answer, and the fact behind it; in ink or in pencil
+// Learned is one fact in a player's almanac: the question, its answer, and the fact behind it; in ink or in grey
 // (ink.go); when it was written, and where: the day's ten (its issue), a chapter's game, a duel. A statement to judge
 // true or not has no question: its answer is the statement itself, Untrue if it isn't so (the bank keeps no
 // corrected one).
@@ -44,7 +45,7 @@ const AlmanacPage = 30
 const AlmanacSearch = 60
 
 // Almanac is a page of a player's book (a chapter, or all of it), the latest written first; each chapter's ink (Ink:
-// the one number a chapter says; pencil is listed, never counted); and where the next page starts (none after the
+// the one number a chapter says; grey is listed, never counted); and where the next page starts (none after the
 // last). The first page has each chapter's rank too.
 type Almanac struct {
 	Facts []Learned `json:"facts"`
@@ -66,22 +67,6 @@ type Almanac struct {
 type AlmanacQuery struct {
 	Topic, From, Search string
 	Page, Limit         int
-}
-
-// factsIn is how many facts each chapter has: its live questions with a fact („Микс“ every topic's, „България“ those
-// about Bulgaria).
-func factsIn(b *bank.Bank) map[string]int {
-	of := map[string]int{}
-	for _, q := range b.Live("", "") {
-		if q.Extra().Fact != "" {
-			of[q.Base().Category]++
-			of[MixTopic]++
-			if q.Extra().BG {
-				of[BulgariaTopic]++
-			}
-		}
-	}
-	return of
 }
 
 // inChapter says whether a question's fact belongs to a chapter.

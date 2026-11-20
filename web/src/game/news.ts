@@ -1,5 +1,5 @@
-// What a game brought, said once, at its end, quietly: what it wrote in the Алманах (the ink counted, pencil only
-// said: play/ink.go), and the ranks it raised (as one line, with the art Страница brings) or, after the day's issue,
+// What a game brought, said once, at its end, quietly: what it wrote in the Алманах (the ink counted, the right
+// answers met before said apart: play/ink.go), and the ranks it raised (as one line) or, after the day's issue,
 // the chapter nearest its next rank (play/rank.go). Each is a quiet line under the result: never a sheet over it, as
 // the game that brought it may have gone badly, and a bad game is never celebrated. In a card of its own, once a day,
 // how others' duels against the player's recordings went (play/recordings.go). A game that ended without its result

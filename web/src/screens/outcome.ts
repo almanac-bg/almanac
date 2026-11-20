@@ -144,9 +144,9 @@ function face(s: Side, label: string, tag: string, won: boolean): Child {
     avatar(look.avatar, { size: "l", name: s.name }),
     tag ? h("a", { class: "duel-name", href: profileHref(tag) }, label) : h("strong", { class: "duel-name" }, label),
     s.gone
-      ? [h("b", { class: "duel-points none" }, "–"), h("span", { class: "duel-rights" }, "Играчът вече го няма")]
+      ? [h("b", { class: "duel-score none" }, "–"), h("span", { class: "duel-rights" }, "Играчът вече го няма")]
       : [
-          h("b", { class: "duel-points", "data-n": s.rights }, formatNumber(s.rights)),
+          h("b", { class: "duel-score", "data-n": s.rights }, formatNumber(s.rights)),
           h("span", { class: "duel-rights" }, `от ${total} верни`),
         ],
   );

@@ -167,7 +167,7 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
 
 /** Their seal and their longest streak. */
 function numbers(p: Profile): Child {
-  if (!p.seal && !p.best) return h("p", { class: "muted" }, "Още няма звание.");
+  if (!p.seal && !p.best) return h("p", { class: "muted" }, "Още няма печат.");
   return h(
     "div",
     { class: "stats" },

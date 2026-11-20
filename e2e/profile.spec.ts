@@ -19,7 +19,7 @@ test("a player's profile: asked to be friends from it, and friends there", async
   await expect(b.getByRole("heading", { level: 1, name: ana.name })).toBeVisible();
   await expect(b.locator(".me-tag")).toHaveText(`@${ana.tag}`);
   // A topic's game writes no rank and no streak: nothing yet, and no lifetime totals nor how well she knows a topic.
-  await expect(b.getByText("Още няма звание.")).toBeVisible();
+  await expect(b.getByText("Още няма печат.")).toBeVisible();
   await expect(b.locator(".me-head")).not.toContainText("Ниво");
   await expect(b.locator(".screen")).not.toContainText(/изиграна игра|верни отговори|Колко знае/);
 

@@ -1333,7 +1333,7 @@
     box-shadow: inset 0 0 0 1.5px var(--ink);
   }
 
-  /* Close: open, with a mark of ink inside — it brought points. */
+  /* Close: open, with a mark of ink inside — near, not right. */
   .trail li.partial {
     background: linear-gradient(var(--ink), var(--ink)) center / 40% 40% no-repeat;
     box-shadow: inset 0 0 0 1.5px var(--ink);
@@ -1559,26 +1559,13 @@
     flex: 1;
   }
 
-  /* A run's tally while it's played: the right answers in a row, and the points so far. Its line is there from the
-     first question, before there are points, as tall as the taller of the two (the chip): the head never grows when
-     they come. */
+  /* A run's tally while it's played: the right answers in a row. Its line is there from the first question, as tall
+     as the chip: the head never grows. */
   .tally {
     display: flex;
     align-items: center;
     gap: var(--space-2);
     min-height: 1.4375rem;
-  }
-
-  .tally-points {
-    color: var(--gold-ink);
-    font: 800 1.375rem / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  .tally-points small {
-    color: var(--ink-3);
-    font: 700 0.8125rem / 1 var(--font-sans);
   }
 
   .timer {
@@ -3183,35 +3170,10 @@
     white-space: nowrap;
   }
 
-  /* What goes with a board's number („от 10“, „точки“, „7/10 ·“): in words' type, small and muted. */
+  /* What goes with a board's number („от 10“, „7/10 ·“): in words' type, small and muted. */
   .sub {
     color: var(--ink-3);
     font: 700 0.8125rem / 1 var(--font-sans);
-  }
-
-  /* A row's points, under its right answers (the day's board): they decide only a tie. */
-  .pts-under {
-    display: block;
-    margin-top: 3px;
-    text-align: right;
-  }
-
-  /* A narrow phone: such a score under the name, so that the name shows whole, the points beside the right answers. */
-  @media (max-width: 22.5rem) {
-    .row:has(.pts-under) {
-      grid-template-columns: 32px minmax(0, 1fr);
-      row-gap: var(--space-1);
-    }
-
-    .row:has(.pts-under) > :nth-child(n + 3) {
-      grid-column: 2;
-      justify-self: end;
-    }
-
-    .pts-under {
-      display: inline;
-      margin-left: var(--space-2);
-    }
   }
 
   .row.me {
@@ -3920,10 +3882,9 @@
     }
   }
 
-  /* A game's news in lines (news.ts), each in one quiet style: what points are, said once on a first game; the facts
-     it put in Моят Алманах, a tap from them; a note it wrote in the book. */
+  /* A game's news in lines (news.ts), each in one quiet style: the facts it put in the Алманах, a tap from them; a
+     seal it raised. */
 
-  .news-open,
   .news-facts,
   .news-note {
     margin: 0;
@@ -4964,14 +4925,6 @@
     font-weight: 600;
   }
 
-  .points {
-    margin-top: 6px;
-  }
-
-  .points-n {
-    font-weight: 500;
-  }
-
   .result-streak {
     display: flex;
     align-items: baseline;
@@ -5370,10 +5323,6 @@
     margin-top: var(--space-2);
   }
 
-  .points-bonus {
-    display: block;
-  }
-
   .perfect-head {
     display: flex;
     align-items: center;
@@ -5429,7 +5378,7 @@
     font-weight: 500;
   }
 
-  /* The score and the points beside it; on a narrow phone, the points under the score, so the name keeps its room. */
+  /* The score and what goes beside it; on a narrow phone, under the score, so the name keeps its room. */
   .rank-end {
     display: flex;
     flex: none;
@@ -7039,7 +6988,7 @@
     hyphens: auto;
   }
 
-  /* A run's head: the count on its line, the topic and the points under it once they don't fit beside it. */
+  /* A run's head: the count on its line, the topic under it once it doesn't fit beside it. */
   .tight .question-head {
     flex-wrap: wrap;
     row-gap: var(--space-1);

@@ -73,7 +73,7 @@
     white-space: nowrap;
   }
 
-  .duel-points,
+  .duel-score,
   .duel-rights {
     grid-column: 1 / -1;
   }
@@ -92,18 +92,18 @@
     grid-column: 1;
   }
 
-  .duel-points {
+  .duel-score {
     margin-top: var(--space-2);
     font: 800 min(calc(32px + 2rem), 15vw) / 0.9 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     transition: color 200ms;
   }
 
-  .duel-face:not(.win) .duel-points {
+  .duel-face:not(.win) .duel-score {
     color: var(--ink-2);
   }
 
-  .duel-points.none {
+  .duel-score.none {
     color: var(--ink-3);
   }
 
