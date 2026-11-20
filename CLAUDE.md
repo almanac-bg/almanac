@@ -11,13 +11,16 @@ their reasons: read it before changing what a player sees or how the game plays,
 
 ## The game, in a paragraph
 
-Ten questions a day, the same for everyone (Начало); games by topic that follow what a player knows; live duels with
-whoever comes (a recording of a real game if nobody does); Роял at 21:00
-Friday to Sunday (every evening once those fill), up to 50 live on 15 questions, cut by right answers after the 5th, 8th, 11th and 14th; friends,
-levels (XP), achievements, titles, avatars, and a rating with divisions. Points are a game's score,
-XP is what playing earns, rating is strength: kept apart on purpose (`internal/play/worth.go`), and joined in one
-system of progress (`internal/play/progress.go` says how: what earns XP, what unlocks what, what's told when), which a
-new player meets a part at a time, as each starts to matter (`internal/play/unfold.go`).
+Every day ten questions write the player's almanac, and set them beside all of Bulgaria. Three places: Днес (the
+day's issue, the same ten for everyone, its result shared without the answers), Алманах (the player's book: a chapter
+per topic with the facts collected and how much of it they know, and its games), Приятели (friends, the day's board,
+duels played on one's own time against a friend or a real recorded game). The streak is the habit and forgives one
+missed day a week. Points are one game's score; nothing else adds up but the book and the streak.
+
+**Being rebuilt (from 20 Nov 2026).** The owner chose this after a full review (DECISIONS.md, „The redesign“). Until
+each part lands, the code still has the old game: XP and levels, goals, achievements, titles and the wardrobe's
+unlocks, rating and divisions, Роял, live duels, four places. Don't extend any of those; remove them as the redesign
+reaches them.
 
 ## Direction
 
