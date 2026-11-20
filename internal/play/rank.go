@@ -1,0 +1,456 @@
+package play
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"math"
+	"slices"
+	"strconv"
+
+	"github.com/almanac-bg/almanac/internal/bank"
+)
+
+// Ranks (DECISIONS.md, „The direction“): a player's rank in a chapter says how much of it their book holds in ink
+// (ink.go), named for the book, not the person: Бележка at 1, Страница at 5, Тетрадка at 15, Тефтер at 40, Книга at
+// 100, Летопис at 250, then „Летопис · 2“ at 350 and another for each further 100 (RankAt). The ranks are the only
+// levels, titles and unlocks the game has.
+//
+// A rank is kept, never worked out on view (ranks): it's counted as a day's issue is finished (afterRun: only the
+// issue writes ink), and it never falls, whatever the bank does to the facts under it later. With it is kept the
+// chapter's ink as counted and how far it is to the next rank in quarters (Quarter): the seal, which is the rank drawn,
+// fills in quarters between ranks.
+//
+// From Тетрадка up a rank is earned only by answers that aren't guesses: the player's answers in the day's issues, all
+// chapters pooled, must be right GuessSD standard deviations above what guessing gets, kind by kind (Guessing). Short
+// of it, the ranks stop at Страница (Held says so); a rank already held stays.
+//
+// A rank risen is told once, with the game's news (NewsOf: Rose), several at once as one; Бележка, the first, never.
+// At Страница a chapter's art becomes the player's to wear as their avatar (progress.go: SetAvatar); the animals are
+// everyone's. The player wears one chapter's seal beside their name, the one they choose (users.seal, SetSeal), or else
+// their best (the highest, the more ink on a tie).
+
+// Rank is a step of the ladder: its name, and the ink it starts at.
+type Rank struct {
+	Name string `json:"name"`
+	From int    `json:"from"`
+}
+
+// Ranks are the ladder's named steps (level 1 to 6); past the last, each further LetopisEvery is another „Летопис“.
+var Ranks = []Rank{
+	{"Бележка", 1}, {"Страница", 5}, {"Тетрадка", 15}, {"Тефтер", 40}, {"Книга", 100}, {"Летопис", 250},
+}
+
+const (
+	// LetopisEvery is how much more ink each „Летопис · N“ past the first takes.
+	LetopisEvery = 100
+	// RankArt is the level whose chapter's art the player may wear (Страница).
+	RankArt = 2
+	// RankGuarded is the first level the guessing check guards (Тетрадка).
+	RankGuarded = 3
+	// GuessSD is how many standard deviations above guessing a player's day answers must be (Guessing).
+	GuessSD = 3
+)
+
+// RankAt is the level a chapter's ink makes: 0 none, 1 Бележка … 6 Летопис, 7 „Летопис · 2“ and on.
+func RankAt(ink int) int {
+	last := Ranks[len(Ranks)-1]
+	if ink >= last.From {
+		return len(Ranks) + (ink-last.From)/LetopisEvery
+	}
+	level := 0
+	for i, r := range Ranks {
+		if ink >= r.From {
+			level = i + 1
+		}
+	}
+	return level
+}
+
+// RankFrom is the ink a level starts at.
+func RankFrom(level int) int {
+	switch {
+	case level <= 0:
+		return 0
+	case level <= len(Ranks):
+		return Ranks[level-1].From
+	}
+	return Ranks[len(Ranks)-1].From + (level-len(Ranks))*LetopisEvery
+}
+
+// RankName is a level's name: „Тетрадка“, „Летопис · 3“; "" for none.
+func RankName(level int) string {
+	switch {
+	case level <= 0:
+		return ""
+	case level <= len(Ranks):
+		return Ranks[level-1].Name
+	}
+	return Ranks[len(Ranks)-1].Name + " · " + strconv.Itoa(level-len(Ranks)+1)
+}
+
+// Quarter is how many quarters of the way from a level to the next a chapter's ink is: 0 to 3.
+func Quarter(level, ink int) int {
+	from, to := RankFrom(level), RankFrom(level+1)
+	return min(3, max(0, 4*(ink-from)/(to-from)))
+}
+
+// ChapterRank is a player's rank in a chapter, as kept: its level and name, the quarters toward the next, the
+// chapter's ink as counted then, and the next rank and the ink it starts at.
+type ChapterRank struct {
+	Chapter string `json:"chapter"`
+	Level   int    `json:"level"`
+	Name    string `json:"name"`
+	Quarter int    `json:"quarter"`
+	Ink     int    `json:"ink"`
+	Next    string `json:"next"`
+	NextAt  int    `json:"nextAt"`
+}
+
+func chapterRank(chapter string, level, quarter, ink int) ChapterRank {
+	return ChapterRank{Chapter: chapter, Level: level, Name: RankName(level), Quarter: quarter, Ink: ink,
+		Next: RankName(level + 1), NextAt: RankFrom(level + 1)}
+}
+
+// rightChance is the chance a guess at a question of each kind is right (not its score: calibrate.go's chance): one of
+// four options; one of two; an order of four, one of 24; four pairs, one of 24; a split of four or five, about one
+// of 16; a number typed blind, next to none.
+var rightChance = map[string]float64{"choice": 0.25, "clues": 0.25, "truefalse": 0.5, "order": 1.0 / 24,
+	"match": 1.0 / 24, "split": 1.0 / 16, "number": 0.02}
+
+// Guessing is how a player's answers in the day's issues stand against guessing, all chapters pooled: the right
+// answers, and what guessing every one would get (Expected, with its standard deviation SD, kind by kind). Fair is
+// whether they're GuessSD standard deviations above it: what ranks from Тетрадка up need. Only answers given count
+// (one let run out isn't a guess), in games not a script's.
+type Guessing struct {
+	Answers  int     `json:"answers"`
+	Rights   int     `json:"rights"`
+	Expected float64 `json:"expected"`
+	SD       float64 `json:"sd"`
+	Fair     bool    `json:"fair"`
+}
+
+// guessing reads a player's Guessing.
+func (g *Game) guessing(ctx context.Context, userID int64) (Guessing, error) {
+	var out Guessing
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id, a.is_right FROM answers a JOIN runs r ON r.id = a.run_id
+		WHERE r.user_id = ? AND r.kind = 'day' AND a.given IS NOT NULL AND `+shadowWrites+` AND NOT `+voidAt, userID)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+	b := g.Bank()
+	variance := 0.0
+	for rows.Next() {
+		var id string
+		var right bool
+		if err := rows.Scan(&id, &right); err != nil {
+			return out, err
+		}
+		p := rightChance["choice"]
+		if q, ok := b.Get(id); ok {
+			if c, ok := rightChance[q.Base().Type]; ok {
+				p = c
+			}
+		}
+		out.Answers++
+		out.Rights += b2i(right)
+		out.Expected += p
+		variance += p * (1 - p)
+	}
+	out.SD = math.Sqrt(variance)
+	out.Fair = out.Answers > 0 && float64(out.Rights) >= out.Expected+GuessSD*out.SD
+	return out, rows.Err()
+}
+
+// keptRank is a chapter's rank as the ranks table keeps it.
+type keptRank struct {
+	level, quarter, ink, told int
+}
+
+// ranksOf reads a player's kept ranks, by chapter.
+func ranksOf(ctx context.Context, db querier, userID int64) (map[string]keptRank, error) {
+	rows, err := db.QueryContext(ctx, `SELECT chapter, level, quarter, ink, told FROM ranks WHERE user_id = ?`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]keptRank{}
+	for rows.Next() {
+		var c string
+		var k keptRank
+		if err := rows.Scan(&c, &k.level, &k.quarter, &k.ink, &k.told); err != nil {
+			return nil, err
+		}
+		out[c] = k
+	}
+	return out, rows.Err()
+}
+
+// countRanks counts a player's ranks again from their book's ink, as a day's issue finishes (afterRun): each chapter
+// of the bank's at the rank its ink makes, never lower than it was; from RankGuarded up only if their answers aren't
+// guesses (Guessing). A rank risen waits to be told (told below level); one counted as the ranks began (quiet) is told
+// already.
+func (g *Game) countRanks(ctx context.Context, userID int64, day string, quiet bool) error {
+	ink, err := g.InkOf(ctx, userID)
+	if err != nil {
+		return err
+	}
+	kept, err := ranksOf(ctx, g.DB.Read, userID)
+	if err != nil {
+		return err
+	}
+	fair := true
+	for _, c := range g.Bank().Categories {
+		if RankAt(ink[c.ID]) >= RankGuarded && kept[c.ID].level < RankAt(ink[c.ID]) {
+			gs, err := g.guessing(ctx, userID)
+			if err != nil {
+				return err
+			}
+			fair = gs.Fair
+			break
+		}
+	}
+	for _, c := range g.Bank().Categories {
+		n := ink[c.ID]
+		level := RankAt(n)
+		if !fair && level >= RankGuarded {
+			level = RankGuarded - 1
+		}
+		was, ok := kept[c.ID]
+		level = max(level, was.level)
+		if level == 0 {
+			continue
+		}
+		quarter := Quarter(level, n)
+		told := 0 // a chapter's first rank waits to be told; a rank kept already keeps what was told of it
+		if quiet {
+			told = level
+		}
+		if ok && level == was.level && quarter == was.quarter && n == was.ink {
+			continue
+		}
+		if _, err := g.DB.Write.ExecContext(ctx, `INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told)
+			VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) ON CONFLICT (user_id, chapter) DO UPDATE SET
+				level = max(ranks.level, excluded.level), quarter = excluded.quarter, ink = excluded.ink,
+				day = CASE WHEN excluded.level > ranks.level THEN excluded.day ELSE ranks.day END`,
+			userID, c.ID, level, quarter, n, day, told); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RanksOf are a player's ranks, as kept, by the bank's chapters (those with none at level 0), and whether the
+// guessing check holds them at Страница now (Held: their ink would make Тетрадка or more somewhere, and their answers
+// don't pass Guessing).
+func (g *Game) RanksOf(ctx context.Context, userID int64) (ranks []ChapterRank, held bool, err error) {
+	kept, err := ranksOf(ctx, g.DB.Read, userID)
+	if err != nil {
+		return nil, false, err
+	}
+	ranks = []ChapterRank{}
+	for _, c := range g.Bank().Categories {
+		k := kept[c.ID]
+		ranks = append(ranks, chapterRank(c.ID, k.level, k.quarter, k.ink))
+		if k.level == RankGuarded-1 && k.ink >= RankFrom(RankGuarded) {
+			held = true
+		}
+	}
+	return ranks, held, nil
+}
+
+// ErrNoSeal is a seal of a chapter the player has no rank in.
+var ErrNoSeal = errors.New("no rank in that chapter")
+
+// Seal is the seal a player wears: a chapter's rank (ChapterRank), drawn.
+type Seal = ChapterRank
+
+// SealOf is the seal a player wears: the chapter they chose (users.seal), while they have a rank in it; else their
+// best (the highest level, the more ink on a tie, the bank's order after that); nil with no rank at all.
+func (g *Game) SealOf(ctx context.Context, userID int64) (*Seal, error) {
+	var chosen sql.NullString
+	if err := g.DB.Read.QueryRowContext(ctx, `SELECT seal FROM users WHERE id = ?`, userID).Scan(&chosen); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	ranks, _, err := g.RanksOf(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return sealOf(ranks, chosen.String), nil
+}
+
+// sealOf is the seal of a player's ranks: the chosen chapter's, if they have a rank there, else the best.
+func sealOf(ranks []ChapterRank, chosen string) *Seal {
+	var best *Seal
+	for i, r := range ranks {
+		if r.Level == 0 {
+			continue
+		}
+		if r.Chapter == chosen {
+			return &ranks[i]
+		}
+		if best == nil || r.Level > best.Level || r.Level == best.Level && r.Ink > best.Ink {
+			best = &ranks[i]
+		}
+	}
+	return best
+}
+
+// SetSeal chooses the chapter whose seal the player wears: one they have a rank in (ErrNoSeal otherwise); "" for
+// their best, whichever it is.
+func (g *Game) SetSeal(ctx context.Context, userID int64, chapter string) error {
+	if chapter != "" {
+		var level int
+		err := g.DB.Read.QueryRowContext(ctx, `SELECT level FROM ranks WHERE user_id = ? AND chapter = ?`, userID, chapter).
+			Scan(&level)
+		if errors.Is(err, sql.ErrNoRows) || err == nil && level == 0 {
+			return ErrNoSeal
+		}
+		if err != nil {
+			return err
+		}
+	}
+	_, err := g.DB.Write.ExecContext(ctx, `UPDATE users SET seal = nullif(?, '') WHERE id = ?`, chapter, userID)
+	return err
+}
+
+// HasArt is whether a player may wear a chapter's art as their avatar: their rank there is RankArt or more.
+func (g *Game) HasArt(ctx context.Context, userID int64, chapter string) (bool, error) {
+	var has bool
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM ranks WHERE user_id = ? AND chapter = ?
+		AND level >= ?)`, userID, chapter, RankArt).Scan(&has)
+	return has, err
+}
+
+// Rose is the ranks risen since the player was last told, told once as one (News.Rose): each chapter's from and to,
+// whether it brings its art (Art: Страница reached), and whether the player's best rank rose with them (Best: the
+// one big moment).
+type Rose struct {
+	Ranks []RankUp `json:"ranks"`
+	Best  bool     `json:"best,omitempty"`
+}
+
+// RankUp is a chapter's rank risen: from the level last told (0: none) to the level now.
+type RankUp struct {
+	Chapter string `json:"chapter"`
+	From    int    `json:"from"`
+	To      int    `json:"to"`
+	Name    string `json:"name"`
+	Art     bool   `json:"art,omitempty"`
+}
+
+// roseOf tells the ranks risen since last told, and marks them told: nil if none worth telling (Бележка alone is
+// never told).
+func roseOf(tx *sql.Tx, userID int64) (*Rose, error) {
+	rows, err := tx.Query(`SELECT chapter, level, told FROM ranks WHERE user_id = ?`, userID)
+	if err != nil {
+		return nil, err
+	}
+	var r Rose
+	before, after := 0, 0
+	for rows.Next() {
+		var chapter string
+		var level, told int
+		if err := rows.Scan(&chapter, &level, &told); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		before, after = max(before, min(told, level)), max(after, level)
+		if level > told && level > 1 {
+			r.Ranks = append(r.Ranks, RankUp{Chapter: chapter, From: told, To: level, Name: RankName(level),
+				Art: told < RankArt && level >= RankArt})
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if _, err := tx.Exec(`UPDATE ranks SET told = level WHERE user_id = ? AND told < level`, userID); err != nil {
+		return nil, err
+	}
+	if len(r.Ranks) == 0 {
+		return nil, nil
+	}
+	slices.SortFunc(r.Ranks, func(a, b RankUp) int { return b.To - a.To })
+	r.Best = after > before
+	return &r, nil
+}
+
+// Step is the chapter nearest its next rank, as the day's result and its reminder say it („История: още 2 до
+// Тетрадка“): the chapter, the ink it still needs (Left), and the rank's name (Next).
+type Step struct {
+	Chapter string `json:"chapter"`
+	Left    int    `json:"left"`
+	Next    string `json:"next"`
+}
+
+// StepOf is a player's chapter nearest its next rank, by their book's ink now and their ranks as kept (the fewest ink
+// still needed; the bank's order on a tie); nil before any ink. The reminders' last word names it.
+func (g *Game) StepOf(ctx context.Context, userID int64) (*Step, error) {
+	ink, err := g.InkOf(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	kept, err := ranksOf(ctx, g.DB.Read, userID)
+	if err != nil {
+		return nil, err
+	}
+	var best *Step
+	for _, c := range g.Bank().Categories {
+		n := ink[c.ID]
+		if n == 0 {
+			continue
+		}
+		level := max(RankAt(n), kept[c.ID].level)
+		left := RankFrom(level+1) - n
+		if left <= 0 {
+			left = 1 // the next rank, held for a day's count
+		}
+		if best == nil || left < best.Left {
+			best = &Step{Chapter: c.ID, Left: left, Next: RankName(level + 1)}
+		}
+	}
+	return best, nil
+}
+
+// RanksDue counts the ranks of the players a migration left to count (ranks_due: their ink is from before the ranks),
+// quietly (nothing to tell: it was there already), and clears the list. The server runs it as it starts; it says how
+// many players it counted.
+func (g *Game) RanksDue(ctx context.Context) (int, error) {
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT user_id FROM ranks_due`)
+	if err != nil {
+		return 0, err
+	}
+	var users []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		users = append(users, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	today := g.Today()
+	for _, id := range users {
+		if err := g.countRanks(ctx, id, today, true); err != nil {
+			return 0, err
+		}
+		if _, err := g.DB.Write.ExecContext(ctx, `DELETE FROM ranks_due WHERE user_id = ?`, id); err != nil {
+			return 0, err
+		}
+	}
+	return len(users), nil
+}
+
+// chapterOfArt is the chapter whose art an avatar's shape is, if it's one (a chapter's id: SetAvatar).
+func chapterOfArt(b *bank.Bank, shape string) (string, bool) {
+	return shape, slices.ContainsFunc(b.Categories, func(c bank.Category) bool { return c.ID == shape })
+}

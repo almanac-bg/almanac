@@ -60,6 +60,19 @@ var mergeSteps = []mergeStep{
 	// The guest's book is written again with the account's, from all their games now (Merge: rewriteFacts), so that a
 	// question met first by either is ink once at most.
 	{carries: []string{"facts.user_id"}, sql: `DELETE FROM facts WHERE user_id IN (?1, ?2)`},
+	// The guest's ranks are the account's, the higher of the two in each chapter (a rank never falls), told as the
+	// higher was; the account's next day counts them again from the book they share now. The seal the account chose
+	// stays, else the guest's.
+	{carries: []string{"ranks.user_id"}, sql: `INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told)
+		SELECT ?1, chapter, level, quarter, ink, day, told FROM ranks WHERE user_id = ?2 AND true
+		ON CONFLICT (user_id, chapter) DO UPDATE SET level = max(ranks.level, excluded.level),
+			quarter = CASE WHEN excluded.level > ranks.level THEN excluded.quarter ELSE ranks.quarter END,
+			ink = max(ranks.ink, excluded.ink), day = CASE WHEN excluded.level > ranks.level THEN excluded.day ELSE ranks.day END,
+			told = max(ranks.told, excluded.told)`},
+	{carries: []string{"ranks_due.user_id"}, sql: `INSERT OR IGNORE INTO ranks_due (user_id)
+		SELECT ?1 FROM ranks_due WHERE user_id = ?2`},
+	{carries: []string{"users.seal"}, sql: `UPDATE users SET seal = coalesce(users.seal, g.seal)
+		FROM (SELECT seal FROM users WHERE id = ?2) g WHERE users.id = ?1`},
 	// The notes in the guest's book are the account's too (a milestone both reached keeps the account's day).
 	{carries: []string{"notes.user_id"}, sql: `INSERT OR IGNORE INTO notes (user_id, day, kind, n, topic, told)
 		SELECT ?1, day, kind, n, topic, told FROM notes WHERE user_id = ?2`},

@@ -1231,7 +1231,15 @@ func TestAvatarChosen(t *testing.T) {
 		out["avatar"] != "lynx-natural" {
 		t.Fatalf("a lynx: %d %v", status, out)
 	}
-	for _, bad := range []string{"crown-gold", "fox-gold/ring", ""} {
+	// A chapter's art is earned at its Страница (play/rank.go); a seal is worn of a chapter with a rank.
+	if status, out := p.call("PATCH", "/api/me/seal", map[string]any{"chapter": "history"}); status != 400 ||
+		out["error"] != "no_seal" {
+		t.Fatalf("a seal without a rank: %d %v", status, out)
+	}
+	if status, out := p.call("PATCH", "/api/me/seal", map[string]any{"chapter": ""}); status != 200 || out["seal"] != nil {
+		t.Fatalf("the best seal of none: %d %v", status, out)
+	}
+	for _, bad := range []string{"crown-gold", "fox-gold/ring", "", "history-gold"} {
 		if status, out := p.call("PATCH", "/api/me/look", map[string]any{"avatar": bad}); status != 400 ||
 			out["error"] != "no_avatar" {
 			t.Fatalf("%q: %d %v", bad, status, out)

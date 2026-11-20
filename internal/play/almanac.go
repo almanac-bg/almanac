@@ -3,6 +3,7 @@ package play
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"math"
 	"slices"
 	"strconv"
@@ -54,6 +55,11 @@ type Almanac struct {
 	Next     string         `json:"next,omitempty"`
 	Notes    []Note         `json:"notes,omitempty"`
 	Chapters []Mastery      `json:"chapters,omitempty"`
+	// Ranks are each of the bank's chapters' ranks, as kept (rank.go); Seal the one the player wears; Held, whether
+	// the guessing check holds their ranks at Страница now. The first page only.
+	Ranks []ChapterRank `json:"ranks,omitempty"`
+	Seal  *Seal         `json:"seal,omitempty"`
+	Held  bool          `json:"held,omitempty"`
 	// Since is the day the player's book began: their first game's.
 	Since string `json:"since,omitempty"`
 }
@@ -178,6 +184,15 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Al
 		if out.Chapters, err = g.ChaptersOf(ctx, userID); err != nil {
 			return out, err
 		}
+		if out.Ranks, out.Held, err = g.RanksOf(ctx, userID); err != nil {
+			return out, err
+		}
+		var chosen sql.NullString
+		if err := g.DB.Read.QueryRowContext(ctx, `SELECT seal FROM users WHERE id = ?`, userID).Scan(&chosen); err != nil &&
+			!errors.Is(err, sql.ErrNoRows) {
+			return out, err
+		}
+		out.Seal = sealOf(out.Ranks, chosen.String)
 	}
 	return out, nil
 }
