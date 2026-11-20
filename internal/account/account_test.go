@@ -79,7 +79,7 @@ func TestGuestKeepsAccountWithEmail(t *testing.T) {
 	if err != nil || !guest.Guest() {
 		t.Fatal(guest, err)
 	}
-	if u, _ := a.Session(ctx, token); u == nil || u.ID != guest.ID {
+	if u, _, _ := a.Session(ctx, token); u == nil || u.ID != guest.ID {
 		t.Fatalf("the guest's session gave %v", u)
 	}
 	c := code(t, a, out, in, " Me@Example.com ")
@@ -97,17 +97,17 @@ func TestGuestKeepsAccountWithEmail(t *testing.T) {
 	if _, _, err := a.Verify(ctx, c, ""); !errors.Is(err, ErrCodeExpired) {
 		t.Fatalf("a used code: %v", err)
 	}
-	if u, _ := a.Session(ctx, token2); u == nil || u.Email != "me@example.com" {
+	if u, _, _ := a.Session(ctx, token2); u == nil || u.Email != "me@example.com" {
 		t.Fatalf("the new session gave %v", u)
 	}
 	// The browser's session was replaced by the new one.
-	if u, _ := a.Session(ctx, token); u != nil {
+	if u, _, _ := a.Session(ctx, token); u != nil {
 		t.Fatalf("the guest's session still signs in %+v", u)
 	}
 	if err := a.SignOut(ctx, token2); err != nil {
 		t.Fatal(err)
 	}
-	if u, _ := a.Session(ctx, token2); u != nil {
+	if u, _, _ := a.Session(ctx, token2); u != nil {
 		t.Fatal("still signed in after signing out")
 	}
 }
@@ -192,10 +192,10 @@ func TestHandoff(t *testing.T) {
 	if err != nil || u.ID != guest.ID || session == "" {
 		t.Fatalf("taken as %+v %q %v", u, session, err)
 	}
-	if s, _ := a.Session(ctx, session); s == nil || s.ID != guest.ID {
+	if s, _, _ := a.Session(ctx, session); s == nil || s.ID != guest.ID {
 		t.Fatalf("the new session is %+v", s)
 	}
-	if s, _ := a.Session(ctx, before); s != nil {
+	if s, _, _ := a.Session(ctx, before); s != nil {
 		t.Fatalf("the browser the game left is still signed in as %+v", s)
 	}
 	if d := devices(t, db, guest.ID); d != "" {
@@ -225,7 +225,7 @@ func TestHandoff(t *testing.T) {
 	if u, s, err := a.TakeHandoff(ctx, links[2], session); err != nil || u.ID != guest.ID || s != "" {
 		t.Fatalf("a link opened where it was made: %+v %q %v", u, s, err)
 	}
-	if s, _ := a.Session(ctx, session); s == nil || s.ID != guest.ID {
+	if s, _, _ := a.Session(ctx, session); s == nil || s.ID != guest.ID {
 		t.Fatalf("where the link was made, the session is %+v", s)
 	}
 	u, moved, err := a.TakeHandoff(ctx, links[3], "")
@@ -258,7 +258,7 @@ func TestHandoff(t *testing.T) {
 	if d := devices(t, db, guest.ID); d != "here" {
 		t.Fatalf("notified after a guest came to a guest: %s", d)
 	}
-	if s, _ := a.Session(ctx, session); s == nil || s.ID != guest.ID {
+	if s, _, _ := a.Session(ctx, session); s == nil || s.ID != guest.ID {
 		t.Fatalf("the browser the game came to is %+v", s)
 	}
 
@@ -277,10 +277,10 @@ func TestHandoff(t *testing.T) {
 	if _, _, err = a.TakeHandoff(ctx, token, otherSession); !errors.Is(err, ErrHandoffHere) || !exists(other.ID) {
 		t.Fatalf("a guest to a guest's game: %v", err)
 	}
-	if s, _ := a.Session(ctx, otherSession); s == nil || s.ID != other.ID {
+	if s, _, _ := a.Session(ctx, otherSession); s == nil || s.ID != other.ID {
 		t.Fatalf("the browser with a game is %+v", s)
 	}
-	if s, _ := a.Session(ctx, session); s == nil || s.ID != guest.ID {
+	if s, _, _ := a.Session(ctx, session); s == nil || s.ID != guest.ID {
 		t.Fatal("a link refused still took the game from where it was")
 	}
 
@@ -293,7 +293,7 @@ func TestHandoff(t *testing.T) {
 	if _, _, err = a.TakeHandoff(ctx, token, ownerSession); !errors.Is(err, ErrHandoffSignedIn) || !exists(guest.ID) {
 		t.Fatalf("a guest to a profile: %v", err)
 	}
-	if s, _ := a.Session(ctx, session); s == nil {
+	if s, _, _ := a.Session(ctx, session); s == nil {
 		t.Fatal("a link refused still took the game from where it was")
 	}
 	if u, _, err := a.TakeHandoff(ctx, token, ""); err != nil || u.ID != guest.ID {
@@ -330,7 +330,7 @@ func TestHandoffTakeover(t *testing.T) {
 		t.Fatalf("the game given, kept with an email: %+v %v", u, err)
 	}
 
-	if s, _ := a.Session(ctx, makerSession); s != nil {
+	if s, _, _ := a.Session(ctx, makerSession); s != nil {
 		t.Fatalf("the link's maker is in the profile: %+v", s)
 	}
 	if _, _, err := a.TakeHandoff(ctx, spare, ""); !errors.Is(err, ErrNoHandoff) {
@@ -339,7 +339,7 @@ func TestHandoffTakeover(t *testing.T) {
 	if d := devices(t, db, u.ID); d != "opened" {
 		t.Fatalf("the profile's notifications go to %s", d)
 	}
-	if s, _ := a.Session(ctx, profile); s == nil || s.Email != "victim@example.com" {
+	if s, _, _ := a.Session(ctx, profile); s == nil || s.Email != "victim@example.com" {
 		t.Fatalf("the browser that gave the email is %+v", s)
 	}
 }
@@ -367,7 +367,7 @@ func TestProfileEndsOtherSessions(t *testing.T) {
 		t.Fatalf("verified %+v %v", u, err)
 	}
 	for name, s := range map[string]string{"elsewhere": elsewhere, "the browser's old": here} {
-		if got, _ := a.Session(ctx, s); got != nil {
+		if got, _, _ := a.Session(ctx, s); got != nil {
 			t.Fatalf("%s session signs in %+v", name, got)
 		}
 	}
@@ -382,10 +382,10 @@ func TestProfileEndsOtherSessions(t *testing.T) {
 
 	// Signing in to the profile elsewhere ends nothing: only a guest's sessions end, as the guest becomes a profile.
 	_, other, _ := a.Verify(ctx, code(t, a, out, in, "me@example.com"), "")
-	if s, _ := a.Session(ctx, session); s == nil {
+	if s, _, _ := a.Session(ctx, session); s == nil {
 		t.Fatal("a sign-in elsewhere ended this session")
 	}
-	if s, _ := a.Session(ctx, other); s == nil || s.ID != u.ID {
+	if s, _, _ := a.Session(ctx, other); s == nil || s.ID != u.ID {
 		t.Fatalf("signed in elsewhere as %+v", s)
 	}
 }
@@ -409,7 +409,7 @@ func TestSignOut(t *testing.T) {
 		t.Fatalf("signed out the others: %d %v", n, err)
 	}
 	for name, s := range sessions {
-		if got, _ := a.Session(ctx, s); (got != nil) != (name == "laptop") {
+		if got, _, _ := a.Session(ctx, s); (got != nil) != (name == "laptop") {
 			t.Fatalf("after signing out the others, %s is %+v", name, got)
 		}
 	}
@@ -703,11 +703,11 @@ func TestNames(t *testing.T) {
 	ctx := t.Context()
 	one, _, _ := a.Guest(ctx)
 	two, _, _ := a.Guest(ctx)
-	if name, err := a.Rename(ctx, one.ID, "  Иван   Петров "); err != nil || name != "Иван Петров" {
+	if name, _, err := a.Rename(ctx, one.ID, new("  Иван   Петров "), nil); err != nil || name != "Иван Петров" {
 		t.Fatalf("%q %v", name, err)
 	}
 	// Names may repeat: the tag tells players apart.
-	if _, err := a.Rename(ctx, two.ID, "Иван Петров"); err != nil {
+	if _, _, err := a.Rename(ctx, two.ID, new("Иван Петров"), nil); err != nil {
 		t.Fatalf("a name someone else has: %v", err)
 	}
 	for _, bad := range []string{"А", "123", "<script>", "Иван!", "абвгдежзийклмнопрстуфхцчшщъьюяю",
@@ -735,7 +735,7 @@ func TestNames(t *testing.T) {
 		if !Reserved(fake) {
 			t.Errorf("%q isn't reserved", fake)
 		}
-		if _, err := a.Rename(ctx, one.ID, fake); err == nil {
+		if _, _, err := a.Rename(ctx, one.ID, new(fake), nil); err == nil {
 			t.Errorf("%q taken as a name", fake)
 		}
 	}
@@ -743,7 +743,7 @@ func TestNames(t *testing.T) {
 	if _, err := a.DB.Write.Exec(`UPDATE users SET admin = 1 WHERE id = ?`, two.ID); err != nil {
 		t.Fatal(err)
 	}
-	if name, err := a.Rename(ctx, two.ID, "АЛМАНАХ"); err != nil || name != "АЛМАНАХ" {
+	if name, _, err := a.Rename(ctx, two.ID, new("АЛМАНАХ"), nil); err != nil || name != "АЛМАНАХ" {
 		t.Fatalf("an admin's name: %q %v", name, err)
 	}
 }
@@ -768,7 +768,7 @@ func TestRudeNames(t *testing.T) {
 		}
 	}
 	for _, tag := range []string{"kurva_123", "pi4ka", "fuck_you", "the_hitler", "fuckyou", "shithead"} {
-		if _, err := a.Retag(ctx, u.ID, tag); !errors.Is(err, ErrNameRude) {
+		if _, _, err := a.Rename(ctx, u.ID, nil, new(tag)); !errors.Is(err, ErrNameRude) {
 			t.Errorf("@%s: %v", tag, err)
 		}
 	}
@@ -787,7 +787,7 @@ func TestRudeNames(t *testing.T) {
 		}
 	}
 	for _, tag := range []string{"fc_levski", "gaz", "huy", "ebbe", "kunt"} {
-		if _, err := a.Retag(ctx, u.ID, tag); err != nil {
+		if _, _, err := a.Rename(ctx, u.ID, nil, new(tag)); err != nil {
 			t.Errorf("@%s: %v", tag, err)
 		}
 	}
@@ -815,17 +815,17 @@ func TestResetName(t *testing.T) {
 	a, _, _, _ := setup(t)
 	ctx := t.Context()
 	u, token, _ := a.Guest(ctx)
-	if _, err := a.Rename(ctx, u.ID, "Иван"); err != nil {
+	if _, _, err := a.Rename(ctx, u.ID, new("Иван"), nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.Retag(ctx, u.ID, "ivan"); err != nil {
+	if _, _, err := a.Rename(ctx, u.ID, nil, new("ivan")); err != nil {
 		t.Fatal(err)
 	}
 	name, tag, err := a.ResetName(ctx, u.ID)
 	if err != nil || !strings.HasPrefix(name, AnimalOf(u.ID).Name+" ") || !strings.HasPrefix(tag, AnimalOf(u.ID).Tag) {
 		t.Fatalf("reset: %q @%s %v", name, tag, err)
 	}
-	if s, _ := a.Session(ctx, token); s == nil || s.Name != name || s.Tag != tag || !s.Drawn() {
+	if s, _, _ := a.Session(ctx, token); s == nil || s.Name != name || s.Tag != tag || !s.Drawn() {
 		t.Fatalf("the player after: %+v", s)
 	}
 	if _, _, err := a.ResetName(ctx, 1<<40); err == nil {
@@ -877,13 +877,13 @@ func TestTags(t *testing.T) {
 	if one.Tag == "" || one.Tag == two.Tag {
 		t.Fatalf("drawn tags: %q %q", one.Tag, two.Tag)
 	}
-	if tag, err := a.Retag(ctx, one.ID, " @Otsirh "); err != nil || tag != "otsirh" {
+	if _, tag, err := a.Rename(ctx, one.ID, nil, new(" @Otsirh ")); err != nil || tag != "otsirh" {
 		t.Fatalf("%q %v", tag, err)
 	}
-	if _, err := a.Retag(ctx, two.ID, "OTSIRH"); !errors.Is(err, ErrTagTaken) {
+	if _, _, err := a.Rename(ctx, two.ID, nil, new("OTSIRH")); !errors.Is(err, ErrTagTaken) {
 		t.Fatalf("a taken tag in other case: %v", err)
 	}
-	if _, err := a.Retag(ctx, one.ID, "otsirh"); err != nil {
+	if _, _, err := a.Rename(ctx, one.ID, nil, new("otsirh")); err != nil {
 		t.Fatalf("one's own tag again: %v", err)
 	}
 	for _, bad := range []string{"ab", "1abc", "иван", "a b c", "a.b.c", "abcdefghijklmnopqrstu"} {
@@ -892,11 +892,11 @@ func TestTags(t *testing.T) {
 		}
 	}
 	for _, fake := range []string{"admin", "almanac_team", "almanakh", "the_admin1", "support"} {
-		if _, err := a.Retag(ctx, two.ID, fake); !errors.Is(err, ErrNameReserved) {
+		if _, _, err := a.Rename(ctx, two.ID, nil, new(fake)); !errors.Is(err, ErrNameReserved) {
 			t.Errorf("%q: %v", fake, err)
 		}
 	}
-	if u, _ := a.Session(ctx, token); u == nil || u.Tag != "otsirh" {
+	if u, _, _ := a.Session(ctx, token); u == nil || u.Tag != "otsirh" {
 		t.Fatalf("the session's user: %+v", u)
 	}
 }
@@ -918,10 +918,10 @@ func TestDrawnName(t *testing.T) {
 			t.Errorf("%q is taken for drawn", name)
 		}
 	}
-	if _, err := a.Rename(ctx, u.ID, "Мария"); err != nil {
+	if _, _, err := a.Rename(ctx, u.ID, new("Мария"), nil); err != nil {
 		t.Fatal(err)
 	}
-	if s, _ := a.Session(ctx, token); s.Drawn() {
+	if s, _, _ := a.Session(ctx, token); s.Drawn() {
 		t.Fatal("a chosen name is still drawn")
 	}
 }
@@ -970,6 +970,45 @@ func TestCleanUpIdleGuests(t *testing.T) {
 		if (n == 1) != want {
 			t.Errorf("player %d kept: %v, want %v", id, n == 1, want)
 		}
+	}
+}
+
+// A guest suspended has no session left, and stays all the same (their games, and the suspension, as Suspend says)
+// for as long as a session would have lasted from then; and then goes, as one unused would.
+func TestCleanUpKeepsTheSuspended(t *testing.T) {
+	a, db, _, _ := setup(t)
+	ctx := t.Context()
+	u, _, err := a.Guest(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Write.ExecContext(ctx, `INSERT INTO runs (user_id, kind, questions, started_at) VALUES (?, 'topic', '[]', ?)`,
+		u.ID, store.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Suspend(ctx, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	kept := func() bool {
+		t.Helper()
+		if err := a.CleanUp(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var n int
+		if err := db.Read.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE id = ?`, u.ID).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n == 1
+	}
+	if !kept() {
+		t.Fatal("a suspended guest cleared")
+	}
+	if _, err := db.Write.ExecContext(ctx, `UPDATE suspensions SET at = ?`,
+		store.Ms(time.Now().AddDate(0, 0, -SessionDays-1))); err != nil {
+		t.Fatal(err)
+	}
+	if kept() {
+		t.Fatal("a guest suspended for longer than a session lasts kept")
 	}
 }
 

@@ -1541,3 +1541,82 @@ func TestOwnNameIsntCheckedAgain(t *testing.T) {
 		t.Fatalf("a rude name taken anew: %d %v", status, out)
 	}
 }
+
+// A session used slides on, and its cookie with it, once a day at most: a guest who plays every day is never dropped
+// by the browser 400 days after the cookie was first set.
+func TestSessionCookieSlides(t *testing.T) {
+	g := start(t)
+	p, _ := g.guest()
+	u, _ := url.Parse(g.url)
+	token := ""
+	for _, c := range p.client.Jar.Cookies(u) {
+		if c.Name == g.srv.cookie {
+			token = c.Value
+		}
+	}
+	// set is the session cookie a request to path sets, if any.
+	set := func(path string) *http.Cookie {
+		t.Helper()
+		req, _ := http.NewRequest("GET", g.url+path, nil)
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
+		res, err := p.client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		for _, c := range res.Cookies() {
+			if c.Name == g.srv.cookie {
+				return c
+			}
+		}
+		return nil
+	}
+	dayAgo := func() {
+		t.Helper()
+		if _, err := g.db.Write.Exec(`UPDATE sessions SET seen_at = ?`, store.Ms(time.Now().Add(-25*time.Hour))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if c := set("/api/me"); c != nil {
+		t.Fatalf("a session seen just now set again: %v", c)
+	}
+	for _, path := range []string{"/api/me", "/"} {
+		dayAgo()
+		if c := set(path); c == nil || c.Value != token || c.MaxAge != account.SessionDays*24*60*60 || !c.HttpOnly {
+			t.Fatalf("%s: a day later, the cookie %v", path, c)
+		}
+		if c := set(path); c != nil {
+			t.Fatalf("%s: set twice in a day: %v", path, c)
+		}
+	}
+}
+
+// A new name and a new tag are saved together or not at all: a tag taken leaves the name as it was.
+func TestRenameIsWhole(t *testing.T) {
+	g := start(t)
+	p, _ := g.guest()
+	other, _ := g.guest()
+	if status, out := other.call("PATCH", "/api/me", map[string]string{"tag": "taken_tag"}); status != 200 {
+		t.Fatalf("%d %v", status, out)
+	}
+	_, before := p.call("GET", "/api/me", nil)
+	if status, out := p.call("PATCH", "/api/me", map[string]string{"name": "Нелина", "tag": "taken_tag"}); status != 409 {
+		t.Fatalf("a taken tag: %d %v", status, out)
+	}
+	if _, now := p.call("GET", "/api/me", nil); name(now) != name(before) {
+		t.Fatalf("the name saved without the tag: %q, was %q", name(now), name(before))
+	}
+	if status, out := p.call("PATCH", "/api/me", map[string]string{"name": "Нелина", "tag": "nelina"}); status != 200 ||
+		name(out) != "Нелина" || out["user"].(map[string]any)["tag"] != "nelina" {
+		t.Fatalf("%d %v", status, out)
+	}
+	if status, out := p.call("PATCH", "/api/me", map[string]string{"name": " "}); status != 400 {
+		t.Fatalf("an empty name: %d %v", status, out)
+	}
+	if status, out := p.call("PATCH", "/api/me", map[string]string{"name": ""}); status != 400 {
+		t.Fatalf("no name at all: %d %v", status, out)
+	}
+	if status, out := p.call("PATCH", "/api/me", map[string]string{"tag": "@"}); status != 400 {
+		t.Fatalf("no tag at all: %d %v", status, out)
+	}
+}

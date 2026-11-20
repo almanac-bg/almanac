@@ -45,36 +45,55 @@ const (
 	TagMax  = 20
 )
 
-// Rename gives a player a new name (anyone's: names may repeat; the tag tells players apart).
-func (a *Accounts) Rename(ctx context.Context, userID int64, name string) (string, error) {
-	name, err := normalName(name)
-	if err == nil && Reserved(name) {
-		err = a.unlessAdmin(ctx, userID)
+// Rename gives a player a new name, a new tag, or both (nil: that one as it is): all of it, or nothing if any of it is
+// refused (a tag taken, a name rude), so that no answer of no leaves half saved. A name may be anyone's (names
+// repeat: the tag tells players apart); a tag only if it's free. It gives the name and tag as kept ("": not given).
+func (a *Accounts) Rename(ctx context.Context, userID int64, name, tag *string) (string, string, error) {
+	if name == nil && tag == nil {
+		return "", "", nil
 	}
+	var newName, newTag string
+	var err error
+	if name != nil {
+		newName, err = normalName(*name)
+		if err == nil && Reserved(newName) {
+			err = a.unlessAdmin(ctx, userID)
+		}
+		if err != nil {
+			return "", "", err
+		}
+	}
+	if tag != nil {
+		newTag, err = NormalTag(*tag)
+		if err == nil && Rude(newTag) {
+			err = ErrNameRude
+		}
+		if err == nil && Reserved(newTag) {
+			err = a.unlessAdmin(ctx, userID)
+		}
+		if err != nil {
+			return "", "", err
+		}
+	}
+	err = a.DB.Tx(ctx, func(tx *sql.Tx) error {
+		if name != nil {
+			if _, err := tx.Exec(`UPDATE users SET name = ? WHERE id = ?`, newName, userID); err != nil {
+				return err
+			}
+		}
+		if tag != nil {
+			_, err := tx.Exec(`UPDATE users SET tag = ? WHERE id = ?`, newTag, userID)
+			if err != nil && strings.Contains(err.Error(), "UNIQUE") {
+				return ErrTagTaken
+			}
+			return err
+		}
+		return nil
+	})
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	_, err = a.DB.Write.ExecContext(ctx, `UPDATE users SET name = ? WHERE id = ?`, name, userID)
-	return name, err
-}
-
-// Retag gives a player a new tag, if it's free.
-func (a *Accounts) Retag(ctx context.Context, userID int64, tag string) (string, error) {
-	tag, err := NormalTag(tag)
-	if err == nil && Rude(tag) {
-		err = ErrNameRude
-	}
-	if err == nil && Reserved(tag) {
-		err = a.unlessAdmin(ctx, userID)
-	}
-	if err != nil {
-		return "", err
-	}
-	_, err = a.DB.Write.ExecContext(ctx, `UPDATE users SET tag = ? WHERE id = ?`, tag, userID)
-	if err != nil && strings.Contains(err.Error(), "UNIQUE") {
-		return "", ErrTagTaken
-	}
-	return tag, err
+	return newName, newTag, nil
 }
 
 // unlessAdmin is ErrNameReserved, unless the player keeps the game.

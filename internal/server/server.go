@@ -297,7 +297,9 @@ func (s *Server) routes() http.Handler {
 	h = s.headers(h)
 	h = s.hosts(h)
 	h = s.logged(h)
-	return s.recovered(h)
+	h = s.recovered(h)
+	// Outside the rest: the request it hands on is a copy, and they read the route the mux sets on theirs.
+	return withWriter(h)
 }
 
 // Run serves until ctx ends, then stops taking requests, gives those under way up to grace to finish, and keeps the

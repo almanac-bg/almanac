@@ -581,6 +581,9 @@ function deleteAccount(): Child {
               class: "btn danger",
               onclick: async () => {
                 try {
+                  // This browser's notifications go too: kept, they'd come back to whoever plays here next, unasked
+                  // (pushOn tells the server of them again). The server forgets them with the player.
+                  if (pushable()) await turnOff().catch(() => {});
                   await api("DELETE", "/api/me");
                   // Nothing is left here: Начало, as for someone new, says so once.
                   notice.set("Профилът е изтрит.");

@@ -13,7 +13,8 @@ var ErrSuspended = errors.New("the player is suspended")
 
 // Suspend stops a player from playing (whoever keeps the game does, for a player who abuses it): every session of
 // theirs ends, with the notifications of their browsers, and none starts again (startSession: a sign-in by email, a
-// handoff) until Unsuspend. Their games and what others keep of them stay as they were.
+// handoff) until Unsuspend. Their games and what others keep of them stay as they were: a guest's too, though no session
+// is left them (CleanUp keeps a suspended guest SessionDays from the suspension).
 func (a *Accounts) Suspend(ctx context.Context, userID int64) error {
 	return a.DB.Tx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.Exec(`INSERT INTO suspensions (user_id, at) SELECT id, ? FROM users WHERE id = ?
