@@ -43,6 +43,9 @@ func (s *Server) friends(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	if err := s.game.Used(r.Context(), u.ID, "friends"); err != nil {
+		return err
+	}
 	if list == nil {
 		list = []play.Friend{}
 	}

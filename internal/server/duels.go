@@ -165,5 +165,8 @@ func (s *Server) almanac(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	if err := s.game.Used(r.Context(), u.ID, "almanac"); err != nil {
+		return err
+	}
 	return ok(w, a)
 }

@@ -489,6 +489,19 @@ type deviceRow struct {
 var questionKinds = map[string]string{"truefalse": "Вярно или не", "choice": "Избор", "number": "Число",
 	"order": "Подреди", "match": "Свържи", "split": "Раздели", "clues": "Подсказки"}
 
+// nounNames are the game's nouns (play.Nouns), as /admin names them: what counts as using each.
+var nounNames = map[string]string{
+	"day": "Брой на деня (завършен)", "ink": "Мастило (нов факт)", "almanac": "Алманах (отворен)",
+	"topic": "Игра на глава (завършена)", "seal": "Печат (отворен или сменен)", "streak": "Серия (2 дни подред)",
+	"friends": "Приятели (отворени)", "duel": "Дуел (изигран)", "share": "Споделен ден",
+}
+
+// nounRow is a noun of the game used, this week and the last: of those who played in each.
+type nounRow struct {
+	Name       string
+	This, Last rate
+}
+
 // timedOutRow is a kind of question's answers run out of time (play.TimedOutSince).
 type timedOutRow struct {
 	Name  string
@@ -527,13 +540,20 @@ type measures struct {
 	StreakFrom, StreakUntil string
 	Repeats                 rate
 	TimedOut                []timedOutRow
-	Streaks                 []streakRow
-	Forgiven                int
-	Kinds                   []string // the kinds of games played in the last 7 days, by name
-	Games                   []gamesRow
-	Features                []featureRow
-	Devices                 []deviceRow
-	Habit, HabitOf          int
+	Nouns                   []nounRow
+	NounWeeks               [2]string // this week and the last, as „17.11–20.11“
+	// The bets: back on days 28–34, of the newcomers who in their first week played only the day, and the others; the
+	// shared days' links made in 28 days, the newcomers who came by one and finished their first game, and that per
+	// link.
+	DayOnlyD30, OthersD30 rate
+	SharePlays            string
+	Streaks               []streakRow
+	Forgiven              int
+	Kinds                 []string // the kinds of games played in the last 7 days, by name
+	Games                 []gamesRow
+	Features              []featureRow
+	Devices               []deviceRow
+	Habit, HabitOf        int
 }
 
 // chartRow is a day of the players' chart.
@@ -983,6 +1003,47 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 		}
 		f.Games = append(f.Games, r)
 	}
+
+	// The game's nouns, used (play.Nouns): of those who played in a week, from its Monday, how many used each; this
+	// week and the last.
+	lastWeek := play.DayShift(thisWeek, -7)
+	f.NounWeeks = [2]string{short(thisWeek) + "–" + short(today), short(lastWeek) + "–" + short(play.DayShift(thisWeek, -1))}
+	var used [2]map[string]int
+	var weekActives [2]int
+	for i, w := range [][2]string{{thisWeek, today}, {lastWeek, play.DayShift(thisWeek, -1)}} {
+		if used[i], err = g.NounUse(ctx, w[0], w[1]); err != nil {
+			return f, err
+		}
+		weekActives[i] = act.Within(w[0], w[1])
+	}
+	for _, n := range play.Nouns {
+		f.Nouns = append(f.Nouns, nounRow{Name: nounNames[n], This: rate{used[0][n], weekActives[0]}.capped(),
+			Last: rate{used[1][n], weekActives[1]}.capped()})
+	}
+
+	// The bets (DECISIONS.md, „The direction“): whether those who play only the day are still here a month on, as
+	// often as those who play more; the seal looked at (the nouns' row); and what a shared day's link brings in.
+	for _, n := range news {
+		if !n.Due(34) {
+			continue
+		}
+		r := &f.OthersD30
+		if len(n.Kinds) == 1 && n.Kinds["day"] {
+			r = &f.DayOnlyD30
+		}
+		r.Of++
+		if n.BackWithin(28, 34) {
+			r.N++
+		}
+	}
+	monthAgo := play.DayShift(today, -27)
+	plays := 0
+	for _, n := range news {
+		if n.CameFrom == "share" && n.First >= monthAgo && n.FirstFinished {
+			plays++
+		}
+	}
+	f.SharePlays = fmt.Sprintf("%d · %d · %s", win[1].t["share:day"], plays, ratio(plays, win[1].t["share:day"]))
 
 	// The parts of the game, and the devices, over 28 days.
 	month := play.DayShift(today, -27)
