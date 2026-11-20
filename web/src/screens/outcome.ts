@@ -268,9 +268,9 @@ function plain(d: DuelView): Child {
   const them = d.opponent?.name ?? "Приятелят ти";
   const why =
     d.lapsed === "they"
-      ? `${them} не изигра дуела за трите дни.`
+      ? `${them} не изигра дуела за седемте дни.`
       : d.lapsed === "you"
-        ? "Не изигра дуела за трите дни."
+        ? "Не изигра дуела за седемте дни."
         : "Без резултат: дуелът прекъсна.";
   return [
     h(
