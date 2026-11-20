@@ -113,6 +113,9 @@ func (s *Server) dayMail(ctx context.Context, today string, at time.Time, userID
 		}
 		return false, err
 	}
+	if week, err := s.rhythm(ctx, userID); err != nil || !week.sends(today) {
+		return false, err // from their third week, only on the weekdays they play (remind.go)
+	}
 	if ignored, left, err := s.mailsIgnored(ctx, userID, played.String, today); err != nil || ignored >= RemindIgnored ||
 		left >= RemindQuietAfter {
 		return false, err
@@ -120,7 +123,7 @@ func (s *Server) dayMail(ctx context.Context, today string, at time.Time, userID
 	word := s.reminder(ctx, today, userID)
 	m := mail.Message{To: email, Subject: word.Title, Unsubscribe: s.mailOffURL(userID, mailDay)}
 	// The link says it came from a mail: a browser signed out is asked to sign in first (screens/today.ts).
-	m.Text = word.Body + "\n\n" + s.cfg.PublicURL + "/?from=mail\n\n—\n" +
+	m.Text = word.Body + "\n\n" + s.mailLink(userID) + "\n\n—\n" +
 		"Пишем ти веднъж на ден, около часа, в който играеш, ако въпросите още те чакат. Спри тези писма: " +
 		m.Unsubscribe + "\n"
 	sent := false

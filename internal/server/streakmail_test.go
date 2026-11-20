@@ -76,7 +76,7 @@ func TestStreakMail(t *testing.T) {
 		// It never names the ended streak's number.
 		if m.Subject != "Въпросите на деня те чакат" || strings.ContainsAny(m.Subject+m.Text[:strings.Index(m.Text, "http")], "0123456789") ||
 			!strings.Contains(m.Text, m.Unsubscribe) ||
-			!strings.Contains(m.Unsubscribe, "/mail/off?") || !strings.Contains(m.Text, "/?from=mail\n") {
+			!strings.Contains(m.Unsubscribe, "/mail/off?") || !strings.Contains(m.Text, "/?from=mail&to=") {
 			t.Fatalf("the mail: %+v", m)
 		}
 		byTo[m.To] = m.Text

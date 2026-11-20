@@ -190,6 +190,34 @@ func TestRemindersOneDayPlayer(t *testing.T) {
 	}
 }
 
+// From a player's third week, a reminder goes only on the weekdays they play: one who plays on Wednesdays hears
+// nothing on a Saturday, and is reminded on the next Wednesday.
+func TestRemindersOnlyOnTheirWeekdaysFromWeekThree(t *testing.T) {
+	s, g, fake, subscribe := pushWorld(t)
+	ana, anaID := g.guest()
+	subscribe(ana, "/ana")
+	for d := 6; d <= 27; d += 7 { // Wednesdays, 6 to 27 March 2030
+		g.finishedDay(anaID, time.Date(2030, 3, d, 0, 0, 0, 0, bulgaria()), 18*time.Hour)
+	}
+	clock := time.Date(2030, 3, 30, 20, 0, 0, 0, bulgaria()) // a Saturday
+	s.game.Now = func() time.Time { return clock }
+	if n := s.remindSent(t.Context(), clock); n != 0 || fake.count("/ana") != 0 {
+		t.Fatalf("a Saturday: reminded %d", n)
+	}
+	clock = time.Date(2030, 4, 3, 20, 0, 0, 0, bulgaria()) // the next Wednesday
+	if n := s.remindSent(t.Context(), clock); n != 1 {
+		t.Fatalf("a Wednesday: reminded %d", n)
+	}
+	// In their first two weeks, any day.
+	bo, boID := g.guest()
+	subscribe(bo, "/bo")
+	g.finishedDay(boID, time.Date(2030, 3, 27, 0, 0, 0, 0, bulgaria()), 18*time.Hour) // one Wednesday
+	clock = time.Date(2030, 3, 30, 20, 0, 0, 0, bulgaria())
+	if n := s.remindSent(t.Context(), clock); n != 1 || fake.count("/bo") != 1 {
+		t.Fatalf("a new player on a Saturday: reminded %d", n)
+	}
+}
+
 // finishedDay puts a day's game the player finished on a day, at a time of it, straight in the database.
 func (g *game) finishedDay(userID int64, day time.Time, at time.Duration) {
 	g.t.Helper()

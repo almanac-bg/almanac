@@ -19,6 +19,8 @@ export interface SignInOptions {
   note?: string;
   /** The button that takes the code: „Влез“ unless said („Потвърди“ where a guest keeps their game). */
   enter?: string;
+  /** The address, filled in (a mail's link: server/streakmail.go, mailWho). */
+  email?: string;
   /** The code taken: what came of it in words (keptWords), and the player now, told before the player is set, so that
    * what draws the screen anew as they are can say it. */
   done?: (said: string, now: User) => void;
@@ -32,10 +34,11 @@ export function signIn({
   note = "Без пароли: всеки път ти пращаме код за вход.",
   enter = "Влез",
   done,
+  email: filled = "",
 }: SignInOptions = {}): Child {
   if (embedded && !embedded.forms)
     return h("p", { class: "muted" }, "Тук не питаме за имейл: отвори играта в браузъра на телефона и я запази там.");
-  const email = signal("");
+  const email = signal(filled);
   const code = signal("");
   const sent = signal(false);
   // How long the code sent is: the server says (account.CodeDigits, or LongCodeDigits).
