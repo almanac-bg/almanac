@@ -485,6 +485,16 @@ type deviceRow struct {
 	DayFinished    rate // of the day's tens begun, finished
 }
 
+// questionKinds are the kinds of questions, as /admin names them.
+var questionKinds = map[string]string{"truefalse": "Вярно или не", "choice": "Избор", "number": "Число",
+	"order": "Подреди", "match": "Свържи", "split": "Раздели", "clues": "Подсказки"}
+
+// timedOutRow is a kind of question's answers run out of time (play.TimedOutSince).
+type timedOutRow struct {
+	Name  string
+	Share rate
+}
+
 // holdoutRow is a measure of the reminders' experiment (play.HeldReminders): for those reminded (Sent) and those held
 // out (Held).
 type holdoutRow struct {
@@ -516,6 +526,7 @@ type measures struct {
 	StreakHoldout           []streakHoldoutRow
 	StreakFrom, StreakUntil string
 	Repeats                 rate
+	TimedOut                []timedOutRow
 	Streaks                 []streakRow
 	Forgiven                int
 	Kinds                   []string // the kinds of games played in the last 7 days, by name
@@ -908,6 +919,14 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 		row("не стигнали до никое устройство", true, count("push:failed:"+k.kind))
 	}
 	f.Repeats = rate{win[0].t["day:seen"], win[0].t["day:answers"]}
+	// The clock: answers run out of time by kind, over 28 days (play.Limit's floors are set so each stays under 2%).
+	timed, err := g.TimedOutSince(ctx, play.DayShift(today, -27))
+	if err != nil {
+		return f, err
+	}
+	for _, t := range timed {
+		f.TimedOut = append(f.TimedOut, timedOutRow{Name: cmp.Or(questionKinds[t.Kind], t.Kind), Share: rate{t.N, t.Of}})
+	}
 
 	// The reminders against the hold-out (play/experiment.go), since it began.
 	if f.Holdout, err = s.holdout(ctx, today); err != nil {

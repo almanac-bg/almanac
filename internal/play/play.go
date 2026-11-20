@@ -70,18 +70,19 @@ func Limit(q bank.Question) time.Duration {
 // of adults reading silently (some 175 words a minute), here on a phone, in a game.
 const SlowReading = 12.0
 
-// limits are each kind's base and floor (Limit). A true-or-not is judged at a glance: 15 s at least. A choice (a
-// choice of pictures among them) or a number asks for thought and a tap or a typed number: 25 s. An order, a match or
-// a split is four taps or more after reading: 40 s. Clues come bank.ClueEvery apart, the last 20 s in, then a choice:
-// 40 s.
+// limits are each kind's base and floor (Limit). The floors are set from the answer times the game keeps, so that
+// under 2% of people's answers run out of time (the Fable review, 20 Nov 2026; /admin shows the share by kind): a
+// true-or-not 20 s, a choice (a choice of pictures among them) or a number 35 s, an order, a match or a split (four
+// taps or more after reading) 60 s. Clues come bank.ClueEvery apart, the last 20 s in, then a choice: 60 s. A quick
+// player loses nothing: nothing is paid for speed.
 var limits = map[string]struct{ base, floor time.Duration }{
-	"truefalse": {8 * time.Second, 15 * time.Second},
-	"choice":    {12 * time.Second, 25 * time.Second},
-	"number":    {15 * time.Second, 25 * time.Second},
-	"order":     {28 * time.Second, 40 * time.Second},
-	"match":     {28 * time.Second, 40 * time.Second},
-	"split":     {28 * time.Second, 40 * time.Second},
-	"clues":     {20 * time.Second, 40 * time.Second},
+	"truefalse": {8 * time.Second, 20 * time.Second},
+	"choice":    {12 * time.Second, 35 * time.Second},
+	"number":    {15 * time.Second, 35 * time.Second},
+	"order":     {28 * time.Second, 60 * time.Second},
+	"match":     {28 * time.Second, 60 * time.Second},
+	"split":     {28 * time.Second, 60 * time.Second},
+	"clues":     {20 * time.Second, 60 * time.Second},
 }
 
 // LongestLimit is the longest any question is shown (Limit).
