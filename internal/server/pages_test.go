@@ -176,3 +176,28 @@ func TestAssetsGoOutCompressed(t *testing.T) {
 		}
 	}
 }
+
+// The seal a player wears is on the frame's avatar from the page's first draw (its boot) and in GET /api/me, which the
+// page asks again after a game: none before a rank, the chosen one's (or the best) after.
+func TestSealWornOnEveryPage(t *testing.T) {
+	g := start(t)
+	ana, id := g.guest()
+	if _, ok := bootOf(t, ana, "/almanac")["seal"]; ok {
+		t.Fatal("a seal before any rank")
+	}
+	if _, out := ana.call("GET", "/api/me", nil); out["seal"] != nil {
+		t.Fatalf("/api/me, a seal before any rank: %v", out["seal"])
+	}
+	if _, err := g.db.Write.Exec(`INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told)
+		VALUES (?1, 'history', 2, 1, 7, '2026-11-20', 2), (?1, 'science', 1, 0, 2, '2026-11-20', 1)`, id); err != nil {
+		t.Fatal(err)
+	}
+	chapter := func(v any) any { m, _ := v.(map[string]any); return m["chapter"] }
+	if seal := bootOf(t, ana, "/friends")["seal"]; chapter(seal) != "history" {
+		t.Fatalf("the page's seal: %v", seal)
+	}
+	ana.call("PATCH", "/api/me/seal", map[string]any{"chapter": "science"})
+	if _, out := ana.call("GET", "/api/me", nil); chapter(out["seal"]) != "science" {
+		t.Fatalf("/api/me's seal, science chosen: %v", out["seal"])
+	}
+}

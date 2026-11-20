@@ -60,22 +60,27 @@ func rewriteFacts(tx *sql.Tx, userID int64) error {
 // writeFact writes the fact of the question a run stands at (r.at), just answered (right or not, or let run out), at a
 // moment (ms): in ink if it's right, in the day's issue, and the player's first meeting with it, else in grey; nothing
 // if the book has it already (written once), the run is a script's (shadowWrites), or the question counts for nobody.
-func (g *Game) writeFact(tx *sql.Tx, r *run, at int64, right bool) error {
+// It says whether it wrote the fact in ink (Result.Ink: the run says so).
+func (g *Game) writeFact(tx *sql.Tx, r *run, at int64, right bool) (bool, error) {
 	p := r.picks[r.at]
 	if r.shadow == ShadowScript || p.Void {
-		return nil
+		return false, nil
 	}
 	ink := false
 	if right && r.kind == "day" && !r.pencil {
 		met, err := metBefore(tx, r, p.ID)
 		if err != nil {
-			return err
+			return false, err
 		}
 		ink = !met
 	}
-	_, err := tx.Exec(`INSERT INTO facts (user_id, question_id, ink, at, run_id) VALUES (?, ?, ?, ?, ?)
+	res, err := tx.Exec(`INSERT INTO facts (user_id, question_id, ink, at, run_id) VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT (user_id, question_id) DO NOTHING`, r.userID, p.ID, ink, at, r.id)
-	return err
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return ink && n == 1, err
 }
 
 // metBefore is whether a player met a question of their day's run (r) before it: an answer to it before the day began
@@ -145,11 +150,14 @@ func countIn(by map[string]int, q bank.Question) {
 	}
 }
 
-// InkIn is how many facts a game (runID) wrote in a player's book in ink, and, of a day's issue, how many of its right
-// answers were to questions met before (metBefore: in the book in grey already, „1 вече срещан“): a game's news.
+// InkIn is how many facts a game (runID) wrote in a player's book in ink, and how many of its right answers were to
+// questions the book had in grey already, written by an earlier game (metBefore: „вече беше в твоя Алманах“; the news
+// says it of a day's issue only). A game that writes nothing (a script's), or writes grey by its own rule (the issue
+// played a second time: runs.pencil), met nothing before by that: its metBefore is 0.
 func (g *Game) InkIn(ctx context.Context, userID, runID int64) (ink, metBefore int, err error) {
 	b := g.Bank()
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id, coalesce(f.ink, 0), coalesce(f.run_id = a.run_id, 0)
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id, coalesce(f.ink, 0), coalesce(f.run_id = a.run_id, 0),
+			coalesce(f.run_id <> a.run_id AND f.at < a.at, 0) AND NOT r.pencil AND `+shadowWrites+`
 		FROM answers a JOIN runs r ON r.id = a.run_id
 		LEFT JOIN facts f ON f.user_id = r.user_id AND f.question_id = a.question_id
 		WHERE a.run_id = ?2 AND r.user_id = ?1 AND (a.is_right OR f.ink) AND NOT `+voidAt, userID, runID)
@@ -159,8 +167,8 @@ func (g *Game) InkIn(ctx context.Context, userID, runID int64) (ink, metBefore i
 	defer rows.Close()
 	for rows.Next() {
 		var id string
-		var inked, here bool
-		if err := rows.Scan(&id, &inked, &here); err != nil {
+		var inked, here, before bool
+		if err := rows.Scan(&id, &inked, &here, &before); err != nil {
 			return 0, 0, err
 		}
 		q, ok := b.Get(id)
@@ -168,7 +176,7 @@ func (g *Game) InkIn(ctx context.Context, userID, runID int64) (ink, metBefore i
 		case !ok || !writtenShows(q):
 		case inked && here:
 			ink++
-		case !inked:
+		case !inked && before:
 			metBefore++
 		}
 	}

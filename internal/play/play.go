@@ -292,11 +292,14 @@ type Shown struct {
 type Result struct {
 	// InRow is how many right answers in a row the answer makes, from 2: heard and seen as the run's climb, worth
 	// nothing more.
-	InRow    int     `json:"inRow,omitempty"`
-	Score    float64 `json:"score"`
-	Right    bool    `json:"right"`
-	Exact    bool    `json:"exact,omitempty"`
-	TimedOut bool    `json:"timedOut,omitempty"`
+	InRow int     `json:"inRow,omitempty"`
+	Score float64 `json:"score"`
+	Right bool    `json:"right"`
+	Exact bool    `json:"exact,omitempty"`
+	// Ink is a right answer that wrote its fact in the Алманах in ink (writeFact: in the issue, met there first): the
+	// run says „Записано с мастило“.
+	Ink      bool `json:"ink,omitempty"`
+	TimedOut bool `json:"timedOut,omitempty"`
 	// Given is the answer as it shows (the player's screen has it already).
 	Given  json.RawMessage `json:"-"`
 	Reveal any             `json:"reveal"`
@@ -369,7 +372,7 @@ func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
 	if ok {
 		ms = Limit(d.Question()).Milliseconds()
 	}
-	err := g.record(tx, r, bank.Graded{}, false, ms)
+	_, err := g.record(tx, r, bank.Graded{}, false, ms)
 	return err == nil && r.finished, err
 }
 
@@ -395,8 +398,8 @@ func (g *Game) settles(r *run) bool {
 }
 
 // record keeps an answer (to a number, if it's one: what decides a tie, tiebreak), and moves the run to the next
-// question (or its end).
-func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, number bool, ms int64) error {
+// question (or its end). It says whether the answer wrote its fact in ink (writeFact).
+func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, number bool, ms int64) (bool, error) {
 	var given, shown any
 	if gr.Given != nil {
 		given, shown = string(gr.Given), string(gr.Shown)
@@ -406,21 +409,22 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, number bool, ms int64)
 	if _, err := tx.Exec(`INSERT INTO answers (run_id, n, question_id, given, shown, score, is_right, ms, at, version)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, r.id, r.at, p.ID, given, shown, gr.Score, gr.Right, ms, now,
 		g.versionOf(p)); err != nil {
-		return err
+		return false, err
 	}
 	if err := g.markActive(tx, r.userID); err != nil {
-		return err
+		return false, err
 	}
 	if r.kind == "day" {
 		if err := g.tallyDayAnswer(tx, r); err != nil {
-			return err
+			return false, err
 		}
 	}
 	if err := g.judgeAnswer(tx, r, gr, ms); err != nil {
-		return err
+		return false, err
 	}
-	if err := g.writeFact(tx, r, now, gr.Right); err != nil {
-		return err
+	ink, err := g.writeFact(tx, r, now, gr.Right)
+	if err != nil {
+		return false, err
 	}
 	r.tie.add(gr.Score, number)
 	r.at++
@@ -431,11 +435,11 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, number bool, ms int64)
 	r.shownAt = sql.NullInt64{}
 	r.skipVoid()
 	if r.at >= len(r.picks) {
-		return g.finish(tx, r)
+		return ink, g.finish(tx, r)
 	}
-	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, rights = ?, closeness = ?, ms = ?
+	_, err = tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, rights = ?, closeness = ?, ms = ?
 		WHERE id = ?`, r.at, r.rights, r.tie.closeness, r.ms, r.id)
-	return err
+	return ink, err
 }
 
 // finish ends a run where it is, and notes that what follows it is due (after.go).
@@ -676,7 +680,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 			res.InRow = inRow
 		}
 		number := d.Question().Base().Type == "number"
-		if err := g.record(tx, r, gr, number, min(took, limit).Milliseconds()); err != nil {
+		if res.Ink, err = g.record(tx, r, gr, number, min(took, limit).Milliseconds()); err != nil {
 			return err
 		}
 		if late > Grace && !res.TimedOut {
@@ -716,8 +720,11 @@ func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
 	}
 	var given, shown sql.NullString
 	var ms int64
-	err := tx.QueryRow(`SELECT given, shown, score, is_right, ms FROM answers WHERE run_id = ? AND n = ?`, r.id, n).
-		Scan(&given, &shown, &res.Score, &res.Right, &ms)
+	// Its fact in ink: written so by this answer (writeFact), as the book has it.
+	err := tx.QueryRow(`SELECT a.given, a.shown, a.score, a.is_right, a.ms, coalesce(f.ink, 0) FROM answers a
+		LEFT JOIN facts f ON f.user_id = ?3 AND f.question_id = a.question_id AND f.run_id = a.run_id
+		WHERE a.run_id = ?1 AND a.n = ?2`, r.id, n, r.userID).
+		Scan(&given, &shown, &res.Score, &res.Right, &ms, &res.Ink)
 	if errors.Is(err, sql.ErrNoRows) {
 		return res, nil, ErrOutOfStep
 	}

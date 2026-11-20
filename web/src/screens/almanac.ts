@@ -142,11 +142,7 @@ function book(p: Page): Child {
       "header",
       { class: "book-head" },
       h("h1", null, name ? `Алманахът на ${name}` : "Алманахът ти"),
-      h(
-        "p",
-        { class: "deck" },
-        "С мастило са верните отговори от броя на деня. В сиво са фактите, които си срещнал другаде.",
-      ),
+      h("p", { class: "deck" }, "С мастило са верните отговори от броя на деня. В сиво са останалите срещнати факти."),
       h(
         "div",
         { class: "ways" },
@@ -389,7 +385,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
         const grey = p.facts.some((f) => !f.ink);
         return [
           grey
-            ? h("p", { class: "grey-note" }, "В сиво са фактите, които си срещнал. С мастило пише само броят на деня.")
+            ? h("p", { class: "grey-note" }, "В сиво са останалите срещнати факти. С мастило пише само броят на деня.")
             : null,
           h(
             "ol",

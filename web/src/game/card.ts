@@ -100,6 +100,16 @@ function rosette(c: CanvasRenderingContext2D, x: number, y: number, size: number
   }
 }
 
+/** How each of the day's ten is drawn on the card, in the issue's order (each mark in its question's place, so that a
+ * tile keeps its chapter): right filled, близо half, wrong dashed, a question that counts for nobody (Mark.void)
+ * dashed and empty, as the tiles on the screen are (ui.ts, tiles). */
+export function cardTiles(marks: Mark[]): ("right" | "near" | "wrong" | "void")[] {
+  return Array.from({ length: 10 }, (_, i) => {
+    const m = marks[i];
+    return m?.void ? "void" : m?.right ? "right" : m?.close ? "near" : "wrong";
+  });
+}
+
 /** The day's card as a PNG (1200 × 630), one look in every theme, read at a chat's 300px: the mark and the name, „Брой
  * N“ big with its date, and the ten tiles two rows of five, each its chapter's colour with its glyph, filled right,
  * half близо, dashed and hollow wrong (so they part in grey too), and almanac.bg. `topics` in the issue's order,
@@ -147,20 +157,21 @@ export async function drawCard(
   const gap = 18;
   const x0 = W - 64 - 5 * size - 4 * gap;
   const y0 = (H - 2 * size - gap) / 2;
-  const counted = marks.filter((m) => !m.void);
   const art = await Promise.all(
     topics.map((t) => glyphImage(pictures[`topic-${t}`] ?? "", vivid[t] ?? "#c9c4de").catch(() => null)),
   );
+  const states = cardTiles(marks);
   for (let i = 0; i < 10; i++) {
     const t = topics[i] ?? "mix";
-    const m = counted[i];
+    const state = states[i];
     const x = x0 + (i % 5) * (size + gap);
     const y = y0 + Math.floor(i / 5) * (size + gap);
     const r = size * 0.24;
     const tone = vivid[t] ?? "#c9c4de";
     const edge = deep[t] ?? ink;
-    const right = !!m?.right;
-    const near = !right && !!m?.close;
+    const right = state === "right";
+    const near = state === "near";
+    const empty = state === "void";
     c.fillStyle = "#fff";
     rounded(c, x, y, size, size, r);
     c.fill();
@@ -181,14 +192,15 @@ export async function drawCard(
       c.restore();
     }
     if (!right) {
-      c.strokeStyle = edge;
+      // A void one's dashes in the page's grey: it counts for nobody, nothing of its chapter.
+      c.strokeStyle = empty ? ink3 : edge;
       c.lineWidth = 6;
       c.setLineDash(near ? [] : [14, 9]);
       rounded(c, x + 3, y + 3, size - 6, size - 6, r - 3);
       c.stroke();
       c.setLineDash([]);
     }
-    const img = art[i];
+    const img = empty ? null : art[i];
     if (img) {
       const g = right ? size * 0.64 : size * 0.6;
       c.globalAlpha = right || near ? 1 : 0.45;

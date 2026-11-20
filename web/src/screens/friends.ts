@@ -373,7 +373,7 @@ function friendsCard(): Child {
             h(
               "div",
               { class: "invitation-actions" },
-              h("button", { class: "btn rose inline", type: "button", onclick: () => accept(r) }, "Приеми"),
+              h("button", { class: "btn inline", type: "button", onclick: () => accept(r) }, "Приеми"),
               h("button", { class: "link", type: "button", onclick: () => drop(r) }, "Откажи"),
             ),
           ),

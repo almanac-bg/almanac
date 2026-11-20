@@ -172,8 +172,14 @@ func TestRanksToldOnce(t *testing.T) {
 	for _, r := range ranks {
 		some += r.Level
 	}
-	if some == 0 || n.Step == nil || n.Step.Left < 1 || n.Step.Next != "Страница" {
+	if some == 0 || n.Step == nil || n.Step.Left < 1 || n.Step.Next != "Страница" || n.Step.Level != 1 {
 		t.Fatalf("after a day: ranks %+v, step %+v", ranks, n.Step)
+	}
+	// The step's rank and quarters are its chapter's, as kept: the seal and pips it's drawn with.
+	for _, r := range ranks {
+		if r.Chapter == n.Step.Chapter && (r.Level != n.Step.Level || r.Quarter != n.Step.Quarter) {
+			t.Fatalf("the step %+v, its chapter %+v", n.Step, r)
+		}
 	}
 	// Five facts of geography in ink, and seven of history: two chapters at Страница, told as one, both with art.
 	var all []answered

@@ -194,7 +194,7 @@ export function reviewed(all: Reviewed[], heading: Child): Child {
         ),
         h("h3", { class: "ask" }, it.view.text),
         picture(it.view),
-        answered(it.view, it.reveal, it.given, it.close),
+        answered(it.view, it.reveal, it.given, it.right ? "right" : it.close ? "partial" : "wrong"),
         crowdLine(it.view.type, it.reveal.crowd, it.right),
         fact(it.reveal.fact, it.reveal.day),
         report(it.reveal.id),

@@ -120,7 +120,7 @@ function head(p: Profile): Child {
 }
 
 /** How the viewer stands with them: as friends, the duels between the two so far; else ask to be friends, or answer
- * their asking. The one thing to do is the gold button; accepting is rose, as everywhere. */
+ * their asking: outlined buttons, beside the page's one action. */
 function actions(p: Profile, reload: () => Promise<unknown>): Child {
   const busy = signal(false);
   const note = signal<{ text: string; bad?: boolean } | null>(null);
@@ -153,7 +153,7 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
   } else if (p.friend === "asks") {
     body = [
       h("p", { class: "player-relation" }, `${p.name} иска да сте приятели.`),
-      button("Приеми", "rose", async () => {
+      button("Приеми", "", async () => {
         await api("POST", `/api/friends/requests/${p.request}/accept`, {});
         friendRequests.update((n) => Math.max(0, n - 1));
         await reload();

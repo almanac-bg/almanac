@@ -198,10 +198,14 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		"outcomeCss": m["outcome.css"],       // a duel's result: its style, loaded with it
 		"now":        time.Now().UnixMilli(), // the clock the page keeps until the API's first answer (lib/api.ts)
 	}
-	// The player's avatar, in the corner of every page (web/src/app.ts): without it, the corner would wait on a question.
+	// The player's avatar and the seal they wear on its corner, in the corner of every page (web/src/app.ts): without
+	// them, the corner would wait on a question.
 	if u != nil {
 		if look, err := s.game.LookOf(r.Context(), u.ID); err == nil {
 			start["avatar"] = look.Avatar
+			if look.Seal != nil {
+				start["seal"] = look.Seal
+			}
 		}
 	}
 	// Днес draws the day as the page comes, without asking for it first: a round trip less on every visit. Should

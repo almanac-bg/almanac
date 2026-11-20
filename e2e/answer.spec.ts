@@ -267,10 +267,15 @@ async function sideways(page: Page): Promise<void> {
   await expect(page.locator(".places-foot")).toBeHidden();
   await expect(page.locator(".question-top")).toHaveClass(/stuck/);
   await expect(page.locator(".question-head .kicker").last()).toBeVisible();
-  const tops = await page
-    .locator(".answering .options .option")
-    .evaluateAll((all) => all.map((o) => o.getBoundingClientRect().top));
-  for (const top of tops) expect(top).toBeLessThan(390);
+  // Once the page has its fonts and the head its small size (a slow machine has the fallback's wider lines first).
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  await expect
+    .poll(() =>
+      page
+        .locator(".answering .options .option")
+        .evaluateAll((all) => Math.max(0, ...all.map((o) => o.getBoundingClientRect().top))),
+    )
+    .toBeLessThan(390);
   const rows = await page
     .locator(".answering :is(.sortable-list, .match) .option")
     .evaluateAll((all) => all.map((o) => getComputedStyle(o).minHeight));

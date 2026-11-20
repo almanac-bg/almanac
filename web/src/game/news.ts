@@ -10,6 +10,7 @@
 import { api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { rankName, rankNames } from "../seal.ts";
+import { refreshSeal } from "../state.ts";
 import { chapterName, pips, seal } from "../ui.ts";
 
 interface News {
@@ -20,25 +21,11 @@ interface News {
   /** The ranks risen since last told, as one (play.Rose): Бележка never; Страница brings the chapter's art; `best`, the
    * player's best rank rose. */
   rose?: { ranks: { chapter: string; name: string; to?: number; art?: boolean }[]; best?: boolean };
-  /** After a day's issue, the chapter nearest its next rank (play.Step), when none rose. */
-  step?: { chapter: string; left: number; next: string; level?: number; quarter?: number };
+  /** After a day's issue, the chapter nearest its next rank (play.Step), when none rose: its rank now (0: none yet) and
+   * the quarters of the way to the next. */
+  step?: { chapter: string; left: number; next: string; level: number; quarter: number };
   /** Others' duels against the player's recordings, once a day, in a card of its own. */
   recordings?: { text: string };
-}
-
-/** The ink each rank starts at (play.Ranks): the quarters to the next are worked out from them where the server
- * doesn't say. */
-const rankFrom = [1, 5, 15, 40, 100, 250];
-
-/** A step's rank and quarters: as the server says, or from how much ink the next rank still takes. */
-function stepRank(s: NonNullable<News["step"]>): { level: number; quarter: number } {
-  if (s.level !== undefined) return { level: s.level, quarter: s.quarter ?? 0 };
-  const next = s.next.startsWith("Летопис ·") ? 7 : rankNames.indexOf(s.next) + 1;
-  const level = Math.max(0, next - 1);
-  const to = next <= 6 ? (rankFrom[next - 1] ?? 1) : 250 + (next - 6) * 100;
-  const from = level <= 0 ? 0 : level <= 6 ? (rankFrom[level - 1] ?? 0) : 250 + (level - 6) * 100;
-  const ink = to - s.left;
-  return { level, quarter: Math.max(0, Math.min(3, Math.floor(((ink - from) / (to - from)) * 4))) };
 }
 
 /** What a game brought, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends).
@@ -49,7 +36,11 @@ export function news(run: number, delay = 0, late?: { title?: string }): Child {
   const t = setTimeout(
     () =>
       api<News>("POST", "/api/me/news", { run }).then(
-        (n) => data.set(n),
+        (n) => {
+          data.set(n);
+          // Ink written, or a rank risen: the seal worn may be another now (a first one, or the best risen).
+          if (n.ink || n.rose) refreshSeal();
+        },
         () => {},
       ),
     delay,
@@ -99,11 +90,10 @@ function metLine(n: number): Child {
 
 /** The chapter nearest its next rank: its seal and pips, „История: още 2 до Тетрадка“. */
 function stepLine(s: NonNullable<News["step"]>): Child {
-  const r = stepRank(s);
   return h(
     "p",
     { class: "news-step" },
-    r.level > 0 ? h("span", { class: "step-seal" }, seal(s.chapter, r.level, 40), pips(r.quarter)) : null,
+    s.level > 0 ? h("span", { class: "step-seal" }, seal(s.chapter, s.level, 40), pips(s.quarter)) : null,
     h("span", null, h("b", null, `${chapterName(s.chapter)}:`), ` още ${s.left} до ${s.next}`),
   );
 }

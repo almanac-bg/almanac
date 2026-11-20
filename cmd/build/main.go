@@ -36,10 +36,14 @@ import (
 	"github.com/almanac-bg/almanac/internal/assets"
 )
 
-// firstScreen is how big, brotli-compressed as it's sent, what Начало needs before it draws may be: app.js, app.css
-// and the fonts the page preloads (assets.FirstFonts). Every daily player downloads it again after each release. A
-// screen a daily visit doesn't open loads on its own (web/src/kit.ts) and doesn't count here.
+// firstScreen is how big, brotli-compressed as it's sent, what Начало needs before it draws may be: firstFiles and the
+// fonts the page preloads (assets.FirstFonts). Every daily player downloads it again after each release. A screen a
+// daily visit doesn't open loads on its own (web/src/kit.ts) and doesn't count here.
 const firstScreen = 110 << 10
+
+// firstFiles are the scripts and styles Начало draws with: the app, and the pictures (a file of their own, loaded as
+// the page starts: the cover's ten glyphs are theirs).
+var firstFiles = []string{"app.js", "app.css", "pictures.js"}
 
 // fontCeiling is how big the fonts a page of Bulgarian may need together may grow: each face's first file (the
 // second, <face>-rest, loads only where a letter of another language shows: web/src/fonts/subset.sh). Two faces
@@ -252,7 +256,7 @@ func checkSize(out string) error {
 		} else {
 			all += n
 		}
-		if name == "app.js" || name == "app.css" || slices.Contains(assets.FirstFonts, name) {
+		if slices.Contains(firstFiles, name) || slices.Contains(assets.FirstFonts, name) {
 			first += n
 		}
 	}
@@ -262,6 +266,11 @@ func checkSize(out string) error {
 	for _, f := range assets.FirstFonts {
 		if manifest[f] == "" {
 			return fmt.Errorf("the page preloads %s (assets.FirstFonts), but no style uses it", f)
+		}
+	}
+	for _, f := range firstFiles {
+		if manifest[f] == "" {
+			return fmt.Errorf("the first screen counts %s (firstFiles), but the build made none: name what it is now", f)
 		}
 	}
 	switch {

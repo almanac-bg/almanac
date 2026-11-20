@@ -16,8 +16,7 @@ import { news } from "../game/news.ts";
 import { closeWords, count, percent } from "../game/numbers.ts";
 import { land, reviewed } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting } from "../game/run.ts";
-import { type SharedDay, shareDay, shareText } from "../game/share.ts";
-import { standing } from "../game/standing.ts";
+import { type SharedDay, shareCard, shareDay, shareText } from "../game/share.ts";
 import type { Board, Mark, Reviewed, Score, State } from "../game/types.ts";
 import { api, errorText, serverNow, tally } from "../lib/api.ts";
 import { boot } from "../lib/boot.ts";
@@ -29,7 +28,7 @@ import { type RemindAsks, remindAnswered, remindAsks, remindShown } from "../lib
 import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { go, goBack, hold, release, title } from "../lib/router.ts";
 import { dateWords, issueOf, onDay, weekday } from "../lib/words.ts";
-import { cover, issueTopics, notice, player, playing, user } from "../state.ts";
+import { cover, notice, player, playing, user } from "../state.ts";
 import { chapterName, chip, failure, formatNumber, glyph, leaf, mini, stakeLine, tiles, who } from "../ui.ts";
 import { type Accepted, acceptedLine, type Waiting, waitingLine } from "./duel.ts";
 import { app, coverExit, exitWay, handedIn, haveProfile, keepLine, keepStake, mailAsk, takeHand } from "./keep.ts";
@@ -145,7 +144,6 @@ export function today() {
       const t = inPage ?? (await api<Today>("GET", "/api/day"));
       inPage = undefined;
       day = t.day;
-      issueTopics.set(t.topics ?? []);
       const run = t.run;
       // A question this tab was showing has its time running (a reload): straight back into it. Otherwise (another
       // device, or tab) the day left half-way waits on Днес for „Продължи“: no question's time starts without a tap.
@@ -439,21 +437,6 @@ function streakSection(t: Today, stats: () => Stats | null, done: boolean): Chil
   };
 }
 
-/** A count of right answers in words, as the result's line opens: „Седем верни.“ */
-const _rightWords = [
-  "Нито един верен.",
-  "Един верен.",
-  "Два верни.",
-  "Три верни.",
-  "Четири верни.",
-  "Пет верни.",
-  "Шест верни.",
-  "Седем верни.",
-  "Осем верни.",
-  "Девет верни.",
-  "Всичките десет верни.",
-];
-
 /** How many a day's right answers are out of: all but those that count for nobody (Mark.void). */
 const outOf = (s: State) => s.total - (s.void ?? 0);
 
@@ -471,8 +454,11 @@ const outOf = (s: State) => s.total - (s.void ?? 0);
  * never celebrated; ten of ten is a big moment. */
 function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   const fresh = signal<Today>(t);
+  // The day as it stands with the game just played (its streak, its friends): until it's here, the streak with today's
+  // isn't known, and the share (which says it) waits for it.
+  const known = signal(!just);
   const now = just ? api<Today>("GET", "/api/day") : null;
-  now?.then(fresh.set, () => {});
+  now?.then(fresh.set, () => {}).finally(() => known.set(true));
   const of = outOf(run);
   const perfect = of > 0 && run.rights === of;
   const review = reviewOf(run.id);
@@ -526,8 +512,14 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   const action = h(
     "div",
     { class: first ? "result-share result-first" : "result-share" },
-    away ? exitWay(stake) : askFirst ? () => (ask.showing() ? ask.view : shareButton(run, t, streak)) : null,
-    first ? null : shareButton(run, t, streak),
+    // The ask while it's being found out whether to ask (notifications on already?): nothing yet, not „Сподели“ swapped
+    // for it a moment later.
+    away
+      ? exitWay(stake)
+      : askFirst
+        ? () => (ask.deciding() ? null : ask.showing() ? ask.view : shareButton(run, t, streak, known))
+        : null,
+    first ? null : shareButton(run, t, streak, known),
   );
   return h(
     "section",
@@ -568,15 +560,32 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   );
 }
 
+/** A question of the ten by its place, as the result's line names it („Десетият“). */
+const lastWords = [
+  "Първият",
+  "Вторият",
+  "Третият",
+  "Четвъртият",
+  "Петият",
+  "Шестият",
+  "Седмият",
+  "Осмият",
+  "Деветият",
+  "Десетият",
+];
+
 /** How many knew the day's tenth, its hard number: „Десетият: знаеха го 14 %“; before there's a crowd, that it's the
  * hardest today. */
 function tenthLine(review: Promise<Reviewed[]>): Child {
   const said = signal("");
   review.then(
     (all) => {
+      // The last that counts: the tenth, unless it counts for nobody (Mark.void), then the one before it.
       const last = all.filter((q) => !q.void).at(-1);
-      const c = last?.reveal.crowd;
-      said.set(c?.answers ? `Десетият: знаеха го ${percent(c.right)}` : "Десетият е най-трудният днес");
+      if (!last) return;
+      const which = lastWords[last.n] ?? "Последният";
+      const c = last.reveal.crowd;
+      said.set(c?.answers ? `${which}: знаеха го ${percent(c.right)}` : `${which} е най-трудният днес`);
     },
     () => {},
   );
@@ -611,15 +620,6 @@ function friendsDay(t: Today): Child {
       ),
     ),
   );
-}
-
-/** How the day played went among everyone: the share of players it did better than, where that's said
- * (game/standing.ts; `early`: on a first day), else, from ten players, how many right is usual today. */
-function _crowdWords(t: Today, early: boolean): string {
-  const lead = standing(t.board.place, t.board.players, early)?.lead;
-  if (lead) return lead;
-  const avg = t.board.average;
-  return avg ? `Средно днес: ${formatNumber(avg, 0.1)} от ${t.board.of}.` : "";
 }
 
 /** How all of България did with the day: how many got each count of right answers, the player's own bar in ink with
@@ -736,12 +736,13 @@ function entryOfDay(r?: DayEntry | null): Child {
 }
 
 /** „Сподели резултата“: the sheet with the day's card and its text (game/share.ts), „Сподели“ (the device's share
- * sheet, where there is one) and „Копирай текста“. */
-function shareButton(run: State, t: Today, streak: () => number): Child {
+ * sheet, where there is one), „Копирай текста“ and the card on its own. Held until the streak with today's is
+ * `known` (the text says it). */
+function shareButton(run: State, t: Today, streak: () => number, known: () => boolean): Child {
   const open = () => shareSheet(run, t, streak());
   return h(
     "button",
-    { class: "btn primary result-share-go", type: "button", onclick: open },
+    { class: "btn primary result-share-go", type: "button", disabled: () => !known(), onclick: open },
     h("span", { class: "i i-share", "aria-hidden": "true" }),
     "Сподели",
   );
@@ -787,13 +788,24 @@ function shareSheet(run: State, t: Today, streak: number): void {
   const send = async () => {
     said.set("");
     try {
-      const out = await shareDay(run.id, day, card.peek());
+      const out = await shareDay(run.id, day);
       if (out === "copied") said.set("Копирано.");
       else if (typeof out === "object") said.set("Копирай текста по-горе.");
       else if (out === "shared") close();
     } catch (err) {
       said.set(errorText(err));
     }
+  };
+  // The card on its own, where the device's share sheet takes a picture: the text with its link goes by „Сподели“
+  // (an app that takes both keeps only the picture: WhatsApp on an iPhone).
+  const sendCard = async () => {
+    said.set("");
+    const file = card.peek();
+    if (file && (await shareCard(file)) === "shared") close();
+  };
+  const canShareCard = () => {
+    const file = card();
+    return !!file && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] });
   };
   const copy = async () => {
     try {
@@ -816,7 +828,7 @@ function shareSheet(run: State, t: Today, streak: number): void {
       ),
       h("div", { class: "share-card-box" }, () =>
         preview()
-          ? cardImage(preview(), `Брой ${issue}: ${day.rights} от ${day.of}`)
+          ? cardImage(preview(), `АЛМАНАХ, Брой ${issue}, ${dateWords(t.day)}: как мина всеки от десетте въпроса`)
           : tiles(run.trail, t.topics ?? []),
       ),
       h("pre", { class: "share-text" }, () => text() || "…"),
@@ -825,6 +837,10 @@ function shareSheet(run: State, t: Today, streak: number): void {
         { class: "share-ways" },
         canShare ? h("button", { class: "btn primary", type: "button", onclick: send }, "Сподели") : null,
         h("button", { class: canShare ? "btn" : "btn primary", type: "button", onclick: copy }, "Копирай текста"),
+        () =>
+          canShareCard()
+            ? h("button", { class: "btn share-card-go", type: "button", onclick: sendCard }, "Сподели картинката")
+            : null,
       ),
       () => (said() ? h("p", { class: "share-said", role: "status" }, said()) : null),
       h("p", { class: "small share-note" }, "Отговорите не се виждат. Който отвори връзката, играе същия брой."),
@@ -961,7 +977,7 @@ function remindAsk(
   day: string,
   stake: () => string | null,
   primary = false,
-): { view: Child; mailing: () => boolean; showing: () => boolean } {
+): { view: Child; mailing: () => boolean; showing: () => boolean; deciding: () => boolean } {
   let asked = remindAsks(null);
   try {
     asked = remindAsks(localStorage.getItem(remindKey));
@@ -978,11 +994,13 @@ function remindAsk(
   };
   const refused = () => typeof Notification !== "undefined" && Notification.permission === "denied";
   const by = signal<"push" | "mail" | null>(pushable() && !refused() ? "push" : app ? null : "mail");
-  const state = signal<"ask" | "on" | "gone">("gone");
+  // "deciding": whether to ask is still being found out (notifications on already? the mail on?).
+  const state = signal<"deciding" | "ask" | "on" | "gone">("gone");
   const mailNo = signal(asked.mailNo === day);
   const mailing = () => by() === "mail" && (state() === "ask" || mailNo()) && !user()?.email;
-  const showing = () => state() !== "gone";
-  if (asked.n >= 3 || asked.day === day || !by.peek()) return { view: null, mailing, showing };
+  const showing = () => state() === "ask" || state() === "on";
+  const deciding = () => state() === "deciding";
+  if (asked.n >= 3 || asked.day === day || !by.peek()) return { view: null, mailing, showing, deciding };
   // Each way of asking counted once a day on a device (play/measure.go), however often Начало is drawn.
   const shown = () => {
     const how = by.peek() ?? "mail";
@@ -995,17 +1013,14 @@ function remindAsk(
     state.set("ask");
     shown();
   };
-  if (by.peek() === "push")
-    pushOn().then(
-      (on) => (on ? null : ask()),
-      () => {},
-    );
-  else if (user.peek()?.email)
-    api<{ day: boolean; can: boolean }>("GET", "/api/mail/prefs").then(
-      (p) => (p.can && !p.day ? ask() : null),
-      () => {},
-    );
-  else ask();
+  const gone = () => state.set("gone");
+  if (by.peek() === "push") {
+    state.set("deciding");
+    pushOn().then((on) => (on ? gone() : ask()), gone);
+  } else if (user.peek()?.email) {
+    state.set("deciding");
+    api<{ day: boolean; can: boolean }>("GET", "/api/mail/prefs").then((p) => (p.can && !p.day ? ask() : gone()), gone);
+  } else ask();
   const error = signal("");
   const yes = async () => {
     error.set("");
@@ -1034,7 +1049,7 @@ function remindAsk(
     tally(how === "push" ? "pushask:no" : "mailask:no");
   };
   const view = () => {
-    if (state() === "gone") return null;
+    if (!showing()) return null;
     if (state() === "on")
       return h(
         "p",
@@ -1069,5 +1084,5 @@ function remindAsk(
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
     ];
   };
-  return { view, mailing, showing };
+  return { view, mailing, showing, deciding };
 }

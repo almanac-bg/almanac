@@ -106,6 +106,15 @@ test.describe("twice the text on a 320px phone", () => {
       await expect(page.locator("#main h1, #main h2").first()).toBeVisible();
       await fits(page, path);
     }
+    // The places at the foot, each name whole in its third: none cut („Алмана…“) or wider than its place.
+    const cut = await page
+      .locator(".places-foot a")
+      .evaluateAll((links) =>
+        links
+          .filter((a) => a.scrollWidth > a.clientWidth + 1 || getComputedStyle(a).textOverflow === "ellipsis")
+          .map((a) => a.textContent),
+      );
+    expect(cut).toEqual([]);
   });
 });
 

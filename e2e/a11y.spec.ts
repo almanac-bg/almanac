@@ -1,6 +1,29 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { answer, moveOn, openGame, playRun, startDay } from "./play.ts";
+
+/** Text on a chapter's sheet (`.leaf`) in anything but the sheet's own ink: the page's greys (--ink-2, --ink-3,
+ * --grey) are made for the page, and on a chapter's colour they fall as low as 1.05:1 by night. Text on a ground of its
+ * own inside the sheet (a chip, the issue's pill) is that ground's, and not judged here. */
+async function greyOnSheets(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: string[] = [];
+    for (const sheet of document.querySelectorAll<HTMLElement>(".leaf")) {
+      const ink = getComputedStyle(sheet).color;
+      for (const el of sheet.querySelectorAll<HTMLElement>("*")) {
+        const words = [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim());
+        if (!words || !el.getClientRects().length) continue;
+        let ground: HTMLElement | null = el;
+        while (ground && ground !== sheet && getComputedStyle(ground).backgroundColor === "rgba(0, 0, 0, 0)")
+          ground = ground.parentElement;
+        if (ground !== sheet) continue;
+        const color = getComputedStyle(el).color;
+        if (color !== ink) out.push(`${el.className}: ${el.textContent?.trim().slice(0, 24)} (${color})`);
+      }
+    }
+    return out;
+  });
+}
 
 // The main screens, light and dark: nothing axe finds (contrast, names, roles, structure).
 for (const scheme of ["light", "dark"] as const) {
@@ -26,6 +49,7 @@ for (const scheme of ["light", "dark"] as const) {
         await page.goto(path);
         await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
         await check();
+        expect(await greyOnSheets(page)).toEqual([]);
         // A topic opened by its address: „Започни“ first, its count, then a question.
         if (path === "/play/geography") {
           await page.getByRole("button", { name: "Започни", exact: true }).click();
@@ -81,6 +105,8 @@ for (const scheme of ["light", "dark"] as const) {
     await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
     const { violations } = await new AxeBuilder({ page }).analyze();
     expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
+    // The score's sheet and the day's entry (its question, „Невярно:“) in the sheet's ink.
+    expect(await greyOnSheets(page)).toEqual([]);
   });
 }
 

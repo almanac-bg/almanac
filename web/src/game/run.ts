@@ -29,6 +29,7 @@ import {
   reachable,
   type VerdictKind,
   verdict,
+  verdictSays,
 } from "../ui.ts";
 import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
 import { inRowOf } from "./numbers.ts";
@@ -645,6 +646,7 @@ function question(
     // The question's own steps on the right answer's beat (the right one marked) are taken with the panel's, in the
     // same frame, so that the answer comes into place in one movement (settle).
     const marks: (() => void)[] = [];
+    const kind = kindOf(res, answer);
     asked.reveal(
       res.reveal,
       answer,
@@ -652,13 +654,12 @@ function question(
         if (ms === beats.right && !calm.peek()) marks.push(step);
         else at(ms, step);
       },
-      kindOf(res, answer) === "partial",
+      kind,
     );
     const now = trail(res.state.trail, s.total);
     now.children[q.n]?.classList.add("fresh");
     progress.replaceWith(now);
     progress = now;
-    const kind = kindOf(res, answer);
     playAnswer(kind, res.inRow ?? 0);
     // The fact behind the answer (and on its date, what happened that day), at the moment the player most wants it:
     // time to read it, or a tap to move on. The verdict comes with all that follows it in place, still hidden, so
@@ -675,8 +676,8 @@ function question(
       crowd = waiting(crowdLine(q.view.type, res.reveal.crowd, res.right));
       rest = [
         theirLine(them, res.state.against?.[q.n]),
-        // Ink, said where it was written: the issue, met there first (the server says; not said, the issue at all).
-        res.right && res.reveal.fact && (res.ink ?? s.kind === "day") ? filed(q.category, res.ink) : null,
+        // Ink, said where it was written, as the server says it was (in the issue, met there first): grey isn't said.
+        res.ink && res.reveal.fact ? filed(q.category) : null,
         fact(res.reveal.fact, res.reveal.day),
         res.reveal.credit ? credit(res.reveal.credit) : null,
         upNext(lasts, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`, true),
@@ -695,7 +696,7 @@ function question(
       ].map(waiting);
       // The verdict is said once, in plain words, through the run's live region (not its own, made already full, nor
       // anything counting up from nothing).
-      const told = verdict(kind, undefined, res.inRow);
+      const told = verdict(kind, verdictSays(kind, q.view.type), res.inRow);
       if (told instanceof HTMLElement) told.removeAttribute("role");
       append(after, [told, crowd, ...rest]);
       settle(page, head, after, asked.node, at, () => {
