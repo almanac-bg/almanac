@@ -83,3 +83,22 @@ test("Моят Алманах reads in the order the facts were learned, with no
   await expect(asked).toHaveCount(1);
   await expect(items.first().locator(".almanac-q")).toHaveCount(1); // learned first
 });
+
+test("Моят Алманах lays its cards as masonry: columns where they fit, none over another", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
+  await knows(page, sampleFacts().slice(0, 12));
+  await page.goto("/almanac");
+  const cards = page.locator(".almanac-card");
+  await expect(cards).toHaveCount(12);
+  const boxes = await cards.evaluateAll((all) =>
+    all.map((e) => {
+      const r = e.getBoundingClientRect();
+      return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+    }),
+  );
+  expect(new Set(boxes.map((b) => Math.round(b.left))).size).toBeGreaterThan(1);
+  for (const [i, a] of boxes.entries())
+    for (const b of boxes.slice(i + 1))
+      expect(a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1).toBe(false);
+});
