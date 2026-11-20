@@ -111,27 +111,38 @@ export function friends(kit: Kit): Child {
     worn,
   } = kit);
   title("Приятели");
-  return h("section", { class: "screen friends-page spread" }, h("h1", null, "Приятели"), dayBoard(), friendsCard());
+  const board = dayBoard();
+  return h(
+    "section",
+    { class: "screen friends-page spread" },
+    h("h1", null, "Приятели"),
+    board.view,
+    friendsCard(board.load),
+  );
 }
 
 /** The day's board: among the player and their friends (first, once they have any), or all of България. A row says
  * what places it: the right answers big („8 от 10“; a tie between them broken as play/board.go says); the player's own
  * row washed, „ти“ after the name, and under the best twenty if further down. */
-function dayBoard(): Child {
+function dayBoard(): { view: Child; load: () => void } {
   const day = signal<Day | null>(null);
   const failed = signal<unknown>(null);
   const among = signal<"friends" | "all" | null>(null);
+  let chosen = false; // the player chose where to look
   const load = () =>
     api<Day>("GET", "/api/day").then(
       (d) => {
         failed.set(null);
+        // The board seen, with its names (the day played): „класация“, counted once a week (play.Used).
+        if (d.run?.done && !day.peek()) api("POST", "/api/me/used", { noun: "board" }).catch(() => {});
         day.set(d);
-        if (among.peek() === null) among.set(d.friends?.length || d.befriended ? "friends" : "all");
+        // Among friends once there are any (a first one just accepted too), unless the player chose.
+        if (!chosen) among.set(d.friends?.length || d.befriended ? "friends" : "all");
       },
       (err) => failed.set(err),
     );
   load();
-  return h(
+  const view = h(
     "section",
     { class: "sect day-board page-1" },
     h(
@@ -139,7 +150,7 @@ function dayBoard(): Child {
       { class: "sect-head" },
       h("h2", null, () => {
         const d = day();
-        return d?.issue ? `Класация · Брой ${d.issue}` : "Класация";
+        return d?.issue ? `Класация\u00a0· Брой\u00a0${d.issue}` : "Класация";
       }),
     ),
     () =>
@@ -151,7 +162,10 @@ function dayBoard(): Child {
               ["all", "България"],
             ],
             () => among() ?? "friends",
-            (v) => among.set(v),
+            (v) => {
+              chosen = true;
+              among.set(v);
+            },
           )
         : null,
     (): Child => {
@@ -160,6 +174,7 @@ function dayBoard(): Child {
       return among() === "all" ? everyone(d) : ofFriends(d);
     },
   );
+  return { view, load: () => void load() };
 }
 
 /** The day among the player's friends: each who played, best first, and who hasn't yet, in a line. */
@@ -208,7 +223,7 @@ function everyone(d: Day): Child {
       ? null
       : b.place
         ? h("p", { class: "board-note" }, `В България си ${ordinal(b.place)} от ${formatNumber(b.players)}.`)
-        : h("p", { class: "board-note" }, `Днес играха ${formatNumber(b.players)} души.`),
+        : h("p", { class: "board-note" }, `Днес играха ${formatNumber(b.players)}\u00a0души.`),
     h(
       "ol",
       { class: "rows ranks" },
@@ -260,7 +275,7 @@ const scoreRow = (s: Score, place: number, gap = false) =>
 
 /** The friends: who asks to be friends, each friend with their day and the duels between you (and, while changing
  * the list, removing them), the one field to add more, and the requests that wait for an answer. */
-function friendsCard(): Child {
+function friendsCard(reloadBoard: () => void): Child {
   const data = signal<Friends | null>(null);
   const duels = signal<Duels | null>(null);
   const error = signal("");
@@ -273,6 +288,10 @@ function friendsCard(): Child {
     try {
       const [f, d] = await Promise.all([api<Friends>("GET", "/api/friends"), api<Duels>("GET", "/api/duels")]);
       failed.set(null);
+      // The friends changed (one accepted, one removed): the board among them is another now.
+      const was = data.peek();
+      const ids = (x: Friends) => x.friends.map((y) => y.id).join(",");
+      if (was && ids(was) !== ids(f)) reloadBoard();
       data.set(f);
       duels.set(d);
       friendRequests.set(f.requests.in.length);
@@ -412,6 +431,7 @@ function friendsCard(): Child {
                   () => remove(f),
                   () => challenge(f),
                   editing,
+                  d.friends.some((o) => o.id !== f.id && o.name === f.name),
                 ),
               ),
             )
@@ -521,9 +541,10 @@ function addFriend(reload: () => Promise<void>): Child {
   );
 }
 
-/** A friend: their name, their day, the duels between you, and a duel a tap away (while changing the list, removing
+/** A friend: their name (with their @username always, where another friend has the same name: `same`), their day, the
+ * duels between you, and a duel a tap away (while changing the list, removing
  * them instead). */
-function row(f: Friend, remove: () => void, challenge: () => void, editing: () => boolean): Child {
+function row(f: Friend, remove: () => void, challenge: () => void, editing: () => boolean, same = false): Child {
   const played = f.won + f.lost + f.drawn;
   return h(
     "li",
@@ -536,7 +557,7 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
         "a",
         { class: "friend-name", href: profileHref(f.tag) },
         f.name,
-        h("span", { class: "friend-tag" }, ` @${f.tag}`),
+        h("span", { class: same ? "friend-tag same" : "friend-tag" }, ` @${f.tag}`),
       ),
       worn(f.seal),
     ),

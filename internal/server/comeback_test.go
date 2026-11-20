@@ -47,21 +47,3 @@ func TestComeBack(t *testing.T) {
 		t.Fatalf("told again: %v", today["back"])
 	}
 }
-
-// Профил's „Всички игри“: the player's games a page at a time, of a kind.
-func TestAllGames(t *testing.T) {
-	g := start(t)
-	ana, anaID := g.guest()
-	g.daysPlayed(anaID, 3, 2, 1)
-	status, out := ana.call("GET", "/api/me/games?kind=day", nil)
-	games, _ := out["games"].([]any)
-	if status != 200 || len(games) != 3 || out["next"] != nil {
-		t.Fatalf("the day's ten: %d %v", status, out)
-	}
-	if first := games[0].(map[string]any); first["kind"] != "day" || first["issue"] == nil {
-		t.Fatalf("a day's game names its issue: %v", first)
-	}
-	if status, out = g.player().call("GET", "/api/me/games", nil); status != 401 {
-		t.Fatalf("nobody's games: %d %v", status, out)
-	}
-}

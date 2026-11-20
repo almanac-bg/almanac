@@ -32,16 +32,16 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
   await page.reload();
   await expect(page.locator(".streak-chip.unlit")).toContainText("3");
   await expect(page.locator(".today-streak .day-stake")).toHaveText("С днешния брой серията става 4.");
-  // A topic's result points to the day while it waits: the gold button, the streak under it, „Още десет“ plain.
+  // A topic's result points to the day while it waits, plain, the streak under it; „Още десет“ the one action.
   await openGame(page, "/play/history");
   await playRun(page);
   // A new level may come with the game, in its sheet once the result has landed: put away.
   await page.waitForTimeout(2500);
   await page.keyboard.press("Escape");
   const day = page.getByRole("link", { name: "Към въпросите на деня" });
-  await expect(day).toHaveClass(/primary/);
+  await expect(day).not.toHaveClass(/primary/);
   await expect(page.locator(".actions .day-stake")).toHaveText("С днешния брой серията става 4.");
-  await expect(page.getByRole("button", { name: "Още десет" })).not.toHaveClass(/primary/);
+  await expect(page.getByRole("button", { name: "Още десет" })).toHaveClass(/primary/);
   await day.click();
   await startDay(page);
   await playRun(page);

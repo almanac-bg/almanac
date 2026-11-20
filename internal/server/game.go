@@ -302,18 +302,3 @@ func (s *Server) stats(w http.ResponseWriter, r *http.Request) error {
 	}
 	return ok(w, st)
 }
-
-// games is a page of the player's finished games, newest first (Профил's „Всички игри“): of a kind (?kind=day, topic
-// or others; none: all), from where the page before ended (?from=, its next).
-func (s *Server) games(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	q := r.URL.Query()
-	page, err := s.game.GamesOf(r.Context(), u.ID, q.Get("kind"), q.Get("from"), play.GamesPage)
-	if err != nil {
-		return err
-	}
-	return ok(w, page)
-}

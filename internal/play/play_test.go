@@ -928,7 +928,7 @@ func TestStats(t *testing.T) {
 	}
 	// No lifetime totals (DECISIONS.md, „The direction“): nothing that counts them is said.
 	out, _ := json.Marshal(s)
-	for _, total := range []string{`"days"`, `"games"`, `"answers"`, `"right"`, `"facts"`, `"duels"`, `"won"`, `"mastery"`} {
+	for _, total := range []string{`"days"`, `"games"`, `"answers"`, `"right"`, `"facts"`, `"duels"`, `"won"`, `"mastery"`, `"recent"`} {
 		if strings.Contains(string(out), total) {
 			t.Errorf("the stats say %s: %s", total, out)
 		}

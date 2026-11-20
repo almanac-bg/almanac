@@ -30,26 +30,14 @@ export function verdictSays(kind: VerdictKind, type?: string): string {
   return kind === "right" && type === "number" ? "Вярно!" : verdictWords[kind];
 }
 
-/** Right answers in a row, from the second: the flame and how many. */
-export function inRowChip(n: number): HTMLElement | null {
-  if (n < 2) return null;
-  return h(
-    "span",
-    { class: "in-row", "aria-label": `${n} верни отговора поред` },
-    h("i", { class: "in-row-flame", "aria-hidden": "true" }),
-    h("b", null, String(n)),
-    " поред",
-  );
-}
-
-/** How an answer went: its sign, the word, and the right answers in a row it makes (the climb's feel only: a game's
- * score is its right answers). */
-export function verdict(kind: VerdictKind, words = verdictWords[kind], inRow = 0): Child {
+/** How an answer went: its sign and the word. Nothing counts a row of right answers: a game's score is its right
+ * answers (DECISIONS.md, the closed list of nouns). */
+export function verdict(kind: VerdictKind, words = verdictWords[kind]): Child {
   return h(
     "div",
     { class: `verdict ${kind}`, role: "status" },
     h("span", { class: "verdict-sign", "aria-hidden": "true" }),
-    h("div", { class: "verdict-says" }, h("strong", { class: "verdict-word" }, words), inRowChip(inRow)),
+    h("div", { class: "verdict-says" }, h("strong", { class: "verdict-word" }, words)),
   );
 }
 

@@ -13,7 +13,7 @@
 
 import { loadPictures, picture } from "../art/picture.ts";
 import { news } from "../game/news.ts";
-import { closeWords, count, percent } from "../game/numbers.ts";
+import { closeLine, count, percent, withOwn } from "../game/numbers.ts";
 import { land, reviewed } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting } from "../game/run.ts";
 import { type SharedDay, shareCard, shareDay, shareText } from "../game/share.ts";
@@ -41,6 +41,8 @@ interface DayEntry {
   n: number;
   crowd: boolean;
   right: number;
+  /** None of the day's others got it: „само ти го знаеш“. */
+  alone?: boolean;
   fact: { category: string; question?: string; answer: string; untrue?: boolean; fact: string };
 }
 
@@ -80,6 +82,11 @@ export interface Today {
   /** Back after days away, the streak ended since (play.BackFrom): the last day played (no streak's number), said
    * once. */
   back?: { last: string };
+  /** Yesterday's issue left half-way before midnight, while it can still be finished (play.Unfinished, DayGrace): its
+   * day, issue, chapters and run, and until when (ms). Днес offers it first. */
+  yesterday?: { day: string; issue: number; topics: string[] | null; run: State; until: number };
+  /** Днес drawn for yesterday's issue (lateView): until when it can be finished, and the way on to today's. */
+  late?: { until: number; today: () => void };
 }
 
 /** The day as Днес's page came with it (server/pages.go): its first draw, without asking; every later one asks. */
@@ -144,15 +151,40 @@ export function today() {
       const t = inPage ?? (await api<Today>("GET", "/api/day"));
       inPage = undefined;
       day = t.day;
-      const run = t.run;
+      // Yesterday's issue left half-way just before midnight, while the game lets it be finished: offered first.
+      const view = lateView(t) ?? t;
+      const run = view.run;
       // A question this tab was showing has its time running (a reload): straight back into it. Otherwise (another
       // device, or tab) the day left half-way waits on Днес for „Продължи“: no question's time starts without a tap.
       if (run && !run.done && run.question && shownHere(run.id))
-        screen.show(() => playRun(run, (s) => home(t, s, true)));
-      else screen.show(() => home(t, t.run, false));
+        screen.show(() => playRun(run, (s) => home(view, s, true)));
+      else screen.show(() => home(view, view.run, false));
     } catch (err) {
       screen.show(() => failure(err, load, null));
     }
+  };
+  /** Днес for yesterday's issue (`t.yesterday`): its day, issue, chapters and run; nothing of today's (its board, its
+   * friends, its entry); and, once finished, the way on to today's. */
+  const lateView = (t: Today): Today | null => {
+    const y = t.yesterday;
+    if (!y) return null;
+    const today = () => {
+      t.yesterday = undefined;
+      screen.show(() => home(t, t.run, false));
+      scrollTo(0, 0);
+    };
+    return {
+      ...t,
+      day: y.day,
+      issue: y.issue,
+      topics: y.topics,
+      run: y.run,
+      entry: null,
+      board: { day: y.day, players: 0, of: y.run.total - (y.run.void ?? 0), top: [] },
+      friends: null,
+      yesterday: undefined,
+      late: { until: y.until, today },
+    };
   };
   // The day's ten (or the rest of them) start after the count every game has, which „Откажи“ backs out of: nothing
   // is sent before it runs out or „Започни сега“, so a tap by mistake costs nothing. What went wrong starting shows
@@ -184,7 +216,11 @@ export function today() {
           screen.show(starting);
           try {
             await player();
-            const s = await api<State>("POST", "/api/day", {});
+            // Yesterday's goes on where it stopped; today's is the one the player has, or a new one.
+            const s =
+              t.late && left
+                ? await api<State>("GET", `/api/runs/${left.id}`)
+                : await api<State>("POST", "/api/day", {});
             counting = false;
             screen.show(() => playRun(s, (end) => home(t, end, true)));
           } catch (err) {
@@ -264,7 +300,8 @@ export function today() {
         issueGo(start(t), marks.length, failed, first),
         first ? null : streakSection(t, stats, false),
         first ? null : untold(t),
-        contents(t),
+        // A new visitor's cover says once what the ten are (issueGo): no list of them again beside it.
+        first ? null : contents(t),
       ),
     );
   }
@@ -335,10 +372,12 @@ function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): 
             "p",
             { class: "issue-meta" },
             at
-              ? "Довърши ги до полунощ."
+              ? t.late
+                ? `Вчерашният брой. Довърши го до ${clockAt(t.late.until)}.`
+                : "Довърши ги до полунощ."
               : // Who has played today, once enough have for it to say something.
                 players >= crowdFrom
-                ? `Около три минути · Днес играха ${formatNumber(players)} души`
+                ? `Около три минути · Днес играха ${formatNumber(players)}\u00a0души`
                 : "Около три минути",
           ),
         ),
@@ -365,7 +404,7 @@ function issueGo(start: () => void, at: number, error: string, first: boolean): 
           "div",
           { class: "issue-words" },
           h("h2", null, "Едни и същи за цяла България."),
-          h("p", { class: "deck" }, "По един от всяка тема, от лесен към труден. Без регистрация."),
+          h("p", { class: "deck" }, "По един от всяка глава, от лесен към труден. Без регистрация."),
         )
       : null,
   ];
@@ -456,8 +495,8 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   const fresh = signal<Today>(t);
   // The day as it stands with the game just played (its streak, its friends): until it's here, the streak with today's
   // isn't known, and the share (which says it) waits for it.
-  const known = signal(!just);
-  const now = just ? api<Today>("GET", "/api/day") : null;
+  const known = signal(!just || !!t.late);
+  const now = just && !t.late ? api<Today>("GET", "/api/day") : null;
   now?.then(fresh.set, () => {}).finally(() => known.set(true));
   const of = outOf(run);
   const perfect = of > 0 && run.rights === of;
@@ -472,6 +511,24 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
     });
   };
   const order = t.topics ?? [];
+  // The streak with today's, the game's stake, and the reminder's ask. A guest in an app's own browser has the way out
+  // for the action; a guest on the first day, or one whose game was just brought here, the ask to keep it and be
+  // reminded (while it's there to ask), right under the score; everyone else, sharing the day. Past the first results
+  // a guest is asked again in „Утре“ (to keep the game, by mail); a player with a profile isn't asked twice.
+  const streak = () => (just && fresh() === t ? 0 : fresh().streak);
+  const stake = keepStake(
+    () => (streak() >= 2 ? 2 : 1),
+    () => streak(),
+  );
+  const guest = !user.peek()?.email;
+  const away = !!app && guest;
+  // A first day: as the server says, or, for a visitor who had no game at all when Днес came, this one.
+  const askFirst = !away && guest && (handedIn.peek() || t.firstDay !== false);
+  const ask = askFirst || guest ? remindAsk(t.day, stake, askFirst) : null;
+  const first = away || askFirst;
+  // While the action is another (the ask, the way out), sharing stays a quiet link beside the tiles.
+  const shareQuiet = () =>
+    away || (askFirst && (ask?.deciding() || ask?.showing())) ? shareLink(run, t, streak, known) : null;
   // 1. The score, the cover's heavy numeral on the sheet of the issue's first chapter.
   const hero = leaf(
     order[0] ?? "general",
@@ -483,9 +540,10 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
         { class: "score" },
         h("b", { class: "score-n" }, String(run.rights)),
         h("span", { class: "score-of" }, `от ${of}`),
-        closeWords(run.trail) ? h("span", { class: "score-close" }, closeWords(run.trail)) : null,
+        closeLine(run.trail) ? h("span", { class: "score-close" }, closeLine(run.trail)) : null,
       ),
       tiles(run.trail, order, run.total),
+      shareQuiet,
       tenthLine(review),
       () => {
         const avg = fresh().board.average;
@@ -495,20 +553,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
     "result-score score-leaf",
   );
   if (just) land(hero, run.id, perfect, true);
-  // The streak with today's, the game's stake, and the reminder's ask. A guest in an app's own browser has the way out
-  // for the action; a guest on the first day, or one whose game was just brought here, the ask to keep it and be
-  // reminded (while it's there to ask), right under the score; everyone else, sharing the day.
-  const streak = () => (just && fresh() === t ? 0 : fresh().streak);
-  const stake = keepStake(
-    () => (streak() >= 2 ? 2 : 1),
-    () => streak(),
-  );
-  const guest = !user.peek()?.email;
-  const away = !!app && guest;
-  // A first day: as the server says, or, for a visitor who had no game at all when Днес came, this one.
-  const askFirst = !away && guest && (handedIn.peek() || t.firstDay !== false);
-  const ask = remindAsk(t.day, stake, askFirst);
-  const first = away || askFirst;
+  const recordings = signal<Child>(null);
   const action = h(
     "div",
     { class: first ? "result-share result-first" : "result-share" },
@@ -517,7 +562,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
     away
       ? exitWay(stake)
       : askFirst
-        ? () => (ask.deciding() ? null : ask.showing() ? ask.view : shareButton(run, t, streak, known))
+        ? () => (ask?.deciding() ? null : ask?.showing() ? ask.view : shareButton(run, t, streak, known))
         : null,
     first ? null : shareButton(run, t, streak, known),
   );
@@ -533,7 +578,8 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       // 2. The day's entry in the book, and what the day wrote.
       () => entryOfDay(fresh().entry),
       // Asked on every visit: the ink and the nearest step are counted again; a rank risen is told once (play.NewsOf).
-      news(run.id),
+      // Others' games against the player's recordings go under „Въпросите и фактите“: not one of the result's parts.
+      news(run.id, 0, undefined, recordings.set),
     ),
     h(
       "div",
@@ -543,7 +589,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       // 4. The action, once the first results are past.
       first ? null : action,
       // 5. Tomorrow.
-      tomorrow(t, streak, stake, first ? null : ask),
+      t.late ? onToToday(t, t.late.today) : tomorrow(t, streak, stake, first ? null : ask),
       h(
         "button",
         { class: "more", type: "button", "aria-expanded": () => !!reviewList(), onclick: openReview },
@@ -555,7 +601,15 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       const all = reviewList();
       if (!all) return null;
       reviewHead = h("h2", { class: "section-title review-head", tabindex: -1 }, "Въпросите и фактите");
-      return h("div", { class: "result-review" }, reviewHead, bulgariaToday(fresh(), run, review), reviewed(all, null));
+      const recs = recordings();
+      return h(
+        "div",
+        { class: "result-review" },
+        reviewHead,
+        recs,
+        bulgariaToday(fresh(), run, review),
+        reviewed(all, null),
+      );
     },
   );
 }
@@ -574,7 +628,7 @@ const lastWords = [
   "Десетият",
 ];
 
-/** How many knew the day's tenth, its hard number: „Десетият: знаеха го 14 %“; before there's a crowd, that it's the
+/** How many knew the day's tenth, its hard number: „Десетият: вярно отговарят 14 %“ (the player among them, as the issue said it); before there's a crowd, that it's the
  * hardest today. */
 function tenthLine(review: Promise<Reviewed[]>): Child {
   const said = signal("");
@@ -585,7 +639,12 @@ function tenthLine(review: Promise<Reviewed[]>): Child {
       if (!last) return;
       const which = lastWords[last.n] ?? "Последният";
       const c = last.reveal.crowd;
-      said.set(c?.answers ? `${which}: знаеха го ${percent(c.right)}` : `${which} е най-трудният днес`);
+      // The share as the issue said it when it was answered (crowdLine): the player among them.
+      said.set(
+        c?.answers
+          ? `${which}: вярно отговарят ${percent(withOwn(c, -1, last.right).right)}`
+          : `${which} е най-трудният днес`,
+      );
     },
     () => {},
   );
@@ -637,7 +696,8 @@ function bulgariaToday(t: Today, run: State, review: Promise<Reviewed[]>): Child
       for (const q of all) {
         const c = q.reveal.crowd;
         if (!c?.answers || q.void) continue;
-        if (!low || c.right < low.share) low = { n: q.n, share: c.right };
+        const share = withOwn(c, -1, q.right).right; // as the issue said it, the player among them
+        if (!low || share < low.share) low = { n: q.n, share };
       }
       hardest.set(low);
     },
@@ -702,7 +762,7 @@ function bulgariaToday(t: Today, run: State, review: Promise<Reviewed[]>): Child
               "div",
               { class: "fig" },
               h("b", { class: "fig-n" }, percent(x.share)),
-              h("span", { class: "fig-label" }, `знаят въпрос ${x.n + 1}, най-трудния днес`),
+              h("span", { class: "fig-label" }, `вярно отговарят на въпрос ${x.n + 1}, най-трудния днес`),
             )
           : null;
       },
@@ -717,7 +777,7 @@ function bulgariaToday(t: Today, run: State, review: Promise<Reviewed[]>): Child
 function entryOfDay(r?: DayEntry | null): Child {
   if (!r) return null;
   const f = r.fact;
-  const kicker = !r.crowd ? `въпрос ${r.n + 1}` : r.right ? `знаеха го ${percent(r.right)}` : "само ти го знаеш";
+  const kicker = !r.crowd ? `въпрос ${r.n + 1}` : r.alone ? "само ти го знаеш" : `вярно отговарят ${percent(r.right)}`;
   return h(
     "section",
     { class: "sect day-entry" },
@@ -738,6 +798,22 @@ function entryOfDay(r?: DayEntry | null): Child {
 /** „Сподели резултата“: the sheet with the day's card and its text (game/share.ts), „Сподели“ (the device's share
  * sheet, where there is one), „Копирай текста“ and the card on its own. Held until the streak with today's is
  * `known` (the text says it). */
+/** Sharing as a quiet link beside the tiles, where the result's action is another (the first results): the same sheet
+ * as „Сподели“. */
+function shareLink(run: State, t: Today, streak: () => number, known: () => boolean): Child {
+  return h(
+    "button",
+    {
+      class: "link tap result-share-link",
+      type: "button",
+      disabled: () => !known(),
+      onclick: () => shareSheet(run, t, streak()),
+    },
+    h("span", { class: "i i-share", "aria-hidden": "true" }),
+    "Сподели резултата",
+  );
+}
+
 function shareButton(run: State, t: Today, streak: () => number, known: () => boolean): Child {
   const open = () => shareSheet(run, t, streak());
   return h(
@@ -857,6 +933,31 @@ function shareSheet(run: State, t: Today, streak: number): void {
 /** Tomorrow: the next issue's date set large, when it comes and what it makes of the streak (`streak`: with today's);
  * a guest's ask to keep the game (keep.ts: what it risks till then, `stake`); and, where it isn't on yet, the
  * reminder's ask (`ask`; null where the result's action is the ask, or the way out of an app's browser). */
+/** Yesterday's issue finished after midnight (`t.late`): in tomorrow's place, today's issue, out already, and the way to
+ * it. */
+function onToToday(t: Today, today: () => void): Child {
+  const next = new Date(`${t.day}T12:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  const day = next.toISOString().slice(0, 10);
+  return h(
+    "section",
+    { class: "sect tomorrow" },
+    h("div", { class: "sect-head" }, h("h2", null, "Днес")),
+    h(
+      "div",
+      { class: "tomorrow-row" },
+      h("b", { class: "tomorrow-n" }, day.slice(8).replace(/^0/, "")),
+      h(
+        "p",
+        { class: "tomorrow-words" },
+        h("b", null, `Брой ${issueOf(day)}, ${weekday(day).toLowerCase()}.`),
+        " Вече излезе.",
+      ),
+    ),
+    h("button", { class: "btn", type: "button", onclick: today }, "Към днешния брой"),
+  );
+}
+
 function tomorrow(
   t: Today,
   streak: () => number,
@@ -960,8 +1061,16 @@ function untilMidnight(): string {
   const sofia = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Sofia" }));
   const minutes = 24 * 60 - (sofia.getHours() * 60 + sofia.getMinutes());
   const hours = Math.floor(minutes / 60);
-  if (!hours) return `${minutes} мин.`;
-  return minutes % 60 ? `${hours} ч. и ${minutes % 60} мин.` : `${hours} ч.`;
+  // A number and its unit never part at a line's end (DESIGN.md, Copy).
+  if (!hours) return `${minutes} мин.`;
+  return minutes % 60 ? `${hours} ч. и ${minutes % 60} мин.` : `${hours} ч.`;
+}
+
+/** A moment's time of day in Bulgaria: „00:15“. */
+function clockAt(ms: number): string {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Sofia", hour: "2-digit", minute: "2-digit" }).format(
+    new Date(ms),
+  );
 }
 
 /** Where the reminder's asks are kept, on this device (notifications are a device's): lib/keep.ts, RemindAsks. */

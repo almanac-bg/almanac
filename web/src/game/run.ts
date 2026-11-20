@@ -24,7 +24,6 @@ import {
   failure,
   filed,
   glyph,
-  inRowChip,
   leaf,
   reachable,
   type VerdictKind,
@@ -32,7 +31,6 @@ import {
   verdictSays,
 } from "../ui.ts";
 import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
-import { inRowOf } from "./numbers.ts";
 import { answered, beats, crowdLine, picture, picturesIn, type Stage } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Reveal, Shown, State, TheirMark, View } from "./types.ts";
 
@@ -407,16 +405,10 @@ export function guardLeaving(
 }
 
 /** The top of a question: the way out, what's played (the day's issue, or the topic: `aside`; in a duel, with whom:
- * `versus`), the game's tally, and which one of how many. A game has the whole screen, the header with it, so the
+ * `versus`), and which one of how many. A game has the whole screen, the header with it, so the
  * way out is here: a cross to Днес (on Днес itself too, where the day's ten are played: it opens afresh, the
  * day waiting there), the way back (router.ts): back in the history where Днес is the page before. */
-export function questionHead(
-  n: number,
-  total: number,
-  aside: string,
-  tally: Child = null,
-  versus: Child = null,
-): Child {
+export function questionHead(n: number, total: number, aside: string, versus: Child = null): Child {
   return h(
     "header",
     { class: "question-head" },
@@ -431,7 +423,6 @@ export function questionHead(
       versus ? h("p", { class: "kicker versus" }, versus) : null,
       h("p", { class: "kicker" }, aside),
     ),
-    tally,
     // „4/10“ to the eye, „4 от 10“ read aloud and in the page's words.
     h(
       "p",
@@ -440,11 +431,6 @@ export function questionHead(
       h("span", { class: "count-of" }, h("span", { class: "num-word" }, " от "), String(total)),
     ),
   );
-}
-
-/** A run's tally while it's played: the right answers in a row it's on, once there are two. */
-function tally(el: HTMLElement, inRow: number) {
-  el.replaceChildren(...[inRowChip(inRow)].filter((c): c is HTMLElement => c !== null));
 }
 
 /** The time left: a bar that runs out with the seconds beside it, muted, then gold for the last ten seconds and red
@@ -564,8 +550,6 @@ function question(
     onCleanup(() => clearTimeout(when));
   }
   const versusNow: Child = theirs ? () => (theyAnswered() ? `${them} отговори` : versus) : versus;
-  const score = h("div", { class: "tally" });
-  tally(score, inRowOf(s.trail));
 
   // Moving on, once the answer has shown for a while: never into a question nobody's looking at (a tab in the
   // background), as its time would run unseen.
@@ -640,7 +624,7 @@ function question(
   });
 
   // The answer shows in beats (DESIGN.md, Motion): the player's own answer judged, its sound and its pip; the right
-  // one (if it wasn't theirs) and the verdict docked at the screen's foot, the tally with them;
+  // one (if it wasn't theirs) and the verdict docked at the screen's foot;
   // how everyone else answered; the fact, and the way on. With less motion, all at once.
   const reveal = (res: Result, answer: Answer | null) => {
     // The question's own steps on the right answer's beat (the right one marked) are taken with the panel's, in the
@@ -672,7 +656,6 @@ function question(
     let rest: Child[] = [];
     at(beats.right, () => {
       for (const step of marks) step();
-      tally(score, res.inRow ?? 0);
       crowd = waiting(crowdLine(q.view.type, res.reveal.crowd, res.right));
       rest = [
         theirLine(them, res.state.against?.[q.n]),
@@ -696,7 +679,7 @@ function question(
       ].map(waiting);
       // The verdict is said once, in plain words, through the run's live region (not its own, made already full, nor
       // anything counting up from nothing).
-      const told = verdict(kind, verdictSays(kind, q.view.type), res.inRow);
+      const told = verdict(kind, verdictSays(kind, q.view.type));
       if (told instanceof HTMLElement) told.removeAttribute("role");
       append(after, [told, crowd, ...rest]);
       settle(page, head, after, asked.node, at, () => {
@@ -771,7 +754,6 @@ function question(
       q.n,
       s.total,
       s.kind === "day" && s.day ? `Брой ${issueOf(s.day)}` : topicName(s.category ?? q.category),
-      score,
       versusNow,
     ),
     progress,
@@ -811,7 +793,7 @@ function question(
 function theirLine(name: string, m: TheirMark | undefined): Child {
   if (!name || !m) return null;
   const secs = (m.ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 });
-  const how = m.right ? `вярно за ${secs} с` : m.close ? "близо" : m.missed ? "без отговор" : "грешно";
+  const how = m.right ? `вярно за ${secs}\u00a0с` : m.close ? "близо" : m.missed ? "без отговор" : "грешно";
   return h("p", { class: `their-line${m.right ? " right" : ""}` }, h("b", null, `${name}: `), how);
 }
 
@@ -850,7 +832,7 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   );
   const first = parts.map((el) => el.getBoundingClientRect().top);
   // The head's own parts, where they are: stuck, it's smaller, and they go there in the same movement.
-  const headParts = [...head.node.querySelectorAll<HTMLElement>(".game-leave, .count, .tally, .trail")];
+  const headParts = [...head.node.querySelectorAll<HTMLElement>(".game-leave, .count, .trail")];
   const headWas = headParts.map((el) => el.getBoundingClientRect());
   const was = scrollY;
   const right = answers instanceof Element ? answers.querySelector("button.option.right") : null;
@@ -924,7 +906,7 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
     rise = Math.max(rise, dy);
     if (Math.abs(dy) >= 1) el.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], settling);
   });
-  // A head made smaller (stuck) has its count, tally, pips and arrow go from where they were, at their size then.
+  // A head made smaller (stuck) has its count, pips and arrow go from where they were, at their size then.
   headParts.forEach((el, i) => {
     const [a, b] = [headWas[i], el.getBoundingClientRect()];
     if (!a || !b.width || !b.height) return;
@@ -967,7 +949,7 @@ interface Head {
   stuckAt(dy: number): boolean;
 }
 
-/** The top of a question (its count, topic and tally, the pips and the clock), kept in view at the top of the screen
+/** The top of a question (its count and topic, the pips and the clock), kept in view at the top of the screen
  * while the question and its answer scroll, and smaller there. The room it gives up stays as a margin, so nothing
  * under it jumps. It's stuck once the page has moved a few pixels past it, and comes back only near the page's top:
  * a page moving by a pixel or two at the edge doesn't make it flicker. On a short screen (a phone on its side,

@@ -3,7 +3,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
-import { dealt, startDay } from "./play.ts";
+import { befriend, daysPlayed, dealt, startDay } from "./play.ts";
 
 /** The text at `percent` of its size from the page's start, as a phone set to large text gives it (a style the page's
  * own rules can't undo; CSP lets the test add it). */
@@ -189,6 +189,73 @@ function eachKind(): string[] {
     ),
   ];
 }
+
+test.describe("a player's places at twice the text on a 320px phone", () => {
+  test.use({ viewport: { width: 320, height: 640 }, bypassCSP: true });
+
+  test("the streak, friends of long names and their duels: words whole, nothing cut or sideways", async ({
+    page,
+    browser,
+  }) => {
+    test.setTimeout(180_000);
+    const other = await (await browser.newContext()).newPage();
+    await page.goto("/");
+    await daysPlayed(page, 1, 2, 3, 4);
+    await befriend(page, other);
+    await other.evaluate(() =>
+      fetch("/api/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Борислав Петров" }),
+      }),
+    );
+    const friend = await other.evaluate(async () => (await (await fetch("/api/me")).json()).user.id as number);
+    await page.evaluate(
+      (id) =>
+        fetch("/api/duels", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ friend: id }),
+        }),
+      friend,
+    );
+    for (const size of [200, 150]) {
+      await textAt(page, size);
+      await page.goto("/");
+      await expect(page.locator(".streak-chip")).toBeVisible();
+      await fits(page, `Днес, ${size} %`);
+      // The streak's words inside its card.
+      const out = await page
+        .locator(".streak-chip")
+        .evaluate((chip) =>
+          [...chip.querySelectorAll("*")].some(
+            (e) => e.getBoundingClientRect().right > chip.getBoundingClientRect().right + 1,
+          ),
+        );
+      expect(out, `the streak's words past its card, ${size} %`).toBe(false);
+      for (const path of ["/friends", "/duel/new"]) {
+        await page.goto(path);
+        await expect(page.locator(".friend, .duel-pick").first()).toBeVisible();
+        await fits(page, `${path}, ${size} %`);
+        expect(
+          await brokenWords(page, ".friend-name, .duel-row .who-name, .segmented button, .friend-act, .places-foot a"),
+          `${path}'s words, ${size} %`,
+        ).toEqual([]);
+        // „Дуел“ and the tabs inside the screen.
+        const off = await page
+          .locator(".friend-act, .segmented button, .duel-row")
+          .evaluateAll((els) =>
+            els.filter((e) => e.getBoundingClientRect().right > innerWidth + 1).map((e) => e.textContent),
+          );
+        expect(off, `${path}: off the screen's edge, ${size} %`).toEqual([]);
+      }
+      const cut = await page
+        .locator(".places-foot a")
+        .evaluateAll((links) => links.filter((a) => a.scrollWidth > a.clientWidth + 1).map((a) => a.textContent));
+      expect(cut, `the places at the foot, ${size} %`).toEqual([]);
+    }
+  });
+});
 
 test.describe("every kind of question at twice the text on a 320px phone", () => {
   test.use({ viewport: { width: 320, height: 640 }, bypassCSP: true });

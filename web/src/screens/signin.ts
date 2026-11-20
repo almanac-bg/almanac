@@ -38,11 +38,13 @@ export function signIn({
 }: SignInOptions = {}): Child {
   if (embedded && !embedded.forms)
     return h("p", { class: "muted" }, "Тук не питаме за имейл: отвори играта в браузъра на телефона и я запази там.");
-  const email = signal(filled);
+  // A code sent from this form a little while ago, in this tab: a reload comes back to the step that takes it.
+  const was = sentBefore(enter);
+  const email = signal(was?.email ?? filled);
   const code = signal("");
-  const sent = signal(false);
+  const sent = signal(!!was);
   // How long the code sent is: the server says (account.CodeDigits, or LongCodeDigits).
-  const digits = signal(6);
+  const digits = signal(was?.digits ?? 6);
   const busy = signal(false);
   const error = signal("");
   // The code sent can't be used any more (its tries used up, or its time): a new one is the way on.
@@ -61,6 +63,7 @@ export function signIn({
     ticking = setInterval(tick, 1000);
   };
   onCleanup(() => clearInterval(ticking));
+  if (was) countDown(Math.max(0, Math.ceil((was.again - Date.now()) / 1000)));
 
   const run = async (fn: () => Promise<void>) => {
     busy.set(true);
@@ -83,6 +86,13 @@ export function signIn({
       code.set("");
       dead.set(false);
       sent.set(true);
+      keepSent({
+        email: email.peek(),
+        digits: digits.peek(),
+        at: Date.now(),
+        again: Date.now() + (r.again ?? 60) * 1000,
+        enter,
+      });
     });
 
   const errorLine = () => error() && h("p", { class: "bad", role: "alert" }, error());
@@ -109,6 +119,7 @@ export function signIn({
                 email: email.peek(),
                 code: code.peek(),
               });
+              keepSent(null);
               done?.(keptWords(user.peek(), r.user), r.user);
               user.set(r.user);
               // The browser has a new session, and its notifications went along with it (account.Verify); any it
@@ -159,10 +170,21 @@ export function signIn({
                     { type: "button", class: "link", onclick: send, disabled: () => busy() || wait() > 0 },
                     "прати нов код",
                   ),
-                  () => (wait() ? ` след ${wait()} с` : ""),
+                  () => (wait() ? ` след ${wait()}\u00a0с` : ""),
                   ". ",
                 ],
-          h("button", { type: "button", class: "link", onclick: () => sent.set(false) }, "Смени имейла"),
+          h(
+            "button",
+            {
+              type: "button",
+              class: "link",
+              onclick: () => {
+                keepSent(null);
+                sent.set(false);
+              },
+            },
+            "Смени имейла",
+          ),
         ),
       ),
     () =>
@@ -198,4 +220,40 @@ export function signIn({
         h("p", { class: "muted" }, note),
       ),
   );
+}
+
+/** A code sent, as this tab keeps it (sessionStorage) so that a reload comes back to the step that takes it: the
+ * address, the code's length, when it went and when another may, and the form's own words (`enter`: which form it
+ * was, of those on a page). */
+interface Sent {
+  email: string;
+  digits: number;
+  at: number;
+  again: number;
+  enter: string;
+}
+
+const sentKey = "almanac.signin";
+
+/** How long a code sent is taken back to after a reload: inside its own life (account.CodeTTL, fifteen minutes). */
+const sentFor = 14 * 60_000;
+
+/** The code this form (`enter`) sent a little while ago in this tab, if any. */
+function sentBefore(enter: string): Sent | null {
+  try {
+    const s = JSON.parse(sessionStorage.getItem(sentKey) ?? "null") as Sent | null;
+    return s && s.enter === enter && typeof s.email === "string" && Date.now() - s.at < sentFor ? s : null;
+  } catch {
+    return null; // no storage: the form starts at the address
+  }
+}
+
+/** Keeps the code sent (or, with null, forgets it: taken, or another address). */
+function keepSent(s: Sent | null): void {
+  try {
+    if (s) sessionStorage.setItem(sentKey, JSON.stringify(s));
+    else sessionStorage.removeItem(sentKey);
+  } catch {
+    // not kept: a reload starts at the address
+  }
 }

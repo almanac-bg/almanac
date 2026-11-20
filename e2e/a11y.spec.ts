@@ -111,7 +111,7 @@ for (const scheme of ["light", "dark"] as const) {
 }
 
 // A duel's result, as one won against a friend has it (the server's answer for it made here): the two face to face,
-// the duel question by question with the quicker answers ringed and the deciding one marked, and the record.
+// the duel question by question with the deciding one marked, and the record.
 for (const scheme of ["light", "dark"] as const) {
   test(`a duel's result is accessible (${scheme})`, async ({ page }) => {
     const mark = (right: number, ms: number) => ({ right: right > 0, ms });
@@ -144,7 +144,8 @@ for (const scheme of ["light", "dark"] as const) {
     await expect(page.getByRole("heading", { name: "Победа" })).toBeVisible();
     await page.keyboard.press("Shift"); // the moment, to its end
     await expect(page.locator(".duel-record")).toBeVisible();
-    await expect(page.locator(".duel-pip.fast")).not.toHaveCount(0);
+    await expect(page.locator(".duel-pip.partial, .duel-pip.right")).not.toHaveCount(0);
+    await expect(page.locator(".duel-pip.fast, .duel-key")).toHaveCount(0); // speed only breaks a tie: no rings
     const { violations } = await new AxeBuilder({ page }).analyze();
     expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
   });

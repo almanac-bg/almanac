@@ -18,6 +18,8 @@ interface News {
   ink?: number;
   /** Right answers in the issue to questions the book had already: their facts stay grey (play: „вече срещан“). */
   metBefore?: number;
+  /** A chapter's game: the facts it wrote in grey, met first (play.News.Grey). */
+  grey?: number;
   /** The ranks risen since last told, as one (play.Rose): Бележка never; Страница brings the chapter's art; `best`, the
    * player's best rank rose. */
   rose?: { ranks: { chapter: string; name: string; to?: number; art?: boolean }[]; best?: boolean };
@@ -30,14 +32,17 @@ interface News {
 
 /** What a game brought, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends).
  * Told `late` (on Днес, of a game whose result was never on screen), it comes under a line that says whose it is
- * (`late.title`), if any. */
-export function news(run: number, delay = 0, late?: { title?: string }): Child {
+ * (`late.title`), if any. How others played the player's recordings goes to `recordingsTo`, where given, not with
+ * the rest.
+ */
+export function news(run: number, delay = 0, late?: { title?: string }, recordingsTo?: (view: Child) => void): Child {
   const data = signal<News | null>(null);
   const t = setTimeout(
     () =>
       api<News>("POST", "/api/me/news", { run }).then(
         (n) => {
           data.set(n);
+          if (n.recordings && recordingsTo) recordingsTo(recordings(n.recordings));
           // Ink written, or a rank risen: the seal worn may be another now (a first one, or the best risen).
           if (n.ink || n.rose) refreshSeal();
         },
@@ -52,13 +57,14 @@ export function news(run: number, delay = 0, late?: { title?: string }): Child {
     const best = n.rose?.best ? rankUp(n.rose) : null;
     const lines = [
       n.ink ? inkLine(n.ink) : null,
+      n.grey ? greyLine(n.grey) : null,
       n.metBefore ? metLine(n.metBefore) : null,
       n.rose && !best ? roseLine(n.rose) : n.step && !n.rose ? stepLine(n.step) : null,
     ].filter(Boolean);
     const parts = [
       best,
       lines.length ? h("section", { class: "inkline", "aria-label": "Днес в Алманаха" }, lines) : null,
-      n.recordings ? recordings(n.recordings) : null,
+      n.recordings && !recordingsTo ? recordings(n.recordings) : null,
     ];
     if (!late?.title) return parts;
     // Late, on Днес: whose news it is, over it; nothing at all when there's nothing to tell.
@@ -74,6 +80,16 @@ function inkLine(ink: number): Child {
     h("span", { class: "i i-nib", "aria-hidden": "true" }),
     h("b", { class: "num" }, `+${ink}`),
     " с мастило",
+  );
+}
+
+/** What a chapter's game wrote in the book, a tap from it: „+4 в сиво“ (only the issue writes ink). */
+function greyLine(grey: number): Child {
+  return h(
+    "a",
+    { class: "news-facts ink-row grey-row", href: "/almanac" },
+    h("b", { class: "num" }, `+${grey}`),
+    " в сиво",
   );
 }
 
@@ -98,11 +114,21 @@ function stepLine(s: NonNullable<News["step"]>): Child {
   );
 }
 
-/** Ranks risen, the best not among them, as one line, a tap from the book: „Страница в История, Тетрадка в Наука“. */
+/** Ranks risen, the best not among them (or beside a ten of ten): the seals risen, drawn, and one line for them all,
+ * a tap from the book: „Нов печат: Страница в История, Тетрадка в Наука.“ */
 function roseLine(r: NonNullable<News["rose"]>): Child {
   const said = r.ranks.map((x) => `${x.name} в ${chapterName(x.chapter)}`).join(", ");
   const art = r.ranks.some((x) => x.art) ? " Картината на главата вече може да е твоят аватар." : "";
-  return h("p", { class: "news-note news-rose" }, h("a", { href: "/almanac" }, `Нов печат: ${said}.`), art);
+  return h(
+    "div",
+    { class: "news-step news-rose" },
+    h(
+      "span",
+      { class: "rose-seals" },
+      r.ranks.map((x) => seal(x.chapter, x.to ?? rankNames.indexOf(x.name) + 1, 40)),
+    ),
+    h("p", null, h("a", { href: "/almanac" }, `Нов печат: ${said}.`), art),
+  );
 }
 
 /** The player's best rank risen: the result's one big moment, the seal set large on its chapter's sheet, its rank's

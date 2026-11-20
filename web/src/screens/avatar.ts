@@ -95,11 +95,11 @@ function choice(ranks: () => Rank[]): Child {
               type: "button",
               "aria-pressed": () => worn(c.id),
               "aria-disabled": open ? null : "true",
-              "aria-label": open ? chapterName(c.id) : `${chapterName(c.id)}: от Страница`,
+              "aria-label": open ? chapterName(c.id) : `${chapterName(c.id)} · от Страница`,
               onclick: () => (open ? wear(`${c.id}-natural`) : null),
             },
             avatar(`${c.id}-natural`),
-            h("span", { class: "pick-name" }, open ? chapterName(c.id) : "от Страница"),
+            h("span", { class: "pick-name" }, open ? chapterName(c.id) : `${chapterName(c.id)} · от\u00a0Страница`),
           );
         }),
       ),

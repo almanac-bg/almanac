@@ -27,5 +27,5 @@ test("each screen sets every piece of the kit it declares", () => {
     assert.deepEqual(names(set[1] ?? ""), names(declared[1] ?? ""), `${file}: the two lists differ`);
     checked++;
   }
-  assert.ok(checked >= 8, `only ${checked} screens checked: the pattern changed?`);
+  assert.ok(checked >= 6, `only ${checked} screens checked: the pattern changed?`);
 });

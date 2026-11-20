@@ -107,7 +107,7 @@ test("„България“: the questions about Bulgaria from every topic, a t
   await expect(page).toHaveURL(/\/play\/bulgaria$/);
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await playRun(page);
-  await expect(page.locator(".day-line .kicker")).toHaveText("България");
+  await expect(page.locator(".score-leaf .chip")).toHaveText("България");
   // Its ten come from more than one topic, each named in the review by its own.
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(page.locator(".reviewed")).toHaveCount(10);
@@ -117,9 +117,6 @@ test("„България“: the questions about Bulgaria from every topic, a t
   expect(topics.size).toBeGreaterThan(1);
   expect(topics.has("")).toBe(false);
   await expect(page.getByRole("button", { name: "Още десет" })).toBeVisible();
-  // The player's games name it.
-  await page.goto("/games");
-  await expect(page.locator(".game-what").filter({ hasText: /^България$/ })).toBeVisible();
 });
 
 test("„Микс“: every topic at once, the first way to play at the book's head, with „България“ after it", async ({
@@ -135,7 +132,7 @@ test("„Микс“: every topic at once, the first way to play at the book's h
   await expect(page).toHaveURL(/\/play\/mix$/);
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await playRun(page);
-  await expect(page.locator(".day-line .kicker")).toHaveText("Микс");
+  await expect(page.locator(".score-leaf .chip")).toHaveText("Микс");
   // Its ten come from more than one topic, each named in the review by its own.
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(page.locator(".reviewed")).toHaveCount(10);
@@ -143,9 +140,6 @@ test("„Микс“: every topic at once, the first way to play at the book's h
     (await page.locator(".reviewed-head .kicker").allTextContents()).map((k) => k.split(" · ")[1]),
   );
   expect(topics.size).toBeGreaterThan(1);
-  // The player's games name it.
-  await page.goto("/games");
-  await expect(page.locator(".game-what").filter({ hasText: /^Микс$/ })).toBeVisible();
 });
 
 test("a topic's count can be backed out of, or cut short", async ({ page }) => {

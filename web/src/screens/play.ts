@@ -41,8 +41,8 @@ export function topic([category = ""]: string[]) {
     home: `/almanac/${category}`,
     lead:
       category === mix.id
-        ? "Десет въпроса от всички теми, от лесен към труден."
-        : "Десет въпроса по темата, от лесен към труден.",
+        ? "Десет въпроса от всички глави, от лесен към труден."
+        : "Десет въпроса от главата, от лесен към труден.",
     begin: async () => {
       const s = await api<State>("POST", "/api/topic", { category });
       ask();
@@ -55,31 +55,39 @@ export function topic([category = ""]: string[]) {
         { class: "screen" },
         // What was played, where the day's result has its date: every result laid out the same. (The day's state is
         // in long before a game ends: as it was then, never drawing the result again.)
+        // The chapter's sheet: its chip, the score and its tiles; under it what the game wrote („+4 в сиво“).
         summary(
           s,
-          h("div", { class: "day-line" }, h("span", { class: "kicker" }, name)),
+          null,
           {
             main: () => nextOf(day(), again, category).main,
             also: [() => nextOf(day(), again, category).also],
           },
-          just ? [otherTopics(category), news(s.id)] : [otherTopics(category)],
+          just ? [news(s.id), otherTopics(category)] : [otherTopics(category)],
           just,
+          category,
         ),
       ),
   });
 }
 
-/** A topic's result's buttons: „Още десет“, gold; or, while the day's ten wait, the way to them, gold, with the streak
- * at stake under it, and „Още десет“ plain. */
+/** A chapter game's result's buttons: „Още десет“, the one action; beside it the way to the chapter (its facts, the
+ * new ones too), and while the day's ten wait, the way to them, plain, with the streak at stake under it. */
 function nextOf(d: DayWaits | null, again: () => void, chapter: string): { main: Child; also: Child[] } {
-  if (!d)
-    return {
-      main: h("button", { class: "btn primary big", onclick: again }, "Още десет"),
-      also: [h("a", { class: "btn", href: `/almanac/${chapter}` }, "Към главата")], // its facts, the new ones too
-    };
+  const more = h("button", { class: "btn primary big", onclick: again }, "Още десет");
+  const book = h("a", { class: "btn", href: `/almanac/${chapter}` }, "Към главата");
+  if (!d) return { main: more, also: [book] };
   return {
-    main: [h("a", { class: "btn primary big", href: "/" }, "Към въпросите на деня"), stakeLine(d.streak, d.spare)],
-    also: [h("button", { class: "btn", onclick: again }, "Още десет")],
+    main: more,
+    also: [
+      h(
+        "div",
+        { class: "stack small-gap" },
+        h("a", { class: "btn", href: "/" }, "Към въпросите на деня"),
+        stakeLine(d.streak, d.spare),
+      ),
+      book,
+    ],
   };
 }
 
@@ -99,8 +107,8 @@ function otherTopics(current: string): Child {
   return () =>
     h(
       "nav",
-      { class: "other-topics", "aria-label": "Друга тема" },
-      h("p", { class: "kicker" }, "Друга тема"),
+      { class: "other-topics", "aria-label": "Друга глава" },
+      h("p", { class: "kicker" }, "Друга глава"),
       h(
         "ul",
         { class: "chips" },
