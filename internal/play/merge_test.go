@@ -140,18 +140,20 @@ func TestForgetKeepsOthersHistory(t *testing.T) {
 		`{"to":"`+email+`","subject":"Серия","text":"Здравей"}`); err != nil {
 		t.Fatal(err)
 	}
-	before, err := w.g.StatsOf(ctx, ana)
-	if err != nil || before.Duels != 2 || before.Won != 1 {
-		t.Fatalf("Ana's duels before: %+v (%v)", before, err)
+	results := func() (n, won int) {
+		return w.count(`SELECT count(*) FROM `+duelResults, ana),
+			w.count(`SELECT count(*) FROM `+duelResults+` WHERE outcome = 'won'`, ana)
+	}
+	n, won := results()
+	if n != 2 || won != 1 {
+		t.Fatalf("Ana's duels before: %d won of %d", won, n)
 	}
 
 	if err := accounts.Delete(ctx, bo); err != nil {
 		t.Fatal(err)
 	}
-	after, err := w.g.StatsOf(ctx, ana)
-	if err != nil || after.Duels != before.Duels || after.Won != before.Won {
-		t.Fatalf("Ana's duels after Bo went: %d won of %d, not %d of %d (%v)", after.Won, after.Duels, before.Won,
-			before.Duels, err)
+	if n2, won2 := results(); n2 != n || won2 != won {
+		t.Fatalf("Ana's duels after Bo went: %d won of %d, not %d of %d", won2, n2, won, n)
 	}
 	duels, err := w.g.DuelsOf(ctx, ana)
 	if err != nil {
@@ -177,6 +179,10 @@ func TestForgetKeepsOthersHistory(t *testing.T) {
 	if d, err := w.g.DuelOf(ctx, ana, l); err != nil || d.State != DuelWon || d.Opponent.Name != GoneName ||
 		!d.Opponent.Gone {
 		t.Fatalf("the first duel: %+v (%v)", d, err)
+	}
+	after, err := w.g.StatsOf(ctx, ana)
+	if err != nil {
+		t.Fatal(err)
 	}
 	for _, p := range after.Recent {
 		if p.Outcome != "" && p.Opponent != GoneName {
@@ -252,8 +258,8 @@ func TestGoneMidDuel(t *testing.T) {
 	// The player of the recording Ed plays goes.
 	gus, ed := w.user(), w.user()
 	s, _ := w.g.StartTopic(ctx, gus, MixTopic)
-	w.play(gus, s.ID, repeat(w.right, Length)...)
-	rec, err := w.g.DuelRecording(ctx, ed)
+	w.play(gus, s.ID, append(repeat(w.right, 6), repeat(w.wrong, Length-6)...)...) // a newcomer's even: Ed's to play
+	rec, err := w.g.DuelRecording(ctx, ed, Even)
 	if err != nil {
 		t.Fatal(err)
 	}

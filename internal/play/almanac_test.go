@@ -78,14 +78,10 @@ func TestFactsCollected(t *testing.T) {
 		t.Fatalf("%d facts in the almanac after a topic's game half right, want %d in pencil (ink %v, %v)",
 			len(alm.Facts), want, alm.Ink, err)
 	}
-	s, err := w.g.StatsOf(ctx, ana)
-	if err != nil || s.Facts != want || s.Answers != Length {
-		t.Fatalf("stats: %d facts of %d answers, want %d (%v)", s.Facts, s.Answers, want, err)
-	}
 	w.knows(ana, append(again, w.picks(run.ID)[0].ID)...)
 	want += len(again)
-	if s, _ := w.g.StatsOf(ctx, ana); s.Facts != want {
-		t.Fatalf("stats: %d facts, want %d: one answered right again counts once", s.Facts, want)
+	if alm, _ := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage}); alm.Found != want {
+		t.Fatalf("the almanac: %d facts, want %d: one answered right again counts once", alm.Found, want)
 	}
 }
 
@@ -132,43 +128,5 @@ func TestAlmanacEntries(t *testing.T) {
 	}
 	if f := byID[untruth]; f.Question != "" || !f.Untrue || f.Answer == "Невярно" {
 		t.Fatalf("an untrue statement: %+v", f)
-	}
-}
-
-// A chapter is complete with every fact a topic has now: its live questions' (a retired question's fact is kept, but
-// no topic waits on it). It's noted in the book once, on the day of the game that completed it.
-func TestWholeTopic(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana := w.user()
-	var facts []string
-	for _, q := range w.b.Live("movies", "") {
-		if q.Extra().Fact != "" {
-			facts = append(facts, q.Base().ID)
-		}
-	}
-	if len(facts) < 2 {
-		t.Fatalf("the sample's movies have %d facts", len(facts))
-	}
-	w.knows(ana, facts[1:]...)
-	if err := w.g.noteMilestones(ctx, ana, w.g.Today()); err != nil {
-		t.Fatal(err)
-	}
-	if notes, _ := w.g.NotesOf(ctx, ana); len(notes) != 0 {
-		t.Fatalf("a whole topic but one: %+v", notes)
-	}
-	w.knows(ana, facts[0])
-	for range 2 {
-		if err := w.g.noteMilestones(ctx, ana, w.g.Today()); err != nil {
-			t.Fatal(err)
-		}
-	}
-	want := []Note{{Day: w.g.Today(), Kind: NoteChapter, Topic: "movies"}}
-	if notes, _ := w.g.NotesOf(ctx, ana); !slices.Equal(notes, want) {
-		t.Fatalf("every fact of a topic: %+v", notes)
-	}
-	s, _ := w.g.StatsOf(ctx, ana)
-	if s.Facts != len(facts) {
-		t.Fatalf("Профил counts %d facts, want %d", s.Facts, len(facts))
 	}
 }

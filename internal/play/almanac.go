@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"math"
+
 	"slices"
 	"strconv"
 	"strings"
@@ -45,16 +45,13 @@ const AlmanacSearch = 60
 
 // Almanac is a page of a player's book (a chapter, or all of it), the latest written first; each chapter's ink (Ink:
 // the one number a chapter says; pencil is listed, never counted); and where the next page starts (none after the
-// last). The first page has the notes in the book too (NotesOf), the latest first, and each chapter's mastery
-// (Chapters).
+// last). The first page has each chapter's rank too.
 type Almanac struct {
 	Facts []Learned `json:"facts"`
 	// Found is how many entries the page's chapter (and the search) lists: its pages are Found / AlmanacPage.
-	Found    int            `json:"found"`
-	Ink      map[string]int `json:"ink"`
-	Next     string         `json:"next,omitempty"`
-	Notes    []Note         `json:"notes,omitempty"`
-	Chapters []Mastery      `json:"chapters,omitempty"`
+	Found int            `json:"found"`
+	Ink   map[string]int `json:"ink"`
+	Next  string         `json:"next,omitempty"`
 	// Ranks are each of the bank's chapters' ranks, as kept (rank.go); Seal the one the player wears; Held, whether
 	// the guessing check holds their ranks at Страница now. The first page only.
 	Ranks []ChapterRank `json:"ranks,omitempty"`
@@ -178,12 +175,6 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Al
 		if since.Valid {
 			out.Since = dayOf(time.UnixMilli(since.Int64))
 		}
-		if out.Notes, err = g.NotesOf(ctx, userID); err != nil {
-			return out, err
-		}
-		if out.Chapters, err = g.ChaptersOf(ctx, userID); err != nil {
-			return out, err
-		}
 		if out.Ranks, out.Held, err = g.RanksOf(ctx, userID); err != nil {
 			return out, err
 		}
@@ -195,75 +186,4 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Al
 		out.Seal = sealOf(out.Ranks, chosen.String)
 	}
 	return out, nil
-}
-
-// ChaptersOf is how much of each chapter of the book a player knows: the bank's topics (MasteryOf), then „Микс“ (over
-// every topic: their ability over all of them, against every question) and „България“ (each of its questions known
-// as well as its own topic is: no ability of its own, bulgaria.go), both told as soon as the topics are, by all the
-// player's answers, once one of them is right (one of its own, for „България“).
-func (g *Game) ChaptersOf(ctx context.Context, userID int64) ([]Mastery, error) {
-	out, err := g.MasteryOf(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	h, err := g.hardness(ctx)
-	if err != nil {
-		return nil, err
-	}
-	topics, all, err := g.abilities(ctx, g.DB.Read, h, userID, 0, false)
-	if err != nil {
-		return nil, err
-	}
-	out = append(out, masteryOf(MixTopic, all, h.byTopic[""]))
-	sum, n := 0.0, 0
-	for _, q := range g.Bank().Live("", "") {
-		if !q.Extra().BG {
-			continue
-		}
-		a, ok := topics[q.Base().Category]
-		if !ok {
-			a = newAbility()
-		}
-		sum += sigmoid(a.mean - h.of(q))
-		n++
-	}
-	bg := masteryOf(BulgariaTopic, all, nil)
-	if topics[BulgariaTopic].rights == 0 {
-		bg.Sure, bg.First = false, false // none of its own questions right yet: nothing to tell of it
-	}
-	if n > 0 {
-		bg.Known = int(math.Round(100 * sum / float64(n)))
-		t := TierOf(bg.Known)
-		bg.Tier, bg.Name, bg.Next, bg.NextAt = t, MasteryTiers[t].Name, "", 0
-		if t+1 < len(MasteryTiers) {
-			bg.Next, bg.NextAt = MasteryTiers[t+1].Name, MasteryTiers[t+1].From
-		}
-	}
-	return append(out, bg), nil
-}
-
-// facts are how many facts a player's almanac has, and the topics it has every fact of (of the topic's live questions:
-// a retired question's fact counts in n, never towards a topic's whole), in the bank's order.
-type facts struct {
-	n     int
-	whole []string
-}
-
-// factsOf counts a player's almanac, as Профил and its notes do.
-func (g *Game) factsOf(ctx context.Context, userID int64) (facts, error) {
-	var f facts
-	byTopic := map[string]int{}
-	err := g.written(ctx, userID, func(q bank.Question, _ written) {
-		f.n++
-		if !q.Extra().Retired {
-			byTopic[q.Base().Category]++
-		}
-	})
-	in := factsIn(g.Bank())
-	for _, c := range g.Bank().Categories {
-		if n := in[c.ID]; n > 0 && byTopic[c.ID] >= n {
-			f.whole = append(f.whole, c.ID)
-		}
-	}
-	return f, err
 }

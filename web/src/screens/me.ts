@@ -144,7 +144,7 @@ function head(): Child {
   );
 }
 
-/** How the streak stands: days in a row, the longest, and the issues played; what the streak forgives under them. */
+/** How the streak stands: days in a row and the longest, and the seal worn; what the streak forgives under them. */
 function figures(s: Stats | null): Child {
   if (!s) return null;
   const fig = (n: number, label: string) =>
@@ -155,7 +155,14 @@ function figures(s: Stats | null): Child {
       { class: "figures-row me-figures" },
       fig(s.streak, s.streak === 1 ? "ден поред" : "дни поред"),
       fig(s.best, "най-дългата серия"),
-      fig(s.days, s.days === 1 ? "изигран брой" : "изиграни броя"),
+      s.seal
+        ? h(
+            "div",
+            { class: "fig" },
+            h("b", { class: "fig-n" }, s.seal.name),
+            h("span", { class: "fig-label" }, "печат"),
+          )
+        : null,
     ),
     // What keeps the streak through a day missed: the week's one day, forgiven by itself (play/runs.go).
     h(

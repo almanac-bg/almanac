@@ -41,22 +41,20 @@ func (w *world) sundayLate(user int64) int64 {
 	return s.ID
 }
 
-// What follows a run is judged by the run, not by when it's done: the sweep's retry after midnight notes a streak's
-// week on the run's day, not the next one, however late it comes.
+// What follows a run is judged by the run, not by when it's done: the sweep's retry after midnight keeps the ranks it
+// raised on the run's day, not the next one, however late it comes.
 func TestAfterRetryAcrossMidnight(t *testing.T) {
 	w := setup(t)
 	ctx := context.Background()
 	ana, bo := w.user(), w.user()
 	w.at(15, 23, 50, 0)
-	w.daysPlayed(ana, 6, 5, 4, 3, 2, 1) // Monday to Saturday: Sunday's day is the seventh in a row
-	w.daysPlayed(bo, 6, 5, 4, 3, 2, 1)
-	// What follows their Sunday runs fails (a note can't be kept), as if the server had stopped there.
-	if _, err := w.db.Write.Exec(`CREATE TEMP TRIGGER stop BEFORE INSERT ON notes
+	// What follows their Sunday runs fails (a rank can't be kept), as if the server had stopped there.
+	if _, err := w.db.Write.Exec(`CREATE TEMP TRIGGER stop BEFORE INSERT ON ranks
 		BEGIN SELECT RAISE(ABORT, 'stopped'); END`); err != nil {
 		t.Fatal(err)
 	}
-	w.dayGame(ana, nil, repeat(w.wrong, Length)...)
-	w.dayGame(bo, nil, repeat(w.wrong, Length)...)
+	w.dayGame(ana, nil)
+	w.dayGame(bo, nil)
 	if _, err := w.db.Write.Exec(`DROP TRIGGER stop`); err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +66,7 @@ func TestAfterRetryAcrossMidnight(t *testing.T) {
 		t.Fatal(err)
 	}
 	week := func(user int64, day string) int {
-		return w.count(`SELECT count(*) FROM notes WHERE user_id = ? AND kind = 'streak' AND n = 7 AND day = ?`, user, day)
+		return w.count(`SELECT count(*) FROM ranks WHERE user_id = ? AND day = ?`, user, day)
 	}
 	// Ana's is retried at 00:05, Bo's an hour after midnight: Sunday's week, both.
 	w.at(16, 0, 5, 0)
@@ -80,8 +78,8 @@ func TestAfterRetryAcrossMidnight(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, u := range []int64{ana, bo} {
-		if week(u, "2026-11-15") != 1 || week(u, "2026-11-16") != 0 {
-			t.Fatalf("player %d: the week noted on Sunday %d, on Monday %d", u, week(u, "2026-11-15"),
+		if week(u, "2026-11-15") == 0 || week(u, "2026-11-16") != 0 {
+			t.Fatalf("player %d: ranks kept on Sunday %d, on Monday %d", u, week(u, "2026-11-15"),
 				week(u, "2026-11-16"))
 		}
 	}

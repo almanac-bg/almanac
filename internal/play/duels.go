@@ -29,7 +29,9 @@ import (
 // way round. A player may have DuelsToOne duels open with one friend at once, and start DuelsADay a day.
 //
 // A duel against a recording (DuelRecording): the same ten as a real player's finished game (recordedRun: a real
-// one, played at a person's speed, none of its questions the player has seen first), played against it as it went:
+// one, played at a person's speed, none of its questions the player has seen first), chosen as „равен“ (Even: about
+// as many right as the player would get on its ten) or „по-силен“ (Stronger: a couple more), by the player's hidden
+// mastery (mastery.go: expectedRights), played against it as it went:
 // its marks come with the duel, for the screen to show at their times. It's shown by who played it, labelled a
 // recording (recordings.go); the recorded player hears of it quietly, with a game's news (RecordingsNews).
 //
@@ -240,30 +242,45 @@ func (g *Game) RecordingReady(ctx context.Context, userID int64) (bool, error) {
 			Scan(&ready); err != nil || ready {
 			return err
 		}
-		rec, err := g.recordedRun(tx, userID, seen)
+		rec, err := g.recordedRun(tx, userID, seen, nil)
 		ready = rec != nil
 		return err
 	})
 	return ready, err
 }
 
+// The recordings a player may choose to play against (DuelRecording).
+const (
+	// Even is a recording about as strong as the player: about as many right as they'd get on its ten.
+	Even = "even"
+	// Stronger is a recording a little stronger: StrongerBy more right than they'd get.
+	Stronger = "stronger"
+	// StrongerBy is how many more right answers „по-силен“ aims for.
+	StrongerBy = 2
+)
+
 // DuelRecording starts a duel against a recording: another player's finished game, the one with the fewest questions
-// the player has seen (recordedRun), and the player's run of its ten. One the player started and left unfinished is
-// gone on with instead. ErrNobody if there's none yet. It says the duel's id.
-func (g *Game) DuelRecording(ctx context.Context, userID int64) (int64, error) {
+// the player has seen that fits the level chosen best (recordedRun: Even or Stronger, by the player's hidden mastery;
+// anything else is Even), and the player's run of its ten. One the player started and left unfinished is gone on with
+// instead. ErrNobody if there's none yet. It says the duel's id.
+func (g *Game) DuelRecording(ctx context.Context, userID int64, level string) (int64, error) {
 	seen := map[string]bool{}
 	if err := seenBy(ctx, g.DB.Read, userID, seen); err != nil {
 		return 0, err
 	}
+	fit, err := g.recordingFit(ctx, userID, level)
+	if err != nil {
+		return 0, err
+	}
 	var id int64
-	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		err := tx.QueryRow(`SELECT d.id FROM duels d JOIN runs r ON r.id = d.a_run
 			WHERE d.kind = 'recording' AND d.a_id = ? AND d.ended_at IS NULL AND r.finished_at IS NULL
 			ORDER BY d.id DESC LIMIT 1`, userID).Scan(&id)
 		if err == nil || !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		rec, err := g.recordedRun(tx, userID, seen)
+		rec, err := g.recordedRun(tx, userID, seen, fit)
 		if err != nil {
 			return err
 		}
@@ -434,9 +451,10 @@ const (
 // before those days were drawn may have them), the latest first. Short of a real game, any game. At each of these, a
 // game over all the topics (a duel's, „Микс“) comes before one in a single topic, which the duel's player didn't
 // choose. Above all of it, a game with more than RecordingSeen of its questions seen by the player comes after every
-// game with fewer: the same ten again (a duel the player has just played, then the other's game in it as a
-// recording) is no duel. Nil if there's none.
-func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*recorded, error) {
+// game with more than RecordingSeen of its questions seen by the player comes after every game with fewer: the same ten
+// again (a duel the player has just played, then the other's game in it as a recording) is no duel. Of those as few
+// seen, the one that fits the level the player chose best (fit, if given: the lower the better). Nil if there's none.
+func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool, fit recordingFit) (*recorded, error) {
 	days, err := g.days(tx)
 	if err != nil {
 		return nil, err
@@ -460,6 +478,7 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 	// seen, the latest first. Those with more than RecordingSeen seen: the same four after all of them (4–7).
 	var best [8]*recorded
 	var fewest [8]int
+	var fits [8]float64
 	for i := range fewest {
 		fewest[i] = Length + 1
 	}
@@ -495,9 +514,13 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 			kind += 4 // mostly seen: after every game the player hasn't
 		}
 		real := rights >= RecordingRights && missed <= RecordingMissed
-		for level, fits := range [2]bool{real, true} {
-			if k := 2*level + kind; fits && n < fewest[k] {
-				best[k], fewest[k] = &recorded{id: id, picks: picks, topic: topic}, n
+		off := 0.0
+		if fit != nil {
+			off = fit(b, picks, rights)
+		}
+		for level, ok := range [2]bool{real, true} {
+			if k := 2*level + kind; ok && (n < fewest[k] || n == fewest[k] && off < fits[k]) {
+				best[k], fewest[k], fits[k] = &recorded{id: id, picks: picks, topic: topic}, n, off
 			}
 		}
 	}

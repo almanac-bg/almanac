@@ -151,9 +151,13 @@ func (w *world) about(p *player) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	notes, err := w.g.NotesOf(ctx, p.id)
+	seal, err := w.g.SealOf(ctx, p.id)
 	if err != nil {
 		return "", err
+	}
+	rank := "no rank"
+	if seal != nil {
+		rank = seal.Name + " in " + seal.Chapter
 	}
 	friends, err := w.g.FriendsOf(ctx, p.id)
 	if err != nil {
@@ -163,8 +167,8 @@ func (w *world) about(p *player) (string, error) {
 	if err := w.one(&days, `SELECT count(*) FROM active_days WHERE user_id = ?`, p.id); err != nil {
 		return "", err
 	}
-	facts := fmt.Sprintf("%d days played, streak %d (best %d, spare %v), %d notes in the book, %d friends, "+
-		"duels: %d to play, %d waiting, %d played", days, streak.Days, streak.Best, streak.Spare, len(notes),
+	facts := fmt.Sprintf("%d days played, streak %d (best %d, spare %v), %s, %d friends, "+
+		"duels: %d to play, %d waiting, %d played", days, streak.Days, streak.Best, streak.Spare, rank,
 		len(friends), len(duels.Yours), len(duels.Theirs), len(duels.Played))
 	fail := func(why string) (string, error) {
 		return "", fmt.Errorf("seed: the %s persona %s: %s", p.persona, why, facts)

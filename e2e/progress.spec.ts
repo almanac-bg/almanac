@@ -1,17 +1,18 @@
 import { expect, test } from "@playwright/test";
 import { openGame, playedBefore, playRun, startDay } from "./play.ts";
 
-test("a topic's game tells how well the topic is known, and the avatar is anyone's to choose", async ({ page }) => {
+test("a topic's game never tells how well the topic is known, and the avatar is anyone's to choose", async ({
+  page,
+}) => {
   test.setTimeout(120_000);
   await page.goto("/");
   await playedBefore(page, 1);
   await openGame(page, "/play/history");
   await playRun(page);
-  // Ten answers in a topic are its first estimate: told under the result, quietly. Nothing about XP, levels or
-  // achievements: the game has none (DECISIONS.md, „The redesign“).
-  await expect(page.locator(".mastery-line")).toContainText("История");
-  await expect(page.locator(".mastery-line")).toContainText("Първа оценка");
-  await expect(page.locator(".screen")).not.toContainText(/XP|[Нн]иво \d|[Пп]остижени/);
+  // How well the topic is known is the game's own (play/mastery.go): never told. Nothing about XP, levels or
+  // achievements: the game has none (DECISIONS.md, „The direction“).
+  await expect(page.locator(".summary")).toBeVisible();
+  await expect(page.locator(".screen")).not.toContainText(/XP|[Нн]иво \d|[Пп]остижени|оценка|Познавач|Новак/);
 
   // The avatar, on Профил: every animal, none locked.
   await page.goto("/me");

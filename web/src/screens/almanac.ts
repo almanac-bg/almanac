@@ -1,11 +1,9 @@
-// Алманах, one of the three places: the player's book. Its contents first — a chapter per topic, then „Микс“ and
-// „България“, each with how much of it the player knows (its share, its tier, a track in its colour) and its facts —
-// and the notes the book keeps (a streak of 7, 30, 100 or 365 days, a first ten of ten, a chapter complete), dated as
-// a ledger, with the next one ahead. A chapter (/almanac/<topic>) is how much of it the player knows on its scale,
-// „Играй главата“ (a game of its questions: topics are played from here), and its facts as entries, the latest first,
-// a page at a time, found by their words.
+// Алманах, one of the three places: the player's book. Its contents — a chapter per topic, then „Микс“ and
+// „България“, each with its ink and its rank (play/rank.go: named for the book, a track of the quarters to the next).
+// A chapter (/almanac/<topic>) is its rank, „Играй главата“ (a game of its questions: topics are played from here),
+// and its facts as entries, ink and pencil, the latest first, a page at a time, found by their words. How well a
+// player knows a chapter (mastery) is the game's own, never shown.
 
-import type { Note } from "../game/news.ts";
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
 import type { Stats } from "./stats.ts";
@@ -17,7 +15,6 @@ let {
   back,
   bulgaria,
   dateWords,
-  dayInBulgaria,
   failure,
   formatNumber,
   h,
@@ -32,17 +29,16 @@ let {
   user,
 } = {} as Kit;
 
-/** A chapter's mastery, as the server sends it (play.Mastery). */
-interface Chapter {
-  category: string;
-  answers: number;
-  known: number;
-  tier: number;
+/** A chapter's rank, as kept (play.ChapterRank): level 0 is none yet. */
+interface Rank {
+  chapter: string;
+  level: number;
   name: string;
-  next?: string;
-  nextAt?: number;
-  sure: boolean;
-  first?: boolean;
+  /** The quarters of the way to the next rank: 0 to 3. */
+  quarter: number;
+  ink: number;
+  next: string;
+  nextAt: number;
 }
 
 interface Learned {
@@ -63,22 +59,20 @@ interface Learned {
 }
 
 /** A page of the book (play.Almanac): its facts, how many the chapter (and the search) lists, each chapter's ink (its
- * one number: pencil is listed, never counted); with the first page, the notes, each chapter's mastery, and the day
- * the book began. */
+ * one number: pencil is listed, never counted); with the first page, each chapter's rank, the seal worn, whether the
+ * guessing check holds the ranks, and the day the book began. */
 interface Page {
   facts: Learned[];
   found: number;
   ink: Record<string, number>;
-  notes?: Note[];
-  chapters?: Chapter[];
+  ranks?: Rank[];
+  seal?: Rank;
+  held?: boolean;
   since?: string;
 }
 
 /** How many facts a page shows (play.AlmanacPage). */
 const perPage = 30;
-
-/** The tiers' starts (play.MasteryTiers), above Новак's 0: the ticks on a chapter's scale. */
-const tierStarts = [35, 50, 65, 78, 90];
 
 function setKit(kit: Kit) {
   ({
@@ -86,7 +80,6 @@ function setKit(kit: Kit) {
     back,
     bulgaria,
     dateWords,
-    dayInBulgaria,
     failure,
     formatNumber,
     h,
@@ -144,7 +137,6 @@ export function almanac(kit: Kit): Child {
   return h("section", { class: "screen book spread" }, (): Child => {
     const p = page();
     if (!p) return failed() ? failure(failed(), load) : h("p", { class: "muted" }, "…");
-    const mix = p.chapters?.find((c) => c.category === "mix");
     const s = stats();
     return [
       h(
@@ -159,12 +151,17 @@ export function almanac(kit: Kit): Child {
           "div",
           { class: "figures-row" },
           figure(s ? formatNumber(s.streak) : "…", s?.streak === 1 ? "ден поред" : "дни поред"),
-
-          figure(told(mix) ? `${mix?.known} %` : "—", "от всичко знаеш"),
+          figure(p.seal ? p.seal.name : "—", p.seal ? `печат: ${nameOf(p.seal.chapter)}` : "звание"),
         ),
+        p.held
+          ? h(
+              "p",
+              { class: "small" },
+              "Званията от Тетрадка нагоре идват, когато отговорите ти в броевете не са налучкване.",
+            )
+          : null,
       ),
       contents(p),
-      notes(p.notes ?? [], s),
     ];
   });
 }
@@ -178,7 +175,7 @@ function contents(p: Page): Child {
       "div",
       { class: "sect-head" },
       h("h2", null, "Съдържание"),
-      h("span", { class: "sect-note" }, "колко знаеш от всяка глава"),
+      h("span", { class: "sect-note" }, "мастилото и званието на всяка глава"),
     ),
     h(
       "ol",
@@ -187,7 +184,7 @@ function contents(p: Page): Child {
         tocRow(
           id,
           p,
-          p.chapters?.find((c) => c.category === id),
+          p.ranks?.find((r) => r.chapter === id),
         ),
       ),
     ),
@@ -198,18 +195,13 @@ function contents(p: Page): Child {
 const figure = (value: string, label: string) =>
   h("div", { class: "fig" }, h("b", { class: "fig-n" }, value), h("span", { class: "fig-label" }, label));
 
-/** Whether a chapter's share known is told yet: from a first estimate (play.MasteryFirst). */
-const told = (c?: Chapter): boolean => !!c && (c.sure || !!c.first);
-
-/** A chapter in the contents: its picture, its name, dotted leaders to the share known, and under them its facts, its
- * tier and a track in its colour. */
-function tocRow(id: string, p: Page, chapter?: Chapter): Child {
-  const c = chapter && told(chapter) ? chapter : null;
-  const known = c ? c.known : 0;
-  const meta = [
-    id === "mix" ? "всички глави" : inked(p.ink[id] ?? 0),
-    c ? (c.sure ? c.name : "първа оценка") : "още без оценка",
-  ].join(" · ");
+/** A chapter in the contents: its picture, its name, dotted leaders to its rank, and under them its ink, the next
+ * rank and a track of the quarters to it in its colour. „Микс“ and „България“ have their ink only. */
+function tocRow(id: string, p: Page, rank?: Rank): Child {
+  const r = rank?.level ? rank : null;
+  const meta = [id === "mix" ? "всички глави" : inked(p.ink[id] ?? 0), rank ? `следва ${rank.next}` : ""]
+    .filter(Boolean)
+    .join(" · ");
   return h(
     "li",
     { class: `toc-row t-${id}` },
@@ -223,12 +215,18 @@ function tocRow(id: string, p: Page, chapter?: Chapter): Child {
         h("span", { class: "toc-name" }, nameOf(id), id === "bulgaria" ? h("i", { class: "flag" }) : null),
         h("span", { class: "toc-dots", "aria-hidden": "true" }),
       ),
-      h("span", { class: "toc-known" }, c ? [String(c.known), h("small", null, "%")] : "—"),
+      h("span", { class: "toc-known" }, r ? r.name : "—"),
       h(
         "span",
         { class: "toc-sub" },
         h("span", null, meta),
-        h("span", { class: "toc-track", "aria-hidden": "true" }, h("i", { style: { width: `${known}%` } })),
+        rank
+          ? h(
+              "span",
+              { class: "toc-track", "aria-hidden": "true" },
+              h("i", { style: { width: `${rank.quarter * 25}%` } }),
+            )
+          : null,
       ),
     ),
   );
@@ -242,89 +240,7 @@ function shortDate(day: string): string {
   return `${d} ${shortMonths[m - 1]}`;
 }
 
-/** The streak's milestones the book notes (play: notes), and how each is written in it. */
-const streakWords: Record<number, string> = {
-  7: "Седем дни поред. Първата седмица без пропуск.",
-  30: "Тридесет дни поред.",
-  100: "Сто дни поред.",
-  365: "Година поред: 365 дни.",
-};
-
-/** The streak's next milestone, ahead. */
-const aheadWords: Record<number, string> = {
-  7: "Седем дни поред",
-  30: "Тридесет дни поред",
-  100: "Сто дни поред",
-  365: "Година поред",
-};
-
-/** A note as the book writes it. */
-function noteText(n: Note): string {
-  switch (n.kind) {
-    case "streak":
-      return streakWords[n.n ?? 0] ?? `${n.n} дни поред.`;
-    case "perfect":
-      return "Първите ти десет от десет.";
-    default:
-      return `Цялата глава „${nameOf(n.topic ?? "")}“: всеки неин факт.`;
-  }
-}
-
-/** The streak's next milestone and the day it would come („2026-11-27“), from the streak, whether today's ten are
- * played, and today: a streak that waits on today's ten runs to yesterday (play/runs.go), so today is the first day
- * it grows by; once they're played, tomorrow is. None without a streak, or past the last milestone. */
-export function milestoneAhead(
-  streak: number,
-  playedToday: boolean,
-  today: string,
-): { n: number; day: string } | undefined {
-  const n = streak > 0 ? [7, 30, 100, 365].find((m) => m > streak) : undefined;
-  if (!n) return undefined;
-  const [y = 1970, m = 1, d = 1] = today.split("-").map(Number);
-  const at = new Date(Date.UTC(y, m - 1, d + n - streak - (playedToday ? 0 : 1)));
-  return { n, day: at.toISOString().slice(0, 10) };
-}
-
-/** Whether today's ten are played, as this week's strip has it (Monday first). */
-function playedOn(s: Stats, today: string): boolean {
-  const [y = 1970, m = 1, d = 1] = today.split("-").map(Number);
-  return !!s.week[(new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7];
-}
-
-/** The notes the book keeps, the latest first, each dated, and the next one ahead, in italic (the streak's next
- * milestone, on the day it would come); nothing while there's neither. */
-function notes(list: Note[], s: Stats | null): Child {
-  const today = dayInBulgaria();
-  const ahead = s ? milestoneAhead(s.streak, playedOn(s, today), today) : undefined;
-  if (!list.length && !ahead) return null;
-  return h(
-    "section",
-    { class: "sect book-notes almanac-notes page-1" },
-    h("div", { class: "sect-head" }, h("h2", null, "Бележки")),
-    h(
-      "ol",
-      { class: "ledger" },
-      ahead
-        ? h(
-            "li",
-            { class: "next" },
-            h("span", { class: "ledger-day" }, shortDate(ahead.day)),
-            h("span", { class: "ledger-text" }, `${aheadWords[ahead.n]}, ако не спреш.`),
-          )
-        : null,
-      list.map((n) =>
-        h(
-          "li",
-          null,
-          h("span", { class: "ledger-day" }, shortDate(n.day)),
-          h("span", { class: "ledger-text" }, noteText(n)),
-        ),
-      ),
-    ),
-  );
-}
-
-/** A chapter of the book (/almanac/<topic>): how much of it the player knows, on its scale; „Играй главата“; its facts
+/** A chapter of the book (/almanac/<topic>): its rank, on its scale; „Играй главата“; its facts
  * as entries, the latest first, a page at a time, found by their words. Its page and search are in the address
  * (?page=2&q=…), so back to it, or a reload, opens the same. */
 export function chapter(kit: Kit, [id = ""]: string[]): Child {
@@ -360,7 +276,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
           return;
         }
         data.set(p);
-        if (p.chapters) first.set(p);
+        if (p.ranks) first.set(p);
         if (toFacts) requestAnimationFrame(() => document.querySelector(".chapter-facts")?.scrollIntoView());
         toFacts = false;
       },
@@ -375,7 +291,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
     rename(`/almanac/${id}${shown.size ? `?${shown}` : ""}`);
   };
   if (user.peek()) {
-    // The first page has the chapter's mastery: asked for once, apart, when the chapter opens on another page.
+    // The first page has the chapter's rank: asked for once, apart, when the chapter opens on another page.
     if (page.peek() || query.peek())
       api<Page>("GET", `/api/almanac?${new URLSearchParams({ topic: id })}`).then(first.set, () => {});
     load();
@@ -423,7 +339,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
         ),
         chapterPic(id, "chapter-pic"),
       ),
-      () => scale(first()?.chapters?.find((c) => c.category === id)),
+      () => scale(first()?.ranks?.find((r) => r.chapter === id)),
       id !== "bulgaria" || bulgaria.open
         ? h(
             "div",
@@ -497,54 +413,34 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   );
 }
 
-/** How much of the chapter the player knows: the share, set big, a sentence with its tier, and its scale — a track
- * filled in the chapter's colour, a tick at each tier, a mark where the player is, only the ends named. Before a
- * first estimate, how far there is to one. */
-function scale(c?: Chapter): Child {
-  if (!c) return h("div", { class: "know" });
-  if (!told(c)) {
-    const left = Math.max(1, 10 - c.answers);
+/** The chapter's rank: its name, set big, a sentence of the ink to the next, and the quarters toward it on a track in
+ * the chapter's colour. Before a rank, what writes one: a right answer in the day's issue. „Микс“ and „България“ have
+ * none. */
+function scale(r?: Rank): Child {
+  if (!r) return h("div", { class: "know" });
+  if (!r.level)
     return h(
       "div",
       { class: "know" },
-      h(
-        "p",
-        { class: "know-words" },
-        !c.answers
-          ? "Изиграй главата и ще видиш колко от нея знаеш."
-          : c.answers < 10
-            ? `Още ${left} ${left === 1 ? "отговор" : "отговора"} и ще видиш колко от главата знаеш.`
-            : "С първия верен отговор ще видиш колко от главата знаеш.",
-      ),
+      h("p", { class: "know-words" }, "Всеки верен отговор в броя на деня записва факт с мастило и носи звание."),
     );
-  }
-  const words = c.sure
-    ? [
-        h("b", null, c.name),
-        c.next && c.nextAt !== undefined
-          ? c.nextAt - c.known <= 5
-            ? `, на крачка от „${c.next}“.`
-            : `, още ${c.nextAt - c.known} % до „${c.next}“.`
-          : ": най-високата степен.",
-      ]
-    : ["Първа оценка: степента идва с още отговори."];
+  const left = Math.max(1, r.nextAt - r.ink);
   return h(
     "div",
     { class: "know" },
     h(
       "div",
       { class: "know-top" },
-      h("b", { class: "know-n" }, String(c.known), h("small", null, "%")),
-      h("p", { class: "know-words" }, "от главата знаеш. ", words),
+      h("b", { class: "know-n" }, r.name),
+      h("p", { class: "know-words" }, `${inked(r.ink)}. Още ${left} до „${r.next}“.`),
     ),
     h(
       "div",
-      { class: "scale", role: "img", "aria-label": `Знаеш ${c.known} % от главата` },
-      h("i", { class: "scale-fill", style: { width: `${c.known}%` } }),
-      tierStarts.map((at) => h("i", { class: "scale-tick", style: { left: `${at}%` } })),
-      h("i", { class: "scale-me", style: { left: `${c.known}%` } }),
-      h("span", { class: "scale-end" }, "Новак"),
-      h("span", { class: "scale-end last" }, "Светило"),
+      { class: "scale", role: "img", "aria-label": `${r.quarter} от 4 четвърти до „${r.next}“` },
+      h("i", { class: "scale-fill", style: { width: `${r.quarter * 25}%` } }),
+      [25, 50, 75].map((at) => h("i", { class: "scale-tick", style: { left: `${at}%` } })),
+      h("span", { class: "scale-end" }, r.name),
+      h("span", { class: "scale-end last" }, r.next),
     ),
   );
 }

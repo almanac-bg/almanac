@@ -57,8 +57,9 @@ func (s *Server) newDuel(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	var in struct {
-		Friend    int64 `json:"friend"`
-		Recording bool  `json:"recording"`
+		Friend    int64  `json:"friend"`
+		Recording bool   `json:"recording"`
+		Level     string `json:"level"`
 	}
 	if err := readJSON(r, &in); err != nil {
 		return err
@@ -69,7 +70,7 @@ func (s *Server) newDuel(w http.ResponseWriter, r *http.Request) error {
 	var id int64
 	switch {
 	case in.Recording:
-		id, err = s.game.DuelRecording(r.Context(), u.ID)
+		id, err = s.game.DuelRecording(r.Context(), u.ID, in.Level)
 	case in.Friend > 0:
 		id, err = s.game.DuelFriend(r.Context(), u.ID, in.Friend)
 	default:

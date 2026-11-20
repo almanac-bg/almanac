@@ -5,7 +5,6 @@ import (
 	"math/rand/v2"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -30,7 +29,7 @@ func TestTopicShape(t *testing.T) {
 }
 
 // Players of a known ability, answering at random questions of the bank's mix, are told apart, and in time told
-// as they are; guessing alone is a Новак.
+// as they are; guessing alone is below every one of them.
 func TestAbility(t *testing.T) {
 	r := rand.New(rand.NewPCG(1, 2))
 	mix := []bank.Difficulty{bank.Easy, bank.Easy, bank.Easy, bank.Easy, bank.Easy, bank.Medium, bank.Medium, bank.Medium, bank.Hard, bank.Hard}
@@ -66,16 +65,46 @@ func TestAbility(t *testing.T) {
 	if early := estimate(2, 10); early < 0.5 || early > 1.8 {
 		t.Errorf("a strong player after ten answers: %.2f", early)
 	}
-	hard := []float64{}
-	for _, d := range mix {
-		hard = append(hard, hardnessOf(labelKnown[d]))
+	if g, weak := estimate(-100, 100), estimate(-2, 100); g >= weak {
+		t.Errorf("a guesser %.2f, a weak player %.2f", g, weak)
 	}
-	if m := masteryOf("x", ability{mean: estimate(-100, 100), answers: 100}, hard); m.Tier != 0 {
-		t.Errorf("a guesser: %+v", m)
+}
+
+// The mastery a player's games shape themselves by: one who knows a topic draws harder games of it than one who
+// doesn't; nothing of it is shown (DECISIONS.md, „The direction“).
+func TestMasteryShapesGames(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo := w.user(), w.user()
+	for _, p := range []struct {
+		user   int64
+		answer func(int64, int) json.RawMessage
+	}{{ana, w.right}, {bo, w.wrong}} {
+		for range 3 {
+			s, err := w.g.StartTopic(ctx, p.user, "history")
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.play(p.user, s.ID, repeat(p.answer, Length)...)
+		}
 	}
-	// An average player knows about 60% of a topic: a Познавач.
-	if m := masteryOf("x", ability{mean: 0, answers: 100}, hard); m.Known < 55 || m.Known > 65 || MasteryTiers[m.Tier].ID != "connoisseur" {
-		t.Errorf("an average player: %+v", m)
+	a, _ := w.g.ability(ctx, w.db.Read, ana, "history")
+	b, _ := w.g.ability(ctx, w.db.Read, bo, "history")
+	if a <= b {
+		t.Fatalf("ana %.2f, bo %.2f", a, b)
+	}
+	hardOnes := func(user int64) int {
+		s, _ := w.g.StartTopic(ctx, user, "history")
+		n := 0
+		for _, p := range w.picks(s.ID) {
+			if q, _ := w.b.Get(p.ID); q.Base().Difficulty == bank.Hard {
+				n++
+			}
+		}
+		return n
+	}
+	if hardOnes(ana) <= hardOnes(bo) {
+		t.Fatal("a run's shape doesn't follow mastery")
 	}
 }
 
@@ -98,151 +127,5 @@ func TestLearnWeighsAnswers(t *testing.T) {
 	}
 	if moved(1, bank.Medium, "number") <= moved(1, bank.Medium, "choice") {
 		t.Error("a number right (no luck in it)")
-	}
-}
-
-func TestMastery(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana, bo := w.user(), w.user()
-	m, err := w.g.MasteryOf(ctx, ana)
-	if err != nil || len(m) != len(w.b.Categories) || m[0].Answers != 0 || m[0].Sure {
-		t.Fatalf("a newcomer's mastery: %+v %v", m, err)
-	}
-	// Ana knows history; Bo doesn't.
-	for _, p := range []struct {
-		user   int64
-		answer func(int64, int) json.RawMessage
-	}{{ana, w.right}, {bo, w.wrong}} {
-		for range MasteryFrom / Length {
-			s, err := w.g.StartTopic(ctx, p.user, "history")
-			if err != nil {
-				t.Fatal(err)
-			}
-			w.play(p.user, s.ID, repeat(p.answer, Length)...)
-		}
-	}
-	know := func(user int64) Mastery {
-		m, _ := w.g.MasteryOf(ctx, user)
-		for _, x := range m {
-			if x.Category == "history" {
-				return x
-			}
-		}
-		return Mastery{}
-	}
-	a, b := know(ana), know(bo)
-	if !a.Sure || a.Answers != MasteryFrom || a.Tier < 3 || b.Tier != 0 || a.Known <= b.Known {
-		t.Fatalf("ana %+v, bo %+v", a, b)
-	}
-	// Ana's next history run is harder than Bo's.
-	hardOnes := func(user int64) int {
-		s, _ := w.g.StartTopic(ctx, user, "history")
-		n := 0
-		for _, p := range w.picks(s.ID) {
-			if q, _ := w.b.Get(p.ID); q.Base().Difficulty == bank.Hard {
-				n++
-			}
-		}
-		return n
-	}
-	if hardOnes(ana) <= hardOnes(bo) {
-		t.Fatal("a run's shape doesn't follow mastery")
-	}
-	// A game tells how it moved the mastery of its topics.
-	s, _ := w.g.StartTopic(ctx, bo, "music")
-	if _, err := w.g.MasteryMoves(ctx, bo, s.ID); err != ErrOutOfStep {
-		t.Fatalf("a game not over: %v", err)
-	}
-	w.play(bo, s.ID, repeat(w.right, Length)...)
-	n, err := w.g.NewsOf(ctx, bo, s.ID)
-	if err != nil || n.Mastery == nil || n.Mastery.To.Category != "music" || n.Mastery.From.Answers != 0 ||
-		n.Mastery.To.Answers != Length || n.Mastery.To.Known <= n.Mastery.From.Known {
-		t.Fatalf("the news of a music game: %+v %v", n.Mastery, err)
-	}
-	if n, err := w.g.NewsOf(ctx, ana, s.ID); err != nil || n.Mastery != nil {
-		t.Fatalf("news of someone else's game: %+v %v", n, err)
-	}
-	// A game played later doesn't change what an earlier one did.
-	w.wait(time.Minute)
-	later, _ := w.g.StartTopic(ctx, bo, "music")
-	w.play(bo, later.ID, repeat(w.wrong, Length)...)
-	if again, _ := w.g.MasteryMoves(ctx, bo, s.ID); len(again) != 1 || again[0] != *n.Mastery {
-		t.Fatalf("an earlier game's news, after another: %+v, was %+v", again, n.Mastery)
-	}
-	stats, _ := w.g.StatsOf(ctx, ana)
-	if len(stats.Mastery) != len(w.b.Categories) || stats.Mastery[0].Name == "" {
-		t.Fatalf("stats' mastery: %+v", stats.Mastery)
-	}
-}
-
-// A game's news tells one move of mastery: the first that's news (a first estimate, a tier first told, a share gone
-// up), never a loss; of a game of one topic with no estimate yet, what's left before one; and the news's cards count
-// it only then, as the client draws it.
-func TestMasteryTold(t *testing.T) {
-	m := func(category string, known, tier int, sure, first bool) Mastery {
-		answers := 4
-		if sure {
-			answers = 40
-		} else if first {
-			answers = 12
-		}
-		return Mastery{Category: category, Answers: answers, Known: known, Tier: tier, Sure: sure, First: first}
-	}
-	h := func(known, tier int, sure, first bool) Mastery { return m("history", known, tier, sure, first) }
-	for _, c := range []struct {
-		name string
-		move MasteryMove
-		news bool
-	}{
-		{"a first estimate", MasteryMove{h(0, 0, false, false), h(31, 0, false, true)}, true},
-		{"its tier, first told", MasteryMove{h(23, 0, false, true), h(13, 0, true, false)}, true},
-		{"a share gone up", MasteryMove{h(40, 2, true, false), h(44, 2, true, false)}, false},
-		{"a tier up", MasteryMove{h(40, 2, true, false), h(52, 3, true, false)}, true},
-		{"down within a tier", MasteryMove{h(15, 0, true, false), h(13, 0, true, false)}, false},
-		{"down a tier", MasteryMove{h(41, 3, true, false), h(38, 2, true, false)}, false},
-		{"a first estimate down", MasteryMove{h(31, 0, false, true), h(29, 0, false, true)}, false},
-		{"no change", MasteryMove{h(40, 2, true, false), h(40, 2, true, false)}, false},
-	} {
-		if got := masteryTold([]MasteryMove{c.move}); (got != nil) != c.news {
-			t.Errorf("%s: told %+v", c.name, got)
-		}
-	}
-	// One topic, still too few answers for an estimate: nothing to tell yet.
-	few := MasteryMove{h(0, 0, false, false), h(0, 0, false, false)}
-	if got := masteryTold([]MasteryMove{few}); got != nil {
-		t.Errorf("one topic, too few answers: %+v", got)
-	}
-	// Several topics: the first that's news; none of them news, nothing.
-	up := MasteryMove{m("music", 40, 2, true, false), m("music", 52, 3, true, false)}
-	down := MasteryMove{h(41, 3, true, false), h(38, 2, true, false)}
-	if got := masteryTold([]MasteryMove{down, few, up}); got == nil || *got != up {
-		t.Errorf("several topics: %+v", got)
-	}
-	if got := masteryTold([]MasteryMove{down, few}); got != nil {
-		t.Errorf("several topics, none news: %+v", got)
-	}
-	if masteryTold(nil) != nil {
-		t.Error("no moves")
-	}
-}
-
-// Answers all wrong tell nothing of what a player knows: no first estimate and no tier, however many; one right
-// answer is a basis.
-func TestMasteryWantsARightAnswer(t *testing.T) {
-	h := []float64{hardnessOf(0.8), hardnessOf(0.5), hardnessOf(0.2)}
-	a := newAbility()
-	for range MasteryFrom {
-		a.learn(0, hardnessOf(0.5), chance["choice"])
-	}
-	if m := masteryOf("history", a, h); m.First || m.Sure {
-		t.Errorf("%d answers all wrong: told as %+v", MasteryFrom, m)
-	}
-	a = newAbility()
-	for i := range MasteryFirst {
-		a.learn(float64(i/(MasteryFirst-1)), hardnessOf(0.5), chance["choice"])
-	}
-	if m := masteryOf("history", a, h); !m.First {
-		t.Errorf("%d answers, one right: not told, %+v", MasteryFirst, m)
 	}
 }

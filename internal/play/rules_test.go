@@ -47,7 +47,7 @@ func TestDayQuestionsKeptOut(t *testing.T) {
 	data, _ := json.Marshal(w.picks(day.ID))
 	_, _ = w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, at, started_at, finished_at)
 		VALUES (?, 'topic', ?, ?, 0, 1)`, ana, string(data), Length)
-	if _, err := w.g.DuelRecording(ctx, bo); !errors.Is(err, ErrNobody) {
+	if _, err := w.g.DuelRecording(ctx, bo, Even); !errors.Is(err, ErrNobody) {
 		t.Fatalf("a recording with today's questions: %v", err)
 	}
 	w.befriend(ana, bo)
@@ -77,7 +77,7 @@ func TestDayQuestionsKeptOut(t *testing.T) {
 
 	// The next day, yesterday's questions are a recording like any other.
 	w.wait(24 * time.Hour)
-	duel, err := w.g.DuelRecording(ctx, bo)
+	duel, err := w.g.DuelRecording(ctx, bo, Even)
 	if d, _ := w.g.DuelOf(ctx, bo, duel); err != nil || d.Opponent == nil || d.Opponent.ID != ana {
 		t.Fatalf("yesterday's recording: %+v %v", d, err)
 	}
@@ -122,7 +122,7 @@ func TestRunEndedByTheClock(t *testing.T) {
 	}
 
 	// Against a recording, too.
-	duel, err = w.g.DuelRecording(ctx, gal)
+	duel, err = w.g.DuelRecording(ctx, gal, Even)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestRunEndedByTheClock(t *testing.T) {
 	}
 
 	// One finished and not settled then (a restart in between) gets its result once its time is up.
-	duel, _ = w.g.DuelRecording(ctx, gal)
+	duel, _ = w.g.DuelRecording(ctx, gal, Even)
 	w.playSide(gal, duel, repeat(w.right, Length))
 	_, _ = w.db.Write.Exec(`UPDATE duels SET ended_at = NULL, outcome = NULL WHERE id = ?`, duel)
 	w.wait(DuelFor)
@@ -165,21 +165,28 @@ func TestMergeBringsProgress(t *testing.T) {
 		_, _ = w.db.Write.Exec(`DELETE FROM users WHERE id = ?`, from) // as signing in does
 	}
 
-	// The guest's notes in their book: a week in a row (the account has its own, on another day) and a day all right
-	// (it has none).
+	// The guest's ranks: the higher of the two in each chapter, as a rank never falls; the seal the guest chose, as the
+	// account chose none.
 	for _, q := range []string{
-		`INSERT INTO notes (user_id, day, kind, n) VALUES (?1, '2026-11-10', 'streak', 7), (?1, '2026-11-11', 'perfect', 0)`,
-		`INSERT INTO notes (user_id, day, kind, n) VALUES (?2, '2026-11-09', 'streak', 7)`,
+		`INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told) VALUES
+			(?1, 'geography', 3, 1, 18, '2026-11-10', 3), (?1, 'history', 1, 0, 2, '2026-11-09', 1)`,
+		`INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told) VALUES (?2, 'history', 2, 0, 6, '2026-11-11', 2)`,
+		`UPDATE users SET seal = 'geography' WHERE id = ?1`,
 	} {
 		if _, err := w.db.Write.Exec(q, guest, owner); err != nil {
 			t.Fatal(err)
 		}
 	}
 	merge(guest, owner)
-
-	want := []Note{{Day: "2026-11-11", Kind: NotePerfect}, {Day: "2026-11-09", Kind: NoteStreak, N: 7}}
-	if notes, _ := w.g.NotesOf(ctx, owner); !slices.Equal(notes, want) {
-		t.Fatalf("the notes after: %+v", notes)
+	ranks, _, _ := w.g.RanksOf(ctx, owner)
+	for _, r := range ranks {
+		want := map[string]int{"geography": 3, "history": 2}[r.Chapter]
+		if r.Level != want {
+			t.Errorf("%s after: %+v, want level %d", r.Chapter, r, want)
+		}
+	}
+	if s, _ := w.g.SealOf(ctx, owner); s == nil || s.Chapter != "geography" {
+		t.Fatalf("the seal after: %+v", s)
 	}
 }
 
@@ -215,7 +222,7 @@ func TestFairRecordings(t *testing.T) {
 	w.pace = func(int) time.Duration { return 50 * time.Millisecond }
 	scripted := topic(bot, Length)
 	w.pace = nil
-	duel, err := w.g.DuelRecording(ctx, ana)
+	duel, err := w.g.DuelRecording(ctx, ana, Even)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,11 +259,11 @@ func TestRecordingsArePeoples(t *testing.T) {
 	}
 	ana := w.user()
 	scripted := game(quick(MostQuick + 1)) // one quick answer too many
-	if _, err := w.g.DuelRecording(ctx, ana); !errors.Is(err, ErrNobody) {
+	if _, err := w.g.DuelRecording(ctx, ana, Even); !errors.Is(err, ErrNobody) {
 		t.Fatalf("with only a script's game to play against: %v, want nobody", err)
 	}
 	person := game(quick(MostQuick)) // knew two at once
-	duel, err := w.g.DuelRecording(ctx, ana)
+	duel, err := w.g.DuelRecording(ctx, ana, Even)
 	if err != nil {
 		t.Fatal(err)
 	}

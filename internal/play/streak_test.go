@@ -1,7 +1,6 @@
 package play
 
 import (
-	"slices"
 	"testing"
 	"time"
 )
@@ -30,8 +29,7 @@ func (w *world) playDay(user int64) {
 	w.play(user, s.ID, repeat(w.right, Length)...)
 }
 
-// The longest streak is kept whatever came after; a streak's milestones are noted in the book once each, on the day
-// the game that reached them counts for, and a year in a row is the last of them.
+// The longest streak is kept whatever came after, a year in a row too.
 func TestTheLongestStreakAndAYear(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -48,29 +46,9 @@ func TestTheLongestStreakAndAYear(t *testing.T) {
 	for d := 364; d >= 1; d-- {
 		w.daysPlayed(bo, d)
 	}
-	if err := w.g.noteMilestones(ctx, bo, DayShift(w.g.Today(), -1)); err != nil {
-		t.Fatal(err)
-	}
-	yesterday := DayShift(w.g.Today(), -1)
-	want := []Note{{Day: yesterday, Kind: NoteStreak, N: 100}, {Day: yesterday, Kind: NoteStreak, N: 30},
-		{Day: yesterday, Kind: NoteStreak, N: 7}}
-	if notes, _ := w.g.NotesOf(ctx, bo); !slices.Equal(notes, want) {
-		t.Fatalf("a year less a day: %+v", notes)
-	}
 	w.playDay(bo)
 	w.g.AftersDone(ctx)
 	if s, _ := w.g.StreakOf(ctx, bo); s.Days != 365 || s.Best != 365 {
 		t.Fatalf("a year: %+v", s)
-	}
-	n, err := w.g.NewsOf(ctx, bo, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	year := Note{Day: w.g.Today(), Kind: NoteStreak, N: 365}
-	if !slices.Contains(n.Notes, year) {
-		t.Fatalf("the year, told: %+v", n.Notes)
-	}
-	if n, _ := w.g.NewsOf(ctx, bo, 0); len(n.Notes) != 0 {
-		t.Fatalf("told again: %+v", n.Notes)
 	}
 }

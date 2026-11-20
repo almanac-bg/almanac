@@ -305,18 +305,6 @@ func TestVoidDayIsOfNine(t *testing.T) {
 	if s := w.stateOf(ana, sa.ID); s.Rights != Length-1 {
 		t.Fatalf("ana: %+v", s)
 	}
-	for who, u := range map[string]int64{"ana": ana, "bo": bo} {
-		if err := w.g.noteMilestones(ctx, u, sb.Day); err != nil {
-			t.Fatal(err)
-		}
-		notes, err := w.g.NotesOf(ctx, u)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !slices.Contains(notes, Note{Day: sb.Day, Kind: NotePerfect}) {
-			t.Errorf("%s hasn't a day all right noted: %+v", who, notes)
-		}
-	}
 
 	// The rarest right answer is one that counts.
 	if rare, err := w.g.EntryOfDay(ctx, bo, sb.Day); err != nil || rare != nil && rare.N == k {

@@ -66,7 +66,9 @@ func TestSeededGame(t *testing.T) {
 		"recorded duels":   `SELECT count(*) FROM duels WHERE kind = 'recording' AND outcome IN ('a', 'b', 'draw')`,
 		"friends":          `SELECT count(*) FROM friends`,
 		"requests waiting": `SELECT count(*) FROM friend_requests WHERE NOT declined`,
-		"notes":            `SELECT count(*) FROM notes`,
+		"ranks":            `SELECT count(*) FROM ranks`,
+		"ink":              `SELECT count(*) FROM facts WHERE ink`,
+		"pencil":           `SELECT count(*) FROM facts WHERE NOT ink`,
 		"guests":           `SELECT count(*) FROM users WHERE email IS NULL`,
 		"tallies":          `SELECT count(*) FROM daily_counts`,
 	} {

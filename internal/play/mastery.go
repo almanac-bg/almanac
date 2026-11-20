@@ -4,15 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"math"
-	"slices"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
 
-// Mastery is how well a player knows a topic: the share of its questions they'd know, and a tier for it, Новак to
-// Светило. It's worked out from every answer they've given, each weighed by how hard its question is, so that
-// harder questions drawn as a player gets better don't hold them back, and a lucky guess counts for little.
+// Mastery is how well a player knows a topic: the game's own, never shown (DECISIONS.md, „The direction“: a player
+// sees their ink and their ranks). It shapes their chapter games (topicSlots: aimRight of them right) and their duels,
+// and chooses the recording they play against, „равен“ or „по-силен“ (recordingFit). It's worked out from every
+// answer they've given, each weighed by how hard its question is, so that harder questions drawn as a player gets
+// better don't hold them back, and a lucky guess counts for little.
 //
 // The model: in each topic a player has an ability, and each question a hardness, on one scale. A player knows a
 // question with the chance σ(ability − hardness), and gets it right with that chance and, of what's left, the luck of
@@ -25,33 +26,6 @@ import (
 // kept in memory while they stand), against the questions' hardness as last counted, so it's always as good as the
 // answers and the bank allow. Questions retired as untrue
 // count for nothing.
-
-// MasteryTier is a band of mastery with a name: a player is in it from From percent of a topic known.
-type MasteryTier struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	From int    `json:"from"`
-}
-
-// MasteryTiers from the lowest up. A player who knows as much as most do is a Познавач: the bank's mix (half easy,
-// a third medium, the rest hard) makes that about 60% of a topic. Майстор takes knowing nearly all the easy and
-// medium questions and half the hard ones; Светило, nearly everything.
-var MasteryTiers = []MasteryTier{
-	{"novice", "Новак", 0},
-	{"amateur", "Любител", 35},
-	{"connoisseur", "Познавач", 50},
-	{"expert", "Експерт", 65},
-	{"master", "Майстор", 78},
-	{"luminary", "Светило", 90},
-}
-
-// MasteryFirst is how many answers in a topic it takes for a first estimate of its mastery, told as a share of the
-// topic and no more; MasteryFrom, before it's sure and told with its tier. A game of a topic is ten of its questions:
-// one game makes a first estimate, three a mark that won't call a player „Експерт“ on a lucky draw of easy ones.
-const (
-	MasteryFirst = 10
-	MasteryFrom  = 30
-)
 
 const (
 	// priorVariance is how unsure a player's ability is before their first answer: as far apart as players are.
@@ -80,8 +54,6 @@ func hardnessOf(known float64) float64 { return math.Log((1 - known) / known) }
 type ability struct {
 	mean, variance float64
 	answers        int
-	// rights are the answers that scored (right, or partly): without one, nothing is told of what a player knows.
-	rights int
 }
 
 func newAbility() ability { return ability{variance: priorVariance} }
@@ -96,65 +68,6 @@ func (a *ability) learn(score, hardness, luck float64) {
 	a.variance = 1 / (1/a.variance + slope*slope/spread)
 	a.mean += max(-1, min(1, a.variance*slope*(score-p)/spread))
 	a.answers++
-	if score > 0 {
-		a.rights++
-	}
-}
-
-// knownOf is the share of questions of these hardnesses a player of an ability knows.
-func knownOf(ability float64, hardness []float64) float64 {
-	if len(hardness) == 0 {
-		return 0
-	}
-	sum := 0.0
-	for _, h := range hardness {
-		sum += sigmoid(ability - h)
-	}
-	return sum / float64(len(hardness))
-}
-
-// Mastery is how well a player knows a topic.
-type Mastery struct {
-	Category string `json:"category"`
-	// Answers is how many of the player's answers it's from.
-	Answers int `json:"answers"`
-	// Known is the share of the topic's questions the player would know, in percent.
-	Known int `json:"known"`
-	// Tier is where Known is in MasteryTiers (0 the lowest), and Name its name.
-	Tier int    `json:"tier"`
-	Name string `json:"name"`
-	// Next is the next tier's name, and NextAt the percent it starts at ("" and 0 at the top).
-	Next   string `json:"next,omitempty"`
-	NextAt int    `json:"nextAt,omitempty"`
-	// Sure is whether there are answers enough to tell (MasteryFrom, one of them right at least): until then, Known and Tier are only a guess, and
-	// the tier isn't told. First is whether there are enough for a first estimate (MasteryFirst) but not yet for that:
-	// Known is told as one, without a tier.
-	Sure  bool `json:"sure"`
-	First bool `json:"first,omitempty"`
-}
-
-// TierOf is the tier a percent of a topic known is in.
-func TierOf(known int) int {
-	t := 0
-	for i, x := range MasteryTiers {
-		if known >= x.From {
-			t = i
-		}
-	}
-	return t
-}
-
-func masteryOf(category string, a ability, hardness []float64) Mastery {
-	// Ten answers all wrong say nothing of what a player knows: no share without a right answer.
-	told := a.rights > 0
-	known := int(math.Round(100 * knownOf(a.mean, hardness)))
-	t := TierOf(known)
-	m := Mastery{Category: category, Answers: a.answers, Known: known, Tier: t, Name: MasteryTiers[t].Name,
-		Sure: told && a.answers >= MasteryFrom, First: told && a.answers >= MasteryFirst && a.answers < MasteryFrom}
-	if t+1 < len(MasteryTiers) {
-		m.Next, m.NextAt = MasteryTiers[t+1].Name, MasteryTiers[t+1].From
-	}
-	return m
 }
 
 // hardnesses are every question's hardness, and the live questions' by topic ("" for all of them), as the bank and
@@ -326,15 +239,6 @@ func (g *Game) goOver(ctx context.Context, db querier, h *hardnesses, b *bank.Ba
 		a.learn(score, hard, chanceOf(q))
 		topics[head.Category] = a
 		all.learn(score, hard, chanceOf(q))
-		// Bulgaria's questions, counted apart: its chapter is told once one of them is answered right (ChaptersOf).
-		if q.Extra().BG {
-			bg := topics[BulgariaTopic]
-			bg.answers++
-			if score > 0 {
-				bg.rights++
-			}
-			topics[BulgariaTopic] = bg
-		}
 	}
 	return topics, all, rows.Err()
 }
@@ -356,100 +260,48 @@ func (g *Game) ability(ctx context.Context, db querier, userID int64, category s
 	return a.mean, err
 }
 
-// MasteryOf is how well a player knows each topic, in the bank's order (those not played yet too).
-func (g *Game) MasteryOf(ctx context.Context, userID int64) ([]Mastery, error) {
-	return g.knownMastery(ctx, userID, false)
+// recordingFit is how far a recording (its picks, its right answers) is from the level a player chose: lower fits
+// better (recordedRun).
+type recordingFit func(b *bank.Bank, picks []Pick, rights int) float64
+
+// expectedRights is how many of these questions a player of an ability over all topics would get right: each known
+// with the chance σ(ability − hardness), and, of the rest, guessed right as often as a guess of its kind is.
+func expectedRights(b *bank.Bank, h *hardnesses, ability float64, picks []Pick) float64 {
+	sum := 0.0
+	for _, p := range picks {
+		q, ok := b.Get(p.ID)
+		if !ok {
+			continue
+		}
+		luck := rightChance[q.Base().Type]
+		sum += luck + (1-luck)*sigmoid(ability-h.of(q))
+	}
+	return sum
 }
 
-// knownMastery is MasteryOf, or (finished) of the games they finished only (abilities).
-func (g *Game) knownMastery(ctx context.Context, userID int64, finished bool) ([]Mastery, error) {
+// recordingFit is the fit of a recording to a player at a level (Even, Stronger; anything else is Even), by their
+// hidden ability over all topics: „равен“, its right answers as near as can be to what the player would get on its ten;
+// „по-силен“, StrongerBy more, never fewer than one more.
+func (g *Game) recordingFit(ctx context.Context, userID int64, level string) (recordingFit, error) {
 	h, err := g.hardness(ctx)
 	if err != nil {
 		return nil, err
 	}
-	topics, _, err := g.abilities(ctx, g.DB.Read, h, userID, 0, finished)
+	ability, err := g.ability(ctx, g.DB.Read, userID, "")
 	if err != nil {
 		return nil, err
 	}
-	out := []Mastery{}
-	for _, c := range g.Bank().Categories {
-		a, ok := topics[c.ID]
-		if !ok {
-			a = newAbility()
+	return func(b *bank.Bank, picks []Pick, rights int) float64 {
+		want := expectedRights(b, h, ability, picks)
+		if level != Stronger {
+			return math.Abs(float64(rights) - want)
 		}
-		out = append(out, masteryOf(c.ID, a, h.byTopic[c.ID]))
-	}
-	return out, nil
-}
-
-// MasteryMove is how a game moved a player's mastery of a topic.
-type MasteryMove struct {
-	From Mastery `json:"from"`
-	To   Mastery `json:"to"`
-}
-
-// MasteryMoves is how a player's finished run moved their mastery of each topic it had, the furthest moved first:
-// from just before its first answer to just after its last.
-func (g *Game) MasteryMoves(ctx context.Context, userID, runID int64) ([]MasteryMove, error) {
-	r, err := scanRun(g.DB.Read.QueryRowContext(ctx, `SELECT `+runColumns+` FROM runs WHERE id = ? AND user_id = ?`, runID, userID))
-	if err != nil {
-		return nil, err
-	}
-	if !r.finished {
-		return nil, ErrOutOfStep
-	}
-	h, err := g.hardness(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var first, last int64
-	if err := g.DB.Read.QueryRowContext(ctx, `SELECT coalesce(min(at), 0), coalesce(max(at), 0) FROM answers WHERE run_id = ?`, runID).
-		Scan(&first, &last); err != nil || last == 0 {
-		return []MasteryMove{}, err
-	}
-	before, _, err := g.abilities(ctx, g.DB.Read, h, userID, first-1, false)
-	if err != nil {
-		return nil, err
-	}
-	after, _, err := g.abilities(ctx, g.DB.Read, h, userID, last, false)
-	if err != nil {
-		return nil, err
-	}
-	b := g.Bank()
-	out := []MasteryMove{}
-	for _, c := range b.Categories {
-		played := slices.ContainsFunc(r.picks, func(p Pick) bool {
-			q, ok := b.Get(p.ID)
-			return ok && q.Base().Category == c.ID
-		})
-		to, ok := after[c.ID]
-		if !played || !ok || to.answers == before[c.ID].answers {
-			continue // not in the run, or nothing answered of it
+		off := math.Abs(float64(rights) - want - StrongerBy)
+		if float64(rights) < want+1 {
+			off += Length // not stronger: after every one that is
 		}
-		from, ok := before[c.ID]
-		if !ok {
-			from = newAbility()
-		}
-		out = append(out, MasteryMove{From: masteryOf(c.ID, from, h.byTopic[c.ID]), To: masteryOf(c.ID, to, h.byTopic[c.ID])})
-	}
-	moved := func(m MasteryMove) int { return max(m.To.Known-m.From.Known, m.From.Known-m.To.Known) }
-	slices.SortStableFunc(out, func(a, b MasteryMove) int { return moved(b) - moved(a) })
-	return out, nil
-}
-
-// masteryTold is the one move of a game's mastery its news tells (of MasteryMoves, the furthest moved first), if any:
-// the first that's news, a first estimate or a tier reached (told for the first time, or one up). A share that only
-// moved isn't news, and a loss never is: Профил has it. The client draws what this picks and nothing else
-// (web/src/game/mastery.ts).
-func masteryTold(moves []MasteryMove) *MasteryMove {
-	for _, m := range moves {
-		first := m.To.First && !m.From.First && !m.From.Sure
-		tier := m.To.Sure && (!m.From.Sure || m.To.Tier > m.From.Tier)
-		if first || tier {
-			return &m
-		}
-	}
-	return nil
+		return off
+	}, nil
 }
 
 // topicSlots is a topic run's shape for a player's ability there: as many easy, medium and hard questions as make

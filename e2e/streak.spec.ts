@@ -16,7 +16,7 @@ test("Профил keeps the longest streak, under the one going on, and says wh
   await page.goto("/");
   await daysPlayed(page, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 2, 1);
   await page.goto("/me");
-  await expect(page.locator(".me-figures .fig-n")).toHaveText(["2", "12", "14"]);
+  await expect(page.locator(".me-figures .fig-n")).toHaveText(["2", "12"]);
   await expect(page.locator(".me-intro")).toContainText("Един пропуснат ден в седмицата не прекъсва серията.");
 });
 
@@ -89,30 +89,23 @@ test("the day played rolls the streak on in its chip, its words with its number:
   expect(said.filter((s) => /^1дни/.test(s))).toEqual([]);
 });
 
-test("a week's streak is noted in the book, in a quiet line under the result: no sheet over it, and the chip rolls on", async ({
-  page,
-}) => {
+test("a week's streak rolls the chip on under the result: no sheet over it, and no note of it", async ({ page }) => {
   test.setTimeout(120_000);
   await watchChip(page);
   await page.goto("/");
-  // Six days: the seventh is a streak's first milestone, noted in the Алманах.
+  // Six days: the seventh rolls the chip on; nothing is noted (DECISIONS.md, „The direction“: no notes as rewards).
   await daysPlayed(page, 6, 5, 4, 3, 2, 1);
   await page.reload();
   await expect(page.locator(".streak-chip.unlit")).toContainText("6дни поред");
   await startDay(page);
   await heard(page);
   await playRun(page);
-  await expect(page.locator(".news-note")).toContainText("Отбелязано в Алманаха: 7 дни поред с въпросите на деня.", {
-    timeout: 10_000,
-  });
-  await expect(page.locator(".streak-chip:not(.unlit) .status-text")).toHaveText("7дни поред");
+  await expect(page.locator(".streak-chip:not(.unlit) .status-text")).toHaveText("7дни поред", { timeout: 10_000 });
+  await expect(page.locator(".summary")).not.toContainText("Отбелязано");
   const said = await heard(page);
   expect(said[0]).toBe("6дни поред unlit");
   expect(said).toContain("67дни поред");
   // Never a sheet over the result, whatever the game was.
   await page.waitForTimeout(1500);
   await expect(page.locator("dialog[open]")).toHaveCount(0);
-  // Kept in the book: Моят Алманах lists it, with its day.
-  await page.goto("/almanac");
-  await expect(page.locator(".almanac-notes")).toContainText("Седем дни поред.");
 });

@@ -230,7 +230,7 @@ func TestRecordingsAsPlayed(t *testing.T) {
 		var rec *recorded
 		err := w.db.Tx(ctx, func(tx *sql.Tx) error {
 			var err error
-			rec, err = w.g.recordedRun(tx, bo, map[string]bool{})
+			rec, err = w.g.recordedRun(tx, bo, map[string]bool{}, nil)
 			return err
 		})
 		if err != nil {

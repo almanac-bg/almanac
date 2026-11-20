@@ -1,13 +1,21 @@
-// Another player's profile, by their tag (/players/tag): how they look, their numbers, how well they
-// know each topic; and how you stand with them — ask to be friends, or answer their asking.
+// Another player's profile, by their tag (/players/tag): how they look, the seal they wear, their ranks by chapter and
+// the longest streak they've had (play/profile.go: no lifetime totals); and how you stand with them — ask to be
+// friends, or answer their asking.
 
-import type { Mastery } from "../game/mastery.ts";
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
-let { masteryCard, api, errorText, h, signal, title, friendRequests, user, avatar, record, stat } = {} as Kit;
+let { api, errorText, h, signal, title, friendRequests, user, avatar, record, stat, topics } = {} as Kit;
+
+/** A chapter's rank (play.ChapterRank): level 0 is none. */
+interface Rank {
+  chapter: string;
+  level: number;
+  name: string;
+  quarter: number;
+}
 
 interface Profile {
   name: string;
@@ -15,26 +23,22 @@ interface Profile {
   me?: boolean;
   avatar: string;
   since: number;
-  streak: number;
-  days: number;
-  games: number;
-  answers: number;
-  right: number;
-  duels: number;
-  won: number;
-  mastery: Mastery[];
+  seal?: Rank;
+  ranks: Rank[];
+  /** The longest streak they've had. */
+  best: number;
   friend?: "yes" | "asked" | "asks";
   request?: number;
   record?: { won: number; lost: number; drawn: number };
 }
 
-const percent = (right: number, of: number) => (of ? Math.round((100 * right) / of) : 0);
+const chapterName = (id: string) => topics.find((t) => t.id === id)?.name ?? id;
 // „г.“ kept with its year, never alone on a line.
 const month = (ms: number) =>
   new Intl.DateTimeFormat("bg", { month: "long", year: "numeric" }).format(new Date(ms)).replace(/\s(?=г\.)/, " ");
 
 export function playerProfile(kit: Kit, [tag]: string[]): Child {
-  ({ masteryCard, api, errorText, h, signal, title, friendRequests, user, avatar, record, stat } = kit);
+  ({ api, errorText, h, signal, title, friendRequests, user, avatar, record, stat, topics } = kit);
   title(`@${tag}`);
   const profile = signal<Profile | null>(null);
   const error = signal("");
@@ -63,13 +67,7 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
         ? h("p", { class: "muted" }, "Така те виждат другите. ", h("a", { href: "/me" }, "Към профила ти"))
         : actions(p, load),
       numbers(p),
-      // Only the topics they've played: the rest would only say they haven't.
-      p.mastery.some((m) => m.answers)
-        ? masteryCard(
-            p.mastery.filter((m) => m.answers),
-            !p.me,
-          )
-        : null,
+      ranks(p),
     ];
   });
 }
@@ -167,17 +165,29 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
   });
 }
 
-/** Their numbers: the streak, how much and how well they've played, their duels. */
+/** Their seal and their longest streak. */
 function numbers(p: Profile): Child {
-  if (!p.games) return h("p", { class: "muted" }, "Още няма изиграни игри.");
+  if (!p.seal && !p.best) return h("p", { class: "muted" }, "Още няма звание.");
   return h(
     "div",
     { class: "stats" },
-    stat(String(p.streak), p.streak === 1 ? "ден поред" : "дни поред", "gold"),
-    stat(`${percent(p.right, p.answers)}\u00a0%`, "верни отговори", "mint"),
-    p.duels > 0
-      ? stat(`${p.won}/${p.duels}`, "спечелени дуела", "rose")
-      : stat(String(p.days), p.days === 1 ? "изигран ден" : "изиграни дни"),
-    stat(String(p.games), p.games === 1 ? "изиграна игра" : "изиграни игри"),
+    p.seal ? stat(p.seal.name, `печат: ${chapterName(p.seal.chapter)}`, "gold") : null,
+    stat(String(p.best), p.best === 1 ? "ден най-дълга серия" : "дни най-дълга серия"),
+  );
+}
+
+/** Their ranks, the chapters they have one in. */
+function ranks(p: Profile): Child {
+  const held = p.ranks.filter((r) => r.level > 0);
+  if (!held.length) return null;
+  return h(
+    "section",
+    { class: "card stack" },
+    h("p", { class: "kicker" }, "Звания"),
+    h(
+      "ul",
+      { class: "rows" },
+      held.map((r) => h("li", null, h("b", null, r.name), ` · ${chapterName(r.chapter)}`)),
+    ),
   );
 }

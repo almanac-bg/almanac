@@ -36,7 +36,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
 
   await openGame(page, "/play/history");
   await playRun(page);
-  await expect(page.locator(".mastery-line")).toContainText("История");
+  await expect(page.locator(".summary")).toBeVisible();
 });
 
 test("the day says how its other players did with each question: under the verdict, and in the review", async ({

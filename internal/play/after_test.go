@@ -39,13 +39,13 @@ func TestAfterARun(t *testing.T) {
 	if n := w.count(`SELECT count(*) FROM runs_after`); n != 0 {
 		t.Fatalf("%d left to do after the run", n)
 	}
-	earned := w.count(`SELECT count(*) FROM notes WHERE user_id = ?`, ana)
+	earned := w.count(`SELECT count(*) FROM ranks WHERE user_id = ?`, ana)
 	if earned == 0 {
-		t.Fatal("the day all right noted nothing")
+		t.Fatal("the day all right ranked nothing")
 	}
 
 	// A restart cut it short: nothing kept but the run, its follow-up noted.
-	if _, err := w.db.Write.Exec(`DELETE FROM notes WHERE user_id = ?`, ana); err != nil {
+	if _, err := w.db.Write.Exec(`DELETE FROM ranks WHERE user_id = ?`, ana); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := w.db.Write.Exec(`INSERT INTO runs_after (run_id, due) VALUES (?, ?)`, s.ID,
@@ -65,8 +65,8 @@ func TestAfterARun(t *testing.T) {
 	if n := w.count(`SELECT count(*) FROM runs_after`); n != 0 {
 		t.Fatalf("%d left after the sweep", n)
 	}
-	if n := w.count(`SELECT count(*) FROM notes WHERE user_id = ?`, ana); n != earned {
-		t.Fatalf("the sweep kept %d notes, not %d", n, earned)
+	if n := w.count(`SELECT count(*) FROM ranks WHERE user_id = ?`, ana); n != earned {
+		t.Fatalf("the sweep kept %d ranks, not %d", n, earned)
 	}
 
 	// One that has failed afterTries times is given up on.
@@ -119,7 +119,7 @@ func TestAnsweredQuestions(t *testing.T) {
 	}
 }
 
-// The last answer of a game doesn't wait for what follows it (the milestones it reached, noted in the book): that's
+// The last answer of a game doesn't wait for what follows it (the ranks its ink raised): that's
 // done in the background, and the game's news waits for it instead, so it still tells all of it.
 func TestTheLastAnswerDoesntWaitForWhatFollows(t *testing.T) {
 	w := setup(t)
@@ -139,6 +139,7 @@ func TestTheLastAnswerDoesntWaitForWhatFollows(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		w.wait(3 * time.Second) // a person's pace: a script's game writes nothing to rank by
 		res, err := w.g.Answer(ctx, ana, s.ID, n, w.right(s.ID, n))
 		if err != nil {
 			t.Fatal(err)
@@ -150,8 +151,8 @@ func TestTheLastAnswerDoesntWaitForWhatFollows(t *testing.T) {
 	if n := w.count(`SELECT count(*) FROM runs_after`); n != 1 {
 		t.Fatalf("%d left to do after the run, not 1: it was done before the answer went back", n)
 	}
-	if n := w.count(`SELECT count(*) FROM notes WHERE user_id = ?`, ana); n != 0 {
-		t.Fatalf("%d notes before what follows the run was done", n)
+	if n := w.count(`SELECT count(*) FROM ranks WHERE user_id = ?`, ana); n != 0 {
+		t.Fatalf("%d ranks before what follows the run was done", n)
 	}
 	waiting, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
 	defer cancel()
@@ -165,8 +166,8 @@ func TestTheLastAnswerDoesntWaitForWhatFollows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(news.Notes) == 0 {
-		t.Fatalf("the news before what the game earned was kept: %+v", news)
+	if n := w.count(`SELECT count(*) FROM ranks WHERE user_id = ?`, ana); n == 0 || news.Step == nil {
+		t.Fatalf("the news before what the game earned was kept: %+v, %d ranks", news, n)
 	}
 	if n := w.count(`SELECT count(*) FROM runs_after`); n != 0 {
 		t.Fatalf("%d left to do after the news", n)

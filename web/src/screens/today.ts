@@ -453,7 +453,7 @@ function friendsToday(t: Today): Child {
   );
 }
 
-/** The way to the player's book: how many facts it has. */
+/** The way to the player's book: the seal it gives them, if any. */
 function bookLink(stats: () => Stats | null): Child {
   return () => {
     const s = stats();
@@ -469,12 +469,9 @@ function bookLink(stats: () => Stats | null): Child {
         h(
           "p",
           { class: "book-words" },
-          s.facts
-            ? [
-                h("strong", null, `${formatNumber(s.facts)} ${s.facts === 1 ? "факт" : "факта"}.`),
-                " Всеки верен отговор записва нов.",
-              ]
-            : "Всеки верен отговор записва по един факт в главата на темата си.",
+          s.seal
+            ? [h("strong", null, `${s.seal.name}.`), " Всеки верен отговор в броя записва факт с мастило."]
+            : "Всеки верен отговор в броя записва по един факт с мастило в главата на темата си.",
         ),
         h("span", { class: "i i-right book-go", "aria-hidden": "true" }),
       ),

@@ -64,19 +64,21 @@ test("a topic counts in only after a tap; a reload goes back to its question, an
   await page.getByRole("button", { name: "Започни", exact: true }).click();
   await page.getByRole("button", { name: "Започни сега" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
-  // A reload mid-question: straight back to it, its time still running (no count first).
+  // A reload mid-question: straight back to it, its time still running (no count first): never more of it than before.
+  const secsLeft = async () =>
+    Number(
+      await page
+        .locator(".timer .secs")
+        .first()
+        .textContent()
+        .then((t) => (t ?? "").replace(/\D/g, "")),
+    );
   await page.waitForTimeout(2000);
+  const before = await secsLeft();
   await page.reload();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
   await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
-  const secs = Number(
-    await page
-      .locator(".timer .secs")
-      .first()
-      .textContent()
-      .then((t) => (t ?? "").replace(/\D/g, "")),
-  );
-  expect(secs).toBeLessThan(20);
+  expect(await secsLeft()).toBeLessThanOrEqual(before);
   await answer(page);
   await moveOn(page);
   for (let n = 1; n < 10; n++) {

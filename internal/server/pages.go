@@ -295,11 +295,10 @@ func (s *Server) preview(r *http.Request, shared play.Share) (title, description
 		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {
 			if p, err := s.profileOf(r, tag, 0); err == nil {
 				title = p.Name + " (@" + p.Tag + ") в АЛМАНАХ"
-				played := "изиграни игри"
-				if p.Games == 1 {
-					played = "изиграна игра"
+				description = "Играе всеки ден десетте въпроса на АЛМАНАХ."
+				if p.Seal != nil {
+					description = fmt.Sprintf("Звание „%s“ в главата „%s“.", p.Seal.Name, s.chapterName(p.Seal.Chapter))
 				}
-				description = fmt.Sprintf("%d %s.", p.Games, played)
 			}
 		}
 	}

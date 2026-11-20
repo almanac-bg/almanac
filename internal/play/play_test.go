@@ -841,7 +841,7 @@ func TestStats(t *testing.T) {
 	ctx := t.Context()
 	u := w.user()
 	empty, err := w.g.StatsOf(ctx, u)
-	if err != nil || empty.Games != 0 || len(empty.Mastery) != len(w.b.Categories) || empty.Mastery[0].Answers != 0 || empty.Recent == nil {
+	if err != nil || len(empty.Recent) != 0 || empty.Recent == nil || empty.Seal != nil {
 		t.Fatalf("a newcomer's stats: %+v %v", empty, err)
 	}
 	day, _ := w.g.StartDay(ctx, u)
@@ -852,12 +852,16 @@ func TestStats(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Streak != 1 || s.Days != 1 || s.Games != 2 || s.Answers != 20 || s.Right != 16 || len(s.Recent) != 2 {
+	if s.Streak != 1 || s.Best != 1 || len(s.Recent) != 2 || s.Recent[0].Kind != "topic" || s.Recent[0].Total != Length ||
+		s.Seal == nil || s.Seal.Level == 0 {
 		t.Fatalf("stats %+v", s)
 	}
-	music := s.Mastery[slices.IndexFunc(s.Mastery, func(m Mastery) bool { return m.Category == "music" })]
-	if music.Sure || !music.First || music.Answers < Length || s.Recent[0].Kind != "topic" || s.Recent[0].Total != Length {
-		t.Fatalf("music %+v, recent %+v", music, s.Recent)
+	// No lifetime totals (DECISIONS.md, „The direction“): nothing that counts them is said.
+	out, _ := json.Marshal(s)
+	for _, total := range []string{`"days"`, `"games"`, `"answers"`, `"right"`, `"facts"`, `"duels"`, `"won"`, `"mastery"`} {
+		if strings.Contains(string(out), total) {
+			t.Errorf("the stats say %s: %s", total, out)
+		}
 	}
 }
 
@@ -912,9 +916,9 @@ func TestFriends(t *testing.T) {
 		t.Fatalf("the friends' board: %+v %v", b, err)
 	}
 
-	// A duel between them counts in the record, from each side, and in their stats.
+	// A duel between them counts in the record, from each side, and in their games.
 	w.duel(ana, bo, repeat(w.right, Length), repeat(w.wrong, Length))
-	if st, _ := w.g.StatsOf(ctx, bo); st.Duels != 1 || st.Won != 0 || st.Recent[0].Kind != "duel" {
+	if st, _ := w.g.StatsOf(ctx, bo); st.Recent[0].Kind != "duel" || st.Recent[0].Outcome != DuelLost {
 		t.Fatalf("Bo's stats after a duel: %+v", st)
 	}
 	list, err := w.g.FriendsOf(ctx, ana)
