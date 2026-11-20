@@ -1168,36 +1168,6 @@
     background: var(--t, var(--tone, var(--ink)));
   }
 
-  /* Моят Алманах: the count in the numeral face, then the facts as cards, laid as masonry. */
-  .almanac-head {
-    display: grid;
-    gap: var(--space-1);
-  }
-
-  /* The notes the book keeps (a streak's milestones, a first ten of ten, a chapter complete): a short quiet list. */
-  .almanac-notes {
-    display: grid;
-    gap: var(--space-2);
-  }
-
-  .almanac-note-list {
-    display: grid;
-    gap: var(--space-1);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .almanac-count {
-    font-size: 1.125rem;
-    font-weight: 700;
-  }
-
-  .almanac-n {
-    font: 900 calc(26px + 1.625rem) / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-  }
-
   .games-date {
     display: flex;
     align-items: center;
@@ -1218,75 +1188,6 @@
     content: "";
     flex: 1;
     border-top: 1px solid var(--line);
-  }
-
-  /* The cards as masonry, in the order learned: each in the column that ends highest, the next in line (a grid's own
-     placement does it, rows 4px tall and each card's span measured in screens/almanac.ts). Columns as many as 17rem fit. */
-  .almanac-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
-    grid-auto-rows: 4px;
-    column-gap: var(--space-3);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  /* A card's place: the card, and the gap under it (its span counts both). */
-  .almanac-item {
-    align-self: start;
-    padding-bottom: var(--space-3);
-  }
-
-  /* A card: the topic in its colour (its picture on a disc of it, a glow of it in the card's corner), the question
-     small, what was learned as its headline, and the fact in the facts' face, set off by a bar of the topic's colour. */
-  .almanac-card {
-    display: grid;
-    gap: var(--space-3);
-    padding: var(--space-4) var(--space-4) var(--space-5);
-    border-radius: var(--radius-lg);
-    background:
-      radial-gradient(120% 70% at 100% 0%, color-mix(in srgb, var(--tone) 14%, transparent), transparent 70%),
-      var(--surface);
-    box-shadow:
-      var(--elev-1),
-      inset 0 0 0 1px color-mix(in srgb, var(--tone) 22%, var(--line));
-  }
-
-  .almanac-topic {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    color: color-mix(in srgb, var(--tone) 75%, var(--text));
-  }
-
-  .almanac-qa {
-    display: grid;
-    gap: var(--space-1);
-  }
-
-  .almanac-q {
-    color: var(--text-muted);
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-  }
-
-  .almanac-a {
-    font: 800 1.125rem / 1.5rem var(--font-sans);
-    letter-spacing: -0.01em;
-    text-wrap: pretty;
-  }
-
-  .almanac-untrue {
-    color: var(--text-muted);
-  }
-
-  /* What was learned, in the facts' face. */
-  .almanac-fact {
-    padding-left: var(--space-3);
-    border-left: 3px solid color-mix(in srgb, var(--tone) 70%, transparent);
-    font: italic 500 1rem / 1.5rem var(--font-serif);
-    text-wrap: pretty;
   }
 
   /* Начало's ask to keep a guest's profile (screens/today.ts): the sign-in form in a card. */
@@ -4911,6 +4812,499 @@
     box-shadow: 0 0 0 1px var(--accent);
   }
 
+  /* ---- Алманах: the book's contents, its notes, a chapter ---- */
+
+  .book,
+  .chapter {
+    gap: var(--space-7);
+  }
+
+  .book-intro {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .book-intro h1 {
+    margin-top: var(--space-1);
+  }
+
+  /* Three figures in a row between rules: the streak, the facts, the share known of everything. */
+  .figures-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: var(--space-4);
+    border-top: 1px solid var(--rule-ink);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .fig {
+    display: grid;
+    gap: 2px;
+    padding: var(--space-3) var(--space-2) var(--space-3) 0;
+  }
+
+  .fig + .fig {
+    padding-left: var(--space-3);
+    border-left: 1px solid var(--rule);
+  }
+
+  .fig-n {
+    font: 800 calc(19px + 1.1875rem) / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .fig-label {
+    color: var(--ink-3);
+    font: 500 0.8125rem / 1.3 var(--font-sans);
+  }
+
+  /* The notes as a ledger: the day in small capitals, the note in the serif; what's ahead in italic. */
+  .ledger {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ledger li {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .ledger-day {
+    padding-top: 3px;
+    color: var(--ink-3);
+    font: 700 0.8125rem / 1.4 var(--font-sans);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .ledger-text {
+    font: 400 1.0625rem / 1.45 var(--font-serif);
+  }
+
+  .ledger .next .ledger-text {
+    color: var(--ink-3);
+    font-style: italic;
+    font-weight: 500;
+  }
+
+  /* The contents: a chapter a row, its picture, its name on dotted leaders to its share, its facts and tier under. */
+  .toc {
+    margin: var(--space-1) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .toc-row a {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 14px;
+    padding: 14px 0 12px;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .toc-pic {
+    --tone: var(--t);
+    grid-row: span 2;
+    width: 40px;
+    height: 40px;
+  }
+
+  .toc-line {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .toc-name {
+    font: 600 1.1875rem / 1.2 var(--font-serif);
+  }
+
+  .toc-dots {
+    flex: 1;
+    min-width: 12px;
+    border-bottom: 2px dotted var(--rule);
+    transform: translateY(-4px);
+  }
+
+  .toc-known {
+    font: 800 1.625rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  :is(.toc-known, .know-n) small {
+    margin-left: 1px;
+    color: var(--ink-3);
+    font-size: 0.6em;
+    font-weight: 700;
+  }
+
+  .toc-sub {
+    display: flex;
+    grid-column: 2 / span 2;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+    color: var(--ink-3);
+    font: 500 0.8125rem / 1.3 var(--font-sans);
+  }
+
+  .toc-track {
+    position: relative;
+    flex: 1;
+    min-width: 2rem;
+    height: 3px;
+    background: var(--rule);
+  }
+
+  .toc-track i {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--t, var(--ink));
+  }
+
+  /* България's small tricolour beside its name. */
+  .flag {
+    display: inline-block;
+    width: 18px;
+    height: 11px;
+    margin-left: var(--space-2);
+    vertical-align: 1px;
+    background: linear-gradient(#fff 0 33.3%, #00966e 0 66.6%, #d62612 0);
+    box-shadow: 0 0 0 1px var(--rule);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .toc-row a:hover .toc-name {
+      text-decoration: underline;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 4px;
+    }
+  }
+
+  /* A chapter: its number, its name and its picture; how much of it is known, on its scale; „Играй главата“. */
+  .chapter-side {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+  }
+
+  .chapter-head {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+  }
+
+  .chapter-title {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .chapter-kicker {
+    color: var(--t);
+  }
+
+  .chapter-head h1 {
+    margin-top: 6px;
+    font-size: calc(21px + 1.3125rem);
+  }
+
+  .chapter-pic {
+    --tone: var(--t);
+    width: 76px;
+    height: 76px;
+  }
+
+  .know {
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--rule-ink);
+  }
+
+  .know-top {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-3);
+  }
+
+  .know-n {
+    font: 800 calc(42px + 2.625rem) / 0.8 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .know-words {
+    min-width: 0;
+    padding-bottom: 4px;
+    font: 400 1.0625rem / 1.35 var(--font-serif);
+  }
+
+  .know-words b {
+    font-weight: 600;
+  }
+
+  /* The scale: a track filled in the chapter's colour, a tick at each tier, a mark where the player is. */
+  .scale {
+    position: relative;
+    height: 40px;
+    margin-top: var(--space-5);
+  }
+
+  .scale::before {
+    content: "";
+    position: absolute;
+    top: 10px;
+    right: 0;
+    left: 0;
+    height: 4px;
+    background: var(--rule);
+  }
+
+  .scale-fill {
+    position: absolute;
+    top: 10px;
+    left: 0;
+    height: 4px;
+    background: var(--t);
+  }
+
+  .scale-tick {
+    position: absolute;
+    top: 6px;
+    height: 12px;
+    border-left: 1px solid var(--ink-3);
+  }
+
+  .scale-me {
+    position: absolute;
+    top: 0;
+    width: 0;
+    height: 0;
+    border: 6px solid transparent;
+    border-top: 8px solid var(--ink);
+    transform: translate(-6px, -6px);
+  }
+
+  .scale-end {
+    position: absolute;
+    top: 26px;
+    left: 0;
+    color: var(--ink-3);
+    font: 600 0.6875rem / 1 var(--font-sans);
+  }
+
+  .scale-end.last {
+    right: 0;
+    left: auto;
+  }
+
+  .chapter-play {
+    display: grid;
+    gap: 10px;
+    margin-top: var(--space-5);
+  }
+
+  .chapter-play .small {
+    text-align: center;
+  }
+
+  /* Finding a fact: a search on an ink line, its words in the serif's italic. */
+  .search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+    border-bottom: 2px solid var(--rule-ink);
+  }
+
+  .search .i {
+    color: var(--ink-2);
+    font-size: 1.25rem;
+  }
+
+  .search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    font: italic 500 1.125rem / 1.3 var(--font-serif);
+  }
+
+  .search input::-webkit-search-cancel-button {
+    filter: grayscale(1);
+  }
+
+  /* A fact as an entry: its dateline, the answer as a headword, the question in italic, the fact. */
+  .entries {
+    margin: 6px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .entry {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--rule);
+    break-inside: avoid;
+  }
+
+  .entry-when {
+    color: var(--ink-3);
+    font: 700 0.71875rem / 1.2 var(--font-sans);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .entry-word {
+    margin-top: var(--space-2);
+    font: 600 1.3125rem / 1.2 var(--font-serif);
+    text-wrap: pretty;
+  }
+
+  .entry-untrue {
+    color: var(--ink-3);
+  }
+
+  .entry-q {
+    margin-top: 4px;
+    color: var(--ink-2);
+    font: italic 500 0.96875rem / 1.4 var(--font-serif);
+  }
+
+  .entry-fact {
+    margin-top: 10px;
+    font: 400 1.03125rem / 1.55 var(--font-serif);
+    text-wrap: pretty;
+  }
+
+  /* The page's first entry opens with a drop cap in the chapter's colour. */
+  .entry.first .entry-fact::first-letter {
+    float: left;
+    margin: 5px 8px 0 -1px;
+    color: var(--t);
+    font: 600 3.625rem / 0.8 var(--font-serif);
+  }
+
+  .entries-none {
+    padding: var(--space-5) 0;
+    color: var(--ink-2);
+    font: italic 500 1.0625rem / 1.45 var(--font-serif);
+  }
+
+  /* The chapter's pages: newer, the numbers, older. */
+  .pager {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding-top: 18px;
+  }
+
+  .pager-pages {
+    display: flex;
+    gap: 4px;
+  }
+
+  .pager-n {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    background: none;
+    color: var(--ink-3);
+    font: 700 1.125rem / 1 var(--font-numeral);
+    cursor: pointer;
+  }
+
+  .pager-n[aria-current="page"] {
+    box-shadow: inset 0 -2px 0 var(--ink);
+    color: var(--ink);
+  }
+
+  .pager-way {
+    min-height: 44px;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font: 700 0.9375rem / 1 var(--font-sans);
+    cursor: pointer;
+  }
+
+  .pager-way.off {
+    display: inline-flex;
+    align-items: center;
+    color: var(--rule-2);
+    font-weight: 600;
+    cursor: default;
+  }
+
+  @media (min-width: 56.25rem) {
+    .book.spread > .page-1,
+    .chapter.spread > .page-1 {
+      grid-column: 1 / span 4;
+    }
+
+    .book.spread > .page-2,
+    .chapter.spread > .page-2 {
+      grid-column: 5 / span 8;
+    }
+
+    /* The book: its title and figures, and its notes under them, beside the contents. */
+    .book.spread > .contents {
+      grid-row: 1 / span 2;
+    }
+
+    .book.spread > .book-notes {
+      grid-row: 2;
+    }
+
+    .chapter-side {
+      position: sticky;
+      top: var(--space-5);
+    }
+
+    .toc {
+      columns: 2;
+      column-gap: 40px;
+    }
+
+    .toc-row {
+      break-inside: avoid;
+    }
+
+    .toc-name {
+      font-size: 1.125rem;
+    }
+
+    .chapter-head h1 {
+      font-size: calc(24px + 1.5rem);
+    }
+
+    .chapter-pic {
+      width: 96px;
+      height: 96px;
+    }
+
+    .chapter-play .small {
+      text-align: left;
+    }
+
+    .entries {
+      columns: 2;
+      column-gap: 40px;
+      column-rule: 1px solid var(--rule);
+    }
+  }
+
   /* ---- Rows of players: a board, the friends ---- */
 
   .rank-row {
@@ -5177,11 +5571,6 @@
       margin: 0 calc(-1 * var(--space-3));
       padding-inline: var(--space-3);
     }
-  }
-
-  .small {
-    font-size: 0.875rem;
-    line-height: 1.25rem;
   }
 
   /* Read by screen readers, not shown. */
@@ -6248,12 +6637,21 @@
     --gutter: 16px;
   }
 
-  .tighter .score-of .num-word {
-    display: block;
+  /* A chapter's row: its name wraps, no leaders; its share known over its words. */
+  .tight .toc-dots {
+    display: none;
   }
 
-  .tighter .almanac-card {
-    overflow-wrap: anywhere;
+  .tight .toc-name {
+    min-width: 0;
+  }
+
+  .tight .know-top {
+    flex-wrap: wrap;
+  }
+
+  .tighter .score-of .num-word {
+    display: block;
   }
 
   /* The places at a phone's foot: a name that doesn't fit its third (a phone that enlarges the text itself) is cut,

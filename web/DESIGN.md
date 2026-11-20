@@ -118,7 +118,24 @@ place.
   with the drawn name). Before a first duel sent to a friend: „Как да те виждат останалите?“, „Готово“ gold.
   A name field never asks
   the browser for a full name (`autocomplete` nickname or off: `fields.test.ts`).
-- **Профил** (`/me`, from the avatar in the bar): the player (streak,
+- **Алманах** (`/almanac`, `screens/almanac.ts`): the player's book, a spread on a big screen. „Твоята книга“, „Алманахът
+  на <име>“ and when it began (the first game's day), three figures between rules (`.figures-row`: дни поред, факта,
+  от всичко знаеш: Микс's share); the contents (`.toc`, two columns on a big screen): a chapter a row
+  (`.toc-row.t-<topic>`) — its picture, its name in the serif on dotted leaders (`.toc-dots`, gone under `tight`) to
+  the share known, and under it its facts, its tier (or „първа оценка“, „още без оценка“) and a 3px track in its
+  colour (`.toc-track`); the ten topics, then „Микс“ (every topic) and „България“ (with its tricolour, `.flag`). Then
+  the notes the book keeps (`.almanac-notes`, a ledger: the day in small capitals, the note in the serif; the streak's
+  next milestone ahead in italic, „Тридесет дни поред, ако не спреш.“).
+  **A chapter** (`/almanac/<topic>`): „← Алманах“, „Глава 3“ in its colour, its name, its picture; how much of it the
+  player knows (`.know`: the share big, its tier in a sentence, „на крачка от „Експерт““ within 5%), its scale
+  (`.scale`: a 4px track filled in its colour, a tick at each tier, a mark at the player, only Новак and Светило
+  named); „Играй главата“ (the topic's game: topics are played from their chapter); then its facts as entries
+  (`.entries`, two columns with a rule on a big screen): a dateline (`.entry-when`: „20 ноем. · Брой 9“, „Играй
+  главата“, „Дуел“), the answer as a headword (`.entry-word`; a statement is its own, „Невярно:“ before one that isn't
+  so), the question in italic (`.entry-q`), the fact (`.entry-fact`, a drop cap in the chapter's colour on the page's
+  first). The latest first, thirty to a page (`.pager`: „← По-нови“, the numbers, „По-стари →“), found by their words
+  (`.search`, at most 60 letters); the page and the search are in the address (`?page=2&q=…`).
+  : the player (streak,
   numbers,
   the facts in the Алманах, mastery (once a topic has a mark; each row a way to play the topic), latest games (the
   day's ten as their issue, „Брой 7“, the date under it; today's each a way to go over it, read-only: `/games/<id>`,
@@ -127,15 +144,6 @@ place.
   is read by few). The avatar is a tap from choosing another (`/avatar`, „Смени аватара“ under the name too): what's
   worn as others see it, then the fifteen animals, each in its own colours, every one anyone's from the first day, a
   tap wearing it.
-  **Моят Алманах** reads as one list, in the order the facts were learned, the first first: the count in the numeral face („42 факта досега“, or a
-  topic's „7 от 24 факта в „История““), and what they are in a line; the notes the book keeps of the player's
-  milestones („Отбелязано“: a streak of 7, 30, 100 or 365 days, a first ten of ten, a chapter complete, each with its
-  day, the latest first; `.almanac-notes`, a short list until the book's own look comes); the topics as a quiet row of chips (names
-  only) to read one by; then the facts as cards laid as masonry (no datelines), as many columns as 17rem fit, each card in the column that
-  ends highest so the order learned still reads left to right: the topic in its colour (its picture on a disc of it, a glow of it in the
-  card's corner, the edge tinted), the question in a small line, what was learned as the headline (the answer; a
-  statement to judge is its own headline, „Невярно:“ before one that isn't so), and the fact in the facts' face, a
-  bar of the topic's colour beside it. It comes a page at a time.
   Общо is a hub, each thing once: the streak, three numbers in one card, the Алманах in a line („N факта в
   Алманаха“, a tap from it), mastery, the latest games and the way to all of them. Its head is the player's own
   avatar, as last seen on the device while it loads (never one drawn from the name: that reads as someone else's
@@ -296,9 +304,6 @@ questions are about. A rule never holds a literal colour: it takes a token.
 - **Начало:** `.status-row` with `.streak-chip`; `.card.hero.day` opening with `.masthead`
   (`.masthead-line`, `.masthead-date`) over `.day-title`; `.modes .mode` and `.topics .topic` (`.topic-lead` for
   „Микс“ and „България“, `.topic-all` across the row).
-- **Моят Алманах:** `.almanac-head` (`.almanac-count` with `.almanac-n`), `.almanac-topics`,
-  `.almanac-list`, each `.almanac-item` (`.almanac-topic`, `.almanac-q`,
-  `.almanac-a`, `.almanac-untrue`, `.almanac-fact`).
 - **Page openers** lead with the thing, not its rules. A lead is one sentence.
 - **Text:** `.kicker`, `.lead`, `.muted`, `.small`, `.bad` (errors) and `.status`; `.explain` with `.explain-pop`
   (a number's name, a tap from its meaning: `explain()`).
@@ -404,6 +409,7 @@ questions are about. A rule never holds a literal colour: it takes a token.
   - `.players li`, `.friend` and `.invitation`
   - `.modes`, `.topics` and `.streak-chip`
   - `.news-open`, `.news-facts`, `.news-note`, `.mastery-line`, `.almanac-notes` and `.explain`
+  - `.toc-row`, `.entry` (`.entry-word`, `.entry-q`), `.pager`, `.fig`, `.day-board`, `.rank-row`
   - `.duel-head`, `.duel-verdict`, `.duel-face`, `.duel-points`, `.duel-marks .duel-pip`, `.duel-line`,
     `.duel-meant` and `.duel-record`
   - `.duels`, `.duel-row`, `.duel-sent`, `.their-line` and `.question-head .versus`

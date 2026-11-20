@@ -123,7 +123,7 @@ test("a week's streak is noted in the book, told by its sheet, not first by its 
   expect(await page.evaluate(() => scrollY)).toBe(scrolled);
   // Kept in the book: Моят Алманах lists it, with its day.
   await page.goto("/almanac");
-  await expect(page.locator(".almanac-notes")).toContainText("7 дни поред с въпросите на деня");
+  await expect(page.locator(".almanac-notes")).toContainText("Седем дни поред.");
 });
 
 /** What a look at the big-news sheet saw: in how many frames it was see-through (it or its panel less than opaque),

@@ -36,7 +36,7 @@ import { calm, setCalm, setTextSize, setTick, textSize, tickOn } from "./lib/pre
 import { needsHomeScreen, pushable, pushOn, pushPrefs, setPushPref, turnOff, turnOn } from "./lib/push.ts";
 import { byTap, go, goBack, rename, title } from "./lib/router.ts";
 import { feelKit, loadFeel, play, playAnswer, playCount, quietWhenSilent, setSound, soundOn } from "./lib/sound.ts";
-import { issueWords, listWords, weekday, withWord } from "./lib/words.ts";
+import { dateWords, issueWords, listWords, weekday, withWord } from "./lib/words.ts";
 import { type DuelView, duelLists, startDuel } from "./screens/duel.ts";
 import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
 import { nameFirst } from "./screens/name.ts";
@@ -97,6 +97,7 @@ export const kit = {
   computed,
   count,
   crowdLine,
+  dateWords,
   dayInBulgaria,
   duelLists,
   duelResult,

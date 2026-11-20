@@ -1103,6 +1103,15 @@ func TestAlmanacPages(t *testing.T) {
 	if got := all("", len(ids), func() {}); !slices.Equal(got, want) {
 		t.Fatalf("all on one page: %v", got)
 	}
+	// By its number: the second page of fours, the count of them all, and the day the book began.
+	a, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Page: 1, Limit: 4})
+	got := []string{}
+	for _, f := range a.Facts {
+		got = append(got, f.ID)
+	}
+	if err != nil || !slices.Equal(got, want[4:8]) || a.Found != len(ids) || a.Since != "" {
+		t.Fatalf("the second page of fours: %v (%d found, since %q) %v", got, a.Found, a.Since, err)
+	}
 	var history []string
 	for _, id := range want {
 		if q, _ := w.b.Get(id); q.Base().Category == "history" {

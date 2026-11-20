@@ -132,16 +132,17 @@ func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 	s.notifyFrom(context.WithoutCancel(ctx), n.From, m, n.To)
 }
 
-// almanac is a page of the player's collection of learned facts: of a topic (?topic=, or all), from where the page
-// before ended (?from=, its next).
+// almanac is a page of the player's book: of a chapter (?topic=, or all), from where the page before ended (?from=,
+// its next) or by its number (?page=, from 0), its facts found by words (?q=).
 func (s *Server) almanac(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
 		return err
 	}
 	q := r.URL.Query()
+	page, _ := strconv.Atoi(q.Get("page"))
 	a, err := s.game.AlmanacOf(r.Context(), u.ID, play.AlmanacQuery{Topic: q.Get("topic"), From: q.Get("from"),
-		Search: q.Get("q"), Limit: play.AlmanacPage})
+		Search: q.Get("q"), Page: min(max(page, 0), 10_000), Limit: play.AlmanacPage})
 	if err != nil {
 		return err
 	}

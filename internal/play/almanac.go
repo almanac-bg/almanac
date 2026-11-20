@@ -2,10 +2,12 @@ package play
 
 import (
 	"context"
+	"database/sql"
 	"math"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -43,20 +45,25 @@ const AlmanacSearch = 60
 // by chapter and in all; how many each chapter has in all; and where the next page starts (none after the last). The
 // first page has the notes in the book too (NotesOf), the latest first, and each chapter's mastery (Chapters).
 type Almanac struct {
-	Facts    []Learned      `json:"facts"`
+	Facts []Learned `json:"facts"`
+	// Found is how many facts the chapter (and the search) has in all: its pages are Found / AlmanacPage.
+	Found    int            `json:"found"`
 	Have     map[string]int `json:"have"`
 	All      int            `json:"all"`
 	Of       map[string]int `json:"of"`
 	Next     string         `json:"next,omitempty"`
 	Notes    []Note         `json:"notes,omitempty"`
 	Chapters []Mastery      `json:"chapters,omitempty"`
+	// Since is the day the player's book began: their first game's.
+	Since string `json:"since,omitempty"`
 }
 
 // AlmanacQuery is what a page of the book is asked for: a chapter ("": all of it), where the page before ended (its
-// Next; "": from the latest), words to find in its facts (their question, answer or fact), and how many at most.
+// Next; "": from the latest) or which page it is (Page, from 0: a chapter's pages are numbered), words to find in its
+// facts (their question, answer or fact), and how many to a page.
 type AlmanacQuery struct {
 	Topic, From, Search string
-	Limit               int
+	Page, Limit         int
 }
 
 // factsIn is how many facts each chapter has: its live questions with a fact („Микс“ every topic's, „България“ those
@@ -176,13 +183,25 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Al
 	}
 	// The latest first: learned in that order, read backwards.
 	slices.Reverse(found)
+	out.Found = len(found)
+	if !paged {
+		found = found[min(len(found), max(aq.Page, 0)*aq.Limit):]
+	}
 	if len(found) > aq.Limit {
 		found = found[:aq.Limit]
 		last := found[len(found)-1]
 		out.Next = strconv.FormatInt(last.At, 10) + ":" + last.ID
 	}
 	out.Facts = append(out.Facts, found...)
-	if aq.From == "" {
+	if aq.From == "" && aq.Page == 0 {
+		var since sql.NullInt64
+		if err := g.DB.Read.QueryRowContext(ctx, `SELECT min(started_at) FROM runs WHERE user_id = ?`, userID).
+			Scan(&since); err != nil {
+			return out, err
+		}
+		if since.Valid {
+			out.Since = dayOf(time.UnixMilli(since.Int64))
+		}
 		if out.Notes, err = g.NotesOf(ctx, userID); err != nil {
 			return out, err
 		}

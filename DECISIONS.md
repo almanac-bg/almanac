@@ -66,8 +66,9 @@ packages' doc comments; this file holds only what must not drift.
   year's report; and on 20 Nov, Профил's chart of the days („Твоите броеве“), Начало's line of how yesterday ended,
   Класации' „Вчера“, Втори шанс (the questions got wrong, asked again days later), the weekly leagues, rooms
   (playing together with a code; the games played in them stay the players'), and blocking players (a request can
-  still be declined, a friend removed). Моят
-  Алманах is one list in the order the facts were learned, with no datelines. Friends are added by username or email.
+  still be declined, a friend removed). The
+  Алманах's facts are a chapter's entries, the latest first, each dated with where it was learned (the edition's
+  mockups, chosen 20 Nov), never one list of them all. Friends are added by username or email.
   Don't bring any of them back, or something in their place, without the owner's call.
 - **Right answers in a row earn no points** (owner, 2026-11-18, review E6): where a miss fell decided close duels.
   The climb stays as sound and feel; a game with every answer right still earns its bonus.
