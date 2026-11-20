@@ -98,32 +98,32 @@ var Achievements = []Achievement{
 	{"friend1", "Двама сме", "Добави първия си приятел в играта.", "heart", Common, 1, false},
 	{"fullDay", "Пълен ден", "Изпълни и трите цели за деня.", "", Common, 1, false},
 
-	{"streak7", "Цяла седмица", "Играй въпросите на деня седем дни поред.", "flame", Rare, 7, false},
+	{"streak7", "Цяла седмица", "Играй въпросите на деня седем дни поред.", "torch", Rare, 7, false},
 	{"perfect", "Десет от десет", "Отговори вярно и на десетте въпроса на деня.", "star", Rare, 1, false},
 	{"exact", "Точно в целта", "Познай число точно, без никаква грешка.", "target", Rare, 1, false},
 	{"allTopics", "Обиколка", "Изиграй поне една игра по всяка тема.", "compass", Rare, 10, false},
-	{"friends5", "Цяла компания", "Събери пет приятели в играта.", "heart", Rare, 5, false},
+	{"friends5", "Цяла компания", "Събери пет приятели в играта.", "hearts", Rare, 5, false},
 	{"fast", "Пет за миг", "Отговори вярно пет пъти в една игра, всеки път за по-малко от три секунди.", "bolt", Rare, FastRights, true},
 	{"nightOwl", "След полунощ", "Отговори на въпрос между полунощ и четири сутринта.", "owl", Rare, 1, true},
 	{"earlyBird", "Преди седем", "Изиграй въпросите на деня преди седем сутринта.", "sun", Rare, 1, true},
 	{"lastSecond", "В последния миг", "Отговори вярно в последната секунда.", "hourglass", Rare, 1, true},
 
-	{"streak30", "Цял месец", "Играй въпросите на деня тридесет дни поред.", "flame", Epic, 30, false},
-	{"facts1000", "Хиляда факта", "Събери хиляда факта в Алманаха.", "book", Epic, 1000, false},
+	{"streak30", "Цял месец", "Играй въпросите на деня тридесет дни поред.", "bonfire", Epic, 30, false},
+	{"facts1000", "Хиляда факта", "Събери хиляда факта в Алманаха.", "books", Epic, 1000, false},
 	{"games100", "Сто игри", "Изиграй сто игри.", "trophy", Epic, 100, false},
-	{"master", "Като петте си пръста", "Стигни до „Майстор“ в една тема.", "trophy", Epic, 1, false},
-	{"duel10", "Десет победи", "Спечели десет дуела.", "shield", Epic, 10, false},
+	{"master", "Като петте си пръста", "Стигни до „Майстор“ в една тема.", "cap", Epic, 1, false},
+	{"duel10", "Десет победи", "Спечели десет дуела.", "blades", Epic, 10, false},
 	{"topicPerfect", "Тема без грешка", "Отговори вярно и на десетте въпроса в игра по тема.", "spark", Epic, 1, true},
 	{"allTypes", "Всеки вид въпрос", "Отговори вярно на всеки вид въпрос: с четири отговора, с число, с подреждане, „Вярно или невярно“ и с двойки.", "clover", Epic, 5, true},
 	{"royalWin", "Вечерта е твоя", "Спечели Роял.", "", Epic, 1, false},
 	{"fullDays30", "Тридесет пълни дни", "Изпълни и трите цели за деня в тридесет различни дни.", "", Epic, 30, false},
 
-	{"streak100", "Сто дни", "Играй въпросите на деня сто дни поред.", "flame", Legendary, 100, false},
-	{"streak365", "Цяла година", "Стигни серия от 365 дни с въпросите на деня.", "flame", Legendary, 365, false},
-	{"noMiss", "Без нито един пропуск", "Играй въпросите на деня 365 дни един след друг, без резервен ден.", "", Legendary, 365, false},
-	{"master5", "Пет теми като петте си пръста", "Стигни до „Майстор“ в пет теми.", "trophy", Legendary, 5, false},
-	{"duel50", "Петдесет победи", "Спечели петдесет дуела.", "shield", Legendary, 50, false},
-	{"facts5000", "Пет хиляди факта", "Събери пет хиляди факта в Алманаха.", "book", Legendary, 5000, false},
+	{"streak100", "Сто дни", "Играй въпросите на деня сто дни поред.", "phoenix", Legendary, 100, false},
+	{"streak365", "Цяла година", "Стигни серия от 365 дни с въпросите на деня.", "year", Legendary, 365, false},
+	{"noMiss", "Без нито един пропуск", "Играй въпросите на деня 365 дни един след друг, без резервен ден.", "calendar", Legendary, 365, false},
+	{"master5", "Пет теми като петте си пръста", "Стигни до „Майстор“ в пет теми.", "wreath", Legendary, 5, false},
+	{"duel50", "Петдесет победи", "Спечели петдесет дуела.", "helmet", Legendary, 50, false},
+	{"facts5000", "Пет хиляди факта", "Събери пет хиляди факта в Алманаха.", "", Legendary, 5000, false},
 	{"wholeTopic", "Цяла тема", "Събери всички факти от една тема в Алманаха.", "", Legendary, 1, false},
 }
 
@@ -135,24 +135,28 @@ func achievementByID(id string) (Achievement, bool) {
 	return Achievements[i], true
 }
 
-// Avatars are a picture in a tone (web/src/art/pictures.ts draws them; a "shape" is a picture's id). The animals are
-// everyone's from the start; the emblems unlock: with an achievement drawn with that emblem, or (the crown) at a level.
-// The tones are the theme's five, each painting the whole picture in its shades, and "natural": every part in its
-// own colour, as the thing looks (a fox orange with a white chest, a stork white with a black wing and a red beak;
-// web/src/app.css, .tone-natural).
+// Avatars are a picture in a tone (web/src/art/pictures.ts draws them; a "shape" is a picture's id). The first animals
+// are everyone's from the start; the rest unlock: an animal or the crown at a level (ShapeLevels), an emblem with the
+// one achievement drawn with it (its Icon: each its own). The tones are the theme's five, each painting the whole
+// picture in its shades, and "natural": every part in its own colour, as the thing looks (a fox orange with a white
+// chest, a stork white with a black wing and a red beak; web/src/app.css, .tone-natural).
 var (
 	Tones  = []string{"gold", "lilac", "sky", "rose", "mint", "natural"}
 	tinted = Tones[:5] // the theme's tones, which the game gives
 
 	FreeShapes = []string{"fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog"}
+	// Unlockable are the shapes that unlock, in the order the wardrobe shows them.
 	Unlockable = []string{
-		"flame", "star", "target", "bolt", "book", "trophy", "shield", "heart", "owl", "compass", "sun", "hourglass",
-		"spark", "clover", "crown",
+		"mouse", "squirrel", "crown", "sheep", "turtle", "badger", "lynx",
+		"flame", "torch", "bonfire", "phoenix", "year", "calendar", "book", "books", "shield", "blades", "helmet",
+		"heart", "hearts", "trophy", "cap", "wreath", "star", "target", "compass", "bolt", "owl", "sun", "hourglass",
+		"spark", "clover",
 	}
+	// ShapeLevels are the shapes a level unlocks, and the level: between the frames, patterns and titles of the
+	// level's ladder, so that a new one comes every few levels.
+	ShapeLevels = map[string]int{"mouse": 4, "squirrel": 7, "crown": 10, "sheep": 15, "turtle": 21, "badger": 28,
+		"lynx": 36}
 )
-
-// CrownLevel is the level that unlocks the crown.
-const CrownLevel = 10
 
 // DefaultAvatar is the avatar the game gives a player until they choose one: a free shape and one of the theme's
 // tones, from their id. Both turn with the id (9 shapes and 5 tones have no common factor, so every pair comes, once
@@ -163,12 +167,32 @@ func DefaultAvatar(userID int64) string {
 	return FreeShapes[n%int64(len(FreeShapes))] + "-" + tinted[n%int64(len(tinted))]
 }
 
-// Shape is an avatar's shape as a player may pick it: free, unlocked, or still locked (and what unlocks it: the name
-// of an achievement, or a level).
+// Shape is an avatar's shape as a player may pick it: free, unlocked, or still locked, with what unlocks it: How, a
+// phrase after „с“ („ниво 15“, „постижението „Цяла седмица““), and the Level or the Achievement it takes, for the
+// wardrobe to say how far along the player is.
 type Shape struct {
-	Shape  string `json:"shape"`
-	Locked bool   `json:"locked,omitempty"`
-	How    string `json:"how,omitempty"`
+	Shape       string `json:"shape"`
+	Locked      bool   `json:"locked,omitempty"`
+	How         string `json:"how,omitempty"`
+	Level       int    `json:"level,omitempty"`
+	Achievement string `json:"achievement,omitempty"`
+}
+
+// shapeAchievement is the achievement drawn with an emblem: the one that unlocks it.
+func shapeAchievement(shape string) (Achievement, bool) {
+	i := slices.IndexFunc(Achievements, func(a Achievement) bool { return a.Icon == shape })
+	if i < 0 {
+		return Achievement{}, false
+	}
+	return Achievements[i], true
+}
+
+// achievementHow says what unlocks something with an achievement, as a phrase after „с“: a hidden one isn't named.
+func achievementHow(a Achievement) string {
+	if a.Hidden {
+		return "скрито постижение"
+	}
+	return "постижението „" + a.Name + "“"
 }
 
 // shapes are every shape, as a player with these achievements and this level may pick them.
@@ -179,26 +203,13 @@ func shapes(earned map[string]int64, level int) []Shape {
 	}
 	for _, s := range Unlockable {
 		sh := Shape{Shape: s}
-		if s == "crown" {
-			if level < CrownLevel {
-				sh.Locked, sh.How = true, "ниво 10"
+		if l, ok := ShapeLevels[s]; ok {
+			if level < l {
+				sh.Locked, sh.How, sh.Level = true, "ниво "+strconv.Itoa(l), l
 			}
-		} else {
-			sh.Locked = true
-			for _, a := range Achievements {
-				if a.Icon != s {
-					continue
-				}
-				if _, ok := earned[a.ID]; ok {
-					sh.Locked, sh.How = false, ""
-					break
-				}
-				if sh.How == "" {
-					sh.How = "постижението „" + a.Name + "“" // the first achievement drawn with it
-					if a.Hidden {
-						sh.How = "скрито постижение" // found while playing: not told
-					}
-				}
+		} else if a, ok := shapeAchievement(s); ok {
+			if _, done := earned[a.ID]; !done {
+				sh.Locked, sh.How, sh.Achievement = true, achievementHow(a), a.ID
 			}
 		}
 		list = append(list, sh)

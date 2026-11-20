@@ -428,7 +428,7 @@ export const tierWords: Record<Tier, { group: string; one: string; title: string
   legendary: { group: "Легендарни", one: "легендарно", title: "Легендарна" },
 };
 
-/** Every avatar's name: the animals everyone has, then the emblems achievements unlock. */
+/** Every avatar's name: the animals everyone has, those levels unlock, then the emblems achievements unlock. */
 export const shapeNames: Record<string, string> = {
   fox: "Лисица",
   bear: "Мечка",
@@ -439,7 +439,24 @@ export const shapeNames: Record<string, string> = {
   deer: "Елен",
   stork: "Щъркел",
   frog: "Жаба",
+  mouse: "Мишка",
+  squirrel: "Катерица",
+  sheep: "Овца",
+  turtle: "Костенурка",
+  badger: "Язовец",
+  lynx: "Рис",
   flame: "Пламък",
+  torch: "Факла",
+  bonfire: "Огън",
+  phoenix: "Феникс",
+  year: "Година",
+  calendar: "Календар",
+  books: "Книги",
+  blades: "Мечове",
+  helmet: "Шлем",
+  hearts: "Сърца",
+  cap: "Академична шапка",
+  wreath: "Венец",
   star: "Звезда",
   target: "Мишена",
   bolt: "Мълния",

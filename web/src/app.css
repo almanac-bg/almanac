@@ -5201,6 +5201,235 @@
     fill: #fffaf0;
   }
 
+  .tone-natural.sh-mouse {
+    --tone: #f3d593;
+  }
+
+  .tone-natural.sh-mouse > .avatar-pic {
+    --k1: #6b6f78;
+    --k2: #9aa0aa;
+    --k4: #f2a7b4;
+    --k5: #f4efe8;
+  }
+
+  .tone-natural.sh-squirrel {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-squirrel > .avatar-pic {
+    --k1: #8a3b14;
+    --k2: #c8642a;
+    --k4: #e89a5c;
+    --k5: #fbeedd;
+  }
+
+  .tone-natural.sh-sheep {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-sheep > .avatar-pic {
+    --k1: #3b3330;
+    --k2: #8a6f63;
+    --k5: #f7f3ea;
+  }
+
+  .tone-natural.sh-turtle {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-turtle > .avatar-pic {
+    --k1: #6b4a24;
+    --k2: #8fa65a;
+    --k4: #c3d48a;
+  }
+
+  .tone-natural.sh-turtle > .avatar-pic > :nth-child(9) {
+    fill: #b8893f;
+  }
+
+  .tone-natural.sh-turtle > .avatar-pic > :nth-child(10) {
+    stroke: #d9b56a;
+  }
+
+  .tone-natural.sh-badger {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-badger > .avatar-pic {
+    --k1: #7d7f86;
+    --k5: #f5f3ee;
+  }
+
+  .tone-natural.sh-lynx {
+    --tone: #d6e4f0;
+  }
+
+  .tone-natural.sh-lynx > .avatar-pic {
+    --k1: #6b4a2b;
+    --k2: #c99a5e;
+    --k4: #f0dcbc;
+    --k5: #fbf3e6;
+  }
+
+  .tone-natural.sh-lynx > .avatar-pic > :nth-child(9) {
+    fill: #b9c43c;
+  }
+
+  .tone-natural.sh-torch {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-torch > .avatar-pic {
+    --k1: #6b3f1f;
+    --k2: #b7791f;
+    --k4: #f97316;
+    --k5: #fcd34d;
+  }
+
+  .tone-natural.sh-bonfire {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-bonfire > .avatar-pic {
+    --k1: #6b3f1f;
+    --k2: #8a5a2e;
+    --k4: #f97316;
+    --k5: #fcd34d;
+  }
+
+  .tone-natural.sh-bonfire > .avatar-pic > :nth-child(7) {
+    fill: #d9a066;
+  }
+
+  .tone-natural.sh-phoenix {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-phoenix > .avatar-pic {
+    --k1: #b45309;
+    --k4: #ef4b23;
+    --k5: #fcb33d;
+  }
+
+  .tone-natural.sh-year {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-year > .avatar-pic {
+    --k3: #f97316;
+    --k4: #f59e0b;
+    --k5: #fde047;
+  }
+
+  .tone-natural.sh-calendar {
+    --tone: #d6e4f0;
+  }
+
+  .tone-natural.sh-calendar > .avatar-pic {
+    --k2: #d62f2f;
+    --k3: #d62f2f;
+    --k5: #e7e2d6;
+  }
+
+  .tone-natural.sh-calendar > .avatar-pic > :nth-child(7) {
+    fill: #fcd34d;
+  }
+
+  .tone-natural.sh-books {
+    --tone: #f3d593;
+  }
+
+  .tone-natural.sh-books > .avatar-pic {
+    --k1: #8a2f17;
+    --k2: #1f3f8f;
+    --k4: #2f6f4e;
+    --k5: #f6eedb;
+  }
+
+  .tone-natural.sh-blades {
+    --tone: #d6e4f0;
+  }
+
+  .tone-natural.sh-blades > .avatar-pic {
+    --k1: #1f3f8f;
+    --k2: #fbbf24;
+    --k4: #b6bcc6;
+    --k5: #eef1f5;
+  }
+
+  .tone-natural.sh-blades > .avatar-pic > :nth-child(4) {
+    fill: #b7791f;
+  }
+
+  .tone-natural.sh-blades > .avatar-pic > :nth-child(9) {
+    fill: #b7791f;
+  }
+
+  .tone-natural.sh-blades > .avatar-pic > :nth-child(15) {
+    fill: #fbbf24;
+  }
+
+  .tone-natural.sh-helmet {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-helmet > .avatar-pic {
+    --k1: #7a4a12;
+    --k4: #c98a12;
+    --k5: #f0b429;
+  }
+
+  .tone-natural.sh-helmet > .avatar-pic > :nth-child(2) {
+    fill: #b91c1c;
+  }
+
+  .tone-natural.sh-helmet > .avatar-pic > :nth-child(3) {
+    fill: #dc2b2b;
+  }
+
+  .tone-natural.sh-hearts {
+    --tone: #fbd3dc;
+  }
+
+  .tone-natural.sh-hearts > .avatar-pic {
+    --k1: #a3122f;
+    --k4: #dc1f45;
+    --k5: #f43f5e;
+  }
+
+  .tone-natural.sh-cap {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-cap > .avatar-pic {
+    --k1: #1f2937;
+    --k2: #111827;
+    --k4: #f0b429;
+    --k5: #fcd34d;
+  }
+
+  .tone-natural.sh-wreath {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-wreath > .avatar-pic {
+    --k1: #3f6b2a;
+    --k4: #4d8a34;
+    --k5: #6fae4a;
+  }
+
+  .tone-natural.sh-wreath > .avatar-pic > :nth-last-child(4) {
+    fill: #b91c1c;
+  }
+
+  .tone-natural.sh-wreath > .avatar-pic > :nth-last-child(2) {
+    fill: #fcd34d;
+  }
+
+  .tone-natural.sh-wreath > .avatar-pic > :nth-last-child(1) {
+    fill: #f0b429;
+  }
+
   .avatar.s {
     --size: 28px;
   }
@@ -6067,13 +6296,18 @@
     box-shadow: 0 0 0 2px var(--accent);
   }
 
-  .pick.locked .avatar {
+  /* A locked one in the wardrobe's list: grey, as a locked medal is, beside what unlocks it. */
+  .lock-art {
+    flex: none;
+  }
+
+  .lock-art .avatar {
     --tone: var(--line-strong);
     opacity: 0.6;
   }
 
-  /* Frames and patterns, each drawn on the player's avatar with its name under it; a locked one dimmed, with what
-     unlocks it in sight (wardrobe.ts). Three to a row on the narrowest phone. */
+  /* Frames and patterns of the player's own, each drawn on their avatar with its name under it (the locked ones are
+     listed after, as the avatars' are: wardrobe.ts). Three to a row on the narrowest phone. */
   .wear {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(5.75rem, 1fr));
@@ -6118,27 +6352,6 @@
     font-size: 0.8125rem;
     line-height: 1.125rem;
     font-weight: 800;
-  }
-
-  .wear-pick.locked {
-    border-style: dashed;
-    background: transparent;
-    cursor: default;
-  }
-
-  .wear-pick.locked .avatar {
-    opacity: 0.55;
-  }
-
-  .wear-pick.locked .wear-name {
-    color: var(--text-muted);
-  }
-
-  .wear-how {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    line-height: 1rem;
-    font-weight: 600;
   }
 
   /* The colours in the avatars' columns, each over the one under it. */

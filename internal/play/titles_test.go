@@ -1,6 +1,7 @@
 package play
 
 import (
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -217,7 +218,7 @@ func TestLevelLadderNeverQuiet(t *testing.T) {
 	w := wardrobe{titles: Titles}
 	last := 12
 	for level := 13; level <= 50; level++ {
-		if len(w.unlocksBy(func(u unlock) bool { return u.level == level })) > 0 || level == CrownLevel {
+		if len(w.unlocksBy(func(u unlock) bool { return u.level == level })) > 0 || slices.Contains(slices.Collect(maps.Values(ShapeLevels)), level) {
 			if level-last > 3 {
 				t.Errorf("nothing unlocks between levels %d and %d", last, level)
 			}
@@ -262,5 +263,91 @@ func TestDaysTitlesMigration(t *testing.T) {
 	_ = w.db.Read.QueryRow(`SELECT count(*) FROM unlocks_told WHERE id = 'title:persistence:Постоянство'`).Scan(&told)
 	if told != 1 {
 		t.Fatalf("%d told of „Постоянство“", told)
+	}
+}
+
+// Every avatar that unlocks does so one way: at a level, or with the one achievement drawn with it; every
+// achievement's emblem is one of them; and a locked one says what it takes, for the wardrobe to say how far along.
+func TestAvatarsUnlockOneWay(t *testing.T) {
+	seen := map[string]bool{}
+	for _, s := range append(slices.Clone(FreeShapes), Unlockable...) {
+		if seen[s] {
+			t.Errorf("%s twice", s)
+		}
+		seen[s] = true
+	}
+	for _, s := range Unlockable {
+		n := 0
+		for _, a := range Achievements {
+			if a.Icon == s {
+				n++
+			}
+		}
+		if _, byLevel := ShapeLevels[s]; (byLevel && n > 0) || (!byLevel && n != 1) {
+			t.Errorf("%s: by level %v, by %d achievements", s, byLevel, n)
+		}
+	}
+	for _, a := range Achievements {
+		if a.Icon != "" && !slices.Contains(Unlockable, a.Icon) {
+			t.Errorf("%s unlocks %s, not an avatar that unlocks", a.ID, a.Icon)
+		}
+	}
+	for s := range ShapeLevels {
+		if !slices.Contains(Unlockable, s) {
+			t.Errorf("level shape %s isn't unlockable", s)
+		}
+	}
+
+	list := shapes(map[string]int64{"streak3": 1}, 4)
+	at := func(s string) Shape { return list[slices.IndexFunc(list, func(x Shape) bool { return x.Shape == s })] }
+	for s, want := range map[string]Shape{
+		"fox":      {Shape: "fox"},
+		"flame":    {Shape: "flame"},
+		"mouse":    {Shape: "mouse"},
+		"squirrel": {Shape: "squirrel", Locked: true, How: "ниво 7", Level: 7},
+		"torch":    {Shape: "torch", Locked: true, How: "постижението „Цяла седмица“", Achievement: "streak7"},
+		"owl":      {Shape: "owl", Locked: true, How: "скрито постижение", Achievement: "nightOwl"},
+	} {
+		if got := at(s); got != want {
+			t.Errorf("%s: %+v, want %+v", s, got, want)
+		}
+	}
+	w := wardrobe{level: 5, earned: map[string]int64{"streak3": 1}}
+	if n := w.next(0); n.Level != 6 || slices.ContainsFunc(n.LevelUnlocks, func(u Unlock) bool { return u.Kind == "avatar" }) {
+		t.Errorf("next from level 5: %+v", n)
+	}
+	if n := (wardrobe{level: 6}).next(0); n.Level != 7 || !slices.Contains(n.LevelUnlocks,
+		Unlock{Kind: "avatar", ID: "squirrel", From: "ниво 7"}) {
+		t.Errorf("next from level 6: %+v", n)
+	}
+}
+
+// Whoever wore the cup by „Майстор“ alone wears the scholar's cap, its own emblem now; with „Сто игри“, the cup stays.
+func TestOwnEmblemsMigration(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	master, both, plain := w.user(), w.user(), w.user()
+	for u, ids := range map[int64][]string{master: {"master"}, both: {"master", "games100"}, plain: {"streak3"}} {
+		for _, id := range ids {
+			if _, err := w.db.Write.Exec(`INSERT INTO achievements (user_id, id, at, xp, seen) VALUES (?, ?, 1, 0, 1)`,
+				u, id); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := w.db.Write.Exec(`UPDATE users SET avatar = 'trophy-rose' WHERE id = ?`, u); err != nil {
+			t.Fatal(err)
+		}
+	}
+	body, err := os.ReadFile("../store/migrations/0083_own_emblems.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.db.Write.Exec(string(body)); err != nil {
+		t.Fatal(err)
+	}
+	for u, want := range map[int64]string{master: "cap-rose", both: "trophy-rose", plain: "trophy-rose"} {
+		if look, err := w.g.LookOf(ctx, u); err != nil || !strings.HasPrefix(look.Avatar, want) {
+			t.Fatalf("wears %q after the migration, want %q (%v)", look.Avatar, want, err)
+		}
 	}
 }

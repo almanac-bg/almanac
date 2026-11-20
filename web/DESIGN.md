@@ -105,7 +105,9 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   day's ten as their issue, „Брой 7“, the date under it; today's each a way to go over it, read-only: `/games/<id>`,
   the score as its result had it and the questions; those of days gone by plain rows) and „Всички игри“ (`/games`:
   every game, by day under its dateline, Всички · Броеве · Теми · С други, a page at a time)), Награди (`/rewards`, the achievements), Гардероб (`/wardrobe`: what's
-  worn as others see it, then Аватар, Рамка, Фон or Титла, one at a time) and Алманах (`/almanac`). Настройки open
+  worn as others see it, then Аватар, Рамка, Фон or Титла, one at a time: what's the player's to pick, then „За
+  отключване“, each locked one in a row with what unlocks it („Отключва се с ниво 7.“), the achievement's deed and
+  its bar, the nearest three first and the rest folded) and Алманах (`/almanac`). Настройки open
   from the button beside the name, its icon and its word at every width (an icon alone is read by few). The switch names the place, so Награди, Гардероб and Алманах have no heading of
   their own on the screen (it's there for screen readers).
   **Моят Алманах** reads as one list, in the order the facts were learned, the first first: the count in the numeral face („42 факта досега“, or a
@@ -434,7 +436,7 @@ media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds th
   and legendary glow. Locked: grey (`--locked`, pale in Day); its progress is the bar beside it, never a ring around the medal. Hidden and not found: a „?“, and nothing about how
   or what it gives.
 - Every achievement says how it's earned, how far along the player is, and its reward: its tier's XP, and only
-  what it would unlock that the player doesn't have (an avatar shared by a chain is the first one's; what the first
+  what it would unlock that the player doesn't have (its own emblem as an avatar; what the first
   of a tier unlocks is said once, under the tier's heading). A title shows in its tier's ink wherever it's worn; as
   an unlock it's drawn as a ribbon with a nameplate in its tier's colour (`.unlock-title-mark`).
 - **One system.** XP comes from answers, the day's goals and achievements; the rating from duels and Роял. Level,
@@ -545,7 +547,7 @@ Every element that looks like a game measures something the game already counts:
 | Level        | All the XP a player has earned; each level takes 150 more than the last (300 for the first); lilac (its bars, the disc on an avatar)                                                                                                                                                                                                                                                                                                                                                                                            | Начало, Профил, avatars      |
 | Achievements | 30 facts of a player's games in four tiers (обикновени, редки, епични, легендарни), each saying how it's earned; announced once                                                                                                                                                                                                                                                                                                                                                                                                 | Result, Профил               |
 | Titles       | Words for the player and their knowledge, worn under their name, never only a deed, one tap's luck or the hour: a ladder by level („Нова искра“ at 1, by choice … „Жив алманах“ at 50; the newest reached is worn until one is chosen), some achievements of how someone plays („Светкавица“: five right in a game, each under 3 s), a topic's mastery („Майстор · История“, „Светило · История“), and the rating (divisions, a Роял won). In their tier's colour; yours first, the locked ones by group with what unlocks them | Boards, friends              |
-| Avatars      | A picture on a tone: nine animals free, emblems unlocked by achievements (the crown at level 10)                                                                                                                                                                                                                                                                                                                                                                                                                                | Everywhere a player is       |
+| Avatars      | A picture on a tone: nine animals free, six more and the crown by level, an emblem for each achievement drawn with one                                                                                                                                                                                                                                                                                                                                                                                                          | Everywhere a player is       |
 
 Feedback fires once, when it's earned, and then the screen is still again:
 

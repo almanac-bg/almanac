@@ -14,7 +14,7 @@ export interface Progress {
   title: string;
   /** No title chosen yet: the level's is worn (`title`; "" before „Любопитен ум“), not „Без титла“, a choice. */
   titleByLevel?: boolean;
-  shapes: { shape: string; locked?: boolean; how?: string }[];
+  shapes: Shape[];
   tones: string[];
   standing: Standing;
   /** Every title: yours, or locked with what unlocks it. */
@@ -40,11 +40,22 @@ export interface Progress {
 }
 
 /** A frame or a pattern: free or unlocked, or locked with what unlocks it. */
-export interface Cosmetic {
-  id: string;
-  name: string;
+/** What unlocks something still locked: the phrase after „с“ („ниво 7“, „постижението „Цяла седмица““), and the level
+ * or the achievement it takes, to say how far along the player is. */
+export interface Lock {
   locked?: boolean;
   how?: string;
+  level?: number;
+  achievement?: string;
+}
+
+export interface Shape extends Lock {
+  shape: string;
+}
+
+export interface Cosmetic extends Lock {
+  id: string;
+  name: string;
 }
 
 /** Who you are in the game: your avatar with your level, your name, your title. */
