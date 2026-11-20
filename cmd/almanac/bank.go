@@ -280,8 +280,9 @@ func bankLint(dir, rules string, short bool) error {
 func today() string { return time.Now().In(play.Bulgaria).Format(time.DateOnly) }
 
 // runway says how long the bank holds the day's questions for each place of a day (play.DayRunway), shortest first,
-// and for the questions about Bulgaria a day needs (play.BulgariaRunway): the days from today, the date the place runs
-// out on, and a warning under play.RunwayWarn days. With used (the days' questions: `almanac bank used`), the days
+// and for the questions about Bulgaria a day needs (play.BulgariaRunway): the days from today it holds at play.Supply
+// times the day's need (Cover), the date the day itself would run out of it, and a warning under play.RunwayWarn days
+// of Cover. With used (the days' questions: `almanac bank used`), the days
 // played and drawn ahead are taken off; without, the whole bank counts, which overstates it. The dated questions are
 // counted apart: each goes on its own date only. It warns rather than fails: a bank fix must still pass while a short
 // place waits for its batch.
@@ -294,17 +295,18 @@ func runway(b *bank.Bank, used play.Used, today string) string {
 			today, len(used.IDs), used.Through)
 	}
 	places := append(play.DayRunway(b, used, today), play.BulgariaRunway(b, used, today))
-	slices.SortStableFunc(places, func(x, y play.Runway) int { return x.Days - y.Days })
+	slices.SortStableFunc(places, func(x, y play.Runway) int { return x.Cover - y.Cover })
+	fmt.Fprintf(&s, "  (days held at %g× the day's need, the bank's measure; the day itself runs out on the date)\n", play.Supply)
 	for _, r := range places {
 		warn := ""
-		if r.Days < play.RunwayWarn {
+		if r.Cover < play.RunwayWarn {
 			warn = fmt.Sprintf("   warning: under %d days: write for it first", play.RunwayWarn)
 		}
 		place := r.Place
 		if r.Kinds == nil {
 			place = fmt.Sprintf("%s (%d a day)", r.Place, r.PerDay)
 		}
-		fmt.Fprintf(&s, "  %-34s %5d days, %5d questions, out on %s%s\n", place, r.Days, r.Questions, r.Out, warn)
+		fmt.Fprintf(&s, "  %-34s %5d days, %5d questions, out on %s%s\n", place, r.Cover, r.Questions, r.Out, warn)
 	}
 	n, per := datedLeft(b, used, today)
 	fmt.Fprintf(&s, "  dated („На този ден“, not in the places): %d questions no day has had, for %d of the year's 366 dates", n, len(per))

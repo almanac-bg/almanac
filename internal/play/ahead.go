@@ -51,8 +51,9 @@ const DayRules = "2026-11-20 the number last, a week apart (recent subjects), es
 // Ahead is how many days ahead of today the day's questions are drawn.
 const Ahead = 90
 
-// RunwayWarn is how many days of a place's runway are enough (runway.go): below it, `almanac bank check` warns, and
-// the next batch writes for that place first. Ahead of them are drawn already; the other 60 are time to write.
+// RunwayWarn is how many days of a place's runway are enough, held at Supply times the day's need (runway.go, Cover):
+// below it, `almanac bank check` warns, and the next batch writes for that place first. Ahead of them are drawn
+// already; the other 60 are time to write.
 const RunwayWarn = Ahead + 60
 
 // dayBars are the questions no game deals now (now: today's, and those due for review today, overdue), and those no
