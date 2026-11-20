@@ -95,7 +95,6 @@ func serve([]string) error {
 		Operator:        os.Getenv("OPERATOR_NAME"),
 		Contact:         env("CONTACT_EMAIL", "privacy@almanac.bg"),
 		Alerts:          server.Alerts{Email: os.Getenv("ALERT_EMAIL")},
-		RoomsFile:       filepath.Join(filepath.Dir(dbPath()), "rooms.json"),
 		LimitsFile:      filepath.Join(filepath.Dir(dbPath()), "limits.json"),
 		RunningFile:     filepath.Join(filepath.Dir(dbPath()), "running.json"),
 		DBPath:          dbPath(),

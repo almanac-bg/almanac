@@ -712,20 +712,20 @@ func TestNames(t *testing.T) {
 	}
 	for _, bad := range []string{"А", "123", "<script>", "Иван!", "абвгдежзийклмнопрстуфхцчшщъьюяю",
 		strings.Repeat("ﷺ", 3), "Ꙭꙮꙮ", "名前です", "Ἀλέξανδρος", "Иван​Петров"} {
-		if _, err := NormalName(bad); !errors.Is(err, ErrBadName) {
+		if _, err := normalName(bad); !errors.Is(err, ErrBadName) {
 			t.Errorf("%q: %v", bad, err)
 		}
 	}
 	// A word in two scripts is how a fake looks real; a dot between letters, a web address.
 	for bad, want := range map[string]error{"АЛМAНAХ": ErrNameScripts, "Ивaн": ErrNameScripts,
 		"almanac.bg": ErrNameLink, "free-coins.com": ErrNameLink, "Д.Петров": ErrNameLink} {
-		if _, err := NormalName(bad); !errors.Is(err, want) {
+		if _, err := normalName(bad); !errors.Is(err, want) {
 			t.Errorf("%q: %v, want %v", bad, err, want)
 		}
 	}
 	for _, good := range []string{"Иван Петров", "Ана-Мария", "Д. Петров", "José Ivanov", "Петър 2", "Лисица 123",
 		"Мечо_Пух", "Иван Ivanov", "Модерна", "Алма", "Хамлет"} {
-		if _, err := NormalName(good); err != nil || Reserved(good) {
+		if _, err := normalName(good); err != nil || Reserved(good) {
 			t.Errorf("%q: %v, reserved %v", good, err, Reserved(good))
 		}
 	}
@@ -763,7 +763,7 @@ func TestRudeNames(t *testing.T) {
 		if !Rude(rude) {
 			t.Errorf("%q isn't rude", rude)
 		}
-		if _, err := NormalName(rude); !errors.Is(err, ErrNameRude) {
+		if _, err := normalName(rude); !errors.Is(err, ErrNameRude) {
 			t.Errorf("%q as a name: %v", rude, err)
 		}
 	}
@@ -782,7 +782,7 @@ func TestRudeNames(t *testing.T) {
 		if Rude(good) {
 			t.Errorf("%q is taken for rude", good)
 		}
-		if _, err := NormalName(good); err != nil {
+		if _, err := normalName(good); err != nil {
 			t.Errorf("%q as a name: %v", good, err)
 		}
 	}

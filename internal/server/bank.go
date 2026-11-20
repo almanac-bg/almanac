@@ -11,7 +11,7 @@ import (
 
 // A bank reload (cmd/almanac: SIGHUP, after deploy/bank.sh pulls) offers the server a bank already loaded and checked.
 // The game keeps its questions' versions first (play.Game.Keep): a play is graded against the version it showed,
-// whatever the bank has become since, and a live game (a live duel, Роял, a room) through the questions it dealt. Even
+// whatever the bank has become since, and a live game (a live duel, Роял) through the questions it dealt. Even
 // so, a new bank never goes into play while Роял is on, from its lobby until its games are over: the evening's
 // questions are one game for fifty, and nothing of it changes under them. It's held, and goes in as the evening ends.
 // /api/health tells which bank is played, which is held, and which was refused, for bank.sh to confirm what became of

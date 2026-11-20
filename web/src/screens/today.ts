@@ -81,9 +81,9 @@ export interface Today {
   friends?: Score[] | null;
   /** While no friend has played: whether the player has any friends at all. */
   befriended?: boolean;
-  /** A live game the player is in, under way (its screen left), a room's by its code; or a seat in Роял's lobby, with
-   * its start (`starts`): the way back to it. */
-  playing?: { kind: "duel" | "room" | "royal"; code?: string; starts?: number } | null;
+  /** A live game the player is in, under way (its screen left); or a seat in Роял's lobby, with its start (`starts`):
+   * the way back to it. */
+  playing?: { kind: "duel" | "royal"; starts?: number } | null;
   /** A friend said yes to the player's request, and a live duel they left: each told once (play/lines.go). */
   accepted?: Accepted | null;
   left?: Left | null;
@@ -305,11 +305,9 @@ export function today() {
                 just,
               )
             : dayCard(t, start(t), run?.trail ?? [], failed),
-        // Before a first game, a player who has a profile already (a new phone) signs in, a tap away; and a room's code
-        // from a friend works from the first visit: the way in, in a line. Both under the day, so that a new player's
-        // Начало is one column, on a big screen too.
+        // Before a first game, a player who has a profile already (a new phone) signs in, a tap away: under the day, so
+        // that a new player's Начало is one column, on a big screen too.
         just || t.played || user.peek()?.email || fromMail ? null : haveProfile(load),
-        just || t.played ? null : h("p", { class: "day-next" }, h("a", { href: "/room" }, "Влез в стая с код")),
       ),
       h(
         "div",
@@ -322,7 +320,7 @@ export function today() {
         // and Роял, in a player's first week, for its evenings to fill (play.NudgeRoyal). While its lobby is open or
         // its games are on, Роял shows to everyone, a new player too: a full evening is the best way to meet it.
         just || t.played
-          ? modes(t.royal ? ["duel", "royal", "room"] : ["duel", "room"], "С други")
+          ? modes(t.royal ? ["duel", "royal"] : ["duel"], "С други")
           : t.royalNow
             ? modes(["royal"], "С други")
             : null,
@@ -391,7 +389,7 @@ function untold(t: Today, run?: number): Child {
   return news(id, 0, undefined, { title: run ? "" : "От последната ти игра" });
 }
 
-/** A live game the player is in goes on while its screen is away (a duel, a room's game, Роял), or waits for them (a
+/** A live game the player is in goes on while its screen is away (a duel, Роял), or waits for them (a
  * seat in Роял's lobby, kept while they play something else): one quiet line above the day, and the way back into it
  * (its screen comes back to it by itself). */
 function playingLine(p: Today["playing"]): Child {
@@ -399,13 +397,11 @@ function playingLine(p: Today["playing"]): Child {
   const [text, href] =
     p.kind === "duel"
       ? ["Дуелът ти продължава", "/duel/live"]
-      : p.kind === "room"
-        ? ["Играта в стаята продължава", `/r/${p.code}`]
-        : p.starts && p.starts <= Date.now()
-          ? ["Роял чака още играчи", "/royal"]
-          : p.starts
-            ? [`Роял започва в ${clock(p.starts)}`, "/royal"]
-            : ["Роял продължава", "/royal"];
+      : p.starts && p.starts <= Date.now()
+        ? ["Роял чака още играчи", "/royal"]
+        : p.starts
+          ? [`Роял започва в ${clock(p.starts)}`, "/royal"]
+          : ["Роял продължава", "/royal"];
   return h("p", { class: "streak-notice playing-notice", role: "status" }, text, h("a", { href }, "Върни се"));
 }
 

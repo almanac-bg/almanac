@@ -27,7 +27,7 @@ import (
 // pushed out starts again from nothing; the server hears when that happens (onFull), as it means a flood.
 //
 // The server has two limiters (Server.limits, Server.guard): the limits that keep players safe (codes mailed and
-// tried, guests made, room codes missed, reports) are kept apart from the rest, so that no flood of the cheap keys
+// tried, guests made, reports) are kept apart from the rest, so that no flood of the cheap keys
 // (pages visited, a player's writes) can push them out at all. Their keys are bounded too: a key for a network is
 // made only while its site's budget isn't spent (from), so one site makes no more of them than its budget.
 //

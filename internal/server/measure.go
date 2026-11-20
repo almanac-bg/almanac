@@ -29,8 +29,6 @@ func landing(path string) string {
 	switch {
 	case path == "/":
 		return "home"
-	case strings.HasPrefix(path, "/r/"), path == "/room":
-		return "room"
 	case strings.HasPrefix(path, "/players/"):
 		return "player"
 	}
@@ -250,17 +248,16 @@ func decimal(x float64) string { return strings.Replace(fmt.Sprintf("%.1f", x), 
 
 // landingNames are the landings as the admin page says them.
 var landingNames = map[string]string{
-	"home": "Началната страница", "room": "Стая",
-	"player": "Профил на играч", "other": "Друга страница", "": "Не се знае",
+	"home": "Началната страница", "player": "Профил на играч", "other": "Друга страница", "": "Не се знае",
 }
 
 // kindNames are the kinds of games, as the admin page says them; kindOrder, the order it tells them in (a kind not
 // here comes after, by its own name).
 var (
 	kindNames = map[string]string{
-		"day": "Денят", "topic": "Тема", "duel": "Дуел", "royal": "Роял", "room": "Стая",
+		"day": "Денят", "topic": "Тема", "duel": "Дуел", "royal": "Роял",
 	}
-	kindOrder = []string{"day", "topic", "duel", "royal", "room"}
+	kindOrder = []string{"day", "topic", "duel", "royal"}
 )
 
 // kindName is a kind of game as the admin page says it.
@@ -390,9 +387,7 @@ func (s *Server) freezeWeeks(ctx context.Context) error {
 	}
 	byWeek := map[string][]play.Newcomer{}
 	for _, n := range news {
-		if !n.RoomOnly {
-			byWeek[play.WeekOf(n.First)] = append(byWeek[play.WeekOf(n.First)], n)
-		}
+		byWeek[play.WeekOf(n.First)] = append(byWeek[play.WeekOf(n.First)], n)
 	}
 	return s.db.Tx(ctx, func(tx *sql.Tx) error {
 		for w := 1; w <= SplitWeeks; w++ {
@@ -545,17 +540,10 @@ var funnelSteps = []struct {
 	{"Пак през " + ordinal(5, ordFeminine) + " седмица", 34, func(n play.Newcomer) bool { return n.BackWithin(28, 34) }},
 }
 
-// funnelWeek is a week's column of the funnel (measures.Funnel), from its visits, its guests made and its newcomers:
-// from the first game on, of those who played more than a room on their first day.
+// funnelWeek is a week's column of the funnel (measures.Funnel), from its visits, its guests made and its newcomers.
 func funnelWeek(visits, guests int, news []play.Newcomer) []template.HTML {
-	var week []play.Newcomer
-	for _, n := range news {
-		if !n.RoomOnly {
-			week = append(week, n)
-		}
-	}
 	var finished rate
-	for _, n := range week {
+	for _, n := range news {
 		if n.Due(0) {
 			finished.Of++
 			if n.FirstFinished {
@@ -564,10 +552,10 @@ func funnelWeek(visits, guests int, news []play.Newcomer) []template.HTML {
 		}
 	}
 	cells := []template.HTML{template.HTML(fmt.Sprint(visits)), rate{guests, visits}.capped().HTML(),
-		rate{len(news), guests}.capped().HTML(), template.HTML(fmt.Sprint(len(news) - len(week))), finished.HTML()}
+		rate{len(news), guests}.capped().HTML(), finished.HTML()}
 	for _, st := range funnelSteps {
 		var r rate
-		for _, n := range week {
+		for _, n := range news {
 			if n.Due(st.day) {
 				r.Of++
 				if st.reached(n) {
@@ -599,12 +587,6 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 	if err != nil {
 		return f, err
 	}
-	var played []play.Newcomer // not only in a room on the first day: the headline's
-	for _, n := range news {
-		if !n.RoomOnly {
-			played = append(played, n)
-		}
-	}
 	weekOf := func(of []play.Newcomer, monday string) []play.Newcomer {
 		var out []play.Newcomer
 		for _, n := range of {
@@ -632,7 +614,7 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 	f.Overall = weekCohort{Name: "Средно (различни седмици)", Rates: make([]rate, len(cohortMeasures))}
 	for w := range SplitWeeks {
 		monday := play.DayShift(thisWeek, -7*w)
-		c := cohortOf(short(monday)+"–"+short(play.DayShift(monday, 6)), weekOf(played, monday))
+		c := cohortOf(short(monday)+"–"+short(play.DayShift(monday, 6)), weekOf(news, monday))
 		c.Monday = monday
 		if kept := frozen[monday]; kept != nil {
 			for i, m := range cohortMeasures {
@@ -744,7 +726,7 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 	var curve []rate
 	for k := 1; k <= CurveWeeks; k++ {
 		var r rate
-		for _, n := range played {
+		for _, n := range news {
 			if n.Due(7*k + 6) {
 				r.Of++
 				if n.BackWithin(7*k, 7*k+6) {
@@ -777,7 +759,6 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 	// The funnel, week by week of first days.
 	f.Funnel = []funnelRow{{Step: "Посещения без профил"}, {Step: "Започнали игра (дял от посещенията)"},
 		{Step: "Отговорили на въпрос (дял от започналите)"},
-		{Step: "само в стая на " + ordinal(1, ordMasculine) + " ден (не са в редовете долу)", Sub: true},
 		{Step: "Завършили първата си игра"}}
 	for _, st := range funnelSteps {
 		f.Funnel = append(f.Funnel, funnelRow{Step: st.name})
@@ -827,12 +808,12 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 	}
 	same := func(k string) string { return k }
 	split("Откъде са дошли", append(slices.Clone(play.Landings), ""), func(n play.Newcomer) string { return n.CameFrom },
-		func(k string) string { return landingNames[k] }, played)
+		func(k string) string { return landingNames[k] }, news)
 	split("Устройство на първия ден", append(slices.Clone(play.Devices), ""), func(n play.Newcomer) string { return n.Device },
-		func(k string) string { return deviceNames[k] }, played)
+		func(k string) string { return deviceNames[k] }, news)
 	// The versions met, newest first: the last ten by name, the rest together.
 	versions := map[string]bool{}
-	for _, n := range played {
+	for _, n := range news {
 		if n.Version != "" {
 			versions[n.Version] = true
 		}
@@ -858,16 +839,15 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 			return "Не се знае"
 		}
 		return k
-	}, played)
-	split("Известия до края на "+ordinal(1, ordMasculine)+" ден", []string{"Да", "Не"}, func(n play.Newcomer) string { return yesNo(n.Push) }, same, played)
-	split("Приятел до края на "+ordinal(1, ordMasculine)+" ден", []string{"Да", "Не"}, func(n play.Newcomer) string { return yesNo(n.Friend) }, same, played)
+	}, news)
+	split("Известия до края на "+ordinal(1, ordMasculine)+" ден", []string{"Да", "Не"}, func(n play.Newcomer) string { return yesNo(n.Push) }, same, news)
+	split("Приятел до края на "+ordinal(1, ordMasculine)+" ден", []string{"Да", "Не"}, func(n play.Newcomer) string { return yesNo(n.Friend) }, same, news)
 	split("Първата игра", append(slices.Clone(kindOrder), "other"), func(n play.Newcomer) string {
 		if slices.Contains(kindOrder, n.FirstKind) {
 			return n.FirstKind
 		}
 		return "other"
-	}, func(k string) string { return cmp.Or(kindNames[k], "Друга") }, played)
-	split("Само в стая на "+ordinal(1, ordMasculine)+" ден", []string{"Да", "Не"}, func(n play.Newcomer) string { return yesNo(n.RoomOnly) }, same, news)
+	}, func(k string) string { return cmp.Or(kindNames[k], "Друга") }, news)
 
 	// The weeks' players: new, kept, back, lost.
 	for _, gw := range act.Growth(today, GrowthWeeks) {

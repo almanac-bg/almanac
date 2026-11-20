@@ -337,8 +337,8 @@ func expect(t *testing.T, out string, code, want int, says ...string) {
 
 var (
 	ready    = `200|{"ready":true}`
-	notReady = `200|{"ready":false,"duels":1,"rooms":0,"duelsLeft":60,"royal":false}`
-	royal    = `200|{"ready":false,"duels":0,"rooms":0,"duelsLeft":0,"royal":true}`
+	notReady = `200|{"ready":false,"duels":1,"duelsLeft":60,"royal":false}`
+	royal    = `200|{"ready":false,"duels":0,"duelsLeft":0,"royal":true}`
 	healthy  = release{tag: "v1.0.1", migrations: []string{mig('1', "0001_a.sql"), mig('2', "0002_b.sql")}}
 )
 

@@ -30,9 +30,8 @@ import (
 var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/$`),
 	regexp.MustCompile(`^/play/[a-z]+$`),
-	regexp.MustCompile(`^/(duel|royal|room|ranks|rewards|wardrobe|me|friends|settings|almanac|games)$`),
+	regexp.MustCompile(`^/(duel|royal|ranks|rewards|wardrobe|me|friends|settings|almanac|games)$`),
 	regexp.MustCompile(`^/duel/([0-9]{1,12}|live)$`),
-	regexp.MustCompile(`^/r/[0-9]{6}$`),
 	regexp.MustCompile(`^/games/[0-9]{1,12}$`),
 	regexp.MustCompile(`^/hand/[A-Za-z0-9_-]{43}$`),
 	regexp.MustCompile(`^/players/[A-Za-z0-9_]{3,20}$`),
@@ -47,7 +46,6 @@ var screens = []struct {
 }{
 	{regexp.MustCompile(`^/duel/live$`), "live.js"},
 	{regexp.MustCompile(`^/royal$`), "royal.js"},
-	{regexp.MustCompile(`^/r/[0-9]{6}$`), "room.js"},
 	{regexp.MustCompile(`^/me$`), "me.js"},
 	{regexp.MustCompile(`^/settings$`), "settings.js"},
 	{regexp.MustCompile(`^/rewards$`), "rewards.js"},
@@ -229,9 +227,9 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 }
 
 // preview is what a link to this page shows when it's sent (Viber, Messenger, WhatsApp): a player's page, whose it
-// is; a room, its code.
+// is.
 func (s *Server) preview(r *http.Request) (title, description string) {
-	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми, дуели и Роял на живо, стаи с приятели. Всеки отговор носи по нещо ново."
+	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми, дуели и Роял на живо. Всеки отговор носи по нещо ново."
 	switch path := r.URL.Path; {
 	case strings.HasPrefix(path, "/players/"):
 		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {
@@ -248,18 +246,12 @@ func (s *Server) preview(r *http.Request) (title, description string) {
 				description = fmt.Sprintf("Ниво %d · %s%d %s.", p.Level, division, p.Games, played)
 			}
 		}
-	case strings.HasPrefix(path, "/r/"):
-		// Whatever the code, open or not: a preview that changed with it would tell anyone which rooms are open.
-		if code := strings.TrimPrefix(path, "/r/"); roomCode.MatchString(code) {
-			title = "Ела в стая " + code[:3] + " " + code[3:]
-			description = "Играем АЛМАНАХ заедно: един и същ въпрос за всички, в един и същ момент."
-		}
 	}
 	return title, description
 }
 
 // Search engines get the front page and the privacy notice, and nothing else: every other page is the game itself,
-// the same empty page until it starts, or something of one player's or one game's (a room, a duel, a profile), so those say "noindex". The API is closed to them. Both files carry the site's own address, so they're
+// the same empty page until it starts, or something of one player's or one game's (a duel, a profile), so those say "noindex". The API is closed to them. Both files carry the site's own address, so they're
 // drawn here, not kept in web/public.
 var indexed = []string{"/", "/privacy"}
 

@@ -2,12 +2,12 @@ package play
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"slices"
@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
+	"github.com/almanac-bg/almanac/internal/store"
 )
 
 // freshFor are the ways a game's questions are chosen (the functions in this package that choose them, or make a run
@@ -26,8 +27,6 @@ var freshFor = map[string]string{
 	"Draw":          "a topic",
 	"StartLive":     "a live duel",
 	"StartRecorded": "a recording",
-	"RecordRoom":    "a room",
-	"DrawRoom":      "a room",
 	"StartRoyal":    "Роял",
 	"EnterRoyal":    "Роял",
 	"DrawRoyal":     "Роял",
@@ -40,7 +39,7 @@ var freshFor = map[string]string{
 
 // TestNothingPlayedAgain holds the rule across every way a game starts: a player who has just played a game, starting
 // any other kind (or the same again: a rematch), is dealt questions they haven't seen while the bank has them. Live
-// duels, rooms and Роял are drawn for all their players: none of them has seen a question dealt while some are left
+// duels and Роял are drawn for all their players: none of them has seen a question dealt while some are left
 // that none has. A recording is a whole game, someone else's: one with at most RecordingSeen of its questions seen
 // while there's such a game. The player has played most of the bank before (all but three topics), so that a draw
 // that didn't prefer what they haven't seen would deal it again almost surely. The repeat by design (freshFor) is the
@@ -86,17 +85,6 @@ func TestNothingPlayedAgain(t *testing.T) {
 			f.must(err)
 			f.w.play(f.ana, l.Runs[0], repeat(f.w.right, Length)...)
 		}},
-		{"a room", func(f *fresh) {
-			picks := f.room()
-			p := RoomPlay{Game: "game", Picks: picks, Length: len(picks), Players: 2}
-			for n := range picks {
-				p.Answers = append(p.Answers, RoomAnswer{N: n, Given: json.RawMessage(`{"pick":0}`),
-					Shown: json.RawMessage(`{"pick":0}`), Right: true, Points: 500, Ms: 3000, At: f.w.now})
-			}
-			_, err := f.w.g.RecordRoom(f.ctx(), f.ana, p)
-			f.must(err)
-			f.w.g.AftersDone(f.ctx())
-		}},
 		{"Роял", func(f *fresh) {
 			id, runs := f.royal()
 			for n := range RoyalLength {
@@ -141,9 +129,6 @@ func TestNothingPlayedAgain(t *testing.T) {
 			return l.Picks, anyQuestion, []int64{f.ana, f.bo}
 		}},
 		{"a recording", nil},
-		{"a room", func(f *fresh) ([]Pick, func(bank.Question) bool, []int64) {
-			return f.room(), anyQuestion, []int64{f.ana, f.bo}
-		}},
 		{"Роял", func(f *fresh) ([]Pick, func(bank.Question) bool, []int64) {
 			_, runs := f.royal()
 			return f.w.picks(runs[f.ana]), func(q bank.Question) bool {
@@ -237,20 +222,31 @@ func newFresh(t *testing.T) *fresh {
 		w.play(u, s.ID, append(repeat(w.right, 6), repeat(w.wrong, Length-6)...)...)
 		w.wait(time.Minute)
 	}
-	// Ана's past: every other question, a third of them wrong, four days ago (kept as a room's game).
-	var past RoomPlay
+	// Ана's past: every question but those of freshTopics, a third of them wrong, four days ago, in one long game.
+	var picks []Pick
 	for _, q := range w.b.Live("", "") {
-		if slices.Contains(freshTopics, q.Base().Category) {
-			continue
+		if !slices.Contains(freshTopics, q.Base().Category) {
+			picks = append(picks, Pick{ID: q.Base().ID, Seed: uint64(len(picks))})
 		}
-		n := len(past.Picks)
-		past.Picks = append(past.Picks, Pick{ID: q.Base().ID, Seed: uint64(n)})
-		past.Answers = append(past.Answers, RoomAnswer{N: n, Given: json.RawMessage(`{"pick":0}`),
-			Shown: json.RawMessage(`{"pick":0}`), Right: n%3 != 0, Ms: 4000, At: w.now.Add(-4 * 24 * time.Hour)})
 	}
-	past.Length, past.Players = len(past.Picks), 1
-	_, err := w.g.RecordRoom(f.ctx(), f.ana, past)
-	f.must(err)
+	var runID int64
+	f.must(w.g.DB.Tx(f.ctx(), func(tx *sql.Tx) error {
+		r, err := w.g.insertRun(f.ctx(), tx, f.ana, "topic", nil, MixTopic, picks)
+		if err != nil {
+			return err
+		}
+		runID = r.id
+		for n, p := range picks {
+			if _, err := tx.Exec(`INSERT INTO answers (run_id, n, question_id, given, shown, score, points, is_right, ms, at, version)
+				VALUES (?, ?, ?, '{"pick":0}', '{"pick":0}', ?, 0, ?, 4000, ?, ?)`, r.id, n, p.ID, n%3, n%3 != 0,
+				store.Ms(w.now.Add(-4*24*time.Hour)), w.g.versionOf(p)); err != nil {
+				return err
+			}
+		}
+		_, err = tx.Exec(`UPDATE runs SET at = ?, finished_at = ? WHERE id = ?`, len(picks), store.Ms(w.now), r.id)
+		return err
+	}))
+	w.g.finished(f.ctx(), f.ana, runID)
 	w.g.AftersDone(f.ctx())
 	return f
 }
@@ -279,13 +275,6 @@ func (f *fresh) seen(u int64) map[string]bool {
 	}
 	f.seenBy[u] = out
 	return out
-}
-
-// room draws a room's game for Ана and Бо, as a room does (room.Room.start).
-func (f *fresh) room() []Pick {
-	barred, seen, err := f.w.g.RoomPast(f.ctx(), []int64{f.ana, f.bo})
-	f.must(err)
-	return DrawRoom(f.w.b, nil, Length, MixMixed, barred, seen, rand.New(rand.NewPCG(1, 2)))
 }
 
 // royal opens an evening's Роял for Бо (its first in), Ана comes too, and its games begin, as the hub does them

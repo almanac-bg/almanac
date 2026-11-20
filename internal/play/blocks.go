@@ -9,7 +9,7 @@ import (
 )
 
 // A player may block another (Block): a stranger who keeps asking, a friend they no longer want near. From then on
-// the two are no friends, and neither reaches the other: a request between them (by tag, by email, from a room) is
+// the two are no friends, and neither reaches the other: a request between them (by tag, by email) is
 // kept nowhere, though its sender is told it went, as any (a block isn't announced); and no push from one goes to the
 // other (the server asks Blocked). Blocking ends the requests that waited between them. Only the one who blocked can lift it (Unblock); lifted, the two are strangers again.
 

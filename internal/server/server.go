@@ -2,9 +2,8 @@
 //
 // It listens on the socket systemd hands it (deploy/almanac.socket), if it's given one, else on Config.Addr: with the
 // socket, connections that come while the server restarts wait for the new one instead of being refused. Before a
-// restart, a deploy drains the server (drain.go), so that the restart cuts no live duel nor a room's game; the rooms
-// themselves are kept over it (Config.RoomsFile), and so are the limits' counts (Config.LimitsFile, limits.go), which
-// count by network, from the player's own address even behind Cloudflare (address.go). A bank reloaded while Роял is
+// restart, a deploy drains the server (drain.go), so that the restart cuts no live duel; the limits' counts are kept
+// over it (Config.LimitsFile, limits.go), which count by network, from the player's own address even behind Cloudflare (address.go). A bank reloaded while Роял is
 // on waits for the evening to end (bank.go). Every API answer names the version (api.go), so that a page loaded before
 // a deploy loads itself anew at a quiet moment (web/src/fresh.ts).
 //
@@ -33,7 +32,6 @@ import (
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/push"
-	"github.com/almanac-bg/almanac/internal/room"
 	"github.com/almanac-bg/almanac/internal/royal"
 	"github.com/almanac-bg/almanac/internal/safe"
 	"github.com/almanac-bg/almanac/internal/store"
@@ -64,9 +62,6 @@ type Config struct {
 	Operator, Contact string
 	// Alerts is where problems are told (TellProblems).
 	Alerts Alerts
-	// RoomsFile is where the rooms open are kept, every few seconds and as the server stops, for its next run to open
-	// again ("": nowhere).
-	RoomsFile string
 	// RunningFile is where the server notes that it runs, to tell at its next start whether it stopped cleanly
 	// (running.go; "": nowhere).
 	RunningFile string
@@ -95,21 +90,19 @@ type Server struct {
 	accounts *account.Accounts
 	outbox   *mail.Outbox
 	game     *play.Game
-	rooms    *room.Hub
 	live     *live.Hub
 	royal    *royal.Hub
 	push     *push.Sender
-	// closing ends the streams (rooms, Роял) when the server stops, so that it needn't wait for them.
-	closing    chan struct{}
-	drain      drain
-	bank       atomic.Pointer[bank.Bank]
-	banks      banks // a bank held for Роял, one refused (bank.go)
-	client     fs.FS
-	limits     *limiter // the limits on floods (limits.go)
-	guard      *limiter // apart, the limits that keep players safe: codes, guests, room codes, reports
-	problems   *problems
-	roomsSaved roomsSaved
-	reminders  reminders // who is due the day's reminder when, today (remind.go)
+	// closing ends the streams (live duels, Роял) when the server stops, so that it needn't wait for them.
+	closing   chan struct{}
+	drain     drain
+	bank      atomic.Pointer[bank.Bank]
+	banks     banks // a bank held for Роял, one refused (bank.go)
+	client    fs.FS
+	limits    *limiter // the limits on floods (limits.go)
+	guard     *limiter // apart, the limits that keep players safe: codes, guests, reports
+	problems  *problems
+	reminders reminders // who is due the day's reminder when, today (remind.go)
 	// heldOut says whether a player is held out of the reminders (play.HeldReminders: remind.go, streakmail.go).
 	heldOut       func(userID int64) bool
 	pushq         pushQueue     // the notifications' queue, as Push sends it (pushes.go)
@@ -186,10 +179,6 @@ func New(cfg Config, d Deps) (*Server, error) {
 		s.callShort(ctx, start, until, away, in)
 	}
 	s.push = cfg.Push
-	s.rooms = room.NewHub(s.bank.Load)
-	s.rooms.Crowd = s.game.Crowd
-	s.rooms.Past = s.game.RoomPast
-	s.rooms.Record = s.game.RecordRoom
 	s.live = live.NewHub(s.game, s.livePlayer)
 	s.closing = make(chan struct{})
 	d.Accounts.Merge = append(d.Accounts.Merge, play.Merge)
@@ -256,20 +245,6 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/runs/{id}/answer", s.answer)
 	api("GET /api/runs/{id}/review", s.review)
 	api("POST /api/questions/{id}/report", s.report)
-	api("POST /api/rooms", s.openRoom)
-	api("GET /api/rooms/{code}", s.roomOpen)
-	api("POST /api/rooms/{code}/join", s.roomJoin)
-	api("POST /api/rooms/{code}/settings", s.roomSettings)
-	mux.HandleFunc("GET /api/rooms/{code}/events", s.roomEvents)
-	api("POST /api/rooms/{code}/start", s.roomStart)
-	api("POST /api/rooms/{code}/lock", s.roomLock)
-	api("POST /api/rooms/{code}/seen", s.roomSeen)
-	api("POST /api/rooms/{code}/answer", s.roomAnswer)
-	api("POST /api/rooms/{code}/remove", s.roomRemove)
-	api("POST /api/rooms/{code}/return", s.roomReturn)
-	api("POST /api/rooms/{code}/rename", s.roomRename)
-	api("GET /api/rooms/{code}/people", s.roomPeople)
-	api("POST /api/rooms/{code}/people", s.roomBefriend)
 	api("GET /api/duels", s.duels)
 	api("GET /api/duels/{id}", s.duelOne)
 	mux.HandleFunc("GET /api/duels/live/events", s.liveEvents)
@@ -328,7 +303,7 @@ func (s *Server) routes() http.Handler {
 }
 
 // Run serves until ctx ends, then stops taking requests, gives those under way up to grace to finish, and keeps the
-// rooms open for the next run. A run that ends otherwise is told of by the next (running.go).
+// limits' counts for the next run. A run that ends otherwise is told of by the next (running.go).
 func (s *Server) Run(ctx context.Context, grace time.Duration) error {
 	s.noteRunning()
 	err := s.run(ctx, grace)
@@ -336,13 +311,8 @@ func (s *Server) Run(ctx context.Context, grace time.Duration) error {
 	return err
 }
 
-// How often the work done in the background comes round.
-const (
-	// stepEvery moves Роял's clock on.
-	stepEvery = 200 * time.Millisecond
-	// roomsEvery saves the rooms, if they've changed: what a crash may lose of them.
-	roomsEvery = 15 * time.Second
-)
+// stepEvery is how often Роял's clock moves on.
+const stepEvery = 200 * time.Millisecond
 
 func (s *Server) run(ctx context.Context, grace time.Duration) error {
 	srv := &http.Server{
@@ -379,10 +349,8 @@ func (s *Server) run(ctx context.Context, grace time.Duration) error {
 	srv.RegisterOnShutdown(func() {
 		// Nothing new starts while the server stops; the streams end (the screens find the next server by themselves).
 		s.live.Pause()
-		s.rooms.Pause()
 		close(s.closing)
 	})
-	s.restoreRooms()
 	s.restoreLimits()
 	// Роял's games under way before a restart go on. Should loading them panic, the site is served all the same, and
 	// the problem told: a state that panics as it's read would otherwise stop every start, and the whole game with it.
@@ -401,9 +369,6 @@ func (s *Server) run(ctx context.Context, grace time.Duration) error {
 		s.drainStep(nil) // a drain whose deploy stopped asking ends; Роял coming stops one
 		s.bankStep()     // a bank held for Роял goes in as it ends
 	})
-	go safe.Every(ctx, "rooms: saving", roomsEvery, s.saveRoomsChanged)
-	go safe.Loop(ctx, "rooms: saving a game's end", s.saveRoomsSoon)
-	go safe.Every(ctx, "rooms: sweeping", time.Minute, s.rooms.Sweep)
 	go safe.Every(ctx, "live: sweeping", time.Minute, s.live.Sweep)
 	go safe.Every(ctx, "duels: settling", time.Minute, func() {
 		if err := s.game.SettleDue(ctx); err != nil && ctx.Err() == nil {
@@ -437,7 +402,6 @@ func (s *Server) run(ctx context.Context, grace time.Duration) error {
 	shutdown, cancel := context.WithTimeout(context.Background(), grace)
 	defer cancel()
 	err = srv.Shutdown(shutdown)
-	s.saveRooms()
 	s.saveLimits()
 	// What follows the runs the last requests finished, in the background: given the rest of the grace (one cut off is
 	// the sweep's after the restart).

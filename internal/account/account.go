@@ -63,8 +63,7 @@ type User struct {
 // Guest is a player without an email yet: their progress lives on this browser only.
 func (u *User) Guest() bool { return u.Email == "" }
 
-// Drawn is whether the player still has the name drawn for them (createUser): their animal and three digits. A room
-// asks such a player for a name as they come in.
+// Drawn is whether the player still has the name drawn for them (createUser): their animal and three digits.
 func (u User) Drawn() bool {
 	rest, ok := strings.CutPrefix(u.Name, AnimalOf(u.ID).Name+" ")
 	if !ok || len(rest) != 3 {

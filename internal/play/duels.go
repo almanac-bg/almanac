@@ -353,7 +353,7 @@ func seenBy(ctx context.Context, db querier, userID int64, seen map[string]bool)
 }
 
 // seenAmong is how stale each question is to a game for players (choose: the least first, those missing none): of
-// those any of them has answered (in any game: the day, a room, Роял…), one for each of them who has, so that no game
+// those any of them has answered (in any game: the day, a duel, Роял…), one for each of them who has, so that no game
 // deals anyone again what they've played while the bank has questions they haven't.
 func (g *Game) seenAmong(ctx context.Context, players []int64) (map[string]int, error) {
 	stale := map[string]int{}

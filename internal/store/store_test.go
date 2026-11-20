@@ -588,6 +588,39 @@ func TestNoSecondChance(t *testing.T) {
 	db.Close()
 }
 
+// No rooms (0081): a room's game stays its player's, a game of its one topic or of „Микс“; nothing else of runs
+// changes. A player who came by a room's link came from elsewhere, and the counts of those links go.
+func TestNoRooms(t *testing.T) {
+	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0081_no_rooms.sql")
+	for _, q := range []string{
+		`INSERT INTO users (id, name, tag, created_at, seen_at, came_from) VALUES
+			(1, 'Ана', 'ana', 1, 1, 'room'), (2, 'Бо', 'bo', 1, 1, 'home')`,
+		`INSERT INTO runs (id, user_id, kind, category, questions, started_at, finished_at, points, xp, room_game, players)
+			VALUES (10, 1, 'room', 'history', '[]', 1, 2, 900, 40, 'g1:1', 2), (11, 1, 'room', NULL, '[]', 3, 4, 300, 20, 'g2:1', 1),
+			(12, 1, 'room', '', '[]', 5, 6, 100, 10, 'g3:1', 3), (13, 2, 'topic', 'mix', '[]', 1, 2, 500, 30, NULL, NULL),
+			(14, 2, 'day', NULL, '[]', 1, 2, 700, 35, NULL, NULL)`,
+		`INSERT INTO daily_counts (day, key, n) VALUES ('2026-11-18', 'visit:room', 3), ('2026-11-18', 'guest:room', 2),
+			('2026-11-18', 'visit:home', 5)`,
+	} {
+		if _, err := db.Write.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	if err := db.migrateTo(migrationsThrough("0081_no_rooms.sql")); err != nil {
+		t.Fatal(err)
+	}
+	var runs, from, counts string
+	_ = db.Read.QueryRow(`SELECT group_concat(concat_ws(' ', id, kind, coalesce(category, '-'), points, xp), ', ')
+		FROM (SELECT * FROM runs ORDER BY id)`).Scan(&runs)
+	_ = db.Read.QueryRow(`SELECT group_concat(came_from, ' ') FROM (SELECT came_from FROM users ORDER BY id)`).Scan(&from)
+	_ = db.Read.QueryRow(`SELECT group_concat(key, ' ') FROM daily_counts`).Scan(&counts)
+	if runs != "10 topic history 900 40, 11 topic mix 300 20, 12 topic mix 100 10, 13 topic mix 500 30, 14 day - 700 35" ||
+		from != "other home" || counts != "visit:home" {
+		t.Fatalf("runs %q, came from %q, counts %q", runs, from, counts)
+	}
+	db.Close()
+}
+
 // openBefore opens a database migrated up to (not with) the named migration.
 func openBefore(t *testing.T, path, name string) *DB {
 	t.Helper()

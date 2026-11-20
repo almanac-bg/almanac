@@ -18,7 +18,6 @@ import (
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/live"
 	"github.com/almanac-bg/almanac/internal/play"
-	"github.com/almanac-bg/almanac/internal/room"
 	"github.com/almanac-bg/almanac/internal/royal"
 	"github.com/almanac-bg/almanac/internal/store"
 )
@@ -62,19 +61,9 @@ var playerErrors = map[error]*apiError{
 	live.ErrTooMany:        {http.StatusServiceUnavailable, "too_many_duels", "Твърде много дуели в момента. Опитай след малко."},
 	play.ErrNoRequest:      {http.StatusNotFound, "no_request", "Поканата вече я няма."},
 	play.ErrManyRequests:   {http.StatusConflict, "many_requests", "Твърде много покани чакат отговор. Изчакай да отговорят на някоя от тях."},
-	play.ErrRoomGame:       {http.StatusBadRequest, "bad_room_game", "Стаята играе по 5, 10, 15 или 20 въпроса, лесни, смесени или трудни."},
 	royal.ErrClosed:        {http.StatusConflict, "royal_closed", "Входът за Роял още не е отворен."}, // joinRoyal says when
 	royal.ErrShut:          {http.StatusConflict, "royal_closed", "Роял вече тече, а закъснелите влизат само до 3-тия въпрос."},
 	royal.ErrNotNow:        {http.StatusConflict, "not_now", "Вече е късно за това."},
-	room.ErrNoRoom:         {http.StatusNotFound, "no_room", "Няма такава стая. Може да е затворена."},
-	room.ErrFull:           {http.StatusConflict, "full", "Стаята е пълна."},
-	room.ErrNotYours:       {http.StatusForbidden, "not_host", "Само водещият може да прави това."},
-	room.ErrRemoved:        {http.StatusForbidden, "removed", "Водещият те махна от стаята."},
-	room.ErrNotNow:         {http.StatusConflict, "not_now", "Вече е късно за това."},
-	room.ErrAnswer:         {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
-	room.ErrTooMany:        {http.StatusServiceUnavailable, "too_many_rooms", "Твърде много отворени стаи. Опитай след малко."},
-	room.ErrPaused:         {http.StatusServiceUnavailable, "updating", "Играта се обновява. Опитай пак след малко."},
-	room.ErrNameAgain:      {http.StatusBadRequest, "name_again", "Водещият помоли за друго име. Избери ново."},
 	account.ErrBadEmail:    {http.StatusBadRequest, "bad_email", "Това не прилича на имейл адрес."},
 	account.ErrTooSoon:     {http.StatusTooManyRequests, "too_soon", "Току-що ти пратихме код. Провери пощата си."},
 	account.ErrBadCode:     {http.StatusBadRequest, "bad_code", "Грешен код."},
@@ -148,7 +137,7 @@ func (s *Server) apiHandler(h func(http.ResponseWriter, *http.Request) error) ht
 // How many writes (any API request but a GET) may come in writesPer: from a browser's session, from a network, and
 // from a site (address.go). Every write takes the database's one writer, so one client sending thousands a second
 // would make everyone's slow (review 2026-11-18, S11). A player answers, taps and moves on at a few a second at
-// most; a school's network has a few classes in rooms, fifty answers at once each; a site, a few such networks. The
+// most; a school's or an office's network has a few hundred at once; a site, a few such networks. The
 // rest of the limits are per action; this is the floor under all of them.
 const (
 	writesPer     = 10 * time.Second
@@ -304,7 +293,7 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) error {
 
 // How many guests a network may start in an hour, and a site (an IPv6 /48; address.go).
 const (
-	guestsNet  = 2*room.MaxPlayers + 20
+	guestsNet  = 120
 	guestsSite = 5 * guestsNet
 )
 
@@ -317,7 +306,7 @@ func (s *Server) guest(w http.ResponseWriter, r *http.Request) error {
 		return ok(w, map[string]any{"user": u})
 	}
 	// A school or a pub comes from one network (an IPv4 address, an IPv6 /64), and a mobile carrier puts many phones
-	// behind one IPv4 address: two rooms' worth of new players an hour (room.MaxPlayers), and a site (an IPv6 /48: a
+	// behind one IPv4 address: a hundred and twenty new players an hour, and a site (an IPv6 /48: a
 	// big school's, a company's; an IPv4 /24) five times that. A guest that never plays is cleared in a few days
 	// (account.CleanUp).
 	if !s.guardFrom(r, "guest", guestsNet, guestsSite, time.Hour) {
@@ -535,7 +524,7 @@ func (s *Server) rename(w http.ResponseWriter, r *http.Request) error {
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
-	// By player, and loosely by address: a whole class names itself as it comes into a room, from one network.
+	// By player, and loosely by address: a whole school or office may name itself at once, from one network.
 	if !s.limits.allow("rename:"+strconv.FormatInt(u.ID, 10), 20, time.Hour) ||
 		!s.allowFrom(r, "rename-net", 200, 1000, time.Hour) {
 		return errTooMany

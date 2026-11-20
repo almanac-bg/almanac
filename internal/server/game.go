@@ -210,12 +210,11 @@ func (s *Server) left(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"runs": runs})
 }
 
-// Playing is a live game the player is in, under way now, which their screen may have left: a live duel, a room's
-// game (by its code) or tonight's Роял. Only one is said, in that order: a player is rarely in two. A seat in Роял's
-// lobby is one too, with its start (Starts): it's kept while the player plays something else (royal.Hub.Waiting).
+// Playing is a live game the player is in, under way now, which their screen may have left: a live duel or tonight's
+// Роял. Only one is said, in that order: a player is rarely in both. A seat in Роял's lobby is one too, with its start
+// (Starts): it's kept while the player plays something else (royal.Hub.Waiting).
 type Playing struct {
-	Kind   string `json:"kind"` // "duel", "room" or "royal"
-	Code   string `json:"code,omitempty"`
+	Kind   string `json:"kind"` // "duel" or "royal"
 	Starts int64  `json:"starts,omitempty"`
 }
 
@@ -224,8 +223,6 @@ func (s *Server) playing(id int64) *Playing {
 	switch {
 	case s.live.Playing(id):
 		return &Playing{Kind: "duel"}
-	case s.rooms.Playing(id) != "":
-		return &Playing{Kind: "room", Code: s.rooms.Playing(id)}
 	case s.royal.Playing(id):
 		return &Playing{Kind: "royal"}
 	}

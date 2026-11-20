@@ -1,6 +1,6 @@
 // app.js holds what a daily visit uses: Начало, a game, the screens a game leads to. A screen a daily visit doesn't
-// open loads on its own, the first time it's opened: the room's (screens/room.ts), Роял's (royal.ts), a live duel's
-// (live.ts) and a duel's result (outcome.ts), only for those who play there; and Профил's places, the boards and the
+// open loads on its own, the first time it's opened: Роял's (royal.ts), a live duel's (live.ts) and a duel's
+// result (outcome.ts), only for those who play there; and Профил's places, the boards and the
 // friends (me, settings, rewards, wardrobe, almanac, played, ranks, friends, player). Each is handed the app's
 // pieces it uses from here, and imports nothing of the app but types: a module it imported would be one app.js
 // imports too, and esbuild would split every such module into a shared file that each page then loads first
@@ -50,14 +50,13 @@ import {
   soundOn,
 } from "./lib/sound.ts";
 import { stream } from "./lib/stream.ts";
-import { issueWords, listWords, weekday, winners, withName } from "./lib/words.ts";
+import { issueWords, listWords, weekday, withName } from "./lib/words.ts";
 import type { DuelView } from "./screens/duel.ts";
 import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
 import { clock, coming, dayAndTime, dayWord, whileSeen } from "./screens/modes.ts";
 import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
 import { loadProgress, nearest } from "./screens/progress.ts";
-import { changeGame, mixes } from "./screens/rooms.ts";
 import { signIn } from "./screens/signin.ts";
 import { gameRow, stats } from "./screens/stats.ts";
 import {
@@ -122,7 +121,6 @@ export const kit = {
   byTap,
   calm,
   categories,
-  changeGame,
   clock,
   coming,
   computed,
@@ -164,7 +162,6 @@ export const kit = {
   masteryCard,
   meaning,
   meter,
-  mixes,
   musicOn,
   nameFirst,
   nearest,
@@ -244,7 +241,6 @@ export const kit = {
   when,
   whileSeen,
   who,
-  winners,
   withName,
 };
 

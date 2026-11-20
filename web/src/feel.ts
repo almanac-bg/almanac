@@ -42,7 +42,7 @@ const cues: Record<SoundName, Cue> = {
   // The player's own touch: a pick, a digit, a move.
   tap: { notes: [["p", 5, 0, 0.04, 0.55]] },
   key: { notes: [["p", 7, 0, 0.03, 0.4]] },
-  // Someone else: the other side answering, a player coming into the room. Two soft low plucks, falling (A4, F♯4),
+  // Someone else: the other side of a duel answering. Two soft low plucks, falling (A4, F♯4),
   // off to one side: not a bell, which is for what's earned, and never the player's own tap.
   them: {
     notes: [

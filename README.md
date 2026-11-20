@@ -1,7 +1,7 @@
 # АЛМАНАХ — almanac.bg
 
 Въпроси, от които научаваш нещо. Десет на ден, едни и същи за всички; игра по теми, която следва колко знаеш;
-дуели на живо и приятели, които се предизвикват; Роял на живо в 21:00; стаи за игра заедно. Играй на
+дуели на живо и приятели, които се предизвикват; Роял на живо в 21:00. Играй на
 **[almanac.bg](https://almanac.bg)**.
 
 Свободен софтуер под [AGPL-3.0](LICENSE).
@@ -26,7 +26,6 @@ internal/store   SQLite и миграциите (internal/store/migrations)
 internal/account гости, вход с код по имейл, сесии, имена
 internal/mail    пощата: опашка в базата, SMTP
 internal/play    играта: денят, темите, дуелите, приятелите, класацията, серията, статистиката
-internal/room    игра на живо: стаите (Server-Sent Events)
 internal/push    известията (Web Push)
 internal/backup  копията на базата в R2
 internal/server  HTTP: API, страницата на приложението, файловете
@@ -66,8 +65,8 @@ go run ./cmd/almanac bank check -sample bank/sample   # извадката
 
 - Всяко сливане в `main` с feat, fix, perf или revert е ново издание: GitHub избира версията, строи програмата и
   я слага на сървъра (`.github/workflows/deploy.yml`).
-- На сървъра `almanac-deploy vX.Y.Z` слага версията, когато рестартът не прекъсва игра: изчаква дуелите на живо и
-  игрите в стаите (до пет минути) и не рестартира около Роял. Щом `deploy/release-signers` назове ключ, приема
+- На сървъра `almanac-deploy vX.Y.Z` слага версията, когато рестартът не прекъсва игра: изчаква дуелите на живо
+  и не рестартира около Роял. Щом `deploy/release-signers` назове ключ, приема
   програмата само с подписа на издаването. Версия, която носи промени в базата (миграции), първо я копира (`before-vX.Y.Z.db`);
   ако новата версия не отговори до три минути или спре в следващите две, се връща предишната, с базата отпреди нея.
   Същата команда с по-стара версия връща назад, а с `now` след нея — веднага. Версия, която вече работи, не се пипа,
@@ -180,7 +179,7 @@ Stack):
 ## In English
 
 ALMANAC (АЛМАНАХ) is a Bulgarian quiz game at [almanac.bg](https://almanac.bg): ten questions a day, the same for
-everyone; topic play that follows what you know; duels in each one's own time; live rooms; friends who call each
+everyone; topic play that follows what you know; duels in each one's own time; friends who call each
 other to a duel. One Go program (stdlib + SQLite) serves a plain TypeScript client of about 23 kB. Run it with `go run
 ./cmd/build && DEV=1 go run ./cmd/almanac serve`. Free software under the AGPL-3.0; issues and pull requests in
 English are welcome.

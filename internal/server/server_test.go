@@ -473,7 +473,7 @@ func TestSearchEngines(t *testing.T) {
 	if res, _ := get("/privacy"); res.Header.Get("X-Robots-Tag") != "" {
 		t.Errorf("/privacy: X-Robots-Tag %q", res.Header.Get("X-Robots-Tag"))
 	}
-	for _, path := range []string{"/me", "/ranks", "/play/history", "/r/123456", "/players/someone", "/nowhere"} {
+	for _, path := range []string{"/me", "/ranks", "/play/history", "/players/someone", "/nowhere"} {
 		res, body := get(path)
 		if res.Header.Get("X-Robots-Tag") != "noindex" || strings.Contains(body, "canonical") {
 			t.Errorf("%s: X-Robots-Tag %q", path, res.Header.Get("X-Robots-Tag"))
@@ -637,7 +637,7 @@ func TestHosts(t *testing.T) {
 	}
 }
 
-// stream is a room's event stream as a browser reads it.
+// stream is an event stream as a browser reads it.
 type stream struct {
 	t   *testing.T
 	r   lines
@@ -654,15 +654,6 @@ func (l lines) ReadString(delim byte) (string, error) {
 			return line, err
 		}
 	}
-}
-
-// follow joins a room and opens its stream, as a player's screen does.
-func (p *player) follow(code string) *stream {
-	p.g.t.Helper()
-	if status, out := p.call("POST", "/api/rooms/"+code+"/join", nil); status != 200 {
-		p.g.t.Fatalf("joining room %s: %d %v", code, status, out)
-	}
-	return p.stream("/api/rooms/" + code + "/events")
 }
 
 // stream opens an event stream at path.
@@ -706,130 +697,6 @@ func (s *stream) until(ok func(map[string]any) bool) map[string]any {
 	}
 	s.t.Fatal("no such view in time")
 	return nil
-}
-
-func TestARoomOverHTTP(t *testing.T) {
-	g := start(t)
-	ana, bo := g.player(), g.player()
-	ana.call("POST", "/api/guest", map[string]any{})
-	bo.call("POST", "/api/guest", map[string]any{})
-	status, out := ana.call("POST", "/api/rooms", map[string]any{"categories": []string{"geography", "history"}})
-	code, _ := out["code"].(string)
-	if status != 200 || len(code) != 6 {
-		t.Fatalf("open: %d %v", status, out)
-	}
-	as, bs := ana.follow(code), bo.follow(code)
-	// Its topics as the bank has them, in its order.
-	if v := as.until(func(v map[string]any) bool { return len(v["players"].([]any)) == 2 }); fmt.Sprint(v["categories"]) !=
-		"[history geography]" {
-		t.Fatalf("the room's topics: %v", v["categories"])
-	}
-	if status, _ := bo.call("POST", "/api/rooms/"+code+"/start", map[string]any{}); status != 403 {
-		t.Fatalf("a guest started: %d", status)
-	}
-	if status, _ := ana.call("POST", "/api/rooms/"+code+"/start", map[string]any{}); status != 200 {
-		t.Fatalf("start: %d", status)
-	}
-	v := bs.until(func(v map[string]any) bool { return v["phase"] == "question" })
-	if v["question"].(map[string]any)["view"] == nil {
-		t.Fatalf("no question: %v", v)
-	}
-	for _, p := range []*player{ana, bo} {
-		// The screen says it shows the question (its time runs from then), as the client does once it's drawn.
-		if status, out := p.call("POST", "/api/rooms/"+code+"/seen", map[string]any{"n": 0}); status != 200 {
-			t.Fatalf("the screen's word: %d %v", status, out)
-		}
-		if status, out := p.call("POST", "/api/rooms/"+code+"/answer", map[string]any{"n": 0, "answer": nil}); status != 400 {
-			t.Fatalf("an empty answer: %d %v", status, out)
-		}
-	}
-	answer := map[string]any{"pick": 0}
-	if q := v["question"].(map[string]any)["view"].(map[string]any); q["type"] == "number" {
-		answer = map[string]any{"value": 1}
-	} else if q["type"] == "order" {
-		answer = map[string]any{"order": []int{0, 1, 2, 3}}
-	} else if q["type"] == "truefalse" {
-		answer = map[string]any{"truth": true}
-	} else if q["type"] == "match" {
-		answer = map[string]any{"pairs": []int{0, 1, 2, 3}}
-	}
-	ana.call("POST", "/api/rooms/"+code+"/answer", map[string]any{"n": 0, "answer": answer})
-	bo.call("POST", "/api/rooms/"+code+"/answer", map[string]any{"n": 0, "answer": answer})
-	v = as.until(func(v map[string]any) bool { return v["phase"] == "reveal" })
-	if v["question"].(map[string]any)["reveal"] == nil {
-		t.Fatalf("no answer shown: %v", v)
-	}
-	if status, _ := g.player().call("GET", "/api/rooms/000000/events", nil); status != 401 {
-		t.Fatalf("a stranger's stream: %d", status)
-	}
-	stranger := g.player()
-	stranger.call("POST", "/api/guest", map[string]any{})
-	req, _ := http.NewRequest("GET", g.url+"/api/rooms/999999/events", nil)
-	res, err := stranger.client.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	body, _ := io.ReadAll(res.Body)
-	res.Body.Close()
-	if !strings.HasPrefix(string(body), "event: closed") {
-		t.Fatalf("no such room: %q", body)
-	}
-}
-
-// A room's end offers each player the others to add as friends (not friends yet, nor asked), and the day's ten while
-// they wait.
-func TestRoomPeople(t *testing.T) {
-	g := start(t)
-	ana, bo, cy := g.player(), g.player(), g.player()
-	for _, p := range []*player{ana, bo, cy} {
-		p.call("POST", "/api/guest", map[string]any{})
-	}
-	_, out := ana.call("POST", "/api/rooms", map[string]any{})
-	code := out["code"].(string)
-	as := ana.follow(code)
-	bo.follow(code)
-	cy.follow(code)
-	v := as.until(func(v map[string]any) bool { return len(v["players"].([]any)) == 3 })
-	keys := map[string]float64{}
-	for _, p := range v["players"].([]any) {
-		p := p.(map[string]any)
-		keys[p["name"].(string)] = p["key"].(float64)
-	}
-	people := func(p *player) ([]any, any) {
-		status, out := p.call("GET", "/api/rooms/"+code+"/people", nil)
-		if status != 200 {
-			t.Fatalf("people: %d %v", status, out)
-		}
-		return out["add"].([]any), out["day"]
-	}
-	if add, day := people(ana); len(add) != 2 || day != false {
-		t.Fatalf("Ana's people at first: %v %v", add, day)
-	}
-	// Ana adds Bo: a request; he's no longer offered to her, she's still offered to him (he can say yes there).
-	_, me := bo.call("GET", "/api/me", nil)
-	boKey := keys[me["user"].(map[string]any)["name"].(string)]
-	if status, out := ana.call("POST", "/api/rooms/"+code+"/people", map[string]any{"key": boKey}); status != 200 ||
-		out["friends"] == true {
-		t.Fatalf("Ana adds Bo: %d %v", status, out)
-	}
-	if add, _ := people(ana); len(add) != 1 || add[0] == boKey {
-		t.Fatalf("Ana's people once she asked Bo: %v", add)
-	}
-	if add, _ := people(bo); len(add) != 2 {
-		t.Fatalf("Bo's people: %v", add)
-	}
-	// Bo adds Ana back: friends, offered to neither.
-	_, me = ana.call("GET", "/api/me", nil)
-	anaKey := keys[me["user"].(map[string]any)["name"].(string)]
-	if _, out := bo.call("POST", "/api/rooms/"+code+"/people", map[string]any{"key": anaKey}); out["friends"] != true {
-		t.Fatalf("Bo adds Ana: %v", out)
-	}
-	if add, _ := people(bo); len(add) != 1 {
-		t.Fatalf("Bo's people once friends with Ana: %v", add)
-	}
-	if status, _ := cy.call("POST", "/api/rooms/"+code+"/people", map[string]any{"key": 99}); status == 200 {
-		t.Fatal("a key nobody has")
-	}
 }
 
 func TestALiveDuelOverHTTP(t *testing.T) {
@@ -1375,18 +1242,10 @@ func TestLinkPreviews(t *testing.T) {
 	}
 	p := g.player()
 	p.call("POST", "/api/guest", map[string]any{})
-	_, room := p.call("POST", "/api/rooms", map[string]any{})
-	code := room["code"].(string)
-	if body := page("/r/" + code); !strings.Contains(body, "Ела в стая "+code[:3]+" "+code[3:]) {
-		t.Fatal("the room's preview")
-	}
-	// A code no room has looks the same: the preview tells nobody which rooms are open.
-	none := "100000"
-	if none == code {
-		none = "100001"
-	}
-	if body := page("/r/" + none); !strings.Contains(body, "Ела в стая "+none[:3]+" "+none[3:]) {
-		t.Fatal("a closed room's preview")
+	_, me := p.call("GET", "/api/me", nil)
+	u := me["user"].(map[string]any)
+	if body := page("/players/" + u["tag"].(string)); !strings.Contains(body, u["name"].(string)+" (@"+u["tag"].(string)+") в АЛМАНАХ") {
+		t.Fatal("a player's preview")
 	}
 }
 
@@ -1679,7 +1538,7 @@ func TestAdminPlayers(t *testing.T) {
 }
 
 // A name or tag is checked only when it changes: one a player has from before a check came in (or drawn) doesn't stop
-// them saving the other, nor coming into a room under it.
+// them saving the other.
 func TestOwnNameIsntCheckedAgain(t *testing.T) {
 	g := start(t)
 	p, id := g.guest()
@@ -1702,15 +1561,5 @@ func TestOwnNameIsntCheckedAgain(t *testing.T) {
 	}
 	if status, out := p.call("PATCH", "/api/me", map[string]string{"name": "Курва"}); status != 400 {
 		t.Fatalf("a rude name taken anew: %d %v", status, out)
-	}
-	host := g.player()
-	host.call("POST", "/api/guest", map[string]any{})
-	_, out := host.call("POST", "/api/rooms", map[string]any{})
-	code := out["code"].(string)
-	if _, err := g.db.Write.Exec(`UPDATE users SET name = 'Курва' WHERE id = ?`, id); err != nil {
-		t.Fatal(err)
-	}
-	if status, out := p.call("POST", "/api/rooms/"+code+"/join", map[string]string{"name": "Курва"}); status != 200 {
-		t.Fatalf("into a room under the name had: %d %v", status, out)
 	}
 }

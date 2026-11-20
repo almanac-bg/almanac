@@ -88,7 +88,7 @@ function countedLine(c: Crowd, right: boolean): Child {
 /** The shares on each answer, where the question has had enough answers to say: each in its place beside the answer
  * now, unseen, so that the answers settle into their place with them (with the right one marked: run.ts, settle) and
  * none grows when they show; and shown by the function returned, a bar behind each answer filling in as long as the
- * share that gave it. A crowd few enough to count (a room's) says how many gave each answer, not what share. The
+ * share that gave it. A crowd few enough to count (Роял's) says how many gave each answer, not what share. The
  * player's own answer is among them (withOwn: `mine`, the place they picked, -1 for none). */
 function crowdOnAll(buttons: HTMLElement[], crowd: Crowd | undefined, mine: number): () => void {
   const c = crowd && withOwn(crowd, mine, false);

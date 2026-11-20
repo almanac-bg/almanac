@@ -71,7 +71,7 @@ func TestMergeCarriesTheRest(t *testing.T) {
 	guest, owner := w.user(), w.user()
 	for _, q := range []string{
 		`UPDATE users SET frame = 'gold', backdrop = 'waves', level_seen = 7, unlocks_known = 1, recordings_told = 50,
-			systems_told = 'duel xp', streak_told = 'kept:2026-11-12', came_from = 'room', created_at = 5,
+			systems_told = 'duel xp', streak_told = 'kept:2026-11-12', came_from = 'player', created_at = 5,
 			seen_at = 900 WHERE id = ?2`,
 		`UPDATE users SET level_seen = 3, recordings_told = 80, systems_told = 'royal', streak_told = 'ended:2026-11-01',
 			came_from = 'home', created_at = 10, seen_at = 100 WHERE id = ?1`,
@@ -109,7 +109,7 @@ func TestMergeCarriesTheRest(t *testing.T) {
 		streak != "kept:2026-11-12" {
 		t.Fatalf("look and told: %s %s, level %d, recordings %d, %q, %q", frame, backdrop, level, recordings, systems, streak)
 	}
-	if came != "room" || created != 5 || seen != 900 {
+	if came != "player" || created != 5 || seen != 900 {
 		t.Fatalf("came from %q at %d, seen %d", came, created, seen)
 	}
 }

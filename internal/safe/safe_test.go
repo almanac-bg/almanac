@@ -66,7 +66,7 @@ func TestAfterFuncLetsTheLockGoFirst(t *testing.T) {
 	told(t)
 	var mu sync.Mutex
 	done := make(chan bool)
-	AfterFunc(time.Millisecond, "a room's clock", func() {
+	AfterFunc(time.Millisecond, "a duel's clock", func() {
 		mu.Lock()
 		defer mu.Unlock()
 		panic("in the lock")

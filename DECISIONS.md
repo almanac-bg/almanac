@@ -25,12 +25,8 @@ packages' doc comments; this file holds only what must not drift.
 - **The day's ten questions are the heart;** everything else serves them or stays out of the way. A new system replaces
   one or proves it's needed (CLAUDE.md, Direction).
 - **For everyone, not for a group.** The game is made for any player, not tailored to one audience (children,
-  classrooms, schools): no levels, question pools, filters, reports or texts that exist for one group. Rooms serve
-  anyone who plays together, whether family, friends, a pub or a class, with the same rules for all (owner,
+  classrooms, schools): no levels, question pools, filters, reports or texts that exist for one group (owner,
   2026-11-18, after the product review's classroom items).
-- **A room's host plays like everyone else.** There's no leading a room without playing: no big screen for a host, no
-  „Напред“, „Задръж“ or „Приключи“, no game with no phones. A room plays the topics its host picks, one, several or all
-  (all unless some are picked), its questions spread evenly over them (owner, 2026-11-19).
 - **„Микс“ and „България“ lead the topics** on Начало, before the bank's: „Микс“ is a game of every topic at once,
   „България“ the questions about Bulgaria from every topic (owner, 2026-11-20).
 - **Accessibility for special needs comes later, not now.** No new work for screen readers, extra time, pausing the
@@ -61,16 +57,17 @@ packages' doc comments; this file holds only what must not drift.
 - **Removed to keep the game simple** (owner, 2026-11-19): sharing, invitations by link, challenges, past days'
   questions (the archive of past issues, and going over a game after its day), winning a broken streak back, and the
   year's report; and on 20 Nov, Профил's chart of the days („Твоите броеве“), Начало's line of how yesterday ended,
-  Класации' „Вчера“, Втори шанс (the questions got wrong, asked again days later) and the weekly leagues. Моят
+  Класации' „Вчера“, Втори шанс (the questions got wrong, asked again days later), the weekly leagues, and rooms
+  (playing together with a code; the games played in them stay the players'). Моят
   Алманах is one list in the order the facts were learned, with no datelines. Friends are added by username or email;
   duels are live (against a recording when nobody comes, with a rematch after), and only they move a rating. Don't
   bring any of them back, or something in their place, without the owner's call.
 - **Right answers in a row earn no points** (owner, 2026-11-18, review E6): where a miss fell decided close duels.
   The climb stays as sound and feel; a game with every answer right still earns its bonus.
 - **The day's goals serve the day,** each one game at most: the day's ten; one more game (a topic's or a duel); and a
-  game played well (8 of 10 or more). No goal for how many or how fast, and a
-  room's game counts only when someone else played it too (owner, 2026-11-18, review O4: the volume and speed goals
-  sent players into a quarter of an hour of other games, away from the day).
+  game played well (8 of 10 or more). No goal for how many or how fast (owner,
+  2026-11-18, review O4: the volume and speed goals sent players into a quarter of an hour of other games, away from
+  the day).
 - **Gamification only from what the game really counts:** no invented currencies, no random boxes, never real money.
 - **A tenth of players get no reminders, to tell what reminders do.** 10 % of players, drawn once by a hash of their
   id (`play/experiment.go`), are held out of the day's notification and the streak's mail; what they would have had

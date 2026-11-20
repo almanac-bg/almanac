@@ -1,5 +1,5 @@
-// Answering a question, the same in every game: a run (run.ts), a live duel, a room and Роял (screens/live.ts, room.ts,
-// royal.ts, handed it by kit.ts). The question's widget is questions.ts's; this is what's around it:
+// Answering a question, the same in every game: a run (run.ts), a live duel and Роял (screens/live.ts, royal.ts,
+// handed it by kit.ts). The question's widget is questions.ts's; this is what's around it:
 //
 // - In a run, the question takes the focus as it opens, so that a screen reader reads it first, and what's said as it
 //   goes (a clue come out, an answer's verdict) is said in one live region (liveRegion), there from the run's start.
@@ -27,7 +27,7 @@ import type { Answer, Reveal, View } from "./types.ts";
  * from that much later: play.PicturesFor). */
 export const picturesFor = 2500;
 
-/** A live game's question as it comes on screen (a duel's, a room's, Роял's): drawn (`draw`) once its pictures are in
+/** A live game's question as it comes on screen (a duel's, Роял's): drawn (`draw`) once its pictures are in
  * (picturesFor at most; at once if it has none), and the server told then (`seen`, once), so that the player's time
  * runs from when they see it, not from when the game showed it (play/seen.go). Until then, a line says it's coming:
  * the words don't show before the pictures, so nobody reads them off the clock. */

@@ -5,11 +5,10 @@ test("the day: ten questions, the result, the review, and one try only", async (
   test.setTimeout(120_000);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Десет въпроса за днес" })).toBeVisible();
-  // A new player sees the day and the topics: duels and rooms come after a first game (a room's code is a line), Роял
-  // only while it's on (the test server always has a lobby open).
+  // A new player sees the day and the topics: duels come after a first game, Роял only while it's on (the test server
+  // always has a lobby open).
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
   await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Влез в стая с код" })).toBeVisible();
   await expect(page.locator(".streak-chip")).toHaveCount(0);
   await startDay(page);
   await playRun(page);
@@ -374,8 +373,8 @@ test.describe("on a computer", () => {
     await page.goto("/ranks");
     await page.getByRole("link", { name: "Начало" }).click();
     await expect(page.locator(".day")).toBeVisible();
-    // The ways in for a new player are lines under the day, not a column of their own: one centred column.
-    await expect(page.locator(".home-main").getByRole("link", { name: "Влез в стая с код" })).toBeVisible();
+    // The way in for a player with a profile is a line under the day, not a column of its own: one centred column.
+    await expect(page.locator(".home-main").getByRole("button", { name: "Имаш профил? Влез" })).toBeVisible();
     const home = page.locator("section.home");
     await expect(page.locator(".home-side > *")).toHaveCount(0);
     expect((await home.boundingBox())?.width).toBeLessThanOrEqual(48 * 16);

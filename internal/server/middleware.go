@@ -51,8 +51,8 @@ func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 // logged writes a line per request: method, route, status, time. Not for a file, nor for what a page or a monitor
 // asks every so often (polled) when it went well: those would be most of the log and say nothing.
 //
-// The route is the pattern the request matched ("/api/rooms/{code}/join"), or for a page its first part ("/hand/…"),
-// never the path itself: a path carries what the log has no need of, a handoff's token, the code of a room, a
+// The route is the pattern the request matched ("/api/players/{tag}"), or for a page its first part ("/hand/…"),
+// never the path itself: a path carries what the log has no need of, a handoff's token, a
 // player's tag (review 2026-11-18, S23). The address goes only with a request that failed (a
 // refusal, a limit, something missing, an error): that's what tracing abuse needs, and a player playing leaves none in
 // the log (I6). The log is kept 14 days (deploy/setup.sh), as the privacy page says.

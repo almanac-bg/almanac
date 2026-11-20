@@ -21,7 +21,7 @@ export const rare = 0.25;
 /** A crowd as the player sees it with their answer: the others' (as the server counts them: the day's are the others',
  * and everyone's ever has this answer only once it's counted again), with the player's own answer counted in — `mine`,
  * the place of the option they picked (-1: none, or a kind without options), and whether it was right — so that what
- * they picked never reads „0%“, and the shares and the line under them add up. A counted crowd (a room's, Роял's: the
+ * they picked never reads „0%“, and the shares and the line under them add up. A counted crowd (Роял's: the
  * game's own) has everyone's already. */
 export function withOwn(c: Crowd, mine: number, right: boolean): Crowd {
   if (c.counts) return c;

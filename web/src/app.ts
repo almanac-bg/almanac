@@ -14,7 +14,6 @@ import { duel, duelOne } from "./screens/duel.ts";
 import { handoff } from "./screens/keep.ts";
 import { missing } from "./screens/missing.ts";
 import { topic } from "./screens/play.ts";
-import { rooms } from "./screens/rooms.ts";
 import { today } from "./screens/today.ts";
 import { friendRequests, playing, watchWaiting } from "./state.ts";
 
@@ -23,7 +22,7 @@ import { friendRequests, playing, watchWaiting } from "./state.ts";
  * from Начало; Профил holds what a player has: their rewards, their wardrobe, their almanac and their settings.
  */
 const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
-  ["/", "Начало", "home", (p) => /^\/($|play\/|duel|royal|room|r\/)/.test(p)],
+  ["/", "Начало", "home", (p) => /^\/($|play\/|duel|royal)/.test(p)],
   ["/friends", "Приятели", "users", (p) => p === "/friends"],
   ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
   ["/me", "Профил", "user", (p) => /^\/(me|settings|rewards|wardrobe|almanac|games(\/[0-9]+)?)$/.test(p)],
@@ -79,13 +78,11 @@ if (root) {
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
       { path: /^\/royal$/, view: later(() => import("./screens/royal.ts").then((m) => m.royal)) },
       { path: /^\/almanac$/, view: later(() => import("./screens/almanac.ts").then((m) => m.almanac)) },
-      { path: /^\/room$/, view: rooms },
       { path: /^\/ranks$/, view: later(() => import("./screens/ranks.ts").then((m) => m.ranks)) },
       { path: /^\/rewards$/, view: later(() => import("./screens/rewards.ts").then((m) => m.rewards)) },
       { path: /^\/wardrobe$/, view: later(() => import("./screens/wardrobe.ts").then((m) => m.wardrobe)) },
       { path: /^\/friends$/, view: later(() => import("./screens/friends.ts").then((m) => m.friends)) },
       { path: /^\/settings$/, view: later(() => import("./screens/settings.ts").then((m) => m.settings)) },
-      { path: /^\/r\/([0-9]{6})$/, view: later(() => import("./screens/room.ts").then((m) => m.room)) },
       { path: /^\/hand\/([A-Za-z0-9_-]{43})$/, view: handoff },
       { path: /^\/me$/, view: later(() => import("./screens/me.ts").then((m) => m.me)) },
       { path: /^\/games$/, view: later(() => import("./screens/games.ts").then((m) => m.games)) },

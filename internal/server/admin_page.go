@@ -95,8 +95,7 @@ var adminBody = template.Must(template.New("admin").Parse(`
 
 <h3>По седмицата на първия ден</h3>
 <p class="muted">Новите и делът от тях, играли пак в прозореца след първия си ден (ден 0); „Денят пак“: от завършилите
-деня на първия си ден, които са го завършили пак до 7-ия. Делът е от тези, за които прозорецът е минал. Без играчите,
-изиграли на първия си ден само стая: те са отделно, в „Кои се връщат“. Седмица с ✓ е замразена: числата ѝ не се
+деня на първия си ден, които са го завършили пак до 7-ия. Делът е от тези, за които прозорецът е минал. Седмица с ✓ е замразена: числата ѝ не се
 променят вече. „Средно“: всяка колона е от седмиците, за които е минала, затова не са от едни и същи играчи.</p>
 <div class="table-scroll"><table class="admin-table"><thead><tr><th>Седмица</th><th class="num">Нови</th>{{range .CohortHeads}}<th class="num">{{.}}</th>{{end}}</tr></thead><tbody>
 {{with .Overall}}{{if .New}}<tr class="total"><td>{{.Name}}</td><td class="num">{{.New}}</td>{{range .Rates}}<td class="num">{{.HTML}}</td>{{end}}</tr>{{end}}{{end}}
@@ -126,7 +125,7 @@ var adminBody = template.Must(template.New("admin").Parse(`
 <h2>Път на новия играч</h2>
 <p class="muted">По седмицата (от понеделник) на първия ден. Посещенията и започналите игра са от същата седмица; гост от
 предишна може да изиграе въпрос в тази, затова дял над 100 % се показва като 100 %. Оттам нататък делът е от изигралите
-въпрос (без тези само в стая), за които денят вече е минал.</p>
+въпрос, за които денят вече е минал.</p>
 <div class="table-scroll"><table class="admin-table"><thead><tr><th></th>{{range .Weeks}}<th class="num">{{.}}</th>{{end}}</tr></thead><tbody>
 {{range .Funnel}}<tr><td>{{if .Sub}}<span class="muted">·</span> {{end}}{{.Step}}</td>{{range .Cells}}<td class="num">{{.}}</td>{{end}}</tr>{{end}}
 </tbody></table></div>
@@ -188,7 +187,7 @@ var adminBody = template.Must(template.New("admin").Parse(`
 {{else}}<tr><td colspan="5" class="muted">Няма игри.</td></tr>{{end}}
 </tbody></table></div>
 <h3>Устройства, 28 дни</h3>
-<p class="muted">На какво е започната всяка игра. Роял и стаите не казват.</p>
+<p class="muted">На какво е започната всяка игра. Роял не казва.</p>
 <div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">Играчи</th><th class="num">Игри</th><th class="num">Започнат ден, завършен</th></tr></thead><tbody>
 {{range .Devices}}<tr><td>{{.Name}}</td><td class="num">{{.Players}}</td><td class="num">{{.Games}}</td><td class="num">{{.DayFinished.HTML}}</td></tr>
 {{else}}<tr><td colspan="4" class="muted">Няма игри.</td></tr>{{end}}

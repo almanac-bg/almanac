@@ -13,7 +13,7 @@ their reasons: read it before changing what a player sees or how the game plays,
 
 Ten questions a day, the same for everyone (Начало); games by topic that follow what a player knows; live duels with
 whoever comes (a recording of a real game if nobody does); Роял at 21:00
-Friday to Sunday (every evening once those fill), up to 50 live on 15 questions, cut by right answers after the 5th, 8th, 11th and 14th; rooms with a code for playing together; friends,
+Friday to Sunday (every evening once those fill), up to 50 live on 15 questions, cut by right answers after the 5th, 8th, 11th and 14th; friends,
 levels (XP), achievements, titles, avatars, and a rating with divisions. Points are a game's score,
 XP is what playing earns, rating is strength: kept apart on purpose (`internal/play/worth.go`), and joined in one
 system of progress (`internal/play/progress.go` says how: what earns XP, what unlocks what, what's told when), which a
@@ -35,7 +35,6 @@ most). A change is judged by whether players come back: the retention numbers in
 | `internal/play` | The game's rules and data: runs, scoring (`worth.go`), duels, friends, rating, goals, progress |
 | `internal/live` | Live duels: matchmaking, the shared clock, recordings |
 | `internal/royal` | Роял, live in the evening (Friday to Sunday until the evenings fill) |
-| `internal/room` | Rooms with a code |
 | `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: the paths it sends the app for, the client's router's list again; a test holds them equal) |
 | `internal/store` | SQLite; migrations in `internal/store/migrations`, applied once each by name |
 | `internal/bank` | Question types, the bank on disk, its checks |
@@ -65,7 +64,7 @@ database (then `serve` it with the same `DB_PATH`) and be its personas, a new gu
 cookie, or `-state`'s Playwright storage state per persona).
 
 CI runs the race detector on everything (`go test -race ./...`, a minute or two); locally run it where goroutines
-meet (`live`, `room`, `royal`, `server`, or `play` when you touch its locks), not on everything: the SQLite driver is
+meet (`live`, `royal`, `server`, or `play` when you touch its locks), not on everything: the SQLite driver is
 Go, so under the detector every query is instrumented, and the whole tree takes minutes instead of seconds. A test gets
 its database from `storetest.Open(t)` (migrated once per test program, copied) and the sample bank from
 `banktest.Sample(t)` (shared: a test that changes questions loads its own with `bank.Load`).
@@ -120,7 +119,7 @@ check holds a rule, the check is named; the rest is judgement, so weigh every ch
   and never so tight that a school, an office or a pub behind one address is refused. Ask of every new endpoint: what does it cost if
   one /48 calls it all day?
 - **One player can hurt another.** Anything one player can send another (a request, a push, a name on a board)
-  honours blocks and goes through `notifyFrom`; a name typed in a room stays in that room.
+  honours blocks and goes through `notifyFrom`.
 - **Text from outside is untrusted everywhere:** names, reports, browser errors in logs, mails, alerts and the
   agents that fix questions (sanitised, never an instruction).
 - **Time belongs to the run.** A run counts on the day it was dealt for, with one grace (`play.DayGrace`), never on
@@ -153,10 +152,9 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
   merge that changes the program (its build's hash differs from the last release's) is released, once main as merged
   passes the server's and the client's checks, one that doesn't (tests, docs, tooling) isn't. The version counts up its minor when the release brings a new migration, its patch
   otherwise: one minor, one schema. A major is the owner's call only (the workflow run by hand). `almanac-deploy` restarts the server only when
-  that cuts no play: it drains it first (no new live duel or room game; those under way finish: a duel by its own
-  clock, seven minutes at the most, a room's game five), and waits out Роял (from 20:37 to the end of its games), so
-  a deploy may take a while to go live, and several merges meanwhile go out as one. Connections wait in systemd's socket through the restart; rooms are kept
-  over it; a version that brings a migration copies the database before it, and the deploy goes back by itself,
+  that cuts no play: it drains it first (no new live duel; those under way finish, each by its own clock, seven
+  minutes at the most), and waits out Роял (from 20:37 to the end of its games), so
+  a deploy may take a while to go live, and several merges meanwhile go out as one. Connections wait in systemd's socket through the restart; a version that brings a migration copies the database before it, and the deploy goes back by itself,
   program and database copy both, if it isn't healthy. Every run deploys the latest release if it isn't live, so a
   failed deploy is tried again by the next merge; one that went back isn't, nor (if it never came up after it began
   to migrate) a release that brings that migration unchanged: change what failed. No tags by hand, no ssh to deploy. A change to `deploy/` reaches the
