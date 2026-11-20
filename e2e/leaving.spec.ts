@@ -195,10 +195,3 @@ test("a game's page left before it's ready holds nothing over the page come to",
   await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
   await expect(page.locator("nav.tabs")).toBeVisible();
 });
-
-test("a second chance with nothing waiting says so at once, with no count", async ({ page }) => {
-  await page.goto("/mistakes");
-  await expect(page.getByText("Още няма въпроси за втори шанс.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Към Начало" })).toBeVisible();
-});

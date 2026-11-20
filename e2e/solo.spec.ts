@@ -140,7 +140,7 @@ test("„България“: the questions about Bulgaria from every topic, a t
   test.setTimeout(120_000);
   await page.goto("/");
   const tile = page.locator(".topics").getByRole("link", { name: /^България/ });
-  await expect(tile).toContainText("Въпроси за България от всяка тема");
+  await expect(tile).toContainText("От всяка тема");
   await tile.click();
   await expect(page).toHaveURL(/\/play\/bulgaria$/);
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
@@ -158,6 +158,30 @@ test("„България“: the questions about Bulgaria from every topic, a t
   // The player's games name it.
   await page.goto("/me");
   await expect(page.locator(".game-what").filter({ hasText: /^България$/ })).toBeVisible();
+});
+
+test("„Микс“: every topic at once, the first of the topics, with „България“ beside it", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto("/");
+  const tiles = page.locator(".topics a.topic");
+  await expect(tiles.nth(0)).toContainText("Микс");
+  await expect(tiles.nth(0)).toContainText("Всички теми наведнъж");
+  await expect(tiles.nth(1)).toContainText("България");
+  await tiles.nth(0).click();
+  await expect(page).toHaveURL(/\/play\/mix$/);
+  await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
+  await playRun(page);
+  await expect(page.locator(".day-line .kicker")).toHaveText("Микс");
+  // Its ten come from more than one topic, each named in the review by its own.
+  await page.getByRole("button", { name: "Прегледай въпросите" }).click();
+  await expect(page.locator(".reviewed")).toHaveCount(10);
+  const topics = new Set(
+    (await page.locator(".reviewed-head .kicker").allTextContents()).map((k) => k.split(" · ")[1]),
+  );
+  expect(topics.size).toBeGreaterThan(1);
+  // The player's games name it.
+  await page.goto("/me");
+  await expect(page.locator(".game-what").filter({ hasText: /^Микс$/ })).toBeVisible();
 });
 
 test("a topic's count can be backed out of, or cut short", async ({ page }) => {
@@ -345,11 +369,13 @@ test.describe("on a computer", () => {
     const topics = await page.locator(".topics").boundingBox();
     expect(side && day && side.x > day.x + day.width).toBe(true);
     expect(topics && day && topics.y > day.y + day.height && Math.abs(topics.x - day.x) < 1).toBe(true);
-    // Ten topics, five to a row: none alone in a row.
+    // „Микс“ and „България“ a row of their own, then ten topics, five to a row: none alone in a row.
     const rows = await page
-      .locator(".topics li:not(.topic-all)")
-      .evaluateAll((li) => new Set(li.map((e) => Math.round(e.getBoundingClientRect().top))).size);
-    expect(rows).toBe(2);
+      .locator(".topics li")
+      .evaluateAll((li) => li.map((e) => Math.round(e.getBoundingClientRect().top)));
+    expect(new Set(rows.slice(0, 2)).size).toBe(1);
+    expect(new Set(rows.slice(2)).size).toBe(2);
+    expect(rows[2]).toBeGreaterThan(rows[0] ?? 0);
   });
 
   test("Начало: a new player's one column, and the day's result as wide at once as after a reload", async ({

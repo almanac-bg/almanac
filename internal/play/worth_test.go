@@ -70,7 +70,7 @@ func TestXP(t *testing.T) {
 		rights, total int
 		want          int
 	}{{"topic", 10, 10, 50}, {"topic", 3, 10, 15}, {"topic", 0, 10, 0}, {"day", 10, 10, 200}, {"day", 0, 10, 150},
-		{"mistakes", 5, 5, 50}, {"royal", 0, 15, 0}} {
+		{"room", 5, 5, 50}, {"royal", 0, 15, 0}} {
 		if got := finishXP(c.kind, c.rights, c.total); got != c.want {
 			t.Errorf("a %s game's end, %d of %d right: %d XP, want %d", c.kind, c.rights, c.total, got, c.want)
 		}
@@ -108,7 +108,7 @@ func TestRowsInARun(t *testing.T) {
 		}
 		return res
 	}
-	s, _ := w.g.StartTopic(ctx, bo, "")
+	s, _ := w.g.StartTopic(ctx, bo, MixTopic)
 	for n, c := range []struct {
 		how   func(int64, int) json.RawMessage
 		inRow int
@@ -128,7 +128,7 @@ func TestRowsInARun(t *testing.T) {
 		t.Fatalf("a game with a wrong answer earned %d for all right", st.AllRight)
 	}
 
-	s, _ = w.g.StartTopic(ctx, bo, "")
+	s, _ = w.g.StartTopic(ctx, bo, MixTopic)
 	sum := 0
 	var last Result
 	for n := range Length {

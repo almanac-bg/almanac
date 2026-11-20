@@ -152,18 +152,22 @@ func (g *Game) StartDay(ctx context.Context, userID int64) (State, error) {
 	return s, err
 }
 
-// StartTopic starts a run of a topic ("" for all of them, BulgariaTopic for Bulgaria's from every topic: bulgaria.go),
-// shaped by how well the player knows it; or, if the player left a run of the topic unfinished today, goes on with it
+// MixTopic is the topic „Микс“: the questions of every topic at once, played and kept as a topic is (runs.category).
+// Its games are shaped by how well the player knows all the topics, and count toward each question's own topic.
+const MixTopic = "mix"
+
+// StartTopic starts a run of a topic (MixTopic for all of them, BulgariaTopic for Bulgaria's from every topic:
+// bulgaria.go), shaped by how well the player knows it; or, if the player left a run of the topic unfinished today, goes on with it
 // where it stopped, as the day's ten do. One left on an earlier day isn't taken up again: it was drawn before today's
 // questions were kept from other games.
 func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (State, error) {
 	b := g.Bank()
-	if category != "" && category != BulgariaTopic &&
+	if category != MixTopic && category != BulgariaTopic &&
 		!slices.ContainsFunc(b.Categories, func(c bank.Category) bool { return c.ID == category }) {
 		return State{}, ErrNoTopic
 	}
-	known := category // how well the player knows Bulgaria's questions: all the topics, as for a game of them all
-	if category == BulgariaTopic {
+	known := category // how well the player knows „Микс“'s and Bulgaria's questions: all the topics
+	if category == MixTopic || category == BulgariaTopic {
 		known = ""
 	}
 	p, err := g.pastOf(ctx, known, userID)
@@ -215,26 +219,23 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 	return s, err
 }
 
-// LeftRun is a game of the player's own left unfinished, to come back to: a topic's today (its category, "" for all
-// of them), or a second chance's today; how far it got (At answered, of Total), and whether a question is showing
-// now, its time running (Open).
+// LeftRun is a game of the player's own left unfinished, to come back to: a topic's today (its category); how far it
+// got (At answered, of Total), and whether a question is showing now, its time running (Open).
 type LeftRun struct {
 	ID       int64  `json:"id"`
-	Kind     string `json:"kind"`
 	Category string `json:"category"`
 	At       int    `json:"at"`
 	Total    int    `json:"total"`
 	Open     bool   `json:"open,omitempty"`
 }
 
-// Left are the games of the player's own left unfinished that StartTopic and StartMistakes would go on with: the latest
-// of each topic and the latest second chance, today's; the latest first. One whose clock has just run out on its last question ends now, as it would at its next look, and
-// isn't among them.
+// Left are the games of the player's own left unfinished that StartTopic would go on with: the latest of each topic,
+// today's; the latest first. One whose clock has just run out on its last question ends now, as it would at its next
+// look, and isn't among them.
 func (g *Game) Left(ctx context.Context, userID int64) ([]LeftRun, error) {
 	today, _ := time.ParseInLocation(time.DateOnly, g.Today(), Bulgaria)
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT max(id) FROM runs WHERE user_id = ? AND finished_at IS NULL
-		AND kind IN ('topic', 'mistakes') AND started_at >= ?
-		GROUP BY kind, coalesce(category, '') ORDER BY 1 DESC`,
+		AND kind = 'topic' AND started_at >= ? GROUP BY category ORDER BY 1 DESC`,
 		userID, store.Ms(today))
 	if err != nil {
 		return nil, err
@@ -259,7 +260,7 @@ func (g *Game) Left(ctx context.Context, userID int64) ([]LeftRun, error) {
 			return nil, err
 		}
 		if !s.Done {
-			left = append(left, LeftRun{ID: s.ID, Kind: s.Kind, Category: s.Category, At: s.At, Total: s.Total, Open: s.Question != nil})
+			left = append(left, LeftRun{ID: s.ID, Category: s.Category, At: s.At, Total: s.Total, Open: s.Question != nil})
 		}
 	}
 	return left, nil

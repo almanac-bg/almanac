@@ -48,8 +48,8 @@ func TestComeBack(t *testing.T) {
 	}
 }
 
-// Профил's „Всички игри“: the player's games a page at a time, of a kind; and /mistakes says what's still to come.
-func TestAllGamesAndWhatsComing(t *testing.T) {
+// Профил's „Всички игри“: the player's games a page at a time, of a kind.
+func TestAllGames(t *testing.T) {
 	g := start(t)
 	ana, anaID := g.guest()
 	g.daysPlayed(anaID, 3, 2, 1)
@@ -63,9 +63,5 @@ func TestAllGamesAndWhatsComing(t *testing.T) {
 	}
 	if status, out = g.player().call("GET", "/api/me/games", nil); status != 401 {
 		t.Fatalf("nobody's games: %d %v", status, out)
-	}
-	_, m := ana.call("GET", "/api/mistakes", nil)
-	if coming, _ := m["coming"].(map[string]any); m["waiting"] != 0.0 || coming == nil || coming["n"] != 0.0 {
-		t.Fatalf("nothing waits, nothing comes: %v", m)
 	}
 }

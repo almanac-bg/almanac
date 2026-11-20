@@ -546,12 +546,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .almanac-head > .second-chance {
-    justify-self: start;
-    margin-top: var(--space-2);
-    font-weight: 700;
-  }
-
   .games-date {
     display: flex;
     align-items: center;
@@ -1327,7 +1321,7 @@
     gap: var(--space-1) var(--space-3);
   }
 
-  /* Начало and a result end in quiet lines (the league, Втори шанс, a way in, what the game brought): one list at the
+  /* Начало and a result end in quiet lines (the league, a way in, what the game brought): one list at the
      column's left, with its buttons, in one style (the news' lines: below). */
   .day-next {
     color: var(--text-muted);
@@ -4521,7 +4515,7 @@
     list-style: none;
   }
 
-  /* All the topics at once: a tile across the row, before the others (and „България“, „Втори шанс“ after them). */
+  /* „Микс“ and „България“ lead the topics (`.topic-lead`), two tiles like theirs; „Микс“ alone takes the row across. */
   .topic-all {
     grid-column: 1 / -1;
   }
@@ -4550,17 +4544,6 @@
     transition:
       transform 160ms ease,
       box-shadow 200ms ease;
-  }
-
-  .topic-all .topic {
-    grid-template-columns: minmax(0, 1fr);
-    padding-left: var(--space-4);
-  }
-
-  /* One across the row with a picture („България“): the picture beside the name, as in a topic's tile. */
-  .topic-all .topic:has(.topic-pic) {
-    grid-template-columns: auto minmax(0, 1fr);
-    padding-left: var(--space-2);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -4691,12 +4674,6 @@
     background: var(--div);
   }
 
-  /* An answer that put a fact in the Almanac, on a second chance (Втори шанс). */
-  .learned {
-    margin: 0;
-    color: var(--gold-ink);
-    font-weight: 600;
-  }
   .goal .meter {
     grid-column: 2;
   }
@@ -6811,25 +6788,24 @@
       font-size: 1.125rem;
     }
 
-    /* Ten topics, five to a row (no topic alone in a row), the picture over the name, each tile as tall as what's in
-       it. After them, one row of the rest (all of them at once, „България“, „Втори шанс“), each a short tile with
-       its picture beside the name: two of them two fifths of the row each, three a third each (in fifteenths). */
+    /* „Микс“ and „България“ first, a row of their own, half of it each (all of it for one alone), short tiles with
+       the picture beside the name. Then ten topics, five to a row (no topic alone in a row), the picture over the
+       name, each tile as tall as what's in it. */
     .topics {
-      grid-template-columns: repeat(15, minmax(0, 1fr));
+      grid-template-columns: repeat(10, minmax(0, 1fr));
       grid-auto-rows: auto;
     }
 
     .topics > li {
-      grid-column: span 3;
+      grid-column: span 2;
+    }
+
+    .topics > .topic-lead {
+      grid-column: span 5;
     }
 
     .topics > .topic-all {
-      order: 1;
-      grid-column: span 6;
-    }
-
-    .topics:has(> .topic-all ~ .topic-all ~ .topic-all) > .topic-all {
-      grid-column: span 5;
+      grid-column: 1 / -1;
     }
 
     /* The picture at the top, the name under it, and what the player knows of the topic under that. */
@@ -6846,18 +6822,14 @@
       margin: -4px 0 0 -4px;
     }
 
-    .topic-all .topic {
-      align-content: center;
-      padding-left: var(--space-4);
-    }
-
-    .topic-all .topic:has(.topic-pic) {
+    .topic-lead .topic {
       grid-template-columns: auto minmax(0, 1fr);
+      align-content: center;
       align-items: center;
-      padding-left: var(--space-2);
+      padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
     }
 
-    .topic-all .topic-pic {
+    .topic-lead .topic-pic {
       width: 44px;
       height: 44px;
       margin: 0;

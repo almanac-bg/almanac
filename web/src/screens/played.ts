@@ -8,7 +8,7 @@ import type { Kit } from "../kit.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
-let { reviewed, scoreCard, api, errorText, h, signal, title, issueWords, bulgaria, categories, back } = {} as Kit;
+let { reviewed, scoreCard, api, errorText, h, signal, title, issueWords, topics, back } = {} as Kit;
 
 /** A game as a run of it is: its kind, and the day's day or a topic's topic. */
 type Played = Omit<State, "kind"> & { kind: string };
@@ -18,8 +18,6 @@ function what(s: Played): string {
   switch (s.kind) {
     case "day":
       return s.day ? `Въпросите на деня · ${issueWords(undefined, s.day)}` : "Въпросите на деня";
-    case "mistakes":
-      return "Втори шанс";
     case "duel":
       return "Дуел";
     case "royal":
@@ -27,14 +25,12 @@ function what(s: Played): string {
     case "room":
       return "Стая";
     default:
-      if (!s.category) return "Всички теми";
-      if (s.category === bulgaria.id) return bulgaria.name;
-      return categories.find((c) => c.id === s.category)?.name ?? "Тема";
+      return topics.find((c) => c.id === s.category)?.name ?? "Тема";
   }
 }
 
 export function playedGame(kit: Kit, [id = ""]: string[]) {
-  ({ reviewed, scoreCard, api, errorText, h, signal, title, issueWords, bulgaria, categories, back } = kit);
+  ({ reviewed, scoreCard, api, errorText, h, signal, title, issueWords, topics, back } = kit);
   title("Изиграна игра");
   const game = signal<{ s: Played; questions: Reviewed[] } | null>(null);
   const error = signal("");

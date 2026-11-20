@@ -105,34 +105,3 @@ func TestGamesPaged(t *testing.T) {
 		t.Fatalf("Профил's latest: %d", len(s.Recent))
 	}
 }
-
-// What will come to a second chance, and when: the questions got wrong lately, each a few days after.
-func TestComingToSecondChance(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	w.now = time.Date(2026, 11, 20, 12, 0, 0, 0, Bulgaria)
-	ana := w.user()
-	res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, finished_at) VALUES (?, 'topic', '[]', 0, 0)`, ana)
-	if err != nil {
-		t.Fatal(err)
-	}
-	run, _ := res.LastInsertId()
-	live := w.b.Live("", "")
-	wrong := func(n int, at time.Time) {
-		if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, given, score, points, is_right, ms, at)
-			VALUES (?, ?, ?, '{}', 0, 0, 0, 3000, ?)`, run, n, live[n].Base().ID, at.UnixMilli()); err != nil {
-			t.Fatal(err)
-		}
-	}
-	wrong(0, w.now.Add(-4*24*time.Hour)) // waiting already
-	wrong(1, w.now.Add(-24*time.Hour))   // in two days
-	wrong(2, w.now.Add(-24*time.Hour))
-	wrong(3, w.now.Add(-time.Hour)) // in three
-	c, err := w.g.ComingOf(ctx, ana)
-	if err != nil || c != (Coming{N: 3, First: 2, Last: 3}) {
-		t.Fatalf("coming: %+v, %v", c, err)
-	}
-	if n, _ := w.g.Mistakes(ctx, ana); n != 1 {
-		t.Fatalf("waiting: %d", n)
-	}
-}

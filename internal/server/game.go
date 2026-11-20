@@ -123,12 +123,6 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 				if out["rarest"], err = s.game.RarestRight(ctx, u.ID, day); err != nil {
 					return nil, err
 				}
-				// The questions it got wrong will wait for a second chance: said when there'll be a game of them.
-				if missed, all, err := s.game.Misses(ctx, u.ID, runID); err != nil {
-					return nil, err
-				} else if missed > 0 && all >= play.MistakesFrom {
-					out["misses"] = map[string]int{"n": missed, "days": int(play.MistakesAfter.Hours() / 24)}
-				}
 			}
 		}
 	}
@@ -183,42 +177,6 @@ func (s *Server) startTopic(w http.ResponseWriter, r *http.Request) error {
 		return errTooMany
 	}
 	st, err := s.game.StartTopic(s.fromClient(r, u.ID), u.ID, in.Category)
-	if err != nil {
-		return err
-	}
-	return ok(w, st)
-}
-
-// mistakes says how many questions wait for the player's second chance, from how many it opens, and, while there are
-// too few to play, what's still to come (play.Coming).
-func (s *Server) mistakes(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	n, err := s.game.Mistakes(r.Context(), u.ID)
-	if err != nil {
-		return err
-	}
-	out := map[string]any{"waiting": n, "from": play.MistakesFrom}
-	if n < play.MistakesFrom {
-		if out["coming"], err = s.game.ComingOf(r.Context(), u.ID); err != nil {
-			return err
-		}
-	}
-	return ok(w, out)
-}
-
-// startMistakes starts a second chance: the questions the player got wrong, asked again.
-func (s *Server) startMistakes(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	if !s.limits.allow("topic:"+strconv.FormatInt(u.ID, 10), 120, time.Hour) {
-		return errTooMany
-	}
-	st, err := s.game.StartMistakes(s.fromClient(r, u.ID), u.ID)
 	if err != nil {
 		return err
 	}

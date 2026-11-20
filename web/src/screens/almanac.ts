@@ -22,10 +22,8 @@ let {
   formatNumber,
   pageArt,
   profileNav,
-  questions,
   toneOf,
   topicMark,
-  loadMistakes,
 } = {} as Kit;
 
 interface Learned {
@@ -67,15 +65,12 @@ export function almanac(kit: Kit) {
     formatNumber,
     pageArt,
     profileNav,
-    questions,
     toneOf,
     topicMark,
-    loadMistakes,
   } = kit);
   title("Моят Алманах");
   const counts = signal<Counts | null>(null);
   const topic = signal("");
-  const waiting = signal(0);
   const list = slot();
   const show = (t: string) => {
     topic.set(t);
@@ -85,13 +80,7 @@ export function almanac(kit: Kit) {
       }),
     );
   };
-  if (user.peek()) {
-    loadMistakes().then(
-      (m) => waiting.set(m.waiting >= m.from ? m.waiting : 0),
-      () => {},
-    );
-    show("");
-  }
+  if (user.peek()) show("");
   return h(
     "section",
     { class: "screen almanac" },
@@ -109,15 +98,14 @@ export function almanac(kit: Kit) {
           ),
     (): Child => {
       const c = counts();
-      return c ? [head(c, topic, waiting), chips(topic, show)] : null;
+      return c ? [head(c, topic), chips(topic, show)] : null;
     },
     list,
   );
 }
 
-/** How many facts: all of them learned, or a topic's out of all it has; what they are; and, quietly, the questions
- * missed that wait for a second chance (a line, a tap from them: Начало has its tile too). */
-function head(c: Counts, topic: () => string, waiting: () => number): Child {
+/** How many facts: all of them learned, or a topic's out of all it has; and what they are. */
+function head(c: Counts, topic: () => string): Child {
   return h(
     "div",
     { class: "almanac-head" },
@@ -135,14 +123,6 @@ function head(c: Counts, topic: () => string, waiting: () => number): Child {
       }),
     ),
     h("p", { class: "muted" }, "Фактът към всеки въпрос, на който отговори вярно, по реда, в който ги отключи."),
-    () =>
-      waiting()
-        ? h(
-            "a",
-            { class: "second-chance", href: "/mistakes" },
-            `${questions(waiting())} ${waiting() === 1 ? "чака" : "чакат"} Втори шанс`,
-          )
-        : null,
   );
 }
 

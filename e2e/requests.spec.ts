@@ -1,5 +1,5 @@
 // What a screen asks the server: each thing once a visit. A part that loads its data as it's made, made again by a
-// render that runs again, asks again each time (the topics' tiles asking for the second chance's count); a page that
+// render that runs again, asks again each time (the topics' tiles asking for the player's stats); a page that
 // loads itself anew asks for all of it again. Counted here over the ways a player goes round Начало and the topics, a
 // deploy among them: a visit that asks for anything twice fails, and so does a deploy that loads the page more than once.
 import { expect, type Page, type Request, test } from "@playwright/test";
@@ -50,13 +50,13 @@ const tab = (page: Page, href: string) => page.locator(`nav.tabs a[href='${href}
 test("each screen asks the server for each thing once a visit, and a deploy loads the page once", async ({ page }) => {
   test.slow();
   await page.goto("/");
-  // A player with the day played, and so with questions missed: Начало asks for all it shows.
+  // A player with the day played: Начало asks for all it shows.
   await startDay(page);
   await playRun(page);
   await expect(page.locator(".summary")).toBeVisible();
 
   const home = (asked: string[]) => {
-    for (const p of ["/api/mistakes", "/api/runs/left", "/api/me/stats", "/api/goals"]) expect(asked).toContain(p);
+    for (const p of ["/api/runs/left", "/api/me/stats", "/api/goals"]) expect(asked).toContain(p);
   };
   home(await once(page, "Начало, loaded", () => page.reload()));
   await once(page, "Приятели", () => tab(page, "/friends"));
@@ -77,7 +77,6 @@ test("each screen asks the server for each thing once a visit, and a deploy load
     }),
   );
   await once(page, "a topic, loaded", () => page.goto("/play/music"));
-  await once(page, "Втори шанс", () => page.goto("/mistakes"));
   await once(page, "Моят Алманах", () => page.goto("/almanac"));
   home(await once(page, "Начало, from Моят Алманах", () => tab(page, "/")));
 

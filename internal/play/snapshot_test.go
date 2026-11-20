@@ -14,7 +14,7 @@ func TestCountsKeptOverARestart(t *testing.T) {
 	ctx := t.Context()
 	w.g.CrowdMin = 1
 	ana := w.user()
-	s, _ := w.g.StartTopic(ctx, ana, "")
+	s, _ := w.g.StartTopic(ctx, ana, MixTopic)
 	w.play(ana, s.ID, repeat(w.right, Length)...)
 	w.wait(keepEvery) // the counts the topic's start made were kept: these are, keepEvery after them
 	if err := w.g.Count(ctx); err != nil {

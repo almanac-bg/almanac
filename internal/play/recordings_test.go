@@ -48,7 +48,7 @@ func TestRecordingsOverAllTopicsFirst(t *testing.T) {
 	// A history game by a player of Ana's rating, and one over all the topics by a player far below: being near her
 	// comes first, so the history game it is, and the duel says so.
 	history := game(near, "history")
-	farAll := game(far, "")
+	farAll := game(far, MixTopic)
 	if rec := pick(nil); rec == nil || rec.id != history || rec.topic != "history" {
 		t.Fatalf("got %+v, want the history game %d", rec, history)
 	}
@@ -61,7 +61,7 @@ func TestRecordingsOverAllTopicsFirst(t *testing.T) {
 	}
 
 	// A game over all the topics by a player near her: it comes before the history game while she hasn't seen it.
-	nearAll := game(near, "")
+	nearAll := game(near, MixTopic)
 	if rec := pick(nil); rec == nil || rec.id != nearAll || rec.topic != "" {
 		t.Fatalf("got %+v, want the game over all topics %d (history %d, far %d)", rec, nearAll, history, farAll)
 	}
@@ -92,7 +92,7 @@ func TestRecordingsNotTheSameTenAgain(t *testing.T) {
 	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1000 WHERE id IN (?, ?)`, friend, ana)
 	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1600 WHERE id = ?`, far)
 	game := func(user int64) int64 {
-		s, err := w.g.StartTopic(ctx, user, "")
+		s, err := w.g.StartTopic(ctx, user, MixTopic)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -130,7 +130,7 @@ func TestRecordingsLeaveOutGamesLeft(t *testing.T) {
 	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 900 WHERE id = ?`, far)
 	none := func(int64, int) json.RawMessage { return nil }
 	game := func(user int64, answers ...func(int64, int) json.RawMessage) int64 {
-		s, err := w.g.StartTopic(ctx, user, "")
+		s, err := w.g.StartTopic(ctx, user, MixTopic)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -180,7 +180,7 @@ func TestRecordingsNews(t *testing.T) {
 		}
 		return n.Recordings
 	}
-	s, err := w.g.StartTopic(ctx, owner, "")
+	s, err := w.g.StartTopic(ctx, owner, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}

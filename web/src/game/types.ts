@@ -167,7 +167,7 @@ export interface Shown {
 
 export interface State {
   id: number;
-  kind: "day" | "topic" | "mistakes";
+  kind: "day" | "topic";
   day?: string;
   category?: string;
   total: number;
@@ -193,8 +193,6 @@ export interface Result {
   right: boolean;
   exact?: boolean;
   timedOut?: boolean;
-  /** A second chance taken: the first right answer to the question, so its fact is in the Almanac now. */
-  learned?: boolean;
   reveal: Reveal;
   state: State;
 }

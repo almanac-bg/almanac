@@ -116,7 +116,7 @@ func TestSeededGame(t *testing.T) {
 		return res.StatusCode, v
 	}
 	screens := []string{"/api/me", "/api/me/stats", "/api/me/games", "/api/me/games?kind=duel", "/api/me/progress",
-		"POST /api/me/news", "/api/day", "/api/mistakes", "/api/runs/left",
+		"POST /api/me/news", "/api/day", "/api/runs/left",
 		"/api/playing", "/api/duels", "/api/ranks", "/api/ranks?among=friends", "/api/ranks?by=knowledge",
 		"/api/royal", "/api/royal/tonight", "/api/almanac", "/api/league", "/api/goals", "/api/friends",
 		"/api/friends/requests", "/api/push/prefs", "/api/mail/prefs"}

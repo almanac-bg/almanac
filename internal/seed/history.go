@@ -203,11 +203,6 @@ func (w *world) visit(s session, online []*player, met map[[2]int64]bool) error 
 			return err
 		}
 	}
-	if w.chance(0.3) {
-		if err := w.mistakesRun(p); err != nil {
-			return err
-		}
-	}
 	if err := w.news(p); err != nil {
 		return fmt.Errorf("news: %w", err)
 	}

@@ -59,7 +59,6 @@ import (
 //	CONTACT_EMAIL       where players write about their data (privacy@almanac.bg)
 //	ROYAL_EVERY         development only: a Роял every this long (2m), its lobby open ROYAL_LOBBY (1m) before; else
 //	                    every evening at 21:00
-//	MISTAKES_AFTER      development only: how long a missed question waits for its second chance (5s); else 3 days
 //	CROWD_FROM          development only: how many answers a question needs before how players answered it shows
 //	                    (1); else 10 of the day's players for the day's ten, 20 for everyone's
 //	MTA_STS_MX          the domain's mail servers, comma-separated, for its MTA-STS policy at mta-sts.<domain>;
@@ -123,13 +122,6 @@ func serve([]string) error {
 	}
 	if dev {
 		play.ReserveRulesFrom = "" // no players from before today's rules of reserve days to keep theirs
-	}
-	if after := os.Getenv("MISTAKES_AFTER"); after != "" && dev {
-		a, err := time.ParseDuration(after)
-		if err != nil || a <= 0 {
-			return errors.New("MISTAKES_AFTER must be like 5s")
-		}
-		cfg.MistakesAfter = a
 	}
 	if from := os.Getenv("CROWD_FROM"); from != "" && dev {
 		n, err := strconv.Atoi(from)

@@ -791,6 +791,8 @@ const avatars: Record<string, Layer[]> = {
 // the tone itself (k3) is the picture's main colour.
 
 const ground: Layer = ["kt", C(32, 32, 30)];
+/** A petal of the game's rosette (the logo, favicon.svg), upright: turned about the centre for the others. */
+const petal = "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z";
 
 const topics: Record<string, Layer[]> = {
   general: [
@@ -964,6 +966,11 @@ const topics: Record<string, Layer[]> = {
     ["k0", E(32, 32, 2.4, 15.5) + C(32, 15, 3.1)],
     ["l0", "M31 12.5C29 7.5 26 5.5 22.5 5.5M33 12.5C35 7.5 38 5.5 41.5 5.5", 'stroke-width="1.4"'],
     ["k0", C(22.5, 5.5, 1.5) + C(41.5, 5.5, 1.5)],
+  ],
+  // „Микс“, every topic at once: the game's own rosette, four answers and one of them right, the lightest.
+  mix: [
+    ground,
+    ...[45, 135, 225, -45].map((deg): Layer => [deg < 0 ? "k4" : "k2", petal, `transform="rotate(${deg} 32 32)"`]),
   ],
 };
 

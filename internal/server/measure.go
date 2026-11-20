@@ -263,10 +263,9 @@ var landingNames = map[string]string{
 // here comes after, by its own name).
 var (
 	kindNames = map[string]string{
-		"day": "Денят", "topic": "Тема", "duel": "Дуел", "royal": "Роял",
-		"mistakes": "Грешки", "room": "Стая",
+		"day": "Денят", "topic": "Тема", "duel": "Дуел", "royal": "Роял", "room": "Стая",
 	}
-	kindOrder = []string{"day", "topic", "duel", "royal", "mistakes", "room"}
+	kindOrder = []string{"day", "topic", "duel", "royal", "room"}
 )
 
 // kindName is a kind of game as the admin page says it.

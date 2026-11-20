@@ -69,7 +69,6 @@ import { leagueBoard, leagueLine, loadLeague } from "./screens/league.ts";
 import { clock, coming, dayAndTime, dayWord, whileSeen } from "./screens/modes.ts";
 import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
-import { loadMistakes } from "./screens/play.ts";
 import { loadProgress, nearest } from "./screens/progress.ts";
 import { changeGame, mixes } from "./screens/rooms.ts";
 import { signIn } from "./screens/signin.ts";
@@ -178,7 +177,6 @@ export const kit = {
   liveAudio,
   loadDuelResult,
   loadLeague,
-  loadMistakes,
   loadProgress,
   mailAsk,
   masteryCard,

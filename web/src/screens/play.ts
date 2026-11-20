@@ -1,7 +1,7 @@
 // Теми: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays the same
-// game. The tiles live on Начало (Втори шанс first while questions wait for one, then each topic, and one for „България“, the questions about Bulgaria from every topic, while
-// the bank has them); a run of one is /play/<topic>, whose result offers ten more at once, and another topic a tap
-// away.
+// game. The tiles live on Начало: „Микс“ (every topic at once) and „България“ (the questions about Bulgaria from every
+// topic, while the bank has them) first, then each topic; a run of one is /play/<topic>, whose result offers ten more
+// at once, and another topic a tap away.
 
 import { picture } from "../art/picture.ts";
 import { type Mastery, masteryBadge } from "../game/mastery.ts";
@@ -12,31 +12,43 @@ import type { State } from "../game/types.ts";
 import { api, errorText } from "../lib/api.ts";
 import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { backOut, byTap, entry, hold, mark, title } from "../lib/router.ts";
-import { bulgaria, type Category, categories, player, user } from "../state.ts";
-import { meter, questions, stakeLine, toneOf, topicMark } from "../ui.ts";
+import { bulgaria, type Category, categories, mix, player, user } from "../state.ts";
+import { meter, stakeLine, toneOf, topicMark } from "../ui.ts";
 import { missing } from "./missing.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
-/** The topics as tiles, each with how well the player knows it: the second chance first while questions wait for one
- * (at the end of the list it went unseen); „България“ across them after the topics (no mastery of its own: its answers
- * count in their own topics). A game left half-way says so on its tile, where it goes on from. */
+/** The topics as tiles: „Микс“ and „България“ first (`.topic-lead`: a row of their own on a big screen; „Микс“
+ * across it alone while „България“ is closed), each with what it is, neither with a mastery of its own (their answers
+ * count in their own topics); then each topic with how well the player knows it. A game left half-way says so on its
+ * tile, where it goes on from. */
 export function topics(): Child {
   const stats = signal<Stats | null>(null);
-  const waiting = signal(0);
   const left = signal<LeftRun[]>([]);
   if (user.peek()) {
     loadStats().then(stats.set, () => {});
-    loadMistakes().then(
-      (m) => waiting.set(m.waiting >= m.from ? m.waiting : 0),
-      () => {},
-    );
     loadLeft().then(left.set, () => {});
   }
   // „Продължи · въпрос 4 от 10“, on the tile of a game left half-way (in place of what it says otherwise).
-  const goesOn = (kind: LeftRun["kind"], category = ""): Child => {
-    const l = left().find((r) => r.kind === kind && r.category === category);
+  const goesOn = (category: string): Child => {
+    const l = left().find((r) => r.category === category);
     return l ? h("span", { class: "topic-meta topic-left" }, `Продължи · въпрос ${l.at + 1} от ${l.total}`) : null;
   };
+  const lead = (c: Category, tone: string, what: string, alone = false): Child =>
+    h(
+      "li",
+      { class: alone ? "topic-lead topic-all" : "topic-lead" },
+      h(
+        "a",
+        { href: `/play/${c.id}`, class: `topic ${tone}` },
+        picture(`topic-${c.id}`, "topic-pic"),
+        h(
+          "span",
+          { class: "topic-text" },
+          h("span", { class: "topic-name" }, c.name),
+          goesOn(c.id) ?? h("span", { class: "topic-meta" }, what),
+        ),
+      ),
+    );
   return h(
     "section",
     { class: "stack" },
@@ -44,9 +56,8 @@ export function topics(): Child {
     h("ul", { class: "topics" }, () => {
       const mine = stats()?.mastery ?? [];
       return [
-        waiting() || goesOn("mistakes")
-          ? h("li", { class: "topic-all" }, secondChance(waiting(), goesOn("mistakes")))
-          : null,
+        lead(mix, "tone-lilac", "Всички теми наведнъж", !bulgaria.open),
+        bulgaria.open ? lead(bulgaria, "tone-mint", "От всяка тема") : null,
         ...categories.map((c) =>
           h(
             "li",
@@ -54,55 +65,12 @@ export function topics(): Child {
             tile(
               c,
               mine.find((m) => m.category === c.id),
-              goesOn("topic", c.id),
+              goesOn(c.id),
             ),
           ),
         ),
-        bulgaria.open
-          ? h(
-              "li",
-              { class: "topic-all" },
-              h(
-                "a",
-                { href: `/play/${bulgaria.id}`, class: "topic tone-mint" },
-                picture(`topic-${bulgaria.id}`, "topic-pic"),
-                h(
-                  "span",
-                  { class: "topic-text" },
-                  h("span", { class: "topic-name" }, bulgaria.name),
-                  goesOn("topic", bulgaria.id) ??
-                    h("span", { class: "topic-meta" }, "Въпроси за България от всяка тема"),
-                ),
-              ),
-            )
-          : null,
       ];
     }),
-  );
-}
-
-/** How many questions wait for the player's second chance, from how many it opens, and, while too few wait, what's
- * still to come: how many, and in how many days the first and the last of them come (0: later today). */
-export interface Mistakes {
-  waiting: number;
-  from: number;
-  coming?: { n: number; first: number; last: number };
-}
-
-export const loadMistakes = () => api<Mistakes>("GET", "/api/mistakes");
-
-/** The way into a second chance: the questions the player got wrong, asked again (/mistakes). */
-export function secondChance(waiting: number, left: Child = null): Child {
-  return h(
-    "a",
-    { href: "/mistakes", class: "topic tone-rose" },
-    h(
-      "span",
-      { class: "topic-text" },
-      h("span", { class: "topic-name" }, "Втори шанс"),
-      left ??
-        h("span", { class: "topic-meta" }, `${questions(waiting)}, ${waiting === 1 ? "на който" : "на които"} сгреши`),
-    ),
   );
 }
 
@@ -131,13 +99,14 @@ function tile(c: Category, m: Mastery | undefined, left: Child): Child {
 }
 
 export function topic([category = ""]: string[]) {
-  const name = !category
-    ? undefined
-    : category === bulgaria.id
-      ? bulgaria.open
-        ? bulgaria.name
-        : undefined
-      : categories.find((c) => c.id === category)?.name;
+  const name =
+    category === mix.id
+      ? mix.name
+      : category === bulgaria.id
+        ? bulgaria.open
+          ? bulgaria.name
+          : undefined
+        : categories.find((c) => c.id === category)?.name;
   // A topic the game doesn't have (an old link, a topic renamed): said so, with the way to the day's ten.
   if (name === undefined) return missing();
   title(name);
@@ -153,13 +122,16 @@ export function topic([category = ""]: string[]) {
   if (user.peek()) ask();
   return run({
     name,
-    lead: "Десет въпроса по темата, от лесен към труден.",
+    lead:
+      category === mix.id
+        ? "Десет въпроса от всички теми, от лесен към труден."
+        : "Десет въпроса по темата, от лесен към труден.",
     begin: async () => {
       const s = await api<State>("POST", "/api/topic", { category });
       ask();
       return s;
     },
-    left: (l) => l.kind === "topic" && l.category === category,
+    left: (l) => l.category === category,
     finished: (s, again, just) =>
       h(
         "div",
@@ -237,11 +209,10 @@ async function dayWaits(): Promise<DayWaits | null> {
   return t.run?.done ? null : { streak: t.streak, reserve: t.reserve ?? 0 };
 }
 
-/** A game of the player's own left unfinished today (play.Left): a topic's or a second chance's, how far it got, and
- * whether its question is showing, its time running. */
+/** A game of a topic the player left unfinished today (play.Left): how far it got, and whether its question is
+ * showing, its time running. */
 export interface LeftRun {
   id: number;
-  kind: "topic" | "mistakes";
   category: string;
   at: number;
   total: number;
@@ -255,24 +226,22 @@ export async function loadLeft(): Promise<LeftRun[]> {
 }
 
 /** A run of the player's own, as its screen plays it: what it's called and is (`name`, `lead`), how it starts
- * (`begin`: a new one, or the one left today), which of the games left today it is (`left`), what its end draws
- * (`finished`: `again` plays another, `just` says it was played this moment, so its news is told), and, if it can't
- * be played now, why (`closed`: asked before anything starts). */
+ * (`begin`: a new one, or the one left today), which of the games left today it is (`left`), and what its end draws
+ * (`finished`: `again` plays another, `just` says it was played this moment, so its news is told). */
 interface Run {
   name: string;
   lead: string;
   begin: () => Promise<State>;
   left: (l: LeftRun) => boolean;
   finished: (s: State, again: () => void, just: boolean) => Child;
-  closed?: () => Promise<Child>;
 }
 
-/** Plays a run (a topic's, a second chance). Opened by a tap, it starts after a short count, which the player can cut
+/** Plays a topic's run. Opened by a tap, it starts after a short count, which the player can cut
  * short or back out of (back where they came from, or to its start come from outside); come to otherwise (a reload, back or forward, a link from outside),
  * nothing starts by itself: the screen says what it is, or where it was left, with „Започни“ or „Продължи“. A game
  * finished here shows its result again; one whose question this tab was showing goes straight back to it, its time
  * running (as one opened by a tap does). */
-export function run(r: Run): Child {
+function run(r: Run): Child {
   const screen = slot(() => h("p", { class: "muted" }, "…"));
   // What „Откажи“ on the count comes back to in a game opened from outside (its own entry held over Начало): the
   // screen's start, in place (router.ts, backOut).
@@ -324,11 +293,6 @@ export function run(r: Run): Child {
       const s = await api<State>("GET", `/api/runs/${left.id}`).catch(() => null);
       if (life.aborted) return;
       if (s && !s.done) return play(s);
-    }
-    if (!left) {
-      const closed = await r.closed?.();
-      if (life.aborted) return;
-      if (closed) return screen.show(() => closed);
     }
     startHere = async () => {
       const marks = left ? (await api<State>("GET", `/api/runs/${left.id}`).catch(() => null))?.trail : undefined;

@@ -26,9 +26,8 @@
 //
 // No game deals a player again what they've played, in any game, while the bank has questions they haven't: a topic's,
 // a duel's (live, a rematch), a room's and Роял's are drawn for all their players, those none of them has seen first,
-// then those the fewest have (choose, seenAmong); a recording is a game with few of its questions seen. Two repeat by
-// design: the day (the same ten for everyone) and Втори шанс (what the player missed). TestNothingPlayedAgain holds
-// it, for every way a game starts.
+// then those the fewest have (choose, seenAmong); a recording is a game with few of its questions seen. One repeats by
+// design: the day (the same ten for everyone). TestNothingPlayedAgain holds it, for every way a game starts.
 //
 // A guest who signs in to their account brings everything along (Merge), and a player who goes leaves others'
 // history whole (Forget): merge.go, checked against the schema so that no table of a player's is left out.
@@ -109,9 +108,6 @@ type Game struct {
 	// LeagueNews, if set, is told of every place when a week of the leagues ends, inside the write that keeps those
 	// places (closeGroups): what it keeps there (a notification queued) is kept with them, or not at all.
 	LeagueNews func(context.Context, *sql.Tx, []LeagueNews) error
-	// MistakesAfter is how long a missed question waits for its second chance (MistakesAfter when 0; the browser
-	// tests make it seconds).
-	MistakesAfter time.Duration
 	// CrowdMin, if set, is how many answers a question needs before how players answered it shows, the day's
 	// players' and everyone's (CrowdFrom, DayCrowdFrom when 0; the browser tests make it 1).
 	CrowdMin int
@@ -136,7 +132,6 @@ type Game struct {
 
 	later  laters                  // what follows the runs just finished, under way (after.go)
 	skills memo[skillsKey, skills] // each player's abilities, kept while their games stand (memo.go)
-	misses memo[[2]int64, [2]int]  // what each player's mistakes make of a second chance (mistakes.go)
 }
 
 func New(db *store.DB, b func() *bank.Bank) *Game {
@@ -340,9 +335,6 @@ type Result struct {
 	Right    bool    `json:"right"`
 	Exact    bool    `json:"exact,omitempty"`
 	TimedOut bool    `json:"timedOut,omitempty"`
-	// Learned is a second chance taken (mistakes.go): the first right answer to the question, so its fact is in the
-	// Almanac now.
-	Learned bool `json:"learned,omitempty"`
 	// Given is the answer as it shows (the player's screen has it already).
 	Given  json.RawMessage `json:"-"`
 	Reveal any             `json:"reveal"`
@@ -769,7 +761,6 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 			return err
 		}
 		res.Score, res.Right, res.Exact, res.Given = gr.Score, gr.Right, gr.Exact, gr.Shown
-		res.Learned = r.kind == "mistakes" && gr.Right && d.Question().Extra().Fact != ""
 		res.State, err = g.state(tx, r)
 		return err
 	})
@@ -837,7 +828,6 @@ func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
 	if w := r.picks[n].worth(d.Question(), res.Score, took); w.Points == res.Points {
 		res.Speed = w.Speed
 	}
-	res.Learned = r.kind == "mistakes" && res.Right && d.Question().Extra().Fact != ""
 	res.State, err = g.state(tx, r)
 	return res, d, err
 }
