@@ -5783,7 +5783,6 @@
 
   .friend-act {
     margin-inline-start: auto;
-    padding-inline: var(--space-4);
   }
 
   .friend + .friend {
