@@ -19,28 +19,16 @@ func (g *game) dayOf(userID int64, day string, rights int) {
 	}
 }
 
-// A player who comes back: Класации' „Вчера“ with its winner, and a welcome, once, for one back after days away.
+// A player who comes back after days away is welcomed, once; one who played yesterday isn't.
 func TestComeBack(t *testing.T) {
 	g := start(t)
 	g.srv.game.Now = func() time.Time { return time.Date(2026, 11, 20, 12, 0, 0, 0, play.Bulgaria) }
 	ana, anaID := g.guest()
-	bo, boID := g.guest()
 	g.dayOf(anaID, "2026-11-19", 7)
-	g.dayOf(boID, "2026-11-19", 9)
 
 	_, today := ana.call("GET", "/api/day", nil)
 	if today["back"] != nil {
 		t.Fatalf("played yesterday, welcomed back: %v", today["back"])
-	}
-	// Класации' „Вчера“: final, its first the winner, the friends on it.
-	befriend(ana, bo)
-	_, past := ana.call("GET", "/api/day/2026-11-19/board", nil)
-	board, _ := past["board"].(map[string]any)
-	top, _ := board["top"].([]any)
-	friends, _ := past["friends"].([]any)
-	if past["final"] != true || past["issue"] != float64(play.Issue("2026-11-19")) || len(top) != 2 || len(friends) != 2 ||
-		top[0].(map[string]any)["rights"] != 9.0 {
-		t.Fatalf("yesterday's board: %v", past)
 	}
 	// Cy played five days in a row, then went away: welcomed back, once, with the longest streak.
 	cy, cyID := g.guest()

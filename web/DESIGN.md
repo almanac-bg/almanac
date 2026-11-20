@@ -96,8 +96,7 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   and a profile at its actions' end; the blocked are listed last („Блокирани“, „Отблокирай“). A name field never asks
   the browser for a full name (`autocomplete` nickname or off: `fields.test.ts`); a room asks a player with a drawn
   name for one for that room alone („Име в стаята“: „Вижда се само в тази стая…“).
-- **Класации** (`/ranks`): Днес (the day's board, first), Вчера (yesterday's, final, its winner over it: „Брой 6
-  спечели Мария: 10 от 10 за 1:12 мин.“; `/ranks#yesterday`), Лига (the player's group this week; `/ranks#league`),
+- **Класации** (`/ranks`): Днес (the day's board, first), Лига (the player's group this week; `/ranks#league`),
   Рейтинг and Знания (Лига and Рейтинг once the player has met them); of everyone or of friends (not the league: a group is its own).
   Empty, a board says what the game knows: among friends with none yet, „Още нямаш приятели…“ and „Добави приятел“
   gold (to Приятели); Знания short of its threshold, „Имаш 20 от 100 отговора. Още 80 и влизаш в класацията.“ A row of the day's

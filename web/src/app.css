@@ -917,12 +917,6 @@
     color: var(--text-muted);
   }
 
-  /* Over yesterday's final board: who won it. */
-  .board-winner {
-    margin: 0;
-    font-weight: 700;
-  }
-
   /* Роял's table: those out are dimmer; how far each got on the right. */
   .royal-table .row.out {
     opacity: 0.62;

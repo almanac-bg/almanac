@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"regexp"
 	"strconv"
 	"time"
 
@@ -167,36 +166,6 @@ func (s *Server) startDay(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return ok(w, st)
-}
-
-var dayPattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
-
-// board is a day's board (Класации' „Вчера“): its best and the viewer's place, its issue, whether it's final
-// (play.DaySettled: its first is the day's winner), and the viewer's friends on it.
-func (s *Server) board(w http.ResponseWriter, r *http.Request) error {
-	day := r.PathValue("day")
-	if _, err := time.Parse(time.DateOnly, day); err != nil || !dayPattern.MatchString(day) {
-		return errNotFound
-	}
-	u, err := s.user(r)
-	if err != nil {
-		return err
-	}
-	var viewer int64
-	if u != nil {
-		viewer = u.ID
-	}
-	b, err := s.game.BoardOf(r.Context(), day, viewer)
-	if err != nil {
-		return err
-	}
-	out := map[string]any{"board": b, "issue": play.Issue(day), "final": s.game.DaySettled(day)}
-	if u != nil {
-		if out["friends"], err = s.game.FriendsBoard(r.Context(), day, u.ID); err != nil {
-			return err
-		}
-	}
-	return ok(w, out)
 }
 
 func (s *Server) startTopic(w http.ResponseWriter, r *http.Request) error {

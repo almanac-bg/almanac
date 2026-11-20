@@ -138,7 +138,7 @@ func (g *Game) dayBoard(ctx context.Context, day string) (*countedBoard, error) 
 // countBoard counts a day's board: every fair game of it finished, in order, and the best with who played them, in
 // one read so that the two agree.
 func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error) {
-	start, final := time.Now(), g.DaySettled(day) // settled before the read: every game of it is in
+	start := time.Now()
 	tx, err := g.DB.Read.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return nil, err
@@ -184,37 +184,22 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	d.counted, d.took, d.final = time.Now(), time.Since(start), final
+	d.counted, d.took = time.Now(), time.Since(start)
 	return d, nil
-}
-
-// DaySettled is whether a day's board is final: the day is over, and so is the last of its games that could still be
-// played on (dayLate). Before then the board moves, and its first place isn't the day's winner yet.
-func (g *Game) DaySettled(day string) bool {
-	_, end := dayBounds(day)
-	return g.Now().After(time.UnixMilli(end).Add(dayLate))
 }
 
 // countedBoard is a day's board as counted: its fair games finished, best first, and the best of them as shown.
 type countedBoard struct {
 	counted time.Time     // when, by the machine's clock (not the game's: it's about the server's time)
 	took    time.Duration // how long counting it took
-	final   bool          // counted once its day had settled (DaySettled): no game of it can finish any more
 	runs    []boardRun
 	rights  int // the right answers of all of them
 	top     []Score
 	users   []int64 // who played each of top
 }
 
-// boardFinalStale is how long a settled day's board is kept: yesterday's is Класации' „Вчера“, and only a name
-// changed or a player gone moves it now.
-const boardFinalStale = time.Minute
-
-// due says whether a board is old enough to be counted again (boardPatience; a settled day's, boardFinalStale).
+// due says whether a board is old enough to be counted again (boardPatience).
 func (d *countedBoard) due() bool {
-	if d.final {
-		return time.Since(d.counted) >= boardFinalStale
-	}
 	return time.Since(d.counted) >= min(boardStale, time.Duration(boardPatience)*d.took)
 }
 

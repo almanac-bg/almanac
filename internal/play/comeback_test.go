@@ -21,31 +21,6 @@ func (w *world) dayPlayed(user int64, day string, rights int) int64 {
 	return id
 }
 
-// Yesterday ends for the player who played it: their right answers and final place, once its last games can't be
-// played on any more; never for one who didn't play it.
-func TestYesterdayEnds(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	w.now = time.Date(2026, 11, 20, 0, 10, 0, 0, Bulgaria)
-	yesterday := "2026-11-19"
-	ana, bo, cy := w.user(), w.user(), w.user()
-	w.dayPlayed(ana, yesterday, 7)
-	w.dayPlayed(bo, yesterday, 9)
-	w.dayPlayed(cy, yesterday, 3)
-	if w.g.DaySettled(yesterday) {
-		t.Fatal("settled ten minutes after midnight: a game begun before it may still be played on")
-	}
-	w.now = time.Date(2026, 11, 20, 8, 0, 0, 0, Bulgaria)
-	if !w.g.DaySettled(yesterday) {
-		t.Fatal("not settled at eight in the morning")
-	}
-	// Its board, counted once settled, is final: kept a while, not counted on every look.
-	d, err := w.g.dayBoard(ctx, yesterday)
-	if err != nil || !d.final || d.due() {
-		t.Fatalf("yesterday's board: final %v, due %v, %v", d != nil && d.final, d != nil && d.due(), err)
-	}
-}
-
 // A player back after days away is welcomed by the last day they played; one who played yesterday isn't away.
 func TestAway(t *testing.T) {
 	w := setup(t)

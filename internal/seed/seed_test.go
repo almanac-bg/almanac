@@ -115,9 +115,8 @@ func TestSeededGame(t *testing.T) {
 		_ = json.NewDecoder(res.Body).Decode(&v)
 		return res.StatusCode, v
 	}
-	yesterday := play.DayShift(time.Now().In(play.Bulgaria).Format(time.DateOnly), -1)
 	screens := []string{"/api/me", "/api/me/stats", "/api/me/games", "/api/me/games?kind=duel", "/api/me/progress",
-		"POST /api/me/news", "/api/day", "/api/day/" + yesterday + "/board", "/api/mistakes", "/api/runs/left",
+		"POST /api/me/news", "/api/day", "/api/mistakes", "/api/runs/left",
 		"/api/playing", "/api/duels", "/api/ranks", "/api/ranks?among=friends", "/api/ranks?by=knowledge",
 		"/api/royal", "/api/royal/tonight", "/api/almanac", "/api/league", "/api/goals", "/api/friends",
 		"/api/friends/requests", "/api/push/prefs", "/api/mail/prefs"}
