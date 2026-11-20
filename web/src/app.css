@@ -510,8 +510,7 @@
     --i: var(--i-users);
   }
 
-  /* Моят Алманах, read as an almanac: the count in the numeral face, then the days, newest first, each under its
-     dateline (a kicker running into a hairline), its facts as entries between hairlines rather than cards. */
+  /* Моят Алманах: the count in the numeral face, then the facts as cards, laid as masonry. */
   .almanac-head {
     display: grid;
     gap: var(--space-1);
@@ -549,31 +548,44 @@
     border-top: 1px solid var(--line);
   }
 
+  /* The cards as masonry, in the order learned: each in the column that ends highest, the next in line (a grid's own
+     placement does it, rows 4px tall and each card's span measured in screens/almanac.ts). Columns as many as 17rem fit. */
   .almanac-list {
     display: grid;
-    gap: 0 var(--space-5);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+    grid-auto-rows: 4px;
+    column-gap: var(--space-3);
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  /* An entry: the topic, the question small, what was learned as its headline, and the fact; a hairline between two. */
+  /* A card's place: the card, and the gap under it (its span counts both). */
   .almanac-item {
-    display: grid;
-    align-content: start;
-    gap: var(--space-2);
-    padding: var(--space-3) 0 var(--space-4);
+    align-self: start;
+    padding-bottom: var(--space-3);
   }
 
-  .almanac-item + .almanac-item {
-    border-top: 1px solid var(--line);
+  /* A card: the topic in its colour (its picture on a disc of it, a glow of it in the card's corner), the question
+     small, what was learned as its headline, and the fact in the facts' face, set off by a bar of the topic's colour. */
+  .almanac-card {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-4) var(--space-5);
+    border-radius: var(--radius-lg);
+    background:
+      radial-gradient(120% 70% at 100% 0%, color-mix(in srgb, var(--tone) 14%, transparent), transparent 70%),
+      var(--surface);
+    box-shadow:
+      var(--elev-1),
+      inset 0 0 0 1px color-mix(in srgb, var(--tone) 22%, var(--line));
   }
 
   .almanac-topic {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    color: var(--text-muted);
+    color: color-mix(in srgb, var(--tone) 75%, var(--text));
   }
 
   .almanac-qa {
@@ -583,12 +595,12 @@
 
   .almanac-q {
     color: var(--text-muted);
-    font-size: 0.9375rem;
-    line-height: 1.375rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
   }
 
   .almanac-a {
-    font: 800 1.25rem / 1.625rem var(--font-sans);
+    font: 800 1.125rem / 1.5rem var(--font-sans);
     letter-spacing: -0.01em;
     text-wrap: pretty;
   }
@@ -599,7 +611,9 @@
 
   /* What was learned, in the facts' face. */
   .almanac-fact {
-    font: italic 500 1.0625rem / 1.625rem var(--font-serif);
+    padding-left: var(--space-3);
+    border-left: 3px solid color-mix(in srgb, var(--tone) 70%, transparent);
+    font: italic 500 1rem / 1.5rem var(--font-serif);
     text-wrap: pretty;
   }
 
@@ -1366,6 +1380,17 @@
     width: 26px;
     height: 26px;
     margin: -4px 0 -4px -4px;
+  }
+
+  /* On a card of Моят Алманах: on a disc of its topic's colour. */
+  .almanac-topic .topic-mark {
+    width: 32px;
+    height: 32px;
+    margin: 0;
+    padding: 4px;
+    border-radius: var(--radius-full);
+    background: color-mix(in srgb, var(--tone) 18%, transparent);
+    box-shadow: none;
   }
 
   .title-row {
@@ -4865,6 +4890,546 @@
       );
   }
 
+  /* The natural tone: no tone over the picture, every part in its own colour, as the thing looks (a fox orange with a
+     white chest, a stork white with a black wing and a red beak), on a tile of its own scene (a meadow, the sky, the
+     night). Each shape sets its inks; a part that shares an ink with another but differs in life (the cat's eyes, the
+     stork's wing lines) is picked by its place among the picture's layers (art/pictures.ts: keep them in order, or
+     move its number here). pictures.test.ts holds every avatar coloured. */
+  .tone-natural {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-fox {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-fox > .avatar-pic {
+    --k1: #a3461c;
+    --k2: #ea7a2c;
+    --k5: #fff5e8;
+  }
+
+  .tone-natural.sh-bear {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-bear > .avatar-pic {
+    --k1: #5a3a22;
+    --k2: #8d5b34;
+    --k4: #d4a877;
+  }
+
+  .tone-natural.sh-cat {
+    --tone: #f3d593;
+  }
+
+  .tone-natural.sh-cat > .avatar-pic {
+    --k1: #c4651f;
+    --k2: #f29a45;
+    --k4: #f6c1a6;
+    --k5: #fff7ec;
+  }
+
+  .tone-natural.sh-cat > .avatar-pic > :nth-child(7) {
+    fill: #b9d03c;
+  }
+
+  .tone-natural.sh-cat > .avatar-pic > :nth-child(10) {
+    fill: #e5808f;
+  }
+
+  .tone-natural.sh-hare {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-hare > .avatar-pic {
+    --k1: #7d6048;
+    --k2: #b08d6e;
+    --k4: #f2c2c2;
+    --k5: #f6efe6;
+  }
+
+  .tone-natural.sh-hare > .avatar-pic > :nth-child(7) {
+    fill: #e5808f;
+  }
+
+  .tone-natural.sh-hedgehog {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-hedgehog > .avatar-pic {
+    --k1: #4f3c2e;
+    --k2: #86684f;
+    --k4: #f0a39a;
+    --k5: #ecd6b8;
+  }
+
+  .tone-natural.sh-dog {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-dog > .avatar-pic {
+    --k1: #7a4a26;
+    --k2: #d99b5c;
+    --k4: #ee7c8b;
+    --k5: #fff6ea;
+  }
+
+  .tone-natural.sh-deer {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-deer > .avatar-pic {
+    --k1: #7a4f2e;
+    --k2: #b8784a;
+    --k4: #f4e7d4;
+  }
+
+  .tone-natural.sh-deer > .avatar-pic > :nth-child(3) {
+    stroke: #d9c09a;
+  }
+
+  .tone-natural.sh-stork {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-stork > .avatar-pic {
+    --k1: #e14a2c;
+    --k5: #fbfbfd;
+  }
+
+  .tone-natural.sh-stork > .avatar-pic > :nth-child(3) {
+    stroke: #4a4a5e;
+  }
+
+  .tone-natural.sh-frog {
+    --tone: #8fd3cf;
+  }
+
+  .tone-natural.sh-frog > .avatar-pic {
+    --k1: #2e8a3d;
+    --k2: #55b84f;
+    --k4: #f1a3a0;
+    --k5: #eaf6c6;
+  }
+
+  .tone-natural.sh-frog > .avatar-pic > :nth-child(10) {
+    stroke: #2a6a30;
+  }
+
+  .tone-natural.sh-flame {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-flame > .avatar-pic {
+    --k4: #f97316;
+    --k5: #fcd34d;
+  }
+
+  .tone-natural.sh-star {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-star > .avatar-pic {
+    --k4: #f2ae0b;
+    --k5: #fde047;
+  }
+
+  .tone-natural.sh-target {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-target > .avatar-pic {
+    --k1: #dc2b2b;
+    --k4: #fde047;
+    --k5: #ffffff;
+  }
+
+  .tone-natural.sh-bolt {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-bolt > .avatar-pic {
+    --k4: #facc15;
+    --k5: #fef08a;
+  }
+
+  .tone-natural.sh-book {
+    --tone: #f3d593;
+  }
+
+  .tone-natural.sh-book > .avatar-pic {
+    --k1: #8a2f17;
+    --k4: #b7aa8e;
+    --k5: #f6eedb;
+  }
+
+  .tone-natural.sh-book > .avatar-pic > :nth-child(6) {
+    fill: #d62f2f;
+  }
+
+  .tone-natural.sh-trophy {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-trophy > .avatar-pic {
+    --k1: #9a5b0c;
+    --k4: #f0b429;
+    --k5: #fcd34d;
+  }
+
+  .tone-natural.sh-trophy > .avatar-pic > :nth-child(8) {
+    fill: #5b3a1e;
+  }
+
+  .tone-natural.sh-trophy > .avatar-pic > :nth-child(9) {
+    fill: #fcd34d;
+  }
+
+  .tone-natural.sh-shield {
+    --tone: #d6e4f0;
+  }
+
+  .tone-natural.sh-shield > .avatar-pic {
+    --k1: #1f3f8f;
+    --k4: #c8d2df;
+    --k5: #eef1f5;
+  }
+
+  .tone-natural.sh-shield > .avatar-pic > :nth-child(6) {
+    fill: #fbbf24;
+  }
+
+  .tone-natural.sh-heart {
+    --tone: #fbd3dc;
+  }
+
+  .tone-natural.sh-heart > .avatar-pic {
+    --k4: #dc1f45;
+    --k5: #f43f5e;
+  }
+
+  .tone-natural.sh-owl {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-owl > .avatar-pic {
+    --k1: #6b4a2b;
+    --k2: #9a6b40;
+    --k4: #e8d2a8;
+    --k5: #fffaf0;
+  }
+
+  .tone-natural.sh-owl > .avatar-pic > :nth-child(9) {
+    fill: #f59e0b;
+  }
+
+  .tone-natural.sh-compass {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-compass > .avatar-pic {
+    --k1: #b7791f;
+    --k2: #6b7280;
+    --k4: #cbd5e1;
+    --k5: #fffaf0;
+  }
+
+  .tone-natural.sh-compass > .avatar-pic > :nth-child(6) {
+    fill: #dc2b2b;
+  }
+
+  .tone-natural.sh-sun {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-sun > .avatar-pic {
+    --k1: #b45309;
+    --k4: #f59e0b;
+    --k5: #fde047;
+  }
+
+  .tone-natural.sh-hourglass {
+    --tone: #f3d593;
+  }
+
+  .tone-natural.sh-hourglass > .avatar-pic {
+    --k1: #7c4a24;
+    --k2: #e8a93f;
+    --k5: #e6f4fd;
+  }
+
+  .tone-natural.sh-spark {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-spark > .avatar-pic {
+    --k4: #fbbf24;
+    --k5: #fde68a;
+  }
+
+  .tone-natural.sh-clover {
+    --tone: #f3d593;
+  }
+
+  .tone-natural.sh-clover > .avatar-pic {
+    --k1: #2f7d32;
+    --k2: #2f7d32;
+    --k4: #3e9b43;
+    --k5: #57b65b;
+  }
+
+  .tone-natural.sh-crown {
+    --tone: #5b2a86;
+  }
+
+  .tone-natural.sh-crown > .avatar-pic {
+    --k1: #b91c1c;
+    --k4: #f0b429;
+    --k5: #fcd34d;
+  }
+
+  .tone-natural.sh-crown > .avatar-pic > :nth-child(5) {
+    fill: #fffaf0;
+  }
+
+  .tone-natural.sh-crown > .avatar-pic > :nth-child(6) {
+    fill: #4f9cf5;
+  }
+
+  .tone-natural.sh-crown > .avatar-pic > :nth-child(8) {
+    fill: #fffaf0;
+  }
+
+  .tone-natural.sh-mouse {
+    --tone: #f3d593;
+  }
+
+  .tone-natural.sh-mouse > .avatar-pic {
+    --k1: #6b6f78;
+    --k2: #9aa0aa;
+    --k4: #f2a7b4;
+    --k5: #f4efe8;
+  }
+
+  .tone-natural.sh-squirrel {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-squirrel > .avatar-pic {
+    --k1: #8a3b14;
+    --k2: #c8642a;
+    --k4: #e89a5c;
+    --k5: #fbeedd;
+  }
+
+  .tone-natural.sh-sheep {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-sheep > .avatar-pic {
+    --k1: #3b3330;
+    --k2: #8a6f63;
+    --k5: #f7f3ea;
+  }
+
+  .tone-natural.sh-turtle {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-turtle > .avatar-pic {
+    --k1: #6b4a24;
+    --k2: #8fa65a;
+    --k4: #c3d48a;
+  }
+
+  .tone-natural.sh-turtle > .avatar-pic > :nth-child(9) {
+    fill: #b8893f;
+  }
+
+  .tone-natural.sh-turtle > .avatar-pic > :nth-child(10) {
+    stroke: #d9b56a;
+  }
+
+  .tone-natural.sh-badger {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-badger > .avatar-pic {
+    --k1: #7d7f86;
+    --k5: #f5f3ee;
+  }
+
+  .tone-natural.sh-lynx {
+    --tone: #d6e4f0;
+  }
+
+  .tone-natural.sh-lynx > .avatar-pic {
+    --k1: #6b4a2b;
+    --k2: #c99a5e;
+    --k4: #f0dcbc;
+    --k5: #fbf3e6;
+  }
+
+  .tone-natural.sh-lynx > .avatar-pic > :nth-child(9) {
+    fill: #b9c43c;
+  }
+
+  .tone-natural.sh-torch {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-torch > .avatar-pic {
+    --k1: #6b3f1f;
+    --k2: #b7791f;
+    --k4: #f97316;
+    --k5: #fcd34d;
+  }
+
+  .tone-natural.sh-bonfire {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-bonfire > .avatar-pic {
+    --k1: #6b3f1f;
+    --k2: #8a5a2e;
+    --k4: #f97316;
+    --k5: #fcd34d;
+  }
+
+  .tone-natural.sh-bonfire > .avatar-pic > :nth-child(7) {
+    fill: #d9a066;
+  }
+
+  .tone-natural.sh-phoenix {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-phoenix > .avatar-pic {
+    --k1: #b45309;
+    --k4: #ef4b23;
+    --k5: #fcb33d;
+  }
+
+  .tone-natural.sh-year {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-year > .avatar-pic {
+    --k3: #f97316;
+    --k4: #f59e0b;
+    --k5: #fde047;
+  }
+
+  .tone-natural.sh-calendar {
+    --tone: #d6e4f0;
+  }
+
+  .tone-natural.sh-calendar > .avatar-pic {
+    --k2: #d62f2f;
+    --k3: #d62f2f;
+    --k5: #e7e2d6;
+  }
+
+  .tone-natural.sh-calendar > .avatar-pic > :nth-child(7) {
+    fill: #fcd34d;
+  }
+
+  .tone-natural.sh-books {
+    --tone: #f3d593;
+  }
+
+  .tone-natural.sh-books > .avatar-pic {
+    --k1: #8a2f17;
+    --k2: #1f3f8f;
+    --k4: #2f6f4e;
+    --k5: #f6eedb;
+  }
+
+  .tone-natural.sh-blades {
+    --tone: #d6e4f0;
+  }
+
+  .tone-natural.sh-blades > .avatar-pic {
+    --k1: #1f3f8f;
+    --k2: #fbbf24;
+    --k4: #b6bcc6;
+    --k5: #eef1f5;
+  }
+
+  .tone-natural.sh-blades > .avatar-pic > :nth-child(4) {
+    fill: #b7791f;
+  }
+
+  .tone-natural.sh-blades > .avatar-pic > :nth-child(9) {
+    fill: #b7791f;
+  }
+
+  .tone-natural.sh-blades > .avatar-pic > :nth-child(15) {
+    fill: #fbbf24;
+  }
+
+  .tone-natural.sh-helmet {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-helmet > .avatar-pic {
+    --k1: #7a4a12;
+    --k4: #c98a12;
+    --k5: #f0b429;
+  }
+
+  .tone-natural.sh-helmet > .avatar-pic > :nth-child(2) {
+    fill: #b91c1c;
+  }
+
+  .tone-natural.sh-helmet > .avatar-pic > :nth-child(3) {
+    fill: #dc2b2b;
+  }
+
+  .tone-natural.sh-hearts {
+    --tone: #fbd3dc;
+  }
+
+  .tone-natural.sh-hearts > .avatar-pic {
+    --k1: #a3122f;
+    --k4: #dc1f45;
+    --k5: #f43f5e;
+  }
+
+  .tone-natural.sh-cap {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-cap > .avatar-pic {
+    --k1: #1f2937;
+    --k2: #111827;
+    --k4: #f0b429;
+    --k5: #fcd34d;
+  }
+
+  .tone-natural.sh-wreath {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-wreath > .avatar-pic {
+    --k1: #3f6b2a;
+    --k4: #4d8a34;
+    --k5: #6fae4a;
+  }
+
+  .tone-natural.sh-wreath > .avatar-pic > :nth-last-child(4) {
+    fill: #b91c1c;
+  }
+
+  .tone-natural.sh-wreath > .avatar-pic > :nth-last-child(2) {
+    fill: #fcd34d;
+  }
+
+  .tone-natural.sh-wreath > .avatar-pic > :nth-last-child(1) {
+    fill: #f0b429;
+  }
+
   .avatar.s {
     --size: 28px;
   }
@@ -5805,6 +6370,11 @@
     border-radius: var(--radius-full);
     background: var(--tone);
     cursor: pointer;
+  }
+
+  /* The natural tone has no one colour: its swatch is a few of the colours it paints in. */
+  .tone-pick.tone-natural {
+    background: conic-gradient(#ea7a2c, #fcd34d, #55b84f, #9fd0f2, #f43f5e, #ea7a2c);
   }
 
   .tone-pick[aria-pressed="true"] {
@@ -6993,15 +7563,6 @@
 
     .home-side .modes {
       grid-auto-flow: row;
-    }
-
-    .almanac-list {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    /* Two to a row: the second opens the day beside the first, with no line over it either. */
-    .almanac-item:nth-child(2) {
-      border-top: 0;
     }
 
     /* A new player: the day and the topics, one centred column. */

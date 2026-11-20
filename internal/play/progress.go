@@ -137,9 +137,13 @@ func achievementByID(id string) (Achievement, bool) {
 
 // Avatars are a picture in a tone (web/src/art/pictures.ts draws them; a "shape" is a picture's id). The first animals
 // are everyone's from the start; the rest unlock: an animal or the crown at a level (ShapeLevels), an emblem with the
-// one achievement drawn with it (its Icon: each its own).
+// one achievement drawn with it (its Icon: each its own). The tones are the theme's five, each painting the whole
+// picture in its shades, and "natural": every part in its own colour, as the thing looks (a fox orange with a white
+// chest, a stork white with a black wing and a red beak; web/src/app.css, .tone-natural).
 var (
-	Tones      = []string{"gold", "lilac", "sky", "rose", "mint"}
+	Tones  = []string{"gold", "lilac", "sky", "rose", "mint", "natural"}
+	tinted = Tones[:5] // the theme's tones, which the game gives
+
 	FreeShapes = []string{"fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog"}
 	// Unlockable are the shapes that unlock, in the order the wardrobe shows them.
 	Unlockable = []string{
@@ -154,12 +158,13 @@ var (
 		"lynx": 36}
 )
 
-// DefaultAvatar is the avatar the game gives a player until they choose one: a free shape and a tone, from their id.
-// Both turn with the id (9 shapes and 5 tones have no common factor, so every pair comes, once in 45): players who
-// sign up one after another never share a tone, and no tone stands for the first ones.
+// DefaultAvatar is the avatar the game gives a player until they choose one: a free shape and one of the theme's
+// tones, from their id. Both turn with the id (9 shapes and 5 tones have no common factor, so every pair comes, once
+// in 45): players who sign up one after another never share a tone, and no tone stands for the first ones. "natural"
+// is only ever chosen.
 func DefaultAvatar(userID int64) string {
 	n := max(userID, 0)
-	return FreeShapes[n%int64(len(FreeShapes))] + "-" + Tones[n%int64(len(Tones))]
+	return FreeShapes[n%int64(len(FreeShapes))] + "-" + tinted[n%int64(len(tinted))]
 }
 
 // Shape is an avatar's shape as a player may pick it: free, unlocked, or still locked, with what unlocks it: How, a
