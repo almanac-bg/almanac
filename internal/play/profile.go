@@ -9,11 +9,11 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// A profile is a player as anyone may see them, found by their tag: how they look, their numbers,
-// and how well they know each topic. What only they see stays theirs: their games one by one, their Алманах, their
-// email, their friends. Nor does it follow them as they play: its numbers are of the games they finished (not a game
-// under way, answer by answer), and its time is a date, the month they started, never the moment (review 2026-11-18,
-// S12). The privacy page says what
+// A profile is a player as anyone may see them, found by their tag: how they look, the seal they wear, their ranks by
+// chapter (rank.go: kept as each day's issue finishes, never as they play), and the longest streak they've had
+// (DECISIONS.md, „The direction“): no lifetime totals, and nothing of how well they know a topic (mastery is the
+// game's own). What only they see stays theirs: their games one by one, their Алманах, their email, their friends.
+// Its time is a date, the month they started, never the moment (review 2026-11-18, S12). The privacy page says what
 // it shows; the server limits how many anyone looks at (server.profileOf).
 
 // Profile is a player as another sees them, and how the viewer stands with them.
@@ -24,16 +24,12 @@ type Profile struct {
 	Me bool `json:"me,omitempty"`
 	Look
 	// Since is when they started playing: the month (its first day, at noon in Bulgaria).
-	Since   int64 `json:"since"`
-	Streak  int   `json:"streak"`
-	Days    int   `json:"days"`
-	Games   int   `json:"games"`
-	Answers int   `json:"answers"`
-	Right   int   `json:"right"`
-	Duels   int   `json:"duels"`
-	Won     int   `json:"won"`
-	// Mastery is how well they know each topic, in the bank's order.
-	Mastery []Mastery `json:"mastery"`
+	Since int64 `json:"since"`
+	// Seal is the seal they wear (none before a rank), Ranks their ranks in the bank's chapters, Best the longest
+	// streak they've had.
+	Seal  *Seal         `json:"seal,omitempty"`
+	Ranks []ChapterRank `json:"ranks"`
+	Best  int           `json:"best"`
 	// Friend is how the viewer stands with them: "yes" (friends), "asked" (the viewer asked them), "asks" (they
 	// asked the viewer), or "" (none of these, or no viewer). Request is the request's id, while one waits.
 	Friend  string `json:"friend,omitempty"`
@@ -78,22 +74,19 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 		return p, err
 	}
 	p.Me, p.Look = id == viewer, lookOf(id, avatar)
-	if p.Streak, err = g.Streak(ctx, id); err != nil {
-		return p, err
-	}
-	err = db.QueryRowContext(ctx, `SELECT count(*), count(*) FILTER (WHERE kind = 'day'),
-		(SELECT count(*) FROM `+duelResults+`), (SELECT count(*) FROM `+duelResults+` WHERE outcome = 'won')
-		FROM runs WHERE user_id = ?1 AND finished_at IS NOT NULL`, id).
-		Scan(&p.Games, &p.Days, &p.Duels, &p.Won)
+	streak, err := g.StreakOf(ctx, id)
 	if err != nil {
 		return p, err
 	}
-	if p.Answers, p.Right, err = g.answered(ctx, id, true); err != nil {
+	p.Best = streak.Best
+	if p.Ranks, _, err = g.RanksOf(ctx, id); err != nil {
 		return p, err
 	}
-	if p.Mastery, err = g.knownMastery(ctx, id, true); err != nil {
+	var chosen sql.NullString
+	if err := db.QueryRowContext(ctx, `SELECT seal FROM users WHERE id = ?`, id).Scan(&chosen); err != nil {
 		return p, err
 	}
+	p.Seal = sealOf(p.Ranks, chosen.String)
 	p.Since = monthOnly(p.Since)
 	if viewer == 0 || p.Me {
 		return p, nil

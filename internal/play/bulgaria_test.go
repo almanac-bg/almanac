@@ -41,11 +41,12 @@ func TestBulgariaTopic(t *testing.T) {
 	}
 	w.play(u, s.ID, repeat(w.right, Length)...)
 	// Its answers count in their own topics, and the game itself is no topic of mastery.
-	m, _ := w.g.MasteryOf(ctx, u)
+	h, _ := w.g.hardness(ctx)
+	m, _, _ := w.g.abilities(ctx, w.db.Read, h, u, 0, false)
 	answered := 0
-	for _, t := range m {
-		answered += t.Answers
-		if t.Category == BulgariaTopic {
+	for topic, a := range m {
+		answered += a.answers
+		if topic == BulgariaTopic {
 			answered = -100
 		}
 	}

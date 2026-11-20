@@ -73,9 +73,6 @@ var mergeSteps = []mergeStep{
 		SELECT ?1 FROM ranks_due WHERE user_id = ?2`},
 	{carries: []string{"users.seal"}, sql: `UPDATE users SET seal = coalesce(users.seal, g.seal)
 		FROM (SELECT seal FROM users WHERE id = ?2) g WHERE users.id = ?1`},
-	// The notes in the guest's book are the account's too (a milestone both reached keeps the account's day).
-	{carries: []string{"notes.user_id"}, sql: `INSERT OR IGNORE INTO notes (user_id, day, kind, n, topic, told)
-		SELECT ?1, day, kind, n, topic, told FROM notes WHERE user_id = ?2`},
 	// The guest's notifications come along, with what they chose of them (unless the account has chosen), the days
 	// they were reminded on, and those on their way (but a day's reminder the account has one of). So does what they chose of mails, though a guest gets none.
 	{carries: []string{"push_subs.user_id"}, sql: `UPDATE push_subs SET user_id = ?1 WHERE user_id = ?2`},

@@ -6,25 +6,17 @@ import (
 	"strings"
 )
 
-// Stats is how a player has done: their avatar, the streak (and the longest they've had), how much they've played, the
-// facts they've collected, and how well they know each topic.
+// Stats is how a player stands, as Профил shows them their own: their avatar and seal (rank.go), the streak (and the
+// longest they've had), and their latest games. No lifetime totals (DECISIONS.md, „The direction“).
 type Stats struct {
 	Avatar   string   `json:"avatar"` // shape-tone (Look)
+	Seal     *Seal    `json:"seal,omitempty"`
 	Streak   int      `json:"streak"`
 	Best     int      `json:"best"`     // the longest streak the player has had (StreakNow)
 	Week     [7]bool  `json:"week"`     // this week's days played, Monday first
 	Forgiven [7]bool  `json:"forgiven"` // this week's day missed that the streak forgave
 	Spare    bool     `json:"spare"`    // whether this week has its day to forgive still
-	Days     int      `json:"days"`     // days' questions finished
-	Games    int      `json:"games"`    // runs finished, of every kind
-	Answers  int      `json:"answers"`  // questions answered (or timed out)
-	Duels    int      `json:"duels"`
-	Won      int      `json:"won"`
-	Right    int      `json:"right"`
-	Facts    int      `json:"facts"` // facts in the player's almanac (almanac.go)
 	Recent   []Played `json:"recent"`
-	// Mastery is how well the player knows each topic, in the bank's order.
-	Mastery []Mastery `json:"mastery"`
 }
 
 // Played is a finished run, as a list of games shows it.
@@ -59,23 +51,7 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	if s.Week, err = g.Week(ctx, userID); err != nil {
 		return s, err
 	}
-	db := g.DB.Read
-	err = db.QueryRowContext(ctx, `SELECT count(*), count(*) FILTER (WHERE kind = 'day'),
-		(SELECT count(*) FROM `+duelResults+`), (SELECT count(*) FROM `+duelResults+` WHERE outcome = 'won')
-		FROM runs WHERE user_id = ?1 AND finished_at IS NOT NULL`, userID).
-		Scan(&s.Games, &s.Days, &s.Duels, &s.Won)
-	if err != nil {
-		return s, err
-	}
-	if s.Answers, s.Right, err = g.answered(ctx, userID, false); err != nil {
-		return s, err
-	}
-	f, err := g.factsOf(ctx, userID)
-	if err != nil {
-		return s, err
-	}
-	s.Facts = f.n
-	if s.Mastery, err = g.MasteryOf(ctx, userID); err != nil {
+	if s.Seal, err = g.SealOf(ctx, userID); err != nil {
 		return s, err
 	}
 	page, err := g.GamesOf(ctx, userID, "", "", RecentGames)
@@ -144,11 +120,3 @@ func (g *Game) GamesOf(ctx context.Context, userID int64, kind, from string, lim
 	return out, rows.Err()
 }
 
-// answered is how many questions a player has answered (or let run out of time), and how many of them right; finished:
-// in the games they finished only (what others see of them, ProfileOf: never a game under way, answer by answer).
-func (g *Game) answered(ctx context.Context, userID int64, finished bool) (answers, right int, err error) {
-	err = g.DB.Read.QueryRowContext(ctx, `SELECT count(*), coalesce(sum(a.is_right), 0) FROM answers a
-		JOIN runs r ON r.id = a.run_id WHERE r.user_id = ? AND (NOT ? OR r.finished_at IS NOT NULL)`, userID, finished).
-		Scan(&answers, &right)
-	return answers, right, err
-}

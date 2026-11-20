@@ -1119,12 +1119,12 @@ func TestProfilesOverHTTP(t *testing.T) {
 	}
 
 	status, p := g.player().call("GET", "/api/players/@"+strings.ToUpper(anaTag), nil)
-	if status != http.StatusOK || p["name"] != name(a) || p["tag"] != anaTag || p["games"] != float64(1) ||
+	if status != http.StatusOK || p["name"] != name(a) || p["tag"] != anaTag || p["best"] != float64(0) ||
 		p["friend"] != nil || p["id"] != nil || p["me"] != nil {
 		t.Fatalf("Ana's profile, to someone not signed in: %d %v", status, p)
 	}
-	if _, ok := p["mastery"].([]any); !ok {
-		t.Fatalf("no mastery: %v", p)
+	if _, ok := p["ranks"].([]any); !ok {
+		t.Fatalf("no ranks: %v", p)
 	}
 	if _, p := ana.call("GET", "/api/players/"+anaTag, nil); p["me"] != true {
 		t.Fatalf("Ana's own profile: %v", p)
@@ -1137,7 +1137,7 @@ func TestProfilesOverHTTP(t *testing.T) {
 	}
 
 	// A profile shows no achievements, no title, no level: they're gone (DECISIONS.md, „The redesign“).
-	for _, gone := range []string{"achievements", "of", "title", "level"} {
+	for _, gone := range []string{"achievements", "of", "title", "level", "mastery", "games", "answers", "days"} {
 		if v, ok := p[gone]; ok {
 			t.Errorf("Ana's profile has %s: %v", gone, v)
 		}

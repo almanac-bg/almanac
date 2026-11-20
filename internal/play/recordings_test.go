@@ -28,7 +28,7 @@ func TestRecordingsOverAllTopicsFirst(t *testing.T) {
 		var rec *recorded
 		if err := w.db.Tx(ctx, func(tx *sql.Tx) error {
 			var err error
-			rec, err = w.g.recordedRun(tx, ana, seen)
+			rec, err = w.g.recordedRun(tx, ana, seen, nil)
 			return err
 		}); err != nil {
 			t.Fatal(err)
@@ -48,7 +48,7 @@ func TestRecordingsOverAllTopicsFirst(t *testing.T) {
 	if rec := pick(nil); rec == nil || rec.id != history || rec.topic != "history" {
 		t.Fatalf("got %+v, want the history game %d", rec, history)
 	}
-	duel, err := w.g.DuelRecording(ctx, ana)
+	duel, err := w.g.DuelRecording(ctx, ana, Even)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestRecordingsNotTheSameTenAgain(t *testing.T) {
 	var rec *recorded
 	if err := w.db.Tx(ctx, func(tx *sql.Tx) error {
 		var err error
-		rec, err = w.g.recordedRun(tx, ana, seen)
+		rec, err = w.g.recordedRun(tx, ana, seen, nil)
 		return err
 	}); err != nil {
 		t.Fatal(err)
@@ -138,7 +138,7 @@ func TestRecordingsLeaveOutGamesLeft(t *testing.T) {
 		var rec *recorded
 		if err := w.db.Tx(ctx, func(tx *sql.Tx) error {
 			var err error
-			rec, err = w.g.recordedRun(tx, ana, nil)
+			rec, err = w.g.recordedRun(tx, ana, nil, nil)
 			return err
 		}); err != nil || rec == nil {
 			t.Fatalf("no recording: %v", err)
@@ -182,7 +182,7 @@ func TestRecordingsNews(t *testing.T) {
 	}
 	duel := func(user int64, answer func(int64, int) json.RawMessage) {
 		t.Helper()
-		id, err := w.g.DuelRecording(ctx, user)
+		id, err := w.g.DuelRecording(ctx, user, Even)
 		if err != nil {
 			t.Fatal(err)
 		}

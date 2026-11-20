@@ -77,13 +77,13 @@ func TestNewsFacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n.Ink != 0 || !n.Pencil || len(n.Notes) != 0 {
+	if n.Ink != 0 || !n.Pencil {
 		t.Fatalf("a first game, three right: %+v", n)
 	}
 	s, _ = w.g.StartTopic(ctx, ana, "history")
 	w.play(ana, s.ID, repeat(wrong, Length)...)
 	n, _ = w.g.NewsOf(ctx, ana, s.ID)
-	if n.Pencil || n.Mastery != nil && n.Mastery.To.Known < n.Mastery.From.Known || len(n.Notes) != 0 {
+	if n.Pencil || n.Rose != nil {
 		t.Fatalf("a second game, all wrong: %+v", n)
 	}
 }

@@ -35,25 +35,3 @@ func TestAvatars(t *testing.T) {
 		t.Fatalf("shapes %v", Shapes)
 	}
 }
-
-// A day's ten all right is noted once, on its own day; a topic's game all right isn't a day's ten, and a bad day
-// notes nothing.
-func TestPerfectNoted(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana := w.user()
-	s, _ := w.g.StartTopic(ctx, ana, "history")
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	w.dayGame(ana, nil, repeat(w.wrong, Length)...)
-	w.g.AftersDone(ctx)
-	if n, _ := w.g.NewsOf(ctx, ana, 0); len(n.Notes) != 0 {
-		t.Fatalf("noted: %+v", n.Notes)
-	}
-	bo := w.user()
-	w.dayGame(bo, nil)
-	w.g.AftersDone(ctx)
-	n, _ := w.g.NewsOf(ctx, bo, dayRun(t, w, bo))
-	if !slices.Equal(n.Notes, []Note{{Day: w.g.Today(), Kind: NotePerfect}}) {
-		t.Fatalf("a day all right: %+v", n.Notes)
-	}
-}

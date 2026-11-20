@@ -1,7 +1,7 @@
-// How a player has done: the streak (and their longest) and this week, their numbers, the facts in their almanac, how
-// well they know each topic (each a way to play it), their latest games (today's each a way to go over it: /games/<id>) and the way to all of them (/games).
+// How a player stands, as Профил shows them their own: their seal, the streak (and their longest) and this week, their
+// latest games (today's each a way to go over it: /games/<id>) and the way to all of them (/games). No lifetime
+// totals (play/stats.go).
 
-import type { Mastery } from "../game/mastery.ts";
 import { api } from "../lib/api.ts";
 import { dayInBulgaria } from "../lib/day.ts";
 import { h } from "../lib/dom.ts";
@@ -11,6 +11,8 @@ import { topics } from "../state.ts";
 export interface Stats {
   /** The player's avatar, as others see it ("shape-tone"). */
   avatar: string;
+  /** The seal they wear (play.Seal): a chapter's rank. */
+  seal?: { chapter: string; level: number; name: string; quarter: number };
   streak: number;
   /** The longest streak the player has had. */
   best: number;
@@ -19,15 +21,6 @@ export interface Stats {
   forgiven: boolean[];
   /** Whether this week would still forgive a day missed. */
   spare: boolean;
-  days: number;
-  games: number;
-  answers: number;
-  right: number;
-  /** Facts in Моят Алманах. */
-  facts: number;
-  duels: number;
-  won: number;
-  mastery: Mastery[];
   recent: Played[];
 }
 

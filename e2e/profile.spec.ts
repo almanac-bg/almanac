@@ -18,10 +18,10 @@ test("a player's profile: asked to be friends from it, and friends there", async
   await b.goto(`/players/${ana.tag}`);
   await expect(b.getByRole("heading", { level: 1, name: ana.name })).toBeVisible();
   await expect(b.locator(".me-tag")).toHaveText(`@${ana.tag}`);
-  await expect(b.locator(".stats")).toContainText("изиграна игра");
-  // No level, no title: the game has none.
+  // A topic's game writes no rank and no streak: nothing yet, and no lifetime totals nor how well she knows a topic.
+  await expect(b.getByText("Още няма звание.")).toBeVisible();
   await expect(b.locator(".me-head")).not.toContainText("Ниво");
-  await expect(b.getByRole("heading", { name: "Колко знае" })).toBeVisible();
+  await expect(b.locator(".screen")).not.toContainText(/изиграна игра|верни отговори|Колко знае/);
 
   // Nobody on his device yet: told to play a game first or sign in, and no guest is made for the asking.
   await expect(b.getByText("За да добавяш приятели, първо изиграй една игра или влез с имейл.")).toBeVisible();

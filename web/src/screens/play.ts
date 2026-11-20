@@ -13,7 +13,6 @@ import { backOut, byTap, entry, hold, mark, title } from "../lib/router.ts";
 import { bulgaria, categories, mix, player, user } from "../state.ts";
 import { stakeLine, toneOf, topicMark } from "../ui.ts";
 import { missing } from "./missing.ts";
-import { loadStats, type Stats } from "./stats.ts";
 
 export function topic([category = ""]: string[]) {
   const name =
@@ -87,21 +86,18 @@ function nextOf(d: DayWaits | null, again: () => void, chapter: string): { main:
 /** How many other topics a topic's result offers. */
 const othersShown = 3;
 
-/** Under a topic's result, a way to another, a tap away (Начало's tiles are a scroll from there): the ones the player
- * has played least first, so that the game goes round what they know. */
+/** Under a topic's result, a way to another, a tap away (Начало's tiles are a scroll from there): the ones after it in
+ * the book's order, so that the game goes round the chapters. */
 function otherTopics(current: string): Child {
-  const stats = signal<Stats | null>(null);
-  loadStats().then(stats.set, () => {});
-  return () => {
-    const answers = (id: string) => stats()?.mastery.find((m) => m.category === id)?.answers ?? 0;
-    const others = categories
-      .filter((c) => c.id !== current)
-      .map((c, i) => ({ c, i }))
-      .sort((a, b) => answers(a.c.id) - answers(b.c.id) || a.i - b.i)
-      .slice(0, othersShown)
-      .map(({ c }) => c);
-    if (!stats()) return null;
-    return h(
+  const at = Math.max(
+    0,
+    categories.findIndex((c) => c.id === current),
+  );
+  const others = [...categories.slice(at + 1), ...categories.slice(0, at)]
+    .filter((c) => c.id !== current)
+    .slice(0, othersShown);
+  return () =>
+    h(
       "nav",
       { class: "other-topics", "aria-label": "Друга тема" },
       h("p", { class: "kicker" }, "Друга тема"),
@@ -113,7 +109,6 @@ function otherTopics(current: string): Child {
         ),
       ),
     );
-  };
 }
 
 /** The day's ten, while they wait for the player: the streak (to yesterday) and whether the week would forgive a day

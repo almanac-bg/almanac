@@ -12,13 +12,17 @@ func TestKeptWhileTheGamesStand(t *testing.T) {
 	w.play(ana, first.ID, repeat(w.wrong, Length)...)
 	mastery := func(finished bool) int {
 		t.Helper()
-		m, err := w.g.knownMastery(ctx, ana, finished)
+		h, err := w.g.hardness(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m, _, err := w.g.abilities(ctx, w.db.Read, h, ana, 0, finished)
 		if err != nil {
 			t.Fatal(err)
 		}
 		n := 0
 		for _, x := range m {
-			n += x.Answers
+			n += x.answers
 		}
 		return n
 	}

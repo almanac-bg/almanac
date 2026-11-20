@@ -1,14 +1,17 @@
 package play
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
 
-// A profile, anyone's to see, doesn't follow a player as they play: its numbers are of the games they finished, and
-// its times are dates (review 2026-11-18, S12). Their own stats count the game under way too.
-func TestProfileShowsNoGameUnderWay(t *testing.T) {
+// A profile, anyone's to see, shows the seal, the ranks by chapter and the longest streak (DECISIONS.md, „The
+// direction“): no lifetime totals and nothing of mastery. The ranks are kept as a day's issue finishes, so a game
+// under way never shows; its time is a date (review 2026-11-18, S12).
+func TestProfileShowsSealRanksAndBest(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
@@ -16,44 +19,30 @@ func TestProfileShowsNoGameUnderWay(t *testing.T) {
 	if _, err := w.db.Write.Exec(`UPDATE users SET created_at = ? WHERE id = ?`, joined.UnixMilli(), ana); err != nil {
 		t.Fatal(err)
 	}
+	p, err := w.g.ProfileOf(ctx, "player1", 0)
+	if err != nil || p.Seal != nil || p.Best != 0 || len(p.Ranks) != len(w.b.Categories) {
+		t.Fatalf("a newcomer's profile: %+v %v", p, err)
+	}
+	w.dayGame(ana, nil)
+	w.g.AfterWait(ctx, ana)
+	if p, err = w.g.ProfileOf(ctx, "player1", 0); err != nil || p.Seal == nil || p.Best != 1 {
+		t.Fatalf("after a day: %+v %v", p, err)
+	}
+	// A topic's game, under way: nothing of it shows.
 	s, err := w.g.StartTopic(ctx, ana, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	before, err := w.g.ProfileOf(ctx, "player1", 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	known := func(p Profile) (n int) {
-		for _, m := range p.Mastery {
-			n += m.Answers
-		}
-		return n
-	}
-	if before.Answers != Length || before.Right != Length || known(before) != Length {
-		t.Fatalf("after a finished game: %d answers, %d right, mastery of %d", before.Answers, before.Right, known(before))
-	}
-
-	// A second game, one answer in: nobody else sees it.
-	w.wait(time.Minute)
-	s, err = w.g.StartTopic(ctx, ana, MixTopic)
-	if err != nil {
-		t.Fatal(err)
-	}
 	w.play(ana, s.ID, w.right)
-	p, err := w.g.ProfileOf(ctx, "player1", 0)
-	if err != nil {
-		t.Fatal(err)
+	if again, _ := w.g.ProfileOf(ctx, "player1", 0); again.Seal == nil || *again.Seal != *p.Seal {
+		t.Fatalf("a game under way moved the profile: %+v, was %+v", again.Seal, p.Seal)
 	}
-	if p.Answers != before.Answers || p.Right != before.Right || known(p) != known(before) {
-		t.Fatalf("a game under way shows on the profile: %d answers, %d right, mastery of %d", p.Answers, p.Right, known(p))
+	out, _ := json.Marshal(p)
+	for _, total := range []string{`"days"`, `"games"`, `"answers"`, `"right"`, `"duels"`, `"won"`, `"mastery"`, `"streak"`} {
+		if strings.Contains(string(out), total) {
+			t.Errorf("the profile says %s: %s", total, out)
+		}
 	}
-	if st, _ := w.g.StatsOf(ctx, ana); st.Answers != Length+1 {
-		t.Fatalf("the player's own stats: %d answers", st.Answers)
-	}
-
-	// A date, not a moment: the month they started (late on the 17th in Bulgaria is still September).
 	if since := time.UnixMilli(p.Since).In(Bulgaria); !since.Equal(time.Date(2026, 9, 1, 12, 0, 0, 0, Bulgaria)) {
 		t.Fatalf("since: %v", since)
 	}
@@ -74,7 +63,7 @@ func TestRecordingsNamed(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.play(owner, s.ID, repeat(w.right, Length)...)
-	duel, err := w.g.DuelRecording(ctx, gal)
+	duel, err := w.g.DuelRecording(ctx, gal, Even)
 	if err != nil {
 		t.Fatal(err)
 	}

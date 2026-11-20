@@ -291,7 +291,7 @@ func TestRecordingDuel(t *testing.T) {
 	if ready, err := w.g.RecordingReady(ctx, gal); ready || err != nil {
 		t.Fatalf("a recording offered out of nothing: %v %v", ready, err)
 	}
-	if _, err := w.g.DuelRecording(ctx, gal); !errors.Is(err, ErrNobody) {
+	if _, err := w.g.DuelRecording(ctx, gal, Even); !errors.Is(err, ErrNobody) {
 		t.Fatalf("a recording out of nothing: %v", err)
 	}
 	s, err := w.g.StartTopic(ctx, owner, "history")
@@ -307,11 +307,11 @@ func TestRecordingDuel(t *testing.T) {
 		}
 	}
 
-	id, err := w.g.DuelRecording(ctx, gal)
+	id, err := w.g.DuelRecording(ctx, gal, Even)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if again, _ := w.g.DuelRecording(ctx, gal); again != id {
+	if again, _ := w.g.DuelRecording(ctx, gal, Even); again != id {
 		t.Fatalf("started again: %d, want %d", again, id)
 	}
 	// The one left unfinished is there to go on with, its recording in a duel under way.
@@ -423,5 +423,53 @@ func TestTieBand(t *testing.T) {
 	}
 	if d := duel(1500 * time.Millisecond); d.State != DuelWon {
 		t.Fatalf("1,5 s apart: %+v", d)
+	}
+}
+
+// A recording is chosen by the player's hidden mastery: „равен“ about as many right as they'd get on its ten,
+// „по-силен“ a couple more, never fewer than one more.
+func TestRecordingByLevel(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	weak, strong, gal := w.user(), w.user(), w.user()
+	rights := func(n int) []func(int64, int) json.RawMessage {
+		return append(repeat(w.right, n), repeat(w.wrong, Length-n)...)
+	}
+	weakRun := w.game(weak, nil, rights(5)...)
+	strongRun := w.game(strong, nil, rights(10)...)
+	w.wait(time.Minute)
+	fit, err := w.g.recordingFit(ctx, gal, Even)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, _ := w.g.hardness(ctx)
+	for _, run := range []int64{weakRun, strongRun} {
+		if e := expectedRights(w.b, h, 0, w.picks(run)); e < 5.5 || e > 8 {
+			t.Fatalf("a new player's expected right answers on game %d: %.1f", run, e)
+		}
+	}
+	if fit(w.b, w.picks(weakRun), 5) >= fit(w.b, w.picks(strongRun), 10) {
+		t.Fatal("five right isn't nearer a new player's level than ten")
+	}
+	got := func(level string) int64 {
+		t.Helper()
+		id, err := w.g.DuelRecording(ctx, gal, level)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var ghost int64
+		if err := w.db.Read.QueryRow(`SELECT ghost_run FROM duels WHERE id = ?`, id).Scan(&ghost); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.db.Write.Exec(`DELETE FROM duels WHERE id = ?`, id); err != nil { // chosen again, fresh
+			t.Fatal(err)
+		}
+		return ghost
+	}
+	if g := got(Even); g != weakRun {
+		t.Fatalf("„равен“: game %d, want %d", g, weakRun)
+	}
+	if g := got(Stronger); g != strongRun {
+		t.Fatalf("„по-силен“: game %d, want %d", g, strongRun)
 	}
 }

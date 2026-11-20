@@ -11,8 +11,7 @@
 import { picture as illustration } from "./art/picture.ts";
 import { recover } from "./fresh.ts";
 import { answering } from "./game/answering.ts";
-import { masteryCard } from "./game/mastery.ts";
-import { news, notedWords } from "./game/news.ts";
+import { news } from "./game/news.ts";
 import { count } from "./game/numbers.ts";
 import { answered, crowdLine, picture } from "./game/questions.ts";
 import {
@@ -127,7 +126,6 @@ export const kit = {
   loadDuelResult,
   loadStats,
   mailAsk,
-  masteryCard,
 
   meter,
   missing,
@@ -135,7 +133,7 @@ export const kit = {
   needsHomeScreen,
   news,
   nextSteps,
-  notedWords,
+
   notice,
   onCleanup,
   ordinal,
