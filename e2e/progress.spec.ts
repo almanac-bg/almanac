@@ -59,6 +59,13 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(page.locator(".title-pick.locked", { hasText: "Сто изгрева" })).toContainText(
     "Отключва се: постижението „Сто дни“",
   );
+  // Frames: the player's own to wear, the locked ones apart, each with what unlocks it in sight.
+  await page.getByRole("tab", { name: "Рамка" }).click();
+  await expect(page.getByRole("button", { name: "Без рамка" })).toBeVisible();
+  await expect(page.locator(".wear-pick.locked", { hasText: "Пламъци" })).toContainText(
+    "Отключва се: постижението „Цял месец“",
+  );
+  await expect(page.locator(".wear-pick.locked", { hasText: "Ореол" })).toContainText("Отключва се: дивизия");
   await page.getByRole("tab", { name: "Аватар" }).click();
   await page.getByRole("button", { name: "Таралеж", exact: true }).click();
   await expect(page.getByRole("button", { name: "Таралеж", exact: true })).toHaveAttribute("aria-pressed", "true");

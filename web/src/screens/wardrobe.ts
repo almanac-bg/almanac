@@ -141,8 +141,6 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
               "Без рамка",
               (id) => avatar(p.avatar, { frame: id, backdrop: p.backdrop }),
               (id) => set({ frame: id }),
-              told,
-              "заключена рамка",
             );
           case "backdrop":
             return wear(
@@ -151,8 +149,6 @@ function look(progress: () => Progress | null, reload: () => Promise<void>): Chi
               "Едноцветен",
               (id) => avatar(p.avatar, { frame: p.frame, backdrop: id }),
               (id) => set({ backdrop: id }),
-              told,
-              "заключен фон",
             );
           case "title":
             return titles(p, set);
@@ -208,37 +204,57 @@ function avatars(p: Progress, set: (body: { avatar: string }) => void, told: { s
   ];
 }
 
-/** A frame or a pattern: each drawn on the player's avatar, the locked ones with what unlocks them. */
+/** A frame or a pattern: each drawn on the player's avatar with its name; a locked one says under it what unlocks it,
+ * in sight, not behind a tap. The player's own come first, the locked after them, each from the plainest. */
 function wear(
   all: Cosmetic[],
   worn: string,
   none: string,
   preview: (id: string) => Child,
   put: (id: string) => void,
-  told: { set: (s: string) => void },
-  locked: string,
 ): Child {
-  return h(
-    "ul",
-    { class: "picker" },
-    [{ id: "", name: none } as Cosmetic, ...all].map((c) =>
-      h(
-        "li",
-        null,
+  const own = [{ id: "", name: none } as Cosmetic, ...all.filter((c) => !c.locked)];
+  const locked = all.filter((c) => c.locked);
+  return [
+    h(
+      "ul",
+      { class: "wear" },
+      own.map((c) =>
         h(
-          "button",
-          {
-            class: c.locked ? "pick locked" : "pick",
-            type: "button",
-            "aria-pressed": c.id === worn,
-            "aria-label": c.locked ? `${c.name}, ${locked}` : c.name,
-            onclick: () => (c.locked ? told.set(`${c.name}. Отключва се: ${c.how}.`) : put(c.id)),
-          },
-          preview(c.id),
+          "li",
+          null,
+          h(
+            "button",
+            { class: "wear-pick", type: "button", "aria-pressed": c.id === worn, onclick: () => put(c.id) },
+            preview(c.id),
+            h("span", { class: "wear-name" }, c.name),
+          ),
         ),
       ),
     ),
-  );
+    locked.length
+      ? [
+          h("h3", { class: "titles-more" }, "За отключване"),
+          h(
+            "ul",
+            { class: "wear" },
+            locked.map((c) =>
+              h(
+                "li",
+                null,
+                h(
+                  "div",
+                  { class: "wear-pick locked" },
+                  preview(c.id),
+                  h("span", { class: "wear-name" }, c.name),
+                  h("span", { class: "wear-how" }, `Отключва се: ${c.how}`),
+                ),
+              ),
+            ),
+          ),
+        ]
+      : null,
+  ];
 }
 
 /** The titles: the player's own to wear, then, folded away, the locked ones by where they come from. */
