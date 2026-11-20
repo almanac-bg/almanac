@@ -3,8 +3,8 @@
 // shared day's link, the score shared over the same ten). A new visitor has the cover alone; a player has beside it
 // the streak and this week, the friends' day, and the way to their book. Once the day is played, the issue is its
 // result (as it lands, and on every later visit): the score and its shape, how it went among everyone, sharing it
-// (game/share.ts, in a sheet with its card and its text), how all of България did with it, the rarest right answer as
-// the book has it, and tomorrow (when the next issue comes, the streak it makes, the reminder's ask). A wrong game is
+// (game/share.ts, in a sheet with its card and its text), how all of България did with it, one entry its right answers
+// wrote in the book (the rarest, once enough others played the day), and tomorrow (when the next issue comes, the streak it makes, the reminder's ask). A wrong game is
 // never celebrated. Topics are played from their chapter in the Алманах, duels from Приятели. Once, over the day: what
 // came of the days just missed, a friend's duel waiting, a friend's yes.
 
@@ -32,12 +32,14 @@ import { type Accepted, acceptedLine, type Waiting, waitingLine } from "./duel.t
 import { app, haveProfile, keepLine, keepStake, mailAsk } from "./keep.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
-/** The rarest right answer of the day played (play.FewRight): its place, the share of the day's others who got it, and
- * its fact as the book has it. */
-interface FewRight {
+/** The entry of the day played that its result shows (play.DayEntry): its place, its fact as the book has it, and
+ * whether there's a crowd (enough of the day's others played it) to say how few got it (`right`, their share): then it
+ * is the rarest right answer with a fact; without one, the hardest, and nothing is said of others. */
+interface DayEntry {
   n: number;
+  crowd: boolean;
   right: number;
-  fact?: { category: string; question?: string; answer: string; untrue?: boolean; fact: string };
+  fact: { category: string; question?: string; answer: string; untrue?: boolean; fact: string };
 }
 
 export interface Today {
@@ -56,8 +58,9 @@ export interface Today {
   /** Whether the player has finished a game of any kind. */
   played?: boolean;
   run: State | null;
-  /** The day played: the right answer the fewest of its other players got. */
-  rarest?: FewRight | null;
+  /** The day played: the entry its right answers wrote in the book that the result shows (none for no right answer
+   * with a fact). */
+  entry?: DayEntry | null;
   board: Board;
   /** The day among the player and their friends, best first: once a friend has played it (null before). */
   friends?: Score[] | null;
@@ -95,8 +98,7 @@ export function sharedDay(): Child {
   return null;
 }
 
-/** Each day played's questions gone over (its review), asked for once: the result's rarest answer, the hardest of the
- * day and the list „Прегледай въпросите“ opens all read the one answer. */
+/** Each day played's questions gone over (its review), asked for once: the hardest of the day and the list „Прегледай въпросите“ opens all read the one answer. */
 const reviews = new Map<number, Promise<Reviewed[]>>();
 const reviewOf = (run: number): Promise<Reviewed[]> => {
   let r = reviews.get(run);
@@ -483,7 +485,7 @@ const rightWords = [
 const outOf = (s: State) => s.total - (s.void ?? 0);
 
 /** The day played, as a page: the score and its shape, how it went among everyone, sharing it; how all of България did
- * with it and the rarest right answer as the book has it; tomorrow; the questions, once opened. As it's played
+ * with it and an entry its right answers wrote, as the book has it; tomorrow; the questions, once opened. As it's played
  * (`just`), it lands (feel.ts: the shape, the score, the streak rolling on) and what it brought is told; on a later
  * visit it is as it is. */
 function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
@@ -582,7 +584,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       "div",
       { class: "result-side page-2" },
       () => bulgariaToday(fresh(), run, review),
-      () => rarest(fresh().rarest),
+      () => entryOfDay(fresh().entry),
     ),
     tomorrow(t, () => (just && fresh() === t ? 0 : fresh().streak)),
     () => {
@@ -691,22 +693,20 @@ function bulgariaToday(t: Today, run: State, review: Promise<Reviewed[]>): Child
   );
 }
 
-/** The rarest right answer of the day, as the book has it now: its chapter and how few knew it, the answer as a
- * headword, the question in italic, the fact with a drop cap, and the chapter it's written into. A right answer's: it's
- * in the book. */
-function rarest(r?: FewRight | null): Child {
-  const f = r?.fact;
-  if (!r || !f) return null;
+/** An entry the day's right answers wrote, as the book has it now: with a crowd, the rarest („Най-рядкото ти
+ * попадение“, its chapter and how few knew it); without one, the hardest („Днес в Алманаха ти“, its chapter and its
+ * place in the ten), nothing said of others. The answer as a headword, the question in italic, the fact with a drop
+ * cap, and the chapter it's written into. A right answer's: it's in the book. */
+function entryOfDay(r?: DayEntry | null): Child {
+  if (!r) return null;
+  const f = r.fact;
   const chapter = topics.find((c) => c.id === f.category)?.name ?? "";
+  const kicker = !r.crowd ? `въпрос ${r.n + 1}` : r.right ? `знаят го ${percent(r.right)}` : "само ти го знаеш";
   return h(
     "section",
     { class: `sect rarest t-${f.category}` },
-    h("div", { class: "sect-head" }, h("h2", null, "Най-рядкото ти попадение")),
-    h(
-      "p",
-      { class: "kicker rarest-kicker" },
-      `${chapter} · ${r.right ? `знаят го ${percent(r.right)}` : "само ти го знаеш"}`,
-    ),
+    h("div", { class: "sect-head" }, h("h2", null, r.crowd ? "Най-рядкото ти попадение" : "Днес в Алманаха ти")),
+    h("p", { class: "kicker rarest-kicker" }, `${chapter} · ${kicker}`),
     h(
       "div",
       { class: "entry first rarest-entry" },

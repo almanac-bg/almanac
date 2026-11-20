@@ -78,8 +78,10 @@ place.
   (`.result-streak`), „Сподели резултата“ (the one action: a sheet with the card a link's preview shows, the text and
   „Сподели“ / „Копирай текста“; `game/share.ts`) and „Прегледай въпросите“ (the questions under the page). Then
   „България днес“ (`.bulgaria-today`, from ten players: how many got each count of right answers, the player's bar in
-  ink with „ти“, the average dashed; the average, the tens, and the share that knew the hardest question), the rarest
-  right answer as the book has it (`.rarest`: its chapter and how few knew it, the answer as a headword, the question,
+  ink with „ти“, the average dashed; the average, the tens, and the share that knew the hardest question), an entry
+  the day's right answers wrote, as the book has it (`.rarest`: from ten players „Най-рядкото ти попадение“, its
+  chapter and how few knew it; with fewer, „Днес в Алманаха ти“, the hardest, its chapter and „въпрос 8“, nothing of
+  others; the answer as a headword, the question,
   the fact, „Записано в Алманаха, глава „…““ — a right answer's, so it is in the book), and tomorrow (`.tomorrow`: the
   next issue's date set large, when it comes and the streak it makes; a guest's ask to keep the game; the reminder's
   ask). A wrong game is never celebrated: the result says what it was.

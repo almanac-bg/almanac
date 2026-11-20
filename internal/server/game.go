@@ -98,8 +98,8 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 			}
 			out["run"] = st
 			done = st.Done
-			if st.Done { // the right answer the fewest others got, for the result shared
-				if out["rarest"], err = s.game.RarestRight(ctx, u.ID, day); err != nil {
+			if st.Done { // the entry its right answers wrote that the result shows
+				if out["entry"], err = s.game.EntryOfDay(ctx, u.ID, day); err != nil {
 					return nil, err
 				}
 			}

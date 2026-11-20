@@ -1363,15 +1363,15 @@ func TestDayCrowd(t *testing.T) {
 		t.Fatalf("the review's third, which no one else answered: %+v", c)
 	}
 	// The rarest right answer for the result shared: the second, which two in ten got.
-	rare, err := w.g.RarestRight(ctx, bo, "2026-11-12")
+	rare, err := w.g.EntryOfDay(ctx, bo, "2026-11-12")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rare == nil || rare.N != 1 || math.Abs(rare.Right-0.2) > 1e-9 {
+	if rare == nil || rare.N != 1 || !rare.Crowd || math.Abs(rare.Right-0.2) > 1e-9 {
 		t.Fatalf("the rarest right answer: %+v", rare)
 	}
 	// None for a day not finished (ana left it after one question).
-	if rare, _ := w.g.RarestRight(ctx, ana, "2026-11-12"); rare != nil {
+	if rare, _ := w.g.EntryOfDay(ctx, ana, "2026-11-12"); rare != nil {
 		t.Fatalf("a rarest right answer in an unfinished day: %+v", rare)
 	}
 

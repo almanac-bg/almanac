@@ -22,7 +22,7 @@ import (
 //
 // The day's ten are the same for everyone, so a question of the day shows how that day's other players answered it
 // („… от играчите днес“), counted with each answer, once DayCrowdFrom of them have; until then everyone's. The share
-// of the day's players right is also what a shared result tells of its rarest right answer (RarestRight).
+// of the day's players right is also what a day's result tells of its rarest right answer (EntryOfDay).
 
 const (
 	// CrowdFrom is how many answers a question needs before its crowd is shown: fewer say little.
@@ -402,18 +402,21 @@ func (d *dayCrowdCache) drop(key string) {
 	delete(d.by, key)
 }
 
-// FewRight is a right answer in the day's ten and how few of the day's other players got it right: its place in the
-// ten, and the share of them that did; and the fact it put in the player's Алманах, as the book has it (the day's
-// result shows it as „Най-рядкото ти попадение“), if its question has one.
-type FewRight struct {
-	N     int      `json:"n"`
-	Right float64  `json:"right"`
-	Fact  *Learned `json:"fact,omitempty"`
+// DayEntry is the one entry a day's result shows of those its right answers wrote in the player's Алманах: its place
+// in the ten, and its fact as the book has it. With a crowd (Crowd: DayCrowdFrom of the day's other players have
+// answered it), it is the rarest right answer („Най-рядкото ти попадение“), and Right the share of them that got it;
+// without one, nothing is said of others (Right is 0): it is the hardest, the last in the ten, which go from easy to
+// hard.
+type DayEntry struct {
+	N     int     `json:"n"`
+	Crowd bool    `json:"crowd"`
+	Right float64 `json:"right"`
+	Fact  Learned `json:"fact"`
 }
 
-// RarestRight is the player's right answer in a day's ten, finished, that the fewest of that day's other players got
-// right (of the questions enough of them have answered, and that count: day.go): nil for none.
-func (g *Game) RarestRight(ctx context.Context, userID int64, day string) (*FewRight, error) {
+// EntryOfDay is the entry of a player's day's ten, finished, that its result shows (DayEntry), of the right answers
+// that count (day.go) and have a fact that's so: the rarest of those with a crowd, else the hardest; nil for none.
+func (g *Game) EntryOfDay(ctx context.Context, userID int64, day string) (*DayEntry, error) {
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.n, a.question_id FROM runs r JOIN answers a ON a.run_id = r.id
 		WHERE r.user_id = ? AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND a.is_right
 			AND NOT `+voidAt+` ORDER BY a.n`,
@@ -438,23 +441,23 @@ func (g *Game) RarestRight(ctx context.Context, userID int64, day string) (*FewR
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	var rare *FewRight
+	var rare, hardest *DayEntry
 	for _, it := range rights {
 		q, ok := g.Bank().Get(it.id)
-		if !ok {
+		if !ok || q.Extra().Fact == "" || q.Extra().Untrue() {
 			continue
 		}
+		hardest = &DayEntry{N: it.n, Fact: learnedAs(q, learnedAt{kind: "day", day: day})}
 		c, err := g.dayCrowd(ctx, g.DB.Read, day, q, userID)
 		if err != nil {
 			return nil, err
 		}
 		if c != nil && (rare == nil || c.Right < rare.Right) {
-			rare = &FewRight{N: it.n, Right: c.Right}
-			if q.Extra().Fact != "" && !q.Extra().Untrue() {
-				l := learnedAs(q, learnedAt{kind: "day", day: day})
-				rare.Fact = &l
-			}
+			rare = &DayEntry{N: it.n, Crowd: true, Right: c.Right, Fact: hardest.Fact}
 		}
 	}
-	return rare, nil
+	if rare != nil {
+		return rare, nil
+	}
+	return hardest, nil
 }
