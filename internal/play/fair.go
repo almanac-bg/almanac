@@ -246,7 +246,7 @@ func (g *Game) keepNet(ctx context.Context, tx *sql.Tx, userID, runID int64) err
 	return err
 }
 
-// JudgeNets lets go of the networks kept past NetsKept, lets a guest who came back out of the shadow, and judges
+// JudgeNets lets go of the networks kept past NetsKept (and the late answers past LateKept: late.go), lets a guest who came back out of the shadow, and judges
 // today's and yesterday's days by their networks (see above): the throwaway guests' days before a player's own become
 // shadows, and the player's day a signal for /admin. It says how many signals are new.
 func (g *Game) JudgeNets(ctx context.Context) (int, error) {
@@ -258,6 +258,9 @@ func (g *Game) JudgeNets(ctx context.Context) (int, error) {
 			return err
 		}
 		if _, err := tx.Exec(`DELETE FROM fair_signals WHERE at < ?`, store.Ms(now.Add(-signalsKept))); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DELETE FROM late_answers WHERE at < ?`, store.Ms(now.Add(-LateKept))); err != nil {
 			return err
 		}
 		// A guest who played again, or kept their game with an email, is a player, not a window thrown away.

@@ -1,7 +1,9 @@
 // Package play is the game: runs through a set of questions (the day's, a topic's, „България“'s: bulgaria.go), one
 // question at a time, against the server's clock; duels, kept as runs; friends.
 //
-// A question's time runs only while it's shown: Show starts it, Answer stops it. A question with pictures waits for
+// A question's time runs only while it's shown: Show starts it, Answer stops it. How long it is is the server's
+// (Limit): by how much the question gives to read, at a slow reader's pace, never under its kind's floor; an answer
+// the player's screen timed within it is taken if the line brings it late, up to LateGrace (late.go). A question with pictures waits for
 // them: Show starts its time PictureWait later, and Start sooner, once the player's screen has them in, so that a slow
 // line doesn't eat the time, and the server still says when it runs. Until its time runs, the screen gets the pictures
 // only (bank.PicturesView): its words and options come with its time, and an answer before it is refused, so that
@@ -51,20 +53,39 @@ const (
 	PictureWait = 8 * time.Second
 )
 
-// Limit is how long a question is shown before its time runs out: a statement to judge true or not is quick;
-// putting four things in order, or joining four pairs, takes longer than a tap or a typed number: both get the same time.
+// Limit is how long a question is shown before its time runs out: the server's clock, the same for everyone. It is a
+// base for its kind (thinking, and the taps or the typing it asks) and the time a slow reader takes to read it
+// (bank.Reading at SlowReading), never under its kind's floor (limits) nor over LongestLimit, in whole seconds. The
+// floors hold for most questions; a long one gets its reading time on top, and the bank's length rule keeps those few.
 func Limit(q bank.Question) time.Duration {
-	switch q.Base().Type {
-	case "truefalse":
-		return 10 * time.Second
-	case "order", "match", "split", "clues":
-		return LongestLimit
+	k, ok := limits[q.Base().Type]
+	if !ok {
+		k = limits["choice"]
 	}
-	return 20 * time.Second
+	read := time.Duration(float64(bank.Reading(q)) / SlowReading * float64(time.Second))
+	return min(max(k.base+read, k.floor), LongestLimit).Round(time.Second)
+}
+
+// SlowReading is how many letters and digits a second a slow reader reads (bank.Reading): about the tenth percentile
+// of adults reading silently (some 175 words a minute), here on a phone, in a game.
+const SlowReading = 12.0
+
+// limits are each kind's base and floor (Limit). A true-or-not is judged at a glance: 15 s at least. A choice (a
+// choice of pictures among them) or a number asks for thought and a tap or a typed number: 25 s. An order, a match or
+// a split is four taps or more after reading: 40 s. Clues come bank.ClueEvery apart, the last 20 s in, then a choice:
+// 40 s.
+var limits = map[string]struct{ base, floor time.Duration }{
+	"truefalse": {8 * time.Second, 15 * time.Second},
+	"choice":    {12 * time.Second, 25 * time.Second},
+	"number":    {15 * time.Second, 25 * time.Second},
+	"order":     {28 * time.Second, 40 * time.Second},
+	"match":     {28 * time.Second, 40 * time.Second},
+	"split":     {28 * time.Second, 40 * time.Second},
+	"clues":     {20 * time.Second, 40 * time.Second},
 }
 
 // LongestLimit is the longest any question is shown (Limit).
-const LongestLimit = 30 * time.Second
+const LongestLimit = 60 * time.Second
 
 // Bulgaria is where the game's days begin and end.
 var Bulgaria, _ = time.LoadLocation("Europe/Sofia")
@@ -179,7 +200,7 @@ const DayGrace = 15 * time.Minute
 
 // dayLate is the most after its day that a run of the day's questions can still be answered: DayGrace, and the time of
 // a question shown just before it ends (dayOver).
-const dayLate = DayGrace + LongestLimit + Grace
+const dayLate = DayGrace + LongestLimit + LateGrace
 
 // dayOver is whether a run of the day's questions can't be played on any more: its day ended DayGrace ago, and no
 // question shown before then is still in its time. It stays as it was left: unfinished, it counts for nothing (the
@@ -192,8 +213,8 @@ func (r *run) dayOver(now time.Time) bool {
 	_, end := dayBounds(r.day)
 	closes := time.UnixMilli(end).Add(DayGrace)
 	if shown := time.UnixMilli(r.shownAt.Int64); r.shownAt.Valid && shown.Before(closes) &&
-		shown.Add(LongestLimit+Grace).After(closes) {
-		closes = shown.Add(LongestLimit + Grace)
+		shown.Add(LongestLimit+LateGrace).After(closes) {
+		closes = shown.Add(LongestLimit + LateGrace)
 	}
 	return now.After(closes)
 }
@@ -366,7 +387,8 @@ func (g *Game) settles(r *run) bool {
 	if !ok {
 		return true
 	}
-	late := Limit(d.Question()) + Grace
+	// A question's answer may still come, timed within its limit by the screen, until LateGrace after it (late.go).
+	late := Limit(d.Question()) + LateGrace
 	return g.Now().Sub(time.UnixMilli(r.shownAt.Int64)) > late
 }
 
@@ -582,13 +604,20 @@ func (r *run) startAt(tx *sql.Tx, t time.Time) error {
 // Answer grades an answer to question n, the one showing. A null answer gives up on it. An answer to the question just
 // answered (the one before, past any that count for nobody the run went on over: day.go) is one sent again, its reply lost on the way (a line that dropped, a server restarting): it gets the answer
 // taken the first time, as it was, and changes nothing (again). One before the question's time runs (still waiting for
-// its pictures) is out of step.
+// its pictures) is out of step. It counts if it arrives within Grace of the question's time; AnswerTimed takes one
+// the screen timed within it later.
 func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage) (Result, error) {
-	return g.answer(ctx, userID, runID, n, answer, g.Now())
+	return g.answer(ctx, userID, runID, n, answer, false, g.Now())
+}
+
+// AnswerTimed is Answer for an answer the player's screen timed within the question's limit, or not (inTime): one
+// that did is taken while it arrives within LateGrace of the limit's end (late.go).
+func (g *Game) AnswerTimed(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, inTime bool) (Result, error) {
+	return g.answer(ctx, userID, runID, n, answer, inTime, g.Now())
 }
 
 // answer grades an answer that arrived at at, against the version of its question the run showed (Pick.V).
-func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, at time.Time) (Result, error) {
+func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage, inTime bool, at time.Time) (Result, error) {
 	var res Result
 	var r *run
 	var d bank.Dealt
@@ -618,8 +647,9 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 		limit := Limit(d.Question())
 		took, due := since, shownAt.Add(limit)
 		var gr bank.Graded
+		late := at.Sub(due)
 		switch {
-		case at.Sub(due) > Grace:
+		case late > Grace && (!inTime || late > LateGrace):
 			res.TimedOut = true
 		case len(answer) == 0 || string(answer) == "null":
 		default:
@@ -640,6 +670,11 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 		number := d.Question().Base().Type == "number"
 		if err := g.record(tx, r, gr, number, min(took, limit).Milliseconds()); err != nil {
 			return err
+		}
+		if late > Grace && !res.TimedOut {
+			if err := keepLate(tx, r.id, n, late, at); err != nil {
+				return err
+			}
 		}
 		res.Score, res.Right, res.Exact, res.Given = gr.Score, gr.Right, gr.Exact, gr.Shown
 		res.State, err = g.state(tx, r)

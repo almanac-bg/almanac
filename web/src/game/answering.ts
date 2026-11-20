@@ -56,6 +56,8 @@ export interface Countdown {
   peek(): number;
   /** Sets the time left (ms) to the server's, when it says otherwise (a question shown again after a restart). */
   sync(ms: number): void;
+  /** The ms left by this screen's clock, untracked: below zero once the time is up. */
+  ms(): number;
 }
 
 export function countdown(ms: number, out?: () => void, stopped?: () => boolean): Countdown {
@@ -80,6 +82,7 @@ export function countdown(ms: number, out?: () => void, stopped?: () => boolean)
   onCleanup(() => clearTimeout(t));
   const c = (() => left()) as Countdown;
   c.peek = () => left.peek();
+  c.ms = () => end - performance.now();
   c.sync = (rest: number) => {
     end = performance.now() + rest;
     clearTimeout(t);

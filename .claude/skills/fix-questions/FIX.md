@@ -43,6 +43,8 @@ What the rules ask (the questions skill has the details):
   smallest change: drop a year from a fact, change an option or an item, reword. The question named on the other side
   may be the one to change; change whichever loses least, and only one of the two.
 - **same-identity**: keep the better of the two, replace the other (`why`: twin).
+- **length**: say the same in fewer words (a clause the answer doesn't need, an option's extra word); never drop
+  what makes it answerable or fair.
 - **estimate**: see replace above. **tolerance**: set the formula's value (the questions skill).
 - **countable** (a number that counts a list's items: works, awards, articles, seats, goals, times): ask what about
   the subject a player can place (a year, a size, a duration), or make it a choice; replace it if it then asks

@@ -142,6 +142,7 @@ enough to be worth a look, not always.
 | `answer-giveaway` (hint) | No question shows a choice's or clues' answer as true (text, clue, fact, day's line, item, pair) in a line that, with its question's text, shares rare words with the asking question's subject („Ариел“ in „бащата на русалката Ариел в анимацията на „Дисни““) |
 | `pair-giveaway` (hint) | No question shows both sides of a medium or hard match's pair within four words („Кучето Лайка“ for Лайка — Куче) |
 | `shared-items` | Two orders share no two items with the same values, nor three items in the same order (one's reveal orders the other); two matches share no pair |
+| `length` (hint) | A question reads no longer than its kind's usual allows: `bank.Reading` (the letters and digits it shows, a picture as 24) past the kind's third quartile by twice the spread of its middle half. The clock gives time by length (`play.Limit`), so a long one runs long for everyone: say it shorter, drop a clause the answer doesn't need |
 | `same-identity` | A "who or what is this" answer (a picture choice, clues) is asked once |
 | `twin` † | Two choices (or clues) over one set of options — three of four shared, each offered by few questions — ask one thing twice: the same answer, or mirrored (Карлоф or Лугоши, each the other's wrong option). Give one other options, or keep the better one |
 

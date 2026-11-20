@@ -91,6 +91,7 @@ var Rules = []Rule{
 	{Name: "pair-giveaway", Says: "no question shows both sides of a medium or hard match's pair close together", Hint: true, all: rulePairGiveaway},
 	{Name: "shared-items", Says: "two orders share no items in one order or with one value, two matches no pair: one's reveal answers the other", all: ruleSharedItems},
 	{Name: "twin", Says: "two choices over one set of options don't ask the same answer, or each other's answers mirrored", From: AuditFrom, all: ruleTwin},
+	{Name: "length", Says: "a question reads no longer than its kind's usual allows (bank.Reading past the third quartile by twice the middle half's spread): the clock would run long for it", Hint: true, all: ruleLength},
 	{Name: "same-identity", Says: "a \"who or what is this\" answer (a picture choice, clues) is asked once", all: ruleSameIdentity},
 }
 
