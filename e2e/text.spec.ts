@@ -219,6 +219,97 @@ test.describe("every kind of question at twice the text on a 320px phone", () =>
   });
 });
 
+/** The browser's own text size (its setting, not the page's): in Chromium the font size it starts every page at,
+ * which also sizes the rem of a media query, as a phone's large text does; elsewhere the page's root, as textAt. */
+async function browserTextAt(page: Page, px: number): Promise<void> {
+  if (page.context().browser()?.browserType().name() !== "chromium") return textAt(page, (px / 16) * 100);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Page.enable");
+  await cdp.send("Page.setFontSizes", { fontSizes: { standard: px, fixed: px } });
+}
+
+/** What's wrong with the question showing at this size, if anything: the clock over the count before an answer;
+ * after it, a column of the answer's panel squeezed to nothing, the line of how everyone answered a few letters
+ * wide, „Напред“ off the screen's sides. */
+async function crowded(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: string[] = [];
+    const box = (s: string) => document.querySelector(s)?.getBoundingClientRect();
+    const meet = (a?: DOMRect, b?: DOMRect) =>
+      !!a && !!b && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    const after = document.querySelector<HTMLElement>(".run-question.answered .after");
+    if (!after) {
+      if (meet(box(".question-head .count"), box(".question-top .timer .secs"))) out.push("the clock over the count");
+      return out;
+    }
+    const cols = getComputedStyle(after).gridTemplateColumns.split(" ").map(parseFloat);
+    if (cols.some((w) => w < 1)) out.push(`the panel's columns ${cols.join(" ")}`);
+    const crowd = document.querySelector<HTMLElement>(".after .crowd-says");
+    if (crowd) {
+      const wide = crowd.getBoundingClientRect().width / parseFloat(getComputedStyle(crowd).fontSize);
+      if (wide < 6) out.push(`how everyone answered, ${wide.toFixed(1)} letters wide`);
+    }
+    const go = box(".after .up-next-go");
+    if (!go || go.left < 0 || go.right > document.documentElement.clientWidth) out.push("„Напред“ off the screen");
+    return out;
+  });
+}
+
+test.describe("every kind of question at a phone's own large text, 24 and 32px, on a 320px phone", () => {
+  test.use({ viewport: { width: 320, height: 640 } });
+
+  for (const px of [24, 32])
+    test(`at ${px}px: its head, its answer's panel and „Напред“ on the screen, nothing sideways`, async ({ page }) => {
+      test.setTimeout(180_000);
+      await browserTextAt(page, px);
+      // How everyone answered, as on a day many have played: its line under the verdict.
+      await page.route("**/api/runs/*/answer", async (route) => {
+        const res = await route.fetch();
+        const json = await res.json();
+        json.reveal.crowd = { answers: 240, right: 0.68, today: true };
+        await route.fulfill({ response: res, json });
+      });
+      const each = async (where: string) => {
+        await expect(page.locator("article.question .answering")).toBeVisible({ timeout: 10_000 });
+        await page.waitForTimeout(300);
+        expect(await crowded(page), `${where}, asked`).toEqual([]);
+        expect(await sideways(page), `${where}, asked`).toBe("");
+        await answerAnyhow(page);
+        await expect(page.locator(".after .up-next-go")).toBeVisible({ timeout: 40_000 });
+        await page.waitForTimeout(800); // the answer's beats
+        expect(await crowded(page), `${where}, answered`).toEqual([]);
+        expect(await sideways(page), `${where}, answered`).toBe("");
+      };
+      // The day's first question: its head has the issue and the clock.
+      await page.goto("/");
+      await startDay(page);
+      await each("the day's first question");
+      // Then one of each kind, a picture's too.
+      await page.goto("/");
+      const ids = [...eachKind(), withPicture()];
+      await dealt(page, "history", ids);
+      await page.goto("/play/history");
+      await page.getByRole("button", { name: "Продължи", exact: true }).click();
+      await page.getByRole("button", { name: "Започни сега" }).click();
+      for (let n = 0; n < ids.length; n++) {
+        await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${ids.length}`, { timeout: 10_000 });
+        await each(`question ${n + 1}`);
+        await page
+          .locator(".after .up-next-go")
+          .dispatchEvent("click")
+          .catch(() => {}); // moved on by itself
+      }
+    });
+});
+
+/** A choice under a picture, from the sample bank. */
+function withPicture(): string {
+  const dir = resolve(import.meta.dirname, "../bank/sample/questions");
+  type Q = { id: string; type: string; image?: unknown };
+  const all = readdirSync(dir).flatMap((f) => JSON.parse(readFileSync(resolve(dir, f), "utf8")) as Q[]);
+  return all.find((q) => q.type === "choice" && q.image)?.id ?? "";
+}
+
 test("„Размер на текста“: three sizes, kept on this device; the one switch before it becomes the first step", async ({
   page,
 }) => {

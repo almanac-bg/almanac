@@ -6002,7 +6002,7 @@
 
   /* A phone in a game, upright or on its side: the question has the whole screen, the header and the bar of places
      with it, and a stray tap can't leave it. The way out is the arrow before the question's count. */
-  @media (max-width: 47.99rem), (pointer: coarse) and (max-height: 30rem) {
+  @media (max-width: 47.99rem), (pointer: coarse) and (orientation: landscape) and (max-height: 30rem) {
     .playing .frame {
       display: none;
     }
@@ -6288,7 +6288,7 @@
 
   /* A phone on its side: the question and what answers it within the screen's height, as upright (above), with the
      head small from the start (run.ts, stays), the question smaller and a choice's answers two by two. */
-  @media (pointer: coarse) and (max-height: 30rem) {
+  @media (pointer: coarse) and (orientation: landscape) and (max-height: 30rem) {
     .question-top {
       --small: 1;
     }
@@ -6811,7 +6811,7 @@
   }
 
   /* On a phone the answer's panel is the page going on, docked: paper, a rule in ink over it. */
-  @media (max-width: 47.99rem), (pointer: coarse) and (max-height: 30rem) {
+  @media (max-width: 47.99rem), (pointer: coarse) and (orientation: landscape) and (max-height: 30rem) {
     .run-question .after {
       border-radius: 0;
       background: var(--paper);
@@ -6885,7 +6885,7 @@
   }
 
   /* A phone on its side: rows a little lower, so the question and its answers fit the screen's height. */
-  @media (pointer: coarse) and (max-height: 30rem) {
+  @media (pointer: coarse) and (orientation: landscape) and (max-height: 30rem) {
     .playing .choices > .option {
       min-height: 3rem;
       padding-block: 6px;
