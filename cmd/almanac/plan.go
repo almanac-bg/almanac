@@ -25,14 +25,17 @@ type batchPlan struct {
 	// drops included.
 	Each  int `json:"each"`
 	Write int `json:"write"`
-	// Places are the day's places, shortest runway first: days now (and the day it runs out on), and after the batch
-	// (its questions for the place in every category; the dated ones not counted). Bulgaria is the runway of the
+	// Places are the day's places, shortest runway first: days held now at play.Supply times the day's need (Cover; and
+	// the day the day itself runs out of it), and after the batch (its questions for the place in every category; the
+	// dated ones not counted). Bulgaria is the runway of the
 	// questions about Bulgaria the days need (BGFloor a day), now and after the batch's undated ones.
 	Places     []planPlace    `json:"places"`
 	Bulgaria   planPlace      `json:"bulgaria"`
 	Categories []planCategory `json:"categories"`
 }
 
+// planPlace is a place of the day in the plan: Days and After are its days held at play.Supply times the day's need
+// (Runway.Cover), before the batch and after it; Out the day the day itself would run out of it.
 type planPlace struct {
 	Place  string `json:"place"`
 	Days   int    `json:"days"`
@@ -143,7 +146,7 @@ func planBatch(b *bank.Bank, each int, now time.Time, used play.Used) batchPlan 
 	// about half each.
 	var cells []planCell
 	for i, r := range places {
-		p.Places = append(p.Places, planPlace{Place: r.Place, Days: r.Days, Out: r.Out, After: r.After(got[i]*cats, today).Days,
+		p.Places = append(p.Places, planPlace{Place: r.Place, Days: r.Cover, Out: r.Out, After: r.After(got[i]*cats, today).Cover,
 			Each: got[i], Spares: spares(got[i])})
 		if got[i] > 0 {
 			cells = append(cells, planCell{Kinds: strings.Join(r.Kinds, "/"), Difficulty: r.Difficulty, Picture: r.Picture,
@@ -163,7 +166,7 @@ func planBatch(b *bank.Bank, each int, now time.Time, used play.Used) batchPlan 
 		}
 	}
 	r := play.BulgariaRunway(b, used, today)
-	p.Bulgaria = planPlace{Place: r.Place, Days: r.Days, Out: r.Out, After: r.After(undated*cats, today).Days, Each: bg}
+	p.Bulgaria = planPlace{Place: r.Place, Days: r.Cover, Out: r.Out, After: r.After(undated*cats, today).Cover, Each: bg}
 
 	dates := thinDates(b, now, used)
 	repeats := b.Repeats(SubjectMost)
@@ -190,8 +193,8 @@ func planBatch(b *bank.Bank, each int, now time.Time, used play.Used) batchPlan 
 }
 
 // fill gives units questions in every category to the places of a day, one unit (a question in each of cats
-// categories) at a time to the place with the fewest days left, the day's order breaking ties, and at most most
-// units to a place.
+// categories) at a time to the place with the fewest days left at play.Supply times its need (the same order as at
+// the need itself: every place's is scaled alike), the day's order breaking ties, and at most most units to a place.
 func fill(places []play.Runway, cats, units, most int) []int {
 	have := make([]int, len(places))
 	for i, r := range places {
@@ -315,7 +318,8 @@ func (p batchPlan) String() string {
 	if p.Through != "" {
 		from = "the days' questions taken off, drawn through " + p.Through
 	}
-	fmt.Fprintf(&s, "the day's runway on %s (%s), shortest first (days now, out on → after the batch):\n", p.Date, from)
+	fmt.Fprintf(&s, "the day's runway on %s (%s), shortest first (days held at %g× the day's need now, the day out on → after the batch):\n",
+		p.Date, from, play.Supply)
 	for _, pl := range p.Places {
 		fmt.Fprintf(&s, "  %-34s %5d %s → %-5d %3d a category", pl.Place, pl.Days, pl.Out, pl.After, pl.Each)
 		if pl.Spares > 0 {

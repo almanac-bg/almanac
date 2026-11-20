@@ -82,8 +82,14 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
   drawn ahead have had; without it, the whole bank, which overstates it), never a dated one (it waits for its date;
   those are counted apart), never one due for review, and for the hard number only the estimates (never an unwaived count of a list: `countable`). The questions about
   Bulgaria have their own line (a day takes three). The days are drawn 90 days ahead (`play.Ahead`), and only while
-  every place has a question that fits it: a place that runs out stops them. **Every batch writes for the shortest
-  runway first**, and no place may stay under 150 days (it warns: 90 drawn ahead, 60 to write the batch). Never by
+  every place has a question that fits it: a place that runs out stops them. **The bank is written at 1.5× the day's
+  need, place by place** (`play.Supply`, the direction's rule since 20 Nov 2026): the days `bank check` and `bank plan`
+  print for a place are the days it holds at one and a half times what the day takes from it (`Runway.Cover`; the
+  date beside them is when the day itself would run out). The day draws its share; the other half is what the chapter
+  games and duels deal fresh, since a new question is held out of them until a day draws it or it is 120 days old. So
+  an easy place the day spends slowly is written for too, once it falls short, never left to the day's pace alone.
+  **Every batch writes for the shortest runway first**, and no place may stay under 150 days at that pace (it warns:
+  90 drawn ahead, 60 to write the batch). Never by
   filler (an "easy number" whose answer is 5 is a choice in disguise; an honest hard question beats a forced place). A retired question is still replaced in its place in the same commit.
 - **The categories about the same size:** within 2% of the mean (`bank.SizeSlack`; `bank check` fails past it). No
   topic outweighs another, so a batch adds about as many to every category, and never to one that is ahead while
@@ -378,7 +384,7 @@ a check in `internal/bank/rules.go` first, then a `/fix-questions` pass over wha
 bank. By hand, for a fix or a few questions:
 
 1. **Find the gaps:** run `bank check` and read the day's runway and the balance report. Plan the batch from the
-   shortest runway first (every place under 150 days before anything else), then the kinds a category lacks; about
+   shortest runway first (every place under 150 days at 1.5× its need before anything else), then the kinds a category lacks; about
    the same count in every category.
 2. **Write** the questions into a batch's category files (new ones with the next free ids, `added` and `updated` set
    to today, and a fact on each; changed ones whole, with their own ids), and put it in with `bank add` (`-check`

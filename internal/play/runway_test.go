@@ -65,6 +65,26 @@ func TestRunwayCountsWhatTheDayTakes(t *testing.T) {
 	}
 }
 
+// The bank is written at Supply times the day's need, place by place: a place's Cover is its days at that pace,
+// from the days drawn ahead on, while Days and Out stay the day's own.
+func TestRunwayCoverIsAtSupply(t *testing.T) {
+	r := Runway{Questions: 30, PerDay: 2}.from(time.Date(2026, 11, 16, 0, 0, 0, 0, time.UTC), "2026-11-16")
+	if r.Days != 15 || r.Out != "2026-12-01" || r.Cover != 10 {
+		t.Fatalf("%+v: want 15 days, out on 1 December, 10 days held at 1.5×", r)
+	}
+	// Drawn through the 25th: those ten days are covered, then 10 more at 1.5×.
+	r = Runway{Questions: 30, PerDay: 2}.from(time.Date(2026, 11, 26, 0, 0, 0, 0, time.UTC), "2026-11-16")
+	if r.Days != 25 || r.Cover != 20 {
+		t.Fatalf("drawn ahead: %+v, want 25 days, 20 held", r)
+	}
+	if Supply != 1.5 {
+		t.Fatalf("Supply %v: the direction writes the bank at 1.5× the day's need", Supply)
+	}
+	if a := r.After(15, "2026-11-16"); a.Cover != r.Cover+5 {
+		t.Fatalf("15 more at 2 a day and 1.5×: %d, want %d", a.Cover, r.Cover+5)
+	}
+}
+
 // The questions about Bulgaria have a runway of their own: those that fit a place of a day, BGFloor a day.
 func TestBulgariaRunway(t *testing.T) {
 	b := biggerSample(t, 5)

@@ -21,6 +21,13 @@ import (
 // The questions about Bulgaria have a runway of their own (BulgariaRunway): every day takes BGFloor at least. The
 // days already drawn ahead count as covered: a place's runway runs from today through the drawn days, then as many
 // more as its questions last.
+//
+// The bank is written at Supply times the day's need, place by place (Cover): the day draws its share, and the rest
+// are what the chapter games and duels deal fresh, since a new question is held out of them until a day draws it or
+// it is 120 days old (DECISIONS.md, the direction). So a place is measured by how long it holds at that pace, not by when the day would run
+// out of it: every place, the easy ones too, is written for once its Cover is short, not only the place the day spends
+// fastest. The warning (RunwayWarn) and the batch plan (`almanac bank plan`) go by Cover; Days and Out still say when
+// the day itself would run out.
 
 // Used are the questions the days have had: the days played and those drawn ahead, through Through (the last day
 // drawn, YYYY-MM-DD). The zero Used is a bank no day has drawn from (`bank check` without the days).
@@ -29,7 +36,11 @@ type Used struct {
 	Through string
 }
 
-// Runway is how long the bank holds the day's questions for one place of a day. The bank grows where the runway is
+// Supply is how many questions the bank is written with, place by place, for each one the day takes (Cover): one and
+// a half.
+const Supply = 1.5
+
+// Runway is how long the bank holds the day's questions for one place of a day. The bank grows where Cover is
 // shortest (the questions skill): the day spends hard numbers three times faster than easy choices.
 type Runway struct {
 	Place string
@@ -37,6 +48,9 @@ type Runway struct {
 	// first day it has none (YYYY-MM-DD).
 	Days int
 	Out  string
+	// Cover is how many days from today the place holds at Supply times the day's need (the days drawn already among
+	// them): what the warning and the batch plan go by.
+	Cover int
 	// Difficulty, Kinds and Picture say what fits the place ("split" and "clues" share theirs); Questions is how many
 	// fit it that a day can still take (the days drawn ahead have theirs), PerDay how many a day takes.
 	Difficulty bank.Difficulty
@@ -54,12 +68,15 @@ func (r Runway) After(more int, today string) Runway {
 	return r.from(start, today)
 }
 
-// from sets Days and Out for a runway whose questions are spent from start on, PerDay a day.
+// from sets Days, Out and Cover for a runway whose questions are spent from start on, PerDay a day (Supply times
+// that for Cover).
 func (r Runway) from(start time.Time, today string) Runway {
 	t, _ := time.Parse(time.DateOnly, today)
 	out := start.AddDate(0, 0, r.Questions/r.PerDay)
 	r.Out = out.Format(time.DateOnly)
 	r.Days = int(out.Sub(t).Hours()/24 + 0.5)
+	held := start.AddDate(0, 0, int(float64(r.Questions)/(Supply*float64(r.PerDay))))
+	r.Cover = int(held.Sub(t).Hours()/24 + 0.5)
 	return r
 }
 
