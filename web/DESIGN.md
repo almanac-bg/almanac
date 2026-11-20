@@ -172,10 +172,8 @@ wherever it does (`explain()`: the word dotted under, its meaning in a small car
 
 ## Large text
 
-The text grows with the phone's own setting (Android's web view and browsers do it themselves; on an iPhone, the app
-asks WebKit for the size the phone gives body text, `-apple-system-body`: `lib/app.ts`) and with „Размер на текста“
-in Настройки → Достъпност („Обичаен“, „Едър“ 125%, „Много едър“ 150%: `lib/prefs.ts`), the two multiplied, at most
-twice the usual. Everything is sized in rem from `<html>`, so a screen at twice the text on a 320px phone is a screen
+The text grows with the browser's own setting and with „Размер на текста“ in Настройки → Достъпност („Обичаен“,
+„Едър“ 125%, „Много едър“ 150%: `lib/prefs.ts`), the two multiplied, at most twice the usual. Everything is sized in rem from `<html>`, so a screen at twice the text on a 320px phone is a screen
 on a phone 160px wide; it holds that way (`e2e/text.spec.ts`):
 
 - **Display type grows at half the rate** (titles, the date, the question, the big numbers): set as half px, half rem
@@ -678,12 +676,6 @@ Feedback fires once, when it's earned, and then the screen is still again:
   follows „Звуци“ and has its own switch, „Музика в Роял“ (on by default, kept on the device).
 - **On by default**, with one switch in Профил („Звуци“) that's kept on the device. The audio starts on the
   player's first touch, as browsers require; a sound that isn't allowed yet is skipped, never queued.
-- **Touch, in the app** (`web/src/lib/phone.ts`, sound or not; „Вибрация“ in Настройки → Звук, only in the app, on by
-  default, kept on the device): a light knock when an answer is tapped; a selection tick for each digit, move and
-  card placed; a medium knock for a right answer and for the streak growing; success for an exact one and for ten of
-  ten; a light knock for a close one; two light knocks, 80ms apart, for a wrong one or none (never the phone's error
-  alert); success, then a heavy knock 120ms later, for the big news's sheet, for getting through Роял's cut and for a
-  win (a duel, Роял, first in a room); a light knock for going out of the cut and for a duel lost.
 
 ## Pictures
 

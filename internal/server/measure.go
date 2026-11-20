@@ -24,11 +24,9 @@ import (
 // population, people (play.People), each share with its interval, so that a difference within the noise isn't taken
 // for a change.
 
-// landing is where a visit landed (one of play.Landings), by its path, or the game's app.
-func landing(path string, app bool) string {
+// landing is where a visit landed (one of play.Landings), by its path.
+func landing(path string) string {
 	switch {
-	case app:
-		return "app"
 	case path == "/":
 		return "home"
 	case strings.HasPrefix(path, "/r/"), path == "/room":
@@ -38,9 +36,6 @@ func landing(path string, app bool) string {
 	}
 	return "other"
 }
-
-// inApp says whether a request comes from the game's app (mobile/capacitor.config.json adds this to its user agent).
-func inApp(r *http.Request) bool { return strings.Contains(r.UserAgent(), "AlmanacApp") }
 
 // robot matches the user agents of programs that fetch a page without a person: search engines, link previews
 // (Viber, Messenger, WhatsApp, Telegram), headless browsers. A person's browser says "Mozilla/" first; these don't, or
@@ -67,7 +62,7 @@ func (s *Server) countVisit(r *http.Request) {
 	if !strings.HasPrefix(ua, "Mozilla/") || robot.MatchString(ua) {
 		return
 	}
-	where, home := landing(r.URL.Path, inApp(r)), s.clientHome(r)
+	where, home := landing(r.URL.Path), s.clientHome(r)
 	browser := sha256.Sum256([]byte(ua))
 	if !s.limits.allow("visit:"+where+":"+home+":"+hex.EncodeToString(browser[:6]), 1, visitEvery) ||
 		!s.limits.allow("visits:"+home, visitsHome, visitEvery) {
@@ -76,12 +71,12 @@ func (s *Server) countVisit(r *http.Request) {
 	_ = s.game.Tally(r.Context(), "visit:"+where, 1)
 }
 
-// cameFrom keeps where a new guest came in (users.came_from): the path the client was first opened at, or the app.
-func (s *Server) cameFrom(ctx context.Context, userID int64, path string, app bool) error {
-	if (path == "" || path[0] != '/' || len(path) > 200) && !app {
+// cameFrom keeps where a new guest came in (users.came_from): the path the client was first opened at.
+func (s *Server) cameFrom(ctx context.Context, userID int64, path string) error {
+	if path == "" || path[0] != '/' || len(path) > 200 {
 		return nil
 	}
-	where := landing(path, app)
+	where := landing(path)
 	if _, err := s.db.Write.ExecContext(ctx, `UPDATE users SET came_from = ? WHERE id = ?`, where, userID); err != nil {
 		return err
 	}
@@ -256,7 +251,7 @@ func decimal(x float64) string { return strings.Replace(fmt.Sprintf("%.1f", x), 
 // landingNames are the landings as the admin page says them.
 var landingNames = map[string]string{
 	"home": "Началната страница", "room": "Стая",
-	"player": "Профил на играч", "app": "Приложението", "other": "Друга страница", "": "Не се знае",
+	"player": "Профил на играч", "other": "Друга страница", "": "Не се знае",
 }
 
 // kindNames are the kinds of games, as the admin page says them; kindOrder, the order it tells them in (a kind not
@@ -293,8 +288,7 @@ func kindsOf[V any](m map[string]V) []string {
 
 // deviceNames are the devices (play.Devices) as the admin page says them.
 var deviceNames = map[string]string{
-	"phone": "Телефон", "tablet": "Таблет", "desktop": "Компютър", "app-ios": "Приложение, iPhone",
-	"app-android": "Приложение, Android", "": "Не се знае",
+	"phone": "Телефон", "tablet": "Таблет", "desktop": "Компютър", "": "Не се знае",
 }
 
 // pushNames are the kinds of notifications as they're counted (pushKind.name; "stop": the day's last reminder), and as

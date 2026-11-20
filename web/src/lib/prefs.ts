@@ -60,21 +60,6 @@ export function setTextSize(size: TextSize): void {
   apply();
 }
 
-/** The phone's own text size as a share of its usual, in the app on an iPhone, whose web view doesn't follow it by
- * itself (app.ts); 1 everywhere else, where the browser does what it does with it. */
-let systemText = 1;
-
-export function setSystemText(scale: number): void {
-  systemText = scale;
-  apply();
-}
-
-/** The page's text as a share of the browser's: the player's step times the phone's own size, at most twice the
- * usual, which every screen is made to hold (app.css, e2e/text.spec.ts); past that, layouts give way. */
-export function rootScale(size: TextSize, system: number): number {
-  return Math.min(2, textScales[size] * system);
-}
-
 /** Роял's lobby music (feel.ts), with the sounds on. */
 export const musicOn = signal(read("almanac.music", true));
 
@@ -83,25 +68,12 @@ export function setMusic(on: boolean): void {
   keep("almanac.music", on);
 }
 
-/** The phone's touch on answers and rewards, in the app (the sounds have their own switch). */
-export const vibrateOn = signal(read("almanac.vibrate", true));
-
-export function setVibrate(on: boolean): void {
-  vibrateOn.set(on);
-  keep("almanac.vibrate", on);
-}
-
 /** How the game looks on this device: as the device is set (Night or Day by its own setting), or Night or Day
  * whatever it's set to (a big screen in a lit room reads better by Day). On the page as `data-scheme` on <html>
  * (app.css); none for the device's. */
 export type Scheme = "device" | "night" | "day";
 
-/** In the app, the game looks as the phone does: the phone's bar over it (its clock, its battery) follows the phone's
- * own setting, and on the other look it would be dark on dark or light on light. */
-const native = !!(globalThis as { Capacitor?: { isNativePlatform(): boolean } }).Capacitor?.isNativePlatform();
-
 function readScheme(): Scheme {
-  if (native) return "device";
   try {
     const v = localStorage.getItem("almanac.scheme");
     return v === "night" || v === "day" ? v : "device";
@@ -124,7 +96,7 @@ function apply(): void {
   for (const m of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
     m.content = chosen === "device" ? barColour[m.media.includes("light") ? "day" : "night"] : barColour[chosen];
   }
-  const scale = rootScale(textSize.peek(), systemText);
+  const scale = textScales[textSize.peek()];
   root.style.fontSize = scale === 1 ? "" : `${Math.round(scale * 1000) / 10}%`;
   measure();
 }

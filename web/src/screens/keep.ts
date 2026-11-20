@@ -7,7 +7,6 @@
 // in, what came of it is said (lib/keep.ts, keptWords).
 
 import { type ApiError, api, errorText } from "../lib/api.ts";
-import { inApp } from "../lib/app.ts";
 import { type Child, computed, h, signal, slot, when } from "../lib/dom.ts";
 import { embedded, outsideLink } from "../lib/embedded.ts";
 import { askToKeep } from "../lib/keep.ts";
@@ -16,8 +15,8 @@ import { notice, type User, user } from "../state.ts";
 import { failure } from "../ui.ts";
 import { signIn } from "./signin.ts";
 
-/** This page's app browser, if it's in one (never in the game's own app). */
-export const app = inApp ? null : embedded;
+/** This page's app browser, if it's in one. */
+export const app = embedded;
 
 /** What keeping the game is for, under the email's field. */
 const keepNote =

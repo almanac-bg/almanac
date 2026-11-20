@@ -8,7 +8,6 @@ export interface Boot {
   bulgaria?: boolean;
   version: string;
   push: string;
-  phones: string[] | null;
   outcomeCss: string;
   /** The server's clock as it drew the page (lib/api.ts holds the page's clock to it until an answer comes). */
   now: number;

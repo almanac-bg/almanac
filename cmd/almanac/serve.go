@@ -42,10 +42,6 @@ import (
 //	ALERT_EMAIL         where new kinds of problems are mailed (hourly, each kind once a day)
 //	PUSH_PUBLIC_KEY,    notifications (Web Push): the VAPID key pair `almanac push keys` makes; without them,
 //	PUSH_PRIVATE_KEY    no notifications
-//	APNS_KEY_FILE       notifications to the app on iPhones: the team's APNs key (.p8), with APNS_KEY_ID and
-//	                    APNS_TEAM_ID; without them, none there
-//	FCM_CREDENTIALS_FILE notifications to the app on Android: the Firebase service account's key (.json); without
-//	                    it, none there
 //	BACKUP_ENDPOINT     S3-compatible storage for copies of the database every quarter of an hour (R2), with
 //	                    BACKUP_BUCKET, BACKUP_ACCESS_KEY, BACKUP_SECRET_KEY, and BACKUP_HEARTBEAT (a monitor's URL,
 //	                    fetched after each)
@@ -194,9 +190,6 @@ func serve([]string) error {
 		}
 		cfg.Push = &push.Sender{Keys: keys, Subject: "mailto:" + cfg.Contact}
 	}
-	if cfg.Phones, err = phones(); err != nil {
-		return err
-	}
 	srv, err := server.New(cfg, server.Deps{DB: db, Accounts: accounts, Outbox: outbox, Bank: b})
 	if err != nil {
 		return err
@@ -335,33 +328,6 @@ func overdue(b *bank.Bank) int {
 func every(ctx context.Context, what string, period time.Duration, fn func()) {
 	safe.Do(what, fn)
 	safe.Every(ctx, what, period, fn)
-}
-
-// phones is what sends notifications to the game's app, from the keys the environment names (nil: none at all).
-func phones() (*push.Phones, error) {
-	var p push.Phones
-	if file := os.Getenv("APNS_KEY_FILE"); file != "" {
-		p8, err := os.ReadFile(file)
-		if err != nil {
-			return nil, err
-		}
-		if p.Apple, err = push.NewApple(p8, os.Getenv("APNS_KEY_ID"), os.Getenv("APNS_TEAM_ID"), "bg.almanac.app"); err != nil {
-			return nil, err
-		}
-	}
-	if file := os.Getenv("FCM_CREDENTIALS_FILE"); file != "" {
-		creds, err := os.ReadFile(file)
-		if err != nil {
-			return nil, err
-		}
-		if p.Google, err = push.NewGoogle(creds); err != nil {
-			return nil, err
-		}
-	}
-	if p.Apple == nil && p.Google == nil {
-		return nil, nil
-	}
-	return &p, nil
 }
 
 // devOnly refuses development's freedoms (DEV=1: no limits, any host, the client from disk, a fixed secret when SECRET

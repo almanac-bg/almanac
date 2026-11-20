@@ -42,8 +42,6 @@ export const bulgaria = { id: "bulgaria", name: "България", open: boot.b
 export const topics: Category[] = [...categories, mix, bulgaria];
 /** The key browsers subscribe to notifications with ("": none here). */
 export const pushKey = boot.push ?? "";
-/** The platforms the game's app gets notifications on ("ios", "android"). */
-export const phonePlatforms: string[] = boot.phones ?? [];
 /** The style of a duel's result (outcome.css): loaded with it (kit.ts). */
 export const outcomeCss = boot.outcomeCss ?? "";
 

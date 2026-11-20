@@ -29,7 +29,6 @@ const known: [RegExp, string][] = [
 /** Whether `ua` is an app's own browser, and which. `standalone`: the page is on the home screen (an iPhone's web app
  * says no "Safari" in its user agent either). */
 export function embeddedBrowser(ua: string, standalone = false): Embedded | null {
-  if (/AlmanacApp/.test(ua)) return null; // the game's own app
   const platform = /Android/.test(ua) ? "android" : /iPhone|iPad|iPod/.test(ua) ? "ios" : "other";
   for (const [word, app] of known) if (word.test(ua)) return { app, platform };
   // Unnamed: Android's web view says "wv"; an iPhone's says no "Safari" (every browser there does, Chrome too).

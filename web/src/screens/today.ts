@@ -19,7 +19,6 @@ import { getReady, playRun, shownHere, starting, trail } from "../game/run.ts";
 import { standing } from "../game/standing.ts";
 import type { Board, Mark, Score, State } from "../game/types.ts";
 import { api, errorText, serverNow, tally } from "../lib/api.ts";
-import { inApp } from "../lib/app.ts";
 import { boot } from "../lib/boot.ts";
 import { dayInBulgaria } from "../lib/day.ts";
 import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
@@ -714,7 +713,7 @@ function remindAsk(day: string, stake: () => string | null): { view: Child; mail
       // not kept: asked (and counted) again next time
     }
   };
-  const refused = () => !inApp && typeof Notification !== "undefined" && Notification.permission === "denied";
+  const refused = () => typeof Notification !== "undefined" && Notification.permission === "denied";
   const by = signal<"push" | "mail" | null>(pushable() && !refused() ? "push" : app ? null : "mail");
   const state = signal<"ask" | "on" | "gone">("gone");
   const mailNo = signal(asked.mailNo === day);

@@ -12,7 +12,6 @@ import type { MailPrefs } from "./keep.ts";
 let {
   api,
   errorText,
-  inApp,
   computed,
   effect,
   h,
@@ -29,9 +28,7 @@ let {
   setCalm,
   setMusic,
   setTick,
-  setVibrate,
   tickOn,
-  vibrateOn,
   needsHomeScreen,
   pushable,
   pushOn,
@@ -61,7 +58,6 @@ export function settings(kit: Kit) {
   ({
     api,
     errorText,
-    inApp,
     computed,
     effect,
     h,
@@ -78,9 +74,7 @@ export function settings(kit: Kit) {
     setCalm,
     setMusic,
     setTick,
-    setVibrate,
     tickOn,
-    vibrateOn,
     needsHomeScreen,
     pushable,
     pushOn,
@@ -347,15 +341,11 @@ function sounds(): Child {
     switchRow("Звуци", "Часовникът, отговорите, новото ниво.", soundOn, setSound),
     switchRow("Тиктакане", "Последните секунди на въпроса.", tickOn, setTick),
     switchRow("Музика в Роял", "Тиха музика, докато чакаш началото.", musicOn, setMusic),
-    // The phone's touch: only in the app, where it's felt.
-    inApp ? switchRow("Вибрация", "При отговорите и наградите.", vibrateOn, setVibrate) : null,
   );
 }
 
-/** Изглед: Night or Day, for this device; as the device is set until chosen. Not in the app, which looks as the phone
- * does (prefs.ts: scheme). */
+/** Изглед: Night or Day, for this device; as the device is set until chosen. */
 function looks(): Child {
-  if (inApp) return null;
   return h(
     "section",
     null,

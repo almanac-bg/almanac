@@ -16,7 +16,6 @@ let {
   answered,
   answering,
   api,
-  appShare,
   avatar,
   boardRow,
   categories,
@@ -138,7 +137,6 @@ export function room(kit: Kit, [code = ""]: string[]) {
     answered,
     answering,
     api,
-    appShare,
     avatar,
     boardRow,
     categories,
@@ -551,13 +549,12 @@ function lobby(view: () => RoomView, code: string): Child {
   );
 }
 
-/** „Прати връзката“: the room's link through the phone's own sheet (the app's, or the browser's), or copied where
- * there's none, or shown where it can't be copied. */
+/** „Прати връзката“: the room's link through the phone's own sheet, or copied where there's none, or shown where it
+ * can't be copied. */
 function sendLink(url: string): Child {
   const done = signal("");
   const text = "Ела да играем заедно в АЛМАНАХ:";
   const send = async () => {
-    if (await appShare(text, url)) return;
     if (navigator.share) {
       try {
         return await navigator.share({ text, url });

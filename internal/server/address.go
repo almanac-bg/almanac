@@ -130,18 +130,14 @@ func (s *Server) fromClient(r *http.Request, userID int64) context.Context {
 	return play.FromDevice(play.FromNet(r.Context(), userID, s.netMark(r)), userID, clientDevice(r))
 }
 
-// clientDevice is what a request comes from, as a game keeps it (play.Devices, runs.device): the game's app by its
-// platform; else a tablet, a phone or a desktop, by the browser's own word (Sec-CH-UA-Mobile, where it gives one) or
-// its user agent. An iPad that asks as a Mac counts as a desktop: nothing in the request tells the two apart.
+// clientDevice is what a request comes from, as a game keeps it (play.Devices, runs.device): a tablet, a phone or a
+// desktop, by the browser's own word (Sec-CH-UA-Mobile, where it gives one) or its user agent. An iPad that asks as a
+// Mac counts as a desktop: nothing in the request tells the two apart.
 func clientDevice(r *http.Request) string {
 	ua := r.UserAgent()
 	switch {
 	case ua == "":
 		return ""
-	case inApp(r) && strings.Contains(ua, "Android"):
-		return "app-android"
-	case inApp(r):
-		return "app-ios"
 	case strings.Contains(ua, "iPad") || strings.Contains(ua, "Tablet") ||
 		strings.Contains(ua, "Android") && !strings.Contains(ua, "Mobile"):
 		return "tablet"

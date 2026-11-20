@@ -25,13 +25,13 @@ import (
 //   - cohort_weeks: a week's newcomers' numbers, frozen once over (server/measure.go). Nobody is in it either.
 //   - users.came_from: where a player first came in (Landings), set as their guest is made; users.first_version, the
 //     version they met (markActive); runs.device, what each game was played on (FromDevice).
-//   - what the game keeps anyway: the days played (active_days), the games (runs), notifications on (push_subs,
-//     phones), friends, the streaks (walkStreak), the reminders and mails sent or held (push_reminded, streak_mails:
+//   - what the game keeps anyway: the days played (active_days), the games (runs), notifications on (push_subs),
+//     friends, the streaks (walkStreak), the reminders and mails sent or held (push_reminded, streak_mails:
 //     experiment.go).
 
 // Landings are where a player can first come in (users.came_from): the front page, a room's link, a player's page,
-// the game's app, and anywhere else.
-var Landings = []string{"home", "room", "player", "app", "other"}
+// and anywhere else.
+var Landings = []string{"home", "room", "player", "other"}
 
 // Tally counts n of something today (daily_counts).
 func (g *Game) Tally(ctx context.Context, key string, n int) error {
@@ -265,8 +265,8 @@ func (g *Game) Newcomers(ctx context.Context, act *Activity, since string) ([]Ne
 			}, err
 		}
 	}
-	err = each(`SELECT user_id, min(created_at) FROM (SELECT user_id, created_at FROM push_subs UNION ALL
-		SELECT user_id, created_at FROM phones) WHERE user_id IN (SELECT value FROM json_each(?1)) GROUP BY user_id`,
+	err = each(`SELECT user_id, min(created_at) FROM push_subs WHERE user_id IN (SELECT value FROM json_each(?1))
+		GROUP BY user_id`,
 		byFirstDay(func(n *Newcomer) { n.Push = true }))
 	if err != nil {
 		return nil, err

@@ -18,9 +18,9 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// A player's devices are few: a session is one browser's (account), so it keeps one subscription and one phone's
-// token, the last it told; and a player keeps pushDevices of each, the newest. Each is told again at most
-// pushTellsPerHour times an hour by a player, pushTellsPerNet from a network (clientNet): the app tells its token at every start.
+// A player's browsers are few: a session is one browser's (account), so it keeps one subscription, the last it told;
+// and a player keeps pushDevices, the newest. A subscription is told at most pushTellsPerHour times an hour by a
+// player, pushTellsPerNet from a network (clientNet).
 const (
 	pushDevices      = 5
 	pushTellsPerHour = 60
@@ -28,30 +28,33 @@ const (
 	pushTellsPerSite = 3000 // a site (/48, /24) is many networks: five of them at full use, as the other limits count
 )
 
-// mayTell says whether a player may tell a device now (pushTellsPerHour, pushTellsPerNet, pushTellsPerSite).
+// mayTell says whether a player may tell a subscription now (pushTellsPerHour, pushTellsPerNet, pushTellsPerSite).
 func (s *Server) mayTell(r *http.Request, userID int64) bool {
 	return s.limits.allow("push:user:"+strconv.FormatInt(userID, 10), pushTellsPerHour, time.Hour) &&
 		s.allowFrom(r, "push:net", pushTellsPerNet, pushTellsPerSite, time.Hour)
 }
 
-// keepDevice keeps a device told by a session (an upsert into table, keyed by column), and makes it the session's
-// only one there, and its player's only pushDevices there.
-func (s *Server) keepDevice(ctx context.Context, table, column, key string, userID int64, session []byte, upsert string, args ...any) error {
+// keepSubscription keeps a browser's subscription told by a session, and makes it the session's only one, and one of
+// its player's newest pushDevices.
+func (s *Server) keepSubscription(ctx context.Context, sub push.Subscription, userID int64, session []byte) error {
 	return s.db.Tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, upsert, args...); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO push_subs (endpoint, user_id, session, p256dh, auth, created_at)
+			VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id,
+			session = excluded.session, p256dh = excluded.p256dh, auth = excluded.auth`,
+			sub.Endpoint, userID, session, sub.Keys.P256dh, sub.Keys.Auth, store.Now()); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE session = ? AND `+column+` <> ?`, session, key); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM push_subs WHERE session = ? AND endpoint <> ?`, session, sub.Endpoint); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE user_id = ?1 AND `+column+` NOT IN (SELECT `+column+`
-			FROM `+table+` WHERE user_id = ?1 ORDER BY created_at DESC, `+column+` LIMIT ?2)`, userID, pushDevices)
+		_, err := tx.ExecContext(ctx, `DELETE FROM push_subs WHERE user_id = ?1 AND endpoint NOT IN (SELECT endpoint
+			FROM push_subs WHERE user_id = ?1 ORDER BY created_at DESC, endpoint LIMIT ?2)`, userID, pushDevices)
 		return err
 	})
 }
 
 // subscribe keeps a browser's push subscription, for its player, tied to the browser's session: it ends with it
-// (account), and is the session's one (keepDevice). Told again, it's tied to the session the browser has now.
+// (account), and is the session's one (keepSubscription). Told again, it's tied to the session the browser has now.
 func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -88,12 +91,7 @@ func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) error {
 		}
 		return errBadRequest
 	}
-	session := account.SessionKey(s.session(r))
-	err = s.keepDevice(r.Context(), "push_subs", "endpoint", sub.Endpoint, u.ID, session, `INSERT INTO push_subs (endpoint,
-		user_id, session, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (endpoint) DO UPDATE SET
-		user_id = excluded.user_id, session = excluded.session, p256dh = excluded.p256dh, auth = excluded.auth`,
-		sub.Endpoint, u.ID, session, sub.Keys.P256dh, sub.Keys.Auth, store.Now())
-	if err != nil {
+	if err := s.keepSubscription(r.Context(), sub, u.ID, account.SessionKey(s.session(r))); err != nil {
 		return err
 	}
 	return ok(w, map[string]bool{"on": true})
@@ -112,62 +110,6 @@ func (s *Server) unsubscribe(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	_, err = s.db.Write.ExecContext(r.Context(), `DELETE FROM push_subs WHERE endpoint = ? AND user_id = ?`, in.Endpoint, u.ID)
-	if err != nil {
-		return err
-	}
-	return ok(w, map[string]bool{"on": false})
-}
-
-// addPhone keeps a phone's token from its maker's push service, for its player: the game's app sends it once the
-// player allows notifications, and again whenever it opens (a token can change). Like a browser's subscription, it's
-// tied to the app's session, and ends with it; and it's the session's one (keepDevice).
-func (s *Server) addPhone(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	if s.phones == nil {
-		return errNotFound
-	}
-	if !s.mayTell(r, u.ID) {
-		return errTooMany
-	}
-	var in struct {
-		Platform string `json:"platform"`
-		Token    string `json:"token"`
-	}
-	if err := readJSON(r, &in); err != nil {
-		return err
-	}
-	in.Token = push.PhoneToken(in.Platform, in.Token)
-	if s.phones.CheckPhone(in.Platform, in.Token) != nil {
-		return errBadRequest
-	}
-	session := account.SessionKey(s.session(r))
-	err = s.keepDevice(r.Context(), "phones", "token", in.Token, u.ID, session, `INSERT INTO phones (token, user_id,
-		session, platform, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (token) DO UPDATE SET user_id = excluded.user_id,
-		session = excluded.session, platform = excluded.platform`,
-		in.Token, u.ID, session, in.Platform, store.Now())
-	if err != nil {
-		return err
-	}
-	return ok(w, map[string]bool{"on": true})
-}
-
-// removePhone forgets a phone's token: its player turned notifications off there.
-func (s *Server) removePhone(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	var in struct {
-		Token string `json:"token"`
-	}
-	if err := readJSON(r, &in); err != nil {
-		return err
-	}
-	_, err = s.db.Write.ExecContext(r.Context(), `DELETE FROM phones WHERE token IN (?, ?) AND user_id = ?`,
-		in.Token, push.PhoneToken("ios", in.Token), u.ID)
 	if err != nil {
 		return err
 	}

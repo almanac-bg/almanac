@@ -40,7 +40,6 @@ func (s *Server) dayMails(ctx context.Context, at time.Time) int {
 	rows, err := s.db.Read.QueryContext(ctx, `SELECT u.id FROM users u JOIN mail_prefs m ON m.user_id = u.id
 		AND m.kind = 'day' AND m.wanted = 1 WHERE u.email IS NOT NULL
 		AND NOT EXISTS (SELECT 1 FROM push_subs p WHERE p.user_id = u.id)
-		AND NOT EXISTS (SELECT 1 FROM phones p WHERE p.user_id = u.id)
 		AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.user_id = u.id AND r.kind = 'day' AND r.day = ?1
 			AND r.finished_at IS NOT NULL)
 		AND NOT EXISTS (SELECT 1 FROM day_mails d WHERE d.user_id = u.id AND d.day = ?1)

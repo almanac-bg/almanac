@@ -154,13 +154,7 @@ func (w *world) prefs(p *player) error {
 		_ = w.g.Tally(w.ctx, "pushask:shown", 1)
 		if w.chance(0.55) {
 			_ = w.g.Tally(w.ctx, "pushask:yes", 1)
-			if p.device == "app-ios" || p.device == "app-android" {
-				platform := map[string]string{"app-ios": "ios", "app-android": "android"}[p.device]
-				if err := w.exec(`INSERT INTO phones (token, user_id, platform, created_at) VALUES (?, ?, ?, ?)`,
-					fmt.Sprintf("seed-phone-%d", p.id), p.id, platform, now); err != nil {
-					return err
-				}
-			} else if err := w.exec(`INSERT INTO push_subs (endpoint, user_id, p256dh, auth, created_at)
+			if err := w.exec(`INSERT INTO push_subs (endpoint, user_id, p256dh, auth, created_at)
 				VALUES (?, ?, 'seed', 'seed', ?)`, fmt.Sprintf("https://push.invalid/seed/%d", p.id), p.id, now); err != nil {
 				return err
 			}

@@ -97,6 +97,7 @@ packages' doc comments; this file holds only what must not drift.
 - **The mark is the rosette:** abstract, not a letter, no gradients. Ask before changing the mark itself.
 - **Bulgarian for players, English for code and URLs; never Bulgarian in Latin letters** (`/daily`, not `/dnes`).
 
-## The app on phones
+## Phones
 
-- **A shell around the site** (Capacitor, `mobile/`): one game, one client. Never Expo.
+- **No app for phones** (owner, 2026-11-20): the game is the website only, played in the phone's browser. An app (a
+  shell around the site, with notifications through Apple and Google) was built and removed; don't propose it again.

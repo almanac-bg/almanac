@@ -6,8 +6,7 @@
 // themselves are kept over it (Config.RoomsFile), and so are the limits' counts (Config.LimitsFile, limits.go), which
 // count by network, from the player's own address even behind Cloudflare (address.go). A bank reloaded while Роял is
 // on waits for the evening to end (bank.go). Every API answer names the version (api.go), so that a page loaded before
-// a deploy loads itself anew at a quiet moment (web/src/fresh.ts); the app on phones opens only the game's own pages
-// (applinks.go).
+// a deploy loads itself anew at a quiet moment (web/src/fresh.ts).
 //
 // A panic in a request ends that request alone (middleware.go); one in the work done in the background (Роял's clock,
 // the sweeps, the loops the program starts) is stopped there by package safe, and told as a problem, mailed to whoever
@@ -61,8 +60,6 @@ type Config struct {
 	CrowdMin int
 	// Push sends notifications to browsers; nil: none.
 	Push *push.Sender
-	// Phones sends notifications to the game's app on phones; nil: none.
-	Phones *push.Phones
 	// Operator is who runs the game, and Contact their address (the privacy page, security.txt).
 	Operator, Contact string
 	// Alerts is where problems are told (TellProblems).
@@ -102,7 +99,6 @@ type Server struct {
 	live     *live.Hub
 	royal    *royal.Hub
 	push     *push.Sender
-	phones   *push.Phones
 	// closing ends the streams (rooms, Роял) when the server stops, so that it needn't wait for them.
 	closing    chan struct{}
 	drain      drain
@@ -190,7 +186,6 @@ func New(cfg Config, d Deps) (*Server, error) {
 		s.callShort(ctx, start, until, away, in)
 	}
 	s.push = cfg.Push
-	s.phones = cfg.Phones
 	s.rooms = room.NewHub(s.bank.Load)
 	s.rooms.Crowd = s.game.Crowd
 	s.rooms.Past = s.game.RoomPast
@@ -236,8 +231,6 @@ func (s *Server) routes() http.Handler {
 	api("PATCH /api/me/look", s.setLook)
 	api("POST /api/push", s.subscribe)
 	api("DELETE /api/push", s.unsubscribe)
-	api("POST /api/push/phone", s.addPhone)
-	api("DELETE /api/push/phone", s.removePhone)
 	api("GET /api/push/prefs", s.pushPrefs)
 	api("PATCH /api/push/prefs", s.setPushPref)
 	api("GET /api/mail/prefs", s.mailPrefs)
@@ -324,8 +317,6 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /admin/players/{id}/reports/resolve", s.resolvePlayer)
 	mux.HandleFunc("POST /admin/players/{id}/{act}", s.adminPlayerAct)
 	mux.HandleFunc("GET /.well-known/security.txt", s.securityTxt)
-	mux.HandleFunc("GET /.well-known/apple-app-site-association", s.appleAppSiteAssociation)
-	mux.HandleFunc("GET /.well-known/assetlinks.json", s.assetLinks)
 	mux.HandleFunc("/", s.page)
 
 	var h http.Handler = mux

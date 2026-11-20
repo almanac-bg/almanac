@@ -11,16 +11,16 @@ import (
 	"github.com/almanac-bg/almanac/internal/push"
 )
 
-// Each push service (a browser maker's Web Push service, Apple's, Google's) has a lane of its own, so that one that's
-// slow or down holds up only the players it serves. A lane sends laneSends at once at most, and keeps laneWaits more
-// waiting for a place; a send past those isn't made now: its row goes back to the queue, not as a try, for when the
-// lane will have taken those before it (held back). So a service can hold laneSends+laneWaits of the queue's
-// pushWorkers players at most, whatever it does, and the rest go on at their own services' pace. A row none of whose
-// services has room is held back before its message is made (room), so that holding it back costs little.
+// Each push service (a browser maker's: Google's, Mozilla's, Apple's, Microsoft's) has a lane of its own, so that
+// one that's slow or down holds up only the players it serves. A lane sends laneSends at once at most, and keeps
+// laneWaits more waiting for a place; a send past those isn't made now: its row goes back to the queue, not as a try,
+// for when the lane will have taken those before it (held back). So a service can hold laneSends+laneWaits of the
+// queue's pushWorkers players at most, whatever it does, and the rest go on at their own services' pace. A row none of
+// whose services has room is held back before its message is made (room), so that holding it back costs little.
 //
-// A lane rests a service that keeps failing (laneTrips busy answers in a row: no answer in time, 5xx, 429, the game's
-// keys refused): for laneRest, twice that each time it fails again, laneRestMost at most. While it rests, its sends
-// are held back at once, without dialling; then one send tries it, and an answer opens it again.
+// A lane rests a service that keeps failing (laneTrips busy answers in a row: no answer in time, 5xx, 429): for
+// laneRest, twice that each time it fails again, laneRestMost at most. While it rests, its sends are held back at
+// once, without dialling; then one send tries it, and an answer opens it again.
 
 const (
 	// laneSends is how many sends a lane makes at once at most: what the whole queue made before lanes.

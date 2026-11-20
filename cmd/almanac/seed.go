@@ -113,7 +113,7 @@ func seedAllowed(publicURL string) error {
 	if err := devOnly(cfg); err != nil {
 		return err
 	}
-	for _, key := range []string{"SMTP_URL", "BACKUP_ENDPOINT", "PUSH_PRIVATE_KEY", "APNS_KEY_FILE", "FCM_CREDENTIALS_FILE"} {
+	for _, key := range []string{"SMTP_URL", "BACKUP_ENDPOINT", "PUSH_PRIVATE_KEY"} {
 		if os.Getenv(key) != "" {
 			return fmt.Errorf("seed is for development only, not with %s set", key)
 		}
