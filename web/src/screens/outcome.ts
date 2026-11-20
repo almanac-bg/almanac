@@ -219,7 +219,7 @@ function line(d: DuelView): string {
   if (other?.gone) return ""; // their game went with them: nothing to set the player's against
   if (d.state === "draw") return "Равни верни отговори и под секунда разлика във времето.";
   if (d.tieBy === "number") return "Равни верни отговори: реши по-близкото число.";
-  if (d.tieBy === "hardest") return "Равни верни отговори: реши верният отговор на по-трудния въпрос.";
+
   if (you && other && d.tieBy === "time")
     return `Равни верни отговори: реши времето (${secs(you.ms)} срещу ${secs(other.ms)}).`;
   if (!d.decided) return "";

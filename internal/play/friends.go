@@ -311,10 +311,10 @@ type Friend struct {
 // day played at a script's speed is theirs alone to see (fair.go).
 func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	db := g.DB.Read
-	rows, err := db.QueryContext(ctx, `SELECT u.id, u.name, u.tag, f.since, r.rights, r.closeness, r.hardest,
+	rows, err := db.QueryContext(ctx, `SELECT u.id, u.name, u.tag, f.since, r.rights, r.closeness,
 			`+countedOf("r.questions")+`, r.ms, `+lookColumns+`
 		FROM friends f JOIN users u ON u.id = f.friend_id
-		LEFT JOIN runs r ON r.user_id = u.id AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND NOT r.shadow
+		LEFT JOIN runs r ON r.user_id = u.id AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND NOT r.shadow AND NOT r.pencil
 		WHERE f.user_id = ?`, g.Today(), userID)
 	if err != nil {
 		return nil, err
@@ -323,16 +323,16 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	at := map[int64]int{}
 	for rows.Next() {
 		var f Friend
-		var rights, closeness, hardest, of, ms sql.NullInt64
+		var rights, closeness, of, ms sql.NullInt64
 		var avatar string
-		if err := rows.Scan(&f.ID, &f.Name, &f.Tag, &f.Since, &rights, &closeness, &hardest, &of, &ms, &avatar); err != nil {
+		if err := rows.Scan(&f.ID, &f.Name, &f.Tag, &f.Since, &rights, &closeness, &of, &ms, &avatar); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		f.Look = lookOf(f.ID, avatar)
 		if rights.Valid {
 			f.Today = &Score{Name: f.Name, Rights: int(rights.Int64), Of: int(of.Int64), Ms: ms.Int64,
-				tie: tiebreak{closeness: int(closeness.Int64), hardest: int(hardest.Int64)}}
+				tie: tiebreak{closeness: int(closeness.Int64)}}
 		}
 		at[f.ID] = len(list)
 		list = append(list, f)

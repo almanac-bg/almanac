@@ -68,7 +68,7 @@ export interface DuelView {
    * even). */
   decided?: number;
   /** One duel's view, of a result on even right answers: what broke the tie (play.DuelView.TieBy). */
-  tieBy?: "number" | "hardest" | "time";
+  tieBy?: "number" | "time";
   record?: { won: number; lost: number; drawn: number };
   /** The other is a friend now (`them`, their id): a rematch is a tap away. */
   friend?: boolean;
