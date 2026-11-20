@@ -208,8 +208,8 @@ func newFresh(t *testing.T) *fresh {
 		}
 		runID = r.id
 		for n, p := range picks {
-			if _, err := tx.Exec(`INSERT INTO answers (run_id, n, question_id, given, shown, score, points, is_right, ms, at, version)
-				VALUES (?, ?, ?, '{"pick":0}', '{"pick":0}', ?, 0, ?, 4000, ?, ?)`, r.id, n, p.ID, n%3, n%3 != 0,
+			if _, err := tx.Exec(`INSERT INTO answers (run_id, n, question_id, given, shown, score, is_right, ms, at, version)
+				VALUES (?, ?, ?, '{"pick":0}', '{"pick":0}', ?, ?, 4000, ?, ?)`, r.id, n, p.ID, n%3, n%3 != 0,
 				store.Ms(w.now.Add(-4*24*time.Hour)), w.g.versionOf(p)); err != nil {
 				return err
 			}

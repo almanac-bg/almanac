@@ -77,8 +77,6 @@ for (const scheme of ["light", "dark"] as const) {
     await startDay(page);
     await playRun(page);
     await expect(page.getByRole("button", { name: "Сподели резултата" })).toBeVisible();
-    // A first day's news: what points are, in a line (play/unfold.go).
-    await expect(page.locator(".news-open")).toBeVisible();
     // The result's moment over (feel.ts: the shape, the score, the streak rolling on), every part as it stays.
     await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
     await expect(page.locator(".streak-chip.unlit")).toHaveCount(0);
@@ -91,22 +89,21 @@ for (const scheme of ["light", "dark"] as const) {
 // the duel question by question with the quicker answers ringed and the deciding one marked, and the record.
 for (const scheme of ["light", "dark"] as const) {
   test(`a duel's result is accessible (${scheme})`, async ({ page }) => {
-    const mark = (points: number, ms: number) => ({ points, right: points > 0, ms });
-    const side = (name: string, tag: string, points: number[], slower = 0) => ({
+    const mark = (right: number, ms: number) => ({ right: right > 0, ms });
+    const side = (name: string, tag: string, rights: number[], slower = 0) => ({
       name,
       tag,
-      points: points.reduce((a, p) => a + p, 0),
-      rights: points.filter((p) => p > 0).length,
+      rights: rights.filter((p) => p > 0).length,
       ms: 40_000,
       done: true,
       look: { avatar: "hare-gold" },
-      marks: points.map((p, i) => mark(p, 3000 + 300 * i + slower)),
+      marks: rights.map((p, i) => mark(p, 3000 + 300 * i + slower)),
     });
     const duel = {
       id: 1,
       state: "won",
-      you: side("Заек 817", "", [1300, 1100, 0, 1500, 1200, 0, 1400, 1250, 1100, 1000]),
-      opponent: { ...side("Мария", "maria", [1200, 0, 1500, 1600, 1300, 0, 1500, 0, 1000, 0], 500), ms: 50_000 },
+      you: side("Заек 817", "", [1, 1, 0, 1, 1, 0, 1, 1, 1, 1]),
+      opponent: { ...side("Мария", "maria", [1, 0, 1, 1, 1, 0, 1, 0, 1, 0], 500), ms: 50_000 },
       runId: 1,
       first: true,
       createdAt: Date.now(),

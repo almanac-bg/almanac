@@ -24,8 +24,8 @@ func (w *world) knowsAt(user, at int64, ids ...string) {
 	}
 	run, _ := res.LastInsertId()
 	for n, id := range ids {
-		if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, given, score, points, is_right, ms, at)
-			VALUES (?, ?, ?, '{}', 1, 0, 1, 3000, ?)`, run, n, id, at+int64(n)); err != nil {
+		if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, given, score, is_right, ms, at)
+			VALUES (?, ?, ?, '{}', 1, 1, 3000, ?)`, run, n, id, at+int64(n)); err != nil {
 			w.t.Fatal(err)
 		}
 	}

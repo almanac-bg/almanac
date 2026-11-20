@@ -228,8 +228,8 @@ func TestScriptedOutOfStatistics(t *testing.T) {
 			t.Fatal(err)
 		}
 		run, _ := res.LastInsertId()
-		if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, given, score, points, is_right, ms, at)
-			VALUES (?, 0, ?, '{"pick":0}', 1, 0, 1, 50, ?)`, run, id, i); err != nil {
+		if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, given, score, is_right, ms, at)
+			VALUES (?, 0, ?, '{"pick":0}', 1, 1, 50, ?)`, run, id, i); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -274,8 +274,8 @@ func TestScriptedBackfill(t *testing.T) {
 	}
 	sorted, _ := res.LastInsertId()
 	for n, p := range slow {
-		if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, given, score, points, is_right, ms, at)
-			VALUES (?, ?, ?, '{}', 1, 0, 1, 1500, 0)`, sorted, n, p.ID); err != nil {
+		if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, given, score, is_right, ms, at)
+			VALUES (?, ?, ?, '{}', 1, 1, 1500, 0)`, sorted, n, p.ID); err != nil {
 			t.Fatal(err)
 		}
 	}

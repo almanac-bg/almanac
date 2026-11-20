@@ -86,8 +86,8 @@ There are three places: **Днес** (`/`), **Алманах** (`/almanac`) and 
   - The kicker „Твоят брой 9 · 20 ноември“.
   - The score as the hero numeral with „от 10“ in italic (`.score-n`, `.score-of`), and its shape (`.trail`: right
     filled, wrong open).
-  - A line of how it went („Седем верни. По-добре от 61 % от играчите днес.“, `game/standing.ts`), and the points,
-    small.
+  - A line of how it went („Седем верни. По-добре от 61 % от играчите днес.“, `game/standing.ts`). There are no
+    points: the score is the right answers, a close one „близо“ beside them.
   - The streak rolling on (`.result-streak`).
   - „Сподели резултата“ (`.result-share`, the one action) opens the share sheet (`.share-sheet`): the card a link's
     preview shows, the text, and „Сподели“ (where the device has a share sheet) or „Копирай текста“
@@ -132,8 +132,8 @@ There are three places: **Днес** (`/`), **Алманах** (`/almanac`) and 
     („С първия верен отговор ще видиш колко от главата знаеш.“), on the chapter, its row and the book's figures.
 - **Приятели** (`/friends`, `screens/friends.ts`), three pages on a big screen:
   - **The day's board** (`.day-board`: „Приятели“ or „България“, a `segmented` choice), where a row is the place, the
-    avatar, the name, the score and the points (`rankRow()`, `.rank-row`; the player's own on `--paper-2`, with
-    „ти“).
+    avatar, the name and the score (`rankRow()`, `.rank-row`; the player's own on `--paper-2`, with „ти“); a tie is
+    broken by the server (`play/board.go`), never shown as a figure.
   - **The duels** (`.duels`): „Твой ред“ (a friend's duel waiting for the player, or their own to finish), „Чакаш“
     (sent and not played yet) and „Изиграни“ (the score and the pair's record, „общо 5 на 3“). Each is a ruled
     `.duel-row` to its page, saying how long is left („още 2 дни“). „Нов дуел“ comes under them.
@@ -165,8 +165,7 @@ There are three places: **Днес** (`/`), **Алманах** (`/almanac`) and 
 A new player meets the game a part at a time, by what they've done, never by the date:
 
 - **A new visitor** gets the cover, the day alone. The places come with the first game begun.
-- **The first day** brings the day's result and its points (what points are is said once, in a quiet line at the top
-  of the first game's news, `.news-open`) and the streak; the Алманах's chapters and Приятели are a tap away.
+- **The first day** brings the day's result and the streak; the Алманах's chapters and Приятели are a tap away.
 - **A chapter's first estimate** (10 answers): the chapter says „първа оценка“ with its share, and a game's news says
   „Първа оценка: знаеш около 74 % от темата“, a share with no tier. The tier („Експерт“) comes with a sure mark (30
   answers).
@@ -349,13 +348,13 @@ A rule never holds a literal colour; it takes a token.
   - `.sheet`: paper with an ink rule on top, over the scrim; a bottom sheet on a phone, centred on a big screen.
 - **The streak:** `.streak-chip` (its number, „дни поред“ and, unlit, the day before it rolls on) and `weekStrip()`
   (`.week`, the week Пн–Нд as squares).
-- **Rows of players:** `rankRow()` (`.rank-row`: the place, the avatar, the name, the score, the points), `who()`
+- **Rows of players:** `rankRow()` (`.rank-row`: the place, the avatar, the name, the score), `who()`
   (`.who`: an avatar and a name), `.friend`, `.invitation` and `.duel-row`.
 - **Play:**
   - `.question-head` holds:
     - `.game-leave`, a cross that is the way out on every screen;
     - what's played: the day's „Брой N · date“, or the topic, with `.versus` naming the friend in a duel;
-    - the tally (`.tally`: the right answers in a row it's on, and its points so far);
+    - the tally (`.tally`: the right answers in a row it's on);
     - `.count`: „4/10“ to the eye, „4 от 10“ read aloud; it never wraps.
 
     In the day's ten, `.question-topic` (the topic's mark and name) sits over each question.
@@ -391,7 +390,7 @@ A rule never holds a literal colour; it takes a token.
     - `.crowd-says`: one quiet sentence under the verdict, or under the answer in a review (`crowdLine()`: the share
       right, of today's players for the day's ten). `.rare`, in `--gold-ink`, marks a right answer a quarter or
       fewer got.
-  - `.verdict`: its word in the serif, in `--right-ink` or `--wrong-ink`, with its points.
+  - `.verdict`: its word in the serif, in `--right-ink` or `--wrong-ink`.
   - `.fact` (`fact()`): „Знаеше ли?“ as part of the page under an ink rule. For a question of the day's ten dealt on
     its own date, `.fact-day` heads it with „На този ден“ and what happened that day. It shows only with the answer,
     never before it. With a right answer, `.filed` goes under the fact: „Записано в Алманаха, глава „…““, with its
@@ -410,7 +409,7 @@ A rule never holds a literal colour; it takes a token.
   - Played second, or against a recording, the other's answer shows as they gave it. The line over the question turns
     „Мария отговори“ at the moment they did (with the sound `them`). Once the player's own answer is in, how it went
     for them shows under the verdict (`.their-line`: „Мария: вярно за 4,2 с“, in the right answer's green; „грешно“,
-    „близо“ and „без отговор“ muted). Their points wait for the end.
+    „близо“ and „без отговор“ muted).
   - Played first, the result is the player's own (`.summary`), with a line that it's sent (`.duel-sent`: „Изпратен.
     Мария ще изиграе същите десет въпроса: има време още 3 дни.“).
   - „Нов дуел“ (`/duel/new`): each friend is a row („Дуел“, as on a friend's row in Приятели), and there is „Играй
@@ -419,8 +418,8 @@ A rule never holds a literal colour; it takes a token.
   - The kicker („Дуел с Мария“, „Срещу запис на Мария“: a duel is named so everywhere) and the verdict in the serif over an ink rule (`.duel-verdict`:
     „Победа“ in green, „Загуба“ in red, „Равенство“).
   - The two face to face (`.duel-face`): the player on the left, the other on the right, each with a small avatar and
-    the name (a way to the profile, „Запис“ for a recording) over the points, big in the numerals, and the right
-    answers. The loser's points are quieter, and a gold colon sits between them. A player gone since shows a dash
+    the name (a way to the profile, „Запис“ for a recording) over the right answers, big in the numerals. The loser's
+    are quieter, and a gold colon sits between them. A player gone since shows a dash
     and „Играчът вече го няма“.
   - The duel question by question (`.duel-marks`, like the day's trail: right in ink, wrong an open square): the
     player's row over the other's, each beside a small avatar. The quicker of two right answers is ringed in gold

@@ -64,7 +64,6 @@ export function topic([category = ""]: string[]) {
             also: [() => nextOf(day(), again, category).also],
           },
           just ? [otherTopics(category), news(s.id)] : [otherTopics(category)],
-          undefined,
           just,
         ),
       ),

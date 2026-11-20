@@ -387,7 +387,7 @@ func TestQuestionTime(t *testing.T) {
 		t.Fatalf("a broken answer: %v", err)
 	}
 	res, err := w.g.Answer(ctx, u, s.ID, 0, w.right(s.ID, 0))
-	if err != nil || res.Points != WorthOf(w.question(s.ID, 0), 1, 0).Points || !res.Right || res.State.At != 1 || res.Reveal == nil {
+	if err != nil || res.Score != 1 || !res.Right || res.State.At != 1 || res.State.Rights != 1 || res.Reveal == nil {
 		t.Fatalf("the right answer: %+v %v", res, err)
 	}
 
@@ -395,14 +395,14 @@ func TestQuestionTime(t *testing.T) {
 	_, _ = w.g.Show(ctx, u, s.ID)
 	w.wait(time.Minute)
 	st, _ := w.g.State(ctx, u, s.ID)
-	if st.At != 2 || st.Question != nil || len(st.Trail) != 2 || st.Trail[1].Points != 0 {
+	if st.At != 2 || st.Question != nil || len(st.Trail) != 2 || st.Trail[1].Right || st.Trail[1].Close {
 		t.Fatalf("after its time ran out: %+v", st)
 	}
 
 	// An answer a little late (within the grace) counts; one later doesn't.
 	_, _ = w.g.Show(ctx, u, s.ID)
 	w.wait(Limit(w.question(s.ID, 2)) + Grace/2)
-	if res, _ := w.g.Answer(ctx, u, s.ID, 2, w.right(s.ID, 2)); res.TimedOut || res.Points == 0 {
+	if res, _ := w.g.Answer(ctx, u, s.ID, 2, w.right(s.ID, 2)); res.TimedOut || !res.Right {
 		t.Fatalf("an answer within the grace: %+v", res)
 	}
 
@@ -434,12 +434,12 @@ func TestAnswerAgain(t *testing.T) {
 		out, _ := json.Marshal(r)
 		return string(out)
 	}
-	// Two right in a row: the second's points are made up of its speed, and so are they again, with the row it makes.
+	// Two right in a row: the second makes a row, and again too.
 	if _, err := answer(0, w.right(s.ID, 0)); err != nil {
 		t.Fatal(err)
 	}
 	first, err := answer(1, w.right(s.ID, 1))
-	if err != nil || !first.Right || first.InRow != 2 || first.Speed == 0 {
+	if err != nil || !first.Right || first.InRow != 2 {
 		t.Fatalf("the first time: %+v %v", first, err)
 	}
 	w.wait(5 * time.Second)
@@ -448,7 +448,7 @@ func TestAnswerAgain(t *testing.T) {
 		t.Fatalf("sent again:\n%s\n%s\n%v", plain(again), plain(first), err)
 	}
 	st, _ := w.g.State(ctx, u, s.ID)
-	if st.At != 2 || st.Points != first.State.Points || len(st.Trail) != 2 {
+	if st.At != 2 || st.Rights != first.State.Rights || len(st.Trail) != 2 {
 		t.Fatalf("the run after an answer sent again: %+v", st)
 	}
 	// Only the last answered: one before it is out of step, as is one not shown yet.
@@ -460,7 +460,7 @@ func TestAnswerAgain(t *testing.T) {
 	if _, err := w.g.Show(ctx, u, s.ID); err != nil {
 		t.Fatal(err)
 	}
-	if again, err := w.g.Answer(ctx, u, s.ID, 1, w.right(s.ID, 1)); err != nil || again.Points != first.Points ||
+	if again, err := w.g.Answer(ctx, u, s.ID, 1, w.right(s.ID, 1)); err != nil || again.Right != first.Right ||
 		again.State.Question == nil || again.State.Question.N != 2 {
 		t.Fatalf("sent again with the next question showing: %+v %v", again, err)
 	}
@@ -469,7 +469,7 @@ func TestAnswerAgain(t *testing.T) {
 	if _, err := w.g.State(ctx, u, s.ID); err != nil {
 		t.Fatal(err)
 	}
-	if late, err := w.g.Answer(ctx, u, s.ID, 2, w.right(s.ID, 2)); err != nil || !late.TimedOut || late.Points != 0 ||
+	if late, err := w.g.Answer(ctx, u, s.ID, 2, w.right(s.ID, 2)); err != nil || !late.TimedOut || late.Score != 0 ||
 		late.Right {
 		t.Fatalf("an answer after its time ran out: %+v %v", late, err)
 	}
@@ -480,15 +480,15 @@ func TestAnswerAgain(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	ended := func() (points int, at int64) {
-		_ = w.db.Read.QueryRow(`SELECT points, finished_at FROM runs WHERE id = ?`, s.ID).Scan(&points, &at)
-		return points, at
+	ended := func() (rights int, at int64) {
+		_ = w.db.Read.QueryRow(`SELECT rights, finished_at FROM runs WHERE id = ?`, s.ID).Scan(&rights, &at)
+		return rights, at
 	}
-	points, at := ended()
+	rights, at := ended()
 	w.wait(time.Second)
 	again, err = w.g.Answer(ctx, u, s.ID, Length-1, w.right(s.ID, Length-1))
-	if p, a := ended(); err != nil || !again.State.Done || plain(again) != plain(last) || p != points || a != at {
-		t.Fatalf("the last answer sent again: %+v %v (points %d at %d, were %d at %d)", again, err, p, a, points, at)
+	if p, a := ended(); err != nil || !again.State.Done || plain(again) != plain(last) || p != rights || a != at {
+		t.Fatalf("the last answer sent again: %+v %v (rights %d at %d, were %d at %d)", again, err, p, a, rights, at)
 	}
 }
 
@@ -551,7 +551,7 @@ func TestPictureTime(t *testing.T) {
 	}
 	w.wait(5 * time.Second)
 	res, err := w.g.Answer(ctx, u, s.ID, 0, w.right(s.ID, 0))
-	if err != nil || res.Points != WorthOf(w.question(s.ID, 0), 1, 6*time.Second).Points {
+	if err != nil || !res.Right || w.count(`SELECT ms FROM answers WHERE run_id = ? AND n = 0`, s.ID) != 6000 {
 		t.Fatalf("answered 6 s after it started: %+v %v", res, err)
 	}
 
@@ -761,7 +761,7 @@ func TestTopicLeftHalfWay(t *testing.T) {
 	if err != nil || back.ID != first.ID || back.At != 4 || len(back.Trail) != 4 || back.Question != nil {
 		t.Fatalf("back to the topic: %+v %v", back, err)
 	}
-	if m := back.Trail[3]; m.Right || m.Points != 0 {
+	if m := back.Trail[3]; m.Right || m.Close {
 		t.Fatalf("the question left showing: %+v", m)
 	}
 	// Another topic is a run of its own, and so is „Микс“.
@@ -1009,16 +1009,16 @@ func TestFriendRequests(t *testing.T) {
 }
 
 func TestDecided(t *testing.T) {
-	marks := func(points ...int) []DuelMark {
-		out := make([]DuelMark, len(points))
-		for i, p := range points {
-			out[i] = DuelMark{Points: p}
+	marks := func(rights string) []DuelMark {
+		out := make([]DuelMark, len(rights))
+		for i, r := range rights {
+			out[i] = DuelMark{Right: r == '1'}
 		}
 		return out
 	}
 	sum := func(m []DuelMark) (n int) {
 		for _, x := range m {
-			n += x.Points
+			n += b2i(x.Right)
 		}
 		return n
 	}
@@ -1027,20 +1027,46 @@ func TestDecided(t *testing.T) {
 		a, b []DuelMark
 		want int
 	}{
-		{"ahead from the first", marks(100, 0, 100), marks(0, 50, 0), 1},
-		{"a lead lost and taken back on the last", marks(100, 0, 0, 200), marks(0, 150, 50, 0), 4},
-		{"even after the second, ahead from the third", marks(100, 0, 100), marks(0, 100, 0), 3},
-		{"the other won it on the second", marks(100, 0, 0), marks(0, 200, 0), 2},
-		{"even points: the time decides", marks(100, 0), marks(0, 100), 0},
+		{"ahead from the first", marks("101"), marks("000"), 1},
+		{"a lead lost and taken back on the last", marks("1001"), marks("0100"), 4},
+		{"even after the second, ahead from the third", marks("101"), marks("010"), 3},
+		{"the other won it on the second", marks("100"), marks("110"), 2},
+		{"even right answers: the tie broken", marks("10"), marks("01"), 0},
 		{"nothing played", nil, nil, 0},
 	} {
 		if got := decided(c.a, c.b, sum(c.a), sum(c.b)); got != c.want {
 			t.Errorf("%s: decided on %d, want %d", c.name, got, c.want)
 		}
 	}
-	// The bonus for all right comes with the last question: it can turn the duel there.
-	if got := decided(marks(100, 100), marks(300, 0), 200+AllRight, 300); got != 2 {
-		t.Errorf("turned by the bonus: decided on %d", got)
+	// A question that counts for nobody is in the marks but not in the score: the last question's lead is the score's.
+	if got := decided(marks("11"), marks("10"), 1, 1); got != 0 {
+		t.Errorf("decided by a void question: %d", got)
+	}
+}
+
+// A duel goes by right answers, then as the board breaks a tie (how close the number came, then the hardest right
+// answer), then by time, by TieBand or more.
+func TestDuelScore(t *testing.T) {
+	base := duelScore{rights: 7, tie: tiebreak{closeness: 500, hardest: 0b0001111111}, ms: 60_000}
+	for _, c := range []struct {
+		name string
+		o    duelScore
+		want int
+	}{
+		{"more right answers", duelScore{rights: 8}, 1},
+		{"fewer right answers, closer and quicker", duelScore{rights: 6, tie: tiebreak{closeness: 1000}, ms: 1}, -1},
+		{"a closer number", duelScore{rights: 7, tie: tiebreak{closeness: 600}, ms: 90_000}, 1},
+		{"a harder right answer", duelScore{rights: 7, tie: tiebreak{closeness: 500, hardest: 0b1000111111}, ms: 90_000}, 1},
+		{"quicker by a second", duelScore{rights: 7, tie: base.tie, ms: 59_000}, 1},
+		{"quicker by less", duelScore{rights: 7, tie: base.tie, ms: 59_500}, 0},
+		{"slower by a second", duelScore{rights: 7, tie: base.tie, ms: 61_000}, -1},
+	} {
+		if got := base.against(c.o); got != c.want {
+			t.Errorf("%s: %d, want %d", c.name, got, c.want)
+		}
+		if got := c.o.against(base); got != -c.want {
+			t.Errorf("%s, the other way: %d, want %d", c.name, got, -c.want)
+		}
 	}
 }
 
@@ -1330,8 +1356,8 @@ func TestDayCrowd(t *testing.T) {
 		}
 		id, _ := res.LastInsertId()
 		for n := range 3 {
-			if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, score, points, is_right, ms, at)
-				VALUES (?, ?, ?, 1, 100, 1, 900, ?)`, id, n, picks[0].ID, w.now.UnixMilli()); err != nil {
+			if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, score, is_right, ms, at)
+				VALUES (?, ?, ?, 1, 1, 900, ?)`, id, n, picks[0].ID, w.now.UnixMilli()); err != nil {
 				t.Fatal(err)
 			}
 		}

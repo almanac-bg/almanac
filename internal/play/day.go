@@ -12,9 +12,9 @@ import (
 
 // The day's ten are one game for everyone who plays them that day, compared on one board: so
 // they hold still for their day. As the day begins (the first time its questions are read on it, pinDay), each of
-// them is kept as it is then, its version and its difficulty (Pick.V, Pick.D), in the day's own questions, which
-// every run of the day copies: a reload of the bank later that day changes nothing of how they're dealt, graded or
-// paid, for anyone.
+// them is kept as it is then, its version (Pick.V), in the day's own questions, which
+// every run of the day copies: a reload of the bank later that day changes nothing of how they're dealt or graded, for
+// anyone.
 //
 // But a question can turn out wrong in the middle of its day (a player reports it, and its keeper retires it as untrue
 // or puts its answer right), and then the day's players, those before the fix and those after it, can't all be graded
@@ -24,10 +24,10 @@ import (
 //
 //   - who hasn't reached it passes over it, and never sees it;
 //   - who is on it now goes on to the next;
-//   - who answered it keeps the answer (its history, what it taught them), but not its points: the
-//     run's points are counted again without them, the row of right answers going over it as if it weren't there
-//     (it neither adds to a row nor breaks one), and the run's right answers, and whether it got all of them, are out
-//     of the questions that count.
+//   - who answered it keeps the answer (its history, what it taught them), but not in the score: the run's right
+//     answers, and what breaks a tie between them (tiebreak), are counted again without it, the row of right answers
+//     going over it as if it weren't there (it neither adds to a row nor breaks one), and the run's right answers are
+//     out of the questions that count.
 //
 // So the day's results stay comparable: everyone's is of the same questions, the same way. Voiding rather than
 // regrading those who answered against the new key: the old answer was given to another question (its options, its
@@ -54,7 +54,7 @@ func (g *Game) pinDay(tx *sql.Tx, day string, picks []Pick, b *bank.Bank) ([]Pic
 			continue
 		}
 		if q, ok := b.Get(p.ID); ok {
-			picks[i].V, picks[i].D = bank.Version(q), q.Base().Difficulty
+			picks[i].V = bank.Version(q)
 			pinned = true
 		}
 	}
@@ -160,23 +160,22 @@ func (g *Game) voidQuestion(tx *sql.Tx, day string, n int) error {
 	return nil
 }
 
-// recount counts a run's points and right answers again from its answers, without those to questions that count for
-// nobody (theirs go to nothing), and a run done earns AllRight if every answer that counts was right. The others keep
-// what they earned: an answer's points are its own, whatever came before it (worth.go).
+// recount counts a run's right answers, and what breaks a tie between them (tiebreak), again from its answers, without
+// those to questions that count for nobody.
 func (g *Game) recount(tx *sql.Tx, r *run) error {
 	type answer struct {
-		n      int
-		right  bool
-		points int
+		n     int
+		right bool
+		score float64
 	}
-	rows, err := tx.Query(`SELECT n, is_right, points FROM answers WHERE run_id = ? ORDER BY n`, r.id)
+	rows, err := tx.Query(`SELECT n, is_right, score FROM answers WHERE run_id = ? ORDER BY n`, r.id)
 	if err != nil {
 		return err
 	}
 	var all []answer
 	for rows.Next() {
 		var a answer
-		if err := rows.Scan(&a.n, &a.right, &a.points); err != nil {
+		if err := rows.Scan(&a.n, &a.right, &a.score); err != nil {
 			rows.Close()
 			return err
 		}
@@ -186,26 +185,21 @@ func (g *Game) recount(tx *sql.Tx, r *run) error {
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	points, rights := 0, 0
+	b := g.Bank()
+	rights, tie := 0, tiebreak{}
 	for _, a := range all {
-		if a.n < len(r.picks) && r.picks[a.n].Void {
-			if a.points != 0 {
-				if _, err := tx.Exec(`UPDATE answers SET points = 0 WHERE run_id = ? AND n = ?`, r.id, a.n); err != nil {
-					return err
-				}
-			}
+		if a.n >= len(r.picks) || r.picks[a.n].Void {
 			continue
 		}
-		if a.right && a.n < len(r.picks) {
+		if a.right {
 			rights++
 		}
-		points += a.points
+		q, ok := b.Get(r.picks[a.n].ID)
+		tie.add(a.n, a.score, a.right, ok && q.Base().Type == "number")
 	}
-	r.points, r.rights = points, rights
-	if r.finished && r.allRight() {
-		r.points += AllRight
-	}
-	_, err = tx.Exec(`UPDATE runs SET points = ?, rights = ? WHERE id = ?`, r.points, r.rights, r.id)
+	r.rights, r.tie = rights, tie
+	_, err = tx.Exec(`UPDATE runs SET rights = ?, closeness = ?, hardest = ? WHERE id = ?`, r.rights, r.tie.closeness,
+		r.tie.hardest, r.id)
 	return err
 }
 
@@ -289,7 +283,6 @@ func trailOf(picks []Pick, at int, marks []markAt) []Mark {
 		if a.n < len(picks) && picks[a.n].Void {
 			m = Mark{Void: true}
 		}
-		m.Partial = m.Points > 0 && !m.Right
 		out = append(out, m)
 		next = a.n + 1
 	}

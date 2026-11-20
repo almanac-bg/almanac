@@ -140,9 +140,9 @@ export type Answer =
   | { sides: number[] };
 
 export interface Mark {
-  points: number;
   right: boolean;
-  partial?: boolean;
+  /** Close („близо“): worth something, not right; it counts as not right (play.Mark.Close). */
+  close?: boolean;
   /** A question of the day that counts for nobody: found wrong, or changed, during its day (play/day.go). */
   void?: boolean;
 }
@@ -170,10 +170,7 @@ export interface State {
   /** How many of the `total` count for nobody (Mark.void): the game is of `total − void` questions. */
   void?: number;
   at: number;
-  points: number;
   rights: number;
-  /** What the game earned at its end for every answer right (in `points`), once it's done. */
-  allRight?: number;
   trail: Mark[];
   question?: Shown;
   done: boolean;
@@ -182,20 +179,16 @@ export interface State {
   against?: TheirMark[];
 }
 
-/** How a question of a duel went for the other side (play.DuelMark), as the player's run has it: their points wait for
- * the end. */
+/** How a question of a duel went for the other side (play.DuelMark), as the player's run has it. */
 export interface TheirMark {
   right?: boolean;
-  partial?: boolean;
+  close?: boolean;
   missed?: boolean;
   ms: number;
 }
 
 export interface Result {
-  points: number;
-  /** How many of the points were for being quick; how many right answers in a row the answer makes (`inRow`, from 2:
-   * the climb's feel, worth no points). */
-  speed?: number;
+  /** How many right answers in a row the answer makes, from 2: the climb's feel, worth nothing more. */
   inRow?: number;
   score: number;
   right: boolean;
@@ -211,9 +204,9 @@ export interface Reviewed {
   view: View;
   reveal: Reveal;
   given: Answer | null;
-  points: number;
   right: boolean;
-  /** An answer to a question that counts for nobody (Mark.void): its points taken out. */
+  close?: boolean;
+  /** An answer to a question that counts for nobody (Mark.void): in no score. */
   void?: boolean;
 }
 
@@ -221,7 +214,6 @@ export interface Score {
   name: string;
   /** The player's tag: a link to their profile. */
   tag?: string;
-  points: number;
   rights: number;
   /** How many questions `rights` is out of: the day's that count (ten, but for one that counts for nobody). */
   of: number;

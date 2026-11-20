@@ -17,7 +17,7 @@ import { beforeLeaving, hold, release } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { dateWords, issueOf } from "../lib/words.ts";
 import { categories, playingWhile } from "../state.ts";
-import { countUp, fact, factFace, failure, inRowChip, reachable, topicMark, type VerdictKind, verdict } from "../ui.ts";
+import { fact, factFace, failure, inRowChip, reachable, topicMark, type VerdictKind, verdict } from "../ui.ts";
 import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
 import { inRowOf } from "./numbers.ts";
 import { answered, beats, crowdLine, picture, picturesIn, type Stage } from "./questions.ts";
@@ -333,7 +333,7 @@ export function trail(marks: Mark[], total: number, now = -1): HTMLElement {
     { class: "trail", "aria-label": `${marks.length} от ${total} въпроса` },
     Array.from({ length: total }, (_, i) => {
       const m = marks[i];
-      const how = !m ? (i === now ? "now" : "") : m.void ? "void" : m.right ? "right" : m.partial ? "partial" : "wrong";
+      const how = !m ? (i === now ? "now" : "") : m.void ? "void" : m.right ? "right" : m.close ? "partial" : "wrong";
       return h("li", { class: how || undefined, title: how && how !== "now" ? `${i + 1}: ${words[how]}` : null });
     }),
   );
@@ -430,22 +430,9 @@ export function questionHead(
   );
 }
 
-/** A run's tally while it's played: the right answers in a row it's on, and its points so far (rising from `from`),
- * once there are some. */
-function tally(el: HTMLElement, points: number, from: number, inRow: number) {
-  el.replaceChildren(
-    ...[
-      inRowChip(inRow),
-      points > 0
-        ? h(
-            "span",
-            { class: "tally-points", "aria-label": `${points} ${points === 1 ? "точка" : "точки"}` },
-            countUp(points, from),
-            h("small", null, points === 1 ? " точка" : " точки"),
-          )
-        : null,
-    ].filter((c): c is HTMLElement => c !== null),
-  );
+/** A run's tally while it's played: the right answers in a row it's on, once there are two. */
+function tally(el: HTMLElement, inRow: number) {
+  el.replaceChildren(...[inRowChip(inRow)].filter((c): c is HTMLElement => c !== null));
 }
 
 /** The time left: a bar that runs out with the seconds beside it, muted, then gold for the last ten seconds and red
@@ -566,7 +553,7 @@ function question(
   }
   const versusNow: Child = theirs ? () => (theyAnswered() ? `${them} отговори` : versus) : versus;
   const score = h("div", { class: "tally" });
-  tally(score, s.points, s.points, inRowOf(s.trail));
+  tally(score, inRowOf(s.trail));
 
   // Moving on, once the answer has shown for a while: never into a question nobody's looking at (a tab in the
   // background), as its time would run unseen.
@@ -641,7 +628,7 @@ function question(
   });
 
   // The answer shows in beats (DESIGN.md, Motion): the player's own answer judged, its sound and its pip; the right
-  // one (if it wasn't theirs) and the verdict docked at the screen's foot, its points and the tally rising with them;
+  // one (if it wasn't theirs) and the verdict docked at the screen's foot, the tally with them;
   // how everyone else answered; the fact, and the way on. With less motion, all at once.
   const reveal = (res: Result, answer: Answer | null) => {
     // The question's own steps on the right answer's beat (the right one marked) are taken with the panel's, in the
@@ -668,7 +655,7 @@ function question(
     let rest: Child[] = [];
     at(beats.right, () => {
       for (const step of marks) step();
-      tally(score, res.state.points, s.points, res.inRow ?? 0);
+      tally(score, res.inRow ?? 0);
       crowd = waiting(crowdLine(q.view.type, res.reveal.crowd, res.right));
       rest = [
         theirLine(them, res.state.against?.[q.n]),
@@ -689,8 +676,8 @@ function question(
         ),
       ].map(waiting);
       // The verdict is said once, in plain words, through the run's live region (not its own, made already full, nor
-      // its points counting up from nothing).
-      const told = verdict(kind, res.points, undefined, res.speed, res.inRow);
+      // anything counting up from nothing).
+      const told = verdict(kind, undefined, res.inRow);
       if (told instanceof HTMLElement) told.removeAttribute("role");
       append(after, [told, crowd, ...rest]);
       settle(page, head, after, asked.node, at, () => {
@@ -698,7 +685,7 @@ function question(
         page.classList.add("answered");
         room();
       });
-      say(spokenVerdict(kind, res.points, q.view, res.reveal));
+      say(spokenVerdict(kind, q.view, res.reveal));
       advance = window.setTimeout(moveOn, lasts);
     });
     at(beats.crowd, () => shows(crowd));
@@ -792,7 +779,7 @@ function question(
 function theirLine(name: string, m: TheirMark | undefined): Child {
   if (!name || !m) return null;
   const secs = (m.ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 });
-  const how = m.right ? `вярно за ${secs} с` : m.partial ? "близо" : m.missed ? "без отговор" : "грешно";
+  const how = m.right ? `вярно за ${secs} с` : m.close ? "близо" : m.missed ? "без отговор" : "грешно";
   return h("p", { class: `their-line${m.right ? " right" : ""}` }, h("b", null, `${name}: `), how);
 }
 
@@ -995,7 +982,7 @@ function kindOf(r: Result, given: Answer | null): VerdictKind {
   if (r.timedOut || given === null) return "time";
   if (r.exact) return "exact";
   if (r.right) return "right";
-  return r.points > 0 ? "partial" : "wrong";
+  return r.score > 0 ? "partial" : "wrong";
 }
 
 function credit(c: Credit): Child {

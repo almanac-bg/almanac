@@ -12,8 +12,8 @@ import (
 // Progress is one measure: the player's Алманах, a chapter per topic with the facts they've collected in it
 // (almanac.go) and how much of it they know (mastery.go), and the streak, the habit (runs.go). Nothing else adds up
 // across games (owner, 2026-11-20, DECISIONS.md „The redesign“): no XP, no levels, no day's goals, no achievements, no
-// titles, nothing to unlock, no rating. Points are one game's score (worth.go); a duel's is its record between two
-// people (duels.go).
+// titles, nothing to unlock, no rating, no points: a game's score is its right answers (board.go); a duel's is its
+// record between two people (duels.go).
 //
 // What a game brings is told once, at its end (NewsOf): the facts it put in the Алманах, how it moved a topic's
 // mastery when that's news (a first estimate, a tier reached), and the milestones it reached. Those are noted in the
@@ -97,13 +97,10 @@ func (g *Game) Played(ctx context.Context, userID int64) (bool, error) {
 	return played, err
 }
 
-// News is what a game brought, told once: the game's kind, whether it's the player's first (what points are is said
-// then), the facts it put in the Алманах, how it moved a topic's mastery when that's news (a topic's game only), the
-// milestones noted in the book since the player was last told (Notes), and, once a day, what others' duels against
-// the player's recordings came to (recordings.go).
+// News is what a game brought, told once: the facts it put in the Алманах, how it moved a topic's mastery when that's
+// news (a topic's game only), the milestones noted in the book since the player was last told (Notes), and, once a
+// day, what others' duels against the player's recordings came to (recordings.go).
 type News struct {
-	Kind       string          `json:"kind,omitempty"`
-	First      bool            `json:"first,omitempty"`
 	Facts      int             `json:"facts,omitempty"`
 	Mastery    *MasteryMove    `json:"mastery,omitempty"`
 	Notes      []Note          `json:"notes"`
@@ -120,11 +117,9 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 	var finished int64 // the game's end: it, and every game finished before it, are told with this news
 	if runID != 0 {
 		// A game that isn't the player's, or isn't over, has nothing to tell: the rest of the news still is.
-		err := g.DB.Read.QueryRowContext(ctx, `SELECT kind, finished_at, NOT EXISTS (SELECT 1 FROM runs o
-				WHERE o.user_id = r.user_id AND o.finished_at IS NOT NULL AND o.id <> r.id
-				AND (o.finished_at < r.finished_at OR o.finished_at = r.finished_at AND o.id < r.id))
-			FROM runs r WHERE id = ? AND user_id = ? AND finished_at IS NOT NULL`, runID, userID).
-			Scan(&n.Kind, &finished, &n.First)
+		var kind string
+		err := g.DB.Read.QueryRowContext(ctx, `SELECT kind, finished_at FROM runs r
+			WHERE id = ? AND user_id = ? AND finished_at IS NOT NULL`, runID, userID).Scan(&kind, &finished)
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
 		case err != nil:
@@ -133,7 +128,7 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 			if n.Facts, err = g.learnedIn(ctx, userID, runID); err != nil {
 				return n, err
 			}
-			if n.Kind == "topic" {
+			if kind == "topic" {
 				moves, err := g.MasteryMoves(ctx, userID, runID)
 				if err != nil {
 					return n, err

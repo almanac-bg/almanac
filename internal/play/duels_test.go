@@ -115,7 +115,7 @@ func TestFriendDuel(t *testing.T) {
 		t.Fatalf("Ana's duels once sent: %+v", d)
 	}
 	db, _ := w.g.DuelsOf(ctx, bo)
-	if len(db.Yours) != 1 || db.Yours[0].Until != store.Ms(w.now.Add(DuelFor)) || db.Yours[0].Opponent.Points != 0 ||
+	if len(db.Yours) != 1 || db.Yours[0].Until != store.Ms(w.now.Add(DuelFor)) || db.Yours[0].Opponent.Rights != 0 ||
 		db.Yours[0].First {
 		t.Fatalf("Bo's duels once sent: %+v", db)
 	}
@@ -124,7 +124,7 @@ func TestFriendDuel(t *testing.T) {
 	}
 	// Bo's turn: nothing of how Ana's answers went before he plays them (they come with his run, as far as he goes).
 	d, err := w.g.DuelOf(ctx, bo, id)
-	if err != nil || d.State != DuelYours || len(d.Opponent.Marks) != 0 || d.Opponent.Points != 0 || len(d.You.Marks) != 0 {
+	if err != nil || d.State != DuelYours || len(d.Opponent.Marks) != 0 || d.Opponent.Rights != 0 || len(d.You.Marks) != 0 {
 		t.Fatalf("Bo's turn: %+v %v", d, err)
 	}
 
@@ -141,7 +141,7 @@ func TestFriendDuel(t *testing.T) {
 	}
 	d, err = w.g.DuelOf(ctx, ana, id)
 	if err != nil || d.State != DuelWon || d.Decided != 1 || !d.Friend || d.Record == nil ||
-		*d.Record != (Record{Won: 1}) || len(d.Opponent.Marks) != Length || d.You.Points == 0 {
+		*d.Record != (Record{Won: 1}) || len(d.Opponent.Marks) != Length || d.You.Rights != Length {
 		t.Fatalf("Ana's result: %+v %v", d, err)
 	}
 	if db, _ = w.g.DuelsOf(ctx, bo); len(db.Played) != 1 || db.Played[0].State != DuelLost ||
@@ -282,7 +282,7 @@ func TestDuelLapses(t *testing.T) {
 	}
 }
 
-// A duel against a recording: a real game's ten, its marks for the screen as it's played (their points at the end),
+// A duel against a recording: a real game's ten, its marks for the screen as it's played (their score at the end),
 // shown by its player, and no record against them.
 func TestRecordingDuel(t *testing.T) {
 	w := setup(t)
@@ -328,7 +328,7 @@ func TestRecordingDuel(t *testing.T) {
 		t.Fatal("not the recording's ten")
 	}
 	d, _ = w.g.DuelOf(ctx, gal, id)
-	if d.State != DuelLost || d.Record != nil || d.Opponent.Marks[0].Points == 0 || d.Opponent.Points == 0 || !d.You.Started {
+	if d.State != DuelLost || d.Record != nil || !d.Opponent.Marks[0].Right || d.Opponent.Rights != Length || !d.You.Started {
 		t.Fatalf("its result: %+v", d)
 	}
 	// Nothing of it is the recorded player's to see.
@@ -337,10 +337,9 @@ func TestRecordingDuel(t *testing.T) {
 	}
 }
 
-// The same points: the quicker wins only by a second or more over the game (TieBand); closer, it's a draw.
 // Played second, the other side's answers come with the run as far as the player has come, and no further: of the
-// question shown, only when they answered it; how it went for them, once the player's own answer is in; their
-// points, at the end. The one who plays first hears nothing of the other's (there's nothing yet).
+// question shown, only when they answered it; how it went for them, once the player's own answer is in; their score,
+// at the end. The one who plays first hears nothing of the other's (there's nothing yet).
 func TestDuelTheOtherAsFarAsYouGo(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -370,7 +369,7 @@ func TestDuelTheOtherAsFarAsYouGo(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if a := res.State.Against; len(a) != n+1 || !a[n].Right || a[n].Points != 0 || a[n].Ms == 0 {
+		if a := res.State.Against; len(a) != n+1 || !a[n].Right || a[n].Ms == 0 {
 			t.Fatalf("question %d answered, the other's: %+v", n+1, a)
 		}
 	}
@@ -389,11 +388,13 @@ func TestDuelTheOtherAsFarAsYouGo(t *testing.T) {
 			t.Fatalf("question %d answered, the other's: %+v", n+1, a)
 		}
 	}
-	if d, err := w.g.DuelOf(ctx, bo, id); err != nil || len(d.Opponent.Marks) != Length || d.Opponent.Marks[0].Points == 0 {
+	if d, err := w.g.DuelOf(ctx, bo, id); err != nil || len(d.Opponent.Marks) != Length || !d.Opponent.Marks[0].Right {
 		t.Fatalf("the duel's end: %+v %v", d.Opponent, err)
 	}
 }
 
+// The same right answers, and nothing else to break the tie: the quicker wins only by a second or more over the game
+// (TieBand); closer, it's a draw.
 func TestTieBand(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -404,7 +405,7 @@ func TestTieBand(t *testing.T) {
 			w.befriend(ana, bo)
 		}
 		id, _ := w.g.DuelFriend(ctx, ana, bo)
-		// Both as quick, answer for answer (the same points); Ana slower overall by `slower` (her line's).
+		// Both as quick, answer for answer (the same score); Ana slower overall by `slower` (her line's).
 		run := w.playSide(ana, id, nil)
 		if _, err := w.db.Write.Exec(`UPDATE runs SET ms = ms + ? WHERE id = ?`, slower.Milliseconds(), run); err != nil {
 			t.Fatal(err)
@@ -412,8 +413,8 @@ func TestTieBand(t *testing.T) {
 		w.play(ana, run, repeat(w.right, Length)...)
 		w.playSide(bo, id, repeat(w.right, Length))
 		d, err := w.g.DuelOf(ctx, bo, id)
-		if err != nil || d.You.Points != d.Opponent.Points {
-			t.Fatalf("not the same points: %+v (%v)", d, err)
+		if err != nil || d.You.Rights != d.Opponent.Rights {
+			t.Fatalf("not the same score: %+v (%v)", d, err)
 		}
 		return d
 	}
