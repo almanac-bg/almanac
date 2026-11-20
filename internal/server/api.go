@@ -72,6 +72,8 @@ var playerErrors = map[error]*apiError{
 	account.ErrNoMail: {http.StatusBadRequest, "no_mail",
 		"Писмата ни до този адрес не стигат. Провери дали е изписан вярно или опитай с друг."},
 	account.ErrNoHandoff: {http.StatusNotFound, "no_handoff", "Тази връзка вече не работи: играта ти остана там, където я започна."},
+	account.ErrHandoffNumber: {http.StatusConflict, "handoff_number",
+		"Въведи числото, което виждаш в приложението, откъдето дойде играта."},
 	account.ErrHandoffSignedIn: {http.StatusConflict, "handoff_signed_in",
 		"Тук вече играеш с профила си. За да добавиш към него играта от другото място, влез с имейла си там, където я започна."},
 	account.ErrHandoffHere: {http.StatusConflict, "handoff_here",
@@ -434,67 +436,6 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) error {
 	http.SetCookie(w, &http.Cookie{Name: s.askCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.secure,
 		SameSite: http.SameSiteStrictMode})
 	s.setSession(w, token)
-	return ok(w, map[string]any{"user": u})
-}
-
-// handoff makes the link that brings the player's game to the phone's own browser, once (account.Handoff): from an
-// app's browser (Messenger, Instagram …) where a guest's game would otherwise stay. The link opens the app's page
-// /hand/<token>, which takes it by takeHandoff: a page, so that a link preview fetching it takes nothing.
-func (s *Server) handoff(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	if !s.limits.allow("handoff:"+strconv.FormatInt(u.ID, 10), 20, time.Hour) {
-		return errTooMany
-	}
-	token, err := s.accounts.Handoff(r.Context(), u.ID)
-	if err != nil {
-		return err
-	}
-	return ok(w, map[string]any{"url": s.cfg.PublicURL + "/hand/" + token})
-}
-
-// lookHandoff says whose game a handoff's token brings to this browser, and on how many days it was played
-// (account.LookHandoff), or why it can't come here: asked by /hand/<token> as it opens, so that the player sees what
-// the tap would bring (a link from someone else is theirs), and taking nothing.
-func (s *Server) lookHandoff(w http.ResponseWriter, r *http.Request) error {
-	var in struct {
-		Token string `json:"token"`
-	}
-	if err := readJSON(r, &in); err != nil {
-		return err
-	}
-	if !s.allowFrom(r, "handlook", 60, 300, time.Hour) {
-		return errTooMany
-	}
-	h, err := s.accounts.LookHandoff(r.Context(), in.Token, s.session(r))
-	if err != nil {
-		return err
-	}
-	return ok(w, map[string]any{"game": h})
-}
-
-// takeHandoff brings the game of a handoff's token to this browser, in place of a guest with nothing yet, and takes
-// it from the browser it came from (account.TakeHandoff): posted from /hand/<token> once the player taps to bring it.
-func (s *Server) takeHandoff(w http.ResponseWriter, r *http.Request) error {
-	var in struct {
-		Token string `json:"token"`
-	}
-	if err := readJSON(r, &in); err != nil {
-		return err
-	}
-	// From a phone's browser: behind a carrier's address, many phones (codesNet).
-	if !s.guardFrom(r, "hand", codesNet, codesSite, time.Hour) {
-		return errTooMany
-	}
-	u, token, err := s.accounts.TakeHandoff(r.Context(), in.Token, s.session(r))
-	if err != nil {
-		return err
-	}
-	if token != "" {
-		s.setSession(w, token)
-	}
 	return ok(w, map[string]any{"user": u})
 }
 

@@ -1,13 +1,15 @@
 // Package account is who plays: guests who start at once, the email code that keeps an account across devices, the
-// one-time link that brings a game from an app's own browser to the phone's (Handoff), the sessions that keep a
-// browser signed in, and names.
+// one-time link that brings a game from an app's own browser to the phone's (Handoff: handoff.go), the sessions that
+// keep a browser signed in, and names.
 //
 // A session is one browser's: nobody else gets it. The notifications turned on in a browser (push_subs) are tied to
 // the session that turned them on, and end with it. A browser signing in by email
 // (Verify) gets a new session in place of the one it had, and its notifications go along to the new one. A handoff
-// moves a game, it doesn't share it: the browser it came from is signed out, and the one it comes to becomes it, if it
-// had no game of its own (a link joins no two games: only an email does). When a guest becomes a profile, every
-// other session the guest had ends: only the browser that proved the email is in it. SignOutOthers ends a player's
+// shares a guest's game with the phone's browser: the app's browser it came from stays signed in, and the one it
+// comes to becomes the same guest with a session of its own, if it had no game of its own (a link joins no two games:
+// only an email does); a browser not plainly the same phone gives the number the app's page shows. When a guest
+// becomes a profile, every other session the guest had ends (the app's browser a handoff came from too): only the
+// browser that proved the email is in it. SignOutOthers ends a player's
 // other sessions on demand. A player suspended by whoever keeps the game (Suspend) loses every session and gets no new
 // one until it's lifted (a guest so left without a session stays all the same, for as long as a session would have
 // lasted: CleanUp); names are checked against fakes of the game's own (names.go). A guest who never plays is
@@ -882,154 +884,6 @@ func (a *Accounts) fold(tx *sql.Tx, from, to int64) error {
 		}
 	}
 	return a.remove(tx, from)
-}
-
-// HandoffTTL is how long a handoff's link works (once).
-const HandoffTTL = 30 * time.Minute
-
-// HandoffsKept is how many of a player's handoff links work at once: a newer one leaves the last few working, so
-// that the link copied a moment ago isn't dead by the time it's pasted.
-const HandoffsKept = 3
-
-var (
-	// ErrNoHandoff is a handoff's link that doesn't work: used, out of time, never made, or not a guest's.
-	ErrNoHandoff = errors.New("no such handoff")
-	// ErrHandoffSignedIn is a guest's game brought to a browser signed in to a profile: it isn't joined to it by a
-	// link (a link from someone else would join their game, and their phone, to this profile), only by signing in
-	// with the email where the game is.
-	ErrHandoffSignedIn = errors.New("a handoff to a profile")
-	// ErrHandoffHere is a guest's game brought to a browser with a guest's game of its own (hasGame): two games
-	// aren't joined by a link either (someone else's would bring its friends into this one), only by an email, kept
-	// in one and signed in to in the other.
-	ErrHandoffHere = errors.New("a handoff to a game")
-)
-
-// Handing is the game a handoff's link brings, as the page that takes it shows it before the tap (LookHandoff): whose
-// it is, and how many days it was played on, so that a link from someone else is seen to be theirs.
-type Handing struct {
-	Name string `json:"name"`
-	Days int    `json:"days"`
-}
-
-// Handoff makes the token of a link that brings a guest's game to another browser, once, within HandoffTTL: how a
-// game begun in an app's own browser (Messenger, Instagram …), which a guest's game would never leave, moves to the
-// phone's browser. Only a guest's: a profile moves by signing in with its email, and a link to it would sign in
-// whoever it reached.
-func (a *Accounts) Handoff(ctx context.Context, userID int64) (string, error) {
-	token, hash := newToken()
-	err := a.DB.Tx(ctx, func(tx *sql.Tx) error {
-		var guest bool
-		if err := tx.QueryRow(`SELECT email IS NULL FROM users WHERE id = ?`, userID).Scan(&guest); err != nil {
-			return err
-		}
-		if !guest {
-			return ErrNoHandoff
-		}
-		if _, err := tx.Exec(`DELETE FROM handoffs WHERE expires_at <= ? OR token_hash IN (SELECT token_hash
-				FROM handoffs WHERE user_id = ? ORDER BY expires_at DESC LIMIT -1 OFFSET ?)`,
-			store.Now(), userID, HandoffsKept-1); err != nil {
-			return err
-		}
-		// Each later than the player's last, if only by a millisecond: which are the last few is never a tie.
-		_, err := tx.Exec(`INSERT INTO handoffs (token_hash, user_id, expires_at) VALUES (?1, ?2,
-				max(?3, (SELECT coalesce(max(expires_at), 0) + 1 FROM handoffs WHERE user_id = ?2)))`,
-			hash, userID, store.Ms(time.Now().Add(HandoffTTL)))
-		return err
-	})
-	return token, err
-}
-
-// handing reads, for a handoff's token taken in the browser of session (its token, maybe ""), the guest whose game it
-// brings (from) and who the browser is (current, nil for no one), or why it can't be taken there: the link doesn't
-// work (ErrNoHandoff), the browser is a profile's (ErrHandoffSignedIn), or a guest's with a game of their own
-// (ErrHandoffHere). Opened where it was made, current is from.
-func handing(tx *sql.Tx, token, session string) (from User, current *User, err error) {
-	var email sql.NullString
-	err = tx.QueryRow(`SELECT u.id, u.name, u.tag, u.email, u.admin FROM handoffs h JOIN users u ON u.id = h.user_id
-		WHERE h.token_hash = ? AND h.expires_at > ?`, hashToken(token), store.Now()).
-		Scan(&from.ID, &from.Name, &from.Tag, &email, &from.Admin)
-	if errors.Is(err, sql.ErrNoRows) || (err == nil && email.Valid) { // a profile's (made before only guests'): none
-		return from, nil, ErrNoHandoff
-	}
-	if err != nil {
-		return from, nil, err
-	}
-	if current, err = sessionUser(tx, session); err != nil || current == nil || current.ID == from.ID {
-		return from, current, err
-	}
-	if !current.Guest() {
-		return from, current, ErrHandoffSignedIn // the link stays good, for the browser it was meant for
-	}
-	var own bool
-	if err := tx.QueryRow(`SELECT `+hasGame+` FROM users u WHERE u.id = ?`, current.ID).Scan(&own); err != nil {
-		return from, current, err
-	}
-	if own {
-		return from, current, ErrHandoffHere // the link stays good here too
-	}
-	return from, current, nil
-}
-
-// LookHandoff says what game a handoff's token brings to the browser of session, before it's taken (Handing), or
-// why it can't be taken there (handing's errors). It takes nothing: the page asks it as it opens.
-func (a *Accounts) LookHandoff(ctx context.Context, token, session string) (Handing, error) {
-	var h Handing
-	tx, err := a.DB.Read.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
-	if err != nil {
-		return h, err
-	}
-	defer tx.Rollback() //nolint:errcheck // a read: nothing to keep
-	from, _, err := handing(tx, token, session)
-	if err != nil {
-		return h, err
-	}
-	h.Name = from.Name
-	err = tx.QueryRow(`SELECT count(*) FROM active_days WHERE user_id = ?`, from.ID).Scan(&h.Days)
-	return h, err
-}
-
-// TakeHandoff brings the game of the guest who made a handoff's token (from) to the browser of session (its token,
-// maybe ""), once. The game moves, it isn't shared: every session `from` had ends, with the notifications of its
-// browsers and its other links, so the browser it came from is signed out (whoever made a link that reached someone
-// else keeps no way into the game it gave away). The browser becomes `from`, with a new session, and keeps its own
-// notifications; a guest it was, who had nothing yet (hasGame), goes. A browser with a game of its own, a profile's
-// or a guest's, isn't joined to another by a link (ErrHandoffSignedIn, ErrHandoffHere): what the link brings is
-// shown first (LookHandoff), and two games are joined only by signing in with an email. The session token is ""
-// when the browser keeps the one it has (opened where it was made).
-func (a *Accounts) TakeHandoff(ctx context.Context, token, session string) (User, string, error) {
-	var u User
-	var started string
-	err := a.DB.Tx(ctx, func(tx *sql.Tx) error {
-		from, current, err := handing(tx, token, session)
-		if err != nil {
-			return err
-		}
-		if current != nil && current.ID == from.ID { // opened where it was made: nothing moves
-			_, err := tx.Exec(`DELETE FROM handoffs WHERE token_hash = ?`, hashToken(token))
-			u = *current
-			return err
-		}
-		// The game leaves where it was: its sessions (and their notifications), and every link to it.
-		if _, err := endSessions(tx, from.ID, nil); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(`DELETE FROM handoffs WHERE user_id = ?`, from.ID); err != nil {
-			return err
-		}
-		u = from
-		if current == nil {
-			started, err = startSession(tx, u.ID)
-			return err
-		}
-		if started, err = moveSession(tx, session, u.ID); err != nil {
-			return err
-		}
-		return a.remove(tx, current.ID)
-	})
-	if err != nil {
-		return User{}, "", err
-	}
-	return u, started, nil
 }
 
 // Animal is what a new player starts as, until they choose: a name (with a number), a tag (with digits) and the

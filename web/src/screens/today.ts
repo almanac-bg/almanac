@@ -6,7 +6,10 @@
 // (game/share.ts, in a sheet with its card and its text), how all of България did with it, one entry its right answers
 // wrote in the book (the rarest, once enough others played the day), and tomorrow (when the next issue comes, the streak it makes, the reminder's ask). A wrong game is
 // never celebrated. Topics are played from their chapter in the Алманах, duels from Приятели. Once, over the day: what
-// came of the days just missed, a friend's duel waiting, a friend's yes.
+// came of the days just missed, a friend's duel waiting, a friend's yes. In an app's own browser the result's action
+// is the way out to the phone's browser with the game (keep.ts, exitWay), and the cover has a line for a game kept
+// there; a game brought here by it (its token in the address's fragment: takeHand) lands on the result, whose action
+// is then the ask to keep it and be reminded.
 
 import { picture } from "../art/picture.ts";
 import { news } from "../game/news.ts";
@@ -20,6 +23,7 @@ import { api, errorText, serverNow, tally } from "../lib/api.ts";
 import { boot } from "../lib/boot.ts";
 import { dayInBulgaria } from "../lib/day.ts";
 import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
+import { handToken } from "../lib/embedded.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { type RemindAsks, remindAnswered, remindAsks, remindShown } from "../lib/keep.ts";
 import { pushable, pushOn, turnOn } from "../lib/push.ts";
@@ -29,7 +33,7 @@ import { dateWords, issueOf, onDay, weekday } from "../lib/words.ts";
 import { cover, notice, player, playing, topics, user } from "../state.ts";
 import { failure, formatNumber, rankRow, rightsOf, stakeLine, weekStrip } from "../ui.ts";
 import { type Accepted, acceptedLine, type Waiting, waitingLine } from "./duel.ts";
-import { app, haveProfile, keepLine, keepStake, mailAsk } from "./keep.ts";
+import { app, coverExit, exitWay, handedIn, haveProfile, keepLine, keepStake, mailAsk, takeHand } from "./keep.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
 /** The entry of the day played that its result shows (play.DayEntry): its place, its fact as the book has it, and
@@ -122,6 +126,10 @@ export function today() {
   // The game's mails link here with ?from=mail (server/streakmail.go, daymail.go): their reader has a profile.
   const fromMail = new URLSearchParams(location.search).get("from") === "mail";
   if (fromMail) history.replaceState(history.state, "", "/");
+  // A game brought from an app's own browser: its token in the address's fragment (keep.ts, exitWay), taken out of
+  // the address at once and taken here (takeHand), not in an app's browser (the one it came from, reloaded).
+  const hand = handToken(location.hash);
+  if (hand) history.replaceState(history.state, "", `${location.pathname}${location.search}`);
   const screen = slot(() => h("p", { class: "muted" }, "…"));
   const load = async () => {
     try {
@@ -198,7 +206,14 @@ export function today() {
     document.removeEventListener("visibilitychange", newDay);
     clearInterval(every);
   });
-  load();
+  if (hand && !app)
+    screen.show(() =>
+      takeHand(hand, () => {
+        inPage = undefined; // the page's day was for the browser as it was
+        load();
+      }),
+    );
+  else load();
   return h("div", null, screen);
 
   /** The screen itself: the issue, or (`run` done) its result; `just`: played this moment, so it lands and what it
@@ -308,6 +323,7 @@ function issue(
       ),
       at ? trail(marks, 10, at) : null,
       h("button", { class: "btn primary issue-go", onclick: start }, at ? "Продължи" : "Започни"),
+      first && !at ? coverExit() : null,
       error ? h("p", { class: "bad", role: "alert" }, error) : null,
       at
         ? null
@@ -522,6 +538,19 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
     ),
   );
   if (just) land(hero, run.id, perfect, true);
+  // The streak with today's, the game's stake, and the reminder's ask: the result's action where it leads, else in
+  // „Утре“. A guest in an app's own browser has the way out for the action; one whose game was just brought here,
+  // the ask to keep it and be reminded (while it's there to ask); everyone else, sharing the day.
+  const streak = () => (just && fresh() === t ? 0 : fresh().streak);
+  const stake = keepStake(
+    () => (streak() >= 2 ? 2 : 1),
+    () => streak(),
+  );
+  const ask = remindAsk(t.day, stake);
+  const guest = !user.peek()?.email;
+  const away = !!app && guest;
+  const askFirst = !away && guest && handedIn.peek();
+  const share = [shareButton(run, t), h("p", { class: "small" }, "Само резултатът и формата му, без отговорите.")];
   const streakRow = () => {
     const f = fresh();
     if (!user() || (!f.streak && !just)) return null;
@@ -558,8 +587,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       h(
         "div",
         { class: "result-share" },
-        shareButton(run, t),
-        h("p", { class: "small" }, "Само резултатът и формата му, без отговорите."),
+        away ? exitWay(stake) : askFirst ? () => (ask.showing() ? ask.view : share) : share,
         h("button", { class: "link tap", type: "button", onclick: openReview }, "Прегледай въпросите"),
       ),
       // What the game brought (a day whose result was never on screen: told now, once).
@@ -571,7 +599,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       () => bulgariaToday(fresh(), run, review),
       () => entryOfDay(fresh().entry),
     ),
-    tomorrow(t, () => (just && fresh() === t ? 0 : fresh().streak)),
+    tomorrow(t, streak, stake, askFirst || away ? null : ask),
     () => {
       const all = reviewList();
       if (!all) return null;
@@ -790,19 +818,20 @@ function shareSheet(run: State, t: Today): void {
 }
 
 /** Tomorrow: the next issue's date set large, when it comes and what it makes of the streak (`streak`: with today's);
- * a guest's ask to keep the game (keep.ts: what it risks till then); and, where it isn't on yet, the reminder's ask. */
-function tomorrow(t: Today, streak: () => number): Child {
+ * a guest's ask to keep the game (keep.ts: what it risks till then, `stake`); and, where it isn't on yet, the
+ * reminder's ask (`ask`; null where the result's action is the ask, or the way out of an app's browser). */
+function tomorrow(
+  t: Today,
+  streak: () => number,
+  stake: () => string | null,
+  ask: { view: Child; mailing: () => boolean } | null,
+): Child {
   const next = new Date(`${t.day}T12:00:00Z`);
   next.setUTCDate(next.getUTCDate() + 1);
   const day = next.toISOString().slice(0, 10);
-  const stake = keepStake(
-    () => (streak() >= 2 ? 2 : 1),
-    () => streak(),
-  );
   const left = signal(untilMidnight());
   const every = setInterval(() => left.set(untilMidnight()), 30_000);
   onCleanup(() => clearInterval(every));
-  const ask = remindAsk(t.day, stake);
   return h(
     "section",
     { class: "sect tomorrow" },
@@ -817,8 +846,7 @@ function tomorrow(t: Today, streak: () => number): Child {
       }),
     ),
     // The ask by mail asks a guest for the email itself: the line to keep the game steps aside for it.
-    keepLine(stake, ask.mailing),
-    ask.view,
+    ask ? [keepLine(stake, ask.mailing), ask.view] : null,
   );
 }
 
@@ -918,10 +946,13 @@ const remindKey = "almanac.remind-ask";
 /** The day played, in its card for tomorrow: shall we remind the player? By notification where one can come and isn't
  * on yet. Where none can (an iPhone in a browser tab, a browser without them, or one told to refuse them, there and
  * then too), by mail (keep.ts, mailAsk: a guest's email, proved by its code, keeps the game as well), unless it's on
- * already; never in an app's own browser, where the way out to the phone's leads (keepLine). At most three times,
+ * already; never in an app's own browser, where the way out to the phone's leads (keep.ts, exitWay). At most three times,
  * and never twice in a day. `mailing`: the ask by mail is asking a guest for an email, or was told „Не сега“ today
  * (one „Не сега“ is enough for the email asked for both ways). */
-function remindAsk(day: string, stake: () => string | null): { view: Child; mailing: () => boolean } {
+function remindAsk(
+  day: string,
+  stake: () => string | null,
+): { view: Child; mailing: () => boolean; showing: () => boolean } {
   let asked = remindAsks(null);
   try {
     asked = remindAsks(localStorage.getItem(remindKey));
@@ -941,7 +972,8 @@ function remindAsk(day: string, stake: () => string | null): { view: Child; mail
   const state = signal<"ask" | "on" | "gone">("gone");
   const mailNo = signal(asked.mailNo === day);
   const mailing = () => by() === "mail" && (state() === "ask" || mailNo()) && !user()?.email;
-  if (asked.n >= 3 || asked.day === day || !by.peek()) return { view: null, mailing };
+  const showing = () => state() !== "gone";
+  if (asked.n >= 3 || asked.day === day || !by.peek()) return { view: null, mailing, showing };
   // Each way of asking counted once a day on a device (play/measure.go), however often Начало is drawn.
   const shown = () => {
     const how = by.peek() ?? "mail";
@@ -1027,5 +1059,5 @@ function remindAsk(day: string, stake: () => string | null): { view: Child; mail
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
     ];
   };
-  return { view, mailing };
+  return { view, mailing, showing };
 }

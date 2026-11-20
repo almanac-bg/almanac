@@ -144,6 +144,7 @@ func (s *Server) startDay(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	s.markPlayed(w, st.Day)
 	return ok(w, st)
 }
 
