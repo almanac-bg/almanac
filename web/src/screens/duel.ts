@@ -7,7 +7,7 @@ import { type ApiError, api } from "../lib/api.ts";
 import { type Child, effect, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { go, title } from "../lib/router.ts";
-import { withName } from "../lib/words.ts";
+import { withWord } from "../lib/words.ts";
 import { player, user } from "../state.ts";
 import {
   back,
@@ -219,7 +219,7 @@ export function leftLine(l?: Left | null): Child {
   return h(
     "p",
     { class: "streak-notice", role: "status" },
-    `Дуелът ${withName(l.them)} продължи без теб (излезе ${leftAfter(l.after)}): ${words[l.state].toLowerCase()}${rating}.`,
+    `Дуелът ${withWord(l.them)} продължи без теб (излезе ${leftAfter(l.after)}): ${words[l.state].toLowerCase()}${rating}.`,
     h("a", { href: `/duel/${l.id}` }, "Виж"),
   );
 }

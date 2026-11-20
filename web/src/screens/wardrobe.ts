@@ -24,6 +24,7 @@ let {
   toneNames,
   loadProgress,
   meter,
+  withWord,
 } = {} as Kit;
 
 type Part = "avatar" | "frame" | "backdrop" | "title";
@@ -60,6 +61,7 @@ export function wardrobe(kit: Kit) {
     toneNames,
     loadProgress,
     meter,
+    withWord,
   } = kit);
   title("Гардероб");
   return h(
@@ -285,10 +287,9 @@ function locks<T extends Lock & { name: string }>(p: Progress, list: T[], previe
   ];
 }
 
-/** What unlocks something, as a sentence: „със“ before a word that starts with „с“ or „з“ („със скрито
- * постижение“). */
+/** What unlocks something, as a sentence: „Отключва се със скрито постижение.“, „… със 100 дни …“ (withWord). */
 function unlockedWith(how: string): string {
-  return `Отключва се ${/^[сз]/i.test(how) ? "със" : "с"} ${how}.`;
+  return `Отключва се ${withWord(how)}.`;
 }
 
 /** A locked thing's words: its name, what unlocks it, and how far along the player is — their level, or the

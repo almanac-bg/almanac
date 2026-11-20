@@ -52,12 +52,8 @@ export interface Today {
   /** The day's issue: its number from the first day of the day's ten (play/issue.go), the same for everyone. */
   issue?: number;
   streak: number;
-  /** This week's days played, Monday first (for a player who has played). */
-  week?: boolean[];
   /** Reserve days in hand: each keeps the streak through a day missed. */
   reserve?: number;
-  /** Days in a row to the next reserve day (0: they are full). */
-  next?: number;
   /** A day just missed that a reserve day kept the streak through (the last 3 days). */
   kept?: string;
   /** A streak that just ended (the last 3 days): its days, and the day missed that ended it. */

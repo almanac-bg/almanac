@@ -291,7 +291,7 @@ var deviceNames = map[string]string{
 // pushNames are the kinds of notifications as they're counted (pushKind.name; "stop": the day's last reminder), and as
 // the admin page says them.
 var pushNames = []struct{ kind, name string }{
-	{"day", "Въпросите на деня"}, {"stop", "Спираме напомнянията"}, {"friends", "Приятели и игри"}, {"royal", "Роял"},
+	{"day", "Въпросите на деня"}, {"stop", "Спираме напомнянията"}, {"friends", "Приятели и резултати"}, {"royal", "Роял"},
 	{"asked", "Роял, поискан"},
 }
 

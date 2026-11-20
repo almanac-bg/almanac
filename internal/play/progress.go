@@ -621,8 +621,9 @@ type News struct {
 	Unlocks []Unlock `json:"unlocks"`
 	// Avatar is the avatar worn (shape-tone), for an unlocked shape to be put on in it.
 	Avatar string `json:"avatar"`
-	// Mastery is how the game just played moved the player's mastery of its topics, told after a topic's game only.
-	Mastery []MasteryMove `json:"mastery,omitempty"`
+	// Mastery is how the game just played moved the player's mastery of a topic, when that's news (masteryTold): told
+	// after a topic's game only, in „Ново за теб“.
+	Mastery *MasteryMove `json:"mastery,omitempty"`
 	// Open is which of the game's systems the player has met; Opened, those just met, told once (Systems' names).
 	Open   Open     `json:"open"`
 	Opened []string `json:"opened,omitempty"`
@@ -686,9 +687,11 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 				}
 			}
 			if n.Kind == "topic" {
-				if n.Mastery, err = g.MasteryMoves(ctx, userID, runID); err != nil {
+				moves, err := g.MasteryMoves(ctx, userID, runID)
+				if err != nil {
 					return n, err
 				}
+				n.Mastery = masteryTold(moves)
 			}
 		}
 	}
