@@ -29,8 +29,10 @@ let {
   record,
   reviewParts,
   topics,
+  recordingName,
   trail,
   withWord,
+  worn,
 } = {} as Kit;
 
 /** How many questions a duel has. */
@@ -63,8 +65,10 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
     record,
     reviewParts,
     topics,
+    recordingName,
     trail,
     withWord,
+    worn,
   } = kit);
   const steps = again && typeof again === "object" && "main" in again ? again : null;
   const next = steps ? steps.main : (again as Child);
@@ -90,8 +94,7 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
 
 /** „Дуел с Мария“, or a recording as it was chosen and whose: „По-силен запис · Краси“. */
 function kicker(d: DuelView): string {
-  if (d.recorded)
-    return `${d.level === "stronger" ? "По-силен запис" : d.level === "equal" ? "Равен запис" : "Запис"} · ${d.opponent?.name ?? ""}`;
+  if (d.recorded) return `${recordingName(d.level)} · ${d.opponent?.name ?? ""}`;
   const them = d.opponent?.name;
   return them ? `Дуел ${withWord(them)}` : "Дуел";
 }
@@ -135,14 +138,15 @@ function hero(d: DuelView): Child {
   return card;
 }
 
-/** One side, face to face: the avatar, the name (a way to their profile), and the score;
+/** One side, face to face: the avatar with the seal they wear on its corner (the name keeps the narrow column's
+ * width), the name (a way to their profile), and the score;
  * the winner's in gold. Never the score of a player gone since, whose game went with them. */
 function face(s: Side, label: string, tag: string, won: boolean): Child {
   const look = s.look ?? {};
   return h(
     "div",
     { class: won ? "duel-face win" : "duel-face" },
-    avatar(look.avatar, { size: "l", name: s.name }),
+    h("span", { class: "duel-avatar" }, avatar(look.avatar, { size: "l", name: s.name }), worn(look.seal)),
     tag ? h("a", { class: "duel-name", href: profileHref(tag) }, label) : h("strong", { class: "duel-name" }, label),
     s.gone
       ? [h("b", { class: "duel-score none" }, "–"), h("span", { class: "duel-rights" }, "Играчът вече го няма")]

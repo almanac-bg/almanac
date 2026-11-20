@@ -5924,6 +5924,28 @@
     font: 700 0.875rem / 1.2 var(--font-sans);
   }
 
+  /* On a narrow phone the day and the record go under the name, so that the name and its seal keep the row's width. */
+  @media (max-width: 24rem) {
+    .friend {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .friend > .avatar {
+      grid-row: 1 / span 2;
+    }
+
+    .friend-day {
+      grid-column: 2;
+      grid-row: 2;
+      justify-items: start;
+    }
+
+    .friend-act {
+      grid-column: 3;
+      grid-row: 1 / span 2;
+    }
+  }
+
   .friend-day .rank-n {
     color: var(--ink);
     font-size: 1.125rem;
@@ -6006,6 +6028,13 @@
     border-radius: var(--r-2);
     background: var(--surface);
     box-shadow: inset 0 0 0 2px var(--line);
+  }
+
+  /* The seal beside the name of who asks, in the line's text. */
+  .invitation .seal {
+    display: inline-block;
+    margin-inline: 4px 0;
+    vertical-align: middle;
   }
 
   .invitation-actions {

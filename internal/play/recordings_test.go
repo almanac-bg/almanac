@@ -233,3 +233,43 @@ func TestRecordingsWords(t *testing.T) {
 		}
 	}
 }
+
+// A duel against a recording keeps the level it was chosen at, „равен“ or „по-силен“ (anything else is „равен“), and
+// says it (DuelView.Level): „По-силен запис · Краси“. A friend's duel has none.
+func TestRecordingLevel(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	one, ana, bo := w.user(), w.user(), w.user()
+	for range 3 {
+		s, err := w.g.StartTopic(ctx, one, MixTopic)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.play(one, s.ID, append(repeat(w.right, 6), repeat(w.wrong, Length-6)...)...)
+		w.wait(time.Minute)
+	}
+	for _, c := range []struct{ chosen, level string }{{Stronger, Stronger}, {Even, Even}, {"", Even}, {"hard", Even}} {
+		id, err := w.g.DuelRecording(ctx, ana, c.chosen)
+		if err != nil {
+			t.Fatal(err)
+		}
+		d, err := w.g.DuelOf(ctx, ana, id)
+		if err != nil || !d.Recorded || d.Level != c.level {
+			t.Fatalf("chosen %q: %+v %v, want the level %q", c.chosen, d, err, c.level)
+		}
+		data, _ := json.Marshal(d)
+		if !strings.Contains(string(data), `"level":"`+c.level+`"`) {
+			t.Fatalf("chosen %q: %s", c.chosen, data)
+		}
+		list, err := w.g.DuelsOf(ctx, ana)
+		if err != nil || len(list.Yours) == 0 || list.Yours[0].Level != c.level {
+			t.Fatalf("chosen %q, in the list: %+v %v", c.chosen, list.Yours, err)
+		}
+		// Played to its end, so the next is a new one, not this one gone on with.
+		w.playSide(ana, id, repeat(w.right, Length))
+	}
+	friendly := w.duel(ana, bo, repeat(w.right, Length), repeat(w.wrong, Length))
+	if d, err := w.g.DuelOf(ctx, bo, friendly); err != nil || d.Level != "" {
+		t.Fatalf("a friend's duel has no level: %+v %v", d, err)
+	}
+}

@@ -80,7 +80,7 @@ test("against a recording: a real game's ten, its player named, its answers as t
   const c = await (await browser.newContext()).newPage();
   await c.goto("/duel/new");
   await expect(c.getByText("Още нямаш приятели тук.")).toBeVisible();
-  await c.getByRole("button", { name: "Играй срещу запис" }).click();
+  await c.getByRole("button", { name: "По-силен запис" }).click();
   await countIn(c);
   await expect(c.locator(".question-head .versus")).toContainText(owner);
   await playSecond(c, owner);
@@ -88,7 +88,7 @@ test("against a recording: a real game's ten, its player named, its answers as t
     timeout: 10_000,
   });
   await c.keyboard.press("Shift");
-  await expect(c.locator(".duel-head .kicker")).toHaveText(`Запис · ${owner}`);
+  await expect(c.locator(".duel-head .kicker")).toHaveText(`По-силен запис · ${owner}`);
   await expect(c.locator(".duel-meant")).toContainText(`Записът е от истинска игра на ${owner}`);
   await expect(c.getByRole("button", { name: "Още един срещу запис" })).toBeVisible();
 });

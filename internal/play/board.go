@@ -103,7 +103,7 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	if err != nil {
 		return b, err
 	}
-	mine.Me, mine.Look = true, lookOf(viewer, avatar)
+	mine.Me, mine.Look = true, g.lookOf(viewer, avatar)
 	b.Mine = &mine
 	r.rights, r.ms = mine.Rights, mine.Ms
 	// Their place: after everyone ahead of them in the count, which has them already, or not yet: finished since, or
@@ -196,7 +196,7 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 		if err := rows.Scan(&id, &s.Name, &s.Tag, &s.Rights, &s.Of, &s.Ms, &avatar); err != nil {
 			return nil, err
 		}
-		s.Look = lookOf(id, avatar)
+		s.Look = g.lookOf(id, avatar)
 		d.top, d.users = append(d.top, s), append(d.users, id)
 	}
 	if err := rows.Err(); err != nil {

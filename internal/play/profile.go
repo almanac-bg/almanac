@@ -25,8 +25,8 @@ type Profile struct {
 	Look
 	// Since is when they started playing: the month (its first day, at noon in Bulgaria).
 	Since int64 `json:"since"`
-	// Seal is the seal they wear (none before a rank), Ranks their ranks in the bank's chapters, Best the longest
-	// streak they've had.
+	// Seal is the seal they wear (none before a rank), whole (its name, its quarters): over the look's, which says
+	// only its chapter and level. Ranks their ranks in the bank's chapters, Best the longest streak they've had.
 	Seal  *Seal         `json:"seal,omitempty"`
 	Ranks []ChapterRank `json:"ranks"`
 	Best  int           `json:"best"`
@@ -73,7 +73,7 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 	if err != nil {
 		return p, err
 	}
-	p.Me, p.Look = id == viewer, lookOf(id, avatar)
+	p.Me, p.Look = id == viewer, g.lookOf(id, avatar)
 	streak, err := g.StreakOf(ctx, id)
 	if err != nil {
 		return p, err

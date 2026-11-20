@@ -35,6 +35,18 @@ test("friends on the day: who has played it, and how each went", async ({ browse
   await expect(friends.locator(".rank-row")).toHaveCount(2);
   await expect(friends.locator(".rank-row.me .rank-you")).toHaveText(" ти");
   await expect(friends.locator(".rank-row").filter({ hasText: ana }).locator(".rank-score")).toHaveText(/^\d+ от 10$/);
+  // Beside each name, the seal its player wears, as the server says it (none before a rank: her ink is her right
+  // answers'), in her chapter's colour.
+  const seal = await b.evaluate(
+    async () =>
+      ((await (await fetch("/api/friends")).json()).friends[0].seal ?? null) as {
+        chapter: string;
+        level: number;
+      } | null,
+  );
+  const worn = friends.locator(".rank-row").filter({ hasText: ana }).locator(".rank-name .seal");
+  await expect(worn).toHaveCount(seal ? 1 : 0);
+  if (seal) await expect(worn).toHaveClass(new RegExp(`t-${seal.chapter}`));
 });
 
 test("friends by tag: a name and a tag of one's own, a request, a yes", async ({ browser }, info) => {
