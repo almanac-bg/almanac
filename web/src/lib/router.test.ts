@@ -130,7 +130,6 @@ router.start(
     { path: /^\/play\/([a-z]+)$/, view: page("topic") },
     { path: /^\/friends$/, view: page("Приятели") },
     { path: /^\/settings$/, view: page("Настройки") },
-    { path: /^\/royal$/, view: page("Роял") },
     { path: /^\/duel\/live$/, view: page("duel") },
     // A screen that sends the player on as it's drawn (an old link): the page sent to is what shows.
     {
@@ -286,11 +285,11 @@ function fromOutside(url: string): void {
 }
 
 test("a game opened from outside has Начало under it: back asks, and „Излез“ leaves the game for Начало", async () => {
-  fromOutside("/royal");
+  fromOutside("/duel/live");
   const at = index;
   router.holdWhile(() => true);
   assert.equal(router.entry().game, true);
-  assert.equal(location.pathname, "/royal", "the game keeps its address");
+  assert.equal(location.pathname, "/duel/live", "the game keeps its address");
   assert.equal(entries[at]?.url, "/", "Начало under it");
   let ask: (() => void) | null = null;
   const unguard = router.beforeLeaving((proceed) => {

@@ -28,8 +28,7 @@ import (
 // hours later. That day's goals are the ones it moves. A game played across midnight moved the goals of both days.
 //
 // It never fails the request that finished the run: the answer is kept, whatever happens after it.
-//
-// A Роял's runs aren't noted here: the evening keeps what they earned off its clock (AfterRoyal).
+
 const (
 	// afterFor is the most the request that finished a run gives what follows it.
 	afterFor = 30 * time.Second

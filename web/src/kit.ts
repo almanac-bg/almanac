@@ -1,6 +1,6 @@
 // app.js holds what a daily visit uses: Начало, a game, the screens a game leads to. A screen a daily visit doesn't
-// open loads on its own, the first time it's opened: Роял's (royal.ts), a live duel's (live.ts) and a duel's
-// result (outcome.ts), only for those who play there; and Профил's places, the boards and the
+// open loads on its own, the first time it's opened: a live duel's (live.ts) and a duel's result (outcome.ts), only
+// for those who play there; and Профил's places, the boards and the
 // friends (me, settings, rewards, wardrobe, almanac, played, ranks, friends, player). Each is handed the app's
 // pieces it uses from here, and imports nothing of the app but types: a module it imported would be one app.js
 // imports too, and esbuild would split every such module into a shared file that each page then loads first
@@ -11,7 +11,7 @@
 import { emblem } from "./art/emblem.ts";
 import { picture as illustration } from "./art/picture.ts";
 import { recover, staying } from "./fresh.ts";
-import { answering, answerState, onScreen } from "./game/answering.ts";
+import { answering, onScreen } from "./game/answering.ts";
 import { masteryCard } from "./game/mastery.ts";
 import { news } from "./game/news.ts";
 import { count } from "./game/numbers.ts";
@@ -22,7 +22,6 @@ import {
   hands,
   landing,
   nextSteps,
-  review,
   reviewed,
   reviewParts,
   scoreCard,
@@ -34,26 +33,15 @@ import { keepAwake } from "./lib/awake.ts";
 import { dayInBulgaria } from "./lib/day.ts";
 import { type Child, computed, effect, h, lifetime, onCleanup, signal, slot, untracked, when } from "./lib/dom.ts";
 import { reportProblem } from "./lib/errors.ts";
-import { ordinal, place } from "./lib/ordinal.ts";
-import { calm, musicOn, setCalm, setMusic, setTextSize, setTick, textSize, tickOn } from "./lib/prefs.ts";
+import { ordinal } from "./lib/ordinal.ts";
+import { calm, setCalm, setTextSize, setTick, textSize, tickOn } from "./lib/prefs.ts";
 import { needsHomeScreen, pushable, pushOn, pushPrefs, setPushPref, turnOff, turnOn } from "./lib/push.ts";
 import { byTap, go, goBack, holdWhile, rename, title } from "./lib/router.ts";
-import {
-  feelKit,
-  liveAudio,
-  loadFeel,
-  play,
-  playAnswer,
-  playCount,
-  quietWhenSilent,
-  setSound,
-  soundOn,
-} from "./lib/sound.ts";
+import { feelKit, loadFeel, play, playAnswer, playCount, quietWhenSilent, setSound, soundOn } from "./lib/sound.ts";
 import { stream } from "./lib/stream.ts";
 import { issueWords, listWords, weekday, withWord } from "./lib/words.ts";
 import type { DuelView } from "./screens/duel.ts";
 import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
-import { clock, coming, dayAndTime, dayWord, whileSeen } from "./screens/modes.ts";
 import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
 import { loadProgress, nearest } from "./screens/progress.ts";
@@ -101,15 +89,12 @@ import {
   unlockPicture,
   unlockWords,
   verdict,
-  verdictWords,
-  who,
 } from "./ui.ts";
 
 export const kit = {
   answered,
   answering,
   ApiError,
-  answerState,
   api,
   avatar,
   back,
@@ -121,14 +106,10 @@ export const kit = {
   byTap,
   calm,
   categories,
-  clock,
-  coming,
   computed,
   count,
   crowdLine,
   dayInBulgaria,
-  dayAndTime,
-  dayWord,
   duelResult,
   effect,
   emblem,
@@ -155,14 +136,12 @@ export const kit = {
   levelNumber,
   lifetime,
   listWords,
-  liveAudio,
   loadDuelResult,
   loadProgress,
   mailAsk,
   masteryCard,
   meaning,
   meter,
-  musicOn,
   nameFirst,
   nearest,
   needsHomeScreen,
@@ -175,7 +154,6 @@ export const kit = {
   ordinal,
   pageArt,
   picture,
-  place,
   play,
   playAnswer,
   playCount,
@@ -193,7 +171,6 @@ export const kit = {
   record,
   rename,
   reportProblem,
-  review,
   reviewed,
   reviewParts,
   rewardWords,
@@ -202,7 +179,6 @@ export const kit = {
   segmented,
   setTextSize,
   setCalm,
-  setMusic,
   setPushPref,
   setSound,
   setTick,
@@ -236,11 +212,8 @@ export const kit = {
   upNext,
   user,
   verdict,
-  verdictWords,
   weekday,
   when,
-  whileSeen,
-  who,
   withWord,
 };
 

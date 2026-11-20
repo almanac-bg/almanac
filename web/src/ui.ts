@@ -182,7 +182,7 @@ export interface Open {
   points: boolean;
   /** XP, the level and the day's goals: from the second day played. */
   xp: boolean;
-  /** The rating and its division: from the first duel or Роял that moved it. */
+  /** The rating and its division: from the first duel that moved it. */
   rating: boolean;
 }
 
@@ -195,7 +195,7 @@ export const meaning = {
   dayBoard: " При равен брой верни в класацията на деня решават точките.",
   xp: "XP печелиш с всяка игра, цел и постижение. Трупа се и вдига нивото ти.",
   rating:
-    "Рейтингът е силата ти в дуелите и в Роял: расте с победа, пада със загуба. Първите 10 игри с рейтинг го определят, после от него зависи дивизията ти.",
+    "Рейтингът е силата ти в дуелите: расте с победа, пада със загуба. Първите 10 игри с рейтинг го определят, после от него зависи дивизията ти.",
 };
 
 /** The day's points' words: with the day's board they place on. */

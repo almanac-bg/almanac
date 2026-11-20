@@ -13,7 +13,7 @@ import (
 )
 
 // A deploy drains the server before it restarts it: with nothing under way it's ready at once, and a player asking
-// for a live duel meanwhile waits, told why. Around Роял there's no drain; a drain the deploy stops asking about ends.
+// for a live duel meanwhile waits, told why; a drain the deploy stops asking about ends.
 func TestDrain(t *testing.T) {
 	g := start(t)
 	var now atomic.Int64
@@ -52,13 +52,6 @@ func TestDrain(t *testing.T) {
 	dee.call("POST", "/api/guest", map[string]any{})
 	dee.stream("/api/duels/live/events")
 	s.until(func(v map[string]any) bool { return v["phase"] == "intro" })
-
-	// Near Роял, no drain: the restart waits for the evening to pass.
-	deploy.call("DELETE", "/api/drain", nil)
-	at(time.Date(2026, 11, 15, 20, 40, 0, 0, play.Bulgaria))
-	if st := drain(); st["ready"] != false || st["royal"] != true || st["waited"] != 0.0 {
-		t.Fatalf("near Роял: %v", st)
-	}
 
 	// From anywhere but the machine itself, there's no such thing.
 	r := httptest.NewRequest("POST", "/api/drain", nil)

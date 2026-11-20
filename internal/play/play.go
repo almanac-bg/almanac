@@ -17,14 +17,14 @@
 // throwaway guest who played it before a player on the same network; a game keeps that network for a week, and two
 // players of one network move no rating between them (fair.go).
 //
-// A run played live (a live duel's, a Роял's) moves on its game's clock alone (driver): the game shows each question
-// and takes each answer (ShowLive and AnswerLive, ShowRoyal and AnswerRoyal: graded through the deal it shows), and
+// A run played live (a live duel's) moves on its game's clock alone (driver): the game shows each question and takes
+// each answer (ShowLive and AnswerLive: graded through the deal it shows), and
 // the player's own Show, Start and Answer refuse it, so that nobody sees a question before the others do, nor answers
 // it outside its time. An answer counts if it reaches the server within Grace of its time's end; its time is to when
 // it arrived, from when the player's own screen showed the question, as it says, within bounds (seen.go).
 //
 // No game deals a player again what they've played, in any game, while the bank has questions they haven't: a topic's,
-// a duel's (live, a rematch) and Роял's are drawn for all their players, those none of them has seen first,
+// a duel's (live, a rematch) are drawn for all their players, those none of them has seen first,
 // then those the fewest have (choose, seenAmong); a recording is a game with few of its questions seen. One repeats by
 // design: the day (the same ten for everyone). TestNothingPlayedAgain holds it, for every way a game starts.
 //
@@ -40,7 +40,6 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"strconv"
-	"sync"
 	"time"
 	_ "time/tzdata" // Bulgaria's days, wherever the server runs
 
@@ -100,20 +99,12 @@ type Game struct {
 	Bank func() *bank.Bank
 	// Now is the clock (tests set their own).
 	Now func() time.Time
-	// RoyalNews, if set, is told of each place when a tournament ends.
-	RoyalNews func(context.Context, RoyalNews)
-	// RoyalAt, if set, is when the next Роял starts after a moment: a day's goals draw Роял only while it's ahead.
-	RoyalAt func(time.Time) time.Time
 	// CrowdMin, if set, is how many answers a question needs before how players answered it shows, the day's
 	// players' and everyone's (CrowdFrom, DayCrowdFrom when 0; the browser tests make it 1).
 	CrowdMin int
 	// Version is the game's version as released (the server's; "" in tests and a developer's build): the version a
 	// player met is kept with them on their first day played (users.first_version, retention.go).
 	Version string
-
-	paceMu sync.Mutex
-	pace   RoyalPace // how often Роял plays, as of paceDay (RoyalPaceOf)
-	paceOn string
 
 	hard      snapshot[*hardnesses] // how hard each question is (mastery.go)
 	crowds    snapshot[crowds]      // how players have answered each question (crowd.go)
@@ -183,31 +174,26 @@ func scanRun(row scanner) (*run, error) {
 }
 
 // driver is who moves a run on: its player (Show, Start, Answer), or the live game it's played in, on that game's
-// clock: its live duel (ShowLive, AnswerLive) or its Роял (ShowRoyal, AnswerRoyal).
+// clock: its live duel (ShowLive, AnswerLive).
 type driver int
 
 const (
 	byPlayer driver = iota
 	byDuel
-	byRoyal
 )
 
 // driver says who moves a run on. A live duel's run is its duel's for good: one cut off (the server restarted under
 // it) stays where it stopped, never played on alone, as its duel ended without a result.
 func (r *run) driver(tx *sql.Tx) (driver, error) {
-	switch r.kind {
-	case "royal":
-		return byRoyal, nil
-	case "duel":
-		var live bool
-		err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM duels WHERE a_run = ?1 OR b_run = ?1)`,
-			r.id).Scan(&live)
-		if live {
-			return byDuel, err
-		}
-		return byPlayer, err
+	if r.kind != "duel" {
+		return byPlayer, nil
 	}
-	return byPlayer, nil
+	var live bool
+	err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM duels WHERE a_run = ?1 OR b_run = ?1)`, r.id).Scan(&live)
+	if live {
+		return byDuel, err
+	}
+	return byPlayer, err
 }
 
 // loadBy reads a player's run that by moves on: another's (a live game's, when by is its player) is out of step, and
@@ -415,7 +401,7 @@ func (g *Game) settles(r *run) bool {
 		return true
 	}
 	late := Limit(d.Question()) + Grace
-	if r.kind == "duel" || r.kind == "royal" { // a live game's may be timed from its player's screen (LiveDue)
+	if r.kind == "duel" { // a live game's may be timed from its player's screen (LiveDue)
 		late += LagOf(d.Question())
 	}
 	return g.Now().Sub(time.UnixMilli(r.shownAt.Int64)) > late
@@ -454,7 +440,6 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 	r.ms += ms
 	r.shownAt = sql.NullInt64{}
 	r.skipVoid()
-	// A Роял run goes on after a wrong answer: who goes on is the tournament's to say, at its cuts (RevealRoyal).
 	if r.at >= len(r.picks) {
 		return g.finish(tx, r)
 	}
@@ -463,29 +448,20 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 	return err
 }
 
-// finish ends a run where it is: what playing it to its end earns, and a game right throughout its bonus; and notes
-// that what follows it is due (after.go), but for a Роял's, whose evening keeps what it earned (AfterRoyal).
+// finish ends a run where it is: what playing it to its end earns (in the share of its questions answered right), and
+// a game right throughout its bonus; and notes that what follows it is due (after.go).
 func (g *Game) finish(tx *sql.Tx, r *run) error {
-	if err := g.finishOf(tx, r, r.counted()); err != nil {
-		return err
-	}
-	if r.kind == "royal" {
-		return nil
-	}
-	return g.afterDue(tx, r.id)
-}
-
-// finishOf ends a run as a game of total questions: what playing it to its end earns is in the share of those answered
-// right (a Роял won before its last question was a game of the questions it asked).
-func (g *Game) finishOf(tx *sql.Tx, r *run, total int) error {
 	r.finished = true
-	r.xp += finishXP(r.kind, r.rights, total)
+	r.xp += finishXP(r.kind, r.rights, r.counted())
 	if r.allRight() {
 		r.points += AllRight
 	}
 	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, points = ?, rights = ?, xp = ?, ms = ?, finished_at = ?
 		WHERE id = ?`, r.at, r.points, r.rights, r.xp, r.ms, store.Ms(g.Now()), r.id)
-	return err
+	if err != nil {
+		return err
+	}
+	return g.afterDue(tx, r.id)
 }
 
 // allRight is whether a run went through all of its questions, each that counts answered right.
@@ -758,11 +734,6 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 	})
 	if err != nil {
 		return res, err
-	}
-	if by == byRoyal {
-		// Роял shows the answer and its crowd to everyone at once, and keeps what a game earned off its clock
-		// (AfterRoyal).
-		return res, nil
 	}
 	// How other players answered it: counted once the answer is kept, outside the write, which it never waits on. The
 	// answer is kept whatever happens here: a count that fails shows none.

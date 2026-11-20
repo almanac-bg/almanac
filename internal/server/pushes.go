@@ -16,15 +16,14 @@ import (
 )
 
 // Notifications go out through a queue in the database (push_queue): notify saves a row for each player, in its own
-// transaction or in the caller's (the day's reminder with its claim, Роял's call with its), and Push sends them,
+// transaction or in the caller's (the day's reminder with its claim), and Push sends them,
 // pushWorkers players at a time, each player's browsers at once, each send within pushTimeout, through its push
 // service's lane (pushlanes.go). So a slow or dead device holds up only its own player's slot, a slow or dead service
 // only its own lane's share, a player has a few devices at most (pushDevices: notify.go), and the evening's reminders
-// and Роял's call go out in seconds, whoever else is in the queue. A row that's of use for less than pushUrgent more (Роял's call) is taken before the rest.
+// go out in seconds, whoever else is in the queue.
 //
 // Nights are quiet: from quietFrom to quietTo in Bulgaria nothing is sent. A row due then waits for the morning, or,
-// if it's of no use by then (until: a day's reminder is the day's), is dropped. The one exception is a notification
-// the player asked for themselves (pushAsked: the evening they said they'd come to), sent when they asked for it.
+// if it's of no use by then (until: a day's reminder is the day's), is dropped.
 //
 // A restart loses nothing: what's queued stays queued. Push, stopping, finishes the sends it has begun and begins no
 // more, so a deploy sends nothing twice. A crash can: a row being sent is leased (its next_at pushLease ahead) and is
@@ -44,8 +43,6 @@ const (
 	// pushWorkers is how many players' notifications are sent at once: enough that every service's lane can be full
 	// (laneSends+laneWaits each) and others still go.
 	pushWorkers = 256
-	// pushUrgent is how near its end a row is taken before the rest.
-	pushUrgent = 5 * time.Minute
 	// pushTick is how often the queue is looked at when nothing else says to.
 	pushTick = 250 * time.Millisecond
 	// quietFrom and quietTo are the night, in minutes of the day in Bulgaria: 22:00 to 08:00.
@@ -106,10 +103,9 @@ func morning(at time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), quietTo/60, quietTo%60, 0, 0, bulgaria())
 }
 
-// quiet is when a notification of a kind due at `at` may be sent: `at`, or the morning after a night; a notification
-// the player asked for is sent when they asked.
-func quiet(kind pushKind, at time.Time) time.Time {
-	if m := morning(at); kind != pushAsked && !m.IsZero() {
+// quiet is when a notification due at `at` may be sent: `at`, or the morning after a night.
+func quiet(at time.Time) time.Time {
+	if m := morning(at); !m.IsZero() {
 		return m
 	}
 	return at
@@ -182,7 +178,7 @@ func (q *queuer) add(ctx context.Context, n notice, userID int64) (bool, error) 
 	if until.IsZero() {
 		until = q.now.Add(pushTTL)
 	}
-	next := quiet(n.kind, q.now)
+	next := quiet(q.now)
 	if next.After(until) {
 		return false, nil
 	}
@@ -305,7 +301,7 @@ type queued struct {
 	tries    int
 }
 
-// claimPushes leases up to n rows that are due: those of use for less than pushUrgent more first, then the oldest.
+// claimPushes leases up to n rows that are due, the oldest first.
 func (s *Server) claimPushes(ctx context.Context, n int) ([]queued, error) {
 	now := s.game.Now().UnixMilli()
 	var due bool
@@ -315,9 +311,9 @@ func (s *Server) claimPushes(ctx context.Context, n int) ([]queued, error) {
 		return nil, err
 	}
 	rows, err := s.db.Write.QueryContext(ctx, `UPDATE push_queue SET next_at = ?1, tries = tries + 1
-		WHERE id IN (SELECT id FROM push_queue WHERE next_at <= ?2 ORDER BY until > ?4, next_at, id LIMIT ?3)
+		WHERE id IN (SELECT id FROM push_queue WHERE next_at <= ?2 ORDER BY next_at, id LIMIT ?3)
 		RETURNING id, user_id, kind, message, coalesce(day, ''), until, tries`,
-		now+pushLease.Milliseconds(), now, n, now+pushUrgent.Milliseconds())
+		now+pushLease.Milliseconds(), now, n)
 	if err != nil {
 		return nil, err
 	}
@@ -343,12 +339,8 @@ type device struct {
 
 // devices are a player's browsers that want notifications of a kind (the newest pushDevices).
 func (s *Server) devices(ctx context.Context, userID int64, kind pushKind) ([]device, error) {
-	want := ""
-	if kind != pushAsked {
-		want = ` AND ` + wants(kind, "?1")
-	}
 	rows, err := s.db.Read.QueryContext(ctx, `SELECT endpoint, p256dh, auth, fails FROM push_subs
-		WHERE user_id = ?1`+want+` ORDER BY created_at DESC LIMIT ?2`, userID, pushDevices)
+		WHERE user_id = ?1 AND `+wants(kind, "?1")+` ORDER BY created_at DESC LIMIT ?2`, userID, pushDevices)
 	if err != nil {
 		return nil, err
 	}
@@ -385,7 +377,7 @@ func (s *Server) sendTo(ctx context.Context, stop <-chan struct{}, d device, m p
 // nothing: the row waits for the morning, or, of no use by then, is done.
 func (s *Server) deliver(ctx context.Context, stop <-chan struct{}, j queued) {
 	now := s.game.Now()
-	if at := quiet(j.kind, now); at.After(now) {
+	if at := quiet(now); at.After(now) {
 		if at.UnixMilli() <= j.until {
 			s.pushDone(ctx, j, nil, nil, againUntried, at)
 		} else {
@@ -408,7 +400,7 @@ func (s *Server) deliver(ctx context.Context, stop <-chan struct{}, j queued) {
 		services[i] = s.service(d)
 	}
 	if after, paced, ok := s.pushq.lanes.room(services); !ok {
-		if next := quiet(j.kind, now.Add(after)); next.UnixMilli() <= j.until {
+		if next := quiet(now.Add(after)); next.UnixMilli() <= j.until {
 			if paced {
 				s.pushq.held(time.Now().Add(after))
 			}
@@ -425,7 +417,7 @@ func (s *Server) deliver(ctx context.Context, stop <-chan struct{}, j queued) {
 		s.pushDone(ctx, j, nil, nil, 0, now)
 		return
 	}
-	m.Kind = cmp.Or(m.Kind, j.kind.name()) // a message may say more of itself (the day's last reminder: "stop")
+	m.Kind = cmp.Or(m.Kind, string(j.kind)) // a message may say more of itself (the day's last reminder: "stop")
 	m.Tag = "n" + strconv.FormatInt(j.id, 10)
 	errs := make([]error, len(devices))
 	var wg sync.WaitGroup
@@ -479,7 +471,7 @@ func (s *Server) deliver(ctx context.Context, stop <-chan struct{}, j queued) {
 			return
 		}
 	case held && !busy: // only held back: again when the lanes have room, no try spent
-		if next := quiet(j.kind, now.Add(holdFor)); next.UnixMilli() <= j.until {
+		if next := quiet(now.Add(holdFor)); next.UnixMilli() <= j.until {
 			if paced {
 				s.pushq.held(time.Now().Add(holdFor)) // soon: sendQueued waits for it
 			}

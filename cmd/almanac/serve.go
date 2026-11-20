@@ -19,7 +19,6 @@ import (
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/push"
-	"github.com/almanac-bg/almanac/internal/royal"
 	"github.com/almanac-bg/almanac/internal/safe"
 	"github.com/almanac-bg/almanac/internal/server"
 	"github.com/almanac-bg/almanac/internal/store"
@@ -52,8 +51,6 @@ import (
 //
 //	OPERATOR_NAME       who runs the game, for the privacy page
 //	CONTACT_EMAIL       where players write about their data (privacy@almanac.bg)
-//	ROYAL_EVERY         development only: a Роял every this long (2m), its lobby open ROYAL_LOBBY (1m) before; else
-//	                    every evening at 21:00
 //	CROWD_FROM          development only: how many answers a question needs before how players answered it shows
 //	                    (1); else 10 of the day's players for the day's ten, 20 for everyone's
 //	MTA_STS_MX          the domain's mail servers, comma-separated, for its MTA-STS policy at mta-sts.<domain>;
@@ -61,8 +58,7 @@ import (
 //
 // The server plays a copy of BANK_DIR kept beside the database (banks.go: outside development), and starts on the
 // last good copy when BANK_DIR has errors. SIGHUP reloads the bank (deploy/bank.sh), from the moment the program
-// starts (one that comes during the start is taken once it's up); a new bank waits while Роял is on
-// (internal/server/bank.go). SIGTERM or SIGINT stop the server after the requests under way finish (a deploy drains it
+// starts (one that comes during the start is taken once it's up). SIGTERM or SIGINT stop the server after the requests under way finish (a deploy drains it
 // first: internal/server/drain.go). A version that brings a migration copies the database as it first starts, before
 // migrating it (store.KeepCopy); one without makes no copy, and starts at once. Started by systemd's socket
 // (deploy/almanac.socket), it serves on that socket, and ADDR is left aside.
@@ -102,17 +98,6 @@ func serve([]string) error {
 	}
 	if err := devOnly(cfg); err != nil {
 		return err
-	}
-	if every := os.Getenv("ROYAL_EVERY"); every != "" && dev {
-		e, err := time.ParseDuration(every)
-		if err != nil || e <= 0 {
-			return errors.New("ROYAL_EVERY must be like 2m")
-		}
-		lobby, err := time.ParseDuration(env("ROYAL_LOBBY", "1m"))
-		if err != nil || lobby <= 0 || lobby > e {
-			return errors.New("ROYAL_LOBBY must be like 1m, and no longer than ROYAL_EVERY")
-		}
-		cfg.Royal = royal.Schedule{Every: e, Lobby: lobby}
 	}
 	if from := os.Getenv("CROWD_FROM"); from != "" && dev {
 		n, err := strconv.Atoi(from)
@@ -156,7 +141,7 @@ func serve([]string) error {
 		slog.Error("bank: BANK_DIR has errors, so the last good copy is played", "refused", commit, "played", b.Commit)
 	}
 	slog.Info("bank", "dir", b.Dir, "commit", b.Commit, "questions", len(b.Questions), "live", len(b.Live("", "")), "overdue", overdue(b))
-	banks.prune([]*bank.Bank{b})
+	banks.prune(b)
 
 	backups, err := backupStore()
 	if err != nil {
@@ -260,7 +245,7 @@ func serve([]string) error {
 }
 
 // reloadOnHangup loads the bank again on SIGHUP (after a pull of the private bank), through a new copy, and offers
-// it to the server: in play at once, or held while Роял is on. A bank with errors is logged and left out: the game
+// it to the server, in play at once. A bank with errors is logged and left out: the game
 // keeps the one it has.
 func reloadOnHangup(ctx context.Context, hup <-chan os.Signal, banks keptBanks, srv *server.Server) {
 	for {
@@ -276,10 +261,9 @@ func reloadOnHangup(ctx context.Context, hup <-chan os.Signal, banks keptBanks, 
 				srv.Problem("bank reload refused: the bank has errors")
 				continue
 			}
-			if !srv.OfferBank(b) {
-				slog.Info("bank reloaded", "commit", b.Commit, "questions", len(b.Questions), "live", len(b.Live("", "")), "overdue", overdue(b))
-			}
-			banks.prune(srv.Banks())
+			srv.OfferBank(b)
+			slog.Info("bank reloaded", "commit", b.Commit, "questions", len(b.Questions), "live", len(b.Live("", "")), "overdue", overdue(b))
+			banks.prune(srv.Bank())
 		}
 	}
 }

@@ -51,7 +51,7 @@ func TestDayQuestionsKeptOut(t *testing.T) {
 		t.Fatalf("a recording with today's questions: %+v %v", l.Picks, err)
 	}
 
-	// No draw deals them: topics, duels, Роял.
+	// No draw deals them: topics, duels.
 	for range 20 {
 		for _, c := range []string{MixTopic, "science"} {
 			s, err := w.g.StartTopic(ctx, bo, c)
@@ -68,13 +68,6 @@ func TestDayQuestionsKeptOut(t *testing.T) {
 		}
 		if n := overlap(l.Picks, today); n != 0 {
 			t.Fatalf("a duel dealt %d of today's questions", n)
-		}
-		picks, err := w.g.DrawRoyal(ctx, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if n := overlap(picks, today); n != 0 {
-			t.Fatalf("Роял dealt %d of today's questions", n)
 		}
 	}
 
@@ -170,14 +163,9 @@ func TestMergeBringsProgress(t *testing.T) {
 		_, _ = w.db.Write.Exec(`DELETE FROM users WHERE id = ?`, from) // as signing in does
 	}
 
-	// The guest: a better rating, an evening of Роял won, and goals: today's (the account has its own) and
+	// The guest: a better rating, and goals: today's (the account has its own) and
 	// yesterday's (it has none).
 	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1180, rated = 12, peak = 1200 WHERE id = ?`, guest)
-	royal, err := w.g.NewRoyal(ctx, w.now, w.picks(mustStart(t, w, guest)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, _ = w.db.Write.Exec(`INSERT INTO royal_players (royal_id, user_id, joined_at, place) VALUES (?, ?, 0, 1)`, royal, guest)
 	if _, err := w.g.GoalsOf(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
@@ -190,12 +178,10 @@ func TestMergeBringsProgress(t *testing.T) {
 	}
 	merge(guest, owner)
 
-	var rating, rated, peak, royals int
-	_ = w.db.Read.QueryRow(`SELECT rating, rated, peak,
-			(SELECT count(*) FROM royal_players WHERE user_id = u.id AND place = 1)
-		FROM users u WHERE id = ?`, owner).Scan(&rating, &rated, &peak, &royals)
-	if rating != 1180 || rated != 12 || peak != 1200 || royals != 1 {
-		t.Fatalf("the account after: rating %d (%d games, peak %d), %d evenings won", rating, rated, peak, royals)
+	var rating, rated, peak int
+	_ = w.db.Read.QueryRow(`SELECT rating, rated, peak FROM users WHERE id = ?`, owner).Scan(&rating, &rated, &peak)
+	if rating != 1180 || rated != 12 || peak != 1200 {
+		t.Fatalf("the account after: rating %d (%d games, peak %d)", rating, rated, peak)
 	}
 	goals := func(day string) (n int) {
 		_ = w.db.Read.QueryRow(`SELECT count(*) FROM goals_done WHERE user_id = ? AND day = ? AND goal IN ('a', 'b', 'c')`,

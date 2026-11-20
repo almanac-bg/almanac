@@ -41,7 +41,7 @@ func (w *world) release() error {
 	return w.exec(`INSERT OR IGNORE INTO releases (version, at) VALUES (?, ?)`, v, store.Ms(w.dayAt(w.day, 5, 0)))
 }
 
-// playDay plays a day: everyone who comes, in the order they come, Роял in the evening if it's on.
+// playDay plays a day: everyone who comes, in the order they come.
 func (w *world) playDay() error {
 	w.g.AftersDone(w.ctx)
 	w.rewind(w.dayAt(w.day, 0, 30))
@@ -55,18 +55,10 @@ func (w *world) playDay() error {
 	if err != nil {
 		return err
 	}
-	evening := w.dayAt(w.day, 21, 0)
 	stop := w.end.Add(-4 * time.Hour) // the end's last hours: what the personas need (finish)
-	royalOn := w.g.RoyalOn(evening) && evening.Add(30*time.Minute).Before(stop)
 	var online []*player
 	met := map[[2]int64]bool{}
-	for i, s := range sessions {
-		if royalOn && !s.at.Before(evening.Add(-20*time.Minute)) {
-			if err := w.evening(sessions[i:]); err != nil {
-				return fmt.Errorf("Роял: %w", err)
-			}
-			royalOn = false
-		}
+	for _, s := range sessions {
 		if !s.at.Before(stop) {
 			break
 		}
@@ -79,11 +71,6 @@ func (w *world) playDay() error {
 		}
 		if err := w.visit(s, online, met); err != nil {
 			return fmt.Errorf("%s (%d): %w", s.p.name, s.p.id, err)
-		}
-	}
-	if royalOn {
-		if err := w.evening(nil); err != nil {
-			return fmt.Errorf("Роял: %w", err)
 		}
 	}
 	return w.tallies()
@@ -201,11 +188,6 @@ func (w *world) visit(s session, online []*player, met map[[2]int64]bool) error 
 	}
 	if err := w.dress(p); err != nil {
 		return fmt.Errorf("dressing: %w", err)
-	}
-	if p.royal > 0 && w.g.RoyalOn(w.dayAt(w.day, 21, 0)) && w.chance(p.royal*0.4) {
-		if err := w.g.PlanRoyal(w.ctx, w.g.Today(), p.id, true); err != nil {
-			return fmt.Errorf("planning Роял: %w", err)
-		}
 	}
 	return w.sweep()
 }

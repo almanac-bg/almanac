@@ -241,8 +241,8 @@ async function inDB(page: Page, f: (db: DatabaseSync, id: number) => void): Prom
   }
 }
 
-/** A player still with the name drawn for them, about to meet others for the first time on this device (a live duel,
- * Роял: screens/name.ts), is asked for a name first: given `name`, or kept as drawn („Не сега“). */
+/** A player still with the name drawn for them, about to meet others for the first time on this device (a live duel:
+ * screens/name.ts), is asked for a name first: given `name`, or kept as drawn („Не сега“). */
 export async function meetAs(page: Page, name?: string): Promise<void> {
   const sheet = page.getByRole("dialog", { name: "Как да те виждат останалите?" });
   if (!name) return sheet.getByRole("button", { name: "Не сега" }).click();

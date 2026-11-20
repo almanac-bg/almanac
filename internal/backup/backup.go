@@ -32,7 +32,7 @@
 // there (Dangling). The copy is sent all the same: a told problem, not a lost copy.
 //
 // The server makes a copy every Every (Run), offset from the quarter hours where the game's own work is (the new day
-// at midnight, Роял at 21:00), by running itself as a program of its own (`almanac backup now`) at a lower priority,
+// at midnight), by running itself as a program of its own (`almanac backup now`) at a lower priority,
 // so a copy never takes the game's processor or memory (cmd/almanac). A file beside the database remembers the copies
 // (State): when the last was made, for the first after a start (soon, if one is due), the rows it had and the day's
 // first had, the day whose copy was brought back, the key the copies go to, and what this server stored (each copy's
@@ -88,7 +88,7 @@ var core = []string{"schema_migrations", "users", "days", "runs"}
 // watched (Changes).
 var transient = []string{
 	"code_mails", "code_misses", "friend_requests", "handoffs", "kv", "mail_suppressed", "outbox", "push_queue",
-	"push_reminded", "royal_plans", "royal_players", "runs_after", "runs_unjudged", "sessions", "sign_in_codes",
+	"push_reminded", "runs_after", "runs_unjudged", "sessions", "sign_in_codes",
 }
 
 // Name is the key of a copy made at t, under prefix (hours or days): encrypted copies end in .age.

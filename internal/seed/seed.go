@@ -3,9 +3,8 @@
 //
 // It plays the history through the game's own functions, on a clock of its own that walks from Options.Days ago to
 // now: players arrive (account.Accounts.Guest, named and given an email by some), play the day's ten and topics
-// (play.Game: Show, Start, Answer), live duels with each other and against recordings (StartLive,
-// ShowLive, AnswerLive), and Роял evenings with their cuts and podiums (royal.Hub, stepped on the same clock); they
-// ask each other to be friends, accept, say no, choose their look. Whatever follows from that, the game works out itself: scores, streaks, goals, XP and
+// (play.Game: Show, Start, Answer), and live duels with each other and against recordings (StartLive,
+// ShowLive, AnswerLive); they ask each other to be friends, accept, say no, choose their look. Whatever follows from that, the game works out itself: scores, streaks, goals, XP and
 // levels, achievements and titles, ratings and divisions (newcomers still placing too), the facts of Моят Алманах.
 // Only what no game function
 // writes is written directly: when a player came and was last seen, their email, their mail and notification
@@ -40,7 +39,6 @@ import (
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/play"
-	"github.com/almanac-bg/almanac/internal/royal"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -120,8 +118,6 @@ func Seed(ctx context.Context, db *store.DB, b *bank.Bank, o Options) ([]Persona
 	}
 	w.g = play.New(db, func() *bank.Bank { return b })
 	w.g.Now = w.clock
-	w.royal = royal.NewHub(w.g, royal.Schedule{Hour: royal.Evening.Hour, Lobby: royal.Evening.Lobby,
-		Least: royal.Evening.Least, Wait: royal.Evening.Wait, On: w.g.RoyalOn})
 	defer w.g.Settled(context.WithoutCancel(ctx))
 	if err := w.g.Keep(ctx, b); err != nil {
 		return nil, err
@@ -129,7 +125,7 @@ func Seed(ctx context.Context, db *store.DB, b *bank.Bank, o Options) ([]Persona
 	w.cast(o.Players)
 	if o.small {
 		for _, p := range w.players {
-			p.topics, p.duels, p.royal = p.topics/3, p.duels/3, p.royal/2
+			p.topics, p.duels = p.topics/3, p.duels/3
 		}
 	}
 	if err := w.history(); err != nil {
@@ -145,7 +141,6 @@ type world struct {
 	db       *store.DB
 	b        *bank.Bank
 	g        *play.Game
-	royal    *royal.Hub
 	accounts *account.Accounts
 	opt      Options
 	r        *mrand.Rand

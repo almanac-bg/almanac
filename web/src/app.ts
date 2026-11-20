@@ -22,7 +22,7 @@ import { friendRequests, playing, watchWaiting } from "./state.ts";
  * from Начало; Профил holds what a player has: their rewards, their wardrobe, their almanac and their settings.
  */
 const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
-  ["/", "Начало", "home", (p) => /^\/($|play\/|duel|royal)/.test(p)],
+  ["/", "Начало", "home", (p) => /^\/($|play\/|duel)/.test(p)],
   ["/friends", "Приятели", "users", (p) => p === "/friends"],
   ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
   ["/me", "Профил", "user", (p) => /^\/(me|settings|rewards|wardrobe|almanac|games(\/[0-9]+)?)$/.test(p)],
@@ -76,7 +76,6 @@ if (root) {
       { path: /^\/duel$/, view: duel },
       { path: /^\/duel\/live$/, view: later(() => import("./screens/live.ts").then((m) => m.liveDuel)) },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
-      { path: /^\/royal$/, view: later(() => import("./screens/royal.ts").then((m) => m.royal)) },
       { path: /^\/almanac$/, view: later(() => import("./screens/almanac.ts").then((m) => m.almanac)) },
       { path: /^\/ranks$/, view: later(() => import("./screens/ranks.ts").then((m) => m.ranks)) },
       { path: /^\/rewards$/, view: later(() => import("./screens/rewards.ts").then((m) => m.rewards)) },

@@ -1,5 +1,5 @@
-// Answering a question, the same in every game: a run (run.ts), a live duel and Роял (screens/live.ts, royal.ts,
-// handed it by kit.ts). The question's widget is questions.ts's; this is what's around it:
+// Answering a question, the same in every game: a run (run.ts) and a live duel (screens/live.ts, handed it by
+// kit.ts). The question's widget is questions.ts's; this is what's around it:
 //
 // - In a run, the question takes the focus as it opens, so that a screen reader reads it first, and what's said as it
 //   goes (a clue come out, an answer's verdict) is said in one live region (liveRegion), there from the run's start.
@@ -27,7 +27,7 @@ import type { Answer, Reveal, View } from "./types.ts";
  * from that much later: play.PicturesFor). */
 export const picturesFor = 2500;
 
-/** A live game's question as it comes on screen (a duel's, Роял's): drawn (`draw`) once its pictures are in
+/** A live game's question as it comes on screen (a duel's): drawn (`draw`) once its pictures are in
  * (picturesFor at most; at once if it has none), and the server told then (`seen`, once), so that the player's time
  * runs from when they see it, not from when the game showed it (play/seen.go). Until then, a line says it's coming:
  * the words don't show before the pictures, so nobody reads them off the clock. */
@@ -138,17 +138,6 @@ export interface Problem {
   retry: (() => void) | null;
 }
 
-/** An answer's state, kept by the screen when a question may be drawn again while its answer is on its way (Роял's,
- * shown again after a restart): the new drawing goes on with it. */
-export interface AnswerState {
-  step: Signal<Step>;
-  problem: Signal<Problem | null>;
-}
-
-export function answerState(): AnswerState {
-  return { step: signal<Step>(""), problem: signal<Problem | null>(null) };
-}
-
 export interface AnswerSpec<R> {
   /** The question as it opens, and its time left. */
   view: View;
@@ -163,8 +152,6 @@ export interface AnswerSpec<R> {
   /** How many times an answer is tried before what's wrong is said, with „Опитай пак“ (a run); none: again and again
    * while the question is open (a live game, whose question moves on by itself). */
   tries?: number;
-  /** False: the player only watches (Роял, not in it): the options stay locked, the clock runs to the end. */
-  plays?: boolean;
   /** When the time runs out with nothing put in, that's sent as no answer (a run: its answer shows at once); else the
    * options just lock (a live game: the server moves on by itself). */
   sendNone?: boolean;
@@ -176,8 +163,6 @@ export interface AnswerSpec<R> {
   focus?: boolean;
   /** The game's live region (a clue come out is said there). */
   say?: Say;
-  /** The answer's state, if the screen keeps it (AnswerState). */
-  state?: AnswerState;
 }
 
 export interface Answering<R> {
@@ -185,7 +170,7 @@ export interface Answering<R> {
   heading: HTMLElement;
   /** The answering part (options, a pad …), under the question. */
   asked: Asked;
-  /** No answer can be given now: one is on its way or in, the time is up, or the player only watches. */
+  /** No answer can be given now: one is on its way or in, or the time is up. */
   locked: Signal<boolean>;
   /** The answer is in (by the server's reply or its view). */
   taken: () => boolean;
@@ -206,14 +191,13 @@ export interface Answering<R> {
 
 /** Asks a question and sees its answer through (above). */
 export function answering<R>(spec: AnswerSpec<R>): Answering<R> {
-  const plays = spec.plays ?? true;
-  const st = spec.state ?? answerState();
+  const st = { step: signal<Step>(""), problem: signal<Problem | null>(null) };
   const inView = spec.inView ?? (() => false);
   const life = lifetime();
   const taken = () => st.step() === "taken" || inView();
 
   const send = (answer: Answer | null): Promise<R | undefined> => {
-    if (!plays || st.step.peek() !== "" || untracked(inView)) return Promise.resolve(undefined);
+    if (st.step.peek() !== "" || untracked(inView)) return Promise.resolve(undefined);
     return go(answer);
   };
   const go = async (answer: Answer | null): Promise<R | undefined> => {
@@ -259,7 +243,7 @@ export function answering<R>(spec: AnswerSpec<R>): Answering<R> {
   );
 
   const stopped = signal(false);
-  effect(() => locked.set(!plays || st.step() !== "" || taken() || left() <= 0 || !spec.open()));
+  effect(() => locked.set(st.step() !== "" || taken() || left() <= 0 || !spec.open()));
   effect(() => stopped.set(taken()));
   // Free again after a refusal: what was picked isn't any more.
   let was = locked.peek();

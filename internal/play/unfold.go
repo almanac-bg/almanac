@@ -8,13 +8,13 @@ import (
 )
 
 // The game unfolds: a new player meets its systems one at a time, as each starts to matter, by what they have done
-// (the days they've played, a duel or a Роял), never by the date.
+// (the days they've played, a duel), never by the date.
 //
 //   - From the first game: the game's points (how well it went, and the day's board), the streak, the topics, and the
 //     achievements a game earns with what they unlock (but what the level unlocks).
 //   - From the second day played (XPFromDay): XP, with the level it makes (anyone's: a first day sees no level on
 //     another's avatar either), what the level unlocks, and the day's goals that pay it.
-//   - From the first game that moved the rating (a duel, a Роял): the rating, being set; its division once it is
+//   - From the first game that moved the rating (a duel): the rating, being set; its division once it is
 //     (rating.go, Placed).
 //
 // Nothing waits to be earned, only to be shown: XP, achievements, unlocks and the rating all count
@@ -33,7 +33,7 @@ type Open struct {
 	Points bool `json:"points"`
 	// XP is what playing earns, with the level and the day's goals.
 	XP bool `json:"xp"`
-	// Rating is strength in duels and Роял, with its division.
+	// Rating is strength in duels, with its division.
 	Rating bool `json:"rating"`
 }
 

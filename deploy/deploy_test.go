@@ -337,8 +337,7 @@ func expect(t *testing.T, out string, code, want int, says ...string) {
 
 var (
 	ready    = `200|{"ready":true}`
-	notReady = `200|{"ready":false,"duels":1,"duelsLeft":60,"royal":false}`
-	royal    = `200|{"ready":false,"duels":0,"duelsLeft":0,"royal":true}`
+	notReady = `200|{"ready":false,"duels":1,"duelsLeft":60}`
 	healthy  = release{tag: "v1.0.1", migrations: []string{mig('1', "0001_a.sql"), mig('2', "0002_b.sql")}}
 )
 
@@ -380,34 +379,6 @@ func TestDrain(t *testing.T) {
 		}
 		if want := []int{5, 5, 10, 20, 30}; fmt.Sprint(gaps) != fmt.Sprint(want) {
 			t.Fatalf("asked again after %v, not %v", gaps, want)
-		}
-	})
-	t.Run("Роял holds it however long, then the drain's 45 minutes start", func(t *testing.T) {
-		t.Parallel()
-		m := newMachine(t)
-		m.publish(healthy)
-		m.drain(royal+"|3000", "000|", "000||2000", notReady, notReady+"|1000", ready)
-		out, code := m.deploy("v1.0.1", "ci")
-		expect(t, out, code, 0, "live: v1.0.1")
-		if strings.Contains(out, "all the same") {
-			t.Fatalf("restarted before ready:\n%s", out)
-		}
-		if times, after := m.polls(); len(times) != 6 || !after {
-			t.Fatalf("polls %v, restarted after the last: %v\n%s", times, after, out)
-		}
-	})
-	t.Run("Роял that doesn't end", func(t *testing.T) {
-		t.Parallel()
-		m := newMachine(t)
-		m.publish(healthy)
-		m.drain(royal, "000||5000", royal+"|6000")
-		out, code := m.deploy("v1.0.1", "ci")
-		expect(t, out, code, 1, "Роял is still near or on after three hours")
-		if m.restarted() || m.live() != "v1.0.0" {
-			t.Fatalf("restarted during Роял: %v", m.log())
-		}
-		if l := m.log(); l[len(l)-1] != "undrain" {
-			t.Fatalf("the drain isn't ended: %v", l)
 		}
 	})
 	t.Run("too old to drain", func(t *testing.T) {

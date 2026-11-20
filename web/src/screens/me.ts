@@ -1,5 +1,5 @@
 // Профил: who you are in the game — your avatar, name, tag and title; your level and what comes next; your streak,
-// numbers, mastery and latest games (the rating's division is the duels' and Роял's, on their screens) — with its own
+// numbers, mastery and latest games (the rating's division is the duels', on their screens) — with its own
 // places a tap away at the top (Награди, Гардероб, Алманах) and Настройки beside your name, in words. A hub: each
 // thing once, the whole of it a tap away. Each system shows once the player has met it (play/unfold.go): the level
 // from the second day played. A guest is asked to keep their game, from the first one, and the way in for a profile

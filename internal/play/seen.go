@@ -6,10 +6,10 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 )
 
-// A live game (a duel, Роял) shows each question to everyone at the same moment, but a player's screen shows
+// A live game (a duel) shows each question to everyone at the same moment, but a player's screen shows
 // it later: the trip to the phone, the screen drawn, its pictures coming in. Measured from the game's moment alone, a
 // phone on a slow line, or a question with pictures, would cost its player time against one on a fast line, in points
-// for speed, in a duel's tie and in Роял's cuts. So a player's time on a live question runs from when their own screen
+// for speed, and in a duel's tie. So a player's time on a live question runs from when their own screen
 // showed it, as it says (Saw: it tells the server once the question is drawn with its pictures in), and the game keeps
 // that moment for each player under its own lock. What a screen says is trusted only so far: never before the game
 // showed the question, nor later than SeenLag after it (so that a screen that says it late gains SeenLag at most),

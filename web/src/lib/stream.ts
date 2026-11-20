@@ -1,4 +1,4 @@
-// A live game's stream from the server (Server-Sent Events): a live duel's, Роял's. The browser opens a
+// A live game's stream from the server (Server-Sent Events): a live duel's. The browser opens a
 // stream that dropped again by itself, after the wait the server named in it (retry:); but one whose answer isn't a
 // stream (a proxy's error page while the server is away, a portal's sign-in page, a 401) it gives up on for good
 // (CLOSED), and so would the screen. Here that one is opened anew, after a wait that grows (1, 2, 4 … 30 s, each a
@@ -11,8 +11,6 @@
 export interface Stream {
   /** Ends the stream for good: the server said the game is over for this screen. */
   close(): void;
-  /** Opens it anew now (Роял: another player signed in, whom the server sees otherwise). */
-  reopen(): void;
 }
 
 export interface StreamOptions {
@@ -85,5 +83,5 @@ export function stream(url: string, { life, on, down }: StreamOptions): Stream {
   };
   life.addEventListener("abort", close, { once: true });
   open();
-  return { close, reopen: open };
+  return { close };
 }

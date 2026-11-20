@@ -123,27 +123,12 @@ type pushKind string
 const (
 	// pushDay is the reminder of the day's questions, at the player's own hour (remind.go).
 	pushDay pushKind = "day"
-	// pushFriends is word from people and of games played: someone asks to be friends (from people, it goes through
-	// notifyFrom: capped), how a Роял played in one's own absence ended.
+	// pushFriends is word from people: someone asks to be friends (it goes through notifyFrom: capped).
 	pushFriends pushKind = "friends"
-	// pushRoyal is the call to every evening's Роял as its lobby opens. Off by default: saying „Ще дойда“ calls a
-	// player to that one evening anyway.
-	pushRoyal pushKind = "royal"
-	// pushAsked is a notification the player asked for themselves (the evening they said they'd come to): it goes
-	// whatever they chose for the kinds.
-	pushAsked pushKind = ""
 )
 
-// name is the kind as notifications carry it, and as they're counted: an asked-for one is "asked".
-func (k pushKind) name() string {
-	if k == pushAsked {
-		return "asked"
-	}
-	return string(k)
-}
-
 // pushKinds are the kinds a player chooses, with their defaults.
-var pushKinds = map[pushKind]bool{pushDay: true, pushFriends: true, pushRoyal: false}
+var pushKinds = map[pushKind]bool{pushDay: true, pushFriends: true}
 
 // wants is the SQL condition that the player in column user wants notifications of kind.
 func wants(kind pushKind, user string) string {

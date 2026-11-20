@@ -16,8 +16,8 @@ import (
 // The rule has one home, scriptPaced: more than MostQuick of a game's answers came under their question's Floor. A
 // person who knew one or two at once is still a person; three in one game is a pattern. Questions not answered (given
 // up, timed out) don't count. A run is judged as its answers come in (record calls judgeAnswer): only a quick answer
-// can make it a script's, and once it is, it stays one, however the run ends (by its last answer, by its time, with
-// its Роял, or left half-way). The runs played before the mark were judged once, as the server started (JudgeRuns).
+// can make it a script's, and once it is, it stays one, however the run ends (by its last answer, by its time, or
+// left half-way). The runs played before the mark were judged once, as the server started (JudgeRuns).
 //
 // A marked run is a shadow (runs.shadow, ShadowScript): its player sees it as any other game, with its score, and
 // their place among the others as if it were in, and nothing tells them otherwise; for everyone else it isn't there.
@@ -32,7 +32,7 @@ import (
 //   - the recordings a duel is played against (recordedRun).
 //
 // What it isn't left out of: the player's own numbers (their profile, level, achievements, goals, streak), which are
-// theirs; and the rating, one number everyone sees, which a duel or a Роял moves as it ends (a live game is played
+// theirs; and the rating, one number everyone sees, which a duel moves as it ends (a live game is played
 // in front of the others anyway).
 //
 // A third reason (ShadowThrowaway) is the day played as throwaway guests to read its answers, or to try it several

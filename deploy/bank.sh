@@ -8,11 +8,10 @@
 # reaches it: it prints the errors, says which commit it left out, and stops (exit 1), the checkout and the game
 # as they were. A good bank prints its count (…: N questions (M live)) and its problems counted (…: 0 errors, W
 # warnings (by rule)); the checkout moves to it, and the game reloads it: the server plays a copy of its own
-# (cmd/almanac/banks.go), and while Роял is on it holds the new bank until the evening is over
-# (internal/server/bank.go). Then it asks the server (/api/health) what became of it, and its last line says:
+# (cmd/almanac/banks.go), at once (internal/server/bank.go). Then it asks the server (/api/health) what became of it,
+# and its last line says:
 #
 #   live: <commit> <title>      the game plays it
-#   held: <commit> <title>      checked, and in play once Роял is over
 #
 # or, with exit 1, that the server refused it or didn't say. One run at a time: a second waits for the first.
 set -eu
@@ -68,16 +67,12 @@ if ! systemctl is-active --quiet almanac; then
 fi
 systemctl reload almanac
 
-# The server copies and loads the bank (a few seconds), then plays it, holds it for Роял, or refuses it.
+# The server copies and loads the bank (a few seconds), then plays it or refuses it.
 for _ in $(seq 60); do
 	sleep 1
 	case $(health) in
 	*'"bank":{"commit":"'"$new"'"'*)
 		echo "live: $title"
-		exit 0
-		;;
-	*'"held":"'"$new"'"'*)
-		echo "held: $title (Роял is on: in play once it's over)"
 		exit 0
 		;;
 	*'"refused":{"commit":"'"$new"'"'*)

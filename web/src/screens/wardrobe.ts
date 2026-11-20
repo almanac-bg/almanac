@@ -42,7 +42,7 @@ const titleGroups: [TitleView["group"], string][] = [
   ["days", "С дните с въпросите на деня"],
   ["achievement", "С постиженията"],
   ["topic", "С майсторството в темите"],
-  ["rank", "С рейтинга и Роял"],
+  ["rank", "С рейтинга"],
 ];
 
 export function wardrobe(kit: Kit) {

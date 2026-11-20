@@ -957,15 +957,11 @@ func TestMergeKeepsTheAccountsDay(t *testing.T) {
 	gs, _ := w.g.StartDay(ctx, guest)
 	topic, _ := w.g.StartTopic(ctx, guest, "science")
 	os, _ := w.g.StartDay(ctx, owner)
-	// The guest said they'd come to tonight's Роял, and chose no word from friends.
-	_ = w.g.PlanRoyal(ctx, "2026-11-14", guest, true)
+	// The guest chose no word from friends.
 	_, _ = w.db.Write.Exec(`INSERT INTO push_prefs (user_id, kind, wanted) VALUES (?, 'friends', 0)`, guest)
 	err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, guest, owner) })
 	if err != nil {
 		t.Fatal(err)
-	}
-	if n, mine, _ := w.g.RoyalPlans(ctx, "2026-11-14", owner); n != 1 || !mine {
-		t.Fatalf("the guest's plan: %d, %v", n, mine)
 	}
 	var wanted int
 	if err := w.db.Read.QueryRow(`SELECT wanted FROM push_prefs WHERE user_id = ? AND kind = 'friends'`, owner).Scan(&wanted); err != nil || wanted != 0 {
@@ -1555,15 +1551,6 @@ func TestRatingAndDivisions(t *testing.T) {
 	}
 }
 
-// placeDeltas: each place against each other counts as a duel won, lost or drawn (Роял's places move ratings so).
-func TestPlaceDeltas(t *testing.T) {
-	// The first wins, the two second share it, the last loses; all from the start.
-	d := placeDeltas([]int{1, 2, 2, 4}, []int{StartRating, StartRating, StartRating, StartRating}, []int{0, 0, 0, 0})
-	if d[0] <= 0 || d[3] >= 0 || d[1] != d[2] || d[0] <= d[1] {
-		t.Fatalf("what the places did: %v", d)
-	}
-}
-
 func TestAlmanac(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -1715,7 +1702,7 @@ func TestTitles(t *testing.T) {
 
 	w := setup(t)
 	ctx := t.Context()
-	ana, bo := w.user(), w.user()
+	ana := w.user()
 	w.played(ana, XPFromDay)
 	p, _ := w.g.ProgressOf(ctx, ana)
 	topics := len(w.g.Bank().Categories)*len(topicTiers) + len(acrossTopics)
@@ -1796,32 +1783,6 @@ func TestTitles(t *testing.T) {
 	}
 	if look, _ := w.g.LookOf(ctx, ana); look.Title != "Страст към викторините" || look.TitleTier != Common {
 		t.Fatalf("the look: %+v", look)
-	}
-
-	// A Роял won, with someone else in it; alone, it doesn't count.
-	royal := func(players ...int64) {
-		res, err := w.db.Write.Exec(`INSERT INTO royals (questions, created_at, closes_at, ended_at) VALUES ('[]', 1, 1, 1)`)
-		if err != nil {
-			t.Fatal(err)
-		}
-		id, _ := res.LastInsertId()
-		for i, u := range players {
-			if _, err := w.db.Write.Exec(`INSERT INTO royal_players (royal_id, user_id, joined_at, place) VALUES (?, ?, 1, ?)`,
-				id, u, i+1); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-	royal(bo)
-	if err := w.g.SetLook(ctx, bo, nil, ptr("royalCrown")); !errors.Is(err, ErrNotYours) {
-		t.Fatalf("a Роял alone: %v", err)
-	}
-	royal(bo, ana)
-	if err := w.g.SetLook(ctx, bo, nil, ptr("royalCrown")); err != nil {
-		t.Fatalf("a Роял won: %v", err)
-	}
-	if err := w.g.SetLook(ctx, ana, nil, ptr("royalCrown")); !errors.Is(err, ErrNotYours) {
-		t.Fatalf("second in a Роял: %v", err)
 	}
 }
 

@@ -19,7 +19,7 @@ import (
 //
 // A day's board ranks by right answers, then points, then time: players tell their day as „8 от 10“, so nine right
 // are never under eight. Points decide among the same right answers, which is what they're for (worth.go). Other
-// games keep their own order: duels by points, Роял by right answers and time (royal.go).
+// games keep their own order: duels by points.
 
 // BoardTop is how many of the best a board shows.
 const BoardTop = 20

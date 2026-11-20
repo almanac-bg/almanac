@@ -15,5 +15,5 @@ test("another game goes where an open goal of a topic points, else to what's nex
     ),
     "/play/history",
   );
-  assert.equal(nextGame([{ done: false }, { href: "/royal", done: false }], "/play/music"), "/play/music");
+  assert.equal(nextGame([{ done: false }, { href: "/duel", done: false }], "/play/music"), "/play/music");
 });

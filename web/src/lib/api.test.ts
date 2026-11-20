@@ -114,7 +114,7 @@ test("a game's step is tried three times while the line or the server is down, a
 });
 
 test("a live answer is sent again while it doesn't get through and its question is open, and not after", async () => {
-  const send = () => api("POST", "/api/royal/answer", {});
+  const send = () => api("POST", "/api/duels/live/1/answer", {});
   const live = (open: () => boolean) => tries(send, { open, pause: 1, max: Number.POSITIVE_INFINITY });
   let asked = serve("down", json(502, {}), "down", json(200, { ok: true }));
   assert.deepEqual(await live(() => true), { ok: true });

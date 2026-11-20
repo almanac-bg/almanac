@@ -64,9 +64,7 @@ var adminBody = template.Must(template.New("admin").Parse(`
 
 <p>{{.Players}} играчи ({{.WithEmail}} с имейл). Днес въпросите на деня са изиграли {{.DayToday}}.{{if .DayScripted}}
 По-бързо, отколкото играе човек: {{.DayScripted}} (другите не ги виждат).{{end}}
-В банката: {{.Questions}} въпроса, {{.Live}} в игра. Роял: {{if .Royal.Nightly}}всяка вечер{{else}}петък, събота и
-неделя{{end}}; медиана на играчите за последните {{.Royal.Evenings}} вечери: {{.RoyalMedian}} (всяка вечер, щом е поне
-{{.RoyalTurnout}} за {{.RoyalEvenings}} вечери).</p>
+В банката: {{.Questions}} въпроса, {{.Live}} в игра.</p>
 <p class="muted">Играч тук е човек: отговорил на въпрос с човешка скорост, без администраторите. Гостите, изиграли деня
 за проба преди своя, са вътре: иначе новите изглеждат по-верни, отколкото са. Под всеки дял: колко от колко и между
 какви стойности е с 90 % сигурност. Разлика в рамките на тези стойности може да е случайна. В сиво: под 20 души, малко
@@ -187,7 +185,7 @@ var adminBody = template.Must(template.New("admin").Parse(`
 {{else}}<tr><td colspan="5" class="muted">Няма игри.</td></tr>{{end}}
 </tbody></table></div>
 <h3>Устройства, 28 дни</h3>
-<p class="muted">На какво е започната всяка игра. Роял не казва.</p>
+<p class="muted">На какво е започната всяка игра.</p>
 <div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">Играчи</th><th class="num">Игри</th><th class="num">Започнат ден, завършен</th></tr></thead><tbody>
 {{range .Devices}}<tr><td>{{.Name}}</td><td class="num">{{.Players}}</td><td class="num">{{.Games}}</td><td class="num">{{.DayFinished.HTML}}</td></tr>
 {{else}}<tr><td colspan="4" class="muted">Няма игри.</td></tr>{{end}}

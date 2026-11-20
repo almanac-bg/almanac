@@ -142,7 +142,7 @@ func among(friends bool) string {
 // division: a win or two isn't a rating yet.
 const MinRatedGames = 10
 
-// rate moves a player's rating by a rated game (a duel, Роял), counts the game, and keeps the peak: the highest rating
+// rate moves a player's rating by a rated game (a duel), counts the game, and keeps the peak: the highest rating
 // since it was set. The placement games' swings are no division (a win or two at the start would otherwise unlock
 // Злато for one placed in Сребро, and keep the news from telling Злато when they reach it): the game that places a
 // rating sets the peak to it, and those after raise it. It says where the rating went.
@@ -207,30 +207,4 @@ func (g *Game) RatingBoard(ctx context.Context, viewer int64, friends bool) (Ran
 	}
 	tx.Rollback() //nolint:errcheck // done reading; its connection back before rankingOf takes one
 	return g.rankingOf(ctx, viewer, list, true)
-}
-
-// placeDeltas is what places in a game of many (Роял) do to ratings: each player's place against each other one's counts as a duel won, lost
-// or drawn, and the rating moves by the average of those.
-func placeDeltas(places, ratings, rated []int) []int {
-	out := make([]int, len(places))
-	if len(places) < 2 {
-		return out
-	}
-	for i := range places {
-		sum := 0.0
-		for j := range places {
-			if i == j {
-				continue
-			}
-			score := 0.5
-			if places[i] < places[j] {
-				score = 1
-			} else if places[i] > places[j] {
-				score = 0
-			}
-			sum += float64(eloDelta(ratings[i], ratings[j], rated[i], score))
-		}
-		out[i] = int(math.Round(sum / float64(len(places)-1)))
-	}
-	return out
 }

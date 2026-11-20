@@ -15,7 +15,7 @@ var Difficulties = []Difficulty{Easy, Medium, Hard}
 
 // TypeMix is the share of each kind of question the bank aims for, in every category (the owner's call, 2026-11-13;
 // splits and clues since 2026-11-14), close to what the game draws: a run of ten has five choices, one of each other
-// kind, and a split or clues, and Роял adds true-or-not. So that no kind runs out long before the others.
+// kind, and a split or clues. So that no kind runs out long before the others.
 var TypeMix = map[string]float64{"choice": 0.50, "truefalse": 0.15, "number": 0.10, "order": 0.075, "match": 0.075, "split": 0.05, "clues": 0.05}
 
 // TypeOrder is the kinds in the order a report shows them.

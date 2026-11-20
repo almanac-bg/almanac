@@ -1,6 +1,6 @@
 // A screen that loads on its own (kit.ts) names the app's pieces it uses twice: declared at the top (`let { … } = {} as
 // Kit`), and set as it opens (`({ … } = kit)`). A piece in the first list and not the second is undefined at run time,
-// with no type error to say so (a Роял verdict threw on it once): the two lists are the same.
+// with no type error to say so (a verdict threw on it once): the two lists are the same.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";

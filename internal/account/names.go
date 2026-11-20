@@ -10,7 +10,7 @@ import (
 	"unicode/utf8"
 )
 
-// Names are shown to strangers: on the boards, in Роял, in duels, on a player's page. So a name
+// Names are shown to strangers: on the boards, in duels, on a player's page. So a name
 // is plain letters of the two scripts players here write in, Cyrillic and Latin, each word in one of them (a Latin
 // „A“ inside „АЛМАНАХ“ is how a fake looks real), with no dot between letters (a name isn't a web address), and
 // nothing that reads as the game or its people (reservedRoots): checked over two skeletons of the name, one by how

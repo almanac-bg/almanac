@@ -1,5 +1,5 @@
-// What the player has set for this device: Night or Day, less motion, the text's size, whether the clock ticks, Роял's
-// music. Kept in the browser (like the sounds' switch), and put on the page: Night or Day as `data-scheme` and less
+// What the player has set for this device: Night or Day, less motion, the text's size, whether the clock ticks. Kept
+// in the browser (like the sounds' switch), and put on the page: Night or Day as `data-scheme` and less
 // motion as a class on <html>, which the CSS reads, the text's size as <html>'s own (everything is sized from it, in
 // rem).
 
@@ -58,14 +58,6 @@ export function setTextSize(size: TextSize): void {
     // Not kept: the choice holds for this visit.
   }
   apply();
-}
-
-/** Роял's lobby music (feel.ts), with the sounds on. */
-export const musicOn = signal(read("almanac.music", true));
-
-export function setMusic(on: boolean): void {
-  musicOn.set(on);
-  keep("almanac.music", on);
 }
 
 /** How the game looks on this device: as the device is set (Night or Day by its own setting), or Night or Day

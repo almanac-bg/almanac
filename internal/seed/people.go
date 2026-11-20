@@ -27,7 +27,6 @@ type player struct {
 	hour   int           // when in the day they usually play
 	topics float64       // topic games on a day they play, on average
 	duels  float64       // live duels
-	royal  float64       // the chance they come to an evening's Роял
 	social float64       // how readily they make friends
 
 	profile int // the day they give an email (-1: a guest throughout)
@@ -82,11 +81,11 @@ func (w *world) cast(n int) {
 	add(&player{kind: keyDay2, persona: keyDay2, joined: last - 1, until: -1, rate: 1, skill: 0.6, topics: 0.6,
 		profile: -1, from: "home", hour: 19})
 	add(&player{kind: keyRegular, persona: keyRegular, joined: last - 29, until: -1, rate: 1, skill: 0.78, topics: 1.2,
-		duels: 1.6, royal: 0.5, social: 1, profile: last - 26, named: true, hour: 8, pace: 6 * time.Second})
+		duels: 1.6, social: 1, profile: last - 26, named: true, hour: 8, pace: 6 * time.Second})
 	add(&player{kind: keyLegend, persona: keyLegend, joined: 0, until: -1, rate: 1, skill: 0.95, topics: 1.5,
-		duels: 6, royal: 0.9, social: 0.6, profile: 1, named: true, hour: 20, pace: 4 * time.Second})
+		duels: 6, social: 0.6, profile: 1, named: true, hour: 20, pace: 4 * time.Second})
 	add(&player{kind: keyAdmin, persona: keyAdmin, joined: 0, until: -1, rate: 0.9, skill: 0.7, topics: 0.8,
-		duels: 0.5, royal: 0.3, social: 0.5, profile: 0, named: true, hour: 9})
+		duels: 0.5, social: 0.5, profile: 0, named: true, hour: 9})
 	// Those who might be the lapsed one: streaks that end yesterday, by whichever days their weeks forgive; the
 	// first whose streak did is the persona.
 	for i := range 4 {
@@ -96,26 +95,26 @@ func (w *world) cast(n int) {
 	// A few who never miss a day: the long streaks.
 	for i := range 4 {
 		add(&player{kind: "devoted", joined: i, until: -1, rate: 1, skill: 0.6 + 0.1*float64(i), topics: 0.8,
-			duels: 1 + float64(i), royal: 0.7, social: 0.7, profile: i + 2, named: true})
+			duels: 1 + float64(i), social: 0.7, profile: i + 2, named: true})
 	}
 	for len(w.players) < n {
 		p := &player{until: -1, profile: -1}
 		switch x := w.r.Float64(); {
 		case x < 0.06:
-			p.kind, p.rate, p.topics, p.duels, p.royal = "devoted", 0.96, 1, 1.5, 0.6
+			p.kind, p.rate, p.topics, p.duels = "devoted", 0.96, 1, 1.5
 			p.joined = w.r.IntN(12)
 		case x < 0.28:
-			p.kind, p.rate, p.topics, p.duels, p.royal = "regular", 0.8, 0.6, 0.6, 0.35
+			p.kind, p.rate, p.topics, p.duels = "regular", 0.8, 0.6, 0.6
 			p.joined = w.r.IntN(max(1, last-10))
 		case x < 0.58:
-			p.kind, p.rate, p.topics, p.duels, p.royal = "casual", 0.4, 0.4, 0.25, 0.1
+			p.kind, p.rate, p.topics, p.duels = "casual", 0.4, 0.4, 0.25
 			p.joined = w.r.IntN(last)
 		case x < 0.80:
 			p.kind, p.rate, p.topics, p.duels = "tried", 1, 0.4, 0.2
 			p.joined = w.r.IntN(last)
 			p.until = p.joined + w.r.IntN(3)
 		case x < 0.92:
-			p.kind, p.rate, p.topics, p.duels, p.royal = "lapsed", 0.85, 0.6, 0.5, 0.2
+			p.kind, p.rate, p.topics, p.duels = "lapsed", 0.85, 0.6, 0.5
 			p.joined = w.r.IntN(max(1, last-25))
 			p.until = p.joined + 7 + w.r.IntN(max(1, last-p.joined-9))
 		default:

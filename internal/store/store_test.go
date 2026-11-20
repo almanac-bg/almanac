@@ -389,7 +389,7 @@ func TestRoyalKeepsRuns(t *testing.T) {
 			t.Fatal(q, err)
 		}
 	}
-	if err := db.migrate(); err != nil {
+	if err := db.migrateTo(migrationsThrough("0011_royal.sql")); err != nil {
 		t.Fatal(err)
 	}
 	var answers, duels int
@@ -617,6 +617,59 @@ func TestNoRooms(t *testing.T) {
 	if runs != "10 topic history 900 40, 11 topic mix 300 20, 12 topic mix 100 10, 13 topic mix 500 30, 14 day - 700 35" ||
 		from != "other home" || counts != "visit:home" {
 		t.Fatalf("runs %q, came from %q, counts %q", runs, from, counts)
+	}
+	db.Close()
+}
+
+// No Роял (0085): its games stay their players', as games of „Микс“ (one a cut left open ended at its last answer,
+// none news to tell); its tournaments, evenings and plans go, with the choice of its notifications, those queued and
+// their counts. Nothing else of runs or of the choices changes.
+func TestNoRoyal(t *testing.T) {
+	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0085_no_royal.sql")
+	for _, q := range []string{
+		`INSERT INTO users (id, name, tag, created_at, seen_at) VALUES (1, 'Ана', 'ana', 1, 1), (2, 'Бо', 'bo', 1, 1)`,
+		`INSERT INTO runs (id, user_id, kind, category, questions, started_at, finished_at, points, rights, xp, told)
+			VALUES (10, 1, 'royal', NULL, '[]', 1, 2, 900, 9, 40, 0), (11, 2, 'royal', NULL, '[]', 3, NULL, 300, 2, 20, 0),
+			(12, 2, 'topic', 'history', '[]', 1, 2, 500, 5, 30, 0), (13, 2, 'day', NULL, '[]', 1, 2, 700, 7, 35, 1)`,
+		`INSERT INTO answers (run_id, n, question_id, score, points, is_right, ms, at) VALUES
+			(10, 0, 'his-001', 1, 100, 1, 900, 2), (11, 0, 'his-002', 1, 100, 1, 900, 5), (11, 1, 'his-003', 0, 0, 0, 900, 8)`,
+		`INSERT INTO royals (id, questions, created_at, closes_at, ended_at, day, starts_at) VALUES (1, '[]', 1, 1, 9, '2026-11-15', 1)`,
+		`INSERT INTO royal_players (royal_id, user_id, run_id, joined_at, place, delta) VALUES (1, 1, 10, 1, 1, 12), (1, 2, 11, 1, 2, -12)`,
+		`INSERT INTO royal_plans (day, user_id) VALUES ('2026-11-20', 1)`,
+		`INSERT INTO royal_evenings (day) VALUES ('2026-11-15')`,
+		`INSERT INTO push_prefs (user_id, kind, wanted) VALUES (1, 'royal', 1), (1, 'friends', 0), (2, 'day', 1)`,
+		`INSERT INTO push_queue (user_id, kind, message, next_at, until) VALUES (1, 'royal', '{}', 1, 9), (1, '', '{}', 1, 9),
+			(2, 'friends', '{}', 1, 9)`,
+		`INSERT INTO daily_counts (day, key, n) VALUES ('2026-11-18', 'push:sent:royal', 3), ('2026-11-18', 'push:open:asked', 1),
+			('2026-11-18', 'push:sent:friends', 5)`,
+	} {
+		if _, err := db.Write.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	if err := db.migrateTo(migrationsThrough("0085_no_royal.sql")); err != nil {
+		t.Fatal(err)
+	}
+	var runs, answers, prefs, queue, counts string
+	_ = db.Read.QueryRow(`SELECT group_concat(concat_ws(' ', id, kind, coalesce(category, '-'), points, rights, xp,
+			coalesce(finished_at, '-'), told), ', ') FROM (SELECT * FROM runs ORDER BY id)`).Scan(&runs)
+	_ = db.Read.QueryRow(`SELECT group_concat(run_id, ' ') FROM (SELECT run_id FROM answers ORDER BY run_id, n)`).Scan(&answers)
+	_ = db.Read.QueryRow(`SELECT group_concat(concat_ws(':', user_id, kind, wanted), ' ')
+		FROM (SELECT * FROM push_prefs ORDER BY user_id, kind)`).Scan(&prefs)
+	_ = db.Read.QueryRow(`SELECT group_concat(kind, ' ') FROM push_queue`).Scan(&queue)
+	_ = db.Read.QueryRow(`SELECT group_concat(key, ' ') FROM daily_counts`).Scan(&counts)
+	if runs != "10 topic mix 900 9 40 2 1, 11 topic mix 300 2 20 8 1, 12 topic history 500 5 30 2 0, 13 day - 700 7 35 2 1" ||
+		answers != "10 11 11" || prefs != "1:friends:0 2:day:1" || queue != "friends" || counts != "push:sent:friends" {
+		t.Fatalf("runs %q, answers %q, prefs %q, queue %q, counts %q", runs, answers, prefs, queue, counts)
+	}
+	for _, table := range []string{"royals", "royal_players", "royal_plans", "royal_evenings"} {
+		var n int
+		if _ = db.Read.QueryRow(`SELECT count(*) FROM sqlite_schema WHERE name = ?`, table).Scan(&n); n != 0 {
+			t.Errorf("%s is still there", table)
+		}
+	}
+	if _, err := db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at) VALUES (1, 'royal', '[]', 3)`); err == nil {
+		t.Error("a Роял run is taken still")
 	}
 	db.Close()
 }

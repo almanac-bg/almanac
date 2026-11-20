@@ -14,8 +14,8 @@ import (
 // (another phone, a private window), not once on each device.
 //
 //   - A game's news belongs to that game (NewsOf): its result tells it as it ends. A game that ended without its result
-//     on screen (the day's last question let run out with the tab in the background, a game left at its last question,
-//     a Роял whose evening ended) has its news told on Начало instead, once (Untold), and not after some later game.
+//     on screen (the day's last question let run out with the tab in the background, or a game left at its last
+//     question) has its news told on Начало instead, once (Untold), and not after some later game.
 //   - What came of the days just missed (the week forgave one, or the streak ended) is said once (StreakNotice,
 //     TellStreak). A player back after days away (BackFrom) is welcomed back once, with the longest streak they've
 //     had, in the same way.

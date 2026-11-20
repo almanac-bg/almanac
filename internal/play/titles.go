@@ -207,10 +207,5 @@ func LevelTitle(level int) string {
 	return id
 }
 
-// royalWins is how many Роял tournaments a player has won (first place, with someone else in it).
-func (g *Game) royalWins(ctx context.Context, userID int64) (int, error) {
-	var n int
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT count(*) FROM royal_players p WHERE p.user_id = ? AND p.place = 1
-		AND (SELECT count(*) FROM royal_players o WHERE o.royal_id = p.royal_id) > 1`, userID).Scan(&n)
-	return n, err
-}
+// royalWins is how many Роял tournaments a player has won: none, now that Роял is gone (its tournaments with it).
+func (g *Game) royalWins(context.Context, int64) (int, error) { return 0, nil }

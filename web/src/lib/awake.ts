@@ -1,4 +1,4 @@
-// Keeping the screen on while a live game needs it (Роял's lobby and game, a live duel): a phone
+// Keeping the screen on while a live game needs it (a live duel): a phone
 // that falls asleep drops the stream, and with it the player. The browser lets the lock go when the page is hidden, so
 // it's asked for again once the page shows; a browser that has no lock, or refuses it (a low battery), is let be.
 

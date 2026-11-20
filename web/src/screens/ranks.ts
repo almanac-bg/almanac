@@ -255,7 +255,7 @@ export function ranks(kit: Kit) {
         d.board,
         (r) => [r.division ? emblem(r.division.id, "s") : null, String(r.value)],
         `Още никой няма ${least} игри за рейтинг.`,
-        `Играчите с поне ${least} игри за рейтинг: дуели и Роял.`,
+        `Играчите с поне ${least} игри за рейтинг: дуели.`,
       );
     },
   );

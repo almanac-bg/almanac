@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { closeWords, countedWords, inRowOf, percent, withOwn } from "./numbers.ts";
+import { closeWords, inRowOf, percent, withOwn } from "./numbers.ts";
 import type { Mark } from "./types.ts";
 
 const right: Mark = { points: 1000, right: true };
@@ -20,8 +20,6 @@ test("the player's own answer is in the crowd they're shown: what they picked ne
     percent(withOwn({ answers: 1000, right: 0.5, picks: [0.5, 0.5, 0, 0] }, 3, false).picks?.[3] ?? 0),
     "под 1%",
   );
-  const room = { answers: 2, right: 0.5, picks: [0.5, 0.5], counts: true };
-  assert.equal(withOwn(room, 0, true), room, "a game's own crowd has them already");
 });
 
 test("a score says its close answers, whose points would read as a mistake beside none right", () => {
@@ -29,14 +27,6 @@ test("a score says its close answers, whose points would read as a mistake besid
   assert.equal(closeWords([right, close, close, { ...close, void: true }]), " · 2 близо");
   assert.equal(closeWords([right, wrong]), "");
   assert.equal(closeWords(), "");
-});
-
-test("a game's own crowd, counted, says how many of its players knew it", () => {
-  assert.equal(countedWords({ answers: 12, right: 3 / 12, counts: true }, false), "Познаха 3 от 12.");
-  assert.equal(countedWords({ answers: 12, right: 1 / 12, counts: true }, true), "Само ти позна.");
-  assert.equal(countedWords({ answers: 2, right: 1, counts: true }, true), "Всички познаха.");
-  assert.equal(countedWords({ answers: 2, right: 0, counts: true }, false), "Никой не позна.");
-  assert.equal(countedWords({ answers: 1, right: 1, counts: true }, true), "", "alone: the verdict says it");
 });
 
 test("a row of right answers goes over a question that counts for nobody, as the server counts it", () => {

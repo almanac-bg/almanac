@@ -105,21 +105,15 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	data := struct {
 		Players, WithEmail, DayToday, DayScripted, Questions, Live int
 		M                                                          measures
-		Royal                                                      play.RoyalPace
-		RoyalMedian                                                string
-		RoyalTurnout, RoyalEvenings                                int
 		Fair                                                       []play.FairSignal
 		Divisions                                                  []divisionShare
 		Placing                                                    int
-	}{Questions: len(b.Questions), Live: len(b.Live("", "")), RoyalTurnout: play.RoyalTurnout, RoyalEvenings: play.RoyalEvenings}
+	}{Questions: len(b.Questions), Live: len(b.Live("", ""))}
 	today := s.game.Today()
 	var err error
 	if data.M, err = s.measures(ctx); err != nil {
 		slog.Error("admin: the measures", "err", err)
 	}
-	// How often Роял plays, and the turnout that decides it.
-	data.Royal, _ = s.game.RoyalPaceOf(ctx)
-	data.RoyalMedian = strings.TrimSuffix(decimal(data.Royal.Median), ",0")
 	_ = db.QueryRowContext(ctx, `SELECT count(*), count(email) FROM users`).Scan(&data.Players, &data.WithEmail)
 	// The days played after several throwaway guests from the same network (play.JudgeNets).
 	if data.Fair, err = s.game.FairSignals(ctx, 50); err != nil {

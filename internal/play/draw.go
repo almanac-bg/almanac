@@ -442,7 +442,7 @@ func matches(q bank.Question, s slot, typ, pictures bool) bool {
 // of an ability there (mastery.go; 0 for one who knows as much as most): questions none of them has seen before those
 // one has, and so on (seen: seenAmong); never one barred (the day's: DayQuestions). Choices come with a picture or without, whichever is drawn, and the number an estimate
 // where one is left (wishes). Every run goes from easy to hard, its special questions in places drawn within their
-// difficulty (inBands). Topic runs and duels draw this way (Роял, drawRoyal). The questions due for review are among
+// difficulty (inBands). Topic runs and duels draw this way. The questions due for review are among
 // the barred (DayQuestions).
 func Draw(b *bank.Bank, category string, ability float64, seen map[string]int, barred map[string]bool, r *rand.Rand) []Pick {
 	pool := topicPool(b, category)

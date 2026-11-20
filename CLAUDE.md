@@ -19,7 +19,7 @@ missed day a week. Points are one game's score; nothing else adds up but the boo
 
 **Being rebuilt (from 20 Nov 2026).** The owner chose this after a full review (DECISIONS.md, „The redesign“). Until
 each part lands, the code still has the old game: XP and levels, goals, achievements, titles and the wardrobe's
-unlocks, rating and divisions, Роял, live duels, four places. Don't extend any of those; remove them as the redesign
+unlocks, rating and divisions, live duels, four places (Роял is gone). Don't extend any of those; remove them as the redesign
 reaches them.
 
 ## Direction
@@ -37,7 +37,6 @@ most). A change is judged by whether players come back: the retention numbers in
 | `cmd/build` | Builds the client into `internal/assets/dist` (esbuild; precompressed; the first screen's budget, and ceilings against accidents) |
 | `internal/play` | The game's rules and data: runs, scoring (`worth.go`), duels, friends, rating, goals, progress |
 | `internal/live` | Live duels: matchmaking, the shared clock, recordings |
-| `internal/royal` | Роял, live in the evening (Friday to Sunday until the evenings fill) |
 | `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: the paths it sends the app for, the client's router's list again; a test holds them equal) |
 | `internal/store` | SQLite; migrations in `internal/store/migrations`, applied once each by name |
 | `internal/bank` | Question types, the bank on disk, its checks |
@@ -67,7 +66,7 @@ database (then `serve` it with the same `DB_PATH`) and be its personas, a new gu
 cookie, or `-state`'s Playwright storage state per persona).
 
 CI runs the race detector on everything (`go test -race ./...`, a minute or two); locally run it where goroutines
-meet (`live`, `royal`, `server`, or `play` when you touch its locks), not on everything: the SQLite driver is
+meet (`live`, `server`, or `play` when you touch its locks), not on everything: the SQLite driver is
 Go, so under the detector every query is instrumented, and the whole tree takes minutes instead of seconds. A test gets
 its database from `storetest.Open(t)` (migrated once per test program, copied) and the sample bank from
 `banktest.Sample(t)` (shared: a test that changes questions loads its own with `bank.Load`).
@@ -157,8 +156,7 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
   passes the server's and the client's checks, one that doesn't (tests, docs, tooling) isn't. The version counts up its minor when the release brings a new migration, its patch
   otherwise: one minor, one schema. A major is the owner's call only (the workflow run by hand). `almanac-deploy` restarts the server only when
   that cuts no play: it drains it first (no new live duel; those under way finish, each by its own clock, seven
-  minutes at the most), and waits out Роял (from 20:37 to the end of its games), so
-  a deploy may take a while to go live, and several merges meanwhile go out as one. Connections wait in systemd's socket through the restart; a version that brings a migration copies the database before it, and the deploy goes back by itself,
+  minutes at the most), so a deploy may take a while to go live, and several merges meanwhile go out as one. Connections wait in systemd's socket through the restart; a version that brings a migration copies the database before it, and the deploy goes back by itself,
   program and database copy both, if it isn't healthy. Every run deploys the latest release if it isn't live, so a
   failed deploy is tried again by the next merge; one that went back isn't, nor (if it never came up after it began
   to migrate) a release that brings that migration unchanged: change what failed. No tags by hand, no ssh to deploy. A change to `deploy/` reaches the
@@ -204,7 +202,7 @@ end, within the same minor (`vX.Y.*`: the same migrations); to an older minor, t
 to where it was, so put the copy from before that release back by hand, `/var/lib/almanac/before-vX.Y.Z.db`, with
 `systemctl stop almanac.socket almanac` first, and lose what was played since; a release is taken only signed, so
 one from before signatures only while it's kept in `/usr/local/lib/almanac`, the five used latest), `almanac-bank` (check the new
-questions apart, then pull and reload them; while Роял is on they wait for its end), `journalctl -u almanac` (logs). The `almanac backup` commands need the service's settings:
+questions apart, then pull and reload them), `journalctl -u almanac` (logs). The `almanac backup` commands need the service's settings:
 `systemd-run --pipe --wait -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac backup verify`
 brings the latest copy back and checks it (the server does this itself daily). Health: `https://almanac.bg/api/health`
-shows the live version and the bank played (its commit; one held for Роял, one refused).
+shows the live version and the bank played (its commit; one refused).

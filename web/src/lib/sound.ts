@@ -1,7 +1,7 @@
 // Sounds: made in the browser (no files), for a game's moments — a pick, the other side answering, the count before a
 // game and its start, the clock's last seconds, a right answer (higher with each one in a row), a wrong one or none,
 // the end (won, lost, perfect or just over), the result's pips and the streak, a goal done, a new level or
-// achievement, Роял's cut, and something new waiting. On unless the player turns them off (kept on this device).
+// achievement, and something new waiting. On unless the player turns them off (kept on this device).
 //
 // Browsers allow sound only once the player has touched the page, so the audio starts then. The bigger sounds (an
 // end, a level, an achievement…) take turns: one asked for while another still sounds follows it, never on top. On
@@ -22,8 +22,6 @@ export type SoundName =
   | "pip"
   | "dud"
   | "streak"
-  | "through"
-  | "out"
   | "hurry"
   | "right"
   | "exact"
@@ -148,12 +146,6 @@ export function prepareSound(): void {
       .then(() => c.resume())
       .catch(() => {});
   });
-}
-
-/** The audio, started, with the game's feel in: for what plays on its own beside the sounds (Роял's lobby music). None
- * while the sounds are off, or before a touch has started them. */
-export function liveAudio(): { audio: AudioContext; feel: Feel } | null {
-  return soundOn.peek() && audio?.state === "running" && kit ? { audio, feel: kit } : null;
 }
 
 /** Plays a sound, if sounds are on and the browser allows them (else nothing: never a backlog later). `lift` raises

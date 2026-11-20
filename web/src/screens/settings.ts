@@ -24,10 +24,8 @@ let {
   textSize,
   schemeSwitch,
   calm,
-  musicOn,
   setTextSize,
   setCalm,
-  setMusic,
   setTick,
   tickOn,
   needsHomeScreen,
@@ -70,10 +68,8 @@ export function settings(kit: Kit) {
     textSize,
     schemeSwitch,
     calm,
-    musicOn,
     setTextSize,
     setCalm,
-    setMusic,
     setTick,
     tickOn,
     needsHomeScreen,
@@ -238,7 +234,7 @@ function nameForm(): Child {
         value: name,
         oninput: typed(name.set),
       }),
-      // Seen by everyone (the boards, Роял, a link's preview): no more than a player means to show.
+      // Seen by everyone (the boards, a duel, a link's preview): no more than a player means to show.
       h("small", { class: "muted", id: "name-how" }, "Вижда се от всички в играта. Прякор или малкото ти име стигат."),
     ),
     h(
@@ -336,7 +332,7 @@ function switchRow(label: string, about: string, on: () => boolean, set: (v: boo
   );
 }
 
-/** Sounds, the clock's last seconds among them, and Роял's music: on or off, on this device. */
+/** Sounds, the clock's last seconds among them: on or off, on this device. */
 function sounds(): Child {
   return h(
     "section",
@@ -351,7 +347,6 @@ function sounds(): Child {
     ),
     switchRow("Звуци", "Часовникът, отговорите, новото ниво.", soundOn, setSound),
     switchRow("Тиктакане", "Последните секунди на въпроса.", tickOn, setTick),
-    switchRow("Музика в Роял", "Тиха музика, докато чакаш началото.", musicOn, setMusic),
   );
 }
 
@@ -559,12 +554,7 @@ function reminders(): Child {
                       "div",
                       null,
                       kind("day", "Въпросите на деня", "Веднъж на ден, около часа, в който играеш, ако още те чакат."),
-                      kind(
-                        "friends",
-                        "Приятели и резултати",
-                        "Покани за приятелство и мястото ти в Роял, когато не го видиш до края.",
-                      ),
-                      kind("royal", "Роял", "Когато входът се отвори: в 20:45 в дните на Роял."),
+                      kind("friends", "Приятели", "Покани за приятелство."),
                     )
                   : null,
               // The night's quiet (server/pushes.go): what's due then comes at 8:00.
@@ -572,7 +562,7 @@ function reminders(): Child {
               h("button", { class: "link", onclick: toggle }, "Спри известията тук"),
             ]
           : [
-              h("p", { class: "muted" }, "Въпросите на деня, приятели, Роял: ти избираш за какво."),
+              h("p", { class: "muted" }, "Въпросите на деня, приятели: ти избираш за какво."),
               h("button", { class: "btn", onclick: toggle }, "Включи известията"),
             ],
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
