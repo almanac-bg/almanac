@@ -11,9 +11,9 @@ func (w *world) dayPlayed(user int64, day string, rights int) int64 {
 	w.t.Helper()
 	at, _ := time.ParseInLocation(time.DateOnly, day, Bulgaria)
 	at = at.Add(10 * time.Hour)
-	res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, day, questions, rights, points, ms, started_at, finished_at)
+	res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, day, questions, rights, ms, started_at, finished_at)
 		VALUES (?, 'day', ?, '[{"id":""},{"id":""},{"id":""},{"id":""},{"id":""},{"id":""},{"id":""},{"id":""},{"id":""},{"id":""}]',
-		?, ?, 60000, ?, ?)`, user, day, rights, 100*rights, at.Add(-3*time.Minute).UnixMilli(), at.UnixMilli())
+		?, 60000, ?, ?)`, user, day, rights, at.Add(-3*time.Minute).UnixMilli(), at.UnixMilli())
 	if err != nil {
 		w.t.Fatal(err)
 	}

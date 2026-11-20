@@ -292,33 +292,13 @@ export interface Hands {
 /** A spring that overshoots a little, for things that land. */
 const spring = "cubic-bezier(0.2, 1.4, 0.4, 1)";
 const settleIn = "cubic-bezier(0.2, 0.8, 0.2, 1)";
-const easeOut = (t: number) => 1 - (1 - t) ** 3;
 
 /** A token's value from the stylesheet (the theme's own colour, for a keyframe). */
 const token = (el: Element, name: string) => getComputedStyle(el).getPropertyValue(name).trim();
 
-/** A number counting up from `from` to `to` in an element, over `ms` from `delay`. */
-function count(el: Element, from: number, to: number, delay: number, ms: number, format: (n: number) => string) {
-  // As wide as the number it ends on all the way: what's beside it (its name, a word to hover) stays put.
-  if (el instanceof HTMLElement) {
-    el.textContent = format(to);
-    el.style.display = "inline-block";
-    el.style.minWidth = `${el.getBoundingClientRect().width}px`;
-  }
-  el.textContent = format(from);
-  const start = performance.now() + delay;
-  const step = (now: number) => {
-    const t = Math.min(1, Math.max(0, (now - start) / ms));
-    el.textContent = format(Math.round((from + (to - from) * easeOut(t)) / 10) * 10);
-    if (t < 1 && el.isConnected) requestAnimationFrame(step);
-    else el.textContent = format(to);
-  };
-  requestAnimationFrame(step);
-}
-
 /**
  * A game's result as a moment, once, as it opens (at most 1.6 s; a tap anywhere jumps to the end): the pips fill one
- * by one with a pluck on the scale for each right one, the score lands with the game's motif, the points count up;
+ * by one with a pluck on the scale for each right one, the score lands with the game's motif;
  * ten of ten sweeps the pips in gold and draws the seal petal by petal. Resolves once it's over. `gap` is the time
  * between two pips (the day's ten take it slower, 85 ms: it's the game of the day).
  */
@@ -330,8 +310,7 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands, gap = 
     ended = true;
     play(perfect ? "perfect" : "end");
   };
-  const points = hero.querySelector(".points-n");
-  const total = Number(points?.getAttribute("data-n") ?? 0);
+
   if (hands.calm) {
     end();
     return Promise.resolve();
@@ -380,7 +359,7 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands, gap = 
       ),
     );
   at(lands, end);
-  if (points) count(points, 0, total, lands, Math.min(800, 1550 - lands), hands.format);
+
   if (perfect) {
     const gold = token(hero, "--gold");
     for (const [i, li] of pips.entries())
@@ -416,7 +395,7 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands, gap = 
       for (const a of moving) a.finish();
       removeEventListener("pointerdown", done, true);
       removeEventListener("keydown", done, true);
-      if (points) points.textContent = hands.format(total);
+
       end();
       resolve();
     };
@@ -426,7 +405,7 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands, gap = 
   });
 }
 
-/** What a duel's moment needs besides its card (screens/outcome.ts): each side's points question by question (the
+/** What a duel's moment needs besides its card (screens/outcome.ts): each side's right answers question by question (the
  * other's none while the duel waits for them), the end's sound, and the question that decided it (from 1; 0: none). */
 export interface DuelPlan {
   mine: number[];

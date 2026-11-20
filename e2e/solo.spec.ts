@@ -12,9 +12,8 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await startDay(page);
   await playRun(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("от 10");
-  // A first result is quiet: what its points are, in a line, said once; no XP, level or goals (the game has none).
-  await expect(page.locator(".news-open")).toContainText("Точките са резултатът ти в една игра");
-  await expect(page.locator(".screen")).not.toContainText(/XP|[Нн]иво \d|Цели за деня/);
+  // A first result is quiet: the right answers, no points, XP, level or goals (the game has none).
+  await expect(page.locator(".screen")).not.toContainText(/XP|[Нн]иво \d|Цели за деня|точк/);
   // One gold way on under the result: sharing it. Topics are played from the Алманах, duels from Приятели.
   await expect(page.locator(".summary .btn.primary")).toHaveText("Сподели резултата");
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
@@ -29,17 +28,15 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.goto("/friends");
   await expect(page.getByRole("tab")).toHaveText(["Приятели", "България"]);
   await page.getByRole("tab", { name: "България" }).click();
-  await expect(page.locator(".day-board .rank-row.me")).toContainText(/\d от 10\s*[\d\s]+$/);
+  await expect(page.locator(".day-board .rank-row.me")).toContainText(/\d от 10$/);
   // A row is the place, the name and the score: no level, no title.
   await expect(page.locator(".day-board .lv, .day-board .who-title")).toHaveCount(0);
   await page.goto("/me");
   await expect(page.locator(".me-figures")).toBeVisible();
 
-  // A second game tells what points are no more: once is enough.
   await openGame(page, "/play/history");
   await playRun(page);
   await expect(page.locator(".mastery-line")).toContainText("История");
-  await expect(page.locator(".news-open")).toHaveCount(0);
 });
 
 test("the day says how its other players did with each question: under the verdict, and in the review", async ({
@@ -278,13 +275,13 @@ test("the day left at its last question comes back done, with what it earned tol
   await expect(page.locator(".question-head")).toContainText("10 от 10", { timeout: 10_000 });
   await page.getByRole("link", { name: "Към Днес", exact: true }).click();
   await page.getByRole("button", { name: "Излез" }).click();
-  // Its result was never on screen: Начало has it, and its news (a first day's: what points are), told now.
+  // Its result was never on screen: Начало has it, and its news (the facts it wrote), told now, once.
   await expect(page.locator(".summary")).toBeVisible();
-  await expect(page.locator(".summary .news-open")).toContainText("са резултатът ти в една игра");
+  await expect(page.locator(".summary .news-facts")).toContainText("в Алманаха");
   await page.reload();
   await expect(page.locator(".result")).toBeVisible();
   await expect(page.locator(".result .trail")).toBeVisible();
-  await expect(page.locator(".news-open")).toHaveCount(0);
+  await expect(page.locator(".news-facts")).toHaveCount(0);
 });
 
 test.describe("on a computer", () => {
@@ -317,20 +314,6 @@ test.describe("on a computer", () => {
     }
     expect(keyed).toBe(true);
     await expect(page.locator(".summary")).toBeVisible({ timeout: 10_000 });
-    // A number's name shows what it means while the mouse is on it, in a card under it, and not a moment longer (a
-    // click changes nothing).
-    const points = page.locator(".points").getByRole("button", { name: "точки" });
-    const card = page.locator(".points .explain-pop");
-    await page.evaluate(() => scrollTo(0, 0)); // the score at the top, room under it
-    await points.hover();
-    await expect(card).toBeVisible();
-    await page.waitForTimeout(200); // its way in done, it sits where it stays
-    const [word, under] = [await points.boundingBox(), await card.boundingBox()];
-    expect(word && under && under.y >= word.y + word.height).toBe(true);
-    await points.click();
-    await expect(card).toBeVisible();
-    await page.mouse.move(0, 0);
-    expect(await card.isVisible()).toBe(false); // at once: nothing waits
     // A player's Днес is a spread: the issue, and beside it the friends' day and the way to the book.
     await page.goto("/");
     const day = await page.locator(".issue").boundingBox();

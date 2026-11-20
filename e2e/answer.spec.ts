@@ -20,7 +20,7 @@ interface Seen {
   through: number;
   /** A choice's answers that changed height from the question to its fact (re-wrapped as their ends filled). */
   rewrapped: number;
-  /** The tally's height as asked and as it ended (its line is kept before there are points). */
+  /** The tally's height as asked and as it ended (its line is kept before there's a row of right answers). */
   tally: number[];
   done: boolean;
   right?: { from: number; to: number; height: number; tall: number[]; pic: boolean; pop: number[] };
@@ -148,7 +148,7 @@ async function playWatching(
     expect(seen.covered, `question ${n + 1}: the right answer was under the panel`).toBe(0);
     expect(seen.through, `question ${n + 1}: the answers showed through the panel`).toBe(0);
     expect(seen.rewrapped, `question ${n + 1}: answers re-wrapped as the answer showed`).toBe(0);
-    expect(seen.tally[1], `question ${n + 1}: the head grew with the points`).toBe(seen.tally[0]);
+    expect(seen.tally[1], `question ${n + 1}: the head grew with the row`).toBe(seen.tally[0]);
     expect(seen.tally[0], `question ${n + 1}: the tally's line isn't kept`).toBeGreaterThan(0);
     const r = seen.right;
     // What shows on an answer later (how everyone answered) doesn't make it taller, out of the room it settled in.

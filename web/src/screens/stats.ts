@@ -41,7 +41,6 @@ export interface Played {
   category?: string;
   rights: number;
   total: number;
-  points: number;
   at: number;
   opponent?: string;
   recorded?: boolean;

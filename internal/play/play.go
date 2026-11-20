@@ -45,9 +45,6 @@ import (
 const (
 	// Length is how many questions a run has.
 	Length = 10
-	// MaxPoints is what a perfect, quick answer to a medium question is worth (an easy one's less, a hard one's more,
-	// one in a row of right answers more: worth).
-	MaxPoints = 1000
 	// Grace is how late an answer may arrive and still count: the trip from the player's screen to the server, on a
 	// slow phone's line too.
 	Grace = 2 * time.Second
@@ -141,14 +138,11 @@ func New(db *store.DB, b func() *bank.Bank) *Game {
 func (g *Game) Today() string { return g.Now().In(Bulgaria).Format(time.DateOnly) }
 
 // Pick is a question as a run holds it: which one, how it's dealt, and, once it's shown, which version of it showed
-// (bank.Version: versions.go) and how hard it was then; the day's ten hold those from the day's start (day.go).
+// (bank.Version: versions.go); the day's ten hold it from the day's start (day.go).
 type Pick struct {
 	ID   string `json:"id"`
 	Seed uint64 `json:"seed"`
 	V    string `json:"v,omitempty"`
-	// D is the difficulty the question pays at (worth): its label as it showed, so that one relabelled meanwhile pays
-	// the same for the same answer.
-	D bank.Difficulty `json:"d,omitempty"`
 	// Void is a question of the day's ten that counts for nobody that day (day.go): found untrue, or changed, while
 	// the day was played.
 	Void bool `json:"void,omitempty"`
@@ -156,20 +150,21 @@ type Pick struct {
 
 // run is a run as the database has it.
 type run struct {
-	id, userID     int64
-	kind           string
-	day, category  string
-	picks          []Pick
-	at             int
-	shownAt        sql.NullInt64
-	points, rights int
-	ms             int64
-	finished       bool
-	shadow         bool // counts for its player alone (fair.go)
+	id, userID    int64
+	kind          string
+	day, category string
+	picks         []Pick
+	at            int
+	shownAt       sql.NullInt64
+	rights        int
+	tie           tiebreak // what decides between the same right answers (board.go)
+	ms            int64
+	finished      bool
+	shadow        bool // counts for its player alone (fair.go)
 }
 
 const runColumns = `id, user_id, kind, coalesce(day, ''), coalesce(category, ''), questions,
-	at, shown_at, points, rights, ms, finished_at IS NOT NULL, shadow <> 0`
+	at, shown_at, rights, closeness, hardest, ms, finished_at IS NOT NULL, shadow <> 0`
 
 type scanner interface{ Scan(...any) error }
 
@@ -177,7 +172,7 @@ func scanRun(row scanner) (*run, error) {
 	var r run
 	var picks string
 	err := row.Scan(&r.id, &r.userID, &r.kind, &r.day, &r.category, &picks,
-		&r.at, &r.shownAt, &r.points, &r.rights, &r.ms, &r.finished, &r.shadow)
+		&r.at, &r.shownAt, &r.rights, &r.tie.closeness, &r.tie.hardest, &r.ms, &r.finished, &r.shadow)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoRun
 	}
@@ -250,29 +245,30 @@ type State struct {
 	// Void is how many of the Total count for nobody (day.go): the run is of Total − Void questions.
 	Void   int `json:"void,omitempty"`
 	At     int `json:"at"`
-	Points int `json:"points"`
 	Rights int `json:"rights"`
-	// AllRight is what the game earned at its end for every answer right (in Points), once it's done.
-	AllRight int `json:"allRight,omitempty"`
 	// Trail is how each answered question went, in order.
 	Trail []Mark `json:"trail"`
 	// Question is the one shown now, if one is.
 	Question *Shown `json:"question,omitempty"`
 	Done     bool   `json:"done"`
 	// Against is, in a duel played second (the other side finished: a friend's, a recording), how the other side's
-	// answers went as far as the player has come, and no further (duelAgainst): each question the player has answered,
-	// its points left out until the end; and of the one shown, only when they answered it (Ms), if they did, for the
+	// answers went as far as the player has come, and no further (duelAgainst): each question the player has answered;
+	// and of the one shown, only when they answered it (Ms), if they did, for the
 	// screen to say so at that moment. How it went for them waits for the player's own answer.
 	Against []DuelMark `json:"against,omitempty"`
 }
 
-// Mark is how one answer went, or that its question counts for nobody (Void: day.go), answered or not.
+// Mark is how one answer went: right, or close („близо“: closeAnswer), or that its question counts for nobody (Void:
+// day.go), answered or not.
 type Mark struct {
-	Points  int  `json:"points"`
-	Right   bool `json:"right"`
-	Partial bool `json:"partial,omitempty"`
-	Void    bool `json:"void,omitempty"`
+	Right bool `json:"right"`
+	Close bool `json:"close,omitempty"`
+	Void  bool `json:"void,omitempty"`
 }
+
+// closeAnswer is whether an answer of a score is close („близо“): worth something, but not right (a number short of
+// bank.RightFrom, an order or a match nearly so). It counts as not right, in the score and everywhere else.
+func closeAnswer(score float64, right bool) bool { return score > 0 && !right }
 
 // Shown is the question on screen, with the time it has left.
 type Shown struct {
@@ -290,12 +286,10 @@ type Shown struct {
 	OnThisDay bool `json:"onThisDay,omitempty"`
 }
 
-// Result is what an answer earned, the answer itself, and the run after it.
+// Result is how an answer went, the answer itself, and the run after it.
 type Result struct {
-	Points int `json:"points"`
-	// Speed is how many of the points were for being quick. InRow is how many right answers in a row the answer
-	// makes, from 2: heard and seen as the run's climb, worth no points (worth.go).
-	Speed    int     `json:"speed,omitempty"`
+	// InRow is how many right answers in a row the answer makes, from 2: heard and seen as the run's climb, worth
+	// nothing more.
 	InRow    int     `json:"inRow,omitempty"`
 	Score    float64 `json:"score"`
 	Right    bool    `json:"right"`
@@ -311,12 +305,9 @@ type Result struct {
 func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 	s := State{
 		ID: r.id, Kind: r.kind, Day: r.day, Category: r.category, Total: len(r.picks), Void: len(r.picks) - r.counted(),
-		At: r.at, Points: r.points, Rights: r.rights, Done: r.finished,
+		At: r.at, Rights: r.rights, Done: r.finished,
 	}
-	if r.finished && r.allRight() {
-		s.AllRight = AllRight
-	}
-	rows, err := tx.Query(`SELECT n, points, is_right FROM answers WHERE run_id = ? ORDER BY n`, r.id)
+	rows, err := tx.Query(`SELECT n, score, is_right FROM answers WHERE run_id = ? ORDER BY n`, r.id)
 	if err != nil {
 		return s, err
 	}
@@ -324,9 +315,11 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 	var marks []markAt
 	for rows.Next() {
 		var a markAt
-		if err := rows.Scan(&a.n, &a.m.Points, &a.m.Right); err != nil {
+		var score float64
+		if err := rows.Scan(&a.n, &score, &a.m.Right); err != nil {
 			return s, err
 		}
+		a.m.Close = closeAnswer(score, a.m.Right)
 		marks = append(marks, a)
 	}
 	if err := rows.Err(); err != nil {
@@ -374,7 +367,7 @@ func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
 	if ok {
 		ms = Limit(d.Question()).Milliseconds()
 	}
-	err := g.record(tx, r, bank.Graded{}, Worth{}, ms)
+	err := g.record(tx, r, bank.Graded{}, false, ms)
 	return err == nil && r.finished, err
 }
 
@@ -399,16 +392,17 @@ func (g *Game) settles(r *run) bool {
 	return g.Now().Sub(time.UnixMilli(r.shownAt.Int64)) > late
 }
 
-// record keeps an answer, and the points it earned, and moves the run to the next question (or its end).
-func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) error {
+// record keeps an answer (to a number, if it's one: what decides a tie, tiebreak), and moves the run to the next
+// question (or its end).
+func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, number bool, ms int64) error {
 	var given, shown any
 	if gr.Given != nil {
 		given, shown = string(gr.Given), string(gr.Shown)
 	}
 	now := store.Ms(g.Now())
 	p := r.picks[r.at]
-	if _, err := tx.Exec(`INSERT INTO answers (run_id, n, question_id, given, shown, score, points, is_right, ms, at, version)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, r.id, r.at, p.ID, given, shown, gr.Score, w.Points, gr.Right, ms, now,
+	if _, err := tx.Exec(`INSERT INTO answers (run_id, n, question_id, given, shown, score, is_right, ms, at, version)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, r.id, r.at, p.ID, given, shown, gr.Score, gr.Right, ms, now,
 		g.versionOf(p)); err != nil {
 		return err
 	}
@@ -423,8 +417,8 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 	if err := g.judgeAnswer(tx, r, gr, ms); err != nil {
 		return err
 	}
+	r.tie.add(r.at, gr.Score, gr.Right, number)
 	r.at++
-	r.points += w.Points
 	if gr.Right {
 		r.rights++
 	}
@@ -434,29 +428,20 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 	if r.at >= len(r.picks) {
 		return g.finish(tx, r)
 	}
-	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, points = ?, rights = ?, ms = ? WHERE id = ?`,
-		r.at, r.points, r.rights, r.ms, r.id)
+	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, rights = ?, closeness = ?, hardest = ?, ms = ?
+		WHERE id = ?`, r.at, r.rights, r.tie.closeness, r.tie.hardest, r.ms, r.id)
 	return err
 }
 
-// finish ends a run where it is: a game right throughout earns its bonus (AllRight); and notes that what follows it is
-// due (after.go).
+// finish ends a run where it is, and notes that what follows it is due (after.go).
 func (g *Game) finish(tx *sql.Tx, r *run) error {
 	r.finished = true
-	if r.allRight() {
-		r.points += AllRight
-	}
-	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, points = ?, rights = ?, ms = ?, finished_at = ?
-		WHERE id = ?`, r.at, r.points, r.rights, r.ms, store.Ms(g.Now()), r.id)
+	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, rights = ?, closeness = ?, hardest = ?, ms = ?,
+		finished_at = ? WHERE id = ?`, r.at, r.rights, r.tie.closeness, r.tie.hardest, r.ms, store.Ms(g.Now()), r.id)
 	if err != nil {
 		return err
 	}
 	return g.afterDue(tx, r.id)
-}
-
-// allRight is whether a run went through all of its questions, each that counts answered right.
-func (r *run) allRight() bool {
-	return r.at == len(r.picks) && r.counted() > 0 && r.rights == r.counted()
 }
 
 // rightsInRow is how many right answers a run's last ones are in a row: one that counts for nobody (day.go) neither
@@ -585,25 +570,23 @@ func (g *Game) Start(ctx context.Context, userID, runID int64, n int) (State, er
 }
 
 // showAt shows the question now, d (nil: none to show, gone from the bank), its time starting at t: the run keeps
-// which version of it shows (Pick.V), so that it's graded against that one, whatever the bank becomes meanwhile, and
-// how hard it is (Pick.D), so that it pays as it showed. A pick that holds them already (the day's, from the day's
-// start) keeps them.
+// which version of it shows (Pick.V), so that it's graded against that one, whatever the bank becomes meanwhile. A
+// pick that holds it already (the day's, from the day's start) keeps it.
 func (r *run) showAt(tx *sql.Tx, t time.Time, d bank.Dealt) error {
 	if d == nil {
 		return r.startAt(tx, t)
 	}
 	p := &r.picks[r.at]
-	v, level := bank.Version(d.Question()), d.Question().Base().Difficulty
-	if v == p.V && p.D != "" {
+	v := bank.Version(d.Question())
+	if v == p.V {
 		return r.startAt(tx, t)
 	}
 	at := store.Ms(t)
-	path := "$[" + strconv.Itoa(r.at) + "]"
-	if _, err := tx.Exec(`UPDATE runs SET shown_at = ?, questions = json_set(questions, ?, ?, ?, ?) WHERE id = ?`,
-		at, path+".v", v, path+".d", string(level), r.id); err != nil {
+	if _, err := tx.Exec(`UPDATE runs SET shown_at = ?, questions = json_set(questions, ?, ?) WHERE id = ?`,
+		at, "$["+strconv.Itoa(r.at)+"].v", v, r.id); err != nil {
 		return err
 	}
-	p.V, p.D = v, level
+	p.V = v
 	r.shownAt = sql.NullInt64{Int64: at, Valid: true}
 	return nil
 }
@@ -681,12 +664,11 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 			}
 			inRow++
 		}
-		w := r.picks[r.at].worth(d.Question(), gr.Score, took)
-		res.Points, res.Speed = w.Points, w.Speed
 		if inRow > 1 {
 			res.InRow = inRow
 		}
-		if err := g.record(tx, r, gr, w, min(took, limit).Milliseconds()); err != nil {
+		number := d.Question().Base().Type == "number"
+		if err := g.record(tx, r, gr, number, min(took, limit).Milliseconds()); err != nil {
 			return err
 		}
 		if late > Grace && !res.TimedOut {
@@ -715,8 +697,8 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 }
 
 // again is an answer to question n, the run's last answered, sent again: its reply was lost on the way, so the screen
-// never showed it. What it gets is what the answer taken the first time got (its points, its verdict, the answer and
-// its fact), and the run as it stands; nothing changes. A question that ran out of time, or was given up on, gives
+// never showed it. What it gets is what the answer taken the first time got (its verdict, the answer and its fact),
+// and the run as it stands; nothing changes. A question that ran out of time, or was given up on, gives
 // that: no answer, and timed out if its time ran out.
 func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
 	var res Result
@@ -726,8 +708,8 @@ func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
 	}
 	var given, shown sql.NullString
 	var ms int64
-	err := tx.QueryRow(`SELECT given, shown, score, points, is_right, ms FROM answers WHERE run_id = ? AND n = ?`, r.id, n).
-		Scan(&given, &shown, &res.Score, &res.Points, &res.Right, &ms)
+	err := tx.QueryRow(`SELECT given, shown, score, is_right, ms FROM answers WHERE run_id = ? AND n = ?`, r.id, n).
+		Scan(&given, &shown, &res.Score, &res.Right, &ms)
 	if errors.Is(err, sql.ErrNoRows) {
 		return res, nil, ErrOutOfStep
 	}
@@ -752,11 +734,6 @@ func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
 			res.InRow = inRow
 		}
 	}
-	// How the points were made up, as far as they can be worked out again (the time kept is to the end of the
-	// question's time at most).
-	if w := r.picks[n].worth(d.Question(), res.Score, took); w.Points == res.Points {
-		res.Speed = w.Speed
-	}
 	res.State, err = g.state(tx, r)
 	return res, d, err
 }
@@ -771,9 +748,9 @@ type Reviewed struct {
 	View     any             `json:"view"`
 	Reveal   any             `json:"reveal"`
 	Given    json.RawMessage `json:"given"` // as shown; null: no answer
-	Points   int             `json:"points"`
 	Right    bool            `json:"right"`
-	// Void is an answer to a question that counts for nobody (day.go): its points taken out.
+	Close    bool            `json:"close,omitempty"`
+	// Void is an answer to a question that counts for nobody (day.go): in no score.
 	Void bool `json:"void,omitempty"`
 }
 
@@ -797,7 +774,7 @@ func (g *Game) Review(ctx context.Context, userID, runID int64) ([]Reviewed, err
 	if now := store.Ms(g.Now()); now >= max(dayEnd, ended+DayGrace.Milliseconds()) {
 		return nil, ErrReviewOver
 	}
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT n, shown, points, is_right FROM answers WHERE run_id = ? ORDER BY n`, r.id)
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT n, shown, score, is_right FROM answers WHERE run_id = ? ORDER BY n`, r.id)
 	if err != nil {
 		return nil, err
 	}
@@ -805,10 +782,12 @@ func (g *Game) Review(ctx context.Context, userID, runID int64) ([]Reviewed, err
 	for rows.Next() {
 		var it Reviewed
 		var shown sql.NullString
-		if err := rows.Scan(&it.N, &shown, &it.Points, &it.Right); err != nil {
+		var score float64
+		if err := rows.Scan(&it.N, &shown, &score, &it.Right); err != nil {
 			rows.Close()
 			return nil, err
 		}
+		it.Close = closeAnswer(score, it.Right)
 		it.Given = json.RawMessage("null")
 		if shown.Valid {
 			it.Given = json.RawMessage(shown.String)

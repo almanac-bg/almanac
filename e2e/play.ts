@@ -205,8 +205,8 @@ export async function knows(page: Page, ids: string[], at = Date.now()): Promise
       .prepare(`INSERT INTO runs (user_id, kind, category, questions, started_at, finished_at)
         VALUES (?, 'topic', '', '[]', 0, 0)`)
       .run(id).lastInsertRowid;
-    const add = db.prepare(`INSERT INTO answers (run_id, n, question_id, given, score, points, is_right, ms, at)
-      VALUES (?, ?, ?, '{}', 1, 0, 1, 3000, ?)`);
+    const add = db.prepare(`INSERT INTO answers (run_id, n, question_id, given, score, is_right, ms, at)
+      VALUES (?, ?, ?, '{}', 1, 1, 3000, ?)`);
     for (const [n, q] of ids.entries()) add.run(run, n, q, at + n);
   });
 }

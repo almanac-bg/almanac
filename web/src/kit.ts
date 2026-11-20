@@ -65,7 +65,6 @@ import {
   fact,
   failure,
   formatNumber,
-  meaning,
   meter,
   pageArt,
   profileHref,
@@ -129,7 +128,7 @@ export const kit = {
   loadStats,
   mailAsk,
   masteryCard,
-  meaning,
+
   meter,
   missing,
   nameFirst,

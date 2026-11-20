@@ -99,14 +99,16 @@ type Server struct {
 	pushq         pushQueue     // the notifications' queue, as Push sends it (pushes.go)
 	streakMailing streakMailing // who is due the mail of a streak ended when, today (streakmail.go)
 	dayMailing    reminders     // who is due the day's reminder by mail when, today (daymail.go)
-	secure        bool
-	host          string
-	cookie        string       // the session's
-	askCookie     string       // the token of the browser a sign-in code is for (account.Asked)
-	playedCookie  string       // the day this browser last started the day's questions (playedHere: handoff.go)
-	unlogged      atomic.Int64 // browsers' errors past clientErrorsAll not logged since the last one (problems.go)
-	probe         probe        // whether the database takes writes, as /api/health last found (api.go)
-	handler       http.Handler
+	// nearestStep is a player's nearest step in the book, for the reminders' last word (step.go); nil names none.
+	nearestStep  func(ctx context.Context, userID int64) (Step, bool, error)
+	secure       bool
+	host         string
+	cookie       string       // the session's
+	askCookie    string       // the token of the browser a sign-in code is for (account.Asked)
+	playedCookie string       // the day this browser last started the day's questions (playedHere: handoff.go)
+	unlogged     atomic.Int64 // browsers' errors past clientErrorsAll not logged since the last one (problems.go)
+	probe        probe        // whether the database takes writes, as /api/health last found (api.go)
+	handler      http.Handler
 }
 
 func New(cfg Config, d Deps) (*Server, error) {

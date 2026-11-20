@@ -639,8 +639,8 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 		n     int
 	}{{"geo-002", false, 10}, {"gen-001", true, 12}, {"geo-001", false, 9}} {
 		for k := range q.n {
-			if _, err := g.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, score, points, is_right, ms, at)
-				VALUES (?, ?, ?, 0, 0, ?, 3000, 0)`, run, 100*i+k, q.id, q.right); err != nil {
+			if _, err := g.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, score, is_right, ms, at)
+				VALUES (?, ?, ?, 0, ?, 3000, 0)`, run, 100*i+k, q.id, q.right); err != nil {
 				t.Fatal(err)
 			}
 		}

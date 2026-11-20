@@ -7,7 +7,7 @@ import "testing"
 func TestShareText(t *testing.T) {
 	s := State{Trail: []Mark{
 		{Right: true}, {Right: true}, {}, {Right: true}, {Void: true},
-		{Right: true}, {Partial: true, Points: 300}, {Right: true}, {Right: true}, {},
+		{Right: true}, {Close: true}, {Right: true}, {Right: true}, {},
 	}}
 	sh := Share{Code: "k4f2m7qa", Day: "2026-11-20", Issue: Issue("2026-11-20"), Shape: shapeOf(s)}
 	if sh.Shape != "110110110" || sh.Rights() != 6 {

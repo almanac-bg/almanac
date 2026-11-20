@@ -5,7 +5,7 @@ import { picture } from "./art/picture.ts";
 import { errorText, passing } from "./lib/api.ts";
 import { hourInBulgaria } from "./lib/day.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
-import { calm, type Scheme, scheme, setScheme } from "./lib/prefs.ts";
+import { type Scheme, scheme, setScheme } from "./lib/prefs.ts";
 import { formatNumber, stakeWords } from "./lib/words.ts";
 import { categories } from "./state.ts";
 
@@ -21,25 +21,6 @@ export const verdictWords: Record<VerdictKind, string> = {
   time: "Времето изтече.",
 };
 
-/** Points rising to `to` from `from`, once (at once where there's to be less motion); `prefix` goes before them. */
-export function countUp(to: number, from = 0, prefix = ""): HTMLElement {
-  const el = h("span", { class: "count-up" }, prefix + formatNumber(to));
-  if (calm.peek() || to === from) return el;
-  const start = performance.now();
-  const step = (now: number) => {
-    const t = Math.min(1, (now - start) / riseMs);
-    const eased = 1 - (1 - t) ** 3;
-    el.textContent = prefix + formatNumber(Math.round((from + (to - from) * eased) / 10) * 10);
-    if (t < 1) requestAnimationFrame(step);
-  };
-  el.textContent = prefix + formatNumber(from);
-  requestAnimationFrame(step);
-  return el;
-}
-
-/** How long points take to rise (DESIGN.md, Motion). */
-const riseMs = 520;
-
 /** Right answers in a row, from the second: the flame and how many. */
 export function inRowChip(n: number): HTMLElement | null {
   if (n < 2) return null;
@@ -52,22 +33,14 @@ export function inRowChip(n: number): HTMLElement | null {
   );
 }
 
-/** How an answer went: its sign, the word, the right answers in a row it makes (the climb's feel: the row earns no
- * points, play/worth.go), and the points it brought (and how many of them for being quick). */
-export function verdict(kind: VerdictKind, points: number, words = verdictWords[kind], speed = 0, inRow = 0): Child {
+/** How an answer went: its sign, the word, and the right answers in a row it makes (the climb's feel only: a game's
+ * score is its right answers). */
+export function verdict(kind: VerdictKind, words = verdictWords[kind], inRow = 0): Child {
   return h(
     "div",
     { class: `verdict ${kind}`, role: "status" },
     h("span", { class: "verdict-sign", "aria-hidden": "true" }),
     h("div", { class: "verdict-says" }, h("strong", { class: "verdict-word" }, words), inRowChip(inRow)),
-    points > 0
-      ? h(
-          "span",
-          { class: "verdict-pts" },
-          countUp(points, 0, "+"),
-          speed > 0 ? h("small", { class: "verdict-part" }, `${formatNumber(speed)} за бързина`) : null,
-        )
-      : null,
   );
 }
 
@@ -175,18 +148,6 @@ export function topicMark(category: string): Child {
     ? picture(`topic-${category}`, `topic-mark ${toneOf(category)}`)
     : h("span", { class: "dot", "aria-hidden": "true" });
 }
-
-/** What the game's numbers mean, in a few words: what one game scored, said where it first shows and a tap from
- * wherever it does (play/worth.go). */
-export const meaning = {
-  points:
-    "Точките са резултатът ти в една игра: за верните отговори (по-трудните носят повече) и за бързината. Игра без грешка носи още точки накрая. Верните поред не носят повече точки.",
-  /** The day's board: said of the day's points only (a topic's game has no board). */
-  dayBoard: " При равен брой верни в класацията на деня решават точките.",
-};
-
-/** The day's points' words: with the day's board they place on. */
-export const dayPointsWords = meaning.points + meaning.dayBoard;
 
 let explained = 0;
 
@@ -427,7 +388,7 @@ export const profileHref = (tag: string) => `/players/${tag}`;
 
 /** A player's row on a board or a list, between hairlines (`.rows`): their place (if it has one), their avatar, their
  * name (a way to their profile, with their tag; „ти“ after the player's own, whose row is washed), and what's said of
- * them at its end: a score („8 от 10“), and a figure beside it (`aside`: the points). */
+ * them at its end: a score („8 от 10“), and a figure beside it (`aside`). */
 export function rankRow(
   name: string,
   opts: { place?: number; me?: boolean; look?: Look; tag?: string; score?: Child; aside?: Child; gap?: boolean } = {},

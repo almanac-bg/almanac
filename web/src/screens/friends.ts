@@ -42,7 +42,7 @@ interface Friend {
   name: string;
   tag: string;
   avatar?: string;
-  today?: { points: number; rights: number; of: number };
+  today?: { rights: number; of: number };
   won: number;
   lost: number;
   drawn: number;
@@ -105,7 +105,7 @@ export function friends(kit: Kit): Child {
 }
 
 /** The day's board: among the player and their friends (first, once they have any), or all of България. A row says
- * what places it: the right answers big („8 от 10“), the points that break a tie small beside them; the player's own
+ * what places it: the right answers big („8 от 10“; a tie between them broken as play/board.go says); the player's own
  * row washed, „ти“ after the name, and under the best twenty if further down. */
 function dayBoard(): Child {
   const day = signal<Day | null>(null);
@@ -215,7 +215,6 @@ const scoreRow = (s: Score, place: number, gap = false) =>
     look: s,
     tag: s.tag,
     score: rightsOf(s.rights, s.of),
-    aside: formatNumber(s.points),
   });
 
 /** The friends: who asks to be friends, each friend with their day and the duels between you (and, while changing

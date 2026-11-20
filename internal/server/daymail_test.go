@@ -49,12 +49,14 @@ func TestDayMail(t *testing.T) {
 	player("", true)               // no email
 	gi := player("gi@example.bg", true)
 	g.finishedDay(gi, day, 8*time.Hour) // played today before their hour
-	ha := player("ha@example.bg", true) // three mails since they last played
+	ha := player("ha@example.bg", true) // three mails since they last played (on any weekday: they've played them all)
 	exec(`DELETE FROM runs WHERE user_id = ?`, ha)
+	g.everyWeekday(ha)
 	g.finishedDay(ha, day.AddDate(0, 0, -4), 10*time.Hour)
 	exec(`INSERT INTO day_mails (user_id, day, at) VALUES (?1, '2030-03-07', 0), (?1, '2030-03-08', 0), (?1, '2030-03-09', 0)`, ha)
 	fe := player("fe@example.bg", true) // two since: one more
 	exec(`DELETE FROM runs WHERE user_id = ?`, fe)
+	g.everyWeekday(fe)
 	g.finishedDay(fe, day.AddDate(0, 0, -3), 10*time.Hour)
 	exec(`INSERT INTO day_mails (user_id, day, at) VALUES (?1, '2030-03-08', 0), (?1, '2030-03-09', 0)`, fe)
 	ju := player("ju@example.bg", true) // the streak's mail went today
@@ -127,5 +129,49 @@ func TestDayMailPrefs(t *testing.T) {
 	}
 	if _, prefs := ana.call("GET", "/api/mail/prefs", nil); prefs["day"] != false || prefs["streak"] != true {
 		t.Fatalf("prefs after the link: %v", prefs)
+	}
+}
+
+// A mail left on a weekday the player never plays on doesn't count as ignored: one who plays Monday to Friday still
+// gets the mail after a weekend of them; mails left on their weekdays do stop it.
+func TestDayMailOnTheirWeekdays(t *testing.T) {
+	g := start(t)
+	s := g.srv
+	_, id := g.guest()
+	if _, err := g.db.Write.Exec(`UPDATE users SET email = 'ana@example.bg' WHERE id = ?`, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.setMailPref(t.Context(), id, mailDay, true); err != nil {
+		t.Fatal(err)
+	}
+	// Played Monday 4 to Friday 8 March 2030; mails on Saturday 9, Sunday 10 and Monday 11, unplayed.
+	for d := 4; d <= 8; d++ {
+		g.finishedDay(id, time.Date(2030, 3, d, 0, 0, 0, 0, bulgaria()), 10*time.Hour)
+	}
+	if _, err := g.db.Write.Exec(`INSERT INTO day_mails (user_id, day, at) VALUES (?1, '2030-03-09', 0),
+		(?1, '2030-03-10', 0), (?1, '2030-03-11', 0)`, id); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := s.mailsIgnored(t.Context(), id, "2030-03-08", "2030-03-12"); err != nil || n != 1 {
+		t.Fatalf("ignored: %d %v, want only Monday's", n, err)
+	}
+	s.game.Now = func() time.Time { return time.Date(2030, 3, 12, 12, 0, 0, 0, bulgaria()) }
+	if n := s.dayMails(t.Context(), s.game.Now()); n != 1 {
+		t.Fatalf("Tuesday: %d mails, want 1", n)
+	}
+	// Wednesday's left too: three on their weekdays, none more.
+	if _, err := g.db.Write.Exec(`INSERT INTO day_mails (user_id, day, at) VALUES (?, '2030-03-13', 0)`, id); err != nil {
+		t.Fatal(err)
+	}
+	s.game.Now = func() time.Time { return time.Date(2030, 3, 14, 12, 0, 0, 0, bulgaria()) }
+	if n := s.dayMails(t.Context(), s.game.Now()); n != 0 {
+		t.Fatalf("Thursday, after three on their weekdays: %d mails", n)
+	}
+}
+
+// everyWeekday puts a finished day's game on each day of a week in January 2030: a player who plays every weekday.
+func (g *game) everyWeekday(userID int64) {
+	for d := 7; d <= 13; d++ {
+		g.finishedDay(userID, time.Date(2030, 1, d, 0, 0, 0, 0, bulgaria()), 10*time.Hour)
 	}
 }

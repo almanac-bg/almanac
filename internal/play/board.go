@@ -17,9 +17,10 @@ import (
 // (boardCache), and each viewer's own game is set into it exactly, whenever it finished: a player who has just
 // played sees their result and place at once; only the others' come in a moment later.
 //
-// A day's board ranks by right answers, then points, then time: players tell their day as „8 от 10“, so nine right
-// are never under eight. Points decide among the same right answers, which is what they're for (worth.go). Other
-// games keep their own order: duels by points.
+// A day's board ranks by right answers, then by what breaks a tie between them (tiebreak): how close the hard number
+// came, then the hardest right answer (the tenth, then the ninth…), then time. Players tell their day as „8 от 10“, so
+// nine right are never under eight; there are no points (DECISIONS.md, „The direction“). A duel is decided the same
+// way (duels.go).
 
 // BoardTop is how many of the best a board shows.
 const BoardTop = 20
@@ -36,7 +37,6 @@ var (
 type Score struct {
 	Name   string `json:"name"`
 	Tag    string `json:"tag,omitempty"`
-	Points int    `json:"points"`
 	Rights int    `json:"rights"`
 	// Of is how many questions the right answers are out of: the day's that count (day.go).
 	Of int   `json:"of"`
@@ -45,6 +45,8 @@ type Score struct {
 	Look
 	// Trail is how each of the ten went, on the friends' board once the viewer has finished the day (FriendsBoard).
 	Trail []Mark `json:"trail,omitempty"`
+
+	tie tiebreak
 }
 
 // Board is a day's results: the best, and the viewer's place among everyone. A game played at a script's speed is on
@@ -90,11 +92,11 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	var mine Score
 	var r boardRun
 	var avatar string
-	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.id, u.name, u.tag, r.points, r.rights, `+countedOf("r.questions")+`, r.ms,
-			`+lookColumns+`
+	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.id, u.name, u.tag, r.rights, r.closeness, r.hardest,
+			`+countedOf("r.questions")+`, r.ms, `+lookColumns+`
 		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind = 'day' AND r.day = ? AND r.user_id = ? AND r.finished_at IS NOT NULL`, day, viewer).
-		Scan(&r.id, &mine.Name, &mine.Tag, &mine.Points, &mine.Rights, &mine.Of, &mine.Ms, &avatar)
+		Scan(&r.id, &mine.Name, &mine.Tag, &mine.Rights, &r.tie.closeness, &r.tie.hardest, &mine.Of, &mine.Ms, &avatar)
 	if errors.Is(err, sql.ErrNoRows) {
 		return b, nil
 	}
@@ -103,7 +105,7 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	}
 	mine.Me, mine.Look = true, lookOf(viewer, avatar)
 	b.Mine = &mine
-	r.rights, r.points, r.ms = mine.Rights, mine.Points, mine.Ms
+	r.rights, r.ms = mine.Rights, mine.Ms
 	// Their place: after everyone ahead of them in the count, which has them already, or not yet: finished since, or
 	// played at a script's speed (counted for nobody else). Then they're set in as the count would have them.
 	at := sort.Search(len(d.runs), func(i int) bool { return !d.runs[i].ahead(r) })
@@ -161,14 +163,14 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT id, rights, points, ms FROM runs WHERE kind = 'day' AND day = ?
+	rows, err := tx.QueryContext(ctx, `SELECT id, rights, closeness, hardest, ms FROM runs WHERE kind = 'day' AND day = ?
 		AND finished_at IS NOT NULL AND NOT shadow ORDER BY `+dayOrder, day)
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
 		var r boardRun
-		if err := rows.Scan(&r.id, &r.rights, &r.points, &r.ms); err != nil {
+		if err := rows.Scan(&r.id, &r.rights, &r.tie.closeness, &r.tie.hardest, &r.ms); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -178,7 +180,7 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	rows, err = tx.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.points, r.rights, `+countedOf("r.questions")+`, r.ms,
+	rows, err = tx.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.rights, `+countedOf("r.questions")+`, r.ms,
 			`+lookColumns+`
 		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND NOT r.shadow
@@ -191,7 +193,7 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 		var id int64
 		var s Score
 		var avatar string
-		if err := rows.Scan(&id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Of, &s.Ms, &avatar); err != nil {
+		if err := rows.Scan(&id, &s.Name, &s.Tag, &s.Rights, &s.Of, &s.Ms, &avatar); err != nil {
 			return nil, err
 		}
 		s.Look = lookOf(id, avatar)
@@ -220,33 +222,74 @@ func (d *countedBoard) due() bool {
 	return time.Since(d.counted) >= min(boardStale, time.Duration(boardPatience)*d.took)
 }
 
-// dayOrder is the order of a day's board, in SQL over runs (ahead says the same in Go): more right answers, then more
-// points, then quicker, then the earlier started. dayOrderOf is it for runs under another name.
+// tiebreak is what decides between games of the same right answers, on a board and in a duel: how close the hard
+// number came (its score, in thousandths: a number short of right still came near or didn't), then the hardest right
+// answer, the one further on in the game (hardest: a bit for each right answer by its place, the tenth's the highest,
+// so that the larger is the one right further on: the tenth, then the ninth…). A run keeps both (runs.closeness,
+// runs.hardest), as it keeps its right answers.
+type tiebreak struct {
+	closeness int
+	hardest   int
+}
+
+// add counts an answer, to question n of its run, into what breaks a tie: a number's score, and a right answer's place.
+func (t *tiebreak) add(n int, score float64, right, number bool) {
+	if number {
+		t.closeness = int(math.Round(1000 * score))
+	}
+	if right && n >= 0 && n < 62 {
+		t.hardest |= 1 << n
+	}
+}
+
+// cmp is -1 if t breaks a tie ahead of o, 1 if behind, 0 if neither does.
+func (t tiebreak) cmp(o tiebreak) int {
+	switch {
+	case t.closeness != o.closeness:
+		return cmpInt(o.closeness, t.closeness)
+	case t.hardest != o.hardest:
+		return cmpInt(o.hardest, t.hardest)
+	}
+	return 0
+}
+
+func cmpInt(a, b int) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	}
+	return 0
+}
+
+// dayOrder is the order of a day's board, in SQL over runs (ahead says the same in Go): more right answers, then what
+// breaks a tie (tiebreak), then quicker, then the earlier started. dayOrderOf is it for runs under another name.
 var dayOrder = dayOrderOf("")
 
 func dayOrderOf(runs string) string {
 	if runs != "" {
 		runs += "."
 	}
-	return runs + "rights DESC, " + runs + "points DESC, " + runs + "ms, " + runs + "id"
+	return runs + "rights DESC, " + runs + "closeness DESC, " + runs + "hardest DESC, " + runs + "ms, " + runs + "id"
 }
 
 // boardRun is a game on a board, as far as its place goes.
 type boardRun struct {
 	id     int64
 	rights int
-	points int
+	tie    tiebreak
 	ms     int64
 }
 
-// ahead says whether a game is ahead of another on a day's board (dayOrder): more right answers, then more points,
-// then quicker, then the earlier started.
+// ahead says whether a game is ahead of another on a day's board (dayOrder): more right answers, then what breaks a
+// tie (tiebreak), then quicker, then the earlier started.
 func (r boardRun) ahead(o boardRun) bool {
 	if r.rights != o.rights {
 		return r.rights > o.rights
 	}
-	if r.points != o.points {
-		return r.points > o.points
+	if c := r.tie.cmp(o.tie); c != 0 {
+		return c < 0
 	}
 	if r.ms != o.ms {
 		return r.ms < o.ms

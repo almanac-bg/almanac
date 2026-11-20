@@ -21,8 +21,10 @@ import (
 	"github.com/almanac-bg/almanac/internal/play"
 )
 
-// The mail when a streak ends: the one word the game sends a player it can't reach otherwise — one with an email and
-// notifications on no device (an iPhone in Safari, say) — when a streak of StreakMailFrom days or more has ended. It
+// The mail when a streak ends: the one word the game sends a player it can't reach otherwise — one with an email (one
+// they proved: only the sign-in code sets it) and notifications on no device (an iPhone in Safari, say) — when a streak
+// of StreakMailFrom days or more has ended. It never names the streak's number (DECISIONS.md, the direction: an ended
+// streak's number is never named): „Въпросите на деня те чакат“, and its link lands on Днес as from a mail. It
 // goes the day after the day missed that ended it, at the player's own hour (RemindMinute), never in the night
 // (quietFrom: pushes.go), unless they've played by then. At most one in StreakMailEvery days, claimed in streak_mails before it's queued in the outbox, so a restart
 // never sends two. A player held out of the reminders (play.HeldReminders) is claimed the same, marked held, and never
@@ -184,8 +186,7 @@ func (s *Server) streakMailOf(ctx context.Context, today string, userID int64) (
 	if st.Days != 0 || e == nil || e.On != play.DayShift(today, -1) || e.Days < StreakMailFrom {
 		return m, false, nil
 	}
-	m = mail.Message{To: email.String, Subject: fmt.Sprintf("Серията ти от %d дни прекъсна", e.Days),
-		Unsubscribe: s.mailOffURL(userID, mailStreak)}
+	m = mail.Message{To: email.String, Subject: "Въпросите на деня те чакат", Unsubscribe: s.mailOffURL(userID, mailStreak)}
 	m.Text = "Въпросите на деня те чакат на almanac.bg. Днес можеш да започнеш нова серия."
 	// The link says it came from the mail: a browser signed out is asked to sign in first (screens/today.ts).
 	m.Text += "\n\n" + s.cfg.PublicURL + "/?from=mail\n\n—\nСпри тези писма: " + m.Unsubscribe + "\n"
