@@ -84,18 +84,6 @@ func (w *world) friendIDs(p *player) ([]int64, error) {
 	return ids, nil
 }
 
-// block has a player block someone they played and didn't like, rarely.
-func (w *world) block(p *player, other *player) error {
-	if other == nil || other.isPersona() || p.isPersona() || !w.chance(0.01) {
-		return nil
-	}
-	if _, err := w.g.Block(w.ctx, p.id, other.tag); err != nil {
-		return err
-	}
-	w.blocked[pair(p.id, other.id)] = true
-	return nil
-}
-
 // dress has a player choose their look from what they have, now and then: an avatar and its colour, a title, a frame,
 // a pattern (SetLook refuses what isn't theirs).
 func (w *world) dress(p *player) error {
@@ -196,7 +184,7 @@ func (w *world) opponent(p *player, online []*player, met map[[2]int64]bool) *pl
 	var best *player
 	bestGap := 1 << 30
 	for _, o := range online {
-		if o == p || o.id == 0 || met[pair(p.id, o.id)] || w.blocked[pair(p.id, o.id)] || o.persona == keyDay2 {
+		if o == p || o.id == 0 || met[pair(p.id, o.id)] || o.persona == keyDay2 {
 			continue
 		}
 		gap := abs(w.rating(o)-mine) + w.r.IntN(150)

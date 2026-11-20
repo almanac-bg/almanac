@@ -4144,11 +4144,6 @@
     margin: 0;
   }
 
-  /* Blocking is there, never in the way: quiet, at the row's end. */
-  .player-block {
-    margin-inline-start: auto;
-  }
-
   /* The name and what's beside it („ти“): the name gives way with an ellipsis, the badge always shows whole. */
   .who-name {
     display: flex;
@@ -5777,7 +5772,7 @@
     list-style: none;
   }
 
-  /* Short of room (a phone's 320px), removing or blocking a friend (while editing) goes under the row, at its end. */
+  /* Short of room (a phone's 320px), removing a friend (while editing) goes under the row, at its end. */
   .friend {
     display: flex;
     flex-wrap: wrap;
@@ -5788,7 +5783,6 @@
 
   .friend-act {
     margin-inline-start: auto;
-    padding-inline: var(--space-4);
   }
 
   .friend + .friend {

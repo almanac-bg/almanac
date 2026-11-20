@@ -40,8 +40,7 @@ packages' doc comments; this file holds only what must not drift.
 - **A recording shows who played it.** Against a recording, the player sees the real player as anywhere in the game
   (name, profile, avatar, frame, title, level, rating), labelled „Запис“, never as an anonymous animal: a duel is
   against someone (owner, 2026-11-19, undoing review S13's unnamed recordings). The other way stays numbers only: the
-  recorded player hears how many played their games and how it went, never who. Two players one of whom has blocked
-  the other are never dealt each other's games. The privacy page says so.
+  recorded player hears how many played their games and how it went, never who. The privacy page says so.
 - **Роял cuts by right answers,** after the 5th, 8th, 11th and 14th: everyone level on right answers with the last
   player through goes through, up to a quarter more than the cut keeps (`play.RoyalThrough`); only past that does the
   time of the right ones decide among those level. So time decides the final, the places and only a crowded line,
@@ -57,8 +56,9 @@ packages' doc comments; this file holds only what must not drift.
 - **Removed to keep the game simple** (owner, 2026-11-19): sharing, invitations by link, challenges, past days'
   questions (the archive of past issues, and going over a game after its day), winning a broken streak back, and the
   year's report; and on 20 Nov, Профил's chart of the days („Твоите броеве“), Начало's line of how yesterday ended,
-  Класации' „Вчера“, Втори шанс (the questions got wrong, asked again days later), the weekly leagues, and rooms
-  (playing together with a code; the games played in them stay the players'). Моят
+  Класации' „Вчера“, Втори шанс (the questions got wrong, asked again days later), the weekly leagues, rooms
+  (playing together with a code; the games played in them stay the players'), and blocking players (a request can
+  still be declined, a friend removed). Моят
   Алманах is one list in the order the facts were learned, with no datelines. Friends are added by username or email;
   duels are live (against a recording when nobody comes, with a rematch after), and only they move a rating. Don't
   bring any of them back, or something in their place, without the owner's call.

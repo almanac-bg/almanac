@@ -43,8 +43,7 @@ type Profile struct {
 	Achievements []Earned `json:"achievements"`
 	Of           int      `json:"of"`
 	// Friend is how the viewer stands with them: "yes" (friends), "asked" (the viewer asked them), "asks" (they
-	// asked the viewer), "blocked" (the viewer blocked them), or "" (none of these, or no viewer). Request is the
-	// request's id, while one waits.
+	// asked the viewer), or "" (none of these, or no viewer). Request is the request's id, while one waits.
 	Friend  string `json:"friend,omitempty"`
 	Request int64  `json:"request,omitempty"`
 	// Record is the duels between the two, from the viewer's side: while they're friends.
@@ -130,18 +129,8 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 	return p, g.relation(ctx, &p, viewer, id)
 }
 
-// relation fills in how viewer stands with the player id: blocked by the viewer, friends (and their record), or a
-// request either way. That the player has blocked the viewer isn't told: as strangers.
+// relation fills in how viewer stands with the player id: friends (and their record), or a request either way.
 func (g *Game) relation(ctx context.Context, p *Profile, viewer, id int64) error {
-	db := g.DB.Read
-	var blocked bool
-	if err := db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM blocks WHERE user_id = ? AND blocked_id = ?)`,
-		viewer, id).Scan(&blocked); err != nil || blocked {
-		if blocked {
-			p.Friend = "blocked"
-		}
-		return err
-	}
 	if _, err := g.Friend(ctx, viewer, id); err == nil {
 		r, err := g.recordAgainst(ctx, viewer, id)
 		p.Friend, p.ID, p.Record = "yes", id, &r
@@ -151,7 +140,7 @@ func (g *Game) relation(ctx context.Context, p *Profile, viewer, id int64) error
 	}
 	// A request either way: the viewer's to them, or theirs to the viewer (by tag, or to the viewer's email).
 	var request, from int64
-	err := db.QueryRowContext(ctx, `SELECT r.id, r.from_id FROM friend_requests r
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT r.id, r.from_id FROM friend_requests r
 		WHERE (r.from_id = ?1 AND r.to_id = ?2)
 		OR (r.from_id = ?2 AND (r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1)) AND NOT r.declined)
 		ORDER BY r.from_id = ?2 DESC LIMIT 1`, viewer, id).Scan(&request, &from)

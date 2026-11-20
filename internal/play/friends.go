@@ -12,8 +12,7 @@ import (
 )
 
 // Friends are two players who joined up: one asked and the other said yes. Asked by tag or by email; never without
-// both. A block keeps two players apart (blocks.go). Each friend sees how the other did on the day's
-// questions, and they keep a record of their duels.
+// both. Each friend sees how the other did on the day's questions, and they keep a record of their duels.
 
 var (
 	// ErrSelf is a player asking themselves to be friends.
@@ -43,17 +42,9 @@ func (g *Game) DayRights(ctx context.Context, userID int64, day string, viewer i
 }
 
 // befriend makes two players friends (if they aren't yet), settles any requests between them, and awards what that
-// earns them. a is the one who asked (whose request b accepted): told of the yes (AcceptedOf). ErrBlocked if one of
-// them has blocked the other.
+// earns them. a is the one who asked (whose request b accepted): told of the yes (AcceptedOf).
 func (g *Game) befriend(ctx context.Context, a, b int64) error {
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		var blocked bool
-		if err := tx.QueryRow(`SELECT `+blockedBetween("?1", "?2"), a, b).Scan(&blocked); err != nil {
-			return err
-		}
-		if blocked {
-			return ErrBlocked
-		}
 		if _, err := tx.Exec(`DELETE FROM friend_requests WHERE (from_id = ?1 AND (to_id = ?2
 			OR to_email = (SELECT email FROM users WHERE id = ?2))) OR (from_id = ?2 AND (to_id = ?1
 			OR to_email = (SELECT email FROM users WHERE id = ?1)))`, a, b); err != nil {
@@ -100,8 +91,7 @@ type Sent struct {
 
 // Request asks a player to be friends: by their tag, or by an email address. An email request waits for whoever has
 // the address, or signs in with it later, and the sender learns nothing about whether anyone does. to is already a
-// normal tag or email (account.NormalTag, account.NormalEmail); byEmail says which. Between two players one of whom
-// has blocked the other, it's kept nowhere, though the sender is told it went.
+// normal tag or email (account.NormalTag, account.NormalEmail); byEmail says which.
 func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool) (Sent, error) {
 	var mine sql.NullString // the sender's email: requests to it are to them
 	if err := g.DB.Read.QueryRowContext(ctx, `SELECT email FROM users WHERE id = ?`, from).Scan(&mine); err != nil {
@@ -131,19 +121,6 @@ func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool)
 	}
 	if other == from {
 		return Sent{}, ErrSelf
-	}
-	// Whoever the request is to (by email, the address's owner, though the sender isn't told), one blocked by the
-	// other: as if sent.
-	var blocked bool
-	if err := g.DB.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM users u WHERE (u.id = ?2 OR (?3 AND u.email = ?4))
-		AND `+blockedBetween("?1", "u.id")+`)`, from, other, byEmail, to).Scan(&blocked); err != nil {
-		return Sent{}, err
-	}
-	if blocked {
-		if byEmail {
-			name = ""
-		}
-		return Sent{Name: name}, nil
 	}
 	if other != 0 {
 		if _, err := g.Friend(ctx, from, other); err == nil {
@@ -205,7 +182,6 @@ func (g *Game) Requests(ctx context.Context, userID int64) (in, out []FriendRequ
 	rows, err := db.QueryContext(ctx, `SELECT r.id, r.at, u.id, u.name, u.tag, `+lookColumns+`
 		FROM friend_requests r JOIN users u ON u.id = r.from_id
 		WHERE (r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1)) AND NOT r.declined
-			AND NOT `+blockedBetween("?1", "r.from_id")+`
 		ORDER BY r.at DESC`, userID)
 	if err != nil {
 		return nil, nil, err
@@ -249,9 +225,8 @@ func (g *Game) Requests(ctx context.Context, userID int64) (in, out []FriendRequ
 func (g *Game) Accept(ctx context.Context, userID, requestID int64) (name string, err error) {
 	var from int64
 	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.from_id, u.name FROM friend_requests r JOIN users u ON u.id = r.from_id
-		WHERE r.id = ?1 AND (r.to_id = ?2 OR r.to_email = (SELECT email FROM users WHERE id = ?2)) AND NOT r.declined
-			AND NOT `+blockedBetween("?2", "r.from_id"), requestID, userID).
-		Scan(&from, &name)
+		WHERE r.id = ?1 AND (r.to_id = ?2 OR r.to_email = (SELECT email FROM users WHERE id = ?2)) AND NOT r.declined`,
+		requestID, userID).Scan(&from, &name)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrNoRequest
 	}
@@ -296,8 +271,7 @@ func (g *Game) Withdraw(ctx context.Context, userID, requestID int64) error {
 func (g *Game) RequestsWaiting(ctx context.Context, userID int64) (int, error) {
 	var n int
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT count(*) FROM friend_requests r
-		WHERE (r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1)) AND NOT r.declined
-			AND NOT `+blockedBetween("?1", "r.from_id"), userID).Scan(&n)
+		WHERE (r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1)) AND NOT r.declined`, userID).Scan(&n)
 	return n, err
 }
 

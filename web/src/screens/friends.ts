@@ -1,6 +1,5 @@
 // Friends (Приятели): who asks to be friends, each friend with their day and your record against them, and the ways to
-// make more: by their tag or email. Anyone who asks, or a friend, can be blocked from here: they're gone, and can't ask
-// again (play/blocks.go); the blocked are listed last, to lift it.
+// make more: by their tag or email.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -52,7 +51,6 @@ interface Request {
 interface Friends {
   friends: Friend[];
   requests: { in: Request[]; out: Request[] };
-  blocked: { name: string; tag: string }[];
 }
 
 /** Приятели, one of the main places. */
@@ -129,16 +127,6 @@ function friendsCard(): Child {
       await api("DELETE", `/api/friends/requests/${r.id}`);
       await load();
     });
-  const block = (tag: string) =>
-    act(async () => {
-      await api("POST", "/api/blocks", { tag });
-      await load();
-    });
-  const unblock = (tag: string) =>
-    act(async () => {
-      await api("DELETE", `/api/blocks/${tag}`);
-      await load();
-    });
   // Made once: what it says after a request stays while the list around it is drawn again.
   const adder = addFriend(load);
 
@@ -171,9 +159,6 @@ function friendsCard(): Child {
               { class: "invitation-actions" },
               h("button", { class: "btn rose inline", type: "button", onclick: () => accept(r) }, "Приеми"),
               h("button", { class: "link", type: "button", onclick: () => drop(r) }, "Откажи"),
-              r.tag
-                ? h("button", { class: "link muted", type: "button", onclick: () => block(r.tag ?? "") }, "Блокирай")
-                : null,
             ),
           ),
         ),
@@ -201,75 +186,39 @@ function friendsCard(): Child {
                 ),
               ];
         }
-        return [
-          d.friends.length
-            ? h(
-                "ol",
-                { class: "friend-list" },
-                d.friends.map((f) =>
-                  row(
-                    f,
-                    () => remove(f),
-                    () => block(f.tag),
-                    editing,
-                  ),
-                ),
-              )
-            : h("p", { class: "muted" }, "Още нямаш приятели тук. Добави ги по потребителско име или имейл."),
-        ];
+        return d.friends.length
+          ? h(
+              "ol",
+              { class: "friend-list" },
+              d.friends.map((f) => row(f, () => remove(f), editing)),
+            )
+          : h("p", { class: "muted" }, "Още нямаш приятели тук. Добави ги по потребителско име или имейл.");
       },
-      // Outside the blocks drawn again on each look (every 15 s): drawn again, its field would lose the focus mid-word.
+      // Outside the parts drawn again on each look (every 15 s): drawn again, its field would lose the focus mid-word.
       when(data, () => adder),
       () => {
-        const d = data();
-        if (!d) return null;
-        return [
-          d.requests.out.length
-            ? h(
-                "div",
-                { class: "stack small-gap" },
-                h("p", { class: "kicker" }, "Чакат отговор"),
-                h(
-                  "ul",
-                  { class: "waiting" },
-                  d.requests.out.map((r) =>
-                    h(
-                      "li",
-                      null,
-                      r.email
-                        ? h("span", null, r.email)
-                        : h(
-                            "a",
-                            { href: profileHref(r.tag ?? "") },
-                            r.name,
-                            h("span", { class: "muted" }, ` @${r.tag}`),
-                          ),
-                      h("button", { class: "link muted", type: "button", onclick: () => drop(r) }, "Отмени"),
-                    ),
+        const out = data()?.requests.out ?? [];
+        return out.length
+          ? h(
+              "div",
+              { class: "stack small-gap" },
+              h("p", { class: "kicker" }, "Чакат отговор"),
+              h(
+                "ul",
+                { class: "waiting" },
+                out.map((r) =>
+                  h(
+                    "li",
+                    null,
+                    r.email
+                      ? h("span", null, r.email)
+                      : h("a", { href: profileHref(r.tag ?? "") }, r.name, h("span", { class: "muted" }, ` @${r.tag}`)),
+                    h("button", { class: "link muted", type: "button", onclick: () => drop(r) }, "Отмени"),
                   ),
                 ),
-              )
-            : null,
-          d.blocked.length
-            ? h(
-                "div",
-                { class: "stack small-gap" },
-                h("p", { class: "kicker" }, "Блокирани"),
-                h(
-                  "ul",
-                  { class: "waiting" },
-                  d.blocked.map((b) =>
-                    h(
-                      "li",
-                      null,
-                      h("span", null, b.name, h("span", { class: "muted" }, ` @${b.tag}`)),
-                      h("button", { class: "link muted", type: "button", onclick: () => unblock(b.tag) }, "Отблокирай"),
-                    ),
-                  ),
-                ),
-              )
-            : null,
-        ];
+              ),
+            )
+          : null;
       },
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
     ),
@@ -339,8 +288,8 @@ function addFriend(reload: () => Promise<void>): Child {
   );
 }
 
-/** A friend: their name, their day, the duels between you (and, while editing, removing or blocking them). */
-function row(f: Friend, remove: () => void, block: () => void, editing: () => boolean): Child {
+/** A friend: their name, their day, the duels between you (and, while editing, removing them). */
+function row(f: Friend, remove: () => void, editing: () => boolean): Child {
   const played = f.won + f.lost + f.drawn;
   return h(
     "li",
@@ -376,13 +325,6 @@ function row(f: Friend, remove: () => void, block: () => void, editing: () => bo
         )
       : null,
     () =>
-      editing()
-        ? h(
-            "span",
-            { class: "invitation-actions friend-act" },
-            h("button", { class: "link muted", type: "button", onclick: remove }, "Премахни"),
-            h("button", { class: "link muted", type: "button", onclick: block }, "Блокирай"),
-          )
-        : null,
+      editing() ? h("button", { class: "link muted friend-act", type: "button", onclick: remove }, "Премахни") : null,
   );
 }

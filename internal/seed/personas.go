@@ -85,7 +85,7 @@ func (w *world) steer(p *player, lo, hi, n int) error {
 		bestRating := 0
 		day := min(w.day, w.today())
 		for _, o := range w.active(day) {
-			if o == p || o.isPersona() || met[o.id] || o.joined > day-4 || w.blocked[pair(p.id, o.id)] {
+			if o == p || o.isPersona() || met[o.id] || o.joined > day-4 {
 				continue
 			}
 			var rated, rating int

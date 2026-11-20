@@ -121,41 +121,6 @@ func TestRecordingsNamed(t *testing.T) {
 	}
 }
 
-// Two players one of whom has blocked the other are never dealt each other's games as recordings, whichever blocked.
-func TestRecordingsHonourBlocks(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	owner, gal := w.user(), w.user()
-	s, err := w.g.StartTopic(ctx, owner, MixTopic)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(owner, s.ID, repeat(w.right, Length)...)
-	w.wait(time.Minute)
-	tags := map[int64]string{}
-	for _, id := range []int64{owner, gal} {
-		var t0 string
-		if err := w.db.Read.QueryRow(`SELECT tag FROM users WHERE id = ?`, id).Scan(&t0); err != nil {
-			t.Fatal(err)
-		}
-		tags[id] = t0
-	}
-	for _, b := range [][2]int64{{gal, owner}, {owner, gal}} {
-		if _, err := w.g.Block(ctx, b[0], tags[b[1]]); err != nil {
-			t.Fatal(err)
-		}
-		if l, err := w.g.StartRecorded(ctx, gal); !errors.Is(err, ErrNobody) {
-			t.Fatalf("player %d blocked %d, and Gal was dealt %+v (%v)", b[0], b[1], l, err)
-		}
-		if err := w.g.Unblock(ctx, b[0], tags[b[1]]); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if l, err := w.g.StartRecorded(ctx, gal); err != nil || l.Users[1] != owner {
-		t.Fatalf("no block between them: %+v %v", l, err)
-	}
-}
-
 // A no to a friend request by email leaves it waiting in its sender's list, as one to an address without a player
 // does, so that the no tells nobody the address has one (review 2026-11-18, S29). The one asked sees it no more.
 func TestDeclinedEmailRequestStaysWaiting(t *testing.T) {
