@@ -562,7 +562,7 @@ func TestPictureTime(t *testing.T) {
 		!strings.Contains(fmt.Sprint(st.Question.View), "Чие") {
 		t.Fatalf("its time, after it started by itself: %+v", st.Question)
 	}
-	w.wait(Grace + time.Second)
+	w.wait(LateGrace + time.Second) // an answer timed in time by the screen may still come until then
 	if st, _ := w.g.State(ctx, u, s.ID); st.At != 2 {
 		t.Fatalf("not out of time after PictureWait and its time: %+v", st)
 	}

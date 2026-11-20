@@ -104,6 +104,7 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 		Players, WithEmail, DayToday, DayScripted, Questions, Live int
 		M                                                          measures
 		Fair                                                       []play.FairSignal
+		Late                                                       []play.LateAnswerer
 	}{Questions: len(b.Questions), Live: len(b.Live("", ""))}
 	today := s.game.Today()
 	var err error
@@ -114,6 +115,10 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	// The days played after several throwaway guests from the same network (play.JudgeNets).
 	if data.Fair, err = s.game.FairSignals(ctx, 50); err != nil {
 		slog.Error("admin: fair play", "err", err)
+	}
+	// The players whose answers were taken late, timed in time by their screens (play/late.go).
+	if data.Late, err = s.game.LateAnswerers(ctx, 20); err != nil {
+		slog.Error("admin: late answers", "err", err)
 	}
 	// The day's games by people, and apart those played at a script's speed, which nobody else sees (play/fair.go).
 	_ = db.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE `+play.People+`), count(*) FILTER (WHERE shadow = ?) FROM runs

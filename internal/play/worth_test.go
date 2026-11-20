@@ -19,7 +19,7 @@ func TestWorth(t *testing.T) {
 		}
 		return &bank.Choice{Head: h}
 	}
-	choice := q("choice", bank.Medium) // 20 s: all the speed in the first 5
+	choice := q("choice", bank.Medium) // 25 s (its floor): all the speed in the first 6.25
 	for _, c := range []struct {
 		q             bank.Question
 		score         float64
@@ -28,9 +28,9 @@ func TestWorth(t *testing.T) {
 	}{
 		{choice, 1, 0, 1000, 250},
 		{choice, 1, 5 * time.Second, 1000, 250},
-		{choice, 1, 12500 * time.Millisecond, 880, 130},
-		{choice, 1, 20 * time.Second, 750, 0},
-		{choice, 1, 21 * time.Second, 750, 0}, // within the grace
+		{choice, 1, 15625 * time.Millisecond, 880, 130},
+		{choice, 1, 25 * time.Second, 750, 0},
+		{choice, 1, 26 * time.Second, 750, 0}, // within the grace
 		{choice, 0, 0, 0, 0},
 		{q("choice", bank.Easy), 1, 0, 800, 200},
 		{q("choice", bank.Hard), 1, 0, 1200, 300},
