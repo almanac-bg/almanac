@@ -191,6 +191,9 @@ The text grows with the browser's own setting and with „Размер на те
 `<html>`, so a screen at twice the text on a 320px phone is a screen on a phone 160px wide, and it holds that way
 (`e2e/text.spec.ts`):
 
+- **A media query's rem is the browser's own size,** not the page's: the browser's setting grows it, „Размер на
+  текста“ doesn't. So a short screen is a phone on its side only with `(orientation: landscape)` too: at 32px an
+  upright phone's 640px is under `max-height: 30rem`, and it would get the side-by-side panel, squeezed to nothing.
 - **Display type grows at half the rate** (titles, the date, the question, the big numbers): it is set as half px,
   half rem (`calc(17px + 1.0625rem)` for 34px), which is the same at the usual size. A numeral that could still
   outgrow a narrow column is capped by the screen's width as well (`min(…, 46vw)`).
