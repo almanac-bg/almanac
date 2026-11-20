@@ -22,6 +22,30 @@ packages' doc comments; this file holds only what must not drift.
 
 ## The game
 
+- **The redesign (owner, 2026-11-20).** After a walk through everything with every kind of player, the owner chose
+  to rebuild the game around one idea: *every day ten questions write the player's almanac, and set them beside all of
+  Bulgaria.* What follows from it, and is not to drift back:
+  - **Three places:** Днес (the day's issue), Алманах (the player's book), Приятели (friends, the day's board, duels).
+    Профил and Настройки open from the player's avatar. Nothing else gets a place.
+  - **One measure of progress: the Алманах.** A chapter per topic (Микс and България as chapters of their own), the
+    facts a player has collected in it, and how much of it they know (mastery). The streak is the habit. Nothing else
+    adds up across games: no XP, no levels, no day's goals, no achievements, no titles, no frames, no backdrops, no
+    unlocks of any kind. Milestones (a streak of 7, 30, 100, 365 days, a first ten of ten, a chapter completed) are
+    noted in the book, not given as medals.
+  - **The streak forgives one missed day a week by itself** (Monday to Sunday); nothing to earn or hold. A streak that
+    ends isn't won back.
+  - **Every avatar is free** from the first day: the animals, chosen by the player. No tones, frames or patterns to
+    unlock.
+  - **No rating and no divisions.** Points are one game's score; a player's strength is what their Алманах says.
+  - **No Роял.** It needs dozens at one moment; with few players it is an empty room that teaches nobody plays. A live
+    evening may come back, built anew, once thousands play daily: the owner's call then.
+  - **A duel is played on one's own time:** the same ten as a friend (who plays them when they can) or as a real
+    recorded game, said plainly; no live matching, no rating. A friend's record against you stays.
+  - **Sharing the day's result comes back:** the score and its shape, never the answers, with a way into the game.
+  - **The first screen of a new visitor is the day alone;** topics are played from their chapter in the Алманах.
+  - **A result is one page:** how it went, how Bulgaria did, the one thing worth keeping, sharing, tomorrow. A wrong
+    game is never celebrated.
+  The decisions below that this replaces are gone from this file; the code follows as each part lands.
 - **The day's ten questions are the heart;** everything else serves them or stays out of the way. A new system replaces
   one or proves it's needed (CLAUDE.md, Direction).
 - **For everyone, not for a group.** The game is made for any player, not tailored to one audience (children,
@@ -33,27 +57,11 @@ packages' doc comments; this file holds only what must not drift.
   pace or similar needs until the owner calls for it; what the game already has (contrast, labels, the axe checks)
   stays and isn't broken. Layout that breaks for ordinary players (large system text, small tap targets) is not this:
   it's fixed as any bug (owner, 2026-11-18).
-- **Points, XP and rating are kept apart** (`play/worth.go`). The word stays **XP**, not „опит“: „опит“ already means a
-  try in the game's texts.
-- **Live means live.** Duels are played at once, with a recording of a real game when nobody comes; Роял is online only,
-  at 21:00, Friday to Sunday until the evenings fill. No made-up opponents: no bots answering by a player's rates.
 - **A recording shows who played it.** Against a recording, the player sees the real player as anywhere in the game
   (name, profile, avatar, frame, title, level, rating), labelled „Запис“, never as an anonymous animal: a duel is
   against someone (owner, 2026-11-19, undoing review S13's unnamed recordings). The other way stays numbers only: the
   recorded player hears how many played their games and how it went, never who. The privacy page says so.
-- **Роял cuts by right answers,** after the 5th, 8th, 11th and 14th: everyone level on right answers with the last
-  player through goes through, up to a quarter more than the cut keeps (`play.RoyalThrough`); only past that does the
-  time of the right ones decide among those level. So time decides the final, the places and only a crowded line,
-  never more rights against fewer but faster (owner, 2026-11-18, review M2: the first cut had been a contest of
-  seconds, partly of the network). It always reaches the 15th. Those cut keep answering on the same clock, off the
-  standings, placed as they stood at their cut (not reordered by their total). Rejected: out at the first wrong (most
-  were out by the 5th), lives, a final from zero (luck over knowledge).
-- **Reserve days: one a week at most,** Monday to Sunday, from whichever source comes first (the day itself and the
-  goals); none before a streak's third day, which brings the first, told then. Players kept the reserve days they held
-  when this came in. Reserve days are the only thing that keeps a streak: one that ends isn't won back. „Година без
-  пропуск“ is 365 days in a row with no reserve day spent; the streak's year is „Година с Алманаха“ (owner,
-  2026-11-18, review E4, E11; 2026-11-19).
-- **Removed to keep the game simple** (owner, 2026-11-19): sharing, invitations by link, challenges, past days'
+- **Removed to keep the game simple** (owner, 2026-11-19; sharing and friends' duels came back with the redesign): past days'
   questions (the archive of past issues, and going over a game after its day), winning a broken streak back, and the
   year's report; and on 20 Nov, Профил's chart of the days („Твоите броеве“), Начало's line of how yesterday ended,
   Класации' „Вчера“, Втори шанс (the questions got wrong, asked again days later), the weekly leagues, rooms
@@ -64,10 +72,6 @@ packages' doc comments; this file holds only what must not drift.
   bring any of them back, or something in their place, without the owner's call.
 - **Right answers in a row earn no points** (owner, 2026-11-18, review E6): where a miss fell decided close duels.
   The climb stays as sound and feel; a game with every answer right still earns its bonus.
-- **The day's goals serve the day,** each one game at most: the day's ten; one more game (a topic's or a duel); and a
-  game played well (8 of 10 or more). No goal for how many or how fast (owner,
-  2026-11-18, review O4: the volume and speed goals sent players into a quarter of an hour of other games, away from
-  the day).
 - **Gamification only from what the game really counts:** no invented currencies, no random boxes, never real money.
 - **A tenth of players get no reminders, to tell what reminders do.** 10 % of players, drawn once by a hash of their
   id (`play/experiment.go`), are held out of the day's notification and the streak's mail; what they would have had
@@ -87,8 +91,10 @@ packages' doc comments; this file holds only what must not drift.
 
 ## How it looks and speaks
 
-- **Modern Editorial Gamified** (`web/DESIGN.md`): the owner's final choice among three. Night first, gold for the one
-  right answer, one obvious action per screen.
+- **The edition** (owner, 2026-11-20, replacing „Modern Editorial Gamified“): the game looks like a publication a
+  player keeps, not a generic game app: paper-light first with a night of its own, serif headlines, numerals as the
+  heroes, colour only where it means something, one obvious action per screen. `web/DESIGN.md` holds the rules as they
+  land.
 - **Art never changes the rules.** Asked for pictures, draw pictures; an achievement doesn't start giving avatars
   because a drawing exists (#234, undone in #236).
 - **The mark is the rosette:** abstract, not a letter, no gradients. Ask before changing the mark itself.
