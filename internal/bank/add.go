@@ -17,8 +17,8 @@ import (
 
 // Batch files: a batch is a directory with <category>.json for each category it adds to or changes (a JSON array, as
 // in the bank: a question whose id the bank has is that question changed, whole; any other is new), and maybe
-// RetireFile (the questions it retires: [{"id", "why", "by"}], why one of RetiredWhys, by the question of the batch
-// that takes its place, if one does) and ImagesDir (its pictures).
+// RetireFile (the questions it retires: [{"id", "why", "by"}], why one of RetiredWhys, by the question that takes its
+// place, if one does: one of the batch, or one live in the bank already) and ImagesDir (its pictures).
 const RetireFile = "retire.json"
 
 // Retirement is a question a batch retires (RetireFile).
@@ -126,6 +126,11 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Added{}, err
 	}
+	retiring := map[string]bool{}
+	for _, r := range retire {
+		retiring[r.ID] = true
+	}
+	live := func(id string) bool { q, ok := b.Get(id); return ok && !q.Extra().Retired && !retiring[id] }
 	for _, r := range retire {
 		q, ok := b.Get(r.ID)
 		switch {
@@ -137,8 +142,8 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 			fault("%s: %s: retired already", RetireFile, r.ID)
 		case !slices.Contains(RetiredWhys, r.Why):
 			fault("%s: %s: why is one of %s", RetireFile, r.ID, strings.Join(RetiredWhys, ", "))
-		case r.By != "" && !seen[r.By]:
-			fault("%s: %s: by %s, which isn't in the batch", RetireFile, r.ID, r.By)
+		case r.By != "" && !seen[r.By] && !live(r.By):
+			fault("%s: %s: by %s, which is neither in the batch nor live in the bank", RetireFile, r.ID, r.By)
 		default:
 			t := q.Extra()
 			t.Retired, t.RetiredWhy, t.ReplacedBy, t.Updated = true, r.Why, r.By, today

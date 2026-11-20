@@ -30,7 +30,7 @@ func TestAddPutsABatchIn(t *testing.T) {
 	id := "gen-" + strconv.Itoa(next)
 	write(t, filepath.Join(batch, "general.json"), `[
   {"id": "`+id+`", "type": "choice", "difficulty": "easy", "text": "Коя е най-високата планина в България?", "answer": "Рила",
-   "wrong": ["Пирин", "Витоша", "Стара планина"], "fact": "Връх Мусала е висок 2925 м — най-високият на Балканския полуостров.",
+   "wrong": ["Пирин", "Витоша", "Странджа"], "fact": "Връх Мусала е висок 2925 м — най-високият на Балканския полуостров.",
    "added": "`+today+`", "updated": "`+today+`", "bg": true, "sources": ["https://bg.wikipedia.org/wiki/Рила"]}
 ]`)
 	write(t, filepath.Join(batch, RetireFile), `[{"id": "`+old+`", "why": "twin", "by": "`+id+`"}]`)
@@ -62,6 +62,45 @@ func TestAddPutsABatchIn(t *testing.T) {
 	data, _ := os.ReadFile(filepath.Join(dir, QuestionsDir, "general.json"))
 	if want, _ := Format(after.InCategory("general")); string(data) != string(want) {
 		t.Error("general.json isn't in the bank's format after the batch")
+	}
+}
+
+// A question is retired by its replacement, one the batch brings or one live in the bank already; never by a question
+// that isn't there, is retired, or leaves with it.
+func TestAddRetiresByALiveReplacement(t *testing.T) {
+	dir := sampleCopy(t)
+	retire := func(body string) error {
+		batch := t.TempDir()
+		write(t, filepath.Join(batch, RetireFile), body)
+		_, err := Add(dir, batch, "", false)
+		return err
+	}
+	if err := retire(`[{"id": "gen-002", "why": "weak", "by": "gen-003"}]`); err != nil {
+		t.Fatalf("retiring by a live question: %v", err)
+	}
+	after, problems := Load(dir)
+	if after == nil {
+		t.Fatalf("the bank doesn't load after the retirement: %v", problems)
+	}
+	if q, _ := after.Get("gen-002"); !q.Extra().Retired || q.Extra().RetiredWhy != "weak" || q.Extra().ReplacedBy != "gen-003" {
+		t.Errorf("gen-002 isn't retired as weak, replaced by gen-003: %+v", q.Extra())
+	}
+
+	before, _ := os.ReadFile(filepath.Join(dir, QuestionsDir, "general.json"))
+	for name, body := range map[string]string{
+		"by a question the bank hasn't": `[{"id": "gen-004", "why": "weak", "by": "gen-99999"}]`,
+		"by a retired question":         `[{"id": "gen-004", "why": "weak", "by": "gen-002"}]`,
+		"by a question retired with it": `[{"id": "gen-004", "why": "weak", "by": "gen-005"}, {"id": "gen-005", "why": "weak"}]`,
+		"by itself":                     `[{"id": "gen-004", "why": "weak", "by": "gen-004"}]`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := retire(body); err == nil || !strings.Contains(err.Error(), "neither in the batch nor live in the bank") {
+				t.Fatalf("want a refusal, got %v", err)
+			}
+			if after, _ := os.ReadFile(filepath.Join(dir, QuestionsDir, "general.json")); string(after) != string(before) {
+				t.Error("a refused batch changed the bank")
+			}
+		})
 	}
 }
 
@@ -138,7 +177,7 @@ func TestAddChangesQuestions(t *testing.T) {
 	batch := t.TempDir()
 	write(t, filepath.Join(batch, "general.json"), "["+strings.Trim(first, "[]")+", "+strings.Trim(second, "[]")+`,
   {"id": "`+added+`", "type": "choice", "difficulty": "easy", "text": "Коя е най-високата планина в България?", "answer": "Рила",
-   "wrong": ["Пирин", "Витоша", "Стара планина"], "fact": "Връх Мусала е висок 2925 м — най-високият на Балканския полуостров.",
+   "wrong": ["Пирин", "Витоша", "Странджа"], "fact": "Връх Мусала е висок 2925 м — най-високият на Балканския полуостров.",
    "added": "`+today+`", "updated": "`+today+`", "bg": true, "sources": ["https://bg.wikipedia.org/wiki/Рила"]}]`)
 
 	before, _ := os.ReadFile(filepath.Join(dir, QuestionsDir, "general.json"))
