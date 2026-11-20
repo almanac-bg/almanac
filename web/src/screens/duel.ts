@@ -15,7 +15,7 @@ import { type Child, effect, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { backOut, byTap, go, hold, title } from "../lib/router.ts";
 import { withWord } from "../lib/words.ts";
 import { player, topics, user } from "../state.ts";
-import { back, failure, formatNumber, pageArt, who } from "../ui.ts";
+import { back, failure, formatNumber, type Look, pageArt, who } from "../ui.ts";
 import { missing } from "./missing.ts";
 import { nameFirst } from "./name.ts";
 import { signIn } from "./signin.ts";
@@ -37,7 +37,7 @@ export interface Side {
   done: boolean;
   /** Whether the side has answered a question yet: a duel sent first may be made and never begun. */
   started?: boolean;
-  look?: { avatar?: string };
+  look?: Look;
   /** A player who has gone since (play.DuelSide.Gone): their game went with them, so their score isn't known. */
   gone?: boolean;
   /** How each question went (one duel's view): the player's own; the other's once there's a result (while the player
@@ -55,7 +55,7 @@ export interface DuelView {
   you?: Side;
   recorded?: boolean;
   /** Against a recording: as it was chosen, as strong as the player („равен“) or stronger („по-силен“). */
-  level?: "equal" | "stronger";
+  level?: Level;
   /** Against a recording of one topic's game: the topic. */
   topic?: string;
   /** The player played first (sent it). */
@@ -77,6 +77,17 @@ export interface DuelView {
   them?: number;
 }
 
+/** A recording as it's chosen (play.Even, play.Stronger): about as strong as the player, or stronger. */
+export type Level = "even" | "stronger";
+
+/** What a recording is called, by the level it was chosen at: „По-силен запис“, „Равен запис“ (one from before
+ * levels were kept: „Запис“). */
+export const recordingName = (level?: Level) =>
+  level === "stronger" ? "По-силен запис" : level === "even" ? "Равен запис" : "Запис";
+
+/** Who a duel is with, to start one: a friend (by their id), or a recording at a level. */
+type To = { friend: number } | { recording: true; level: Level };
+
 /** The player's duels, as Приятели lists them (play.Duels). */
 export interface Duels {
   yours: DuelView[];
@@ -94,7 +105,7 @@ const oneDuel = async (id: number) => shown((await api<{ duel: DuelView }>("GET"
 
 /** Starts a duel: with a friend (by their id), or against a recording; the player made first if need be, and asked
  * for a name of their own if they still have the one drawn for them (a friend sees it). It says the duel. */
-export async function startDuel(to: { friend: number } | { recording: true }): Promise<DuelView | null> {
+export async function startDuel(to: To): Promise<DuelView | null> {
   await player();
   if ("friend" in to && !(await nameFirst())) return null;
   return shown((await api<{ duel: DuelView }>("POST", "/api/duels", to)).duel);
@@ -253,6 +264,8 @@ interface Friend {
   name: string;
   tag: string;
   avatar?: string;
+  /** The seal they wear beside their name (play.Seal). */
+  seal?: { chapter: string; level: number };
 }
 
 /** Нов дуел: with a friend (each a tap), or against a recording of a real game. */
@@ -273,7 +286,7 @@ export function duelNew() {
     (r) => recording.set(r.ready),
     () => {},
   );
-  const begin = async (to: { friend: number } | { recording: true }) => {
+  const begin = async (to: To) => {
     if (busy.peek()) return;
     busy.set(true);
     error.set("");
@@ -324,7 +337,7 @@ export function duelNew() {
                 "aria-label": `Дуел ${withWord(f.name)}`,
                 onclick: () => begin({ friend: f.id }),
               },
-              who(f.name, { avatar: f.avatar }, null, f.name),
+              who(f.name, f, null, f.name),
               h("span", { class: "duel-row-end" }, h("strong", { class: "duel-state duel-invite" }, "Дуел")),
             ),
           ),
@@ -340,12 +353,14 @@ export function duelNew() {
             h(
               "p",
               { class: "muted" },
-              "Същите десет въпроса като в истинска игра на друг играч, с отговорите в нея, както са дадени.",
+              "Същите десет въпроса като в истинска игра на друг играч, с отговорите в нея, както са дадени: равен запис е горе-долу колкото теб, по-силен е малко над теб.",
             ),
-            h(
-              "button",
-              { class: "btn", type: "button", disabled: busy, onclick: () => begin({ recording: true }) },
-              "Играй срещу запис",
+            (["even", "stronger"] as const).map((level) =>
+              h(
+                "button",
+                { class: "btn", type: "button", disabled: busy, onclick: () => begin({ recording: true, level }) },
+                recordingName(level),
+              ),
             ),
           )
         : null,
@@ -393,8 +408,7 @@ function duelName(d: DuelView): string {
   const them = d.opponent?.name ?? "";
   if (!d.recorded) return `Дуел ${withWord(them)}`;
   const topic = d.topic ? topics.find((t) => t.id === d.topic)?.name : "";
-  const kind = d.level === "stronger" ? "По-силен запис" : d.level === "equal" ? "Равен запис" : "Запис";
-  return `${kind} · ${them}${topic ? ` · ${topic}` : ""}`;
+  return `${recordingName(d.level)} · ${them}${topic ? ` · ${topic}` : ""}`;
 }
 
 /** A friend's duel the player has just played first: sent, the friend told. Their own result, and where it went. */
@@ -426,7 +440,7 @@ function sent(d: DuelView, s: State, just: boolean): Child {
 
 /** A gold button that starts another duel (a rematch, the other way round; another recording), and says so if it
  * can't (a limit reached). */
-function again(label: string, to: { friend: number } | { recording: true }): Child {
+function again(label: string, to: To): Child {
   const said = signal("");
   const busy = signal(false);
   return h(
@@ -482,7 +496,7 @@ export function duelOne(params: string[]) {
       d.friend && d.them
         ? again("Реванш", { friend: d.them })
         : d.recorded
-          ? again("Още един срещу запис", { recording: true })
+          ? again("Още един срещу запис", { recording: true, level: d.level ?? "even" })
           : null;
     screen.show(() =>
       duelResult(

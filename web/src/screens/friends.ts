@@ -7,6 +7,7 @@
 import type { Board, Score } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
+import type { Look } from "../ui.ts";
 import type { Duels } from "./duel.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
@@ -58,6 +59,8 @@ interface Request {
   id: number;
   name?: string;
   tag?: string;
+  /** Who asks, as they show to others: their seal beside their name (play.Look). */
+  look?: Look;
   email?: string;
 }
 
@@ -363,6 +366,7 @@ function friendsCard(): Child {
               "p",
               null,
               r.tag ? h("a", { href: profileHref(r.tag) }, h("strong", null, r.name)) : h("strong", null, r.name),
+              worn(r.look?.seal),
               h("span", { class: "muted" }, ` @${r.tag}`),
               " иска да сте приятели.",
             ),

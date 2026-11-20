@@ -24,7 +24,8 @@ import (
 // A rank risen is told once, with the game's news (NewsOf: Rose), several at once as one; Бележка, the first, never.
 // At Страница a chapter's art becomes the player's to wear as their avatar (progress.go: SetAvatar); the animals are
 // everyone's. The player wears one chapter's seal beside their name, the one they choose (users.seal, SetSeal), or else
-// their best (the highest, the more ink on a tie).
+// their best (the highest, the more ink on a tie). It goes with their look (progress.go: Look) wherever others see
+// their name (boards, friends, requests, duels, the profile), read from the ranks kept like all of this.
 
 // Rank is a step of the ladder: its name, and the ink it starts at.
 type Rank struct {
@@ -186,6 +187,13 @@ func (g *Game) RanksOf(ctx context.Context, userID int64) ([]ChapterRank, error)
 		ranks = append(ranks, chapterRank(c.ID, k.level, k.quarter, k.ink))
 	}
 	return ranks, nil
+}
+
+// Worn is a seal as it shows beside a player's name to others (Look): its chapter and level, no more (its word is
+// the Алманах's, never beside a name; its quarters show from 32px, on the player's own pages).
+type Worn struct {
+	Chapter string `json:"chapter"`
+	Level   int    `json:"level"`
 }
 
 // ErrNoSeal is a seal of a chapter the player has no rank in.

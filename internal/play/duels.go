@@ -87,6 +87,9 @@ type DuelView struct {
 	Opponent *DuelSide `json:"opponent,omitempty"`
 	You      *DuelSide `json:"you,omitempty"`
 	Recorded bool      `json:"recorded,omitempty"`
+	// Level is, against a recording, the level it was chosen at: Even („равен“) or Stronger („по-силен“); none
+	// against a friend.
+	Level string `json:"level,omitempty"`
 	// Topic is, against a recording of a topic's game, its topic (none: a game over all of them, „Микс“).
 	Topic string `json:"topic,omitempty"`
 	// First says the player played first (sent it).
@@ -267,6 +270,9 @@ func (g *Game) DuelRecording(ctx context.Context, userID int64, level string) (i
 	if err := seenBy(ctx, g.DB.Read, userID, seen); err != nil {
 		return 0, err
 	}
+	if level != Stronger {
+		level = Even
+	}
 	fit, err := g.recordingFit(ctx, userID, level)
 	if err != nil {
 		return 0, err
@@ -292,8 +298,8 @@ func (g *Game) DuelRecording(ctx context.Context, userID int64, level string) (i
 		}
 		data, _ := json.Marshal(rec.picks)
 		now := g.Now()
-		res, err := tx.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, ghost_run, created_at, expires_at)
-			VALUES ('recording', ?, ?, ?, ?, ?, ?)`, string(data), userID, r.id, rec.id, store.Ms(now),
+		res, err := tx.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, ghost_run, level, created_at, expires_at)
+			VALUES ('recording', ?, ?, ?, ?, ?, ?, ?)`, string(data), userID, r.id, rec.id, level, store.Ms(now),
 			store.Ms(now.Add(DuelFor)))
 		if err != nil {
 			return err
@@ -810,7 +816,8 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			coalesce(CASE WHEN NOT d.mine THEN d.a_run WHEN d.kind = 'recording' THEN d.ghost_run ELSE d.b_run END, 0),
 			coalesce(CASE WHEN NOT d.mine THEN d.a_id WHEN d.kind = 'recording'
 				THEN (SELECT user_id FROM runs WHERE id = d.ghost_run) ELSE d.b_id END, 0),
-			coalesce((SELECT category FROM runs WHERE id = d.ghost_run AND kind = 'topic' AND category <> ?3), '')
+			coalesce((SELECT category FROM runs WHERE id = d.ghost_run AND kind = 'topic' AND category <> ?3), ''),
+			coalesce(d.level, '')
 		FROM (SELECT *, coalesce(a_id = ?1, 0) AS mine FROM duels
 			WHERE (a_id = ?1 OR (b_id = ?1 AND sent_at IS NOT NULL)) AND (?2 = 0 OR id = ?2)) d
 		ORDER BY d.ended_at IS NOT NULL, CASE WHEN d.ended_at IS NULL THEN d.expires_at ELSE -d.ended_at END
@@ -829,7 +836,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 	for rows.Next() {
 		var r row
 		if err := rows.Scan(&r.v.ID, &r.kind, &r.v.First, &r.v.CreatedAt, &r.v.EndedAt, &r.expires, &r.sent,
-			&r.outcome, &r.myRun, &r.theirRun, &r.theirs, &r.v.Topic); err != nil {
+			&r.outcome, &r.myRun, &r.theirRun, &r.theirs, &r.v.Topic, &r.v.Level); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -904,7 +911,7 @@ func (g *Game) duelSide(ctx context.Context, userID, runID int64) (*DuelSide, er
 	if err != nil {
 		return nil, err
 	}
-	look := lookOf(userID, avatar)
+	look := g.lookOf(userID, avatar)
 	s.Look = &look
 	if runID != 0 {
 		err = g.DB.Read.QueryRowContext(ctx, `SELECT finished_at IS NOT NULL, rights, closeness, ms,

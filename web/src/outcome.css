@@ -56,10 +56,29 @@
     min-width: 0;
   }
 
-  .duel-face .avatar {
+  .duel-avatar {
+    position: relative;
     grid-row: 1;
+  }
+
+  .duel-face .avatar {
     width: 44px;
     height: 44px;
+  }
+
+  /* The seal worn, on the avatar's corner nearer the name (the other's mirrored), on a ring of the page. */
+  .duel-avatar > .seal {
+    position: absolute;
+    right: -8px;
+    bottom: -6px;
+    border-radius: 50%;
+    background: var(--bg);
+    box-shadow: 0 0 0 2px var(--bg);
+  }
+
+  .duel-face:last-child .duel-avatar > .seal {
+    right: auto;
+    left: -8px;
   }
 
   .duel-name {
@@ -84,7 +103,7 @@
     justify-items: end;
   }
 
-  .duel-face:last-child .avatar {
+  .duel-face:last-child .duel-avatar {
     grid-column: 2;
   }
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 )
@@ -47,24 +48,53 @@ func DefaultAvatar(userID int64) string {
 	return Starters[n%int64(len(Starters))] + "-" + tinted[n%int64(len(tinted))]
 }
 
-// Look is how a player shows to others: their avatar ("shape-tone").
+// Look is how a player shows to others: their avatar ("shape-tone"), and the seal they wear beside their name (rank.go:
+// none before a rank).
 type Look struct {
 	Avatar string `json:"avatar"`
+	Seal   *Worn  `json:"seal,omitempty"`
 }
 
-// lookOf makes a look from what lookColumns read: the avatar chosen, or the one the game gives.
-func lookOf(userID int64, avatar string) Look {
-	return Look{Avatar: cmp.Or(avatar, DefaultAvatar(userID))}
-}
+// lookColumns read a player's look in a query over users u, as one text for lookOf: the avatar chosen, the chapter
+// whose seal they chose, and their ranks as kept (rank.go), each "chapter level ink". A player's ranks are a dozen rows
+// read by their key: a board of N names is N such reads, never a count of anyone's ink.
+const lookColumns = `coalesce(u.avatar, '') || char(31) || coalesce(u.seal, '') || char(31) ||
+	coalesce((SELECT group_concat(k.chapter || ' ' || k.level || ' ' || k.ink, ',') FROM ranks k
+		WHERE k.user_id = u.id AND k.level > 0), '')`
 
-// lookColumns read a player's look in a query over users u.
-const lookColumns = `coalesce(u.avatar, '')`
+// lookOf makes a look from what lookColumns read: the avatar chosen, or the one the game gives; and the seal worn, by
+// the one rule (sealOf) over the bank's chapters.
+func (g *Game) lookOf(userID int64, read string) Look {
+	avatar, rest, _ := strings.Cut(read, "\x1f")
+	chosen, kept, _ := strings.Cut(rest, "\x1f")
+	look := Look{Avatar: cmp.Or(avatar, DefaultAvatar(userID))}
+	if kept == "" {
+		return look
+	}
+	byChapter := map[string]ChapterRank{}
+	for e := range strings.SplitSeq(kept, ",") {
+		var r ChapterRank
+		if _, err := fmt.Sscan(e, &r.Chapter, &r.Level, &r.Ink); err == nil {
+			byChapter[r.Chapter] = r
+		}
+	}
+	var ranks []ChapterRank
+	for _, c := range g.Bank().Categories {
+		if r, ok := byChapter[c.ID]; ok {
+			ranks = append(ranks, r)
+		}
+	}
+	if s := sealOf(ranks, chosen); s != nil {
+		look.Seal = &Worn{Chapter: s.Chapter, Level: s.Level}
+	}
+	return look
+}
 
 // LookOf is how a player shows to others.
 func (g *Game) LookOf(ctx context.Context, userID int64) (Look, error) {
-	var avatar string
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT `+lookColumns+` FROM users u WHERE u.id = ?`, userID).Scan(&avatar)
-	return lookOf(userID, avatar), err
+	var read string
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT `+lookColumns+` FROM users u WHERE u.id = ?`, userID).Scan(&read)
+	return g.lookOf(userID, read), err
 }
 
 // SetAvatar changes a player's avatar: a shape of Shapes in a tone of Tones ("fox-gold").
