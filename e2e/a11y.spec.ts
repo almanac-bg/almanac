@@ -10,8 +10,7 @@ for (const scheme of ["light", "dark"] as const) {
       "/",
       "/duel",
       "/ranks",
-      "/rewards",
-      "/wardrobe",
+      "/avatar",
       "/me",
       "/friends",
       "/settings",
@@ -97,7 +96,7 @@ for (const scheme of ["light", "dark"] as const) {
       rights: points.filter((p) => p > 0).length,
       ms: 40_000,
       done: true,
-      look: { avatar: "hare-gold/double/", title: "Познавач", titleTier: "rare", level: 7 },
+      look: { avatar: "hare-gold" },
       marks: points.map((p, i) => mark(p, 3000 + 300 * i + slower)),
     });
     const duel = {

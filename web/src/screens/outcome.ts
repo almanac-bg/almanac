@@ -149,21 +149,15 @@ function hero(d: DuelView): Child {
   return card;
 }
 
-/** One side, face to face: the avatar (with its frame), the name (a way to their profile) and title, and the score;
+/** One side, face to face: the avatar, the name (a way to their profile), and the score;
  * the winner's in gold. Never the score of a player gone since, whose game went with them. */
 function face(s: Side, label: string, tag: string, won: boolean): Child {
   const look = s.look ?? {};
   return h(
     "div",
     { class: won ? "duel-face win" : "duel-face" },
-    avatar(look.avatar, { size: "l", level: look.level, name: s.name }),
+    avatar(look.avatar, { size: "l", name: s.name }),
     tag ? h("a", { class: "duel-name", href: profileHref(tag) }, label) : h("strong", { class: "duel-name" }, label),
-    // The title's line is kept with or without one, so that the two scores stand level.
-    h(
-      "span",
-      { class: "duel-title" },
-      look.title ? h("span", { class: `who-title t-${look.titleTier ?? "common"}` }, look.title) : null,
-    ),
     s.gone
       ? [h("b", { class: "duel-points none" }, "–"), h("span", { class: "duel-rights" }, "Играчът вече го няма")]
       : [

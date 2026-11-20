@@ -425,19 +425,16 @@ func (g *Game) MasteryMoves(ctx context.Context, userID, runID int64) ([]Mastery
 }
 
 // masteryTold is the one move of a game's mastery its news tells (of MasteryMoves, the furthest moved first), if any:
-// the first that's news (a first estimate, a tier told for the first time, a share gone up; a share gone down isn't,
-// and „Ново за теб“ is no place for a loss: Профил has it); or, of a game of one topic with no estimate yet, what's left
-// before one. The client draws what this picks and nothing else (web/src/game/mastery.ts), so the news's cards are
-// counted from it (News.cards).
+// the first that's news, a first estimate or a tier reached (told for the first time, or one up). A share that only
+// moved isn't news, and a loss never is: Профил has it. The client draws what this picks and nothing else
+// (web/src/game/mastery.ts).
 func masteryTold(moves []MasteryMove) *MasteryMove {
-	shown := func(m Mastery) bool { return m.Sure || m.First }
 	for _, m := range moves {
-		if shown(m.To) && (!shown(m.From) || m.To.Sure && !m.From.Sure || m.To.Known > m.From.Known) {
+		first := m.To.First && !m.From.First && !m.From.Sure
+		tier := m.To.Sure && (!m.From.Sure || m.To.Tier > m.From.Tier)
+		if first || tier {
 			return &m
 		}
-	}
-	if len(moves) == 1 && !shown(moves[0].To) {
-		return &moves[0]
 	}
 	return nil
 }

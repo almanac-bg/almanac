@@ -9,22 +9,8 @@ import (
 	"github.com/almanac-bg/almanac/internal/play"
 )
 
-// progress is the player's level, achievements, and what they may look like.
-func (s *Server) progress(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	s.game.AfterWait(r.Context(), u.ID) // a game just finished: what it earned is in
-	p, err := s.game.ProgressOf(r.Context(), u.ID)
-	if err != nil {
-		return err
-	}
-	return ok(w, p)
-}
-
-// news tells the player, once, what they've earned since they last looked: achievements, and a level gone up; and,
-// for the game they just played (run), how it moved their mastery of its topics.
+// news tells the player, once, what's new since they last looked (play.NewsOf): the milestones noted in their book;
+// and, for the game they just played (run), the facts it put in their Алманах and how it moved a topic's mastery.
 func (s *Server) news(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -63,22 +49,19 @@ func (s *Server) streakTold(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"fresh": fresh})
 }
 
-// setLook changes the player's avatar or title (either may be left out; an empty title takes it off).
+// setLook changes the player's avatar (play.SetAvatar).
 func (s *Server) setLook(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
 		return err
 	}
 	var in struct {
-		Avatar   *string `json:"avatar"`
-		Title    *string `json:"title"`
-		Frame    *string `json:"frame"`
-		Backdrop *string `json:"backdrop"`
+		Avatar string `json:"avatar"`
 	}
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
-	if err := s.game.SetLook(r.Context(), u.ID, in.Avatar, in.Title, in.Frame, in.Backdrop); err != nil {
+	if err := s.game.SetAvatar(r.Context(), u.ID, in.Avatar); err != nil {
 		return err
 	}
 	look, err := s.game.LookOf(r.Context(), u.ID)

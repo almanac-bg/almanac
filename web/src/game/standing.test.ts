@@ -7,7 +7,7 @@ test("no place without someone to be placed among", () => {
   assert.equal(standing(1, 1, false), null);
 });
 
-test("once XP is open, the place is the way to the board, whatever it is", () => {
+test("after the first day, the place is the way to the board, whatever it is", () => {
   assert.deepEqual(standing(7, 7, false), { place: "7\u2011о място от 7", lead: undefined });
   assert.deepEqual(standing(30, 31, false), { place: "30\u2011о място от 31", lead: undefined });
 });

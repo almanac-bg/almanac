@@ -1,6 +1,5 @@
 // A name of the player's own, asked the first time others will see them (screens/name.ts): saved before the game goes
-// on, however slow the line, and one refused said in the sheet; one ask for a double tap. And the wardrobe tells a
-// title not chosen yet from „Без титла“.
+// on, however slow the line, and one refused said in the sheet; one ask for a double tap.
 import { expect, type Page, test } from "@playwright/test";
 
 /** The name's saving held back `ms`, as on a slow line, then sent on to the server. */
@@ -30,16 +29,6 @@ test("before a first live duel: a slow save is waited for, a refused name said i
   await expect(page.getByRole("heading", { name: "Търсим съперник" })).toBeVisible();
   const me = await page.evaluate(() => fetch("/api/me").then((r) => r.json()));
   expect(me.user?.name ?? me.name).toBe("Ана Слаба");
-
-  // Гардероб: no title chosen yet, so „Без титла“ (a choice of its own) isn't the one pressed.
-  await page.goto("/wardrobe");
-  await page.getByRole("tab", { name: "Титла" }).click();
-  const none = page.getByRole("button", { name: "Без титла" });
-  await expect(none).toHaveAttribute("aria-pressed", "false");
-  await expect(page.locator(".worn-text")).toContainText("Още без титла");
-  await none.click();
-  await expect(none).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".worn-text")).not.toContainText("Още");
 });
 
 test("a double tap on a first live duel is one guest and one ask", async ({ page }) => {

@@ -22,7 +22,7 @@ export function loadPictures(): Promise<Record<string, string>> {
   return loading;
 }
 
-/** A picture by its id ("fox", "topic-science", "mode-duel", "frame-laurel"), as decoration: its words are beside
+/** A picture by its id ("fox", "topic-science", "mode-duel", "flame"), as decoration: its words are beside
  * it. */
 export function picture(id: string, cls = ""): SVGSVGElement {
   const svg = document.createElementNS(svgNS, "svg");

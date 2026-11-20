@@ -1,7 +1,7 @@
 // app.js holds what a daily visit uses: Начало, a game, the screens a game leads to. A screen a daily visit doesn't
 // open loads on its own, the first time it's opened: a live duel's (live.ts) and a duel's result (outcome.ts), only
 // for those who play there; and Профил's places, the boards and the
-// friends (me, settings, rewards, wardrobe, almanac, played, ranks, friends, player). Each is handed the app's
+// friends (me, settings, avatar, almanac, played, ranks, friends, player). Each is handed the app's
 // pieces it uses from here, and imports nothing of the app but types: a module it imported would be one app.js
 // imports too, and esbuild would split every such module into a shared file that each page then loads first
 // (cmd/build fails if there is one). What only such a screen uses (lib/hash.ts, the boards') it imports itself. So a
@@ -13,7 +13,7 @@ import { picture as illustration } from "./art/picture.ts";
 import { recover, staying } from "./fresh.ts";
 import { answering, onScreen } from "./game/answering.ts";
 import { masteryCard } from "./game/mastery.ts";
-import { news } from "./game/news.ts";
+import { news, notedWords } from "./game/news.ts";
 import { count } from "./game/numbers.ts";
 import { answered, crowdLine, picture } from "./game/questions.ts";
 import {
@@ -44,15 +44,13 @@ import type { DuelView } from "./screens/duel.ts";
 import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
 import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
-import { loadProgress, nearest } from "./screens/progress.ts";
 import { signIn } from "./screens/signin.ts";
-import { gameRow, stats } from "./screens/stats.ts";
+import { gameRow, loadStats, stats } from "./screens/stats.ts";
 import {
   bulgaria,
   categories,
   friendRequests,
   notice,
-  opened,
   outcomeCss,
   player,
   playingWhile,
@@ -62,12 +60,10 @@ import {
 import {
   avatar,
   back,
-  badge,
   explain,
   fact,
   failure,
   formatNumber,
-  levelNumber,
   meaning,
   meter,
   pageArt,
@@ -75,19 +71,14 @@ import {
   profileNav,
   questions,
   record,
-  rewardWords,
   schemeSwitch,
   segmented,
   shapeNames,
   standingCard,
   stat,
-  tiers,
-  tierWords,
   toneNames,
   toneOf,
   topicMark,
-  unlockPicture,
-  unlockWords,
   verdict,
 } from "./ui.ts";
 
@@ -98,7 +89,6 @@ export const kit = {
   api,
   avatar,
   back,
-  badge,
   textSize,
   board,
   boardRow,
@@ -133,24 +123,22 @@ export const kit = {
   keepAwake,
   keepGame,
   landing,
-  levelNumber,
   lifetime,
   listWords,
   loadDuelResult,
-  loadProgress,
+  loadStats,
   mailAsk,
   masteryCard,
   meaning,
   meter,
   nameFirst,
-  nearest,
   needsHomeScreen,
   news,
   nextSteps,
+  notedWords,
   notice,
   onCleanup,
   onScreen,
-  opened,
   ordinal,
   pageArt,
   picture,
@@ -173,7 +161,6 @@ export const kit = {
   reportProblem,
   reviewed,
   reviewParts,
-  rewardWords,
   schemeSwitch,
   scoreCard,
   segmented,
@@ -195,8 +182,6 @@ export const kit = {
   stream,
   summary,
   tickOn,
-  tiers,
-  tierWords,
   timer,
   title,
   toneNames,
@@ -206,8 +191,6 @@ export const kit = {
   trail,
   turnOff,
   turnOn,
-  unlockPicture,
-  unlockWords,
   untracked,
   upNext,
   user,

@@ -70,11 +70,10 @@ func TestMergeCarriesTheRest(t *testing.T) {
 	ctx := t.Context()
 	guest, owner := w.user(), w.user()
 	for _, q := range []string{
-		`UPDATE users SET frame = 'gold', backdrop = 'waves', level_seen = 7, unlocks_known = 1, recordings_told = 50,
-			systems_told = 'duel xp', streak_told = 'kept:2026-11-12', came_from = 'player', created_at = 5,
-			seen_at = 900 WHERE id = ?2`,
-		`UPDATE users SET level_seen = 3, recordings_told = 80, systems_told = 'points', streak_told = 'ended:2026-11-01',
-			came_from = 'home', created_at = 10, seen_at = 100 WHERE id = ?1`,
+		`UPDATE users SET avatar = 'lynx-mint', recordings_told = 50, streak_told = 'forgiven:2026-11-12',
+			came_from = 'player', created_at = 5, seen_at = 900 WHERE id = ?2`,
+		`UPDATE users SET recordings_told = 80, streak_told = 'ended:2026-11-01', came_from = 'home', created_at = 10,
+			seen_at = 100 WHERE id = ?1`,
 		`INSERT INTO reports (question_id, user_id, text, at) VALUES ('his-001', ?2, 'Грешен отговор', 1)`,
 		`INSERT INTO push_reminded (user_id, day, at) VALUES (?2, '2026-11-11', 1), (?1, '2026-11-11', 2), (?2, '2026-11-10', 3)`,
 		`INSERT INTO push_queue (user_id, kind, message, day, next_at, until) VALUES
@@ -92,22 +91,20 @@ func TestMergeCarriesTheRest(t *testing.T) {
 	}
 
 	var reports, reminded, queued int
-	var frame, backdrop, systems, streak, came string
-	var level, recordings, created, seen int
+	var avatar, streak, came string
+	var recordings, created, seen int
 	if err := w.db.Read.QueryRow(`SELECT
 		(SELECT count(*) FROM reports WHERE user_id = ?1), (SELECT count(*) FROM push_reminded WHERE user_id = ?1),
 		(SELECT count(*) FROM push_queue WHERE user_id = ?1),
-		frame, backdrop, systems_told, streak_told, came_from, level_seen, recordings_told,
-		created_at, seen_at FROM users WHERE id = ?1`, owner).Scan(&reports, &reminded, &queued,
-		&frame, &backdrop, &systems, &streak, &came, &level, &recordings, &created, &seen); err != nil {
+		avatar, streak_told, came_from, recordings_told, created_at, seen_at FROM users WHERE id = ?1`, owner).
+		Scan(&reports, &reminded, &queued, &avatar, &streak, &came, &recordings, &created, &seen); err != nil {
 		t.Fatal(err)
 	}
 	if reports != 1 || reminded != 2 || queued != 2 {
 		t.Fatalf("%d reports, reminded on %d days, %d pushes on the way", reports, reminded, queued)
 	}
-	if frame != "gold" || backdrop != "waves" || level != 7 || recordings != 80 || systems != "points duel xp" ||
-		streak != "kept:2026-11-12" {
-		t.Fatalf("look and told: %s %s, level %d, recordings %d, %q, %q", frame, backdrop, level, recordings, systems, streak)
+	if avatar != "lynx-mint" || recordings != 80 || streak != "forgiven:2026-11-12" {
+		t.Fatalf("look and told: %s, recordings %d, %q", avatar, recordings, streak)
 	}
 	if came != "player" || created != 5 || seen != 900 {
 		t.Fatalf("came from %q at %d, seen %d", came, created, seen)

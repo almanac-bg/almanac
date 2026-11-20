@@ -148,14 +148,13 @@ type run struct {
 	at             int
 	shownAt        sql.NullInt64
 	points, rights int
-	xp             int
 	ms             int64
 	finished       bool
 	shadow         bool // counts for its player alone (fair.go)
 }
 
 const runColumns = `id, user_id, kind, coalesce(day, ''), coalesce(category, ''), questions,
-	at, shown_at, points, rights, xp, ms, finished_at IS NOT NULL, shadow <> 0`
+	at, shown_at, points, rights, ms, finished_at IS NOT NULL, shadow <> 0`
 
 type scanner interface{ Scan(...any) error }
 
@@ -163,7 +162,7 @@ func scanRun(row scanner) (*run, error) {
 	var r run
 	var picks string
 	err := row.Scan(&r.id, &r.userID, &r.kind, &r.day, &r.category, &picks,
-		&r.at, &r.shownAt, &r.points, &r.rights, &r.xp, &r.ms, &r.finished, &r.shadow)
+		&r.at, &r.shownAt, &r.points, &r.rights, &r.ms, &r.finished, &r.shadow)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoRun
 	}
@@ -433,7 +432,6 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 	}
 	r.at++
 	r.points += w.Points
-	r.xp += xp(gr)
 	if gr.Right {
 		r.rights++
 	}
@@ -443,21 +441,20 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) err
 	if r.at >= len(r.picks) {
 		return g.finish(tx, r)
 	}
-	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, points = ?, rights = ?, xp = ?, ms = ? WHERE id = ?`,
-		r.at, r.points, r.rights, r.xp, r.ms, r.id)
+	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, points = ?, rights = ?, ms = ? WHERE id = ?`,
+		r.at, r.points, r.rights, r.ms, r.id)
 	return err
 }
 
-// finish ends a run where it is: what playing it to its end earns (in the share of its questions answered right), and
-// a game right throughout its bonus; and notes that what follows it is due (after.go).
+// finish ends a run where it is: a game right throughout earns its bonus (AllRight); and notes that what follows it is
+// due (after.go).
 func (g *Game) finish(tx *sql.Tx, r *run) error {
 	r.finished = true
-	r.xp += finishXP(r.kind, r.rights, r.counted())
 	if r.allRight() {
 		r.points += AllRight
 	}
-	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, points = ?, rights = ?, xp = ?, ms = ?, finished_at = ?
-		WHERE id = ?`, r.at, r.points, r.rights, r.xp, r.ms, store.Ms(g.Now()), r.id)
+	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, points = ?, rights = ?, ms = ?, finished_at = ?
+		WHERE id = ?`, r.at, r.points, r.rights, r.ms, store.Ms(g.Now()), r.id)
 	if err != nil {
 		return err
 	}

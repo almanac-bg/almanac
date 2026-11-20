@@ -238,14 +238,3 @@ func TestRecordingsWords(t *testing.T) {
 		}
 	}
 }
-
-// The recordings wait while a game's news fills its three cards.
-func TestRecordingsWaitForACard(t *testing.T) {
-	full := News{Goals: []DoneGoal{{}}, LevelUp: true, Unlocks: []Unlock{{}}}
-	if full.cards() != NewsCards {
-		t.Fatalf("a full news: %d cards", full.cards())
-	}
-	if (News{Mastery: &MasteryMove{}}).cards() != 1 || (News{}).cards() != 0 {
-		t.Fatal("cards miscounted")
-	}
-}

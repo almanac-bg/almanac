@@ -163,42 +163,36 @@ func TestMergeBringsProgress(t *testing.T) {
 		_, _ = w.db.Write.Exec(`DELETE FROM users WHERE id = ?`, from) // as signing in does
 	}
 
-	// The guest: a better rating, and goals: today's (the account has its own) and
-	// yesterday's (it has none).
-	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1180, rated = 12, peak = 1200 WHERE id = ?`, guest)
-	if _, err := w.g.GoalsOf(ctx, owner); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := w.g.GoalsOf(ctx, guest); err != nil {
-		t.Fatal(err)
-	}
-	for i, day := range []string{"2026-11-12", "2026-11-12", "2026-11-11"} {
-		_, _ = w.db.Write.Exec(`INSERT INTO goals_done (user_id, day, goal, at, xp) VALUES (?, ?, ?, 0, 100)`,
-			guest, day, []string{"a", "b", "c"}[i])
+	// The guest: a rating (the account has none yet) and notes in their book: a week in a row (the account has its
+	// own, on another day) and a day all right (it has none).
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1180, rated = 12 WHERE id = ?`, guest)
+	for _, q := range []string{
+		`INSERT INTO notes (user_id, day, kind, n) VALUES (?1, '2026-11-10', 'streak', 7), (?1, '2026-11-11', 'perfect', 0)`,
+		`INSERT INTO notes (user_id, day, kind, n) VALUES (?2, '2026-11-09', 'streak', 7)`,
+	} {
+		if _, err := w.db.Write.Exec(q, guest, owner); err != nil {
+			t.Fatal(err)
+		}
 	}
 	merge(guest, owner)
 
-	var rating, rated, peak int
-	_ = w.db.Read.QueryRow(`SELECT rating, rated, peak FROM users WHERE id = ?`, owner).Scan(&rating, &rated, &peak)
-	if rating != 1180 || rated != 12 || peak != 1200 {
-		t.Fatalf("the account after: rating %d (%d games, peak %d)", rating, rated, peak)
+	var rating, rated int
+	_ = w.db.Read.QueryRow(`SELECT rating, rated FROM users WHERE id = ?`, owner).Scan(&rating, &rated)
+	if rating != 1180 || rated != 12 {
+		t.Fatalf("the account after: rating %d (%d games)", rating, rated)
 	}
-	goals := func(day string) (n int) {
-		_ = w.db.Read.QueryRow(`SELECT count(*) FROM goals_done WHERE user_id = ? AND day = ? AND goal IN ('a', 'b', 'c')`,
-			owner, day).Scan(&n)
-		return n
-	}
-	if goals("2026-11-12") != 0 || goals("2026-11-11") != 1 {
-		t.Fatalf("goals: today's %d (the account had its own), yesterday's %d", goals("2026-11-12"), goals("2026-11-11"))
+	want := []Note{{Day: "2026-11-11", Kind: NotePerfect}, {Day: "2026-11-09", Kind: NoteStreak, N: 7}}
+	if notes, _ := w.g.NotesOf(ctx, owner); !slices.Equal(notes, want) {
+		t.Fatalf("the notes after: %+v", notes)
 	}
 
 	// A guest with a worse rating leaves the account's as it is.
 	worse := w.user()
-	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 900, rated = 30, peak = 1000 WHERE id = ?`, worse)
+	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 900, rated = 30 WHERE id = ?`, worse)
 	merge(worse, owner)
-	_ = w.db.Read.QueryRow(`SELECT rating, rated, peak FROM users WHERE id = ?`, owner).Scan(&rating, &rated, &peak)
-	if rating != 1180 || rated != 12 || peak != 1200 {
-		t.Fatalf("a worse guest's rating: %d (%d games, peak %d)", rating, rated, peak)
+	_ = w.db.Read.QueryRow(`SELECT rating, rated FROM users WHERE id = ?`, owner).Scan(&rating, &rated)
+	if rating != 1180 || rated != 12 {
+		t.Fatalf("a worse guest's rating: %d (%d games)", rating, rated)
 	}
 }
 

@@ -105,7 +105,7 @@ test("a right answer rises a step of the scale for each before it in a row, up t
 
 test("every sound is in the one key (but the thud and the bells' inner wobble)", () => {
   const names = ["tap", "key", "them", "count", "go", "tick", "hurry", "right", "exact", "partial", "end"] as const;
-  for (const name of [...names, "perfect", "level", "win", "lose", "goal", "achievement", "ping", "pip"] as const)
+  for (const name of [...names, "perfect", "win", "lose", "note", "ping", "pip"] as const)
     for (let lift = 0; lift < 6; lift++) {
       tones.length = 0;
       FakeAudio.last.currentTime += 60;
@@ -125,14 +125,14 @@ test("the other side answering is two low plucks, A4 then F♯4, off to the righ
   assert.equal(panners[0]?.pan.value, 0.3);
 });
 
-test("the bigger sounds take turns: a level waits for the end to finish", () => {
+test("the bigger sounds take turns: a note waits for the end to finish", () => {
   play("end");
   const end = Math.max(...tones.map((t) => t.end));
   const n = tones.length;
-  play("level");
-  const level = tones.slice(n);
-  assert.ok(level.length > 0);
-  assert.ok(Math.min(...level.map((t) => t.at)) >= end, "the level starts after the end");
+  play("note");
+  const note = tones.slice(n);
+  assert.ok(note.length > 0);
+  assert.ok(Math.min(...note.map((t) => t.at)) >= end, "the note starts after the end");
 });
 
 test("a big sound that would wait too long is left out, never a backlog", () => {
@@ -156,7 +156,7 @@ test("the answers' sounds are short, the moments' longer but under a second and 
   const { length } = await loadFeel();
   for (const name of ["tap", "key", "tick", "hurry", "right", "exact", "partial", "wrong", "time", "pip"] as const)
     assert.ok(length(name) < 0.5, `${name}: ${length(name)} s`);
-  for (const name of ["end", "perfect", "level", "win", "streak"] as const)
+  for (const name of ["end", "perfect", "note", "win", "streak"] as const)
     assert.ok(length(name) <= 1.4, `${name}: ${length(name)} s`);
 });
 

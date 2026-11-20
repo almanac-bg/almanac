@@ -65,8 +65,7 @@ func TestSeededGame(t *testing.T) {
 		"recorded duels":   `SELECT count(*) FROM duels WHERE ghost_run IS NOT NULL`,
 		"friends":          `SELECT count(*) FROM friends`,
 		"requests waiting": `SELECT count(*) FROM friend_requests WHERE NOT declined`,
-		"achievements":     `SELECT count(*) FROM achievements`,
-		"goals done":       `SELECT count(*) FROM goals_done`,
+		"notes":            `SELECT count(*) FROM notes`,
 		"placed ratings":   `SELECT count(*) FROM users WHERE rated >= 10`,
 		"placing ratings":  `SELECT count(*) FROM users WHERE rated BETWEEN 1 AND 9`,
 		"guests":           `SELECT count(*) FROM users WHERE email IS NULL`,
@@ -112,10 +111,10 @@ func TestSeededGame(t *testing.T) {
 		_ = json.NewDecoder(res.Body).Decode(&v)
 		return res.StatusCode, v
 	}
-	screens := []string{"/api/me", "/api/me/stats", "/api/me/games", "/api/me/games?kind=duel", "/api/me/progress",
+	screens := []string{"/api/me", "/api/me/stats", "/api/me/games", "/api/me/games?kind=duel",
 		"POST /api/me/news", "/api/day", "/api/runs/left",
 		"/api/playing", "/api/duels", "/api/ranks", "/api/ranks?among=friends", "/api/ranks?by=knowledge",
-		"/api/almanac", "/api/goals", "/api/friends",
+		"/api/almanac", "/api/friends",
 		"/api/friends/requests", "/api/push/prefs", "/api/mail/prefs"}
 	for _, p := range personas {
 		for _, path := range append(screens, "/api/players/"+p.Tag) {

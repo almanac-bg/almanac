@@ -9,36 +9,15 @@ import (
 )
 
 // A recording is a real player's earlier game, and the one playing against it sees who played it, as anyone is seen
-// anywhere in the game (owner, 2026-11-19): their name (a way to their profile), avatar with its frame, title and
-// level, during the duel, on its result and in the duel history, always labelled a recording, never taken for a person
+// anywhere in the game (owner, 2026-11-19): their name (a way to their profile) and avatar, during the duel, on its result and in the duel history, always labelled a recording, never taken for a person
 // here now. The other way it's numbers only: the recorded player hears what others' duels against their recordings came to
 // (RecordingsNews), never who played.
 
 // RecordingsNews is what others' duels against the player's recordings came to (duels.go): how many people played
 // how many, and how many the recordings won. It's told quietly, with a game's news and never in a push: once a day at
-// most, from one duel up, and only while the news has room for it (NewsCards).
+// most, from one duel up.
 type RecordingsNews struct {
 	Text string `json:"text"`
-}
-
-// NewsCards is how many cards a game's news shows at most (web/src/game/news.ts): the goals, the one biggest event,
-// what's new; the recordings take a place left free.
-const NewsCards = 3
-
-// cards is how many of a game's news cards this news fills, as the client draws them: the goals done, the one biggest
-// event, and „Ново за теб“ (achievements, unlocks, or a move of mastery that's news: masteryTold, all the client draws).
-func (n News) cards() int {
-	c := 0
-	for _, has := range []bool{
-		len(n.Goals) > 0,
-		n.Division != nil || n.LevelUp,
-		len(n.Achievements) > 0 || len(n.Unlocks) > 0 || n.Mastery != nil,
-	} {
-		if has {
-			c++
-		}
-	}
-	return c
 }
 
 // recordingsNews is the news of the duels played against the player's recordings since they last heard of them, at

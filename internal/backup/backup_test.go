@@ -592,7 +592,7 @@ func TestACopyWeighsItsTables(t *testing.T) {
 	b := w.backer(w.db.Read)
 	w.at = time.Date(2026, 11, 15, 10, 0, 0, 0, time.UTC)
 	if _, err := w.db.Write.Exec(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 100)
-		INSERT INTO achievements (user_id, id, at) SELECT 1, 'a' || i, 1 FROM n`); err != nil {
+		INSERT INTO notes (user_id, day, kind, n) SELECT 1, '2026-11-15', 'streak', i FROM n`); err != nil {
 		t.Fatal(err)
 	}
 	if r, err := b.Once(t.Context()); err != nil || len(r.Warnings) != 0 {
@@ -600,14 +600,14 @@ func TestACopyWeighsItsTables(t *testing.T) {
 	}
 	// A slow bleed: each copy a little fewer, never half of the one before, but half the day's first.
 	for _, left := range []int{70, 45} {
-		if _, err := w.db.Write.Exec(`DELETE FROM achievements WHERE CAST(substr(id, 2) AS INTEGER) > ?`, left); err != nil {
+		if _, err := w.db.Write.Exec(`DELETE FROM notes WHERE n > ?`, left); err != nil {
 			t.Fatal(err)
 		}
 		r, err := b.Once(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
-		if left == 70 && len(r.Warnings) != 0 || left == 45 && (len(r.Warnings) != 1 || !strings.Contains(r.Warnings[0], "achievements fell to under half the 100 rows it had in the day's first copy")) {
+		if left == 70 && len(r.Warnings) != 0 || left == 45 && (len(r.Warnings) != 1 || !strings.Contains(r.Warnings[0], "notes fell to under half the 100 rows it had in the day's first copy")) {
 			t.Fatalf("%d left: %v", left, r.Warnings)
 		}
 	}
@@ -616,7 +616,7 @@ func TestACopyWeighsItsTables(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, q := range []string{`PRAGMA foreign_keys = OFF`, `INSERT INTO achievements (user_id, id, at) VALUES (99, 'x', 1)`, `PRAGMA foreign_keys = ON`} {
+	for _, q := range []string{`PRAGMA foreign_keys = OFF`, `INSERT INTO notes (user_id, day, kind) VALUES (99, '2026-11-15', 'perfect')`, `PRAGMA foreign_keys = ON`} {
 		if _, err := conn.ExecContext(t.Context(), q); err != nil {
 			t.Fatal(err)
 		}
@@ -624,7 +624,7 @@ func TestACopyWeighsItsTables(t *testing.T) {
 	conn.Close()
 	w.at = time.Date(2026, 11, 16, 0, 0, 0, 0, time.UTC)
 	r, err := b.Once(t.Context())
-	if err != nil || !r.Drilled || !slices.ContainsFunc(r.Warnings, func(s string) bool { return strings.Contains(s, "achievements → users: 1") }) {
+	if err != nil || !r.Drilled || !slices.ContainsFunc(r.Warnings, func(s string) bool { return strings.Contains(s, "notes → users: 1") }) {
 		t.Fatalf("%+v %v", r, err)
 	}
 }

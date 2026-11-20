@@ -10,6 +10,8 @@ import { topics } from "../state.ts";
 import { figure, formatNumber, streak } from "../ui.ts";
 
 export interface Stats {
+  /** The player's avatar, as others see it ("shape-tone"). */
+  avatar: string;
   streak: number;
   /** The longest streak the player has had. */
   best: number;
@@ -84,12 +86,12 @@ function almanacLine(facts: number): Child {
   );
 }
 
-/** Профил's numbers: the streak and this week; how well and how much they've played, in one card (the day's place
+/** Профил's numbers (`load`: the stats, asked for already by whoever shows them): the streak and this week; how well and how much they've played, in one card (the day's place
  * is Начало's and Класации'); the facts in their almanac; how well they know each topic (once one has a mark); their
  * latest games. */
-export function stats(): Child {
+export function stats(load: Promise<Stats> = loadStats()): Child {
   const data = signal<Stats | null>(null);
-  loadStats().then(data.set, () => {});
+  load.then(data.set, () => {});
   return () => {
     const s = data();
     if (!s) return null;

@@ -415,7 +415,7 @@ func TestAvatarsDrawnAnew(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.migrate(); err != nil {
+	if err := db.migrateTo(migrationsThrough("0084_streak_forgives.sql")); err != nil {
 		t.Fatal(err)
 	}
 	want := map[int]string{1: "fox-gold", 2: "owl-rose", 3: "star-sky", 4: "", 5: "frog-mint"}
@@ -440,7 +440,7 @@ func TestAvatarsAsBefore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.migrate(); err != nil {
+	if err := db.migrateTo(migrationsThrough("0084_streak_forgives.sql")); err != nil {
 		t.Fatal(err)
 	}
 	want := map[int]string{1: "flame-gold", 2: "heart-rose", 3: "", 4: "fox-mint", 5: "owl-lilac", 6: "trophy-sky"}
@@ -726,7 +726,7 @@ func TestFastByTheNewRule(t *testing.T) {
 			t.Fatal(q, err)
 		}
 	}
-	if err := db.migrate(); err != nil {
+	if err := db.migrateTo(migrationsThrough("0084_streak_forgives.sql")); err != nil {
 		t.Fatal(err)
 	}
 	look := func(id int) string {
@@ -796,6 +796,39 @@ func TestStreakForgives(t *testing.T) {
 	want := "1 2026-11-03 1, 1 2026-11-05 0, 2 2026-11-11 1, 2 2026-11-12 1, 2 2026-11-13 0, 3 2026-11-18 1, 3 2026-11-19 0"
 	if missed != want || told != "forgiven:2026-11-03 ended:2026-11-13 " {
 		t.Fatalf("missed %q, want %q; told %q", missed, want, told)
+	}
+	db.Close()
+}
+
+// One measure of progress (0086): the streak's achievements and the first ten of ten become notes in the book, on the
+// day (in Bulgaria) they were earned, as told; the rest of the achievements, goals, titles and unlocks go; an emblem
+// worn gives way to the avatar the game gives, an animal stays.
+func TestOneMeasure(t *testing.T) {
+	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0086_one_measure.sql")
+	// 2026-11-19 22:30 UTC is the 20th in Bulgaria.
+	late := time.Date(2026, 11, 19, 22, 30, 0, 0, time.UTC).UnixMilli()
+	for _, q := range []string{
+		`INSERT INTO users (id, name, tag, created_at, seen_at, avatar, title, frame) VALUES
+			(1, 'Ана', 'ana', 1, 1, 'flame-gold', 'curious', 'ring'), (2, 'Бо', 'bo', 1, 1, 'lynx-natural', NULL, NULL),
+			(3, 'Ви', 'vi', 1, 1, NULL, NULL, NULL)`,
+		`INSERT INTO achievements (user_id, id, at, xp) VALUES (1, 'streak7', ` + fmt.Sprint(late) + `, 150),
+			(1, 'perfect', ` + fmt.Sprint(late-4*24*3600*1000) + `, 150), (1, 'duel1', 1, 50), (2, 'streak3', 1, 50)`,
+		`INSERT INTO runs (user_id, kind, day, questions, started_at, finished_at, xp) VALUES (1, 'day', '2026-11-19', '[]', 1, 2, 200)`,
+	} {
+		if _, err := db.Write.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	if err := db.migrateTo(migrationsThrough("0086_one_measure.sql")); err != nil {
+		t.Fatal(err)
+	}
+	var notes, avatars string
+	_ = db.Read.QueryRow(`SELECT group_concat(concat_ws(' ', user_id, day, kind, n, told), ', ')
+		FROM (SELECT * FROM notes ORDER BY user_id, kind)`).Scan(&notes)
+	_ = db.Read.QueryRow(`SELECT group_concat(coalesce(avatar, '-'), ' ') FROM (SELECT avatar FROM users ORDER BY id)`).
+		Scan(&avatars)
+	if notes != "1 2026-11-16 perfect 0 1, 1 2026-11-20 streak 7 1" || avatars != "- lynx-natural -" {
+		t.Fatalf("notes %q, avatars %q", notes, avatars)
 	}
 	db.Close()
 }

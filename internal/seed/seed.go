@@ -4,8 +4,9 @@
 // It plays the history through the game's own functions, on a clock of its own that walks from Options.Days ago to
 // now: players arrive (account.Accounts.Guest, named and given an email by some), play the day's ten and topics
 // (play.Game: Show, Start, Answer), and live duels with each other and against recordings (StartLive,
-// ShowLive, AnswerLive); they ask each other to be friends, accept, say no, choose their look. Whatever follows from that, the game works out itself: scores, streaks, goals, XP and
-// levels, achievements and titles, ratings and divisions (newcomers still placing too), the facts of Моят Алманах.
+// ShowLive, AnswerLive); they ask each other to be friends, accept, say no, choose their avatar. Whatever follows from
+// that, the game works out itself: scores, streaks, ratings and divisions (newcomers still placing too), the facts of
+// Моят Алманах and the notes in it.
 // Only what no game function
 // writes is written directly: when a player came and was last seen, their email, their mail and notification
 // preferences, the players' sessions (each guest's from the day they came, as their browser keeps it; the personas'

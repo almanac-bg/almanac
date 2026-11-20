@@ -356,16 +356,3 @@ func (s *Server) almanac(w http.ResponseWriter, r *http.Request) error {
 	}
 	return ok(w, a)
 }
-
-// goals are the player's goals for today.
-func (s *Server) goals(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	goals, err := s.game.GoalsOf(r.Context(), u.ID)
-	if err != nil {
-		return err
-	}
-	return ok(w, map[string]any{"goals": goals})
-}

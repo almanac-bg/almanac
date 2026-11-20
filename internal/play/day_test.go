@@ -323,20 +323,15 @@ func TestVoidDayIsOfNine(t *testing.T) {
 		t.Fatalf("ana: %+v", s)
 	}
 	for who, u := range map[string]int64{"ana": ana, "bo": bo} {
-		m, err := w.g.measure(ctx, u)
+		if err := w.g.noteMilestones(ctx, u, sb.Day); err != nil {
+			t.Fatal(err)
+		}
+		notes, err := w.g.NotesOf(ctx, u)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if m["perfect"] != 1 {
-			t.Errorf("%s hasn't a perfect day: %+v", who, m)
-		}
-		tl, err := w.g.tallyOf(ctx, u, sb.Day)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// The void one neither adds to a row nor breaks it.
-		if tl.perfect != 1 || tl.row != Length-1 {
-			t.Errorf("%s's day hasn't a game without a mistake, nine in a row: %+v", who, tl)
+		if !slices.Contains(notes, Note{Day: sb.Day, Kind: NotePerfect}) {
+			t.Errorf("%s hasn't a day all right noted: %+v", who, notes)
 		}
 	}
 

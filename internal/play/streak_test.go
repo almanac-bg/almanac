@@ -30,7 +30,8 @@ func (w *world) playDay(user int64) {
 	w.play(user, s.ID, repeat(w.right, Length)...)
 }
 
-// The longest streak is kept whatever came after; a year in a row is an achievement, with a frame and a title.
+// The longest streak is kept whatever came after; a streak's milestones are noted in the book once each, on the day
+// the game that reached them counts for, and a year in a row is the last of them.
 func TestTheLongestStreakAndAYear(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -47,31 +48,29 @@ func TestTheLongestStreakAndAYear(t *testing.T) {
 	for d := 364; d >= 1; d-- {
 		w.daysPlayed(bo, d)
 	}
-	if got, _ := w.g.Award(ctx, bo); slices.Contains(got, "streak365") {
-		t.Fatal("a year less a day earned the year")
+	if err := w.g.noteMilestones(ctx, bo, DayShift(w.g.Today(), -1)); err != nil {
+		t.Fatal(err)
+	}
+	yesterday := DayShift(w.g.Today(), -1)
+	want := []Note{{Day: yesterday, Kind: NoteStreak, N: 100}, {Day: yesterday, Kind: NoteStreak, N: 30},
+		{Day: yesterday, Kind: NoteStreak, N: 7}}
+	if notes, _ := w.g.NotesOf(ctx, bo); !slices.Equal(notes, want) {
+		t.Fatalf("a year less a day: %+v", notes)
 	}
 	w.playDay(bo)
+	w.g.AftersDone(ctx)
 	if s, _ := w.g.StreakOf(ctx, bo); s.Days != 365 || s.Best != 365 {
 		t.Fatalf("a year: %+v", s)
 	}
-	p, err := w.g.ProgressOf(ctx, bo)
+	n, err := w.g.NewsOf(ctx, bo, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	year := p.Achievements[slices.IndexFunc(p.Achievements, func(e Earned) bool { return e.ID == "streak365" })]
-	if year.At == 0 || year.Tier != Legendary || year.Name != "Цяла година" {
-		t.Fatalf("the year's achievement: %+v", year)
+	year := Note{Day: w.g.Today(), Kind: NoteStreak, N: 365}
+	if !slices.Contains(n.Notes, year) {
+		t.Fatalf("the year, told: %+v", n.Notes)
 	}
-	sun := p.Frames[slices.IndexFunc(p.Frames, func(c Cosmetic) bool { return c.ID == "sun" })]
-	title := p.Titles[slices.IndexFunc(p.Titles, func(v TitleView) bool { return v.ID == "fullYear" })]
-	if sun.Locked || sun.Name != "Слънце" || title.Locked || title.Name != "Година без пропуск" || title.Tier != Legendary {
-		t.Fatalf("the year's frame %+v and title %+v", sun, title)
-	}
-	frame := "sun"
-	if err := w.g.SetLook(ctx, bo, nil, nil, &frame); err != nil {
-		t.Fatalf("wearing the sun: %v", err)
-	}
-	if err := w.g.SetLook(ctx, ana, nil, nil, &frame); err == nil {
-		t.Fatal("the sun worn without the year")
+	if n, _ := w.g.NewsOf(ctx, bo, 0); len(n.Notes) != 0 {
+		t.Fatalf("told again: %+v", n.Notes)
 	}
 }

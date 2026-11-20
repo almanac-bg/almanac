@@ -9,17 +9,7 @@ import { ordinal } from "../lib/ordinal.ts";
 import { go, title } from "../lib/router.ts";
 import { withWord } from "../lib/words.ts";
 import { player, user } from "../state.ts";
-import {
-  back,
-  type Division,
-  failure,
-  formatNumber,
-  pageArt,
-  type Standing,
-  standingCard,
-  type Tier,
-  who,
-} from "../ui.ts";
+import { back, type Division, failure, formatNumber, pageArt, type Standing, standingCard, who } from "../ui.ts";
 import { missing } from "./missing.ts";
 import { signIn } from "./signin.ts";
 
@@ -40,7 +30,7 @@ export interface Side {
   rights: number;
   ms: number;
   done: boolean;
-  look?: { avatar?: string; title?: string; titleTier?: Tier; level?: number };
+  look?: { avatar?: string };
   /** A player who has gone since (play.DuelSide.Gone): their game went with them, so their score isn't known. */
   gone?: boolean;
   /** How each question went (one duel's view): the player's own as they play, the other's once there's a result. */
@@ -154,7 +144,7 @@ export function duel() {
       },
       "Намери съперник",
     ),
-    // The division once a duel has moved the rating (play/unfold.go): before that it says nothing.
+    // The division once a duel has moved the rating: before that it says nothing.
     () => {
       const d = data();
       return d?.standing.rated ? standingCard(d.standing, true) : null;

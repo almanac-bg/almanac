@@ -566,9 +566,9 @@ func TestPlayingOverHTTP(t *testing.T) {
 	if rarest, asked := today["rarest"]; !asked || rarest != nil {
 		t.Fatalf("today's rarest right answer: %v", today)
 	}
-	// Начало shows the level too: the day's ten have earned XP.
-	if lv, _ := today["level"].(map[string]any); lv == nil || lv["level"].(float64) < 1 || lv["xp"].(float64) <= 0 {
-		t.Fatalf("today's level: %v", today["level"])
+	// Nothing adds up but the book and the streak: Начало has no level.
+	if lv, ok := today["level"]; ok {
+		t.Fatalf("today's level: %v", lv)
 	}
 	friend := g.player()
 	friend.call("POST", "/api/guest", map[string]any{})
@@ -1376,9 +1376,14 @@ func TestProfilesOverHTTP(t *testing.T) {
 		t.Fatalf("a tag that can't be: %d", status)
 	}
 
-	// Ana's achievements are counted out of as many as Награди counts for her: the same rule, both places.
-	if _, pr := ana.call("GET", "/api/me/progress", nil); p["of"] != float64(len(pr["achievements"].([]any))) {
-		t.Errorf("Ana's achievements: of %v on her page, %d in Награди", p["of"], len(pr["achievements"].([]any)))
+	// A profile shows no achievements, no title, no level: they're gone (DECISIONS.md, „The redesign“).
+	for _, gone := range []string{"achievements", "of", "title", "level"} {
+		if v, ok := p[gone]; ok {
+			t.Errorf("Ana's profile has %s: %v", gone, v)
+		}
+	}
+	if status, _ := ana.call("GET", "/api/me/progress", nil); status != http.StatusNotFound {
+		t.Errorf("/api/me/progress: %d", status)
 	}
 
 	// Bo asks; Ana sees he asks, he sees he asked; once she accepts, they're friends and he may call her to a duel.
@@ -1432,12 +1437,12 @@ func TestOrdinal(t *testing.T) {
 
 // A new player starts as one animal: its name, its tag and the avatar drawn for them.
 func TestGuestIsOneAnimal(t *testing.T) {
-	if len(account.Animals) != len(play.FreeShapes) {
-		t.Fatalf("%d animals for %d free avatars", len(account.Animals), len(play.FreeShapes))
+	if len(account.Animals) != len(play.Starters) {
+		t.Fatalf("%d animals for %d starters", len(account.Animals), len(play.Starters))
 	}
 	for i, a := range account.Animals {
-		if a.Shape != play.FreeShapes[i] {
-			t.Fatalf("animal %d is %q, the free avatar %q", i, a.Shape, play.FreeShapes[i])
+		if a.Shape != play.Starters[i] {
+			t.Fatalf("animal %d is %q, the starter %q", i, a.Shape, play.Starters[i])
 		}
 	}
 	g := start(t)
@@ -1453,6 +1458,27 @@ func TestGuestIsOneAnimal(t *testing.T) {
 			!strings.HasPrefix(play.DefaultAvatar(int64(id)), a.Shape+"-") {
 			t.Fatalf("a guest %q @%s with the avatar %s", name, tag, play.DefaultAvatar(int64(id)))
 		}
+	}
+}
+
+// Any animal in any tone is a player's to choose, from the first day; nothing else is. The Алманах's first page has the
+// notes in the book, none on a new player's.
+func TestAvatarChosen(t *testing.T) {
+	g := start(t)
+	p := g.player()
+	p.call("POST", "/api/guest", map[string]any{})
+	if status, out := p.call("PATCH", "/api/me/look", map[string]any{"avatar": "lynx-natural"}); status != 200 ||
+		out["avatar"] != "lynx-natural" {
+		t.Fatalf("a lynx: %d %v", status, out)
+	}
+	for _, bad := range []string{"crown-gold", "fox-gold/ring", ""} {
+		if status, out := p.call("PATCH", "/api/me/look", map[string]any{"avatar": bad}); status != 400 ||
+			out["error"] != "no_avatar" {
+			t.Fatalf("%q: %d %v", bad, status, out)
+		}
+	}
+	if _, a := p.call("GET", "/api/almanac", nil); a["notes"] != nil {
+		t.Fatalf("a new player's notes: %v", a["notes"])
 	}
 }
 

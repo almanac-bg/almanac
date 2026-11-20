@@ -11,8 +11,8 @@ import (
 	"github.com/almanac-bg/almanac/internal/play"
 )
 
-// today is the day screen's state: the day and its issue (play.Issue), the viewer's streak, level and run (if any),
-// a live game they're in (playing), whether they've finished a game yet and which of the game's systems they've met,
+// today is the day screen's state: the day and its issue (play.Issue), the viewer's streak and run (if any),
+// a live game they're in (playing), whether they've finished a game yet,
 // how many have played the day (and how well on average), and their friends' day.
 func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
@@ -34,7 +34,7 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 	var viewer int64
 	if u != nil {
 		viewer = u.ID
-		s.game.AfterWait(ctx, u.ID) // a game just finished: what it earned (goals, achievements) is in
+		s.game.AfterWait(ctx, u.ID) // a game just finished: what it brought (its notes) is in
 		streak, err := s.game.StreakOf(ctx, u.ID)
 		if err != nil {
 			return nil, err
@@ -65,16 +65,10 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 				out["back"] = map[string]any{"last": last, "best": streak.Best}
 			}
 		}
-		if out["level"], err = s.game.LevelNow(ctx, u.ID); err != nil {
-			return nil, err
-		}
 		// Whether they've finished a game of any kind yet: until then Начало is the day and the topics only.
-		var played bool
-		if err := s.db.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM runs WHERE user_id = ? AND finished_at IS NOT NULL)`, u.ID).
-			Scan(&played); err != nil {
+		if out["played"], err = s.game.Played(ctx, u.ID); err != nil {
 			return nil, err
 		}
-		out["played"] = played
 		// A live game they're in, under way: Начало has the way back to it.
 		if p := s.playing(u.ID); p != nil {
 			out["playing"] = p
@@ -84,10 +78,6 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 			return nil, err
 		}
 		if out["left"], err = s.game.LeftOf(ctx, u.ID); err != nil {
-			return nil, err
-		}
-		// Which of the game's systems they've met: Начало shows the level and the goals once XP is open.
-		if out["open"], err = s.game.OpenOf(ctx, u.ID); err != nil {
 			return nil, err
 		}
 		// A game that ended without its result on screen: its news is told on Начало, once (play/told.go).

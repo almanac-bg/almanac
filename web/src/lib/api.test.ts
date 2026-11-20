@@ -57,8 +57,8 @@ test("an answer cut off on its way (a page reloaded under it) is the line's, and
     },
   });
   const asked = serve(new Response(cut, { status: 200, headers: { "Content-Type": "application/json" } }));
-  await assert.rejects(api("GET", "/api/goals"), (e: ApiError) => e.code === "offline" && e.status === 0);
-  assert.deepEqual(asked, ["GET /api/goals"]);
+  await assert.rejects(api("GET", "/api/day"), (e: ApiError) => e.code === "offline" && e.status === 0);
+  assert.deepEqual(asked, ["GET /api/day"]);
 });
 
 test("the player is told an ApiError's words, and a plain Bulgarian line for anything else", () => {

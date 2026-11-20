@@ -942,17 +942,16 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 // duelSide is a player in a duel: who they are, and (when shown) how their run went.
 func (g *Game) duelSide(ctx context.Context, userID, runID int64, show bool) (*DuelSide, error) {
 	var s DuelSide
-	var avatar, title string
-	var points int
+	var avatar string
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT u.name, u.tag, `+lookColumns+` FROM users u WHERE u.id = ?`, userID).
-		Scan(&s.Name, &s.Tag, &avatar, &title, &points)
+		Scan(&s.Name, &s.Tag, &avatar)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	look := g.lookOf(userID, avatar, title, points)
+	look := lookOf(userID, avatar)
 	s.Look = &look
 	if runID != 0 {
 		err = g.DB.Read.QueryRowContext(ctx, `SELECT finished_at IS NOT NULL, points, rights, ms FROM runs WHERE id = ?`, runID).

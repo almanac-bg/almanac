@@ -20,12 +20,12 @@ import { loadStats, type Stats } from "./stats.ts";
 /** The topics as tiles: „Микс“ and „България“ first (`.topic-lead`: a row of their own on a big screen; „Микс“
  * across it alone while „България“ is closed), each with what it is, neither with a mastery of its own (their answers
  * count in their own topics); then each topic with how well the player knows it. A game left half-way says so on its
- * tile, where it goes on from. */
-export function topics(): Child {
+ * tile, where it goes on from. `load`: the player's numbers, if asked for already (Начало's, for its next game). */
+export function topics(load?: Promise<Stats>): Child {
   const stats = signal<Stats | null>(null);
   const left = signal<LeftRun[]>([]);
   if (user.peek()) {
-    loadStats().then(stats.set, () => {});
+    (load ?? loadStats()).then(stats.set, () => {});
     loadLeft().then(left.set, () => {});
   }
   // „Продължи · въпрос 4 от 10“, on the tile of a game left half-way (in place of what it says otherwise).

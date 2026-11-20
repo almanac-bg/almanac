@@ -31,13 +31,15 @@ type Learned struct {
 const AlmanacPage = 30
 
 // Almanac is a page of a player's collection (of one topic, or of all), in the order it was learned, the first first; how many facts they have, by
-// topic and in all; how many each topic has in all; and where the next page starts (none after the last).
+// topic and in all; how many each topic has in all; and where the next page starts (none after the last). The first
+// page has the notes in the book too (NotesOf), the latest first.
 type Almanac struct {
 	Facts []Learned      `json:"facts"`
 	Have  map[string]int `json:"have"`
 	All   int            `json:"all"`
 	Of    map[string]int `json:"of"`
 	Next  string         `json:"next,omitempty"`
+	Notes []Note         `json:"notes,omitempty"`
 }
 
 // factsIn is how many facts each topic has: its live questions with a fact.
@@ -112,14 +114,17 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, topic, from string, 
 	if last := len(out.Facts) - 1; more && last >= 0 {
 		out.Next = strconv.FormatInt(out.Facts[last].At, 10) + ":" + out.Facts[last].ID
 	}
-	return out, nil
+	if from == "" {
+		out.Notes, err = g.NotesOf(ctx, userID)
+	}
+	return out, err
 }
 
-// facts are how many facts a player's almanac has, and whether it has every fact of a topic (of the topic's live
-// questions: a retired question's fact counts in n, never towards a topic's whole).
+// facts are how many facts a player's almanac has, and the topics it has every fact of (of the topic's live questions:
+// a retired question's fact counts in n, never towards a topic's whole), in the bank's order.
 type facts struct {
 	n     int
-	whole bool
+	whole []string
 }
 
 // learnedIn is how many facts a game (runID) put in the player's almanac: the questions it answered right for the
@@ -147,7 +152,7 @@ func (g *Game) learnedIn(ctx context.Context, userID, runID int64) (int, error) 
 	return n, rows.Err()
 }
 
-// factsOf counts a player's almanac, as its achievements and Профил do.
+// factsOf counts a player's almanac, as Профил and its notes do.
 func (g *Game) factsOf(ctx context.Context, userID int64) (facts, error) {
 	var f facts
 	byTopic := map[string]int{}
@@ -157,9 +162,10 @@ func (g *Game) factsOf(ctx context.Context, userID int64) (facts, error) {
 			byTopic[q.Base().Category]++
 		}
 	})
-	for topic, n := range factsIn(g.Bank()) {
-		if byTopic[topic] >= n {
-			f.whole = true
+	in := factsIn(g.Bank())
+	for _, c := range g.Bank().Categories {
+		if n := in[c.ID]; n > 0 && byTopic[c.ID] >= n {
+			f.whole = append(f.whole, c.ID)
 		}
 	}
 	return f, err

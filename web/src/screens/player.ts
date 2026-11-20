@@ -1,40 +1,21 @@
 // Another player's profile, by their tag (/players/tag): how they look, their division, their numbers, how well they
-// know each topic, the achievements they've earned; and how you stand with them — ask to be friends, or answer their
-// asking.
+// know each topic; and how you stand with them — ask to be friends, or answer their asking.
 
 import type { Mastery } from "../game/mastery.ts";
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
-import type { AchievementInfo, Standing, Tier } from "../ui.ts";
+import type { Standing } from "../ui.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
-let {
-  masteryCard,
-  api,
-  errorText,
-  h,
-  signal,
-  title,
-  friendRequests,
-  user,
-  avatar,
-  badge,
-  record,
-  standingCard,
-  stat,
-  tierWords,
-  opened,
-} = {} as Kit;
+let { masteryCard, api, errorText, h, signal, title, friendRequests, user, avatar, record, standingCard, stat } =
+  {} as Kit;
 
 interface Profile {
   name: string;
   tag: string;
   me?: boolean;
   avatar: string;
-  title?: string;
-  titleTier?: Tier;
-  level: number;
   since: number;
   standing: Standing;
   streak: number;
@@ -45,8 +26,6 @@ interface Profile {
   duels: number;
   won: number;
   mastery: Mastery[];
-  achievements: AchievementInfo[];
-  of: number;
   friend?: "yes" | "asked" | "asks";
   request?: number;
   record?: { won: number; lost: number; drawn: number };
@@ -56,26 +35,9 @@ const percent = (right: number, of: number) => (of ? Math.round((100 * right) / 
 // „г.“ kept with its year, never alone on a line.
 const month = (ms: number) =>
   new Intl.DateTimeFormat("bg", { month: "long", year: "numeric" }).format(new Date(ms)).replace(/\s(?=г\.)/, " ");
-const day = (ms: number) => new Intl.DateTimeFormat("bg", { day: "numeric", month: "long" }).format(new Date(ms));
 
 export function playerProfile(kit: Kit, [tag]: string[]): Child {
-  ({
-    masteryCard,
-    api,
-    errorText,
-    h,
-    signal,
-    title,
-    friendRequests,
-    user,
-    avatar,
-    badge,
-    record,
-    standingCard,
-    stat,
-    tierWords,
-    opened,
-  } = kit);
+  ({ masteryCard, api, errorText, h, signal, title, friendRequests, user, avatar, record, standingCard, stat } = kit);
   title(`@${tag}`);
   const profile = signal<Profile | null>(null);
   const error = signal("");
@@ -112,29 +74,22 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
             !p.me,
           )
         : null,
-      achievements(p),
     ];
   });
 }
 
-/** Their avatar, name, tag and title, level, and since when they play. */
+/** Their avatar, name and tag, and since when they play. */
 function head(p: Profile): Child {
   return h(
     "div",
     { class: "me-head" },
-    avatar(p.avatar, { size: "l", level: p.level, name: p.name }),
+    avatar(p.avatar, { size: "l", name: p.name }),
     h(
       "div",
       { class: "me-head-text" },
       h("h1", null, p.name),
       h("span", { class: "me-tag" }, `@${p.tag}`),
-      p.title ? h("span", { class: `me-title t-${p.titleTier ?? "common"}` }, p.title) : null,
-      // The level once the viewer has met XP (play/unfold.go), as their avatar shows it.
-      h(
-        "span",
-        { class: "muted small" },
-        `${opened.peek().xp ? `Ниво ${p.level} · играе` : "Играе"} от ${month(p.since)}`,
-      ),
+      h("span", { class: "muted small" }, `Играе от ${month(p.since)}`),
     ),
   );
 }
@@ -192,9 +147,9 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
         await reload();
       }),
     ];
-  } else if (!user.peek()?.email && !opened.peek().points) {
-    // Nobody yet on this device, or a guest with no game finished: a request is a player's (the server says so too),
-    // never a guest made for the asking.
+  } else if (!user.peek()) {
+    // Nobody yet on this device: a request is a player's, never a guest made for the asking (a guest with no game
+    // finished is told so by the server).
     body = [
       h("p", { class: "player-relation muted" }, "За да добавяш приятели, първо изиграй една игра или влез с имейл."),
       h("a", { class: "btn inline primary", href: "/" }, "Към играта"),
@@ -228,38 +183,5 @@ function numbers(p: Profile): Child {
       ? stat(`${p.won}/${p.duels}`, "спечелени дуела", "rose")
       : stat(String(p.days), p.days === 1 ? "изигран ден" : "изиграни дни"),
     stat(String(p.games), p.games === 1 ? "изиграна игра" : "изиграни игри"),
-  );
-}
-
-/** The achievements they've earned, the latest first: each with its tier and the day. */
-function achievements(p: Profile): Child {
-  return h(
-    "section",
-    { class: "stack" },
-    h("h2", { class: "section-title" }, `Постижения · ${p.achievements.length} от ${p.of}`),
-    p.achievements.length
-      ? h(
-          "ul",
-          { class: "achievements" },
-          p.achievements.map((a) =>
-            h(
-              "li",
-              { class: `achievement t-${a.tier}` },
-              badge(a, true),
-              h(
-                "div",
-                { class: "achievement-text" },
-                h("span", { class: "achievement-name" }, a.name),
-                // A common one's tier is its ink alone: „обикновено“ reads as „nothing special“.
-                h(
-                  "span",
-                  { class: "achievement-when" },
-                  [a.tier === "common" ? "" : tierWords[a.tier].one, a.at ? day(a.at) : ""].filter(Boolean).join(" · "),
-                ),
-              ),
-            ),
-          ),
-        )
-      : h("p", { class: "muted" }, "Още няма постижения."),
   );
 }
