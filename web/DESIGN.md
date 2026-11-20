@@ -110,9 +110,11 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   their own on the screen (it's there for screen readers).
   **Моят Алманах** reads as one list, in the order the facts were learned, the first first: the count in the numeral face („42 факта досега“, or a
   topic's „7 от 24 факта в „История““), and what they are in a line; the topics as a quiet row of chips (names
-  only) to read one by; then the facts as entries between hairlines, not cards (no datelines): the
-  topic, the question in a small line, what was learned as the headline (the answer; a statement to judge is its
-  own headline, „Невярно:“ before one that isn't so), and the fact. It comes a page at a time.
+  only) to read one by; then the facts as cards laid as masonry (no datelines), as many columns as 17rem fit, each card in the column that
+  ends highest so the order learned still reads left to right: the topic in its colour (its picture on a disc of it, a glow of it in the
+  card's corner, the edge tinted), the question in a small line, what was learned as the headline (the answer; a
+  statement to judge is its own headline, „Невярно:“ before one that isn't so), and the fact in the facts' face, a
+  bar of the topic's colour beside it. It comes a page at a time.
   Общо is a hub, each thing once: the level with what comes next in one card, the streak, three numbers in one card, the days' ten (from the third), the Алманах in a line („N факта в Алманаха“, a tap from it), mastery,
   the latest games and the way to all of them. Its head is the player's own look, as last seen on the device while
   it loads (never one drawn from the name: that reads as someone else's profile; a plain tile before any). Награди

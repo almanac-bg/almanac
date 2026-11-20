@@ -1,5 +1,5 @@
-// Моят Алманах: what the player has learned — the fact behind every question they've answered right — read as an
-// almanac, one list in the order the facts were learned, the first first. A topic is a quiet filter above. It grows to
+// Моят Алманах: what the player has learned — the fact behind every question they've answered right — as cards laid
+// as masonry, in the order the facts were learned, the first first. A topic is a quiet filter above. It grows to
 // thousands, so it comes a page at a time: the next as the list's end comes near.
 
 import type { Kit } from "../kit.ts";
@@ -173,7 +173,24 @@ function pages(topic: string, counted: (c: Counts) => void): Child {
     },
     { rootMargin: "0px 0px 100% 0px" },
   );
-  onCleanup(() => near.disconnect());
+  // Masonry: each card spans the 4px rows its height takes (gap included), so the grid lays it in the column that ends
+  // highest. Measured as it's added, before it's drawn; and again whenever its height changes (a narrower screen, the
+  // fonts arriving), a frame later: a change made in the observer's own turn would change the page's height there,
+  // which another observer watches (prefs.ts), and the browser would call that a loop.
+  const span = (el: HTMLElement, height: number) => {
+    const rows = `span ${Math.max(1, Math.ceil(height / 4))}`;
+    if (el.style.gridRowEnd !== rows) el.style.gridRowEnd = rows;
+  };
+  const spans = new ResizeObserver((seen) => {
+    const sizes = seen.map((e) => [e.target as HTMLElement, e.borderBoxSize[0]?.blockSize ?? 0] as const);
+    requestAnimationFrame(() => {
+      for (const [el, height] of sizes) span(el, height);
+    });
+  });
+  onCleanup(() => {
+    near.disconnect();
+    spans.disconnect();
+  });
   const load = () => {
     const from = next.peek();
     if (busy.peek() || from === "") return;
@@ -184,8 +201,15 @@ function pages(topic: string, counted: (c: Counts) => void): Child {
       (p) => {
         if (life.aborted) return;
         counted(p);
-        for (const f of p.facts) facts.append(entry(f));
+        const added = p.facts.map(entry);
+        facts.append(...added);
         next.set(p.next ?? "");
+        // Every height read first, then every span set: one layout for the page, not one a card.
+        const heights = added.map((el) => el.getBoundingClientRect().height);
+        added.forEach((el, i) => {
+          span(el, heights[i] ?? 0);
+          spans.observe(el);
+        });
         busy.set(false);
         // Still near the end (a short page, a tall screen): looked at afresh, it says so again.
         near.unobserve(more);
@@ -224,7 +248,7 @@ function pages(topic: string, counted: (c: Counts) => void): Child {
   ];
 }
 
-/** A fact as an almanac's entry: its topic, then what was learned as its headline — the answer, under the question
+/** A fact as a card: its topic, then what was learned as its headline — the answer, under the question
  * asked in a small line; a statement to judge is its own headline („Невярно:“ before one that isn't so) — and the
  * fact. */
 function entry(f: Learned): HTMLElement {
@@ -232,17 +256,21 @@ function entry(f: Learned): HTMLElement {
     "li",
     { class: `almanac-item ${toneOf(f.category)}` },
     h(
-      "p",
-      { class: "kicker almanac-topic" },
-      topicMark(f.category),
-      categories.find((c) => c.id === f.category)?.name ?? "",
-    ),
-    h(
       "div",
-      { class: "almanac-qa" },
-      f.question ? h("p", { class: "almanac-q" }, f.question) : null,
-      h("p", { class: "almanac-a" }, f.untrue ? h("span", { class: "almanac-untrue" }, "Невярно: ") : null, f.answer),
+      { class: "almanac-card" },
+      h(
+        "p",
+        { class: "kicker almanac-topic" },
+        topicMark(f.category),
+        categories.find((c) => c.id === f.category)?.name ?? "",
+      ),
+      h(
+        "div",
+        { class: "almanac-qa" },
+        f.question ? h("p", { class: "almanac-q" }, f.question) : null,
+        h("p", { class: "almanac-a" }, f.untrue ? h("span", { class: "almanac-untrue" }, "Невярно: ") : null, f.answer),
+      ),
+      h("p", { class: "almanac-fact" }, f.fact),
     ),
-    h("p", { class: "almanac-fact" }, f.fact),
   );
 }
