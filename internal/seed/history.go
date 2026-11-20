@@ -176,9 +176,6 @@ func (w *world) visit(s session, online []*player, met map[[2]int64]bool) error 
 		if _, err := w.liveDuel(p, o); err != nil {
 			return err
 		}
-		if err := w.block(p, o); err != nil {
-			return err
-		}
 	}
 	// The legend's last evenings before today: on form, so that the history leaves it near Легенда whatever the draw
 	// (finish brings it the rest of the way; one evening's opponents may not be enough on their own).

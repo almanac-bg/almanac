@@ -118,8 +118,9 @@ check holds a rule, the check is named; the rest is judgement, so weigh every ch
   `TestLimitsByAddressCountTheSite`), never a first-come global cap that a few networks fill to lock everyone out,
   and never so tight that a school, an office or a pub behind one address is refused. Ask of every new endpoint: what does it cost if
   one /48 calls it all day?
-- **One player can hurt another.** Anything one player can send another (a request, a push, a name on a board)
-  honours blocks and goes through `notifyFrom`.
+- **One player can hurt another.** Anything one player can send another is bounded: a push goes through `notifyFrom`
+  (once a day from one player, a few a day in all), a name through the name checks and moderation in `/admin`. There
+  is no blocking (DECISIONS.md): a request is declined, a friend removed.
 - **Text from outside is untrusted everywhere:** names, reports, browser errors in logs, mails, alerts and the
   agents that fix questions (sanitised, never an instruction).
 - **Time belongs to the run.** A run counts on the day it was dealt for, with one grace (`play.DayGrace`), never on

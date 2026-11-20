@@ -41,16 +41,6 @@ var mergeSteps = []mergeStep{
 		SELECT user_id, ?1, since, asked FROM friends WHERE friend_id = ?2 AND user_id <> ?1
 			AND user_id IN (SELECT friend_id FROM friends WHERE user_id = ?1)`},
 	{sql: `DELETE FROM friends WHERE user_id = ?2 OR friend_id = ?2`},
-	// Whom the guest blocked, the account has blocked; who blocked the guest, has blocked the account: the same person.
-	{carries: []string{"blocks.user_id", "blocks.blocked_id"}, sql: `INSERT OR IGNORE INTO blocks (user_id, blocked_id, at)
-		SELECT ?1, blocked_id, at FROM blocks WHERE user_id = ?2 AND blocked_id <> ?1`},
-	{sql: `INSERT OR IGNORE INTO blocks (user_id, blocked_id, at)
-		SELECT user_id, ?1, at FROM blocks WHERE blocked_id = ?2 AND user_id <> ?1`},
-	{sql: `DELETE FROM blocks WHERE user_id = ?2 OR blocked_id = ?2`},
-	{sql: `DELETE FROM friends WHERE (user_id = ?1 AND friend_id IN (SELECT blocked_id FROM blocks WHERE user_id = ?1
-		UNION SELECT user_id FROM blocks WHERE blocked_id = ?1))
-		OR (friend_id = ?1 AND user_id IN (SELECT blocked_id FROM blocks WHERE user_id = ?1
-		UNION SELECT user_id FROM blocks WHERE blocked_id = ?1))`},
 	// Duels against the guest count against the account.
 	{carries: []string{"runs.opponent_id"}, sql: `UPDATE runs SET opponent_id = ?1 WHERE opponent_id = ?2`},
 	// The guest's duels are the account's. One between the two goes with the guest: what's left of the guest's duels

@@ -86,12 +86,11 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   place still the way to the board („4312-о място“ alone says nothing). „Средно днес: 5,1 от 10.“ from ten players.
 - **Приятели** (`/friends`): requests, friends, and the one way to add them: the field by потребителско име or
   имейл, „Добави“. A request is accepted or not („Поканата до Мария е изпратена.“): nobody becomes a friend alone. A
-  friend's row is their name, their day and the duels between you; „Промени“ shows „Премахни“ and „Блокирай“. A
+  friend's row is their name, their day and the duels between you; „Промени“ shows „Премахни“. A
   player still with the name drawn for them is asked for theirs once on a device, the first time others would see
   it: a sheet from the bottom (`.sheet`, `screens/name.ts`), the drawn name in its one field, „Не сега“ quiet (on
   with the drawn name). Before a first live duel or Роял's lobby: „Как да те виждат останалите?“, „Готово“ gold.
-  A request has „Блокирай“ quiet beside „Приеми“ and „Откажи“, as a friend has under „Промени“
-  and a profile at its actions' end; the blocked are listed last („Блокирани“, „Отблокирай“). A name field never asks
+  A name field never asks
   the browser for a full name (`autocomplete` nickname or off: `fields.test.ts`).
 - **Класации** (`/ranks`): Днес (the day's board, first), Рейтинг (once the player has met it) and Знания; of
   everyone or of friends.

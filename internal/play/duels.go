@@ -386,9 +386,8 @@ const (
 	RecordingSeen   = 3
 )
 
-// recordedRun is another player's finished run of ten questions (none still played in a duel), by a player
-// neither of the two has blocked (blocks.go), all still in play as it played them (asPlayed: none retired, none
-// changed since), none of today's and none due
+// recordedRun is another player's finished run of ten questions (none still played in a duel), all still in play as
+// it played them (asPlayed: none retired, none changed since), none of today's and none due
 // for review (dayBars.now; a day's run never), played at a person's speed (not marked a script's: fair.go), to play
 // against: a real game (RecordingRights right or more, RecordingMissed not answered at most), by a player whose rating
 // is within RecordingBand of the player's, the one with the fewest questions the player has seen (seen, read before
@@ -412,7 +411,7 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 			(SELECT count(*) FROM answers a WHERE a.run_id = r.id AND a.given IS NULL)
 		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind IN ('topic', 'duel') AND r.finished_at IS NOT NULL AND NOT r.shadow AND r.user_id <> ?1
-			AND json_array_length(r.questions) = ?2 AND NOT `+blockedBetween("r.user_id", "?1")+`
+			AND json_array_length(r.questions) = ?2
 			AND NOT EXISTS (SELECT 1 FROM duels d WHERE d.ended_at IS NULL
 				AND (d.a_run = r.id OR d.b_run = r.id))
 		ORDER BY r.finished_at DESC LIMIT 200`, userID, Length, MixTopic)

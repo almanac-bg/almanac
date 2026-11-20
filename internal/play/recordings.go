@@ -11,8 +11,7 @@ import (
 // A recording is a real player's earlier game, and the one playing against it sees who played it, as anyone is seen
 // anywhere in the game (owner, 2026-11-19): their name (a way to their profile), avatar with its frame, title and
 // level, during the duel, on its result and in the duel history, always labelled a recording, never taken for a person
-// here now. Two players one of whom has blocked the other are never dealt each other's games (recordedRun). The other
-// way it's numbers only: the recorded player hears what others' duels against their recordings came to
+// here now. The other way it's numbers only: the recorded player hears what others' duels against their recordings came to
 // (RecordingsNews), never who played.
 
 // RecordingsNews is what others' duels against the player's recordings came to (duels.go): how many people played

@@ -1312,51 +1312,29 @@ func TestFriendsOverHTTP(t *testing.T) {
 	if _, mine := ana.call("GET", "/api/friends", nil); len(mine["friends"].([]any)) != 0 {
 		t.Fatalf("back by a request alone: %v", mine)
 	}
-
-	// Ana blocks Bo: his request goes, and his asking again reaches nothing; she sees him on her list, and lifts it.
-	_, me := bo.call("GET", "/api/me", nil)
-	boTag := me["user"].(map[string]any)["tag"].(string)
-	if status, out := ana.call("POST", "/api/blocks", map[string]string{"tag": "@" + boTag}); status != 200 || out["name"] == nil {
-		t.Fatalf("block: %d %v", status, out)
-	}
-	if status, out := bo.call("POST", "/api/friends/requests", map[string]string{"to": "@" + anaTag}); status != http.StatusOK ||
-		out["friends"] != nil {
-		t.Fatalf("Bo, blocked, asks: %d %v", status, out)
-	}
-	_, mine = ana.call("GET", "/api/friends", nil)
-	if in := mine["requests"].(map[string]any)["in"].([]any); len(in) != 0 {
-		t.Fatalf("Ana's requests: %v", in)
-	}
-	if blocked := mine["blocked"].([]any); len(blocked) != 1 || blocked[0].(map[string]any)["tag"] != boTag {
-		t.Fatalf("Ana's blocked: %v", mine["blocked"])
-	}
-	if _, p := ana.call("GET", "/api/players/"+boTag, nil); p["friend"] != "blocked" {
-		t.Fatalf("Bo, to Ana who blocked him: %v", p)
-	}
-	if status, _ := ana.call("DELETE", "/api/blocks/"+boTag, nil); status != 200 {
-		t.Fatalf("unblock: %d", status)
-	}
-	if status, _ := ana.call("DELETE", "/api/blocks/"+boTag, nil); status != http.StatusNotFound {
-		t.Fatalf("unblock again: %d", status)
-	}
 }
 
-// Pushes that others cause are capped for whoever gets them: strangers asking to be friends, one each, at most
-// peoplePushes a day; and none from one who's blocked.
+// Pushes that others cause are capped for whoever gets them: strangers asking to be friends, once a day each (asking
+// again after a no tells nobody again), at most peoplePushes a day in all.
 func TestPeoplePushesCapped(t *testing.T) {
 	s, g, fake, subscribe := pushWorld(t)
 	ana := g.player()
 	ana.call("POST", "/api/guest", map[string]any{})
 	subscribe(ana, "/ana")
 	asks := map[string]string{"to": "@" + tagOf(ana)}
-	// A stranger Ana blocked asks: nothing.
+	// A stranger asks, Ana says no, and the stranger asks again: one push.
 	cy := g.player()
-	_, c := cy.call("POST", "/api/guest", map[string]any{})
-	ana.call("POST", "/api/blocks", map[string]string{"tag": c["user"].(map[string]any)["tag"].(string)})
+	cy.call("POST", "/api/guest", map[string]any{})
+	cy.call("POST", "/api/friends/requests", asks)
+	_, mine := ana.call("GET", "/api/friends", nil)
+	in := mine["requests"].(map[string]any)["in"].([]any)
+	if status, _ := ana.call("DELETE", fmt.Sprintf("/api/friends/requests/%d", int64(in[0].(map[string]any)["id"].(float64))), nil); status != http.StatusOK {
+		t.Fatalf("a no: %d", status)
+	}
 	cy.call("POST", "/api/friends/requests", asks)
 	s.sendQueued(t.Context())
-	if got := fake.count("/ana"); got != 0 {
-		t.Fatalf("a push from one blocked: %d", got)
+	if got := fake.count("/ana"); got != 1 {
+		t.Fatalf("a stranger asking again after a no: %d pushes, want 1", got)
 	}
 	for range peoplePushes + 5 {
 		p := g.player()

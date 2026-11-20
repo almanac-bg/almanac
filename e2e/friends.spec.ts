@@ -83,7 +83,7 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await expect(yes).toHaveCount(0);
 });
 
-test("a block keeps someone away", async ({ browser }) => {
+test("a request turned down, a friend removed", async ({ browser }) => {
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
   for (const p of [a, b]) {
@@ -99,17 +99,21 @@ test("a block keeps someone away", async ({ browser }) => {
   };
   await ask();
 
-  // Ana blocks Bo from his request: it's gone, and he's on her list of the blocked.
+  // Ana says no: the request is gone from both.
   await a.reload();
-  await a.locator(".invitation").getByRole("button", { name: "Блокирай" }).click();
+  await a.locator(".invitation").getByRole("button", { name: "Откажи" }).click();
   await expect(a.locator(".invitation")).toHaveCount(0);
-  const blocked = a.locator(".stack", { has: a.getByText("Блокирани", { exact: true }) });
-  await expect(blocked.locator("li")).toHaveCount(1);
-  // Bo asks again: he's told it went, as anyone is; nothing reaches Ana.
+  await b.reload();
+  await expect(b.locator(".waiting")).toHaveCount(0);
+
+  // He asks again, she says yes; then she removes him, and they're friends no more on either side.
   await ask();
   await a.reload();
-  await expect(a.locator(".invitation")).toHaveCount(0);
-  // Lifted from her list.
-  await blocked.getByRole("button", { name: "Отблокирай" }).click();
-  await expect(a.getByText("Блокирани", { exact: true })).toHaveCount(0);
+  await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
+  await expect(a.locator(".friend")).toHaveCount(1);
+  await a.getByRole("button", { name: "Промени" }).click();
+  await a.locator(".friend").getByRole("button", { name: "Премахни" }).click();
+  await expect(a.locator(".friend")).toHaveCount(0);
+  await b.reload();
+  await expect(b.getByText("Още нямаш приятели тук. Добави ги по потребителско име или имейл.")).toBeVisible();
 });

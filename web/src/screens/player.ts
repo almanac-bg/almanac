@@ -1,6 +1,6 @@
 // Another player's profile, by their tag (/players/tag): how they look, their division, their numbers, how well they
-// know each topic, the achievements they've earned; and what you can do with them — ask to be friends, answer their
-// asking, call them to a duel, or block them (and lift it).
+// know each topic, the achievements they've earned; and how you stand with them — ask to be friends, or answer their
+// asking.
 
 import type { Mastery } from "../game/mastery.ts";
 import type { Kit } from "../kit.ts";
@@ -18,7 +18,6 @@ let {
   title,
   friendRequests,
   player,
-  user,
   avatar,
   badge,
   record,
@@ -48,7 +47,7 @@ interface Profile {
   mastery: Mastery[];
   achievements: AchievementInfo[];
   of: number;
-  friend?: "yes" | "asked" | "asks" | "blocked";
+  friend?: "yes" | "asked" | "asks";
   request?: number;
   record?: { won: number; lost: number; drawn: number };
   id?: number;
@@ -70,7 +69,6 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
     title,
     friendRequests,
     player,
-    user,
     avatar,
     badge,
     record,
@@ -142,9 +140,8 @@ function head(p: Profile): Child {
   );
 }
 
-/** What the viewer can do with them: as friends, a duel (and the duels between the two so far); else ask to be
- * friends, or answer their asking. The one thing to do is the gold button; accepting is rose, as everywhere. Last, a
- * quiet „Блокирай“; blocked, only the way to lift it. */
+/** How the viewer stands with them: as friends, the duels between the two so far; else ask to be friends, or answer
+ * their asking. The one thing to do is the gold button; accepting is rose, as everywhere. */
 function actions(p: Profile, reload: () => Promise<unknown>): Child {
   const busy = signal(false);
   const note = signal<{ text: string; bad?: boolean } | null>(null);
@@ -163,21 +160,6 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
     h("button", { class: `btn inline ${cls}`, type: "button", disabled: busy, onclick: () => act(fn) }, label);
 
   let body: Child;
-  if (p.friend === "blocked") {
-    return h(
-      "section",
-      { class: "card player-actions" },
-      h("p", { class: "player-relation muted" }, "Блокиран профил: не може да те добавя в приятели."),
-      button("Отблокирай", "", async () => {
-        await api("DELETE", `/api/blocks/${p.tag}`);
-        await reload();
-      }),
-      () => {
-        const n = note();
-        return n && h("p", { class: "bad", role: "alert" }, n.text);
-      },
-    );
-  }
   if (p.friend === "yes") {
     const r = p.record ?? { won: 0, lost: 0, drawn: 0 };
     const played = r.won + r.lost + r.drawn;
@@ -222,33 +204,10 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
       }),
     ];
   }
-  return h(
-    "section",
-    { class: "card player-actions" },
-    body,
-    () => {
-      const n = note();
-      return n && h("p", { class: n.bad ? "bad" : "muted", role: n.bad ? "alert" : "status" }, n.text);
-    },
-    // Only a player can block (one not signed in has nobody to keep away).
-    () =>
-      user()
-        ? h(
-            "button",
-            {
-              class: "link muted small player-block",
-              type: "button",
-              disabled: busy,
-              onclick: () =>
-                act(async () => {
-                  await api("POST", "/api/blocks", { tag: p.tag });
-                  await reload();
-                }),
-            },
-            "Блокирай",
-          )
-        : null,
-  );
+  return h("section", { class: "card player-actions" }, body, () => {
+    const n = note();
+    return n && h("p", { class: n.bad ? "bad" : "muted", role: n.bad ? "alert" : "status" }, n.text);
+  });
 }
 
 /** Their numbers: the streak, how much and how well they've played, their duels. */

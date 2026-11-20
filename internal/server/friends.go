@@ -13,23 +13,18 @@ import (
 	"github.com/almanac-bg/almanac/internal/push"
 )
 
-// Pushes that other players cause (a friend request) are what a stranger could turn
-// into a flood: so none goes between two players one of whom has blocked the other, one of a kind from one player
-// goes once a day at most (dedupe), and a player gets at most peoplePushes of them a day, whoever they're from.
+// Pushes that other players cause (a friend request) are what a stranger could turn into a flood: so one from one
+// player goes once a day at most (asking again after a no included), and a player gets at most peoplePushes of them a
+// day, whoever they're from.
 const peoplePushes = 20
 
-// notifyFrom queues a push to a player that another (from) caused, unless one of them has blocked the other or the
-// caps above are spent. what names its kind for the once a day from one player ("" for news that comes once by
-// itself, as a duel's result).
-func (s *Server) notifyFrom(ctx context.Context, from int64, what string, m push.Message, to int64) {
+// notifyFrom queues a push to a player that another (from) caused, unless the caps above are spent.
+func (s *Server) notifyFrom(ctx context.Context, from int64, m push.Message, to int64) {
 	if s.push == nil {
 		return
 	}
-	if blocked, err := s.game.Blocked(ctx, from, to); err != nil || blocked {
-		return
-	}
 	who := strconv.FormatInt(to, 10)
-	if what != "" && !s.limits.allow("told:"+who+":"+strconv.FormatInt(from, 10)+":"+what, 1, 24*time.Hour) {
+	if !s.limits.allow("told:"+who+":"+strconv.FormatInt(from, 10), 1, 24*time.Hour) {
 		return
 	}
 	if !s.limits.allow("told:"+who, peoplePushes, 24*time.Hour) {
@@ -38,8 +33,7 @@ func (s *Server) notifyFrom(ctx context.Context, from int64, what string, m push
 	s.notify(ctx, pushFriends, m, to)
 }
 
-// friends is the player's side of being friends: their friends, the friend requests to and from them, and whom
-// they've blocked.
+// friends is the player's side of being friends: their friends, and the friend requests to and from them.
 func (s *Server) friends(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -56,54 +50,10 @@ func (s *Server) friends(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	blocked, err := s.game.BlockedOf(r.Context(), u.ID)
-	if err != nil {
-		return err
-	}
 	return ok(w, map[string]any{
 		"friends":  list,
 		"requests": map[string]any{"in": in, "out": out},
-		"blocked":  blocked,
 	})
-}
-
-// block blocks a player, by their tag: no longer friends, and nothing more between the two (play/blocks.go).
-func (s *Server) block(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	var in struct {
-		Tag string `json:"tag"`
-	}
-	if err := readJSON(r, &in); err != nil {
-		return err
-	}
-	tag, err := account.NormalTag(in.Tag)
-	if err != nil {
-		return play.ErrNoPlayer
-	}
-	name, err := s.game.Block(r.Context(), u.ID, tag)
-	if err != nil {
-		return err
-	}
-	return ok(w, map[string]string{"name": name})
-}
-
-// unblock lifts the player's block of another, by their tag.
-func (s *Server) unblock(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	tag, err := account.NormalTag(r.PathValue("tag"))
-	if err != nil {
-		return play.ErrNoPlayer
-	}
-	if err := s.game.Unblock(r.Context(), u.ID, tag); err != nil {
-		return err
-	}
-	return ok(w, map[string]bool{"ok": true})
 }
 
 // requestFriend asks someone to be friends: by their tag (@tag) or an email address.
@@ -145,7 +95,7 @@ func (s *Server) toldOfRequest(ctx context.Context, from *account.User, sent pla
 	if !sent.New {
 		return
 	}
-	s.notifyFrom(context.WithoutCancel(ctx), from.ID, "request",
+	s.notifyFrom(context.WithoutCancel(ctx), from.ID,
 		push.Message{Title: from.Name + " иска да сте приятели", Body: "Приеми или откажи в Приятели.", URL: "/friends"}, sent.To)
 }
 

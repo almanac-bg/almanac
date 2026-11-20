@@ -89,8 +89,6 @@ var playerErrors = map[error]*apiError{
 	account.ErrBadTag:       {http.StatusBadRequest, "bad_tag", "Потребителското име трябва да е от 3 до 20 знака: латински букви, цифри или _, като първият е буква."},
 	account.ErrTagTaken:     {http.StatusConflict, "tag_taken", "Това потребителско име е заето. Опитай друго."},
 	account.ErrSuspended:    {http.StatusForbidden, "suspended", "Този профил е спрян от екипа на играта."},
-	play.ErrBlocked:         {http.StatusNotFound, "no_player", "Няма такъв играч."},
-	play.ErrManyBlocks:      {http.StatusConflict, "many_blocks", "Имаш твърде много блокирани играчи."},
 }
 
 // versionHeader names the game's version on every API answer: a page loaded before a deploy sees it's another and
