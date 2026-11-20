@@ -91,17 +91,14 @@ func TestAfterRetryAcrossMidnight(t *testing.T) {
 }
 
 // The day's goals are the day's game's, though its last answers came after midnight: all ten answers count on its own
-// day (a row, eight of ten), its goals are kept, and the day with all three done earns its reserve day.
+// day (a row, eight of ten), and its goals are kept.
 func TestGoalsAcrossMidnight(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
 	w.at(15, 12, 0, 0)
-	w.daysPlayed(ana, 3, 2, 1) // Thursday to Saturday: the first day's reserve
+	w.daysPlayed(ana, 3, 2, 1) // Thursday to Saturday
 	w.setGoals(ana, "day", "row5", "eight")
-	if s, _ := w.g.StreakOf(ctx, ana); s.Reserve != 1 {
-		t.Fatalf("before: %+v", s)
-	}
 	w.sundayLate(ana)
 	var done []string
 	rows, err := w.db.Read.Query(`SELECT goal FROM goals_done WHERE user_id = ? AND day = '2026-11-15' ORDER BY goal`, ana)
@@ -117,8 +114,8 @@ func TestGoalsAcrossMidnight(t *testing.T) {
 	if !slices.Equal(done, []string{"day", "eight", "row5"}) {
 		t.Fatalf("Sunday's goals done: %v", done)
 	}
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 4 || s.Reserve != 2 {
-		t.Fatalf("Sunday's full day earned no reserve: %+v", s)
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 4 {
+		t.Fatalf("Sunday's game, finished after midnight, isn't Sunday's: %+v", s)
 	}
 	// Monday's goals are Monday's: Sunday's game moved none of them.
 	if goals := w.goalsOf(ana); goals["day"].Done || goals["day"].Progress != 0 {

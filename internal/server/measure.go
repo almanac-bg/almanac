@@ -512,7 +512,7 @@ type measures struct {
 	HoldoutFrom         string // its first day, as „19.11.2026“; "" from the start
 	Repeats             rate
 	Streaks             []streakRow
-	Spent               int
+	Forgiven            int
 	Kinds               []string // the kinds of games played in the last 7 days, by name
 	Games               []gamesRow
 	Features            []featureRow
@@ -924,7 +924,7 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 		}
 		f.Streaks = append(f.Streaks, streakRow{Band: band, Going: h.Going[i], Ended: h.Ended[i]})
 	}
-	f.Spent = h.Spent
+	f.Forgiven = h.Forgiven
 
 	// The games, by kind, day by day: the kinds there are, as the runs have them.
 	days7, err := g.Games(ctx, 7)

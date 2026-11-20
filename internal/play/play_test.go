@@ -674,7 +674,6 @@ func TestBoardAndStreak(t *testing.T) {
 	if n, _ := w.g.Streak(ctx, ana); n != 1 {
 		t.Fatalf("streak %d the next morning, before playing", n)
 	}
-	w.setGoals(ana, "day", "duel", "duelWin") // goals the day's questions alone don't finish: no reserve day from the goals
 	s, _ := w.g.StartDay(ctx, ana)
 	w.play(ana, s.ID, repeat(w.right, Length)...)
 	if n, _ := w.g.Streak(ctx, ana); n != 2 {
@@ -682,7 +681,7 @@ func TestBoardAndStreak(t *testing.T) {
 	}
 	w.wait(48 * time.Hour)
 	if n, _ := w.g.Streak(ctx, ana); n != 2 {
-		t.Fatalf("streak %d after missing a day, with the first day's reserve day", n)
+		t.Fatalf("streak %d after missing a day, which the week forgives", n)
 	}
 	if week, _ := w.g.Week(ctx, ana); week != [7]bool{3: true, 4: true} {
 		t.Fatalf("week %v on Sunday, after Thursday and Friday", week)
@@ -692,142 +691,83 @@ func TestBoardAndStreak(t *testing.T) {
 		t.Fatalf("week %v on a new Monday", week)
 	}
 	if n, _ := w.g.Streak(ctx, ana); n != 0 {
-		t.Fatalf("streak %d after missing two days, with one reserve day", n)
+		t.Fatalf("streak %d after missing two days in a week", n)
 	}
 }
 
-// The days before the rules of 2026-11-19 earned reserve days as the rules were then: the first day played, every
-// seventh in a row and a day with all three goals done, two at most and no cap a week; a missed day spends one and the
-// streak holds; with none left it ends, and says so.
-func TestReserveDaysBefore(t *testing.T) {
-	rules := ReserveRulesFrom
-	ReserveRulesFrom = "9999-12-31"
-	t.Cleanup(func() { ReserveRulesFrom = rules })
-	w := setup(t)
-	ctx := t.Context()
-	ana := w.user()
-	day := func() {
-		s, _ := w.g.StartDay(ctx, ana)
-		w.play(ana, s.ID, repeat(w.right, Length)...)
-	}
-	full := func() {
-		day()
-		for i := range GoalsPerDay {
-			_, _ = w.db.Write.Exec(`INSERT OR IGNORE INTO goals_done (user_id, day, goal, at, xp, seen) VALUES (?, ?, ?, 1, 0, 1)`,
-				ana, w.g.Today(), fmt.Sprint("g", i))
-		}
-	}
-	day() // the first day ever: a reserve day, goals or not
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 1 || s.Reserve != 1 || s.Next != 6 || s.Ended != nil {
-		t.Fatalf("after a first day: %+v", s)
-	}
-	w.wait(48 * time.Hour) // a day missed
-	missed := w.g.Now().In(Bulgaria).AddDate(0, 0, -1).Format(time.DateOnly)
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 1 || s.Reserve != 0 || len(s.Saved) != 1 || s.Saved[0] != missed {
-		t.Fatalf("a day missed, with a reserve: %+v", s)
-	}
-	full() // all three goals: a reserve day
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 2 || s.Reserve != 1 || s.Next != 5 {
-		t.Fatalf("a full day: %+v", s)
-	}
-	for range 5 { // to seven days in a row: the second reserve day, and no more to earn
-		w.wait(24 * time.Hour)
-		day()
-	}
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 7 || s.Reserve != ReserveMax || s.Next != 0 {
-		t.Fatalf("seven days in a row: %+v", s)
-	}
-	w.wait(24 * time.Hour)
-	full() // a full day with the reserve days full earns nothing more
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 8 || s.Reserve != ReserveMax {
-		t.Fatalf("a full day with reserve days full: %+v", s)
-	}
-	w.wait(4 * 24 * time.Hour) // three days missed, two reserve days: the third ends it
-	ended := w.g.Now().In(Bulgaria).AddDate(0, 0, -1).Format(time.DateOnly)
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 0 || s.Reserve != 0 || len(s.Saved) != 0 || s.Ended == nil ||
-		*s.Ended != (Ended{Days: 8, On: ended}) || s.Next != ReserveEvery {
-		t.Fatalf("three days missed: %+v (ended %+v)", s, s.Ended)
-	}
-}
-
-// Reserve days come from the day itself (a streak's third day, then every seventh in a row) and from a day with all
-// three goals done: one a week at most, none before the streak's third day, two in hand at most. A missed day spends
-// one and the streak holds; with none left it ends.
-func TestReserveDays(t *testing.T) {
-	rules := ReserveRulesFrom
-	ReserveRulesFrom = ""
-	t.Cleanup(func() { ReserveRulesFrom = rules })
+// The streak forgives the first day missed in a week, Monday to Sunday, by itself; a second that week ends it. Two days
+// missed in a row are both forgiven only across a week's turn.
+func TestStreakForgives(t *testing.T) {
 	w := setup(t) // Thursday, 12 November
 	ctx := t.Context()
 	ana := w.user()
-	day := func() {
-		s, _ := w.g.StartDay(ctx, ana)
-		w.play(ana, s.ID, repeat(w.right, Length)...)
-	}
-	full := func() {
-		day()
-		for i := range GoalsPerDay {
-			_, _ = w.db.Write.Exec(`INSERT OR IGNORE INTO goals_done (user_id, day, goal, at, xp, seen) VALUES (?, ?, ?, 1, 0, 1)`,
-				ana, w.g.Today(), fmt.Sprint("g", i))
-		}
-	}
-	streak := func(what string, days, reserve, next int, week bool, goals string) StreakNow {
+	streak := func(what string, days int, forgiven []string, spare bool) StreakNow {
 		t.Helper()
 		s, err := w.g.StreakOf(ctx, ana)
-		if err != nil || s.Days != days || s.Reserve != reserve || s.Next != next || s.Week != week ||
-			s.GoalsReserve() != goals {
-			t.Fatalf("%s: %+v, goals %q; want %d days, %d reserve, next in %d, week %v, goals %q (%v)", what, s,
-				s.GoalsReserve(), days, reserve, next, week, goals, err)
+		if err != nil || s.Days != days || !slices.Equal(s.Forgiven, forgiven) || s.Spare != spare {
+			t.Fatalf("%s: %+v; want %d days, forgiven %v, spare %v (%v)", what, s, days, forgiven, spare, err)
 		}
 		return s
 	}
-	full() // the first day, all three goals done: no reserve day yet, and day two keeps its stake
-	streak("Thursday, the first day", 1, 0, 2, false, ReserveSoon)
+	streak("before the first day", 0, []string{}, true)
+	w.playDay(ana)
 	w.wait(24 * time.Hour)
-	streak("Friday, before playing", 1, 0, 2, false, ReserveSoon)
-	full()
-	streak("Friday, the second day", 2, 0, 1, false, ReserveSoon)
-	w.wait(24 * time.Hour)
-	day() // Saturday, the third day in a row: the first reserve day, this week's
-	streak("Saturday, the third day", 3, 1, 4, true, ReserveWeek)
-	w.wait(24 * time.Hour)
-	full() // Sunday, all three goals: this week's reserve day is earned already
-	streak("Sunday, a full day", 4, 1, 3, true, ReserveWeek)
-	w.wait(24 * time.Hour)
-	full() // Monday, a new week: all three goals earn its reserve day
-	streak("Monday, a full day", 5, ReserveMax, 0, true, ReserveFull)
-	w.wait(48 * time.Hour) // Tuesday missed: a reserve day spent
-	day()
-	s := streak("Wednesday, after a day missed", 6, 1, 8, true, ReserveWeek)
-	if len(s.Saved) != 1 || s.Saved[0] != "2026-11-17" || s.Unbroken != 1 {
-		t.Fatalf("the day a reserve day kept: %+v", s)
+	w.playDay(ana)
+	streak("Friday, the second day", 2, []string{}, true)
+	w.wait(48 * time.Hour) // Saturday missed: this week's day forgiven
+	streak("Sunday, before playing", 2, []string{"2026-11-14"}, false)
+	if week := w.g.InWeek([]string{"2026-11-14"}); week != [7]bool{5: true} {
+		t.Fatalf("the day forgiven on the week's strip: %v", week)
 	}
-	w.wait(24 * time.Hour)
-	day() // Thursday, the seventh day in a row: this week's reserve day is earned already
-	streak("Thursday, the seventh day", 7, 1, 7, true, ReserveWeek)
-	w.wait(3 * 24 * time.Hour) // Friday spends the last, Saturday ends it
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 0 || s.Reserve != 0 || s.Ended == nil ||
-		*s.Ended != (Ended{Days: 7, On: "2026-11-21"}) || s.Next != ReserveFrom {
-		t.Fatalf("two days missed with one reserve day: %+v (ended %+v)", s, s.Ended)
+	w.playDay(ana)
+	streak("Sunday, the third day", 3, []string{"2026-11-14"}, false)
+	w.wait(24 * time.Hour) // Monday: a new week, with its own day to forgive
+	streak("Monday, before playing", 3, []string{"2026-11-14"}, true)
+	w.wait(24 * time.Hour) // Monday missed, forgiven
+	s := streak("Tuesday, before playing", 3, []string{"2026-11-14", "2026-11-16"}, false)
+	if s.Ended != nil || s.Best != 3 {
+		t.Fatalf("still going: %+v", s)
+	}
+	w.wait(24 * time.Hour) // Tuesday missed too: the week's second, which ends it
+	s = streak("Wednesday", 0, []string{}, false)
+	if s.Ended == nil || *s.Ended != (Ended{Days: 3, On: "2026-11-17"}) || s.Best != 3 {
+		t.Fatalf("ended: %+v", s)
+	}
+	// A Sunday and the Monday after are each their own week's.
+	bo := w.user()
+	w.daysPlayed(bo, 6, 5, 4, 1) // Thursday to Saturday, then yesterday (Tuesday): Sunday and Monday forgiven
+	if s, _ := w.g.StreakOf(ctx, bo); s.Days != 4 || !slices.Equal(s.Forgiven, []string{"2026-11-15", "2026-11-16"}) {
+		t.Fatalf("across a week's turn: %+v", s)
 	}
 }
 
-// A player keeps the reserve days the rules before 2026-11-19 gave, and earns by today's rules from then.
-func TestReserveDaysKeptOverTheRules(t *testing.T) {
-	rules := ReserveRulesFrom
-	ReserveRulesFrom = "2026-11-14"
-	t.Cleanup(func() { ReserveRulesFrom = rules })
+// The days missed before the rule came in stay as the reserve days of then judged them (streak_missed): one kept is
+// its week's day forgiven, two kept in a week both hold, and one that ended a streak isn't won back.
+func TestStreakAsJudgedBefore(t *testing.T) {
 	w := setup(t) // Thursday, 12 November
 	ctx := t.Context()
-	ana := w.user()
-	w.daysPlayed(ana, 0) // the first day ever, by the old rules: a reserve day
-	if s, _ := w.g.StreakOf(ctx, ana); s.Reserve != 1 || !s.Week {
-		t.Fatalf("a first day, by the old rules: %+v", s)
+	ana, bo := w.user(), w.user()
+	judged := func(user int64, day string, kept bool) {
+		t.Helper()
+		if _, err := w.db.Write.Exec(`INSERT INTO streak_missed (user_id, day, kept) VALUES (?, ?, ?)`, user, day, kept); err != nil {
+			t.Fatal(err)
+		}
 	}
-	w.wait(2 * 24 * time.Hour)
-	w.daysPlayed(ana, 1, 0) // Saturday, the third day, by today's rules: this week's reserve day came on Thursday
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 3 || s.Reserve != 1 || s.Next != 4 {
-		t.Fatalf("the third day, by today's rules: %+v", s)
+	w.daysPlayed(ana, 3, 1)          // Monday and Wednesday, 9 and 11 November
+	judged(ana, "2026-11-10", false) // Tuesday ended her streak, though the week had a day to forgive
+	w.daysPlayed(bo, 4, 1)           // Sunday and Wednesday
+	judged(bo, "2026-11-09", true)   // Monday and Tuesday were kept by reserve days
+	judged(bo, "2026-11-10", true)
+	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 1 || s.Ended == nil || s.Ended.On != "2026-11-10" || s.Best != 1 {
+		t.Fatalf("a streak ended before: %+v", s)
+	}
+	s, _ := w.g.StreakOf(ctx, bo)
+	if s.Days != 2 || !slices.Equal(s.Forgiven, []string{"2026-11-09", "2026-11-10"}) || s.Spare {
+		t.Fatalf("two kept in a week: %+v", s)
+	}
+	w.wait(48 * time.Hour) // Thursday missed: the week has had its day forgiven
+	if s, _ := w.g.StreakOf(ctx, bo); s.Days != 0 || s.Ended == nil || s.Ended.On != "2026-11-12" {
+		t.Fatalf("a day missed after the kept ones: %+v", s)
 	}
 }
 

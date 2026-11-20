@@ -27,9 +27,8 @@ import (
 // All three unlock the wardrobe (wardrobe.go, titles.go): a level, an achievement, a topic's mastery, a division or a
 // Роял won each gives an avatar, a frame, a pattern or a title. Whatever unlocks something, the player is told
 // once, at the end of the game that did it (NewsOf), and is shown what comes next (Next): the next level that gives
-// something, the next division, the achievements nearest. Reserve days keep the streak through a missed day (runs.go):
-// the day itself earns them (the streak's third day, every seventh in a row), and so do the day's goals, done all
-// three, one a week at most; the streak makes achievements of its own, and a year with no day missed at all one more.
+// something, the next division, the achievements nearest. The streak forgives a missed day a week by itself (runs.go);
+// it makes achievements of its own, and a year with no day missed at all one more.
 //
 // All of it comes from the game's own records: nothing to buy, nothing made up. A new player meets it a part at a
 // time (unfold.go): all of it counts from the first game, but XP and the rating show as each starts to
@@ -120,7 +119,7 @@ var Achievements = []Achievement{
 
 	{"streak100", "Сто дни", "Играй въпросите на деня сто дни поред.", "phoenix", Legendary, 100, false},
 	{"streak365", "Цяла година", "Стигни серия от 365 дни с въпросите на деня.", "year", Legendary, 365, false},
-	{"noMiss", "Без нито един пропуск", "Играй въпросите на деня 365 дни един след друг, без резервен ден.", "calendar", Legendary, 365, false},
+	{"noMiss", "Без нито един пропуск", "Играй въпросите на деня 365 дни един след друг, без нито един пропуснат.", "calendar", Legendary, 365, false},
 	{"master5", "Пет теми като петте си пръста", "Стигни до „Майстор“ в пет теми.", "wreath", Legendary, 5, false},
 	{"duel50", "Петдесет победи", "Спечели петдесет дуела.", "helmet", Legendary, 50, false},
 	{"facts5000", "Пет хиляди факта", "Събери пет хиляди факта в Алманаха.", "", Legendary, 5000, false},

@@ -57,8 +57,8 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   (`.topic-lead`, each with what it is under its name; „Микс“ across the row alone while „България“ is closed); on a
   big screen those two a row of their own, short tiles side by side, then the topics five to a row, the picture over
   the name, each tile as tall as what's in it. A day gone by isn't played again, nor its
-  questions gone over: the day is today's (owner, 19 Nov 2026). The streak's chip shows only a streak (or reserve
-  days); none at all rather than „0 дни поред“, the level's chip taking the row. A streak that ended is said once,
+  questions gone over: the day is today's (owner, 19 Nov 2026). The streak's chip shows only a streak; none at all
+  rather than „0 дни поред“, the level's chip taking the row. A streak that ended is said once,
   over the day („Серията ти от 5 дни прекъсна. Днес започва нова.“): it isn't won back. A player back after days away
   (the streak ended since the last day played, `play.BackFrom`) is welcomed once, over the day: „Радваме се, че се
   върна. Най-дългата ти серия е 11 дни. Днес започва нова.“ Дуел and Роял open from here and
@@ -75,8 +75,8 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   устройство? Влез с имейла си“ under the name.
 - **The streak at stake.** While the day's ten wait, a streak (1 day or more: the second day is where a habit is won or
   lost) is at stake: its flame is unlit (`.streak-chip.unlit`, the number still there), and the day's card says what
-  the ten make of it („Серия от 5 дни. С днешните въпроси става 6.“); from 18:00, if no reserve day would keep it, that
-  it ends („Серия от 5 дни. Прекъсва в полунощ, ако не изиграеш днешните.“, `.day-stake`). The day played lights the
+  the ten make of it („Серия от 5 дни. С днешните въпроси става 6.“); from 18:00, if the week has forgiven its day already,
+  that it ends („Серия от 5 дни. Прекъсва в полунощ, ако не изиграеш днешните.“, `.day-stake`). The day played lights the
   flame as its number rolls on (Motion). A topic's result, while the day waits, has „Към въпросите на деня“ as its gold
   button, the same line under it, and „Още десет“ plain.
 - **The place** on the day's board (`game/standing.ts`) is a way to the board from two players, but not always said:
@@ -185,8 +185,7 @@ on a phone 160px wide; it holds that way (`e2e/text.spec.ts`):
   `tight` on `<html>` under 17em and `tighter` under 13.5em (at the usual size even a 320px phone's is 18em). Under
   `tight`: topics and the ways to play one to a row, the streak over the level, a board's score under the name, an
   answer gone over with how it went on a line under its words, „Вярно“ over „Невярно“, switches of choices and
-  Профил's places on two lines, the answers as tall as their words (the four in sight), the reserve days at the
-  streak's far end. Under `tighter`: the bar of places shows its pictures alone (the names stay for screen
+  Профил's places on two lines, the answers as tall as their words (the four in sight). Under `tighter`: the bar of places shows its pictures alone (the names stay for screen
   readers); a pair's mark sits over its words; a choice keeps the room for its share and its ✓ or ✕ at its foot,
   not its end; and a run's answer comes under the answers, as on a tablet, not docked at the screen's foot (there it
   would leave no room for the right answer and its fact both).
@@ -458,9 +457,8 @@ media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds th
   everyone has, are never news. A game that ended without its result on screen (the day's last question let run
   out, a game left at its end, a Роял) has its news told on Начало, once, under „От последната ти игра“, with no sheet
   or sound (`play/told.go`). What really is big is also brought forward in a sheet over the result (Motion). Профил shows
-  what comes next (`.next`); reserve days keep the streak (a streak's third day brings the first, told in its sheet;
-  then every seventh in a row and a day with all three goals, one a week at most: `.goals-reserve` says when the goals
-  won't bring one, `.week li.saved`); a day a reserve kept, or a streak that ended, is said
+  what comes next (`.next`); the streak forgives a missed day a week by itself, said under it in Профил
+  (`.streak-note`, the day forgiven on the week's strip: `.week li.forgiven`); a day forgiven, or a streak that ended, is said
   once on Начало (`.streak-notice`; told once on the server, not once per device), as is, one at a time, what others
   did meanwhile: a friend said yes to a request („Мария прие поканата ти за приятелство.“ and „Приятели“), or a live
   duel left went on without the player.

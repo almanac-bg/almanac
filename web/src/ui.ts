@@ -323,10 +323,10 @@ function today(): number {
   return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(weekday.format(new Date()));
 }
 
-/** The streak: days in a row with the day's ten, this week's days played (and kept by a reserve day), the reserve days
- * in hand, (`next`) how many more days in a row earn the next one, and (`best`, Профил's) the longest streak the player
+/** The streak: days in a row with the day's ten, this week's days played (and the day missed that it forgave), whether
+ * this week still has its day to forgive (`spare`: play/runs.go), and (`best`, Профил's) the longest streak the player
  * has had, when it's longer than this one. */
-export function streak(days: number, week?: boolean[], saved?: boolean[], reserve = 0, next = 0, best = 0): Child {
+export function streak(days: number, week?: boolean[], forgiven?: boolean[], spare = true, best = 0): Child {
   const unit = days === 1 ? "ден" : "дни";
   const now = today();
   return h(
@@ -343,17 +343,17 @@ export function streak(days: number, week?: boolean[], saved?: boolean[], reserv
         h("span", { class: "streak-unit" }, unit),
       ),
       h("p", null, days ? "поред с въпросите на деня" : "Изиграй въпросите на деня и започни серия."),
-      // What keeps the streak through a day missed: the reserve days in hand, or the way to the next (play/runs.go).
-      reserve || next
+      // What keeps the streak through a day missed: the week's one day, forgiven by itself (play/runs.go).
+      days
         ? h(
             "p",
-            { class: "streak-reserve" },
-            reserve
-              ? `${reserveWords(reserve)}: ако пропуснеш ден, серията остава.`
-              : `Още ${next === 1 ? "1 ден" : `${next} дни`} поред и печелиш резервен ден за серията.`,
+            { class: "streak-note" },
+            spare
+              ? "Един пропуснат ден в седмицата не прекъсва серията."
+              : "Тази седмица един ден вече е простен: следващият пропуснат прекъсва серията.",
           )
         : null,
-      best > Math.max(days, 1) ? h("p", { class: "streak-reserve" }, `Най-дълга серия: ${best} дни`) : null,
+      best > Math.max(days, 1) ? h("p", { class: "streak-note" }, `Най-дълга серия: ${best} дни`) : null,
     ),
     week?.length === 7
       ? h(
@@ -364,8 +364,9 @@ export function streak(days: number, week?: boolean[], saved?: boolean[], reserv
               "li",
               {
                 class:
-                  [week[i] && "on", saved?.[i] && "saved", i === now && "today"].filter(Boolean).join(" ") || undefined,
-                "aria-label": `${dayNames[i]}${week[i] ? ": изиграно" : saved?.[i] ? ": серията е запазена" : ""}`,
+                  [week[i] && "on", forgiven?.[i] && "forgiven", i === now && "today"].filter(Boolean).join(" ") ||
+                  undefined,
+                "aria-label": `${dayNames[i]}${week[i] ? ": изиграно" : forgiven?.[i] ? ": простен ден" : ""}`,
               },
               h("i", { class: "week-dot" }),
               d,
@@ -376,24 +377,15 @@ export function streak(days: number, week?: boolean[], saved?: boolean[], reserv
   );
 }
 
-/** Reserve days, counted: 1 резервен ден, 2 резервни дни. */
-export const reserveWords = (n: number) => (n === 1 ? "1 резервен ден" : `${n} резервни дни`);
-
-/** What reserve days in hand are for, in a line (by the shield on the streak's flame). */
-export const reserveMeaning = (n: number) =>
-  n === 1
-    ? "Резервен ден: пази серията, ако пропуснеш ден."
-    : `${reserveWords(n)}: всеки пази серията за един пропуснат ден.`;
-
 /** A streak at stake while the day's ten wait (play/runs.go: it runs to yesterday until they're played), in a line
  * (stakeWords), read again each minute, so a screen left open turns to the evening's line: on the day's card and under
  * a topic's result. */
-export function stakeLine(days: number, reserve: number): Child {
+export function stakeLine(days: number, spare: boolean): Child {
   if (days < 1) return null;
   const hour = signal(hourInBulgaria());
   const every = setInterval(() => hour.set(hourInBulgaria()), 60_000);
   onCleanup(() => clearInterval(every));
-  return h("p", { class: "day-stake" }, () => stakeWords(days, reserve, hour()));
+  return h("p", { class: "day-stake" }, () => stakeWords(days, spare, hour()));
 }
 
 /** A count of games, the way it's said: 1 игра, 2 игри. */

@@ -162,7 +162,7 @@ function nextOf(d: DayWaits | null, again: () => void): { main: Child; also: Chi
       also: [h("a", { class: "btn", href: "/" }, "Към Начало")], // where the day and the other topics are
     };
   return {
-    main: [h("a", { class: "btn primary big", href: "/" }, "Към въпросите на деня"), stakeLine(d.streak, d.reserve)],
+    main: [h("a", { class: "btn primary big", href: "/" }, "Към въпросите на деня"), stakeLine(d.streak, d.spare)],
     also: [h("button", { class: "btn", onclick: again }, "Още десет")],
   };
 }
@@ -199,16 +199,17 @@ function otherTopics(current: string): Child {
   };
 }
 
-/** The day's ten, while they wait for the player: the streak (to yesterday) and the reserve days in hand. */
+/** The day's ten, while they wait for the player: the streak (to yesterday) and whether the week would forgive a day
+ * missed. */
 interface DayWaits {
   streak: number;
-  reserve: number;
+  spare: boolean;
 }
 
 /** Whether the day's ten still wait for the player (null once played), from Начало's state. */
 async function dayWaits(): Promise<DayWaits | null> {
-  const t = await api<{ streak: number; reserve?: number; run: State | null }>("GET", "/api/day");
-  return t.run?.done ? null : { streak: t.streak, reserve: t.reserve ?? 0 };
+  const t = await api<{ streak: number; spare?: boolean; run: State | null }>("GET", "/api/day");
+  return t.run?.done ? null : { streak: t.streak, spare: t.spare ?? true };
 }
 
 /** A game of a topic the player left unfinished today (play.Left): how far it got, and whether its question is

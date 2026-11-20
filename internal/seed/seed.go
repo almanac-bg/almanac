@@ -5,7 +5,7 @@
 // now: players arrive (account.Accounts.Guest, named and given an email by some), play the day's ten and topics
 // (play.Game: Show, Start, Answer), live duels with each other and against recordings (StartLive,
 // ShowLive, AnswerLive), and Роял evenings with their cuts and podiums (royal.Hub, stepped on the same clock); they
-// ask each other to be friends, accept, say no, choose their look. Whatever follows from that, the game works out itself: scores, streaks, reserve days, goals, XP and
+// ask each other to be friends, accept, say no, choose their look. Whatever follows from that, the game works out itself: scores, streaks, goals, XP and
 // levels, achievements and titles, ratings and divisions (newcomers still placing too), the facts of Моят Алманах.
 // Only what no game function
 // writes is written directly: when a player came and was last seen, their email, their mail and notification
@@ -108,9 +108,6 @@ func Seed(ctx context.Context, db *store.DB, b *bank.Bank, o Options) ([]Persona
 	if o.Players < len(personaKinds)+10 || o.Days < 14 {
 		return nil, fmt.Errorf("seed: at least %d players and 14 days", len(personaKinds)+10)
 	}
-	// Reserve days by today's rules from the first day, as a development server counts them (serve: DEV=1): the
-	// history has no players from before them.
-	play.ReserveRulesFrom = ""
 	end := o.Now.In(play.Bulgaria)
 	first := time.Date(end.Year(), end.Month(), end.Day(), 0, 0, 0, 0, play.Bulgaria).AddDate(0, 0, -(o.Days - 1))
 	w := &world{

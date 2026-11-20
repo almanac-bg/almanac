@@ -100,13 +100,13 @@ func (s *Server) streakMails(ctx context.Context, at time.Time) int {
 }
 
 // streakMailDue are the players who may be due the mail today, with their minute: an email, no notifications, and
-// the day's questions last finished between ReserveMax+2 and 2 days ago (the streak ended yesterday, if it was one:
+// the day's questions last finished between MostForgiven+2 and 2 days ago (the streak ended yesterday, if it was one:
 // streakMail says).
 func (s *Server) streakMailDue(ctx context.Context, today string) (map[int64]int, error) {
 	rows, err := s.db.Read.QueryContext(ctx, `SELECT u.id FROM users u WHERE u.email IS NOT NULL
 		AND NOT EXISTS (SELECT 1 FROM push_subs p WHERE p.user_id = u.id)
 		AND (SELECT max(day) FROM runs r WHERE r.user_id = u.id AND r.kind = 'day' AND r.finished_at IS NOT NULL)
-			BETWEEN ? AND ?`, play.DayShift(today, -2-play.ReserveMax), play.DayShift(today, -2))
+			BETWEEN ? AND ?`, play.DayShift(today, -2-play.MostForgiven), play.DayShift(today, -2))
 	if err != nil {
 		return nil, err
 	}

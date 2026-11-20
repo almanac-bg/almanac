@@ -63,6 +63,10 @@ var mergeSteps = []mergeStep{
 	{carries: []string{"active_days.user_id"},
 		sql: `INSERT OR IGNORE INTO active_days (user_id, day) SELECT ?1, day FROM active_days WHERE user_id = ?2`},
 	{sql: `DELETE FROM active_days WHERE user_id = ?2`},
+	// The days the guest missed before the streak forgave a day a week, as the reserve days judged them (runs.go): a
+	// day the account has judged too stays the account's; one either played isn't missed.
+	{carries: []string{"streak_missed.user_id"}, sql: `INSERT OR IGNORE INTO streak_missed (user_id, day, kept)
+		SELECT ?1, day, kept FROM streak_missed WHERE user_id = ?2`},
 	// What the guest earned is the account's too.
 	{carries: []string{"achievements.user_id"}, sql: `INSERT OR IGNORE INTO achievements (user_id, id, at, seen, xp)
 		SELECT ?1, id, at, seen, xp FROM achievements WHERE user_id = ?2`},

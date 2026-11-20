@@ -97,12 +97,21 @@ func (w *world) plan() ([]session, error) {
 			continue
 		}
 		if p.kind == lapsing && p.until < 0 && w.day >= w.today()-4 && p.id != 0 {
-			// A streak that ends yesterday, whichever reserve days it holds (cast): stop on the day that does it.
+			// A streak that ends yesterday (cast): stop on the day that does it. Missed from today, it ends today if
+			// this week has forgiven a day already; else tomorrow, or the day after if tomorrow is a Monday, whose
+			// week forgives one of its own (play/runs.go).
 			s, err := w.g.StreakOf(w.ctx, p.id)
 			if err != nil {
 				return nil, err
 			}
-			if w.day+s.Reserve == w.today()-1 {
+			ends := w.day
+			if s.Spare {
+				ends++
+				if w.dayAt(ends, 0, 0).Weekday() == time.Monday {
+					ends++
+				}
+			}
+			if ends == w.today()-1 {
 				p.until = w.day - 1
 				continue
 			}

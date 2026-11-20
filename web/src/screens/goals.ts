@@ -1,14 +1,11 @@
 // The day's goals: three a day, each one game at most — the day's questions, another game drawn for the player, and a
-// game played well (8 of 10) — each worth XP once done, and each a way to where it's done (play/goals.go). All three
-// done earn a reserve day, which keeps the streak through a day missed: one a week at most, from the streak's third day
-// (play/runs.go); the card says when they won't. Начало has them in a card; the day's result, just played, has those
-// still open, quietly, as what's next.
+// game played well (8 of 10) — each worth XP once done, and each a way to where it's done (play/goals.go). Начало has
+// them in a card; the day's result, just played, has those still open, quietly, as what's next.
 
-import { picture } from "../art/picture.ts";
 import { api } from "../lib/api.ts";
 import { type Child, h, type Signal, signal } from "../lib/dom.ts";
 import { user } from "../state.ts";
-import { meter, reserveWords } from "../ui.ts";
+import { meter } from "../ui.ts";
 
 export interface DayGoal {
   id: string;
@@ -23,12 +20,6 @@ export interface DayGoal {
 
 export interface Goals {
   goals: DayGoal[];
-  /** Reserve days in hand, of the most there can be: all three goals done earns one. */
-  reserve: number;
-  reserveMax: number;
-  /** What all three done today bring the streak: a reserve day (""), or nothing, as all are in hand ("full"), this
-   * week's is earned ("week") or the streak is under three days ("soon"). */
-  reserveBy: "" | "full" | "week" | "soon";
 }
 
 export const loadGoals = () => api<Goals>("GET", "/api/goals");
@@ -73,7 +64,6 @@ export function goalsCard(): Child {
     const d = data();
     if (!d) return null;
     const goals = d.goals;
-    const all3 = goals.every((g) => g.done);
     const earned = goals.filter((g) => g.done).reduce((n, g) => n + g.xp, 0);
     const all = goals.reduce((n, g) => n + g.xp, 0);
     return h(
@@ -86,21 +76,6 @@ export function goalsCard(): Child {
         h("span", { class: "tag num" }, `${earned} от ${all} XP`),
       ),
       h("ul", { class: "goal-list" }, goals.map(goalRow)),
-      // All three keep the streak through a missed day, or why not now.
-      h(
-        "p",
-        { class: all3 ? "goals-reserve done" : "goals-reserve" },
-        picture("shield", "reserve-pic"),
-        d.reserveBy === "full"
-          ? `Имаш всички резервни дни: ${d.reserve} от ${d.reserveMax}.`
-          : d.reserveBy === "week"
-            ? all3
-              ? `И трите са изпълнени. Резервният ден за седмицата е спечелен: имаш ${reserveWords(d.reserve)}.`
-              : "Резервният ден за седмицата е спечелен."
-            : d.reserveBy === "soon"
-              ? "Резервен ден за серията идва на третия ден поред."
-              : "Изпълни и трите: +1 резервен ден за серията.",
-      ),
     );
   };
 }

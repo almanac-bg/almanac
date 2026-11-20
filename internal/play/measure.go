@@ -305,23 +305,23 @@ func StreakBand(days int) int {
 	return b
 }
 
-// StreakHealth is how the streaks go: those going on now, and over the days measured, the reserve days spent and the
-// streaks that ended, by the bands of StreakBands.
+// StreakHealth is how the streaks go: those going on now, and over the days measured, the days missed that the streaks
+// forgave and the streaks that ended, by the bands of StreakBands.
 type StreakHealth struct {
-	Going []int
-	Spent int
-	Ended []int
+	Going    []int
+	Forgiven int
+	Ended    []int
 }
 
-// StreakHealth tells the streaks going on now, and those ended and the reserve days spent over the last `days` days
+// StreakHealth tells the streaks going on now, and those ended and the days forgiven over the last `days` days
 // (today, not over yet, not among them).
 func (g *Game) StreakHealth(ctx context.Context, days int) (StreakHealth, error) {
 	h := StreakHealth{Going: make([]int, len(StreakBands)), Ended: make([]int, len(StreakBands))}
 	today := g.Today()
 	from := DayShift(today, -days)
-	// Whoever's streak was alive in the days measured finished a day's ten no more than ReserveMax days before them.
+	// Whoever's streak was alive in the days measured finished a day's ten no more than MostForgiven days before them.
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT DISTINCT user_id FROM runs WHERE kind = 'day' AND finished_at IS NOT NULL
-		AND day >= ?`, DayShift(from, -ReserveMax-1))
+		AND day >= ?`, DayShift(from, -MostForgiven-1))
 	if err != nil {
 		return h, err
 	}
@@ -344,12 +344,12 @@ func (g *Game) StreakHealth(ctx context.Context, days int) (StreakHealth, error)
 		if days.first == "" {
 			continue
 		}
-		s := walkStreak(days, today, func(day string, spent bool, ended int) {
+		s := walkStreak(days, today, func(day string, forgiven bool, ended int) {
 			if day < from {
 				return
 			}
-			if spent {
-				h.Spent++
+			if forgiven {
+				h.Forgiven++
 			} else {
 				h.Ended[StreakBand(ended)]++
 			}

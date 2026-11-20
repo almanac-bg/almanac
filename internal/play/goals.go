@@ -23,8 +23,7 @@ import (
 // questions count on their own day, all ten, though the last answers came after midnight (onDay): so a day run begun
 // at 23:58 finishes that day's goals, not the next's. A goal done earns its tier's XP, kept as it's done (whether or not the player
 // looks; after.go keeps the goals of the day a game counts on, whenever that's done) and told once, at the end of the
-// game that did it. A day with all three done also earns a reserve day for the streak (runs.go), and counts towards
-// the achievements for full days.
+// game that did it. A day with all three done counts towards the achievements for full days.
 
 // Goal is one of the day's goals: what to do, how much of it, and where it's done.
 type Goal struct {

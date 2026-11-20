@@ -240,8 +240,8 @@ func (w *world) about(p *player) (string, error) {
 	if play.Placed(standing.Rated) {
 		rating = fmt.Sprintf("%s, rating %d", standing.Division.Name, standing.Rating)
 	}
-	facts := fmt.Sprintf("%d days played, streak %d (best %d, %d reserve), level %d, %s, %d friends",
-		days, streak.Days, streak.Best, streak.Reserve, level.Level, rating, len(friends))
+	facts := fmt.Sprintf("%d days played, streak %d (best %d, spare %v), level %d, %s, %d friends",
+		days, streak.Days, streak.Best, streak.Spare, level.Level, rating, len(friends))
 	fail := func(why string) (string, error) {
 		return "", fmt.Errorf("seed: the %s persona %s: %s", p.persona, why, facts)
 	}

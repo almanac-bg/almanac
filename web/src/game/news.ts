@@ -89,7 +89,7 @@ interface MovedGoal {
 export function news(
   run: number,
   delay = 0,
-  streak?: { round: Promise<number>; reserve?: Promise<boolean>; grown: Promise<unknown> },
+  streak?: { round: Promise<number>; grown: Promise<unknown> },
   late?: { title?: string },
 ): Child {
   const data = signal<News | null>(null);
@@ -102,7 +102,7 @@ export function news(
           data.set(n);
           if (late) return;
           const kit = feelKit();
-          const top = kit && bigOne(n, (await streak?.round) ?? 0, (await streak?.reserve) ?? false);
+          const top = kit && bigOne(n, (await streak?.round) ?? 0);
           if (!kit || !top) {
             // After the result's own moment, whose sound (a duel's verdict, the day's end) comes first.
             const sound = loudest(n);
@@ -178,12 +178,11 @@ function loudest(n: News): SoundName | null {
 }
 
 /** The one big thing a game brought, for its sheet: a division reached,
- * the streak at a round number (`days`, with the reserve day it earned, if it did), a level that unlocks something or
+ * the streak at a round number (`days`), a level that unlocks something or
  * is a fifth, an epic or legendary achievement. The smaller news stays in the cards. */
 function bigOne(
   n: News,
   days: number,
-  reserve = false,
 ): {
   parts: Element[];
   sound: SoundName;
@@ -224,12 +223,7 @@ function bigOne(
     };
   if (days)
     return {
-      parts: sheet(
-        numeral(String(days)),
-        "Серия",
-        `${days} дни поред с въпросите на деня.`,
-        reserve ? "Получаваш резервен ден: ако пропуснеш ден, серията остава." : null,
-      ),
+      parts: sheet(numeral(String(days)), "Серия", `${days} дни поред с въпросите на деня.`),
       sound: "streak",
       glow: true,
     };

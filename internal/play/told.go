@@ -16,7 +16,7 @@ import (
 //   - A game's news belongs to that game (NewsOf): its result tells it as it ends. A game that ended without its result
 //     on screen (the day's last question let run out with the tab in the background, a game left at its last question,
 //     a Роял whose evening ended) has its news told on Начало instead, once (Untold), and not after some later game.
-//   - What came of the days just missed (a reserve day kept the streak, or it ended) is said once (StreakNotice,
+//   - What came of the days just missed (the week forgave one, or the streak ended) is said once (StreakNotice,
 //     TellStreak). A player back after days away (BackFrom) is welcomed back once, with the longest streak they've
 //     had, in the same way.
 
@@ -38,7 +38,7 @@ func (g *Game) Untold(ctx context.Context, userID int64) (int64, error) {
 
 // streakKey is what a streak notice is kept by: what came of it and the day it's about (back: the last day played
 // before a player came back, BackFrom).
-var streakKey = regexp.MustCompile(`^(kept|ended|back):\d{4}-\d{2}-\d{2}$`)
+var streakKey = regexp.MustCompile(`^(forgiven|ended|back):\d{4}-\d{2}-\d{2}$`)
 
 // BackFrom is how many days after the last day played a player who comes back is welcomed back (BackOf): two days
 // missed or more, so further back than a streak's end that Начало tells (StreakNotice).
@@ -61,7 +61,7 @@ func (g *Game) Away(last string) bool {
 // ErrNotice is a streak notice that isn't one.
 var ErrNotice = errors.New("no such notice")
 
-// StreakTold is the last streak notice the player has been told ("kept:2026-11-15", "ended:2026-11-15"; "" for none).
+// StreakTold is the last streak notice the player has been told ("forgiven:2026-11-15", "ended:2026-11-15"; "" for none).
 func (g *Game) StreakTold(ctx context.Context, userID int64) (string, error) {
 	var key string
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT streak_told FROM users WHERE id = ?`, userID).Scan(&key)

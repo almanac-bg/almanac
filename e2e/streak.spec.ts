@@ -3,7 +3,8 @@ import { daysPlayed, openGame, playRun, startDay } from "./play.ts";
 
 test("a streak that ended is said to have ended, once", async ({ page }) => {
   await page.goto("/");
-  await daysPlayed(page, 4, 3);
+  // Three days missed since: two weeks forgive two at most, so the third ends it, whatever today's weekday.
+  await daysPlayed(page, 5, 4);
   await page.reload();
   await expect(page.locator(".streak-notice")).toContainText("Серията ти от 2 дни прекъсна. Днес започва нова.");
   await page.reload();
@@ -11,12 +12,13 @@ test("a streak that ended is said to have ended, once", async ({ page }) => {
   await expect(page.locator(".streak-notice")).toHaveCount(0);
 });
 
-test("Профил keeps the longest streak, under the one going on", async ({ page }) => {
+test("Профил keeps the longest streak, under the one going on, and says what the week forgives", async ({ page }) => {
   await page.goto("/");
   await daysPlayed(page, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 2, 1);
   await page.goto("/me");
   await expect(page.locator(".streak .streak-num")).toHaveText("2");
   await expect(page.locator(".streak")).toContainText("Най-дълга серия: 12 дни");
+  await expect(page.locator(".streak")).toContainText("Един пропуснат ден в седмицата не прекъсва серията.");
 });
 
 test("a streak at stake: unlit till the day lights it, pointed to from a topic, tomorrow under the result", async ({
@@ -24,14 +26,11 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
 }) => {
   test.setTimeout(120_000);
   await page.goto("/");
-  // Three days, to yesterday; the third earned a reserve day, so nothing ends at midnight, whatever the hour.
+  // Three days, to yesterday, none missed: the week would forgive today, so nothing ends at midnight, whatever the hour.
   await daysPlayed(page, 3, 2, 1);
   await page.reload();
   await expect(page.locator(".streak-chip.unlit")).toContainText("3");
   await expect(page.locator(".day .day-stake")).toHaveText("Серия от 3 дни. С днешните въпроси става 4.");
-  // The reserve day, a tap from what it's for.
-  await page.locator(".status-reserve .explain").click();
-  await expect(page.getByRole("note")).toHaveText("Резервен ден: пази серията, ако пропуснеш ден.");
   // A topic's result points to the day while it waits: the gold button, the streak under it, „Още десет“ plain.
   await openGame(page, "/play/history");
   await playRun(page);
@@ -97,11 +96,10 @@ test("a round streak is told by its sheet, not first by its chip: the number rol
   test.setTimeout(120_000);
   await watchChip(page);
   await page.goto("/");
-  // Two days: no reserve day yet, so the second's stake is real; the third brings the first, told with its sheet.
+  // Two days: the third is a round number, told with its sheet.
   await daysPlayed(page, 2, 1);
   await page.reload();
   await expect(page.locator(".streak-chip.unlit")).toContainText("2дни поред");
-  await expect(page.locator(".status-reserve")).toHaveCount(0);
   await startDay(page);
   await heard(page);
   await watchSheet(page);
@@ -110,7 +108,6 @@ test("a round streak is told by its sheet, not first by its chip: the number rol
   // It waits for the result to land and the chips to grow (a new level here: its bar fills, its number rolls, it fills
   // again), about four seconds, longer on a slow machine.
   await expect(sheet).toBeVisible({ timeout: 10_000 });
-  await expect(sheet).toContainText("Получаваш резервен ден: ако пропуснеш ден, серията остава.");
   const said = await heard(page);
   expect(said[0]).toBe("2дни поред unlit");
   expect(said).toContain("23дни поред");

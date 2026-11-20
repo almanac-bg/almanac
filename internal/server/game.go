@@ -43,22 +43,22 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 		if err != nil {
 			return nil, err
 		}
-		out["streak"], out["reserve"] = streak.Days, streak.Reserve
-		// What came of the days just missed, told on Начало once (play.TellStreak: the client says when it has): a
-		// reserve day kept the streak; or none was left and it ended, and a new one begins.
+		out["streak"], out["spare"] = streak.Days, streak.Spare
+		// What came of the days just missed, told on Начало once (play.TellStreak: the client says when it has): the
+		// week forgave one; or it had forgiven one already and the streak ended, and a new one begins.
 		recent := s.game.Now().In(play.Bulgaria).AddDate(0, 0, -3).Format(time.DateOnly)
 		told, err := s.game.StreakTold(ctx, u.ID)
 		if err != nil {
 			return nil, err
 		}
-		if n := len(streak.Saved); n > 0 && streak.Saved[n-1] >= recent && told != "kept:"+streak.Saved[n-1] {
-			out["kept"] = streak.Saved[n-1]
+		if n := len(streak.Forgiven); n > 0 && streak.Forgiven[n-1] >= recent && told != "forgiven:"+streak.Forgiven[n-1] {
+			out["forgiven"] = streak.Forgiven[n-1]
 		}
 		if e := streak.Ended; e != nil && e.On >= recent && e.Days >= 2 {
 			if told != "ended:"+e.On {
 				out["ended"] = e
 			}
-		} else if e != nil && out["kept"] == nil && streak.Days <= 1 {
+		} else if e != nil && out["forgiven"] == nil && streak.Days <= 1 {
 			// Back after days away, the streak ended since the last day played (and not just now: that's told as its
 			// end, above): welcomed back, once, with the longest streak they've had.
 			last, err := s.game.LastDay(ctx, u.ID)

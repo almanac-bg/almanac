@@ -367,12 +367,5 @@ func (s *Server) goals(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	streak, err := s.game.StreakOf(r.Context(), u.ID)
-	if err != nil {
-		return err
-	}
-	// What the three done would bring the streak: a reserve day, or why not (all in hand, this week's earned, the
-	// streak too young: play.ReserveFrom).
-	return ok(w, map[string]any{"goals": goals, "reserve": streak.Reserve, "reserveMax": play.ReserveMax,
-		"reserveBy": streak.GoalsReserve()})
+	return ok(w, map[string]any{"goals": goals})
 }

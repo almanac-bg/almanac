@@ -14,10 +14,10 @@ export interface Stats {
   /** The longest streak the player has had. */
   best: number;
   week: boolean[];
-  saved: boolean[];
-  reserve: number;
-  /** Days in a row to the next reserve day (0: they are full). */
-  next: number;
+  /** This week's day missed that the streak forgave, Monday first. */
+  forgiven: boolean[];
+  /** Whether this week would still forgive a day missed. */
+  spare: boolean;
   days: number;
   games: number;
   answers: number;
@@ -97,11 +97,11 @@ export function stats(): Child {
     if (!s) return null;
     if (s.games === 0)
       return [
-        streak(s.streak, s.week, s.saved, s.reserve, s.next, s.best),
+        streak(s.streak, s.week, s.forgiven, s.spare, s.best),
         h("p", { class: "muted" }, "Още няма изиграни игри."),
       ];
     return [
-      streak(s.streak, s.week, s.saved, s.reserve, s.next, s.best),
+      streak(s.streak, s.week, s.forgiven, s.spare, s.best),
       h(
         "section",
         { class: "card figures" },
