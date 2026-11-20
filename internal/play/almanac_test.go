@@ -41,8 +41,8 @@ func (w *world) rewrite(user int64) {
 	}
 }
 
-// The almanac counts the facts collected: a question with a fact, answered right once, whatever came
-// before or after; a wrong answer or a time-out counts nothing, and neither does a question without a fact.
+// The almanac has every fact met, once: a question with a fact, answered right or wrong, or let run out, in grey
+// outside the day's issue; never one without a fact; and a question met again is the same entry.
 func TestFactsCollected(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -60,28 +60,22 @@ func TestFactsCollected(t *testing.T) {
 	}
 	w.play(ana, run.ID, answers...)
 	want := 0
-	for n, p := range w.picks(run.ID) {
-		if q, _ := w.b.Get(p.ID); n%2 == 0 && q.Extra().Fact != "" {
+	var ids []string
+	for _, p := range w.picks(run.ID) {
+		if q, _ := w.b.Get(p.ID); q.Extra().Fact != "" {
 			want++
-		}
-	}
-	// The same questions again, all right: the wrong ones are learned now; the right ones were already.
-	var again []string
-	for n, p := range w.picks(run.ID) {
-		if q, _ := w.b.Get(p.ID); n%2 == 1 && q.Extra().Fact != "" {
-			again = append(again, p.ID)
+			ids = append(ids, p.ID)
 		}
 	}
 	alm, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage})
 	if err != nil || len(alm.Facts) != want || alm.Found != want || len(alm.Ink) != 0 ||
 		slices.ContainsFunc(alm.Facts, func(l Learned) bool { return l.Ink }) {
-		t.Fatalf("%d facts in the almanac after a topic's game half right, want %d in pencil (ink %v, %v)",
+		t.Fatalf("%d facts in the almanac after a topic's game half right, want %d in grey (ink %v, %v)",
 			len(alm.Facts), want, alm.Ink, err)
 	}
-	w.knows(ana, append(again, w.picks(run.ID)[0].ID)...)
-	want += len(again)
+	w.knows(ana, ids...)
 	if alm, _ := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage}); alm.Found != want {
-		t.Fatalf("the almanac: %d facts, want %d: one answered right again counts once", alm.Found, want)
+		t.Fatalf("the almanac: %d facts, want %d: one met again is one entry", alm.Found, want)
 	}
 }
 

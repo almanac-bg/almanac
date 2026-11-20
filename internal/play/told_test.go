@@ -49,7 +49,7 @@ func TestUntold(t *testing.T) {
 	if id := untold(); id != b.ID {
 		t.Fatalf("the latest untold: %d, not %d", id, b.ID)
 	}
-	if n, _ := w.g.NewsOf(ctx, ana, b.ID); n.Ink != 0 || n.Pencil {
+	if n, _ := w.g.NewsOf(ctx, ana, b.ID); n.Ink != 0 || n.MetBefore != 0 {
 		t.Fatalf("a game of wrong answers: %+v", n)
 	}
 	if id := untold(); id != 0 {
@@ -77,13 +77,13 @@ func TestNewsFacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n.Ink != 0 || !n.Pencil {
+	if n.Ink != 0 || n.MetBefore != 0 {
 		t.Fatalf("a first game, three right: %+v", n)
 	}
 	s, _ = w.g.StartTopic(ctx, ana, "history")
 	w.play(ana, s.ID, repeat(wrong, Length)...)
 	n, _ = w.g.NewsOf(ctx, ana, s.ID)
-	if n.Pencil || n.Rose != nil {
+	if n.Ink != 0 || n.Rose != nil {
 		t.Fatalf("a second game, all wrong: %+v", n)
 	}
 }
