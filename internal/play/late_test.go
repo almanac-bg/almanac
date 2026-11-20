@@ -9,14 +9,14 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 )
 
-// The clock is a base for the kind and a slow reader's time to read the question, never under the kind's floor: 15 s
-// for a true-or-not, 25 s for a choice or a number, 40 s for an order, a match, a split or clues; and never over
+// The clock is a base for the kind and a slow reader's time to read the question, never under the kind's floor: 20 s
+// for a true-or-not, 35 s for a choice or a number, 60 s for an order, a match, a split or clues; and never over
 // LongestLimit.
 func TestLimitByLength(t *testing.T) {
 	short := bank.Head{Text: "Кратко?"}
 	for typ, floor := range map[string]time.Duration{
-		"truefalse": 15 * time.Second, "choice": 25 * time.Second, "number": 25 * time.Second,
-		"order": 40 * time.Second, "match": 40 * time.Second, "split": 40 * time.Second, "clues": 40 * time.Second,
+		"truefalse": 20 * time.Second, "choice": 35 * time.Second, "number": 35 * time.Second,
+		"order": 60 * time.Second, "match": 60 * time.Second, "split": 60 * time.Second, "clues": 60 * time.Second,
 	} {
 		h := short
 		h.Type = typ
@@ -42,11 +42,11 @@ func TestLimitByLength(t *testing.T) {
 		}
 	}
 	// A long choice: its base and its reading, past the floor.
-	long := &bank.Choice{Head: bank.Head{Type: "choice", Text: strings.Repeat("дума ", 30) + "?"},
+	long := &bank.Choice{Head: bank.Head{Type: "choice", Text: strings.Repeat("дума ", 50) + "?"},
 		Answer: strings.Repeat("а", 40), Wrong: []string{strings.Repeat("б", 40), strings.Repeat("в", 40), strings.Repeat("г", 40)}}
 	read := float64(bank.Reading(long)) / SlowReading
 	if want := (limits["choice"].base + time.Duration(read*float64(time.Second))).Round(time.Second); Limit(long) != want ||
-		want <= 25*time.Second {
+		want <= 35*time.Second {
 		t.Errorf("a long choice (%d letters): %v, want %v, past its floor", bank.Reading(long), Limit(long), want)
 	}
 	// However long, never over LongestLimit.
@@ -119,5 +119,40 @@ func TestLateAnswers(t *testing.T) {
 	}
 	if late, err := w.g.LateAnswerers(ctx, 10); err != nil || len(late) != 0 {
 		t.Fatalf("a month on: %+v %v", late, err)
+	}
+}
+
+// /admin counts the answers run out of time by kind, what the clock's floors are set by: a time run out counts, an
+// answer or a give-up doesn't.
+func TestTimedOutByKind(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	u := w.user()
+	s, _ := w.g.StartDay(ctx, u)
+	w.show(u, s.ID)
+	w.wait(3 * time.Second)
+	if _, err := w.answer(u, s.ID, 0, w.right(s.ID, 0)); err != nil {
+		t.Fatal(err)
+	}
+	w.show(u, s.ID)
+	w.wait(time.Second + 300*time.Millisecond)
+	if _, err := w.g.Answer(ctx, u, s.ID, 1, nil); err != nil { // given up
+		t.Fatal(err)
+	}
+	w.show(u, s.ID)
+	w.wait(Limit(w.question(s.ID, 2)) + time.Minute) // run out
+	if _, err := w.g.State(ctx, u, s.ID); err != nil {
+		t.Fatal(err)
+	}
+	list, err := w.g.TimedOutSince(ctx, w.g.Today())
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, of := 0, 0
+	for _, k := range list {
+		n, of = n+k.N, of+k.Of
+	}
+	if n != 1 || of != 3 {
+		t.Fatalf("run out %d of %d: %+v", n, of, list)
 	}
 }

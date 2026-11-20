@@ -152,6 +152,10 @@ var adminBody = template.Must(template.New("admin").Parse(`
 {{range .Loop}}<tr><td>{{if .Sub}}<span class="muted">·</span> {{end}}{{.Name}}</td><td class="num">{{.Week}}</td><td class="num">{{.Month}}</td></tr>{{end}}
 </tbody></table></div>
 <p>Отговори в деня на въпрос, на който играчът е отговарял преди, за 7 дни: {{.Repeats.HTML}} (трябва да е 0).</p>
+{{if .TimedOut}}<p>Изтекло време, по вид въпрос, за 28 дни (трябва да е под 2 %):</p>
+<div class="table-scroll"><table class="admin-table"><tbody>
+{{range .TimedOut}}<tr><td>{{.Name}}</td><td class="num">{{.Share.HTML}}</td></tr>{{end}}
+</tbody></table></div>{{end}}
 </section>
 
 <section class="admin-section" id="streaks">

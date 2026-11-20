@@ -29,6 +29,54 @@ func keepLate(tx *sql.Tx, runID int64, n int, late time.Duration, at time.Time) 
 	return err
 }
 
+// TimedOut is how many of people's answers of a kind of question ran out of time (Of: all of them), since a day: what
+// the clock's floors are set by (Limit: under 2% each).
+type TimedOut struct {
+	Kind  string
+	N, Of int
+}
+
+// TimedOutSince counts people's answers by kind since a day (YYYY-MM-DD), and those that ran out of time: no answer,
+// kept at the question's whole limit (settle keeps a time run out as its limit, in whole seconds; a give-up keeps when
+// it came), in games not a script's or a second play's (FairAnswers).
+func (g *Game) TimedOutSince(ctx context.Context, day string) ([]TimedOut, error) {
+	start, _ := dayBounds(day)
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, given IS NULL AND ms % 1000 = 0 AND ms >= 15000
+		FROM answers WHERE at >= ? AND `+FairAnswers, start)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	b := g.Bank()
+	by := map[string]*TimedOut{}
+	for rows.Next() {
+		var id string
+		var out bool
+		if err := rows.Scan(&id, &out); err != nil {
+			return nil, err
+		}
+		q, ok := b.Get(id)
+		if !ok {
+			continue
+		}
+		k := q.Base().Type
+		if by[k] == nil {
+			by[k] = &TimedOut{Kind: k}
+		}
+		by[k].Of++
+		if out {
+			by[k].N++
+		}
+	}
+	var list []TimedOut
+	for _, k := range []string{"truefalse", "choice", "number", "order", "match", "split", "clues"} {
+		if t := by[k]; t != nil {
+			list = append(list, *t)
+		}
+	}
+	return list, rows.Err()
+}
+
 // LateAnswerer is a player whose answers were taken late (LateGrace) within LateKept: how many, of how many answers
 // they gave in that time, and how late the latest came.
 type LateAnswerer struct {
