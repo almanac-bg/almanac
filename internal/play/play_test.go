@@ -84,6 +84,10 @@ func (w *world) user() int64 {
 	return id
 }
 
+// pastLimit is a wait past any question's time, its grace for a late answer too: the longest limit is a minute (an
+// order or a match), so a minute's wait is no time run out.
+const pastLimit = LongestLimit + LateGrace + time.Second
+
 func (w *world) wait(d time.Duration) {
 	w.clock.Lock()
 	defer w.clock.Unlock()
@@ -393,7 +397,7 @@ func TestQuestionTime(t *testing.T) {
 
 	// Left showing past its time: unanswered, as soon as anyone looks.
 	_, _ = w.g.Show(ctx, u, s.ID)
-	w.wait(time.Minute)
+	w.wait(pastLimit)
 	st, _ := w.g.State(ctx, u, s.ID)
 	if st.At != 2 || st.Question != nil || len(st.Trail) != 2 || st.Trail[1].Right || st.Trail[1].Close {
 		t.Fatalf("after its time ran out: %+v", st)
@@ -465,7 +469,7 @@ func TestAnswerAgain(t *testing.T) {
 		t.Fatalf("sent again with the next question showing: %+v %v", again, err)
 	}
 	// A question whose time ran out: sent after it did, the answer is that.
-	w.wait(time.Minute)
+	w.wait(pastLimit)
 	if _, err := w.g.State(ctx, u, s.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -822,7 +826,7 @@ func TestTopicLeftHalfWay(t *testing.T) {
 	if _, err := w.g.Show(ctx, u, first.ID); err != nil {
 		t.Fatal(err)
 	}
-	w.wait(time.Minute)
+	w.wait(pastLimit)
 	back, err := w.g.StartTopic(ctx, u, "history")
 	if err != nil || back.ID != first.ID || back.At != 4 || len(back.Trail) != 4 || back.Question != nil {
 		t.Fatalf("back to the topic: %+v %v", back, err)
