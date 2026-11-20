@@ -14,7 +14,7 @@
 
 import { ApiError, errorText, passing, tries } from "../lib/api.ts";
 import { effect, h, lifetime, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
-import { type VerdictKind, verdictWords } from "../ui.ts";
+import { type VerdictKind, verdictSays } from "../ui.ts";
 import { type Asked, ask, spokenAnswer } from "./questions.ts";
 import type { Answer, Reveal, View } from "./types.ts";
 
@@ -43,7 +43,7 @@ export function liveRegion(): { node: HTMLElement; say: Say } {
  * „Вярно!“ */
 export function spokenVerdict(kind: VerdictKind, view: View, reveal: Reveal): string {
   const answer = kind === "right" || kind === "exact" ? "" : spokenAnswer(view, reveal);
-  return [verdictWords[kind], answer].filter(Boolean).join(" ");
+  return [verdictSays(kind, view.type), answer].filter(Boolean).join(" ");
 }
 
 /** A question's seconds left, counting down with the clock: each second is worked out from when the time ends, so

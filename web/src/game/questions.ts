@@ -5,7 +5,7 @@ import { append, type Child, effect, h, listen, onCleanup, type Signal, signal }
 import { ordinal } from "../lib/ordinal.ts";
 import { play } from "../lib/sound.ts";
 import { hyphenate, withWord } from "../lib/words.ts";
-import { formatNumber } from "../ui.ts";
+import { formatNumber, type VerdictKind } from "../ui.ts";
 import { percent, rare, withOwn } from "./numbers.ts";
 import { optionSizes, overSizes } from "./sizes.ts";
 import type {
@@ -38,8 +38,8 @@ export interface Asked {
   /** The answering part, under the question. */
   node: Child;
   /** Shows the answer: what was right, and how what was given compares; in beats on a stage (a run, run.ts), the
-   * player's own answer first; `near`: it was close („близо“). */
-  reveal(reveal: Reveal, given: Answer | null, at?: Stage, near?: boolean): void;
+   * player's own answer first; `how` it went (a number's own mark: right, close („близо“) or not). */
+  reveal(reveal: Reveal, given: Answer | null, at?: Stage, how?: VerdictKind): void;
   /** What's been put in but not sent yet (a typed number, things moved into an order): it counts when time runs out. */
   pending(): Answer | null;
   /** Takes a newer view of the same question, as more of it shows (the next clue). */
@@ -141,9 +141,9 @@ export function ask(
 
 /** Draws a question as it was answered, for going over it once the question is past (a review). „Вярно“ and „Невярно“ carry no ✓ while asked; here the right one says it is, for whoever can't tell
  * colours. */
-export function answered(view: View, reveal: Reveal, given: Answer | null, near = false): Child {
+export function answered(view: View, reveal: Reveal, given: Answer | null, how?: VerdictKind): Child {
   const a = ask(view, () => {}, signal(true), undefined, true);
-  a.reveal(reveal, given, undefined, near);
+  a.reveal(reveal, given, undefined, how);
   if (a.node instanceof Element)
     a.node.querySelector(".option.tf.right")?.append(h("small", { class: "tf-right" }, "верният отговор"));
   return a.node;
@@ -450,7 +450,7 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
       const v = value();
       return v === null ? null : { value: v };
     },
-    reveal(reveal, given, at = atOnce, near = false) {
+    reveal(reveal, given, at = atOnce, how) {
       pad.hidden = true;
       result.hidden = false;
       const answer = reveal.value ?? 0;
@@ -465,7 +465,7 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
             ? h("span", { class: "typed muted" }, "Без отговор")
             : [h("span", { class: "typed" }, said(mine)), view.unit ? h("span", { class: "unit" }, view.unit) : null],
         ),
-        mine === null || mine === answer ? null : scale(answer, mine, near, view),
+        mine === null || mine === answer ? null : scale(answer, mine, how, view),
         h("p", { class: "number-answer" }, "Отговорът: ", h("strong", null, `${said(answer)}${unit}`), "."),
       ]);
       // Everyone's guesses take their room at once, and show on their beat.
@@ -480,8 +480,12 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
 }
 
 /** The player's number beside the answer on a scale running a little past both (as far again as they are apart), its
- * two ends named: the answer a filled square, the player's half filled when it was close („близо“), hollow when not. */
-function scale(answer: number, mine: number, near: boolean, view: NumberView): HTMLElement {
+ * two ends named: the answer a filled square; the player's a filled disc when it was near enough to be right, half
+ * filled when it was close („близо“), hollow when not. */
+function scale(answer: number, mine: number, how: VerdictKind | undefined, view: NumberView): HTMLElement {
+  const right = how === "right" || how === "exact";
+  const near = how === "partial";
+  const mark = right ? "right" : near ? "near" : "mine";
   const gap = Math.abs(answer - mine);
   let lo = Math.min(answer, mine) - gap;
   const hi = Math.max(answer, mine) + gap;
@@ -498,7 +502,7 @@ function scale(answer: number, mine: number, near: boolean, view: NumberView): H
       { class: "near-scale", "aria-hidden": "true" },
       h("span", { class: "near-track" }),
       h("span", { class: "near-mark answer", style: { left: at(answer) } }, word(answer), h("i")),
-      h("span", { class: `near-mark ${near ? "near" : "mine"}`, style: { left: at(mine) } }, word(mine), h("i")),
+      h("span", { class: `near-mark ${mark}`, style: { left: at(mine) } }, word(mine), h("i")),
       h("span", { class: "near-end lo" }, word(lo)),
       h("span", { class: "near-end hi" }, `${word(hi)}${unit}`),
     ),
@@ -506,7 +510,7 @@ function scale(answer: number, mine: number, near: boolean, view: NumberView): H
       "p",
       { class: "near-key", "aria-hidden": "true" },
       h("span", null, h("i", { class: "answer" }), "отговорът"),
-      h("span", null, h("i", { class: near ? "near" : "" }), near ? "ти, близо" : "ти"),
+      h("span", null, h("i", { class: mark }), right ? "ти, вярно" : near ? "ти, близо" : "ти"),
     ),
   );
 }

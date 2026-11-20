@@ -1,8 +1,9 @@
 // Sharing the day's result (server/share.go, play/share.go): its issue, the score and its tiles, never an answer, and
 // the link that brings whoever opens it to the same ten: „Брой 42 · 8/10 · 23 дни“, the tiles as squares (■ right,
 // ◧ близо, □ not), the link. The link is made as the day is first shared (the server's), and kept for the page's life,
-// so a second tap shares at once. With it goes the card (game/card.ts), drawn here as it's shared, where the device's
-// share sheet takes a picture; where there's no sheet, the text is copied. What it looks like is the screen's: this is
+// so a second tap shares at once; where there's no sheet, the text is copied. The card (game/card.ts), drawn here as
+// it's shared, goes on its own, where the device's share sheet takes a picture: never with the text, which an app
+// given both may drop, link and all. What it looks like is the screen's: this is
 // only what it does, for any screen to use.
 
 import { api } from "../lib/api.ts";
@@ -55,15 +56,15 @@ export async function shareText(run: number, d: SharedDay): Promise<string> {
   return shareWords(d, await shareLink(run));
 }
 
-/** Shares a finished day (`run`): with the device's share sheet where there is one, the card with the text where it
- * takes a picture (`card`: drawn by then, or null), else by copying its text. The link is asked for first, so the
- * sheet opens a moment after the tap, which every browser allows (its five seconds). */
-export async function shareDay(run: number, d: SharedDay, card: File | null = null): Promise<Shared> {
+/** Shares a finished day (`run`): its text with the link, with the device's share sheet where there is one, else by
+ * copying it. Never with the card: an app given both may keep only the picture and lose the link (WhatsApp on an
+ * iPhone); the card goes on its own (shareCard). The link is asked for first, so the sheet opens a moment after the
+ * tap, which every browser allows (its five seconds). */
+export async function shareDay(run: number, d: SharedDay): Promise<Shared> {
   const text = await shareText(run, d);
   if (typeof navigator.share === "function") {
-    const files = card && navigator.canShare?.({ files: [card] }) ? [card] : null;
     try {
-      await navigator.share(files ? { files, text } : { text });
+      await navigator.share({ text });
       return "shared";
     } catch (err) {
       if ((err as Error)?.name === "AbortError") return "cancelled";
@@ -75,5 +76,17 @@ export async function shareDay(run: number, d: SharedDay, card: File | null = nu
     return "copied";
   } catch {
     return { text };
+  }
+}
+
+/** Shares the day's card on its own (game/card.ts: almanac.bg on it), where the device's share sheet takes a picture:
+ * "cancelled" where it was closed without a choice, or it couldn't. */
+export async function shareCard(card: File): Promise<"shared" | "cancelled"> {
+  if (typeof navigator.share !== "function" || !navigator.canShare?.({ files: [card] })) return "cancelled";
+  try {
+    await navigator.share({ files: [card] });
+    return "shared";
+  } catch {
+    return "cancelled";
   }
 }

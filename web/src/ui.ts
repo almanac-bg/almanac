@@ -23,6 +23,13 @@ export const verdictWords: Record<VerdictKind, string> = {
   time: "Времето изтече.",
 };
 
+/** A verdict's words for a question of a kind (`type`): a number right but not spot on (near enough to count) is
+ * „Вярно!“, never „Точно!“, which it isn't; no other kind is right without being exact, so „Вярно!“ never meets
+ * true-or-not's answer. */
+export function verdictSays(kind: VerdictKind, type?: string): string {
+  return kind === "right" && type === "number" ? "Вярно!" : verdictWords[kind];
+}
+
 /** Right answers in a row, from the second: the flame and how many. */
 export function inRowChip(n: number): HTMLElement | null {
   if (n < 2) return null;
@@ -99,14 +106,14 @@ export function fact(text?: string, day?: string): Child {
   );
 }
 
-/** Where a right answer in the issue wrote its fact: in ink, in its chapter (`ink`, as the server says; not said, the
- * book alone). Only ink is said: every other fact met is in the book in grey, and nothing says so as it's met. */
-export function filed(topic: string, ink?: boolean): Child {
+/** Where a right answer in the issue wrote its fact in ink (play.Result.Ink): its chapter. Only ink is said: every
+ * other fact met is in the book in grey, and nothing says so as it's met. */
+export function filed(topic: string): Child {
   return h(
     "p",
     { class: "filed" },
     h("span", { class: "i i-nib", "aria-hidden": "true" }),
-    `Записано ${ink ? "с мастило" : "в Алманаха"} · глава ${chapterName(topic)}`,
+    `Записано с мастило · глава ${chapterName(topic)}`,
   );
 }
 

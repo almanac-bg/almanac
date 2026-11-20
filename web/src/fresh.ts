@@ -13,7 +13,7 @@ import { api, hearing } from "./lib/api.ts";
 import { version } from "./lib/boot.ts";
 import { effect, signal } from "./lib/dom.ts";
 import { loadAnew } from "./lib/router.ts";
-import { playing, type User, user } from "./state.ts";
+import { playing, type User, user, wornSeal } from "./state.ts";
 
 /** Why the page is behind: a new version of the game, or another player's session in the browser ("": it isn't). */
 export const stale = signal<"" | "version" | "session">("");
@@ -56,8 +56,9 @@ async function check(): Promise<void> {
   if (Date.now() - asked < 5_000) return;
   asked = Date.now();
   try {
-    const r = await api<{ user: User | null }>("GET", "/api/me");
+    const r = await api<{ user: User | null; seal?: { chapter: string; level: number } }>("GET", "/api/me");
     heardOf(r.user);
+    if (r.user && r.user.id === user.peek()?.id) wornSeal.set(r.seal ?? null);
   } catch {
     // no line: the next answer will tell
   }

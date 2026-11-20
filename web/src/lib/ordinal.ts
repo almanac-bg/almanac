@@ -18,6 +18,3 @@ export function ordinal(n: number, kind: keyof typeof endings = "m"): string {
   const digits = new Intl.NumberFormat("bg", { useGrouping: n >= 10000 }).format(n);
   return `${digits}\u2011${endings[kind][i]}`;
 }
-
-/** A player's place among others, said of the place so that it reads the same to everyone: „3-то място от 10“. */
-export const place = (n: number, of: number) => `${ordinal(n, "n")} място от ${of}`;

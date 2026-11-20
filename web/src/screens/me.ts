@@ -115,7 +115,7 @@ export function me(kit: Kit) {
           h(
             "div",
             { class: "me-side page-2" },
-            () => seals(ranks(), data()),
+            () => seals(ranks(), data(), data.set),
             h(
               "section",
               { class: "sect me-avatars" },
@@ -205,9 +205,9 @@ function longest(s: Stats | null): Child {
   ];
 }
 
-/** The seals: a chapter's each, once it has a rank, its name under it; the one worn ringed, and a tap wears another.
- * Before any: what brings the first. */
-function seals(ranks: Rank[] | null, s: Stats | null): Child {
+/** The seals: a chapter's each, once it has a rank, its name under it; the one worn ringed, and a tap wears another
+ * (Профил's numbers, and with them the head's seal, asked again: `told`). Before any: what brings the first. */
+function seals(ranks: Rank[] | null, s: Stats | null, told: (s: Stats) => void): Child {
   if (!ranks) return null;
   const had = categories.map((c) => ranks.find((r) => r.chapter === c.id)).filter((r): r is Rank => !!r && r.level > 0);
   const wearing = signal(s?.seal?.chapter ?? "");
@@ -225,7 +225,7 @@ function seals(ranks: Rank[] | null, s: Stats | null): Child {
     choosing.set(false);
     try {
       await api("PATCH", "/api/me/seal", { chapter });
-      loadStats().catch(() => {});
+      loadStats().then(told, () => {});
     } catch (err) {
       wearing.set(was);
       error.set(errorText(err));

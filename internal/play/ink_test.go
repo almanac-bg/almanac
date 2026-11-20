@@ -46,7 +46,8 @@ func (w *world) book(user int64) map[string]bool {
 	return out
 }
 
-// met makes a player one who met a question long before (a wrong answer, in a game of their own).
+// met makes a player one who met a question long before (a wrong answer, in a game of their own), its fact in their
+// book in grey, as the answer wrote it.
 func (w *world) met(user int64, id string) {
 	w.t.Helper()
 	res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, finished_at) VALUES (?, 'topic', '[]', 0, 0)`, user)
@@ -56,6 +57,10 @@ func (w *world) met(user int64, id string) {
 	run, _ := res.LastInsertId()
 	if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, given, score, is_right, ms, at)
 		VALUES (?, 0, ?, '{}', 0, 0, 3000, 0)`, run, id); err != nil {
+		w.t.Fatal(err)
+	}
+	if _, err := w.db.Write.Exec(`INSERT INTO facts (user_id, question_id, ink, at, run_id) VALUES (?, ?, 0, 0, ?)`,
+		user, id, run); err != nil {
 		w.t.Fatal(err)
 	}
 }
@@ -126,6 +131,51 @@ func TestInkAndGrey(t *testing.T) {
 	w.consistent(ana)
 }
 
+// An answer says whether it wrote its fact in ink (Result.Ink: the run's „Записано с мастило“), as the book has it:
+// a right one in the issue met there first, never a wrong one, one met before, or any in another game; and an answer
+// sent again (its reply lost) says the same.
+func TestAnswerSaysItsInk(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	s, err := w.g.StartDay(ctx, ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	picks := w.picks(s.ID)
+	w.met(ana, picks[1].ID)
+	for n := range Length {
+		answer := w.right
+		if n == 2 {
+			answer = w.wrong
+		}
+		w.show(ana, s.ID)
+		w.wait(3 * time.Second)
+		res, err := w.answer(ana, s.ID, n, answer(s.ID, n))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := w.book(ana)[picks[n].ID]; res.Ink != want || res.Ink != (n != 1 && n != 2) {
+			t.Errorf("question %d: ink said %v, the book has %v", n+1, res.Ink, want)
+		}
+		if n == 0 {
+			again, err := w.answer(ana, s.ID, n, answer(s.ID, n))
+			if err != nil || !again.Ink {
+				t.Errorf("the first answer sent again: ink %v, %v", again.Ink, err)
+			}
+		}
+	}
+	topic, err := w.g.StartTopic(ctx, ana, "history")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.show(ana, topic.ID)
+	w.wait(3 * time.Second)
+	if res, err := w.answer(ana, topic.ID, 0, w.right(topic.ID, 0)); err != nil || res.Ink {
+		t.Fatalf("a topic's right answer: ink %v, %v", res.Ink, err)
+	}
+}
+
 // inkShown is how many of these picks' questions the book shows (a fact, so): those its ink counts.
 func (w *world) inkShown(picks []Pick, of ...int) int {
 	n := 0
@@ -158,6 +208,9 @@ func TestScriptWritesNothing(t *testing.T) {
 	}
 	if b := w.book(gal); len(b) != 0 {
 		t.Fatalf("a script's day wrote %v", b)
+	}
+	if n, err := w.g.NewsOf(t.Context(), gal, run); err != nil || n.Ink != 0 || n.MetBefore != 0 {
+		t.Fatalf("a script's day's news: %+v %v", n, err)
 	}
 	w.consistent(gal)
 }
@@ -252,6 +305,10 @@ func TestSecondPlayWritesGrey(t *testing.T) {
 	w.consistent(ana)
 	if n := w.count(`SELECT count(*) FROM runs WHERE user_id = ? AND pencil`, ana); n != 1 {
 		t.Fatalf("%d runs of pencil", n)
+	}
+	// Its grey is its own rule's, not questions met before: the news says neither.
+	if n, err := w.g.NewsOf(ctx, ana, s.ID); err != nil || n.Ink != 0 || n.MetBefore != 0 {
+		t.Fatalf("a second play's news: %+v %v", n, err)
 	}
 }
 

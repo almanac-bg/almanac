@@ -82,12 +82,18 @@ export const cover = signal(false);
  * brought from another browser (screens/keep.ts). */
 export const notice = signal("");
 
-/** The day's issue's topics in the order its ten are asked (play.IssueTopics), as Днес last had them: a question's
- * sheet turns to the next one's colour. */
-export const issueTopics = signal<string[]>([]);
+/** The seal the player wears (play.Seal), on the frame's avatar: as the page came with it, and as the server last
+ * said it since (GET /api/me after a rank risen, Профил's numbers, a seal chosen). */
+export const wornSeal = signal<{ chapter: string; level: number } | null>(boot.seal ?? null);
 
-/** The seal the player wears (play.Seal), as Профил's numbers last said it: on the frame's avatar. */
-export const wornSeal = signal<{ chapter: string; level: number } | null>(null);
+/** Asks the server again which seal the player wears (a rank just risen may have changed it). */
+export function refreshSeal(): void {
+  if (!user.peek()) return;
+  api<{ seal?: { chapter: string; level: number } }>("GET", "/api/me").then(
+    (r) => wornSeal.set(r.seal ?? null),
+    () => {},
+  );
+}
 
 /** How many friend requests wait for the player's answer. */
 export const friendRequests = signal(0);

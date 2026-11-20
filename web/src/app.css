@@ -557,6 +557,16 @@
     margin-right: -2px;
   }
 
+  /* The seal on the avatar's lower corner, on a ring of the page, as on Профил (.me-avatar > .seal). */
+  .bar-me > .seal {
+    position: absolute;
+    right: -4px;
+    bottom: -2px;
+    border-radius: 50%;
+    background: var(--bg);
+    box-shadow: 0 0 0 2px var(--bg);
+  }
+
   .bar-in {
     display: grid;
     align-items: center;
@@ -900,13 +910,6 @@
     color: var(--danger);
   }
 
-  /* Accepting a friend's request. */
-  .btn.rose {
-    border-color: var(--action);
-    background: var(--action);
-    color: var(--on-action);
-  }
-
   .btn.big {
     min-height: 3.75rem;
   }
@@ -1076,12 +1079,6 @@
     font: 900 0.75rem / 1 var(--font-sans);
     letter-spacing: 0.04em;
     white-space: nowrap;
-  }
-
-  .tag.rose,
-  .tag.gold {
-    background: var(--ink);
-    color: var(--bg);
   }
 
   /* A picture takes its chapter's vivid as its tone wherever it's put. */
@@ -2262,6 +2259,12 @@
     background: linear-gradient(90deg, var(--ink) 50%, var(--bg) 50%);
   }
 
+  /* The player's number near enough to be right: filled, as a right answer is, a disc beside the answer's square. */
+  .near-mark.right i {
+    border-radius: 50%;
+    background: var(--ink);
+  }
+
   .near-end {
     position: absolute;
     top: 40px;
@@ -2304,6 +2307,11 @@
 
   .near-key i.near {
     background: linear-gradient(90deg, var(--ink) 50%, transparent 50%);
+  }
+
+  .near-key i.right {
+    border-radius: 50%;
+    background: var(--ink);
   }
 
   /* A narrow, short phone: the scale says itself; its key goes. */
@@ -3487,6 +3495,7 @@
   .who-name {
     display: flex;
     align-items: center;
+    gap: 6px;
     min-width: 0;
     font-size: 1rem;
     line-height: 1.375rem;
@@ -5263,9 +5272,18 @@
     font-size: 0.875rem;
   }
 
+  /* Ten of ten: the rosette over the score, on the sheet (the same in both themes), its last petal gold. */
   .perfect-mark {
     width: 40px;
     height: 40px;
+  }
+
+  .perfect-mark .petal {
+    fill: #16132b;
+  }
+
+  .perfect-mark .gold {
+    fill: var(--gold);
   }
 
   /* The day's entry: a sheet of its chapter, the chip and how few knew it, the answer, the question, the fact. */
@@ -5298,6 +5316,11 @@
 
   .entry-leaf .entry-q {
     font: 600 0.9375rem / 1.35 var(--font-sans);
+  }
+
+  /* On the chapter's sheet, the dark ink only: the page's greys don't hold on its colour (contrast.test.ts). */
+  .entry-leaf :is(.entry-q, .entry-untrue) {
+    color: var(--on-sheet);
   }
 
   .entry-leaf .entry-fact {
@@ -5398,21 +5421,27 @@
     font: 700 0.9375rem / 1.35 var(--font-sans);
   }
 
-  /* The friends who played the day: a row each, their tiles small, their score. */
+  /* The friends who played the day: a row each, the name, their small squares under it (127px whatever the text: beside
+     the name they'd squeeze it to a letter on a phone), their score at the end. */
   .fd-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 10px;
+    gap: 6px 10px;
     min-height: 54px;
+    padding: var(--space-2) 0;
   }
 
-  .fd-row .who {
-    min-width: 0;
-    margin-right: auto;
+  .fd-row > .mini {
+    grid-column: 1;
+    grid-row: 2;
+    margin-left: 38px; /* under the name, past the avatar (28px) and its gap */
   }
 
   .fd-score {
-    width: 26px;
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-width: 26px;
     font: 900 1.375rem / 1 var(--font-numeral);
     text-align: right;
   }
@@ -5690,25 +5719,6 @@
     margin-top: var(--space-2);
   }
 
-  .perfect-head {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
-
-  .seal {
-    width: 36px;
-    height: 36px;
-  }
-
-  .seal .petal {
-    fill: var(--petal);
-  }
-
-  .seal .gold {
-    fill: var(--gold);
-  }
-
   /* ---- Rows of players: a board, the friends; Приятели ---- */
 
   .rank-row {
@@ -5751,27 +5761,21 @@
     font-weight: 900;
   }
 
-  /* The score, and the day's small squares beside it; on a narrow phone, the squares under the score. */
+  /* The score at the row's end, and the day's small squares on a line of their own under the name (127px whatever the
+     text: beside it they'd squeeze the name to a letter on a phone). */
+  .rank-row:has(.rank-aside) {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
   .rank-end {
-    display: flex;
-    flex: none;
-    flex-direction: row-reverse;
-    align-items: center;
-    gap: var(--space-3);
+    display: contents;
   }
 
   .rank-score,
   .friend-day {
     flex: none;
     white-space: nowrap;
-  }
-
-  @media (max-width: 24rem) {
-    .rank-end {
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 4px;
-    }
   }
 
   .rank-n {
@@ -5787,7 +5791,12 @@
 
   .rank-aside {
     display: flex;
-    flex: none;
+    flex-basis: 100%;
+    padding-left: calc(1.5rem + 60px); /* under the name: past the place, the avatar (40px) and their gaps */
+  }
+
+  .rank-row:not(:has(> .rank-place)) .rank-aside {
+    padding-left: 50px;
   }
 
   /* The player's own row: on a well. */
@@ -7136,6 +7145,45 @@
     --gutter: 16px;
   }
 
+  /* A board's row: the name has the line to itself (on two lines rather than cut to its first letters), the score and
+     the squares under it. */
+  .tight .rank-row {
+    flex-wrap: wrap;
+  }
+
+  .tight .rank-name {
+    flex-basis: calc(100% - 1.5rem - 60px);
+    min-width: 4em;
+  }
+
+  .tight .rank-score {
+    margin-left: calc(1.5rem + 60px);
+  }
+
+  .tight .rank-row:not(:has(> .rank-place)) .rank-score {
+    margin-left: 50px;
+  }
+
+  .tight .rank-name {
+    flex-wrap: wrap;
+  }
+
+  .tight .rank-name a {
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+
+  /* A friend's name on two lines rather than cut to its first letters; their day under it wraps in its column, never
+     under the way to a duel. */
+  .tight .friend-name {
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+
+  .tight .friend-day {
+    white-space: normal;
+  }
+
   /* A duel's row: how it stands under the other player, at the left. */
   .tight .duel-row {
     flex-wrap: wrap;
@@ -7157,13 +7205,12 @@
     border-left: 0;
   }
 
-  /* The places at a phone's foot: a name that doesn't fit its third (a phone that enlarges the text itself) is cut,
-     never run into the next. */
+  /* The places at a phone's foot: a name no bigger than its third of the screen holds whole (a phone that enlarges
+     the text itself), and where even that doesn't fit, it breaks onto a second line, never cut or run into the next. */
   .tighter .places-foot a {
-    overflow: hidden;
-    font-size: 0.8125rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-size: min(0.8125rem, 5.25vw);
+    overflow-wrap: anywhere;
+    hyphens: auto;
   }
 
   /* The Алманах's chapters one to a row once a chapter's longest word no longer fits half the column; the ways to play

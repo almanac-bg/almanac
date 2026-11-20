@@ -75,7 +75,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/fi
   nearest its next step.
 - **A chapter:** its head on its sheet (glyph, name, the seal with its pips, its ink, how much to the next rank),
   „Игра на главата“, then its facts, the latest first: ink black, facts met in grey (a thin solid 1.5px grey outline,
-  lighter text). Where grey first shows: „В сиво са фактите, които си срещнал. С мастило пише само брой на деня.“
+  lighter text). Where grey first shows: „В сиво са останалите срещнати факти. С мастило пише само броят на деня.“
 - **Приятели:** the board (friends by default, or all of България: its spread and the player's place first, then the
   top rows); the friends (a row each: avatar, name, seal, today's score, the duels between you „дуели 3 : 1“); the
   duels („Твой ред“ the page's action, „Чакаш“, „Изиграни“).
@@ -237,12 +237,13 @@ under it.
   answered as the right order — a row in place with a solid ✓, one out of place hollow and dashed with „ти: 3-ти“;
   match, two columns, the left lettered А–Г and a right one joined taking its left one's letter (never colour);
   split, a card sent left or right; clues, coming out as their time does; number, typed on the game's own pad (keys
-  44px at the least), answered as what was said, the answer, and both on a scale („ти, близо“ half filled).
+  44px at the least), answered as what was said, the answer, and both on a scale (the answer a filled square; „ти, вярно“ a filled disc,
+  „ти, близо“ half filled, „ти“ hollow).
 - **The answer** (`.after`): docked at a phone's foot, a surface over the answers, at most what leaves the player's
   row and the right one in sight; a longer fact scrolls in it, fading out above „Напред“. In it, the verdict, how many
   got it, „Записано с мастило · глава История“ for ink, „Знаеше ли?“ and the fact, and „Напред“ (the one action).
-- **Verdicts** are a fixed set, never an answer's own word: „Точно!“, „Не е това.“, „Близо, но не се брои.“,
-  „Времето изтече.“ The verdict's sign is ink: a filled disc with ✓, a half-filled disc, a ✕ or a clock in a dashed
+- **Verdicts** are a fixed set, never an answer's own word: „Точно!“, „Вярно!“ (a number near enough to count, not
+  spot on), „Не е това.“, „Близо, но не се брои.“, „Времето изтече.“ The verdict's sign is ink: a filled disc with ✓, a half-filled disc, a ✕ or a clock in a dashed
   ring.
 - **Leaving** while a question's time runs asks in a sheet at the foot („Остани“, „Излез“).
 
@@ -289,6 +290,10 @@ flat shapes with depth, lit from the top left, no outlines, painted from one ton
 - **The card** (`game/card.ts`), drawn in the browser as it's shared, one look in every theme: the mark and the name,
   „Брой N“ big with its date, the ten tiles two rows of five (filled, half, dashed and hollow: they part in grey too),
   and almanac.bg. No score, no streak, no name. The server's card (`internal/card`) stays for a link's preview.
+- **The sheet** („Сподели резултата“): the card, the text, „Сподели“ (the text with its link, through the device's
+  share sheet), „Копирай текста“, and „Сподели картинката“ where the device shares a picture. Never the text and the
+  card together: an app given both may keep only the picture (WhatsApp on an iPhone), and the link is the share's
+  point.
 
 ## Copy
 

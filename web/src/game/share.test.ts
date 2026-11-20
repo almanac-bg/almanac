@@ -2,7 +2,7 @@
 // else the text to copy by hand; the link asked for once; the text the issue, the score, the streak and the tiles.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { type SharedDay, shareDay, shareWords, squares } from "./share.ts";
+import { type SharedDay, shareCard, shareDay, shareWords, squares } from "./share.ts";
 
 (globalThis as { location?: unknown }).location = { pathname: "/" };
 
@@ -66,15 +66,16 @@ test("shared with the sheet where there is one, the link asked for once", async 
   assert.deepEqual(asked, ["POST /api/runs/1/share"]);
 });
 
-test("the card goes with the text where the sheet takes a picture, and only there", async () => {
+test("the text never goes with the card (an app given both may drop the link); the card goes alone, where it can", async () => {
   serve();
   const card = new File(["png"], "almanah.png", { type: "image/png" });
   const sent: ShareData[] = [];
   browser(async (d) => void sent.push(d), undefined, true);
-  await shareDay(4, day, card);
+  await shareDay(4, day);
+  assert.equal(await shareCard(card), "shared");
   browser(async (d) => void sent.push(d), undefined, false);
-  await shareDay(4, day, card);
-  assert.deepEqual(sent, [{ files: [card], text }, { text }]);
+  assert.equal(await shareCard(card), "cancelled");
+  assert.deepEqual(sent, [{ text }, { files: [card] }]);
 });
 
 test("the sheet closed without a choice is nothing; refused, the text is copied", async () => {
