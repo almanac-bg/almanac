@@ -143,7 +143,8 @@ test("a name changed in Настройки is kept on leaving, and a deleted pro
 // (push.ts: a subscription the browser has is told to the server again).
 test("a deleted profile lets go of the browser's notifications", async ({ page }) => {
   // Notifications on, as far as the page can tell: a key in the page (the test server has none), and a browser
-  // subscribed.
+  // subscribed. The emulated iPhone is a browser tab, where an iPhone has no notifications at all: here it's as on one
+  // with the game on its home screen, the push manager and notifications there.
   await page.route("**/*", async (route) => {
     if (route.request().resourceType() !== "document") return route.fallback();
     const res = await route.fetch();
@@ -167,6 +168,8 @@ test("a deleted profile lets go of the browser's notifications", async ({ page }
       configurable: true,
       value: { getRegistration: async () => reg, register: async () => reg, ready: Promise.resolve(reg) },
     });
+    for (const api of ["PushManager", "Notification"])
+      if (!(api in window)) Object.defineProperty(window, api, { configurable: true, value: class {} });
   });
   await becomeGuest(page);
   await page.goto("/settings");
