@@ -51,7 +51,7 @@ for (const scheme of ["light", "dark"] as const) {
       await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`);
       await expect(page.locator("h1.ask")).toBeFocused();
       await answer(page);
-      await expect(region).toHaveText(/^(Точно!|Вярно!|Близо\.|Не е това\.|Времето изтече\.)( \+[\d ]+ точк[аи]\.)?/);
+      await expect(region).toHaveText(/^(Точно!|Вярно!|Близо, но не се брои\.|Не е това\.|Времето изтече\.)/);
       // The verdict on the screen says nothing by itself: the region says it.
       await expect(page.locator(".after .verdict")).not.toHaveAttribute("role");
       if (n === 0) {

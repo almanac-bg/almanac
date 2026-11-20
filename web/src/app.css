@@ -4572,6 +4572,7 @@
 
   .card-ink {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
     gap: 6px;
     margin-top: auto;
@@ -7165,8 +7166,15 @@
     white-space: nowrap;
   }
 
-  /* Topics one to a row once a topic's longest word no longer fits half the column; the ways to play too, each its
-     picture beside its name. */
+  /* The Алманах's chapters one to a row once a chapter's longest word no longer fits half the column; the ways to play
+     (Микс, България) too, each its glyph beside its name. */
+  .tight :is(.ways, .chapters) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tight .card-leaf {
+    min-height: 0;
+  }
 
   /* A title's long word breaks where it must, wherever the title sits. */
   .tight h1,
