@@ -133,7 +133,7 @@ test.describe("in Messenger's own browser", () => {
     await phone.getByRole("button", { name: "Продължи тук" }).click();
     await expect(phone.getByRole("status").filter({ hasText: "Готово: играта ти е тук." })).toBeVisible();
     await expect(phone).toHaveURL(/\/$/);
-    await expect(phone.locator(".day-done-n")).toHaveText(rights ?? "");
+    await expect(phone.locator(".score-n")).toHaveText(rights ?? "");
     // The game moved: Messenger's browser is signed out of it.
     const left = await page.evaluate(async () => ((await (await fetch("/api/me")).json()) as { user: unknown }).user);
     expect(left).toBeNull();
@@ -212,7 +212,8 @@ test("come from the streak's mail, signed out: the way in comes first", async ({
   await expect(page.getByRole("heading", { name: "Влез в профила си" })).toBeVisible();
   await expect(page.getByLabel("Имейл")).toBeVisible();
   await expect(page).toHaveURL(/\/$/);
-  // Without the mail, the quiet line only.
+  // Without the mail, the way in is the cover's „Вход“ only.
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Имаш профил? Влез" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Влез в профила си" })).toHaveCount(0);
+  await expect(page.locator(".bar-in")).toHaveText("Вход");
 });

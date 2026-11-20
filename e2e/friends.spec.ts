@@ -6,32 +6,31 @@ test("friends on the day: who has played it, and how each went", async ({ browse
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
 
-  // Ana plays the day with no friends yet: one quiet line, a way to add someone.
+  // Ana plays the day with no friends yet: Приятели says so, with the way to add someone.
   await a.goto("/");
   await startDay(a);
   await playRun(a);
   await playedFair(a);
-  const add = a.getByRole("link", { name: /^Добави приятел и сравнявайте резултатите си всеки ден/ });
-  await expect(add).toHaveAttribute("href", "/friends");
+  await a.goto("/friends");
+  await a.getByRole("tab", { name: "Приятели" }).click();
+  await expect(a.locator(".day-board")).toContainText("Още нямаш приятели тук.");
   const ana = await a.evaluate(async () => (await (await fetch("/api/me")).json()).user.name as string);
 
-  // Bo asks her by her username, and she says yes. Before he plays, Начало names her, without her score.
+  // Bo asks her by her username, and she says yes. Before he plays, Днес has her day beside his.
   await befriend(a, b);
   await b.goto("/");
-  await expect(b.locator(".day-meta").last()).toHaveText(`${ana} вече изигра днешните въпроси.`);
+  await expect(b.locator(".today-friends .rank-row").filter({ hasText: ana })).toContainText(/\d+ от 10$/);
 
-  // He plays the day: one gold action under the result, and both on the friends' day, his own row marked, each with
-  // how their ten went.
+  // He plays the day: one gold action under the result, and both on the friends' day in Приятели, his own row marked.
   await startDay(b);
   await playRun(b);
   await expect(b.locator(".tomorrow")).toBeVisible();
   await expect(b.locator(".summary .btn.primary")).toHaveCount(1);
-  await b.goto("/");
-  const friends = b.locator(".board", { has: b.getByRole("heading", { name: "Приятелите ти днес" }) });
-  await expect(friends.locator(".row")).toHaveCount(2);
-  await expect(friends.locator(".row.me .you")).toHaveText("ти");
-  await expect(friends.locator(".row").filter({ hasText: ana }).locator(".pts")).toHaveText(/^\d+ от 10$/);
-  await expect(friends.locator(".row .trail li")).toHaveCount(20);
+  await b.goto("/friends");
+  const friends = b.locator(".day-board");
+  await expect(friends.locator(".rank-row")).toHaveCount(2);
+  await expect(friends.locator(".rank-row.me .rank-you")).toHaveText(" ти");
+  await expect(friends.locator(".rank-row").filter({ hasText: ana }).locator(".rank-score")).toHaveText(/^\d+ от 10$/);
 });
 
 test("friends by tag: a name and a tag of one's own, a request, a yes", async ({ browser }, info) => {

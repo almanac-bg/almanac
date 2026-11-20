@@ -403,10 +403,12 @@ func (d *dayCrowdCache) drop(key string) {
 }
 
 // FewRight is a right answer in the day's ten and how few of the day's other players got it right: its place in the
-// ten, and the share of them that did.
+// ten, and the share of them that did; and the fact it put in the player's Алманах, as the book has it (the day's
+// result shows it as „Най-рядкото ти попадение“), if its question has one.
 type FewRight struct {
-	N     int     `json:"n"`
-	Right float64 `json:"right"`
+	N     int      `json:"n"`
+	Right float64  `json:"right"`
+	Fact  *Learned `json:"fact,omitempty"`
 }
 
 // RarestRight is the player's right answer in a day's ten, finished, that the fewest of that day's other players got
@@ -448,6 +450,10 @@ func (g *Game) RarestRight(ctx context.Context, userID int64, day string) (*FewR
 		}
 		if c != nil && (rare == nil || c.Right < rare.Right) {
 			rare = &FewRight{N: it.n, Right: c.Right}
+			if q.Extra().Fact != "" && !q.Extra().Untrue() {
+				l := learnedAs(q, learnedAt{kind: "day", day: day})
+				rare.Fact = &l
+			}
 		}
 	}
 	return rare, nil

@@ -42,7 +42,7 @@ test("a topic's game tells how well the topic is known, and the avatar is anyone
   await expect(page.getByRole("radio", { name: "Едър", exact: true })).toHaveAttribute("aria-checked", "true");
 });
 
-test("just played, a right answer few others got is told in gold", async ({ page }) => {
+test("just played, the rarest right answer is told as the book has it", async ({ page }) => {
   test.setTimeout(120_000);
   // The day as the server would have it with others playing: the right answer a tenth of the others got, told (as
   // the server does) only once the day is played.
@@ -50,15 +50,22 @@ test("just played, a right answer few others got is told in gold", async ({ page
     if (route.request().method() !== "GET") return route.continue();
     const res = await route.fetch();
     const t = await res.json();
-    if (t.run?.done) t.rarest = { n: 0, right: 0.1 };
+    if (t.run?.done)
+      t.rarest = {
+        n: 0,
+        right: 0.1,
+        fact: { category: "history", question: "Кой въпрос?", answer: "Този отговор", fact: "Ето защо." },
+      };
     await route.fulfill({ response: res, json: t });
   });
   await page.goto("/");
   await startDay(page);
   await playRun(page);
-  await expect(page.locator(".summary .crowd-says.rare")).toHaveText(
-    "Позна въпрос 1: днес го знаят само 10% от играчите.",
-  );
+  const rarest = page.locator(".summary .rarest");
+  await expect(rarest.locator(".rarest-kicker")).toHaveText("История · знаят го 10%");
+  await expect(rarest.locator(".entry-word")).toHaveText("Този отговор");
+  await expect(rarest.locator(".entry-q")).toHaveText("Кой въпрос?");
+  await expect(rarest.locator(".filed")).toHaveText("Записано в Алманаха, глава „История“");
   await expect(page.locator(".summary .btn.primary")).toHaveCount(1);
 });
 
@@ -69,12 +76,10 @@ test("after the day: one gold thing to do next, and Профил leading back to
   await page.reload();
   await startDay(page);
   await playRun(page);
-  // One gold action: another game.
+  // One gold action: sharing the day.
   const gold = page.locator(".btn.primary");
   await expect(gold).toHaveCount(1);
-  await expect(gold).toHaveText("Още десет");
-  // The topic played least: the day's ten touch every topic once, so the bank's first of them.
-  await expect(gold).toHaveAttribute("href", /^\/play\/[a-z]+$/);
+  await expect(gold).toHaveText("Сподели резултата");
   await expect(page.locator(".open-goals, .goal")).toHaveCount(0);
 
   // A topic, then Профил: the topic known leads back to it, the games played to going over them.

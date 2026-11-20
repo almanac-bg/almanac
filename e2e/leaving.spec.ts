@@ -25,15 +25,15 @@ test("the browser's back asks in the day's ten, opened from outside, and never l
   // Back again, and „Излез“: the question given up, Начало waits with the rest of the day, in the game still.
   await page.goBack();
   await page.getByRole("button", { name: "Излез" }).click();
-  await expect(page.locator(".card.day")).toContainText("Следва въпрос 3 от 10.");
+  await expect(page.locator(".issue")).toContainText("Следва въпрос 3 от 10.");
   await expect(page).toHaveURL(/\/$/);
 });
 
-test("the browser's back in a topic asks, its address kept while it does; „Излез“ comes to Начало", async ({
+test("the browser's back in a topic asks, its address kept while it does; „Излез“ comes to its chapter", async ({
   page,
 }) => {
-  await page.goto("/");
-  await page.locator(".topics").getByRole("link", { name: "История" }).click();
+  await page.goto("/almanac/history");
+  await page.getByRole("link", { name: "Играй главата" }).click();
   await page.getByRole("button", { name: "Започни сега" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
   // Back once, then again while it asks: the game's address stays, the question with it.
@@ -45,16 +45,16 @@ test("the browser's back in a topic asks, its address kept while it does; „И�
     await expect(page.locator(".question-head")).toContainText("1 от 10");
   }
   await page.getByRole("button", { name: "Излез" }).click();
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toContainText("Продължи");
+  await expect(page).toHaveURL(/\/almanac\/history$/);
+  await expect(page.getByRole("link", { name: "Продължи главата" })).toBeVisible();
 });
 
 test("a topic counts in only after a tap; a reload goes back to its question, and keeps its result", async ({
   page,
 }) => {
   test.setTimeout(120_000);
-  await page.goto("/");
-  await page.locator(".topics").getByRole("link", { name: "История" }).click();
+  await page.goto("/almanac/history");
+  await page.getByRole("link", { name: "Играй главата" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   // A reload in the count starts nothing: the topic waits for „Започни“.
   await page.reload();
@@ -90,9 +90,9 @@ test("a topic counts in only after a tap; a reload goes back to its question, an
   await page.reload();
   await expect(page.locator(".summary .score-n")).toHaveText(score);
   await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
-  // Back goes to Начало, where the tap was; forward comes to the result again.
+  // Back goes to the chapter, where the tap was; forward comes to the result again.
   await page.goBack();
-  await expect(page.locator(".card.day")).toBeVisible();
+  await expect(page.locator(".chapter")).toBeVisible();
   await page.goForward();
   await expect(page.locator(".summary .score-n")).toHaveText(score);
 });
@@ -127,10 +127,8 @@ test("a topic left half-way says so on its tile; another tab waits for „Про
   await other.goto("/play/history");
   await expect(other.getByRole("button", { name: "Продължи" })).toBeVisible();
   await expect(other.locator(".start-screen")).toContainText("Следва въпрос 2 от 10.");
-  await other.goto("/");
-  await expect(other.locator(".topics").getByRole("link", { name: /История/ })).toContainText(
-    "Продължи · въпрос 2 от 10",
-  );
+  await other.goto("/almanac/history");
+  await expect(other.locator(".chapter-play")).toContainText("Следва въпрос 2 от 10.");
   await other.close();
 });
 
@@ -182,7 +180,7 @@ test("a link out of the day's ten opens from Начало: back comes to it once
   await expect.poll(() => page.evaluate(() => history.state?.i)).toBe(1);
   await page.goBack();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.locator(".card.day")).toContainText("Следва въпрос 2 от 10.");
+  await expect(page.locator(".issue")).toContainText("Следва въпрос 2 от 10.");
   expect(await page.evaluate(() => history.state)).toMatchObject({ i: 0 });
   expect(await page.evaluate(() => history.state?.game)).toBeUndefined();
 });
@@ -191,7 +189,7 @@ test("a game's page left before it's ready holds nothing over the page come to",
   await page.goto("/");
   await page.evaluate(() => fetch("/api/guest", { method: "POST", body: "{}" }));
   await page.reload();
-  await expect(page.locator(".card.day")).toBeVisible();
+  await expect(page.locator(".issue")).toBeVisible();
   // The topic's start-up waits for the games left today; meanwhile the player goes back to Начало.
   let free = () => {};
   const held = new Promise<void>((on) => {
@@ -201,10 +199,11 @@ test("a game's page left before it's ready holds nothing over the page come to",
     await held;
     await route.continue();
   });
-  await page.locator(".topics").getByRole("link", { name: "История" }).click();
+  await page.goto("/almanac/history");
+  await page.getByRole("link", { name: "Играй главата" }).click();
   await expect(page).toHaveURL(/\/play\/history$/);
   await page.goBack();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/almanac\/history$/);
   free();
   await page.waitForTimeout(1000);
   // The topic's count never came: no game's entry over Начало, and the header and the places are there.

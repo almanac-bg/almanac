@@ -306,6 +306,9 @@ func TestVoidDayIsOfNine(t *testing.T) {
 	})
 	if rare, err := w.g.RarestRight(ctx, bo, sb.Day); err != nil || rare == nil || rare.N != k {
 		t.Fatalf("before the void, the rarest right answer: %+v %v", rare, err)
+	} else if q, _ := w.b.Get(w.picks(sb.ID)[k].ID); q.Extra().Fact != "" &&
+		(rare.Fact == nil || rare.Fact.Fact != q.Extra().Fact || rare.Fact.Issue != Issue(sb.Day)) {
+		t.Fatalf("the rarest right answer's fact, as the book has it: %+v", rare.Fact)
 	}
 	sc := w.dayAs(cy, k-1, allRight) // at k-1, not shown yet
 	target := w.picks(sb.ID)[k].ID

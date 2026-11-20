@@ -109,18 +109,23 @@ const chapterPic = (id: string, cls: string) => illustration(`topic-${id}`, `${c
 export function almanac(kit: Kit): Child {
   setKit(kit);
   title("Алманах");
+  // Not a player yet: the book as it starts, its chapters each a way to play one.
   if (!user.peek())
     return h(
       "section",
-      { class: "screen book" },
-      h("p", { class: "kicker" }, "Твоята книга"),
-      h("h1", null, "Алманахът ти"),
+      { class: "screen book spread" },
       h(
-        "p",
-        { class: "deck" },
-        "Всеки верен отговор записва в него по един факт, в главата на темата си. Започва с първия ти брой.",
+        "div",
+        { class: "book-intro page-1" },
+        h("p", { class: "kicker" }, "Твоята книга"),
+        h("h1", null, "Алманахът ти"),
+        h(
+          "p",
+          { class: "deck" },
+          "Всеки верен отговор записва в него по един факт, в главата на темата си. Започва с първия ти брой.",
+        ),
       ),
-      h("a", { class: "btn primary", href: "/" }, "Към днешния брой"),
+      contents({ facts: [], found: 0, have: {}, all: 0, of: {} }),
     );
   const page = signal<Page | null>(null);
   const stats = signal<Stats | null>(null);
@@ -153,30 +158,35 @@ export function almanac(kit: Kit): Child {
           figure(mix && (mix.sure || mix.first) ? `${mix.known} %` : "—", "от всичко знаеш"),
         ),
       ),
-      h(
-        "section",
-        { class: "sect contents page-2" },
-        h(
-          "div",
-          { class: "sect-head" },
-          h("h2", null, "Съдържание"),
-          h("span", { class: "sect-note" }, "колко знаеш от всяка глава"),
-        ),
-        h(
-          "ol",
-          { class: "toc" },
-          chapters().map((id) =>
-            tocRow(
-              id,
-              p,
-              p.chapters?.find((c) => c.category === id),
-            ),
-          ),
-        ),
-      ),
+      contents(p),
       notes(p.notes ?? [], s?.streak ?? 0),
     ];
   });
+}
+
+/** The book's contents: a chapter a row. */
+function contents(p: Page): Child {
+  return h(
+    "section",
+    { class: "sect contents page-2" },
+    h(
+      "div",
+      { class: "sect-head" },
+      h("h2", null, "Съдържание"),
+      h("span", { class: "sect-note" }, "колко знаеш от всяка глава"),
+    ),
+    h(
+      "ol",
+      { class: "toc" },
+      chapters().map((id) =>
+        tocRow(
+          id,
+          p,
+          p.chapters?.find((c) => c.category === id),
+        ),
+      ),
+    ),
+  );
 }
 
 /** A number and what it counts, in the row under the book's title. */
@@ -335,6 +345,13 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
       api<Page>("GET", `/api/almanac?${new URLSearchParams({ topic: id })}`).then(first.set, () => {});
     load();
   }
+  // The chapter's game left half-way today: it goes on from where it stopped (play.Left).
+  const left = signal<{ at: number; total: number } | null>(null);
+  if (user.peek())
+    api<{ runs: { category: string; at: number; total: number }[] }>("GET", "/api/runs/left").then(
+      (r) => left.set(r.runs.find((x) => x.category === id) ?? null),
+      () => {},
+    );
   let typing = 0;
   onCleanup(() => clearTimeout(typing));
   const search = (text: string) => {
@@ -374,14 +391,16 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
         ? h(
             "div",
             { class: "chapter-play" },
-            h("a", { class: "btn primary", href: `/play/${id}` }, "Играй главата"),
-            h(
-              "p",
-              { class: "small" },
-              id === "mix"
-                ? "Десет въпроса от всички глави, по твоята мярка."
-                : `Десет въпроса от „${name}“, по твоята мярка.`,
+            h("a", { class: "btn primary", href: `/play/${id}` }, () =>
+              left() ? "Продължи главата" : "Играй главата",
             ),
+            h("p", { class: "small" }, () => {
+              const l = left();
+              if (l) return `Следва въпрос ${l.at + 1} от ${l.total}.`;
+              return id === "mix"
+                ? "Десет въпроса от всички глави, по твоята мярка."
+                : `Десет въпроса от „${name}“, по твоята мярка.`;
+            }),
           )
         : null,
     ),

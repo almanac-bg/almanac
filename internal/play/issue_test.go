@@ -17,3 +17,26 @@ func TestIssue(t *testing.T) {
 		}
 	}
 }
+
+// An issue's topics are its ten's, in their order, once the day is drawn: one of each of the bank's ten.
+func TestIssueTopics(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	if got, err := w.g.IssueTopics(ctx, "2026-01-01"); err != nil || got != nil {
+		t.Fatalf("a day not drawn: %v %v", got, err)
+	}
+	if _, err := w.g.StartDay(ctx, w.user()); err != nil {
+		t.Fatal(err)
+	}
+	got, err := w.g.IssueTopics(ctx, w.g.Today())
+	if err != nil || len(got) != Length {
+		t.Fatalf("today's: %v %v", got, err)
+	}
+	seen := map[string]bool{}
+	for _, c := range got {
+		seen[c] = true
+	}
+	if len(seen) != len(w.b.Categories) {
+		t.Fatalf("not one of each topic: %v", got)
+	}
+}

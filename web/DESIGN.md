@@ -53,60 +53,36 @@ place.
   while a game is under way (`html.playing`), and the places on a new visitor's cover (`html.cover`: Днес before any
   game begun).
 
-- **Начало** (`/`): the day first. The streak (a way to Профил); the day's ten as the
-  day's issue (`.masthead`: the weekday and „Брой 6“ on a hairline, the date set large, „17 ноември“, a hairline
-  under it; then „Десет въпроса за днес“ a size down, what they are, and „Започни“; no pips before play: they'd
-  measure nothing yet). The issue is the day's number from the first day of the day's ten (`play/issue.go`, 12
-  November 2026 is Брой 1), the same for everyone. Left half-way, the same card with where the player stopped, „Следва въпрос 4 от 10“, the pips
-  so far, and „Продължи“; or once played, as it lands, how they went (under the score the issue line, „Брой 6 · 17
-  ноември“, and the way to the day's board; see The place, below) with the one gold thing to do next right under it
-  (`game/gold.ts`: „Още десет“, to the topic the player has played least, by its answers; „Микс“ until that's
-  known), „Прегледай въпросите“ beside it (a game is gone over on its own day only, `play.Review`); then tomorrow in
-  one quiet card
-  (`.tomorrow`: when the next ten come, what they make of the streak, and the reminder's ask); before the friends'
-  day and the game's news. **A later visit** finds the day played, and its
-  moment over: one short card (`.day-done`: the issue line and the place, the score a size down with its points, one
-  line of how it went among everyone, the pips), „Още десет“ gold under it, „Прегледай въпросите“ (its own page,
-  `/games/<id>`) plain; tomorrow; the friends' day after the ways to play (beside the day on a big screen). A result never on screen
-  (the last question let run out) is the full one, once, with what it brought. Then the ways to play
-  with others, three in a row (the picture over
-  the name on a phone); the topics, two by two, „Микс“ (every topic at once) and „България“ first
-  (`.topic-lead`, each with what it is under its name; „Микс“ across the row alone while „България“ is closed); on a
-  big screen those two a row of their own, short tiles side by side, then the topics five to a row, the picture over
-  the name, each tile as tall as what's in it. A day gone by isn't played again, nor its
-  questions gone over: the day is today's (owner, 19 Nov 2026). The streak's chip shows only a streak; none at all
-  rather than „0 дни поред“. A streak that ended is said once,
-  over the day („Серията ти от 5 дни прекъсна. Днес започва нова.“): it isn't won back. A player back after days away
-  (the streak ended since the last day played, `play.BackFrom`) is welcomed once, over the day: „Радваме се, че се
-  върна. Най-дългата ти серия е 11 дни. Днес започва нова.“ Дуел opens from here and
-  has a way back to it (`back()`). A player who hasn't finished a game yet sees only the day and the topics, and a
-  quiet „Имаш профил? Влез“ (a new phone) that opens the sign-in in place (open from the start, above the day, for a
-  browser signed out that came from the streak's mail, `/?from=mail`): the
-  streak and the ways to play with others come after the first game (see First days). From the second day played, a guest is asked to keep the game in one line of the „Утре“
-  card, said by what's at stake („Серията ти от 2 дни е само на това устройство. Запази я с имейл.“), the form opening
-  in place. In an app's own browser (Messenger, Instagram …: `lib/embedded.ts`), where a guest's game would stay, it's
-  asked on the first day, with the way out that carries the game: „Отвори в браузъра“ on Android, „Копирай връзката“
-  (for Safari) on an iPhone (`/hand/<token>`, once, `account.Handoff`). The link takes nothing until „Продължи тук“
-  is tapped, and then the game moves: the browser it came from no longer has it. A guest's Профил has „Играеш и на друго
-  устройство? Влез с имейла си“ under the name.
-- **The streak at stake.** While the day's ten wait, a streak (1 day or more: the second day is where a habit is won or
-  lost) is at stake: its flame is unlit (`.streak-chip.unlit`, the number still there), and the day's card says what
-  the ten make of it („Серия от 5 дни. С днешните въпроси става 6.“); from 18:00, if the week has forgiven its day already,
-  that it ends („Серия от 5 дни. Прекъсва в полунощ, ако не изиграеш днешните.“, `.day-stake`). The day played lights the
-  flame as its number rolls on (Motion). A topic's result, while the day waits, has „Към въпросите на деня“ as its gold
-  button, the same line under it, and „Още десет“ plain.
-- **The place** on the day's board (`game/standing.ts`) is a way to the board from two players, but not always said:
-  on a player's first day, only in the better half or first, else the way is plain,
-  „Класацията на деня“ (a new player's first social signal isn't last place). From ten players a share says how it
-  went where the place isn't said, „По-добре от 35% от играчите днес.“; from a hundred it leads for everyone, the
-  place still the way to the board („4312-о място“ alone says nothing). „Средно днес: 5,1 от 10.“ from ten players.
-- **Sharing the day** („Сподели резултата“, plain, beside „Прегледай въпросите“ under the day's result and on its later
-  card; `game/share.ts` does it, the screen draws it): the share sheet where the device has one, else the text copied
-  and the button says „Копирано“ a moment. The text is „Алманах, брой 9 · 20 ноември“, „7 от 10 ■■■□■■■□■□“ (■ right,
-  □ anything else; a question that counts for nobody has no square) and the link, `/d/<issue>-<code>`: never an
-  answer, never a name. The link opens Начало: while it's that day, „Споделен резултат“, the score and its pips over
-  „Колко ще познаеш ти?“ and „Започни“, the same ten; after, „Брой 8 вече мина. Ето днешния.“ Its preview is the card
-  (`internal/card`): the edition's paper, whatever the theme.
+- **Днес** (`/`, `screens/today.ts`): the day's issue. Under the frame's double rule its dateline (`.dateline`: „Брой 9“
+  and „Петък, 20 ноември“); the date as the hero numeral with the month in the serif's italic (`.issue-date`);
+  „Десет въпроса за днес.“ and its deck; „Започни“ (left half-way: „Следва въпрос 4 от 10.“, its shape so far and
+  „Продължи“); „Около три минути · Днес играха 4812 души“; on a big screen the issue's contents („В броя“: its ten
+  topics in their order, each with its chapter's dot, `.contents-issue`). The issue is the day's number from the
+  first day of the day's ten (`play/issue.go`, 12 November 2026 is Брой 1), the same for everyone. **A new visitor**
+  (no game begun) has the cover alone (`html.cover`): the bar becomes the masthead, the mark over the name in the
+  middle, „Вход“ in its corner; no places; on a big screen the date on the left page and the issue on the right.
+  **A player** has beside it (under it on a phone, `.today-side`): the streak (`.today-streak`: its number and „дни
+  поред“, this week as squares — played filled, today ringed in gold, the day forgiven hatched — and what the day
+  makes of it, `.day-stake`, „Серия от 5 дни. С днешните въпроси става 6.“, from 18:00, if the week has forgiven
+  its day already, that it ends), the friends' day (`.today-friends`, their scores, „Всички“ to Приятели) and the
+  way to the book (`.book-link`). Topics are played from their chapter in the Алманах, duels from Приятели; nothing
+  else is on Днес. Once over the day, quietly (`.notices`): what came of the days just missed (a day the week forgave,
+  a streak that ended, a welcome back), a friend's duel waiting, a friend's yes, a shared day that's over. Come by a
+  shared day's link (`/d/<issue>-<code>`), the shared score and its shape lead (`.shared-score`) and the title is
+  „Колко ще познаеш ти?“; the page names nobody (the day's board names its players only to one who has played the
+  day: `server/game.go`).
+- **The day's result** is Днес once the day is played, as it lands and on every later visit (`.result`, a spread: the
+  score on the left page, България on the right): „Твоят брой 9 · 20 ноември“, the score as the hero numeral with „от
+  10“ in italic (`.score-n`, `.score-of`), its shape (`.trail`: right filled, wrong open), a line of how it went
+  („Седем верни. По-добре от 61 % от играчите днес.“; `game/standing.ts`), the points small, the streak rolling on
+  (`.result-streak`), „Сподели резултата“ (the one action: a sheet with the card a link's preview shows, the text and
+  „Сподели“ / „Копирай текста“; `game/share.ts`) and „Прегледай въпросите“ (the questions under the page). Then
+  „България днес“ (`.bulgaria-today`, from ten players: how many got each count of right answers, the player's bar in
+  ink with „ти“, the average dashed; the average, the tens, and the share that knew the hardest question), the rarest
+  right answer as the book has it (`.rarest`: its chapter and how few knew it, the answer as a headword, the question,
+  the fact, „Записано в Алманаха, глава „…““ — a right answer's, so it is in the book), and tomorrow (`.tomorrow`: the
+  next issue's date set large, when it comes and the streak it makes; a guest's ask to keep the game; the reminder's
+  ask). A wrong game is never celebrated: the result says what it was.
 - **Приятели** (`/friends`): the duels (`.duels`: „Твой ред“, a friend's waiting for the player, or their own to
   finish; „Чакаш“, sent and not played yet; „Изиграни“, the score and the record, „общо 5 на 3“; each a `.duel-row`
   to its page, with how long is left, „още 2 дни“, and „Нов дуел“ beside the heading), requests, friends, and the one
@@ -153,11 +129,11 @@ place.
 
 A new player meets the game a part at a time, by what they've done, never by the date:
 
+- **A new visitor:** the cover, the day alone (Днес above); the places come with the first game begun.
 - **The first day:** the day's result and its points (what points are, said once in a quiet line at the top of the
-  first game's news, `.news-open`), the streak, the topics. Before a first game finished, Начало is the day and the
-  topics only.
-- **After a first game:** the ways to play with others.
-- **A topic's first estimate** (10 answers): „Колко знаеш“ on Профил and the topic's tile say „първа оценка · 74%“,
+  first game's news, `.news-open`), the streak; the Алманах's chapters (topics are played from there) and Приятели a
+  tap away at the foot.
+- **A chapter's first estimate** (10 answers): the chapter and Профил say „първа оценка“ with its share,
   a game's news „Първа оценка: знаеш около 74% от темата“, a share and no tier; the tier („Експерт“) comes with a sure
   mark (30 answers).
 
@@ -206,14 +182,13 @@ on a phone 160px wide; it holds that way (`e2e/text.spec.ts`):
   answers are bigger, and a choice's answers sit two by two (a list stays one column: an order, pairs, groups). The
   number's field and pad stay a phone's width. A page's picture sits beside its heading and lead, not over them.
   A page's buttons are a hand's width (22rem), not the column's, at its left, the gold one first: the day's, a page's
-  own, Начало's cards', and a group of them (`.actions`: under a result, Дуел's) side by side where two fit, the plain
-  ones after the gold one and as tall as it, a line about the gold one under it. Начало's and a result's quiet lines sit
+  own, and a group of them (`.actions`: under a result, Дуел's) side by side where two fit, the plain
+  ones after the gold one and as tall as it, a line about the gold one under it. A page's quiet lines sit
   at the left with them, as on a phone, never centred.
-- **64rem (a laptop):** the page is up to 76rem wide with a 32px gutter. Начало is two columns: the day (or its result,
-  „Още десет“ beside „Прегледай въпросите“; just played as after a reload), and under it the topics, five to a row;
-  beside them, at most 22rem wide, the streak first, level with the day, on a row of its own with its number big (the
-  habit's reward is no small chip in a corner), then the ways to play with others, one under another. A new player, with only the day and the topics (the ways in are lines under the day), gets one centred
-  column. Профил's places are 64rem wide: Общо's cards in two columns, read
+- **64rem (a laptop):** the page is up to 76rem wide with a 32px gutter, and a place is a spread (`.spread`, above):
+  Днес's issue on the left page with „В броя“ under it, the streak, the friends' day and the book on the right; the
+  result's score on the left and България's day and the rarest right answer on the right (just played as after a
+  reload); the cover's date on the left page and the issue on the right. Профил's places are 64rem wide: Общо's cards in two columns, read
   top to bottom; bigger avatars to choose from, more to a row. Every other page is a centred column of 48rem, so no
   line of text runs too long; a game is 54rem, with bigger type still. A run's question (the day, a topic) takes the
   page's width in two columns: the head, the question and its answers on the left, and on the
@@ -301,9 +276,9 @@ questions are about. A rule never holds a literal colour: it takes a token.
 - **Getting around:** `.tabs` (the four places), `.back` (drawn by `back()`), `.subnav` (Профил's places, drawn by
   `profileNav()`), `.me-settings` (Настройки: an icon and its word, the word under the icon on a narrow phone) and `.more` (a `details` that
   folds what's rarely needed; what it holds is spaced as a section's parts).
-- **Начало:** `.status-row` with `.streak-chip`; `.card.hero.day` opening with `.masthead`
-  (`.masthead-line`, `.masthead-date`) over `.day-title`; `.modes .mode` and `.topics .topic` (`.topic-lead` for
-  „Микс“ and „България“, `.topic-all` across the row).
+- **Днес:** `.issue` (`.issue-date`, `.issue-body`, `.issue-go`, `.contents-issue`) and `.today-side`
+  (`.today-streak` with `.streak-chip`, `.today-friends`, `.book-link`); the result `.result` (`.result-main` with
+  `.result-score`, `.result-share`; `.result-side` with `.bulgaria-today`, `.rarest`) and `.tomorrow`; `.share-sheet`.
 - **Page openers** lead with the thing, not its rules. A lead is one sentence.
 - **Text:** `.kicker`, `.lead`, `.muted`, `.small`, `.bad` (errors) and `.status`; `.explain` with `.explain-pop`
   (a number's name, a tap from its meaning: `explain()`).
@@ -407,7 +382,8 @@ questions are about. A rule never holds a literal colour: it takes a token.
   - `.question-head`, `.options .option`, `.number`, `.keypad` and `.sortable-list`
   - `.up-next`, `.summary`, `.reviewed` and `.verdict`
   - `.players li`, `.friend` and `.invitation`
-  - `.modes`, `.topics` and `.streak-chip`
+  - `.issue`, `.issue-date`, `.issue-body`, `.result`, `.result-main`, `.score-n`, `.tomorrow`, `.share-sheet`
+    and `.streak-chip`
   - `.news-open`, `.news-facts`, `.news-note`, `.mastery-line`, `.almanac-notes` and `.explain`
   - `.toc-row`, `.entry` (`.entry-word`, `.entry-q`), `.pager`, `.fig`, `.day-board`, `.rank-row`
   - `.duel-head`, `.duel-verdict`, `.duel-face`, `.duel-points`, `.duel-marks .duel-pip`, `.duel-line`,

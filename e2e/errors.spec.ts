@@ -9,14 +9,14 @@ test("Днес and Приятели that can't load try again, by a tap or as th
   await page.goto("/");
   await page.evaluate(() => fetch("/api/guest", { method: "POST", body: "{}" }));
   await page.reload();
-  await expect(page.locator(".card.day")).toBeVisible();
+  await expect(page.locator(".issue")).toBeVisible();
   await page.route("**/api/day", (route) => route.abort("internetdisconnected"));
   await page.locator("nav.places-foot").getByRole("link", { name: "Приятели" }).click();
   await page.locator("nav.places-foot").getByRole("link", { name: "Днес" }).click();
   await expect(page.getByRole("alert")).toContainText("Няма връзка");
   await page.unroute("**/api/day");
   await page.getByRole("button", { name: "Опитай пак" }).click();
-  await expect(page.locator(".card.day")).toBeVisible();
+  await expect(page.locator(".issue")).toBeVisible();
 
   // Приятели's file in already: its day's board can't load, and comes by itself as the line comes back.
   await page.context().setOffline(true);
@@ -38,7 +38,7 @@ test("a page that isn't there says so, with a way on", async ({ page }) => {
   await page.goto("/play/nothing");
   await expect(page.getByRole("heading", { name: "Тази страница я няма" })).toBeVisible();
   await page.getByRole("link", { name: "Към въпросите на деня" }).click();
-  await expect(page.locator(".card.day")).toBeVisible();
+  await expect(page.locator(".issue")).toBeVisible();
 });
 
 test("a run offline: the clock runs on while the answer is sent, and the run keeps its frame", async ({

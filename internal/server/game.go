@@ -31,6 +31,11 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, error) {
 	day := s.game.Today()
 	out := map[string]any{"day": day, "issue": play.Issue(day), "streak": 0, "run": nil}
+	topics, err := s.game.IssueTopics(ctx, day)
+	if err != nil {
+		return nil, err
+	}
+	out["topics"] = topics
 	var viewer int64
 	done := false // the viewer has finished the day's ten
 	if u != nil {

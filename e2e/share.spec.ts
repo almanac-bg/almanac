@@ -30,8 +30,14 @@ test("the day shared: its score and shape and a link, which brings another to th
   await page.goto("/");
   await startDay(page);
   await playRun(page);
+  // The sheet: the card a link's preview shows, the text, and the ways to send it.
   await page.getByRole("button", { name: "Сподели резултата" }).click();
+  const sheet = page.getByRole("dialog", { name: "Сподели резултата" });
+  await expect(sheet.locator(".share-card")).toHaveAttribute("src", /^\/card\/\d+-[01]{10}\.png$/);
+  await expect(sheet.locator(".share-text")).toContainText("от 10");
+  await sheet.getByRole("button", { name: "Сподели", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { sent: string[] }).sent.length)).toBe(1);
+  await expect(sheet).toBeHidden();
   const text = await page.evaluate(() => (window as unknown as { sent: string[] }).sent[0] ?? "");
   const m = text.match(shape);
   expect(m, text).not.toBeNull();
@@ -63,16 +69,21 @@ test("without a share sheet, the day's text is copied", async ({ page }) => {
   await page.goto("/");
   await startDay(page);
   await playRun(page);
-  const button = page.getByRole("button", { name: "Сподели резултата" });
-  await button.click();
-  await expect(page.getByRole("button", { name: "Копирано" })).toBeVisible();
+  await page.getByRole("button", { name: "Сподели резултата" }).click();
+  const sheet = page.getByRole("dialog", { name: "Сподели резултата" });
+  // No share sheet on the device: copying is the way, gold.
+  await expect(sheet.getByRole("button", { name: "Сподели", exact: true })).toHaveCount(0);
+  await sheet.getByRole("button", { name: "Копирай текста" }).click();
+  await expect(sheet.getByRole("status")).toHaveText("Копирано.");
   const copied = await page.evaluate(() => (window as unknown as { copied: string[] }).copied);
   expect(copied).toHaveLength(1);
   expect(copied[0]).toMatch(shape);
-  await expect(button).toBeVisible({ timeout: 5000 }); // back to itself a moment after
-  // A later visit: the day in one short card, shared from there too, with the same link.
+  await sheet.getByRole("button", { name: "Затвори" }).click();
+  await expect(sheet).toBeHidden();
+  // A later visit: the result again, shared from there too, with the same link.
   await page.reload();
-  await expect(page.locator(".day-done")).toBeVisible();
+  await expect(page.locator(".result")).toBeVisible();
   await page.getByRole("button", { name: "Сподели резултата" }).click();
+  await page.getByRole("dialog", { name: "Сподели резултата" }).getByRole("button", { name: "Копирай текста" }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { copied: string[] }).copied)).toEqual(copied);
 });
