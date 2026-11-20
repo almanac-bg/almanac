@@ -57,8 +57,10 @@ export interface Today {
   spare?: boolean;
   /** A day just missed that the week forgave (the last 3 days). */
   forgiven?: string;
-  /** A streak that just ended (the last 3 days): its days, and the day missed that ended it. */
-  ended?: { days: number; on: string };
+  /** How many missed days a week the streak forgives the player (play.StreakNow.PerWeek). */
+  perWeek?: number;
+  /** A streak that just ended (the last 3 days): the day missed that ended it. How many days it had is never said. */
+  ended?: { on: string };
   /** Whether today is the player's first day (no game finished before it): the same all day, whatever they play. */
   firstDay?: boolean;
   run: State | null;
@@ -77,9 +79,9 @@ export interface Today {
   /** A game that ended without its result on screen (the day's last question let run out, a game left at its end):
    * its news, told here once (play/told.go). */
   untold?: number;
-  /** Back after days away, the streak ended since (play.BackFrom): the last day played and the longest streak, said
+  /** Back after days away, the streak ended since (play.BackFrom): the last day played (no streak's number), said
    * once. */
-  back?: { last: string; best: number };
+  back?: { last: string };
 }
 
 /** The day as Днес's page came with it (server/pages.go): its first draw, without asking; every later one asks. */
@@ -395,9 +397,7 @@ function streakSection(t: Today, stats: () => Stats | null, done: boolean): Chil
           h(
             "p",
             { class: "streak-note" },
-            (t.spare ?? true)
-              ? "Ако пропуснеш ден, един на седмица ти се прощава."
-              : "Тази седмица един ден вече е простен.",
+            (t.spare ?? true) ? forgivesWords(t.perWeek) : "Тази седмица простените дни вече са използвани.",
           ),
         ];
     return h(
@@ -867,7 +867,7 @@ function tellStreak(key: string): boolean {
   return true;
 }
 
-/** What came of the days just missed — the week forgave one, or it had forgiven one already and the streak ended — or,
+/** What came of the days just missed — the week forgave one, or it had forgiven all it does and the streak ended — or,
  * back after days away, a welcome with the longest streak the player has had: said once, over the day (the server
  * sends it until it's told). */
 function streakNotice(t: Today): Child {
@@ -880,16 +880,20 @@ function streakNotice(t: Today): Child {
         : "";
   if (!key || !tellStreak(key)) return null;
   const begins = t.run?.done ? "Днес започна нова" : "Днес започва нова";
-  const best = t.back?.best ?? 0;
+  // An ended streak's number is never said (DECISIONS.md, „The direction“): only that a new one begins.
   const text = t.forgiven
-    ? `${onDay(t.forgiven).replace(/^./, (c) => c.toUpperCase())} пропусна въпросите, но серията остава: един пропуснат ден в седмицата не я прекъсва. Серия: ${count(t.streak, "ден", "дни")}.`
+    ? `${onDay(t.forgiven).replace(/^./, (c) => c.toUpperCase())} пропусна въпросите, но серията остава. ${forgivesWords(t.perWeek)} Серия: ${count(t.streak, "ден", "дни")}.`
     : t.ended
-      ? `Серията ти от ${count(t.ended.days, "ден", "дни")} прекъсна. ${begins}.`
-      : best > 1
-        ? `Радваме се, че се върна. Най-дългата ти серия е ${best} дни. ${begins}.`
-        : `Радваме се, че се върна. ${begins} серия.`;
+      ? `Серията ти прекъсна. ${begins}.`
+      : `Радваме се, че се върна. ${begins} серия.`;
   return h("p", { class: "streak-notice", role: "status" }, text);
 }
+
+/** What the streak forgives a week, in words: „Ако пропуснеш ден, до два на седмица ти се прощават.“ */
+const forgivesWords = (perWeek = 2) =>
+  perWeek === 1
+    ? "Ако пропуснеш ден, един на седмица ти се прощава."
+    : "Ако пропуснеш ден, до два на седмица ти се прощават.";
 
 /** The streak's words beside its number. */
 const streakLabel = (n: number) => (n === 1 ? "ден поред" : "дни поред");

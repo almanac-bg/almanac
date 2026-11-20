@@ -21,7 +21,7 @@ func TestStreakMail(t *testing.T) {
 		clock = day.Add(time.Duration(h)*time.Hour + time.Duration(m)*time.Minute)
 		return clock
 	}
-	// Five days at 10:00, Sunday to Thursday, the last three days ago; the week forgave Friday, Saturday ended the
+	// Five days at 10:00, Saturday to Wednesday, the last four days ago; the week forgave Thursday and Friday, Saturday ended the
 	// streak: yesterday.
 	player := func(email string, days int) int64 {
 		_, id := g.guest()
@@ -31,7 +31,7 @@ func TestStreakMail(t *testing.T) {
 			}
 		}
 		for d := range days {
-			g.finishedDay(id, day.AddDate(0, 0, -3-d), 10*time.Hour)
+			g.finishedDay(id, day.AddDate(0, 0, -4-d), 10*time.Hour)
 		}
 		return id
 	}
