@@ -24,6 +24,7 @@ let {
   pageArt,
   profileHref,
   record,
+  withWord,
 } = {} as Kit;
 
 interface Friend {
@@ -34,7 +35,7 @@ interface Friend {
   title?: string;
   titleTier?: Tier;
   level?: number;
-  today?: { points: number; rights: number };
+  today?: { points: number; rights: number; of: number };
   won: number;
   lost: number;
   drawn: number;
@@ -72,6 +73,7 @@ export function friends(kit: Kit): Child {
     pageArt,
     profileHref,
     record,
+    withWord,
   } = kit);
   title("Приятели");
   return h("section", { class: "screen" }, friendsCard());
@@ -245,7 +247,7 @@ function addFriend(reload: () => Promise<void>): Child {
           const byEmail = who.includes("@") && !who.startsWith("@");
           note.set({
             text: r.friends
-              ? `Вече сте приятели с ${r.name}.`
+              ? `Вече сте приятели ${withWord(r.name ?? "")}.`
               : byEmail
                 ? "Поканата е изпратена. Ако има играч с този имейл, ще я види в играта."
                 : `Поканата до ${r.name} е изпратена.`,
@@ -309,7 +311,7 @@ function row(f: Friend, remove: () => void, editing: () => boolean): Child {
         "span",
         { class: "friend-day" },
         f.today
-          ? `${f.today.rights} от 10 · ${formatNumber(f.today.points)} ${f.today.points === 1 ? "точка" : "точки"}`
+          ? `${f.today.rights} от ${f.today.of} · ${formatNumber(f.today.points)} ${f.today.points === 1 ? "точка" : "точки"}`
           : "Днес още няма резултат",
       ),
     ),

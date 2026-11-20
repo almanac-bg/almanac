@@ -220,6 +220,29 @@ func (r *run) counted() int {
 	return n
 }
 
+// countedOf is, in SQL, how many of the questions in a column of picks (a run's, a day's) count: all but those void.
+// Every "all right" and every "out of" of a day reads it, never the length of the picks.
+func countedOf(questions string) string {
+	return `(SELECT count(*) FROM json_each(` + questions + `) WHERE NOT coalesce(json_extract(value, '$.void'), 0))`
+}
+
+// voidAt is, in SQL, whether the question an answer (a) answered in its run (r) counts for nobody.
+const voidAt = `coalesce(json_extract(r.questions, '$[' || a.n || '].void'), 0)`
+
+// justBefore is whether question n is the last a run could have answered before where it stands: the one before it,
+// or one before those that count for nobody it went on over since (skipVoid, passVoid).
+func (r *run) justBefore(n int) bool {
+	if n < 0 || n >= r.at || r.at > len(r.picks) {
+		return false
+	}
+	for i := n + 1; i < r.at; i++ {
+		if !r.picks[i].Void {
+			return false
+		}
+	}
+	return true
+}
+
 // voidNow is whether the question a run stands at counts for nobody.
 func (r *run) voidNow() bool { return !r.finished && r.at < len(r.picks) && r.picks[r.at].Void }
 

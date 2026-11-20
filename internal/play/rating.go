@@ -142,6 +142,19 @@ func among(friends bool) string {
 // division: a win or two isn't a rating yet.
 const MinRatedGames = 10
 
+// rate moves a player's rating by a rated game (a duel, Роял), counts the game, and keeps the peak: the highest rating
+// since it was set. The placement games' swings are no division (a win or two at the start would otherwise unlock
+// Злато for one placed in Сребро, and keep the news from telling Злато when they reach it): the game that places a
+// rating sets the peak to it, and those after raise it. It says where the rating went.
+func rate(tx *sql.Tx, userID int64, delta int) (int, error) {
+	var after int
+	err := tx.QueryRow(`UPDATE users SET rating = max(0, rating + ?2), rated = rated + 1,
+		peak = CASE WHEN rated + 1 < ?3 THEN peak WHEN rated + 1 = ?3 THEN max(0, rating + ?2)
+			ELSE max(peak, rating + ?2) END
+		WHERE id = ?1 RETURNING rating`, userID, delta, MinRatedGames).Scan(&after)
+	return after, err
+}
+
 // onRatingBoard is who's on the rating's board, as the index of it (users_rated) says it: SQLite uses an index of
 // some rows only for a query that says the very same of them, a number written out, not one bound.
 var onRatingBoard = "u.rated >= " + strconv.Itoa(MinRatedGames)

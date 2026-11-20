@@ -50,7 +50,6 @@ interface Profile {
   friend?: "yes" | "asked" | "asks";
   request?: number;
   record?: { won: number; lost: number; drawn: number };
-  id?: number;
 }
 
 const percent = (right: number, of: number) => (of ? Math.round((100 * right) / of) : 0);

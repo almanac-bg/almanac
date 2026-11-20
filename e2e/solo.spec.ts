@@ -118,6 +118,11 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
   // Another topic is a tap away, under the result.
   await expect(page.locator(".other-topics .chip")).toHaveCount(3);
   await expect(page.locator(".other-topics")).not.toContainText("История");
+  // Each in its own topic's tone, as on Начало: not all of them in gold.
+  const tones = await page
+    .locator(".other-topics .chip .topic-mark")
+    .evaluateAll((marks) => marks.map((m) => getComputedStyle(m).getPropertyValue("--tone").trim()));
+  expect(new Set(tones).size, tones.join(" ")).toBeGreaterThan(1);
   // Ten more from a result start at once: the player is ready, no count.
   await page.getByRole("button", { name: "Още десет" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10");

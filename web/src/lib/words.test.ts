@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dateWords, formatNumber, hyphenate, issueWords, stakeWords, weekday, withName } from "./words.ts";
+import { dateWords, formatNumber, hyphenate, issueWords, stakeWords, weekday, withWord } from "./words.ts";
 
 test("a day as the game writes it: the date, the month in lower case; with its issue, a dateline", () => {
   assert.equal(dateWords("2026-11-17"), "17 ноември");
@@ -12,7 +12,7 @@ test("a day as the game writes it: the date, the month in lower case; with its i
 });
 
 test("„със“ before an с or a з, „с“ before anything else", () => {
-  assert.deepEqual(["Заек 817", "Сова", "зора", "Мечка 12", "Ана", "Sasho", "Zara", "Shon", "Ivo"].map(withName), [
+  assert.deepEqual(["Заек 817", "Сова", "зора", "Мечка 12", "Ана", "Sasho", "Zara", "Shon", "Ivo"].map(withWord), [
     "със Заек 817",
     "със Сова",
     "със зора",
@@ -23,6 +23,33 @@ test("„със“ before an с or a з, „с“ before anything else", () => {
     "с Shon",
     "с Ivo",
   ]);
+  assert.equal(withWord("„Светило“ в „История“"), "със „Светило“ в „История“");
+  assert.equal(withWord("„Познавач“ в три теми"), "с „Познавач“ в три теми");
+});
+
+test("„със“ before a number read starting with an с: 7, 17, 70–79, 100–199, 700–799, and their thousands", () => {
+  const sz = ["7", "17", "70", "77", "100", "150", "199", "700", "765", "7 000", "7000", "17 000", "100 000", "170000"];
+  const s = [
+    "0",
+    "1",
+    "2",
+    "6",
+    "8",
+    "10",
+    "16",
+    "20",
+    "27",
+    "60",
+    "80",
+    "200",
+    "365",
+    "600",
+    "1000",
+    "1 000",
+    "1 700",
+  ];
+  for (const n of sz) assert.equal(withWord(`${n} дни`), `със ${n} дни`, n);
+  for (const n of s) assert.equal(withWord(`${n} дни`), `с ${n} дни`, n);
 });
 
 test("a word breaks by its syllables, as Bulgarian hyphenates", () => {

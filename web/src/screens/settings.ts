@@ -325,7 +325,7 @@ function switchRow(label: string, about: string, on: () => boolean, set: (v: boo
   );
 }
 
-/** Sounds, the clock's last seconds among them, and in the app the phone's touch: on or off, on this device. */
+/** Sounds, the clock's last seconds among them, and Роял's music: on or off, on this device. */
 function sounds(): Child {
   return h(
     "section",
@@ -548,7 +548,11 @@ function reminders(): Child {
                       "div",
                       null,
                       kind("day", "Въпросите на деня", "Веднъж на ден, около часа, в който играеш, ако още те чакат."),
-                      kind("friends", "Приятели и дуели", "Покани за приятелство и как са свършили игрите ти."),
+                      kind(
+                        "friends",
+                        "Приятели и резултати",
+                        "Покани за приятелство и мястото ти в Роял, когато не го видиш до края.",
+                      ),
                       kind("royal", "Роял", "Когато входът се отвори: в 20:45 в дните на Роял."),
                     )
                   : null,
@@ -557,7 +561,7 @@ function reminders(): Child {
               h("button", { class: "link", onclick: toggle }, "Спри известията тук"),
             ]
           : [
-              h("p", { class: "muted" }, "Въпросите на деня, приятели, дуели, Роял: ти избираш за какво."),
+              h("p", { class: "muted" }, "Въпросите на деня, приятели, Роял: ти избираш за какво."),
               h("button", { class: "btn", onclick: toggle }, "Включи известията"),
             ],
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
@@ -581,6 +585,9 @@ function deleteAccount(): Child {
               class: "btn danger",
               onclick: async () => {
                 try {
+                  // This browser's notifications go too: kept, they'd come back to whoever plays here next, unasked
+                  // (pushOn tells the server of them again). The server forgets them with the player.
+                  if (pushable()) await turnOff().catch(() => {});
                   await api("DELETE", "/api/me");
                   // Nothing is left here: Начало, as for someone new, says so once.
                   notice.set("Профилът е изтрит.");

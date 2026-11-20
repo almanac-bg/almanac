@@ -423,7 +423,7 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 		(SELECT coalesce(max(rights), 0) FROM runs WHERE user_id = ?1 AND kind = 'royal' AND started_at BETWEEN ?2 AND ?3
 			AND id <> ?6),
 		(SELECT count(*) FROM runs r WHERE r.user_id = ?1 AND `+onDay("r")+` AND r.rights > 0
-			AND r.rights = json_array_length(r.questions) AND r.id <> ?6),
+			AND r.rights = `+countedOf("r.questions")+` AND r.id <> ?6),
 		(SELECT count(*) FROM runs r WHERE r.user_id = ?1 AND `+onDay("r")+`
 			AND json_array_length(r.questions) = ?5 AND r.rights >= ?5 - 2 AND r.id <> ?6)`, userID, from, to, day, Length, except).
 		Scan(&t.day, &t.duels, &t.duelWins, &t.royals, &t.royalBest, &t.perfect,
@@ -452,7 +452,8 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 	}
 	// The day's answers, game by game in their order (for a row): a game begun before midnight counts from it, but
 	// the day's questions are their own day's, all ten, though the last came after midnight.
-	rows, err = db.QueryContext(ctx, `SELECT a.run_id, a.question_id, a.is_right, a.ms, coalesce(a.given, '')
+	rows, err = db.QueryContext(ctx, `SELECT a.run_id, a.question_id, a.is_right, a.ms, coalesce(a.given, ''),
+			`+voidAt+`
 		FROM answers a JOIN runs r ON r.id = a.run_id
 		WHERE r.user_id = ?1 AND r.started_at >= ?2 - 86400000 AND r.started_at < ?3 AND r.id <> ?5
 			AND CASE WHEN r.kind = 'day' THEN r.day = ?4 ELSE a.at BETWEEN ?2 AND ?3 END
@@ -469,18 +470,23 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 		var question, given string
 		var right bool
 		var ms int64
-		if err := rows.Scan(&id, &question, &right, &ms, &given); err != nil {
+		var void bool
+		if err := rows.Scan(&id, &question, &right, &ms, &given, &void); err != nil {
 			return nil, err
 		}
 		if id != run {
 			run, row = id, 0
 		}
 		if !right {
-			row = 0
+			if !void { // one that counts for nobody neither adds to a row nor breaks it (day.go)
+				row = 0
+			}
 			continue
 		}
-		row++
-		t.row = max(t.row, row)
+		if !void {
+			row++
+			t.row = max(t.row, row)
+		}
 		t.right++
 		if ms < fastMs {
 			t.fast++

@@ -245,7 +245,7 @@ func TestRecordingsWaitForACard(t *testing.T) {
 	if full.cards() != NewsCards {
 		t.Fatalf("a full news: %d cards", full.cards())
 	}
-	if (News{Mastery: []MasteryMove{{}}}).cards() != 1 || (News{}).cards() != 0 {
+	if (News{Mastery: &MasteryMove{}}).cards() != 1 || (News{}).cards() != 0 {
 		t.Fatal("cards miscounted")
 	}
 }

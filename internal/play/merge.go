@@ -49,12 +49,12 @@ var mergeSteps = []mergeStep{
 		sql: `UPDATE duels SET a_id = ?1 WHERE a_id = ?2 AND coalesce(b_id, 0) <> ?1`},
 	{sql: `UPDATE duels SET b_id = ?1 WHERE b_id = ?2 AND coalesce(a_id, 0) <> ?1`},
 	{sql: `DELETE FROM duels WHERE a_id = ?2 OR b_id = ?2`},
-	// The rating: the guest's, with its games and peak, only if the account has none of its own (no rated duel yet).
-	// Never the higher of the two: a guest is free to make, so a rating pumped up on throwaway guests would otherwise
-	// become any account's by signing in from the guest (review 2026-11-18, S20).
+	// The rating: the guest's, with its games, its peak and what was told of it, only if the account has none of its
+	// own (no rated duel yet: its peak is none either, rate). Never the higher of the two: a guest is free to make, so
+	// a rating pumped up on throwaway guests would otherwise become any account's by signing in from the guest (review
+	// 2026-11-18, S20).
 	{carries: []string{"users.rating", "users.rated", "users.peak", "users.peak_seen"},
-		sql: `UPDATE users SET rating = g.rating, rated = g.rated, peak = max(users.peak, g.peak),
-		peak_seen = max(users.peak_seen, g.peak_seen)
+		sql: `UPDATE users SET rating = g.rating, rated = g.rated, peak = g.peak, peak_seen = g.peak_seen
 		FROM (SELECT rating, rated, peak, peak_seen FROM users WHERE id = ?2) g
 		WHERE users.id = ?1 AND g.rated > 0 AND users.rated = 0`},
 	// The evenings of Роял the guest played (an evening both played in stays the account's).
@@ -158,7 +158,8 @@ const GoneName = "Изтрит играч"
 // before), as it was without them: a duel's result stays the other's, without the player's name or game (the schema
 // sets the player to none there, ON DELETE SET NULL); what was theirs alone, or nobody's once they're gone, goes.
 //
-//   - Their duels without a result yet go (nobody can finish them).
+//   - A duel under way with another player, or against their recording, stays the other's: they forfeit it, and it's
+//     the other's win once played to its end (forfeit).
 //   - A duel only they had (against a recording, or the other gone before) goes.
 //   - Their name goes from others' games against them, or against their recordings.
 //   - Friend requests to their address go.
@@ -172,7 +173,6 @@ func Forget(tx *sql.Tx, id int64) error {
 		return err
 	}
 	for _, q := range []string{
-		`DELETE FROM duels WHERE ended_at IS NULL AND (a_id = ?1 OR b_id = ?1)`,
 		`DELETE FROM duels WHERE a_id = ?1 AND b_id IS NULL`,
 		`DELETE FROM duels WHERE b_id = ?1 AND a_id IS NULL`,
 		`UPDATE runs SET opponent = NULL WHERE opponent_id = ?1`,

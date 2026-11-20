@@ -413,10 +413,11 @@ type FewRight struct {
 }
 
 // RarestRight is the player's right answer in a day's ten, finished, that the fewest of that day's other players got
-// right (of the questions enough of them have answered): nil for none.
+// right (of the questions enough of them have answered, and that count: day.go): nil for none.
 func (g *Game) RarestRight(ctx context.Context, userID int64, day string) (*FewRight, error) {
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.n, a.question_id FROM runs r JOIN answers a ON a.run_id = r.id
-		WHERE r.user_id = ? AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND a.is_right ORDER BY a.n`,
+		WHERE r.user_id = ? AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND a.is_right
+			AND NOT `+voidAt+` ORDER BY a.n`,
 		userID, day)
 	if err != nil {
 		return nil, err

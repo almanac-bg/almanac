@@ -93,6 +93,7 @@ let {
   errorText,
   lifetime,
   opened,
+  withWord,
 } = {} as Kit;
 
 type Phase = "soon" | "lobby" | "question" | "reveal" | "end";
@@ -319,6 +320,7 @@ export function royal(kit: Kit) {
     errorText,
     lifetime,
     opened,
+    withWord,
   } = kit);
   title("Роял");
   const view = signal<Evening | null>(null);
@@ -875,7 +877,7 @@ function standing(view: () => Evening): Child {
  * decide, more being level at it than the cut takes), and where the player stands against it, if in. */
 function cutLine(c: Cut, at: Score, me?: Player): string {
   const who = c.timed
-    ? `След ${nth(c.after)} продължават тези с повече от ${rights(at.rights)}, а от тези с ${at.rights} — по-бързите (до ${seconds(at.ms, me?.in && me.reached === at.rights ? [me.ms] : [])}).`
+    ? `След ${nth(c.after)} продължават тези с повече от ${rights(at.rights)}, а от тези ${withWord(String(at.rights))} — по-бързите (до ${seconds(at.ms, me?.in && me.reached === at.rights ? [me.ms] : [])}).`
     : `След ${nth(c.after)} продължават тези с поне ${rights(at.rights)}.`;
   if (!me?.in) return who;
   if (me.goes) return `${who} Засега си вътре.`;
@@ -1214,7 +1216,7 @@ function end(view: () => Evening, first: Evening, now: Signal<number>): Child {
               h("span", { class: "muted" }, p.rights >= first.length ? `всичките ${first.length}!` : rights(p.rights)),
               // Two short lines: a narrow phone's row holds them beside the name.
               p.outAt >= 0 ? h("span", { class: "muted" }, `отпадна след ${ordinal(p.outAt + 1)}я`) : null,
-              p.outAt >= 0 ? h("span", { class: "muted" }, `с ${rights(p.reached)}`) : null,
+              p.outAt >= 0 ? h("span", { class: "muted" }, withWord(rights(p.reached))) : null,
               timed(p, all, i),
               delta(p.delta),
             ),

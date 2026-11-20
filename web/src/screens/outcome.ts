@@ -35,7 +35,7 @@ let {
   reviewParts,
   signal,
   trail,
-  withName,
+  withWord,
 } = {} as Kit;
 
 /** How many questions a duel has. */
@@ -76,7 +76,7 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
     reviewParts,
     signal,
     trail,
-    withName,
+    withWord,
   } = kit);
   const steps = again && typeof again === "object" && "main" in again ? again : null;
   const next = steps ? steps.main : (again as Child);
@@ -108,7 +108,7 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
 function kicker(d: DuelView): string {
   if (d.recorded) return "Дуел срещу запис";
   const them = d.opponent?.name;
-  return them ? `Дуел на живо ${withName(them)}` : "Дуел";
+  return them ? `Дуел на живо ${withWord(them)}` : "Дуел";
 }
 
 const headings: Record<DuelView["state"], string> = {
@@ -276,12 +276,13 @@ function line(d: DuelView): string {
   return d.state === "won" ? `Водеше от ${from} въпрос до края.` : `${them} водеше от ${from} въпрос до края.`;
 }
 
-/** Why a duel moved no rating (play.DuelView.Unrated); a notification says the same (server/notify.go). */
+/** Why a duel moved no rating (play.DuelView.Unrated). */
 const unratedWords: Record<NonNullable<DuelView["unrated"]>, string> = {
   again: "Дуел без рейтинг: днес вече сте играли.",
   recordings: "Срещу запис рейтингът се променя до пет пъти на ден: този дуел е без рейтинг.",
   network: "Дуел без рейтинг: играете от една и съща мрежа.",
   newcomers: "Дуел без рейтинг: с нови играчи рейтингът се променя до пет пъти на ден.",
+  gone: "Дуел без рейтинг: другият играч изтри профила си.",
 };
 
 /** What the duel meant: where the rating went (from and to, its division and how far to the next), or why it didn't

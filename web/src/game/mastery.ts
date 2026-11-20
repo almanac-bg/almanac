@@ -4,9 +4,25 @@
 import { type Child, h } from "../lib/dom.ts";
 import { categories } from "../state.ts";
 import { meter, questions, toneOf, topicMark } from "../ui.ts";
-import { type Mastery, type MasteryMove, masteryNews } from "./known.ts";
 
-export type { Mastery, MasteryMove } from "./known.ts";
+/** A topic's mastery as the server sends it (play.Mastery). */
+export interface Mastery {
+  category: string;
+  answers: number;
+  known: number; // percent of the topic's questions
+  tier: number; // 0 (Новак) … TIERS - 1 (Светило)
+  name: string;
+  next?: string;
+  nextAt?: number;
+  sure: boolean; // answers enough to tell, with its tier: until then it's a guess
+  first?: boolean; // answers enough for a first estimate, not yet sure: its share is told, never its tier
+}
+
+/** How a game moved a topic's mastery (play.MasteryMove). */
+export interface MasteryMove {
+  from: Mastery;
+  to: Mastery;
+}
 
 /** How many tiers there are (play.MasteryTiers). */
 const TIERS = 6;
@@ -49,8 +65,13 @@ const firstWords = (m: Mastery) => [
 /** A topic's row: how well it's known; the whole row a way to play it (`play`: the player's own). */
 function row(m: Mastery, extra: Child = null, play = false): Child {
   const topic = play
-    ? h("a", { class: "mastery-topic", href: `/play/${m.category}` }, topicMark(m.category), topicName(m.category))
-    : h("span", { class: "mastery-topic" }, topicMark(m.category), topicName(m.category));
+    ? h(
+        "a",
+        { class: "mastery-topic", href: `/play/${m.category}` },
+        topicMark(m.category),
+        h("span", null, topicName(m.category)),
+      )
+    : h("span", { class: "mastery-topic" }, topicMark(m.category), h("span", null, topicName(m.category)));
   // Still being found out: one line, the topic and its first estimate, or what's left before one.
   if (!m.sure)
     return h(
@@ -121,14 +142,12 @@ export function masteryCard(all: Mastery[], theirs = false): Child {
   );
 }
 
-/** How a topic's game moved its mastery, in a line, when it's news (masteryNews): the topic, how much of it is known
+/** How a topic's game moved its mastery, in a line: the move the server picked as news (play.masteryTold, which also
+ * counts the news's cards by it: draw it whenever it's sent), never one of its own. The topic, how much of it is known
  * now and how it moved — „нова степен“ for a tier above the lowest reached, else the share gained; before its mark is
  * sure, a first estimate of what share of the topic it is, never a tier; or, while there's no estimate yet, what's left
- * before one. Of a game of several topics, the one that moved most. */
-export function masteryLine(moves: MasteryMove[]): Child {
-  const shown = (m: Mastery) => m.sure || !!m.first;
-  const only = moves.length === 1 ? moves[0] : undefined;
-  const move = moves.find(masteryNews) ?? (only && !shown(only.to) ? only : undefined);
+ * before one. */
+export function masteryLine(move: MasteryMove | undefined): Child {
   if (!move) return null;
   const { from, to } = move;
   const d = to.known - from.known;

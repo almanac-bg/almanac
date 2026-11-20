@@ -837,6 +837,22 @@ func TestAlone(t *testing.T) {
 	}
 }
 
+// An evening nobody came to is held all the same: it counts, with nobody, in how often Роял plays (play.RoyalPaceOf).
+func TestHeldEmpty(t *testing.T) {
+	w := setup(t) // Saturday, 14 November
+	w.at(20, 50, 0)
+	w.at(21, 0, 0)
+	w.at(21, 0, 1)
+	var held int
+	_ = w.db.Read.QueryRow(`SELECT count(*) FROM royal_evenings WHERE day = '2026-11-14'`).Scan(&held)
+	if held != 1 {
+		t.Fatal("an evening nobody came to not kept as held")
+	}
+	if g := w.h.Glance(); g.StartsAt != time.Date(2026, 11, 15, 21, 0, 0, 0, play.Bulgaria).UnixMilli() {
+		t.Fatalf("after an evening nobody came to: %+v", g)
+	}
+}
+
 // An evening the server missed (down from before the start to well after) is ended by SettleDue.
 func TestMissed(t *testing.T) {
 	w := setup(t)

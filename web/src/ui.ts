@@ -169,9 +169,12 @@ export const levelNumber = (level: number): Child[] => [
   h("span", { class: "level-num" }, String(level)),
 ];
 
-/** A topic's small picture, as on a chip (decoration); a plain dot for all of them. */
+/** A topic's small picture, as on a chip (decoration), in the topic's own tone wherever it's put; a plain dot for all
+ * of them. */
 export function topicMark(category: string): Child {
-  return category ? picture(`topic-${category}`, "topic-mark") : h("span", { class: "dot", "aria-hidden": "true" });
+  return category
+    ? picture(`topic-${category}`, `topic-mark ${toneOf(category)}`)
+    : h("span", { class: "dot", "aria-hidden": "true" });
 }
 
 /** Which of the game's systems a player has met (play/unfold.go): the rest waits, untold, until it matters. */

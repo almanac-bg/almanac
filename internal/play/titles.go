@@ -152,7 +152,7 @@ func (w wardrobe) titleViews(all []Title) []TitleView {
 	list := make([]TitleView, 0, len(all))
 	for _, t := range all {
 		v := TitleView{TitleRef: t.ref(), Group: t.Group}
-		if !w.has(t.by) {
+		if !w.hasTitle(t) {
 			v.Locked, v.How = true, t.how()
 			if t.by.days > 0 && w.days > 0 {
 				v.How += ", засега " + strconv.Itoa(w.days)
@@ -178,7 +178,7 @@ func (t Title) how() string {
 // wears is whether a player with this wardrobe may wear a title: one they've unlocked.
 func (w wardrobe) wears(all []Title, id string) bool {
 	i := slices.IndexFunc(all, func(t Title) bool { return t.ID == id })
-	return i >= 0 && w.has(all[i].by)
+	return i >= 0 && w.hasTitle(all[i])
 }
 
 // titleOf is the name a title is shown by, and its tier ("" for none).

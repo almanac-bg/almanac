@@ -424,6 +424,24 @@ func (g *Game) MasteryMoves(ctx context.Context, userID, runID int64) ([]Mastery
 	return out, nil
 }
 
+// masteryTold is the one move of a game's mastery its news tells (of MasteryMoves, the furthest moved first), if any:
+// the first that's news (a first estimate, a tier told for the first time, a share gone up; a share gone down isn't,
+// and „Ново за теб“ is no place for a loss: Профил has it); or, of a game of one topic with no estimate yet, what's left
+// before one. The client draws what this picks and nothing else (web/src/game/mastery.ts), so the news's cards are
+// counted from it (News.cards).
+func masteryTold(moves []MasteryMove) *MasteryMove {
+	shown := func(m Mastery) bool { return m.Sure || m.First }
+	for _, m := range moves {
+		if shown(m.To) && (!shown(m.From) || m.To.Sure && !m.From.Sure || m.To.Known > m.From.Known) {
+			return &m
+		}
+	}
+	if len(moves) == 1 && !shown(moves[0].To) {
+		return &moves[0]
+	}
+	return nil
+}
+
 // topicSlots is a topic run's shape for a player's ability there: as many easy, medium and hard questions as make
 // about aimRight of them right, easy to hard — easier for those still learning a topic, harder as they know it.
 // There's always at least one easy and one hard question, and three medium (the order and the match are among them).

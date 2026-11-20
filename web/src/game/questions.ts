@@ -4,7 +4,7 @@
 import { append, type Child, effect, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { play } from "../lib/sound.ts";
-import { hyphenate } from "../lib/words.ts";
+import { hyphenate, withWord } from "../lib/words.ts";
 import { formatNumber } from "../ui.ts";
 import { countedWords, percent, rare, withOwn } from "./numbers.ts";
 import { optionSizes, overSizes } from "./sizes.ts";
@@ -891,7 +891,7 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
         "aria-label": () => {
           const k = pairOf();
           const other = side === "left" ? view.right[pairs()[i] ?? -1] : view.left[k];
-          return k >= 0 && other ? `${text}, свързано с ${other}` : text;
+          return k >= 0 && other ? `${text}, свързано ${withWord(other)}` : text;
         },
         onclick: () => tap(side, i),
       },

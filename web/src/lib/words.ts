@@ -1,8 +1,25 @@
 // Words as Bulgarian says and writes them: those that change with the word after them, and where a word may break.
 
-/** „с“ or „със“ before a name: „със“ before an с or a з, in either alphabet („със Заек 817“, „с Мечка 12“). */
-export function withName(name: string): string {
-  return `${/^([сз]|[sz](?!h))/i.test(name) ? "със" : "с"} ${name}`;
+/** „с“ or „със“ before a word, a name or a number: „със“ where it's read starting with an с or a з, in either
+ * alphabet, past an opening quote („със Заек 817“, „с Мечка 12“, „със „Светило“…“), or a number read so („със 7“,
+ * „със 100 дни“, „с 20 дни“). */
+export function withWord(text: string): string {
+  const s = text.replace(/^„/, "");
+  const number = /^\d+(?:[   ]\d{3})*/.exec(s)?.[0];
+  const sz = number ? readsWithS(number.replace(/\D/g, "")) : /^([сз]|[sz](?!h))/i.test(s);
+  return `${sz ? "със" : "с"} ${text}`;
+}
+
+/** Whether a whole number (its digits) is read in Bulgarian starting with an „с“: седем (7), седемнадесет (17),
+ * седемдесет… (70–79), сто… (100–199), седемстотин… (700–799); past a thousand, as its leading group is read („сто
+ * хиляди“, „седем хиляди“), except a lone one („хиляда“, „милион“). No numeral is read starting with a з. */
+function readsWithS(digits: string): boolean {
+  const d = digits.replace(/^0+(?=\d)/, "");
+  const lead = Number(d.slice(0, d.length % 3 || 3));
+  if (d.length > 3 && lead === 1) return false;
+  if (lead >= 100) return [1, 7].includes(Math.floor(lead / 100));
+  if (lead >= 10) return lead === 17 || Math.floor(lead / 10) === 7;
+  return lead === 7;
 }
 
 /** A number as people write it in Bulgarian: a space between thousands from 10 000 up, a decimal comma, and the minus

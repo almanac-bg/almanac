@@ -25,13 +25,14 @@ type RecordingsNews struct {
 // what's new; the recordings take a place left free.
 const NewsCards = 3
 
-// cards is how many of a game's news cards this news fills.
+// cards is how many of a game's news cards this news fills, as the client draws them: the goals done, the one biggest
+// event, and „Ново за теб“ (achievements, unlocks, or a move of mastery that's news: masteryTold, all the client draws).
 func (n News) cards() int {
 	c := 0
 	for _, has := range []bool{
 		len(n.Goals) > 0,
 		n.Division != nil || n.LevelUp,
-		len(n.Achievements) > 0 || len(n.Unlocks) > 0 || len(n.Mastery) > 0,
+		len(n.Achievements) > 0 || len(n.Unlocks) > 0 || n.Mastery != nil,
 	} {
 		if has {
 			c++

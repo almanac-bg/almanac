@@ -357,6 +357,46 @@ func TestOneLeaves(t *testing.T) {
 	})
 }
 
+// One who deletes their account under way has left for good, and forfeits: the duel goes on for the other, who wins
+// it at its end (play.Forget), behind on points or not.
+func TestOneDeleted(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		w := setup(t)
+		ana, bo := w.user(), w.user()
+		sa, sb := w.hub.Seek(ana), w.hub.Seek(bo)
+		<-sb.Done()
+		m := sa.Match
+		fa, _ := m.Follow(ana.ID)
+		defer m.Unfollow(fa)
+		fb, _ := m.Follow(bo.ID)
+		next(m, ana.ID)
+		_ = m.Answer(bo.ID, 0, answer(m, true))
+		_ = m.Answer(ana.ID, 0, answer(m, false))
+		next(m, ana.ID)
+		if err := w.db.Tx(t.Context(), func(tx *sql.Tx) error {
+			if err := play.Forget(tx, bo.ID); err != nil {
+				return err
+			}
+			_, err := tx.Exec(`DELETE FROM users WHERE id = ?`, bo.ID)
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+		m.Unfollow(fb) // his sessions went with him
+		for v := next(m, ana.ID); v.Phase != PhaseEnd; v = next(m, ana.ID) {
+			if v.Phase == PhaseOff {
+				t.Fatal("called off as Bo went")
+			}
+			if v.Phase == PhaseQuestion {
+				_ = m.Answer(ana.ID, v.N, answer(m, false))
+			}
+		}
+		if d, err := w.g.DuelOf(t.Context(), ana.ID, m.ID()); err != nil || d.State != "won" || d.Unrated != "gone" {
+			t.Fatalf("Ana's duel, Bo gone: %+v (%v)", d, err)
+		}
+	})
+}
+
 // One who leaves for good is waited for Away, whatever question is up by then; after it, they show as gone.
 func TestGoneForGood(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {

@@ -15,6 +15,7 @@ import { emblem } from "../art/emblem.ts";
 import { api, errorText } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { feelKit, play, type SoundName, voice } from "../lib/sound.ts";
+import { withWord } from "../lib/words.ts";
 import { met } from "../state.ts";
 import {
   type AchievementInfo,
@@ -53,8 +54,8 @@ interface News {
   unlocks: Unlock[];
   /** The avatar worn (shape-tone): an unlocked shape is put on in its tone. */
   avatar: string;
-  /** How a topic's game moved its mastery. */
-  mastery?: MasteryMove[];
+  /** How a topic's game moved its mastery, when that's news (play.masteryTold). */
+  mastery?: MasteryMove;
   /** Which of the game's systems the player has met, and those met with this game (told once). */
   open: Open;
   opened?: (keyof Open)[];
@@ -417,7 +418,7 @@ const shownRows = 3;
 /** „Ново за теб“: the achievements earned and everything unlocked to wear, in one list (each unlock a tap from being
  * worn), and how a topic's game moved its mastery, in a line. */
 function fresh(n: News): Child {
-  const mastery = masteryLine(n.mastery ?? []);
+  const mastery = masteryLine(n.mastery);
   if (!n.achievements.length && !n.unlocks.length && !mastery) return null;
   // One list, the highest tier first (an achievement before what it unlocks, of a tier): an unlock is of its own tier
   // (a title's), or of the achievement's that unlocked it.
@@ -445,16 +446,22 @@ function fresh(n: News): Child {
         )
       : null,
     mastery,
-    // A first game earns several things at once: three are told here, the rest wait where they're kept (an
-    // achievement, with what it gives, in Награди; what's to wear, in the wardrobe).
-    rest.length
-      ? rest.some((r) => r.achievement)
-        ? h("a", { class: "link", href: "/rewards" }, `Още ${rest.length} в Награди`)
-        : h("a", { class: "link", href: "/wardrobe" }, `Още ${rest.length} в гардероба`)
-      : n.unlocks.length
-        ? h("a", { class: "link", href: "/wardrobe" }, "Към гардероба")
-        : null,
+    // A first game earns several things at once: three are told here, the rest wait where they're kept, each counted
+    // where it is (the achievements in Награди, which lists only them; what's to wear in the wardrobe).
+    more(rest.filter((r) => r.achievement).length, rest.filter((r) => !r.achievement).length, n.unlocks.length > 0),
   );
+}
+
+/** Where the rest of „Ново за теб“ waits: `achievements` more in Награди, `unlocks` more in the wardrobe; with none
+ * left, a way to the wardrobe if anything was unlocked (`any`). */
+function more(achievements: number, unlocks: number, any: boolean): Child {
+  const rewards = achievements ? h("a", { class: "link", href: "/rewards" }, `Още ${achievements} в Награди`) : null;
+  const wardrobe = unlocks
+    ? h("a", { class: "link", href: "/wardrobe" }, `Още ${unlocks} в гардероба`)
+    : any && !achievements
+      ? h("a", { class: "link", href: "/wardrobe" }, "Към гардероба")
+      : null;
+  return [rewards, wardrobe];
 }
 
 /** The tiers, lowest first, for the news to put the highest first. */
@@ -492,7 +499,7 @@ function unlockRow(u: Unlock, worn: string, told = false): Child {
       "span",
       { class: "unlock-text" },
       h("strong", { class: u.kind === "title" ? "unlock-title-name" : undefined }, cap(unlockWords(u))),
-      told ? null : h("span", { class: "unlock-about" }, `${/^„?[сз]/i.test(u.from) ? "Със" : "С"} ${u.from}.`),
+      told ? null : h("span", { class: "unlock-about" }, `${cap(withWord(u.from))}.`),
     ),
     wear(u, worn),
   );

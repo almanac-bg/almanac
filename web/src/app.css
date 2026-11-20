@@ -6643,9 +6643,10 @@
     gap: 6px;
   }
 
+  /* The topic on the left, its tier (or what's known) on the right, on one line: a long name („Изкуство и
+     литература“) wraps in its own place, never pushing the tier under it. */
   .mastery-head {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-1) var(--space-2);
@@ -6655,7 +6656,12 @@
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
+    min-width: 0;
     font-weight: 800;
+  }
+
+  .mastery-head > .mastery {
+    flex-shrink: 0;
   }
 
   /* The player's own topic leads to playing it: the whole row is the link. */
@@ -6674,7 +6680,8 @@
     content: "";
   }
 
-  a.mastery-topic::after {
+  /* The way on, after the name, on its last line when a long one wraps. */
+  a.mastery-topic > span::after {
     content: "\00a0›";
     color: var(--text-muted);
   }
@@ -6687,6 +6694,7 @@
 
   /* On a row, the picture starts at the card's edge like the words under it (a chip pulls it in instead). */
   .mastery-topic .topic-mark {
+    flex-shrink: 0;
     margin-left: 0;
   }
 

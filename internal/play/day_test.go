@@ -284,3 +284,110 @@ func TestRelabelPaysAsShown(t *testing.T) {
 	}
 	_ = ctx
 }
+
+// A day with a question void is a game of the nine that count wherever it's counted: nine of nine right is all right
+// (the achievement, the goal), a row goes over it, a result is told out of nine (the boards, the friends, the games played), the rarest
+// right answer is never the void one, and an answer sent again just before the void one gets its reply again.
+func TestVoidDayIsOfNine(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	w.reload(w.b)
+	w.g.CrowdMin = 1
+	const k = 4
+	ana, bo, cy := w.user(), w.user(), w.user()
+	w.befriend(ana, bo)
+	allRight := func(int) func(int64, int) json.RawMessage { return w.right }
+	sb := w.dayAs(bo, -1, allRight)
+	sa := w.dayAs(ana, -1, func(n int) func(int64, int) json.RawMessage {
+		if n == k {
+			return w.wrong
+		}
+		return w.right
+	})
+	if rare, err := w.g.RarestRight(ctx, bo, sb.Day); err != nil || rare == nil || rare.N != k {
+		t.Fatalf("before the void, the rarest right answer: %+v %v", rare, err)
+	}
+	sc := w.dayAs(cy, k-1, allRight) // at k-1, not shown yet
+	target := w.picks(sb.ID)[k].ID
+	w.reload(editedSample(t, func(id string, q map[string]any) {
+		if id == target {
+			q["retired"], q["retiredWhy"] = true, "wrong"
+		}
+	}))
+	if err := w.g.EnsureDays(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// ana missed only the void one: all right, as bo is.
+	if s := w.stateOf(ana, sa.ID); s.Rights != Length-1 || s.AllRight != AllRight {
+		t.Fatalf("ana: %+v", s)
+	}
+	for who, u := range map[string]int64{"ana": ana, "bo": bo} {
+		m, err := w.g.measure(ctx, u)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m["perfect"] != 1 {
+			t.Errorf("%s hasn't a perfect day: %+v", who, m)
+		}
+		tl, err := w.g.tallyOf(ctx, u, sb.Day)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The void one neither adds to a row nor breaks it.
+		if tl.perfect != 1 || tl.row != Length-1 {
+			t.Errorf("%s's day hasn't a game without a mistake, nine in a row: %+v", who, tl)
+		}
+	}
+
+	// The rarest right answer is one that counts.
+	if rare, err := w.g.RarestRight(ctx, bo, sb.Day); err != nil || rare != nil && rare.N == k {
+		t.Fatalf("after the void, the rarest right answer: %+v %v", rare, err)
+	}
+
+	// Results are out of nine.
+	board, err := w.g.BoardOf(ctx, sb.Day, ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if board.Of != Length-1 || board.Mine == nil || board.Mine.Of != Length-1 || len(board.Top) == 0 ||
+		slices.ContainsFunc(board.Top, func(s Score) bool { return s.Of != Length-1 }) {
+		t.Fatalf("the board: %+v", board)
+	}
+	friends, err := w.g.FriendsBoard(ctx, sb.Day, ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(friends) != 2 || slices.ContainsFunc(friends, func(s Score) bool { return s.Of != Length-1 }) {
+		t.Fatalf("the friends' board: %+v", friends)
+	}
+	list, err := w.g.FriendsOf(ctx, ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].Today == nil || list[0].Today.Of != Length-1 {
+		t.Fatalf("the friends: %+v", list)
+	}
+	games, err := w.g.GamesOf(ctx, ana, "day", "", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(games.Games) != 1 || games.Games[0].Total != Length-1 {
+		t.Fatalf("the games played: %+v", games)
+	}
+
+	// cy answers the question before the void one, and the reply is lost: sent again, it gets it again.
+	w.show(cy, sc.ID)
+	w.wait(3 * time.Second)
+	first, err := w.answer(cy, sc.ID, k-1, w.right(sc.ID, k-1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.State.At != k+1 {
+		t.Fatalf("past the void one: %+v", first.State)
+	}
+	again, err := w.answer(cy, sc.ID, k-1, w.right(sc.ID, k-1))
+	if err != nil || !again.Right || again.Points != first.Points || again.Reveal == nil {
+		t.Fatalf("sent again: %+v %v", again, err)
+	}
+}

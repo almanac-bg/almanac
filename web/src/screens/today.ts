@@ -52,12 +52,8 @@ export interface Today {
   /** The day's issue: its number from the first day of the day's ten (play/issue.go), the same for everyone. */
   issue?: number;
   streak: number;
-  /** This week's days played, Monday first (for a player who has played). */
-  week?: boolean[];
   /** Reserve days in hand: each keeps the streak through a day missed. */
   reserve?: number;
-  /** Days in a row to the next reserve day (0: they are full). */
-  next?: number;
   /** A day just missed that a reserve day kept the streak through (the last 3 days). */
   kept?: string;
   /** A streak that just ended (the last 3 days): its days, and the day missed that ended it. */
@@ -353,7 +349,9 @@ function crowdSays(t: Today, one = false): Child {
   const avg = t.board.average;
   const lines = [
     lead ? h("p", { class: "crowd-says" }, lead) : null,
-    avg && !(one && lead) ? h("p", { class: "crowd-says" }, `Средно днес: ${formatNumber(avg, 0.1)} от 10.`) : null,
+    avg && !(one && lead)
+      ? h("p", { class: "crowd-says" }, `Средно днес: ${formatNumber(avg, 0.1)} от ${t.board.of}.`)
+      : null,
   ].filter(Boolean);
   return lines.length ? lines : null;
 }
@@ -627,7 +625,7 @@ function friendsDay(t: Today): Child {
       "ol",
       null,
       rows.map(({ s, i }) => {
-        const row = boardRow(i + 1, s.name, [String(s.rights), h("small", { class: "sub" }, " от 10")], {
+        const row = boardRow(i + 1, s.name, [String(s.rights), h("small", { class: "sub" }, ` от ${s.of}`)], {
           me: s.me,
           gap: i > 4,
           look: s,

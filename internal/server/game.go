@@ -44,8 +44,6 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 			return nil, err
 		}
 		out["streak"], out["reserve"] = streak.Days, streak.Reserve
-		out["saved"] = s.game.InWeek(streak.Saved) // kept, by a reserve day
-		out["next"] = streak.Next
 		// What came of the days just missed, told on Начало once (play.TellStreak: the client says when it has): a
 		// reserve day kept the streak; or none was left and it ended, and a new one begins.
 		recent := s.game.Now().In(play.Bulgaria).AddDate(0, 0, -3).Format(time.DateOnly)
@@ -70,9 +68,6 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 			if e.On > last && s.game.Away(last) && told != "back:"+last {
 				out["back"] = map[string]any{"last": last, "best": streak.Best}
 			}
-		}
-		if out["week"], err = s.game.Week(ctx, u.ID); err != nil {
-			return nil, err
 		}
 		if out["level"], err = s.game.LevelNow(ctx, u.ID); err != nil {
 			return nil, err
