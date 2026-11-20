@@ -219,6 +219,37 @@ func TestHandoffNumber(t *testing.T) {
 	}
 }
 
+// A link copied by hand asks every browser for its number, the same phone's too; the browser that made it is told
+// it's its own (nothing to take), and only the player's own link is marked.
+func TestHandoffCopied(t *testing.T) {
+	a, _, _, _ := setup(t)
+	ctx := t.Context()
+	guest, session, _ := a.Guest(ctx)
+	other, _, _ := a.Guest(ctx)
+	link, _ := a.Handoff(ctx, guest.ID, phone)
+	if err := a.CopiedHandoff(ctx, other.ID, link.Token); err != nil {
+		t.Fatal(err)
+	}
+	if h, _ := a.LookHandoff(ctx, link.Token, "", phone); h.Number {
+		t.Fatal("another player marked the link copied")
+	}
+	if err := a.CopiedHandoff(ctx, guest.ID, link.Token); err != nil {
+		t.Fatal(err)
+	}
+	if h, err := a.LookHandoff(ctx, link.Token, "", phone); err != nil || !h.Number || h.Mine || h.Name != guest.Name {
+		t.Fatalf("a copied link on the same phone: %+v %v", h, err)
+	}
+	if _, _, err := a.TakeHandoff(ctx, link.Token, "", phone, 0); !errors.Is(err, ErrHandoffNumber) {
+		t.Fatalf("a copied link taken on the same phone without the number: %v", err)
+	}
+	if h, err := a.LookHandoff(ctx, link.Token, session, phone); err != nil || !h.Mine || h.Number {
+		t.Fatalf("a copied link where it was made: %+v %v", h, err)
+	}
+	if u, s, err := a.TakeHandoff(ctx, link.Token, "", phone, link.Number); err != nil || u.ID != guest.ID || s == "" {
+		t.Fatalf("with the number: %+v %v", u, err)
+	}
+}
+
 // The takeover a handoff once let through (review 2026-11-17, S1): someone makes a link and sends it; it's opened in
 // a browser with nobody in it (the number given), which plays on and later gives its email. Whoever made the link has
 // no way into that profile: not by the session they had (a guest becoming a profile ends its other sessions), not by

@@ -25,8 +25,9 @@ import (
 // its own, or a profile, is told how they're joined: by an email). And a browser that isn't plainly the same phone —
 // another network (an IPv4 /24, an IPv6 /64) or another family of system than the one that made the link (Origin) —
 // is asked for the two-digit number the making page shows (Offer.Number): a link that reached someone else is no way
-// into the game without the phone it came from. A wrong number counts against the link, which dies after
-// HandoffMisses. The network is kept as a keyed hash, never the address, and goes with the link.
+// into the game without the phone it came from. A link copied by hand (CopiedHandoff) asks every browser, the same
+// phone's too: a paste goes anywhere. A wrong number counts against the link, which dies after HandoffMisses. The
+// network is kept as a keyed hash, never the address, and goes with the link.
 
 // HandoffTTL is how long a handoff's link works (once).
 const HandoffTTL = 30 * time.Minute
@@ -132,6 +133,14 @@ func (a *Accounts) Handoff(ctx context.Context, userID int64, from Origin) (Offe
 	return out, nil
 }
 
+// CopiedHandoff marks a player's link as copied by hand („Копирай връзката“): from then on every browser that takes it
+// gives its number, the same phone's too. A token that isn't the player's changes nothing.
+func (a *Accounts) CopiedHandoff(ctx context.Context, userID int64, token string) error {
+	_, err := a.DB.Write.ExecContext(ctx, `UPDATE handoffs SET copied = 1 WHERE token_hash = ? AND user_id = ?`,
+		hashToken(token), userID)
+	return err
+}
+
 // twoDigits is a number from 10 to 99.
 func twoDigits() int {
 	n, _ := rand.Int(rand.Reader, big.NewInt(90))
@@ -144,7 +153,12 @@ type handoff struct {
 	origin Origin
 	number int
 	misses int
+	copied bool // copied by hand (CopiedHandoff)
 }
+
+// asks says whether a browser at origin, not the link's own, gives the link's number: one not plainly the maker's
+// phone, or any once the link was copied by hand.
+func (h handoff) asks(at Origin) bool { return h.copied || !h.origin.same(at) }
 
 // handing reads, for a handoff's token taken in the browser of session (its token, maybe ""), the link (whose game
 // it brings, where it was made, its number) and who the browser is (current, nil for no one), or why it can't be taken
@@ -152,10 +166,11 @@ type handoff struct {
 // game of their own (ErrHandoffHere). Opened where it was made, current is the link's player.
 func handing(tx *sql.Tx, token, session string) (h handoff, current *User, err error) {
 	var email sql.NullString
-	err = tx.QueryRow(`SELECT u.id, u.name, u.tag, u.email, u.admin, h.net, h.os, h.number, h.misses FROM handoffs h
-		JOIN users u ON u.id = h.user_id WHERE h.token_hash = ? AND h.expires_at > ? AND h.misses < ?`,
+	err = tx.QueryRow(`SELECT u.id, u.name, u.tag, u.email, u.admin, h.net, h.os, h.number, h.misses, h.copied
+		FROM handoffs h JOIN users u ON u.id = h.user_id WHERE h.token_hash = ? AND h.expires_at > ? AND h.misses < ?`,
 		hashToken(token), store.Now(), HandoffMisses).
-		Scan(&h.from.ID, &h.from.Name, &h.from.Tag, &email, &h.from.Admin, &h.origin.Net, &h.origin.OS, &h.number, &h.misses)
+		Scan(&h.from.ID, &h.from.Name, &h.from.Tag, &email, &h.from.Admin, &h.origin.Net, &h.origin.OS, &h.number, &h.misses,
+			&h.copied)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && email.Valid) { // a profile's (made before only guests'): none
 		return h, nil, ErrNoHandoff
 	}
@@ -179,11 +194,14 @@ func handing(tx *sql.Tx, token, session string) (h handoff, current *User, err e
 }
 
 // Handing is the game a handoff's link brings, as the page that takes it shows it (LookHandoff): whose it is, how
-// many days it was played on, and whether the number the making page shows is asked for here.
+// many days it was played on, whether the number the making page shows is asked for here, and whether this is the
+// browser that made it (Mine: nothing to take). Any other browser takes it with one tap that names the game, or with
+// the number.
 type Handing struct {
 	Name   string `json:"name"`
 	Days   int    `json:"days"`
 	Number bool   `json:"number,omitempty"`
+	Mine   bool   `json:"mine,omitempty"`
 }
 
 // LookHandoff says what game a handoff's token brings to the browser of session, at origin, before it's taken
@@ -200,7 +218,8 @@ func (a *Accounts) LookHandoff(ctx context.Context, token, session string, at Or
 		return out, err
 	}
 	out.Name = h.from.Name
-	out.Number = (current == nil || current.ID != h.from.ID) && !h.origin.same(at)
+	out.Mine = current != nil && current.ID == h.from.ID
+	out.Number = !out.Mine && h.asks(at)
 	err = tx.QueryRow(`SELECT count(*) FROM active_days WHERE user_id = ?`, h.from.ID).Scan(&out.Days)
 	return out, err
 }
@@ -208,8 +227,9 @@ func (a *Accounts) LookHandoff(ctx context.Context, token, session string, at Or
 // TakeHandoff brings the game of the guest who made a handoff's token to the browser of session (its token, maybe
 // ""), at origin, once; number is the number given for it (0: none). The game is shared, not moved: the browser it
 // came from stays signed in, and this one becomes the same player with a session of its own, keeping its own
-// notifications; a guest it was, who had nothing yet (hasGame), goes. A browser not plainly the maker's (Origin) gives
-// the link's number first (ErrHandoffNumber; WrongNumber, which counts against the link). A browser with a game of its
+// notifications; a guest it was, who had nothing yet (hasGame), goes. A browser not plainly the maker's (Origin), or
+// any once the link was copied (CopiedHandoff), gives the link's number first (ErrHandoffNumber; WrongNumber, which
+// counts against the link). A browser with a game of its
 // own, a profile's or a guest's, isn't joined to another by a link (ErrHandoffSignedIn, ErrHandoffHere): two games are
 // joined only by signing in with an email. The session token is "" when the browser keeps the one it has (opened
 // where it was made: nothing changes, and the link stays good).
@@ -226,7 +246,7 @@ func (a *Accounts) TakeHandoff(ctx context.Context, token, session string, at Or
 			u = *current
 			return nil
 		}
-		if !h.origin.same(at) && number != h.number {
+		if h.asks(at) && number != h.number {
 			if number == 0 {
 				return ErrHandoffNumber
 			}

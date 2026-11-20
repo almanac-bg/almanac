@@ -247,9 +247,12 @@ export function exitWay(stake: () => string | null): Child {
     if (offer.peek()) location.assign(outsideLink(location.href));
     else hold().then(() => location.assign(outsideLink(location.href)), fail);
   };
-  // Where no menu says it (an app that has none), the address to copy by hand into the phone's browser.
+  // Where no menu says it (an app that has none), the address to copy by hand into the phone's browser. A link copied
+  // goes wherever a paste can: every browser that opens it is asked for the number (account.CopiedHandoff).
   const copy = () => {
     const at = () => `${location.origin}/${location.hash}`;
+    const token = offer.peek()?.token;
+    if (token) api("POST", "/api/auth/handoff/copied", { token }).catch(() => {});
     let done: Promise<void>;
     try {
       done = navigator.clipboard.writeText(at());
@@ -310,18 +313,20 @@ export function coverExit(): Child {
  * to keep it and be reminded (screens/today.ts). */
 export const handedIn = signal(false);
 
-/** The game a handoff's link brings (account.Handing): whose, on how many days it was played, and whether the number
- * its page shows is asked for here. */
+/** The game a handoff's link brings (account.Handing): whose, on how many days it was played, whether the number
+ * its page shows is asked for here, and whether this is the browser that made it. */
 interface Handing {
   name: string;
   days: number;
   number?: boolean;
+  mine?: boolean;
 }
 
 /** A game brought by a Handoff's token found in Днес's address (handToken, which Днес takes out of it at once):
- * taken here, at once on the same phone, and elsewhere with the number the app's page shows; then `done` draws Днес
- * as it is, the day's result with the ask to keep the game and be reminded, and the notice says what came of it. The
- * app's browser it came from stays signed in (account.TakeHandoff). Opened where it was made, nothing changes. */
+ * taken here with one tap that names the game, or with the number the app's page shows where it's asked for; then
+ * `done` draws Днес as it is, the day's result with the ask to keep the game and be reminded, and the notice says what
+ * came of it. The app's browser it came from stays signed in (account.TakeHandoff). Opened where it was made, nothing
+ * changes and nothing is asked. */
 export function takeHand(token: string, done: () => void): Child {
   const screen = slot(() => h("p", { class: "muted" }, "…"));
   const finish = (words: string) => {
@@ -338,12 +343,38 @@ export function takeHand(token: string, done: () => void): Child {
   };
   api<{ game: Handing }>("POST", "/api/auth/hand/look", { token }).then(
     (r) =>
-      r.game.number
-        ? screen.show(() => numberForm(r.game, take, finish))
-        : take().catch((err) => finish(errorText(err))),
+      r.game.mine
+        ? take().catch((err) => finish(errorText(err)))
+        : screen.show(() => (r.game.number ? numberForm(r.game, take, finish) : confirmTake(r.game, take, finish))),
     (err) => finish(errorText(err)),
   );
   return h("section", { class: "screen" }, screen);
+}
+
+/** The one tap that takes a game brought by a link here, naming whose it is: a link opened is never taken unseen. */
+function confirmTake(game: Handing, take: () => Promise<void>, finish: (words: string) => void): Child {
+  const busy = signal(false);
+  return h(
+    "form",
+    {
+      class: "stack hand-number",
+      onsubmit: async (e: SubmitEvent) => {
+        e.preventDefault();
+        busy.set(true);
+        try {
+          await take();
+        } catch (err) {
+          finish(errorText(err));
+        } finally {
+          busy.set(false);
+        }
+      },
+    },
+    h("div", { class: "intro" }, h("h1", null, "Продължи играта тук")),
+    h("p", { class: "lead" }, "Връзката носи играта на ", h("strong", null, game.name), "."),
+    h("button", { class: "btn primary", disabled: busy }, "Продължи тук"),
+    h("button", { class: "link tap", type: "button", onclick: () => finish("") }, "Откажи"),
+  );
 }
 
 /** The number the app's page shows, asked for in a browser that isn't plainly the same phone (account.Origin): a
