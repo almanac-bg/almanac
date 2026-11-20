@@ -208,7 +208,8 @@ function avatars(p: Progress, set: (body: { avatar: string }) => void): Child {
   ];
 }
 
-/** A frame or a pattern: each drawn on the player's avatar, those still locked after. */
+/** A frame or a pattern: each drawn on the player's avatar with its name, the player's own to pick; those still
+ * locked after, as the avatars' are. */
 function wear(
   p: Progress,
   all: Cosmetic[],
@@ -220,21 +221,16 @@ function wear(
   return [
     h(
       "ul",
-      { class: "picker" },
+      { class: "wear" },
       [{ id: "", name: none } as Cosmetic, ...all.filter((c) => !c.locked)].map((c) =>
         h(
           "li",
           null,
           h(
             "button",
-            {
-              class: "pick",
-              type: "button",
-              "aria-pressed": c.id === worn,
-              "aria-label": c.name,
-              onclick: () => put(c.id),
-            },
+            { class: "wear-pick", type: "button", "aria-pressed": c.id === worn, onclick: () => put(c.id) },
             preview(c.id),
+            h("span", { class: "wear-name" }, c.name),
           ),
         ),
       ),

@@ -61,6 +61,15 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(page.locator(".title-pick.locked", { hasText: "Сто изгрева" })).toContainText(
     "Отключва се с постижението „Сто дни“.",
   );
+  // Frames: the player's own to wear, each with its name; the locked ones apart, as the avatars' are, each with what
+  // unlocks it in sight (the rest folded).
+  await page.getByRole("tab", { name: "Рамка" }).click();
+  await expect(page.getByRole("button", { name: "Без рамка" })).toBeVisible();
+  await page.getByText(/^Още \d+$/).click();
+  await expect(page.locator(".achievement.locked", { hasText: "Пламъци" })).toContainText(
+    "Отключва се с постижението „Цял месец“.",
+  );
+  await expect(page.locator(".achievement.locked", { hasText: "Ореол" })).toContainText("Отключва се с дивизия");
   await page.getByRole("tab", { name: "Аватар" }).click();
   await page.getByRole("button", { name: "Таралеж", exact: true }).click();
   await expect(page.getByRole("button", { name: "Таралеж", exact: true })).toHaveAttribute("aria-pressed", "true");

@@ -5741,6 +5741,54 @@
     opacity: 0.6;
   }
 
+  /* Frames and patterns of the player's own, each drawn on their avatar with its name under it (the locked ones are
+     listed after, as the avatars' are: wardrobe.ts). Three to a row on the narrowest phone. */
+  .wear {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(5.75rem, 1fr));
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (min-width: 40rem) {
+    .wear {
+      grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+    }
+  }
+
+  .wear > li {
+    display: grid;
+  }
+
+  .wear-pick {
+    appearance: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-1);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--raised);
+    color: var(--text);
+    font: inherit;
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .wear-pick[aria-pressed="true"] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .wear-name {
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+    font-weight: 800;
+  }
+
   /* The colours in the avatars' columns, each over the one under it. */
   .tones {
     display: grid;
