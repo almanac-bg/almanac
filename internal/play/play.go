@@ -406,7 +406,7 @@ func (g *Game) settles(r *run) bool {
 	return g.Now().Sub(time.UnixMilli(r.shownAt.Int64)) > late
 }
 
-// record keeps an answer, and the points and XP it earned, and moves the run to the next question (or its end).
+// record keeps an answer, and the points it earned, and moves the run to the next question (or its end).
 func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, w Worth, ms int64) error {
 	var given, shown any
 	if gr.Given != nil {

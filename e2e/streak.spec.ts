@@ -44,7 +44,7 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
   await day.click();
   await startDay(page);
   await playRun(page);
-  // Played: the flame lit, and tomorrow under the result's buttons (and the goals still open).
+  // Played: the flame lit, and tomorrow under the result's buttons.
   await expect(page.locator(".streak-chip")).toContainText("4");
   await expect(page.locator(".streak-chip.unlit")).toHaveCount(0);
   const tomorrow = page.locator(".summary .tomorrow");

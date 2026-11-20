@@ -24,7 +24,7 @@ import (
 //
 //   - who hasn't reached it passes over it, and never sees it;
 //   - who is on it now goes on to the next;
-//   - who answered it keeps the answer (its history, what it taught them, the XP it earned), but not its points: the
+//   - who answered it keeps the answer (its history, what it taught them), but not its points: the
 //     run's points are counted again without them, the row of right answers going over it as if it weren't there
 //     (it neither adds to a row nor breaks one), and the run's right answers, and whether it got all of them, are out
 //     of the questions that count.
