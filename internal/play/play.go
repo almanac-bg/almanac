@@ -669,7 +669,7 @@ func (r *run) startAt(tx *sql.Tx, t time.Time) error {
 }
 
 // Answer grades an answer to question n, the one showing. A null answer gives up on it. An answer to the question just
-// answered is one sent again, its reply lost on the way (a line that dropped, a server restarting): it gets the answer
+// answered (the one before, past any that count for nobody the run went on over: day.go) is one sent again, its reply lost on the way (a line that dropped, a server restarting): it gets the answer
 // taken the first time, as it was, and changes nothing (again). One before the question's time runs (still waiting for
 // its pictures), or to a run a live game moves on (driver), is out of step.
 func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage) (Result, error) {
@@ -697,7 +697,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 		if r, err = g.loadBy(tx, userID, runID, by); err != nil {
 			return err
 		}
-		if n == r.at-1 && by == byPlayer {
+		if by == byPlayer && r.justBefore(n) {
 			res, d, err = g.again(tx, r, n)
 			return err
 		}

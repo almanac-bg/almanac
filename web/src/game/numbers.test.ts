@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { closeWords, countedWords, percent, withOwn } from "./numbers.ts";
+import { closeWords, countedWords, inRowOf, percent, withOwn } from "./numbers.ts";
 import type { Mark } from "./types.ts";
 
 const right: Mark = { points: 1000, right: true };
@@ -37,4 +37,13 @@ test("a game's own crowd, counted, says how many of its players knew it", () => 
   assert.equal(countedWords({ answers: 2, right: 1, counts: true }, true), "Всички познаха.");
   assert.equal(countedWords({ answers: 2, right: 0, counts: true }, false), "Никой не позна.");
   assert.equal(countedWords({ answers: 1, right: 1, counts: true }, true), "", "alone: the verdict says it");
+});
+
+test("a row of right answers goes over a question that counts for nobody, as the server counts it", () => {
+  const none: Mark = { points: 0, right: false, void: true };
+  assert.equal(inRowOf([right, right, none, right]), 3);
+  assert.equal(inRowOf([wrong, right, none]), 1, "a void last one ends no row");
+  assert.equal(inRowOf([right, wrong, none, right]), 1);
+  assert.equal(inRowOf([none]), 0);
+  assert.equal(inRowOf([]), 0);
 });

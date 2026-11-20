@@ -490,7 +490,7 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 				WHEN json_type(a.given, '$.pairs') IS NOT NULL THEN 'match' END AS t
 			FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?1 AND a.is_right) WHERE t IS NOT NULL),
 		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'day' AND finished_at IS NOT NULL
-			AND rights = json_array_length(questions)),
+			AND rights = `+countedOf("questions")+`),
 		(SELECT coalesce(max(n), 0) FROM (SELECT count(*) AS n FROM answers a JOIN runs r ON r.id = a.run_id
 			WHERE r.user_id = ?1 AND a.is_right AND a.ms < ?4 GROUP BY a.run_id)),
 		EXISTS (SELECT 1 FROM answers a JOIN runs r ON r.id = a.run_id WHERE r.user_id = ?1

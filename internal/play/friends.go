@@ -320,7 +320,8 @@ type Friend struct {
 // day played at a script's speed is theirs alone to see (fair.go).
 func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	db := g.DB.Read
-	rows, err := db.QueryContext(ctx, `SELECT u.id, u.name, u.tag, f.since, r.points, r.rights, r.ms, `+lookColumns+`
+	rows, err := db.QueryContext(ctx, `SELECT u.id, u.name, u.tag, f.since, r.points, r.rights, `+countedOf("r.questions")+`,
+			r.ms, `+lookColumns+`
 		FROM friends f JOIN users u ON u.id = f.friend_id
 		LEFT JOIN runs r ON r.user_id = u.id AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND NOT r.shadow
 		WHERE f.user_id = ?`, g.Today(), userID)
@@ -331,16 +332,16 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	at := map[int64]int{}
 	for rows.Next() {
 		var f Friend
-		var points, rights, ms sql.NullInt64
+		var points, rights, of, ms sql.NullInt64
 		var avatar, title string
 		var total int
-		if err := rows.Scan(&f.ID, &f.Name, &f.Tag, &f.Since, &points, &rights, &ms, &avatar, &title, &total); err != nil {
+		if err := rows.Scan(&f.ID, &f.Name, &f.Tag, &f.Since, &points, &rights, &of, &ms, &avatar, &title, &total); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		f.Look = g.lookOf(f.ID, avatar, title, total)
 		if points.Valid {
-			f.Today = &Score{Name: f.Name, Points: int(points.Int64), Rights: int(rights.Int64), Ms: ms.Int64}
+			f.Today = &Score{Name: f.Name, Points: int(points.Int64), Rights: int(rights.Int64), Of: int(of.Int64), Ms: ms.Int64}
 		}
 		at[f.ID] = len(list)
 		list = append(list, f)
@@ -398,7 +399,8 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Score, error) {
 	// From the player and their friends to each one's game of the day (runs_one_a_day): CROSS JOIN keeps that order,
 	// so it costs as many as they are, not as many as the day has players.
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT r.id, u.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+`
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT r.id, u.id, u.name, u.tag, r.points, r.rights, `+countedOf("r.questions")+`,
+			r.ms, `+lookColumns+`
 		FROM (SELECT ?2 AS id UNION SELECT friend_id FROM friends WHERE user_id = ?2) f
 		CROSS JOIN runs r ON r.user_id = f.id AND r.kind = 'day' AND r.day = ?1
 		JOIN users u ON u.id = r.user_id
@@ -416,7 +418,7 @@ func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Sc
 		var run, id int64
 		var avatar, title string
 		var total int
-		if err := rows.Scan(&run, &id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Ms, &avatar, &title, &total); err != nil {
+		if err := rows.Scan(&run, &id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Of, &s.Ms, &avatar, &title, &total); err != nil {
 			return nil, err
 		}
 		s.Me, s.Look = id == userID, g.lookOf(id, avatar, title, total)

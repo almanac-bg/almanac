@@ -1,4 +1,5 @@
-// How the game says its numbers: a share of players („58%“), the close answers beside a score's right ones, how a
+// How the game says its numbers: a share of players („58%“), the close answers beside a score's right ones, a row of
+// right answers, how a
 // game's own players did with a question, and a count with its noun.
 
 import type { Crowd, Mark } from "./types.ts";
@@ -13,6 +14,19 @@ export function percent(x: number): string {
 export function closeWords(trail: Mark[] = []): string {
   const n = trail.filter((m) => m?.partial && !m.right && !m.void).length;
   return n ? ` · ${n} близо` : "";
+}
+
+/** How many right answers in a row a run's last ones are: one that counts for nobody (`void`) neither adds to a row
+ * nor breaks it, as the server counts it (play.rightsInRow). */
+export function inRowOf(marks: Mark[]): number {
+  let n = 0;
+  for (let i = marks.length - 1; i >= 0; i--) {
+    const m = marks[i];
+    if (m?.void) continue;
+    if (!m?.right) break;
+    n++;
+  }
+  return n;
 }
 
 /** The share of players right at or under which a right answer is a rare one, told in gold: a quarter. */

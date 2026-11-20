@@ -35,7 +35,7 @@ type Played struct {
 	Issue    int    `json:"issue,omitempty"` // the day's ten's: the day's issue (Issue)
 	Category string `json:"category,omitempty"`
 	Rights   int    `json:"rights"`
-	Total    int    `json:"total"`
+	Total    int    `json:"total"` // the questions that count (day.go): what Rights is out of
 	Points   int    `json:"points"`
 	At       int64  `json:"at"`
 	// A duel's: against whom, a recording or not, and how it ended.
@@ -112,7 +112,7 @@ func (g *Game) GamesOf(ctx context.Context, userID int64, kind, from string, lim
 		}
 	}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT id, kind, coalesce(day, ''), coalesce(category, ''), rights,
-		points, json_array_length(questions), finished_at, coalesce(opponent, ''), recorded, coalesce(outcome, '')
+		points, `+countedOf("questions")+`, finished_at, coalesce(opponent, ''), recorded, coalesce(outcome, '')
 		FROM runs WHERE user_id = ? AND finished_at IS NOT NULL `+only+` AND (finished_at < ? OR finished_at = ? AND id < ?)
 		ORDER BY finished_at DESC, id DESC LIMIT ?`, userID, at, at, id, limit+1)
 	if err != nil {

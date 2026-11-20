@@ -34,7 +34,7 @@ interface Friend {
   title?: string;
   titleTier?: Tier;
   level?: number;
-  today?: { points: number; rights: number };
+  today?: { points: number; rights: number; of: number };
   won: number;
   lost: number;
   drawn: number;
@@ -309,7 +309,7 @@ function row(f: Friend, remove: () => void, editing: () => boolean): Child {
         "span",
         { class: "friend-day" },
         f.today
-          ? `${f.today.rights} от 10 · ${formatNumber(f.today.points)} ${f.today.points === 1 ? "точка" : "точки"}`
+          ? `${f.today.rights} от ${f.today.of} · ${formatNumber(f.today.points)} ${f.today.points === 1 ? "точка" : "точки"}`
           : "Днес още няма резултат",
       ),
     ),
