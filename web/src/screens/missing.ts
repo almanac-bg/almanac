@@ -23,6 +23,6 @@ export function missing() {
       h("h1", null, "Тази страница я няма"),
       h("p", { class: "lead" }, "Може връзката да е стара или да има грешка в нея."),
     ),
-    h("a", { class: "btn primary big", href: "/" }, () => (played() ? "Към Начало" : "Към въпросите на деня")),
+    h("a", { class: "btn primary big", href: "/" }, () => (played() ? "Към Днес" : "Към въпросите на деня")),
   );
 }

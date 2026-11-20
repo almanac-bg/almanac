@@ -206,7 +206,7 @@ test("the day left after its third question waits on Начало, and goes on f
   }
   // The third's answer showing, the arrow goes at once: nothing is lost between two questions.
   await expect(page.locator(".verdict")).toBeVisible();
-  await page.getByRole("link", { name: "Към Начало", exact: true }).click();
+  await page.getByRole("link", { name: "Към Днес", exact: true }).click();
   const day = page.locator(".issue");
   await expect(day).toContainText("Следва въпрос 4 от 10.");
   await expect(day.locator(".trail li:is(.right, .partial, .wrong)")).toHaveCount(3);
@@ -240,7 +240,7 @@ test("a question left while its time runs: asked first, given up, and the topic 
   await moveOn(page);
   await expect(page.locator(".question-head")).toContainText("2 от 10", { timeout: 10_000 });
   // Leaving would cost the question: the arrow asks first, and „Остани“ plays on.
-  const leave = page.getByRole("link", { name: "Към Начало", exact: true });
+  const leave = page.getByRole("link", { name: "Към Днес", exact: true });
   const asked = page.getByText("Ако излезеш сега, въпросът остава без отговор.");
   await leave.click();
   await expect(asked).toBeVisible();
@@ -276,7 +276,7 @@ test("the day left at its last question comes back done, with what it earned tol
     await moveOn(page);
   }
   await expect(page.locator(".question-head")).toContainText("10 от 10", { timeout: 10_000 });
-  await page.getByRole("link", { name: "Към Начало", exact: true }).click();
+  await page.getByRole("link", { name: "Към Днес", exact: true }).click();
   await page.getByRole("button", { name: "Излез" }).click();
   // Its result was never on screen: Начало has it, and its news (a first day's: what points are), told now.
   await expect(page.locator(".summary")).toBeVisible();

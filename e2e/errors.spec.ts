@@ -63,7 +63,7 @@ test("a run offline: the clock runs on while the answer is sent, and the run kee
   await context.setOffline(true);
   await moveOn(page);
   await expect(page.getByRole("alert")).toContainText("Няма връзка", { timeout: 10_000 });
-  await expect(page.getByRole("link", { name: "Към Начало", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Към Днес", exact: true })).toBeVisible();
   await expect(page.locator(".question-head")).toContainText("2 от 10");
   await context.setOffline(false);
   await expect(page.locator("article.question h1.ask")).toBeVisible({ timeout: 10_000 });

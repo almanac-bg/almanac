@@ -167,20 +167,22 @@ test("the ways back pop the history; back comes to a page and its board where th
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(y);
 });
 
-test("a link out of the day's ten opens from Начало: back comes to it once", async ({ page }) => {
+test("on a laptop the day's ten have the screen to themselves: the cross is the way out, back to Днес once", async ({
+  page,
+}) => {
   test.setTimeout(60_000);
-  await page.setViewportSize({ width: 1024, height: 800 }); // the places in the header, there in a game too
+  await page.setViewportSize({ width: 1024, height: 800 });
   await page.goto("/");
   await startDay(page);
   await expect(page.locator(".question-head")).toContainText("1 от 10");
-  await page.locator("nav.places").getByRole("link", { name: "Приятели" }).click();
+  // The frame steps aside while a question is asked.
+  await expect(page.locator("nav.places")).toBeHidden();
+  await page.getByRole("link", { name: "Към Днес" }).click();
   await page.getByRole("button", { name: "Излез" }).click();
-  await expect(page).toHaveURL(/\/friends$/);
-  // In place of the game's own entry, not over it: back from Приятели is Днес, and Днес is the first page.
-  await expect.poll(() => page.evaluate(() => history.state?.i)).toBe(1);
-  await page.goBack();
+  // Back where the game was opened, in place of the game's own entry, not over it.
   await expect(page).toHaveURL(/\/$/);
   await expect(page.locator(".issue")).toContainText("Следва въпрос 2 от 10.");
+  await expect(page.locator("nav.places")).toBeVisible();
   expect(await page.evaluate(() => history.state)).toMatchObject({ i: 0 });
   expect(await page.evaluate(() => history.state?.game)).toBeUndefined();
 });

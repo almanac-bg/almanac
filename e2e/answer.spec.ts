@@ -380,8 +380,8 @@ function oneOfEach(): string[] {
   ];
 }
 
-/** Where the answer ended, on a laptop: in its own column beside the question; the verdict, the fact whole and
- * „Напред“ in sight on the screen, nothing over them. */
+/** Where the answer ended, on a laptop: on the left page under the question, what answered it on the right; the
+ * verdict, the fact whole and „Напред“ in sight on the screen, nothing over them. */
 async function beside(page: Page): Promise<void> {
   const at = await page.evaluate(() => {
     const box = (s: string) => document.querySelector(s)?.getBoundingClientRect();
@@ -391,14 +391,14 @@ async function beside(page: Page): Promise<void> {
     const go = box(".after .up-next-go");
     const verdict = box(".after .verdict");
     return {
-      question: box(".run-question .answering")?.right ?? 0,
-      panel: box(".after")?.left ?? 0,
+      answers: box(".run-question .answering")?.left ?? 0,
+      panel: box(".after")?.right ?? Number.POSITIVE_INFINITY,
       verdict: !!verdict && seen(".verdict", verdict.left + 8, verdict.top + verdict.height / 2),
       fact: !fact || (seen(".fact", fact.left + 8, fact.top + 4) && seen(".fact", fact.left + 8, fact.bottom - 4)),
       go: !!go && seen(".up-next-go", go.left + go.width / 2, go.top + 4) && go.bottom <= innerHeight,
     };
   });
-  expect(at.panel, "the answer is beside the question").toBeGreaterThan(at.question);
+  expect(at.panel, "the answer is beside what answered it").toBeLessThan(at.answers);
   expect(at.verdict, "the verdict is in sight").toBe(true);
   expect(at.fact, "the fact is in sight, whole").toBe(true);
   expect(at.go, "„Напред“ is in sight").toBe(true);
