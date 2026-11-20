@@ -1,7 +1,7 @@
 // Алманах, one of the three places: the player's book. Its contents — a chapter per topic, then „Микс“ and
 // „България“, each with its ink and its rank (play/rank.go: named for the book, a track of the quarters to the next).
 // A chapter (/almanac/<topic>) is its rank, „Играй главата“ (a game of its questions: topics are played from here),
-// and its facts as entries, ink and pencil, the latest first, a page at a time, found by their words. How well a
+// and its facts as entries, ink and grey, the latest first, a page at a time, found by their words. How well a
 // player knows a chapter (mastery) is the game's own, never shown.
 
 import type { Kit } from "../kit.ts";
@@ -59,7 +59,7 @@ interface Learned {
 }
 
 /** A page of the book (play.Almanac): its facts, how many the chapter (and the search) lists, each chapter's ink (its
- * one number: pencil is listed, never counted); with the first page, each chapter's rank, the seal worn, whether the
+ * one number: grey is listed, never counted); with the first page, each chapter's rank, the seal worn, whether the
  * guessing check holds the ranks, and the day the book began. */
 interface Page {
   facts: Learned[];

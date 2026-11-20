@@ -443,10 +443,10 @@ export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<v
   const pips = [...card.querySelectorAll<HTMLElement>(".duel-pip")];
   const n = pips.length / 2;
   const rows = [pips.slice(0, n), pips.slice(n)];
-  const points = [...card.querySelectorAll<HTMLElement>(".duel-points[data-n]")];
-  const finals = points.map((p) => Number(p.dataset.n ?? 0));
+  const scores = [...card.querySelectorAll<HTMLElement>(".duel-score[data-n]")];
+  const finals = scores.map((p) => Number(p.dataset.n ?? 0));
   const sums = [0, 0];
-  for (const p of points) p.textContent = format(0);
+  for (const p of scores) p.textContent = format(0);
   const first = 100;
   const step = 75;
   for (let i = 0; i < n; i++) {
@@ -469,7 +469,7 @@ export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<v
       if (mine && i < plan.mine.length) play(mine.classList.contains("wrong") ? "dud" : "pip", i);
       sums[0] = (sums[0] ?? 0) + (plan.mine[i] ?? 0);
       sums[1] = (sums[1] ?? 0) + (plan.theirs[i] ?? 0);
-      points.forEach((p, k) => {
+      scores.forEach((p, k) => {
         p.textContent = format(sums[k] ?? 0);
       });
     });
@@ -477,7 +477,7 @@ export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<v
   if (plan.decided > 1) rise(card.querySelector(".duel-band"), first + (plan.decided - 1) * step, { opacity: 0 });
   const landAt = first + n * step + 50;
   for (const el of card.querySelectorAll(".duel-head h1, .duel-line, .duel-key")) rise(el, landAt);
-  for (const p of points)
+  for (const p of scores)
     moving.push(
       p.animate(
         [
@@ -492,7 +492,7 @@ export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<v
   winner?.classList.remove("win");
   const settle = () => {
     winner?.classList.add("win");
-    points.forEach((p, k) => {
+    scores.forEach((p, k) => {
       p.textContent = format(finals[k] ?? 0);
     });
     end();

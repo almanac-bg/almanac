@@ -125,8 +125,7 @@ There are three places: **Днес** (`/`), **Алманах** (`/almanac`) and 
   - The latest come first, thirty to a page (`.pager`: „← По-нови“, the numbers, „По-стари →“), and are found by their
     words (`.search`, at most 60 letters). The page and the search are kept in the address (`?page=2&q=…`); each page
     is a link, an entry of the history of its own (back from page 3 is page 2), and a page past the last is the last.
-  - A chapter's share known shows from a first estimate with a right answer in it: answers all wrong tell nothing
-    („С първия верен отговор ще видиш колко от главата знаеш.“), on the chapter, its row and the book's figures.
+
 - **Приятели** (`/friends`, `screens/friends.ts`), three pages on a big screen:
   - **The day's board** (`.day-board`: „Приятели“ or „България“, a `segmented` choice), where a row is the place, the
     avatar, the name and the score (`rankRow()`, `.rank-row`; the player's own on `--paper-2`, with „ти“); a tie is
@@ -163,14 +162,11 @@ A new player meets the game a part at a time, by what they've done, never by the
 
 - **A new visitor** gets the cover, the day alone. The places come with the first game begun.
 - **The first day** brings the day's result and the streak; the Алманах's chapters and Приятели are a tap away.
-- **A chapter's first estimate** (10 answers): the chapter says „първа оценка“ with its share, and a game's news says
-  „Първа оценка: знаеш около 74 % от темата“, a share with no tier. The tier („Експерт“) comes with a sure mark (30
-  answers).
+- **A chapter's ink**: a game's news says the facts it wrote in ink, and a chapter's seal rises with its ink
+  (Бележка, Страница, Тетрадка, Книга, Том, Летопис).
 
-**Points** say what they are where they first show, and a tap from anywhere they do (`explain()`: the word dotted
-under, its meaning in a small card under it; the words are `meaning` in `ui.ts`). They are one game's score (right
-answers and speed), and the day's board is ordered by them after the right answers. There is no rating: a duel's
-standing is its record between two people.
+There are no points and no rating: a game's score is its right answers, the day's board is ordered by them, and a
+duel's standing is its record between two people.
 
 ## Space and size
 
@@ -455,16 +451,16 @@ A rule never holds a literal colour; it takes a token.
 
 Every element that looks like a game measures something the game already counts:
 
-| Element  | Measures                                                                                                                                                                                                                          | Where                            |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| Streak   | Days the day's ten were played, up to two missed days a week forgiven (one in the hold-out: `perWeek`); the strip is this week's days played; an ended streak's number is never said                                              | Днес, the result, Профил         |
-| Score    | A game's right answers out of its questions; a close answer is „близо“ and counts as not right. No points. A tie on a board or in a duel goes by the number's closeness, then the hardest right answer, then time (play/board.go) | Verdict, result, the day's board |
-| In a row | Right answers in a row within a game, from the second (the flame and „3 поред“): feel only                                                                                                                                        | Question head, verdict           |
-| Place    | Place on the day's board                                                                                                                                                                                                          | Приятели                         |
-| Ink      | Facts written in the book: in ink from the day's issue at the first meeting, in pencil elsewhere (play/ink.go); a chapter says its ink, pencil is listed, never counted                                                           | Алманах, the news                |
-| Rank     | A chapter's rank from its ink: Бележка 1, Страница 5, Тетрадка 15, Тефтер 40, Книга 100, Летопис 250, then „Летопис · N“; kept, never falling; one worn as a seal (play/rank.go)                                                  | Алманах, Профил, the news        |
-| Duels    | Each on one's own time, with a friend (who has seven days to play the same ten) or against a real recorded game („равен“ or „по-силен“); between two people, their record („3 : 2“)                                               | Приятели, a duel's result        |
-| Boards   | The day's ten, of all of България or of friends                                                                                                                                                                                   | Приятели                         |
+| Element  | Measures                                                                                                                                                                                           | Where                            |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| Streak   | Days the day's ten were played, up to two missed days a week forgiven (one in the hold-out: `perWeek`); the strip is this week's days played; an ended streak's number is never said               | Днес, the result, Профил         |
+| Score    | A game's right answers out of its questions; a close answer is „близо“ and counts as not right. No points. A tie on a board or in a duel goes by the number's closeness, then time (play/board.go) | Verdict, result, the day's board |
+| In a row | Right answers in a row within a game, from the second (the flame and „3 поред“): feel only                                                                                                         | Question head, verdict           |
+| Place    | Place on the day's board                                                                                                                                                                           | Приятели                         |
+| Ink      | Facts written in the book: in ink from the day's issue at the first meeting, in pencil elsewhere (play/ink.go); a chapter says its ink, pencil is listed, never counted                            | Алманах, the news                |
+| Rank     | A chapter's rank from its ink: Бележка 1, Страница 5, Тетрадка 15, Тефтер 40, Книга 100, Летопис 250, then „Летопис · N“; kept, never falling; one worn as a seal (play/rank.go)                   | Алманах, Профил, the news        |
+| Duels    | Each on one's own time, with a friend (who has seven days to play the same ten) or against a real recorded game („равен“ or „по-силен“); between two people, their record („3 : 2“)                | Приятели, a duel's result        |
+| Boards   | The day's ten, of all of България or of friends                                                                                                                                                    | Приятели                         |
 
 **What a game brings** is quiet lines of what's true, in its news under the result:
 
@@ -478,12 +474,12 @@ result on screen (the day's last question left to run out, a game left at its en
 (`play/told.go`).
 
 Feedback fires once, when it's earned, and then the screen is still again: a right answer pops, a wrong one shakes
-once, points rise counting up to what was earned, and an exact number answer gets the star.
+once, a result's right answers count up, and an exact number answer gets the star.
 
 ## Flow
 
 - **The game moves on by itself, and a tap moves it on sooner.** An answer shows in steps: the answer marked, the
-  verdict with its points, then its fact, at the moment the player most wants it. It stays 3 seconds (4.5 for
+  verdict, then its fact, at the moment the player most wants it. It stays 3 seconds (4.5 for
   anything but a choice or „Вярно или невярно“, which have less to look at) plus the time to read the fact and the
   day's line (1.2 seconds and a little for each letter, 9 at most), with a line filling as it waits. „Напред“ is
   always there (Enter on a computer; „Към резултата“ after the last) and goes on at once. A question never opens in a
@@ -553,7 +549,7 @@ once, points rise counting up to what was earned, and an exact number answer get
 - **Timings:**
   - presses 120ms; hover and colour 160–200ms;
   - the right answer's pop 360ms (to 1.04); the wrong answer's shake 320ms (4px);
-  - an answer's points rise 520ms; a result's 800ms;
+  - a result's right answers count up 800ms;
   - the clock runs linearly, and so does the ring of the three-second count before a chapter's game (with „Започни
     сега“ and „Откажи“, so a tap never throws the player straight into a question).
 - **An answer shows in beats** (`beats` in `game/questions.ts`), the same however quick the line, all within a
