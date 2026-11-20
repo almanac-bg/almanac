@@ -202,6 +202,29 @@ func TestFactsAsTheRule(t *testing.T) {
 	if _, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage}); err != nil {
 		t.Fatal(err)
 	}
+
+	// A guest who signs in mid-issue to an account that was there already (its day a ShadowGuest, fair.go) goes on
+	// writing ink for the rest of it, as answer by answer and by the rule (review 2026-11-20: it wrote nothing).
+	w.wait(24 * time.Hour)
+	cy, guest := w.user(), w.user()
+	w.since(cy, 30*24*time.Hour)
+	s, err := w.g.StartDay(ctx, guest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.playOn(guest, s.ID, 0, repeat(w.right, 4)...)
+	w.fold(guest, cy)
+	if w.shadow(s.ID) != ShadowGuest {
+		t.Fatalf("the guest's day brought to the account: shadow %d", w.shadow(s.ID))
+	}
+	w.playOn(cy, s.ID, 4, repeat(w.right, Length-4)...)
+	book := w.book(cy)
+	for n, p := range w.picks(s.ID) {
+		if !book[p.ID] {
+			t.Errorf("question %d of the issue, right, signed in at the fifth: ink %v", n+1, book[p.ID])
+		}
+	}
+	w.consistent(cy)
 }
 
 // The issue played a second time in one browser (SecondPlay) writes pencil only, as the answers then and by the

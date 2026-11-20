@@ -21,7 +21,9 @@ import (
 // The claim keeps how many of the player's devices it reached.
 //
 // It stops when it doesn't help: after RemindIgnored reminders left without play since the player last played the day,
-// none more; on the RemindQuietAfter-th day without play, one last word that the reminders stop (naming the nearest
+// counted on their weekdays, or RemindQuietAfter left in all whatever the weekday (a player who played one day has a
+// rhythm of one weekday: the others' reminders alone mustn't run on for weeks), none more; on the RemindQuietAfter-th
+// day without play, or with the RemindQuietAfter-th left, one last word that the reminders stop (naming the nearest
 // step in their book, never a question's text, nor a streak that ended: lastReminder), then nothing until they play the
 // day again, when the reminders start again by themselves. A reminder left counts only on a weekday the player has
 // played on (rhythm): one who plays on weekdays alone isn't cut off by a weekend's reminders, and the rhythm is theirs
@@ -248,7 +250,7 @@ func (s *Server) dayReminder(ctx context.Context, today string, userID int64) (l
 	if err != nil {
 		return false, false, err
 	}
-	var ignored int
+	var ignored, left int
 	var stopped bool
 	var first sql.NullString
 	for rows.Next() {
@@ -262,8 +264,11 @@ func (s *Server) dayReminder(ctx context.Context, today string, userID int64) (l
 			first = sql.NullString{String: day, Valid: true}
 		}
 		stopped = stopped || isLast
-		if !isLast && week.counts(day) {
-			ignored++
+		if !isLast {
+			left++
+			if week.counts(day) {
+				ignored++
+			}
 		}
 	}
 	rows.Close()
@@ -273,6 +278,8 @@ func (s *Server) dayReminder(ctx context.Context, today string, userID int64) (l
 	switch {
 	case stopped:
 		return false, false, nil
+	case left >= RemindQuietAfter-1:
+		return true, true, nil // the last word, whatever the weekdays: RemindQuietAfter in all
 	case ignored < RemindIgnored:
 		return false, true, nil
 	}

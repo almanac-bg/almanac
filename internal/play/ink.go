@@ -62,7 +62,7 @@ func rewriteFacts(tx *sql.Tx, userID int64) error {
 // (written once), the run is a script's (shadowWrites), or the question counts for nobody.
 func (g *Game) writeFact(tx *sql.Tx, r *run, at int64) error {
 	p := r.picks[r.at]
-	if r.shadow || p.Void {
+	if r.shadow == ShadowScript || p.Void {
 		return nil
 	}
 	ink := false

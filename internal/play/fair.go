@@ -108,15 +108,17 @@ func scriptPaced(b *bank.Bank, picks []Pick, times map[int]int64) bool {
 // judgeAnswer marks a run as played at a script's speed if the answer just kept (to question r.at, in ms) makes it
 // one: only a quick answer can.
 func (g *Game) judgeAnswer(tx *sql.Tx, r *run, gr bank.Graded, ms int64) error {
-	if r.shadow || gr.Given == nil {
+	if r.shadow != 0 || gr.Given == nil {
 		return nil
 	}
 	b := g.Bank()
 	if q, ok := b.Get(r.picks[r.at].ID); !ok || time.Duration(ms)*time.Millisecond >= Floor(q) {
 		return nil
 	}
-	var err error
-	r.shadow, err = judge(tx, b, r.id, r.picks)
+	is, err := judge(tx, b, r.id, r.picks)
+	if is {
+		r.shadow = ShadowScript
+	}
 	return err
 }
 
