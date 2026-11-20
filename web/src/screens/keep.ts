@@ -75,20 +75,23 @@ export interface MailPrefs {
  * said first, is what it risks till then). What came of it is said in its place. `no`: a „Не сега“ under it
  * (Начало's ask); `folded`: the guest's form a tap away (Настройки, where the profile's own is further down);
  * `turning`: told as it's being turned on (before a guest's email is set as theirs); `yes`: told once it's on, with
- * the mail as it is now. */
+ * the mail as it is now; `primary`: it's the page's one action (the first results'). */
 export function mailAsk({
   stake,
   no,
   folded = false,
   turning,
   yes,
+  primary = false,
 }: {
   stake?: () => string | null;
   no?: () => void;
   folded?: boolean;
   turning?: () => void;
   yes?: (now: MailPrefs) => void;
+  primary?: boolean;
 }): Child {
+  const btn = primary ? "btn primary" : "btn";
   const said = signal("");
   const error = signal("");
   const saving = signal(false);
@@ -128,7 +131,7 @@ export function mailAsk({
           h(
             "div",
             { class: "remind-actions" },
-            h("button", { class: "btn", type: "button", onclick: () => turnOn("") }, "Напомняй ми по имейл"),
+            h("button", { class: btn, type: "button", onclick: () => turnOn("") }, "Напомняй ми по имейл"),
             nope(),
           ),
         ];
@@ -138,14 +141,14 @@ export function mailAsk({
         when(
           open,
           () => [
-            signIn({ primary: false, send: "Напомняй ми по имейл", note: keepNote, enter: "Потвърди", done: turnOn }),
+            signIn({ primary, send: "Напомняй ми по имейл", note: keepNote, enter: "Потвърди", done: turnOn }),
             no ? h("div", { class: "remind-actions" }, nope()) : null,
           ],
           () =>
             h(
               "div",
               { class: "remind-actions" },
-              h("button", { class: "btn", type: "button", onclick: () => open.set(true) }, "Напомняй ми по имейл"),
+              h("button", { class: btn, type: "button", onclick: () => open.set(true) }, "Напомняй ми по имейл"),
               nope(),
             ),
         ),

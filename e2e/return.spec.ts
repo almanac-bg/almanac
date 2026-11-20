@@ -16,12 +16,12 @@ test("a player who comes back: the day played one short card, and every game a t
   const card = page.locator(".result");
   await expect(card).toBeVisible();
   await expect(page.locator(".news-open")).toHaveCount(0);
-  await expect(card.locator(".trail")).toBeVisible();
+  await expect(card.locator(".tiles")).toBeVisible();
   const gold = page.locator(".btn.primary");
   await expect(gold).toHaveCount(1);
-  await expect(gold).toHaveText("Сподели резултата");
+  await expect(gold).toHaveText("Сподели");
 
-  await card.getByRole("button", { name: "Прегледай въпросите" }).click();
+  await card.getByRole("button", { name: "Въпросите и фактите" }).click();
   await expect(page.locator(".review .reviewed")).toHaveCount(10);
   // Every game, by day: the day's ten by their issue.
   await page.goto("/games");

@@ -1,6 +1,7 @@
-/* АЛМАНАХ: the edition. The game looks like a publication a player keeps: paper first with a night of its own, serif
-   headlines, numerals as the heroes, colour only where it means something, one obvious action per screen. The tokens
-   are at the top; every colour below is one of them. The rules for using them: web/DESIGN.md. */
+/* АЛМАНАХ: a bright almanac (DECISIONS.md, „How it looks and speaks“). A game, bright and alive: each chapter its
+   colour, always with its glyph; the almanac's forms (the issue's coloured sheet and its turned corner, ink and pencil
+   in the book), never a paper texture; right and wrong carried by shape and fill, never by colour alone; one obvious
+   action per screen. The tokens are at the top; every colour below is one of them. The rules: web/DESIGN.md. */
 
 /* ---- Fonts: our own files (the CSP allows no others, and players' browsers ask no one else for anything). Each
    face is two files (web/src/fonts/subset.sh, whose ranges these are, word for word): one with all a page of
@@ -44,42 +45,6 @@
   unicode-range:
     U+00A1-00A6, U+00A8, U+00AA, U+00AC, U+00AF, U+00B4-00B6, U+00B8, U+00BA, U+00BF-00D6, U+00D8-00F6, U+00F8-024F, U+0259, U+02B0-02FF, U+0300, U+0302-036F, U+0370-03FF, U+0460-048F, U+0492-04AF, U+04B2-052F, U+1E00-1EFF, U+2000-2008, U+200B-200F, U+2016-2017, U+201F-2021, U+2023-2025, U+2027-202E, U+2031, U+2034-2038, U+203B-209F, U+20A0-20AB, U+20AD-20CF, U+2100-2115, U+2117-218F, U+2194-21FF, U+2200-2211, U+2213-22FF, U+FB00-FB06;
 }
-@font-face {
-  font-family: "Literata";
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url("./fonts/literata.woff2") format("woff2");
-  unicode-range:
-    U+0020-007E, U+00A0, U+00A7, U+00A9, U+00AB, U+00AD, U+00AE, U+00B0-00B3, U+00B7, U+00B9, U+00BB-00BE, U+00D7, U+00F7, U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2009, U+2010-2015, U+2018-201E, U+2022, U+2026, U+202F, U+2030, U+2032-2033, U+2039-203A, U+20AC, U+2116, U+2190-2193, U+2212;
-}
-@font-face {
-  font-family: "Literata";
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url("./fonts/literata-rest.woff2") format("woff2");
-  unicode-range:
-    U+00A1-00A6, U+00A8, U+00AA, U+00AC, U+00AF, U+00B4-00B6, U+00B8, U+00BA, U+00BF-00D6, U+00D8-00F6, U+00F8-024F, U+0259, U+02B0-02FF, U+0300, U+0302-036F, U+0370-03FF, U+0460-048F, U+0492-04AF, U+04B2-052F, U+1E00-1EFF, U+2000-2008, U+200B-200F, U+2016-2017, U+201F-2021, U+2023-2025, U+2027-202E, U+2031, U+2034-2038, U+203B-209F, U+20A0-20AB, U+20AD-20CF, U+2100-2115, U+2117-218F, U+2194-21FF, U+2200-2211, U+2213-22FF, U+FB00-FB06;
-}
-@font-face {
-  font-family: "Literata";
-  font-style: italic;
-  font-weight: 500;
-  font-display: swap;
-  src: url("./fonts/literata-italic.woff2") format("woff2");
-  unicode-range:
-    U+0020-007E, U+00A0, U+00A7, U+00A9, U+00AB, U+00AD, U+00AE, U+00B0-00B3, U+00B7, U+00B9, U+00BB-00BE, U+00D7, U+00F7, U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2009, U+2010-2015, U+2018-201E, U+2022, U+2026, U+202F, U+2030, U+2032-2033, U+2039-203A, U+20AC, U+2116, U+2190-2193, U+2212;
-}
-@font-face {
-  font-family: "Literata";
-  font-style: italic;
-  font-weight: 500;
-  font-display: swap;
-  src: url("./fonts/literata-italic-rest.woff2") format("woff2");
-  unicode-range:
-    U+00A1-00A6, U+00A8, U+00AA, U+00AC, U+00AF, U+00B4-00B6, U+00B8, U+00BA, U+00BF-00D6, U+00D8-00F6, U+00F8-024F, U+0259, U+02B0-02FF, U+0300, U+0302-036F, U+0370-03FF, U+0460-048F, U+0492-04AF, U+04B2-052F, U+1E00-1EFF, U+2000-2008, U+200B-200F, U+2016-2017, U+201F-2021, U+2023-2025, U+2027-202E, U+2031, U+2034-2038, U+203B-209F, U+20A0-20AB, U+20AD-20CF, U+2100-2115, U+2117-218F, U+2194-21FF, U+2200-2211, U+2213-22FF, U+FB00-FB06;
-}
 
 /* The share of players who gave an answer, as a bar that fills in behind it (.option.crowd): registered, so that it
    can move. */
@@ -90,56 +55,82 @@
 }
 
 @layer app {
-  /* ---- Tokens: Day (paper, the first look), then Night: for a dark system, or chosen (data-scheme: prefs.ts).
-     Night is not the day inverted: a deep blue-black page under a lamp, the one action lamp-gold. Text holds 4.5:1 on
-     --paper and --paper-2 in both; control lines (--rule-2) 3:1. ---- */
+  /* ---- Tokens: Day first, then Night: for a dark system, or chosen (data-scheme: prefs.ts). Night is a deep
+     violet-blue page with the same vivid chapters; a chapter's large sheet is darkened by night as far as its ink
+     still holds 4.5:1 (--s-<topic>). Text holds 4.5:1 on --bg, --surface and --surface-2 in both; control lines
+     (--line-2) 3:1. ---- */
 
   :root {
     color-scheme: light dark;
-    --paper: #f6f1e7;
-    /* The player's own row, a pressed option, a well. */
-    --paper-2: #ede6d8;
+    --bg: #f3f4fa;
+    /* Cards, answers, the bars. */
+    --surface: #ffffff;
+    /* The player's own row, a well, a letter's box. */
+    --surface-2: #eaecf5;
     /* A pressed key. */
-    --paper-3: #e3dac8;
-    --ink: #1c1915;
-    /* Decks, secondary text. */
-    --ink-2: #4a443b;
+    --surface-3: #dfe1ee;
+    --ink: #16132b;
+    /* Secondary text. */
+    --ink-2: #47445f;
     /* Kickers, meta, labels. */
-    --ink-3: #675f53;
-    /* Hairlines between rows, tracks. */
-    --rule: #d9cfbd;
-    /* Control outlines: an option's ring, a switch off, a segmented choice. */
-    --rule-2: #8f8169;
-    /* Section rules, the double rule. */
-    --rule-ink: #1c1915;
-    /* The one action: ink by day, lamp-gold by night. */
-    --action: #1c1915;
-    --on-action: #f6f1e7;
-    --right: #2f8a57;
-    --right-ink: #1e6a43;
-    --right-wash: #e2eedf;
-    --wrong: #c2493a;
-    --wrong-ink: #a8372a;
-    --wrong-wash: #f6e2db;
-    /* The mark's petal, today's square, the caret. */
-    --gold: #d9a21b;
-    --gold-ink: #855b00;
-    --petal: var(--ink);
-    --scrim: #1c191573;
+    --ink-3: #5d5a77;
+    /* What's written in pencil in the book. */
+    --pencil: #66637f;
+    /* Hairlines between rows, tracks, the pips to come. */
+    --line: #dadced;
+    /* Control outlines: an answer's frame, a field, a switch off, a pip to come (3:1). */
+    --line-2: #8a87a6;
+    /* The one action: ink by day, the page's light by night. */
+    --action: #16132b;
+    --on-action: #ffffff;
+    /* Text on a chapter's colour: always the dark ink, in both themes. */
+    --on-sheet: #16132b;
+    /* Something gone wrong (a failed send, a field refused) and a step that can't be undone. */
+    --danger: #b3261e;
+    /* The mark's one gold petal. */
+    --gold: #e0a81e;
+    --petal: #16132b;
+    --scrim: rgb(22 19 43 / 0.45);
+    --lift: 0 4px 0 rgb(22 19 43 / 0.18);
 
-    /* The chapters' colours: the cloth of each chapter's binding, text-safe on paper (.t-<topic>, --t). */
-    --t-general: #87600f;
-    --t-science: #1f6e76;
-    --t-history: #8c3a2e;
-    --t-geography: #4f682a;
-    --t-movies: #7a4580;
-    --t-music: #3b55a0;
-    --t-sports: #9a481b;
-    --t-technology: #43648a;
-    --t-literature: #9c3f60;
-    --t-nature: #376e41;
-    --t-mix: #57514a;
-    --t-bulgaria: #2e6b4c;
+    /* The chapters. Vivid (--t-): a tile, a seal, a glyph's ring, the sheet by day; the same in both themes, with the
+       dark ink on it. Deep (--d-): a line or a word in the chapter's colour on the page. Sheet (--s-): a large sheet. */
+    --t-general: #ffc21a;
+    --t-science: #22ccc4;
+    --t-history: #ff6b4a;
+    --t-geography: #4b90ff;
+    --t-movies: #e863e6;
+    --t-music: #9a82ff;
+    --t-sports: #ff9a2e;
+    --t-technology: #a3db2e;
+    --t-literature: #ff77ae;
+    --t-nature: #33cf7a;
+    --t-mix: #c9c4de;
+    --t-bulgaria: #2ec4a0;
+    --d-general: #8a5d00;
+    --d-science: #00777a;
+    --d-history: #c33a1c;
+    --d-geography: #1f5fd6;
+    --d-movies: #a52ba6;
+    --d-music: #5a43e0;
+    --d-sports: #ad5300;
+    --d-technology: #4c7700;
+    --d-literature: #c42d6c;
+    --d-nature: #0f8148;
+    --d-mix: #4a4766;
+    --d-bulgaria: #0b7a60;
+    --s-general: #ffc21a;
+    --s-science: #22ccc4;
+    --s-history: #ff6b4a;
+    --s-geography: #4b90ff;
+    --s-movies: #e863e6;
+    --s-music: #9a82ff;
+    --s-sports: #ff9a2e;
+    --s-technology: #a3db2e;
+    --s-literature: #ff77ae;
+    --s-nature: #33cf7a;
+    --s-mix: #c9c4de;
+    --s-bulgaria: #2ec4a0;
 
     --space-1: 4px;
     --space-2: 8px;
@@ -148,65 +139,75 @@
     --space-5: 24px;
     --space-6: 32px;
     --space-7: 48px;
-    --gutter: 20px;
-    --page: 1270px;
-    --radius: 3px;
+    --gutter: 16px;
+    --page: 1260px;
+    --r-1: 10px;
+    --r-2: 16px;
+    --r-3: 24px;
     --radius-full: 999px;
     --font-sans: "Sofia Sans", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
     --font-numeral: "Sofia Sans Extra Condensed", "Arial Narrow", "Sofia Sans", sans-serif;
-    --font-serif: "Literata", Georgia, "Times New Roman", serif;
 
     /* Icons: 24px, round strokes, drawn as masks in the text colour. */
     --i-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
     --i-cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M7 7l10 10M17 7L7 17'/%3E%3C/svg%3E");
-    --i-close: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M5 5l14 14M19 5L5 19'/%3E%3C/svg%3E");
+    --i-close: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round'%3E%3Cpath d='M5 5l14 14M19 5L5 19'/%3E%3C/svg%3E");
     --i-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5h11v14H9l-6-7z'/%3E%3Cpath d='M12.5 9.5l5 5M17.5 9.5l-5 5'/%3E%3C/svg%3E");
-    --i-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 12H5M11 6l-6 6 6 6'/%3E%3C/svg%3E");
-    --i-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13 6l6 6-6 6'/%3E%3C/svg%3E");
+    --i-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 5l-7 7 7 7'/%3E%3C/svg%3E");
+    --i-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5l7 7-7 7'/%3E%3C/svg%3E");
     --i-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5'/%3E%3Cpath d='M15.5 15.5L21 21'/%3E%3C/svg%3E");
     --i-grip: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M5 8h14M5 12h14M5 16h14'/%3E%3C/svg%3E");
-    --i-near: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M4 13.5c2.6-3.2 5.2-3.2 8 0s5.4 3.2 8 0'/%3E%3C/svg%3E");
     --i-clock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3Cpath d='M12 8v4.5l3 2'/%3E%3C/svg%3E");
-    --i-star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 3.2l2.7 5.5 6 .9-4.35 4.2 1.03 6L12 16.95 6.62 19.8l1.03-6L3.3 9.6l6-.9z'/%3E%3C/svg%3E");
     --i-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 5l7 10H5z'/%3E%3C/svg%3E");
     --i-flame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 28'%3E%3Cpath d='M12 1c1.2 4.6 7 7.4 7 14.2a7 7 0 0 1-14 .4c0-3.6 1.9-6 3.8-7.6.2 2.4 1.2 3.8 2.7 4.3C11 9.2 11 5 12 1z'/%3E%3C/svg%3E");
+    --i-share: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 15V4M7.5 8.5L12 4l4.5 4.5'/%3E%3Cpath d='M5 13v6h14v-6'/%3E%3C/svg%3E");
+    --i-nib: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5c2.6 3 5 6.2 5 9.3 0 2-1.1 3.4-2.6 4.1V18H9.6v-2.1C8.1 15.2 7 13.8 7 11.8c0-3.1 2.4-6.3 5-9.3zm0 6.3a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM8.6 19.4h6.8v2.1H8.6z'/%3E%3C/svg%3E");
+    --i-pencil: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20l1.2-4.6L15.8 4.8a2.1 2.1 0 0 1 3 0l.4.4a2.1 2.1 0 0 1 0 3L8.6 18.8z'/%3E%3Cpath d='M13.8 6.8l3.4 3.4'/%3E%3C/svg%3E");
+    --i-gear: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='3.2'/%3E%3Cpath d='M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M5.5 18.5l1.9-1.9M16.6 7.4l1.9-1.9'/%3E%3C/svg%3E");
   }
 
   @media (prefers-color-scheme: dark) {
     :root:not([data-scheme="day"]) {
-      --paper: #121620;
-      --paper-2: #1a1f2b;
-      --paper-3: #242a38;
-      --ink: #eee7d8;
-      --ink-2: #c4bcad;
-      --ink-3: #9c9586;
-      --rule: #2a3040;
-      --rule-2: #68728a;
-      --rule-ink: #c4bcad;
-      --action: #e8b84b;
-      --on-action: #17130a;
-      --right: #5fc08e;
-      --right-ink: #7fd3a6;
-      --right-wash: #173127;
-      --wrong: #e9796a;
-      --wrong-ink: #f2907f;
-      --wrong-wash: #38201f;
-      --gold: #e8b84b;
-      --gold-ink: #e8b84b;
-      --petal: #eee7d8;
-      --scrim: #000000a0;
-      --t-general: #d9ae55;
-      --t-science: #6cc0c8;
-      --t-history: #e08c7d;
-      --t-geography: #a9c277;
-      --t-movies: #c99ace;
-      --t-music: #94a9ec;
-      --t-sports: #ee9a68;
-      --t-technology: #91b2d8;
-      --t-literature: #e596b2;
-      --t-nature: #8ccb95;
-      --t-mix: #bdb6ac;
-      --t-bulgaria: #7cc59e;
+      --bg: #0e0c1d;
+      --surface: #1a1730;
+      --surface-2: #262243;
+      --surface-3: #312c54;
+      --ink: #f5f3ff;
+      --ink-2: #cdc9e6;
+      --ink-3: #a7a3c6;
+      --pencil: #9a96bb;
+      --line: #34305a;
+      --line-2: #7f7aa8;
+      --action: #f5f3ff;
+      --on-action: #16132b;
+      --danger: #ff8f80;
+      --petal: #f5f3ff;
+      --scrim: rgb(0 0 0 / 0.6);
+      --lift: 0 4px 0 rgb(0 0 0 / 0.5);
+      --d-general: #ffc21a;
+      --d-science: #22ccc4;
+      --d-history: #ff7f63;
+      --d-geography: #6aa3ff;
+      --d-movies: #ec7eea;
+      --d-music: #a893ff;
+      --d-sports: #ff9a2e;
+      --d-technology: #a3db2e;
+      --d-literature: #ff89b9;
+      --d-nature: #33cf7a;
+      --d-mix: #c9c4de;
+      --d-bulgaria: #2ec4a0;
+      --s-general: #cc9b15;
+      --s-science: #1ba39d;
+      --s-history: #e05e41;
+      --s-geography: #427fe0;
+      --s-movies: #cc57cb;
+      --s-music: #8873e0;
+      --s-sports: #cc7b25;
+      --s-technology: #82af25;
+      --s-literature: #cc5f8b;
+      --s-nature: #29a662;
+      --s-mix: #a19db2;
+      --s-bulgaria: #259d80;
     }
   }
 
@@ -221,77 +222,109 @@
   }
 
   :root[data-scheme="night"] {
-    --paper: #121620;
-    --paper-2: #1a1f2b;
-    --paper-3: #242a38;
-    --ink: #eee7d8;
-    --ink-2: #c4bcad;
-    --ink-3: #9c9586;
-    --rule: #2a3040;
-    --rule-2: #68728a;
-    --rule-ink: #c4bcad;
-    --action: #e8b84b;
-    --on-action: #17130a;
-    --right: #5fc08e;
-    --right-ink: #7fd3a6;
-    --right-wash: #173127;
-    --wrong: #e9796a;
-    --wrong-ink: #f2907f;
-    --wrong-wash: #38201f;
-    --gold: #e8b84b;
-    --gold-ink: #e8b84b;
-    --petal: #eee7d8;
-    --scrim: #000000a0;
-    --t-general: #d9ae55;
-    --t-science: #6cc0c8;
-    --t-history: #e08c7d;
-    --t-geography: #a9c277;
-    --t-movies: #c99ace;
-    --t-music: #94a9ec;
-    --t-sports: #ee9a68;
-    --t-technology: #91b2d8;
-    --t-literature: #e596b2;
-    --t-nature: #8ccb95;
-    --t-mix: #bdb6ac;
-    --t-bulgaria: #7cc59e;
+    --bg: #0e0c1d;
+    --surface: #1a1730;
+    --surface-2: #262243;
+    --surface-3: #312c54;
+    --ink: #f5f3ff;
+    --ink-2: #cdc9e6;
+    --ink-3: #a7a3c6;
+    --pencil: #9a96bb;
+    --line: #34305a;
+    --line-2: #7f7aa8;
+    --action: #f5f3ff;
+    --on-action: #16132b;
+    --danger: #ff8f80;
+    --petal: #f5f3ff;
+    --scrim: rgb(0 0 0 / 0.6);
+    --lift: 0 4px 0 rgb(0 0 0 / 0.5);
+    --d-general: #ffc21a;
+    --d-science: #22ccc4;
+    --d-history: #ff7f63;
+    --d-geography: #6aa3ff;
+    --d-movies: #ec7eea;
+    --d-music: #a893ff;
+    --d-sports: #ff9a2e;
+    --d-technology: #a3db2e;
+    --d-literature: #ff89b9;
+    --d-nature: #33cf7a;
+    --d-mix: #c9c4de;
+    --d-bulgaria: #2ec4a0;
+    --s-general: #cc9b15;
+    --s-science: #1ba39d;
+    --s-history: #e05e41;
+    --s-geography: #427fe0;
+    --s-movies: #cc57cb;
+    --s-music: #8873e0;
+    --s-sports: #cc7b25;
+    --s-technology: #82af25;
+    --s-literature: #cc5f8b;
+    --s-nature: #29a662;
+    --s-mix: #a19db2;
+    --s-bulgaria: #259d80;
   }
 
-  /* A chapter's colour, on whatever is of its topic (ui.ts, chapterOf). */
+  /* A chapter's colours, on whatever is of its topic (.t-<topic>): --tv vivid, --td deep, --ts its sheet. Its art
+     takes the vivid as its tone. */
   .t-general {
-    --t: var(--t-general);
+    --tv: var(--t-general);
+    --td: var(--d-general);
+    --ts: var(--s-general);
   }
   .t-science {
-    --t: var(--t-science);
+    --tv: var(--t-science);
+    --td: var(--d-science);
+    --ts: var(--s-science);
   }
   .t-history {
-    --t: var(--t-history);
+    --tv: var(--t-history);
+    --td: var(--d-history);
+    --ts: var(--s-history);
   }
   .t-geography {
-    --t: var(--t-geography);
+    --tv: var(--t-geography);
+    --td: var(--d-geography);
+    --ts: var(--s-geography);
   }
   .t-movies {
-    --t: var(--t-movies);
+    --tv: var(--t-movies);
+    --td: var(--d-movies);
+    --ts: var(--s-movies);
   }
   .t-music {
-    --t: var(--t-music);
+    --tv: var(--t-music);
+    --td: var(--d-music);
+    --ts: var(--s-music);
   }
   .t-sports {
-    --t: var(--t-sports);
+    --tv: var(--t-sports);
+    --td: var(--d-sports);
+    --ts: var(--s-sports);
   }
   .t-technology {
-    --t: var(--t-technology);
+    --tv: var(--t-technology);
+    --td: var(--d-technology);
+    --ts: var(--s-technology);
   }
   .t-literature {
-    --t: var(--t-literature);
+    --tv: var(--t-literature);
+    --td: var(--d-literature);
+    --ts: var(--s-literature);
   }
   .t-nature {
-    --t: var(--t-nature);
+    --tv: var(--t-nature);
+    --td: var(--d-nature);
+    --ts: var(--s-nature);
   }
   .t-mix {
-    --t: var(--t-mix);
+    --tv: var(--t-mix);
+    --td: var(--d-mix);
+    --ts: var(--s-mix);
   }
   .t-bulgaria {
-    --t: var(--t-bulgaria);
+    --tv: var(--t-bulgaria);
+    --td: var(--d-bulgaria);
+    --ts: var(--s-bulgaria);
   }
 
   /* ---- Base ---- */
@@ -308,19 +341,24 @@
     text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
     /* What's brought into view (a field focused, an ask opened) stops above a phone's places, not under them. */
-    scroll-padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
   }
 
   body {
     margin: 0;
-    background: var(--paper);
+    background: var(--bg);
     color: var(--ink);
-    font: 400 1rem / 1.45 var(--font-sans);
+    font: 500 1rem / 1.45 var(--font-sans);
     font-feature-settings: "kern";
     /* A word too long for its line (large text on a narrow phone) breaks rather than runs off the screen. */
     overflow-wrap: break-word;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Sofia Sans draws the Bulgarian letter forms (д, л, т) with lang="bg": keep them. */
+  :lang(bg) {
+    font-variant-ligatures: common-ligatures;
   }
 
   h1,
@@ -334,8 +372,8 @@
   /* Display type (a title, the date, the question, a big number) grows at half the rate the text does: as set at the
      usual size (half in px, half in rem), and never the width of a phone at twice it (Large text, at the end). */
   h1 {
-    font: 600 calc(17px + 1.0625rem) / 1.06 var(--font-serif);
-    letter-spacing: -0.012em;
+    font: 900 calc(14px + 1.125rem) / 1.08 var(--font-sans);
+    letter-spacing: -0.01em;
     text-wrap: balance;
   }
 
@@ -345,13 +383,13 @@
   }
 
   h2 {
-    font: 600 calc(12.5px + 0.78125rem) / 1.15 var(--font-serif);
-    letter-spacing: -0.008em;
+    font: 900 calc(11px + 0.6875rem) / 1.15 var(--font-sans);
+    letter-spacing: -0.005em;
     text-wrap: balance;
   }
 
   h3 {
-    font: 600 1.1875rem / 1.25 var(--font-serif);
+    font: 800 1.0625rem / 1.25 var(--font-sans);
   }
 
   a,
@@ -361,7 +399,7 @@
 
   /* Focus: one outline for everything, outside any shadow a component draws. */
   :focus-visible {
-    outline: 2px solid var(--ink);
+    outline: 3px solid var(--ink);
     outline-offset: 2px;
   }
 
@@ -370,46 +408,47 @@
   }
 
   .bad {
-    color: var(--wrong-ink);
-    font-weight: 600;
+    color: var(--danger);
+    font-weight: 700;
   }
 
-  /* A kicker: small capitals over what it heads (the issue, a topic, a section's name). */
+  /* A kicker: small capitals over what it heads (the issue, a topic, a group of rows). */
   .kicker,
   .board h2,
   .settings h2,
   .section-title {
     color: var(--ink-3);
-    font: 700 0.75rem / 1.2 var(--font-sans);
-    letter-spacing: 0.14em;
+    font: 800 0.75rem / 1.2 var(--font-sans);
+    letter-spacing: 0.12em;
     text-transform: uppercase;
   }
 
-  /* A deck: the sentence under a headline, in the serif's italic. */
+  /* A deck: the sentence under a headline. */
   .lead,
   .deck {
     color: var(--ink-2);
-    font: italic 500 1.125rem / 1.45 var(--font-serif);
+    font: 600 1.0625rem / 1.45 var(--font-sans);
     text-wrap: pretty;
   }
 
   .small {
     color: var(--ink-3);
-    font: 500 0.875rem / 1.4 var(--font-sans);
+    font: 600 0.875rem / 1.4 var(--font-sans);
   }
 
   .num {
     font-family: var(--font-numeral);
+    font-weight: 900;
     font-variant-numeric: lining-nums tabular-nums;
   }
 
   /* A word beside a big number (7 „от“ 10): the numeral face is for digits only, Cyrillic words read badly in it at
-     display size. Small, muted, on the number's baseline. */
+     display size. On the number's baseline. */
   .num-word {
-    color: var(--ink-3);
+    color: var(--ink);
     font-family: var(--font-sans);
-    font-size: max(0.8125rem, 0.5em);
-    font-weight: 600;
+    font-size: max(0.875rem, 0.4em);
+    font-weight: 900;
     letter-spacing: 0;
   }
 
@@ -439,10 +478,26 @@
     --i: var(--i-search);
   }
 
-  /* ---- The frame: the bar, the double rule, the places ---- */
+  .i-share {
+    --i: var(--i-share);
+  }
+
+  .i-nib {
+    --i: var(--i-nib);
+  }
+
+  .i-pencil {
+    --i: var(--i-pencil);
+  }
+
+  .i-gear {
+    --i: var(--i-gear);
+  }
+
+  /* ---- The frame: the bar, the places ---- */
 
   #app {
-    padding-bottom: calc(var(--space-7) + 3.5rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(var(--space-7) + 4.5rem + env(safe-area-inset-bottom));
   }
 
   .frame {
@@ -452,19 +507,11 @@
       max(var(--gutter), env(safe-area-inset-left));
   }
 
-  .frame::after {
-    content: "";
-    display: block;
-    height: 5px;
-    border-top: 2px solid var(--rule-ink);
-    border-bottom: 1px solid var(--rule-ink);
-  }
-
   .bar {
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    min-height: 56px;
+    min-height: 60px;
   }
 
   /* The mark and the name, a way back to Днес. */
@@ -475,7 +522,7 @@
     min-height: 44px;
     padding: 0 0.1em 0 0;
     color: var(--ink);
-    font: 600 calc(7.5px + 0.46875rem) / 1 var(--font-serif);
+    font: 900 calc(7.5px + 0.46875rem) / 1 var(--font-sans);
     letter-spacing: 0.2em;
     text-decoration: none;
   }
@@ -483,8 +530,8 @@
   .rosette {
     display: block;
     flex: none;
-    width: 22px;
-    height: 22px;
+    width: 26px;
+    height: 26px;
   }
 
   .rosette .petal {
@@ -500,33 +547,32 @@
     display: none;
   }
 
-  .bar-issue {
-    display: none;
-  }
-
   .bar-me,
   .bar-in {
     margin-left: auto;
   }
 
+  /* The player's avatar, with the seal they wear on its corner (ui.ts, worn). */
   .bar-me {
+    position: relative;
     display: grid;
     place-items: center;
     min-width: 44px;
     min-height: 44px;
-    margin-right: -6px;
+    margin-right: -2px;
   }
 
   .bar-in {
     display: grid;
     align-items: center;
     min-height: 44px;
-    color: var(--ink-2);
-    font: 500 0.9375rem / 1 var(--font-sans);
+    padding: 0 4px;
+    color: var(--ink);
+    font: 800 0.9375rem / 1 var(--font-sans);
     text-decoration: none;
   }
 
-  /* The three places on a phone: words, not icons, at the foot where a thumb is. */
+  /* The three places on a phone: words at the foot where a thumb is, the current one on a well. */
   .places-foot {
     position: fixed;
     right: 0;
@@ -535,48 +581,43 @@
     z-index: 10;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    border-top: 1px solid var(--rule-ink);
-    background: var(--paper);
+    gap: 6px;
+    padding: 8px max(12px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom))
+      max(12px, env(safe-area-inset-left));
+    border-top: 1px solid var(--line);
+    background: var(--surface);
   }
 
   .places-foot a {
     position: relative;
     display: grid;
     place-items: center;
-    min-height: 3.375rem;
+    min-height: 3rem;
     padding: 0 var(--space-1);
+    border-radius: 14px;
     color: var(--ink-3);
-    font: 600 0.9375rem / 1.1 var(--font-sans);
+    font: 700 0.9375rem / 1.1 var(--font-sans);
     text-align: center;
     text-decoration: none;
   }
 
   .places-foot a[aria-current="page"] {
+    background: var(--surface-2);
     color: var(--ink);
-    font-weight: 800;
+    font-weight: 900;
   }
 
-  .places-foot a[aria-current="page"]::before {
-    content: "";
-    position: absolute;
-    top: -1px;
-    left: calc(50% - 14px);
-    width: 28px;
-    height: 3px;
-    background: var(--ink);
-  }
-
-  /* Someone asks to be friends: a dot on Приятели. */
+  /* Someone asks to be friends, or a friend's duel waits: a dot on Приятели. */
   :is(.places-foot, .places) a.news::after {
     content: "";
     position: absolute;
-    top: 10px;
-    right: calc(50% - 3.25em);
+    top: 50%;
+    right: calc(50% - 3.4em);
     width: 7px;
     height: 7px;
+    margin-top: -3.5px;
     border-radius: var(--radius-full);
-    background: var(--wrong);
+    background: var(--ink);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -596,22 +637,22 @@
     padding-bottom: var(--space-7);
   }
 
-  /* The screen under the frame: a phone's column (each screen in the edition's look sets its own page). */
+  /* The screen under the frame: a phone's column (a big screen makes a place a spread). */
   #main {
     max-width: 40rem;
     margin: 0 auto;
-    padding: var(--space-5) max(var(--gutter), env(safe-area-inset-right)) 0
+    padding: var(--space-1) max(var(--gutter), env(safe-area-inset-right)) 0
       max(var(--gutter), env(safe-area-inset-left));
   }
 
-  /* A big screen: the places in the bar, the issue on its right, the avatar in the corner. */
+  /* A big screen: the places in the bar, the avatar in the corner. */
   @media (min-width: 56.25rem) {
     :root {
-      --gutter: 48px;
+      --gutter: 40px;
     }
 
     .bar {
-      gap: var(--space-6);
+      gap: var(--space-3);
       min-height: 72px;
     }
 
@@ -620,46 +661,38 @@
     }
 
     .rosette {
-      width: 26px;
-      height: 26px;
+      width: 28px;
+      height: 28px;
     }
 
     .bar .places {
       display: flex;
-      gap: var(--space-6);
-      margin-left: var(--space-6);
-      align-self: stretch;
+      gap: 6px;
+      margin-left: 28px;
     }
 
     .places a {
       position: relative;
-      display: flex;
-      align-items: center;
-      padding-top: 3px;
-      border-bottom: 3px solid transparent;
+      display: grid;
+      place-items: center;
+      min-height: 44px;
+      padding: 0 18px;
+      border-radius: 14px;
       color: var(--ink-3);
-      font: 600 1rem / 1 var(--font-sans);
+      font: 800 1rem / 1 var(--font-sans);
       text-decoration: none;
     }
 
     .places a[aria-current="page"] {
-      border-bottom-color: var(--ink);
+      background: var(--surface);
       color: var(--ink);
-      font-weight: 800;
+      font-weight: 900;
     }
 
-    .bar-issue {
-      display: block;
-      margin-left: auto;
-      color: var(--ink-3);
-      font: 700 0.75rem / 1 var(--font-sans);
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
-
-    .bar-issue + :is(.bar-me, .bar-in) {
-      margin-left: 0;
+    .places a.news::after {
+      right: 6px;
+      top: 12px;
+      margin: 0;
     }
 
     .places-foot {
@@ -670,8 +703,7 @@
       padding-bottom: var(--space-7);
     }
 
-    /* A screen in the edition's look is a spread: the page's whole width, on a 12-column grid, its two pages
-       divided by a hairline (.page-2: the second). */
+    /* A place on a big screen is a spread: the page's whole width, on a 12-column grid, its pages side by side. */
     #main:has(.spread) {
       max-width: calc(var(--page) + 2 * var(--gutter));
       padding-inline: max(var(--gutter), env(safe-area-inset-left)) max(var(--gutter), env(safe-area-inset-right));
@@ -699,21 +731,15 @@
 
     .spread > .page-2 {
       grid-column: 8 / span 5;
-      align-self: stretch;
-      padding-left: 40px;
-      border-left: 1px solid var(--rule);
     }
 
-    /* Приятели with duels: three pages, the board, the duels and the friends. */
+    /* Приятели with duels: three pages, the board, the friends and the duels. */
     .friends-page:has(> .page-mid) > .page-1 {
       grid-column: 1 / span 5;
     }
 
     .spread > .page-mid {
       grid-column: 6 / span 4;
-      align-self: stretch;
-      padding-left: 40px;
-      border-left: 1px solid var(--rule);
     }
 
     .friends-page:has(> .page-mid) > .page-2 {
@@ -721,7 +747,7 @@
     }
   }
 
-  /* Each screen's own: a phone's column, a tablet's and a laptop's (the edition's screens set their own spread). */
+  /* Each screen's own: a phone's column, a tablet's and a laptop's (a place sets its own spread). */
   .screen,
   .stack,
   .summary,
@@ -745,25 +771,15 @@
     gap: var(--space-3);
   }
 
-  /* A page's picture, over its heading. */
-  .page-art {
-    width: 88px;
-    height: 88px;
-    margin: 0 0 -4px -3px;
-  }
+  /* ---- Cards and sections ---- */
 
-  /* ---- Sections and rows ---- */
-
-  /* A card, in the edition: no box, a section on an ink rule. */
+  /* A card: a white surface with soft corners on the page. */
   .card {
     display: grid;
     gap: var(--space-4);
-    padding: var(--space-4) 0 0;
-    border-top: 1px solid var(--rule-ink);
-  }
-
-  .card.hero {
-    padding-top: var(--space-5);
+    padding: 20px;
+    border-radius: var(--r-3);
+    background: var(--surface);
   }
 
   .card-head {
@@ -776,14 +792,15 @@
 
   /* A card's own title, smaller than a screen's sections. */
   .card-title {
-    font: 600 1.25rem / 1.25 var(--font-serif);
+    font: 900 1.1875rem / 1.25 var(--font-sans);
   }
 
-  /* A section: its heading (a serif H3) on an ink rule, a small note on the same line. */
+  /* A section: its heading, a small note on the same line, and what it holds under it. */
   .sect {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     align-content: start;
+    gap: var(--space-3);
   }
 
   .sect-head {
@@ -792,52 +809,53 @@
     align-items: baseline;
     justify-content: space-between;
     gap: var(--space-1) var(--space-3);
-    padding-bottom: var(--space-3);
-    border-bottom: 1px solid var(--rule-ink);
   }
 
   .sect-head h2 {
-    font: 600 calc(10px + 0.625rem) / 1.25 var(--font-serif);
-    letter-spacing: 0;
+    font: 900 1.25rem / 1.2 var(--font-sans);
+    letter-spacing: -0.005em;
   }
 
   .sect-note {
     color: var(--ink-3);
-    font: 500 0.875rem / 1.3 var(--font-sans);
+    font: 700 0.875rem / 1.3 var(--font-sans);
   }
 
-  /* Rows between hairlines: a player, a friend, an entry of a list. */
+  a.sect-note {
+    color: var(--ink);
+    font-weight: 800;
+  }
+
+  /* Rows on a card, a hairline between them: a player, a friend, an entry of a list. */
   .rows {
     margin: 0;
-    padding: 0;
+    padding: 6px 16px;
+    border-radius: var(--r-3);
+    background: var(--surface);
     list-style: none;
   }
 
   .rows > * + * {
-    border-top: 1px solid var(--rule);
-  }
-
-  .rows > :last-child {
-    border-bottom: 1px solid var(--rule);
+    border-top: 1px solid var(--line);
   }
 
   /* ---- Controls ---- */
 
-  /* The one action: a full-width bar of ink by day, lamp-gold by night. */
+  /* A button: outlined in the line's grey; the one action (primary) a full-width bar of ink, raised a little. */
   .btn {
     appearance: none;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: var(--space-2);
+    gap: 10px;
     width: 100%;
     min-height: 3rem;
-    padding: var(--space-2) var(--space-4);
-    border: 1px solid var(--rule-ink);
-    border-radius: var(--radius);
+    padding: var(--space-2) 20px;
+    border: 2px solid var(--line-2);
+    border-radius: var(--r-2);
     background: transparent;
     color: var(--ink);
-    font: 700 1rem / 1.2 var(--font-sans);
+    font: 800 1rem / 1.2 var(--font-sans);
     text-align: center;
     text-decoration: none;
     cursor: pointer;
@@ -850,43 +868,49 @@
   /* Only where a pointer hovers: on a touch screen hover sticks after the tap. */
   @media (hover: hover) and (pointer: fine) {
     .btn:hover:not(:disabled) {
-      background: var(--paper-2);
+      background: var(--surface);
     }
 
     .btn.primary:hover:not(:disabled) {
       background: var(--action);
-      opacity: 0.88;
+      opacity: 0.9;
     }
   }
 
   .btn:active:not(:disabled) {
-    transform: scale(0.985);
+    transform: translateY(2px);
   }
 
   .btn:disabled {
-    border-color: var(--rule);
+    border-color: var(--line);
     color: var(--ink-3);
     cursor: default;
   }
 
   .btn.primary {
-    min-height: 3.5rem;
-    border-color: var(--action);
+    min-height: 3.75rem;
+    border: 0;
     background: var(--action);
+    box-shadow: var(--lift);
     color: var(--on-action);
-    font-size: 1.125rem;
-    letter-spacing: 0.01em;
+    font-size: 1.1875rem;
+    font-weight: 900;
+  }
+
+  .btn.primary:active:not(:disabled) {
+    box-shadow: none;
+    transform: translateY(4px);
   }
 
   .btn.primary:disabled {
-    border-color: var(--paper-3);
-    background: var(--paper-3);
+    background: var(--surface-3);
+    box-shadow: none;
     color: var(--ink-3);
   }
 
   .btn.danger {
-    border-color: var(--wrong-ink);
-    color: var(--wrong-ink);
+    border-color: var(--danger);
+    color: var(--danger);
   }
 
   /* Accepting a friend's request. */
@@ -897,7 +921,7 @@
   }
 
   .btn.big {
-    min-height: 3.5rem;
+    min-height: 3.75rem;
   }
 
   .btn.inline {
@@ -910,18 +934,17 @@
     border: 0;
     background: none;
     font: inherit;
-    font-weight: 700;
+    font-weight: 800;
     text-align: left;
     text-decoration: underline;
-    text-decoration-color: var(--rule-2);
-    text-decoration-thickness: 1px;
+    text-decoration-thickness: 2px;
     text-underline-offset: 4px;
     cursor: pointer;
   }
 
   .link.muted {
     color: var(--ink-3);
-    font-weight: 500;
+    font-weight: 700;
   }
 
   /* A link on its own line that's tapped, not read in a sentence: a finger's height. A way on in a line of its own
@@ -946,20 +969,20 @@
     justify-self: start;
     gap: 6px;
     min-height: 2.75rem;
-    margin: calc(-1 * var(--space-3)) 0 calc(-1 * var(--space-2));
-    color: var(--ink-2);
-    font: 600 0.875rem / 1 var(--font-sans);
+    margin: calc(-1 * var(--space-2)) 0 calc(-1 * var(--space-2)) -4px;
+    color: var(--ink);
+    font: 800 0.9375rem / 1 var(--font-sans);
     text-decoration: none;
   }
 
   @media (hover: hover) and (pointer: fine) {
     .back:hover {
-      color: var(--ink);
+      text-decoration: underline;
     }
   }
 
   .back-i {
-    font-size: 1rem;
+    font-size: 1.25rem;
   }
 
   .field {
@@ -969,7 +992,7 @@
 
   .field > span {
     color: var(--ink-2);
-    font: 600 0.875rem / 1.25 var(--font-sans);
+    font: 700 0.875rem / 1.25 var(--font-sans);
   }
 
   .field small {
@@ -977,42 +1000,39 @@
     line-height: 1.125rem;
   }
 
-  /* A field: written on a line, as on a form, the placeholder in the serif's italic. */
+  /* A field: a white box with a line round it, a button's height. */
   input,
   textarea {
     width: 100%;
-    border: 0;
-    border-bottom: 2px solid var(--rule-ink);
-    border-radius: 0;
-    background: transparent;
+    border: 2px solid var(--line-2);
+    border-radius: 14px;
+    background: var(--surface);
     color: var(--ink);
-    font: 500 1.125rem / 1.3 var(--font-sans);
+    font: 600 1.0625rem / 1.3 var(--font-sans);
     transition: border-color 160ms ease;
   }
 
   /* A field is a button's height, so the two pair up side by side and one under the other. */
   input {
     min-height: 3rem;
-    padding: 0 2px;
+    padding: 0 14px;
   }
 
   textarea {
-    padding: var(--space-3) var(--space-3);
-    border: 1px solid var(--rule-2);
-    border-radius: var(--radius);
+    padding: var(--space-3) 14px;
     resize: vertical;
   }
 
   input::placeholder,
   textarea::placeholder {
     color: var(--ink-3);
-    font: italic 500 1.0625rem / 1.3 var(--font-serif);
+    font: 600 1rem / 1.3 var(--font-sans);
     opacity: 1;
   }
 
   input:focus,
   textarea:focus {
-    border-color: var(--gold-ink);
+    border-color: var(--ink);
     outline: none;
   }
 
@@ -1024,7 +1044,7 @@
   input.code {
     min-height: 4rem;
     padding-inline: var(--space-2);
-    font: 800 clamp(2rem, 10vw, 2.5rem) / 1 var(--font-numeral);
+    font: 900 clamp(2rem, 10vw, 2.5rem) / 1 var(--font-numeral);
     letter-spacing: 0.1em;
     text-align: center;
     font-variant-numeric: tabular-nums;
@@ -1038,14 +1058,14 @@
 
   /* Empty, the code's field says what goes in it in plain words, never in digits that look typed. */
   input.code::placeholder {
-    font: italic 500 1.125rem / 1 var(--font-serif);
+    font: 600 1.0625rem / 1 var(--font-sans);
     letter-spacing: normal;
   }
 
   .join {
     display: flex;
-    align-items: flex-end;
-    gap: var(--space-3);
+    align-items: stretch;
+    gap: var(--space-2);
   }
 
   .join input {
@@ -1060,54 +1080,56 @@
   .tag {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-1);
+    gap: 5px;
     min-height: 22px;
     padding: 0 8px;
-    border: 1px solid var(--rule-2);
-    border-radius: var(--radius);
+    border-radius: 6px;
+    background: var(--surface-2);
     color: var(--ink-2);
-    font: 700 0.6875rem / 1 var(--font-sans);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font: 900 0.75rem / 1 var(--font-sans);
+    letter-spacing: 0.04em;
     white-space: nowrap;
   }
 
   .tag.rose,
   .tag.gold {
-    border-color: var(--ink);
-    color: var(--ink);
+    background: var(--ink);
+    color: var(--bg);
   }
 
-  /* The old tones of the pictures, until each screen gives its topic its chapter's colour. */
-  .tone-gold {
-    --tone: var(--gold);
+  /* A picture takes its chapter's vivid as its tone wherever it's put. */
+  :where([class^="t-"], [class*=" t-"]) {
+    --tone: var(--tv);
   }
-  .tone-lilac {
-    --tone: var(--t-movies);
+
+  /* Tones that aren't a chapter's: the four pairs of „Свържи“ (questions.ts, pairTones), and the mark's gold. */
+  .tone-gold {
+    --tone: var(--t-general);
   }
   .tone-sky {
-    --tone: var(--t-technology);
+    --tone: var(--t-geography);
   }
   .tone-rose {
     --tone: var(--t-literature);
   }
-  .tone-mint {
-    --tone: var(--t-nature);
+  .tone-lilac {
+    --tone: var(--t-music);
   }
 
   .dot {
     display: inline-block;
     flex: none;
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     border-radius: var(--radius-full);
-    background: var(--t, var(--tone, var(--ink)));
+    background: var(--tv, var(--tone, var(--ink)));
   }
 
   .games-date {
     display: flex;
     align-items: center;
     gap: var(--space-3);
+    font-weight: 800;
   }
 
   .games-days {
@@ -1123,14 +1145,17 @@
   .games-date::after {
     content: "";
     flex: 1;
-    border-top: 1px solid var(--rule);
+    border-top: 1px solid var(--line);
   }
 
-  /* Начало's ask to keep a guest's profile (screens/today.ts): the sign-in form in a card. */
+  /* The ask to keep a guest's game (screens/keep.ts): the sign-in form on a card. */
   .keep-card {
     display: grid;
     gap: var(--space-3);
     justify-items: start;
+    padding: 20px;
+    border-radius: var(--r-3);
+    background: var(--surface);
   }
 
   .keep-card h2,
@@ -1138,9 +1163,8 @@
     margin: 0;
   }
 
-  /* One question over the page, in a sheet from the bottom (screens/name.ts: a name before others first see it). */
-  /* A sheet over the page: paper with an ink rule on top, over a scrim; from the foot on a phone, centred on a big
-     screen (a name asked for, the share's sheet, a note in the book). */
+  /* A sheet over the page (a name asked for, the share, a way out of a game): a surface with round top corners
+     over a scrim; from the foot on a phone, centred on a big screen. */
   .sheet {
     position: fixed;
     inset: 0;
@@ -1172,9 +1196,9 @@
     margin: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: var(--space-5) var(--gutter) calc(var(--space-5) + env(safe-area-inset-bottom));
-    border-top: 3px solid var(--rule-ink);
-    background: var(--paper);
+    padding: var(--space-5) 20px calc(var(--space-5) + env(safe-area-inset-bottom));
+    border-radius: var(--r-3) var(--r-3) 0 0;
+    background: var(--surface);
   }
 
   .sheet-panel h2,
@@ -1190,34 +1214,14 @@
     .sheet-panel {
       max-height: calc(100% - 2 * var(--space-6));
       padding: var(--space-6);
+      border-radius: var(--r-3);
     }
   }
 
-  /* The quiet way out, centred under the gold button. */
+  /* The quiet way out, centred under the action. */
   .sheet-skip {
     justify-self: center;
   }
-
-  /* A line that's a tap from a place of its own (Профил's facts, to the Алманах). */
-
-  /* The ways to play with others: three peers, so three in a row, a small card each in its colour; on a phone the
-     picture over the name (a big screen puts it beside, below). */
-
-  /* What came of the days just missed: the week forgave one, or the streak ended. Said once, quietly. */
-
-  /* Начало's top: the streak, a way to Профил. */
-
-  /* No streak (cold), or one at stake while the day's ten wait (unlit): the flame out; at stake, the number still
-   * reads, plain, as what the day would keep. */
-
-  /* The streak's chip. */
-
-  /* The day as the day's issue: a dateline over the card (the weekday and „Брой N“ on a hairline, the date set large,
-     a hairline under it), then what the ten are, a size down. */
-
-  /* The day's ten waiting: what they'd make of the streak, and in the evening that it ends at midnight. */
-
-  /* Under a topic's result's gold button, the way to the day: centred with it. */
 
   .remind-actions {
     display: flex;
@@ -1226,19 +1230,12 @@
     gap: var(--space-3);
   }
 
-  /* Начало's two parts are one column on a phone (a big screen sets them side by side, below). */
-
-  /* After: the date and the place on the day's board (a way to it). */
-
-  /* Начало and a result end in quiet lines (a way in, what the game brought): one list at the
-     column's left, with its buttons, in one style (the news' lines: below). */
+  /* Quiet lines at a page's end (a way in, what the game brought), in one style. */
   .day-next {
     color: var(--ink-3);
     font-size: 0.9375rem;
     line-height: 1.375rem;
   }
-
-  /* Under a topic's result: the way to another topic, quietly (no card). */
 
   .other-topics {
     display: grid;
@@ -1253,20 +1250,19 @@
     text-decoration: none;
   }
 
-  /* The way back from a screen reached from a main place. */
   /* ---- Figures: numbers with what they count ---- */
 
   .stat-label {
     color: var(--ink-3);
     font-size: 0.875rem;
     line-height: 1.25rem;
-    font-weight: 600;
+    font-weight: 700;
   }
 
   .stats {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
   .stat {
@@ -1274,44 +1270,25 @@
     align-content: start;
     gap: var(--space-1);
     padding: var(--space-4);
-    border-radius: var(--radius);
-    background: var(--paper);
-    box-shadow: none;
+    border-radius: var(--r-2);
+    background: var(--surface);
   }
 
   .stat-value {
-    font: 900 calc(26px + 1.625rem) / 0.95 var(--font-numeral);
+    font: 900 calc(24px + 1.5rem) / 0.9 var(--font-numeral);
     letter-spacing: -0.01em;
     font-variant-numeric: tabular-nums;
   }
 
-  .stat.gold .stat-value {
-    color: var(--gold-ink);
-  }
-  .stat.mint .stat-value {
-    color: var(--right-ink);
-  }
-  .stat.rose .stat-value {
-    color: var(--t-literature);
-  }
-  .stat.sky .stat-value {
-    color: var(--t-technology);
-  }
+  /* ---- The pips of a run: a bar a question, right filled in ink, близо half, wrong hollow, the one asked in its
+     chapter's colour, the ones to come quiet ---- */
 
-  /* ---- Streak: days in a row with the day's ten, and this week ---- */
-
-  /* The streak's flame (art/pictures.ts): gold and glowing while it burns, grey when there's none. */
-
-  /* ---- The shape of a game: a square a question, right filled in ink, wrong open ---- */
-
-  /* One row always, across the column on a phone (the squares shrink rather than wrap). The same shape in a run, on a
-     result, in the shared text (■□) and on the card. */
+  /* One row always, across the column (the bars shrink rather than wrap). */
   .trail {
     display: grid;
     grid-auto-columns: minmax(0, 1fr);
     grid-auto-flow: column;
     gap: 5px;
-    max-width: 21rem;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -1319,38 +1296,274 @@
 
   .trail li {
     width: 100%;
-    aspect-ratio: 1;
-    border-radius: 2px;
-    background: var(--rule);
+    height: 10px;
+    border-radius: 4px;
+    background: var(--line);
+    box-shadow: inset 0 0 0 1.5px var(--line-2);
   }
 
   .trail li.right {
     background: var(--ink);
+    box-shadow: none;
   }
 
   .trail li.wrong {
     background: transparent;
-    box-shadow: inset 0 0 0 1.5px var(--ink);
+    box-shadow: inset 0 0 0 2px var(--ink);
   }
 
-  /* Close: open, with a mark of ink inside — near, not right. */
+  /* Близо: the left half filled. */
   .trail li.partial {
-    background: linear-gradient(var(--ink), var(--ink)) center / 40% 40% no-repeat;
-    box-shadow: inset 0 0 0 1.5px var(--ink);
+    background: linear-gradient(90deg, var(--ink) 50%, transparent 50%);
+    box-shadow: inset 0 0 0 2px var(--ink);
   }
 
-  /* A question that counts for nobody (found wrong during its day): a dashed square, quieter than a miss. */
+  /* A question that counts for nobody (found wrong during its day): dashed, quieter than a miss. */
   .trail li.void {
     background: transparent;
-    outline: 1.5px dashed var(--rule-2);
+    box-shadow: none;
+    outline: 1.5px dashed var(--line-2);
     outline-offset: -1.5px;
   }
 
+  /* The one being asked: its chapter's colour, ringed. */
   .trail li.now {
-    background: var(--gold);
+    background: var(--tv, var(--ink));
+    box-shadow: inset 0 0 0 2px var(--ink);
+    outline: 3px solid color-mix(in srgb, var(--tv, var(--ink)) 45%, transparent);
+    outline-offset: 1px;
   }
 
-  /* ---- A question ---- */
+  /* ---- The tiles: the day's ten in their chapters' colours, right filled, близо half, wrong hollow (ui.ts, tiles);
+     on the result, a friend's row, the share ---- */
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 5px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tile {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 26%;
+    background: var(--tv);
+  }
+
+  /* Right: the glyph on a white disc on the chapter's colour. */
+  .tile-pic {
+    display: grid;
+    place-items: center;
+    width: 74%;
+    height: 74%;
+    border-radius: 50%;
+    background: #fff;
+  }
+
+  .tile-pic .pic {
+    width: 92%;
+    height: 92%;
+  }
+
+  /* Wrong: hollow, outlined in the chapter's deep colour, the glyph straight on it, quiet. */
+  .tile.wrong {
+    background: transparent;
+    outline: 2.5px dashed var(--td);
+    outline-offset: -2.5px;
+  }
+
+  /* Близо: the left half in the chapter's colour, the right half empty, outlined the same. */
+  .tile.near {
+    background: linear-gradient(90deg, var(--tv) 50%, transparent 50%);
+    box-shadow: inset 0 0 0 2.5px var(--td);
+  }
+
+  .tile:is(.near, .wrong) .tile-pic {
+    width: 60%;
+    height: 60%;
+    background: none;
+  }
+
+  .tile:is(.near, .wrong) .tile-pic .pic {
+    width: 100%;
+    height: 100%;
+  }
+
+  .tile.wrong .tile-pic {
+    opacity: 0.6;
+    filter: grayscale(0.5);
+  }
+
+  /* One that counts for nobody: dashed, empty. */
+  .tile.void {
+    background: transparent;
+    box-shadow: none;
+    outline: 2px dashed var(--line-2);
+    outline-offset: -2px;
+  }
+
+  .tile.void .tile-pic {
+    opacity: 0.4;
+    background: none;
+  }
+
+  /* Still to come (a day half-played). */
+  .tile.later {
+    background: var(--surface-2);
+  }
+
+  .tile.later .tile-pic {
+    opacity: 0.35;
+    background: none;
+    filter: grayscale(1);
+  }
+
+  /* A row's small shape of the day (a friend's, a board's): ten squares in ink. */
+  .mini {
+    display: inline-grid;
+    flex: none;
+    grid-template-columns: repeat(10, 10px);
+    gap: 3px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .mini li {
+    width: 10px;
+    height: 10px;
+    border-radius: 2.5px;
+    box-shadow: inset 0 0 0 1.8px var(--ink);
+  }
+
+  .mini li.right {
+    background: var(--ink);
+  }
+
+  .mini li.partial {
+    background: linear-gradient(90deg, var(--ink) 50%, transparent 50%);
+  }
+
+  .mini li.void {
+    box-shadow: inset 0 0 0 1.5px var(--line-2);
+  }
+
+  /* ---- The seal (seal.ts, ui.ts): a chapter's rank, in its colour, with its glyph in the middle; 24px at the least.
+     By day its edge has a fine outline in the chapter's deep colour, so the light chapters keep their shape on white;
+     by night none. On its own chapter's colour (a sheet), a 2px ink rim. ---- */
+
+  .seal {
+    --seal-outline: var(--td);
+    display: block;
+    flex: none;
+    overflow: visible;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-scheme="day"]) .seal {
+      --seal-outline: transparent;
+    }
+  }
+
+  :root[data-scheme="night"] .seal {
+    --seal-outline: transparent;
+  }
+
+  .seal .f-vivid {
+    fill: var(--tv);
+  }
+
+  .seal .f-core {
+    fill: #fff;
+  }
+
+  .seal .f-none {
+    fill: none;
+  }
+
+  .seal .s-vivid {
+    stroke: var(--tv);
+  }
+
+  .seal .s-ink {
+    stroke: #16132b;
+  }
+
+  .seal .s-outline {
+    stroke: var(--seal-outline);
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* On a sheet of a chapter's colour (its own, most often), the seal keeps its edge with a rim of ink. */
+  .leaf .seal .s-outline,
+  .seal.rimmed .s-outline {
+    stroke: #16132b;
+    stroke-width: 2;
+  }
+
+  .seal-tab {
+    fill: #16132b;
+    stroke: var(--bg);
+    stroke-width: 1.6;
+  }
+
+  .seal-n {
+    fill: var(--tv);
+    font: 900 12.5px var(--font-numeral);
+  }
+
+  /* How far towards the next rank: four pips under a seal of 32px or more. */
+  .seal-pips {
+    display: inline-grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 3px;
+    width: 34px;
+  }
+
+  .seal-pips i {
+    height: 5px;
+    border-radius: 2px;
+    background: var(--line);
+    box-shadow: inset 0 0 0 1px var(--line-2);
+  }
+
+  .seal-pips i.on {
+    background: var(--ink);
+    box-shadow: none;
+  }
+
+  /* Art drawn on white (a glyph's disc, a tile's, the seal's core) keeps the day's inks by night too. */
+  :is(.seal, .glyph, .tile-pic, .chip) .pic {
+    --k4: color-mix(in srgb, var(--tone) 72%, #fff);
+    --k5: color-mix(in srgb, var(--tone) 32%, #fff);
+    --kt: 0.26;
+  }
+
+  /* A seal on an avatar's corner: ringed in the page's colour, so it stands off the picture. */
+  .worn-on {
+    position: relative;
+    display: inline-grid;
+    flex: none;
+  }
+
+  .worn-on > .seal {
+    position: absolute;
+    right: -7px;
+    bottom: -6px;
+    border-radius: 50%;
+    background: var(--bg);
+    box-shadow: 0 0 0 1.5px var(--bg);
+  }
+
+  /* ---- A question: the head (the way out, what's played, the count), the pips and the clock; the question on its
+     chapter's coloured sheet with its turned corner (the next question's colour under it); what answers it under the
+     sheet, at the thumb; the answer docked at the foot on a phone ---- */
 
   .question {
     gap: var(--space-4);
@@ -1358,85 +1571,98 @@
 
   .question-head {
     display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: var(--space-4);
+    align-items: center;
+    gap: var(--space-3);
   }
 
-  /* The count never breaks („1 от / 10“): a long topic beside it wraps instead. */
+  /* The way out of a game: a cross before what's played. */
+  .game-leave {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin: -6px 0 -6px -10px;
+    border-radius: var(--radius-full);
+    color: var(--ink);
+    font-size: 1.375rem;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .game-leave:hover {
+      background: var(--surface);
+    }
+  }
+
+  .head-side {
+    display: grid;
+    justify-items: start;
+    gap: 2px;
+    min-width: 0;
+    margin-right: auto;
+  }
+
+  /* What's played: „Брой 31“, the topic, „Дуел с Мария“. */
+  .question-head .kicker {
+    color: var(--ink);
+    font: 900 1rem / 1.2 var(--font-sans);
+    letter-spacing: 0;
+    text-transform: none;
+    text-wrap: balance;
+  }
+
+  .question-head .versus {
+    color: var(--ink-3);
+    font-size: 0.875rem;
+  }
+
+  /* „4/10“ to the eye, „4 от 10“ read aloud; it never wraps. */
   .count {
     display: flex;
     flex: none;
     align-items: baseline;
-    gap: var(--space-2);
+    gap: 1px;
     font-family: var(--font-numeral);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
 
   .count-n {
-    font-size: calc(18px + 1.125rem);
-    line-height: 1;
+    font-size: 2rem;
+    line-height: 0.85;
     font-weight: 900;
   }
 
   .count-of {
     color: var(--ink-3);
-    font-size: 1.25rem;
-    line-height: 1.25rem;
-    font-weight: 800;
+    font: 700 0.875rem / 1 var(--font-sans);
   }
 
-  .question-head .kicker {
-    text-align: right;
-    text-wrap: balance;
+  .count-of::before {
+    content: "/";
+    margin-right: 1px;
   }
 
-  .head-side {
-    display: grid;
-    justify-items: end;
-    gap: var(--space-2);
-    min-width: 0;
-    margin-bottom: var(--space-2);
-    margin-left: auto;
+  .count-of .num-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
-  /* A duel with a friend: with whom, over the topic, in the duels' colour. */
-  .question-head .versus {
-    margin-bottom: -4px;
-    color: var(--t-literature);
-  }
-
-  /* The way out of a game on a phone, where the header steps aside (below): an arrow to Начало before the count. */
-  .game-leave {
-    display: none;
-    flex: none;
-    place-items: center;
-    align-self: flex-end;
-    width: 2.75rem;
-    height: 2.75rem;
-    margin: 0 calc(-1 * var(--space-3)) 4px -12px;
-    border-radius: var(--radius);
-    color: var(--ink-3);
-    font-size: 1.5rem;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .game-leave:hover {
-      color: var(--ink);
-    }
-  }
-
-  /* A run's head and pips stay in view while the question and its answer scroll (run.ts), smaller once stuck. */
+  /* A run's head, pips and clock stay in view while the question and its answer scroll (run.ts), smaller once
+     stuck. */
   .question-top {
     position: sticky;
     top: -1px;
     z-index: 2;
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-3);
     margin-inline: calc(-1 * var(--space-4));
     padding-inline: var(--space-4);
-    background: var(--paper);
+    background: var(--bg);
   }
 
   /* The head keeps the page's height itself as it gets smaller (run.ts, stays): the browser's own scroll anchoring
@@ -1448,126 +1674,30 @@
   .question-top.stuck {
     gap: var(--space-1);
     padding-block: max(var(--space-2), env(safe-area-inset-top)) var(--space-2);
-    box-shadow: none;
   }
 
   .stuck .count-n {
-    font-size: 1.5rem;
-    line-height: 1.5rem;
+    font-size: 1.375rem;
   }
 
-  .stuck .count-of {
-    font-size: 1rem;
-    line-height: 1rem;
-  }
-
-  .stuck .head-side {
-    margin-bottom: 0;
-  }
-
-  /* Stuck, the arrow keeps a thumb's room (44px), reaching past the smaller head's row. */
+  /* Stuck, the cross keeps a thumb's room (44px), reaching past the smaller head's row. */
   .stuck .game-leave {
-    align-self: center;
     margin-block: -0.5rem;
-  }
-
-  .stuck .kicker {
-    display: none;
-  }
-
-  .stuck .trail {
-    max-width: min(15rem, 100% - 4.5rem);
   }
 
   .trail li.fresh {
     animation: pip 200ms cubic-bezier(0.2, 1.4, 0.4, 1);
   }
 
-  /* „Отговори“ and „Готово“ stay at hand on a screen too short for the whole question (a phone, a laptop's height):
-     at its foot, over what scrolls under them. */
-  .run-question .answering .btn.primary.big {
-    position: sticky;
-    bottom: var(--app-foot, var(--space-4));
-    z-index: 1;
-  }
-
-  /* „Напред“ too, under an answer that shows whole only scrolled (a laptop's height: run.ts, settle keeps the
-     question's first line in sight): at the screen's foot until the panel's own foot comes up to it, the page going on
-     under it to the screen's edge. */
-  .run-question .after .up-next-go {
-    position: sticky;
-    bottom: var(--space-4);
-    z-index: 1;
-    box-shadow: none;
-  }
-
-  .after > * {
-    animation: enter 200ms ease-out;
-  }
-
-  /* A part of an answer shown in beats (run.ts): in its place, unseen, until its beat. */
-  .after > .unseen,
-  .spread.unseen {
-    visibility: hidden;
-    animation: none;
-  }
-
-  .spread {
-    animation: enter 200ms ease-out;
-  }
-
-  /* Asked to leave while a game would cost it (run.ts, guardLeaving): what it costs, and the choice, in a sheet over
-     the game at the screen's foot (over the answers, nothing pushed down), the clock running on in sight above it. */
-  .leave-layer {
-    position: fixed;
-    inset: 0;
-    z-index: 30;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    background: color-mix(in srgb, var(--paper) 45%, transparent);
-  }
-
-  .leave-layer[hidden] {
-    display: none;
-  }
-
-  /* The sheet itself is opaque paper across the screen's width, its words and choice in a hand's width: the answers
-     under it never show through. */
-  .leave-ask {
-    display: grid;
-    gap: var(--space-4);
-    width: 100%;
-    padding: var(--space-4) max(var(--space-4), calc((100% - 28rem) / 2));
-    padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
-    background: var(--paper);
-    box-shadow: none;
-    animation: enter 200ms ease-out;
-  }
-
-  .leave-text {
-    margin: 0;
-    font-weight: 600;
-  }
-
-  .leave-actions {
-    display: flex;
-    gap: var(--space-2);
-  }
-
-  .leave-actions > .btn {
-    flex: 1;
-  }
-
-  /* A run's tally while it's played: the right answers in a row. Its line is there from the first question, as tall
-     as the chip: the head never grows. */
+  /* A run's tally: the right answers in a row it's on, from the second; its line is kept from the start. */
   .tally {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
-    min-height: 1.4375rem;
+    min-height: 1.5rem;
   }
 
+  /* The clock: a bar under the pips, the seconds small at its end. Quiet while there's time; ink, heavier, for the
+     last ten seconds; grey once answered. */
   .timer {
     display: flex;
     align-items: center;
@@ -1577,96 +1707,215 @@
   .track {
     position: relative;
     flex: 1;
-    height: 8px;
-    border-radius: var(--radius-full);
-    background: var(--paper-2);
+    height: 6px;
+    border-radius: 3px;
+    background: var(--surface-2);
     overflow: hidden;
   }
 
-  /* The clock is quiet while there's time (as its sound is), gold for the last ten seconds, red for the last five. */
   .time-bar {
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: var(--ink-3);
+    background: var(--ink-2);
     transform-origin: left;
-    transition:
-      background-color 200ms ease,
-      box-shadow 200ms ease;
+    transition: background-color 200ms ease;
   }
 
   .secs {
-    min-width: 3.2ch;
-    color: var(--ink-3);
-    font: 800 1.625rem / 1 var(--font-numeral);
+    min-width: 2.5rem;
+    color: var(--ink-2);
+    font: 900 1rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     text-align: right;
     white-space: nowrap;
-    transition: color 200ms ease;
   }
 
   .secs small {
-    color: var(--ink-3);
-    font: 700 0.875rem / 1 var(--font-sans);
+    font: inherit;
+    color: inherit;
   }
 
-  .timer.soon .time-bar {
-    background: var(--gold-ink);
-    box-shadow: 0 0 14px -2px var(--gold);
+  .timer:is(.soon, .low) .time-bar {
+    background: var(--ink);
   }
 
-  .timer.soon .secs {
-    color: var(--gold-ink);
+  .timer:is(.soon, .low) .secs {
+    color: var(--ink);
+    font-size: 1.125rem;
   }
 
-  .timer.low .time-bar {
-    background: var(--wrong);
-    box-shadow: 0 0 14px -2px var(--wrong);
-  }
-
-  .timer.low .secs {
-    color: var(--wrong-ink);
+  .timer.low .track {
+    height: 8px;
+    border-radius: 4px;
   }
 
   .timer.stopped .time-bar {
-    background: var(--rule-2);
-    box-shadow: none;
+    background: var(--line-2);
   }
 
   .timer.stopped .secs {
     color: var(--ink-3);
   }
 
-  /* 24 above the question: the game's count and clock apart from what's asked. */
-  .ask {
-    margin-top: var(--space-2);
-    font-size: calc(14px + 0.875rem);
-    line-height: 1.2143;
-    font-weight: 700;
-    letter-spacing: -0.01em;
+  /* ---- The sheet: a large sheet in its chapter's colour, the ink on it always dark; its bottom right corner turned,
+     the back of the sheet lighter, the next sheet's colour under it (ui.ts, leaf). The issue's cover, a question, the
+     result's entry, a chapter's head and its card in the Алманах are sheets; nothing else. ---- */
+
+  .leaf {
+    --fold: 54px;
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: var(--space-4);
+    padding: 20px 20px 26px;
+    border-radius: var(--r-3);
+    background: var(--ts);
+    color: var(--on-sheet);
   }
 
-  /* The picture over a question: while it's asked, low enough for the whole question to fit (--fit, from
+  /* The issue's cover and the chapters' cards: the corner turned. */
+  .leaf.folded {
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--fold)), calc(100% - var(--fold)) 100%, 0 100%);
+  }
+
+  /* The flap: the turned corner, the sheet's back side lighter, with a fine shade on its edge. */
+  .fold {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: var(--fold, 54px);
+    height: var(--fold, 54px);
+    border-top-left-radius: 10px;
+    background: linear-gradient(
+      315deg,
+      transparent 50%,
+      rgb(22 19 43 / 0.28) 50%,
+      rgb(22 19 43 / 0.28) calc(50% + 2px),
+      color-mix(in srgb, var(--ts) 42%, #fff) calc(50% + 2px)
+    );
+    pointer-events: none;
+  }
+
+  /* Under the corner, the next sheet in its colour (its own .t-<topic>), or the page. */
+  .leaf-next {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: var(--fold, 54px);
+    height: var(--fold, 54px);
+    border-bottom-right-radius: var(--r-3);
+    background: var(--ts);
+  }
+
+  .leaf-wrap {
+    position: relative;
+  }
+
+  .leaf-wrap > .leaf-next {
+    z-index: 0;
+  }
+
+  .leaf-wrap > .leaf {
+    z-index: 1;
+  }
+
+  .leaf-wrap > .leaf > .fold {
+    z-index: 2;
+  }
+
+  /* A chapter's glyph: its art on a white disc (ui.ts, glyph). */
+  .glyph {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: var(--g, 28px);
+    height: var(--g, 28px);
+    border-radius: 50%;
+    background: #fff;
+  }
+
+  .glyph .pic {
+    width: 86%;
+    height: 86%;
+  }
+
+  /* A chapter's name with its glyph, on a white pill (a question's chapter, a way to play). */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    justify-self: start;
+    gap: 8px;
+    min-height: 34px;
+    padding: 3px 14px 3px 3px;
+    border-radius: var(--radius-full);
+    background: #fff;
+    color: #16132b;
+    font: 800 0.9375rem / 1.1 var(--font-sans);
+  }
+
+  .chip .glyph {
+    --g: 28px;
+    background: color-mix(in srgb, var(--tv) 22%, #fff);
+  }
+
+  /* The question's sheet: the chapter's chip (and on the day's last, „Трудното число“), then the question. */
+  .q-leaf {
+    min-height: 11rem;
+    padding: 18px 20px 24px;
+  }
+
+  .q-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ask {
+    padding-right: 14px;
+    font: 900 calc(12px + 0.875rem) / 1.18 var(--font-sans);
+    letter-spacing: -0.005em;
+    text-wrap: pretty;
+  }
+
+  /* The day's last question, its hard number: an ink pill on its sheet. */
+  .hard-tag {
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    background: #16132b;
+    color: #fff;
+    font: 900 0.875rem / 1 var(--font-sans);
+  }
+
+  /* Answered on a phone, the sheet shrinks to the question alone (the corner, the chip go): room for the answer. */
+  .q-mini {
+    display: none;
+  }
+
+  /* The picture over a question: its box is the picture's own (no wider than the column), with a hairline inside its
+     edge so a white flag holds on the page; while it's asked, low enough for the whole question (--fit,
      questions.ts). */
-  /* The picture as it is, no wider than the column and no taller than the room it has: its box is the picture, so
-     a flag keeps its corners square and its edge shows (Japan's white on a white card), drawn inside it. */
   .picture {
     display: block;
     width: auto;
     max-width: 100%;
     height: auto;
-    max-height: min(40vh, var(--fit, 40vh));
+    max-height: min(30vh, var(--fit, 30vh));
     margin-inline: auto;
-    border-radius: 2px;
-    outline: 1px solid var(--rule);
+    border-radius: var(--r-1);
+    outline: 1px solid var(--line);
     outline-offset: -1px;
-    background: var(--paper-2);
+    background: var(--surface-2);
   }
+
+  /* ---- What answers it ---- */
 
   .options {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-2);
+    gap: 10px;
   }
 
   .option {
@@ -1678,34 +1927,31 @@
     width: 100%;
     min-width: 0;
     min-height: 3.75rem;
-    padding: 10px var(--space-4) 10px 10px;
-    border: 1px solid var(--rule-2);
-    border-radius: var(--radius);
-    background: var(--paper);
+    padding: 10px 14px;
+    overflow: hidden;
+    border: 2px solid var(--line-2);
+    border-radius: var(--r-2);
+    background: var(--surface);
     color: var(--ink);
-    box-shadow: none;
-    font: 500 1.125rem / 1.625rem var(--font-sans);
+    font: 800 1.125rem / 1.35 var(--font-sans);
     text-align: left;
     cursor: pointer;
     transition:
       transform 120ms ease,
       border-color 160ms ease,
-      background-color 160ms ease,
-      box-shadow 200ms ease;
+      background-color 160ms ease;
   }
 
-  /* An answer pressed gives under the finger; hovered (only where a pointer hovers: on a touch screen hover sticks
-     after the tap, and an answer would look chosen), it lifts. Once answered, it stays put (aria-disabled keeps the
-     focus on it, questions.ts). */
+  /* An answer pressed gives under the finger; hovered (only where a pointer hovers), its line darkens. Once answered,
+     it stays put (aria-disabled keeps the focus on it, questions.ts). */
   .option:active:not(:disabled, [aria-disabled="true"]) {
     border-color: var(--ink);
-    transform: scale(0.98);
+    transform: scale(0.985);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .option:hover:not(:disabled, [aria-disabled="true"], :active) {
-      border-color: var(--rule-2);
-      transform: translateY(-1px);
+      border-color: var(--ink);
     }
   }
 
@@ -1718,12 +1964,12 @@
     flex: none;
     display: grid;
     place-items: center;
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius);
-    background: var(--paper-2);
-    color: var(--ink-3);
-    font: 800 1rem / 1 var(--font-sans);
+    width: 32px;
+    height: 32px;
+    border-radius: var(--r-1);
+    background: var(--surface-2);
+    color: var(--ink-2);
+    font: 900 0.9375rem / 1 var(--font-sans);
     font-variant-numeric: tabular-nums;
   }
 
@@ -1735,19 +1981,23 @@
   .option .value {
     margin-left: auto;
     color: var(--ink-3);
-    font: 800 1.25rem / 1 var(--font-numeral);
+    font: 900 1.0625rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
 
+  /* The ✓ or ✕ on a revealed answer: a solid ✓ on the player's own right one, a ✓ in a ring on the right one they
+     didn't give, a ✕ in a dashed ring on their wrong one. */
   .option .sign {
+    position: relative;
     display: grid;
     place-items: center;
     flex: none;
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
     border-radius: var(--radius-full);
-    color: var(--paper);
+    box-shadow: inset 0 0 0 2.5px currentColor;
+    color: var(--ink);
   }
 
   .option .sign::before {
@@ -1761,84 +2011,112 @@
 
   .option.picked {
     border-color: var(--ink);
-    box-shadow: 0 0 0 1px var(--ink);
+    box-shadow: inset 0 0 0 1px var(--ink);
   }
 
   .option.picked .letter {
     background: var(--ink);
-    color: var(--paper);
+    color: var(--bg);
   }
 
+  /* Right: the right one the player didn't give, a 3px ink outline and a ✓ in a ring. */
   .option.right {
-    border-color: var(--right-ink);
-    background: color-mix(in srgb, var(--right) 14%, var(--paper));
-    box-shadow: none;
-    animation: pop 360ms cubic-bezier(0.2, 1.4, 0.4, 1);
-  }
-
-  .option.right .letter,
-  .option.right .sign {
-    background: var(--right);
-    color: var(--paper);
+    border-color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--ink);
+    color: var(--ink);
   }
 
   .option.right .sign {
     --i: var(--i-check);
   }
 
-  .option.wrong {
-    border-color: var(--wrong-ink);
-    background: color-mix(in srgb, var(--wrong) 12%, var(--paper));
+  /* The player's own right answer: ink, a dark fill with white text by day and a light one with dark text by night,
+     and a solid ✓. It pops. */
+  .option.right.mine {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--bg);
+    animation: pop 360ms cubic-bezier(0.2, 1.4, 0.4, 1);
+  }
+
+  .option.right.mine .letter {
+    background: color-mix(in srgb, var(--bg) 22%, transparent);
+    color: var(--bg);
+  }
+
+  .option.right.mine .sign {
+    background: var(--bg);
     box-shadow: none;
-    animation: shake 320ms ease;
-  }
-
-  .option.wrong .letter,
-  .option.wrong .sign {
-    background: var(--wrong);
-    color: var(--paper);
-  }
-
-  .option.wrong .sign {
-    --i: var(--i-cross);
-  }
-
-  /* A part of the answer the player didn't have („Подреди“, „Свържи“, „Раздели“): the row is the right answer, so it
-     stays plain; a hollow ✕ and „ти: …“ say what the player gave instead. */
-  /* A row with „ти: …“ under its words stays a row's height. */
-  .option.missed {
-    padding-block: var(--space-2);
-    box-shadow: none;
-  }
-
-  .option.missed .sign {
-    box-shadow: inset 0 0 0 2px currentColor;
-    color: var(--wrong-ink);
-    --i: var(--i-cross);
-  }
-
-  .option.missed .sign::before {
-    width: 12px;
-    height: 12px;
-  }
-
-  .option.right .value,
-  .option.wrong .value {
     color: var(--ink);
   }
 
-  .option.dim {
-    background: transparent;
-    color: var(--ink-3);
-    box-shadow: none;
+  .option.right.mine .value {
+    color: var(--bg);
   }
 
-  /* The reviewed questions of a finished run sit still, their answers a step under the question, closer set (a
-     card's width at 320px holds an order's row: its place, name, value and mark). */
+  /* Wrong and the player's: hollow and dashed, a ✕ in a dashed ring; it shakes once. */
+  .option.wrong {
+    border-style: dashed;
+    border-color: var(--line-2);
+    background: transparent;
+    color: var(--ink-2);
+    animation: shake 320ms ease;
+  }
+
+  .option.wrong .sign {
+    --i: var(--i-cross);
+    box-shadow: none;
+    outline: 2.5px dashed currentColor;
+    outline-offset: -2.5px;
+    color: var(--ink);
+  }
+
+  /* A part of the answer the player didn't have („Подреди“, „Свържи“, „Раздели“): the row is the right answer; it's
+     dashed, with a ✕ in a dashed ring and „ти: …“ under its words for what the player gave instead. */
+  .option.missed {
+    padding-block: var(--space-2);
+    border-style: dashed;
+    border-color: var(--line-2);
+    background: transparent;
+  }
+
+  .option.missed .sign {
+    --i: var(--i-cross);
+    box-shadow: none;
+    outline: 2px dashed currentColor;
+    outline-offset: -2px;
+  }
+
+  .option.missed .sign::before {
+    width: 13px;
+    height: 13px;
+  }
+
+  /* In a list (an order, pairs, groups), a row the player had right: outlined in ink, a solid ✓. */
+  :is(.sortable-list, .match-result, .split-result) > .option.right {
+    border-width: 2px;
+  }
+
+  :is(.sortable-list, .match-result, .split-result) > .option.right .sign {
+    background: var(--ink);
+    box-shadow: none;
+    color: var(--bg);
+  }
+
+  .option.dim {
+    border-color: var(--line);
+    color: var(--ink-3);
+  }
+
+  .option.dim .letter {
+    opacity: 0.7;
+  }
+
+  /* The reviewed questions of a finished run sit still, their answers a step under the question, closer set. */
   .reviewed .option {
     gap: var(--space-2);
     min-height: 3rem;
-    padding-right: var(--space-3);
+    padding: 6px 12px;
     font-size: 1rem;
     line-height: 1.375rem;
     animation: none;
@@ -1853,33 +2131,35 @@
   .hint {
     color: var(--ink-3);
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: 700;
   }
 
-  /* The number's field, pad and button: a phone's width at most, so on a big screen the keys stay keys. */
+  /* „Отговори“ and „Готово“ stay at hand on a screen too short for the whole question: at its foot, over what scrolls
+     under them. */
+  .run-question .answering .btn.primary.big {
+    position: sticky;
+    bottom: var(--app-foot, var(--space-4));
+    z-index: 1;
+  }
+
+  /* ---- The number: typed big on an ink line, the unit beside it; the game's own pad ---- */
+
   .number {
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-3);
     width: 100%;
-    max-width: 22rem;
+    max-width: 24rem;
     margin-inline: auto;
   }
 
-  /* The number as typed: big, on its own line, the unit beside it. */
   .number-out {
     display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-height: 3.5rem;
-    padding: 0 var(--space-4);
-    border: 1px solid var(--rule-2);
-    border-radius: var(--radius);
-    background: var(--paper-2);
+    align-items: baseline;
+    gap: 10px;
+    min-height: 4rem;
+    padding: 0 4px var(--space-2);
+    border-bottom: 3px solid var(--ink);
     cursor: text;
-  }
-
-  .number-out.live {
-    border-color: var(--ink);
   }
 
   .typed {
@@ -1887,7 +2167,7 @@
     min-width: 0;
     overflow: hidden;
     color: var(--ink);
-    font: 800 2rem / 1 var(--font-numeral);
+    font: 900 calc(24px + 1.5rem) / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1897,12 +2177,12 @@
   .number-out.live .typed::after {
     content: "";
     display: inline-block;
-    width: 3px;
-    height: 0.85em;
-    margin-left: 2px;
+    width: 4px;
+    height: 0.8em;
+    margin-left: 3px;
     border-radius: 2px;
     background: var(--ink);
-    vertical-align: -0.05em;
+    vertical-align: -0.04em;
     animation: caret 1s steps(1) infinite;
   }
 
@@ -1912,22 +2192,28 @@
     }
   }
 
+  .number-out .unit {
+    color: var(--ink-2);
+    font: 800 1.375rem / 1 var(--font-sans);
+  }
+
   .sign-key {
     flex: none;
+    align-self: center;
     width: 44px;
     height: 44px;
-    border: 1px solid var(--rule);
-    border-radius: var(--radius);
-    background: var(--paper);
-    color: var(--ink-3);
-    font: 800 1.5rem / 1 var(--font-numeral);
+    border: 2px solid var(--line-2);
+    border-radius: var(--r-1);
+    background: var(--surface);
+    color: var(--ink-2);
+    font: 900 1.5rem / 1 var(--font-numeral);
     cursor: pointer;
   }
 
   .sign-key.on {
     border-color: var(--ink);
     background: var(--ink);
-    color: var(--paper);
+    color: var(--bg);
   }
 
   .keypad {
@@ -1940,13 +2226,12 @@
     appearance: none;
     display: grid;
     place-items: center;
-    min-height: 3rem;
-    border: 1px solid var(--rule);
-    border-radius: var(--radius);
-    background: var(--paper);
-    box-shadow: none;
+    min-height: 3.375rem;
+    border: 2px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
     color: var(--ink);
-    font: 700 1.375rem / 1 var(--font-numeral);
+    font: 900 1.625rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     cursor: pointer;
     touch-action: manipulation;
@@ -1957,7 +2242,7 @@
 
   .key:active:not(:disabled) {
     transform: scale(0.96);
-    background: var(--paper);
+    background: var(--surface-3);
   }
 
   .key:disabled {
@@ -1974,13 +2259,140 @@
     mask: var(--i-back) center / contain no-repeat;
   }
 
-  /* Things to order: a row tapped is picked up (.chosen) and goes where the next tap says, or is dragged into place,
-     by its grip at once on a touch screen, or by the rest of the row once held a moment (moved at once, it scrolls the
-     page). A long press shows no menu over it. */
+  /* The number answered: what the player said, big, and on a scale beside the answer (questions.ts, nearScale). */
+  .number-result {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .number-said {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 0 4px var(--space-2);
+    border-bottom: 3px solid var(--ink);
+  }
+
+  .number-said .typed::after {
+    content: none;
+  }
+
+  .number-answer {
+    font: 800 1.0625rem / 1.3 var(--font-sans);
+  }
+
+  .number-answer strong {
+    font-weight: 900;
+  }
+
+  /* The scale: its two ends, the answer a filled square, the player's a half one (близо) or a hollow one. */
+  .near-scale {
+    position: relative;
+    height: 52px;
+    margin: 0 18px;
+  }
+
+  .near-track {
+    position: absolute;
+    top: 30px;
+    right: -18px;
+    left: -18px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--surface-2);
+  }
+
+  .near-mark {
+    position: absolute;
+    top: 0;
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    translate: -50% 0;
+    font: 900 0.9375rem / 1 var(--font-numeral);
+    white-space: nowrap;
+  }
+
+  .near-mark i {
+    display: block;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 2.5px var(--ink);
+    background: var(--bg);
+  }
+
+  .near-mark.answer i {
+    background: var(--ink);
+  }
+
+  .near-mark.near i {
+    background: linear-gradient(90deg, var(--ink) 50%, var(--bg) 50%);
+  }
+
+  .near-end {
+    position: absolute;
+    top: 40px;
+    color: var(--ink-3);
+    font: 800 0.75rem / 1 var(--font-sans);
+  }
+
+  .near-end.lo {
+    left: -18px;
+  }
+
+  .near-end.hi {
+    right: -18px;
+  }
+
+  .near-key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-4);
+    color: var(--ink-3);
+    font: 700 0.875rem / 1.2 var(--font-sans);
+  }
+
+  .near-key span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .near-key i {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    box-shadow: inset 0 0 0 2px var(--ink);
+  }
+
+  .near-key i.answer {
+    background: var(--ink);
+  }
+
+  .near-key i.near {
+    background: linear-gradient(90deg, var(--ink) 50%, transparent 50%);
+  }
+
+  /* A narrow, short phone: the scale says itself; its key goes. */
+  @media (max-width: 22.5rem) and (max-height: 37.5rem) {
+    .near-key {
+      display: none;
+    }
+  }
+
+  /* ---- Things to order: a row tapped is picked up (.chosen) and goes where the next tap says, or is dragged into
+     place, by its grip at once on a touch screen, or by the rest of the row once held a moment. A long press shows no
+     menu over it. ---- */
   .sortable-list {
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  .sortable-list > .option {
+    min-height: 3rem;
+    padding-block: 6px;
   }
 
   .option.sortable {
@@ -1993,7 +2405,8 @@
 
   .option.sortable.chosen {
     border-color: var(--ink);
-    box-shadow: none;
+    box-shadow: inset 0 0 0 1px var(--ink);
+    background: var(--surface-2);
   }
 
   .sortable-list.sorting .option.sortable:not(.dragging) {
@@ -2003,14 +2416,14 @@
   .option.sortable.dragging {
     z-index: 1;
     border-color: var(--ink);
-    box-shadow: none;
+    box-shadow: var(--lift);
     cursor: grabbing;
     transition: none;
   }
 
   .option.sortable .letter {
     background: var(--ink);
-    color: var(--paper);
+    color: var(--bg);
   }
 
   /* The grip: drawn at 20px, a thumb's room (44px) to take hold of. */
@@ -2034,11 +2447,11 @@
     mask: var(--i-grip) center / contain no-repeat;
   }
 
-  /* „Вярно или невярно“: two answers side by side. */
+  /* ---- „Вярно или невярно“: two answers side by side ---- */
   .tf-options {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-2);
+    gap: 10px;
   }
 
   .option.tf {
@@ -2048,20 +2461,20 @@
     min-height: 5.5rem;
     padding: var(--space-3);
     font-size: 1.25rem;
-    font-weight: 800;
+    font-weight: 900;
     text-align: center;
   }
 
   /* Gone over (a review): the right one of the two says so in words, not by colour alone. */
   .tf-right {
-    font: 700 0.75rem / 1 var(--font-sans);
+    font: 800 0.75rem / 1 var(--font-sans);
     letter-spacing: 0.04em;
   }
 
-  /* How everyone else answered: a bar behind each answer as long as the share that gave it, the share beside it, and
-     a sentence under the question. */
+  /* ---- How everyone else answered: a bar behind each answer as long as the share that gave it, the share beside
+     it, and a sentence under the verdict ---- */
   .option.crowd {
-    --crowd-fill: color-mix(in srgb, var(--ink) 9%, transparent);
+    --crowd-fill: var(--surface-2);
     background-image: linear-gradient(to right, var(--crowd-fill) var(--share), transparent var(--share));
     transition:
       --share 700ms cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -2069,12 +2482,12 @@
       background-color 160ms ease;
   }
 
-  .option.crowd.right {
-    --crowd-fill: color-mix(in srgb, var(--right) 24%, transparent);
+  .option.crowd.right.mine {
+    --crowd-fill: color-mix(in srgb, var(--bg) 14%, transparent);
   }
 
   .option.crowd.wrong {
-    --crowd-fill: color-mix(in srgb, var(--wrong) 20%, transparent);
+    --crowd-fill: color-mix(in srgb, var(--ink) 7%, transparent);
   }
 
   /* The shares fade in as their bars grow; before, each keeps its room (questions.ts, crowdOnAll). */
@@ -2089,7 +2502,7 @@
 
   .option.tf .crowd-share {
     margin-left: 0;
-    font-size: 1.125rem;
+    font-size: 1.0625rem;
   }
 
   @keyframes shown {
@@ -2101,25 +2514,24 @@
   /* A choice's answers keep the room at their end from the start for what the answer brings there (questions.ts): how
      many gave each, and its ✓ or ✕ at the far end, where the key waits on a computer. Nothing re-wraps as they come. */
   .choices > .option {
-    padding-right: calc(var(--space-4) + 28px + var(--space-2) + 2.125rem + var(--space-3));
+    padding-right: calc(14px + 30px + var(--space-2) + 2.75rem + var(--space-2));
   }
 
   .choices > .option > :is(.sign, .crowd-share, .key-hint) {
     position: absolute;
     top: 50%;
-    right: var(--space-4);
+    right: 14px;
     translate: 0 -50%;
   }
 
   .choices > .option > .crowd-share {
-    right: calc(var(--space-4) + 28px + var(--space-2));
+    right: calc(14px + 30px + var(--space-2));
   }
 
   .crowd-says {
     margin: 0;
     color: var(--ink-3);
-    font-size: 0.9375rem;
-    line-height: 1.375rem;
+    font: 700 0.9375rem / 1.375rem var(--font-sans);
   }
 
   /* Under the verdict, it belongs to it. */
@@ -2127,64 +2539,72 @@
     margin-top: calc(-1 * var(--space-2));
   }
 
-  /* A right answer few others got: a small reward, in gold. */
+  /* A right answer few others got: said as the feat it is. */
   .crowd-says.rare {
-    color: var(--gold-ink);
-    font-weight: 600;
+    color: var(--ink);
+    font-weight: 800;
   }
 
   /* Where everyone's guesses at a number fell. */
-  .spread {
+  .guesses {
     display: grid;
     gap: var(--space-2);
-    margin-top: var(--space-3);
+    margin-top: var(--space-2);
+    animation: enter 200ms ease-out;
   }
 
-  .spread-bars {
+  .guesses.unseen {
+    visibility: hidden;
+    animation: none;
+  }
+
+  .guess-bars {
     display: grid;
     align-items: end;
     gap: 3px;
-    height: 72px;
+    height: 64px;
   }
 
-  .spread-bar {
+  .guess-bar {
     display: block;
     border-radius: 3px 3px 1px 1px;
-    background: var(--rule-2);
+    background: var(--line-2);
   }
 
-  .spread-bar.edge,
-  .spread-swatch.edge {
-    background: var(--rule);
+  .guess-bar.edge,
+  .guess-swatch.edge {
+    background: var(--line);
   }
 
-  .spread-bar.mine,
-  .spread-swatch.mine {
+  .guess-bar.mine,
+  .guess-swatch.mine {
+    background: repeating-linear-gradient(135deg, var(--ink) 0 3px, transparent 3px 6px);
+    box-shadow: inset 0 0 0 1.5px var(--ink);
+  }
+
+  .guess-bar.answer,
+  .guess-swatch.answer {
     background: var(--ink);
   }
 
-  .spread-bar.answer,
-  .spread-swatch.answer {
-    background: var(--right);
-  }
-
-  .spread-axis {
+  .guess-axis {
     display: flex;
     justify-content: space-between;
     color: var(--ink-3);
-    font: 700 0.875rem / 1 var(--font-numeral);
+    font: 800 0.875rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
   }
 
-  .spread-key {
+  .guess-key {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-1) var(--space-3);
     color: var(--ink-3);
     font-size: 0.8125rem;
+    font-weight: 700;
   }
 
-  .spread-swatch {
+  .guess-swatch {
     display: inline-block;
     width: 10px;
     height: 10px;
@@ -2197,7 +2617,7 @@
     color: var(--ink-3);
   }
 
-  /* A choice of pictures: two by two, each picture with its letter, and its name once answered. */
+  /* ---- A choice of pictures: two by two, each picture with its letter, and its name once answered ---- */
   .pic-options {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2215,22 +2635,21 @@
     height: auto;
     aspect-ratio: 5 / 3;
     object-fit: contain;
-    border-radius: var(--radius);
-    background: var(--paper-2);
+    border-radius: var(--r-1);
+    background: var(--surface-2);
   }
 
   .pic-foot {
     display: flex;
     align-items: center;
     gap: var(--space-2);
-    min-height: 28px;
+    min-height: 30px;
   }
 
-  /* A small letter keeps a big one's shape: its corner in proportion. */
   .pic-letter {
     width: 28px;
     height: 28px;
-    border-radius: 2px;
+    border-radius: 8px;
     font-size: 0.8125rem;
   }
 
@@ -2238,20 +2657,19 @@
     flex: 1;
     min-width: 0;
     font-size: 0.9375rem;
-    font-weight: 700;
+    font-weight: 800;
     line-height: 1.25rem;
   }
 
-  /* The share that gave a picture, on its corner: the tile keeps its height as the shares come, the answer having
-     settled in its place by then (run.ts, settle). */
+  /* The share that gave a picture, on its corner: the tile keeps its height as the shares come. */
   .option.pic-option .crowd-share {
     position: absolute;
     top: var(--space-3);
     right: var(--space-3);
     padding: var(--space-1) var(--space-2);
-    border-radius: 2px;
-    background: var(--paper);
-    box-shadow: none;
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
     font-size: 1rem;
   }
 
@@ -2259,7 +2677,8 @@
     margin-top: var(--space-2);
   }
 
-  /* „Подсказки“: the clues one under another, each with what a right answer is worth while it's the last one out. */
+  /* ---- „Подсказки“: the clues one under another, each with what a right answer is worth while it's the last one
+     out ---- */
   .clues {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -2273,11 +2692,11 @@
     display: flex;
     align-items: center;
     gap: var(--space-3);
-    min-height: 3.75rem;
-    padding: 10px var(--space-4) 10px 10px;
-    border-radius: var(--radius);
-    background: var(--paper);
-    box-shadow: inset 0 0 0 1px var(--rule);
+    min-height: 3.5rem;
+    padding: 10px 14px 10px 10px;
+    border-radius: var(--r-2);
+    background: var(--surface);
+    box-shadow: inset 0 0 0 2px var(--line);
     transition:
       background-color 200ms ease,
       box-shadow 200ms ease;
@@ -2286,7 +2705,7 @@
   .clue-worth {
     flex: none;
     width: 3.25rem;
-    color: var(--gold-ink);
+    color: var(--ink);
     font: 900 1.375rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     text-align: right;
@@ -2295,13 +2714,13 @@
   .clue-text {
     flex: 1;
     min-width: 0;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.375rem;
   }
 
-  /* The last clue out: what an answer now is worth. */
+  /* The last clue out. */
   .clue.now {
-    box-shadow: inset 0 0 0 2px var(--gold);
+    box-shadow: inset 0 0 0 2.5px var(--ink);
   }
 
   .clue.past .clue-worth {
@@ -2311,15 +2730,16 @@
 
   .clue.locked {
     background: transparent;
+    box-shadow: inset 0 0 0 2px var(--line);
   }
 
   .clue.locked .clue-worth,
   .clue.locked .clue-text {
     color: var(--ink-3);
-    font-weight: 500;
+    font-weight: 600;
   }
 
-  /* „Раздели“: the things one by one on a card, sent left or right; the two groups under them. */
+  /* ---- „Раздели“: the things one by one on a card, sent left or right; the two groups under them ---- */
   .split {
     display: grid;
     gap: var(--space-3);
@@ -2341,12 +2761,14 @@
     width: 82%;
     min-height: 9rem;
     padding: var(--space-5) var(--space-4);
-    border-radius: var(--radius);
-    background: var(--paper);
-    box-shadow: none;
+    border-radius: var(--r-3);
+    background: var(--surface);
+    box-shadow:
+      inset 0 0 0 2px var(--line-2),
+      var(--lift);
     font-size: 1.375rem;
     line-height: 1.75rem;
-    font-weight: 800;
+    font-weight: 900;
     text-align: center;
     text-wrap: balance;
     overflow-wrap: break-word;
@@ -2390,9 +2812,9 @@
     padding: 4px 10px;
     border-radius: var(--radius-full);
     background: var(--ink);
-    color: var(--paper);
-    font: 800 0.75rem / 1.2 var(--font-sans);
-    letter-spacing: 0.08em;
+    color: var(--bg);
+    font: 900 0.75rem / 1.2 var(--font-sans);
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     opacity: 0;
     transition: opacity 120ms ease;
@@ -2419,14 +2841,14 @@
   .split-sides {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-2);
+    gap: 10px;
   }
 
   .option.split-side {
     justify-content: center;
     gap: var(--space-2);
     padding: 10px var(--space-3);
-    font-weight: 800;
+    font-weight: 900;
     text-align: center;
   }
 
@@ -2463,13 +2885,15 @@
 
   .split-pips b {
     width: 20px;
-    height: 6px;
+    height: 8px;
     border-radius: 3px;
-    background: var(--paper-2);
+    background: var(--line);
+    box-shadow: inset 0 0 0 1.5px var(--line-2);
   }
 
   .split-pips b.done {
-    background: var(--gold);
+    background: var(--ink);
+    box-shadow: none;
   }
 
   .split-result {
@@ -2483,7 +2907,8 @@
     min-width: 0;
   }
 
-  /* „Свържи“: two columns, and a line for each pair joined. A long word breaks by its syllables (lib/words.ts). */
+  /* ---- „Свържи“: two columns, and a line for each pair joined, in the pair's own colour with its number. A long
+     word breaks by its syllables (lib/words.ts) ---- */
   .match {
     position: relative;
     display: grid;
@@ -2508,7 +2933,7 @@
   }
 
   .match-lines line {
-    stroke: var(--tone);
+    stroke: var(--ink);
     stroke-width: 3;
     stroke-linecap: round;
   }
@@ -2536,22 +2961,24 @@
   .option.match-item .letter {
     width: 26px;
     height: 26px;
-    border-radius: 2px;
+    border-radius: 8px;
     font-size: 0.8125rem;
   }
 
   .option.match-item.chosen {
     border-color: var(--ink);
-    box-shadow: 0 0 0 1px var(--ink);
+    box-shadow: inset 0 0 0 1px var(--ink);
+    background: var(--surface-2);
   }
 
+  /* Joined: the right one takes its left one's letter, in ink. */
   .option.match-item.joined {
-    border-color: var(--tone);
+    border-color: var(--ink);
   }
 
   .option.match-item.joined .letter {
-    background: var(--tone);
-    color: var(--paper);
+    background: var(--ink);
+    color: var(--bg);
   }
 
   .match-result {
@@ -2567,135 +2994,305 @@
 
   .match-gave {
     display: block;
-    color: var(--wrong-ink);
+    color: var(--ink-2);
     font-size: 0.8125rem;
     line-height: 1rem;
-    font-weight: 700;
-  }
-
-  /* Tabs that switch what a screen shows: words on a hairline, the chosen one bold on a 2px ink underline. */
-  .segmented {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 var(--space-5);
-    border-bottom: 1px solid var(--rule);
-  }
-
-  .segmented button {
-    appearance: none;
-    position: relative;
-    min-height: 2.75rem;
-    margin-bottom: -1px;
-    padding: 0;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    background: none;
-    color: var(--ink-3);
-    font: 600 0.9375rem / 1 var(--font-sans);
-    cursor: pointer;
-  }
-
-  .segmented button[aria-selected="true"] {
-    border-bottom-color: var(--ink);
-    color: var(--ink);
     font-weight: 800;
   }
 
-  /* A setting's few choices: boxed, the chosen one filled ink. */
-  .segmented[role="radiogroup"] {
-    display: inline-flex;
-    gap: 0;
-    overflow: hidden;
-    border: 1px solid var(--rule-ink);
-    border-radius: var(--radius);
+  /* ---- The answer: the verdict and its sign, how everyone answered, where the fact went, the fact, and the way on
+     ---- */
+
+  .after > * {
+    animation: enter 200ms ease-out;
   }
 
-  .segmented[role="radiogroup"] button {
-    flex: 1 1 auto;
-    min-height: 2.75rem;
-    margin: 0;
-    padding: 0 var(--space-3);
-    border: 0;
-    color: var(--ink-2);
-    font-size: 0.875rem;
+  /* A part of an answer shown in beats (run.ts): in its place, unseen, until its beat. */
+  .after > .unseen {
+    visibility: hidden;
+    animation: none;
   }
 
-  .segmented[role="radiogroup"] > * + * {
-    border-left: 1px solid var(--rule-ink);
+  .after {
+    gap: var(--space-3);
+    padding: 20px;
+    border-radius: var(--r-3);
+    background: var(--surface);
   }
 
-  .segmented[role="radiogroup"] button[aria-checked="true"] {
+  .verdict {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  /* The verdict's sign, in ink: right a filled disc with a ✓ (the page's colour on it), близо a disc half filled, wrong
+     a ✕ in a dashed ring, out of time a clock in a ring. */
+  .verdict-sign {
+    position: relative;
+    display: grid;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-full);
     background: var(--ink);
-    color: var(--paper);
+    color: var(--bg);
+  }
+
+  .verdict-sign::before {
+    content: "";
+    margin: auto;
+    width: 22px;
+    height: 22px;
+    background: currentColor;
+    -webkit-mask: var(--i) center / contain no-repeat;
+    mask: var(--i) center / contain no-repeat;
+  }
+
+  .verdict:is(.right, .exact) .verdict-sign {
+    --i: var(--i-check);
+  }
+
+  .verdict.partial .verdict-sign {
+    background: linear-gradient(90deg, var(--ink) 50%, transparent 50%);
+    box-shadow: inset 0 0 0 3px var(--ink);
+  }
+
+  .verdict.partial .verdict-sign::before {
+    content: none;
+  }
+
+  .verdict:is(.wrong, .time) .verdict-sign {
+    background: transparent;
+    outline: 3px dashed var(--ink);
+    outline-offset: -3px;
+    color: var(--ink);
+  }
+
+  .verdict.wrong .verdict-sign {
+    --i: var(--i-cross);
+  }
+
+  .verdict.time .verdict-sign {
+    --i: var(--i-clock);
+  }
+
+  .verdict-says {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .verdict-word {
+    color: var(--ink);
+    font: 900 calc(12px + 0.875rem) / 1.05 var(--font-sans);
+    letter-spacing: -0.01em;
+  }
+
+  /* Right answers in a row: the flame and how many, quiet; it pops when it grows. */
+  .in-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px 3px 7px;
+    border-radius: var(--radius-full);
+    background: var(--surface-2);
+    color: var(--ink);
+    font: 800 0.8125rem / 1 var(--font-sans);
+    white-space: nowrap;
+    animation: pop 360ms cubic-bezier(0.2, 1.4, 0.4, 1);
+  }
+
+  .in-row b {
+    font: 900 1.0625rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .in-row-flame {
+    --i: var(--i-flame);
+    width: 12px;
+    height: 14px;
+    background: var(--t-sports);
+    -webkit-mask: var(--i) center / contain no-repeat;
+    mask: var(--i) center / contain no-repeat;
+  }
+
+  /* Where a right answer's fact went: „Записано с мастило · глава История“, on a well, the nib before it. */
+  .filed {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: var(--surface-2);
+    font: 800 0.9375rem / 1.25 var(--font-sans);
+  }
+
+  .filed .i {
+    width: 22px;
+    height: 22px;
+  }
+
+  .filed.pencil {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--line-2);
+    color: var(--pencil);
+  }
+
+  /* „Знаеше ли?“: a kicker and the fact. On its date, what happened that day heads it. */
+  .fact {
+    display: grid;
+    gap: 6px;
+  }
+
+  .fact h2 {
+    color: var(--ink-3);
+    font: 900 0.8125rem / 1 var(--font-sans);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .fact p {
+    font: 500 1.0625rem / 1.45 var(--font-sans);
+    text-wrap: pretty;
+  }
+
+  .fact-day {
+    display: grid;
+    gap: 6px;
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .fact-day p {
     font-weight: 700;
   }
 
-  /* A choice has 44px to tap, whatever it's drawn at. */
-  .segmented[role="radiogroup"] button::after {
-    content: "";
-    position: absolute;
-    inset: -2px 0;
+  .fact.alone .fact-day {
+    padding-bottom: 0;
+    border-bottom: 0;
   }
 
-  /* Duels as ruled rows: the other player, how it stands, and a word on it. */
-  .duel-list {
-    display: grid;
+  .credit {
+    color: var(--ink-3);
+    font-size: 0.875rem;
+  }
+
+  .status {
+    color: var(--ink-3);
+    font-size: 0.9375rem;
+    font-weight: 700;
+  }
+
+  /* Played second in a duel: how the question went for the other, under the player's own verdict (run.ts). */
+  .their-line {
     margin: 0;
-    padding: 0;
-    border-top: 1px solid var(--rule);
-    list-style: none;
+    padding: var(--space-2) var(--space-3);
+    border-radius: 14px;
+    background: var(--surface-2);
+    color: var(--ink-3);
+    font-weight: 800;
   }
 
-  .duel-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    min-height: 3.75rem;
-    padding: var(--space-2) 0;
-    border-bottom: 1px solid var(--rule);
+  .their-line.right {
     color: var(--ink);
-    text-decoration: none;
   }
 
-  /* A friend to start a duel with (/duel/new): a row like a duel's, the whole width a button. */
-  .duel-pick {
-    width: 100%;
-    font: inherit;
-    text-align: start;
-    cursor: pointer;
+  /* The game moving on by itself: a line filling while the answer shows; „Напред“ the one action. */
+  .up-next {
+    display: grid;
+    gap: var(--space-2);
+    color: var(--ink-3);
+    font-size: 0.875rem;
+    font-weight: 800;
+  }
+
+  .up-next .track {
+    flex: none;
+    height: 4px;
+  }
+
+  .up-next-fill {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--ink-3);
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+
+  .run-question .after .up-next-go {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+  }
+
+  /* „Напред“ is the one action of an answer: the primary's look, whatever its class says (run.ts makes it a .btn). */
+  .up-next-go {
+    min-height: 3.75rem;
+    border: 0;
+    background: var(--action);
+    box-shadow: var(--lift);
+    color: var(--on-action);
+    font-size: 1.1875rem;
+    font-weight: 900;
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .duel-row:hover .who-name {
-      text-decoration: underline;
-      text-underline-offset: 3px;
+    .btn.up-next-go:hover:not(:disabled) {
+      background: var(--action);
+      opacity: 0.9;
     }
   }
 
-  .duel-row-end {
+  .unit {
+    color: var(--ink-3);
+    font-size: 1.125rem;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  /* Asked to leave while a game would cost it (run.ts, guardLeaving): what it costs, and the choice, in a sheet over
+     the game at the screen's foot, the clock running on in sight above it. */
+  .leave-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    background: var(--scrim);
+  }
+
+  .leave-layer[hidden] {
+    display: none;
+  }
+
+  .leave-ask {
     display: grid;
-    justify-items: end;
-    gap: 2px;
-    font-size: 0.8125rem;
-    text-align: right;
+    gap: var(--space-4);
+    width: 100%;
+    padding: var(--space-5) max(20px, calc((100% - 28rem) / 2));
+    padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
+    border-radius: var(--r-3) var(--r-3) 0 0;
+    background: var(--surface);
+    animation: enter 200ms ease-out;
   }
 
-  .duel-state {
-    font: 600 0.9375rem / 1.25rem var(--font-serif);
+  .leave-text {
+    margin: 0;
+    font-weight: 800;
   }
 
-  /* „Дуел“ on a friend's row in /duel/new: what the tap does, in the link's colour. */
-  .duel-invite {
-    color: var(--ink);
+  .leave-actions {
+    display: flex;
+    gap: var(--space-2);
   }
 
-  .s-won .duel-state {
-    color: var(--right-ink);
-  }
-
-  .s-lost .duel-state {
-    color: var(--wrong-ink);
+  .leave-actions > .btn {
+    flex: 1;
   }
 
   /* Before a run: a ring running out around the seconds left, and a way to start at once or back out. */
@@ -2724,15 +3321,16 @@
   .ready-track,
   .ready-arc {
     fill: none;
-    stroke-width: 8;
+    stroke-width: 10;
   }
 
   .ready-track {
-    stroke: var(--paper-2);
+    stroke: var(--surface-2);
   }
 
   .ready-arc {
-    stroke: var(--gold);
+    stroke: var(--ink);
+    stroke-linecap: round;
     stroke-dasharray: 100;
     animation: ready-run var(--ready) linear forwards;
   }
@@ -2753,297 +3351,108 @@
     width: min(100%, 320px);
   }
 
-  /* A game left half-way today, on its tile: where it goes on from, in the accent (where the player is). */
+  /* Tabs that switch what a screen shows: a well, the chosen one a raised surface; a setting's few choices the same,
+     as radios. */
+  .segmented {
+    display: inline-grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    justify-self: start;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 14px;
+    background: var(--surface-2);
+  }
+
+  .segmented button {
+    appearance: none;
+    position: relative;
+    min-height: 2.5rem;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 10px;
+    background: none;
+    color: var(--ink-3);
+    font: 800 0.9375rem / 1.1 var(--font-sans);
+    cursor: pointer;
+  }
+
+  .segmented button:is([aria-selected="true"], [aria-checked="true"]) {
+    background: var(--surface);
+    box-shadow: 0 1px 0 var(--line);
+    color: var(--ink);
+    font-weight: 900;
+  }
+
+  /* A choice has 44px to tap, whatever it's drawn at. */
+  .segmented button::after {
+    content: "";
+    position: absolute;
+    inset: -2px 0;
+  }
+
+  /* Duels as rows: the other player, how it stands, and a word on it. */
+  .duel-list {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .duel-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 3.75rem;
+    padding: 12px 14px;
+    border-radius: var(--r-2);
+    background: var(--surface);
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  /* A friend to start a duel with (/duel/new): a row like a duel's, the whole width a button. */
+  .duel-pick {
+    width: 100%;
+    border: 0;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .duel-row:hover .who-name {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  .duel-row-end {
+    display: grid;
+    justify-items: end;
+    gap: 2px;
+    font-size: 0.8125rem;
+    text-align: right;
+  }
+
+  .duel-state {
+    font: 700 0.875rem / 1.25rem var(--font-sans);
+    color: var(--ink-3);
+  }
+
+  .duel-invite {
+    color: var(--ink);
+    font-weight: 900;
+  }
 
   /* A friend's duel just played first: sent, and how long the friend has (screens/duel.ts). */
   .duel-sent {
     margin: 0;
     color: var(--ink-3);
     font-size: 0.875rem;
-  }
-
-  /* Played second in a duel: how the question went for the other, under the player's own verdict (run.ts). */
-  .their-line {
-    margin: 0;
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius);
-    background: var(--paper);
-    color: var(--ink-3);
     font-weight: 700;
-  }
-
-  .their-line.right {
-    color: var(--right-ink);
-  }
-
-  /* The game moving on by itself: a line filling while the answer shows. */
-  .up-next {
-    display: grid;
-    gap: var(--space-2);
-    color: var(--ink-3);
-    font-size: 0.875rem;
-    font-weight: 700;
-  }
-
-  .up-next .track {
-    flex: none;
-    height: 4px;
-  }
-
-  .up-next-fill {
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: var(--ink-3);
-    transform: scaleX(0);
-    transform-origin: left;
-  }
-
-  /* Stuck, the clock is a thin bar along the head's lower edge, its seconds at the end of the pips' row. */
-  .stuck .timer {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    left: 0;
-  }
-
-  .stuck .timer .track {
-    height: 3px;
-    border-radius: 0;
-    background: transparent;
-  }
-
-  .stuck .timer .secs {
-    position: absolute;
-    right: var(--space-4);
-    bottom: calc(var(--space-2) + 3px);
-    font-size: 1.25rem;
-  }
-
-  .unit {
-    color: var(--ink-3);
-    font-size: 1.125rem;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-
-  .number-result {
-    display: grid;
-    gap: var(--space-1);
-    padding: var(--space-4);
-    border-radius: var(--radius);
-    background: var(--paper);
-    box-shadow: none;
-  }
-
-  .number-answer strong {
-    color: var(--gold-ink);
-    font: 900 2.5rem / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .verdict {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-3);
-  }
-
-  .verdict-sign {
-    display: grid;
-    width: 44px;
-    height: 44px;
-    border-radius: var(--radius-full);
-    color: var(--paper);
-    background: var(--wrong);
-  }
-
-  .verdict-sign::before {
-    content: "";
-    margin: auto;
-    width: 22px;
-    height: 22px;
-    background: currentColor;
-    -webkit-mask: var(--i) center / contain no-repeat;
-    mask: var(--i) center / contain no-repeat;
-  }
-
-  .verdict-word {
-    color: var(--wrong-ink);
-    font-size: calc(13px + 0.8125rem);
-    line-height: 1.077;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-  }
-
-  .verdict-pts {
-    margin-left: auto;
-    color: var(--gold-ink);
-    font: 900 calc(20px + 1.25rem) / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-    text-shadow: 0 0 18px color-mix(in srgb, var(--gold) 50%, transparent);
-    animation: rise 520ms cubic-bezier(0.2, 1.2, 0.4, 1);
-  }
-
-  .verdict-part {
-    display: block;
-    margin-top: 2px;
-    color: var(--ink-3);
-    font: 700 0.75rem / 1 var(--font-sans);
-    text-align: right;
-    text-shadow: none;
-    white-space: nowrap;
-  }
-
-  .verdict-says {
-    display: grid;
-    justify-items: start;
-    gap: var(--space-1);
-  }
-
-  /* Right answers in a row: the flame and how many, in gold (a reward); it pops when it grows. */
-  .in-row {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 10px 3px 7px;
-    border-radius: var(--radius-full);
-    color: var(--gold-ink);
-    background: color-mix(in srgb, var(--gold) 16%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 40%, transparent);
-    font: 700 0.8125rem / 1 var(--font-sans);
-    white-space: nowrap;
-    animation: pop 360ms cubic-bezier(0.2, 1.4, 0.4, 1);
-  }
-
-  .in-row b {
-    font: 900 1.0625rem / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .in-row-flame {
-    --i: var(--i-flame);
-    width: 12px;
-    height: 14px;
-    background: var(--gold);
-    -webkit-mask: var(--i) center / contain no-repeat;
-    mask: var(--i) center / contain no-repeat;
-  }
-
-  .verdict.right .verdict-sign {
-    --i: var(--i-check);
-    background: var(--right);
-    box-shadow: none;
-  }
-
-  .verdict.right .verdict-word {
-    color: var(--right-ink);
-  }
-
-  .verdict.exact .verdict-sign {
-    --i: var(--i-star);
-    background: var(--gold);
-    box-shadow: none;
-    animation: star 360ms cubic-bezier(0.2, 1.4, 0.4, 1);
-  }
-
-  .verdict.exact .verdict-word {
-    color: var(--gold-ink);
-  }
-
-  .verdict.partial .verdict-sign {
-    --i: var(--i-near);
-    background: transparent;
-    color: var(--gold-ink);
-    box-shadow: inset 0 0 0 2px var(--gold-ink);
-  }
-
-  .verdict.partial .verdict-word {
-    color: var(--ink);
-  }
-
-  .verdict.wrong .verdict-sign {
-    --i: var(--i-cross);
-  }
-
-  .verdict.time .verdict-sign {
-    --i: var(--i-clock);
-  }
-
-  .fact {
-    position: relative;
-    overflow: hidden;
-    display: grid;
-    gap: var(--space-2);
-    padding: var(--space-4);
-    border-radius: var(--radius);
-    background: var(--paper);
-    box-shadow: none;
-  }
-
-  /* A „?“ set in the card's top corner, whole, in the heading's colour: the text keeps clear of it. Drawn, not read: its
-     size in px, as at the usual text, whatever the text's. */
-  .fact::before {
-    content: "?";
-    position: absolute;
-    top: var(--space-4);
-    right: var(--space-4);
-    color: color-mix(in srgb, var(--ink) 30%, transparent);
-    font: 900 72px / 1 var(--font-numeral);
-    pointer-events: none;
-  }
-
-  .fact h2 {
-    position: relative;
-    color: var(--ink);
-    font: 800 0.75rem / 1rem var(--font-sans);
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-  }
-
-  .fact p {
-    position: relative;
-    padding-right: var(--space-6);
-    font: italic 500 1.1875rem / 1.8125rem var(--font-serif);
-    text-wrap: pretty;
-  }
-
-  /* On its date, what happened that day heads the card in plain type, a hairline under it; the „?“ goes down to the
-     fact it belongs to. */
-  .fact-day {
-    display: grid;
-    gap: var(--space-2);
-    padding-bottom: var(--space-3);
-    box-shadow: inset 0 -1px var(--rule);
-  }
-
-  .fact-day p {
-    font: 600 1rem / 1.5rem var(--font-sans);
-  }
-
-  .fact.dated::before {
-    top: auto;
-    bottom: var(--space-4);
-  }
-
-  .fact.alone .fact-day {
-    padding-bottom: 0;
-    box-shadow: none;
-  }
-
-  .fact.alone::before {
-    content: none;
-  }
-
-  .credit {
-    color: var(--ink-3);
-    font-size: 0.875rem;
-  }
-
-  .status {
-    color: var(--ink-3);
-    font-size: 0.9375rem;
-    font-weight: 600;
   }
 
   /* ---- Results ---- */
@@ -3056,8 +3465,8 @@
     display: grid;
     overflow: hidden;
     padding: 0;
-    border-radius: var(--radius);
-    background: var(--paper);
+    border-radius: var(--r-1);
+    background: var(--bg);
     box-shadow: none;
   }
 
@@ -3082,7 +3491,7 @@
   }
 
   .row + .row {
-    border-top: 1px solid var(--rule);
+    border-top: 1px solid var(--line);
   }
 
   .row.gap {
@@ -3095,7 +3504,7 @@
     width: 32px;
     height: 32px;
     border-radius: var(--radius-full);
-    background: var(--paper-2);
+    background: var(--surface-2);
     color: var(--ink-3);
     font: 800 1.125rem / 1 var(--font-numeral);
   }
@@ -3157,7 +3566,7 @@
     padding: 2px 7px;
     border-radius: var(--radius-full);
     background: var(--ink);
-    color: var(--paper);
+    color: var(--bg);
     font-size: 0.6875rem;
     line-height: 1rem;
     font-weight: 700;
@@ -3220,7 +3629,7 @@
 
   .delta.up {
     --i: var(--i-up);
-    color: var(--right-ink);
+    color: var(--ink);
   }
 
   /* A question gone over: a card of its own, a band in its verdict's colour on top; its number, topic and how it went
@@ -3230,17 +3639,17 @@
     display: grid;
     gap: var(--space-3);
     padding: var(--space-5) var(--space-4) var(--space-3);
-    border-radius: var(--radius);
-    background: var(--paper);
+    border-radius: var(--r-1);
+    background: var(--bg);
     box-shadow: none;
   }
 
   .reviewed.right {
-    --v-ink: var(--right-ink);
+    --v-ink: var(--ink);
   }
 
   .reviewed.close {
-    --v-ink: var(--gold-ink);
+    --v-ink: var(--ink);
   }
 
   .reviewed-head {
@@ -3268,7 +3677,7 @@
     padding: var(--space-3) 0 0;
     border-radius: 0;
     background: none;
-    box-shadow: inset 0 1px var(--rule);
+    box-shadow: inset 0 1px var(--line);
   }
 
   .reviewed .fact::before {
@@ -3313,7 +3722,7 @@
     width: 3px;
     height: calc(1.6px * var(--n, 1) + 2.4px);
     border-radius: 2px;
-    background: var(--rule-2);
+    background: var(--line-2);
   }
 
   .bars i:nth-child(1) {
@@ -3344,7 +3753,7 @@
     display: block;
     height: 6px;
     border-radius: var(--radius-full);
-    background: var(--paper-2);
+    background: var(--surface-2);
     overflow: hidden;
   }
 
@@ -3384,40 +3793,6 @@
       margin-inline: 0;
       padding: 0;
     }
-  }
-
-  .chip {
-    appearance: none;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: 2.75rem;
-    padding: 0 var(--space-4) 0 var(--space-3);
-    border: 1px solid var(--rule);
-    border-radius: var(--radius-full);
-    background: var(--paper);
-    color: var(--ink);
-    box-shadow: none;
-    font: 700 0.9375rem / 1.2 var(--font-sans);
-    cursor: pointer;
-    transition:
-      transform 120ms ease,
-      border-color 160ms ease;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .chip:hover {
-      border-color: var(--rule-2);
-      transform: translateY(-1px);
-    }
-  }
-
-  /* In the 26px slot a topic's picture has, so every chip's words start at one inset. */
-  .chip .dot {
-    width: 10px;
-    height: 10px;
-    margin: 0 var(--space-2) 0 var(--space-1);
-    border-radius: 4px;
   }
 
   /* ---- Pictures (art/pictures.ts): painted from one ramp of the tone they sit in, with the night ink and white ---- */
@@ -3533,7 +3908,7 @@
     height: var(--size);
     overflow: hidden;
     border-radius: 50%;
-    background: var(--tone, var(--paper-2));
+    background: var(--tone, var(--surface-2));
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent);
   }
 
@@ -3783,7 +4158,7 @@
 
   /* The name as the page's title, in the serif; a long one wraps, never past the column. */
   .me-head h1 {
-    font: 600 calc(24px + 1.5rem) / 1.05 var(--font-serif);
+    font: 600 calc(24px + 1.5rem) / 1.05 var(--font-sans);
     letter-spacing: -0.02em;
     overflow-wrap: anywhere;
   }
@@ -3830,7 +4205,7 @@
     gap: var(--space-3);
     min-height: 3.75rem;
     padding-block: var(--space-3);
-    border-bottom: 1px solid var(--rule);
+    border-bottom: 1px solid var(--line);
     color: var(--ink);
     text-decoration: none;
   }
@@ -3934,8 +4309,8 @@
     margin: 0;
     padding: var(--space-4);
     border: 0;
-    border-radius: var(--radius);
-    background: var(--paper);
+    border-radius: var(--r-1);
+    background: var(--bg);
     box-shadow: none;
     color: var(--ink);
     font: 500 1rem / 1.5rem var(--font-sans);
@@ -4032,19 +4407,14 @@
 
   .pick[aria-pressed="true"] .avatar {
     box-shadow:
-      0 0 0 3px var(--paper),
+      0 0 0 3px var(--bg),
       0 0 0 5px var(--ink);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .pick:hover:not([aria-pressed="true"]) .avatar {
-      box-shadow: 0 0 0 2px var(--rule-2);
+      box-shadow: 0 0 0 2px var(--line-2);
     }
-  }
-
-  .chip[aria-pressed="true"] {
-    border-color: var(--ink);
-    box-shadow: 0 0 0 1px var(--ink);
   }
 
   /* ---- Алманах: the book's contents, its notes, a chapter ---- */
@@ -4071,8 +4441,8 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     margin-top: var(--space-4);
-    border-top: 1px solid var(--rule-ink);
-    border-bottom: 1px solid var(--rule);
+    border-top: 1px solid var(--ink);
+    border-bottom: 1px solid var(--line);
   }
 
   .fig {
@@ -4083,7 +4453,7 @@
 
   .fig + .fig {
     padding-left: var(--space-3);
-    border-left: 1px solid var(--rule);
+    border-left: 1px solid var(--line);
   }
 
   .fig-n {
@@ -4109,7 +4479,7 @@
     grid-template-columns: 4.5rem minmax(0, 1fr);
     gap: var(--space-3);
     padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--rule);
+    border-bottom: 1px solid var(--line);
   }
 
   .ledger-day {
@@ -4121,7 +4491,7 @@
   }
 
   .ledger-text {
-    font: 400 1.0625rem / 1.45 var(--font-serif);
+    font: 400 1.0625rem / 1.45 var(--font-sans);
   }
 
   .ledger .next .ledger-text {
@@ -4143,7 +4513,7 @@
     align-items: center;
     column-gap: 14px;
     padding: 14px 0 12px;
-    border-bottom: 1px solid var(--rule);
+    border-bottom: 1px solid var(--line);
     color: var(--ink);
     text-decoration: none;
   }
@@ -4163,13 +4533,13 @@
   }
 
   .toc-name {
-    font: 600 1.1875rem / 1.2 var(--font-serif);
+    font: 600 1.1875rem / 1.2 var(--font-sans);
   }
 
   .toc-dots {
     flex: 1;
     min-width: 12px;
-    border-bottom: 2px dotted var(--rule);
+    border-bottom: 2px dotted var(--line);
     transform: translateY(-4px);
   }
 
@@ -4200,7 +4570,7 @@
     flex: 1;
     min-width: 2rem;
     height: 3px;
-    background: var(--rule);
+    background: var(--line);
   }
 
   .toc-track i {
@@ -4217,7 +4587,7 @@
     margin-left: var(--space-2);
     vertical-align: 1px;
     background: linear-gradient(#fff 0 33.3%, #00966e 0 66.6%, #d62612 0);
-    box-shadow: 0 0 0 1px var(--rule);
+    box-shadow: 0 0 0 1px var(--line);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -4265,7 +4635,7 @@
   .know {
     margin-top: var(--space-5);
     padding-top: var(--space-4);
-    border-top: 1px solid var(--rule-ink);
+    border-top: 1px solid var(--ink);
   }
 
   .know-top {
@@ -4282,7 +4652,7 @@
   .know-words {
     min-width: 0;
     padding-bottom: 4px;
-    font: 400 1.0625rem / 1.35 var(--font-serif);
+    font: 400 1.0625rem / 1.35 var(--font-sans);
   }
 
   .know-words b {
@@ -4303,7 +4673,7 @@
     right: 0;
     left: 0;
     height: 4px;
-    background: var(--rule);
+    background: var(--line);
   }
 
   .scale-fill {
@@ -4360,7 +4730,7 @@
     align-items: center;
     gap: 10px;
     margin-top: 6px;
-    border-bottom: 2px solid var(--rule-ink);
+    border-bottom: 2px solid var(--ink);
   }
 
   .search .i {
@@ -4372,7 +4742,7 @@
     flex: 1;
     min-width: 0;
     border: 0;
-    font: italic 500 1.125rem / 1.3 var(--font-serif);
+    font: italic 500 1.125rem / 1.3 var(--font-sans);
   }
 
   .search input::-webkit-search-cancel-button {
@@ -4388,7 +4758,7 @@
 
   .entry {
     padding: 18px 0;
-    border-bottom: 1px solid var(--rule);
+    border-bottom: 1px solid var(--line);
     break-inside: avoid;
   }
 
@@ -4401,7 +4771,7 @@
 
   .entry-word {
     margin-top: var(--space-2);
-    font: 600 1.3125rem / 1.2 var(--font-serif);
+    font: 600 1.3125rem / 1.2 var(--font-sans);
     text-wrap: pretty;
   }
 
@@ -4412,12 +4782,12 @@
   .entry-q {
     margin-top: 4px;
     color: var(--ink-2);
-    font: italic 500 0.96875rem / 1.4 var(--font-serif);
+    font: italic 500 0.96875rem / 1.4 var(--font-sans);
   }
 
   .entry-fact {
     margin-top: 10px;
-    font: 400 1.03125rem / 1.55 var(--font-serif);
+    font: 400 1.03125rem / 1.55 var(--font-sans);
     text-wrap: pretty;
   }
 
@@ -4426,13 +4796,13 @@
     float: left;
     margin: 5px 8px 0 -1px;
     color: var(--t);
-    font: 600 3.625rem / 0.8 var(--font-serif);
+    font: 600 3.625rem / 0.8 var(--font-sans);
   }
 
   .entries-none {
     padding: var(--space-5) 0;
     color: var(--ink-2);
-    font: italic 500 1.0625rem / 1.45 var(--font-serif);
+    font: italic 500 1.0625rem / 1.45 var(--font-sans);
   }
 
   /* The chapter's pages: newer, the numbers, older. */
@@ -4483,7 +4853,7 @@
   .pager-way.off {
     display: inline-flex;
     align-items: center;
-    color: var(--rule-2);
+    color: var(--line-2);
     font-weight: 600;
     cursor: default;
   }
@@ -4542,47 +4912,26 @@
     .entries {
       columns: 2;
       column-gap: 40px;
-      column-rule: 1px solid var(--rule);
+      column-rule: 1px solid var(--line);
     }
   }
 
   /* ---- Днес: the day's issue, and its result ---- */
 
-  /* A new visitor's cover: the bar becomes the masthead, the mark over the name, centred; „Вход“ in its corner. */
+  /* A new visitor's cover: the mark and the name in the middle of the bar, „Вход“ in its corner. */
   .cover .bar {
     position: relative;
-    flex-direction: column;
     justify-content: center;
-    gap: 0;
-    padding: var(--space-6) 0 var(--space-4);
-  }
-
-  .cover .brand {
-    flex-direction: column;
-    gap: var(--space-3);
-    padding-left: 0.24em;
-    font-size: min(calc(15px + 0.9375rem), 9vw);
-    letter-spacing: 0.24em;
-  }
-
-  .cover .brand .rosette {
-    width: 34px;
-    height: 34px;
   }
 
   .cover .bar-in {
     position: absolute;
-    top: var(--space-2);
     right: 0;
-  }
-
-  .cover #main {
-    padding-top: 0;
   }
 
   .today,
   .result {
-    gap: 0;
+    align-items: start;
   }
 
   .notices:empty {
@@ -4592,7 +4941,6 @@
   .notices {
     display: grid;
     gap: var(--space-2);
-    margin-bottom: var(--space-4);
   }
 
   .notice,
@@ -4600,375 +4948,558 @@
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: var(--space-1) var(--space-3);
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--rule);
+    gap: 2px 10px;
+    margin: 0;
+    padding: 12px 16px;
+    border-radius: var(--r-2);
+    background: var(--surface);
     color: var(--ink-2);
-    font: italic 500 1rem / 1.45 var(--font-serif);
+    font: 700 0.9375rem / 1.4 var(--font-sans);
   }
 
   .streak-notice a {
-    font: 700 0.9375rem / 1.3 var(--font-sans);
-    font-style: normal;
+    color: var(--ink);
+    font-weight: 900;
   }
 
-  /* The issue's dateline: its number and the day, between the frame's double rule and a hairline. */
-  .dateline {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: var(--space-3);
-    margin-top: calc(-1 * var(--space-5));
-    padding: 9px 0 8px;
-    border-bottom: 1px solid var(--rule-ink);
-    color: var(--ink-2);
-    font: 700 0.75rem / 1.2 var(--font-sans);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  .cover .dateline {
-    margin-top: 0;
-  }
-
+  /* The issue: a stack of ten sheets in its chapters' colours, the top one turned at its corner on the next. */
   .issue {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    padding-top: var(--space-5);
+    --under: 30px;
+    position: relative;
+    padding-bottom: var(--under);
   }
 
-  /* The date as the hero numeral, the month in the serif's italic beside it. */
+  .issue-stack {
+    position: absolute;
+    inset: 0;
+  }
+
+  .stack-leaf {
+    position: absolute;
+    top: 0;
+    right: calc(var(--i) * 3px);
+    bottom: calc(var(--under) - var(--i) * var(--under) / 10);
+    left: calc(var(--i) * 3px);
+    border-radius: var(--r-3);
+    background: var(--ts);
+    box-shadow: inset 0 -1px 0 rgb(22 19 43 / 0.18);
+  }
+
+  /* On a phone the cover is under half the screen's height (about 44%), so that „Започни“ is in sight under it on the
+     shortest: its date set by the screen's height. */
+  .issue-leaf {
+    gap: 10px;
+    padding: 18px 18px 20px;
+  }
+
+  .issue-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  /* „Брой 31“ on an ink pill; the weekday plain. */
+  .issue-n {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 12px;
+    border-radius: var(--radius-full);
+    background: #16132b;
+    color: #fff;
+    font: 900 0.875rem / 1 var(--font-sans);
+    letter-spacing: 0.02em;
+  }
+
+  .issue-weekday {
+    font: 800 0.9375rem / 1 var(--font-sans);
+  }
+
+  /* The date as the hero numeral, the month beside it. */
   .issue-date {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    gap: var(--space-3);
+    gap: 4px 12px;
+    margin-top: 6px;
   }
 
-  .issue-n {
-    margin-left: -4px;
-    font: 800 calc(66px + 4.125rem) / 0.8 var(--font-numeral);
-    letter-spacing: -0.02em;
+  .issue-day {
+    display: block;
+    font: 900 clamp(4rem, 15dvh, 9.5rem) / 0.82 var(--font-numeral);
     font-variant-numeric: lining-nums tabular-nums;
-  }
-
-  .first .issue-n {
-    font-size: clamp(150px, 51vw, 200px);
+    letter-spacing: -0.01em;
   }
 
   .issue-month {
-    display: grid;
-    gap: var(--space-2);
-    padding-bottom: 4px;
-    font: italic 500 calc(15px + 0.9375rem) / 1 var(--font-serif);
-  }
-
-  .issue-weekday {
-    font-style: normal;
+    padding-bottom: 6px;
+    font: 900 calc(14px + 0.875rem) / 1 var(--font-sans);
   }
 
   .issue-body {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    margin-top: auto;
   }
 
   .issue-title {
-    margin-top: var(--space-5);
+    font: 900 calc(12px + 0.75rem) / 1.1 var(--font-sans);
+    letter-spacing: -0.01em;
   }
 
-  .issue-body .deck {
-    max-width: 34ch;
-    margin-top: var(--space-2);
+  .issue-deck {
+    font: 800 1rem / 1.3 var(--font-sans);
   }
 
-  .issue-body .trail {
-    margin-top: var(--space-4);
+  /* The ten chapters of the issue, a glyph each, ringed in ink. */
+  .issue-toc {
+    display: grid;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 5px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
-  .issue-go {
-    margin-top: var(--space-5);
+  .issue-toc .glyph {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    box-shadow: 0 0 0 2px #16132b;
+  }
+
+  /* On the sheet, the tiles so far are drawn on white where they're hollow, so the sheet's colour doesn't hide them. */
+  .issue-leaf .tile:is(.wrong, .near, .later, .void) {
+    background-color: #fff;
+  }
+
+  .issue-leaf .tile.near {
+    background-image: linear-gradient(90deg, var(--tv) 50%, transparent 50%);
   }
 
   .issue-meta {
-    margin-top: var(--space-3);
-    text-align: center;
-  }
-
-  .day-stake {
-    margin-top: var(--space-3);
-    color: var(--ink);
-    font: 600 0.9375rem / 1.4 var(--font-sans);
+    padding-right: 50px;
+    font: 700 0.875rem / 1.3 var(--font-sans);
   }
 
   .shared-score {
     display: grid;
     gap: var(--space-2);
-    margin-top: var(--space-4);
+  }
+
+  .shared-score .kicker {
+    color: #16132b;
   }
 
   .shared-score-n {
-    font: 500 1rem / 1 var(--font-sans);
+    font: 900 1.25rem / 1 var(--font-sans);
   }
 
   .shared-score-n b {
-    font: 800 calc(28px + 1.75rem) / 0.9 var(--font-numeral);
+    font: 900 3rem / 0.9 var(--font-numeral);
   }
 
-  /* The issue's contents („В броя“): a big screen's, the ten topics in two columns, each with its chapter's dot. */
+  /* Beside the issue (under it on a phone): its action, the streak, and on a big screen the issue's contents. */
+  .today-side {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+  }
+
+  .issue-words {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .issue-words h2 {
+    font-size: calc(14px + 0.875rem);
+    line-height: 1.1;
+  }
+
+  .issue-exit {
+    margin-top: calc(-1 * var(--space-2));
+  }
+
+  /* The issue's contents („В броя“), a big screen's: its ten chapters in their order, each with its glyph. */
   .contents-issue {
     display: none;
   }
 
-  .contents-issue ol {
-    margin: 10px 0 0;
-    padding: 0;
-    columns: 2;
-    column-gap: 40px;
-    border-top: 1px solid var(--rule-ink);
-    list-style: none;
-  }
-
-  .contents-issue li {
+  .contents-row {
     display: flex;
-    align-items: baseline;
-    gap: var(--space-3);
-    padding: 10px 0;
-    border-bottom: 1px solid var(--rule);
-    break-inside: avoid;
-    font: 500 1rem / 1.3 var(--font-sans);
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+    font: 700 1rem / 1.2 var(--font-sans);
   }
 
   .contents-n {
-    width: 18px;
+    width: 22px;
     color: var(--ink-3);
-    font: 700 1.125rem / 1 var(--font-numeral);
-    text-align: right;
+    font: 900 1.125rem / 1 var(--font-numeral);
   }
 
-  .contents-issue .dot {
-    align-self: center;
+  .contents-name {
+    flex: 1;
+    min-width: 0;
   }
 
-  /* Beside the issue (under it on a phone): the streak, the friends' day, the way to the book. */
-  .today-side {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    align-content: start;
-    gap: var(--space-7);
-    padding-top: var(--space-7);
+  .contents-hard {
+    color: var(--ink-3);
+    font: 800 0.8125rem / 1.2 var(--font-sans);
   }
 
-  .streak-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-    padding: var(--space-4) 0 var(--space-2);
-  }
-
+  /* The streak: the flame, the number, „изиграни дни“ and a quiet line under them; unlit while the day's ten wait. */
   .streak-chip {
-    display: inline-grid;
-    color: var(--ink);
-    text-decoration: none;
-  }
-
-  .status-text {
-    display: grid;
-  }
-
-  .status-n {
-    font: 800 calc(32px + 2rem) / 0.85 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .status-label {
-    margin-top: 2px;
-    color: var(--ink-2);
-    font: 600 0.9375rem / 1.2 var(--font-sans);
-  }
-
-  /* This week: a square a day, played filled, today ringed in gold, to come open. */
-  .week {
-    display: grid;
-    grid-template-columns: repeat(7, 22px);
-    gap: 6px;
-    margin: 0 0 0 auto;
-    padding: 0;
-    list-style: none;
-    text-align: center;
-  }
-
-  .week li {
-    display: grid;
-    gap: 6px;
-  }
-
-  .week-day {
-    color: var(--ink-3);
-    font: 700 0.625rem / 1 var(--font-sans);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  .week-dot {
-    height: 22px;
-    border-radius: 2px;
-    box-shadow: inset 0 0 0 1px var(--rule-2);
-  }
-
-  .week .on .week-dot {
-    background: var(--ink);
-    box-shadow: none;
-  }
-
-  .week .forgiven .week-dot {
-    background: repeating-linear-gradient(-45deg, var(--rule-2) 0 2px, transparent 2px 5px);
-  }
-
-  .week .today:not(.on) .week-dot {
-    box-shadow: inset 0 0 0 2px var(--gold);
-  }
-
-  .streak-note {
-    color: var(--ink-3);
-    font: 500 0.875rem / 1.45 var(--font-sans);
-  }
-
-  .today-none {
-    padding: var(--space-4) 0;
-    color: var(--ink-2);
-    font: italic 500 1rem / 1.45 var(--font-serif);
-  }
-
-  .book-link {
     display: flex;
     align-items: center;
-    gap: var(--space-4);
-    padding: 14px 0;
+    gap: 14px;
+    padding: 14px 18px;
+    border-radius: var(--r-3);
+    background: var(--surface);
     color: var(--ink);
     text-decoration: none;
   }
 
-  .book-pic {
-    --tone: var(--gold);
-    flex: none;
+  .streak-flame {
+    --tone: var(--t-sports);
     width: 44px;
     height: 44px;
   }
 
-  .book-words {
-    font: 400 1rem / 1.45 var(--font-serif);
+  .streak-chip.unlit .streak-flame {
+    filter: grayscale(0.4);
+    opacity: 0.85;
   }
 
-  .book-link strong {
-    font-weight: 600;
+  .status-n {
+    font: 900 3.25rem / 0.82 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
   }
 
-  .book-go {
-    margin-left: auto;
+  .status-text {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .status-label {
+    font: 900 1.0625rem / 1.1 var(--font-sans);
+  }
+
+  .streak-note,
+  .streak-chip .day-stake {
     color: var(--ink-3);
-    font-size: 1.375rem;
+    font: 600 0.9375rem / 1.3 var(--font-sans);
   }
 
-  /* The result: the score as the hero numeral, its shape, a line of how it went. */
-  .result-main {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    align-content: start;
-  }
+  /* ---- The day's result, in its budget's order: the score on its sheet, the day's entry and its ink, the friends,
+     the action, tomorrow; „Въпросите и фактите“ under them ---- */
 
-  /* The score lands from a little bigger (feel.ts): on its way it never reaches past the page's column. */
-  .result-score {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    overflow-x: clip;
-    overflow-clip-margin: var(--space-2);
-  }
-
-  /* As wide as what's in it: it lands from a little bigger (feel.ts), and a column-wide one would reach past the
-     screen on its way. */
-  h1.score {
-    display: flex;
-    flex-wrap: wrap;
-    justify-self: start;
-    max-width: 100%;
-    align-items: flex-end;
-    gap: var(--space-3);
-    margin-top: var(--space-2);
-  }
-
-  .score-n {
-    margin-left: -6px;
-    font: 800 min(calc(88px + 5.5rem), 46vw) / 0.8 var(--font-numeral);
-    letter-spacing: -0.02em;
-  }
-
-  .score-of {
-    padding-bottom: 6px;
-    color: var(--ink-2);
-    font: italic 500 calc(16px + 1rem) / 1 var(--font-serif);
-  }
-
-  .score-close {
-    font-size: 0.6em;
-  }
-
-  .result-score .trail {
-    margin-top: var(--space-5);
-  }
-
-  .result-line {
-    margin-top: var(--space-4);
-    font: 400 1.1875rem / 1.45 var(--font-serif);
-  }
-
-  .result-line b {
-    font-weight: 600;
-  }
-
-  .result-streak {
-    display: flex;
-    align-items: baseline;
-    margin-top: var(--space-4);
-  }
-
-  .result-streak .status-text {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-2);
-  }
-
-  .result-streak .status-n {
-    font-size: calc(14px + 0.875rem);
-  }
-
-  .result-share {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-2);
-    margin-top: var(--space-5);
-  }
-
-  .result-share .small {
-    text-align: center;
-  }
-
-  .result-share .link {
-    justify-self: center;
-  }
-
+  .result-main,
   .result-side {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     align-content: start;
-    gap: var(--space-7);
-    padding-top: var(--space-7);
+    gap: var(--space-5);
   }
 
-  .result-side:empty {
+  /* The score: the cover's heavy numeral on the sheet of the issue's first chapter, the tiles under it, then how many
+     knew the tenth and how all of България did. It lands from a little bigger (feel.ts). */
+  .score-leaf {
+    gap: 14px;
+    padding: 20px 18px 20px;
+  }
+
+  .score-kicker {
+    color: var(--on-sheet);
+  }
+
+  .score {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0 12px;
+    justify-self: start;
+    font: inherit;
+  }
+
+  .score-n {
+    font: 900 min(calc(64px + 4rem), 34vw) / 0.82 var(--font-numeral);
+    letter-spacing: -0.01em;
+  }
+
+  .score-of {
+    padding-bottom: 10px;
+    font: 900 calc(14px + 0.875rem) / 1 var(--font-sans);
+  }
+
+  .score-close {
+    flex-basis: 100%;
+    padding-top: 6px;
+    font: 800 0.9375rem / 1.2 var(--font-sans);
+  }
+
+  /* On the sheet, a hollow or a half tile is drawn on white, so the sheet's colour doesn't hide it. */
+  .score-leaf .tile:is(.wrong, .near, .void) {
+    background-color: #fff;
+  }
+
+  .score-leaf .tile.near {
+    background-image: linear-gradient(90deg, var(--tv) 50%, transparent 50%);
+  }
+
+  /* A right tile of the sheet's own chapter would melt into it: every right one on the sheet has a rim of ink. */
+  :is(.score-leaf, .issue-leaf) .tile.right {
+    box-shadow: inset 0 0 0 2px #16132b;
+  }
+
+  .tenth,
+  .score-bg {
+    font: 800 0.9375rem / 1.3 var(--font-sans);
+  }
+
+  .score-bg {
+    margin-top: -8px;
+  }
+
+  /* Ten of ten: the mark drawn over the score, petal by petal (feel.ts), and „Всички верни“. */
+  .perfect-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .perfect-head .kicker {
+    color: var(--on-sheet);
+    font-size: 0.875rem;
+  }
+
+  .perfect-mark {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* The day's entry: a sheet of its chapter, the chip and how few knew it, the answer, the question, the fact. */
+  .day-entry {
+    gap: var(--space-3);
+  }
+
+  .entry-leaf {
+    gap: 8px;
+    padding: 18px 20px 22px;
+  }
+
+  .entry-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .entry-kicker {
+    font: 800 0.875rem / 1.2 var(--font-sans);
+  }
+
+  .entry-leaf .entry-word {
+    margin-top: 4px;
+    font: 900 calc(14px + 0.875rem) / 1.08 var(--font-sans);
+    letter-spacing: -0.01em;
+  }
+
+  .entry-leaf .entry-q {
+    font: 600 0.9375rem / 1.35 var(--font-sans);
+  }
+
+  .entry-leaf .entry-fact {
+    font: 500 1.0625rem / 1.45 var(--font-sans);
+  }
+
+  /* What the day wrote: „+6 с мастило“, the facts met before (grey), and the chapter nearest its next rank. */
+  .inkline {
+    display: grid;
+    gap: 12px;
+    padding: 16px 18px;
+    border-radius: var(--r-3);
+    background: var(--surface);
+  }
+
+  .ink-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink);
+    font: 800 1.0625rem / 1.2 var(--font-sans);
+    text-decoration: none;
+  }
+
+  .ink-row .i {
+    width: 24px;
+    height: 24px;
+  }
+
+  .ink-row .num {
+    font-size: 2.25rem;
+    line-height: 0.85;
+  }
+
+  .news-met {
+    color: var(--ink-3);
+    font: 700 0.875rem / 1.35 var(--font-sans);
+  }
+
+  .news-step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    font: 700 1rem / 1.3 var(--font-sans);
+  }
+
+  .inkline > .news-step:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .step-seal {
+    display: grid;
+    justify-items: center;
+    gap: 5px;
+    flex: none;
+  }
+
+  .news-rose {
+    font: 700 1rem / 1.35 var(--font-sans);
+  }
+
+  /* A best rank risen: the one big moment, the seal large on its chapter's sheet. */
+  .rankup {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    padding: 24px 20px 26px;
+    border-radius: var(--r-3);
+    background: var(--ts);
+    color: var(--on-sheet);
+    text-align: center;
+  }
+
+  .rankup .kicker {
+    color: var(--on-sheet);
+  }
+
+  .rankup-seal {
+    animation: rankup 400ms cubic-bezier(0.2, 1.4, 0.4, 1);
+  }
+
+  @keyframes rankup {
+    0% {
+      transform: scale(0.6) rotate(-12deg);
+      opacity: 0;
+    }
+  }
+
+  .rankup-name {
+    font: 900 calc(18px + 1.125rem) / 1.05 var(--font-sans);
+  }
+
+  .rankup-art,
+  .rankup-more {
+    font: 700 0.9375rem / 1.35 var(--font-sans);
+  }
+
+  /* The friends who played the day: a row each, their tiles small, their score. */
+  .fd-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 54px;
+  }
+
+  .fd-row .who {
+    min-width: 0;
+    margin-right: auto;
+  }
+
+  .fd-score {
+    width: 26px;
+    font: 900 1.375rem / 1 var(--font-numeral);
+    text-align: right;
+  }
+
+  .result-share {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  /* Tomorrow: the next issue's date set big, its words beside it, and the asks that come with it. */
+  .tomorrow {
+    display: grid;
+    align-content: start;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  .tomorrow .sect-head {
     display: none;
   }
 
-  /* How all of България did: eleven bars, 0 to 10, the player's in ink, the average dashed. */
+  .tomorrow-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .tomorrow-n {
+    flex: none;
+    font: 900 3rem / 0.82 var(--font-numeral);
+  }
+
+  .tomorrow-words {
+    color: var(--ink-2);
+    font: 700 0.9375rem / 1.35 var(--font-sans);
+  }
+
+  .tomorrow-words b {
+    color: var(--ink);
+    font-weight: 900;
+  }
+
+  /* „Въпросите и фактите“: the rest of the day, a tap away. */
+  .more {
+    appearance: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 56px;
+    padding: 0 18px;
+    border: 2px solid var(--line-2);
+    border-radius: var(--r-2);
+    background: transparent;
+    color: var(--ink);
+    font: 900 1.0625rem / 1.2 var(--font-sans);
+    cursor: pointer;
+  }
+
+  .more .i {
+    width: 20px;
+    height: 20px;
+  }
+
+  .result-review {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-5);
+    padding-top: var(--space-5);
+  }
+
+  /* How all of България did, under „Въпросите и фактите“: eleven bars, 0 to 10, the player's in ink, the average a
+     thin line. */
   .spread-chart {
     margin-top: 14px;
   }
@@ -4980,13 +5511,13 @@
     gap: 4px;
     align-items: end;
     height: 150px;
-    border-bottom: 1px solid var(--rule-ink);
+    border-bottom: 1px solid var(--ink);
   }
 
   .spread-bars i {
     display: block;
-    border-radius: 1px 1px 0 0;
-    background: color-mix(in srgb, var(--ink) 22%, var(--paper));
+    border-radius: 3px 3px 0 0;
+    background: var(--line);
   }
 
   .spread-bars i.me {
@@ -5008,7 +5539,7 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    border-left: 1.5px dashed var(--ink-2);
+    border-left: 2px solid var(--ink-3);
   }
 
   .spread-avg span {
@@ -5016,7 +5547,7 @@
     top: -2px;
     right: 6px;
     color: var(--ink-2);
-    font: 600 0.75rem / 1 var(--font-sans);
+    font: 700 0.75rem / 1 var(--font-sans);
     white-space: nowrap;
   }
 
@@ -5026,79 +5557,13 @@
     gap: 4px;
     margin-top: 6px;
     color: var(--ink-3);
-    font: 600 0.9375rem / 1 var(--font-numeral);
+    font: 700 0.9375rem / 1 var(--font-numeral);
     text-align: center;
   }
 
   .spread-ticks .me {
     color: var(--ink);
-    font-weight: 800;
-  }
-
-  .bulgaria-figures {
-    border-top: 0;
-  }
-
-  /* The rarest right answer, as an entry cut from the book. */
-  .rarest-kicker {
-    margin-top: var(--space-3);
-    color: var(--t);
-  }
-
-  .rarest-entry {
-    padding-top: var(--space-2);
-    border-bottom: 0;
-  }
-
-  .rarest-entry .entry-word {
-    font-size: calc(13px + 0.8125rem);
-  }
-
-  .filed {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin-top: 14px;
-    color: var(--ink-3);
-    font: 600 0.8125rem / 1.3 var(--font-sans);
-  }
-
-  .filed-pic {
-    --tone: var(--t);
-    width: 20px;
-    height: 20px;
-  }
-
-  /* Tomorrow: the next issue's date, its words, and the asks that come with it. */
-  .tomorrow {
-    display: grid;
-    align-content: start;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-3);
-    padding-top: var(--space-7);
-  }
-
-  .tomorrow-row {
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    padding: var(--space-4) 0 var(--space-1);
-  }
-
-  .tomorrow-n {
-    font: 800 calc(32px + 2rem) / 0.85 var(--font-numeral);
-  }
-
-  .tomorrow-words {
-    font: 400 1.0625rem / 1.45 var(--font-serif);
-  }
-
-  .tomorrow-words b {
-    font-weight: 600;
-  }
-
-  .result-review {
-    padding-top: var(--space-7);
+    font-weight: 900;
   }
 
   /* The share sheet: the card a link's preview shows, the text, the ways to send it. */
@@ -5114,18 +5579,25 @@
     gap: var(--space-3);
   }
 
+  /* The card as it goes (game/card.ts), its tiles until it's drawn. */
+  .share-card-box {
+    display: grid;
+    min-height: 3rem;
+  }
+
   .share-card {
     width: 100%;
     height: auto;
-    border: 1px solid var(--rule);
+    border-radius: var(--r-2);
+    box-shadow: 0 0 0 1px var(--line);
   }
 
   .share-text {
     margin: 0;
-    padding: var(--space-3) 0;
-    border-top: 1px solid var(--rule);
-    border-bottom: 1px solid var(--rule);
-    font: 500 1rem / 1.5 var(--font-sans);
+    padding: var(--space-3) 14px;
+    border-radius: var(--r-2);
+    background: var(--surface-2);
+    font: 600 1rem / 1.5 var(--font-sans);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
@@ -5141,149 +5613,63 @@
   }
 
   @media (min-width: 56.25rem) {
-    .dateline {
-      margin-top: calc(-1 * var(--space-5));
-      font-size: 0.8125rem;
-    }
-
-    .cover .bar {
-      padding-top: var(--space-6);
-    }
-
-    .cover .brand {
-      font-size: calc(22px + 1.375rem);
-    }
-
-    .cover .brand .rosette {
-      width: 40px;
-      height: 40px;
-    }
-
-    .cover .bar .places,
-    .cover .bar-issue {
-      display: none;
-    }
-
+    /* Днес: the issue on the left page, its action, the streak and its contents on the right. */
     .today.spread > .issue {
       grid-column: 1 / span 7;
-      padding-top: var(--space-6);
     }
 
     .today.spread > .today-side {
       grid-column: 8 / span 5;
-      margin-top: var(--space-6);
-      padding-top: 0;
-      padding-left: 40px;
-      border-left: 1px solid var(--rule);
     }
 
-    .today-side .sect:first-child .sect-head {
-      padding-top: 0;
+    .issue-leaf {
+      min-height: 32.5rem;
+      padding: 32px;
     }
 
-    .issue-n {
-      margin-left: -10px;
-      font-size: 260px;
+    .issue {
+      --under: 44px;
+    }
+
+    .issue-day {
+      font-size: 15rem;
     }
 
     .issue-month {
-      padding-bottom: 10px;
-      font-size: 48px;
+      padding-bottom: 22px;
+      font-size: 2.75rem;
     }
 
     .issue-title {
-      margin-top: var(--space-6);
-      font-size: calc(27px + 1.6875rem);
-    }
-
-    .issue-body .deck {
-      font-size: 1.3125rem;
-    }
-
-    .issue-go {
-      width: 320px;
-      margin-top: var(--space-6);
-    }
-
-    .issue-meta {
-      text-align: left;
+      font-size: 2.25rem;
     }
 
     .contents-issue {
-      display: block;
-      margin-top: 56px;
+      display: grid;
     }
 
-    /* A new visitor's cover: the date on the left page, the issue on the right. */
-    .first.spread > .issue {
-      grid-column: 1 / -1;
-      grid-template-columns: 5fr 7fr;
-      column-gap: 48px;
-      padding-top: 56px;
+    /* A new visitor's cover: the day alone, no places in the bar. */
+    .cover .bar .places {
+      display: none;
     }
 
-    .first .issue-date {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: var(--space-1);
-    }
-
-    .first .issue-n {
-      margin-left: -16px;
-      font-size: 400px;
-      line-height: 0.76;
-    }
-
-    .first .issue-month {
-      font-size: 52px;
-    }
-
-    .first .issue-body {
-      padding-left: 48px;
-      border-left: 1px solid var(--rule);
-    }
-
-    .first .issue-title {
-      margin-top: var(--space-4);
-    }
-
+    /* The result: the score and the day's entry on the left page, the friends, the action and tomorrow on the right;
+       what's under „Въпросите и фактите“ across both. */
     .result.spread > .result-main {
-      grid-column: 1 / span 5;
-      padding-top: var(--space-6);
+      grid-column: 1 / span 7;
     }
 
     .result.spread > .result-side {
-      grid-column: 6 / span 7;
-      grid-row: span 2;
-      margin-top: var(--space-6);
-      padding-top: 0;
-      padding-left: 40px;
-      border-left: 1px solid var(--rule);
-    }
-
-    .result.spread > .tomorrow {
-      grid-column: 1 / span 5;
+      grid-column: 8 / span 5;
     }
 
     .score-n {
-      font-size: 300px;
+      font-size: 12rem;
     }
 
     .score-of {
-      padding-bottom: 14px;
-      font-size: 48px;
-    }
-
-    .result-score .trail {
-      max-width: 24rem;
-    }
-
-    .result-share .small {
-      text-align: left;
-    }
-
-    .result-share .link {
-      justify-self: start;
+      padding-bottom: 18px;
+      font-size: 2.25rem;
     }
 
     .spread-bars {
@@ -5424,7 +5810,7 @@
   .rank-row.me {
     margin: 0 calc(-1 * var(--gutter));
     padding-inline: var(--gutter);
-    background: var(--paper-2);
+    background: var(--surface-2);
   }
 
   /* Further down than the best: a little apart from them. */
@@ -5469,7 +5855,7 @@
   .friends-none {
     padding: var(--space-4) 0;
     color: var(--ink-2);
-    font: italic 500 1rem / 1.45 var(--font-serif);
+    font: italic 500 1rem / 1.45 var(--font-sans);
   }
 
   /* Short of room (a phone's 320px), removing a friend (while editing) goes under the row, at its end. */
@@ -5482,7 +5868,7 @@
     gap: var(--space-1) var(--space-3);
     min-height: 3.5rem;
     padding: var(--space-2) 0;
-    border-bottom: 1px solid var(--rule);
+    border-bottom: 1px solid var(--line);
   }
 
   .friend-act {
@@ -5595,7 +5981,7 @@
     justify-content: space-between;
     gap: var(--space-2) var(--space-3);
     padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--rule);
+    border-bottom: 1px solid var(--line);
   }
 
   .invitation-actions {
@@ -5740,8 +6126,8 @@
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius);
-    background: var(--paper);
+    border-radius: var(--r-1);
+    background: var(--bg);
     box-shadow: none;
   }
 
@@ -5930,8 +6316,8 @@
     height: 30px;
     border: 0;
     border-radius: var(--radius-full);
-    background: var(--paper-2);
-    box-shadow: inset 0 0 0 1px var(--rule-2);
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--line-2);
     cursor: pointer;
   }
 
@@ -5952,7 +6338,7 @@
   }
 
   .switch[aria-checked="true"] .switch-knob {
-    background: var(--paper);
+    background: var(--bg);
     transform: translateX(22px);
   }
 
@@ -6025,21 +6411,28 @@
         max(var(--space-4), env(safe-area-inset-left));
       overflow-y: auto;
       overscroll-behavior: contain;
-      border-radius: var(--radius) var(--radius) 0 0;
-      background: var(--paper);
-      box-shadow:
-        0 -1px 0 var(--rule),
-        0 -12px 32px -12px #0000008c;
-    }
-
-    .run-question .after .fact {
-      flex: none;
-      background: var(--paper);
+      border-radius: 22px 22px 0 0;
+      background: var(--surface);
+      box-shadow: 0 -12px 28px rgb(22 19 43 / 0.16);
     }
 
     .run-question .after .fact p {
-      font-size: 1.0625rem;
-      line-height: 1.5rem;
+      font-size: 1rem;
+      line-height: 1.45;
+    }
+
+    .run-question .after .verdict-sign {
+      width: 34px;
+      height: 34px;
+    }
+
+    .run-question .after .verdict-word {
+      font-size: 1.5rem;
+    }
+
+    .run-question .after .filed {
+      padding: 8px 10px;
+      font-size: 0.875rem;
     }
 
     /* What happened on the day, in a line run on from its heading: the fact under it has the room. */
@@ -6060,8 +6453,8 @@
     .run-question .after .up-next {
       position: absolute;
       top: 0;
-      right: var(--radius);
-      left: var(--radius);
+      right: 22px;
+      left: 22px;
     }
 
     .run-question .after .up-next-label {
@@ -6078,29 +6471,35 @@
       background: transparent;
     }
 
-    /* At the panel's foot, over what scrolls under it: the surface goes on below it to the panel's edge, and what
-       scrolls fades out above it. */
+    /* At the panel's foot, over what scrolls under it: the surface goes on below it to the panel's edge. */
     .run-question .after .up-next-go {
       position: sticky;
       bottom: 0;
       width: 100%;
-      box-shadow: none;
+      min-height: 3.375rem;
     }
 
-    /* Once answered, the stopped clock steps aside with the panel coming up: room for the answers. */
-    .run-question .question-top > .timer {
-      max-height: 3rem;
+    /* While the panel scrolls (a long fact: ui.ts, reachable gives it a stop of its own), what scrolls fades out
+       above „Напред“. */
+    .run-question .after[tabindex] .up-next-go::before {
+      content: "";
+      position: absolute;
+      right: 0;
+      bottom: calc(100% + 4px);
+      left: 0;
+      height: 28px;
+      background: linear-gradient(to bottom, transparent, var(--surface));
+      pointer-events: none;
     }
 
-    .run-question.answered .question-top > .timer {
-      max-height: 0;
-      margin-top: calc(-1 * var(--space-4));
-      overflow: hidden;
-      opacity: 0;
-    }
-
-    .run-question.answered .question-top.stuck > .timer {
-      margin-top: 0;
+    .run-question .after[tabindex] .up-next-go::after {
+      content: "";
+      position: absolute;
+      right: 0;
+      bottom: 100%;
+      left: 0;
+      height: 4px;
+      background: var(--surface);
     }
   }
 
@@ -6431,48 +6830,6 @@
     }
   }
 
-  /* A laptop: the answer beside the question. The question and what answers it stay on the left, where they were
-     asked; the answer (the verdict, how everyone answered, the fact and „Напред“) comes in a column of its own on
-     the right, in sight from the top of the screen however tall the question, so that nothing scrolls for it (run.ts,
-     settle). The column is there from the question's start: nothing moves aside when the answer comes. The rows end
-     in a flexible one, which the answer spans: a long answer makes the page taller, not the question's rows apart.
-     A phone on its side, however wide, docks its answer (above). */
-  @media (min-width: 64rem) and (min-height: 30.0625rem), (min-width: 64rem) and (pointer: fine) {
-    .playing main > :has(.run-question > .after) {
-      max-width: none;
-    }
-
-    .run-question:has(> .after) {
-      grid-template-rows: repeat(4, auto) 1fr;
-      grid-template-columns: minmax(0, 1fr) min(26rem, 38%);
-      column-gap: var(--space-6);
-    }
-
-    .run-question > * {
-      grid-column: 1;
-    }
-
-    /* At most the screen's height under the header (6rem): a fact longer than the rest scrolls in it, „Напред“
-       staying at its foot. Its padding gives the shadows and the glows inside it their room. */
-    .run-question > .after {
-      position: sticky;
-      top: var(--space-4);
-      grid-row: 1 / -1;
-      grid-column: 2;
-      align-self: start;
-      max-height: calc(100dvh - 6rem);
-      margin: calc(-1 * var(--space-2));
-      padding: var(--space-2);
-      overflow-y: auto;
-      overscroll-behavior: contain;
-    }
-
-    .run-question .after .up-next-go {
-      bottom: 0;
-      box-shadow: none;
-    }
-  }
-
   /* A computer: the keys that play show on what they play (1–4 on the answers, Enter to go on). */
   .key-hint {
     display: none;
@@ -6486,14 +6843,14 @@
       height: 1.5rem;
       padding: 0 6px;
       border-radius: 2px;
-      background: var(--paper-2);
-      box-shadow: inset 0 -1px 0 var(--rule-2);
+      background: var(--surface-2);
+      box-shadow: inset 0 -1px 0 var(--line-2);
       color: var(--ink-3);
       font: 800 0.75rem / 1 var(--font-sans);
     }
 
     .btn.primary .key-hint {
-      background: color-mix(in srgb, var(--paper) 12%, transparent);
+      background: color-mix(in srgb, var(--bg) 12%, transparent);
       box-shadow: none;
       color: inherit;
     }
@@ -6516,396 +6873,302 @@
     }
   }
 
-  /* ---- The run, as the edition sets it: a cross, what's played and the count in one line; the pips as a row of
-     bars, the clock a hairline under them; the question in the serif; a choice's answers ruled rows with their
-     letter in a ring ---- */
+  /* ---- A run on each screen: on a phone a column the screen's height, the answer docked at its foot; on a laptop a
+     spread, the question's sheet on the left, what answers it and the answer on the right ---- */
 
-  .question-head {
-    align-items: center;
-    gap: var(--space-3);
+  /* Once answered, on every screen: the stopped clock goes, and a choice's answers are the player's own and the right
+     one, the others each a 36px line of their own words. */
+  .run-question.answered .question-top > .timer {
+    display: none;
   }
 
-  .question-head .game-leave {
-    display: grid;
-    align-self: center;
-    margin: -6px 0 -6px -12px;
-    font-size: 1.25rem;
+  .run-question.answered .options.choices {
+    gap: 6px;
   }
 
-  .question-head .head-side {
-    justify-items: start;
-    gap: 2px;
-    margin: 0 auto 0 0;
+  .run-question.answered .choices > .option.dim {
+    min-height: 36px;
+    padding-block: 4px;
+    border-width: 1.5px;
+    font-size: 0.9375rem;
+    line-height: 1.2;
   }
 
-  .question-head .kicker {
-    text-align: left;
-  }
-
-  .question-head .count-n {
-    font-size: 1.375rem;
-  }
-
-  .question-head .count-of {
-    font-size: 0.875rem;
-    line-height: 1;
-  }
-
-  /* „4/10“: the words („от“) are read aloud, the eye sees the stroke. */
-  .question-head .count-of .num-word {
-    position: absolute;
-    width: 1px;
-    height: 1px;
+  .run-question.answered .choices > .option.dim .option-words {
     overflow: hidden;
-    clip-path: inset(50%);
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .question-head .count-of::before {
-    content: "/";
-    margin-right: 1px;
+  .run-question.answered .choices > .option.dim .letter {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    font-size: 0.8125rem;
   }
 
-  .question-head .count {
-    gap: 1px;
+  .run-question.answered .choices > .option.dim .crowd-share {
+    font-size: 0.9375rem;
   }
 
-  .run-question .question-top {
-    gap: var(--space-2);
-  }
-
-  /* The pips a row of bars the column's width: done in ink, the one asked in gold. */
-  .run-question .question-top .trail {
-    gap: 4px;
-    max-width: none;
-  }
-
-  .question-top .trail li {
-    aspect-ratio: auto;
-    height: 5px;
-    border-radius: 0;
-  }
-
-  .question-top .trail li.wrong,
-  .question-top .trail li.partial {
-    box-shadow: inset 0 0 0 1.25px var(--ink);
-  }
-
-  .question-top.stuck .trail {
-    max-width: none;
-  }
-
-  /* The clock a hairline under the bars, the seconds small at its end. */
-  .question-top .timer .track {
-    height: 2px;
-    border-radius: 0;
-    background: var(--rule);
-  }
-
-  .question-top .timer .time-bar {
-    border-radius: 0;
-    background: var(--ink-2);
-  }
-
-  .question-top .timer.soon .time-bar,
-  .question-top .timer.low .time-bar {
-    box-shadow: none;
-  }
-
-  .run-question .question-top .secs {
-    font-size: 1rem;
-  }
-
-  .question-top .secs small {
-    font-size: 0.75rem;
-  }
-
-  /* The day's ten: each question's topic over it, its mark and its name. */
-  .question-topic {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin-bottom: calc(-1 * var(--space-2));
-    color: var(--ink-3);
-    font: 700 0.75rem / 1rem var(--font-sans);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
-
-  .question-topic .topic-mark {
-    width: 20px;
-    height: 20px;
-  }
-
-  .run-question .ask {
-    font-family: var(--font-serif);
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-
-  /* A choice's answers: ruled rows under a rule in ink, the letter in a ring. */
-  .options.choices {
-    gap: 0;
-    border-top: 1.5px solid var(--ink);
-  }
-
-  .choices > .option {
-    min-height: 4rem;
-    padding: 10px var(--space-3) 10px 6px;
-    border: 0;
-    border-bottom: 1px solid var(--rule);
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-  }
-
-  .options.choices > .option .letter {
-    width: 30px;
-    height: 30px;
-    border-radius: var(--radius-full);
-    background: transparent;
-    box-shadow: inset 0 0 0 1.25px var(--ink-3);
-    font: 600 0.8125rem / 1 var(--font-sans);
-  }
-
-  .choices > .option:active:not(:disabled, [aria-disabled="true"]) {
-    background: var(--paper-2);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .choices > .option:hover:not(:disabled, [aria-disabled="true"], :active) {
-      background: color-mix(in srgb, var(--ink) 4%, transparent);
-      transform: none;
-    }
-  }
-
-  .choices > .option.picked {
-    box-shadow: none;
-    background: var(--paper-2);
-  }
-
-  .choices > .option.picked .letter {
-    background: var(--ink);
-    color: var(--paper);
-    box-shadow: none;
-  }
-
-  /* Answered: the row washed in its colour, its ring filled, the sign at its end (nothing moves). */
-  .options.choices > .option:is(.right, .wrong) .letter {
-    color: var(--paper);
-    box-shadow: none;
-  }
-
-  .options.choices > .option.right .letter {
-    background: var(--right);
-  }
-
-  .options.choices > .option.wrong .letter {
-    background: var(--wrong);
-  }
-
-  .choices > .option.right {
-    background: var(--right-wash);
-    box-shadow: none;
-    font-weight: 700;
-  }
-
-  .choices > .option.wrong {
-    background: var(--wrong-wash);
-    box-shadow: none;
-  }
-
-  .choices > .option.dim {
-    background: transparent;
-  }
-
-  .options.choices > .option.dim .letter {
-    box-shadow: inset 0 0 0 1.25px var(--rule-2);
-  }
-
-  /* The verdict in the serif, in its colour; the sign stays the run's own (feel). */
-  .run-question .verdict .verdict-word {
-    font-family: var(--font-serif);
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-
-  /* „Знаеше ли?“ as a part of the page: a rule in ink over it, no card. */
-  .run-question .fact {
-    padding: var(--space-3) 0 0;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: inset 0 1.5px var(--ink);
-  }
-
-  .run-question .fact::before {
-    content: none;
-  }
-
-  :where(.run-question) .fact h2 {
-    color: var(--ink-3);
-    letter-spacing: 0.12em;
-  }
-
-  .run-question .fact p {
-    padding-right: 0;
-    font-style: normal;
-    font-weight: 400;
-  }
-
-  .fact .filed {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    color: var(--ink-3);
-    font: 500 0.8125rem / 1.125rem var(--font-sans);
-  }
-
-  .fact .filed .topic-mark {
-    width: 18px;
-    height: 18px;
-  }
-
-  /* On a phone the answer's panel is the page going on, docked: paper, a rule in ink over it. */
+  /* On a phone, once answered, the sheet shrinks to the question alone, the answers come up right under it, and of a
+     choice of pictures only the player's and the right one stay. The answer's panel (docked, below) leaves them in
+     sight. */
   @media (max-width: 47.99rem), (pointer: coarse) and (orientation: landscape) and (max-height: 30rem) {
-    .run-question .after {
-      border-radius: 0;
-      background: var(--paper);
-      box-shadow:
-        0 -1.5px 0 var(--ink),
-        0 -16px 24px -16px #00000040;
+    .run-question.answered .q-leaf {
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+      min-height: 0;
+      padding: 10px 14px;
+      border-radius: var(--r-2);
     }
 
-    .run-question .after .fact {
-      background: transparent;
+    .run-question.answered .q-leaf > .q-tags {
+      display: none;
     }
 
-    .run-question .after .up-next {
-      right: 0;
-      left: 0;
+    .run-question.answered .q-mini {
+      display: inline-grid;
+      --g: 32px;
     }
 
-    .run-question .after .up-next-go {
-      box-shadow:
-        0 var(--app-foot) 0 var(--paper),
-        0 -12px 12px -4px var(--paper);
+    .run-question.answered .q-leaf .ask {
+      padding: 0;
+      font-size: 1.0625rem;
+      line-height: 1.25;
+    }
+
+    .run-question.answered .answering {
+      margin-top: 0;
+    }
+
+    .run-question.answered .pic-options > .option.dim {
+      display: none;
     }
   }
 
-  /* The number as typed: the numeral big on a rule in ink, the caret in gold, the unit in the serif's italic beside it;
-     the pad a ruled grid of keys. */
-  .number-out {
-    min-height: 4rem;
-    padding: 0 0 var(--space-2);
-    border: 0;
-    border-bottom: 1.5px solid var(--ink);
-    border-radius: 0;
-    background: transparent;
+  /* A short phone (Safari's 664px and 600px of a 390px and a 375px one): the sheet, the question, the answers and the
+     pad a little smaller, so that all of it fits over the action at the foot. */
+  @media (max-width: 47.99rem) and (max-height: 43.75rem) {
+    .run-question .q-leaf {
+      gap: 10px;
+      min-height: 0;
+      padding: 14px 16px 22px;
+    }
+
+    .run-question .ask {
+      font-size: calc(10px + 0.625rem);
+      line-height: 1.22;
+    }
+
+    .run-question .chip {
+      min-height: 30px;
+      font-size: 0.875rem;
+    }
+
+    .run-question .chip .glyph {
+      --g: 24px;
+    }
+
+    .run-question .options {
+      gap: 8px;
+    }
+
+    .run-question .option {
+      min-height: 3.25rem;
+    }
+
+    .run-question .number {
+      gap: 8px;
+    }
+
+    .run-question .number-out {
+      min-height: 3.25rem;
+    }
+
+    .run-question .number-out .typed {
+      font-size: 2.5rem;
+    }
+
+    .run-question .keypad {
+      gap: 6px;
+    }
+
+    .run-question .key {
+      min-height: 2.75rem;
+    }
+
+    .run-question .option.tf {
+      min-height: 4.5rem;
+    }
   }
 
-  .number-out .typed {
-    font-size: calc(22px + 1.375rem);
+  /* Under 620px of height (a 320 × 568 phone): the chapter is its glyph alone beside „Трудното число“, the question a
+     size smaller. */
+  @media (max-width: 47.99rem) and (max-height: 38.75rem) {
+    .run-question .q-leaf {
+      gap: 8px;
+      padding: 12px 14px 18px;
+    }
+
+    .run-question .chip {
+      padding-right: 3px;
+    }
+
+    .run-question .chip-name {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .run-question .ask {
+      font-size: 1.125rem;
+    }
+
+    .run-question .option {
+      min-height: 3rem;
+      font-size: 1.0625rem;
+    }
+
+    .run-question .number-out .typed {
+      font-size: 2rem;
+    }
+
+    .playing #main {
+      --app-top: max(10px, env(safe-area-inset-top));
+      --app-foot: max(10px, env(safe-area-inset-bottom));
+    }
+
+    .run-question {
+      gap: 10px;
+    }
+
+    .run-question .question-top {
+      gap: 8px;
+    }
+
+    .run-question .number {
+      gap: 6px;
+    }
+
+    .run-question .number-out {
+      min-height: 2.75rem;
+      padding-bottom: 4px;
+    }
+
+    .run-question .answering .btn.primary.big {
+      min-height: 3.25rem;
+    }
   }
 
-  .number-out.live .typed::after {
-    width: 3px;
-    border-radius: 0;
-    background: var(--gold);
+  /* On a phone, how everyone guessed a number is said in a sentence under the verdict; the chart of the guesses waits
+     for a bigger screen, so that what the player said and the answer stay in sight. */
+  @media (max-width: 47.99rem) {
+    .run-question .guesses {
+      display: none;
+    }
   }
 
-  .number-out .unit {
-    color: var(--ink-3);
-    font: italic 500 1.125rem / 1 var(--font-serif);
-  }
-
-  .keypad {
-    gap: 0;
-    border-top: 1px solid var(--rule);
-    border-left: 1px solid var(--rule);
-    box-shadow: inset 0 -1px var(--rule);
-  }
-
-  .keypad .key {
-    min-height: 3.5rem;
-    border: 0;
-    border-right: 1px solid var(--rule);
-    border-bottom: 1px solid var(--rule);
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-  }
-
-  .keypad .key:active:not(:disabled) {
-    transform: none;
-    background: var(--paper-2);
-  }
-
-  /* A phone on its side: rows a little lower, so the question and its answers fit the screen's height. */
+  /* A phone on its side: the sheet low, the rows a little lower, so the question and its answers fit the screen's
+     height. */
   @media (pointer: coarse) and (orientation: landscape) and (max-height: 30rem) {
+    .run-question .q-leaf {
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+      min-height: 0;
+      padding: 8px 14px;
+      border-radius: var(--r-2);
+    }
+
+    .run-question .q-leaf > .q-tags {
+      display: none;
+    }
+
+    .run-question .q-mini {
+      display: inline-grid;
+      --g: 28px;
+    }
+
     .playing .choices > .option {
       min-height: 3rem;
       padding-block: 6px;
     }
   }
 
-  /* A big screen (not a phone on its side): a choice's answers one under another, ruled, as on a phone. */
+  /* A big screen (not a phone on its side): a choice's answers one under another, as on a phone. */
   @media (min-width: 48rem) and (min-height: 30.01rem) {
     .playing .options.choices {
       grid-template-columns: minmax(0, 1fr);
     }
   }
 
-  /* A laptop: the question is a spread, the question, its verdict and its fact on the left page, what answers it on
-     the right. */
+  /* A laptop: the question is a spread. On the left the head, the pips and the clock over the question's sheet (and
+     its picture), and the answer under them as it comes, kept in sight at the screen's foot; on the right what answers
+     it, marked. */
   @media (min-width: 64rem) {
     .run-question {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       grid-auto-rows: min-content;
-      column-gap: 80px;
+      column-gap: 20px;
+      row-gap: var(--space-4);
       align-content: start;
+    }
+
+    .run-question > * {
+      grid-column: 1;
     }
 
     .run-question > .question-top {
       grid-row: 1;
-      grid-column: 1 / -1;
-      margin-bottom: var(--space-6);
     }
 
-    /* The left page in its order: the topic, the question, its picture, the answer. */
-    .run-question > :not(.question-top, .answering, .leave-layer) {
-      grid-row: 4;
-      grid-column: 1;
-    }
-
-    .run-question > .question-topic {
+    .run-question > .q-leaf {
       grid-row: 2;
     }
 
-    .run-question > .ask {
+    .run-question > .picture {
       grid-row: 3;
     }
 
-    /* Under the question; on a screen too short for both, it keeps to the screen's foot, over the question's end,
-       „Напред“ always in sight. */
+    /* What answers it, level with the sheet. */
+    .run-question > .answering {
+      grid-row: 2 / span 4;
+      grid-column: 2;
+      align-self: start;
+    }
+
     .run-question > .after {
       position: sticky;
       bottom: 0;
       z-index: 1;
-      grid-row: 5;
-      padding-bottom: var(--space-4);
-      background: var(--paper);
+      grid-row: 4;
+      grid-column: 1;
+      box-shadow: 0 0 0 var(--space-4) var(--bg);
     }
 
-    .run-question > .answering {
-      grid-row: 2 / span 5;
-      grid-column: 2;
-      align-self: start;
+    .run-question .q-leaf {
+      min-height: 22.5rem;
+      padding: 32px 36px 40px;
+    }
+
+    /* Answered, the sheet is as tall as its question: the answer comes right under it. */
+    .run-question.answered .q-leaf {
+      min-height: 0;
     }
 
     .run-question .ask {
       font-size: calc(19px + 1.1875rem);
       line-height: 1.15;
+    }
+
+    .run-question .chip {
+      justify-self: start;
     }
 
     #main:has(.run-question) {
@@ -6965,7 +7228,7 @@
 
   .tight .fig + .fig {
     padding-left: 0;
-    border-top: 1px solid var(--rule);
+    border-top: 1px solid var(--line);
     border-left: 0;
   }
 
@@ -7028,7 +7291,7 @@
   /* Choices in a switch go on to a second line rather than out of the screen. */
   .tight .segmented {
     flex-wrap: wrap;
-    border-radius: var(--radius);
+    border-radius: var(--r-1);
   }
 
   .tight .segmented button {
@@ -7134,7 +7397,7 @@
     margin: var(--space-4) 0 0;
     padding: var(--space-4);
     overflow: visible;
-    border-radius: var(--radius);
+    border-radius: var(--r-1);
   }
 
   /* A result's plain buttons keep their words on one line while they can, then wrap them. */

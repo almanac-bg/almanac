@@ -6,8 +6,8 @@
 #                         use („“ – — … № · ° × −), so a page of Bulgarian needs one file of each family it shows;
 #   <family>-rest.woff2   the rest of Latin (é, č, ș), Greek and the other signs, loaded only where one shows.
 #
-# The weights are only those the style uses (app.css): Sofia Sans 400–900, Extra Condensed 600–900, Literata roman
-# 400–700 (its optical size fixed at 24, the headlines') and italic 500. The ranges below are the @font-face rules' unicode-range in app.css, word for word: change both together.
+# The weights are only those the style uses (app.css): Sofia Sans 400–900 and Extra Condensed 600–900.
+# The ranges below are the @font-face rules' unicode-range in app.css, word for word: change both together.
 #
 # And the faces of the card a shared result's link shows (internal/card), which the server draws itself: it reads
 # TrueType only and applies no font features, so each is a static cut of the one weight the card sets it in, cut to
@@ -46,8 +46,6 @@ make() {
 }
 make sofia-sans "ofl/sofiasans/SofiaSans%5Bwght%5D.ttf" "wght=400:900"
 make sofia-sans-extra-condensed "ofl/sofiasansextracondensed/SofiaSansExtraCondensed%5Bwght%5D.ttf" "wght=600:900"
-make literata "ofl/literata/Literata%5Bopsz,wght%5D.ttf" "wght=400:700 opsz=24"
-make literata-italic "ofl/literata/Literata-Italic%5Bopsz,wght%5D.ttf" "wght=500 opsz=12"
 ls -l "$here"/*.woff2
 
 card="U+0020-007E,U+00A0,U+00B7,U+0400-045F,U+2013-2014,U+201C,U+201E"

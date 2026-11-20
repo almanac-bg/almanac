@@ -11,12 +11,12 @@
 // there; a game brought here by it (its token in the address's fragment: takeHand) lands on the result, whose action
 // is then the ask to keep it and be reminded.
 
-import { picture } from "../art/picture.ts";
+import { loadPictures, picture } from "../art/picture.ts";
 import { news } from "../game/news.ts";
 import { closeWords, count, percent } from "../game/numbers.ts";
-import { hands, land, landed, reviewed } from "../game/results.ts";
-import { getReady, playRun, shownHere, starting, trail } from "../game/run.ts";
-import { shareDay, shareText } from "../game/share.ts";
+import { hands, land, reviewed } from "../game/results.ts";
+import { getReady, playRun, shownHere, starting } from "../game/run.ts";
+import { type SharedDay, shareDay, shareText } from "../game/share.ts";
 import { standing } from "../game/standing.ts";
 import type { Board, Mark, Reviewed, Score, State } from "../game/types.ts";
 import { api, errorText, serverNow, tally } from "../lib/api.ts";
@@ -30,8 +30,8 @@ import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { go, goBack, hold, release, title } from "../lib/router.ts";
 import { feelKit } from "../lib/sound.ts";
 import { dateWords, issueOf, onDay, weekday } from "../lib/words.ts";
-import { cover, notice, player, playing, topics, user } from "../state.ts";
-import { failure, formatNumber, rankRow, rightsOf, stakeLine, weekStrip } from "../ui.ts";
+import { cover, issueTopics, notice, player, playing, user } from "../state.ts";
+import { chapterName, chip, failure, formatNumber, glyph, leaf, mini, stakeLine, tiles, who, worn } from "../ui.ts";
 import { type Accepted, acceptedLine, type Waiting, waitingLine } from "./duel.ts";
 import { app, coverExit, exitWay, handedIn, haveProfile, keepLine, keepStake, mailAsk, takeHand } from "./keep.ts";
 import { loadStats, type Stats } from "./stats.ts";
@@ -146,6 +146,7 @@ export function today() {
       const t = inPage ?? (await api<Today>("GET", "/api/day"));
       inPage = undefined;
       day = t.day;
+      issueTopics.set(t.topics ?? []);
       const run = t.run;
       // A question this tab was showing has its time running (a reload): straight back into it. Otherwise (another
       // device, or tab) the day left half-way waits on Днес for „Продължи“: no question's time starts without a tap.
@@ -253,242 +254,190 @@ export function today() {
     const stats = signal<Stats | null>(null);
     if (user.peek()) loadStats().then(stats.set, () => {});
     const first = !user.peek();
+    const marks = run?.trail ?? [];
+    // Днес's budget (DESIGN.md): the issue, its action, the streak; on a big screen the issue's contents under them.
     return h(
       "section",
       { class: first ? "screen today first spread" : "screen today spread" },
       h("div", { class: "notices" }, notices),
-      dateline(t, first),
-      issue(t, start(t), run?.trail ?? [], failed, shared?.day === t.day ? shared : null, first),
-      first
-        ? null
-        : h(
-            "aside",
-            { class: "today-side page-2" },
-            streakSection(t, stats, false),
-            friendsToday(t),
-            bookLink(stats),
-            untold(t),
-          ),
+      issue(t, marks, shared?.day === t.day ? shared : null, first),
+      h(
+        "div",
+        { class: "today-side page-2" },
+        issueGo(start(t), marks.length, failed, first),
+        first ? null : streakSection(t, stats, false),
+        first ? null : untold(t),
+        contents(t),
+      ),
     );
   }
 }
 
-/** The issue's dateline under the frame's double rule: its number, and the day. */
-function dateline(t: Today, full: boolean): Child {
-  const year = full ? ` ${t.day.slice(0, 4)}` : "";
-  return h(
-    "div",
-    { class: "dateline" },
-    h("span", null, `Брой ${t.issue ?? issueOf(t.day)}`),
-    h("span", null, `${weekday(t.day)}, ${dateWords(t.day)}${year}`),
-  );
-}
-
-/** The day's ten, not played yet, as the day's issue: the date set large, what they are, and „Започни“; or, left
- * half-way (`marks`: how the questions answered went), where the player stopped, its shape so far, and „Продължи“;
- * and what went wrong starting them (`error`). Come by a shared day's link (`shared`), the score shared and its shape
- * lead, and the question is the player's. Before play there's no shape: it would measure nothing yet. */
-function issue(
-  t: Today,
-  start: () => void,
-  marks: Mark[],
-  error: string,
-  shared: Shared | null,
-  first: boolean,
-): Child {
+/** The day's ten, not played yet, as the day's issue: a stack of ten sheets in the colours of its ten chapters, the top
+ * one the first question's, its corner turned on the second's. On it the issue's number and weekday, the date set
+ * large, „Десет въпроса за днес“, the ten chapters' glyphs, and how long it takes; left half-way (`marks`), where the
+ * player stopped and its tiles so far. Come by a shared day's link (`shared`), whoever shared it and how they did, and
+ * the question is the player's. Before play there's no shape: it would measure nothing yet. */
+function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): Child {
   const players = t.board.players;
   const at = marks.length;
   const lead = shared && !at ? shared : null;
+  const order = t.topics?.length ? t.topics : [];
   const [, , date = 1] = t.day.split("-").map(Number);
+  const top = order[0] ?? "general";
+  const sharedMarks: Mark[] = lead ? [...lead.shape].map((c) => ({ right: c === "1" })) : [];
   return h(
     "div",
     { class: "issue day page-1" },
-    h(
-      "p",
-      { class: "issue-date" },
-      h("time", { datetime: t.day }, h("b", { class: "issue-n" }, String(date))),
-      " ",
-      h(
-        "span",
-        { class: "issue-month" },
-        dateWords(t.day).split(" ")[1] ?? "",
-        first ? h("span", { class: "kicker issue-weekday" }, weekday(t.day)) : null,
-      ),
-    ),
+    // The sheets under the top one, each its chapter's colour, a little narrower and lower than the one over it.
     h(
       "div",
-      { class: "issue-body" },
-      lead ? sharedScore(lead) : null,
-      h("h1", { class: "issue-title" }, lead ? "Колко ще познаеш ти?" : "Десет въпроса за днес."),
-      h(
-        "p",
-        { class: "deck" },
-        at
-          ? `Следва въпрос ${at + 1} от 10. Довърши ги до полунощ.`
-          : lead
-            ? "Същите десет въпроса чакат и теб: по един от всяка тема, от лесен към труден."
-            : first
-              ? "Едни и същи за цяла България. По един от всяка тема, от лесен към труден."
-              : "Едни и същи за цяла България.",
-      ),
-      at ? trail(marks, 10, at) : null,
-      h("button", { class: "btn primary issue-go", onclick: start }, at ? "Продължи" : "Започни"),
-      first && !at ? coverExit() : null,
-      error ? h("p", { class: "bad", role: "alert" }, error) : null,
-      at
-        ? null
-        : h(
-            "p",
-            { class: "small issue-meta" },
-            // Who has played today, once someone has: a zero says only that the place is empty.
-            players
-              ? `Около три минути · Днес ${players === 1 ? "игра 1 човек" : `играха ${formatNumber(players)} души`}`
-              : "Около три минути",
+      { class: "issue-stack", "aria-hidden": "true" },
+      order
+        .slice(1)
+        .map((id, i) => h("span", { class: `stack-leaf t-${id}`, style: { "--i": String(order.length - 1 - i) } })),
+    ),
+    leaf(
+      top,
+      [
+        h(
+          "p",
+          { class: "issue-top" },
+          h("span", { class: "issue-n" }, `Брой ${t.issue ?? issueOf(t.day)}`),
+          h("span", { class: "issue-weekday" }, weekday(t.day).toLowerCase()),
+        ),
+        h(
+          "p",
+          { class: "issue-date" },
+          h("time", { datetime: t.day }, h("b", { class: "issue-day" }, String(date))),
+          " ",
+          h("span", { class: "issue-month" }, dateWords(t.day).split(" ")[1] ?? ""),
+        ),
+        h(
+          "div",
+          { class: "issue-body" },
+          h(
+            "h1",
+            { class: "issue-title" },
+            lead
+              ? `Някой позна ${sharedMarks.filter((m) => m.right).length} от ${sharedMarks.length}. А ти?`
+              : "Десет въпроса за днес",
           ),
-      contents(t),
+          at
+            ? [h("p", { class: "issue-deck" }, `Следва въпрос ${at + 1} от 10.`), tiles(marks, order)]
+            : lead
+              ? h("div", { class: "shared-score" }, tiles(sharedMarks, order, sharedMarks.length))
+              : order.length
+                ? h(
+                    "ol",
+                    { class: "issue-toc", "aria-label": "В броя" },
+                    order.map((id, i) => h("li", { "aria-label": `${i + 1}. ${chapterName(id)}` }, glyph(id, 36))),
+                  )
+                : null,
+          h(
+            "p",
+            { class: "issue-meta" },
+            at
+              ? "Довърши ги до полунощ."
+              : // Who has played today, once enough have for it to say something.
+                players >= crowdFrom
+                ? `Около три минути · Днес играха ${formatNumber(players)} души`
+                : "Около три минути",
+          ),
+        ),
+      ],
+      first ? "issue-leaf first" : "issue-leaf",
+      { next: order[1] ?? "" },
     ),
   );
 }
 
-/** The issue's contents on a big screen („В броя“): its ten topics in their order, each with its chapter's colour. */
+/** From how many players today's count is said on the cover: below it, a count says little but that it's early. */
+const crowdFrom = 100;
+
+/** The issue's action beside it: „Започни“ (or, left half-way, „Продължи“), what went wrong starting it (`error`),
+ * and for a new visitor what the ten are, first. */
+function issueGo(start: () => void, at: number, error: string, first: boolean): Child {
+  return [
+    h("button", { class: "btn primary issue-go", onclick: start }, at ? "Продължи" : "Започни"),
+    first && !at ? coverExit() : null,
+    error ? h("p", { class: "bad", role: "alert" }, error) : null,
+    // A new visitor: what the ten are, under the action (which stays high on the screen).
+    first && !at
+      ? h(
+          "div",
+          { class: "issue-words" },
+          h("h2", null, "Едни и същи за цяла България."),
+          h("p", { class: "deck" }, "По един от всяка тема, от лесен към труден. Без регистрация."),
+        )
+      : null,
+  ];
+}
+
+/** The issue's contents on a big screen („В броя“): its ten chapters in their order, each with its glyph, the tenth
+ * named the hard number. */
 function contents(t: Today): Child {
   const list = t.topics ?? [];
   if (list.length < 2) return null;
   return h(
     "section",
-    { class: "contents-issue", "aria-label": "В броя" },
-    h("p", { class: "kicker" }, "В броя"),
+    { class: "sect contents-issue" },
+    h("div", { class: "sect-head" }, h("h2", null, "В броя"), h("span", { class: "sect-note" }, "от лесен към труден")),
     h(
       "ol",
-      null,
+      { class: "rows" },
       list.map((id, i) =>
         h(
           "li",
-          { class: `t-${id}` },
+          { class: "contents-row" },
           h("span", { class: "contents-n" }, String(i + 1)),
-          h("span", { class: "dot" }),
-          topics.find((c) => c.id === id)?.name ?? id,
+          glyph(id, 30),
+          h("span", { class: "contents-name" }, chapterName(id)),
+          i === list.length - 1 ? h("span", { class: "contents-hard" }, "най-трудният") : null,
         ),
       ),
     ),
   );
 }
 
-/** A shared day's score, as its link brought it: „7 от 10“ and its shape, a square each, no answers. */
-function sharedScore(s: Shared): Child {
-  const marks: Mark[] = [...s.shape].map((c) => ({ right: c === "1" }));
-  const rights = marks.filter((m) => m.right).length;
-  return h(
-    "div",
-    { class: "shared-score" },
-    h("p", { class: "kicker" }, "Споделен резултат"),
-    h("p", { class: "shared-score-n" }, h("b", null, String(rights)), ` от ${marks.length}`),
-    trail(marks, marks.length),
-  );
-}
-
-/** The streak: its number and this week, a square a day (played filled, today ringed in gold, the day forgiven), and
- * a line of what the day makes of it. While the day's ten wait (`done` false) the streak is at stake; once played,
- * its number rolls on (grow). Nothing while there's no streak and nothing played. */
+/** The streak: its number and „изиграни дни“, a day the week forgave said under it; while the day's ten wait (`done`
+ * false), it is at stake, unlit, and from the evening, if it ends at midnight, that's said. Nothing below three days
+ * (direction: the streak shows from 3). */
 function streakSection(t: Today, stats: () => Stats | null, done: boolean): Child {
   return () => {
-    const s = stats();
     const days = t.streak;
-    if (!days && !done) return null;
-    const unit = days === 1 ? "ден поред" : "дни поред";
-    // While the day waits, what it makes of the streak, and from the evening, if the week has forgiven its day
-    // already, that it ends (stakeLine: read again each minute).
-    const note = done
-      ? h("p", { class: "streak-note" }, `Утрешният брой я прави ${days + 1}.`)
-      : [
-          stakeLine(days, t.spare ?? true),
-          h(
-            "p",
-            { class: "streak-note" },
-            (t.spare ?? true) ? forgivesWords(t.perWeek) : "Тази седмица простените дни вече са използвани.",
-          ),
-        ];
-    return h(
-      "section",
-      { class: "sect today-streak" },
-      h("div", { class: "sect-head" }, h("h2", null, "Серия")),
-      h(
-        "div",
-        { class: "streak-row" },
-        h(
-          "a",
-          { class: done ? "streak-chip" : "streak-chip unlit", href: "/me", "aria-label": `Серия: ${days} ${unit}` },
-          h(
-            "span",
-            { class: "status-text" },
-            h("b", { class: "status-n" }, String(days)),
-            h("span", { class: "status-label" }, unit),
-          ),
-        ),
-        s ? weekStrip(s.week, s.forgiven) : null,
-      ),
-      note,
-    );
-  };
-}
-
-/** The friends' day: who has played it and how, best first, the way to them all in Приятели; for a player without
- * friends, one quiet line to add one. */
-function friendsToday(t: Today): Child {
-  const all = (t.friends ?? []).filter((s) => !s.me);
-  return h(
-    "section",
-    { class: "sect today-friends" },
-    h(
-      "div",
-      { class: "sect-head" },
-      h("h2", null, "Приятели днес"),
-      h("a", { class: "link sect-note", href: "/friends" }, "Всички"),
-    ),
-    all.length
-      ? h(
-          "ol",
-          { class: "rows ranks" },
-          all.slice(0, 5).map((s) => rankRow(s.name, { look: s, tag: s.tag, score: rightsOf(s.rights, s.of) })),
-        )
-      : h(
-          "p",
-          { class: "today-none" },
-          t.befriended === false
-            ? h("a", { href: "/friends" }, "Добави приятел и сравнявайте резултатите си всеки ден.")
-            : "Още никой от приятелите ти не е играл днес.",
-        ),
-  );
-}
-
-/** The way to the player's book: the seal it gives them, if any. */
-function bookLink(stats: () => Stats | null): Child {
-  return () => {
+    if (days < 3) return null;
     const s = stats();
-    if (!s) return null;
+    const forgiven = s?.forgiven?.filter(Boolean).length ?? 0;
     return h(
-      "section",
-      { class: "sect today-book" },
-      h("div", { class: "sect-head" }, h("h2", null, "Твоят Алманах")),
+      "a",
+      {
+        class: done ? "streak-chip today-streak" : "streak-chip today-streak unlit",
+        href: "/me",
+        "aria-label": `Серия: ${days} изиграни дни`,
+      },
+      picture("flame", "streak-flame tone-flame"),
+      h("b", { class: "status-n" }, String(days)),
       h(
-        "a",
-        { class: "book-link", href: "/almanac" },
-        picture("mode-almanac", "book-pic"),
-        h(
-          "p",
-          { class: "book-words" },
-          s.seal
-            ? [h("strong", null, `${s.seal.name}.`), " Всеки верен отговор в броя записва факт с мастило."]
-            : "Всеки верен отговор в броя записва по един факт с мастило в главата на темата си.",
-        ),
-        h("span", { class: "i i-right book-go", "aria-hidden": "true" }),
+        "span",
+        { class: "status-text" },
+        h("span", { class: "status-label" }, "изиграни дни"),
+        forgiven
+          ? h(
+              "span",
+              { class: "streak-note" },
+              `${forgiven} ${forgiven === 1 ? "простен ден" : "простени дни"} тази седмица`,
+            )
+          : done
+            ? null
+            : stakeLine(days, t.spare ?? true),
       ),
     );
   };
 }
 
 /** A count of right answers in words, as the result's line opens: „Седем верни.“ */
-const rightWords = [
+const _rightWords = [
   "Нито един верен.",
   "Един верен.",
   "Два верни.",
@@ -505,15 +454,22 @@ const rightWords = [
 /** How many a day's right answers are out of: all but those that count for nobody (Mark.void). */
 const outOf = (s: State) => s.total - (s.void ?? 0);
 
-/** The day played, as a page: the score and its shape, how it went among everyone, sharing it; how all of България did
- * with it and an entry its right answers wrote, as the book has it; tomorrow; the questions, once opened. As it's played
- * (`just`), it lands (feel.ts: the shape, the score, the streak rolling on) and what it brought is told; on a later
- * visit it is as it is. */
+/** The day played, as a page, in its budget's order (DESIGN.md, The result), the HTML's order too:
+ *
+ *   1. the score on its sheet, the tiles, how many knew the tenth, and how all of България did on average;
+ *   2. the day's entry in the book and what the day wrote (its ink, the chapter nearest its next rank, or a rank risen);
+ *   3. the friends who played it, their tiles;
+ *   4. the action: sharing it (on the first results, keeping the game and being reminded, or the way out of an app's
+ *      browser, which come right under the score instead);
+ *   5. tomorrow.
+ *
+ * Everything else (how all of България spread, the questions and their facts) is under „Въпросите и фактите“. As it's
+ * played (`just`), it lands (feel.ts) and what it brought is told; on a later visit it is as it is. A wrong game is
+ * never celebrated; ten of ten is a big moment. */
 function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   const fresh = signal<Today>(t);
   const now = just ? api<Today>("GET", "/api/day") : null;
   now?.then(fresh.set, () => {});
-  let growing: Promise<void> | null = null;
   const of = outOf(run);
   const perfect = of > 0 && run.rights === of;
   const review = reviewOf(run.id);
@@ -526,60 +482,50 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       reviewHead?.scrollIntoView({ block: "start" });
     });
   };
-  const hero = h(
-    "div",
-    { class: "result-score" },
-    perfect ? h("div", { class: "perfect-head" }, seal(), h("p", { class: "kicker" }, "Всички верни")) : null,
-    h("p", { class: "kicker" }, `Твоят брой ${t.issue ?? issueOf(t.day)} · ${dateWords(t.day)}`),
-    h(
-      "h1",
-      { class: "score" },
-      h("b", { class: "score-n" }, String(run.rights)),
-      h("span", { class: "score-of" }, `от ${of}`, h("span", { class: "score-close" }, closeWords(run.trail))),
-    ),
-    trail(run.trail, run.total),
-    h("p", { class: "result-line" }, h("b", null, rightWords[Math.min(10, run.rights)] ?? ""), " ", () =>
-      crowdWords(fresh(), !!t.firstDay),
-    ),
+  const order = t.topics ?? [];
+  // 1. The score, the cover's heavy numeral on the sheet of the issue's first chapter.
+  const hero = leaf(
+    order[0] ?? "general",
+    [
+      perfect ? h("div", { class: "perfect-head" }, perfectMark(), h("p", { class: "kicker" }, "Всички верни")) : null,
+      h("p", { class: "kicker score-kicker" }, `Брой ${t.issue ?? issueOf(t.day)} · ${dateWords(t.day)}`),
+      h(
+        "h1",
+        { class: "score" },
+        h("b", { class: "score-n" }, String(run.rights)),
+        h("span", { class: "score-of" }, `от ${of}`),
+        closeWords(run.trail) ? h("span", { class: "score-close" }, closeWords(run.trail)) : null,
+      ),
+      tiles(run.trail, order, run.total),
+      tenthLine(review),
+      () => {
+        const avg = fresh().board.average;
+        return avg ? h("p", { class: "score-bg" }, `България днес: средно ${formatNumber(avg, 0.1)}`) : null;
+      },
+    ],
+    "result-score score-leaf",
   );
   if (just) land(hero, run.id, perfect, true);
-  // The streak with today's, the game's stake, and the reminder's ask: the result's action where it leads, else in
-  // „Утре“. A guest in an app's own browser has the way out for the action; one whose game was just brought here,
-  // the ask to keep it and be reminded (while it's there to ask); everyone else, sharing the day.
+  // The streak with today's, the game's stake, and the reminder's ask. A guest in an app's own browser has the way out
+  // for the action; a guest on the first day, or one whose game was just brought here, the ask to keep it and be
+  // reminded (while it's there to ask), right under the score; everyone else, sharing the day.
   const streak = () => (just && fresh() === t ? 0 : fresh().streak);
   const stake = keepStake(
     () => (streak() >= 2 ? 2 : 1),
     () => streak(),
   );
-  const ask = remindAsk(t.day, stake);
   const guest = !user.peek()?.email;
   const away = !!app && guest;
-  const askFirst = !away && guest && handedIn.peek();
-  const share = [shareButton(run, t), h("p", { class: "small" }, "Само резултатът и формата му, без отговорите.")];
-  const streakRow = () => {
-    const f = fresh();
-    if (!user() || (!f.streak && !just)) return null;
-    const days = just && f === t ? t.streak : f.streak;
-    // Just played, the streak as it was before the day (unlit) until the day as it is now comes and it rolls on.
-    const row = h(
-      "a",
-      { class: just && f === t ? "streak-chip result-streak unlit" : "streak-chip result-streak", href: "/me" },
-      h(
-        "span",
-        { class: "status-text" },
-        h("b", { class: "status-n" }, String(days)),
-        h("span", { class: "status-label" }, streakLabel(days)),
-      ),
-    );
-    if (f !== t && !growing)
-      growing = grow(
-        row,
-        t,
-        f,
-        landed(run.id).then(() => wait(200)),
-      );
-    return row;
-  };
+  // A first day: as the server says, or, for a visitor who had no game at all when Днес came, this one.
+  const askFirst = !away && guest && (handedIn.peek() || t.firstDay !== false);
+  const ask = remindAsk(t.day, stake, askFirst);
+  const first = away || askFirst;
+  const action = h(
+    "div",
+    { class: first ? "result-share result-first" : "result-share" },
+    away ? exitWay(stake) : askFirst ? () => (ask.showing() ? ask.view : shareButton(run, t, streak)) : null,
+    first ? null : shareButton(run, t, streak),
+  );
   return h(
     "section",
     { class: "screen result summary spread" },
@@ -588,35 +534,85 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       "div",
       { class: "result-main page-1" },
       hero,
-      streakRow,
-      h(
-        "div",
-        { class: "result-share" },
-        away ? exitWay(stake) : askFirst ? () => (ask.showing() ? ask.view : share) : share,
-        h("button", { class: "link tap", type: "button", onclick: openReview }, "Прегледай въпросите"),
-      ),
-      // What the game brought (a day whose result was never on screen: told now, once).
-      just ? news(run.id) : untold(t, run.id),
+      first ? action : null,
+      // 2. The day's entry in the book, and what the day wrote.
+      () => entryOfDay(fresh().entry),
+      // Asked on every visit: the ink and the nearest step are counted again; a rank risen is told once (play.NewsOf).
+      news(run.id),
     ),
     h(
       "div",
       { class: "result-side page-2" },
-      () => bulgariaToday(fresh(), run, review),
-      () => entryOfDay(fresh().entry),
+      // 3. The friends who played it.
+      () => friendsDay(fresh()),
+      // 4. The action, once the first results are past.
+      first ? null : action,
+      // 5. Tomorrow.
+      tomorrow(t, streak, stake, first ? null : ask),
+      h(
+        "button",
+        { class: "more", type: "button", "aria-expanded": () => !!reviewList(), onclick: openReview },
+        "Въпросите и фактите",
+        h("span", { class: "i i-right", "aria-hidden": "true" }),
+      ),
     ),
-    tomorrow(t, streak, stake, askFirst || away ? null : ask),
     () => {
       const all = reviewList();
       if (!all) return null;
-      reviewHead = h("h2", { class: "section-title review-head", tabindex: -1 }, "Въпросите");
-      return h("div", { class: "result-review" }, reviewed(all, reviewHead));
+      reviewHead = h("h2", { class: "section-title review-head", tabindex: -1 }, "Въпросите и фактите");
+      return h("div", { class: "result-review" }, reviewHead, bulgariaToday(fresh(), run, review), reviewed(all, null));
     },
+  );
+}
+
+/** How many knew the day's tenth, its hard number: „Десетият: знаеха го 14 %“; before there's a crowd, that it's the
+ * hardest today. */
+function tenthLine(review: Promise<Reviewed[]>): Child {
+  const said = signal("");
+  review.then(
+    (all) => {
+      const last = all.filter((q) => !q.void).at(-1);
+      const c = last?.reveal.crowd;
+      said.set(c?.answers ? `Десетият: знаеха го ${percent(c.right)}` : "Десетият е най-трудният днес");
+    },
+    () => {},
+  );
+  return () => (said() ? h("p", { class: "tenth" }, said()) : null);
+}
+
+/** The friends who have played the day, best first, up to five, each with their tiles as small squares and their
+ * score; nothing while none has (no line asking for friends: the day's result isn't the place). */
+function friendsDay(t: Today): Child {
+  const all = (t.friends ?? []).filter((s) => !s.me).slice(0, 5);
+  if (!all.length) return null;
+  return h(
+    "section",
+    { class: "sect friends-day" },
+    h(
+      "div",
+      { class: "sect-head" },
+      h("h2", null, "Приятели днес"),
+      h("a", { class: "sect-note", href: "/friends" }, "Класация"),
+    ),
+    h(
+      "ol",
+      { class: "rows" },
+      all.map((s) =>
+        h(
+          "li",
+          { class: "fd-row" },
+          who(s.name, s, worn(s.seal), s.name, s.tag),
+          s.trail?.length ? mini(s.trail) : null,
+          h("b", { class: "fd-score", "aria-label": `${s.rights} от ${s.of}` }, String(s.rights)),
+        ),
+      ),
+    ),
   );
 }
 
 /** How the day played went among everyone: the share of players it did better than, where that's said
  * (game/standing.ts; `early`: on a first day), else, from ten players, how many right is usual today. */
-function crowdWords(t: Today, early: boolean): string {
+function _crowdWords(t: Today, early: boolean): string {
   const lead = standing(t.board.place, t.board.players, early)?.lead;
   if (lead) return lead;
   const avg = t.board.average;
@@ -718,56 +714,77 @@ function bulgariaToday(t: Today, run: State, review: Promise<Reviewed[]>): Child
 function entryOfDay(r?: DayEntry | null): Child {
   if (!r) return null;
   const f = r.fact;
-  const chapter = topics.find((c) => c.id === f.category)?.name ?? "";
-  const kicker = !r.crowd ? `въпрос ${r.n + 1}` : r.right ? `знаят го ${percent(r.right)}` : "само ти го знаеш";
+  const kicker = !r.crowd ? `въпрос ${r.n + 1}` : r.right ? `знаеха го ${percent(r.right)}` : "само ти го знаеш";
   return h(
     "section",
-    { class: `sect rarest t-${f.category}` },
-    h("div", { class: "sect-head" }, h("h2", null, r.crowd ? "Най-рядкото ти попадение" : "Днес в Алманаха ти")),
-    h("p", { class: "kicker rarest-kicker" }, `${chapter} · ${kicker}`),
-    h(
-      "div",
-      { class: "entry first rarest-entry" },
-      h("p", { class: "entry-word" }, f.untrue ? h("span", { class: "entry-untrue" }, "Невярно: ") : null, f.answer),
-      f.question ? h("p", { class: "entry-q" }, f.question) : null,
-      h("p", { class: "entry-fact" }, f.fact),
-      h(
-        "p",
-        { class: "filed" },
-        picture(`topic-${f.category}`, `filed-pic t-${f.category}`),
-        `Записано в Алманаха, глава „${chapter}“`,
-      ),
+    { class: "sect day-entry" },
+    h("div", { class: "sect-head" }, h("h2", null, r.crowd ? "Най-рядкото ти попадение" : "Днес в Алманаха")),
+    leaf(
+      f.category,
+      [
+        h("div", { class: "entry-tags" }, chip(f.category), h("span", { class: "entry-kicker" }, kicker)),
+        h("p", { class: "entry-word" }, f.untrue ? h("span", { class: "entry-untrue" }, "Невярно: ") : null, f.answer),
+        f.question ? h("p", { class: "entry-q" }, f.question) : null,
+        h("p", { class: "entry-fact" }, f.fact),
+      ],
+      "entry-leaf",
     ),
   );
 }
 
 /** „Сподели резултата“: the sheet with the day's card and its text (game/share.ts), „Сподели“ (the device's share
  * sheet, where there is one) and „Копирай текста“. */
-function shareButton(run: State, t: Today): Child {
-  const open = () => shareSheet(run, t);
-  return h("button", { class: "btn primary result-share-go", type: "button", onclick: open }, "Сподели резултата");
+function shareButton(run: State, t: Today, streak: () => number): Child {
+  const open = () => shareSheet(run, t, streak());
+  return h(
+    "button",
+    { class: "btn primary result-share-go", type: "button", onclick: open },
+    h("span", { class: "i i-share", "aria-hidden": "true" }),
+    "Сподели",
+  );
 }
 
-/** The share sheet over the result (a <dialog>, from the foot on a phone, centred on a big screen): the card a link's
- * preview shows (internal/card), the text the link goes with, and the ways to send it. Esc, „Затвори“ or a tap beside
- * it puts it away. */
-function shareSheet(run: State, t: Today): void {
+/** The card as drawn (game/card.ts), shown from its data: the page's own picture, made here, so it's set as it is
+ * (h() takes no data: address, lib/dom.ts, safeURL: one from anywhere else never reaches it). */
+function cardImage(data: string, alt: string): HTMLImageElement {
+  const img = h("img", { class: "share-card", alt, width: 1200, height: 630 }) as HTMLImageElement;
+  if (data.startsWith("data:image/png;base64,")) img.src = data;
+  return img;
+}
+
+/** The share sheet over the result (a <dialog>, from the foot on a phone, centred on a big screen): the card that goes
+ * with it (game/card.ts, drawn here), the text, and the ways to send it. Esc, „Затвори“ or a tap beside it puts it
+ * away. */
+function shareSheet(run: State, t: Today, streak: number): void {
+  const issue = t.issue ?? issueOf(t.day);
+  const day: SharedDay = { issue, rights: run.rights, of: outOf(run), streak, marks: run.trail };
   const text = signal("");
   const said = signal("");
-  const shape = run.trail
-    .filter((m) => !m.void)
-    .map((m) => (m.right ? "1" : "0"))
-    .join("");
+  const card = signal<File | null>(null);
+  const preview = signal("");
   const sheet = h("dialog", { class: "sheet share-sheet", "aria-labelledby": "share-title" }) as HTMLDialogElement;
   const close = () => {
     sheet.close();
     sheet.remove();
   };
-  shareText(run.id).then(text.set, (err) => said.set(errorText(err)));
+  shareText(run.id, day).then(text.set, (err) => said.set(errorText(err)));
+  Promise.all([import("../game/card.ts"), loadPictures()])
+    .then(([m, pictures]) => m.drawCard(issue, dateWords(t.day), run.trail, t.topics ?? [], pictures))
+    .then(
+      (file) => {
+        if (!file) return;
+        card.set(file);
+        // Shown as data (the page's pictures are its own or data: server/middleware.go, csp).
+        const read = new FileReader();
+        read.onload = () => preview.set(String(read.result));
+        read.readAsDataURL(file);
+      },
+      () => {},
+    );
   const send = async () => {
     said.set("");
     try {
-      const out = await shareDay(run.id);
+      const out = await shareDay(run.id, day, card.peek());
       if (out === "copied") said.set("Копирано.");
       else if (typeof out === "object") said.set("Копирай текста по-горе.");
       else if (out === "shared") close();
@@ -777,7 +794,7 @@ function shareSheet(run: State, t: Today): void {
   };
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(text.peek() || (await shareText(run.id)));
+      await navigator.clipboard.writeText(text.peek() || (await shareText(run.id, day)));
       said.set("Копирано.");
     } catch {
       said.set("Копирай текста по-горе.");
@@ -794,15 +811,11 @@ function shareSheet(run: State, t: Today): void {
         h("h2", { id: "share-title" }, "Сподели резултата"),
         h("button", { class: "link", type: "button", onclick: close }, "Затвори"),
       ),
-      h("p", { class: "kicker" }, "Картата към връзката"),
-      h("img", {
-        class: "share-card",
-        src: `/card/${t.issue ?? issueOf(t.day)}-${shape}.png`,
-        alt: `Брой ${t.issue ?? issueOf(t.day)}: ${run.rights} от ${outOf(run)}`,
-        width: 1200,
-        height: 630,
-      }),
-      h("p", { class: "kicker" }, "Текстът"),
+      h("div", { class: "share-card-box" }, () =>
+        preview()
+          ? cardImage(preview(), `Брой ${issue}: ${day.rights} от ${day.of}`)
+          : tiles(run.trail, t.topics ?? []),
+      ),
       h("pre", { class: "share-text" }, () => text() || "…"),
       h(
         "div",
@@ -903,29 +916,12 @@ const forgivesWords = (perWeek = 2) =>
     ? "Ако пропуснеш ден, един на седмица ти се прощава."
     : "Ако пропуснеш ден, до два на седмица ти се прощават.";
 
-/** The streak's words beside its number. */
-const streakLabel = (n: number) => (n === 1 ? "ден поред" : "дни поред");
-
-/** The streak just grown by the day played (`was` before it, `now` after), moved there in its chip once the result
- * has landed (`after`): its number rolls on. Resolves once it's over. Without the game's feel loaded, or with less
- * motion, it is simply as it is. */
-async function grow(chip: HTMLElement, was: Today, now: Today, after: Promise<void>): Promise<void> {
-  const kit = feelKit();
-  if (!kit || now.streak !== was.streak + 1) return;
-  // Unlit as it was before the day, until its number rolls on.
-  chip.classList.add("unlit");
-  after.then(() => chip.classList.remove("unlit"));
-  await kit.streak(chip, now.streak, streakLabel, after, hands());
-}
-
-const wait = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
-
-/** The logo's rosette as a seal over ten of ten: four petals, the gold one last (feel.ts draws them in). */
-function seal(): SVGElement {
+/** The logo's rosette over ten of ten: four petals, the gold one last (feel.ts draws them in). */
+function perfectMark(): SVGElement {
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", "0 0 64 64");
-  svg.setAttribute("class", "seal");
+  svg.setAttribute("class", "perfect-mark");
   svg.setAttribute("aria-hidden", "true");
   for (const turn of [45, 135, 225, -45]) {
     const group = document.createElementNS(ns, "g");
@@ -961,6 +957,7 @@ const remindKey = "almanac.remind-ask";
 function remindAsk(
   day: string,
   stake: () => string | null,
+  primary = false,
 ): { view: Child; mailing: () => boolean; showing: () => boolean } {
   let asked = remindAsks(null);
   try {
@@ -1047,6 +1044,7 @@ function remindAsk(
         mailAsk({
           stake,
           no,
+          primary,
           yes: () => {
             save(remindAnswered(asked, "mail", day, true));
             tally("mailask:yes");
@@ -1062,7 +1060,7 @@ function remindAsk(
       h(
         "div",
         { class: "remind-actions" },
-        h("button", { class: "btn", type: "button", onclick: yes }, "Напомняй ми"),
+        h("button", { class: primary ? "btn primary" : "btn", type: "button", onclick: yes }, "Напомняй ми"),
         h("button", { class: "link tap", type: "button", onclick: no }, "Не сега"),
       ),
       () => error() && h("p", { class: "bad", role: "alert" }, error()),

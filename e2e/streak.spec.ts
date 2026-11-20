@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { daysPlayed, openGame, playRun, startDay } from "./play.ts";
 
 test("a streak that ended is said to have ended, once", async ({ page }) => {
@@ -31,7 +31,7 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
   await daysPlayed(page, 3, 2, 1);
   await page.reload();
   await expect(page.locator(".streak-chip.unlit")).toContainText("3");
-  await expect(page.locator(".today-streak .day-stake")).toHaveText("Серия от 3 дни. С днешните въпроси става 4.");
+  await expect(page.locator(".today-streak .day-stake")).toHaveText("С днешния брой серията става 4.");
   // A topic's result points to the day while it waits: the gold button, the streak under it, „Още десет“ plain.
   await openGame(page, "/play/history");
   await playRun(page);
@@ -40,73 +40,30 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
   await page.keyboard.press("Escape");
   const day = page.getByRole("link", { name: "Към въпросите на деня" });
   await expect(day).toHaveClass(/primary/);
-  await expect(page.locator(".actions .day-stake")).toHaveText("Серия от 3 дни. С днешните въпроси става 4.");
+  await expect(page.locator(".actions .day-stake")).toHaveText("С днешния брой серията става 4.");
   await expect(page.getByRole("button", { name: "Още десет" })).not.toHaveClass(/primary/);
   await day.click();
   await startDay(page);
   await playRun(page);
-  // Played: the flame lit, and tomorrow under the result's buttons.
-  await expect(page.locator(".streak-chip")).toContainText("4");
-  await expect(page.locator(".streak-chip.unlit")).toHaveCount(0);
+  // Played: tomorrow under the result says what it makes of the streak.
   const tomorrow = page.locator(".summary .tomorrow");
   await expect(tomorrow).toContainText("Утре");
   await expect(tomorrow).toContainText("Серията ти става 5.");
 });
 
-/** Keeps every way the streak's chip reads as Начало draws and moves it (its number and words, and „unlit“ while its
- * flame is), for `heard`. */
-async function watchChip(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const said: string[] = [];
-    (window as unknown as { chipSaid: string[] }).chipSaid = said;
-    new MutationObserver(() => {
-      for (const chip of document.querySelectorAll(".streak-chip")) {
-        const now = `${chip.querySelector(".status-text")?.textContent}${chip.classList.contains("unlit") ? " unlit" : ""}`;
-        if (said.at(-1) !== now) said.push(now);
-      }
-    }).observe(document, { subtree: true, childList: true, characterData: true, attributeFilter: ["class"] });
-  });
-}
-
-/** What the streak's chip has said since last asked. */
-const heard = (page: Page) => page.evaluate(() => (window as unknown as { chipSaid: string[] }).chipSaid.splice(0));
-
-test("the day played rolls the streak on in its chip, its words with its number: never „1 дни поред“", async ({
+test("a week's streak on Днес, and the day played makes it one more: no sheet over the result, no note of it", async ({
   page,
 }) => {
   test.setTimeout(120_000);
-  await watchChip(page);
   await page.goto("/");
-  await daysPlayed(page, 1);
-  await page.reload();
-  await expect(page.locator(".streak-chip.unlit")).toContainText("1ден поред");
-  await startDay(page);
-  await heard(page);
-  await playRun(page);
-  await expect(page.locator(".streak-chip:not(.unlit) .status-text")).toHaveText("2дни поред");
-  // From the day before, unlit, rolling on (both numbers on their way), to the day played, lit.
-  const said = await heard(page);
-  expect(said).toContain("1ден поред unlit");
-  expect(said).toContain("12дни поред");
-  expect(said.filter((s) => /^1дни/.test(s))).toEqual([]);
-});
-
-test("a week's streak rolls the chip on under the result: no sheet over it, and no note of it", async ({ page }) => {
-  test.setTimeout(120_000);
-  await watchChip(page);
-  await page.goto("/");
-  // Six days: the seventh rolls the chip on; nothing is noted (DECISIONS.md, „The direction“: no notes as rewards).
+  // Six days: the seventh makes it seven; nothing is noted (DECISIONS.md, „The direction“: no notes as rewards).
   await daysPlayed(page, 6, 5, 4, 3, 2, 1);
   await page.reload();
-  await expect(page.locator(".streak-chip.unlit")).toContainText("6дни поред");
+  await expect(page.locator(".streak-chip.unlit")).toContainText("6изиграни дни");
   await startDay(page);
-  await heard(page);
   await playRun(page);
-  await expect(page.locator(".streak-chip:not(.unlit) .status-text")).toHaveText("7дни поред", { timeout: 10_000 });
+  await expect(page.locator(".summary .tomorrow")).toContainText("Серията ти става 8.");
   await expect(page.locator(".summary")).not.toContainText("Отбелязано");
-  const said = await heard(page);
-  expect(said[0]).toBe("6дни поред unlit");
-  expect(said).toContain("67дни поред");
   // Never a sheet over the result, whatever the game was.
   await page.waitForTimeout(1500);
   await expect(page.locator("dialog[open]")).toHaveCount(0);

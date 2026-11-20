@@ -318,7 +318,7 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands, gap = 
   const moving: Animation[] = [];
   const timers: number[] = [];
   const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
-  const pips = [...hero.querySelectorAll<HTMLElement>(".trail li")];
+  const pips = [...hero.querySelectorAll<HTMLElement>(".trail li, .tiles .tile")];
   // Each pluck a step up the scale for each right answer before it, as the bell in a run: a good game climbs, a
   // wrong one thuds where the climb stands. The score lands as the last pip fills.
   let rights = 0;
@@ -378,7 +378,7 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands, gap = 
           fill: "backwards",
         }),
       );
-    for (const [k, petal] of [...hero.querySelectorAll(".seal path")].entries())
+    for (const [k, petal] of [...hero.querySelectorAll(".perfect-mark path")].entries())
       moving.push(
         petal.animate(
           [

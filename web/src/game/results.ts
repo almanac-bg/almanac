@@ -111,7 +111,7 @@ function seal(): SVGElement {
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", "0 0 64 64");
-  svg.setAttribute("class", "seal");
+  svg.setAttribute("class", "perfect-mark");
   svg.setAttribute("aria-hidden", "true");
   for (const turn of [45, 135, 225, -45]) {
     // Turned by its group, so the petal itself is free to grow (feel.ts) about the centre.
@@ -119,7 +119,7 @@ function seal(): SVGElement {
     group.setAttribute("transform", `rotate(${turn} 32 32)`);
     const petal = document.createElementNS(ns, "path");
     petal.setAttribute("d", "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z");
-    petal.style.fill = turn < 0 ? "var(--gold)" : "var(--t-movies)";
+    petal.style.fill = turn < 0 ? "var(--gold)" : "var(--ink)";
     petal.style.transformOrigin = "32px 32px";
     group.append(petal);
     svg.append(group);
@@ -194,7 +194,7 @@ export function reviewed(all: Reviewed[], heading: Child): Child {
         ),
         h("h3", { class: "ask" }, it.view.text),
         picture(it.view),
-        answered(it.view, it.reveal, it.given),
+        answered(it.view, it.reveal, it.given, it.close),
         crowdLine(it.view.type, it.reveal.crowd, it.right),
         fact(it.reveal.fact, it.reveal.day),
         report(it.reveal.id),

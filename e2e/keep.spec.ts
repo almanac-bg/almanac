@@ -41,14 +41,15 @@ test("a first day asks for the reminder only, not yet to keep the game; „Не 
   await page.goto("/");
   await startDay(page);
   await playRun(page);
-  const tomorrow = page.locator(".tomorrow");
-  await expect(tomorrow).toContainText("Да ти пишем, ако въпросите още те чакат?");
-  await expect(tomorrow).not.toContainText("само на това устройство");
-  await tomorrow.getByRole("button", { name: "Не сега" }).click();
-  await expect(tomorrow).not.toContainText("Да ти пишем");
+  // The first result's action, right under the score.
+  const ask = page.locator(".result-share.result-first");
+  await expect(ask).toContainText("Да ти пишем, ако въпросите още те чакат?");
+  await expect(ask).not.toContainText("само на това устройство");
+  await ask.getByRole("button", { name: "Не сега" }).click();
+  await expect(page.locator(".summary")).not.toContainText("Да ти пишем");
   await page.reload();
   await expect(page.locator(".tomorrow")).toBeVisible();
-  await expect(page.locator(".tomorrow")).not.toContainText("Да ти пишем");
+  await expect(page.locator(".summary")).not.toContainText("Да ти пишем");
 });
 
 test("„Не сега“ to the reminder by mail is one to the email: the line to keep the game waits for another day", async ({

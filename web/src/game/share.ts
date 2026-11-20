@@ -1,35 +1,69 @@
-// Sharing the day's result (server/share.go, play/share.go): the text the server writes for a finished day — its
-// issue, the score and its shape in squares, never an answer, and the link that brings whoever opens it to the same
-// ten — sent with the device's own share sheet where there is one (the Web Share API), else copied. The link is made
-// as the day is first shared; its text is kept for the page's life, so a second tap shares at once. What it looks like
-// is the screen's: this is only what it does, for any screen to use.
+// Sharing the day's result (server/share.go, play/share.go): its issue, the score and its tiles, never an answer, and
+// the link that brings whoever opens it to the same ten: „Брой 42 · 8/10 · 23 дни“, the tiles as squares (■ right,
+// ◧ близо, □ not), the link. The link is made as the day is first shared (the server's), and kept for the page's life,
+// so a second tap shares at once. With it goes the card (game/card.ts), drawn here as it's shared, where the device's
+// share sheet takes a picture; where there's no sheet, the text is copied. What it looks like is the screen's: this is
+// only what it does, for any screen to use.
 
 import { api } from "../lib/api.ts";
+import type { Mark } from "./types.ts";
 
 /** How sharing went: sent on (or at least the share sheet closed with a choice), copied, given up (the sheet closed
  * without one), or neither possible: the text, for the player to copy by hand. */
 export type Shared = "shared" | "copied" | "cancelled" | { text: string };
 
-const texts = new Map<number, Promise<string>>();
-
-/** The text a finished day of the player's (`run`) is shared with, its link made the first time. */
-export function shareText(run: number): Promise<string> {
-  let text = texts.get(run);
-  if (!text) {
-    text = api<{ text: string }>("POST", `/api/runs/${run}/share`).then((r) => r.text);
-    texts.set(run, text);
-    text.catch(() => texts.delete(run)); // asked again next time
-  }
-  return text;
+/** A finished day as it's shared: its issue, how many were right of how many count, the streak with it, and how each
+ * question went. */
+export interface SharedDay {
+  issue: number;
+  rights: number;
+  of: number;
+  streak: number;
+  marks: Mark[];
 }
 
-/** Shares a finished day (`run`): with the device's share sheet where there is one, else by copying its text. The
- * text is asked for first, so the sheet opens a moment after the tap, which every browser allows (its five seconds). */
-export async function shareDay(run: number): Promise<Shared> {
-  const text = await shareText(run);
+/** The day's tiles as text: ■ right, ◧ близо, □ not; a question that counts for nobody has no place. */
+export function squares(marks: Mark[]): string {
+  return marks
+    .filter((m) => !m.void)
+    .map((m) => (m.right ? "■" : m.close ? "◧" : "□"))
+    .join("");
+}
+
+/** The text a day is shared with: „Брой 42 · 8/10 · 23 дни“ (the streak from three days), its squares, and the link
+ * (`url`, said without its scheme). Unsigned: nothing in it says whose it is. */
+export function shareWords(d: SharedDay, url: string): string {
+  const streak = d.streak >= 3 ? ` · ${d.streak} дни` : "";
+  return `Брой ${d.issue} · ${d.rights}/${d.of}${streak}\n${squares(d.marks)}\n${url.replace(/^https?:\/\//, "")}`;
+}
+
+const links = new Map<number, Promise<string>>();
+
+/** The link of a finished day of the player's (`run`), made the first time it's asked for. */
+export function shareLink(run: number): Promise<string> {
+  let link = links.get(run);
+  if (!link) {
+    link = api<{ url: string }>("POST", `/api/runs/${run}/share`).then((r) => r.url);
+    links.set(run, link);
+    link.catch(() => links.delete(run)); // asked again next time
+  }
+  return link;
+}
+
+/** The text a finished day is shared with, its link made the first time. */
+export async function shareText(run: number, d: SharedDay): Promise<string> {
+  return shareWords(d, await shareLink(run));
+}
+
+/** Shares a finished day (`run`): with the device's share sheet where there is one, the card with the text where it
+ * takes a picture (`card`: drawn by then, or null), else by copying its text. The link is asked for first, so the
+ * sheet opens a moment after the tap, which every browser allows (its five seconds). */
+export async function shareDay(run: number, d: SharedDay, card: File | null = null): Promise<Shared> {
+  const text = await shareText(run, d);
   if (typeof navigator.share === "function") {
+    const files = card && navigator.canShare?.({ files: [card] }) ? [card] : null;
     try {
-      await navigator.share({ text });
+      await navigator.share(files ? { files, text } : { text });
       return "shared";
     } catch (err) {
       if ((err as Error)?.name === "AbortError") return "cancelled";

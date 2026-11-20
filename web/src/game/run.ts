@@ -15,9 +15,21 @@ import { append, type Child, computed, effect, h, listen, onCleanup, type Signal
 import { calm, tickOn } from "../lib/prefs.ts";
 import { beforeLeaving, hold, release } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
-import { dateWords, issueOf } from "../lib/words.ts";
-import { categories, playingWhile } from "../state.ts";
-import { fact, factFace, failure, inRowChip, reachable, topicMark, type VerdictKind, verdict } from "../ui.ts";
+import { issueOf } from "../lib/words.ts";
+import { playingWhile } from "../state.ts";
+import {
+  chapterName,
+  chip,
+  fact,
+  failure,
+  filed,
+  glyph,
+  inRowChip,
+  leaf,
+  reachable,
+  type VerdictKind,
+  verdict,
+} from "../ui.ts";
 import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
 import { inRowOf } from "./numbers.ts";
 import { answered, beats, crowdLine, picture, picturesIn, type Stage } from "./questions.ts";
@@ -51,7 +63,6 @@ function showing(run: number): void {
 export function playRun(initial: State, done: (s: State) => Child, versus = "", them = ""): Child {
   const screen = slot();
   hold();
-  factFace();
 
   // A step of the run that doesn't get through (no line, the server restarting) is tried again quietly, a few times;
   // then it says so in the run's own frame (its head, its arrow out, its pips), and goes on as the line comes back.
@@ -339,7 +350,7 @@ export function trail(marks: Mark[], total: number, now = -1): HTMLElement {
   );
 }
 
-const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
+const topicName = chapterName;
 
 /** While leaving would cost the player something (`costs`: a question with its time running),
  * every way out (a link, back, the game's arrow) first asks, in a sheet over the game at the screen's foot: what it
@@ -634,10 +645,15 @@ function question(
     // The question's own steps on the right answer's beat (the right one marked) are taken with the panel's, in the
     // same frame, so that the answer comes into place in one movement (settle).
     const marks: (() => void)[] = [];
-    asked.reveal(res.reveal, answer, (ms, step) => {
-      if (ms === beats.right && !calm.peek()) marks.push(step);
-      else at(ms, step);
-    });
+    asked.reveal(
+      res.reveal,
+      answer,
+      (ms, step) => {
+        if (ms === beats.right && !calm.peek()) marks.push(step);
+        else at(ms, step);
+      },
+      kindOf(res, answer) === "partial",
+    );
     const now = trail(res.state.trail, s.total);
     now.children[q.n]?.classList.add("fresh");
     progress.replaceWith(now);
@@ -659,7 +675,9 @@ function question(
       crowd = waiting(crowdLine(q.view.type, res.reveal.crowd, res.right));
       rest = [
         theirLine(them, res.state.against?.[q.n]),
-        fact(res.reveal.fact, res.reveal.day, res.right ? q.category : undefined),
+        // Ink, said where it was written: the issue, met there first (the server says; not said, the issue at all).
+        res.right && res.reveal.fact && (res.ink ?? s.kind === "day") ? filed(q.category, res.ink) : null,
+        fact(res.reveal.fact, res.reveal.day),
         res.reveal.credit ? credit(res.reveal.credit) : null,
         upNext(lasts, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`, true),
         h(
@@ -745,13 +763,13 @@ function question(
   });
 
   // On a phone the question is a column the screen's height: the head, the pips and the clock at the top, the
-  // question under them, and what answers it at the foot, under the thumb (app.css).
+  // question on its chapter's sheet under them, and what answers it at the foot, under the thumb (app.css).
   const topicWords = q.onThisDay ? `${topicName(q.category)} · На този ден` : topicName(q.category);
   const head = stays(
     questionHead(
       q.n,
       s.total,
-      s.kind === "day" && s.day ? `Брой ${issueOf(s.day)} · ${dateWords(s.day)}` : topicWords,
+      s.kind === "day" && s.day ? `Брой ${issueOf(s.day)}` : topicName(s.category ?? q.category),
       score,
       versusNow,
     ),
@@ -760,12 +778,26 @@ function question(
   );
   const page = h(
     "article",
-    { class: "question run-question" },
+    { class: `question run-question t-${q.category}` },
     head.node,
-    // The day's ten are of every topic: each says its own over it.
-    s.kind === "day" ? h("p", { class: "question-topic" }, topicMark(q.category), topicWords) : null,
-    // It takes the focus as it opens, so a screen reader reads it first (no ring for it: app.css, h1).
-    ans.heading,
+    leaf(
+      q.category,
+      [
+        h(
+          "div",
+          { class: "q-tags" },
+          chip(q.category, h("span", { class: "chip-name" }, topicWords)),
+          // The day ends on its hard number: said on its sheet.
+          s.kind === "day" && q.n === s.total - 1 && q.view.type === "number"
+            ? h("span", { class: "hard-tag" }, "Трудното число")
+            : null,
+        ),
+        glyph(q.category, 32, "q-mini"),
+        // It takes the focus as it opens, so a screen reader reads it first (no ring for it: app.css, h1).
+        ans.heading,
+      ],
+      "q-leaf",
+    ),
     picture(q.view, true),
     h("div", { class: "answering" }, asked.node, problem),
     after,
@@ -773,7 +805,6 @@ function question(
   );
   return page;
 }
-
 /** How a question went for the other side of a duel, as a line under the player's verdict: „Мария: вярно за 4,2 с“.
  * Their mark for it comes with the player's own answer (play.State.Against): none, nothing to say. */
 function theirLine(name: string, m: TheirMark | undefined): Child {
@@ -822,11 +853,22 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   const headWas = headParts.map((el) => el.getBoundingClientRect());
   const was = scrollY;
   const right = answers instanceof Element ? answers.querySelector("button.option.right") : null;
+  // The player's own wrong answer stays in sight with the right one: the two rows a choice keeps (app.css).
+  const mine = answers instanceof Element ? answers.querySelector("button.option.wrong") : null;
   const key = right ?? (answers instanceof Element ? answers : after);
   const keyWas = key.getBoundingClientRect().top;
-  // The docked panel leaves room for the right answer over it, however tall (app.css).
-  if (right) page.style.setProperty("--keep", `${Math.ceil(right.getBoundingClientRect().height)}px`);
+  // What has to stay in sight: the right answer, and the player's own beside it.
+  const keyBox = () => {
+    const a = key.getBoundingClientRect();
+    const b = mine?.getBoundingClientRect();
+    if (!b || !right) return a;
+    const top = Math.min(a.top, b.top);
+    const bottom = Math.max(a.bottom, b.bottom);
+    return { top, bottom, height: bottom - top };
+  };
   show();
+  // The docked panel leaves room for them over it, however tall (app.css), as they are once answered.
+  if (right) page.style.setProperty("--keep", `${Math.ceil(keyBox().height)}px`);
   // Docked at a phone's foot (fixed), beside the question on a laptop (sticky, in its own column), or under it.
   const place = getComputedStyle(after).position;
   const docked = place === "fixed";
@@ -847,7 +889,7 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   // (what doesn't fit is a scroll away, „Напред“ at the screen's foot meanwhile, app.css), and always the verdict,
   // over „Напред“.
   const by = (headFoot: number) => {
-    const box = (docked || beside ? key : after).getBoundingClientRect();
+    const box = docked || beside ? keyBox() : after.getBoundingClientRect();
     const foot = docked ? after.getBoundingClientRect().top - 12 : innerHeight - 16;
     const below = box.bottom - foot;
     const room = (top: number) => top - headFoot - 12;

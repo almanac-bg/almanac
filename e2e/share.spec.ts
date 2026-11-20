@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { playRun, startDay } from "./play.ts";
+import { daysPlayed, playRun, startDay } from "./play.ts";
 
 /** What the page sent to the share sheet and to the clipboard, each stood in for (`sheet`: whether there is a share
  * sheet at all). */
@@ -19,7 +19,7 @@ async function standIn(page: Page, sheet: boolean): Promise<void> {
   }, sheet);
 }
 
-const shape = /^Алманах, брой \d+ · \d{1,2} [а-я]+\n(\d+) от 10 [■□]{10}\n\S+(\/d\/\d+-[a-z2-9]{8})$/;
+const shape = /^Брой \d+ · (\d+)\/10( · \d+ дни)?\n[■◧□]{10}\n\S+(\/d\/\d+-[a-z2-9]{8})$/;
 
 test("the day shared: its score and shape and a link, which brings another to the same ten", async ({
   page,
@@ -28,20 +28,23 @@ test("the day shared: its score and shape and a link, which brings another to th
   test.setTimeout(120_000);
   await standIn(page, true);
   await page.goto("/");
+  // Not the first day (whose result's action is keeping the game): its action is sharing it.
+  await daysPlayed(page, 1);
+  await page.reload();
   await startDay(page);
   await playRun(page);
-  // The sheet: the card a link's preview shows, the text, and the ways to send it.
-  await page.getByRole("button", { name: "Сподели резултата" }).click();
+  // The sheet: the card drawn for it, the text, and the ways to send it.
+  await page.getByRole("button", { name: "Сподели", exact: true }).click();
   const sheet = page.getByRole("dialog", { name: "Сподели резултата" });
-  await expect(sheet.locator(".share-card")).toHaveAttribute("src", /^\/card\/\d+-[01]{10}\.png$/);
-  await expect(sheet.locator(".share-text")).toContainText("от 10");
+  await expect(sheet.locator(".share-card")).toHaveAttribute("src", /^data:image\/png;base64,/);
+  await expect(sheet.locator(".share-text")).toContainText("/10");
   await sheet.getByRole("button", { name: "Сподели", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { sent: string[] }).sent.length)).toBe(1);
   await expect(sheet).toBeHidden();
   const text = await page.evaluate(() => (window as unknown as { sent: string[] }).sent[0] ?? "");
   const m = text.match(shape);
   expect(m, text).not.toBeNull();
-  const [, rights = "", link = ""] = m ?? [];
+  const [, rights = "", , link = ""] = m ?? [];
   // The day's result says the same score.
   await expect(page.locator(".score-n")).toHaveText(rights);
 
@@ -50,10 +53,9 @@ test("the day shared: its score and shape and a link, which brings another to th
   const visitor = await other.newPage();
   await visitor.goto(link);
   await expect(visitor).toHaveURL(/\/$/);
-  await expect(visitor.getByRole("heading", { name: "Колко ще познаеш ти?" })).toBeVisible();
-  await expect(visitor.locator(".shared-score-n")).toHaveText(`${rights} от 10`);
-  await expect(visitor.locator(".shared-score .trail li")).toHaveCount(10);
-  await expect(visitor.locator(".shared-score .trail li.right")).toHaveCount(Number(rights));
+  await expect(visitor.getByRole("heading", { name: `Някой позна ${rights} от 10. А ти?` })).toBeVisible();
+  await expect(visitor.locator(".shared-score .tile")).toHaveCount(10);
+  await expect(visitor.locator(".shared-score .tile.right")).toHaveCount(Number(rights));
   await startDay(visitor);
   await expect(visitor.locator(".question-head")).toContainText("1 от 10");
   await other.close();
@@ -67,9 +69,11 @@ test("without a share sheet, the day's text is copied", async ({ page }) => {
   test.setTimeout(120_000);
   await standIn(page, false);
   await page.goto("/");
+  await daysPlayed(page, 1);
+  await page.reload();
   await startDay(page);
   await playRun(page);
-  await page.getByRole("button", { name: "Сподели резултата" }).click();
+  await page.getByRole("button", { name: "Сподели", exact: true }).click();
   const sheet = page.getByRole("dialog", { name: "Сподели резултата" });
   // No share sheet on the device: copying is the way, gold.
   await expect(sheet.getByRole("button", { name: "Сподели", exact: true })).toHaveCount(0);
@@ -83,7 +87,7 @@ test("without a share sheet, the day's text is copied", async ({ page }) => {
   // A later visit: the result again, shared from there too, with the same link.
   await page.reload();
   await expect(page.locator(".result")).toBeVisible();
-  await page.getByRole("button", { name: "Сподели резултата" }).click();
+  await page.getByRole("button", { name: "Сподели", exact: true }).click();
   await page.getByRole("dialog", { name: "Сподели резултата" }).getByRole("button", { name: "Копирай текста" }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { copied: string[] }).copied)).toEqual(copied);
 });

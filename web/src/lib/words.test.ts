@@ -101,11 +101,11 @@ test("a word breaks by its syllables, as Bulgarian hyphenates", () => {
 
 test("a streak at stake says what the day's ten make of it, and from 18:00 that it ends at midnight", () => {
   assert.equal(stakeWords(0, false, 20), ""); // nothing to lose
-  assert.equal(stakeWords(1, false, 9), "Серия от 1 ден. С днешните въпроси става 2.");
-  assert.equal(stakeWords(5, false, 17), "Серия от 5 дни. С днешните въпроси става 6.");
-  assert.equal(stakeWords(5, false, 18), "Серия от 5 дни. Прекъсва в полунощ, ако не изиграеш въпросите на деня.");
+  assert.equal(stakeWords(1, false, 9), "С днешния брой серията става 2.");
+  assert.equal(stakeWords(5, false, 17), "С днешния брой серията става 6.");
+  assert.equal(stakeWords(5, false, 18), "Без днешния брой серията прекъсва в полунощ.");
   // The week would forgive the day: nothing ends at midnight.
-  assert.equal(stakeWords(5, true, 23), "Серия от 5 дни. С днешните въпроси става 6.");
+  assert.equal(stakeWords(5, true, 23), "С днешния брой серията става 6.");
 });
 
 test("a number the Bulgarian way: a space between thousands from 10 000, a decimal comma, a minus sign, not a hyphen", () => {

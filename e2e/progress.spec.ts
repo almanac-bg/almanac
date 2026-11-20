@@ -44,8 +44,8 @@ test("a topic's game never tells how well the topic is known, and the avatar is 
 // The day as the server would have it, the entry its right answers wrote told (as the server does) only once the day
 // is played: with others playing, the right answer a tenth of them got; with too few, the hardest, nothing of others.
 for (const { crowd, head, kicker } of [
-  { crowd: true, head: "Най-рядкото ти попадение", kicker: "История · знаят го 10\u00a0%" },
-  { crowd: false, head: "Днес в Алманаха ти", kicker: "История · въпрос 8" },
+  { crowd: true, head: "Най-рядкото ти попадение", kicker: "знаеха го 10\u00a0%" },
+  { crowd: false, head: "Днес в Алманаха", kicker: "въпрос 8" },
 ]) {
   test(`just played, an entry of the day is told as the book has it (${crowd ? "a crowd" : "no crowd"})`, async ({
     page,
@@ -67,12 +67,12 @@ for (const { crowd, head, kicker } of [
     await page.goto("/");
     await startDay(page);
     await playRun(page);
-    const entry = page.locator(".summary .rarest");
+    const entry = page.locator(".summary .day-entry");
     await expect(entry.locator("h2")).toHaveText(head);
-    await expect(entry.locator(".rarest-kicker")).toHaveText(kicker);
+    await expect(entry.locator(".chip")).toHaveText("История");
+    await expect(entry.locator(".entry-kicker")).toHaveText(kicker);
     await expect(entry.locator(".entry-word")).toHaveText("Този отговор");
     await expect(entry.locator(".entry-q")).toHaveText("Кой въпрос?");
-    await expect(entry.locator(".filed")).toHaveText("Записано в Алманаха, глава „История“");
     await expect(page.locator(".summary .btn.primary")).toHaveCount(1);
   });
 }
@@ -87,7 +87,7 @@ test("after the day: one gold thing to do next, and Профил leading back to
   // One gold action: sharing the day.
   const gold = page.locator(".btn.primary");
   await expect(gold).toHaveCount(1);
-  await expect(gold).toHaveText("Сподели резултата");
+  await expect(gold).toHaveText("Сподели");
   await expect(page.locator(".open-goals, .goal")).toHaveCount(0);
 
   // A topic, then Профил: its games, each of today's a way to go over it.

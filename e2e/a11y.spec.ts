@@ -76,10 +76,9 @@ for (const scheme of ["light", "dark"] as const) {
     await page.goto("/");
     await startDay(page);
     await playRun(page);
-    await expect(page.getByRole("button", { name: "Сподели резултата" })).toBeVisible();
-    // The result's moment over (feel.ts: the shape, the score, the streak rolling on), every part as it stays.
+    await expect(page.locator(".result-share")).toBeVisible();
+    // The result's moment over (feel.ts: the tiles, the score), every part as it stays.
     await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
-    await expect(page.locator(".streak-chip.unlit")).toHaveCount(0);
     const { violations } = await new AxeBuilder({ page }).analyze();
     expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
   });
