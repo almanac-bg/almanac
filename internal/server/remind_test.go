@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -75,8 +77,8 @@ func TestRemindersBackOff(t *testing.T) {
 	start := time.Date(2030, 3, 1, 0, 0, 0, 0, bulgaria())
 	clock := start
 	s.game.Now = func() time.Time { return clock }
-	// A streak of 4 days, the last on 1 March.
-	for i := range 4 {
+	// A streak of 7 days, the last on 1 March: every weekday is one she plays.
+	for i := range 7 {
 		g.finishedDay(anaID, start.AddDate(0, 0, -i), 18*time.Hour)
 	}
 	sent := map[int]bool{}
@@ -94,7 +96,7 @@ func TestRemindersBackOff(t *testing.T) {
 	if fake.count("/ana") != 4 || g.counted("push:sent:stop") != 1 || g.counted("push:sent:day") != 3 {
 		t.Fatalf("pushes %d, last %d", fake.count("/ana"), g.counted("push:sent:stop"))
 	}
-	if m := s.lastReminder(t.Context(), anaID, "2030-03-01"); m.Body != "Въпросите на деня са тук, когато решиш. Серията ти беше 4 дни." ||
+	if m := s.lastReminder(t.Context(), anaID); m.Body != "Днешният брой те чака" ||
 		m.Title != "Спираме напомнянията засега" || m.Kind != "stop" {
 		t.Fatalf("the last: %+v", m)
 	}
@@ -107,18 +109,59 @@ func TestRemindersBackOff(t *testing.T) {
 	}
 }
 
-// The last word leaves out a streak of one day.
-func TestLastReminderWithoutAStreak(t *testing.T) {
+// The last word names the nearest step in the player's book, when play gives one, and never a streak that ended, nor
+// a question's text: the day's issue alone otherwise.
+func TestLastReminderNamesTheNearestStep(t *testing.T) {
 	s, g, _, _ := pushWorld(t)
 	_, id := g.guest()
 	day := time.Date(2030, 3, 1, 0, 0, 0, 0, bulgaria())
 	s.game.Now = func() time.Time { return day.AddDate(0, 0, 8) }
-	g.finishedDay(id, day, 9*time.Hour)
-	if m := s.lastReminder(t.Context(), id, "2030-03-01"); m.Body != "Въпросите на деня са тук, когато решиш." {
-		t.Fatalf("one day: %q", m.Body)
+	for i := range 6 { // a streak of six, ended
+		g.finishedDay(id, day.AddDate(0, 0, -i), 9*time.Hour)
 	}
-	if strings.Contains(s.lastReminder(t.Context(), id, "2030-03-01").Body, "Серия") {
-		t.Fatal("a streak of one")
+	if m := s.lastReminder(t.Context(), id); m.Body != "Днешният брой те чака" {
+		t.Fatalf("no step known: %q", m.Body)
+	}
+	s.nearestStep = func(_ context.Context, userID int64) (Step, bool, error) {
+		return Step{Chapter: "История", Left: 1, Rank: "Тетрадка"}, userID == id, nil
+	}
+	m := s.lastReminder(t.Context(), id)
+	if m.Body != "Днешният брой те чака · История: още 1 до Тетрадка" || strings.Contains(m.Body, "6") ||
+		strings.Contains(m.Body, "Серия") {
+		t.Fatalf("with a step: %q", m.Body)
+	}
+	_, other := g.guest()
+	if m := s.lastReminder(t.Context(), other); m.Body != "Днешният брой те чака" {
+		t.Fatalf("a player with no step: %q", m.Body)
+	}
+	s.nearestStep = func(context.Context, int64) (Step, bool, error) { return Step{}, false, errors.New("down") }
+	if m := s.lastReminder(t.Context(), id); m.Body != "Днешният брой те чака" {
+		t.Fatalf("play failing: %q", m.Body)
+	}
+}
+
+// A reminder left on a weekday the player never plays on doesn't count as ignored: one who plays Monday to Friday
+// is still reminded on Monday after a weekend of reminders, and the rhythm is theirs from their first week.
+func TestRemindersOnTheirWeekdays(t *testing.T) {
+	s, g, fake, subscribe := pushWorld(t)
+	ana, anaID := g.guest()
+	subscribe(ana, "/ana")
+	// One week played, Monday 4 to Friday 8 March 2030.
+	for d := 4; d <= 8; d++ {
+		g.finishedDay(anaID, time.Date(2030, 3, d, 0, 0, 0, 0, bulgaria()), 18*time.Hour)
+	}
+	clock := time.Date(2030, 3, 9, 20, 0, 0, 0, bulgaria())
+	s.game.Now = func() time.Time { return clock }
+	var sent []string
+	for d := 9; d <= 14; d++ { // Saturday to Thursday, unplayed
+		clock = time.Date(2030, 3, d, 20, 0, 0, 0, bulgaria())
+		if s.remindSent(t.Context(), clock) == 1 {
+			sent = append(sent, clock.Weekday().String()[:3])
+		}
+	}
+	// Saturday and Sunday don't count; Monday, Tuesday and Wednesday do: none on Thursday.
+	if strings.Join(sent, " ") != "Sat Sun Mon Tue Wed" || fake.count("/ana") != 5 {
+		t.Fatalf("reminded on %v (%d pushes)", sent, fake.count("/ana"))
 	}
 }
 

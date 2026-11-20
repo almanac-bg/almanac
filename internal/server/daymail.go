@@ -13,8 +13,10 @@ import (
 // who said no to them) who asked for it, at the address they proved with the sign-in code; an address only typed in
 // gets nothing (a mail to anyone's address would be cheap to cause). As the notification (remind.go): once a day at
 // most, at the player's own hour (RemindMinute), never in the night (quietFrom: pushes.go), only while the day's
-// questions still wait, in the notification's words (reminder); after RemindIgnored of them since the player last
-// played the day, none more until they play it again. Never on a day the streak's mail goes (streakmail.go): one mail
+// questions still wait, in the notification's words (reminder); after RemindIgnored of them left since the player last
+// played the day, counted on the weekdays they play (rhythm: remind.go), none more until they play it again. It goes
+// only to an address the player proved (only the sign-in code sets one), and its link lands on Днес as from a mail
+// (?from=mail: a browser signed out is asked to sign in there first). Never on a day the streak's mail goes (streakmail.go): one mail
 // a day at most. Claimed in day_mails before it's queued in the outbox (which lets go of one to an address the mail
 // server refused: mail.Suppressed), so a restart never sends two. Asked for, it goes to every player who asked, those
 // held out of the reminders too (play.HeldReminders: the owner's call): a streak's mail held from them (streakmail.go)
@@ -97,19 +99,21 @@ func (s *Server) dayMails(ctx context.Context, at time.Time) int {
 	return n
 }
 
-// dayMail sends a player the day's reminder by mail, unless RemindIgnored of them have gone since they last played
-// the day, and says whether it went.
+// dayMail sends a player the day's reminder by mail, unless RemindIgnored of them have been left since they last
+// played the day (on the weekdays they play: rhythm), and says whether it went.
 func (s *Server) dayMail(ctx context.Context, today string, at time.Time, userID int64) (bool, error) {
 	var email string
-	var ignored int
-	err := s.db.Read.QueryRowContext(ctx, `SELECT u.email, (SELECT count(*) FROM day_mails d WHERE d.user_id = u.id
-		AND d.day < ?2 AND d.day > coalesce((SELECT max(day) FROM runs r WHERE r.user_id = u.id AND r.kind = 'day'
-			AND r.finished_at IS NOT NULL), ''))
-		FROM users u WHERE u.id = ?1 AND u.email IS NOT NULL`, userID, today).Scan(&email, &ignored)
-	if err != nil || ignored >= RemindIgnored {
+	var played sql.NullString
+	err := s.db.Read.QueryRowContext(ctx, `SELECT u.email, (SELECT max(day) FROM runs r WHERE r.user_id = u.id
+		AND r.kind = 'day' AND r.finished_at IS NOT NULL) FROM users u WHERE u.id = ? AND u.email IS NOT NULL`, userID).
+		Scan(&email, &played)
+	if err != nil {
 		if err == sql.ErrNoRows {
 			err = nil
 		}
+		return false, err
+	}
+	if ignored, err := s.mailsIgnored(ctx, userID, played.String, today); err != nil || ignored >= RemindIgnored {
 		return false, err
 	}
 	word := s.reminder(ctx, today, userID)
@@ -137,4 +141,30 @@ func (s *Server) dayMail(ctx context.Context, today string, at time.Time, userID
 		return false, err
 	}
 	return true, s.game.Tally(ctx, "mail:day:sent", 1)
+}
+
+// mailsIgnored is how many of the day's reminders by mail a player has left since they last played the day (played,
+// "" for never), before today: those on the weekdays they play (rhythm).
+func (s *Server) mailsIgnored(ctx context.Context, userID int64, played, today string) (int, error) {
+	week, err := s.rhythm(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	rows, err := s.db.Read.QueryContext(ctx, `SELECT day FROM day_mails WHERE user_id = ? AND day > ? AND day < ?`,
+		userID, played, today)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	n := 0
+	for rows.Next() {
+		var day string
+		if err := rows.Scan(&day); err != nil {
+			return 0, err
+		}
+		if week.counts(day) {
+			n++
+		}
+	}
+	return n, rows.Err()
 }
