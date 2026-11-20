@@ -6,30 +6,28 @@ import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
 import { feelKit, play } from "../lib/sound.ts";
 import { categories } from "../state.ts";
-import { countUp, explain, fact, formatNumber, type Look, meaning, who } from "../ui.ts";
+import { fact, type Look, who } from "../ui.ts";
 import { closeWords } from "./numbers.ts";
 import { answered, crowdLine, picture } from "./questions.ts";
 import { report } from "./report.ts";
 import { trail } from "./run.ts";
 import type { Reviewed, Score, State } from "./types.ts";
 
-/** A finished run: the score as the screen's big number, its points, a line about it (the place), and the marks;
- * right under it what to do next (`next`: the gold action, then „Прегледай въпросите“ and the others); then
- * whatever the screen adds (`more`: what the game earned); and at the end, once opened, the questions. `words` say
- * what its points are (the day's say the day's board too). */
+/** A finished run: the score as the screen's big number (its right answers), a line about it (the place), and the
+ * marks; right under it what to do next (`next`: the gold action, then „Прегледай въпросите“ and the others); then
+ * whatever the screen adds (`more`: what the game earned); and at the end, once opened, the questions. */
 export function summary(
   s: State,
   line: Child,
   next: { main: Child; also?: Child[] },
   more: Child[] = [],
-  words = meaning.points,
   moment = true,
 ): Child {
   const questions = reviewParts(
     async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${s.id}/review`)).questions,
   );
   const perfect = outOf(s) > 0 && s.rights === outOf(s);
-  const hero = scoreCard(s, line, words, moment ? formatNumber(s.points) : countUp(s.points));
+  const hero = scoreCard(s, line);
   if (moment) land(hero, s.id, perfect, s.kind === "day");
   return h(
     "section",
@@ -41,9 +39,9 @@ export function summary(
   );
 }
 
-/** A finished game's score, as its result has it: the right answers big, its points (`points`: as they're drawn),
- * a line about it, and the marks. */
-export function scoreCard(s: State, line: Child, words = meaning.points, points: Child = formatNumber(s.points)) {
+/** A finished game's score, as its result has it: the right answers big (the close ones beside them), a line about
+ * it, and the marks. */
+export function scoreCard(s: State, line: Child) {
   const perfect = outOf(s) > 0 && s.rights === outOf(s);
   return h(
     "div",
@@ -65,15 +63,6 @@ export function scoreCard(s: State, line: Child, words = meaning.points, points:
           h("span", { class: "num-word" }, closeWords(s.trail)),
         ),
       ),
-      h(
-        "p",
-        { class: "points" },
-        h("b", { class: "points-n", "data-n": s.points }, points),
-        " ",
-        // What points are, a tap away: the game's score, not strength (the rating).
-        explain(h("span", { class: "points-label" }, s.points === 1 ? "точка" : "точки"), words),
-        s.allRight ? h("span", { class: "points-bonus" }, `+${formatNumber(s.allRight)} за всички верни`) : null,
-      ),
     ),
     line,
     trail(s.trail, s.total),
@@ -84,7 +73,7 @@ export function scoreCard(s: State, line: Child, words = meaning.points, points:
 const outOf = (s: State) => s.total - (s.void ?? 0);
 
 /** What the game's feel (feel.ts) needs of the app, as it is now. */
-export const hands = () => ({ calm: calm.peek(), play, format: (n: number) => formatNumber(n) });
+export const hands = () => ({ calm: calm.peek(), play, format: (n: number) => String(n) });
 
 /** Each game's result moment, while it plays: what waits for it to land (the streak rolling on). */
 const moments = new Map<number, Promise<void>>();
@@ -189,7 +178,7 @@ export function reviewed(all: Reviewed[], heading: Child): Child {
         ? ["void", "Не се брои"]
         : it.right
           ? ["right", "Вярно"]
-          : it.points > 0
+          : it.close
             ? ["close", "Близо"]
             : it.given
               ? ["wrong", "Грешно"]
@@ -201,11 +190,7 @@ export function reviewed(all: Reviewed[], heading: Child): Child {
           "p",
           { class: "reviewed-head" },
           h("span", { class: "kicker" }, `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""}`),
-          h(
-            "span",
-            { class: "reviewed-says" },
-            it.points > 0 ? `${word} · ${formatNumber(it.points)} ${it.points === 1 ? "точка" : "точки"}` : word,
-          ),
+          h("span", { class: "reviewed-says" }, word),
         ),
         h("h3", { class: "ask" }, it.view.text),
         picture(it.view),
@@ -236,12 +221,8 @@ export function boardRow(
   );
 }
 
-/** A row's score, as its place is decided: the right answers big, the points that break a tie small under them. */
-const scoreOf = (s: Score) => [
-  String(s.rights),
-  h("small", { class: "sub" }, ` от ${s.of}`),
-  h("small", { class: "sub pts-under" }, `${formatNumber(s.points)} ${s.points === 1 ? "точка" : "точки"}`),
-];
+/** A row's score, as its place is decided: the right answers (a tie is broken by the server: play/board.go). */
+const scoreOf = (s: Score) => [String(s.rights), h("small", { class: "sub" }, ` от ${s.of}`)];
 
 /** A board of results: the best, and the viewer among them. */
 export function board(title: string, scores: Score[], place?: number, mine?: Score): Child {

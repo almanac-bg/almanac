@@ -57,8 +57,8 @@ func TestDayAnswersSeenBefore(t *testing.T) {
 	// Ana met the day's first question before, in a game of long ago (before the days were drawn ahead).
 	res, _ := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, category, questions, started_at) VALUES (?, 'topic', '', '[]', 0)`, ana)
 	old, _ := res.LastInsertId()
-	if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, score, points, is_right, ms, at)
-		VALUES (?, 0, ?, 1, 0, 1, 3000, 0)`, old, w.picks(s.ID)[0].ID); err != nil {
+	if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, score, is_right, ms, at)
+		VALUES (?, 0, ?, 1, 1, 3000, 0)`, old, w.picks(s.ID)[0].ID); err != nil {
 		t.Fatal(err)
 	}
 	// And the second one in a game this morning, which another player's day doesn't count for her.
@@ -66,8 +66,8 @@ func TestDayAnswersSeenBefore(t *testing.T) {
 	res, _ = w.db.Write.Exec(`INSERT INTO runs (user_id, kind, category, questions, started_at) VALUES (?, 'topic', '', '[]', ?)`,
 		ana, now)
 	morning, _ := res.LastInsertId()
-	if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, score, points, is_right, ms, at)
-		VALUES (?, 0, ?, 1, 0, 1, 3000, ?)`, morning, w.picks(s.ID)[1].ID, now); err != nil {
+	if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, score, is_right, ms, at)
+		VALUES (?, 0, ?, 1, 1, 3000, ?)`, morning, w.picks(s.ID)[1].ID, now); err != nil {
 		t.Fatal(err)
 	}
 	bo := w.user()

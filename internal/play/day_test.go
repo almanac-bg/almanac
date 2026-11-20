@@ -74,7 +74,7 @@ func withoutQuestion(t *testing.T, drop string) *bank.Bank {
 
 // A question of the day's ten found wrong in the middle of its day counts for nobody that day, whenever they played:
 // who played it all before (right throughout), who missed just that one, who was on it as it was voided, and who
-// came after and never saw it end with the same nine right, all right, and the same points, to the point.
+// came after and never saw it end with the same nine right, all right, and the same tiebreak, to the bit.
 func TestDayVoidKeepsResultsComparable(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -83,7 +83,7 @@ func TestDayVoidKeepsResultsComparable(t *testing.T) {
 	before, missed, during, after := w.user(), w.user(), w.user(), w.user()
 	allRight := func(int) func(int64, int) json.RawMessage { return w.right }
 	sb := w.dayAs(before, -1, allRight)
-	if !sb.Done || sb.Rights != Length || sb.AllRight != AllRight {
+	if !sb.Done || sb.Rights != Length {
 		t.Fatalf("all right before: %+v", sb)
 	}
 	sm := w.dayAs(missed, -1, func(n int) func(int64, int) json.RawMessage {
@@ -92,7 +92,7 @@ func TestDayVoidKeepsResultsComparable(t *testing.T) {
 		}
 		return w.right
 	})
-	if sm.Rights != Length-1 || sm.AllRight != 0 {
+	if sm.Rights != Length-1 {
 		t.Fatalf("one missed: %+v", sm)
 	}
 	sd := w.dayAs(during, k, allRight)
@@ -117,23 +117,29 @@ func TestDayVoidKeepsResultsComparable(t *testing.T) {
 	if w.count(`SELECT count(*) FROM answers WHERE run_id = ? AND n = ?`, sa.ID, k) != 0 {
 		t.Fatal("a player after the void was shown the void question")
 	}
-	want := sa.Points
+	hardest := func(run int64) int {
+		return w.count(`SELECT hardest FROM runs WHERE id = ?`, run)
+	}
+	want := hardest(sa.ID)
+	if want != (1<<Length-1)&^(1<<k) {
+		t.Fatalf("the hardest right answers of nine: %b", want)
+	}
 	for who, s := range map[string]State{
 		"before": w.stateOf(before, sb.ID), "missed": w.stateOf(missed, sm.ID), "during": sd, "after": sa,
 	} {
-		if !s.Done || s.Void != 1 || s.Rights != Length-1 || s.AllRight != AllRight || s.Points != want {
-			t.Errorf("%s: %+v, not nine right of nine and %d points", who, s, want)
+		if !s.Done || s.Void != 1 || s.Rights != Length-1 || hardest(s.ID) != want {
+			t.Errorf("%s: %+v, not nine right of nine (hardest %b)", who, s, hardest(s.ID))
 		}
-		if len(s.Trail) != Length || !s.Trail[k].Void || s.Trail[k].Points != 0 || slices.ContainsFunc(s.Trail[:k], func(m Mark) bool { return m.Void }) {
+		if len(s.Trail) != Length || !s.Trail[k].Void || s.Trail[k].Right || slices.ContainsFunc(s.Trail[:k], func(m Mark) bool { return m.Void }) {
 			t.Errorf("%s's trail: %+v", who, s.Trail)
 		}
 	}
-	// The answer given before stays (what was played), worth nothing now; the review says it's void.
-	if w.count(`SELECT count(*) FROM answers WHERE run_id = ? AND n = ? AND given IS NOT NULL AND points = 0`, sb.ID, k) != 1 {
-		t.Fatal("the answer to the void question isn't kept, worth nothing")
+	// The answer given before stays (what was played); the review says it's void.
+	if w.count(`SELECT count(*) FROM answers WHERE run_id = ? AND n = ? AND given IS NOT NULL`, sb.ID, k) != 1 {
+		t.Fatal("the answer to the void question isn't kept")
 	}
 	review, err := w.g.Review(ctx, before, sb.ID)
-	if err != nil || len(review) != Length || !review[k].Void || review[k].Points != 0 {
+	if err != nil || len(review) != Length || !review[k].Void {
 		t.Fatalf("the review: %+v %v", review, err)
 	}
 	// The board and the friends' board see the day so.
@@ -155,7 +161,7 @@ func TestDayVoidKeepsResultsComparable(t *testing.T) {
 	if err := w.g.EnsureDays(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if s := w.stateOf(before, sb.ID); s.Points != want || s.Void != 1 {
+	if s := w.stateOf(before, sb.ID); hardest(s.ID) != want || s.Rights != Length-1 || s.Void != 1 {
 		t.Fatalf("again: %+v", s)
 	}
 }
@@ -229,7 +235,7 @@ func TestDayHoldsStill(t *testing.T) {
 				}
 			})
 			s1 = w.stateOf(first, s1.ID)
-			if s1.Void != len(c.void) || s2.Void != len(c.void) || s1.Points != s2.Points || s2.Rights != Length-len(c.void) {
+			if s1.Void != len(c.void) || s2.Void != len(c.void) || s1.Rights != s2.Rights || s2.Rights != Length-len(c.void) {
 				t.Fatalf("before %+v, after %+v", s1, s2)
 			}
 			for _, n := range c.void {
@@ -255,34 +261,6 @@ func rightOf(t *testing.T, d bank.Dealt) json.RawMessage {
 	}
 	t.Fatalf("no answer in %s", reveal)
 	return nil
-}
-
-// A question relabelled while it's on screen pays as it showed: the same answer, the same points.
-func TestRelabelPaysAsShown(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	w.reload(w.b)
-	u := w.user()
-	run := w.runOf(u, "topic", "geo-001", "geo-002")
-	level := mustQuestion(t, w, "geo-001").Base().Difficulty
-	w.show(u, run)
-	w.reload(editedSample(t, func(id string, q map[string]any) {
-		if id == "geo-001" {
-			q["difficulty"] = map[bank.Difficulty]string{bank.Easy: "hard", bank.Medium: "hard", bank.Hard: "easy"}[level]
-		}
-	}))
-	w.wait(3 * time.Second)
-	res, err := w.answer(u, run, 0, w.right(run, 0))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := WorthOf(mustQuestion(t, w, "geo-001"), 1, 3*time.Second).Points; res.Points == want {
-		t.Fatalf("paid as relabelled: %d", res.Points)
-	}
-	if p := w.picks(run)[0]; p.D != level || res.Points != p.worth(mustQuestion(t, w, "geo-001"), 1, 3*time.Second).Points {
-		t.Fatalf("paid %d, the pick %+v (shown %s)", res.Points, p, level)
-	}
-	_ = ctx
 }
 
 // A day with a question void is a game of the nine that count wherever it's counted: nine of nine right is all right
@@ -324,7 +302,7 @@ func TestVoidDayIsOfNine(t *testing.T) {
 	}
 
 	// ana missed only the void one: all right, as bo is.
-	if s := w.stateOf(ana, sa.ID); s.Rights != Length-1 || s.AllRight != AllRight {
+	if s := w.stateOf(ana, sa.ID); s.Rights != Length-1 {
 		t.Fatalf("ana: %+v", s)
 	}
 	for who, u := range map[string]int64{"ana": ana, "bo": bo} {
@@ -387,7 +365,7 @@ func TestVoidDayIsOfNine(t *testing.T) {
 		t.Fatalf("past the void one: %+v", first.State)
 	}
 	again, err := w.answer(cy, sc.ID, k-1, w.right(sc.ID, k-1))
-	if err != nil || !again.Right || again.Points != first.Points || again.Reveal == nil {
+	if err != nil || !again.Right || again.InRow != first.InRow || again.Reveal == nil {
 		t.Fatalf("sent again: %+v %v", again, err)
 	}
 }

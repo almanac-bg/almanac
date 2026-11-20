@@ -109,8 +109,8 @@ func TestDayCrowdCountedByOne(t *testing.T) {
 	}
 }
 
-// A day's boards rank by right answers, then points: nine right are never under eight, whatever the points (the bonus
-// for right answers in a row can give eight more than nine); points decide among as many right. The same on the day's
+// A day's boards rank by right answers, then by how close the hard number came: nine right are never under eight,
+// however close an eight's number came; among as many right, the closer number goes first. The same on the day's
 // board, its places, the friends' board and the friends' list.
 func TestDayBoardsRankRightsFirst(t *testing.T) {
 	w := setup(t)
@@ -122,8 +122,9 @@ func TestDayBoardsRankRightsFirst(t *testing.T) {
 	nine, quick, slow := w.user(), w.user(), w.user()
 	w.befriend(nine, quick)
 	w.befriend(nine, slow)
-	// Each finishes the day, then their game is set to the case: Bo's eight right made more points than Ana's nine.
-	set := map[int64][2]int{nine: {9, 9210}, quick: {8, 9660}, slow: {8, 9000}}
+	// Each finishes the day, then their game is set to the case: Bo's eight right came closer on the number than
+	// Ana's nine, and than Vi's eight.
+	set := map[int64][2]int{nine: {9, 100}, quick: {8, 700}, slow: {8, 400}}
 	for _, user := range []int64{slow, quick, nine} {
 		s, err := w.g.StartDay(ctx, user)
 		if err != nil {
@@ -131,19 +132,27 @@ func TestDayBoardsRankRightsFirst(t *testing.T) {
 		}
 		c := set[user]
 		w.play(user, s.ID, append(repeat(w.right, c[0]), repeat(w.wrong, Length-c[0])...)...)
-		if _, err := w.db.Write.ExecContext(ctx, `UPDATE runs SET points = ? WHERE id = ?`, c[1], s.ID); err != nil {
+		if _, err := w.db.Write.ExecContext(ctx, `UPDATE runs SET closeness = ? WHERE id = ?`, c[1], s.ID); err != nil {
 			t.Fatal(err)
 		}
 	}
 	today := w.g.Today()
-	order := func(scores []Score) []int {
-		var out []int
+	tags := map[string]int64{}
+	for _, id := range []int64{nine, quick, slow} {
+		var tag string
+		if err := w.db.Read.QueryRow(`SELECT tag FROM users WHERE id = ?`, id).Scan(&tag); err != nil {
+			t.Fatal(err)
+		}
+		tags[tag] = id
+	}
+	order := func(scores []Score) []int64 {
+		var out []int64
 		for _, s := range scores {
-			out = append(out, s.Points)
+			out = append(out, tags[s.Tag])
 		}
 		return out
 	}
-	want := []int{9210, 9660, 9000}
+	want := []int64{nine, quick, slow}
 	b, err := w.g.BoardOf(ctx, today, quick)
 	if err != nil || !slices.Equal(order(b.Top), want) || b.Place != 2 || !b.Top[1].Me {
 		t.Fatalf("the day's board, as Bo sees it: %v place %d %v", order(b.Top), b.Place, err)
@@ -154,7 +163,7 @@ func TestDayBoardsRankRightsFirst(t *testing.T) {
 		}
 	}
 	f, err := w.g.FriendsBoard(ctx, today, slow)
-	if err != nil || !slices.Equal(order(f), []int{9210, 9000}) {
+	if err != nil || !slices.Equal(order(f), []int64{nine, slow}) {
 		t.Fatalf("the friends' board, as Vi sees it: %v %v", order(f), err)
 	}
 	if f, _ := w.g.FriendsBoard(ctx, today, nine); !slices.Equal(order(f), want) || !f[0].Me {
@@ -261,14 +270,45 @@ func TestBoardAverage(t *testing.T) {
 }
 
 // A game not yet counted takes its place among those counted as the count would put it: right answers first, then
-// points, then time, then the earlier started.
+// how close the hard number came, then the hardest right answer, then time, then the earlier started.
 func TestBoardRunAhead(t *testing.T) {
-	nine := boardRun{id: 2, rights: 9, points: 9210, ms: 90_000}
-	eight := boardRun{id: 1, rights: 8, points: 9660, ms: 60_000}
-	quicker := boardRun{id: 3, rights: 8, points: 9660, ms: 50_000}
-	later := boardRun{id: 4, rights: 8, points: 9660, ms: 60_000}
+	nine := boardRun{id: 2, rights: 9, tie: tiebreak{closeness: 0, hardest: 0b0111111111}, ms: 90_000}
+	eight := boardRun{id: 1, rights: 8, tie: tiebreak{closeness: 700, hardest: 0b0011111111}, ms: 60_000}
+	closer := boardRun{id: 5, rights: 8, tie: tiebreak{closeness: 750, hardest: 0b0011111111}, ms: 90_000}
+	harder := boardRun{id: 6, rights: 8, tie: tiebreak{closeness: 700, hardest: 0b0101111111}, ms: 90_000}
+	quicker := boardRun{id: 3, rights: 8, tie: eight.tie, ms: 50_000}
+	later := boardRun{id: 4, rights: 8, tie: eight.tie, ms: 60_000}
 	if !nine.ahead(eight) || eight.ahead(nine) || !quicker.ahead(eight) || eight.ahead(quicker) || nine.ahead(nine) ||
-		!eight.ahead(later) || later.ahead(eight) {
+		!eight.ahead(later) || later.ahead(eight) || !nine.ahead(closer) {
 		t.Fatal("ahead")
+	}
+	if !closer.ahead(eight) || eight.ahead(closer) || !closer.ahead(harder) {
+		t.Fatal("the closer number isn't ahead")
+	}
+	if !harder.ahead(eight) || eight.ahead(harder) || !harder.ahead(quicker) {
+		t.Fatal("the hardest right answer isn't ahead")
+	}
+}
+
+// What breaks a tie is counted answer by answer: the number's score, in thousandths, and each right answer's place,
+// the tenth's above all those before it.
+func TestTiebreakAdds(t *testing.T) {
+	var a, b tiebreak
+	for n := range Length - 1 {
+		a.add(n, 1, true, false)
+	}
+	a.add(Length-1, 0.62, false, true) // nine right, the number close
+	for n := range Length {
+		b.add(n, 1, n != 0, n == Length-1) // the first wrong, the number right on
+	}
+	if a.closeness != 620 || b.closeness != 1000 || a.hardest != 0b0111111111 || b.hardest != 0b1111111110 {
+		t.Fatalf("%+v %+v", a, b)
+	}
+	if b.cmp(a) != -1 || a.cmp(b) != 1 || a.cmp(a) != 0 {
+		t.Fatal("the closer number doesn't break the tie")
+	}
+	c, d := tiebreak{hardest: 0b1000000000}, tiebreak{hardest: 0b0111111111}
+	if c.cmp(d) != -1 {
+		t.Fatal("the tenth right isn't above the nine before it")
 	}
 }

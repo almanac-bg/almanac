@@ -36,7 +36,6 @@ type Played struct {
 	Category string `json:"category,omitempty"`
 	Rights   int    `json:"rights"`
 	Total    int    `json:"total"` // the questions that count (day.go): what Rights is out of
-	Points   int    `json:"points"`
 	At       int64  `json:"at"`
 	// A duel's: against whom, a recording or not, and how it ended.
 	Opponent string `json:"opponent,omitempty"`
@@ -117,7 +116,7 @@ func (g *Game) GamesOf(ctx context.Context, userID int64, kind, from string, lim
 		}
 	}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT id, kind, coalesce(day, ''), coalesce(category, ''), rights,
-		points, `+countedOf("questions")+`, finished_at, coalesce(opponent, ''), recorded, coalesce(outcome, '')
+		`+countedOf("questions")+`, finished_at, coalesce(opponent, ''), recorded, coalesce(outcome, '')
 		FROM runs WHERE user_id = ? AND finished_at IS NOT NULL `+only+` AND (finished_at < ? OR finished_at = ? AND id < ?)
 		ORDER BY finished_at DESC, id DESC LIMIT ?`, userID, at, at, id, limit+1)
 	if err != nil {
@@ -126,7 +125,7 @@ func (g *Game) GamesOf(ctx context.Context, userID int64, kind, from string, lim
 	defer rows.Close()
 	for rows.Next() {
 		var p Played
-		if err := rows.Scan(&p.ID, &p.Kind, &p.Day, &p.Category, &p.Rights, &p.Points, &p.Total, &p.At, &p.Opponent, &p.Recorded, &p.Outcome); err != nil {
+		if err := rows.Scan(&p.ID, &p.Kind, &p.Day, &p.Category, &p.Rights, &p.Total, &p.At, &p.Opponent, &p.Recorded, &p.Outcome); err != nil {
 			return out, err
 		}
 		if p.Outcome != "" && p.Opponent == "" {

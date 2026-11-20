@@ -3,7 +3,7 @@
 // and the notes it wrote in the book — a streak of 7, 30, 100 or 365 days, a first ten of ten, a chapter of the Алманах
 // complete. Each is a quiet line under the result, a note too: never a sheet over it and never a medal, as the game
 // that brought it may have gone badly (a streak's milestone may come with two right of ten), and a bad game is never
-// celebrated. On a player's first game, a line says what points are. In a card of its own, once a day, how others'
+// celebrated. In a card of its own, once a day, how others'
 // duels against the player's recordings went (play/recordings.go). A game that ended without its result on screen has
 // its news told on Начало later (play/told.go): under its result, if it's the day's; else under a line that says whose
 // it is.
@@ -12,7 +12,6 @@ import { api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { dateWords } from "../lib/words.ts";
 import { categories } from "../state.ts";
-import { dayPointsWords, explain, meaning } from "../ui.ts";
 import { type MasteryMove, masteryLine } from "./mastery.ts";
 
 /** A milestone noted in the player's book (play.Note): the day it happened, and what it was. */
@@ -26,10 +25,6 @@ export interface Note {
 }
 
 interface News {
-  /** The game's kind: what its points are said to be for. */
-  kind?: string;
-  /** The player's first finished game: what points are is said, once. */
-  first?: boolean;
   /** The facts the game put in Моят Алманах. */
   facts?: number;
   /** How a topic's game moved its mastery, when that's news (play.masteryTold). */
@@ -75,7 +70,6 @@ export function news(run: number, delay = 0, late?: { title?: string }): Child {
     const n = data();
     if (!n) return null;
     const parts = [
-      n.first ? pointsLine(n.kind) : null,
       n.facts ? factsLine(n.facts) : null,
       masteryLine(n.mastery),
       n.notes?.length ? notesLine(n.notes) : null,
@@ -85,17 +79,6 @@ export function news(run: number, delay = 0, late?: { title?: string }): Child {
     // Late, on Начало: whose news it is, over it; nothing at all when there's nothing to tell.
     return parts.flat().some(Boolean) ? [h("p", { class: "kicker news-late" }, late.title), parts] : null;
   };
-}
-
-/** What points are, said once, on a first game: one line, the rest a tap away on the word (with the day's board only
- * after the day's ten: it's theirs). */
-function pointsLine(kind?: string): Child {
-  return h(
-    "p",
-    { class: "news-open" },
-    explain(h("b", null, "Точките"), kind === "day" ? dayPointsWords : meaning.points),
-    " са резултатът ти в една игра.",
-  );
 }
 
 /** The facts a game put in Моят Алманах, a tap from them. */

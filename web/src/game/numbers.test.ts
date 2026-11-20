@@ -3,9 +3,9 @@ import { test } from "node:test";
 import { closeWords, inRowOf, percent, withOwn } from "./numbers.ts";
 import type { Mark } from "./types.ts";
 
-const right: Mark = { points: 1000, right: true };
-const close: Mark = { points: 400, right: false, partial: true };
-const wrong: Mark = { points: 0, right: false };
+const right: Mark = { right: true };
+const close: Mark = { right: false, close: true };
+const wrong: Mark = { right: false };
 
 test("the player's own answer is in the crowd they're shown: what they picked never reads 0%, and it adds up", () => {
   // Twenty others today, sixteen right (the answer is second), four on the third; the player picked the first.
@@ -22,7 +22,7 @@ test("the player's own answer is in the crowd they're shown: what they picked ne
   );
 });
 
-test("a score says its close answers, whose points would read as a mistake beside none right", () => {
+test("a score says its close answers, not right but not nothing", () => {
   assert.equal(closeWords([wrong, wrong, close, wrong]), " · 1 близо");
   assert.equal(closeWords([right, close, close, { ...close, void: true }]), " · 2 близо");
   assert.equal(closeWords([right, wrong]), "");
@@ -30,7 +30,7 @@ test("a score says its close answers, whose points would read as a mistake besid
 });
 
 test("a row of right answers goes over a question that counts for nobody, as the server counts it", () => {
-  const none: Mark = { points: 0, right: false, void: true };
+  const none: Mark = { right: false, void: true };
   assert.equal(inRowOf([right, right, none, right]), 3);
   assert.equal(inRowOf([wrong, right, none]), 1, "a void last one ends no row");
   assert.equal(inRowOf([right, wrong, none, right]), 1);

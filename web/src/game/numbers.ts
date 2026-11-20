@@ -9,10 +9,10 @@ export function percent(x: number): string {
   return x > 0 && x < 0.005 ? "под 1\u00a0%" : `${Math.round(x * 100)}\u00a0%`;
 }
 
-/** The close answers beside a score's right ones („ · 1 близо“), "" for none: they bring points too, so that none right
- * with its points never reads as a mistake. */
+/** The close answers beside a score's right ones („ · 1 близо“), "" for none: they count as not right, but a game of
+ * near misses never reads as nothing. */
 export function closeWords(trail: Mark[] = []): string {
-  const n = trail.filter((m) => m?.partial && !m.right && !m.void).length;
+  const n = trail.filter((m) => m?.close && !m.right && !m.void).length;
   return n ? ` · ${n} близо` : "";
 }
 

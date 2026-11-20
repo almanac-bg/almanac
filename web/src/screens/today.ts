@@ -350,7 +350,7 @@ function contents(t: Today): Child {
 
 /** A shared day's score, as its link brought it: „7 от 10“ and its shape, a square each, no answers. */
 function sharedScore(s: Shared): Child {
-  const marks: Mark[] = [...s.shape].map((c) => ({ points: 0, right: c === "1" }));
+  const marks: Mark[] = [...s.shape].map((c) => ({ right: c === "1" }));
   const rights = marks.filter((m) => m.right).length;
   return h(
     "div",
@@ -519,13 +519,6 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
     trail(run.trail, run.total),
     h("p", { class: "result-line" }, h("b", null, rightWords[Math.min(10, run.rights)] ?? ""), " ", () =>
       crowdWords(fresh(), !!t.firstDay),
-    ),
-    h(
-      "p",
-      { class: "small points" },
-      h("b", { class: "points-n", "data-n": run.points }, formatNumber(run.points)),
-      run.points === 1 ? " точка" : " точки",
-      run.allRight ? ` · +${formatNumber(run.allRight)} за всички верни` : "",
     ),
   );
   if (just) land(hero, run.id, perfect, true);

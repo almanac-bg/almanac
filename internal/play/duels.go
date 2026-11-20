@@ -15,9 +15,10 @@ import (
 )
 
 // Duels are two players on the same ten questions, each played on one's own time, as any game is (play.go: the run's
-// own clock, a question at a time); more points wins, the same points the quicker by a second or more (TieBand), and
-// anything closer is a draw. Nothing moves but the record between two people: there's no rating (owner, 2026-11-20,
-// DECISIONS.md „The redesign“).
+// own clock, a question at a time); more right answers wins, and between the same, what breaks a tie on the day's
+// board (tiebreak: how close the hard number came, then the hardest right answer), then the quicker by a second or
+// more (TieBand); anything closer is a draw (duelScore). Nothing moves but the record between two people: there's no
+// rating (owner, 2026-11-20, DECISIONS.md „The redesign“).
 //
 // A duel with a friend (DuelFriend): the player picks a friend and plays ten questions drawn for the two of them
 // (drawFor: „Микс“, at their pair's level, questions neither has seen first). Once their side is played, the duel is
@@ -37,8 +38,8 @@ import (
 // side left half-way counts as it stood when the time runs out.
 
 const (
-	// TieBand is how much quicker (ms, over the whole game) one of two with the same points must be to win: less is a
-	// draw.
+	// TieBand is how much quicker (ms, over the whole game) one of two with the same right answers, and nothing else to
+	// break the tie, must be to win: less is a draw.
 	TieBand = 1000
 	// DuelFor is how long a friend has to play a duel sent to them (from when it was sent: SentAt), and the first
 	// side to play theirs (from its start).
@@ -96,9 +97,14 @@ type DuelView struct {
 	Until int64 `json:"until,omitempty"`
 	// Lapsed is, of a duel that expired, who didn't play it in time: "you" or "they" (none: cut off, from before).
 	Lapsed string `json:"lapsed,omitempty"`
-	// Decided is, in a duel won on points, the question (from 1) after which the winner led to the end (decided); 0
-	// when the points were even and the time decided it, or nothing did. One duel's view (DuelOf) only.
+	// Decided is, in a duel won on right answers, the question (from 1) after which the winner led to the end
+	// (decided); 0 when the right answers were even and the tie was broken (or nothing did). One duel's view (DuelOf)
+	// only.
 	Decided int `json:"decided,omitempty"`
+	// TieBy is, of a duel with a result on even right answers, what broke the tie (duelScore): TieNumber (the number
+	// nearer), TieHardest (the harder right answer) or TieTime (quicker by TieBand or more); "" for a draw, or a duel
+	// won on right answers. One duel's view (DuelOf) only.
+	TieBy string `json:"tieBy,omitempty"`
 	// Record is how the player's duels against this person went, this one with them (not a recording's).
 	Record *Record `json:"record,omitempty"`
 	// Friend says the other is the player's friend now, Them who they are: a rematch is a tap away.
@@ -113,7 +119,6 @@ type DuelSide struct {
 	ID     int64  `json:"-"`
 	Name   string `json:"name"`
 	Tag    string `json:"tag,omitempty"`
-	Points int    `json:"points"`
 	Rights int    `json:"rights"`
 	Ms     int64  `json:"ms"`
 	Done   bool   `json:"done"`
@@ -125,16 +130,24 @@ type DuelSide struct {
 	// Marks are how each question answered went (DuelOf): the player's own; the other's once the duel has a result.
 	// While the player plays, the other's come with the run, each as far as the player has come (State.Against).
 	Marks []DuelMark `json:"marks,omitempty"`
+
+	score duelScore
 }
 
-// DuelMark is how one question of a duel went for one side: the points, whether right (partly, with some points but
-// not right), how long it took, and whether nothing was given (Missed: the time ran out).
+// What broke a tie on even right answers (DuelView.TieBy).
+const (
+	TieNumber  = "number"
+	TieHardest = "hardest"
+	TieTime    = "time"
+)
+
+// DuelMark is how one question of a duel went for one side: right, or close („близо“: closeAnswer), how long it took,
+// and whether nothing was given (Missed: the time ran out).
 type DuelMark struct {
-	Points  int   `json:"points"`
-	Right   bool  `json:"right"`
-	Partial bool  `json:"partial,omitempty"`
-	Ms      int64 `json:"ms"`
-	Missed  bool  `json:"missed,omitempty"`
+	Right  bool  `json:"right"`
+	Close  bool  `json:"close,omitempty"`
+	Ms     int64 `json:"ms"`
+	Missed bool  `json:"missed,omitempty"`
 }
 
 // DuelNews is a duel news to another player, for the server to tell them (a push through notifyFrom): sent to them
@@ -554,16 +567,15 @@ func (g *Game) duelNews(ctx context.Context, n DuelNews) {
 	}
 }
 
-// settleDuel ends a duel both sides of which are played (against a recording, the player's), with its result: more
-// points wins, the same points the quicker by TieBand or more, else it's a draw. A duel ended already (both sides
+// settleDuel ends a duel both sides of which are played (against a recording, the player's), with its result
+// (duelScore). A duel ended already (both sides
 // finished at once, and the other settled it) is left as it is. finished is the run that has just ended it, whose own
 // follow-up this is (after.go); the other side's is due again, with the result.
 func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 	type side struct {
 		id, run       int64
 		name          string
-		points        int
-		ms            int64
+		score         duelScore
 		done, present bool
 	}
 	var a, b side
@@ -574,16 +586,17 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 		followed = nil
 		var bID, bRun sql.NullInt64
 		var bName sql.NullString
-		var bPoints sql.NullInt64
-		var bMs sql.NullInt64
+		var bRights, bClose, bHardest, bMs sql.NullInt64
 		var bDone sql.NullBool
-		err := tx.QueryRow(`SELECT d.kind, d.a_id, ua.name, ra.id, ra.points, ra.ms, ra.finished_at IS NOT NULL,
-				rb.user_id, ub.name, rb.id, rb.points, rb.ms, rb.finished_at IS NOT NULL
+		err := tx.QueryRow(`SELECT d.kind, d.a_id, ua.name, ra.id, ra.rights, ra.closeness, ra.hardest, ra.ms,
+				ra.finished_at IS NOT NULL,
+				rb.user_id, ub.name, rb.id, rb.rights, rb.closeness, rb.hardest, rb.ms, rb.finished_at IS NOT NULL
 			FROM duels d JOIN users ua ON ua.id = d.a_id JOIN runs ra ON ra.id = d.a_run
 			LEFT JOIN runs rb ON rb.id = CASE d.kind WHEN 'recording' THEN d.ghost_run ELSE d.b_run END
 			LEFT JOIN users ub ON ub.id = rb.user_id
 			WHERE d.id = ? AND d.ended_at IS NULL`, duelID).
-			Scan(&kind, &a.id, &a.name, &a.run, &a.points, &a.ms, &a.done, &bID, &bName, &bRun, &bPoints, &bMs, &bDone)
+			Scan(&kind, &a.id, &a.name, &a.run, &a.score.rights, &a.score.tie.closeness, &a.score.tie.hardest,
+				&a.score.ms, &a.done, &bID, &bName, &bRun, &bRights, &bClose, &bHardest, &bMs, &bDone)
 		if errors.Is(err, sql.ErrNoRows) {
 			settled = true // the other side's last answer settled it a moment ago: it's done
 			return nil
@@ -591,18 +604,19 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 		if err != nil {
 			return err
 		}
-		b = side{id: bID.Int64, run: bRun.Int64, name: bName.String, points: int(bPoints.Int64), ms: bMs.Int64,
-			done: bDone.Bool, present: bRun.Valid}
+		b = side{id: bID.Int64, run: bRun.Int64, name: bName.String, done: bDone.Bool, present: bRun.Valid,
+			score: duelScore{rights: int(bRights.Int64), ms: bMs.Int64,
+				tie: tiebreak{closeness: int(bClose.Int64), hardest: int(bHardest.Int64)}}}
 		if !a.done || !b.present || !b.done {
 			settled = true // not played to its end yet: nothing to settle
 			return nil
 		}
 		recording := kind == "recording"
 		score := 0.5
-		switch {
-		case a.points > b.points || (a.points == b.points && a.ms <= b.ms-TieBand):
+		switch a.score.against(b.score) {
+		case -1:
 			score = 1
-		case a.points < b.points || (a.points == b.points && a.ms >= b.ms+TieBand):
+		case 1:
 			score = 0
 		}
 		outcomeOf := map[float64]string{1: DuelWon, 0: DuelLost, 0.5: DuelDraw}
@@ -849,7 +863,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 		}
 		// The other's score shows once there's a result.
 		if result := v.State == DuelWon || v.State == DuelLost || v.State == DuelDraw; !result && v.Opponent != nil {
-			v.Opponent.Points, v.Opponent.Rights, v.Opponent.Ms = 0, 0, 0
+			v.Opponent.Rights, v.Opponent.Ms = 0, 0
 		}
 		out = append(out, v)
 	}
@@ -871,9 +885,10 @@ func (g *Game) duelSide(ctx context.Context, userID, runID int64) (*DuelSide, er
 	look := lookOf(userID, avatar)
 	s.Look = &look
 	if runID != 0 {
-		err = g.DB.Read.QueryRowContext(ctx, `SELECT finished_at IS NOT NULL, points, rights, ms,
+		err = g.DB.Read.QueryRowContext(ctx, `SELECT finished_at IS NOT NULL, rights, closeness, hardest, ms,
 			EXISTS (SELECT 1 FROM answers WHERE run_id = runs.id) FROM runs WHERE id = ?`, runID).
-			Scan(&s.Done, &s.Points, &s.Rights, &s.Ms, &s.Started)
+			Scan(&s.Done, &s.Rights, &s.score.tie.closeness, &s.score.tie.hardest, &s.Ms, &s.Started)
+		s.score.rights, s.score.ms = s.Rights, s.Ms
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
@@ -917,7 +932,10 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 			return v, err
 		}
 		if v.You != nil {
-			v.Decided = decided(v.You.Marks, v.Opponent.Marks, v.You.Points, v.Opponent.Points)
+			v.Decided = decided(v.You.Marks, v.Opponent.Marks, v.You.Rights, v.Opponent.Rights)
+			if v.State != DuelDraw {
+				v.TieBy = v.You.score.tieBy(v.Opponent.score)
+			}
 		}
 	}
 	if !v.Recorded && v.against != 0 {
@@ -960,7 +978,7 @@ func (g *Game) DuelsWaiting(ctx context.Context, userID int64) (*DuelWaiting, er
 
 // duelMarks is how each question of a run went, in order.
 func (g *Game) duelMarks(ctx context.Context, runID int64) ([]DuelMark, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT points, is_right, ms, given IS NULL FROM answers WHERE run_id = ?
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT score, is_right, ms, given IS NULL FROM answers WHERE run_id = ?
 		ORDER BY n`, runID)
 	if err != nil {
 		return nil, err
@@ -969,17 +987,18 @@ func (g *Game) duelMarks(ctx context.Context, runID int64) ([]DuelMark, error) {
 	var out []DuelMark
 	for rows.Next() {
 		var m DuelMark
-		if err := rows.Scan(&m.Points, &m.Right, &m.Ms, &m.Missed); err != nil {
+		var score float64
+		if err := rows.Scan(&score, &m.Right, &m.Ms, &m.Missed); err != nil {
 			return nil, err
 		}
-		m.Partial = m.Points > 0 && !m.Right
+		m.Close = closeAnswer(score, m.Right)
 		out = append(out, m)
 	}
 	return out, rows.Err()
 }
 
 // duelAgainst is the other side's answers in a duel run played second (State.Against), as far as the player has come:
-// each of the at questions the player has answered, its points left out; and, if the question at is shown, only when
+// each of the at questions the player has answered; and, if the question at is shown, only when
 // the other answered it, if they did. Nothing while the other side hasn't finished (a friend's duel played first).
 func duelAgainst(tx *sql.Tx, runID int64, at int, shown bool) ([]DuelMark, error) {
 	var other int64
@@ -992,7 +1011,7 @@ func duelAgainst(tx *sql.Tx, runID int64, at int, shown bool) ([]DuelMark, error
 	} else if err != nil {
 		return nil, err
 	}
-	rows, err := tx.Query(`SELECT n, is_right, points, ms, given IS NULL FROM answers WHERE run_id = ? AND n <= ?
+	rows, err := tx.Query(`SELECT n, is_right, score, ms, given IS NULL FROM answers WHERE run_id = ? AND n <= ?
 		ORDER BY n`, other, at)
 	if err != nil {
 		return nil, err
@@ -1002,14 +1021,14 @@ func duelAgainst(tx *sql.Tx, runID int64, at int, shown bool) ([]DuelMark, error
 	for rows.Next() {
 		var n int
 		var m DuelMark
-		if err := rows.Scan(&n, &m.Right, &m.Points, &m.Ms, &m.Missed); err != nil {
+		var score float64
+		if err := rows.Scan(&n, &m.Right, &score, &m.Ms, &m.Missed); err != nil {
 			return nil, err
 		}
 		for len(out) < n { // a question with no answer of theirs (one that counts for nobody): nothing to say of it
 			out = append(out, DuelMark{Missed: true})
 		}
-		m.Partial = m.Points > 0 && !m.Right
-		m.Points = 0 // the points wait for the end
+		m.Close = closeAnswer(score, m.Right)
 		switch {
 		case n < at:
 			out = append(out, m)
@@ -1020,10 +1039,10 @@ func duelAgainst(tx *sql.Tx, runID int64, at int, shown bool) ([]DuelMark, error
 	return out, rows.Err()
 }
 
-// decided is the question (from 1) after which a duel's winner on points led to the end, by how each question went
-// for each side (a and b) and their games' points (what isn't in the answers, the bonus for all right, comes with the
-// last question); 0 when their points end even.
-func decided(a, b []DuelMark, pointsA, pointsB int) int {
+// decided is the question (from 1) after which a duel's winner on right answers led to the end, by how each question
+// went for each side (a and b) and their games' right answers (those that count: the last question's lead is theirs);
+// 0 when their right answers end even, and what broke the tie decided it.
+func decided(a, b []DuelMark, rightsA, rightsB int) int {
 	n := max(len(a), len(b))
 	if n == 0 {
 		return 0
@@ -1031,15 +1050,15 @@ func decided(a, b []DuelMark, pointsA, pointsB int) int {
 	lead := make([]int, n) // a's lead over b after each question
 	sum := 0
 	for i := range n {
-		if i < len(a) {
-			sum += a[i].Points
+		if i < len(a) && a[i].Right {
+			sum++
 		}
-		if i < len(b) {
-			sum -= b[i].Points
+		if i < len(b) && b[i].Right {
+			sum--
 		}
 		lead[i] = sum
 	}
-	lead[n-1] = pointsA - pointsB
+	lead[n-1] = rightsA - rightsB
 	sum = lead[n-1]
 	if sum == 0 {
 		return 0
@@ -1051,6 +1070,46 @@ func decided(a, b []DuelMark, pointsA, pointsB int) int {
 		}
 	}
 	return at
+}
+
+// duelScore is one side's game in a duel as its result goes: its right answers, what breaks a tie between the same
+// (tiebreak, as on the day's board), and its time.
+type duelScore struct {
+	rights int
+	tie    tiebreak
+	ms     int64
+}
+
+// against is -1 if s wins against o, 1 if it loses, 0 for a draw: more right answers wins; the same, what breaks a tie
+// on the board (tiebreak); nothing there, the quicker by TieBand or more.
+func (s duelScore) against(o duelScore) int {
+	switch {
+	case s.rights != o.rights:
+		return cmpInt(o.rights, s.rights)
+	case s.tie != o.tie:
+		return s.tie.cmp(o.tie)
+	case s.ms <= o.ms-TieBand:
+		return -1
+	case s.ms >= o.ms+TieBand:
+		return 1
+	}
+	return 0
+}
+
+// tieBy is what breaks a tie between two games of even right answers (TieBy), "" if their right answers differ or
+// nothing does.
+func (s duelScore) tieBy(o duelScore) string {
+	switch {
+	case s.rights != o.rights:
+		return ""
+	case s.tie.closeness != o.tie.closeness:
+		return TieNumber
+	case s.tie.hardest != o.tie.hardest:
+		return TieHardest
+	case s.against(o) != 0:
+		return TieTime
+	}
+	return ""
 }
 
 // duelResults is, in a query whose ?1 is a player, every duel they've played to a result, one row each: the other

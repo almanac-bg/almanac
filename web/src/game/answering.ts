@@ -14,7 +14,7 @@
 
 import { ApiError, errorText, passing, tries } from "../lib/api.ts";
 import { effect, h, lifetime, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
-import { formatNumber, type VerdictKind, verdictWords } from "../ui.ts";
+import { type VerdictKind, verdictWords } from "../ui.ts";
 import { type Asked, ask, spokenAnswer } from "./questions.ts";
 import type { Answer, Reveal, View } from "./types.ts";
 
@@ -39,12 +39,11 @@ export function liveRegion(): { node: HTMLElement; say: Say } {
   };
 }
 
-/** A verdict as a screen reader says it, in the game's live region: „Не е това. Верният отговор е Бийтълс.“, „Вярно!
- * +1040 точки.“ */
-export function spokenVerdict(kind: VerdictKind, points: number, view: View, reveal: Reveal): string {
-  const pts = points > 0 ? `+${formatNumber(points)} ${points === 1 ? "точка" : "точки"}.` : "";
+/** A verdict as a screen reader says it, in the game's live region: „Не е това. Верният отговор е Бийтълс.“,
+ * „Вярно!“ */
+export function spokenVerdict(kind: VerdictKind, view: View, reveal: Reveal): string {
   const answer = kind === "right" || kind === "exact" ? "" : spokenAnswer(view, reveal);
-  return [verdictWords[kind], pts, answer].filter(Boolean).join(" ");
+  return [verdictWords[kind], answer].filter(Boolean).join(" ");
 }
 
 /** A question's seconds left, counting down with the clock: each second is worked out from when the time ends, so

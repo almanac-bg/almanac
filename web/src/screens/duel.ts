@@ -20,12 +20,11 @@ import { missing } from "./missing.ts";
 import { nameFirst } from "./name.ts";
 import { signIn } from "./signin.ts";
 
-/** How one question of a duel went for one side: its points, right or partly (some points, not right), how long it
- * took, and whether nothing was given. */
+/** How one question of a duel went for one side: right, or close (not right), how long it took, and whether nothing
+ * was given. */
 export interface DuelMark {
-  points: number;
   right: boolean;
-  partial?: boolean;
+  close?: boolean;
   ms: number;
   missed?: boolean;
 }
@@ -33,7 +32,6 @@ export interface DuelMark {
 export interface Side {
   name: string;
   tag?: string;
-  points: number;
   rights: number;
   ms: number;
   done: boolean;
@@ -66,8 +64,11 @@ export interface DuelView {
   /** When an open duel lapses. */
   until?: number;
   lapsed?: "you" | "they";
-  /** One duel's view: the question (from 1) after which the winner led to the end (none: the points were even). */
+  /** One duel's view: the question (from 1) after which the winner led to the end (none: the right answers were
+   * even). */
   decided?: number;
+  /** One duel's view, of a result on even right answers: what broke the tie (play.DuelView.TieBy). */
+  tieBy?: "number" | "hardest" | "time";
   record?: { won: number; lost: number; drawn: number };
   /** The other is a friend now (`them`, their id): a rematch is a tap away. */
   friend?: boolean;
@@ -139,7 +140,7 @@ function rowLine(d: DuelView): string {
       return "Без резултат";
   }
   if (them?.gone) return "Играчът вече го няма"; // their game went with them: no score of theirs to set beside the player's
-  return `${formatNumber(d.you?.points ?? 0)} : ${formatNumber(them?.points ?? 0)}${versus}${recordLine(d.record)}`;
+  return `${formatNumber(d.you?.rights ?? 0)} : ${formatNumber(them?.rights ?? 0)}${versus}${recordLine(d.record)}`;
 }
 
 /** A duel as a row: the other player, where it stands, and a word on it. */
@@ -395,7 +396,6 @@ function sent(d: DuelView, s: State, just: boolean): Child {
         also: [h("a", { class: "btn", href: "/duel/new" }, "Нов дуел")],
       },
       [just ? news(s.id) : null],
-      undefined,
       just,
     ),
   );

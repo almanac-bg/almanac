@@ -146,8 +146,8 @@ function face(s: Side, label: string, tag: string, won: boolean): Child {
     s.gone
       ? [h("b", { class: "duel-points none" }, "–"), h("span", { class: "duel-rights" }, "Играчът вече го няма")]
       : [
-          h("b", { class: "duel-points", "data-n": s.points }, formatNumber(s.points)),
-          h("span", { class: "duel-rights" }, `${s.rights} от ${total} верни`),
+          h("b", { class: "duel-points", "data-n": s.rights }, formatNumber(s.rights)),
+          h("span", { class: "duel-rights" }, `от ${total} верни`),
         ],
   );
 }
@@ -157,11 +157,11 @@ function face(s: Side, label: string, tag: string, won: boolean): Child {
 function marks(d: DuelView, mine: DuelMark[], theirs: DuelMark[]): Child {
   const fast = (a?: DuelMark, b?: DuelMark) => !!a?.right && !!b?.right && a.ms < b.ms;
   const words = (m: DuelMark) =>
-    m.right ? `вярно за ${secs(m.ms)}` : m.partial ? "близо" : m.missed ? "без отговор" : "грешно";
+    m.right ? `вярно за ${secs(m.ms)}` : m.close ? "близо" : m.missed ? "без отговор" : "грешно";
   const them = d.opponent?.name ?? "съперникът";
   const pip = (m: DuelMark | undefined, other: DuelMark | undefined, row: number, i: number) =>
     h("span", {
-      class: ["duel-pip", m && (m.right ? "right" : m.partial ? "partial" : "wrong"), fast(m, other) && "fast"]
+      class: ["duel-pip", m && (m.right ? "right" : m.close ? "partial" : "wrong"), fast(m, other) && "fast"]
         .filter(Boolean)
         .join(" "),
       style: { "grid-row": String(row), "grid-column": String(i + 2) },
@@ -209,16 +209,19 @@ function marks(d: DuelView, mine: DuelMark[], theirs: DuelMark[]): Child {
   ];
 }
 
-/** What decided the duel: the question from which the winner led to the end, or the time on even points (a second
+/** What decided the duel: the question from which the winner led to the end, or, on even right answers, what broke
+ * the tie as on the day's board (play.duelScore): the number nearer, the harder right answer, or the time (a second
  * apart or more: closer is a draw, play.TieBand). */
 function line(d: DuelView): string {
   const them = d.opponent?.name ?? "Съперникът";
   const you = d.you;
   const other = d.opponent;
   if (other?.gone) return ""; // their game went with them: nothing to set the player's against
-  if (d.state === "draw") return "Равни точки и под секунда разлика във времето.";
-  if (you && other && you.points === other.points)
-    return `Равни точки: реши времето (${secs(you.ms)} срещу ${secs(other.ms)}).`;
+  if (d.state === "draw") return "Равни верни отговори и под секунда разлика във времето.";
+  if (d.tieBy === "number") return "Равни верни отговори: реши по-близкото число.";
+  if (d.tieBy === "hardest") return "Равни верни отговори: реши верният отговор на по-трудния въпрос.";
+  if (you && other && d.tieBy === "time")
+    return `Равни верни отговори: реши времето (${secs(you.ms)} срещу ${secs(other.ms)}).`;
   if (!d.decided) return "";
   if (d.decided >= total) return "Реши го последният въпрос.";
   const from = d.decided === 1 ? "първия" : `${ordinal(d.decided)}я`;
@@ -285,8 +288,8 @@ function plain(d: DuelView): Child {
           h(
             "p",
             { class: "duel-mine-score" },
-            h("b", { class: "duel-mine-n" }, formatNumber(you.points)),
-            ` ${you.points === 1 ? "точка" : "точки"} · ${you.rights} от ${total} верни`,
+            h("b", { class: "duel-mine-n" }, formatNumber(you.rights)),
+            ` от ${total} верни`,
           ),
           trail(you.marks ?? [], total),
         )
@@ -327,7 +330,12 @@ function land(card: HTMLElement, d: DuelView, mine: DuelMark[], theirs: DuelMark
       feel
         .duel(
           card,
-          { mine: mine.map((m) => m.points), theirs: theirs.map((m) => m.points), end, decided: d.decided ?? 0 },
+          {
+            mine: mine.map((m) => (m.right ? 1 : 0)),
+            theirs: theirs.map((m) => (m.right ? 1 : 0)),
+            end,
+            decided: d.decided ?? 0,
+          },
           hands(),
         )
         .then(done),
