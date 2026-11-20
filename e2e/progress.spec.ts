@@ -14,9 +14,10 @@ test("a topic's game never tells how well the topic is known, and the avatar is 
   await expect(page.locator(".summary")).toBeVisible();
   await expect(page.locator(".screen")).not.toContainText(/XP|[Нн]иво \d|[Пп]остижени|оценка|Познавач|Новак/);
 
-  // The avatar, on Профил: every animal, none locked.
+  // The avatar, on Профил: every animal, none locked; each chapter's art, the player's from its Страница.
   await page.goto("/me");
-  await expect(page.locator(".pick")).toHaveCount(15);
+  await expect(page.locator(".pick:not(.locked)")).toHaveCount(15);
+  await expect(page.locator(".pick.locked")).toHaveCount(10);
   await page.getByRole("button", { name: "Рис", exact: true }).click();
   await expect(page.getByRole("button", { name: "Рис", exact: true })).toHaveAttribute("aria-pressed", "true");
   // Avatars are pictures (art/pictures.ts), loaded after the first screen: the lynx is drawn on its tile.
@@ -24,6 +25,9 @@ test("a topic's game never tells how well the topic is known, and the avatar is 
   // Kept: Профил shows it.
   await page.goto("/me");
   await expect(page.locator(".me-head .avatar.sh-lynx")).toBeVisible();
+  // The frame's way to Профил wears it too, everywhere but on Профил itself (its head shows it there).
+  await expect(page.locator(".bar-me")).toBeHidden();
+  await page.goto("/almanac");
   await expect(page.locator(".bar-me .avatar.sh-lynx")).toBeVisible();
 
   // Sounds are on until turned off, and stay off on this device.

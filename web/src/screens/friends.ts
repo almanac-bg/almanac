@@ -1,7 +1,8 @@
-// Приятели, one of the three places: the day's board (among friends, or all of България); the duels (a friend's
-// waiting for you, yours waiting for them, those played: screens/duel.ts) and a new one; who asks to be friends, the
-// friends with their day, the duels between you and a duel a tap away; and the one way to make more: by потребителско
-// име or email.
+// Приятели, one of the three places, in its budget's order (DESIGN.md, Places): the day's board (among friends, or all
+// of България: its spread and the player's place first, then the top rows); the friends (who asks to be friends, each
+// friend with their day, the duels between you and a duel a tap away, and the one way to make more: by потребителско
+// име or email); and the duels (a friend's waiting for you, yours waiting for them, those played: screens/duel.ts)
+// and a new one.
 
 import type { Board, Score } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
@@ -35,6 +36,8 @@ let {
   rightsOf,
   segmented,
   withWord,
+  mini,
+  worn,
 } = {} as Kit;
 
 interface Friend {
@@ -42,6 +45,8 @@ interface Friend {
   name: string;
   tag: string;
   avatar?: string;
+  /** The seal they wear beside their name (play.Seal). */
+  seal?: { chapter: string; level: number };
   today?: { rights: number; of: number };
   won: number;
   lost: number;
@@ -99,6 +104,8 @@ export function friends(kit: Kit): Child {
     rightsOf,
     segmented,
     withWord,
+    mini,
+    worn,
   } = kit);
   title("Приятели");
   return h("section", { class: "screen friends-page spread" }, h("h1", null, "Приятели"), dayBoard(), friendsCard());
@@ -129,9 +136,8 @@ function dayBoard(): Child {
       { class: "sect-head" },
       h("h2", null, () => {
         const d = day();
-        return d?.issue ? `Днес, брой ${d.issue}` : "Днес";
+        return d?.issue ? `Класация · Брой ${d.issue}` : "Класация";
       }),
-      h("span", { class: "sect-note" }, "точки"),
     ),
     () =>
       day()
@@ -192,19 +198,50 @@ function everyone(d: Day): Child {
   if (!b.top.length) return h("p", { class: "board-empty" }, "Още никой не е играл днешните въпроси.");
   const mine = b.mine && b.place && !b.top.some((s) => s.me) ? b.mine : null;
   return [
+    // First how all of България did and where the player stands (alone on the board, a place says nothing); then the
+    // top rows.
+    spreadOf(b),
+    b.players < 2
+      ? null
+      : b.place
+        ? h("p", { class: "board-note" }, `В България си ${ordinal(b.place)} от ${formatNumber(b.players)}.`)
+        : h("p", { class: "board-note" }, `Днес играха ${formatNumber(b.players)} души.`),
     h(
       "ol",
       { class: "rows ranks" },
       b.top.map((s, i) => scoreRow(s, i + 1)),
       mine && b.place ? scoreRow(mine, b.place, b.place > b.top.length + 1) : null,
     ),
-    // Alone on the board, a place says nothing.
-    b.players < 2
-      ? null
-      : b.place
-        ? h("p", { class: "board-note" }, `В България си ${ordinal(b.place)} от ${formatNumber(b.players)}.`)
-        : h("p", { class: "board-note" }, `Днес играха ${formatNumber(b.players)} души.`),
   ];
+}
+
+/** How all of България did with the day: how many got each count of right answers, 0 to 10, the player's in ink.
+ * From ten players (play.Board.Spread). */
+function spreadOf(b: Board): Child {
+  const spread = b.spread;
+  if (!spread?.length) return null;
+  const most = Math.max(1, ...spread);
+  const mine = b.mine ? Math.min(b.mine.rights, spread.length - 1) : -1;
+  return h(
+    "div",
+    {
+      class: "board-spread",
+      role: "img",
+      "aria-label": `Колко играчи на колко верни: най-много на ${spread.indexOf(Math.max(...spread))}.${mine >= 0 ? ` Ти: ${mine}.` : ""}`,
+    },
+    h(
+      "div",
+      { class: "board-bars" },
+      spread.map((n, i) =>
+        h("i", { class: i === mine ? "me" : undefined, style: { height: `${Math.max(2, (100 * n) / most)}%` } }),
+      ),
+    ),
+    h(
+      "div",
+      { class: "board-ticks", "aria-hidden": "true" },
+      spread.map((_, i) => h("span", { class: i === mine ? "me" : undefined }, String(i))),
+    ),
+  );
 }
 
 const scoreRow = (s: Score, place: number, gap = false) =>
@@ -215,6 +252,7 @@ const scoreRow = (s: Score, place: number, gap = false) =>
     look: s,
     tag: s.tag,
     score: rightsOf(s.rights, s.of),
+    aside: s.trail?.length ? mini(s.trail) : null,
   });
 
 /** The friends: who asks to be friends, each friend with their day and the duels between you (and, while changing
@@ -282,6 +320,7 @@ function friendsCard(): Child {
   const adder = addFriend(load);
 
   return [
+    friendsList(),
     // The duels: theirs to play first; a new one a tap away once there are friends to play.
     () => {
       const d = duels();
@@ -289,7 +328,7 @@ function friendsCard(): Child {
       if (!d || (!any && !data()?.friends.length)) return null;
       return h(
         "section",
-        { class: "sect duels page-mid" },
+        { class: "sect duels page-2" },
         h("div", { class: "sect-head" }, h("h2", null, "Дуели")),
         h("p", { class: "sect-lead" }, "Същите десет въпроса, всеки когато може."),
         any ? duelLists(d) : null,
@@ -297,14 +336,13 @@ function friendsCard(): Child {
         h("p", { class: "small sect-foot" }, "С приятел или срещу запис на истинска игра."),
       );
     },
-    friendsList(),
   ];
 
   function friendsList(): Child {
     return h(
       "section",
-      { class: "sect friends page-2" },
-      h("div", { class: "sect-head" }, h("h2", null, "Твоите приятели"), () => {
+      { class: "sect friends page-mid" },
+      h("div", { class: "sect-head" }, h("h2", null, "Приятели"), () => {
         const n = data()?.friends.length ?? 0;
         return n
           ? h(
@@ -496,18 +534,24 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
         f.name,
         h("span", { class: "friend-tag" }, ` @${f.tag}`),
       ),
-      played
-        ? h(
-            "span",
-            { class: "record", title: `Дуели помежду ви: ${record(f.won, f.lost, f.drawn)}` },
-            `Дуели ${f.won} : ${f.lost}`,
-          )
-        : null,
+      worn(f.seal),
     ),
     h(
       "span",
       { class: "friend-day" },
-      f.today ? rightsOf(f.today.rights, f.today.of) : h("span", { class: "muted" }, "още не"),
+      h(
+        "span",
+        null,
+        f.today ? ["днес ", rightsOf(f.today.rights, f.today.of)] : h("span", { class: "muted" }, "днес още не"),
+      ),
+      // The pair's record: the one count kept between two players.
+      played
+        ? h(
+            "span",
+            { class: "record", title: `Дуели помежду ви: ${record(f.won, f.lost, f.drawn)}` },
+            `дуели\u00a0${f.won}\u00a0:\u00a0${f.lost}`,
+          )
+        : null,
     ),
     () =>
       editing()

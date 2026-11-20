@@ -382,16 +382,6 @@ export function meter(percent: number, label: string): Child {
   );
 }
 
-/** A number and what it counts, in a card. */
-export function stat(value: string, label: string, tone = ""): Child {
-  return h(
-    "div",
-    { class: tone ? `stat ${tone}` : "stat" },
-    h("b", { class: "stat-value" }, value),
-    h("span", { class: "stat-label" }, label),
-  );
-}
-
 const dayNames = ["понеделник", "вторник", "сряда", "четвъртък", "петък", "събота", "неделя"];
 const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Sofia", weekday: "short" });
 
@@ -450,6 +440,8 @@ export const record = (won: number, lost: number, drawn: number) =>
 /** How a player shows to others: their avatar (shape-tone). */
 export interface Look {
   avatar?: string;
+  /** The seal they wear beside their name (play.Seal), if any. */
+  seal?: Worn | null;
 }
 
 /** Every avatar's name: the animals, each anyone's to choose from the first day (play.Animals), in the order the
@@ -495,6 +487,13 @@ function fromName(name: string): string {
  * name is said in words nearby. */
 export function avatar(id: string | undefined, opts: { size?: "s" | "l"; name?: string } = {}) {
   const shape = (id || fromName(opts.name ?? "")).split("-")[0] ?? "";
+  // A chapter's art, the player's from the chapter's Страница: its glyph on a disc of its colour.
+  if (topics.some((t) => t.id === shape))
+    return h(
+      "span",
+      { class: ["avatar", "chart", opts.size, `t-${shape}`].filter(Boolean).join(" "), "aria-hidden": "true" },
+      h("span", { class: "chart-disc" }, picture(`topic-${shape}`, "avatar-pic")),
+    );
   return h(
     "span",
     {
@@ -542,6 +541,7 @@ export function rankRow(
       "span",
       { class: "rank-name" },
       opts.tag ? h("a", { href: profileHref(opts.tag) }, name) : name,
+      worn(opts.look?.seal),
       opts.me ? h("span", { class: "rank-you" }, " ти") : null,
     ),
     opts.score || opts.aside
@@ -570,8 +570,8 @@ export function who(name: Child, look: Look = {}, extra: Child = null, plainName
     h(
       "span",
       { class: "who-text" },
-      // The name gives way (an ellipsis) so that what's beside it („ти“) always shows whole.
-      h("span", { class: "who-name" }, h("span", { class: "who-label" }, name), extra),
+      // The name gives way (an ellipsis) so that what's beside it (the seal, „ти“) always shows whole.
+      h("span", { class: "who-name" }, h("span", { class: "who-label" }, name), worn(look.seal), extra),
     ),
   );
 }

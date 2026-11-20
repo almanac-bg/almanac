@@ -57,7 +57,7 @@ function showing(run: number): void {
 }
 
 /** Plays a run from where it stands; `done` draws what comes after its last answer. A duel is named over each
- * question as its page names it (`versus`: „Дуел с Мария“, „Срещу запис на Мария“); played second (the run's
+ * question as its page names it (`versus`: „Дуел с Мария“, „По-силен запис · Краси“); played second (the run's
  * `against`), the other's answer (`them`, their name) shows as they gave it: a word at the moment they did, and how it
  * went once the player's own is in. */
 export function playRun(initial: State, done: (s: State) => Child, versus = "", them = ""): Child {
@@ -448,8 +448,8 @@ function tally(el: HTMLElement, inRow: number) {
 
 /** The time left: a bar that runs out with the seconds beside it, muted, then gold for the last ten seconds and red
  * for the last five, grey once answered. The clock is silent until the last ten seconds: then a soft tick a second,
- * and for the last five a beep a second, a step higher each (a question of ten seconds, „Вярно или невярно“, sounds
- * and turns red only for those five). */
+ * and for the last five a beep a second, a step higher each (a question of ten seconds or less sounds and turns red
+ * only for those five; the floors are 20 s to a minute: play/play.go, Limit). */
 export function timer(leftMs: number, limitMs: number, left: () => number, locked: Signal<boolean>): Child {
   const bar = h("div", { class: "time-bar" });
   bar.style.transform = `scaleX(${leftMs / limitMs})`;

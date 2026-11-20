@@ -216,7 +216,7 @@ const factsRule = `WITH met AS (
 	SELECT ?1, question_id, ink, at, run_id FROM ranked WHERE k = 1`;
 
 /** Makes the player one who has answered these questions right (in a game of nothing), straight in the test server's
- * database: their facts are in the Алманах (play/ink.go), in pencil, or in `ink`, written at a moment (`at`, ms; now
+ * database: their facts are in the Алманах (play/ink.go), in grey, or in `ink`, written at a moment (`at`, ms; now
  * if not given). */
 export async function knows(page: Page, ids: string[], at = Date.now(), ink = false): Promise<void> {
   await inDB(page, (db, id) => {

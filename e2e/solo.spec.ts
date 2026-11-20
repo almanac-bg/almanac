@@ -33,7 +33,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // A row is the place, the name and the score: no level, no title.
   await expect(page.locator(".day-board .lv, .day-board .who-title")).toHaveCount(0);
   await page.goto("/me");
-  await expect(page.locator(".me-figures")).toBeVisible();
+  await expect(page.locator(".me-seals")).toBeVisible();
 
   await openGame(page, "/play/history");
   await playRun(page);
@@ -75,7 +75,7 @@ test("the day says how its other players did with each question: under the verdi
 test("a topic, ten questions, a question reported, and ten more", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/almanac/history");
-  await page.getByRole("link", { name: "Играй главата" }).click();
+  await page.getByRole("link", { name: "Игра на главата" }).click();
   // A short count first, then the game starts by itself.
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await expect(page.getByRole("timer")).toHaveAccessibleName(/Започва след [1-3] с/);
@@ -100,11 +100,10 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
 test("„България“: the questions about Bulgaria from every topic, a topic of its own", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/almanac");
-  const chapter = page.locator(".toc-row").last();
-  await expect(chapter).toContainText("България");
-  await chapter.getByRole("link").click();
-  await expect(page).toHaveURL(/\/almanac\/bulgaria$/);
-  await page.getByRole("link", { name: "Играй главата" }).click();
+  // One of the two ways to play at the book's head, straight to its game.
+  const way = page.locator(".way").last();
+  await expect(way).toContainText("България");
+  await way.click();
   await expect(page).toHaveURL(/\/play\/bulgaria$/);
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await playRun(page);
@@ -123,17 +122,16 @@ test("„България“: the questions about Bulgaria from every topic, a t
   await expect(page.locator(".game-what").filter({ hasText: /^България$/ })).toBeVisible();
 });
 
-test("„Микс“: every topic at once, a chapter of its own after the topics, with „България“ after it", async ({
+test("„Микс“: every topic at once, the first way to play at the book's head, with „България“ after it", async ({
   page,
 }) => {
   test.setTimeout(120_000);
   await page.goto("/almanac");
-  const chapters = page.locator(".toc-row");
-  await expect(chapters.nth(10)).toContainText("Микс");
-  await expect(chapters.nth(10)).toContainText("всички глави");
-  await expect(chapters.nth(11)).toContainText("България");
-  await chapters.nth(10).getByRole("link").click();
-  await page.getByRole("link", { name: "Играй главата" }).click();
+  const ways = page.locator(".way");
+  await expect(ways.first()).toContainText("Микс");
+  await expect(ways.first()).toContainText("всички глави");
+  await expect(ways.last()).toContainText("България");
+  await ways.first().click();
   await expect(page).toHaveURL(/\/play\/mix$/);
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await playRun(page);
@@ -152,7 +150,7 @@ test("„Микс“: every topic at once, a chapter of its own after the topics
 
 test("a topic's count can be backed out of, or cut short", async ({ page }) => {
   await page.goto("/almanac/history");
-  await page.getByRole("link", { name: "Играй главата" }).click();
+  await page.getByRole("link", { name: "Игра на главата" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await page.getByRole("button", { name: "Откажи" }).click();
   await expect(page).toHaveURL(/\/almanac\/history$/);
@@ -160,12 +158,12 @@ test("a topic's count can be backed out of, or cut short", async ({ page }) => {
   await page.waitForTimeout(3500);
   await expect(page).toHaveURL(/\/almanac\/history$/);
 
-  await page.getByRole("link", { name: "Играй главата" }).click();
+  await page.getByRole("link", { name: "Игра на главата" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/almanac\/history$/);
 
-  await page.getByRole("link", { name: "Играй главата" }).click();
+  await page.getByRole("link", { name: "Игра на главата" }).click();
   await page.getByRole("button", { name: "Започни сега" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10", { timeout: 1500 });
 });

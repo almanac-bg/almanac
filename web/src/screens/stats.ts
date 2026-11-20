@@ -6,7 +6,7 @@ import { api } from "../lib/api.ts";
 import { dayInBulgaria } from "../lib/day.ts";
 import { h } from "../lib/dom.ts";
 import { withWord } from "../lib/words.ts";
-import { topics } from "../state.ts";
+import { topics, wornSeal } from "../state.ts";
 
 export interface Stats {
   /** The player's avatar, as others see it ("shape-tone"). */
@@ -42,7 +42,12 @@ export interface Played {
   outcome?: "won" | "lost" | "draw";
 }
 
-export const loadStats = () => api<Stats>("GET", "/api/me/stats");
+export const loadStats = () =>
+  api<Stats>("GET", "/api/me/stats").then((s) => {
+    // The seal worn, for the frame's avatar too.
+    wornSeal.set(s.seal ?? null);
+    return s;
+  });
 
 const topicName = (id?: string) => (id ? (topics.find((c) => c.id === id)?.name ?? id) : "Всички теми");
 const outcome = { won: "победа", lost: "загуба", draw: "равенство" };

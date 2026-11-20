@@ -20,21 +20,20 @@ test("the book's contents: a chapter a row with its ink, and no count of it all"
   await knows(page, ["his-002"]);
 
   await page.goto("/almanac");
-  await expect(page.locator(".figures-row")).not.toContainText("факта");
-  // Ten topics, „Микс“ and „България“: twelve chapters, each a way into its own.
-  const rows = page.locator(".toc-row");
-  await expect(rows).toHaveCount(12);
-  await expect(rows.nth(4)).toContainText("Кино и телевизия");
-  await expect(rows.nth(4)).toContainText("7 с мастило");
-  await expect(rows.nth(2)).toContainText("0 с мастило");
-  await expect(rows.nth(10)).toContainText("Микс");
-  await expect(rows.nth(11)).toContainText("България");
-  await rows.nth(4).getByRole("link").click();
+  await expect(page.locator(".book")).not.toContainText("факта");
+  // Ten topics, each a chapter's card with its ink; „Микс“ and „България“ two ways to play at the book's head.
+  const cards = page.locator(".chapter-card");
+  await expect(cards).toHaveCount(10);
+  const movies = cards.filter({ hasText: "Кино и телевизия" });
+  await expect(movies).toContainText(/7\s*с\sмастило/);
+  await expect(cards.filter({ hasText: "География" })).toContainText(/0\s*с\sмастило/);
+  await expect(page.locator(".way")).toHaveText([/Микс/, /България/]);
+  await movies.click();
   await expect(page).toHaveURL(/\/almanac\/movies$/);
   await expect(page.getByRole("heading", { level: 1, name: "Кино и телевизия" })).toBeVisible();
   await expect(page.locator(".entry")).toHaveCount(7);
   // Its game, a tap away.
-  await expect(page.getByRole("link", { name: "Играй главата" })).toHaveAttribute("href", "/play/movies");
+  await expect(page.getByRole("link", { name: "Игра на главата" })).toHaveAttribute("href", "/play/movies");
 });
 
 test("a chapter comes a page at a time, by its numbers, and finds its facts by their words", async ({ page }) => {
@@ -104,23 +103,23 @@ test("a chapter the book doesn't have is the page that isn't there; the book wit
   await expect(page.getByRole("heading", { level: 1, name: "Тази страница я няма" })).toBeVisible();
   await page.goto("/almanac/");
   await expect(page).toHaveURL(/\/almanac$/);
-  await expect(page.locator(".toc-row")).toHaveCount(12);
+  await expect(page.locator(".chapter-card")).toHaveCount(10);
 });
 
-test("on a big screen the book is a spread: the contents in two columns, none over another", async ({ page }) => {
+test("on a big screen the book's chapters are in four columns, none over another", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/");
   await knows(page, sampleFacts().slice(0, 12));
   await page.goto("/almanac");
-  const rows = page.locator(".toc-row");
-  await expect(rows).toHaveCount(12);
+  const rows = page.locator(".chapter-card");
+  await expect(rows).toHaveCount(10);
   const boxes = await rows.evaluateAll((all) =>
     all.map((e) => {
       const r = e.getBoundingClientRect();
       return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
     }),
   );
-  expect(new Set(boxes.map((b) => Math.round(b.left))).size).toBe(2);
+  expect(new Set(boxes.map((b) => Math.round(b.left))).size).toBe(4);
   for (const [i, a] of boxes.entries())
     for (const b of boxes.slice(i + 1))
       expect(a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1).toBe(false);

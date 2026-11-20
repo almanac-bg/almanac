@@ -1,7 +1,7 @@
-// Профил: who you are in the game, as a spread. On the left page your avatar, name and tag, how the streak stands
-// (days in a row, the longest, the issues played) and the ways on (all your games, how others see you); on the right
-// the avatars, every one yours, a tap wearing it, and Настройки. A guest is asked to keep their game, from the first
-// one, and the way in for a profile from elsewhere is apart from it.
+// Профил: who you are in the game, in its budget's order (DESIGN.md, Places): your avatar with the seal you wear on its
+// corner, your name and tag; the longest streak; your seals, a chapter's each, the one worn ringed and a tap wearing
+// another; the avatars (every animal yours, a chapter's art yours from its Страница); and Настройки, last. A guest is
+// asked to keep their game, and the way in for a profile from elsewhere is apart from it. No lifetime totals.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -10,6 +10,7 @@ import type { Stats } from "./stats.ts";
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
 let {
+  api,
   h,
   signal,
   when,
@@ -20,15 +21,29 @@ let {
   avatar,
   look,
   failure,
+  errorText,
   profileHref,
   haveProfile,
   keepGame,
   loadStats,
   formatNumber,
+  categories,
+  chapterName,
+  seal,
+  worn,
+  illustration,
 } = {} as Kit;
+
+/** A chapter's rank, as the book has it (play.ChapterRank). */
+interface Rank {
+  chapter: string;
+  level: number;
+  name: string;
+}
 
 export function me(kit: Kit) {
   ({
+    api,
     h,
     signal,
     when,
@@ -39,11 +54,17 @@ export function me(kit: Kit) {
     avatar,
     look,
     failure,
+    errorText,
     profileHref,
     haveProfile,
     keepGame,
     loadStats,
     formatNumber,
+    categories,
+    chapterName,
+    seal,
+    worn,
+    illustration,
   } = kit);
   title("Профил");
   // A game just kept, or a profile signed in to, here (keepGame, haveProfile): said once, at the top.
@@ -56,18 +77,27 @@ export function me(kit: Kit) {
       () => user(),
       () => {
         const data = signal<Stats | null>(null);
+        const ranks = signal<Rank[] | null>(null);
         // Профил that couldn't load (no line): said, with the way to try again (the whole page, afresh).
         const failed = signal<unknown>(null);
         loadStats().then(data.set, failed.set);
+        // The ranks, as others see them on the player's page (not the book's: opening it is counted as opening the book).
+        const tag = user.peek()?.tag;
+        if (tag)
+          api<{ ranks?: Rank[] }>("GET", `/api/players/${encodeURIComponent(tag)}`).then(
+            (p) => ranks.set(p.ranks ?? []),
+            () => ranks.set([]),
+          );
+        else ranks.set([]);
         // The avatars: their own part (screens/avatar.ts), loaded with the page.
         const picker = signal<Child>(null);
-        import("./avatar.ts").then((m) => picker.set(m.picker(kit)));
+        import("./avatar.ts").then((m) => picker.set(m.picker(kit, () => ranks() ?? [])));
         return [
           h(
             "div",
             { class: "me-intro page-1" },
             said ? h("p", { class: "muted", role: "status" }, said) : null,
-            head(),
+            head(data),
             () => (failed() && !data() ? failure(failed(), () => go("/me", true)) : null),
             // A guest keeps their game with an email; one who has a profile elsewhere signs in to it, apart, in a
             // smaller line. Either way, Профил again, as the profile has it.
@@ -75,7 +105,7 @@ export function me(kit: Kit) {
               user()?.email
                 ? null
                 : [keepGame(() => go("/me", true)), haveProfile(() => go("/me", true), "Имаш профил? Влез")],
-            () => figures(data()),
+            () => longest(data()),
             h("p", { class: "me-links" }, h("a", { class: "link", href: "/games" }, "Всички игри"), () =>
               user()?.tag
                 ? h("a", { class: "link muted", href: profileHref(user()?.tag ?? "") }, "Как те виждат другите")
@@ -85,31 +115,24 @@ export function me(kit: Kit) {
           h(
             "div",
             { class: "me-side page-2" },
+            () => seals(ranks(), data()),
             h(
               "section",
               { class: "sect me-avatars" },
-              h(
-                "div",
-                { class: "sect-head" },
-                h("h2", null, "Аватар"),
-                h("span", { class: "sect-note" }, "Всички са твои"),
-              ),
+              h("div", { class: "sect-head" }, h("h2", null, "Аватар")),
               picker,
             ),
             h(
-              "section",
-              { class: "sect me-settings-sect" },
+              "a",
+              { class: "me-settings", href: "/settings" },
+              h("span", { class: "i i-gear", "aria-hidden": "true" }),
               h(
-                "a",
-                { class: "me-settings", href: "/settings" },
-                h(
-                  "span",
-                  { class: "me-settings-text" },
-                  h("strong", null, "Настройки"),
-                  h("span", { class: "muted" }, "Изглед, звуци, напомняне, името, имейлът и профилът"),
-                ),
-                h("span", { class: "i i-left me-settings-i", "aria-hidden": "true" }),
+                "span",
+                { class: "me-settings-text" },
+                h("strong", null, "Настройки"),
+                h("span", { class: "muted" }, "Изглед, звуци, напомняне, името, имейлът и профилът"),
               ),
+              h("span", { class: "i i-right me-settings-i", "aria-hidden": "true" }),
             ),
           ),
         ];
@@ -123,51 +146,56 @@ export function me(kit: Kit) {
   );
 }
 
-/** Who you are: your avatar as you wear it, your name and tag; a name still the one drawn says so, with the way to
- * change it. */
-function head(): Child {
+/** Who you are: your avatar as you wear it, the seal you wear on its corner, your name and tag; a name still the one
+ * drawn says so, with the way to change it. */
+function head(data: () => Stats | null): Child {
   return h(
     "div",
     { class: "me-head" },
-    h("span", { class: "me-avatar" }, () => avatar(look(), { size: "l", name: user.peek()?.name })),
-    h("h1", null, () => user()?.name ?? "Профил"),
-    () => (user()?.tag ? h("span", { class: "me-tag" }, `@${user()?.tag}`) : null),
-    () =>
-      user()?.drawn
-        ? h(
-            "p",
-            { class: "me-drawn muted" },
-            "Това име е избрано наслуки. ",
-            h("a", { class: "link", href: "/settings#name" }, "Смени го"),
-          )
-        : h("a", { class: "link me-rename", href: "/settings#name" }, "Промени името"),
+    h(
+      "span",
+      { class: "me-avatar" },
+      () => avatar(look(), { size: "l", name: user.peek()?.name }),
+      () => worn(data()?.seal, 48),
+    ),
+    h(
+      "div",
+      { class: "me-who" },
+      h("h1", null, () => user()?.name ?? "Профил"),
+      () => (user()?.tag ? h("span", { class: "me-tag" }, `@${user()?.tag}`) : null),
+      () =>
+        user()?.drawn
+          ? h(
+              "p",
+              { class: "me-drawn muted" },
+              "Това име е избрано наслуки. ",
+              h("a", { class: "link", href: "/settings#name" }, "Смени го"),
+            )
+          : h("a", { class: "link me-rename", href: "/settings#name" }, "Промени името"),
+    ),
   );
 }
 
-/** How the streak stands: days in a row and the longest, and the seal worn; what the streak forgives under them. */
-function figures(s: Stats | null): Child {
-  if (!s) return null;
-  const fig = (n: number, label: string) =>
-    h("div", { class: "fig" }, h("b", { class: "fig-n" }, formatNumber(n)), h("span", { class: "fig-label" }, label));
+/** The longest streak: its number and words, the flame by it; under it, what the week forgives. Nothing before a
+ * first day. */
+function longest(s: Stats | null): Child {
+  if (!s?.best) return null;
   return [
     h(
       "div",
-      { class: "figures-row me-figures" },
-      fig(s.streak, s.streak === 1 ? "ден поред" : "дни поред"),
-      fig(s.best, "най-дългата серия"),
-      s.seal
-        ? h(
-            "div",
-            { class: "fig" },
-            h("b", { class: "fig-n" }, s.seal.name),
-            h("span", { class: "fig-label" }, "печат"),
-          )
-        : null,
+      { class: "streak-chip me-longest" },
+      illustration("flame", "streak-flame"),
+      h("b", { class: "status-n" }, formatNumber(s.best)),
+      h(
+        "span",
+        { class: "status-text" },
+        h("span", { class: "status-label" }, "най-дълга серия"),
+        h("span", { class: "streak-note" }, "изиграни дни"),
+      ),
     ),
-    // What keeps the streak through a day missed: the week's days, forgiven by themselves (play/runs.go).
     h(
       "p",
-      { class: "small muted" },
+      { class: "small muted me-forgives" },
       s.spare
         ? s.perWeek === 1
           ? "Един пропуснат ден в седмицата не прекъсва серията."
@@ -175,4 +203,90 @@ function figures(s: Stats | null): Child {
         : "Тази седмица простените дни са използвани: следващият пропуснат прекъсва серията.",
     ),
   ];
+}
+
+/** The seals: a chapter's each, once it has a rank, its name under it; the one worn ringed, and a tap wears another.
+ * Before any: what brings the first. */
+function seals(ranks: Rank[] | null, s: Stats | null): Child {
+  if (!ranks) return null;
+  const had = categories.map((c) => ranks.find((r) => r.chapter === c.id)).filter((r): r is Rank => !!r && r.level > 0);
+  const wearing = signal(s?.seal?.chapter ?? "");
+  // Choosing another: the seals become buttons, and a tap wears one.
+  const choosing = signal(false);
+  const error = signal("");
+  const choose = () => {
+    choosing.update((c) => !c);
+    if (choosing.peek()) api("POST", "/api/me/used", { noun: "seal" }).catch(() => {});
+  };
+  const wear = async (chapter: string) => {
+    error.set("");
+    const was = wearing.peek();
+    wearing.set(chapter);
+    choosing.set(false);
+    try {
+      await api("PATCH", "/api/me/seal", { chapter });
+      loadStats().catch(() => {});
+    } catch (err) {
+      wearing.set(was);
+      error.set(errorText(err));
+    }
+  };
+  const item = (r: Rank) => [
+    seal(r.chapter, r.level, 40),
+    h("span", { class: "rk-words" }, h("b", null, chapterName(r.chapter)), h("span", null, r.name)),
+  ];
+  return h(
+    "section",
+    { class: "sect me-seals" },
+    h("div", { class: "sect-head" }, h("h2", null, "Печати")),
+    had.length
+      ? [
+          h("p", { class: "seal-worn" }, () =>
+            choosing()
+              ? [
+                  "Докосни печата, който да носиш. ",
+                  h("button", { class: "link", type: "button", onclick: choose }, "Готово"),
+                ]
+              : [
+                  wearing() ? `Носиш печата на ${chapterName(wearing())} · ` : "",
+                  had.length > 1 || !wearing()
+                    ? h(
+                        "button",
+                        { class: "link", type: "button", onclick: choose },
+                        wearing() ? "избери друг" : "избери",
+                      )
+                    : null,
+                ],
+          ),
+          h("ul", { class: "seal-list" }, () =>
+            had.map((r) =>
+              h(
+                "li",
+                null,
+                choosing()
+                  ? h(
+                      "button",
+                      {
+                        class: "rk",
+                        type: "button",
+                        "aria-pressed": wearing() === r.chapter,
+                        onclick: () => wear(r.chapter),
+                      },
+                      item(r),
+                    )
+                  : h("span", { class: wearing() === r.chapter ? "rk worn" : "rk" }, item(r)),
+              ),
+            ),
+          ),
+        ]
+      : [
+          h("p", { class: "seal-worn" }, "Още няма печат."),
+          h(
+            "p",
+            { class: "small" },
+            "Първият печат на глава идва с първия ѝ факт с мастило: верен отговор в броя на деня.",
+          ),
+        ],
+    () => error() && h("p", { class: "bad", role: "alert" }, error()),
+  );
 }

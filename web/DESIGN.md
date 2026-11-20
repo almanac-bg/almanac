@@ -79,8 +79,11 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/fi
 - **Приятели:** the board (friends by default, or all of България: its spread and the player's place first, then the
   top rows); the friends (a row each: avatar, name, seal, today's score, the duels between you „дуели 3 : 1“); the
   duels („Твой ред“ the page's action, „Чакаш“, „Изиграни“).
-- **Профил:** the avatar, the seal worn, the ranks by chapter, the longest streak, and Настройки last. No duplicate
-  avatar in the bar's corner on this page.
+- **Профил:** the avatar with the seal worn on its corner, the name; the longest streak and what the week forgives;
+  the seals by chapter, the one worn ringed in ink, another chosen behind „избери друг“; the avatars (every animal,
+  and a chapter's art from its Страница, hollow with a grey ring and „от Страница“ until then); Настройки last. No
+  duplicate avatar in the bar's corner on this page. Another player's page (`/players/<tag>`) is the same head,
+  streak and seals, with the way to be friends.
 
 ## Colour
 
@@ -99,7 +102,7 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 | `--ink`                    | `#16132b`             | `#f5f3ff`             | text, numerals, right (filled), the pips done          |
 | `--ink-2`                  | `#47445f`             | `#cdc9e6`             | secondary text                                         |
 | `--ink-3`                  | `#5d5a77`             | `#a7a3c6`             | kickers, meta, labels                                  |
-| `--pencil`                 | `#66637f`             | `#9a96bb`             | a fact met, in grey                                    |
+| `--grey`                   | `#66637f`             | `#9a96bb`             | a fact met, in grey                                    |
 | `--line`                   | `#dadced`             | `#34305a`             | hairlines, tracks                                      |
 | `--line-2`                 | `#8a87a6`             | `#7f7aa8`             | control lines: an answer's 2px frame, a pip to come    |
 | `--action` / `--on-action` | `#16132b` / `#ffffff` | `#f5f3ff` / `#16132b` | the one action                                         |

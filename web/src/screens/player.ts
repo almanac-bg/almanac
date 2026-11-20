@@ -7,7 +7,23 @@ import type { Child } from "../lib/dom.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
-let { api, errorText, h, signal, title, friendRequests, user, avatar, record, stat, topics } = {} as Kit;
+let {
+  api,
+  errorText,
+  h,
+  signal,
+  title,
+  friendRequests,
+  user,
+  avatar,
+  record,
+  chapterName,
+  seal,
+  worn,
+  illustration,
+  formatNumber,
+  categories,
+} = {} as Kit;
 
 /** A chapter's rank (play.ChapterRank): level 0 is none. */
 interface Rank {
@@ -32,13 +48,28 @@ interface Profile {
   record?: { won: number; lost: number; drawn: number };
 }
 
-const chapterName = (id: string) => topics.find((t) => t.id === id)?.name ?? id;
 // „г.“ kept with its year, never alone on a line.
 const month = (ms: number) =>
   new Intl.DateTimeFormat("bg", { month: "long", year: "numeric" }).format(new Date(ms)).replace(/\s(?=г\.)/, " ");
 
 export function playerProfile(kit: Kit, [tag]: string[]): Child {
-  ({ api, errorText, h, signal, title, friendRequests, user, avatar, record, stat, topics } = kit);
+  ({
+    api,
+    errorText,
+    h,
+    signal,
+    title,
+    friendRequests,
+    user,
+    avatar,
+    record,
+    chapterName,
+    seal,
+    worn,
+    illustration,
+    formatNumber,
+    categories,
+  } = kit);
   title(`@${tag}`);
   const profile = signal<Profile | null>(null);
   const error = signal("");
@@ -51,7 +82,7 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
       (err) => error.set(errorText(err)),
     );
   load();
-  return h("section", { class: "screen" }, (): Child => {
+  return h("section", { class: "screen player" }, (): Child => {
     const p = profile();
     if (error() && !p) {
       return [
@@ -72,15 +103,15 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
   });
 }
 
-/** Their avatar, name and tag, and since when they play. */
+/** Their avatar with the seal they wear on its corner, their name and tag, and since when they play. */
 function head(p: Profile): Child {
   return h(
     "div",
     { class: "me-head" },
-    avatar(p.avatar, { size: "l", name: p.name }),
+    h("span", { class: "me-avatar" }, avatar(p.avatar, { size: "l", name: p.name }), worn(p.seal, 48)),
     h(
       "div",
-      { class: "me-head-text" },
+      { class: "me-who" },
       h("h1", null, p.name),
       h("span", { class: "me-tag" }, `@${p.tag}`),
       h("span", { class: "muted small" }, `Играе от ${month(p.since)}`),
@@ -165,29 +196,49 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
   });
 }
 
-/** Their seal and their longest streak. */
+/** Their longest streak, as Профил says the player's own. */
 function numbers(p: Profile): Child {
-  if (!p.seal && !p.best) return h("p", { class: "muted" }, "Още няма печат.");
+  if (!p.best) return null;
   return h(
     "div",
-    { class: "stats" },
-    p.seal ? stat(p.seal.name, `печат: ${chapterName(p.seal.chapter)}`, "gold") : null,
-    stat(String(p.best), p.best === 1 ? "ден най-дълга серия" : "дни най-дълга серия"),
+    { class: "streak-chip me-longest" },
+    illustration("flame", "streak-flame"),
+    h("b", { class: "status-n" }, formatNumber(p.best)),
+    h(
+      "span",
+      { class: "status-text" },
+      h("span", { class: "status-label" }, "най-дълга серия"),
+      h("span", { class: "streak-note" }, "изиграни дни"),
+    ),
   );
 }
 
-/** Their ranks, the chapters they have one in. */
+/** Their seals, a chapter's each in the bank's order, the one worn ringed; before any, „Още няма печат.“ */
 function ranks(p: Profile): Child {
-  const held = p.ranks.filter((r) => r.level > 0);
-  if (!held.length) return null;
+  const had = categories
+    .map((c) => p.ranks.find((r) => r.chapter === c.id))
+    .filter((r): r is Rank => !!r && r.level > 0);
   return h(
     "section",
-    { class: "card stack" },
-    h("p", { class: "kicker" }, "Печати"),
-    h(
-      "ul",
-      { class: "rows" },
-      held.map((r) => h("li", null, h("b", null, r.name), ` · ${chapterName(r.chapter)}`)),
-    ),
+    { class: "sect me-seals" },
+    h("div", { class: "sect-head" }, h("h2", null, "Печати")),
+    had.length
+      ? h(
+          "ul",
+          { class: "seal-list" },
+          had.map((r) =>
+            h(
+              "li",
+              null,
+              h(
+                "span",
+                { class: p.seal?.chapter === r.chapter ? "rk worn" : "rk" },
+                seal(r.chapter, r.level, 40),
+                h("span", { class: "rk-words" }, h("b", null, chapterName(r.chapter)), h("span", null, r.name)),
+              ),
+            ),
+          ),
+        )
+      : h("p", { class: "seal-worn" }, "Още няма печат."),
   );
 }

@@ -43,6 +43,7 @@ import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
 import { signIn } from "./screens/signin.ts";
 import { gameRow, loadStats } from "./screens/stats.ts";
+import { rankName, rankNames } from "./seal.ts";
 import {
   bulgaria,
   categories,
@@ -60,24 +61,32 @@ import {
 import {
   avatar,
   back,
+  chapterName,
+  chip,
   explain,
   fact,
   failure,
   formatNumber,
+  glyph,
+  leaf,
   meter,
+  mini,
   pageArt,
+  pips,
   profileHref,
   questions,
   rankRow,
   record,
   rightsOf,
   schemeSwitch,
+  seal,
   segmented,
   shapeNames,
-  stat,
+  tiles,
   toneOf,
   topicMark,
   verdict,
+  worn,
 } from "./ui.ts";
 
 export const kit = {
@@ -92,6 +101,8 @@ export const kit = {
   boardRow,
   bulgaria,
   byTap,
+  chapterName,
+  chip,
   calm,
   categories,
   computed,
@@ -111,6 +122,7 @@ export const kit = {
   formatNumber,
   friendRequests,
   gameRow,
+  glyph,
   go,
   goBack,
   guardLeaving,
@@ -121,6 +133,7 @@ export const kit = {
   issueWords,
   keepGame,
   landing,
+  leaf,
   lifetime,
   listWords,
   loadDuelResult,
@@ -128,6 +141,7 @@ export const kit = {
   mailAsk,
 
   meter,
+  mini,
   missing,
   nameFirst,
   needsHomeScreen,
@@ -139,6 +153,7 @@ export const kit = {
   ordinal,
   pageArt,
   picture,
+  pips,
   play,
   playAnswer,
   playCount,
@@ -152,6 +167,8 @@ export const kit = {
   questions,
   quietWhenSilent,
   readyClock,
+  rankName,
+  rankNames,
   rankRow,
   record,
   rightsOf,
@@ -161,6 +178,7 @@ export const kit = {
   reviewParts,
   schemeSwitch,
   scoreCard,
+  seal,
   segmented,
   setTextSize,
   setCalm,
@@ -176,9 +194,9 @@ export const kit = {
   soundOn,
   startDuel,
   startScreen,
-  stat,
   summary,
   tickOn,
+  tiles,
   timer,
   title,
   toneOf,
@@ -194,6 +212,7 @@ export const kit = {
   weekday,
   when,
   withWord,
+  worn,
 };
 
 export type Kit = typeof kit;

@@ -1,5 +1,5 @@
 /* АЛМАНАХ: a bright almanac (DECISIONS.md, „How it looks and speaks“). A game, bright and alive: each chapter its
-   colour, always with its glyph; the almanac's forms (the issue's coloured sheet and its turned corner, ink and pencil
+   colour, always with its glyph; the almanac's forms (the issue's coloured sheet and its turned corner, ink and grey
    in the book), never a paper texture; right and wrong carried by shape and fill, never by colour alone; one obvious
    action per screen. The tokens are at the top; every colour below is one of them. The rules: web/DESIGN.md. */
 
@@ -74,8 +74,8 @@
     --ink-2: #47445f;
     /* Kickers, meta, labels. */
     --ink-3: #5d5a77;
-    /* What's written in pencil in the book. */
-    --pencil: #66637f;
+    /* A fact met, in grey in the book. */
+    --grey: #66637f;
     /* Hairlines between rows, tracks, the pips to come. */
     --line: #dadced;
     /* Control outlines: an answer's frame, a field, a switch off, a pip to come (3:1). */
@@ -162,7 +162,6 @@
     --i-flame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 28'%3E%3Cpath d='M12 1c1.2 4.6 7 7.4 7 14.2a7 7 0 0 1-14 .4c0-3.6 1.9-6 3.8-7.6.2 2.4 1.2 3.8 2.7 4.3C11 9.2 11 5 12 1z'/%3E%3C/svg%3E");
     --i-share: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 15V4M7.5 8.5L12 4l4.5 4.5'/%3E%3Cpath d='M5 13v6h14v-6'/%3E%3C/svg%3E");
     --i-nib: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5c2.6 3 5 6.2 5 9.3 0 2-1.1 3.4-2.6 4.1V18H9.6v-2.1C8.1 15.2 7 13.8 7 11.8c0-3.1 2.4-6.3 5-9.3zm0 6.3a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM8.6 19.4h6.8v2.1H8.6z'/%3E%3C/svg%3E");
-    --i-pencil: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20l1.2-4.6L15.8 4.8a2.1 2.1 0 0 1 3 0l.4.4a2.1 2.1 0 0 1 0 3L8.6 18.8z'/%3E%3Cpath d='M13.8 6.8l3.4 3.4'/%3E%3C/svg%3E");
     --i-gear: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='3.2'/%3E%3Cpath d='M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M5.5 18.5l1.9-1.9M16.6 7.4l1.9-1.9'/%3E%3C/svg%3E");
   }
 
@@ -175,7 +174,7 @@
       --ink: #f5f3ff;
       --ink-2: #cdc9e6;
       --ink-3: #a7a3c6;
-      --pencil: #9a96bb;
+      --grey: #9a96bb;
       --line: #34305a;
       --line-2: #7f7aa8;
       --action: #f5f3ff;
@@ -229,7 +228,7 @@
     --ink: #f5f3ff;
     --ink-2: #cdc9e6;
     --ink-3: #a7a3c6;
-    --pencil: #9a96bb;
+    --grey: #9a96bb;
     --line: #34305a;
     --line-2: #7f7aa8;
     --action: #f5f3ff;
@@ -484,10 +483,6 @@
 
   .i-nib {
     --i: var(--i-nib);
-  }
-
-  .i-pencil {
-    --i: var(--i-pencil);
   }
 
   .i-gear {
@@ -780,14 +775,6 @@
     padding: 20px;
     border-radius: var(--r-3);
     background: var(--surface);
-  }
-
-  .card-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-2) var(--space-3);
   }
 
   /* A card's own title, smaller than a screen's sections. */
@@ -1102,18 +1089,9 @@
     --tone: var(--tv);
   }
 
-  /* Tones that aren't a chapter's: the four pairs of „Свържи“ (questions.ts, pairTones), and the mark's gold. */
-  .tone-gold {
-    --tone: var(--t-general);
-  }
-  .tone-sky {
-    --tone: var(--t-geography);
-  }
+  /* A tone that isn't a chapter's: rose. */
   .tone-rose {
     --tone: var(--t-literature);
-  }
-  .tone-lilac {
-    --tone: var(--t-music);
   }
 
   .dot {
@@ -1248,36 +1226,6 @@
 
   .other-topics a.chip {
     text-decoration: none;
-  }
-
-  /* ---- Figures: numbers with what they count ---- */
-
-  .stat-label {
-    color: var(--ink-3);
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    font-weight: 700;
-  }
-
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-2);
-  }
-
-  .stat {
-    display: grid;
-    align-content: start;
-    gap: var(--space-1);
-    padding: var(--space-4);
-    border-radius: var(--r-2);
-    background: var(--surface);
-  }
-
-  .stat-value {
-    font: 900 calc(24px + 1.5rem) / 0.9 var(--font-numeral);
-    letter-spacing: -0.01em;
-    font-variant-numeric: tabular-nums;
   }
 
   /* ---- The pips of a run: a bar a question, right filled in ink, близо half, wrong hollow, the one asked in its
@@ -1543,22 +1491,6 @@
     --k4: color-mix(in srgb, var(--tone) 72%, #fff);
     --k5: color-mix(in srgb, var(--tone) 32%, #fff);
     --kt: 0.26;
-  }
-
-  /* A seal on an avatar's corner: ringed in the page's colour, so it stands off the picture. */
-  .worn-on {
-    position: relative;
-    display: inline-grid;
-    flex: none;
-  }
-
-  .worn-on > .seal {
-    position: absolute;
-    right: -7px;
-    bottom: -6px;
-    border-radius: 50%;
-    background: var(--bg);
-    box-shadow: 0 0 0 1.5px var(--bg);
   }
 
   /* ---- A question: the head (the way out, what's played, the count), the pips and the clock; the question on its
@@ -3135,12 +3067,6 @@
     height: 22px;
   }
 
-  .filed.pencil {
-    background: transparent;
-    box-shadow: inset 0 0 0 1.5px var(--line-2);
-    color: var(--pencil);
-  }
-
   /* „Знаеше ли?“: a kicker and the fact. On its date, what happened that day heads it. */
   .fact {
     display: grid;
@@ -3429,8 +3355,32 @@
     }
   }
 
+  /* The duel waiting for the player first: who, where it stands, „Играй“. */
+  .duel-turn {
+    display: grid;
+    gap: 10px;
+    padding: 14px 16px 16px;
+    border-radius: var(--r-3);
+    background: var(--surface);
+    box-shadow: inset 0 0 0 3px var(--ink);
+  }
+
+  .duel-turn .who-name {
+    font-weight: 900;
+  }
+
+  .duel-turn-line {
+    font: 600 0.875rem / 1.35 var(--font-sans);
+  }
+
+  /* The name keeps at least two fifths of the row: the line beside it wraps first. */
+  .duel-row > .who {
+    flex: 1 0 40%;
+  }
+
   .duel-row-end {
     display: grid;
+    flex: 0 1 auto;
     justify-items: end;
     gap: 2px;
     font-size: 0.8125rem;
@@ -4132,50 +4082,75 @@
     --size: 72px;
   }
 
-  /* ---- Профил: who you are on the left page, the avatars and Настройки on the right ---- */
+  /* ---- Профил: the avatar with the seal worn, the name; the longest streak; the seals; the avatars; Настройки ---- */
 
-  .me-intro {
+  .me-intro,
+  .me-side {
     display: grid;
-    align-content: start;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-5);
+    align-content: start;
   }
 
   .me-head {
-    display: grid;
-    justify-items: start;
-    gap: var(--space-1);
+    display: flex;
+    align-items: center;
+    gap: 18px;
   }
 
+  /* The avatar, the seal worn on its corner, on a ring of the page so it stands off the picture. */
   .me-avatar {
-    display: inline-flex;
-    margin-bottom: var(--space-3);
+    position: relative;
+    flex: none;
   }
 
   .me-avatar .avatar.l {
-    width: 96px;
-    height: 96px;
+    --size: 96px;
   }
 
-  /* The name as the page's title, in the serif; a long one wraps, never past the column. */
-  .me-head h1 {
-    font: 600 calc(24px + 1.5rem) / 1.05 var(--font-sans);
-    letter-spacing: -0.02em;
+  .me-avatar > .seal {
+    position: absolute;
+    right: -8px;
+    bottom: -6px;
+    border-radius: 50%;
+    background: var(--bg);
+    box-shadow: 0 0 0 3px var(--bg);
+  }
+
+  .me-who {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  /* A long name breaks rather than push the page sideways; on a narrow phone, a size down, the avatar too. */
+  .me-who h1 {
+    font-size: calc(16px + 1rem);
     overflow-wrap: anywhere;
   }
 
+  @media (max-width: 23.75rem) {
+    .me-who h1 {
+      font-size: calc(10px + 1rem);
+    }
+
+    .me-avatar .avatar.l {
+      --size: 80px;
+    }
+  }
+
+  .me-tag {
+    color: var(--ink-3);
+    font: 700 1rem / 1.2 var(--font-sans);
+  }
+
   .me-rename {
-    margin-top: var(--space-2);
-    font-size: 0.875rem;
+    justify-self: start;
+    font-size: 0.9375rem;
   }
 
-  /* Under a name still drawn: that it was, and the way to change it. */
   .me-drawn {
-    margin-top: var(--space-2);
     font-size: 0.875rem;
-  }
-
-  .me-figures {
-    border-top: 1.5px solid var(--ink);
   }
 
   .me-links {
@@ -4184,65 +4159,103 @@
     gap: var(--space-2) var(--space-5);
   }
 
-  .me-avatars .sect-head {
-    margin-bottom: var(--space-4);
-  }
-
-  .me-side {
+  /* The seals: a chapter's each, its rank's name under it, the one worn ringed in ink; a tap wears another. */
+  .seal-list {
     display: grid;
-    align-content: start;
-    gap: var(--space-7);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
-  /* Настройки, a row to its page under a rule in ink: its name, what's there, and the arrow. */
-  .me-settings-sect {
-    border-top: 1.5px solid var(--ink);
-  }
-
-  .me-settings {
+  .rk {
+    appearance: none;
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    min-height: 3.75rem;
-    padding-block: var(--space-3);
-    border-bottom: 1px solid var(--line);
+    gap: 10px;
+    width: 100%;
+    min-height: 64px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: var(--r-2);
+    background: var(--surface);
     color: var(--ink);
-    text-decoration: none;
+    text-align: left;
   }
 
-  .me-settings-text {
+  button.rk {
+    cursor: pointer;
+    box-shadow: inset 0 0 0 2px var(--line-2);
+  }
+
+  .rk.worn,
+  .rk[aria-pressed="true"] {
+    box-shadow: inset 0 0 0 3px var(--ink);
+  }
+
+  .seal-worn {
+    margin-bottom: 10px;
+    color: var(--ink-2);
+    font: 700 0.9375rem / 1.4 var(--font-sans);
+  }
+
+  .rk-words {
     display: grid;
-    flex: 1;
     gap: 2px;
     min-width: 0;
   }
 
-  .me-settings-text .muted {
-    font-size: 0.8125rem;
+  .rk-words b {
+    font: 900 0.9375rem / 1.15 var(--font-sans);
+    text-wrap: balance;
   }
 
-  .me-settings-i {
-    flex: none;
+  .rk-words span {
     color: var(--ink-3);
-    transform: scaleX(-1);
+    font: 700 0.8125rem / 1.2 var(--font-sans);
+  }
+
+  /* Настройки, last: a row to its page. */
+  .me-settings {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-height: 64px;
+    padding: 10px 18px;
+    border-radius: var(--r-2);
+    background: var(--surface);
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .me-settings > .i {
+    width: 22px;
+    height: 22px;
+  }
+
+  .me-settings-text {
+    display: grid;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .me-settings-text strong {
+    font: 900 1.0625rem / 1.2 var(--font-sans);
+  }
+
+  .me-settings-text .muted {
+    font: 600 0.8125rem / 1.3 var(--font-sans);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .me-settings:hover strong {
       text-decoration: underline;
-      text-underline-offset: 3px;
     }
   }
 
-  /* On a phone the pages one under another, a rule in ink between them. */
-  @media (max-width: 63.99rem) {
-    .me-side {
-      margin-top: var(--space-7);
-    }
-  }
-
-  /* A big screen: who you are on the narrower left page, the avatars and Настройки on the wider right. */
-  @media (min-width: 64rem) {
+  @media (min-width: 56.25rem) {
     .me.spread > .page-1 {
       grid-column: 1 / span 5;
     }
@@ -4252,8 +4265,7 @@
     }
 
     .me-avatar .avatar.l {
-      width: 120px;
-      height: 120px;
+      --size: 132px;
     }
   }
 
@@ -4277,12 +4289,6 @@
 
   .news-note a {
     color: inherit;
-  }
-
-  /* A chapter's picture in its note's sheet, as large as a number there. */
-  .sheet-pic {
-    width: 112px;
-    height: 112px;
   }
 
   /* News told late, on Начало (play/told.go): whose it is, over it. */
@@ -4417,362 +4423,346 @@
     }
   }
 
-  /* ---- Алманах: the book's contents, its notes, a chapter ---- */
-
-  .book,
-  .chapter {
-    gap: var(--space-7);
+  /* A chapter's art as an avatar: its glyph on white, on a disc of its colour. Not the player's yet: hollow, a solid
+     grey ring, the art faded. */
+  .avatar.chart {
+    display: inline-grid;
+    place-items: center;
+    background: var(--tv);
   }
 
-  .book-intro {
+  .chart-disc {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-2);
+    place-items: center;
+    width: 84%;
+    height: 84%;
+    border-radius: 50%;
+    background: #fff;
   }
 
-  .book-intro h1 {
-    margin-top: var(--space-1);
+  .chart-disc .avatar-pic {
+    width: 88%;
+    height: 88%;
   }
 
-  /* Three figures in a row between rules: the streak, the facts, the share known of everything. */
-
-  /* Three figures in a row between rules: the streak, the facts, the share known of everything. */
-  .figures-row {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin-top: var(--space-4);
-    border-top: 1px solid var(--ink);
-    border-bottom: 1px solid var(--line);
+  .pick.locked {
+    cursor: default;
   }
 
-  .fig {
-    display: grid;
-    gap: 2px;
-    padding: var(--space-3) var(--space-2) var(--space-3) 0;
-  }
-
-  .fig + .fig {
-    padding-left: var(--space-3);
-    border-left: 1px solid var(--line);
-  }
-
-  .fig-n {
-    font: 800 calc(19px + 1.1875rem) / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
+  /* „от Страница“ on one line, a size down. */
+  .pick.locked .pick-name {
+    font-size: 0.6875rem;
     white-space: nowrap;
   }
 
-  .fig-label {
-    color: var(--ink-3);
-    font: 500 0.8125rem / 1.3 var(--font-sans);
+  .pick.locked .avatar.chart {
+    background: transparent;
+    box-shadow: inset 0 0 0 3px var(--line-2);
   }
 
-  /* The notes as a ledger: the day in small capitals, the note in the serif; what's ahead in italic. */
-  .ledger {
+  .pick.locked .chart-disc {
+    background: transparent;
+    opacity: 0.45;
+    filter: grayscale(1);
+  }
+
+  /* ---- Алманах: the book's head, its chapters as cards in their colours; a chapter's page ---- */
+
+  .book,
+  .chapter {
+    align-items: start;
+  }
+
+  .book-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  /* Микс and България: two ways to play at the book's head. */
+  .ways {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: var(--space-1);
+  }
+
+  .way {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 64px;
+    padding: 8px 14px 8px 8px;
+    border: 2px solid var(--line);
+    border-radius: var(--r-2);
+    background: var(--surface);
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .way-words {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .way-words b {
+    font: 900 1.0625rem / 1.1 var(--font-sans);
+  }
+
+  .way-words small {
+    color: var(--ink-3);
+    font: 600 0.8125rem / 1.2 var(--font-sans);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .way:hover {
+      border-color: var(--line-2);
+    }
+  }
+
+  /* The chapters: two to a row on a phone, five on a big screen, each a page of the book in its colour, its corner
+     turned; the one nearest its next rank first. */
+  .chapters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
     margin: 0;
     padding: 0;
     list-style: none;
   }
 
-  .ledger li {
-    display: grid;
-    grid-template-columns: 4.5rem minmax(0, 1fr);
-    gap: var(--space-3);
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .ledger-day {
-    padding-top: 3px;
-    color: var(--ink-3);
-    font: 700 0.8125rem / 1.4 var(--font-sans);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  .ledger-text {
-    font: 400 1.0625rem / 1.45 var(--font-sans);
-  }
-
-  .ledger .next .ledger-text {
-    color: var(--ink-3);
-    font-style: italic;
-    font-weight: 500;
-  }
-
-  /* The contents: a chapter a row, its picture, its name on dotted leaders to its share, its facts and tier under. */
-  .toc {
-    margin: var(--space-1) 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .toc-row a {
-    display: grid;
-    grid-template-columns: 40px minmax(0, 1fr) auto;
-    align-items: center;
-    column-gap: 14px;
-    padding: 14px 0 12px;
-    border-bottom: 1px solid var(--line);
-    color: var(--ink);
+  .chapter-card {
+    display: block;
+    height: 100%;
+    color: var(--on-sheet);
     text-decoration: none;
   }
 
-  .toc-pic {
-    --tone: var(--t);
-    grid-row: span 2;
-    width: 40px;
-    height: 40px;
+  .chapter-card .leaf-wrap {
+    height: 100%;
   }
 
-  .toc-line {
+  .card-leaf {
+    --fold: 34px;
+    height: 100%;
+    min-height: 10.5rem;
+    gap: 8px;
+    padding: 14px 14px 16px;
+  }
+
+  .card-leaf > .fold {
+    border-top-left-radius: 8px;
+  }
+
+  .card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  /* A chapter's name breaks between its words, never inside one. */
+  .card-name {
+    min-width: 0;
+    font: 900 1.0625rem / 1.15 var(--font-sans);
+    overflow-wrap: normal;
+    text-wrap: balance;
+  }
+
+  .card-ink {
     display: flex;
     align-items: baseline;
-    gap: var(--space-2);
-    min-width: 0;
+    gap: 6px;
+    margin-top: auto;
+    font: 800 0.875rem / 1 var(--font-sans);
   }
 
-  .toc-name {
-    font: 600 1.1875rem / 1.2 var(--font-sans);
+  .card-ink .num {
+    font-size: 2.75rem;
+    line-height: 0.85;
   }
 
-  .toc-dots {
-    flex: 1;
-    min-width: 12px;
-    border-bottom: 2px dotted var(--line);
-    transform: translateY(-4px);
+  .card-rank {
+    padding-right: 22px;
+    font: 700 0.8125rem / 1.25 var(--font-sans);
   }
 
-  .toc-known {
-    font: 800 1.625rem / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-  }
-
-  :is(.toc-known, .know-n) small {
-    margin-left: 1px;
-    color: var(--ink-3);
-    font-size: 0.6em;
-    font-weight: 700;
-  }
-
-  .toc-sub {
-    display: flex;
-    grid-column: 2 / span 2;
-    align-items: center;
-    gap: 10px;
-    margin-top: 6px;
-    color: var(--ink-3);
-    font: 500 0.8125rem / 1.3 var(--font-sans);
-  }
-
-  .toc-track {
-    position: relative;
-    flex: 1;
-    min-width: 2rem;
-    height: 3px;
-    background: var(--line);
-  }
-
-  .toc-track i {
-    position: absolute;
-    inset: 0 auto 0 0;
-    background: var(--t, var(--ink));
-  }
-
-  /* България's small tricolour beside its name. */
-  .flag {
-    display: inline-block;
-    width: 18px;
-    height: 11px;
-    margin-left: var(--space-2);
-    vertical-align: 1px;
-    background: linear-gradient(#fff 0 33.3%, #00966e 0 66.6%, #d62612 0);
-    box-shadow: 0 0 0 1px var(--line);
+  .chapter-card.nearest .card-leaf {
+    box-shadow: inset 0 0 0 3px #16132b;
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .toc-row a:hover .toc-name {
+    .chapter-card:hover .card-name {
       text-decoration: underline;
-      text-decoration-thickness: 1px;
-      text-underline-offset: 4px;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 3px;
     }
   }
 
-  /* A chapter: its number, its name and its picture; how much of it is known, on its scale; „Играй главата“. */
+  /* A narrow phone: the cards' numbers a size down. */
+  @media (max-width: 23.75rem) {
+    .chapters {
+      gap: 8px;
+    }
+
+    .card-leaf {
+      padding: 12px 10px 14px;
+    }
+
+    .card-ink .num {
+      font-size: 2.125rem;
+    }
+  }
+
+  /* A chapter: its head on its sheet (its glyph, its name, the seal with its pips, its ink, the next rank), „Игра на
+     главата“, then its facts. */
   .chapter-side {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
     align-content: start;
+  }
+
+  .chapter-leaf {
+    gap: var(--space-4);
+    padding: 18px 18px 20px;
   }
 
   .chapter-head {
     display: flex;
-    align-items: flex-end;
-    gap: var(--space-4);
-    margin-top: var(--space-4);
+    align-items: center;
+    gap: 14px;
   }
 
-  .chapter-title {
-    flex: 1;
-    min-width: 0;
+  .chapter-head .glyph {
+    --g: 72px;
   }
 
-  .chapter-kicker {
-    color: var(--t);
+  .chapter-title .kicker {
+    color: var(--on-sheet);
   }
 
-  .chapter-head h1 {
-    margin-top: 6px;
-    font-size: calc(21px + 1.3125rem);
+  .chapter-title h1 {
+    font-size: calc(14px + 1.125rem);
   }
 
-  .chapter-pic {
-    --tone: var(--t);
-    width: 76px;
-    height: 76px;
-  }
-
-  .know {
-    margin-top: var(--space-5);
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--ink);
-  }
-
-  .know-top {
+  .ch-stand {
     display: flex;
-    align-items: flex-end;
-    gap: var(--space-3);
+    align-items: center;
+    gap: 16px;
+    padding: 14px;
+    border-radius: 20px;
+    background: rgb(255 255 255 / 0.72);
+    color: #16132b;
   }
 
-  .know-n {
-    font: 800 calc(42px + 2.625rem) / 0.8 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
+  .ch-seal {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    flex: none;
   }
 
-  .know-words {
+  .ch-seal .seal-pips i {
+    background: rgb(22 19 43 / 0.16);
+    box-shadow: none;
+  }
+
+  .ch-seal .seal-pips i.on {
+    background: #16132b;
+  }
+
+  .ch-words {
+    display: grid;
+    gap: 4px;
     min-width: 0;
-    padding-bottom: 4px;
-    font: 400 1.0625rem / 1.35 var(--font-sans);
   }
 
-  .know-words b {
-    font-weight: 600;
+  .ch-ink {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font: 800 0.9375rem / 1 var(--font-sans);
   }
 
-  /* The scale: a track filled in the chapter's colour, a tick at each tier, a mark where the player is. */
-  .scale {
-    position: relative;
-    height: 40px;
-    margin-top: var(--space-5);
+  .ch-ink .num {
+    font-size: 3.5rem;
+    line-height: 0.85;
   }
 
-  .scale::before {
-    content: "";
-    position: absolute;
-    top: 10px;
-    right: 0;
-    left: 0;
-    height: 4px;
-    background: var(--line);
+  .ch-rank {
+    font: 900 1.25rem / 1.1 var(--font-sans);
   }
 
-  .scale-fill {
-    position: absolute;
-    top: 10px;
-    left: 0;
-    height: 4px;
-    background: var(--t);
-  }
-
-  .scale-tick {
-    position: absolute;
-    top: 6px;
-    height: 12px;
-    border-left: 1px solid var(--ink-3);
-  }
-
-  .scale-me {
-    position: absolute;
-    top: 0;
-    width: 0;
-    height: 0;
-    border: 6px solid transparent;
-    border-top: 8px solid var(--ink);
-    transform: translate(-6px, -6px);
-  }
-
-  .scale-end {
-    position: absolute;
-    top: 26px;
-    left: 0;
-    color: var(--ink-3);
-    font: 600 0.6875rem / 1 var(--font-sans);
-  }
-
-  .scale-end.last {
-    right: 0;
-    left: auto;
+  .ch-next {
+    font: 700 0.9375rem / 1.3 var(--font-sans);
   }
 
   .chapter-play {
     display: grid;
-    gap: 10px;
-    margin-top: var(--space-5);
+    gap: var(--space-2);
   }
 
-  .chapter-play .small {
-    text-align: center;
-  }
-
-  /* Finding a fact: a search on an ink line, its words in the serif's italic. */
+  /* Finding a fact. */
   .search {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 6px;
-    border-bottom: 2px solid var(--ink);
+    position: relative;
+    display: block;
   }
 
   .search .i {
-    color: var(--ink-2);
-    font-size: 1.25rem;
+    position: absolute;
+    top: 50%;
+    left: 14px;
+    width: 18px;
+    height: 18px;
+    color: var(--ink-3);
+    translate: 0 -50%;
   }
 
   .search input {
-    flex: 1;
-    min-width: 0;
-    border: 0;
-    font: italic 500 1.125rem / 1.3 var(--font-sans);
+    padding-left: 42px;
   }
 
   .search input::-webkit-search-cancel-button {
-    filter: grayscale(1);
+    -webkit-appearance: none;
   }
 
-  /* A fact as an entry: its dateline, the answer as a headword, the question in italic, the fact. */
+  /* What grey is, where it first shows. */
+  .grey-note {
+    color: var(--ink-3);
+    font: 700 0.875rem / 1.4 var(--font-sans);
+  }
+
+  /* The facts: ink a card with an ink edge, grey a thin solid outline and lighter words. */
   .entries {
-    margin: 6px 0 0;
+    display: grid;
+    gap: 10px;
+    margin: 0;
     padding: 0;
     list-style: none;
   }
 
   .entry {
-    padding: 18px 0;
-    border-bottom: 1px solid var(--line);
-    break-inside: avoid;
+    display: grid;
+    gap: 6px;
+    padding: 16px 18px;
+    border-radius: var(--r-2);
+    background: var(--surface);
+    box-shadow: inset 6px 0 0 var(--ink);
   }
 
   .entry-when {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
     color: var(--ink-3);
-    font: 700 0.71875rem / 1.2 var(--font-sans);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font: 800 0.8125rem / 1.2 var(--font-sans);
   }
 
   .entry-word {
-    margin-top: var(--space-2);
-    font: 600 1.3125rem / 1.2 var(--font-sans);
-    text-wrap: pretty;
+    font: 900 1.375rem / 1.15 var(--font-sans);
   }
 
   .entry-untrue {
@@ -4780,29 +4770,47 @@
   }
 
   .entry-q {
-    margin-top: 4px;
     color: var(--ink-2);
-    font: italic 500 0.96875rem / 1.4 var(--font-sans);
+    font: 600 0.9375rem / 1.35 var(--font-sans);
   }
 
   .entry-fact {
-    margin-top: 10px;
-    font: 400 1.03125rem / 1.55 var(--font-sans);
-    text-wrap: pretty;
+    font: 500 1rem / 1.45 var(--font-sans);
   }
 
-  /* The page's first entry opens with a drop cap in the chapter's colour. */
-  .entry.first .entry-fact::first-letter {
-    float: left;
-    margin: 5px 8px 0 -1px;
-    color: var(--t);
-    font: 600 3.625rem / 0.8 var(--font-sans);
+  .entry.met {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--line-2);
+    color: var(--grey);
+  }
+
+  .entry.met :is(.entry-word, .entry-q, .entry-fact) {
+    color: var(--grey);
+  }
+
+  .entry.met .entry-word {
+    font-weight: 700;
+  }
+
+  .tag.ink {
+    background: var(--ink);
+    color: var(--bg);
+  }
+
+  .tag.ink .i {
+    width: 12px;
+    height: 12px;
+  }
+
+  .tag.grey {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--line-2);
+    color: var(--grey);
   }
 
   .entries-none {
-    padding: var(--space-5) 0;
-    color: var(--ink-2);
-    font: italic 500 1.0625rem / 1.45 var(--font-sans);
+    color: var(--ink-3);
+    font: 600 0.9375rem / 1.4 var(--font-sans);
   }
 
   /* The chapter's pages: newer, the numbers, older. */
@@ -4812,7 +4820,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2);
-    padding-top: 18px;
+    margin-top: var(--space-4);
   }
 
   .pager-pages {
@@ -4823,96 +4831,81 @@
   .pager-n {
     display: grid;
     place-items: center;
-    width: 44px;
-    height: 44px;
-    border: 0;
-    background: none;
-    color: var(--ink-3);
-    font: 700 1.125rem / 1 var(--font-numeral);
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 12px;
+    color: var(--ink);
+    font: 900 1rem / 1 var(--font-numeral);
     text-decoration: none;
-    cursor: pointer;
   }
 
   .pager-n[aria-current="page"] {
-    box-shadow: inset 0 -2px 0 var(--ink);
-    color: var(--ink);
+    background: var(--ink);
+    color: var(--bg);
   }
 
   .pager-way {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
-    border: 0;
-    background: none;
     color: var(--ink);
-    font: 700 0.9375rem / 1 var(--font-sans);
+    font: 800 0.9375rem / 1 var(--font-sans);
     text-decoration: none;
-    cursor: pointer;
   }
 
   .pager-way.off {
-    display: inline-flex;
-    align-items: center;
-    color: var(--line-2);
-    font-weight: 600;
-    cursor: default;
+    visibility: hidden;
+  }
+
+  /* Numbers in a row (the profile's, the day's Bulgaria): each big, its words under it. */
+  .figures-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .fig {
+    display: grid;
+    align-content: start;
+    gap: 4px;
+    padding: 14px;
+    border-radius: var(--r-2);
+    background: var(--surface);
+  }
+
+  .fig-n {
+    font: 900 2.25rem / 0.9 var(--font-numeral);
+  }
+
+  .fig-label {
+    color: var(--ink-3);
+    font: 700 0.8125rem / 1.25 var(--font-sans);
   }
 
   @media (min-width: 56.25rem) {
-    .book.spread > .page-1,
+    .ways {
+      max-width: 36rem;
+    }
+
+    .chapters {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .card-leaf {
+      min-height: 12.5rem;
+    }
+
     .chapter.spread > .page-1 {
-      grid-column: 1 / span 4;
+      grid-column: 1 / span 5;
     }
 
-    .book.spread > .page-2,
     .chapter.spread > .page-2 {
-      grid-column: 5 / span 8;
-    }
-
-    /* The book: its title and figures, and its notes under them, beside the contents. */
-    .book.spread > .contents {
-      grid-row: 1 / span 2;
-    }
-
-    .book.spread > .book-notes {
-      grid-row: 2;
-    }
-
-    .chapter-side {
-      position: sticky;
-      top: var(--space-5);
-    }
-
-    .toc {
-      columns: 2;
-      column-gap: 40px;
-    }
-
-    .toc-row {
-      break-inside: avoid;
-    }
-
-    .toc-name {
-      font-size: 1.125rem;
-    }
-
-    .chapter-head h1 {
-      font-size: calc(24px + 1.5rem);
-    }
-
-    .chapter-pic {
-      width: 96px;
-      height: 96px;
-    }
-
-    .chapter-play .small {
-      text-align: left;
+      grid-column: 6 / span 7;
     }
 
     .entries {
-      columns: 2;
-      column-gap: 40px;
-      column-rule: 1px solid var(--line);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
@@ -5091,14 +5084,6 @@
 
   .shared-score .kicker {
     color: #16132b;
-  }
-
-  .shared-score-n {
-    font: 900 1.25rem / 1 var(--font-sans);
-  }
-
-  .shared-score-n b {
-    font: 900 3rem / 0.9 var(--font-numeral);
   }
 
   /* Beside the issue (under it on a phone): its action, the streak, and on a big screen the issue's contents. */
@@ -5684,11 +5669,6 @@
     margin: -4px 0 -4px -4px;
   }
 
-  .mastery-topic .topic-mark {
-    flex-shrink: 0;
-    margin-left: 0;
-  }
-
   /* A result's kicker line: what was played, and what's beside it. */
   .day-line {
     display: flex;
@@ -5728,47 +5708,54 @@
     fill: var(--gold);
   }
 
-  /* ---- Rows of players: a board, the friends ---- */
+  /* ---- Rows of players: a board, the friends; Приятели ---- */
 
   .rank-row {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    min-height: 3.5rem;
+    gap: 10px;
+    min-height: 3.625rem;
     padding: var(--space-2) 0;
   }
 
   .rank-place {
     flex: none;
-    width: 1.625rem;
+    width: 1.5rem;
     color: var(--ink-3);
-    font: 700 1.25rem / 1 var(--font-numeral);
+    font: 900 1.25rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
-    text-align: right;
+    text-align: center;
   }
 
   .rank-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     flex: 1;
     min-width: 0;
-    font: 600 1rem / 1.25 var(--font-sans);
+    font: 800 1rem / 1.25 var(--font-sans);
   }
 
   .rank-name a {
+    overflow: hidden;
     color: inherit;
     text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .rank-you {
     color: var(--ink-3);
-    font-size: 0.875rem;
-    font-weight: 500;
+    font-size: 0.75rem;
+    font-weight: 900;
   }
 
-  /* The score and what goes beside it; on a narrow phone, under the score, so the name keeps its room. */
+  /* The score, and the day's small squares beside it; on a narrow phone, the squares under the score. */
   .rank-end {
     display: flex;
     flex: none;
-    align-items: baseline;
+    flex-direction: row-reverse;
+    align-items: center;
     gap: var(--space-3);
   }
 
@@ -5782,35 +5769,37 @@
     .rank-end {
       flex-direction: column;
       align-items: flex-end;
-      gap: 2px;
+      gap: 4px;
     }
   }
 
   .rank-n {
-    font: 700 1.5rem / 1 var(--font-numeral);
+    font: 900 1.5rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
   }
 
   :is(.rank-score, .friend-day) small {
     margin-left: 2px;
     color: var(--ink-3);
-    font: 500 0.875rem / 1 var(--font-sans);
+    font: 700 0.8125rem / 1 var(--font-sans);
   }
 
   .rank-aside {
+    display: flex;
     flex: none;
-    min-width: 3.25em;
-    color: var(--ink-3);
-    font: 500 0.875rem / 1 var(--font-sans);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
   }
 
-  /* The player's own row: washed to the page's edges. */
+  /* The player's own row: on a well. */
   .rank-row.me {
-    margin: 0 calc(-1 * var(--gutter));
-    padding-inline: var(--gutter);
+    margin: 0 -8px;
+    padding-inline: 8px;
+    border-radius: 14px;
     background: var(--surface-2);
+  }
+
+  .rows > .rank-row.me,
+  .rows > .rank-row.me + * {
+    border-top-color: transparent;
   }
 
   /* Further down than the best: a little apart from them. */
@@ -5819,56 +5808,81 @@
   }
 
   .friends-page {
-    gap: var(--space-7);
+    gap: var(--space-6);
   }
 
   .sect-lead {
-    margin-top: var(--space-2);
     color: var(--ink-2);
-    font: 500 0.875rem / 1.4 var(--font-sans);
-  }
-
-  .duels > .btn {
-    margin-top: var(--space-5);
+    font: 600 0.875rem / 1.4 var(--font-sans);
   }
 
   .sect-foot {
-    margin-top: var(--space-2);
     text-align: center;
   }
 
-  .day-board .segmented {
-    margin: var(--space-2) 0 0;
-  }
-
   .board-note {
-    margin-top: var(--space-3);
     color: var(--ink-3);
-    font: 500 0.875rem / 1.4 var(--font-sans);
-  }
-
-  .add-friend input::placeholder {
-    font-size: 1rem;
+    font: 700 0.875rem / 1.4 var(--font-sans);
   }
 
   .board-empty,
   .friends-none {
-    padding: var(--space-4) 0;
+    padding: var(--space-2) 0;
     color: var(--ink-2);
-    font: italic 500 1rem / 1.45 var(--font-sans);
+    font: 600 1rem / 1.45 var(--font-sans);
   }
 
-  /* Short of room (a phone's 320px), removing a friend (while editing) goes under the row, at its end. */
-  /* A friend: the avatar, the name (and the pair's duels under it), today's score at the end, and the way to a duel
-     (or „Премахни“) after it; in a narrow column, the way under the score. */
+  /* All of България: how many got each count, the player's bar in ink. */
+  .board-spread {
+    display: grid;
+    gap: 6px;
+    padding: 14px 16px 12px;
+    border-radius: var(--r-3);
+    background: var(--surface);
+  }
+
+  .board-bars {
+    display: grid;
+    grid-template-columns: repeat(11, minmax(0, 1fr));
+    align-items: end;
+    gap: 4px;
+    height: 72px;
+    border-bottom: 1px solid var(--ink);
+  }
+
+  .board-bars i {
+    display: block;
+    border-radius: 3px 3px 0 0;
+    background: var(--line);
+  }
+
+  .board-bars i.me {
+    background: var(--ink);
+  }
+
+  .board-ticks {
+    display: grid;
+    grid-template-columns: repeat(11, minmax(0, 1fr));
+    gap: 4px;
+    color: var(--ink-3);
+    font: 800 0.875rem / 1 var(--font-numeral);
+    text-align: center;
+  }
+
+  .board-ticks .me {
+    color: var(--ink);
+    font-weight: 900;
+  }
+
+  /* A friend: the avatar, the name and the seal worn, their day and the pair's duels at the end, and the way to a duel
+     (or „Премахни“) after it. */
   .friend {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto auto;
     align-items: center;
     gap: var(--space-1) var(--space-3);
-    min-height: 3.5rem;
+    min-height: 3.625rem;
     padding: var(--space-2) 0;
-    border-bottom: 1px solid var(--line);
   }
 
   .friend-act {
@@ -5876,18 +5890,21 @@
   }
 
   .friend-text {
-    display: grid;
+    display: flex;
+    align-items: center;
+    gap: 6px;
     min-width: 0;
   }
 
   /* Short of room, the tag gives way, not the name. */
   .friend-name {
-    display: flex;
-    gap: 0.3em;
+    display: block;
+    min-width: 0;
     overflow: hidden;
     color: var(--ink);
-    font-weight: 600;
+    font-weight: 800;
     text-decoration: none;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
@@ -5895,19 +5912,26 @@
   .me-tag {
     overflow: hidden;
     color: var(--ink-3);
-    font-weight: 500;
+    font-weight: 600;
     text-overflow: ellipsis;
   }
 
-  /* A tag is one word: cut short with „…“, never broken over two lines. */
-  .me-tag {
-    font-size: 0.875rem;
-    white-space: nowrap;
+  .friend-day {
+    display: grid;
+    justify-items: end;
+    gap: 2px;
+    color: var(--ink-3);
+    font: 700 0.875rem / 1.2 var(--font-sans);
+  }
+
+  .friend-day .rank-n {
+    color: var(--ink);
+    font-size: 1.125rem;
   }
 
   .record {
     color: var(--ink-3);
-    font: 500 0.8125rem / 1.3 var(--font-sans);
+    font: 700 0.8125rem / 1.3 var(--font-sans);
   }
 
   /* A tag typed after its @. */
@@ -5919,21 +5943,20 @@
   .tag-input > span {
     position: absolute;
     top: 50%;
-    left: 2px;
+    left: 14px;
     color: var(--ink-3);
-    font: 700 1.125rem / 1 var(--font-sans);
+    font: 700 1.0625rem / 1 var(--font-sans);
     transform: translateY(-50%);
     pointer-events: none;
   }
 
   .tag-input input {
-    padding-left: 1.1rem;
+    padding-left: 1.75rem;
   }
 
   .add-friend {
     display: grid;
     gap: var(--space-2);
-    margin-top: var(--space-5);
   }
 
   /* On a narrow phone the button goes under the field, so the field keeps room for its hint. */
@@ -5954,7 +5977,6 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);
-    margin-top: var(--space-6);
   }
 
   .waiting li {
@@ -5973,15 +5995,17 @@
     white-space: nowrap;
   }
 
-  /* Someone asks to be friends: their line, „Приеми“ and „Откажи“, over the list. */
+  /* Someone asks to be friends: their line, „Приеми“ and „Откажи“, on a card over the list. */
   .invitation {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2) var(--space-3);
-    padding: var(--space-3) 0;
-    border-bottom: 1px solid var(--line);
+    padding: 12px 14px;
+    border-radius: var(--r-2);
+    background: var(--surface);
+    box-shadow: inset 0 0 0 2px var(--line);
   }
 
   .invitation-actions {
@@ -5989,13 +6013,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2) var(--space-4);
-  }
-
-  @media (min-width: 56.25rem) {
-    .rank-row.me {
-      margin: 0 calc(-1 * var(--space-3));
-      padding-inline: var(--space-3);
-    }
   }
 
   /* Read by screen readers, not shown. */
@@ -6009,109 +6026,6 @@
   }
 
   /* ---- Profile ---- */
-
-  .mastery-list {
-    display: grid;
-    gap: var(--space-4);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .mastery-row {
-    display: grid;
-    gap: 6px;
-  }
-
-  /* The topic on the left, its tier (or what's known) on the right, on one line: a long name („Изкуство и
-     литература“) wraps in its own place, never pushing the tier under it. */
-  .mastery-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-1) var(--space-2);
-  }
-
-  .mastery-topic {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-width: 0;
-    font-weight: 800;
-  }
-
-  .mastery-head > .mastery {
-    flex-shrink: 0;
-  }
-
-  /* The player's own topic leads to playing it: the whole row is the link. */
-  .mastery-row:has(a.mastery-topic) {
-    position: relative;
-  }
-
-  a.mastery-topic {
-    color: var(--ink);
-    text-decoration: none;
-  }
-
-  a.mastery-topic::before {
-    position: absolute;
-    inset: -4px 0;
-    content: "";
-  }
-
-  /* The way on, after the name, on its last line when a long one wraps. */
-  a.mastery-topic > span::after {
-    content: "\00a0›";
-    color: var(--ink-3);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    a.mastery-topic:hover {
-      color: var(--ink);
-    }
-  }
-
-  /* On a row, the picture starts at the card's edge like the words under it (a chip pulls it in instead). */
-
-  .mastery-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-1) var(--space-2);
-    color: var(--ink-3);
-    font-size: 0.8125rem;
-    line-height: 1rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* Beside the topic, what's known takes the rest of the line and wraps in it, so every row keeps one shape. */
-  .mastery-head > .mastery-meta {
-    flex: 1 1 0;
-    justify-content: flex-end;
-    text-align: right;
-  }
-
-  .mastery-known {
-    color: var(--ink);
-    font: 900 1.25rem / 1 var(--font-numeral);
-  }
-
-  /* How a topic's game moved its mastery, a line in „Ново за теб“. */
-  .mastery-line {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-1) var(--space-2);
-    width: 100%;
-    margin: 0;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .mastery-line .mastery {
-    margin-left: auto;
-  }
 
   .games {
     display: grid;
@@ -6270,7 +6184,6 @@
 
     .option.right,
     .option.wrong,
-    .verdict-pts,
     .in-row,
     .explain-pop:popover-open,
     .number-out.live .typed::after {
@@ -7193,19 +7106,6 @@
     --gutter: 16px;
   }
 
-  /* A chapter's row: its name wraps, no leaders; its share known over its words. */
-  .tight .toc-dots {
-    display: none;
-  }
-
-  .tight .toc-name {
-    min-width: 0;
-  }
-
-  .tight .know-top {
-    flex-wrap: wrap;
-  }
-
   /* A duel's row: how it stands under the other player, at the left. */
   .tight .duel-row {
     flex-wrap: wrap;
@@ -7216,14 +7116,9 @@
     text-align: left;
   }
 
-  /* Figures in a row, and the notes' days: one under another. */
-  .tight .figures-row,
-  .tight .ledger li {
+  /* Figures in a row: one under another. */
+  .tight .figures-row {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .tight .ledger li {
-    gap: 2px;
   }
 
   .tight .fig + .fig {

@@ -193,7 +193,7 @@ export interface Result {
   score: number;
   right: boolean;
   exact?: boolean;
-  /** A right answer's fact, written in the Алманах in ink (the issue, met there first) or not (pencil); not said, nothing
+  /** A right answer's fact, written in the Алманах in ink (the issue, met there first) or not (grey); not said, nothing
    * is said of which (play/ink.go). */
   ink?: boolean;
   timedOut?: boolean;
