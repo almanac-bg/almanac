@@ -1266,6 +1266,7 @@ func TestProgress(t *testing.T) {
 		ok            bool
 	}{
 		{nil, ptr("master-history"), true}, // thirty right in history: sure, and a master
+		{ptr("star-natural"), nil, true}, // every part in its own colour
 		{ptr("star-gold"), ptr("flawless"), true},
 		{ptr("crown-gold"), nil, false},
 		{ptr("star-black"), nil, false},

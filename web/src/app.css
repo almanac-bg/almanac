@@ -4865,6 +4865,317 @@
       );
   }
 
+  /* The natural tone: no tone over the picture, every part in its own colour, as the thing looks (a fox orange with a
+     white chest, a stork white with a black wing and a red beak), on a tile of its own scene (a meadow, the sky, the
+     night). Each shape sets its inks; a part that shares an ink with another but differs in life (the cat's eyes, the
+     stork's wing lines) is picked by its place among the picture's layers (art/pictures.ts: keep them in order, or
+     move its number here). pictures.test.ts holds every avatar coloured. */
+  .tone-natural {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-fox {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-fox > .avatar-pic {
+    --k1: #a3461c;
+    --k2: #ea7a2c;
+    --k5: #fff5e8;
+  }
+
+  .tone-natural.sh-bear {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-bear > .avatar-pic {
+    --k1: #5a3a22;
+    --k2: #8d5b34;
+    --k4: #d4a877;
+  }
+
+  .tone-natural.sh-cat {
+    --tone: #f3d593;
+  }
+
+  .tone-natural.sh-cat > .avatar-pic {
+    --k1: #c4651f;
+    --k2: #f29a45;
+    --k4: #f6c1a6;
+    --k5: #fff7ec;
+  }
+
+  .tone-natural.sh-cat > .avatar-pic > :nth-child(7) {
+    fill: #b9d03c;
+  }
+
+  .tone-natural.sh-cat > .avatar-pic > :nth-child(10) {
+    fill: #e5808f;
+  }
+
+  .tone-natural.sh-hare {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-hare > .avatar-pic {
+    --k1: #7d6048;
+    --k2: #b08d6e;
+    --k4: #f2c2c2;
+    --k5: #f6efe6;
+  }
+
+  .tone-natural.sh-hare > .avatar-pic > :nth-child(7) {
+    fill: #e5808f;
+  }
+
+  .tone-natural.sh-hedgehog {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-hedgehog > .avatar-pic {
+    --k1: #4f3c2e;
+    --k2: #86684f;
+    --k4: #f0a39a;
+    --k5: #ecd6b8;
+  }
+
+  .tone-natural.sh-dog {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-dog > .avatar-pic {
+    --k1: #7a4a26;
+    --k2: #d99b5c;
+    --k4: #ee7c8b;
+    --k5: #fff6ea;
+  }
+
+  .tone-natural.sh-deer {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-deer > .avatar-pic {
+    --k1: #7a4f2e;
+    --k2: #b8784a;
+    --k4: #f4e7d4;
+  }
+
+  .tone-natural.sh-deer > .avatar-pic > :nth-child(3) {
+    stroke: #d9c09a;
+  }
+
+  .tone-natural.sh-stork {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-stork > .avatar-pic {
+    --k1: #e14a2c;
+    --k5: #fbfbfd;
+  }
+
+  .tone-natural.sh-stork > .avatar-pic > :nth-child(3) {
+    stroke: #4a4a5e;
+  }
+
+  .tone-natural.sh-frog {
+    --tone: #8fd3cf;
+  }
+
+  .tone-natural.sh-frog > .avatar-pic {
+    --k1: #2e8a3d;
+    --k2: #55b84f;
+    --k4: #f1a3a0;
+    --k5: #eaf6c6;
+  }
+
+  .tone-natural.sh-frog > .avatar-pic > :nth-child(10) {
+    stroke: #2a6a30;
+  }
+
+  .tone-natural.sh-flame {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-flame > .avatar-pic {
+    --k4: #f97316;
+    --k5: #fcd34d;
+  }
+
+  .tone-natural.sh-star {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-star > .avatar-pic {
+    --k4: #f2ae0b;
+    --k5: #fde047;
+  }
+
+  .tone-natural.sh-target {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-target > .avatar-pic {
+    --k1: #dc2b2b;
+    --k4: #fde047;
+    --k5: #ffffff;
+  }
+
+  .tone-natural.sh-bolt {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-bolt > .avatar-pic {
+    --k4: #facc15;
+    --k5: #fef08a;
+  }
+
+  .tone-natural.sh-book {
+    --tone: #f3d593;
+  }
+
+  .tone-natural.sh-book > .avatar-pic {
+    --k1: #8a2f17;
+    --k4: #b7aa8e;
+    --k5: #f6eedb;
+  }
+
+  .tone-natural.sh-book > .avatar-pic > :nth-child(6) {
+    fill: #d62f2f;
+  }
+
+  .tone-natural.sh-trophy {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-trophy > .avatar-pic {
+    --k1: #9a5b0c;
+    --k4: #f0b429;
+    --k5: #fcd34d;
+  }
+
+  .tone-natural.sh-trophy > .avatar-pic > :nth-child(8) {
+    fill: #5b3a1e;
+  }
+
+  .tone-natural.sh-trophy > .avatar-pic > :nth-child(9) {
+    fill: #fcd34d;
+  }
+
+  .tone-natural.sh-shield {
+    --tone: #d6e4f0;
+  }
+
+  .tone-natural.sh-shield > .avatar-pic {
+    --k1: #1f3f8f;
+    --k4: #c8d2df;
+    --k5: #eef1f5;
+  }
+
+  .tone-natural.sh-shield > .avatar-pic > :nth-child(6) {
+    fill: #fbbf24;
+  }
+
+  .tone-natural.sh-heart {
+    --tone: #fbd3dc;
+  }
+
+  .tone-natural.sh-heart > .avatar-pic {
+    --k4: #dc1f45;
+    --k5: #f43f5e;
+  }
+
+  .tone-natural.sh-owl {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-owl > .avatar-pic {
+    --k1: #6b4a2b;
+    --k2: #9a6b40;
+    --k4: #e8d2a8;
+    --k5: #fffaf0;
+  }
+
+  .tone-natural.sh-owl > .avatar-pic > :nth-child(9) {
+    fill: #f59e0b;
+  }
+
+  .tone-natural.sh-compass {
+    --tone: #a7d99b;
+  }
+
+  .tone-natural.sh-compass > .avatar-pic {
+    --k1: #b7791f;
+    --k2: #6b7280;
+    --k4: #cbd5e1;
+    --k5: #fffaf0;
+  }
+
+  .tone-natural.sh-compass > .avatar-pic > :nth-child(6) {
+    fill: #dc2b2b;
+  }
+
+  .tone-natural.sh-sun {
+    --tone: #9fd0f2;
+  }
+
+  .tone-natural.sh-sun > .avatar-pic {
+    --k1: #b45309;
+    --k4: #f59e0b;
+    --k5: #fde047;
+  }
+
+  .tone-natural.sh-hourglass {
+    --tone: #f3d593;
+  }
+
+  .tone-natural.sh-hourglass > .avatar-pic {
+    --k1: #7c4a24;
+    --k2: #e8a93f;
+    --k5: #e6f4fd;
+  }
+
+  .tone-natural.sh-spark {
+    --tone: #2e3566;
+  }
+
+  .tone-natural.sh-spark > .avatar-pic {
+    --k4: #fbbf24;
+    --k5: #fde68a;
+  }
+
+  .tone-natural.sh-clover {
+    --tone: #f3d593;
+  }
+
+  .tone-natural.sh-clover > .avatar-pic {
+    --k1: #2f7d32;
+    --k2: #2f7d32;
+    --k4: #3e9b43;
+    --k5: #57b65b;
+  }
+
+  .tone-natural.sh-crown {
+    --tone: #5b2a86;
+  }
+
+  .tone-natural.sh-crown > .avatar-pic {
+    --k1: #b91c1c;
+    --k4: #f0b429;
+    --k5: #fcd34d;
+  }
+
+  .tone-natural.sh-crown > .avatar-pic > :nth-child(5) {
+    fill: #fffaf0;
+  }
+
+  .tone-natural.sh-crown > .avatar-pic > :nth-child(6) {
+    fill: #4f9cf5;
+  }
+
+  .tone-natural.sh-crown > .avatar-pic > :nth-child(8) {
+    fill: #fffaf0;
+  }
+
   .avatar.s {
     --size: 28px;
   }
@@ -5752,6 +6063,11 @@
     border-radius: var(--radius-full);
     background: var(--tone);
     cursor: pointer;
+  }
+
+  /* The natural tone has no one colour: its swatch is a few of the colours it paints in. */
+  .tone-pick.tone-natural {
+    background: conic-gradient(#ea7a2c, #fcd34d, #55b84f, #9fd0f2, #f43f5e, #ea7a2c);
   }
 
   .tone-pick[aria-pressed="true"] {
