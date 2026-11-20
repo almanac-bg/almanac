@@ -5,6 +5,7 @@
 
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal, when } from "../lib/dom.ts";
+import { embedded } from "../lib/embedded.ts";
 import { keptWords } from "../lib/keep.ts";
 import { pushable, pushOn } from "../lib/push.ts";
 import { type User, user } from "../state.ts";
@@ -23,7 +24,8 @@ export interface SignInOptions {
   done?: (said: string, now: User) => void;
 }
 
-/** Signing in by email, with a code (SignInOptions). */
+/** Signing in by email, with a code (SignInOptions). Never in Meta's or TikTok's own browsers (lib/embedded.ts,
+ * forms): what's typed there the app can read, so the way is the phone's own browser. */
 export function signIn({
   primary = true,
   send: sendWords = "Прати ми код",
@@ -31,6 +33,8 @@ export function signIn({
   enter = "Влез",
   done,
 }: SignInOptions = {}): Child {
+  if (embedded && !embedded.forms)
+    return h("p", { class: "muted" }, "Тук не питаме за имейл: отвори играта в браузъра на телефона и я запази там.");
   const email = signal("");
   const code = signal("");
   const sent = signal(false);

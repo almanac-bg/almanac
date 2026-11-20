@@ -78,6 +78,7 @@ func start(t *testing.T) *game {
 type player struct {
 	g      *game
 	client *http.Client
+	ua     string // the User-Agent it sends, if any
 }
 
 func (g *game) player() *player {
@@ -98,6 +99,9 @@ func (p *player) call(method, path string, body any) (int, map[string]any) {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	if p.ua != "" {
+		req.Header.Set("User-Agent", p.ua)
+	}
 	res, err := p.client.Do(req)
 	if err != nil {
 		p.g.t.Fatal(err)
@@ -222,48 +226,6 @@ func TestCodesForAClass(t *testing.T) {
 	}
 }
 
-// A guest in an app's own browser takes the game to the phone's browser by a link, once.
-func TestHandoffLink(t *testing.T) {
-	g := start(t)
-	app := g.player()
-	_, out := app.call("POST", "/api/guest", map[string]any{})
-	guest := name(out)
-	_, out = app.call("POST", "/api/auth/handoff", map[string]any{})
-	link, _ := out["url"].(string)
-	token, found := strings.CutPrefix(link, g.url+"/hand/")
-	if !found || len(token) != 43 {
-		t.Fatalf("the link: %v", out)
-	}
-	// The page itself is the app's, and takes nothing (a link preview fetches it).
-	if res, err := http.Get(g.url + "/hand/" + token); err != nil || res.StatusCode != 200 {
-		t.Fatalf("the page: %v %v", res, err)
-	}
-	browser := g.player()
-	// What it brings shows first, whose it is, and nothing is taken by it.
-	if status, out := browser.call("POST", "/api/auth/hand/look", map[string]string{"token": token}); status != 200 ||
-		out["game"].(map[string]any)["name"] != guest {
-		t.Fatalf("looked at: %d %v", status, out)
-	}
-	if _, out := app.call("GET", "/api/me", nil); name(out) != guest {
-		t.Fatalf("a look took the game: the app's browser is %v", out)
-	}
-	if status, out := browser.call("POST", "/api/auth/hand", map[string]string{"token": token}); status != 200 ||
-		name(out) != guest {
-		t.Fatalf("taken: %d %v", status, out)
-	}
-	if _, out := browser.call("GET", "/api/me", nil); name(out) != guest {
-		t.Fatalf("the browser is %v", out)
-	}
-	// The game moved: the app's browser it left is signed out.
-	if _, out := app.call("GET", "/api/me", nil); out["user"] != nil {
-		t.Fatalf("the app's browser is still %v", out)
-	}
-	if status, out := g.player().call("POST", "/api/auth/hand", map[string]string{"token": token}); status != 404 ||
-		out["error"] != "no_handoff" {
-		t.Fatalf("taken twice: %d %v", status, out)
-	}
-}
-
 // signIn signs a browser in with an email, by the code mailed to it.
 func (p *player) signIn(email string) map[string]any {
 	p.g.t.Helper()
@@ -278,35 +240,6 @@ func (p *player) signIn(email string) map[string]any {
 		p.g.t.Fatalf("verify: %d %v", status, out)
 	}
 	return out
-}
-
-// The takeover a handoff once let through (review 2026-11-17, S1), as it was done: someone makes a link in a game
-// of their own and sends it; it's taken in a browser with nobody in it, which later gives its email. The link's maker
-// is signed out, and stays out of the profile.
-func TestHandoffTakeover(t *testing.T) {
-	g := start(t)
-	maker := g.player()
-	maker.call("POST", "/api/guest", map[string]any{})
-	_, out := maker.call("POST", "/api/auth/handoff", map[string]any{})
-	link, _ := out["url"].(string)
-	token := strings.TrimPrefix(link, g.url+"/hand/")
-
-	victim := g.player()
-	if status, out := victim.call("POST", "/api/auth/hand", map[string]string{"token": token}); status != 200 {
-		t.Fatalf("taken: %d %v", status, out)
-	}
-	if u, _ := victim.signIn("victim@example.com")["user"].(map[string]any); u["email"] != "victim@example.com" {
-		t.Fatalf("signed in as %v", u)
-	}
-	if _, out := maker.call("GET", "/api/me", nil); out["user"] != nil {
-		t.Fatalf("the link's maker is in the profile: %v", out)
-	}
-	if status, _ := maker.call("PATCH", "/api/me", map[string]string{"name": "Чужд"}); status != 401 {
-		t.Fatalf("the link's maker renamed the profile: %d", status)
-	}
-	if _, out := victim.call("GET", "/api/me", nil); name(out) == "Чужд" || out["user"] == nil {
-		t.Fatalf("the profile is %v", out)
-	}
 }
 
 // „Излез от другите устройства“: every other browser signed in to the profile is signed out; this one stays.

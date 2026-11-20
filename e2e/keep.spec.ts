@@ -96,53 +96,89 @@ test("the reminder by mail turned on from Настройки says the game is ke
   await expect(mail.getByRole("switch", { name: "Напомняне по имейл" })).toHaveAttribute("aria-checked", "true");
 });
 
+const messengerOnAndroid =
+  "Mozilla/5.0 (Linux; Android 14; Pixel 7 Build/AP2A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0 Mobile Safari/537.36 [FB_IAB/Orca-Android;FBAV/480.0.0.0;]";
+const chromeOnAndroid =
+  "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36";
+
 test.describe("in Messenger's own browser", () => {
-  test.use({
-    userAgent:
-      "Mozilla/5.0 (Linux; Android 14; Pixel 7 Build/AP2A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0 Mobile Safari/537.36 [FB_IAB/Orca-Android;FBAV/480.0.0.0;]",
+  test.use({ userAgent: messengerOnAndroid });
+
+  test("the cover has a line for a game kept in the phone's browser", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator(".issue-exit")).toHaveText("Имаш игра в браузъра? Отвори там");
   });
 
-  test("the first day asks at once, and the game goes to the phone's browser with its link", async ({
-    page,
-    browser,
-  }) => {
+  test("the result's action takes the game to the phone's browser; both keep it", async ({ page, browser }) => {
     test.setTimeout(90_000);
     await page.goto("/");
     await startDay(page);
     await playRun(page);
-    const tomorrow = page.locator(".tomorrow");
-    await expect(tomorrow).toContainText("Играта ти е само тук, в Messenger.");
-    await expect(tomorrow.getByRole("button", { name: "Отвори в браузъра" })).toBeVisible();
+    const action = page.locator(".result-share");
+    await expect(action).toContainText("Играта ти е само тук, в Messenger.");
+    await expect(action.getByRole("button", { name: "Отвори в браузъра" })).toBeVisible();
+    // No email or code is asked for in Meta's browsers, here nor on Профил.
+    await expect(action.getByRole("button", { name: "Или я запази с имейл" })).toHaveCount(0);
+    await expect(action.locator(".exit-number")).toHaveText(/^Ако браузърът поиска число, въведи \d\d\.$/);
+    // The link's token is in the address, its fragment, while the way out is offered: the app's „Open in browser“
+    // takes it along. Nothing else in the page says it.
+    await expect(page).toHaveURL(/\/#hand=[A-Za-z0-9_-]{43}$/);
+    const url = page.url();
+    const number = ((await action.locator(".exit-number").textContent()) ?? "").replace(/\D/g, "");
     const rights = await page.locator(".summary .score-n").textContent();
-    // The link the button opens, as the phone's browser gets it: the game is there, and the link works once.
-    const url = await page.evaluate(async () => {
-      const r = await fetch("/api/auth/handoff", { method: "POST", body: "{}" });
-      return ((await r.json()) as { url: string }).url;
-    });
     const name = await page.evaluate(
       async () => ((await (await fetch("/api/me")).json()) as { user: { name: string } }).user.name,
     );
-    const phone = await browser.newPage();
-    await phone.goto(url);
-    // Nothing is taken until the player taps for it: a link that opens by itself, or someone else's, brings nothing.
-    // The page says whose game it is, and on how many days it was played, so that someone else's is seen to be theirs.
-    await expect(phone.locator(".lead")).toHaveText(
-      `Играта на ${name} ще продължи тук. Там, където е започната, вече няма да я има.`,
+
+    // The phone's browser, on the same phone: taken at once, on the day's result, whose action is the ask.
+    const phone = await browser.newContext({ userAgent: chromeOnAndroid });
+    const there = await phone.newPage();
+    await there.goto(url);
+    await expect(there.getByRole("status").filter({ hasText: "Готово: играта ти е тук." })).toBeVisible();
+    await expect(there).toHaveURL(/\/$/);
+    await expect(there.locator(".score-n")).toHaveText(rights ?? "");
+    await expect(there.locator(".result-share")).toContainText("Да ти пишем, ако въпросите още те чакат?");
+    // Messenger's browser keeps the game too: the same player.
+    const still = await page.evaluate(
+      async () => ((await (await fetch("/api/me")).json()) as { user: { name: string } | null }).user?.name,
     );
-    await expect(phone.getByText("1 ден игра. Продължи само ако играта е твоя.")).toBeVisible();
-    await phone.getByRole("button", { name: "Продължи тук" }).click();
-    await expect(phone.getByRole("status").filter({ hasText: "Готово: играта ти е тук." })).toBeVisible();
-    await expect(phone).toHaveURL(/\/$/);
-    await expect(phone.locator(".score-n")).toHaveText(rights ?? "");
-    // The game moved: Messenger's browser is signed out of it.
-    const left = await page.evaluate(async () => ((await (await fetch("/api/me")).json()) as { user: unknown }).user);
-    expect(left).toBeNull();
-    const late = await browser.newPage();
+    expect(still).toBe(name);
+    // Used once.
+    const late = await (await browser.newContext({ userAgent: chromeOnAndroid })).newPage();
     await late.goto(url);
-    await expect(late.getByRole("alert")).toContainText("Тази връзка вече не работи");
-    await expect(late.getByRole("button", { name: "Продължи тук" })).toHaveCount(0);
+    await expect(late.locator(".notice")).toContainText("Тази връзка вече не работи");
+    await late.context().close();
+
+    // Another link, opened somewhere else (a computer): asked for the number first.
+    await page.reload();
+    await expect(page).toHaveURL(/\/#hand=[A-Za-z0-9_-]{43}$/);
+    const other = page.url();
+    const now = ((await page.locator(".exit-number").textContent()) ?? "").replace(/\D/g, "");
+    const laptop = await browser.newContext({
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+    });
+    const desk = await laptop.newPage();
+    await desk.goto(other);
+    await expect(desk.locator(".hand-number")).toContainText(`Играта на ${name} идва от друго място.`);
+    await desk.getByLabel("Число").fill(now === "10" ? "11" : "10");
+    await desk.getByRole("button", { name: "Продължи тук" }).click();
+    await expect(desk.getByRole("alert")).toContainText("Грешно число.");
+    await desk.getByLabel("Число").fill(now);
+    await desk.getByRole("button", { name: "Продължи тук" }).click();
+    await expect(desk.getByRole("status").filter({ hasText: "Готово: играта ти е тук." })).toBeVisible();
+    await expect(desk.locator(".score-n")).toHaveText(rights ?? "");
+    expect(number).toMatch(/^\d\d$/);
     await phone.close();
-    await late.close();
+    await laptop.close();
+  });
+
+  test("Профил asks for no email here: the way is the phone's browser", async ({ page }) => {
+    await page.goto("/");
+    await daysPlayed(page, 1);
+    await page.goto("/me");
+    await page.getByRole("button", { name: "Запази я с имейл" }).click();
+    await expect(page.getByText("Тук не питаме за имейл")).toBeVisible();
+    await expect(page.getByLabel("Имейл")).toHaveCount(0);
   });
 });
 
@@ -152,7 +188,7 @@ test.describe("in Messenger's own browser on an older iPhone, with no clipboard 
       "Mozilla/5.0 (iPhone; CPU iPhone OS 13_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/MessengerForiOS;FBAV/300.0.0.0]",
   });
 
-  test("„Копирай връзката“ shows the link to copy by hand", async ({ page }) => {
+  test("the action names the app's menu, and „Копирай връзката“ shows the link to copy by hand", async ({ page }) => {
     test.setTimeout(90_000);
     await page.addInitScript(() => {
       Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
@@ -161,10 +197,11 @@ test.describe("in Messenger's own browser on an older iPhone, with no clipboard 
     await page.goto("/");
     await startDay(page);
     await playRun(page);
-    const tomorrow = page.locator(".tomorrow");
-    await expect(tomorrow).toContainText("Играта ти е само тук, в Messenger.");
-    await tomorrow.getByRole("button", { name: "Копирай връзката" }).click();
-    await expect(tomorrow.locator(".keep-said")).toContainText("/hand/");
+    const action = page.locator(".result-share");
+    await expect(action.locator(".exit-menu")).toHaveText("··· → Отвори в Safari");
+    await expect(page).toHaveURL(/\/#hand=[A-Za-z0-9_-]{43}$/);
+    await action.getByRole("button", { name: "Копирай връзката" }).click();
+    await expect(action.locator(".keep-said")).toContainText("/#hand=");
   });
 });
 

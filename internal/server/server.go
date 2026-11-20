@@ -103,6 +103,7 @@ type Server struct {
 	host          string
 	cookie        string       // the session's
 	askCookie     string       // the token of the browser a sign-in code is for (account.Asked)
+	playedCookie  string       // the day this browser last started the day's questions (playedHere: handoff.go)
 	unlogged      atomic.Int64 // browsers' errors past clientErrorsAll not logged since the last one (problems.go)
 	probe         probe        // whether the database takes writes, as /api/health last found (api.go)
 	handler       http.Handler
@@ -130,9 +131,9 @@ func New(cfg Config, d Deps) (*Server, error) {
 		host:   strings.ToLower(u.Hostname()),
 	}
 	// A __Host- cookie is bound to this exact host, over HTTPS, for the whole site: nothing else can set or read it.
-	s.cookie, s.askCookie = "sid", "ask"
+	s.cookie, s.askCookie, s.playedCookie = "sid", "ask", "played"
 	if s.secure {
-		s.cookie, s.askCookie = "__Host-sid", "__Host-ask"
+		s.cookie, s.askCookie, s.playedCookie = "__Host-sid", "__Host-ask", "__Host-played"
 	}
 	s.limits.off, s.guard.off = cfg.Dev, cfg.Dev
 	// A key pushed out of a full limiter means a flood of keys: the counts pushed out start again (limits.go).
