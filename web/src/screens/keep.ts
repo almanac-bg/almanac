@@ -20,7 +20,7 @@ import { signIn } from "./signin.ts";
 export const app = embedded;
 
 /** What keeping the game is for, under the email's field. */
-const keepNote = "Пращаме ти код, за да потвърдиш имейла. Серията и научените факти остават с теб на всяко устройство.";
+const keepNote = "Пращаме ти код, за да потвърдиш имейла. Серията и Алманахът ти остават с теб на всяко устройство.";
 
 /** What a guest's game risks, while they're to be asked to keep it (`days`: the days played as far as they count, 1
  * or 2; `streak` with today's): the game in this app's browser only, or on this device. Null once it's kept. */
@@ -31,7 +31,7 @@ export function keepStake(days: () => number, streak: () => number): () => strin
     if (app)
       return `Играта ти е само тук, ${app.app ? `${/^[ВвФфVvFf]/.test(app.app) ? "във" : "в"} ${app.app}` : "в това приложение"}.`;
     const n = streak();
-    return n >= 2 ? `Серията ти от ${n} дни е само на това устройство.` : "Играта ти е само на това устройство.";
+    return n >= 2 ? `Серията ти от ${n}\u00a0дни е само на това устройство.` : "Играта ти е само на това устройство.";
   };
 }
 
@@ -190,18 +190,19 @@ export function keepGame(signedIn: () => void): Child {
 
 /** The way in for a player who has a profile already (a new phone, another browser): a quiet line (`label`) that
  * opens the form in place (`open`: opened from the start). Signed in, `signedIn` draws the screen again, as the
- * profile has it, and the screen says what came of it (notice). */
+ * profile has it, and the screen says what came of it (notice). `primary`: the form is the page's one action (Вход). */
 export function haveProfile(
   signedIn: () => void,
   label = "Имаш профил? Влез",
   open = false,
   email: () => string = () => "",
+  primary = false,
 ): Child {
   const opened = signal(open);
   return () =>
     opened()
       ? h("section", { class: "card keep-card" }, h("h2", { class: "card-title" }, "Влез в профила си"), () =>
-          signIn({ primary: false, done: told(signedIn), email: email() }),
+          signIn({ primary, done: told(signedIn), email: email() }),
         )
       : h(
           "p",

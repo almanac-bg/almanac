@@ -19,9 +19,12 @@ test("a guest keeps their game with a code by email, and can sign out", async ({
   await page.getByLabel("Имейл").fill(email);
   await page.getByRole("button", { name: "Прати ми код" }).click();
   await expect(page.getByText(`Пратихме код на ${email}`)).toBeVisible();
+  // A reload comes back to the step that takes the code.
+  await page.reload();
+  await expect(page.getByText(`Пратихме код на ${email}`)).toBeVisible();
   // Another code waits a minute, and the wait is said.
   await expect(page.getByRole("button", { name: "прати нов код" })).toBeDisabled();
-  await expect(page.getByText(/прати нов код след \d+ с/)).toBeVisible();
+  await expect(page.getByText(/прати нов код след \d+\sс/)).toBeVisible();
   // A code too short is said so; a wrong code says so, and counts.
   await page.getByLabel("Код").fill("123");
   await page.getByRole("button", { name: "Потвърди" }).click();
@@ -177,4 +180,12 @@ test("a deleted profile lets go of the browser's notifications", async ({ page }
   await page.getByRole("button", { name: "Изтрий профила" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Профилът е изтрит." })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("unsubscribed"))).toBe("1");
+});
+
+test("„Вход“ in the bar is the sign-in form, at once", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Вход", exact: true }).click();
+  await expect(page).toHaveURL(/\/me#signin$/);
+  await expect(page.getByLabel("Имейл")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Прати ми код" })).toBeVisible();
 });

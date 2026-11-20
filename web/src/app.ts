@@ -72,7 +72,7 @@ if (root) {
         // has it). Without a profile yet (or on the cover, not signed in), the way in.
         () => {
           const u = user();
-          if (!u || (cover() && !u.email)) return h("a", { class: "bar-in", href: "/me" }, "Вход");
+          if (!u || (cover() && !u.email)) return h("a", { class: "bar-in", href: "/me#signin" }, "Вход");
           if (path() === "/me") return null;
           return h(
             "a",
@@ -100,8 +100,6 @@ if (root) {
       { path: /^\/settings$/, view: later(() => import("./screens/settings.ts").then((m) => m.settings)) },
       { path: /^\/d\/([0-9]{1,5})-([a-z2-9]{8})$/, view: sharedDay },
       { path: /^\/me$/, view: later(() => import("./screens/me.ts").then((m) => m.me)) },
-      { path: /^\/games$/, view: later(() => import("./screens/games.ts").then((m) => m.games)) },
-      { path: /^\/games\/([0-9]+)$/, view: later(() => import("./screens/played.ts").then((m) => m.playedGame)) },
       {
         path: /^\/players\/([A-Za-z0-9_]{3,20})$/,
         view: later(() => import("./screens/player.ts").then((m) => m.playerProfile)),

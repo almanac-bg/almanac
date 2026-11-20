@@ -6,8 +6,8 @@ import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
 import { feelKit, play } from "../lib/sound.ts";
 import { categories } from "../state.ts";
-import { fact, type Look, who } from "../ui.ts";
-import { closeWords } from "./numbers.ts";
+import { chip, fact, type Look, leaf, tiles, who } from "../ui.ts";
+import { closeLine, closeWords } from "./numbers.ts";
 import { answered, crowdLine, picture } from "./questions.ts";
 import { report } from "./report.ts";
 import { trail } from "./run.ts";
@@ -22,12 +22,13 @@ export function summary(
   next: { main: Child; also?: Child[] },
   more: Child[] = [],
   moment = true,
+  chapter = "",
 ): Child {
   const questions = reviewParts(
     async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${s.id}/review`)).questions,
   );
   const perfect = outOf(s) > 0 && s.rights === outOf(s);
-  const hero = scoreCard(s, line);
+  const hero = chapter ? chapterCard(s, chapter) : scoreCard(s, line);
   if (moment) land(hero, s.id, perfect, s.kind === "day");
   return h(
     "section",
@@ -66,6 +67,33 @@ export function scoreCard(s: State, line: Child) {
     ),
     line,
     trail(s.trail, s.total),
+  );
+}
+
+/** A chapter's game, as its result has it: on the chapter's sheet, its chip (the glyph and the name), the right
+ * answers big, and the tiles in its colour. */
+export function chapterCard(s: State, chapter: string): HTMLElement {
+  const perfect = outOf(s) > 0 && s.rights === outOf(s);
+  return leaf(
+    chapter,
+    [
+      perfect ? h("div", { class: "perfect-head" }, seal(), h("p", { class: "kicker" }, "Всички верни")) : null,
+      h("div", { class: "score-kicker" }, chip(chapter)),
+      h(
+        "h1",
+        { class: "score" },
+        h("b", { class: "score-n" }, String(s.rights)),
+        h("span", { class: "score-of" }, `от ${outOf(s)}`),
+        closeLine(s.trail) ? h("span", { class: "score-close" }, closeLine(s.trail)) : null,
+      ),
+      tiles(
+        s.trail,
+        Array.from({ length: s.total }, () => chapter),
+        s.total,
+        "Как мина играта",
+      ),
+    ],
+    "result-score score-leaf chapter-score",
   );
 }
 
@@ -174,14 +202,16 @@ export function reviewed(all: Reviewed[], heading: Child): Child {
     { class: "review" },
     heading,
     all.map((it) => {
+      // The verdict never reads as a true-or-not statement's answer („Вярно“, „Невярно“): as in the run (verdictSays),
+      // right there is „Точно“, and wrong, for every kind, „Не е това“.
       const [kind, word] = it.void
         ? ["void", "Не се брои"]
         : it.right
-          ? ["right", "Вярно"]
+          ? ["right", it.view.type === "truefalse" ? "Точно" : "Вярно"]
           : it.close
             ? ["close", "Близо"]
             : it.given
-              ? ["wrong", "Грешно"]
+              ? ["wrong", "Не е това"]
               : ["wrong", "Без отговор"];
       return h(
         "article",

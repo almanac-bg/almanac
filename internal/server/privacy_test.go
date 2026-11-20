@@ -39,9 +39,9 @@ func TestRequestLog(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(&log, nil)))
 	t.Cleanup(func() { slog.SetDefault(slog.New(slog.DiscardHandler)) })
 
-	token := "987654321098" // a game of a player's, as its page's path names it
+	token := "987654321098" // a duel, as its page's path names it
 	for _, c := range []struct{ path string }{
-		{"/games/" + token}, {"/players/secret_tag"},
+		{"/duel/" + token}, {"/players/secret_tag"},
 		{"/api/players/secret_tag"}, {"/api/health"},
 	} {
 		if status, _ := g.from("203.0.113.7", "GET", c.path, ""); status == 0 {
@@ -65,7 +65,7 @@ func TestRequestLog(t *testing.T) {
 		}
 	}
 	for route, ip := range map[string]bool{
-		"/games/…": false, "/players/…": true, // a 404 too: nobody has that tag
+		"/duel/…": true, "/players/…": true, // 404s: no such duel, nobody has that tag
 		"/api/players/{tag}": true, // 404s: someone may be walking them
 	} {
 		l, ok := routes[route]

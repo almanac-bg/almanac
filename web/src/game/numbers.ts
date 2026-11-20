@@ -1,5 +1,4 @@
-// How the game says its numbers: a share of players („58 %“), the close answers beside a score's right ones, a row of
-// right answers, how a
+// How the game says its numbers: a share of players („58 %“), the close answers beside a score's right ones, how a
 // game's own players did with a question, and a count with its noun.
 
 import type { Crowd, Mark } from "./types.ts";
@@ -9,25 +8,21 @@ export function percent(x: number): string {
   return x > 0 && x < 0.005 ? "под 1\u00a0%" : `${Math.round(x * 100)}\u00a0%`;
 }
 
-/** The close answers beside a score's right ones („ · 1 близо“), "" for none: they count as not right, but a game of
- * near misses never reads as nothing. */
+/** The close answers beside a score's right ones („ · 1 близо“, glued to the score: the dot never starts a line), ""
+ * for none: they count as not right, but a game of near misses never reads as nothing. */
 export function closeWords(trail: Mark[] = []): string {
-  const n = trail.filter((m) => m?.close && !m.right && !m.void).length;
-  return n ? ` · ${n} близо` : "";
+  const n = closeCount(trail);
+  return n ? `\u00a0· ${n}\u00a0близо` : "";
 }
 
-/** How many right answers in a row a run's last ones are: one that counts for nobody (`void`) neither adds to a row
- * nor breaks it, as the server counts it (play.rightsInRow). */
-export function inRowOf(marks: Mark[]): number {
-  let n = 0;
-  for (let i = marks.length - 1; i >= 0; i--) {
-    const m = marks[i];
-    if (m?.void) continue;
-    if (!m?.right) break;
-    n++;
-  }
-  return n;
+/** The close answers on a line of their own, under a score („1 близо“): no dot to start the line; "" for none. */
+export function closeLine(trail: Mark[] = []): string {
+  const n = closeCount(trail);
+  return n ? `${n} близо` : "";
 }
+
+/** How many of a run's answers were close („близо“), not right, of those that count. */
+const closeCount = (trail: Mark[]) => trail.filter((m) => m?.close && !m.right && !m.void).length;
 
 /** The share of players right at or under which a right answer is a rare one, told in gold: a quarter. */
 export const rare = 0.25;

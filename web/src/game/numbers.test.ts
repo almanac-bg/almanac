@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { closeWords, inRowOf, percent, withOwn } from "./numbers.ts";
+import { closeLine, closeWords, percent, withOwn } from "./numbers.ts";
 import type { Mark } from "./types.ts";
 
 const right: Mark = { right: true };
@@ -23,17 +23,11 @@ test("the player's own answer is in the crowd they're shown: what they picked ne
 });
 
 test("a score says its close answers, not right but not nothing", () => {
-  assert.equal(closeWords([wrong, wrong, close, wrong]), " · 1 близо");
-  assert.equal(closeWords([right, close, close, { ...close, void: true }]), " · 2 близо");
+  assert.equal(closeWords([wrong, wrong, close, wrong]), "\u00a0· 1\u00a0близо");
+  assert.equal(closeWords([right, close, close, { ...close, void: true }]), "\u00a0· 2\u00a0близо");
   assert.equal(closeWords([right, wrong]), "");
   assert.equal(closeWords(), "");
-});
-
-test("a row of right answers goes over a question that counts for nobody, as the server counts it", () => {
-  const none: Mark = { right: false, void: true };
-  assert.equal(inRowOf([right, right, none, right]), 3);
-  assert.equal(inRowOf([wrong, right, none]), 1, "a void last one ends no row");
-  assert.equal(inRowOf([right, wrong, none, right]), 1);
-  assert.equal(inRowOf([none]), 0);
-  assert.equal(inRowOf([]), 0);
+  // On a line of its own, under the score: no dot to start it.
+  assert.equal(closeLine([wrong, close]), "1\u00a0близо");
+  assert.equal(closeLine([right]), "");
 });

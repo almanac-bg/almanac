@@ -142,7 +142,14 @@ function book(p: Page): Child {
       "header",
       { class: "book-head" },
       h("h1", null, name ? `Алманахът на ${name}` : "Алманахът ти"),
-      h("p", { class: "deck" }, "С мастило са верните отговори от броя на деня. В сиво са останалите срещнати факти."),
+      h(
+        "p",
+        { class: "deck" },
+        // At zero, said once here, not on each chapter.
+        Object.values(p.ink).some(Boolean)
+          ? "С мастило са верните отговори от броя на деня. В сиво са останалите срещнати факти."
+          : "Всеки верен отговор в броя на деня пише факт с мастило в главата си.",
+      ),
       h(
         "div",
         { class: "ways" },
@@ -188,16 +195,11 @@ function card(id: string, ink: number, r: Rank | undefined, nearest: boolean): C
           h("span", { class: "card-name" }, nameOf(id)),
           ranked ? seal(id, ranked.level, 40) : glyph(id, 40),
         ),
-        h("span", { class: "card-ink" }, h("b", { class: "num" }, formatNumber(ink)), h("span", null, "с мастило")),
-        h(
-          "span",
-          { class: "card-rank" },
-          ranked
-            ? `${ranked.name} · още ${left} до ${ranked.next}`
-            : ink
-              ? ""
-              : "Верен отговор в броя пише първия факт",
-        ),
+        // A counter at zero is hidden: the book's head says once how ink is written.
+        ink
+          ? h("span", { class: "card-ink" }, h("b", { class: "num" }, formatNumber(ink)), h("span", null, "с мастило"))
+          : null,
+        ranked ? h("span", { class: "card-rank" }, `${ranked.name} · още ${left} до ${ranked.next}`) : null,
       ],
       "card-leaf",
       { next: "" },
@@ -410,7 +412,9 @@ function stand(id: string, r: Rank | undefined, ink: number): Child {
     h(
       "div",
       { class: "ch-words" },
-      h("p", { class: "ch-ink" }, h("b", { class: "num" }, formatNumber(r?.ink ?? ink)), " с мастило"),
+      (r?.ink ?? ink)
+        ? h("p", { class: "ch-ink" }, h("b", { class: "num" }, formatNumber(r?.ink ?? ink)), " с мастило")
+        : null,
       ranked
         ? [
             h("p", { class: "ch-rank" }, rankName(ranked.level)),

@@ -48,7 +48,7 @@ test("a topic's game never tells how well the topic is known, and the avatar is 
 // The day as the server would have it, the entry its right answers wrote told (as the server does) only once the day
 // is played: with others playing, the right answer a tenth of them got; with too few, the hardest, nothing of others.
 for (const { crowd, head, kicker } of [
-  { crowd: true, head: "Най-рядкото ти попадение", kicker: "знаеха го 10\u00a0%" },
+  { crowd: true, head: "Най-рядкото ти попадение", kicker: "вярно отговарят 10\u00a0%" },
   { crowd: false, head: "Днес в Алманаха", kicker: "въпрос 8" },
 ]) {
   test(`just played, an entry of the day is told as the book has it (${crowd ? "a crowd" : "no crowd"})`, async ({
@@ -81,7 +81,7 @@ for (const { crowd, head, kicker } of [
   });
 }
 
-test("after the day: one gold thing to do next, and Профил leading back to play", async ({ page }) => {
+test("after the day: one gold thing to do next", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/");
   await playedBefore(page, 1);
@@ -93,16 +93,4 @@ test("after the day: one gold thing to do next, and Профил leading back to
   await expect(gold).toHaveCount(1);
   await expect(gold).toHaveText("Сподели");
   await expect(page.locator(".open-goals, .goal")).toHaveCount(0);
-
-  // A topic, then Профил: its games, each of today's a way to go over it.
-  await openGame(page, "/play/history");
-  await playRun(page);
-  await page.goto("/me");
-  await page.getByRole("link", { name: "Всички игри" }).click();
-  await page.locator("a.game").first().click();
-  await expect(page).toHaveURL(/\/games\/\d+$/);
-  await expect(page.locator(".day-line")).toContainText("История");
-  await expect(page.locator(".reviewed")).toHaveCount(10);
-  await page.getByRole("link", { name: "Профил" }).first().click();
-  await expect(page).toHaveURL(/\/me$/);
 });

@@ -111,15 +111,33 @@ export async function startDuel(to: To): Promise<DuelView | null> {
   return shown((await api<{ duel: DuelView }>("POST", "/api/duels", to)).duel);
 }
 
-/** How long an open duel has left, in words: „още 2 дни“, „още 5 часа“, „под час“. */
+/** How long an open duel has left, in words, rounded up (a duel just sent has „още 7 дни“, not six and some hours):
+ * „още 2 дни“, „още 5 часа“, „под час“. */
 export function leftWords(until: number, now = Date.now()): string {
-  const hours = Math.floor((until - now) / 3_600_000);
-  if (hours >= 48) return `още ${Math.floor(hours / 24)} дни`;
-  if (hours >= 24) return "още 1 ден";
-  if (hours >= 2) return `още ${hours} часа`;
-  if (hours === 1) return "още 1 час";
-  return "под час";
+  const left = until - now;
+  if (left < 3_600_000) return "под час";
+  const hours = Math.ceil(left / 3_600_000);
+  if (hours > 24) {
+    const days = Math.ceil(hours / 24);
+    return `още ${days} ${days === 1 ? "ден" : "дни"}`;
+  }
+  return hours === 1 ? "още 1 час" : `още ${hours} часа`;
 }
+
+/** What broke a tie on even right answers (DuelView.tieBy), as a duel's row and its result say it: „равни верни ·
+ * по-близо числото“, „равни верни · 34,5 с срещу 40,1 с“; a draw, „равни верни и под секунда разлика“; "" for a
+ * duel won on right answers, or none ended. */
+export function tieWords(d: DuelView): string {
+  if (d.state === "draw") return "равни верни и под секунда разлика";
+  if (d.state !== "won" && d.state !== "lost") return "";
+  if (d.tieBy === "number") return "равни верни · по-близо числото";
+  if (d.tieBy === "time" && d.you && d.opponent)
+    return `равни верни · ${seconds(d.you.ms)} срещу ${seconds(d.opponent.ms)}`;
+  return "";
+}
+
+/** Seconds, the Bulgarian way: „34,5 с“. */
+const seconds = (ms: number) => `${(ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 })} с`;
 
 /** What a duel's end is called. */
 const ends: Record<DuelView["state"], string> = {
@@ -131,11 +149,8 @@ const ends: Record<DuelView["state"], string> = {
   expired: "Изтече",
 };
 
-/** The pair's record, the way a row says it: „общо 5 на 3“. */
-const recordLine = (r?: DuelView["record"]) =>
-  r && r.won + r.lost + r.drawn > 1 ? ` · общо ${r.won} на ${r.lost}${r.drawn ? `, ${r.drawn} равни` : ""}` : "";
-
-/** What a row says under a duel's end. */
+/** What a row says under a duel's end: where an open one stands; a finished one's score and, on even right answers,
+ * what broke the tie. The pair's record is said once, on the friend (Приятели), not on each duel. */
 function rowLine(d: DuelView): string {
   const them = d.opponent;
   const versus = d.recorded ? " · срещу запис" : "";
@@ -153,7 +168,8 @@ function rowLine(d: DuelView): string {
       return "Без резултат";
   }
   if (them?.gone) return "Играчът вече го няма"; // their game went with them: no score of theirs to set beside the player's
-  return `${formatNumber(d.you?.rights ?? 0)} : ${formatNumber(them?.rights ?? 0)}${versus}${recordLine(d.record)}`;
+  const tie = tieWords(d);
+  return `${formatNumber(d.you?.rights ?? 0)} : ${formatNumber(them?.rights ?? 0)}${versus}${tie ? ` · ${tie}` : ""}`;
 }
 
 /** A duel as a row: the other player, where it stands, and a word on it. */
@@ -324,8 +340,10 @@ export function duelNew() {
       return h(
         "ul",
         { class: "duel-list" },
-        list.map((f) =>
-          h(
+        list.map((f) => {
+          // Two friends of one name: each said with their @username, to tell them apart.
+          const same = list.some((o) => o.id !== f.id && o.name === f.name);
+          return h(
             "li",
             null,
             h(
@@ -334,14 +352,14 @@ export function duelNew() {
                 class: "duel-row duel-pick",
                 type: "button",
                 disabled: busy,
-                "aria-label": `Дуел ${withWord(f.name)}`,
+                "aria-label": `Дуел ${withWord(f.name)}${same ? ` (@${f.tag})` : ""}`,
                 onclick: () => begin({ friend: f.id }),
               },
-              who(f.name, f, null, f.name),
+              who(f.name, f, same ? h("span", { class: "who-tag" }, ` @${f.tag}`) : null, f.name),
               h("span", { class: "duel-row-end" }, h("strong", { class: "duel-state duel-invite" }, "Дуел")),
             ),
-          ),
-        ),
+          );
+        }),
       );
     }),
     () =>

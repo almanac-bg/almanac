@@ -1,7 +1,7 @@
 // app.js holds what a daily visit uses: Начало, a game, the screens a game leads to. A screen a daily visit doesn't
 // open loads on its own, the first time it's opened: a duel's result (outcome.ts), only for those who play there; and
 // Профил's places, the boards and the
-// friends (me, settings, avatar, almanac, played, ranks, friends, player). Each is handed the app's
+// friends (me, settings, avatar, almanac, friends, player). Each is handed the app's
 // pieces it uses from here, and imports nothing of the app but types: a module it imported would be one app.js
 // imports too, and esbuild would split every such module into a shared file that each page then loads first
 // (cmd/build fails if there is one). What only such a screen uses (lib/hash.ts, the boards') it imports itself. So a
@@ -36,13 +36,13 @@ import { needsHomeScreen, pushable, pushOn, pushPrefs, setPushPref, turnOff, tur
 import { byTap, go, goBack, rename, title } from "./lib/router.ts";
 import { feelKit, loadFeel, play, playAnswer, playCount, quietWhenSilent, setSound, soundOn } from "./lib/sound.ts";
 import { dateWords, issueWords, listWords, weekday, withWord } from "./lib/words.ts";
-import { type DuelView, duelLists, recordingName, startDuel } from "./screens/duel.ts";
+import { type DuelView, duelLists, recordingName, startDuel, tieWords } from "./screens/duel.ts";
 import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
 import { missing } from "./screens/missing.ts";
 import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
 import { signIn } from "./screens/signin.ts";
-import { gameRow, loadStats } from "./screens/stats.ts";
+import { loadStats } from "./screens/stats.ts";
 import { rankName, rankNames } from "./seal.ts";
 import {
   bulgaria,
@@ -121,7 +121,6 @@ export const kit = {
   feelKit,
   formatNumber,
   friendRequests,
-  gameRow,
   glyph,
   go,
   goBack,
@@ -172,6 +171,7 @@ export const kit = {
   rankRow,
   record,
   recordingName,
+  tieWords,
   rightsOf,
   rename,
   reportProblem,

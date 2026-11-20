@@ -78,7 +78,7 @@ export function crowdLine(type: View["type"], c: Crowd | undefined, right: boole
     choice: `Вярно отговарят ${s}.`,
     truefalse: `Вярно отговарят ${s}.`,
     clues: `Вярно отговарят ${s}.`,
-    number: `Достатъчно близо са ${s}.`,
+    number: `Вярно отговарят ${s}.`, // near enough to count is right; „близо“ is only the close answer that isn't
     order: `Изцяло вярно подреждат ${s}.`,
     match: `Всички двойки свързват вярно ${s}.`,
     split: `Всичко разпределят вярно ${s}.`,
@@ -1254,7 +1254,7 @@ function clues(
       row.className = `clue${text === undefined ? " locked" : !all && i === out.length - 1 ? " now" : all ? "" : " past"}`;
       const left = Math.ceil(((now.stepsMs[i] ?? 0) - elapsed) / 1000);
       (row.lastChild as HTMLElement).textContent =
-        text ?? (left > 0 ? `Подсказка ${i + 1} идва след ${left} с` : `Подсказка ${i + 1} идва…`);
+        text ?? (left > 0 ? `Подсказка ${i + 1} идва след ${left}\u00a0с` : `Подсказка ${i + 1} идва…`);
     });
   };
   paint();

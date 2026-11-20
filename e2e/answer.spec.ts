@@ -21,8 +21,6 @@ interface Seen {
   /** A choice's answers kept whole (the player's, the right one) that changed height from the question to its fact
    * (re-wrapped as their ends filled). */
   rewrapped: number;
-  /** The tally's height as asked and as it ended (its line is kept before there's a row of right answers). */
-  tally: number[];
   done: boolean;
   right?: { from: number; to: number; height: number; tall: number[]; pic: boolean; pop: number[] };
 }
@@ -33,8 +31,7 @@ interface Seen {
 async function watch(page: Page): Promise<void> {
   await page.evaluate(() => {
     const w = window as unknown as { seen: Seen };
-    const tally = () => document.querySelector<HTMLElement>(".question-top .tally")?.offsetHeight ?? 0;
-    const seen: Seen = { flips: 0, snaps: 0, covered: 0, through: 0, rewrapped: 0, tally: [tally()], done: false };
+    const seen: Seen = { flips: 0, snaps: 0, covered: 0, through: 0, rewrapped: 0, done: false };
     w.seen = seen;
     const head = document.querySelector(".question-top");
     const shown = () => document.querySelector(".run-question .after:not([hidden])");
@@ -81,7 +78,6 @@ async function watch(page: Page): Promise<void> {
       if (from && t - from > 1000) {
         // The rows that stay whole (the player's and the right one: the others go to a line each, as they should).
         seen.rewrapped = choices.filter((o, i) => o.matches(".right, .wrong") && o.offsetHeight !== tall[i]).length;
-        seen.tally.push(tally());
         seen.done = true;
         changes.disconnect();
       } else requestAnimationFrame(frame);
@@ -146,8 +142,6 @@ async function playWatching(
     expect(seen.covered, `question ${n + 1}: the right answer was under the panel`).toBe(0);
     expect(seen.through, `question ${n + 1}: the answers showed through the panel`).toBe(0);
     expect(seen.rewrapped, `question ${n + 1}: answers re-wrapped as the answer showed`).toBe(0);
-    expect(seen.tally[1], `question ${n + 1}: the head grew with the row`).toBe(seen.tally[0]);
-    expect(seen.tally[0], `question ${n + 1}: the tally's line isn't kept`).toBeGreaterThan(0);
     const r = seen.right;
     // What shows on an answer later (how everyone answered) doesn't make it taller, out of the room it settled in.
     if (r) expect(r.tall[1], `question ${n + 1}: the right answer grew once in place`).toBe(r.tall[0]);

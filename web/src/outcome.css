@@ -155,7 +155,7 @@
     display: grid;
   }
 
-  /* As the day's trail: right in ink, wrong an open square, close an open one with a mark of ink. */
+  /* As the day's trail: right in ink, wrong an open square, близо half filled. */
   .duel-pip {
     z-index: 1;
     aspect-ratio: 1;
@@ -168,7 +168,7 @@
   }
 
   .duel-pip.partial {
-    background: linear-gradient(var(--ink), var(--ink)) center / 40% 40% no-repeat;
+    background: linear-gradient(90deg, var(--ink) 50%, transparent 50%);
     box-shadow: inset 0 0 0 1.5px var(--ink);
   }
 
@@ -177,35 +177,11 @@
     box-shadow: inset 0 0 0 1.5px var(--ink);
   }
 
-  /* The quicker of two right answers: ringed in gold. */
-  .duel-pip.fast,
-  .duel-key-ring {
-    outline: 2px solid var(--gold);
-    outline-offset: 2px;
-  }
-
   .duel-band {
     align-self: stretch;
     margin: -5px -3px;
     border-radius: var(--r-1);
-    background: color-mix(in srgb, var(--gold) 14%, transparent);
-  }
-
-  .duel-key {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin-top: calc(-1 * var(--space-2));
-    color: var(--ink-3);
-    font-size: 0.75rem;
-  }
-
-  .duel-key-ring {
-    width: 10px;
-    height: 10px;
-    border-radius: 2px;
-    background: var(--ink);
-    outline-offset: 1px;
+    background: var(--surface-2);
   }
 
   .duel-line {
@@ -256,5 +232,47 @@
 
   .duel-mine-n {
     font: 800 2rem / 1 var(--font-numeral);
+  }
+
+  /* The result's two pages: on a phone one column; what it meant and what to do next under the result. */
+  .duel-main,
+  .duel-side {
+    display: grid;
+    gap: var(--space-5);
+    min-width: 0;
+  }
+
+  /* A big screen: the result on the left page, the two face to face across it; the record, the ways on and what the
+     game earned on the right page, level with the verdict. */
+  @media (min-width: 56.25rem) {
+    .duel-result > .duel-main {
+      grid-column: 1 / span 6;
+    }
+
+    .duel-result > .duel-side {
+      grid-column: 8 / span 5;
+    }
+
+    .duel-side .duel-meant {
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    .duel-side .actions,
+    .duel-side .result-actions {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-2);
+    }
+
+    .duel-side .actions .btn {
+      width: 100%;
+      max-width: none;
+    }
+
+    /* The marks as wide as the two faces over them. */
+    .duel-main .duel-marks {
+      max-width: none;
+    }
   }
 }

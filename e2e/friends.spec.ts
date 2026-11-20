@@ -148,3 +148,22 @@ test("a request turned down, a friend removed", async ({ browser }) => {
   await b.reload();
   await expect(b.getByText("Още нямаш приятели тук. Добави ги по потребителско име или имейл.")).toBeVisible();
 });
+
+test("a friend just accepted is on the day's board at once, without a reload", async ({ browser }) => {
+  test.setTimeout(240_000);
+  const a = await (await browser.newContext()).newPage();
+  const b = await (await browser.newContext()).newPage();
+  for (const p of [a, b]) {
+    await p.goto("/");
+    await startDay(p);
+    await playRun(p);
+    await playedFair(p);
+  }
+  const bo = await b.evaluate(async () => (await (await fetch("/api/me")).json()).user.name as string);
+  // Ana says yes in Приятели (befriend), and the board there is among the two of them, Bo on it.
+  await befriend(a, b);
+  const board = a.locator(".day-board");
+  await expect(board.getByRole("tab", { name: "Приятели" })).toHaveAttribute("aria-selected", "true");
+  await expect(board.locator(".rank-row").filter({ hasText: bo })).toHaveCount(1);
+  await expect(board.locator(".rank-row")).toHaveCount(2);
+});

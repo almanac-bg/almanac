@@ -92,10 +92,6 @@ func TestRecordingsNamed(t *testing.T) {
 		*one.Opponent.Look != look || one.Record != nil {
 		t.Fatalf("the duel's result: %+v %v", one, err)
 	}
-	st, err := w.g.StatsOf(ctx, gal)
-	if err != nil || len(st.Recent) == 0 || st.Recent[0].Opponent != "Мария" || !st.Recent[0].Recorded {
-		t.Fatalf("Gal's games: %+v %v", st.Recent, err)
-	}
 }
 
 // A no to a friend request by email leaves it waiting in its sender's list, as one to an address without a player

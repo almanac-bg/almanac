@@ -67,6 +67,8 @@ export function me(kit: Kit) {
     illustration,
   } = kit);
   title("Профил");
+  // Come by „Вход“ (the bar's, a guest's): the way in open at once.
+  const signingIn = location.hash === "#signin";
   // A game just kept, or a profile signed in to, here (keepGame, haveProfile): said once, at the top.
   const said = notice.peek();
   notice.set("");
@@ -104,13 +106,16 @@ export function me(kit: Kit) {
             () =>
               user()?.email
                 ? null
-                : [keepGame(() => go("/me", true)), haveProfile(() => go("/me", true), "Имаш профил? Влез")],
+                : [keepGame(() => go("/me", true)), haveProfile(() => go("/me", true), "Имаш профил? Влез", signingIn)],
             () => longest(data()),
-            h("p", { class: "me-links" }, h("a", { class: "link", href: "/games" }, "Всички игри"), () =>
+            () =>
               user()?.tag
-                ? h("a", { class: "link muted", href: profileHref(user()?.tag ?? "") }, "Как те виждат другите")
+                ? h(
+                    "p",
+                    { class: "me-links" },
+                    h("a", { class: "link muted", href: profileHref(user()?.tag ?? "") }, "Как те виждат другите"),
+                  )
                 : null,
-            ),
           ),
           h(
             "div",
@@ -137,10 +142,15 @@ export function me(kit: Kit) {
           ),
         ];
       },
+      // No player here yet („Вход“ in the bar): the sign-in form at once.
       () => [
-        h("h1", null, "Профил"),
-        h("p", { class: "lead" }, "Още нямаш профил. Създава се сам с първата ти игра. Или тук, с имейл."),
-        h("a", { class: "btn primary big", href: "/settings" }, "Влез с имейл"),
+        h("h1", null, "Вход"),
+        h(
+          "p",
+          { class: "lead" },
+          "Имаш профил? Влез с имейла си. Ако нямаш, профилът се създава сам с първата ти игра.",
+        ),
+        haveProfile(() => go("/me", true), undefined, true, undefined, true),
       ],
     ),
   );

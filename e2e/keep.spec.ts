@@ -29,6 +29,10 @@ test("from the second day, where no notification comes, the reminder by mail ask
     `Готово. Играта ти е запазена с имейла ${email}. Влизай с него от всяко устройство. Ще ти напомняме по имейл, ако въпросите още те чакат.`,
   );
   await expect(tomorrow).not.toContainText("само на това устройство");
+  // A player with a profile, past the first results, isn't asked again.
+  await page.reload();
+  await expect(page.locator(".tomorrow")).toBeVisible();
+  await expect(page.locator(".summary")).not.toContainText("Да ти пишем");
   // Настройки has it on, the player's to switch off.
   await page.goto("/settings");
   await expect(page.getByRole("switch", { name: "Напомняне по имейл" })).toHaveAttribute("aria-checked", "true");
@@ -45,6 +49,8 @@ test("a first day asks for the reminder only, not yet to keep the game; „Не 
   const ask = page.locator(".result-share.result-first");
   await expect(ask).toContainText("Да ти пишем, ако въпросите още те чакат?");
   await expect(ask).not.toContainText("само на това устройство");
+  // Sharing stays, a quiet link beside the tiles.
+  await expect(page.locator(".score-leaf .result-share-link")).toBeVisible();
   await ask.getByRole("button", { name: "Не сега" }).click();
   await expect(page.locator(".summary")).not.toContainText("Да ти пишем");
   await page.reload();

@@ -37,15 +37,17 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/fi
 
 - **The frame** (`app.ts`): the bar holds the rosette and „АЛМАНАХ“ in spaced capitals (a way to Днес); on a big
   screen the three places as words on pills (`.places`); the avatar with the seal the player wears on its corner
-  (`.bar-me`), or „Вход“. On a phone the places are at the foot (`.places-foot`), the current one on a well, a dot on
-  Приятели while a request or a friend's duel waits. The frame steps aside in a game (`html.playing`) and on a new
-  visitor's cover (`html.cover`, no places).
+  (`.bar-me`), or „Вход“ (straight to the sign-in form). On a phone the places are at the foot (`.places-foot`), the
+  current one on a well, a dot on Приятели while a request or a friend's duel waits. The frame steps aside in a game
+  (`html.playing`) and on a new visitor's cover (`html.cover`, no places).
 - **Днес** (`screens/today.ts`): the issue; its action; the streak.
   - The issue (`.issue`): a stack of ten sheets (`.stack-leaf`) in the colours of its ten chapters, the top one the
     first question's, its corner turned on the second's (`leaf(…, { next })`). On it „Брой N“ on an ink pill, the
     weekday, the date set large with its month, „Десет въпроса за днес“, the ten glyphs (`.issue-toc`), and „Около
     три минути · Днес играха N души“ (the count from 100 players). Left half-way: „Следва въпрос 4 от 10.“ and its
-    tiles so far, and „Продължи“. Come by a shared link: „Някой позна 7 от 10. А ти?“ and the shared tiles.
+    tiles so far, and „Продължи“; yesterday's left so just before midnight, while the game lets it be finished
+    (`play.DayGrace`), comes first, with its date and „Вчерашният брой. Довърши го до 00:15.“ Come by a shared link:
+    „Някой позна 7 от 10. А ти?“ and the shared tiles.
   - On a phone the cover is under half the screen (its date sized by the height), so that „Започни“ is whole by 500px
     on 320 × 568 and 540px on 375 × 600 (`fit.spec.ts`).
   - The streak (`.streak-chip`): the flame, the number and „изиграни дни“, from three days; under it a day the week
@@ -56,32 +58,40 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/fi
   - Notices (a day forgiven, a friend's duel waiting) are one quiet line each over the issue, told once.
 - **The day's result** (Днес once the day is played):
   1. The score on a sheet of the issue's first chapter: „Брой 9 · 20 ноември“, the score as the hero numeral „7 от
-     10“, the tiles, „Десетият: знаеха го 14 %“ (or „Десетият е най-трудният днес“ before a crowd), and with a crowd
+     10“, the tiles, „Десетият: вярно отговарят 14 %“ (or „Десетият е най-трудният днес“ before a crowd), and with a crowd
      „България днес: средно 6,2“. Ten of ten: „Всички верни“ and the mark drawn over it.
   2. On the first results (a guest's first day, a game just brought here, an app's own browser): the action, right
-     under the score — keeping the game and being reminded, or the way out to the phone's browser.
+     under the score — keeping the game and being reminded, or the way out to the phone's browser; sharing then stays a
+     quiet link beside the tiles („Сподели резултата“). A player with a profile is asked to be reminded only there.
   3. The day's entry („Днес в Алманаха“, or „Най-рядкото ти попадение“ with a crowd): a sheet of its chapter with the
      chip, the answer as a headword, the question, the fact. Under it what the day wrote (`game/news.ts`): „+6 с
      мастило“; „Един от въпросите вече беше в твоя Алманах и остава в сиво.“; the chapter nearest its next rank with
-     its seal and pips („История: още 2 до Книга“); or a best rank risen, the big moment.
+     its seal and pips („История: още 2 до Книга“); ranks risen, their seals and one line; or a best rank risen, the
+     big moment.
   4. Friends who played it, up to five (`.friends-day`): avatar, name, worn seal, their small squares, their score.
   5. The action, past the first results: „Сподели“.
   6. Tomorrow: the next issue's date set big, when it comes, what it makes of the streak.
 
-  Everything else is under „Въпросите и фактите“ (`.more`): how all of България spread, and each question with its
-  fact.
+  Everything else is under „Въпросите и фактите“ (`.more`): how others played the player's recordings, how all of
+  България spread, and each question with its fact (its verdict never a true-or-not's answer: „Точно“, „Не е това“).
 - **Алманах:** its head (Микс and България as two ways to play, no lifetime totals), then the chapters, each a folded
-  card in its colour with its seal as the badge (40px) and its ink („180 с мастило“). It leads with the chapter
-  nearest its next step.
+  card in its colour with its seal as the badge (40px) and its ink („180 с мастило“); a counter at zero is hidden, and
+  the head says once how ink is written. It leads with the chapter nearest its next step.
 - **A chapter:** its head on its sheet (glyph, name, the seal with its pips, its ink, how much to the next rank),
   „Игра на главата“, then its facts, the latest first: ink black, facts met in grey (a thin solid 1.5px grey outline,
   lighter text). Where grey first shows: „В сиво са останалите срещнати факти. С мастило пише само броят на деня.“
+  Its game's result: on the chapter's sheet its chip, the score and its tiles; under it what the game wrote („+4 в
+  сиво“); „Още десет“ the action.
 - **Приятели:** the board (friends by default, or all of България: its spread and the player's place first, then the
   top rows); the friends (a row each: avatar, name, seal, today's score, the duels between you „дуели 3 : 1“); the
-  duels („Твой ред“ the page's action, „Чакаш“, „Изиграни“).
+  duels („Твой ред“ the page's action, „Чакаш“, „Изиграни“: each its score and, on even right answers, what broke the
+  tie; the record between two is the friend's row's alone). Two friends of one name show their @username. A duel's
+  result is a spread on a big screen: the two face to face on the left, the record and the ways on on the right; its
+  marks as the tiles (близо half filled), nothing ringed: speed only breaks a tie.
 - **Профил:** the avatar with the seal worn on its corner, the name; the longest streak and what the week forgives;
   the seals by chapter, the one worn ringed in ink, another chosen behind „избери друг“; the avatars (every animal,
-  and a chapter's art from its Страница, hollow with a grey ring and „от Страница“ until then); Настройки last. No
+  and a chapter's art from its Страница, hollow with a grey ring and „История · от Страница“ until then); Настройки
+  last; no list of past games (a game isn't gone over after its day). No
   duplicate avatar in the bar's corner on this page. Another player's page (`/players/<tag>`) is the same head,
   streak and seals, with the way to be friends.
 
@@ -221,7 +231,7 @@ thumb. On a laptop (64rem) it's a spread: the head and the sheet on the left; wh
 under it.
 
 - **The head** (`.question-head`): the cross out („Към Днес“), what's played („Брой 31“, the chapter, „Дуел с Мария“
-  over it), the right answers in a row from the second, and the number big: „4/10“ to the eye, „4 от 10“ aloud.
+  over it), and the number big: „4/10“ to the eye, „4 от 10“ aloud. Nothing counts right answers in a row.
 - **The clock** (`.timer`): a bar under the pips, the seconds at its end; ink and heavier for the last ten seconds;
   gone once answered. Its sound: silent until ten seconds are left.
 - **The sheet** (`.q-leaf`, no corner): the chip (and on the day's last question „Трудното число“ beside it), then the

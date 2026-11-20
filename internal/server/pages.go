@@ -32,9 +32,8 @@ var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/$`),
 	regexp.MustCompile(`^/play/[a-z]+$`),
 	regexp.MustCompile(`^/almanac/[a-z]+$`),
-	regexp.MustCompile(`^/(avatar|me|friends|settings|almanac|games)$`),
+	regexp.MustCompile(`^/(avatar|me|friends|settings|almanac)$`),
 	regexp.MustCompile(`^/duel/([0-9]{1,12}|new)$`),
-	regexp.MustCompile(`^/games/[0-9]{1,12}$`),
 	regexp.MustCompile(`^/players/[A-Za-z0-9_]{3,20}$`),
 	sharePath, // a shared day (share.go)
 }
@@ -60,8 +59,6 @@ var screens = []struct {
 	{regexp.MustCompile(`^/settings$`), "settings.js"},
 	{regexp.MustCompile(`^/avatar$`), "avatar.js"},
 	{regexp.MustCompile(`^/almanac(/[a-z]+)?$`), "almanac.js"},
-	{regexp.MustCompile(`^/games$`), "games.js"},
-	{regexp.MustCompile(`^/games/[0-9]{1,12}$`), "played.js"},
 	{regexp.MustCompile(`^/friends$`), "friends.js"},
 	{regexp.MustCompile(`^/players/[A-Za-z0-9_]{3,20}$`), "player.js"},
 }

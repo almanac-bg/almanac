@@ -418,9 +418,8 @@ export interface DuelPlan {
  * A duel's result as a moment, once (at most 1.6 s; a tap anywhere jumps to the end). The verdict waits while the
  * marks fill pair by pair, 75 ms apart, a pluck on the scale for each of the player's right ones and a muted thud for
  * each that wasn't; the two scores count up with them, so the lead changes hands as it did, and the band behind the
- * question that decided it lights as it's reached. Then the verdict and the scores land, the winner's turning gold,
- * with the end's sound (the motif over a low D for a win, a soft fall for a loss); and what it meant (the record
- * between the two) fades in. Resolves once it's over.
+ * question that decided it lights as it's reached. Then the verdict and the scores land, the winner's in full ink,
+ * with the end's sound (the motif over a low D for a win, a soft fall for a loss). Resolves once it's over.
  */
 export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<void> {
   const { play, format } = hands;
@@ -476,7 +475,7 @@ export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<v
   }
   if (plan.decided > 1) rise(card.querySelector(".duel-band"), first + (plan.decided - 1) * step, { opacity: 0 });
   const landAt = first + n * step + 50;
-  for (const el of card.querySelectorAll(".duel-head h1, .duel-line, .duel-key")) rise(el, landAt);
+  for (const el of card.querySelectorAll(".duel-head h1, .duel-line")) rise(el, landAt);
   for (const p of scores)
     moving.push(
       p.animate(
@@ -487,7 +486,7 @@ export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<v
         { duration: 260, delay: landAt, easing: spring, fill: "backwards" },
       ),
     );
-  // The winner is gold only once it's landed.
+  // The winner is in full ink only once it's landed.
   const winner = card.querySelector(".duel-face.win");
   winner?.classList.remove("win");
   const settle = () => {
@@ -498,7 +497,6 @@ export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<v
     end();
   };
   at(landAt, settle);
-  rise(card.querySelector(".duel-meant"), landAt + 150);
   return new Promise((resolve) => {
     const done = () => {
       for (const t of timers) clearTimeout(t);

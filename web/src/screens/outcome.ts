@@ -1,7 +1,7 @@
 // A duel's result, the most dramatic moment in the game, for every way a duel ends (against a friend, or against a
-// recording): the two face to face with their scores, the winner in gold and the other plain; the duel question by
-// question, the two rows of marks aligned, the quicker of two right answers ringed, and the question that decided it;
-// the record between the two; and what to do next. One that lapsed (not played in time) says so. The first time it
+// recording): the two face to face with their scores, the winner in full ink and the other quieter; the duel question
+// by question, the two rows of marks aligned, the question that decided it, and on a tie what broke it; then (a second
+// page on a big screen) the record between the two and what to do next. One that lapsed says so. The first time it
 // shows, it lands as a moment (feel.ts: duel), never again.
 //
 // It loads on its own, with its style (outcome.css) and the game's feel, the first time a duel's result shows (kit.ts:
@@ -31,6 +31,7 @@ let {
   topics,
   recordingName,
   trail,
+  tieWords,
   withWord,
   worn,
 } = {} as Kit;
@@ -39,7 +40,7 @@ let {
 const total = 10;
 
 /** Seconds, the Bulgarian way: „34,5 с“. */
-const secs = (ms: number) => `${(ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 })} с`;
+const secs = (ms: number) => `${(ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 })}\u00a0с`;
 
 /** What to do next, where the screen that shows a result has its own: the gold button, and plain ones beside it. */
 export interface Steps {
@@ -67,6 +68,7 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
     topics,
     recordingName,
     trail,
+    tieWords,
     withWord,
     worn,
   } = kit);
@@ -77,17 +79,24 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
       ? reviewParts(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${d.runId}/review`)).questions)
       : null;
   const head = d.state === "expired" ? plain(d) : hero(d);
+  // Two sides on a big screen (DESIGN.md, a spread): the result on the left; what it meant, what to do next and what
+  // the game earned on the right. One column on a phone, in that order.
   return h(
     "section",
-    { class: "screen" },
-    head,
-    // The gold button is another duel where there's one, else the way back to Приятели; the rest are plain, side by
-    // side.
-    nextSteps(
-      next ?? toDuels(true),
-      steps ? [questions?.button, ...(steps.also ?? [])] : [questions?.button, next ? toDuels(false) : null],
+    { class: "screen duel-result spread" },
+    h("div", { class: "duel-main page-1" }, head),
+    h(
+      "div",
+      { class: "duel-side page-2" },
+      d.state === "expired" ? null : meant(d),
+      // The gold button is another duel where there's one, else the way back to Приятели; the rest are plain, side by
+      // side.
+      nextSteps(
+        next ?? toDuels(true),
+        steps ? [questions?.button, ...(steps.also ?? [])] : [questions?.button, next ? toDuels(false) : null],
+      ),
+      more,
     ),
-    more,
     questions?.list,
   );
 }
@@ -132,7 +141,6 @@ function hero(d: DuelView): Child {
     ),
     marks(d, mine, theirs),
     h("p", { class: "duel-line" }, line(d)),
-    meant(d),
   ) as HTMLElement;
   land(card, d, mine, theirs);
   return card;
@@ -157,18 +165,16 @@ function face(s: Side, label: string, tag: string, won: boolean): Child {
   );
 }
 
-/** The duel question by question: the player's marks over the other's, aligned, the quicker of two right answers
- * ringed in gold, and a band behind the question that decided it. */
+/** The duel question by question: the player's marks over the other's, aligned (right filled, близо half filled,
+ * wrong hollow), and a band behind the question that decided it. Speed only breaks a tie (line), so no mark says who
+ * was quicker; gold is the mark's alone. */
 function marks(d: DuelView, mine: DuelMark[], theirs: DuelMark[]): Child {
-  const fast = (a?: DuelMark, b?: DuelMark) => !!a?.right && !!b?.right && a.ms < b.ms;
   const words = (m: DuelMark) =>
     m.right ? `вярно за ${secs(m.ms)}` : m.close ? "близо" : m.missed ? "без отговор" : "грешно";
   const them = d.opponent?.name ?? "съперникът";
-  const pip = (m: DuelMark | undefined, other: DuelMark | undefined, row: number, i: number) =>
+  const pip = (m: DuelMark | undefined, row: number, i: number) =>
     h("span", {
-      class: ["duel-pip", m && (m.right ? "right" : m.close ? "partial" : "wrong"), fast(m, other) && "fast"]
-        .filter(Boolean)
-        .join(" "),
+      class: ["duel-pip", m && (m.right ? "right" : m.close ? "partial" : "wrong")].filter(Boolean).join(" "),
       style: { "grid-row": String(row), "grid-column": String(i + 2) },
       title: m ? `${i + 1}: ${words(m)}` : null,
     });
@@ -182,51 +188,31 @@ function marks(d: DuelView, mine: DuelMark[], theirs: DuelMark[]): Child {
   const bare = (s?: Side) => s?.look?.avatar?.split("/")[0];
   const you = { avatar: bare(d.you) };
   const other = { avatar: bare(d.opponent) };
-  const anyFast = mine.some((m, i) => fast(m, theirs[i]) || fast(theirs[i], m));
-  return [
-    h(
-      "div",
-      { class: "duel-marks", role: "img", "aria-label": label },
-      d.decided && d.decided > 1
-        ? h("span", { class: "duel-band", style: { "grid-row": "1 / span 2", "grid-column": String(d.decided + 1) } })
-        : null,
-      h(
-        "span",
-        { class: "duel-who", style: { "grid-row": "1", "grid-column": "1" } },
-        avatar(you.avatar, { size: "s" }),
-      ),
-      Array.from({ length: total }, (_, i) => pip(mine[i], theirs[i], 1, i)),
-      h(
-        "span",
-        { class: "duel-who", style: { "grid-row": "2", "grid-column": "1" } },
-        avatar(other.avatar, { size: "s", name: d.opponent?.name }),
-      ),
-      Array.from({ length: total }, (_, i) => pip(theirs[i], mine[i], 2, i)),
-    ),
-    anyFast
-      ? h(
-          "p",
-          { class: "duel-key", "aria-hidden": "true" },
-          h("span", { class: "duel-key-ring" }),
-          "по-бърз верен отговор",
-        )
+  return h(
+    "div",
+    { class: "duel-marks", role: "img", "aria-label": label },
+    d.decided && d.decided > 1
+      ? h("span", { class: "duel-band", style: { "grid-row": "1 / span 2", "grid-column": String(d.decided + 1) } })
       : null,
-  ];
+    h("span", { class: "duel-who", style: { "grid-row": "1", "grid-column": "1" } }, avatar(you.avatar, { size: "s" })),
+    Array.from({ length: total }, (_, i) => pip(mine[i], 1, i)),
+    h(
+      "span",
+      { class: "duel-who", style: { "grid-row": "2", "grid-column": "1" } },
+      avatar(other.avatar, { size: "s", name: d.opponent?.name }),
+    ),
+    Array.from({ length: total }, (_, i) => pip(theirs[i], 2, i)),
+  );
 }
 
-/** What decided the duel: the question from which the winner led to the end, or, on even right answers, what broke
- * the tie as on the day's board (play.duelScore): the number nearer, the harder right answer, or the time (a second
- * apart or more: closer is a draw, play.TieBand). */
+/** What decided the duel: on even right answers, and only then, what broke the tie as on the day's board
+ * (play.duelScore, tieWords): the number nearer, or the time (a second apart or more: closer is a draw,
+ * play.TieBand); else the question from which the winner led to the end. */
 function line(d: DuelView): string {
   const them = d.opponent?.name ?? "Съперникът";
-  const you = d.you;
-  const other = d.opponent;
-  if (other?.gone) return ""; // their game went with them: nothing to set the player's against
-  if (d.state === "draw") return "Равни верни отговори и под секунда разлика във времето.";
-  if (d.tieBy === "number") return "Равни верни отговори: реши по-близкото число.";
-
-  if (you && other && d.tieBy === "time")
-    return `Равни верни отговори: реши времето (${secs(you.ms)} срещу ${secs(other.ms)}).`;
+  if (d.opponent?.gone) return ""; // their game went with them: nothing to set the player's against
+  const tie = tieWords(d);
+  if (tie) return `${tie.charAt(0).toUpperCase()}${tie.slice(1)}.`;
   if (!d.decided) return "";
   if (d.decided >= total) return "Реши го последният въпрос.";
   const from = d.decided === 1 ? "първия" : `${ordinal(d.decided)}я`;
@@ -242,7 +228,7 @@ function meant(d: DuelView): Child {
     "div",
     { class: "duel-meant" },
     d.recorded && d.opponent
-      ? h("p", { class: "duel-why" }, `Записът е от истинска игра на ${them}${topic ? ` по темата „${topic}“` : ""}.`)
+      ? h("p", { class: "duel-why" }, `Записът е от истинска игра на ${them}${topic ? ` на главата „${topic}“` : ""}.`)
       : null,
     rec && them && rec.won + rec.lost + rec.drawn > 0
       ? h(

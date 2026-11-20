@@ -112,7 +112,7 @@ func TestSeededGame(t *testing.T) {
 		_ = json.NewDecoder(res.Body).Decode(&v)
 		return res.StatusCode, v
 	}
-	screens := []string{"/api/me", "/api/me/stats", "/api/me/games", "/api/me/games?kind=duel",
+	screens := []string{"/api/me", "/api/me/stats",
 		"POST /api/me/news", "/api/day", "/api/runs/left",
 		"/api/duels",
 		"/api/almanac", "/api/friends",

@@ -26,7 +26,8 @@ test("the book's contents: a chapter a row with its ink, and no count of it all"
   await expect(cards).toHaveCount(10);
   const movies = cards.filter({ hasText: "Кино и телевизия" });
   await expect(movies).toContainText(/7\s*с\sмастило/);
-  await expect(cards.filter({ hasText: "География" })).toContainText(/0\s*с\sмастило/);
+  // A counter at zero is hidden: the book's head says how ink is written.
+  await expect(cards.filter({ hasText: "География" })).not.toContainText("с мастило");
   await expect(page.locator(".way")).toHaveText([/Микс/, /България/]);
   await movies.click();
   await expect(page).toHaveURL(/\/almanac\/movies$/);
