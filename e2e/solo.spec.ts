@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { answer, moveOn, openGame, playRun, startDay } from "./play.ts";
+import { answer, moveOn, openGame, playedFair, playRun, startDay } from "./play.ts";
 
 test("the day: ten questions, the result, the review, and one try only", async ({ page }) => {
   test.setTimeout(120_000);
@@ -273,6 +273,7 @@ test("the day left at its last question comes back done, with what it earned tol
     await moveOn(page);
   }
   await expect(page.locator(".question-head")).toContainText("10 от 10", { timeout: 10_000 });
+  await playedFair(page); // a test answers quicker than a person: its book as a person's
   await page.getByRole("link", { name: "Към Днес", exact: true }).click();
   await page.getByRole("button", { name: "Излез" }).click();
   // Its result was never on screen: Начало has it, and its news (the facts it wrote), told now, once.

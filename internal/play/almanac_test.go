@@ -1,6 +1,7 @@
 package play
 
 import (
+	"database/sql"
 	"encoding/json"
 	"slices"
 	"testing"
@@ -9,7 +10,7 @@ import (
 )
 
 // knows gives a player right answers to these questions, in a game of their own (as many games would), one after
-// another from the start of time.
+// another from the start of time: their book written as the rule writes it (pencil: ink.go).
 func (w *world) knows(user int64, ids ...string) {
 	w.t.Helper()
 	w.knowsAt(user, 0, ids...)
@@ -28,6 +29,15 @@ func (w *world) knowsAt(user, at int64, ids ...string) {
 			VALUES (?, ?, ?, '{}', 1, 1, 3000, ?)`, run, n, id, at+int64(n)); err != nil {
 			w.t.Fatal(err)
 		}
+	}
+	w.rewrite(user)
+}
+
+// rewrite writes a player's book again from their answers (rewriteFacts), as after answers put in by hand.
+func (w *world) rewrite(user int64) {
+	w.t.Helper()
+	if err := w.db.Tx(w.t.Context(), func(tx *sql.Tx) error { return rewriteFacts(tx, user) }); err != nil {
+		w.t.Fatal(err)
 	}
 }
 
@@ -63,8 +73,10 @@ func TestFactsCollected(t *testing.T) {
 		}
 	}
 	alm, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage})
-	if err != nil || alm.All != want || len(alm.Facts) != want {
-		t.Fatalf("%d facts in the almanac after a game half right, want %d (%v)", alm.All, want, err)
+	if err != nil || len(alm.Facts) != want || alm.Found != want || len(alm.Ink) != 0 ||
+		slices.ContainsFunc(alm.Facts, func(l Learned) bool { return l.Ink }) {
+		t.Fatalf("%d facts in the almanac after a topic's game half right, want %d in pencil (ink %v, %v)",
+			len(alm.Facts), want, alm.Ink, err)
 	}
 	s, err := w.g.StatsOf(ctx, ana)
 	if err != nil || s.Facts != want || s.Answers != Length {

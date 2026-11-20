@@ -54,20 +54,21 @@ interface Learned {
   /** A statement that isn't so: its answer is the statement, said untrue. */
   untrue?: boolean;
   fact: string;
+  /** Written in ink (right in its issue, met there first), else in pencil (play/ink.go). */
+  ink?: boolean;
   at: number;
   /** Where it was learned: the day's ten (its issue), a chapter's game, a duel. */
   kind?: "day" | "topic" | "duel";
   issue?: number;
 }
 
-/** A page of the book (play.Almanac): its facts, how many the chapter (and the search) has, the counts by chapter and
- * of every fact each has; with the first page, the notes, each chapter's mastery, and the day the book began. */
+/** A page of the book (play.Almanac): its facts, how many the chapter (and the search) lists, each chapter's ink (its
+ * one number: pencil is listed, never counted); with the first page, the notes, each chapter's mastery, and the day
+ * the book began. */
 interface Page {
   facts: Learned[];
   found: number;
-  have: Record<string, number>;
-  all: number;
-  of: Record<string, number>;
+  ink: Record<string, number>;
   notes?: Note[];
   chapters?: Chapter[];
   since?: string;
@@ -104,7 +105,7 @@ function setKit(kit: Kit) {
 /** The book's chapters, in its order: the bank's topics, then „Микс“ and „България“. */
 const chapters = () => topics.map((t) => t.id);
 const nameOf = (id: string) => topics.find((t) => t.id === id)?.name ?? id;
-const facts = (n: number) => `${formatNumber(n)} ${n === 1 ? "факт" : "факта"}`;
+const inked = (n: number) => `${formatNumber(n)} с мастило`;
 
 /** A chapter's picture, in its colour. */
 const chapterPic = (id: string, cls: string) => illustration(`topic-${id}`, `${cls} t-${id}`);
@@ -129,7 +130,7 @@ export function almanac(kit: Kit): Child {
           "Всеки верен отговор записва в него по един факт, в главата на темата си. Започва с първия ти брой.",
         ),
       ),
-      contents({ facts: [], found: 0, have: {}, all: 0, of: {} }),
+      contents({ facts: [], found: 0, ink: {} }),
     );
   const page = signal<Page | null>(null);
   const stats = signal<Stats | null>(null);
@@ -158,7 +159,7 @@ export function almanac(kit: Kit): Child {
           "div",
           { class: "figures-row" },
           figure(s ? formatNumber(s.streak) : "…", s?.streak === 1 ? "ден поред" : "дни поред"),
-          figure(formatNumber(p.all), p.all === 1 ? "факт" : "факта"),
+
           figure(told(mix) ? `${mix?.known} %` : "—", "от всичко знаеш"),
         ),
       ),
@@ -206,7 +207,7 @@ function tocRow(id: string, p: Page, chapter?: Chapter): Child {
   const c = chapter && told(chapter) ? chapter : null;
   const known = c ? c.known : 0;
   const meta = [
-    id === "mix" ? "всички глави" : facts(p.have[id] ?? 0),
+    id === "mix" ? "всички глави" : inked(p.ink[id] ?? 0),
     c ? (c.sure ? c.name : "първа оценка") : "още без оценка",
   ].join(" · ");
   return h(
@@ -562,7 +563,7 @@ function whence(f: Learned): string {
 function entry(f: Learned, first: boolean): Child {
   return h(
     "li",
-    { class: first ? `entry first t-${f.category}` : `entry t-${f.category}` },
+    { class: [`entry t-${f.category}`, first && "first", !f.ink && "pencil"].filter(Boolean).join(" ") },
     h("p", { class: "entry-when" }, whence(f)),
     h("p", { class: "entry-word" }, f.untrue ? h("span", { class: "entry-untrue" }, "Невярно: ") : null, f.answer),
     f.question ? h("p", { class: "entry-q" }, f.question) : null,

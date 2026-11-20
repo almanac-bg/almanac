@@ -13,13 +13,13 @@ import (
 )
 
 // The Алманах is a player's book: a chapter per topic, and „Микс“ (every topic) and „България“ (the questions about
-// Bulgaria from every topic) as chapters of their own. A chapter holds the fact behind every question the player has
-// answered right, out of all the facts the topic has, and says how much of the topic they know (mastery.go). It's
-// part of progress (progress.go): the notes in the book are its milestones, and Профил says how many facts there are.
+// Bulgaria from every topic) as pages of their own. A chapter holds the fact behind every question the player has
+// answered right, each written in ink or in pencil (ink.go), and says one number, its ink.
 
-// Learned is one fact in a player's almanac: the question, its answer, and the fact behind it; when it was learned
-// (first answered right), and where: the day's ten (its issue), a chapter's game, a duel. A statement to judge true or
-// not has no question: its answer is the statement itself, Untrue if it isn't so (the bank keeps no corrected one).
+// Learned is one fact in a player's almanac: the question, its answer, and the fact behind it; in ink or in pencil
+// (ink.go); when it was written, and where: the day's ten (its issue), a chapter's game, a duel. A statement to judge
+// true or not has no question: its answer is the statement itself, Untrue if it isn't so (the bank keeps no
+// corrected one).
 type Learned struct {
 	ID       string `json:"id"`
 	Category string `json:"category"`
@@ -27,6 +27,7 @@ type Learned struct {
 	Answer   string `json:"answer"`
 	Untrue   bool   `json:"untrue,omitempty"`
 	Fact     string `json:"fact"`
+	Ink      bool   `json:"ink,omitempty"`
 	At       int64  `json:"at"`
 	// Kind is the game it was learned in ("day", "topic", "duel"), and Issue the day's, for one of the day's ten.
 	Kind  string `json:"kind,omitempty"`
@@ -41,16 +42,15 @@ const AlmanacPage = 30
 // against every fact.
 const AlmanacSearch = 60
 
-// Almanac is a page of a player's book (a chapter, or all of it), the latest learned first; how many facts they have,
-// by chapter and in all; how many each chapter has in all; and where the next page starts (none after the last). The
-// first page has the notes in the book too (NotesOf), the latest first, and each chapter's mastery (Chapters).
+// Almanac is a page of a player's book (a chapter, or all of it), the latest written first; each chapter's ink (Ink:
+// the one number a chapter says; pencil is listed, never counted); and where the next page starts (none after the
+// last). The first page has the notes in the book too (NotesOf), the latest first, and each chapter's mastery
+// (Chapters).
 type Almanac struct {
 	Facts []Learned `json:"facts"`
-	// Found is how many facts the chapter (and the search) has in all: its pages are Found / AlmanacPage.
+	// Found is how many entries the page's chapter (and the search) lists: its pages are Found / AlmanacPage.
 	Found    int            `json:"found"`
-	Have     map[string]int `json:"have"`
-	All      int            `json:"all"`
-	Of       map[string]int `json:"of"`
+	Ink      map[string]int `json:"ink"`
 	Next     string         `json:"next,omitempty"`
 	Notes    []Note         `json:"notes,omitempty"`
 	Chapters []Mastery      `json:"chapters,omitempty"`
@@ -93,44 +93,17 @@ func inChapter(q bank.Question, topic string) bool {
 	return q.Base().Category == topic
 }
 
-// learnedAt is where and when a fact was learned: the first right answer to its question.
+// learnedAt is where and when a fact was written: the right answer that wrote it (ink.go).
 type learnedAt struct {
 	at   int64
 	kind string
 	day  string
 }
 
-// learned calls fn with every question a player has answered right that has a fact (a retired one too: what was
-// learned stays, unless it wasn't so: a question retired as wrong or stale, bank.Tail.Untrue), in the order they were
-// learned, with when and in what game each was first answered right.
-func (g *Game) learned(ctx context.Context, userID int64, fn func(q bank.Question, at learnedAt)) error {
-	b := g.Bank()
-	// The game's kind and day come from the row of the first right answer (SQLite takes a bare column from the row
-	// min() picks).
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id, min(a.at), r.kind, coalesce(r.day, '')
-		FROM answers a JOIN runs r ON r.id = a.run_id
-		WHERE r.user_id = ? AND a.is_right GROUP BY a.question_id ORDER BY min(a.at), a.question_id`, userID)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var id string
-		var at learnedAt
-		if err := rows.Scan(&id, &at.at, &at.kind, &at.day); err != nil {
-			return err
-		}
-		if q, ok := b.Get(id); ok && q.Extra().Fact != "" && !q.Extra().Untrue() {
-			fn(q, at)
-		}
-	}
-	return rows.Err()
-}
-
-// learnedAs is a learned question as its almanac shows it.
-func learnedAs(q bank.Question, at learnedAt) Learned {
+// learnedAs is a written question as its almanac shows it.
+func learnedAs(q bank.Question, at learnedAt, ink bool) Learned {
 	l := Learned{ID: q.Base().ID, Category: q.Base().Category, Question: q.Base().Text, Answer: bank.AnswerText(q),
-		Fact: q.Extra().Fact, At: at.at, Kind: at.kind}
+		Fact: q.Extra().Fact, At: at.at, Kind: at.kind, Ink: ink}
 	if at.kind == "day" {
 		l.Issue = Issue(at.day)
 	}
@@ -152,29 +125,26 @@ func hasWords(l Learned, words []string) bool {
 	return true
 }
 
-// AlmanacOf reads a page of a player's book (AlmanacQuery), the latest learned first. Next is when and which fact the
-// page ends on, since facts are in that order, so a fact learned meanwhile only comes at the top, and no page after
+// AlmanacOf reads a page of a player's book (AlmanacQuery), the latest written first. Next is when and which fact the
+// page ends on, since facts are in that order, so a fact written meanwhile only comes at the top, and no page after
 // it shows one twice.
 func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Almanac, error) {
-	out := Almanac{Facts: []Learned{}, Have: map[string]int{}, Of: factsIn(g.Bank())}
+	out := Almanac{Facts: []Learned{}, Ink: map[string]int{}}
 	fromAt, fromID, paged := strings.Cut(aq.From, ":")
 	before, err := strconv.ParseInt(fromAt, 10, 64)
 	paged = paged && err == nil
 	search := []rune(strings.ToLower(strings.TrimSpace(aq.Search)))
 	words := strings.Fields(string(search[:min(len(search), AlmanacSearch)]))
 	var found []Learned
-	err = g.learned(ctx, userID, func(q bank.Question, at learnedAt) {
-		category := q.Base().Category
-		out.All++
-		out.Have[category]++
-		out.Have[MixTopic]++
-		if q.Extra().BG {
-			out.Have[BulgariaTopic]++
+	err = g.written(ctx, userID, func(q bank.Question, w written) {
+		if w.ink {
+			countIn(out.Ink, q)
 		}
+		at := w.at
 		if !inChapter(q, aq.Topic) || paged && (at.at > before || at.at == before && q.Base().ID >= fromID) {
 			return
 		}
-		if l := learnedAs(q, at); len(words) == 0 || hasWords(l, words) {
+		if l := learnedAs(q, at, w.ink); len(words) == 0 || hasWords(l, words) {
 			found = append(found, l)
 		}
 	})
@@ -264,36 +234,11 @@ type facts struct {
 	whole []string
 }
 
-// learnedIn is how many facts a game (runID) put in the player's almanac: the questions it answered right for the
-// first time that have a fact, as the almanac counts them (learned). Its news says so: what a first day earns that only
-// goes up.
-func (g *Game) learnedIn(ctx context.Context, userID, runID int64) (int, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id FROM answers a WHERE a.run_id = ?1 AND a.is_right
-		AND NOT EXISTS (SELECT 1 FROM answers b JOIN runs r ON r.id = b.run_id WHERE r.user_id = ?2
-			AND b.question_id = a.question_id AND b.is_right AND (b.at < a.at OR (b.at = a.at AND b.run_id < a.run_id)))`,
-		runID, userID)
-	if err != nil {
-		return 0, err
-	}
-	defer rows.Close()
-	b, n := g.Bank(), 0
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return 0, err
-		}
-		if q, ok := b.Get(id); ok && q.Extra().Fact != "" && !q.Extra().Untrue() {
-			n++
-		}
-	}
-	return n, rows.Err()
-}
-
 // factsOf counts a player's almanac, as Профил and its notes do.
 func (g *Game) factsOf(ctx context.Context, userID int64) (facts, error) {
 	var f facts
 	byTopic := map[string]int{}
-	err := g.learned(ctx, userID, func(q bank.Question, _ learnedAt) {
+	err := g.written(ctx, userID, func(q bank.Question, _ written) {
 		f.n++
 		if !q.Extra().Retired {
 			byTopic[q.Base().Category]++

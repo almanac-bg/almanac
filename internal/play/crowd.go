@@ -441,13 +441,32 @@ func (g *Game) EntryOfDay(ctx context.Context, userID int64, day string) (*DayEn
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	// Which of them the day wrote in ink (ink.go): the others, met before, are in pencil.
+	inked := map[string]bool{}
+	ink, err := g.DB.Read.QueryContext(ctx, `SELECT f.question_id FROM facts f JOIN runs r ON r.id = f.run_id
+		WHERE f.user_id = ? AND f.ink AND r.kind = 'day' AND r.day = ?`, userID, day)
+	if err != nil {
+		return nil, err
+	}
+	for ink.Next() {
+		var id string
+		if err := ink.Scan(&id); err != nil {
+			ink.Close()
+			return nil, err
+		}
+		inked[id] = true
+	}
+	ink.Close()
+	if err := ink.Err(); err != nil {
+		return nil, err
+	}
 	var rare, hardest *DayEntry
 	for _, it := range rights {
 		q, ok := g.Bank().Get(it.id)
 		if !ok || q.Extra().Fact == "" || q.Extra().Untrue() {
 			continue
 		}
-		hardest = &DayEntry{N: it.n, Fact: learnedAs(q, learnedAt{kind: "day", day: day})}
+		hardest = &DayEntry{N: it.n, Fact: learnedAs(q, learnedAt{kind: "day", day: day}, inked[it.id])}
 		c, err := g.dayCrowd(ctx, g.DB.Read, day, q, userID)
 		if err != nil {
 			return nil, err

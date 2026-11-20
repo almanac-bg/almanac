@@ -120,7 +120,8 @@ func (g *Game) judgeAnswer(tx *sql.Tx, r *run, gr bank.Graded, ms int64) error {
 	return err
 }
 
-// judge marks a run if its answers so far were a script's (scriptPaced), and says whether they were.
+// judge marks a run if its answers so far were a script's (scriptPaced), and says whether they were. What its answers
+// wrote in its player's book goes (ink.go: a script's game writes nothing).
 func judge(tx *sql.Tx, b *bank.Bank, runID int64, picks []Pick) (bool, error) {
 	rows, err := tx.Query(`SELECT n, ms FROM answers WHERE run_id = ? AND given IS NOT NULL`, runID)
 	if err != nil {
@@ -140,8 +141,12 @@ func judge(tx *sql.Tx, b *bank.Bank, runID int64, picks []Pick) (bool, error) {
 	if err := rows.Err(); err != nil || !scriptPaced(b, picks, times) {
 		return false, err
 	}
-	_, err = tx.Exec(`UPDATE runs SET shadow = ? WHERE id = ?`, ShadowScript, runID)
-	return true, err
+	var user int64
+	if err := tx.QueryRow(`UPDATE runs SET shadow = ? WHERE id = ? RETURNING user_id`, ShadowScript, runID).
+		Scan(&user); err != nil {
+		return false, err
+	}
+	return true, rewriteFacts(tx, user)
 }
 
 // JudgeRuns judges the runs a migration left for the bank to judge (runs_unjudged: whether an answer came under its

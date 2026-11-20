@@ -34,8 +34,8 @@ func TestUntold(t *testing.T) {
 		t.Fatalf("told by news of no game: %d", id)
 	}
 	n, err := w.g.NewsOf(ctx, ana, s.ID)
-	if err != nil || n.Facts == 0 {
-		t.Fatalf("the day's news: %d facts, %v", n.Facts, err)
+	if err != nil || n.Ink == 0 {
+		t.Fatalf("the day's news: %d in ink, %v", n.Ink, err)
 	}
 	if id := untold(); id != 0 {
 		t.Fatalf("told, still untold: %d", id)
@@ -49,8 +49,8 @@ func TestUntold(t *testing.T) {
 	if id := untold(); id != b.ID {
 		t.Fatalf("the latest untold: %d, not %d", id, b.ID)
 	}
-	if n, _ := w.g.NewsOf(ctx, ana, b.ID); n.Facts != 0 {
-		t.Fatalf("a game of wrong answers: %d facts", n.Facts)
+	if n, _ := w.g.NewsOf(ctx, ana, b.ID); n.Ink != 0 || n.Pencil {
+		t.Fatalf("a game of wrong answers: %+v", n)
 	}
 	if id := untold(); id != 0 {
 		t.Fatalf("the earlier game still untold: %d", id)
@@ -77,13 +77,13 @@ func TestNewsFacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n.Facts > 3 || n.Facts == 0 || len(n.Notes) != 0 {
+	if n.Ink != 0 || !n.Pencil || len(n.Notes) != 0 {
 		t.Fatalf("a first game, three right: %+v", n)
 	}
 	s, _ = w.g.StartTopic(ctx, ana, "history")
 	w.play(ana, s.ID, repeat(wrong, Length)...)
 	n, _ = w.g.NewsOf(ctx, ana, s.ID)
-	if n.Facts != 0 || n.Mastery != nil && n.Mastery.To.Known < n.Mastery.From.Known || len(n.Notes) != 0 {
+	if n.Pencil || n.Mastery != nil && n.Mastery.To.Known < n.Mastery.From.Known || len(n.Notes) != 0 {
 		t.Fatalf("a second game, all wrong: %+v", n)
 	}
 }
