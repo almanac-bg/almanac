@@ -9,25 +9,25 @@ test("Night or Day, whatever the device says", async ({ page }) => {
   await page.goto("/settings");
   const look = page.getByRole("radiogroup", { name: "Изглед" });
   await expect(look.getByRole("radio", { name: "Автоматично" })).toHaveAttribute("aria-checked", "true");
-  expect(await ground()).toBe("rgb(246, 241, 231)");
+  expect(await ground()).toBe("rgb(243, 244, 250)");
 
   await look.getByRole("radio", { name: "Нощ" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-scheme", "night");
-  expect(await ground()).toBe("rgb(18, 22, 32)");
+  expect(await ground()).toBe("rgb(14, 12, 29)");
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-scheme", "night");
   await expect(page.getByRole("radiogroup", { name: "Изглед" }).getByRole("radio", { name: "Нощ" })).toHaveAttribute(
     "aria-checked",
     "true",
   );
-  expect(await ground()).toBe("rgb(18, 22, 32)");
+  expect(await ground()).toBe("rgb(14, 12, 29)");
 
   await page.emulateMedia({ colorScheme: "dark" });
   await page.getByRole("radiogroup", { name: "Изглед" }).getByRole("radio", { name: "Ден" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-scheme", "day");
-  expect(await ground()).toBe("rgb(246, 241, 231)");
+  expect(await ground()).toBe("rgb(243, 244, 250)");
 
   await page.getByRole("radiogroup", { name: "Изглед" }).getByRole("radio", { name: "Автоматично" }).click();
   await expect(page.locator("html")).not.toHaveAttribute("data-scheme");
-  expect(await ground()).toBe("rgb(18, 22, 32)");
+  expect(await ground()).toBe("rgb(14, 12, 29)");
 });

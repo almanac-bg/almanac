@@ -193,6 +193,9 @@ export interface Result {
   score: number;
   right: boolean;
   exact?: boolean;
+  /** A right answer's fact, written in the Алманах in ink (the issue, met there first) or not (pencil); not said, nothing
+   * is said of which (play/ink.go). */
+  ink?: boolean;
   timedOut?: boolean;
   reveal: Reveal;
   state: State;
@@ -222,6 +225,8 @@ export interface Score {
   avatar?: string;
   /** How each of the ten went: on the friends' board, once the viewer has finished the day. */
   trail?: Mark[];
+  /** The seal they wear beside their name (play.Seal): a chapter and its rank. */
+  seal?: { chapter: string; level: number };
 }
 
 export interface Board {

@@ -92,7 +92,7 @@
   }
 
   .admin details {
-    border-top: 1px solid var(--rule);
+    border-top: 1px solid var(--line);
     padding-top: var(--space-2);
   }
 
@@ -118,9 +118,9 @@
     align-content: start;
     gap: var(--space-1);
     padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--rule);
-    border-radius: var(--radius);
-    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--r-1);
+    background: var(--bg);
   }
 
   .tile p {
@@ -183,8 +183,8 @@
   .table-scroll {
     overflow-x: auto;
     background:
-      linear-gradient(to right, var(--paper) 30%, transparent) left / 2rem 100% no-repeat local,
-      linear-gradient(to left, var(--paper) 30%, transparent) right / 2rem 100% no-repeat local,
+      linear-gradient(to right, var(--bg) 30%, transparent) left / 2rem 100% no-repeat local,
+      linear-gradient(to left, var(--bg) 30%, transparent) right / 2rem 100% no-repeat local,
       radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--ink) 22%, transparent), transparent) left /
       0.75rem 100% no-repeat scroll,
       radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--ink) 22%, transparent), transparent) right /
@@ -201,7 +201,7 @@
   .admin-table th,
   .admin-table td {
     padding: var(--space-2) var(--space-3) var(--space-2) 0;
-    border-bottom: 1px solid var(--rule);
+    border-bottom: 1px solid var(--line);
     text-align: left;
     vertical-align: top;
   }
@@ -301,7 +301,7 @@
   }
 
   .chart .grid {
-    stroke: var(--rule);
+    stroke: var(--line);
     stroke-width: 1;
   }
 

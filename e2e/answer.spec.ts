@@ -18,7 +18,8 @@ interface Seen {
   covered: number;
   /** Frames with the panel less than opaque: the answers under it showing through. */
   through: number;
-  /** A choice's answers that changed height from the question to its fact (re-wrapped as their ends filled). */
+  /** A choice's answers kept whole (the player's, the right one) that changed height from the question to its fact
+   * (re-wrapped as their ends filled). */
   rewrapped: number;
   /** The tally's height as asked and as it ended (its line is kept before there's a row of right answers). */
   tally: number[];
@@ -78,7 +79,8 @@ async function watch(page: Page): Promise<void> {
         seen.right.tall[1] = tall;
       }
       if (from && t - from > 1000) {
-        seen.rewrapped = choices.filter((o, i) => o.offsetHeight !== tall[i]).length;
+        // The rows that stay whole (the player's and the right one: the others go to a line each, as they should).
+        seen.rewrapped = choices.filter((o, i) => o.matches(".right, .wrong") && o.offsetHeight !== tall[i]).length;
         seen.tally.push(tally());
         seen.done = true;
         changes.disconnect();
@@ -135,10 +137,6 @@ async function playWatching(
   for (let n = 0; n < 10; n++) {
     await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
     await before?.();
-    // The facts' face is in before the first answer: a panel laid out without it changes height as it comes.
-    await expect
-      .poll(() => page.evaluate(() => document.fonts.check("italic 500 1rem Literata", "Знаеше ли?")))
-      .toBe(true);
     await watch(page);
     await answer(page);
     await page.waitForFunction(() => (window as unknown as { seen: Seen }).seen.done);

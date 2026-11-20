@@ -18,14 +18,16 @@ test("friends on the day: who has played it, and how each went", async ({ browse
   await expect(a.locator(".day-board .rank-row.me")).toHaveCount(1);
   const ana = await a.evaluate(async () => (await (await fetch("/api/me")).json()).user.name as string);
 
-  // Bo asks her by her username, and she says yes. Before he plays, Днес has her day beside his.
+  // Bo asks her by her username, and she says yes. Днес is the day alone: friends' days come with his result.
   await befriend(a, b);
   await b.goto("/");
-  await expect(b.locator(".today-friends .rank-row").filter({ hasText: ana })).toContainText(/\d+ от 10$/);
+  await expect(b.locator(".friends-day")).toHaveCount(0);
 
-  // He plays the day: one gold action under the result, and both on the friends' day in Приятели, his own row marked.
+  // He plays the day: her tiles and score under his result, one gold action, and both on the friends' day in
+  // Приятели, his own row marked.
   await startDay(b);
   await playRun(b);
+  await expect(b.locator(".friends-day .fd-row").filter({ hasText: ana }).locator(".fd-score")).toHaveText(/^\d+$/);
   await expect(b.locator(".tomorrow")).toBeVisible();
   await expect(b.locator(".summary .btn.primary")).toHaveCount(1);
   await b.goto("/friends");

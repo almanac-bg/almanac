@@ -7,16 +7,18 @@ import { hourInBulgaria } from "./lib/day.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { type Scheme, scheme, setScheme } from "./lib/prefs.ts";
 import { formatNumber, stakeWords } from "./lib/words.ts";
-import { categories } from "./state.ts";
+import { glyphBox, rankName, sealParts } from "./seal.ts";
+import { topics } from "./state.ts";
 
 export { formatNumber };
 
 export type VerdictKind = "exact" | "right" | "partial" | "wrong" | "time";
 
+/** The verdicts, a fixed set, never an answer's own words („Вярно“ is one of true-or-not's). */
 export const verdictWords: Record<VerdictKind, string> = {
   exact: "Точно!",
-  right: "Вярно!",
-  partial: "Близо.",
+  right: "Точно!",
+  partial: "Близо, но не се брои.",
   wrong: "Не е това.",
   time: "Времето изтече.",
 };
@@ -83,9 +85,8 @@ export function schemeSwitch(): Child {
 }
 
 /** The fact behind an answer; over it, for a question of the day's ten dealt on its date, what happened that day
- * („На този ден“). Nothing when there's neither. `filed`: the chapter it went into, said under it (a right answer's
- * fact goes into the Алманах; a wrong one's waits for a right answer, and nothing says so). */
-export function fact(text?: string, day?: string, filed?: string): Child {
+ * („На този ден“). Nothing when there's neither. */
+export function fact(text?: string, day?: string): Child {
   if (!text && !day) return null;
   return h(
     "aside",
@@ -95,22 +96,18 @@ export function fact(text?: string, day?: string, filed?: string): Child {
     },
     day ? h("div", { class: "fact-day" }, h("h2", null, "На този ден"), h("p", null, day)) : null,
     text ? [h("h2", null, "Знаеше ли?"), h("p", null, text)] : null,
-    text && filed
-      ? h(
-          "p",
-          { class: "filed" },
-          topicMark(filed),
-          `Записано в Алманаха, глава „${categories.find((c) => c.id === filed)?.name ?? ""}“`,
-        )
-      : null,
   );
 }
 
-/** Asks for the facts' face (Literata, app.css) now. It loads only as text in it first shows, and an answer's panel
- * laid out before it came would change height when it did, after the answers had settled above it (game/run.ts,
- * settle): the right answer under the panel. A game asks for it as it starts, long before its first fact. */
-export function factFace(): void {
-  document.fonts?.load("italic 500 1rem Literata", "Знаеше ли?").catch(() => {});
+/** Where a right answer in the issue wrote its fact: in ink, in its chapter (`ink`, as the server says; not said, the
+ * book alone). Only ink is said: every other fact met is in the book in grey, and nothing says so as it's met. */
+export function filed(topic: string, ink?: boolean): Child {
+  return h(
+    "p",
+    { class: "filed" },
+    h("span", { class: "i i-nib", "aria-hidden": "true" }),
+    `Записано ${ink ? "с мастило" : "в Алманаха"} · глава ${chapterName(topic)}`,
+  );
 }
 
 /** A box that may scroll on its own (the answer's panel docked at a run's foot, with a long fact: app.css): while it
@@ -125,15 +122,158 @@ export function reachable(box: HTMLElement): void {
   onCleanup(() => sized.disconnect());
 }
 
-const tones = ["gold", "lilac", "sky", "rose", "mint"];
-
-/** A topic's colour, the same on every screen (by its place in the bank's list). */
+/** A topic's colour, the same on every screen: its chapter's (app.css, .t-<topic>). */
 export function toneOf(category: string): string {
-  const i = Math.max(
-    0,
-    categories.findIndex((c) => c.id === category),
+  return `t-${category}`;
+}
+
+/** A chapter's name, as players read it ("history" → „История“; „Микс“, „България“). */
+export const chapterName = (topic: string): string => topics.find((c) => c.id === topic)?.name ?? "";
+
+/** A chapter's glyph: its art on a white disc, `size` across (for the eye: its name is said beside it). */
+export function glyph(topic: string, size = 28, cls = ""): HTMLElement {
+  return h(
+    "span",
+    {
+      class: ["glyph", `t-${topic}`, cls].filter(Boolean).join(" "),
+      style: { "--g": `${size}px` },
+      "aria-hidden": "true",
+    },
+    picture(`topic-${topic}`),
   );
-  return `tone-${tones[i % tones.length]}`;
+}
+
+/** A chapter's name with its glyph, on a white pill: a question's chapter. */
+export function chip(topic: string, words: Child = chapterName(topic)): HTMLElement {
+  return h("span", { class: `chip t-${topic}` }, glyph(topic), words);
+}
+
+/** A large sheet in a chapter's colour: a question, the day's entry, a chapter's head. `fold`: its corner turned, the
+ * next sheet's colour under it (`next`: its topic; none, the page), as the issue's cover and the chapters' cards have
+ * it, and nothing else does. */
+export function leaf(topic: string, parts: Child, cls = "", fold: { next?: string } | null = null): HTMLElement {
+  const sheet = h(
+    "div",
+    { class: ["leaf", fold ? "folded" : "", `t-${topic}`, cls].filter(Boolean).join(" ") },
+    parts,
+    fold ? h("span", { class: "fold", "aria-hidden": "true" }) : null,
+  );
+  if (!fold) return sheet;
+  return h(
+    "div",
+    { class: "leaf-wrap" },
+    fold.next ? h("span", { class: `leaf-next t-${fold.next}`, "aria-hidden": "true" }) : null,
+    sheet,
+  );
+}
+
+/** How one of the day's ten went, as a tile says it. */
+export type TileState = "right" | "near" | "wrong" | "void" | "later";
+
+const tileWords: Record<TileState, string> = {
+  right: "вярно",
+  near: "близо",
+  wrong: "грешно",
+  void: "не се брои",
+  later: "предстои",
+};
+
+/** A mark's state as a tile (none yet: still to come). */
+export const tileOf = (m?: { right: boolean; close?: boolean; void?: boolean }): TileState =>
+  !m ? "later" : m.void ? "void" : m.right ? "right" : m.close ? "near" : "wrong";
+
+/** The day's ten as tiles in their chapters' colours: right filled, близо half, wrong hollow, each with its glyph
+ * (`topics`: the issue's, in its order). Read aloud as „3. История: вярно“. */
+export function tiles(
+  marks: { right: boolean; close?: boolean; void?: boolean }[],
+  topicsOf: string[],
+  total = 10,
+  label = "Как мина денят",
+): HTMLElement {
+  return h(
+    "ol",
+    { class: "tiles", "aria-label": label },
+    Array.from({ length: total }, (_, i) => {
+      const topic = topicsOf[i] ?? "mix";
+      const state = tileOf(marks[i]);
+      return h(
+        "li",
+        { class: `tile ${state} t-${topic}`, "aria-label": `${i + 1}. ${chapterName(topic)}: ${tileWords[state]}` },
+        h("span", { class: "tile-pic" }, picture(`topic-${topic}`)),
+      );
+    }),
+  );
+}
+
+/** A row's small shape of the day (a friend's, a board's): ten squares in ink, right filled, близо half. */
+export function mini(marks: { right: boolean; close?: boolean; void?: boolean }[]): HTMLElement {
+  const said = marks.map((m, i) => `${i + 1}: ${tileWords[tileOf(m)]}`).join(", ");
+  return h(
+    "ol",
+    { class: "mini", role: "img", "aria-label": said },
+    marks.map((m) => h("li", { class: tileOf(m) === "near" ? "partial" : tileOf(m) })),
+  );
+}
+
+const svgNS = "http://www.w3.org/2000/svg";
+
+/** A chapter's seal (seal.ts): its rank as its silhouette, the chapter's glyph in its middle, `size` across (24 at the
+ * least; from 32, Летопис's number past the first). Named for a screen reader: „История: Тетрадка“. */
+export function seal(topic: string, rank: number, size = 32, cls = ""): SVGSVGElement {
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", "0 0 48 48");
+  svg.setAttribute("width", String(size));
+  svg.setAttribute("height", String(size));
+  svg.setAttribute("class", ["seal", `t-${topic}`, cls].filter(Boolean).join(" "));
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", `${chapterName(topic)}: ${rankName(rank)}`);
+  for (const p of sealParts(rank)) {
+    const path = document.createElementNS(svgNS, "path");
+    path.setAttribute("d", p.d);
+    path.setAttribute("class", [p.fill && `f-${p.fill}`, p.stroke && `s-${p.stroke}`].filter(Boolean).join(" "));
+    if (p.width) path.setAttribute("stroke-width", String(p.width));
+    svg.append(path);
+  }
+  const art = picture(`topic-${topic}`, `t-${topic}`);
+  art.setAttribute("x", String(glyphBox.x));
+  art.setAttribute("y", String(glyphBox.y));
+  art.setAttribute("width", String(glyphBox.size));
+  art.setAttribute("height", String(glyphBox.size));
+  svg.append(art);
+  // Летопис · 2 and on: its number on a tab at the corner, where it can be read.
+  if (rank >= 7 && size >= 32) {
+    const tab = document.createElementNS(svgNS, "rect");
+    for (const [k, v] of Object.entries({ x: 29, y: 30, width: 18, height: 14, rx: 4, class: "seal-tab" }))
+      tab.setAttribute(k, String(v));
+    const n = document.createElementNS(svgNS, "text");
+    for (const [k, v] of Object.entries({ x: 38, y: 41, "text-anchor": "middle", class: "seal-n" }))
+      n.setAttribute(k, String(v));
+    n.textContent = String(rank - 5);
+    svg.append(tab, n);
+  }
+  return svg;
+}
+
+/** How far a chapter has come towards its next rank: four pips under its seal, `quarters` (0–3) of them filled. For
+ * the eye: the words beside it say how much ink is still to come. */
+export function pips(quarters: number): HTMLElement {
+  return h(
+    "span",
+    { class: "seal-pips", "aria-hidden": "true" },
+    [0, 1, 2, 3].map((i) => h("i", { class: i < quarters ? "on" : undefined })),
+  );
+}
+
+/** A player's worn seal, as it shows beside their name: none for a player without one. */
+export interface Worn {
+  chapter: string;
+  level: number;
+}
+
+/** The seal a player wears, beside their name or on their avatar's corner, 24px (or `size`); nothing without one. Only
+ * the seal: its rank's word is the Алманах's, never beside a name. */
+export function worn(w: Worn | null | undefined, size = 24): Child {
+  return w?.chapter && w.level > 0 ? seal(w.chapter, w.level, size) : null;
 }
 
 /** A page's picture, over its heading (decoration): one of the ways to play, or "almanac", "friends". */

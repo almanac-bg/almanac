@@ -26,16 +26,16 @@
   }
 
   .duel-verdict {
-    font: 600 calc(18px + 1.125rem) / 1.1 var(--font-serif);
+    font: 600 calc(18px + 1.125rem) / 1.1 var(--font-sans);
     letter-spacing: -0.02em;
   }
 
   .s-won .duel-verdict {
-    color: var(--right-ink);
+    color: var(--ink);
   }
 
   .s-lost .duel-verdict {
-    color: var(--wrong-ink);
+    color: var(--ink);
   }
 
   /* The two, face to face: the avatar and the name over each score, the player's on the left, the other's on the
@@ -116,7 +116,7 @@
   .duel-colon {
     align-self: center;
     margin-top: var(--space-6);
-    color: var(--gold-ink);
+    color: var(--ink);
     font: 800 2rem / 1 var(--font-numeral);
   }
 
@@ -129,7 +129,7 @@
     width: 100%;
     max-width: 28rem;
     padding-top: var(--space-4);
-    border-top: 1px solid var(--rule);
+    border-top: 1px solid var(--line);
   }
 
   .duel-who {
@@ -141,7 +141,7 @@
     z-index: 1;
     aspect-ratio: 1;
     border-radius: 2px;
-    background: var(--rule);
+    background: var(--line);
   }
 
   .duel-pip.right {
@@ -168,7 +168,7 @@
   .duel-band {
     align-self: stretch;
     margin: -5px -3px;
-    border-radius: var(--radius);
+    border-radius: var(--r-1);
     background: color-mix(in srgb, var(--gold) 14%, transparent);
   }
 
@@ -204,7 +204,7 @@
     display: grid;
     gap: var(--space-3);
     padding-top: var(--space-4);
-    border-top: 1px solid var(--rule);
+    border-top: 1px solid var(--line);
   }
 
   .duel-record {

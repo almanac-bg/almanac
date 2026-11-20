@@ -82,6 +82,10 @@ export const cover = signal(false);
  * brought from another browser (screens/keep.ts). */
 export const notice = signal("");
 
+/** The day's issue's topics in the order its ten are asked (play.IssueTopics), as Днес last had them: a question's
+ * sheet turns to the next one's colour. */
+export const issueTopics = signal<string[]>([]);
+
 /** How many friend requests wait for the player's answer. */
 export const friendRequests = signal(0);
 

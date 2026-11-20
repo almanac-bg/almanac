@@ -1,41 +1,80 @@
-// Sharing the day: the share sheet where there is one, else the text copied, else the text to copy by hand; the link
-// asked for once.
+// Sharing the day: the share sheet where there is one (with the card where it takes a picture), else the text copied,
+// else the text to copy by hand; the link asked for once; the text the issue, the score, the streak and the tiles.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { shareDay } from "./share.ts";
+import { type SharedDay, shareDay, shareWords, squares } from "./share.ts";
 
 (globalThis as { location?: unknown }).location = { pathname: "/" };
 
-const text = "Алманах, брой 9 · 20 ноември\n7 от 10 ■■■□■■■□■□\nalmanac.bg/d/9-k4f2m7qa";
+const day: SharedDay = {
+  issue: 9,
+  rights: 7,
+  of: 10,
+  streak: 23,
+  marks: [
+    { right: true },
+    { right: true },
+    { right: false, close: true },
+    { right: true },
+    { right: false },
+    { right: true },
+    { right: true },
+    { right: false },
+    { right: true },
+    { right: true },
+  ],
+};
+const text = "Брой 9 · 7/10 · 23 дни\n■■◧■□■■□■■\nalmanac.bg/d/9-k4f2m7qa";
 
-/** The server, giving the text; what was asked of it. */
+/** The server, giving the link; what was asked of it. */
 function serve(): string[] {
   const asked: string[] = [];
   globalThis.fetch = (async (path: string, init: RequestInit) => {
     asked.push(`${init.method} ${path}`);
-    return new Response(JSON.stringify({ text, url: "https://almanac.bg/d/9-k4f2m7qa" }), {
+    return new Response(JSON.stringify({ text: "the server's", url: "https://almanac.bg/d/9-k4f2m7qa" }), {
       headers: { "Content-Type": "application/json" },
     });
   }) as typeof fetch;
   return asked;
 }
 
-/** A browser that can share (`share`: what its sheet does) and copy (`copy`: what writing to the clipboard does). */
-function browser(share?: (data: ShareData) => Promise<void>, copy?: (t: string) => Promise<void>): void {
+/** A browser that can share (`share`: what its sheet does; `files`: whether it takes a picture) and copy (`copy`). */
+function browser(share?: (data: ShareData) => Promise<void>, copy?: (t: string) => Promise<void>, files = false): void {
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
-    value: { share, clipboard: { writeText: copy ?? (() => Promise.reject(new Error("no"))) } },
+    value: {
+      share,
+      canShare: (d: ShareData) => files || !d.files,
+      clipboard: { writeText: copy ?? (() => Promise.reject(new Error("no"))) },
+    },
   });
 }
 
-test("shared with the sheet where there is one, the text asked for once", async () => {
+test("the text: the issue, the score, the streak from three days, the tiles, the link without its scheme", () => {
+  assert.equal(shareWords(day, "https://almanac.bg/d/9-k4f2m7qa"), text);
+  assert.equal(shareWords({ ...day, streak: 2 }, "https://almanac.bg/d/9-x").split("\n")[0], "Брой 9 · 7/10");
+  assert.equal(squares([{ right: true }, { right: false, void: true }, { right: false }]), "■□");
+});
+
+test("shared with the sheet where there is one, the link asked for once", async () => {
   const asked = serve();
   const sent: ShareData[] = [];
   browser(async (d) => void sent.push(d));
-  assert.equal(await shareDay(1), "shared");
-  assert.equal(await shareDay(1), "shared");
+  assert.equal(await shareDay(1, day), "shared");
+  assert.equal(await shareDay(1, day), "shared");
   assert.deepEqual(sent, [{ text }, { text }]);
   assert.deepEqual(asked, ["POST /api/runs/1/share"]);
+});
+
+test("the card goes with the text where the sheet takes a picture, and only there", async () => {
+  serve();
+  const card = new File(["png"], "almanah.png", { type: "image/png" });
+  const sent: ShareData[] = [];
+  browser(async (d) => void sent.push(d), undefined, true);
+  await shareDay(4, day, card);
+  browser(async (d) => void sent.push(d), undefined, false);
+  await shareDay(4, day, card);
+  assert.deepEqual(sent, [{ files: [card], text }, { text }]);
 });
 
 test("the sheet closed without a choice is nothing; refused, the text is copied", async () => {
@@ -46,14 +85,14 @@ test("the sheet closed without a choice is nothing; refused, the text is copied"
     () => Promise.reject(abort),
     async (t) => void copied.push(t),
   );
-  assert.equal(await shareDay(2), "cancelled");
+  assert.equal(await shareDay(2, day), "cancelled");
   assert.equal(copied.length, 0);
   const refused = Object.assign(new Error("no"), { name: "NotAllowedError" });
   browser(
     () => Promise.reject(refused),
     async (t) => void copied.push(t),
   );
-  assert.equal(await shareDay(2), "copied");
+  assert.equal(await shareDay(2, day), "copied");
   assert.deepEqual(copied, [text]);
 });
 
@@ -61,8 +100,8 @@ test("without a sheet the text is copied, and where it can't be, given to copy b
   serve();
   const copied: string[] = [];
   browser(undefined, async (t) => void copied.push(t));
-  assert.equal(await shareDay(3), "copied");
+  assert.equal(await shareDay(3, day), "copied");
   assert.deepEqual(copied, [text]);
   browser();
-  assert.deepEqual(await shareDay(3), { text });
+  assert.deepEqual(await shareDay(3, day), { text });
 });

@@ -4,7 +4,7 @@ import { answer, moveOn, openGame, playedFair, playRun, startDay } from "./play.
 test("the day: ten questions, the result, the review, and one try only", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Десет въпроса за днес." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Десет въпроса за днес" })).toBeVisible();
   // A new visitor's cover is the day alone: no places, no streak, no topics.
   await expect(page.locator(".places-foot")).toBeHidden();
   await expect(page.locator(".streak-chip")).toHaveCount(0);
@@ -14,16 +14,17 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.getByRole("heading", { level: 1 })).toContainText("от 10");
   // A first result is quiet: the right answers, no points, XP, level or goals (the game has none).
   await expect(page.locator(".screen")).not.toContainText(/XP|[Нн]иво \d|Цели за деня|точк/);
-  // One gold way on under the result: sharing it. Topics are played from the Алманах, duels from Приятели.
-  await expect(page.locator(".summary .btn.primary")).toHaveText("Сподели резултата");
-  await page.getByRole("button", { name: "Прегледай въпросите" }).click();
+  // The first result's action sits right under the score: keeping the game and being reminded (or, until that's there
+  // to ask, sharing it). Topics are played from the Алманах, duels from Приятели.
+  await expect(page.locator(".result-main > .result-score + .result-share.result-first")).toBeVisible();
+  await page.getByRole("button", { name: "Въпросите и фактите" }).click();
   await expect(page.locator(".reviewed")).toHaveCount(10);
   await page.reload();
   await expect(page.locator(".result")).toBeVisible();
   await expect(page.getByRole("button", { name: "Започни" })).toHaveCount(0);
   await expect(page.locator(".places-foot")).toBeVisible();
-  // The result tells the streak the day made.
-  await expect(page.locator(".streak-chip")).toContainText("1");
+  // The result tells the streak tomorrow makes.
+  await expect(page.locator(".tomorrow")).toContainText("Серията ти става 2.");
   // Приятели has the day's board: of friends (none yet), and of all България, the player on it.
   await page.goto("/friends");
   await expect(page.getByRole("tab")).toHaveText(["Приятели", "България"]);
@@ -67,7 +68,7 @@ test("the day says how its other players did with each question: under the verdi
     await answer(page);
     await moveOn(page);
   }
-  await page.getByRole("button", { name: "Прегледай въпросите" }).click();
+  await page.getByRole("button", { name: "Въпросите и фактите" }).click();
   await expect(page.locator(".reviewed").first().locator(".crowd-says")).toHaveText(/от играчите днес\.$|^Днес /);
 });
 
@@ -180,14 +181,15 @@ test("the day's count can be backed out of, and nothing starts; let run, it star
   await page.waitForTimeout(3500);
   await expect(page.locator(".question-head")).toHaveCount(0);
   await page.reload();
-  await expect(day.getByRole("button", { name: "Започни", exact: true })).toBeVisible();
+  const go = page.locator(".today").getByRole("button", { name: "Започни", exact: true });
+  await expect(go).toBeVisible();
 
-  await day.getByRole("button", { name: "Започни", exact: true }).click();
+  await go.click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(day).toBeVisible();
 
-  await day.getByRole("button", { name: "Започни", exact: true }).click();
+  await go.click();
   await expect(page.getByRole("timer")).toHaveAccessibleName(/Започва след [1-3] с/);
   await expect(page.locator(".question-head")).toContainText("1 от 10", { timeout: 6000 });
 });
@@ -206,7 +208,7 @@ test("the day left after its third question waits on Начало, and goes on f
   await page.getByRole("link", { name: "Към Днес", exact: true }).click();
   const day = page.locator(".issue");
   await expect(day).toContainText("Следва въпрос 4 от 10.");
-  await expect(day.locator(".trail li:is(.right, .partial, .wrong)")).toHaveCount(3);
+  await expect(day.locator(".tiles .tile:is(.right, .near, .wrong)")).toHaveCount(3);
   await expect(page.locator(".places-foot")).toBeVisible();
   // The card waits: no question's time starts behind it, a reload included.
   await page.waitForTimeout(4000);
@@ -220,8 +222,8 @@ test("the day left after its third question waits on Начало, and goes on f
   }
   await expect(page.locator(".summary")).toBeVisible({ timeout: 10_000 });
   // Ten answers, each given and counted: the score is the right ones of the ten.
-  await expect(page.locator(".summary .trail li:is(.right, .partial, .wrong)")).toHaveCount(10);
-  const rights = await page.locator(".summary .trail li.right").count();
+  await expect(page.locator(".summary .tiles .tile:is(.right, .near, .wrong)")).toHaveCount(10);
+  const rights = await page.locator(".summary .tiles .tile.right").count();
   await expect(page.locator(".summary .score-n")).toHaveText(String(rights));
   const { run } = await (await page.request.get("/api/day")).json();
   const { questions } = await (await page.request.get(`/api/runs/${run.id}/review`)).json();
@@ -276,13 +278,12 @@ test("the day left at its last question comes back done, with what it earned tol
   await playedFair(page); // a test answers quicker than a person: its book as a person's
   await page.getByRole("link", { name: "Към Днес", exact: true }).click();
   await page.getByRole("button", { name: "Излез" }).click();
-  // Its result was never on screen: Начало has it, and its news (the facts it wrote), told now, once.
+  // Its result was never on screen: Днес has it, its tenth told as given up, the same on every visit.
   await expect(page.locator(".summary")).toBeVisible();
-  await expect(page.locator(".summary .news-facts")).toContainText("в Алманаха");
+  await expect(page.locator(".summary .tiles .tile")).toHaveCount(10);
   await page.reload();
   await expect(page.locator(".result")).toBeVisible();
-  await expect(page.locator(".result .trail")).toBeVisible();
-  await expect(page.locator(".news-facts")).toHaveCount(0);
+  await expect(page.locator(".result .tiles .tile:is(.right, .near, .wrong)")).toHaveCount(10);
 });
 
 test.describe("on a computer", () => {
@@ -315,7 +316,7 @@ test.describe("on a computer", () => {
     }
     expect(keyed).toBe(true);
     await expect(page.locator(".summary")).toBeVisible({ timeout: 10_000 });
-    // A player's Днес is a spread: the issue, and beside it the friends' day and the way to the book.
+    // A player's Днес is a spread: the issue, and beside it its action, the streak and its contents.
     await page.goto("/");
     const day = await page.locator(".issue").boundingBox();
     const side = await page.locator(".today-side").boundingBox();
@@ -326,17 +327,17 @@ test.describe("on a computer", () => {
   test("Днес: a new visitor's cover, and the day's result a spread at once as after a reload", async ({ page }) => {
     test.setTimeout(120_000);
     await page.goto("/");
-    // The cover: the masthead in the middle, the date on the left page, the issue on the right; no places.
+    // The cover: the mark in the middle of the bar, the issue on the left page, its action on the right; no places.
     await expect(page.locator(".issue")).toBeVisible();
     await expect(page.locator("nav.places")).toBeHidden();
-    const date = await page.locator(".issue-date").boundingBox();
-    const body = await page.locator(".issue-body").boundingBox();
-    expect(date && body && body.x > date.x + date.width).toBe(true);
+    const issue = await page.locator(".issue").boundingBox();
+    const go = await page.locator(".issue-go").boundingBox();
+    expect(issue && go && go.x > issue.x + issue.width).toBe(true);
     await startDay(page);
     await playRun(page);
     await expect(page.locator(".summary")).toBeVisible();
     // Just played, the result is a spread (it's drawn where the game was), as it is after a reload.
-    await expect(page.locator(".streak-chip")).toContainText("1");
+    await expect(page.locator(".tomorrow")).toContainText("Серията ти става 2.");
     // (Few have played in a test: the right page, България's, is empty, and the score has the left one.)
     const box = async () => (await page.locator(".result-main").boundingBox())?.width ?? -1;
     const just = await box();

@@ -131,8 +131,7 @@ export const stakeHour = 18;
  * its day already, that it ends at midnight. "" while there's no streak to lose. */
 export function stakeWords(days: number, spare: boolean, hour: number): string {
   if (days < 1) return "";
-  const streak = `Серия от ${days} ${days === 1 ? "ден" : "дни"}.`;
   return hour >= stakeHour && !spare
-    ? `${streak} Прекъсва в полунощ, ако не изиграеш въпросите на деня.`
-    : `${streak} С днешните въпроси става ${days + 1}.`;
+    ? "Без днешния брой серията прекъсва в полунощ."
+    : `С днешния брой серията става ${days + 1}.`;
 }

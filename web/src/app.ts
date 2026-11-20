@@ -6,15 +6,12 @@
 import { loadPictures } from "./art/picture.ts";
 import { keepFresh } from "./fresh.ts";
 import { later } from "./kit.ts";
-import { serverNow } from "./lib/api.ts";
-import { dayInBulgaria } from "./lib/day.ts";
 import { effect, h, mount } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { applyPrefs } from "./lib/prefs.ts";
 import { preparePush } from "./lib/push.ts";
 import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
-import { dateWords, issueOf } from "./lib/words.ts";
 import { duelNew, duelOne } from "./screens/duel.ts";
 import { missing } from "./screens/missing.ts";
 import { topic } from "./screens/play.ts";
@@ -71,14 +68,6 @@ if (root) {
         { class: "bar" },
         h("a", { href: "/", class: "brand", "aria-label": "АЛМАНАХ, днешният брой" }, rosette(), "АЛМАНАХ"),
         h("nav", { class: "places", "aria-label": "Основно" }, placeLinks()),
-        // The issue on a big screen, but on Днес, whose dateline says it.
-        () =>
-          path() === "/"
-            ? null
-            : h("span", { class: "bar-issue" }, () => {
-                const day = dayInBulgaria(new Date(serverNow()));
-                return `Брой ${issueOf(day)} · ${dateWords(day)}`;
-              }),
         // The player's avatar: Профил, and Настройки in it. Without a profile yet (or on the cover, not signed in),
         // the way in.
         () => {

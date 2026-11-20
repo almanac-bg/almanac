@@ -38,8 +38,8 @@ export interface Asked {
   /** The answering part, under the question. */
   node: Child;
   /** Shows the answer: what was right, and how what was given compares; in beats on a stage (a run, run.ts), the
-   * player's own answer first. */
-  reveal(reveal: Reveal, given: Answer | null, at?: Stage): void;
+   * player's own answer first; `near`: it was close („близо“). */
+  reveal(reveal: Reveal, given: Answer | null, at?: Stage, near?: boolean): void;
   /** What's been put in but not sent yet (a typed number, things moved into an order): it counts when time runs out. */
   pending(): Answer | null;
   /** Takes a newer view of the same question, as more of it shows (the next clue). */
@@ -141,9 +141,9 @@ export function ask(
 
 /** Draws a question as it was answered, for going over it once the question is past (a review). „Вярно“ and „Невярно“ carry no ✓ while asked; here the right one says it is, for whoever can't tell
  * colours. */
-export function answered(view: View, reveal: Reveal, given: Answer | null): Child {
+export function answered(view: View, reveal: Reveal, given: Answer | null, near = false): Child {
   const a = ask(view, () => {}, signal(true), undefined, true);
-  a.reveal(reveal, given);
+  a.reveal(reveal, given, undefined, near);
   if (a.node instanceof Element)
     a.node.querySelector(".option.tf.right")?.append(h("small", { class: "tf-right" }, "верният отговор"));
   return a.node;
@@ -172,7 +172,7 @@ export function spokenAnswer(view: View, reveal: Reveal): string {
 }
 
 /** The least a question's picture is drawn at, however little room the screen has. */
-const pictureFloor = 128;
+const pictureFloor = 80;
 
 /** The picture over a question. While it's asked (fit), it's kept low enough that the question, the picture and the
  * whole answering part under it fit on the screen, down to a floor on a screen too small for that, and kept so as
@@ -311,6 +311,7 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
         b.classList.remove("picked");
         const how = i === reveal.pick ? "right" : i === mine ? "wrong" : "dim";
         b.classList.add(how);
+        if (i === mine) b.classList.add("mine");
         const name = reveal.names?.[i];
         if (name) {
           names[i]?.replaceChildren(name);
@@ -449,25 +450,65 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
       const v = value();
       return v === null ? null : { value: v };
     },
-    reveal(reveal, given, at = atOnce) {
+    reveal(reveal, given, at = atOnce, near = false) {
       pad.hidden = true;
       result.hidden = false;
-      const right = `${formatNumber(reveal.value ?? 0, view.step)}${unit}`;
+      const answer = reveal.value ?? 0;
+      const mine = given && "value" in given ? given.value : null;
+      const said = (v: number) => `${v < 0 ? "−" : ""}${formatNumber(Math.abs(v), view.step)}`;
       append(result, [
-        h("p", { class: "number-answer" }, h("span", { class: "kicker" }, "Отговор"), " ", h("strong", null, right)),
-        given && "value" in given
-          ? h("p", { class: "muted" }, `Ти каза ${formatNumber(given.value, view.step)}${unit}.`)
-          : h("p", { class: "muted" }, "Без отговор."),
+        // What the player said, as they typed it; then the answer, and both on a scale.
+        h(
+          "p",
+          { class: "number-said" },
+          mine === null
+            ? h("span", { class: "typed muted" }, "Без отговор")
+            : [h("span", { class: "typed" }, said(mine)), view.unit ? h("span", { class: "unit" }, view.unit) : null],
+        ),
+        mine === null || mine === answer ? null : scale(answer, mine, near, view),
+        h("p", { class: "number-answer" }, "Отговорът: ", h("strong", null, `${said(answer)}${unit}`), "."),
       ]);
       // Everyone's guesses take their room at once, and show on their beat.
       const guesses = reveal.crowd?.guesses;
       if (!guesses) return;
-      const all = spread(guesses, reveal.value ?? 0, given && "value" in given ? given.value : null, view);
+      const all = spread(guesses, answer, mine, view);
       all.classList.add("unseen");
       result.append(all);
       at(beats.crowd, () => all.classList.remove("unseen"));
     },
   };
+}
+
+/** The player's number beside the answer on a scale running a little past both (as far again as they are apart), its
+ * two ends named: the answer a filled square, the player's half filled when it was close („близо“), hollow when not. */
+function scale(answer: number, mine: number, near: boolean, view: NumberView): HTMLElement {
+  const gap = Math.abs(answer - mine);
+  let lo = Math.min(answer, mine) - gap;
+  const hi = Math.max(answer, mine) + gap;
+  // A scale of a count or a size starts no lower than nothing, as the answer can't be under it.
+  if (lo < 0 && Math.min(answer, mine) >= 0) lo = 0;
+  const at = (v: number) => `${((v - lo) / (hi - lo || 1)) * 100}%`;
+  const word = (v: number) => `${v < 0 ? "−" : ""}${formatNumber(Math.abs(v), view.step)}`;
+  const unit = view.unit ? ` ${view.unit}` : "";
+  return h(
+    "div",
+    { class: "number-near" },
+    h(
+      "div",
+      { class: "near-scale", "aria-hidden": "true" },
+      h("span", { class: "near-track" }),
+      h("span", { class: "near-mark answer", style: { left: at(answer) } }, word(answer), h("i")),
+      h("span", { class: `near-mark ${near ? "near" : "mine"}`, style: { left: at(mine) } }, word(mine), h("i")),
+      h("span", { class: "near-end lo" }, word(lo)),
+      h("span", { class: "near-end hi" }, `${word(hi)}${unit}`),
+    ),
+    h(
+      "p",
+      { class: "near-key", "aria-hidden": "true" },
+      h("span", null, h("i", { class: "answer" }), "отговорът"),
+      h("span", null, h("i", { class: near ? "near" : "" }), near ? "ти, близо" : "ти"),
+    ),
+  );
 }
 
 /** Where everyone's guesses at a number fell: a bar for each part of the range a guess scores in, one at each end for
@@ -490,14 +531,14 @@ function spread(s: Spread, answer: number, mine: number | null, view: NumberView
   const bars = h(
     "div",
     {
-      class: "spread-bars",
+      class: "guess-bars",
       role: "img",
       "aria-label": `${percent(inRange)} от догадките са между ${formatNumber(s.lo, view.step)} и ${formatNumber(s.hi, view.step)}${unit}.`,
       style: { "grid-template-columns": `0.6fr repeat(${n}, 1fr) 0.6fr` },
     },
     shares.map((x, k) =>
       h("span", {
-        class: ["spread-bar", (k === 0 || k === n + 1) && "edge", k === theirs && "mine", k === theAnswer && "answer"]
+        class: ["guess-bar", (k === 0 || k === n + 1) && "edge", k === theirs && "mine", k === theAnswer && "answer"]
           .filter(Boolean)
           .join(" "),
         style: { height: `${Math.max(3, (x / top) * 100)}%` },
@@ -506,21 +547,21 @@ function spread(s: Spread, answer: number, mine: number | null, view: NumberView
   );
   return h(
     "div",
-    { class: "spread" },
+    { class: "guesses" },
     h("span", { class: "kicker" }, "Догадките на играчите"),
     bars,
     h(
       "div",
-      { class: "spread-axis", "aria-hidden": "true" },
+      { class: "guess-axis", "aria-hidden": "true" },
       h("span", null, formatNumber(s.lo, view.step)),
       h("span", null, `${formatNumber(s.hi, view.step)}${unit}`),
     ),
     h(
       "div",
-      { class: "spread-key", "aria-hidden": "true" },
-      h("span", null, h("i", { class: "spread-swatch answer" }), "отговорът"),
-      mine === null ? null : h("span", null, h("i", { class: "spread-swatch mine" }), "твоята"),
-      h("span", null, h("i", { class: "spread-swatch edge" }), "извън целта"),
+      { class: "guess-key", "aria-hidden": "true" },
+      h("span", null, h("i", { class: "guess-swatch answer" }), "отговорът"),
+      mine === null ? null : h("span", null, h("i", { class: "guess-swatch mine" }), "твоята"),
+      h("span", null, h("i", { class: "guess-swatch edge" }), "извън целта"),
     ),
   );
 }
@@ -809,6 +850,7 @@ function truefalse(
       const mark = (b: HTMLElement, truth: boolean) => {
         b.classList.remove("picked");
         b.classList.add(truth === reveal.truth ? "right" : truth === mine ? "wrong" : "dim");
+        if (truth === mine) b.classList.add("mine");
       };
       if (mine !== null) mark(mine ? yes : no, mine);
       let crowd = () => {};
@@ -821,9 +863,6 @@ function truefalse(
     },
   };
 }
-
-/** The tone each pair of a match is drawn in, by its left's place (with its number, for whoever can't tell colours). */
-const pairTones = ["tone-gold", "tone-sky", "tone-rose", "tone-lilac"];
 
 /** „Свържи“: tap a thing on the left, then its pair on the right (or the other way round); a line joins them. A
  * joined one tapped again comes apart. */
@@ -859,12 +898,7 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
         class: () => {
           const k = pairOf();
           const c = chosen();
-          return [
-            "option",
-            "match-item",
-            k >= 0 && `joined ${pairTones[k]}`,
-            c && c.side === side && c.i === i && "chosen",
-          ]
+          return ["option", "match-item", k >= 0 && "joined", c && c.side === side && c.i === i && "chosen"]
             .filter(Boolean)
             .join(" ");
         },
@@ -881,9 +915,11 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
         },
         onclick: () => tap(side, i),
       },
+      // A left one is its letter; a right one, joined, takes its left one's: the pair is tied by the letter.
       h("span", { class: "letter", "aria-hidden": "true" }, () => {
+        if (side === "left") return letters[i] ?? "";
         const k = pairOf();
-        return k >= 0 ? String(k + 1) : "";
+        return k >= 0 ? (letters[k] ?? "") : "";
       }),
       h("span", null, wholeWords(text)),
     );
@@ -914,7 +950,6 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
         line.setAttribute("y1", String(a.top + a.height / 2 - box.top));
         line.setAttribute("x2", String(b.left - box.left));
         line.setAttribute("y2", String(b.top + b.height / 2 - box.top));
-        line.setAttribute("class", pairTones[i] ?? "");
         return [line];
       }),
     );
@@ -1264,6 +1299,7 @@ function clues(
         b.classList.remove("picked");
         const how = i === reveal.pick ? "right" : i === mine ? "wrong" : "dim";
         b.classList.add(how);
+        if (i === mine) b.classList.add("mine");
         if (how !== "dim") b.append(sign());
       };
       const own = buttons[mine];
