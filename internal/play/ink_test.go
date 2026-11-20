@@ -204,6 +204,32 @@ func TestFactsAsTheRule(t *testing.T) {
 	}
 }
 
+// The issue played a second time in one browser (SecondPlay) writes pencil only, as the answers then and by the
+// whole rule; a topic's game is no second play of anything.
+func TestSecondPlayWritesPencil(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	s, err := w.g.StartDay(SecondPlay(ctx, ana), ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	book := w.book(ana)
+	if len(book) == 0 {
+		t.Fatal("nothing written")
+	}
+	for id, ink := range book {
+		if ink {
+			t.Fatalf("%s in ink from a second play", id)
+		}
+	}
+	w.consistent(ana)
+	if n := w.count(`SELECT count(*) FROM runs WHERE user_id = ? AND pencil`, ana); n != 1 {
+		t.Fatalf("%d runs of pencil", n)
+	}
+}
+
 // A guest's day brought to an account that hasn't met its questions is ink, as it was the guest's: one person.
 func TestMergeKeepsAGuestsInk(t *testing.T) {
 	w := setup(t)

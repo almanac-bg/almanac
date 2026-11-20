@@ -193,6 +193,12 @@ func serve([]string) error {
 	} else if n > 0 {
 		slog.Info("judged runs", "scripted", n)
 	}
+	// The ranks of the players whose ink is from before them (play/rank.go).
+	if n, err := srv.RanksDue(ctx); err != nil {
+		slog.Error("counting ranks", "err", err)
+	} else if n > 0 {
+		slog.Info("counted ranks", "players", n)
+	}
 	// The work done in the background, each loop started again if it panics (package safe: the panic is told, and
 	// the process, with every game in it, goes on).
 	go safe.Loop(ctx, "mail: the outbox", outbox.Run)

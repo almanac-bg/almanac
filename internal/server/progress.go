@@ -49,6 +49,28 @@ func (s *Server) streakTold(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"fresh": fresh})
 }
 
+// setSeal chooses the chapter whose seal the player wears (play.SetSeal; "" for their best).
+func (s *Server) setSeal(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		Chapter string `json:"chapter"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	if err := s.game.SetSeal(r.Context(), u.ID, in.Chapter); err != nil {
+		return err
+	}
+	seal, err := s.game.SealOf(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"seal": seal})
+}
+
 // setLook changes the player's avatar (play.SetAvatar).
 func (s *Server) setLook(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)

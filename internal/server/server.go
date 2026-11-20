@@ -144,6 +144,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.bank.Store(d.Bank)
 	s.game = play.New(d.DB, s.bank.Load)
 	s.heldOut = func(id int64) bool { return play.HeldOut(play.HeldReminders, id) }
+	s.nearestStep = s.stepOf
 	if strings.HasPrefix(cfg.Version, "v") { // a release, not a developer's build
 		s.game.Version = cfg.Version
 		if err := s.released(context.Background()); err != nil {
@@ -174,6 +175,9 @@ func (s *Server) Count(ctx context.Context) error { return s.game.Count(ctx) }
 // speed. Run as the server starts, before it serves; it says how many it marked.
 func (s *Server) JudgeRuns(ctx context.Context) (int, error) { return s.game.JudgeRuns(ctx) }
 
+// RanksDue counts the ranks a migration left to count (play.RanksDue): of the players with ink from before ranks.
+func (s *Server) RanksDue(ctx context.Context) (int, error) { return s.game.RanksDue(ctx) }
+
 // KeepDays draws the day's questions ahead, in transactions of their own (play.Game.KeepDays), until ctx ends.
 func (s *Server) KeepDays(ctx context.Context) { s.game.KeepDays(ctx) }
 
@@ -193,6 +197,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/me/news", s.news)
 	api("POST /api/me/streak-told", s.streakTold)
 	api("PATCH /api/me/look", s.setLook)
+	api("PATCH /api/me/seal", s.setSeal)
 	api("POST /api/push", s.subscribe)
 	api("DELETE /api/push", s.unsubscribe)
 	api("GET /api/push/prefs", s.pushPrefs)

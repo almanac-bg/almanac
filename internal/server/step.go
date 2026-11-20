@@ -21,6 +21,25 @@ type Step struct {
 	Rank string
 }
 
+// stepOf is a player's nearest step, from play (play.StepOf), its chapter by name: Server.nearestStep.
+func (s *Server) stepOf(ctx context.Context, userID int64) (Step, bool, error) {
+	st, err := s.game.StepOf(ctx, userID)
+	if err != nil || st == nil {
+		return Step{}, false, err
+	}
+	return Step{Chapter: s.chapterName(st.Chapter), Left: st.Left, Rank: st.Next}, true, nil
+}
+
+// chapterName is a chapter's name as the bank has it (its id, if the bank has no such).
+func (s *Server) chapterName(id string) string {
+	for _, c := range s.bank.Load().Categories {
+		if c.ID == id {
+			return c.Name
+		}
+	}
+	return id
+}
+
 // stepWords is the reminders' last word to a player: the day's issue, and their nearest step if they have one.
 func (s *Server) stepWords(ctx context.Context, userID int64) string {
 	const issue = "Днешният брой те чака"

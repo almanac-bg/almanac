@@ -72,7 +72,19 @@ func (g *Game) LookOf(ctx context.Context, userID int64) (Look, error) {
 // SetAvatar changes a player's avatar: a shape of Shapes in a tone of Tones ("fox-gold").
 func (g *Game) SetAvatar(ctx context.Context, userID int64, avatar string) error {
 	shape, tone, _ := strings.Cut(avatar, "-")
-	if !slices.Contains(Shapes, shape) || !slices.Contains(Tones, tone) {
+	if !slices.Contains(Tones, tone) {
+		return ErrNoAvatar
+	}
+	if chapter, ok := chapterOfArt(g.Bank(), shape); ok {
+		// A chapter's art, the player's from its Страница (rank.go).
+		has, err := g.HasArt(ctx, userID, chapter)
+		if err != nil {
+			return err
+		}
+		if !has {
+			return ErrNoAvatar
+		}
+	} else if !slices.Contains(Shapes, shape) {
 		return ErrNoAvatar
 	}
 	_, err := g.DB.Write.ExecContext(ctx, `UPDATE users SET avatar = ? WHERE id = ?`, avatar, userID)
@@ -102,9 +114,14 @@ func (g *Game) Played(ctx context.Context, userID int64) (bool, error) {
 // topic's game only), the milestones noted in the book since the player was last told (Notes), and, once a day, what
 // others' duels against the player's recordings came to (recordings.go).
 type News struct {
-	Ink        int             `json:"ink,omitempty"`
-	Pencil     bool            `json:"pencil,omitempty"`
-	Mastery    *MasteryMove    `json:"mastery,omitempty"`
+	Ink     int          `json:"ink,omitempty"`
+	Pencil  bool         `json:"pencil,omitempty"`
+	Mastery *MasteryMove `json:"mastery,omitempty"`
+	// Rose is the ranks risen since the player was last told, as one (rank.go); Step, after a day's issue, the
+	// chapter nearest its next rank (when no rank rose); Held, whether the guessing check holds the ranks.
+	Rose       *Rose           `json:"rose,omitempty"`
+	Step       *Step           `json:"step,omitempty"`
+	Held       bool            `json:"held,omitempty"`
 	Notes      []Note          `json:"notes"`
 	Recordings *RecordingsNews `json:"recordings,omitempty"`
 }
@@ -130,6 +147,14 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 			if n.Ink, n.Pencil, err = g.InkIn(ctx, userID, runID); err != nil {
 				return n, err
 			}
+			if kind == "day" {
+				if n.Step, err = g.StepOf(ctx, userID); err != nil {
+					return n, err
+				}
+				if _, n.Held, err = g.RanksOf(ctx, userID); err != nil {
+					return n, err
+				}
+			}
 			if kind == "topic" {
 				moves, err := g.MasteryMoves(ctx, userID, runID)
 				if err != nil {
@@ -146,6 +171,12 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 		}
 		if n.Recordings, err = g.recordingsNews(tx, userID); err != nil {
 			return err
+		}
+		if n.Rose, err = roseOf(tx, userID); err != nil {
+			return err
+		}
+		if n.Rose != nil {
+			n.Step = nil // the day's big news is the rank: no step beside it
 		}
 		for _, q := range []string{
 			`UPDATE notes SET told = 1 WHERE user_id = ?1 AND NOT told`,

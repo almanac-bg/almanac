@@ -31,6 +31,10 @@ interface News {
   pencil?: boolean;
   /** How a topic's game moved its mastery, when that's news (play.masteryTold). */
   mastery?: MasteryMove;
+  /** The ranks risen since last told, as one (play.Rose): Бележка never; Страница brings the chapter's art. */
+  rose?: { ranks: { chapter: string; name: string; art?: boolean }[]; best?: boolean };
+  /** After a day's issue, the chapter nearest its next rank (play.Step), when none rose. */
+  step?: { chapter: string; left: number; next: string };
   /** The milestones noted in the book with this news, oldest first, each told once. */
   notes?: Note[];
   /** Others' duels against the player's recordings, once a day, in a card of its own. */
@@ -73,6 +77,7 @@ export function news(run: number, delay = 0, late?: { title?: string }): Child {
     if (!n) return null;
     const parts = [
       n.ink || n.pencil ? factsLine(n.ink ?? 0) : null,
+      n.rose ? roseLine(n.rose) : n.step ? stepLine(n.step) : null,
       masteryLine(n.mastery),
       n.notes?.length ? notesLine(n.notes) : null,
       n.recordings ? recordings(n.recordings) : null,
@@ -94,6 +99,18 @@ function factsLine(ink: number): Child {
       ink ? [h("b", { class: "num" }, `+${ink}`), " с мастило в Алманаха"] : "Записано с молив в Алманаха",
     ),
   );
+}
+
+/** The ranks risen, as one line, a tap from the book: „Звание: Страница в „История“ · картината ѝ е твоя“. */
+function roseLine(r: NonNullable<News["rose"]>): Child {
+  const said = r.ranks.map((x) => `${x.name} в „${topicName(x.chapter)}“`).join(", ");
+  const art = r.ranks.some((x) => x.art) ? " Картината на главата вече може да е твоят аватар." : "";
+  return h("p", { class: "news-note news-rose" }, h("a", { href: "/almanac" }, `Звание: ${said}.`), art);
+}
+
+/** The chapter nearest its next rank: „История: още 2 до Тетрадка“. */
+function stepLine(s: NonNullable<News["step"]>): Child {
+  return h("p", { class: "news-note news-step" }, `${topicName(s.chapter)}: още ${s.left} до ${s.next}`);
 }
 
 /** The notes just written in the book, in a quiet line (one after another, if a game brought several), a tap from

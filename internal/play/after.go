@@ -228,9 +228,14 @@ func (g *Game) playedOf(ctx context.Context, userID, runID int64) (played, error
 // dayOf is the day a moment is in, in Bulgaria (YYYY-MM-DD).
 func dayOf(t time.Time) string { return t.In(Bulgaria).Format(time.DateOnly) }
 
-// afterRun keeps what a player's game, just finished, brought them: the milestones it reached, noted in their book on
-// the day it counts for (played).
+// afterRun keeps what a player's game, just finished, brought them: their ranks, after a day's issue (rank.go: only
+// it writes ink), and the milestones it reached, noted in their book on the day it counts for (played).
 func (g *Game) afterRun(ctx context.Context, p played) error {
+	if p.kind == "day" {
+		if err := g.countRanks(ctx, p.user, p.day, false); err != nil {
+			return err
+		}
+	}
 	return g.noteMilestones(ctx, p.user, p.day)
 }
 

@@ -99,12 +99,28 @@ func deviceOf(ctx context.Context, userID int64) any {
 	return nil
 }
 
-// insertRun starts a game for a player, with the network they play from if ctx has it (FromNet, fair.go), and the
-// device (FromDevice).
+// secondKey keeps in a context the players whose day's issue is played a second time in one browser (SecondPlay).
+type secondKey struct{}
+
+// SecondPlay is ctx with a player's day's issue, if a run of it is begun in it, played a second time in this
+// browser: the browser started the day before as someone else (a sign-out, a handoff), so the day's answers were in
+// sight there; the run writes pencil, never ink (ink.go).
+func SecondPlay(ctx context.Context, userID int64) context.Context {
+	was, _ := ctx.Value(secondKey{}).(map[int64]bool)
+	second := make(map[int64]bool, len(was)+1)
+	maps.Copy(second, was)
+	second[userID] = true
+	return context.WithValue(ctx, secondKey{}, second)
+}
+
+// insertRun starts a game for a player, with the network they play from if ctx has it (FromNet, fair.go), the device
+// (FromDevice), and, of a day's issue, whether it's a second play in this browser (SecondPlay).
 func (g *Game) insertRun(ctx context.Context, tx *sql.Tx, userID int64, kind string, day, category any, picks []Pick) (*run, error) {
 	data, _ := json.Marshal(picks)
-	res, err := tx.Exec(`INSERT INTO runs (user_id, kind, day, category, questions, started_at, device)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`, userID, kind, day, category, string(data), store.Ms(g.Now()), deviceOf(ctx, userID))
+	second, _ := ctx.Value(secondKey{}).(map[int64]bool)
+	res, err := tx.Exec(`INSERT INTO runs (user_id, kind, day, category, questions, started_at, device, pencil)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, userID, kind, day, category, string(data), store.Ms(g.Now()),
+		deviceOf(ctx, userID), kind == "day" && second[userID])
 	if err != nil {
 		return nil, err
 	}
