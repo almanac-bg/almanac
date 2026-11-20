@@ -648,7 +648,6 @@ function question(
       tally(score, res.state.points, s.points, res.inRow ?? 0);
       crowd = waiting(crowdLine(q.view.type, res.reveal.crowd, res.right));
       rest = [
-        res.learned ? h("p", { class: "learned" }, "Нов факт в Алманаха") : null,
         fact(res.reveal.fact, res.reveal.day),
         res.reveal.credit ? credit(res.reveal.credit) : null,
         upNext(lasts, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`, true),

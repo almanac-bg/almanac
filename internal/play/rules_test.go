@@ -26,7 +26,7 @@ func TestDayQuestionsKeptOut(t *testing.T) {
 	ana, bo := w.user(), w.user()
 
 	// Before anyone plays the day, a topic run draws it, and keeps out of it.
-	topic, err := w.g.StartTopic(ctx, bo, "")
+	topic, err := w.g.StartTopic(ctx, bo, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestDayQuestionsKeptOut(t *testing.T) {
 
 	// No draw deals them: topics, duels, Роял.
 	for range 20 {
-		for _, c := range []string{"", "science"} {
+		for _, c := range []string{MixTopic, "science"} {
 			s, err := w.g.StartTopic(ctx, bo, c)
 			if err != nil {
 				t.Fatal(err)
@@ -224,7 +224,7 @@ func TestMergeBringsProgress(t *testing.T) {
 // mustStart starts a topic run for a player, its id.
 func mustStart(t *testing.T, w *world, user int64) int64 {
 	t.Helper()
-	s, err := w.g.StartTopic(t.Context(), user, "")
+	s, err := w.g.StartTopic(t.Context(), user, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +238,7 @@ func TestFairRecordings(t *testing.T) {
 	ctx := t.Context()
 	weak, strong, far, ana := w.user(), w.user(), w.user(), w.user()
 	topic := func(user int64, right int) int64 {
-		s, err := w.g.StartTopic(ctx, user, "")
+		s, err := w.g.StartTopic(ctx, user, MixTopic)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -310,7 +310,7 @@ func TestRecordingsArePeoples(t *testing.T) {
 	}
 	game := func(pace func(int) time.Duration) int64 {
 		user := w.user()
-		s, err := w.g.StartTopic(ctx, user, "")
+		s, err := w.g.StartTopic(ctx, user, MixTopic)
 		if err != nil {
 			t.Fatal(err)
 		}

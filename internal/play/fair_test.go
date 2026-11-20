@@ -24,7 +24,7 @@ func quickPace(n int) func(int) time.Duration {
 // game plays a topic's ten at a pace, all right, and says which run it was.
 func (w *world) game(user int64, pace func(int) time.Duration, answers ...func(int64, int) json.RawMessage) int64 {
 	w.t.Helper()
-	s, err := w.g.StartTopic(w.t.Context(), user, "")
+	s, err := w.g.StartTopic(w.t.Context(), user, MixTopic)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestScriptedRunsAreMarked(t *testing.T) {
 	}
 	// Marked as it's played: a run left half-way, three quick answers in, is a script's already.
 	user := w.user()
-	s, err := w.g.StartTopic(t.Context(), user, "")
+	s, err := w.g.StartTopic(t.Context(), user, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}

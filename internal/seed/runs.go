@@ -174,9 +174,9 @@ func (w *world) dayRun(p *player) error {
 	return nil
 }
 
-// topicRun is a game of a topic (all of them, now and then), maybe left half-way; it says the run.
+// topicRun is a game of a topic („Микс“ now and then), maybe left half-way; it says the run.
 func (w *world) topicRun(p *player) (play.State, error) {
-	topic := ""
+	topic := play.MixTopic
 	if cats := w.b.Categories; len(cats) > 0 && w.chance(0.8) {
 		topic = cats[w.r.IntN(len(cats))].ID
 	}
@@ -196,23 +196,6 @@ func (w *world) topicRun(p *player) (play.State, error) {
 		return s, fmt.Errorf("topic %q: %w", topic, err)
 	}
 	return s, nil
-}
-
-// mistakesRun is a second chance, when enough mistakes wait for one.
-func (w *world) mistakesRun(p *player) error {
-	n, err := w.g.Mistakes(w.ctx, p.id)
-	if err != nil || n < play.MistakesFrom {
-		return err
-	}
-	s, err := w.g.StartMistakes(w.as(p), p.id)
-	if errors.Is(err, play.ErrNoMistakes) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("mistakes: %w", err)
-	}
-	_, err = w.playRun(p, s, -1)
-	return err
 }
 
 // liveDuel is a live duel between two players here now, or against a recording (b nil), played as internal/live

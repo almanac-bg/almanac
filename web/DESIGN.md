@@ -46,18 +46,18 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   (`game/gold.ts`: „Още десет“, to where an open goal of a topic points, or a topic, a new one each day),
   „Прегледай въпросите“ beside it (a game is gone over on its own day only, `play.Review`); just played, the goals
   still open (`.open-goals`, no card); then tomorrow in one quiet card
-  (`.tomorrow`: when the next ten come, what they make of the streak, and the reminder's ask); a line each for where
-  the day leaves the league („Лига Странджа: 2-ро място от 12 · зона за качване“) and for the questions got wrong that
-  will wait in Втори шанс; before the friends' day and the game's news. **A later visit** finds the day played, and its
+  (`.tomorrow`: when the next ten come, what they make of the streak, and the reminder's ask); a line for where
+  the day leaves the league („Лига Странджа: 2-ро място от 12 · зона за качване“); before the friends' day and the
+  game's news. **A later visit** finds the day played, and its
   moment over: one short card (`.day-done`: the issue line and the place, the score a size down with its points, one
   line of how it went among everyone, the pips), „Още десет“ gold under it, „Прегледай въпросите“ (its own page,
-  `/games/<id>`) plain; tomorrow, the league's line and
-  Втори шанс's; the friends' day after the ways to play (beside the day on a big screen). A result never on screen
+  `/games/<id>`) plain; tomorrow, the league's line; the friends' day after the ways to play (beside the day on a big screen). A result never on screen
   (the last question let run out) is the full one, once, with what it earned. Then the day's goals; the ways to play
   with others, three in a row (the picture over
-  the name on a phone); the topics, two by two (five to a row on a big screen, the picture over the name, each tile
-  as tall as what's in it), with „Втори шанс“ across the row before them while questions wait (on a big screen in one
-  row after the topics with „България“, short tiles side by side). A day gone by isn't played again, nor its
+  the name on a phone); the topics, two by two, „Микс“ (every topic at once) and „България“ first
+  (`.topic-lead`, each with what it is under its name; „Микс“ across the row alone while „България“ is closed); on a
+  big screen those two a row of their own, short tiles side by side, then the topics five to a row, the picture over
+  the name, each tile as tall as what's in it. A day gone by isn't played again, nor its
   questions gone over: the day is today's (owner, 19 Nov 2026). The streak's chip shows only a streak (or reserve
   days); none at all rather than „0 дни поред“, the level's chip taking the row. A streak that ended is said once,
   over the day („Серията ти от 5 дни прекъсна. Днес започва нова.“): it isn't won back. A player back after days away
@@ -113,8 +113,7 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   from the button beside the name, its icon and its word at every width (an icon alone is read by few). The switch names the place, so Награди, Гардероб and Алманах have no heading of
   their own on the screen (it's there for screen readers).
   **Моят Алманах** reads as one list, in the order the facts were learned, the first first: the count in the numeral face („42 факта досега“, or a
-  topic's „7 от 24 факта в „История““), what they are in a line, and the questions waiting for a second chance as one
-  plain link („17 въпроса чакат втори шанс“: Начало has its tile too); the topics as a quiet row of chips (names
+  topic's „7 от 24 факта в „История““), and what they are in a line; the topics as a quiet row of chips (names
   only) to read one by; then the facts as entries between hairlines, not cards (no datelines): the
   topic, the question in a small line, what was learned as the headline (the answer; a statement to judge is its
   own headline, „Невярно:“ before one that isn't so), and the fact. It comes a page at a time.
@@ -302,9 +301,9 @@ media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds th
   `profileNav()`), `.me-settings` (Настройки: an icon and its word, the word under the icon on a narrow phone) and `.more` (a `details` that
   folds what's rarely needed; what it holds is spaced as a section's parts).
 - **Начало:** `.status` with `.streak-chip` and `.level-chip`; `.card.hero.day` opening with `.masthead`
-  (`.masthead-line`, `.masthead-date`) over `.day-title`; `.modes .mode` and `.topics .topic` (`.topic-all` across
-  the row).
-- **Моят Алманах:** `.almanac-head` (`.almanac-count` with `.almanac-n`, and `.second-chance`), `.almanac-topics`,
+  (`.masthead-line`, `.masthead-date`) over `.day-title`; `.modes .mode` and `.topics .topic` (`.topic-lead` for
+  „Микс“ and „България“, `.topic-all` across the row).
+- **Моят Алманах:** `.almanac-head` (`.almanac-count` with `.almanac-n`), `.almanac-topics`,
   `.almanac-list`, each `.almanac-item` (`.almanac-topic`, `.almanac-q`,
   `.almanac-a`, `.almanac-untrue`, `.almanac-fact`).
 - **Page openers** lead with the thing, not its rules: Роял's next evening is its start in big numerals
@@ -380,7 +379,7 @@ media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds th
     (what's worn), `.picker`/`.pick` and `.tone-pick` for choosing a look.
   - `.place-link` (a line in Профил a tap from a place: the league's group, `.league-link` too; the Алманах).
 - **Results:** `.summary`, `.board`/`.row` (with `p1`–`p3`, `me`, `gap` and `moves`), `.topics`/`.topic`,
-  `.players` and `.settings`. Every result screen (the day, a topic, Втори шанс, a duel, a room) is laid out the same:
+  `.players` and `.settings`. Every result screen (the day, a topic, a duel, a room) is laid out the same:
   the result; right under it what to do next (`nextSteps`): the one gold `big` button (the day's by `game/gold.ts`; a topic's „Още
   десет“, at once without a count, with „Друга тема“, three topics as chips, under the buttons; „Още един дуел“, „Нова
   игра“), then the others as plain buttons of one size, side by side where they fit

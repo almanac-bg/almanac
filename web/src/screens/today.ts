@@ -5,7 +5,7 @@
 // („Брой 6“, play/issue.go) (left half-way, where the player stopped and the
 // way on, and the streak at stake while they wait; once played, as it lands, how they went and the one gold thing to
 // do next (game/gold.ts: another game, where a goal points), the goals
-// still open, tomorrow, and where the day leaves the league and the second chance; on a later visit, the day played in
+// still open, tomorrow, and where the day leaves the league; on a later visit, the day played in
 // one short card, another game the gold thing to do); the day's goals; and every other way to play a tap away: by
 // topic, and — once a first game is finished — with others. The day's boards are in Класации. The game unfolds by the
 // days played (play/unfold.go): a first day has the streak without the level, and no goals.
@@ -92,9 +92,6 @@ export interface Today {
   /** A game that ended without its result on screen (the day's last question let run out, a game left at its end):
    * its news, told here once (play/told.go). */
   untold?: number;
-  /** The day played: how many of its questions got wrong will wait for a second chance, in how many days (sent when
-   * there'll be a game of them: play.MistakesFrom). */
-  misses?: { n: number; days: number };
   /** Back after days away, the streak ended since (play.BackFrom): the last day played and the longest streak, said
    * once. */
   back?: { last: string; best: number };
@@ -280,7 +277,6 @@ export function today() {
               dayDone(t, run, next),
               tomorrow,
               () => (fresh().open?.league ? leagueNote() : null),
-              () => missesLine(fresh().misses),
             ]
           : run?.done
             ? summary(
@@ -299,14 +295,13 @@ export function today() {
                 // Right under it, what to do next: one gold action (game/gold.ts).
                 dayNext(next),
                 // The goals still open, just played (else they're in their card); tomorrow (when the next ten come,
-                // the streak, the reminder); where the day leaves the league, and what waits for a second chance; then
-                // the friends' day, and what the game earned (a day whose result was never on screen: told now, once).
-                // Just played, the streak waits for the day as it is now, with today in it.
+                // the streak, the reminder); where the day leaves the league; then the friends' day, and what the game
+                // earned (a day whose result was never on screen: told now, once). Just played, the streak waits for
+                // the day as it is now, with today in it.
                 [
                   just ? () => (fresh().open?.xp ? openGoals(goals) : null) : null,
                   tomorrow,
                   () => (fresh().open?.league ? leagueNote() : null),
-                  () => missesLine(fresh().misses),
                   () => friendsDay(fresh()),
                   just ? news(run.id, 0, streak ?? undefined) : untold(t, run.id),
                 ],
@@ -347,17 +342,6 @@ export function today() {
  * (`next`). */
 function dayNext(next: () => string): { main: Child } {
   return { main: () => h("a", { class: "btn primary big", href: next() }, "Още десет") };
-}
-
-/** The day played: how many of its questions got wrong will wait for a second chance, and when, in a quiet line. */
-function missesLine(m: Today["misses"]): Child {
-  if (!m?.n) return null;
-  const when = `във Втори шанс след ${m.days} ${m.days === 1 ? "ден" : "дни"}`;
-  return h(
-    "p",
-    { class: "day-next" },
-    m.n === 1 ? `Един от днешните въпроси ще те чака ${when}.` : `${m.n} от днешните въпроси ще те чакат ${when}.`,
-  );
 }
 
 /** The day played among everyone (game/standing.ts): the way to the day's board, said by the place where it's worth

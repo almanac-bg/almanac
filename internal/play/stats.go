@@ -91,11 +91,10 @@ type Games struct {
 	Next  string   `json:"next,omitempty"`
 }
 
-// gameKinds are the games a list of them can be narrowed to: the day's ten, games of topics (a second chance is
-// one), and games with others.
+// gameKinds are the games a list of them can be narrowed to: the day's ten, games of topics, and games with others.
 var gameKinds = map[string]string{
 	"day":    `AND kind = 'day'`,
-	"topic":  `AND kind IN ('topic', 'mistakes')`,
+	"topic":  `AND kind = 'topic'`,
 	"others": `AND kind IN ('duel', 'royal', 'room')`,
 }
 

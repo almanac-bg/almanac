@@ -30,7 +30,7 @@ import (
 var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/$`),
 	regexp.MustCompile(`^/play/[a-z]+$`),
-	regexp.MustCompile(`^/(duel|royal|room|ranks|rewards|wardrobe|me|friends|settings|almanac|mistakes|games)$`),
+	regexp.MustCompile(`^/(duel|royal|room|ranks|rewards|wardrobe|me|friends|settings|almanac|games)$`),
 	regexp.MustCompile(`^/duel/([0-9]{1,12}|live)$`),
 	regexp.MustCompile(`^/r/[0-9]{6}$`),
 	regexp.MustCompile(`^/games/[0-9]{1,12}$`),

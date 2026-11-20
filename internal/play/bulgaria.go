@@ -8,8 +8,8 @@ import "github.com/almanac-bg/almanac/internal/bank"
 // (runs.category = BulgariaTopic), with two differences:
 //
 //   - it has no mastery of its own: each of its questions counts toward its own topic's (mastery.go reads a question's
-//     topic from the bank), and its games are shaped by how well the player knows all the topics, as a game of all of
-//     them is; a mastery of it would count every Bulgarian answer twice, and a title for it would be a second title
+//     topic from the bank), and its games are shaped by how well the player knows all the topics, as „Микс“'s are
+//     (MixTopic); a mastery of it would count every Bulgarian answer twice, and a title for it would be a second title
 //     for the same answers;
 //   - it is open only while the bank has a game's worth of Bulgarian questions that no day holds (BulgariaOpen): the
 //     days take at least BGFloor each, so it opens once the bank has more than the days ahead spend.
@@ -17,19 +17,22 @@ import "github.com/almanac-bg/almanac/internal/bank"
 // BulgariaTopic is the topic of Bulgaria's questions from every topic.
 const BulgariaTopic = "bulgaria"
 
-// topicPool is what a topic's games draw from: the topic's live questions ("" for every topic), and for BulgariaTopic
-// the live questions about Bulgaria from every topic.
+// topicPool is what a topic's games draw from: the topic's live questions, every topic's for MixTopic, and for
+// BulgariaTopic the live questions about Bulgaria from every topic.
 func topicPool(b *bank.Bank, topic string) []bank.Question {
-	if topic != BulgariaTopic {
-		return b.Live(topic, "")
-	}
-	var out []bank.Question
-	for _, q := range b.Live("", "") {
-		if q.Extra().BG {
-			out = append(out, q)
+	switch topic {
+	case MixTopic:
+		return b.Live("", "")
+	case BulgariaTopic:
+		var out []bank.Question
+		for _, q := range b.Live("", "") {
+			if q.Extra().BG {
+				out = append(out, q)
+			}
 		}
+		return out
 	}
-	return out
+	return b.Live(topic, "")
 }
 
 // bulgariaLeft is how many live questions about Bulgaria no day holds (barred: the days', nil for none).

@@ -554,6 +554,40 @@ func TestNoChallenges(t *testing.T) {
 	db.Close()
 }
 
+// No second chance (0078): its games stay the players', as games of „Микс“, and so do the games of every topic kept
+// without a topic; a goal of it still to do is drawn again with its day's, one done stays done and isn't told.
+func TestNoSecondChance(t *testing.T) {
+	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0078_no_second_chance.sql")
+	for _, q := range []string{
+		`INSERT INTO users (id, name, tag, created_at, seen_at) VALUES (1, 'Ана', 'ana', 1, 1), (2, 'Бо', 'bo', 1, 1)`,
+		`INSERT INTO runs (id, user_id, kind, category, questions, started_at, finished_at, xp) VALUES
+			(10, 1, 'mistakes', NULL, '[]', 1, 2, 40), (11, 1, 'topic', '', '[]', 1, 2, 0), (12, 1, 'topic', NULL, '[]', 1, 2, 0),
+			(13, 1, 'topic', 'history', '[]', 1, 2, 0), (14, 1, 'room', '', '[]', 1, 2, 0), (15, 1, 'day', NULL, '[]', 1, 2, 0)`,
+		`INSERT INTO day_goals (user_id, day, n, goal) VALUES (1, '2026-11-20', 0, 'day'), (1, '2026-11-20', 1, 'mended3'),
+			(1, '2026-11-20', 2, 'eight'), (2, '2026-11-20', 0, 'day'), (2, '2026-11-20', 1, 'mended3'), (2, '2026-11-20', 2, 'eight')`,
+		`INSERT INTO goals_done (user_id, day, goal, at, xp, seen) VALUES (1, '2026-11-20', 'day', 1, 50, 0),
+			(2, '2026-11-20', 'mended3', 1, 100, 0)`,
+	} {
+		if _, err := db.Write.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	if err := db.migrateTo(migrationsThrough("0078_no_second_chance.sql")); err != nil {
+		t.Fatal(err)
+	}
+	var runs, goals, done string
+	_ = db.Read.QueryRow(`SELECT group_concat(id || kind || coalesce(category, '-') || xp, ' ')
+		FROM (SELECT * FROM runs ORDER BY id)`).Scan(&runs)
+	_ = db.Read.QueryRow(`SELECT group_concat(user_id || goal, ' ') FROM (SELECT * FROM day_goals ORDER BY user_id, n)`).Scan(&goals)
+	_ = db.Read.QueryRow(`SELECT group_concat(user_id || goal || seen, ' ')
+		FROM (SELECT * FROM goals_done ORDER BY user_id)`).Scan(&done)
+	if runs != "10topicmix40 11topicmix0 12topicmix0 13topichistory0 14room0 15day-0" ||
+		goals != "2day 2mended3 2eight" || done != "1day0 2mended31" {
+		t.Fatalf("runs %q, goals %q, done %q", runs, goals, done)
+	}
+	db.Close()
+}
+
 // openBefore opens a database migrated up to (not with) the named migration.
 func openBefore(t *testing.T, path, name string) *DB {
 	t.Helper()

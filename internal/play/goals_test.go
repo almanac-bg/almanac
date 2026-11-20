@@ -37,10 +37,9 @@ func TestGoalDraws(t *testing.T) {
 	w := setup(t)
 	seen := map[string]bool{}
 	for seed := range uint64(3000) {
-		mistakes := seed%2 == 0
-		yesterday := drawGoals(seed+1_000_000, w.b, true, nil)
-		ids := drawGoals(seed, w.b, mistakes, yesterday)
-		if len(ids) != GoalsPerDay || ids[0] != "day" || !slices.Equal(ids, drawGoals(seed, w.b, mistakes, yesterday)) {
+		yesterday := drawGoals(seed+1_000_000, w.b, nil)
+		ids := drawGoals(seed, w.b, yesterday)
+		if len(ids) != GoalsPerDay || ids[0] != "day" || !slices.Equal(ids, drawGoals(seed, w.b, yesterday)) {
 			t.Fatalf("seed %d: %v", seed, ids)
 		}
 		_, before, _, _ := goalOf(w.b, yesterday[1])
@@ -52,8 +51,6 @@ func TestGoalDraws(t *testing.T) {
 				t.Fatalf("seed %d: goal %q is %+v (tier %d)", seed, id, goal, k.tier)
 			case families[k.family] || (k.tier == 1 && k.family == before.family):
 				t.Fatalf("seed %d: %v after %v, a family twice", seed, ids, yesterday)
-			case k.mistakes && !mistakes:
-				t.Fatalf("seed %d: %q with no game of Втори шанс waiting", seed, id)
 			case k.retired:
 				t.Fatalf("seed %d: %q is retired", seed, id)
 			}
@@ -167,7 +164,7 @@ func TestGoalMeasures(t *testing.T) {
 	if g := w.goalsOf(vi); g["row5"].Progress != 4 || g["topics3"].Progress != 1 {
 		t.Fatalf("a row of four: %+v", g)
 	}
-	s, _ = w.g.StartTopic(ctx, vi, "") // all topics: no topic of its own
+	s, _ = w.g.StartTopic(ctx, vi, MixTopic) // „Микс“: no topic of its own
 	w.play(vi, s.ID, append([]func(int64, int) json.RawMessage{w.right, w.wrong}, repeat(w.right, Length-2)...)...)
 	if g := w.goalsOf(vi); !g["row5"].Done || g["topics3"].Progress != 1 {
 		t.Fatalf("a row of eight: %+v", g)
@@ -237,27 +234,19 @@ func TestGoalDuelWonAgainstARecording(t *testing.T) {
 	}
 }
 
-// Three questions fixed in Втори шанс: right answers there, and only there. A topic's game of eight right or more is
-// the game played well.
-func TestGoalSecondChance(t *testing.T) {
+// A game played well is eight right of ten or more, a topic's too; seven isn't.
+func TestGoalPlayedWell(t *testing.T) {
 	w := setup(t)
-	ctx := t.Context()
 	ana := w.user()
-	s, _ := w.g.StartTopic(ctx, ana, "general")
-	w.play(ana, s.ID, repeat(w.wrong, Length)...)
-	w.wait(MistakesAfter)
-	w.setGoals(ana, "day", "mended3", "eight")
-	s, _ = w.g.StartTopic(ctx, ana, "history")
+	w.setGoals(ana, "day", "topic:history", "eight")
+	s, _ := w.g.StartTopic(t.Context(), ana, "general")
+	w.play(ana, s.ID, append(repeat(w.right, 7), repeat(w.wrong, 3)...)...)
+	if g := w.goalsOf(ana); g["eight"].Done || g["topic:history"].Done {
+		t.Fatalf("after seven right in another topic: %+v", g)
+	}
+	s, _ = w.g.StartTopic(t.Context(), ana, "history")
 	w.play(ana, s.ID, append(repeat(w.right, 8), w.wrong, w.wrong)...)
-	if g := w.goalsOf(ana); g["mended3"].Progress != 0 || !g["eight"].Done || g["mended3"].Href != "/mistakes" {
-		t.Fatalf("after a topic's game: %+v", g)
-	}
-	m, err := w.g.StartMistakes(ctx, ana)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(ana, m.ID, w.right, w.wrong, w.right, w.right)
-	if g := w.goalsOf(ana); g["mended3"].Progress != 3 || !g["mended3"].Done {
-		t.Fatalf("three fixed: %+v", g["mended3"])
+	if g := w.goalsOf(ana); !g["eight"].Done || !g["topic:history"].Done {
+		t.Fatalf("after eight right in the topic: %+v", g)
 	}
 }

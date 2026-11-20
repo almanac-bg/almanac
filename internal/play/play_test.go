@@ -326,7 +326,7 @@ func TestOnThisDay(t *testing.T) {
 	}
 
 	// A topic's game, today: the question it deals is no day's.
-	topic, _ := w.g.StartTopic(ctx, u, "")
+	topic, _ := w.g.StartTopic(ctx, u, MixTopic)
 	q, _ := w.b.Get(w.picks(topic.ID)[0].ID)
 	date(q, "11-12")
 	if on, res := answer(topic.ID, 0); on || dayOf(res.Reveal) != "" {
@@ -366,7 +366,7 @@ func TestLevelUpNews(t *testing.T) {
 	w.played(bo, XPFromDay-1) // the level's told from the second day played (TestUnfolding)
 	var n News
 	for range 5 {
-		s, _ := w.g.StartTopic(ctx, bo, "")
+		s, _ := w.g.StartTopic(ctx, bo, MixTopic)
 		w.play(bo, s.ID, repeat(w.right, Length)...)
 		var err error
 		if n, err = w.g.NewsOf(ctx, bo, 0); err != nil {
@@ -403,7 +403,7 @@ func TestLevelNewOnlyByTheGame(t *testing.T) {
 		VALUES (?, '2026-11-02', 0, 1, 5, 900, 1, ?, 0)`, bo, pay); err != nil {
 		t.Fatal(err)
 	}
-	s, _ := w.g.StartTopic(ctx, bo, "")
+	s, _ := w.g.StartTopic(ctx, bo, MixTopic)
 	w.play(bo, s.ID, repeat(w.wrong, Length)...)
 	n, err = w.g.NewsOf(ctx, bo, s.ID)
 	var game int
@@ -932,9 +932,9 @@ func TestTopics(t *testing.T) {
 	if fresh < min(unseen, Length) {
 		t.Fatalf("%d fresh questions of %d unseen", fresh, unseen)
 	}
-	all, err := w.g.StartTopic(ctx, u, "")
-	if err != nil || all.Total != Length {
-		t.Fatalf("all topics: %+v %v", all, err)
+	mix, err := w.g.StartTopic(ctx, u, MixTopic)
+	if err != nil || mix.Total != Length {
+		t.Fatalf("„Микс“: %+v %v", mix, err)
 	}
 }
 
@@ -957,24 +957,24 @@ func TestTopicLeftHalfWay(t *testing.T) {
 	if m := back.Trail[3]; m.Right || m.Points != 0 {
 		t.Fatalf("the question left showing: %+v", m)
 	}
-	// Another topic is a run of its own, and so is all of them.
+	// Another topic is a run of its own, and so is „Микс“.
 	if other, _ := w.g.StartTopic(ctx, u, "science"); other.ID == first.ID {
 		t.Fatal("another topic went on with history's run")
 	}
-	all, _ := w.g.StartTopic(ctx, u, "")
-	if all.ID == first.ID {
-		t.Fatal("all the topics went on with history's run")
+	mix, _ := w.g.StartTopic(ctx, u, MixTopic)
+	if mix.ID == first.ID {
+		t.Fatal("„Микс“ went on with history's run")
 	}
 	// The games left, to come back to: each topic's latest, the latest first; one with its question showing is open.
-	if _, err := w.g.Show(ctx, u, all.ID); err != nil {
+	if _, err := w.g.Show(ctx, u, mix.ID); err != nil {
 		t.Fatal(err)
 	}
 	left, err := w.g.Left(ctx, u)
 	if err != nil || len(left) != 3 {
 		t.Fatalf("left: %+v %v", left, err)
 	}
-	if l := left[0]; l.ID != all.ID || l.Category != "" || l.At != 0 || l.Total != Length || !l.Open {
-		t.Errorf("all the topics, left: %+v", l)
+	if l := left[0]; l.ID != mix.ID || l.Category != MixTopic || l.At != 0 || l.Total != Length || !l.Open {
+		t.Errorf("„Микс“, left: %+v", l)
 	}
 	if l := left[2]; l.ID != first.ID || l.Category != "history" || l.At != 4 || l.Open {
 		t.Errorf("history, left: %+v", l)
@@ -1737,7 +1737,7 @@ func TestWardrobe(t *testing.T) {
 	}
 	// Two perfect runs make level 2: the ring is hers, and it shows wherever she does.
 	for range 2 {
-		s, _ := w.g.StartTopic(ctx, ana, "")
+		s, _ := w.g.StartTopic(ctx, ana, MixTopic)
 		w.play(ana, s.ID, repeat(w.right, Length)...)
 	}
 	if err := w.g.SetLook(ctx, ana, nil, nil, ptr("ring"), ptr("")); err != nil {
@@ -2083,7 +2083,7 @@ func TestBoards(t *testing.T) {
 		right bool
 	}{{ana, true}, {bo, false}} {
 		for range KnowAll / Length {
-			s, err := w.g.StartTopic(ctx, p.id, "")
+			s, err := w.g.StartTopic(ctx, p.id, MixTopic)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2120,7 +2120,7 @@ func TestKnowledgeCounted(t *testing.T) {
 	w.pace = func(int) time.Duration { return 2 * time.Second } // a person's, and Bo's games well inside knowFresh
 	games := func(id int64, answer func(int64, int) json.RawMessage) {
 		for range KnowAll / Length {
-			s, err := w.g.StartTopic(ctx, id, "")
+			s, err := w.g.StartTopic(ctx, id, MixTopic)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2452,72 +2452,4 @@ func mustJSON(t *testing.T, v any) []byte {
 		t.Fatal(err)
 	}
 	return b
-}
-
-func TestMistakes(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana := w.user()
-	// Ten wrong in a topic, then nothing waits until three days have passed.
-	s, _ := w.g.StartTopic(ctx, ana, "general")
-	missed := w.picks(s.ID)
-	w.play(ana, s.ID, repeat(w.wrong, Length)...)
-	if n, _ := w.g.Mistakes(ctx, ana); n != 0 {
-		t.Fatalf("%d waiting at once", n)
-	}
-	if _, err := w.g.StartMistakes(ctx, ana); !errors.Is(err, ErrNoMistakes) {
-		t.Fatalf("a second chance at once: %v", err)
-	}
-	w.wait(MistakesAfter)
-	if n, _ := w.g.Mistakes(ctx, ana); n != Length {
-		t.Fatalf("%d waiting after three days", n)
-	}
-	m, err := w.g.StartMistakes(ctx, ana)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if m.Kind != "mistakes" || m.Total != Length {
-		t.Fatalf("the run: %+v", m)
-	}
-	for i, p := range w.picks(m.ID) {
-		if p.ID != missed[i].ID {
-			t.Fatalf("question %d is %s, not the one missed first (%s)", i, p.ID, missed[i].ID)
-		}
-	}
-	// Right on the first, and its fact is learned; wrong on the rest, which wait three days again.
-	w.show(ana, m.ID)
-	res, err := w.g.Answer(ctx, ana, m.ID, 0, w.right(m.ID, 0))
-	if err != nil {
-		t.Fatal(err)
-	}
-	q, _ := w.b.Get(missed[0].ID)
-	if res.Learned != (q.Extra().Fact != "") {
-		t.Errorf("learned = %v for a question with fact %q", res.Learned, q.Extra().Fact)
-	}
-	// Left after it and come back to: the same second chance, from the second question.
-	if again, err := w.g.StartMistakes(ctx, ana); err != nil || again.ID != m.ID || again.At != 1 {
-		t.Fatalf("back to the second chance: %+v %v", again, err)
-	}
-	if left, _ := w.g.Left(ctx, ana); len(left) != 1 || left[0].ID != m.ID || left[0].Kind != "mistakes" || left[0].At != 1 {
-		t.Fatalf("left: %+v", left)
-	}
-	for n := 1; n < Length; n++ {
-		w.show(ana, m.ID)
-		if _, err := w.g.Answer(ctx, ana, m.ID, n, w.wrong(m.ID, n)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if n, _ := w.g.Mistakes(ctx, ana); n != 0 {
-		t.Fatalf("%d waiting right after a second chance", n)
-	}
-	w.wait(MistakesAfter)
-	if n, _ := w.g.Mistakes(ctx, ana); n != Length-1 {
-		t.Fatalf("%d waiting again, want the %d still wrong", n, Length-1)
-	}
-	// A right answer in a topic run is never a second chance's „learned“.
-	s, _ = w.g.StartTopic(ctx, ana, "general")
-	w.show(ana, s.ID)
-	if res, _ := w.g.Answer(ctx, ana, s.ID, 0, w.right(s.ID, 0)); res.Learned {
-		t.Error("learned in a topic run")
-	}
 }

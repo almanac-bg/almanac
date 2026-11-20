@@ -17,7 +17,7 @@ func TestProfileShowsNoGameUnderWay(t *testing.T) {
 	if _, err := w.db.Write.Exec(`UPDATE users SET created_at = ? WHERE id = ?`, joined.UnixMilli(), ana); err != nil {
 		t.Fatal(err)
 	}
-	s, err := w.g.StartTopic(ctx, ana, "")
+	s, err := w.g.StartTopic(ctx, ana, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestProfileShowsNoGameUnderWay(t *testing.T) {
 
 	// A second game, one answer in: nobody else sees it.
 	w.wait(time.Minute)
-	s, err = w.g.StartTopic(ctx, ana, "")
+	s, err = w.g.StartTopic(ctx, ana, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestRecordingsNamed(t *testing.T) {
 		owner); err != nil {
 		t.Fatal(err)
 	}
-	s, err := w.g.StartTopic(ctx, owner, "")
+	s, err := w.g.StartTopic(ctx, owner, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestRecordingsHonourBlocks(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	owner, gal := w.user(), w.user()
-	s, err := w.g.StartTopic(ctx, owner, "")
+	s, err := w.g.StartTopic(ctx, owner, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}

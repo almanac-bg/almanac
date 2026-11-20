@@ -34,9 +34,8 @@ var freshFor = map[string]string{
 	"DealRoyal":     "Роял",
 	"drawRoyal":     "Роял",
 	// By design:
-	"StartDay":      "by design: the day's ten are the same for everyone",
-	"drawDay":       "by design: the day's ten are the same for everyone",
-	"StartMistakes": "by design: Втори шанс asks again what the player missed",
+	"StartDay": "by design: the day's ten are the same for everyone",
+	"drawDay":  "by design: the day's ten are the same for everyone",
 }
 
 // TestNothingPlayedAgain holds the rule across every way a game starts: a player who has just played a game, starting
@@ -44,8 +43,8 @@ var freshFor = map[string]string{
 // duels, rooms and Роял are drawn for all their players: none of them has seen a question dealt while some are left
 // that none has. A recording is a whole game, someone else's: one with at most RecordingSeen of its questions seen
 // while there's such a game. The player has played most of the bank before (all but three topics), so that a draw
-// that didn't prefer what they haven't seen would deal it again almost surely. Repeats by design (freshFor) are the
-// day (the same for everyone) and Втори шанс (what they missed).
+// that didn't prefer what they haven't seen would deal it again almost surely. The repeat by design (freshFor) is the
+// day (the same for everyone).
 func TestNothingPlayedAgain(t *testing.T) {
 	t.Run("every way is here", func(t *testing.T) {
 		ways := choosers(t)
@@ -72,7 +71,7 @@ func TestNothingPlayedAgain(t *testing.T) {
 			f.w.play(f.ana, s.ID, repeat(f.w.right, Length)...)
 		}},
 		{"a topic", func(f *fresh) {
-			s, err := f.w.g.StartTopic(f.ctx(), f.ana, "")
+			s, err := f.w.g.StartTopic(f.ctx(), f.ana, MixTopic)
 			f.must(err)
 			f.w.play(f.ana, s.ID, repeat(f.w.right, Length)...)
 		}},
@@ -117,11 +116,6 @@ func TestNothingPlayedAgain(t *testing.T) {
 			_, err := f.w.g.SettleRoyal(f.ctx(), id)
 			f.must(err)
 		}},
-		{"Втори шанс", func(f *fresh) {
-			s, err := f.w.g.StartMistakes(f.ctx(), f.ana)
-			f.must(err)
-			f.w.play(f.ana, s.ID, repeat(f.w.right, len(f.w.picks(s.ID)))...)
-		}},
 	}
 
 	// The games held to the rule: what each deals the player, of which questions (pool), drawn for whom (players).
@@ -132,7 +126,7 @@ func TestNothingPlayedAgain(t *testing.T) {
 	}
 	nexts := []next{
 		{"a topic", func(f *fresh) ([]Pick, func(bank.Question) bool, []int64) {
-			s, err := f.w.g.StartTopic(f.ctx(), f.ana, "")
+			s, err := f.w.g.StartTopic(f.ctx(), f.ana, MixTopic)
 			f.must(err)
 			return f.w.picks(s.ID), anyQuestion, []int64{f.ana}
 		}},
@@ -218,8 +212,8 @@ var freshTopics = []string{"geography", "history", "science"}
 
 func anyQuestion(bank.Question) bool { return true }
 
-// fresh is a world for TestNothingPlayedAgain, the day after the first issue (neither Ана nor Бо played it): Ана, who has played every question but those of freshTopics (some wrong, days ago: a Втори шанс
-// waits), and her friend Бо; two others' games of one topic each, in two of freshTopics, to play against as
+// fresh is a world for TestNothingPlayedAgain, the day after the first issue (neither Ана nor Бо played it): Ана, who
+// has played every question but those of freshTopics (some wrong, days ago), and her friend Бо; two others' games of one topic each, in two of freshTopics, to play against as
 // recordings.
 type fresh struct {
 	t       *testing.T

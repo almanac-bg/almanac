@@ -477,7 +477,7 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		(SELECT count(*) FROM `+duelResults+` WHERE outcome = 'won'),
 		(SELECT count(*) FROM friends WHERE user_id = ?1),
 		(SELECT count(DISTINCT category) FROM runs WHERE user_id = ?1 AND kind = 'topic' AND finished_at IS NOT NULL
-			AND category NOT IN ('', ?4)),
+			AND category NOT IN ('`+MixTopic+`', ?4)),
 		(SELECT count(*) FROM (SELECT DISTINCT CASE
 				WHEN json_type(a.given, '$.pick') IS NOT NULL THEN 'choice'
 				WHEN json_type(a.given, '$.value') IS NOT NULL THEN 'number'
@@ -496,7 +496,7 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'day' AND finished_at IS NOT NULL
 			AND `+bulgarianHour("finished_at")+` < 7),
 		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'topic' AND finished_at IS NOT NULL
-			AND rights = json_array_length(questions)),
+			AND rights = `+strconv.Itoa(Length)+` AND json_array_length(questions) = `+strconv.Itoa(Length)+`),
 		(SELECT count(*) FROM (SELECT day FROM goals_done WHERE user_id = ?1 GROUP BY day HAVING count(*) >= ?2)),
 		EXISTS (SELECT 1 FROM royal_players p WHERE p.user_id = ?1 AND p.place = 1
 			AND (SELECT count(*) FROM royal_players o WHERE o.royal_id = p.royal_id) > 1),

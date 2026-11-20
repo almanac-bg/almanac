@@ -74,7 +74,7 @@ func TestUnfolding(t *testing.T) {
 		t.Fatal(err)
 	}
 	for range 2 {
-		ts, _ := w.g.StartTopic(ctx, ana, "")
+		ts, _ := w.g.StartTopic(ctx, ana, MixTopic)
 		w.play(ana, ts.ID, repeat(w.right, Length)...)
 	}
 	n, _ = w.g.NewsOf(ctx, ana, 0)
@@ -103,7 +103,7 @@ func TestUnfolding(t *testing.T) {
 
 	// Day 3: the league.
 	w.wait(24 * time.Hour)
-	ts, _ := w.g.StartTopic(ctx, ana, "")
+	ts, _ := w.g.StartTopic(ctx, ana, MixTopic)
 	w.play(ana, ts.ID, repeat(w.right, Length)...)
 	if n, _ = w.g.NewsOf(ctx, ana, ts.ID); !slices.Equal(n.Opened, []string{"league"}) || !n.Open.League || n.Open.Rating {
 		t.Fatalf("the third day's news: %+v", n)

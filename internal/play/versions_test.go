@@ -226,7 +226,7 @@ func TestRecordingsAsPlayed(t *testing.T) {
 	ctx := t.Context()
 	w.reload(w.b)
 	ana, bo := w.user(), w.user()
-	s, err := w.g.StartTopic(ctx, ana, "")
+	s, err := w.g.StartTopic(ctx, ana, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func TestCountsStandOverAReload(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
-	s, _ := w.g.StartTopic(ctx, ana, "")
+	s, _ := w.g.StartTopic(ctx, ana, MixTopic)
 	w.play(ana, s.ID, repeat(w.right, Length)...)
 	if err := w.g.Count(ctx); err != nil {
 		t.Fatal(err)

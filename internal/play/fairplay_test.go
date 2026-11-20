@@ -72,7 +72,7 @@ func TestThrowawayGuestsBeforeAPlayer(t *testing.T) {
 	}
 
 	// The scout comes back and plays a topic: a player now, out of the shadow; the second guest alone is no pattern.
-	s, err := w.g.StartTopic(ctx, scout, "")
+	s, err := w.g.StartTopic(ctx, scout, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}

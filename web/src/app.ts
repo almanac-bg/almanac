@@ -14,7 +14,6 @@ import { prepareSound } from "./lib/sound.ts";
 import { duel, duelOne } from "./screens/duel.ts";
 import { handoff } from "./screens/keep.ts";
 import { missing } from "./screens/missing.ts";
-import { mistakes } from "./screens/mistakes.ts";
 import { topic } from "./screens/play.ts";
 import { rooms } from "./screens/rooms.ts";
 import { today } from "./screens/today.ts";
@@ -25,7 +24,7 @@ import { friendRequests, playing, watchWaiting } from "./state.ts";
  * from Начало; Профил holds what a player has: their rewards, their wardrobe, their almanac and their settings.
  */
 const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
-  ["/", "Начало", "home", (p) => /^\/($|play\/|mistakes|duel|royal|room|r\/)/.test(p)],
+  ["/", "Начало", "home", (p) => /^\/($|play\/|duel|royal|room|r\/)/.test(p)],
   ["/friends", "Приятели", "users", (p) => p === "/friends"],
   ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
   ["/me", "Профил", "user", (p) => /^\/(me|settings|rewards|wardrobe|almanac|games(\/[0-9]+)?)$/.test(p)],
@@ -90,7 +89,6 @@ if (root) {
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
       { path: /^\/royal$/, view: later(() => import("./screens/royal.ts").then((m) => m.royal)) },
       { path: /^\/almanac$/, view: later(() => import("./screens/almanac.ts").then((m) => m.almanac)) },
-      { path: /^\/mistakes$/, view: mistakes },
       { path: /^\/room$/, view: rooms },
       { path: /^\/ranks$/, view: later(() => import("./screens/ranks.ts").then((m) => m.ranks)) },
       { path: /^\/rewards$/, view: later(() => import("./screens/rewards.ts").then((m) => m.rewards)) },

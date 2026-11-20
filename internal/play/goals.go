@@ -15,11 +15,10 @@ import (
 )
 
 // Daily goals serve the day: every day a player has three, each done in one game at most — the day's questions; one
-// more game drawn for them (a topic's, three questions fixed in Втори шанс, or a duel); and a game played well, 8 of 10
-// right or more (the day's own ten count). They're kept once drawn (day_goals), so that they stay the day's whatever
-// changes. The game drawn is never of the family drawn the day before while another is left, and some are about
-// something drawn with them (a topic); Втори шанс only while enough questions wait for a game of them. None is about
-// how many or how fast (owner, 2026-11-18): those sent players into a quarter of an hour of other games, away from the
+// more game drawn for them (a topic's or a duel); and a game played well, 8 of 10 right or more (the day's own ten
+// count). They're kept once drawn (day_goals), so that they stay the day's whatever changes. The game drawn is never
+// of the family drawn the day before while another is left, and some are about something drawn with them (a topic).
+// None is about how many or how fast (owner, 2026-11-18): those sent players into a quarter of an hour of other games, away from the
 // day, and paid for speed, which XP never does (worth.go). What counts on a day is what was played on it, and the day's
 // questions count on their own day, all ten, though the last answers came after midnight (onDay): so a day run begun
 // at 23:58 finishes that day's goals, not the next's. A room's game counts only when someone else played it too: alone,
@@ -50,7 +49,6 @@ type goalKind struct {
 	tier       int
 	target     int
 	about      string // what it's drawn with: "topic", "type", or nothing
-	mistakes   bool   // drawn only while a game of Втори шанс waits (MistakesFrom)
 	retired    bool   // no longer drawn; kept so that a day it was drawn for still counts it
 	name, href string
 	reached    func(t *tally, arg string) int
@@ -62,8 +60,6 @@ var goalKinds = []goalKind{
 
 	{id: "topic", family: "topic", tier: 1, target: 1, about: "topic", name: "Изиграй игра по тема „{}“",
 		href: "/play/{}", reached: func(t *tally, c string) int { return t.topics[c] }},
-	{id: "mended3", family: "mistakes", tier: 1, target: 3, mistakes: true, name: "Поправи 3 въпроса във Втори шанс",
-		href: "/mistakes", reached: func(t *tally, _ string) int { return t.mended }},
 	{id: "duel", family: "duel", tier: 1, target: 1, name: "Изиграй дуел", href: "/duel",
 		reached: func(t *tally, _ string) int { return t.duels }},
 
@@ -177,9 +173,8 @@ func goalOf(b *bank.Bank, id string) (Goal, goalKind, string, bool) {
 }
 
 // drawGoals are a day's goals: the day's questions, then one of each tier after it, drawn by the seed. The two drawn
-// are of two families, neither drawn the day before (unless nothing else is left), and Втори шанс only while a game
-// of it waits (mistakes): each can be done that day.
-func drawGoals(seed uint64, b *bank.Bank, mistakes bool, yesterday []string) []string {
+// are of two families, neither drawn the day before (unless nothing else is left): each can be done that day.
+func drawGoals(seed uint64, b *bank.Bank, yesterday []string) []string {
 	r := rand.New(rand.NewPCG(seed, seed>>32|seed<<32))
 	before := map[string]bool{}
 	for _, id := range yesterday {
@@ -194,7 +189,7 @@ func drawGoals(seed uint64, b *bank.Bank, mistakes bool, yesterday []string) []s
 		for _, fresh := range []bool{true, false} {
 			for _, k := range goalKinds {
 				if k.tier == tier && !k.retired && !used[k.family] && (!fresh || !before[k.family]) &&
-					(mistakes || !k.mistakes) && (k.about == "" || len(k.args(b)) > 0) {
+					(k.about == "" || len(k.args(b)) > 0) {
 					drawn = append(drawn, k)
 				}
 			}
@@ -284,13 +279,9 @@ func (g *Game) dayGoals(ctx context.Context, userID int64, day string) ([]string
 	if err != nil {
 		return nil, err
 	}
-	waiting, err := g.Mistakes(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(strconv.FormatInt(userID, 10) + "/" + day))
-	drawn := drawGoals(h.Sum64(), g.Bank(), waiting >= MistakesFrom, before)
+	drawn := drawGoals(h.Sum64(), g.Bank(), before)
 	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.Exec(`DELETE FROM day_goals WHERE user_id = ? AND day < ?`, userID, yesterday); err != nil {
 			return err
@@ -384,8 +375,8 @@ func keptGoals(ctx context.Context, db *sql.DB, userID int64, day string) (map[s
 // tally is how far a player's day has got, by every measure a goal has.
 type tally struct {
 	day, duels, duelWins, royals, royalBest, perfect, eight int
-	right, fast, row, exact, mended                         int
-	topics                                                  map[string]int // topic games, by topic ("": all of them)
+	right, fast, row, exact                                 int
+	topics                                                  map[string]int // topic games, by topic
 	rightIn                                                 map[string]int // right answers, by topic
 	rightOf                                                 map[string]int // right answers, by type of question
 }
@@ -394,7 +385,7 @@ type tally struct {
 func (t *tally) distinctTopics() int {
 	n := 0
 	for c, games := range t.topics {
-		if c != "" && games > 0 {
+		if c != MixTopic && games > 0 {
 			n++
 		}
 	}
@@ -462,7 +453,7 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 	}
 	// The day's answers, game by game in their order (for a row): a game begun before midnight counts from it, but
 	// the day's questions are their own day's, all ten, though the last came after midnight.
-	rows, err = db.QueryContext(ctx, `SELECT a.run_id, r.kind, a.question_id, a.is_right, a.ms, coalesce(a.given, '')
+	rows, err = db.QueryContext(ctx, `SELECT a.run_id, a.question_id, a.is_right, a.ms, coalesce(a.given, '')
 		FROM answers a JOIN runs r ON r.id = a.run_id
 		WHERE r.user_id = ?1 AND r.started_at >= ?2 - 86400000 AND r.started_at < ?3 AND r.id <> ?5
 			AND `+together("r")+`
@@ -477,10 +468,10 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 	row := 0
 	for rows.Next() {
 		var id int64
-		var kind, question, given string
+		var question, given string
 		var right bool
 		var ms int64
-		if err := rows.Scan(&id, &kind, &question, &right, &ms, &given); err != nil {
+		if err := rows.Scan(&id, &question, &right, &ms, &given); err != nil {
 			return nil, err
 		}
 		if id != run {
@@ -493,9 +484,6 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 		row++
 		t.row = max(t.row, row)
 		t.right++
-		if kind == "mistakes" {
-			t.mended++
-		}
 		if ms < fastMs {
 			t.fast++
 		}

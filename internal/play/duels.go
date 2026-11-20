@@ -328,7 +328,7 @@ func (g *Game) drawFor(tx *sql.Tx, p past) ([]Pick, error) {
 	if err != nil {
 		return nil, err
 	}
-	picks := Draw(g.Bank(), "", p.ability, p.seen, barred, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+	picks := Draw(g.Bank(), MixTopic, p.ability, p.seen, barred, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 	if len(picks) == 0 {
 		return nil, ErrNoQuestion
 	}
@@ -372,7 +372,7 @@ func (g *Game) seenAmong(ctx context.Context, players []int64) (map[string]int, 
 type recorded struct {
 	id    int64
 	picks []Pick
-	// topic is the one topic the recorded game was in (a topic's game), "" for all of them (a duel's).
+	// topic is the one topic the recorded game was in (a topic's game), "" for all of them (a duel's, „Микс“).
 	topic string
 }
 
@@ -393,7 +393,7 @@ const (
 // against: a real game (RecordingRights right or more, RecordingMissed not answered at most), by a player whose rating
 // is within RecordingBand of the player's, the one with the fewest questions the player has seen (seen, read before
 // the write) or a day ahead holds (ahead.go: a game played before those days were drawn may have them), the latest
-// first. Short of such, the nearest it gets: any real game, then any game. At each of these, a game over all the topics (a duel's) comes before one in a
+// first. Short of such, the nearest it gets: any real game, then any game. At each of these, a game over all the topics (a duel's, „Микс“) comes before one in a
 // single topic, which the duel's player didn't choose. Above all of it, a game with more than RecordingSeen of its
 // questions seen by the player comes after every game with fewer: the same ten again (a duel the player has just
 // played, then the other's game in it as a recording) is no duel, however near the rating. Nil if there's none.
@@ -408,14 +408,14 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool) (*rec
 	}
 	// A script's game is left out before the limit, so that a script's many games can't push the people's out of it.
 	rows, err := tx.Query(`SELECT r.id, r.questions, r.rights, u.rating, r.finished_at,
-			CASE WHEN r.kind = 'topic' THEN coalesce(r.category, '') ELSE '' END,
+			CASE WHEN r.kind = 'topic' AND r.category <> ?3 THEN r.category ELSE '' END,
 			(SELECT count(*) FROM answers a WHERE a.run_id = r.id AND a.given IS NULL)
 		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind IN ('topic', 'duel') AND r.finished_at IS NOT NULL AND NOT r.shadow AND r.user_id <> ?1
 			AND json_array_length(r.questions) = ?2 AND NOT `+blockedBetween("r.user_id", "?1")+`
 			AND NOT EXISTS (SELECT 1 FROM duels d WHERE d.ended_at IS NULL
 				AND (d.a_run = r.id OR d.b_run = r.id))
-		ORDER BY r.finished_at DESC LIMIT 200`, userID, Length)
+		ORDER BY r.finished_at DESC LIMIT 200`, userID, Length, MixTopic)
 	if err != nil {
 		return nil, err
 	}

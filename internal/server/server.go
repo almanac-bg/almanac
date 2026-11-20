@@ -57,8 +57,6 @@ type Config struct {
 	MTASTSMode string
 	// Royal is when Роял's evenings are (royal.Evening when unset).
 	Royal royal.Schedule
-	// MistakesAfter is how long a missed question waits for its second chance (play.MistakesAfter when unset).
-	MistakesAfter time.Duration
 	// CrowdMin is how many answers a question needs before how players answered it shows (play.CrowdMin).
 	CrowdMin int
 	// Push sends notifications to browsers; nil: none.
@@ -177,7 +175,6 @@ func New(cfg Config, d Deps) (*Server, error) {
 	safe.Tell(s.problems.add)
 	s.game.RoyalNews = s.royalNews
 	s.game.LeagueNews = s.leagueNews
-	s.game.MistakesAfter = cfg.MistakesAfter
 	s.game.CrowdMin = cfg.CrowdMin
 	if cfg.Royal.Every == 0 && cfg.Royal.Hour == 0 {
 		cfg.Royal = royal.Evening
@@ -259,8 +256,6 @@ func (s *Server) routes() http.Handler {
 	api("GET /api/day", s.today)
 	api("POST /api/day", s.startDay)
 	api("POST /api/topic", s.startTopic)
-	api("GET /api/mistakes", s.mistakes)
-	api("POST /api/mistakes", s.startMistakes)
 	api("GET /api/runs/left", s.left)
 	api("GET /api/playing", s.playingNow)
 	api("GET /api/runs/{id}", s.runState)

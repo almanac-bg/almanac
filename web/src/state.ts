@@ -33,11 +33,13 @@ export const met = (open?: Open) => {
   if (open) opened.set(open);
 };
 export const categories: Category[] = boot.categories ?? [];
+/** „Микс“: the questions of every topic at once, a topic of its own (play.MixTopic). */
+export const mix: Category = { id: "mix", name: "Микс" };
 /** „България“: the questions about Bulgaria from every topic, a topic of its own (play/bulgaria.go). Its tile shows
  * while the bank has a game's worth of them (open); its games keep its name after. */
 export const bulgaria = { id: "bulgaria", name: "България", open: boot.bulgaria === true };
-/** Every topic a game can be of, the bank's and „България“: for naming a game's topic. */
-export const topics: Category[] = [...categories, bulgaria];
+/** Every topic a game can be of, the bank's, „Микс“ and „България“: for naming a game's topic. */
+export const topics: Category[] = [...categories, mix, bulgaria];
 /** The key browsers subscribe to notifications with ("": none here). */
 export const pushKey = boot.push ?? "";
 /** The platforms the game's app gets notifications on ("ios", "android"). */

@@ -38,8 +38,6 @@ func TestReadsNeverNest(t *testing.T) {
 		"BoardOf":        func(ctx context.Context) error { _, err := w.g.BoardOf(ctx, w.g.Today(), ana); return err },
 		"FriendsBoard":   func(ctx context.Context) error { _, err := w.g.FriendsBoard(ctx, w.g.Today(), bo); return err },
 		"KnowledgeBoard": func(ctx context.Context) error { _, err := w.g.KnowledgeBoard(ctx, ana, false, ""); return err },
-		"Misses":         func(ctx context.Context) error { _, _, err := w.g.Misses(ctx, ana, day.ID); return err },
-		"Mistakes":       func(ctx context.Context) error { _, err := w.g.Mistakes(ctx, ana); return err },
 		"MasteryMoves":   func(ctx context.Context) error { _, err := w.g.MasteryMoves(ctx, bo, topic.ID); return err },
 		"StreakOf":       func(ctx context.Context) error { _, err := w.g.StreakOf(ctx, ana); return err },
 		"DuelsOf":        func(ctx context.Context) error { _, err := w.g.DuelsOf(ctx, ana); return err },
