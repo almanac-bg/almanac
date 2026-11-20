@@ -15,7 +15,7 @@ import { append, type Child, computed, effect, h, listen, onCleanup, type Signal
 import { calm, tickOn } from "../lib/prefs.ts";
 import { beforeLeaving, hold, release } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
-import { withName } from "../lib/words.ts";
+import { withWord } from "../lib/words.ts";
 import { categories, playingWhile } from "../state.ts";
 import { countUp, fact, factFace, failure, inRowChip, reachable, type VerdictKind, verdict } from "../ui.ts";
 import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
@@ -109,7 +109,7 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
   // Where the run stands: its end, a question waiting for its pictures, a question showing, or between questions
   // (the next one opens at once). A question and the end open at the top of the page, not where the answer before
   // them (its fact, „Напред“) was scrolled to.
-  const versus = opponent ? `Дуел ${withName(opponent)}` : "";
+  const versus = opponent ? `Дуел ${withWord(opponent)}` : "";
   const at = (s: State) => {
     if (gone) return;
     last = s;

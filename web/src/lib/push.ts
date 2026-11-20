@@ -1,6 +1,6 @@
-// Notifications: the day's reminder (at the player's own hour), word from friends (a link accepted, a call to a duel)
-// and Роял's call, each kind on or off as the player chooses. The browser asks the player first; the service worker
-// (/sw.js) shows them.
+// Notifications: the day's reminder (at the player's own hour), word of people and results (a request to be friends,
+// how a Роял ended for a player who didn't see its end) and Роял's call, each kind on or off as the player chooses.
+// The browser asks the player first; the service worker (/sw.js) shows them.
 
 import { pushKey } from "../state.ts";
 import { api } from "./api.ts";

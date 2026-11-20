@@ -1,7 +1,7 @@
 // What the player has set for this device: Night or Day, less motion, the text's size, whether the clock ticks, Роял's
-// music, and (in the app) the phone's touch. Kept in the browser (like the sounds' switch), and put on the page: Night
-// or Day as `data-scheme` and less motion as a class on <html>, which the CSS reads, the text's size as <html>'s own
-// (everything is sized from it, in rem).
+// music. Kept in the browser (like the sounds' switch), and put on the page: Night or Day as `data-scheme` and less
+// motion as a class on <html>, which the CSS reads, the text's size as <html>'s own (everything is sized from it, in
+// rem).
 
 import { signal } from "./dom.ts";
 

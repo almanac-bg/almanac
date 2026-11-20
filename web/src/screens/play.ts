@@ -191,7 +191,9 @@ function otherTopics(current: string): Child {
       h(
         "ul",
         { class: "chips" },
-        others.map((c) => h("li", null, h("a", { class: "chip", href: `/play/${c.id}` }, topicMark(c.id), c.name))),
+        others.map((c) =>
+          h("li", null, h("a", { class: `chip ${toneOf(c.id)}`, href: `/play/${c.id}` }, topicMark(c.id), c.name)),
+        ),
       ),
     );
   };

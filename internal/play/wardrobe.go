@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 	"strconv"
+	"strings"
 )
 
 // The wardrobe: besides the avatar's shape and tone and the title (titles.go), a frame around the avatar and a pattern behind
@@ -86,6 +87,7 @@ type wardrobe struct {
 	placed  bool // the rating is set (Placed)
 	royals  int
 	mastery map[string]int
+	kept    map[string]bool   // the titles the player has had (told as unlocked: unlocks_told), by id
 	titles  []Title           // every title there is (the game's: topics come from the bank)
 	topics  map[string]string // the bank's topics' names, by id
 }
@@ -125,6 +127,14 @@ func (w wardrobe) has(u unlock) bool {
 		return need > 0 && n >= need
 	}
 	return true
+}
+
+// hasTitle is whether a title is the player's: one they've unlocked, or once had. A title, once earned, stays, though
+// what unlocked it may go down since (a topic's mastery; „Всезнание“ when the bank gains a topic), as every other
+// title does: it stays on if worn, may be put on again, and is told once, never taken and told again. A change to what
+// unlocks a title takes it, with a migration, from those told of it who don't meet the new rule (as 0071 did).
+func (w wardrobe) hasTitle(t Title) bool {
+	return w.kept[t.ID] || w.has(t.by)
 }
 
 // how says what unlocks a cosmetic, for whoever hasn't yet.
@@ -203,6 +213,9 @@ func (g *Game) wardrobeOf(ctx context.Context, userID int64) (wardrobe, error) {
 	for _, c := range g.Bank().Categories {
 		w.topics[c.ID] = c.Name
 	}
+	if w.kept, err = g.titlesKept(ctx, userID); err != nil {
+		return w, err
+	}
 	mastery, err := g.MasteryOf(ctx, userID)
 	w.mastery = map[string]int{}
 	for _, m := range mastery {
@@ -211,6 +224,26 @@ func (g *Game) wardrobeOf(ctx context.Context, userID int64) (wardrobe, error) {
 		}
 	}
 	return w, err
+}
+
+// titlesKept are the titles a player has had, by id: those told as unlocked (NewsOf keeps each it tells, and all a
+// player has once they're first told: Unlock.key).
+func (g *Game) titlesKept(ctx context.Context, userID int64) (map[string]bool, error) {
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT id FROM unlocks_told WHERE user_id = ? AND id LIKE 'title:%'`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	kept := map[string]bool{}
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		id, _, _ := strings.Cut(strings.TrimPrefix(key, "title:"), ":")
+		kept[id] = true
+	}
+	return kept, rows.Err()
 }
 
 // Unlock is something a player may wear, from what unlocked it: a title, a frame, a pattern or an avatar's shape.
@@ -274,7 +307,7 @@ func (w wardrobe) shapeOpen(shape string) bool {
 func (w wardrobe) unlocks() []Unlock {
 	var out []Unlock
 	for _, t := range w.titles {
-		if w.has(t.by) {
+		if w.hasTitle(t) {
 			out = append(out, Unlock{Kind: "title", ID: t.ID, Name: t.Name, Tier: t.Tier, From: w.from(t.by),
 				byLevel: t.by.level})
 		}

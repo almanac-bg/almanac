@@ -1394,7 +1394,7 @@ func TestProfilesOverHTTP(t *testing.T) {
 	}
 	ana.call("POST", fmt.Sprintf("/api/friends/requests/%d/accept", int64(p["request"].(float64))), map[string]any{})
 	_, p = bo.call("GET", "/api/players/"+anaTag, nil)
-	if p["friend"] != "yes" || p["id"] != a["user"].(map[string]any)["id"] || p["record"] == nil {
+	if p["friend"] != "yes" || p["id"] != nil || p["record"] == nil {
 		t.Fatalf("Ana, to her friend Bo: %v", p)
 	}
 

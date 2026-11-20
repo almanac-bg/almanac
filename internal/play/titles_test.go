@@ -351,3 +351,58 @@ func TestOwnEmblemsMigration(t *testing.T) {
 		}
 	}
 }
+
+// A title once earned stays the player's though what unlocked it goes down: a master of history who then gets history
+// wrong keeps „Майстор · История“, worn, to wear, and told only the once.
+func TestTitlesStayEarned(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	for range MasteryFrom / Length {
+		run, _ := w.g.StartTopic(ctx, ana, "history")
+		w.play(ana, run.ID, repeat(w.right, Length)...)
+	}
+	if err := w.g.SetLook(ctx, ana, nil, ptr("master-history")); err != nil {
+		t.Fatal(err)
+	}
+	for _, again := range []bool{false, true} {
+		n, err := w.g.NewsOf(ctx, ana, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if told := slices.ContainsFunc(n.Unlocks, func(u Unlock) bool { return u.ID == "master-history" }); again && told {
+			t.Fatal("a title told twice")
+		}
+	}
+	tier := func() int {
+		m, _ := w.g.MasteryOf(ctx, ana)
+		return m[slices.IndexFunc(m, func(x Mastery) bool { return x.Category == "history" })].Tier
+	}
+	for i := 0; tier() >= MasterTier; i++ {
+		if i == 20 {
+			t.Fatalf("history's mastery stays at %d", tier())
+		}
+		run, _ := w.g.StartTopic(ctx, ana, "history")
+		w.play(ana, run.ID, repeat(w.wrong, Length)...)
+	}
+	if look, _ := w.g.LookOf(ctx, ana); look.Title != "Майстор · История" {
+		t.Fatalf("worn after the mastery went down: %+v", look)
+	}
+	if err := w.g.SetLook(ctx, ana, nil, ptr("")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.g.SetLook(ctx, ana, nil, ptr("master-history")); err != nil {
+		t.Fatalf("put on again after the mastery went down: %v", err)
+	}
+	p, _ := w.g.ProgressOf(ctx, ana)
+	if i := slices.IndexFunc(p.Titles, func(v TitleView) bool { return v.ID == "master-history" }); i < 0 || p.Titles[i].Locked {
+		t.Fatal("locked after the mastery went down")
+	}
+	if n, _ := w.g.NewsOf(ctx, ana, 0); slices.ContainsFunc(n.Unlocks, func(u Unlock) bool { return u.ID == "master-history" }) {
+		t.Fatal("told again")
+	}
+	// Another, who never had it, may not wear it.
+	if err := w.g.SetLook(ctx, w.user(), nil, ptr("master-history")); err == nil {
+		t.Fatal("worn by one who never had it")
+	}
+}

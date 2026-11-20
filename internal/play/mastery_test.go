@@ -156,8 +156,8 @@ func TestMastery(t *testing.T) {
 	}
 	w.play(bo, s.ID, repeat(w.right, Length)...)
 	n, err := w.g.NewsOf(ctx, bo, s.ID)
-	if err != nil || len(n.Mastery) != 1 || n.Mastery[0].To.Category != "music" || n.Mastery[0].From.Answers != 0 ||
-		n.Mastery[0].To.Answers != Length || n.Mastery[0].To.Known <= n.Mastery[0].From.Known {
+	if err != nil || n.Mastery == nil || n.Mastery.To.Category != "music" || n.Mastery.From.Answers != 0 ||
+		n.Mastery.To.Answers != Length || n.Mastery.To.Known <= n.Mastery.From.Known {
 		t.Fatalf("the news of a music game: %+v %v", n.Mastery, err)
 	}
 	if n, err := w.g.NewsOf(ctx, ana, s.ID); err != nil || n.Mastery != nil {
@@ -167,11 +167,67 @@ func TestMastery(t *testing.T) {
 	w.wait(time.Minute)
 	later, _ := w.g.StartTopic(ctx, bo, "music")
 	w.play(bo, later.ID, repeat(w.wrong, Length)...)
-	if again, _ := w.g.MasteryMoves(ctx, bo, s.ID); len(again) != 1 || again[0] != n.Mastery[0] {
+	if again, _ := w.g.MasteryMoves(ctx, bo, s.ID); len(again) != 1 || again[0] != *n.Mastery {
 		t.Fatalf("an earlier game's news, after another: %+v, was %+v", again, n.Mastery)
 	}
 	stats, _ := w.g.StatsOf(ctx, ana)
 	if len(stats.Mastery) != len(w.b.Categories) || stats.Mastery[0].Name == "" {
 		t.Fatalf("stats' mastery: %+v", stats.Mastery)
+	}
+}
+
+// A game's news tells one move of mastery: the first that's news (a first estimate, a tier first told, a share gone
+// up), never a loss; of a game of one topic with no estimate yet, what's left before one; and the news's cards count
+// it only then, as the client draws it.
+func TestMasteryTold(t *testing.T) {
+	m := func(category string, known, tier int, sure, first bool) Mastery {
+		answers := 4
+		if sure {
+			answers = 40
+		} else if first {
+			answers = 12
+		}
+		return Mastery{Category: category, Answers: answers, Known: known, Tier: tier, Sure: sure, First: first}
+	}
+	h := func(known, tier int, sure, first bool) Mastery { return m("history", known, tier, sure, first) }
+	for _, c := range []struct {
+		name string
+		move MasteryMove
+		news bool
+	}{
+		{"a first estimate", MasteryMove{h(0, 0, false, false), h(31, 0, false, true)}, true},
+		{"its tier, first told", MasteryMove{h(23, 0, false, true), h(13, 0, true, false)}, true},
+		{"a share gone up", MasteryMove{h(40, 2, true, false), h(44, 2, true, false)}, true},
+		{"a tier up", MasteryMove{h(40, 2, true, false), h(52, 3, true, false)}, true},
+		{"down within a tier", MasteryMove{h(15, 0, true, false), h(13, 0, true, false)}, false},
+		{"down a tier", MasteryMove{h(41, 3, true, false), h(38, 2, true, false)}, false},
+		{"a first estimate down", MasteryMove{h(31, 0, false, true), h(29, 0, false, true)}, false},
+		{"no change", MasteryMove{h(40, 2, true, false), h(40, 2, true, false)}, false},
+	} {
+		got := masteryTold([]MasteryMove{c.move})
+		cards := 0
+		if c.news {
+			cards = 1
+		}
+		if (got != nil) != c.news || (News{Mastery: got}).cards() != cards {
+			t.Errorf("%s: told %+v", c.name, got)
+		}
+	}
+	// One topic, still too few answers for an estimate: what's left before one is told.
+	few := MasteryMove{h(0, 0, false, false), h(0, 0, false, false)}
+	if got := masteryTold([]MasteryMove{few}); got == nil || *got != few {
+		t.Errorf("one topic, too few answers: %+v", got)
+	}
+	// Several topics: the first that's news; none of them news, nothing.
+	up := MasteryMove{m("music", 40, 2, true, false), m("music", 44, 2, true, false)}
+	down := MasteryMove{h(41, 3, true, false), h(38, 2, true, false)}
+	if got := masteryTold([]MasteryMove{down, few, up}); got == nil || *got != up {
+		t.Errorf("several topics: %+v", got)
+	}
+	if got := masteryTold([]MasteryMove{down, few}); got != nil {
+		t.Errorf("several topics, none news: %+v", got)
+	}
+	if masteryTold(nil) != nil {
+		t.Error("no moves")
 	}
 }

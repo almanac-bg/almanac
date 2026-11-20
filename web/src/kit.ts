@@ -50,7 +50,7 @@ import {
   soundOn,
 } from "./lib/sound.ts";
 import { stream } from "./lib/stream.ts";
-import { issueWords, listWords, weekday, withName } from "./lib/words.ts";
+import { issueWords, listWords, weekday, withWord } from "./lib/words.ts";
 import type { DuelView } from "./screens/duel.ts";
 import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
 import { clock, coming, dayAndTime, dayWord, whileSeen } from "./screens/modes.ts";
@@ -241,7 +241,7 @@ export const kit = {
   when,
   whileSeen,
   who,
-  withName,
+  withWord,
 };
 
 export type Kit = typeof kit;

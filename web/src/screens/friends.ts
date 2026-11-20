@@ -24,6 +24,7 @@ let {
   pageArt,
   profileHref,
   record,
+  withWord,
 } = {} as Kit;
 
 interface Friend {
@@ -72,6 +73,7 @@ export function friends(kit: Kit): Child {
     pageArt,
     profileHref,
     record,
+    withWord,
   } = kit);
   title("Приятели");
   return h("section", { class: "screen" }, friendsCard());
@@ -245,7 +247,7 @@ function addFriend(reload: () => Promise<void>): Child {
           const byEmail = who.includes("@") && !who.startsWith("@");
           note.set({
             text: r.friends
-              ? `Вече сте приятели с ${r.name}.`
+              ? `Вече сте приятели ${withWord(r.name ?? "")}.`
               : byEmail
                 ? "Поканата е изпратена. Ако има играч с този имейл, ще я види в играта."
                 : `Поканата до ${r.name} е изпратена.`,
