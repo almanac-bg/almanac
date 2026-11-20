@@ -106,18 +106,15 @@ There are three places: **Днес** (`/`), **Алманах** (`/almanac`) and 
   - „Твоята книга“, „Алманахът на <име>“ and when it began (the first game's day).
   - Three figures between rules (`.figures-row`, `.fig`): дни поред, факта, от всичко знаеш (Микс's share).
   - The contents (`.toc`): a chapter a row (`.toc-row.t-<topic>`) with its picture, its name in the serif on dotted
-    leaders (`.toc-dots`, gone under `tight`) to the share known, and under it its facts, its tier (or „първа
-    оценка“, „още без оценка“) and a 3px track in its colour (`.toc-track`). The ten topics come first, then „Микс“
-    (every topic) and „България“ (with its tricolour, `.flag`).
-  - The notes the book keeps (`.almanac-notes`, a ledger): the day in small capitals and the note in the serif, with
-    the streak's next milestone ahead in italic („Тридесет дни поред, ако не спреш.“).
+    leaders (`.toc-dots`, gone under `tight`) to its rank, and under it its ink („12 с мастило“), the next rank and a
+    3px track of the quarters to it in its colour (`.toc-track`). The ten topics come first, then „Микс“ (every topic)
+    and „България“ (with its tricolour, `.flag`), with their ink only. No count of it all, and no notes.
   - A visitor without a game sees the book as it starts: the contents, each chapter a way to play it.
 - **A chapter** (`/almanac/<topic>`):
   - „← Алманах“, „Глава 3“ in its colour, its name and its picture.
-  - How much of it the player knows (`.know`): the share big, its tier in a sentence, and „на крачка от „Експерт““
-    when within 5%.
-  - Its scale (`.scale`): a 4px track filled in its colour, a tick at each tier, a mark at the player, and only Новак
-    and Светило named.
+  - Its rank (`.know`): the name big, its ink and how much more to the next in a sentence.
+  - Its scale (`.scale`): a 4px track of the quarters to the next rank in its colour, a tick at each quarter, the two
+    ranks named at its ends. How well a player knows a chapter is never shown (play/mastery.go).
   - „Играй главата“, the topic's game; a game left half-way is „Продължи главата“.
   - Its facts as entries (`.entries`, two columns with a rule on a big screen). Each entry has:
     - a dateline (`.entry-when`: „20 ноем. · Брой 9“, „Игра на главата“, „Дуел“);
@@ -425,7 +422,7 @@ A rule never holds a literal colour; it takes a token.
     player's row over the other's, each beside a small avatar. The quicker of two right answers is ringed in gold
     (`.fast`, explained once under them), and a gold band sits behind the question that decided it.
   - One line of what decided it (`.duel-line`: „Водеше от 8-ия въпрос до края.“, „Реши го последният въпрос.“,
-    „Равни точки: реши времето (…)“).
+    „Равни верни отговори: реши по-близкото число.“, „… реши времето (…)“).
   - What it meant, under a hairline (`.duel-meant`): the record against this person („Срещу Мария 3 : 2“), or, against
     a recording, whose game it was („Записът е от истинска игра на Мария.“).
   - Then the next steps: „Реванш“ (a new duel the other way round, the player playing first) or „Още един срещу
@@ -438,7 +435,7 @@ A rule never holds a literal colour; it takes a token.
     `rosette` and `topicMark`.
   - `game/run.ts` has `trail`, `questionHead` and `timer`.
   - `game/results.ts` has `summary`, `nextSteps` and `reviewParts`.
-  - `game/mastery.ts` has `masteryCard` and the lines of a game's news.
+  - `game/news.ts` has the lines of a game's news.
 - **Selectors:** give a part its own class (`.streak-num`) rather than a tag under a class (`.streak b`); Biome's
   `noDescendingSpecificity` flags the second kind. One class, one thing: a name already in `app.css` (`.back`, the
   way back; `.status`, a line of status) is taken, so a new part gets a name of its own. A class nothing names any
@@ -448,8 +445,8 @@ A rule never holds a literal colour; it takes a token.
     `.after`
   - `.issue`, `.issue-date`, `.issue-body`, `.result`, `.result-main`, `.score-n`, `.tomorrow`, `.share-sheet` and
     `.streak-chip`
-  - `.summary`, `.reviewed`, `.news-open`, `.news-facts`, `.news-note`, `.mastery-line` and `.explain`
-  - `.toc-row`, `.entry` (`.entry-word`, `.entry-q`), `.pager`, `.fig`, `.almanac-notes`
+  - `.summary`, `.reviewed`, `.news-facts`, `.news-note`
+  - `.toc-row`, `.entry` (`.entry-word`, `.entry-q`), `.pager`, `.fig`
   - `.day-board`, `.rank-row`, `.friend`, `.invitation`, `.me-figures`, `.me-settings` and `.pick`
   - `.duel-head`, `.duel-verdict`, `.duel-face`, `.duel-points`, `.duel-marks .duel-pip`, `.duel-line`,
     `.duel-meant`, `.duel-record`, `.duels`, `.duel-row`, `.duel-sent`, `.their-line` and `.question-head .versus`
@@ -458,24 +455,22 @@ A rule never holds a literal colour; it takes a token.
 
 Every element that looks like a game measures something the game already counts:
 
-| Element  | Measures                                                                                                                                                                                                                                    | Where                            |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| Streak   | Days in a row with the day's ten, one missed day a week forgiven; the strip is this week's days played (`week` in `/api/me/stats`)                                                                                                          | Днес, the result, Профил         |
-| Points   | One game's score, per answer and per run, from the server (with the parts for speed and for the row); a right answer about 1000; never added up across games                                                                                | Verdict, result, the day's board |
-| In a row | Right answers in a row within a game, from the second (the flame and „3 поред“); each earns a tenth more, up to a half                                                                                                                      | Question head, verdict           |
-| Place    | Place on the day's board                                                                                                                                                                                                                    | Приятели                         |
-| Mastery  | Share of a topic's questions a player knows, from every answer weighed by its question's hardness (play/mastery.go); told after 10 answers, in six tiers: Новак, Любител (35%), Познавач (50%), Експерт (65%), Майстор (78%), Светило (90%) | Алманах, a chapter, the news     |
-| Facts    | Facts collected in the book: a question's fact, with its first right answer                                                                                                                                                                 | Алманах, the news                |
-| Notes    | Milestones noted in the book once each: a streak of 7, 30, 100 or 365 days, a first ten of ten on the day's questions, a chapter complete (every fact of a topic); with their day                                                           | The news, the Алманах's notes    |
-| Duels    | Each on one's own time, with a friend (who has three days to play the same ten) or against a real recorded game; between two people, their record („3 : 2“)                                                                                 | Приятели, a duel's result        |
-| Boards   | The day's ten, of all of България or of friends                                                                                                                                                                                             | Приятели                         |
+| Element  | Measures                                                                                                                                                                                                                          | Where                            |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| Streak   | Days the day's ten were played, up to two missed days a week forgiven (one in the hold-out: `perWeek`); the strip is this week's days played; an ended streak's number is never said                                              | Днес, the result, Профил         |
+| Score    | A game's right answers out of its questions; a close answer is „близо“ and counts as not right. No points. A tie on a board or in a duel goes by the number's closeness, then the hardest right answer, then time (play/board.go) | Verdict, result, the day's board |
+| In a row | Right answers in a row within a game, from the second (the flame and „3 поред“): feel only                                                                                                                                        | Question head, verdict           |
+| Place    | Place on the day's board                                                                                                                                                                                                          | Приятели                         |
+| Ink      | Facts written in the book: in ink from the day's issue at the first meeting, in pencil elsewhere (play/ink.go); a chapter says its ink, pencil is listed, never counted                                                           | Алманах, the news                |
+| Rank     | A chapter's rank from its ink: Бележка 1, Страница 5, Тетрадка 15, Тефтер 40, Книга 100, Летопис 250, then „Летопис · N“; kept, never falling; one worn as a seal (play/rank.go)                                                  | Алманах, Профил, the news        |
+| Duels    | Each on one's own time, with a friend (who has seven days to play the same ten) or against a real recorded game („равен“ or „по-силен“); between two people, their record („3 : 2“)                                               | Приятели, a duel's result        |
+| Boards   | The day's ten, of all of България or of friends                                                                                                                                                                                   | Приятели                         |
 
 **What a game brings** is quiet lines of what's true, in its news under the result:
 
-- the facts it put in the book (`.news-facts`, „+3 факта в Алманаха“, a tap from them);
-- how a topic's game moved its mastery when that's news (`.mastery-line`: a first estimate, a tier reached; never a
-  loss);
-- the notes it wrote in the book (`.news-note`, „Отбелязано в Алманаха: 30 дни поред с въпросите на деня.“);
+- what it wrote in the book (`.news-facts`, „+3 с мастило в Алманаха“, or „Записано с молив в Алманаха“);
+- the ranks it raised, as one line, with the art Страница brings (`.news-rose`), or after the day's issue the chapter
+  nearest its next rank (`.news-step`, „История: още 2 до Тетрадка“);
 - once a day, how others' duels against the player's recordings went („Твоите записи“).
 
 Nothing of it is a sheet or has a sound of its own: a note too is a line (Motion). A game that ended without its
@@ -526,7 +521,7 @@ once, points rise counting up to what was earned, and an exact number answer get
 - **A screen reader plays too.** Each question takes the focus as it opens. An answer chosen keeps it (`aria-disabled`,
   not `disabled`, once answered); where the answering part goes (a pad, a list), „Напред“ takes it. A run has one
   live region, there from its start: it says each verdict once in plain words („Не е това. Вярно е: Бийтълс.“,
-  „Вярно! +1040 точки.“) and each clue as it comes, never a countdown.
+  „Вярно!“) and each clue as it comes, never a countdown.
 - **Touch:** there's no grey flash on a tap, and an answer gives under the finger. Hover, and anything it does,
   applies only where a pointer hovers (`@media (hover: hover) and (pointer: fine)`: `hover.test.ts`), so on a phone
   nothing looks chosen or current after a tap. Small drawn controls (the cross, „Върни последното“, an order's grip)
