@@ -36,13 +36,13 @@ func streakEndedOnTheDay(t *testing.T, now time.Time) {
 	g := start(t)
 	g.srv.game.Now = func() time.Time { return now }
 	ana, anaID := g.guest()
-	g.daysPlayed(anaID, 5, 4, 3) // three days to Monday; Tuesday forgiven, Wednesday (yesterday) ended it
+	g.daysPlayed(anaID, 6, 5, 4) // three days to Sunday; Monday and Tuesday forgiven, Wednesday (yesterday) ended it
 	_, today := ana.call("GET", "/api/day", nil)
 	if want := play.Issue(g.srv.game.Today()); want < 1 || today["issue"] != float64(want) {
 		t.Fatalf("the day's issue: %v, want %d", today["issue"], want)
 	}
 	ended, _ := today["ended"].(map[string]any)
-	if ended == nil || ended["days"] != 3.0 || ended["on"] != "2026-12-09" {
+	if ended == nil || ended["days"] != nil || ended["on"] != "2026-12-09" { // its number never said
 		t.Fatalf("a streak of three, ended yesterday: %v", today["ended"])
 	}
 	if m := g.srv.reminder(t.Context(), g.srv.game.Today(), anaID); m.Body != "Десет въпроса, един опит. До полунощ." {

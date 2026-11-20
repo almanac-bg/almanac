@@ -190,6 +190,7 @@ func (s *Server) routes() http.Handler {
 	}
 	api("GET /api/health", s.health)
 	api("GET /api/me", s.me)
+	api("GET /api/mail-who", s.mailWho)
 	api("PATCH /api/me", s.rename)
 	api("DELETE /api/me", s.deleteAccount)
 	api("GET /api/me/stats", s.stats)
@@ -212,6 +213,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/auth/signout", s.signOut)
 	api("POST /api/auth/signout-others", s.signOutOthers)
 	api("POST /api/auth/handoff", s.handoff)
+	api("POST /api/auth/handoff/copied", s.copiedHandoff)
 	api("POST /api/auth/hand", s.takeHandoff)
 	api("POST /api/auth/hand/look", s.lookHandoff)
 	api("GET /api/day", s.today)

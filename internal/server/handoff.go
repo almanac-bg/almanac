@@ -51,6 +51,28 @@ func (s *Server) handoff(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, offer)
 }
 
+// copiedHandoff marks the player's link as copied by hand („Копирай връзката“, account.CopiedHandoff): every browser
+// that takes it is asked for its number.
+func (s *Server) copiedHandoff(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		Token string `json:"token"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	if !s.limits.allow("handcopied:"+strconv.FormatInt(u.ID, 10), 60, time.Hour) {
+		return errTooMany
+	}
+	if err := s.accounts.CopiedHandoff(r.Context(), u.ID, in.Token); err != nil {
+		return err
+	}
+	return ok(w, map[string]any{})
+}
+
 // lookHandoff says whose game a handoff's token brings to this browser, on how many days it was played, and whether
 // the number is asked for here (account.LookHandoff), or why it can't come here; it takes nothing.
 func (s *Server) lookHandoff(w http.ResponseWriter, r *http.Request) error {
@@ -147,7 +169,7 @@ func osFamily(ua string) string {
 // The day's questions played in this browser: a cookie holds the day this browser last started them, whoever it was
 // signed in as, and stays through a sign-out and a handoff (it's no session's). A game brought into a browser that
 // played the day already (by a handoff, or a sign-in after a sign-out) has the day's answers in sight there, so its
-// play of the issue that day is its second (playedHere): the game writes pencil for it, not ink (DECISIONS.md, the
+// play of the issue that day is its second (playedHere): the game writes grey for it, not ink (DECISIONS.md, the
 // direction: ink is the first meeting in the issue).
 
 // playedKept is how long the cookie lasts: the day, and its grace past midnight.

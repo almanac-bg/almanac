@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -189,8 +190,43 @@ func (s *Server) streakMailOf(ctx context.Context, today string, userID int64) (
 	m = mail.Message{To: email.String, Subject: "Въпросите на деня те чакат", Unsubscribe: s.mailOffURL(userID, mailStreak)}
 	m.Text = "Въпросите на деня те чакат на almanac.bg. Днес можеш да започнеш нова серия."
 	// The link says it came from the mail: a browser signed out is asked to sign in first (screens/today.ts).
-	m.Text += "\n\n" + s.cfg.PublicURL + "/?from=mail\n\n—\nСпри тези писма: " + m.Unsubscribe + "\n"
+	m.Text += "\n\n" + s.mailLink(userID) + "\n\n—\nСпри тези писма: " + m.Unsubscribe + "\n"
 	return m, true, nil
+}
+
+// mailLink is the way into the game from a mail to a player: it says it came from a mail, and whose (mailWho), so that
+// a browser with no session there (a mail app's own) asks to sign in by code, the address filled in, never a new game.
+func (s *Server) mailLink(userID int64) string {
+	return s.cfg.PublicURL + "/?" + url.Values{"from": {"mail"}, "to": {s.mailWhoToken(userID)}}.Encode()
+}
+
+// mailWhoToken is a player's id, signed: what a mail's link carries (mailLink) for the sign-in to fill their address
+// (mailWho), and nothing else.
+func (s *Server) mailWhoToken(userID int64) string {
+	h := hmac.New(sha256.New, s.accounts.Secret)
+	fmt.Fprintf(h, "mail-who\x00%d", userID)
+	return strconv.FormatInt(userID, 36) + "." + base64.RawURLEncoding.EncodeToString(h.Sum(nil)[:12])
+}
+
+// mailWho is the address a mail's link was sent to (mailWhoToken), for the sign-in to fill in: a mail app's browser
+// has no session, and the one who opened it is the one it was sent to. A token that isn't one is nobody's (404).
+// Limited by the network and its site, as anything a stranger can call is.
+func (s *Server) mailWho(w http.ResponseWriter, r *http.Request) error {
+	if !s.allowFrom(r, "mailwho", 60, 300, time.Hour) {
+		return errTooMany
+	}
+	token := r.URL.Query().Get("to")
+	id36, _, cut := strings.Cut(token, ".")
+	id, err := strconv.ParseInt(id36, 36, 64)
+	if !cut || err != nil || id <= 0 || !hmac.Equal([]byte(token), []byte(s.mailWhoToken(id))) {
+		return errNotFound
+	}
+	var email sql.NullString
+	if err := s.db.Read.QueryRowContext(r.Context(), `SELECT email FROM users WHERE id = ?`, id).Scan(&email); err != nil ||
+		!email.Valid {
+		return errNotFound
+	}
+	return ok(w, map[string]any{"email": email.String})
 }
 
 // wantsMail says whether a player gets a kind of mail: as they chose, else the streak's on, the day's off.

@@ -11,10 +11,10 @@ import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { categories } from "../state.ts";
 
 interface News {
-  /** The facts the game wrote in the Алманах in ink (play.News.Ink), and whether it wrote any in pencil (never
-   * counted). */
+  /** The facts the game wrote in the Алманах in ink (play.News.Ink), and, of the day's issue, its right answers to
+   * questions met before (in grey: „1 вече срещан“). */
   ink?: number;
-  pencil?: boolean;
+  metBefore?: number;
   /** The ranks risen since last told, as one (play.Rose): Бележка never; Страница brings the chapter's art. */
   rose?: { ranks: { chapter: string; name: string; art?: boolean }[]; best?: boolean };
   /** After a day's issue, the chapter nearest its next rank (play.Step), when none rose. */
@@ -43,7 +43,7 @@ export function news(run: number, delay = 0, late?: { title?: string }): Child {
     const n = data();
     if (!n) return null;
     const parts = [
-      n.ink || n.pencil ? factsLine(n.ink ?? 0) : null,
+      n.ink || n.metBefore ? factsLine(n.ink ?? 0, n.metBefore ?? 0) : null,
       n.rose ? roseLine(n.rose) : n.step ? stepLine(n.step) : null,
       n.recordings ? recordings(n.recordings) : null,
     ];
@@ -53,15 +53,17 @@ export function news(run: number, delay = 0, late?: { title?: string }): Child {
   };
 }
 
-/** What a game wrote in the Алманах, a tap from it: the ink counted („+6 с мастило“), pencil only said. */
-function factsLine(ink: number): Child {
+/** What a game wrote in the Алманах, a tap from it: the ink counted („+6 с мастило“), and the issue's right answers
+ * met before („1 вече срещан“). */
+function factsLine(ink: number, met: number): Child {
   return h(
     "p",
     { class: "news-facts" },
     h(
       "a",
       { href: "/almanac" },
-      ink ? [h("b", { class: "num" }, `+${ink}`), " с мастило в Алманаха"] : "Записано с молив в Алманаха",
+      ink ? [h("b", { class: "num" }, `+${ink}`), " с мастило в Алманаха"] : "Алманахът",
+      met ? ` · ${met} вече ${met === 1 ? "срещан" : "срещани"}` : "",
     ),
   );
 }
@@ -70,7 +72,7 @@ function factsLine(ink: number): Child {
 function roseLine(r: NonNullable<News["rose"]>): Child {
   const said = r.ranks.map((x) => `${x.name} в „${topicName(x.chapter)}“`).join(", ");
   const art = r.ranks.some((x) => x.art) ? " Картината на главата вече може да е твоят аватар." : "";
-  return h("p", { class: "news-note news-rose" }, h("a", { href: "/almanac" }, `Звание: ${said}.`), art);
+  return h("p", { class: "news-note news-rose" }, h("a", { href: "/almanac" }, `Нов печат: ${said}.`), art);
 }
 
 /** The chapter nearest its next rank: „История: още 2 до Тетрадка“. */

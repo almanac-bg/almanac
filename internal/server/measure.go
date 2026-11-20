@@ -485,6 +485,16 @@ type deviceRow struct {
 	DayFinished    rate // of the day's tens begun, finished
 }
 
+// questionKinds are the kinds of questions, as /admin names them.
+var questionKinds = map[string]string{"truefalse": "Вярно или не", "choice": "Избор", "number": "Число",
+	"order": "Подреди", "match": "Свържи", "split": "Раздели", "clues": "Подсказки"}
+
+// timedOutRow is a kind of question's answers run out of time (play.TimedOutSince).
+type timedOutRow struct {
+	Name  string
+	Share rate
+}
+
 // holdoutRow is a measure of the reminders' experiment (play.HeldReminders): for those reminded (Sent) and those held
 // out (Held).
 type holdoutRow struct {
@@ -511,14 +521,19 @@ type measures struct {
 	Holdout             []holdoutRow
 	HoldoutShare        int
 	HoldoutFrom         string // its first day, as „19.11.2026“; "" from the start
-	Repeats             rate
-	Streaks             []streakRow
-	Forgiven            int
-	Kinds               []string // the kinds of games played in the last 7 days, by name
-	Games               []gamesRow
-	Features            []featureRow
-	Devices             []deviceRow
-	Habit, HabitOf      int
+	// The streak's hold-out (play.StreakHoldout): the newcomers of its window, two forgiven days a week against one,
+	// and the window, as „21.11.2026“.
+	StreakHoldout           []streakHoldoutRow
+	StreakFrom, StreakUntil string
+	Repeats                 rate
+	TimedOut                []timedOutRow
+	Streaks                 []streakRow
+	Forgiven                int
+	Kinds                   []string // the kinds of games played in the last 7 days, by name
+	Games                   []gamesRow
+	Features                []featureRow
+	Devices                 []deviceRow
+	Habit, HabitOf          int
 }
 
 // chartRow is a day of the players' chart.
@@ -904,6 +919,14 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 		row("не стигнали до никое устройство", true, count("push:failed:"+k.kind))
 	}
 	f.Repeats = rate{win[0].t["day:seen"], win[0].t["day:answers"]}
+	// The clock: answers run out of time by kind, over 28 days (play.Limit's floors are set so each stays under 2%).
+	timed, err := g.TimedOutSince(ctx, play.DayShift(today, -27))
+	if err != nil {
+		return f, err
+	}
+	for _, t := range timed {
+		f.TimedOut = append(f.TimedOut, timedOutRow{Name: cmp.Or(questionKinds[t.Kind], t.Kind), Share: rate{t.N, t.Of}})
+	}
 
 	// The reminders against the hold-out (play/experiment.go), since it began.
 	if f.Holdout, err = s.holdout(ctx, today); err != nil {
@@ -915,6 +938,11 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 	}
 	if began != "" {
 		f.HoldoutFrom = short(began) + "." + began[:4]
+	}
+
+	// The streak's hold-out: its measure and window said in advance (admin_page.go).
+	if f.StreakHoldout, f.StreakFrom, f.StreakUntil, err = s.streakHoldout(ctx); err != nil {
+		return f, err
 	}
 
 	// The streaks.
@@ -993,6 +1021,66 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 			DayFinished: rate{day.Finished, day.Games}})
 	}
 	return f, nil
+}
+
+// streakHoldoutRow is a measure of the streak's hold-out (play.StreakHoldout): of the newcomers of its window, those
+// forgiven two days a week (Two) and those forgiven one (One).
+type streakHoldoutRow struct {
+	Name     string
+	Two, One rate
+}
+
+// streakHoldout compares the newcomers of the streak hold-out's window (first played on or after its first day, come
+// in before its end), forgiven two missed days a week and one, by the measure set in advance: back on any of days 7 to
+// 13 (the first row, what decides it), and played again on days 1 to 6, back on days 28 to 34, each of those whose
+// days are over. None with no window kept.
+func (s *Server) streakHoldout(ctx context.Context) ([]streakHoldoutRow, string, string, error) {
+	g := s.game
+	from, until, err := g.StreakHoldoutWindow(ctx)
+	if err != nil || from == "" {
+		return nil, "", "", err
+	}
+	act, err := g.Activity(ctx, from)
+	if err != nil {
+		return nil, "", "", err
+	}
+	news, err := g.Newcomers(ctx, act, from)
+	if err != nil {
+		return nil, "", "", err
+	}
+	measures := []struct {
+		name string
+		a, b int
+	}{{"Върнали се в дни 7–13 (мярката)", 7, 13}, {"Играли пак в дни 1–6", 1, 6}, {"Върнали се в дни 28–34", 28, 34}}
+	rows := make([]streakHoldoutRow, len(measures))
+	for i, m := range measures {
+		rows[i].Name = m.name
+	}
+	for _, n := range news {
+		var created int64
+		if err := s.db.Read.QueryRowContext(ctx, `SELECT created_at FROM users WHERE id = ?`, n.ID).Scan(&created); err != nil {
+			continue // gone since
+		}
+		if came := time.UnixMilli(created).In(play.Bulgaria).Format(time.DateOnly); came < from || came >= until {
+			continue // came in before the window, or after it: in neither group
+		}
+		held := play.HeldOut(play.StreakHoldout, n.ID)
+		for i, m := range measures {
+			if !n.Due(m.b) {
+				continue
+			}
+			r := &rows[i].Two
+			if held {
+				r = &rows[i].One
+			}
+			r.Of++
+			if n.BackWithin(m.a, m.b) {
+				r.N++
+			}
+		}
+	}
+	day := func(d string) string { return short(d) + "." + d[:4] }
+	return rows, day(from), day(play.DayShift(until, -1)), nil
 }
 
 // holdout compares the players reminded with those held out of the reminders (play.HeldReminders), from its first

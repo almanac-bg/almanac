@@ -108,15 +108,17 @@ func scriptPaced(b *bank.Bank, picks []Pick, times map[int]int64) bool {
 // judgeAnswer marks a run as played at a script's speed if the answer just kept (to question r.at, in ms) makes it
 // one: only a quick answer can.
 func (g *Game) judgeAnswer(tx *sql.Tx, r *run, gr bank.Graded, ms int64) error {
-	if r.shadow || gr.Given == nil {
+	if r.shadow != 0 || gr.Given == nil {
 		return nil
 	}
 	b := g.Bank()
 	if q, ok := b.Get(r.picks[r.at].ID); !ok || time.Duration(ms)*time.Millisecond >= Floor(q) {
 		return nil
 	}
-	var err error
-	r.shadow, err = judge(tx, b, r.id, r.picks)
+	is, err := judge(tx, b, r.id, r.picks)
+	if is {
+		r.shadow = ShadowScript
+	}
 	return err
 }
 
@@ -197,11 +199,12 @@ func (g *Game) JudgeRuns(ctx context.Context) (int, error) {
 
 // FairAnswers is a SQL condition on an answer (its run_id) that leaves out the answers of shadow runs: what a
 // question's statistics count is how people answer it, each once at a day's questions.
-const FairAnswers = `run_id NOT IN (SELECT id FROM runs WHERE shadow)`
+const FairAnswers = `run_id NOT IN (SELECT id FROM runs WHERE shadow OR pencil)`
 
-// fairFor is a SQL condition on a run (its alias) that leaves it out if it's a shadow, unless it's the viewer's own (a SQL expression; 0 for nobody signed in): a board as the viewer sees it.
+// fairFor is a SQL condition on a run (its alias) that leaves it out if others don't see it (othersSee: a shadow, a
+// second play), unless it's the viewer's own (a SQL expression; 0 for nobody signed in): a board as the viewer sees it.
 func fairFor(run, viewer string) string {
-	return `(NOT ` + run + `.shadow OR ` + run + `.user_id = ` + viewer + `)`
+	return `(` + othersSee(run) + ` OR ` + run + `.user_id = ` + viewer + `)`
 }
 
 const (

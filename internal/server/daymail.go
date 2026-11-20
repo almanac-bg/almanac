@@ -100,7 +100,7 @@ func (s *Server) dayMails(ctx context.Context, at time.Time) int {
 }
 
 // dayMail sends a player the day's reminder by mail, unless RemindIgnored of them have been left since they last
-// played the day (on the weekdays they play: rhythm), and says whether it went.
+// played the day (on the weekdays they play: rhythm), or RemindQuietAfter in all, and says whether it went.
 func (s *Server) dayMail(ctx context.Context, today string, at time.Time, userID int64) (bool, error) {
 	var email string
 	var played sql.NullString
@@ -113,13 +113,17 @@ func (s *Server) dayMail(ctx context.Context, today string, at time.Time, userID
 		}
 		return false, err
 	}
-	if ignored, err := s.mailsIgnored(ctx, userID, played.String, today); err != nil || ignored >= RemindIgnored {
+	if week, err := s.rhythm(ctx, userID); err != nil || !week.sends(today) {
+		return false, err // from their third week, only on the weekdays they play (remind.go)
+	}
+	if ignored, left, err := s.mailsIgnored(ctx, userID, played.String, today); err != nil || ignored >= RemindIgnored ||
+		left >= RemindQuietAfter {
 		return false, err
 	}
 	word := s.reminder(ctx, today, userID)
 	m := mail.Message{To: email, Subject: word.Title, Unsubscribe: s.mailOffURL(userID, mailDay)}
 	// The link says it came from a mail: a browser signed out is asked to sign in first (screens/today.ts).
-	m.Text = word.Body + "\n\n" + s.cfg.PublicURL + "/?from=mail\n\n—\n" +
+	m.Text = word.Body + "\n\n" + s.mailLink(userID) + "\n\n—\n" +
 		"Пишем ти веднъж на ден, около часа, в който играеш, ако въпросите още те чакат. Спри тези писма: " +
 		m.Unsubscribe + "\n"
 	sent := false
@@ -144,27 +148,27 @@ func (s *Server) dayMail(ctx context.Context, today string, at time.Time, userID
 }
 
 // mailsIgnored is how many of the day's reminders by mail a player has left since they last played the day (played,
-// "" for never), before today: those on the weekdays they play (rhythm).
-func (s *Server) mailsIgnored(ctx context.Context, userID int64, played, today string) (int, error) {
+// "" for never), before today: those on the weekdays they play (rhythm), and all of them (left).
+func (s *Server) mailsIgnored(ctx context.Context, userID int64, played, today string) (ignored, left int, err error) {
 	week, err := s.rhythm(ctx, userID)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	rows, err := s.db.Read.QueryContext(ctx, `SELECT day FROM day_mails WHERE user_id = ? AND day > ? AND day < ?`,
 		userID, played, today)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	defer rows.Close()
-	n := 0
 	for rows.Next() {
 		var day string
 		if err := rows.Scan(&day); err != nil {
-			return 0, err
+			return 0, 0, err
 		}
+		left++
 		if week.counts(day) {
-			n++
+			ignored++
 		}
 	}
-	return n, rows.Err()
+	return ignored, left, rows.Err()
 }

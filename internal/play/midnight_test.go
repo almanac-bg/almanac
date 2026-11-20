@@ -95,7 +95,7 @@ func TestStreakWaitsForYesterdaysRun(t *testing.T) {
 	w.at(15, 23, 50, 0)
 	w.daysPlayed(ana, 6, 5, 4, 3, 2) // Monday to Friday; Saturday missed: the week's day forgiven
 	w.daysPlayed(bo, 6, 5, 4, 3, 2, 1)
-	w.daysPlayed(cy, 6, 5, 4, 3, 2)
+	w.daysPlayed(cy, 6, 5, 4, 2) // Thursday and Saturday missed: the week's two forgiven
 	half := func(user int64) int64 {
 		w.at(15, 23, 58, 0)
 		s, err := w.g.StartDay(ctx, user)
@@ -131,9 +131,9 @@ func TestStreakWaitsForYesterdaysRun(t *testing.T) {
 	if s := streak(bo); s.Days != 7 || len(s.Forgiven) != 0 {
 		t.Fatalf("Bo, Sunday finished at 00:05: %+v", s)
 	}
-	// Cy left Sunday's run unfinished: past the grace, Sunday is missed, the week's second, and the streak ends.
+	// Cy left Sunday's run unfinished: past the grace, Sunday is missed, the week's third, and the streak ends.
 	w.at(16, 0, 30, 0)
-	if s := streak(cy); s.Days != 0 || s.Ended == nil || s.Ended.On != "2026-11-15" || s.Ended.Days != 5 {
+	if s := streak(cy); s.Days != 0 || s.Ended == nil || s.Ended.On != "2026-11-15" || s.Ended.Days != 4 {
 		t.Fatalf("Cy, Sunday left past the grace: %+v", s)
 	}
 }

@@ -74,7 +74,7 @@ func withoutQuestion(t *testing.T, drop string) *bank.Bank {
 
 // A question of the day's ten found wrong in the middle of its day counts for nobody that day, whenever they played:
 // who played it all before (right throughout), who missed just that one, who was on it as it was voided, and who
-// came after and never saw it end with the same nine right, all right, and the same tiebreak, to the bit.
+// came after and never saw it end with the same nine right, all right, and the same tiebreak.
 func TestDayVoidKeepsResultsComparable(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -117,18 +117,18 @@ func TestDayVoidKeepsResultsComparable(t *testing.T) {
 	if w.count(`SELECT count(*) FROM answers WHERE run_id = ? AND n = ?`, sa.ID, k) != 0 {
 		t.Fatal("a player after the void was shown the void question")
 	}
-	hardest := func(run int64) int {
-		return w.count(`SELECT hardest FROM runs WHERE id = ?`, run)
+	closeness := func(run int64) int {
+		return w.count(`SELECT closeness FROM runs WHERE id = ?`, run)
 	}
-	want := hardest(sa.ID)
-	if want != (1<<Length-1)&^(1<<k) {
-		t.Fatalf("the hardest right answers of nine: %b", want)
+	want := closeness(sa.ID)
+	if want != 1000 {
+		t.Fatalf("the number, right on: %d", want)
 	}
 	for who, s := range map[string]State{
 		"before": w.stateOf(before, sb.ID), "missed": w.stateOf(missed, sm.ID), "during": sd, "after": sa,
 	} {
-		if !s.Done || s.Void != 1 || s.Rights != Length-1 || hardest(s.ID) != want {
-			t.Errorf("%s: %+v, not nine right of nine (hardest %b)", who, s, hardest(s.ID))
+		if !s.Done || s.Void != 1 || s.Rights != Length-1 || closeness(s.ID) != want {
+			t.Errorf("%s: %+v, not nine right of nine (the number %d)", who, s, closeness(s.ID))
 		}
 		if len(s.Trail) != Length || !s.Trail[k].Void || s.Trail[k].Right || slices.ContainsFunc(s.Trail[:k], func(m Mark) bool { return m.Void }) {
 			t.Errorf("%s's trail: %+v", who, s.Trail)
@@ -161,7 +161,7 @@ func TestDayVoidKeepsResultsComparable(t *testing.T) {
 	if err := w.g.EnsureDays(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if s := w.stateOf(before, sb.ID); hardest(s.ID) != want || s.Rights != Length-1 || s.Void != 1 {
+	if s := w.stateOf(before, sb.ID); closeness(s.ID) != want || s.Rights != Length-1 || s.Void != 1 {
 		t.Fatalf("again: %+v", s)
 	}
 }

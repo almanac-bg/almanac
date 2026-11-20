@@ -164,13 +164,15 @@ function figures(s: Stats | null): Child {
           )
         : null,
     ),
-    // What keeps the streak through a day missed: the week's one day, forgiven by itself (play/runs.go).
+    // What keeps the streak through a day missed: the week's days, forgiven by themselves (play/runs.go).
     h(
       "p",
       { class: "small muted" },
       s.spare
-        ? "Един пропуснат ден в седмицата не прекъсва серията."
-        : "Тази седмица един ден вече е простен: следващият пропуснат прекъсва серията.",
+        ? s.perWeek === 1
+          ? "Един пропуснат ден в седмицата не прекъсва серията."
+          : "До два пропуснати дни в седмицата не прекъсват серията."
+        : "Тази седмица простените дни са използвани: следващият пропуснат прекъсва серията.",
     ),
   ];
 }

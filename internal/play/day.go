@@ -126,6 +126,11 @@ func (g *Game) voidQuestion(tx *sql.Tx, day string, n int) error {
 		path, day); err != nil {
 		return err
 	}
+	// What its answers wrote in the players' books goes (ink.go: a question that counts for nobody writes nothing).
+	if _, err := tx.Exec(`DELETE FROM facts WHERE question_id = (SELECT json_extract(questions, '$[' || ?1 || '].id')
+		FROM days WHERE day = ?2) AND run_id IN (SELECT id FROM runs WHERE kind = 'day' AND day = ?2)`, n, day); err != nil {
+		return err
+	}
 	rows, err := tx.Query(`SELECT `+runColumns+` FROM runs WHERE kind = 'day' AND day = ?`, day)
 	if err != nil {
 		return err
@@ -195,11 +200,10 @@ func (g *Game) recount(tx *sql.Tx, r *run) error {
 			rights++
 		}
 		q, ok := b.Get(r.picks[a.n].ID)
-		tie.add(a.n, a.score, a.right, ok && q.Base().Type == "number")
+		tie.add(a.score, ok && q.Base().Type == "number")
 	}
 	r.rights, r.tie = rights, tie
-	_, err = tx.Exec(`UPDATE runs SET rights = ?, closeness = ?, hardest = ? WHERE id = ?`, r.rights, r.tie.closeness,
-		r.tie.hardest, r.id)
+	_, err = tx.Exec(`UPDATE runs SET rights = ?, closeness = ? WHERE id = ?`, r.rights, r.tie.closeness, r.id)
 	return err
 }
 

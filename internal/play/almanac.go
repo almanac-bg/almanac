@@ -52,11 +52,10 @@ type Almanac struct {
 	Found int            `json:"found"`
 	Ink   map[string]int `json:"ink"`
 	Next  string         `json:"next,omitempty"`
-	// Ranks are each of the bank's chapters' ranks, as kept (rank.go); Seal the one the player wears; Held, whether
-	// the guessing check holds their ranks at Страница now. The first page only.
+	// Ranks are each of the bank's chapters' seals, as kept (rank.go); Seal the one the player wears. The first page
+	// only.
 	Ranks []ChapterRank `json:"ranks,omitempty"`
 	Seal  *Seal         `json:"seal,omitempty"`
-	Held  bool          `json:"held,omitempty"`
 	// Since is the day the player's book began: their first game's.
 	Since string `json:"since,omitempty"`
 }
@@ -175,7 +174,7 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Al
 		if since.Valid {
 			out.Since = dayOf(time.UnixMilli(since.Int64))
 		}
-		if out.Ranks, out.Held, err = g.RanksOf(ctx, userID); err != nil {
+		if out.Ranks, err = g.RanksOf(ctx, userID); err != nil {
 			return out, err
 		}
 		var chosen sql.NullString

@@ -70,18 +70,19 @@ func Limit(q bank.Question) time.Duration {
 // of adults reading silently (some 175 words a minute), here on a phone, in a game.
 const SlowReading = 12.0
 
-// limits are each kind's base and floor (Limit). A true-or-not is judged at a glance: 15 s at least. A choice (a
-// choice of pictures among them) or a number asks for thought and a tap or a typed number: 25 s. An order, a match or
-// a split is four taps or more after reading: 40 s. Clues come bank.ClueEvery apart, the last 20 s in, then a choice:
-// 40 s.
+// limits are each kind's base and floor (Limit). The floors are set from the answer times the game keeps, so that
+// under 2% of people's answers run out of time (the Fable review, 20 Nov 2026; /admin shows the share by kind): a
+// true-or-not 20 s, a choice (a choice of pictures among them) or a number 35 s, an order, a match or a split (four
+// taps or more after reading) 60 s. Clues come bank.ClueEvery apart, the last 20 s in, then a choice: 60 s. A quick
+// player loses nothing: nothing is paid for speed.
 var limits = map[string]struct{ base, floor time.Duration }{
-	"truefalse": {8 * time.Second, 15 * time.Second},
-	"choice":    {12 * time.Second, 25 * time.Second},
-	"number":    {15 * time.Second, 25 * time.Second},
-	"order":     {28 * time.Second, 40 * time.Second},
-	"match":     {28 * time.Second, 40 * time.Second},
-	"split":     {28 * time.Second, 40 * time.Second},
-	"clues":     {20 * time.Second, 40 * time.Second},
+	"truefalse": {8 * time.Second, 20 * time.Second},
+	"choice":    {12 * time.Second, 35 * time.Second},
+	"number":    {15 * time.Second, 35 * time.Second},
+	"order":     {28 * time.Second, 60 * time.Second},
+	"match":     {28 * time.Second, 60 * time.Second},
+	"split":     {28 * time.Second, 60 * time.Second},
+	"clues":     {20 * time.Second, 60 * time.Second},
 }
 
 // LongestLimit is the longest any question is shown (Limit).
@@ -160,12 +161,12 @@ type run struct {
 	tie           tiebreak // what decides between the same right answers (board.go)
 	ms            int64
 	finished      bool
-	shadow        bool // counts for its player alone (fair.go)
+	shadow        int  // why it counts for its player alone (fair.go: ShadowScript…), 0 if it doesn't
 	pencil        bool // a day's issue played a second time in one browser: writes pencil only (ink.go)
 }
 
 const runColumns = `id, user_id, kind, coalesce(day, ''), coalesce(category, ''), questions,
-	at, shown_at, rights, closeness, hardest, ms, finished_at IS NOT NULL, shadow <> 0, pencil <> 0`
+	at, shown_at, rights, closeness, ms, finished_at IS NOT NULL, shadow, pencil <> 0`
 
 type scanner interface{ Scan(...any) error }
 
@@ -173,7 +174,7 @@ func scanRun(row scanner) (*run, error) {
 	var r run
 	var picks string
 	err := row.Scan(&r.id, &r.userID, &r.kind, &r.day, &r.category, &picks,
-		&r.at, &r.shownAt, &r.rights, &r.tie.closeness, &r.tie.hardest, &r.ms, &r.finished, &r.shadow, &r.pencil)
+		&r.at, &r.shownAt, &r.rights, &r.tie.closeness, &r.ms, &r.finished, &r.shadow, &r.pencil)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoRun
 	}
@@ -418,12 +419,10 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, number bool, ms int64)
 	if err := g.judgeAnswer(tx, r, gr, ms); err != nil {
 		return err
 	}
-	if gr.Right {
-		if err := g.writeFact(tx, r, now); err != nil {
-			return err
-		}
+	if err := g.writeFact(tx, r, now, gr.Right); err != nil {
+		return err
 	}
-	r.tie.add(r.at, gr.Score, gr.Right, number)
+	r.tie.add(gr.Score, number)
 	r.at++
 	if gr.Right {
 		r.rights++
@@ -434,16 +433,16 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, number bool, ms int64)
 	if r.at >= len(r.picks) {
 		return g.finish(tx, r)
 	}
-	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, rights = ?, closeness = ?, hardest = ?, ms = ?
-		WHERE id = ?`, r.at, r.rights, r.tie.closeness, r.tie.hardest, r.ms, r.id)
+	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, rights = ?, closeness = ?, ms = ?
+		WHERE id = ?`, r.at, r.rights, r.tie.closeness, r.ms, r.id)
 	return err
 }
 
 // finish ends a run where it is, and notes that what follows it is due (after.go).
 func (g *Game) finish(tx *sql.Tx, r *run) error {
 	r.finished = true
-	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, rights = ?, closeness = ?, hardest = ?, ms = ?,
-		finished_at = ? WHERE id = ?`, r.at, r.rights, r.tie.closeness, r.tie.hardest, r.ms, store.Ms(g.Now()), r.id)
+	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, rights = ?, closeness = ?, ms = ?,
+		finished_at = ? WHERE id = ?`, r.at, r.rights, r.tie.closeness, r.ms, store.Ms(g.Now()), r.id)
 	if err != nil {
 		return err
 	}
@@ -662,6 +661,9 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 			if gr, err = bank.GradeAt(d, answer, since); err != nil {
 				return ErrBadAnswer
 			}
+		}
+		if late > Grace && gr.Given == nil {
+			res.TimedOut = true // only an answer is taken late: no answer late is the time run out (late.go)
 		}
 		inRow := 0
 		if gr.Right {

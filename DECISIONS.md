@@ -32,31 +32,39 @@ packages' doc comments; this file holds only what must not drift.
   - **The issue is asked once.** Its score is the number right out of 10; a close answer is „близо“, not right. No
     points and no bonus. No played question is asked again (no Втори шанс, no past issues), and a share link opened
     after its day opens today's issue.
-  - **Ink and pencil.** A right answer in the issue, the first time a player meets that question, writes its fact in
-    ink; a right answer anywhere else (chapter games, duels) writes it in pencil. A chapter shows one number, its ink.
-  - **Rank per chapter from ink, never falling, named for the book, not the person** (Бележка 1, Страница 5,
-    Тетрадка 15, Тефтер 40, Книга 100, Летопис 250, then „Летопис · 2“ for each further 100), drawn as a seal of its
-    own (not the logo) that fills in quarters between ranks, worn beside the name; the chapter's art becomes a
-    choosable avatar at Страница. The animals stay free. Mastery is hidden: it steers chapter games and recordings.
+  - **Ink.** A right answer in the issue, the first time a player meets that question, writes its fact in ink. Every
+    other fact a player meets (a miss, or any answer in chapter games and duels) is in the book in grey, as met: never
+    counted, never promised to turn into ink. A chapter shows one number, its ink.
+  - **Each chapter's seal (печат) is its rank,** from ink, never falling, named for the book, not the person
+    (Бележка 1, Страница 5, Тетрадка 15, Книга 40, Том 100, Летопис 250, then „Летопис · 2“ for each further 100):
+    a badge of its own (not the logo), filling in quarters between ranks; beside a name only the seal shows, the name
+    only in the Алманах and on a rank-up. No check against guessing: the names claim nothing a count doesn't hold. The
+    chapter's art becomes a choosable avatar at Страница. The animals stay free. Mastery is hidden: it steers chapter games and recordings.
     These are the only levels, titles and unlocks; nothing else adds up across games (no XP, currencies, goals,
-    achievements, notes as rewards, lifetime totals, rating, divisions, leagues, rooms, anything live).
+    achievements, notes as rewards, lifetime totals, rating, divisions, leagues, rooms). Anything live stays out until
+    the owner reopens it.
   - **The streak counts days the issue was played** and forgives up to two missed days a week by itself; an ended
     streak's number is never named.
   - **Duels on one's own time:** a friend has 7 days; or a real recording, chosen as „равен“ or „по-силен“. A friend's
-    record against you stays.
+    record against you stays: the one count kept between two players.
   - **Sharing:** the score and its tiles, never the answers, unsigned, with a way into the same ten.
   - **A result has a budget:** the score and tiles, the day's entry and its growth line, friends' tiles, one action,
-    tomorrow; everything else under „Въпросите и фактите“. A wrong game is never celebrated; a best rank rising is the
-    only big moment.
-  - **The player's nouns are a closed list:** Брой, близо, серия, Алманах (глави, факти, мастило, молив), звание and
-    its печат, игра на главата (Микс, България), приятели, класация, дуел (запис), споделяне, профил, напомняне.
-    Adding one is the owner's call.
+    tomorrow; with a crowd, how Bulgaria did that day („средно 6,2“). Everything else under „Въпросите и фактите“. A
+    wrong game is never celebrated; a best rank rising and a ten of ten are the only big moments.
+  - **The player's nouns are a closed list:** Брой, близо, серия, Алманах (глави, факти, мастило), печат, игра на
+    главата (Микс, България), приятели, класация, дуел (запис), споделяне, профил, напомняне. Adding one is the owner's
+    call. `/admin` shows each one's weekly use; a session proposes removing one nobody uses.
   - **The rule for later.** A change is made only if it makes the issue better or names the measure it moves and what
     it removes; adds no noun; keeps every place's budget; is good at zero (first player, first day, 0 right, no
     friends); pays one deed once; is measured by a randomised hold-out where it can be (changes to the shared day are
     judged before and after, the owner's call), and while effects are too small to detect, removes at least as much as
-    it adds; and answers „Built to hold“ (CLAUDE.md). A fix restores stated behaviour; polish adds no data, count,
-    block or notification.
+    it adds (the default while numbers are small); and answers „Built to hold“ (CLAUDE.md). "Makes the issue better"
+    means it changes only the questions, the clock or the play screen and adds nothing outside it. A fix restores
+    stated behaviour; polish adds no data, count, block or notification. A hold-out states its measure and window in
+    advance; if it shows nothing by then, the direction's choice stays.
+  - **The bets,** each with its measure in `/admin`: that ink from the issue alone is enough progress (D30 of players
+    who play only the day); that the seals are wanted (players who open or change theirs); that the share brings
+    players (plays per shared link).
   The decisions below that this replaces are gone from this file; the code follows as each part lands.
 - **The day's ten questions are the heart;** everything else serves them or stays out of the way. A new system replaces
   one or proves it's needed (CLAUDE.md, Direction).

@@ -147,7 +147,7 @@ func TestStreakMailHeldOut(t *testing.T) {
 		t.Fatal(err)
 	}
 	for d := range 5 {
-		g.finishedDay(id, day.AddDate(0, 0, -3-d), 10*time.Hour)
+		g.finishedDay(id, day.AddDate(0, 0, -4-d), 10*time.Hour)
 	}
 	s.heldOut = func(int64) bool { return true }
 	if n := s.streakMails(t.Context(), day.Add(12*time.Hour)); n != 0 {

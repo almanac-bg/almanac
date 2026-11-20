@@ -206,12 +206,12 @@ export async function playedFair(page: Page): Promise<void> {
 const factsRule = `WITH met AS (
 		SELECT a.question_id, min(a.at) AS at FROM answers a JOIN runs r ON r.id = a.run_id
 		WHERE r.user_id = ?1 GROUP BY a.question_id),
-	rights AS (
-		SELECT a.question_id, a.at, a.run_id, r.kind = 'day' AND NOT r.pencil AND a.at = m.at AS ink
+	meets AS (
+		SELECT a.question_id, a.at, a.run_id, a.is_right AND r.kind = 'day' AND NOT r.pencil AND a.at = m.at AS ink
 		FROM answers a JOIN runs r ON r.id = a.run_id JOIN met m ON m.question_id = a.question_id
-		WHERE r.user_id = ?1 AND a.is_right AND r.shadow <> 1 AND NOT coalesce(json_extract(r.questions, '$[' || a.n || '].void'), 0)),
+		WHERE r.user_id = ?1 AND r.shadow <> 1 AND NOT coalesce(json_extract(r.questions, '$[' || a.n || '].void'), 0)),
 	ranked AS (
-		SELECT *, row_number() OVER (PARTITION BY question_id ORDER BY ink DESC, at, run_id) AS k FROM rights)
+		SELECT *, row_number() OVER (PARTITION BY question_id ORDER BY ink DESC, at, run_id) AS k FROM meets)
 	INSERT INTO facts (user_id, question_id, ink, at, run_id)
 	SELECT ?1, question_id, ink, at, run_id FROM ranked WHERE k = 1`;
 

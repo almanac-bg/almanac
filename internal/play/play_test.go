@@ -621,13 +621,13 @@ func TestBoardAndStreak(t *testing.T) {
 	if week, _ := w.g.Week(ctx, ana); week != [7]bool{} {
 		t.Fatalf("week %v on a new Monday", week)
 	}
-	if n, _ := w.g.Streak(ctx, ana); n != 0 {
-		t.Fatalf("streak %d after missing two days in a week", n)
+	if n, _ := w.g.Streak(ctx, ana); n != 2 {
+		t.Fatalf("streak %d after missing two days in a week, both forgiven", n)
 	}
 }
 
-// The streak forgives the first day missed in a week, Monday to Sunday, by itself; a second that week ends it. Two days
-// missed in a row are both forgiven only across a week's turn.
+// The streak forgives two days missed in a week, Monday to Sunday, by itself; a third that week ends it. Four days
+// missed in a row are forgiven only across a week's turn.
 func TestStreakForgives(t *testing.T) {
 	w := setup(t) // Thursday, 12 November
 	ctx := t.Context()
@@ -645,30 +645,96 @@ func TestStreakForgives(t *testing.T) {
 	w.wait(24 * time.Hour)
 	w.playDay(ana)
 	streak("Friday, the second day", 2, []string{}, true)
-	w.wait(48 * time.Hour) // Saturday missed: this week's day forgiven
-	streak("Sunday, before playing", 2, []string{"2026-11-14"}, false)
+	w.wait(48 * time.Hour) // Saturday missed: one of this week's two forgiven
+	s := streak("Sunday, before playing", 2, []string{"2026-11-14"}, true)
+	if s.PerWeek != Forgives || s.Left != 1 {
+		t.Fatalf("Sunday, the week's forgiving: %+v", s)
+	}
 	if week := w.g.InWeek([]string{"2026-11-14"}); week != [7]bool{5: true} {
 		t.Fatalf("the day forgiven on the week's strip: %v", week)
 	}
 	w.playDay(ana)
-	streak("Sunday, the third day", 3, []string{"2026-11-14"}, false)
-	w.wait(24 * time.Hour) // Monday: a new week, with its own day to forgive
+	streak("Sunday, the third day", 3, []string{"2026-11-14"}, true)
+	w.wait(24 * time.Hour) // Monday: a new week, with its own two to forgive
 	streak("Monday, before playing", 3, []string{"2026-11-14"}, true)
-	w.wait(24 * time.Hour) // Monday missed, forgiven
-	s := streak("Tuesday, before playing", 3, []string{"2026-11-14", "2026-11-16"}, false)
-	if s.Ended != nil || s.Best != 3 {
+	w.wait(48 * time.Hour) // Monday and Tuesday missed, both forgiven
+	s = streak("Wednesday, before playing", 3, []string{"2026-11-14", "2026-11-16", "2026-11-17"}, false)
+	if s.Ended != nil || s.Best != 3 || s.Left != 0 {
 		t.Fatalf("still going: %+v", s)
 	}
-	w.wait(24 * time.Hour) // Tuesday missed too: the week's second, which ends it
-	s = streak("Wednesday", 0, []string{}, false)
-	if s.Ended == nil || *s.Ended != (Ended{Days: 3, On: "2026-11-17"}) || s.Best != 3 {
+	w.wait(24 * time.Hour) // Wednesday missed too: the week's third, which ends it
+	s = streak("Thursday", 0, []string{}, false)
+	if s.Ended == nil || *s.Ended != (Ended{Days: 3, On: "2026-11-18"}) || s.Best != 3 {
 		t.Fatalf("ended: %+v", s)
 	}
-	// A Sunday and the Monday after are each their own week's.
+	// A Saturday and Sunday, then the Monday and Tuesday after: each two their own week's.
 	bo := w.user()
-	w.daysPlayed(bo, 6, 5, 4, 1) // Thursday to Saturday, then yesterday (Tuesday): Sunday and Monday forgiven
-	if s, _ := w.g.StreakOf(ctx, bo); s.Days != 4 || !slices.Equal(s.Forgiven, []string{"2026-11-15", "2026-11-16"}) {
+	w.daysPlayed(bo, 8, 7, 6, 1) // Wednesday to Friday, then yesterday (Wednesday): four days forgiven
+	if s, _ := w.g.StreakOf(ctx, bo); s.Days != 4 ||
+		!slices.Equal(s.Forgiven, []string{"2026-11-14", "2026-11-15", "2026-11-16", "2026-11-17"}) {
 		t.Fatalf("across a week's turn: %+v", s)
+	}
+	// The ended streak's days are never said: its day only.
+	if out, _ := json.Marshal(StreakNow{Ended: &Ended{Days: 3, On: "2026-11-18"}}); !strings.Contains(string(out),
+		`"ended":{"on":"2026-11-18"}`) {
+		t.Fatalf("an ended streak's number said: %s", out)
+	}
+}
+
+// A tenth of the players who come in during the hold-out's window (StreakHoldout) get one forgiven day a week while
+// it lasts, by a bucket of their own; from its end, two, as everyone.
+func TestStreakHoldout(t *testing.T) {
+	w := setup(t) // Thursday, 12 November
+	ctx := t.Context()
+	for _, q := range []string{
+		`INSERT OR REPLACE INTO kv (key, value) VALUES ('streak_forgives_from', '2026-11-01')`,
+		`INSERT OR REPLACE INTO kv (key, value) VALUES ('streak_forgives_until', '2026-11-20')`,
+	} {
+		if _, err := w.db.Write.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var held, free int64
+	for held == 0 || free == 0 {
+		id := w.user()
+		if _, err := w.db.Write.Exec(`UPDATE users SET created_at = ? WHERE id = ?`,
+			time.Date(2026, 11, 10, 12, 0, 0, 0, Bulgaria).UnixMilli(), id); err != nil {
+			t.Fatal(err)
+		}
+		switch {
+		case HeldOut(StreakHoldout, id) && held == 0:
+			held = id
+		case !HeldOut(StreakHoldout, id) && free == 0:
+			free = id
+		}
+	}
+	if Bucket(StreakHoldout, held) == Bucket(HeldReminders, held) && Bucket(StreakHoldout, free) == Bucket(HeldReminders, free) {
+		t.Fatal("the streak's buckets are the reminders'")
+	}
+	// Tuesday and Wednesday played; Thursday's today. Saturday and Sunday missed by both.
+	w.daysPlayed(held, 2, 1)
+	w.daysPlayed(free, 2, 1)
+	w.playDay(held)
+	w.playDay(free)
+	w.wait(72 * time.Hour) // Sunday: Friday and Saturday missed
+	if s, _ := w.g.StreakOf(ctx, held); s.Days != 0 || s.PerWeek != HeldForgives || s.Ended == nil {
+		t.Fatalf("held out, two missed: %+v", s)
+	}
+	if s, _ := w.g.StreakOf(ctx, free); s.Days != 3 || s.PerWeek != Forgives || len(s.Forgiven) != 2 {
+		t.Fatalf("not held out, two missed: %+v", s)
+	}
+	// Past the window: two for everyone.
+	w.wait(7 * 24 * time.Hour)
+	if s, _ := w.g.StreakOf(ctx, held); s.PerWeek != Forgives {
+		t.Fatalf("held out, after the window: %+v", s)
+	}
+	// One who came in before the window is never held.
+	old := w.user()
+	for HeldOut(StreakHoldout, old) == false {
+		old = w.user()
+	}
+	if until, _ := w.g.heldUntil(ctx, old); until != "" {
+		t.Fatalf("a player from before the window held: %q", until)
 	}
 }
 
@@ -1048,10 +1114,10 @@ func TestDecided(t *testing.T) {
 	}
 }
 
-// A duel goes by right answers, then as the board breaks a tie (how close the number came, then the hardest right
-// answer), then by time, by TieBand or more.
+// A duel goes by right answers, then as the board breaks a tie (how close the number came), then by time, by TieBand
+// or more.
 func TestDuelScore(t *testing.T) {
-	base := duelScore{rights: 7, tie: tiebreak{closeness: 500, hardest: 0b0001111111}, ms: 60_000}
+	base := duelScore{rights: 7, tie: tiebreak{closeness: 500}, ms: 60_000}
 	for _, c := range []struct {
 		name string
 		o    duelScore
@@ -1060,7 +1126,6 @@ func TestDuelScore(t *testing.T) {
 		{"more right answers", duelScore{rights: 8}, 1},
 		{"fewer right answers, closer and quicker", duelScore{rights: 6, tie: tiebreak{closeness: 1000}, ms: 1}, -1},
 		{"a closer number", duelScore{rights: 7, tie: tiebreak{closeness: 600}, ms: 90_000}, 1},
-		{"a harder right answer", duelScore{rights: 7, tie: tiebreak{closeness: 500, hardest: 0b1000111111}, ms: 90_000}, 1},
 		{"quicker by a second", duelScore{rights: 7, tie: base.tie, ms: 59_000}, 1},
 		{"quicker by less", duelScore{rights: 7, tie: base.tie, ms: 59_500}, 0},
 		{"slower by a second", duelScore{rights: 7, tie: base.tie, ms: 61_000}, -1},

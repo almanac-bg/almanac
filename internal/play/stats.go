@@ -15,7 +15,8 @@ type Stats struct {
 	Best     int      `json:"best"`     // the longest streak the player has had (StreakNow)
 	Week     [7]bool  `json:"week"`     // this week's days played, Monday first
 	Forgiven [7]bool  `json:"forgiven"` // this week's day missed that the streak forgave
-	Spare    bool     `json:"spare"`    // whether this week has its day to forgive still
+	Spare    bool     `json:"spare"`    // whether this week has a day to forgive still
+	PerWeek  int      `json:"perWeek"`  // how many missed days a week the streak forgives the player
 	Recent   []Played `json:"recent"`
 }
 
@@ -48,6 +49,7 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 		return s, err
 	}
 	s.Streak, s.Best, s.Spare, s.Forgiven = streak.Days, streak.Best, streak.Spare, g.InWeek(streak.Forgiven)
+	s.PerWeek = streak.PerWeek
 	if s.Week, err = g.Week(ctx, userID); err != nil {
 		return s, err
 	}

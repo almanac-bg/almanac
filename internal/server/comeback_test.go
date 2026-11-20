@@ -37,7 +37,7 @@ func TestComeBack(t *testing.T) {
 	}
 	_, today = cy.call("GET", "/api/day", nil)
 	back, _ := today["back"].(map[string]any)
-	if back == nil || back["last"] != "2026-11-09" || back["best"] != 5.0 || today["ended"] != nil {
+	if back == nil || back["last"] != "2026-11-09" || back["best"] != nil || today["ended"] != nil {
 		t.Fatalf("back after days away: %v (ended %v)", today["back"], today["ended"])
 	}
 	if status, _ := cy.call("POST", "/api/me/streak-told", map[string]any{"key": "back:2026-11-09"}); status != 200 {

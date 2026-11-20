@@ -18,6 +18,9 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 )
 
+// A question new to the bank is held for the days the same way (unproven): out of chapter games and duels until a day
+// has dealt it or it is NewHeld days old, so that the issue meets it first.
+//
 // The days ahead: the day's questions are drawn up to Ahead days before their day, and no other game deals them
 // (dayQuestions), so that the day stays one attempt for everyone. Were only today's ten kept out, a question would
 // reach a topic game or a duel before its own day, and the players who play most would meet more and
@@ -252,11 +255,28 @@ func barsOf(days map[string][]Pick, today string, b *bank.Bank) dayBars {
 		bars.now[id], bars.all[id] = true, true
 	}
 	for _, q := range b.Live("", "") {
-		if id := q.Base().ID; !dealt[id] && waiting(q, today) {
+		if id := q.Base().ID; !dealt[id] && (waiting(q, today) || unproven(q, today)) {
 			bars.all[id] = true
 		}
 	}
 	return bars
+}
+
+// NewHeld is how long a question new to the bank is kept out of every game but the day's, unless a day has dealt it
+// before (DECISIONS.md, „The direction“: freshness): its first meeting is the issue's, in ink, for everyone who plays
+// the days, and a chapter's game or a duel never spends it first. NewHeldFrom is the first day it holds for: the bank
+// as it was the day before (nearly all of it written in the month before) plays as it did, or chapter games and duels
+// would have had nothing to deal for months.
+const (
+	NewHeld     = 120
+	NewHeldFrom = "2026-11-21"
+)
+
+// unproven is whether a question is new to the bank (bank.Tail.Added: from NewHeldFrom on, NewHeld days at most before
+// today) and so held for the days: one without a date of joining is old.
+func unproven(q bank.Question, today string) bool {
+	added := q.Extra().Added
+	return added >= NewHeldFrom && added > DayShift(today, -NewHeld)
 }
 
 // waiting is whether a question belongs to a date still to come (bank.Tail.On: every year's, or that year's from today

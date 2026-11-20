@@ -3,10 +3,12 @@ import { daysPlayed, openGame, playRun, startDay } from "./play.ts";
 
 test("a streak that ended is said to have ended, once", async ({ page }) => {
   await page.goto("/");
-  // Three days missed since: two weeks forgive two at most, so the third ends it, whatever today's weekday.
-  await daysPlayed(page, 5, 4);
+  // Five days missed since: two weeks forgive four at most, so one of the last three ends it, whatever today's
+  // weekday. Its number is never said (DECISIONS.md, „The direction“).
+  await daysPlayed(page, 7, 6);
   await page.reload();
-  await expect(page.locator(".streak-notice")).toContainText("Серията ти от 2 дни прекъсна. Днес започва нова.");
+  await expect(page.locator(".streak-notice")).toContainText("Серията ти прекъсна. Днес започва нова.");
+  await expect(page.locator(".streak-notice")).not.toContainText(/\d/);
   await page.reload();
   await expect(page.getByRole("button", { name: "Започни" })).toBeVisible();
   await expect(page.locator(".streak-notice")).toHaveCount(0);
@@ -17,7 +19,7 @@ test("Профил keeps the longest streak, under the one going on, and says wh
   await daysPlayed(page, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 2, 1);
   await page.goto("/me");
   await expect(page.locator(".me-figures .fig-n")).toHaveText(["2", "12"]);
-  await expect(page.locator(".me-intro")).toContainText("Един пропуснат ден в седмицата не прекъсва серията.");
+  await expect(page.locator(".me-intro")).toContainText("До два пропуснати дни в седмицата не прекъсват серията.");
 });
 
 test("a streak at stake: unlit till the day lights it, pointed to from a topic, tomorrow under the result", async ({

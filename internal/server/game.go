@@ -45,9 +45,9 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 		if err != nil {
 			return nil, err
 		}
-		out["streak"], out["spare"] = streak.Days, streak.Spare
+		out["streak"], out["spare"], out["perWeek"] = streak.Days, streak.Spare, streak.PerWeek
 		// What came of the days just missed, told on Начало once (play.TellStreak: the client says when it has): the
-		// week forgave one; or it had forgiven one already and the streak ended, and a new one begins.
+		// week forgave one; or it had forgiven what it does already and the streak ended, and a new one begins.
 		recent := s.game.Now().In(play.Bulgaria).AddDate(0, 0, -3).Format(time.DateOnly)
 		told, err := s.game.StreakTold(ctx, u.ID)
 		if err != nil {
@@ -62,13 +62,13 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 			}
 		} else if e != nil && out["forgiven"] == nil && streak.Days <= 1 {
 			// Back after days away, the streak ended since the last day played (and not just now: that's told as its
-			// end, above): welcomed back, once, with the longest streak they've had.
+			// end, above): welcomed back, once, never with a streak's number (an ended one is never named).
 			last, err := s.game.LastDay(ctx, u.ID)
 			if err != nil {
 				return nil, err
 			}
 			if e.On > last && s.game.Away(last) && told != "back:"+last {
-				out["back"] = map[string]any{"last": last, "best": streak.Best}
+				out["back"] = map[string]any{"last": last}
 			}
 		}
 		// Whether today is their first day (no game finished before it): its result says less of where they stand.
@@ -142,7 +142,7 @@ func (s *Server) startDay(w http.ResponseWriter, r *http.Request) error {
 	}
 	ctx := s.fromClient(r, u.ID)
 	if s.playedHere(r, s.game.Today()) {
-		// This browser started today's issue already, as someone else: a run begun now writes pencil (handoff.go).
+		// This browser started today's issue already, as someone else: a run begun now writes grey (handoff.go).
 		ctx = play.SecondPlay(ctx, u.ID)
 	}
 	st, err := s.game.StartDay(ctx, u.ID)
