@@ -233,6 +233,55 @@ func TestRulesOfAQuestion(t *testing.T) {
 		{"anchor", number("a", "Колко населени места в България нямат жители?", 192, 58, ""), false},
 		{"anchor", number("a", "Колко минути продължава филмът „Отнесени от вихъра“?", 238, 71, "минути"), false},
 		{"anchor", number("a", "През коя година излиза първият епизод на „Стъклен дом“?", 2010, 8, ""), false},
+		{"countable", number("a", "Колко опери пише Джоакино Росини?", 39, 12, "опери"), true},
+		{"countable", number("a", "На колко клаузи се дели Магна харта?", 63, 19, "клаузи"), true},
+		{"countable", number("a", "Колко хиляди зрители гледат филма „11А“?", 98, 29, "хиляди"), true},
+		{"countable", number("a", "Колко пъти бие сърцето за минута?", 70, 21, "пъти"), true},
+		{"countable", number("a", "Около колко пъти Земята е по-тежка от Луната?", 81, 24, "пъти"), false},
+		{"countable", number("a", "Колко метра е висок Мусала?", 2925, 880, "м"), false},
+		{"countable", number("a", "Какъв е най-високият рейтинг „Ело“ на Веселин Топалов?", 2816, 80, "точки"), false},
+		{"countable", number("a", "Колко точки вкарва Янис Адетокунбо в шестия мач?", 50, 15, "точки"), true},
+		{"countable", number("a", "Колко хиляди души живеят в Гренландия?", 57, 17, "хил."), false},
+		{"countable", number("a", "Колко населени места в България нямат жители?", 192, 58, ""), false},
+		{"countable", number("a", "През коя година излиза първият епизод на „Стъклен дом“?", 2010, 8, ""), false},
+		{"offset-scale", number("a", "Какъв е най-високият рейтинг „Ело“ на Веселин Топалов?", 2816, 840, "точки"), true},
+		{"offset-scale", number("a", "Какъв е най-високият рейтинг „Ело“ на Веселин Топалов?", 2816, 80, "точки"), false},
+		{"offset-scale", number("a", "При колко градуса по Целзий се топи готварската сол?", 801, 250, "°C"), true},
+		{"offset-scale", number("a", "При колко градуса по Целзий се топи готварската сол?", 801, 80, "°C"), false},
+		{"offset-scale", number("a", "Около колко градуса е един радиан?", 57.3, 17, "°"), true},
+		{"offset-scale", number("a", "Колко метра е висок Мусала?", 2925, 880, "м"), false},
+		{"own-number", number("a", "Колко дни продължават „Стоте дни“ на Наполеон?", 110, 33, "дни"), true},
+		{"own-number", number("a", "Колко дни трае обсадата, започнала 90 дни след войната?", 110, 33, "дни"), true},
+		{"own-number", number("a", "Колко метра е дълъг тунелът, открит през 2024 г.?", 2000, 500, "м"), false},
+		{"own-number", number("a", "Колко са прелюдиите в цикъла оп. 28 на Шопен?", 24, 8, "прелюдии"), false},
+		{"own-number", number("a", "Колко милиона души живеят в Германия, закръглено до сто хиляди?", 82.7, 20, "млн. души"), false},
+		{"own-number", number("a", "Колко процента от хората на 16–74 години ползват интернет?", 22, 7, "%"), false},
+		{"present", &Clues{Head: Head{ID: "a", Type: "clues", Text: "Кой е този боец?"}, Answer: "Багата", Wrong: []string{"А", "Б", "В"},
+			Clues: []string{"Роден е в София.", "Бие се в тежка категория на UFC.", "Трета."}}, true},
+		{"present", func() Question {
+			q := choice("a", "В коя сграда се записва шоуто?", "НДК", "БНТ", "Дворецът", "Арена")
+			q.Fact = "Студиото е в зала 12, а шоуто се записва всяка делнична вечер."
+			return q
+		}(), true},
+		{"present", func() Question {
+			q := choice("a", "В коя сграда се записва шоуто?", "НДК", "БНТ", "Дворецът", "Арена")
+			q.Fact = "От 2000 до 2019 г. шоуто се записва всяка делнична вечер."
+			return q
+		}(), false},
+		{"present", func() Question {
+			q := choice("a", "Кой е президент на Франция?", "Макрон", "Оланд", "Саркози", "Ширак")
+			q.ReviewBy = "2027-05-01"
+			return q
+		}(), false},
+		{"present", choice("a", "Кой е президент на Франция?", "Макрон", "Оланд", "Саркози", "Ширак"), true},
+		{"present", choice("a", "Колко години Роналд Рейгън е президент на САЩ?", "8", "4", "6", "12"), false},
+		{"present", choice("a", "Кой е първият президент на САЩ?", "Вашингтон", "Адамс", "Джеферсън", "Линкълн"), false},
+		{"present", &TrueFalse{Head: Head{ID: "a", Type: "truefalse", Text: "Серина Уилямс се състезава за Великобритания."}}, false},
+		{"present", func() Question {
+			q := choice("a", "За кой клуб играе Джордж Бест?", "Манчестър Юнайтед", "Ливърпул", "Челси", "Арсенал")
+			q.Fact = "Бест умира през 2005 г. в Лондон."
+			return q
+		}(), false},
 		{"decoy", &Match{Head: Head{ID: "a", Type: "match", Text: "Свържи:"}, Pairs: []MatchPair{{"А", "Б"}}, Tail: Tail{Added: "2026-11-01"}}, true},
 	} {
 		rule, _ := RuleNamed(c.rule)
@@ -368,6 +417,67 @@ func TestStrictness(t *testing.T) {
 	got = found(b, Waiver{"gen-9", "ending", "няма го"}, Waiver{"gen-1", "nosuch", "?"}, Waiver{"gen-1", "ending", ""})
 	if n := len(slices.DeleteFunc(got, func(s string) bool { return !strings.HasPrefix(s, "! ") })); n != 3 {
 		t.Errorf("bad waivers make %d errors: %v", n, found(b, Waiver{"gen-9", "ending", "няма го"}))
+	}
+}
+
+// A rule added later is an error only for the questions added from its own day (Rule.From): one added between
+// StrictFrom and then is warned of, so that the bank that loaded yesterday loads today.
+func TestRuleStrictFromItsDay(t *testing.T) {
+	between := number("gen-1", "Колко опери пише Джоакино Росини?", 39, 12, "опери")
+	between.Added = StrictFrom
+	after := number("gen-2", "Колко симфонии пише Хайдн?", 104, 31, "симфонии")
+	after.Added = AuditFrom
+	if got := found(bankOf(between, after)); !slices.Equal(got, []string{"countable gen-1", "!countable gen-2"}) {
+		t.Errorf("found %v", got)
+	}
+}
+
+// A count of a list is no estimate for the day's hard number either (Bank.Estimate), unless the bank waives it for its
+// anchor.
+func TestEstimateOfACount(t *testing.T) {
+	operas := number("gen-1", "Колко опери пише Джоакино Росини?", 39, 12, "опери")
+	books := number("gen-2", "Колко книги има Библията в протестантския канон?", 66, 20, "книги")
+	height := number("gen-3", "Колко метра е висок Мусала?", 2925, 880, "м")
+	year := number("gen-4", "През коя година е Освобождението?", 1878, 16, "")
+	b := bankOf(operas, books, height, year)
+	got := found(b, Waiver{"gen-2", "countable", "известен сбор: 39 книги в Стария и 27 в Новия завет"})
+	if !slices.Equal(got, []string{"countable gen-1"}) {
+		t.Errorf("found %v", got)
+	}
+	for q, want := range map[Question]bool{operas: false, books: true, height: true, year: false} {
+		if b.Estimate(q) != want {
+			t.Errorf("%s: estimate %v", q.Base().ID, !want)
+		}
+	}
+}
+
+// Two choices over one set of rare options ask one thing twice: mirrored (each one's answer the other's wrong
+// option), or the same answer; over the options of a whole kind (the countries), or sharing two, they don't.
+func TestTwin(t *testing.T) {
+	karloff := choice("mov-1", "Кой играе чудовището във „Франкенщайн“ (1931)?", "Борис Карлоф", "Бела Лугоши", "Лон Чейни", "Питър Лоре")
+	lugosi := choice("mov-2", "Кой играе граф Дракула във филма от 1931 г.?", "Бела Лугоши", "Борис Карлоф", "Лон Чейни", "Питър Лоре")
+	same := choice("mov-3", "Кой актьор е чудовището на Франкенщайн в киното от 1931 г.?", "Борис Карлоф", "Бела Лугоши", "Лон Чейни", "Клод Рейнс")
+	other := choice("mov-4", "Кой играе Невидимия човек (1933)?", "Клод Рейнс", "Бела Лугоши", "Конрад Фейт", "Фредрик Марч")
+	twins := func(qs ...Question) []string {
+		return slices.DeleteFunc(found(bankOf(qs...)), func(s string) bool { return !strings.HasPrefix(s, "twin") })
+	}
+	if got := twins(karloff, lugosi); len(got) != 1 {
+		t.Errorf("mirrored: %v", got)
+	}
+	if got := twins(karloff, same); len(got) != 1 {
+		t.Errorf("the same answer: %v", got)
+	}
+	if got := twins(karloff, other); len(got) != 0 {
+		t.Errorf("two options shared: %v", got)
+	}
+	// Countries every geography question offers: a kind's list, no twins.
+	var qs []Question
+	for i, c := range []string{"Франция", "Германия", "Италия", "Испания", "Франция", "Германия"} {
+		rest := slices.DeleteFunc([]string{"Франция", "Германия", "Италия", "Испания"}, func(s string) bool { return s == c })
+		qs = append(qs, choice(fmt.Sprintf("geo-%d", i), fmt.Sprintf("Въпрос %d за държава?", i), c, rest...))
+	}
+	if got := twins(qs...); len(got) != 0 {
+		t.Errorf("a kind's list: %v", got)
 	}
 }
 

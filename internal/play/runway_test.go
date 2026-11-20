@@ -37,7 +37,7 @@ func TestRunwayCountsWhatTheDayTakes(t *testing.T) {
 	b := biggerSample(t, 5)
 	today := "2026-11-16"
 	nums := hardNumbers(b)
-	if len(nums) != 6 || !slices.ContainsFunc(nums, func(n *bank.Number) bool { return estimate(n) }) {
+	if len(nums) != 6 || !slices.ContainsFunc(nums, func(n *bank.Number) bool { return b.Estimate(n) }) {
 		t.Fatalf("%d hard numbers in the sample, 6 estimates wanted", len(nums))
 	}
 	nums[0].Unit = ""               // a year: not an estimate
@@ -112,7 +112,7 @@ func TestDayNumberIsAnEstimate(t *testing.T) {
 		t.Fatal("no hard number in science")
 	}
 	for seed := range uint64(30) {
-		picks, short := drawDay(b, day, map[string]bool{}, nil, rand.New(rand.NewPCG(seed, 3)))
+		picks, short := drawDay(b, day, map[string]bool{}, nil, nil, rand.New(rand.NewPCG(seed, 3)))
 		last := dayNumber(t, b, picks)
 		if len(short) > 0 || !slices.Contains(estimates, last.Base().ID) {
 			t.Fatalf("seed %d: the day's number is %s (short %v), not science's estimate", seed, last.Base().ID, short)
@@ -122,7 +122,7 @@ func TestDayNumberIsAnEstimate(t *testing.T) {
 	for _, id := range estimates {
 		used[id] = true
 	}
-	picks, short := drawDay(b, day, used, nil, rand.New(rand.NewPCG(1, 3)))
+	picks, short := drawDay(b, day, used, nil, nil, rand.New(rand.NewPCG(1, 3)))
 	last := dayNumber(t, b, picks)
 	if !slices.Equal(short, []string{"hard number (estimate)"}) || last.Base().Type != "number" {
 		t.Fatalf("with the estimates spent: the number is %s, short %v", last.Base().ID, short)
@@ -175,13 +175,13 @@ func TestDayPassesOverdueQuestions(t *testing.T) {
 	}
 	before := false
 	for seed := range uint64(30) {
-		picks, _ := drawDay(b, day, map[string]bool{}, nil, rand.New(rand.NewPCG(seed, 9)))
+		picks, _ := drawDay(b, day, map[string]bool{}, nil, nil, rand.New(rand.NewPCG(seed, 9)))
 		for _, p := range picks {
 			if due[p.ID] {
 				t.Fatalf("seed %d: %s is due for review", seed, p.ID)
 			}
 		}
-		picks, _ = drawDay(b, "2026-11-19", map[string]bool{}, nil, rand.New(rand.NewPCG(seed, 9)))
+		picks, _ = drawDay(b, "2026-11-19", map[string]bool{}, nil, nil, rand.New(rand.NewPCG(seed, 9)))
 		before = before || slices.ContainsFunc(picks, func(p Pick) bool { return due[p.ID] })
 	}
 	if !before {
@@ -209,7 +209,7 @@ func TestTheRunwayIsTrue(t *testing.T) {
 			used := map[string]bool{}
 			r := rand.New(rand.NewPCG(seed, 2))
 			for day := range shortest.Days * 2 {
-				picks, short := drawDay(b, start.AddDate(0, 0, day).Format(time.DateOnly), used, nil, r)
+				picks, short := drawDay(b, start.AddDate(0, 0, day).Format(time.DateOnly), used, nil, nil, r)
 				if len(short) > 0 {
 					if day < shortest.Days*9/10 || day > shortest.Days*5/4 || !slices.Contains(short, shortest.Place) {
 						t.Fatalf("short on day %d (%v); the runway said %s, %d days", day, short, shortest.Place, shortest.Days)

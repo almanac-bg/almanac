@@ -33,6 +33,8 @@ func bankCommand(args []string) error {
 		return bankCheck(rest)
 	case "used":
 		return bankUsed()
+	case "days":
+		return bankDays(rest)
 	case "fmt":
 		return bankFmt(dir())
 	case "lint":
@@ -364,10 +366,10 @@ func b2i(b bool) int {
 }
 
 // bankUsed prints the questions the days have had (play.Game.DaysUsed), played and drawn ahead, for `bank check` and
-// `bank plan` -used: run it where the game's database is (DB_PATH). Question ids and the last day drawn, nothing of
-// a player's, so the file may leave the server.
+// `bank plan` -used: run it where the game's database is (DB_PATH), which it only reads. Question ids and the last day
+// drawn, nothing of a player's, so the file may leave the server.
 func bankUsed() error {
-	db, err := store.Open(dbPath())
+	db, err := store.OpenReadOnly(dbPath())
 	if err != nil {
 		return err
 	}

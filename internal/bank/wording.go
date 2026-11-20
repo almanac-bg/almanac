@@ -368,3 +368,79 @@ func namesDate(on []string, s string) (dates []string, named bool) {
 	}
 	return dates, named
 }
+
+// presentWords are a career, a show or an office told in the present: a player who „играе за“ a club, a fighter who
+// „се бие в“ a league, a host who „води предаването“, a show that „се записва всяка вечер“, whoever „е президент на“ a
+// country. The bank tells the past in the present too („През 1994 г. Стоичков играе за „Барселона““), so only a line
+// with no time of its own is read as now (presentTime), and never in a question that says its subject's life is over
+// (lifeOver). In lower case.
+var presentWords = regexp.MustCompile(`(?:^|[^\p{L}])(` + strings.Join([]string{
+	`играе за`,
+	`играе в (?:отбора|тима|клуба|националния|нба|нхл|премиър лийг|ла лига|серия а|бундеслигата)`,
+	`(?:се бие|бие се) (?:в|за)`,
+	`(?:се състезава|състезава се) (?:за|в|под)`,
+	`(?:е|остава) (?:старши |главен )?треньор на`,
+	`тренира (?:отбора|тима|клуба|националния)`,
+	`(?:е|остава) капитан на`,
+	`води (?:предаването|шоуто|рубриката|новините|емисията|сутрешния|вечерния|предаване|шоу)`,
+	`(?:е|остава) водещ[аи]? на`,
+	`(?:се записва|се снима) (?:всяка|всеки|в зала|в студио)`,
+	`заема поста`,
+	`(?:е|остава) (?:президент|премиер|министър-председател|кмет|министър|председател|генерален секретар|` +
+		`генерален директор|главен изпълнителен директор|канцлер|папа|патриарх|крал|кралица|император) на`,
+}, "|") + `)(?:[^\p{L}]|$)`)
+
+// presentTime says a line has a time of its own (a year, a decade, a span, a moment, an order among holders), or
+// counts a span (колко години), so its present is the past's.
+var presentTime = regexp.MustCompile(`\d{4}|\d0-те|\d+ (?:години|сезона)|(?:^|[^\p{L}])(?:когато|по време на|докато|` +
+	`след като|преди|след|от|до|при|през|век|века|вече не|бивш\p{L}*|бил\p{L}*|тогава|едно време|някога|по-късно|` +
+	`като дете|колко|пъти|разказва|първ\p{L}*|втор\p{L}*|трет\p{L}*|последн\p{L}*|най-\p{L}+)(?:[^\p{L}]|$)`)
+
+// lifeOver says a question's subject has died: a life's span in years („(1936–2011)“), or its death told.
+var lifeOver = regexp.MustCompile(`\d{4}\s*[–—-]\s*\d{4}\)|(?:^|[^\p{L}])(?:умира|почина|почива|загива|убит\p{L}*|` +
+	`погребан\p{L}*|посмъртно)(?:[^\p{L}]|$)`)
+
+// ruleStalePresent: a career, a show or an office told as now (presentWords) in a line with no time of its own
+// (presentTime) can stop being true: it has reviewBy, or a year that pins it. A false true-or-not stays false.
+func ruleStalePresent(q Question) []string {
+	if q.Extra().ReviewBy != "" {
+		return nil
+	}
+	if tf, ok := q.(*TrueFalse); ok && !tf.Answer {
+		return nil
+	}
+	lines := append([]string{q.Base().Text, q.Extra().Fact, q.Extra().Day}, cluesOf(q)...)
+	if lifeOver.MatchString(strings.ToLower(strings.Join(lines, " "))) {
+		return nil
+	}
+	for _, line := range lines {
+		for _, s := range sentences(strings.ToLower(line)) {
+			if m := presentWords.FindStringSubmatch(s); m != nil && !presentTime.MatchString(s) {
+				return []string{fmt.Sprintf("„%s“ tells a career, a show or an office as now: pin it to a year, or set reviewBy", m[1])}
+			}
+		}
+	}
+	return nil
+}
+
+// sentences are a line's sentences: cut at „.“, „!“, „?“ and „;“, but not at an abbreviation's period („1878 г.“,
+// „хил.“).
+func sentences(line string) []string {
+	var out []string
+	from := 0
+	for i, r := range line {
+		if strings.ContainsRune(".!?;", r) && (r != '.' || !abbreviation.MatchString(line[from:i+1])) {
+			out = append(out, line[from:i])
+			from = i + 1
+		}
+	}
+	return append(out, line[from:])
+}
+
+// cluesOf are a question's clues, if it has any.
+func cluesOf(q Question) []string {
+	if c, ok := q.(*Clues); ok {
+		return c.Clues
+	}
+	return nil
+}

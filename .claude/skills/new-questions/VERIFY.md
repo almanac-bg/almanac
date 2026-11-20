@@ -30,8 +30,9 @@ Your prompt gives you: `<skill>` (this folder), `<repo>` (the game's code), `<ba
 4. **One reading:** the wording can't be read two ways. True-or-not is false by one clear fact, never by a trick,
    and a false one's fact starts with what is true. Numbers are estimates (a year, or more than 20 steps), with one
    accepted value (or the text pins the source) and the skill's tolerance formula, and **a well-read player can place
-   them** (an anchor: a height, a distance, an age, a famous total), never an archive's count (episodes, seats, a
-   council's members, prize money): such a number is a DROP or a FIX. **The topic:** it belongs under its category
+   them** (an anchor: a height, a distance, an age, a famous total, named in the text or the fact), never an archive's
+   count (episodes, seats, a council's members, prize money, works, goals, awards, times): such a number is a DROP or
+   a FIX. An easy true-or-not that nobody could miss (a truism, not a misconception) is a FIX. **The topic:** it belongs under its category
    (a player of the topic expects it there). Orders: exact values, measured ones
    10% apart. Matches: one right per left, a tempting decoy that fits no left. Splits: every item in its group only,
    under every source. Clues: hardest to easiest, each true of the answer only, none giving it away by a word.
