@@ -110,8 +110,9 @@ export function schemeSwitch(): Child {
 }
 
 /** The fact behind an answer; over it, for a question of the day's ten dealt on its date, what happened that day
- * („На този ден“). Nothing when there's neither. */
-export function fact(text?: string, day?: string): Child {
+ * („На този ден“). Nothing when there's neither. `filed`: the chapter it went into, said under it (a right answer's
+ * fact goes into the Алманах; a wrong one's waits for a right answer, and nothing says so). */
+export function fact(text?: string, day?: string, filed?: string): Child {
   if (!text && !day) return null;
   return h(
     "aside",
@@ -121,6 +122,14 @@ export function fact(text?: string, day?: string): Child {
     },
     day ? h("div", { class: "fact-day" }, h("h2", null, "На този ден"), h("p", null, day)) : null,
     text ? [h("h2", null, "Знаеше ли?"), h("p", null, text)] : null,
+    text && filed
+      ? h(
+          "p",
+          { class: "filed" },
+          topicMark(filed),
+          `Записано в Алманаха, глава „${categories.find((c) => c.id === filed)?.name ?? ""}“`,
+        )
+      : null,
   );
 }
 
@@ -517,7 +526,7 @@ export function who(name: Child, look: Look = {}, extra: Child = null, plainName
 export function failure(
   err: unknown,
   retry?: () => void,
-  way: [href: string, label: string] | null = ["/", "Към Начало"],
+  way: [href: string, label: string] | null = ["/", "Към Днес"],
 ): Child {
   const message = errorText(err);
   const again = retry && passing(err) ? retry : null;

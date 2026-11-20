@@ -15,9 +15,9 @@ import { append, type Child, computed, effect, h, listen, onCleanup, type Signal
 import { calm, tickOn } from "../lib/prefs.ts";
 import { beforeLeaving, hold, release } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
-import { withWord } from "../lib/words.ts";
+import { dateWords, issueOf, withWord } from "../lib/words.ts";
 import { categories, playingWhile } from "../state.ts";
-import { countUp, fact, factFace, failure, inRowChip, reachable, type VerdictKind, verdict } from "../ui.ts";
+import { countUp, fact, factFace, failure, inRowChip, reachable, topicMark, type VerdictKind, verdict } from "../ui.ts";
 import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
 import { inRowOf } from "./numbers.ts";
 import { answered, beats, crowdLine, picture, picturesIn, type Stage } from "./questions.ts";
@@ -329,7 +329,7 @@ function stuckAt(s: State, err: unknown, retry: () => void): Child {
 /** Where a run that can't go on leads: a day's run past its day (play.ErrDayOver), to Начало and today's questions;
  * otherwise nowhere but the run's own arrow out. */
 function wayOut(err: unknown): [href: string, label: string] | null {
-  return (err as ApiError).code === "day_over" ? ["/", "Към Начало"] : null;
+  return (err as ApiError).code === "day_over" ? ["/", "Към Днес"] : null;
 }
 
 /** A run's progress: a pip for each question, marked by how it went (and the one being asked, if any). */
@@ -401,10 +401,10 @@ export function guardLeaving(
   );
 }
 
-/** The top of a question: which one of how many, and its topic (and, in a duel, with whom: `versus`),
- * with the game's tally under it, if it has one. On a phone a game has the whole screen, the header with it, so the
- * way out is here: an arrow to Начало (on Начало itself too, where the day's ten are played: it opens afresh, the
- * day waiting there as a card), the way back (router.ts): back in the history where Начало is the page before. */
+/** The top of a question: the way out, what's played (the day's issue, or the topic: `aside`; in a duel, with whom:
+ * `versus`), the game's tally, and which one of how many. A game has the whole screen, the header with it, so the
+ * way out is here: a cross to Днес (on Днес itself too, where the day's ten are played: it opens afresh, the
+ * day waiting there), the way back (router.ts): back in the history where Днес is the page before. */
 export function questionHead(
   n: number,
   total: number,
@@ -417,21 +417,22 @@ export function questionHead(
     { class: "question-head" },
     h(
       "a",
-      { class: "game-leave", href: "/", "data-back": true, "aria-label": "Към Начало", title: "Към Начало" },
-      h("span", { class: "i i-left", "aria-hidden": "true" }),
-    ),
-    h(
-      "p",
-      { class: "count" },
-      h("b", { class: "count-n" }, String(n + 1)),
-      h("span", { class: "count-of" }, h("span", { class: "num-word" }, " от "), String(total)),
+      { class: "game-leave", href: "/", "data-back": true, "aria-label": "Към Днес", title: "Към Днес" },
+      h("span", { class: "i i-close", "aria-hidden": "true" }),
     ),
     h(
       "div",
       { class: "head-side" },
       versus ? h("p", { class: "kicker versus" }, versus) : null,
       h("p", { class: "kicker" }, aside),
-      tally,
+    ),
+    tally,
+    // „4/10“ to the eye, „4 от 10“ read aloud and in the page's words.
+    h(
+      "p",
+      { class: "count" },
+      h("b", { class: "count-n" }, String(n + 1)),
+      h("span", { class: "count-of" }, h("span", { class: "num-word" }, " от "), String(total)),
     ),
   );
 }
@@ -674,7 +675,7 @@ function question(
       crowd = waiting(crowdLine(q.view.type, res.reveal.crowd, res.right));
       rest = [
         theirs && against ? theirLine(against.name, theirs) : null,
-        fact(res.reveal.fact, res.reveal.day),
+        fact(res.reveal.fact, res.reveal.day, res.right ? q.category : undefined),
         res.reveal.credit ? credit(res.reveal.credit) : null,
         upNext(lasts, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`, true),
         h(
@@ -761,11 +762,12 @@ function question(
 
   // On a phone the question is a column the screen's height: the head, the pips and the clock at the top, the
   // question under them, and what answers it at the foot, under the thumb (app.css).
+  const topicWords = q.onThisDay ? `${topicName(q.category)} · На този ден` : topicName(q.category);
   const head = stays(
     questionHead(
       q.n,
       s.total,
-      q.onThisDay ? `${topicName(q.category)} · На този ден` : topicName(q.category),
+      s.kind === "day" && s.day ? `Брой ${issueOf(s.day)} · ${dateWords(s.day)}` : topicWords,
       score,
       versusNow,
     ),
@@ -776,6 +778,8 @@ function question(
     "article",
     { class: "question run-question" },
     head.node,
+    // The day's ten are of every topic: each says its own over it.
+    s.kind === "day" ? h("p", { class: "question-topic" }, topicMark(q.category), topicWords) : null,
     // It takes the focus as it opens, so a screen reader reads it first (no ring for it: app.css, h1).
     ans.heading,
     picture(q.view, true),

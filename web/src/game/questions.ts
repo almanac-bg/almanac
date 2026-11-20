@@ -276,7 +276,7 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
       typeof option === "string"
         ? [
             h("span", { class: "letter", "aria-hidden": "true" }, letters[i]),
-            h("span", null, option),
+            h("span", { class: "option-words" }, option),
             display ? null : keyHint(String(i + 1)),
           ]
         : [
@@ -1240,7 +1240,7 @@ function clues(
         },
       },
       h("span", { class: "letter", "aria-hidden": "true" }, letters[i]),
-      h("span", null, text),
+      h("span", { class: "option-words" }, text),
       display ? null : keyHint(String(i + 1)),
     ),
   );

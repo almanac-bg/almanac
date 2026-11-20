@@ -301,17 +301,21 @@ questions are about. A rule never holds a literal colour: it takes a token.
 - **Mastery:** `.mastery` (the tier's bars, lit in the topic's tone, and its name), `.mastery-list`/`.mastery-row`, and
   `.mastery-line` (how a topic's game moved it) in a result's news.
 - **Play:**
-  - `.question-head` (with `.count`, which never wraps; `.versus`, the friend in a duel with one; and `.game-leave`,
-    the way out on a phone), `.leave-layer` with `.leave-ask` (asked to leave, in a sheet at
-    the foot over the answers, „Остани“ gold, the clock running in sight above it), `.trail`, `.timer` (muted while
+  - `.question-head`: `.game-leave` (a cross, the way out, on every screen), what's played (the day's „Брой N ·
+    date“, or the topic; `.versus`, the friend in a duel with one), the tally and `.count` („4/10“ to the eye, „4 от
+    10“ read aloud; it never wraps). In the day's ten, `.question-topic` (the topic's mark and name) over each
+    question. `.leave-layer` with `.leave-ask` (asked to leave, in a sheet at
+    the foot over the answers, „Остани“ gold, the clock running in sight above it), `.trail` (in a run a row of bars the column's width: done in ink, the one
+    asked in gold), `.timer` (a hairline under the bars, the seconds small at its end; muted while
     there's time, `.soon` gold for the last ten seconds of a question longer than ten, `.low` red for the last five,
-    `.stopped` grey once answered) and `.ask`; in a run, `.question-top` holds the head, the pips and the clock, and
+    `.stopped` grey once answered) and `.ask` (in a run, in the serif); in a run, `.question-top` holds the head, the pips and the clock, and
     on a phone `.answering` is set at the foot and `.after` (the answer: verdict, fact, „Напред“) docks under it.
   - `.picture` over a question, its box the picture's own (no wider than the column), a hairline `--line` inside its
     edge so a white flag holds on a white card, on `--sunken` while it loads: while it's asked, `picture(view, true)` keeps it low enough for the question, the
     picture and the whole answering part to fit on the screen (no less than 128px); a question's time starts once
     its pictures are in.
-  - `.options .option`, with the states `picked`, `placed`, `right`, `wrong` and `dim`; and `missed`, a row of a right
+  - `.options .option`, with the states `picked`, `placed`, `right`, `wrong` and `dim`; a choice's (`.choices`) are
+    ruled rows under a rule in ink, the letter in a ring, washed in `--right-wash` or `--wrong-wash` once answered; and `missed`, a row of a right
     answer the player didn't have (an order, pairs, groups): plain, with a hollow ✕ and „ти: …“ for what they gave.
     A choice's (`.choices`) keep the room at their end from the start for what the answer brings there, the share
     that gave each and its ✓ or ✕ at the far end (where a computer's key waits): nothing re-wraps as they come.
@@ -328,9 +332,13 @@ questions are about. A rule never holds a literal colour: it takes a token.
     part in `--right`, the player's in `--accent`) and `.crowd-says` (one quiet sentence under the verdict, or under
     the answer in a review, `crowdLine()`: the share right, of the day's players today for the day's ten; `.rare`,
     in `--gold-ink`, for a right answer a quarter or fewer got).
-  - `.verdict` and `.fact` (`fact()`: „Знаеше ли?“ in Literata; for a question of the day's ten dealt on its own
-    date, `.fact-day` heads the same card, „На този ден“ and what happened that day in plain type, a hairline under
-    it, the „?“ moving down to the fact. Only with the answer, never before it, never in a topic's game).
+  - `.verdict` (in a run, its word in the serif) and `.fact` (`fact()`: „Знаеше ли?“ in Literata; in a run a part of
+    the page under a rule in ink, no card; for a question of the day's ten dealt on its own date, `.fact-day` heads
+    it, „На този ден“ and what happened that day in plain type. Only with the answer, never before it, never in a
+    topic's game). With a right answer, `.filed` under the fact: „Записано в Алманаха, глава „…““, its chapter's
+    mark before it; a wrong answer's fact goes into the book with the first right answer, and nothing says so then.
+  - The number: `.number-out` the numeral big on a rule in ink, its caret gold, the unit in the serif's italic;
+    `.keypad` a ruled grid of keys.
 - **Players:**
   - `.avatar` (a picture on a tile of its tone `tone-…`, sizes `s` and `l`), drawn by `avatar()`.
   - `.who` (avatar and name) for a player on a board or a list, drawn by `who()`.
@@ -423,8 +431,8 @@ questions are about. A rule never holds a literal colour: it takes a token.
   on at once. A question never opens in a
   tab that's out of sight.
 - **A game has the whole screen.** On a phone the header and the bar of places step aside from the count before a
-  run, and while a question or its answer shows (an arrow before the count goes home), so the pad and the verdict fit
-  and a stray tap can't leave the game. Each question opens at the top of the page.
+  run, and on every screen while a question or its answer shows (a cross before the head goes home), so the pad and
+  the verdict fit and a stray tap can't leave the game. Each question opens at the top of the page.
 - **On a phone, the answers are at the thumb.** A run's question is a column the screen's height: the head, the pips
   and the clock at the top (kept there as the page scrolls), the question under them, and what answers it at the
   foot — the answers, „Вярно“ and „Невярно“, the pad with „Отговори“, „Готово“ (which stays at hand on a screen too
@@ -435,15 +443,14 @@ questions are about. A rule never holds a literal colour: it takes a token.
   longer than the rest scrolls with the panel, „Напред“ staying at its foot. A phone on its side plays the same,
   the head small from the start (or from when the phone is turned), the topic still in it, the question smaller, a
   choice's answers two by two and a choice of pictures four across, so that they start on the screen; its panel has
-  how everyone answered and „Напред“ on the verdict's row, so the fact under them shows. A laptop shows the answer
-  beside the question: the question and its answers stay on the left, where they were asked, and the verdict, how
-  everyone answered, the fact and „Напред“ come into the column on the right, held in sight from the top of the
-  screen, so nothing scrolls for the fact (a fact longer than the screen scrolls in its column, „Напред“ at its foot);
-  the page moves only for a right answer below the screen. A tablet shows the answer under the question; the page
+  how everyone answered and „Напред“ on the verdict's row, so the fact under them shows. A laptop shows a question as a
+  spread: the topic, the question and its picture on the left page, what answers it on the right; the answer comes
+  on the left page under the question (the verdict, how everyone answered, the fact and „Напред“), beside the answers
+  marked, and on a screen too short for both it keeps to the screen's foot over the question's end, „Напред“ in sight. A tablet shows the answer under the question; the page
   moves for it, but never the question's first line under the head unless the verdict wouldn't show, „Напред“
   staying at the screen's foot.
 - **Leaving a game is free between two questions.** While a question's time runs (on the server, so it can't wait),
-  a way out — the arrow, a place in the header — asks first („Ако излезеш сега, въпросът остава без отговор.“,
+  a way out — the cross, the browser's back — asks first („Ако излезеш сега, въпросът остава без отговор.“,
   „Остани“ or „Излез“), and leaving gives that question up. The game waits where it stopped: the day on Начало with
   „Продължи“, a topic's game for the next tap on that topic the same day. No question's time starts without a tap;
   only a reload with one showing goes straight back into it.
