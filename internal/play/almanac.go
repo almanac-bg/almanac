@@ -49,9 +49,9 @@ const AlmanacSearch = 60
 type Almanac struct {
 	Facts []Learned `json:"facts"`
 	// Found is how many entries the page's chapter (and the search) lists: its pages are Found / AlmanacPage.
-	Found    int            `json:"found"`
-	Ink      map[string]int `json:"ink"`
-	Next     string         `json:"next,omitempty"`
+	Found int            `json:"found"`
+	Ink   map[string]int `json:"ink"`
+	Next  string         `json:"next,omitempty"`
 	// Ranks are each of the bank's chapters' ranks, as kept (rank.go); Seal the one the player wears; Held, whether
 	// the guessing check holds their ranks at Страница now. The first page only.
 	Ranks []ChapterRank `json:"ranks,omitempty"`

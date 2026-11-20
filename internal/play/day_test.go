@@ -306,7 +306,6 @@ func TestVoidDayIsOfNine(t *testing.T) {
 		t.Fatalf("ana: %+v", s)
 	}
 
-
 	// The rarest right answer is one that counts.
 	if rare, err := w.g.EntryOfDay(ctx, bo, sb.Day); err != nil || rare != nil && rare.N == k {
 		t.Fatalf("after the void, the rarest right answer: %+v %v", rare, err)
