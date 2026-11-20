@@ -6,9 +6,9 @@ import (
 	"testing"
 )
 
-// A server that starts again takes up the counts kept by the one before (the hardness, the crowds, the boards of
-// knowledge): nobody waits for a count over every answer after a deploy, and each is counted again in the background.
-// A count is kept at most every keepEvery.
+// A server that starts again takes up the counts kept by the one before (the hardness, the crowds): nobody waits for
+// a count over every answer after a deploy, and each is counted again in the background. A count is kept at most
+// every keepEvery.
 func TestCountsKeptOverARestart(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -39,11 +39,10 @@ func TestCountsKeptOverARestart(t *testing.T) {
 		return out
 	}
 	first := kept()
-	if len(first) != 3 {
+	if len(first) != 2 {
 		t.Fatalf("kept: %v", first)
 	}
 	h, _ := w.g.hardness(ctx)
-	k, _ := w.g.knowledge(ctx)
 	q, _ := w.b.Get(w.picks(s.ID)[0].ID)
 	crowd := w.g.Crowd(q)
 	if crowd == nil {
@@ -57,16 +56,11 @@ func TestCountsKeptOverARestart(t *testing.T) {
 	if err != nil || !maps.Equal(h2.byID, h.byID) || len(h2.byTopic[""]) != len(h.byTopic[""]) {
 		t.Fatalf("the hardness kept: %v", err)
 	}
-	k2, err := restarted.knowledge(gone)
-	if err != nil || len(k2[""]) != 1 || k2[""][0] != k[""][0] {
-		t.Fatalf("the knowledge kept: %+v %v", k2, err)
-	}
 	if c := restarted.Crowd(q); c == nil || c.Answers != crowd.Answers || c.Right != crowd.Right {
 		t.Fatalf("the crowd kept: %+v", c)
 	}
 	// Taken up as stale: counted again at once, for the bank in play.
 	restarted.hard.settle()
-	restarted.known.settle()
 	restarted.crowds.settle()
 	if h3, _ := restarted.hardness(ctx); h3 == h2 {
 		t.Fatal("not counted again")

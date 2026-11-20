@@ -26,7 +26,6 @@ import (
 // from the best of them, and the day's one game would be the best of many. It's left out of:
 //   - the day's board, its count of players and its places, and friends' results of the day (BoardOf, FriendsBoard,
 //     FriendsOf; fairFor);
-//   - the Знания board (KnowledgeBoard);
 //   - the questions' statistics: how players answered each (crowd.go), how hard each is (hardness, Calibrate) and
 //     /admin's tallies (FairAnswers);
 //   - the recordings a duel is played against (recordedRun).

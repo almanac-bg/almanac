@@ -15,10 +15,10 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// snapshot keeps a count that goes over everyone's answers (the crowds, the questions' hardness, the boards of
-// knowledge): too dear to make for a request, so it's shown as last counted, and counted again in the background once
-// it's stale. One count at a time, on no request's context, with no deadline: a player who gives up waiting doesn't
-// throw a count away for the next to start again, and a big count still ends. It reads on the database's pool for
+// snapshot keeps a count that goes over everyone's answers (the crowds, the questions' hardness): too dear to make for
+// a request, so it's shown as last counted, and counted again in the background once it's stale. One count at a time,
+// on no request's context, with no deadline: a player who gives up waiting doesn't throw a count away for the next to
+// start again, and a big count still ends. It reads on the database's pool for
 // long reads (store.DB.Scan), never taking a connection a request needs. A bank reloaded makes the count stale,
 // not missing: what it holds is by question id, and a count of the bank before is better than a wait (each user of it
 // says what stands for a question it lacks).

@@ -142,7 +142,6 @@ func (g *Game) Settled(ctx context.Context) {
 		defer close(settled)
 		g.hard.settle()
 		g.crowds.settle()
-		g.known.settle()
 	})
 	select {
 	case <-settled:

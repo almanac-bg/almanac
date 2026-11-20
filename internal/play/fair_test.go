@@ -203,20 +203,14 @@ func (w *world) dayGame(user int64, pace func(int) time.Duration, answers ...fun
 	return s.ID
 }
 
-// The knowledge board, recordings and the questions' calibration are people's too.
-func TestScriptedOutOfBoardsAndStatistics(t *testing.T) {
+// Recordings and the questions' calibration are people's too.
+func TestScriptedOutOfStatistics(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana, bot := w.user(), w.user()
-	for range KnowAll / Length {
+	for range 3 {
 		w.game(ana, nil, repeat(w.wrong, Length)...)
 		w.game(bot, scriptPace)
-	}
-	if k, err := w.g.KnowledgeBoard(ctx, ana, false, ""); err != nil || len(k.Top) != 1 || !k.Top[0].Me {
-		t.Fatalf("knowledge as Ana sees it: %+v %v", k, err)
-	}
-	if k, err := w.g.KnowledgeBoard(ctx, bot, false, ""); err != nil || len(k.Top) != 2 || k.Place != 1 || k.Top[0].Value < 90 {
-		t.Fatalf("knowledge as the script's player sees it: %+v %v", k, err)
 	}
 	// A recording: Ana's, never the script's (the latest, all right).
 	duel, err := w.g.DuelRecording(ctx, w.user())

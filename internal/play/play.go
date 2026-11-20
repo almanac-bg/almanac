@@ -106,7 +106,6 @@ type Game struct {
 	dayCrowds dayCrowdCache         // how the day's players have answered its questions (crowd.go)
 	boards    boardCache            // the days' boards (board.go)
 	daysAhead daysCache             // today's questions and the days ahead's (ahead.go)
-	known     snapshot[knowledge]   // everyone's answers, for the boards of knowledge (knowledge.go)
 	versions  versions              // the questions' versions kept (versions.go)
 
 	later  laters                  // what follows the runs just finished, under way (after.go)
