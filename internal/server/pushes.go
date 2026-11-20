@@ -496,15 +496,13 @@ func (s *Server) message(ctx context.Context, j queued, now time.Time) (push.Mes
 	}
 	// A day's reminder is written as it's sent, and not sent to one who has played the day since it was queued.
 	var playedToday bool
-	var played sql.NullString
 	if err := s.db.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'day'
-			AND day = ?2 AND finished_at IS NOT NULL),
-		(SELECT max(day) FROM runs WHERE user_id = ?1 AND kind = 'day' AND finished_at IS NOT NULL)`, j.user, j.day).
-		Scan(&playedToday, &played); err != nil || playedToday {
+			AND day = ?2 AND finished_at IS NOT NULL)`, j.user, j.day).
+		Scan(&playedToday); err != nil || playedToday {
 		return j.m, false, err
 	}
 	if j.m.Kind == "stop" {
-		return s.lastReminder(ctx, j.user, played.String), true, nil
+		return s.lastReminder(ctx, j.user), true, nil
 	}
 	return s.reminder(ctx, j.day, j.user), true, nil
 }

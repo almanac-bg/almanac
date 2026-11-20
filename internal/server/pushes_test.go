@@ -119,6 +119,7 @@ func TestFailedRemindersDontCount(t *testing.T) {
 	start := time.Date(2030, 3, 1, 0, 0, 0, 0, bulgaria())
 	clock := start
 	s.game.Now = func() time.Time { return clock }
+	g.everyWeekday(anaID) // every weekday hers: each reminder left counts
 	g.finishedDay(anaID, start, 18*time.Hour)
 	fake.answering("/ana", http.StatusForbidden)
 	for d := 1; d <= 4; d++ {

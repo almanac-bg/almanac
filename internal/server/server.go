@@ -99,6 +99,8 @@ type Server struct {
 	pushq         pushQueue     // the notifications' queue, as Push sends it (pushes.go)
 	streakMailing streakMailing // who is due the mail of a streak ended when, today (streakmail.go)
 	dayMailing    reminders     // who is due the day's reminder by mail when, today (daymail.go)
+	// nearestStep is a player's nearest step in the book, for the reminders' last word (step.go); nil names none.
+	nearestStep func(ctx context.Context, userID int64) (Step, bool, error)
 	secure        bool
 	host          string
 	cookie        string       // the session's
