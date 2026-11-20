@@ -1,5 +1,5 @@
 // Every avatar the server knows (internal/play: FreeShapes, Unlockable) is drawn and has a name in the client; every
-// achievement's picture, medal, frame and division is drawn.
+// achievement's picture, medal, frame and division is drawn. Every avatar has its natural colours.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -20,11 +20,17 @@ function goList(src: string, name: string): string[] {
 test("every avatar is drawn and named", () => {
   const go = read("internal/play/progress.go");
   const ui = read("web/src/ui.ts");
+  const css = read("web/src/app.css");
   const shapes = [...goList(go, "FreeShapes"), ...goList(go, "Unlockable")];
   assert.ok(shapes.length >= 20);
   for (const s of shapes) {
     assert.ok(pictures[s], `${s} isn't drawn in art/pictures.ts`);
     assert.match(ui, new RegExp(`\\n  ${s}: "`), `${s} has no name in ui.ts shapeNames`);
+    assert.match(
+      css,
+      new RegExp(`\\.tone-natural\\.sh-${s} > \\.avatar-pic \\{`),
+      `${s} has no natural colours in app.css`,
+    );
   }
 });
 

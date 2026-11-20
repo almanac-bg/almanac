@@ -462,6 +462,7 @@ export const toneNames: Record<string, string> = {
   sky: "небе",
   rose: "роза",
   mint: "мента",
+  natural: "естествени цветове",
 };
 
 const freeShapes = ["fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog"];
@@ -488,7 +489,8 @@ export function avatar(
   return h(
     "span",
     {
-      class: ["avatar", opts.size, `tone-${tone}`, backdrop && `bd-${backdrop}`, frame && "framed"]
+      // The shape's class gives it its own colours in the natural tone (app.css, .tone-natural).
+      class: ["avatar", opts.size, `tone-${tone}`, `sh-${shape}`, backdrop && `bd-${backdrop}`, frame && "framed"]
         .filter(Boolean)
         .join(" "),
       "aria-hidden": "true",

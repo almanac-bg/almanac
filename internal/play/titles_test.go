@@ -196,7 +196,7 @@ func TestDevotionMigrationOn(t *testing.T) {
 // aren't all one tone, and every shape comes in every tone.
 func TestDefaultAvatars(t *testing.T) {
 	pairs := map[string]bool{}
-	n := int64(len(FreeShapes) * len(Tones))
+	n := int64(len(FreeShapes) * len(tinted))
 	for id := int64(1); id <= n; id++ {
 		a, b := DefaultAvatar(id), DefaultAvatar(id+1)
 		pairs[a] = true
