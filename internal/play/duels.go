@@ -16,7 +16,7 @@ import (
 
 // Duels are two players on the same ten questions, each played on one's own time, as any game is (play.go: the run's
 // own clock, a question at a time); more right answers wins, and between the same, what breaks a tie on the day's
-// board (tiebreak: how close the hard number came, then the hardest right answer), then the quicker by a second or
+// board (tiebreak: how close the hard number came), then the quicker by a second or
 // more (TieBand); anything closer is a draw (duelScore). Nothing moves but the record between two people: there's no
 // rating (owner, 2026-11-20, DECISIONS.md „The redesign“).
 //
@@ -104,7 +104,7 @@ type DuelView struct {
 	// only.
 	Decided int `json:"decided,omitempty"`
 	// TieBy is, of a duel with a result on even right answers, what broke the tie (duelScore): TieNumber (the number
-	// nearer), TieHardest (the harder right answer) or TieTime (quicker by TieBand or more); "" for a draw, or a duel
+	// nearer) or TieTime (quicker by TieBand or more); "" for a draw, or a duel
 	// won on right answers. One duel's view (DuelOf) only.
 	TieBy string `json:"tieBy,omitempty"`
 	// Record is how the player's duels against this person went, this one with them (not a recording's).
@@ -138,9 +138,8 @@ type DuelSide struct {
 
 // What broke a tie on even right answers (DuelView.TieBy).
 const (
-	TieNumber  = "number"
-	TieHardest = "hardest"
-	TieTime    = "time"
+	TieNumber = "number"
+	TieTime   = "time"
 )
 
 // DuelMark is how one question of a duel went for one side: right, or close („близо“: closeAnswer), how long it took,
@@ -609,17 +608,17 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 		followed = nil
 		var bID, bRun sql.NullInt64
 		var bName sql.NullString
-		var bRights, bClose, bHardest, bMs sql.NullInt64
+		var bRights, bClose, bMs sql.NullInt64
 		var bDone sql.NullBool
-		err := tx.QueryRow(`SELECT d.kind, d.a_id, ua.name, ra.id, ra.rights, ra.closeness, ra.hardest, ra.ms,
+		err := tx.QueryRow(`SELECT d.kind, d.a_id, ua.name, ra.id, ra.rights, ra.closeness, ra.ms,
 				ra.finished_at IS NOT NULL,
-				rb.user_id, ub.name, rb.id, rb.rights, rb.closeness, rb.hardest, rb.ms, rb.finished_at IS NOT NULL
+				rb.user_id, ub.name, rb.id, rb.rights, rb.closeness, rb.ms, rb.finished_at IS NOT NULL
 			FROM duels d JOIN users ua ON ua.id = d.a_id JOIN runs ra ON ra.id = d.a_run
 			LEFT JOIN runs rb ON rb.id = CASE d.kind WHEN 'recording' THEN d.ghost_run ELSE d.b_run END
 			LEFT JOIN users ub ON ub.id = rb.user_id
 			WHERE d.id = ? AND d.ended_at IS NULL`, duelID).
-			Scan(&kind, &a.id, &a.name, &a.run, &a.score.rights, &a.score.tie.closeness, &a.score.tie.hardest,
-				&a.score.ms, &a.done, &bID, &bName, &bRun, &bRights, &bClose, &bHardest, &bMs, &bDone)
+			Scan(&kind, &a.id, &a.name, &a.run, &a.score.rights, &a.score.tie.closeness,
+				&a.score.ms, &a.done, &bID, &bName, &bRun, &bRights, &bClose, &bMs, &bDone)
 		if errors.Is(err, sql.ErrNoRows) {
 			settled = true // the other side's last answer settled it a moment ago: it's done
 			return nil
@@ -629,7 +628,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 		}
 		b = side{id: bID.Int64, run: bRun.Int64, name: bName.String, done: bDone.Bool, present: bRun.Valid,
 			score: duelScore{rights: int(bRights.Int64), ms: bMs.Int64,
-				tie: tiebreak{closeness: int(bClose.Int64), hardest: int(bHardest.Int64)}}}
+				tie: tiebreak{closeness: int(bClose.Int64)}}}
 		if !a.done || !b.present || !b.done {
 			settled = true // not played to its end yet: nothing to settle
 			return nil
@@ -908,9 +907,9 @@ func (g *Game) duelSide(ctx context.Context, userID, runID int64) (*DuelSide, er
 	look := lookOf(userID, avatar)
 	s.Look = &look
 	if runID != 0 {
-		err = g.DB.Read.QueryRowContext(ctx, `SELECT finished_at IS NOT NULL, rights, closeness, hardest, ms,
+		err = g.DB.Read.QueryRowContext(ctx, `SELECT finished_at IS NOT NULL, rights, closeness, ms,
 			EXISTS (SELECT 1 FROM answers WHERE run_id = runs.id) FROM runs WHERE id = ?`, runID).
-			Scan(&s.Done, &s.Rights, &s.score.tie.closeness, &s.score.tie.hardest, &s.Ms, &s.Started)
+			Scan(&s.Done, &s.Rights, &s.score.tie.closeness, &s.Ms, &s.Started)
 		s.score.rights, s.score.ms = s.Rights, s.Ms
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
@@ -1127,8 +1126,6 @@ func (s duelScore) tieBy(o duelScore) string {
 		return ""
 	case s.tie.closeness != o.tie.closeness:
 		return TieNumber
-	case s.tie.hardest != o.tie.hardest:
-		return TieHardest
 	case s.against(o) != 0:
 		return TieTime
 	}

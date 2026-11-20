@@ -271,46 +271,35 @@ func TestBoardAverage(t *testing.T) {
 }
 
 // A game not yet counted takes its place among those counted as the count would put it: right answers first, then
-// how close the hard number came, then the hardest right answer, then time, then the earlier started.
+// how close the hard number came, then time, then the earlier started.
 func TestBoardRunAhead(t *testing.T) {
-	nine := boardRun{id: 2, rights: 9, tie: tiebreak{closeness: 0, hardest: 0b0111111111}, ms: 90_000}
-	eight := boardRun{id: 1, rights: 8, tie: tiebreak{closeness: 700, hardest: 0b0011111111}, ms: 60_000}
-	closer := boardRun{id: 5, rights: 8, tie: tiebreak{closeness: 750, hardest: 0b0011111111}, ms: 90_000}
-	harder := boardRun{id: 6, rights: 8, tie: tiebreak{closeness: 700, hardest: 0b0101111111}, ms: 90_000}
+	nine := boardRun{id: 2, rights: 9, tie: tiebreak{closeness: 0}, ms: 90_000}
+	eight := boardRun{id: 1, rights: 8, tie: tiebreak{closeness: 700}, ms: 60_000}
+	closer := boardRun{id: 5, rights: 8, tie: tiebreak{closeness: 750}, ms: 90_000}
 	quicker := boardRun{id: 3, rights: 8, tie: eight.tie, ms: 50_000}
 	later := boardRun{id: 4, rights: 8, tie: eight.tie, ms: 60_000}
 	if !nine.ahead(eight) || eight.ahead(nine) || !quicker.ahead(eight) || eight.ahead(quicker) || nine.ahead(nine) ||
 		!eight.ahead(later) || later.ahead(eight) || !nine.ahead(closer) {
 		t.Fatal("ahead")
 	}
-	if !closer.ahead(eight) || eight.ahead(closer) || !closer.ahead(harder) {
+	if !closer.ahead(eight) || eight.ahead(closer) || !closer.ahead(quicker) {
 		t.Fatal("the closer number isn't ahead")
-	}
-	if !harder.ahead(eight) || eight.ahead(harder) || !harder.ahead(quicker) {
-		t.Fatal("the hardest right answer isn't ahead")
 	}
 }
 
-// What breaks a tie is counted answer by answer: the number's score, in thousandths, and each right answer's place,
-// the tenth's above all those before it.
+// What breaks a tie is counted answer by answer: the number's score, in thousandths; nothing else.
 func TestTiebreakAdds(t *testing.T) {
 	var a, b tiebreak
-	for n := range Length - 1 {
-		a.add(n, 1, true, false)
+	for range Length - 1 {
+		a.add(1, false)
 	}
-	a.add(Length-1, 0.62, false, true) // nine right, the number close
-	for n := range Length {
-		b.add(n, 1, n != 0, n == Length-1) // the first wrong, the number right on
-	}
-	if a.closeness != 620 || b.closeness != 1000 || a.hardest != 0b0111111111 || b.hardest != 0b1111111110 {
+	a.add(0.62, true) // the number close
+	b.add(1, true)    // the number right on
+	if a.closeness != 620 || b.closeness != 1000 {
 		t.Fatalf("%+v %+v", a, b)
 	}
 	if b.cmp(a) != -1 || a.cmp(b) != 1 || a.cmp(a) != 0 {
 		t.Fatal("the closer number doesn't break the tie")
-	}
-	c, d := tiebreak{hardest: 0b1000000000}, tiebreak{hardest: 0b0111111111}
-	if c.cmp(d) != -1 {
-		t.Fatal("the tenth right isn't above the nine before it")
 	}
 }
 
@@ -345,5 +334,36 @@ func TestRowsInARun(t *testing.T) {
 	}
 	if !last.State.Done || last.State.Rights != Length-1 || last.InRow != 6 {
 		t.Fatalf("the game's end: %+v, %d in a row", last.State, last.InRow)
+	}
+}
+
+// The issue played a second time in one browser (runs.pencil: SecondPlay) is its player's alone, as a shadow is: on
+// nobody else's board, count or friends' board; its player sees it with the others.
+func TestSecondPlayOffOthersBoards(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	stale := boardStale
+	t.Cleanup(func() { boardStale = stale })
+	boardStale = 0
+	ana, bo := w.user(), w.user()
+	w.befriend(ana, bo)
+	s, err := w.g.StartDay(SecondPlay(ctx, ana), ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(ana, s.ID, repeat(w.right, Length)...)
+	w.dayGame(bo, nil)
+	today := w.g.Today()
+	if b, _ := w.g.BoardOf(ctx, today, bo); b.Players != 1 || len(b.Top) != 1 || !b.Top[0].Me {
+		t.Fatalf("the board, as Bo sees it: %+v", b)
+	}
+	if b, _ := w.g.BoardOf(ctx, today, ana); b.Place != 1 || b.Mine == nil {
+		t.Fatalf("the board, as Ana sees it: %+v", b)
+	}
+	if f, _ := w.g.FriendsBoard(ctx, today, bo); len(f) != 0 {
+		t.Fatalf("Bo's friends' board: %+v", f)
+	}
+	if list, _ := w.g.FriendsOf(ctx, bo); len(list) != 1 || list[0].Today != nil {
+		t.Fatalf("Bo's friends: %+v", list)
 	}
 }

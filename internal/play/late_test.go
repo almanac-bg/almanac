@@ -1,6 +1,7 @@
 package play
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -98,9 +99,17 @@ func TestLateAnswers(t *testing.T) {
 	if res := at(4, Grace/2, true); res.TimedOut || !res.Right {
 		t.Fatalf("timed in time, within Grace: %+v", res)
 	}
+	// No answer, late (a give-up timed in time): the time ran out, and nothing is taken late.
+	if _, err := w.g.Show(ctx, u, s.ID); err != nil {
+		t.Fatal(err)
+	}
+	w.wait(Limit(w.question(s.ID, 5)) + 10*time.Second)
+	if res, err := w.g.AnswerTimed(ctx, u, s.ID, 5, json.RawMessage("null"), true); err != nil || !res.TimedOut {
+		t.Fatalf("no answer, late: %+v %v", res, err)
+	}
 	// Only the one taken past Grace is counted, by player.
 	late, err := w.g.LateAnswerers(ctx, 10)
-	if err != nil || len(late) != 1 || late[0].Late != 1 || late[0].Answers != 5 || late[0].MostMs != 10_000 {
+	if err != nil || len(late) != 1 || late[0].Late != 1 || late[0].Answers != 6 || late[0].MostMs != 10_000 {
 		t.Fatalf("the late answers: %+v %v", late, err)
 	}
 	// Let go of after LateKept.

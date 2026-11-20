@@ -1114,10 +1114,10 @@ func TestDecided(t *testing.T) {
 	}
 }
 
-// A duel goes by right answers, then as the board breaks a tie (how close the number came, then the hardest right
-// answer), then by time, by TieBand or more.
+// A duel goes by right answers, then as the board breaks a tie (how close the number came), then by time, by TieBand
+// or more.
 func TestDuelScore(t *testing.T) {
-	base := duelScore{rights: 7, tie: tiebreak{closeness: 500, hardest: 0b0001111111}, ms: 60_000}
+	base := duelScore{rights: 7, tie: tiebreak{closeness: 500}, ms: 60_000}
 	for _, c := range []struct {
 		name string
 		o    duelScore
@@ -1126,7 +1126,6 @@ func TestDuelScore(t *testing.T) {
 		{"more right answers", duelScore{rights: 8}, 1},
 		{"fewer right answers, closer and quicker", duelScore{rights: 6, tie: tiebreak{closeness: 1000}, ms: 1}, -1},
 		{"a closer number", duelScore{rights: 7, tie: tiebreak{closeness: 600}, ms: 90_000}, 1},
-		{"a harder right answer", duelScore{rights: 7, tie: tiebreak{closeness: 500, hardest: 0b1000111111}, ms: 90_000}, 1},
 		{"quicker by a second", duelScore{rights: 7, tie: base.tie, ms: 59_000}, 1},
 		{"quicker by less", duelScore{rights: 7, tie: base.tie, ms: 59_500}, 0},
 		{"slower by a second", duelScore{rights: 7, tie: base.tie, ms: 61_000}, -1},

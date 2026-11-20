@@ -165,7 +165,7 @@ type run struct {
 }
 
 const runColumns = `id, user_id, kind, coalesce(day, ''), coalesce(category, ''), questions,
-	at, shown_at, rights, closeness, hardest, ms, finished_at IS NOT NULL, shadow, pencil <> 0`
+	at, shown_at, rights, closeness, ms, finished_at IS NOT NULL, shadow, pencil <> 0`
 
 type scanner interface{ Scan(...any) error }
 
@@ -173,7 +173,7 @@ func scanRun(row scanner) (*run, error) {
 	var r run
 	var picks string
 	err := row.Scan(&r.id, &r.userID, &r.kind, &r.day, &r.category, &picks,
-		&r.at, &r.shownAt, &r.rights, &r.tie.closeness, &r.tie.hardest, &r.ms, &r.finished, &r.shadow, &r.pencil)
+		&r.at, &r.shownAt, &r.rights, &r.tie.closeness, &r.ms, &r.finished, &r.shadow, &r.pencil)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoRun
 	}
@@ -423,7 +423,7 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, number bool, ms int64)
 			return err
 		}
 	}
-	r.tie.add(r.at, gr.Score, gr.Right, number)
+	r.tie.add(gr.Score, number)
 	r.at++
 	if gr.Right {
 		r.rights++
@@ -434,16 +434,16 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, number bool, ms int64)
 	if r.at >= len(r.picks) {
 		return g.finish(tx, r)
 	}
-	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, rights = ?, closeness = ?, hardest = ?, ms = ?
-		WHERE id = ?`, r.at, r.rights, r.tie.closeness, r.tie.hardest, r.ms, r.id)
+	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, rights = ?, closeness = ?, ms = ?
+		WHERE id = ?`, r.at, r.rights, r.tie.closeness, r.ms, r.id)
 	return err
 }
 
 // finish ends a run where it is, and notes that what follows it is due (after.go).
 func (g *Game) finish(tx *sql.Tx, r *run) error {
 	r.finished = true
-	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, rights = ?, closeness = ?, hardest = ?, ms = ?,
-		finished_at = ? WHERE id = ?`, r.at, r.rights, r.tie.closeness, r.tie.hardest, r.ms, store.Ms(g.Now()), r.id)
+	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, rights = ?, closeness = ?, ms = ?,
+		finished_at = ? WHERE id = ?`, r.at, r.rights, r.tie.closeness, r.ms, store.Ms(g.Now()), r.id)
 	if err != nil {
 		return err
 	}
@@ -662,6 +662,9 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 			if gr, err = bank.GradeAt(d, answer, since); err != nil {
 				return ErrBadAnswer
 			}
+		}
+		if late > Grace && gr.Given == nil {
+			res.TimedOut = true // only an answer is taken late: no answer late is the time run out (late.go)
 		}
 		inRow := 0
 		if gr.Right {

@@ -195,11 +195,10 @@ func (g *Game) recount(tx *sql.Tx, r *run) error {
 			rights++
 		}
 		q, ok := b.Get(r.picks[a.n].ID)
-		tie.add(a.n, a.score, a.right, ok && q.Base().Type == "number")
+		tie.add(a.score, ok && q.Base().Type == "number")
 	}
 	r.rights, r.tie = rights, tie
-	_, err = tx.Exec(`UPDATE runs SET rights = ?, closeness = ?, hardest = ? WHERE id = ?`, r.rights, r.tie.closeness,
-		r.tie.hardest, r.id)
+	_, err = tx.Exec(`UPDATE runs SET rights = ?, closeness = ? WHERE id = ?`, r.rights, r.tie.closeness, r.id)
 	return err
 }
 

@@ -18,7 +18,7 @@ import (
 // played sees their result and place at once; only the others' come in a moment later.
 //
 // A day's board ranks by right answers, then by what breaks a tie between them (tiebreak): how close the hard number
-// came, then the hardest right answer (the tenth, then the ninth…), then time. Players tell their day as „8 от 10“, so
+// came, then time. Players tell their day as „8 от 10“, so
 // nine right are never under eight; there are no points (DECISIONS.md, „The direction“). A duel is decided the same
 // way (duels.go).
 
@@ -92,11 +92,11 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	var mine Score
 	var r boardRun
 	var avatar string
-	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.id, u.name, u.tag, r.rights, r.closeness, r.hardest,
+	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.id, u.name, u.tag, r.rights, r.closeness,
 			`+countedOf("r.questions")+`, r.ms, `+lookColumns+`
 		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind = 'day' AND r.day = ? AND r.user_id = ? AND r.finished_at IS NOT NULL`, day, viewer).
-		Scan(&r.id, &mine.Name, &mine.Tag, &mine.Rights, &r.tie.closeness, &r.tie.hardest, &mine.Of, &mine.Ms, &avatar)
+		Scan(&r.id, &mine.Name, &mine.Tag, &mine.Rights, &r.tie.closeness, &mine.Of, &mine.Ms, &avatar)
 	if errors.Is(err, sql.ErrNoRows) {
 		return b, nil
 	}
@@ -163,14 +163,14 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT id, rights, closeness, hardest, ms FROM runs WHERE kind = 'day' AND day = ?
-		AND finished_at IS NOT NULL AND NOT shadow ORDER BY `+dayOrder, day)
+	rows, err := tx.QueryContext(ctx, `SELECT id, rights, closeness, ms FROM runs WHERE kind = 'day' AND day = ?
+		AND finished_at IS NOT NULL AND `+othersSee("runs")+` ORDER BY `+dayOrder, day)
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
 		var r boardRun
-		if err := rows.Scan(&r.id, &r.rights, &r.tie.closeness, &r.tie.hardest, &r.ms); err != nil {
+		if err := rows.Scan(&r.id, &r.rights, &r.tie.closeness, &r.ms); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -183,7 +183,7 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 	rows, err = tx.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.rights, `+countedOf("r.questions")+`, r.ms,
 			`+lookColumns+`
 		FROM runs r JOIN users u ON u.id = r.user_id
-		WHERE r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND NOT r.shadow
+		WHERE r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND `+othersSee("r")+`
 		ORDER BY `+dayOrderOf("r")+` LIMIT ?`, day, BoardTop)
 	if err != nil {
 		return nil, err
@@ -222,36 +222,26 @@ func (d *countedBoard) due() bool {
 	return time.Since(d.counted) >= min(boardStale, time.Duration(boardPatience)*d.took)
 }
 
-// tiebreak is what decides between games of the same right answers, on a board and in a duel: how close the hard
-// number came (its score, in thousandths: a number short of right still came near or didn't), then the hardest right
-// answer, the one further on in the game (hardest: a bit for each right answer by its place, the tenth's the highest,
-// so that the larger is the one right further on: the tenth, then the ninth…). A run keeps both (runs.closeness,
-// runs.hardest), as it keeps its right answers.
+// tiebreak is what decides between games of the same right answers, on a board and in a duel, before their time: how
+// close the hard number came (its score, in thousandths: a number short of right still came near or didn't). A run
+// keeps it (runs.closeness), as it keeps its right answers.
 type tiebreak struct {
 	closeness int
-	hardest   int
 }
 
-// add counts an answer, to question n of its run, into what breaks a tie: a number's score, and a right answer's place.
-func (t *tiebreak) add(n int, score float64, right, number bool) {
+// add counts an answer into what breaks a tie: a number's score.
+func (t *tiebreak) add(score float64, number bool) {
 	if number {
 		t.closeness = int(math.Round(1000 * score))
-	}
-	if right && n >= 0 && n < 62 {
-		t.hardest |= 1 << n
 	}
 }
 
 // cmp is -1 if t breaks a tie ahead of o, 1 if behind, 0 if neither does.
-func (t tiebreak) cmp(o tiebreak) int {
-	switch {
-	case t.closeness != o.closeness:
-		return cmpInt(o.closeness, t.closeness)
-	case t.hardest != o.hardest:
-		return cmpInt(o.hardest, t.hardest)
-	}
-	return 0
-}
+func (t tiebreak) cmp(o tiebreak) int { return cmpInt(o.closeness, t.closeness) }
+
+// othersSee is, in SQL over runs (an alias), whether a day's game is on the others' boards and in their counts: not a
+// shadow (fair.go), nor the issue played a second time in one browser (runs.pencil: its answers were in sight).
+func othersSee(run string) string { return `NOT ` + run + `.shadow AND NOT ` + run + `.pencil` }
 
 func cmpInt(a, b int) int {
 	switch {
@@ -271,7 +261,7 @@ func dayOrderOf(runs string) string {
 	if runs != "" {
 		runs += "."
 	}
-	return runs + "rights DESC, " + runs + "closeness DESC, " + runs + "hardest DESC, " + runs + "ms, " + runs + "id"
+	return runs + "rights DESC, " + runs + "closeness DESC, " + runs + "ms, " + runs + "id"
 }
 
 // boardRun is a game on a board, as far as its place goes.
