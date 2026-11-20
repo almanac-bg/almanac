@@ -104,6 +104,7 @@ func WeekOf(day string) string {
 // Newcomer is a player in their first weeks: when they first played (answered a question), where they came from, the
 // version they met, and what they did then. Day N is N days after the first (day 0).
 type Newcomer struct {
+	ID       int64
 	First    string
 	CameFrom string // one of Landings; "" when not known
 	Version  string // the game's version on their first day ("" when not known)
@@ -171,7 +172,7 @@ func (g *Game) Newcomers(ctx context.Context, act *Activity, since string) ([]Ne
 		if first == "" || first < since {
 			continue
 		}
-		n := &Newcomer{First: first, Over: daysBetween(first, act.Today), Kinds: map[string]bool{}}
+		n := &Newcomer{ID: id, First: first, Over: daysBetween(first, act.Today), Kinds: map[string]bool{}}
 		for d := range n.Played {
 			if i := act.index(DayShift(first, d)); i >= 0 {
 				n.Played[d] = act.played[id][i]

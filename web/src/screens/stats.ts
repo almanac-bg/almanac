@@ -21,6 +21,8 @@ export interface Stats {
   forgiven: boolean[];
   /** Whether this week would still forgive a day missed. */
   spare: boolean;
+  /** How many missed days a week the streak forgives the player. */
+  perWeek: number;
   recent: Played[];
 }
 

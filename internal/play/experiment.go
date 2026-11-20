@@ -14,7 +14,10 @@ import (
 // the same bucket of an experiment always, and their buckets in two experiments are unrelated. Nothing is kept: the
 // bucket is worked out each time it's asked.
 //
-// The one experiment so far (the owner's call, 2026-11-18: DECISIONS.md): HeldReminders, a tenth of the players held
+// The second (the owner's call, 2026-11-20: DECISIONS.md, „The direction“): StreakHoldout, a tenth of the players who
+// come in during its window forgiven one missed day a week instead of two (runs.go), its own bucket.
+//
+// The first (the owner's call, 2026-11-18: DECISIONS.md): HeldReminders, a tenth of the players held
 // out of the day's notification and the streak's mail. What they would have had is kept as if sent, marked held
 // (push_reminded, streak_mails), by the same rules and at the same hour, so /admin compares those reminded with those
 // who weren't, and the difference is the reminder's. The day's reminder by mail isn't in it: a player asks for that

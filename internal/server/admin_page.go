@@ -83,6 +83,18 @@ var adminBody = template.Must(template.New("admin").Parse(`
 </tbody></table></div>
 </section>
 
+{{if .StreakHoldout}}
+<section class="admin-section" id="streak-holdout">
+<h2>Помага ли вторият простен ден</h2>
+<p class="muted">Новите играчи от {{.StreakFrom}} до {{.StreakUntil}}: един от всеки десет, по жребий, има един простен
+пропуснат ден на седмица, останалите два. Мярката, казана предварително: колко се връщат в дни 7–13. Ако до края на
+прозореца интервалите на двете групи се застъпват, двата простени дни остават.</p>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">Два дни</th><th class="num">Един ден</th></tr></thead><tbody>
+{{range .StreakHoldout}}<tr><td>{{.Name}}</td><td class="num">{{.Two.HTML}}</td><td class="num">{{.One.HTML}}</td></tr>{{end}}
+</tbody></table></div>
+</section>
+{{end}}
+
 <section class="admin-section" id="back">
 <h2>Връщане</h2>
 <div class="charts">{{.PlayersChart}}{{.CohortChart}}{{.Curve}}</div>
