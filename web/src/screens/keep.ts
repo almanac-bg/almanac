@@ -188,15 +188,17 @@ export function keepGame(signedIn: () => void): Child {
 /** The way in for a player who has a profile already (a new phone, another browser): a quiet line (`label`) that
  * opens the form in place (`open`: opened from the start). Signed in, `signedIn` draws the screen again, as the
  * profile has it, and the screen says what came of it (notice). */
-export function haveProfile(signedIn: () => void, label = "Имаш профил? Влез", open = false): Child {
+export function haveProfile(
+  signedIn: () => void,
+  label = "Имаш профил? Влез",
+  open = false,
+  email: () => string = () => "",
+): Child {
   const opened = signal(open);
   return () =>
     opened()
-      ? h(
-          "section",
-          { class: "card keep-card" },
-          h("h2", { class: "card-title" }, "Влез в профила си"),
-          signIn({ primary: false, done: told(signedIn) }),
+      ? h("section", { class: "card keep-card" }, h("h2", { class: "card-title" }, "Влез в профила си"), () =>
+          signIn({ primary: false, done: told(signedIn), email: email() }),
         )
       : h(
           "p",

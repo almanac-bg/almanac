@@ -84,7 +84,7 @@ func TestDayMail(t *testing.T) {
 			t.Fatalf("to %s", m.To)
 		}
 		if m.Subject != "Въпросите на деня те чакат" || !strings.Contains(m.Text, m.Unsubscribe) ||
-			!strings.Contains(m.Unsubscribe, "k=day") || !strings.Contains(m.Text, "/?from=mail\n") {
+			!strings.Contains(m.Unsubscribe, "k=day") || !strings.Contains(m.Text, "/?from=mail&to=") {
 			t.Fatalf("the mail: %+v", m)
 		}
 	}

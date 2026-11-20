@@ -27,8 +27,9 @@ import (
 // step in their book, never a question's text, nor a streak that ended: lastReminder), then nothing until they play the
 // day again, when the reminders start again by themselves. A reminder left counts only on a weekday the player has
 // played on (rhythm): one who plays on weekdays alone isn't cut off by a weekend's reminders, and the rhythm is theirs
-// from their first week, not learned over months. A reminder that reached none of their devices (a service down, the
-// game's keys wrong) counts for neither. Word from friends goes as before.
+// from their first week, not learned over months. From their third week (RhythmFrom days after their first day
+// played) a reminder goes only on those weekdays at all (rhythm.sends). A reminder that reached none of their devices
+// (a service down, the game's keys wrong) counts for neither. Word from friends goes as before.
 //
 // A player held out (play.HeldReminders, a tenth of them: the owner's call, so that /admin can tell what the
 // reminders do) is claimed the same, at the same hour, by the same rules, marked held, and never sent: what they would
@@ -47,6 +48,9 @@ const (
 	RemindIgnored = 3
 	// RemindQuietAfter is the day without play that says the reminders stop.
 	RemindQuietAfter = 7
+	// RhythmFrom is how many days after their first day played a player is reminded only on the weekdays they play:
+	// from their third week (the Fable review, 20 Nov 2026).
+	RhythmFrom = 14
 )
 
 // RemindMinute is the minute of the day, in Bulgaria, a player is reminded at, from the minutes of the day they
@@ -242,7 +246,7 @@ func (s *Server) dayReminder(ctx context.Context, today string, userID int64) (l
 		return false, false, err
 	}
 	week, err := s.rhythm(ctx, userID)
-	if err != nil {
+	if err != nil || !week.sends(today) {
 		return false, false, err
 	}
 	rows, err := s.db.Read.QueryContext(ctx, `SELECT day, last FROM push_reminded WHERE user_id = ? AND day > ?
@@ -305,6 +309,17 @@ func (s *Server) lastReminder(ctx context.Context, userID int64) push.Message {
 type rhythm struct {
 	days  [7]bool
 	known bool
+	first string // the first day they played (YYYY-MM-DD)
+}
+
+// sends says whether a reminder goes on day at all: any day in a player's first two weeks (RhythmFrom), from then on
+// only on the weekdays they play.
+func (w rhythm) sends(day string) bool {
+	if !w.known || w.first == "" || dayGap(w.first, day) < RhythmFrom {
+		return true
+	}
+	d, err := time.Parse(time.DateOnly, day)
+	return err != nil || w.days[d.Weekday()]
 }
 
 // counts says whether a reminder left on day (YYYY-MM-DD) counts as ignored.
@@ -316,19 +331,23 @@ func (w rhythm) counts(day string) bool {
 // rhythm reads a player's rhythm: the weekdays of the days they finished the day's questions.
 func (s *Server) rhythm(ctx context.Context, userID int64) (rhythm, error) {
 	var w rhythm
-	rows, err := s.db.Read.QueryContext(ctx, `SELECT DISTINCT CAST(strftime('%w', day) AS INTEGER) FROM runs
-		WHERE user_id = ? AND kind = 'day' AND finished_at IS NOT NULL`, userID)
+	rows, err := s.db.Read.QueryContext(ctx, `SELECT CAST(strftime('%w', day) AS INTEGER), min(day) FROM runs
+		WHERE user_id = ? AND kind = 'day' AND finished_at IS NOT NULL GROUP BY 1`, userID)
 	if err != nil {
 		return w, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var d int
-		if err := rows.Scan(&d); err != nil {
+		var first string
+		if err := rows.Scan(&d, &first); err != nil {
 			return w, err
 		}
 		if d >= 0 && d < 7 {
 			w.days[d], w.known = true, true
+		}
+		if w.first == "" || first < w.first {
+			w.first = first
 		}
 	}
 	return w, rows.Err()

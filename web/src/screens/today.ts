@@ -127,6 +127,14 @@ export function today() {
   notice.set("");
   // The game's mails link here with ?from=mail (server/streakmail.go, daymail.go): their reader has a profile.
   const fromMail = new URLSearchParams(location.search).get("from") === "mail";
+  // Whose mail it was (server: mailWho), for the sign-in to fill the address in.
+  const mailTo = new URLSearchParams(location.search).get("to") ?? "";
+  const mailedTo = signal("");
+  if (fromMail && mailTo && !user.peek()?.email)
+    api<{ email: string }>("GET", `/api/mail-who?${new URLSearchParams({ to: mailTo })}`).then(
+      (r) => mailedTo.set(r.email),
+      () => {},
+    );
   if (fromMail) history.replaceState(history.state, "", "/");
   // A game brought from an app's own browser: its token in the address's fragment (keep.ts, exitWay), taken out of
   // the address at once and taken here (takeHand), not in an app's browser (the one it came from, reloaded).
@@ -238,7 +246,7 @@ export function today() {
       // One line at a time, of others: a friend's duel waits (it has a time), or a friend said yes to their request.
       waitingLine(t.duel) ?? acceptedLine(t.accepted),
       // Come from the streak's mail to a browser signed out: the way in comes first, open.
-      fromMail && !user.peek()?.email ? haveProfile(load, undefined, true) : null,
+      fromMail && !user.peek()?.email ? haveProfile(load, undefined, true, mailedTo) : null,
     ];
     if (run?.done) return result(t, run, just, notices);
     // The player's numbers (Профил's): the streak's week, the facts in the book.
