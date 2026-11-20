@@ -388,7 +388,7 @@ function sent(d: DuelView, s: State, just: boolean): Child {
         h(
           "p",
           { class: "duel-sent" },
-          `Изпратен. ${them} ще изиграе същите десет въпроса: има време ${leftWords(d.until ?? Date.now() + 3 * 86_400_000)}. Ще видиш резултата, щом играе.`,
+          `Изпратен. ${them} ще изиграе същите десет въпроса: има време ${leftWords(d.until ?? Date.now() + 7 * 86_400_000)}. Ще видиш резултата, щом играе.`,
         ),
       ],
       {

@@ -395,6 +395,37 @@ func TestDuelTheOtherAsFarAsYouGo(t *testing.T) {
 
 // The same right answers, and nothing else to break the tie: the quicker wins only by a second or more over the game
 // (TieBand); closer, it's a draw.
+// A friend has a week to play a duel sent to them (DECISIONS.md, „The direction“): open for six days and a half, gone
+// past seven.
+func TestDuelWaitsAWeek(t *testing.T) {
+	if DuelFor != 7*24*time.Hour {
+		t.Fatalf("a friend has %v", DuelFor)
+	}
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo := w.user(), w.user()
+	w.befriend(ana, bo)
+	id, err := w.g.DuelFriend(ctx, ana, bo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.playSide(ana, id, repeat(w.right, Length))
+	w.wait(6*24*time.Hour + 12*time.Hour)
+	if err := w.g.SettleDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if d, _ := w.g.DuelOf(ctx, bo, id); d.State != DuelYours {
+		t.Fatalf("after six days and a half: %+v", d)
+	}
+	w.wait(13 * time.Hour)
+	if err := w.g.SettleDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if d, _ := w.g.DuelOf(ctx, bo, id); d.State != DuelExpired || d.Lapsed != "you" {
+		t.Fatalf("after a week: %+v", d)
+	}
+}
+
 func TestTieBand(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()

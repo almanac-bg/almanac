@@ -143,7 +143,7 @@ func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 	if err := s.db.Read.QueryRowContext(ctx, `SELECT name FROM users WHERE id = ?`, n.From).Scan(&name); err != nil {
 		return
 	}
-	m := push.Message{Title: name + " те покани на дуел", Body: "Същите десет въпроса. Имаш три дни.",
+	m := push.Message{Title: name + " те покани на дуел", Body: "Същите десет въпроса. Имаш седем дни.",
 		URL: "/duel/" + strconv.FormatInt(n.DuelID, 10)}
 	if n.Played {
 		m.Title, m.Body = name+" изигра дуела ви", "Виж кой спечели."
