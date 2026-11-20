@@ -288,10 +288,6 @@ func TestUntrueLeavesMastery(t *testing.T) {
 	if got := topics["geography"].answers; got != all-1 {
 		t.Fatalf("answers in the mastery: %d, want %d (the untrue one out, the weak one in)", got, all-1)
 	}
-	k, err := w.g.countKnowledge(ctx, w.now, w.b)
-	if err != nil || len(k["geography"]) != 1 || k["geography"][0].answers != all-1 {
-		t.Fatalf("the boards of knowledge: %+v %v", k["geography"], err)
-	}
 }
 
 // A reload doesn't make anyone wait for everyone's answers to be counted again: the counts before stand meanwhile
@@ -314,9 +310,6 @@ func TestCountsStandOverAReload(t *testing.T) {
 	if err != nil || h != first {
 		t.Fatalf("the hardness over a reload: %v", err)
 	}
-	if _, err := w.g.knowledge(gone); err != nil {
-		t.Fatal(err)
-	}
 	w.g.hard.settle()
 	if h, _ := w.g.hardness(ctx); h == first {
 		t.Fatal("not counted again for the new bank")
@@ -327,11 +320,11 @@ func TestCountsStandOverAReload(t *testing.T) {
 		t.Fatal(err)
 	}
 	fresh := &Game{DB: w.db, Bank: w.g.Bank, Now: w.g.Now}
-	if _, err := fresh.knowledge(gone); !errors.Is(err, context.Canceled) {
+	if _, err := fresh.hardness(gone); !errors.Is(err, context.Canceled) {
 		t.Fatalf("waiting with a request gone: %v", err)
 	}
-	fresh.known.settle()
-	if k, err := fresh.knowledge(gone); err != nil || len(k[""]) != 1 {
-		t.Fatalf("the count its waiter left: %+v %v", k, err)
+	fresh.hard.settle()
+	if h, err := fresh.hardness(gone); err != nil || len(h.byID) == 0 {
+		t.Fatalf("the count its waiter left: %v", err)
 	}
 }

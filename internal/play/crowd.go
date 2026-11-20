@@ -61,12 +61,12 @@ func (g *Game) Crowd(q bank.Question) *bank.Crowd {
 	return nil
 }
 
-// Count counts what's kept counted for everyone (the questions' crowds and hardness, the boards of knowledge), the
-// three at once, and waits for them: the server's first counts, made as it starts. Until they're in, what was kept of
+// Count counts what's kept counted for everyone (the questions' crowds and hardness), the two at once, and waits for
+// them: the server's first counts, made as it starts. Until they're in, what was kept of
 // the last ones (snapshot.go) is shown, so no player waits on them unless none was ever kept.
 func (g *Game) Count(ctx context.Context) error {
 	now, b := g.Now(), g.Bank()
-	errs := make([]error, 3)
+	errs := make([]error, 2)
 	var wg sync.WaitGroup
 	// A panic in a count is the count's (errCountBroke: snapshot.go); one around it is stopped here.
 	wg.Go(func() {
@@ -74,9 +74,6 @@ func (g *Game) Count(ctx context.Context) error {
 	})
 	wg.Go(func() {
 		safe.Do("counting: hardness", func() { _, errs[1] = g.hard.refresh(ctx, now, b, g.hardCounter()) })
-	})
-	wg.Go(func() {
-		safe.Do("counting: knowledge", func() { _, errs[2] = g.known.refresh(ctx, now, b, g.knowCounter()) })
 	})
 	wg.Wait()
 	return errors.Join(errs...)

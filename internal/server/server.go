@@ -162,8 +162,8 @@ func New(cfg Config, d Deps) (*Server, error) {
 	return s, nil
 }
 
-// Count makes the game's first counts over every answer (play.Game.Count): how players answered each question, how
-// hard each is, the boards of knowledge; so that the first players after a start don't wait on them (later counts
+// Count makes the game's first counts over every answer (play.Game.Count): how players answered each question and how
+// hard each is; so that the first players after a start don't wait on them (later counts
 // run by themselves, in the background, as they fall due).
 func (s *Server) Count(ctx context.Context) error { return s.game.Count(ctx) }
 

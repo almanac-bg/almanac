@@ -32,21 +32,20 @@ func TestReadsNeverNest(t *testing.T) {
 	}
 	w.playSide(ana, duel, repeat(w.right, Length))
 	reads := map[string]func(context.Context) error{
-		"Count":          w.g.Count,
-		"NewsOf":         func(ctx context.Context) error { _, err := w.g.NewsOf(ctx, bo, topic.ID); return err },
-		"NotesOf":        func(ctx context.Context) error { _, err := w.g.NotesOf(ctx, ana); return err },
-		"ProfileOf":      func(ctx context.Context) error { _, err := w.g.ProfileOf(ctx, "player2", ana); return err },
-		"StatsOf":        func(ctx context.Context) error { _, err := w.g.StatsOf(ctx, ana); return err },
-		"BoardOf":        func(ctx context.Context) error { _, err := w.g.BoardOf(ctx, w.g.Today(), ana); return err },
-		"FriendsBoard":   func(ctx context.Context) error { _, err := w.g.FriendsBoard(ctx, w.g.Today(), bo); return err },
-		"KnowledgeBoard": func(ctx context.Context) error { _, err := w.g.KnowledgeBoard(ctx, ana, false, ""); return err },
-		"MasteryMoves":   func(ctx context.Context) error { _, err := w.g.MasteryMoves(ctx, bo, topic.ID); return err },
-		"StreakOf":       func(ctx context.Context) error { _, err := w.g.StreakOf(ctx, ana); return err },
-		"DuelsOf":        func(ctx context.Context) error { _, err := w.g.DuelsOf(ctx, ana); return err },
-		"DuelOf":         func(ctx context.Context) error { _, err := w.g.DuelOf(ctx, bo, duel); return err },
-		"DuelsWaiting":   func(ctx context.Context) error { _, err := w.g.DuelsWaiting(ctx, bo); return err },
-		"RarestRight":    func(ctx context.Context) error { _, err := w.g.RarestRight(ctx, ana, w.g.Today()); return err },
-		"Suspects":       func(ctx context.Context) error { _, err := w.g.Suspects(ctx); return err },
+		"Count":        w.g.Count,
+		"NewsOf":       func(ctx context.Context) error { _, err := w.g.NewsOf(ctx, bo, topic.ID); return err },
+		"NotesOf":      func(ctx context.Context) error { _, err := w.g.NotesOf(ctx, ana); return err },
+		"ProfileOf":    func(ctx context.Context) error { _, err := w.g.ProfileOf(ctx, "player2", ana); return err },
+		"StatsOf":      func(ctx context.Context) error { _, err := w.g.StatsOf(ctx, ana); return err },
+		"BoardOf":      func(ctx context.Context) error { _, err := w.g.BoardOf(ctx, w.g.Today(), ana); return err },
+		"FriendsBoard": func(ctx context.Context) error { _, err := w.g.FriendsBoard(ctx, w.g.Today(), bo); return err },
+		"MasteryMoves": func(ctx context.Context) error { _, err := w.g.MasteryMoves(ctx, bo, topic.ID); return err },
+		"StreakOf":     func(ctx context.Context) error { _, err := w.g.StreakOf(ctx, ana); return err },
+		"DuelsOf":      func(ctx context.Context) error { _, err := w.g.DuelsOf(ctx, ana); return err },
+		"DuelOf":       func(ctx context.Context) error { _, err := w.g.DuelOf(ctx, bo, duel); return err },
+		"DuelsWaiting": func(ctx context.Context) error { _, err := w.g.DuelsWaiting(ctx, bo); return err },
+		"RarestRight":  func(ctx context.Context) error { _, err := w.g.RarestRight(ctx, ana, w.g.Today()); return err },
+		"Suspects":     func(ctx context.Context) error { _, err := w.g.Suspects(ctx); return err },
 	}
 	for name, read := range reads {
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
