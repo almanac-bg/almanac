@@ -82,20 +82,19 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	}
 	var mine Score
 	var r boardRun
-	var avatar, title string
-	var points int
+	var avatar string
 	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.id, u.name, u.tag, r.points, r.rights, `+countedOf("r.questions")+`, r.ms,
 			`+lookColumns+`
 		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind = 'day' AND r.day = ? AND r.user_id = ? AND r.finished_at IS NOT NULL`, day, viewer).
-		Scan(&r.id, &mine.Name, &mine.Tag, &mine.Points, &mine.Rights, &mine.Of, &mine.Ms, &avatar, &title, &points)
+		Scan(&r.id, &mine.Name, &mine.Tag, &mine.Points, &mine.Rights, &mine.Of, &mine.Ms, &avatar)
 	if errors.Is(err, sql.ErrNoRows) {
 		return b, nil
 	}
 	if err != nil {
 		return b, err
 	}
-	mine.Me, mine.Look = true, g.lookOf(viewer, avatar, title, points)
+	mine.Me, mine.Look = true, lookOf(viewer, avatar)
 	b.Mine = &mine
 	r.rights, r.points, r.ms = mine.Rights, mine.Points, mine.Ms
 	// Their place: after everyone ahead of them in the count, which has them already, or not yet: finished since, or
@@ -184,12 +183,11 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 	for rows.Next() {
 		var id int64
 		var s Score
-		var avatar, title string
-		var points int
-		if err := rows.Scan(&id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Of, &s.Ms, &avatar, &title, &points); err != nil {
+		var avatar string
+		if err := rows.Scan(&id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Of, &s.Ms, &avatar); err != nil {
 			return nil, err
 		}
-		s.Look = g.lookOf(id, avatar, title, points)
+		s.Look = lookOf(id, avatar)
 		d.top, d.users = append(d.top, s), append(d.users, id)
 	}
 	if err := rows.Err(); err != nil {

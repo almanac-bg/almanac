@@ -142,34 +142,29 @@ export function masteryCard(all: Mastery[], theirs = false): Child {
   );
 }
 
-/** How a topic's game moved its mastery, in a line: the move the server picked as news (play.masteryTold, which also
- * counts the news's cards by it: draw it whenever it's sent), never one of its own. The topic, how much of it is known
- * now and how it moved — „нова степен“ for a tier above the lowest reached, else the share gained; before its mark is
- * sure, a first estimate of what share of the topic it is, never a tier; or, while there's no estimate yet, what's left
- * before one. */
+/** How a topic's game moved its mastery, in a line: the move the server picked as news (play.masteryTold: a first
+ * estimate, or a tier reached; never a loss), never one of its own. The topic, how much of it is known now, and the
+ * tier it reached („нова степен“); before its mark is sure, a first estimate of what share of the topic it is, never a
+ * tier. */
 export function masteryLine(move: MasteryMove | undefined): Child {
   if (!move) return null;
   const { from, to } = move;
-  const d = to.known - from.known;
-  const change =
-    to.tier > 0 && (!from.sure || to.tier > from.tier)
-      ? h("span", { class: "delta up" }, "нова степен")
-      : from.sure && d > 0
-        ? h("span", { class: "delta up" }, `+${d}%`)
-        : null;
+  if (!to.sure && !to.first) return null;
   return h(
     "p",
     { class: `mastery-line ${toneOf(to.category)}` },
     topicMark(to.category),
     h("span", { class: "mastery-topic" }, topicName(to.category)),
     to.sure
-      ? [h("b", { class: "mastery-known" }, `${to.known}%`), change, masteryBadge(to)]
-      : to.first
-        ? [
-            h("span", { class: "muted" }, "Първа оценка: знаеш около"),
-            h("b", { class: "mastery-known" }, `${to.known}%`),
-            h("span", { class: "muted" }, "от темата"),
-          ]
-        : h("span", { class: "muted" }, masteryLeft(to)),
+      ? [
+          h("b", { class: "mastery-known" }, `${to.known}%`),
+          !from.sure || to.tier > from.tier ? h("span", { class: "delta up" }, "нова степен") : null,
+          masteryBadge(to),
+        ]
+      : [
+          h("span", { class: "muted" }, "Първа оценка: знаеш около"),
+          h("b", { class: "mastery-known" }, `${to.known}%`),
+          h("span", { class: "muted" }, "от темата"),
+        ],
   );
 }

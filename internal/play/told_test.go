@@ -64,20 +64,12 @@ func TestUntold(t *testing.T) {
 	}
 }
 
-// A game's news counts the facts it put in the almanac: a question's first right answer, once; the goals it moved
-// without finishing them are told with how far along they are.
-func TestNewsFactsAndGoals(t *testing.T) {
+// A game's news counts the facts it put in the almanac (a question's first right answer, once), says of the player's
+// first game that it's the first, and tells a bad game nothing it didn't bring.
+func TestNewsFacts(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
-	w.played(ana, XPFromDay-1)
-	day := w.g.Today()
-	for n, goal := range []string{"day", "know:history", "right30"} {
-		if _, err := w.db.Write.Exec(`INSERT INTO day_goals (user_id, day, n, goal) VALUES (?, ?, ?, ?)`,
-			ana, day, n, goal); err != nil {
-			t.Fatal(err)
-		}
-	}
 	right, wrong := w.right, w.wrong
 	s, _ := w.g.StartTopic(ctx, ana, "history")
 	w.play(ana, s.ID, right, right, right, wrong, wrong, wrong, wrong, wrong, wrong, wrong)
@@ -85,21 +77,13 @@ func TestNewsFactsAndGoals(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	moved := map[string]int{}
-	for _, d := range n.Moved {
-		moved[d.ID] = d.Progress
+	if n.Kind != "topic" || !n.First || n.Facts > 3 || n.Facts == 0 || len(n.Notes) != 0 {
+		t.Fatalf("a first game, three right: %+v", n)
 	}
-	if len(moved) != 2 || moved["know:history"] != 3 || moved["right30"] != 3 {
-		t.Fatalf("goals moved: %+v", n.Moved)
-	}
-	if n.Facts > 3 || n.Facts == 0 {
-		t.Fatalf("facts of three right answers: %d", n.Facts)
-	}
-	// A second game finishing one goal and moving the other: the finished one is told as done, not as moved.
 	s, _ = w.g.StartTopic(ctx, ana, "history")
-	w.play(ana, s.ID, right, right, right, wrong, wrong, wrong, wrong, wrong, wrong, wrong)
+	w.play(ana, s.ID, repeat(wrong, Length)...)
 	n, _ = w.g.NewsOf(ctx, ana, s.ID)
-	if len(n.Moved) != 1 || n.Moved[0].ID != "right30" || n.Moved[0].Progress != 6 || len(n.Goals) != 1 {
-		t.Fatalf("one done, one moved: moved %+v, done %+v", n.Moved, n.Goals)
+	if n.First || n.Facts != 0 || n.Mastery != nil && n.Mastery.To.Known < n.Mastery.From.Known || len(n.Notes) != 0 {
+		t.Fatalf("a second game, all wrong: %+v", n)
 	}
 }

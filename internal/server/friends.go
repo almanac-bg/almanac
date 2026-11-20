@@ -79,11 +79,11 @@ func (s *Server) requestFriend(w http.ResponseWriter, r *http.Request) error {
 	// A guest who hasn't finished a game is nobody yet: one made for the asking, then another, would let a stranger
 	// send anyone requests from throwaway names.
 	if u.Email == "" {
-		open, err := s.game.OpenOf(r.Context(), u.ID)
+		played, err := s.game.Played(r.Context(), u.ID)
 		if err != nil {
 			return err
 		}
-		if !open.Points {
+		if !played {
 			return errPlayFirst
 		}
 	}

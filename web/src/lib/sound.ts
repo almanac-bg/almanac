@@ -1,10 +1,10 @@
 // Sounds: made in the browser (no files), for a game's moments — a pick, the other side answering, the count before a
 // game and its start, the clock's last seconds, a right answer (higher with each one in a row), a wrong one or none,
-// the end (won, lost, perfect or just over), the result's pips and the streak, a goal done, a new level or
-// achievement, and something new waiting. On unless the player turns them off (kept on this device).
+// the end (won, lost, perfect or just over), the result's pips and the streak, a note in the book, and something new
+// waiting. On unless the player turns them off (kept on this device).
 //
 // Browsers allow sound only once the player has touched the page, so the audio starts then. The bigger sounds (an
-// end, a level, an achievement…) take turns: one asked for while another still sounds follows it, never on top. On
+// end, a win, a note…) take turns: one asked for while another still sounds follows it, never on top. On
 // a phone the sounds mix with whatever the player is listening to and keep quiet with the silent switch. The voices
 // themselves are in the game's feel (../feel.ts), a file of its own that the first touch sends for: here are the
 // switch, the audio and the turns.
@@ -31,13 +31,11 @@ export type SoundName =
   | "end"
   | "win"
   | "lose"
-  | "goal"
-  | "level"
-  | "achievement"
+  | "note"
   | "ping";
 
 /** The bigger sounds, which take turns rather than sound over each other. */
-const inTurn = new Set<SoundName>(["end", "perfect", "win", "lose", "goal", "level", "achievement"]);
+const inTurn = new Set<SoundName>(["end", "perfect", "win", "lose", "note"]);
 /** The longest a sound waits for its turn; later than that it's no longer news, and is left out. */
 const longestWait = 2.5;
 

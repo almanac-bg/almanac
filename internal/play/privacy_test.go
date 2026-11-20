@@ -2,7 +2,6 @@ package play
 
 import (
 	"errors"
-	"strings"
 	"testing"
 	"time"
 )
@@ -54,20 +53,9 @@ func TestProfileShowsNoGameUnderWay(t *testing.T) {
 		t.Fatalf("the player's own stats: %d answers", st.Answers)
 	}
 
-	// Dates, not moments: the month they started (late on the 17th in Bulgaria is still September), each achievement's
-	// day.
+	// A date, not a moment: the month they started (late on the 17th in Bulgaria is still September).
 	if since := time.UnixMilli(p.Since).In(Bulgaria); !since.Equal(time.Date(2026, 9, 1, 12, 0, 0, 0, Bulgaria)) {
 		t.Fatalf("since: %v", since)
-	}
-	if len(p.Achievements) == 0 {
-		t.Fatal("no achievement after a game of ten right: the test needs one")
-	}
-	for _, a := range p.Achievements {
-		at := time.UnixMilli(a.At).In(Bulgaria)
-		if at.Hour() != 12 || at.Minute() != 0 || at.Second() != 0 || at.Nanosecond() != 0 ||
-			at.YearDay() != w.now.In(Bulgaria).YearDay() {
-			t.Fatalf("%s earned at %v", a.ID, at)
-		}
 	}
 }
 
@@ -77,7 +65,7 @@ func TestRecordingsNamed(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	owner, gal := w.user(), w.user()
-	if _, err := w.db.Write.Exec(`UPDATE users SET name = 'Мария', avatar = 'bear-2', frame = 'laurel' WHERE id = ?`,
+	if _, err := w.db.Write.Exec(`UPDATE users SET name = 'Мария', avatar = 'lynx-natural' WHERE id = ?`,
 		owner); err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +82,7 @@ func TestRecordingsNamed(t *testing.T) {
 	w.wait(time.Minute)
 
 	look, err := w.g.LookOf(ctx, owner)
-	if err != nil || !strings.HasPrefix(look.Avatar, "bear-2/laurel") {
+	if err != nil || look.Avatar != "lynx-natural" {
 		t.Fatalf("the owner's look: %+v %v", look, err)
 	}
 	var ownerTag string

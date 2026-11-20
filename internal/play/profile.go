@@ -1,21 +1,19 @@
 package play
 
 import (
-	"cmp"
 	"context"
 	"database/sql"
 	"errors"
-	"slices"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
 // A profile is a player as anyone may see them, found by their tag: how they look, their division, their numbers,
-// how well they know each topic, and the achievements they've earned. What only they see stays theirs: their games
-// one by one, achievements not yet earned, their email, their friends. Nor does it follow them as they play: its
-// numbers are of the games they finished (not a game under way, answer by answer), and its times are dates, the month
-// they started and the day of each achievement, never the moment (review 2026-11-18, S12). The privacy page says what
+// and how well they know each topic. What only they see stays theirs: their games one by one, their Алманах, their
+// email, their friends. Nor does it follow them as they play: its numbers are of the games they finished (not a game
+// under way, answer by answer), and its time is a date, the month they started, never the moment (review 2026-11-18,
+// S12). The privacy page says what
 // it shows; the server limits how many anyone looks at (server.profileOf).
 
 // Profile is a player as another sees them, and how the viewer stands with them.
@@ -24,7 +22,6 @@ type Profile struct {
 	Tag  string `json:"tag"`
 	// Me says it's the viewer's own.
 	Me bool `json:"me,omitempty"`
-	// Avatar comes as a look's does ("shape-tone/frame/backdrop"), with their title and level.
 	Look
 	// Since is when they started playing: the month (its first day, at noon in Bulgaria).
 	Since    int64    `json:"since"`
@@ -38,10 +35,6 @@ type Profile struct {
 	Won      int      `json:"won"`
 	// Mastery is how well they know each topic, in the bank's order.
 	Mastery []Mastery `json:"mastery"`
-	// Achievements are those they've earned, the latest first, each with the day (at noon in Bulgaria); Of is how many
-	// there are for them, as their Награди counts them (Open.shows).
-	Achievements []Earned `json:"achievements"`
-	Of           int      `json:"of"`
 	// Friend is how the viewer stands with them: "yes" (friends), "asked" (the viewer asked them), "asks" (they
 	// asked the viewer), or "" (none of these, or no viewer). Request is the request's id, while one waits.
 	Friend  string `json:"friend,omitempty"`
@@ -76,17 +69,16 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 	db := g.DB.Read
 	var p Profile
 	var id int64
-	var avatar, title string
-	var total int
+	var avatar string
 	err := db.QueryRowContext(ctx, `SELECT u.id, u.name, u.tag, u.created_at, `+lookColumns+` FROM users u WHERE u.tag = ?`, tag).
-		Scan(&id, &p.Name, &p.Tag, &p.Since, &avatar, &title, &total)
+		Scan(&id, &p.Name, &p.Tag, &p.Since, &avatar)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, ErrNoPlayer
 	}
 	if err != nil {
 		return p, err
 	}
-	p.Me, p.Look = id == viewer, g.lookOf(id, avatar, title, total)
+	p.Me, p.Look = id == viewer, lookOf(id, avatar)
 	if p.Standing, err = g.StandingOf(ctx, id); err != nil {
 		return p, err
 	}
@@ -106,30 +98,7 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 	if p.Mastery, err = g.knownMastery(ctx, id, true); err != nil {
 		return p, err
 	}
-	earned, err := g.earned(ctx, id)
-	if err != nil {
-		return p, err
-	}
-	open, err := g.OpenOf(ctx, id)
-	if err != nil {
-		return p, err
-	}
-	// Counted as their Награди counts them: those of the systems they've met (Open.shows).
-	p.Achievements = []Earned{}
-	for _, a := range Achievements {
-		if !open.shows(a) {
-			continue
-		}
-		p.Of++
-		if at, ok := earned[a.ID]; ok {
-			p.Achievements = append(p.Achievements, Earned{Achievement: a, At: at, Progress: a.Goal})
-		}
-	}
-	slices.SortStableFunc(p.Achievements, func(a, b Earned) int { return cmp.Compare(b.At, a.At) })
 	p.Since = monthOnly(p.Since)
-	for i := range p.Achievements {
-		p.Achievements[i].At = dayOnly(p.Achievements[i].At)
-	}
 	if viewer == 0 || p.Me {
 		return p, nil
 	}

@@ -90,28 +90,28 @@ test("the day played rolls the streak on in its chip, its words with its number:
   expect(said.filter((s) => /^1дни/.test(s))).toEqual([]);
 });
 
-test("a round streak is told by its sheet, not first by its chip: the number rolls on just before it", async ({
+test("a week's streak is noted in the book, told by its sheet, not first by its chip: the number rolls on just before it", async ({
   page,
 }) => {
   test.setTimeout(120_000);
   await watchChip(page);
   await page.goto("/");
-  // Two days: the third is a round number, told with its sheet.
-  await daysPlayed(page, 2, 1);
+  // Six days: the seventh is a streak's first milestone, noted in the Алманах and told with its sheet.
+  await daysPlayed(page, 6, 5, 4, 3, 2, 1);
   await page.reload();
-  await expect(page.locator(".streak-chip.unlit")).toContainText("2дни поред");
+  await expect(page.locator(".streak-chip.unlit")).toContainText("6дни поред");
   await startDay(page);
   await heard(page);
   await watchSheet(page);
   await playRun(page);
-  const sheet = page.getByRole("dialog", { name: "3 дни поред с въпросите на деня." });
-  // It waits for the result to land and the chips to grow (a new level here: its bar fills, its number rolls, it fills
-  // again), about four seconds, longer on a slow machine.
+  const sheet = page.getByRole("dialog", { name: "7 дни поред с въпросите на деня." });
+  // It waits for the result to land and the chip to roll on, a few seconds, longer on a slow machine.
   await expect(sheet).toBeVisible({ timeout: 10_000 });
+  await expect(sheet).toContainText("Отбелязано в Алманаха ти.");
   const said = await heard(page);
-  expect(said[0]).toBe("2дни поред unlit");
-  expect(said).toContain("23дни поред");
-  expect(said.at(-1)).toBe("3дни поред");
+  expect(said[0]).toBe("6дни поред unlit");
+  expect(said).toContain("67дни поред");
+  expect(said.at(-1)).toBe("7дни поред");
   // It came up opaque, nothing of the result showing through it, and goes back down, the page staying where it was.
   await page.waitForTimeout(500);
   const scrolled = await page.evaluate(() => scrollY);
@@ -121,6 +121,9 @@ test("a round streak is told by its sheet, not first by its chip: the number rol
   expect(seen.through, "frames with the sheet see-through").toBe(0);
   expect(seen.away, "the sheet, put away: still open, sliding down").toEqual({ open: true, sliding: true });
   expect(await page.evaluate(() => scrollY)).toBe(scrolled);
+  // Kept in the book: Моят Алманах lists it, with its day.
+  await page.goto("/almanac");
+  await expect(page.locator(".almanac-notes")).toContainText("7 дни поред с въпросите на деня");
 });
 
 /** What a look at the big-news sheet saw: in how many frames it was see-through (it or its panel less than opaque),

@@ -322,12 +322,11 @@ func (g *Game) rankingOf(ctx context.Context, viewer int64, list []ranked, divis
 	for rows.Next() {
 		var id int64
 		var r Ranked
-		var avatar, title string
-		var xp int
-		if err := rows.Scan(&id, &r.Name, &r.Tag, &avatar, &title, &xp); err != nil {
+		var avatar string
+		if err := rows.Scan(&id, &r.Name, &r.Tag, &avatar); err != nil {
 			return out, err
 		}
-		r.Look = g.lookOf(id, avatar, title, xp)
+		r.Look = lookOf(id, avatar)
 		who[id] = r
 	}
 	if err := rows.Err(); err != nil {

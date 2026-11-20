@@ -32,7 +32,7 @@ func TestReadsNeverNest(t *testing.T) {
 	reads := map[string]func(context.Context) error{
 		"Count":          w.g.Count,
 		"NewsOf":         func(ctx context.Context) error { _, err := w.g.NewsOf(ctx, bo, topic.ID); return err },
-		"ProgressOf":     func(ctx context.Context) error { _, err := w.g.ProgressOf(ctx, ana); return err },
+		"NotesOf":        func(ctx context.Context) error { _, err := w.g.NotesOf(ctx, ana); return err },
 		"ProfileOf":      func(ctx context.Context) error { _, err := w.g.ProfileOf(ctx, "player2", ana); return err },
 		"StatsOf":        func(ctx context.Context) error { _, err := w.g.StatsOf(ctx, ana); return err },
 		"BoardOf":        func(ctx context.Context) error { _, err := w.g.BoardOf(ctx, w.g.Today(), ana); return err },

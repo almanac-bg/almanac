@@ -197,29 +197,24 @@ func TestMasteryTold(t *testing.T) {
 	}{
 		{"a first estimate", MasteryMove{h(0, 0, false, false), h(31, 0, false, true)}, true},
 		{"its tier, first told", MasteryMove{h(23, 0, false, true), h(13, 0, true, false)}, true},
-		{"a share gone up", MasteryMove{h(40, 2, true, false), h(44, 2, true, false)}, true},
+		{"a share gone up", MasteryMove{h(40, 2, true, false), h(44, 2, true, false)}, false},
 		{"a tier up", MasteryMove{h(40, 2, true, false), h(52, 3, true, false)}, true},
 		{"down within a tier", MasteryMove{h(15, 0, true, false), h(13, 0, true, false)}, false},
 		{"down a tier", MasteryMove{h(41, 3, true, false), h(38, 2, true, false)}, false},
 		{"a first estimate down", MasteryMove{h(31, 0, false, true), h(29, 0, false, true)}, false},
 		{"no change", MasteryMove{h(40, 2, true, false), h(40, 2, true, false)}, false},
 	} {
-		got := masteryTold([]MasteryMove{c.move})
-		cards := 0
-		if c.news {
-			cards = 1
-		}
-		if (got != nil) != c.news || (News{Mastery: got}).cards() != cards {
+		if got := masteryTold([]MasteryMove{c.move}); (got != nil) != c.news {
 			t.Errorf("%s: told %+v", c.name, got)
 		}
 	}
-	// One topic, still too few answers for an estimate: what's left before one is told.
+	// One topic, still too few answers for an estimate: nothing to tell yet.
 	few := MasteryMove{h(0, 0, false, false), h(0, 0, false, false)}
-	if got := masteryTold([]MasteryMove{few}); got == nil || *got != few {
+	if got := masteryTold([]MasteryMove{few}); got != nil {
 		t.Errorf("one topic, too few answers: %+v", got)
 	}
 	// Several topics: the first that's news; none of them news, nothing.
-	up := MasteryMove{m("music", 40, 2, true, false), m("music", 44, 2, true, false)}
+	up := MasteryMove{m("music", 40, 2, true, false), m("music", 52, 3, true, false)}
 	down := MasteryMove{h(41, 3, true, false), h(38, 2, true, false)}
 	if got := masteryTold([]MasteryMove{down, few, up}); got == nil || *got != up {
 		t.Errorf("several topics: %+v", got)

@@ -115,17 +115,6 @@
     --div-platinum: #7fe0cf;
     --div-diamond: #79c7ff;
     --div-legend: #c4a3ff;
-    /* Achievement tiers: the fill of a badge, and the ink of its words. */
-    --tier-common: var(--silver);
-    --tier-rare: var(--sky);
-    --tier-epic: #b48cff;
-    --tier-legendary: var(--gold);
-    --tier-common-ink: #cfc8e3;
-    --tier-rare-ink: var(--sky-ink);
-    --tier-epic-ink: #c7a8ff;
-    --tier-legendary-ink: var(--gold-ink);
-    /* A medal not earned yet: grey, apart from common's silver. */
-    --locked: var(--line-strong);
     --on-fill: #140f26;
     --link: var(--accent);
     --elev-1: inset 0 1px 0 #ffffff0f, 0 2px 8px #00000066;
@@ -196,10 +185,6 @@
       --div-platinum: #3fb5a0;
       --div-diamond: #3c9be0;
       --div-legend: #8b5cf6;
-      --tier-common: #9aa6ba;
-      --tier-common-ink: #5d5677;
-      --locked: #cdc7dc;
-      --tier-epic-ink: #6a35d6;
       --elev-1: 0 1px 2px #140f2614, 0 2px 8px #140f260d;
       --elev-2: 0 2px 6px #140f2612, 0 18px 40px -16px #140f2638;
       --glow-gold: 0 1px 0 #b7860b, 0 8px 22px -8px #f59e0bb3;
@@ -242,10 +227,6 @@
     --div-platinum: #3fb5a0;
     --div-diamond: #3c9be0;
     --div-legend: #8b5cf6;
-    --tier-common: #9aa6ba;
-    --tier-common-ink: #5d5677;
-    --locked: #cdc7dc;
-    --tier-epic-ink: #6a35d6;
     --elev-1: 0 1px 2px #140f2614, 0 2px 8px #140f260d;
     --elev-2: 0 2px 6px #140f2612, 0 18px 40px -16px #140f2638;
     --glow-gold: 0 1px 0 #b7860b, 0 8px 22px -8px #f59e0bb3;
@@ -518,6 +499,20 @@
     gap: var(--space-1);
   }
 
+  /* The notes the book keeps (a streak's milestones, a first ten of ten, a chapter complete): a short quiet list. */
+  .almanac-notes {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .almanac-note-list {
+    display: grid;
+    gap: var(--space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
   .almanac-count {
     font-size: 1.125rem;
     font-weight: 700;
@@ -617,87 +612,6 @@
     border-left: 3px solid color-mix(in srgb, var(--tone) 70%, transparent);
     font: italic 500 1rem / 1.5rem var(--font-serif);
     text-wrap: pretty;
-  }
-
-  /* The day's goals: each with its mark (a star once done) and the XP it earns. */
-  .goal-list {
-    display: grid;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .goal {
-    position: relative;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 4px var(--space-3);
-  }
-
-  /* A goal not done yet leads to where it's done: the whole row is the link. */
-  a.goal-name {
-    color: var(--text);
-    text-decoration: none;
-  }
-
-  a.goal-name::before {
-    position: absolute;
-    inset: -6px 0;
-    content: "";
-  }
-
-  a.goal-name::after {
-    content: "\00a0›"; /* kept with the last word */
-    color: var(--text-muted);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    a.goal-name:hover {
-      color: var(--link);
-    }
-  }
-
-  .goal-mark {
-    width: 22px;
-    height: 22px;
-    border: 2px solid var(--line-strong);
-    border-radius: var(--radius-full);
-  }
-
-  .goal.done .goal-mark {
-    border-color: var(--accent);
-    background: var(--accent);
-    -webkit-mask: var(--i-star) center / 80% no-repeat;
-    mask: var(--i-star) center / 80% no-repeat;
-  }
-
-  .goal.done .goal-name {
-    color: var(--text-muted);
-    text-decoration: line-through;
-    text-decoration-color: var(--line-strong);
-  }
-
-  /* Just done, at a game's end: said, not struck out. */
-  .goal.fresh .goal-name {
-    color: var(--text);
-    text-decoration: none;
-  }
-
-  .goal-xp {
-    color: var(--text-muted);
-    font-size: 0.8125rem;
-    line-height: 1.125rem;
-    font-weight: 800;
-  }
-
-  .goal-n {
-    justify-self: end;
-    color: var(--text-muted);
-    font-size: 0.8125rem;
-    line-height: 1.125rem;
-    font-weight: 700;
   }
 
   /* Начало's ask to keep a guest's profile (screens/today.ts): the sign-in form in a card. */
@@ -902,16 +816,11 @@
     color: var(--text-muted);
   }
 
-  /* Начало's top: the streak and the level, side by side, each a way to Профил. */
+  /* Начало's top: the streak, a way to Профил. */
   .status-row {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);
-  }
-
-  /* A first day: the streak alone (the level comes with XP, play/unfold.go). */
-  .status-item:only-child {
-    grid-column: 1 / -1;
   }
 
   .status-item {
@@ -1046,11 +955,6 @@
     gap: var(--space-3);
   }
 
-  /* The level's words, then how far into it: beside them, so its number sits level with the streak's. */
-  .level-chip {
-    gap: var(--space-3);
-  }
-
   .day-meta {
     color: var(--text-muted);
     font-size: 0.875rem;
@@ -1081,19 +985,13 @@
     line-height: 1.375rem;
   }
 
-  :is(.home, .summary) :is(.news-xp, .news-open, .news-facts, .news-goal, .news-late) {
-    text-align: left;
-  }
+  /* Under a topic's result: the way to another topic, quietly (no card). */
 
-  /* The day's result, just played: the goals still open, as what's next, quietly (no card), and under a topic's result
-     the way to another topic. */
-  .open-goals,
   .other-topics {
     display: grid;
     gap: var(--space-2);
   }
 
-  .open-goals .kicker,
   .other-topics .kicker {
     margin: 0;
   }
@@ -4022,16 +3920,6 @@
     text-overflow: ellipsis;
   }
 
-  .who-title {
-    overflow: hidden;
-    color: var(--tier-ink, var(--accent));
-    font-size: 0.75rem;
-    line-height: 1rem;
-    font-weight: 700;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   .you {
     flex: none;
     margin-left: 6px;
@@ -4367,21 +4255,8 @@
     grid-column: 1 / -1;
   }
 
-  .level-chip .meter {
-    flex: 1;
-    min-width: 2rem;
-  }
-
-  .level-chip .meter-fill {
-    background: var(--lilac);
-  }
-
   .standing .meter-fill {
     background: var(--div);
-  }
-
-  .goal .meter {
-    grid-column: 2;
   }
 
   .chips {
@@ -4555,7 +4430,7 @@
     stroke: var(--k5);
   }
 
-  /* ---- Avatars: a picture on a tile of its tone, with the level beside it ---- */
+  /* ---- Avatars: a picture on a tile of its tone ---- */
 
   .avatar {
     --size: 40px;
@@ -4574,146 +4449,6 @@
     position: absolute;
     inset: 0;
     clip-path: inset(0 round calc(var(--size) * 0.3));
-  }
-
-  /* The wardrobe on an avatar: a frame drawn around it (art/frame.ts), a pattern behind its shape. */
-  .avatar-frame {
-    position: absolute;
-    inset: -16.7%;
-    width: 133.4%;
-    height: 133.4%;
-    overflow: visible;
-    pointer-events: none;
-  }
-
-  /* A frame's room round the avatar: on a list the same for every row, framed or not, so that the names line up. */
-  .avatar:is(.framed, .s, .friend > *) {
-    margin: calc(var(--size) * 0.12);
-  }
-
-  .fr-ring {
-    --tone: var(--silver);
-  }
-
-  .fr-double,
-  .fr-flames,
-  .fr-laurel,
-  .fr-sun {
-    --tone: var(--div-gold);
-  }
-
-  .fr-dots,
-  .fr-constellation {
-    --tone: var(--sky);
-  }
-
-  .fr-embroidery {
-    --tone: var(--rose);
-  }
-
-  .fr-sparks {
-    --tone: var(--lilac);
-  }
-
-  .fr-gem {
-    --tone: var(--div-diamond);
-  }
-
-  .fr-halo {
-    --tone: var(--div-legend);
-  }
-
-  .fr-halo,
-  .fr-sun,
-  .fr-sparks {
-    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tone) 60%, transparent));
-  }
-
-  .bd-dots {
-    background-image: radial-gradient(color-mix(in srgb, var(--on-fill) 22%, transparent) 1.3px, transparent 1.7px);
-    background-size: calc(var(--size) / 6) calc(var(--size) / 6);
-  }
-
-  .bd-stripes {
-    background-image: repeating-linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--on-fill) 14%, transparent) 0 3px,
-      transparent 3px 8px
-    );
-  }
-
-  .bd-grid {
-    background-image:
-      linear-gradient(color-mix(in srgb, var(--on-fill) 14%, transparent) 1px, transparent 1px),
-      linear-gradient(90deg, color-mix(in srgb, var(--on-fill) 14%, transparent) 1px, transparent 1px);
-    background-size: calc(var(--size) / 5) calc(var(--size) / 5);
-  }
-
-  .bd-rays {
-    background-image: repeating-conic-gradient(
-      from 0deg at 50% 50%,
-      color-mix(in srgb, var(--on-fill) 14%, transparent) 0 12deg,
-      transparent 12deg 24deg
-    );
-  }
-
-  .bd-stars {
-    background-image:
-      radial-gradient(color-mix(in srgb, white 70%, transparent) 1px, transparent 1.6px),
-      radial-gradient(color-mix(in srgb, white 45%, transparent) 0.8px, transparent 1.3px);
-    background-position:
-      0 0,
-      calc(var(--size) / 8) calc(var(--size) / 10);
-    background-size:
-      calc(var(--size) / 4) calc(var(--size) / 4),
-      calc(var(--size) / 3) calc(var(--size) / 3);
-  }
-
-  /* The patterns of the levels past 12 (play/wardrobe.go): waves, a zigzag, diamonds, rings, a glow. */
-  .bd-waves {
-    background-image: radial-gradient(
-      circle at 50% 100%,
-      transparent 42%,
-      color-mix(in srgb, var(--on-fill) 16%, transparent) 43% 52%,
-      transparent 53%
-    );
-    background-size: calc(var(--size) / 4) calc(var(--size) / 8);
-  }
-
-  .bd-zigzag {
-    background-image:
-      linear-gradient(135deg, color-mix(in srgb, var(--on-fill) 15%, transparent) 25%, transparent 25%),
-      linear-gradient(225deg, color-mix(in srgb, var(--on-fill) 15%, transparent) 25%, transparent 25%);
-    background-size: calc(var(--size) / 5) calc(var(--size) / 5);
-  }
-
-  .bd-diamonds {
-    background-image: conic-gradient(
-      from 45deg,
-      color-mix(in srgb, var(--on-fill) 15%, transparent) 25%,
-      transparent 25% 50%,
-      color-mix(in srgb, var(--on-fill) 15%, transparent) 50% 75%,
-      transparent 75%
-    );
-    background-size: calc(var(--size) / 4) calc(var(--size) / 4);
-  }
-
-  .bd-rings {
-    background-image: repeating-radial-gradient(
-      circle at 50% 50%,
-      color-mix(in srgb, var(--on-fill) 15%, transparent) 0 1.5px,
-      transparent 1.5px calc(var(--size) / 12)
-    );
-  }
-
-  .bd-glow {
-    background-image:
-      radial-gradient(circle at 50% 42%, color-mix(in srgb, white 45%, transparent), transparent 60%),
-      repeating-conic-gradient(
-        from 0deg at 50% 42%,
-        color-mix(in srgb, white 12%, transparent) 0 6deg,
-        transparent 6deg 18deg
-      );
   }
 
   /* The natural tone: no tone over the picture, every part in its own colour, as the thing looks (a fox orange with a
@@ -4843,190 +4578,6 @@
     stroke: #2a6a30;
   }
 
-  .tone-natural.sh-flame {
-    --tone: #2e3566;
-  }
-
-  .tone-natural.sh-flame > .avatar-pic {
-    --k4: #f97316;
-    --k5: #fcd34d;
-  }
-
-  .tone-natural.sh-star {
-    --tone: #2e3566;
-  }
-
-  .tone-natural.sh-star > .avatar-pic {
-    --k4: #f2ae0b;
-    --k5: #fde047;
-  }
-
-  .tone-natural.sh-target {
-    --tone: #a7d99b;
-  }
-
-  .tone-natural.sh-target > .avatar-pic {
-    --k1: #dc2b2b;
-    --k4: #fde047;
-    --k5: #ffffff;
-  }
-
-  .tone-natural.sh-bolt {
-    --tone: #2e3566;
-  }
-
-  .tone-natural.sh-bolt > .avatar-pic {
-    --k4: #facc15;
-    --k5: #fef08a;
-  }
-
-  .tone-natural.sh-book {
-    --tone: #f3d593;
-  }
-
-  .tone-natural.sh-book > .avatar-pic {
-    --k1: #8a2f17;
-    --k4: #b7aa8e;
-    --k5: #f6eedb;
-  }
-
-  .tone-natural.sh-book > .avatar-pic > :nth-child(6) {
-    fill: #d62f2f;
-  }
-
-  .tone-natural.sh-trophy {
-    --tone: #2e3566;
-  }
-
-  .tone-natural.sh-trophy > .avatar-pic {
-    --k1: #9a5b0c;
-    --k4: #f0b429;
-    --k5: #fcd34d;
-  }
-
-  .tone-natural.sh-trophy > .avatar-pic > :nth-child(8) {
-    fill: #5b3a1e;
-  }
-
-  .tone-natural.sh-trophy > .avatar-pic > :nth-child(9) {
-    fill: #fcd34d;
-  }
-
-  .tone-natural.sh-shield {
-    --tone: #d6e4f0;
-  }
-
-  .tone-natural.sh-shield > .avatar-pic {
-    --k1: #1f3f8f;
-    --k4: #c8d2df;
-    --k5: #eef1f5;
-  }
-
-  .tone-natural.sh-shield > .avatar-pic > :nth-child(6) {
-    fill: #fbbf24;
-  }
-
-  .tone-natural.sh-heart {
-    --tone: #fbd3dc;
-  }
-
-  .tone-natural.sh-heart > .avatar-pic {
-    --k4: #dc1f45;
-    --k5: #f43f5e;
-  }
-
-  .tone-natural.sh-owl {
-    --tone: #2e3566;
-  }
-
-  .tone-natural.sh-owl > .avatar-pic {
-    --k1: #6b4a2b;
-    --k2: #9a6b40;
-    --k4: #e8d2a8;
-    --k5: #fffaf0;
-  }
-
-  .tone-natural.sh-owl > .avatar-pic > :nth-child(9) {
-    fill: #f59e0b;
-  }
-
-  .tone-natural.sh-compass {
-    --tone: #a7d99b;
-  }
-
-  .tone-natural.sh-compass > .avatar-pic {
-    --k1: #b7791f;
-    --k2: #6b7280;
-    --k4: #cbd5e1;
-    --k5: #fffaf0;
-  }
-
-  .tone-natural.sh-compass > .avatar-pic > :nth-child(6) {
-    fill: #dc2b2b;
-  }
-
-  .tone-natural.sh-sun {
-    --tone: #9fd0f2;
-  }
-
-  .tone-natural.sh-sun > .avatar-pic {
-    --k1: #b45309;
-    --k4: #f59e0b;
-    --k5: #fde047;
-  }
-
-  .tone-natural.sh-hourglass {
-    --tone: #f3d593;
-  }
-
-  .tone-natural.sh-hourglass > .avatar-pic {
-    --k1: #7c4a24;
-    --k2: #e8a93f;
-    --k5: #e6f4fd;
-  }
-
-  .tone-natural.sh-spark {
-    --tone: #2e3566;
-  }
-
-  .tone-natural.sh-spark > .avatar-pic {
-    --k4: #fbbf24;
-    --k5: #fde68a;
-  }
-
-  .tone-natural.sh-clover {
-    --tone: #f3d593;
-  }
-
-  .tone-natural.sh-clover > .avatar-pic {
-    --k1: #2f7d32;
-    --k2: #2f7d32;
-    --k4: #3e9b43;
-    --k5: #57b65b;
-  }
-
-  .tone-natural.sh-crown {
-    --tone: #5b2a86;
-  }
-
-  .tone-natural.sh-crown > .avatar-pic {
-    --k1: #b91c1c;
-    --k4: #f0b429;
-    --k5: #fcd34d;
-  }
-
-  .tone-natural.sh-crown > .avatar-pic > :nth-child(5) {
-    fill: #fffaf0;
-  }
-
-  .tone-natural.sh-crown > .avatar-pic > :nth-child(6) {
-    fill: #4f9cf5;
-  }
-
-  .tone-natural.sh-crown > .avatar-pic > :nth-child(8) {
-    fill: #fffaf0;
-  }
-
   .tone-natural.sh-mouse {
     --tone: #f3d593;
   }
@@ -5101,161 +4652,6 @@
     fill: #b9c43c;
   }
 
-  .tone-natural.sh-torch {
-    --tone: #2e3566;
-  }
-
-  .tone-natural.sh-torch > .avatar-pic {
-    --k1: #6b3f1f;
-    --k2: #b7791f;
-    --k4: #f97316;
-    --k5: #fcd34d;
-  }
-
-  .tone-natural.sh-bonfire {
-    --tone: #2e3566;
-  }
-
-  .tone-natural.sh-bonfire > .avatar-pic {
-    --k1: #6b3f1f;
-    --k2: #8a5a2e;
-    --k4: #f97316;
-    --k5: #fcd34d;
-  }
-
-  .tone-natural.sh-bonfire > .avatar-pic > :nth-child(7) {
-    fill: #d9a066;
-  }
-
-  .tone-natural.sh-phoenix {
-    --tone: #2e3566;
-  }
-
-  .tone-natural.sh-phoenix > .avatar-pic {
-    --k1: #b45309;
-    --k4: #ef4b23;
-    --k5: #fcb33d;
-  }
-
-  .tone-natural.sh-year {
-    --tone: #9fd0f2;
-  }
-
-  .tone-natural.sh-year > .avatar-pic {
-    --k3: #f97316;
-    --k4: #f59e0b;
-    --k5: #fde047;
-  }
-
-  .tone-natural.sh-calendar {
-    --tone: #d6e4f0;
-  }
-
-  .tone-natural.sh-calendar > .avatar-pic {
-    --k2: #d62f2f;
-    --k3: #d62f2f;
-    --k5: #e7e2d6;
-  }
-
-  .tone-natural.sh-calendar > .avatar-pic > :nth-child(7) {
-    fill: #fcd34d;
-  }
-
-  .tone-natural.sh-books {
-    --tone: #f3d593;
-  }
-
-  .tone-natural.sh-books > .avatar-pic {
-    --k1: #8a2f17;
-    --k2: #1f3f8f;
-    --k4: #2f6f4e;
-    --k5: #f6eedb;
-  }
-
-  .tone-natural.sh-blades {
-    --tone: #d6e4f0;
-  }
-
-  .tone-natural.sh-blades > .avatar-pic {
-    --k1: #1f3f8f;
-    --k2: #fbbf24;
-    --k4: #b6bcc6;
-    --k5: #eef1f5;
-  }
-
-  .tone-natural.sh-blades > .avatar-pic > :nth-child(4) {
-    fill: #b7791f;
-  }
-
-  .tone-natural.sh-blades > .avatar-pic > :nth-child(9) {
-    fill: #b7791f;
-  }
-
-  .tone-natural.sh-blades > .avatar-pic > :nth-child(15) {
-    fill: #fbbf24;
-  }
-
-  .tone-natural.sh-helmet {
-    --tone: #2e3566;
-  }
-
-  .tone-natural.sh-helmet > .avatar-pic {
-    --k1: #7a4a12;
-    --k4: #c98a12;
-    --k5: #f0b429;
-  }
-
-  .tone-natural.sh-helmet > .avatar-pic > :nth-child(2) {
-    fill: #b91c1c;
-  }
-
-  .tone-natural.sh-helmet > .avatar-pic > :nth-child(3) {
-    fill: #dc2b2b;
-  }
-
-  .tone-natural.sh-hearts {
-    --tone: #fbd3dc;
-  }
-
-  .tone-natural.sh-hearts > .avatar-pic {
-    --k1: #a3122f;
-    --k4: #dc1f45;
-    --k5: #f43f5e;
-  }
-
-  .tone-natural.sh-cap {
-    --tone: #9fd0f2;
-  }
-
-  .tone-natural.sh-cap > .avatar-pic {
-    --k1: #1f2937;
-    --k2: #111827;
-    --k4: #f0b429;
-    --k5: #fcd34d;
-  }
-
-  .tone-natural.sh-wreath {
-    --tone: #2e3566;
-  }
-
-  .tone-natural.sh-wreath > .avatar-pic {
-    --k1: #3f6b2a;
-    --k4: #4d8a34;
-    --k5: #6fae4a;
-  }
-
-  .tone-natural.sh-wreath > .avatar-pic > :nth-last-child(4) {
-    fill: #b91c1c;
-  }
-
-  .tone-natural.sh-wreath > .avatar-pic > :nth-last-child(2) {
-    fill: #fcd34d;
-  }
-
-  .tone-natural.sh-wreath > .avatar-pic > :nth-last-child(1) {
-    fill: #f0b429;
-  }
-
   .avatar.s {
     --size: 28px;
   }
@@ -5269,30 +4665,7 @@
     background: var(--sunken);
   }
 
-  .avatar .lv {
-    position: absolute;
-    right: -6px;
-    bottom: -6px;
-    min-width: 20px;
-    height: 20px;
-    padding: 0 5px;
-    border-radius: var(--radius-full);
-    background: var(--lilac);
-    color: var(--on-fill);
-    box-shadow: 0 0 0 2px var(--surface);
-    font: 800 0.75rem / 20px var(--font-numeral);
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .avatar.l .lv {
-    min-width: 28px;
-    height: 28px;
-    font-size: 1rem;
-    line-height: 28px;
-  }
-
-  /* ---- Progress: the level, achievements, how a player looks ---- */
+  /* ---- Профил's head: the avatar (a tap from choosing another), the name and tag ---- */
 
   .me-head {
     display: flex;
@@ -5308,6 +4681,17 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 2px;
     min-width: 0;
+  }
+
+  .me-avatar {
+    display: inline-flex;
+    flex: none;
+    border-radius: var(--radius-lg);
+  }
+
+  .me-avatar-link {
+    justify-self: start;
+    font-size: 0.875rem;
   }
 
   /* A long name wraps in its column, never under what's beside it. */
@@ -5345,7 +4729,7 @@
     font-size: 0.875rem;
   }
 
-  /* Гардероб: what's worn, as others see it. */
+  /* The avatar's choice (/avatar): what's worn, as others see it. */
   .worn {
     display: flex;
     align-items: center;
@@ -5366,7 +4750,7 @@
     letter-spacing: -0.02em;
   }
 
-  /* What's folded away until asked for: the locked titles, the rest of the achievements. What it holds is laid out
+  /* What's folded away until asked for (how a game is played, a list's rest). What it holds is laid out
      in the details' own content box, so it gets a grid of its own, spaced as a section's parts. */
   .more {
     display: grid;
@@ -5391,18 +4775,12 @@
     cursor: pointer;
   }
 
-  .me-title {
-    color: var(--tier-ink, var(--accent));
-    font-weight: 700;
-  }
+  /* A game's news in lines (news.ts), each in one quiet style: what points are, said once on a first game; the facts
+     it put in Моят Алманах, a tap from them; a note it wrote in the book. */
 
-  /* A game's news in lines (news.ts), each in one quiet style: a system met with this game (play/unfold.go), said
-     once in a few words; the facts it put in Моят Алманах, a tap from them; the XP it brought and the level (when no
-     new level has a card); a day's goal it moved without finishing one. */
-  .news-xp,
   .news-open,
   .news-facts,
-  .news-goal {
+  .news-note {
     margin: 0;
     color: var(--text-muted);
     font-size: 0.9375rem;
@@ -5411,15 +4789,19 @@
     text-wrap: pretty;
   }
 
-  :is(.news-xp, .news-open, .news-facts) b,
-  .news-goal-n {
-    color: var(--text);
-    font-weight: 700;
-  }
-
   .news-facts a {
     color: inherit;
     text-decoration: none;
+  }
+
+  .news-note a {
+    color: inherit;
+  }
+
+  /* A chapter's picture in its note's sheet, as large as a number there. */
+  .sheet-pic {
+    width: 112px;
+    height: 112px;
   }
 
   /* News told late, on Начало (play/told.go): whose it is, over it. */
@@ -5493,425 +4875,6 @@
     scroll-margin-top: var(--space-5);
   }
 
-  .level-card {
-    display: grid;
-    gap: var(--space-2);
-  }
-
-  .level-card.up {
-    box-shadow:
-      var(--elev-1),
-      inset 0 0 0 1.5px var(--lilac);
-  }
-
-  .level-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-1) var(--space-3);
-  }
-
-  .level-n {
-    font: 900 2rem / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .level-card .meter,
-  .me-level-bar .meter {
-    height: 10px;
-  }
-
-  .level-card .meter-fill,
-  .me-level-bar .meter-fill {
-    background: var(--lilac);
-  }
-
-  .t-common {
-    --tier: var(--tier-common);
-    --tier-ink: var(--tier-common-ink);
-  }
-
-  .t-rare {
-    --tier: var(--tier-rare);
-    --tier-ink: var(--tier-rare-ink);
-  }
-
-  .t-epic {
-    --tier: var(--tier-epic);
-    --tier-ink: var(--tier-epic-ink);
-  }
-
-  .t-legendary {
-    --tier: var(--tier-legendary);
-    --tier-ink: var(--tier-legendary-ink);
-  }
-
-  /* An achievement's medal (art/badge.ts): drawn in the tier's colour, the tier's form, the achievement's picture on
-     its face; a locked one grey (its progress is a bar beside it). */
-  .badge {
-    --tone: var(--tier, var(--gold));
-    position: relative;
-    display: inline-grid;
-    flex: none;
-    place-items: center;
-    width: 56px;
-    height: 56px;
-  }
-
-  .badge-s {
-    width: 32px;
-    height: 32px;
-  }
-
-  .badge-l {
-    width: 88px;
-    height: 88px;
-  }
-
-  .badge-medal {
-    position: absolute;
-    inset: 0;
-  }
-
-  .badge-glyph {
-    position: relative;
-    width: 70%;
-    height: 70%;
-    clip-path: circle(46%);
-  }
-
-  .badge.locked {
-    --tone: var(--locked);
-  }
-
-  .badge.locked .badge-medal,
-  .badge.locked .badge-glyph {
-    opacity: 0.6;
-  }
-
-  .badge.earned.t-epic .badge-medal,
-  .badge.earned.t-legendary .badge-medal {
-    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--tier) 55%, transparent));
-  }
-
-  .badge .badge-glyph.secret {
-    display: grid;
-    place-items: center;
-    clip-path: none;
-    color: var(--on-fill);
-    font: 900 1.5rem / 1 var(--font-numeral);
-  }
-
-  .tier {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-3);
-  }
-
-  .tier-head {
-    margin: 0;
-    color: var(--tier-ink);
-    font: 800 0.8125rem / 1rem var(--font-sans);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .tier-head .muted {
-    letter-spacing: 0;
-    text-transform: none;
-  }
-
-  .achievement-progress {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: var(--space-2);
-    margin: 4px 0 2px;
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
-
-  .achievement-progress .meter-fill {
-    background: var(--tier);
-  }
-
-  .achievement-reward {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: 22px;
-    margin-top: 2px;
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    line-height: 1rem;
-    font-weight: 600;
-  }
-
-  .reward-mark {
-    --tone: var(--tier);
-    flex: none;
-    width: 22px;
-    height: 22px;
-    border-radius: 7px;
-    background: var(--tier);
-  }
-
-  .reward-mark.secret {
-    display: none;
-  }
-
-  .achievement-when {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    line-height: 1rem;
-    font-weight: 600;
-  }
-
-  .achievement:not(.locked) .achievement-when {
-    color: var(--tier-ink);
-  }
-
-  .titles {
-    display: grid;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .title-pick {
-    appearance: none;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 2px var(--space-3);
-    width: 100%;
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-md);
-    background: var(--raised);
-    color: var(--text);
-    font: inherit;
-    text-align: left;
-  }
-
-  button.title-pick {
-    cursor: pointer;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    button.title-pick:hover {
-      border-color: var(--line-strong);
-    }
-  }
-
-  .title-pick[aria-pressed="true"] {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent);
-  }
-
-  .title-name {
-    color: var(--tier-ink, var(--text));
-    font-weight: 800;
-  }
-
-  .title-tier {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
-
-  .title-pick.t-common .title-name {
-    color: var(--text);
-  }
-
-  .title-pick.locked {
-    background: transparent;
-    padding-block: var(--space-2);
-  }
-
-  .title-pick.locked .title-name {
-    color: var(--text-muted);
-  }
-
-  .titles-more {
-    margin: var(--space-2) 0 0;
-    color: var(--text-muted);
-    font-size: 0.875rem;
-    font-weight: 700;
-  }
-
-  .title-how {
-    flex-basis: 100%;
-    color: var(--text-muted);
-    font-size: 0.8125rem;
-    line-height: 1.125rem;
-  }
-
-  .unlock.t-epic,
-  .unlock.t-legendary {
-    box-shadow:
-      var(--elev-1),
-      inset 0 0 0 1px var(--tier),
-      0 0 24px -12px var(--tier);
-  }
-
-  .achievements {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .achievement {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-md);
-    background: var(--surface);
-    box-shadow:
-      var(--elev-1),
-      inset 0 0 0 1px var(--line);
-  }
-
-  .achievement.locked {
-    background: transparent;
-    box-shadow: inset 0 0 0 1px var(--line);
-  }
-
-  /* The words take the rest of the row, so every card's meter and count end at the same edge. */
-  .achievement-text {
-    display: grid;
-    flex: 1;
-    min-width: 0;
-  }
-
-  .achievement-name {
-    font-weight: 700;
-  }
-
-  .achievement.locked .achievement-name {
-    color: var(--text-muted);
-  }
-
-  .achievement-about {
-    color: var(--text-muted);
-    font-size: 0.8125rem;
-    line-height: 1.125rem;
-  }
-
-  .unlock {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
-
-  .unlock-text {
-    display: grid;
-    flex: 1;
-    justify-items: start;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .unlock-text .link {
-    margin-top: var(--space-1);
-  }
-
-  .unlock-title-name {
-    color: var(--tier-ink, var(--text));
-  }
-
-  /* What a game unlocked, all together, each a tap from being worn; an achievement's XP and rewards in a line. Small
-     print under each name, so the news stays short. */
-  .unlock-reward {
-    color: var(--text-muted);
-    font-size: 0.8125rem;
-    font-weight: 700;
-    line-height: 1.125rem;
-  }
-
-  /* An achievement's: its tier in the tier's ink, its XP in gold (a reward). */
-  .achievement-row .unlock-reward {
-    color: var(--text-muted);
-  }
-
-  .unlock-tier {
-    color: var(--tier-ink);
-  }
-
-  .unlock-xp {
-    color: var(--gold-ink);
-  }
-
-  .unlock-about {
-    color: var(--text-muted);
-    font-size: 0.8125rem;
-    line-height: 1.125rem;
-  }
-
-  .unlocks {
-    justify-items: start;
-  }
-
-  .unlock-list {
-    display: grid;
-    width: 100%;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .unlock-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-height: 3rem;
-  }
-
-  .unlock-row .btn {
-    flex: none;
-    min-height: 2.75rem;
-    margin-left: auto;
-    padding: 0 var(--space-3);
-    font-size: 0.875rem;
-  }
-
-  /* A title: a ribbon with a nameplate in the tier's colour, its tails and folds in shade, a name's line on it. */
-  .unlock-title-mark {
-    position: relative;
-    display: block;
-    flex: none;
-    width: 40px;
-    height: 40px;
-  }
-
-  .unlock-title-mark::before,
-  .unlock-title-mark::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    -webkit-mask: var(--m) center / contain no-repeat;
-    mask: var(--m) center / contain no-repeat;
-  }
-
-  .unlock-title-mark::before {
-    --m: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath d='M1.5 16.5h9.5v13H1.5l4-6.5zM38.5 16.5H29v13h9.5l-4-6.5zM7.5 10h25v15h-25z'/%3E%3C/svg%3E");
-    background: color-mix(in srgb, var(--tier) 58%, var(--on-fill));
-  }
-
-  .unlock-title-mark::after {
-    --m: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath fill-rule='evenodd' d='M9.5 10h21a2 2 0 0 1 2 2v13H7.5V12a2 2 0 0 1 2-2zM13 17.25a1.25 1.25 0 0 0 0 2.5h14a1.25 1.25 0 0 0 0-2.5z'/%3E%3C/svg%3E");
-    background: var(--tier);
-  }
-
   /* The picture by a streak's notice. */
   .notice-pic {
     flex: none;
@@ -5931,121 +4894,10 @@
     box-shadow: inset 0 0 0 2px var(--gold);
   }
 
-  /* How it all fits together (Награди), and what comes next (Профил). */
-  .how-list {
-    display: grid;
-    gap: var(--space-2);
-    margin: 0;
-    padding-left: 1.1rem;
-    color: var(--text-muted);
-    font-size: 0.875rem;
-    line-height: 1.3rem;
-  }
-
-  .how-list b {
-    color: var(--text);
-  }
-
   .next {
     display: grid;
     justify-items: start;
     gap: var(--space-3);
-  }
-
-  /* Профил's level: the level and its bar, what the next level brings, then what else comes next. */
-  .me-level {
-    justify-items: start;
-  }
-
-  .me-level-bar {
-    display: grid;
-    justify-self: stretch;
-    gap: var(--space-2);
-  }
-
-  .next-level {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-1) var(--space-3);
-    margin: 0;
-    font-size: 0.8125rem;
-    line-height: 1.125rem;
-  }
-
-  .next-list {
-    display: grid;
-    width: 100%;
-    gap: var(--space-3);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .next-row {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--space-3);
-  }
-
-  .next-text {
-    display: grid;
-    flex: 1;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .next-text .muted {
-    font-size: 0.8125rem;
-    line-height: 1.125rem;
-  }
-
-  .next-reward {
-    color: var(--text-muted);
-    font-size: 0.8125rem;
-    line-height: 1.125rem;
-    font-weight: 700;
-  }
-
-  .next-unlocks {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1) var(--space-3);
-    margin-top: var(--space-1);
-  }
-
-  .next-unlock {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: 0.8125rem;
-  }
-
-  /* Each in the same 30px slot (a frame reaches 3px out of its avatar), so the words line up. */
-  .next-unlock .avatar,
-  .next-unlock .unlock-title-mark {
-    --size: 24px;
-    width: 24px;
-    height: 24px;
-    margin: 3px;
-  }
-
-  .next-unlock .avatar {
-    border-radius: 8px;
-  }
-
-  /* A division's emblem as big as the achievements' medals under it. */
-  .next-row .emblem {
-    width: 32px;
-    height: 32px;
-  }
-
-  .tier-reward {
-    margin: 0;
-    color: var(--tier-ink, var(--text-muted));
-    font-size: 0.8125rem;
-    line-height: 1.125rem;
-    font-weight: 700;
   }
 
   /* Five to a row on the narrowest phone, so the five colours above sit in a row over them. */
@@ -6073,64 +4925,6 @@
 
   .pick[aria-pressed="true"] {
     box-shadow: 0 0 0 2px var(--accent);
-  }
-
-  /* A locked one in the wardrobe's list: grey, as a locked medal is, beside what unlocks it. */
-  .lock-art {
-    flex: none;
-  }
-
-  .lock-art .avatar {
-    --tone: var(--line-strong);
-    opacity: 0.6;
-  }
-
-  /* Frames and patterns of the player's own, each drawn on their avatar with its name under it (the locked ones are
-     listed after, as the avatars' are: wardrobe.ts). Three to a row on the narrowest phone. */
-  .wear {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(5.75rem, 1fr));
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  @media (min-width: 40rem) {
-    .wear {
-      grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
-    }
-  }
-
-  .wear > li {
-    display: grid;
-  }
-
-  .wear-pick {
-    appearance: none;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-1);
-    padding: var(--space-2) var(--space-1);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-md);
-    background: var(--raised);
-    color: var(--text);
-    font: inherit;
-    text-align: center;
-    cursor: pointer;
-  }
-
-  .wear-pick[aria-pressed="true"] {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent);
-  }
-
-  .wear-name {
-    font-size: 0.8125rem;
-    line-height: 1.125rem;
-    font-weight: 800;
   }
 
   /* The colours in the avatars' columns, each over the one under it. */
@@ -7181,8 +5975,8 @@
     }
   }
 
-  /* A laptop and up: the page takes the width. Начало in two columns (the day and the topics; beside them the streak,
-     the level, the goals and the ways to play with others); Профил's places at 64rem, with Профил's cards in two
+  /* A laptop and up: the page takes the width. Начало in two columns (the day and the topics; beside them the streak
+     and the ways to play with others); Профил's places at 64rem, with Профил's cards in two
      columns; every other page a centred column of 48rem, so no line of text runs too long. */
   @media (min-width: 64rem) {
     #app {
@@ -7258,7 +6052,7 @@
     }
 
     /* The streak, the habit's reward, leads the column beside the day, level with its result: a row of its own, its
-       number big; the level under it. */
+       number big. */
     .home > .status-row {
       grid-template-columns: minmax(0, 1fr);
     }
@@ -7320,7 +6114,7 @@
       width: fit-content;
     }
 
-    /* Гардероб: bigger looks to choose from, more to a row. */
+    /* The avatar's choice: bigger looks to choose from, more to a row. */
     .picker,
     .tones {
       grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
@@ -7513,8 +6307,7 @@
     line-height: 1.375rem;
   }
 
-  /* Side by side no more: the streak over the level, the figures one under another. */
-  .tight .status-row,
+  /* Side by side no more: the figures one under another. */
   .tight .figures {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -7528,7 +6321,7 @@
     margin-left: var(--space-2);
   }
 
-  /* The streak and the level as tall as what they say. */
+  /* The streak as tall as what it says. */
   .tight .status-item {
     min-height: 0;
   }

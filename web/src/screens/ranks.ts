@@ -5,7 +5,7 @@ import type { Board, Score } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
 import type { Child, Signal } from "../lib/dom.ts";
 import { type By, boardHash, readBoard } from "../lib/hash.ts";
-import type { Open, Standing, Tier } from "../ui.ts";
+import type { Standing } from "../ui.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
@@ -37,9 +37,6 @@ interface Ranked {
   tier?: string;
   me?: boolean;
   avatar?: string;
-  title?: string;
-  titleTier?: Tier;
-  level?: number;
 }
 
 interface Ranking {
@@ -60,7 +57,6 @@ interface Day {
   friends?: Score[] | null;
   /** No friend has played: whether the player has any at all. */
   befriended?: boolean;
-  open?: Open;
 }
 
 const tabs: [By, string][] = [
@@ -68,9 +64,6 @@ const tabs: [By, string][] = [
   ["rating", "Рейтинг"],
   ["knowledge", "Знания"],
 ];
-
-/** Whether a board shows to a viewer who has met these of the game's systems: the rating's waits for it. */
-const shows = (by: By, open?: Open) => by !== "rating" || !!open?.rating;
 
 export function ranks(kit: Kit) {
   ({
@@ -110,13 +103,9 @@ export function ranks(kit: Kit) {
     if (by() === "knowledge" && topic()) q.set("topic", topic());
     return q.toString();
   };
-  // The day's board comes first, and says which of the others the viewer has met: the rating's board, not theirs yet,
-  // waits (play/unfold.go).
+  // The day's board comes first.
   const loadDay = () => {
-    api<Day>("GET", "/api/day").then((d) => {
-      day.set(d);
-      if (!shows(by.peek(), d.open)) pick(by, "day");
-    }, error.set);
+    api<Day>("GET", "/api/day").then(day.set, error.set);
   };
   loadDay();
   const load = () => {
@@ -142,13 +131,7 @@ export function ranks(kit: Kit) {
     h(
       "div",
       { class: "board-filters" },
-      () =>
-        segmented(
-          "Класация",
-          tabs.filter(([id]) => shows(id, day()?.open)),
-          by,
-          (v) => pick(by, v),
-        ),
+      () => segmented("Класация", tabs, by, (v) => pick(by, v)),
       () =>
         user.peek()
           ? segmented(

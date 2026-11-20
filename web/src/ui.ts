@@ -1,7 +1,6 @@
 // The pieces several screens draw with: the verdict and the fact, the streak, numbers with what they count, and each
 // topic's colour. The stylesheet draws them; these only say what to draw.
 
-import { badgeArt } from "./art/badge.ts";
 import { type DivisionID, emblem } from "./art/emblem.ts";
 import { picture } from "./art/picture.ts";
 import { errorText, passing } from "./lib/api.ts";
@@ -10,7 +9,7 @@ import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { calm, type Scheme, scheme, setScheme } from "./lib/prefs.ts";
 import { path } from "./lib/router.ts";
 import { formatNumber, stakeWords } from "./lib/words.ts";
-import { categories, opened } from "./state.ts";
+import { categories } from "./state.ts";
 
 export { formatNumber };
 
@@ -162,13 +161,6 @@ export function pageArt(id: string, tone: string): Child {
   return picture(`mode-${id}`, `page-art ${tone}`);
 }
 
-/** The level as words and a number: „Ниво“ in the words' face, small and muted, the number in the numerals'. The
- * numeral face is for digits only: Cyrillic words read badly in it at display size. */
-export const levelNumber = (level: number): Child[] => [
-  h("span", { class: "num-word" }, "Ниво "),
-  h("span", { class: "level-num" }, String(level)),
-];
-
 /** A topic's small picture, as on a chip (decoration), in the topic's own tone wherever it's put; a plain dot for all
  * of them. */
 export function topicMark(category: string): Child {
@@ -177,23 +169,13 @@ export function topicMark(category: string): Child {
     : h("span", { class: "dot", "aria-hidden": "true" });
 }
 
-/** Which of the game's systems a player has met (play/unfold.go): the rest waits, untold, until it matters. */
-export interface Open {
-  points: boolean;
-  /** XP, the level and the day's goals: from the second day played. */
-  xp: boolean;
-  /** The rating and its division: from the first duel that moved it. */
-  rating: boolean;
-}
-
-/** The game's three numbers, each in a few words: what one game scored, what playing earns, how strong a player is.
- * Kept apart on purpose (play/worth.go), so each is said where it first shows and a tap from wherever it does. */
+/** The game's two numbers, each in a few words: what one game scored, and how strong a player is in duels. Kept
+ * apart on purpose (play/worth.go), so each is said where it first shows and a tap from wherever it does. */
 export const meaning = {
   points:
     "Точките са резултатът ти в една игра: за верните отговори (по-трудните носят повече) и за бързината. Игра без грешка носи още точки накрая. Верните поред не носят повече точки.",
   /** The day's board: said of the day's points only (a topic's game has no board). */
   dayBoard: " При равен брой верни в класацията на деня решават точките.",
-  xp: "XP печелиш с всяка игра, цел и постижение. Трупа се и вдига нивото ти.",
   rating:
     "Рейтингът е силата ти в дуелите: расте с победа, пада със загуба. Първите 10 игри с рейтинг го определят, после от него зависи дивизията ти.",
 };
@@ -397,29 +379,13 @@ export const record = (won: number, lost: number, drawn: number) =>
   `${won} ${won === 1 ? "победа" : "победи"}, ${lost} ${lost === 1 ? "загуба" : "загуби"}` +
   (drawn ? `, ${drawn} ${drawn === 1 ? "равенство" : "равенства"}` : "");
 
-/** How a player shows to others: their avatar (shape-tone), title and level. */
+/** How a player shows to others: their avatar (shape-tone). */
 export interface Look {
   avatar?: string;
-  title?: string;
-  /** The title's tier: it shows in that tier's colour. */
-  titleTier?: Tier;
-  level?: number;
 }
 
-/** How hard an achievement or a title is to earn: a title shows in its tier's colour. */
-export type Tier = "common" | "rare" | "epic" | "legendary";
-
-export const tiers: Tier[] = ["common", "rare", "epic", "legendary"];
-
-/** A tier's words: for a group of achievements, for one achievement (neuter), and for a title (feminine). */
-export const tierWords: Record<Tier, { group: string; one: string; title: string }> = {
-  common: { group: "Обикновени", one: "обикновено", title: "Обикновена" },
-  rare: { group: "Редки", one: "рядко", title: "Рядка" },
-  epic: { group: "Епични", one: "епично", title: "Епична" },
-  legendary: { group: "Легендарни", one: "легендарно", title: "Легендарна" },
-};
-
-/** Every avatar's name: the animals everyone has, those levels unlock, then the emblems achievements unlock. */
+/** Every avatar's name: the animals, each anyone's to choose from the first day (play.Animals), in the order the
+ * choice shows them. */
 export const shapeNames: Record<string, string> = {
   fox: "Лисица",
   bear: "Мечка",
@@ -436,32 +402,6 @@ export const shapeNames: Record<string, string> = {
   turtle: "Костенурка",
   badger: "Язовец",
   lynx: "Рис",
-  flame: "Пламък",
-  torch: "Факла",
-  bonfire: "Огън",
-  phoenix: "Феникс",
-  year: "Година",
-  calendar: "Календар",
-  books: "Книги",
-  blades: "Мечове",
-  helmet: "Шлем",
-  hearts: "Сърца",
-  cap: "Академична шапка",
-  wreath: "Венец",
-  star: "Звезда",
-  target: "Мишена",
-  bolt: "Мълния",
-  book: "Книга",
-  trophy: "Купа",
-  shield: "Щит",
-  heart: "Сърце",
-  owl: "Бухал",
-  compass: "Компас",
-  sun: "Слънце",
-  hourglass: "Пясъчен часовник",
-  spark: "Искра",
-  clover: "Детелина",
-  crown: "Корона",
 };
 
 export const toneNames: Record<string, string> = {
@@ -482,38 +422,25 @@ function fromName(name: string): string {
   return `${freeShapes[n % freeShapes.length]}-${tones[Math.floor(n / freeShapes.length) % tones.length]}`;
 }
 
-/** An avatar: a picture on a tile of its tone, and from the wardrobe a pattern behind it and a frame around it, with
- * the level beside it when given, once the viewer has met XP (play/unfold.go: a first day shows nobody's level).
- * `id` is "shape-tone", or "shape-tone/frame/backdrop" as the server sends a look. For the eye: the name and level are
- * said in words nearby. */
-export function avatar(
-  id: string | undefined,
-  opts: { size?: "s" | "l"; level?: number; name?: string; frame?: string; backdrop?: string } = {},
-) {
-  const [base = "", worn = "", pattern = ""] = (id || fromName(opts.name ?? "")).split("/");
-  const [shape = "", tone] = base.split("-");
-  const frame = opts.frame ?? worn;
-  const backdrop = opts.backdrop ?? pattern;
+/** An avatar: a picture on a tile of its tone. `id` is "shape-tone", as the server sends a look. For the eye: the
+ * name is said in words nearby. */
+export function avatar(id: string | undefined, opts: { size?: "s" | "l"; name?: string } = {}) {
+  const [shape = "", tone] = (id || fromName(opts.name ?? "")).split("-");
   return h(
     "span",
     {
       // The shape's class gives it its own colours in the natural tone (app.css, .tone-natural).
-      class: ["avatar", opts.size, `tone-${tone}`, `sh-${shape}`, backdrop && `bd-${backdrop}`, frame && "framed"]
-        .filter(Boolean)
-        .join(" "),
+      class: ["avatar", opts.size, `tone-${tone}`, `sh-${shape}`].filter(Boolean).join(" "),
       "aria-hidden": "true",
     },
     picture(shape, "avatar-pic"),
-    frame ? picture(`frame-${frame}`, `avatar-frame fr-${frame}`) : null,
-    opts.level && opened.peek().xp ? h("b", { class: "lv" }, String(opts.level)) : null,
   );
 }
 
 /** Where a player's profile is: by their tag. */
 export const profileHref = (tag: string) => `/players/${tag}`;
 
-/** A player on a board or a list: their avatar, name and title; with their tag, a link to their profile. No level: on
- * a board it would be a second number beside the place, and the profile has it, a tap away. */
+/** A player on a board or a list: their avatar and name; with their tag, a link to their profile. */
 export function who(name: Child, look: Look = {}, extra: Child = null, plainName = "", tag = ""): Child {
   return h(
     tag ? "a" : "span",
@@ -524,28 +451,8 @@ export function who(name: Child, look: Look = {}, extra: Child = null, plainName
       { class: "who-text" },
       // The name gives way (an ellipsis) so that what's beside it („ти“) always shows whole.
       h("span", { class: "who-name" }, h("span", { class: "who-label" }, name), extra),
-      look.title ? h("span", { class: `who-title t-${look.titleTier ?? "common"}` }, look.title) : null,
     ),
   );
-}
-
-/** An achievement: drawn as a medal of its tier with its shape, bright once earned. `about` says how it's earned;
- * `goal` and `progress` how far along it is; a hidden one not found yet comes without its name or how. */
-export interface AchievementInfo {
-  id: string;
-  name: string;
-  about: string;
-  icon: string;
-  tier: Tier;
-  goal?: number;
-  progress?: number;
-  hidden?: boolean;
-  at?: number;
-  /** The XP it earns, once. */
-  xp?: number;
-  /** What else it gives: what it unlocks that the player doesn't have yet (once earned, what came with it). Not told
-   * of a hidden one not yet found. */
-  rewards?: Unlock[];
 }
 
 /** A band of rating, and where it starts. */
@@ -609,64 +516,6 @@ export function standingCard(s: Standing, own = false): Child {
   );
 }
 
-/** Something to wear, unlocked (or to be): a title, a frame, a pattern or an avatar's shape, and what unlocks it. */
-export interface Unlock {
-  kind: "title" | "frame" | "backdrop" | "avatar";
-  /** What to wear it by (an avatar's: its shape). */
-  id: string;
-  /** Its name ("" for an avatar: see `shapeNames`). */
-  name: string;
-  tier?: Tier;
-  /** What unlocks it, as a phrase after „с“: „ниво 5“, „дивизия Злато“. */
-  from: string;
-}
-
-/** What an unlock is, in a word, and its name: „титла „Оракул““, „рамка „Пламъци““. */
-export function unlockWords(u: Unlock): string {
-  const name = u.kind === "avatar" ? (shapeNames[u.id] ?? u.id) : u.name;
-  const kind = { title: "титла", frame: "рамка", backdrop: "фон", avatar: "аватар" }[u.kind];
-  return `${kind} „${name}“`;
-}
-
-/** An achievement's reward, said in a line: its XP and what it unlocks. */
-export function rewardWords(a: AchievementInfo): string {
-  const parts = [a.xp ? `+${a.xp} XP` : "", ...(a.rewards ?? []).map(unlockWords)].filter(Boolean);
-  return parts.join(" · ");
-}
-
-/** An unlock drawn: an avatar's shape, a frame or a pattern on the player's own avatar (`worn`: shape-tone), or a
- * title in its tier's ink. */
-export function unlockPicture(u: Unlock, worn: string): Child {
-  const [, tone = "gold"] = worn.split("-");
-  switch (u.kind) {
-    case "avatar":
-      return avatar(`${u.id}-${tone}`);
-    case "frame":
-      return avatar(worn, { frame: u.id });
-    case "backdrop":
-      return avatar(worn, { backdrop: u.id });
-    default:
-      return h("span", { class: `unlock-title-mark t-${u.tier ?? "common"}`, "aria-hidden": "true" });
-  }
-}
-
-/** A title: its id (to wear it), its name, and its tier. */
-export interface TitleRef {
-  id: string;
-  name: string;
-  tier: Tier;
-}
-
-export function badge(a: AchievementInfo, earned: boolean, size: "s" | "m" | "l" = "m"): HTMLElement {
-  return badgeArt({
-    id: a.id,
-    tier: a.tier,
-    icon: a.icon,
-    earned,
-    size,
-  });
-}
-
 /** A screen that couldn't load, never a dead end: what went wrong (lib/api.ts, errorText); „Опитай пак“ where trying
  * again can help, and the same by itself as the line comes back; and a way on (`way`: Начало, unless the screen is
  * Начало itself: null). */
@@ -698,11 +547,9 @@ export function back(href: string, label: string): Child {
   );
 }
 
-/** Профил's own places: the player at a glance, their rewards, their wardrobe, and their almanac. */
+/** Профил's own places: the player at a glance, and their almanac. */
 const profilePlaces: [href: string, label: string][] = [
   ["/me", "Общо"],
-  ["/rewards", "Награди"],
-  ["/wardrobe", "Гардероб"],
   ["/almanac", "Алманах"],
 ];
 

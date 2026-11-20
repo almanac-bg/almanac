@@ -69,7 +69,7 @@ export function scoreCard(s: State, line: Child, words = meaning.points, points:
         "p",
         { class: "points" },
         h("b", { class: "points-n", "data-n": s.points }, points),
-        // What points are, a tap away: the game's score, not what playing earns (XP) or strength (the rating).
+        // What points are, a tap away: the game's score, not strength (the rating).
         explain(h("span", { class: "points-label" }, s.points === 1 ? "точка" : "точки"), words),
         s.allRight ? h("span", { class: "points-bonus" }, `+${formatNumber(s.allRight)} за всички верни`) : null,
       ),

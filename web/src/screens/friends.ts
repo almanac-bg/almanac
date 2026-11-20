@@ -3,7 +3,6 @@
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
-import type { Tier } from "../ui.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
@@ -32,9 +31,6 @@ interface Friend {
   name: string;
   tag: string;
   avatar?: string;
-  title?: string;
-  titleTier?: Tier;
-  level?: number;
   today?: { points: number; rights: number; of: number };
   won: number;
   lost: number;
@@ -307,7 +303,7 @@ function row(f: Friend, remove: () => void, editing: () => boolean): Child {
   return h(
     "li",
     { class: "friend" },
-    avatar(f.avatar, { level: f.level, name: f.name }),
+    avatar(f.avatar, { name: f.name }),
     h(
       "div",
       { class: "friend-text" },
@@ -317,7 +313,6 @@ function row(f: Friend, remove: () => void, editing: () => boolean): Child {
         f.name,
         h("span", { class: "friend-tag" }, ` @${f.tag}`),
       ),
-      f.title ? h("span", { class: `who-title t-${f.titleTier ?? "common"}` }, f.title) : null,
       h(
         "span",
         { class: "friend-day" },

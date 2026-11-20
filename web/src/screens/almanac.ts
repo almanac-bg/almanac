@@ -1,7 +1,10 @@
 // Моят Алманах: what the player has learned — the fact behind every question they've answered right — as cards laid
 // as masonry, in the order the facts were learned, the first first. A topic is a quiet filter above. It grows to
-// thousands, so it comes a page at a time: the next as the list's end comes near.
+// thousands, so it comes a page at a time: the next as the list's end comes near. Above the facts, the notes the book
+// keeps of the player's milestones (a streak of 7, 30, 100 or 365 days, a first ten of ten, a chapter complete), the
+// latest first: a short list for now, the book's own look comes later.
 
+import type { Note } from "../game/news.ts";
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
 
@@ -24,6 +27,7 @@ let {
   profileNav,
   toneOf,
   topicMark,
+  notedWords,
 } = {} as Kit;
 
 interface Learned {
@@ -38,12 +42,14 @@ interface Learned {
   at: number;
 }
 
-/** A page of the almanac, and the counts of the whole: by topic, in all, and of every fact each topic has. */
+/** A page of the almanac, and the counts of the whole: by topic, in all, and of every fact each topic has; with the
+ * first page, the notes the book keeps, the latest first. */
 interface Page {
   facts: Learned[];
   have: Record<string, number>;
   all: number;
   of: Record<string, number>;
+  notes?: Note[];
   next?: string;
 }
 
@@ -67,6 +73,7 @@ export function almanac(kit: Kit) {
     profileNav,
     toneOf,
     topicMark,
+    notedWords,
   } = kit);
   title("Моят Алманах");
   const counts = signal<Counts | null>(null);
@@ -98,7 +105,7 @@ export function almanac(kit: Kit) {
           ),
     (): Child => {
       const c = counts();
-      return c ? [head(c, topic), chips(topic, show)] : null;
+      return c ? [head(c, topic), () => (topic() ? null : notes(c.notes ?? [])), chips(topic, show)] : null;
     },
     list,
   );
@@ -123,6 +130,21 @@ function head(c: Counts, topic: () => string): Child {
       }),
     ),
     h("p", { class: "muted" }, "Фактът към всеки въпрос, на който отговори вярно, по реда, в който ги отключи."),
+  );
+}
+
+/** The notes the book keeps, the latest first, each with its day: nothing while there are none. */
+function notes(list: Note[]): Child {
+  if (!list.length) return null;
+  return h(
+    "section",
+    { class: "almanac-notes", "aria-label": "Отбелязано" },
+    h("h2", { class: "kicker" }, "Отбелязано"),
+    h(
+      "ul",
+      { class: "almanac-note-list" },
+      list.map((n) => h("li", null, notedWords(n))),
+    ),
   );
 }
 

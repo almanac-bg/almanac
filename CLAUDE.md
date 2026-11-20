@@ -18,8 +18,7 @@ duels played on one's own time against a friend or a real recorded game). The st
 missed day a week. Points are one game's score; nothing else adds up but the book and the streak.
 
 **Being rebuilt (from 20 Nov 2026).** The owner chose this after a full review (DECISIONS.md, „The redesign“). Until
-each part lands, the code still has the old game: XP and levels, goals, achievements, titles and the wardrobe's
-unlocks, rating and divisions, live duels, four places (Роял is gone). Don't extend any of those; remove them as the redesign
+each part lands, the code still has the old game: rating and divisions, live duels, four places (Роял is gone). Don't extend any of those; remove them as the redesign
 reaches them.
 
 ## Direction
@@ -35,7 +34,7 @@ most). A change is judged by whether players come back: the retention numbers in
 | --- | --- |
 | `cmd/almanac` | The program: `serve`, `bank check/fmt`, `backup now/list/restore/verify/keys` |
 | `cmd/build` | Builds the client into `internal/assets/dist` (esbuild; precompressed; the first screen's budget, and ceilings against accidents) |
-| `internal/play` | The game's rules and data: runs, scoring (`worth.go`), duels, friends, rating, goals, progress |
+| `internal/play` | The game's rules and data: runs, scoring (`worth.go`), the streak (`runs.go`), the Алманах and its notes (`progress.go`), duels, friends, rating |
 | `internal/live` | Live duels: matchmaking, the shared clock, recordings |
 | `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: the paths it sends the app for, the client's router's list again; a test holds them equal) |
 | `internal/store` | SQLite; migrations in `internal/store/migrations`, applied once each by name |

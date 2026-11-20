@@ -1,11 +1,8 @@
 package play
 
 import (
-	"strings"
 	"testing"
 	"time"
-
-	"github.com/almanac-bg/almanac/internal/bank"
 )
 
 // stored puts a game straight in the database: begun at 10:00 in Bulgaria on its day, with a question answered.
@@ -186,79 +183,5 @@ func TestGames(t *testing.T) {
 	}
 	if d := days[1]; d.Kinds["day"] != 1 || d.DayPlayers != 1 || d.OnlyDayPlayer != 1 {
 		t.Fatalf("yesterday: %+v", d)
-	}
-}
-
-// Speed is a pace, not one tap's luck: „Пет за миг“ takes five right answers in one game, each under three seconds.
-func TestFastIsAPace(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana := w.user()
-	q := w.b.Questions[0].Base().ID
-	game := func(answers ...int) {
-		res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, finished_at) VALUES (?, 'topic', '[]', 0, 1)`, ana)
-		if err != nil {
-			t.Fatal(err)
-		}
-		run, _ := res.LastInsertId()
-		for i, ms := range answers {
-			if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, score, points, is_right, ms, at)
-				VALUES (?, ?, ?, 1, 0, 1, ?, ?)`, run, i, q, ms, i); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-	fast := func() int {
-		m, err := w.g.measure(ctx, ana)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return m["fast"]
-	}
-	game(900, 1200, 2500, 2900, FastMs) // four quick, the fifth on the line
-	game(1000, 1000, 1000)
-	if n := fast(); n != 4 {
-		t.Fatalf("the best game's quick right answers: %d", n)
-	}
-	game(2000, 2000, 2000, 2000, 2999)
-	if n := fast(); n != FastRights {
-		t.Fatalf("five quick in a game: %d", n)
-	}
-}
-
-// „Всеки вид въпрос“ counts every kind of question the bank has, each told apart (clues by their question: their
-// answer is a pick, as a choice's is), and its text names as many as it counts.
-func TestAllTypesCountsEveryKind(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana := w.user()
-	given := map[string]string{"choice": `{"pick":0}`, "clues": `{"pick":0}`, "number": `{"value":1}`,
-		"order": `{"order":[0,1,2]}`, "truefalse": `{"truth":true}`, "match": `{"pairs":[0,1,2]}`, "split": `{"sides":[0,1]}`}
-	res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, category, questions, started_at) VALUES (?, 'topic', '', '[]', 0)`, ana)
-	if err != nil {
-		t.Fatal(err)
-	}
-	run, _ := res.LastInsertId()
-	for n, typ := range bank.Types() {
-		g, ok := given[typ]
-		qs := w.g.Bank().Live("", typ)
-		if !ok || len(qs) == 0 {
-			t.Fatalf("a kind of question allTypes doesn't know: %s", typ)
-		}
-		if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, given, score, points, is_right, ms, at)
-			VALUES (?, ?, ?, ?, 1, 0, 1, 3000, 0)`, run, n, qs[0].Base().ID, g); err != nil {
-			t.Fatal(err)
-		}
-		m, err := w.g.measure(ctx, ana)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if m["allTypes"] != n+1 {
-			t.Fatalf("after a right answer of %s: %d kinds, want %d", typ, m["allTypes"], n+1)
-		}
-	}
-	a, _ := achievementByID("allTypes")
-	if a.Goal != len(bank.Types()) || strings.Count(a.About, ",")+2 != len(bank.Types()) {
-		t.Fatalf("allTypes: target %d, %q, for %d kinds", a.Goal, a.About, len(bank.Types()))
 	}
 }

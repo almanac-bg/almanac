@@ -27,13 +27,6 @@ test("Моят Алманах in progress: Профил counts the facts, a topi
   await expect(head).toContainText("8 факта досега");
   await page.getByRole("button", { name: /Кино и телевизия/ }).click();
   await expect(head).toContainText("7 от 7 факта в „Кино и телевизия“");
-
-  // „Цяла тема“: every fact of a topic, there for the taking (it's given with the next game's news).
-  await page.goto("/rewards");
-  await page.getByText(/^Останалите постижения \(\d+\)$/).click();
-  const whole = page.locator(".achievement", { hasText: "Цяла тема" }).last();
-  await expect(whole).toContainText("Събери всички факти от една тема в Алманаха.");
-  await expect(page.locator(".achievement", { hasText: "Сто факта" }).last()).toContainText("8 / 100");
 });
 
 test("Моят Алманах comes a page at a time, the next as the list's end comes near", async ({ page }) => {

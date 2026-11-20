@@ -455,7 +455,7 @@ type Change struct{ Table, Said string }
 
 // Changes says which watched tables (all but the transient) changed sharply since before (a copy's rows; since names
 // it): to fewer than half the rows they had (a core table from 10 rows, any other from 50), or, with rises, to more
-// than twice as many and a thousand more. A game doesn't lose half its friendships or achievements in a day, nor
+// than twice as many and a thousand more. A game doesn't lose half its friendships or notes in a day, nor
 // double its answers in a quarter of an hour, unless something deleted them or wrote them over and over. A table
 // that's new, or gone (a migration's), says nothing.
 func Changes(before, now map[string]int64, since string, rises bool) []Change {

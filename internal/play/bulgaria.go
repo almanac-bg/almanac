@@ -13,8 +13,7 @@ import (
 //
 //   - it has no mastery of its own: each of its questions counts toward its own topic's (mastery.go reads a question's
 //     topic from the bank), and its games are shaped by how well the player knows all the topics, as „Микс“'s are
-//     (MixTopic); a mastery of it would count every Bulgarian answer twice, and a title for it would be a second title
-//     for the same answers;
+//     (MixTopic); a mastery of it would count every Bulgarian answer twice;
 //   - it is open only while the bank has a game's worth of Bulgarian questions that no day holds (BulgariaOpen): the
 //     days take at least BGFloor each, so it opens once the bank has more than the days ahead spend.
 

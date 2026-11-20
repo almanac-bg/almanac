@@ -58,7 +58,7 @@ packages' doc comments; this file holds only what must not drift.
   stays and isn't broken. Layout that breaks for ordinary players (large system text, small tap targets) is not this:
   it's fixed as any bug (owner, 2026-11-18).
 - **A recording shows who played it.** Against a recording, the player sees the real player as anywhere in the game
-  (name, profile, avatar, frame, title, level, rating), labelled „Запис“, never as an anonymous animal: a duel is
+  (name, profile, avatar, rating), labelled „Запис“, never as an anonymous animal: a duel is
   against someone (owner, 2026-11-19, undoing review S13's unnamed recordings). The other way stays numbers only: the
   recorded player hears how many played their games and how it went, never who. The privacy page says so.
 - **Removed to keep the game simple** (owner, 2026-11-19; sharing and friends' duels came back with the redesign): past days'
@@ -95,8 +95,8 @@ packages' doc comments; this file holds only what must not drift.
   player keeps, not a generic game app: paper-light first with a night of its own, serif headlines, numerals as the
   heroes, colour only where it means something, one obvious action per screen. `web/DESIGN.md` holds the rules as they
   land.
-- **Art never changes the rules.** Asked for pictures, draw pictures; an achievement doesn't start giving avatars
-  because a drawing exists (#234, undone in #236).
+- **Art never changes the rules.** Asked for pictures, draw pictures; a drawing doesn't change what the game gives
+  because it exists (#234, undone in #236).
 - **The mark is the rosette:** abstract, not a letter, no gradients. Ask before changing the mark itself.
 - **Bulgarian for players, English for code and URLs; never Bulgarian in Latin letters** (`/daily`, not `/dnes`).
 

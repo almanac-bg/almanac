@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { answer, moveOn, openGame, playedBefore, playRun, startDay } from "./play.ts";
+import { answer, moveOn, openGame, playRun, startDay } from "./play.ts";
 
 test("the day: ten questions, the result, the review, and one try only", async ({ page }) => {
   test.setTimeout(120_000);
@@ -12,10 +12,9 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await startDay(page);
   await playRun(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("от 10");
-  // A first result is quiet (play/unfold.go): what its points are, in a line, and what the game earned to wear; no
-  // XP, level or goals yet.
+  // A first result is quiet: what its points are, in a line, said once; no XP, level or goals (the game has none).
   await expect(page.locator(".news-open")).toContainText("Точките са резултатът ти в една игра");
-  await expect(page.locator(".news-xp, .level-card, .goal")).toHaveCount(0);
+  await expect(page.locator(".screen")).not.toContainText(/XP|[Нн]иво \d|Цели за деня/);
   // „точки“ is a tap from what they are.
   await page.locator(".points").getByRole("button", { name: "точки" }).click();
   await expect(page.locator(".points .explain-pop")).toBeVisible();
@@ -31,36 +30,24 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.locator(".day-done")).toBeVisible();
   await expect(page.getByRole("button", { name: "Започни" })).toHaveCount(0);
   await expect(page.locator(".modes")).toBeVisible();
-  // Начало's top tells the streak the day made; the level and the goals come from the second day played.
+  // Начало's top tells the streak the day made, and only that.
   await expect(page.locator(".streak-chip")).toContainText("1");
-  await expect(page.locator(".level-chip, .card.goals")).toHaveCount(0);
-  // Класации opens on the day's board, the player on it; the rating isn't theirs yet.
+  await expect(page.locator(".status-row .status-item")).toHaveCount(1);
+  // Класации opens on the day's board, the player on it.
   await page.goto("/ranks");
   await expect(page.locator(".board .row.me")).toContainText(/\d от 10\d[\d\s]* точки$/);
-  await expect(page.getByRole("tab")).toHaveText(["Днес", "Знания", "Всички", "Приятели"]);
-  // No level on a board's row, and no title the start gives everyone: a row is the place, the name and the score.
-  await expect(page.locator(".board .lv")).toHaveCount(0);
-  await expect(page.locator(".board")).not.toContainText("Нова искра");
+  await expect(page.getByRole("tab")).toHaveText(["Днес", "Рейтинг", "Знания", "Всички", "Приятели"]);
+  // A row is the place, the name and the score: no level, no title.
+  await expect(page.locator(".board .lv, .board .who-title")).toHaveCount(0);
   await page.goto("/me");
   await expect(page.locator(".streak")).toBeVisible();
-  await expect(page.locator(".me-level-bar")).toHaveCount(0);
-  // Награди too: no XP and no goals anywhere on it, folded parts included; points and achievements are
-  // what „Как се печели“ tells.
-  await page.goto("/rewards");
-  await expect(page.getByRole("heading", { name: "Най-близо" })).toBeVisible();
-  await expect(page.locator(".screen")).not.toContainText(/XP|Цели за деня/);
-  await expect(page.locator(".how")).toContainText("Точки.");
+  await expect(page.getByRole("navigation", { name: "Профил" }).getByRole("link")).toHaveText(["Общо", "Алманах"]);
 
-  // A second day: a game tells XP once, with the goals; Начало shows the level and the goals from then on.
-  await playedBefore(page, 1);
+  // A second game tells what points are no more: once is enough.
   await openGame(page, "/play/history");
   await playRun(page);
-  await expect(page.locator(".news-open")).toContainText("Ново: XP и цели за деня.");
-  await expect(page.locator(".news-xp, .level-card.up").first()).toContainText(/\+\d+ XP/);
-  await page.goto("/");
-  await expect(page.locator(".level-chip")).toContainText("Ниво");
-  // The day's goal is done. (The other two goals are drawn per day, and a run of the day can finish them too.)
-  await expect(page.locator(".goal.done").filter({ hasText: "Изиграй въпросите на деня" })).toBeVisible();
+  await expect(page.locator(".mastery-line")).toContainText("История");
+  await expect(page.locator(".news-open")).toHaveCount(0);
 });
 
 test("the day says how its other players did with each question: under the verdict, and in the review", async ({

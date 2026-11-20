@@ -148,8 +148,8 @@ export async function moveOn(page: Page): Promise<void> {
 }
 
 /** Makes the player (a guest, made now if there's none) one who finished a game on each of the `days` days before
- * today, straight in the test server's database: a player on their next days, who has met what those open
- * (play/unfold.go). The games are of nothing, and earn nothing. */
+ * today, straight in the test server's database: a player on their next days, not a new one. The games are of
+ * nothing, and bring nothing. */
 export async function playedBefore(page: Page, days: number): Promise<void> {
   await inDB(page, (db, id) => {
     const add = db.prepare(`INSERT INTO runs (user_id, kind, category, questions, started_at, finished_at)
@@ -159,17 +159,6 @@ export async function playedBefore(page: Page, days: number): Promise<void> {
       add.run(id, at, at);
     }
   });
-}
-
-/** Makes the player (a guest, made now if there's none) one who has earned an achievement not told yet, straight in the
- * test server's database: the next game's news tells it, with what it unlocks (its XP left out, so that no level comes
- * with it). */
-export async function earnedUntold(page: Page, achievement: string): Promise<void> {
-  await inDB(page, (db, id) =>
-    db
-      .prepare("INSERT INTO achievements (user_id, id, at, seen, xp) VALUES (?, ?, ?, 0, 0)")
-      .run(id, achievement, Date.now()),
-  );
 }
 
 /** Makes the player (a guest, made now if there's none) one who finished the day's ten on each of these days, counted

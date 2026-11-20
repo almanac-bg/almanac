@@ -1,9 +1,9 @@
-// Pictures: the game's illustrations — the avatars, the topics, the ways to play, the avatars' frames, the divisions'
-// emblems, Рила and a medal — drawn by hand as paths on a 64 × 64 grid, in one style, so that they belong
+// Pictures: the game's illustrations — the avatars, the topics, the ways to play, the divisions' emblems, Рила and
+// the streak's flame — drawn by hand as paths on a 64 × 64 grid, in one style, so that they belong
 // together (web/DESIGN.md, Pictures).
 //
 // The style: flat shapes with depth, no outlines, lit from the top left. Every picture is painted from one ramp of
-// its tone (the topic's, the avatar's, the mode's, the frame's, the tier's) with the night ink and white, so a
+// its tone (the topic's, the avatar's, the mode's, the division's) with the night ink and white, so a
 // picture always sits in the colours around it and follows the theme. The inks are classes coloured in app.css
 // (.pic):
 //
@@ -28,12 +28,6 @@ const both = (f: (x: (dx: number) => number) => string) => f((dx) => n(32 + dx))
 const at = (cx: number, cy: number, r: number, deg: number) => {
   const a = (deg * Math.PI) / 180;
   return `${n(cx + r * Math.cos(a))} ${n(cy + r * Math.sin(a))}`;
-};
-/** A star of `points` points, outer radius R and inner r, its first point straight up. */
-const star = (cx: number, cy: number, R: number, r: number, points = 5) => {
-  let d = "";
-  for (let i = 0; i < points * 2; i++) d += `${i ? "L" : "M"}${at(cx, cy, i % 2 ? r : R, -90 + (180 / points) * i)}`;
-  return `${d}Z`;
 };
 /** A five-pointed star cut into facets: the lit half of each point, then the half in shade. */
 const facets = (cx: number, cy: number, R: number, r: number): [string, string] => {
@@ -77,153 +71,6 @@ const eyes = (dx: number, y: number, r: number): Layer[] => [
 ];
 const shoulders = "M7 66C8 54 19 48 32 48C45 48 56 54 57 66Z";
 const foxChest = "M25 66C25.5 57 28.5 52.5 32 52.5C35.5 52.5 38.5 57 39 66Z";
-const heart =
-  "M32 55C32 55 8 41 8 24.5C8 16 14 10 21.5 10C26.5 10 30 13 32 17C34 13 37.5 10 42.5 10C50 10 56 16 56 24.5C56 41 32 55 32 55Z";
-const heartLit = "M32 17C34 13 37.5 10 42.5 10C50 10 56 16 56 24.5C56 41 32 55 32 55Z";
-/** Laurel branches up both sides of a circle, from `from` degrees (the bottom) to `to`, leaves alternating in two
- * inks (the tone and its light; on a tile of the tone, pass lighter ones); the left branch is drawn, then the right
- * mirrors it. */
-const laurel = (
-  cx: number,
-  cy: number,
-  r: number,
-  from: number,
-  to: number,
-  count: number,
-  leaf = 5,
-  inks: [string, string, string] = ["k3", "k4", "l2"],
-): Layer[] => {
-  let stems = "";
-  const leaves: Layer[] = [];
-  for (const s of [-1, 1]) {
-    // The left branch climbs clockwise from the bottom; the right one is its mirror.
-    const angle = (t: number) => (s < 0 ? t : 180 - t);
-    stems += `M${at(cx, cy, r, angle(from))}A${r} ${r} 0 0 ${s < 0 ? 1 : 0} ${at(cx, cy, r, angle(to))}`;
-    for (let i = 0; i < count; i++) {
-      const t = from + ((to - from) * (i + 0.6)) / count;
-      const out = i % 2 ? 1 : -1; // leaves alternate outside and inside the stem
-      const [x = 0, y = 0] = at(cx, cy, r + out * leaf * 0.45, angle(t))
-        .split(" ")
-        .map(Number);
-      const along = angle(t) + s * -90; // the way the branch grows, upward
-      const turn = n(along + s * out * 26);
-      // Each leaf turns on its own centre, so each is a path of its own.
-      leaves.push([
-        i % 2 ? inks[1] : inks[0],
-        `M${n(x - leaf)} ${y}Q${x} ${n(y - leaf * 0.62)} ${n(x + leaf)} ${y}Q${x} ${n(y + leaf * 0.62)} ${n(x - leaf)} ${y}Z`,
-        `transform="rotate(${turn} ${x} ${y})"`,
-      ]);
-    }
-  }
-  return [[inks[2], stems, 'stroke-width="1.4"'], ...leaves];
-};
-/** Laurel branches up both sides of the avatar's tile (grown by `inset`), following its rounded square, not a circle:
- * from the bottom middle round the lower corner and up the side, past the upper corner; leaves alternating outside
- * and inside the stem, in two inks; the right branch mirrors the left. */
-const tileLaurel = (
-  inset: number,
-  count: number,
-  leaf: number,
-  inks: [string, string, string] = ["k3", "k4", "l2"],
-) => {
-  // 96 points round the outline, clockwise from the top middle: 48 is the bottom middle, 72 the left side's middle.
-  const path = around(inset, 96);
-  const [first, last] = [50, 88];
-  const pt = (i: number) => path[i] ?? [32, 32];
-  let stems = "";
-  const leaves: Layer[] = [];
-  for (const s of [-1, 1]) {
-    const x = (v: number) => (s < 0 ? v : n(64 - v));
-    stems += `M${x(pt(first)[0])} ${pt(first)[1]}`;
-    for (let i = first + 1; i <= last; i++) stems += `L${x(pt(i)[0])} ${pt(i)[1]}`;
-    for (let k = 0; k < count; k++) {
-      const i = Math.round(first + ((last - first) * (k + 0.6)) / count);
-      const [px, py] = pt(i);
-      const [qx, qy] = pt(i + 1);
-      const [dx, dy] = [qx - px, qy - py]; // the way the left branch grows, clockwise
-      const len = Math.hypot(dx, dy) || 1;
-      const out = k % 2 ? 1 : -1; // outside, then inside the stem
-      const [ox, oy] = [(dy / len) * out * leaf * 0.45, (-dx / len) * out * leaf * 0.45];
-      const [lx, ly] = [n(x(px + ox)), n(py + oy)];
-      const along = (Math.atan2(dy, dx) * 180) / Math.PI;
-      const turn = n((s < 0 ? along : 180 - along) + s * out * 26);
-      leaves.push([
-        k % 2 ? inks[1] : inks[0],
-        `M${n(lx - leaf)} ${ly}Q${lx} ${n(ly - leaf * 0.62)} ${n(lx + leaf)} ${ly}Q${lx} ${n(ly + leaf * 0.62)} ${n(lx - leaf)} ${ly}Z`,
-        `transform="rotate(${turn} ${lx} ${ly})"`,
-      ]);
-    }
-  }
-  return [[inks[2], stems, 'stroke-width="1.4"'] as Layer, ...leaves];
-};
-/** The avatar's tile (8–56 in a frame's box), grown by `inset`, as a path: its corners round at 30%. */
-const tile = (inset: number) => {
-  const x = 8 - inset;
-  const s = 48 + 2 * inset;
-  const r = n(s * 0.3);
-  return `M${n(x + r)} ${n(x)}H${n(x + s - r)}A${r} ${r} 0 0 1 ${n(x + s)} ${n(x + r)}V${n(x + s - r)}A${r} ${r} 0 0 1 ${n(x + s - r)} ${n(x + s)}H${n(x + r)}A${r} ${r} 0 0 1 ${n(x)} ${n(x + s - r)}V${n(x + r)}A${r} ${r} 0 0 1 ${n(x + r)} ${n(x)}Z`;
-};
-/** Points evenly along the tile's outline (grown by `inset`), clockwise from the top middle. */
-const around = (inset: number, count: number, shift = 0): [number, number][] => {
-  const x0 = 8 - inset;
-  const s = 48 + 2 * inset;
-  const r = s * 0.3;
-  const flat = s - 2 * r;
-  const arc = (Math.PI * r) / 2;
-  const corners: [number, number, number][] = [
-    [x0 + s - r, x0 + r, -90],
-    [x0 + s - r, x0 + s - r, 0],
-    [x0 + r, x0 + s - r, 90],
-    [x0 + r, x0 + r, 180],
-  ];
-  const sides: [number, number, number, number][] = [
-    [x0 + r, x0, 1, 0],
-    [x0 + s, x0 + r, 0, 1],
-    [x0 + s - r, x0 + s, -1, 0],
-    [x0, x0 + s - r, 0, -1],
-  ];
-  const total = 4 * (flat + arc);
-  const out: [number, number][] = [];
-  for (let k = 0; k < count; k++) {
-    let d = (((k + shift) / count) * total + flat / 2) % total;
-    for (let i = 0; i < 4; i++) {
-      const [sx, sy, dx, dy] = sides[i] as [number, number, number, number];
-      if (d <= flat) {
-        out.push([n(sx + dx * d), n(sy + dy * d)]);
-        break;
-      }
-      d -= flat;
-      if (d <= arc) {
-        const [ccx, ccy, a0] = corners[i] as [number, number, number];
-        const a = ((a0 + (d / arc) * 90) * Math.PI) / 180;
-        out.push([n(ccx + r * Math.cos(a)), n(ccy + r * Math.sin(a))]);
-        break;
-      }
-      d -= arc;
-    }
-  }
-  return out;
-};
-/** A tongue of flame standing on (x, y): h tall, w wide each side of its foot, its tip leaning `lean` sideways. */
-const flame = (x: number, y: number, h: number, w: number, lean = 0) => {
-  const tx = n(x + lean);
-  return `M${n(x - w)} ${y}C${n(x - w * 1.2)} ${n(y - h * 0.5)} ${n(tx - w * 0.5)} ${n(y - h * 0.62)} ${tx} ${n(y - h)}C${n(tx + w * 0.4)} ${n(y - h * 0.62)} ${n(x + w * 1.2)} ${n(y - h * 0.5)} ${n(x + w)} ${y}Q${x} ${n(y + w * 0.6)} ${n(x - w)} ${y}Z`;
-};
-/** A cut gem: a rhombus in four facets, lit from the top left. */
-const gem = (x: number, y: number, r: number): Layer[] => {
-  const t = `${x} ${n(y - r)}`;
-  const rt = `${n(x + r * 0.8)} ${y}`;
-  const b = `${x} ${n(y + r)}`;
-  const lf = `${n(x - r * 0.8)} ${y}`;
-  const c = `${x} ${n(y - r * 0.1)}`;
-  return [
-    ["ks", `M${t}L${rt}L${b}L${lf}Z`, 'transform="translate(0.6 1.2)"'],
-    ["k5", `M${t}L${c}L${lf}Z`],
-    ["k3", `M${t}L${rt}L${c}Z`],
-    ["k4", `M${lf}L${c}L${b}Z`],
-    ["k2", `M${c}L${rt}L${b}Z`],
-  ];
-};
 
 /** A sword standing on the middle, turned by `deg` (crossed swords are two). */
 const sword = (deg: number): Layer[] => {
@@ -237,9 +84,8 @@ const sword = (deg: number): Layer[] => {
   ];
 };
 
-// ---- Avatars: nine animals everyone has, six more and the crown that levels unlock, and the emblems that achievements
-// unlock, one each. Each is drawn over a tile in its tone (k3), so it's painted in the ramp's darker and lighter inks.
-// The animals are portraits, cut at the tile's bottom edge; the emblems stand in the middle.
+// ---- Avatars: fifteen animals, each anyone's from the first day (play.Animals). Each is drawn over a tile in its tone
+// (k3), so it's painted in the ramp's darker and lighter inks: portraits, cut at the tile's bottom edge.
 
 const avatars: Record<string, Layer[]> = {
   fox: [
@@ -464,7 +310,11 @@ const avatars: Record<string, Layer[]> = {
     ...eyes(6.2, 38, 2.5),
     ["l5", both((x) => `M${x(6.5)} 47L${x(17)} 45M${x(6.5)} 49L${x(16.5)} 51`), 'stroke-width="0.9"'],
   ],
+};
 
+// ---- Marks: pictures of what isn't a player, a topic or a way to play: the streak's flame.
+
+const marks: Record<string, Layer[]> = {
   flame: [
     lift(
       "M32 6C34 15 46 21 46 37C46 47 40 54 32 54C24 54 18 47 18 38C18 31 21 26 25 22C25.5 27 27.5 30 30.5 31C29 24 29 14 32 6Z",
@@ -483,292 +333,6 @@ const avatars: Record<string, Layer[]> = {
       "M32 36C33 40 36.5 41.5 36.5 45.5C36.5 48.5 34.5 50.5 32 50.5C29.5 50.5 27.5 48.5 27.5 45.5C27.5 42.5 30.5 40.5 32 36Z",
     ],
     ["k5", C(15, 21, 1.6) + C(49.5, 15, 1.3) + C(51, 27, 1)],
-  ],
-  book: [
-    lift("M5 22C14 19.5 24 19.5 32 23.5C40 19.5 50 19.5 59 22V53C50 50.5 40 50.5 32 54.5C24 50.5 14 50.5 5 53Z"),
-    ["k1", "M5 22C14 19.5 24 19.5 32 23.5C40 19.5 50 19.5 59 22V53C50 50.5 40 50.5 32 54.5C24 50.5 14 50.5 5 53Z"],
-    ["kw", "M9 17.5C17.5 15.5 26 16.5 31 20.5V49.5C26 46 17.5 45 9 47Z"],
-    ["k5", "M55 17.5C46.5 15.5 38 16.5 33 20.5V49.5C38 46 46.5 45 55 47Z"],
-    [
-      "l4",
-      "M13.5 23.5C18 22.6 23 23 27 25M13.5 29C18 28.1 23 28.5 27 30.5M13.5 34.5C18 33.6 23 34 27 36M37 25C41 23 46 22.6 50.5 23.5M37 30.5C41 28.5 46 28.1 50.5 29M37 36C41 34 46 33.6 50.5 34.5",
-      'stroke-width="1.6"',
-    ],
-    ["k0", "M41 46.4V59L44 56L47 59V45.8Z"],
-  ],
-  bolt: [
-    lift("M36.5 4L13.5 36.5H28.5L24.5 60L50.5 26H35.5L41.5 4Z"),
-    ["k4", "M36.5 4L13.5 36.5H28.5L24.5 60L50.5 26H35.5L41.5 4Z"],
-    ["k5", "M36.5 4L13.5 36.5H28.5L24.5 60L32.5 33H23Z"],
-    ["kw", "M35.3 7.2L18.5 31.5H21.4L36.6 9Z"],
-  ],
-  shield: [
-    lift("M32 6L52 12.5V30C52 43 43.5 52.5 32 58C20.5 52.5 12 43 12 30V12.5Z"),
-    ["k1", "M32 6L52 12.5V30C52 43 43.5 52.5 32 58C20.5 52.5 12 43 12 30V12.5Z"],
-    ["k5", "M32 11L47.5 16V30C47.5 40.5 41 48.5 32 53C23 48.5 16.5 40.5 16.5 30V16Z"],
-    ["k4", "M32 11L47.5 16V30C47.5 40.5 41 48.5 32 53Z"],
-    ["k1", "M21 30.5L32 38.5L43 30.5V36L32 44L21 36Z"],
-    ["k1", star(32, 23, 5.2, 2.2)],
-  ],
-  heart: [
-    lift(
-      "M32 55C32 55 8 41 8 24.5C8 16 14 10 21.5 10C26.5 10 30 13 32 17C34 13 37.5 10 42.5 10C50 10 56 16 56 24.5C56 41 32 55 32 55Z",
-    ),
-    [
-      "k5",
-      "M32 55C32 55 8 41 8 24.5C8 16 14 10 21.5 10C26.5 10 30 13 32 17C34 13 37.5 10 42.5 10C50 10 56 16 56 24.5C56 41 32 55 32 55Z",
-    ],
-    ["k4", "M32 17C34 13 37.5 10 42.5 10C50 10 56 16 56 24.5C56 41 32 55 32 55Z"],
-    ["kw", E(19, 20, 3.4, 2.2), 'transform="rotate(-38 19 20)"'],
-  ],
-  star: (() => {
-    const [lit, shade] = facets(32, 33.5, 27, 11.5);
-    return [lift(star(32, 33.5, 27, 11.5)), ["k5", lit], ["k4", shade]] as Layer[];
-  })(),
-  target: [
-    lift(C(29, 35, 24)),
-    ["k5", C(29, 35, 24)],
-    ["k1", C(29, 35, 18.5)],
-    ["k5", C(29, 35, 13)],
-    ["k1", C(29, 35, 7.5)],
-    ["k4", C(29, 35, 3)],
-    ["l0", "M30 34L52 12", 'stroke-width="2.8"'],
-    ["k0", "M52 12L50.4 4.6L56 9.2ZM52 12L59.4 13.6L54.8 8Z"],
-  ],
-  compass: [
-    lift(C(32, 34, 24.5)),
-    ["l1", C(32, 6.6, 3), 'stroke-width="2.6"'],
-    ["k1", C(32, 34, 24.5)],
-    ["k5", C(32, 34, 20)],
-    ["l2", "M32 16.5V20M32 48V51.5M14.5 34H18M46 34H49.5", 'stroke-width="2.2"'],
-    ["k0", "M32 18L37.6 34H26.4Z", 'transform="rotate(28 32 34)"'],
-    ["k4", "M32 50L37.6 34H26.4Z", 'transform="rotate(28 32 34)"'],
-    ["k1", C(32, 34, 3)],
-    ["kw", C(32, 34, 1.3)],
-  ],
-  owl: [
-    ["k1", "M9 66C9 52 18 44 32 44C46 44 55 52 55 66Z"],
-    ["k2", both((x) => `M${x(8)} 16L${x(17.5)} 5.5L${x(18.5)} 20Z`)],
-    ["k2", "M32 12C45 12 52 21 52 33C52 46 44 57 32 57C20 57 12 46 12 33C12 21 19 12 32 12Z"],
-    [
-      "k1",
-      both((x) => `M${x(17)} 31C${x(23)} 39 ${x(22.5)} 51 ${x(15.5)} 57.5C${x(12.5)} 51 ${x(12)} 41 ${x(17)} 31Z`),
-    ],
-    ["k4", "M23 47C23 42.5 27 40.5 32 40.5C37 40.5 41 42.5 41 47C41 52.5 37 57 32 57C27 57 23 52.5 23 47Z"],
-    ["l2", "M27 46.6L29 48.6L31 46.6M33 46.6L35 48.6L37 46.6M30 51.6L32 53.6L34 51.6", 'stroke-width="1.3"'],
-    ["k4", both((x) => C(x(9), 30, 9.4))],
-    ["k5", both((x) => C(x(9), 30, 6.6))],
-    ["k3", both((x) => C(x(9), 30, 4.2))],
-    ["k0", both((x) => C(x(9), 30, 2.5))],
-    ["kw", both((x) => C(n(x(9) + 1.4), 28.5, 1))],
-    ["k0", "M29.4 35.5H34.6L32 41.5Z"],
-  ],
-  sun: [
-    ["k4", rays(32, 32, 19, 30, 12, 7)],
-    ["k5", rays(32, 32, 19, 25, 12, 6, -75)],
-    lift(C(32, 32, 17)),
-    ["k5", C(32, 32, 17)],
-    ["k4", "M32 15A17 17 0 0 1 32 49A20 20 0 0 0 32 15Z"],
-    ["l1", both((x) => `M${x(3.6)} 29.6Q${x(6.8)} 26.8 ${x(10)} 29.6`), 'stroke-width="2"'],
-    ["l1", "M26.5 37.5Q32 42.5 37.5 37.5", 'stroke-width="2"'],
-    ["k4", both((x) => E(x(10.5), 35.5, 2.6, 1.6))],
-  ],
-  hourglass: [
-    lift("M12 7H52V13H48C48 23 37 28 35 32C37 36 48 41 48 51H52V57H12V51H16C16 41 27 36 29 32C27 28 16 23 16 13H12Z"),
-    ["k5", "M18 13H46C46 23 37 28 35 32C37 36 46 41 46 51H18C18 41 27 36 29 32C27 28 18 23 18 13Z"],
-    ["k2", "M22.5 19.5H41.5C40 24.5 34.5 27.8 32 30.4C29.5 27.8 24 24.5 22.5 19.5Z"],
-    ["l2", "M32 31V45", 'stroke-width="1.4"'],
-    ["k2", "M19.6 51C21 45 27 42 32 41.6C37 42 43 45 44.4 51Z"],
-    ["kh", "M21 15.5C22 21.5 26 26 28.6 29L27.2 30.2C23.8 27 20 22 21 15.5Z"],
-    [
-      "k1",
-      "M14 7H50Q52 7 52 9V11Q52 13 50 13H14Q12 13 12 11V9Q12 7 14 7ZM14 51H50Q52 51 52 53V55Q52 57 50 57H14Q12 57 12 55V53Q12 51 14 51ZM15 13H17.6V51H15ZM46.4 13H49V51H46.4Z",
-    ],
-  ],
-  trophy: [
-    lift("M18 9H46V22C46 31 40 37 32 38C24 37 18 31 18 22Z"),
-    ["l4", both((x) => `M${x(13)} 14H${x(19.5)}C${x(21.5)} 25 ${x(17.5)} 30.5 ${x(11.5)} 31`), 'stroke-width="3.2"'],
-    ["k5", "M18 9H46V22C46 31 40 37 32 38C24 37 18 31 18 22Z"],
-    ["k4", "M32 9H46V22C46 31 40 37 32 38Z"],
-    ["k4", "M17 7H47Q48.6 7 48.6 8.6V11H15.4V8.6Q15.4 7 17 7Z"],
-    ["k1", star(32, 21.5, 6.2, 2.7)],
-    ["k1", "M29 37.4H35L36.6 46H27.4Z"],
-    ["k1", "M21 46H43Q45 46 45 48V56H19V48Q19 46 21 46Z"],
-    ["k4", "M24.5 49.5H39.5V52.4H24.5Z"],
-  ],
-  spark: [
-    lift(sparkle(28, 35, 22)),
-    ["k5", sparkle(28, 35, 22)],
-    [
-      "k4",
-      `M28 35L${28 + 22} 35Q${n(28 + 3.5)} ${n(35 + 3.5)} 28 ${35 + 22}ZM28 35L${28 - 22} 35Q${n(28 - 3.5)} ${n(35 - 3.5)} 28 ${35 - 22}Z`,
-    ],
-    ["kw", sparkle(49, 13, 8)],
-    ["k4", sparkle(50, 51, 5.5)],
-  ],
-  clover: (() => {
-    const leaf =
-      "M32 31C27 27 21.5 23 21.5 17C21.5 12.5 24.5 9.5 28 9.5C30 9.5 31.5 11 32 12.5C32.5 11 34 9.5 36 9.5C39.5 9.5 42.5 12.5 42.5 17C42.5 23 37 27 32 31Z";
-    const turn = (deg: number) => `transform="rotate(${deg} 32 31)"`;
-    return [
-      ["l1", "M33 32C35 42 40 50 47 56.5", 'stroke-width="3.2"'],
-      lift(C(32, 31, 21)),
-      ["k5", leaf, turn(-45)],
-      ["k4", leaf, turn(45)],
-      ["k5", leaf, turn(135)],
-      ["k4", leaf, turn(225)],
-      ["l2", "M32 31L23 22M32 31L41 22M32 31L41 40M32 31L23 40", 'stroke-width="1.2"'],
-      ["k1", C(32, 31, 2.2)],
-    ] as Layer[];
-  })(),
-  torch: [
-    lift("M22 28H42L37 37H35L33.6 60H30.4L29 37H27Z"),
-    ["k4", flame(32, 28, 26, 12, -2)],
-    ["k5", flame(32, 28, 17, 7.5, -1)],
-    ["kw", flame(32, 28, 8.5, 3.6)],
-    ["k1", "M29 37H35L33.6 60Q32 61.4 30.4 60Z"],
-    ["k2", "M28.8 41H35.2V44H28.6ZM29.4 50H34.6V53H29.2Z"],
-    ["k1", "M22 28H42L37 37H27Z"],
-    ["k2", "M32 28H42L37 37H32Z"],
-  ],
-  bonfire: [
-    ["k4", flame(23, 51, 24, 7, -4) + flame(41, 51, 26, 7, 4)],
-    ["k4", flame(32, 51, 41, 13)],
-    ["k5", flame(32, 51, 28, 8.5, -1) + flame(23, 51, 13, 3.6, -2) + flame(41, 51, 14, 3.6, 2)],
-    ["kw", flame(32, 51, 14, 4.4)],
-    ["l1", "M11 49L52 59", 'stroke-width="6.4"'],
-    ["l2", "M12 59L53 49", 'stroke-width="6.4"'],
-    ["k4", C(11, 49, 2.4) + C(53, 49, 2.4)],
-    ["k5", C(14, 22, 1.4) + C(50, 16, 1.2) + C(46, 8, 0.9) + C(19, 12, 1)],
-  ],
-  phoenix: [
-    [
-      "k4",
-      both(
-        (x) =>
-          `M${x(3)} 31C${x(10)} 27 ${x(16)} 19 ${x(27)} 5C${x(26)} 13 ${x(27.5)} 17 ${x(29.5)} 19.5C${x(25.5)} 23.5 ${x(24.5)} 28.5 ${x(21)} 32C${x(24)} 32 ${x(27)} 33.5 ${x(28)} 35.5C${x(21)} 38 ${x(11)} 37.5 ${x(3)} 35Z`,
-      ),
-    ],
-    [
-      "k5",
-      both(
-        (x) =>
-          `M${x(6)} 32C${x(12)} 29 ${x(17)} 23 ${x(23)} 14C${x(22.5)} 20 ${x(23.5)} 23 ${x(25)} 25C${x(21)} 28.5 ${x(16)} 32 ${x(10)} 33.5Z`,
-      ),
-    ],
-    ["k4", flame(32, 44, 18, 5.4), 'transform="rotate(180 32 44)"'],
-    ["k4", flame(30, 43, 14, 3.8), 'transform="rotate(162 30 43)"'],
-    ["k4", flame(34, 43, 14, 3.8), 'transform="rotate(198 34 43)"'],
-    ["k5", flame(32, 44, 10, 3), 'transform="rotate(180 32 44)"'],
-    ["k5", "M32 18C36 18 38 22 37.4 28C36.8 34 35 40 32 46C29 40 27.2 34 26.6 28C26 22 28 18 32 18Z"],
-    ["kw", "M32 22C33.6 22 34.4 25 34 29C33.6 33 33 36 32 39C31 36 30.4 33 30 29C29.6 25 30.4 22 32 22Z"],
-    ["k4", flame(32, 13, 8, 2.2) + flame(28.8, 14, 6, 1.7, -2.2) + flame(35.2, 14, 6, 1.7, 2.2)],
-    ["k5", C(32, 15.5, 4.2)],
-    ["k1", "M30.7 16.6H33.3L32 19.6Z"],
-    ["k0", both((x) => C(x(1.8), 14.8, 0.8))],
-  ],
-  // A whole year in a row: the sun gone round, a flame at its heart (the streak's family: flame, torch, bonfire,
-  // phoenix, then this).
-  year: [
-    ["k3", rays(32, 32, 18, 31, 12, 7.5)],
-    ["k5", rays(32, 32, 18, 25.5, 12, 6, -75)],
-    lift(C(32, 32, 17)),
-    ["k4", C(32, 32, 17)],
-    ["ks", "M32 15A17 17 0 0 1 32 49A20 20 0 0 0 32 15Z"],
-    ["k5", flame(32, 44, 22, 7)],
-    ["kw", flame(32, 44, 11, 3.6)],
-  ],
-  // A year with no day missed: a calendar page, every day on it marked.
-  calendar: [
-    lift("M14 14H50Q54 14 54 18V53Q54 57 50 57H14Q10 57 10 53V18Q10 14 14 14Z"),
-    ["k5", "M14 14H50Q54 14 54 18V53Q54 57 50 57H14Q10 57 10 53V18Q10 14 14 14Z"],
-    ["kw", "M13 25H51V53Q51 54 50 54H14Q13 54 13 53Z"],
-    ["k2", "M14 14H50Q54 14 54 18V24H10V18Q10 14 14 14Z"],
-    ["l0", "M21 8.5V18M43 8.5V18", 'stroke-width="3.6"'],
-    ["k3", [18, 25, 32, 39, 46].flatMap((x) => [30, 37, 44, 51].map((y) => C(x, y, 2.6))).join("")],
-    ["k5", sparkle(55, 9, 4.4)],
-  ],
-  books: [
-    lift("M10 47H54V57H10ZM14 37H50V47H14ZM12 27.5H48V37H12Z"),
-    ["k1", "M11.5 47H52.5Q54 47 54 48.5V55.5Q54 57 52.5 57H11.5Q10 57 10 55.5V48.5Q10 47 11.5 47Z"],
-    ["l5", "M15 52H49", 'stroke-width="1.6"'],
-    ["k5", "M48.6 48.4H52.6V55.6H48.6Z"],
-    ["k4", "M15.5 37H48.5Q50 37 50 38.5V45.5Q50 47 48.5 47H15.5Q14 47 14 45.5V38.5Q14 37 15.5 37Z"],
-    ["l2", "M18 42H45", 'stroke-width="1.6"'],
-    ["k2", "M13.5 27.5H46.5Q48 27.5 48 29V35.5Q48 37 46.5 37H13.5Q12 37 12 35.5V29Q12 27.5 13.5 27.5Z"],
-    ["l5", "M16 32.2H43", 'stroke-width="1.6"'],
-    ["k5", "M12.6 28.8H16.4V35.6H12.6Z"],
-    ["k0", "M36 27.5V18.5L39 21.5L42 18.5V27.5Z"],
-    ["kw", sparkle(20, 16, 4.6)],
-    ["k5", sparkle(28, 9, 2.6)],
-  ],
-  blades: [
-    ...sword(-40),
-    ...sword(40),
-    lift("M32 21L46 26V36.5C46 45 40.4 50.6 32 54C23.6 50.6 18 45 18 36.5V26Z"),
-    ["k1", "M32 21L46 26V36.5C46 45 40.4 50.6 32 54C23.6 50.6 18 45 18 36.5V26Z"],
-    ["k5", "M32 25L42.5 28.8V36.6C42.5 43.2 38.4 47.6 32 50.4C25.6 47.6 21.5 43.2 21.5 36.6V28.8Z"],
-    ["k4", "M32 25L42.5 28.8V36.6C42.5 43.2 38.4 47.6 32 50.4Z"],
-    ["k1", star(32, 37, 7, 3)],
-  ],
-  helmet: [
-    ["k4", rays(32, 34, 25, 31, 12, 5)],
-    ["k1", "M36 15C33 5 20 3.5 10.5 12C9 13.5 8 15.5 7.6 17.4C14 13 24 11.5 33.6 16.6Z"],
-    ["k2", "M36 15C34 9.5 28 7 22 7.5C28 9 32 12 33.6 16.6Z"],
-    lift(
-      "M13 40C11.5 24 20.5 13.5 33 13.5C44.5 13.5 52 22 52.5 32.5L57 35L50.5 37.5L46 37.6L45 48C44.4 53.6 39.6 56.5 34 55.5L31.6 41.5H26L24 52C18.6 51 14 46.6 13 40Z",
-    ),
-    [
-      "k5",
-      "M13 40C11.5 24 20.5 13.5 33 13.5C44.5 13.5 52 22 52.5 32.5L57 35L50.5 37.5L46 37.6L45 48C44.4 53.6 39.6 56.5 34 55.5L31.6 41.5H26L24 52C18.6 51 14 46.6 13 40Z",
-    ],
-    ["k4", "M52.5 32.5L57 35L50.5 37.5L46 37.6L45 48C44.4 53.6 39.6 56.5 34 55.5L33 49.5C38 50 41.4 47 42 43L43.2 33Z"],
-    ["k0", "M26 41.5H31.6L33 49.5L28 49Z"],
-    ["k1", "M13.2 31H52.6L52.8 34.6H13.1Z"],
-    ["k4", C(20, 24, 1.6) + C(27, 20, 1.6) + C(35, 19.5, 1.6) + C(42.5, 22, 1.6)],
-    ["kh", "M17.5 29C18.5 22 22.5 17.5 28 15.6C24 19.4 21.6 24 21 29Z"],
-  ],
-  hearts: [
-    ["k4", heart, 'transform="translate(5.5 7) scale(0.52)"'],
-    ["k4", heart, 'transform="translate(25 7) scale(0.52)"'],
-    ["k1", heartLit, 'transform="translate(5.5 7) scale(0.52)"'],
-    ["k1", heartLit, 'transform="translate(25 7) scale(0.52)"'],
-    ["ks", heart, 'transform="translate(13.8 16.5) scale(0.6)"'],
-    ["k5", heart, 'transform="translate(12.8 15) scale(0.6)"'],
-    ["k4", heartLit, 'transform="translate(12.8 15) scale(0.6)"'],
-    ["kw", E(23.4, 30, 2.2, 1.5), 'transform="rotate(-38 23.4 30)"'],
-  ],
-  cap: [
-    lift("M32 12L58 22L32 32L6 22ZM18 27V38C18 42 25 45.4 32 45.4C39 45.4 46 42 46 38V27L32 32Z"),
-    ["k1", "M18 26V38C18 42 25 45.4 32 45.4C39 45.4 46 42 46 38V26L32 31.4Z"],
-    ["k2", "M32 31.4L46 26V38C46 42 39 45.4 32 45.4Z"],
-    ["k1", "M32 12L58 22L32 32L6 22Z"],
-    ["k2", "M32 12L58 22L32 32Z"],
-    ["kh", "M32 14.4L52 22L49.6 22.9L32 16.2L14.4 22.9L12 22Z"],
-    ["l4", "M32 22L50.5 26.6V38", 'stroke-width="1.6"'],
-    ["k4", "M48.4 37.6H52.6L53.8 47H47.2Z"],
-    ["k5", C(32, 22, 1.8)],
-  ],
-  wreath: (() => {
-    const [lit, shade] = facets(32, 32, 12.5, 5.4);
-    return [
-      ...laurel(32, 32, 24, 100, 262, 8, 4.8, ["k5", "k4", "l1"]),
-      ["k1", "M26.5 55Q32 52.5 37.5 55L36 58.5Q32 56.5 28 58.5Z"],
-      lift(star(32, 32, 12.5, 5.4), 1.8),
-      ["k5", lit],
-      ["k4", shade],
-    ] as Layer[];
-  })(),
-  crown: [
-    lift("M9 21L21 32L32 11L43 32L55 21L49.5 52H14.5Z"),
-    ["k5", "M9 21L21 32L32 11L43 32L55 21L49.5 52H14.5Z"],
-    ["k4", "M32 11L43 32L55 21L49.5 52H32Z"],
-    ["k1", "M14.5 43.5H49.5L49.5 52H14.5Z"],
-    ["k5", C(23, 47.7, 2) + C(41, 47.7, 2)],
-    ["k4", "M32 44.6L35.2 47.7L32 50.8L28.8 47.7Z"],
-    ["k1", "M32 24L36.4 30L32 36L27.6 30Z"],
-    ["k5", C(9, 20, 3.2) + C(32, 9.5, 3.6) + C(55, 20, 3.2)],
-    ["kw", C(31, 8.4, 1.1)],
   ],
 };
 
@@ -972,8 +536,22 @@ const head = (id: string, x: number, y: number, s: number, deg: number, front: b
     .map(([ink, d, attrs]) => [(front && lighter[ink]) || ink, d, attrs ? `${t} ${attrs}` : t]);
 };
 
+/** An open book, for Моят Алманах. */
+const book: Layer[] = [
+  lift("M5 22C14 19.5 24 19.5 32 23.5C40 19.5 50 19.5 59 22V53C50 50.5 40 50.5 32 54.5C24 50.5 14 50.5 5 53Z"),
+  ["k1", "M5 22C14 19.5 24 19.5 32 23.5C40 19.5 50 19.5 59 22V53C50 50.5 40 50.5 32 54.5C24 50.5 14 50.5 5 53Z"],
+  ["kw", "M9 17.5C17.5 15.5 26 16.5 31 20.5V49.5C26 46 17.5 45 9 47Z"],
+  ["k5", "M55 17.5C46.5 15.5 38 16.5 33 20.5V49.5C38 46 46.5 45 55 47Z"],
+  [
+    "l4",
+    "M13.5 23.5C18 22.6 23 23 27 25M13.5 29C18 28.1 23 28.5 27 30.5M13.5 34.5C18 33.6 23 34 27 36M37 25C41 23 46 22.6 50.5 23.5M37 30.5C41 28.5 46 28.1 50.5 29M37 36C41 34 46 33.6 50.5 34.5",
+    'stroke-width="1.6"',
+  ],
+  ["k0", "M41 46.4V59L44 56L47 59V45.8Z"],
+];
+
 const modes: Record<string, Layer[]> = {
-  almanac: [ground, ...(avatars.book ?? [])],
+  almanac: [ground, ...book],
   // Two friends side by side, the fox and the bear (the avatars are the players' faces), their heads leaning
   // together with a little space between them, both well inside the disc; the bear, a step behind, in darker inks.
   // Their shoulders and the fox's white chest are the avatars' own, set down with the heads and cut at the disc's edge.
@@ -1004,122 +582,6 @@ const modes: Record<string, Layer[]> = {
     ["k1", "M4 55H60V59H4Z"],
   ],
 };
-
-// ---- Frames: drawn around an avatar's tile, in the frame's own tone (app.css: .fr-*). The tile sits at 8–56; a
-// frame lives in the margin around it and may reach a little past the box.
-
-/** A sun's rays out of the avatar's tile, every way from its middle: `count` of them round its outline (grown by
- * `inset`), each `half` wide at its foot, the even ones `long` and the odd ones `short`, as two paths. */
-const sunRays = (inset: number, count: number, long: number, short: number, half: number): [string, string] => {
-  const out: [string, string] = ["", ""];
-  around(inset, count).forEach(([x, y], i) => {
-    const len = Math.hypot(x - 32, y - 32) || 1;
-    const [ux, uy] = [(x - 32) / len, (y - 32) / len];
-    const reach = i % 2 ? short : long;
-    out[i % 2] +=
-      `M${n(x - uy * half)} ${n(y + ux * half)}L${n(x + ux * reach)} ${n(y + uy * reach)}L${n(x + uy * half)} ${n(y - ux * half)}Z`;
-  });
-  return out;
-};
-
-const band = (inset: number, width: number): Layer[] => [
-  ["l1", tile(inset), `stroke-width="${width}"`],
-  ["l4", tile(inset), `stroke-width="${n(width * 0.42)}"`],
-];
-
-const frames: Record<string, Layer[]> = {
-  ring: band(3, 3.4),
-  double: [
-    ...band(2.2, 2),
-    ...band(6, 2.4),
-    ...gem(32, 1.8, 3.4),
-    ...gem(32, 62.2, 3.4),
-    ...gem(1.8, 32, 3.4),
-    ...gem(62.2, 32, 3.4),
-  ],
-  dots: around(4.2, 28).flatMap(([x, y], i): Layer[] =>
-    i % 2
-      ? [["k2", C(x, y, 1.3)]]
-      : [
-          ["k4", C(x, y, 2.4)],
-          ["kw", C(n(x - 0.7), n(y - 0.8), 0.7)],
-        ],
-  ),
-  flames: [
-    ...band(3, 3.2),
-    ...(
-      [
-        [32, 0, 15],
-        [24, -3, 12],
-        [40, 3, 12],
-        [16.5, -7, 9.5],
-        [47.5, 7, 9.5],
-        [10.5, -10, 6.5],
-        [53.5, 10, 6.5],
-      ] as const
-    ).flatMap(([x, lean, h]): Layer[] => [
-      ["k3", flame(x, 7, h, h * 0.36, lean)],
-      ["k4", flame(x, 7, h * 0.7, h * 0.24, lean * 0.7)],
-      ["k5", flame(x, 7, h * 0.38, h * 0.13, lean * 0.4)],
-    ]),
-  ],
-  // Round the tile like every other frame: a circle of laurel round a square avatar looked like it didn't belong.
-  laurel: [...tileLaurel(4, 8, 4.8), ["k1", "M26.5 60Q32 57 37.5 60L36 63Q32 61.1 28 63Z"], ["k4", C(32, 59.5, 2.2)]],
-  gem: [
-    ...band(3, 2.6),
-    ...around(3, 4, 0.5).flatMap(([x, y]) => gem(x, y, 5)),
-    ...around(3, 4).flatMap(([x, y]) => gem(x, y, 3)),
-  ],
-  halo: [
-    ["k3", rays(32, 32, 29, 37, 12, 6.5)],
-    ["k5", rays(32, 32, 29, 34, 12, 5, -90 + 15)],
-    ...band(3.4, 2.8),
-    ["kw", sparkle(9, 9, 3.6) + sparkle(55, 55, 3.6)],
-    ["k5", sparkle(55, 9, 2.6) + sparkle(9, 55, 2.6)],
-  ],
-  sun: (() => {
-    const [long, short] = sunRays(3.4, 28, 8.5, 5, 2.4);
-    return [["k3", long], ["k4", short], ...band(3.4, 3), ["k5", sunRays(3.4, 28, 4.5, 2.6, 1.1)[0]]];
-  })(),
-};
-
-/** A rhombus standing on its point, as a path. */
-const rhomb = (x: number, y: number, r: number) =>
-  `M${x} ${n(y - r)}L${n(x + r)} ${y}L${x} ${n(y + r)}L${n(x - r)} ${y}Z`;
-
-// The levels past 12 (play/wardrobe.go): a ring of stars, an embroidered band, a ring of sparks.
-frames.constellation = [
-  ...band(3, 2.4),
-  ...around(3, 8).flatMap(([x, y], i): Layer[] => {
-    const R = i % 2 ? 2.8 : 4.4;
-    return [
-      lift(star(x, y, R, n(R * 0.45)), 0.8),
-      ["k4", star(x, y, R, n(R * 0.45))],
-      ["kw", C(n(x - R * 0.15), n(y - R * 0.2), n(R * 0.18))],
-    ];
-  }),
-];
-frames.embroidery = [
-  ...band(3, 3.4),
-  ...around(3, 16).flatMap(([x, y], i): Layer[] =>
-    i % 2
-      ? [["k5", C(x, y, 1.1)]]
-      : [
-          ["k1", rhomb(x, y, 3)],
-          ["k4", rhomb(x, y, 1.5)],
-        ],
-  ),
-];
-frames.sparks = [
-  ...band(3.4, 2.6),
-  ...around(3.4, 8).flatMap(([x, y], i): Layer[] => {
-    const R = i % 2 ? 3.4 : 5.6;
-    return [
-      ["k4", sparkle(x, y, R)],
-      ["kw", sparkle(x, y, n(R * 0.45))],
-    ];
-  }),
-];
 
 // ---- Divisions: a crest for each band of rating, in the division's colour (app.css: .d-*). Each has its own
 // silhouette, so they read apart without colour: Бронз a plain shield; Сребро a chevron on it; Злато wings; Платина a
@@ -1186,77 +648,6 @@ const divisions: Record<string, Layer[]> = {
   })(),
 };
 
-// ---- Achievements' medals, in the tier's colour: the form tells the tier even without colour (common a round coin,
-// rare a hexagon, epic an eight-pointed star, legendary a sunburst with ribbons). Each has a raised rim, lit on its
-// top-left half and shaded below, around a face in the tone itself, where the achievement's own picture is drawn
-// (art/badge.ts lays it over the face).
-
-/** A regular polygon of `count` corners, the first straight up. */
-const polygon = (cx: number, cy: number, r: number, count: number) => {
-  let d = "";
-  for (let i = 0; i < count; i++) d += `${i ? "L" : "M"}${at(cx, cy, r, -90 + (360 / count) * i)}`;
-  return `${d}Z`;
-};
-/** The half of a disc on the lit side (top left). */
-const litHalf = (r: number) => `M${at(32, 32, r, 135)}A${r} ${r} 0 0 1 ${at(32, 32, r, -45)}Z`;
-/** A raised round rim of radius r around a face of radius f. */
-const rim = (r: number, f: number): Layer[] => [
-  ["k2", C(32, 32, r)],
-  ["k4", litHalf(r)],
-  ["k3", C(32, 32, f)],
-  ["ks", `M${at(32, 32, f, -45)}A${f} ${f} 0 0 1 ${at(32, 32, f, 135)}A${f + 6} ${f + 6} 0 0 0 ${at(32, 32, f, -45)}Z`],
-];
-
-const badges: Record<string, Layer[]> = {
-  common: [lift(C(32, 32, 29)), ["k1", C(32, 32, 29)], ...rim(26.5, 22.5)],
-  rare: [
-    lift(polygon(32, 32, 31, 6)),
-    ["k1", polygon(32, 32, 31, 6)],
-    ["k2", polygon(32, 32, 28, 6)],
-    ["k4", `M${at(32, 32, 28, -30)}L${at(32, 32, 28, -90)}L${at(32, 32, 28, 210)}L${at(32, 32, 28, 150)}Z`],
-    ["k3", polygon(32, 32, 25, 6)],
-    [
-      "ks",
-      `M${at(32, 32, 25, -30)}L${at(32, 32, 25, 30)}L${at(32, 32, 25, 90)}L${at(32, 32, 25, 150)}Q32 40 ${at(32, 32, 25, -30)}Z`,
-    ],
-  ],
-  epic: [
-    lift(star(32, 32, 31.5, 25, 8)),
-    ["k1", star(32, 32, 31.5, 25, 8)],
-    ["k4", star(32, 32, 28.5, 23, 8)],
-    [
-      "k2",
-      `M${at(32, 32, 28.5, -45)}L${at(32, 32, 23, -22.5)}L${at(32, 32, 28.5, 0)}L${at(32, 32, 23, 22.5)}L${at(32, 32, 28.5, 45)}L${at(32, 32, 23, 67.5)}L${at(32, 32, 28.5, 90)}L${at(32, 32, 23, 112.5)}L${at(32, 32, 28.5, 135)}L32 32Z`,
-    ],
-    ...rim(24, 21),
-    ["k5", C(32, 3.4, 1.5) + C(60.6, 32, 1.5) + C(32, 60.6, 1.5) + C(3.4, 32, 1.5)],
-  ],
-  legendary: [
-    ["k1", "M21 47L13 63L19.6 60.4L22.4 66L29.6 51Z"],
-    ["k2", "M43 47L51 63L44.4 60.4L41.6 66L34.4 51Z"],
-    lift(star(32, 32, 31.5, 25.5, 16)),
-    ["k4", star(32, 32, 31.5, 25.5, 16)],
-    ["k5", rays(32, 32, 24, 31.5, 16, 2.4)],
-    ["k1", C(32, 32, 25.5)],
-    ...rim(23.5, 20.5),
-  ],
-};
-
-/** A medal: a ribbon, a disc with a rim, a faceted star (an achievement's picture). */
-const medal: Layer[] = (() => {
-  const [lit, shade] = facets(32, 40, 10, 4.3);
-  return [
-    ["k1", "M18 2H28L36 24H26Z"],
-    ["k2", "M46 2H36L28 24H38Z"],
-    lift(C(32, 40, 19)),
-    ["k3", C(32, 40, 19)],
-    ["k2", "M32 21A19 19 0 0 1 32 59A21 21 0 0 0 32 21Z"],
-    ["l4", C(32, 40, 14.5), 'stroke-width="1.6"'],
-    ["k5", lit],
-    ["k4", shade],
-  ];
-})();
-
 // ---- Рила, for the topic „България“: a mountain deep in snow on a round of sky, a star over it. Lit from the left: a
 // peak's right face is in shade.
 
@@ -1292,15 +683,14 @@ const rila: Layer[] = [
 const draw = (layers: Layer[]) =>
   layers.map(([ink, d, attrs]) => `<path class="${ink}" d="${d}"${attrs ? ` ${attrs}` : ""}/>`).join("");
 
-/** Every picture's paths, by its id: an avatar's shape ("fox"), "topic-<id>" or "mode-<id>". */
+/** Every picture's paths, by its id: an avatar's shape ("fox"), "topic-<id>", "mode-<id>", "division-<id>" or the
+ * streak's "flame". */
 export const pictures: Record<string, string> = {
   ...Object.fromEntries(Object.entries(avatars).map(([id, l]) => [id, draw(l)])),
   ...Object.fromEntries(Object.entries(topics).map(([id, l]) => [`topic-${id}`, draw(l)])),
   // „България“, the questions about Bulgaria from every topic: Рила.
   "topic-bulgaria": draw(rila),
   ...Object.fromEntries(Object.entries(modes).map(([id, l]) => [`mode-${id}`, draw(l)])),
-  ...Object.fromEntries(Object.entries(frames).map(([id, l]) => [`frame-${id}`, draw(l)])),
   ...Object.fromEntries(Object.entries(divisions).map(([id, l]) => [`division-${id}`, draw(l)])),
-  medal: draw(medal),
-  ...Object.fromEntries(Object.entries(badges).map(([id, l]) => [`badge-${id}`, draw(l)])),
+  ...Object.fromEntries(Object.entries(marks).map(([id, l]) => [id, draw(l)])),
 };

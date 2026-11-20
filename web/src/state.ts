@@ -5,7 +5,6 @@ import { api } from "./lib/api.ts";
 import { boot } from "./lib/boot.ts";
 import { effect, onCleanup, signal, untracked } from "./lib/dom.ts";
 import { play } from "./lib/sound.ts";
-import type { Open } from "./ui.ts";
 
 export interface User {
   id: number;
@@ -24,14 +23,6 @@ export interface Category {
 }
 
 export const user = signal<User | null>(boot.user ?? null);
-/** Which of the game's systems the player has met (play/unfold.go), for what any screen shows of them: an avatar's
- * level waits for XP. The page has it from the server; Начало's day, Профил and a game's news say it again as it
- * grows (met). Nothing yet before a first game. */
-export const opened = signal<Partial<Open>>(boot.open ?? {});
-/** The player's systems, as an answer just said them. */
-export const met = (open?: Open) => {
-  if (open) opened.set(open);
-};
 export const categories: Category[] = boot.categories ?? [];
 /** „Микс“: the questions of every topic at once, a topic of its own (play.MixTopic). */
 export const mix: Category = { id: "mix", name: "Микс" };

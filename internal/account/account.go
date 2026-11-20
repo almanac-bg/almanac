@@ -1037,10 +1037,10 @@ func (a *Accounts) TakeHandoff(ctx context.Context, token, session string) (User
 type Animal struct {
 	Name  string // in Bulgarian, as players read it
 	Tag   string // in Latin letters, as tags are
-	Shape string // the avatar's shape (play.FreeShapes, in the same order)
+	Shape string // the avatar's shape (play.Starters, in the same order)
 }
 
-// Animals are what new players start as: the free avatars' animals, in play.FreeShapes's order (a test keeps it).
+// Animals are what new players start as: the starters' animals, in play.Starters's order (a test keeps it).
 var Animals = []Animal{
 	{"Лисица", "fox", "fox"}, {"Мечка", "bear", "bear"}, {"Котка", "cat", "cat"}, {"Заек", "hare", "hare"},
 	{"Таралеж", "hedgehog", "hedgehog"}, {"Куче", "dog", "dog"}, {"Елен", "deer", "deer"},

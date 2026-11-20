@@ -387,6 +387,12 @@ func walkStreak(h streakHistory, today string, saw func(day string, forgiven boo
 	return s
 }
 
+// dayBounds are the day's start and end, in milliseconds.
+func dayBounds(day string) (int64, int64) {
+	t, _ := time.ParseInLocation(time.DateOnly, day, Bulgaria)
+	return t.UnixMilli(), t.AddDate(0, 0, 1).UnixMilli()
+}
+
 // monday is the Monday of a day's week.
 func monday(d time.Time) time.Time { return d.AddDate(0, 0, -((int(d.Weekday()) + 6) % 7)) }
 

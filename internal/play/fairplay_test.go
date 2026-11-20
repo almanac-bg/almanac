@@ -218,22 +218,20 @@ func TestMergeKeepsTheAccountsRating(t *testing.T) {
 	w := setup(t)
 	account, guest := w.user(), w.user()
 	if _, err := w.db.Write.Exec(`UPDATE users SET rating = CASE id WHEN ?1 THEN 1050 ELSE 1500 END,
-		rated = CASE id WHEN ?1 THEN 12 ELSE 40 END, peak = CASE id WHEN ?1 THEN 1080 ELSE 1550 END
-		WHERE id IN (?1, ?2)`, account, guest); err != nil {
+		rated = CASE id WHEN ?1 THEN 12 ELSE 40 END WHERE id IN (?1, ?2)`, account, guest); err != nil {
 		t.Fatal(err)
 	}
 	w.fold(guest, account)
-	if r, n, p := w.count(`SELECT rating FROM users WHERE id = ?`, account), w.count(`SELECT rated FROM users WHERE id = ?`, account),
-		w.count(`SELECT peak FROM users WHERE id = ?`, account); r != 1050 || n != 12 || p != 1080 {
-		t.Fatalf("the account's rating: %d of %d, peak %d", r, n, p)
+	if r, n := w.count(`SELECT rating FROM users WHERE id = ?`, account), w.count(`SELECT rated FROM users WHERE id = ?`, account); r != 1050 || n != 12 {
+		t.Fatalf("the account's rating: %d of %d", r, n)
 	}
 	// An account with no rating of its own takes the guest's: the player's only one.
 	fresh, played := w.user(), w.user()
-	if _, err := w.db.Write.Exec(`UPDATE users SET rating = 1200, rated = 15, peak = 1210 WHERE id = ?`, played); err != nil {
+	if _, err := w.db.Write.Exec(`UPDATE users SET rating = 1200, rated = 15 WHERE id = ?`, played); err != nil {
 		t.Fatal(err)
 	}
 	w.fold(played, fresh)
-	if r, p := w.count(`SELECT rating FROM users WHERE id = ?`, fresh), w.count(`SELECT peak FROM users WHERE id = ?`, fresh); r != 1200 || p != 1210 {
-		t.Fatalf("an unrated account's rating: %d, peak %d", r, p)
+	if r := w.count(`SELECT rating FROM users WHERE id = ?`, fresh); r != 1200 {
+		t.Fatalf("an unrated account's rating: %d", r)
 	}
 }

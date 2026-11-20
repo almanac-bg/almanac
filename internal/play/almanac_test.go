@@ -2,7 +2,6 @@ package play
 
 import (
 	"encoding/json"
-	"os"
 	"slices"
 	"testing"
 
@@ -73,23 +72,8 @@ func TestFactsCollected(t *testing.T) {
 	}
 	w.knows(ana, append(again, w.picks(run.ID)[0].ID)...)
 	want += len(again)
-	p, err := w.g.ProgressOf(ctx, ana)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, a := range p.Achievements {
-		switch a.ID {
-		case "facts100", "facts1000", "facts5000":
-			if a.At != 0 || a.Progress != want {
-				t.Fatalf("%s at %d facts: %+v", a.ID, want, a)
-			}
-		case "wholeTopic":
-			if a.At != 0 || a.Progress != 0 || a.Goal != 1 {
-				t.Fatalf("a whole topic before one is: %+v", a)
-			}
-		case "answers100", "answers1000":
-			t.Fatalf("an achievement for answers given: %s", a.ID)
-		}
+	if s, _ := w.g.StatsOf(ctx, ana); s.Facts != want {
+		t.Fatalf("stats: %d facts, want %d: one answered right again counts once", s.Facts, want)
 	}
 }
 
@@ -139,8 +123,8 @@ func TestAlmanacEntries(t *testing.T) {
 	}
 }
 
-// „Цяла тема“ is every fact a topic has now: its live questions' (a retired question's fact is kept, but no topic
-// waits on it).
+// A chapter is complete with every fact a topic has now: its live questions' (a retired question's fact is kept, but
+// no topic waits on it). It's noted in the book once, on the day of the game that completed it.
 func TestWholeTopic(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -155,65 +139,24 @@ func TestWholeTopic(t *testing.T) {
 		t.Fatalf("the sample's movies have %d facts", len(facts))
 	}
 	w.knows(ana, facts[1:]...)
-	if news, err := w.g.Award(ctx, ana); err != nil || slices.Contains(news, "wholeTopic") {
-		t.Fatalf("a whole topic but one: %v %v", news, err)
+	if err := w.g.noteMilestones(ctx, ana, w.g.Today()); err != nil {
+		t.Fatal(err)
+	}
+	if notes, _ := w.g.NotesOf(ctx, ana); len(notes) != 0 {
+		t.Fatalf("a whole topic but one: %+v", notes)
 	}
 	w.knows(ana, facts[0])
-	if news, err := w.g.Award(ctx, ana); err != nil || !slices.Contains(news, "wholeTopic") {
-		t.Fatalf("every fact of a topic: %v %v", news, err)
+	for range 2 {
+		if err := w.g.noteMilestones(ctx, ana, w.g.Today()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want := []Note{{Day: w.g.Today(), Kind: NoteChapter, Topic: "movies"}}
+	if notes, _ := w.g.NotesOf(ctx, ana); !slices.Equal(notes, want) {
+		t.Fatalf("every fact of a topic: %+v", notes)
 	}
 	s, _ := w.g.StatsOf(ctx, ana)
 	if s.Facts != len(facts) {
 		t.Fatalf("Профил counts %d facts, want %d", s.Facts, len(facts))
-	}
-}
-
-// The achievements for answers given become the ones for facts collected, with the XP they paid and what they
-// unlocked: the book avatar, and the first epic's pattern.
-func TestFactsMigration(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana := w.user()
-	for _, a := range []struct {
-		id string
-		xp int
-	}{{"answers100", 50}, {"answers1000", 400}, {"streak3", 50}} {
-		if _, err := w.db.Write.Exec(`INSERT INTO achievements (user_id, id, at, xp, seen) VALUES (?, ?, 1, ?, 1)`,
-			ana, a.id, a.xp); err != nil {
-			t.Fatal(err)
-		}
-	}
-	body, err := os.ReadFile("../store/migrations/0042_facts_achievements.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := w.db.Write.Exec(string(body)); err != nil {
-		t.Fatal(err)
-	}
-	earned, _ := w.g.earned(ctx, ana)
-	if len(earned) != 3 || earned["facts100"] == 0 || earned["facts1000"] == 0 || earned["streak3"] == 0 {
-		t.Fatalf("after the migration: %v", earned)
-	}
-	if xp, _ := w.g.totalXP(ctx, ana); xp != 500 {
-		t.Fatalf("XP after the migration: %d", xp)
-	}
-	if err := w.g.SetLook(ctx, ana, ptr("book-gold"), nil); err != nil {
-		t.Fatalf("the book, unlocked by „Сто отговора“: %v", err)
-	}
-	p, _ := w.g.ProgressOf(ctx, ana)
-	for _, b := range p.Backdrops {
-		if b.ID == "rays" && b.Locked {
-			t.Fatal("the first epic's pattern, locked")
-		}
-	}
-	for _, a := range p.Achievements {
-		if a.ID == "facts1000" && (a.At == 0 || a.Progress != a.Goal) {
-			t.Fatalf("„Хиляда факта“, kept: %+v", a)
-		}
-	}
-	// Nothing is told again: what was seen stays seen.
-	n, _ := w.g.NewsOf(ctx, ana, 0)
-	if len(n.Achievements) != 0 {
-		t.Fatalf("told again: %+v", n.Achievements)
 	}
 }

@@ -30,7 +30,7 @@ import (
 var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/$`),
 	regexp.MustCompile(`^/play/[a-z]+$`),
-	regexp.MustCompile(`^/(duel|ranks|rewards|wardrobe|me|friends|settings|almanac|games)$`),
+	regexp.MustCompile(`^/(duel|ranks|avatar|me|friends|settings|almanac|games)$`),
 	regexp.MustCompile(`^/duel/([0-9]{1,12}|live)$`),
 	regexp.MustCompile(`^/games/[0-9]{1,12}$`),
 	regexp.MustCompile(`^/hand/[A-Za-z0-9_-]{43}$`),
@@ -47,8 +47,7 @@ var screens = []struct {
 	{regexp.MustCompile(`^/duel/live$`), "live.js"},
 	{regexp.MustCompile(`^/me$`), "me.js"},
 	{regexp.MustCompile(`^/settings$`), "settings.js"},
-	{regexp.MustCompile(`^/rewards$`), "rewards.js"},
-	{regexp.MustCompile(`^/wardrobe$`), "wardrobe.js"},
+	{regexp.MustCompile(`^/avatar$`), "avatar.js"},
 	{regexp.MustCompile(`^/almanac$`), "almanac.js"},
 	{regexp.MustCompile(`^/games$`), "games.js"},
 	{regexp.MustCompile(`^/games/[0-9]{1,12}$`), "played.js"},
@@ -181,13 +180,6 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		"outcomeCss": m["outcome.css"],       // a duel's result: its style, loaded with it
 		"now":        time.Now().UnixMilli(), // the clock the page keeps until the API's first answer (lib/api.ts)
 	}
-	// Which of the game's systems the player has met (play/unfold.go), for every screen: an avatar shows its level
-	// only once XP is open. Without it (a slip), the page shows as on a first day, and the next answer says it.
-	if u != nil {
-		if open, err := s.game.OpenOf(r.Context(), u.ID); err == nil {
-			start["open"] = open
-		}
-	}
 	// Начало draws the day as the page comes, without asking for it first: a round trip less on every visit. Should
 	// it fail, the page asks for it as any other.
 	if r.URL.Path == "/" && r.Method == http.MethodGet {
@@ -270,7 +262,7 @@ func (s *Server) preview(r *http.Request) (title, description string) {
 				if p.Standing.Of == 0 {
 					division = p.Standing.Division.Name + " · "
 				}
-				description = fmt.Sprintf("Ниво %d · %s%d %s.", p.Level, division, p.Games, played)
+				description = fmt.Sprintf("%s%d %s.", division, p.Games, played)
 			}
 		}
 	}

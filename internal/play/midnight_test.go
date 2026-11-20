@@ -3,7 +3,6 @@ package play
 import (
 	"context"
 	"encoding/json"
-	"slices"
 	"testing"
 	"time"
 )
@@ -41,20 +40,22 @@ func (w *world) sundayLate(user int64) int64 {
 	return s.ID
 }
 
-// What follows a run is judged by the run, not by when it's done: the sweep's retry after midnight keeps the goals of
-// the run's day, not the next one's, however late it comes.
+// What follows a run is judged by the run, not by when it's done: the sweep's retry after midnight notes a streak's
+// week on the run's day, not the next one, however late it comes.
 func TestAfterRetryAcrossMidnight(t *testing.T) {
 	w := setup(t)
 	ctx := context.Background()
 	ana, bo := w.user(), w.user()
-	// What follows their Sunday runs fails (a goal can't be kept), as if the server had stopped there.
-	if _, err := w.db.Write.Exec(`CREATE TEMP TRIGGER stop BEFORE INSERT ON goals_done
+	w.at(15, 23, 50, 0)
+	w.daysPlayed(ana, 6, 5, 4, 3, 2, 1) // Monday to Saturday: Sunday's day is the seventh in a row
+	w.daysPlayed(bo, 6, 5, 4, 3, 2, 1)
+	// What follows their Sunday runs fails (a note can't be kept), as if the server had stopped there.
+	if _, err := w.db.Write.Exec(`CREATE TEMP TRIGGER stop BEFORE INSERT ON notes
 		BEGIN SELECT RAISE(ABORT, 'stopped'); END`); err != nil {
 		t.Fatal(err)
 	}
-	w.at(15, 23, 50, 0)
-	w.dayGame(ana, nil)
-	w.dayGame(bo, nil)
+	w.dayGame(ana, nil, repeat(w.wrong, Length)...)
+	w.dayGame(bo, nil, repeat(w.wrong, Length)...)
 	if _, err := w.db.Write.Exec(`DROP TRIGGER stop`); err != nil {
 		t.Fatal(err)
 	}
@@ -65,63 +66,22 @@ func TestAfterRetryAcrossMidnight(t *testing.T) {
 		time.Date(2026, 11, 16, 1, 0, 0, 0, Bulgaria).UnixMilli(), dayRun(t, w, bo)); err != nil {
 		t.Fatal(err)
 	}
-
-	// Ana's is retried at 00:05: Sunday's goals.
+	week := func(user int64, day string) int {
+		return w.count(`SELECT count(*) FROM notes WHERE user_id = ? AND kind = 'streak' AND n = 7 AND day = ?`, user, day)
+	}
+	// Ana's is retried at 00:05, Bo's an hour after midnight: Sunday's week, both.
 	w.at(16, 0, 5, 0)
 	if err := w.g.AfterDue(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if n := w.count(`SELECT count(*) FROM goals_done WHERE user_id = ? AND day = '2026-11-15' AND goal = 'day'`, ana); n != 1 {
-		t.Fatal("the retry after midnight didn't keep Sunday's goal")
-	}
-	if n := w.count(`SELECT count(*) FROM goals_done WHERE user_id = ? AND day = '2026-11-16'`, ana); n != 0 {
-		t.Fatal("Sunday's run counted for Monday's goals")
-	}
-	// Bo's comes an hour after midnight: Sunday's goals still.
 	w.at(16, 1, 0, 0)
 	if err := w.g.AfterDue(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if n := w.count(`SELECT count(*) FROM goals_done WHERE user_id = ? AND day = '2026-11-16'`, bo); n != 0 {
-		t.Fatal("Sunday's run counted for Monday's goals")
-	}
-	if n := w.count(`SELECT count(*) FROM goals_done WHERE user_id = ? AND day = '2026-11-15' AND goal = 'day'`, bo); n != 1 {
-		t.Fatal("Bo's late retry didn't keep Sunday's goal")
-	}
-}
-
-// The day's goals are the day's game's, though its last answers came after midnight: all ten answers count on its own
-// day (a row, eight of ten), and its goals are kept.
-func TestGoalsAcrossMidnight(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana := w.user()
-	w.at(15, 12, 0, 0)
-	w.daysPlayed(ana, 3, 2, 1) // Thursday to Saturday
-	w.setGoals(ana, "day", "row5", "eight")
-	w.sundayLate(ana)
-	var done []string
-	rows, err := w.db.Read.Query(`SELECT goal FROM goals_done WHERE user_id = ? AND day = '2026-11-15' ORDER BY goal`, ana)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for rows.Next() {
-		var id string
-		_ = rows.Scan(&id)
-		done = append(done, id)
-	}
-	rows.Close()
-	if !slices.Equal(done, []string{"day", "eight", "row5"}) {
-		t.Fatalf("Sunday's goals done: %v", done)
-	}
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 4 {
-		t.Fatalf("Sunday's game, finished after midnight, isn't Sunday's: %+v", s)
-	}
-	// Monday's goals are Monday's: Sunday's game moved none of them.
-	if goals := w.goalsOf(ana); goals["day"].Done || goals["day"].Progress != 0 {
-		t.Fatalf("Monday's goals: %+v", goals)
-	}
-	if moved, err := w.g.GoalsMoved(ctx, ana, dayRun(t, w, ana)); err != nil || len(moved) != 0 {
-		t.Fatalf("Sunday's game told as moving goals: %+v %v", moved, err)
+	for _, u := range []int64{ana, bo} {
+		if week(u, "2026-11-15") != 1 || week(u, "2026-11-16") != 0 {
+			t.Fatalf("player %d: the week noted on Sunday %d, on Monday %d", u, week(u, "2026-11-15"),
+				week(u, "2026-11-16"))
+		}
 	}
 }

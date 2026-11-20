@@ -11,7 +11,7 @@ import type { Answer, Mark, Reveal, View } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
 import type { ApiError } from "../lib/api.ts";
 import type { Child } from "../lib/dom.ts";
-import type { Tier, VerdictKind } from "../ui.ts";
+import type { VerdictKind } from "../ui.ts";
 import type { DuelView } from "./duel.ts";
 
 // The app's pieces, set as the screen opens (liveDuel).
@@ -64,9 +64,6 @@ interface Side {
   name: string;
   tag?: string;
   avatar?: string;
-  title?: string;
-  titleTier?: Tier;
-  level?: number;
   rating: number;
   /** Their division; "" while their rating is still being set (play/rating.go). */
   division: "bronze" | "silver" | "gold" | "platinum" | "diamond" | "legend" | "";
@@ -413,7 +410,7 @@ function intro(v: LiveView): Child {
     h(
       "div",
       { class: s.division ? `live-face d-${s.division}` : "live-face" },
-      avatar(s.avatar, { size: "l", level: s.level, name: s.name }),
+      avatar(s.avatar, { size: "l", name: s.name }),
       h("strong", { class: "live-name" }, s.name),
       h("span", { class: "kicker" }, label),
       h(
@@ -486,7 +483,7 @@ function scoreboard(view: () => LiveView, total: number): Child {
 }
 
 /** The other gone for good while the player leads (live.go, Claim): the win is theirs to take now, the questions left
- * unanswered by both (and so no XP for them), or to play on for it. Told once it's so, until a choice is made; gone
+ * unanswered by both (and so worth nothing to either), or to play on for it. Told once it's so, until a choice is made; gone
  * again if the other comes back, or the lead goes. */
 function claim(view: () => LiveView, dismissed: () => boolean, dismiss: () => void): Child {
   const busy = signal(false);

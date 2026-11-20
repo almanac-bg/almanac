@@ -40,13 +40,7 @@ func TestBulgariaTopic(t *testing.T) {
 		t.Fatalf("Bulgaria's game from %d topics only", len(topics))
 	}
 	w.play(u, s.ID, repeat(w.right, Length)...)
-	// Its answers count in their own topics; the game itself is no topic toward „Обиколка“.
-	p, _ := w.g.ProgressOf(ctx, u)
-	for _, a := range p.Achievements {
-		if a.ID == "allTopics" && a.Progress != 0 {
-			t.Fatalf("„Обиколка“ counted Bulgaria's game: %+v", a)
-		}
-	}
+	// Its answers count in their own topics, and the game itself is no topic of mastery.
 	m, _ := w.g.MasteryOf(ctx, u)
 	answered := 0
 	for _, t := range m {

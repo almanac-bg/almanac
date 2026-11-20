@@ -56,7 +56,7 @@ test("each screen asks the server for each thing once a visit, and a deploy load
   await expect(page.locator(".summary")).toBeVisible();
 
   const home = (asked: string[]) => {
-    for (const p of ["/api/runs/left", "/api/me/stats", "/api/goals"]) expect(asked).toContain(p);
+    for (const p of ["/api/runs/left", "/api/me/stats"]) expect(asked).toContain(p);
   };
   home(await once(page, "Начало, loaded", () => page.reload()));
   await once(page, "Приятели", () => tab(page, "/friends"));

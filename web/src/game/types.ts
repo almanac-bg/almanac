@@ -1,7 +1,5 @@
 // What the server sends while playing (internal/play and internal/bank, as JSON).
 
-import type { Tier } from "../ui.ts";
-
 export interface Picture {
   src: string;
   srcset: string;
@@ -218,9 +216,6 @@ export interface Score {
   ms: number;
   me?: boolean;
   avatar?: string;
-  title?: string;
-  titleTier?: Tier;
-  level?: number;
   /** How each of the ten went: on the friends' board, once the viewer has finished the day. */
   trail?: Mark[];
 }

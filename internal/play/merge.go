@@ -49,13 +49,13 @@ var mergeSteps = []mergeStep{
 		sql: `UPDATE duels SET a_id = ?1 WHERE a_id = ?2 AND coalesce(b_id, 0) <> ?1`},
 	{sql: `UPDATE duels SET b_id = ?1 WHERE b_id = ?2 AND coalesce(a_id, 0) <> ?1`},
 	{sql: `DELETE FROM duels WHERE a_id = ?2 OR b_id = ?2`},
-	// The rating: the guest's, with its games, its peak and what was told of it, only if the account has none of its
-	// own (no rated duel yet: its peak is none either, rate). Never the higher of the two: a guest is free to make, so
+	// The rating: the guest's, with its games, only if the account has none of its own (no rated duel yet). Never the
+	// higher of the two: a guest is free to make, so
 	// a rating pumped up on throwaway guests would otherwise become any account's by signing in from the guest (review
 	// 2026-11-18, S20).
-	{carries: []string{"users.rating", "users.rated", "users.peak", "users.peak_seen"},
-		sql: `UPDATE users SET rating = g.rating, rated = g.rated, peak = g.peak, peak_seen = g.peak_seen
-		FROM (SELECT rating, rated, peak, peak_seen FROM users WHERE id = ?2) g
+	{carries: []string{"users.rating", "users.rated"},
+		sql: `UPDATE users SET rating = g.rating, rated = g.rated
+		FROM (SELECT rating, rated FROM users WHERE id = ?2) g
 		WHERE users.id = ?1 AND g.rated > 0 AND users.rated = 0`},
 	// The days the guest played on were the account's player's: the same person, so not a player who left.
 	{carries: []string{"active_days.user_id"},
@@ -65,11 +65,9 @@ var mergeSteps = []mergeStep{
 	// day the account has judged too stays the account's; one either played isn't missed.
 	{carries: []string{"streak_missed.user_id"}, sql: `INSERT OR IGNORE INTO streak_missed (user_id, day, kept)
 		SELECT ?1, day, kept FROM streak_missed WHERE user_id = ?2`},
-	// What the guest earned is the account's too.
-	{carries: []string{"achievements.user_id"}, sql: `INSERT OR IGNORE INTO achievements (user_id, id, at, seen, xp)
-		SELECT ?1, id, at, seen, xp FROM achievements WHERE user_id = ?2`},
-	{carries: []string{"unlocks_told.user_id"},
-		sql: `INSERT OR IGNORE INTO unlocks_told (user_id, id) SELECT ?1, id FROM unlocks_told WHERE user_id = ?2`},
+	// The notes in the guest's book are the account's too (a milestone both reached keeps the account's day).
+	{carries: []string{"notes.user_id"}, sql: `INSERT OR IGNORE INTO notes (user_id, day, kind, n, topic, told)
+		SELECT ?1, day, kind, n, topic, told FROM notes WHERE user_id = ?2`},
 	// The guest's notifications come along, with what they chose of them (unless the account has chosen), the days
 	// they were reminded on, and those on their way (but a day's reminder the account has one of). So does what they chose of mails, though a guest gets none.
 	{carries: []string{"push_subs.user_id"}, sql: `UPDATE push_subs SET user_id = ?1 WHERE user_id = ?2`},
@@ -82,19 +80,9 @@ var mergeSteps = []mergeStep{
 		SELECT ?1, kind, wanted FROM mail_prefs WHERE user_id = ?2`},
 	{carries: []string{"streak_mails.user_id"}, sql: `UPDATE OR IGNORE streak_mails SET user_id = ?1 WHERE user_id = ?2`},
 	{carries: []string{"day_mails.user_id"}, sql: `UPDATE OR IGNORE day_mails SET user_id = ?1 WHERE user_id = ?2`},
-	// So are the guest's goals of a day the account has none for: those drawn, and those finished (with their XP). A
-	// day both had goals for keeps the account's, so that it's never more than a day's goals.
-	{carries: []string{"goals_done.user_id"}, sql: `INSERT OR IGNORE INTO goals_done (user_id, day, goal, at, xp, seen)
-		SELECT ?1, day, goal, at, xp, seen FROM goals_done WHERE user_id = ?2
-			AND day NOT IN (SELECT day FROM day_goals WHERE user_id = ?1)
-			AND day NOT IN (SELECT day FROM goals_done WHERE user_id = ?1)`},
-	{carries: []string{"day_goals.user_id"}, sql: `INSERT OR IGNORE INTO day_goals (user_id, day, n, goal)
-		SELECT ?1, day, n, goal FROM day_goals WHERE user_id = ?2 AND day NOT IN (SELECT day FROM day_goals WHERE user_id = ?1)`},
-	// The guest's look, where the account hasn't chosen one.
-	{carries: []string{"users.avatar", "users.title", "users.frame", "users.backdrop"},
-		sql: `UPDATE users SET avatar = coalesce(users.avatar, g.avatar), title = coalesce(users.title, g.title),
-		frame = coalesce(users.frame, g.frame), backdrop = coalesce(users.backdrop, g.backdrop)
-		FROM (SELECT avatar, title, frame, backdrop FROM users WHERE id = ?2) g WHERE users.id = ?1`},
+	// The guest's avatar, where the account hasn't chosen one.
+	{carries: []string{"users.avatar"}, sql: `UPDATE users SET avatar = coalesce(users.avatar, g.avatar)
+		FROM (SELECT avatar FROM users WHERE id = ?2) g WHERE users.id = ?1`},
 	// Friend requests: the guest's become the account's (none to itself).
 	{carries: []string{"friend_requests.from_id", "friend_requests.to_id"},
 		sql: `UPDATE OR IGNORE friend_requests SET from_id = ?1 WHERE from_id = ?2 AND (to_id IS NULL OR to_id <> ?1)`},
@@ -102,19 +90,15 @@ var mergeSteps = []mergeStep{
 	{sql: `DELETE FROM friend_requests WHERE from_id = ?2 OR to_id = ?2`},
 	// The questions the guest reported, still theirs.
 	{carries: []string{"reports.user_id"}, sql: `UPDATE reports SET user_id = ?1 WHERE user_id = ?2`},
-	// What the guest has been told, so that nothing is told twice: of Начало's lines, of levels and unlocks, of the
-	// parts of the game opened, of the duels against their recordings, of their streak.
+	// What the guest has been told, so that nothing is told twice: of Начало's lines, of the duels against their
+	// recordings, of their streak.
 	{carries: []string{"home_lines.user_id"},
 		sql: `INSERT OR IGNORE INTO home_lines (user_id, what, at) SELECT ?1, what, at FROM home_lines WHERE user_id = ?2`},
-	{carries: []string{"users.level_seen", "users.unlocks_known", "users.recordings_told", "users.systems_told",
-		"users.streak_told"},
-		sql: `UPDATE users SET level_seen = max(users.level_seen, g.level_seen),
-		unlocks_known = max(users.unlocks_known, g.unlocks_known),
-		recordings_told = max(users.recordings_told, g.recordings_told),
-		systems_told = trim(users.systems_told || ' ' || g.systems_told),
+	{carries: []string{"users.recordings_told", "users.streak_told"},
+		sql: `UPDATE users SET recordings_told = max(users.recordings_told, g.recordings_told),
 		streak_told = CASE WHEN substr(g.streak_told, instr(g.streak_told, ':') + 1)
 			> substr(users.streak_told, instr(users.streak_told, ':') + 1) THEN g.streak_told ELSE users.streak_told END
-		FROM (SELECT level_seen, unlocks_known, recordings_told, systems_told, streak_told FROM users WHERE id = ?2) g
+		FROM (SELECT recordings_told, streak_told FROM users WHERE id = ?2) g
 		WHERE users.id = ?1`},
 	// The player came in when, and where, the earlier of the two did, and met the version that one met; and was last
 	// seen when the later was.

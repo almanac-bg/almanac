@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log/slog"
 	"runtime"
-	"slices"
 	"sync"
 	"time"
 
@@ -15,17 +14,17 @@ import (
 )
 
 // After a run: once its last answer is kept, a run has more to do, each in a write of its own: its duel is settled
-// once both sides have played (settleRun), and what it earned is kept (afterRun: achievements and the day's goals).
+// once both sides have played (settleRun), and what it brought is kept (afterRun: the milestones noted in the book).
 // The transaction that finishes the run notes that it's due (runs_after, afterDue), so none of it is lost to a closed connection or a restart in between: the request that finished the run settles it at
 // once, on a context of its own that the player leaving doesn't cancel (finished: the result shows the duel's outcome), and
-// hands the rest to the background (afterLater), so that the last answer doesn't wait for every achievement to be
-// measured again; the game's news waits for it instead (AfterWait: NewsOf, Начало), and gets it as soon as it's
+// hands the rest to the background (afterLater), so that the last answer doesn't wait for the player's history to be
+// read again; the game's news waits for it instead (AfterWait: NewsOf, Начало), and gets it as soon as it's
 // done. The sweep each minute does whatever that left (AfterDue), a few times more, waiting longer each time, before
-// it gives up. All of it may be done again safely: a duel is settled once, an achievement or a goal kept once.
+// it gives up. All of it may be done again safely: a duel is settled once, a note kept once.
 //
 // What a run earned is judged by the run, never by the clock it's looked at on (played): a run of the day's questions
 // counts for its own day though its last answer came after midnight (DayGrace), and so does the sweep's retry of it
-// hours later. That day's goals are the ones it moves. A game played across midnight moved the goals of both days.
+// hours later: what it reached is noted on that day.
 //
 // It never fails the request that finished the run: the answer is kept, whatever happens after it.
 
@@ -234,31 +233,10 @@ func (g *Game) playedOf(ctx context.Context, userID, runID int64) (played, error
 // dayOf is the day a moment is in, in Bulgaria (YYYY-MM-DD).
 func dayOf(t time.Time) string { return t.In(Bulgaria).Format(time.DateOnly) }
 
-// afterRun keeps what a player's game, just finished, earned them, on the days it counts on (played): achievements
-// and the day's goals.
+// afterRun keeps what a player's game, just finished, brought them: the milestones it reached, noted in their book on
+// the day it counts for (played).
 func (g *Game) afterRun(ctx context.Context, p played) error {
-	if _, err := g.Award(ctx, p.user); err != nil {
-		return err
-	}
-	// A goal done is kept, with its XP, whether or not the player looks: on the days the game was played on, and
-	// today, when a duel won has only now been settled.
-	for _, day := range unique(p.began, p.day, g.Today()) {
-		if _, err := g.goalsOn(ctx, p.user, day); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// unique are the days given, each once, in their order.
-func unique(days ...string) []string {
-	var out []string
-	for _, d := range days {
-		if !slices.Contains(out, d) {
-			out = append(out, d)
-		}
-	}
-	return out
+	return g.noteMilestones(ctx, p.user, p.day)
 }
 
 // AfterDue does what follows the finished runs that their own requests left undone (cut off by a restart, or failed),

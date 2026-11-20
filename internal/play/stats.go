@@ -6,9 +6,10 @@ import (
 	"strings"
 )
 
-// Stats is how a player has done: the streak (and the longest they've had), how much they've played, the facts
-// they've collected, and how well they know each topic.
+// Stats is how a player has done: their avatar, the streak (and the longest they've had), how much they've played, the
+// facts they've collected, and how well they know each topic.
 type Stats struct {
+	Avatar   string   `json:"avatar"` // shape-tone (Look)
 	Streak   int      `json:"streak"`
 	Best     int      `json:"best"`     // the longest streak the player has had (StreakNow)
 	Week     [7]bool  `json:"week"`     // this week's days played, Monday first
@@ -46,6 +47,11 @@ type Played struct {
 // StatsOf reads a player's stats.
 func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	var s Stats
+	look, err := g.LookOf(ctx, userID)
+	if err != nil {
+		return s, err
+	}
+	s.Avatar = look.Avatar
 	streak, err := g.StreakOf(ctx, userID)
 	if err != nil {
 		return s, err

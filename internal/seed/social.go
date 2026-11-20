@@ -84,54 +84,13 @@ func (w *world) friendIDs(p *player) ([]int64, error) {
 	return ids, nil
 }
 
-// dress has a player choose their look from what they have, now and then: an avatar and its colour, a title, a frame,
-// a pattern (SetLook refuses what isn't theirs).
+// dress has a player choose their avatar now and then: any animal, in any tone.
 func (w *world) dress(p *player) error {
 	if !w.chance(0.05) && !(p.persona != "" && w.day == w.today()-1) {
 		return nil
 	}
-	pr, err := w.g.ProgressOf(w.ctx, p.id)
-	if err != nil {
-		return err
-	}
-	var shapes, titles, frames, backdrops []string
-	for _, s := range pr.Shapes {
-		if !s.Locked {
-			shapes = append(shapes, s.Shape)
-		}
-	}
-	for _, t := range pr.Titles {
-		if !t.Locked {
-			titles = append(titles, t.ID)
-		}
-	}
-	for _, c := range pr.Frames {
-		if !c.Locked {
-			frames = append(frames, c.ID)
-		}
-	}
-	for _, c := range pr.Backdrops {
-		if !c.Locked {
-			backdrops = append(backdrops, c.ID)
-		}
-	}
-	pick := func(s []string) *string {
-		if len(s) == 0 {
-			return nil
-		}
-		v := s[w.r.IntN(len(s))]
-		return &v
-	}
-	var avatar *string
-	if shape := pick(shapes); shape != nil && len(pr.Tones) > 0 {
-		v := *shape + "-" + pr.Tones[w.r.IntN(len(pr.Tones))]
-		avatar = &v
-	}
-	err = w.g.SetLook(w.ctx, p.id, avatar, pick(titles), pick(frames), pick(backdrops))
-	if errors.Is(err, play.ErrNotYours) {
-		return nil
-	}
-	return err
+	avatar := play.Shapes[w.r.IntN(len(play.Shapes))] + "-" + play.Tones[w.r.IntN(len(play.Tones))]
+	return w.g.SetAvatar(w.ctx, p.id, avatar)
 }
 
 // prefs are what a player said to the asks for reminders: notifications on a device (and which kinds), mail (and

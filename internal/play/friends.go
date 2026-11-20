@@ -69,15 +69,7 @@ func (g *Game) befriend(ctx context.Context, a, b int64) error {
 			a, b, now, b, a, now)
 		return err
 	})
-	if err != nil {
-		return err
-	}
-	for _, who := range []int64{a, b} {
-		if _, err := g.Award(ctx, who); err != nil {
-			return err
-		}
-	}
-	return nil
+	return err
 }
 
 // Sent is what came of a friend request: sent, or (when the other had asked first) friends at once.
@@ -190,13 +182,12 @@ func (g *Game) Requests(ctx context.Context, userID int64) (in, out []FriendRequ
 	for rows.Next() {
 		var r FriendRequest
 		var id int64
-		var avatar, title string
-		var points int
-		if err := rows.Scan(&r.ID, &r.At, &id, &r.Name, &r.Tag, &avatar, &title, &points); err != nil {
+		var avatar string
+		if err := rows.Scan(&r.ID, &r.At, &id, &r.Name, &r.Tag, &avatar); err != nil {
 			rows.Close()
 			return nil, nil, err
 		}
-		look := g.lookOf(id, avatar, title, points)
+		look := lookOf(id, avatar)
 		r.Look = &look
 		in = append(in, r)
 	}
@@ -333,13 +324,12 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	for rows.Next() {
 		var f Friend
 		var points, rights, of, ms sql.NullInt64
-		var avatar, title string
-		var total int
-		if err := rows.Scan(&f.ID, &f.Name, &f.Tag, &f.Since, &points, &rights, &of, &ms, &avatar, &title, &total); err != nil {
+		var avatar string
+		if err := rows.Scan(&f.ID, &f.Name, &f.Tag, &f.Since, &points, &rights, &of, &ms, &avatar); err != nil {
 			rows.Close()
 			return nil, err
 		}
-		f.Look = g.lookOf(f.ID, avatar, title, total)
+		f.Look = lookOf(f.ID, avatar)
 		if points.Valid {
 			f.Today = &Score{Name: f.Name, Points: int(points.Int64), Rights: int(rights.Int64), Of: int(of.Int64), Ms: ms.Int64}
 		}
@@ -416,12 +406,11 @@ func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Sc
 	for rows.Next() {
 		var s Score
 		var run, id int64
-		var avatar, title string
-		var total int
-		if err := rows.Scan(&run, &id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Of, &s.Ms, &avatar, &title, &total); err != nil {
+		var avatar string
+		if err := rows.Scan(&run, &id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Of, &s.Ms, &avatar); err != nil {
 			return nil, err
 		}
-		s.Me, s.Look = id == userID, g.lookOf(id, avatar, title, total)
+		s.Me, s.Look = id == userID, lookOf(id, avatar)
 		others, played = others || !s.Me, played || s.Me
 		board, runs = append(board, s), append(runs, run)
 	}

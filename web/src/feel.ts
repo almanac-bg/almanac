@@ -1,5 +1,5 @@
 // The game's feel, in a file of its own: the sounds' voices, the result's moment (a game's end as a short sequence),
-// the streak and the level growing in place, and the sheet for big news. It loads after the player's first touch
+// the streak growing in place, and the sheet for big news (a note in the book). It loads after the player's first touch
 // (lib/sound.ts starts it), since nothing sounds or ends before one, and the first screen doesn't wait for it; until
 // it's in, the game is whole and only plainer: the screens always draw the end state, and this only moves them there.
 // Like a screen that loads on its own (kit.ts), it imports nothing of the app but types: what it needs comes as
@@ -13,8 +13,8 @@
 // that follow each other sound like one piece. Four voices: a bell (two-operator FM) for what's earned, a wooden pluck
 // for the player's own touches, a soft thud for a wrong answer or none (same meaning as a buzzer, no punishment), and a
 // plain short beep for the clock. The game's motif, D–A–F♯–D (four petals, the last one gold, as in the logo), is its
-// audio logo: the end of a game, a perfect day, a level, a win. The big ones get a little room (a reverb made of
-// noise), and everything goes through a compressor, so sounds that meet can't clip.
+// audio logo: the end of a game, a perfect day, a win. The big ones get a little room (a reverb made of noise), and
+// everything goes through a compressor, so sounds that meet can't clip.
 
 import type { SoundName } from "./lib/sound.ts";
 
@@ -80,10 +80,9 @@ const cues: Record<SoundName, Cue> = {
   // A wrong answer and none: a soft thud.
   wrong: { notes: [["t", 0, 0, 0.2, 0.9]] },
   time: { notes: [["t", 0, 0, 0.2, 0.9]] },
-  // The end of a game: the motif. A perfect day and a new level: with a harmony, in the room.
+  // The end of a game: the motif. A perfect day: with a harmony, in the room.
   end: { notes: motifNotes(0.55) },
   perfect: { notes: motifNotes(0.55, true), room: true },
-  level: { notes: motifNotes(0.55, true), room: true },
   // Won (a duel): the motif over a low D.
   win: { notes: [...motifNotes(0.55, true), ["b", -10, 0, 1.3, 0.4]], room: true },
   lose: {
@@ -93,14 +92,8 @@ const cues: Record<SoundName, Cue> = {
       ["b", 0, 0.26, 0.55, 0.35],
     ],
   },
-  // A day's goal done: two bells, up a fourth.
-  goal: {
-    notes: [
-      ["b", 3, 0, 0.3, 0.5],
-      ["b", 5, 0.1, 0.5, 0.5],
-    ],
-  },
-  achievement: {
+  // A note in the book (a streak's milestone, a first ten of ten, a chapter complete): three bells rising.
+  note: {
     notes: [
       ["b", 5, 0, 0.3, 0.45],
       ["b", 7, 0.08, 0.3, 0.45],
@@ -584,7 +577,7 @@ function roll(el: HTMLElement, from: string, to: string): Promise<void> {
 
 /** The streak one day longer, in its chip (drawn with the new number): once `after` has come (the result has landed),
  * the number rolls up from the day before (a first streak's words come in with it: never „0 ден поред“), its words
- * (`label`, of a number) following the number shown, as the level's do: never „1 дни поред“. The flame swells once
+ * (`label`, of a number) following the number shown: never „1 дни поред“. The flame swells once
  * with a gold glow, and the streak's sound. Resolves once it's over. */
 export async function streak(
   chip: HTMLElement,
@@ -621,48 +614,6 @@ export async function streak(
     { duration: 600, easing: "ease-in-out" },
   );
   await Promise.all([roll(n, was, String(days)), swell?.finished.catch(() => {})]);
-}
-
-/** The level growing in its chip (drawn as it is now): once `after` has come, the bar fills from where it was; a new
- * level fills it to the end, flashes in its lilac, rolls the number and fills again from nothing. Resolves once it's
- * over. */
-export async function level(
-  chip: HTMLElement,
-  from: { level: number; share: number; left: string },
-  to: { level: number; share: number; left: string },
-  after: Promise<void>,
-  hands: Hands,
-): Promise<void> {
-  const fill = chip.querySelector<HTMLElement>(".meter-fill");
-  const n = chip.querySelector<HTMLElement>(".level-num");
-  const left = chip.querySelector<HTMLElement>(".status-label");
-  if (hands.calm || !fill || !n || (from.level === to.level && from.share >= to.share)) return;
-  const width = (p: number) => `${Math.max(0, Math.min(100, p))}%`;
-  const grow = (a: number, b: number, ms: number) =>
-    fill.animate([{ width: width(a) }, { width: width(b) }], { duration: ms, easing: settleIn, fill: "both" }).finished;
-  // As it was before the game, until its moment comes.
-  if (left) left.textContent = from.left;
-  n.textContent = String(from.level);
-  fill.style.width = width(from.share);
-  try {
-    await after;
-    if (to.level === from.level) await grow(from.share, to.share, 700);
-    else {
-      const lilac = token(chip, "--lilac");
-      await grow(from.share, 100, 700);
-      await fill.animate([{ background: lilac, boxShadow: `0 0 10px ${lilac}` }, {}], { duration: 200 }).finished;
-      if (left) left.textContent = to.left;
-      await roll(n, String(from.level), String(to.level));
-      await grow(0, to.share, 500);
-    }
-  } catch {
-    // an animation cancelled on its way (the screen gone): straight to the end
-  } finally {
-    for (const a of fill.getAnimations()) a.cancel();
-    fill.style.width = width(to.share);
-    n.textContent = String(to.level);
-    if (left) left.textContent = to.left;
-  }
 }
 
 /**
