@@ -48,9 +48,11 @@ func editedSample(t *testing.T, edit func(id string, q map[string]any)) *bank.Ba
 	return b
 }
 
-// reload puts a bank in play, its versions kept first, as the server does.
+// reload puts a bank in play, its versions kept first, as the server does. The follow-ups of runs already played read
+// the bank in play: they finish first, or they'd read it while it's swapped.
 func (w *world) reload(b *bank.Bank) {
 	w.t.Helper()
+	w.g.AftersDone(w.t.Context())
 	if err := w.g.Keep(w.t.Context(), b); err != nil {
 		w.t.Fatal(err)
 	}
