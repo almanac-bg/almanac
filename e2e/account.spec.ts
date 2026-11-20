@@ -131,3 +131,40 @@ test("a name changed in Настройки is kept on leaving, and a deleted pro
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("status").filter({ hasText: "Профилът е изтрит." })).toBeVisible();
 });
+
+// The browser's notifications go with a deleted profile: kept, they'd come back to whoever plays here next, unasked
+// (push.ts: a subscription the browser has is told to the server again).
+test("a deleted profile lets go of the browser's notifications", async ({ page }) => {
+  // Notifications on, as far as the page can tell: a key in the page (the test server has none), and a browser
+  // subscribed.
+  await page.route("**/*", async (route) => {
+    if (route.request().resourceType() !== "document") return route.fallback();
+    const res = await route.fetch();
+    await route.fulfill({ response: res, body: (await res.text()).replace('"push":""', '"push":"BKey"') });
+  });
+  await page.addInitScript(() => {
+    const endpoint = "https://push.example/subscription";
+    const sub = {
+      endpoint,
+      toJSON: () => ({ endpoint, keys: { p256dh: "key", auth: "auth" } }),
+      unsubscribe: async () => {
+        localStorage.setItem("unsubscribed", "1");
+        return true;
+      },
+    };
+    const reg = {
+      active: {},
+      pushManager: { getSubscription: async () => (localStorage.getItem("unsubscribed") ? null : sub) },
+    };
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: { getRegistration: async () => reg, register: async () => reg, ready: Promise.resolve(reg) },
+    });
+  });
+  await becomeGuest(page);
+  await page.goto("/settings");
+  await page.getByRole("button", { name: "Изтрий профила" }).click();
+  await page.getByRole("button", { name: "Изтрий профила" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Профилът е изтрит." })).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem("unsubscribed"))).toBe("1");
+});

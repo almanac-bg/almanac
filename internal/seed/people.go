@@ -180,11 +180,11 @@ func (w *world) arrive(p *player) error {
 	return nil
 }
 
-// name gives a player a name of their own and a tag to go with it, as they choose them (Rename, Retag).
+// name gives a player a name of their own and a tag to go with it, as they choose them (Rename).
 func (w *world) name(p *player) {
 	for range 20 {
 		full, tag := w.drawName(p)
-		name, err := w.accounts.Rename(w.ctx, p.id, full)
+		name, _, err := w.accounts.Rename(w.ctx, p.id, &full, nil)
 		if err != nil {
 			continue
 		}
@@ -194,7 +194,7 @@ func (w *world) name(p *player) {
 			if i > 0 {
 				t = fmt.Sprintf("%s%d", tag, w.r.IntN(990)+10)
 			}
-			if got, err := w.accounts.Retag(w.ctx, p.id, t); err == nil {
+			if _, got, err := w.accounts.Rename(w.ctx, p.id, nil, &t); err == nil {
 				p.tag = got
 				return
 			}

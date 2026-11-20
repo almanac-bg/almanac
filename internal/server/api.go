@@ -186,9 +186,26 @@ func readJSON(r *http.Request, v any) error {
 	return nil
 }
 
-// user is who's signed in, or nil.
+// user is who's signed in, or nil. A session it moves on (account.Session: once a day at most) has its cookie set
+// again, to last as long: the browser would otherwise drop it SessionDays after it was first set, however often the
+// player plays.
 func (s *Server) user(r *http.Request) (*account.User, error) {
-	return s.accounts.Session(r.Context(), s.session(r))
+	token := s.session(r)
+	u, renewed, err := s.accounts.Session(r.Context(), token)
+	if w, ok := r.Context().Value(writerKey{}).(http.ResponseWriter); ok && renewed {
+		s.setSession(w, token)
+	}
+	return u, err
+}
+
+// writerKey keeps a request's ResponseWriter in its context (withWriter), for user to set the session's cookie
+// again from wherever it's asked.
+type writerKey struct{}
+
+func withWriter(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), writerKey{}, w)))
+	})
 }
 
 // session is the token of the browser's session, as its cookie has it ("": none).
@@ -528,16 +545,22 @@ func (s *Server) rename(w http.ResponseWriter, r *http.Request) error {
 		return errTooMany
 	}
 	// Each is checked only when it changes: a name or tag the player has (drawn, or taken before a check came in)
-	// doesn't stop them saving the other.
-	if in.Name != nil && strings.Join(strings.Fields(*in.Name), " ") != u.Name {
-		if u.Name, err = s.accounts.Rename(r.Context(), u.ID, *in.Name); err != nil {
-			return err
-		}
+	// doesn't stop them saving the other. Both are saved, or (one refused) neither.
+	if in.Name != nil && strings.Join(strings.Fields(*in.Name), " ") == u.Name {
+		in.Name = nil
 	}
-	if in.Tag != nil && strings.ToLower(strings.TrimPrefix(strings.TrimSpace(*in.Tag), "@")) != u.Tag {
-		if u.Tag, err = s.accounts.Retag(r.Context(), u.ID, *in.Tag); err != nil {
-			return err
-		}
+	if in.Tag != nil && strings.ToLower(strings.TrimPrefix(strings.TrimSpace(*in.Tag), "@")) == u.Tag {
+		in.Tag = nil
+	}
+	name, tag, err := s.accounts.Rename(r.Context(), u.ID, in.Name, in.Tag)
+	if err != nil {
+		return err
+	}
+	if in.Name != nil {
+		u.Name = name
+	}
+	if in.Tag != nil {
+		u.Tag = tag
 	}
 	return ok(w, map[string]any{"user": u})
 }

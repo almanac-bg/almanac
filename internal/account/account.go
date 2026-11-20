@@ -9,7 +9,8 @@
 // had no game of its own (a link joins no two games: only an email does). When a guest becomes a profile, every
 // other session the guest had ends: only the browser that proved the email is in it. SignOutOthers ends a player's
 // other sessions on demand. A player suspended by whoever keeps the game (Suspend) loses every session and gets no new
-// one until it's lifted; names are checked against fakes of the game's own (names.go). A guest who never plays is
+// one until it's lifted (a guest so left without a session stays all the same, for as long as a session would have
+// lasted: CleanUp); names are checked against fakes of the game's own (names.go). A guest who never plays is
 // cleared after a few days unused (CleanUp), so that guests made and dropped don't stay.
 //
 // A player goes one way, whether they delete their account, are a guest cleared, a guest folded into an account, or a
@@ -368,10 +369,11 @@ func draw(tx *sql.Tx, id int64) (name, tag string, err error) {
 	return "", "", errors.New("no free tag")
 }
 
-// Session finds who a token signs in, and keeps the session alive while it's used.
-func (a *Accounts) Session(ctx context.Context, token string) (*User, error) {
+// Session finds who a token signs in, and keeps the session alive while it's used: each day it's used (once a day at
+// most) its end moves SessionDays on, and renewed says so, for the browser's cookie to move on with it.
+func (a *Accounts) Session(ctx context.Context, token string) (*User, bool, error) {
 	if token == "" {
-		return nil, nil
+		return nil, false, nil
 	}
 	hash := hashToken(token)
 	var u User
@@ -381,30 +383,31 @@ func (a *Accounts) Session(ctx context.Context, token string) (*User, error) {
 		FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?`, hash,
 	).Scan(&u.ID, &u.Name, &u.Tag, &email, &u.Admin, &seen, &expires)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
+		return nil, false, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	now := time.Now()
 	if expires <= store.Ms(now) {
-		return nil, nil
+		return nil, false, nil
 	}
 	u.Email = email.String
 	// Once a day at most: a write per request would be a write per request.
-	if store.Ms(now)-seen > int64(24*time.Hour/time.Millisecond) {
+	renewed := store.Ms(now)-seen > int64(24*time.Hour/time.Millisecond)
+	if renewed {
 		// Two statements, not one Exec: the driver binds each statement of a multi-statement Exec from the first
 		// argument, so the second never matched.
 		_, err := a.DB.Write.ExecContext(ctx, `UPDATE sessions SET seen_at = ?, expires_at = ? WHERE token_hash = ?`,
 			store.Ms(now), store.Ms(now.AddDate(0, 0, SessionDays)), hash)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if _, err := a.DB.Write.ExecContext(ctx, `UPDATE users SET seen_at = ? WHERE id = ?`, store.Ms(now), u.ID); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
-	return &u, nil
+	return &u, renewed, nil
 }
 
 // Delete deletes a player and, with them, everything of theirs (remove).
@@ -496,8 +499,9 @@ const hasGame = `(EXISTS (SELECT 1 FROM runs r WHERE r.user_id = u.id)
 // CleanUp drops expired sessions, codes and handoffs, the wrong codes counted for an address once their stretch is
 // over (MissesKept), the codes mailed counted once a day old, friend requests to an address older than
 // EmailRequestDays, questions' reports seen to more than ReportDays ago, and the guests nobody can use or does: those whose sessions are gone (nothing of theirs can come
-// back), and those who never played nor have a friend, unseen for IdleGuestDays. Their days played stay counted, as
-// nobody's (play.Forget).
+// back), and those who never played nor have a friend, unseen for IdleGuestDays; but not a guest suspended (Suspend ends
+// their sessions, and keeps their games), until SessionDays after it, as long as a session would have lasted. Their
+// days played stay counted, as nobody's (play.Forget).
 func (a *Accounts) CleanUp(ctx context.Context) error {
 	now := store.Now()
 	for _, q := range []string{
@@ -526,6 +530,7 @@ func (a *Accounts) CleanUp(ctx context.Context) error {
 		return err
 	}
 	idle := store.Ms(time.Now().AddDate(0, 0, -IdleGuestDays))
+	suspended := store.Ms(time.Now().AddDate(0, 0, -SessionDays))
 	for _, q := range []struct {
 		where string
 		args  []any
@@ -536,8 +541,9 @@ func (a *Accounts) CleanUp(ctx context.Context) error {
 		for {
 			var n int
 			err := a.DB.Tx(ctx, func(tx *sql.Tx) error {
-				rows, err := tx.Query(`SELECT u.id FROM users u WHERE u.email IS NULL AND `+q.where+`
-					LIMIT `+strconv.Itoa(cleanBatch), q.args...)
+				rows, err := tx.Query(`SELECT u.id FROM users u WHERE u.email IS NULL
+					AND NOT EXISTS (SELECT 1 FROM suspensions x WHERE x.user_id = u.id AND x.at > ?)
+					AND `+q.where+` LIMIT `+strconv.Itoa(cleanBatch), append([]any{suspended}, q.args...)...)
 				if err != nil {
 					return err
 				}
