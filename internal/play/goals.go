@@ -21,8 +21,7 @@ import (
 // None is about how many or how fast (owner, 2026-11-18): those sent players into a quarter of an hour of other games, away from the
 // day, and paid for speed, which XP never does (worth.go). What counts on a day is what was played on it, and the day's
 // questions count on their own day, all ten, though the last answers came after midnight (onDay): so a day run begun
-// at 23:58 finishes that day's goals, not the next's. A room's game counts only when someone else played it too: alone,
-// with easy questions, it's a shortcut. A goal done earns its tier's XP, kept as it's done (whether or not the player
+// at 23:58 finishes that day's goals, not the next's. A goal done earns its tier's XP, kept as it's done (whether or not the player
 // looks; after.go keeps the goals of the day a game counts on, whenever that's done) and told once, at the end of the
 // game that did it. A day with all three done also earns a reserve day for the streak (runs.go), and counts towards
 // the achievements for full days.
@@ -423,9 +422,9 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND kind = 'royal' AND started_at BETWEEN ?2 AND ?3 AND id <> ?6),
 		(SELECT coalesce(max(rights), 0) FROM runs WHERE user_id = ?1 AND kind = 'royal' AND started_at BETWEEN ?2 AND ?3
 			AND id <> ?6),
-		(SELECT count(*) FROM runs r WHERE r.user_id = ?1 AND `+onDay("r")+` AND `+together("r")+` AND r.rights > 0
+		(SELECT count(*) FROM runs r WHERE r.user_id = ?1 AND `+onDay("r")+` AND r.rights > 0
 			AND r.rights = json_array_length(r.questions) AND r.id <> ?6),
-		(SELECT count(*) FROM runs r WHERE r.user_id = ?1 AND `+onDay("r")+` AND `+together("r")+`
+		(SELECT count(*) FROM runs r WHERE r.user_id = ?1 AND `+onDay("r")+`
 			AND json_array_length(r.questions) = ?5 AND r.rights >= ?5 - 2 AND r.id <> ?6)`, userID, from, to, day, Length, except).
 		Scan(&t.day, &t.duels, &t.duelWins, &t.royals, &t.royalBest, &t.perfect,
 			&t.eight)
@@ -456,7 +455,6 @@ func (g *Game) tallyWithout(ctx context.Context, userID int64, day string, excep
 	rows, err = db.QueryContext(ctx, `SELECT a.run_id, a.question_id, a.is_right, a.ms, coalesce(a.given, '')
 		FROM answers a JOIN runs r ON r.id = a.run_id
 		WHERE r.user_id = ?1 AND r.started_at >= ?2 - 86400000 AND r.started_at < ?3 AND r.id <> ?5
-			AND `+together("r")+`
 			AND CASE WHEN r.kind = 'day' THEN r.day = ?4 ELSE a.at BETWEEN ?2 AND ?3 END
 		ORDER BY a.run_id, a.n`, userID, from, to, day, except)
 	if err != nil {

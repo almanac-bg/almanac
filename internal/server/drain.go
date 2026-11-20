@@ -1,25 +1,20 @@
 package server
 
 import (
-	"context"
-	"errors"
-	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/live"
 )
 
-// A restart cuts what is played in memory: live duels (internal/live) and games in rooms (internal/room). So a deploy
-// (deploy/deploy.sh) asks the server to drain first, with POST /api/drain from the machine itself, again every few
-// seconds while it waits. Draining, the server starts no live duel (whoever asks for one waits, told why, and finds
-// it on the new server) and no game in a room, and says it's ready once nothing is under way: each live duel waited
-// for to its end, by its own clock (live.Hub.UnderWay: however long its questions, live.Longest at most), the rooms'
-// games for drainCap at most (a game cut then goes on after the restart, where it was: room.Hub.Restore). Around Роял,
+// A restart cuts what is played in memory: live duels (internal/live). So a deploy (deploy/deploy.sh) asks the server
+// to drain first, with POST /api/drain from the machine itself, again every few seconds while it waits. Draining, the
+// server starts no live duel (whoever asks for one waits, told why, and finds it on the new server), and says it's
+// ready once none is under way: each waited for to its end, by its own clock (live.Hub.UnderWay: however long its
+// questions, live.Longest at most). Around Роял,
 // from drainLead before its lobby opens until its games are over, it doesn't drain at all: the restart waits for the
 // evening to pass. A drain nobody asks about for drainLease ends by itself (a deploy that died midway), and DELETE
 // /api/drain ends it at once.
@@ -28,10 +23,8 @@ import (
 // deploy hears back at once even at the evening's peak. A deploy that hears nothing (a timeout, an error) asks again,
 // and never takes that for ready; only a server too old to drain answers it 404 (deploy.sh).
 const (
-	// drainCap is the longest a restart waits for the rooms' games under way.
-	drainCap = 5 * time.Minute
 	// drainLead is how long before Роял's lobby opens a drain no longer starts: one begun earlier is over in time.
-	drainLead = max(drainCap, live.Longest) + time.Minute
+	drainLead = live.Longest + time.Minute
 	// drainLease is how long a drain lasts without being asked about again.
 	drainLease = time.Minute
 )
@@ -46,9 +39,8 @@ type drain struct {
 // DrainStatus is what a deploy hears: whether it may restart the server now, and if not, what it waits for.
 type DrainStatus struct {
 	Ready bool `json:"ready"`
-	// Duels and Rooms are the live duels and the rooms' games under way.
+	// Duels are the live duels under way.
 	Duels int `json:"duels"`
-	Rooms int `json:"rooms"`
 	// DuelsLeft is, in seconds, how long the live duels under way may still take, at most.
 	DuelsLeft int `json:"duelsLeft"`
 	// Royal says Роял is near or on: no drain until it's over.
@@ -78,22 +70,19 @@ func (s *Server) drainStep(asked *bool) DrainStatus {
 	case on && d.since.IsZero():
 		d.since = now
 		s.live.Pause()
-		s.rooms.Pause()
 		slog.Info("draining for a restart")
 	case !on && !d.since.IsZero():
 		d.since = time.Time{}
 		s.live.Resume()
-		s.rooms.Resume()
 		slog.Info("drain over", "asked", wanted, "royal", royal)
 	}
 	duels, left := s.live.UnderWay()
-	st := DrainStatus{Duels: duels, Rooms: s.rooms.UnderWay(), Royal: royal}
+	st := DrainStatus{Duels: duels, Royal: royal}
 	st.DuelsLeft = int(left.Round(time.Second).Seconds())
 	if !d.since.IsZero() {
-		waited := now.Sub(d.since)
-		st.Waited = int(waited.Seconds())
+		st.Waited = int(now.Sub(d.since).Seconds())
 		// A duel past its longest by its own clock (left 0) is stuck: waiting for it would save nothing.
-		st.Ready = (st.Duels == 0 || left == 0) && (st.Rooms == 0 || waited >= drainCap)
+		st.Ready = st.Duels == 0 || left == 0
 	}
 	return st
 }
@@ -107,98 +96,4 @@ func (s *Server) drainHandler(w http.ResponseWriter, r *http.Request) error {
 	}
 	asked := r.Method == http.MethodPost
 	return ok(w, s.drainStep(&asked))
-}
-
-// roomsSaved is where the rooms' file stands: one save at a time, and the hub's changes it holds.
-type roomsSaved struct {
-	mu      sync.Mutex
-	changes uint64
-}
-
-// saveRoomsChanged saves the rooms if they've changed since they were last saved: every roomsEvery, so that a crash
-// loses no more of them than that (the game under way in each, every answer in it).
-func (s *Server) saveRoomsChanged() {
-	if s.rooms.Changes() != s.roomsSaved.changesNow() {
-		s.saveRooms()
-	}
-}
-
-// saveRoomsSoon saves the rooms whenever the hub says they're worth saving at once (room.Hub.Saving: a game has ended,
-// or been kept), so that a crash can't play a game's end again; a second apart at most, however many games end.
-func (s *Server) saveRoomsSoon(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-s.rooms.Saving():
-			s.saveRooms()
-		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(time.Second):
-		}
-	}
-}
-
-func (r *roomsSaved) changesNow() uint64 {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.changes
-}
-
-// saveRooms keeps the rooms open, with their games as they stand, for the next run to open again (room.Hub.Save):
-// written whole beside the file, synced, then put in its place, so that a crash or a power cut at any moment leaves
-// the last save or this one, never half of one.
-func (s *Server) saveRooms() {
-	if s.cfg.RoomsFile == "" {
-		return
-	}
-	s.roomsSaved.mu.Lock()
-	defer s.roomsSaved.mu.Unlock()
-	changes := s.rooms.Changes() // before the save: a change during it is saved next time
-	tmp := s.cfg.RoomsFile + ".part"
-	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
-	if err == nil {
-		err = s.rooms.Save(f)
-		if err == nil {
-			err = f.Sync()
-		}
-		if cerr := f.Close(); err == nil {
-			err = cerr
-		}
-	}
-	if err == nil {
-		err = os.Rename(tmp, s.cfg.RoomsFile)
-	}
-	if err != nil {
-		slog.Error("saving rooms", "err", err)
-		return
-	}
-	s.roomsSaved.changes = changes
-}
-
-// restoreRooms opens again the rooms the last run of the server kept. The file stays: until the next save, it is what
-// a crash would come back to.
-func (s *Server) restoreRooms() {
-	if s.cfg.RoomsFile == "" {
-		return
-	}
-	f, err := os.Open(s.cfg.RoomsFile)
-	if errors.Is(err, fs.ErrNotExist) {
-		return
-	}
-	if err != nil {
-		slog.Error("restoring rooms", "err", err)
-		return
-	}
-	n, err := s.rooms.Restore(f)
-	f.Close()
-	if err != nil {
-		slog.Error("restoring rooms", "err", err)
-		return
-	}
-	if n > 0 {
-		slog.Info("rooms restored", "rooms", n)
-	}
 }

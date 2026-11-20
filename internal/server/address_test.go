@@ -95,10 +95,10 @@ func TestLimitsByNetwork(t *testing.T) {
 func TestSiteSpentMakesNoKeys(t *testing.T) {
 	s := addressServer(true)
 	from := func(i int) bool {
-		r := httptest.NewRequest("POST", "/api/rooms/123456/join", nil)
+		r := httptest.NewRequest("POST", "/api/auth/verify", nil)
 		r.RemoteAddr = "[2606:4700::1]:443"
 		r.Header.Set("CF-Connecting-IP", fmt.Sprintf("2001:db8:0:%x::1", i))
-		return s.guardFrom(r, "roommiss", 100, 300, time.Hour)
+		return s.guardFrom(r, "verify", 100, 300, time.Hour)
 	}
 	for i := range 300 {
 		if !from(i) {

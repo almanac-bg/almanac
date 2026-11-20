@@ -41,8 +41,8 @@ func TestRequestLog(t *testing.T) {
 
 	token := strings.Repeat("T", 43)
 	for _, c := range []struct{ path string }{
-		{"/hand/" + token}, {"/r/123456"}, {"/players/secret_tag"},
-		{"/api/players/secret_tag"}, {"/api/rooms/654321"}, {"/api/health"}, {"/api/royal/tonight"},
+		{"/hand/" + token}, {"/players/secret_tag"},
+		{"/api/players/secret_tag"}, {"/api/health"}, {"/api/royal/tonight"},
 	} {
 		if status, _ := g.from("203.0.113.7", "GET", c.path, ""); status == 0 {
 			t.Fatal(c.path)
@@ -59,14 +59,14 @@ func TestRequestLog(t *testing.T) {
 	for _, l := range lines {
 		routes[fmt.Sprint(l["route"])] = l
 	}
-	for _, secret := range []string{token, "123456", "654321", "secret_tag"} {
+	for _, secret := range []string{token, "secret_tag"} {
 		if strings.Contains(log.String(), secret) {
 			t.Errorf("the log has %q in it:\n%s", secret, log.String())
 		}
 	}
 	for route, ip := range map[string]bool{
-		"/hand/…": false, "/r/…": false, "/players/…": false,
-		"/api/players/{tag}": true, "/api/rooms/{code}": true, // 404s: someone may be walking them
+		"/hand/…": false, "/players/…": false,
+		"/api/players/{tag}": true, // 404s: someone may be walking them
 	} {
 		l, ok := routes[route]
 		if !ok {

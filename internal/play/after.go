@@ -48,7 +48,7 @@ func (g *Game) afterDue(tx *sql.Tx, runID int64) error {
 	return err
 }
 
-// finished does what follows a run that has just ended (by an answer, by its clock in settle, or kept from a room):
+// finished does what follows a run that has just ended (by an answer, or by its clock in settle):
 // its duel settled before the answer or the run goes back, so that the screen with the result has it,
 // and the rest in the background (afterLater). The player leaving doesn't cut it short, and what fails is left to the
 // sweep (AfterDue).

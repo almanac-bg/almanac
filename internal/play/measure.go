@@ -17,7 +17,7 @@ import (
 // the first two:
 //
 //   - daily_counts: a number a day for each thing counted that no other table keeps (Tally): a visit without a
-//     profile by where it landed ("visit:home"), a guest made ("guest:room"), the reminder's ask on Начало
+//     profile by where it landed ("visit:home"), a guest made ("guest:player"), the reminder's ask on Начало
 //     ("pushask:shown|yes|no", and by mail "mailask:shown|yes|no"), notifications sent and opened by kind
 //     ("push:sent:day", "push:open:day"), the day's reminders mailed ("mail:day:sent"), the day's answers and those
 //     to a question the player had answered before ("day:answers", "day:seen": none since the days are drawn ahead,
@@ -29,9 +29,9 @@ import (
 //     friends, the streaks (walkStreak), the reminders and mails sent or held (push_reminded, streak_mails:
 //     experiment.go).
 
-// Landings are where a player can first come in (users.came_from): the front page, a room's link, a player's page,
-// and anywhere else.
-var Landings = []string{"home", "room", "player", "other"}
+// Landings are where a player can first come in (users.came_from): the front page, a player's page, and anywhere
+// else.
+var Landings = []string{"home", "player", "other"}
 
 // Tally counts n of something today (daily_counts).
 func (g *Game) Tally(ctx context.Context, key string, n int) error {
@@ -113,9 +113,8 @@ type Newcomer struct {
 	// The kind of the first game ("day", "topic", "duel" …), and whether it was finished.
 	FirstKind     string
 	FirstFinished bool
-	// Games begun on the first day (with a question answered); RoomOnly: all of them in a room.
-	Games    int
-	RoomOnly bool
+	// Games begun on the first day (with a question answered).
+	Games int
 	// The kinds of games played in the first week (days 0 to 6).
 	Kinds map[string]bool
 	// Played on day N (0 to 90).
@@ -236,7 +235,6 @@ func (g *Game) Newcomers(ctx context.Context, act *Activity, since string) ([]Ne
 					n.FirstKind, n.FirstFinished = kind, finished
 				}
 				if started == 0 {
-					n.RoomOnly = kind == "room" && (n.Games == 0 || n.RoomOnly)
 					n.Games++
 					if n.Device == "" {
 						n.Device = device

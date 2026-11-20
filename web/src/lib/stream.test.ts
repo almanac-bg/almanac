@@ -84,14 +84,14 @@ test("a stream ends with its screen, and once its game says so: nothing opens it
   mock.timers.enable({ apis: ["setTimeout"] });
   FakeSource.all.length = 0;
   const life = new AbortController();
-  stream("/api/rooms/123456/events", { life: life.signal, on: {} });
+  stream("/api/royal/events", { life: life.signal, on: {} });
   latest().fail(true);
   life.abort(); // the screen gone while it waits to open again
   mock.timers.tick(60_000);
   assert.equal(FakeSource.all.length, 1);
 
   const again = new AbortController();
-  const t = stream("/api/rooms/123456/events", { life: again.signal, on: { closed: () => t.close() } });
+  const t = stream("/api/royal/events", { life: again.signal, on: { closed: () => t.close() } });
   latest().send("closed");
   assert.equal(latest().closed, true);
   latest().fail(true);

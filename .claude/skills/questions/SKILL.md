@@ -305,7 +305,7 @@ shows with the answer, over the fact: the player learns why the day. (The owner'
 - **A date takes one question a year, and waits for it.** A day never deals a question twice, so a date with one
   question is blank the year after: `bank check` warns of every date of the year ahead with fewer than two that no day
   has had, and batches write for the thinnest dates (`bank plan` gives them). Until a day deals it, a dated question
-  is kept out of every other game (topic games, duels, rooms, Роял: `play.waiting`), so it isn't spent early.
+  is kept out of every other game (topic games, duels, Роял: `play.waiting`), so it isn't spent early.
 - **The national days come first** (`bank.NationalDays`: the Liberation, the Unification, Independence, Левски's
   birth and death, Ботев, the 24th of May, the Enlighteners, Гергьовден, the students' day, the feasts): each has
   questions about Bulgaria on its own theme, two or three of them (`bank check` fails while one has none). A date's

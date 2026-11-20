@@ -10,7 +10,7 @@ import (
 	"unicode/utf8"
 )
 
-// Names are shown to strangers: on the boards, in Роял, in rooms, in a link's preview („<name> те кани…“). So a name
+// Names are shown to strangers: on the boards, in Роял, in duels, on a player's page. So a name
 // is plain letters of the two scripts players here write in, Cyrillic and Latin, each word in one of them (a Latin
 // „A“ inside „АЛМАНАХ“ is how a fake looks real), with no dot between letters (a name isn't a web address), and
 // nothing that reads as the game or its people (reservedRoots): checked over two skeletons of the name, one by how
@@ -18,11 +18,11 @@ import (
 // letters gone, so that „А Л М А Н А Х“ and „Allmanac“ are caught as well. Whoever keeps the game (an admin) may
 // take such a name; and can put any player's name and tag back to the drawn ones (ResetName).
 //
-// Nor is a name or tag rude (Rude): the swear words and slurs a board or a room would show, in Cyrillic,
+// Nor is a name or tag rude (Rude): the swear words and slurs a board would show, in Cyrillic,
 // in Latin letters and in the digits chat writes some letters with („pi4ka“; a number on its own is only a number),
 // heard by how they sound, so that „kurva“ and „курва“ are one, or seen by how they look, where the sound is also an
-// ordinary name's („Газ“ isn't „гъз“). The list is a floor, not a wall: what gets past it, a room's host asks to change
-// (room.Room.AskName), and whoever keeps the game resets (ResetName).
+// ordinary name's („Газ“ isn't „гъз“). The list is a floor, not a wall: what gets past it, whoever keeps the game resets
+// (ResetName).
 
 var (
 	ErrBadName = errors.New("bad name")
@@ -47,7 +47,7 @@ const (
 
 // Rename gives a player a new name (anyone's: names may repeat; the tag tells players apart).
 func (a *Accounts) Rename(ctx context.Context, userID int64, name string) (string, error) {
-	name, err := NormalName(name)
+	name, err := normalName(name)
 	if err == nil && Reserved(name) {
 		err = a.unlessAdmin(ctx, userID)
 	}
@@ -122,11 +122,11 @@ func NormalTag(s string) (string, error) {
 	return s, nil
 }
 
-// NormalName is a name as players see it — 2 to 30 Cyrillic or Latin letters, digits, single spaces, dots, dashes
+// normalName is a name as players see it — 2 to 30 Cyrillic or Latin letters, digits, single spaces, dots, dashes
 // and underscores, at least one letter — or ErrBadName; ErrNameScripts for a word in both scripts, ErrNameLink for a
 // dot between letters, ErrNameRude for one that swears or insults (Rude). Whether it's free to take is Rename's
 // (Reserved).
-func NormalName(s string) (string, error) {
+func normalName(s string) (string, error) {
 	s = strings.Join(strings.Fields(s), " ")
 	n := utf8.RuneCountInString(s)
 	if n < NameMin || n > NameMax {

@@ -119,7 +119,7 @@ export interface Crowd {
   guesses?: Spread;
   /** A question of the day's ten: its players today, not everyone ever. */
   today?: boolean;
-  /** Few enough to count (a room's own, set by the room's screen): each answer says how many gave it, not what share. */
+  /** Few enough to count (Роял's own, set by its screen): each answer says how many gave it, not what share. */
   counts?: boolean;
 }
 
@@ -211,7 +211,7 @@ export interface Reviewed {
 
 export interface Score {
   name: string;
-  /** The player's tag (a link to their profile); none in a room, where guests play by name. */
+  /** The player's tag: a link to their profile. */
   tag?: string;
   points: number;
   rights: number;

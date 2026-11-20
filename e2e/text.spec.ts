@@ -102,7 +102,7 @@ test.describe("twice the text on a 320px phone", () => {
     }
     await expect(page.locator(".summary")).toBeVisible({ timeout: 10_000 });
     await fits(page, "the day's result");
-    for (const path of ["/", "/ranks", "/me", "/rewards", "/wardrobe", "/friends", "/settings", "/room", "/duel"]) {
+    for (const path of ["/", "/ranks", "/me", "/rewards", "/wardrobe", "/friends", "/settings", "/duel"]) {
       await page.goto(path);
       await expect(page.locator("#main h1, #main h2").first()).toBeVisible();
       await fits(page, path);
@@ -178,7 +178,7 @@ test.describe("a finger's room", () => {
 
   test("every control on its own has 44px to tap", async ({ page }) => {
     test.setTimeout(90_000);
-    for (const path of ["/", "/settings", "/me", "/ranks", "/room", "/wardrobe", "/friends"]) {
+    for (const path of ["/", "/settings", "/me", "/ranks", "/wardrobe", "/friends"]) {
       await page.goto(path);
       await expect(page.locator("#main h1, #main h2").first()).toBeVisible();
       expect(await smallTargets(page), path).toEqual([]);

@@ -8,7 +8,7 @@ import (
 )
 
 // Points are a game's score: what each answer earned, added up within one game, to compare players who played the
-// same questions (a duel, the day's, a room), never added up across games. What a player earns by playing is XP (xp),
+// same questions (a duel, the day's), never added up across games. What a player earns by playing is XP (xp),
 // and how strong they are is their rating.
 //
 // An answer earns
@@ -48,7 +48,7 @@ type Worth struct {
 	Speed  int
 }
 
-// WorthOf is what an answer of a score to a question, given after took, earns: in a run, and in a room.
+// WorthOf is what an answer of a score to a question, given after took, earns, at the question's own label.
 func WorthOf(q bank.Question, score float64, took time.Duration) Worth {
 	return worthAt(q, q.Base().Difficulty, score, took)
 }

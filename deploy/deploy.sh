@@ -27,8 +27,8 @@
 # latest are kept in /usr/local/lib/almanac, each checked when it came) can be gone back to.
 #
 # Before the restart it drains the server (internal/server/drain.go): asked every few seconds, the server starts no
-# live duel and no game in a room, and says it's ready once those under way are over (a duel by its own clock, seven
-# minutes at the most; a room's game, five). Near Роял, from 20:37 until the evening's games are over, it doesn't
+# live duel, and says it's ready once those under way are over (each by its own clock, seven minutes at the most).
+# Near Роял, from 20:37 until the evening's games are over, it doesn't
 # drain: the restart waits, and never comes while the server's last answer said Роял is near or on (after three hours
 # of that the deploy gives up, nothing restarted). An answer that doesn't come (a timeout, an error, the server busy at
 # the evening's peak) is asked again, ever more slowly up to half a minute apart: it never counts as ready. Only these

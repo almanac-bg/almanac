@@ -14,7 +14,7 @@ export interface User {
   tag: string;
   email?: string;
   admin?: boolean;
-  /** Still the name drawn for them (an animal and three digits): a room asks for one first. */
+  /** Still the name drawn for them (an animal and three digits): asked for one of their own (screens/name.ts). */
   drawn?: boolean;
 }
 
@@ -46,7 +46,7 @@ export const pushKey = boot.push ?? "";
 export const outcomeCss = boot.outcomeCss ?? "";
 
 /** Where the page was first opened: a new guest says it, so the admin page can tell where players come from (a
- * room, a player's page …), whatever pages they went through before their first game. */
+ * player's page …), whatever pages they went through before their first game. */
 const landing = location.pathname;
 
 /** A guest on its way: one, however many ask for the player meanwhile (a double tap on a first „Започни“). */

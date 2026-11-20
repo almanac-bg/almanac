@@ -272,15 +272,6 @@ func (w *world) about(p *player) (string, error) {
 			return "", err
 		}
 		return fmt.Sprintf("the strongest player: Легенда, a streak from the first day, Роял won %d times; %s", wins, facts), nil
-	case keyHost:
-		var rooms int
-		if err := w.one(&rooms, `SELECT count(*) FROM runs WHERE user_id = ? AND kind = 'room'`, p.id); err != nil {
-			return "", err
-		}
-		if rooms == 0 {
-			return fail("has hosted no room")
-		}
-		return fmt.Sprintf("a room host: a quiz night with friends each Thursday (%d room games); %s", rooms, facts), nil
 	case keyAdmin:
 		return "an admin (/admin), who plays most days; " + facts, nil
 	}

@@ -148,7 +148,7 @@ func TestPruneCopies(t *testing.T) {
 	path := filepath.Join(dir, "almanac.db")
 	old := time.Now().Add(-CopiesKept - time.Hour)
 	for _, name := range []string{"almanac.db", "before-v1.0.0.db", "before-v1.0.0.db-wal", "pre-v0.9.db",
-		"replaced-2026-10-01T000000Z.db", "restored.db", "rooms.json"} {
+		"replaced-2026-10-01T000000Z.db", "restored.db", "limits.json"} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -165,7 +165,7 @@ func TestPruneCopies(t *testing.T) {
 	for _, e := range entries {
 		left = append(left, e.Name())
 	}
-	if want := []string{"almanac.db", "replaced-new.db", "rooms.json"}; !slices.Equal(left, want) {
+	if want := []string{"almanac.db", "limits.json", "replaced-new.db"}; !slices.Equal(left, want) {
 		t.Fatalf("left %v, want %v", left, want)
 	}
 }

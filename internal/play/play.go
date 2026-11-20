@@ -1,6 +1,5 @@
 // Package play is the game: runs through a set of questions (the day's, a topic's, „България“'s: bulgaria.go), one
-// question at a time, against the server's clock; duels, and the games played in a room (rooms.go), kept as runs;
-// friends.
+// question at a time, against the server's clock; duels, kept as runs; friends.
 //
 // A question's time runs only while it's shown: Show starts it, Answer stops it. A question with pictures waits for
 // them: Show starts its time PictureWait later, and Start sooner, once the player's screen has them in, so that a slow
@@ -25,7 +24,7 @@
 // it arrived, from when the player's own screen showed the question, as it says, within bounds (seen.go).
 //
 // No game deals a player again what they've played, in any game, while the bank has questions they haven't: a topic's,
-// a duel's (live, a rematch), a room's and Роял's are drawn for all their players, those none of them has seen first,
+// a duel's (live, a rematch) and Роял's are drawn for all their players, those none of them has seen first,
 // then those the fewest have (choose, seenAmong); a recording is a game with few of its questions seen. One repeats by
 // design: the day (the same ten for everyone). TestNothingPlayedAgain holds it, for every way a game starts.
 //

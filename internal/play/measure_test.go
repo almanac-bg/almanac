@@ -91,9 +91,9 @@ func TestNewcomers(t *testing.T) {
 	w.stored(ana, "day", "2026-11-13", true, false)
 	w.stored(ana, "day", "2026-11-15", true, false)
 	w.stored(ana, "topic", "2026-11-19", false, false)
-	// Bo came by an invite, began with a topic, turned notifications on and made a friend the same day.
+	// Bo came by a player's page, began with a topic, turned notifications on and made a friend the same day.
 	w.stored(bo, "topic", "2026-11-13", false, false)
-	_, _ = w.db.Write.Exec(`UPDATE users SET came_from = 'room' WHERE id = ?`, bo)
+	_, _ = w.db.Write.Exec(`UPDATE users SET came_from = 'player' WHERE id = ?`, bo)
 	evening := time.Date(2026, 11, 13, 21, 0, 0, 0, Bulgaria).UnixMilli()
 	_, _ = w.db.Write.Exec(`INSERT INTO push_subs (endpoint, user_id, p256dh, auth, created_at) VALUES ('e', ?, 'p', 'a', ?)`, bo, evening)
 	_, _ = w.db.Write.Exec(`INSERT INTO friends (user_id, friend_id, since) VALUES (?, ?, ?)`, bo, ana, evening)
@@ -115,13 +115,13 @@ func TestNewcomers(t *testing.T) {
 	a, b := news[0], news[1]
 	if a.First != "2026-11-12" || a.Over != 8 || a.Games != 2 || a.FirstKind != "day" || a.CameFrom != "" ||
 		!a.Played[0] || !a.Played[1] || a.Played[2] || !a.Played[7] || a.DayTens() != 3 || a.Push || a.Friend ||
-		!a.FirstFinished || a.RoomOnly || !a.Kinds["topic"] || !a.DayTenAgain() {
+		!a.FirstFinished || !a.Kinds["topic"] || !a.DayTenAgain() {
 		t.Fatalf("Ana: %+v", a)
 	}
 	if !a.Due(7) || a.Due(8) || !a.BackWithin(1, 7) || a.BackWithin(4, 6) {
 		t.Fatalf("Ana's days: %+v", a)
 	}
-	if b.First != "2026-11-13" || b.Over != 7 || b.Games != 1 || b.FirstKind != "topic" || b.CameFrom != "room" ||
+	if b.First != "2026-11-13" || b.Over != 7 || b.Games != 1 || b.FirstKind != "topic" || b.CameFrom != "player" ||
 		!b.Push || !b.Friend || b.DayTens() != 0 || b.Due(7) {
 		t.Fatalf("Bo: %+v", b)
 	}

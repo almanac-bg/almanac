@@ -130,7 +130,8 @@ router.start(
     { path: /^\/play\/([a-z]+)$/, view: page("topic") },
     { path: /^\/friends$/, view: page("Приятели") },
     { path: /^\/settings$/, view: page("Настройки") },
-    { path: /^\/r\/([0-9]+)$/, view: page("room") },
+    { path: /^\/royal$/, view: page("Роял") },
+    { path: /^\/duel\/live$/, view: page("duel") },
     // A screen that sends the player on as it's drawn (an old link): the page sent to is what shows.
     {
       path: /^\/gone$/,
@@ -285,11 +286,11 @@ function fromOutside(url: string): void {
 }
 
 test("a game opened from outside has Начало under it: back asks, and „Излез“ leaves the game for Начало", async () => {
-  fromOutside("/r/123456");
+  fromOutside("/royal");
   const at = index;
   router.holdWhile(() => true);
   assert.equal(router.entry().game, true);
-  assert.equal(location.pathname, "/r/123456", "the game keeps its address");
+  assert.equal(location.pathname, "/royal", "the game keeps its address");
   assert.equal(entries[at]?.url, "/", "Начало under it");
   let ask: (() => void) | null = null;
   const unguard = router.beforeLeaving((proceed) => {
@@ -329,7 +330,7 @@ test("a game opened from outside, over: the page under it takes its address, ren
 
 test("a live game holds its entry while it's under way, and gives it back at its end", async () => {
   const { signal } = await import("./dom.ts");
-  fromOutside("/r/654321");
+  fromOutside("/duel/live");
   const at = index;
   const playing = signal(false);
   router.holdWhile(playing);
@@ -340,8 +341,8 @@ test("a live game holds its entry while it's under way, and gives it back at its
   playing.set(false);
   await tick();
   assert.equal(index, at);
-  assert.equal(location.pathname, "/r/654321");
-  playing.set(true); // the next game in the same room
+  assert.equal(location.pathname, "/duel/live");
+  playing.set(true); // a rematch, on the same screen
   assert.equal(router.entry().game, true);
   playing.set(false);
   await tick();

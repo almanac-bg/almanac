@@ -22,8 +22,6 @@ function what(s: Played): string {
       return "Дуел";
     case "royal":
       return "Роял";
-    case "room":
-      return "Стая";
     default:
       return topics.find((c) => c.id === s.category)?.name ?? "Тема";
   }

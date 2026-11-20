@@ -1014,17 +1014,6 @@ const modes: Record<string, Layer[]> = {
     ["k5", "M32 40.8L34.8 43.5L32 46.2L29.2 43.5Z"],
     ["k5", C(13, 23, 2.8) + C(32, 13, 3.2) + C(51, 23, 2.8)],
   ],
-  room: [
-    ground,
-    ["k1", "M15 9H49V58H15Z"],
-    ["k5", "M19 13H45V58H19Z"],
-    ["kh", "M19 58H45L56 64H23Z"],
-    ["k3", "M19 13L33.5 17V54.5L19 58Z"],
-    ["ks", "M19 13L33.5 17V19.5L19 16Z"],
-    ["k5", C(30.4, 37.5, 1.6)],
-    ["k1", "M25 3H39Q41 3 41 5V9H23V5Q23 3 25 3Z"],
-    ["k4", C(28, 6, 1.1) + C(32, 6, 1.1) + C(36, 6, 1.1)],
-  ],
 };
 
 // ---- Frames: drawn around an avatar's tile, in the frame's own tone (app.css: .fr-*). The tile sits at 8–56; a

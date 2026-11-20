@@ -460,8 +460,7 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 	var games, duelsWon, friends, topicsPlayed, types, fullDays, fast int
 	var perfect, nightOwl, earlyBird, topicPerfect, royalWin bool
 	err = db.QueryRowContext(ctx, `SELECT
-		(SELECT count(*) FROM runs r WHERE r.user_id = ?1 AND r.finished_at IS NOT NULL AND `+together("r")+`
-			AND (r.kind <> 'room' OR json_array_length(r.questions) >= `+strconv.Itoa(Length)+`)),
+		(SELECT count(*) FROM runs WHERE user_id = ?1 AND finished_at IS NOT NULL),
 		(SELECT count(*) FROM `+duelResults+` WHERE outcome = 'won'),
 		(SELECT count(*) FROM friends WHERE user_id = ?1),
 		(SELECT count(DISTINCT category) FROM runs WHERE user_id = ?1 AND kind = 'topic' AND finished_at IS NOT NULL

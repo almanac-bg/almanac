@@ -1337,7 +1337,6 @@
   .question,
   .after,
   .actions,
-  .send-link,
   .review {
     display: grid;
     /* One column, never wider than the page: a long word in it breaks (large text) instead of widening it. */
@@ -1514,7 +1513,7 @@
   }
 
   /* A link on its own line that's tapped, not read in a sentence: a finger's height. A way on in a line of its own
-     (`.day-next`: „Имаш профил? Влез“, „Влез в стая с код“) is one too. */
+     (`.day-next`: „Имаш профил? Влез“) is one too. */
   .link.tap,
   .day-next > :is(a, .link):only-child {
     display: inline-flex;
@@ -2717,21 +2716,6 @@
   .crowd-says.rare {
     color: var(--gold-ink);
     font-weight: 600;
-  }
-
-  /* Who in a room knew it (screens/room.ts): the room's own word, under the verdict, over everyone's. */
-  .room-knew {
-    margin: 0;
-    font-weight: 700;
-    line-height: 1.375rem;
-  }
-
-  .verdict + .room-knew {
-    margin-top: calc(-1 * var(--space-2));
-  }
-
-  .room-knew + .crowd-says {
-    margin-top: calc(-1 * var(--space-3));
   }
 
   /* Where everyone's guesses at a number fell. */
@@ -4101,10 +4085,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .row.moves {
-    grid-template-columns: 32px minmax(0, 1fr) auto 44px;
-  }
-
   .row + .row {
     border-top: 1px solid var(--line);
   }
@@ -4305,10 +4285,6 @@
     font-size: 0.8125rem;
     line-height: 1;
     font-weight: 700;
-  }
-
-  .delta-sign {
-    font-size: 12px;
   }
 
   .delta.up {
@@ -5961,18 +5937,7 @@
     white-space: nowrap;
   }
 
-  /* ---- Rooms ---- */
-
-  /* The room's phase, as if it were the page's own (hidden while a new name is asked: screens/room.ts). */
-  .room-phase {
-    display: contents;
-  }
-
-  .code-big {
-    font: 900 calc(28px + 1.75rem) / 1 var(--font-numeral);
-    letter-spacing: 0.08em;
-    font-variant-numeric: tabular-nums;
-  }
+  /* ---- Роял's players ---- */
 
   .players {
     display: flex;
@@ -5983,7 +5948,7 @@
     list-style: none;
   }
 
-  /* A player in a room or a Роял: their avatar's tile inside a tile of the same corners, 8 from each edge (a pill's
+  /* A player in Роял: their avatar's tile inside a tile of the same corners, 8 from each edge (a pill's
      round end can't hold a square avatar, nor its frame). */
   .players li {
     display: inline-flex;
@@ -6015,45 +5980,6 @@
     box-shadow: inset 0 0 0 1.5px var(--accent);
   }
 
-  /* The host's „Смени името“, „Махни“ and „Върни“: the chip's full height to tap. */
-  .players .remove {
-    align-self: stretch;
-    margin: calc(var(--space-2) * -1) 0 calc(var(--space-2) * -1) var(--space-1);
-    font-size: 0.875rem;
-    white-space: nowrap;
-  }
-
-  .player-name {
-    min-width: 0;
-    overflow-wrap: break-word;
-  }
-
-  /* The host's buttons on a chip, together: under the name when the two don't fit beside it (a phone, a long name).
-     The avatar and the name are one piece, so a long name wraps beside its avatar, never under it. */
-  .players li:has(> .player-acts) {
-    flex-wrap: wrap;
-  }
-
-  .player-who {
-    display: flex;
-    flex: 1 1 auto;
-    align-items: center;
-    gap: var(--space-2);
-    min-width: 0;
-  }
-
-  .player-acts {
-    display: inline-flex;
-    align-self: stretch;
-    gap: var(--space-3);
-    margin-left: auto;
-    padding-left: var(--space-1);
-  }
-
-  .player-acts .remove {
-    margin-left: 0;
-  }
-
   /* Роял's lobby on a big screen: those in as a grid of avatars, filling as they come. */
   @media (min-width: 64rem) {
     .royal-lobby .players {
@@ -6072,24 +5998,6 @@
     .royal-lobby .players .avatar {
       --size: 56px;
     }
-  }
-
-  /* Those the host sent out, under the others, to bring back. */
-  .players-out {
-    display: grid;
-    gap: var(--space-2);
-    margin-top: var(--space-3);
-  }
-
-  /* The host's lock on the room, under its players: who may come in, and the switch beside it (below, on a phone). */
-  .door {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2) var(--space-3);
-    margin-top: var(--space-3);
-    color: var(--text-muted);
   }
 
   /* ---- Profile ---- */
@@ -6771,7 +6679,7 @@
        page's own, and a group of them (.actions: under a result, Дуел's), side by side where two fit, the
        plain ones after the gold one (a result's .result-actions gives the group its buttons) and as tall as it. A line
        about the gold one sits under it. */
-    :is(.day, .screen, .royal-plan) > :is(.btn, .send-link) {
+    :is(.day, .screen, .royal-plan) > .btn {
       max-width: 22rem;
     }
 
@@ -7303,8 +7211,7 @@
   }
 
   /* A board's row: the place and the player, the score under the name. */
-  .tight .row,
-  .tight .row.moves {
+  .tight .row {
     grid-template-columns: 32px minmax(0, 1fr);
     row-gap: var(--space-1);
   }

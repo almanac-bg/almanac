@@ -11,8 +11,8 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// Friends are two players who joined up: one asked and the other said yes. Asked by tag, by email, or from a room's
-// end; never without both. A block keeps two players apart (blocks.go). Each friend sees how the other did on the day's
+// Friends are two players who joined up: one asked and the other said yes. Asked by tag or by email; never without
+// both. A block keeps two players apart (blocks.go). Each friend sees how the other did on the day's
 // questions, and they keep a record of their duels.
 
 var (

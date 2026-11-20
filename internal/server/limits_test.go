@@ -217,68 +217,6 @@ func (g *game) from(addr, method, path, body string) (int, string) {
 	return w.Code, w.Body.String()
 }
 
-// Room codes that miss are counted by the /48 as well as by the /64: a site can't walk the codes from its 65,536
-// networks (review 2026-11-18, S3). An IPv4 /24 is one site too.
-func TestRoomMissesBySite(t *testing.T) {
-	g := start(t)
-	for _, c := range []struct{ name, addr string }{{"IPv6", "2001:db8:0:%x::1"}, {"IPv4", "198.51.100.%d"}} {
-		misses := 0
-		for n := 0; misses < roomMissesSite; n++ {
-			addr := fmt.Sprintf(c.addr, n/(roomMissesAddress/2)+1) // half a network's misses each
-			if status, _ := g.from(addr, "GET", fmt.Sprintf("/api/rooms/%d", 100000+n), ""); status != 404 {
-				t.Fatalf("%s: miss %d: %d", c.name, misses+1, status)
-			}
-			misses++
-		}
-		if status, _ := g.from(fmt.Sprintf(c.addr, 200), "GET", "/api/rooms/999999", ""); status != 429 {
-			t.Fatalf("%s: a new network of the site, past the site's misses: %d", c.name, status)
-		}
-	}
-	if status, _ := g.from("2001:db8:1::1", "GET", "/api/rooms/999999", ""); status != 404 {
-		t.Fatalf("another site: %d", status)
-	}
-}
-
-// Past the misses of everyone in an hour, whoever runs the game hears of it; nobody is refused for it.
-func TestRoomMissesOfEveryoneTold(t *testing.T) {
-	g := start(t)
-	for range roomMissesAll {
-		g.srv.guard.allow("roommiss:all", roomMissesAll, time.Hour)
-	}
-	g.srv.problems.take()
-	if status, _ := g.from("203.0.113.1", "GET", "/api/rooms/999999", ""); status != 404 {
-		t.Fatalf("a code past everyone's misses: %d", status)
-	}
-	news, _ := g.srv.problems.take()
-	if len(news) != 1 {
-		t.Fatalf("told: %v", news)
-	}
-}
-
-// A room's stream opened again and again is told to wait before the browser tries again (review 2026-11-18, S6).
-func TestRoomStreamsLimited(t *testing.T) {
-	g := start(t)
-	p := g.player()
-	p.call("POST", "/api/guest", map[string]any{})
-	open := func() string {
-		res, err := p.client.Get(g.url + "/api/rooms/999999/events")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer res.Body.Close()
-		body, _ := io.ReadAll(res.Body)
-		return string(body)
-	}
-	for i := range roomStreamsPlayer {
-		if body := open(); !strings.HasPrefix(body, "event: closed") {
-			t.Fatalf("stream %d: %q", i+1, body)
-		}
-	}
-	if body := open(); !strings.HasPrefix(body, "retry: ") {
-		t.Fatalf("past the streams a minute: %q", body)
-	}
-}
-
 // Writes are limited by session, network and site, whatever they are: one client can't take the database's writer
 // (review 2026-11-18, S11). Reads aren't.
 func TestWritesLimited(t *testing.T) {

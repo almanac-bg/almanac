@@ -38,18 +38,17 @@ const phoneBrowser = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML,
 
 func TestVisitsAreCounted(t *testing.T) {
 	g := start(t)
-	g.open("/r/654321", phoneBrowser)
-	g.open("/r/654321", phoneBrowser) // a reload: once a half hour
-	// Another phone behind the same address (a carrier's): a visit of its own.
-	g.open("/r/654321", strings.Replace(phoneBrowser, "Android 14", "Android 13", 1))
-	g.open("/", phoneBrowser)
 	g.open("/players/nobody", phoneBrowser)
+	g.open("/players/nobody", phoneBrowser) // a reload: once a half hour
+	// Another phone behind the same address (a carrier's): a visit of its own.
+	g.open("/players/nobody", strings.Replace(phoneBrowser, "Android 14", "Android 13", 1))
+	g.open("/", phoneBrowser)
 	g.open("/nope", phoneBrowser) // not a page of the game
 	// Link previews and search engines are no visitors.
 	g.open("/", "WhatsApp/2.24.1 A")
 	g.open("/", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")
 	g.open("/", "facebookexternalhit/1.1")
-	for key, want := range map[string]int{"visit:room": 2, "visit:home": 1, "visit:player": 1, "visit:other": 0} {
+	for key, want := range map[string]int{"visit:home": 1, "visit:player": 2, "visit:other": 0} {
 		if got := g.counted(key); got != want {
 			t.Errorf("%s: %d, want %d", key, got, want)
 		}
@@ -62,7 +61,7 @@ func TestVisitsAreCounted(t *testing.T) {
 	if res, err := p.client.Do(req); err == nil {
 		res.Body.Close()
 	}
-	if got := g.counted("visit:player"); got != 1 {
+	if got := g.counted("visit:player"); got != 2 {
 		t.Fatalf("a player's visit counted: %d", got)
 	}
 }
@@ -93,7 +92,7 @@ func TestWhereGuestsCameFrom(t *testing.T) {
 		}
 		return from.String
 	}
-	for path, want := range map[string]string{"/r/123456": "room", "/f/abcd1234": "other", "/": "home",
+	for path, want := range map[string]string{"/f/abcd1234": "other", "/": "home",
 		"/players/ana": "player", "/royal": "other"} {
 		_, out := g.player().call("POST", "/api/guest", map[string]any{"from": path})
 		if got := cameFrom(out); got != want {
@@ -106,8 +105,8 @@ func TestWhereGuestsCameFrom(t *testing.T) {
 	if _, out := g.player().call("POST", "/api/guest", map[string]any{"from": "https://elsewhere.example/"}); cameFrom(out) != "" {
 		t.Error("not a path: kept")
 	}
-	if g.counted("guest:room") != 1 || g.counted("guest:home") != 1 {
-		t.Fatalf("the guests counted: room %d, home %d", g.counted("guest:room"), g.counted("guest:home"))
+	if g.counted("guest:player") != 1 || g.counted("guest:home") != 1 {
+		t.Fatalf("the guests counted: player %d, home %d", g.counted("guest:player"), g.counted("guest:home"))
 	}
 }
 
@@ -125,21 +124,20 @@ func TestTheClientsCounts(t *testing.T) {
 	}
 }
 
-// The funnel from the first game on is of the newcomers who played more than a room on their first day: one only in a
-// room is told apart, and isn't in the rows below, „Завършили първата си игра“ either.
-func TestFunnelLeavesRoomsOut(t *testing.T) {
-	cells := funnelWeek(10, 4, []play.Newcomer{{RoomOnly: true, FirstFinished: true, Over: 2}, {Over: 2}})
-	if cells[2] != (rate{2, 4}).HTML() || cells[3] != "1" || cells[4] != (rate{0, 1}).HTML() {
-		t.Fatalf("the week: %v", cells[:5])
+// The funnel's week: its visits, guests made, newcomers, and from the first game on, of the newcomers whose day is over.
+func TestFunnelWeek(t *testing.T) {
+	cells := funnelWeek(10, 4, []play.Newcomer{{FirstFinished: true, Over: 2}, {Over: 2}, {Over: 0}})
+	if cells[2] != (rate{3, 4}).HTML() || cells[3] != (rate{1, 2}).HTML() {
+		t.Fatalf("the week: %v", cells[:4])
 	}
-	if len(cells) != 5+len(funnelSteps) {
+	if len(cells) != 4+len(funnelSteps) {
 		t.Fatalf("%d cells", len(cells))
 	}
 }
 
 func TestLanding(t *testing.T) {
-	for path, want := range map[string]string{"/": "home", "/f/x": "other", "/room": "room", "/r/123456": "room",
-		"/players/x": "player", "/duel": "other"} {
+	for path, want := range map[string]string{"/": "home", "/f/x": "other", "/players/x": "player",
+		"/duel": "other"} {
 		if got := landing(path); got != want {
 			t.Errorf("%s: %s, want %s", path, got, want)
 		}

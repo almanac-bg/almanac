@@ -4,10 +4,9 @@
 // name saved, then on), „Не сега“ quiet (on with the drawn name: the name can wait, and Профил has it). Asked once on
 // a device, whatever the answer, before others see them (nameFirst): a first live duel (screens/live.ts: before a new
 // search, never on coming back to a duel under way nor for a rematch), or going into Роял's lobby (screens/royal.ts).
-// Never in a room: a room asks for a name of its own, kept in the room (screens/room.ts). The name is saved before the
-// game goes on (the others see it), and one refused is said in the sheet, to change. Esc or a tap beside the sheet is
-// „Не сега“: the player tapped to play, and the game goes on (put away with its screen, by going elsewhere, it's no
-// answer). One sheet at a time: a second ask while it's up (a double tap) waits for the same answer.
+// The name is saved before the game goes on (the others see it), and one refused is said in the sheet, to change. Esc
+// or a tap beside the sheet is „Не сега“: the player tapped to play, and the game goes on (put away with its screen,
+// by going elsewhere, it's no answer). One sheet at a time: a second ask while it's up (a double tap) waits for the same answer.
 
 import { api, errorText } from "../lib/api.ts";
 import { h } from "../lib/dom.ts";

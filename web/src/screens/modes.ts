@@ -6,7 +6,7 @@ import { picture } from "../art/picture.ts";
 import { api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 
-type Mode = "duel" | "royal" | "room";
+type Mode = "duel" | "royal";
 
 const all: Record<Mode, { href: string; name: string; about: string; tone: string }> = {
   duel: {
@@ -21,7 +21,6 @@ const all: Record<Mode, { href: string; name: string; about: string; tone: strin
     about: "В 21:00",
     tone: "tone-gold",
   },
-  room: { href: "/room", name: "Стая", about: "С код, за своите хора", tone: "tone-lilac" },
 };
 
 /** The next Роял at a glance (GET /api/royal/tonight). */

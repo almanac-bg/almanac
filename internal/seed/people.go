@@ -48,14 +48,13 @@ const (
 	keyRegular = "regular"
 	keyLapsed  = "lapsed"
 	keyLegend  = "legend"
-	keyHost    = "host"
 	keyAdmin   = "admin"
 
 	// lapsing are those who might be the lapsed persona (cast).
 	lapsing = "lapsing"
 )
 
-var personaKinds = []string{keyGuest, keyDay2, keyRegular, keyLapsed, keyLegend, keyHost, keyAdmin}
+var personaKinds = []string{keyGuest, keyDay2, keyRegular, keyLapsed, keyLegend, keyAdmin}
 
 // cast draws the players: their kinds in a game's shares, then the personas (those of them played in the history).
 func (w *world) cast(n int) {
@@ -86,8 +85,6 @@ func (w *world) cast(n int) {
 		duels: 1.6, royal: 0.5, social: 1, profile: last - 26, named: true, hour: 8, pace: 6 * time.Second})
 	add(&player{kind: keyLegend, persona: keyLegend, joined: 0, until: -1, rate: 1, skill: 0.95, topics: 1.5,
 		duels: 6, royal: 0.9, social: 0.6, profile: 1, named: true, hour: 20, pace: 4 * time.Second})
-	add(&player{kind: keyHost, persona: keyHost, joined: 3, until: -1, rate: 0.7, skill: 0.7, topics: 0.5, duels: 0.3,
-		royal: 0.2, social: 1, profile: 4, named: true, hour: 18, from: "room"})
 	add(&player{kind: keyAdmin, persona: keyAdmin, joined: 0, until: -1, rate: 0.9, skill: 0.7, topics: 0.8,
 		duels: 0.5, royal: 0.3, social: 0.5, profile: 0, named: true, hour: 9})
 	// Those who might be the lapsed one: streaks that end yesterday, by whichever reserve days they hold then; the
@@ -149,10 +146,8 @@ func (w *world) pickDevice() string {
 
 func (w *world) pickLanding() string {
 	switch x := w.r.Float64(); {
-	case x < 0.75:
+	case x < 0.85:
 		return "home"
-	case x < 0.87:
-		return "room"
 	case x < 0.93:
 		return "player"
 	}

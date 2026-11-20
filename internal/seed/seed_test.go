@@ -57,7 +57,7 @@ func TestSeededGame(t *testing.T) {
 		}
 	}
 
-	// The history has what the screens show: every kind of game, friends, Роял, rooms.
+	// The history has what the screens show: every kind of game, friends, Роял.
 	for what, q := range map[string]string{
 		"day runs":         `SELECT count(*) FROM runs WHERE kind = 'day' AND finished_at IS NOT NULL`,
 		"topic runs":       `SELECT count(*) FROM runs WHERE kind = 'topic'`,
@@ -68,7 +68,6 @@ func TestSeededGame(t *testing.T) {
 		"achievements":     `SELECT count(*) FROM achievements`,
 		"goals done":       `SELECT count(*) FROM goals_done`,
 		"Роял places":      `SELECT count(*) FROM royal_players WHERE place IS NOT NULL`,
-		"room games":       `SELECT count(*) FROM runs WHERE kind = 'room'`,
 		"placed ratings":   `SELECT count(*) FROM users WHERE rated >= 10`,
 		"placing ratings":  `SELECT count(*) FROM users WHERE rated BETWEEN 1 AND 9`,
 		"guests":           `SELECT count(*) FROM users WHERE email IS NULL`,
