@@ -51,6 +51,28 @@ func (s *Server) handoff(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, offer)
 }
 
+// copiedHandoff marks the player's link as copied by hand („Копирай връзката“, account.CopiedHandoff): every browser
+// that takes it is asked for its number.
+func (s *Server) copiedHandoff(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		Token string `json:"token"`
+	}
+	if err := readJSON(r, &in); err != nil {
+		return err
+	}
+	if !s.limits.allow("handcopied:"+strconv.FormatInt(u.ID, 10), 60, time.Hour) {
+		return errTooMany
+	}
+	if err := s.accounts.CopiedHandoff(r.Context(), u.ID, in.Token); err != nil {
+		return err
+	}
+	return ok(w, map[string]any{})
+}
+
 // lookHandoff says whose game a handoff's token brings to this browser, on how many days it was played, and whether
 // the number is asked for here (account.LookHandoff), or why it can't come here; it takes nothing.
 func (s *Server) lookHandoff(w http.ResponseWriter, r *http.Request) error {

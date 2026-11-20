@@ -98,6 +98,8 @@ test("the reminder by mail turned on from Настройки says the game is ke
 
 const messengerOnAndroid =
   "Mozilla/5.0 (Linux; Android 14; Pixel 7 Build/AP2A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0 Mobile Safari/537.36 [FB_IAB/Orca-Android;FBAV/480.0.0.0;]";
+const safariOnIPhone =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 13_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.2 Mobile/15E148 Safari/604.1";
 const chromeOnAndroid =
   "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36";
 
@@ -130,10 +132,13 @@ test.describe("in Messenger's own browser", () => {
       async () => ((await (await fetch("/api/me")).json()) as { user: { name: string } }).user.name,
     );
 
-    // The phone's browser, on the same phone: taken at once, on the day's result, whose action is the ask.
+    // The phone's browser, on the same phone: one tap that names the game, then the day's result, whose action is the
+    // ask.
     const phone = await browser.newContext({ userAgent: chromeOnAndroid });
     const there = await phone.newPage();
     await there.goto(url);
+    await expect(there.locator(".hand-number")).toContainText(`Връзката носи играта на ${name}.`);
+    await there.getByRole("button", { name: "Продължи тук" }).click();
     await expect(there.getByRole("status").filter({ hasText: "Готово: играта ти е тук." })).toBeVisible();
     await expect(there).toHaveURL(/\/$/);
     await expect(there.locator(".score-n")).toHaveText(rights ?? "");
@@ -189,7 +194,10 @@ test.describe("in Messenger's own browser on an older iPhone, with no clipboard 
       "Mozilla/5.0 (iPhone; CPU iPhone OS 13_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/MessengerForiOS;FBAV/300.0.0.0]",
   });
 
-  test("the action names the app's menu, and „Копирай връзката“ shows the link to copy by hand", async ({ page }) => {
+  test("the action names the app's menu, and „Копирай връзката“ shows the link to copy by hand", async ({
+    page,
+    browser,
+  }) => {
     test.setTimeout(90_000);
     await page.addInitScript(() => {
       Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
@@ -203,6 +211,13 @@ test.describe("in Messenger's own browser on an older iPhone, with no clipboard 
     await expect(page).toHaveURL(/\/#hand=[A-Za-z0-9_-]{43}$/);
     await action.getByRole("button", { name: "Копирай връзката" }).click();
     await expect(action.locator(".keep-said")).toContainText("/#hand=");
+    // A link copied asks every browser for the number, the same phone's too.
+    const url = page.url();
+    const safari = await browser.newContext({ userAgent: safariOnIPhone });
+    const there = await safari.newPage();
+    await there.goto(url);
+    await expect(there.getByLabel("Число")).toBeVisible();
+    await safari.close();
   });
 });
 
