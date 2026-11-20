@@ -539,10 +539,17 @@ func (h *Hub) Step(ctx context.Context) {
 	defer h.op.Unlock()
 	var n *night
 	var now time.Time
-	var held, begin bool
+	var held time.Time // the start of an evening held now (zero: none)
+	var begin bool
 	var back []Player
 	h.locked(func() {
 		now = h.now()
+		// An evening whose start came is held, whoever came: one nobody came to too, over as it starts and left for the
+		// next one below, so that how often Роял plays counts it, with nobody (play.RoyalPaceOf).
+		if n := h.night; n != nil && !n.held && !now.Before(n.start) {
+			n.held, held = true, n.start
+			h.changed() // begun: those not in see the first tournament, or that there's none
+		}
 		next := h.sched.Next(now)
 		if n := h.night; n == nil {
 			h.renew(next, false)
@@ -583,11 +590,6 @@ func (h *Hub) Step(ctx context.Context) {
 				safe.Go("royal: the start soon", func() { h.Soon(context.WithoutCancel(ctx), start, away, in) })
 			}
 		}
-		held = !n.held && !now.Before(n.start)
-		if held {
-			n.held = true
-			h.changed() // begun: those not in see the first tournament, or that there's none
-		}
 		begin = !now.Before(n.start) && n.phase == play.RoyalLobby && len(n.tables) > 0
 		if n.open() {
 			for id, p := range n.absent {
@@ -598,9 +600,9 @@ func (h *Hub) Step(ctx context.Context) {
 		}
 	})
 
-	if held {
-		if err := h.game.HeldRoyal(ctx, n.start); err != nil {
-			slog.Error("royal", "held", n.start, "err", err)
+	if !held.IsZero() {
+		if err := h.game.HeldRoyal(ctx, held); err != nil {
+			slog.Error("royal", "held", held, "err", err)
 		}
 	}
 	if begin {

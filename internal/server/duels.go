@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -60,9 +61,10 @@ func (s *Server) liveEvents(w http.ResponseWriter, r *http.Request) {
 	defer ping.Stop()
 	// find is the duel to follow. A line that dropped and came back (the browser says the duel it had) goes back to
 	// that duel, over or not, or hears that it's gone (a restart): never into the queue for a new one, which would
-	// leave the screen on the old one's last question.
+	// leave the screen on the old one's last question. The browser says it in a header; a stream the screen opens anew
+	// (one the browser gave up on: web/src/lib/stream.ts), in the address (?last=), as it can set no header.
 	find := func() (*live.Match, bool) {
-		if last := r.Header.Get("Last-Event-ID"); last != "" {
+		if last := cmp.Or(r.Header.Get("Last-Event-ID"), r.URL.Query().Get("last")); last != "" {
 			id, _ := strconv.ParseInt(last, 10, 64)
 			m, err := s.live.Get(id)
 			if err != nil {

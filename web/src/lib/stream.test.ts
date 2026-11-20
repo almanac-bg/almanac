@@ -12,25 +12,28 @@ class FakeSource {
   readyState = FakeSource.CONNECTING;
   onopen: (() => void) | null = null;
   onerror: (() => void) | null = null;
-  listeners = new Map<string, ((e: { data: string }) => void)[]>();
+  listeners = new Map<string, ((e: { data: string; lastEventId: string }) => void)[]>();
+  /** The last event's id, as the browser keeps it for the stream it opens again itself. */
+  lastEventId = "";
   closed = false;
   url: string;
   constructor(url: string) {
     this.url = url;
     FakeSource.all.push(this);
   }
-  addEventListener(type: string, fn: (e: { data: string }) => void) {
+  addEventListener(type: string, fn: (e: { data: string; lastEventId: string }) => void) {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn]);
   }
   close() {
     this.closed = true;
     this.readyState = FakeSource.CLOSED;
   }
-  /** The server says something. */
-  send(type: string, data = "{}") {
+  /** The server says something (with an id, `id`). */
+  send(type: string, data = "{}", id?: string) {
     this.readyState = FakeSource.OPEN;
     this.onopen?.();
-    for (const fn of this.listeners.get(type) ?? []) fn({ data });
+    if (id !== undefined) this.lastEventId = id;
+    for (const fn of this.listeners.get(type) ?? []) fn({ data, lastEventId: this.lastEventId });
   }
   /** The line drops: the browser opens it again itself (CONNECTING), or has given up on it (CLOSED). */
   fail(given: boolean) {
@@ -111,6 +114,26 @@ test("a stream ends with its screen, and once its game says so: nothing opens it
   again.abort();
   assert.equal(latest().closed, true);
   mock.timers.reset();
+});
+
+test("a stream opened anew says the last id it heard, as the browser does when it opens one again itself", () => {
+  mock.timers.enable({ apis: ["setTimeout"] });
+  mock.method(Math, "random", () => 0);
+  FakeSource.all.length = 0;
+  const life = new AbortController();
+  stream("/api/duels/live/events?rematch=4", { life: life.signal, on: { waiting: () => {}, message: () => {} } });
+  latest().send("waiting");
+  latest().fail(true);
+  mock.timers.tick(1_000);
+  assert.equal(latest().url, "/api/duels/live/events?rematch=4", "no id heard yet");
+  latest().send("message", "{}", "7");
+  latest().send("message", "{}"); // the id stays the last one said
+  latest().fail(true);
+  mock.timers.tick(1_000);
+  assert.equal(latest().url, "/api/duels/live/events?rematch=4&last=7");
+  life.abort();
+  mock.timers.reset();
+  mock.restoreAll();
 });
 
 test("the wait doubles each time, to half a minute, less a random part of up to half", () => {

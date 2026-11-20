@@ -105,3 +105,60 @@ func TestRatingBoardIndexed(t *testing.T) {
 		t.Fatalf("the rating's board is planned as %q", p)
 	}
 }
+
+// The peak counts from the game that places a rating on: what the placement games reached is no division. Placed in
+// Сребро after a start in Злато's range, a player is told Сребро and unlocks only what it does, and is told Злато when
+// they reach it.
+func TestPeakFromPlacement(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	_, _ = w.g.NewsOf(ctx, ana, 0)
+	// Two placement games to go, wins behind them: a rating and a peak in Злато's range.
+	if _, err := w.db.Write.Exec(`UPDATE users SET rating = 1080, peak = 1080, rated = ? WHERE id = ?`,
+		MinRatedGames-2, ana); err != nil {
+		t.Fatal(err)
+	}
+	duel := func(won bool) {
+		t.Helper()
+		l, err := w.g.StartLive(ctx, ana, w.user()) // someone new each time: every duel rated
+		if err != nil {
+			t.Fatal(err)
+		}
+		mine, theirs := w.wrong, w.right
+		if won {
+			mine, theirs = w.right, w.wrong
+		}
+		w.play(ana, l.Runs[0], repeat(mine, Length)...)
+		w.play(l.Users[1], l.Runs[1], repeat(theirs, Length)...)
+	}
+	standing := func() (rating, peak, rated int) {
+		_ = w.db.Read.QueryRow(`SELECT rating, peak, rated FROM users WHERE id = ?`, ana).Scan(&rating, &peak, &rated)
+		return
+	}
+	duel(false)
+	duel(false) // the tenth: placed
+	rating, peak, rated := standing()
+	if rated != MinRatedGames || rating >= Divisions[2].From || peak != rating {
+		t.Fatalf("placed: rating %d, peak %d, %d games", rating, peak, rated)
+	}
+	n, err := w.g.NewsOf(ctx, ana, 0)
+	if err != nil || n.Division == nil || n.Division.ID != "silver" || !n.Placed {
+		t.Fatalf("placed in Сребро: %+v %v", n.Division, err)
+	}
+	for _, u := range n.Unlocks {
+		if u.From == "дивизия Злато" {
+			t.Fatalf("Злато's unlocked, placed in Сребро: %+v", n.Unlocks)
+		}
+	}
+	for rating < Divisions[2].From {
+		duel(true)
+		rating, peak, _ = standing()
+	}
+	if peak != rating {
+		t.Fatalf("Злато reached: rating %d, peak %d", rating, peak)
+	}
+	if n, _ = w.g.NewsOf(ctx, ana, 0); n.Division == nil || n.Division.ID != "gold" || n.Placed {
+		t.Fatalf("Злато reached, not told: %+v", n.Division)
+	}
+}
