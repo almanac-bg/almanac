@@ -29,6 +29,8 @@ func landing(path string) string {
 	switch {
 	case path == "/":
 		return "home"
+	case strings.HasPrefix(path, "/d/"):
+		return "share"
 	case strings.HasPrefix(path, "/players/"):
 		return "player"
 	}
@@ -247,7 +249,8 @@ func decimal(x float64) string { return strings.Replace(fmt.Sprintf("%.1f", x), 
 
 // landingNames are the landings as the admin page says them.
 var landingNames = map[string]string{
-	"home": "Началната страница", "player": "Профил на играч", "other": "Друга страница", "": "Не се знае",
+	"home": "Началната страница", "share": "Споделен резултат", "player": "Профил на играч", "other": "Друга страница",
+	"": "Не се знае",
 }
 
 // kindNames are the kinds of games, as the admin page says them; kindOrder, the order it tells them in (a kind not
@@ -879,6 +882,10 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 		return func(w window) template.HTML { return text(fmt.Sprint(w.t[key])) }
 	}
 	row("Завършени дни", false, func(w window) template.HTML { return text(fmt.Sprint(w.dayTens)) })
+	// The days shared (a link made: play.Share), and how many times a person opened one (countOpen).
+	row("Споделени · отворени връзки", true, func(w window) template.HTML {
+		return text(fmt.Sprintf("%d · %d", w.t["share:day"], w.t["share:open"]))
+	})
 	into = &f.Notices
 	row("Покана за напомняне, показана", false, count("pushask:shown"))
 	row("„Напомняй ми“", true, func(w window) template.HTML { return rate{w.t["pushask:yes"], w.t["pushask:shown"]}.HTML() })

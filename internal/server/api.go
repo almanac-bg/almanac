@@ -46,6 +46,7 @@ var playerErrors = map[error]*apiError{
 	play.ErrNoQuestion:     {http.StatusServiceUnavailable, "no_questions", "В момента няма въпроси за игра."},
 	play.ErrDayOver:        {http.StatusGone, "day_over", "Денят на тази игра свърши. Днешните въпроси те чакат в Начало."},
 	play.ErrReviewOver:     {http.StatusGone, "review_over", "Въпросите на игра се преглеждат само в деня ѝ."},
+	play.ErrNotShared:      {http.StatusConflict, "not_shared", "Споделя се само завършен ден."},
 	play.ErrSelf:           {http.StatusConflict, "self", "Това си ти. Добави някой друг."},
 	play.ErrNotFriends:     {http.StatusNotFound, "not_friends", "Не сте приятели в играта."},
 	play.ErrManyFriends:    {http.StatusConflict, "many_friends", "Списъкът с приятели е пълен: в него има място за 200."},

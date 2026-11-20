@@ -6,7 +6,8 @@
 // way on, and the streak at stake while they wait; once played, as it lands, how they went and the one gold thing to
 // do next (game/gold.ts: another game, of the topic played least), and tomorrow; on a later visit, the day played in
 // one short card, another game the gold thing to do); and every other way to play a tap away: by topic, and — once a
-// first game is finished — with others. The day's boards are in Класации.
+// first game is finished — with others. The day's boards are in Класации. The day played is shared from its result
+// (game/share.ts); a shared day's link opens here (sharedDay), the same ten offered while their day lasts.
 
 import { picture } from "../art/picture.ts";
 import { nextGame } from "../game/gold.ts";
@@ -14,6 +15,7 @@ import { news } from "../game/news.ts";
 import { closeWords, percent, rare } from "../game/numbers.ts";
 import { boardRow, hands, landed, nextSteps, summary } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting, trail } from "../game/run.ts";
+import { shareDay } from "../game/share.ts";
 import { standing } from "../game/standing.ts";
 import type { Board, Mark, Score, State } from "../game/types.ts";
 import { api, errorText, serverNow, tally } from "../lib/api.ts";
@@ -23,7 +25,7 @@ import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { type RemindAsks, remindAnswered, remindAsks, remindShown } from "../lib/keep.ts";
 import { pushable, pushOn, turnOn } from "../lib/push.ts";
-import { goBack, hold, release, title } from "../lib/router.ts";
+import { go, goBack, hold, release, title } from "../lib/router.ts";
 import { feelKit } from "../lib/sound.ts";
 import { dateWords, issueWords, onDay, weekday } from "../lib/words.ts";
 import { categories, notice, player, playing, user } from "../state.ts";
@@ -71,8 +73,29 @@ export interface Today {
 /** The day as Начало's page came with it (server/pages.go): its first draw, without asking; every later one asks. */
 let inPage = boot.day as Today | undefined;
 
+/** A day shared (server/share.go): its day, its issue, and its shape (each question that counts: '1' right, '0' not). */
+interface Shared {
+  day: string;
+  issue: number;
+  shape: string;
+}
+
+/** The day shared by the link the page was opened at, until Начало has taken it (sharedDay). */
+let invite = (boot.shared as Shared | undefined) ?? null;
+
+/** A shared day's link (/d/<issue>-<code>), opened: Начало, which says the day shared once (today). The address
+ * becomes Начало's, so that a reload, or the address copied from the bar, is the day's and not the share's. */
+export function sharedDay(): Child {
+  go("/", true);
+  return null;
+}
+
 export function today() {
   title();
+  // Come by a shared day's link: while it's still that day, its score and shape over the same ten, „Колко ще познаеш
+  // ти?“; once it's over, a line that it is, over today's.
+  const shared = invite;
+  invite = null;
   // A profile just deleted, or a game just brought here, is said once, over the day.
   let bye = notice.peek();
   notice.set("");
@@ -175,8 +198,11 @@ export function today() {
         () => undefined,
       ),
     };
-    // Or a profile just signed in to here (haveProfile): what came of it.
-    const said = bye || notice.peek();
+    // Or a profile just signed in to here (haveProfile): what came of it; or a shared day that's over.
+    const said =
+      bye ||
+      notice.peek() ||
+      (shared && shared.day !== t.day && !run?.done ? `Брой ${shared.issue} вече мина. Ето днешния.` : "");
     bye = "";
     notice.set("");
     // The player's numbers (Профил's), for the topics' tiles and where another game goes: the topic played least
@@ -254,8 +280,8 @@ export function today() {
                     return lines.some(Boolean) ? h("div", null, lines) : null;
                   },
                 ],
-                // Right under it, what to do next: one gold action (game/gold.ts).
-                dayNext(next),
+                // Right under it, what to do next: one gold action (game/gold.ts), and the day to share.
+                { ...dayNext(next), also: [shareButton(run)] },
                 // Tomorrow (when the next ten come, the streak, the reminder); then the friends' day, and what the
                 // game brought (a day whose result was never on screen: told now, once). Just played, the streak
                 // waits for the day as it is now, with today in it.
@@ -263,7 +289,7 @@ export function today() {
                 dayPointsWords,
                 just,
               )
-            : dayCard(t, start(t), run?.trail ?? [], failed),
+            : dayCard(t, start(t), run?.trail ?? [], failed, shared?.day === t.day ? shared : null),
         // Before a first game, a player who has a profile already (a new phone) signs in, a tap away: under the day, so
         // that a new player's Начало is one column, on a big screen too.
         just || t.played || user.peek()?.email || fromMail ? null : haveProfile(load),
@@ -330,8 +356,53 @@ function dayDone(t: Today, run: State, next: () => string): Child {
     ),
     crowdSays(t, false, true),
     trail(run.trail, run.total),
-    nextSteps(ways.main, [h("a", { class: "btn", href: `/games/${run.id}` }, "Прегледай въпросите")]),
+    nextSteps(ways.main, [h("a", { class: "btn", href: `/games/${run.id}` }, "Прегледай въпросите"), shareButton(run)]),
   );
+}
+
+/** „Сподели резултата“ (game/share.ts): the day's text sent on, or copied (the button says „Копирано“ a moment);
+ * where neither can be done, the text in its place, to copy by hand. */
+function shareButton(run: State): Child {
+  const now = signal<"" | "busy" | "copied">("");
+  const byHand = signal("");
+  const error = signal("");
+  const press = async () => {
+    if (now.peek() === "busy") return;
+    now.set("busy");
+    error.set("");
+    try {
+      const out = await shareDay(run.id);
+      now.set(out === "copied" ? "copied" : "");
+      if (typeof out === "object") byHand.set(out.text);
+      if (out === "copied") setTimeout(() => now.peek() === "copied" && now.set(""), 2500);
+    } catch (err) {
+      now.set("");
+      error.set(errorText(err));
+    }
+  };
+  return () =>
+    byHand()
+      ? h(
+          "textarea",
+          {
+            class: "share-text",
+            readonly: true,
+            rows: 3,
+            "aria-label": "Резултатът за споделяне",
+            onfocus: (e: Event) => (e.target as HTMLTextAreaElement).select(),
+          },
+          byHand(),
+        )
+      : h(
+          "span",
+          { class: "share" },
+          h(
+            "button",
+            { class: "btn", type: "button", onclick: press, "aria-busy": () => (now() === "busy" ? "true" : null) },
+            () => (now() === "copied" ? "Копирано" : "Сподели резултата"),
+          ),
+          () => (error() ? h("span", { class: "bad", role: "alert" }, error()) : null),
+        );
 }
 
 /** The news of a game whose result was never on screen (`t.untold`; of `run` only, if given: the day's, under its
@@ -441,9 +512,11 @@ const wait = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
  * large), what they are, and the gold button; or, left half-way (`marks`: how the questions answered went), where the
  * player stopped, the pips so far, and the way on from there; and what went wrong starting them (`error`). Before
  * play there are no pips: they'd measure nothing yet. */
-function dayCard(t: Today, start: () => void, marks: Mark[], error: string): Child {
+function dayCard(t: Today, start: () => void, marks: Mark[], error: string, shared: Shared | null): Child {
   const players = t.board.players;
   const at = marks.length;
+  // Come by a shared day's link, before playing: the score shared and its shape lead, and the question is the player's.
+  const lead = shared && !at ? shared : null;
   return h(
     "section",
     { class: "card hero day" },
@@ -461,13 +534,16 @@ function dayCard(t: Today, start: () => void, marks: Mark[], error: string): Chi
     h(
       "div",
       { class: "intro" },
-      h("h1", { class: "day-title" }, "Десет въпроса за днес"),
+      lead ? sharedScore(lead) : null,
+      h("h1", { class: "day-title" }, lead ? "Колко ще познаеш ти?" : "Десет въпроса за днес"),
       h(
         "p",
         { class: "muted" },
         at
           ? `Следва въпрос ${at + 1} от 10. Довърши играта до полунощ.`
-          : "По един от всяка тема, от лесен към труден. Едни и същи за всички, с един опит.",
+          : lead
+            ? "Същите десет въпроса чакат и теб: по един от всяка тема, от лесен към труден, с един опит."
+            : "По един от всяка тема, от лесен към труден. Едни и същи за всички, с един опит.",
       ),
       stakeLine(t.streak, t.spare ?? true),
     ),
@@ -485,6 +561,19 @@ function dayCard(t: Today, start: () => void, marks: Mark[], error: string): Chi
             : "Около три минути",
         ),
     friendsPlayed(t),
+  );
+}
+
+/** A shared day's score, as its link brought it: „7 от 10“ and its shape, a pip each, no answers. */
+function sharedScore(s: Shared): Child {
+  const marks: Mark[] = [...s.shape].map((c) => ({ points: 0, right: c === "1" }));
+  const rights = marks.filter((m) => m.right).length;
+  return h(
+    "div",
+    { class: "shared-score" },
+    h("p", { class: "kicker" }, "Споделен резултат"),
+    h("p", { class: "shared-score-n" }, h("b", null, String(rights)), ` от ${marks.length}`),
+    trail(marks, marks.length),
   );
 }
 
