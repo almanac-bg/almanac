@@ -158,6 +158,19 @@ var adminBody = template.Must(template.New("admin").Parse(`
 </tbody></table></div>{{end}}
 </section>
 
+<section class="admin-section" id="nouns">
+<h2>Думите на играта</h2>
+<p class="muted">От играещите през седмицата (от понеделник), колко са ползвали всяка част. Част, която почти никой не
+ползва, си отива.</p>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">{{index .NounWeeks 0}}</th><th class="num">{{index .NounWeeks 1}}</th></tr></thead><tbody>
+{{range .Nouns}}<tr><td>{{.Name}}</td><td class="num">{{.This.HTML}}</td><td class="num">{{.Last.HTML}}</td></tr>{{end}}
+</tbody></table></div>
+<h3>Залозите</h3>
+<p>Върнали се в дни 28–34: играли само деня през първата си седмица {{.DayOnlyD30.HTML}}, играли и друго {{.OthersD30.HTML}}.</p>
+<p>Печатът, отворен или сменен: редът „Печат“ горе.</p>
+<p>Споделени дни за 28 дни · нови играчи, дошли по споделена връзка и завършили първата си игра · на връзка: {{.SharePlays}}.</p>
+</section>
+
 <section class="admin-section" id="streaks">
 <h2>Серии</h2>
 <div class="table-scroll"><table class="admin-table"><thead><tr><th>Дължина</th><th class="num">Вървят сега</th><th class="num">Прекъснати за 7 дни</th></tr></thead><tbody>

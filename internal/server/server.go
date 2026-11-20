@@ -198,6 +198,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/me/streak-told", s.streakTold)
 	api("PATCH /api/me/look", s.setLook)
 	api("PATCH /api/me/seal", s.setSeal)
+	api("POST /api/me/used", s.used)
 	api("POST /api/push", s.subscribe)
 	api("DELETE /api/push", s.unsubscribe)
 	api("GET /api/push/prefs", s.pushPrefs)

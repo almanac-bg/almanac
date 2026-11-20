@@ -123,6 +123,8 @@ var mergeLeft = map[string]string{
 	"users.tag":        "the account's: friends know it by it",
 	"users.email":      "the account's (a guest has none)",
 	"users.admin":      "the account's (a guest is never one)",
+	"users.used_week":  "the account's: a week's marks only count (Used); a guest's that week is at most counted twice",
+	"users.used":       "the account's, with its week (users.used_week)",
 	"sessions.user_id": "a guest's sessions end: the browser that signed in gets the account's (account.Verify)",
 	"handoffs.user_id": "a link that moves the guest to another device: nothing to move once it's the account",
 	"suspensions.user_id": "a suspended guest has no session to sign in from, so is never merged; the account's " +
