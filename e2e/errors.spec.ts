@@ -3,26 +3,28 @@
 import { expect, test } from "@playwright/test";
 import { answer, moveOn, openGame } from "./play.ts";
 
-test("Начало and Класации that can't load try again, by a tap or as the line comes back", async ({ page }) => {
-  // Начало's page comes with the day in it: the day is asked for when Начало is opened from another screen.
+test("Днес and Приятели that can't load try again, by a tap or as the line comes back", async ({ page }) => {
+  // Днес's page comes with the day in it: the day is asked for when Днес is opened from another screen. (A player:
+  // a new visitor's cover has no places.)
   await page.goto("/");
+  await page.evaluate(() => fetch("/api/guest", { method: "POST", body: "{}" }));
+  await page.reload();
   await expect(page.locator(".card.day")).toBeVisible();
   await page.route("**/api/day", (route) => route.abort("internetdisconnected"));
-  await page.locator("nav.tabs").getByRole("link", { name: "Класации" }).click();
-  await page.locator("nav.tabs").getByRole("link", { name: "Начало" }).click();
+  await page.locator("nav.places-foot").getByRole("link", { name: "Приятели" }).click();
+  await page.locator("nav.places-foot").getByRole("link", { name: "Днес" }).click();
   await expect(page.getByRole("alert")).toContainText("Няма връзка");
   await page.unroute("**/api/day");
   await page.getByRole("button", { name: "Опитай пак" }).click();
   await expect(page.locator(".card.day")).toBeVisible();
 
-  await page.goto("/ranks");
+  // Приятели's file in already: its day's board can't load, and comes by itself as the line comes back.
   await page.context().setOffline(true);
-  await page.getByRole("tab", { name: "Знания" }).click();
-  await expect(page.getByRole("button", { name: "Опитай пак" })).toBeVisible();
-  // The line back: the board comes by itself.
+  await page.locator("nav.places-foot").getByRole("link", { name: "Приятели" }).click();
+  await expect(page.locator(".day-board").getByRole("button", { name: "Опитай пак" })).toBeVisible();
   await page.context().setOffline(false);
-  await expect(page.getByRole("button", { name: "Опитай пак" })).toBeHidden();
-  await expect(page.locator(".board, .board-empty").first()).toBeVisible();
+  await expect(page.locator(".day-board").getByRole("button", { name: "Опитай пак" })).toBeHidden();
+  await expect(page.locator(".day-board .board-empty, .day-board .ranks").first()).toBeVisible();
 });
 
 test("a page that isn't there says so, with a way on", async ({ page }) => {

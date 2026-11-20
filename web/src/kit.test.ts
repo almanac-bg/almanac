@@ -22,10 +22,10 @@ test("each screen sets every piece of the kit it declares", () => {
     const src = readFileSync(join(screens, file), "utf8");
     const declared = /let \{([^}]*)\} = \{\} as Kit;/.exec(src);
     if (!declared) continue;
-    const set = /\(\{([^}]*)\} = kit\);/.exec(src);
+    const set = /\(\{([^}]*)\}\s*=\s*kit\);/.exec(src);
     assert.ok(set, `${file}: declares the kit's pieces, never sets them`);
     assert.deepEqual(names(set[1] ?? ""), names(declared[1] ?? ""), `${file}: the two lists differ`);
     checked++;
   }
-  assert.ok(checked >= 10, `only ${checked} screens checked: the pattern changed?`);
+  assert.ok(checked >= 8, `only ${checked} screens checked: the pattern changed?`);
 });

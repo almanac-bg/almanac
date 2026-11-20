@@ -45,7 +45,8 @@ async function once(page: Page, what: string, go: () => Promise<unknown>): Promi
   return asked;
 }
 
-const tab = (page: Page, href: string) => page.locator(`nav.tabs a[href='${href}']`).click();
+const tab = (page: Page, href: string) =>
+  page.locator(`nav.places-foot a[href='${href}'], .bar a.bar-me[href='${href}']`).first().click();
 
 test("each screen asks the server for each thing once a visit, and a deploy loads the page once", async ({ page }) => {
   test.slow();
@@ -60,7 +61,7 @@ test("each screen asks the server for each thing once a visit, and a deploy load
   };
   home(await once(page, "Начало, loaded", () => page.reload()));
   await once(page, "Приятели", () => tab(page, "/friends"));
-  await once(page, "Класации", () => tab(page, "/ranks"));
+  await once(page, "Алманах", () => tab(page, "/almanac"));
   await once(page, "Профил", () => tab(page, "/me"));
   home(await once(page, "Начало, from Профил", () => tab(page, "/")));
   // Начало tapped on Начало opens it afresh: once more, not more than that.
@@ -85,7 +86,7 @@ test("each screen asks the server for each thing once a visit, and a deploy load
     const res = await route.fetch();
     await route.fulfill({ response: res, headers: { ...res.headers(), "x-almanac-version": "next" } });
   });
-  await once(page, "Класации, the server's version another", () => tab(page, "/ranks"));
+  await once(page, "Приятели, the server's version another", () => tab(page, "/friends"));
   let loads = 0;
   page.on("load", () => loads++);
   home(await once(page, "Начало, after a deploy", () => tab(page, "/")));

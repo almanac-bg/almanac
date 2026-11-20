@@ -61,6 +61,9 @@ type Board struct {
 	// Average is the right answers of the day's ten on average, to a tenth, once DayCrowdFrom have finished it (0
 	// before): what tells a player whether their eight is good today.
 	Average float64 `json:"average,omitempty"`
+	// Spread is how many played the day to each count of right answers, 0 to Of, once DayCrowdFrom have finished it:
+	// the day's result draws it as „България днес“. People only: a game played at a script's speed is in no count.
+	Spread []int `json:"spread,omitempty"`
 }
 
 // BoardOf reads a day's board for a viewer (0: nobody signed in).
@@ -72,6 +75,10 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	b := Board{Day: day, Players: len(d.runs), Of: d.of, Top: make([]Score, len(d.top), BoardTop)}
 	if len(d.runs) >= DayCrowdFrom {
 		b.Average = math.Round(10*float64(d.rights)/float64(len(d.runs))) / 10
+		b.Spread = make([]int, d.of+1)
+		for _, r := range d.runs {
+			b.Spread[min(max(r.rights, 0), d.of)]++
+		}
 	}
 	for i, s := range d.top {
 		s.Me = d.users[i] == viewer

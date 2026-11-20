@@ -62,7 +62,7 @@ func TestFactsCollected(t *testing.T) {
 			again = append(again, p.ID)
 		}
 	}
-	alm, err := w.g.AlmanacOf(ctx, ana, "", "", AlmanacPage)
+	alm, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage})
 	if err != nil || alm.All != want || len(alm.Facts) != want {
 		t.Fatalf("%d facts in the almanac after a game half right, want %d (%v)", alm.All, want, err)
 	}
@@ -101,12 +101,12 @@ func TestAlmanacEntries(t *testing.T) {
 	}
 	w.knowsAt(ana, 2000, truth, untruth)
 	w.knowsAt(ana, 1000, choice)
-	alm, err := w.g.AlmanacOf(t.Context(), ana, "", "", AlmanacPage)
+	alm, err := w.g.AlmanacOf(t.Context(), ana, AlmanacQuery{Limit: AlmanacPage})
 	if err != nil || len(alm.Facts) != 3 {
 		t.Fatalf("%d facts (%v)", len(alm.Facts), err)
 	}
-	if got := []string{alm.Facts[0].ID, alm.Facts[1].ID, alm.Facts[2].ID}; !slices.Equal(got, []string{choice, truth, untruth}) {
-		t.Fatalf("not in the order learned: %v", got)
+	if got := []string{alm.Facts[0].ID, alm.Facts[1].ID, alm.Facts[2].ID}; !slices.Equal(got, []string{untruth, truth, choice}) {
+		t.Fatalf("not the latest learned first: %v", got)
 	}
 	byID := map[string]Learned{}
 	for _, f := range alm.Facts {

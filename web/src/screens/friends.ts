@@ -1,7 +1,9 @@
-// Friends (Приятели): the duels (a friend's waiting for you, yours waiting for them, those played: screens/duel.ts),
-// who asks to be friends, each friend with their day, your record against them and a duel a tap away, and the ways to
-// make more: by their tag or email.
+// Приятели, one of the three places: the day's board (among friends, or all of България); the duels (a friend's
+// waiting for you, yours waiting for them, those played: screens/duel.ts) and a new one; who asks to be friends, the
+// friends with their day, the duels between you and a duel a tap away; and the one way to make more: by потребителско
+// име or email.
 
+import type { Board, Score } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
 import type { Duels } from "./duel.ts";
@@ -26,9 +28,12 @@ let {
   avatar,
   failure,
   formatNumber,
-  pageArt,
+  ordinal,
   profileHref,
+  rankRow,
   record,
+  rightsOf,
+  segmented,
   withWord,
 } = {} as Kit;
 
@@ -56,7 +61,18 @@ interface Friends {
   requests: { in: Request[]; out: Request[] };
 }
 
-/** Приятели, one of the main places. */
+/** The day's boards, as /api/day has them. */
+interface Day {
+  day: string;
+  issue?: number;
+  board: Board;
+  /** The player's day: the board of everyone names its players only to one who has finished it (server/game.go). */
+  run?: { done: boolean } | null;
+  friends?: Score[] | null;
+  /** No friend has played: whether the player has any at all. */
+  befriended?: boolean;
+}
+
 export function friends(kit: Kit): Child {
   ({
     api,
@@ -76,16 +92,129 @@ export function friends(kit: Kit): Child {
     avatar,
     failure,
     formatNumber,
-    pageArt,
+    ordinal,
     profileHref,
+    rankRow,
     record,
+    rightsOf,
+    segmented,
     withWord,
   } = kit);
   title("Приятели");
-  return h("section", { class: "screen" }, friendsCard());
+  return h("section", { class: "screen friends-page spread" }, h("h1", null, "Приятели"), dayBoard(), friendsCard());
 }
 
-/** The page's title (with the way to change the list, once there are friends), then the friends card itself. */
+/** The day's board: among the player and their friends (first, once they have any), or all of България. A row says
+ * what places it: the right answers big („8 от 10“), the points that break a tie small beside them; the player's own
+ * row washed, „ти“ after the name, and under the best twenty if further down. */
+function dayBoard(): Child {
+  const day = signal<Day | null>(null);
+  const failed = signal<unknown>(null);
+  const among = signal<"friends" | "all" | null>(null);
+  const load = () =>
+    api<Day>("GET", "/api/day").then(
+      (d) => {
+        failed.set(null);
+        day.set(d);
+        if (among.peek() === null) among.set(d.friends?.length || d.befriended ? "friends" : "all");
+      },
+      (err) => failed.set(err),
+    );
+  load();
+  return h(
+    "section",
+    { class: "sect day-board page-1" },
+    h(
+      "div",
+      { class: "sect-head" },
+      h("h2", null, () => {
+        const d = day();
+        return d?.issue ? `Днес, брой ${d.issue}` : "Днес";
+      }),
+      h("span", { class: "sect-note" }, "точки"),
+    ),
+    () =>
+      day()
+        ? segmented<"friends" | "all">(
+            "Сред кого",
+            [
+              ["friends", "Приятели"],
+              ["all", "България"],
+            ],
+            () => among() ?? "friends",
+            (v) => among.set(v),
+          )
+        : null,
+    (): Child => {
+      const d = day();
+      if (!d) return failed() ? failure(failed(), () => void load(), null) : h("p", { class: "muted" }, "…");
+      return among() === "all" ? everyone(d) : ofFriends(d);
+    },
+  );
+}
+
+/** The day among the player's friends: each who played, best first, and who hasn't yet, in a line. */
+function ofFriends(d: Day): Child {
+  const rows = d.friends ?? [];
+  if (!rows.length)
+    return h(
+      "p",
+      { class: "board-empty" },
+      d.befriended === false
+        ? "Още нямаш приятели тук. Добави някого и сравнявайте резултатите си всеки ден."
+        : "Още никой от приятелите ти не е играл днес.",
+    );
+  return h(
+    "ol",
+    { class: "rows ranks" },
+    rows.map((s, i) => scoreRow(s, i + 1)),
+  );
+}
+
+/** The day among everyone who played it: the best twenty, and the player's own place under them if further down; to
+ * one who hasn't played it, how many have (the names come with their own result). */
+function everyone(d: Day): Child {
+  const b = d.board;
+  if (!d.run?.done)
+    return h(
+      "p",
+      { class: "board-empty" },
+      b.players
+        ? `Днес играха ${formatNumber(b.players)} ${b.players === 1 ? "човек" : "души"}. Изиграй днешния брой и ще видиш класацията.`
+        : "Още никой не е играл днешните въпроси.",
+    );
+  if (!b.top.length) return h("p", { class: "board-empty" }, "Още никой не е играл днешните въпроси.");
+  const mine = b.mine && b.place && !b.top.some((s) => s.me) ? b.mine : null;
+  return [
+    h(
+      "ol",
+      { class: "rows ranks" },
+      b.top.map((s, i) => scoreRow(s, i + 1)),
+      mine && b.place ? scoreRow(mine, b.place, b.place > b.top.length + 1) : null,
+    ),
+    b.place
+      ? h("p", { class: "board-note" }, `В България си ${ordinal(b.place)} от ${formatNumber(b.players)}.`)
+      : h(
+          "p",
+          { class: "board-note" },
+          `Днес играха ${formatNumber(b.players)} ${b.players === 1 ? "човек" : "души"}.`,
+        ),
+  ];
+}
+
+const scoreRow = (s: Score, place: number, gap = false) =>
+  rankRow(s.name, {
+    place,
+    me: s.me,
+    gap,
+    look: s,
+    tag: s.tag,
+    score: rightsOf(s.rights, s.of),
+    aside: formatNumber(s.points),
+  });
+
+/** The friends: who asks to be friends, each friend with their day and the duels between you (and, while changing
+ * the list, removing them), the one field to add more, and the requests that wait for an answer. */
 function friendsCard(): Child {
   const data = signal<Friends | null>(null);
   const duels = signal<Duels | null>(null);
@@ -149,14 +278,6 @@ function friendsCard(): Child {
   const adder = addFriend(load);
 
   return [
-    pageArt("friends", "tone-rose"),
-    h("div", { class: "title-row" }, h("h1", null, "Приятели"), () =>
-      data()?.friends.length
-        ? h("button", { class: "link muted", type: "button", onclick: () => editing.update((e) => !e) }, () =>
-            editing() ? "Готово" : "Промени",
-          )
-        : null,
-    ),
     // The duels: theirs to play first; a new one a tap away once there are friends to play.
     () => {
       const d = duels();
@@ -164,19 +285,33 @@ function friendsCard(): Child {
       if (!d || (!any && !data()?.friends.length)) return null;
       return h(
         "section",
-        { class: "stack duels" },
-        h(
-          "div",
-          { class: "title-row" },
-          h("h2", { class: "section-title" }, "Дуели"),
-          h("a", { class: "btn inline", href: "/duel/new" }, "Нов дуел"),
-        ),
-        any ? duelLists(d) : h("p", { class: "muted" }, "Десет въпроса, всеки по свое време. Покани приятел."),
+        { class: "sect duels page-mid" },
+        h("div", { class: "sect-head" }, h("h2", null, "Дуели")),
+        h("p", { class: "sect-lead" }, "Същите десет въпроса, всеки когато може."),
+        any ? duelLists(d) : null,
+        h("a", { class: "btn", href: "/duel/new" }, "Нов дуел"),
+        h("p", { class: "small sect-foot" }, "С приятел или срещу запис на истинска игра."),
       );
     },
-    h(
+    friendsList(),
+  ];
+
+  function friendsList(): Child {
+    return h(
       "section",
-      { class: "card friends" },
+      { class: "sect friends page-2" },
+      h("div", { class: "sect-head" }, h("h2", null, "Твоите приятели"), () => {
+        const n = data()?.friends.length ?? 0;
+        return n
+          ? h(
+              "span",
+              { class: "sect-note" },
+              h("button", { class: "link muted", type: "button", onclick: () => editing.update((e) => !e) }, () =>
+                editing() ? "Готово" : "Промени",
+              ),
+            )
+          : null;
+      }),
       () =>
         (data()?.requests.in ?? []).map((r) =>
           h(
@@ -199,13 +334,13 @@ function friendsCard(): Child {
         ),
       () => {
         const d = data();
-        if (!d && failed()) return failure(failed(), () => void load());
+        if (!d && failed()) return failure(failed(), () => void load(), null);
         if (!d) {
           // Not a player yet: friends are added once they are.
           return user()
             ? null
             : [
-                h("p", { class: "muted" }, "Добави приятели: ще виждате резултатите си за деня."),
+                h("p", { class: "muted friends-none" }, "Добави приятели: ще виждате резултатите си за деня."),
                 h(
                   "button",
                   {
@@ -224,7 +359,7 @@ function friendsCard(): Child {
         return d.friends.length
           ? h(
               "ol",
-              { class: "friend-list" },
+              { class: "rows friend-list" },
               d.friends.map((f) =>
                 row(
                   f,
@@ -234,7 +369,11 @@ function friendsCard(): Child {
                 ),
               ),
             )
-          : h("p", { class: "muted" }, "Още нямаш приятели тук. Добави ги по потребителско име или имейл.");
+          : h(
+              "p",
+              { class: "muted friends-none" },
+              "Още нямаш приятели тук. Добави ги по потребителско име или имейл.",
+            );
       },
       // Outside the parts drawn again on each look (every 15 s): drawn again, its field would lose the focus mid-word.
       when(data, () => adder),
@@ -243,11 +382,11 @@ function friendsCard(): Child {
         return out.length
           ? h(
               "div",
-              { class: "stack small-gap" },
+              { class: "waiting-for" },
               h("p", { class: "kicker" }, "Чакат отговор"),
               h(
                 "ul",
-                { class: "waiting" },
+                { class: "rows waiting" },
                 out.map((r) =>
                   h(
                     "li",
@@ -263,11 +402,11 @@ function friendsCard(): Child {
           : null;
       },
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
-    ),
-  ];
+    );
+  }
 }
 
-/** Asking someone to be friends: by their tag (@tag) or their email. */
+/** Asking someone to be friends: by their tag (@tag) or their email, on a line, „Добави“ beside it. */
 function addFriend(reload: () => Promise<void>): Child {
   const to = signal("");
   const busy = signal(false);
@@ -308,31 +447,26 @@ function addFriend(reload: () => Promise<void>): Child {
       },
     },
     h(
-      "label",
-      { class: "field" },
-      h("span", null, "Добави приятел"),
-      h(
-        "span",
-        { class: "add-friend-row" },
-        h("input", {
-          name: "to",
-          "aria-label": "Потребителско име или имейл на приятел",
-          placeholder: "@име или имейл",
-          autocomplete: "off",
-          autocapitalize: "none",
-          spellcheck: false,
-          maxlength: 254,
-          value: to,
-          oninput: (e: Event) => {
-            to.set((e.target as HTMLInputElement).value);
-            note.set(null);
-          },
-          ref: (el) => {
-            field = el as HTMLInputElement;
-          },
-        }),
-        h("button", { class: "btn inline", disabled: busy }, "Добави"),
-      ),
+      "span",
+      { class: "add-friend-row join" },
+      h("input", {
+        name: "to",
+        "aria-label": "Потребителско име или имейл на приятел",
+        placeholder: "Потребителско име или имейл",
+        autocomplete: "off",
+        autocapitalize: "none",
+        spellcheck: false,
+        maxlength: 254,
+        value: to,
+        oninput: (e: Event) => {
+          to.set((e.target as HTMLInputElement).value);
+          note.set(null);
+        },
+        ref: (el) => {
+          field = el as HTMLInputElement;
+        },
+      }),
+      h("button", { class: "btn inline", disabled: busy }, "Добави"),
     ),
     () => {
       const n = note();
@@ -341,7 +475,8 @@ function addFriend(reload: () => Promise<void>): Child {
   );
 }
 
-/** A friend: their name, their day, the duels between you (and, while editing, removing them). */
+/** A friend: their name, their day, the duels between you, and a duel a tap away (while changing the list, removing
+ * them instead). */
 function row(f: Friend, remove: () => void, challenge: () => void, editing: () => boolean): Child {
   const played = f.won + f.lost + f.drawn;
   return h(
@@ -357,32 +492,26 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
         f.name,
         h("span", { class: "friend-tag" }, ` @${f.tag}`),
       ),
-      h(
-        "span",
-        { class: "friend-day" },
-        f.today
-          ? `${f.today.rights} от ${f.today.of} · ${formatNumber(f.today.points)} ${f.today.points === 1 ? "точка" : "точки"}`
-          : "Днес още няма резултат",
-      ),
+      played
+        ? h(
+            "span",
+            { class: "record", title: `Дуели помежду ви: ${record(f.won, f.lost, f.drawn)}` },
+            `Дуели ${f.won} : ${f.lost}`,
+          )
+        : null,
     ),
-    played
-      ? h(
-          "span",
-          {
-            class: "record",
-            title: `Дуели помежду ви: ${record(f.won, f.lost, f.drawn)}`,
-          },
-          h("span", { class: "sr" }, "Дуели: "),
-          `${f.won} : ${f.lost}`,
-        )
-      : null,
+    h(
+      "span",
+      { class: "friend-day" },
+      f.today ? rightsOf(f.today.rights, f.today.of) : h("span", { class: "muted" }, "още не"),
+    ),
     () =>
       editing()
         ? h("button", { class: "link muted friend-act", type: "button", onclick: remove }, "Премахни")
         : h(
             "button",
             {
-              class: "btn inline friend-act",
+              class: "link friend-act",
               type: "button",
               "aria-label": `Дуел ${withWord(f.name)}`,
               onclick: challenge,

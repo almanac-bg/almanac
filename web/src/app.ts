@@ -1,32 +1,34 @@
-// АЛМАНАХ's web client: the mark and the name, the four main places (in the header on a big screen, a bar at the
-// bottom of a phone's), and the screen the router puts under them.
+// АЛМАНАХ's web client: the edition's frame — the bar (the rosette and the name, the three places on a big screen, the
+// player's avatar in the corner: Профил and Настройки), the double rule under it, the three places as words at the
+// foot of a phone's screen — and the screen the router puts under it. A game has the whole screen: the frame steps
+// aside while one is under way, and on a new visitor's cover (the day alone: screens/today.ts).
 
 import { loadPictures } from "./art/picture.ts";
 import { keepFresh } from "./fresh.ts";
 import { later } from "./kit.ts";
+import { serverNow } from "./lib/api.ts";
+import { dayInBulgaria } from "./lib/day.ts";
 import { effect, h, mount } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { applyPrefs } from "./lib/prefs.ts";
 import { preparePush } from "./lib/push.ts";
 import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
+import { dateWords, issueOf } from "./lib/words.ts";
 import { duelNew, duelOne } from "./screens/duel.ts";
 import { handoff } from "./screens/keep.ts";
 import { missing } from "./screens/missing.ts";
 import { topic } from "./screens/play.ts";
 import { sharedDay, today } from "./screens/today.ts";
-import { duelsWaiting, friendRequests, playing, watchWaiting } from "./state.ts";
+import { cover, duelsWaiting, friendRequests, look, playing, user, watchWaiting } from "./state.ts";
+import { avatar, rosette } from "./ui.ts";
 
-/**
- * The four main places: where each goes, its name and icon, and which paths are part of it. The day and the topics
- * are played from Начало, duels from Приятели; Профил holds what a player has: their almanac, their avatar and their
- * settings.
- */
-const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
-  ["/", "Начало", "home", (p) => /^\/($|play\/)/.test(p)],
-  ["/friends", "Приятели", "users", (p) => /^\/(friends|duel\/.+)$/.test(p)],
-  ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
-  ["/me", "Профил", "user", (p) => /^\/(me|settings|avatar|almanac|games(\/[0-9]+)?)$/.test(p)],
+/** The three places (DECISIONS.md, „The redesign“): where each goes, its name, and which paths are part of it. A game
+ * of the day is played on Днес, a topic's from its chapter in the Алманах; a duel is the friends'. */
+const places: [href: string, label: string, here: (p: string) => boolean][] = [
+  ["/", "Днес", (p) => p === "/"],
+  ["/almanac", "Алманах", (p) => /^\/(almanac|play)(\/|$)/.test(p)],
+  ["/friends", "Приятели", (p) => /^\/(friends|duel|players)(\/|$)/.test(p)],
 ];
 
 reportErrors();
@@ -34,46 +36,61 @@ applyPrefs();
 keepFresh();
 loadPictures().catch(() => {}); // the illustrations, in a file of their own: on their way at once
 
+/** The places as links (the bar's on a big screen, the foot's on a phone): the one here marked; a dot on Приятели
+ * while someone asks to be friends, or a friend's duel waits. */
+const placeLinks = () =>
+  places.map(([href, label, here]) =>
+    h(
+      "a",
+      {
+        href,
+        "aria-current": () => (here(path()) ? "page" : null),
+        // Someone asks to be friends, or a friend's duel waits: a dot on Приятели.
+        class: () => (href === "/friends" && (friendRequests() || duelsWaiting()) ? "news" : ""),
+      },
+      label,
+      () =>
+        href !== "/friends"
+          ? null
+          : friendRequests()
+            ? h("span", { class: "sr" }, " (покана за приятелство)")
+            : duelsWaiting()
+              ? h("span", { class: "sr" }, " (дуел те чака)")
+              : null,
+    ),
+  );
+
 const root = document.getElementById("app");
 if (root) {
   const main = h("main", { id: "main" });
   mount(root, () => [
     h(
       "header",
-      { class: "top" },
+      { class: "frame" },
       h(
-        "a",
-        { href: "/", class: "name" },
-        h("img", { class: "mark", src: "/favicon.svg", alt: "", width: 32, height: 32 }),
-        "АЛМАНАХ",
-      ),
-      h(
-        "nav",
-        { class: "tabs", "aria-label": "Основно" },
-        links.map(([href, label, icon, here]) =>
-          h(
-            "a",
-            {
-              href,
-              "aria-current": () => (here(path()) ? "page" : null),
-              // Someone asks to be friends, or a friend's duel waits: a dot on Приятели.
-              class: () => (href === "/friends" && (friendRequests() || duelsWaiting()) ? "news" : ""),
-            },
-            h("span", { class: `i i-${icon}`, "aria-hidden": "true" }),
-            h("span", { class: "tab-label" }, label),
-            () =>
-              href !== "/friends"
-                ? null
-                : friendRequests()
-                  ? h("span", { class: "sr" }, " (покана за приятелство)")
-                  : duelsWaiting()
-                    ? h("span", { class: "sr" }, " (дуел те чака)")
-                    : null,
-          ),
-        ),
+        "div",
+        { class: "bar" },
+        h("a", { href: "/", class: "brand", "aria-label": "АЛМАНАХ, днешният брой" }, rosette(), "АЛМАНАХ"),
+        h("nav", { class: "places", "aria-label": "Основно" }, placeLinks()),
+        // The issue on a big screen, but on Днес, whose dateline says it.
+        () =>
+          path() === "/"
+            ? null
+            : h("span", { class: "bar-issue" }, () => {
+                const day = dayInBulgaria(new Date(serverNow()));
+                return `Брой ${issueOf(day)} · ${dateWords(day)}`;
+              }),
+        // The player's avatar: Профил, and Настройки in it. Without a profile yet (or on the cover, not signed in),
+        // the way in.
+        () => {
+          const u = user();
+          if (!u || (cover() && !u.email)) return h("a", { class: "bar-in", href: "/me" }, "Вход");
+          return h("a", { class: "bar-me", href: "/me", "aria-label": "Профил" }, () => avatar(look()));
+        },
       ),
     ),
     main,
+    h("nav", { class: "places-foot", "aria-label": "Основно" }, placeLinks()),
   ]);
   start(
     main,
@@ -83,7 +100,6 @@ if (root) {
       { path: /^\/duel\/new$/, view: duelNew },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
       { path: /^\/almanac$/, view: later(() => import("./screens/almanac.ts").then((m) => m.almanac)) },
-      { path: /^\/ranks$/, view: later(() => import("./screens/ranks.ts").then((m) => m.ranks)) },
       { path: /^\/avatar$/, view: later(() => import("./screens/avatar.ts").then((m) => m.avatarChoice)) },
       { path: /^\/friends$/, view: later(() => import("./screens/friends.ts").then((m) => m.friends)) },
       { path: /^\/settings$/, view: later(() => import("./screens/settings.ts").then((m) => m.settings)) },
@@ -99,8 +115,9 @@ if (root) {
     ],
     missing,
   );
-  // In a game, a phone's bar of places steps aside (app.css): the question gets the screen.
+  // In a game the frame steps aside (app.css): the question gets the screen. On a new visitor's cover, the places too.
   effect(() => document.documentElement.classList.toggle("playing", playing()));
+  effect(() => document.documentElement.classList.toggle("cover", cover() && path() === "/"));
   watchWaiting();
   prepareSound();
   preparePush();

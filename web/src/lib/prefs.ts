@@ -76,8 +76,8 @@ function readScheme(): Scheme {
 
 export const scheme = signal<Scheme>(readScheme());
 
-/** The browser's own bar (a phone's, over the page), in the page's colour: --bg's, by Night and by Day. */
-const barColour = { night: "#110c20", day: "#f5f3fa" };
+/** The browser's own bar (a phone's, over the page), in the page's colour: --paper's, by Day and by Night. */
+const barColour = { night: "#121620", day: "#f6f1e7" };
 
 function apply(): void {
   const root = document.documentElement;
@@ -110,7 +110,8 @@ export function setScheme(v: Scheme): void {
  * here rather than asked by a container query in rem, which Chromium doesn't always ask again as the text's size
  * changes. Again as the column's width changes (a phone turned, a window resized) and as the text's size does. */
 export function measure(): void {
-  const app = document.getElementById("app");
+  // The screen's column (app.ts: the frame's <main>), or the page before the frame is drawn.
+  const app = document.getElementById("main") ?? document.getElementById("app");
   if (!app) return;
   const root = document.documentElement;
   const box = getComputedStyle(app);

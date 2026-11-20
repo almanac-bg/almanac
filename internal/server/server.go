@@ -221,7 +221,6 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/duels", s.newDuel)
 	api("GET /api/duels/{id}", s.duelOne)
 	api("POST /api/duels/{id}/play", s.playDuel)
-	api("GET /api/ranks", s.ranks)
 	api("GET /api/players/{tag}", s.profile)
 	api("GET /api/almanac", s.almanac)
 	api("GET /api/friends", s.friends)

@@ -85,10 +85,7 @@ test.describe("twice the text on a 320px phone", () => {
     await textAt(page, 200);
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "Десет въпроса за днес" })).toBeVisible();
-    await fits(page, "Начало");
-    // The bar of places shows its pictures alone, the places still named for whoever can't see them.
-    await expect(page.locator(".tabs .tab-label").first()).toHaveCSS("position", "absolute");
-    await expect(page.getByRole("link", { name: "Класации" })).toBeVisible();
+    await fits(page, "Днес");
     await startDay(page);
     for (let n = 0; n < 10; n++) {
       await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
@@ -104,7 +101,7 @@ test.describe("twice the text on a 320px phone", () => {
     }
     await expect(page.locator(".summary")).toBeVisible({ timeout: 10_000 });
     await fits(page, "the day's result");
-    for (const path of ["/", "/ranks", "/me", "/avatar", "/friends", "/settings", "/duel/new"]) {
+    for (const path of ["/", "/almanac", "/me", "/avatar", "/friends", "/settings", "/duel/new"]) {
       await page.goto(path);
       await expect(page.locator("#main h1, #main h2").first()).toBeVisible();
       await fits(page, path);
@@ -290,7 +287,7 @@ test.describe("a finger's room", () => {
 
   test("every control on its own has 44px to tap", async ({ page }) => {
     test.setTimeout(90_000);
-    for (const path of ["/", "/settings", "/me", "/ranks", "/avatar", "/friends"]) {
+    for (const path of ["/", "/settings", "/me", "/almanac", "/avatar", "/friends"]) {
       await page.goto(path);
       await expect(page.locator("#main h1, #main h2").first()).toBeVisible();
       expect(await smallTargets(page), path).toEqual([]);

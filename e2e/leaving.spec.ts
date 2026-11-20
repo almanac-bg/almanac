@@ -147,12 +147,10 @@ test("the ways back pop the history; back comes to a page and its board where th
   expect(await page.evaluate(() => history.length)).toBe(length + 1);
   expect(await page.evaluate(() => history.state?.from)).toBeUndefined();
 
-  // Класации: the board chosen is in the address; back to the page opens it again, and a page back where it was.
+  // A page back where it was.
   await page.setViewportSize({ width: 360, height: 320 }); // short, for Профил to scroll
-  const knowledge = page.getByRole("tab", { name: "Знания" });
-  await page.goto("/ranks");
-  await knowledge.click();
-  await expect(page).toHaveURL(/\/ranks#knowledge$/);
+  await page.goto("/friends");
+  await expect(page.getByRole("heading", { name: "Приятели", level: 1 })).toBeVisible();
   await page.getByRole("link", { name: "Профил" }).first().click();
   await expect(page).toHaveURL(/\/me$/);
   await expect(page.getByRole("link", { name: "Настройки" })).toBeVisible(); // Профил loads on its own (kit.ts)
@@ -165,8 +163,7 @@ test("the ways back pop the history; back comes to a page and its board where th
   const y = await page.evaluate(() => scrollY);
   expect(y).toBeGreaterThan(0);
   await page.goBack();
-  await expect(page).toHaveURL(/\/ranks#knowledge$/);
-  await expect(knowledge).toHaveAttribute("aria-selected", "true");
+  await expect(page).toHaveURL(/\/friends$/);
   await page.goForward();
   await expect(page).toHaveURL(/\/me$/);
   await expect.poll(() => page.evaluate(() => scrollY)).toBe(y);
@@ -178,10 +175,10 @@ test("a link out of the day's ten opens from Начало: back comes to it once
   await page.goto("/");
   await startDay(page);
   await expect(page.locator(".question-head")).toContainText("1 от 10");
-  await page.locator("nav.tabs").getByRole("link", { name: "Класации" }).click();
+  await page.locator("nav.places").getByRole("link", { name: "Приятели" }).click();
   await page.getByRole("button", { name: "Излез" }).click();
-  await expect(page).toHaveURL(/\/ranks$/);
-  // In place of the game's own entry, not over it: back from Класации is Начало, and Начало is the first page.
+  await expect(page).toHaveURL(/\/friends$/);
+  // In place of the game's own entry, not over it: back from Приятели is Днес, and Днес is the first page.
   await expect.poll(() => page.evaluate(() => history.state?.i)).toBe(1);
   await page.goBack();
   await expect(page).toHaveURL(/\/$/);
@@ -213,5 +210,5 @@ test("a game's page left before it's ready holds nothing over the page come to",
   // The topic's count never came: no game's entry over Начало, and the header and the places are there.
   expect(await page.evaluate(() => history.state?.game)).toBeUndefined();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
-  await expect(page.locator("nav.tabs")).toBeVisible();
+  await expect(page.locator("nav.places-foot")).toBeVisible();
 });

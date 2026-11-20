@@ -13,21 +13,19 @@ test("a topic's game tells how well the topic is known, and the avatar is anyone
   await expect(page.locator(".mastery-line")).toContainText("Първа оценка");
   await expect(page.locator(".screen")).not.toContainText(/XP|[Нн]иво \d|[Пп]остижени/);
 
-  // The avatar, a tap from Профил: every animal and every colour, none locked.
+  // The avatar, a tap from Профил: every animal, none locked.
   await page.goto("/me");
   await page.getByRole("link", { name: "Смени аватара" }).first().click();
   await expect(page).toHaveURL(/\/avatar$/);
   await expect(page.locator(".pick")).toHaveCount(15);
-  await expect(page.locator(".tone-pick")).toHaveCount(6);
   await page.getByRole("button", { name: "Рис", exact: true }).click();
   await expect(page.getByRole("button", { name: "Рис", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "Цвят: мента" }).click();
-  await expect(page.getByRole("button", { name: "Цвят: мента" })).toHaveAttribute("aria-pressed", "true");
   // Avatars are pictures (art/pictures.ts), loaded after the first screen: the lynx is drawn on its tile.
   await expect(page.locator('.pick[aria-pressed="true"] .avatar-pic path').first()).toBeAttached();
   // Kept: Профил shows it.
   await page.goto("/me");
-  await expect(page.locator(".me-head .avatar.sh-lynx.tone-mint")).toBeVisible();
+  await expect(page.locator(".me-head .avatar.sh-lynx")).toBeVisible();
+  await expect(page.locator(".bar-me .avatar.sh-lynx")).toBeVisible();
 
   // Sounds are on until turned off, and stay off on this device.
   await page.goto("/settings");

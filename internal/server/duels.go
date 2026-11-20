@@ -132,25 +132,6 @@ func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 	s.notifyFrom(context.WithoutCancel(ctx), n.From, m, n.To)
 }
 
-// ranks is the board of knowledge (over every topic, or one): of everyone, or of the viewer and their friends
-// (?among=friends).
-func (s *Server) ranks(w http.ResponseWriter, r *http.Request) error {
-	viewer := int64(0)
-	if u, err := s.user(r); err == nil && u != nil {
-		viewer = u.ID
-	}
-	q := r.URL.Query()
-	b, err := s.game.KnowledgeBoard(r.Context(), viewer, q.Get("among") == "friends", q.Get("topic"))
-	if err != nil {
-		return err
-	}
-	least := play.KnowAll
-	if q.Get("topic") != "" {
-		least = play.KnowTopic
-	}
-	return ok(w, map[string]any{"board": b, "least": least})
-}
-
 // almanac is a page of the player's collection of learned facts: of a topic (?topic=, or all), from where the page
 // before ended (?from=, its next).
 func (s *Server) almanac(w http.ResponseWriter, r *http.Request) error {
@@ -159,7 +140,8 @@ func (s *Server) almanac(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	q := r.URL.Query()
-	a, err := s.game.AlmanacOf(r.Context(), u.ID, q.Get("topic"), q.Get("from"), play.AlmanacPage)
+	a, err := s.game.AlmanacOf(r.Context(), u.ID, play.AlmanacQuery{Topic: q.Get("topic"), From: q.Get("from"),
+		Search: q.Get("q"), Limit: play.AlmanacPage})
 	if err != nil {
 		return err
 	}

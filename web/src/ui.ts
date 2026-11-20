@@ -6,7 +6,6 @@ import { errorText, passing } from "./lib/api.ts";
 import { hourInBulgaria } from "./lib/day.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { calm, type Scheme, scheme, setScheme } from "./lib/prefs.ts";
-import { path } from "./lib/router.ts";
 import { formatNumber, stakeWords } from "./lib/words.ts";
 import { categories } from "./state.ts";
 
@@ -416,26 +415,79 @@ const freeShapes = ["fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "st
 function fromName(name: string): string {
   let n = 0;
   for (const c of name) n = (n * 31 + (c.codePointAt(0) ?? 0)) >>> 0;
-  return `${freeShapes[n % freeShapes.length]}-${tones[Math.floor(n / freeShapes.length) % tones.length]}`;
+  return freeShapes[n % freeShapes.length] ?? "fox";
 }
 
-/** An avatar: a picture on a tile of its tone. `id` is "shape-tone", as the server sends a look. For the eye: the
+/** An avatar: the drawn animal in its own colours, in a round medallion of its scene (DECISIONS.md: no tones). `id` is
+ * "shape-tone", as the server sends a look; the tone a player chose before the edition is let be. For the eye: the
  * name is said in words nearby. */
 export function avatar(id: string | undefined, opts: { size?: "s" | "l"; name?: string } = {}) {
-  const [shape = "", tone] = (id || fromName(opts.name ?? "")).split("-");
+  const shape = (id || fromName(opts.name ?? "")).split("-")[0] ?? "";
   return h(
     "span",
     {
-      // The shape's class gives it its own colours in the natural tone (app.css, .tone-natural).
-      class: ["avatar", opts.size, `tone-${tone}`, `sh-${shape}`].filter(Boolean).join(" "),
+      // The shape's class gives it its colours and its scene's (app.css, .tone-natural).
+      class: ["avatar", opts.size, "tone-natural", `sh-${shape}`].filter(Boolean).join(" "),
       "aria-hidden": "true",
     },
     picture(shape, "avatar-pic"),
   );
 }
 
+/** The mark: the rosette, four petals, the gold one up and to the left (web/public/favicon.svg, bare). */
+export function rosette(): SVGSVGElement {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "5 5 54 54");
+  svg.setAttribute("class", "rosette");
+  svg.setAttribute("aria-hidden", "true");
+  for (const turn of [-45, 45, 135, 225]) {
+    const petal = document.createElementNS(ns, "path");
+    petal.setAttribute("d", "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z");
+    petal.setAttribute("transform", `rotate(${turn} 32 32)`);
+    petal.setAttribute("class", turn < 0 ? "petal gold" : "petal");
+    svg.append(petal);
+  }
+  return svg;
+}
+
 /** Where a player's profile is: by their tag. */
 export const profileHref = (tag: string) => `/players/${tag}`;
+
+/** A player's row on a board or a list, between hairlines (`.rows`): their place (if it has one), their avatar, their
+ * name (a way to their profile, with their tag; „ти“ after the player's own, whose row is washed), and what's said of
+ * them at its end: a score („8 от 10“), and a figure beside it (`aside`: the points). */
+export function rankRow(
+  name: string,
+  opts: { place?: number; me?: boolean; look?: Look; tag?: string; score?: Child; aside?: Child; gap?: boolean } = {},
+): HTMLElement {
+  return h(
+    "li",
+    { class: ["rank-row", opts.me && "me", opts.gap && "gap"].filter(Boolean).join(" ") },
+    opts.place ? h("span", { class: "rank-place" }, String(opts.place)) : null,
+    avatar(opts.look?.avatar, { name }),
+    h(
+      "span",
+      { class: "rank-name" },
+      opts.tag ? h("a", { href: profileHref(opts.tag) }, name) : name,
+      opts.me ? h("span", { class: "rank-you" }, " ти") : null,
+    ),
+    opts.score || opts.aside
+      ? h(
+          "span",
+          { class: "rank-end" },
+          opts.score ? h("span", { class: "rank-score" }, opts.score) : null,
+          opts.aside ? h("span", { class: "rank-aside" }, opts.aside) : null,
+        )
+      : null,
+  );
+}
+
+/** A day's score as a row says it: the right answers big, „от 10“ small beside them. */
+export const rightsOf = (rights: number, of: number): Child => [
+  h("b", { class: "rank-n" }, String(rights)),
+  h("small", null, ` от ${of}`),
+];
 
 /** A player on a board or a list: their avatar and name; with their tag, a link to their profile. */
 export function who(name: Child, look: Look = {}, extra: Child = null, plainName = "", tag = ""): Child {
@@ -480,22 +532,5 @@ export function back(href: string, label: string): Child {
     { class: "back", href, "data-back": "" },
     h("span", { class: "i i-left back-i", "aria-hidden": "true" }),
     label,
-  );
-}
-
-/** Профил's own places: the player at a glance, and their almanac. */
-const profilePlaces: [href: string, label: string][] = [
-  ["/me", "Общо"],
-  ["/almanac", "Алманах"],
-];
-
-/** The switch between Профил's places, at the top of each. */
-export function profileNav(): Child {
-  return h(
-    "nav",
-    { class: "subnav", "aria-label": "Профил" },
-    profilePlaces.map(([href, label]) =>
-      h("a", { href, "aria-current": () => (path() === href ? "page" : null) }, label),
-    ),
   );
 }

@@ -6,7 +6,7 @@
 // way on, and the streak at stake while they wait; once played, as it lands, how they went and the one gold thing to
 // do next (game/gold.ts: another game, of the topic played least), and tomorrow; on a later visit, the day played in
 // one short card, another game the gold thing to do); and every other way to play a tap away: by topic, and — once a
-// first game is finished — with others. The day's boards are in Класации. The day played is shared from its result
+// first game is finished — with others. The day's boards are in Приятели. The day played is shared from its result
 // (game/share.ts); a shared day's link opens here (sharedDay), the same ten offered while their day lasts.
 
 import { picture } from "../art/picture.ts";
@@ -28,7 +28,7 @@ import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { go, goBack, hold, release, title } from "../lib/router.ts";
 import { feelKit } from "../lib/sound.ts";
 import { dateWords, issueWords, onDay, weekday } from "../lib/words.ts";
-import { categories, notice, player, playing, user } from "../state.ts";
+import { categories, cover, notice, player, playing, user } from "../state.ts";
 import { dayPointsWords, failure, formatNumber, stakeLine } from "../ui.ts";
 import { type Accepted, acceptedLine, type Waiting, waitingLine } from "./duel.ts";
 import { app, haveProfile, keepLine, keepStake, mailAsk } from "./keep.ts";
@@ -197,6 +197,9 @@ export function today() {
         () => undefined,
       ),
     };
+    // A new visitor (no game begun yet) has the day alone: the cover (the frame's places step aside).
+    cover.set(!user.peek());
+    onCleanup(() => cover.set(false));
     // Or a profile just signed in to here (haveProfile): what came of it; or a shared day that's over.
     const said =
       bye ||
@@ -318,7 +321,9 @@ function dayNext(next: () => string): { main: Child } {
  * saying. */
 function placeLink(t: Today, early: boolean): Child {
   const s = standing(t.board.place, t.board.players, early);
-  return s ? h("a", { class: "place-line", href: "/ranks" }, s.place ? `${s.place} днес` : "Класацията на деня") : null;
+  return s
+    ? h("a", { class: "place-line", href: "/friends" }, s.place ? `${s.place} днес` : "Класацията на деня")
+    : null;
 }
 
 /** How the day played went among everyone: the share of players it did better than, where that's said
@@ -606,7 +611,7 @@ function friendsDay(t: Today): Child {
         return row;
       }),
     ),
-    all.length > 5 ? h("p", { class: "board-note" }, h("a", { href: "/ranks#friends" }, "Всички")) : null,
+    all.length > 5 ? h("p", { class: "board-note" }, h("a", { href: "/friends" }, "Всички")) : null,
   );
 }
 

@@ -4,6 +4,8 @@
 
 export interface Boot {
   user: import("../state.ts").User | null;
+  /** The player's avatar ("shape-tone"), with the player. */
+  avatar?: string;
   categories: import("../state.ts").Category[];
   bulgaria?: boolean;
   version: string;

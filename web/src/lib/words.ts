@@ -69,6 +69,16 @@ export function dateWords(day: string): string {
   return `${date} ${months[month - 1]}`;
 }
 
+/** The day of Брой 1 (play.FirstIssue). */
+const firstIssue = Date.UTC(2026, 10, 12);
+
+/** A day's issue (YYYY-MM-DD), as play.Issue counts it: 1 on 12 November 2026, one more each day after; 0 before. */
+export function issueOf(day: string): number {
+  const [y = 0, m = 1, d = 1] = day.split("-").map(Number);
+  const n = Math.round((Date.UTC(y, m - 1, d) - firstIssue) / 86_400_000);
+  return n >= 0 ? n + 1 : 0;
+}
+
 /** A day's issue (play/issue.go) and its date, as the game's dateline: „Брой 6 · 17 ноември“; the date alone without
  * one. */
 export function issueWords(issue: number | undefined, day: string): string {

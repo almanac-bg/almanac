@@ -32,6 +32,7 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 	day := s.game.Today()
 	out := map[string]any{"day": day, "issue": play.Issue(day), "streak": 0, "run": nil}
 	var viewer int64
+	done := false // the viewer has finished the day's ten
 	if u != nil {
 		viewer = u.ID
 		s.game.AfterWait(ctx, u.ID) // a game just finished: what it brought (its notes) is in
@@ -91,6 +92,7 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 				return nil, err
 			}
 			out["run"] = st
+			done = st.Done
 			if st.Done { // the right answer the fewest others got, for the result shared
 				if out["rarest"], err = s.game.RarestRight(ctx, u.ID, day); err != nil {
 					return nil, err
@@ -101,6 +103,12 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 	board, err := s.game.BoardOf(ctx, day, viewer)
 	if err != nil {
 		return nil, err
+	}
+	// The day's board names its players only to one who has played the day: never to a visitor, nor on a new
+	// player's cover, nor where a shared day's link lands (share.go), where a score shared beside the names would say
+	// whose it is. How many played, and how well on average, is anyone's.
+	if !done {
+		board.Top, board.Mine, board.Place = []play.Score{}, nil, 0
 	}
 	out["board"] = board
 	if u != nil {

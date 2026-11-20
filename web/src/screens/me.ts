@@ -20,7 +20,6 @@ let {
   avatar,
   failure,
   profileHref,
-  profileNav,
   haveProfile,
   keepGame,
   loadStats,
@@ -28,23 +27,8 @@ let {
 } = {} as Kit;
 
 export function me(kit: Kit) {
-  ({
-    h,
-    signal,
-    when,
-    go,
-    title,
-    user,
-    notice,
-    avatar,
-    failure,
-    profileHref,
-    profileNav,
-    haveProfile,
-    keepGame,
-    loadStats,
-    stats,
-  } = kit);
+  ({ h, signal, when, go, title, user, notice, avatar, failure, profileHref, haveProfile, keepGame, loadStats, stats } =
+    kit);
   title("Профил");
   // A game just kept, or a profile signed in to, here (keepGame, haveProfile): said once, at the top.
   const said = notice.peek();
@@ -61,7 +45,6 @@ export function me(kit: Kit) {
         const failed = signal<unknown>(null);
         load.then(data.set, failed.set);
         return [
-          profileNav(),
           said ? h("p", { class: "muted", role: "status" }, said) : null,
           head(data),
           // A name still the one drawn: said so, with the way to change it.

@@ -1,9 +1,9 @@
-/* АЛМАНАХ: a modern magazine that keeps score. Night first, gold for the one right answer, numbers as heroes.
-   The tokens are the design system's (АЛМАНАХ Modern); every colour below is one of them. The rules for using
-   them: web/DESIGN.md. */
+/* АЛМАНАХ: the edition. The game looks like a publication a player keeps: paper first with a night of its own, serif
+   headlines, numerals as the heroes, colour only where it means something, one obvious action per screen. The tokens
+   are at the top; every colour below is one of them. The rules for using them: web/DESIGN.md. */
 
 /* ---- Fonts: our own files (the CSP allows no others, and players' browsers ask no one else for anything). Each
-   family is two files (web/src/fonts/subset.sh, whose ranges these are, word for word): one with all a page of
+   face is two files (web/src/fonts/subset.sh, whose ranges these are, word for word): one with all a page of
    Bulgarian needs (Cyrillic, Latin letters and digits, the marks the texts use), the other with the rest of Latin,
    Greek and other signs, loaded only where one shows. The weights are only those used here. Sofia Sans is asked for
    by the page itself at once (server/pages.go: assets.FirstFonts). ---- */
@@ -46,6 +46,24 @@
 }
 @font-face {
   font-family: "Literata";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./fonts/literata.woff2") format("woff2");
+  unicode-range:
+    U+0020-007E, U+00A0, U+00A7, U+00A9, U+00AB, U+00AD, U+00AE, U+00B0-00B3, U+00B7, U+00B9, U+00BB-00BE, U+00D7, U+00F7, U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2009, U+2010-2015, U+2018-201E, U+2022, U+2026, U+202F, U+2030, U+2032-2033, U+2039-203A, U+20AC, U+2116, U+2190-2193, U+2212;
+}
+@font-face {
+  font-family: "Literata";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./fonts/literata-rest.woff2") format("woff2");
+  unicode-range:
+    U+00A1-00A6, U+00A8, U+00AA, U+00AC, U+00AF, U+00B4-00B6, U+00B8, U+00BA, U+00BF-00D6, U+00D8-00F6, U+00F8-024F, U+0259, U+02B0-02FF, U+0300, U+0302-036F, U+0370-03FF, U+0460-048F, U+0492-04AF, U+04B2-052F, U+1E00-1EFF, U+2000-2008, U+200B-200F, U+2016-2017, U+201F-2021, U+2023-2025, U+2027-202E, U+2031, U+2034-2038, U+203B-209F, U+20A0-20AB, U+20AD-20CF, U+2100-2115, U+2117-218F, U+2194-21FF, U+2200-2211, U+2213-22FF, U+FB00-FB06;
+}
+@font-face {
+  font-family: "Literata";
   font-style: italic;
   font-weight: 500;
   font-display: swap;
@@ -72,49 +90,56 @@
 }
 
 @layer app {
-  /* ---- Tokens: Night (the first look), then Day: for a light system, or chosen (data-scheme: prefs.ts). ---- */
+  /* ---- Tokens: Day (paper, the first look), then Night: for a dark system, or chosen (data-scheme: prefs.ts).
+     Night is not the day inverted: a deep blue-black page under a lamp, the one action lamp-gold. Text holds 4.5:1 on
+     --paper and --paper-2 in both; control lines (--rule-2) 3:1. ---- */
 
   :root {
-    color-scheme: dark light;
-    --bg: #110c20;
-    --surface: #1a1430;
-    --raised: #241d3d;
-    --sunken: #0b0816;
-    /* The one hero card (the day): a ground of its own above the cards and tiles around it. */
-    --hero: var(--surface);
-    --line: #352d57;
-    /* The edge of an answer to press: the line in Night, stronger in Day, where white answers sit on a light page. */
-    --edge: var(--line);
-    --line-strong: #7a70a6;
-    --text: #f4f1fb;
-    --text-muted: #a9a1c6;
-    --accent: #c4b5fd;
-    --on-accent: #140f26;
-    --gold: #fbbf24;
-    --gold-ink: #fbbf24;
-    /* Gold as a big number (24px and up, or 22px bold): the streak, points just earned. Large type needs 3:1, so Day
-       keeps it gold where --gold-ink, made for small words, turns brown. */
-    --gold-display: #fbbf24;
-    /* The streak's flame: gold, a deeper amber in Day, where a pale flame vanishes on white. */
-    --flame: var(--gold);
-    --lilac: #c4b5fd;
-    --right: #3ddc97;
-    --right-ink: #5fe3a9;
-    --wrong: #ff7a66;
-    --wrong-ink: #ff8f7e;
-    --sky: #7cc4ff;
-    --sky-ink: #8fcdff;
-    --rose: #ff8fc8;
-    --rose-ink: #ff9fd0;
-    --silver: #cfc8e3;
-    --bronze: #e8a46c;
-    --on-fill: #140f26;
-    --link: var(--accent);
-    --elev-1: inset 0 1px 0 #ffffff0f, 0 2px 8px #00000066;
-    --elev-2: inset 0 1px 0 #ffffff14, 0 16px 40px -12px #000000b3;
-    --glow-gold: 0 0 0 1px #fbbf2459, 0 8px 28px -6px #fbbf248c;
-    --glow-right: 0 0 0 1px #3ddc9766, 0 8px 28px -8px #3ddc9799;
-    --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+    color-scheme: light dark;
+    --paper: #f6f1e7;
+    /* The player's own row, a pressed option, a well. */
+    --paper-2: #ede6d8;
+    /* A pressed key. */
+    --paper-3: #e3dac8;
+    --ink: #1c1915;
+    /* Decks, secondary text. */
+    --ink-2: #4a443b;
+    /* Kickers, meta, labels. */
+    --ink-3: #675f53;
+    /* Hairlines between rows, tracks. */
+    --rule: #d9cfbd;
+    /* Control outlines: an option's ring, a switch off, a segmented choice. */
+    --rule-2: #8f8169;
+    /* Section rules, the double rule. */
+    --rule-ink: #1c1915;
+    /* The one action: ink by day, lamp-gold by night. */
+    --action: #1c1915;
+    --on-action: #f6f1e7;
+    --right: #2f8a57;
+    --right-ink: #1e6a43;
+    --right-wash: #e2eedf;
+    --wrong: #c2493a;
+    --wrong-ink: #a8372a;
+    --wrong-wash: #f6e2db;
+    /* The mark's petal, today's square, the caret. */
+    --gold: #d9a21b;
+    --gold-ink: #855b00;
+    --petal: var(--ink);
+    --scrim: #1c191573;
+
+    /* The chapters' colours: the cloth of each chapter's binding, text-safe on paper (.t-<topic>, --t). */
+    --t-general: #87600f;
+    --t-science: #1f6e76;
+    --t-history: #8c3a2e;
+    --t-geography: #4f682a;
+    --t-movies: #7a4580;
+    --t-music: #3b55a0;
+    --t-sports: #9a481b;
+    --t-technology: #43648a;
+    --t-literature: #9c3f60;
+    --t-nature: #376e41;
+    --t-mix: #57514a;
+    --t-bulgaria: #2e6b4c;
 
     --space-1: 4px;
     --space-2: 8px;
@@ -123,21 +148,57 @@
     --space-5: 24px;
     --space-6: 32px;
     --space-7: 48px;
-    --radius-xs: 6px;
-    --radius-sm: 10px;
-    --radius-md: 14px;
-    --radius-lg: 20px;
-    --radius-xl: 28px;
+    --space-8: 64px;
+    --gutter: 20px;
+    --page: 1270px;
+    --radius: 3px;
     --radius-full: 999px;
     --font-sans: "Sofia Sans", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
     --font-numeral: "Sofia Sans Extra Condensed", "Arial Narrow", "Sofia Sans", sans-serif;
     --font-serif: "Literata", Georgia, "Times New Roman", serif;
 
-    /* Icons: 24px, 3px round strokes (the places' icons with a soft fill inside), drawn as masks in the text colour. */
+    /* The pieces not in the edition's look yet speak its colours (each goes as its screen does). */
+    --bg: var(--paper);
+    --surface: var(--paper);
+    --raised: var(--paper);
+    --sunken: var(--paper-2);
+    --hero: var(--paper);
+    --line: var(--rule);
+    --edge: var(--rule-2);
+    --line-strong: var(--rule-2);
+    --text: var(--ink);
+    --text-muted: var(--ink-3);
+    --accent: var(--ink);
+    --on-accent: var(--paper);
+    --gold-display: var(--gold-ink);
+    --flame: var(--gold);
+    --lilac: var(--t-movies);
+    --sky: var(--t-technology);
+    --sky-ink: var(--t-technology);
+    --rose: var(--t-literature);
+    --rose-ink: var(--t-literature);
+    --silver: var(--rule-2);
+    --bronze: var(--t-sports);
+    --on-fill: var(--paper);
+    --link: var(--ink);
+    --elev-1: none;
+    --elev-2: none;
+    --glow-gold: none;
+    --glow-right: none;
+    --radius-xs: 2px;
+    --radius-sm: var(--radius);
+    --radius-md: var(--radius);
+    --radius-lg: var(--radius);
+    --radius-xl: var(--radius);
+
+    /* Icons: 24px, round strokes, drawn as masks in the text colour. */
     --i-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
     --i-cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M7 7l10 10M17 7L7 17'/%3E%3C/svg%3E");
+    --i-close: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M5 5l14 14M19 5L5 19'/%3E%3C/svg%3E");
     --i-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5h11v14H9l-6-7z'/%3E%3Cpath d='M12.5 9.5l5 5M17.5 9.5l-5 5'/%3E%3C/svg%3E");
-    --i-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 5l-7 7 7 7'/%3E%3C/svg%3E");
+    --i-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 12H5M11 6l-6 6 6 6'/%3E%3C/svg%3E");
+    --i-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13 6l6 6-6 6'/%3E%3C/svg%3E");
+    --i-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5'/%3E%3Cpath d='M15.5 15.5L21 21'/%3E%3C/svg%3E");
     --i-tune: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M4 7h8M18 7h2M4 17h2M12 17h8'/%3E%3Ccircle cx='15' cy='7' r='2.5'/%3E%3Ccircle cx='9' cy='17' r='2.5'/%3E%3C/svg%3E");
     --i-grip: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M5 8h14M5 12h14M5 16h14'/%3E%3C/svg%3E");
     --i-near: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M4 13.5c2.6-3.2 5.2-3.2 8 0s5.4 3.2 8 0'/%3E%3C/svg%3E");
@@ -146,74 +207,128 @@
     --i-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 5l7 10H5z'/%3E%3C/svg%3E");
     --i-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 19L5 9h14z'/%3E%3C/svg%3E");
     --i-flame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 28'%3E%3Cpath d='M12 1c1.2 4.6 7 7.4 7 14.2a7 7 0 0 1-14 .4c0-3.6 1.9-6 3.8-7.6.2 2.4 1.2 3.8 2.7 4.3C11 9.2 11 5 12 1z'/%3E%3C/svg%3E");
-    --i-home: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 10.5 12 4l8 6.5V20H4z' fill-opacity='.32'/%3E%3Cpath d='M4 10.5 12 4l8 6.5V20h-5.5v-5.5h-5V20H4z' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    --i-podium: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 14h4.5v6H5zM14.5 16H19v4h-4.5z' fill-opacity='.32'/%3E%3Cpath d='M9.5 11h5v9h-5z'/%3E%3Cpath d='M3 20h18M5 20v-6h4.5M9.5 20v-9h5v9M14.5 16H19v4' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 1.6l1.3 2.6 2.9.4-2.1 2 .5 2.9L12 8.1l-2.6 1.4.5-2.9-2.1-2 2.9-.4z'/%3E%3C/svg%3E");
-    --i-user: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='3' width='18' height='18' rx='6' fill-opacity='.32'/%3E%3Ccircle cx='12' cy='10' r='3.8'/%3E%3Cpath d='M5.2 19.3C6.4 16 9 14.6 12 14.6s5.6 1.4 6.8 4.7A6 6 0 0 1 15 21H9a6 6 0 0 1-3.8-1.7z'/%3E%3C/svg%3E");
-    --i-users: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='9' cy='7.5' r='3.5'/%3E%3Cpath d='M2.5 20a6.5 6.5 0 0 1 13 0z' fill-opacity='.32'/%3E%3Cpath d='M2.5 20a6.5 6.5 0 0 1 13 0' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M16 4.5a3.5 3.5 0 0 1 0 6.5M18.5 14.5a6.5 6.5 0 0 1 3 5.5' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 
-  @media (prefers-color-scheme: light) {
-    :root:not([data-scheme="night"]) {
-      --bg: #f5f3fa;
-      --surface: #ffffff;
-      --raised: #ffffff;
-      --sunken: #ebe7f4;
-      --hero: #fffbf2;
-      --line: #dfd9ec;
-      --edge: #c4bcd9;
-      --line-strong: #8a82a6;
-      --text: #140f26;
-      --text-muted: #5d5677;
-      --accent: #5b3fd1;
-      --on-accent: #ffffff;
-      --gold-ink: #8a5800;
-      --gold-display: #b77400;
-      --flame: #f59e0b;
-      --right-ink: #086b3f;
-      --wrong-ink: #bf3018;
-      --sky-ink: #1f63a8;
-      --rose-ink: #b12a72;
-      --elev-1: 0 1px 2px #140f2614, 0 2px 8px #140f260d;
-      --elev-2: 0 2px 6px #140f2612, 0 18px 40px -16px #140f2638;
-      --glow-gold: 0 1px 0 #b7860b, 0 8px 22px -8px #f59e0bb3;
-      --glow-right: 0 0 0 1px #3ddc97, 0 8px 22px -10px #0a7a4a80;
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-scheme="day"]) {
+      --paper: #121620;
+      --paper-2: #1a1f2b;
+      --paper-3: #242a38;
+      --ink: #eee7d8;
+      --ink-2: #c4bcad;
+      --ink-3: #9c9586;
+      --rule: #2a3040;
+      --rule-2: #68728a;
+      --rule-ink: #c4bcad;
+      --action: #e8b84b;
+      --on-action: #17130a;
+      --right: #5fc08e;
+      --right-ink: #7fd3a6;
+      --right-wash: #173127;
+      --wrong: #e9796a;
+      --wrong-ink: #f2907f;
+      --wrong-wash: #38201f;
+      --gold: #e8b84b;
+      --gold-ink: #e8b84b;
+      --petal: #eee7d8;
+      --scrim: #000000a0;
+      --t-general: #d9ae55;
+      --t-science: #6cc0c8;
+      --t-history: #e08c7d;
+      --t-geography: #a9c277;
+      --t-movies: #c99ace;
+      --t-music: #94a9ec;
+      --t-sports: #ee9a68;
+      --t-technology: #91b2d8;
+      --t-literature: #e596b2;
+      --t-nature: #8ccb95;
+      --t-mix: #bdb6ac;
+      --t-bulgaria: #7cc59e;
     }
   }
 
   /* Night or Day chosen (Настройки: prefs.ts, scheme) whatever the device says: the browser's own parts
-     (scrollbars, fields) go with it, and Day's tokens, the same as above (scheme.test.ts holds them equal). */
-  :root[data-scheme="night"] {
-    color-scheme: dark;
-  }
-
+     (scrollbars, fields) go with it, and Night's tokens, the same as above (scheme.test.ts holds them equal). */
   :root[data-scheme="day"] {
     color-scheme: light;
   }
 
-  :root[data-scheme="day"] {
-    --bg: #f5f3fa;
-    --surface: #ffffff;
-    --raised: #ffffff;
-    --sunken: #ebe7f4;
-    --hero: #fffbf2;
-    --line: #dfd9ec;
-    --edge: #c4bcd9;
-    --line-strong: #8a82a6;
-    --text: #140f26;
-    --text-muted: #5d5677;
-    --accent: #5b3fd1;
-    --on-accent: #ffffff;
-    --gold-ink: #8a5800;
-    --gold-display: #b77400;
-    --flame: #f59e0b;
-    --right-ink: #086b3f;
-    --wrong-ink: #bf3018;
-    --sky-ink: #1f63a8;
-    --rose-ink: #b12a72;
-    --elev-1: 0 1px 2px #140f2614, 0 2px 8px #140f260d;
-    --elev-2: 0 2px 6px #140f2612, 0 18px 40px -16px #140f2638;
-    --glow-gold: 0 1px 0 #b7860b, 0 8px 22px -8px #f59e0bb3;
-    --glow-right: 0 0 0 1px #3ddc97, 0 8px 22px -10px #0a7a4a80;
+  :root[data-scheme="night"] {
+    color-scheme: dark;
+  }
+
+  :root[data-scheme="night"] {
+    --paper: #121620;
+    --paper-2: #1a1f2b;
+    --paper-3: #242a38;
+    --ink: #eee7d8;
+    --ink-2: #c4bcad;
+    --ink-3: #9c9586;
+    --rule: #2a3040;
+    --rule-2: #68728a;
+    --rule-ink: #c4bcad;
+    --action: #e8b84b;
+    --on-action: #17130a;
+    --right: #5fc08e;
+    --right-ink: #7fd3a6;
+    --right-wash: #173127;
+    --wrong: #e9796a;
+    --wrong-ink: #f2907f;
+    --wrong-wash: #38201f;
+    --gold: #e8b84b;
+    --gold-ink: #e8b84b;
+    --petal: #eee7d8;
+    --scrim: #000000a0;
+    --t-general: #d9ae55;
+    --t-science: #6cc0c8;
+    --t-history: #e08c7d;
+    --t-geography: #a9c277;
+    --t-movies: #c99ace;
+    --t-music: #94a9ec;
+    --t-sports: #ee9a68;
+    --t-technology: #91b2d8;
+    --t-literature: #e596b2;
+    --t-nature: #8ccb95;
+    --t-mix: #bdb6ac;
+    --t-bulgaria: #7cc59e;
+  }
+
+  /* A chapter's colour, on whatever is of its topic (ui.ts, chapterOf). */
+  .t-general {
+    --t: var(--t-general);
+  }
+  .t-science {
+    --t: var(--t-science);
+  }
+  .t-history {
+    --t: var(--t-history);
+  }
+  .t-geography {
+    --t: var(--t-geography);
+  }
+  .t-movies {
+    --t: var(--t-movies);
+  }
+  .t-music {
+    --t: var(--t-music);
+  }
+  .t-sports {
+    --t: var(--t-sports);
+  }
+  .t-technology {
+    --t: var(--t-technology);
+  }
+  .t-literature {
+    --t: var(--t-literature);
+  }
+  .t-nature {
+    --t: var(--t-nature);
+  }
+  .t-mix {
+    --t: var(--t-mix);
+  }
+  .t-bulgaria {
+    --t: var(--t-bulgaria);
   }
 
   /* ---- Base ---- */
@@ -229,26 +344,20 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
-    /* What's brought into view (a field focused, an ask opened) stops above a phone's bar of places, not under it. */
-    scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+    /* What's brought into view (a field focused, an ask opened) stops above a phone's places, not under them. */
+    scroll-padding-bottom: calc(4rem + env(safe-area-inset-bottom));
   }
 
   body {
     margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font: 400 1rem / 1.5 var(--font-sans);
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 1rem / 1.45 var(--font-sans);
+    font-feature-settings: "kern";
     /* A word too long for its line (large text on a narrow phone) breaks rather than runs off the screen. */
     overflow-wrap: break-word;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-  }
-
-  #app {
-    max-width: 40rem;
-    margin: 0 auto;
-    padding: max(var(--space-2), env(safe-area-inset-top)) max(var(--space-4), env(safe-area-inset-right))
-      calc(var(--space-7) + 4rem + env(safe-area-inset-bottom)) max(var(--space-4), env(safe-area-inset-left));
   }
 
   h1,
@@ -262,10 +371,8 @@
   /* Display type (a title, the date, the question, a big number) grows at half the rate the text does: as set at the
      usual size (half in px, half in rem), and never the width of a phone at twice it (Large text, at the end). */
   h1 {
-    font-size: calc(17px + 1.0625rem);
-    line-height: 1.06;
-    font-weight: 800;
-    letter-spacing: -0.03em;
+    font: 600 calc(17px + 1.0625rem) / 1.06 var(--font-serif);
+    letter-spacing: -0.012em;
     text-wrap: balance;
   }
 
@@ -275,32 +382,28 @@
   }
 
   h2 {
-    font-size: calc(13px + 0.8125rem);
-    line-height: 1.08;
-    font-weight: 800;
-    letter-spacing: -0.02em;
+    font: 600 calc(12.5px + 0.78125rem) / 1.15 var(--font-serif);
+    letter-spacing: -0.008em;
     text-wrap: balance;
   }
 
   h3 {
-    font-size: 1.125rem;
-    line-height: 1.3;
-    font-weight: 700;
+    font: 600 1.1875rem / 1.25 var(--font-serif);
   }
 
   a,
   .link {
-    color: var(--link);
+    color: var(--ink);
   }
 
   /* Focus: one outline for everything, outside any shadow a component draws. */
   :focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--ink);
     outline-offset: 2px;
   }
 
   .muted {
-    color: var(--text-muted);
+    color: var(--ink-3);
   }
 
   .bad {
@@ -308,37 +411,42 @@
     font-weight: 600;
   }
 
+  /* A kicker: small capitals over what it heads (the issue, a topic, a section's name). */
   .kicker,
   .board h2,
   .settings h2,
   .section-title {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    line-height: 1rem;
-    font-weight: 800;
+    color: var(--ink-3);
+    font: 700 0.75rem / 1.2 var(--font-sans);
     letter-spacing: 0.14em;
     text-transform: uppercase;
   }
 
-  .lead {
-    color: var(--text-muted);
-    font-size: 1.125rem;
-    line-height: 1.625rem;
-    font-weight: 500;
+  /* A deck: the sentence under a headline, in the serif's italic. */
+  .lead,
+  .deck {
+    color: var(--ink-2);
+    font: italic 500 1.125rem / 1.45 var(--font-serif);
+    text-wrap: pretty;
+  }
+
+  .small {
+    color: var(--ink-3);
+    font: 500 0.875rem / 1.4 var(--font-sans);
   }
 
   .num {
     font-family: var(--font-numeral);
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: lining-nums tabular-nums;
   }
 
-  /* A word beside a big number (7 „от“ 10, a board's „точки“): the numeral face is for digits only, Cyrillic
-     words read badly in it at display size. Small, muted, on the number's baseline. */
+  /* A word beside a big number (7 „от“ 10): the numeral face is for digits only, Cyrillic words read badly in it at
+     display size. Small, muted, on the number's baseline. */
   .num-word {
-    color: var(--text-muted);
+    color: var(--ink-3);
     font-family: var(--font-sans);
     font-size: max(0.8125rem, 0.5em);
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: 0;
   }
 
@@ -352,128 +460,712 @@
     mask: var(--i) center / contain no-repeat;
   }
 
-  /* ---- Frame ---- */
-
-  .top {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2) var(--space-5);
-    padding: var(--space-2) 0 var(--space-3);
-    margin-bottom: var(--space-4);
-  }
-
-  .name {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    color: var(--text);
-    font-size: 1.0625rem;
-    line-height: 1.25rem;
-    font-weight: 900;
-    letter-spacing: 0.12em;
-    text-decoration: none;
-    /* A finger's height to tap (44px), the header not the taller for it. */
-    padding-block: 6px;
-    margin-block: -6px;
-  }
-
-  /* The four main places: a bar at the bottom of a phone's screen, a row in the header on a big one. */
-  .tabs {
-    position: fixed;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 10;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    padding: 6px max(var(--space-2), env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom))
-      max(var(--space-2), env(safe-area-inset-left));
-    border-top: 1px solid var(--line);
-    /* Solid: a blur under a fixed bar costs a weak phone's GPU every frame of a scroll, for next to nothing seen. */
-    background: var(--surface);
-  }
-
-  .tabs a {
-    position: relative;
-    display: grid;
-    justify-items: center;
-    gap: 2px;
-    min-height: 44px;
-    align-content: center;
-    padding: 6px 0 4px;
-    border-radius: var(--radius-sm);
-    color: var(--text-muted);
-    font: 700 0.75rem / 1rem var(--font-sans);
-    text-decoration: none;
-  }
-
-  .tabs .i {
-    font-size: 1.5rem;
-  }
-
-  .tab-label {
-    white-space: nowrap;
-  }
-
-  .tabs a[aria-current="page"] {
-    color: var(--text);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .tabs a:hover {
-      color: var(--text);
-    }
-  }
-
-  /* Where the player is: the place in full text, marked in the accent (gold is for the right answer, not for here). */
-  .tabs a[aria-current="page"]::after {
-    content: "";
-    position: absolute;
-    top: -6px;
-    left: calc(50% - 12px);
-    width: 24px;
-    height: 3px;
-    border-radius: 0 0 3px 3px;
-    background: var(--accent);
-  }
-
-  /* Something waits there: a friend calls to a duel, someone asks to be friends. */
-  .tabs a.news::before {
-    content: "";
-    position: absolute;
-    top: 4px;
-    left: calc(50% + 8px);
-    width: 8px;
-    height: 8px;
-    border-radius: var(--radius-full);
-    background: var(--rose);
-    box-shadow: 0 0 0 2px var(--surface);
-  }
-
-  .i-home {
-    --i: var(--i-home);
-  }
-
-  .i-podium {
-    --i: var(--i-podium);
-  }
-
   .i-left {
     --i: var(--i-left);
+  }
+
+  .i-right {
+    --i: var(--i-right);
+  }
+
+  .i-close {
+    --i: var(--i-close);
+  }
+
+  .i-search {
+    --i: var(--i-search);
   }
 
   .i-tune {
     --i: var(--i-tune);
   }
 
-  .i-user {
-    --i: var(--i-user);
+  /* The edition's rules: a hairline between rows, an ink rule under a section's heading, and the double rule under
+     the bar and a masthead. */
+  .rule-double {
+    height: 5px;
+    border-top: 2px solid var(--rule-ink);
+    border-bottom: 1px solid var(--rule-ink);
   }
 
-  .i-users {
-    --i: var(--i-users);
+  /* ---- The frame: the bar, the double rule, the places ---- */
+
+  #app {
+    padding-bottom: calc(var(--space-7) + 3.5rem + env(safe-area-inset-bottom));
+  }
+
+  .frame {
+    max-width: calc(var(--page) + 2 * var(--gutter));
+    margin: 0 auto;
+    padding: env(safe-area-inset-top) max(var(--gutter), env(safe-area-inset-right)) 0
+      max(var(--gutter), env(safe-area-inset-left));
+  }
+
+  .frame::after {
+    content: "";
+    display: block;
+    height: 5px;
+    border-top: 2px solid var(--rule-ink);
+    border-bottom: 1px solid var(--rule-ink);
+  }
+
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 56px;
+  }
+
+  /* The mark and the name, a way back to Днес. */
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0 0.1em 0 0;
+    color: var(--ink);
+    font: 600 calc(7.5px + 0.46875rem) / 1 var(--font-serif);
+    letter-spacing: 0.2em;
+    text-decoration: none;
+  }
+
+  .rosette {
+    display: block;
+    flex: none;
+    width: 22px;
+    height: 22px;
+  }
+
+  .rosette .petal {
+    fill: var(--petal);
+  }
+
+  .rosette .gold {
+    fill: var(--gold);
+  }
+
+  /* The places in the bar: a big screen's (a phone's are at its foot). */
+  .bar .places {
+    display: none;
+  }
+
+  .bar-issue {
+    display: none;
+  }
+
+  .bar-me,
+  .bar-in {
+    margin-left: auto;
+  }
+
+  .bar-me {
+    display: grid;
+    place-items: center;
+    min-width: 44px;
+    min-height: 44px;
+    margin-right: -6px;
+  }
+
+  .bar-in {
+    display: grid;
+    align-items: center;
+    min-height: 44px;
+    color: var(--ink-2);
+    font: 500 0.9375rem / 1 var(--font-sans);
+    text-decoration: none;
+  }
+
+  /* The three places on a phone: words, not icons, at the foot where a thumb is. */
+  .places-foot {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    border-top: 1px solid var(--rule-ink);
+    background: var(--paper);
+  }
+
+  .places-foot a {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: 3.375rem;
+    padding: 0 var(--space-1);
+    color: var(--ink-3);
+    font: 600 0.9375rem / 1.1 var(--font-sans);
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .places-foot a[aria-current="page"] {
+    color: var(--ink);
+    font-weight: 800;
+  }
+
+  .places-foot a[aria-current="page"]::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: calc(50% - 14px);
+    width: 28px;
+    height: 3px;
+    background: var(--ink);
+  }
+
+  /* Someone asks to be friends: a dot on Приятели. */
+  :is(.places-foot, .places) a.news::after {
+    content: "";
+    position: absolute;
+    top: 10px;
+    right: calc(50% - 3.25em);
+    width: 7px;
+    height: 7px;
+    border-radius: var(--radius-full);
+    background: var(--wrong);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    :is(.places-foot, .places) a:hover,
+    .bar-in:hover {
+      color: var(--ink);
+    }
+  }
+
+  /* A game has the whole screen, and a new visitor's cover the day alone (app.ts). */
+  .playing .places-foot,
+  .cover .places-foot {
+    display: none;
+  }
+
+  .cover #app {
+    padding-bottom: var(--space-7);
+  }
+
+  /* The screen under the frame: a phone's column (each screen in the edition's look sets its own page). */
+  #main {
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: var(--space-5) max(var(--gutter), env(safe-area-inset-right)) 0
+      max(var(--gutter), env(safe-area-inset-left));
+  }
+
+  /* A big screen: the places in the bar, the issue on its right, the avatar in the corner. */
+  @media (min-width: 56.25rem) {
+    :root {
+      --gutter: 48px;
+    }
+
+    .bar {
+      gap: var(--space-6);
+      min-height: 72px;
+    }
+
+    .brand {
+      font-size: calc(8.5px + 0.53125rem);
+    }
+
+    .rosette {
+      width: 26px;
+      height: 26px;
+    }
+
+    .bar .places {
+      display: flex;
+      gap: var(--space-6);
+      margin-left: var(--space-6);
+      align-self: stretch;
+    }
+
+    .places a {
+      position: relative;
+      display: flex;
+      align-items: center;
+      padding-top: 3px;
+      border-bottom: 3px solid transparent;
+      color: var(--ink-3);
+      font: 600 1rem / 1 var(--font-sans);
+      text-decoration: none;
+    }
+
+    .places a[aria-current="page"] {
+      border-bottom-color: var(--ink);
+      color: var(--ink);
+      font-weight: 800;
+    }
+
+    .bar-issue {
+      display: block;
+      margin-left: auto;
+      color: var(--ink-3);
+      font: 700 0.75rem / 1 var(--font-sans);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .bar-issue + :is(.bar-me, .bar-in) {
+      margin-left: 0;
+    }
+
+    .places-foot {
+      display: none;
+    }
+
+    #app {
+      padding-bottom: var(--space-7);
+    }
+
+    /* A screen in the edition's look is a spread: the page's whole width, on a 12-column grid, its two pages
+       divided by a hairline (.page-2: the second). */
+    #main:has(> .spread) {
+      max-width: calc(var(--page) + 2 * var(--gutter));
+      padding-inline: max(var(--gutter), env(safe-area-inset-left)) max(var(--gutter), env(safe-area-inset-right));
+    }
+
+    main > .spread {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      column-gap: 40px;
+      align-items: start;
+      max-width: none;
+    }
+
+    .spread > * {
+      grid-column: 1 / -1;
+    }
+
+    .spread > .page-1 {
+      grid-column: 1 / span 7;
+    }
+
+    .spread > .page-2 {
+      grid-column: 8 / span 5;
+      align-self: stretch;
+      padding-left: 40px;
+      border-left: 1px solid var(--rule);
+    }
+
+    /* Приятели with duels: three pages, the board, the duels and the friends. */
+    .friends-page:has(> .page-mid) > .page-1 {
+      grid-column: 1 / span 5;
+    }
+
+    .spread > .page-mid {
+      grid-column: 6 / span 4;
+      align-self: stretch;
+      padding-left: 40px;
+      border-left: 1px solid var(--rule);
+    }
+
+    .friends-page:has(> .page-mid) > .page-2 {
+      grid-column: 10 / span 3;
+    }
+  }
+
+  /* Each screen's own: a phone's column, a tablet's and a laptop's (the edition's screens set their own spread). */
+  .screen,
+  .stack,
+  .summary,
+  .question,
+  .after,
+  .actions,
+  .review {
+    display: grid;
+    /* One column, never wider than the page: a long word in it breaks (large text) instead of widening it. */
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+  }
+
+  .screen {
+    gap: var(--space-5);
+  }
+
+  .intro {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  /* A page's picture, over its heading. */
+  .page-art {
+    width: 88px;
+    height: 88px;
+    margin: 0 0 -4px -3px;
+  }
+
+  /* A topic's small picture on a chip or a row. */
+  .topic-mark {
+    width: 26px;
+    height: 26px;
+    margin: -4px 0 -4px -4px;
+  }
+
+  .title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  /* ---- Sections and rows ---- */
+
+  /* A card, in the edition: no box, a section on an ink rule. */
+  .card {
+    display: grid;
+    gap: var(--space-4);
+    padding: var(--space-4) 0 0;
+    border-top: 1px solid var(--rule-ink);
+  }
+
+  .card.hero {
+    padding-top: var(--space-5);
+  }
+
+  .card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-3);
+  }
+
+  /* A card's own title, smaller than a screen's sections. */
+  .card-title {
+    font: 600 1.25rem / 1.25 var(--font-serif);
+  }
+
+  /* A section: its heading (a serif H3) on an ink rule, a small note on the same line. */
+  .sect {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+  }
+
+  .sect-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-3);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--rule-ink);
+  }
+
+  .sect-head h2 {
+    font: 600 calc(10px + 0.625rem) / 1.25 var(--font-serif);
+    letter-spacing: 0;
+  }
+
+  .sect-note {
+    color: var(--ink-3);
+    font: 500 0.875rem / 1.3 var(--font-sans);
+  }
+
+  /* Rows between hairlines: a player, a friend, an entry of a list. */
+  .rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rows > * + * {
+    border-top: 1px solid var(--rule);
+  }
+
+  .rows > :last-child {
+    border-bottom: 1px solid var(--rule);
+  }
+
+  /* ---- Controls ---- */
+
+  /* The one action: a full-width bar of ink by day, lamp-gold by night. */
+  .btn {
+    appearance: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: 3rem;
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--rule-ink);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--ink);
+    font: 700 1rem / 1.2 var(--font-sans);
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      transform 120ms ease,
+      background-color 160ms ease,
+      color 160ms ease;
+  }
+
+  /* Only where a pointer hovers: on a touch screen hover sticks after the tap. */
+  @media (hover: hover) and (pointer: fine) {
+    .btn:hover:not(:disabled) {
+      background: var(--paper-2);
+    }
+
+    .btn.primary:hover:not(:disabled) {
+      background: var(--action);
+      opacity: 0.88;
+    }
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.985);
+  }
+
+  .btn:disabled {
+    border-color: var(--rule);
+    color: var(--ink-3);
+    cursor: default;
+  }
+
+  .btn.primary {
+    min-height: 3.5rem;
+    border-color: var(--action);
+    background: var(--action);
+    color: var(--on-action);
+    font-size: 1.125rem;
+    letter-spacing: 0.01em;
+  }
+
+  .btn.primary:disabled {
+    border-color: var(--paper-3);
+    background: var(--paper-3);
+    color: var(--ink-3);
+  }
+
+  .btn.danger {
+    border-color: var(--wrong-ink);
+    color: var(--wrong-ink);
+  }
+
+  /* Accepting a friend's request. */
+  .btn.rose {
+    border-color: var(--action);
+    background: var(--action);
+    color: var(--on-action);
+  }
+
+  .btn.big {
+    min-height: 3.5rem;
+  }
+
+  .btn.inline {
+    display: inline-flex;
+    width: auto;
+  }
+
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-weight: 700;
+    text-align: left;
+    text-decoration: underline;
+    text-decoration-color: var(--rule-2);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+    cursor: pointer;
+  }
+
+  .link.muted {
+    color: var(--ink-3);
+    font-weight: 500;
+  }
+
+  /* A link on its own line that's tapped, not read in a sentence: a finger's height. A way on in a line of its own
+     (`.day-next`: „Имаш профил? Влез“) is one too. */
+  .link.tap,
+  .day-next > :is(a, .link):only-child {
+    display: inline-flex;
+    align-items: center;
+    justify-self: start;
+    min-height: 2.75rem;
+  }
+
+  .link:disabled {
+    color: var(--ink-3);
+    cursor: default;
+  }
+
+  /* A way back: an arrow and where it goes, small, over a page's heading. */
+  .back {
+    display: inline-flex;
+    align-items: center;
+    justify-self: start;
+    gap: 6px;
+    min-height: 2.75rem;
+    margin: calc(-1 * var(--space-3)) 0 calc(-1 * var(--space-2));
+    color: var(--ink-2);
+    font: 600 0.875rem / 1 var(--font-sans);
+    text-decoration: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .back:hover {
+      color: var(--ink);
+    }
+  }
+
+  .back-i {
+    font-size: 1rem;
+  }
+
+  .field {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .field > span {
+    color: var(--ink-2);
+    font: 600 0.875rem / 1.25 var(--font-sans);
+  }
+
+  .field small {
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+  }
+
+  /* A field: written on a line, as on a form, the placeholder in the serif's italic. */
+  input,
+  textarea {
+    width: 100%;
+    border: 0;
+    border-bottom: 2px solid var(--rule-ink);
+    border-radius: 0;
+    background: transparent;
+    color: var(--ink);
+    font: 500 1.125rem / 1.3 var(--font-sans);
+    transition: border-color 160ms ease;
+  }
+
+  /* A field is a button's height, so the two pair up side by side and one under the other. */
+  input {
+    min-height: 3rem;
+    padding: 0 2px;
+  }
+
+  textarea {
+    padding: var(--space-3) var(--space-3);
+    border: 1px solid var(--rule-2);
+    border-radius: var(--radius);
+    resize: vertical;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--ink-3);
+    font: italic 500 1.0625rem / 1.3 var(--font-serif);
+    opacity: 1;
+  }
+
+  input:focus,
+  textarea:focus {
+    border-color: var(--gold-ink);
+    outline: none;
+  }
+
+  input:focus-visible,
+  textarea:focus-visible {
+    outline: none;
+  }
+
+  input.code {
+    min-height: 4rem;
+    padding-inline: var(--space-2);
+    font: 800 clamp(2rem, 10vw, 2.5rem) / 1 var(--font-numeral);
+    letter-spacing: 0.1em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Twelve digits fit a phone's width. */
+  input.code.long {
+    font-size: clamp(1.25rem, 6.5vw, 2rem);
+    letter-spacing: 0.04em;
+  }
+
+  /* Empty, the code's field says what goes in it in plain words, never in digits that look typed. */
+  input.code::placeholder {
+    font: italic 500 1.125rem / 1 var(--font-serif);
+    letter-spacing: normal;
+  }
+
+  .join {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-3);
+  }
+
+  .join input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .join .btn {
+    width: auto;
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: 22px;
+    padding: 0 8px;
+    border: 1px solid var(--rule-2);
+    border-radius: var(--radius);
+    color: var(--ink-2);
+    font: 700 0.6875rem / 1 var(--font-sans);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .tag.rose,
+  .tag.gold {
+    border-color: var(--ink);
+    color: var(--ink);
+  }
+
+  /* The old tones of the pictures, until each screen gives its topic its chapter's colour. */
+  .tone-gold {
+    --tone: var(--gold);
+  }
+  .tone-lilac {
+    --tone: var(--t-movies);
+  }
+  .tone-sky {
+    --tone: var(--t-technology);
+  }
+  .tone-rose {
+    --tone: var(--t-literature);
+  }
+  .tone-mint {
+    --tone: var(--t-nature);
+  }
+  /* A player gone since (screens/duel.ts): a plain tile, nobody's. */
+  .tone-gone {
+    --tone: var(--rule-2);
+  }
+
+  .dot {
+    display: inline-block;
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--t, var(--tone, var(--ink)));
   }
 
   /* Моят Алманах: the count in the numeral face, then the facts as cards, laid as masonry. */
@@ -700,29 +1392,6 @@
     flex: none;
     color: var(--text-muted);
     transform: scaleX(-1);
-  }
-
-  /* Класации: who the board is of (everyone, friends) and, for knowledge, which topic. */
-  .board-filters {
-    display: grid;
-    gap: var(--space-3);
-  }
-
-  .board-note {
-    margin: 0;
-    color: var(--text-muted);
-    font-size: 0.875rem;
-  }
-
-  /* Under a board's heading, words line up with its rows. */
-  .board .board-note,
-  .board-empty {
-    margin: 0;
-    padding: 0 var(--space-4) var(--space-3);
-  }
-
-  .board-empty {
-    color: var(--text-muted);
   }
 
   /* The ways to play with others: three peers, so three in a row, a small card each in its colour; on a phone the
@@ -984,428 +1653,6 @@
   }
 
   /* The way back from a screen reached from a main place. */
-  .back {
-    display: inline-flex;
-    align-items: center;
-    justify-self: start;
-    gap: 2px;
-    min-height: 2.75rem;
-    margin: calc(-1 * var(--space-3)) 0 calc(-1 * var(--space-2)) -6px;
-    padding-right: var(--space-2);
-    color: var(--text-muted);
-    font-weight: 700;
-    text-decoration: none;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .back:hover {
-      color: var(--text);
-    }
-  }
-
-  .back-i {
-    font-size: 1.25rem;
-  }
-
-  /* Профил's own places, at the top of each: a row of tabs that are links. */
-  .subnav {
-    display: flex;
-    gap: var(--space-1);
-    overflow-x: auto;
-    padding: var(--space-1);
-    border-radius: var(--radius-full);
-    background: var(--sunken);
-    scrollbar-width: none;
-  }
-
-  .subnav a {
-    display: grid;
-    flex: 1 0 auto;
-    place-items: center;
-    min-height: 2.5rem;
-    padding: 0 var(--space-3);
-    border-radius: var(--radius-full);
-    color: var(--text-muted);
-    font: 800 0.875rem / 1 var(--font-sans);
-    text-decoration: none;
-    white-space: nowrap;
-    position: relative;
-  }
-
-  .subnav a[aria-current="page"] {
-    background: var(--raised);
-    box-shadow: var(--elev-1);
-    color: var(--text);
-  }
-
-  /* A card's own title, smaller than a screen's sections. */
-  .card-title {
-    font-size: 1.25rem;
-  }
-
-  .mark {
-    display: block;
-    flex: none;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    box-shadow: 0 0 0 1px var(--line);
-  }
-
-  .screen,
-  .stack,
-  .summary,
-  .question,
-  .after,
-  .actions,
-  .review {
-    display: grid;
-    /* One column, never wider than the page: a long word in it breaks (large text) instead of widening it. */
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-4);
-  }
-
-  .screen {
-    gap: var(--space-5);
-  }
-
-  .intro {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-3);
-  }
-
-  /* A page's picture, over its heading. */
-  .page-art {
-    width: 88px;
-    height: 88px;
-    margin: 0 0 -4px -3px;
-  }
-
-  /* A topic's small picture on a chip or a row. */
-  .topic-mark {
-    width: 26px;
-    height: 26px;
-    margin: -4px 0 -4px -4px;
-  }
-
-  /* On a card of Моят Алманах: on a disc of its topic's colour. */
-  .almanac-topic .topic-mark {
-    width: 32px;
-    height: 32px;
-    margin: 0;
-    padding: 4px;
-    border-radius: var(--radius-full);
-    background: color-mix(in srgb, var(--tone) 18%, transparent);
-    box-shadow: none;
-  }
-
-  .title-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-
-  /* ---- Cards ---- */
-
-  .card {
-    display: grid;
-    gap: var(--space-4);
-    padding: var(--space-4);
-    border-radius: var(--radius-lg);
-    background: var(--surface);
-    box-shadow:
-      var(--elev-1),
-      inset 0 0 0 1px var(--line);
-  }
-
-  .card.hero {
-    gap: var(--space-4);
-    padding: 20px;
-    border-radius: var(--radius-xl);
-    background: var(--hero);
-    box-shadow:
-      var(--elev-2),
-      inset 0 0 0 1px var(--line);
-  }
-
-  .card-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2) var(--space-3);
-  }
-
-  /* ---- Controls ---- */
-
-  .btn {
-    appearance: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-    width: 100%;
-    min-height: 3rem;
-    padding: var(--space-2) var(--space-5);
-    border: 1px solid var(--line-strong);
-    border-radius: var(--radius-md);
-    background: var(--raised);
-    color: var(--text);
-    box-shadow: var(--elev-1);
-    font: 700 1rem / 1.25 var(--font-sans);
-    text-align: center;
-    text-decoration: none;
-    cursor: pointer;
-    transition:
-      transform 120ms ease,
-      box-shadow 200ms ease,
-      background-color 160ms ease;
-  }
-
-  /* Only where a pointer hovers: on a touch screen hover sticks after the tap. */
-  @media (hover: hover) and (pointer: fine) {
-    .btn:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: var(--elev-2);
-    }
-
-    .btn.primary:hover:not(:disabled) {
-      box-shadow: var(--glow-gold);
-    }
-  }
-
-  .btn:active:not(:disabled) {
-    transform: translateY(1px) scale(0.985);
-  }
-
-  .btn:disabled {
-    border-color: transparent;
-    background: var(--sunken);
-    color: var(--text-muted);
-    box-shadow: none;
-    cursor: default;
-  }
-
-  .btn.primary {
-    border-color: transparent;
-    background: var(--gold);
-    color: var(--on-fill);
-    box-shadow: var(--glow-gold);
-  }
-
-  .btn.primary:disabled {
-    background: var(--sunken);
-    color: var(--text-muted);
-    box-shadow: none;
-  }
-
-  .btn.danger {
-    border-color: transparent;
-    background: var(--wrong);
-    color: var(--on-fill);
-  }
-
-  /* Duels: accepting a friend's call to one. */
-  .btn.rose {
-    border-color: transparent;
-    background: var(--rose);
-    color: var(--on-fill);
-  }
-
-  .btn.big {
-    min-height: 3.75rem;
-    font-size: 1.1875rem;
-  }
-
-  .btn.inline {
-    display: inline-flex;
-    width: auto;
-  }
-
-  .link {
-    padding: 0;
-    border: 0;
-    background: none;
-    font: inherit;
-    font-weight: 600;
-    text-align: left;
-    text-decoration: underline;
-    text-decoration-thickness: 2px;
-    text-underline-offset: 4px;
-    cursor: pointer;
-  }
-
-  .link.muted {
-    color: var(--text-muted);
-    font-weight: 500;
-    text-decoration-thickness: 1px;
-  }
-
-  /* A link on its own line that's tapped, not read in a sentence: a finger's height. A way on in a line of its own
-     (`.day-next`: „Имаш профил? Влез“) is one too. */
-  .link.tap,
-  .day-next > :is(a, .link):only-child {
-    display: inline-flex;
-    align-items: center;
-    justify-self: start;
-    min-height: 2.75rem;
-  }
-
-  .link:disabled {
-    color: var(--text-muted);
-    cursor: default;
-  }
-
-  .field {
-    display: grid;
-    gap: var(--space-2);
-  }
-
-  .field > span {
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    font-weight: 700;
-  }
-
-  .field small {
-    font-size: 0.8125rem;
-    line-height: 1.125rem;
-  }
-
-  input,
-  textarea {
-    width: 100%;
-    border: 1px solid var(--line-strong);
-    border-radius: var(--radius-md);
-    background: var(--sunken);
-    color: var(--text);
-    font: 500 1.125rem / 1.3 var(--font-sans);
-    transition:
-      border-color 160ms ease,
-      box-shadow 160ms ease;
-  }
-
-  /* A field is a button's height, so the two pair up side by side and one under the other. */
-  input {
-    min-height: 3rem;
-    padding: 0 var(--space-4);
-  }
-
-  textarea {
-    padding: var(--space-3) var(--space-4);
-    resize: vertical;
-  }
-
-  input::placeholder,
-  textarea::placeholder {
-    color: var(--text-muted);
-    opacity: 1;
-  }
-
-  input:focus,
-  textarea:focus {
-    border-color: var(--accent);
-  }
-
-  input.code {
-    min-height: 4rem;
-    padding-inline: var(--space-2);
-    font: 800 clamp(2rem, 10vw, 2.5rem) / 1 var(--font-numeral);
-    letter-spacing: 0.1em;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* Twelve digits fit a phone's width. */
-  input.code.long {
-    font-size: clamp(1.25rem, 6.5vw, 2rem);
-    letter-spacing: 0.04em;
-  }
-
-  /* Empty, the code's field says what goes in it in plain words, never in digits that look typed. */
-  input.code::placeholder {
-    font: 500 1.125rem / 1 var(--font-sans);
-    letter-spacing: normal;
-  }
-
-  .join {
-    display: flex;
-    gap: var(--space-2);
-  }
-
-  .join input {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .join .btn {
-    width: auto;
-    min-height: 4rem;
-  }
-
-  .tag {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    min-height: 26px;
-    padding: 0 10px;
-    border-radius: var(--radius-full);
-    background: var(--raised);
-    color: var(--text);
-    box-shadow: inset 0 0 0 1px var(--line);
-    font-size: 0.75rem;
-    line-height: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
-  .tag.rose {
-    background: var(--rose);
-    color: var(--on-fill);
-    box-shadow: none;
-  }
-
-  .tag.gold {
-    background: var(--gold);
-    color: var(--on-fill);
-    box-shadow: none;
-  }
-
-  /* Topic tones: each topic keeps its colour everywhere. */
-  .tone-gold {
-    --tone: var(--gold);
-  }
-  .tone-lilac {
-    --tone: var(--lilac);
-  }
-  .tone-sky {
-    --tone: var(--sky);
-  }
-  .tone-rose {
-    --tone: var(--rose);
-  }
-  .tone-mint {
-    --tone: var(--right);
-  }
-  /* A player gone since (screens/duel.ts): a plain tile, nobody's. */
-  .tone-gone {
-    --tone: var(--line-strong);
-  }
-
-  .dot {
-    display: inline-block;
-    flex: none;
-    width: 14px;
-    height: 14px;
-    border-radius: 5px;
-    background: var(--tone, var(--gold));
-  }
-
   /* ---- Figures: numbers with what they count ---- */
 
   .figures {
@@ -2885,53 +3132,68 @@
     font-weight: 700;
   }
 
-  /* Tabs that switch what a screen shows. */
+  /* Tabs that switch what a screen shows: words on a hairline, the chosen one bold on a 2px ink underline. */
   .segmented {
     display: flex;
-    gap: var(--space-1);
-    padding: var(--space-1);
-    border-radius: var(--radius-full);
-    background: var(--sunken);
+    flex-wrap: wrap;
+    gap: 0 var(--space-5);
+    border-bottom: 1px solid var(--rule);
   }
 
   .segmented button {
     appearance: none;
-    flex: 1;
-    min-height: 2.5rem;
-    border: 0;
-    border-radius: var(--radius-full);
-    background: none;
-    color: var(--text-muted);
-    font: 800 0.875rem / 1 var(--font-sans);
-    cursor: pointer;
     position: relative;
+    min-height: 2.75rem;
+    margin-bottom: -1px;
+    padding: 0;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--ink-3);
+    font: 600 0.9375rem / 1 var(--font-sans);
+    cursor: pointer;
   }
 
-  .segmented button[aria-selected="true"],
-  .segmented button[aria-checked="true"] {
-    background: var(--raised);
-    box-shadow: var(--elev-1);
-    color: var(--text);
+  .segmented button[aria-selected="true"] {
+    border-bottom-color: var(--ink);
+    color: var(--ink);
+    font-weight: 800;
   }
 
-  /* A second, lesser switch under the first: whose board it is. */
-  .segmented.small {
-    justify-self: start;
-    width: min(100%, 15rem);
+  /* A setting's few choices: boxed, the chosen one filled ink. */
+  .segmented[role="radiogroup"] {
+    display: inline-flex;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--rule-ink);
+    border-radius: var(--radius);
   }
 
-  .segmented.small button {
-    min-height: 2.25rem;
-    font-size: 0.8125rem;
+  .segmented[role="radiogroup"] button {
+    flex: 1 1 auto;
+    min-height: 2.75rem;
+    margin: 0;
+    padding: 0 var(--space-3);
+    border: 0;
+    color: var(--ink-2);
+    font-size: 0.875rem;
   }
 
-  /* A choice in a switch, or a place in Профил, has the pill's whole height to tap (44px and more), its padding
-     too. */
-  .segmented button::after,
-  .subnav a::after {
+  .segmented[role="radiogroup"] > * + * {
+    border-left: 1px solid var(--rule-ink);
+  }
+
+  .segmented[role="radiogroup"] button[aria-checked="true"] {
+    background: var(--ink);
+    color: var(--paper);
+    font-weight: 700;
+  }
+
+  /* A choice has 44px to tap, whatever it's drawn at. */
+  .segmented[role="radiogroup"] button::after {
     content: "";
     position: absolute;
-    inset: calc(-1 * var(--space-1)) 0;
+    inset: -2px 0;
   }
 
   /* Duels as rows: the other player, how it stands, the rating it moved. */
@@ -3378,6 +3640,7 @@
 
   h1.score {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
     gap: var(--space-2);
     font-family: var(--font-numeral);
@@ -3982,36 +4245,31 @@
 
   /* ---- Pictures (art/pictures.ts): painted from one ramp of the tone they sit in, with the night ink and white ---- */
 
+  /* By day, on paper, the light inks and the tinted disc would wash out (a flask, the streak's flame), so they take
+     more of the tone than by night. */
   .pic {
     --ink: #140f26;
     --k1: color-mix(in srgb, var(--tone, var(--gold)) 42%, var(--ink));
     --k2: color-mix(in srgb, var(--tone, var(--gold)) 70%, var(--ink));
     --k3: var(--tone, var(--gold));
-    --k4: color-mix(in srgb, var(--tone, var(--gold)) 55%, #fff);
-    --k5: color-mix(in srgb, var(--tone, var(--gold)) 18%, #fff);
+    --k4: color-mix(in srgb, var(--tone, var(--gold)) 72%, #fff);
+    --k5: color-mix(in srgb, var(--tone, var(--gold)) 32%, #fff);
+    --kt: 0.26;
   }
 
-  /* Day: on a white card the light inks and the tinted disc wash out (a flask, the streak's flame, a common medal),
-     so they take more of the tone. */
-  @media (prefers-color-scheme: light) {
-    :where(:root:not([data-scheme="night"])) .pic {
-      --k4: color-mix(in srgb, var(--tone, var(--gold)) 72%, #fff);
-      --k5: color-mix(in srgb, var(--tone, var(--gold)) 32%, #fff);
-    }
-
-    :where(:root:not([data-scheme="night"])) .kt {
-      opacity: 0.26;
+  @media (prefers-color-scheme: dark) {
+    :where(:root:not([data-scheme="day"])) .pic {
+      --k4: color-mix(in srgb, var(--tone, var(--gold)) 55%, #fff);
+      --k5: color-mix(in srgb, var(--tone, var(--gold)) 18%, #fff);
+      --kt: 0.16;
     }
   }
 
   /* The same, chosen whatever the device says (prefs.ts: scheme; scheme.test.ts holds the two equal). */
-  :where(:root[data-scheme="day"]) .pic {
-    --k4: color-mix(in srgb, var(--tone, var(--gold)) 72%, #fff);
-    --k5: color-mix(in srgb, var(--tone, var(--gold)) 32%, #fff);
-  }
-
-  :where(:root[data-scheme="day"]) .kt {
-    opacity: 0.26;
+  :where(:root[data-scheme="night"]) .pic {
+    --k4: color-mix(in srgb, var(--tone, var(--gold)) 55%, #fff);
+    --k5: color-mix(in srgb, var(--tone, var(--gold)) 18%, #fff);
+    --kt: 0.16;
   }
 
   /* A picture fills its box unless its own class sizes it (no weight here, so that one always wins). */
@@ -4054,7 +4312,7 @@
   }
   .kt {
     fill: var(--k3);
-    opacity: 0.16;
+    opacity: var(--kt);
   }
   .l0,
   .l1,
@@ -4086,7 +4344,7 @@
     stroke: var(--k5);
   }
 
-  /* ---- Avatars: a picture on a tile of its tone ---- */
+  /* ---- Avatars: the drawn animal in its own colours, in a round medallion of its scene ---- */
 
   .avatar {
     --size: 40px;
@@ -4096,15 +4354,21 @@
     place-items: center;
     width: var(--size);
     height: var(--size);
-    border-radius: calc(var(--size) * 0.3);
-    background: var(--tone, var(--gold));
-    color: var(--on-fill);
+    overflow: hidden;
+    border-radius: 50%;
+    background: var(--tone, var(--paper-2));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent);
   }
 
   .avatar-pic {
     position: absolute;
-    inset: 0;
-    clip-path: inset(0 round calc(var(--size) * 0.3));
+    inset: 6%;
+    width: 88%;
+    height: 88%;
+  }
+
+  .bar-me .avatar {
+    --size: 32px;
   }
 
   /* The natural tone: no tone over the picture, every part in its own colour, as the thing looks (a fox orange with a
@@ -4647,13 +4911,134 @@
     box-shadow: 0 0 0 1px var(--accent);
   }
 
-  /* ---- Friends ---- */
+  /* ---- Rows of players: a board, the friends ---- */
 
-  .friend-list {
-    display: grid;
-    margin: 0;
-    padding: 0;
-    list-style: none;
+  .rank-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 3.5rem;
+    padding: var(--space-2) 0;
+  }
+
+  .rank-place {
+    flex: none;
+    width: 1.625rem;
+    color: var(--ink-3);
+    font: 700 1.25rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .rank-name {
+    flex: 1;
+    min-width: 0;
+    font: 600 1rem / 1.25 var(--font-sans);
+  }
+
+  .rank-name a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .rank-you {
+    color: var(--ink-3);
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  /* The score and the points beside it; on a narrow phone, the points under the score, so the name keeps its room. */
+  .rank-end {
+    display: flex;
+    flex: none;
+    align-items: baseline;
+    gap: var(--space-3);
+  }
+
+  .rank-score,
+  .friend-day {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 24rem) {
+    .rank-end {
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+    }
+  }
+
+  .rank-n {
+    font: 700 1.5rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  :is(.rank-score, .friend-day) small {
+    margin-left: 2px;
+    color: var(--ink-3);
+    font: 500 0.875rem / 1 var(--font-sans);
+  }
+
+  .rank-aside {
+    flex: none;
+    min-width: 3.25em;
+    color: var(--ink-3);
+    font: 500 0.875rem / 1 var(--font-sans);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  /* The player's own row: washed to the page's edges. */
+  .rank-row.me {
+    margin: 0 calc(-1 * var(--gutter));
+    padding-inline: var(--gutter);
+    background: var(--paper-2);
+  }
+
+  /* Further down than the best: a little apart from them. */
+  .rank-row.gap {
+    margin-top: var(--space-3);
+  }
+
+  .friends-page {
+    gap: var(--space-7);
+  }
+
+  .sect-lead {
+    margin-top: var(--space-2);
+    color: var(--ink-2);
+    font: 500 0.875rem / 1.4 var(--font-sans);
+  }
+
+  .duels > .btn {
+    margin-top: var(--space-5);
+  }
+
+  .sect-foot {
+    margin-top: var(--space-2);
+    text-align: center;
+  }
+
+  .day-board .segmented {
+    margin: var(--space-2) 0 0;
+  }
+
+  .board-note {
+    margin-top: var(--space-3);
+    color: var(--ink-3);
+    font: 500 0.875rem / 1.4 var(--font-sans);
+  }
+
+  .add-friend input::placeholder {
+    font-size: 1rem;
+  }
+
+  .board-empty,
+  .friends-none {
+    padding: var(--space-4) 0;
+    color: var(--ink-2);
+    font: italic 500 1rem / 1.45 var(--font-serif);
   }
 
   /* Short of room (a phone's 320px), removing a friend (while editing) goes under the row, at its end. */
@@ -4661,16 +5046,13 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) 0;
+    gap: var(--space-1) var(--space-3);
+    min-height: 3.5rem;
+    padding: var(--space-2) 0;
   }
 
   .friend-act {
     margin-inline-start: auto;
-  }
-
-  .friend + .friend {
-    border-top: 1px solid var(--line);
   }
 
   .friend-text {
@@ -4684,15 +5066,17 @@
     display: flex;
     gap: 0.3em;
     overflow: hidden;
-    font-weight: 700;
+    color: var(--ink);
+    font-weight: 600;
+    text-decoration: none;
     white-space: nowrap;
   }
 
   .friend-tag,
   .me-tag {
     overflow: hidden;
-    color: var(--text-muted);
-    font-weight: 600;
+    color: var(--ink-3);
+    font-weight: 500;
     text-overflow: ellipsis;
   }
 
@@ -4700,6 +5084,11 @@
   .me-tag {
     font-size: 0.875rem;
     white-space: nowrap;
+  }
+
+  .record {
+    color: var(--ink-3);
+    font: 500 0.8125rem / 1.3 var(--font-sans);
   }
 
   /* A tag typed after its @. */
@@ -4711,27 +5100,26 @@
   .tag-input > span {
     position: absolute;
     top: 50%;
-    left: var(--space-4);
-    color: var(--text-muted);
+    left: 2px;
+    color: var(--ink-3);
     font: 700 1.125rem / 1 var(--font-sans);
     transform: translateY(-50%);
     pointer-events: none;
   }
 
   .tag-input input {
-    padding-left: calc(var(--space-4) + 1.1rem);
+    padding-left: 1.1rem;
   }
 
   .add-friend {
     display: grid;
     gap: var(--space-2);
+    margin-top: var(--space-5);
   }
 
   /* On a narrow phone the button goes under the field, so the field keeps room for its hint. */
   .add-friend-row {
-    display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
   }
 
   .add-friend-row input {
@@ -4743,56 +5131,38 @@
     flex: 1 0 auto;
   }
 
-  .waiting {
+  .waiting-for {
     display: grid;
-    gap: var(--space-1);
-    margin: 0;
-    padding: 0;
-    list-style: none;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+    margin-top: var(--space-6);
   }
 
   .waiting li {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
     min-width: 0;
+    min-height: 2.75rem;
   }
 
-  .waiting li > span {
+  .waiting li > :first-child {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .small-gap {
-    gap: var(--space-1);
-  }
-
-  .friend-day {
-    color: var(--text-muted);
-    font-size: 0.875rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .record {
-    color: var(--rose-ink);
-    font: 800 1.375rem / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
+  /* Someone asks to be friends: their line, „Приеми“ and „Откажи“, over the list. */
   .invitation {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2) var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-md);
-    background: color-mix(in srgb, var(--rose) 16%, var(--surface));
-    box-shadow: inset 0 0 0 1px var(--rose-ink);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--rule);
   }
 
   .invitation-actions {
@@ -4800,6 +5170,13 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2) var(--space-4);
+  }
+
+  @media (min-width: 56.25rem) {
+    .rank-row.me {
+      margin: 0 calc(-1 * var(--space-3));
+      padding-inline: var(--space-3);
+    }
   }
 
   .small {
@@ -5159,25 +5536,18 @@
     transform: translateX(22px);
   }
 
-  @media (min-width: 40rem) {
-    h1 {
-      font-size: 2.5rem;
-    }
-
-    .top {
-      margin-bottom: var(--space-6);
-    }
-  }
-
   /* A phone in a game, upright or on its side: the question has the whole screen, the header and the bar of places
      with it, and a stray tap can't leave it. The way out is the arrow before the question's count. */
   @media (max-width: 47.99rem), (pointer: coarse) and (max-height: 30rem) {
-    .playing .tabs,
-    .playing #app > .top {
+    .playing .frame {
       display: none;
     }
 
     .playing #app {
+      padding-bottom: 0;
+    }
+
+    .playing #main {
       --app-top: max(var(--space-4), env(safe-area-inset-top));
       --app-foot: max(var(--space-4), env(safe-area-inset-bottom));
       padding-top: var(--app-top);
@@ -5328,12 +5698,6 @@
       gap: var(--space-2);
     }
 
-    .subnav a {
-      flex-shrink: 1;
-      padding: 0 6px;
-      font-size: 0.8125rem;
-    }
-
     .segmented button {
       font-size: 0.8125rem;
     }
@@ -5365,36 +5729,6 @@
   @media (min-width: 48rem) {
     html {
       scroll-padding-bottom: 0;
-    }
-
-    #app {
-      padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));
-    }
-
-    /* Beside the name, at the header's end. */
-    .tabs {
-      position: static;
-      display: flex;
-      gap: var(--space-1);
-      margin: 0 calc(-1 * var(--space-2)) 0 0;
-      padding: 0;
-      border: 0;
-      background: none;
-    }
-
-    .tabs a {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: var(--space-2);
-      font-size: 0.875rem;
-      line-height: 1.25rem;
-      /* 44px to tap, the header no taller for it. */
-      margin-block: -4px;
-    }
-
-    .tabs .i {
-      font-size: 1.125rem;
     }
 
     /* „Микс“ and „България“ first, a row of their own, half of it each (all of it for one alone), short tiles with
@@ -5456,24 +5790,8 @@
       text-align: left;
     }
 
-    .tabs a[aria-current="page"]::after {
-      top: auto;
-      right: var(--space-2);
-      bottom: 5px;
-      left: var(--space-2);
-      width: auto;
-      border-radius: 3px;
-    }
-
-    .tabs a.news::before {
-      top: 10px;
-      left: auto;
-      right: 2px;
-      box-shadow: 0 0 0 2px var(--bg);
-    }
-
     /* A tablet: the column a little wider than a phone's. */
-    #app {
+    #main {
       max-width: 48rem;
     }
 
@@ -5667,7 +5985,7 @@
      and the ways to play with others); Профил's places at 64rem, with Профил's cards in two
      columns; every other page a centred column of 48rem, so no line of text runs too long. */
   @media (min-width: 64rem) {
-    #app {
+    #main {
       max-width: 76rem;
       padding-inline: max(var(--space-6), env(safe-area-inset-left)) max(var(--space-6), env(safe-area-inset-right));
     }
@@ -5682,7 +6000,7 @@
       max-width: none;
     }
 
-    main > :has(> .subnav) {
+    main > :has(.me-head) {
       max-width: 64rem;
     }
 
@@ -5698,10 +6016,6 @@
     .playing .option {
       min-height: 4.75rem;
       font-size: 1.375rem;
-    }
-
-    .playing .top {
-      margin-bottom: var(--space-4);
     }
 
     /* Начало: floats, so each column stacks on its own, whatever the other's height. */
@@ -5793,7 +6107,7 @@
       break-inside: avoid;
     }
 
-    .screen:has(> .me-head) > :is(.subnav, .me-head) {
+    .screen:has(> .me-head) > .me-head {
       column-span: all;
     }
 
@@ -5929,25 +6243,26 @@
      on <html> under 17em, `tighter` under 13.5em (lib/prefs.ts measures it; at the text's usual size even the
      narrowest phone's column is 18em, so none of this applies). */
 
-  /* The bar of places: its pictures alone once a place's name no longer fits its quarter (the names stay, for screen
-     readers); a name that still doesn't fit (a phone that enlarges the text itself) is cut, never run into the next. */
-  .tab-label {
-    max-width: 100%;
+  /* Few words to a line: the page's gutter gives the column back a little. */
+  .tighter {
+    --gutter: 16px;
+  }
+
+  .tighter .score-of .num-word {
+    display: block;
+  }
+
+  .tighter .almanac-card {
+    overflow-wrap: anywhere;
+  }
+
+  /* The places at a phone's foot: a name that doesn't fit its third (a phone that enlarges the text itself) is cut,
+     never run into the next. */
+  .tighter .places-foot a {
     overflow: hidden;
+    font-size: 0.8125rem;
     text-overflow: ellipsis;
-  }
-
-  .tighter .tabs a {
-    align-content: center;
-    min-height: 44px;
-  }
-
-  .tighter .tabs .tab-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   /* Topics one to a row once a topic's longest word no longer fits half the column; the ways to play too, each its
@@ -6030,19 +6345,13 @@
     overflow-wrap: anywhere;
   }
 
-  /* Choices in a switch, or the places in Профил, go on to a second line rather than out of the screen. */
-  .tight .segmented,
-  .tight .subnav {
+  /* Choices in a switch go on to a second line rather than out of the screen. */
+  .tight .segmented {
     flex-wrap: wrap;
     border-radius: var(--radius-lg);
   }
 
-  .tight .subnav {
-    overflow-x: visible;
-  }
-
-  .tight .segmented button,
-  .tight .subnav a {
+  .tight .segmented button {
     flex: 1 1 auto;
     padding-inline: var(--space-3);
   }

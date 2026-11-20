@@ -58,7 +58,27 @@ export function player(): Promise<User> {
   return making;
 }
 
-/** What became of the profile just now, said once where the player lands, on Начало: deleted (Настройки), or a game
+/** The animals a new player is given one of, by their id (play.Starters): their avatar until they choose one. */
+const starters = ["fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog"];
+
+/** The player's avatar as the server last said it (the page's, a choice made since: screens/avatar.ts), or "". */
+const avatarSaid = signal(boot.avatar ?? "");
+
+/** The player's avatar, as the corner of every page shows it: as the server said, or the one a new player is given. */
+export const look = (): string => {
+  const said = avatarSaid();
+  const u = user();
+  return said || (u ? starters[u.id % starters.length] : "") || "";
+};
+
+/** The player's avatar, chosen just now. */
+export const setLook = (avatar: string) => avatarSaid.set(avatar);
+
+/** Днес is a new visitor's cover (the day alone, before any game begun: screens/today.ts): the frame's places step
+ * aside. */
+export const cover = signal(false);
+
+/** What became of the profile just now, said once where the player lands, on Днес: deleted (Настройки), or a game
  * brought from another browser (screens/keep.ts). */
 export const notice = signal("");
 

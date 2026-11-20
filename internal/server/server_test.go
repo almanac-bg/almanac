@@ -473,7 +473,7 @@ func TestSearchEngines(t *testing.T) {
 	if res, _ := get("/privacy"); res.Header.Get("X-Robots-Tag") != "" {
 		t.Errorf("/privacy: X-Robots-Tag %q", res.Header.Get("X-Robots-Tag"))
 	}
-	for _, path := range []string{"/me", "/ranks", "/play/history", "/players/someone", "/nowhere"} {
+	for _, path := range []string{"/me", "/friends", "/play/history", "/players/someone", "/nowhere"} {
 		res, body := get(path)
 		if res.Header.Get("X-Robots-Tag") != "noindex" || strings.Contains(body, "canonical") {
 			t.Errorf("%s: X-Robots-Tag %q", path, res.Header.Get("X-Robots-Tag"))
@@ -622,7 +622,7 @@ func TestHosts(t *testing.T) {
 		res.Body.Close()
 		return res, string(body)
 	}
-	if res, _ := get("www.127.0.0.1", "/ranks?x=1"); res.StatusCode != 301 || res.Header.Get("Location") != g.url+"/ranks?x=1" {
+	if res, _ := get("www.127.0.0.1", "/friends?x=1"); res.StatusCode != 301 || res.Header.Get("Location") != g.url+"/friends?x=1" {
 		t.Errorf("www: %d %s", res.StatusCode, res.Header.Get("Location"))
 	}
 	if res, body := get("mta-sts.127.0.0.1", "/.well-known/mta-sts.txt"); res.StatusCode != 200 ||
