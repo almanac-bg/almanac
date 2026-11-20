@@ -116,13 +116,13 @@ export function hyphenate(text: string): string {
 /** The hour (in Bulgaria) from which a streak at stake says it ends at midnight. */
 export const stakeHour = 18;
 
-/** A streak at stake while the day's ten wait (`days`: in a row to yesterday; `reserve`: days in hand; `hour`: in
- * Bulgaria): what the ten make of it; from the evening, if no reserve day would keep it, that it ends at midnight.
- * "" while there's no streak to lose. */
-export function stakeWords(days: number, reserve: number, hour: number): string {
+/** A streak at stake while the day's ten wait (`days`: in a row to yesterday; `spare`: whether this week would still
+ * forgive the day missed; `hour`: in Bulgaria): what the ten make of it; from the evening, if the week has forgiven
+ * its day already, that it ends at midnight. "" while there's no streak to lose. */
+export function stakeWords(days: number, spare: boolean, hour: number): string {
   if (days < 1) return "";
   const streak = `Серия от ${days} ${days === 1 ? "ден" : "дни"}.`;
-  return hour >= stakeHour && !reserve
+  return hour >= stakeHour && !spare
     ? `${streak} Прекъсва в полунощ, ако не изиграеш въпросите на деня.`
     : `${streak} С днешните въпроси става ${days + 1}.`;
 }

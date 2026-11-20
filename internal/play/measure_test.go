@@ -139,7 +139,7 @@ func TestStreakHealth(t *testing.T) {
 		}
 	}
 	ana, bo, cy := w.user(), w.user(), w.user()
-	days(ana, "2026-11-12", 4) // to the 15th; the 16th spends her reserve day, the 17th ends a streak of 4
+	days(ana, "2026-11-12", 4) // to the 15th; the 16th is forgiven (a new week's), the 17th ends a streak of 4
 	days(bo, "2026-11-18", 2)  // 2 days, today not played yet
 	days(cy, "2026-11-13", 7)  // 7 days, today with them
 	w.now = time.Date(2026, 11, 19, 10, 0, 0, 0, Bulgaria)
@@ -147,16 +147,16 @@ func TestStreakHealth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if h.Going[0] != 1 || h.Going[1] != 0 || h.Going[2] != 1 || h.Going[3] != 0 || h.Spent != 1 ||
+	if h.Going[0] != 1 || h.Going[1] != 0 || h.Going[2] != 1 || h.Going[3] != 0 || h.Forgiven != 1 ||
 		h.Ended[1] != 1 || h.Ended[0]+h.Ended[2]+h.Ended[3] != 0 {
 		t.Fatalf("the streaks: %+v", h)
 	}
-	// Measured over two days (the 17th and 18th), Ana's streak ends in them and her spent day is before; over one, both
+	// Measured over two days (the 17th and 18th), Ana's streak ends in them and her forgiven day is before; over one, both
 	// are.
-	if h, _ := w.g.StreakHealth(ctx, 2); h.Spent != 0 || h.Ended[1] != 1 {
+	if h, _ := w.g.StreakHealth(ctx, 2); h.Forgiven != 0 || h.Ended[1] != 1 {
 		t.Fatalf("over two days: %+v", h)
 	}
-	if h, _ := w.g.StreakHealth(ctx, 1); h.Spent != 0 || h.Ended[1] != 0 || h.Going[2] != 1 {
+	if h, _ := w.g.StreakHealth(ctx, 1); h.Forgiven != 0 || h.Ended[1] != 0 || h.Going[2] != 1 {
 		t.Fatalf("over one day: %+v", h)
 	}
 	if StreakBand(1) != 0 || StreakBand(2) != 0 || StreakBand(6) != 1 || StreakBand(29) != 2 || StreakBand(400) != 3 {

@@ -36,7 +36,7 @@ func streakEndedOnTheDay(t *testing.T, now time.Time) {
 	g := start(t)
 	g.srv.game.Now = func() time.Time { return now }
 	ana, anaID := g.guest()
-	g.daysPlayed(anaID, 5, 4, 3) // three days; the reserve kept the 2nd day back, the 1st ended it
+	g.daysPlayed(anaID, 5, 4, 3) // three days to Monday; Tuesday forgiven, Wednesday (yesterday) ended it
 	_, today := ana.call("GET", "/api/day", nil)
 	if want := play.Issue(g.srv.game.Today()); want < 1 || today["issue"] != float64(want) {
 		t.Fatalf("the day's issue: %v, want %d", today["issue"], want)
@@ -74,9 +74,9 @@ func TestStreakFinishedAfterMidnight(t *testing.T) {
 	g.daysPlayed(anaID, 4, 3, 2)
 	g.finishedDay(anaID, time.Date(2026, 12, 9, 0, 0, 0, 0, play.Bulgaria), 24*time.Hour+3*time.Minute) // at 00:03
 	_, today := ana.call("GET", "/api/day", nil)
-	if today["streak"] != 4.0 || today["ended"] != nil || today["kept"] != nil {
-		t.Fatalf("yesterday's, finished after midnight: streak %v, ended %v, kept %v", today["streak"], today["ended"],
-			today["kept"])
+	if today["streak"] != 4.0 || today["ended"] != nil || today["forgiven"] != nil {
+		t.Fatalf("yesterday's, finished after midnight: streak %v, ended %v, forgiven %v", today["streak"],
+			today["ended"], today["forgiven"])
 	}
 	if m := g.srv.reminder(t.Context(), g.srv.game.Today(), anaID); m.Body !=
 		"Серията ти е 4 дни. Не я прекъсвай: десет въпроса, до полунощ." {

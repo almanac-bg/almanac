@@ -21,8 +21,8 @@ func TestStreakMail(t *testing.T) {
 		clock = day.Add(time.Duration(h)*time.Hour + time.Duration(m)*time.Minute)
 		return clock
 	}
-	// Five days at 10:00, the last three days ago; the first day's reserve kept the day after: the streak ended
-	// yesterday.
+	// Five days at 10:00, Sunday to Thursday, the last three days ago; the week forgave Friday, Saturday ended the
+	// streak: yesterday.
 	player := func(email string, days int) int64 {
 		_, id := g.guest()
 		if email != "" {

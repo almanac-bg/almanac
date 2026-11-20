@@ -1,5 +1,5 @@
 // Начало: where every game starts, on one short screen, and the day is its heart. At the top the player's streak and
-// level (and, once, what came of the days just missed — a reserve day spent, a streak ended, or a welcome back after
+// level (and, once, what came of the days just missed — a day the week forgave, a streak ended, or a welcome back after
 // days away — or, one line at a time, of a friend's yes to a request, a live duel left that went on); then the day's
 // ten questions, the same for everyone, once, as the day's issue
 // („Брой 6“, play/issue.go) (left half-way, where the player stopped and the
@@ -29,18 +29,7 @@ import { goBack, hold, release, title } from "../lib/router.ts";
 import { feelKit } from "../lib/sound.ts";
 import { dateWords, issueWords, onDay, weekday } from "../lib/words.ts";
 import { categories, met, notice, player, playing, user } from "../state.ts";
-import {
-  dayPointsWords,
-  explain,
-  failure,
-  formatNumber,
-  levelNumber,
-  meter,
-  type Open,
-  reserveMeaning,
-  reserveWords,
-  stakeLine,
-} from "../ui.ts";
+import { dayPointsWords, failure, formatNumber, levelNumber, meter, type Open, stakeLine } from "../ui.ts";
 import { type Accepted, acceptedLine, type Left, leftLine } from "./duel.ts";
 import { type Goals, goalsCard, loadGoals, openGoals } from "./goals.ts";
 import { app, haveProfile, keepLine, keepStake, mailAsk } from "./keep.ts";
@@ -52,10 +41,10 @@ export interface Today {
   /** The day's issue: its number from the first day of the day's ten (play/issue.go), the same for everyone. */
   issue?: number;
   streak: number;
-  /** Reserve days in hand: each keeps the streak through a day missed. */
-  reserve?: number;
-  /** A day just missed that a reserve day kept the streak through (the last 3 days). */
-  kept?: string;
+  /** Whether this week would still forgive a day missed (play/runs.go: one a week). */
+  spare?: boolean;
+  /** A day just missed that the week forgave (the last 3 days). */
+  forgiven?: string;
   /** A streak that just ended (the last 3 days): its days, and the day missed that ended it. */
   ended?: { days: number; on: string };
   /** The player's level, from all their XP (for a player). */
@@ -196,12 +185,6 @@ export function today() {
       round: now.then(
         (f) => (f.streak > t.streak && streakMarks.includes(f.streak) ? f.streak : 0),
         () => 0,
-      ),
-      // A reserve day the day's ten just earned (play/runs.go: the streak's third day, the first), told with the
-      // streak's round number.
-      reserve: now.then(
-        (f) => (f.reserve ?? 0) > (t.reserve ?? 0),
-        () => false,
       ),
       // Once the day as it is now has come and drawn the chips (signals run at once): their growing, if any.
       grown: now.then(
@@ -415,30 +398,36 @@ function tellStreak(key: string): boolean {
   return true;
 }
 
-/** What came of the days just missed — a reserve day kept the streak, or none was left and it ended — or, back after
+/** What came of the days just missed — the week forgave one, or it had forgiven one already and the streak ended — or, back after
  * days away, a welcome with the longest streak the player has had: said once, above the day (the server sends it
  * until it's told). */
 function streakNotice(t: Today): Child {
-  const key = t.kept ? `kept:${t.kept}` : t.ended ? `ended:${t.ended.on}` : t.back ? `back:${t.back.last}` : "";
+  const key = t.forgiven
+    ? `forgiven:${t.forgiven}`
+    : t.ended
+      ? `ended:${t.ended.on}`
+      : t.back
+        ? `back:${t.back.last}`
+        : "";
   if (!key || !tellStreak(key)) return null;
   const begins = t.run?.done ? "Днес започна нова" : "Днес започва нова";
   const best = t.back?.best ?? 0;
-  const text = t.kept
-    ? `${onDay(t.kept).replace(/^./, (c) => c.toUpperCase())} резервен ден запази серията ти. Серия: ${t.streak === 1 ? "1 ден" : `${t.streak} дни`}.`
+  const text = t.forgiven
+    ? `${onDay(t.forgiven).replace(/^./, (c) => c.toUpperCase())} пропусна въпросите, но серията остава: един пропуснат ден в седмицата не я прекъсва. Серия: ${t.streak === 1 ? "1 ден" : `${t.streak} дни`}.`
     : t.ended
       ? `Серията ти от ${t.ended.days} дни прекъсна. ${begins}.`
       : best > 1
         ? `Радваме се, че се върна. Най-дългата ти серия е ${best} дни. ${begins}.`
         : `Радваме се, че се върна. ${begins} серия.`;
-  return h("p", { class: "streak-notice", role: "status" }, picture(t.kept ? "shield" : "flame", "reserve-pic"), text);
+  return h("p", { class: "streak-notice", role: "status" }, picture("flame", "notice-pic"), text);
 }
 
 /** The streak and (once XP is open: a first day has the streak only) the level, side by side: each a tap from Профил,
- * where there's more of both. The reserve days sit on the flame's corner, each a tap from what they're for, so the
- * streak's words keep the chip's width (half a phone's, or the side column's on a wide screen). While the day's ten
+ * where there's more of both. The streak's words keep the chip's width (half a phone's, or the side column's on a
+ * wide screen). While the day's ten
  * wait, the streak is at stake: its flame unlit, its number still there, until the day played lights it (grow). */
 function status(t: Today): HTMLElement | null {
-  // A plain „0 дни поред“ reads as a scold: without a streak (nor a reserve day) there's no chip, and the level takes
+  // A plain „0 дни поред“ reads as a scold: without a streak there's no chip, and the level takes
   // the row, until the day played starts one.
   const days = t.streak;
   const lv = t.open?.xp ? t.level : undefined;
@@ -447,41 +436,24 @@ function status(t: Today): HTMLElement | null {
   return h(
     "div",
     { class: "status-row" },
-    days || t.reserve
+    days
       ? h(
           "div",
           { class: "streak-wrap" },
-          days
-            ? h(
-                "a",
-                {
-                  class: `status-item streak-chip${t.run?.done ? "" : " unlit"}`,
-                  href: "/me",
-                },
-                h("span", { class: "status-icon" }, picture("flame", "flame status-flame")),
-                h(
-                  "span",
-                  { class: "status-text" },
-                  h("b", { class: "status-n" }, String(days)),
-                  h("span", { class: "status-label" }, streakLabel(days)),
-                ),
-              )
-            : null,
-          // Beside the link, not in it: a tap on the shield says what it's for, and stays on Начало.
-          t.reserve
-            ? h(
-                "span",
-                { class: "status-reserve" },
-                explain(
-                  [
-                    picture("shield", "reserve-pic"),
-                    h("b", { class: "num", "aria-hidden": "true" }, String(t.reserve)),
-                    h("span", { class: "sr" }, reserveWords(t.reserve)),
-                  ],
-                  reserveMeaning(t.reserve),
-                ),
-              )
-            : null,
+          h(
+            "a",
+            {
+              class: `status-item streak-chip${t.run?.done ? "" : " unlit"}`,
+              href: "/me",
+            },
+            h("span", { class: "status-icon" }, picture("flame", "flame status-flame")),
+            h(
+              "span",
+              { class: "status-text" },
+              h("b", { class: "status-n" }, String(days)),
+              h("span", { class: "status-label" }, streakLabel(days)),
+            ),
+          ),
         )
       : null,
     lv
@@ -574,7 +546,7 @@ function dayCard(t: Today, start: () => void, marks: Mark[], error: string): Chi
           ? `Следва въпрос ${at + 1} от 10. Довърши играта до полунощ.`
           : "По един от всяка тема, от лесен към труден. Едни и същи за всички, с един опит.",
       ),
-      stakeLine(t.streak, t.reserve ?? 0),
+      stakeLine(t.streak, t.spare ?? true),
     ),
     at ? trail(marks, 10, at) : null,
     h("button", { class: "btn primary big", onclick: start }, at ? "Продължи" : "Започни"),

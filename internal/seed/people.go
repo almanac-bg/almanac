@@ -87,7 +87,7 @@ func (w *world) cast(n int) {
 		duels: 6, royal: 0.9, social: 0.6, profile: 1, named: true, hour: 20, pace: 4 * time.Second})
 	add(&player{kind: keyAdmin, persona: keyAdmin, joined: 0, until: -1, rate: 0.9, skill: 0.7, topics: 0.8,
 		duels: 0.5, royal: 0.3, social: 0.5, profile: 0, named: true, hour: 9})
-	// Those who might be the lapsed one: streaks that end yesterday, by whichever reserve days they hold then; the
+	// Those who might be the lapsed one: streaks that end yesterday, by whichever days their weeks forgive; the
 	// first whose streak did is the persona.
 	for i := range 4 {
 		add(&player{kind: lapsing, joined: last - 12 - 4*i, until: -1, rate: 1, skill: 0.62, topics: 0.4,

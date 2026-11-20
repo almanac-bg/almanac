@@ -9,20 +9,19 @@ import (
 // Stats is how a player has done: the streak (and the longest they've had), how much they've played, the facts
 // they've collected, and how well they know each topic.
 type Stats struct {
-	Streak  int      `json:"streak"`
-	Best    int      `json:"best"`    // the longest streak the player has had (StreakNow)
-	Week    [7]bool  `json:"week"`    // this week's days played, Monday first
-	Saved   [7]bool  `json:"saved"`   // this week's days a reserve day kept the streak through
-	Reserve int      `json:"reserve"` // reserve days in hand
-	Next    int      `json:"next"`    // days in a row to the next reserve day (0: they are full)
-	Days    int      `json:"days"`    // days' questions finished
-	Games   int      `json:"games"`   // runs finished, of every kind
-	Answers int      `json:"answers"` // questions answered (or timed out)
-	Duels   int      `json:"duels"`
-	Won     int      `json:"won"`
-	Right   int      `json:"right"`
-	Facts   int      `json:"facts"` // facts in the player's almanac (almanac.go)
-	Recent  []Played `json:"recent"`
+	Streak   int      `json:"streak"`
+	Best     int      `json:"best"`     // the longest streak the player has had (StreakNow)
+	Week     [7]bool  `json:"week"`     // this week's days played, Monday first
+	Forgiven [7]bool  `json:"forgiven"` // this week's day missed that the streak forgave
+	Spare    bool     `json:"spare"`    // whether this week has its day to forgive still
+	Days     int      `json:"days"`     // days' questions finished
+	Games    int      `json:"games"`    // runs finished, of every kind
+	Answers  int      `json:"answers"`  // questions answered (or timed out)
+	Duels    int      `json:"duels"`
+	Won      int      `json:"won"`
+	Right    int      `json:"right"`
+	Facts    int      `json:"facts"` // facts in the player's almanac (almanac.go)
+	Recent   []Played `json:"recent"`
 	// Mastery is how well the player knows each topic, in the bank's order.
 	Mastery []Mastery `json:"mastery"`
 }
@@ -51,7 +50,7 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	if err != nil {
 		return s, err
 	}
-	s.Streak, s.Best, s.Reserve, s.Next, s.Saved = streak.Days, streak.Best, streak.Reserve, streak.Next, g.InWeek(streak.Saved)
+	s.Streak, s.Best, s.Spare, s.Forgiven = streak.Days, streak.Best, streak.Spare, g.InWeek(streak.Forgiven)
 	if s.Week, err = g.Week(ctx, userID); err != nil {
 		return s, err
 	}

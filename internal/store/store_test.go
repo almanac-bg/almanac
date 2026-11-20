@@ -711,3 +711,38 @@ func TestFastByTheNewRule(t *testing.T) {
 	}
 	db.Close()
 }
+
+// The streak forgives a day a week (0084): each day missed in a streak before it is kept as the reserve days judged
+// it, so that no streak going ends and none ended comes back. Ана's first day earns a reserve day (the rules before
+// 2026-11-19), which keeps the first day missed; the next ends it. Бо's goals earn a second, and both keep two days
+// missed in one week, as the new rule wouldn't; the third ends it. Ви's first day earns one, kept on the day after;
+// the day after that ends the streak, under the rules of 2026-11-19 too.
+func TestStreakForgives(t *testing.T) {
+	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0084_streak_forgives.sql")
+	for _, q := range []string{
+		`INSERT INTO users (id, name, tag, created_at, seen_at, streak_told) VALUES (1, 'Ана', 'ana', 1, 1, 'kept:2026-11-03'),
+			(2, 'Бо', 'bo', 1, 1, 'ended:2026-11-13'), (3, 'Ви', 'vi', 1, 1, '')`,
+		`INSERT INTO runs (user_id, kind, day, questions, started_at, finished_at) VALUES
+			(1, 'day', '2026-11-01', '[]', 1, 2), (1, 'day', '2026-11-02', '[]', 1, 2), (1, 'day', '2026-11-04', '[]', 1, 2),
+			(2, 'day', '2026-11-09', '[]', 1, 2), (2, 'day', '2026-11-10', '[]', 1, 2),
+			(3, 'day', '2026-11-17', '[]', 1, 2), (3, 'topic', NULL, '[]', 1, 2)`,
+		`INSERT INTO goals_done (user_id, day, goal, at) VALUES (2, '2026-11-09', 'a', 1), (2, '2026-11-09', 'b', 1),
+			(2, '2026-11-09', 'c', 1), (2, '2026-11-10', 'a', 1), (2, '2026-11-10', 'b', 1), (2, '2026-11-10', 'c', 1)`,
+	} {
+		if _, err := db.Write.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	if err := db.migrateTo(migrationsThrough("0084_streak_forgives.sql")); err != nil {
+		t.Fatal(err)
+	}
+	var missed, told string
+	_ = db.Read.QueryRow(`SELECT group_concat(concat_ws(' ', user_id, day, kept), ', ')
+		FROM (SELECT * FROM streak_missed ORDER BY user_id, day)`).Scan(&missed)
+	_ = db.Read.QueryRow(`SELECT group_concat(streak_told, ' ') FROM (SELECT streak_told FROM users ORDER BY id)`).Scan(&told)
+	want := "1 2026-11-03 1, 1 2026-11-05 0, 2 2026-11-11 1, 2 2026-11-12 1, 2 2026-11-13 0, 3 2026-11-18 1, 3 2026-11-19 0"
+	if missed != want || told != "forgiven:2026-11-03 ended:2026-11-13 " {
+		t.Fatalf("missed %q, want %q; told %q", missed, want, told)
+	}
+	db.Close()
+}
