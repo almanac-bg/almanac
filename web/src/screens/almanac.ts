@@ -182,7 +182,6 @@ function card(id: string, ink: number, r: Rank | undefined, nearest: boolean): C
     {
       class: nearest ? "chapter-card nearest" : "chapter-card",
       href: `/almanac/${id}`,
-      "aria-label": `${nameOf(id)}: ${formatNumber(ink)} с мастило${ranked ? `, ${ranked.name}` : ""}`,
     },
     leaf(
       id,
