@@ -88,7 +88,7 @@ test("against a recording: a real game's ten, its player named, its answers as t
     timeout: 10_000,
   });
   await c.keyboard.press("Shift");
-  await expect(c.locator(".duel-head .kicker")).toHaveText("Дуел срещу запис");
+  await expect(c.locator(".duel-head .kicker")).toHaveText(`Срещу запис на ${owner}`);
   await expect(c.locator(".duel-meant")).toContainText(`Записът е от истинска игра на ${owner}`);
   await expect(c.getByRole("button", { name: "Още един срещу запис" })).toBeVisible();
 });

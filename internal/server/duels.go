@@ -31,6 +31,24 @@ func (s *Server) duels(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, list)
 }
 
+// recordingReady says whether a duel against a recording can be played now (play.RecordingReady), so that the way to
+// one is offered only while there is one; to a visitor too, who becomes a guest by starting it.
+func (s *Server) recordingReady(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.user(r)
+	if err != nil {
+		return err
+	}
+	var id int64
+	if u != nil {
+		id = u.ID
+	}
+	ready, err := s.game.RecordingReady(r.Context(), id)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"ready": ready})
+}
+
 // newDuel starts a duel: with a friend ({"friend": id}) or against a recording ({"recording": true}); one of the same
 // left unfinished is gone on with instead. It answers with the duel, and the player's run in it to play.
 func (s *Server) newDuel(w http.ResponseWriter, r *http.Request) error {

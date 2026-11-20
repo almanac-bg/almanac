@@ -215,7 +215,7 @@ func (p players) HTML() template.HTML {
 		return `<span class="rate none">—</span>`
 	}
 	lo, hi := wilson(float64(p.N)/float64(p.Of), p.eff)
-	word := "играчи"
+	word := "играча"
 	if p.Players == 1 {
 		word = "играч"
 	}

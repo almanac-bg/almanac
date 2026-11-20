@@ -18,7 +18,7 @@ test("a new player sees their place only in the better half", () => {
   assert.deepEqual(standing(7, 7, true), { place: undefined, lead: undefined }, "few: no share");
   assert.deepEqual(standing(20, 31, true), {
     place: undefined,
-    lead: "По-добре от 36% от играчите днес.",
+    lead: "По-добре от 36\u00a0% от играчите днес.",
   });
   assert.deepEqual(standing(31, 31, true), { place: undefined, lead: undefined }, "last: nothing to say");
 });
@@ -26,11 +26,11 @@ test("a new player sees their place only in the better half", () => {
 test("among a hundred and more, the share leads and the place stays the way to the board", () => {
   assert.deepEqual(standing(60, 215, false), {
     place: "60\u2011о място от 215",
-    lead: "По-добре от 72% от играчите днес.",
+    lead: "По-добре от 72\u00a0% от играчите днес.",
   });
   assert.deepEqual(standing(1, 215, false), { place: "1\u2011во място от 215", lead: undefined }, "first is first");
   assert.deepEqual(standing(150, 215, true), {
     place: undefined,
-    lead: "По-добре от 30% от играчите днес.",
+    lead: "По-добре от 30\u00a0% от играчите днес.",
   });
 });

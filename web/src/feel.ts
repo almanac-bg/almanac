@@ -1,5 +1,5 @@
 // The game's feel, in a file of its own: the sounds' voices, the result's moment (a game's end as a short sequence),
-// the streak growing in place, and the sheet for big news (a note in the book). It loads after the player's first touch
+// the streak growing in place. It loads after the player's first touch
 // (lib/sound.ts starts it), since nothing sounds or ends before one, and the first screen doesn't wait for it; until
 // it's in, the game is whole and only plainer: the screens always draw the end state, and this only moves them there.
 // Like a screen that loads on its own (kit.ts), it imports nothing of the app but types: what it needs comes as
@@ -91,15 +91,6 @@ const cues: Record<SoundName, Cue> = {
       ["b", 1, 0.13, 0.3, 0.35],
       ["b", 0, 0.26, 0.55, 0.35],
     ],
-  },
-  // A note in the book (a streak's milestone, a first ten of ten, a chapter complete): three bells rising.
-  note: {
-    notes: [
-      ["b", 5, 0, 0.3, 0.45],
-      ["b", 7, 0.08, 0.3, 0.45],
-      ["b", 8, 0.16, 0.7, 0.5],
-    ],
-    room: true,
   },
   // Something new: an opponent found, a friend's request.
   ping: {
@@ -609,85 +600,4 @@ export async function streak(
     { duration: 600, easing: "ease-in-out" },
   );
   await Promise.all([roll(n, was, String(days)), swell?.finished.catch(() => {})]);
-}
-
-/**
- * The sheet for the one big thing a game brought, over the result (at most one a game): it slides up from the bottom,
- * opaque, over the screen dimming behind it, its picture lands (and, `glow`, glows once), and its sound plays as it
- * opens. „Продължи“, a tap beside it or Esc puts it away, sliding back down; it never goes by itself. `parts` are its
- * picture, kicker, name and lines, drawn by the app (the name with the id "moment-name"). `actions`, if given, are its
- * own buttons in place of „Продължи“ (the first focused), each told how to put the sheet away. Resolves once it's put
- * away.
- */
-export function sheet(
-  parts: Element[],
-  sound: SoundName,
-  glow: boolean,
-  hands: Hands,
-  actions?: (close: () => void) => HTMLElement[],
-): Promise<void> {
-  // The name's sheet's look (app.css, .sheet), its words centred.
-  const box = document.createElement("dialog");
-  box.className = "sheet";
-  box.setAttribute("aria-labelledby", "moment-name");
-  const panel = document.createElement("section");
-  panel.className = "card sheet-panel";
-  panel.style.cssText = "justify-items:center;gap:var(--space-3);text-align:center";
-  const go = document.createElement("button");
-  go.type = "button";
-  go.className = "btn primary big";
-  go.style.cssText = "width:100%;margin-top:var(--space-3)";
-  go.textContent = "Продължи";
-  // Put away, it slides back down as the screen under it brightens again; with less motion, at once.
-  let going = false;
-  const close = () => {
-    if (!box.open || going) return;
-    going = true;
-    if (hands.calm) return box.close();
-    const away = { duration: 200, easing: "cubic-bezier(0.4, 0, 1, 1)", fill: "forwards" } as const;
-    box.animate([{}, { backgroundColor: "transparent" }], away);
-    const shut = () => box.close();
-    panel.animate([{ transform: "none" }, { transform: "translateY(100%)" }], away).finished.then(shut, shut);
-  };
-  const own = actions?.(close);
-  const buttons = own?.length ? own : [go];
-  panel.append(...parts, ...buttons);
-  box.append(panel);
-  document.body.append(box);
-  box.showModal();
-  buttons[0]?.focus();
-  hands.play(sound);
-  const [picture] = parts;
-  if (!hands.calm) {
-    // Only what's behind it dims in: the sheet is opaque all the way up, nothing shows through it.
-    box.animate([{ backgroundColor: "transparent" }, {}], { duration: 200 });
-    panel.animate([{ transform: "translateY(100%)" }, { transform: "none" }], { duration: 320, easing: settleIn });
-    picture?.animate([{ transform: "scale(0.6)" }, { transform: "none" }], {
-      duration: 420,
-      delay: 120,
-      easing: spring,
-    });
-    if (glow && picture) {
-      const gold = token(panel, "--gold");
-      picture.animate([{ filter: "none" }, { filter: `drop-shadow(0 0 24px ${gold})` }, { filter: "none" }], {
-        duration: 900,
-        delay: 300,
-      });
-    }
-  }
-  return new Promise((resolve) => {
-    box.addEventListener("close", () => {
-      box.remove();
-      resolve();
-    });
-    // Esc puts it away the same way (a second Esc meanwhile is the browser's: at once).
-    box.addEventListener("cancel", (e) => {
-      e.preventDefault();
-      close();
-    });
-    go.addEventListener("click", close);
-    box.addEventListener("click", (e) => {
-      if (e.target === box) close();
-    });
-  });
 }

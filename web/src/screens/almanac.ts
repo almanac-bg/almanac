@@ -17,11 +17,13 @@ let {
   back,
   bulgaria,
   dateWords,
+  dayInBulgaria,
   failure,
   formatNumber,
   h,
   illustration,
   loadStats,
+  missing,
   onCleanup,
   rename,
   signal,
@@ -83,11 +85,13 @@ function setKit(kit: Kit) {
     back,
     bulgaria,
     dateWords,
+    dayInBulgaria,
     failure,
     formatNumber,
     h,
     illustration,
     loadStats,
+    missing,
     onCleanup,
     rename,
     signal,
@@ -153,13 +157,13 @@ export function almanac(kit: Kit): Child {
         h(
           "div",
           { class: "figures-row" },
-          figure(s ? formatNumber(s.streak) : "…", "дни поред"),
+          figure(s ? formatNumber(s.streak) : "…", s?.streak === 1 ? "ден поред" : "дни поред"),
           figure(formatNumber(p.all), p.all === 1 ? "факт" : "факта"),
-          figure(mix && (mix.sure || mix.first) ? `${mix.known} %` : "—", "от всичко знаеш"),
+          figure(told(mix) ? `${mix?.known} %` : "—", "от всичко знаеш"),
         ),
       ),
       contents(p),
-      notes(p.notes ?? [], s?.streak ?? 0),
+      notes(p.notes ?? [], s),
     ];
   });
 }
@@ -265,17 +269,33 @@ function noteText(n: Note): string {
   }
 }
 
-/** The day `days` after today, in Bulgaria. */
-function daysAhead(days: number): string {
-  const d = new Date(Date.now() + days * 86_400_000);
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(d);
+/** The streak's next milestone and the day it would come („2026-11-27“), from the streak, whether today's ten are
+ * played, and today: a streak that waits on today's ten runs to yesterday (play/runs.go), so today is the first day
+ * it grows by; once they're played, tomorrow is. None without a streak, or past the last milestone. */
+export function milestoneAhead(
+  streak: number,
+  playedToday: boolean,
+  today: string,
+): { n: number; day: string } | undefined {
+  const n = streak > 0 ? [7, 30, 100, 365].find((m) => m > streak) : undefined;
+  if (!n) return undefined;
+  const [y = 1970, m = 1, d = 1] = today.split("-").map(Number);
+  const at = new Date(Date.UTC(y, m - 1, d + n - streak - (playedToday ? 0 : 1)));
+  return { n, day: at.toISOString().slice(0, 10) };
+}
+
+/** Whether today's ten are played, as this week's strip has it (Monday first). */
+function playedOn(s: Stats, today: string): boolean {
+  const [y = 1970, m = 1, d = 1] = today.split("-").map(Number);
+  return !!s.week[(new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7];
 }
 
 /** The notes the book keeps, the latest first, each dated, and the next one ahead, in italic (the streak's next
  * milestone, on the day it would come); nothing while there's neither. */
-function notes(list: Note[], streak: number): Child {
-  const next = streak > 0 ? [7, 30, 100, 365].find((n) => n > streak) : undefined;
-  if (!list.length && !next) return null;
+function notes(list: Note[], s: Stats | null): Child {
+  const today = dayInBulgaria();
+  const ahead = s ? milestoneAhead(s.streak, playedOn(s, today), today) : undefined;
+  if (!list.length && !ahead) return null;
   return h(
     "section",
     { class: "sect book-notes almanac-notes page-1" },
@@ -283,12 +303,12 @@ function notes(list: Note[], streak: number): Child {
     h(
       "ol",
       { class: "ledger" },
-      next
+      ahead
         ? h(
             "li",
             { class: "next" },
-            h("span", { class: "ledger-day" }, shortDate(daysAhead(next - streak))),
-            h("span", { class: "ledger-text" }, `${aheadWords[next]}, ако не спреш.`),
+            h("span", { class: "ledger-day" }, shortDate(ahead.day)),
+            h("span", { class: "ledger-text" }, `${aheadWords[ahead.n]}, ако не спреш.`),
           )
         : null,
       list.map((n) =>
@@ -308,7 +328,12 @@ function notes(list: Note[], streak: number): Child {
  * (?page=2&q=…), so back to it, or a reload, opens the same. */
 export function chapter(kit: Kit, [id = ""]: string[]): Child {
   setKit(kit);
+  // A chapter the book doesn't have: the page that isn't there, not an empty chapter by that name.
+  if (!chapters().includes(id)) return missing();
   const name = nameOf(id);
+  // Come to by a turn of this chapter's pages: the facts stay in sight once they're in.
+  let toFacts = turned;
+  turned = false;
   title(name);
   const at = new URLSearchParams(location.search);
   const page = signal(Math.max(0, (Number(at.get("page")) || 1) - 1));
@@ -326,8 +351,17 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
     api<Page>("GET", `/api/almanac?${ask}`).then(
       (p) => {
         if (asked !== ask) return; // an older answer, come late
+        // A page past the last (an old link, a number typed in): the last page, in its place.
+        const last = Math.max(0, Math.ceil(p.found / perPage) - 1);
+        if (!p.facts.length && page.peek() > last) {
+          page.set(last);
+          load();
+          return;
+        }
         data.set(p);
         if (p.chapters) first.set(p);
+        if (toFacts) requestAnimationFrame(() => document.querySelector(".chapter-facts")?.scrollIntoView());
+        toFacts = false;
       },
       (err) => {
         if (asked === ask) failed.set(err);
@@ -362,10 +396,12 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
       load();
     }, 300);
   };
-  const turn = (to: number) => {
-    page.set(to);
-    load();
-    document.querySelector(".chapter-facts")?.scrollIntoView({ block: "start" });
+  // Each page of the chapter is an entry of the history: back from page 3 comes to page 2, not out of the chapter.
+  const pageHref = (to: number) => {
+    const shown = new URLSearchParams();
+    if (to) shown.set("page", String(to + 1));
+    if (query.peek().trim()) shown.set("q", query.peek().trim());
+    return `/almanac/${id}${shown.size ? `?${shown}` : ""}`;
   };
   const index = chapters().indexOf(id);
   return h(
@@ -453,7 +489,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
             { class: "entries" },
             p.facts.map((f, i) => entry(f, i === 0)),
           ),
-          pager(page(), Math.ceil(p.found / perPage), turn),
+          pager(page(), Math.ceil(p.found / perPage), pageHref),
         ];
       },
     ),
@@ -473,9 +509,11 @@ function scale(c?: Chapter): Child {
       h(
         "p",
         { class: "know-words" },
-        c.answers
-          ? `Още ${left} ${left === 1 ? "отговор" : "отговора"} и ще видиш колко от главата знаеш.`
-          : "Изиграй главата и ще видиш колко от нея знаеш.",
+        !c.answers
+          ? "Изиграй главата и ще видиш колко от нея знаеш."
+          : c.answers < 10
+            ? `Още ${left} ${left === 1 ? "отговор" : "отговора"} и ще видиш колко от главата знаеш.`
+            : "С първия верен отговор ще видиш колко от главата знаеш.",
       ),
     );
   }
@@ -514,7 +552,7 @@ function scale(c?: Chapter): Child {
 function whence(f: Learned): string {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(new Date(f.at));
   const from =
-    f.kind === "day" && f.issue ? `Брой ${f.issue}` : f.kind === "duel" ? "Дуел" : f.kind ? "Играй главата" : "";
+    f.kind === "day" && f.issue ? `Брой ${f.issue}` : f.kind === "duel" ? "Дуел" : f.kind ? "Игра на главата" : "";
   return from ? `${shortDate(day)} · ${from}` : shortDate(day);
 }
 
@@ -532,13 +570,27 @@ function entry(f: Learned, first: boolean): Child {
   );
 }
 
+/** Whether the chapter drawn next is come to by a turn of its pages (pager). */
+let turned = false;
+
 /** The chapter's pages: newer and older, and each by its number (a few around the one open, and the first and the
- * last). */
-function pager(now: number, pages: number, turn: (to: number) => void): Child {
+ * last), each a link to its page. */
+function pager(now: number, pages: number, href: (to: number) => string): Child {
   if (pages < 2) return null;
   const shown = [...new Set([0, now - 1, now, now + 1, pages - 1])].filter((n) => n >= 0 && n < pages);
   const go = (to: number, label: Child, cls: string, aria?: string) =>
-    h("button", { class: cls, type: "button", onclick: () => turn(to), "aria-label": aria }, label);
+    h(
+      "a",
+      {
+        class: cls,
+        href: href(to),
+        "aria-label": aria,
+        onclick: () => {
+          turned = true;
+        },
+      },
+      label,
+    );
   return h(
     "nav",
     { class: "pager", "aria-label": "Страници" },

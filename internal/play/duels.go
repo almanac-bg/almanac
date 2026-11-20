@@ -117,7 +117,9 @@ type DuelSide struct {
 	Rights int    `json:"rights"`
 	Ms     int64  `json:"ms"`
 	Done   bool   `json:"done"`
-	Look   *Look  `json:"look,omitempty"`
+	// Started is whether the side has answered a question yet (a duel sent first may be made and never begun).
+	Started bool  `json:"started,omitempty"`
+	Look    *Look `json:"look,omitempty"`
 	// Gone is a player who has gone since (play.Forget): their game went with them, so their score isn't known.
 	Gone bool `json:"gone,omitempty"`
 	// Marks are how each question answered went (DuelOf): the player's own; the other's once the duel has a result.
@@ -204,6 +206,32 @@ func (g *Game) DuelFriend(ctx context.Context, userID, friendID int64) (int64, e
 		return nil
 	})
 	return id, err
+}
+
+// RecordingReady is whether a duel against a recording can be played now (DuelRecording): one the player left
+// unfinished, or a recording to draw. Nothing is made: the way to one is offered only while there is one (userID 0: a
+// visitor, any recording).
+func (g *Game) RecordingReady(ctx context.Context, userID int64) (bool, error) {
+	seen := map[string]bool{}
+	if err := seenBy(ctx, g.DB.Read, userID, seen); err != nil {
+		return false, err
+	}
+	// The days drawn, as a recording is judged by them (recordedRun): drawn once a day, so that this only reads.
+	if err := g.EnsureDays(ctx); err != nil {
+		return false, err
+	}
+	var ready bool
+	err := g.read(ctx, func(tx *sql.Tx) error {
+		if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM duels d JOIN runs r ON r.id = d.a_run
+			WHERE d.kind = 'recording' AND d.a_id = ? AND d.ended_at IS NULL AND r.finished_at IS NULL)`, userID).
+			Scan(&ready); err != nil || ready {
+			return err
+		}
+		rec, err := g.recordedRun(tx, userID, seen)
+		ready = rec != nil
+		return err
+	})
+	return ready, err
 }
 
 // DuelRecording starts a duel against a recording: another player's finished game, the one with the fewest questions
@@ -843,8 +871,9 @@ func (g *Game) duelSide(ctx context.Context, userID, runID int64) (*DuelSide, er
 	look := lookOf(userID, avatar)
 	s.Look = &look
 	if runID != 0 {
-		err = g.DB.Read.QueryRowContext(ctx, `SELECT finished_at IS NOT NULL, points, rights, ms FROM runs WHERE id = ?`, runID).
-			Scan(&s.Done, &s.Points, &s.Rights, &s.Ms)
+		err = g.DB.Read.QueryRowContext(ctx, `SELECT finished_at IS NOT NULL, points, rights, ms,
+			EXISTS (SELECT 1 FROM answers WHERE run_id = runs.id) FROM runs WHERE id = ?`, runID).
+			Scan(&s.Done, &s.Points, &s.Rights, &s.Ms, &s.Started)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}

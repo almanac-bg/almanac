@@ -31,11 +31,10 @@ export type SoundName =
   | "end"
   | "win"
   | "lose"
-  | "note"
   | "ping";
 
 /** The bigger sounds, which take turns rather than sound over each other. */
-const inTurn = new Set<SoundName>(["end", "perfect", "win", "lose", "note"]);
+const inTurn = new Set<SoundName>(["end", "perfect", "win", "lose"]);
 /** The longest a sound waits for its turn; later than that it's no longer news, and is left out. */
 const longestWait = 2.5;
 

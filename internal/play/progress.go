@@ -79,6 +79,16 @@ func (g *Game) SetAvatar(ctx context.Context, userID int64, avatar string) error
 	return err
 }
 
+// FirstDay is whether day is a player's first: no game of theirs finished before it. It stays so all day, whatever they
+// play, so that what is said of their first day (web/src/game/standing.ts) reads the same on a reload after the game.
+func (g *Game) FirstDay(ctx context.Context, userID int64, day string) (bool, error) {
+	start, _ := dayBounds(day)
+	var before bool
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM runs WHERE user_id = ? AND finished_at < ?)`,
+		userID, start).Scan(&before)
+	return !before, err
+}
+
 // Played is whether a player has finished a game of any kind.
 func (g *Game) Played(ctx context.Context, userID int64) (bool, error) {
 	var played bool

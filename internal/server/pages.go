@@ -40,6 +40,16 @@ var appPaths = []*regexp.Regexp{
 	sharePath, // a shared day (share.go)
 }
 
+// isAppPath is whether a path is one of the app's pages (appPaths).
+func isAppPath(path string) bool {
+	for _, p := range appPaths {
+		if p.MatchString(path) {
+			return true
+		}
+	}
+	return false
+}
+
 // screens are the pages whose screen loads on its own (web/src/kit.ts), and the file it's in (the build's manifest
 // names it): the page asks for it with app.js, so that one opened by its link (a notification's, a bookmark's) waits
 // for no second round trip. TestScreensMatchTheClient holds it to the client's router.
@@ -149,11 +159,17 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	// A page of the app's with a slash after it (/almanac/) is that page (the client's router drops the slash, and the
+	// page's canonical link is without it): served in place, never sent elsewhere by a redirect.
+	if p := strings.TrimSuffix(r.URL.Path, "/"); p != r.URL.Path && p != "" && isAppPath(p) {
+		u, req := *r.URL, *r
+		u.Path, u.RawPath = p, ""
+		req.URL = &u
+		r = &req
+	}
 	status := http.StatusNotFound
-	for _, p := range appPaths {
-		if p.MatchString(r.URL.Path) {
-			status = http.StatusOK
-		}
+	if isAppPath(r.URL.Path) {
+		status = http.StatusOK
 	}
 	// A shared day's link (share.go), looked up once for all the page says of it.
 	shared, isShared := s.sharedOf(r)

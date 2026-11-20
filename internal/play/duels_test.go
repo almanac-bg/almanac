@@ -288,6 +288,9 @@ func TestRecordingDuel(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	owner, gal := w.user(), w.user()
+	if ready, err := w.g.RecordingReady(ctx, gal); ready || err != nil {
+		t.Fatalf("a recording offered out of nothing: %v %v", ready, err)
+	}
 	if _, err := w.g.DuelRecording(ctx, gal); !errors.Is(err, ErrNobody) {
 		t.Fatalf("a recording out of nothing: %v", err)
 	}
@@ -297,6 +300,12 @@ func TestRecordingDuel(t *testing.T) {
 	}
 	w.play(owner, s.ID, repeat(w.right, Length)...)
 	w.wait(time.Minute)
+	// One to play now, to anyone but its player; a visitor too.
+	for who, want := range map[int64]bool{gal: true, 0: true, owner: false} {
+		if ready, err := w.g.RecordingReady(ctx, who); ready != want || err != nil {
+			t.Fatalf("a recording for %d: %v %v, want %v", who, ready, err, want)
+		}
+	}
 
 	id, err := w.g.DuelRecording(ctx, gal)
 	if err != nil {
@@ -305,9 +314,13 @@ func TestRecordingDuel(t *testing.T) {
 	if again, _ := w.g.DuelRecording(ctx, gal); again != id {
 		t.Fatalf("started again: %d, want %d", again, id)
 	}
+	// The one left unfinished is there to go on with, its recording in a duel under way.
+	if ready, err := w.g.RecordingReady(ctx, gal); !ready || err != nil {
+		t.Fatalf("an unfinished duel against a recording: %v %v", ready, err)
+	}
 	d, err := w.g.DuelOf(ctx, gal, id)
 	if err != nil || !d.Recorded || d.Topic != "history" || d.State != DuelYours || d.Opponent.ID != owner ||
-		len(d.Opponent.Marks) != 0 {
+		len(d.Opponent.Marks) != 0 || d.You.Started {
 		t.Fatalf("against a recording: %+v %v", d, err)
 	}
 	run := w.playSide(gal, id, repeat(w.wrong, Length))
@@ -315,7 +328,7 @@ func TestRecordingDuel(t *testing.T) {
 		t.Fatal("not the recording's ten")
 	}
 	d, _ = w.g.DuelOf(ctx, gal, id)
-	if d.State != DuelLost || d.Record != nil || d.Opponent.Marks[0].Points == 0 || d.Opponent.Points == 0 {
+	if d.State != DuelLost || d.Record != nil || d.Opponent.Marks[0].Points == 0 || d.Opponent.Points == 0 || !d.You.Started {
 		t.Fatalf("its result: %+v", d)
 	}
 	// Nothing of it is the recorded player's to see.

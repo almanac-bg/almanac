@@ -62,7 +62,7 @@ var adminBody = template.Must(template.New("admin").Parse(`
 <p class="tile-value">{{if .Rate}}{{.Rate.HTML}}{{else}}{{.Value}}{{end}}</p>
 <p class="tile-was">Преди 4 седмици: {{.Was}}</p>{{if .Note}}<p class="tile-note">{{.Note}}</p>{{end}}</div>{{end}}</div>{{end}}
 
-<p>{{.Players}} играчи ({{.WithEmail}} с имейл). Днес въпросите на деня са изиграли {{.DayToday}}.{{if .DayScripted}}
+<p>{{.Players}} {{if eq .Players 1}}играч{{else}}играча{{end}} ({{.WithEmail}} с имейл). Днес въпросите на деня са изиграли {{.DayToday}}.{{if .DayScripted}}
 По-бързо, отколкото играе човек: {{.DayScripted}} (другите не ги виждат).{{end}}
 В банката: {{.Questions}} въпроса, {{.Live}} в игра.</p>
 <p class="muted">Играч тук е човек: отговорил на въпрос с човешка скорост, без администраторите. Гостите, изиграли деня

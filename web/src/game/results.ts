@@ -69,6 +69,7 @@ export function scoreCard(s: State, line: Child, words = meaning.points, points:
         "p",
         { class: "points" },
         h("b", { class: "points-n", "data-n": s.points }, points),
+        " ",
         // What points are, a tap away: the game's score, not strength (the rating).
         explain(h("span", { class: "points-label" }, s.points === 1 ? "точка" : "точки"), words),
         s.allRight ? h("span", { class: "points-bonus" }, `+${formatNumber(s.allRight)} за всички верни`) : null,
@@ -85,7 +86,7 @@ const outOf = (s: State) => s.total - (s.void ?? 0);
 /** What the game's feel (feel.ts) needs of the app, as it is now. */
 export const hands = () => ({ calm: calm.peek(), play, format: (n: number) => formatNumber(n) });
 
-/** Each game's result moment, while it plays: what waits for it to land (the sheet for big news). */
+/** Each game's result moment, while it plays: what waits for it to land (the streak rolling on). */
 const moments = new Map<number, Promise<void>>();
 
 /** When a game's result has landed: at once if it had no moment. */

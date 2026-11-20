@@ -89,75 +89,30 @@ test("the day played rolls the streak on in its chip, its words with its number:
   expect(said.filter((s) => /^1дни/.test(s))).toEqual([]);
 });
 
-test("a week's streak is noted in the book, told by its sheet, not first by its chip: the number rolls on just before it", async ({
+test("a week's streak is noted in the book, in a quiet line under the result: no sheet over it, and the chip rolls on", async ({
   page,
 }) => {
   test.setTimeout(120_000);
   await watchChip(page);
   await page.goto("/");
-  // Six days: the seventh is a streak's first milestone, noted in the Алманах and told with its sheet.
+  // Six days: the seventh is a streak's first milestone, noted in the Алманах.
   await daysPlayed(page, 6, 5, 4, 3, 2, 1);
   await page.reload();
   await expect(page.locator(".streak-chip.unlit")).toContainText("6дни поред");
   await startDay(page);
   await heard(page);
-  await watchSheet(page);
   await playRun(page);
-  const sheet = page.getByRole("dialog", { name: "7 дни поред с въпросите на деня." });
-  // It waits for the result to land and the chip to roll on, a few seconds, longer on a slow machine.
-  await expect(sheet).toBeVisible({ timeout: 10_000 });
-  await expect(sheet).toContainText("Отбелязано в Алманаха ти.");
+  await expect(page.locator(".news-note")).toContainText("Отбелязано в Алманаха: 7 дни поред с въпросите на деня.", {
+    timeout: 10_000,
+  });
+  await expect(page.locator(".streak-chip:not(.unlit) .status-text")).toHaveText("7дни поред");
   const said = await heard(page);
   expect(said[0]).toBe("6дни поред unlit");
   expect(said).toContain("67дни поред");
-  expect(said.at(-1)).toBe("7дни поред");
-  // It came up opaque, nothing of the result showing through it, and goes back down, the page staying where it was.
-  await page.waitForTimeout(500);
-  const scrolled = await page.evaluate(() => scrollY);
-  await sheet.getByRole("button", { name: "Продължи" }).click();
-  await expect(sheet).toBeHidden();
-  const seen = await page.evaluate(() => (window as unknown as { sheetSeen: SheetSeen }).sheetSeen);
-  expect(seen.through, "frames with the sheet see-through").toBe(0);
-  expect(seen.away, "the sheet, put away: still open, sliding down").toEqual({ open: true, sliding: true });
-  expect(await page.evaluate(() => scrollY)).toBe(scrolled);
+  // Never a sheet over the result, whatever the game was.
+  await page.waitForTimeout(1500);
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
   // Kept in the book: Моят Алманах lists it, with its day.
   await page.goto("/almanac");
   await expect(page.locator(".almanac-notes")).toContainText("Седем дни поред.");
 });
-
-/** What a look at the big-news sheet saw: in how many frames it was see-through (it or its panel less than opaque),
- * and, as „Продължи“ was tapped, whether it was still open with its panel sliding down. The slide is read off its
- * animation, not counted in frames: a slow machine (WebKit on CI) may draw none of its 200 ms. */
-interface SheetSeen {
-  through: number;
-  away?: { open: boolean; sliding: boolean };
-}
-
-async function watchSheet(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const seen: SheetSeen = { through: 0 };
-    (window as unknown as { sheetSeen: SheetSeen }).sheetSeen = seen;
-    let opened = false;
-    const frame = () => {
-      const box = document.querySelector("dialog[open]");
-      const panel = box?.firstElementChild;
-      if (box && panel) {
-        opened = true;
-        if (Number(getComputedStyle(box).opacity) < 1 || Number(getComputedStyle(panel).opacity) < 1) seen.through++;
-      } else if (opened) return;
-      requestAnimationFrame(frame);
-    };
-    requestAnimationFrame(frame);
-    // A tap on its button bubbles here after the sheet's own handlers have run: what they left.
-    document.addEventListener("click", (e) => {
-      const box = (e.target as Element).closest("dialog.sheet");
-      const panel = box?.firstElementChild;
-      if (!(box instanceof HTMLDialogElement) || !panel || seen.away) return;
-      const sliding = panel.getAnimations().some((a) => {
-        const frames = (a.effect as KeyframeEffect | null)?.getKeyframes() ?? [];
-        return a.playState === "running" && frames.at(-1)?.transform === "translateY(100%)";
-      });
-      seen.away = { open: box.open, sliding };
-    });
-  });
-}

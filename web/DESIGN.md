@@ -120,13 +120,16 @@ There are three places: **Днес** (`/`), **Алманах** (`/almanac`) and 
     and Светило named.
   - „Играй главата“, the topic's game; a game left half-way is „Продължи главата“.
   - Its facts as entries (`.entries`, two columns with a rule on a big screen). Each entry has:
-    - a dateline (`.entry-when`: „20 ноем. · Брой 9“, „Играй главата“, „Дуел“);
+    - a dateline (`.entry-when`: „20 ноем. · Брой 9“, „Игра на главата“, „Дуел“);
     - the answer as a headword (`.entry-word`; a statement is its own headword, with „Невярно:“ before one that isn't
       so);
     - the question in italic (`.entry-q`);
     - the fact (`.entry-fact`), with a drop cap in the chapter's colour on the page's first entry.
   - The latest come first, thirty to a page (`.pager`: „← По-нови“, the numbers, „По-стари →“), and are found by their
-    words (`.search`, at most 60 letters). The page and the search are kept in the address (`?page=2&q=…`).
+    words (`.search`, at most 60 letters). The page and the search are kept in the address (`?page=2&q=…`); each page
+    is a link, an entry of the history of its own (back from page 3 is page 2), and a page past the last is the last.
+  - A chapter's share known shows from a first estimate with a right answer in it: answers all wrong tell nothing
+    („С първия верен отговор ще видиш колко от главата знаеш.“), on the chapter, its row and the book's figures.
 - **Приятели** (`/friends`, `screens/friends.ts`), three pages on a big screen:
   - **The day's board** (`.day-board`: „Приятели“ or „България“, a `segmented` choice), where a row is the place, the
     avatar, the name, the score and the points (`rankRow()`, `.rank-row`; the player's own on `--paper-2`, with
@@ -165,7 +168,7 @@ A new player meets the game a part at a time, by what they've done, never by the
 - **The first day** brings the day's result and its points (what points are is said once, in a quiet line at the top
   of the first game's news, `.news-open`) and the streak; the Алманах's chapters and Приятели are a tap away.
 - **A chapter's first estimate** (10 answers): the chapter says „първа оценка“ with its share, and a game's news says
-  „Първа оценка: знаеш около 74% от темата“, a share with no tier. The tier („Експерт“) comes with a sure mark (30
+  „Първа оценка: знаеш около 74 % от темата“, a share with no tier. The tier („Експерт“) comes with a sure mark (30
   answers).
 
 **Points** say what they are where they first show, and a tap from anywhere they do (`explain()`: the word dotted
@@ -394,8 +397,8 @@ A rule never holds a literal colour; it takes a token.
     never before it. With a right answer, `.filed` goes under the fact: „Записано в Алманаха, глава „…““, with its
     chapter's mark before it. A wrong answer's fact goes into the book with the first right answer, and nothing says
     so then.
-  - `.leave-layer` with `.leave-ask`: asked to leave, a sheet at the foot over the answers, with „Остани“ as the one
-    action and the clock running in sight above it.
+  - `.leave-layer` with `.leave-ask`: asked to leave, a sheet of opaque paper across the foot, over the answers, with
+    „Остани“ as the one action and the clock running in sight above it.
 - **A topic's result** (`game/results.ts`, `.summary`), the same shape as every result: the score and its shape;
   right under it what to do next (`nextSteps`: one `big` primary button, „Още десет“ — or, while the day's ten wait,
   the way to them, with „Още десет“ plain); then the game's news; and at the end the questions, once opened. Each
@@ -410,9 +413,10 @@ A rule never holds a literal colour; it takes a token.
     „близо“ and „без отговор“ muted). Their points wait for the end.
   - Played first, the result is the player's own (`.summary`), with a line that it's sent (`.duel-sent`: „Изпратен.
     Мария ще изиграе същите десет въпроса: има време още 3 дни.“).
-  - „Нов дуел“ (`/duel/new`): each friend is a row („Покани“), and there is „Играй срещу запис“.
+  - „Нов дуел“ (`/duel/new`): each friend is a row („Дуел“, as on a friend's row in Приятели), and there is „Играй
+    срещу запис“ while there is a recording to play (`GET /api/duels/recording`).
 - **A duel's result** (`screens/outcome.ts` with `outcome.css`, loaded as a duel starts) is a page (`.duel-end`):
-  - The kicker („Дуел с Мария“, „Дуел срещу запис“) and the verdict in the serif over an ink rule (`.duel-verdict`:
+  - The kicker („Дуел с Мария“, „Срещу запис на Мария“: a duel is named so everywhere) and the verdict in the serif over an ink rule (`.duel-verdict`:
     „Победа“ in green, „Загуба“ in red, „Равенство“).
   - The two face to face (`.duel-face`): the player on the left, the other on the right, each with a small avatar and
     the name (a way to the profile, „Запис“ for a recording) over the points, big in the numerals, and the right
@@ -475,9 +479,9 @@ Every element that looks like a game measures something the game already counts:
 - the notes it wrote in the book (`.news-note`, „Отбелязано в Алманаха: 30 дни поред с въпросите на деня.“);
 - once a day, how others' duels against the player's recordings went („Твоите записи“).
 
-A note is the one thing big enough for a sheet over the result (Motion), with its sound. A game that ended without
-its result on screen (the day's last question left to run out, a game left at its end) has its news told on Днес,
-once, with no sheet or sound (`play/told.go`).
+Nothing of it is a sheet or has a sound of its own: a note too is a line (Motion). A game that ended without its
+result on screen (the day's last question left to run out, a game left at its end) has its news told on Днес, once
+(`play/told.go`).
 
 Feedback fires once, when it's earned, and then the screen is still again: a right answer pops, a wrong one shakes
 once, points rise counting up to what was earned, and an exact number answer gets the star.
@@ -586,16 +590,12 @@ once, points rise counting up to what was earned, and an exact number answer get
     thud for each not), the two scores counting up with them so the lead changes hands as it did.
   - The band of the deciding question lights as it's reached.
   - At about 0.9s the verdict rises and the scores land, with `win`, `lose` or `end`; then the record fades in.
-- **A note in the book is a sheet** (at most one a game: the streak at 7, 30, 100 or 365 days, a first ten of ten, a
-  chapter complete):
-  - It opens once the result has landed (on the day, once the streak has rolled on too: one moment after another,
-    never one over another).
-  - It slides up (320ms), opaque, over the result dimming behind it, its number set large (or the chapter's picture),
-    with „Отбелязано в Алманаха ти.“ and its sound.
-  - „Продължи“, a tap beside it or Esc puts it away (200ms); it never goes by itself.
+- **A note in the book is a quiet line** under the result (`.news-note`), never a sheet over it or a medal: the game
+  that brought it may have gone badly (a streak's thirtieth day with two right of ten), and a bad game is never
+  celebrated.
 - **No ambient motion** and no confetti.
 - **Reduced motion** („По-малко движение“, which follows `prefers-reduced-motion` until set): the pop, the shake, the
-  rise, the transitions and the steps stop, and a result and a sheet show their end state at once, with their sound.
+  rise, the transitions and the steps stop, and a result shows its end state at once, with their sound.
   The clock and the count before a run still move, because they are information.
 
 ## Sound
@@ -609,7 +609,7 @@ once, points rise counting up to what was earned, and an exact number answer get
 - **Four voices:** a bell (FM) for what's earned; a wooden pluck for the player's own touches; a soft thud for a wrong
   answer or none (never a buzzer); a short beep for the clock. Everything goes through a compressor, so sounds that
   meet can't clip.
-- **Short:** an answer's sounds are over in under half a second; a moment's (the end, a note) may take up to 1.4
+- **Short:** an answer's sounds are over in under half a second; a moment's (the end, a duel's) may take up to 1.4
   seconds, as it comes once a game.
 - **One sound per moment,** and only for game moments:
   - `tap` when an answer is given, and `key` for each key of the pad and each move in an order;
@@ -618,7 +618,6 @@ once, points rise counting up to what was earned, and an exact number answer get
     second for the last five, a step higher each („Тиктакане“ in Настройки turns it off);
   - `count` for each second of the count before a run, and `go` at its start;
   - `end` when a run's result opens (`perfect` for ten of ten), and `win` or `lose` at a duel's end;
-  - `note` (three bells rising) with a note in the book, as its sheet opens, only after the result's own sound;
   - `ping` when something new waits in Приятели (a friend's request, a friend's duel);
   - `them`, the other side of a duel answering, when played second (two soft low plucks, A4 then F♯4, off to the
     right, never a bell; only while the player hasn't answered).

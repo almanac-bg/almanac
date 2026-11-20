@@ -37,6 +37,8 @@ export interface Side {
   rights: number;
   ms: number;
   done: boolean;
+  /** Whether the side has answered a question yet: a duel sent first may be made and never begun. */
+  started?: boolean;
   look?: { avatar?: string };
   /** A player who has gone since (play.DuelSide.Gone): their game went with them, so their score isn't known. */
   gone?: boolean;
@@ -125,6 +127,7 @@ function rowLine(d: DuelView): string {
   const versus = d.recorded ? " · срещу запис" : "";
   switch (d.state) {
     case "yours":
+      if (d.first && !d.you?.started) return `Не е започнат · ${leftWords(d.until ?? 0)}`;
       return d.first
         ? `Довърши своята игра · ${leftWords(d.until ?? 0)}`
         : `Изиграй същите десет · ${leftWords(d.until ?? 0)}`;
@@ -242,6 +245,12 @@ export function duelNew() {
       () => friends.set([]),
     );
   else friends.set([]);
+  // A recording to play against: offered only while there is one.
+  const recording = signal(false);
+  api<{ ready: boolean }>("GET", "/api/duels/recording").then(
+    (r) => recording.set(r.ready),
+    () => {},
+  );
   const begin = async (to: { friend: number } | { recording: true }) => {
     if (busy.peek()) return;
     busy.set(true);
@@ -294,27 +303,30 @@ export function duelNew() {
                 onclick: () => begin({ friend: f.id }),
               },
               who(f.name, { avatar: f.avatar }, null, f.name),
-              h("span", { class: "duel-row-end" }, h("strong", { class: "duel-state duel-invite" }, "Покани")),
+              h("span", { class: "duel-row-end" }, h("strong", { class: "duel-state duel-invite" }, "Дуел")),
             ),
           ),
         ),
       );
     }),
-    h(
-      "section",
-      { class: "stack small-gap" },
-      h("h2", { class: "section-title" }, "Срещу запис"),
-      h(
-        "p",
-        { class: "muted" },
-        "Същите десет въпроса като в истинска игра на друг играч, с отговорите в нея, както са дадени.",
-      ),
-      h(
-        "button",
-        { class: "btn", type: "button", disabled: busy, onclick: () => begin({ recording: true }) },
-        "Играй срещу запис",
-      ),
-    ),
+    () =>
+      recording()
+        ? h(
+            "section",
+            { class: "stack small-gap" },
+            h("h2", { class: "section-title" }, "Срещу запис"),
+            h(
+              "p",
+              { class: "muted" },
+              "Същите десет въпроса като в истинска игра на друг играч, с отговорите в нея, както са дадени.",
+            ),
+            h(
+              "button",
+              { class: "btn", type: "button", disabled: busy, onclick: () => begin({ recording: true }) },
+              "Играй срещу запис",
+            ),
+          )
+        : null,
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }
@@ -523,7 +535,7 @@ export function duelOne(params: string[]) {
           );
           return h("div", null, after);
         },
-        d.recorded ? `запис на ${d.opponent?.name ?? ""}` : (d.opponent?.name ?? ""),
+        duelName(d),
         d.opponent?.name ?? "",
       ),
     );

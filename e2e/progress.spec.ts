@@ -43,7 +43,7 @@ test("a topic's game tells how well the topic is known, and the avatar is anyone
 // The day as the server would have it, the entry its right answers wrote told (as the server does) only once the day
 // is played: with others playing, the right answer a tenth of them got; with too few, the hardest, nothing of others.
 for (const { crowd, head, kicker } of [
-  { crowd: true, head: "Най-рядкото ти попадение", kicker: "История · знаят го 10%" },
+  { crowd: true, head: "Най-рядкото ти попадение", kicker: "История · знаят го 10\u00a0%" },
   { crowd: false, head: "Днес в Алманаха ти", kicker: "История · въпрос 8" },
 ]) {
   test(`just played, an entry of the day is told as the book has it (${crowd ? "a crowd" : "no crowd"})`, async ({

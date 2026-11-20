@@ -80,6 +80,8 @@ func hardnessOf(known float64) float64 { return math.Log((1 - known) / known) }
 type ability struct {
 	mean, variance float64
 	answers        int
+	// rights are the answers that scored (right, or partly): without one, nothing is told of what a player knows.
+	rights int
 }
 
 func newAbility() ability { return ability{variance: priorVariance} }
@@ -94,6 +96,9 @@ func (a *ability) learn(score, hardness, luck float64) {
 	a.variance = 1 / (1/a.variance + slope*slope/spread)
 	a.mean += max(-1, min(1, a.variance*slope*(score-p)/spread))
 	a.answers++
+	if score > 0 {
+		a.rights++
+	}
 }
 
 // knownOf is the share of questions of these hardnesses a player of an ability knows.
@@ -121,7 +126,7 @@ type Mastery struct {
 	// Next is the next tier's name, and NextAt the percent it starts at ("" and 0 at the top).
 	Next   string `json:"next,omitempty"`
 	NextAt int    `json:"nextAt,omitempty"`
-	// Sure is whether there are answers enough to tell (MasteryFrom): until then, Known and Tier are only a guess, and
+	// Sure is whether there are answers enough to tell (MasteryFrom, one of them right at least): until then, Known and Tier are only a guess, and
 	// the tier isn't told. First is whether there are enough for a first estimate (MasteryFirst) but not yet for that:
 	// Known is told as one, without a tier.
 	Sure  bool `json:"sure"`
@@ -140,10 +145,12 @@ func TierOf(known int) int {
 }
 
 func masteryOf(category string, a ability, hardness []float64) Mastery {
+	// Ten answers all wrong say nothing of what a player knows: no share without a right answer.
+	told := a.rights > 0
 	known := int(math.Round(100 * knownOf(a.mean, hardness)))
 	t := TierOf(known)
 	m := Mastery{Category: category, Answers: a.answers, Known: known, Tier: t, Name: MasteryTiers[t].Name,
-		Sure: a.answers >= MasteryFrom, First: a.answers >= MasteryFirst && a.answers < MasteryFrom}
+		Sure: told && a.answers >= MasteryFrom, First: told && a.answers >= MasteryFirst && a.answers < MasteryFrom}
 	if t+1 < len(MasteryTiers) {
 		m.Next, m.NextAt = MasteryTiers[t+1].Name, MasteryTiers[t+1].From
 	}
@@ -319,6 +326,15 @@ func (g *Game) goOver(ctx context.Context, db querier, h *hardnesses, b *bank.Ba
 		a.learn(score, hard, chanceOf(q))
 		topics[head.Category] = a
 		all.learn(score, hard, chanceOf(q))
+		// Bulgaria's questions, counted apart: its chapter is told once one of them is answered right (ChaptersOf).
+		if q.Extra().BG {
+			bg := topics[BulgariaTopic]
+			bg.answers++
+			if score > 0 {
+				bg.rights++
+			}
+			topics[BulgariaTopic] = bg
+		}
 	}
 	return topics, all, rows.Err()
 }

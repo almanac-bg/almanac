@@ -94,7 +94,7 @@ func PlayerText(s string) string {
 // (adminQuestions). Admins only; to anyone else they aren't there.
 func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	if !s.isAdmin(r) {
-		http.NotFound(w, r)
+		s.page(w, r) // to anyone else, the game's own page that isn't there
 		return
 	}
 	ctx := r.Context()
@@ -140,7 +140,7 @@ func (s *Server) isAdmin(r *http.Request) bool {
 // adminQuestions is /admin's page of the questions: reports on them, and how each goes.
 func (s *Server) adminQuestions(w http.ResponseWriter, r *http.Request) {
 	if !s.isAdmin(r) {
-		http.NotFound(w, r)
+		s.page(w, r) // to anyone else, the game's own page that isn't there
 		return
 	}
 	ctx := r.Context()

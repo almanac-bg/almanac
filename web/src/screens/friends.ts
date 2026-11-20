@@ -156,14 +156,20 @@ function dayBoard(): Child {
 /** The day among the player's friends: each who played, best first, and who hasn't yet, in a line. */
 function ofFriends(d: Day): Child {
   const rows = d.friends ?? [];
-  if (!rows.length)
-    return h(
-      "p",
-      { class: "board-empty" },
-      d.befriended === false
-        ? "Още нямаш приятели тук. Добави някого и сравнявайте резултатите си всеки ден."
-        : "Още никой от приятелите ти не е играл днес.",
-    );
+  if (!rows.length) {
+    // No friend has played yet: the player's own day on the board all the same, once played, and why it's alone.
+    const mine = d.run?.done ? (d.board.mine ?? d.board.top.find((s) => s.me)) : undefined;
+    return [
+      mine ? h("ol", { class: "rows ranks" }, scoreRow({ ...mine, me: true }, 1)) : null,
+      h(
+        "p",
+        { class: "board-empty" },
+        d.befriended === false
+          ? "Още нямаш приятели тук. Добави някого и сравнявайте резултатите си всеки ден."
+          : "Още никой от приятелите ти не е играл днес.",
+      ),
+    ];
+  }
   return h(
     "ol",
     { class: "rows ranks" },
@@ -192,13 +198,12 @@ function everyone(d: Day): Child {
       b.top.map((s, i) => scoreRow(s, i + 1)),
       mine && b.place ? scoreRow(mine, b.place, b.place > b.top.length + 1) : null,
     ),
-    b.place
-      ? h("p", { class: "board-note" }, `В България си ${ordinal(b.place)} от ${formatNumber(b.players)}.`)
-      : h(
-          "p",
-          { class: "board-note" },
-          `Днес играха ${formatNumber(b.players)} ${b.players === 1 ? "човек" : "души"}.`,
-        ),
+    // Alone on the board, a place says nothing.
+    b.players < 2
+      ? null
+      : b.place
+        ? h("p", { class: "board-note" }, `В България си ${ordinal(b.place)} от ${formatNumber(b.players)}.`)
+        : h("p", { class: "board-note" }, `Днес играха ${formatNumber(b.players)} души.`),
   ];
 }
 

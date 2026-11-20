@@ -39,6 +39,7 @@ import { feelKit, loadFeel, play, playAnswer, playCount, quietWhenSilent, setSou
 import { dateWords, issueWords, listWords, weekday, withWord } from "./lib/words.ts";
 import { type DuelView, duelLists, startDuel } from "./screens/duel.ts";
 import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
+import { missing } from "./screens/missing.ts";
 import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
 import { signIn } from "./screens/signin.ts";
@@ -130,6 +131,7 @@ export const kit = {
   masteryCard,
   meaning,
   meter,
+  missing,
   nameFirst,
   needsHomeScreen,
   news,

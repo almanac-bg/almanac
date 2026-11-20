@@ -14,6 +14,8 @@ test("friends on the day: who has played it, and how each went", async ({ browse
   await a.goto("/friends");
   await a.getByRole("tab", { name: "Приятели" }).click();
   await expect(a.locator(".day-board")).toContainText("Още нямаш приятели тук.");
+  // Her own day is on the board all the same.
+  await expect(a.locator(".day-board .rank-row.me")).toHaveCount(1);
   const ana = await a.evaluate(async () => (await (await fetch("/api/me")).json()).user.name as string);
 
   // Bo asks her by her username, and she says yes. Before he plays, Днес has her day beside his.

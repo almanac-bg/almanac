@@ -5,6 +5,7 @@ import type { Mastery } from "../game/mastery.ts";
 import { api } from "../lib/api.ts";
 import { dayInBulgaria } from "../lib/day.ts";
 import { h } from "../lib/dom.ts";
+import { withWord } from "../lib/words.ts";
 import { topics } from "../state.ts";
 
 export interface Stats {
@@ -60,7 +61,8 @@ function what(p: Played): string {
       return p.issue ? `Брой ${p.issue}` : "Въпросите на деня";
     case "duel":
       // A duel cut off has no result: only that it was a duel.
-      return p.outcome ? `Дуел срещу ${p.opponent}${p.recorded ? " (запис)" : ""}, ${outcome[p.outcome]}` : "Дуел";
+      if (!p.outcome) return "Дуел";
+      return `${p.recorded ? `Срещу запис на ${p.opponent}` : `Дуел ${withWord(p.opponent ?? "")}`}, ${outcome[p.outcome]}`;
     default:
       return topicName(p.category);
   }
