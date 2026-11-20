@@ -111,19 +111,13 @@ place.
   so), the question in italic (`.entry-q`), the fact (`.entry-fact`, a drop cap in the chapter's colour on the page's
   first). The latest first, thirty to a page (`.pager`: „← По-нови“, the numbers, „По-стари →“), found by their words
   (`.search`, at most 60 letters); the page and the search are in the address (`?page=2&q=…`).
-  : the player (streak,
-  numbers,
-  the facts in the Алманах, mastery (once a topic has a mark; each row a way to play the topic), latest games (the
-  day's ten as their issue, „Брой 7“, the date under it; today's each a way to go over it, read-only: `/games/<id>`,
-  the score as its result had it and the questions; those of days gone by plain rows) and „Всички игри“ (`/games`:
-  every game, by day under its dateline, Всички · Броеве · Теми · С други, a page at a time)). Настройки open from the button beside the name, its icon and its word at every width (an icon alone
-  is read by few). The avatar is a tap from choosing another (`/avatar`, „Смени аватара“ under the name too): what's
-  worn as others see it, then the fifteen animals, each in its own colours, every one anyone's from the first day, a
-  tap wearing it.
-  Общо is a hub, each thing once: the streak, three numbers in one card, the Алманах in a line („N факта в
-  Алманаха“, a tap from it), mastery, the latest games and the way to all of them. Its head is the player's own
-  avatar, as last seen on the device while it loads (never one drawn from the name: that reads as someone else's
-  profile; a plain tile before any).
+- **Профил** (`/me`, from the avatar in the bar's corner) is a spread: on the left page the avatar as it's worn,
+  the name as the page's title in the serif, the tag, „Промени името“ (or, for a name still drawn, that it was and
+  „Смени го“), three figures between rules (days in a row, the longest streak, the issues played) with what the streak
+  forgives under them, and „Всички игри“ (`/games`) and „Как те виждат другите“. On the right „Аватар“, the fifteen
+  animals each with its name under it, every one anyone's from the first day, the one worn ringed in ink, a tap wearing
+  it (the bar's avatar with it); then „Настройки“, a row to their page (`/settings`). A guest is asked to keep the game
+  on the left page. `/avatar` is the same choice on a page of its own.
 
 ## First days
 
@@ -188,8 +182,8 @@ on a phone 160px wide; it holds that way (`e2e/text.spec.ts`):
 - **64rem (a laptop):** the page is up to 76rem wide with a 32px gutter, and a place is a spread (`.spread`, above):
   Днес's issue on the left page with „В броя“ under it, the streak, the friends' day and the book on the right; the
   result's score on the left and България's day and the rarest right answer on the right (just played as after a
-  reload); the cover's date on the left page and the issue on the right. Профил's places are 64rem wide: Общо's cards in two columns, read
-  top to bottom; bigger avatars to choose from, more to a row. Every other page is a centred column of 48rem, so no
+  reload); the cover's date on the left page and the issue on the right. Профил: who you are on the narrower left page, the avatars and
+  Настройки on the wider right. Every other page is a centred column of 48rem, so no
   line of text runs too long; a game is 54rem, with bigger type still. A run's question (the day, a topic) takes the
   page's width in two columns: the head, the question and its answers on the left, and on the
   right, from the question's start, the column its answer comes into (see Flow); on a laptop's height a choice of
@@ -273,8 +267,8 @@ questions are about. A rule never holds a literal colour: it takes a token.
 
 - **Layout:** `.screen`, `.stack`, `.intro`, `.title-row`, `.card` (with `.card-head` and `.card-title`) and
   `.card.hero`.
-- **Getting around:** `.tabs` (the four places), `.back` (drawn by `back()`), `.subnav` (Профил's places, drawn by
-  `profileNav()`), `.me-settings` (Настройки: an icon and its word, the word under the icon on a narrow phone) and `.more` (a `details` that
+- **Getting around:** `.places` (the three places), `.back` (drawn by `back()`), `.me-settings` (Профил's row to
+  Настройки) and `.more` (a `details` that
   folds what's rarely needed; what it holds is spaced as a section's parts).
 - **Днес:** `.issue` (`.issue-date`, `.issue-body`, `.issue-go`, `.contents-issue`) and `.today-side`
   (`.today-streak` with `.streak-chip`, `.today-friends`, `.book-link`); the result `.result` (`.result-main` with
@@ -342,8 +336,7 @@ questions are about. A rule never holds a literal colour: it takes a token.
 - **Players:**
   - `.avatar` (a picture on a tile of its tone `tone-…`, sizes `s` and `l`), drawn by `avatar()`.
   - `.who` (avatar and name) for a player on a board or a list, drawn by `who()`.
-  - `.worn` (what's worn), `.picker`/`.pick` and `.tone-pick` for choosing an avatar (`/avatar`).
-  - `.place-link` (a line in Профил a tap from a place: the Алманах).
+  - `.picker`/`.pick` (with `.pick-name`) for choosing an avatar (Профил, `/avatar`).
 - **Results:** `.summary`, `.board`/`.row` (with `p1`–`p3`, `me` and `gap`), `.topics`/`.topic`,
   `.players` and `.settings`. Every result screen (the day, a topic, a duel) is laid out the same:
   the result; right under it what to do next (`nextSteps`): the one gold `big` button (the day's by `game/gold.ts`; a topic's „Още
@@ -353,17 +346,17 @@ questions are about. A rule never holds a literal colour: it takes a token.
   opened (the button takes the player there). Each question gone over is a card of its own (`.reviewed`, a band in
   its verdict's colour on top): its number and topic as a kicker with „Вярно“, „Близо“ or „Грешно“ beside them, the
   question the strongest line, the answers marked, and the fact a quiet note under them.
-- **A duel's result** (`screens/outcome.ts` with `outcome.css`, loaded as a duel starts), one card (`.duel-end`): the
-  kicker („Дуел с Мария“, „Дуел срещу запис“) and the verdict (`.duel-verdict`: „Победа“, „Загуба“,
-  „Равенство“); the two face to face
-  (`.duel-face`: the big avatar, the name a way to the profile, „Запис“ for a recording, the points and
-  the right answers; the winner's points gold and its avatar glowing, the other's plain; a player gone since, a dash
-  and „Играчът вече го няма“); the duel question by question (`.duel-marks`: the player's row over the
-  other's, each beside a small avatar; the quicker of two right answers ringed in gold, `.fast`, said once under
-  them; a gold band behind the question that decided it); one line of what decided it (`.duel-line`: „Водеше от
+- **A duel's result** (`screens/outcome.ts` with `outcome.css`, loaded as a duel starts), a page (`.duel-end`): the
+  kicker („Дуел с Мария“, „Дуел срещу запис“) and the verdict in the serif over a rule in ink (`.duel-verdict`:
+  „Победа“ in green, „Загуба“ in red, „Равенство“); the two face to face, the player on the left, the other on the
+  right (`.duel-face`: a small avatar and the name, a way to the profile, „Запис“ for a recording, over the points
+  big in the numerals and the right answers; the loser's points quieter, a gold colon between; a player gone since,
+  a dash and „Играчът вече го няма“); the duel question by question (`.duel-marks`, as the day's trail: right in
+  ink, wrong an open square; the player's row over the other's, each beside a small avatar; the quicker of two
+  right answers ringed in gold, `.fast`, said once under them; a gold band behind the question that decided it); one line of what decided it (`.duel-line`: „Водеше от
   8-ия въпрос до края.“, „Мария водеше от първия въпрос до края.“, „Реши го последният въпрос.“, „Равни точки: реши
   времето (…)“, a second or more apart, „Равни точки и под секунда разлика във времето.“ for a draw); and what it
-  meant under a hairline (`.duel-meant`: the record against this person, „Срещу Мария 3 : 2“, in rose; against a
+  meant under a hairline (`.duel-meant`: the record against this person, „Срещу Мария 3 : 2“; against a
   recording, whose game it was, „Записът е от истинска игра на Мария.“). Then the next steps: „Реванш“ gold (a new
   duel the other way round: the player plays first), or „Още един срещу запис“; „Към Приятели“ plain. A duel that
   lapsed is its heading („Дуелът изтече“) and who didn't play it in time („Мария не изигра дуела за трите дни.“), and
@@ -412,7 +405,7 @@ questions are about. A rule never holds a literal colour: it takes a token.
   („Твоите записи“). A game that ended without its result on screen (the day's last question let run out, a game
   left at its end) has its news told on Начало, once, under „От последната ти игра“, with no sheet or sound
   (`play/told.go`).
-- **The streak** forgives a missed day a week by itself, said under it in Профил (`.streak-note`, the day forgiven
+- **The streak** forgives a missed day a week by itself, said under it on Днес and in Профил (the day forgiven
   on the week's strip: `.week li.forgiven`); a day forgiven, or a streak that ended, is said once on Начало
   (`.streak-notice`; told once on the server, not once per device), as is, one at a time, what others did meanwhile:
   a friend said yes to a request („Мария прие поканата ти за приятелство.“ and „Приятели“). While a friend's duel

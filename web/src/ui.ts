@@ -291,57 +291,12 @@ export function stat(value: string, label: string, tone = ""): Child {
   );
 }
 
-/** A number and what it counts, bare (inside a card). */
-export function figure(value: string, label: string): Child {
-  return h(
-    "div",
-    { class: "figure" },
-    h("b", { class: "figure-value" }, value),
-    h("span", { class: "figure-label" }, label),
-  );
-}
-
 const dayNames = ["понеделник", "вторник", "сряда", "четвъртък", "петък", "събота", "неделя"];
 const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Sofia", weekday: "short" });
 
 /** Today in Bulgaria, Monday first (0–6): the game's days are Bulgaria's. */
 function today(): number {
   return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(weekday.format(new Date()));
-}
-
-/** The streak: days in a row with the day's ten, this week's days played (and the day missed that it forgave), whether
- * this week still has its day to forgive (`spare`: play/runs.go), and (`best`, Профил's) the longest streak the player
- * has had, when it's longer than this one. */
-export function streak(days: number, week?: boolean[], forgiven?: boolean[], spare = true, best = 0): Child {
-  const unit = days === 1 ? "ден" : "дни";
-  return h(
-    "section",
-    { class: days ? "streak" : "streak cold", "aria-label": `Серия: ${days} ${unit}` },
-    picture("flame", "flame"),
-    h(
-      "div",
-      null,
-      h(
-        "div",
-        { class: "streak-count" },
-        h("b", { class: "streak-num" }, String(days)),
-        h("span", { class: "streak-unit" }, unit),
-      ),
-      h("p", null, days ? "поред с въпросите на деня" : "Изиграй въпросите на деня и започни серия."),
-      // What keeps the streak through a day missed: the week's one day, forgiven by itself (play/runs.go).
-      days
-        ? h(
-            "p",
-            { class: "streak-note" },
-            spare
-              ? "Един пропуснат ден в седмицата не прекъсва серията."
-              : "Тази седмица един ден вече е простен: следващият пропуснат прекъсва серията.",
-          )
-        : null,
-      best > Math.max(days, 1) ? h("p", { class: "streak-note" }, `Най-дълга серия: ${best} дни`) : null,
-    ),
-    weekStrip(week, forgiven),
-  );
 }
 
 const weekLetters = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];

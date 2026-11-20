@@ -13,16 +13,12 @@ function sampleFacts(): string[] {
   );
 }
 
-test("the book's contents: a chapter a row with its facts, and Профил counting them", async ({ page }) => {
+test("the book's contents: a chapter a row with its facts, and the book counting them", async ({ page }) => {
   // Every fact of the sample's „Кино и телевизия“, and one of „История“.
   await page.goto("/");
   await knows(page, ["mov-300", "mov-302", "mov-960", "mov-961", "mov-962", "mov-963", "mov-964", "his-002"]);
 
-  await page.goto("/me");
-  const line = page.getByRole("link", { name: /^8 факта в Алманаха/ });
-  await expect(line).toBeVisible();
-  await line.click();
-  await expect(page).toHaveURL(/\/almanac$/);
+  await page.goto("/almanac");
   await expect(page.locator(".fig").nth(1)).toContainText("8факта");
   // Ten topics, „Микс“ and „България“: twelve chapters, each a way into its own.
   const rows = page.locator(".toc-row");

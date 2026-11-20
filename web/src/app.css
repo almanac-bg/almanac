@@ -1262,56 +1262,6 @@
   }
 
   /* A line that's a tap from a place of its own (Профил's facts, to the Алманах). */
-  .place-link-pic {
-    flex: none;
-    width: 44px;
-    height: 44px;
-  }
-
-  .place-link {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-md);
-    background: var(--surface);
-    box-shadow:
-      var(--elev-1),
-      inset 0 0 0 1px var(--line);
-    color: inherit;
-    text-decoration: none;
-    transition: box-shadow 160ms;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .place-link:hover {
-      box-shadow:
-        var(--elev-2),
-        inset 0 0 0 1px var(--line);
-    }
-  }
-
-  .place-link-text {
-    display: grid;
-    flex: 1;
-    min-width: 0;
-  }
-
-  .place-link-name {
-    font-weight: 800;
-  }
-
-  .place-link-more {
-    color: var(--text-muted);
-    font-size: 0.8125rem;
-    line-height: 1.125rem;
-  }
-
-  .place-link-i {
-    flex: none;
-    color: var(--text-muted);
-    transform: scaleX(-1);
-  }
 
   /* The ways to play with others: three peers, so three in a row, a small card each in its colour; on a phone the
      picture over the name (a big screen puts it beside, below). */
@@ -1369,23 +1319,6 @@
   /* The way back from a screen reached from a main place. */
   /* ---- Figures: numbers with what they count ---- */
 
-  .figures {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: var(--space-3);
-  }
-
-  .figure {
-    display: grid;
-    align-content: start;
-    gap: var(--space-1);
-  }
-
-  .figure-value {
-    font: 900 2rem / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-  }
-
   .figure-label,
   .stat-label {
     color: var(--text-muted);
@@ -1433,63 +1366,7 @@
 
   /* ---- Streak: days in a row with the day's ten, and this week ---- */
 
-  .streak {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    gap: var(--space-2) var(--space-4);
-    padding: var(--space-4);
-    border-radius: var(--radius-lg);
-    background: var(--surface);
-    box-shadow:
-      var(--elev-1),
-      inset 0 0 0 1px var(--line);
-  }
-
   /* The streak's flame (art/pictures.ts): gold and glowing while it burns, grey when there's none. */
-  .flame {
-    --tone: var(--flame);
-    width: 52px;
-    height: 52px;
-    filter: drop-shadow(0 0 10px color-mix(in srgb, var(--gold) 45%, transparent));
-  }
-
-  .streak.cold .flame {
-    --tone: var(--line-strong);
-    opacity: 0.7;
-    filter: none;
-  }
-
-  .streak-count {
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .streak-num {
-    color: var(--gold-display);
-    font: 900 calc(26px + 1.625rem) / 0.9 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .streak.cold .streak-num {
-    color: var(--text-muted);
-  }
-
-  .streak-unit {
-    color: var(--text-muted);
-    font-size: 1rem;
-    font-weight: 700;
-  }
-
-  .streak p {
-    margin-top: 4px;
-    color: var(--text-muted);
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    font-weight: 600;
-  }
 
   /* ---- The shape of a game: a square a question, right filled in ink, wrong open ---- */
 
@@ -2844,12 +2721,12 @@
     inset: -2px 0;
   }
 
-  /* Duels as rows: the other player, how it stands, the rating it moved. */
+  /* Duels as ruled rows: the other player, how it stands, and a word on it. */
   .duel-list {
     display: grid;
-    gap: var(--space-2);
     margin: 0;
     padding: 0;
+    border-top: 1px solid var(--rule);
     list-style: none;
   }
 
@@ -2858,10 +2735,9 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
-    padding: var(--space-3);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-md);
-    background: var(--surface);
+    min-height: 3.75rem;
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--rule);
     color: var(--text);
     text-decoration: none;
   }
@@ -2875,8 +2751,9 @@
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .duel-row:hover {
-      border-color: var(--line-strong);
+    .duel-row:hover .who-name {
+      text-decoration: underline;
+      text-underline-offset: 3px;
     }
   }
 
@@ -2889,7 +2766,7 @@
   }
 
   .duel-state {
-    font-size: 0.9375rem;
+    font: 600 0.9375rem / 1.25rem var(--font-serif);
   }
 
   /* „Покани“ on a friend's row in /duel/new: what the tap does, in the link's colour. */
@@ -4036,89 +3913,129 @@
     background: var(--sunken);
   }
 
-  /* ---- Профил's head: the avatar (a tap from choosing another), the name and tag ---- */
+  /* ---- Профил: who you are on the left page, the avatars and Настройки on the right ---- */
 
-  .me-head {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
+  .me-intro {
+    display: grid;
+    align-content: start;
+    gap: var(--space-5);
   }
 
-  /* Beside the avatar while a name's words fit there: past that (large text on a narrow phone) the words go under it,
-     the whole width theirs, rather than a word broken in two. */
-  .me-head-text {
+  .me-head {
     display: grid;
-    flex: 1 1 10em;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2px;
-    min-width: 0;
+    justify-items: start;
+    gap: var(--space-1);
   }
 
   .me-avatar {
     display: inline-flex;
-    flex: none;
-    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-3);
   }
 
-  .me-avatar-link {
-    justify-self: start;
-    font-size: 0.875rem;
+  .me-avatar .avatar.l {
+    width: 96px;
+    height: 96px;
   }
 
-  /* A long name wraps in its column, never under what's beside it. */
+  /* The name as the page's title, in the serif; a long one wraps, never past the column. */
   .me-head h1 {
-    font-size: calc(13px + 0.8125rem);
+    font: 600 calc(24px + 1.5rem) / 1.05 var(--font-serif);
+    letter-spacing: -0.02em;
     overflow-wrap: anywhere;
   }
 
-  /* Настройки, its icon and its word (an icon alone is read by few): beside the name on a big screen; on a phone a row
-     of its own under it, so that the name has the width. */
-  .me-settings {
-    flex: none;
-    width: auto;
-    min-height: 2.75rem;
-    padding: var(--space-2) var(--space-3);
-    font-size: 0.9375rem;
-  }
-
-  .me-settings .i {
-    font-size: 1.25rem;
-  }
-
-  @media (max-width: 40rem) {
-    .me-head {
-      flex-wrap: wrap;
-    }
-
-    .me-settings {
-      flex: 1 1 100%;
-    }
+  .me-rename {
+    margin-top: var(--space-2);
+    font-size: 0.875rem;
   }
 
   /* Under a name still drawn: that it was, and the way to change it. */
   .me-drawn {
+    margin-top: var(--space-2);
     font-size: 0.875rem;
   }
 
-  /* The avatar's choice (/avatar): what's worn, as others see it. */
-  .worn {
+  .me-figures {
+    border-top: 1.5px solid var(--ink);
+  }
+
+  .me-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-5);
+  }
+
+  .me-avatars .sect-head {
+    margin-bottom: var(--space-4);
+  }
+
+  .me-side {
+    display: grid;
+    align-content: start;
+    gap: var(--space-7);
+  }
+
+  /* Настройки, a row to its page under a rule in ink: its name, what's there, and the arrow. */
+  .me-settings-sect {
+    border-top: 1.5px solid var(--ink);
+  }
+
+  .me-settings {
     display: flex;
     align-items: center;
     gap: var(--space-3);
+    min-height: 3.75rem;
+    padding-block: var(--space-3);
+    border-bottom: 1px solid var(--rule);
+    color: var(--text);
+    text-decoration: none;
   }
 
-  .worn-text {
+  .me-settings-text {
     display: grid;
+    flex: 1;
     gap: 2px;
     min-width: 0;
   }
 
-  /* The name as Профил shows it beside the same avatar. */
-  .worn-name {
-    font-size: 1.625rem;
-    line-height: 1.08;
-    font-weight: 800;
-    letter-spacing: -0.02em;
+  .me-settings-text .muted {
+    font-size: 0.8125rem;
+  }
+
+  .me-settings-i {
+    flex: none;
+    color: var(--text-muted);
+    transform: scaleX(-1);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .me-settings:hover strong {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  /* On a phone the pages one under another, a rule in ink between them. */
+  @media (max-width: 63.99rem) {
+    .me-side {
+      margin-top: var(--space-7);
+    }
+  }
+
+  /* A big screen: who you are on the narrower left page, the avatars and Настройки on the wider right. */
+  @media (min-width: 64rem) {
+    .me.spread > .page-1 {
+      grid-column: 1 / span 5;
+    }
+
+    .me.spread > .page-2 {
+      grid-column: 6 / span 7;
+    }
+
+    .me-avatar .avatar.l {
+      width: 120px;
+      height: 120px;
+    }
   }
 
   /* What's folded away until asked for (how a game is played, a list's rest). What it holds is laid out
@@ -4261,11 +4178,12 @@
     gap: var(--space-3);
   }
 
-  /* Five to a row on the narrowest phone, so the five colours above sit in a row over them. */
+  /* The avatars, each with its name under it: four to a row on a phone, eight on a big screen; the one worn ringed
+     in ink. */
   .picker {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
-    gap: var(--space-2);
+    grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+    gap: var(--space-4) var(--space-2);
     margin: 0;
     padding: 0;
     list-style: none;
@@ -4274,18 +4192,38 @@
   .pick {
     appearance: none;
     display: grid;
-    place-items: center;
+    justify-items: center;
+    gap: var(--space-2);
     width: 100%;
-    aspect-ratio: 1;
-    padding: var(--space-1);
+    padding: 0;
     border: 0;
-    border-radius: var(--radius-md);
     background: transparent;
+    color: var(--text-muted);
+    font: 500 0.8125rem / 1rem var(--font-sans);
     cursor: pointer;
   }
 
+  .pick .avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--radius-full);
+  }
+
   .pick[aria-pressed="true"] {
-    box-shadow: 0 0 0 2px var(--accent);
+    color: var(--text);
+    font-weight: 700;
+  }
+
+  .pick[aria-pressed="true"] .avatar {
+    box-shadow:
+      0 0 0 3px var(--bg),
+      0 0 0 5px var(--ink);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .pick:hover:not([aria-pressed="true"]) .avatar {
+      box-shadow: 0 0 0 2px var(--rule-2);
+    }
   }
 
   /* The colours in the avatars' columns, each over the one under it. */
@@ -4336,6 +4274,8 @@
   .book-intro h1 {
     margin-top: var(--space-1);
   }
+
+  /* Three figures in a row between rules: the streak, the facts, the share known of everything. */
 
   /* Three figures in a row between rules: the streak, the facts, the share known of everything. */
   .figures-row {
@@ -5752,22 +5692,24 @@
   }
 
   /* Short of room (a phone's 320px), removing a friend (while editing) goes under the row, at its end. */
+  /* A friend: the avatar, the name (and the pair's duels under it), today's score at the end, and the way to a duel
+     (or „Премахни“) after it; in a narrow column, the way under the score. */
   .friend {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     align-items: center;
     gap: var(--space-1) var(--space-3);
     min-height: 3.5rem;
     padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--rule);
   }
 
   .friend-act {
-    margin-inline-start: auto;
+    justify-self: end;
   }
 
   .friend-text {
     display: grid;
-    flex: 1 1 6rem;
     min-width: 0;
   }
 
@@ -6407,6 +6349,28 @@
 
     .who {
       gap: var(--space-2);
+    }
+  }
+
+  /* Приятели on a laptop: the friends a narrow page of three, the tag left to their profile, the way to a duel under
+     the score. */
+  @media (min-width: 64rem) {
+    .friends-page .page-2 .friend {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .friends-page .page-2 .friend-act {
+      grid-column: 3;
+      font-size: 0.875rem;
+    }
+
+    .friends-page .page-2 .friend-tag {
+      display: none;
+    }
+
+    .friends-page .page-2 .friend-name {
+      display: block;
+      text-overflow: ellipsis;
     }
   }
 
@@ -7211,6 +7175,16 @@
 
   .tight .know-top {
     flex-wrap: wrap;
+  }
+
+  /* A duel's row: how it stands under the other player, at the left. */
+  .tight .duel-row {
+    flex-wrap: wrap;
+  }
+
+  .tight .duel-row-end {
+    justify-items: start;
+    text-align: left;
   }
 
   /* Figures in a row, and the notes' days: one under another. */

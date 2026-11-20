@@ -33,7 +33,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // A row is the place, the name and the score: no level, no title.
   await expect(page.locator(".day-board .lv, .day-board .who-title")).toHaveCount(0);
   await page.goto("/me");
-  await expect(page.locator(".streak")).toBeVisible();
+  await expect(page.locator(".me-figures")).toBeVisible();
 
   // A second game tells what points are no more: once is enough.
   await openGame(page, "/play/history");
@@ -121,7 +121,7 @@ test("„България“: the questions about Bulgaria from every topic, a t
   expect(topics.has("")).toBe(false);
   await expect(page.getByRole("button", { name: "Още десет" })).toBeVisible();
   // The player's games name it.
-  await page.goto("/me");
+  await page.goto("/games");
   await expect(page.locator(".game-what").filter({ hasText: /^България$/ })).toBeVisible();
 });
 
@@ -148,7 +148,7 @@ test("„Микс“: every topic at once, a chapter of its own after the topics
   );
   expect(topics.size).toBeGreaterThan(1);
   // The player's games name it.
-  await page.goto("/me");
+  await page.goto("/games");
   await expect(page.locator(".game-what").filter({ hasText: /^Микс$/ })).toBeVisible();
 });
 
