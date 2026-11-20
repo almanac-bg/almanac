@@ -202,24 +202,20 @@ type played struct {
 	kind      string
 	// day is the day it counts for: a run of the day's questions, its own day; any other game, the day it ended.
 	day string
-	// began is the day it began on: a game played across midnight moved that day's goals too.
-	began string
 }
 
 // playedOf is a player's finished run as what follows it sees it (ErrNoRun: no such run of theirs).
 func (g *Game) playedOf(ctx context.Context, userID, runID int64) (played, error) {
 	p := played{user: userID, run: runID}
-	var started int64
 	var finished sql.NullInt64
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT kind, coalesce(day, ''), started_at, finished_at FROM runs
-		WHERE id = ? AND user_id = ?`, runID, userID).Scan(&p.kind, &p.day, &started, &finished)
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT kind, coalesce(day, ''), finished_at FROM runs
+		WHERE id = ? AND user_id = ?`, runID, userID).Scan(&p.kind, &p.day, &finished)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, ErrNoRun
 	}
 	if err != nil {
 		return p, err
 	}
-	p.began = dayOf(time.UnixMilli(started))
 	if p.kind != "day" || p.day == "" {
 		end := g.Now()
 		if finished.Valid {

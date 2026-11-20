@@ -45,9 +45,6 @@ var MasteryTiers = []MasteryTier{
 	{"luminary", "Светило", 90},
 }
 
-// MasterTier is the tier the achievements for mastering a topic ask for.
-const MasterTier = 4
-
 // MasteryFirst is how many answers in a topic it takes for a first estimate of its mastery, told as a share of the
 // topic and no more; MasteryFrom, before it's sure and told with its tier. A game of a topic is ten of its questions:
 // one game makes a first estimate, three a mark that won't call a player „Експерт“ on a lucky draw of easy ones.

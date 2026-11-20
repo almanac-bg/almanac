@@ -31,7 +31,7 @@ import (
 //     /admin's tallies (FairAnswers);
 //   - the recordings a duel is played against (recordedRun).
 //
-// What it isn't left out of: the player's own numbers (their profile, level, achievements, goals, streak), which are
+// What it isn't left out of: the player's own numbers (their profile, Алманах, streak), which are
 // theirs; and the rating, one number everyone sees, which a duel moves as it ends (a live game is played
 // in front of the others anyway).
 //

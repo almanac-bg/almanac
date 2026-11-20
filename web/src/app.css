@@ -349,7 +349,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* A word beside a big number („Ниво“ 4, 7 „от“ 10, „днес в“ 21:00): the numeral face is for digits only, Cyrillic
+  /* A word beside a big number (7 „от“ 10, a board's „точки“): the numeral face is for digits only, Cyrillic
      words read badly in it at display size. Small, muted, on the number's baseline. */
   .num-word {
     color: var(--text-muted);

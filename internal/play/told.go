@@ -20,8 +20,8 @@ import (
 //     TellStreak). A player back after days away (BackFrom) is welcomed back once, with the longest streak they've
 //     had, in the same way.
 
-// UntoldWithin is how long a game's untold news waits for Начало: older, it's let go (what it earned is the player's
-// all the same, and its achievements are told with the next game's news).
+// UntoldWithin is how long a game's untold news waits for Начало: older, it's let go (what it brought is the player's
+// all the same, and its notes are told with the next game's news).
 const UntoldWithin = 3 * 24 * time.Hour
 
 // Untold is the latest game the player finished whose news hasn't been told (0 for none): Начало tells it (NewsOf
