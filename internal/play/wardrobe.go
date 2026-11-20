@@ -11,12 +11,15 @@ import (
 // and shows wherever they do. Every unlock, of any of them, is an Unlock: what NewsOf tells once, an
 // achievement lists as its reward, and Next shows ahead. The art is drawn in the client (web/src/art).
 
-// Cosmetic is a frame or a pattern as a player may pick it: free, unlocked, or locked with what unlocks it.
+// Cosmetic is a frame or a pattern as a player may pick it: free, unlocked, or locked with what unlocks it (as a
+// Shape's: the phrase, and the level or the achievement it takes).
 type Cosmetic struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Locked bool   `json:"locked,omitempty"`
-	How    string `json:"how,omitempty"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Locked      bool   `json:"locked,omitempty"`
+	How         string `json:"how,omitempty"`
+	Level       int    `json:"level,omitempty"`
+	Achievement string `json:"achievement,omitempty"`
 }
 
 // unlock is what makes a cosmetic or a title a player's: a level, days on which the day's questions were played, an
@@ -133,7 +136,7 @@ func (u unlock) how() string {
 		return strconv.Itoa(u.days) + " дни с въпросите на деня"
 	case u.achieved != "":
 		a, _ := achievementByID(u.achieved)
-		return "постижението „" + a.Name + "“"
+		return achievementHow(a)
 	case u.tier != "":
 		return "първото " + map[Tier]string{Common: "обикновено", Rare: "рядко", Epic: "епично",
 			Legendary: "легендарно"}[u.tier] + " постижение"
@@ -160,7 +163,7 @@ func (w wardrobe) list(all []cosmetic) []Cosmetic {
 	for _, c := range all {
 		x := Cosmetic{ID: c.id, Name: c.name}
 		if !w.has(c.by) {
-			x.Locked, x.How = true, c.by.how()
+			x.Locked, x.How, x.Level, x.Achievement = true, c.by.how(), c.by.level, c.by.achieved
 		}
 		out = append(out, x)
 	}
@@ -235,15 +238,13 @@ func (w wardrobe) from(u unlock) string {
 	return u.how()
 }
 
-// shapeFrom says what unlocks an avatar's shape: the level (the crown), or the first achievement drawn with it — the
-// one the player earned first, if they have.
-func (w wardrobe) shapeFrom(shape string) string {
-	if shape == "crown" {
-		return "ниво " + strconv.Itoa(CrownLevel)
+// shapeFrom says what unlocks an avatar's shape: its level, or the achievement drawn with it.
+func shapeFrom(shape string) string {
+	if l, ok := ShapeLevels[shape]; ok {
+		return "ниво " + strconv.Itoa(l)
 	}
-	if id := w.first(func(a Achievement) bool { return a.Icon == shape }); id != "" {
-		a, _ := achievementByID(id)
-		return "постижението „" + a.Name + "“"
+	if a, ok := shapeAchievement(shape); ok {
+		return achievementHow(a)
 	}
 	return ""
 }
@@ -261,10 +262,12 @@ func (w wardrobe) first(pass func(Achievement) bool) string {
 
 // shapeOpen is whether a player has an avatar's shape.
 func (w wardrobe) shapeOpen(shape string) bool {
-	if shape == "crown" {
-		return w.level >= CrownLevel
+	if l, ok := ShapeLevels[shape]; ok {
+		return w.level >= l
 	}
-	return w.first(func(a Achievement) bool { return a.Icon == shape }) != ""
+	a, ok := shapeAchievement(shape)
+	_, done := w.earned[a.ID]
+	return ok && done
 }
 
 // unlocks are everything a player has unlocked: titles, frames, patterns, shapes.
@@ -288,11 +291,7 @@ func (w wardrobe) unlocks() []Unlock {
 	}
 	for _, s := range Unlockable {
 		if w.shapeOpen(s) {
-			u := Unlock{Kind: "avatar", ID: s, From: w.shapeFrom(s)}
-			if s == "crown" {
-				u.byLevel = CrownLevel
-			}
-			out = append(out, u)
+			out = append(out, Unlock{Kind: "avatar", ID: s, From: shapeFrom(s), byLevel: ShapeLevels[s]})
 		}
 	}
 	return out
@@ -319,26 +318,14 @@ func (w wardrobe) unlocksBy(pass func(unlock) bool) []Unlock {
 	return out
 }
 
-// rewardsOf is what an achievement gives a player besides its XP. One not earned yet: what it would unlock that they
-// don't have — an avatar shared by a few (a flame for every streak) is the reward of the first of them in the list
-// only, and what the first of a tier unlocks is the tier's (tierUnlocks), not each one's. One earned: what came with
-// it.
+// rewardsOf is what an achievement gives a player besides its XP: its avatar, and what it unlocks — what the first of
+// a tier unlocks is the tier's (tierUnlocks), not each one's, until one of the tier is earned.
 func (w wardrobe) rewardsOf(a Achievement) []Unlock {
-	_, done := w.earned[a.ID]
-	firstOf := func(pass func(Achievement) bool) bool {
-		if done {
-			return w.first(pass) == a.ID
-		}
-		if w.first(pass) != "" {
-			return false
-		}
-		i := slices.IndexFunc(Achievements, pass)
-		return i >= 0 && Achievements[i].ID == a.ID
-	}
 	var out []Unlock
-	if a.Icon != "" && firstOf(func(x Achievement) bool { return x.Icon == a.Icon }) {
+	if a.Icon != "" {
 		out = append(out, Unlock{Kind: "avatar", ID: a.Icon, From: "постижението „" + a.Name + "“"})
 	}
+	_, done := w.earned[a.ID]
 	tierFirst := done && w.first(func(x Achievement) bool { return x.Tier == a.Tier }) == a.ID
 	return append(out, w.unlocksBy(func(u unlock) bool {
 		return u.achieved == a.ID || (u.tier == a.Tier && tierFirst)
@@ -382,8 +369,10 @@ func (w wardrobe) next(rating int) Next {
 	n := Next{LevelUnlocks: []Unlock{}, DivisionUnlocks: []Unlock{}}
 	for l := w.level + 1; l <= w.level+100 && n.Level == 0; l++ {
 		at := w.unlocksBy(func(u unlock) bool { return u.level == l })
-		if l == CrownLevel {
-			at = append(at, Unlock{Kind: "avatar", ID: "crown", From: "ниво " + strconv.Itoa(CrownLevel)})
+		for _, s := range Unlockable {
+			if ShapeLevels[s] == l {
+				at = append(at, Unlock{Kind: "avatar", ID: s, From: "ниво " + strconv.Itoa(l)})
+			}
 		}
 		if len(at) > 0 {
 			n.Level, n.LevelUnlocks = l, at

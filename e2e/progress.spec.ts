@@ -46,9 +46,11 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(hundred).toContainText(/\d+ \/ 100/);
   await expect(hundred.locator(".meter")).toBeVisible();
   await expect(page.locator(".badge-ring")).toHaveCount(0);
-  // Each earns XP, and some more: only what's new to the player (the flame is the first streak's).
+  // Each earns XP, and some more: its own emblem, and only what else is new to the player.
   await expect(hundred).toContainText("Награда: +50 XP · аватар „Книга“");
-  await expect(row("Цял месец")).toContainText("Награда: +400 XP · титла „Неугасим пламък“ · рамка „Пламъци“");
+  await expect(row("Цял месец")).toContainText(
+    "Награда: +400 XP · аватар „Огън“ · титла „Неугасим пламък“ · рамка „Пламъци“",
+  );
   await expect(page.getByText("Първото епично постижение отключва фон „Лъчи“.")).toBeVisible();
   await expect(page.locator(".achievement", { hasText: /скрит/i }).first()).toContainText("ще разбереш");
 
@@ -57,15 +59,27 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await page.getByRole("tab", { name: "Титла" }).click();
   await page.getByText(/Още \d+ за отключване/).click();
   await expect(page.locator(".title-pick.locked", { hasText: "Сто изгрева" })).toContainText(
-    "Отключва се: постижението „Сто дни“",
+    "Отключва се с постижението „Сто дни“.",
   );
   await page.getByRole("tab", { name: "Аватар" }).click();
   await page.getByRole("button", { name: "Таралеж", exact: true }).click();
   await expect(page.getByRole("button", { name: "Таралеж", exact: true })).toHaveAttribute("aria-pressed", "true");
   // Avatars are pictures (art/pictures.ts), loaded after the first screen: the hedgehog is drawn on its tile.
   await expect(page.locator('.pick[aria-pressed="true"] .avatar-pic path').first()).toBeAttached();
-  await page.getByRole("button", { name: "Корона, заключен аватар" }).click();
-  await expect(page.getByText("Корона. Отключва се: ниво 10.")).toBeVisible();
+  // The locked ones are listed after, each saying what unlocks it and how far along the player is, the nearest first,
+  // the rest folded away.
+  await expect(page.getByRole("button", { name: "Корона" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "За отключване" })).toBeVisible();
+  await page.getByText(/^Още \d+$/).click();
+  await expect(page.locator(".achievement.locked", { hasText: "Корона" })).toContainText(
+    /Отключва се с ниво 10\.Сега си на ниво \d+\./,
+  );
+  await expect(page.locator(".achievement.locked", { hasText: "Бухал" })).toContainText(
+    "Отключва се със скрито постижение.Открий го, докато играеш.",
+  );
+  await expect(page.locator(".achievement.locked", { hasText: "Книги" })).toContainText(
+    /Събери хиляда факта в Алманаха\.\d+ \/ 1000/,
+  );
 
   // Sounds are on until turned off, and stay off on this device.
   await page.goto("/settings");

@@ -5731,7 +5731,12 @@
     box-shadow: 0 0 0 2px var(--accent);
   }
 
-  .pick.locked .avatar {
+  /* A locked one in the wardrobe's list: grey, as a locked medal is, beside what unlocks it. */
+  .lock-art {
+    flex: none;
+  }
+
+  .lock-art .avatar {
     --tone: var(--line-strong);
     opacity: 0.6;
   }

@@ -237,9 +237,9 @@ const sword = (deg: number): Layer[] => {
   ];
 };
 
-// ---- Avatars: nine animals everyone has, and fifteen emblems that achievements unlock. Each is drawn over a tile in
-// its tone (k3), so it's painted in the ramp's darker and lighter inks. The animals are portraits, cut at the tile's
-// bottom edge; the emblems stand in the middle.
+// ---- Avatars: nine animals everyone has, six more and the crown that levels unlock, and the emblems that achievements
+// unlock, one each. Each is drawn over a tile in its tone (k3), so it's painted in the ramp's darker and lighter inks.
+// The animals are portraits, cut at the tile's bottom edge; the emblems stand in the middle.
 
 const avatars: Record<string, Layer[]> = {
   fox: [

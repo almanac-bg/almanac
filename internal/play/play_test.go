@@ -855,7 +855,7 @@ func TestUnlocks(t *testing.T) {
 		t.Fatalf("next after gold: %+v", p.Next)
 	}
 
-	// The shield is duel1's: once it's earned, duel10 gives its XP (said once XP is open) and its title, not the shield.
+	// Each gives its own emblem: duel1 the shield, duel10 (its XP said once XP is open) the swords and its title.
 	_, _ = w.db.Write.Exec(`INSERT INTO achievements (user_id, id, at, xp, seen) VALUES (?, 'duel1', 1, 50, 1)`, ana)
 	w.played(ana, XPFromDay)
 	p, _ = w.g.ProgressOf(ctx, ana)
@@ -866,12 +866,12 @@ func TestUnlocks(t *testing.T) {
 				t.Fatalf("duel1's rewards: %+v", a.Rewards)
 			}
 		case "duel10":
-			if a.XP != AchievementXP[Epic] || len(a.Rewards) != 1 || a.Rewards[0].ID != "duelInstinct" {
+			if a.XP != AchievementXP[Epic] || len(a.Rewards) != 2 || a.Rewards[0].ID != "blades" ||
+				a.Rewards[1].ID != "duelInstinct" {
 				t.Fatalf("duel10's rewards: %+v", a.Rewards)
 			}
 		case "friend1", "friends5":
-			// The heart is the first's in the list, not friends5's.
-			if heart := len(a.Rewards) == 1 && a.Rewards[0].ID == "heart"; heart != (a.ID == "friend1") {
+			if len(a.Rewards) == 0 || a.Rewards[0].ID != map[string]string{"friend1": "heart", "friends5": "hearts"}[a.ID] {
 				t.Fatalf("%s's rewards: %+v", a.ID, a.Rewards)
 			}
 		}
@@ -1811,14 +1811,14 @@ func TestTitles(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Everything the levels up to 5 unlock is told with it (but the first level's title, worn from the start): the
-	// titles, a frame, a pattern.
+	// titles, a frame, a pattern, an animal.
 	n, err := w.g.NewsOf(ctx, ana, 0)
 	told := []string{}
 	for _, u := range n.Unlocks {
 		told = append(told, u.Kind+":"+u.ID+" "+u.From)
 	}
 	if err != nil || n.Level != 5 || !slices.Equal(told, []string{"title:curious ниво 3",
-		"title:passion ниво 5", "frame:ring ниво 2", "frame:double ниво 5", "backdrop:dots ниво 3"}) {
+		"title:passion ниво 5", "frame:ring ниво 2", "frame:double ниво 5", "backdrop:dots ниво 3", "avatar:mouse ниво 4"}) {
 		t.Fatalf("level 5's news: %v %+v %v", told, n, err)
 	}
 	if p, _ := w.g.ProgressOf(ctx, ana); p.Next.Level != 6 || len(p.Next.LevelUnlocks) != 1 ||
