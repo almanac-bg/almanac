@@ -165,6 +165,31 @@ func TestRemindersOnTheirWeekdays(t *testing.T) {
 	}
 }
 
+// A player who played one day has a rhythm of one weekday: the reminders on the others stop all the same, the
+// RemindQuietAfter-th the last word (review 2026-11-20: 21 reminders to a one-day player).
+func TestRemindersOneDayPlayer(t *testing.T) {
+	s, g, fake, subscribe := pushWorld(t)
+	ana, anaID := g.guest()
+	subscribe(ana, "/ana")
+	g.finishedDay(anaID, time.Date(2030, 3, 6, 0, 0, 0, 0, bulgaria()), 18*time.Hour) // one Wednesday
+	clock := time.Date(2030, 3, 7, 20, 0, 0, 0, bulgaria())
+	s.game.Now = func() time.Time { return clock }
+	sent := 0
+	for d := 7; d <= 37; d++ {
+		clock = time.Date(2030, 3, d, 20, 0, 0, 0, bulgaria())
+		sent += s.remindSent(t.Context(), clock)
+	}
+	if sent != RemindQuietAfter || fake.count("/ana") != RemindQuietAfter {
+		t.Fatalf("a one-day player reminded %d times in a month (%d pushes), want %d", sent, fake.count("/ana"),
+			RemindQuietAfter)
+	}
+	var last int
+	if err := g.db.Read.QueryRow(`SELECT count(*) FROM push_reminded WHERE user_id = ? AND last`, anaID).Scan(&last); err != nil ||
+		last != 1 {
+		t.Fatalf("the last word: %d %v", last, err)
+	}
+}
+
 // finishedDay puts a day's game the player finished on a day, at a time of it, straight in the database.
 func (g *game) finishedDay(userID int64, day time.Time, at time.Duration) {
 	g.t.Helper()

@@ -160,12 +160,12 @@ type run struct {
 	tie           tiebreak // what decides between the same right answers (board.go)
 	ms            int64
 	finished      bool
-	shadow        bool // counts for its player alone (fair.go)
+	shadow        int  // why it counts for its player alone (fair.go: ShadowScript…), 0 if it doesn't
 	pencil        bool // a day's issue played a second time in one browser: writes pencil only (ink.go)
 }
 
 const runColumns = `id, user_id, kind, coalesce(day, ''), coalesce(category, ''), questions,
-	at, shown_at, rights, closeness, hardest, ms, finished_at IS NOT NULL, shadow <> 0, pencil <> 0`
+	at, shown_at, rights, closeness, hardest, ms, finished_at IS NOT NULL, shadow, pencil <> 0`
 
 type scanner interface{ Scan(...any) error }
 
