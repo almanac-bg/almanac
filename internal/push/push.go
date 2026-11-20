@@ -1,16 +1,13 @@
 // Package push sends notifications to players' browsers (Web Push): a message encrypted for the browser that asked
 // for it (RFC 8291, aes128gcm), sent to its push service with the game's signed name (VAPID, RFC 8292). Only the
 // push services browsers use are posted to (Services), never a redirect: a subscription is whatever a player sends.
-// The game's own app on phones gets its notifications from Apple's and Google's push services instead (phones.go).
-// Standard library only, and package safe for the one goroutine it starts (phones.go).
+// Standard library only.
 //
-// A send that fails says why, the same way for every service, so that the caller knows what to do with the browser
-// or the phone: ErrGone, it's no more (forget it); Refused, the service won't take pushes for it (forget it if that
-// goes on); Busy, the service can't take one now (try again, after what it asked). The game's own keys refused (a
-// signed token Apple calls expired or invalid, an access token Google won't give or FCM won't take) are Busy too,
-// with ErrKeys in them: tried again, since keys are renewed and services mend, and told to whoever runs the game.
-// Any other error is the game's own (its message) and says nothing of the device. A message's Tag makes a second send
-// of it replace the first, at the service and on the device, so that a notification sent twice shows once.
+// A send that fails says why, the same way for every service, so that the caller knows what to do with the browser:
+// ErrGone, it's no more (forget it); Refused, the service won't take pushes for it (forget it if that goes on); Busy,
+// the service can't take one now (try again, after what it asked). Any other error is the game's own (its message)
+// and says nothing of the browser. A message's Tag makes a second send of it replace the first, at the service and on
+// the device, so that a notification sent twice shows once.
 package push
 
 import (
@@ -111,7 +108,7 @@ func (s Subscription) Check() error {
 }
 
 // Message is what a notification shows, and where tapping it goes; and what it's about (its kind), which the browser
-// or the app says back on a tap, so that the game counts the notifications opened by kind.
+// says back on a tap, so that the game counts the notifications opened by kind.
 type Message struct {
 	Title string `json:"title"`
 	Body  string `json:"body"`
@@ -125,8 +122,8 @@ type Message struct {
 // ErrGone means the browser unsubscribed (or the subscription expired, or can't be one): forget it.
 var ErrGone = errors.New("the subscription is gone")
 
-// Refused is a push the service wouldn't take for this browser or phone, for a reason of the device's (keys it
-// doesn't know, another app's token, a host that doesn't exist): the same is likely to go on.
+// Refused is a push the service wouldn't take for this browser, for a reason of the browser's (keys it doesn't know,
+// an endpoint it doesn't, a host that doesn't exist): the same is likely to go on.
 type Refused struct{ Err error }
 
 func (e *Refused) Error() string { return "refused: " + e.Err.Error() }
@@ -141,12 +138,6 @@ type Busy struct {
 
 func (e *Busy) Error() string { return "busy: " + e.Err.Error() }
 func (e *Busy) Unwrap() error { return e.Err }
-
-// ErrKeys means a service didn't take the game's own credentials: nothing of the device. It comes inside a Busy.
-var ErrKeys = errors.New("the service refused the game's keys")
-
-// keysRefused is a push not taken for the game's keys: Busy, to be tried again, with ErrKeys in it.
-func keysRefused(err error) error { return &Busy{Err: fmt.Errorf("%w: %w", ErrKeys, err)} }
 
 // answered is what a service's status says of a push it didn't take: Busy (429, 5xx, with its Retry-After), or err.
 func answered(res *http.Response, err error) error {

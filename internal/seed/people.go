@@ -139,16 +139,12 @@ func (w *world) cast(n int) {
 
 func (w *world) pickDevice() string {
 	switch x := w.r.Float64(); {
-	case x < 0.62:
+	case x < 0.72:
 		return "phone"
-	case x < 0.86:
+	case x < 0.95:
 		return "desktop"
-	case x < 0.90:
-		return "tablet"
-	case x < 0.96:
-		return "app-ios"
 	}
-	return "app-android"
+	return "tablet"
 }
 
 func (w *world) pickLanding() string {
@@ -159,8 +155,6 @@ func (w *world) pickLanding() string {
 		return "room"
 	case x < 0.93:
 		return "player"
-	case x < 0.97:
-		return "app"
 	}
 	return "other"
 }

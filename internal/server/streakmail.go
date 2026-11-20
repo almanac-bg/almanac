@@ -105,7 +105,6 @@ func (s *Server) streakMails(ctx context.Context, at time.Time) int {
 func (s *Server) streakMailDue(ctx context.Context, today string) (map[int64]int, error) {
 	rows, err := s.db.Read.QueryContext(ctx, `SELECT u.id FROM users u WHERE u.email IS NOT NULL
 		AND NOT EXISTS (SELECT 1 FROM push_subs p WHERE p.user_id = u.id)
-		AND NOT EXISTS (SELECT 1 FROM phones p WHERE p.user_id = u.id)
 		AND (SELECT max(day) FROM runs r WHERE r.user_id = u.id AND r.kind = 'day' AND r.finished_at IS NOT NULL)
 			BETWEEN ? AND ?`, play.DayShift(today, -2-play.ReserveMax), play.DayShift(today, -2))
 	if err != nil {
@@ -167,7 +166,7 @@ func (s *Server) streakMailOf(ctx context.Context, today string, userID int64) (
 	var email sql.NullString
 	var reachable bool
 	err := s.db.Read.QueryRowContext(ctx, `SELECT email, EXISTS (SELECT 1 FROM push_subs WHERE user_id = ?1)
-		OR EXISTS (SELECT 1 FROM phones WHERE user_id = ?1) FROM users WHERE id = ?1`, userID).Scan(&email, &reachable)
+		FROM users WHERE id = ?1`, userID).Scan(&email, &reachable)
 	if errors.Is(err, sql.ErrNoRows) {
 		return m, false, nil
 	}
@@ -277,8 +276,8 @@ func (s *Server) mailPrefsOf(ctx context.Context, w http.ResponseWriter, userID 
 		return err
 	}
 	var reachable bool
-	if err := s.db.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM push_subs WHERE user_id = ?1)
-		OR EXISTS (SELECT 1 FROM phones WHERE user_id = ?1)`, userID).Scan(&reachable); err != nil {
+	if err := s.db.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM push_subs WHERE user_id = ?1)`,
+		userID).Scan(&reachable); err != nil {
 		return err
 	}
 	return ok(w, map[string]bool{"streak": on, "day": day, "can": email && !reachable})

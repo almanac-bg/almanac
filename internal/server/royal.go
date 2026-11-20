@@ -272,7 +272,7 @@ func planners(ctx context.Context, tx *sql.Tx, q string, args ...any) ([]int64, 
 // server): to is who, by the kind of call each gets, read as it's claimed. It says how many it called.
 func (s *Server) call(ctx context.Context, key string, start time.Time, m push.Message,
 	to func(tx *sql.Tx) (map[pushKind][]int64, error)) int {
-	if s.push == nil && s.phones == nil {
+	if s.push == nil {
 		return 0
 	}
 	called := 0

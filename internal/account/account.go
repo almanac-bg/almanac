@@ -2,8 +2,8 @@
 // one-time link that brings a game from an app's own browser to the phone's (Handoff), the sessions that keep a
 // browser signed in, and names.
 //
-// A session is one browser's (or one phone's app's): nobody else gets it. The notifications turned on in a browser
-// (push_subs and phones) are tied to the session that turned them on, and end with it. A browser signing in by email
+// A session is one browser's: nobody else gets it. The notifications turned on in a browser (push_subs) are tied to
+// the session that turned them on, and end with it. A browser signing in by email
 // (Verify) gets a new session in place of the one it had, and its notifications go along to the new one. A handoff
 // moves a game, it doesn't share it: the browser it came from is signed out, and the one it comes to becomes it, if it
 // had no game of its own (a link joins no two games: only an email does). When a guest becomes a profile, every
@@ -228,7 +228,7 @@ func hashToken(token string) []byte {
 }
 
 // SessionKey is what a session is kept under (its token's hash): what the notifications turned on in its browser are
-// tied to (push_subs, phones), so that they end with it.
+// tied to (push_subs), so that they end with it.
 func SessionKey(token string) []byte { return hashToken(token) }
 
 // startSession signs a browser in as a player: a new session, unless the player is suspended (ErrSuspended).
@@ -274,13 +274,9 @@ func moveSession(tx *sql.Tx, old string, userID int64) (string, error) {
 	if err != nil || old == "" {
 		return token, err
 	}
-	for _, q := range []string{
-		`UPDATE push_subs SET session = ?, user_id = ? WHERE session = ?`,
-		`UPDATE phones SET session = ?, user_id = ? WHERE session = ?`,
-	} {
-		if _, err := tx.Exec(q, hashToken(token), userID, hashToken(old)); err != nil {
-			return "", err
-		}
+	if _, err := tx.Exec(`UPDATE push_subs SET session = ?, user_id = ? WHERE session = ?`,
+		hashToken(token), userID, hashToken(old)); err != nil {
+		return "", err
 	}
 	_, err = tx.Exec(`DELETE FROM sessions WHERE token_hash = ?`, hashToken(old))
 	return token, err
@@ -300,13 +296,8 @@ func endSessions(tx *sql.Tx, userID int64, keep []byte) (int, error) {
 		return 0, err
 	}
 	n, _ := res.RowsAffected()
-	for _, q := range []string{
-		`DELETE FROM push_subs WHERE user_id = ? AND session IS NULL`,
-		`DELETE FROM phones WHERE user_id = ? AND session IS NULL`,
-	} {
-		if _, err := tx.Exec(q, userID); err != nil {
-			return 0, err
-		}
+	if _, err := tx.Exec(`DELETE FROM push_subs WHERE user_id = ? AND session IS NULL`, userID); err != nil {
+		return 0, err
 	}
 	return int(n), nil
 }

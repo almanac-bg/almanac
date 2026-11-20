@@ -82,7 +82,6 @@ var mergeSteps = []mergeStep{
 	// they were reminded on, those on their way (but a day's reminder the account has one of), and the Роял they
 	// said they'd come to. So does what they chose of mails, though a guest gets none.
 	{carries: []string{"push_subs.user_id"}, sql: `UPDATE push_subs SET user_id = ?1 WHERE user_id = ?2`},
-	{carries: []string{"phones.user_id"}, sql: `UPDATE phones SET user_id = ?1 WHERE user_id = ?2`},
 	{carries: []string{"push_prefs.user_id"}, sql: `INSERT OR IGNORE INTO push_prefs (user_id, kind, wanted)
 		SELECT ?1, kind, wanted FROM push_prefs WHERE user_id = ?2`},
 	{carries: []string{"push_reminded.user_id"}, sql: `UPDATE OR IGNORE push_reminded SET user_id = ?1 WHERE user_id = ?2`},

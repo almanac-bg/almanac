@@ -138,7 +138,7 @@ func TestGuestSigningInMergesIntoAccount(t *testing.T) {
 }
 
 // notified turns notifications on for a player in a browser (its session; "" for one turned on before they were
-// tied to sessions), as a browser does and as the app does.
+// tied to sessions), as a browser does.
 func notified(t *testing.T, db *store.DB, userID int64, session, name string) {
 	t.Helper()
 	var key any
@@ -149,18 +149,14 @@ func notified(t *testing.T, db *store.DB, userID int64, session, name string) {
 		VALUES (?, ?, ?, 'k', 'a', 0)`, "https://push.example/"+name, userID, key); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Write.Exec(`INSERT INTO phones (token, user_id, session, platform, created_at)
-		VALUES (?, ?, ?, 'android', 0)`, name, userID, key); err != nil {
-		t.Fatal(err)
-	}
 }
 
-// devices are the names (notified) of the browsers and phones a player gets notifications on, each once if both.
+// devices are the names (notified) of the browsers a player gets notifications on.
 func devices(t *testing.T, db *store.DB, userID int64) string {
 	t.Helper()
 	var s sql.NullString
 	if err := db.Read.QueryRow(`SELECT group_concat(name, ' ') FROM (SELECT substr(endpoint, 22) AS name FROM push_subs
-		WHERE user_id = ?1 UNION SELECT token FROM phones WHERE user_id = ?1 ORDER BY 1)`, userID).Scan(&s); err != nil {
+		WHERE user_id = ?1 ORDER BY 1)`, userID).Scan(&s); err != nil {
 		t.Fatal(err)
 	}
 	return s.String
@@ -395,7 +391,7 @@ func TestProfileEndsOtherSessions(t *testing.T) {
 }
 
 // Signing out the other devices ends every session of the player but this one, with the notifications of those
-// browsers and phones; signing out ends this one, with its own.
+// browsers; signing out ends this one, with its own.
 func TestSignOut(t *testing.T) {
 	a, db, out, in := setup(t)
 	ctx := t.Context()

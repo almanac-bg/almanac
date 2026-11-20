@@ -30,24 +30,12 @@ import {
 } from "./game/results.ts";
 import { guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
 import { ApiError, api, errorText } from "./lib/api.ts";
-import { appShare, inApp } from "./lib/app.ts";
 import { keepAwake } from "./lib/awake.ts";
 import { dayInBulgaria } from "./lib/day.ts";
 import { type Child, computed, effect, h, lifetime, onCleanup, signal, slot, untracked, when } from "./lib/dom.ts";
 import { reportProblem } from "./lib/errors.ts";
 import { ordinal, place } from "./lib/ordinal.ts";
-import {
-  calm,
-  musicOn,
-  setCalm,
-  setMusic,
-  setTextSize,
-  setTick,
-  setVibrate,
-  textSize,
-  tickOn,
-  vibrateOn,
-} from "./lib/prefs.ts";
+import { calm, musicOn, setCalm, setMusic, setTextSize, setTick, textSize, tickOn } from "./lib/prefs.ts";
 import { needsHomeScreen, pushable, pushOn, pushPrefs, setPushPref, turnOff, turnOn } from "./lib/push.ts";
 import { byTap, go, goBack, holdWhile, rename, title } from "./lib/router.ts";
 import {
@@ -124,7 +112,6 @@ export const kit = {
   ApiError,
   answerState,
   api,
-  appShare,
   avatar,
   back,
   badge,
@@ -163,7 +150,6 @@ export const kit = {
   haveProfile,
   holdWhile,
   illustration,
-  inApp,
   issueWords,
   keepAwake,
   keepGame,
@@ -223,7 +209,6 @@ export const kit = {
   setPushPref,
   setSound,
   setTick,
-  setVibrate,
   shapeNames,
   signal,
   signIn,
@@ -255,7 +240,6 @@ export const kit = {
   user,
   verdict,
   verdictWords,
-  vibrateOn,
   weekday,
   when,
   whileSeen,

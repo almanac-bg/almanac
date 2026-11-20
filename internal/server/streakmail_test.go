@@ -36,8 +36,8 @@ func TestStreakMail(t *testing.T) {
 		return id
 	}
 	player("ana@example.bg", 5)
-	bo := player("bo@example.bg", 5) // notifications on a phone
-	if _, err := g.db.Write.Exec(`INSERT INTO phones (token, user_id, platform, created_at) VALUES ('t', ?, 'ios', 0)`, bo); err != nil {
+	bo := player("bo@example.bg", 5) // notifications on in a browser
+	if _, err := g.db.Write.Exec(`INSERT INTO push_subs (endpoint, user_id, p256dh, auth, created_at) VALUES ('e', ?, 'p', 'a', 0)`, bo); err != nil {
 		t.Fatal(err)
 	}
 	player("vi@example.bg", 4) // a streak too short

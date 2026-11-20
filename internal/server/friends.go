@@ -22,7 +22,7 @@ const peoplePushes = 20
 // caps above are spent. what names its kind for the once a day from one player ("" for news that comes once by
 // itself, as a duel's result).
 func (s *Server) notifyFrom(ctx context.Context, from int64, what string, m push.Message, to int64) {
-	if s.push == nil && s.phones == nil {
+	if s.push == nil {
 		return
 	}
 	if blocked, err := s.game.Blocked(ctx, from, to); err != nil || blocked {

@@ -44,13 +44,12 @@ func TestVisitsAreCounted(t *testing.T) {
 	g.open("/r/654321", strings.Replace(phoneBrowser, "Android 14", "Android 13", 1))
 	g.open("/", phoneBrowser)
 	g.open("/players/nobody", phoneBrowser)
-	g.open("/r/123456", phoneBrowser+" AlmanacApp") // the app, wherever it opens
-	g.open("/nope", phoneBrowser)                   // not a page of the game
+	g.open("/nope", phoneBrowser) // not a page of the game
 	// Link previews and search engines are no visitors.
 	g.open("/", "WhatsApp/2.24.1 A")
 	g.open("/", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")
 	g.open("/", "facebookexternalhit/1.1")
-	for key, want := range map[string]int{"visit:room": 2, "visit:home": 1, "visit:player": 1, "visit:app": 1, "visit:other": 0} {
+	for key, want := range map[string]int{"visit:room": 2, "visit:home": 1, "visit:player": 1, "visit:other": 0} {
 		if got := g.counted(key); got != want {
 			t.Errorf("%s: %d, want %d", key, got, want)
 		}
@@ -107,20 +106,8 @@ func TestWhereGuestsCameFrom(t *testing.T) {
 	if _, out := g.player().call("POST", "/api/guest", map[string]any{"from": "https://elsewhere.example/"}); cameFrom(out) != "" {
 		t.Error("not a path: kept")
 	}
-	// The app says so in its user agent.
-	req, _ := http.NewRequest("POST", g.url+"/api/guest", strings.NewReader(`{"from": "/"}`))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Sec-Fetch-Site", "same-origin")
-	req.Header.Set("User-Agent", phoneBrowser+" AlmanacApp")
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	res.Body.Close()
-	var app int
-	_ = g.db.Read.QueryRow(`SELECT count(*) FROM users WHERE came_from = 'app'`).Scan(&app)
-	if app != 1 || g.counted("guest:app") != 1 || g.counted("guest:room") != 1 {
-		t.Fatalf("the app's guests: %d, counted %d", app, g.counted("guest:app"))
+	if g.counted("guest:room") != 1 || g.counted("guest:home") != 1 {
+		t.Fatalf("the guests counted: room %d, home %d", g.counted("guest:room"), g.counted("guest:home"))
 	}
 }
 
@@ -151,13 +138,10 @@ func TestFunnelLeavesRoomsOut(t *testing.T) {
 }
 
 func TestLanding(t *testing.T) {
-	for _, c := range []struct {
-		path string
-		app  bool
-		want string
-	}{{"/", false, "home"}, {"/", true, "app"}, {"/f/x", false, "other"}, {"/room", false, "room"}, {"/r/123456", false, "room"}, {"/players/x", false, "player"}, {"/duel", false, "other"}} {
-		if got := landing(c.path, c.app); got != c.want {
-			t.Errorf("%s (app %v): %s, want %s", c.path, c.app, got, c.want)
+	for path, want := range map[string]string{"/": "home", "/f/x": "other", "/room": "room", "/r/123456": "room",
+		"/players/x": "player", "/duel": "other"} {
+		if got := landing(path); got != want {
+			t.Errorf("%s: %s, want %s", path, got, want)
 		}
 	}
 	if ratio(1, 3) != "0,3" || ratio(1, 0) != "—" {
@@ -188,8 +172,6 @@ func TestRate(t *testing.T) {
 func TestClientDevice(t *testing.T) {
 	for ua, want := range map[string]string{
 		phoneBrowser: "phone",
-		"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 AlmanacApp":                "app-ios",
-		"Mozilla/5.0 (Linux; Android 14; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36 AlmanacApp":            "app-android",
 		"Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1":          "tablet",
 		"Mozilla/5.0 (Linux; Android 14; SM-X910) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36":                              "tablet",
 		"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1": "phone",

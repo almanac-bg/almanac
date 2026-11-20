@@ -6,9 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
-	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -18,11 +16,11 @@ import (
 )
 
 // Notifications go out through a queue in the database (push_queue): notify saves a row for each player, in its own
-// transaction or in the caller's (the day's reminder with its claim, Роял's call with its), and Push sends them, pushWorkers players at a time, each player's browsers and phones at
-// once, each send within pushTimeout, through its push service's lane (pushlanes.go). So a slow or dead device holds
-// up only its own player's slot, a slow or dead service only its own lane's share, a player has a few devices at most
-// (pushDevices of each kind: notify.go), and the evening's reminders and Роял's call go out in seconds, whoever else is
-// in the queue. A row that's of use for less than pushUrgent more (Роял's call) is taken before the rest.
+// transaction or in the caller's (the day's reminder with its claim, Роял's call with its), and Push sends them,
+// pushWorkers players at a time, each player's browsers at once, each send within pushTimeout, through its push
+// service's lane (pushlanes.go). So a slow or dead device holds up only its own player's slot, a slow or dead service
+// only its own lane's share, a player has a few devices at most (pushDevices: notify.go), and the evening's reminders
+// and Роял's call go out in seconds, whoever else is in the queue. A row that's of use for less than pushUrgent more (Роял's call) is taken before the rest.
 //
 // Nights are quiet: from quietFrom to quietTo in Bulgaria nothing is sent. A row due then waits for the morning, or,
 // if it's of no use by then (until: a day's reminder is the day's), is dropped. The one exception is a notification
@@ -35,13 +33,12 @@ import (
 //
 // A row that reached none of the player's devices because their services were busy is tried again, after what the
 // service asked or pushBackoff, while it's still of use (until); one that reached none because its lanes held it back
-// goes again when they have room, not counted as a try. The game's own keys refused (push.ErrKeys) are busy too, and
-// told as a problem. Each device's failures are kept: one gone (404/410, a token its maker no longer knows) is
-// forgotten at once; one refused or unreached at every try for pushForgetAfter, pushForgetTries tries at least, is
-// forgotten then (a week, so that an outage of the service's, or a mistake of the game's own that refuses everyone,
-// forgets nobody before it's seen and mended). Counted by the message's kind (play/measure.go): push:sent, a device
-// reached; push:gone, a device found gone; push:failed, a notification that reached none of the player's devices,
-// though they had some.
+// goes again when they have room, not counted as a try. Each device's failures are kept: one gone (404/410, a
+// subscription its service no longer knows) is forgotten at once; one refused or unreached at every try for
+// pushForgetAfter, pushForgetTries tries at least, is forgotten then (a week, so that an outage of the service's, or a
+// mistake of the game's own that refuses everyone, forgets nobody before it's seen and mended). Counted by the
+// message's kind (play/measure.go): push:sent, a device reached; push:gone, a device found gone; push:failed, a
+// notification that reached none of the player's devices, though they had some.
 
 const (
 	// pushWorkers is how many players' notifications are sent at once: enough that every service's lane can be full
@@ -53,7 +50,7 @@ const (
 	pushTick = 250 * time.Millisecond
 	// quietFrom and quietTo are the night, in minutes of the day in Bulgaria: 22:00 to 08:00.
 	quietFrom, quietTo = 22 * 60, 8 * 60
-	// pushTimeout is how long a send to one device may take (an iPhone's two hosts together).
+	// pushTimeout is how long a send to one device may take.
 	pushTimeout = 5 * time.Second
 	// pushLease is how long a row being sent is held from another try: past it, a crash's row is sent again.
 	pushLease = time.Minute
@@ -174,7 +171,7 @@ type queuer struct {
 func (s *Server) queuer(ctx context.Context, tx *sql.Tx) (*queuer, error) {
 	stmt, err := tx.PrepareContext(ctx, `INSERT INTO push_queue (user_id, kind, message, day, next_at, until)
 		SELECT ?1, ?2, ?3, nullif(?4, ''), ?5, ?6
-		WHERE EXISTS (SELECT 1 FROM push_subs WHERE user_id = ?1) OR EXISTS (SELECT 1 FROM phones WHERE user_id = ?1)`)
+		WHERE EXISTS (SELECT 1 FROM push_subs WHERE user_id = ?1)`)
 	return &queuer{stmt: stmt, now: s.game.Now()}, err
 }
 
@@ -223,10 +220,10 @@ func (s *Server) queue(ctx context.Context, tx *sql.Tx, n notice, userIDs ...int
 	return k, nil
 }
 
-// notify queues a message of a kind for these players, to go to every browser and phone of theirs that asked for
+// notify queues a message of a kind for these players, to go to every browser of theirs that asked for
 // notifications, if they want that kind (sent by Push, soon after).
 func (s *Server) notify(ctx context.Context, kind pushKind, m push.Message, userIDs ...int64) {
-	if (s.push == nil && s.phones == nil) || len(userIDs) == 0 {
+	if s.push == nil || len(userIDs) == 0 {
 		return
 	}
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
@@ -248,7 +245,7 @@ func (s *Server) Push(ctx context.Context) { s.pushes(ctx, false) }
 func (s *Server) sendQueued(ctx context.Context) { s.pushes(ctx, true) }
 
 func (s *Server) pushes(ctx context.Context, untilIdle bool) {
-	if s.push == nil && s.phones == nil {
+	if s.push == nil {
 		if !untilIdle {
 			<-ctx.Done()
 		}
@@ -338,71 +335,37 @@ func (s *Server) claimPushes(ctx context.Context, n int) ([]queued, error) {
 	return out, rows.Err()
 }
 
-// device is a browser's subscription (platform "") or a phone's token, as a row of the queue is sent to it.
+// device is a browser's subscription, as a row of the queue is sent to it, and how many tries it has refused.
 type device struct {
-	sub      push.Subscription
-	platform string
-	token    string
-	fails    int
+	sub   push.Subscription
+	fails int
 }
 
-// table and key are where the device is kept.
-func (d device) table() (table, column, key string) {
-	if d.platform == "" {
-		return "push_subs", "endpoint", d.sub.Endpoint
-	}
-	return "phones", "token", d.token
-}
-
-// devices are a player's browsers and phones that want notifications of a kind (the newest pushDevices of each) and
-// that the game has a sender for.
+// devices are a player's browsers that want notifications of a kind (the newest pushDevices).
 func (s *Server) devices(ctx context.Context, userID int64, kind pushKind) ([]device, error) {
 	want := ""
 	if kind != pushAsked {
 		want = ` AND ` + wants(kind, "?1")
 	}
-	rows, err := s.db.Read.QueryContext(ctx, `SELECT * FROM (SELECT endpoint, p256dh, auth, '', fails FROM push_subs
-			WHERE user_id = ?1`+want+` ORDER BY created_at DESC LIMIT ?2)
-		UNION ALL SELECT * FROM (SELECT token, '', '', platform, fails FROM phones
-			WHERE user_id = ?1`+want+` ORDER BY created_at DESC LIMIT ?2)`, userID, pushDevices)
+	rows, err := s.db.Read.QueryContext(ctx, `SELECT endpoint, p256dh, auth, fails FROM push_subs
+		WHERE user_id = ?1`+want+` ORDER BY created_at DESC LIMIT ?2`, userID, pushDevices)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	platforms := s.phones.Platforms()
 	var out []device
 	for rows.Next() {
 		var d device
-		var key string
-		if err := rows.Scan(&key, &d.sub.Keys.P256dh, &d.sub.Keys.Auth, &d.platform, &d.fails); err != nil {
+		if err := rows.Scan(&d.sub.Endpoint, &d.sub.Keys.P256dh, &d.sub.Keys.Auth, &d.fails); err != nil {
 			return nil, err
-		}
-		switch {
-		case d.platform == "" && s.push != nil:
-			d.sub.Endpoint = key
-		case d.platform != "" && slices.Contains(platforms, d.platform):
-			d.token = key
-		default:
-			continue // none to send it with here: kept for when there is
 		}
 		out = append(out, d)
 	}
 	return out, rows.Err()
 }
 
-// service is the push service a device is reached through, which its send goes through the lane of: a browser's
-// Web Push service, Apple's, Google's.
-func (s *Server) service(d device) string {
-	switch d.platform {
-	case "":
-		return s.push.Service(d.sub.Endpoint)
-	case "ios":
-		return "apns"
-	case "android":
-		return "fcm"
-	}
-	return d.platform
-}
+// service is the Web Push service a device is reached through, which its send goes through the lane of.
+func (s *Server) service(d device) string { return s.push.Service(d.sub.Endpoint) }
 
 // errSendBroke is a send that panicked (stopped and told by package safe): the game's own.
 var errSendBroke = errors.New("push: the send broke off")
@@ -410,24 +373,11 @@ var errSendBroke = errors.New("push: the send broke off")
 // sendTo sends m to a device, in its service's lane.
 func (s *Server) sendTo(ctx context.Context, stop <-chan struct{}, d device, m push.Message) error {
 	return s.pushq.lanes.send(ctx, stop, s.service(d), pushTimeout, func(ctx context.Context) (err error) {
-		if !safe.Do("push: a send", func() {
-			if d.platform == "" {
-				err = s.push.Send(ctx, d.sub, m)
-			} else {
-				err = s.phones.Send(ctx, d.platform, d.token, m)
-			}
-		}) {
+		if !safe.Do("push: a send", func() { err = s.push.Send(ctx, d.sub, m) }) {
 			err = errSendBroke
 		}
 		return err
 	})
-}
-
-// keysRefused tells, as a problem, that a service refused the game's own keys: once a day for each service and answer
-// (problems.go), however many pushes it refuses, since they're tried again quietly.
-func (s *Server) keysRefused(service string, err error) {
-	s.Problem(fmt.Sprintf("push: %s refused the game's keys (APNS_*, FCM_CREDENTIALS_FILE); the notifications are "+
-		"tried again until they're mended: %s", service, plainKind(err.Error(), "", 160)))
 }
 
 // deliver sends a row of the queue to the player's devices, and keeps what came of it: the row done (or tried again
@@ -504,11 +454,6 @@ func (s *Server) deliver(ctx context.Context, stop <-chan struct{}, j queued) {
 			held, holdFor = true, max(holdFor, h.after)
 			paced = paced || h.full
 			devices[i].fails = -1
-		case errors.Is(err, push.ErrKeys) && errors.As(err, &b): // the game's own, for a while: tried again, and told
-			busy, wait = true, max(wait, b.After)
-			devices[i].fails = -1
-			s.keysRefused(s.service(devices[i]), err)
-			slog.Warn("push", "err", err, "kind", m.Kind)
 		case errors.As(err, &b):
 			busy, wait = true, max(wait, b.After)
 			slog.Warn("push", "err", err, "kind", m.Kind)
@@ -519,7 +464,7 @@ func (s *Server) deliver(ctx context.Context, stop <-chan struct{}, j queued) {
 		default: // the game's own: says nothing of the device
 			devices[i].fails = -1
 			slog.Warn("push", "err", err, "kind", m.Kind)
-			// A message it can't send, a send that broke off: told. (Its keys refused are push.ErrKeys, above.)
+			// A message it can't send, a send that broke off: told.
 			s.Problem("push: the game's own send failed: " + plainKind(err.Error(), "", 160))
 		}
 	}
@@ -585,7 +530,7 @@ func (s *Server) pushDone(ctx context.Context, j queued, devices []device, errs 
 	ms := at.UnixMilli()
 	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
 		for i, d := range devices {
-			table, column, key := d.table()
+			key := d.sub.Endpoint
 			var q string
 			var args []any
 			switch err := errs[i]; {
@@ -594,17 +539,17 @@ func (s *Server) pushDone(ctx context.Context, j queued, devices []device, errs 
 			case err == nil && d.fails == 0:
 				continue
 			case err == nil:
-				q = `UPDATE ` + table + ` SET fails = 0, failing_since = NULL WHERE ` + column + ` = ?`
+				q = `UPDATE push_subs SET fails = 0, failing_since = NULL WHERE endpoint = ?`
 				args = []any{key}
 			case errors.Is(err, push.ErrGone):
-				q, args = `DELETE FROM `+table+` WHERE `+column+` = ?`, []any{key}
+				q, args = `DELETE FROM push_subs WHERE endpoint = ?`, []any{key}
 			default:
-				q = `UPDATE ` + table + ` SET fails = fails + 1, failing_since = coalesce(failing_since, ?2) WHERE ` + column + ` = ?1`
+				q = `UPDATE push_subs SET fails = fails + 1, failing_since = coalesce(failing_since, ?2) WHERE endpoint = ?1`
 				args = []any{key, s.game.Now().UnixMilli()}
 				if _, err := tx.ExecContext(ctx, q, args...); err != nil {
 					return err
 				}
-				q = `DELETE FROM ` + table + ` WHERE ` + column + ` = ? AND fails >= ? AND failing_since <= ?`
+				q = `DELETE FROM push_subs WHERE endpoint = ? AND fails >= ? AND failing_since <= ?`
 				args = []any{key, pushForgetTries, s.game.Now().Add(-pushForgetAfter).UnixMilli()}
 			}
 			if _, err := tx.ExecContext(ctx, q, args...); err != nil {

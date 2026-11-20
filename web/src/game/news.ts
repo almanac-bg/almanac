@@ -13,7 +13,6 @@
 
 import { emblem } from "../art/emblem.ts";
 import { api, errorText } from "../lib/api.ts";
-import { haptic } from "../lib/app.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { feelKit, play, type SoundName, voice } from "../lib/sound.ts";
 import { met } from "../state.ts";
@@ -114,7 +113,6 @@ export function news(
           await landed(run);
           await streak?.grown;
           if (gone) return;
-          haptic("big");
           kit.sheet(top.parts, top.sound, top.glow, { ...hands(), play: voice }, top.actions);
         },
         () => {},

@@ -99,7 +99,7 @@ func (s *Server) Remind(ctx context.Context) {
 // remind queues the reminders of the players whose hour has come at `at` and who haven't been reminded today. It says
 // how many.
 func (s *Server) remind(ctx context.Context, at time.Time) int {
-	if s.push == nil && s.phones == nil {
+	if s.push == nil {
 		return 0
 	}
 	now := at.In(bulgaria())
@@ -107,8 +107,7 @@ func (s *Server) remind(ctx context.Context, at time.Time) int {
 	if minute < RemindEarliest || minute >= quietFrom {
 		return 0 // a player found due late (just subscribed, the server back after a while) waits for tomorrow
 	}
-	rows, err := s.db.Read.QueryContext(ctx, `SELECT DISTINCT p.user_id FROM (SELECT user_id FROM push_subs
-		UNION SELECT user_id FROM phones) p WHERE `+wants(pushDay, "p.user_id")+`
+	rows, err := s.db.Read.QueryContext(ctx, `SELECT DISTINCT p.user_id FROM push_subs p WHERE `+wants(pushDay, "p.user_id")+`
 		AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.user_id = p.user_id AND r.kind = 'day' AND r.day = ?1
 			AND r.finished_at IS NOT NULL)
 		AND NOT EXISTS (SELECT 1 FROM push_reminded d WHERE d.user_id = p.user_id AND d.day = ?1)`, today)

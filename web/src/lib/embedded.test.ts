@@ -35,7 +35,6 @@ test("a browser of its own, the home screen and the game's app are not", () => {
   assert.equal(embeddedBrowser(safari), null);
   assert.equal(embeddedBrowser(`${iphone} CriOS/130 Mobile/15E148 Safari/604.1`), null);
   assert.equal(embeddedBrowser(`${iphone} Mobile/15E148`, true), null); // added to the home screen
-  assert.equal(embeddedBrowser(`${android} Chrome/130 Mobile Safari/537.36 AlmanacApp/1.6`), null);
   assert.equal(
     embeddedBrowser("Mozilla/5.0 (Macintosh; Intel Mac OS X 15_1) AppleWebKit/605.1.15 Safari/605.1.15"),
     null,

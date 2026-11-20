@@ -78,12 +78,6 @@ async function check(): Promise<void> {
 /** Away for at least this long, the page asks whether it's behind as it comes back. */
 const away = 60_000;
 
-/** The page brought back by the phone's app (lib/phone.ts), whose web view may not say it was hidden: is it behind? */
-export function resumed(): void {
-  if (stale.peek()) catchUp();
-  else void check();
-}
-
 /** Keeps the page current (above): from the start, for good. */
 export function keepFresh(): void {
   hearing.push((res, code) => {

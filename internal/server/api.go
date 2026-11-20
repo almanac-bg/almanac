@@ -332,7 +332,7 @@ func (s *Server) guest(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if err := s.cameFrom(r.Context(), u.ID, in.From, inApp(r)); err != nil {
+	if err := s.cameFrom(r.Context(), u.ID, in.From); err != nil {
 		slog.Warn("came from", "err", err) // the guest is made all the same
 	}
 	s.setSession(w, token)
@@ -509,8 +509,8 @@ func (s *Server) signOut(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"user": nil})
 }
 
-// signOutOthers ends the player's every other session, and the notifications of those browsers and phones: a phone
-// lost, a computer left signed in. This browser stays signed in.
+// signOutOthers ends the player's every other session, and the notifications of those browsers: a phone lost, a
+// computer left signed in. This browser stays signed in.
 func (s *Server) signOutOthers(w http.ResponseWriter, r *http.Request) error {
 	if _, err := s.mustUser(r); err != nil {
 		return err

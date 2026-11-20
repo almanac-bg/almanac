@@ -9,7 +9,6 @@
 // themselves are in the game's feel (../feel.ts), a file of its own that the first touch sends for: here are the
 // switch, the audio and the turns.
 
-import { type Haptic, haptic } from "./app.ts";
 import { signal } from "./dom.ts";
 
 export type SoundName =
@@ -157,27 +156,13 @@ export function liveAudio(): { audio: AudioContext; feel: Feel } | null {
   return soundOn.peek() && audio?.state === "running" && kit ? { audio, feel: kit } : null;
 }
 
-/** What the sounds that come with a touch feel like in the app (the answers' are playAnswer's), sound or not. */
-const touches: Partial<Record<SoundName, Haptic>> = {
-  tap: "tap",
-  key: "select",
-  streak: "streak",
-  perfect: "exact",
-  through: "big",
-  out: "close",
-  win: "big",
-  lose: "close",
-};
-
 /** Plays a sound, if sounds are on and the browser allows them (else nothing: never a backlog later). `lift` raises
- * it by that many steps of the scale (feel.ts). In the app, some are felt too, sound or not. */
+ * it by that many steps of the scale (feel.ts). */
 export function play(name: SoundName, lift = 0): void {
-  const touch = touches[name];
-  if (touch) haptic(touch);
   voice(name, lift);
 }
 
-/** A sound alone, never felt (the big moments are felt on their own). */
+/** A sound (play's). */
 export function voice(name: SoundName, lift = 0): void {
   if (!soundOn.peek()) return;
   const c = context();
@@ -206,10 +191,8 @@ export function voice(name: SoundName, lift = 0): void {
   kit.sound(c, name, lift, t0);
 }
 
-/** How an answer sounds: a right one a step of the scale higher for each before it in a row, up to an octave. In the
- * app it's felt too, sound or not. */
+/** How an answer sounds: a right one a step of the scale higher for each before it in a row, up to an octave. */
 export function playAnswer(kind: "exact" | "right" | "partial" | "wrong" | "time", inRow = 0): void {
-  haptic(kind === "partial" ? "close" : kind === "time" ? "wrong" : kind);
   const right = kind === "exact" || kind === "right";
   voice(kind, right ? Math.min(Math.max(inRow - 1, 0), 5) : 0);
 }

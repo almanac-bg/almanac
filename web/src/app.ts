@@ -2,14 +2,13 @@
 // bottom of a phone's), and the screen the router puts under them.
 
 import { loadPictures } from "./art/picture.ts";
-import { keepFresh, resumed } from "./fresh.ts";
+import { keepFresh } from "./fresh.ts";
 import { later } from "./kit.ts";
-import { startApp } from "./lib/app.ts";
 import { effect, h, mount } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { applyPrefs } from "./lib/prefs.ts";
 import { preparePush } from "./lib/push.ts";
-import { canGoBack, entry, go, navigate, path, start } from "./lib/router.ts";
+import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
 import { duel, duelOne } from "./screens/duel.ts";
 import { handoff } from "./screens/keep.ts";
@@ -33,15 +32,6 @@ const links: [href: string, label: string, icon: string, here: (p: string) => bo
 reportErrors();
 applyPrefs();
 keepFresh();
-startApp({
-  navigate,
-  go,
-  // Android's back puts the app away from Начало, unless a game is under way there (the day's ten), which it asks of.
-  home: () => location.pathname === "/" && !entry().game && !playing.peek(),
-  playing: () => playing.peek(),
-  canGoBack,
-  resumed,
-});
 loadPictures().catch(() => {}); // the illustrations, in a file of their own: on their way at once
 
 const root = document.getElementById("app");

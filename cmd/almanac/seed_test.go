@@ -12,7 +12,7 @@ func TestSeedOnlyInDevelopment(t *testing.T) {
 		t.Setenv("DEV", "1")
 		t.Setenv("DB_PATH", filepath.Join(t.TempDir(), "seeded.db"))
 		for _, k := range []string{"TLS_CERT", "TLS_KEY", "TRUST_CLOUDFLARE", "SMTP_URL", "BACKUP_ENDPOINT",
-			"PUSH_PRIVATE_KEY", "APNS_KEY_FILE", "FCM_CREDENTIALS_FILE"} {
+			"PUSH_PRIVATE_KEY"} {
 			t.Setenv(k, "")
 		}
 	}

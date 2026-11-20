@@ -43,8 +43,8 @@ func TestDayMail(t *testing.T) {
 		}
 	}
 	player("ana@example.bg", true)
-	bo := player("bo@example.bg", true) // notifications on a phone: they remind
-	exec(`INSERT INTO phones (token, user_id, platform, created_at) VALUES ('t', ?, 'ios', 0)`, bo)
+	bo := player("bo@example.bg", true) // notifications on in a browser: they remind
+	exec(`INSERT INTO push_subs (endpoint, user_id, p256dh, auth, created_at) VALUES ('e', ?, 'p', 'a', 0)`, bo)
 	player("vi@example.bg", false) // never asked
 	player("", true)               // no email
 	gi := player("gi@example.bg", true)

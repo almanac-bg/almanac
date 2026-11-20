@@ -77,9 +77,9 @@ func (g *Game) DayQuestions(ctx context.Context) (map[string]bool, error) {
 	return barred, err
 }
 
-// Devices are what a game can be started on, as runs.device keeps them: for /admin to tell phones, desktops and the
-// app apart.
-var Devices = []string{"phone", "tablet", "desktop", "app-ios", "app-android"}
+// Devices are what a game can be started on, as runs.device keeps them: for /admin to tell phones, tablets and
+// desktops apart.
+var Devices = []string{"phone", "tablet", "desktop"}
 
 // devicesKey keeps in a context the device each of its players plays on (FromDevice), by player.
 type devicesKey struct{}
