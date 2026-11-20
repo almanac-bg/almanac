@@ -43,13 +43,25 @@ test("a chapter comes a page at a time, by its numbers, and finds its facts by t
   const entries = page.locator(".entry");
   await expect(entries).toHaveCount(30);
   await expect(page.locator(".chapter-facts .sect-note")).toHaveText(`${facts.length}, най-новите първи`);
-  await page.locator(".pager").getByRole("button", { name: "По-стари" }).click();
+  await page.locator(".pager").getByRole("link", { name: "По-стари" }).click();
   await expect(page).toHaveURL(/\/almanac\/mix\?page=2$/);
   await expect(page.locator('.pager-n[aria-current="page"]')).toHaveText("2");
   // The page in the address: a reload opens it again.
   await page.reload();
   await expect(page.locator('.pager-n[aria-current="page"]')).toHaveText("2");
   await expect(entries).toHaveCount(30);
+  // A page is an entry of the history: back is the page before, still in the chapter.
+  await page.goBack();
+  await expect(page).toHaveURL(/\/almanac\/mix$/);
+  await expect(page.locator('.pager-n[aria-current="page"]')).toHaveText("1");
+  await page.goForward();
+  await expect(page.locator('.pager-n[aria-current="page"]')).toHaveText("2");
+  // A page past the last is the last.
+  const last = String(Math.ceil(facts.length / 30));
+  await page.goto("/almanac/mix?page=99");
+  await expect(page.locator('.pager-n[aria-current="page"]')).toHaveText(last);
+  await expect(page).toHaveURL(new RegExp(`/almanac/mix\\?page=${last}$`));
+  await expect(entries.first()).toBeVisible();
   // Found by a word of its answer, in any case.
   await page.getByRole("searchbox", { name: "Търси във фактите" }).fill("ДУНАВ");
   await expect(page).toHaveURL(/\?q=/);
@@ -81,6 +93,16 @@ test("a chapter's entries: the latest first, each with its dateline; a statement
   // A question's answer is the headword, the question in italic under it.
   await expect(items.filter({ has: page.locator(".entry-q") })).toHaveCount(1);
   await expect(items.last().locator(".entry-q")).toHaveCount(1); // learned first
+});
+
+test("a chapter the book doesn't have is the page that isn't there; the book with a slash after it is the book", async ({
+  page,
+}) => {
+  await page.goto("/almanac/nosuch");
+  await expect(page.getByRole("heading", { level: 1, name: "Тази страница я няма" })).toBeVisible();
+  await page.goto("/almanac/");
+  await expect(page).toHaveURL(/\/almanac$/);
+  await expect(page.locator(".toc-row")).toHaveCount(12);
 });
 
 test("on a big screen the book is a spread: the contents in two columns, none over another", async ({ page }) => {

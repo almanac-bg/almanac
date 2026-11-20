@@ -29,6 +29,6 @@ export function standing(at: number | undefined, players: number, early: boolean
   const share = at > 1 && better > 0 && players >= shareFrom && (players >= shareLeads || !shown);
   return {
     place: shown ? place(at, players) : undefined,
-    lead: share ? `По-добре от ${better}% от играчите днес.` : undefined,
+    lead: share ? `По-добре от ${better}\u00a0% от играчите днес.` : undefined,
   };
 }

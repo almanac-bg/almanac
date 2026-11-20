@@ -19,8 +19,7 @@ import { signIn } from "./signin.ts";
 export const app = embedded;
 
 /** What keeping the game is for, under the email's field. */
-const keepNote =
-  "Пращаме ти код, за да потвърдиш имейла. Серията, точките и научените факти остават с теб на всяко устройство.";
+const keepNote = "Пращаме ти код, за да потвърдиш имейла. Серията и научените факти остават с теб на всяко устройство.";
 
 /** What a guest's game risks, while they're to be asked to keep it (`days`: the days played as far as they count, 1
  * or 2; `streak` with today's): the game in this app's browser only, or on this device. Null once it's kept. */

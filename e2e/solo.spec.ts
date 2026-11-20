@@ -62,7 +62,7 @@ test("the day says how its other players did with each question: under the verdi
   const says = page.locator(".after .verdict + .crowd-says");
   // The other answered nothing, so this may be the first right answer: then it says so, never „0%“.
   await expect(says).toHaveText(
-    /^([А-Яа-я ]+ (\d+|под 1)% от играчите днес|Днес (само ти го позна|още никой не го е познал))\.$/,
+    /^([А-Яа-я ]+ (\d+|под 1)\u00a0% от играчите днес|Днес (само ти го позна|още никой не го е познал))\.$/,
   );
   await moveOn(page);
   for (let n = 1; n < 10; n++) {

@@ -71,8 +71,8 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 				out["back"] = map[string]any{"last": last, "best": streak.Best}
 			}
 		}
-		// Whether they've finished a game of any kind yet: until then Начало is the day and the topics only.
-		if out["played"], err = s.game.Played(ctx, u.ID); err != nil {
+		// Whether today is their first day (no game finished before it): its result says less of where they stand.
+		if out["firstDay"], err = s.game.FirstDay(ctx, u.ID, day); err != nil {
 			return nil, err
 		}
 		// A friend said yes to their request: told once (POST /api/told).

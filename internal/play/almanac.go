@@ -215,7 +215,7 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Al
 // ChaptersOf is how much of each chapter of the book a player knows: the bank's topics (MasteryOf), then „Микс“ (over
 // every topic: their ability over all of them, against every question) and „България“ (each of its questions known
 // as well as its own topic is: no ability of its own, bulgaria.go), both told as soon as the topics are, by all the
-// player's answers.
+// player's answers, once one of them is right (one of its own, for „България“).
 func (g *Game) ChaptersOf(ctx context.Context, userID int64) ([]Mastery, error) {
 	out, err := g.MasteryOf(ctx, userID)
 	if err != nil {
@@ -243,6 +243,9 @@ func (g *Game) ChaptersOf(ctx context.Context, userID int64) ([]Mastery, error) 
 		n++
 	}
 	bg := masteryOf(BulgariaTopic, all, nil)
+	if topics[BulgariaTopic].rights == 0 {
+		bg.Sure, bg.First = false, false // none of its own questions right yet: nothing to tell of it
+	}
 	if n > 0 {
 		bg.Known = int(math.Round(100 * sum / float64(n)))
 		t := TierOf(bg.Known)

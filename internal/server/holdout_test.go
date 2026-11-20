@@ -91,7 +91,7 @@ func TestHoldoutByPlayer(t *testing.T) {
 	if width(alike) >= width(apart) {
 		t.Fatalf("alike %d, apart %d", width(alike), width(apart))
 	}
-	if !strings.Contains(string(many.HTML()), "20 играчи") || !strings.Contains(string(one.HTML()), "<small>1 играч</small>") {
+	if !strings.Contains(string(many.HTML()), "20 играча") || !strings.Contains(string(one.HTML()), "<small>1 играч</small>") {
 		t.Fatalf("cells: %s, %s", many.HTML(), one.HTML())
 	}
 	if byPlayer(nil).HTML() != `<span class="rate none">—</span>` {

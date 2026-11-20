@@ -10,7 +10,7 @@
 
 import { picture } from "../art/picture.ts";
 import { news } from "../game/news.ts";
-import { closeWords, percent } from "../game/numbers.ts";
+import { closeWords, count, percent } from "../game/numbers.ts";
 import { hands, land, landed, reviewed } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting, trail } from "../game/run.ts";
 import { shareDay, shareText } from "../game/share.ts";
@@ -55,8 +55,8 @@ export interface Today {
   forgiven?: string;
   /** A streak that just ended (the last 3 days): its days, and the day missed that ended it. */
   ended?: { days: number; on: string };
-  /** Whether the player has finished a game of any kind. */
-  played?: boolean;
+  /** Whether today is the player's first day (no game finished before it): the same all day, whatever they play. */
+  firstDay?: boolean;
   run: State | null;
   /** The day played: the entry its right answers wrote in the book that the result shows (none for no right answer
    * with a fact). */
@@ -274,7 +274,7 @@ function issue(
   const players = t.board.players;
   const at = marks.length;
   const lead = shared && !at ? shared : null;
-  const [, month = 1, date = 1] = t.day.split("-").map(Number);
+  const [, , date = 1] = t.day.split("-").map(Number);
   return h(
     "div",
     { class: "issue day page-1" },
@@ -282,13 +282,13 @@ function issue(
       "p",
       { class: "issue-date" },
       h("time", { datetime: t.day }, h("b", { class: "issue-n" }, String(date))),
+      " ",
       h(
         "span",
         { class: "issue-month" },
         dateWords(t.day).split(" ")[1] ?? "",
         first ? h("span", { class: "kicker issue-weekday" }, weekday(t.day)) : null,
       ),
-      h("span", { class: "sr" }, ` ${month}`),
     ),
     h(
       "div",
@@ -493,13 +493,6 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   const now = just ? api<Today>("GET", "/api/day") : null;
   now?.then(fresh.set, () => {});
   let growing: Promise<void> | null = null;
-  const streak = now && {
-    // Once the day as it is now has come and drawn the streak (signals run at once): its growing, if any.
-    grown: now.then(
-      () => growing ?? undefined,
-      () => undefined,
-    ),
-  };
   const of = outOf(run);
   const perfect = of > 0 && run.rights === of;
   const review = reviewOf(run.id);
@@ -525,7 +518,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
     ),
     trail(run.trail, run.total),
     h("p", { class: "result-line" }, h("b", null, rightWords[Math.min(10, run.rights)] ?? ""), " ", () =>
-      crowdWords(fresh(), !t.played),
+      crowdWords(fresh(), !!t.firstDay),
     ),
     h(
       "p",
@@ -576,9 +569,8 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
         h("p", { class: "small" }, "Само резултатът и формата му, без отговорите."),
         h("button", { class: "link tap", type: "button", onclick: openReview }, "Прегледай въпросите"),
       ),
-      // What the game brought (a day whose result was never on screen: told now, once). Just played, the streak
-      // waits for the day as it is now, with today in it.
-      just ? news(run.id, 0, streak ?? undefined) : untold(t, run.id),
+      // What the game brought (a day whose result was never on screen: told now, once).
+      just ? news(run.id) : untold(t, run.id),
     ),
     h(
       "div",
@@ -843,7 +835,7 @@ function untold(t: Today, run?: number): Child {
   const id = t.untold;
   if (!id || (run !== undefined && id !== run)) return null;
   t.untold = undefined;
-  return news(id, 0, undefined, { title: run ? "" : "От последната ти игра" });
+  return news(id, 0, { title: run ? "" : "От последната ти игра" });
 }
 
 /** The streak notices told on this page: the server keeps them as told (play.TellStreak), and each is said once. */
@@ -872,9 +864,9 @@ function streakNotice(t: Today): Child {
   const begins = t.run?.done ? "Днес започна нова" : "Днес започва нова";
   const best = t.back?.best ?? 0;
   const text = t.forgiven
-    ? `${onDay(t.forgiven).replace(/^./, (c) => c.toUpperCase())} пропусна въпросите, но серията остава: един пропуснат ден в седмицата не я прекъсва. Серия: ${t.streak === 1 ? "1 ден" : `${t.streak} дни`}.`
+    ? `${onDay(t.forgiven).replace(/^./, (c) => c.toUpperCase())} пропусна въпросите, но серията остава: един пропуснат ден в седмицата не я прекъсва. Серия: ${count(t.streak, "ден", "дни")}.`
     : t.ended
-      ? `Серията ти от ${t.ended.days} дни прекъсна. ${begins}.`
+      ? `Серията ти от ${count(t.ended.days, "ден", "дни")} прекъсна. ${begins}.`
       : best > 1
         ? `Радваме се, че се върна. Най-дългата ти серия е ${best} дни. ${begins}.`
         : `Радваме се, че се върна. ${begins} серия.`;
@@ -885,8 +877,8 @@ function streakNotice(t: Today): Child {
 const streakLabel = (n: number) => (n === 1 ? "ден поред" : "дни поред");
 
 /** The streak just grown by the day played (`was` before it, `now` after), moved there in its chip once the result
- * has landed (`after`): its number rolls on. Resolves once it's over, for what's big to come after it (news.ts), never
- * over it. Without the game's feel loaded, or with less motion, it is simply as it is. */
+ * has landed (`after`): its number rolls on. Resolves once it's over. Without the game's feel loaded, or with less
+ * motion, it is simply as it is. */
 async function grow(chip: HTMLElement, was: Today, now: Today, after: Promise<void>): Promise<void> {
   const kit = feelKit();
   if (!kit || now.streak !== was.streak + 1) return;

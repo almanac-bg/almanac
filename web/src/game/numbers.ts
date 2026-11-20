@@ -1,12 +1,12 @@
-// How the game says its numbers: a share of players („58%“), the close answers beside a score's right ones, a row of
+// How the game says its numbers: a share of players („58 %“), the close answers beside a score's right ones, a row of
 // right answers, how a
 // game's own players did with a question, and a count with its noun.
 
 import type { Crowd, Mark } from "./types.ts";
 
-/** A share as the game writes it: „58%“, and „под 1%“ for what rounds to nothing but isn't. */
+/** A share as the game writes it: „58 %“, and „под 1 %“ for what rounds to nothing but isn't. */
 export function percent(x: number): string {
-  return x > 0 && x < 0.005 ? "под 1%" : `${Math.round(x * 100)}%`;
+  return x > 0 && x < 0.005 ? "под 1\u00a0%" : `${Math.round(x * 100)}\u00a0%`;
 }
 
 /** The close answers beside a score's right ones („ · 1 близо“), "" for none: they bring points too, so that none right

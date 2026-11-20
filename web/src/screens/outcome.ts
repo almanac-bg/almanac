@@ -88,9 +88,9 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
   );
 }
 
-/** „Дуел с Мария“ or „Дуел срещу запис“. */
+/** „Дуел с Мария“ or „Срещу запис на Мария“. */
 function kicker(d: DuelView): string {
-  if (d.recorded) return "Дуел срещу запис";
+  if (d.recorded) return `Срещу запис на ${d.opponent?.name ?? ""}`;
   const them = d.opponent?.name;
   return them ? `Дуел ${withWord(them)}` : "Дуел";
 }

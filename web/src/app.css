@@ -1525,8 +1525,6 @@
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    padding: var(--space-4);
-    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
     background: color-mix(in srgb, var(--paper) 45%, transparent);
   }
 
@@ -1534,10 +1532,15 @@
     display: none;
   }
 
+  /* The sheet itself is opaque paper across the screen's width, its words and choice in a hand's width: the answers
+     under it never show through. */
   .leave-ask {
     display: grid;
     gap: var(--space-4);
-    width: min(100%, 28rem);
+    width: 100%;
+    padding: var(--space-4) max(var(--space-4), calc((100% - 28rem) / 2));
+    padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
+    background: var(--paper);
     box-shadow: none;
     animation: enter 200ms ease-out;
   }
@@ -2695,7 +2698,7 @@
     font: 600 0.9375rem / 1.25rem var(--font-serif);
   }
 
-  /* „Покани“ on a friend's row in /duel/new: what the tap does, in the link's colour. */
+  /* „Дуел“ on a friend's row in /duel/new: what the tap does, in the link's colour. */
   .duel-invite {
     color: var(--ink);
   }
@@ -4495,6 +4498,7 @@
     background: none;
     color: var(--ink-3);
     font: 700 1.125rem / 1 var(--font-numeral);
+    text-decoration: none;
     cursor: pointer;
   }
 
@@ -4504,11 +4508,14 @@
   }
 
   .pager-way {
+    display: inline-flex;
+    align-items: center;
     min-height: 44px;
     border: 0;
     background: none;
     color: var(--ink);
     font: 700 0.9375rem / 1 var(--font-sans);
+    text-decoration: none;
     cursor: pointer;
   }
 

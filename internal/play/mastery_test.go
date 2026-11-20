@@ -226,3 +226,23 @@ func TestMasteryTold(t *testing.T) {
 		t.Error("no moves")
 	}
 }
+
+// Answers all wrong tell nothing of what a player knows: no first estimate and no tier, however many; one right
+// answer is a basis.
+func TestMasteryWantsARightAnswer(t *testing.T) {
+	h := []float64{hardnessOf(0.8), hardnessOf(0.5), hardnessOf(0.2)}
+	a := newAbility()
+	for range MasteryFrom {
+		a.learn(0, hardnessOf(0.5), chance["choice"])
+	}
+	if m := masteryOf("history", a, h); m.First || m.Sure {
+		t.Errorf("%d answers all wrong: told as %+v", MasteryFrom, m)
+	}
+	a = newAbility()
+	for i := range MasteryFirst {
+		a.learn(float64(i/(MasteryFirst-1)), hardnessOf(0.5), chance["choice"])
+	}
+	if m := masteryOf("history", a, h); !m.First {
+		t.Errorf("%d answers, one right: not told, %+v", MasteryFirst, m)
+	}
+}

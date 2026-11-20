@@ -73,6 +73,10 @@ export function start(target: Element, list: Route[], notFound: () => Child): vo
   } catch {
     // an old browser: it scrolls as it likes
   }
+  // A page's address with a slash after it (/almanac/) is that page (the server sends it so): shown without the slash.
+  const bare = location.pathname.replace(/\/+$/, "");
+  if (bare && bare !== location.pathname && !bare.startsWith("//"))
+    history.replaceState(history.state, "", bare + location.search + location.hash);
   if (typeof entry().i !== "number") history.replaceState({ ...entry(), i: 0 }, "");
   at = entry().i ?? 0;
   // A screen loaded anew for a tap opens as one tapped (once: a reload of it after isn't).

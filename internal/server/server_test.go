@@ -422,6 +422,8 @@ func TestPages(t *testing.T) {
 		"/play/mix": 200, "/play/nosuch": 404, "/players/nobody": 404, "/nowhere": 404, "/api/nowhere": 404,
 		"/qimg/edf5f1c42d5e21e8.webp": 200, "/qimg/../../go.mod": 404, "/qimg/0000000000000000.webp": 404,
 		"/privacy": 200, "/.well-known/security.txt": 200,
+		// An app's page with a slash after it is that page; the slash after anything else isn't.
+		"/almanac/": 200, "/almanac/history/": 200, "/almanac/nosuch/": 404, "/nowhere/": 404,
 	} {
 		res, err := http.Get(g.url + path)
 		if err != nil {
@@ -506,9 +508,9 @@ func TestPlayingOverHTTP(t *testing.T) {
 		t.Fatalf("playing without even a guest: %d", status)
 	}
 	p.call("POST", "/api/guest", map[string]any{})
-	// Before a first game finished, Начало is the day and the topics only.
-	if _, today := p.call("GET", "/api/day", nil); today["played"] != false {
-		t.Fatalf("played before a game: %v", today["played"])
+	// A first day: no game finished before it.
+	if _, today := p.call("GET", "/api/day", nil); today["firstDay"] != true {
+		t.Fatalf("not a first day before a game: %v", today["firstDay"])
 	}
 	status, run := p.call("POST", "/api/day", map[string]any{})
 	if status != 200 || run["total"] != float64(10) {
@@ -558,7 +560,7 @@ func TestPlayingOverHTTP(t *testing.T) {
 		t.Fatalf("review: %d %v", status, out)
 	}
 	_, today := p.call("GET", "/api/day", nil)
-	if today["run"].(map[string]any)["done"] != true || today["streak"] != float64(1) || today["played"] != true {
+	if today["run"].(map[string]any)["done"] != true || today["streak"] != float64(1) || today["firstDay"] != true {
 		t.Fatalf("today: %v", today)
 	}
 	// The day done, the entry its right answers wrote is asked for the result (none for no right answer with a fact);
@@ -664,9 +666,10 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 		return res.StatusCode, string(body)
 	}
 	page := func() (int, string) { return at("/admin/questions") }
+	// To a player, the game's own page that isn't there, not Go's bare one.
 	for _, path := range []string{"/admin", "/admin/questions"} {
-		if status, _ := at(path); status != 404 {
-			t.Fatalf("%s for a player: %d", path, status)
+		if status, body := at(path); status != 404 || !strings.Contains(body, `id="boot"`) {
+			t.Fatalf("%s for a player: %d %.80s", path, status, body)
 		}
 	}
 	_, _ = g.db.Write.Exec(`UPDATE users SET admin = 1`)
