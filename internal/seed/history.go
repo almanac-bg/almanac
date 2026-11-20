@@ -127,8 +127,8 @@ func (w *world) plan() ([]session, error) {
 		if p.persona == keyDay2 && w.day == w.today() {
 			comes = false // day two, not played yet
 		}
-		if p.persona == keyRegular && w.day == w.today() && w.dayAt(w.day, 0, 0).Weekday() != time.Monday {
-			comes = false // today's ten left for whoever looks at the regular (a Monday's played: the week's league)
+		if p.persona == keyRegular && w.day == w.today() {
+			comes = false // today's ten left for whoever looks at the regular
 		}
 		if !comes {
 			continue

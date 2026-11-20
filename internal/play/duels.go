@@ -761,11 +761,8 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 }
 
 // SettleDue ends the duels whose time is up — a live duel cut off — and
-// the tournaments whose time is up. Run every few minutes. A week of the leagues that's due (ensureWeek) closes first.
+// the tournaments whose time is up. Run every few minutes.
 func (g *Game) SettleDue(ctx context.Context) error {
-	if err := g.ensureWeek(ctx); err != nil {
-		return err
-	}
 	if err := g.settleRoyalsDue(ctx); err != nil {
 		return err
 	}

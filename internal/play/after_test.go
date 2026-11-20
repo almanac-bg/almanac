@@ -119,8 +119,8 @@ func TestAnsweredQuestions(t *testing.T) {
 	}
 }
 
-// The last answer of a game doesn't wait for what follows it (the achievements measured again, the goals, the
-// league): that's done in the background, and the game's news waits for it instead, so it still tells all of it.
+// The last answer of a game doesn't wait for what follows it (the achievements measured again, the goals):
+// that's done in the background, and the game's news waits for it instead, so it still tells all of it.
 func TestTheLastAnswerDoesntWaitForWhatFollows(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()

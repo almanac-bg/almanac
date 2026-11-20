@@ -1,12 +1,11 @@
-// Класации: where players stand — on the day's ten (first: it's what most play), in the week's league (the player's own group), by rating
-// (with its division), and by knowledge (over every topic, or one) — among everyone, or among you and your friends.
+// Класации: where players stand — on the day's ten (first: it's what most play), by rating (with its division), and
+// by knowledge (over every topic, or one) — among everyone, or among you and your friends.
 
 import type { Board, Score } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
 import type { Child, Signal } from "../lib/dom.ts";
 import { type By, boardHash, readBoard } from "../lib/hash.ts";
 import type { Open, Standing, Tier } from "../ui.ts";
-import type { LeagueView } from "./league.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
@@ -26,8 +25,6 @@ let {
   segmented,
   toneOf,
   topicMark,
-  leagueBoard,
-  loadLeague,
 } = {} as Kit;
 
 interface Ranked {
@@ -68,14 +65,12 @@ interface Day {
 
 const tabs: [By, string][] = [
   ["day", "Днес"],
-  ["league", "Лига"],
   ["rating", "Рейтинг"],
   ["knowledge", "Знания"],
 ];
 
-/** Whether a board shows to a viewer who has met these of the game's systems: the league's and the rating's wait for
- * them. */
-const shows = (by: By, open?: Open) => (by === "league" ? !!open?.league : by === "rating" ? !!open?.rating : true);
+/** Whether a board shows to a viewer who has met these of the game's systems: the rating's waits for it. */
+const shows = (by: By, open?: Open) => by !== "rating" || !!open?.rating;
 
 export function ranks(kit: Kit) {
   ({
@@ -94,12 +89,10 @@ export function ranks(kit: Kit) {
     segmented,
     toneOf,
     topicMark,
-    leagueBoard,
-    loadLeague,
   } = kit);
   title("Класации");
   // Which board, among whom and of which topic, in the address (lib/hash.ts): back to the page, a reload or a link
-  // opens the same one („#league“; „#friends“, the day's among friends, from Начало's „Всички“).
+  // opens the same one („#rating“; „#friends“, the day's among friends, from Начало's „Всички“).
   const at = readBoard(
     location.hash,
     categories.map((c) => c.id),
@@ -109,7 +102,6 @@ export function ranks(kit: Kit) {
   const topic = signal(at.topic);
   const data = signal<Answer | null>(null);
   const day = signal<Day | null>(null);
-  const league = signal<LeagueView | null>(null);
   const error = signal<unknown>(null);
   // The board asked for now; an older answer arriving late is dropped.
   const current = () => {
@@ -118,8 +110,8 @@ export function ranks(kit: Kit) {
     if (by() === "knowledge" && topic()) q.set("topic", topic());
     return q.toString();
   };
-  // The day's boards come first, and say which of the others the viewer has met: a board of a league or a rating not
-  // theirs yet waits (play/unfold.go).
+  // The day's board comes first, and says which of the others the viewer has met: the rating's board, not theirs yet,
+  // waits (play/unfold.go).
   const loadDay = () => {
     api<Day>("GET", "/api/day").then((d) => {
       day.set(d);
@@ -131,10 +123,6 @@ export function ranks(kit: Kit) {
     data.set(null);
     error.set(null);
     if (by() === "day") return;
-    if (by() === "league") {
-      if (!league.peek()) loadLeague().then(league.set, error.set);
-      return;
-    }
     const asked = current();
     api<Answer>("GET", `/api/ranks?${asked}`).then((a) => {
       if (current() === asked) data.set(a);
@@ -162,7 +150,7 @@ export function ranks(kit: Kit) {
           (v) => pick(by, v),
         ),
       () =>
-        user.peek() && by() !== "league"
+        user.peek()
           ? segmented(
               "Сред кого",
               [
@@ -231,10 +219,6 @@ export function ranks(kit: Kit) {
               t.board.mine,
             )
           : h("p", { class: "board-empty" }, "Още никой не е играл днешните въпроси.");
-      }
-      if (by() === "league") {
-        const v = league();
-        return v ? leagueBoard(v) : h("p", { class: "muted" }, "…");
       }
       const d = data();
       if (!d) return h("p", { class: "muted" }, "…");

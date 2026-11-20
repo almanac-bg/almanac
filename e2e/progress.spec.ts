@@ -31,9 +31,8 @@ test("progress: a game's level, the achievements, and a look of one's own", asyn
   await expect(page.locator(".unlocks").getByRole("status")).toHaveText("Сложено");
 
   await page.goto("/rewards");
-  // A second day's: XP and the goals are met, the league isn't, so its three achievements wait (play/unfold.go).
-  await expect(page.getByRole("heading", { name: /Постижения · \d+ от 31/ })).toBeVisible();
-  await expect(page.locator(".how")).not.toContainText("Лиги");
+  // A second day's: XP and the goals are met, so every achievement shows (play/unfold.go).
+  await expect(page.getByRole("heading", { name: /Постижения · \d+ от 30/ })).toBeVisible();
   // The nearest to done and the earned ones first; the rest by tier a tap away, each in full: how it's earned, how
   // far along, what it gives.
   await expect(page.getByRole("heading", { name: "Най-близо" })).toBeVisible();

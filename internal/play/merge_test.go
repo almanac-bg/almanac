@@ -37,9 +37,6 @@ func TestMergeCoversTheSchema(t *testing.T) {
 	}
 	named := map[string]string{}
 	for _, s := range mergeSteps {
-		if (s.sql == "") == (s.do == nil) {
-			t.Errorf("a step of Merge with %v has both SQL and a function, or neither", s.carries)
-		}
 		for _, ref := range s.carries {
 			if named[ref] != "" {
 				t.Errorf("%s carried twice", ref)
@@ -74,7 +71,7 @@ func TestMergeCarriesTheRest(t *testing.T) {
 	guest, owner := w.user(), w.user()
 	for _, q := range []string{
 		`UPDATE users SET frame = 'gold', backdrop = 'waves', level_seen = 7, unlocks_known = 1, recordings_told = 50,
-			systems_told = 'duel league', streak_told = 'kept:2026-11-12', came_from = 'room', created_at = 5,
+			systems_told = 'duel xp', streak_told = 'kept:2026-11-12', came_from = 'room', created_at = 5,
 			seen_at = 900 WHERE id = ?2`,
 		`UPDATE users SET level_seen = 3, recordings_told = 80, systems_told = 'royal', streak_told = 'ended:2026-11-01',
 			came_from = 'home', created_at = 10, seen_at = 100 WHERE id = ?1`,
@@ -108,7 +105,7 @@ func TestMergeCarriesTheRest(t *testing.T) {
 	if reports != 1 || reminded != 2 || queued != 2 {
 		t.Fatalf("%d reports, reminded on %d days, %d pushes on the way", reports, reminded, queued)
 	}
-	if frame != "gold" || backdrop != "waves" || level != 7 || recordings != 80 || systems != "royal duel league" ||
+	if frame != "gold" || backdrop != "waves" || level != 7 || recordings != 80 || systems != "royal duel xp" ||
 		streak != "kept:2026-11-12" {
 		t.Fatalf("look and told: %s %s, level %d, recordings %d, %q, %q", frame, backdrop, level, recordings, systems, streak)
 	}
@@ -270,72 +267,6 @@ func (w *world) since(user int64, d time.Duration) {
 	w.t.Helper()
 	if _, err := w.db.Write.Exec(`UPDATE users SET created_at = ? WHERE id = ?`, w.now.Add(-d).UnixMilli(), user); err != nil {
 		w.t.Fatal(err)
-	}
-}
-
-// league is a player's league (its tier).
-func (w *world) league(user int64) int {
-	w.t.Helper()
-	return w.count(`SELECT league FROM users WHERE id = ?`, user)
-}
-
-// A player back on a new device, who plays the day as a guest before signing in, keeps their league: the guest's
-// group, of the lowest league, isn't the account's, and the account races the week in one of its own (review
-// 2026-11-18, A1: Пирин went to Странджа). A guest's group of the account's league comes along; and an account raised
-// to a guest's higher league keeps it, whatever group it raced in.
-func TestMergeKeepsTheAccountsLeague(t *testing.T) {
-	w := setup(t) // Thursday, 12 November
-	ctx := t.Context()
-	owner, guest := w.user(), w.user()
-	w.since(owner, 60*24*time.Hour)
-	w.since(guest, time.Hour)
-	if _, err := w.db.Write.Exec(`UPDATE users SET league = 4 WHERE id = ?`, owner); err != nil {
-		t.Fatal(err)
-	}
-	w.dayGame(guest, nil)
-	if v, _ := w.g.LeagueOf(ctx, guest); !v.In || v.League.Tier != 0 {
-		t.Fatalf("the guest's week: %+v", v)
-	}
-	w.fold(guest, owner)
-	if v, err := w.g.LeagueOf(ctx, owner); err != nil || !v.In || v.League.Tier != 4 {
-		t.Fatalf("the account's week after signing in: %+v %v", v, err)
-	}
-	w.now = time.Date(2026, 11, 16, 10, 0, 0, 0, Bulgaria)
-	if err := w.g.SettleDue(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if tier := w.league(owner); tier != 4 {
-		t.Fatalf("the account's league after the week: %d, not Пирин", tier)
-	}
-
-	// A guest in a group of the account's league brings it.
-	owner2, guest2 := w.user(), w.user()
-	w.since(owner2, 60*24*time.Hour)
-	w.since(guest2, time.Hour)
-	w.dayGame(guest2, nil)
-	group := w.count(`SELECT group_id FROM league_members WHERE user_id = ?`, guest2)
-	w.fold(guest2, owner2)
-	if now := w.count(`SELECT coalesce(max(group_id), 0) FROM league_members WHERE user_id = ?`, owner2); now != group {
-		t.Fatalf("the guest's group %d, the account's %d", group, now)
-	}
-
-	// An account in a group already, raised to a guest's higher league: the week's end keeps it there.
-	owner3, guest3 := w.user(), w.user()
-	w.since(owner3, 60*24*time.Hour)
-	w.dayGame(owner3, nil)
-	if _, err := w.db.Write.Exec(`UPDATE users SET league = 3 WHERE id = ?`, guest3); err != nil {
-		t.Fatal(err)
-	}
-	w.fold(guest3, owner3)
-	if tier := w.league(owner3); tier != 3 {
-		t.Fatalf("raised to the guest's league: %d", tier)
-	}
-	w.now = time.Date(2026, 11, 23, 10, 0, 0, 0, Bulgaria)
-	if err := w.g.SettleDue(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if tier := w.league(owner3); tier != 3 {
-		t.Fatalf("the raised account's league after the week: %d", tier)
 	}
 }
 

@@ -115,13 +115,6 @@
     --div-platinum: #7fe0cf;
     --div-diamond: #79c7ff;
     --div-legend: #c4a3ff;
-    /* Leagues: each mountain's colour (art/pictures.ts), from Странджа's green to Рила's ice. */
-    --lg-0: #7ccf8a;
-    --lg-1: #5cc7b4;
-    --lg-2: #6fb8ff;
-    --lg-3: #9d93ff;
-    --lg-4: #c9b8ff;
-    --lg-5: #bfe6ff;
     /* Achievement tiers: the fill of a badge, and the ink of its words. */
     --tier-common: var(--silver);
     --tier-rare: var(--sky);
@@ -203,12 +196,6 @@
       --div-platinum: #3fb5a0;
       --div-diamond: #3c9be0;
       --div-legend: #8b5cf6;
-      --lg-0: #2f9a4a;
-      --lg-1: #13917c;
-      --lg-2: #2d7fd0;
-      --lg-3: #5b4fd6;
-      --lg-4: #7d5ad8;
-      --lg-5: #2f8fc4;
       --tier-common: #9aa6ba;
       --tier-common-ink: #5d5677;
       --locked: #cdc7dc;
@@ -255,12 +242,6 @@
     --div-platinum: #3fb5a0;
     --div-diamond: #3c9be0;
     --div-legend: #8b5cf6;
-    --lg-0: #2f9a4a;
-    --lg-1: #13917c;
-    --lg-2: #2d7fd0;
-    --lg-3: #5b4fd6;
-    --lg-4: #7d5ad8;
-    --lg-5: #2f8fc4;
     --tier-common: #9aa6ba;
     --tier-common-ink: #5d5677;
     --locked: #cdc7dc;
@@ -758,52 +739,7 @@
     justify-self: center;
   }
 
-  /* The week's league (screens/league.ts): its mountain and name, the player's place, the zones of the group. */
-  .league-card {
-    display: grid;
-    gap: var(--space-3);
-  }
-
-  .league-head {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
-
-  .league-name {
-    display: grid;
-    flex: 1;
-    min-width: 0;
-  }
-
-  .league-name .kicker {
-    margin: 0;
-  }
-
-  .league-name strong {
-    color: color-mix(in srgb, var(--lg) 75%, var(--text));
-    font: 900 1.5rem / 1.75rem var(--font-sans);
-  }
-
-  /* The week as it stands: the days left and who goes up, then the gap worth playing for, a size up. */
-  .league-now {
-    display: grid;
-    gap: var(--space-1);
-  }
-
-  .league-when {
-    color: var(--text-muted);
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-  }
-
-  .league-gap {
-    font-size: 1.125rem;
-    line-height: 1.5rem;
-    font-weight: 800;
-  }
-
-  /* Профил's line of the league: its mountain, the place in the group, a tap from it. */
+  /* A line that's a tap from a place of its own (Профил's facts, to Моят Алманах). */
   .place-link {
     display: flex;
     align-items: center;
@@ -849,43 +785,19 @@
     transform: scaleX(-1);
   }
 
-  .league-zone {
-    margin: 0;
-    font-weight: 700;
-  }
-
-  .league-zone.up {
-    color: var(--right-ink);
-  }
-
-  .league-zone.down {
-    color: var(--wrong-ink);
-  }
-
-  /* The group: the ones going up and down marked at the edge, and a line where each zone ends. */
-  .league-board .row.up {
+  /* Роял's table: those going on marked at the edge, and a line where the cut falls. */
+  .royal-table .row.up {
     box-shadow: inset 3px 0 0 var(--right);
   }
 
-  .league-board .row.down {
-    box-shadow: inset 3px 0 0 var(--wrong);
-  }
-
-  .league-line {
+  .cut-line {
     padding: var(--space-1) var(--space-3);
+    color: var(--right-ink);
     font-size: 0.75rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
     list-style: none;
-  }
-
-  .league-line.up {
-    color: var(--right-ink);
-  }
-
-  .league-line.down {
-    color: var(--wrong-ink);
   }
 
   /* Класации: who the board is of (everyone, friends) and, for knowledge, which topic. */
@@ -1027,7 +939,7 @@
     font-size: 1.625rem;
   }
 
-  .league-line.now {
+  .cut-line.now {
     border-top: 2px solid;
     animation: cut 0.3s ease-out 0.5s both;
   }
@@ -1321,7 +1233,7 @@
     gap: var(--space-1) var(--space-3);
   }
 
-  /* Начало and a result end in quiet lines (the league, a way in, what the game brought): one list at the
+  /* Начало and a result end in quiet lines (a way in, what the game brought): one list at the
      column's left, with its buttons, in one style (the news' lines: below). */
   .day-next {
     color: var(--text-muted);
@@ -3277,34 +3189,6 @@
     --div: var(--div-legend);
   }
 
-  /* League emblems (art/league.ts): a mountain in the league's colour. */
-  .lg-0 {
-    --lg: var(--lg-0);
-  }
-  .lg-1 {
-    --lg: var(--lg-1);
-  }
-  .lg-2 {
-    --lg: var(--lg-2);
-  }
-  .lg-3 {
-    --lg: var(--lg-3);
-  }
-  .lg-4 {
-    --lg: var(--lg-4);
-  }
-  .lg-5 {
-    --lg: var(--lg-5);
-  }
-
-  .emblem[class*="lg-"] {
-    --tone: var(--lg);
-  }
-
-  .emblem.lg-5 {
-    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--lg) 55%, transparent));
-  }
-
   .emblem {
     --tone: var(--div);
     display: inline-grid;
@@ -4352,7 +4236,7 @@
     font: 700 0.8125rem / 1 var(--font-sans);
   }
 
-  /* A row's points, under its right answers (the day's board, a league's): they decide only a tie. */
+  /* A row's points, under its right answers (the day's board): they decide only a tie. */
   .pts-under {
     display: block;
     margin-top: 3px;
@@ -4892,8 +4776,7 @@
   .fr-double,
   .fr-flames,
   .fr-laurel,
-  .fr-sun,
-  .fr-peak5 {
+  .fr-sun {
     --tone: var(--div-gold);
   }
 
@@ -4918,18 +4801,9 @@
     --tone: var(--div-legend);
   }
 
-  .fr-peak4 {
-    --tone: var(--div-silver);
-  }
-
-  .fr-peak3 {
-    --tone: var(--div-bronze);
-  }
-
   .fr-halo,
   .fr-sun,
-  .fr-sparks,
-  .fr-peak5 {
+  .fr-sparks {
     filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tone) 60%, transparent));
   }
 
@@ -6484,7 +6358,7 @@
     .in-row,
     .explain-pop:popover-open,
     .number-out.live .typed::after,
-    .league-line.now,
+    .cut-line.now,
     .royal-cut {
       animation: none;
     }

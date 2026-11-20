@@ -28,7 +28,6 @@ export const medalPictures: Record<string, string> = {
   duel50: "helmet",
   friend1: "heart",
   friends5: "hearts",
-  friendWin: "knight",
   perfect: "star",
   topicPerfect: "spark",
   exact: "target",
@@ -42,9 +41,6 @@ export const medalPictures: Record<string, string> = {
   fullDay: "mode-almanac",
   fullDays30: "medal",
   royalWin: "crown",
-  leagueUp: "league-1",
-  leagueFirst: "league-3",
-  rila: "league-5",
 };
 
 export interface BadgeOptions {

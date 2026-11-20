@@ -29,8 +29,7 @@ func TestOpenTo(t *testing.T) {
 		{0, 0, Open{}},
 		{1, 0, Open{Points: true}},
 		{2, 0, Open{Points: true, XP: true}},
-		{3, 0, Open{Points: true, XP: true, League: true}},
-		{30, 0, Open{Points: true, XP: true, League: true}},
+		{30, 0, Open{Points: true, XP: true}},
 		{1, 1, Open{Points: true, Rating: true}},
 	} {
 		if got := OpenTo(c.days, c.rated); got != c.want {
@@ -43,8 +42,8 @@ func TestOpenTo(t *testing.T) {
 }
 
 // A new player meets the game one system at a time, by the days they play: on the first, the points and what the
-// game's achievements gave; on the second, XP, its level and goals, with what was held for them; on the third, the
-// league; with a rated game, the rating. Each is told once, as it opens; nothing earned is lost.
+// game's achievements gave; on the second, XP, its level and goals, with what was held for them; with a rated game,
+// the rating. Each is told once, as it opens; nothing earned is lost.
 func TestUnfolding(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -58,7 +57,7 @@ func TestUnfolding(t *testing.T) {
 	w.play(ana, s.ID, repeat(w.right, Length)...)
 	n, err := w.g.NewsOf(ctx, ana, s.ID)
 	if err != nil || !slices.Equal(n.Opened, []string{"points"}) || n.Open != (Open{Points: true}) || len(n.Goals) != 0 ||
-		n.LevelUp || n.League != nil {
+		n.LevelUp {
 		t.Fatalf("the first day's news: %+v %v", n, err)
 	}
 	if len(n.Achievements) == 0 {
@@ -91,7 +90,7 @@ func TestUnfolding(t *testing.T) {
 	s, _ = w.g.StartDay(ctx, ana)
 	w.play(ana, s.ID, repeat(w.wrong, Length)...)
 	n, _ = w.g.NewsOf(ctx, ana, s.ID)
-	if !slices.Equal(n.Opened, []string{"xp"}) || !n.Open.XP || n.Open.League || !n.LevelUp || n.Level < level ||
+	if !slices.Equal(n.Opened, []string{"xp"}) || !n.Open.XP || !n.LevelUp || n.Level < level ||
 		slices.ContainsFunc(n.Unlocks, func(u Unlock) bool { return u.ID == "spark" || u.byLevel == 1 }) ||
 		!slices.ContainsFunc(n.Achievements, func(a Earned) bool { return a.ID == "fullDay" }) ||
 		!slices.Contains(n.Goals, DoneGoal{Name: "Изиграй въпросите на деня", XP: GoalXP[0]}) {
@@ -101,14 +100,6 @@ func TestUnfolding(t *testing.T) {
 		t.Fatalf("told twice: %+v", again)
 	}
 
-	// Day 3: the league.
-	w.wait(24 * time.Hour)
-	ts, _ := w.g.StartTopic(ctx, ana, MixTopic)
-	w.play(ana, ts.ID, repeat(w.right, Length)...)
-	if n, _ = w.g.NewsOf(ctx, ana, ts.ID); !slices.Equal(n.Opened, []string{"league"}) || !n.Open.League || n.Open.Rating {
-		t.Fatalf("the third day's news: %+v", n)
-	}
-
 	// A game that moves the rating opens it.
 	if _, err := w.db.Write.Exec(`UPDATE users SET rated = 1 WHERE id = ?`, ana); err != nil {
 		t.Fatal(err)
@@ -116,35 +107,7 @@ func TestUnfolding(t *testing.T) {
 	if n, _ = w.g.NewsOf(ctx, ana, 0); !slices.Equal(n.Opened, []string{"rating"}) || !n.Open.Rating {
 		t.Fatalf("a rated game's news: %+v", n)
 	}
-	if p, _ := w.g.ProgressOf(ctx, ana); p.Open != (Open{Points: true, XP: true, League: true, Rating: true}) {
+	if p, _ := w.g.ProgressOf(ctx, ana); p.Open != (Open{Points: true, XP: true, Rating: true}) {
 		t.Fatalf("Профил's open: %+v", p.Open)
-	}
-}
-
-// A week of the league that ends before the league is open is let go untold: its XP is the player's all the same.
-func TestUnfoldingLeagueWeek(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana := w.user()
-	s, _ := w.g.StartDay(ctx, ana)
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	_, _ = w.g.NewsOf(ctx, ana, s.ID)
-	if _, err := w.db.Write.Exec(`INSERT INTO league_results (user_id, week, tier, place, of, points, moved, xp, seen)
-		VALUES (?, '2026-11-02', 0, 1, 5, 900, 1, 300, 0)`, ana); err != nil {
-		t.Fatal(err)
-	}
-	before, _ := w.g.totalXP(ctx, ana)
-	n, err := w.g.NewsOf(ctx, ana, 0)
-	if err != nil || n.League != nil || slices.ContainsFunc(n.Achievements, func(a Earned) bool { return a.ID == "leagueUp" }) {
-		t.Fatalf("a week told before the league: %+v %v", n, err)
-	}
-	// Its XP is kept, and so are the achievements it earned, which wait for the league.
-	if after, _ := w.g.totalXP(ctx, ana); after != before+AchievementXP[Common]+AchievementXP[Rare] { // leagueUp, leagueFirst
-		t.Fatalf("the week's XP: %d, then %d", before, after)
-	}
-	w.played(ana, 2)
-	n, _ = w.g.NewsOf(ctx, ana, 0)
-	if n.League != nil || !n.Open.League || !slices.ContainsFunc(n.Achievements, func(a Earned) bool { return a.ID == "leagueUp" }) {
-		t.Fatalf("the league opened: %+v", n)
 	}
 }

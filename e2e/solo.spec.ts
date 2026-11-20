@@ -15,9 +15,9 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await playRun(page);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("от 10");
   // A first result is quiet (play/unfold.go): what its points are, in a line, and what the game earned to wear; no
-  // XP, level, goals or league yet.
+  // XP, level or goals yet.
   await expect(page.locator(".news-open")).toContainText("Точките са резултатът ти в една игра");
-  await expect(page.locator(".news-xp, .level-card, .goal, .league-end")).toHaveCount(0);
+  await expect(page.locator(".news-xp, .level-card, .goal")).toHaveCount(0);
   // „точки“ is a tap from what they are.
   await page.locator(".points").getByRole("button", { name: "точки" }).click();
   await expect(page.locator(".points .explain-pop")).toBeVisible();
@@ -36,7 +36,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // Начало's top tells the streak the day made; the level and the goals come from the second day played.
   await expect(page.locator(".streak-chip")).toContainText("1");
   await expect(page.locator(".level-chip, .card.goals")).toHaveCount(0);
-  // Класации opens on the day's board, the player on it; the league and the rating aren't theirs yet.
+  // Класации opens on the day's board, the player on it; the rating isn't theirs yet.
   await page.goto("/ranks");
   await expect(page.locator(".board .row.me")).toContainText(/\d от 10\d[\d\s]* точки$/);
   await expect(page.getByRole("tab")).toHaveText(["Днес", "Знания", "Всички", "Приятели"]);
@@ -45,12 +45,12 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.locator(".board")).not.toContainText("Нова искра");
   await page.goto("/me");
   await expect(page.locator(".streak")).toBeVisible();
-  await expect(page.locator(".me-level-bar, .league-link")).toHaveCount(0);
-  // Награди too: no XP, no goals and no league anywhere on it, folded parts included; points and achievements are
+  await expect(page.locator(".me-level-bar")).toHaveCount(0);
+  // Награди too: no XP and no goals anywhere on it, folded parts included; points and achievements are
   // what „Как се печели“ tells.
   await page.goto("/rewards");
   await expect(page.getByRole("heading", { name: "Най-близо" })).toBeVisible();
-  await expect(page.locator(".screen")).not.toContainText(/XP|лига|Цели за деня/);
+  await expect(page.locator(".screen")).not.toContainText(/XP|Цели за деня/);
   await expect(page.locator(".how")).toContainText("Точки.");
 
   // A second day: a game tells XP once, with the goals; Начало shows the level and the goals from then on.
@@ -63,23 +63,6 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.locator(".level-chip")).toContainText("Ниво");
   // The day's goal is done. (The other two goals are drawn per day, and a run of the day can finish them too.)
   await expect(page.locator(".goal.done").filter({ hasText: "Изиграй въпросите на деня" })).toBeVisible();
-
-  // A third: the league. The day put the player in the week's group, racing on the day's right answers (a topic's game
-  // doesn't); the rating's board waits for a rated game of theirs. The group shows once it has five; until then it's
-  // gathering (other tests play the same day, so it may be either).
-  await playedBefore(page, 2);
-  await page.goto("/ranks");
-  await expect(page.getByRole("tab", { name: "Рейтинг" })).toHaveCount(0);
-  await page.getByRole("tab", { name: "Лига" }).click();
-  await expect(page.locator(".league-card")).toContainText("Странджа");
-  await expect(page.locator(".league-card")).toContainText("от верните отговори на въпросите на деня");
-  const mine = page.locator(".league-board .row.me, .league-gathering").first();
-  await expect(mine).toContainText(/\d+ (верен|верни)|Групата ти още се събира/);
-  // Профил shows the league too, in a line that is a tap from the group.
-  await page.goto("/me");
-  await expect(page.locator(".league-link")).toContainText(/място от|Групата ти още се събира/);
-  await page.locator(".league-link").click();
-  await expect(page.locator(".league-board .row.me, .league-gathering").first()).toBeVisible();
 });
 
 test("the day says how its other players did with each question: under the verdict, and in the review", async ({

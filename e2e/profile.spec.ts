@@ -14,7 +14,7 @@ test("a player's profile: asked to be friends from it, and friends there", async
     async () => (await (await fetch("/api/me")).json()).user as { name: string; tag: string },
   );
 
-  // Bo opens her profile (a board's name is a link to it, as the league's group shows in the solo spec).
+  // Bo opens her profile (a board's name is a link to it).
   await b.goto(`/players/${ana.tag}`);
   await expect(b.getByRole("heading", { level: 1, name: ana.name })).toBeVisible();
   await expect(b.locator(".me-tag")).toHaveText(`@${ana.tag}`);

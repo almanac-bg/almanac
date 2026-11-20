@@ -20,7 +20,6 @@ import (
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/bank/banktest"
 	"github.com/almanac-bg/almanac/internal/mail"
-	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/push"
 	"github.com/almanac-bg/almanac/internal/store/storetest"
 )
@@ -311,30 +310,6 @@ func TestQueueSurvivesRestart(t *testing.T) {
 	<-done
 	if fake.count("/bo") != 2 {
 		t.Fatalf("running: bo %d", fake.count("/bo"))
-	}
-}
-
-// The week's end in the leagues is told to those who have met the league, through the queue.
-func TestLeagueNewsQueued(t *testing.T) {
-	s, g, fake, subscribe := pushWorld(t)
-	ana, anaID := g.guest()
-	bo, boID := g.guest()
-	subscribe(ana, "/ana")
-	subscribe(bo, "/bo")
-	day := s.game.Now().In(play.Bulgaria).Truncate(24 * time.Hour)
-	for i := range play.LeagueFromDay {
-		g.finishedDay(anaID, day.AddDate(0, 0, -i-1), 12*time.Hour)
-	}
-	news := []play.LeagueNews{
-		{To: anaID, From: play.Leagues[0], Now: play.Leagues[1], Place: 1, Of: 8, XP: 50},
-		{To: boID, From: play.Leagues[0], Now: play.Leagues[0], Place: 5, Of: 8},
-	}
-	if err := s.db.Tx(t.Context(), func(tx *sql.Tx) error { return s.leagueNews(t.Context(), tx, news) }); err != nil {
-		t.Fatal(err)
-	}
-	s.sendQueued(t.Context())
-	if fake.count("/ana") != 1 || fake.count("/bo") != 0 {
-		t.Fatalf("ana %d, bo %d", fake.count("/ana"), fake.count("/bo"))
 	}
 }
 

@@ -183,8 +183,6 @@ export interface Open {
   points: boolean;
   /** XP, the level and the day's goals: from the second day played. */
   xp: boolean;
-  /** The week's league: from the third. */
-  league: boolean;
   /** The rating and its division: from the first duel or Роял that moved it. */
   rating: boolean;
 }
@@ -197,14 +195,12 @@ export const meaning = {
   /** The day's board: said of the day's points only (a topic's game has no board). */
   dayBoard: " При равен брой верни в класацията на деня решават точките.",
   xp: "XP печелиш с всяка игра, цел и постижение. Трупа се и вдига нивото ти.",
-  league: " В лигата за седмицата първо решават верните отговори на въпросите на деня, после точките.",
   rating:
     "Рейтингът е силата ти в дуелите и в Роял: расте с победа, пада със загуба. Първите 10 игри с рейтинг го определят, после от него зависи дивизията ти.",
 };
 
-/** The day's points' words: the day's board they place on, and the league once it's open, where (added up over the
- * week) they decide between as many right answers. */
-export const pointsWords = (open?: Open) => meaning.points + meaning.dayBoard + (open?.league ? meaning.league : "");
+/** The day's points' words: with the day's board they place on. */
+export const dayPointsWords = meaning.points + meaning.dayBoard;
 
 let explained = 0;
 

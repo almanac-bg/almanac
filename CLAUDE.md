@@ -14,7 +14,7 @@ their reasons: read it before changing what a player sees or how the game plays,
 Ten questions a day, the same for everyone (Начало); games by topic that follow what a player knows; live duels with
 whoever comes (a recording of a real game if nobody does); Роял at 21:00
 Friday to Sunday (every evening once those fill), up to 50 live on 15 questions, cut by right answers after the 5th, 8th, 11th and 14th; rooms with a code for playing together; friends,
-levels (XP), achievements, titles, avatars, a rating with divisions, and weekly leagues. Points are a game's score,
+levels (XP), achievements, titles, avatars, and a rating with divisions. Points are a game's score,
 XP is what playing earns, rating is strength: kept apart on purpose (`internal/play/worth.go`), and joined in one
 system of progress (`internal/play/progress.go` says how: what earns XP, what unlocks what, what's told when), which a
 new player meets a part at a time, as each starts to matter (`internal/play/unfold.go`).
@@ -32,7 +32,7 @@ most). A change is judged by whether players come back: the retention numbers in
 | --- | --- |
 | `cmd/almanac` | The program: `serve`, `bank check/fmt`, `backup now/list/restore/verify/keys` |
 | `cmd/build` | Builds the client into `internal/assets/dist` (esbuild; precompressed; the first screen's budget, and ceilings against accidents) |
-| `internal/play` | The game's rules and data: runs, scoring (`worth.go`), duels, friends, rating, leagues, goals, progress |
+| `internal/play` | The game's rules and data: runs, scoring (`worth.go`), duels, friends, rating, goals, progress |
 | `internal/live` | Live duels: matchmaking, the shared clock, recordings |
 | `internal/royal` | Роял, live in the evening (Friday to Sunday until the evenings fill) |
 | `internal/room` | Rooms with a code |

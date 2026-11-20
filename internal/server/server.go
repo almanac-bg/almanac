@@ -174,7 +174,6 @@ func New(cfg Config, d Deps) (*Server, error) {
 	// one of this server's problems: there is one server in the program.
 	safe.Tell(s.problems.add)
 	s.game.RoyalNews = s.royalNews
-	s.game.LeagueNews = s.leagueNews
 	s.game.CrowdMin = cfg.CrowdMin
 	if cfg.Royal.Every == 0 && cfg.Royal.Hour == 0 {
 		cfg.Royal = royal.Evening
@@ -297,7 +296,6 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/royal/plan", s.planRoyal)
 	api("DELETE /api/royal/plan", s.planRoyal)
 	api("GET /api/almanac", s.almanac)
-	api("GET /api/league", s.league)
 	api("GET /api/goals", s.goals)
 	api("GET /api/friends", s.friends)
 	api("GET /api/friends/requests", s.requestsWaiting)

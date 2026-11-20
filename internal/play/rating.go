@@ -10,8 +10,7 @@ import (
 
 // Rating is a player's strength in duels: Elo, from 1000, moved by every duel that counts. It shows as a division once
 // it's set: its first MinRatedGames games place it (Placed), and until then it says so, „Рейтингът се определя · 4 от
-// 10“, not „Бронз“ from a win or two. It has no seasons: the weekly race is the leagues' (leagues.go), on playing, not
-// on strength.
+// 10“, not „Бронз“ from a win or two. It has no seasons.
 
 // StartRating is where every player starts.
 const StartRating = 1000

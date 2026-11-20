@@ -10,8 +10,8 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 )
 
-// The day's ten are one game for everyone who plays them that day, compared on one board and in one week's league:
-// so they hold still for their day. As the day begins (the first time its questions are read on it, pinDay), each of
+// The day's ten are one game for everyone who plays them that day, compared on one board: so
+// they hold still for their day. As the day begins (the first time its questions are read on it, pinDay), each of
 // them is kept as it is then, its version and its difficulty (Pick.V, Pick.D), in the day's own questions, which
 // every run of the day copies: a reload of the bank later that day changes nothing of how they're dealt, graded or
 // paid, for anyone.

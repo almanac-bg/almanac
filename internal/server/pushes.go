@@ -18,8 +18,7 @@ import (
 )
 
 // Notifications go out through a queue in the database (push_queue): notify saves a row for each player, in its own
-// transaction or in the caller's (the day's reminder with its claim, Роял's call with its, the week's end in the
-// leagues with its places), and Push sends them, pushWorkers players at a time, each player's browsers and phones at
+// transaction or in the caller's (the day's reminder with its claim, Роял's call with its), and Push sends them, pushWorkers players at a time, each player's browsers and phones at
 // once, each send within pushTimeout, through its push service's lane (pushlanes.go). So a slow or dead device holds
 // up only its own player's slot, a slow or dead service only its own lane's share, a player has a few devices at most
 // (pushDevices of each kind: notify.go), and the evening's reminders and Роял's call go out in seconds, whoever else is
@@ -158,13 +157,12 @@ func (s *Server) flushTallies(ctx context.Context) {
 }
 
 // notice is a notification to queue: its kind and its message; until when it's of use (zero: pushTTL); a day's
-// reminder's day (remind.go); the part of the game the player must have met for it ("league").
+// reminder's day (remind.go).
 type notice struct {
 	kind  pushKind
 	m     push.Message
 	until time.Time
 	day   string
-	needs string
 }
 
 // queuer queues notices in a transaction.
@@ -174,8 +172,8 @@ type queuer struct {
 }
 
 func (s *Server) queuer(ctx context.Context, tx *sql.Tx) (*queuer, error) {
-	stmt, err := tx.PrepareContext(ctx, `INSERT INTO push_queue (user_id, kind, message, day, needs, next_at, until)
-		SELECT ?1, ?2, ?3, nullif(?4, ''), nullif(?5, ''), ?6, ?7
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO push_queue (user_id, kind, message, day, next_at, until)
+		SELECT ?1, ?2, ?3, nullif(?4, ''), ?5, ?6
 		WHERE EXISTS (SELECT 1 FROM push_subs WHERE user_id = ?1) OR EXISTS (SELECT 1 FROM phones WHERE user_id = ?1)`)
 	return &queuer{stmt: stmt, now: s.game.Now()}, err
 }
@@ -195,7 +193,7 @@ func (q *queuer) add(ctx context.Context, n notice, userID int64) (bool, error) 
 	if err != nil {
 		return false, err
 	}
-	res, err := q.stmt.ExecContext(ctx, userID, string(n.kind), string(m), n.day, n.needs, next.UnixMilli(), until.UnixMilli())
+	res, err := q.stmt.ExecContext(ctx, userID, string(n.kind), string(m), n.day, next.UnixMilli(), until.UnixMilli())
 	if err != nil {
 		return false, err
 	}
@@ -302,12 +300,12 @@ func (s *Server) pushes(ctx context.Context, untilIdle bool) {
 
 // queued is a row of the queue, as it's sent.
 type queued struct {
-	id, user   int64
-	kind       pushKind
-	m          push.Message
-	day, needs string
-	until      int64
-	tries      int
+	id, user int64
+	kind     pushKind
+	m        push.Message
+	day      string
+	until    int64
+	tries    int
 }
 
 // claimPushes leases up to n rows that are due: those of use for less than pushUrgent more first, then the oldest.
@@ -321,7 +319,7 @@ func (s *Server) claimPushes(ctx context.Context, n int) ([]queued, error) {
 	}
 	rows, err := s.db.Write.QueryContext(ctx, `UPDATE push_queue SET next_at = ?1, tries = tries + 1
 		WHERE id IN (SELECT id FROM push_queue WHERE next_at <= ?2 ORDER BY until > ?4, next_at, id LIMIT ?3)
-		RETURNING id, user_id, kind, message, coalesce(day, ''), coalesce(needs, ''), until, tries`,
+		RETURNING id, user_id, kind, message, coalesce(day, ''), until, tries`,
 		now+pushLease.Milliseconds(), now, n, now+pushUrgent.Milliseconds())
 	if err != nil {
 		return nil, err
@@ -331,7 +329,7 @@ func (s *Server) claimPushes(ctx context.Context, n int) ([]queued, error) {
 	for rows.Next() {
 		var j queued
 		var m string
-		if err := rows.Scan(&j.id, &j.user, &j.kind, &m, &j.day, &j.needs, &j.until, &j.tries); err != nil {
+		if err := rows.Scan(&j.id, &j.user, &j.kind, &m, &j.day, &j.until, &j.tries); err != nil {
 			return out, err
 		}
 		_ = json.Unmarshal([]byte(m), &j.m)
@@ -554,16 +552,6 @@ func (s *Server) deliver(ctx context.Context, stop <-chan struct{}, j queued) {
 // for a player who no longer needs it, isn't.
 func (s *Server) message(ctx context.Context, j queued, now time.Time) (push.Message, bool, error) {
 	if now.UnixMilli() > j.until || j.tries > pushTries {
-		return j.m, false, nil
-	}
-	switch j.needs {
-	case "":
-	case "league":
-		open, err := s.game.OpenOf(ctx, j.user)
-		if err != nil || !open.League {
-			return j.m, false, err
-		}
-	default:
 		return j.m, false, nil
 	}
 	if j.day == "" {

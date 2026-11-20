@@ -65,7 +65,6 @@ import { stream } from "./lib/stream.ts";
 import { issueWords, listWords, weekday, winners, withName } from "./lib/words.ts";
 import type { DuelView } from "./screens/duel.ts";
 import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
-import { leagueBoard, leagueLine, loadLeague } from "./screens/league.ts";
 import { clock, coming, dayAndTime, dayWord, whileSeen } from "./screens/modes.ts";
 import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
@@ -169,14 +168,11 @@ export const kit = {
   keepAwake,
   keepGame,
   landing,
-  leagueBoard,
-  leagueLine,
   levelNumber,
   lifetime,
   listWords,
   liveAudio,
   loadDuelResult,
-  loadLeague,
   loadProgress,
   mailAsk,
   masteryCard,

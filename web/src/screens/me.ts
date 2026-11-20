@@ -1,9 +1,9 @@
-// Профил: who you are in the game — your avatar, name, tag and title; your level and what comes next; your league in a
-// line (its group is Класации'); your streak, numbers, mastery and latest games (the rating's division is the duels'
-// and Роял's, on their screens) — with its own places a tap away at the top (Награди, Гардероб, Алманах) and
-// Настройки beside your name, in words. A hub: each thing once, the whole of it a tap away. Each system shows once the
-// player has met it (play/unfold.go): the level from the second day played, the league from the third. A guest is
-// asked to keep their game, from the first one, and the way in for a profile from elsewhere is apart from it.
+// Профил: who you are in the game — your avatar, name, tag and title; your level and what comes next; your streak,
+// numbers, mastery and latest games (the rating's division is the duels' and Роял's, on their screens) — with its own
+// places a tap away at the top (Награди, Гардероб, Алманах) and Настройки beside your name, in words. A hub: each
+// thing once, the whole of it a tap away. Each system shows once the player has met it (play/unfold.go): the level
+// from the second day played. A guest is asked to keep their game, from the first one, and the way in for a profile
+// from elsewhere is apart from it.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -35,7 +35,6 @@ let {
   unlockWords,
   haveProfile,
   keepGame,
-  leagueLine,
   loadProgress,
   nearest,
   stats,
@@ -65,7 +64,6 @@ export function me(kit: Kit) {
     unlockWords,
     haveProfile,
     keepGame,
-    leagueLine,
     loadProgress,
     nearest,
     stats,
@@ -109,8 +107,6 @@ export function me(kit: Kit) {
             const p = progress();
             return p ? levelCard(p) : null;
           },
-          // The league once it's open (play/unfold.go): from the third day played.
-          () => (progress()?.open.league ? leagueLine() : null),
           stats(),
           () =>
             user()?.tag

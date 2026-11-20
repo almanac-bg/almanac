@@ -179,7 +179,7 @@ function rewardMark(a: AchievementInfo): Child {
 }
 
 /** How it all fits together, in a few lines, of the systems the player has met (all of them told to nobody signed in
- * would be a tour): what points are, what earns XP, what the rating and the league are for, what unlocks what. */
+ * would be a tour): what points are, what earns XP, what the rating is for, what unlocks what. */
 function howItWorks(open?: Open): Child {
   const item = (head: string, text: string) => h("li", null, h("b", null, head), text);
   return h(
@@ -193,19 +193,13 @@ function howItWorks(open?: Open): Child {
       open?.xp
         ? item(
             "XP и нива. ",
-            `XP носят отговорите (верните — повече), въпросите на деня (най-много), всяка цел за деня, всяко постижение${open.league ? " и първите три места в седмицата на лигата" : ""}. XP вдига нивото, а нивата отключват титли, рамки, фонове и короната. Дните с изиграни въпроси на деня отключват титли за постоянство.`,
+            `XP носят отговорите (верните — повече), въпросите на деня (най-много), всяка цел за деня, всяко постижение. XP вдига нивото, а нивата отключват титли, рамки, фонове и короната. Дните с изиграни въпроси на деня отключват титли за постоянство.`,
           )
         : null,
       open?.rating
         ? item(
             "Рейтинг и дивизии. ",
             "Дуелите и Роял променят рейтинга. Първите 10 игри с рейтинг го определят и тогава получаваш дивизия. Нова дивизия отключва титла, рамка или фон.",
-          )
-        : null,
-      open?.league
-        ? item(
-            "Лиги. ",
-            "Всяка седмица се състезаваш с група от своята лига по верните отговори на въпросите на деня, а при равенство по точките. Първите се качват, последните слизат: от Странджа до Рила. Първо място във високите лиги отключва рамка, а в Рила и титла.",
           )
         : null,
       item(
