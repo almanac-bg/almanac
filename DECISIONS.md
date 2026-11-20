@@ -22,37 +22,49 @@ packages' doc comments; this file holds only what must not drift.
 
 ## The game
 
-- **The redesign (owner, 2026-11-20).** After a walk through everything with every kind of player, the owner chose
-  to rebuild the game around one idea: *every day ten questions write the player's almanac, and set them beside all of
-  Bulgaria.* What follows from it, and is not to drift back:
-  - **Three places:** Днес (the day's issue), Алманах (the player's book), Приятели (friends, the day's board, duels).
-    Профил and Настройки open from the player's avatar. Nothing else gets a place.
-  - **One measure of progress: the Алманах.** A chapter per topic (Микс and България as chapters of their own), the
-    facts a player has collected in it, and how much of it they know (mastery). The streak is the habit. Nothing else
-    adds up across games: no XP, no levels, no day's goals, no achievements, no titles, no frames, no backdrops, no
-    unlocks of any kind. Milestones (a streak of 7, 30, 100, 365 days, a first ten of ten, a chapter completed) are
-    noted in the book, not given as medals.
-  - **The streak forgives one missed day a week by itself** (Monday to Sunday); nothing to earn or hold. A streak that
-    ends isn't won back.
-  - **Every avatar is free** from the first day: the animals, chosen by the player. No tones, frames or patterns to
-    unlock.
-  - **No rating and no divisions.** Points are one game's score; a player's strength is what their Алманах says.
-  - **No Роял.** It needs dozens at one moment; with few players it is an empty room that teaches nobody plays. A live
-    evening may come back, built anew, once thousands play daily: the owner's call then.
-  - **A duel is played on one's own time:** the same ten as a friend (who plays them when they can) or as a real
-    recorded game, said plainly; no live matching, no rating. A friend's record against you stays.
-  - **Sharing the day's result comes back:** the score and its shape, never the answers, with a way into the game.
-  - **The first screen of a new visitor is the day alone;** topics are played from their chapter in the Алманах.
-  - **A result is one page:** how it went, how Bulgaria did, the one thing worth keeping, sharing, tomorrow. A wrong
-    game is never celebrated.
+- **The direction (owner, 2026-11-20; final).** The owner asked for one direction to keep for years, after which the
+  work is only fixing and finishing; it was set after eight rounds of independent review (simulations, player panels,
+  evidence, security), whose last round found no flaw in it. *Every day ten questions; each one a player gets right in
+  the issue writes its fact in ink in their Алманах; their rank in a chapter says how much of it the book holds in ink;
+  played alone, with friends, and beside all of Bulgaria.* Not to drift:
+  - **Three places:** Днес (the issue), Алманах (the book), Приятели (friends, the day's board, duels). Профил and
+    Настройки open from the avatar. Nothing else gets a place.
+  - **The issue is asked once.** Its score is the number right out of 10; a close answer is „близо“, not right. No
+    points and no bonus. No played question is asked again (no Втори шанс, no past issues), and a share link opened
+    after its day opens today's issue.
+  - **Ink and pencil.** A right answer in the issue, the first time a player meets that question, writes its fact in
+    ink; a right answer anywhere else (chapter games, duels) writes it in pencil. A chapter shows one number, its ink.
+  - **Rank per chapter from ink, never falling, named for the book, not the person** (Бележка 1, Страница 5,
+    Тетрадка 15, Тефтер 40, Книга 100, Летопис 250, then „Летопис · 2“ for each further 100), drawn as a seal of its
+    own (not the logo) that fills in quarters between ranks, worn beside the name; the chapter's art becomes a
+    choosable avatar at Страница. The animals stay free. Mastery is hidden: it steers chapter games and recordings.
+    These are the only levels, titles and unlocks; nothing else adds up across games (no XP, currencies, goals,
+    achievements, notes as rewards, lifetime totals, rating, divisions, leagues, rooms, anything live).
+  - **The streak counts days the issue was played** and forgives up to two missed days a week by itself; an ended
+    streak's number is never named.
+  - **Duels on one's own time:** a friend has 7 days; or a real recording, chosen as „равен“ or „по-силен“. A friend's
+    record against you stays.
+  - **Sharing:** the score and its tiles, never the answers, unsigned, with a way into the same ten.
+  - **A result has a budget:** the score and tiles, the day's entry and its growth line, friends' tiles, one action,
+    tomorrow; everything else under „Въпросите и фактите“. A wrong game is never celebrated; a best rank rising is the
+    only big moment.
+  - **The player's nouns are a closed list:** Брой, близо, серия, Алманах (глави, факти, мастило, молив), звание and
+    its печат, игра на главата (Микс, България), приятели, класация, дуел (запис), споделяне, профил, напомняне.
+    Adding one is the owner's call.
+  - **The rule for later.** A change is made only if it makes the issue better or names the measure it moves and what
+    it removes; adds no noun; keeps every place's budget; is good at zero (first player, first day, 0 right, no
+    friends); pays one deed once; is measured by a randomised hold-out where it can be (changes to the shared day are
+    judged before and after, the owner's call), and while effects are too small to detect, removes at least as much as
+    it adds; and answers „Built to hold“ (CLAUDE.md). A fix restores stated behaviour; polish adds no data, count,
+    block or notification.
   The decisions below that this replaces are gone from this file; the code follows as each part lands.
 - **The day's ten questions are the heart;** everything else serves them or stays out of the way. A new system replaces
   one or proves it's needed (CLAUDE.md, Direction).
 - **For everyone, not for a group.** The game is made for any player, not tailored to one audience (children,
   classrooms, schools): no levels, question pools, filters, reports or texts that exist for one group (owner,
   2026-11-18, after the product review's classroom items).
-- **„Микс“ and „България“ lead the topics** on Начало, before the bank's: „Микс“ is a game of every topic at once,
-  „България“ the questions about Bulgaria from every topic (owner, 2026-11-20).
+- **„Микс“ and „България“ lead the Алманах** as two ways to play at its head, not chapters: „Микс“ is a game of every
+  topic at once, „България“ the questions about Bulgaria from every topic (owner, 2026-11-20).
 - **Accessibility for special needs comes later, not now.** No new work for screen readers, extra time, pausing the
   pace or similar needs until the owner calls for it; what the game already has (contrast, labels, the axe checks)
   stays and isn't broken. Layout that breaks for ordinary players (large system text, small tap targets) is not this:
@@ -64,14 +76,12 @@ packages' doc comments; this file holds only what must not drift.
 - **Removed to keep the game simple** (owner, 2026-11-19; sharing and friends' duels came back with the redesign): past days'
   questions (the archive of past issues, and going over a game after its day), winning a broken streak back, and the
   year's report; and on 20 Nov, Профил's chart of the days („Твоите броеве“), Начало's line of how yesterday ended,
-  Класации' „Вчера“, Втори шанс (the questions got wrong, asked again days later), the weekly leagues, rooms
+  Класации' „Вчера“, the book's notes and profile totals (on the direction), Втори шанс (the questions got wrong, asked again days later), the weekly leagues, rooms
   (playing together with a code; the games played in them stay the players'), and blocking players (a request can
   still be declined, a friend removed). The
   Алманах's facts are a chapter's entries, the latest first, each dated with where it was learned (the edition's
   mockups, chosen 20 Nov), never one list of them all. Friends are added by username or email.
   Don't bring any of them back, or something in their place, without the owner's call.
-- **Right answers in a row earn no points** (owner, 2026-11-18, review E6): where a miss fell decided close duels.
-  The climb stays as sound and feel; a game with every answer right still earns its bonus.
 - **Gamification only from what the game really counts:** no invented currencies, no random boxes, never real money.
 - **A tenth of players get no reminders, to tell what reminders do.** 10 % of players, drawn once by a hash of their
   id (`play/experiment.go`), are held out of the day's notification and the streak's mail; what they would have had
@@ -91,10 +101,10 @@ packages' doc comments; this file holds only what must not drift.
 
 ## How it looks and speaks
 
-- **The edition** (owner, 2026-11-20, replacing „Modern Editorial Gamified“): the game looks like a publication a
-  player keeps, not a generic game app: paper-light first with a night of its own, serif headlines, numerals as the
-  heroes, colour only where it means something, one obvious action per screen. `web/DESIGN.md` holds the rules as they
-  land.
+- **A bright almanac** (owner, 2026-11-20, replacing „the edition“, whose paper look put the owner off): a game, bright
+  and alive; each chapter its colour, always with its glyph; right and wrong carried by shape and fill, never by colour
+  alone; the almanac's forms (the issue's sheet and its turn, ink and pencil), never a paper texture; one obvious action
+  per screen. The owner judges mockups on the real screens before it is built. `web/DESIGN.md` holds the rules.
 - **Art never changes the rules.** Asked for pictures, draw pictures; a drawing doesn't change what the game gives
   because it exists (#234, undone in #236).
 - **The mark is the rosette:** abstract, not a letter, no gradients. Ask before changing the mark itself.

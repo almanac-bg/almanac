@@ -11,11 +11,17 @@ their reasons: read it before changing what a player sees or how the game plays,
 
 ## The game, in a paragraph
 
-Every day ten questions write the player's almanac, and set them beside all of Bulgaria. Three places: Днес (the
-day's issue, the same ten for everyone, its result shared without the answers), Алманах (the player's book: a chapter
-per topic with the facts collected and how much of it they know, and its games), Приятели (friends, the day's board,
-duels played on one's own time against a friend or a real recorded game). The streak is the habit and forgives one
-missed day a week. Points are one game's score; nothing else adds up but the book and the streak.
+Every day ten questions; each one a player gets right in the issue writes its fact in ink in their Алманах, and their
+rank in a chapter says how much of it the book holds in ink; played alone, with friends, beside all of Bulgaria. Three
+places: Днес (the day's issue, the same ten for everyone, asked once, its result shared without the answers), Алманах
+(the player's book: a chapter per topic, ink from the issues, pencil from chapter games and duels, a rank named for the
+book and drawn as a seal), Приятели (friends, the day's board, duels on one's own time against a friend or a real
+recorded game). The streak is the habit and forgives two missed days a week. The score is the number right; nothing
+else adds up but ink and the streak. DECISIONS.md, „The direction“, is final: it lists the player's nouns and the rule
+every later change passes.
+
+**Being built (from 20 Nov 2026).** Until each part lands the code still has points, visible mastery, the book's notes
+and „the edition“ look; don't extend them.
 
 ## Direction
 
