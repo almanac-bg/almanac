@@ -1,6 +1,7 @@
 package play
 
 import (
+	"context"
 	"database/sql"
 	"strconv"
 )
@@ -61,8 +62,8 @@ var mergeSteps = []mergeStep{
 	// question met first by either is ink once at most.
 	{carries: []string{"facts.user_id"}, sql: `DELETE FROM facts WHERE user_id IN (?1, ?2)`},
 	// The guest's ranks are the account's, the higher of the two in each chapter (a rank never falls), told as the
-	// higher was; the account's next day counts them again from the book they share now. The seal the account chose
-	// stays, else the guest's.
+	// higher was; then they're counted again from the book the two share now (Merge: rewriteBook), and a rank that rises
+	// by it is told with the next news. The seal the account chose stays, else the guest's.
 	{carries: []string{"ranks.user_id"}, sql: `INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told)
 		SELECT ?1, chapter, level, quarter, ink, day, told FROM ranks WHERE user_id = ?2 AND true
 		ON CONFLICT (user_id, chapter) DO UPDATE SET level = max(ranks.level, excluded.level),
@@ -132,14 +133,15 @@ var mergeLeft = map[string]string{
 }
 
 // Merge moves a guest's progress to the account they signed in to (account.Accounts.Merge), where it doesn't clash
-// with the account's own (mergeSteps say what of it, and how).
-func Merge(tx *sql.Tx, from, to int64) error {
+// with the account's own (mergeSteps say what of it, and how), then writes its book again and counts its ranks from it
+// (rewriteBook).
+func (g *Game) Merge(tx *sql.Tx, from, to int64) error {
 	for _, s := range mergeSteps {
 		if _, err := tx.Exec(s.sql, to, from); err != nil {
 			return err
 		}
 	}
-	return rewriteFacts(tx, to)
+	return rewriteBook(context.Background(), tx, g.Bank(), to, g.Today())
 }
 
 // GoneName is how a player who's gone (deleted, or a guest cleared) shows in others' history.

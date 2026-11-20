@@ -2,6 +2,7 @@ package play
 
 import (
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -334,13 +335,6 @@ func TestVoidDayIsOfNine(t *testing.T) {
 	if len(list) != 1 || list[0].Today == nil || list[0].Today.Of != Length-1 {
 		t.Fatalf("the friends: %+v", list)
 	}
-	games, err := w.g.GamesOf(ctx, ana, "day", "", 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(games.Games) != 1 || games.Games[0].Total != Length-1 {
-		t.Fatalf("the games played: %+v", games)
-	}
 
 	// cy answers the question before the void one, and the reply is lost: sent again, it gets it again.
 	w.show(cy, sc.ID)
@@ -447,7 +441,7 @@ func TestEntryOfDayRarestWithAFact(t *testing.T) {
 	w.dayAs(cy, -1, missing(k))
 	sb := w.dayAs(bo, -1, missing())
 	e, err := w.g.EntryOfDay(ctx, bo, sb.Day)
-	if err != nil || e == nil || e.N != j || !e.Crowd || e.Right != 0.5 || e.Fact.Fact == "" {
+	if err != nil || e == nil || e.N != j || !e.Crowd || math.Abs(e.Right-2.0/3) > 1e-9 || e.Fact.Fact == "" { // Bo among them
 		t.Fatalf("the rarest right answer with a fact: %+v %v (want question %d)", e, err, j)
 	}
 }

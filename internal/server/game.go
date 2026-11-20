@@ -89,6 +89,19 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 		} else if untold != 0 {
 			out["untold"] = untold
 		}
+		// Yesterday's issue left half-way just before midnight, while it can still be finished (play.DayGrace): Днес
+		// offers it first, with its own day, issue and chapters.
+		if open, err := s.game.Unfinished(ctx, u.ID); err != nil {
+			return nil, err
+		} else if open != nil {
+			topics, err := s.game.IssueTopics(ctx, open.Day)
+			if err != nil {
+				return nil, err
+			}
+			midnight, _ := time.ParseInLocation(time.DateOnly, day, play.Bulgaria)
+			out["yesterday"] = map[string]any{"day": open.Day, "issue": play.Issue(open.Day), "topics": topics, "run": open,
+				"until": midnight.Add(play.DayGrace).UnixMilli()}
+		}
 		var runID int64
 		err = s.db.Read.QueryRowContext(ctx, `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, u.ID, day).Scan(&runID)
 		if err == nil {

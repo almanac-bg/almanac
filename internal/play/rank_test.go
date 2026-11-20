@@ -1,6 +1,7 @@
 package play
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -290,5 +291,71 @@ func TestRanksDue(t *testing.T) {
 	}
 	if n := w.count(`SELECT count(*) FROM ranks_due`); n != 0 {
 		t.Fatalf("%d left to count", n)
+	}
+}
+
+// A guest's game brought to an account writes the book again from both, and counts its ranks again from it there and
+// then: ten facts of geography the account had and five the guest had are Тетрадка at once, told once, never
+// „15 с мастило · Страница“ until the next day's issue.
+func TestMergeCountsRanksAgain(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	owner, guest := w.user(), w.user()
+	var facts []answered
+	for _, q := range w.b.Live("geography", "") {
+		if q.Extra().Fact != "" && len(facts) < 15 {
+			facts = append(facts, answered{q.Base().ID, true})
+		}
+	}
+	if len(facts) != 15 {
+		t.Fatalf("the sample has %d geography facts", len(facts))
+	}
+	w.dayHistory(owner, facts[:10])
+	w.dayHistory(guest, facts[10:])
+	// The guest's day is another than the account's: a day the account played stays the account's.
+	if _, err := w.db.Write.Exec(`UPDATE runs SET day = '2024-06-01' WHERE user_id = ?`, guest); err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range []int64{owner, guest} {
+		w.countRanks(u)
+		if _, err := w.g.NewsOf(ctx, u, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if r := w.rankIn(owner, "geography"); r.Level != 2 {
+		t.Fatalf("the account's geography before: %+v", r)
+	}
+	if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return w.g.Merge(tx, guest, owner) }); err != nil {
+		t.Fatal(err)
+	}
+	if r := w.rankIn(owner, "geography"); r.Level != 3 || r.Name != "Тетрадка" || r.Ink != 15 || r.Next != "Книга" {
+		t.Fatalf("the account's geography after the guest's game came: %+v", r)
+	}
+	n, err := w.g.NewsOf(ctx, owner, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n.Rose == nil || len(n.Rose.Ranks) != 1 || n.Rose.Ranks[0].Chapter != "geography" || n.Rose.Ranks[0].From != 2 ||
+		n.Rose.Ranks[0].To != 3 {
+		t.Fatalf("the rank risen by the merge, told: %+v", n.Rose)
+	}
+	if n, _ = w.g.NewsOf(ctx, owner, 0); n.Rose != nil {
+		t.Fatalf("told twice: %+v", n.Rose)
+	}
+}
+
+// A chapter's game says what it wrote: its facts, met first, in grey (never ink: only the issue writes it).
+func TestChapterGameNewsSaysItsGrey(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	run := w.game(ana, nil)
+	n, err := w.g.NewsOf(ctx, ana, run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	facts := w.count(`SELECT count(*) FROM facts WHERE user_id = ? AND run_id = ? AND NOT ink`, ana, run)
+	if n.Ink != 0 || n.Grey == 0 || n.Grey > facts {
+		t.Fatalf("a chapter's game: %+v, %d facts in grey", n, facts)
 	}
 }

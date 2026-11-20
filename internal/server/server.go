@@ -160,7 +160,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.game.CrowdMin = cfg.CrowdMin
 	s.push = cfg.Push
 	s.game.DuelNews = s.duelNews
-	d.Accounts.Merge = append(d.Accounts.Merge, play.Merge)
+	d.Accounts.Merge = append(d.Accounts.Merge, s.game.Merge)
 	d.Accounts.Forget = append(d.Accounts.Forget, play.Forget)
 	s.handler = s.routes()
 	return s, nil

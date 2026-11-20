@@ -404,13 +404,15 @@ func (d *dayCrowdCache) drop(key string) {
 
 // DayEntry is the one entry a day's result shows of those its right answers wrote in the player's Алманах: its place
 // in the ten, and its fact as the book has it. With a crowd (Crowd: DayCrowdFrom of the day's other players have
-// answered it), it is the rarest right answer („Най-рядкото ти попадение“), and Right the share of them that got it;
-// without one, nothing is said of others (Right is 0): it is the hardest, the last in the ten, which go from easy to
-// hard.
+// answered it), it is the rarest right answer („Най-рядкото ти попадение“), and Right the share of them that got it,
+// the player among them, as the issue said it as it was answered (crowdLine: one number for a question everywhere),
+// and Alone that none of the others did; without one, nothing is said of others (Right is 0): it is the hardest, the
+// last in the ten, which go from easy to hard.
 type DayEntry struct {
 	N     int     `json:"n"`
 	Crowd bool    `json:"crowd"`
 	Right float64 `json:"right"`
+	Alone bool    `json:"alone,omitempty"`
 	Fact  Learned `json:"fact"`
 }
 
@@ -461,6 +463,7 @@ func (g *Game) EntryOfDay(ctx context.Context, userID int64, day string) (*DayEn
 		return nil, err
 	}
 	var rare, hardest *DayEntry
+	rareOthers := 0.0 // the rarest's share among the others
 	for _, it := range rights {
 		q, ok := g.Bank().Get(it.id)
 		if !ok || q.Extra().Fact == "" || q.Extra().Untrue() {
@@ -471,8 +474,10 @@ func (g *Game) EntryOfDay(ctx context.Context, userID int64, day string) (*DayEn
 		if err != nil {
 			return nil, err
 		}
-		if c != nil && (rare == nil || c.Right < rare.Right) {
-			rare = &DayEntry{N: it.n, Crowd: true, Right: c.Right, Fact: hardest.Fact}
+		if c != nil && (rare == nil || c.Right < rareOthers) {
+			rareOthers = c.Right
+			rare = &DayEntry{N: it.n, Crowd: true, Right: (c.Right*float64(c.Answers) + 1) / float64(c.Answers+1),
+				Alone: c.Right == 0, Fact: hardest.Fact}
 		}
 	}
 	if rare != nil {

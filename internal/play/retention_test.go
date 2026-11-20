@@ -69,7 +69,7 @@ func TestNewcomersMerged(t *testing.T) {
 	guest, owner := w.user(), w.user()
 	w.stored(guest, "topic", "2026-11-12", true, false)
 	w.stored(owner, "topic", "2026-11-12", true, false)
-	if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, guest, owner) }); err != nil {
+	if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return w.g.Merge(tx, guest, owner) }); err != nil {
 		t.Fatal(err)
 	}
 	act, _ := w.g.Activity(ctx, "2026-11-01")

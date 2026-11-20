@@ -286,9 +286,10 @@ func (s *Server) there(r *http.Request) bool {
 }
 
 // preview is what a link to this page shows when it's sent (Viber, Messenger, WhatsApp), and its picture: a player's
-// page, whose it is; a shared day, its score and its card (share.go), never whose it was.
+// page, whose it is, and nothing it would have to claim of them (never a rank's word beside a name: DECISIONS.md, the
+// seal); a shared day, its score and its card (share.go), never whose it was.
 func (s *Server) preview(r *http.Request, shared play.Share) (title, description, image string) {
-	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми и дуели. Всеки отговор носи по нещо ново."
+	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри на главите и дуели. Всеки отговор носи по нещо ново."
 	image = "/og.png"
 	switch path := r.URL.Path; {
 	case shared.Code != "":
@@ -299,10 +300,7 @@ func (s *Server) preview(r *http.Request, shared play.Share) (title, description
 		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {
 			if p, err := s.profileOf(r, tag, 0); err == nil {
 				title = p.Name + " (@" + p.Tag + ") в АЛМАНАХ"
-				description = "Играе всеки ден десетте въпроса на АЛМАНАХ."
-				if p.Seal != nil {
-					description = fmt.Sprintf("Звание „%s“ в главата „%s“.", p.Seal.Name, s.chapterName(p.Seal.Chapter))
-				}
+				description = "Профил в АЛМАНАХ. Десет въпроса на ден, едни и същи за цяла България."
 			}
 		}
 	}

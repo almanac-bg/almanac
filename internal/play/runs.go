@@ -162,6 +162,37 @@ func (g *Game) StartDay(ctx context.Context, userID int64) (State, error) {
 	return s, err
 }
 
+// Unfinished is yesterday's issue as the player left it half-way, while it can still be finished (DayGrace after its
+// midnight, or a question shown before then still in its time: dayOver): the game allows it, and it counts for its own
+// day, so Днес offers it („Продължи“) until then. Nil for none: not begun, finished, or over.
+func (g *Game) Unfinished(ctx context.Context, userID int64) (*State, error) {
+	yesterday := DayShift(g.Today(), -1)
+	var id int64
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?
+		AND finished_at IS NULL`, userID, yesterday).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var over bool
+	if err := g.read(ctx, func(tx *sql.Tx) error {
+		r, err := load(tx, userID, id)
+		if err == nil {
+			over = r.dayOver(g.Now())
+		}
+		return err
+	}); err != nil || over {
+		return nil, err
+	}
+	s, err := g.State(ctx, userID, id) // a question whose time ran out ends as at any look
+	if err != nil || s.Done {
+		return nil, err
+	}
+	return &s, nil
+}
+
 // MixTopic is the topic „Микс“: the questions of every topic at once, played and kept as a topic is (runs.category).
 // Its games are shaped by how well the player knows all the topics, and count toward each question's own topic.
 const MixTopic = "mix"

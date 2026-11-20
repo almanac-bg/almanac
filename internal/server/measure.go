@@ -489,16 +489,32 @@ type deviceRow struct {
 var questionKinds = map[string]string{"truefalse": "Вярно или не", "choice": "Избор", "number": "Число",
 	"order": "Подреди", "match": "Свържи", "split": "Раздели", "clues": "Подсказки"}
 
-// nounNames are the game's nouns (play.Nouns), as /admin names them: what counts as using each.
-var nounNames = map[string]string{
-	"day": "Брой на деня (завършен)", "ink": "Мастило (нов факт)", "almanac": "Алманах (отворен)",
-	"topic": "Игра на глава (завършена)", "seal": "Печат (отворен или сменен)", "streak": "Серия (2 дни подред)",
-	"friends": "Приятели (отворени)", "duel": "Дуел (изигран)", "share": "Споделен ден",
+// nounNames are the game's nouns (play.Nouns), as /admin names them: each its exact name in the closed list
+// (DECISIONS.md, „The direction“; TestNounNamesAreTheClosedList), and what counts as using it.
+var nounNames = map[string][2]string{
+	"day":       {"Брой", "завършен"},
+	"close":     {"близо", "отговор близо в броя"},
+	"streak":    {"серия", "2 дни подред"},
+	"almanac":   {"Алманах", "отворен"},
+	"chapters":  {"глави", "страница на глава, отворена"},
+	"facts":     {"факти", "нов факт в Алманаха"},
+	"ink":       {"мастило", "нов факт с мастило"},
+	"seal":      {"печат", "отворен или сменен"},
+	"topic":     {"игра на главата", "завършена"},
+	"mix":       {"Микс", "завършен"},
+	"bulgaria":  {"България", "завършена"},
+	"friends":   {"приятели", "отворени"},
+	"board":     {"класация", "видяна"},
+	"duel":      {"дуел", "с приятел, изигран"},
+	"recording": {"запис", "дуел срещу запис, изигран"},
+	"share":     {"споделяне", "споделен ден"},
+	"profile":   {"профил", "отворен"},
+	"reminder":  {"напомняне", "получено"},
 }
 
 // nounRow is a noun of the game used, this week and the last: of those who played in each.
 type nounRow struct {
-	Name       string
+	Name, What string
 	This, Last rate
 }
 
@@ -1017,7 +1033,8 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 		weekActives[i] = act.Within(w[0], w[1])
 	}
 	for _, n := range play.Nouns {
-		f.Nouns = append(f.Nouns, nounRow{Name: nounNames[n], This: rate{used[0][n], weekActives[0]}.capped(),
+		f.Nouns = append(f.Nouns, nounRow{Name: nounNames[n][0], What: nounNames[n][1],
+			This: rate{used[0][n], weekActives[0]}.capped(),
 			Last: rate{used[1][n], weekActives[1]}.capped()})
 	}
 

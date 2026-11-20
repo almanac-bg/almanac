@@ -48,7 +48,19 @@ var factsRule = `WITH met AS (
 	INSERT INTO facts (user_id, question_id, ink, at, run_id)
 	SELECT ?1, question_id, ink, at, run_id FROM ranked WHERE k = 1`
 
-// rewriteFacts writes a player's book again from their answers, by the whole rule (factsRule).
+// rewriteBook writes a player's book again from their answers (rewriteFacts) and counts their ranks again from it
+// (countRanksIn), on the day it's done: a rank never falls, and one risen by it is told with the next news, as any
+// is. Whatever writes a book again does it so, so that a chapter's seal is never behind its ink („15 с мастило ·
+// Страница“).
+func rewriteBook(ctx context.Context, tx *sql.Tx, b *bank.Bank, userID int64, day string) error {
+	if err := rewriteFacts(tx, userID); err != nil {
+		return err
+	}
+	return countRanksIn(ctx, tx, tx, b, userID, day, false)
+}
+
+// rewriteFacts writes a player's book again from their answers, by the whole rule (factsRule); rewriteBook counts
+// their ranks again after it.
 func rewriteFacts(tx *sql.Tx, userID int64) error {
 	if _, err := tx.Exec(`DELETE FROM facts WHERE user_id = ?`, userID); err != nil {
 		return err
@@ -106,8 +118,12 @@ type written struct {
 
 // written calls fn with every fact in a player's book that it shows (writtenShows), in the order they were written.
 func (g *Game) written(ctx context.Context, userID int64, fn func(q bank.Question, w written)) error {
-	b := g.Bank()
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT f.question_id, f.ink, f.at, coalesce(r.kind, ''),
+	return writtenIn(ctx, g.DB.Read, g.Bank(), userID, fn)
+}
+
+// writtenIn is written, read by db (a transaction that has just written the book again, or the database) by bank b.
+func writtenIn(ctx context.Context, db querier, b *bank.Bank, userID int64, fn func(q bank.Question, w written)) error {
+	rows, err := db.QueryContext(ctx, `SELECT f.question_id, f.ink, f.at, coalesce(r.kind, ''),
 			coalesce(r.day, '')
 		FROM facts f LEFT JOIN runs r ON r.id = f.run_id WHERE f.user_id = ? ORDER BY f.at, f.question_id`, userID)
 	if err != nil {
@@ -132,8 +148,13 @@ func writtenShows(q bank.Question) bool { return q.Extra().Fact != "" && !q.Extr
 // InkOf is how many facts a player's book has in ink in each chapter: the bank's topics, „Микс“ (all of them) and
 // „България“ (the questions about Bulgaria).
 func (g *Game) InkOf(ctx context.Context, userID int64) (map[string]int, error) {
+	return inkIn(ctx, g.DB.Read, g.Bank(), userID)
+}
+
+// inkIn is InkOf, read by db by bank b.
+func inkIn(ctx context.Context, db querier, b *bank.Bank, userID int64) (map[string]int, error) {
 	ink := map[string]int{}
-	err := g.written(ctx, userID, func(q bank.Question, w written) {
+	err := writtenIn(ctx, db, b, userID, func(q bank.Question, w written) {
 		if w.ink {
 			countIn(ink, q)
 		}
@@ -148,6 +169,30 @@ func countIn(by map[string]int, q bank.Question) {
 	if q.Extra().BG {
 		by[BulgariaTopic]++
 	}
+}
+
+// GreyIn is how many facts a game (runID) wrote in a player's book in grey: the questions it met first (a chapter's
+// game, a duel, a miss in the issue). A chapter game's result says it („+4 в сиво“): what that game wrote, never a
+// count of the book's grey.
+func (g *Game) GreyIn(ctx context.Context, userID, runID int64) (int, error) {
+	b := g.Bank()
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT f.question_id FROM facts f
+		WHERE f.user_id = ? AND f.run_id = ? AND NOT f.ink`, userID, runID)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	grey := 0
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return 0, err
+		}
+		if q, ok := b.Get(id); ok && writtenShows(q) {
+			grey++
+		}
+	}
+	return grey, rows.Err()
 }
 
 // InkIn is how many facts a game (runID) wrote in a player's book in ink, and how many of its right answers were to

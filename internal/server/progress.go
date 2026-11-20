@@ -134,6 +134,11 @@ func (s *Server) profile(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	if viewer != 0 { // a profile looked at, once a week (play.Used: „профил“)
+		if err := s.game.Used(r.Context(), viewer, "profile"); err != nil {
+			return err
+		}
+	}
 	return ok(w, p)
 }
 

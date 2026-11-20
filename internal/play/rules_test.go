@@ -159,7 +159,7 @@ func TestMergeBringsProgress(t *testing.T) {
 	guest, owner := w.user(), w.user()
 	merge := func(from, to int64) {
 		t.Helper()
-		if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, from, to) }); err != nil {
+		if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return w.g.Merge(tx, from, to) }); err != nil {
 			t.Fatal(err)
 		}
 		_, _ = w.db.Write.Exec(`DELETE FROM users WHERE id = ?`, from) // as signing in does
