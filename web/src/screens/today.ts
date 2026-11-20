@@ -14,7 +14,7 @@
 import { loadPictures, picture } from "../art/picture.ts";
 import { news } from "../game/news.ts";
 import { closeWords, count, percent } from "../game/numbers.ts";
-import { hands, land, reviewed } from "../game/results.ts";
+import { land, reviewed } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting } from "../game/run.ts";
 import { type SharedDay, shareDay, shareText } from "../game/share.ts";
 import { standing } from "../game/standing.ts";
@@ -28,10 +28,9 @@ import { reportProblem } from "../lib/errors.ts";
 import { type RemindAsks, remindAnswered, remindAsks, remindShown } from "../lib/keep.ts";
 import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { go, goBack, hold, release, title } from "../lib/router.ts";
-import { feelKit } from "../lib/sound.ts";
 import { dateWords, issueOf, onDay, weekday } from "../lib/words.ts";
 import { cover, issueTopics, notice, player, playing, user } from "../state.ts";
-import { chapterName, chip, failure, formatNumber, glyph, leaf, mini, stakeLine, tiles, who, worn } from "../ui.ts";
+import { chapterName, chip, failure, formatNumber, glyph, leaf, mini, stakeLine, tiles, who } from "../ui.ts";
 import { type Accepted, acceptedLine, type Waiting, waitingLine } from "./duel.ts";
 import { app, coverExit, exitWay, handedIn, haveProfile, keepLine, keepStake, mailAsk, takeHand } from "./keep.ts";
 import { loadStats, type Stats } from "./stats.ts";
@@ -426,7 +425,11 @@ function streakSection(t: Today, stats: () => Stats | null, done: boolean): Chil
           ? h(
               "span",
               { class: "streak-note" },
-              `${forgiven} ${forgiven === 1 ? "простен ден" : "простени дни"} тази седмица`,
+              forgiven === 1
+                ? "Тази седмица един пропуснат ден е простен."
+                : forgiven === 2
+                  ? "Тази седмица два пропуснати дни са простени."
+                  : `Тази седмица ${forgiven} пропуснати дни са простени.`,
             )
           : done
             ? null
@@ -601,7 +604,7 @@ function friendsDay(t: Today): Child {
         h(
           "li",
           { class: "fd-row" },
-          who(s.name, s, worn(s.seal), s.name, s.tag),
+          who(s.name, s, null, s.name, s.tag),
           s.trail?.length ? mini(s.trail) : null,
           h("b", { class: "fd-score", "aria-label": `${s.rights} от ${s.of}` }, String(s.rights)),
         ),

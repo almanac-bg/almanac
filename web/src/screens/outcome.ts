@@ -88,9 +88,10 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
   );
 }
 
-/** „Дуел с Мария“ or „Срещу запис на Мария“. */
+/** „Дуел с Мария“, or a recording as it was chosen and whose: „По-силен запис · Краси“. */
 function kicker(d: DuelView): string {
-  if (d.recorded) return `Срещу запис на ${d.opponent?.name ?? ""}`;
+  if (d.recorded)
+    return `${d.level === "stronger" ? "По-силен запис" : d.level === "equal" ? "Равен запис" : "Запис"} · ${d.opponent?.name ?? ""}`;
   const them = d.opponent?.name;
   return them ? `Дуел ${withWord(them)}` : "Дуел";
 }

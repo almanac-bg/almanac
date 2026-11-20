@@ -3,7 +3,7 @@
 // answers it and its action in sight, and once answered the player's row, the right one and „Напред“; and Днес keeps
 // its budget, in the HTML's order.
 import { expect, type Page, test } from "@playwright/test";
-import { dealt } from "./play.ts";
+import { dealt, knows } from "./play.ts";
 
 const sizes = [
   { width: 320, height: 568, go: 500 },
@@ -99,4 +99,23 @@ for (const scheme of ["light", "dark"] as const)
             expect(box.bottom, "the row is over the panel").toBeLessThanOrEqual(box.foot + 1);
           }
         });
+
+      test("the places: nothing sideways, with a long name and facts in the book", async ({ page }) => {
+        await page.goto("/");
+        await knows(page, ["his-002", "mov-001"], Date.now(), true);
+        const named = await page.evaluate(async () => {
+          const r = await fetch("/api/me", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: "Константинова-Христозова" }),
+          });
+          return r.ok;
+        });
+        expect(named).toBe(true);
+        for (const path of ["/almanac", "/almanac/history", "/friends", "/me"]) {
+          await page.goto(path);
+          await expect(page.locator("h1").first()).toBeVisible();
+          expect(await sideways(page), path).toBe(false);
+        }
+      });
     });

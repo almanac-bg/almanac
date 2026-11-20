@@ -86,6 +86,9 @@ export const notice = signal("");
  * sheet turns to the next one's colour. */
 export const issueTopics = signal<string[]>([]);
 
+/** The seal the player wears (play.Seal), as Профил's numbers last said it: on the frame's avatar. */
+export const wornSeal = signal<{ chapter: string; level: number } | null>(null);
+
 /** How many friend requests wait for the player's answer. */
 export const friendRequests = signal(0);
 

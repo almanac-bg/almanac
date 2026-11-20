@@ -54,6 +54,8 @@ export interface DuelView {
   opponent?: Side;
   you?: Side;
   recorded?: boolean;
+  /** Against a recording: as it was chosen, as strong as the player („равен“) or stronger („по-силен“). */
+  level?: "equal" | "stronger";
   /** Against a recording of one topic's game: the topic. */
   topic?: string;
   /** The player played first (sent it). */
@@ -166,18 +168,37 @@ export function duelRow(d: DuelView): Child {
 /** How many played duels Приятели lists. */
 const playedShown = 5;
 
-/** The player's duels in Приятели: theirs to play first, then those waiting for a friend, then those played. */
+/** The player's duels in Приятели: theirs to play first (the first of them the page's one action, „Играй“), then those
+ * waiting for a friend, then those played. */
 export function duelLists(d: Duels): Child {
-  const part = (heading: string, list: DuelView[]) =>
-    list.length
+  const part = (heading: string, list: DuelView[], first: Child = null) =>
+    list.length || first
       ? h(
           "section",
           { class: "stack small-gap" },
           h("h2", { class: "section-title" }, heading),
-          h("ul", { class: "duel-list" }, list.map(shown).map(duelRow)),
+          first,
+          list.length ? h("ul", { class: "duel-list" }, list.map(shown).map(duelRow)) : null,
         )
       : null;
-  return [part("Твой ред", d.yours), part("Чакаш", d.theirs), part("Изиграни", d.played.slice(0, playedShown))];
+  const [turn, ...more] = d.yours;
+  return [
+    part("Твой ред", more, turn ? duelTurn(shown(turn)) : null),
+    part("Чакаш", d.theirs),
+    part("Изиграни", d.played.slice(0, playedShown)),
+  ];
+}
+
+/** The duel waiting for the player first: who, where it stands, and „Играй“, the page's one action. */
+function duelTurn(d: DuelView): Child {
+  const them = d.opponent;
+  return h(
+    "div",
+    { class: "duel-turn" },
+    them ? who(duelName(d), them.look ?? {}, null, them.name) : h("span", { class: "who-name" }, "Съперник"),
+    h("p", { class: "muted duel-turn-line" }, rowLine(d)),
+    h("a", { class: "btn primary", href: `/duel/${d.id}` }, "Играй"),
+  );
 }
 
 /** A friend's duel that waits for the player, as Начало says it (play.DuelWaiting): one quiet line, while it waits. */
@@ -366,12 +387,14 @@ function notHere(signedIn: () => void): Child {
   );
 }
 
-/** What a duel is called over its game: „Дуел с Мария“, „Срещу запис на Мария“ (of a topic's game: „… · История“). */
+/** What a duel is called over its game: „Дуел с Мария“; against a recording, how it was chosen and whose:
+ * „По-силен запис · Краси“ (of a topic's game: „… · История“). */
 function duelName(d: DuelView): string {
   const them = d.opponent?.name ?? "";
   if (!d.recorded) return `Дуел ${withWord(them)}`;
   const topic = d.topic ? topics.find((t) => t.id === d.topic)?.name : "";
-  return `Срещу запис на ${them}${topic ? ` · ${topic}` : ""}`;
+  const kind = d.level === "stronger" ? "По-силен запис" : d.level === "equal" ? "Равен запис" : "Запис";
+  return `${kind} · ${them}${topic ? ` · ${topic}` : ""}`;
 }
 
 /** A friend's duel the player has just played first: sent, the friend told. Their own result, and where it went. */

@@ -1,12 +1,12 @@
-// Алманах, one of the three places: the player's book. Its contents — a chapter per topic, then „Микс“ and
-// „България“, each with its ink and its rank (play/rank.go: named for the book, a track of the quarters to the next).
-// A chapter (/almanac/<topic>) is its rank, „Играй главата“ (a game of its questions: topics are played from here),
-// and its facts as entries, ink and grey, the latest first, a page at a time, found by their words. How well a
-// player knows a chapter (mastery) is the game's own, never shown.
+// Алманах, one of the three places: the player's book (DESIGN.md, Places). Its head — whose book it is, what ink and
+// grey mean, and Микс and България as two ways to play — then its chapters, each a card in its colour with its seal as
+// the badge and its ink („22 с мастило“), the one nearest its next rank first. A chapter (/almanac/<topic>) is its head
+// on its sheet (the seal with its pips, its ink, the next rank), „Игра на главата“, and its facts, ink and grey, the
+// latest first, a page at a time, found by their words. How well a player knows a chapter (mastery) is the game's own,
+// never shown.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
-import type { Stats } from "./stats.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
@@ -14,18 +14,22 @@ let {
   api,
   back,
   bulgaria,
-  dateWords,
+  chapterName,
   failure,
   formatNumber,
+  glyph,
   h,
-  illustration,
-  loadStats,
+  leaf,
   missing,
   onCleanup,
+  pips,
+  rankName,
   rename,
+  seal,
   signal,
   title,
   topics,
+  categories,
   user,
 } = {} as Kit;
 
@@ -53,14 +57,14 @@ interface Learned {
   /** Written in ink (right in its issue, met there first), else in grey, as met (play/ink.go). */
   ink?: boolean;
   at: number;
-  /** Where it was learned: the day's ten (its issue), a chapter's game, a duel. */
+  /** Where it was met: the day's ten (its issue), a chapter's game, a duel. */
   kind?: "day" | "topic" | "duel";
   issue?: number;
 }
 
 /** A page of the book (play.Almanac): its facts, how many the chapter (and the search) lists, each chapter's ink (its
- * one number: grey is listed, never counted); with the first page, each chapter's rank, the seal worn, whether the
- * guessing check holds the ranks, and the day the book began. */
+ * one number: grey is listed, never counted); with the first page, each chapter's rank, the seal worn, and the day the
+ * book began. */
 interface Page {
   facts: Learned[];
   found: number;
@@ -78,163 +82,145 @@ function setKit(kit: Kit) {
     api,
     back,
     bulgaria,
-    dateWords,
+    chapterName,
     failure,
     formatNumber,
+    glyph,
     h,
-    illustration,
-    loadStats,
+    leaf,
     missing,
     onCleanup,
+    pips,
+    rankName,
     rename,
+    seal,
     signal,
     title,
     topics,
+    categories,
     user,
   } = kit);
 }
 
-/** The book's chapters, in its order: the bank's topics, then „Микс“ and „България“. */
+/** The book's chapters, in its order: the bank's topics, then „Микс“ and „България“ (a chapter's page each, played
+ * from the book's head). */
 const chapters = () => topics.map((t) => t.id);
-const nameOf = (id: string) => topics.find((t) => t.id === id)?.name ?? id;
-const inked = (n: number) => `${formatNumber(n)} с мастило`;
+const nameOf = (id: string) => chapterName(id) || id;
 
-/** A chapter's picture, in its colour. */
-const chapterPic = (id: string, cls: string) => illustration(`topic-${id}`, `${cls} t-${id}`);
-
-/** Алманах: the book's contents, its numbers, and its notes. */
+/** Алманах: the book's head, then its chapters. */
 export function almanac(kit: Kit): Child {
   setKit(kit);
   title("Алманах");
   // Not a player yet: the book as it starts, its chapters each a way to play one.
-  if (!user.peek())
-    return h(
-      "section",
-      { class: "screen book spread" },
-      h(
-        "div",
-        { class: "book-intro page-1" },
-        h("p", { class: "kicker" }, "Твоята книга"),
-        h("h1", null, "Алманахът ти"),
-        h(
-          "p",
-          { class: "deck" },
-          "Всеки верен отговор записва в него по един факт, в главата на темата си. Започва с първия ти брой.",
-        ),
-      ),
-      contents({ facts: [], found: 0, ink: {} }),
-    );
+  if (!user.peek()) return book({ facts: [], found: 0, ink: {} });
   const page = signal<Page | null>(null);
-  const stats = signal<Stats | null>(null);
   const failed = signal<unknown>(null);
   const load = () => {
     failed.set(null);
     api<Page>("GET", "/api/almanac").then(page.set, failed.set);
-    loadStats().then(stats.set, () => {});
   };
   load();
-  return h("section", { class: "screen book spread" }, (): Child => {
+  return () => {
     const p = page();
     if (!p) return failed() ? failure(failed(), load) : h("p", { class: "muted" }, "…");
-    const s = stats();
-    return [
-      h(
-        "div",
-        { class: "book-intro page-1" },
-        h("p", { class: "kicker" }, "Твоята книга"),
-        h("h1", null, `Алманахът на ${user.peek()?.name ?? ""}`),
-        p.since
-          ? h("p", { class: "deck" }, `Започнат на ${dateWords(p.since)}. Всеки брой добавя по нещо.`)
-          : h("p", { class: "deck" }, "Всеки верен отговор записва по един факт."),
-        h(
-          "div",
-          { class: "figures-row" },
-          figure(s ? formatNumber(s.streak) : "…", s?.streak === 1 ? "ден поред" : "дни поред"),
-          figure(p.seal ? p.seal.name : "—", p.seal ? `печат: ${nameOf(p.seal.chapter)}` : "печат"),
-        ),
-      ),
-      contents(p),
-    ];
-  });
+    return book(p);
+  };
 }
 
-/** The book's contents: a chapter a row. */
-function contents(p: Page): Child {
+/** The book as a page: its head, and its chapters, the one nearest its next rank first. */
+function book(p: Page): Child {
+  const name = user.peek()?.name;
+  const rankOf = (id: string) => p.ranks?.find((r) => r.chapter === id);
+  // The chapter nearest its next rank: the least ink still to come, of those begun.
+  const begun = categories.map((c) => rankOf(c.id)).filter((r): r is Rank => !!r && r.level > 0);
+  const nearest = begun.sort((a, b) => a.nextAt - a.ink - (b.nextAt - b.ink))[0]?.chapter;
+  const order = categories.map((c) => c.id).sort((a, b) => (a === nearest ? -1 : b === nearest ? 1 : 0));
   return h(
     "section",
-    { class: "sect contents page-2" },
+    { class: "screen book" },
     h(
-      "div",
-      { class: "sect-head" },
-      h("h2", null, "Съдържание"),
-      h("span", { class: "sect-note" }, "мастилото и печатът на всяка глава"),
+      "header",
+      { class: "book-head" },
+      h("h1", null, name ? `Алманахът на ${name}` : "Алманахът ти"),
+      h(
+        "p",
+        { class: "deck" },
+        "С мастило са верните отговори от броя на деня. В сиво са фактите, които си срещнал другаде.",
+      ),
+      h(
+        "div",
+        { class: "ways" },
+        way("mix", "Микс", "всички глави"),
+        bulgaria.open ? way("bulgaria", "България", "въпроси за България") : null,
+      ),
     ),
     h(
       "ol",
-      { class: "toc" },
-      chapters().map((id) =>
-        tocRow(
-          id,
-          p,
-          p.ranks?.find((r) => r.chapter === id),
-        ),
-      ),
+      { class: "chapters", "aria-label": "Главите" },
+      order.map((id) => h("li", null, card(id, p.ink[id] ?? 0, rankOf(id), id === nearest))),
     ),
   );
 }
 
-/** A number and what it counts, in the row under the book's title. */
-const figure = (value: string, label: string) =>
-  h("div", { class: "fig" }, h("b", { class: "fig-n" }, value), h("span", { class: "fig-label" }, label));
-
-/** A chapter in the contents: its picture, its name, dotted leaders to its rank, and under them its ink, the next
- * rank and a track of the quarters to it in its colour. „Микс“ and „България“ have their ink only. */
-function tocRow(id: string, p: Page, rank?: Rank): Child {
-  const r = rank?.level ? rank : null;
-  const meta = [id === "mix" ? "всички глави" : inked(p.ink[id] ?? 0), rank ? `следва ${rank.next}` : ""]
-    .filter(Boolean)
-    .join(" · ");
+/** One of the ways to play at the book's head: „Микс“ or „България“, its glyph, a word of what it is. */
+function way(id: string, name: string, note: string): Child {
   return h(
-    "li",
-    { class: `toc-row t-${id}` },
-    h(
-      "a",
-      { href: `/almanac/${id}` },
-      chapterPic(id, "toc-pic"),
-      h(
-        "span",
-        { class: "toc-line" },
-        h("span", { class: "toc-name" }, nameOf(id), id === "bulgaria" ? h("i", { class: "flag" }) : null),
-        h("span", { class: "toc-dots", "aria-hidden": "true" }),
-      ),
-      h("span", { class: "toc-known" }, r ? r.name : "—"),
-      h(
-        "span",
-        { class: "toc-sub" },
-        h("span", null, meta),
-        rank
-          ? h(
-              "span",
-              { class: "toc-track", "aria-hidden": "true" },
-              h("i", { style: { width: `${rank.quarter * 25}%` } }),
-            )
-          : null,
-      ),
+    "a",
+    { class: `way t-${id}`, href: `/play/${id}` },
+    glyph(id, 44),
+    h("span", { class: "way-words" }, h("b", null, name), h("small", null, note)),
+  );
+}
+
+/** A chapter's card: its colour, its name, its seal as the badge (or its glyph, before a rank), its ink, and its rank
+ * with the ink to the next. The corner turned, as a page of the book. */
+function card(id: string, ink: number, r: Rank | undefined, nearest: boolean): Child {
+  const ranked = r && r.level > 0 ? r : null;
+  const left = ranked ? Math.max(1, ranked.nextAt - ranked.ink) : 0;
+  return h(
+    "a",
+    {
+      class: nearest ? "chapter-card nearest" : "chapter-card",
+      href: `/almanac/${id}`,
+      "aria-label": `${nameOf(id)}: ${formatNumber(ink)} с мастило${ranked ? `, ${ranked.name}` : ""}`,
+    },
+    leaf(
+      id,
+      [
+        h(
+          "span",
+          { class: "card-top" },
+          h("span", { class: "card-name" }, nameOf(id)),
+          ranked ? seal(id, ranked.level, 40) : glyph(id, 40),
+        ),
+        h("span", { class: "card-ink" }, h("b", { class: "num" }, formatNumber(ink)), h("span", null, "с мастило")),
+        h(
+          "span",
+          { class: "card-rank" },
+          ranked
+            ? `${ranked.name} · още ${left} до ${ranked.next}`
+            : ink
+              ? ""
+              : "Верен отговор в броя пише първия факт",
+        ),
+      ],
+      "card-leaf",
+      { next: "" },
     ),
   );
 }
 
 const shortMonths = ["ян.", "февр.", "март", "апр.", "май", "юни", "юли", "авг.", "септ.", "окт.", "ноем.", "дек."];
 
-/** A day as the ledger dates it: „19 ноем.“ */
+/** A day as an entry dates it: „19 ноем.“ */
 function shortDate(day: string): string {
   const [, m = 1, d = 1] = day.split("-").map(Number);
-  return `${d} ${shortMonths[m - 1]}`;
+  return `${d} ${shortMonths[m - 1]}`;
 }
 
-/** A chapter of the book (/almanac/<topic>): its rank, on its scale; „Играй главата“; its facts
- * as entries, the latest first, a page at a time, found by their words. Its page and search are in the address
- * (?page=2&q=…), so back to it, or a reload, opens the same. */
+/** A chapter of the book (/almanac/<topic>): its head on its sheet, „Игра на главата“, and its facts as entries, the
+ * latest first, a page at a time, found by their words. Its page and search are in the address (?page=2&q=…), so back
+ * to it, or a reload, opens the same. */
 export function chapter(kit: Kit, [id = ""]: string[]): Child {
   setKit(kit);
   // A chapter the book doesn't have: the page that isn't there, not an empty chapter by that name.
@@ -320,39 +306,47 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
       "div",
       { class: "chapter-side page-1" },
       back("/almanac", "Алманах"),
-      h(
-        "header",
-        { class: "chapter-head" },
-        h(
-          "div",
-          { class: "chapter-title" },
-          h("p", { class: "kicker chapter-kicker" }, `Глава ${index + 1}`),
-          h("h1", null, name),
-        ),
-        chapterPic(id, "chapter-pic"),
+      leaf(
+        id,
+        [
+          h(
+            "header",
+            { class: "chapter-head" },
+            h("span", { class: "chapter-art" }, glyph(id, 72)),
+            h(
+              "div",
+              { class: "chapter-title" },
+              index < categories.length ? h("p", { class: "kicker" }, `Глава ${index + 1}`) : null,
+              h("h1", null, name),
+            ),
+          ),
+          () =>
+            stand(
+              id,
+              first()?.ranks?.find((r) => r.chapter === id),
+              first()?.ink[id] ?? 0,
+            ),
+        ],
+        "chapter-leaf",
       ),
-      () => scale(first()?.ranks?.find((r) => r.chapter === id)),
       id !== "bulgaria" || bulgaria.open
         ? h(
             "div",
             { class: "chapter-play" },
             h("a", { class: "btn primary", href: `/play/${id}` }, () =>
-              left() ? "Продължи главата" : "Играй главата",
+              left() ? "Продължи главата" : "Игра на главата",
             ),
-            h("p", { class: "small" }, () => {
+            () => {
               const l = left();
-              if (l) return `Следва въпрос ${l.at + 1} от ${l.total}.`;
-              return id === "mix"
-                ? "Десет въпроса от всички глави, по твоята мярка."
-                : `Десет въпроса от „${name}“, по твоята мярка.`;
-            }),
+              return l ? h("p", { class: "small" }, `Следва въпрос ${l.at + 1} от ${l.total}.`) : null;
+            },
           )
         : null,
     ),
     h(
       "section",
       { class: "sect chapter-facts page-2" },
-      h("div", { class: "sect-head" }, h("h2", null, "Фактите в главата"), () => {
+      h("div", { class: "sect-head" }, h("h2", null, "Фактите"), () => {
         const p = data();
         return p
           ? h(
@@ -390,13 +384,18 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
             { class: "entries-none" },
             query().trim()
               ? "Нищо не е намерено. Опитай с друга дума."
-              : "Тук още няма факти. Отговори вярно на въпрос от тази глава и фактът му ще се запише тук.",
+              : "Тук още няма факти. Всеки въпрос от главата, който срещнеш, записва своя.",
           );
+        // Where grey first shows, what it is: once, over the list.
+        const grey = p.facts.some((f) => !f.ink);
         return [
+          grey
+            ? h("p", { class: "grey-note" }, "В сиво са фактите, които си срещнал. С мастило пише само броят на деня.")
+            : null,
           h(
             "ol",
             { class: "entries" },
-            p.facts.map((f, i) => entry(f, i === 0)),
+            p.facts.map((f) => entry(f)),
           ),
           pager(page(), Math.ceil(p.found / perPage), pageHref),
         ];
@@ -405,39 +404,29 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   );
 }
 
-/** The chapter's rank: its name, set big, a sentence of the ink to the next, and the quarters toward it on a track in
- * the chapter's colour. Before a rank, what writes one: a right answer in the day's issue. „Микс“ and „България“ have
- * none. */
-function scale(r?: Rank): Child {
-  if (!r) return h("div", { class: "know" });
-  if (!r.level)
-    return h(
-      "div",
-      { class: "know" },
-      h("p", { class: "know-words" }, "Всеки верен отговор в броя на деня записва факт с мастило."),
-    );
-  const left = Math.max(1, r.nextAt - r.ink);
+/** Where a chapter stands: its seal with the pips towards the next rank, its ink, its rank's name and the ink still to
+ * come. Before a rank, what writes its first: a right answer in the day's issue. */
+function stand(id: string, r: Rank | undefined, ink: number): Child {
+  const ranked = r && r.level > 0 ? r : null;
   return h(
     "div",
-    { class: "know" },
+    { class: "ch-stand" },
+    ranked ? h("span", { class: "ch-seal" }, seal(id, ranked.level, 64, "rimmed"), pips(ranked.quarter)) : null,
     h(
       "div",
-      { class: "know-top" },
-      h("b", { class: "know-n" }, r.name),
-      h("p", { class: "know-words" }, `${inked(r.ink)}. Още ${left} до „${r.next}“.`),
-    ),
-    h(
-      "div",
-      { class: "scale", role: "img", "aria-label": `${r.quarter} от 4 четвърти до „${r.next}“` },
-      h("i", { class: "scale-fill", style: { width: `${r.quarter * 25}%` } }),
-      [25, 50, 75].map((at) => h("i", { class: "scale-tick", style: { left: `${at}%` } })),
-      h("span", { class: "scale-end" }, r.name),
-      h("span", { class: "scale-end last" }, r.next),
+      { class: "ch-words" },
+      h("p", { class: "ch-ink" }, h("b", { class: "num" }, formatNumber(r?.ink ?? ink)), " с мастило"),
+      ranked
+        ? [
+            h("p", { class: "ch-rank" }, rankName(ranked.level)),
+            h("p", { class: "ch-next" }, `още ${Math.max(1, ranked.nextAt - ranked.ink)} до ${ranked.next}`),
+          ]
+        : h("p", { class: "ch-next" }, "Всеки верен отговор в броя на деня пише факт с мастило."),
     ),
   );
 }
 
-/** Where a fact was learned, as its entry's dateline says it: „20 ноем. · Брой 9“. */
+/** Where a fact was met, as its entry's dateline says it: „20 ноем. · Брой 9“. */
 function whence(f: Learned): string {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(new Date(f.at));
   const from =
@@ -445,14 +434,21 @@ function whence(f: Learned): string {
   return from ? `${shortDate(day)} · ${from}` : shortDate(day);
 }
 
-/** A fact as an entry of the book: its dateline, the answer as its headword (a statement to judge is its own
- * headword, „Невярно:“ before one that isn't so), the question in italic, and the fact (a drop cap in the chapter's
- * colour on the page's first). */
-function entry(f: Learned, first: boolean): Child {
+/** A fact as an entry of the book: ink (a card with an ink edge and „мастило“), or grey (outlined thin, lighter); its
+ * dateline, the answer as its headword (a statement to judge is its own headword, „Невярно:“ before one that isn't so),
+ * the question, and the fact. */
+function entry(f: Learned): Child {
   return h(
     "li",
-    { class: [`entry t-${f.category}`, first && "first", !f.ink && "met"].filter(Boolean).join(" ") },
-    h("p", { class: "entry-when" }, whence(f)),
+    { class: f.ink ? `entry ink t-${f.category}` : `entry met t-${f.category}` },
+    h(
+      "p",
+      { class: "entry-when" },
+      f.ink
+        ? h("span", { class: "tag ink" }, h("span", { class: "i i-nib", "aria-hidden": "true" }), "мастило")
+        : h("span", { class: "tag grey" }, "срещнат"),
+      whence(f),
+    ),
     h("p", { class: "entry-word" }, f.untrue ? h("span", { class: "entry-untrue" }, "Невярно: ") : null, f.answer),
     f.question ? h("p", { class: "entry-q" }, f.question) : null,
     h("p", { class: "entry-fact" }, f.fact),

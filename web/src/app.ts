@@ -16,8 +16,8 @@ import { duelNew, duelOne } from "./screens/duel.ts";
 import { missing } from "./screens/missing.ts";
 import { topic } from "./screens/play.ts";
 import { sharedDay, today } from "./screens/today.ts";
-import { cover, duelsWaiting, friendRequests, look, playing, user, watchWaiting } from "./state.ts";
-import { avatar, rosette } from "./ui.ts";
+import { cover, duelsWaiting, friendRequests, look, playing, user, watchWaiting, wornSeal } from "./state.ts";
+import { avatar, rosette, worn } from "./ui.ts";
 
 /** The three places (DECISIONS.md, „The redesign“): where each goes, its name, and which paths are part of it. A game
  * of the day is played on Днес, a topic's from its chapter in the Алманах; a duel is the friends'. */
@@ -68,12 +68,18 @@ if (root) {
         { class: "bar" },
         h("a", { href: "/", class: "brand", "aria-label": "АЛМАНАХ, днешният брой" }, rosette(), "АЛМАНАХ"),
         h("nav", { class: "places", "aria-label": "Основно" }, placeLinks()),
-        // The player's avatar: Профил, and Настройки in it. Without a profile yet (or on the cover, not signed in),
-        // the way in.
+        // The player's avatar with the seal they wear: Профил, and Настройки in it (not on Профил itself, whose page
+        // has it). Without a profile yet (or on the cover, not signed in), the way in.
         () => {
           const u = user();
           if (!u || (cover() && !u.email)) return h("a", { class: "bar-in", href: "/me" }, "Вход");
-          return h("a", { class: "bar-me", href: "/me", "aria-label": "Профил" }, () => avatar(look()));
+          if (path() === "/me") return null;
+          return h(
+            "a",
+            { class: "bar-me", href: "/me", "aria-label": "Профил" },
+            () => avatar(look()),
+            () => worn(wornSeal(), 24),
+          );
         },
       ),
     ),

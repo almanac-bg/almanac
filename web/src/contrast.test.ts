@@ -54,7 +54,7 @@ for (const [name, t] of [
 ] as const) {
   test(`${name}: text holds 4.5:1 on the page and its surfaces, and a control's line 3:1`, () => {
     for (const ground of ["bg", "surface", "surface-2"])
-      for (const text of ["ink", "ink-2", "ink-3", "pencil"]) {
+      for (const text of ["ink", "ink-2", "ink-3", "grey"]) {
         const c = contrast(t[text] ?? "", t[ground] ?? "");
         assert.ok(c >= 4.5, `${name}: --${text} on --${ground} is ${c.toFixed(2)}`);
       }
