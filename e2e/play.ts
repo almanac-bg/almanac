@@ -192,10 +192,28 @@ export async function dealt(page: Page, category: string, ids: string[]): Promis
 }
 
 /** Makes the player's games count as a person's for the others (a test plays quicker than a person: play/fair.go),
- * so that their friends see their day. */
+ * so that their friends see their day, and their book has what they got right (play/ink.go: a script's game writes
+ * nothing). */
 export async function playedFair(page: Page): Promise<void> {
-  await inDB(page, (db, id) => db.prepare("UPDATE runs SET shadow = 0 WHERE user_id = ?").run(id));
+  await inDB(page, (db, id) => {
+    db.prepare("UPDATE runs SET shadow = 0 WHERE user_id = ?").run(id);
+    db.prepare("DELETE FROM facts WHERE user_id = ?").run(id);
+    db.prepare(factsRule).run(id);
+  });
 }
+
+/** The book's rule as the server writes it (play.factsRule, the same text: TestE2EFactsRule holds them equal). */
+const factsRule = `WITH met AS (
+		SELECT a.question_id, min(a.at) AS at FROM answers a JOIN runs r ON r.id = a.run_id
+		WHERE r.user_id = ?1 GROUP BY a.question_id),
+	rights AS (
+		SELECT a.question_id, a.at, a.run_id, r.kind = 'day' AND a.at = m.at AS ink
+		FROM answers a JOIN runs r ON r.id = a.run_id JOIN met m ON m.question_id = a.question_id
+		WHERE r.user_id = ?1 AND a.is_right AND r.shadow <> 1 AND NOT coalesce(json_extract(r.questions, '$[' || a.n || '].void'), 0)),
+	ranked AS (
+		SELECT *, row_number() OVER (PARTITION BY question_id ORDER BY ink DESC, at, run_id) AS k FROM rights)
+	INSERT INTO facts (user_id, question_id, ink, at, run_id)
+	SELECT ?1, question_id, ink, at, run_id FROM ranked WHERE k = 1`;
 
 /** Makes the player one who has answered these questions right (in a game of nothing), straight in the test server's
  * database: their facts are in the Алманах (play/ink.go), in pencil, or in `ink`, written at a moment (`at`, ms; now

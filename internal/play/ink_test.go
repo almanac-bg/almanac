@@ -3,9 +3,28 @@ package play
 import (
 	"encoding/json"
 	"maps"
+	"os"
+	"strings"
 	"testing"
 	"time"
 )
+
+// The browser tests write a player's book by the rule the server does (e2e/play.ts, playedFair, after they've made
+// their quick games a person's): the same text, so that it can't drift.
+func TestE2EFactsRule(t *testing.T) {
+	src, err := os.ReadFile("../../e2e/play.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, after, ok := strings.Cut(string(src), "const factsRule = `")
+	rule, _, ok2 := strings.Cut(after, "`;")
+	if !ok || !ok2 {
+		t.Fatal("e2e/play.ts has no factsRule")
+	}
+	if got, want := strings.Join(strings.Fields(rule), " "), strings.Join(strings.Fields(factsRule), " "); got != want {
+		t.Fatalf("e2e/play.ts's rule:\n%s\nthe server's:\n%s", got, want)
+	}
+}
 
 // book is a player's book as kept: by question, ink (true) or pencil (false).
 func (w *world) book(user int64) map[string]bool {
