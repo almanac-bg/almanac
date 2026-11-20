@@ -231,7 +231,7 @@ func newFresh(t *testing.T) *fresh {
 	}
 	var runID int64
 	f.must(w.g.DB.Tx(f.ctx(), func(tx *sql.Tx) error {
-		r, err := w.g.insertRun(f.ctx(), tx, f.ana, "topic", nil, "", picks)
+		r, err := w.g.insertRun(f.ctx(), tx, f.ana, "topic", nil, MixTopic, picks)
 		if err != nil {
 			return err
 		}
