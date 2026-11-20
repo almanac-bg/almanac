@@ -1,7 +1,6 @@
 // Моят Алманах: what the player has learned — the fact behind every question they've answered right — read as an
-// almanac, by day, newest first: each day under its dateline (its issue and date, as the day's ten carry them), the
-// facts learned that day under it. A topic is a quiet filter above. It grows to thousands, so it comes a page at a
-// time: the next as the list's end comes near, each day's facts going on under its head across pages.
+// almanac, one list in the order the facts were learned, the first first. A topic is a quiet filter above. It grows to
+// thousands, so it comes a page at a time: the next as the list's end comes near.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -18,8 +17,6 @@ let {
   slot,
   when,
   title,
-  issueWords,
-  dayInBulgaria,
   categories,
   user,
   formatNumber,
@@ -41,9 +38,6 @@ interface Learned {
   untrue?: boolean;
   fact: string;
   at: number;
-  /** The day it was learned (YYYY-MM-DD, in Bulgaria) and that day's issue (play/issue.go). */
-  day: string;
-  issue?: number;
 }
 
 /** A page of the almanac, and the counts of the whole: by topic, in all, and of every fact each topic has. */
@@ -68,8 +62,6 @@ export function almanac(kit: Kit) {
     slot,
     when,
     title,
-    issueWords,
-    dayInBulgaria,
     categories,
     user,
     formatNumber,
@@ -142,7 +134,7 @@ function head(c: Counts, topic: () => string, waiting: () => number): Child {
         return ` от ${formatNumber(of)} ${of === 1 ? "факт" : "факта"} в „${categories.find((x) => x.id === t)?.name ?? ""}“`;
       }),
     ),
-    h("p", { class: "muted" }, "Фактът към всеки въпрос, на който отговори вярно, ден по ден."),
+    h("p", { class: "muted" }, "Фактът към всеки въпрос, на който отговори вярно, по реда, в който ги отключи."),
     () =>
       waiting()
         ? h(
@@ -184,35 +176,10 @@ function chips(topic: () => string, show: (t: string) => void): Child {
   );
 }
 
-/** A day's dateline in the almanac: its issue and date, and the year when it isn't this one. */
-function dateline(f: Learned, year: string): string {
-  const words = issueWords(f.issue, f.day);
-  return f.day.startsWith(year) ? words : `${words} ${f.day.slice(0, 4)}`;
-}
-
-/** A topic's facts (or all), a page at a time, by day: each page added under the last (a day begun on the page before
- * goes on under its head), the next fetched as the end of the list comes within a screen or so, or with the button
+/** A topic's facts (or all), a page at a time, in the order learned: each page added under the last, the next fetched as the end of the list comes within a screen or so, or with the button
  * that ends it (which tries again after a failed fetch). */
 function pages(topic: string, counted: (c: Counts) => void): Child {
-  const days = h("div", { class: "almanac-days" });
-  const year = dayInBulgaria().slice(0, 4);
-  let day = "";
-  let facts: HTMLElement | null = null;
-  const add = (f: Learned) => {
-    if (f.day !== day || !facts) {
-      day = f.day;
-      facts = h("ol", { class: "almanac-list" }) as HTMLElement;
-      days.append(
-        h(
-          "section",
-          { class: "almanac-day" },
-          h("h2", { class: "kicker almanac-date" }, h("time", { datetime: f.day }, dateline(f, year))),
-          facts,
-        ),
-      );
-    }
-    facts.append(entry(f));
-  };
+  const facts = h("ol", { class: "almanac-list" }) as HTMLElement;
   const next = signal<string | null>(null); // where the next page starts; "" after the last; null before the first
   const busy = signal(false);
   const trouble = signal("");
@@ -237,7 +204,7 @@ function pages(topic: string, counted: (c: Counts) => void): Child {
       (p) => {
         if (life.aborted) return;
         counted(p);
-        for (const f of p.facts) add(f);
+        for (const f of p.facts) facts.append(entry(f));
         next.set(p.next ?? "");
         busy.set(false);
         // Still near the end (a short page, a tall screen): looked at afresh, it says so again.
@@ -254,7 +221,7 @@ function pages(topic: string, counted: (c: Counts) => void): Child {
   load();
   return [
     when(
-      () => next() === "" && !days.childElementCount,
+      () => next() === "" && !facts.childElementCount,
       () =>
         h(
           "p",
@@ -263,7 +230,7 @@ function pages(topic: string, counted: (c: Counts) => void): Child {
             ? "Тук още няма факти. Отговори вярно на въпрос от тази тема и фактът му ще се появи тук."
             : "Още няма факти. Всеки верен отговор носи един.",
         ),
-      () => days,
+      () => facts,
     ),
     () => (trouble() ? h("p", { role: "alert" }, trouble()) : null),
     when(

@@ -552,17 +552,7 @@
     font-weight: 700;
   }
 
-  .almanac-days {
-    display: grid;
-    gap: var(--space-6);
-  }
-
-  .almanac-day {
-    display: grid;
-    gap: var(--space-2);
-  }
-
-  .almanac-date {
+  .games-date {
     display: flex;
     align-items: center;
     gap: var(--space-3);
@@ -578,7 +568,7 @@
     gap: var(--space-2);
   }
 
-  .almanac-date::after {
+  .games-date::after {
     content: "";
     flex: 1;
     border-top: 1px solid var(--line);
@@ -1783,59 +1773,6 @@
     height: 14px;
     border-radius: 5px;
     background: var(--tone, var(--gold));
-  }
-
-  /* ---- Твоите броеве: the days' ten by right answers, a column for each score, today's in gold ---- */
-
-  .issues-bars {
-    display: grid;
-    grid-template-columns: repeat(11, minmax(0, 1fr));
-    grid-template-rows: 8.5rem;
-    gap: 2px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  /* Each column stands on the baseline: its count over its bar, the score under it. */
-  .issues-bar {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    text-align: center;
-  }
-
-  .issues-n {
-    color: var(--text-muted);
-    font: 700 0.75rem / 1rem var(--font-sans);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .issues-fill {
-    height: calc(var(--tall, 0) * 6rem);
-    min-height: 2px;
-    margin-inline: 2px;
-    border-radius: 4px 4px 0 0;
-    background: var(--lilac);
-  }
-
-  .issues-bar.today .issues-fill {
-    background: var(--gold);
-  }
-
-  .issues-score {
-    color: var(--text-muted);
-    font: 800 0.875rem / 1.25rem var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .issues-bar.today :is(.issues-score, .issues-n) {
-    color: var(--gold-ink);
-  }
-
-  .issues-line {
-    margin: 0;
-    font-size: 0.875rem;
   }
 
   /* ---- Figures: numbers with what they count ---- */
@@ -4259,11 +4196,6 @@
   .day-done-points {
     margin-left: auto;
     font: 600 0.9375rem / 1.375rem var(--font-sans);
-  }
-
-  /* While today's ten wait, how yesterday's ended: a quiet line over the day. */
-  .yesterday-line {
-    margin: 0;
   }
 
   .board {

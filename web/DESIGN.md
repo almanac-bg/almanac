@@ -40,9 +40,7 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   day's issue (`.masthead`: the weekday and „Брой 6“ on a hairline, the date set large, „17 ноември“, a hairline
   under it; then „Десет въпроса за днес“ a size down, what they are, and „Започни“; no pips before play: they'd
   measure nothing yet). The issue is the day's number from the first day of the day's ten (`play/issue.go`, 12
-  November 2026 is Брой 1), the same for everyone. While the ten wait, a quiet line over the card says how
-  yesterday's ended for a player who played it, once its board is final („Вчера: 7 от 10 · 41-во място от 312“, a way
-  to Класации' „Вчера“). Left half-way, the same card with where the player stopped, „Следва въпрос 4 от 10“, the pips
+  November 2026 is Брой 1), the same for everyone. Left half-way, the same card with where the player stopped, „Следва въпрос 4 от 10“, the pips
   so far, and „Продължи“; or once played, as it lands, how they went (under the score the issue line, „Брой 6 · 17
   ноември“, and the way to the day's board; see The place, below) with the one gold thing to do next right under it
   (`game/gold.ts`: „Още десет“, to where an open goal of a topic points, or a topic, a new one each day),
@@ -107,8 +105,7 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   under them (on a phone under 22.5rem, the score under the name, so that the name shows whole). Every row's avatar
   has a frame's room round it, framed or not, so that the names line up.
 - **Профил** (`/me`): its own four places in a switch at the top (`profileNav()`): Общо (the player: level,
-  league (once open and in one), streak, numbers, „Твоите броеве“ from the third day played (`.issues`: a column for
-  each score from 0 to 10, how many days had it, today's in gold; „Най-добър: 9 от 10 · Средно: 6,4 · Изиграни: 23“),
+  league (once open and in one), streak, numbers,
   the facts in the Алманах, mastery (once a topic has a mark; each row a way to play the topic), latest games (the
   day's ten as their issue, „Брой 7“, the date under it; today's each a way to go over it, read-only: `/games/<id>`,
   the score as its result had it and the questions; those of days gone by plain rows) and „Всички игри“ (`/games`:
@@ -116,14 +113,12 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   worn as others see it, then Аватар, Рамка, Фон or Титла, one at a time) and Алманах (`/almanac`). Настройки open
   from the button beside the name, its icon and its word at every width (an icon alone is read by few). The switch names the place, so Награди, Гардероб and Алманах have no heading of
   their own on the screen (it's there for screen readers).
-  **Моят Алманах** reads as an almanac, by day, newest first: the count in the numeral face („42 факта досега“, or a
+  **Моят Алманах** reads as one list, in the order the facts were learned, the first first: the count in the numeral face („42 факта досега“, or a
   topic's „7 от 24 факта в „История““), what they are in a line, and the questions waiting for a second chance as one
   plain link („17 въпроса чакат втори шанс“: Начало has its tile too); the topics as a quiet row of chips (names
-  only) to read one by; then each day under its dateline (`.almanac-date`: „Брой 6 · 17 ноември“, a kicker running
-  into a hairline, with the year once it isn't this one), its facts as entries between hairlines, not cards: the
+  only) to read one by; then the facts as entries between hairlines, not cards (no datelines): the
   topic, the question in a small line, what was learned as the headline (the answer; a statement to judge is its
-  own headline, „Невярно:“ before one that isn't so), and the fact. It comes a page at a time, a day going on under
-  its head from page to page.
+  own headline, „Невярно:“ before one that isn't so), and the fact. It comes a page at a time.
   Общо is a hub, each thing once: the level with what comes next in one card, the league in a line (its group is
   Класации'), the streak, three numbers in one card, the days' ten (from the third), the Алманах in a line („N факта в Алманаха“, a tap from it), mastery,
   the latest games and the way to all of them. Its head is the player's own look, as last seen on the device while
@@ -311,7 +306,7 @@ media query and `:root[data-scheme="day"]` outside it (`scheme.test.ts` holds th
   (`.masthead-line`, `.masthead-date`) over `.day-title`; `.modes .mode` and `.topics .topic` (`.topic-all` across
   the row).
 - **Моят Алманах:** `.almanac-head` (`.almanac-count` with `.almanac-n`, and `.second-chance`), `.almanac-topics`,
-  `.almanac-day` with `.almanac-date` and `.almanac-list`, each `.almanac-item` (`.almanac-topic`, `.almanac-q`,
+  `.almanac-list`, each `.almanac-item` (`.almanac-topic`, `.almanac-q`,
   `.almanac-a`, `.almanac-untrue`, `.almanac-fact`).
 - **Page openers** lead with the thing, not its rules: Роял's next evening is its start in big numerals
   (`.royal-when`), the time to it under it (`.royal-countdown`) and „Ще дойда“ gold, the rules folded in „Как се

@@ -19,8 +19,7 @@ func (g *game) dayOf(userID int64, day string, rights int) {
 	}
 }
 
-// Начало for a player who comes back: how yesterday ended (and Класации' „Вчера“ with its winner), and a welcome, once,
-// for one back after days away.
+// A player who comes back: Класации' „Вчера“ with its winner, and a welcome, once, for one back after days away.
 func TestComeBack(t *testing.T) {
 	g := start(t)
 	g.srv.game.Now = func() time.Time { return time.Date(2026, 11, 20, 12, 0, 0, 0, play.Bulgaria) }
@@ -30,10 +29,6 @@ func TestComeBack(t *testing.T) {
 	g.dayOf(boID, "2026-11-19", 9)
 
 	_, today := ana.call("GET", "/api/day", nil)
-	y, _ := today["yesterday"].(map[string]any)
-	if y == nil || y["rights"] != 7.0 || y["place"] != 2.0 || y["players"] != 2.0 || y["issue"] != float64(play.Issue("2026-11-19")) {
-		t.Fatalf("how yesterday ended: %v", today["yesterday"])
-	}
 	if today["back"] != nil {
 		t.Fatalf("played yesterday, welcomed back: %v", today["back"])
 	}
@@ -43,16 +38,10 @@ func TestComeBack(t *testing.T) {
 	board, _ := past["board"].(map[string]any)
 	top, _ := board["top"].([]any)
 	friends, _ := past["friends"].([]any)
-	if past["final"] != true || past["issue"] != y["issue"] || len(top) != 2 || len(friends) != 2 ||
+	if past["final"] != true || past["issue"] != float64(play.Issue("2026-11-19")) || len(top) != 2 || len(friends) != 2 ||
 		top[0].(map[string]any)["rights"] != 9.0 {
 		t.Fatalf("yesterday's board: %v", past)
 	}
-	// Today's ten played: today's result says it, not yesterday.
-	g.dayOf(anaID, "2026-11-20", 5)
-	if _, today = ana.call("GET", "/api/day", nil); today["yesterday"] != nil {
-		t.Fatalf("today played, yesterday still told: %v", today["yesterday"])
-	}
-
 	// Cy played five days in a row, then went away: welcomed back, once, with the longest streak.
 	cy, cyID := g.guest()
 	for d := 5; d <= 9; d++ {
@@ -60,7 +49,7 @@ func TestComeBack(t *testing.T) {
 	}
 	_, today = cy.call("GET", "/api/day", nil)
 	back, _ := today["back"].(map[string]any)
-	if back == nil || back["last"] != "2026-11-09" || back["best"] != 5.0 || today["ended"] != nil || today["yesterday"] != nil {
+	if back == nil || back["last"] != "2026-11-09" || back["best"] != 5.0 || today["ended"] != nil {
 		t.Fatalf("back after days away: %v (ended %v)", today["back"], today["ended"])
 	}
 	if status, _ := cy.call("POST", "/api/me/streak-told", map[string]any{"key": "back:2026-11-09"}); status != 200 {

@@ -96,7 +96,7 @@ export function games(kit: Kit) {
           h(
             "section",
             { class: "games-day" },
-            h("h2", { class: "kicker almanac-date" }, h("time", { datetime: d.day }, dateline(d.at))),
+            h("h2", { class: "kicker games-date" }, h("time", { datetime: d.day }, dateline(d.at))),
             h(
               "ol",
               { class: "games" },

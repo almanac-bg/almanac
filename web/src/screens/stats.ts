@@ -1,6 +1,5 @@
-// How a player has done: the streak (and their longest) and this week, their numbers, how their days' ten have gone
-// (from the third day played), the facts in their almanac, how well they know each topic (each a way to play it), their
-// latest games (today's each a way to go over it: /games/<id>) and the way to all of them (/games).
+// How a player has done: the streak (and their longest) and this week, their numbers, the facts in their almanac, how
+// well they know each topic (each a way to play it), their latest games (today's each a way to go over it: /games/<id>) and the way to all of them (/games).
 
 import { picture } from "../art/picture.ts";
 import { type Mastery, masteryCard } from "../game/mastery.ts";
@@ -25,9 +24,6 @@ export interface Stats {
   right: number;
   /** Facts in Моят Алманах. */
   facts: number;
-  /** How the day's ten have gone over the days played: how many days had 0 right, 1, … 10; and today's (-1: not yet). */
-  spread: number[];
-  today: number;
   duels: number;
   won: number;
   mastery: Mastery[];
@@ -122,8 +118,6 @@ export function stats(): Child {
           ? figure(`${s.won}/${s.duels}`, "победи в дуели")
           : figure(String(s.days), s.days === 1 ? "изигран ден" : "изиграни дни"),
       ),
-      // From the third day played, how the days' ten have gone: a day's ten is one result, and its spread the progress.
-      s.days >= 3 ? issuesCard(s.spread, s.today) : null,
       s.facts ? almanacLine(s.facts) : null,
       // „Колко знаеш“ once a topic has a first estimate: a first day's one answer a topic tells nothing.
       s.mastery.some((m) => m.sure || m.first) ? masteryCard(s.mastery) : null,
@@ -159,43 +153,6 @@ export function gameRow(p: Played, when: string | null): HTMLElement {
         when ? h("span", { class: "game-when" }, when) : null,
       ),
       h("b", { class: "game-score" }, String(p.rights), h("span", { class: "num-word" }, " от "), String(p.total)),
-    ),
-  );
-}
-
-/** „Твоите броеве“: how the day's ten have gone over the days played, a column for each score from 0 to 10 (today's in
- * gold), how many days had it over each; and the best, the average and how many, in a line. */
-function issuesCard(spread: number[], today: number): Child {
-  const days = spread.reduce((a, n) => a + n, 0);
-  if (!days) return null;
-  const most = Math.max(...spread);
-  const best = spread.reduce((b, n, i) => (n ? i : b), 0);
-  const average = spread.reduce((a, n, i) => a + n * i, 0) / days;
-  return h(
-    "section",
-    { class: "card issues" },
-    h("h2", { class: "card-title" }, "Твоите броеве"),
-    h(
-      "ol",
-      { class: "issues-bars", "aria-label": "Дни по верни отговори" },
-      spread.map((n, i) =>
-        h(
-          "li",
-          {
-            class: i === today ? "issues-bar today" : "issues-bar",
-            title: `${i} от 10: ${n} ${n === 1 ? "ден" : "дни"}${i === today ? " (днес)" : ""}`,
-          },
-          h("span", { class: "issues-n" }, n ? String(n) : ""),
-          h("span", { class: "issues-fill", style: { "--tall": String(most ? n / most : 0) } }),
-          h("span", { class: "issues-score", "aria-hidden": "true" }, String(i)),
-          h("span", { class: "sr" }, `${i} от 10: ${n} ${n === 1 ? "ден" : "дни"}`),
-        ),
-      ),
-    ),
-    h(
-      "p",
-      { class: "muted issues-line" },
-      `Най-добър: ${best} от 10 · Средно: ${formatNumber(average, 0.1)} · Изиграни: ${formatNumber(days)}`,
     ),
   );
 }
