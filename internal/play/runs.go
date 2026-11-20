@@ -356,6 +356,15 @@ func (h streakHistory) perWeek(day string) int {
 	return Forgives
 }
 
+// StreakHoldoutWindow is the streak's hold-out window (StreakHoldout): its first day and the day it ends ("" for both
+// with none kept, as in a database made after it).
+func (g *Game) StreakHoldoutWindow(ctx context.Context) (from, until string, err error) {
+	err = g.DB.Read.QueryRowContext(ctx, `SELECT coalesce((SELECT value FROM kv WHERE key = ?), ''),
+		coalesce((SELECT value FROM kv WHERE key = ?), '')`, StreakHoldout+"_from", StreakHoldout+"_until").
+		Scan(&from, &until)
+	return from, until, err
+}
+
 // heldUntil is, for a player in the streak's hold-out (StreakHoldout: in its bucket, and come in during its window),
 // the day the window ends; "" for any other, or with no window kept (a database made after it).
 func (g *Game) heldUntil(ctx context.Context, userID int64) (string, error) {
