@@ -243,14 +243,17 @@ func (s *Server) answer(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	// InTime: the screen timed the answer within the question's limit, so it's taken if it comes within
+	// play.LateGrace (play/late.go).
 	var in struct {
 		N      int             `json:"n"`
 		Answer json.RawMessage `json:"answer"`
+		InTime bool            `json:"inTime"`
 	}
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
-	res, err := s.game.Answer(r.Context(), user, id, in.N, in.Answer)
+	res, err := s.game.AnswerTimed(r.Context(), user, id, in.N, in.Answer, in.InTime)
 	if err != nil {
 		return err
 	}

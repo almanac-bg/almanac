@@ -602,14 +602,18 @@ function question(
   // doesn't get through (the clock running on in sight: it stops once the answer is taken, as the server takes the
   // time it came in), and only then said under the question, with „Опитай пак“ (tried again by itself as the line
   // comes back). When the time is up, whatever has been put in (or nothing) is the answer. What the player chose stays
-  // chosen a moment, however quick the line, before the answer shows.
+  // chosen a moment, however quick the line, before the answer shows. Whether it was given within the question's
+  // time, by this screen's clock, goes with it, as it was at the first send: the server takes one that was, should
+  // the line make it late (play/late.go). The time-up's own send is within it (a timer fires a moment after).
   let held = 0;
+  let inTime: boolean | undefined;
   const ans = answering<Result>({
     view: q.view,
     leftMs: q.leftMs,
-    post: (answer) => {
+    post: (answer): Promise<Result> => {
       held ||= answer === null ? 1 : performance.now() + holdMs;
-      return api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer });
+      inTime ??= ans.left.ms() > -1000;
+      return api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer, inTime });
     },
     open: () => !over,
     tries: 3,

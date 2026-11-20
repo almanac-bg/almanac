@@ -160,6 +160,14 @@ var adminBody = template.Must(template.New("admin").Parse(`
 {{range .Fair}}<tr><td class="num">{{.Day}}</td><td><a href="/admin?player={{.Tag}}#players">{{.Name}}</a></td><td class="num">{{.Rights}}</td><td class="num">{{.Guests}}</td><td class="num">{{.Best}}</td><td>{{if .Shadow}}да{{else}}не{{end}}</td></tr>
 {{else}}<tr><td colspan="6" class="muted">Няма.</td></tr>{{end}}
 </tbody></table></div>
+<h3>Късни отговори</h3>
+<p class="muted">Отговори, стигнали до сървъра след времето на въпроса, но до 15 секунди и отбелязани от екрана на
+играча като дадени навреме: приети. Последните 30 дни. Много такива често значат бавна връзка или екран, който казва
+каквото не бива.</p>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th>Играч</th><th class="num">Късни</th><th class="num">От отговори</th><th class="num">Най-късно, мс</th></tr></thead><tbody>
+{{range .Late}}<tr><td><a href="/admin?player={{.Tag}}#players">{{.Name}}</a></td><td class="num">{{.Late}}</td><td class="num">{{.Answers}}</td><td class="num">{{.MostMs}}</td></tr>
+{{else}}<tr><td colspan="4" class="muted">Няма.</td></tr>{{end}}
+</tbody></table></div>
 </section>
 </div>
 
