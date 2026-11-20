@@ -95,6 +95,7 @@ type Server struct {
 	banks     banks // a bank refused (bank.go)
 	client    fs.FS
 	limits    *limiter // the limits on floods (limits.go)
+	cards     *cards   // the shared days' cards drawn (share.go)
 	guard     *limiter // apart, the limits that keep players safe: codes, guests, reports
 	problems  *problems
 	reminders reminders // who is due the day's reminder when, today (remind.go)
@@ -129,7 +130,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s := &Server{
 		cfg: cfg, db: d.DB, accounts: d.Accounts, outbox: d.Outbox,
 		client: assets.FS(cfg.Dev),
-		limits: newLimiter(), guard: newLimiterOf(limitKeys / 2), problems: newProblems(),
+		limits: newLimiter(), guard: newLimiterOf(limitKeys / 2), problems: newProblems(), cards: newCards(),
 		secure: u.Scheme == "https",
 		host:   strings.ToLower(u.Hostname()),
 	}
@@ -223,6 +224,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/runs/{id}/start", s.start)
 	api("POST /api/runs/{id}/answer", s.answer)
 	api("GET /api/runs/{id}/review", s.review)
+	api("POST /api/runs/{id}/share", s.share)
 	api("POST /api/questions/{id}/report", s.report)
 	api("GET /api/duels", s.duels)
 	api("GET /api/duels/{id}", s.duelOne)
@@ -244,6 +246,7 @@ func (s *Server) routes() http.Handler {
 	mux.Handle("/api/", s.apiHandler(func(http.ResponseWriter, *http.Request) error { return errNotFound }))
 
 	mux.HandleFunc("GET /qimg/{file}", s.picture)
+	mux.HandleFunc("GET /card/{file}", s.card)
 	mux.HandleFunc("GET /assets/{file...}", s.asset)
 	for _, f := range publicFiles {
 		mux.HandleFunc("GET /"+f, s.publicFile)

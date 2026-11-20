@@ -83,6 +83,13 @@ Four main places, in a bar at the bottom of a phone (in the header on a big scre
   „Класацията на деня“ (a new player's first social signal isn't last place). From ten players a share says how it
   went where the place isn't said, „По-добре от 35% от играчите днес.“; from a hundred it leads for everyone, the
   place still the way to the board („4312-о място“ alone says nothing). „Средно днес: 5,1 от 10.“ from ten players.
+- **Sharing the day** („Сподели резултата“, plain, beside „Прегледай въпросите“ under the day's result and on its later
+  card; `game/share.ts` does it, the screen draws it): the share sheet where the device has one, else the text copied
+  and the button says „Копирано“ a moment. The text is „Алманах, брой 9 · 20 ноември“, „7 от 10 ■■■□■■■□■□“ (■ right,
+  □ anything else; a question that counts for nobody has no square) and the link, `/d/<issue>-<code>`: never an
+  answer, never a name. The link opens Начало: while it's that day, „Споделен резултат“, the score and its pips over
+  „Колко ще познаеш ти?“ and „Започни“, the same ten; after, „Брой 8 вече мина. Ето днешния.“ Its preview is the card
+  (`internal/card`): the edition's paper, whatever the theme.
 - **Приятели** (`/friends`): requests, friends, and the one way to add them: the field by потребителско име or
   имейл, „Добави“. A request is accepted or not („Поканата до Мария е изпратена.“): nobody becomes a friend alone. A
   friend's row is their name, their day and the duels between you; „Промени“ shows „Премахни“. A

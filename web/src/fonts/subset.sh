@@ -9,6 +9,11 @@
 # The weights are only those the style uses (app.css): Sofia Sans 400–900, Extra Condensed 600–900, Literata italic
 # 500. The ranges below are the @font-face rules' unicode-range in app.css, word for word: change both together.
 #
+# And the faces of the card a shared result's link shows (internal/card), which the server draws itself: it reads
+# TrueType only and applies no font features, so each is a static cut of the one weight the card sets it in, cut to
+# the letters a card can show (card=). Sofia Sans draws the Bulgarian letter forms by default (its locl is for
+# Russian), so the card has them without the feature.
+#
 #   sh web/src/fonts/subset.sh      (needs python3; makes a virtual environment of its own, and removes it)
 set -eu
 
@@ -43,3 +48,20 @@ make sofia-sans "ofl/sofiasans/SofiaSans%5Bwght%5D.ttf" "wght=400:900"
 make sofia-sans-extra-condensed "ofl/sofiasansextracondensed/SofiaSansExtraCondensed%5Bwght%5D.ttf" "wght=600:900"
 make literata-italic "ofl/literata/Literata-Italic%5Bopsz,wght%5D.ttf" "wght=500 opsz=12"
 ls -l "$here"/*.woff2
+
+card="U+0020-007E,U+00A0,U+00B7,U+0400-045F,U+2013-2014,U+201C,U+201E"
+cards="$here/../../../internal/card/fonts"
+mkdir -p "$cards"
+# name source axes
+cut() {
+  curl -fsSL -o "$work/src.ttf" "https://raw.githubusercontent.com/google/fonts/$commit/$2"
+  "$work/venv/bin/fonttools" varLib.instancer -q "$work/src.ttf" $3 -o "$work/cut.ttf"
+  "$work/venv/bin/pyftsubset" "$work/cut.ttf" --unicodes="$card" --layout-features=kern --no-hinting \
+    --desubroutinize --output-file="$cards/$1.ttf"
+}
+cut literata-600 "ofl/literata/Literata%5Bopsz,wght%5D.ttf" "wght=600 opsz=24"
+cut literata-italic-500 "ofl/literata/Literata-Italic%5Bopsz,wght%5D.ttf" "wght=500 opsz=24"
+cut sofia-sans-500 "ofl/sofiasans/SofiaSans%5Bwght%5D.ttf" "wght=500"
+cut sofia-sans-700 "ofl/sofiasans/SofiaSans%5Bwght%5D.ttf" "wght=700"
+cut sofia-sans-extra-condensed-800 "ofl/sofiasansextracondensed/SofiaSansExtraCondensed%5Bwght%5D.ttf" "wght=800"
+ls -l "$cards"/*.ttf

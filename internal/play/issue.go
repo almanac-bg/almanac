@@ -18,3 +18,12 @@ func Issue(day string) int {
 	}
 	return int(d.Sub(first)/(24*time.Hour)) + 1
 }
+
+// IssueDay is the day (YYYY-MM-DD) of an issue's number, the other way from Issue; "" for a number no day has.
+func IssueDay(issue int) string {
+	if issue < 1 {
+		return ""
+	}
+	first, _ := time.Parse(time.DateOnly, FirstIssue)
+	return first.AddDate(0, 0, issue-1).Format(time.DateOnly)
+}

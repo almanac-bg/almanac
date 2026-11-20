@@ -21,6 +21,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/assets"
 	"github.com/almanac-bg/almanac/internal/bank"
+	"github.com/almanac-bg/almanac/internal/play"
 )
 
 // The app is one page: the server sends it for every path the app knows (and a 404 with it for the rest, which the
@@ -35,6 +36,7 @@ var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/games/[0-9]{1,12}$`),
 	regexp.MustCompile(`^/hand/[A-Za-z0-9_-]{43}$`),
 	regexp.MustCompile(`^/players/[A-Za-z0-9_]{3,20}$`),
+	sharePath, // a shared day (share.go)
 }
 
 // screens are the pages whose screen loads on its own (web/src/kit.ts), and the file it's in (the build's manifest
@@ -154,7 +156,9 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 			status = http.StatusOK
 		}
 	}
-	if status == http.StatusOK && !s.there(r) {
+	// A shared day's link (share.go), looked up once for all the page says of it.
+	shared, isShared := s.sharedOf(r)
+	if status == http.StatusOK && (!s.there(r) || sharePath.MatchString(r.URL.Path) && !isShared) {
 		status = http.StatusNotFound
 	}
 	u, err := s.user(r)
@@ -182,14 +186,18 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	}
 	// Начало draws the day as the page comes, without asking for it first: a round trip less on every visit. Should
 	// it fail, the page asks for it as any other.
-	if r.URL.Path == "/" && r.Method == http.MethodGet {
+	// A shared day's link is Начало too, with the day shared: its issue, its date and its shape.
+	if (r.URL.Path == "/" || isShared) && r.Method == http.MethodGet {
 		if day, err := s.todayOf(r.Context(), u); err == nil {
 			start["day"] = day
 		}
 	}
+	if isShared {
+		start["shared"] = shared
+	}
 	boot, _ := json.Marshal(start) // escapes <, > and &: safe inside the script element
 	files := filesOf(m, r.URL.Path)
-	title, description := s.preview(r)
+	title, description, image := s.preview(r, shared)
 	canonical := ""
 	if r.URL.Path == "/" {
 		canonical = s.cfg.PublicURL + "/"
@@ -198,13 +206,16 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	if err := shell.Execute(&out, map[string]any{
 		"Files": files, "Boot": template.JS(boot),
 		"Title": title, "Description": description, "Canonical": canonical,
-		"URL": s.cfg.PublicURL + r.URL.Path, "Image": s.cfg.PublicURL + "/og.png",
+		"URL": s.cfg.PublicURL + r.URL.Path, "Image": s.cfg.PublicURL + image,
 	}); err != nil {
 		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
 	}
 	if status == http.StatusOK && u == nil {
 		s.countVisit(r)
+	}
+	if isShared {
+		s.countOpen(r)
 	}
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")
@@ -245,11 +256,16 @@ func (s *Server) there(r *http.Request) bool {
 	return yes || err != nil
 }
 
-// preview is what a link to this page shows when it's sent (Viber, Messenger, WhatsApp): a player's page, whose it
-// is.
-func (s *Server) preview(r *http.Request) (title, description string) {
+// preview is what a link to this page shows when it's sent (Viber, Messenger, WhatsApp), and its picture: a player's
+// page, whose it is; a shared day, its score and its card (share.go), never whose it was.
+func (s *Server) preview(r *http.Request, shared play.Share) (title, description, image string) {
 	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми и дуели. Всеки отговор носи по нещо ново."
+	image = "/og.png"
 	switch path := r.URL.Path; {
+	case shared.Code != "":
+		title = fmt.Sprintf("%d от %d · АЛМАНАХ, брой %d", shared.Rights(), len(shared.Shape), shared.Issue)
+		description = "Десет въпроса на ден, едни и същи за цяла България. Колко ще познаеш ти?"
+		image = cardOf(shared)
 	case strings.HasPrefix(path, "/players/"):
 		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {
 			if p, err := s.profileOf(r, tag, 0); err == nil {
@@ -266,7 +282,7 @@ func (s *Server) preview(r *http.Request) (title, description string) {
 			}
 		}
 	}
-	return title, description
+	return title, description, image
 }
 
 // Search engines get the front page and the privacy notice, and nothing else: every other page is the game itself,

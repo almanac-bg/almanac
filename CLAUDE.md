@@ -39,6 +39,7 @@ most). A change is judged by whether players come back: the retention numbers in
 | `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: the paths it sends the app for, the client's router's list again; a test holds them equal) |
 | `internal/store` | SQLite; migrations in `internal/store/migrations`, applied once each by name |
 | `internal/bank` | Question types, the bank on disk, its checks |
+| `internal/card` | The picture a shared day's link shows (1200 × 630 PNG), drawn in Go with the game's fonts (static cuts made by `web/src/fonts/subset.sh`) |
 | `internal/account`, `mail`, `push`, `backup` | Players and sign-in, email, Web Push, backups to R2 every 15 minutes (each checked before it's sent, encrypted to a key kept off the server, one brought back daily, the owner's key proven monthly: `backup proven`) |
 | `web/src` | The client, plain TypeScript, no framework: `lib/` (DOM, signals, router), `game/` (questions, a run), `screens/` (one file per page), `ui.ts`, `app.css` |
 | `web/DESIGN.md` | How it looks and speaks: tokens, components, copy rules. Follow it for any UI |

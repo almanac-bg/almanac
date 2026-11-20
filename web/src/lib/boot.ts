@@ -11,8 +11,11 @@ export interface Boot {
   outcomeCss: string;
   /** The server's clock as it drew the page (lib/api.ts holds the page's clock to it until an answer comes). */
   now: number;
-  /** Начало's day, in its page only (GET /api/day's answer: screens/today.ts draws it at once, the first time). */
+  /** Начало's day, in its page only (GET /api/day's answer: screens/today.ts draws it at once, the first time); and in a
+   * shared day's link's, which opens Начало. */
   day?: unknown;
+  /** The day a shared day's link shares (server/share.go), in its page only. */
+  shared?: unknown;
 }
 
 export const boot: Partial<Boot> =
