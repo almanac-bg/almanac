@@ -79,6 +79,13 @@ export function signIn({
     });
 
   const errorLine = () => error() && h("p", { class: "bad", role: "alert" }, error());
+  // What's missing, said the game's way in the error line (not the browser's bubble), and the field it's about.
+  const missing = (words: string, field?: HTMLInputElement) => {
+    error.set(words);
+    field?.focus();
+  };
+  let codeField: HTMLInputElement | undefined;
+  let emailField: HTMLInputElement | undefined;
 
   return when(
     () => sent(),
@@ -89,6 +96,7 @@ export function signIn({
           class: "stack",
           onsubmit: (e: SubmitEvent) => {
             e.preventDefault();
+            if (code.peek().length !== digits.peek()) return missing(`Кодът е от ${digits.peek()} цифри.`, codeField);
             run(async () => {
               const r = await api<{ user: User }>("POST", "/api/auth/verify", {
                 email: email.peek(),
@@ -112,8 +120,6 @@ export function signIn({
             class: () => (digits() > 6 ? "code long" : "code"),
             inputmode: "numeric",
             autocomplete: "one-time-code",
-            pattern: () => `[0-9]{${digits()}}`,
-            required: true,
             value: code,
             // Only the digits, however it was typed or pasted (a long code comes in fours, with spaces).
             oninput: (e: Event) => {
@@ -121,7 +127,10 @@ export function signIn({
               el.value = el.value.replace(/\D/g, "").slice(0, digits.peek());
               code.set(el.value);
             },
-            ref: (el) => queueMicrotask(() => el.focus()),
+            ref: (el) => {
+              codeField = el as HTMLInputElement;
+              queueMicrotask(() => el.focus());
+            },
           }),
         ),
         // A dead code takes no more tries: the way on is a new one, at once.
@@ -156,6 +165,7 @@ export function signIn({
           class: "stack",
           onsubmit: (e: SubmitEvent) => {
             e.preventDefault();
+            if (!email.peek().trim()) return missing("Напиши имейла си.", emailField);
             send();
           },
         },
@@ -166,9 +176,14 @@ export function signIn({
           h("input", {
             type: "email",
             autocomplete: "email",
-            required: true,
             value: email.peek(),
-            oninput: (e: Event) => email.set((e.target as HTMLInputElement).value),
+            oninput: (e: Event) => {
+              email.set((e.target as HTMLInputElement).value);
+              error.set("");
+            },
+            ref: (el) => {
+              emailField = el as HTMLInputElement;
+            },
           }),
         ),
         h("button", { class: primary ? "btn primary" : "btn", disabled: busy }, sendWords),

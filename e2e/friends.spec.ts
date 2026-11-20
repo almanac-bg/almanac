@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { befriend, playedFair, playRun, startDay } from "./play.ts";
+import { befriend, playedBefore, playedFair, playRun, startDay } from "./play.ts";
 
 test("friends on the day: who has played it, and how each went", async ({ browser }) => {
   test.setTimeout(240_000);
@@ -47,13 +47,28 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await a.getByLabel("Потребителско име", { exact: true }).fill(`@${tag}`);
   await a.getByRole("button", { name: "Запази" }).click();
   await expect(a.getByText("Запазено.")).toBeVisible();
+  // A tag the game doesn't take: its rule in the game's words (not the browser's), the last „Запазено.“ gone.
+  await a.getByLabel("Потребителско име", { exact: true }).fill("мечка");
+  await expect(a.getByText("Запазено.")).toHaveCount(0);
+  await a.getByRole("button", { name: "Запази" }).click();
+  await expect(a.locator("form .bad")).toHaveText(/^Потребителското име трябва да е от 3 до 20 знака/);
+  await a.getByLabel("Потребителско име", { exact: true }).fill(`@${tag}`);
   await a.goto("/me");
   await expect(a.locator(".me-tag")).toHaveText(`@${tag}`);
 
-  // Bo asks her by that tag; an unknown tag is said to be unknown.
+  // Bo asks her by that tag; an unknown tag is said to be unknown. A guest who hasn't finished a game is told to play
+  // one first: a request is a player's.
   await b.goto("/friends");
   await b.locator(".friends").getByRole("button", { name: "Добави приятел" }).click();
   await expect(b.getByText("Още нямаш приятели тук. Добави ги по потребителско име или имейл.")).toBeVisible();
+  // Nothing typed: said in the game's words, the cursor in the field.
+  await b.getByRole("button", { name: "Добави", exact: true }).click();
+  await expect(b.getByRole("alert")).toHaveText("Напиши потребителското име или имейла на приятеля си.");
+  await expect(b.getByLabel("Потребителско име или имейл на приятел")).toBeFocused();
+  await b.getByLabel("Потребителско име или имейл на приятел").fill(`@${tag}`);
+  await b.getByRole("button", { name: "Добави", exact: true }).click();
+  await expect(b.getByText("Първо изиграй една игра, после добавяй приятели.")).toBeVisible();
+  await playedBefore(b, 1);
   await b.getByLabel("Потребителско име или имейл на приятел").fill("@nosuch_player_here");
   await b.getByRole("button", { name: "Добави", exact: true }).click();
   await expect(b.getByText("Няма играч с такова потребителско име.")).toBeVisible();
@@ -90,6 +105,7 @@ test("a request turned down, a friend removed", async ({ browser }) => {
     await p.goto("/friends");
     await p.locator(".friends").getByRole("button", { name: "Добави приятел" }).click();
   }
+  await playedBefore(b, 1);
   const tag = await a.evaluate(async () => (await (await fetch("/api/me")).json()).user.tag as string);
   const ask = async () => {
     await b.goto("/friends");

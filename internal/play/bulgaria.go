@@ -1,6 +1,10 @@
 package play
 
-import "github.com/almanac-bg/almanac/internal/bank"
+import (
+	"slices"
+
+	"github.com/almanac-bg/almanac/internal/bank"
+)
 
 // The topic „България“: the questions about Bulgaria (bank.Tail.BG) from every topic, as a topic of its own beside
 // the bank's. They are the ones a player here is proudest to know and the one thing a quiz from elsewhere can't give,
@@ -57,4 +61,16 @@ func (g *Game) BulgariaOpen() bool {
 	}
 	g.daysAhead.mu.Unlock()
 	return bulgariaLeft(b, barred) >= Length
+}
+
+// IsTopic is whether a topic's games can be played, as its page has them: one of the bank's, „Микс“, or „България“
+// while it's open (BulgariaOpen).
+func (g *Game) IsTopic(id string) bool {
+	switch id {
+	case MixTopic:
+		return true
+	case BulgariaTopic:
+		return g.BulgariaOpen()
+	}
+	return slices.ContainsFunc(g.Bank().Categories, func(c bank.Category) bool { return c.ID == id })
 }

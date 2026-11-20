@@ -971,6 +971,13 @@ func (g *Game) duelSide(ctx context.Context, userID, runID int64, show bool) (*D
 	return &s, nil
 }
 
+// DuelExists is whether there is a duel by this id, whoever's it is: what a page of it can say to anyone.
+func (g *Game) DuelExists(ctx context.Context, id int64) (bool, error) {
+	var yes bool
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM duels WHERE id = ?)`, id).Scan(&yes)
+	return yes, err
+}
+
 // DuelOf is one of a player's duels, as DuelsOf has it, with what its result says: how each question went for each
 // side (the other's once it has a result), the question that decided it, where the player's rating went, and their
 // record against this opponent. ErrNoDuel if it isn't theirs (or, live, isn't over).

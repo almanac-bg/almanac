@@ -291,13 +291,21 @@ func (s *Server) duels(w http.ResponseWriter, r *http.Request) error {
 
 // duelOne is one of the player's duels, with what its result says (play.DuelOf).
 func (s *Server) duelOne(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		return play.ErrNoDuel
+	}
+	u, err := s.mustUser(r)
+	if errors.Is(err, errSignedOut) {
+		// Signed out: asked to sign in only for a duel there is (one that isn't is said so, to anyone).
+		if there, e := s.game.DuelExists(r.Context(), id); e != nil {
+			return e
+		} else if !there {
+			return play.ErrNoDuel
+		}
+	}
+	if err != nil {
+		return err
 	}
 	d, err := s.game.DuelOf(r.Context(), u.ID, id)
 	if err != nil {

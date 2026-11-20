@@ -210,6 +210,10 @@ export function h<K extends keyof HTMLElementTagNameMap>(
   ...children: Child[]
 ): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);
+  // A form says what's wrong with it in the game's words, in its own alert line, never in the browser's bubble (in the
+  // browser's language, English as often as not, for a type="email" too): fields.test.ts keeps the checks off the
+  // fields.
+  if (el instanceof HTMLFormElement) el.noValidate = true;
   if (props) {
     for (const [key, value] of Object.entries(props)) {
       if (key === "ref") (value as (el: HTMLElement) => void)(el);

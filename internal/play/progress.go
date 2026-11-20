@@ -392,7 +392,7 @@ func (g *Game) ProgressOf(ctx context.Context, userID int64) (Progress, error) {
 	}
 	p.Achievements = []Earned{}
 	for _, a := range Achievements {
-		if s := systemOf(a.ID); s != "" && !p.Open.has(s) {
+		if !p.Open.shows(a) {
 			continue
 		}
 		e := Earned{Achievement: a, At: earned[a.ID], Progress: min(reached[a.ID], a.Goal), Rewards: w.rewardsOf(a)}
@@ -739,10 +739,8 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 				rows.Close()
 				return err
 			}
-			if sys := systemOf(id); sys != "" && !open.has(sys) {
-				continue // its system isn't open: it waits
-			}
-			if a, ok := achievementByID(id); ok {
+			// One of a system not open yet waits (shows).
+			if a, ok := achievementByID(id); ok && open.shows(a) {
 				n.Achievements = append(n.Achievements, Earned{Achievement: a, Progress: a.Goal, XP: AchievementXP[a.Tier],
 					At: w.earned[id], Rewards: w.rewardsOf(a)})
 			}

@@ -232,6 +232,7 @@ function addFriend(reload: () => Promise<void>): Child {
   const to = signal("");
   const busy = signal(false);
   const note = signal<{ text: string; bad?: boolean } | null>(null);
+  let field: HTMLInputElement | undefined;
   return h(
     "form",
     {
@@ -239,7 +240,12 @@ function addFriend(reload: () => Promise<void>): Child {
       onsubmit: async (e: SubmitEvent) => {
         e.preventDefault();
         const who = to.peek().trim();
-        if (!who) return;
+        // Said the game's way, not in the browser's bubble.
+        if (!who) {
+          note.set({ text: "Напиши потребителското име или имейла на приятеля си.", bad: true });
+          field?.focus();
+          return;
+        }
         busy.set(true);
         note.set(null);
         try {
@@ -276,16 +282,21 @@ function addFriend(reload: () => Promise<void>): Child {
           autocapitalize: "none",
           spellcheck: false,
           maxlength: 254,
-          required: true,
           value: to,
-          oninput: (e: Event) => to.set((e.target as HTMLInputElement).value),
+          oninput: (e: Event) => {
+            to.set((e.target as HTMLInputElement).value);
+            note.set(null);
+          },
+          ref: (el) => {
+            field = el as HTMLInputElement;
+          },
         }),
         h("button", { class: "btn inline", disabled: busy }, "Добави"),
       ),
     ),
     () => {
       const n = note();
-      return n && h("p", { class: n.bad ? "bad" : "muted", role: "status" }, n.text);
+      return n && h("p", { class: n.bad ? "bad" : "muted", role: n.bad ? "alert" : "status" }, n.text);
     },
   );
 }

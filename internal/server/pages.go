@@ -156,6 +156,9 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 			status = http.StatusOK
 		}
 	}
+	if status == http.StatusOK && !s.there(r) {
+		status = http.StatusNotFound
+	}
 	u, err := s.user(r)
 	if err != nil {
 		// The browser went away before the answer (a reload over a page still coming: one held through a restart):
@@ -224,6 +227,31 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(status)
 	_, _ = w.Write(out.Bytes())
+}
+
+// there is whether what a page of the app is of is there, where the server can tell: a topic's games, a duel, a
+// player. One that isn't is a 404 (as for a path the app doesn't know), which its screen says in words. A failure to
+// tell is taken as there: the screen finds out.
+func (s *Server) there(r *http.Request) bool {
+	p, ctx := r.URL.Path, r.Context()
+	var yes bool
+	var err error
+	switch {
+	case strings.HasPrefix(p, "/play/"):
+		return s.game.IsTopic(strings.TrimPrefix(p, "/play/"))
+	case strings.HasPrefix(p, "/duel/") && p != "/duel/live":
+		id, _ := strconv.ParseInt(strings.TrimPrefix(p, "/duel/"), 10, 64)
+		yes, err = s.game.DuelExists(ctx, id)
+	case strings.HasPrefix(p, "/players/"):
+		tag, e := account.NormalTag(strings.TrimPrefix(p, "/players/"))
+		if e != nil {
+			return false
+		}
+		err = s.db.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM users WHERE tag = ?)`, tag).Scan(&yes)
+	default:
+		return true
+	}
+	return yes || err != nil
 }
 
 // preview is what a link to this page shows when it's sent (Viber, Messenger, WhatsApp): a player's page, whose it

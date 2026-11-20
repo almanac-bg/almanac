@@ -56,7 +56,11 @@ func (s *Server) friends(w http.ResponseWriter, r *http.Request) error {
 	})
 }
 
-// requestFriend asks someone to be friends: by their tag (@tag) or an email address.
+// errPlayFirst is a friend request from a guest who has yet to finish a game.
+var errPlayFirst = &apiError{http.StatusForbidden, "play_first", "Първо изиграй една игра, после добавяй приятели."}
+
+// requestFriend asks someone to be friends: by their tag (@tag) or an email address. A guest asks once they've
+// finished a game (errPlayFirst).
 func (s *Server) requestFriend(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -71,6 +75,17 @@ func (s *Server) requestFriend(w http.ResponseWriter, r *http.Request) error {
 	// Tags are public, but a stream of guesses isn't asking a friend.
 	if !s.allowFrom(r, "request", 30, 0, time.Hour) {
 		return errTooMany
+	}
+	// A guest who hasn't finished a game is nobody yet: one made for the asking, then another, would let a stranger
+	// send anyone requests from throwaway names.
+	if u.Email == "" {
+		open, err := s.game.OpenOf(r.Context(), u.ID)
+		if err != nil {
+			return err
+		}
+		if !open.Points {
+			return errPlayFirst
+		}
 	}
 	to, byEmail := strings.TrimSpace(in.To), strings.Contains(in.To, "@") && !strings.HasPrefix(strings.TrimSpace(in.To), "@")
 	if byEmail {

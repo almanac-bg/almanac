@@ -2,6 +2,7 @@
 // keeps; and this device's look (Night or Day), sound and access, with a profile or without one.
 
 import type { Kit } from "../kit.ts";
+import type { ApiError } from "../lib/api.ts";
 import type { Child, Signal } from "../lib/dom.ts";
 import type { PushKind, PushPrefs } from "../lib/push.ts";
 import type { User } from "../state.ts";
@@ -163,10 +164,17 @@ function nameForm(): Child {
   const busy = signal(false);
   const note = signal<{ text: string; bad?: boolean } | null>(null);
   let form: HTMLFormElement | null = null;
-  // A name or tag changed and not saved yet, that would be taken as it is (the fields' own rules hold).
-  const unsaved = () => {
+  let nameField: HTMLInputElement | undefined;
+  let tagField: HTMLInputElement | undefined;
+  // A name or tag changed and not saved yet.
+  const changed = () => {
     const u = user.peek();
-    return !!u && !!form?.checkValidity() && (name.peek().trim() !== u.name || tag.peek().trim() !== u.tag);
+    return !!u && (name.peek().trim() !== u.name || tag.peek().trim() !== u.tag);
+  };
+  // What's typed is the news now: the last answer's words („Запазено.“, or why not) go with the first key.
+  const typed = (to: (v: string) => void) => (e: Event) => {
+    to((e.target as HTMLInputElement).value);
+    note.set(null);
   };
   const save = async () => {
     busy.set(true);
@@ -178,14 +186,18 @@ function nameForm(): Child {
       tag.set(r.user.tag);
       note.set({ text: "Запазено." });
     } catch (err) {
+      // Why not, in the server's words (the rule, said the same everywhere), and the field it's about, to change.
       note.set({ text: errorText(err), bad: true });
+      const code = (err as ApiError).code ?? "";
+      (code === "bad_tag" || code === "tag_taken" ? tagField : code.endsWith("_name") ? nameField : undefined)?.focus();
     } finally {
       busy.set(false);
     }
   };
-  // Saved as a field is left, and as the screen is: a name changed is never dropped by going elsewhere.
+  // Saved as the form is left, and as the screen is: a name changed is never dropped by going elsewhere (one the
+  // server refuses isn't saved, and nothing else with it).
   const saveIfChanged = () => {
-    if (!busy.peek() && unsaved()) save();
+    if (!busy.peek() && changed()) save();
   };
   onCleanup(saveIfChanged);
   return h(
@@ -215,17 +227,16 @@ function nameForm(): Child {
         autocomplete: "nickname",
         // Come to change the name (Профил's „Смени го“ under a name drawn): the field, ready for the new one.
         ref: (el) => {
+          nameField = el as HTMLInputElement;
           if (location.hash === "#name")
             queueMicrotask(() => {
               (el as HTMLInputElement).focus();
               (el as HTMLInputElement).select();
             });
         },
-        minlength: 2,
         maxlength: 30,
-        required: true,
         value: name,
-        oninput: (e: Event) => name.set((e.target as HTMLInputElement).value),
+        oninput: typed(name.set),
       }),
       // Seen by everyone (the boards, Роял, a link's preview): no more than a player means to show.
       h("small", { class: "muted", id: "name-how" }, "Вижда се от всички в играта. Прякор или малкото ти име стигат."),
@@ -245,12 +256,12 @@ function nameForm(): Child {
           autocomplete: "username",
           autocapitalize: "none",
           spellcheck: false,
-          minlength: 3,
           maxlength: 20,
-          pattern: "@?[A-Za-z][A-Za-z0-9_]{2,19}",
-          required: true,
           value: tag,
-          oninput: (e: Event) => tag.set((e.target as HTMLInputElement).value),
+          ref: (el) => {
+            tagField = el as HTMLInputElement;
+          },
+          oninput: typed(tag.set),
         }),
       ),
       h(
@@ -262,7 +273,7 @@ function nameForm(): Child {
     h("button", { class: "btn", disabled: busy }, "Запази"),
     () => {
       const n = note();
-      return n && h("p", { class: n.bad ? "bad" : "muted", role: "status" }, n.text);
+      return n && h("p", { class: n.bad ? "bad" : "muted", role: n.bad ? "alert" : "status" }, n.text);
     },
   );
 }
@@ -577,7 +588,15 @@ function deleteAccount(): Child {
     asking()
       ? h(
           "div",
-          { class: "stack" },
+          {
+            class: "stack",
+            // The ask, at the page's foot: brought into view whole, its button clear of a phone's bar of places
+            // (app.css, scroll-padding).
+            ref: (el) =>
+              requestAnimationFrame(() =>
+                el.scrollIntoView({ block: "nearest", behavior: calm.peek() ? "auto" : "smooth" }),
+              ),
+          },
           h("p", null, "Профилът, името и всички игри ще се изтрият завинаги."),
           h(
             "button",

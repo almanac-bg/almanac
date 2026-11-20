@@ -169,4 +169,20 @@ func TestSeededGame(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("/admin for the admin: %d", res.StatusCode)
 	}
+
+	// The server's clean-up, run as it serves the database, leaves the players as seeded: a guest's browser keeps its
+	// cookie, and only a guest nothing of theirs can come back to is dropped.
+	var before, after int
+	if err := db.Read.QueryRow(`SELECT count(*) FROM users`).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	if err := (&account.Accounts{DB: db}).CleanUp(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Read.QueryRow(`SELECT count(*) FROM users`).Scan(&after); err != nil {
+		t.Fatal(err)
+	}
+	if after != before {
+		t.Errorf("the clean-up dropped %d of %d seeded players", before-after, before)
+	}
 }

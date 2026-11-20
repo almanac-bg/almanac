@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,12 +19,14 @@ import (
 )
 
 type world struct {
-	t    *testing.T
-	g    *Game
-	db   *store.DB
-	b    *bank.Bank
-	now  time.Time
-	next int64
+	t   *testing.T
+	g   *Game
+	db  *store.DB
+	b   *bank.Bank
+	now time.Time
+	// clock guards now where the game's background work reads it (a game's follow-up) while a test moves it on (wait).
+	clock sync.Mutex
+	next  int64
 	// pace, if set, is how long a player takes over question n (three seconds otherwise).
 	pace func(n int) time.Duration
 }
@@ -37,7 +40,11 @@ func setup(t *testing.T) *world {
 		t.Fatal(problems)
 	}
 	w := &world{t: t, db: db, b: b, now: time.Date(2026, 11, 12, 10, 0, 0, 0, Bulgaria)}
-	w.g = &Game{DB: db, Bank: func() *bank.Bank { return b }, Now: func() time.Time { return w.now }}
+	w.g = &Game{DB: db, Bank: func() *bank.Bank { return b }, Now: func() time.Time {
+		w.clock.Lock()
+		defer w.clock.Unlock()
+		return w.now
+	}}
 	return w
 }
 
@@ -53,7 +60,11 @@ func (w *world) user() int64 {
 	return id
 }
 
-func (w *world) wait(d time.Duration) { w.now = w.now.Add(d) }
+func (w *world) wait(d time.Duration) {
+	w.clock.Lock()
+	defer w.clock.Unlock()
+	w.now = w.now.Add(d)
+}
 
 // picks are a run's questions, as stored.
 func (w *world) picks(runID int64) []Pick {

@@ -28,3 +28,17 @@ test("no field asks the browser for a full name", () => {
         });
   assert.deepEqual(found, []);
 });
+
+// No field asks the browser to check it (required, pattern, minlength): the browser says what's wrong in its own bubble,
+// in its own language (English as often as not), and the forms are made not to ask (lib/dom.ts, noValidate). A form says
+// what's missing in the game's words, in its alert line, and puts the cursor in the field (game/report.ts).
+test("no field asks the browser to check it", () => {
+  const found: string[] = [];
+  for (const path of files("web/src"))
+    readFileSync(join(root, path), "utf8")
+      .split("\n")
+      .forEach((line, i) => {
+        if (/^\s*["']?(required|pattern|minlength)["']?\s*:/.test(line)) found.push(`${path}:${i + 1}: ${line.trim()}`);
+      });
+  assert.deepEqual(found, []);
+});

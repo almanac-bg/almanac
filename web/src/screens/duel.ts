@@ -20,6 +20,7 @@ import {
   type Tier,
   who,
 } from "../ui.ts";
+import { missing } from "./missing.ts";
 import { signIn } from "./signin.ts";
 
 /** How one question of a duel went for one side: its points, right or partly (some points, not right), how long it
@@ -276,6 +277,8 @@ export function duelOne(params: string[]) {
     } catch (err) {
       if (life.aborted) return;
       const code = (err as ApiError).code;
+      // Nobody here, and no such duel at all (the server tells anyone that): the page isn't there, not a sign-in.
+      if (code === "no_duel" && !user.peek()) return screen.show(missing);
       if (code === "signed_out" || code === "no_duel") return screen.show(() => notHere(() => void load()));
       screen.show(() => failure(err, () => void load(), ["/duel", "Към дуелите"]));
     }

@@ -12,13 +12,20 @@ test("a guest keeps their game with a code by email, and can sign out", async ({
   const email = `player-${info.project.name}-${Date.now()}@example.com`;
   await becomeGuest(page);
   await page.goto("/settings");
+  // Nothing typed: said in the game's words (never the browser's bubble), the cursor in the field.
+  await page.getByRole("button", { name: "Прати ми код" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Напиши имейла си.");
+  await expect(page.getByLabel("Имейл")).toBeFocused();
   await page.getByLabel("Имейл").fill(email);
   await page.getByRole("button", { name: "Прати ми код" }).click();
   await expect(page.getByText(`Пратихме код на ${email}`)).toBeVisible();
   // Another code waits a minute, and the wait is said.
   await expect(page.getByRole("button", { name: "прати нов код" })).toBeDisabled();
   await expect(page.getByText(/прати нов код след \d+ с/)).toBeVisible();
-  // A wrong code says so, and counts.
+  // A code too short is said so; a wrong code says so, and counts.
+  await page.getByLabel("Код").fill("123");
+  await page.getByRole("button", { name: "Потвърди" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Кодът е от 6 цифри.");
   await page.getByLabel("Код").fill("000000");
   await page.getByRole("button", { name: "Потвърди" }).click();
   await expect(page.getByRole("alert")).toHaveText(/^Грешен код\./);

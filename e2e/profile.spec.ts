@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { playRun } from "./play.ts";
+import { playedBefore, playRun } from "./play.ts";
 
 test("a player's profile: asked to be friends from it, and friends there", async ({ browser }) => {
   test.setTimeout(120_000);
@@ -24,7 +24,14 @@ test("a player's profile: asked to be friends from it, and friends there", async
   await expect(b.locator(".me-head")).not.toContainText("Ниво");
   await expect(b.getByRole("heading", { name: "Колко знае" })).toBeVisible();
 
-  // He asks to be friends; she sees it on his profile and accepts there.
+  // Nobody on his device yet: told to play a game first or sign in, and no guest is made for the asking.
+  await expect(b.getByText("За да добавяш приятели, първо изиграй една игра или влез с имейл.")).toBeVisible();
+  await expect(b.getByRole("button", { name: "Добави приятел" })).toHaveCount(0);
+  expect(await b.evaluate(async () => (await (await fetch("/api/me")).json()).user)).toBeNull();
+
+  // He has played a game: he asks to be friends; she sees it on his profile and accepts there.
+  await playedBefore(b, 1);
+  await b.reload();
   await b.getByRole("button", { name: "Добави приятел" }).click();
   await expect(b.getByText("Поканата за приятелство чака отговор.")).toBeVisible();
   const bo = await b.evaluate(
