@@ -30,7 +30,7 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
   await daysPlayed(page, 3, 2, 1);
   await page.reload();
   await expect(page.locator(".streak-chip.unlit")).toContainText("3");
-  await expect(page.locator(".day .day-stake")).toHaveText("Серия от 3 дни. С днешните въпроси става 4.");
+  await expect(page.locator(".today-streak .day-stake")).toHaveText("Серия от 3 дни. С днешните въпроси става 4.");
   // A topic's result points to the day while it waits: the gold button, the streak under it, „Още десет“ plain.
   await openGame(page, "/play/history");
   await playRun(page);
@@ -48,8 +48,8 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
   await expect(page.locator(".streak-chip")).toContainText("4");
   await expect(page.locator(".streak-chip.unlit")).toHaveCount(0);
   const tomorrow = page.locator(".summary .tomorrow");
-  await expect(tomorrow).toContainText("Утре — нови десет");
-  await expect(tomorrow).toContainText("Изиграй ги и серията ти става 5.");
+  await expect(tomorrow).toContainText("Утре");
+  await expect(tomorrow).toContainText("Серията ти става 5.");
 });
 
 /** Keeps every way the streak's chip reads as Начало draws and moves it (its number and words, and „unlit“ while its

@@ -721,12 +721,16 @@
 
     /* A screen in the edition's look is a spread: the page's whole width, on a 12-column grid, its two pages
        divided by a hairline (.page-2: the second). */
-    #main:has(> .spread) {
+    #main:has(.spread) {
       max-width: calc(var(--page) + 2 * var(--gutter));
       padding-inline: max(var(--gutter), env(safe-area-inset-left)) max(var(--gutter), env(safe-area-inset-right));
     }
 
-    main > .spread {
+    main > :has(.spread) {
+      max-width: none;
+    }
+
+    .screen.spread {
       display: grid;
       grid-template-columns: repeat(12, minmax(0, 1fr));
       column-gap: 40px;
@@ -798,11 +802,6 @@
   }
 
   /* A topic's small picture on a chip or a row. */
-  .topic-mark {
-    width: 26px;
-    height: 26px;
-    margin: -4px 0 -4px -4px;
-  }
 
   .title-row {
     display: flex;
@@ -1203,6 +1202,8 @@
   }
 
   /* One question over the page, in a sheet from the bottom (screens/name.ts: a name before others first see it). */
+  /* A sheet over the page: paper with an ink rule on top, over a scrim; from the foot on a phone, centred on a big
+     screen (a name asked for, the share's sheet, a note in the book). */
   .sheet {
     position: fixed;
     inset: 0;
@@ -1212,9 +1213,9 @@
     max-height: none;
     margin: 0;
     padding: 0;
-    color: var(--text);
-    background: color-mix(in srgb, var(--bg) 40%, transparent);
     border: 0;
+    background: var(--scrim);
+    color: var(--ink);
   }
 
   .sheet[open] {
@@ -1229,14 +1230,14 @@
 
   /* Taller than the screen (large text on a small phone), it scrolls, its button at the foot reachable. */
   .sheet-panel {
-    width: min(100%, 28rem);
+    width: min(100%, 30rem);
     max-height: 100%;
     margin: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: var(--space-6) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom));
-    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-    box-shadow: var(--elev-2);
+    padding: var(--space-5) var(--gutter) calc(var(--space-5) + env(safe-area-inset-bottom));
+    border-top: 3px solid var(--rule-ink);
+    background: var(--paper);
   }
 
   .sheet-panel h2,
@@ -1244,12 +1245,29 @@
     margin: 0;
   }
 
+  @media (min-width: 56.25rem) {
+    .sheet[open] {
+      align-items: center;
+    }
+
+    .sheet-panel {
+      max-height: calc(100% - 2 * var(--space-6));
+      padding: var(--space-6);
+    }
+  }
+
   /* The quiet way out, centred under the gold button. */
   .sheet-skip {
     justify-self: center;
   }
 
-  /* A line that's a tap from a place of its own (Профил's facts, to Моят Алманах). */
+  /* A line that's a tap from a place of its own (Профил's facts, to the Алманах). */
+  .place-link-pic {
+    flex: none;
+    width: 44px;
+    height: 44px;
+  }
+
   .place-link {
     display: flex;
     align-items: center;
@@ -1297,209 +1315,22 @@
 
   /* The ways to play with others: three peers, so three in a row, a small card each in its colour; on a phone the
      picture over the name (a big screen puts it beside, below). */
-  .modes {
-    display: grid;
-    grid-auto-columns: minmax(0, 1fr); /* in one row, two or three as there are */
-    grid-auto-flow: column;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .mode {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-1);
-    height: 100%;
-    min-height: 4.25rem;
-    padding: var(--space-3) var(--space-2);
-    text-align: center;
-    border-radius: var(--radius-md);
-    background:
-      radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--tone) 18%, transparent), transparent 60%),
-      var(--surface);
-    box-shadow:
-      var(--elev-1),
-      inset 0 0 0 1px var(--line);
-    color: var(--text);
-    text-decoration: none;
-    transition:
-      transform 120ms ease,
-      box-shadow 160ms ease;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .mode:hover {
-      box-shadow:
-        var(--elev-1),
-        inset 0 0 0 1px var(--tone);
-      transform: translateY(-1px);
-    }
-  }
-
-  .mode-pic {
-    flex: none;
-    width: 44px;
-    height: 44px;
-  }
-
-  .mode-text {
-    display: grid;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .mode-name {
-    font: 800 1.0625rem / 1.375rem var(--font-sans);
-  }
-
-  .mode-about {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    line-height: 1rem;
-  }
 
   /* What came of the days just missed: the week forgave one, or the streak ended. Said once, quietly. */
-  .streak-notice {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    color: var(--text-muted);
-  }
 
   /* Начало's top: the streak, a way to Профил. */
-  .status-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-2);
-  }
-
-  .status-item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: 4.25rem;
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
-    background: var(--surface);
-    box-shadow:
-      var(--elev-1),
-      inset 0 0 0 1px var(--line);
-    color: var(--text);
-    text-decoration: none;
-  }
-
-  .status-text {
-    display: grid;
-    min-width: 0;
-  }
-
-  .status-n {
-    font: 900 1.375rem / 1.375rem var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  .status-label {
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    line-height: 1rem;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-
-  .status-icon {
-    position: relative;
-    flex: none;
-  }
-
-  .status-item .status-flame {
-    display: block;
-    width: 44px;
-    height: 44px;
-  }
-
-  .streak-chip .status-n {
-    color: var(--gold-display);
-  }
-
-  .streak-chip .status-flame,
-  .streak-chip .status-n {
-    transition:
-      opacity 400ms ease-out,
-      color 400ms ease-out;
-  }
 
   /* No streak (cold), or one at stake while the day's ten wait (unlit): the flame out; at stake, the number still
    * reads, plain, as what the day would keep. */
-  .streak-chip.cold .status-flame,
-  .streak-chip.unlit .status-flame {
-    --tone: var(--line-strong);
-    opacity: 0.7;
-    filter: none;
-  }
-
-  .streak-chip.cold .status-n {
-    color: var(--text-muted);
-  }
-
-  .streak-chip.unlit .status-n {
-    color: var(--text);
-  }
 
   /* The streak's chip. */
-  .streak-wrap {
-    position: relative;
-    display: grid;
-  }
-
-  .streak-wrap:only-child {
-    grid-column: 1 / -1;
-  }
 
   /* The day as the day's issue: a dateline over the card (the weekday and „Брой N“ on a hairline, the date set large,
      a hairline under it), then what the ten are, a size down. */
-  .masthead {
-    display: grid;
-    gap: var(--space-2);
-    padding-bottom: var(--space-3);
-    border-bottom: 1px solid var(--line);
-  }
-
-  .masthead-line {
-    display: flex;
-    justify-content: space-between;
-    gap: var(--space-3);
-    padding-top: var(--space-1);
-    border-top: 1px solid var(--line);
-  }
-
-  .masthead-date {
-    font-size: calc(22px + 1.375rem);
-    line-height: 1;
-    font-weight: 800;
-    letter-spacing: -0.035em;
-  }
-
-  .day-title {
-    font-size: 1.375rem;
-    line-height: 1.75rem;
-    letter-spacing: -0.02em;
-  }
 
   /* The day's ten waiting: what they'd make of the streak, and in the evening that it ends at midnight. */
-  .day-stake {
-    margin: 0;
-    color: var(--text);
-    font-weight: 700;
-  }
 
   /* Under a topic's result's gold button, the way to the day: centred with it. */
-  .actions > .day-stake {
-    text-align: center;
-  }
 
   .remind-actions {
     display: flex;
@@ -1508,27 +1339,9 @@
     gap: var(--space-3);
   }
 
-  .day-meta {
-    color: var(--text-muted);
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    text-align: center;
-  }
-
   /* Начало's two parts are one column on a phone (a big screen sets them side by side, below). */
-  .home-main,
-  .home-side {
-    display: contents;
-  }
 
   /* After: the date and the place on the day's board (a way to it). */
-  .day-line {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-1) var(--space-3);
-  }
 
   /* Начало and a result end in quiet lines (a way in, what the game brought): one list at the
      column's left, with its buttons, in one style (the news' lines: below). */
@@ -1650,6 +1463,7 @@
   .streak-count {
     display: flex;
     align-items: baseline;
+    flex-wrap: wrap;
     gap: 6px;
   }
 
@@ -1677,119 +1491,52 @@
     font-weight: 600;
   }
 
-  .week {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 6px;
-    margin: var(--space-2) 0 0;
-    padding: 0;
-    list-style: none;
-  }
+  /* ---- The shape of a game: a square a question, right filled in ink, wrong open ---- */
 
-  .week li {
-    display: grid;
-    justify-items: center;
-    gap: 6px;
-    color: var(--text-muted);
-    font-size: 0.6875rem;
-    line-height: 1;
-    font-weight: 700;
-  }
-
-  .week-dot {
-    display: block;
-    width: 100%;
-    height: 8px;
-    border-radius: var(--radius-full);
-    background: var(--sunken);
-  }
-
-  .week li.on .week-dot {
-    background: var(--gold);
-  }
-
-  .week li.today {
-    color: var(--text);
-  }
-
-  .week li.today .week-dot {
-    box-shadow:
-      0 0 0 2px var(--surface),
-      0 0 0 3.5px var(--gold-ink);
-  }
-
-  /* ---- Trail: a pip per question ---- */
-
-  /* One row always, across the column on a phone (the pips shrink rather than wrap); on a big screen they stop
-     growing at 32px. */
+  /* One row always, across the column on a phone (the squares shrink rather than wrap). The same shape in a run, on a
+     result, in the shared text (■□) and on the card. */
   .trail {
-    list-style: none;
-    max-width: 24.5rem;
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    gap: 5px;
+    max-width: 21rem;
     margin: 0;
     padding: 0;
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-    gap: var(--space-2);
+    list-style: none;
   }
 
   .trail li {
-    display: grid;
-    place-items: center;
     width: 100%;
     aspect-ratio: 1;
-    border-radius: var(--radius-xs);
-    background: var(--sunken);
-    color: var(--on-fill);
-  }
-
-  .trail li::before {
-    content: "";
-    width: 60%;
-    height: 60%;
-    background: currentColor;
-    -webkit-mask: var(--i) center / contain no-repeat;
-    mask: var(--i) center / contain no-repeat;
-  }
-
-  .trail li:not(.right, .partial, .wrong, .void)::before {
-    content: none;
+    border-radius: 2px;
+    background: var(--rule);
   }
 
   .trail li.right {
-    --i: var(--i-check);
-    background: var(--right);
-    box-shadow: inset 0 0 0 1.5px var(--right-ink);
-  }
-
-  /* Right filled, the strongest; close a hollow gold ring;
-     wrong quiet, the ground of a question not yet played with a muted ✕. The red is the answer's, in the moment. */
-  .trail li.partial {
-    --i: var(--i-near);
-    background: transparent;
-    color: var(--gold-ink);
-    box-shadow: inset 0 0 0 1.5px var(--gold-ink);
+    background: var(--ink);
   }
 
   .trail li.wrong {
-    --i: var(--i-cross);
-    color: var(--text-muted);
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--ink);
   }
 
-  /* A question that counts for nobody (found wrong during its day): a dash on the ground, quieter than a miss. */
+  /* Close: open, with a mark of ink inside — it brought points. */
+  .trail li.partial {
+    background: linear-gradient(var(--ink), var(--ink)) center / 40% 40% no-repeat;
+    box-shadow: inset 0 0 0 1.5px var(--ink);
+  }
+
+  /* A question that counts for nobody (found wrong during its day): a dashed square, quieter than a miss. */
   .trail li.void {
-    --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M7 12h10'/%3E%3C/svg%3E");
     background: transparent;
-    color: var(--text-muted);
-    box-shadow: inset 0 0 0 1.5px var(--line);
+    outline: 1.5px dashed var(--rule-2);
+    outline-offset: -1.5px;
   }
 
   .trail li.now {
-    background: var(--surface);
-    box-shadow:
-      inset 0 0 0 2px var(--gold-display),
-      0 0 12px -2px var(--gold);
+    background: var(--gold);
   }
 
   /* ---- A question ---- */
@@ -3214,9 +2961,6 @@
   }
 
   /* A game left half-way today, on its tile: where it goes on from, in the accent (where the player is). */
-  .topic-left {
-    color: var(--link);
-  }
 
   /* A friend's duel just played first: sent, and how long the friend has (screens/duel.ts). */
   .duel-sent {
@@ -3516,120 +3260,8 @@
   /* ---- Results ---- */
 
   /* Ten of ten: the rosette as a seal, and the words in gold, over the score. */
-  .perfect-head {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
-
-  .perfect-head .kicker {
-    color: var(--gold-ink);
-  }
-
-  .seal {
-    width: 5.5rem;
-    height: 5.5rem;
-  }
-
-  .score-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-
-  h1.score {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--space-2);
-    font-family: var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0;
-  }
-
-  .score-n {
-    font-size: calc(60px + 3.75rem);
-    line-height: 0.8;
-    font-weight: 900;
-    letter-spacing: -0.01em;
-  }
-
-  .score-of {
-    color: var(--text-muted);
-    font-size: 2rem;
-    line-height: 2rem;
-    font-weight: 800;
-  }
-
-  .score-of .num-word {
-    font-size: 1.25rem;
-  }
-
-  .points {
-    display: grid;
-    justify-items: end;
-    gap: 2px;
-    padding-bottom: var(--space-1);
-  }
-
-  .points-n {
-    color: var(--gold-display);
-    font: 800 2rem / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .points-label {
-    color: var(--text-muted);
-    font-size: 0.875rem;
-    font-weight: 600;
-  }
-
-  .points-bonus {
-    color: var(--gold-ink);
-    font-size: 0.8125rem;
-    font-weight: 700;
-  }
-
-  .place-line {
-    font-size: 1.125rem;
-    line-height: 1.625rem;
-    font-weight: 500;
-    /* The line's own height to read, a finger's (44px) to tap. */
-    display: inline-block;
-    padding-block: 9px;
-    margin-block: -9px;
-  }
 
   /* Начало on a later visit: the day played as one short card, its score a size down from the result's. */
-  .day-done-score {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0 var(--space-2);
-    margin: 0;
-    color: var(--text-muted);
-    font-family: var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .day-done-n {
-    color: var(--text);
-    font-size: calc(28px + 1.75rem);
-    line-height: 0.857;
-    font-weight: 900;
-  }
-
-  .day-done-of {
-    font-size: 1.5rem;
-    font-weight: 800;
-  }
-
-  .day-done-points {
-    margin-left: auto;
-    font: 600 0.9375rem / 1.375rem var(--font-sans);
-  }
 
   .board {
     display: grid;
@@ -3927,66 +3559,8 @@
   /* ---- Topics ---- */
 
   /* Every row as tall as its tallest tile, so one with more to say doesn't make its row stand out. */
-  .topics {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-auto-rows: 1fr;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
 
   /* „Микс“ and „България“ lead the topics (`.topic-lead`), two tiles like theirs; „Микс“ alone takes the row across. */
-  .topic-all {
-    grid-column: 1 / -1;
-  }
-
-  .topic {
-    appearance: none;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    gap: var(--space-2) var(--space-3);
-    width: 100%;
-    height: 100%;
-    min-height: 4.25rem;
-    padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
-    border: 0;
-    border-radius: var(--radius-md);
-    background: var(--surface);
-    color: var(--text);
-    box-shadow:
-      var(--elev-1),
-      inset 0 0 0 1px var(--line);
-    font: inherit;
-    text-align: left;
-    text-decoration: none;
-    cursor: pointer;
-    transition:
-      transform 160ms ease,
-      box-shadow 200ms ease;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .topic:hover {
-      transform: translateY(-1px);
-      box-shadow:
-        var(--elev-2),
-        inset 0 0 0 1px var(--line-strong);
-    }
-  }
-
-  .topic-pic {
-    width: 44px;
-    height: 44px;
-  }
-
-  .topic-text {
-    display: grid;
-    gap: 2px;
-    min-width: 0;
-  }
 
   .mastery {
     display: inline-flex;
@@ -4040,27 +3614,6 @@
     background: var(--tone, var(--text));
   }
 
-  .topic-name {
-    font-size: 1rem;
-    line-height: 1.25rem;
-    font-weight: 800;
-    letter-spacing: -0.01em;
-    text-wrap: balance;
-    hyphens: auto;
-    overflow-wrap: break-word;
-  }
-
-  .topic-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 2px var(--space-1);
-    color: var(--text-muted);
-    font-size: 0.8125rem;
-    line-height: 1rem;
-    font-weight: 600;
-  }
-
   .meter {
     display: block;
     height: 6px;
@@ -4074,9 +3627,6 @@
     height: 100%;
     border-radius: inherit;
     background: var(--tone, var(--accent));
-  }
-  .topic .meter {
-    grid-column: 1 / -1;
   }
 
   .chips {
@@ -4693,35 +4243,8 @@
 
   /* „Сподели резултата“: the button fills its cell, a word of what went wrong under it; where it can neither share
      nor copy, the text in its place, to copy by hand. */
-  .share {
-    display: grid;
-    gap: var(--space-1);
-  }
-
-  .share-text {
-    width: 100%;
-    resize: none;
-    font: inherit;
-    color: var(--text);
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-xs);
-    padding: var(--space-2);
-  }
 
   /* A shared day's score over the same ten, as its link brought it. */
-  .shared-score {
-    display: grid;
-    gap: var(--space-2);
-  }
-
-  .shared-score-n {
-    margin: 0;
-  }
-
-  .shared-score-n b {
-    font-size: 1.75rem;
-  }
 
   /* The questions, once opened at the end of a result: „Прегледай въпросите“ brings their heading to the top. */
   .review-head {
@@ -4729,23 +4252,8 @@
   }
 
   /* The picture by a streak's notice. */
-  .notice-pic {
-    flex: none;
-    width: 1.25rem;
-    height: 1.25rem;
-  }
-
-  .streak-note {
-    color: var(--text-muted);
-    font-size: 0.8125rem;
-    line-height: 1.125rem;
-  }
 
   /* A day missed that the streak forgave. */
-  .week li.forgiven .week-dot {
-    background: transparent;
-    box-shadow: inset 0 0 0 2px var(--gold);
-  }
 
   .next {
     display: grid;
@@ -5305,6 +4813,814 @@
     }
   }
 
+  /* ---- Днес: the day's issue, and its result ---- */
+
+  /* A new visitor's cover: the bar becomes the masthead, the mark over the name, centred; „Вход“ in its corner. */
+  .cover .bar {
+    position: relative;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0;
+    padding: var(--space-6) 0 var(--space-4);
+  }
+
+  .cover .brand {
+    flex-direction: column;
+    gap: var(--space-3);
+    padding-left: 0.24em;
+    font-size: min(calc(15px + 0.9375rem), 9vw);
+    letter-spacing: 0.24em;
+  }
+
+  .cover .brand .rosette {
+    width: 34px;
+    height: 34px;
+  }
+
+  .cover .bar-in {
+    position: absolute;
+    top: var(--space-2);
+    right: 0;
+  }
+
+  .cover #main {
+    padding-top: 0;
+  }
+
+  .today,
+  .result {
+    gap: 0;
+  }
+
+  .notices:empty {
+    display: none;
+  }
+
+  .notices {
+    display: grid;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+
+  .notice,
+  .streak-notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-2);
+    font: italic 500 1rem / 1.45 var(--font-serif);
+  }
+
+  .streak-notice a {
+    font: 700 0.9375rem / 1.3 var(--font-sans);
+    font-style: normal;
+  }
+
+  /* The issue's dateline: its number and the day, between the frame's double rule and a hairline. */
+  .dateline {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+    margin-top: calc(-1 * var(--space-5));
+    padding: 9px 0 8px;
+    border-bottom: 1px solid var(--rule-ink);
+    color: var(--ink-2);
+    font: 700 0.75rem / 1.2 var(--font-sans);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .cover .dateline {
+    margin-top: 0;
+  }
+
+  .issue {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: var(--space-5);
+  }
+
+  /* The date as the hero numeral, the month in the serif's italic beside it. */
+  .issue-date {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-3);
+  }
+
+  .issue-n {
+    margin-left: -4px;
+    font: 800 calc(66px + 4.125rem) / 0.8 var(--font-numeral);
+    letter-spacing: -0.02em;
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+
+  .first .issue-n {
+    font-size: clamp(150px, 51vw, 200px);
+  }
+
+  .issue-month {
+    display: grid;
+    gap: var(--space-2);
+    padding-bottom: 4px;
+    font: italic 500 calc(15px + 0.9375rem) / 1 var(--font-serif);
+  }
+
+  .issue-weekday {
+    font-style: normal;
+  }
+
+  .issue-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .issue-title {
+    margin-top: var(--space-5);
+  }
+
+  .issue-body .deck {
+    max-width: 34ch;
+    margin-top: var(--space-2);
+  }
+
+  .issue-body .trail {
+    margin-top: var(--space-4);
+  }
+
+  .issue-go {
+    margin-top: var(--space-5);
+  }
+
+  .issue-meta {
+    margin-top: var(--space-3);
+    text-align: center;
+  }
+
+  .day-stake {
+    margin-top: var(--space-3);
+    color: var(--ink);
+    font: 600 0.9375rem / 1.4 var(--font-sans);
+  }
+
+  .shared-score {
+    display: grid;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+  }
+
+  .shared-score-n {
+    font: 500 1rem / 1 var(--font-sans);
+  }
+
+  .shared-score-n b {
+    font: 800 calc(28px + 1.75rem) / 0.9 var(--font-numeral);
+  }
+
+  /* The issue's contents („В броя“): a big screen's, the ten topics in two columns, each with its chapter's dot. */
+  .contents-issue {
+    display: none;
+  }
+
+  .contents-issue ol {
+    margin: 10px 0 0;
+    padding: 0;
+    columns: 2;
+    column-gap: 40px;
+    border-top: 1px solid var(--rule-ink);
+    list-style: none;
+  }
+
+  .contents-issue li {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-3);
+    padding: 10px 0;
+    border-bottom: 1px solid var(--rule);
+    break-inside: avoid;
+    font: 500 1rem / 1.3 var(--font-sans);
+  }
+
+  .contents-n {
+    width: 18px;
+    color: var(--ink-3);
+    font: 700 1.125rem / 1 var(--font-numeral);
+    text-align: right;
+  }
+
+  .contents-issue .dot {
+    align-self: center;
+  }
+
+  /* Beside the issue (under it on a phone): the streak, the friends' day, the way to the book. */
+  .today-side {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: var(--space-7);
+    padding-top: var(--space-7);
+  }
+
+  .streak-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4) 0 var(--space-2);
+  }
+
+  .streak-chip {
+    display: inline-grid;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .status-text {
+    display: grid;
+  }
+
+  .status-n {
+    font: 800 calc(32px + 2rem) / 0.85 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .status-label {
+    margin-top: 2px;
+    color: var(--ink-2);
+    font: 600 0.9375rem / 1.2 var(--font-sans);
+  }
+
+  /* This week: a square a day, played filled, today ringed in gold, to come open. */
+  .week {
+    display: grid;
+    grid-template-columns: repeat(7, 22px);
+    gap: 6px;
+    margin: 0 0 0 auto;
+    padding: 0;
+    list-style: none;
+    text-align: center;
+  }
+
+  .week li {
+    display: grid;
+    gap: 6px;
+  }
+
+  .week-day {
+    color: var(--ink-3);
+    font: 700 0.625rem / 1 var(--font-sans);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .week-dot {
+    height: 22px;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 1px var(--rule-2);
+  }
+
+  .week .on .week-dot {
+    background: var(--ink);
+    box-shadow: none;
+  }
+
+  .week .forgiven .week-dot {
+    background: repeating-linear-gradient(-45deg, var(--rule-2) 0 2px, transparent 2px 5px);
+  }
+
+  .week .today:not(.on) .week-dot {
+    box-shadow: inset 0 0 0 2px var(--gold);
+  }
+
+  .streak-note {
+    color: var(--ink-3);
+    font: 500 0.875rem / 1.45 var(--font-sans);
+  }
+
+  .today-none {
+    padding: var(--space-4) 0;
+    color: var(--ink-2);
+    font: italic 500 1rem / 1.45 var(--font-serif);
+  }
+
+  .book-link {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: 14px 0;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .book-pic {
+    --tone: var(--gold);
+    flex: none;
+    width: 44px;
+    height: 44px;
+  }
+
+  .book-words {
+    font: 400 1rem / 1.45 var(--font-serif);
+  }
+
+  .book-link strong {
+    font-weight: 600;
+  }
+
+  .book-go {
+    margin-left: auto;
+    color: var(--ink-3);
+    font-size: 1.375rem;
+  }
+
+  /* The result: the score as the hero numeral, its shape, a line of how it went. */
+  .result-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+  }
+
+  /* The score lands from a little bigger (feel.ts): on its way it never reaches past the page's column. */
+  .result-score {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    overflow-x: clip;
+    overflow-clip-margin: var(--space-2);
+  }
+
+  /* As wide as what's in it: it lands from a little bigger (feel.ts), and a column-wide one would reach past the
+     screen on its way. */
+  h1.score {
+    display: flex;
+    flex-wrap: wrap;
+    justify-self: start;
+    max-width: 100%;
+    align-items: flex-end;
+    gap: var(--space-3);
+    margin-top: var(--space-2);
+  }
+
+  .score-n {
+    margin-left: -6px;
+    font: 800 min(calc(88px + 5.5rem), 46vw) / 0.8 var(--font-numeral);
+    letter-spacing: -0.02em;
+  }
+
+  .score-of {
+    padding-bottom: 6px;
+    color: var(--ink-2);
+    font: italic 500 calc(16px + 1rem) / 1 var(--font-serif);
+  }
+
+  .score-close {
+    font-size: 0.6em;
+  }
+
+  .result-score .trail {
+    margin-top: var(--space-5);
+  }
+
+  .result-line {
+    margin-top: var(--space-4);
+    font: 400 1.1875rem / 1.45 var(--font-serif);
+  }
+
+  .result-line b {
+    font-weight: 600;
+  }
+
+  .points {
+    margin-top: 6px;
+  }
+
+  .points-n {
+    font-weight: 500;
+  }
+
+  .result-streak {
+    display: flex;
+    align-items: baseline;
+    margin-top: var(--space-4);
+  }
+
+  .result-streak .status-text {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .result-streak .status-n {
+    font-size: calc(14px + 0.875rem);
+  }
+
+  .result-share {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+    margin-top: var(--space-5);
+  }
+
+  .result-share .small {
+    text-align: center;
+  }
+
+  .result-share .link {
+    justify-self: center;
+  }
+
+  .result-side {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: var(--space-7);
+    padding-top: var(--space-7);
+  }
+
+  .result-side:empty {
+    display: none;
+  }
+
+  /* How all of България did: eleven bars, 0 to 10, the player's in ink, the average dashed. */
+  .spread-chart {
+    margin-top: 14px;
+  }
+
+  .spread-bars {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(11, minmax(0, 1fr));
+    gap: 4px;
+    align-items: end;
+    height: 150px;
+    border-bottom: 1px solid var(--rule-ink);
+  }
+
+  .spread-bars i {
+    display: block;
+    border-radius: 1px 1px 0 0;
+    background: color-mix(in srgb, var(--ink) 22%, var(--paper));
+  }
+
+  .spread-bars i.me {
+    position: relative;
+    background: var(--ink);
+  }
+
+  .spread-bars i.me::after {
+    content: "ти";
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    margin-bottom: 4px;
+    font: 800 0.8125rem / 1 var(--font-sans);
+    transform: translateX(-50%);
+  }
+
+  .spread-avg {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-left: 1.5px dashed var(--ink-2);
+  }
+
+  .spread-avg span {
+    position: absolute;
+    top: -2px;
+    right: 6px;
+    color: var(--ink-2);
+    font: 600 0.75rem / 1 var(--font-sans);
+    white-space: nowrap;
+  }
+
+  .spread-ticks {
+    display: grid;
+    grid-template-columns: repeat(11, minmax(0, 1fr));
+    gap: 4px;
+    margin-top: 6px;
+    color: var(--ink-3);
+    font: 600 0.9375rem / 1 var(--font-numeral);
+    text-align: center;
+  }
+
+  .spread-ticks .me {
+    color: var(--ink);
+    font-weight: 800;
+  }
+
+  .bulgaria-figures {
+    border-top: 0;
+  }
+
+  /* The rarest right answer, as an entry cut from the book. */
+  .rarest-kicker {
+    margin-top: var(--space-3);
+    color: var(--t);
+  }
+
+  .rarest-entry {
+    padding-top: var(--space-2);
+    border-bottom: 0;
+  }
+
+  .rarest-entry .entry-word {
+    font-size: calc(13px + 0.8125rem);
+  }
+
+  .filed {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: 14px;
+    color: var(--ink-3);
+    font: 600 0.8125rem / 1.3 var(--font-sans);
+  }
+
+  .filed-pic {
+    --tone: var(--t);
+    width: 20px;
+    height: 20px;
+  }
+
+  /* Tomorrow: the next issue's date, its words, and the asks that come with it. */
+  .tomorrow {
+    display: grid;
+    align-content: start;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+    padding-top: var(--space-7);
+  }
+
+  .tomorrow-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: var(--space-4) 0 var(--space-1);
+  }
+
+  .tomorrow-n {
+    font: 800 calc(32px + 2rem) / 0.85 var(--font-numeral);
+  }
+
+  .tomorrow-words {
+    font: 400 1.0625rem / 1.45 var(--font-serif);
+  }
+
+  .tomorrow-words b {
+    font-weight: 600;
+  }
+
+  .result-review {
+    padding-top: var(--space-7);
+  }
+
+  /* The share sheet: the card a link's preview shows, the text, the ways to send it. */
+  .sheet-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .share-sheet .sheet-panel {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .share-card {
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--rule);
+  }
+
+  .share-text {
+    margin: 0;
+    padding: var(--space-3) 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+    font: 500 1rem / 1.5 var(--font-sans);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .share-ways {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .share-note,
+  .share-said {
+    text-align: center;
+  }
+
+  @media (min-width: 56.25rem) {
+    .dateline {
+      margin-top: calc(-1 * var(--space-5));
+      font-size: 0.8125rem;
+    }
+
+    .cover .bar {
+      padding-top: var(--space-6);
+    }
+
+    .cover .brand {
+      font-size: calc(22px + 1.375rem);
+    }
+
+    .cover .brand .rosette {
+      width: 40px;
+      height: 40px;
+    }
+
+    .cover .bar .places,
+    .cover .bar-issue {
+      display: none;
+    }
+
+    .today.spread > .issue {
+      grid-column: 1 / span 7;
+      padding-top: var(--space-6);
+    }
+
+    .today.spread > .today-side {
+      grid-column: 8 / span 5;
+      margin-top: var(--space-6);
+      padding-top: 0;
+      padding-left: 40px;
+      border-left: 1px solid var(--rule);
+    }
+
+    .today-side .sect:first-child .sect-head {
+      padding-top: 0;
+    }
+
+    .issue-n {
+      margin-left: -10px;
+      font-size: 260px;
+    }
+
+    .issue-month {
+      padding-bottom: 10px;
+      font-size: 48px;
+    }
+
+    .issue-title {
+      margin-top: var(--space-6);
+      font-size: calc(27px + 1.6875rem);
+    }
+
+    .issue-body .deck {
+      font-size: 1.3125rem;
+    }
+
+    .issue-go {
+      width: 320px;
+      margin-top: var(--space-6);
+    }
+
+    .issue-meta {
+      text-align: left;
+    }
+
+    .contents-issue {
+      display: block;
+      margin-top: 56px;
+    }
+
+    /* A new visitor's cover: the date on the left page, the issue on the right. */
+    .first.spread > .issue {
+      grid-column: 1 / -1;
+      grid-template-columns: 5fr 7fr;
+      column-gap: 48px;
+      padding-top: 56px;
+    }
+
+    .first .issue-date {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-1);
+    }
+
+    .first .issue-n {
+      margin-left: -16px;
+      font-size: 400px;
+      line-height: 0.76;
+    }
+
+    .first .issue-month {
+      font-size: 52px;
+    }
+
+    .first .issue-body {
+      padding-left: 48px;
+      border-left: 1px solid var(--rule);
+    }
+
+    .first .issue-title {
+      margin-top: var(--space-4);
+    }
+
+    .result.spread > .result-main {
+      grid-column: 1 / span 5;
+      padding-top: var(--space-6);
+    }
+
+    .result.spread > .result-side {
+      grid-column: 6 / span 7;
+      grid-row: span 2;
+      margin-top: var(--space-6);
+      padding-top: 0;
+      padding-left: 40px;
+      border-left: 1px solid var(--rule);
+    }
+
+    .result.spread > .tomorrow {
+      grid-column: 1 / span 5;
+    }
+
+    .score-n {
+      font-size: 300px;
+    }
+
+    .score-of {
+      padding-bottom: 14px;
+      font-size: 48px;
+    }
+
+    .result-score .trail {
+      max-width: 24rem;
+    }
+
+    .result-share .small {
+      text-align: left;
+    }
+
+    .result-share .link {
+      justify-self: start;
+    }
+
+    .spread-bars {
+      height: 190px;
+    }
+  }
+
+  /* A topic's small picture on a chip or a row. */
+  .topic-mark {
+    width: 26px;
+    height: 26px;
+    margin: -4px 0 -4px -4px;
+  }
+
+  .mastery-topic .topic-mark {
+    flex-shrink: 0;
+    margin-left: 0;
+  }
+
+  /* A result's kicker line: what was played, and what's beside it. */
+  .day-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-3);
+  }
+
+  /* A topic's or a duel's result (results.ts, scoreCard): the score as the day's is. */
+  .score-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .card.hero > .trail {
+    margin-top: var(--space-2);
+  }
+
+  .points-bonus {
+    display: block;
+  }
+
+  .perfect-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .seal {
+    width: 36px;
+    height: 36px;
+  }
+
+  .seal .petal {
+    fill: var(--petal);
+  }
+
+  .seal .gold {
+    fill: var(--gold);
+  }
+
   /* ---- Rows of players: a board, the friends ---- */
 
   .rank-row {
@@ -5648,10 +5964,6 @@
   }
 
   /* On a row, the picture starts at the card's edge like the words under it (a chip pulls it in instead). */
-  .mastery-topic .topic-mark {
-    flex-shrink: 0;
-    margin-left: 0;
-  }
 
   .mastery-meta {
     display: flex;
@@ -6078,27 +6390,11 @@
 
   /* A narrow phone: a topic's longest word still fits its tile whole. */
   @media (max-width: 22.5rem) {
-    .topic-pic {
-      width: 36px;
-      height: 36px;
-    }
-
-    .topic {
-      gap: var(--space-2);
-    }
-
     .segmented button {
       font-size: 0.8125rem;
     }
 
     /* The longest topic's name („Литература“) fits beside its picture. */
-    .topic {
-      padding-right: var(--space-2);
-    }
-
-    .topic-name {
-      font-size: 0.875rem;
-    }
 
     /* A board's row gives its gaps to the name; a friend's row leaves out the tag (it's on their profile). */
     .row {
@@ -6123,61 +6419,10 @@
     /* „Микс“ and „България“ first, a row of their own, half of it each (all of it for one alone), short tiles with
        the picture beside the name. Then ten topics, five to a row (no topic alone in a row), the picture over the
        name, each tile as tall as what's in it. */
-    .topics {
-      grid-template-columns: repeat(10, minmax(0, 1fr));
-      grid-auto-rows: auto;
-    }
-
-    .topics > li {
-      grid-column: span 2;
-    }
-
-    .topics > .topic-lead {
-      grid-column: span 5;
-    }
-
-    .topics > .topic-all {
-      grid-column: 1 / -1;
-    }
 
     /* The picture at the top, the name under it, and what the player knows of the topic under that. */
-    .topic {
-      grid-template-columns: minmax(0, 1fr);
-      align-content: start;
-      align-items: start;
-      padding: var(--space-3);
-    }
-
-    .topic-pic {
-      width: 72px;
-      height: 72px;
-      margin: -4px 0 0 -4px;
-    }
-
-    .topic-lead .topic {
-      grid-template-columns: auto minmax(0, 1fr);
-      align-content: center;
-      align-items: center;
-      padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
-    }
-
-    .topic-lead .topic-pic {
-      width: 44px;
-      height: 44px;
-      margin: 0;
-    }
-
-    .topic-name {
-      font-size: 0.9375rem;
-    }
 
     /* A way to play has room for its picture beside the name, like a topic. */
-    .mode {
-      flex-direction: row;
-      gap: var(--space-3);
-      padding: var(--space-2) var(--space-3);
-      text-align: left;
-    }
 
     /* A tablet: the column a little wider than a phone's. */
     #main {
@@ -6233,17 +6478,6 @@
     }
 
     /* Начало's cards (tomorrow and its reminder, keeping the game): their buttons a hand's width too. */
-    .home .keep-card .btn {
-      max-width: 22rem;
-    }
-
-    .day > .day-meta {
-      text-align: left;
-    }
-
-    .masthead-date {
-      font-size: 3.5rem;
-    }
 
     /* In a game: the question and its answers bigger, read from further away; a choice's answers two by two. A
        list stays one column: things put in order (dragged up and down), and the rows of pairs and groups shown. */
@@ -6385,9 +6619,6 @@
     }
 
     /* Начало, wherever it's drawn: its own page, or the end of the day's ten played there. */
-    main > :has(.home) {
-      max-width: none;
-    }
 
     main > :has(.me-head) {
       max-width: 64rem;
@@ -6408,81 +6639,11 @@
     }
 
     /* Начало: floats, so each column stacks on its own, whatever the other's height. */
-    .home {
-      --side: min(22rem, 30%);
-      display: flow-root;
-    }
-
-    .home-main,
-    .home-side {
-      display: grid;
-      align-content: start;
-      gap: var(--space-5);
-    }
-
-    .home-main,
-    .home > .home-side + * {
-      float: left;
-      width: calc(100% - var(--side) - var(--space-6));
-    }
-
-    .home > .status-row,
-    .home-side {
-      float: right;
-      clear: right;
-      width: var(--side);
-    }
-
-    .home > .home-side + * {
-      clear: left;
-      margin-top: var(--space-6);
-    }
-
-    .home > .status-row ~ .home-side {
-      margin-top: var(--space-5);
-    }
 
     /* The streak, the habit's reward, leads the column beside the day, level with its result: a row of its own, its
        number big. */
-    .home > .status-row {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .home > .status-row .streak-chip {
-      min-height: 5.5rem;
-      gap: var(--space-3);
-      padding-inline: var(--space-4);
-    }
-
-    .home > .status-row .streak-chip .status-flame {
-      width: 56px;
-      height: 56px;
-    }
-
-    .home > .status-row .streak-chip .status-n {
-      font-size: 2.5rem;
-      line-height: 2.5rem;
-    }
-
-    .home > .status-row .streak-chip .status-label {
-      font-size: 0.875rem;
-      line-height: 1.25rem;
-    }
-
-    .home-side .modes {
-      grid-auto-flow: row;
-    }
 
     /* A new player: the day and the topics, one centred column. */
-    .home:not(:has(> .home-side > *)) {
-      max-width: 48rem;
-      margin-inline: auto;
-    }
-
-    .home:not(:has(> .home-side > *)) > * {
-      float: none;
-      width: auto;
-    }
 
     /* Профил: two columns of cards under the name, each read top to bottom. */
     .screen:has(> .me-head) {
@@ -6650,8 +6811,20 @@
     flex-wrap: wrap;
   }
 
-  .tighter .score-of .num-word {
-    display: block;
+  /* Figures in a row, and the notes' days: one under another. */
+  .tight .figures-row,
+  .tight .ledger li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tight .ledger li {
+    gap: 2px;
+  }
+
+  .tight .fig + .fig {
+    padding-left: 0;
+    border-top: 1px solid var(--rule);
+    border-left: 0;
   }
 
   /* The places at a phone's foot: a name that doesn't fit its third (a phone that enlarges the text itself) is cut,
@@ -6665,24 +6838,6 @@
 
   /* Topics one to a row once a topic's longest word no longer fits half the column; the ways to play too, each its
      picture beside its name. */
-  .tight .topics {
-    grid-template-columns: minmax(0, 1fr);
-    grid-auto-rows: auto;
-  }
-
-  .tight .topic {
-    min-height: 68px;
-  }
-
-  .tight .modes {
-    grid-auto-flow: row;
-  }
-
-  .tight .mode {
-    flex-direction: row;
-    gap: var(--space-3);
-    text-align: left;
-  }
 
   /* A title's long word breaks where it must, wherever the title sits. */
   .tight h1,
@@ -6714,18 +6869,8 @@
   }
 
   /* A line over the day, its way on („Виж“) after its last word, not pushed out of the screen by its longest one. */
-  .tight .streak-notice {
-    display: block;
-  }
-
-  .tight .streak-notice > a {
-    margin-left: var(--space-2);
-  }
 
   /* The streak as tall as what it says. */
-  .tight .status-item {
-    min-height: 0;
-  }
 
   /* A board's row: the place and the player, the score under the name. */
   .tight .row {

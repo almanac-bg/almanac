@@ -1,10 +1,8 @@
-// Теми: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays the same
-// game. The tiles live on Начало: „Микс“ (every topic at once) and „България“ (the questions about Bulgaria from every
-// topic, while the bank has them) first, then each topic; a run of one is /play/<topic>, whose result offers ten more
-// at once, and another topic a tap away.
+// A chapter's game: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays
+// the same game. It's started from its chapter in the Алманах („Играй главата“: a topic, „Микс“ — every topic at once —
+// or „България“ — the questions about Bulgaria from every topic, while the bank has them); a run of one is
+// /play/<topic>, whose result offers ten more at once, the way back to its chapter, and another chapter a tap away.
 
-import { picture } from "../art/picture.ts";
-import { type Mastery, masteryBadge } from "../game/mastery.ts";
 import { news } from "../game/news.ts";
 import { summary } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting, startScreen } from "../game/run.ts";
@@ -12,91 +10,10 @@ import type { State } from "../game/types.ts";
 import { api, errorText } from "../lib/api.ts";
 import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { backOut, byTap, entry, hold, mark, title } from "../lib/router.ts";
-import { bulgaria, type Category, categories, mix, player, user } from "../state.ts";
-import { meter, stakeLine, toneOf, topicMark } from "../ui.ts";
+import { bulgaria, categories, mix, player, user } from "../state.ts";
+import { stakeLine, toneOf, topicMark } from "../ui.ts";
 import { missing } from "./missing.ts";
 import { loadStats, type Stats } from "./stats.ts";
-
-/** The topics as tiles: „Микс“ and „България“ first (`.topic-lead`: a row of their own on a big screen; „Микс“
- * across it alone while „България“ is closed), each with what it is, neither with a mastery of its own (their answers
- * count in their own topics); then each topic with how well the player knows it. A game left half-way says so on its
- * tile, where it goes on from. `load`: the player's numbers, if asked for already (Начало's, for its next game). */
-export function topics(load?: Promise<Stats>): Child {
-  const stats = signal<Stats | null>(null);
-  const left = signal<LeftRun[]>([]);
-  if (user.peek()) {
-    (load ?? loadStats()).then(stats.set, () => {});
-    loadLeft().then(left.set, () => {});
-  }
-  // „Продължи · въпрос 4 от 10“, on the tile of a game left half-way (in place of what it says otherwise).
-  const goesOn = (category: string): Child => {
-    const l = left().find((r) => r.category === category);
-    return l ? h("span", { class: "topic-meta topic-left" }, `Продължи · въпрос ${l.at + 1} от ${l.total}`) : null;
-  };
-  const lead = (c: Category, tone: string, what: string, alone = false): Child =>
-    h(
-      "li",
-      { class: alone ? "topic-lead topic-all" : "topic-lead" },
-      h(
-        "a",
-        { href: `/play/${c.id}`, class: `topic ${tone}` },
-        picture(`topic-${c.id}`, "topic-pic"),
-        h(
-          "span",
-          { class: "topic-text" },
-          h("span", { class: "topic-name" }, c.name),
-          goesOn(c.id) ?? h("span", { class: "topic-meta" }, what),
-        ),
-      ),
-    );
-  return h(
-    "section",
-    { class: "stack" },
-    h("h2", { class: "section-title" }, "Теми"),
-    h("ul", { class: "topics" }, () => {
-      const mine = stats()?.mastery ?? [];
-      return [
-        lead(mix, "tone-lilac", "Всички теми наведнъж", !bulgaria.open),
-        bulgaria.open ? lead(bulgaria, "tone-mint", "От всяка тема") : null,
-        ...categories.map((c) =>
-          h(
-            "li",
-            null,
-            tile(
-              c,
-              mine.find((m) => m.category === c.id),
-              goesOn(c.id),
-            ),
-          ),
-        ),
-      ];
-    }),
-  );
-}
-
-/** A topic: its picture and colour, its name, and how well the player knows it (once they've played enough of it to
- * tell: a first estimate as a share alone, its tier once the mark is sure; Профил has the rest). */
-function tile(c: Category, m: Mastery | undefined, left: Child): Child {
-  const sure = m?.sure ? m : null;
-  const first = m?.first ? m : null;
-  return h(
-    "a",
-    { href: `/play/${c.id}`, class: `topic ${toneOf(c.id)}` },
-    picture(`topic-${c.id}`, "topic-pic"),
-    h(
-      "span",
-      { class: "topic-text" },
-      h("span", { class: "topic-name" }, c.name),
-      left ??
-        (sure
-          ? h("span", { class: "topic-meta" }, masteryBadge(sure), h("b", { class: "num" }, `${sure.known}%`))
-          : first
-            ? h("span", { class: "topic-meta" }, `първа оценка · ${first.known}%`)
-            : null),
-    ),
-    sure ? meter(sure.known, `знаеш ${sure.known}% от темата`) : null,
-  );
-}
 
 export function topic([category = ""]: string[]) {
   const name =
@@ -122,6 +39,7 @@ export function topic([category = ""]: string[]) {
   if (user.peek()) ask();
   return run({
     name,
+    home: `/almanac/${category}`,
     lead:
       category === mix.id
         ? "Десет въпроса от всички теми, от лесен към труден."
@@ -142,8 +60,8 @@ export function topic([category = ""]: string[]) {
           s,
           h("div", { class: "day-line" }, h("span", { class: "kicker" }, name)),
           {
-            main: () => nextOf(day(), again).main,
-            also: [() => nextOf(day(), again).also],
+            main: () => nextOf(day(), again, category).main,
+            also: [() => nextOf(day(), again, category).also],
           },
           just ? [otherTopics(category), news(s.id)] : [otherTopics(category)],
           undefined,
@@ -155,11 +73,11 @@ export function topic([category = ""]: string[]) {
 
 /** A topic's result's buttons: „Още десет“, gold; or, while the day's ten wait, the way to them, gold, with the streak
  * at stake under it, and „Още десет“ plain. */
-function nextOf(d: DayWaits | null, again: () => void): { main: Child; also: Child[] } {
+function nextOf(d: DayWaits | null, again: () => void, chapter: string): { main: Child; also: Child[] } {
   if (!d)
     return {
       main: h("button", { class: "btn primary big", onclick: again }, "Още десет"),
-      also: [h("a", { class: "btn", href: "/" }, "Към Начало")], // where the day and the other topics are
+      also: [h("a", { class: "btn", href: `/almanac/${chapter}` }, "Към главата")], // its facts, the new ones too
     };
   return {
     main: [h("a", { class: "btn primary big", href: "/" }, "Към въпросите на деня"), stakeLine(d.streak, d.spare)],
@@ -234,6 +152,8 @@ export async function loadLeft(): Promise<LeftRun[]> {
 interface Run {
   name: string;
   lead: string;
+  /** Where „Откажи“ on the count goes back to, if not where the game was opened from: its chapter. */
+  home: string;
   begin: () => Promise<State>;
   left: (l: LeftRun) => boolean;
   finished: (s: State, again: () => void, just: boolean) => Child;
@@ -251,7 +171,7 @@ function run(r: Run): Child {
   let startHere = async () => {};
   const ready = () => {
     hold();
-    screen.show(() => getReady(r.name, start, () => backOut("/", () => void startHere())));
+    screen.show(() => getReady(r.name, start, () => backOut(r.home, () => void startHere())));
   };
   // Another from a result starts at once: the player is ready.
   const again = () => {

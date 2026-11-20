@@ -230,4 +230,6 @@ export interface Board {
   mine?: Score;
   /** The day's right answers on average, once ten have played it. */
   average?: number;
+  /** How many played the day to each count of right answers, 0 to `of`, once ten have (people only). */
+  spread?: number[];
 }

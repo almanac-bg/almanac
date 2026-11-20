@@ -97,7 +97,7 @@ export const landing = (run: number, moment: Promise<void>): void => void moment
 /** A game's result as a moment as it ends (feel.ts: the pips, the score, the motif), once: never again on its way
  * back to the screen; the day's pips a little slower. Without the feel loaded, the result is as it is, with the end's
  * sound. */
-function land(hero: HTMLElement, run: number, perfect: boolean, day: boolean): void {
+export function land(hero: HTMLElement, run: number, perfect: boolean, day: boolean): void {
   const key = `almanac.landed.${run}`;
   try {
     if (sessionStorage.getItem(key)) return;

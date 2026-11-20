@@ -59,7 +59,7 @@ test("a guest keeps their game with a code by email, and can sign out", async ({
   await expect(page.getByRole("switch", { name: "По-малко движение" })).toBeVisible();
   // Said there, once: Днес, next, doesn't say it again.
   await page.locator("nav.places-foot").getByRole("link", { name: "Днес" }).click();
-  await expect(page.locator(".card.day")).toBeVisible();
+  await expect(page.locator(".issue")).toBeVisible();
   await expect(page.getByText("Излезе от профила си.")).toHaveCount(0);
 });
 

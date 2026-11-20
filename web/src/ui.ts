@@ -292,7 +292,6 @@ export function figure(value: string, label: string): Child {
   );
 }
 
-const dayLetters = ["П", "В", "С", "Ч", "П", "С", "Н"];
 const dayNames = ["понеделник", "вторник", "сряда", "четвъртък", "петък", "събота", "неделя"];
 const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Sofia", weekday: "short" });
 
@@ -306,7 +305,6 @@ function today(): number {
  * has had, when it's longer than this one. */
 export function streak(days: number, week?: boolean[], forgiven?: boolean[], spare = true, best = 0): Child {
   const unit = days === 1 ? "ден" : "дни";
-  const now = today();
   return h(
     "section",
     { class: days ? "streak" : "streak cold", "aria-label": `Серия: ${days} ${unit}` },
@@ -333,25 +331,34 @@ export function streak(days: number, week?: boolean[], forgiven?: boolean[], spa
         : null,
       best > Math.max(days, 1) ? h("p", { class: "streak-note" }, `Най-дълга серия: ${best} дни`) : null,
     ),
-    week?.length === 7
-      ? h(
-          "ol",
-          { class: "week", "aria-label": "Тази седмица" },
-          dayLetters.map((d, i) =>
-            h(
-              "li",
-              {
-                class:
-                  [week[i] && "on", forgiven?.[i] && "forgiven", i === now && "today"].filter(Boolean).join(" ") ||
-                  undefined,
-                "aria-label": `${dayNames[i]}${week[i] ? ": изиграно" : forgiven?.[i] ? ": простен ден" : ""}`,
-              },
-              h("i", { class: "week-dot" }),
-              d,
-            ),
-          ),
-        )
-      : null,
+    weekStrip(week, forgiven),
+  );
+}
+
+const weekLetters = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
+
+/** This week, a square a day, Monday first: a day played filled, today ringed in gold, the day the week forgave
+ * marked, the days to come open. */
+export function weekStrip(week?: boolean[], forgiven?: boolean[]): Child {
+  if (week?.length !== 7) return null;
+  const now = today();
+  return h(
+    "ol",
+    { class: "week", "aria-label": "Тази седмица" },
+    weekLetters.map((d, i) =>
+      h(
+        "li",
+        {
+          class:
+            [week[i] && "on", forgiven?.[i] && "forgiven", i === now && "today", i > now && "later"]
+              .filter(Boolean)
+              .join(" ") || undefined,
+          "aria-label": `${dayNames[i]}${week[i] ? ": изиграно" : forgiven?.[i] ? ": простен ден" : ""}`,
+        },
+        h("b", { class: "week-day" }, d),
+        h("i", { class: "week-dot" }),
+      ),
+    ),
   );
 }
 

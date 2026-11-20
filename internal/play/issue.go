@@ -1,6 +1,12 @@
 package play
 
-import "time"
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"time"
+)
 
 // The day's ten are the game's issue of the day, as an almanac's: numbered from the first day they were played as the
 // game plays them now (the rebuild went live that evening), the same number for everyone. Начало heads the day with
@@ -26,4 +32,29 @@ func IssueDay(issue int) string {
 	}
 	first, _ := time.Parse(time.DateOnly, FirstIssue)
 	return first.AddDate(0, 0, issue-1).Format(time.DateOnly)
+}
+
+// IssueTopics are a day's topics in the order its ten are asked („В броя“ on Днес): what the issue holds, never which
+// questions. None while the day isn't drawn yet (ahead.go draws it before it comes).
+func (g *Game) IssueTopics(ctx context.Context, day string) ([]string, error) {
+	var raw string
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT questions FROM days WHERE day = ?`, day).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var picks []Pick
+	if err := json.Unmarshal([]byte(raw), &picks); err != nil {
+		return nil, err
+	}
+	b := g.Bank()
+	out := make([]string, 0, len(picks))
+	for _, p := range picks {
+		if q, ok := b.Get(p.ID); ok {
+			out = append(out, q.Base().Category)
+		}
+	}
+	return out, nil
 }

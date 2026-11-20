@@ -57,7 +57,7 @@ test("each screen asks the server for each thing once a visit, and a deploy load
   await expect(page.locator(".summary")).toBeVisible();
 
   const home = (asked: string[]) => {
-    for (const p of ["/api/runs/left", "/api/me/stats"]) expect(asked).toContain(p);
+    expect(asked.filter((p) => /^\/api\/runs\/\d+\/review$/.test(p)).length).toBeLessThanOrEqual(1);
   };
   home(await once(page, "Начало, loaded", () => page.reload()));
   await once(page, "Приятели", () => tab(page, "/friends"));
@@ -66,17 +66,16 @@ test("each screen asks the server for each thing once a visit, and a deploy load
   home(await once(page, "Начало, from Профил", () => tab(page, "/")));
   // Начало tapped on Начало opens it afresh: once more, not more than that.
   home(await once(page, "Начало, tapped again", () => tab(page, "/")));
-  // A topic's tile, its count backed out of: back on Начало.
+  // A chapter, its game's count backed out of: back on the chapter.
+  await once(page, "a chapter", () => page.goto("/almanac/history"));
   await once(page, "a topic", async () => {
-    await page.locator("a.topic[href='/play/history']").click();
+    await page.getByRole("link", { name: "Играй главата" }).click();
     await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   });
-  home(
-    await once(page, "Начало, the count backed out of", async () => {
-      await page.getByRole("button", { name: "Откажи" }).click();
-      await expect(page).toHaveURL(/\/$/);
-    }),
-  );
+  await once(page, "a chapter, the count backed out of", async () => {
+    await page.getByRole("button", { name: "Откажи" }).click();
+    await expect(page).toHaveURL(/\/almanac\/history$/);
+  });
   await once(page, "a topic, loaded", () => page.goto("/play/music"));
   await once(page, "Моят Алманах", () => page.goto("/almanac"));
   home(await once(page, "Начало, from Моят Алманах", () => tab(page, "/")));

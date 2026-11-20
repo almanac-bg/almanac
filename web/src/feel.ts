@@ -308,6 +308,12 @@ const token = (el: Element, name: string) => getComputedStyle(el).getPropertyVal
 
 /** A number counting up from `from` to `to` in an element, over `ms` from `delay`. */
 function count(el: Element, from: number, to: number, delay: number, ms: number, format: (n: number) => string) {
+  // As wide as the number it ends on all the way: what's beside it (its name, a word to hover) stays put.
+  if (el instanceof HTMLElement) {
+    el.textContent = format(to);
+    el.style.display = "inline-block";
+    el.style.minWidth = `${el.getBoundingClientRect().width}px`;
+  }
   el.textContent = format(from);
   const start = performance.now() + delay;
   const step = (now: number) => {

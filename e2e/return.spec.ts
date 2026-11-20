@@ -10,19 +10,19 @@ test("a player who comes back: the day played one short card, and every game a t
   await playRun(page);
   // Just played: the result in full.
   await expect(page.locator(".summary")).toBeVisible();
-  // A later visit: one short card, another game the gold thing to do, the questions on their page.
+  // A later visit: the result as it is (no moment, no news), sharing it the gold thing to do, the questions a tap
+  // away under it.
   await page.reload();
-  const card = page.locator(".day-done");
+  const card = page.locator(".result");
   await expect(card).toBeVisible();
-  await expect(page.locator(".summary")).toHaveCount(0);
+  await expect(page.locator(".news-open")).toHaveCount(0);
   await expect(card.locator(".trail")).toBeVisible();
   const gold = page.locator(".btn.primary");
   await expect(gold).toHaveCount(1);
-  await expect(gold).toHaveText("Още десет");
+  await expect(gold).toHaveText("Сподели резултата");
 
-  await card.getByRole("link", { name: "Прегледай въпросите" }).click();
-  await expect(page).toHaveURL(/\/games\/\d+$/);
-  await expect(page.locator(".review")).toBeVisible();
+  await card.getByRole("button", { name: "Прегледай въпросите" }).click();
+  await expect(page.locator(".review .reviewed")).toHaveCount(10);
   // Every game, by day: the day's ten by their issue.
   await page.goto("/games");
   await expect(page.getByRole("heading", { name: "Всички игри" })).toBeVisible();

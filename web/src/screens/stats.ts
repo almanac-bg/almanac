@@ -75,7 +75,7 @@ function almanacLine(facts: number): Child {
   return h(
     "a",
     { class: "place-link", href: "/almanac" },
-    picture("mode-almanac", "mode-pic tone-gold"),
+    picture("mode-almanac", "place-link-pic tone-gold"),
     h(
       "span",
       { class: "place-link-text" },
