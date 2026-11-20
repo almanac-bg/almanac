@@ -215,6 +215,8 @@ export interface Score {
   tag?: string;
   points: number;
   rights: number;
+  /** How many questions `rights` is out of: the day's that count (ten, but for one that counts for nobody). */
+  of: number;
   ms: number;
   me?: boolean;
   avatar?: string;
@@ -228,6 +230,8 @@ export interface Score {
 export interface Board {
   day: string;
   players: number;
+  /** How many of the day's questions count (ten, but for one that counts for nobody): what `average` is out of. */
+  of: number;
   top: Score[];
   place?: number;
   mine?: Score;

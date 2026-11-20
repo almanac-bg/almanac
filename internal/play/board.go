@@ -38,8 +38,10 @@ type Score struct {
 	Tag    string `json:"tag,omitempty"`
 	Points int    `json:"points"`
 	Rights int    `json:"rights"`
-	Ms     int64  `json:"ms"`
-	Me     bool   `json:"me,omitempty"`
+	// Of is how many questions the right answers are out of: the day's that count (day.go).
+	Of int   `json:"of"`
+	Ms int64 `json:"ms"`
+	Me bool  `json:"me,omitempty"`
 	Look
 	// Trail is how each of the ten went, on the friends' board once the viewer has finished the day (FriendsBoard).
 	Trail []Mark `json:"trail,omitempty"`
@@ -48,9 +50,11 @@ type Score struct {
 // Board is a day's results: the best, and the viewer's place among everyone. A game played at a script's speed is on
 // it for its player alone (fairFor): they see it with the others, and their place among them as if it counted.
 type Board struct {
-	Day     string  `json:"day"`
-	Players int     `json:"players"`
-	Top     []Score `json:"top"`
+	Day     string `json:"day"`
+	Players int    `json:"players"`
+	// Of is how many of the day's questions count (day.go): what its results and Average are out of.
+	Of  int     `json:"of"`
+	Top []Score `json:"top"`
 	// Place is the viewer's (1 for the best), 0 if they haven't finished the day.
 	Place int    `json:"place,omitempty"`
 	Mine  *Score `json:"mine,omitempty"`
@@ -65,7 +69,7 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	if err != nil {
 		return Board{}, err
 	}
-	b := Board{Day: day, Players: len(d.runs), Top: make([]Score, len(d.top), BoardTop)}
+	b := Board{Day: day, Players: len(d.runs), Of: d.of, Top: make([]Score, len(d.top), BoardTop)}
 	if len(d.runs) >= DayCrowdFrom {
 		b.Average = math.Round(10*float64(d.rights)/float64(len(d.runs))) / 10
 	}
@@ -80,10 +84,11 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	var r boardRun
 	var avatar, title string
 	var points int
-	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+`
+	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.id, u.name, u.tag, r.points, r.rights, `+countedOf("r.questions")+`, r.ms,
+			`+lookColumns+`
 		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind = 'day' AND r.day = ? AND r.user_id = ? AND r.finished_at IS NOT NULL`, day, viewer).
-		Scan(&r.id, &mine.Name, &mine.Tag, &mine.Points, &mine.Rights, &mine.Ms, &avatar, &title, &points)
+		Scan(&r.id, &mine.Name, &mine.Tag, &mine.Points, &mine.Rights, &mine.Of, &mine.Ms, &avatar, &title, &points)
 	if errors.Is(err, sql.ErrNoRows) {
 		return b, nil
 	}
@@ -145,6 +150,11 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 	}
 	defer tx.Rollback() //nolint:errcheck // a read: nothing to keep
 	d := &countedBoard{}
+	d.of = Length
+	err = tx.QueryRowContext(ctx, `SELECT `+countedOf("questions")+` FROM days WHERE day = ?`, day).Scan(&d.of)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
 	rows, err := tx.QueryContext(ctx, `SELECT id, rights, points, ms FROM runs WHERE kind = 'day' AND day = ?
 		AND finished_at IS NOT NULL AND NOT shadow ORDER BY `+dayOrder, day)
 	if err != nil {
@@ -162,7 +172,8 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	rows, err = tx.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.points, r.rights, r.ms, `+lookColumns+`
+	rows, err = tx.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.points, r.rights, `+countedOf("r.questions")+`, r.ms,
+			`+lookColumns+`
 		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND NOT r.shadow
 		ORDER BY `+dayOrderOf("r")+` LIMIT ?`, day, BoardTop)
@@ -175,7 +186,7 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 		var s Score
 		var avatar, title string
 		var points int
-		if err := rows.Scan(&id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Ms, &avatar, &title, &points); err != nil {
+		if err := rows.Scan(&id, &s.Name, &s.Tag, &s.Points, &s.Rights, &s.Of, &s.Ms, &avatar, &title, &points); err != nil {
 			return nil, err
 		}
 		s.Look = g.lookOf(id, avatar, title, points)
@@ -192,6 +203,7 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 type countedBoard struct {
 	counted time.Time     // when, by the machine's clock (not the game's: it's about the server's time)
 	took    time.Duration // how long counting it took
+	of      int           // the day's questions that count (day.go)
 	runs    []boardRun
 	rights  int // the right answers of all of them
 	top     []Score

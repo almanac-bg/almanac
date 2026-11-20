@@ -352,7 +352,9 @@ function crowdSays(t: Today, one = false): Child {
   const avg = t.board.average;
   const lines = [
     lead ? h("p", { class: "crowd-says" }, lead) : null,
-    avg && !(one && lead) ? h("p", { class: "crowd-says" }, `Средно днес: ${formatNumber(avg, 0.1)} от 10.`) : null,
+    avg && !(one && lead)
+      ? h("p", { class: "crowd-says" }, `Средно днес: ${formatNumber(avg, 0.1)} от ${t.board.of}.`)
+      : null,
   ].filter(Boolean);
   return lines.length ? lines : null;
 }
@@ -626,7 +628,7 @@ function friendsDay(t: Today): Child {
       "ol",
       null,
       rows.map(({ s, i }) => {
-        const row = boardRow(i + 1, s.name, [String(s.rights), h("small", { class: "sub" }, " от 10")], {
+        const row = boardRow(i + 1, s.name, [String(s.rights), h("small", { class: "sub" }, ` от ${s.of}`)], {
           me: s.me,
           gap: i > 4,
           look: s,

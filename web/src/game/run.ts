@@ -19,6 +19,7 @@ import { withName } from "../lib/words.ts";
 import { categories, playingWhile } from "../state.ts";
 import { countUp, fact, factFace, failure, inRowChip, reachable, type VerdictKind, verdict } from "../ui.ts";
 import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
+import { inRowOf } from "./numbers.ts";
 import { answered, beats, crowdLine, picture, picturesIn, type Stage } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Reveal, Shown, State, View } from "./types.ts";
 
@@ -437,13 +438,6 @@ function tally(el: HTMLElement, points: number, from: number, inRow: number) {
         : null,
     ].filter((c): c is HTMLElement => c !== null),
   );
-}
-
-/** How many right answers in a row a run's last ones are. */
-function inRowOf(marks: Mark[]): number {
-  let n = 0;
-  for (let i = marks.length - 1; i >= 0 && marks[i]?.right; i--) n++;
-  return n;
 }
 
 /** The time left: a bar that runs out with the seconds beside it, muted, then gold for the last ten seconds and red

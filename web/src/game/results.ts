@@ -244,7 +244,7 @@ export function boardRow(
 /** A row's score, as its place is decided: the right answers big, the points that break a tie small under them. */
 const scoreOf = (s: Score) => [
   String(s.rights),
-  h("small", { class: "sub" }, " от 10"),
+  h("small", { class: "sub" }, ` от ${s.of}`),
   h("small", { class: "sub pts-under" }, `${formatNumber(s.points)} ${s.points === 1 ? "точка" : "точки"}`),
 ];
 
