@@ -4,7 +4,9 @@
 // (CLOSED), and so would the screen. Here that one is opened anew, after a wait that grows (1, 2, 4 … 30 s, each a
 // random part shorter, so that a crowd of screens doesn't come back in one instant), for as long as the screen lasts
 // (its lifetime) and until its game says it's over (close). The line is down from the first error until the next
-// word of the server's.
+// word of the server's. A stream the browser opens again says the last event's id (Last-Event-ID: a live duel's, to
+// come back to it, not be paired into a new one); one opened anew here says it too, in its address (?last=), as no
+// header can be set on an EventSource.
 
 export interface Stream {
   /** Ends the stream for good: the server said the game is over for this screen. */
@@ -39,6 +41,7 @@ export function stream(url: string, { life, on, down }: StreamOptions): Stream {
   let failures = 0;
   let wait = 0;
   let isDown = false;
+  let last = ""; // the last event's id heard
   const line = (d: boolean) => {
     if (d === isDown) return;
     isDown = d;
@@ -52,7 +55,7 @@ export function stream(url: string, { life, on, down }: StreamOptions): Stream {
   const open = () => {
     shut();
     if (over || life.aborted) return;
-    const s = new EventSource(url);
+    const s = new EventSource(last ? `${url}${url.includes("?") ? "&" : "?"}last=${encodeURIComponent(last)}` : url);
     es = s;
     s.onopen = () => {
       failures = 0;
@@ -62,6 +65,7 @@ export function stream(url: string, { life, on, down }: StreamOptions): Stream {
         if (es !== s) return;
         failures = 0;
         line(false);
+        last = (e as MessageEvent).lastEventId || last;
         fn((e as MessageEvent).data);
       });
     }

@@ -789,6 +789,12 @@ func TestALiveDuelOverHTTP(t *testing.T) {
 	if line, _ := gone.r.ReadString('\n'); line != "event: closed\n" {
 		t.Fatalf("a duel that's gone: %q", line)
 	}
+	// A stream the screen opened anew (the browser gave up on it: a proxy's error page) says the duel in its address,
+	// as no header can be set on it (web/src/lib/stream.ts): the same.
+	gone = ana.stream(fmt.Sprintf("/api/duels/live/events?last=%d", id+1000))
+	if line, _ := gone.r.ReadString('\n'); line != "event: closed\n" {
+		t.Fatalf("a duel that's gone, opened anew: %q", line)
+	}
 }
 
 func TestReportsAndTheAdminPage(t *testing.T) {

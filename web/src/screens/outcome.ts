@@ -282,6 +282,7 @@ const unratedWords: Record<NonNullable<DuelView["unrated"]>, string> = {
   recordings: "Срещу запис рейтингът се променя до пет пъти на ден: този дуел е без рейтинг.",
   network: "Дуел без рейтинг: играете от една и съща мрежа.",
   newcomers: "Дуел без рейтинг: с нови играчи рейтингът се променя до пет пъти на ден.",
+  gone: "Дуел без рейтинг: другият играч изтри профила си.",
 };
 
 /** What the duel meant: where the rating went (from and to, its division and how far to the next), or why it didn't

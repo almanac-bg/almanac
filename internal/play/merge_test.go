@@ -171,8 +171,8 @@ func TestForgetKeepsOthersHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	var states []string
-	if n := w.count(`SELECT count(*) FROM duels WHERE id = ?`, under.DuelID); n != 0 {
-		t.Fatal("the duel under way with Bo is still there")
+	if n := w.count(`SELECT count(*) FROM duels WHERE id = ? AND ended_at IS NULL`, under.DuelID); n != 1 {
+		t.Fatal("the duel under way with Bo isn't left to Ana") // hers once its time is up (TestGoneMidDuel)
 	}
 	for _, d := range duels {
 		// Their game went with them: said so (their score isn't known), never a 0 they didn't score.
@@ -214,6 +214,77 @@ func TestForgetKeepsOthersHistory(t *testing.T) {
 	if left != 0 {
 		t.Fatalf("%d duels left of two players gone", left)
 	}
+}
+
+// One who goes (deletes their account) while a duel is under way forfeits it: the one who stays plays it to its end and
+// wins it, and no rating moves (the other's went with them). So for either side of a live duel, and for one playing a
+// recording whose player goes.
+func TestGoneMidDuel(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	accounts := &account.Accounts{DB: w.db, Forget: []func(*sql.Tx, int64) error{Forget}}
+	gone := func(id int64) {
+		t.Helper()
+		if err := accounts.Delete(ctx, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	won := func(user, duel int64) {
+		t.Helper()
+		d, err := w.g.DuelOf(ctx, user, duel)
+		if err != nil || d.State != "won" || !d.Friendly || d.Unrated != "gone" || d.Delta != 0 || d.Opponent == nil ||
+			!d.Opponent.Gone {
+			t.Fatalf("the duel of the one who stayed: %+v (%v)", d, err)
+		}
+		if s, _ := w.g.StandingOf(ctx, user); s.Rating != StartRating {
+			t.Fatalf("a rating moved against one gone: %+v", s)
+		}
+	}
+
+	// Bo, ahead, goes halfway through his duel with Ana: she plays it to its end, and wins.
+	ana, bo := w.user(), w.user()
+	l, err := w.g.StartLive(ctx, ana, bo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(bo, l.Runs[1], repeat(w.right, Length/2)...)
+	gone(bo)
+	w.play(ana, l.Runs[0], repeat(w.wrong, Length)...)
+	won(ana, l.DuelID)
+
+	// Cy, who started his, goes: Di wins it.
+	cy, di := w.user(), w.user()
+	if l, err = w.g.StartLive(ctx, cy, di); err != nil {
+		t.Fatal(err)
+	}
+	gone(cy)
+	w.play(di, l.Runs[1], repeat(w.wrong, Length)...)
+	won(di, l.DuelID)
+
+	// The player of the recording Ed plays goes: Ed wins it.
+	ed := w.user()
+	if l, err = w.g.StartRecorded(ctx, ed); err != nil {
+		t.Fatal(err)
+	}
+	gone(l.Users[1])
+	w.play(ed, l.Runs[0], repeat(w.wrong, Length)...)
+	won(ed, l.DuelID)
+
+	// Gus goes after Fi has played hers to its end: a restart doesn't cut it off, and it's hers once its time is up.
+	fi, gus := w.user(), w.user()
+	if l, err = w.g.StartLive(ctx, fi, gus); err != nil {
+		t.Fatal(err)
+	}
+	w.play(fi, l.Runs[0], repeat(w.wrong, Length)...)
+	gone(gus)
+	if err := w.g.EndLive(ctx); err != nil {
+		t.Fatal(err)
+	}
+	w.wait(LiveFor)
+	if err := w.g.SettleDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	won(fi, l.DuelID)
 }
 
 // holding are the table.column where some row holds s.

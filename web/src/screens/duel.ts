@@ -60,7 +60,7 @@ export interface DuelView {
   recorded?: boolean;
   /** Didn't move ratings; `unrated` says why (play.DuelView). */
   friendly?: boolean;
-  unrated?: "again" | "recordings" | "network" | "newcomers";
+  unrated?: "again" | "recordings" | "network" | "newcomers" | "gone";
   delta?: number;
   runId?: number;
   createdAt: number;

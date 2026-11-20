@@ -57,7 +57,7 @@ type DuelView struct {
 	Recorded bool      `json:"recorded,omitempty"`
 	// Friendly is a duel that didn't move ratings; Unrated says why: again (the two had a rated duel today), recordings
 	// (past the day's rated duels against recordings), network (the two play from one network), newcomers (past the
-	// day's rated duels against new players).
+	// day's rated duels against new players), gone (the other went while it was under way, and forfeited it: forfeit).
 	Friendly bool   `json:"friendly,omitempty"`
 	Unrated  string `json:"unrated,omitempty"`
 	// Delta is what the duel did to the player's rating.
@@ -285,14 +285,12 @@ func (g *Game) DropLive(ctx context.Context, duelID int64) error {
 
 // EndLive ends every live duel still under way without a result: run when the server starts, as live duels are
 // played in its memory and a restart cuts them off. One played to its end, both sides (or the player's, against a
-// recording), wasn't cut off, only not settled yet (the server stopped between its last answer and its result): it's
-// left to be settled as any finished run's duel is (AfterDue, SettleDue), with its result.
+// recording; the one who stayed, the other gone: duelPlayed), wasn't cut off, only not settled yet (the server stopped
+// between its last answer and its result): it's left to be settled as any finished run's duel is (AfterDue,
+// SettleDue), with its result.
 func (g *Game) EndLive(ctx context.Context) error {
-	_, err := g.DB.Write.ExecContext(ctx, `UPDATE duels SET ended_at = ?, outcome = 'expired'
-		WHERE ended_at IS NULL AND NOT (
-			coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = duels.a_run), 0)
-			AND (ghost_run IS NOT NULL OR coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = duels.b_run), 0)))`,
-		store.Ms(g.Now()))
+	_, err := g.DB.Write.ExecContext(ctx, `UPDATE duels AS d SET ended_at = ?, outcome = 'expired'
+		WHERE ended_at IS NULL AND NOT (`+duelPlayed+`)`, store.Ms(g.Now()))
 	return err
 }
 
@@ -498,16 +496,24 @@ func abs(n int) int {
 	return n
 }
 
+// duelPlayed says of a duel (d) whether it's played to its end: each side's run finished (a recording's always is),
+// but a side gone (the player's account deleted while it was under way: Forget) isn't waited for. duelForfeited
+// says a side is gone.
+const (
+	duelPlayed = `(d.a_run IS NULL OR coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = d.a_run), 0))
+		AND (d.ghost_run IS NOT NULL OR d.b_run IS NULL
+			OR coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = d.b_run), 0))`
+	duelForfeited = `(d.a_run IS NULL OR (d.b_run IS NULL AND d.ghost_run IS NULL))`
+)
+
 // settleRun settles the duel a just-finished run belongs to once both sides are played (against a recording, once
-// the player's is).
+// the player's is; with one side gone, once the other's is).
 func (g *Game) settleRun(ctx context.Context, runID int64) error {
 	var duelID int64
-	var ghost, aDone, bDone bool
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT d.id, d.ghost_run IS NOT NULL,
-			coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = d.a_run), 0),
-			coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = d.b_run), 0)
+	var ghost, played, forfeited bool
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT d.id, d.ghost_run IS NOT NULL, `+duelPlayed+`, `+duelForfeited+`
 		FROM duels d WHERE (d.a_run = ?1 OR d.b_run = ?1) AND d.ended_at IS NULL`, runID).
-		Scan(&duelID, &ghost, &aDone, &bDone)
+		Scan(&duelID, &ghost, &played, &forfeited)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
@@ -515,10 +521,47 @@ func (g *Game) settleRun(ctx context.Context, runID int64) error {
 		return err
 	}
 	switch {
-	case aDone && bDone:
-		return g.settleDuel(ctx, duelID, false, runID)
-	case ghost && aDone:
-		return g.settleDuel(ctx, duelID, true, runID)
+	case !played:
+		return nil
+	case forfeited:
+		return g.forfeit(ctx, duelID, runID)
+	}
+	return g.settleDuel(ctx, duelID, ghost, runID)
+}
+
+// forfeit ends a duel one side of which went while it was under way (their account deleted: Forget), played to its
+// end by the one who stayed: theirs is the win, and no rating moves, as the other's went with them (DuelView.Unrated:
+// gone). finished is the run that has just ended it, whose own follow-up this is (settleDuel).
+func (g *Game) forfeit(ctx context.Context, duelID, finished int64) error {
+	var user, run int64
+	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		var a bool // the one who stayed is a
+		err := tx.QueryRow(`SELECT a_run IS NOT NULL, coalesce(a_id, b_id), coalesce(a_run, b_run) FROM duels
+			WHERE id = ? AND ended_at IS NULL AND coalesce(a_run, b_run) IS NOT NULL`, duelID).Scan(&a, &user, &run)
+		if errors.Is(err, sql.ErrNoRows) {
+			run = 0 // settled a moment ago
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`UPDATE runs SET recorded = 0, outcome = 'won' WHERE id = ?`, run); err != nil {
+			return err
+		}
+		if run != finished {
+			if err := g.afterDue(tx, run); err != nil {
+				return err
+			}
+		}
+		_, err = tx.Exec(`UPDATE duels SET ended_at = ?, outcome = ?, rated = 0 WHERE id = ?`,
+			store.Ms(g.Now()), map[bool]string{true: "a", false: "b"}[a], duelID)
+		return err
+	})
+	if err != nil || run == 0 || run == finished {
+		return err
+	}
+	if err := g.after(ctx, user, run); err != nil {
+		slog.Error("after a duel", "duel", duelID, "run", run, "err", err)
 	}
 	return nil
 }
@@ -692,8 +735,8 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 			}
 			return "draw"
 		}
-		// rate moves a player's rating by a duel (if it counts), and says by how much and to what (null: it didn't).
-		rate := func(s side, against side, score float64) (int, sql.NullInt64, error) {
+		// move moves a player's rating by a duel (if it counts), and says by how much and to what (null: it didn't).
+		move := func(s side, against side, score float64) (int, sql.NullInt64, error) {
 			var after sql.NullInt64
 			if !rated {
 				return 0, after, nil
@@ -704,15 +747,14 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 			} else if against.new && !s.new {
 				d /= 2 // a new player may be anyone's second account: an established rating moves half as far
 			}
-			err := tx.QueryRow(`UPDATE users SET rating = max(0, rating + ?1), peak = max(peak, rating + ?1), rated = rated + 1
-				WHERE id = ?2 RETURNING rating`, d, s.id).Scan(&after)
-			return d, after, err
+			r, err := rate(tx, s.id, d)
+			return d, sql.NullInt64{Int64: int64(r), Valid: err == nil}, err
 		}
 		now := store.Ms(g.Now())
 		// opponent_id is a player the duel was against, never a recording's: the year's rival counts only duels
 		// played against a person.
 		opponentID := sql.NullInt64{Int64: b.id, Valid: !recording}
-		da, ra, err := rate(a, b, score)
+		da, ra, err := move(a, b, score)
 		if err != nil {
 			return err
 		}
@@ -729,7 +771,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 				now, "ghost_"+outcomeOf(score), da, ra, rated, unrated, a.new, b.new, duelID)
 			return err
 		}
-		db, rb, err := rate(b, a, 1-score)
+		db, rb, err := move(b, a, 1-score)
 		if err != nil {
 			return err
 		}
@@ -766,21 +808,19 @@ func (g *Game) SettleDue(ctx context.Context) error {
 		return err
 	}
 	now := store.Ms(g.Now())
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.ghost_run IS NOT NULL,
-			coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = d.a_run), 0),
-			coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = d.b_run), 0)
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.ghost_run IS NOT NULL, `+duelPlayed+`, `+duelForfeited+`
 		FROM duels d WHERE d.ended_at IS NULL AND d.expires_at <= ?`, now)
 	if err != nil {
 		return err
 	}
 	type due struct {
-		id                  int64
-		ghost, aDone, bDone bool
+		id                       int64
+		ghost, played, forfeited bool
 	}
 	var list []due
 	for rows.Next() {
 		var d due
-		if err := rows.Scan(&d.id, &d.ghost, &d.aDone, &d.bDone); err != nil {
+		if err := rows.Scan(&d.id, &d.ghost, &d.played, &d.forfeited); err != nil {
 			rows.Close()
 			return err
 		}
@@ -791,11 +831,13 @@ func (g *Game) SettleDue(ctx context.Context) error {
 		return err
 	}
 	for _, d := range list {
+		// Played to its end, and not settled then (a restart in between; or the one who stays had finished as the other
+		// went), it's settled now; else it was cut off.
 		switch {
-		case d.aDone && d.bDone:
-			err = g.settleDuel(ctx, d.id, false, 0)
-		case d.ghost && d.aDone: // finished, and not settled then (a restart in between)
-			err = g.settleDuel(ctx, d.id, true, 0)
+		case d.played && d.forfeited:
+			err = g.forfeit(ctx, d.id, 0)
+		case d.played:
+			err = g.settleDuel(ctx, d.id, d.ghost, 0)
 		default:
 			_, err = g.DB.Write.ExecContext(ctx, `UPDATE duels SET ended_at = ?, outcome = 'expired' WHERE id = ? AND ended_at IS NULL`,
 				now, d.id)
@@ -892,6 +934,9 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 		v.Friendly = !r.rated && v.State != "expired"
 		if v.Friendly {
 			v.Unrated = r.unrated
+			if r.unrated == "" && r.theirs == 0 {
+				v.Unrated = "gone" // forfeited by one who went under way: nothing to move a rating against
+			}
 		}
 		out = append(out, v)
 	}

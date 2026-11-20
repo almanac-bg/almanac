@@ -8,7 +8,8 @@
 // waited for until Arrive; after it, the duel is called off and leaves nothing (play.DropLive), so leaving the wait at
 // its last second never costs a lost duel. An answer sent again (its reply lost on the way) is taken as the first. One
 // who left for good is named on the result (play.LeftLive: after which question). Either way, one who comes back to the
-// duel is in it again.
+// duel is in it again. One whose account is deleted under way (their run goes with it) has left for good, and forfeits:
+// the duel goes on for the other, whose win it is at its end (play.Forget).
 //
 // One who stays while the other is gone (left, or away past Away) and leads on points may take the win at once
 // (Claim): the questions left are played out in a moment, unanswered by both, and the duel ends as it would have, the
@@ -1084,9 +1085,9 @@ func (m *Match) left() time.Duration {
 // answer before, or the two face to face), and nobody can answer a question their run doesn't show yet.
 func (m *Match) show(n int) {
 	at, dealt := time.Now(), m.dealt[n]
-	var humans []*side
+	var humans, deleted []*side
 	for _, s := range m.sides {
-		if s.human() {
+		if s.human() && s.run != 0 {
 			humans = append(humans, s)
 		}
 	}
@@ -1095,7 +1096,11 @@ func (m *Match) show(n int) {
 		ctx, cancel := context.WithTimeout(context.Background(), writeFor)
 		defer cancel()
 		for _, s := range humans {
-			if err = m.hub.game.ShowLive(ctx, s.ID, s.run, n, at, dealt); err != nil {
+			err = m.hub.game.ShowLive(ctx, s.ID, s.run, n, at, dealt)
+			if errors.Is(err, play.ErrNoRun) { // their account deleted: their run went with them
+				deleted, err = append(deleted, s), nil
+			}
+			if err != nil {
 				return
 			}
 		}
@@ -1107,6 +1112,11 @@ func (m *Match) show(n int) {
 		slog.Error("live duel", "duel", m.id, "err", err)
 		m.cancel()
 		return
+	}
+	// One whose account was deleted has left for good, and forfeits: the duel goes on for the other, whose win it is
+	// at its end (play.Forget).
+	for _, s := range deleted {
+		s.run, s.left = 0, true
 	}
 	m.phase, m.n, m.shownAt = PhaseQuestion, n, at
 	for _, s := range m.sides {
@@ -1295,7 +1305,7 @@ func (m *Match) reveal() {
 	n, dealt := m.n, m.dealt[m.n]
 	var absent []*side
 	for _, s := range m.sides {
-		if !s.answered && s.human() {
+		if !s.answered && s.human() && s.run != 0 {
 			absent = append(absent, s)
 		}
 		if !s.answered {
@@ -1315,7 +1325,7 @@ func (m *Match) reveal() {
 			defer cancel()
 			for _, s := range absent {
 				if _, err := m.hub.game.AnswerLive(ctx, s.ID, s.run, n, nil, time.Now(), s.saw, dealt); err != nil &&
-					!errors.Is(err, play.ErrOutOfStep) {
+					!errors.Is(err, play.ErrOutOfStep) && !errors.Is(err, play.ErrNoRun) { // gone: show says so
 					slog.Error("live duel", "duel", m.id, "err", err)
 				}
 			}
