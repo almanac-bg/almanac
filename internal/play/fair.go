@@ -205,9 +205,9 @@ func fairFor(run, viewer string) string {
 }
 
 const (
-	// NetsKept is how long a game's network is kept: a week, well over SameNetFor and the two days JudgeNets looks
-	// at.
-	NetsKept = 7 * 24 * time.Hour
+	// NetsKept is how long a game's network is kept: three days, over SameNetFor and the two days JudgeNets looks at
+	// (a game of yesterday's begun at its start is judged up to 48 hours later), and no longer.
+	NetsKept = 3 * 24 * time.Hour
 	// SameNetFor is how close together two players' games from one network make them one network's: a day (only the
 	// first duel of a day between two is rated anyway).
 	SameNetFor = 24 * time.Hour
