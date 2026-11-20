@@ -137,3 +137,44 @@ func TestStreakWaitsForYesterdaysRun(t *testing.T) {
 		t.Fatalf("Cy, Sunday left past the grace: %+v", s)
 	}
 }
+
+// Yesterday's issue left half-way just before midnight is Днес's to finish while the game lets it (DayGrace): offered
+// where it stopped, and finished, it counts for its own day; past the grace, or finished, it isn't offered.
+func TestUnfinishedAfterMidnight(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	w.at(15, 23, 58, 0)
+	s, err := w.g.StartDay(ctx, ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if open, err := w.g.Unfinished(ctx, ana); err != nil || open != nil {
+		t.Fatalf("today's own issue offered as yesterday's: %+v %v", open, err)
+	}
+	w.playOn(ana, s.ID, 0, repeat(w.right, 4)...)
+	w.at(16, 0, 5, 0)
+	open, err := w.g.Unfinished(ctx, ana)
+	if err != nil || open == nil || open.ID != s.ID || open.Day != "2026-11-15" || open.At != 4 {
+		t.Fatalf("Sunday's issue at 00:05: %+v %v", open, err)
+	}
+	w.playOn(ana, s.ID, 4, repeat(w.right, Length-4)...)
+	if open, _ := w.g.Unfinished(ctx, ana); open != nil {
+		t.Fatalf("finished, offered still: %+v", open)
+	}
+	if done := w.show(ana, s.ID); !done.Done || done.Day != "2026-11-15" {
+		t.Fatalf("Sunday's issue, finished after midnight: %+v", done)
+	}
+	// Bo left his half-way too, and comes back past the grace: nothing to offer.
+	bo := w.user()
+	w.at(16, 23, 58, 0)
+	b, err := w.g.StartDay(ctx, bo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.playOn(bo, b.ID, 0, repeat(w.right, 3)...)
+	w.at(17, 0, 30, 0)
+	if open, err := w.g.Unfinished(ctx, bo); err != nil || open != nil {
+		t.Fatalf("Monday's issue past the grace: %+v %v", open, err)
+	}
+}

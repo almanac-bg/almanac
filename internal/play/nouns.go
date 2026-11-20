@@ -7,17 +7,19 @@ import (
 )
 
 // The game's nouns, used (DECISIONS.md, „The direction“: the rule for later): /admin shows, week by week, how many of
-// those who played used each — the day's issue, ink, the book, its chapters' games, the seal, the streak, friends, a
-// duel, a shared day — so that a part nobody uses is seen, and goes. Most are in what the game keeps anyway (Uses);
-// the three that are only looked at (the book, Приятели, the seal) a player marks as they open them (Used), once a
+// those who played used each noun of the closed list — Брой, близо, серия, Алманах (глави, факти, мастило), печат,
+// игра на главата (Микс, България), приятели, класация, дуел (запис), споделяне, профил, напомняне — so that a part
+// nobody uses is seen, and goes. Most are in what the game keeps anyway (NounUse); those that are only looked at (the
+// book, a chapter's page, Приятели, the seal, the board, a profile) a player marks as they open them (Used), once a
 // week each, kept as bits of the week on their row (users.used, users.used_week) and counted without a name
 // (daily_counts, "use:<noun>").
 
-// Nouns are the parts of the game /admin counts by week, in its order.
-var Nouns = []string{"day", "ink", "almanac", "topic", "seal", "streak", "friends", "duel", "share"}
+// Nouns are the closed list's nouns, as /admin counts them by week, in the list's order.
+var Nouns = []string{"day", "close", "streak", "almanac", "chapters", "facts", "ink", "seal", "topic", "mix",
+	"bulgaria", "friends", "board", "duel", "recording", "share", "profile", "reminder"}
 
 // opened are the nouns a player marks as they open them (Used), each its bit in users.used.
-var opened = map[string]int{"almanac": 1, "friends": 2, "seal": 4}
+var opened = map[string]int{"almanac": 1, "friends": 2, "seal": 4, "chapters": 8, "board": 16, "profile": 32}
 
 // Opened says whether a noun is one a player marks as they open it (Used).
 func Opened(noun string) bool { return opened[noun] != 0 }
@@ -52,6 +54,44 @@ func (g *Game) Used(ctx context.Context, userID int64, noun string) error {
 	})
 }
 
+// kept are the nouns the game keeps anyway, each the players who used it from a day to a day (?1, ?2: both in) or
+// from a moment to a moment (?3, ?4: ms), a script's games left out.
+var kept = map[string]string{
+	// Брой: the day's issue finished.
+	"day": `SELECT count(DISTINCT user_id) FROM runs WHERE kind = 'day' AND day BETWEEN ?1 AND ?2
+		AND finished_at IS NOT NULL AND NOT shadow`,
+	// близо: a close answer (not right) in the day's issue.
+	"close": `SELECT count(DISTINCT r.user_id) FROM runs r JOIN answers a ON a.run_id = r.id
+		WHERE r.kind = 'day' AND r.day BETWEEN ?1 AND ?2 AND NOT r.shadow AND a.score > 0 AND NOT a.is_right`,
+	// серия: two days played one after the other.
+	"streak": `SELECT count(DISTINCT a.user_id) FROM active_days a JOIN active_days b ON b.user_id = a.user_id
+		AND b.day = date(a.day, '+1 day') WHERE a.day >= ?1 AND b.day <= ?2`,
+	// факти: any fact written in the book, ink or grey.
+	"facts": `SELECT count(DISTINCT user_id) FROM facts WHERE at >= ?3 AND at < ?4`,
+	// мастило: a fact written in ink.
+	"ink": `SELECT count(DISTINCT user_id) FROM facts WHERE ink AND at >= ?3 AND at < ?4`,
+	// игра на главата: a chapter's game finished (Микс and България apart).
+	"topic": `SELECT count(DISTINCT user_id) FROM runs WHERE kind = 'topic' AND category NOT IN ('mix', 'bulgaria')
+		AND finished_at >= ?3 AND finished_at < ?4 AND NOT shadow`,
+	"mix": `SELECT count(DISTINCT user_id) FROM runs WHERE kind = 'topic' AND category = 'mix'
+		AND finished_at >= ?3 AND finished_at < ?4 AND NOT shadow`,
+	"bulgaria": `SELECT count(DISTINCT user_id) FROM runs WHERE kind = 'topic' AND category = 'bulgaria'
+		AND finished_at >= ?3 AND finished_at < ?4 AND NOT shadow`,
+	// дуел: a duel with a friend played; запис: one against a recording.
+	"duel": `SELECT count(*) FROM (SELECT r.user_id FROM duels d JOIN runs r ON r.id = d.a_run
+			WHERE d.kind = 'person' AND r.finished_at >= ?3 AND r.finished_at < ?4 AND NOT r.shadow
+		UNION SELECT r.user_id FROM duels d JOIN runs r ON r.id = d.b_run
+			WHERE d.kind = 'person' AND r.finished_at >= ?3 AND r.finished_at < ?4 AND NOT r.shadow)`,
+	"recording": `SELECT count(DISTINCT r.user_id) FROM duels d JOIN runs r ON r.id = d.a_run
+		WHERE d.kind = 'recording' AND r.finished_at >= ?3 AND r.finished_at < ?4 AND NOT r.shadow`,
+	// споделяне: a day shared.
+	"share": `SELECT count(DISTINCT r.user_id) FROM shares s JOIN runs r ON r.id = s.run_id
+		WHERE s.created_at >= ?3 AND s.created_at < ?4`,
+	// напомняне: reminded of the day, by a notification or by mail.
+	"reminder": `SELECT count(*) FROM (SELECT user_id FROM push_reminded WHERE day BETWEEN ?1 AND ?2
+		UNION SELECT user_id FROM day_mails WHERE day BETWEEN ?1 AND ?2)`,
+}
+
 // NounUse is how many players used each of the game's nouns (Nouns) from a day to a day (both in): of those the game
 // keeps, distinct players; of those marked as opened (Used), the marks, which are distinct players when the days are
 // a week from its Monday.
@@ -59,23 +99,13 @@ func (g *Game) NounUse(ctx context.Context, from, to string) (map[string]int, er
 	start, _ := dayBounds(from)
 	_, end := dayBounds(to)
 	out := map[string]int{}
-	var day, ink, topic, streak, duel, share int
-	if err := g.DB.Read.QueryRowContext(ctx, `SELECT
-		(SELECT count(DISTINCT user_id) FROM runs WHERE kind = 'day' AND day BETWEEN ?1 AND ?2
-			AND finished_at IS NOT NULL AND NOT shadow),
-		(SELECT count(DISTINCT user_id) FROM facts WHERE ink AND at >= ?3 AND at < ?4),
-		(SELECT count(DISTINCT user_id) FROM runs WHERE kind = 'topic' AND finished_at >= ?3 AND finished_at < ?4
-			AND NOT shadow),
-		(SELECT count(DISTINCT a.user_id) FROM active_days a JOIN active_days b ON b.user_id = a.user_id
-			AND b.day = date(a.day, '+1 day') WHERE a.day >= ?1 AND b.day <= ?2),
-		(SELECT count(DISTINCT user_id) FROM runs WHERE kind = 'duel' AND finished_at >= ?3 AND finished_at < ?4
-			AND NOT shadow),
-		(SELECT count(DISTINCT r.user_id) FROM shares s JOIN runs r ON r.id = s.run_id
-			WHERE s.created_at >= ?3 AND s.created_at < ?4)`, from, to, start, end).
-		Scan(&day, &ink, &topic, &streak, &duel, &share); err != nil {
-		return nil, err
+	for noun, q := range kept {
+		var n int
+		if err := g.DB.Read.QueryRowContext(ctx, q, from, to, start, end).Scan(&n); err != nil {
+			return nil, err
+		}
+		out[noun] = n
 	}
-	out["day"], out["ink"], out["topic"], out["streak"], out["duel"], out["share"] = day, ink, topic, streak, duel, share
 	t, err := g.Tallies(ctx, from, to)
 	if err != nil {
 		return nil, err

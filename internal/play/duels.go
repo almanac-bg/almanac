@@ -108,7 +108,7 @@ type DuelView struct {
 	Decided int `json:"decided,omitempty"`
 	// TieBy is, of a duel with a result on even right answers, what broke the tie (duelScore): TieNumber (the number
 	// nearer) or TieTime (quicker by TieBand or more); "" for a draw, or a duel
-	// won on right answers. One duel's view (DuelOf) only.
+	// won on right answers.
 	TieBy string `json:"tieBy,omitempty"`
 	// Record is how the player's duels against this person went, this one with them (not a recording's).
 	Record *Record `json:"record,omitempty"`
@@ -893,6 +893,10 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 		// The other's score shows once there's a result.
 		if result := v.State == DuelWon || v.State == DuelLost || v.State == DuelDraw; !result && v.Opponent != nil {
 			v.Opponent.Rights, v.Opponent.Ms = 0, 0
+		}
+		// A result on even right answers says what broke the tie, in a list too (Приятели's rows).
+		if (v.State == DuelWon || v.State == DuelLost) && v.You != nil && !v.Opponent.Gone {
+			v.TieBy = v.You.score.tieBy(v.Opponent.score)
 		}
 		out = append(out, v)
 	}

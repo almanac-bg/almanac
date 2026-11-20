@@ -140,15 +140,26 @@ func ranksOf(ctx context.Context, db querier, userID int64) (map[string]keptRank
 // of the bank's at the rank its ink makes, never lower than it was. A rank risen waits to be told (told below level);
 // one counted as the ranks began (quiet) is told already.
 func (g *Game) countRanks(ctx context.Context, userID int64, day string, quiet bool) error {
-	ink, err := g.InkOf(ctx, userID)
+	return countRanksIn(ctx, g.DB.Read, g.DB.Write, g.Bank(), userID, day, quiet)
+}
+
+// execer is what writes: the database, or a transaction.
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+// countRanksIn is countRanks, read by r and written by w (a transaction, both, where the book was just written again
+// in it: rewriteBook), by bank b.
+func countRanksIn(ctx context.Context, r querier, w execer, b *bank.Bank, userID int64, day string, quiet bool) error {
+	ink, err := inkIn(ctx, r, b, userID)
 	if err != nil {
 		return err
 	}
-	kept, err := ranksOf(ctx, g.DB.Read, userID)
+	kept, err := ranksOf(ctx, r, userID)
 	if err != nil {
 		return err
 	}
-	for _, c := range g.Bank().Categories {
+	for _, c := range b.Categories {
 		n := ink[c.ID]
 		level := RankAt(n)
 		was, ok := kept[c.ID]
@@ -164,7 +175,7 @@ func (g *Game) countRanks(ctx context.Context, userID int64, day string, quiet b
 		if ok && level == was.level && quarter == was.quarter && n == was.ink {
 			continue
 		}
-		if _, err := g.DB.Write.ExecContext(ctx, `INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told)
+		if _, err := w.ExecContext(ctx, `INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told)
 			VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) ON CONFLICT (user_id, chapter) DO UPDATE SET
 				level = max(ranks.level, excluded.level), quarter = excluded.quarter, ink = excluded.ink,
 				day = CASE WHEN excluded.level > ranks.level THEN excluded.day ELSE ranks.day END`,

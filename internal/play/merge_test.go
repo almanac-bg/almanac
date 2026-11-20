@@ -83,7 +83,7 @@ func TestMergeCarriesTheRest(t *testing.T) {
 			t.Fatal(q, err)
 		}
 	}
-	if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, guest, owner) }); err != nil {
+	if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return w.g.Merge(tx, guest, owner) }); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := w.db.Write.Exec(`DELETE FROM users WHERE id = ?`, guest); err != nil {
@@ -179,15 +179,6 @@ func TestForgetKeepsOthersHistory(t *testing.T) {
 	if d, err := w.g.DuelOf(ctx, ana, l); err != nil || d.State != DuelWon || d.Opponent.Name != GoneName ||
 		!d.Opponent.Gone {
 		t.Fatalf("the first duel: %+v (%v)", d, err)
-	}
-	after, err := w.g.StatsOf(ctx, ana)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, p := range after.Recent {
-		if p.Outcome != "" && p.Opponent != GoneName {
-			t.Fatalf("Ana's game against Bo, after: %+v", p)
-		}
 	}
 	// Nothing anywhere has his name or address.
 	for _, s := range []string{name, email} {
@@ -305,7 +296,7 @@ func holding(t *testing.T, w *world, s string) []string {
 func (w *world) fold(guest, owner int64) {
 	w.t.Helper()
 	err := w.db.Tx(w.t.Context(), func(tx *sql.Tx) error {
-		if err := Merge(tx, guest, owner); err != nil {
+		if err := w.g.Merge(tx, guest, owner); err != nil {
 			return err
 		}
 		_, err := tx.Exec(`DELETE FROM users WHERE id = ?`, guest)

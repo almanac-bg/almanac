@@ -115,7 +115,7 @@ func (g *Game) judgeAnswer(tx *sql.Tx, r *run, gr bank.Graded, ms int64) error {
 	if q, ok := b.Get(r.picks[r.at].ID); !ok || time.Duration(ms)*time.Millisecond >= Floor(q) {
 		return nil
 	}
-	is, err := judge(tx, b, r.id, r.picks)
+	is, err := judge(context.Background(), tx, b, r.id, r.picks, g.Today())
 	if is {
 		r.shadow = ShadowScript
 	}
@@ -124,7 +124,7 @@ func (g *Game) judgeAnswer(tx *sql.Tx, r *run, gr bank.Graded, ms int64) error {
 
 // judge marks a run if its answers so far were a script's (scriptPaced), and says whether they were. What its answers
 // wrote in its player's book goes (ink.go: a script's game writes nothing).
-func judge(tx *sql.Tx, b *bank.Bank, runID int64, picks []Pick) (bool, error) {
+func judge(ctx context.Context, tx *sql.Tx, b *bank.Bank, runID int64, picks []Pick, day string) (bool, error) {
 	rows, err := tx.Query(`SELECT n, ms FROM answers WHERE run_id = ? AND given IS NOT NULL`, runID)
 	if err != nil {
 		return false, err
@@ -148,7 +148,7 @@ func judge(tx *sql.Tx, b *bank.Bank, runID int64, picks []Pick) (bool, error) {
 		Scan(&user); err != nil {
 		return false, err
 	}
-	return true, rewriteFacts(tx, user)
+	return true, rewriteBook(ctx, tx, b, user, day)
 }
 
 // JudgeRuns judges the runs a migration left for the bank to judge (runs_unjudged: whether an answer came under its
@@ -183,7 +183,7 @@ func (g *Game) JudgeRuns(ctx context.Context) (int, error) {
 		}
 		b := g.Bank()
 		for _, u := range list {
-			is, err := judge(tx, b, u.id, u.picks)
+			is, err := judge(ctx, tx, b, u.id, u.picks, g.Today())
 			if err != nil {
 				return err
 			}

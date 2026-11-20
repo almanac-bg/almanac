@@ -139,12 +139,14 @@ func (g *Game) Played(ctx context.Context, userID int64) (bool, error) {
 
 // News is what a game brought, told once: the facts it wrote in the Алманах in ink (Ink, a count: ink.go), and, of a
 // day's issue, how many of its right answers were to questions met before (MetBefore: in grey already, „1 вече
-// срещан“; grey is never counted otherwise); the ranks risen since the player was last told (Rose, as one: rank.go),
+// срещан“), and of a chapter's game the facts it wrote in grey (Grey: „+4 в сиво“; grey is never counted
+// otherwise); the ranks risen since the player was last told (Rose, as one: rank.go),
 // or, after a day's issue, the chapter nearest its next rank (Step); and, once a day, what others' duels against the
 // player's recordings came to (recordings.go).
 type News struct {
 	Ink        int             `json:"ink,omitempty"`
 	MetBefore  int             `json:"metBefore,omitempty"`
+	Grey       int             `json:"grey,omitempty"`
 	Rose       *Rose           `json:"rose,omitempty"`
 	Step       *Step           `json:"step,omitempty"`
 	Recordings *RecordingsNews `json:"recordings,omitempty"`
@@ -171,6 +173,11 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 			var met int
 			if n.Ink, met, err = g.InkIn(ctx, userID, runID); err != nil {
 				return n, err
+			}
+			if kind == "topic" {
+				if n.Grey, err = g.GreyIn(ctx, userID, runID); err != nil {
+					return n, err
+				}
 			}
 			if kind == "day" {
 				n.MetBefore = met

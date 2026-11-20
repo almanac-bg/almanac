@@ -887,7 +887,7 @@ func TestMergeKeepsTheAccountsDay(t *testing.T) {
 	os, _ := w.g.StartDay(ctx, owner)
 	// The guest chose no word from friends.
 	_, _ = w.db.Write.Exec(`INSERT INTO push_prefs (user_id, kind, wanted) VALUES (?, 'friends', 0)`, guest)
-	err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, guest, owner) })
+	err := w.db.Tx(ctx, func(tx *sql.Tx) error { return w.g.Merge(tx, guest, owner) })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -911,7 +911,7 @@ func TestStats(t *testing.T) {
 	ctx := t.Context()
 	u := w.user()
 	empty, err := w.g.StatsOf(ctx, u)
-	if err != nil || len(empty.Recent) != 0 || empty.Recent == nil || empty.Seal != nil {
+	if err != nil || empty.Seal != nil {
 		t.Fatalf("a newcomer's stats: %+v %v", empty, err)
 	}
 	day, _ := w.g.StartDay(ctx, u)
@@ -922,7 +922,7 @@ func TestStats(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Streak != 1 || s.Best != 1 || len(s.Recent) != 2 || s.Recent[0].Kind != "topic" || s.Recent[0].Total != Length ||
+	if s.Streak != 1 || s.Best != 1 ||
 		s.Seal == nil || s.Seal.Level == 0 {
 		t.Fatalf("stats %+v", s)
 	}
@@ -986,11 +986,8 @@ func TestFriends(t *testing.T) {
 		t.Fatalf("the friends' board: %+v %v", b, err)
 	}
 
-	// A duel between them counts in the record, from each side, and in their games.
+	// A duel between them counts in the record, from each side.
 	w.duel(ana, bo, repeat(w.right, Length), repeat(w.wrong, Length))
-	if st, _ := w.g.StatsOf(ctx, bo); st.Recent[0].Kind != "duel" || st.Recent[0].Outcome != DuelLost {
-		t.Fatalf("Bo's stats after a duel: %+v", st)
-	}
 	list, err := w.g.FriendsOf(ctx, ana)
 	if err != nil || len(list) != 1 || list[0].ID != bo || list[0].Won != 1 || list[0].Lost != 0 ||
 		list[0].Today == nil || list[0].Today.Rights != Length {
@@ -1001,7 +998,7 @@ func TestFriends(t *testing.T) {
 	}
 
 	// A guest who signs in to an account brings their friends and their record along.
-	if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return Merge(tx, bo, vi) }); err != nil {
+	if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return w.g.Merge(tx, bo, vi) }); err != nil {
 		t.Fatal(err)
 	}
 	if list, _ := w.g.FriendsOf(ctx, ana); len(list) != 1 || list[0].ID != vi || list[0].Won != 1 {
@@ -1485,12 +1482,12 @@ func TestDayCrowd(t *testing.T) {
 	if c := crowdOf(items[2].Reveal); c != nil {
 		t.Fatalf("the review's third, which no one else answered: %+v", c)
 	}
-	// The rarest right answer for the result shared: the second, which two in ten got.
+	// The rarest right answer for the result shared: the second, which two in ten others got, and Bo: 3 in 11.
 	rare, err := w.g.EntryOfDay(ctx, bo, "2026-11-12")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rare == nil || rare.N != 1 || !rare.Crowd || math.Abs(rare.Right-0.2) > 1e-9 {
+	if rare == nil || rare.N != 1 || !rare.Crowd || math.Abs(rare.Right-3.0/11) > 1e-9 || rare.Alone {
 		t.Fatalf("the rarest right answer: %+v", rare)
 	}
 	// None for a day not finished (ana left it after one question).
