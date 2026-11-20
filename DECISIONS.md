@@ -61,7 +61,9 @@ packages' doc comments; this file holds only what must not drift.
   2026-11-18, review E4, E11; 2026-11-19).
 - **Removed to keep the game simple** (owner, 2026-11-19): sharing, invitations by link, challenges, past days'
   questions (the archive of past issues, and going over a game after its day), winning a broken streak back, and the
-  year's report. Friends are added by username or email; duels are live (against a recording when nobody comes, with
+  year's report; and on 20 Nov, Профил's chart of the days („Твоите броеве“), Начало's line of how yesterday ended
+  and Класации' „Вчера“. Моят Алманах is one list in the order the facts were learned, with no datelines. Friends are
+  added by username or email; duels are live (against a recording when nobody comes, with
   a rematch after), and only they move a rating. Don't bring any of them back, or something in their place, without
   the owner's call.
 - **Right answers in a row earn no points** (owner, 2026-11-18, review E6): where a miss fell decided close duels and
