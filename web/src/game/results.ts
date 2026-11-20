@@ -129,7 +129,7 @@ function seal(): SVGElement {
     group.setAttribute("transform", `rotate(${turn} 32 32)`);
     const petal = document.createElementNS(ns, "path");
     petal.setAttribute("d", "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z");
-    petal.style.fill = turn < 0 ? "var(--gold)" : "var(--lilac)";
+    petal.style.fill = turn < 0 ? "var(--gold)" : "var(--t-movies)";
     petal.style.transformOrigin = "32px 32px";
     group.append(petal);
     svg.append(group);

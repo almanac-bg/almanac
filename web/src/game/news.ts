@@ -154,7 +154,7 @@ function biggest(notes: Note[]): Note {
  * and that it's in the book. The name is the dialog's (id "moment-name"). */
 function sheet(n: Note): Element[] {
   const numeral = (text: string) =>
-    h("b", { class: "num", style: { font: "900 7.5rem/1 var(--font-numeral)", color: "var(--gold-display)" } }, text);
+    h("b", { class: "num", style: { font: "900 7.5rem/1 var(--font-numeral)", color: "var(--gold-ink)" } }, text);
   const art =
     n.kind === "streak"
       ? numeral(String(n.n))
