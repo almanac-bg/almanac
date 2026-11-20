@@ -26,9 +26,8 @@
 # deploy/deploy-ci.sh; RELEASE_SIGNING_KEY, whose public half is in deploy/release-signers, which almanac-deploy checks
 # before it runs anything: the server refuses a release without its signature, so without the key nothing is released.
 #
-# almanac-deploy waits for a moment the restart cuts no play: the live duels under way (seven minutes at most), so the
-# deploy may wait that long; merges meanwhile queue behind it, and the newest of them goes out next, with all of
-# theirs. It runs on the server as a unit of its own: cancelling this run
+# almanac-deploy restarts the server at once: nothing a player does lives in the server's memory, so a restart cuts no
+# play; merges meanwhile queue behind it, and the newest of them goes out next, with all of theirs. It runs on the server as a unit of its own: cancelling this run
 # doesn't stop it, and it goes back by itself if the new version isn't healthy. Last, the run compares the server's
 # deploy files (its units, scripts and host settings, installed by deploy/setup.sh, by hand; the firewall's and ssh's
 # only while in force) with the repository's, and fails on a difference, so a change to deploy/ that hasn't reached

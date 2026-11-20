@@ -598,7 +598,7 @@ const rila: Layer[] = [
 const draw = (layers: Layer[]) =>
   layers.map(([ink, d, attrs]) => `<path class="${ink}" d="${d}"${attrs ? ` ${attrs}` : ""}/>`).join("");
 
-/** Every picture's paths, by its id: an avatar's shape ("fox"), "topic-<id>", "mode-<id>", "division-<id>" or the
+/** Every picture's paths, by its id: an avatar's shape ("fox"), "topic-<id>", "mode-<id>" or the
  * streak's "flame". */
 export const pictures: Record<string, string> = {
   ...Object.fromEntries(Object.entries(avatars).map(([id, l]) => [id, draw(l)])),

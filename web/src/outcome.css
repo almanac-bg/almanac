@@ -66,7 +66,7 @@
     grid-row: 1;
     max-width: 100%;
     overflow: hidden;
-    color: var(--text);
+    color: var(--ink);
     font-size: 0.9375rem;
     font-weight: 600;
     text-overflow: ellipsis;
@@ -104,11 +104,11 @@
   }
 
   .duel-points.none {
-    color: var(--text-muted);
+    color: var(--ink-3);
   }
 
   .duel-rights {
-    color: var(--text-muted);
+    color: var(--ink-3);
     font-size: 0.8125rem;
   }
 
@@ -168,7 +168,7 @@
   .duel-band {
     align-self: stretch;
     margin: -5px -3px;
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
     background: color-mix(in srgb, var(--gold) 14%, transparent);
   }
 
@@ -177,7 +177,7 @@
     align-items: center;
     gap: var(--space-2);
     margin-top: calc(-1 * var(--space-2));
-    color: var(--text-muted);
+    color: var(--ink-3);
     font-size: 0.75rem;
   }
 
@@ -190,7 +190,7 @@
   }
 
   .duel-line {
-    color: var(--text-muted);
+    color: var(--ink-3);
     font-size: 0.9375rem;
     text-wrap: pretty;
   }
@@ -216,7 +216,7 @@
   }
 
   .duel-why {
-    color: var(--text-muted);
+    color: var(--ink-3);
     font-size: 0.8125rem;
   }
 

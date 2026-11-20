@@ -17,10 +17,6 @@ per topic with the facts collected and how much of it they know, and its games),
 duels played on one's own time against a friend or a real recorded game). The streak is the habit and forgives one
 missed day a week. Points are one game's score; nothing else adds up but the book and the streak.
 
-**Being rebuilt (from 20 Nov 2026).** The owner chose this after a full review (DECISIONS.md, „The redesign“). Until
-each part lands, the code still has the old game: four places (Роял, live duels, the rating and divisions are gone).
-Don't extend any of those; remove them as the redesign reaches them.
-
 ## Direction
 
 The day's ten questions are the heart of the game: the habit a player comes back for. Everything
@@ -61,11 +57,11 @@ DEV=1 DB_PATH=/tmp/seeded.db go run ./cmd/almanac seed -state /tmp/personas   # 
 ```
 
 A review or a look at a screen is of a game played for a while, not only of a new guest's empty pages: seed a new
-database (then `serve` it with the same `DB_PATH`) and be its personas, a new guest to a Легенда (each one's `sid`
+database (then `serve` it with the same `DB_PATH`) and be its personas, a new guest to a long-time player (each one's `sid`
 cookie, or `-state`'s Playwright storage state per persona).
 
 CI runs the race detector on everything (`go test -race ./...`, a minute or two); locally run it where goroutines
-meet (`live`, `server`, or `play` when you touch its locks), not on everything: the SQLite driver is
+meet (`server`, or `play` when you touch its locks), not on everything: the SQLite driver is
 Go, so under the detector every query is instrumented, and the whole tree takes minutes instead of seconds. A test gets
 its database from `storetest.Open(t)` (migrated once per test program, copied) and the sample bank from
 `banktest.Sample(t)` (shared: a test that changes questions loads its own with `bank.Load`).
