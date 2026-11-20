@@ -58,7 +58,7 @@ func TestSaw(t *testing.T) {
 }
 
 // A live game's answer counts the player's time from when their screen showed the question (paying for speed, and
-// kept for a duel's tie and Роял's cuts), and runs to their own time's end; what a clue is worth goes by the game's
+// kept for a duel's tie), and runs to their own time's end; what a clue is worth goes by the game's
 // clock, the clues out when the answer came.
 func TestAnswerLiveFromTheScreen(t *testing.T) {
 	w := setup(t)

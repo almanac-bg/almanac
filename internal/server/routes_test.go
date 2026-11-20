@@ -133,7 +133,7 @@ func TestAPIPathsMatchTheServer(t *testing.T) {
 	}
 
 	calls := clientCalls(t)
-	if len(calls) < 80 {
+	if len(calls) < 60 {
 		t.Fatalf("found %d API calls in web/src: has the way the client calls the API changed? Change this test with it", len(calls))
 	}
 	for _, c := range calls {

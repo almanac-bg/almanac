@@ -1,21 +1,10 @@
 package server
 
-import (
-	"sync/atomic"
-	"testing"
-	"time"
+import "testing"
 
-	"github.com/almanac-bg/almanac/internal/play"
-)
-
-// A reload while Роял is on is held until the evening is over; /api/health tells which bank is played, which is held
-// and which was refused.
+// A reload goes into play at once; /api/health tells which bank is played and which was refused.
 func TestBankReload(t *testing.T) {
 	g := start(t)
-	var now atomic.Int64
-	at := func(t time.Time) { now.Store(t.UnixMilli()) }
-	at(time.Date(2026, 11, 15, 12, 0, 0, 0, play.Bulgaria)) // a Sunday: Роял in the evening
-	g.srv.game.Now = func() time.Time { return time.UnixMilli(now.Load()) }
 	p := g.player()
 	health := func() map[string]any {
 		t.Helper()
@@ -33,8 +22,8 @@ func TestBankReload(t *testing.T) {
 	}
 
 	version("aaa")
-	if h := health(); h["commit"] != "aaa" || h["questions"].(float64) < 100 || h["held"] != nil || h["refused"] != nil {
-		t.Fatalf("in the afternoon, at once: %v", h)
+	if h := health(); h["commit"] != "aaa" || h["questions"].(float64) < 100 || h["refused"] != nil {
+		t.Fatalf("at once: %v", h)
 	}
 
 	g.srv.RefuseBank("bad", 3)
@@ -42,28 +31,9 @@ func TestBankReload(t *testing.T) {
 		t.Fatalf("refused: %v", h)
 	}
 
-	// From the lobby on, a new bank waits; the newest one offered is the one held.
-	at(time.Date(2026, 11, 15, 20, 50, 0, 0, play.Bulgaria))
+	// A good bank after it clears the refusal.
 	version("bbb")
-	version("ccc")
-	if h := health(); h["commit"] != "aaa" || h["held"] != "ccc" || h["refused"] != nil {
-		t.Fatalf("during Роял: %v", h)
-	}
-	if bs := g.srv.Banks(); len(bs) != 2 || bs[0].Commit != "aaa" || bs[1].Commit != "ccc" {
-		t.Fatalf("the banks held: %v", bs)
-	}
-	g.srv.bankStep()
-	if h := health(); h["commit"] != "aaa" {
-		t.Fatalf("in play before Роял is over: %v", h)
-	}
-
-	// The evening over, the held bank goes in.
-	at(time.Date(2026, 11, 15, 23, 0, 0, 0, play.Bulgaria))
-	g.srv.bankStep()
-	if h := health(); h["commit"] != "ccc" || h["held"] != nil {
-		t.Fatalf("after Роял: %v", h)
-	}
-	if bs := g.srv.Banks(); len(bs) != 1 {
-		t.Fatalf("still held: %v", bs)
+	if h := health(); h["commit"] != "bbb" || h["refused"] != nil {
+		t.Fatalf("after the refusal: %v", h)
 	}
 }

@@ -24,7 +24,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/store/storetest"
 )
 
-// remindSent, notifySent, callRoyalSent and callSoonSent queue as their namesakes do, and send what they queued.
+// remindSent and notifySent queue as their namesakes do, and send what they queued.
 func (s *Server) remindSent(ctx context.Context, at time.Time) int {
 	n := s.remind(ctx, at)
 	s.sendQueued(ctx)
@@ -34,18 +34,6 @@ func (s *Server) remindSent(ctx context.Context, at time.Time) int {
 func (s *Server) notifySent(ctx context.Context, kind pushKind, m push.Message, userIDs ...int64) {
 	s.notify(ctx, kind, m, userIDs...)
 	s.sendQueued(ctx)
-}
-
-func (s *Server) callRoyalSent(ctx context.Context, start time.Time) int {
-	n := s.callRoyal(ctx, start)
-	s.sendQueued(ctx)
-	return n
-}
-
-func (s *Server) callSoonSent(ctx context.Context, start time.Time, away, in []int64) int {
-	n := s.callSoon(ctx, start, away, in)
-	s.sendQueued(ctx)
-	return n
 }
 
 // daytime is a clock that runs from noon today in Bulgaria: nights are quiet (pushes.go), and a test that sends
@@ -205,7 +193,7 @@ func TestBusyTriedAgain(t *testing.T) {
 	s.game.Now = func() time.Time { return clock }
 	m := push.Message{Title: "Т", Body: "Т", URL: "/"}
 	fake.answering("/ana", http.StatusServiceUnavailable)
-	s.notifySent(t.Context(), pushAsked, m, anaID)
+	s.notifySent(t.Context(), pushFriends, m, anaID)
 	var id, tries int
 	_ = g.db.Read.QueryRow(`SELECT id, tries FROM push_queue`).Scan(&id, &tries)
 	if id == 0 || tries != 1 {
@@ -227,14 +215,14 @@ func TestBusyTriedAgain(t *testing.T) {
 
 	// Busy at every try: given up on after pushTries, and counted.
 	fake.answering("/ana", http.StatusTooManyRequests)
-	s.notifySent(t.Context(), pushAsked, m, anaID)
+	s.notifySent(t.Context(), pushFriends, m, anaID)
 	for range pushTries {
 		clock = clock.Add(time.Hour)
 		s.sendQueued(t.Context())
 	}
 	_ = g.db.Read.QueryRow(`SELECT count(*) FROM push_queue`).Scan(&left)
-	if left != 0 || g.counted("push:failed:asked") != 1 {
-		t.Fatalf("given up: %d left, %d failed", left, g.counted("push:failed:asked"))
+	if left != 0 || g.counted("push:failed:friends") != 1 {
+		t.Fatalf("given up: %d left, %d failed", left, g.counted("push:failed:friends"))
 	}
 }
 
@@ -249,13 +237,13 @@ func TestRefusingDevicesForgotten(t *testing.T) {
 	m := push.Message{Title: "Т", Body: "Т", URL: "/"}
 	for _, after := range []time.Duration{0, 24 * time.Hour, 5 * 24 * time.Hour} {
 		clock = clock.Add(after)
-		s.notifySent(t.Context(), pushAsked, m, anaID)
+		s.notifySent(t.Context(), pushFriends, m, anaID)
 	}
 	if len(devicesOf(g, anaID)) != 1 {
 		t.Fatal("forgotten within the week")
 	}
 	clock = clock.Add(2 * 24 * time.Hour)
-	s.notifySent(t.Context(), pushAsked, m, anaID)
+	s.notifySent(t.Context(), pushFriends, m, anaID)
 	if len(devicesOf(g, anaID)) != 0 {
 		t.Fatal("kept after a week of refusals")
 	}
@@ -271,7 +259,7 @@ func TestQueueSurvivesRestart(t *testing.T) {
 	subscribe(bo, "/bo")
 	clock := s.game.Now()
 	s.game.Now = func() time.Time { return clock }
-	s.notify(t.Context(), pushAsked, push.Message{Title: "Т", Body: "Т", URL: "/"}, anaID, boID)
+	s.notify(t.Context(), pushFriends, push.Message{Title: "Т", Body: "Т", URL: "/"}, anaID, boID)
 
 	// Stopped before it began: nothing sent, nothing lost.
 	stopped, stop := context.WithCancel(t.Context())
@@ -302,7 +290,7 @@ func TestQueueSurvivesRestart(t *testing.T) {
 		s.Push(ctx)
 		close(done)
 	}()
-	s.notify(t.Context(), pushAsked, push.Message{Title: "Т", Body: "Т", URL: "/"}, boID)
+	s.notify(t.Context(), pushFriends, push.Message{Title: "Т", Body: "Т", URL: "/"}, boID)
 	for deadline := time.Now().Add(5 * time.Second); fake.count("/bo") < 2 && time.Now().Before(deadline); {
 		time.Sleep(10 * time.Millisecond)
 	}
@@ -513,7 +501,7 @@ func TestSlowServiceHoldsUpNoOne(t *testing.T) {
 }
 
 // Nights are quiet: a notification due from 22:00 to 08:00 waits for the morning, or, of no use by then, goes
-// nowhere; one the player asked for goes when they asked; a day's reminder found due late waits for tomorrow.
+// nowhere; a day's reminder found due late waits for tomorrow.
 func TestQuietNights(t *testing.T) {
 	s, g, fake, subscribe := pushWorld(t)
 	ana, anaID := g.guest()
@@ -524,20 +512,19 @@ func TestQuietNights(t *testing.T) {
 	m := push.Message{Title: "Т", Body: "Т", URL: "/"}
 
 	s.notifySent(t.Context(), pushFriends, m, anaID) // a friend request at 23:30
-	s.notifySent(t.Context(), pushAsked, m, anaID)   // the evening Ana said she'd come to
 	var next int64
 	_ = g.db.Read.QueryRow(`SELECT next_at FROM push_queue`).Scan(&next)
-	if fake.count("/ana") != 1 || next != at(8, 8, 0).UnixMilli() {
+	if fake.count("/ana") != 0 || next != at(8, 8, 0).UnixMilli() {
 		t.Fatalf("at night: %d sent, the rest at %v", fake.count("/ana"), time.UnixMilli(next).In(bulgaria()))
 	}
 	clock = at(8, 7, 59)
 	s.sendQueued(t.Context())
-	if fake.count("/ana") != 1 {
+	if fake.count("/ana") != 0 {
 		t.Fatal("sent before the morning")
 	}
 	clock = at(8, 8, 0)
 	s.sendQueued(t.Context())
-	if fake.count("/ana") != 2 {
+	if fake.count("/ana") != 1 {
 		t.Fatal("not sent in the morning")
 	}
 
@@ -570,7 +557,7 @@ func TestQuietNights(t *testing.T) {
 	s.sendQueued(t.Context())
 	var left, tries int
 	_ = g.db.Read.QueryRow(`SELECT count(*), max(next_at), max(tries) FROM push_queue`).Scan(&left, &next, &tries)
-	if fake.count("/ana") != 2 || left != 1 || next != at(10, 8, 0).UnixMilli() || tries != 0 {
+	if fake.count("/ana") != 1 || left != 1 || next != at(10, 8, 0).UnixMilli() || tries != 0 {
 		t.Fatalf("in the night: %d sent, %d left, next at %v, tries %d", fake.count("/ana"), left,
 			time.UnixMilli(next).In(bulgaria()), tries)
 	}
@@ -583,7 +570,7 @@ func TestQuietNights(t *testing.T) {
 		t.Fatalf("reminded at 22:10: %d", n)
 	}
 	clock = at(11, 21, 59)
-	if n := s.remindSent(t.Context(), clock); n != 1 || fake.count("/ana") != 3 {
+	if n := s.remindSent(t.Context(), clock); n != 1 || fake.count("/ana") != 2 {
 		t.Fatalf("reminded at 21:59: %d", n)
 	}
 }
@@ -607,27 +594,5 @@ func TestMorning(t *testing.T) {
 		if got != want {
 			t.Errorf("%s: %q, want %q", at, got, want)
 		}
-	}
-}
-
-// A row of use for only a few minutes more (Роял's call) is taken before older ones that can wait.
-func TestUrgentFirst(t *testing.T) {
-	s, g, _, subscribe := pushWorld(t)
-	ana, anaID := g.guest()
-	subscribe(ana, "/ana")
-	now := s.game.Now()
-	m := push.Message{Title: "Т", Body: "Т", URL: "/"}
-	err := s.db.Tx(t.Context(), func(tx *sql.Tx) error {
-		if _, err := s.queue(t.Context(), tx, notice{kind: pushFriends, m: m}, anaID); err != nil {
-			return err
-		}
-		_, err := s.queue(t.Context(), tx, notice{kind: pushAsked, m: m, until: now.Add(time.Minute)}, anaID)
-		return err
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, err := s.claimPushes(t.Context(), 1); err != nil || len(got) != 1 || got[0].kind != pushAsked {
-		t.Fatalf("taken first: %+v %v", got, err)
 	}
 }

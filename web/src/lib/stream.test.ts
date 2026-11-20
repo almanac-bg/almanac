@@ -54,7 +54,11 @@ test("a stream given up on is opened anew, later each time, its line down until 
   const life = new AbortController();
   const heard: string[] = [];
   const lines: boolean[] = [];
-  stream("/api/royal/events", { life: life.signal, on: { message: (d) => heard.push(d) }, down: (d) => lines.push(d) });
+  stream("/api/duels/live/events", {
+    life: life.signal,
+    on: { message: (d) => heard.push(d) },
+    down: (d) => lines.push(d),
+  });
   latest().send("message", "a");
   // Dropped, and the browser is on it (after the server's retry:): nothing is opened here.
   latest().fail(false);
@@ -87,32 +91,20 @@ test("a stream ends with its screen, and once its game says so: nothing opens it
   mock.timers.enable({ apis: ["setTimeout"] });
   FakeSource.all.length = 0;
   const life = new AbortController();
-  stream("/api/royal/events", { life: life.signal, on: {} });
+  stream("/api/duels/live/events", { life: life.signal, on: {} });
   latest().fail(true);
   life.abort(); // the screen gone while it waits to open again
   mock.timers.tick(60_000);
   assert.equal(FakeSource.all.length, 1);
 
   const again = new AbortController();
-  const t = stream("/api/royal/events", { life: again.signal, on: { closed: () => t.close() } });
+  const t = stream("/api/duels/live/events", { life: again.signal, on: { closed: () => t.close() } });
   latest().send("closed");
   assert.equal(latest().closed, true);
   latest().fail(true);
   mock.timers.tick(60_000);
   assert.equal(FakeSource.all.length, 2);
-
-  // Opened again on purpose (another player signed in): a new stream, and the old one says nothing more.
-  const heard: string[] = [];
-  const u = stream("/api/royal/events", { life: again.signal, on: { message: (d) => heard.push(d) } });
-  const old = latest();
-  u.reopen();
-  assert.equal(old.closed, true);
-  assert.equal(FakeSource.all.length, 4);
-  old.send("message", "old");
-  latest().send("message", "new");
-  assert.deepEqual(heard, ["new"]);
   again.abort();
-  assert.equal(latest().closed, true);
   mock.timers.reset();
 });
 

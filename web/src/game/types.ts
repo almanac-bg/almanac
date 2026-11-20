@@ -119,8 +119,6 @@ export interface Crowd {
   guesses?: Spread;
   /** A question of the day's ten: its players today, not everyone ever. */
   today?: boolean;
-  /** Few enough to count (Роял's own, set by its screen): each answer says how many gave it, not what share. */
-  counts?: boolean;
 }
 
 /** Typed guesses around a number's answer: equal parts of lo–hi (on a log scale if log), and the shares beyond. */

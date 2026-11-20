@@ -99,7 +99,6 @@ func init() {
 	for k := range pushKinds {
 		clientTallies["push:open:"+string(k)] = true
 	}
-	clientTallies["push:open:"+pushAsked.name()] = true
 	clientTallies["push:open:stop"] = true // the day's last reminder (remind.go)
 }
 
@@ -255,9 +254,9 @@ var landingNames = map[string]string{
 // here comes after, by its own name).
 var (
 	kindNames = map[string]string{
-		"day": "Денят", "topic": "Тема", "duel": "Дуел", "royal": "Роял",
+		"day": "Денят", "topic": "Тема", "duel": "Дуел",
 	}
-	kindOrder = []string{"day", "topic", "duel", "royal"}
+	kindOrder = []string{"day", "topic", "duel"}
 )
 
 // kindName is a kind of game as the admin page says it.
@@ -291,8 +290,7 @@ var deviceNames = map[string]string{
 // pushNames are the kinds of notifications as they're counted (pushKind.name; "stop": the day's last reminder), and as
 // the admin page says them.
 var pushNames = []struct{ kind, name string }{
-	{"day", "Въпросите на деня"}, {"stop", "Спираме напомнянията"}, {"friends", "Приятели и резултати"}, {"royal", "Роял"},
-	{"asked", "Роял, поискан"},
+	{"day", "Въпросите на деня"}, {"stop", "Спираме напомнянията"}, {"friends", "Приятели"},
 }
 
 // FunnelWeeks and SplitWeeks are how many weeks of first days the admin page tells: the funnel's, week by week; the

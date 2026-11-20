@@ -474,7 +474,8 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 		return nil, err
 	}
 	var games, duelsWon, friends, topicsPlayed, types, fullDays, fast int
-	var perfect, nightOwl, earlyBird, topicPerfect, royalWin bool
+	var perfect, nightOwl, earlyBird, topicPerfect bool
+	royalWin := false // Роял is gone, its tournaments with it
 	err = db.QueryRowContext(ctx, `SELECT
 		(SELECT count(*) FROM runs WHERE user_id = ?1 AND finished_at IS NOT NULL),
 		(SELECT count(*) FROM `+duelResults+` WHERE outcome = 'won'),
@@ -500,12 +501,10 @@ func (g *Game) measure(ctx context.Context, userID int64) (map[string]int, error
 			AND `+bulgarianHour("finished_at")+` < 7),
 		EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'topic' AND finished_at IS NOT NULL
 			AND rights = `+strconv.Itoa(Length)+` AND json_array_length(questions) = `+strconv.Itoa(Length)+`),
-		(SELECT count(*) FROM (SELECT day FROM goals_done WHERE user_id = ?1 GROUP BY day HAVING count(*) >= ?2)),
-		EXISTS (SELECT 1 FROM royal_players p WHERE p.user_id = ?1 AND p.place = 1
-			AND (SELECT count(*) FROM royal_players o WHERE o.royal_id = p.royal_id) > 1)`,
+		(SELECT count(*) FROM (SELECT day FROM goals_done WHERE user_id = ?1 GROUP BY day HAVING count(*) >= ?2))`,
 		userID, GoalsPerDay, BulgariaTopic, FastMs, cluesIDs(g.Bank())).
 		Scan(&games, &duelsWon, &friends, &topicsPlayed, &types, &perfect, &fast, &nightOwl, &earlyBird,
-			&topicPerfect, &fullDays, &royalWin)
+			&topicPerfect, &fullDays)
 	if err != nil {
 		return nil, err
 	}

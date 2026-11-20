@@ -6,7 +6,7 @@ import { ordinal } from "../lib/ordinal.ts";
 import { play } from "../lib/sound.ts";
 import { hyphenate, withWord } from "../lib/words.ts";
 import { formatNumber } from "../ui.ts";
-import { countedWords, percent, rare, withOwn } from "./numbers.ts";
+import { percent, rare, withOwn } from "./numbers.ts";
 import { optionSizes, overSizes } from "./sizes.ts";
 import type {
   Answer,
@@ -58,11 +58,9 @@ function wholeWords(text: string): Child {
 /** How everyone did with a question, in one quiet line under its verdict, as each kind of question counts right:
  * „Вярно отговарят 34% от играчите днес.“ for the day's ten (its players today), without „днес“ for everyone ever;
  * the player among them (withOwn), as on the answers' shares. A right answer few others got stands out, said as the feat it is („Познаха го само 12% от играчите днес.“), and
- * nobody else right is said as such, never as „0%“. Nothing while the question has too few answers to say. A game's
- * own crowd, counted (Роял's), says how many of its players knew it (countedWords). */
+ * nobody else right is said as such, never as „0%“. Nothing while the question has too few answers to say. */
 export function crowdLine(type: View["type"], c: Crowd | undefined, right: boolean): Child {
   if (!c) return null;
-  if (c.counts) return countedLine(c, right);
   const all = withOwn(c, -1, right).right;
   const s = `${percent(all)} от играчите${c.today ? " днес" : ""}`;
   if (c.right === 0) {
@@ -88,27 +86,16 @@ export function crowdLine(type: View["type"], c: Crowd | undefined, right: boole
   return h("p", { class: "crowd-says" }, says);
 }
 
-/** How a game's own players did, counted (Роял's): „Познаха 3 от 12.“ (countedWords). */
-function countedLine(c: Crowd, right: boolean): Child {
-  const text = countedWords(c, right);
-  return text ? h("p", { class: "crowd-says" }, text) : null;
-}
-
 /** The shares on each answer, where the question has had enough answers to say: each in its place beside the answer
  * now, unseen, so that the answers settle into their place with them (with the right one marked: run.ts, settle) and
  * none grows when they show; and shown by the function returned, a bar behind each answer filling in as long as the
- * share that gave it. A crowd few enough to count (Роял's) says how many gave each answer, not what share. The
- * player's own answer is among them (withOwn: `mine`, the place they picked, -1 for none). */
+ * share that gave it. The player's own answer is among them (withOwn: `mine`, the place they picked, -1 for none). */
 function crowdOnAll(buttons: HTMLElement[], crowd: Crowd | undefined, mine: number): () => void {
   const c = crowd && withOwn(crowd, mine, false);
   const shares = buttons.flatMap((b, i) => {
     const x = c?.picks?.[i];
     if (!c || x === undefined) return [];
-    const share = h(
-      "span",
-      { class: "value crowd-share unseen" },
-      c.counts ? String(Math.round(x * c.answers)) : percent(x),
-    );
+    const share = h("span", { class: "value crowd-share unseen" }, percent(x));
     b.append(share);
     return [{ b, share, x }];
   });

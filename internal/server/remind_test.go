@@ -18,12 +18,10 @@ func TestRemindMinute(t *testing.T) {
 		{[]int{hm(10, 0), hm(12, 0)}, hm(10, 30)},             // the middle two's middle
 		{[]int{hm(7, 0)}, hm(8, 0)},                           // not before 8:00
 		{[]int{hm(0, 10)}, hm(8, 0)},                          // a night owl's morning
-		{[]int{hm(21, 0)}, hm(20, 30)},                        // just before Роял
-		{[]int{hm(21, 10)}, hm(20, 40)},                       // still before it
-		{[]int{hm(21, 20)}, hm(20, 30)},                       // in Роял's evening: before it
-		{[]int{hm(23, 50)}, hm(20, 30)},                       // at most 21:30, which is Роял's
-		{[]int{hm(22, 30), hm(22, 0), hm(18, 0)}, hm(20, 30)}, // 21:30, the latest, is Роял's too
-		{[]int{hm(20, 0), hm(21, 0), hm(9, 0)}, hm(19, 30)},   // an evening player before Роял
+		{[]int{hm(21, 20)}, hm(20, 50)},                       // half an hour before, in the evening too
+		{[]int{hm(23, 50)}, hm(21, 30)},                       // at most 21:30
+		{[]int{hm(22, 30), hm(22, 0), hm(18, 0)}, hm(21, 30)}, // the latest
+		{[]int{hm(20, 0), hm(21, 0), hm(9, 0)}, hm(19, 30)},   // an evening player
 	} {
 		if got := RemindMinute(c.finished); got != c.want {
 			t.Errorf("%v: %d:%02d, want %d:%02d", c.finished, got/60, got%60, c.want/60, c.want%60)

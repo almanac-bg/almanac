@@ -146,7 +146,7 @@ func (w *world) prefs(p *player) error {
 				VALUES (?, ?, 'seed', 'seed', ?)`, fmt.Sprintf("https://push.invalid/seed/%d", p.id), p.id, now); err != nil {
 				return err
 			}
-			for _, kind := range []string{"day", "friends", "royal"} {
+			for _, kind := range []string{"day", "friends"} {
 				if err := w.exec(`INSERT INTO push_prefs (user_id, kind, wanted) VALUES (?, ?, ?)`,
 					p.id, kind, b2i(w.chance(0.85))); err != nil {
 					return err

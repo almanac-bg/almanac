@@ -1,5 +1,5 @@
-// Notifications: the day's reminder (at the player's own hour), word of people and results (a request to be friends,
-// how a Роял ended for a player who didn't see its end) and Роял's call, each kind on or off as the player chooses.
+// Notifications: the day's reminder (at the player's own hour) and word of people (a request to be friends), each kind
+// on or off as the player chooses.
 // The browser asks the player first; the service worker (/sw.js) shows them.
 
 import { pushKey } from "../state.ts";
@@ -83,8 +83,8 @@ function key(base64url: string): Uint8Array<ArrayBuffer> {
   return out;
 }
 
-/** The kinds of notification a player chooses: the day's reminder, word from friends and of games, Роял's call. */
-export type PushKind = "day" | "friends" | "royal";
+/** The kinds of notification a player chooses: the day's reminder, word from friends. */
+export type PushKind = "day" | "friends";
 export type PushPrefs = Record<PushKind, boolean>;
 
 /** Which kinds of notification the player gets. */

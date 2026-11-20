@@ -145,13 +145,7 @@ export function nextSteps(main: Child, others: Child[]): Child {
 }
 
 /** Going over a game, once it's over: each question, the answer, what was given, the fact behind it, and a word
- * about the question if something's wrong with it, opened right under the button (which goes once they're open). */
-export function review(load: () => Promise<Reviewed[]>): Child {
-  const { button, list, opened } = reviewParts(load);
-  return h("section", { class: "review" }, () => (opened() ? null : button), list);
-}
-
-/** The questions of a game to go over, in two parts: the button, kept with the other ways on under the result, and
+ * about the question if something's wrong with it. In two parts: the button, kept with the other ways on under the result, and
  * the list it opens, kept for the end of the screen; the button takes the player there. */
 export function reviewParts(load: () => Promise<Reviewed[]>): { button: Child; list: Child; opened: () => boolean } {
   const items = signal<Reviewed[] | null>(null);

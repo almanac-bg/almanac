@@ -205,16 +205,6 @@ func TestGradedAsShown(t *testing.T) {
 	}
 }
 
-// Роял deals its games as they start, and keeps the versions dealt: so does a run of its.
-func TestLiveGamesKeepTheirVersions(t *testing.T) {
-	w := setup(t)
-	for _, p := range drawRoyal(w.b, nil, nil, nil, newRand()) {
-		if q, _ := w.b.Get(p.ID); p.V == "" || p.V != bank.Version(q) {
-			t.Fatalf("an evening's question without its version: %+v", p)
-		}
-	}
-}
-
 // A recording is a game whose every question is still in play as it was played: none retired, none changed since.
 func TestRecordingsAsPlayed(t *testing.T) {
 	w := setup(t)

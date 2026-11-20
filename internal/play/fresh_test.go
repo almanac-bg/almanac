@@ -27,11 +27,6 @@ var freshFor = map[string]string{
 	"Draw":          "a topic",
 	"StartLive":     "a live duel",
 	"StartRecorded": "a recording",
-	"StartRoyal":    "Роял",
-	"EnterRoyal":    "Роял",
-	"DrawRoyal":     "Роял",
-	"DealRoyal":     "Роял",
-	"drawRoyal":     "Роял",
 	// By design:
 	"StartDay": "by design: the day's ten are the same for everyone",
 	"drawDay":  "by design: the day's ten are the same for everyone",
@@ -39,7 +34,7 @@ var freshFor = map[string]string{
 
 // TestNothingPlayedAgain holds the rule across every way a game starts: a player who has just played a game, starting
 // any other kind (or the same again: a rematch), is dealt questions they haven't seen while the bank has them. Live
-// duels and Роял are drawn for all their players: none of them has seen a question dealt while some are left
+// duels are drawn for all their players: none of them has seen a question dealt while some are left
 // that none has. A recording is a whole game, someone else's: one with at most RecordingSeen of its questions seen
 // while there's such a game. The player has played most of the bank before (all but three topics), so that a draw
 // that didn't prefer what they haven't seen would deal it again almost surely. The repeat by design (freshFor) is the
@@ -85,25 +80,6 @@ func TestNothingPlayedAgain(t *testing.T) {
 			f.must(err)
 			f.w.play(f.ana, l.Runs[0], repeat(f.w.right, Length)...)
 		}},
-		{"Роял", func(f *fresh) {
-			id, runs := f.royal()
-			for n := range RoyalLength {
-				if n > 0 {
-					_, err := f.w.g.ShowRoyal(f.ctx(), n, id)
-					f.must(err)
-				}
-				for _, u := range []int64{f.ana, f.bo} {
-					f.w.wait(2 * time.Second)
-					_, err := f.w.g.AnswerRoyal(f.ctx(), u, runs[u], n, f.w.right(runs[u], n), f.w.now, time.Time{},
-						f.w.dealt(runs[u], n))
-					f.must(err)
-				}
-				_, err := f.w.g.RevealRoyal(f.ctx(), id)
-				f.must(err)
-			}
-			_, err := f.w.g.SettleRoyal(f.ctx(), id)
-			f.must(err)
-		}},
 	}
 
 	// The games held to the rule: what each deals the player, of which questions (pool), drawn for whom (players).
@@ -129,12 +105,6 @@ func TestNothingPlayedAgain(t *testing.T) {
 			return l.Picks, anyQuestion, []int64{f.ana, f.bo}
 		}},
 		{"a recording", nil},
-		{"Роял", func(f *fresh) ([]Pick, func(bank.Question) bool, []int64) {
-			_, runs := f.royal()
-			return f.w.picks(runs[f.ana]), func(q bank.Question) bool {
-				return q.Base().Type == "choice" || q.Base().Type == "truefalse"
-			}, []int64{f.ana, f.bo}
-		}},
 	}
 	for name, game := range freshFor {
 		if !strings.HasPrefix(game, "by design") && !slices.ContainsFunc(nexts, func(n next) bool { return n.name == game }) {
@@ -275,24 +245,6 @@ func (f *fresh) seen(u int64) map[string]bool {
 	}
 	f.seenBy[u] = out
 	return out
-}
-
-// royal opens an evening's Роял for Бо (its first in), Ана comes too, and its games begin, as the hub does them
-// (royal.Hub.Join, begin): the tournament, and each one's run.
-func (f *fresh) royal() (int64, map[int64]int64) {
-	start := time.Date(2026, 11, 13, 21, 0, 0, 0, Bulgaria)
-	picks, err := f.w.g.DrawRoyal(f.ctx(), []int64{f.bo})
-	f.must(err)
-	id, err := f.w.g.NewRoyal(f.ctx(), start, picks)
-	f.must(err)
-	for _, u := range []int64{f.bo, f.ana} {
-		f.must(f.w.g.JoinRoyal(f.ctx(), id, u))
-	}
-	_, err = f.w.g.DealRoyal(f.ctx(), []int64{id}, []int64{f.bo, f.ana})
-	f.must(err)
-	runs, _, err := f.w.g.StartRoyal(f.ctx(), id, []int64{f.bo, f.ana})
-	f.must(err)
-	return id, runs
 }
 
 // recordingsSeen is, of the games others have finished that a recording may be (none with a question barred now, none

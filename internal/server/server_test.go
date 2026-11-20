@@ -1128,7 +1128,7 @@ func TestNotifications(t *testing.T) {
 	}
 }
 
-// Each player chooses the kinds of notification they get: the day's reminder, word from friends, Роял's call.
+// Each player chooses the kinds of notification they get: the day's reminder, word from friends.
 func TestPushKinds(t *testing.T) {
 	s, g, fake, subscribe := pushWorld(t)
 	ana, anaID := g.guest()
@@ -1136,13 +1136,13 @@ func TestPushKinds(t *testing.T) {
 	subscribe(ana, "/ana")
 	subscribe(bo, "/bo")
 
-	if _, out := ana.call("GET", "/api/push/prefs", nil); fmt.Sprint(out["prefs"]) != "map[day:true friends:true royal:false]" {
+	if _, out := ana.call("GET", "/api/push/prefs", nil); fmt.Sprint(out["prefs"]) != "map[day:true friends:true]" {
 		t.Fatalf("the defaults: %v", out)
 	}
 	if status, _ := ana.call("PATCH", "/api/push/prefs", map[string]any{"kind": "news", "on": true}); status != 400 {
 		t.Fatalf("an unknown kind: %d", status)
 	}
-	if _, out := ana.call("PATCH", "/api/push/prefs", map[string]any{"kind": "friends", "on": false}); fmt.Sprint(out["prefs"]) != "map[day:true friends:false royal:false]" {
+	if _, out := ana.call("PATCH", "/api/push/prefs", map[string]any{"kind": "friends", "on": false}); fmt.Sprint(out["prefs"]) != "map[day:true friends:false]" {
 		t.Fatalf("friends off: %v", out)
 	}
 	bo.call("PATCH", "/api/push/prefs", map[string]any{"kind": "day", "on": false})
@@ -1155,14 +1155,12 @@ func TestPushKinds(t *testing.T) {
 	// Ana turned word from friends off; the day's reminders she still gets.
 	m := push.Message{Title: "Т", Body: "Т", URL: "/"}
 	s.notifySent(t.Context(), pushFriends, m, anaID)
-	s.notifySent(t.Context(), pushRoyal, m, anaID)
 	if got := fake.count("/ana"); got != 1 {
 		t.Fatalf("ana got %d pushes, want 1", got)
 	}
 	s.notifySent(t.Context(), pushDay, m, anaID)
-	s.notifySent(t.Context(), pushAsked, m, anaID)
-	if got := fake.count("/ana"); got != 3 {
-		t.Fatalf("ana got %d pushes, want 3", got)
+	if got := fake.count("/ana"); got != 2 {
+		t.Fatalf("ana got %d pushes, want 2", got)
 	}
 }
 
@@ -1208,60 +1206,6 @@ func TestReminderNamesAFriend(t *testing.T) {
 	// Cy isn't Ana's friend, and has no streak.
 	if m := s.reminder(ctx, today, cyID); m.Body != "Десет въпроса, един опит. До полунощ." {
 		t.Fatalf("someone else's friend: %+v", m)
-	}
-}
-
-// Players say they'll come to the evening's Роял; when its lobby opens they're called, with those who want the call
-// every evening. Once an evening.
-func TestRoyalPlans(t *testing.T) {
-	s, g, fake, subscribe := pushWorld(t)
-	ana, _ := g.guest()
-	bo, boID := g.guest()
-	cy, cyID := g.guest()
-	for p, path := range map[*player]string{ana: "/ana", bo: "/bo", cy: "/cy"} {
-		subscribe(p, path)
-	}
-	// Ana turned Роял's notifications off; she still comes tonight.
-	ana.call("PATCH", "/api/push/prefs", map[string]any{"kind": "royal", "on": false})
-	cy.call("PATCH", "/api/push/prefs", map[string]any{"kind": "royal", "on": true})
-
-	if status, out := ana.call("POST", "/api/royal/plan", map[string]any{}); status != 200 || out["coming"] != 1.0 || out["planned"] != true {
-		t.Fatalf("Ana's plan: %d %v", status, out)
-	}
-	ana.call("POST", "/api/royal/plan", map[string]any{}) // again changes nothing
-	if _, out := bo.call("GET", "/api/royal/tonight", nil); out["coming"] != 1.0 || out["planned"] != false ||
-		len(out["friends"].([]any)) != 0 {
-		t.Fatalf("tonight, to Bo: %v", out)
-	}
-	if res, err := http.Get(g.url + "/api/royal/tonight"); err != nil || res.StatusCode != 200 {
-		t.Fatalf("tonight, to someone not signed in: %v %v", res, err)
-	}
-	bo.call("POST", "/api/royal/plan", map[string]any{})
-	if _, out := bo.call("DELETE", "/api/royal/plan", nil); out["coming"] != 1.0 || out["planned"] != false {
-		t.Fatalf("Bo changes his mind: %v", out)
-	}
-
-	_, out := ana.call("GET", "/api/royal/tonight", nil)
-	start := time.UnixMilli(int64(out["glance"].(map[string]any)["next"].(float64)))
-	if n := s.callRoyalSent(t.Context(), start); n != 2 || fake.count("/ana") != 1 || fake.count("/cy") != 1 || fake.count("/bo") != 0 {
-		t.Fatalf("called %d: ana %d, cy %d, bo %d", n, fake.count("/ana"), fake.count("/cy"), fake.count("/bo"))
-	}
-	if n := s.callRoyalSent(t.Context(), start); n != 0 {
-		t.Fatal("called twice")
-	}
-	// A minute before the start: Ana said she'd come and isn't in; Bo is in, his screen away; Cy is in, on it.
-	if n := s.callSoonSent(t.Context(), start, []int64{boID}, []int64{boID, cyID}); n != 2 || fake.count("/ana") != 2 ||
-		fake.count("/bo") != 1 || fake.count("/cy") != 1 {
-		t.Fatalf("called again %d: ana %d, bo %d, cy %d", n, fake.count("/ana"), fake.count("/bo"), fake.count("/cy"))
-	}
-	if n := s.callSoonSent(t.Context(), start, []int64{boID}, []int64{boID}); n != 0 {
-		t.Fatal("called again twice")
-	}
-	// Cy, Ana's friend, hears it's her who's coming.
-	befriend(ana, cy)
-	_, me := ana.call("GET", "/api/me", nil)
-	if _, out := cy.call("GET", "/api/royal/tonight", nil); fmt.Sprint(out["friends"]) != fmt.Sprint([]any{name(me)}) {
-		t.Fatalf("tonight, to Ana's friend: %v", out)
 	}
 }
 

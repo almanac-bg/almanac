@@ -30,7 +30,7 @@ import (
 var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/$`),
 	regexp.MustCompile(`^/play/[a-z]+$`),
-	regexp.MustCompile(`^/(duel|royal|ranks|rewards|wardrobe|me|friends|settings|almanac|games)$`),
+	regexp.MustCompile(`^/(duel|ranks|rewards|wardrobe|me|friends|settings|almanac|games)$`),
 	regexp.MustCompile(`^/duel/([0-9]{1,12}|live)$`),
 	regexp.MustCompile(`^/games/[0-9]{1,12}$`),
 	regexp.MustCompile(`^/hand/[A-Za-z0-9_-]{43}$`),
@@ -45,7 +45,6 @@ var screens = []struct {
 	file string
 }{
 	{regexp.MustCompile(`^/duel/live$`), "live.js"},
-	{regexp.MustCompile(`^/royal$`), "royal.js"},
 	{regexp.MustCompile(`^/me$`), "me.js"},
 	{regexp.MustCompile(`^/settings$`), "settings.js"},
 	{regexp.MustCompile(`^/rewards$`), "rewards.js"},
@@ -257,7 +256,7 @@ func (s *Server) there(r *http.Request) bool {
 // preview is what a link to this page shows when it's sent (Viber, Messenger, WhatsApp): a player's page, whose it
 // is.
 func (s *Server) preview(r *http.Request) (title, description string) {
-	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми, дуели и Роял на живо. Всеки отговор носи по нещо ново."
+	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри по теми и дуели. Всеки отговор носи по нещо ново."
 	switch path := r.URL.Path; {
 	case strings.HasPrefix(path, "/players/"):
 		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {

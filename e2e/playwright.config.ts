@@ -62,9 +62,6 @@ export default defineConfig({
       BANK_DIR: "bank/sample",
       DB_PATH: db,
       MAIL_DIR: "test-results/mail",
-      // A Роял every half minute, its lobby open the 25 seconds before, instead of every evening at 21:00.
-      ROYAL_EVERY: "30s",
-      ROYAL_LOBBY: "25s",
       // How players answered a question shows from its first answer, not its tenth or twentieth.
       CROWD_FROM: "1",
     },

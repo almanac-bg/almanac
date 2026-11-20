@@ -5,8 +5,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   test.setTimeout(120_000);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Десет въпроса за днес" })).toBeVisible();
-  // A new player sees the day and the topics: duels come after a first game, Роял only while it's on (the test server
-  // always has a lobby open).
+  // A new player sees the day and the topics: duels come after a first game.
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
   await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toHaveCount(0);
   await expect(page.locator(".streak-chip")).toHaveCount(0);
@@ -23,8 +22,6 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.keyboard.press("Escape");
   // After the day, the other ways to play are right there: with others, and by topic.
   await expect(page.locator(".modes").getByRole("link", { name: /Дуел/ })).toBeVisible();
-  // As the player now is (the day was fetched before there was one): Роял too, its lobby open, as a reload has it.
-  await expect(page.locator(".modes").getByRole("link", { name: /Роял/ })).toBeVisible();
   await expect(page.locator(".topics").getByRole("link", { name: /История/ })).toBeVisible();
   // One gold way on under the result: another game.
   await expect(page.locator(".summary .btn.primary")).toHaveText("Още десет");
@@ -374,12 +371,6 @@ test.describe("on a computer", () => {
     page,
   }) => {
     test.setTimeout(120_000);
-    // Роял's lobby closed (the test server opens one every few minutes): only it would fill the column beside the day.
-    // Asked for, not in the page, so that Начало is drawn from the answer changed here.
-    await page.route(/\/api\/day$/, async (route) => {
-      const response = await route.fetch();
-      await route.fulfill({ response, json: { ...(await response.json()), royalNow: false } });
-    });
     await page.goto("/ranks");
     await page.getByRole("link", { name: "Начало" }).click();
     await expect(page.locator(".day")).toBeVisible();

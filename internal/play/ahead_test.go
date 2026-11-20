@@ -220,7 +220,7 @@ func mustPicks(t *testing.T, s string) []Pick {
 }
 
 // A question due for review is dealt by no game from its date on: the days ahead drawn before it was due are drawn
-// again without it, and it is barred from every other game (DayQuestions: topics, duels, Роял). DaysUsed gives
+// again without it, and it is barred from every other game (DayQuestions: topics, duels). DaysUsed gives
 // the days' questions, and the last day drawn.
 func TestNoGameDealsAQuestionDueForReview(t *testing.T) {
 	w := setup(t)

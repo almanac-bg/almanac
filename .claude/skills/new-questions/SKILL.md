@@ -80,7 +80,7 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
    bank's size per topic after; the body lists the ids by topic), `git push`. Then on the server:
    `ssh -i ~/.ssh/hetzner -o BatchMode=yes root@2.31.121.12 almanac-bank`. Its first line must be the bank's count
    (`…: N questions (M live)`, M the new live total), its second the problems counted (`…: 0 errors, W warnings
-   (by rule)`: anything but 0 errors stops it before the bank on the server moves, with the errors), and its last `live: <your commit>` (the server confirmed it plays it) or, on a Роял evening, `held: <your commit>` (in play once Роял is over). If the push
+   (by rule)`: anything but 0 errors stops it before the bank on the server moves, with the errors), and its last `live: <your commit>` (the server confirmed it plays it). If the push
    or the server step fails, say so; the batch is safe in the commit.
 10. **Tell the owner,** in a few lines: how many went in, the runway before → after, how many the checks dropped and
    the worst they caught, what was fixed in older questions, a handful of the new questions (question → answer), and

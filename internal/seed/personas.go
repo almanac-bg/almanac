@@ -267,11 +267,7 @@ func (w *world) about(p *player) (string, error) {
 		if !w.opt.small && (standing.Division.ID != "legend" || !play.Placed(standing.Rated)) {
 			return fail("isn't in Легенда")
 		}
-		var wins int
-		if err := w.one(&wins, `SELECT count(*) FROM royal_players WHERE user_id = ? AND place = 1`, p.id); err != nil {
-			return "", err
-		}
-		return fmt.Sprintf("the strongest player: Легенда, a streak from the first day, Роял won %d times; %s", wins, facts), nil
+		return "the strongest player: Легенда, a streak from the first day; " + facts, nil
 	case keyAdmin:
 		return "an admin (/admin), who plays most days; " + facts, nil
 	}

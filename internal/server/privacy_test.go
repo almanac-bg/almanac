@@ -42,7 +42,7 @@ func TestRequestLog(t *testing.T) {
 	token := strings.Repeat("T", 43)
 	for _, c := range []struct{ path string }{
 		{"/hand/" + token}, {"/players/secret_tag"},
-		{"/api/players/secret_tag"}, {"/api/health"}, {"/api/royal/tonight"},
+		{"/api/players/secret_tag"}, {"/api/health"},
 	} {
 		if status, _ := g.from("203.0.113.7", "GET", c.path, ""); status == 0 {
 			t.Fatal(c.path)
@@ -77,7 +77,7 @@ func TestRequestLog(t *testing.T) {
 			t.Errorf("%s (%v): an address %v, want %v", route, l["status"], has, ip)
 		}
 	}
-	for _, route := range []string{"/api/health", "/api/royal/tonight"} {
+	for _, route := range []string{"/api/health"} {
 		if l, ok := routes[route]; ok {
 			t.Errorf("a poll logged: %v", l)
 		}

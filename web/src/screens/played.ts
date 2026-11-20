@@ -20,8 +20,6 @@ function what(s: Played): string {
       return s.day ? `Въпросите на деня · ${issueWords(undefined, s.day)}` : "Въпросите на деня";
     case "duel":
       return "Дуел";
-    case "royal":
-      return "Роял";
     default:
       return topics.find((c) => c.id === s.category)?.name ?? "Тема";
   }

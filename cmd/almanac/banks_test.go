@@ -77,8 +77,8 @@ func TestKeptBanks(t *testing.T) {
 	}
 	os.WriteFile(file, was, 0o644)
 
-	// Copies of more commits (d twice, as after a restart): the newest keepBanks of different commits stay, and those
-	// held, however old.
+	// Copies of more commits (d twice, as after a restart): the newest keepBanks of different commits stay, and the
+	// one in play, however old.
 	var last *bank.Bank
 	for _, c := range []byte{'c', 'd', 'd', 'e', 'f'} {
 		at(commit(c))
@@ -86,7 +86,7 @@ func TestKeptBanks(t *testing.T) {
 			t.Fatal("no copy")
 		}
 	}
-	k.prune([]*bank.Bank{a, last})
+	k.prune(a)
 	var got []string
 	for _, c := range k.kept() {
 		got = append(got, c.commit[:1])
@@ -100,7 +100,7 @@ func TestKeptBanks(t *testing.T) {
 	if kept := k.kept(); kept[0].commit != commit('f') {
 		t.Fatalf("a half copy counts: %v", kept)
 	}
-	k.prune([]*bank.Bank{last})
+	k.prune(last)
 	if entries, _ := os.ReadDir(k.dir); len(entries) != keepBanks {
 		t.Fatalf("after pruning: %d entries", len(entries))
 	}

@@ -297,7 +297,7 @@ func TestEachCopyIsNew(t *testing.T) {
 	}
 }
 
-// A copy is made every quarter of an hour, seven minutes past: away from the hour's and Роял's work.
+// A copy is made every quarter of an hour, seven minutes past: away from the hour's work.
 func TestNextCopy(t *testing.T) {
 	for at, want := range map[string]string{"10:00": "10:07", "10:06": "10:07", "10:07": "10:22", "10:30": "10:37", "10:59": "11:07"} {
 		in, _ := time.Parse("15:04", at)

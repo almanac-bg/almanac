@@ -94,7 +94,7 @@ type Games struct {
 var gameKinds = map[string]string{
 	"day":    `AND kind = 'day'`,
 	"topic":  `AND kind = 'topic'`,
-	"others": `AND kind IN ('duel', 'royal')`,
+	"others": `AND kind = 'duel'`,
 }
 
 // GamesOf reads a page of a player's finished games, newest first: of a kind (gameKinds; any other: all), from where the

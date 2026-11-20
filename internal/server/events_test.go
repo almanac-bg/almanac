@@ -10,7 +10,7 @@ import (
 )
 
 // A stream stays open over HTTP/2 through a quiet spell longer than the write deadline (it used to be reset then,
-// so the Роял lobby said „Връзката прекъсна“ every few seconds).
+// so a screen waiting on one said „Връзката прекъсна“ every few seconds).
 func TestStreamOutlivesWriteDeadline(t *testing.T) {
 	was := writeWait
 	writeWait = 100 * time.Millisecond

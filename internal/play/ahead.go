@@ -19,7 +19,7 @@ import (
 
 // The days ahead: the day's questions are drawn up to Ahead days before their day, and no other game deals them
 // (dayQuestions), so that the day stays one attempt for everyone. Were only today's ten kept out, a question would
-// reach a topic game, a duel or Роял before its own day, and the players who play most would meet more and
+// reach a topic game or a duel before its own day, and the players who play most would meet more and
 // more of the day as a rerun, with its answer known. The questions that belong to a date („На този ден“) are kept out
 // the same way however far off their date is, until a day has dealt them (waiting): a date has only a few, one a year.
 //
@@ -259,7 +259,7 @@ func barsOf(days map[string][]Pick, today string, b *bank.Bank) dayBars {
 
 // waiting is whether a question belongs to a date still to come (bank.Tail.On: every year's, or that year's from today
 // on): it waits for it, out of every other game, until a day has dealt it. „На този ден“ has a few questions a date,
-// each for one year; a topic game, a duel or Роял that dealt one first would leave its date empty a year sooner,
+// each for one year; a topic game or a duel that dealt one first would leave its date empty a year sooner,
 // and show its answer before its day.
 func waiting(q bank.Question, today string) bool {
 	for _, d := range q.Extra().On {

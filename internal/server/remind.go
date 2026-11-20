@@ -23,8 +23,8 @@ import (
 // It stops when it doesn't help: after RemindIgnored reminders reached the player since they last played the day,
 // none more; on the RemindQuietAfter-th day without play, one last word that the reminders stop (with the streak that
 // ended), then nothing until they play the day again, when the reminders start again by themselves. A reminder that
-// reached none of their devices (a service down, the game's keys wrong) counts for neither. Word from friends and
-// Роял's call go as before.
+// reached none of their devices (a service down, the game's keys wrong) counts for neither. Word from friends goes
+// as before.
 //
 // A player held out (play.HeldReminders, a tenth of them: the owner's call, so that /admin can tell what the
 // reminders do) is claimed the same, at the same hour, by the same rules, marked held, and never sent: what they would
@@ -39,9 +39,6 @@ const (
 	RemindFrom = 7
 	// RemindEarliest and RemindLatest bound the hour: 08:00 to 21:30.
 	RemindEarliest, RemindLatest = 8 * 60, 21*60 + 30
-	// Роял's evening (its lobby, its game) is no time for the day's reminder: one that would fall in it goes at
-	// RemindBeforeRoyal.
-	RoyalQuietFrom, RoyalQuietTo, RemindBeforeRoyal = 20*60 + 45, 21*60 + 30, 20*60 + 30
 	// RemindIgnored is how many reminders in a row a player may leave without playing the day before they stop.
 	RemindIgnored = 3
 	// RemindQuietAfter is the day without play that says the reminders stop.
@@ -50,7 +47,7 @@ const (
 
 // RemindMinute is the minute of the day, in Bulgaria, a player is reminded at, from the minutes of the day they
 // finished the day's questions on their last days played (RemindFrom of them): the median, RemindAhead sooner, between
-// RemindEarliest and RemindLatest and never in Роял's evening; RemindDefault without any.
+// RemindEarliest and RemindLatest; RemindDefault without any.
 func RemindMinute(finished []int) int {
 	if len(finished) == 0 {
 		return RemindDefault
@@ -60,11 +57,7 @@ func RemindMinute(finished []int) int {
 	if len(s)%2 == 0 {
 		median = (s[len(s)/2-1] + s[len(s)/2]) / 2
 	}
-	m := min(max(median-RemindAhead, RemindEarliest), RemindLatest)
-	if m >= RoyalQuietFrom && m <= RoyalQuietTo {
-		m = RemindBeforeRoyal
-	}
-	return m
+	return min(max(median-RemindAhead, RemindEarliest), RemindLatest)
 }
 
 // reminders keeps, for the day, when each player is due (a minute of the day; never: past its end). Lost in a restart,

@@ -96,7 +96,7 @@ func TestWhereGuestsCameFrom(t *testing.T) {
 		return from.String
 	}
 	for path, want := range map[string]string{"/f/abcd1234": "other", "/": "home",
-		"/players/ana": "player", "/royal": "other"} {
+		"/players/ana": "player", "/duel": "other"} {
 		_, out := g.player().call("POST", "/api/guest", map[string]any{"from": path})
 		if got := cameFrom(out); got != want {
 			t.Errorf("from %s: %q, want %q", path, got, want)
@@ -117,12 +117,12 @@ func TestTheClientsCounts(t *testing.T) {
 	g := start(t)
 	p := g.player() // no profile needed: a notification is opened before the page knows who plays
 	for key, want := range map[string]int{"share:day": 400, "pushask:yes": 200, "push:open:day": 200,
-		"push:open:asked": 200, "push:open:news": 400, "visit:home": 400, "": 400} {
+		"push:open:friends": 200, "push:open:asked": 400, "push:open:royal": 400, "push:open:news": 400, "visit:home": 400, "": 400} {
 		if status, _ := p.call("POST", "/api/tally", map[string]string{"key": key}); status != want {
 			t.Errorf("%q: %d, want %d", key, status, want)
 		}
 	}
-	if g.counted("share:day") != 0 || g.counted("push:open:asked") != 1 || g.counted("visit:home") != 0 {
+	if g.counted("share:day") != 0 || g.counted("push:open:friends") != 1 || g.counted("visit:home") != 0 {
 		t.Fatal("not counted")
 	}
 }

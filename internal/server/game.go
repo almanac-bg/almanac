@@ -31,10 +31,6 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, error) {
 	day := s.game.Today()
 	out := map[string]any{"day": day, "issue": play.Issue(day), "streak": 0, "run": nil}
-	// Роял's lobby open or its games under way: Начало shows it to everyone then, new players too (it's the best
-	// nudge there is), whatever play.NudgeRoyal says between evenings.
-	royalNow := s.royal.Glance().Phase != "soon"
-	out["royalNow"] = royalNow
 	var viewer int64
 	if u != nil {
 		viewer = u.ID
@@ -79,16 +75,10 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 			return nil, err
 		}
 		out["played"] = played
-		// Whether Роял is among the ways to play with others: not for a new player while its evenings are thin.
-		nudge, err := s.game.NudgeRoyal(ctx, u.ID)
-		if err != nil {
-			return nil, err
-		}
 		// A live game they're in, under way: Начало has the way back to it.
 		if p := s.playing(u.ID); p != nil {
 			out["playing"] = p
 		}
-		out["royal"] = nudge || royalNow
 		// A friend said yes to their request, and what came of a live duel they left: each told once (POST /api/told).
 		if out["accepted"], err = s.game.AcceptedOf(ctx, u.ID); err != nil {
 			return nil, err
@@ -205,24 +195,15 @@ func (s *Server) left(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"runs": runs})
 }
 
-// Playing is a live game the player is in, under way now, which their screen may have left: a live duel or tonight's
-// Роял. Only one is said, in that order: a player is rarely in both. A seat in Роял's lobby is one too, with its start
-// (Starts): it's kept while the player plays something else (royal.Hub.Waiting).
+// Playing is a live game the player is in, under way now, which their screen may have left: a live duel.
 type Playing struct {
-	Kind   string `json:"kind"` // "duel" or "royal"
-	Starts int64  `json:"starts,omitempty"`
+	Kind string `json:"kind"` // "duel"
 }
 
 // playing is the live game a player is in now, if any.
 func (s *Server) playing(id int64) *Playing {
-	switch {
-	case s.live.Playing(id):
+	if s.live.Playing(id) {
 		return &Playing{Kind: "duel"}
-	case s.royal.Playing(id):
-		return &Playing{Kind: "royal"}
-	}
-	if start, ok := s.royal.Waiting(id); ok {
-		return &Playing{Kind: "royal", Starts: start.UnixMilli()}
 	}
 	return nil
 }

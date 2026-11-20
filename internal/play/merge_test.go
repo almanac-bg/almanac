@@ -73,7 +73,7 @@ func TestMergeCarriesTheRest(t *testing.T) {
 		`UPDATE users SET frame = 'gold', backdrop = 'waves', level_seen = 7, unlocks_known = 1, recordings_told = 50,
 			systems_told = 'duel xp', streak_told = 'kept:2026-11-12', came_from = 'player', created_at = 5,
 			seen_at = 900 WHERE id = ?2`,
-		`UPDATE users SET level_seen = 3, recordings_told = 80, systems_told = 'royal', streak_told = 'ended:2026-11-01',
+		`UPDATE users SET level_seen = 3, recordings_told = 80, systems_told = 'points', streak_told = 'ended:2026-11-01',
 			came_from = 'home', created_at = 10, seen_at = 100 WHERE id = ?1`,
 		`INSERT INTO reports (question_id, user_id, text, at) VALUES ('his-001', ?2, 'Грешен отговор', 1)`,
 		`INSERT INTO push_reminded (user_id, day, at) VALUES (?2, '2026-11-11', 1), (?1, '2026-11-11', 2), (?2, '2026-11-10', 3)`,
@@ -105,7 +105,7 @@ func TestMergeCarriesTheRest(t *testing.T) {
 	if reports != 1 || reminded != 2 || queued != 2 {
 		t.Fatalf("%d reports, reminded on %d days, %d pushes on the way", reports, reminded, queued)
 	}
-	if frame != "gold" || backdrop != "waves" || level != 7 || recordings != 80 || systems != "royal duel xp" ||
+	if frame != "gold" || backdrop != "waves" || level != 7 || recordings != 80 || systems != "points duel xp" ||
 		streak != "kept:2026-11-12" {
 		t.Fatalf("look and told: %s %s, level %d, recordings %d, %q, %q", frame, backdrop, level, recordings, systems, streak)
 	}

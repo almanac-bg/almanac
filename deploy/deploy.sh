@@ -28,12 +28,10 @@
 #
 # Before the restart it drains the server (internal/server/drain.go): asked every few seconds, the server starts no
 # live duel, and says it's ready once those under way are over (each by its own clock, seven minutes at the most).
-# Near Роял, from 20:37 until the evening's games are over, it doesn't
-# drain: the restart waits, and never comes while the server's last answer said Роял is near or on (after three hours
-# of that the deploy gives up, nothing restarted). An answer that doesn't come (a timeout, an error, the server busy at
-# the evening's peak) is asked again, ever more slowly up to half a minute apart: it never counts as ready. Only these
-# restart without the server's ready: a server too old to drain (404 from the first answer on), one not running at all
-# (nothing to cut), and 45 minutes without ready since Роял was last near (a game stuck; cut all the same). Connections
+# An answer that doesn't come (a timeout, an error, the server busy) is asked again, ever more slowly up to half a
+# minute apart: it never counts as ready. Only these restart without the server's ready: a server too old to drain
+# (404 from the first answer on), one not running at all (nothing to cut), and 45 minutes without ready (a game stuck;
+# cut all the same). Connections
 # that come during the restart wait in systemd's socket (almanac.socket) for the new server.
 #
 # The database: a version that brings a migration the database hasn't had copies it as it first starts, before
@@ -186,10 +184,8 @@ fi
 if [ "$mode" != now ]; then
 	drained=1
 	began=$(date +%s)
-	since=$began # the drain's own clock: from the start, or from when Роял was last near (or thought so)
-	status=      # the server's last answer
-	royal=       # it said Роял is near or on
-	failed=0     # answers missed in a row
+	status=  # the server's last answer
+	failed=0 # answers missed in a row
 	told=-1
 	while :; do
 		code=$(curl -sk --max-time 10 --resolve almanac.bg:443:127.0.0.1 -o "$work/drain" -w '%{http_code}' \
@@ -203,10 +199,6 @@ if [ "$mode" != now ]; then
 				echo "ready: $status"
 				break
 				;;
-			esac
-			case $status in
-			*'"royal":true'*) royal=1 ;;
-			*) royal= ;;
 			esac
 			;;
 		404)
@@ -226,18 +218,11 @@ if [ "$mode" != now ]; then
 			echo "no answer to the drain (${code:-000}): asked again"
 			;;
 		esac
-		# While the last answer said Роял, a missed one too: no restart, and the drain's 45 minutes haven't begun.
-		if [ -n "$royal" ]; then
-			since=$now
-			if [ $((now - began)) -ge 10800 ]; then
-				echo "not deployed: Роял is still near or on after three hours ($status)" >&2
-				exit 1
-			fi
-		elif [ $((now - since)) -ge 2700 ]; then
+		waited=$((now - began))
+		if [ "$waited" -ge 2700 ]; then
 			echo "not ready after 45 minutes (${status:-no answer}): restarting all the same" >&2
 			break
 		fi
-		waited=$((now - began))
 		if [ "$failed" -eq 0 ] && [ $((waited / 60)) -gt "$told" ]; then
 			told=$((waited / 60))
 			echo "waiting ($told min): $status"

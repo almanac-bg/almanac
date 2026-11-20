@@ -57,7 +57,7 @@ func TestSeededGame(t *testing.T) {
 		}
 	}
 
-	// The history has what the screens show: every kind of game, friends, Роял.
+	// The history has what the screens show: every kind of game, friends.
 	for what, q := range map[string]string{
 		"day runs":         `SELECT count(*) FROM runs WHERE kind = 'day' AND finished_at IS NOT NULL`,
 		"topic runs":       `SELECT count(*) FROM runs WHERE kind = 'topic'`,
@@ -67,7 +67,6 @@ func TestSeededGame(t *testing.T) {
 		"requests waiting": `SELECT count(*) FROM friend_requests WHERE NOT declined`,
 		"achievements":     `SELECT count(*) FROM achievements`,
 		"goals done":       `SELECT count(*) FROM goals_done`,
-		"Роял places":      `SELECT count(*) FROM royal_players WHERE place IS NOT NULL`,
 		"placed ratings":   `SELECT count(*) FROM users WHERE rated >= 10`,
 		"placing ratings":  `SELECT count(*) FROM users WHERE rated BETWEEN 1 AND 9`,
 		"guests":           `SELECT count(*) FROM users WHERE email IS NULL`,
@@ -116,7 +115,7 @@ func TestSeededGame(t *testing.T) {
 	screens := []string{"/api/me", "/api/me/stats", "/api/me/games", "/api/me/games?kind=duel", "/api/me/progress",
 		"POST /api/me/news", "/api/day", "/api/runs/left",
 		"/api/playing", "/api/duels", "/api/ranks", "/api/ranks?among=friends", "/api/ranks?by=knowledge",
-		"/api/royal", "/api/royal/tonight", "/api/almanac", "/api/goals", "/api/friends",
+		"/api/almanac", "/api/goals", "/api/friends",
 		"/api/friends/requests", "/api/push/prefs", "/api/mail/prefs"}
 	for _, p := range personas {
 		for _, path := range append(screens, "/api/players/"+p.Tag) {

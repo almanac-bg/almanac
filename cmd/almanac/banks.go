@@ -134,15 +134,11 @@ func (k keptBanks) fallback() *bank.Bank {
 	return nil
 }
 
-// prune removes the copies no longer needed: all but those held (in play, or held for Роял) and the newest
-// keepBanks of different commits; and any copy left half made.
-func (k keptBanks) prune(held []*bank.Bank) {
+// prune removes the copies no longer needed: all but the one in play and the newest keepBanks of different commits;
+// and any copy left half made.
+func (k keptBanks) prune(playing *bank.Bank) {
 	if k.dir == "" {
 		return
-	}
-	keep := map[string]bool{}
-	for _, b := range held {
-		keep[b.Dir] = true
 	}
 	seen, n := map[string]bool{}, 0
 	for _, c := range k.kept() {
@@ -151,7 +147,7 @@ func (k keptBanks) prune(held []*bank.Bank) {
 		if fresh {
 			n++
 		}
-		if keep[c.dir] || fresh && n <= keepBanks {
+		if c.dir == playing.Dir || fresh && n <= keepBanks {
 			continue
 		}
 		if err := os.RemoveAll(c.dir); err != nil {

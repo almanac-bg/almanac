@@ -69,8 +69,8 @@ jobs:
         run: npx biome ci .
       - run: npm test
 
-  # One job per engine, side by side: all three in one job outgrew its time (Роял's evenings alone take minutes), so
-  # every run was cut off before it said anything.
+  # One job per engine, side by side: all three in one job outgrew its time, so every run was cut off before it said
+  # anything.
   browsers:
     name: Browsers (${{ matrix.engine }})
     if: github.event_name != 'pull_request'

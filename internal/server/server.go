@@ -3,12 +3,11 @@
 // It listens on the socket systemd hands it (deploy/almanac.socket), if it's given one, else on Config.Addr: with the
 // socket, connections that come while the server restarts wait for the new one instead of being refused. Before a
 // restart, a deploy drains the server (drain.go), so that the restart cuts no live duel; the limits' counts are kept
-// over it (Config.LimitsFile, limits.go), which count by network, from the player's own address even behind Cloudflare (address.go). A bank reloaded while Роял is
-// on waits for the evening to end (bank.go). Every API answer names the version (api.go), so that a page loaded before
+// over it (Config.LimitsFile, limits.go), which count by network, from the player's own address even behind Cloudflare (address.go). A bank reloaded goes
+// into play at once (bank.go). Every API answer names the version (api.go), so that a page loaded before
 // a deploy loads itself anew at a quiet moment (web/src/fresh.ts).
 //
-// A panic in a request ends that request alone (middleware.go); one in the work done in the background (Роял's clock,
-// the sweeps, the loops the program starts) is stopped there by package safe, and told as a problem, mailed to whoever
+// A panic in a request ends that request alone (middleware.go); one in the work done in the background (the sweeps, the loops the program starts) is stopped there by package safe, and told as a problem, mailed to whoever
 // runs the game (problems.go). A run that ends some other way (a crash, a kill, the machine) is told of by the next
 // (running.go).
 package server
@@ -32,7 +31,6 @@ import (
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/push"
-	"github.com/almanac-bg/almanac/internal/royal"
 	"github.com/almanac-bg/almanac/internal/safe"
 	"github.com/almanac-bg/almanac/internal/store"
 )
@@ -52,8 +50,6 @@ type Config struct {
 	// MTASTSMode the policy's mode ("testing" until reports are clean, then "enforce").
 	MTASTS     []string
 	MTASTSMode string
-	// Royal is when Роял's evenings are (royal.Evening when unset).
-	Royal royal.Schedule
 	// CrowdMin is how many answers a question needs before how players answered it shows (play.CrowdMin).
 	CrowdMin int
 	// Push sends notifications to browsers; nil: none.
@@ -91,13 +87,12 @@ type Server struct {
 	outbox   *mail.Outbox
 	game     *play.Game
 	live     *live.Hub
-	royal    *royal.Hub
 	push     *push.Sender
-	// closing ends the streams (live duels, Роял) when the server stops, so that it needn't wait for them.
+	// closing ends the streams (live duels) when the server stops, so that it needn't wait for them.
 	closing   chan struct{}
 	drain     drain
 	bank      atomic.Pointer[bank.Bank]
-	banks     banks // a bank held for Роял, one refused (bank.go)
+	banks     banks // a bank refused (bank.go)
 	client    fs.FS
 	limits    *limiter // the limits on floods (limits.go)
 	guard     *limiter // apart, the limits that keep players safe: codes, guests, reports
@@ -162,22 +157,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	// Every panic stopped in the work done in the background (package safe), anywhere in the program, is told as
 	// one of this server's problems: there is one server in the program.
 	safe.Tell(s.problems.add)
-	s.game.RoyalNews = s.royalNews
 	s.game.CrowdMin = cfg.CrowdMin
-	if cfg.Royal.Every == 0 && cfg.Royal.Hour == 0 {
-		cfg.Royal = royal.Evening
-	}
-	if cfg.Royal.Every == 0 && cfg.Royal.On == nil {
-		cfg.Royal.On = s.game.RoyalOn // Friday to Sunday, until the evenings fill
-	}
-	s.game.RoyalAt = cfg.Royal.Next
-	s.royal = royal.NewHub(s.game, cfg.Royal)
-	s.royal.News = s.royalNews
-	s.royal.Opened = func(ctx context.Context, start time.Time) { s.callRoyal(ctx, start) }
-	s.royal.Soon = func(ctx context.Context, start time.Time, away, in []int64) { s.callSoon(ctx, start, away, in) }
-	s.royal.Short = func(ctx context.Context, start, until time.Time, away, in []int64) {
-		s.callShort(ctx, start, until, away, in)
-	}
 	s.push = cfg.Push
 	s.live = live.NewHub(s.game, s.livePlayer)
 	s.closing = make(chan struct{})
@@ -254,15 +234,6 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/duels/live/{id}/claim", s.liveClaim)
 	api("GET /api/ranks", s.ranks)
 	api("GET /api/players/{tag}", s.profile)
-	mux.HandleFunc("GET /api/royal/events", s.royalEvents)
-	api("POST /api/royal", s.joinRoyal)
-	api("DELETE /api/royal", s.leaveRoyal)
-	api("POST /api/royal/seen", s.royalSeen)
-	api("POST /api/royal/answer", s.royalAnswer)
-	api("GET /api/royal", s.royals)
-	api("GET /api/royal/tonight", s.tonight)
-	api("POST /api/royal/plan", s.planRoyal)
-	api("DELETE /api/royal/plan", s.planRoyal)
 	api("GET /api/almanac", s.almanac)
 	api("GET /api/goals", s.goals)
 	api("GET /api/friends", s.friends)
@@ -311,9 +282,6 @@ func (s *Server) Run(ctx context.Context, grace time.Duration) error {
 	return err
 }
 
-// stepEvery is how often Роял's clock moves on.
-const stepEvery = 200 * time.Millisecond
-
 func (s *Server) run(ctx context.Context, grace time.Duration) error {
 	srv := &http.Server{
 		Addr:              s.cfg.Addr,
@@ -352,23 +320,10 @@ func (s *Server) run(ctx context.Context, grace time.Duration) error {
 		close(s.closing)
 	})
 	s.restoreLimits()
-	// Роял's games under way before a restart go on. Should loading them panic, the site is served all the same, and
-	// the problem told: a state that panics as it's read would otherwise stop every start, and the whole game with it.
-	if !safe.Do("royal: loading the evening", func() { err = s.royal.Load(ctx) }) {
-		err = nil
-	}
-	if err != nil {
-		ln.Close()
-		return err
-	}
 	errs := make(chan error, 1)
 	go func() { errs <- srv.Serve(ln) }() // a handler's panic is its request's alone (recovered)
 	// The work done in the background: each round on its own, a panic in one stopped and told (package safe).
-	go safe.Every(ctx, "royal: the clock", stepEvery, func() { s.royal.Step(ctx) })
-	go safe.Every(ctx, "the drain and the bank", time.Second, func() {
-		s.drainStep(nil) // a drain whose deploy stopped asking ends; Роял coming stops one
-		s.bankStep()     // a bank held for Роял goes in as it ends
-	})
+	go safe.Every(ctx, "the drain", time.Second, func() { s.drainStep(nil) }) // a drain whose deploy stopped asking ends
 	go safe.Every(ctx, "live: sweeping", time.Minute, s.live.Sweep)
 	go safe.Every(ctx, "duels: settling", time.Minute, func() {
 		if err := s.game.SettleDue(ctx); err != nil && ctx.Err() == nil {

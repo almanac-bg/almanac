@@ -84,7 +84,6 @@ var polled = map[string]bool{
 	"GET /api/health":           true,
 	"GET /api/friends":          true,
 	"GET /api/friends/requests": true,
-	"GET /api/royal/tonight":    true,
 }
 
 // route is a request as the log names it: the pattern it matched, without its method; or, for a page (and whatever

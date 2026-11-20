@@ -57,8 +57,6 @@ var mergeSteps = []mergeStep{
 		sql: `UPDATE users SET rating = g.rating, rated = g.rated, peak = g.peak, peak_seen = g.peak_seen
 		FROM (SELECT rating, rated, peak, peak_seen FROM users WHERE id = ?2) g
 		WHERE users.id = ?1 AND g.rated > 0 AND users.rated = 0`},
-	// The evenings of Роял the guest played (an evening both played in stays the account's).
-	{carries: []string{"royal_players.user_id"}, sql: `UPDATE OR IGNORE royal_players SET user_id = ?1 WHERE user_id = ?2`},
 	// The days the guest played on were the account's player's: the same person, so not a player who left.
 	{carries: []string{"active_days.user_id"},
 		sql: `INSERT OR IGNORE INTO active_days (user_id, day) SELECT ?1, day FROM active_days WHERE user_id = ?2`},
@@ -73,15 +71,13 @@ var mergeSteps = []mergeStep{
 	{carries: []string{"unlocks_told.user_id"},
 		sql: `INSERT OR IGNORE INTO unlocks_told (user_id, id) SELECT ?1, id FROM unlocks_told WHERE user_id = ?2`},
 	// The guest's notifications come along, with what they chose of them (unless the account has chosen), the days
-	// they were reminded on, those on their way (but a day's reminder the account has one of), and the Роял they
-	// said they'd come to. So does what they chose of mails, though a guest gets none.
+	// they were reminded on, and those on their way (but a day's reminder the account has one of). So does what they chose of mails, though a guest gets none.
 	{carries: []string{"push_subs.user_id"}, sql: `UPDATE push_subs SET user_id = ?1 WHERE user_id = ?2`},
 	{carries: []string{"push_prefs.user_id"}, sql: `INSERT OR IGNORE INTO push_prefs (user_id, kind, wanted)
 		SELECT ?1, kind, wanted FROM push_prefs WHERE user_id = ?2`},
 	{carries: []string{"push_reminded.user_id"}, sql: `UPDATE OR IGNORE push_reminded SET user_id = ?1 WHERE user_id = ?2`},
 	{carries: []string{"push_queue.user_id"}, sql: `UPDATE push_queue SET user_id = ?1 WHERE user_id = ?2
 		AND (day IS NULL OR day NOT IN (SELECT day FROM push_queue WHERE user_id = ?1 AND day IS NOT NULL))`},
-	{carries: []string{"royal_plans.user_id"}, sql: `UPDATE OR IGNORE royal_plans SET user_id = ?1 WHERE user_id = ?2`},
 	{carries: []string{"mail_prefs.user_id"}, sql: `INSERT OR IGNORE INTO mail_prefs (user_id, kind, wanted)
 		SELECT ?1, kind, wanted FROM mail_prefs WHERE user_id = ?2`},
 	{carries: []string{"streak_mails.user_id"}, sql: `UPDATE OR IGNORE streak_mails SET user_id = ?1 WHERE user_id = ?2`},

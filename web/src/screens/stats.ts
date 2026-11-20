@@ -33,7 +33,7 @@ export interface Stats {
 /** A finished game, as a list of them has it. */
 export interface Played {
   id: number;
-  kind: "day" | "topic" | "duel" | "royal";
+  kind: "day" | "topic" | "duel";
   day?: string;
   /** The day's ten's: the day's issue. */
   issue?: number;
@@ -63,8 +63,6 @@ function what(p: Played): string {
     case "duel":
       // A duel cut off has no result: only that it was a duel.
       return p.outcome ? `Дуел срещу ${p.opponent}${p.recorded ? " (запис)" : ""}, ${outcome[p.outcome]}` : "Дуел";
-    case "royal":
-      return "Роял";
     default:
       return topicName(p.category);
   }

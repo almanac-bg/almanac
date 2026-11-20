@@ -18,7 +18,6 @@ import (
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/live"
 	"github.com/almanac-bg/almanac/internal/play"
-	"github.com/almanac-bg/almanac/internal/royal"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -61,9 +60,6 @@ var playerErrors = map[error]*apiError{
 	live.ErrTooMany:        {http.StatusServiceUnavailable, "too_many_duels", "Твърде много дуели в момента. Опитай след малко."},
 	play.ErrNoRequest:      {http.StatusNotFound, "no_request", "Поканата вече я няма."},
 	play.ErrManyRequests:   {http.StatusConflict, "many_requests", "Твърде много покани чакат отговор. Изчакай да отговорят на някоя от тях."},
-	royal.ErrClosed:        {http.StatusConflict, "royal_closed", "Входът за Роял още не е отворен."}, // joinRoyal says when
-	royal.ErrShut:          {http.StatusConflict, "royal_closed", "Роял вече тече, а закъснелите влизат само до 3-тия въпрос."},
-	royal.ErrNotNow:        {http.StatusConflict, "not_now", "Вече е късно за това."},
 	account.ErrBadEmail:    {http.StatusBadRequest, "bad_email", "Това не прилича на имейл адрес."},
 	account.ErrTooSoon:     {http.StatusTooManyRequests, "too_soon", "Току-що ти пратихме код. Провери пощата си."},
 	account.ErrBadCode:     {http.StatusBadRequest, "bad_code", "Грешен код."},

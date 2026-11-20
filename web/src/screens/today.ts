@@ -33,7 +33,7 @@ import { dayPointsWords, failure, formatNumber, levelNumber, meter, type Open, s
 import { type Accepted, acceptedLine, type Left, leftLine } from "./duel.ts";
 import { type Goals, goalsCard, loadGoals, openGoals } from "./goals.ts";
 import { app, haveProfile, keepLine, keepStake, mailAsk } from "./keep.ts";
-import { clock, modes } from "./modes.ts";
+import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
 
 export interface Today {
@@ -51,11 +51,6 @@ export interface Today {
   level?: { level: number; xp: number; from: number; to: number };
   /** Whether the player has finished a game of any kind: until then Начало is the day and the topics only. */
   played?: boolean;
-  /** Whether Роял is among the ways to play with others: not for a new player while its evenings are thin (nor before
-   * there's a player: they're new); always while its lobby is open or its games are on. */
-  royal?: boolean;
-  /** Роял's lobby is open or its games are on (for anyone, signed in or not). */
-  royalNow?: boolean;
   /** Which of the game's systems the player has met: the level and the goals show once XP is open. */
   open?: Open;
   run: State | null;
@@ -66,9 +61,8 @@ export interface Today {
   friends?: Score[] | null;
   /** While no friend has played: whether the player has any friends at all. */
   befriended?: boolean;
-  /** A live game the player is in, under way (its screen left); or a seat in Роял's lobby, with its start (`starts`):
-   * the way back to it. */
-  playing?: { kind: "duel" | "royal"; starts?: number } | null;
+  /** A live game the player is in, under way (its screen left): the way back to it. */
+  playing?: { kind: "duel" } | null;
   /** A friend said yes to the player's request, and a live duel they left: each told once (play/lines.go). */
   accepted?: Accepted | null;
   left?: Left | null;
@@ -295,15 +289,8 @@ export function today() {
         just ? null : untold(t),
         // Just played, the goals it finished are told with its news; a first day has none (play/unfold.go).
         just || !t.open?.xp ? null : goalsCard(),
-        // The ways to play with others wait for a first game finished: a new player starts with the day and a topic;
-        // and Роял, in a player's first week, for its evenings to fill (play.NudgeRoyal). While its lobby is open or
-        // its games are on, Роял shows to everyone, a new player too: a full evening is the best way to meet it.
-        // Just played, as the player now is (a first game made them a player: the day fetched before it didn't know).
-        just || t.played
-          ? () => modes(fresh().royal ? ["duel", "royal"] : ["duel"], "С други")
-          : t.royalNow
-            ? modes(["royal"], "С други")
-            : null,
+        // The ways to play with others wait for a first game finished: a new player starts with the day and a topic.
+        just || t.played ? modes(["duel"], "С други") : null,
         // A later visit: the friends' day after the ways to play (beside the day on a big screen).
         run?.done && !full ? () => friendsDay(fresh()) : null,
       ),
@@ -371,20 +358,16 @@ function untold(t: Today, run?: number): Child {
   return news(id, 0, undefined, { title: run ? "" : "От последната ти игра" });
 }
 
-/** A live game the player is in goes on while its screen is away (a duel, Роял), or waits for them (a
- * seat in Роял's lobby, kept while they play something else): one quiet line above the day, and the way back into it
- * (its screen comes back to it by itself). */
+/** A live duel the player is in goes on while its screen is away: one quiet line above the day, and the way back
+ * into it (its screen comes back to it by itself). */
 function playingLine(p: Today["playing"]): Child {
   if (!p) return null;
-  const [text, href] =
-    p.kind === "duel"
-      ? ["Дуелът ти продължава", "/duel/live"]
-      : p.starts && p.starts <= Date.now()
-        ? ["Роял чака още играчи", "/royal"]
-        : p.starts
-          ? [`Роял започва в ${clock(p.starts)}`, "/royal"]
-          : ["Роял продължава", "/royal"];
-  return h("p", { class: "streak-notice playing-notice", role: "status" }, text, h("a", { href }, "Върни се"));
+  return h(
+    "p",
+    { class: "streak-notice playing-notice", role: "status" },
+    "Дуелът ти продължава",
+    h("a", { href: "/duel/live" }, "Върни се"),
+  );
 }
 
 /** The streak notices told on this page: the server keeps them as told (play.TellStreak), and each is said once. */

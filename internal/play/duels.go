@@ -351,7 +351,7 @@ func seenBy(ctx context.Context, db querier, userID int64, seen map[string]bool)
 }
 
 // seenAmong is how stale each question is to a game for players (choose: the least first, those missing none): of
-// those any of them has answered (in any game: the day, a duel, Роял…), one for each of them who has, so that no game
+// those any of them has answered (in any game: the day, a topic's, a duel), one for each of them who has, so that no game
 // deals anyone again what they've played while the bank has questions they haven't.
 func (g *Game) seenAmong(ctx context.Context, players []int64) (map[string]int, error) {
 	stale := map[string]int{}
@@ -801,12 +801,8 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, ghost bool, finishe
 	return nil
 }
 
-// SettleDue ends the duels whose time is up — a live duel cut off — and
-// the tournaments whose time is up. Run every few minutes.
+// SettleDue ends the duels whose time is up — a live duel cut off. Run every few minutes.
 func (g *Game) SettleDue(ctx context.Context) error {
-	if err := g.settleRoyalsDue(ctx); err != nil {
-		return err
-	}
 	now := store.Ms(g.Now())
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.ghost_run IS NOT NULL, `+duelPlayed+`, `+duelForfeited+`
 		FROM duels d WHERE d.ended_at IS NULL AND d.expires_at <= ?`, now)
