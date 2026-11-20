@@ -10,20 +10,21 @@ import { applyPrefs } from "./lib/prefs.ts";
 import { preparePush } from "./lib/push.ts";
 import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
-import { duel, duelOne } from "./screens/duel.ts";
+import { duelNew, duelOne } from "./screens/duel.ts";
 import { handoff } from "./screens/keep.ts";
 import { missing } from "./screens/missing.ts";
 import { topic } from "./screens/play.ts";
 import { sharedDay, today } from "./screens/today.ts";
-import { friendRequests, playing, watchWaiting } from "./state.ts";
+import { duelsWaiting, friendRequests, playing, watchWaiting } from "./state.ts";
 
 /**
- * The four main places: where each goes, its name and icon, and which paths are part of it. Playing (every way) starts
- * from Начало; Профил holds what a player has: their almanac, their avatar and their settings.
+ * The four main places: where each goes, its name and icon, and which paths are part of it. The day and the topics
+ * are played from Начало, duels from Приятели; Профил holds what a player has: their almanac, their avatar and their
+ * settings.
  */
 const links: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
-  ["/", "Начало", "home", (p) => /^\/($|play\/|duel)/.test(p)],
-  ["/friends", "Приятели", "users", (p) => p === "/friends"],
+  ["/", "Начало", "home", (p) => /^\/($|play\/)/.test(p)],
+  ["/friends", "Приятели", "users", (p) => /^\/(friends|duel\/.+)$/.test(p)],
   ["/ranks", "Класации", "podium", (p) => p === "/ranks"],
   ["/me", "Профил", "user", (p) => /^\/(me|settings|avatar|almanac|games(\/[0-9]+)?)$/.test(p)],
 ];
@@ -55,13 +56,19 @@ if (root) {
             {
               href,
               "aria-current": () => (here(path()) ? "page" : null),
-              // Someone asks to be friends: a dot on Приятели.
-              class: () => (href === "/friends" && friendRequests() ? "news" : ""),
+              // Someone asks to be friends, or a friend's duel waits: a dot on Приятели.
+              class: () => (href === "/friends" && (friendRequests() || duelsWaiting()) ? "news" : ""),
             },
             h("span", { class: `i i-${icon}`, "aria-hidden": "true" }),
             h("span", { class: "tab-label" }, label),
             () =>
-              href === "/friends" && friendRequests() ? h("span", { class: "sr" }, " (покана за приятелство)") : null,
+              href !== "/friends"
+                ? null
+                : friendRequests()
+                  ? h("span", { class: "sr" }, " (покана за приятелство)")
+                  : duelsWaiting()
+                    ? h("span", { class: "sr" }, " (дуел те чака)")
+                    : null,
           ),
         ),
       ),
@@ -73,8 +80,7 @@ if (root) {
     [
       { path: /^\/$/, view: today },
       { path: /^\/play\/([a-z]+)$/, view: topic },
-      { path: /^\/duel$/, view: duel },
-      { path: /^\/duel\/live$/, view: later(() => import("./screens/live.ts").then((m) => m.liveDuel)) },
+      { path: /^\/duel\/new$/, view: duelNew },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
       { path: /^\/almanac$/, view: later(() => import("./screens/almanac.ts").then((m) => m.almanac)) },
       { path: /^\/ranks$/, view: later(() => import("./screens/ranks.ts").then((m) => m.ranks)) },

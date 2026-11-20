@@ -26,9 +26,11 @@ func TestReadsNeverNest(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.play(bo, topic.ID, repeat(w.right, Length)...)
-	if _, err := w.g.StartLive(ctx, ana, bo); err != nil {
+	duel, err := w.g.DuelFriend(ctx, ana, bo)
+	if err != nil {
 		t.Fatal(err)
 	}
+	w.playSide(ana, duel, repeat(w.right, Length))
 	reads := map[string]func(context.Context) error{
 		"Count":          w.g.Count,
 		"NewsOf":         func(ctx context.Context) error { _, err := w.g.NewsOf(ctx, bo, topic.ID); return err },
@@ -41,6 +43,8 @@ func TestReadsNeverNest(t *testing.T) {
 		"MasteryMoves":   func(ctx context.Context) error { _, err := w.g.MasteryMoves(ctx, bo, topic.ID); return err },
 		"StreakOf":       func(ctx context.Context) error { _, err := w.g.StreakOf(ctx, ana); return err },
 		"DuelsOf":        func(ctx context.Context) error { _, err := w.g.DuelsOf(ctx, ana); return err },
+		"DuelOf":         func(ctx context.Context) error { _, err := w.g.DuelOf(ctx, bo, duel); return err },
+		"DuelsWaiting":   func(ctx context.Context) error { _, err := w.g.DuelsWaiting(ctx, bo); return err },
 		"RarestRight":    func(ctx context.Context) error { _, err := w.g.RarestRight(ctx, ana, w.g.Today()); return err },
 		"Suspects":       func(ctx context.Context) error { _, err := w.g.Suspects(ctx); return err },
 	}

@@ -5,8 +5,8 @@
 // under way guards its screen (beforeLeaving): a link out, the browser's back (or a phone's) and the game's own arrow
 // all ask first, and only „Излез“ goes on, to where they were going. A game gets an entry of its own when its screen
 // has none behind it in the app (hold): the day's ten on Начало, a game opened by a link from outside; so that back, mid-question, lands on the guard and not outside the game. Under
-// a game opened from outside is Начало, not the game's page again: „Излез“ leaves the game, and a live duel drawn
-// anew would take the player straight back into it.
+// a game opened from outside is Начало, not the game's page again: „Излез“ leaves the game, and its page drawn anew
+// would take the player straight back into it.
 //
 // A page that has fallen behind (a new version of the game out, another account signed in: fresh.ts) opens its next
 // screen by loading the page anew (loadAnew), not in place: a moment between screens, which costs the player nothing.
@@ -16,7 +16,7 @@
 // over the page (a <dialog> on the body, outside any screen: a game's news, the name asked for) goes with the screen
 // it was over.
 
-import { type Child, effect, mount, signal } from "./dom.ts";
+import { type Child, mount, signal } from "./dom.ts";
 
 export interface Route {
   path: RegExp;
@@ -151,7 +151,7 @@ export function loadAnew(when: () => boolean): void {
   anew = when;
 }
 
-/** While leaving the screen would cost the player something (a question with its time running, a live game), a way
+/** While leaving the screen would cost the player something (a question with its time running), a way
  * out first asks this: it takes the way on (`proceed`), and says whether it holds the way out back until then. */
 let leaving: ((proceed: () => void) => boolean) | null = null;
 
@@ -309,18 +309,6 @@ export function release(keep: Partial<Entry> = {}): void {
       // too many writes for a moment: the page under keeps its own address
     }
     path.set(location.pathname);
-  });
-}
-
-/** Holds the game's own entry (hold) while `playing` says the screen's game is under way, and gives it back as it
- * ends (release): a live duel's, which starts and ends on its screen, and may start again there. */
-export function holdWhile(playing: () => boolean): void {
-  let held = false;
-  effect(() => {
-    const now = playing();
-    if (now && !held) hold();
-    else if (!now && held) release();
-    held = now;
   });
 }
 

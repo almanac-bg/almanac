@@ -11,7 +11,7 @@ import (
 
 // A bank reload (cmd/almanac: SIGHUP, after deploy/bank.sh pulls) offers the server a bank already loaded and checked.
 // The game keeps its questions' versions first (play.Game.Keep): a play is graded against the version it showed,
-// whatever the bank has become since, and a live duel through the questions it dealt; so a new bank goes into play
+// whatever the bank has become since (a duel's second side too: it's dealt the first's); so a new bank goes into play
 // at once. /api/health tells which bank is played and which was refused, for bank.sh to confirm what became of its
 // pull.
 

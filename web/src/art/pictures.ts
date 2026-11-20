@@ -1,9 +1,9 @@
-// Pictures: the game's illustrations — the avatars, the topics, the ways to play, the divisions' emblems, Рила and
+// Pictures: the game's illustrations — the avatars, the topics, the ways to play, Рила and
 // the streak's flame — drawn by hand as paths on a 64 × 64 grid, in one style, so that they belong
 // together (web/DESIGN.md, Pictures).
 //
 // The style: flat shapes with depth, no outlines, lit from the top left. Every picture is painted from one ramp of
-// its tone (the topic's, the avatar's, the mode's, the division's) with the night ink and white, so a
+// its tone (the topic's, the avatar's, the mode's) with the night ink and white, so a
 // picture always sits in the colours around it and follows the theme. The inks are classes coloured in app.css
 // (.pic):
 //
@@ -29,17 +29,6 @@ const at = (cx: number, cy: number, r: number, deg: number) => {
   const a = (deg * Math.PI) / 180;
   return `${n(cx + r * Math.cos(a))} ${n(cy + r * Math.sin(a))}`;
 };
-/** A five-pointed star cut into facets: the lit half of each point, then the half in shade. */
-const facets = (cx: number, cy: number, R: number, r: number): [string, string] => {
-  let lit = "";
-  let shade = "";
-  for (let i = 0; i < 5; i++) {
-    const tip = -90 + 72 * i;
-    lit += `M${cx} ${cy}L${at(cx, cy, R, tip)}L${at(cx, cy, r, tip + 36)}Z`;
-    shade += `M${cx} ${cy}L${at(cx, cy, r, tip - 36)}L${at(cx, cy, R, tip)}Z`;
-  }
-  return [lit, shade];
-};
 /** A four-pointed sparkle. */
 const sparkle = (cx: number, cy: number, R: number) => {
   const k = R * 0.16;
@@ -52,15 +41,6 @@ const spikes = (cx: number, cy: number, R: number, r: number, from: number, to: 
   for (let i = 0; i < count; i++)
     d += `L${at(cx, cy, R, from + step * (i + 0.5))}L${at(cx, cy, r, from + step * (i + 1))}`;
   return `${d}L${cx} ${cy}Z`;
-};
-/** Rays around a centre: thin wedges from r1 out to r2. */
-const rays = (cx: number, cy: number, r1: number, r2: number, count: number, half: number, turn = -90) => {
-  let d = "";
-  for (let i = 0; i < count; i++) {
-    const a = turn + (360 / count) * i;
-    d += `M${at(cx, cy, r1, a - half)}L${at(cx, cy, r2, a)}L${at(cx, cy, r1, a + half)}Z`;
-  }
-  return d;
 };
 /** A soft shadow under a shape: the same path, set down and right a little. */
 const lift = (d: string, dy = 2.5): Layer => ["ks", d, `transform="translate(1 ${dy})"`];
@@ -583,71 +563,6 @@ const modes: Record<string, Layer[]> = {
   ],
 };
 
-// ---- Divisions: a crest for each band of rating, in the division's colour (app.css: .d-*). Each has its own
-// silhouette, so they read apart without colour: Бронз a plain shield; Сребро a chevron on it; Злато wings; Платина a
-// star; Диамант a cut gem; Легенда a crowned shield of stars, with rays.
-
-const shield = "M32 7L52 14V31C52 44 43 53 32 58C21 53 12 44 12 31V14Z";
-const shieldIn = "M32 12L47.5 17.5V31C47.5 41.2 40.6 48.8 32 53C23.4 48.8 16.5 41.2 16.5 31V17.5Z";
-const shieldInRight = "M32 12L47.5 17.5V31C47.5 41.2 40.6 48.8 32 53Z";
-const crest = (...more: Layer[]): Layer[] => [
-  lift(shield),
-  ["k1", shield],
-  ["k3", shieldIn],
-  ["k2", shieldInRight],
-  ["kh", "M18.5 19L31 14.6V18.6L20.6 22.4Z"],
-  ...more,
-];
-const chevron: Layer[] = [
-  ["k5", "M19.5 28.5L32 37.5L44.5 28.5V34.6L32 43.6L19.5 34.6Z"],
-  ["k4", "M32 37.5L44.5 28.5V34.6L32 43.6Z"],
-];
-const wing = (x: (dx: number) => number) =>
-  `M${x(19)} 18C${x(27)} 16 ${x(31.5)} 21 ${x(31)} 29C${x(28)} 25.5 ${x(24)} 25 ${x(20)} 26ZM${x(19.5)} 27.5C${x(26)} 27 ${x(30)} 31 ${x(29.5)} 37.5C${x(27)} 35 ${x(23.5)} 34 ${x(20)} 34.5ZM${x(19.5)} 36C${x(25)} 36 ${x(27.5)} 39.5 ${x(27)} 45C${x(25)} 43 ${x(22.5)} 42 ${x(20)} 42Z`;
-
-const divisions: Record<string, Layer[]> = {
-  bronze: crest(["k4", "M29.6 18H34.4V50.2Q32 51.6 29.6 50.2Z"], ["k5", "M29.6 18H32V51Q30.8 50.9 29.6 50.2Z"]),
-  silver: crest(...chevron),
-  gold: [
-    ["k4", both(wing)],
-    ["k2", both((x) => `M${x(19)} 18C${x(23)} 17.4 ${x(26)} 18.4 ${x(28)} 20.4L${x(20)} 26Z`)],
-    ...crest(...chevron),
-  ],
-  platinum: (() => {
-    const [lit, shade] = facets(32, 31.5, 12.5, 5.4);
-    return crest(["k5", lit], ["k4", shade]);
-  })(),
-  diamond: [
-    lift("M18 11H46L58 25L32 58L6 25Z"),
-    ["k4", "M18 11L6 25H26Z"],
-    ["k5", "M18 11L26 25L32 11Z"],
-    ["k4", "M32 11L26 25H38Z"],
-    ["k5", "M32 11L38 25L46 11Z"],
-    ["k3", "M46 11L38 25H58Z"],
-    ["k3", "M6 25H26L32 58Z"],
-    ["k4", "M26 25H38L32 58Z"],
-    ["k2", "M38 25H58L32 58Z"],
-    ["kw", sparkle(20.5, 18, 3.4)],
-  ],
-  legend: (() => {
-    const [lit, shade] = facets(32, 36, 10, 4.3);
-    const small = "M32 16L49 22V35C49 46 41.5 53 32 57C22.5 53 15 46 15 35V22Z";
-    return [
-      ["k4", rays(32, 35, 22, 32, 12, 6)],
-      lift(small),
-      ["k1", small],
-      ["k3", "M32 20.5L45 25V35C45 43.6 39.4 49.4 32 52.6C24.6 49.4 19 43.6 19 35V25Z"],
-      ["k2", "M32 20.5L45 25V35C45 43.6 39.4 49.4 32 52.6Z"],
-      ["k5", lit],
-      ["k4", shade],
-      lift("M19 17L22 5.5L29 11L32 3.5L35 11L42 5.5L45 17Z", 1.2),
-      ["k5", "M19 17L22 5.5L29 11L32 3.5L35 11L42 5.5L45 17Z"],
-      ["k4", "M32 3.5L35 11L42 5.5L45 17H32Z"],
-      ["k1", C(25.5, 13.5, 1.3) + C(32, 12.5, 1.5) + C(38.5, 13.5, 1.3)],
-    ] as Layer[];
-  })(),
-};
-
 // ---- Рила, for the topic „България“: a mountain deep in snow on a round of sky, a star over it. Lit from the left: a
 // peak's right face is in shade.
 
@@ -691,6 +606,5 @@ export const pictures: Record<string, string> = {
   // „България“, the questions about Bulgaria from every topic: Рила.
   "topic-bulgaria": draw(rila),
   ...Object.fromEntries(Object.entries(modes).map(([id, l]) => [`mode-${id}`, draw(l)])),
-  ...Object.fromEntries(Object.entries(divisions).map(([id, l]) => [`division-${id}`, draw(l)])),
   ...Object.fromEntries(Object.entries(marks).map(([id, l]) => [id, draw(l)])),
 };

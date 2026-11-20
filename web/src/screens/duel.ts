@@ -1,16 +1,23 @@
-// Дуел: two players live, the same ten questions at the same moment (screens/live.ts), with whoever comes, or a
-// recording of a real game if nobody does. Your division and rating, and how the last duels went. One duel's screen
-// shows how it ended (screens/outcome.ts, loaded on its own: kit.ts).
+// Дуел: two players on the same ten questions, each on their own time (play/duels.go). With a friend: the player plays
+// first, and the friend, told, plays the same ten when they can (three days); whoever plays second sees both at once.
+// Or against a recording: a real player's finished game, its answers shown as they came. A duel is played as any
+// game is (game/run.ts), with the other's answers beside the player's once they've given theirs. Приятели lists the
+// duels (duelLists: theirs to play, waiting, played); „Нов дуел“ (/duel/new) starts one; one duel's page (/duel/<id>)
+// plays it, or shows how it ended (screens/outcome.ts, loaded on its own: kit.ts).
 
+import { news } from "../game/news.ts";
+import { summary } from "../game/results.ts";
+import { getReady, playRun, shownHere, starting, startScreen } from "../game/run.ts";
+import type { State } from "../game/types.ts";
 import { duelResult } from "../kit.ts";
-import { type ApiError, api } from "../lib/api.ts";
+import { type ApiError, api, errorText } from "../lib/api.ts";
 import { type Child, effect, h, lifetime, signal, slot } from "../lib/dom.ts";
-import { ordinal } from "../lib/ordinal.ts";
-import { go, title } from "../lib/router.ts";
+import { backOut, byTap, go, hold, title } from "../lib/router.ts";
 import { withWord } from "../lib/words.ts";
-import { player, user } from "../state.ts";
-import { back, type Division, failure, formatNumber, pageArt, type Standing, standingCard, who } from "../ui.ts";
+import { player, topics, user } from "../state.ts";
+import { back, failure, formatNumber, pageArt, who } from "../ui.ts";
 import { missing } from "./missing.ts";
+import { nameFirst } from "./name.ts";
 import { signIn } from "./signin.ts";
 
 /** How one question of a duel went for one side: its points, right or partly (some points, not right), how long it
@@ -33,8 +40,43 @@ export interface Side {
   look?: { avatar?: string };
   /** A player who has gone since (play.DuelSide.Gone): their game went with them, so their score isn't known. */
   gone?: boolean;
-  /** How each question went (one duel's view): the player's own as they play, the other's once there's a result. */
+  /** How each question went (one duel's view): the player's own; the other's once there's a result, or while it's the
+   * player's turn, for the screen to show as they play (their points only at the end). */
   marks?: DuelMark[];
+}
+
+/** A duel as the player sees it (play.DuelView): theirs to play (sent to them, or their own side not finished), sent
+ * and waiting for the friend, won, lost, drawn, or expired (not played in time: `lapsed` says by whom; or, from
+ * before, cut off). */
+export interface DuelView {
+  id: number;
+  state: "yours" | "theirs" | "won" | "lost" | "draw" | "expired";
+  opponent?: Side;
+  you?: Side;
+  recorded?: boolean;
+  /** Against a recording of one topic's game: the topic. */
+  topic?: string;
+  /** The player played first (sent it). */
+  first?: boolean;
+  runId?: number;
+  createdAt: number;
+  endedAt?: number;
+  /** When an open duel lapses. */
+  until?: number;
+  lapsed?: "you" | "they";
+  /** One duel's view: the question (from 1) after which the winner led to the end (none: the points were even). */
+  decided?: number;
+  record?: { won: number; lost: number; drawn: number };
+  /** The other is a friend now (`them`, their id): a rematch is a tap away. */
+  friend?: boolean;
+  them?: number;
+}
+
+/** The player's duels, as Приятели lists them (play.Duels). */
+export interface Duels {
+  yours: DuelView[];
+  theirs: DuelView[];
+  played: DuelView[];
 }
 
 /** A duel as its screens show it: a player gone since shows as nobody's, a plain tile without an animal (no avatar of
@@ -42,53 +84,64 @@ export interface Side {
 const shown = (d: DuelView): DuelView =>
   d.opponent?.gone ? { ...d, opponent: { ...d.opponent, look: { avatar: "-gone" } } } : d;
 
-/** A live duel that has ended: won, lost, drawn, or (expired) cut off without a result. */
-export interface DuelView {
-  id: number;
-  state: "won" | "lost" | "draw" | "expired";
-  opponent?: Side;
-  you?: Side;
-  recorded?: boolean;
-  /** Didn't move ratings; `unrated` says why (play.DuelView). */
-  friendly?: boolean;
-  unrated?: "again" | "recordings" | "network" | "newcomers" | "gone";
-  delta?: number;
-  runId?: number;
-  createdAt: number;
-  endedAt: number;
-  /** One duel's view says more of its result: the question (from 1) after which the winner led to the end (none: the
-   * points were even), where the rating went, and the player's record against this opponent (a person). */
-  decided?: number;
-  /** Where the rating went; while it's still being set, how many rated games of how many it's from (no division). */
-  rating?: { before: number; after: number; division: Division; next?: Division; rated?: number; of?: number };
-  record?: { won: number; lost: number; drawn: number };
-  /** A live duel one of the two left under way (it went on without them): how many questions they had played. */
-  youLeft?: number;
-  theyLeft?: number;
-  /** The other, met in a live duel, may be asked to be friends (not a friend, nor asked). */
-  befriend?: boolean;
-}
-
 /** One of the player's duels, as its screen shows it. */
 const oneDuel = async (id: number) => shown((await api<{ duel: DuelView }>("GET", `/api/duels/${id}`)).duel);
 
-/** What a duel's end is called: one without a result was cut off. */
-const words: Record<DuelView["state"], string> = {
+/** Starts a duel: with a friend (by their id), or against a recording; the player made first if need be, and asked
+ * for a name of their own if they still have the one drawn for them (a friend sees it). It says the duel. */
+export async function startDuel(to: { friend: number } | { recording: true }): Promise<DuelView | null> {
+  await player();
+  if ("friend" in to && !(await nameFirst())) return null;
+  return shown((await api<{ duel: DuelView }>("POST", "/api/duels", to)).duel);
+}
+
+/** How long an open duel has left, in words: „още 2 дни“, „още 5 часа“, „под час“. */
+export function leftWords(until: number, now = Date.now()): string {
+  const hours = Math.floor((until - now) / 3_600_000);
+  if (hours >= 48) return `още ${Math.floor(hours / 24)} дни`;
+  if (hours >= 24) return "още 1 ден";
+  if (hours >= 2) return `още ${hours} часа`;
+  if (hours === 1) return "още 1 час";
+  return "под час";
+}
+
+/** What a duel's end is called. */
+const ends: Record<DuelView["state"], string> = {
+  yours: "Твой ред",
+  theirs: "Чака",
   won: "Победа",
   lost: "Загуба",
   draw: "Равенство",
-  expired: "Прекъснат",
+  expired: "Изтече",
 };
 
-/** A duel as a row: the other player, how it ended, and the rating it moved. */
-function duelRow(d: DuelView): Child {
+/** The pair's record, the way a row says it: „общо 5 на 3“. */
+const recordLine = (r?: DuelView["record"]) =>
+  r && r.won + r.lost + r.drawn > 1 ? ` · общо ${r.won} на ${r.lost}${r.drawn ? `, ${r.drawn} равни` : ""}` : "";
+
+/** What a row says under a duel's end. */
+function rowLine(d: DuelView): string {
   const them = d.opponent;
-  const line =
-    d.state === "expired"
-      ? "Без резултат"
-      : them?.gone
-        ? "Играчът вече го няма" // their game went with them: no score of theirs to set beside the player's
-        : `${formatNumber(d.you?.points ?? 0)} : ${formatNumber(them?.points ?? 0)}${d.recorded ? " · срещу запис" : ""}${d.friendly ? " · без рейтинг" : ""}`;
+  const versus = d.recorded ? " · срещу запис" : "";
+  switch (d.state) {
+    case "yours":
+      return d.first
+        ? `Довърши своята игра · ${leftWords(d.until ?? 0)}`
+        : `Изиграй същите десет · ${leftWords(d.until ?? 0)}`;
+    case "theirs":
+      return `Не е изигран · ${leftWords(d.until ?? 0)}`;
+    case "expired":
+      if (d.lapsed === "they") return `${them?.name ?? "Приятелят"} не го изигра навреме`;
+      if (d.lapsed === "you") return "Не го изигра навреме";
+      return "Без резултат";
+  }
+  if (them?.gone) return "Играчът вече го няма"; // their game went with them: no score of theirs to set beside the player's
+  return `${formatNumber(d.you?.points ?? 0)} : ${formatNumber(them?.points ?? 0)}${versus}${recordLine(d.record)}`;
+}
+
+/** A duel as a row: the other player, where it stands, and a word on it. */
+export function duelRow(d: DuelView): Child {
+  const them = d.opponent;
   return h(
     "li",
     null,
@@ -99,68 +152,45 @@ function duelRow(d: DuelView): Child {
       h(
         "span",
         { class: "duel-row-end" },
-        h("strong", { class: "duel-state" }, words[d.state]),
-        h("span", { class: "muted" }, line),
-        d.delta
-          ? h(
-              "span",
-              { class: d.delta > 0 ? "delta up" : "delta down" },
-              `${d.delta > 0 ? "+" : ""}${formatNumber(d.delta)}`,
-            )
-          : null,
+        h("strong", { class: "duel-state" }, ends[d.state]),
+        h("span", { class: "muted" }, rowLine(d)),
       ),
     ),
   );
 }
 
-export function duel() {
-  title("Дуел");
-  const data = signal<{ duels: DuelView[]; standing: Standing } | null>(null);
-  if (user.peek())
-    api<{ duels: DuelView[]; standing: Standing }>("GET", "/api/duels").then(
-      (r) => data.set({ ...r, duels: r.duels.map(shown) }),
-      () => {},
-    );
+/** How many played duels Приятели lists. */
+const playedShown = 5;
+
+/** The player's duels in Приятели: theirs to play first, then those waiting for a friend, then those played. */
+export function duelLists(d: Duels): Child {
+  const part = (heading: string, list: DuelView[]) =>
+    list.length
+      ? h(
+          "section",
+          { class: "stack small-gap" },
+          h("h2", { class: "section-title" }, heading),
+          h("ul", { class: "duel-list" }, list.map(shown).map(duelRow)),
+        )
+      : null;
+  return [part("Твой ред", d.yours), part("Чакаш", d.theirs), part("Изиграни", d.played.slice(0, playedShown))];
+}
+
+/** A friend's duel that waits for the player, as Начало says it (play.DuelWaiting): one quiet line, while it waits. */
+export interface Waiting {
+  id: number;
+  name: string;
+  n: number;
+}
+
+/** Начало's line: a friend's duel waits for the player. */
+export function waitingLine(w?: Waiting | null): Child {
+  if (!w) return null;
   return h(
-    "section",
-    { class: "screen" },
-    h(
-      "div",
-      { class: "intro" },
-      back("/", "Начало"),
-      pageArt("duel", "tone-rose"),
-      h("h1", null, "Дуел"),
-      h("p", { class: "lead" }, "Ти и друг играч на живо: едни и същи десет въпроса, в един и същ миг."),
-    ),
-    h(
-      "button",
-      {
-        class: "btn primary big",
-        type: "button",
-        onclick: async () => {
-          await player();
-          go("/duel/live");
-        },
-      },
-      "Намери съперник",
-    ),
-    // The division once a duel has moved the rating: before that it says nothing.
-    () => {
-      const d = data();
-      return d?.standing.rated ? standingCard(d.standing, true) : null;
-    },
-    () => {
-      // The latest first.
-      const done = (data()?.duels ?? []).toSorted((a, b) => b.endedAt - a.endedAt).slice(0, 20);
-      return done.length
-        ? h(
-            "section",
-            { class: "stack" },
-            h("h2", { class: "section-title" }, "История"),
-            h("ul", { class: "duel-list" }, done.map(duelRow)),
-          )
-        : null;
-    },
+    "p",
+    { class: "streak-notice", role: "status" },
+    w.n > 1 ? `${w.n} дуела те чакат.` : `${w.name} те покани на дуел.`,
+    w.n > 1 ? h("a", { href: "/friends" }, "Приятели") : h("a", { href: `/duel/${w.id}` }, "Играй"),
   );
 }
 
@@ -171,24 +201,13 @@ export interface Accepted {
   line: string;
 }
 
-/** A live duel the player left under way, and what came of it (play.LeftOf). */
-export interface Left {
-  id: number;
-  them: string;
-  after: number;
-  state: "won" | "lost" | "draw";
-  delta?: number;
-  line: string;
-}
-
 /** Lines told on this page already: Начало drawn again (after a game) doesn't say them twice. */
 const toldHere = new Set<unknown>();
 
-/** Tells a line once, wherever the player is signed in (the server keeps it as told): whether it's news here. `news`
- * is what's told, where the line's id is the same for all of it (its own, if it has one). */
-function toldOnce(line: string, news: unknown = line): boolean {
-  if (toldHere.has(news)) return false;
-  toldHere.add(news);
+/** Tells a line once, wherever the player is signed in (the server keeps it as told): whether it's news here. */
+function toldOnce(line: string): boolean {
+  if (toldHere.has(line)) return false;
+  toldHere.add(line);
   api("POST", "/api/told", { line }).catch(() => {});
   return true;
 }
@@ -204,18 +223,99 @@ export function acceptedLine(a?: Accepted | null): Child {
   );
 }
 
-/** After which question one left, in words: „след 4-тия въпрос“, or „още на първия въпрос“. */
-const leftAfter = (n: number) => (n > 0 ? `след ${ordinal(n)}я въпрос` : "още на първия въпрос");
+interface Friend {
+  id: number;
+  name: string;
+  tag: string;
+  avatar?: string;
+}
 
-/** A live duel the player left went on without them: what came of it, said once, a tap from the result. */
-export function leftLine(l?: Left | null): Child {
-  if (!l || !toldOnce(l.line)) return null;
-  const rating = l.delta ? `, рейтинг ${l.delta > 0 ? "+" : "−"}${Math.abs(l.delta)}` : "";
+/** Нов дуел: with a friend (each a tap), or against a recording of a real game. */
+export function duelNew() {
+  title("Нов дуел");
+  const friends = signal<Friend[] | null>(null);
+  const error = signal("");
+  const busy = signal(false);
+  if (user.peek())
+    api<{ friends: Friend[] }>("GET", "/api/friends").then(
+      (r) => friends.set(r.friends),
+      () => friends.set([]),
+    );
+  else friends.set([]);
+  const begin = async (to: { friend: number } | { recording: true }) => {
+    if (busy.peek()) return;
+    busy.set(true);
+    error.set("");
+    try {
+      const d = await startDuel(to);
+      if (d) go(`/duel/${d.id}`);
+    } catch (err) {
+      error.set(errorText(err));
+    } finally {
+      busy.set(false);
+    }
+  };
   return h(
-    "p",
-    { class: "streak-notice", role: "status" },
-    `Дуелът ${withWord(l.them)} продължи без теб (излезе ${leftAfter(l.after)}): ${words[l.state].toLowerCase()}${rating}.`,
-    h("a", { href: `/duel/${l.id}` }, "Виж"),
+    "section",
+    { class: "screen" },
+    h(
+      "div",
+      { class: "intro" },
+      back("/friends", "Приятели"),
+      pageArt("duel", "tone-rose"),
+      h("h1", null, "Нов дуел"),
+      h("p", { class: "lead" }, "Десет въпроса. Изиграй ги сега, а другият ги играе, когато може."),
+    ),
+    h("section", { class: "stack small-gap" }, h("h2", { class: "section-title" }, "С приятел"), () => {
+      const list = friends();
+      if (!list) return h("p", { class: "muted" }, "…");
+      if (!list.length)
+        return h(
+          "p",
+          { class: "muted" },
+          "Още нямаш приятели тук. ",
+          h("a", { href: "/friends" }, "Добави ги в Приятели"),
+          ".",
+        );
+      return h(
+        "ul",
+        { class: "duel-list" },
+        list.map((f) =>
+          h(
+            "li",
+            null,
+            h(
+              "button",
+              {
+                class: "duel-row duel-pick",
+                type: "button",
+                disabled: busy,
+                "aria-label": `Дуел ${withWord(f.name)}`,
+                onclick: () => begin({ friend: f.id }),
+              },
+              who(f.name, { avatar: f.avatar }, null, f.name),
+              h("span", { class: "duel-row-end" }, h("strong", { class: "duel-state duel-invite" }, "Покани")),
+            ),
+          ),
+        ),
+      );
+    }),
+    h(
+      "section",
+      { class: "stack small-gap" },
+      h("h2", { class: "section-title" }, "Срещу запис"),
+      h(
+        "p",
+        { class: "muted" },
+        "Същите десет въпроса като в истинска игра на друг играч, с отговорите в нея, както са дадени.",
+      ),
+      h(
+        "button",
+        { class: "btn", type: "button", disabled: busy, onclick: () => begin({ recording: true }) },
+        "Играй срещу запис",
+      ),
+    ),
+    () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }
 
@@ -234,7 +334,7 @@ function notHere(signedIn: () => void): Child {
         h("h1", null, "Този дуел не е тук"),
         h("p", { class: "lead" }, "Или е на друг профил, или вече го няма."),
       ),
-      h("a", { class: "btn primary big", href: "/duel" }, "Към дуелите"),
+      h("a", { class: "btn primary big", href: "/friends" }, "Към Приятели"),
     );
   effect(() => {
     if (user()?.email) signedIn();
@@ -253,24 +353,193 @@ function notHere(signedIn: () => void): Child {
   );
 }
 
-/** One duel: how it ended. */
+/** What a duel is called over its game: „Дуел с Мария“, „Срещу запис на Мария“ (of a topic's game: „… · История“). */
+function duelName(d: DuelView): string {
+  const them = d.opponent?.name ?? "";
+  if (!d.recorded) return `Дуел ${withWord(them)}`;
+  const topic = d.topic ? topics.find((t) => t.id === d.topic)?.name : "";
+  return `Срещу запис на ${them}${topic ? ` · ${topic}` : ""}`;
+}
+
+/** A friend's duel the player has just played first: sent, the friend told. Their own result, and where it went. */
+function sent(d: DuelView, s: State, just: boolean): Child {
+  const them = d.opponent?.name ?? "Приятелят";
+  return h(
+    "div",
+    { class: "screen" },
+    summary(
+      s,
+      // In the card, under its name: sent, and how long the friend has.
+      [
+        h("div", { class: "day-line" }, h("span", { class: "kicker" }, duelName(d))),
+        h(
+          "p",
+          { class: "duel-sent" },
+          `Изпратен. ${them} ще изиграе същите десет въпроса: има време ${leftWords(d.until ?? Date.now() + 3 * 86_400_000)}. Ще видиш резултата, щом играе.`,
+        ),
+      ],
+      {
+        main: h("a", { class: "btn primary big", href: "/friends" }, "Към Приятели"),
+        also: [h("a", { class: "btn", href: "/duel/new" }, "Нов дуел")],
+      },
+      [just ? news(s.id) : null],
+      undefined,
+      just,
+    ),
+  );
+}
+
+/** A gold button that starts another duel (a rematch, the other way round; another recording), and says so if it
+ * can't (a limit reached). */
+function again(label: string, to: { friend: number } | { recording: true }): Child {
+  const said = signal("");
+  const busy = signal(false);
+  return h(
+    "div",
+    { class: "stack small-gap" },
+    h(
+      "button",
+      {
+        class: "btn primary big",
+        type: "button",
+        disabled: busy,
+        onclick: async () => {
+          busy.set(true);
+          said.set("");
+          try {
+            const next = await startDuel(to);
+            if (next) go(`/duel/${next.id}`);
+          } catch (err) {
+            said.set(errorText(err));
+          } finally {
+            busy.set(false);
+          }
+        },
+      },
+      label,
+    ),
+    () => said() && h("p", { class: "bad", role: "alert" }, said()),
+  );
+}
+
+/** One duel: played (the player's side, if it's theirs), waiting for the friend, or how it ended. */
 export function duelOne(params: string[]) {
   title("Дуел");
   const id = Number(params[0]);
   const screen = slot(() => h("p", { class: "muted" }, "…"));
   // What comes back once the screen is gone (another page opened meanwhile) does nothing.
   const life = lifetime();
+  const tap = byTap();
+
+  // How the duel stands, drawn: the result (with a rematch, a new duel), the wait, or the player's side to play.
+  const show = (d: DuelView, just = false, run?: State) => {
+    if (d.state === "yours") return ready(d);
+    if (d.state === "theirs") {
+      if (run) return screen.show(() => sent(d, run, just));
+      return void api<State>("GET", `/api/runs/${d.runId}`).then(
+        (s) => !life.aborted && screen.show(() => sent(d, s, false)),
+        (err) => !life.aborted && screen.show(() => failure(err, () => void load(), ["/friends", "Към Приятели"])),
+      );
+    }
+    const toFriends = (main: boolean) =>
+      h("a", { class: main ? "btn primary big" : "btn", href: "/friends" }, "Към Приятели");
+    const next =
+      d.friend && d.them
+        ? again("Реванш", { friend: d.them })
+        : d.recorded
+          ? again("Още един срещу запис", { recording: true })
+          : null;
+    screen.show(() =>
+      duelResult(
+        d,
+        { main: next ?? toFriends(true), also: next ? [toFriends(false)] : [] },
+        just && d.runId ? news(d.runId) : null,
+      ),
+    );
+  };
+
+  // The player's side: straight in where this tab was showing its question, after a count when a tap brought them,
+  // else what it is and „Започни“ (or „Продължи“ where it was left).
+  const ready = async (d: DuelView) => {
+    const name = duelName(d);
+    let s: State | null = null;
+    if (d.runId) s = await api<State>("GET", `/api/runs/${d.runId}`).catch(() => null);
+    if (life.aborted) return;
+    if (s && !s.done && s.question && shownHere(s.id)) return play(d, s);
+    const begin = () => {
+      hold();
+      screen.show(() =>
+        getReady(
+          name,
+          () => void start(d),
+          () => backOut("/friends", () => void ready(d)),
+        ),
+      );
+    };
+    if (tap && !s?.at) return begin();
+    const lead = d.recorded
+      ? `Десет въпроса като в истинската игра на ${d.opponent?.name ?? "друг играч"}. След всеки отговор виждаш как е минал въпросът в записа.`
+      : d.first
+        ? `Десет въпроса. После ${d.opponent?.name ?? "приятелят ти"} ще изиграе същите.`
+        : `Същите десет въпроса като на ${d.opponent?.name ?? "приятеля ти"}. След всеки отговор виждаш как е минал въпросът за ${d.opponent?.name ?? "приятеля ти"}.`;
+    screen.show(() =>
+      startScreen(name, lead, s?.at ? { at: s.at, total: s.total, marks: s.trail } : null, () =>
+        s?.at ? void start(d) : begin(),
+      ),
+    );
+  };
+
+  // Its run, made as it's first played (the friend's side), then played.
+  const start = async (d: DuelView) => {
+    screen.show(starting);
+    try {
+      const now = shown((await api<{ duel: DuelView }>("POST", `/api/duels/${d.id}/play`, {})).duel);
+      const s = await api<State>("GET", `/api/runs/${now.runId}`);
+      if (!life.aborted) play(now, s);
+    } catch (err) {
+      if (life.aborted) return;
+      screen.show(() =>
+        h(
+          "div",
+          { class: "stack" },
+          h("p", { role: "alert" }, errorText(err)),
+          h("button", { class: "btn primary", onclick: () => void start(d) }, "Опитай пак"),
+        ),
+      );
+    }
+  };
+
+  // Played as any game, the other's answers beside the player's (when the other has played); its end, the duel again.
+  const play = (d: DuelView, s: State) => {
+    const other = d.opponent?.marks?.length ? { name: d.opponent.name, marks: d.opponent.marks } : undefined;
+    screen.show(() =>
+      playRun(
+        s,
+        (end) => {
+          const after = slot(() => h("p", { class: "muted" }, "…"));
+          oneDuel(id).then(
+            (now) => !life.aborted && show(now, true, end),
+            (err) => !life.aborted && after.show(() => failure(err, () => void load(), ["/friends", "Към Приятели"])),
+          );
+          return h("div", null, after);
+        },
+        d.recorded ? `запис на ${d.opponent?.name ?? ""}` : (d.opponent?.name ?? ""),
+        other,
+      ),
+    );
+  };
+
   const load = async () => {
     try {
       const d = await oneDuel(id);
-      if (!life.aborted) screen.show(() => duelResult(d));
+      if (!life.aborted) show(d);
     } catch (err) {
       if (life.aborted) return;
       const code = (err as ApiError).code;
       // Nobody here, and no such duel at all (the server tells anyone that): the page isn't there, not a sign-in.
       if (code === "no_duel" && !user.peek()) return screen.show(missing);
       if (code === "signed_out" || code === "no_duel") return screen.show(() => notHere(() => void load()));
-      screen.show(() => failure(err, () => void load(), ["/duel", "Към дуелите"]));
+      screen.show(() => failure(err, () => void load(), ["/friends", "Към Приятели"]));
     }
   };
   load();

@@ -2,8 +2,8 @@
 // („Щъркел 402“), on the day's board, in a duel, and nobody remembers that. So the first moment they
 // meet others asks, in a sheet over the page: one field, the drawn name in it to keep or change, the gold way on (the
 // name saved, then on), „Не сега“ quiet (on with the drawn name: the name can wait, and Профил has it). Asked once on
-// a device, whatever the answer, before others see them (nameFirst): a first live duel (screens/live.ts: before a new
-// search, never on coming back to a duel under way nor for a rematch).
+// a device, whatever the answer, before others see them (nameFirst): a first duel sent to a friend (screens/duel.ts),
+// who sees it with the duel.
 // The name is saved before the game goes on (the others see it), and one refused is said in the sheet, to change. Esc
 // or a tap beside the sheet is „Не сега“: the player tapped to play, and the game goes on (put away with its screen,
 // by going elsewhere, it's no answer). One sheet at a time: a second ask while it's up (a double tap) waits for the same answer.
@@ -38,7 +38,7 @@ const toAsk = (u: User | null): u is User => !!u?.drawn && !asked(u.id);
 /** The ask under way for nameFirst, and the answer it will give: a second ask meanwhile waits for it. */
 let asking: Promise<boolean> | null = null;
 
-/** Before the player first meets others (a live duel): the player made if they're not yet (a
+/** Before the player first meets others (a duel sent to a friend): the player made if they're not yet (a
  * first game), and, if they still have the name drawn for them and weren't asked on this device, the sheet first.
  * Done once it's answered, whichever way (a name given, once saved): true to go on, false if the player has gone to
  * another screen meanwhile (the router puts the sheet away with the screen). `without`, asked only when the sheet

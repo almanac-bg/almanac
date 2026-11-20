@@ -119,7 +119,7 @@ func (g *Game) KnowledgeBoard(ctx context.Context, viewer int64, friends bool, t
 		}
 		placed = placed || k.viewer
 	}
-	r, err := g.rankingOf(ctx, viewer, out, false)
+	r, err := g.rankingOf(ctx, viewer, out)
 	if viewer != 0 && mine.answers < least {
 		r.Answers = &mine.answers
 	}
@@ -292,6 +292,45 @@ func (g *Game) countKnowledge(ctx context.Context, now time.Time, b *bank.Bank) 
 	return by, nil
 }
 
+// Ranked is a player on a board of knowledge: who they are, the percent of a topic (or of all of them) they know,
+// how many answers it's from, and the mastery's name.
+type Ranked struct {
+	Name    string `json:"name"`
+	Tag     string `json:"tag"`
+	Value   int    `json:"value"`
+	Answers int    `json:"answers,omitempty"`
+	Tier    string `json:"tier,omitempty"`
+	Me      bool   `json:"me,omitempty"`
+	Look
+}
+
+// Ranking is a board: the best, and the viewer's place on it (0: not on it).
+type Ranking struct {
+	Top   []Ranked `json:"top"`
+	Place int      `json:"place,omitempty"`
+	Mine  *Ranked  `json:"mine,omitempty"`
+	// Answers is the viewer's answers while they're short of the board: how far they are.
+	Answers *int `json:"answers,omitempty"`
+}
+
+const (
+	// BoardSize is how many a board shows.
+	BoardSize = 50
+	// KnowAll is how many answers a player needs to be on the board of knowledge, and KnowTopic in one topic: a
+	// mark from a few is luck.
+	KnowAll   = 100
+	KnowTopic = 30
+)
+
+// among limits a board's query over users u to the viewer and their friends (friends), or not at all; ?2 is the
+// viewer.
+func among(friends bool) string {
+	if !friends {
+		return ""
+	}
+	return ` AND (u.id = ?2 OR u.id IN (SELECT friend_id FROM friends WHERE user_id = ?2))`
+}
+
 // ranked is a player's place on a board, before their name and look are read: on a board of knowledge, with their
 // mastery's tier.
 type ranked struct {
@@ -302,7 +341,7 @@ type ranked struct {
 
 // rankingOf reads who the players on a board are (names and looks) and makes it the board: the best (BoardSize, in
 // order), and the viewer's place if they're on it.
-func (g *Game) rankingOf(ctx context.Context, viewer int64, list []ranked, divisions bool) (Ranking, error) {
+func (g *Game) rankingOf(ctx context.Context, viewer int64, list []ranked) (Ranking, error) {
 	out := Ranking{Top: []Ranked{}}
 	if len(list) == 0 {
 		return out, nil
@@ -338,10 +377,6 @@ func (g *Game) rankingOf(ctx context.Context, viewer int64, list []ranked, divis
 			continue
 		}
 		r.Value, r.Answers, r.Tier, r.Me = x.value, x.answers, x.tier, x.id == viewer
-		if divisions {
-			d, _ := DivisionOf(r.Value)
-			r.Division = &d
-		}
 		if r.Me {
 			out.Place, out.Mine = x.place, &r
 		}

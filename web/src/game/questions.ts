@@ -139,8 +139,7 @@ export function ask(
   }
 }
 
-/** Draws a question as it was answered, for going over it once the question is past (a review, a live game's
- * answer). „Вярно“ and „Невярно“ carry no ✓ while asked; here the right one says it is, for whoever can't tell
+/** Draws a question as it was answered, for going over it once the question is past (a review). „Вярно“ and „Невярно“ carry no ✓ while asked; here the right one says it is, for whoever can't tell
  * colours. */
 export function answered(view: View, reveal: Reveal, given: Answer | null): Child {
   const a = ask(view, () => {}, signal(true), undefined, true);

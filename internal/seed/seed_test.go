@@ -61,13 +61,12 @@ func TestSeededGame(t *testing.T) {
 	for what, q := range map[string]string{
 		"day runs":         `SELECT count(*) FROM runs WHERE kind = 'day' AND finished_at IS NOT NULL`,
 		"topic runs":       `SELECT count(*) FROM runs WHERE kind = 'topic'`,
-		"live duels":       `SELECT count(*) FROM duels WHERE b_id IS NOT NULL AND outcome IN ('a', 'b', 'draw')`,
-		"recorded duels":   `SELECT count(*) FROM duels WHERE ghost_run IS NOT NULL`,
+		"friends' duels":   `SELECT count(*) FROM duels WHERE kind = 'person' AND outcome IN ('a', 'b', 'draw')`,
+		"duels waiting":    `SELECT count(*) FROM duels WHERE kind = 'person' AND sent_at IS NOT NULL AND ended_at IS NULL`,
+		"recorded duels":   `SELECT count(*) FROM duels WHERE kind = 'recording' AND outcome IN ('a', 'b', 'draw')`,
 		"friends":          `SELECT count(*) FROM friends`,
 		"requests waiting": `SELECT count(*) FROM friend_requests WHERE NOT declined`,
 		"notes":            `SELECT count(*) FROM notes`,
-		"placed ratings":   `SELECT count(*) FROM users WHERE rated >= 10`,
-		"placing ratings":  `SELECT count(*) FROM users WHERE rated BETWEEN 1 AND 9`,
 		"guests":           `SELECT count(*) FROM users WHERE email IS NULL`,
 		"tallies":          `SELECT count(*) FROM daily_counts`,
 	} {
@@ -113,7 +112,7 @@ func TestSeededGame(t *testing.T) {
 	}
 	screens := []string{"/api/me", "/api/me/stats", "/api/me/games", "/api/me/games?kind=duel",
 		"POST /api/me/news", "/api/day", "/api/runs/left",
-		"/api/playing", "/api/duels", "/api/ranks", "/api/ranks?among=friends", "/api/ranks?by=knowledge",
+		"/api/duels", "/api/ranks", "/api/ranks?among=friends", "/api/ranks?topic=history",
 		"/api/almanac", "/api/friends",
 		"/api/friends/requests", "/api/push/prefs", "/api/mail/prefs"}
 	for _, p := range personas {
@@ -126,12 +125,14 @@ func TestSeededGame(t *testing.T) {
 		if u, _ := me["user"].(map[string]any); code != http.StatusOK || u["tag"] != p.Tag {
 			t.Errorf("%s isn't signed in by their cookie: %v", p.Key, me)
 		}
-		// A duel, and a game gone over, of those who have them.
+		// Each of their duels (to play, waiting, played), and a game gone over, of those who have them.
 		_, d := get(p, "/api/duels")
-		if list, _ := d["duels"].([]any); len(list) > 0 {
-			id := list[0].(map[string]any)["id"]
-			if code, v := get(p, fmt.Sprintf("/api/duels/%v", id)); code != http.StatusOK {
-				t.Errorf("%s: a duel: %d %v", p.Key, code, v)
+		for _, kind := range []string{"yours", "theirs", "played"} {
+			if list, _ := d[kind].([]any); len(list) > 0 {
+				id := list[0].(map[string]any)["id"]
+				if code, v := get(p, fmt.Sprintf("/api/duels/%v", id)); code != http.StatusOK {
+					t.Errorf("%s: a duel: %d %v", p.Key, code, v)
+				}
 			}
 		}
 		var run int64 // today's: a game is gone over on its day

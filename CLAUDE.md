@@ -18,8 +18,8 @@ duels played on one's own time against a friend or a real recorded game). The st
 missed day a week. Points are one game's score; nothing else adds up but the book and the streak.
 
 **Being rebuilt (from 20 Nov 2026).** The owner chose this after a full review (DECISIONS.md, „The redesign“). Until
-each part lands, the code still has the old game: rating and divisions, live duels, four places (Роял is gone). Don't extend any of those; remove them as the redesign
-reaches them.
+each part lands, the code still has the old game: four places (Роял, live duels, the rating and divisions are gone).
+Don't extend any of those; remove them as the redesign reaches them.
 
 ## Direction
 
@@ -34,8 +34,7 @@ most). A change is judged by whether players come back: the retention numbers in
 | --- | --- |
 | `cmd/almanac` | The program: `serve`, `bank check/fmt`, `backup now/list/restore/verify/keys` |
 | `cmd/build` | Builds the client into `internal/assets/dist` (esbuild; precompressed; the first screen's budget, and ceilings against accidents) |
-| `internal/play` | The game's rules and data: runs, scoring (`worth.go`), the streak (`runs.go`), the Алманах and its notes (`progress.go`), duels, friends, rating |
-| `internal/live` | Live duels: matchmaking, the shared clock, recordings |
+| `internal/play` | The game's rules and data: runs, scoring (`worth.go`), the streak (`runs.go`), the Алманах and its notes (`progress.go`), duels on one's own time (`duels.go`: a friend's, a recording's), friends |
 | `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: the paths it sends the app for, the client's router's list again; a test holds them equal) |
 | `internal/store` | SQLite; migrations in `internal/store/migrations`, applied once each by name |
 | `internal/bank` | Question types, the bank on disk, its checks |
@@ -154,16 +153,15 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
 - **Merging to `main` releases and deploys by itself** (`.github/workflows/deploy.yml`), and nobody decides it: a
   merge that changes the program (its build's hash differs from the last release's) is released, once main as merged
   passes the server's and the client's checks, one that doesn't (tests, docs, tooling) isn't. The version counts up its minor when the release brings a new migration, its patch
-  otherwise: one minor, one schema. A major is the owner's call only (the workflow run by hand). `almanac-deploy` restarts the server only when
-  that cuts no play: it drains it first (no new live duel; those under way finish, each by its own clock, seven
-  minutes at the most), so a deploy may take a while to go live, and several merges meanwhile go out as one. Connections wait in systemd's socket through the restart; a version that brings a migration copies the database before it, and the deploy goes back by itself,
+  otherwise: one minor, one schema. A major is the owner's call only (the workflow run by hand). `almanac-deploy` restarts the server at
+  once: every game is in the database, answer by answer, so a restart cuts no play. Connections wait in systemd's socket through the restart; a version that brings a migration copies the database before it, and the deploy goes back by itself,
   program and database copy both, if it isn't healthy. Every run deploys the latest release if it isn't live, so a
   failed deploy is tried again by the next merge; one that went back isn't, nor (if it never came up after it began
   to migrate) a release that brings that migration unchanged: change what failed. No tags by hand, no ssh to deploy. A change to `deploy/` reaches the
   server only by hand, as root, the way `deploy/setup.sh` installs it (then `systemctl daemon-reload` for a unit; a
   changed firewall or sshd file goes back by itself in ten minutes unless `almanac-harden confirm` comes from a new
-  ssh login: `deploy/harden.sh`); until then the Deploy run is red. Anything new kept in memory must survive a restart or count as under way
-  (`internal/server/drain.go`).
+  ssh login: `deploy/harden.sh`); until then the Deploy run is red. Nothing a player does may live in the server's memory
+  alone: anything new kept there must survive a restart (the limits' counts do: `limits.go`).
 - **The browser tests run after the merge, on `main`** (about 15 minutes, all three engines). They hold nothing up;
   if one fails, whoever sees it fixes it, at once (a session is told as it starts: `.claude/hooks/main-red.sh`).
   Before opening a PR, run only the specs your change touches, in Chromium:
@@ -197,8 +195,7 @@ This runs on the owner's own Mac, with other sessions beside you. When your work
 
 One Hetzner server (ARM) behind Cloudflare; the program runs under systemd as `almanac`, serves HTTPS itself, keeps
 SQLite in `/var/lib/almanac`, and backs it up to R2 every 15 minutes. Deploys come from CI (above). By hand, as root:
-`almanac-deploy vX.Y.Z` (also how to go back: an older version, with `now` after it to skip the wait for play to
-end, within the same minor (`vX.Y.*`: the same migrations); to an older minor, the older version refuses the database and the deploy goes back
+`almanac-deploy vX.Y.Z` (also how to go back: an older version, within the same minor (`vX.Y.*`: the same migrations); to an older minor, the older version refuses the database and the deploy goes back
 to where it was, so put the copy from before that release back by hand, `/var/lib/almanac/before-vX.Y.Z.db`, with
 `systemctl stop almanac.socket almanac` first, and lose what was played since; a release is taken only signed, so
 one from before signatures only while it's kept in `/usr/local/lib/almanac`, the five used latest), `almanac-bank` (check the new

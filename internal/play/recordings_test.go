@@ -13,9 +13,7 @@ import (
 func TestRecordingsOverAllTopicsFirst(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	near, far, ana := w.user(), w.user(), w.user()
-	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1350 WHERE id IN (?, ?)`, near, ana)
-	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 900 WHERE id = ?`, far)
+	one, other, ana := w.user(), w.user(), w.user()
 	game := func(user int64, category string) int64 {
 		s, err := w.g.StartTopic(ctx, user, category)
 		if err != nil {
@@ -45,37 +43,35 @@ func TestRecordingsOverAllTopicsFirst(t *testing.T) {
 		return seen
 	}
 
-	// A history game by a player of Ana's rating, and one over all the topics by a player far below: being near her
-	// comes first, so the history game it is, and the duel says so.
-	history := game(near, "history")
-	farAll := game(far, MixTopic)
+	// A history game alone: it's the one, and the duel says its topic.
+	history := game(one, "history")
 	if rec := pick(nil); rec == nil || rec.id != history || rec.topic != "history" {
 		t.Fatalf("got %+v, want the history game %d", rec, history)
 	}
-	l, err := w.g.StartRecorded(ctx, ana)
-	if err != nil || l.Runs[1] != history || l.Topic != "history" {
-		t.Fatalf("the duel against the history game: runs %v, topic %q, %v", l.Runs, l.Topic, err)
+	duel, err := w.g.DuelRecording(ctx, ana)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if err := w.g.CancelLive(ctx, l.DuelID); err != nil {
+	if d, err := w.g.DuelOf(ctx, ana, duel); err != nil || d.Topic != "history" {
+		t.Fatalf("the duel against the history game: %+v %v", d, err)
+	}
+	if _, err := w.db.Write.Exec(`DELETE FROM duels WHERE id = ?`, duel); err != nil {
 		t.Fatal(err)
 	}
 
-	// A game over all the topics by a player near her: it comes before the history game while she hasn't seen it.
-	nearAll := game(near, MixTopic)
-	if rec := pick(nil); rec == nil || rec.id != nearAll || rec.topic != "" {
-		t.Fatalf("got %+v, want the game over all topics %d (history %d, far %d)", rec, nearAll, history, farAll)
+	// A game over all the topics: it comes before the history game while she hasn't seen it.
+	mix := game(other, MixTopic)
+	if rec := pick(nil); rec == nil || rec.id != mix || rec.topic != "" {
+		t.Fatalf("got %+v, want the game over all topics %d (history %d)", rec, mix, history)
 	}
 	// With every one of its questions seen (the same ten again), it comes after every game she hasn't: the history
-	// game by the player near her.
-	if rec := pick(all(nearAll)); rec == nil || rec.id != history {
-		t.Fatalf("got %+v, want the history game %d, not the ten she has seen (%d)", rec, history, nearAll)
+	// game.
+	if rec := pick(all(mix)); rec == nil || rec.id != history {
+		t.Fatalf("got %+v, want the history game %d, not the ten she has seen (%d)", rec, history, mix)
 	}
 	// Only seen games left: the one with the fewest seen still plays, rather than nobody.
-	seen := all(nearAll)
+	seen := all(mix)
 	for id := range all(history) {
-		seen[id] = true
-	}
-	for id := range all(farAll) {
 		seen[id] = true
 	}
 	if rec := pick(seen); rec == nil {
@@ -84,13 +80,11 @@ func TestRecordingsOverAllTopicsFirst(t *testing.T) {
 }
 
 // A game whose ten the player has just played (a duel's other side, say) is no recording for them: the same ten
-// questions again. Another real game comes first, however far its player's rating.
+// questions again. Another real game comes first.
 func TestRecordingsNotTheSameTenAgain(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	friend, far, ana := w.user(), w.user(), w.user()
-	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1000 WHERE id IN (?, ?)`, friend, ana)
-	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1600 WHERE id = ?`, far)
 	game := func(user int64) int64 {
 		s, err := w.g.StartTopic(ctx, user, MixTopic)
 		if err != nil {
@@ -121,13 +115,11 @@ func TestRecordingsNotTheSameTenAgain(t *testing.T) {
 }
 
 // A game left halfway (the tab closed: the rest of its questions not answered) isn't a real game to play against,
-// however many it got right before: a duel waited out each missing answer. A real game by anyone comes first.
+// however many it got right before. A real game comes first, the latest of them.
 func TestRecordingsLeaveOutGamesLeft(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	near, far, ana := w.user(), w.user(), w.user()
-	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 1350 WHERE id IN (?, ?)`, near, ana)
-	_, _ = w.db.Write.Exec(`UPDATE users SET rating = 900 WHERE id = ?`, far)
 	none := func(int64, int) json.RawMessage { return nil }
 	game := func(user int64, answers ...func(int64, int) json.RawMessage) int64 {
 		s, err := w.g.StartTopic(ctx, user, MixTopic)
@@ -139,7 +131,7 @@ func TestRecordingsLeaveOutGamesLeft(t *testing.T) {
 		return s.ID
 	}
 	real := game(far, append(repeat(w.right, 5), repeat(w.wrong, Length-5)...)...)
-	// Near Ana's rating, two not answered: still a real game, and the nearer.
+	// Two not answered: still a real game, and the latest.
 	missedTwo := game(near, append(append(repeat(w.right, 5), repeat(none, 2)...), repeat(w.wrong, Length-7)...)...)
 	pick := func() int64 {
 		t.Helper()
@@ -154,16 +146,16 @@ func TestRecordingsLeaveOutGamesLeft(t *testing.T) {
 		return rec.id
 	}
 	if got := pick(); got != missedTwo {
-		t.Fatalf("got %d, want the game near Ana with two not answered %d", got, missedTwo)
+		t.Fatalf("got %d, want the game with two not answered %d", got, missedTwo)
 	}
-	// Near her, left at the sixth: five right, the rest not answered. The real game far from her comes first.
+	// Left at the sixth: five right, the rest not answered. The real games come first, however late it is.
 	_ = game(near, append(repeat(w.right, 5), repeat(none, Length-5)...)...)
 	if got := pick(); got != missedTwo {
-		t.Fatalf("got %d, want %d (the real one far off: %d)", got, missedTwo, real)
+		t.Fatalf("got %d, want %d (the other real one: %d)", got, missedTwo, real)
 	}
 	_, _ = w.db.Write.Exec(`DELETE FROM runs WHERE id = ?`, missedTwo)
 	if got := pick(); got != real {
-		t.Fatalf("got %d, want the real game far off %d", got, real)
+		t.Fatalf("got %d, want the other real game %d", got, real)
 	}
 }
 
@@ -190,11 +182,14 @@ func TestRecordingsNews(t *testing.T) {
 	}
 	duel := func(user int64, answer func(int64, int) json.RawMessage) {
 		t.Helper()
-		l, err := w.g.StartRecorded(ctx, user)
-		if err != nil || l.Users[1] != owner {
-			t.Fatalf("a duel against the owner's game: %+v %v", l, err)
+		id, err := w.g.DuelRecording(ctx, user)
+		if err != nil {
+			t.Fatal(err)
 		}
-		w.play(user, l.Runs[0], repeat(answer, Length)...)
+		if d, _ := w.g.DuelOf(ctx, user, id); d.Opponent == nil || d.Opponent.ID != owner {
+			t.Fatalf("a duel against the owner's game: %+v", d)
+		}
+		w.playSide(user, id, repeat(answer, Length))
 		w.wait(time.Minute)
 	}
 

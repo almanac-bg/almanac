@@ -1,10 +1,9 @@
 #!/bin/sh
-# Makes a release of the game the live one, at a moment the restart cuts no play, and goes back to the one before if
-# the new one isn't healthy. As root, or from CI through deploy-ci.sh:
+# Makes a release of the game the live one, and goes back to the one before if the new one isn't healthy. As root, or
+# from CI through deploy-ci.sh:
 #
-#   almanac-deploy v2.0.0        when nothing is under way (the usual way)
-#   almanac-deploy v2.0.0 now    at once (to go back from a broken release)
-#   almanac-deploy v2.0.0 ci     as CI asks: as the usual way, but not a release that failed before (below)
+#   almanac-deploy v2.0.0        by hand (also how to go back to an older one)
+#   almanac-deploy v2.0.0 ci     as CI asks: not a release that failed before (below)
 #
 # It runs as a unit of its own (almanac-deploy-v2.0.0: journalctl -u), and whoever started it follows its output: a
 # deploy goes to its end, going back included, even if the session that started it is cut (CI cancelled, the network
@@ -26,18 +25,14 @@
 # it runs. A release without one (from before signatures) is never taken: only one kept here already (the five used
 # latest are kept in /usr/local/lib/almanac, each checked when it came) can be gone back to.
 #
-# Before the restart it drains the server (internal/server/drain.go): asked every few seconds, the server starts no
-# live duel, and says it's ready once those under way are over (each by its own clock, seven minutes at the most).
-# An answer that doesn't come (a timeout, an error, the server busy) is asked again, ever more slowly up to half a
-# minute apart: it never counts as ready. Only these restart without the server's ready: a server too old to drain
-# (404 from the first answer on), one not running at all (nothing to cut), and 45 minutes without ready (a game stuck;
-# cut all the same). Connections
-# that come during the restart wait in systemd's socket (almanac.socket) for the new server.
+# Nothing the game plays lives only in its memory (every game is in the database, step by step), so a restart cuts no
+# play, and the deploy restarts at once. Connections that come during the restart wait in systemd's socket
+# (almanac.socket) for the new server.
 #
 # The database: a version that brings a migration the database hasn't had copies it as it first starts, before
 # migrating (before-vX.Y.Z.db: store.KeepCopy); this script can't, as the socket starts the server again as soon as a
 # connection comes. So the disk must have room for that copy and the migrations, twice the database, or the deploy
-# stops before it drains. Going back puts the copy in the database's place, by renaming it, if the failed version
+# stops before the restart. Going back puts the copy in the database's place, by renaming it, if the failed version
 # made it: a program refuses a database that has a migration it doesn't know (internal/store), so the version before
 # can only start on the database as it was before the new one migrated it. The failed version's database, its log
 # with it, is kept beside it (failed-vX.Y.Z-<time>.db, pruned with the other copies after a month), for what it wrote
@@ -47,7 +42,7 @@
 # Healthy: the server answers as the new version within three minutes, and then keeps answering, the same process,
 # for two more (a crash after a good start goes back too).
 set -eu
-usage="usage: almanac-deploy vX.Y.Z [now | ci]"
+usage="usage: almanac-deploy vX.Y.Z [ci]"
 tag=${1:-}
 # A version: v and three numbers, the whole string (no second line, no path).
 case $tag in *[!v0-9.]* | '') tag=bad ;; esac
@@ -56,7 +51,7 @@ if ! printf '%s\n' "$tag" | grep -Exq 'v(0|[1-9][0-9]{0,5})(\.(0|[1-9][0-9]{0,5}
 	exit 1
 fi
 mode=${2:-}
-case $mode in "" | now | ci) ;; *)
+case $mode in "" | ci) ;; *)
 	echo "$usage" >&2
 	exit 1
 	;;
@@ -116,15 +111,12 @@ fi
 
 incoming=
 work=
-drained=
 stopped=
 finish() {
 	# The game stopped for going back, and this cut off midway: started again, whatever it starts on.
 	if [ -n "$stopped" ]; then systemctl start almanac.socket almanac || true; fi
 	if [ -n "$incoming" ]; then rm -rf "$incoming"; fi
 	if [ -n "$work" ]; then rm -rf "$work"; fi
-	# The server doesn't stay drained (it would end the drain by itself in a minute anyway).
-	if [ -n "$drained" ]; then api DELETE drain >/dev/null 2>&1 || true; fi
 }
 trap finish EXIT
 trap 'exit 1' HUP INT TERM
@@ -173,67 +165,12 @@ if [ "$mode" = ci ] && [ -s "$work/brings" ]; then
 	done
 fi
 
-# Room for a copy of the database and its migrations: refused here, before any play is cut.
+# Room for a copy of the database and its migrations: refused here, before the restart.
 size=$(($(stat -c %s "$db" 2>/dev/null || echo 0) + $(stat -c %s "$db-wal" 2>/dev/null || echo 0)))
 room=$(df --output=avail -B1 "$data" | tail -n 1)
 if [ "$room" -lt $((2 * size)) ]; then
 	echo "not deployed: $((room >> 20)) MB free in $data, and a copy of the database with its migrations may take $((2 * size >> 20)) MB" >&2
 	exit 1
-fi
-
-if [ "$mode" != now ]; then
-	drained=1
-	began=$(date +%s)
-	status=  # the server's last answer
-	failed=0 # answers missed in a row
-	told=-1
-	while :; do
-		code=$(curl -sk --max-time 10 --resolve almanac.bg:443:127.0.0.1 -o "$work/drain" -w '%{http_code}' \
-			-X POST https://almanac.bg/api/drain 2>/dev/null || true)
-		now=$(date +%s)
-		case $code in
-		200)
-			status=$(cat "$work/drain")
-			failed=0
-			case $status in *'"ready":true'*)
-				echo "ready: $status"
-				break
-				;;
-			esac
-			;;
-		404)
-			if [ -z "$status" ]; then
-				echo "the server is too old to drain: restarting at once"
-				break
-			fi
-			failed=$((failed + 1))
-			echo "no answer to the drain (404, after it answered): asked again"
-			;;
-		*)
-			failed=$((failed + 1))
-			if ! systemctl is-active --quiet almanac; then
-				echo "the server isn't running (${code:-000}): nothing to cut, restarting"
-				break
-			fi
-			echo "no answer to the drain (${code:-000}): asked again"
-			;;
-		esac
-		waited=$((now - began))
-		if [ "$waited" -ge 2700 ]; then
-			echo "not ready after 45 minutes (${status:-no answer}): restarting all the same" >&2
-			break
-		fi
-		if [ "$failed" -eq 0 ] && [ $((waited / 60)) -gt "$told" ]; then
-			told=$((waited / 60))
-			echo "waiting ($told min): $status"
-		fi
-		if [ "$failed" -eq 0 ]; then
-			sleep 5
-		else # 5, 10, 20, then 30 seconds: under the drain's minute, so one that comes back keeps it
-			pause=$((5 << (failed < 4 ? failed - 1 : 3)))
-			sleep $((pause > 30 ? 30 : pause))
-		fi
-	done
 fi
 
 restarted=$(date +%s)
@@ -282,7 +219,7 @@ if [ -n "$healthy" ]; then
 			rm -f "$mark"
 		fi
 	done
-	# The five used latest are kept, to go back to any of them: almanac-deploy <tag> now.
+	# The five used latest are kept, to go back to any of them: almanac-deploy <tag>.
 	# shellcheck disable=SC2012 # the names are versions: no spaces, no new lines
 	ls -t "$dir"/almanac-v* | tail -n +6 | while read -r old; do
 		if [ "$old" != "$program" ]; then rm -f "$old"; fi

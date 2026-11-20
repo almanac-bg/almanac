@@ -1,5 +1,5 @@
 // Every avatar the server knows (internal/play: Shapes) is drawn, named and has its natural colours in the client,
-// and the client offers no other; every division is drawn.
+// and the client offers no other.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -47,9 +47,4 @@ test("every avatar is drawn and named, and the choice offers no other", () => {
   const tones = ui.slice(ui.indexOf("export const toneNames"), ui.indexOf("const freeShapes"));
   const toned = [...tones.matchAll(/\n {2}([a-z]+): "/g)].map((m) => m[1] ?? "");
   assert.deepEqual(toned, goList(go, "Tones"), "toneNames are the server's tones, in its order");
-});
-
-test("every division is drawn", () => {
-  for (const d of ["bronze", "silver", "gold", "platinum", "diamond", "legend"])
-    assert.ok(pictures[`division-${d}`], `division ${d}`);
 });

@@ -73,7 +73,8 @@ func (w *world) runOf(user int64, kind string, ids ...string) int64 {
 		}
 		id = r.id
 		if kind == "duel" {
-			_, err = tx.Exec(`INSERT INTO duels (questions, a_id, a_run, created_at, expires_at) VALUES ('[]', ?, ?, 0, ?)`,
+			_, err = tx.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, created_at, expires_at)
+				VALUES ('recording', '[]', ?, ?, 0, ?)`,
 				user, id, store.Ms(w.now.Add(time.Hour)))
 		}
 		return err
@@ -161,23 +162,27 @@ func TestGradedAsShown(t *testing.T) {
 		t.Fatalf("after a restart: %+v %v", res, err)
 	}
 
-	// A live duel: dealt as it began, under the bank before; shown and answered after the fix.
-	gal := w.user()
+	// A duel's second side: the first's ten, at the versions they showed. Gal's side was shown before the fix, so
+	// Di, who plays it after, plays the version before, and is graded against it.
+	gal, di := w.user(), w.user()
 	w.reload(before)
-	run = w.runOf(gal, "duel", "geo-960")
-	d, _ := w.g.Deal(w.picks(run)[0])
-	w.reload(fixed)
-	if err := w.g.ShowLive(ctx, gal, run, 0, w.now, d); err != nil {
+	run = w.runOf(gal, "topic", "geo-960")
+	w.show(gal, run)
+	sent, err := w.db.Write.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, b_id, created_at, sent_at, expires_at)
+		VALUES ('person', '[]', ?, ?, ?, 0, 0, ?)`, gal, run, di, store.Ms(w.now.Add(time.Hour)))
+	if err != nil {
 		t.Fatal(err)
 	}
-	w.wait(2 * time.Second)
-	if res, err := w.g.AnswerLive(ctx, gal, run, 0, truth, w.now, time.Time{}, d); err != nil || !res.Right {
-		t.Fatalf("a live duel's answer: %+v %v", res, err)
+	duel, _ := sent.LastInsertId()
+	w.reload(fixed)
+	second, err := w.g.PlayDuel(ctx, di, duel)
+	if err != nil {
+		t.Fatal(err)
 	}
-	// A deal that isn't the run's question is out of step.
-	other, _ := w.g.Deal(Pick{ID: "geo-001", Seed: 1})
-	if err := w.g.ShowLive(ctx, gal, w.runOf(gal, "duel", "geo-960"), 0, w.now, other); !errors.Is(err, ErrOutOfStep) {
-		t.Fatalf("another question shown live: %v", err)
+	w.show(di, second)
+	w.wait(2 * time.Second)
+	if res, err := w.g.Answer(ctx, di, second, 0, truth); err != nil || !res.Right {
+		t.Fatalf("the second side's answer: %+v %v", res, err)
 	}
 
 	// The fixed version's crowd and hardness start afresh: the answers to the one before aren't its, though given the

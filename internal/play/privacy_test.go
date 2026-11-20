@@ -60,7 +60,7 @@ func TestProfileShowsNoGameUnderWay(t *testing.T) {
 }
 
 // A recording shows who played it, as anyone shows anywhere in the game: their name, tag and look, during the duel
-// (internal/live) and after it, labelled a recording (owner, 2026-11-19).
+// and after it, labelled a recording (owner, 2026-11-19).
 func TestRecordingsNamed(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -74,11 +74,11 @@ func TestRecordingsNamed(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.play(owner, s.ID, repeat(w.right, Length)...)
-	l, err := w.g.StartRecorded(ctx, gal)
-	if err != nil || l.Users[1] != owner {
-		t.Fatalf("a duel against the owner's game: %+v %v", l, err)
+	duel, err := w.g.DuelRecording(ctx, gal)
+	if err != nil {
+		t.Fatal(err)
 	}
-	w.play(gal, l.Runs[0], repeat(w.wrong, Length)...)
+	w.playSide(gal, duel, repeat(w.wrong, Length))
 	w.wait(time.Minute)
 
 	look, err := w.g.LookOf(ctx, owner)
@@ -90,10 +90,10 @@ func TestRecordingsNamed(t *testing.T) {
 		t.Fatal(err)
 	}
 	duels, err := w.g.DuelsOf(ctx, gal)
-	if err != nil || len(duels) != 1 {
+	if err != nil || len(duels.Played) != 1 {
 		t.Fatalf("Gal's duels: %+v %v", duels, err)
 	}
-	d := duels[0]
+	d := duels.Played[0]
 	if !d.Recorded || d.Opponent == nil || d.Opponent.Name != "Мария" || d.Opponent.Tag != ownerTag ||
 		d.Opponent.Look == nil || *d.Opponent.Look != look {
 		t.Fatalf("the recording, as Gal's duels show it: %+v %+v", d, d.Opponent)

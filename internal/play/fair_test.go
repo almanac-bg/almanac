@@ -219,8 +219,11 @@ func TestScriptedOutOfBoardsAndStatistics(t *testing.T) {
 		t.Fatalf("knowledge as the script's player sees it: %+v %v", k, err)
 	}
 	// A recording: Ana's, never the script's (the latest, all right).
-	if l, err := w.g.StartRecorded(ctx, w.user()); err != nil || w.scripted(l.Runs[1]) {
-		t.Fatalf("a recording of a script's game: %+v %v", l, err)
+	duel, err := w.g.DuelRecording(ctx, w.user())
+	var recording int64
+	_ = w.db.Read.QueryRow(`SELECT ghost_run FROM duels WHERE id = ?`, duel).Scan(&recording)
+	if err != nil || w.scripted(recording) {
+		t.Fatalf("a recording of a script's game: %d %v", recording, err)
 	}
 
 	// Calibration counts CalibrateFrom answers of people.

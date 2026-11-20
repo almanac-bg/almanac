@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Fair play by network and by newcomers (review 2026-11-18, S4, S20).
+// Fair play by network (review 2026-11-18, S4).
 
 // netDay is a player's day's ten, played from a network (fair.go, FromNet): all right, or all wrong.
 func (w *world) netDay(user int64, net string, right bool) int64 {
@@ -125,113 +125,5 @@ func TestThrowawayGuestsBeforeAPlayer(t *testing.T) {
 	}
 	if n := w.count(`SELECT count(*) FROM run_nets`); n != 0 {
 		t.Fatalf("%d networks kept past their time", n)
-	}
-}
-
-// pairDuel is a live duel between two players, a's from netA and b's from netB ("": none), b winning it: b's duel.
-func (w *world) pairDuel(a, b int64, netA, netB string) DuelView {
-	w.t.Helper()
-	ctx := w.t.Context()
-	l, err := w.g.StartLive(FromNet(FromNet(ctx, a, []byte(netA)), b, []byte(netB)), a, b)
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	w.play(a, l.Runs[0], repeat(w.wrong, Length)...)
-	w.play(b, l.Runs[1], repeat(w.right, Length)...)
-	d, err := w.g.DuelOf(ctx, b, l.DuelID)
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	return d
-}
-
-// Two who play from one network move no rating between them, and are told why; from two networks, they do. A
-// network a day old no longer joins them (S20).
-func TestNoRatingFromOneNetwork(t *testing.T) {
-	w := setup(t)
-	ana, bo := w.user(), w.user()
-	d := w.pairDuel(ana, bo, "home", "home")
-	if !d.Friendly || d.Unrated != "network" || d.Rating != nil || w.count(`SELECT rating FROM users WHERE id = ?`, bo) != StartRating {
-		t.Fatalf("from one network: %+v", d)
-	}
-	// The next day, Bo from his phone's network: the home network of yesterday is past SameNetFor.
-	w.wait(SameNetFor + time.Hour)
-	if d := w.pairDuel(ana, bo, "home", "phone"); d.Friendly || d.Rating == nil {
-		t.Fatalf("from two networks: %+v", d)
-	}
-	// Ana's game from home, Bo's from his phone, but Bo played at home the same day: one network still.
-	w.wait(SameNetFor + time.Hour)
-	w.netDay(bo, "home", true)
-	if d := w.pairDuel(ana, bo, "home", "phone"); !d.Friendly || d.Unrated != "network" {
-		t.Fatalf("Bo at home earlier today: %+v", d)
-	}
-}
-
-// Against a new player, an established one's rating moves half as far, NewcomersRatedPerDay times a day; the new
-// one's as any (S20).
-func TestNewcomersMoveRatingLess(t *testing.T) {
-	w := setup(t)
-	ana := w.user()
-	if _, err := w.db.Write.Exec(`UPDATE users SET rated = 30 WHERE id = ?`, ana); err != nil {
-		t.Fatal(err)
-	}
-	rating := func(id int64) int { return w.count(`SELECT rating FROM users WHERE id = ?`, id) }
-	for i := range NewcomersRatedPerDay + 1 {
-		alt := w.user()
-		before := rating(ana)
-		d := w.pairDuel(alt, ana, "", "")
-		if i == NewcomersRatedPerDay {
-			if !d.Friendly || d.Unrated != "newcomers" || rating(ana) != before {
-				t.Fatalf("past the day's duels against new players: %+v", d)
-			}
-			break
-		}
-		if d.Friendly || d.Delta != eloDelta(before, StartRating, 30, 1)/2 {
-			t.Fatalf("against a new player, duel %d: %+v (from %d)", i, d, before)
-		}
-		if lost := StartRating - rating(alt); lost != -eloDelta(StartRating, before, 0, 0) {
-			t.Fatalf("the new player lost %d", lost)
-		}
-	}
-	// An account three days old with ten rated duels is no newcomer.
-	vet := w.user()
-	if _, err := w.db.Write.Exec(`UPDATE users SET rated = 10 WHERE id = ?`, vet); err != nil {
-		t.Fatal(err)
-	}
-	w.since(vet, NewcomerFor+time.Hour)
-	w.befriend(ana, vet)
-	before := rating(ana)
-	if d := w.pairDuel(vet, ana, "", ""); d.Friendly || d.Delta != eloDelta(before, StartRating, 30, 1) {
-		t.Fatalf("against an established player: %+v (from %d)", d, before)
-	}
-	// One made today is new, however many rated duels it has had.
-	young := w.user()
-	w.since(young, time.Hour)
-	if !w.g.Newcomer(50, int64(w.count(`SELECT created_at FROM users WHERE id = ?`, young))) || w.g.Newcomer(10, 0) {
-		t.Fatal("Newcomer")
-	}
-}
-
-// A guest signing in brings their rating only to an account that has none: never a higher one over the account's
-// own, which a guest pumped up on throwaway guests would otherwise give any account (S20).
-func TestMergeKeepsTheAccountsRating(t *testing.T) {
-	w := setup(t)
-	account, guest := w.user(), w.user()
-	if _, err := w.db.Write.Exec(`UPDATE users SET rating = CASE id WHEN ?1 THEN 1050 ELSE 1500 END,
-		rated = CASE id WHEN ?1 THEN 12 ELSE 40 END WHERE id IN (?1, ?2)`, account, guest); err != nil {
-		t.Fatal(err)
-	}
-	w.fold(guest, account)
-	if r, n := w.count(`SELECT rating FROM users WHERE id = ?`, account), w.count(`SELECT rated FROM users WHERE id = ?`, account); r != 1050 || n != 12 {
-		t.Fatalf("the account's rating: %d of %d", r, n)
-	}
-	// An account with no rating of its own takes the guest's: the player's only one.
-	fresh, played := w.user(), w.user()
-	if _, err := w.db.Write.Exec(`UPDATE users SET rating = 1200, rated = 15 WHERE id = ?`, played); err != nil {
-		t.Fatal(err)
-	}
-	w.fold(played, fresh)
-	if r := w.count(`SELECT rating FROM users WHERE id = ?`, fresh); r != 1200 {
-		t.Fatalf("an unrated account's rating: %d", r)
 	}
 }

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bufio"
 	"context"
 	"crypto/ecdh"
 	"crypto/rand"
@@ -419,7 +418,7 @@ func TestRefusesOtherSites(t *testing.T) {
 func TestPages(t *testing.T) {
 	g := start(t)
 	for path, want := range map[string]int{
-		"/": 200, "/play": 404, "/play/history": 200, "/me": 200, "/duel/live": 200, "/duel/12": 404, "/duel/other": 404,
+		"/": 200, "/play": 404, "/play/history": 200, "/me": 200, "/duel/new": 200, "/duel/12": 404, "/duel/other": 404, "/duel": 404,
 		"/play/mix": 200, "/play/nosuch": 404, "/players/nobody": 404, "/nowhere": 404, "/api/nowhere": 404,
 		"/qimg/edf5f1c42d5e21e8.webp": 200, "/qimg/../../go.mod": 404, "/qimg/0000000000000000.webp": 404,
 		"/privacy": 200, "/.well-known/security.txt": 200,
@@ -635,184 +634,6 @@ func TestHosts(t *testing.T) {
 	}
 	if res, _ := get("evil.example", "/"); res.StatusCode != 404 {
 		t.Errorf("another site's name: %d", res.StatusCode)
-	}
-}
-
-// stream is an event stream as a browser reads it.
-type stream struct {
-	t   *testing.T
-	r   lines
-	res *http.Response
-}
-
-// lines reads a stream's lines past how long to wait before reconnecting (retry: the browser's own).
-type lines struct{ *bufio.Reader }
-
-func (l lines) ReadString(delim byte) (string, error) {
-	for {
-		line, err := l.Reader.ReadString(delim)
-		if err != nil || !strings.HasPrefix(line, "retry:") {
-			return line, err
-		}
-	}
-}
-
-// stream opens an event stream at path.
-func (p *player) stream(path string, lastID ...string) *stream {
-	p.g.t.Helper()
-	req, _ := http.NewRequest("GET", p.g.url+path, nil)
-	for _, id := range lastID {
-		req.Header.Set("Last-Event-ID", id) // as a browser sends it, coming back after the line dropped
-	}
-	res, err := p.client.Do(req)
-	if err != nil {
-		p.g.t.Fatal(err)
-	}
-	if res.Header.Get("Content-Type") != "text/event-stream" {
-		p.g.t.Fatalf("not a stream: %d %s", res.StatusCode, res.Header.Get("Content-Type"))
-	}
-	p.g.t.Cleanup(func() { res.Body.Close() })
-	return &stream{t: p.g.t, r: lines{bufio.NewReader(res.Body)}, res: res}
-}
-
-// until reads views until one passes ok.
-func (s *stream) until(ok func(map[string]any) bool) map[string]any {
-	s.t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		line, err := s.r.ReadString('\n')
-		if err != nil {
-			s.t.Fatal(err)
-		}
-		data, found := strings.CutPrefix(strings.TrimSpace(line), "data: ")
-		if !found {
-			continue
-		}
-		var v map[string]any
-		if err := json.Unmarshal([]byte(data), &v); err != nil {
-			s.t.Fatal(err)
-		}
-		if ok(v) {
-			return v
-		}
-	}
-	s.t.Fatal("no such view in time")
-	return nil
-}
-
-func TestALiveDuelOverHTTP(t *testing.T) {
-	g := start(t)
-	ana, bo := g.player(), g.player()
-	ana.call("POST", "/api/guest", map[string]any{})
-	bo.call("POST", "/api/guest", map[string]any{})
-
-	// Ana waits, told for how long; Bo comes, and both see the duel.
-	as := ana.stream("/api/duels/live/events")
-	if line, _ := as.r.ReadString('\n'); line != "event: waiting\n" {
-		t.Fatalf("Ana isn't waiting: %q", line)
-	}
-	bs := bo.stream("/api/duels/live/events")
-	v := as.until(func(v map[string]any) bool { return v["phase"] == "intro" })
-	id := int64(v["id"].(float64))
-	if v["them"].(map[string]any)["name"] == nil || v["recorded"] != nil {
-		t.Fatalf("the start: %v", v)
-	}
-	// Someone signed out, sent its link: asked to sign in for it; one that isn't there is said so, a 404 page.
-	outside := g.player()
-	if status, out := outside.call("GET", fmt.Sprintf("/api/duels/%d", id), nil); status != 401 || out["error"] != "signed_out" {
-		t.Errorf("a duel there, signed out: %d %v", status, out)
-	}
-	if status, out := outside.call("GET", fmt.Sprintf("/api/duels/%d", id+1000), nil); status != 404 || out["error"] != "no_duel" {
-		t.Errorf("a duel not there, signed out: %d %v", status, out)
-	}
-	for at, want := range map[int64]int{id: 200, id + 1000: 404} {
-		res, err := http.Get(fmt.Sprintf("%s/duel/%d", g.url, at))
-		if err != nil {
-			t.Fatal(err)
-		}
-		res.Body.Close()
-		if res.StatusCode != want {
-			t.Errorf("/duel/%d: %d, want %d", at, res.StatusCode, want)
-		}
-	}
-	path := fmt.Sprintf("/api/duels/live/%d/answer", id)
-	if status, _ := ana.call("POST", path, map[string]any{"n": 0, "answer": map[string]any{"pick": 0}}); status != 409 {
-		t.Fatalf("an answer before the question: %d", status)
-	}
-	// Nor through Ana's own run: the duel alone shows its questions and takes its answers.
-	_, me := ana.call("GET", "/api/me", nil)
-	var run int64
-	if err := g.db.Read.QueryRow(`SELECT CASE WHEN a_id = ? THEN a_run ELSE b_run END FROM duels WHERE id = ?`,
-		int64(me["user"].(map[string]any)["id"].(float64)), id).Scan(&run); err != nil {
-		t.Fatal(err)
-	}
-	runPath := fmt.Sprintf("/api/runs/%d/", run)
-	for step, body := range map[string]map[string]any{
-		"show": {}, "start": {"n": 0}, "answer": {"n": 0, "answer": map[string]any{"pick": 0}},
-	} {
-		if status, out := ana.call("POST", runPath+step, body); status != 409 {
-			t.Fatalf("the duel's first question through %s on its run: %d %v", step, status, out)
-		}
-	}
-	v = bs.until(func(v map[string]any) bool { return v["phase"] == "question" })
-	answer := map[string]any{"pick": 0}
-	switch v["question"].(map[string]any)["view"].(map[string]any)["type"] {
-	case "number":
-		answer = map[string]any{"value": 1}
-	case "order":
-		answer = map[string]any{"order": []int{0, 1, 2, 3}}
-	case "truefalse":
-		answer = map[string]any{"truth": true}
-	case "match":
-		answer = map[string]any{"pairs": []int{0, 1, 2, 3}}
-	}
-	// Ana's screen says it shows the question (her time runs from then), as the client does once it's drawn.
-	if status, out := ana.call("POST", fmt.Sprintf("/api/duels/live/%d/seen", id), map[string]any{"n": 0}); status != 200 {
-		t.Fatalf("Ana's screen's word: %d %v", status, out)
-	}
-	if status, out := ana.call("POST", path, map[string]any{"n": 0, "answer": answer}); status != 200 {
-		t.Fatalf("Ana's answer: %d %v", status, out)
-	}
-	v = bs.until(func(v map[string]any) bool { return v["them"].(map[string]any)["answered"] == true })
-	if v["phase"] != "question" || v["them"].(map[string]any)["given"] != nil {
-		t.Fatalf("Bo sees Ana's answer before his own: %v", v["them"])
-	}
-	stranger := g.player()
-	stranger.call("POST", "/api/guest", map[string]any{})
-	if status, _ := stranger.call("POST", path, map[string]any{"n": 0, "answer": answer}); status != 404 {
-		t.Fatalf("a stranger answered: %d", status)
-	}
-	// The duel under way: Начало, and any screen that asks, has the way back to it.
-	if _, p := ana.call("GET", "/api/playing", nil); p["playing"].(map[string]any)["kind"] != "duel" {
-		t.Fatalf("playing: %v", p)
-	}
-	if _, today := bo.call("GET", "/api/day", nil); today["playing"].(map[string]any)["kind"] != "duel" {
-		t.Fatalf("today's playing: %v", today["playing"])
-	}
-	if _, p := stranger.call("GET", "/api/playing", nil); p["playing"] != nil {
-		t.Fatalf("a stranger playing: %v", p)
-	}
-	bo.call("POST", path, map[string]any{"n": 0, "answer": answer})
-	v = as.until(func(v map[string]any) bool { return v["phase"] == "reveal" })
-	if v["question"].(map[string]any)["reveal"] == nil || v["them"].(map[string]any)["given"] == nil {
-		t.Fatalf("no answers shown: %v", v)
-	}
-
-	// Ana's line drops and comes back: the same duel, not the queue for a new one. A duel that's gone (a restart) says
-	// so.
-	again := ana.stream("/api/duels/live/events", strconv.FormatInt(id, 10))
-	if v := again.until(func(map[string]any) bool { return true }); int64(v["id"].(float64)) != id {
-		t.Fatalf("back in another duel: %v", v)
-	}
-	gone := ana.stream("/api/duels/live/events", strconv.FormatInt(id+1000, 10))
-	if line, _ := gone.r.ReadString('\n'); line != "event: closed\n" {
-		t.Fatalf("a duel that's gone: %q", line)
-	}
-	// A stream the screen opened anew (the browser gave up on it: a proxy's error page) says the duel in its address,
-	// as no header can be set on it (web/src/lib/stream.ts): the same.
-	gone = ana.stream(fmt.Sprintf("/api/duels/live/events?last=%d", id+1000))
-	if line, _ := gone.r.ReadString('\n'); line != "event: closed\n" {
-		t.Fatalf("a duel that's gone, opened anew: %q", line)
 	}
 }
 

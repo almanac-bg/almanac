@@ -136,34 +136,6 @@ func b2i(b bool) int {
 	return 0
 }
 
-// opponent is whom a player meets in a live duel now: someone else playing at about this time, of about their
-// rating as the queue pairs them, not met today yet; nil for nobody (a recording, then).
-func (w *world) opponent(p *player, online []*player, met map[[2]int64]bool) *player {
-	mine := w.rating(p)
-	var best *player
-	bestGap := 1 << 30
-	for _, o := range online {
-		if o == p || o.id == 0 || met[pair(p.id, o.id)] || o.persona == keyDay2 {
-			continue
-		}
-		gap := abs(w.rating(o)-mine) + w.r.IntN(150)
-		if gap < bestGap {
-			best, bestGap = o, gap
-		}
-	}
-	if best != nil {
-		met[pair(p.id, best.id)] = true
-	}
-	return best
-}
-
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
 // friendsOfPersona makes sure a persona who should have friends has: asked by some of their circle (accepted as they
 // come in).
 func (w *world) friendsOfPersona(p *player, n int) error {

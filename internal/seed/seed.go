@@ -3,10 +3,10 @@
 //
 // It plays the history through the game's own functions, on a clock of its own that walks from Options.Days ago to
 // now: players arrive (account.Accounts.Guest, named and given an email by some), play the day's ten and topics
-// (play.Game: Show, Start, Answer), and live duels with each other and against recordings (StartLive,
-// ShowLive, AnswerLive); they ask each other to be friends, accept, say no, choose their avatar. Whatever follows from
-// that, the game works out itself: scores, streaks, ratings and divisions (newcomers still placing too), the facts of
-// Моят Алманах and the notes in it.
+// (play.Game: Show, Start, Answer), and duels with their friends (sent, played back, some let lapse) and against
+// recordings (DuelFriend, PlayDuel, DuelRecording); they ask each other to be friends, accept, say no, choose their
+// avatar. Whatever follows from that, the game works out itself: scores, streaks, duels' results and records, the
+// facts of Моят Алманах and the notes in it.
 // Only what no game function
 // writes is written directly: when a player came and was last seen, their email, their mail and notification
 // preferences, the players' sessions (each guest's from the day they came, as their browser keeps it; the personas'
@@ -56,8 +56,7 @@ type Options struct {
 	// Progress, if set, is told how far the history has come, a line a day.
 	Progress func(string)
 	// small is a test's history: a few weeks of a few players, playing a third as many games (the race detector makes
-	// each one dear), with the checks of the regular's and the legend's divisions left out, which so little doesn't
-	// make (the command's sixty days of two hundred do, and it checks).
+	// each one dear).
 	small bool
 }
 
@@ -224,8 +223,7 @@ func (w *world) count(mean float64) int {
 	return n
 }
 
-// sweep does what the server does every few minutes in the background, as the clock passes: duels and tournaments
-// whose time is up, what follows runs, the days drawn ahead, the throwaway guests.
+// sweep does what the server does every few minutes in the background, as the clock passes: duels whose time is up, what follows runs, the days drawn ahead, the throwaway guests.
 func (w *world) sweep() error {
 	if w.clock().Sub(w.swept) < 10*time.Minute {
 		return nil

@@ -1,9 +1,9 @@
 // Package server is the game over HTTP: the API, the app's page and its files, and the pictures.
 //
 // It listens on the socket systemd hands it (deploy/almanac.socket), if it's given one, else on Config.Addr: with the
-// socket, connections that come while the server restarts wait for the new one instead of being refused. Before a
-// restart, a deploy drains the server (drain.go), so that the restart cuts no live duel; the limits' counts are kept
-// over it (Config.LimitsFile, limits.go), which count by network, from the player's own address even behind Cloudflare (address.go). A bank reloaded goes
+// socket, connections that come while the server restarts wait for the new one instead of being refused. Nothing the
+// game plays lives in its memory alone (every game is in the database, answer by answer), so a restart cuts no play;
+// the limits' counts are kept over it (Config.LimitsFile, limits.go), which count by network, from the player's own address even behind Cloudflare (address.go). A bank reloaded goes
 // into play at once (bank.go). Every API answer names the version (api.go), so that a page loaded before
 // a deploy loads itself anew at a quiet moment (web/src/fresh.ts).
 //
@@ -27,7 +27,6 @@ import (
 	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/assets"
 	"github.com/almanac-bg/almanac/internal/bank"
-	"github.com/almanac-bg/almanac/internal/live"
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/push"
@@ -81,16 +80,12 @@ type Deps struct {
 
 // Server is the game's HTTP side.
 type Server struct {
-	cfg      Config
-	db       *store.DB
-	accounts *account.Accounts
-	outbox   *mail.Outbox
-	game     *play.Game
-	live     *live.Hub
-	push     *push.Sender
-	// closing ends the streams (live duels) when the server stops, so that it needn't wait for them.
-	closing   chan struct{}
-	drain     drain
+	cfg       Config
+	db        *store.DB
+	accounts  *account.Accounts
+	outbox    *mail.Outbox
+	game      *play.Game
+	push      *push.Sender
 	bank      atomic.Pointer[bank.Bank]
 	banks     banks // a bank refused (bank.go)
 	client    fs.FS
@@ -160,8 +155,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 	safe.Tell(s.problems.add)
 	s.game.CrowdMin = cfg.CrowdMin
 	s.push = cfg.Push
-	s.live = live.NewHub(s.game, s.livePlayer)
-	s.closing = make(chan struct{})
+	s.game.DuelNews = s.duelNews
 	d.Accounts.Merge = append(d.Accounts.Merge, play.Merge)
 	d.Accounts.Forget = append(d.Accounts.Forget, play.Forget)
 	s.handler = s.routes()
@@ -188,8 +182,6 @@ func (s *Server) routes() http.Handler {
 		mux.Handle(pattern, s.apiHandler(h))
 	}
 	api("GET /api/health", s.health)
-	api("POST /api/drain", s.drainHandler)
-	api("DELETE /api/drain", s.drainHandler)
 	api("GET /api/me", s.me)
 	api("PATCH /api/me", s.rename)
 	api("DELETE /api/me", s.deleteAccount)
@@ -218,7 +210,6 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/day", s.startDay)
 	api("POST /api/topic", s.startTopic)
 	api("GET /api/runs/left", s.left)
-	api("GET /api/playing", s.playingNow)
 	api("GET /api/runs/{id}", s.runState)
 	api("POST /api/runs/{id}/show", s.show)
 	api("POST /api/runs/{id}/start", s.start)
@@ -227,12 +218,9 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/runs/{id}/share", s.share)
 	api("POST /api/questions/{id}/report", s.report)
 	api("GET /api/duels", s.duels)
+	api("POST /api/duels", s.newDuel)
 	api("GET /api/duels/{id}", s.duelOne)
-	mux.HandleFunc("GET /api/duels/live/events", s.liveEvents)
-	api("POST /api/duels/live/{id}/seen", s.liveSeen)
-	api("POST /api/duels/live/{id}/answer", s.liveAnswer)
-	api("POST /api/duels/live/{id}/leave", s.liveLeave)
-	api("POST /api/duels/live/{id}/claim", s.liveClaim)
+	api("POST /api/duels/{id}/play", s.playDuel)
 	api("GET /api/ranks", s.ranks)
 	api("GET /api/players/{tag}", s.profile)
 	api("GET /api/almanac", s.almanac)
@@ -309,23 +297,11 @@ func (s *Server) run(ctx context.Context, grace time.Duration) error {
 			NextProtos:   []string{"h2", "http/1.1"},
 		})
 	}
-	// Live duels are played in memory: those the last run of the server left under way are over, without a result.
-	if err := s.game.EndLive(ctx); err != nil {
-		ln.Close()
-		return err
-	}
 	slog.Info("serving", "addr", ln.Addr().String(), "url", s.cfg.PublicURL, "version", s.cfg.Version, "tls", s.cfg.TLSCert != "")
-	srv.RegisterOnShutdown(func() {
-		// Nothing new starts while the server stops; the streams end (the screens find the next server by themselves).
-		s.live.Pause()
-		close(s.closing)
-	})
 	s.restoreLimits()
 	errs := make(chan error, 1)
 	go func() { errs <- srv.Serve(ln) }() // a handler's panic is its request's alone (recovered)
 	// The work done in the background: each round on its own, a panic in one stopped and told (package safe).
-	go safe.Every(ctx, "the drain", time.Second, func() { s.drainStep(nil) }) // a drain whose deploy stopped asking ends
-	go safe.Every(ctx, "live: sweeping", time.Minute, s.live.Sweep)
 	go safe.Every(ctx, "duels: settling", time.Minute, func() {
 		if err := s.game.SettleDue(ctx); err != nil && ctx.Err() == nil {
 			slog.Error("duels", "err", err)
@@ -367,8 +343,5 @@ func (s *Server) run(ctx context.Context, grace time.Duration) error {
 
 // isAsset says whether a path is a static file (left out of the request log).
 func isAsset(path string) bool {
-	if strings.HasSuffix(path, "/events") || path == "/api/drain" { // a stream, logged when it ends; a deploy waiting
-		return true
-	}
 	return strings.HasPrefix(path, "/assets/") || strings.HasPrefix(path, "/qimg/") || path == "/favicon.svg"
 }

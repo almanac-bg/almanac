@@ -44,9 +44,17 @@ function showing(run: number): void {
   }
 }
 
-/** Plays a run from where it stands; `done` draws what comes after its last answer. A duel with a friend names them
- * (`opponent`) over each question. */
-export function playRun(initial: State, done: (s: State) => Child, opponent = ""): Child {
+/** The other side of a duel, played already, as the player plays the same ten: who, and how each question went for
+ * them (when they answered it, and whether right; their points wait for the end). */
+export interface Against {
+  name: string;
+  marks: { right: boolean; partial?: boolean; missed?: boolean; ms: number }[];
+}
+
+/** Plays a run from where it stands; `done` draws what comes after its last answer. A duel names the other (`opponent`)
+ * over each question; played second (`against`), their answer shows as they gave it: a word at the moment they did,
+ * and how it went once the player's own is in. */
+export function playRun(initial: State, done: (s: State) => Child, opponent = "", against?: Against): Child {
   const screen = slot();
   hold();
   factFace();
@@ -126,7 +134,7 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
       const q = s.question;
       showing(s.id);
       screen.show(() =>
-        question(s, q, next, reload, versus, say, (now) => {
+        question(s, q, next, reload, versus, say, against, (now) => {
           last = now;
         }),
       );
@@ -286,7 +294,7 @@ export function startScreen(
 }
 
 /** The seconds before a start, big, in a ring that runs out with them (in CSS, over the same time, like a question's
- * time bar): before a run, and as a live duel's two are shown. `ms` is the time to the start, `left` the whole seconds
+ * time bar): before a run. `ms` is the time to the start, `left` the whole seconds
  * still to go. */
 export function readyClock(ms: number, left: () => number): Child {
   const ring = svg("svg", { class: "ready-ring", viewBox: "0 0 120 120", "aria-hidden": "true" });
@@ -340,7 +348,7 @@ export function trail(marks: Mark[], total: number, now = -1): HTMLElement {
 
 const topicName = (id: string) => categories.find((c) => c.id === id)?.name ?? "";
 
-/** While leaving would cost the player something (`costs`: a question with its time running, a live game under way),
+/** While leaving would cost the player something (`costs`: a question with its time running),
  * every way out (a link, back, the game's arrow) first asks, in a sheet over the game at the screen's foot: what it
  * costs (`text`), „Остани“ (gold: playing on is the one right answer) and „Излез“, which does `leave` (given the way
  * on) and goes. Esc stays too. The clock runs on meanwhile, in sight above the sheet. */
@@ -393,11 +401,17 @@ export function guardLeaving(
   );
 }
 
-/** The top of a question: which one of how many, and its topic (and, in a duel with a friend, with whom: `versus`),
+/** The top of a question: which one of how many, and its topic (and, in a duel, with whom: `versus`),
  * with the game's tally under it, if it has one. On a phone a game has the whole screen, the header with it, so the
  * way out is here: an arrow to Начало (on Начало itself too, where the day's ten are played: it opens afresh, the
  * day waiting there as a card), the way back (router.ts): back in the history where Начало is the page before. */
-export function questionHead(n: number, total: number, aside: string, tally: Child = null, versus = ""): Child {
+export function questionHead(
+  n: number,
+  total: number,
+  aside: string,
+  tally: Child = null,
+  versus: Child = null,
+): Child {
   return h(
     "header",
     { class: "question-head" },
@@ -529,6 +543,7 @@ function question(
   reload: () => void,
   versus: string,
   say: Say,
+  against: Against | undefined,
   taken: (now: State) => void,
 ): Child {
   const problem = slot();
@@ -540,6 +555,22 @@ function question(
   onCleanup(() => {
     over = true;
   });
+  // Played second: a word over the question as the other answered it (at the moment they did, as far into its time),
+  // and how it went for them once the player's own is in.
+  const theirs = against?.marks[q.n];
+  const theyAnswered = signal(false);
+  if (theirs && !theirs.missed) {
+    const when = window.setTimeout(
+      () => {
+        if (ans.locked.peek()) return; // the player's own is in: theirs shows with it
+        theyAnswered.set(true);
+        play("them");
+      },
+      Math.max(0, theirs.ms - (q.limitMs - q.leftMs)),
+    );
+    onCleanup(() => clearTimeout(when));
+  }
+  const versusNow: Child = against ? () => (theyAnswered() ? `${against.name} отговори` : versus) : versus;
   const score = h("div", { class: "tally" });
   tally(score, s.points, s.points, inRowOf(s.trail));
 
@@ -642,6 +673,7 @@ function question(
       tally(score, res.state.points, s.points, res.inRow ?? 0);
       crowd = waiting(crowdLine(q.view.type, res.reveal.crowd, res.right));
       rest = [
+        theirs && against ? theirLine(against.name, theirs) : null,
         fact(res.reveal.fact, res.reveal.day),
         res.reveal.credit ? credit(res.reveal.credit) : null,
         upNext(lasts, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`, true),
@@ -735,7 +767,7 @@ function question(
       s.total,
       q.onThisDay ? `${topicName(q.category)} · На този ден` : topicName(q.category),
       score,
-      versus,
+      versusNow,
     ),
     progress,
     timer(q.leftMs, q.limitMs, ans.left, ans.stopped),
@@ -752,6 +784,13 @@ function question(
     leaveAsk,
   );
   return page;
+}
+
+/** How a question went for the other side of a duel, as a line under the player's verdict: „Мария: вярно за 4,2 с“. */
+function theirLine(name: string, m: Against["marks"][number]): Child {
+  const secs = (m.ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 });
+  const how = m.right ? `вярно за ${secs} с` : m.partial ? "близо" : m.missed ? "без отговор" : "грешно";
+  return h("p", { class: `their-line${m.right ? " right" : ""}` }, h("b", null, `${name}: `), how);
 }
 
 /** How long what the player chose stays chosen before the answer shows, however quick the line. */

@@ -1,16 +1,14 @@
-// Класации: where players stand — on the day's ten (first: it's what most play), by rating (with its division), and
-// by knowledge (over every topic, or one) — among everyone, or among you and your friends.
+// Класации: where players stand — on the day's ten (first: it's what most play), and by knowledge (over every topic,
+// or one) — among everyone, or among you and your friends.
 
 import type { Board, Score } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
 import type { Child, Signal } from "../lib/dom.ts";
 import { type By, boardHash, readBoard } from "../lib/hash.ts";
-import type { Standing } from "../ui.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
 let {
-  emblem,
   board,
   boardRow,
   api,
@@ -31,7 +29,6 @@ interface Ranked {
   name: string;
   tag: string;
   value: number;
-  division?: Standing["division"];
   /** On a board of knowledge: how many answers the mastery is from, and its tier's name. */
   answers?: number;
   tier?: string;
@@ -61,13 +58,11 @@ interface Day {
 
 const tabs: [By, string][] = [
   ["day", "Днес"],
-  ["rating", "Рейтинг"],
   ["knowledge", "Знания"],
 ];
 
 export function ranks(kit: Kit) {
   ({
-    emblem,
     board,
     boardRow,
     api,
@@ -85,7 +80,7 @@ export function ranks(kit: Kit) {
   } = kit);
   title("Класации");
   // Which board, among whom and of which topic, in the address (lib/hash.ts): back to the page, a reload or a link
-  // opens the same one („#rating“; „#friends“, the day's among friends, from Начало's „Всички“).
+  // opens the same one („#knowledge“; „#friends“, the day's among friends, from Начало's „Всички“).
   const at = readBoard(
     location.hash,
     categories.map((c) => c.id),
@@ -98,7 +93,7 @@ export function ranks(kit: Kit) {
   const error = signal<unknown>(null);
   // The board asked for now; an older answer arriving late is dropped.
   const current = () => {
-    const q = new URLSearchParams({ by: by() });
+    const q = new URLSearchParams();
     if (friends()) q.set("among", "friends");
     if (by() === "knowledge" && topic()) q.set("topic", topic());
     return q.toString();
@@ -207,39 +202,27 @@ export function ranks(kit: Kit) {
       if (!d) return h("p", { class: "muted" }, "…");
       if (friends() && day()?.befriended === false) return noFriends();
       const among = (name: string) => (friends() ? `${name} · приятели` : name);
-      switch (by()) {
-        case "knowledge": {
-          const name = categories.find((c) => c.id === topic())?.name;
-          const least = d.least ?? 100;
-          const have = d.board.answers;
-          return [
-            ranking(
-              among(name ? `Най-знаещи: ${name}` : "Най-знаещи"),
-              d.board,
-              // „72% · Експерт“: the mastery, as a topic's tile says it (play/knowledge.go).
-              (r) => [`${r.value}%`, r.tier ? h("small", { class: "sub" }, ` · ${r.tier}`) : null],
-              `Още никой няма ${d.least ?? 100} отговора${name ? " в тази тема" : ""}.`,
-              `Каква част от ${name ? "въпросите в темата" : "всички въпроси"} знае всеки, според всичките му отговори. По-трудните тежат повече. В класацията са играчите с поне ${d.least ?? 100} отговора${name ? " в темата" : ""}.`,
-            ),
-            // The viewer short of it: how far they are.
-            have !== undefined
-              ? h(
-                  "p",
-                  { class: "board-note" },
-                  `Имаш ${formatNumber(have)} от ${least} отговора${name ? " в темата" : ""}. Още ${formatNumber(least - have)} и влизаш в класацията.`,
-                )
-              : null,
-          ];
-        }
-      }
-      const least = d.least ?? 10;
-      return ranking(
-        among("Рейтинг"),
-        d.board,
-        (r) => [r.division ? emblem(r.division.id, "s") : null, String(r.value)],
-        `Още никой няма ${least} игри за рейтинг.`,
-        `Играчите с поне ${least} игри за рейтинг: дуели.`,
-      );
+      const name = categories.find((c) => c.id === topic())?.name;
+      const least = d.least ?? 100;
+      const have = d.board.answers;
+      return [
+        ranking(
+          among(name ? `Най-знаещи: ${name}` : "Най-знаещи"),
+          d.board,
+          // „72% · Експерт“: the mastery, as a topic's tile says it (play/knowledge.go).
+          (r) => [`${r.value}%`, r.tier ? h("small", { class: "sub" }, ` · ${r.tier}`) : null],
+          `Още никой няма ${least} отговора${name ? " в тази тема" : ""}.`,
+          `Каква част от ${name ? "въпросите в темата" : "всички въпроси"} знае всеки, според всичките му отговори. По-трудните тежат повече. В класацията са играчите с поне ${least} отговора${name ? " в темата" : ""}.`,
+        ),
+        // The viewer short of it: how far they are.
+        have !== undefined
+          ? h(
+              "p",
+              { class: "board-note" },
+              `Имаш ${formatNumber(have)} от ${least} отговора${name ? " в темата" : ""}. Още ${formatNumber(least - have)} и влизаш в класацията.`,
+            )
+          : null,
+      ];
     },
   );
 }

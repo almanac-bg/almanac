@@ -9,7 +9,7 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// A profile is a player as anyone may see them, found by their tag: how they look, their division, their numbers,
+// A profile is a player as anyone may see them, found by their tag: how they look, their numbers,
 // and how well they know each topic. What only they see stays theirs: their games one by one, their Алманах, their
 // email, their friends. Nor does it follow them as they play: its numbers are of the games they finished (not a game
 // under way, answer by answer), and its time is a date, the month they started, never the moment (review 2026-11-18,
@@ -24,15 +24,14 @@ type Profile struct {
 	Me bool `json:"me,omitempty"`
 	Look
 	// Since is when they started playing: the month (its first day, at noon in Bulgaria).
-	Since    int64    `json:"since"`
-	Standing Standing `json:"standing"`
-	Streak   int      `json:"streak"`
-	Days     int      `json:"days"`
-	Games    int      `json:"games"`
-	Answers  int      `json:"answers"`
-	Right    int      `json:"right"`
-	Duels    int      `json:"duels"`
-	Won      int      `json:"won"`
+	Since   int64 `json:"since"`
+	Streak  int   `json:"streak"`
+	Days    int   `json:"days"`
+	Games   int   `json:"games"`
+	Answers int   `json:"answers"`
+	Right   int   `json:"right"`
+	Duels   int   `json:"duels"`
+	Won     int   `json:"won"`
 	// Mastery is how well they know each topic, in the bank's order.
 	Mastery []Mastery `json:"mastery"`
 	// Friend is how the viewer stands with them: "yes" (friends), "asked" (the viewer asked them), "asks" (they
@@ -79,9 +78,6 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 		return p, err
 	}
 	p.Me, p.Look = id == viewer, lookOf(id, avatar)
-	if p.Standing, err = g.StandingOf(ctx, id); err != nil {
-		return p, err
-	}
 	if p.Streak, err = g.Streak(ctx, id); err != nil {
 		return p, err
 	}

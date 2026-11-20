@@ -12,7 +12,7 @@ import (
 )
 
 // today is the day screen's state: the day and its issue (play.Issue), the viewer's streak and run (if any),
-// a live game they're in (playing), whether they've finished a game yet,
+// a friend's duel waiting for them, whether they've finished a game yet,
 // how many have played the day (and how well on average), and their friends' day.
 func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
@@ -69,15 +69,12 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 		if out["played"], err = s.game.Played(ctx, u.ID); err != nil {
 			return nil, err
 		}
-		// A live game they're in, under way: Начало has the way back to it.
-		if p := s.playing(u.ID); p != nil {
-			out["playing"] = p
-		}
-		// A friend said yes to their request, and what came of a live duel they left: each told once (POST /api/told).
+		// A friend said yes to their request: told once (POST /api/told).
 		if out["accepted"], err = s.game.AcceptedOf(ctx, u.ID); err != nil {
 			return nil, err
 		}
-		if out["left"], err = s.game.LeftOf(ctx, u.ID); err != nil {
+		// A friend's duel waits for them: a quiet line, while it waits.
+		if out["duel"], err = s.game.DuelsWaiting(ctx, u.ID); err != nil {
 			return nil, err
 		}
 		// A game that ended without its result on screen: its news is told on Начало, once (play/told.go).
@@ -183,33 +180,6 @@ func (s *Server) left(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	return ok(w, map[string]any{"runs": runs})
-}
-
-// Playing is a live game the player is in, under way now, which their screen may have left: a live duel.
-type Playing struct {
-	Kind string `json:"kind"` // "duel"
-}
-
-// playing is the live game a player is in now, if any.
-func (s *Server) playing(id int64) *Playing {
-	if s.live.Playing(id) {
-		return &Playing{Kind: "duel"}
-	}
-	return nil
-}
-
-// playingNow says which live game the player is in now (null: none), for a screen deciding whether to go straight
-// back into it.
-func (s *Server) playingNow(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.user(r)
-	if err != nil {
-		return err
-	}
-	var p *Playing
-	if u != nil {
-		p = s.playing(u.ID)
-	}
-	return ok(w, map[string]any{"playing": p})
 }
 
 func (s *Server) runState(w http.ResponseWriter, r *http.Request) error {

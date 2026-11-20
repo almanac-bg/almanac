@@ -1,5 +1,4 @@
-// Профил: who you are in the game — your avatar, name and tag; your streak, numbers, mastery and latest games (the
-// rating's division is the duels', on their screens) — with Алманах a tap away at the top, Настройки beside your name,
+// Профил: who you are in the game — your avatar, name and tag; your streak, numbers, mastery and latest games — with Алманах a tap away at the top, Настройки beside your name,
 // in words, and the avatar's choice (/avatar) a tap on the avatar. A hub: each thing once, the whole of it a tap away.
 // A guest is asked to keep their game, from the first one, and the way in for a profile from elsewhere is apart from
 // it.

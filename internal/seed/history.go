@@ -56,20 +56,12 @@ func (w *world) playDay() error {
 		return err
 	}
 	stop := w.end.Add(-4 * time.Hour) // the end's last hours: what the personas need (finish)
-	var online []*player
-	met := map[[2]int64]bool{}
 	for _, s := range sessions {
 		if !s.at.Before(stop) {
 			break
 		}
 		w.rewind(s.at)
-		online = online[:0]
-		for _, o := range sessions {
-			if d := o.at.Sub(s.at); d > -40*time.Minute && d < 40*time.Minute {
-				online = append(online, o.p)
-			}
-		}
-		if err := w.visit(s, online, met); err != nil {
+		if err := w.visit(s); err != nil {
 			return fmt.Errorf("%s (%d): %w", s.p.name, s.p.id, err)
 		}
 	}
@@ -126,7 +118,7 @@ func (w *world) plan() ([]session, error) {
 }
 
 // visit is one of a player's visits: they come in (the first time, as a new guest), see what waits for them, play.
-func (w *world) visit(s session, online []*player, met map[[2]int64]bool) error {
+func (w *world) visit(s session) error {
 	p := s.p
 	if p.id == 0 {
 		if err := w.arrive(p); err != nil {
@@ -164,19 +156,20 @@ func (w *world) visit(s session, online []*player, met map[[2]int64]bool) error 
 			return err
 		}
 	}
-	for range min(8, w.count(p.duels)) {
-		o := w.opponent(p, online, met)
-		if o != nil && w.chance(0.2) {
-			o = nil // nobody came in time: a recording
-		}
-		if _, err := w.liveDuel(p, o); err != nil {
+	if err := w.duelsWaiting(p); err != nil {
+		return fmt.Errorf("duels: %w", err)
+	}
+	for range min(4, w.count(p.duels)) {
+		o, err := w.friendToDuel(p)
+		if err != nil {
 			return err
 		}
-	}
-	// The legend's last evenings before today: on form, so that the history leaves it near Легенда whatever the draw
-	// (finish brings it the rest of the way; one evening's opponents may not be enough on their own).
-	if p.persona == keyLegend && w.day >= w.today()-3 && w.day < w.today() {
-		if err := w.steer(p, 1500, 1<<20, 20); err != nil {
+		if o != nil && w.chance(0.7) {
+			err = w.friendDuel(p, o)
+		} else {
+			err = w.recordingDuel(p)
+		}
+		if err != nil {
 			return err
 		}
 	}

@@ -41,15 +41,15 @@ test("a page loaded before a deploy opens its next screen by loading anew, and n
 test("a screen's own file gone with a deploy: the page loads anew for it, once", async ({ page }) => {
   let refused = 0;
   await page.route(
-    "**/assets/live-*.js",
+    "**/assets/ranks-*.js",
     (route) => {
       refused++;
       return route.fulfill({ status: 404, body: "" });
     },
     { times: 1 },
   );
-  await page.goto("/duel/live");
-  await expect(page.getByRole("button", { name: "Намери съперник" })).toBeVisible();
+  await page.goto("/ranks");
+  await expect(page.getByRole("heading", { name: "Класации" })).toBeVisible();
   expect(refused).toBe(1);
   await expect(page.getByRole("alert")).toHaveCount(0);
 });

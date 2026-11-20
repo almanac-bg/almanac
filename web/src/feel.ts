@@ -41,7 +41,7 @@ const cues: Record<SoundName, Cue> = {
   // The player's own touch: a pick, a digit, a move.
   tap: { notes: [["p", 5, 0, 0.04, 0.55]] },
   key: { notes: [["p", 7, 0, 0.03, 0.4]] },
-  // Someone else: the other side of a duel answering. Two soft low plucks, falling (A4, F♯4),
+  // Someone else: the other side of a duel answering (as they did, played second). Two soft low plucks, falling (A4, F♯4),
   // off to one side: not a bell, which is for what's earned, and never the player's own tap.
   them: {
     notes: [
@@ -443,8 +443,8 @@ export interface DuelPlan {
  * marks fill pair by pair, 75 ms apart, a pluck on the scale for each of the player's right ones and a muted thud for
  * each that wasn't; the two scores count up with them, so the lead changes hands as it did, and the band behind the
  * question that decided it lights as it's reached. Then the verdict and the scores land, the winner's turning gold,
- * with the end's sound (the motif over a low D for a win, a soft fall for a loss); and what it meant fades in, the
- * rating's bar filling from where it was. Resolves once it's over.
+ * with the end's sound (the motif over a low D for a win, a soft fall for a loss); and what it meant (the record
+ * between the two) fades in. Resolves once it's over.
  */
 export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<void> {
   const { play, format } = hands;
@@ -523,17 +523,6 @@ export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<v
   };
   at(landAt, settle);
   rise(card.querySelector(".duel-meant"), landAt + 150);
-  const fill = card.querySelector(".duel-rating .meter-fill");
-  const shares = card.querySelector<HTMLElement>(".duel-rating-line")?.dataset;
-  if (fill && shares)
-    moving.push(
-      fill.animate([{ width: `${shares.from}%` }, { width: `${shares.to}%` }], {
-        duration: 450,
-        delay: landAt + 200,
-        easing: settleIn,
-        fill: "backwards",
-      }),
-    );
   return new Promise((resolve) => {
     const done = () => {
       for (const t of timers) clearTimeout(t);

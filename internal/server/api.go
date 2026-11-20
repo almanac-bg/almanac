@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
-	"github.com/almanac-bg/almanac/internal/live"
 	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/store"
 )
@@ -39,26 +38,26 @@ var (
 
 // playerErrors are the errors a player may cause, as the API answers them.
 var playerErrors = map[error]*apiError{
-	play.ErrNoRun:          {http.StatusNotFound, "no_run", "Няма такава игра."},
-	play.ErrNoTopic:        {http.StatusNotFound, "no_topic", "Няма такава тема."},
-	play.ErrOutOfStep:      {http.StatusConflict, "out_of_step", "Играта е продължила другаде. Зареждаме я наново."},
-	play.ErrBadAnswer:      {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
-	play.ErrNoQuestion:     {http.StatusServiceUnavailable, "no_questions", "В момента няма въпроси за игра."},
-	play.ErrDayOver:        {http.StatusGone, "day_over", "Денят на тази игра свърши. Днешните въпроси те чакат в Начало."},
-	play.ErrReviewOver:     {http.StatusGone, "review_over", "Въпросите на игра се преглеждат само в деня ѝ."},
-	play.ErrNotShared:      {http.StatusConflict, "not_shared", "Споделя се само завършен ден."},
-	play.ErrSelf:           {http.StatusConflict, "self", "Това си ти. Добави някой друг."},
-	play.ErrNotFriends:     {http.StatusNotFound, "not_friends", "Не сте приятели в играта."},
-	play.ErrManyFriends:    {http.StatusConflict, "many_friends", "Списъкът с приятели е пълен: в него има място за 200."},
-	play.ErrNoAvatar:       {http.StatusBadRequest, "no_avatar", "Няма такъв аватар."},
-	play.ErrNotice:         {http.StatusBadRequest, "no_notice", "Няма такова известие."},
-	play.ErrNoPlayer:       {http.StatusNotFound, "no_player", "Няма играч с такова потребителско име."},
-	play.ErrNoDuel:         {http.StatusNotFound, "no_duel", "Този дуел вече го няма."},
-	play.ErrNobody:         {http.StatusConflict, "nobody", "Точно сега няма с кого да играеш. Опитай след малко."},
-	live.ErrNoMatch:        {http.StatusNotFound, "no_duel", "Този дуел вече го няма."},
-	live.ErrNotNow:         {http.StatusConflict, "not_now", "Този въпрос вече отмина."},
-	live.ErrAnswer:         {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
-	live.ErrTooMany:        {http.StatusServiceUnavailable, "too_many_duels", "Твърде много дуели в момента. Опитай след малко."},
+	play.ErrNoRun:       {http.StatusNotFound, "no_run", "Няма такава игра."},
+	play.ErrNoTopic:     {http.StatusNotFound, "no_topic", "Няма такава тема."},
+	play.ErrOutOfStep:   {http.StatusConflict, "out_of_step", "Играта е продължила другаде. Зареждаме я наново."},
+	play.ErrBadAnswer:   {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
+	play.ErrNoQuestion:  {http.StatusServiceUnavailable, "no_questions", "В момента няма въпроси за игра."},
+	play.ErrDayOver:     {http.StatusGone, "day_over", "Денят на тази игра свърши. Днешните въпроси те чакат в Начало."},
+	play.ErrReviewOver:  {http.StatusGone, "review_over", "Въпросите на игра се преглеждат само в деня ѝ."},
+	play.ErrNotShared:   {http.StatusConflict, "not_shared", "Споделя се само завършен ден."},
+	play.ErrSelf:        {http.StatusConflict, "self", "Това си ти. Добави някой друг."},
+	play.ErrNotFriends:  {http.StatusNotFound, "not_friends", "Не сте приятели в играта."},
+	play.ErrManyFriends: {http.StatusConflict, "many_friends", "Списъкът с приятели е пълен: в него има място за 200."},
+	play.ErrNoAvatar:    {http.StatusBadRequest, "no_avatar", "Няма такъв аватар."},
+	play.ErrNotice:      {http.StatusBadRequest, "no_notice", "Няма такова известие."},
+	play.ErrNoPlayer:    {http.StatusNotFound, "no_player", "Няма играч с такова потребителско име."},
+	play.ErrNoDuel:      {http.StatusNotFound, "no_duel", "Този дуел вече го няма."},
+	play.ErrNobody:      {http.StatusConflict, "nobody", "Още няма запис на игра, срещу който да играеш. Опитай по-късно."},
+	play.ErrDuelOver:    {http.StatusGone, "duel_over", "Този дуел вече свърши."},
+	play.ErrDuelsToOne: {http.StatusConflict, "duels_to_one",
+		"Вече чакат три твои дуела с този приятел. Изчакай да изиграе някой от тях."},
+	play.ErrDuelsADay:      {http.StatusTooManyRequests, "duels_a_day", "Днес започна много дуели. Утре можеш пак."},
 	play.ErrNoRequest:      {http.StatusNotFound, "no_request", "Поканата вече я няма."},
 	play.ErrManyRequests:   {http.StatusConflict, "many_requests", "Твърде много покани чакат отговор. Изчакай да отговорят на някоя от тях."},
 	account.ErrBadEmail:    {http.StatusBadRequest, "bad_email", "Това не прилича на имейл адрес."},

@@ -1,6 +1,6 @@
 // Начало: where every game starts, on one short screen, and the day is its heart. At the top the player's streak
 // (and, once, what came of the days just missed — a day the week forgave, a streak ended, or a welcome back after
-// days away — or, one line at a time, of a friend's yes to a request, a live duel left that went on); then the day's
+// days away — or, one line at a time, of a friend's yes to a request, a friend's duel waiting); then the day's
 // ten questions, the same for everyone, once, as the day's issue
 // („Брой 6“, play/issue.go) (left half-way, where the player stopped and the
 // way on, and the streak at stake while they wait; once played, as it lands, how they went and the one gold thing to
@@ -30,7 +30,7 @@ import { feelKit } from "../lib/sound.ts";
 import { dateWords, issueWords, onDay, weekday } from "../lib/words.ts";
 import { categories, notice, player, playing, user } from "../state.ts";
 import { dayPointsWords, failure, formatNumber, stakeLine } from "../ui.ts";
-import { type Accepted, acceptedLine, type Left, leftLine } from "./duel.ts";
+import { type Accepted, acceptedLine, type Waiting, waitingLine } from "./duel.ts";
 import { app, haveProfile, keepLine, keepStake, mailAsk } from "./keep.ts";
 import { modes } from "./modes.ts";
 import { topics } from "./play.ts";
@@ -57,11 +57,10 @@ export interface Today {
   friends?: Score[] | null;
   /** While no friend has played: whether the player has any friends at all. */
   befriended?: boolean;
-  /** A live game the player is in, under way (its screen left): the way back to it. */
-  playing?: { kind: "duel" } | null;
-  /** A friend said yes to the player's request, and a live duel they left: each told once (play/lines.go). */
+  /** A friend said yes to the player's request: told once (play/lines.go). */
   accepted?: Accepted | null;
-  left?: Left | null;
+  /** A friend's duel waits for the player (play.DuelWaiting): a quiet line while it does. */
+  duel?: Waiting | null;
   /** A game that ended without its result on screen (the day's last question let run out, a game left at its end):
    * its news, told here once (play/told.go). */
   untold?: number;
@@ -255,9 +254,9 @@ export function today() {
         { class: "home-main" },
         // What came of the days just missed, once.
         streakNotice(t),
-        // One line at a time: a live game of the player's going on; of others, a friend said yes to their request, or
-        // the duel left went on.
-        playingLine(t.playing) ?? acceptedLine(t.accepted) ?? leftLine(t.left),
+        // One line at a time, of others: a friend's duel waits (it has a time), or a friend said yes to their request
+        // (told once: it waits for its turn).
+        waitingLine(t.duel) ?? acceptedLine(t.accepted),
         // Come from the streak's mail to a browser signed out: the way in comes first, open.
         fromMail && !user.peek()?.email ? haveProfile(load, undefined, true) : null,
         run?.done && !full
@@ -412,18 +411,6 @@ function untold(t: Today, run?: number): Child {
   if (!id || (run !== undefined && id !== run)) return null;
   t.untold = undefined;
   return news(id, 0, undefined, { title: run ? "" : "От последната ти игра" });
-}
-
-/** A live duel the player is in goes on while its screen is away: one quiet line above the day, and the way back
- * into it (its screen comes back to it by itself). */
-function playingLine(p: Today["playing"]): Child {
-  if (!p) return null;
-  return h(
-    "p",
-    { class: "streak-notice playing-notice", role: "status" },
-    "Дуелът ти продължава",
-    h("a", { href: "/duel/live" }, "Върни се"),
-  );
 }
 
 /** The streak notices told on this page: the server keeps them as told (play.TellStreak), and each is said once. */

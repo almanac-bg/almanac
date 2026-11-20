@@ -130,7 +130,7 @@ router.start(
     { path: /^\/play\/([a-z]+)$/, view: page("topic") },
     { path: /^\/friends$/, view: page("Приятели") },
     { path: /^\/settings$/, view: page("Настройки") },
-    { path: /^\/duel\/live$/, view: page("duel") },
+    { path: /^\/duel\/([0-9]+)$/, view: page("duel") },
     // A screen that sends the player on as it's drawn (an old link): the page sent to is what shows.
     {
       path: /^\/gone$/,
@@ -285,11 +285,11 @@ function fromOutside(url: string): void {
 }
 
 test("a game opened from outside has Начало under it: back asks, and „Излез“ leaves the game for Начало", async () => {
-  fromOutside("/duel/live");
+  fromOutside("/duel/7");
   const at = index;
-  router.holdWhile(() => true);
+  router.hold();
   assert.equal(router.entry().game, true);
-  assert.equal(location.pathname, "/duel/live", "the game keeps its address");
+  assert.equal(location.pathname, "/duel/7", "the game keeps its address");
   assert.equal(entries[at]?.url, "/", "Начало under it");
   let ask: (() => void) | null = null;
   const unguard = router.beforeLeaving((proceed) => {
@@ -325,26 +325,6 @@ test("a game opened from outside, over: the page under it takes its address, ren
   assert.equal(router.entry().game, undefined);
   assert.equal(router.entry().from, undefined, "still the first page: back from it leaves");
   assert.deepEqual(drawn, [], "the result stays on screen as it is");
-});
-
-test("a live game holds its entry while it's under way, and gives it back at its end", async () => {
-  const { signal } = await import("./dom.ts");
-  fromOutside("/duel/live");
-  const at = index;
-  const playing = signal(false);
-  router.holdWhile(playing);
-  assert.equal(index, at, "the lobby holds nothing");
-  playing.set(true);
-  assert.equal(index, at + 1);
-  assert.equal(router.entry().game, true);
-  playing.set(false);
-  await tick();
-  assert.equal(index, at);
-  assert.equal(location.pathname, "/duel/live");
-  playing.set(true); // a rematch, on the same screen
-  assert.equal(router.entry().game, true);
-  playing.set(false);
-  await tick();
 });
 
 test("a screen that sends the player on as it's drawn: the page it sends to shows", async () => {

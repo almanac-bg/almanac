@@ -1,6 +1,6 @@
 // Package deploy holds the tests of the server's deploy scripts (deploy.sh, deploy-ci.sh): there's no Go here
 // besides. deploy.sh runs against a machine made of stubs in a temporary directory (the server, systemd, curl, the
-// clock), each of its ways through played out: draining, going back, the marks, the checks of a release.
+// clock), each of its ways through played out: the restart, going back, the marks, the checks of a release.
 package deploy
 
 import (
@@ -11,13 +11,12 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 )
 
 // The stubs: what deploy.sh calls on a server, each a script acting on the world's files (WORLD): the clock, the
-// running version, its process, the drain's answers in turn. The clock moves only by sleep, and by an answer's +N.
+// running version, its process. The clock moves only by sleep.
 var stubs = map[string]string{
 	"date":  `if [ "$1" = +%s ]; then cat "$WORLD/clock"; else exec /bin/date "$@"; fi`,
 	"sleep": `c=$(cat "$WORLD/clock"); echo $((c + ${1%.*})) >"$WORLD/clock"`,
@@ -68,11 +67,11 @@ restart | start)
 	;;
 esac`,
 	"curl": `W=$WORLD
-out= method=GET url=
+out= url=
 while [ $# -gt 0 ]; do
 	case $1 in
 	-o) out=$2; shift ;;
-	-X) method=$2; shift ;;
+	-X) shift ;;
 	-w | --max-time | --resolve | --proto) shift ;;
 	https://*) url=$1 ;;
 	esac
@@ -85,20 +84,6 @@ case $url in
 	[ "$(cat "$W/behave-$r" 2>/dev/null)" != never ] || exit 7
 	if [ -f "$W/crash-at" ] && [ "$(cat "$W/clock")" -ge "$(cat "$W/crash-at")" ]; then exit 7; fi
 	printf '{"version":"%s"}' "$r"
-	;;
-*/api/drain)
-	if [ "$method" = DELETE ]; then echo "undrain" >>"$W/log"; exit 0; fi
-	n=$(($(cat "$W/drain-n" 2>/dev/null || echo 0) + 1))
-	echo "$n" >"$W/drain-n"
-	line=$(sed -n "${n}p" "$W/drain")
-	[ -n "$line" ] || line=$(tail -n 1 "$W/drain")
-	code=${line%%|*} rest=${line#*|}
-	body=${rest%%|*} jump=${rest#*|}
-	if [ "$jump" != "$rest" ]; then echo $(($(cat "$W/clock") + jump)) >"$W/clock"; fi
-	echo "poll $code @$(cat "$W/clock")" >>"$W/log"
-	printf '%s' "$body" >"$out"
-	printf '%s' "$code"
-	if [ "$code" = 000 ]; then exit 28; fi
 	;;
 */releases/download/*)
 	tag=${url%/*} tag=${tag##*/}
@@ -197,7 +182,6 @@ func newMachine(t *testing.T) *machine {
 	m.write(filepath.Join(m.world, "clock"), "1000000", 0o644)
 	m.write(filepath.Join(m.world, "pid"), "1", 0o644)
 	m.write(filepath.Join(m.world, "active"), "", 0o644)
-	m.write(filepath.Join(m.world, "drain"), `200|{"ready":true}`+"\n", 0o644)
 	m.write(filepath.Join(m.data, "almanac.db"), "the game\n", 0o600)
 	m.install(release{tag: "v1.0.0", migrations: []string{mig('1', "0001_a.sql"), mig('2', "0002_b.sql")}})
 	return m
@@ -254,13 +238,6 @@ func (m *machine) publish(r release) {
 	}
 }
 
-// drain sets the server's answers to the drain, in turn (the last one again after): code|body[|+seconds the clock
-// moves on as it answers].
-func (m *machine) drain(answers ...string) {
-	m.write(filepath.Join(m.world, "drain"), strings.Join(answers, "\n")+"\n", 0o644)
-	os.Remove(filepath.Join(m.world, "drain-n"))
-}
-
 // deploy runs deploy.sh (as its own unit already), and says what it printed and how it ended.
 func (m *machine) deploy(args ...string) (string, int) {
 	m.t.Helper()
@@ -281,28 +258,10 @@ func (m *machine) deploy(args ...string) (string, int) {
 	return string(out), code
 }
 
-// log is what the stubs saw, in order: systemctl's calls, the drain's polls.
+// log is what the stubs saw, in order: systemctl's calls.
 func (m *machine) log() []string {
 	b, _ := os.ReadFile(filepath.Join(m.world, "log"))
 	return strings.Split(strings.TrimSpace(string(b)), "\n")
-}
-
-// polls is the times the drain was asked, and whether the server was restarted only after the last of them.
-func (m *machine) polls() (times []int, restartedAfter bool) {
-	restarted := -1
-	for i, l := range m.log() {
-		if strings.HasPrefix(l, "poll ") {
-			at, _ := strconv.Atoi(l[strings.LastIndex(l, "@")+1:])
-			times = append(times, at)
-			if restarted >= 0 {
-				return times, false
-			}
-		}
-		if strings.HasPrefix(l, "systemctl restart almanac") && restarted < 0 {
-			restarted = i
-		}
-	}
-	return times, restarted >= 0
 }
 
 func (m *machine) restarted() bool {
@@ -335,95 +294,28 @@ func expect(t *testing.T, out string, code, want int, says ...string) {
 	}
 }
 
-var (
-	ready    = `200|{"ready":true}`
-	notReady = `200|{"ready":false,"duels":1,"duelsLeft":60}`
-	healthy  = release{tag: "v1.0.1", migrations: []string{mig('1', "0001_a.sql"), mig('2', "0002_b.sql")}}
-)
+var healthy = release{tag: "v1.0.1", migrations: []string{mig('1', "0001_a.sql"), mig('2', "0002_b.sql")}}
 
-// The drain: asked until the server says it's ready, and only then the restart; an answer that doesn't come is
-// asked again, ever more slowly, and is never taken for ready.
-func TestDrain(t *testing.T) {
+// A release goes live at once: nothing is played in the server's memory, so the restart waits for nothing. One live
+// already is left as it is, and a mode that isn't one is refused.
+func TestDeploy(t *testing.T) {
 	t.Parallel()
-	t.Run("ready", func(t *testing.T) {
+	t.Run("at once", func(t *testing.T) {
 		t.Parallel()
 		m := newMachine(t)
 		m.publish(healthy)
-		m.drain(notReady, ready)
 		out, code := m.deploy("v1.0.1", "ci")
-		expect(t, out, code, 0, "ready:", "live: v1.0.1")
-		if times, after := m.polls(); len(times) != 2 || !after {
-			t.Fatalf("polls %v, restarted after the last: %v\n%s", times, after, out)
-		}
-		if m.live() != "v1.0.1" {
-			t.Fatalf("live: %s", m.live())
-		}
-		if l := m.log(); l[len(l)-1] != "undrain" {
-			t.Fatalf("the drain isn't ended: %v", l)
-		}
-	})
-	t.Run("missed answers", func(t *testing.T) {
-		t.Parallel()
-		m := newMachine(t)
-		m.publish(healthy)
-		m.drain(notReady, "000|", "500|oops", "404|", "000|", ready)
-		out, code := m.deploy("v1.0.1")
-		expect(t, out, code, 0, "asked again", "live: v1.0.1")
-		times, after := m.polls()
-		if len(times) != 6 || !after {
-			t.Fatalf("polls %v, restarted after the last: %v\n%s", times, after, out)
-		}
-		var gaps []int
-		for i := 1; i < len(times); i++ {
-			gaps = append(gaps, times[i]-times[i-1])
-		}
-		if want := []int{5, 5, 10, 20, 30}; fmt.Sprint(gaps) != fmt.Sprint(want) {
-			t.Fatalf("asked again after %v, not %v", gaps, want)
-		}
-	})
-	t.Run("too old to drain", func(t *testing.T) {
-		t.Parallel()
-		m := newMachine(t)
-		m.publish(healthy)
-		m.drain("404|")
-		out, code := m.deploy("v1.0.1", "ci")
-		expect(t, out, code, 0, "too old to drain", "live: v1.0.1")
-		if times, after := m.polls(); len(times) != 1 || !after {
-			t.Fatalf("polls %v, restarted after the last: %v", times, after)
-		}
-	})
-	t.Run("not running", func(t *testing.T) {
-		t.Parallel()
-		m := newMachine(t)
-		m.publish(healthy)
-		os.Remove(filepath.Join(m.world, "active"))
-		m.drain("000|")
-		out, code := m.deploy("v1.0.1", "ci")
-		expect(t, out, code, 0, "isn't running", "live: v1.0.1")
-		if times, _ := m.polls(); len(times) != 1 {
-			t.Fatalf("polls %v", times)
-		}
-	})
-	t.Run("never ready", func(t *testing.T) {
-		t.Parallel()
-		m := newMachine(t)
-		m.publish(healthy)
-		m.drain(notReady, "000||2700")
-		out, code := m.deploy("v1.0.1", "ci")
-		expect(t, out, code, 0, "not ready after 45 minutes", "live: v1.0.1")
-		if times, _ := m.polls(); len(times) != 2 {
-			t.Fatalf("polls %v", times)
-		}
-	})
-	t.Run("now", func(t *testing.T) {
-		t.Parallel()
-		m := newMachine(t)
-		m.publish(healthy)
-		out, code := m.deploy("v1.0.1", "now")
 		expect(t, out, code, 0, "live: v1.0.1")
-		if times, _ := m.polls(); len(times) != 0 {
-			t.Fatalf("drained: %v", times)
+		if m.live() != "v1.0.1" || !m.restarted() {
+			t.Fatalf("live: %s, %v", m.live(), m.log())
 		}
+	})
+	t.Run("by hand", func(t *testing.T) {
+		t.Parallel()
+		m := newMachine(t)
+		m.publish(healthy)
+		out, code := m.deploy("v1.0.1")
+		expect(t, out, code, 0, "live: v1.0.1")
 	})
 	t.Run("live already", func(t *testing.T) {
 		t.Parallel()
@@ -434,10 +326,20 @@ func TestDrain(t *testing.T) {
 			t.Fatalf("restarted: %v", m.log())
 		}
 	})
+	t.Run("no such mode", func(t *testing.T) {
+		t.Parallel()
+		m := newMachine(t)
+		m.publish(healthy)
+		out, code := m.deploy("v1.0.1", "now")
+		expect(t, out, code, 1, "usage")
+		if m.restarted() {
+			t.Fatalf("restarted: %v", m.log())
+		}
+	})
 }
 
 // A release is taken only signed, and only if it says it's that version; and only with room for a copy of the
-// database. Each refusal comes before any play is cut.
+// database. Each refusal comes before the restart.
 func TestRefused(t *testing.T) {
 	t.Parallel()
 	for name, c := range map[string]struct {
@@ -467,9 +369,6 @@ func TestRefused(t *testing.T) {
 			expect(t, out, code, 1, c.says)
 			if m.restarted() || m.live() != "v1.0.0" {
 				t.Fatalf("deployed: %v", m.log())
-			}
-			if times, _ := m.polls(); len(times) != 0 {
-				t.Fatalf("drained: %v", times)
 			}
 			if _, err := os.Stat(filepath.Join(m.lib, "almanac-v1.0.1")); (err == nil) != c.arrives {
 				t.Fatalf("kept: %v", err)
@@ -512,12 +411,12 @@ func TestBackFromAMigration(t *testing.T) {
 	out, code = m.deploy("v1.1.0", "ci")
 	expect(t, out, code, 1, "not tried again from CI")
 
-	// The next patch, with the same migration: refused before the drain. Changed, it goes out.
+	// The next patch, with the same migration: refused before the restart. Changed, it goes out.
 	m.publish(release{tag: "v1.1.1", migrations: append(before, bad), migrates: true})
 	out, code = m.deploy("v1.1.1", "ci")
 	expect(t, out, code, 1, "brings that release's migration, unchanged", "0003_c.sql")
-	if times, _ := m.polls(); len(times) != 0 || m.restarted() {
-		t.Fatalf("drained or restarted: %v", m.log())
+	if m.restarted() {
+		t.Fatalf("restarted: %v", m.log())
 	}
 	m.publish(release{tag: "v1.1.2", migrations: append(before, mig('4', "0003_c.sql")), migrates: true})
 	out, code = m.deploy("v1.1.2", "ci")
@@ -584,7 +483,7 @@ func TestBackCutOff(t *testing.T) {
 	m := newMachine(t)
 	m.publish(release{tag: "v1.1.0", behave: "never", migrates: true})
 	m.write(filepath.Join(m.world, "fail-stop"), "", 0o644)
-	out, code := m.deploy("v1.1.0", "now")
+	out, code := m.deploy("v1.1.0")
 	expect(t, out, code, 1)
 	l := m.log()
 	if !strings.HasPrefix(l[len(l)-1], "systemctl start almanac.socket almanac") {
