@@ -252,7 +252,7 @@ export async function meetAs(page: Page, name?: string): Promise<void> {
 }
 
 /** Two players made friends the one way there is: `b` asks `a` by `a`'s username (each made a player first, if not
- * yet), and `a` says yes in Приятели. */
+ * yet, and `b` one who has finished a game, as a guest asks only then), and `a` says yes in Приятели. */
 export async function befriend(a: Page, b: Page): Promise<void> {
   for (const p of [a, b]) {
     await p.goto("/friends");
@@ -260,6 +260,7 @@ export async function befriend(a: Page, b: Page): Promise<void> {
     if (await make.count()) await make.click();
     await expect(p.getByLabel("Потребителско име или имейл на приятел")).toBeVisible();
   }
+  await playedBefore(b, 1);
   const tag = await a.evaluate(async () => (await (await fetch("/api/me")).json()).user.tag as string);
   await b.getByLabel("Потребителско име или имейл на приятел").fill(`@${tag}`);
   await b.getByRole("button", { name: "Добави", exact: true }).click();

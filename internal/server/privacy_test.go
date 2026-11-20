@@ -65,7 +65,7 @@ func TestRequestLog(t *testing.T) {
 		}
 	}
 	for route, ip := range map[string]bool{
-		"/hand/…": false, "/players/…": false,
+		"/hand/…": false, "/players/…": true, // a 404 too: nobody has that tag
 		"/api/players/{tag}": true, // 404s: someone may be walking them
 	} {
 		l, ok := routes[route]

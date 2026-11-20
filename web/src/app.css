@@ -265,6 +265,8 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    /* What's brought into view (a field focused, an ask opened) stops above a phone's bar of places, not under it. */
+    scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
   }
 
   body {
@@ -5485,9 +5487,12 @@
     gap: var(--space-3);
   }
 
+  /* Beside the avatar while a name's words fit there: past that (large text on a narrow phone) the words go under it,
+     the whole width theirs, rather than a word broken in two. */
   .me-head-text {
     display: grid;
-    flex: 1;
+    flex: 1 1 10em;
+    grid-template-columns: minmax(0, 1fr);
     gap: 2px;
     min-width: 0;
   }
@@ -6446,8 +6451,10 @@
     text-overflow: ellipsis;
   }
 
+  /* A tag is one word: cut short with „…“, never broken over two lines. */
   .me-tag {
     font-size: 0.875rem;
+    white-space: nowrap;
   }
 
   /* A tag typed after its @. */
@@ -7176,6 +7183,10 @@
 
   /* A big screen: the four places sit in the header, beside the name. */
   @media (min-width: 48rem) {
+    html {
+      scroll-padding-bottom: 0;
+    }
+
     #app {
       padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));
     }

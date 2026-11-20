@@ -9,7 +9,8 @@
 // levels, achievements and titles, ratings and divisions (newcomers still placing too), the facts of Моят Алманах.
 // Only what no game function
 // writes is written directly: when a player came and was last seen, their email, their mail and notification
-// preferences, the sessions of the personas, and /admin's
+// preferences, the players' sessions (each guest's from the day they came, as their browser keeps it; the personas'
+// to sign in by), and /admin's
 // tallies of visits and asks.
 //
 // Players play at once, not one after another: each visit begins at its own time (rewind), the clock put back if the

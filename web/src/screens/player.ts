@@ -17,7 +17,7 @@ let {
   signal,
   title,
   friendRequests,
-  player,
+  user,
   avatar,
   badge,
   record,
@@ -67,7 +67,7 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
     signal,
     title,
     friendRequests,
-    player,
+    user,
     avatar,
     badge,
     record,
@@ -192,11 +192,18 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
         await reload();
       }),
     ];
+  } else if (!user.peek()?.email && !opened.peek().points) {
+    // Nobody yet on this device, or a guest with no game finished: a request is a player's (the server says so too),
+    // never a guest made for the asking.
+    body = [
+      h("p", { class: "player-relation muted" }, "За да добавяш приятели, първо изиграй една игра или влез с имейл."),
+      h("a", { class: "btn inline primary", href: "/" }, "Към играта"),
+      h("a", { class: "btn inline", href: "/settings" }, "Влез"),
+    ];
   } else {
     body = [
       h("p", { class: "player-relation muted" }, "Като приятели виждате резултатите си за деня."),
       button("Добави приятел", "primary", async () => {
-        await player(); // not a player yet: a guest first, as on the first game
         const r = await api<{ friends?: boolean; name?: string }>("POST", "/api/friends/requests", { to: p.tag });
         await reload();
         if (!r.friends) note.set({ text: `Поканата до ${p.name} е изпратена.` });

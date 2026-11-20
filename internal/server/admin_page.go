@@ -232,7 +232,7 @@ action="/admin/players/{{.Player}}/reports/resolve"><button class="link">Вси�
 <h2>Най-трудните</h2>
 <p class="muted">Въпроси с поне 10 отговора, по дела на верните.</p>
 <div class="table-scroll"><table class="admin-table"><thead><tr><th>Въпрос</th><th class="num">Отговори</th><th class="num">Верни</th></tr></thead><tbody>
-{{range .Hardest}}<tr><td>{{.ID}} · {{.Text}}<br><span class="muted">{{.Answer}}{{if .Lure}} · най-често грешат с „{{.Lure}}“{{end}}</span></td>
+{{range .Hardest}}<tr><td>{{.ID}} · {{.Text}}<br><span class="muted">{{.Answer}}{{if .Lure}} · грешат най-често с {{.Lure}}{{end}}</span></td>
 <td class="num">{{.Answers}}</td><td class="num">{{.Share}}%</td></tr>{{else}}<tr><td colspan="3" class="muted">Още няма достатъчно отговори.</td></tr>{{end}}
 </tbody></table></div>
 </section>

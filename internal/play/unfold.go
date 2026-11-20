@@ -21,7 +21,8 @@ import (
 // from the first game, and what was held is told when its system opens (NewsOf), not lost. Each system is told once,
 // quietly, as it opens: a line in that game's news (News.Opened). A topic's mastery needs no rule here: it shows as a
 // first estimate once a topic has a few answers (Mastery.First), and with its tier once its mark is sure
-// (Mastery.Sure). Награди (ProgressOf) shows the achievements of the systems open, and their XP once XP is.
+// (Mastery.Sure). Награди (ProgressOf) and the player's page (ProfileOf) count the achievements of the systems open
+// (Open.shows), and Награди tells their XP once XP is.
 
 // XPFromDay is the day played that XP, the level and the day's goals show from.
 const XPFromDay = 2
@@ -81,6 +82,13 @@ func systemOf(id string) string {
 		return "xp"
 	}
 	return ""
+}
+
+// shows is whether a player who has met these systems is shown an achievement, anywhere it's counted (Награди, their
+// page): not one of a system still closed to them.
+func (o Open) shows(a Achievement) bool {
+	s := systemOf(a.ID)
+	return s == "" || o.has(s)
 }
 
 // opened are the systems open now that a player hasn't been told of (told: the ones they have, space-separated).

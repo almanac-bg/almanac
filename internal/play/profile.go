@@ -39,7 +39,7 @@ type Profile struct {
 	// Mastery is how well they know each topic, in the bank's order.
 	Mastery []Mastery `json:"mastery"`
 	// Achievements are those they've earned, the latest first, each with the day (at noon in Bulgaria); Of is how many
-	// there are in all.
+	// there are for them, as their Награди counts them (Open.shows).
 	Achievements []Earned `json:"achievements"`
 	Of           int      `json:"of"`
 	// Friend is how the viewer stands with them: "yes" (friends), "asked" (the viewer asked them), "asks" (they
@@ -110,8 +110,17 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 	if err != nil {
 		return p, err
 	}
-	p.Achievements, p.Of = []Earned{}, len(Achievements)
+	open, err := g.OpenOf(ctx, id)
+	if err != nil {
+		return p, err
+	}
+	// Counted as their Награди counts them: those of the systems they've met (Open.shows).
+	p.Achievements = []Earned{}
 	for _, a := range Achievements {
+		if !open.shows(a) {
+			continue
+		}
+		p.Of++
 		if at, ok := earned[a.ID]; ok {
 			p.Achievements = append(p.Achievements, Earned{Achievement: a, At: at, Progress: a.Goal})
 		}

@@ -164,7 +164,11 @@ func (w *world) arrive(p *player) error {
 	p.id, p.name, p.tag = u.ID, u.Name, u.Tag
 	w.byID[p.id] = p
 	now := store.Ms(w.clock())
-	if err := w.exec(`DELETE FROM sessions WHERE user_id = ?`, p.id); err != nil { // the persona's is made at the end
+	// The guest's browser keeps its cookie, as a real one does: the session from the day they came, so that the
+	// server's clean-up (account.Accounts.CleanUp drops a guest with no session) leaves the seeded players as seeded.
+	// A persona's own, to sign in by, is made at the end.
+	if err := w.exec(`UPDATE sessions SET created_at = ?, seen_at = ?, expires_at = ? WHERE user_id = ?`,
+		now, now, store.Ms(w.clock().AddDate(0, 0, account.SessionDays)), p.id); err != nil {
 		return err
 	}
 	if err := w.exec(`UPDATE users SET created_at = ?, seen_at = ?, came_from = ? WHERE id = ?`,

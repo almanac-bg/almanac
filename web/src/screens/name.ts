@@ -32,16 +32,6 @@ function markAsked(id: number): void {
   }
 }
 
-/** A name in the shape the server takes (account.NormalName): its spaces made single, 2 to 30 letters, digits,
- * spaces, dots, dashes or underscores with a letter among them; "" if it isn't. The rest (one script a word, no web
- * address, nothing that reads as the game's own) is the server's to say, in its answer. */
-export function normalName(s: string): string {
-  const name = s.trim().replace(/\s+/g, " ");
-  const n = [...name].length;
-  if (n < 2 || n > 30 || !/^[\p{L}\p{N} ._-]+$/u.test(name) || !/\p{L}/u.test(name)) return "";
-  return name;
-}
-
 /** Whether the player is to be asked: still with the name drawn for them, and not asked on this device. */
 const toAsk = (u: User | null): u is User => !!u?.drawn && !asked(u.id);
 
@@ -112,8 +102,9 @@ function sheet(
         class: "card sheet-panel stack",
         onsubmit: async (e: SubmitEvent) => {
           e.preventDefault();
-          const name = normalName(input.value);
-          if (!name) return say("Името е от 2 до 30 знака: букви, цифри, интервали, точки или тирета.");
+          // Its spaces made single, as the server keeps it. Whether the game takes it is the server's to say, in the
+          // words it says the rule in everywhere (account's names).
+          const name = input.value.trim().replace(/\s+/g, " ");
           if (name !== u.name) {
             go.disabled = true;
             // Saved first, so that what follows has it (the duel's other side).

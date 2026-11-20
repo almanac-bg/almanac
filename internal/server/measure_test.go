@@ -38,12 +38,17 @@ const phoneBrowser = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML,
 
 func TestVisitsAreCounted(t *testing.T) {
 	g := start(t)
-	g.open("/players/nobody", phoneBrowser)
-	g.open("/players/nobody", phoneBrowser) // a reload: once a half hour
+	// A player with a profile, whose page visitors open: a link they were sent.
+	p := g.player()
+	p.call("POST", "/api/guest", map[string]any{})
+	page := "/players/" + tagOf(p)
+	g.open(page, phoneBrowser)
+	g.open(page, phoneBrowser) // a reload: once a half hour
 	// Another phone behind the same address (a carrier's): a visit of its own.
-	g.open("/players/nobody", strings.Replace(phoneBrowser, "Android 14", "Android 13", 1))
+	g.open(page, strings.Replace(phoneBrowser, "Android 14", "Android 13", 1))
 	g.open("/", phoneBrowser)
-	g.open("/nope", phoneBrowser) // not a page of the game
+	g.open("/nope", phoneBrowser)           // not a page of the game
+	g.open("/players/nobody", phoneBrowser) // nor a player who isn't
 	// Link previews and search engines are no visitors.
 	g.open("/", "WhatsApp/2.24.1 A")
 	g.open("/", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)")
@@ -54,9 +59,7 @@ func TestVisitsAreCounted(t *testing.T) {
 		}
 	}
 	// A player with a profile isn't a visitor.
-	p := g.player()
-	p.call("POST", "/api/guest", map[string]any{})
-	req, _ := http.NewRequest("GET", g.url+"/players/nobody", nil)
+	req, _ := http.NewRequest("GET", g.url+page, nil)
 	req.Header.Set("User-Agent", phoneBrowser)
 	if res, err := p.client.Do(req); err == nil {
 		res.Body.Close()

@@ -419,7 +419,8 @@ func TestRefusesOtherSites(t *testing.T) {
 func TestPages(t *testing.T) {
 	g := start(t)
 	for path, want := range map[string]int{
-		"/": 200, "/play": 404, "/play/history": 200, "/me": 200, "/duel/live": 200, "/duel/12": 200, "/duel/other": 404, "/nowhere": 404, "/api/nowhere": 404,
+		"/": 200, "/play": 404, "/play/history": 200, "/me": 200, "/duel/live": 200, "/duel/12": 404, "/duel/other": 404,
+		"/play/mix": 200, "/play/nosuch": 404, "/players/nobody": 404, "/nowhere": 404, "/api/nowhere": 404,
 		"/qimg/edf5f1c42d5e21e8.webp": 200, "/qimg/../../go.mod": 404, "/qimg/0000000000000000.webp": 404,
 		"/privacy": 200, "/.well-known/security.txt": 200,
 	} {
@@ -715,6 +716,24 @@ func TestALiveDuelOverHTTP(t *testing.T) {
 	id := int64(v["id"].(float64))
 	if v["them"].(map[string]any)["name"] == nil || v["recorded"] != nil {
 		t.Fatalf("the start: %v", v)
+	}
+	// Someone signed out, sent its link: asked to sign in for it; one that isn't there is said so, a 404 page.
+	outside := g.player()
+	if status, out := outside.call("GET", fmt.Sprintf("/api/duels/%d", id), nil); status != 401 || out["error"] != "signed_out" {
+		t.Errorf("a duel there, signed out: %d %v", status, out)
+	}
+	if status, out := outside.call("GET", fmt.Sprintf("/api/duels/%d", id+1000), nil); status != 404 || out["error"] != "no_duel" {
+		t.Errorf("a duel not there, signed out: %d %v", status, out)
+	}
+	for at, want := range map[int64]int{id: 200, id + 1000: 404} {
+		res, err := http.Get(fmt.Sprintf("%s/duel/%d", g.url, at))
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != want {
+			t.Errorf("/duel/%d: %d, want %d", at, res.StatusCode, want)
+		}
 	}
 	path := fmt.Sprintf("/api/duels/live/%d/answer", id)
 	if status, _ := ana.call("POST", path, map[string]any{"n": 0, "answer": map[string]any{"pick": 0}}); status != 409 {
@@ -1012,10 +1031,23 @@ func (g *game) guest() (*player, int64) {
 	return p, int64(id)
 }
 
-// befriend makes two players friends: b asks a by their tag, and a says yes.
+// befriend makes two players friends: b asks a by their tag (having finished a game: played), and a says yes.
 func befriend(a, b *player) {
+	played(b)
 	b.call("POST", "/api/friends/requests", map[string]string{"to": "@" + tagOf(a)})
 	acceptAll(a)
+}
+
+// played makes a player one who has finished a game (a topic's, a year ago, so that nothing of today's changes): a
+// guest asks anyone to be friends only then.
+func played(p *player) {
+	p.g.t.Helper()
+	_, me := p.call("GET", "/api/me", nil)
+	at := time.Now().AddDate(-1, 0, 0).UnixMilli()
+	if _, err := p.g.db.Write.Exec(`INSERT INTO runs (user_id, kind, category, questions, started_at, finished_at)
+		VALUES (?, 'topic', 'history', '[]', ?, ?)`, me["user"].(map[string]any)["id"], at, at); err != nil {
+		p.g.t.Fatal(err)
+	}
 }
 
 // tagOf is a player's tag.
@@ -1081,6 +1113,7 @@ func TestNotifications(t *testing.T) {
 			t.Fatalf("%s: %d pushes, want %d", path, got, want)
 		}
 	}
+	played(bo)
 	for range 3 {
 		bo.call("POST", "/api/friends/requests", map[string]string{"to": "@" + tagOf(ana)})
 	}
@@ -1285,6 +1318,16 @@ func TestFriendsOverHTTP(t *testing.T) {
 	_, a := ana.call("POST", "/api/guest", map[string]any{})
 	bo.call("POST", "/api/guest", map[string]any{})
 	anaTag := a["user"].(map[string]any)["tag"].(string)
+	// A guest who hasn't finished a game asks nobody: a throwaway made to send requests sends none.
+	if status, out := bo.call("POST", "/api/friends/requests", map[string]string{"to": "@" + anaTag}); status != http.StatusForbidden ||
+		out["error"] != "play_first" {
+		t.Fatalf("Bo asks before a game: %d %v", status, out)
+	}
+	if _, w := ana.call("GET", "/api/friends/requests", nil); w["requests"] != 0.0 {
+		t.Fatalf("a request from a guest who hasn't played: %v", w)
+	}
+	played(ana)
+	played(bo)
 	if status, out := ana.call("POST", "/api/friends/requests", map[string]string{"to": "@" + anaTag}); status != http.StatusConflict ||
 		out["error"] != "self" {
 		t.Fatalf("Ana asks herself: %d %v", status, out)
@@ -1331,6 +1374,7 @@ func TestPeoplePushesCapped(t *testing.T) {
 	// A stranger asks, Ana says no, and the stranger asks again: one push.
 	cy := g.player()
 	cy.call("POST", "/api/guest", map[string]any{})
+	played(cy)
 	cy.call("POST", "/api/friends/requests", asks)
 	_, mine := ana.call("GET", "/api/friends", nil)
 	in := mine["requests"].(map[string]any)["in"].([]any)
@@ -1345,6 +1389,7 @@ func TestPeoplePushesCapped(t *testing.T) {
 	for range peoplePushes + 5 {
 		p := g.player()
 		p.call("POST", "/api/guest", map[string]any{})
+		played(p)
 		p.call("POST", "/api/friends/requests", asks)
 	}
 	s.sendQueued(t.Context())
@@ -1387,7 +1432,13 @@ func TestProfilesOverHTTP(t *testing.T) {
 		t.Fatalf("a tag that can't be: %d", status)
 	}
 
+	// Ana's achievements are counted out of as many as Награди counts for her: the same rule, both places.
+	if _, pr := ana.call("GET", "/api/me/progress", nil); p["of"] != float64(len(pr["achievements"].([]any))) {
+		t.Errorf("Ana's achievements: of %v on her page, %d in Награди", p["of"], len(pr["achievements"].([]any)))
+	}
+
 	// Bo asks; Ana sees he asks, he sees he asked; once she accepts, they're friends and he may call her to a duel.
+	played(bo)
 	bo.call("POST", "/api/friends/requests", map[string]string{"to": "@" + anaTag})
 	if _, p := bo.call("GET", "/api/players/"+anaTag, nil); p["friend"] != "asked" || p["request"] == nil {
 		t.Fatalf("Ana, to Bo who asked: %v", p)
