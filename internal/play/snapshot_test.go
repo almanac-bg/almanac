@@ -49,7 +49,8 @@ func TestCountsKeptOverARestart(t *testing.T) {
 		t.Fatal("no crowd counted")
 	}
 
-	restarted := &Game{DB: w.db, Bank: w.g.Bank, Now: w.g.Now, CrowdMin: 1}
+	restarted := w.newGame()
+	restarted.CrowdMin = 1
 	gone, cancel := context.WithCancel(ctx)
 	cancel() // a request that can't wait at all: what's kept is there at once
 	h2, err := restarted.hardness(gone)

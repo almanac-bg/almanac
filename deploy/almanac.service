@@ -20,7 +20,8 @@ RestartSec=2
 # over). A crash soon after a deploy goes back to the version before (deploy.sh).
 RestartSteps=5
 RestartMaxDelaySec=60
-# Requests under way get 30 seconds to finish (a deploy drains the games first: deploy.sh).
+# Requests under way get 30 seconds to finish, and what follows the games they ended the rest of it (one cut off is
+# the sweep's after the restart: server.go).
 TimeoutStopSec=45
 
 # Memory, of the machine's 3.8 GB: the program's heap kept under 2 GiB (Go collects harder as it nears that), and the

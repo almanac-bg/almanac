@@ -238,6 +238,11 @@ type State struct {
 	// Question is the one shown now, if one is.
 	Question *Shown `json:"question,omitempty"`
 	Done     bool   `json:"done"`
+	// Against is, in a duel played second (the other side finished: a friend's, a recording), how the other side's
+	// answers went as far as the player has come, and no further (duelAgainst): each question the player has answered,
+	// its points left out until the end; and of the one shown, only when they answered it (Ms), if they did, for the
+	// screen to say so at that moment. How it went for them waits for the player's own answer.
+	Against []DuelMark `json:"against,omitempty"`
 }
 
 // Mark is how one answer went, or that its question counts for nobody (Void: day.go), answered or not.
@@ -321,6 +326,12 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 			if since < 0 { // waiting for its pictures: those only, until its time runs
 				s.Question.View, s.Question.MoreMs = bank.PicturesView(d), 0
 			}
+		}
+	}
+	if r.kind == "duel" {
+		var err error
+		if s.Against, err = duelAgainst(tx, r.id, r.at, s.Question != nil); err != nil {
+			return s, err
 		}
 	}
 	return s, nil

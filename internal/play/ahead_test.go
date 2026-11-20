@@ -20,8 +20,7 @@ import (
 // their questions reaches another game; and a day ahead whose question leaves the bank is drawn again.
 func TestDaysAhead(t *testing.T) {
 	w := setup(t)
-	w.b = biggerSample(t, 20)
-	w.g.Bank = func() *bank.Bank { return w.b }
+	w.use(biggerSample(t, 20))
 	ctx := t.Context()
 	if err := w.g.EnsureDays(ctx); err != nil {
 		t.Fatal(err)
@@ -76,7 +75,7 @@ func TestDaysAhead(t *testing.T) {
 	b2, _ := bank.Load(w.b.Dir)
 	q, _ := b2.Get(gone)
 	q.Extra().Retired = true
-	w.g.Bank = func() *bank.Bank { return b2 }
+	w.swap(b2)
 	if err := w.g.EnsureDays(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -163,8 +162,7 @@ func biggerSample(t *testing.T, n int) *bank.Bank {
 // player's game only reads them (today's drawn there if it must be); the next game finds what was kept.
 func TestDaysAheadRollBack(t *testing.T) {
 	w := setup(t)
-	w.b = biggerSample(t, 20)
-	w.g.Bank = func() *bank.Bank { return w.b }
+	w.use(biggerSample(t, 20))
 	ctx := t.Context()
 	var seen map[string]bool
 	failed := w.db.Tx(ctx, func(tx *sql.Tx) error {
@@ -224,8 +222,7 @@ func mustPicks(t *testing.T, s string) []Pick {
 // the days' questions, and the last day drawn.
 func TestNoGameDealsAQuestionDueForReview(t *testing.T) {
 	w := setup(t)
-	w.b = biggerSample(t, 20)
-	w.g.Bank = func() *bank.Bank { return w.b }
+	w.use(biggerSample(t, 20))
 	ctx := t.Context()
 	if err := w.g.EnsureDays(ctx); err != nil {
 		t.Fatal(err)
@@ -268,7 +265,7 @@ func TestNoGameDealsAQuestionDueForReview(t *testing.T) {
 		}
 	}
 	now.Extra().ReviewBy = today
-	w.g.Bank = func() *bank.Bank { return b2 }
+	w.swap(b2)
 	if err := w.g.EnsureDays(ctx); err != nil {
 		t.Fatal(err)
 	}

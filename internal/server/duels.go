@@ -76,7 +76,7 @@ func (s *Server) playDuel(w http.ResponseWriter, r *http.Request) error {
 	}
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		return play.ErrNoDuel
+		return play.ErrDuelGone
 	}
 	if _, err := s.game.PlayDuel(r.Context(), u.ID, id); err != nil {
 		return err
@@ -92,7 +92,7 @@ func (s *Server) playDuel(w http.ResponseWriter, r *http.Request) error {
 func (s *Server) duelOne(w http.ResponseWriter, r *http.Request) error {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		return play.ErrNoDuel
+		return play.ErrDuelGone
 	}
 	u, err := s.mustUser(r)
 	if errors.Is(err, errSignedOut) {
@@ -100,7 +100,7 @@ func (s *Server) duelOne(w http.ResponseWriter, r *http.Request) error {
 		if there, e := s.game.DuelExists(r.Context(), id); e != nil {
 			return e
 		} else if !there {
-			return play.ErrNoDuel
+			return play.ErrDuelGone
 		}
 	}
 	if err != nil {

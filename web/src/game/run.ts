@@ -21,7 +21,7 @@ import { countUp, fact, factFace, failure, inRowChip, reachable, topicMark, type
 import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
 import { inRowOf } from "./numbers.ts";
 import { answered, beats, crowdLine, picture, picturesIn, type Stage } from "./questions.ts";
-import type { Answer, Credit, Mark, Result, Reveal, Shown, State, View } from "./types.ts";
+import type { Answer, Credit, Mark, Result, Reveal, Shown, State, TheirMark, View } from "./types.ts";
 
 /** Where the run whose question this tab showed last is kept (this tab's, for as long as it's open). */
 const showingKey = "almanac.showing";
@@ -44,17 +44,10 @@ function showing(run: number): void {
   }
 }
 
-/** The other side of a duel, played already, as the player plays the same ten: who, and how each question went for
- * them (when they answered it, and whether right; their points wait for the end). */
-export interface Against {
-  name: string;
-  marks: { right: boolean; partial?: boolean; missed?: boolean; ms: number }[];
-}
-
 /** Plays a run from where it stands; `done` draws what comes after its last answer. A duel names the other (`opponent`)
- * over each question; played second (`against`), their answer shows as they gave it: a word at the moment they did,
- * and how it went once the player's own is in. */
-export function playRun(initial: State, done: (s: State) => Child, opponent = "", against?: Against): Child {
+ * over each question; played second (the run's `against`), the other's answer (`them`, their name) shows as they gave
+ * it: a word at the moment they did, and how it went once the player's own is in. */
+export function playRun(initial: State, done: (s: State) => Child, opponent = "", them = ""): Child {
   const screen = slot();
   hold();
   factFace();
@@ -134,7 +127,7 @@ export function playRun(initial: State, done: (s: State) => Child, opponent = ""
       const q = s.question;
       showing(s.id);
       screen.show(() =>
-        question(s, q, next, reload, versus, say, against, (now) => {
+        question(s, q, next, reload, versus, say, them, (now) => {
           last = now;
         }),
       );
@@ -544,7 +537,7 @@ function question(
   reload: () => void,
   versus: string,
   say: Say,
-  against: Against | undefined,
+  them: string,
   taken: (now: State) => void,
 ): Child {
   const problem = slot();
@@ -558,7 +551,7 @@ function question(
   });
   // Played second: a word over the question as the other answered it (at the moment they did, as far into its time),
   // and how it went for them once the player's own is in.
-  const theirs = against?.marks[q.n];
+  const theirs = them ? s.against?.[q.n] : undefined;
   const theyAnswered = signal(false);
   if (theirs && !theirs.missed) {
     const when = window.setTimeout(
@@ -571,7 +564,7 @@ function question(
     );
     onCleanup(() => clearTimeout(when));
   }
-  const versusNow: Child = against ? () => (theyAnswered() ? `${against.name} отговори` : versus) : versus;
+  const versusNow: Child = theirs ? () => (theyAnswered() ? `${them} отговори` : versus) : versus;
   const score = h("div", { class: "tally" });
   tally(score, s.points, s.points, inRowOf(s.trail));
 
@@ -674,7 +667,7 @@ function question(
       tally(score, res.state.points, s.points, res.inRow ?? 0);
       crowd = waiting(crowdLine(q.view.type, res.reveal.crowd, res.right));
       rest = [
-        theirs && against ? theirLine(against.name, theirs) : null,
+        theirLine(them, res.state.against?.[q.n]),
         fact(res.reveal.fact, res.reveal.day, res.right ? q.category : undefined),
         res.reveal.credit ? credit(res.reveal.credit) : null,
         upNext(lasts, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`, true),
@@ -790,8 +783,10 @@ function question(
   return page;
 }
 
-/** How a question went for the other side of a duel, as a line under the player's verdict: „Мария: вярно за 4,2 с“. */
-function theirLine(name: string, m: Against["marks"][number]): Child {
+/** How a question went for the other side of a duel, as a line under the player's verdict: „Мария: вярно за 4,2 с“.
+ * Their mark for it comes with the player's own answer (play.State.Against): none, nothing to say. */
+function theirLine(name: string, m: TheirMark | undefined): Child {
+  if (!name || !m) return null;
   const secs = (m.ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 });
   const how = m.right ? `вярно за ${secs} с` : m.partial ? "близо" : m.missed ? "без отговор" : "грешно";
   return h("p", { class: `their-line${m.right ? " right" : ""}` }, h("b", null, `${name}: `), how);

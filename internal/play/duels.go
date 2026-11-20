@@ -1,7 +1,6 @@
 package play
 
 import (
-	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -53,7 +52,11 @@ const (
 )
 
 var (
-	ErrNoDuel = errors.New("no such duel")
+	// ErrNoDuel is a duel that isn't the player's (another's, or not sent to them yet); ErrDuelGone one there isn't at
+	// all: never was, or gone (its player deleted: Forget; its first side never finished: SettleDue). A page tells the
+	// two apart: one may be the player's in another profile, the other is nobody's.
+	ErrNoDuel   = errors.New("not the player's duel")
+	ErrDuelGone = errors.New("no such duel")
 	// ErrNobody is that there's no recording to play against yet.
 	ErrNobody = errors.New("nobody to play")
 	// ErrDuelsToOne is a duel past DuelsToOne open with one friend; ErrDuelsADay one past DuelsADay today.
@@ -117,9 +120,8 @@ type DuelSide struct {
 	Look   *Look  `json:"look,omitempty"`
 	// Gone is a player who has gone since (play.Forget): their game went with them, so their score isn't known.
 	Gone bool `json:"gone,omitempty"`
-	// Marks are how each question answered went (DuelOf): the player's own; the other's once the duel has a result,
-	// or, while it's the player's turn, for the screen to show each at its time, after the player's own answer (their
-	// points left out until the end).
+	// Marks are how each question answered went (DuelOf): the player's own; the other's once the duel has a result.
+	// While the player plays, the other's come with the run, each as far as the player has come (State.Against).
 	Marks []DuelMark `json:"marks,omitempty"`
 }
 
@@ -247,7 +249,7 @@ func (g *Game) DuelRecording(ctx context.Context, userID int64) (int64, error) {
 
 // PlayDuel is the player's run in a duel that's theirs to play (DuelYours): their own side, or, sent to them, the
 // same ten as the friend played them, made as they first play it. ErrNoDuel if it isn't theirs to play (not theirs,
-// not sent yet), ErrDuelOver once it's over.
+// not sent yet), ErrDuelGone if there's no such duel, ErrDuelOver once it's over.
 func (g *Game) PlayDuel(ctx context.Context, userID, duelID int64) (int64, error) {
 	var run int64
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
@@ -257,7 +259,7 @@ func (g *Game) PlayDuel(ctx context.Context, userID, duelID int64) (int64, error
 			duelID).Scan(&a, &b, &aRun, &bRun, &sent, &ended)
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
-			return ErrNoDuel
+			return ErrDuelGone
 		case err != nil:
 			return err
 		case a.Int64 == userID && a.Valid:
@@ -859,11 +861,20 @@ func (g *Game) DuelExists(ctx context.Context, id int64) (bool, error) {
 
 // DuelOf is one of a player's duels, as DuelsOf has it, with more: how each question went for each side (the other's
 // once it has a result, or while it's the player's turn, for its screen: DuelSide.Marks), the question that decided
-// it, their record against this person, and whether they're friends. ErrNoDuel if it isn't theirs.
+// it, their record against this person, and whether they're friends. ErrNoDuel if it isn't theirs, ErrDuelGone if
+// there's no such duel.
 func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, error) {
 	list, err := g.duelsOf(ctx, userID, duelID)
-	if err != nil || len(list) == 0 {
-		return DuelView{}, cmp.Or(err, ErrNoDuel)
+	if err != nil {
+		return DuelView{}, err
+	}
+	if len(list) == 0 {
+		if there, err := g.DuelExists(ctx, duelID); err != nil {
+			return DuelView{}, err
+		} else if !there {
+			return DuelView{}, ErrDuelGone
+		}
+		return DuelView{}, ErrNoDuel
 	}
 	v := list[0]
 	if v.You != nil && v.RunID != 0 {
@@ -872,15 +883,11 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 		}
 	}
 	result := v.State == DuelWon || v.State == DuelLost || v.State == DuelDraw
-	if v.Opponent != nil && v.theirRun != 0 && (result || v.State == DuelYours) {
+	if v.Opponent != nil && v.theirRun != 0 && result {
 		if v.Opponent.Marks, err = g.duelMarks(ctx, v.theirRun); err != nil {
 			return v, err
 		}
-		if !result { // for the screen, each at its time: the points wait for the end
-			for i := range v.Opponent.Marks {
-				v.Opponent.Marks[i].Points = 0
-			}
-		} else if v.You != nil {
+		if v.You != nil {
 			v.Decided = decided(v.You.Marks, v.Opponent.Marks, v.You.Points, v.Opponent.Points)
 		}
 	}
@@ -938,6 +945,48 @@ func (g *Game) duelMarks(ctx context.Context, runID int64) ([]DuelMark, error) {
 		}
 		m.Partial = m.Points > 0 && !m.Right
 		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// duelAgainst is the other side's answers in a duel run played second (State.Against), as far as the player has come:
+// each of the at questions the player has answered, its points left out; and, if the question at is shown, only when
+// the other answered it, if they did. Nothing while the other side hasn't finished (a friend's duel played first).
+func duelAgainst(tx *sql.Tx, runID int64, at int, shown bool) ([]DuelMark, error) {
+	var other int64
+	err := tx.QueryRow(`SELECT o.id FROM duels d
+		JOIN runs o ON o.id = CASE WHEN d.a_run = ?1 THEN CASE WHEN d.kind = 'recording' THEN d.ghost_run ELSE d.b_run END
+			ELSE d.a_run END
+		WHERE (d.a_run = ?1 OR d.b_run = ?1) AND o.finished_at IS NOT NULL`, runID).Scan(&other)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	rows, err := tx.Query(`SELECT n, is_right, points, ms, given IS NULL FROM answers WHERE run_id = ? AND n <= ?
+		ORDER BY n`, other, at)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]DuelMark, 0, at+1)
+	for rows.Next() {
+		var n int
+		var m DuelMark
+		if err := rows.Scan(&n, &m.Right, &m.Points, &m.Ms, &m.Missed); err != nil {
+			return nil, err
+		}
+		for len(out) < n { // a question with no answer of theirs (one that counts for nobody): nothing to say of it
+			out = append(out, DuelMark{Missed: true})
+		}
+		m.Partial = m.Points > 0 && !m.Right
+		m.Points = 0 // the points wait for the end
+		switch {
+		case n < at:
+			out = append(out, m)
+		case shown && !m.Missed: // the one shown: when they answered, nothing of how
+			out = append(out, DuelMark{Ms: m.Ms})
+		}
 	}
 	return out, rows.Err()
 }

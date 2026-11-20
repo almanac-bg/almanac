@@ -56,11 +56,11 @@ func (w *world) reload(b *bank.Bank) {
 	if err := w.g.Keep(w.t.Context(), b); err != nil {
 		w.t.Fatal(err)
 	}
-	w.b = b
-	w.g.Bank = func() *bank.Bank { return b }
+	w.use(b)
 }
 
-// runOf makes a player's run of the questions given (by id), of a kind; a live duel's is its duel's.
+// runOf makes a player's run of the questions given (by id), of a kind; a duel's (a recording's first side) with its
+// duel.
 func (w *world) runOf(user int64, kind string, ids ...string) int64 {
 	w.t.Helper()
 	picks := make([]Pick, len(ids))
@@ -89,7 +89,7 @@ func (w *world) runOf(user int64, kind string, ids ...string) int64 {
 
 // A question is graded as it was shown, whatever the bank has become meanwhile: a key fixed between a question
 // showing and its answer (geo-960, a statement that was true) grades the answer the screen asked for, in a game of
-// one's own, after a refresh, after a restart, and in a live duel, which grades through the deal it shows. Its answer
+// one's own, after a refresh, after a restart, and in a duel's second side, which plays the first's ten as shown. Its answer
 // is kept as to that version; going over the game shows that version, and how others answered it; and the new version
 // starts its crowd and hardness afresh.
 func TestGradedAsShown(t *testing.T) {
@@ -154,11 +154,13 @@ func TestGradedAsShown(t *testing.T) {
 	w.reload(before)
 	run = w.runOf(bo, "topic", "geo-960")
 	w.show(bo, run)
-	restarted := &Game{DB: w.db, Bank: func() *bank.Bank { return fixed }, Now: w.g.Now}
+	w.g.AftersDone(ctx)
+	w.use(fixed)
+	restarted := w.newGame()
 	if err := restarted.Keep(ctx, fixed); err != nil {
 		t.Fatal(err)
 	}
-	w.g, w.b = restarted, fixed
+	w.g = restarted
 	w.wait(3 * time.Second)
 	if res, err := w.g.Answer(ctx, bo, run, 0, truth); err != nil || !res.Right {
 		t.Fatalf("after a restart: %+v %v", res, err)
@@ -321,7 +323,7 @@ func TestCountsStandOverAReload(t *testing.T) {
 	if _, err := w.db.Write.Exec(`DELETE FROM counts`); err != nil {
 		t.Fatal(err)
 	}
-	fresh := &Game{DB: w.db, Bank: w.g.Bank, Now: w.g.Now}
+	fresh := w.newGame()
 	if _, err := fresh.hardness(gone); !errors.Is(err, context.Canceled) {
 		t.Fatalf("waiting with a request gone: %v", err)
 	}

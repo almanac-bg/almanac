@@ -63,8 +63,17 @@ func TestADuelOverHTTP(t *testing.T) {
 	if status, out := outside.call("GET", fmt.Sprintf("/api/duels/%d", id), nil); status != 401 || out["error"] != "signed_out" {
 		t.Errorf("a duel there, signed out: %d %v", status, out)
 	}
-	if status, out := outside.call("GET", fmt.Sprintf("/api/duels/%d", id+1000), nil); status != 404 || out["error"] != "no_duel" {
+	if status, out := outside.call("GET", fmt.Sprintf("/api/duels/%d", id+1000), nil); status != 404 || out["error"] != "duel_gone" {
 		t.Errorf("a duel not there, signed out: %d %v", status, out)
+	}
+	// Signed in (a guest too): a duel there but not theirs may be theirs in another profile; one not there is gone.
+	guest := g.player()
+	guest.call("POST", "/api/guest", map[string]any{})
+	if status, out := guest.call("GET", fmt.Sprintf("/api/duels/%d", id), nil); status != 404 || out["error"] != "no_duel" {
+		t.Errorf("another's duel: %d %v", status, out)
+	}
+	if status, out := guest.call("GET", fmt.Sprintf("/api/duels/%d", id+1000), nil); status != 404 || out["error"] != "duel_gone" {
+		t.Errorf("a duel not there, signed in: %d %v", status, out)
 	}
 	for at, want := range map[string]int{fmt.Sprint(id): 200, fmt.Sprint(id + 1000): 404, "new": 200} {
 		res, err := http.Get(g.url + "/duel/" + at)

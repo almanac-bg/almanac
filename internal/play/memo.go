@@ -8,7 +8,7 @@ import (
 )
 
 // Some of what's worked out from all of a player's answers is asked for far more often than their answers change:
-// their abilities (a mastery, a profile, a duel's draw, every achievement's measure). Going over the answers takes
+// their abilities (a chapter's mastery, a profile, a game's result, a duel's draw). Going over the answers takes
 // milliseconds and a sort, growing with every game the player plays; so they're kept per player (memo), with the
 // version of the player's games they were worked out from (history), and worked out again only once that has moved.
 //

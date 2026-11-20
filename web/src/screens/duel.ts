@@ -40,8 +40,8 @@ export interface Side {
   look?: { avatar?: string };
   /** A player who has gone since (play.DuelSide.Gone): their game went with them, so their score isn't known. */
   gone?: boolean;
-  /** How each question went (one duel's view): the player's own; the other's once there's a result, or while it's the
-   * player's turn, for the screen to show as they play (their points only at the end). */
+  /** How each question went (one duel's view): the player's own; the other's once there's a result (while the player
+   * plays, the run has the other's as far as they've come: State.against). */
   marks?: DuelMark[];
 }
 
@@ -509,9 +509,9 @@ export function duelOne(params: string[]) {
     }
   };
 
-  // Played as any game, the other's answers beside the player's (when the other has played); its end, the duel again.
+  // Played as any game, the other's answers beside the player's (when the other has played: the run has them, each as
+  // far as the player has come); its end, the duel again.
   const play = (d: DuelView, s: State) => {
-    const other = d.opponent?.marks?.length ? { name: d.opponent.name, marks: d.opponent.marks } : undefined;
     screen.show(() =>
       playRun(
         s,
@@ -524,7 +524,7 @@ export function duelOne(params: string[]) {
           return h("div", null, after);
         },
         d.recorded ? `запис на ${d.opponent?.name ?? ""}` : (d.opponent?.name ?? ""),
-        other,
+        d.opponent?.name ?? "",
       ),
     );
   };
@@ -536,8 +536,9 @@ export function duelOne(params: string[]) {
     } catch (err) {
       if (life.aborted) return;
       const code = (err as ApiError).code;
-      // Nobody here, and no such duel at all (the server tells anyone that): the page isn't there, not a sign-in.
-      if (code === "no_duel" && !user.peek()) return screen.show(missing);
+      // No such duel at all (never was, or gone; the server tells anyone that): the page isn't there, not a sign-in.
+      if (code === "duel_gone") return screen.show(missing);
+      // There, but not this profile's: it may be the player's in another one.
       if (code === "signed_out" || code === "no_duel") return screen.show(() => notHere(() => void load()));
       screen.show(() => failure(err, () => void load(), ["/friends", "Към Приятели"]));
     }
