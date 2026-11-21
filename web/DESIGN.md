@@ -36,9 +36,10 @@ avatar in the bar (`/me`, `/settings`). Each screen holds its budget, in this or
 places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/layout.spec.ts` holds Днес's).
 
 - **The frame** (`app.ts`): the bar holds the rosette and „АЛМАНАХ“ in spaced capitals (a way to Днес); on a big
-  screen the three places as words on pills (`.places`); the avatar with the seal the player wears on its corner
-  (`.bar-me`), or „Вход“ (straight to the sign-in form). On a phone the places are at the foot (`.places-foot`), the
-  current one on a well, a dot on Приятели while something has come there since the player last looked (a request, a
+  screen the three places as an icon and a word on pills (`.places`; Днес a calendar, Алманах a book, Приятели two
+  people; every name bold); the avatar with the seal the player wears on its corner
+  (`.bar-me`), or „Вход“ (straight to the sign-in form). On a phone the places float at the foot (`.places-foot`): a
+  pill clear of every edge, its icon over its name, the current one on a well, a dot on Приятели while something has come there since the player last looked (a request, a
   duel sent, a duel's result), gone as it opens. The frame steps aside in a game
   (`html.playing`) and on a new visitor's cover (`html.cover`, no places).
 - **Днес** (`screens/today.ts`): the issue; its action; the streak.
