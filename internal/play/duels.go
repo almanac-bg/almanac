@@ -87,7 +87,8 @@ type DuelView struct {
 	Opponent *DuelSide `json:"opponent,omitempty"`
 	You      *DuelSide `json:"you,omitempty"`
 	Recorded bool      `json:"recorded,omitempty"`
-	// Level is, against a recording, the level it was chosen at: Even („равен“) or Stronger („по-силен“); none
+	// Level is, against a recording, the level it was chosen at, Even („равен“) or Stronger („по-силен“), where the
+	// recording is that level (recordingFit: meets); none where it was only the nearest there was („Запис“), nor
 	// against a friend.
 	Level string `json:"level,omitempty"`
 	// Topic is, against a recording of a topic's game, its topic (none: a game over all of them, „Микс“).
@@ -263,8 +264,8 @@ const (
 
 // DuelRecording starts a duel against a recording: another player's finished game, the one with the fewest questions
 // the player has seen that fits the level chosen best (recordedRun: Even or Stronger, by the player's hidden mastery;
-// anything else is Even), and the player's run of its ten. One the player started and left unfinished is gone on with
-// instead. ErrNobody if there's none yet. It says the duel's id.
+// anything else is Even), and the player's run of its ten; the duel keeps the level only if the recording is it. One the
+// player started and left unfinished is gone on with instead. ErrNobody if there's none yet. It says the duel's id.
 func (g *Game) DuelRecording(ctx context.Context, userID int64, level string) (int64, error) {
 	seen := map[string]bool{}
 	if err := seenBy(ctx, g.DB.Read, userID, seen); err != nil {
@@ -298,8 +299,13 @@ func (g *Game) DuelRecording(ctx context.Context, userID int64, level string) (i
 		}
 		data, _ := json.Marshal(rec.picks)
 		now := g.Now()
+		// The level it's called by only if it is that level: else (the nearest there was) only „Запис“.
+		var kept *string
+		if rec.meets {
+			kept = &level
+		}
 		res, err := tx.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, ghost_run, level, created_at, expires_at)
-			VALUES ('recording', ?, ?, ?, ?, ?, ?, ?)`, string(data), userID, r.id, rec.id, level, store.Ms(now),
+			VALUES ('recording', ?, ?, ?, ?, ?, ?, ?)`, string(data), userID, r.id, rec.id, kept, store.Ms(now),
 			store.Ms(now.Add(DuelFor)))
 		if err != nil {
 			return err
@@ -437,6 +443,8 @@ type recorded struct {
 	picks []Pick
 	// topic is the one topic the recorded game was in (a topic's game), "" for all of them (a duel's, „Микс“).
 	topic string
+	// meets is whether it's the level chosen (recordingFit), not only the nearest there was.
+	meets bool
 }
 
 // RecordingRights is how many right answers make a game worth playing against, RecordingMissed how many not answered
@@ -519,13 +527,13 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool, fit r
 			kind += 4 // mostly seen: after every game the player hasn't
 		}
 		real := rights >= RecordingRights && missed <= RecordingMissed
-		off := 0.0
+		off, meets := 0.0, false
 		if fit != nil {
-			off = fit(b, picks, rights)
+			off, meets = fit(b, picks, rights)
 		}
 		for level, ok := range [2]bool{real, true} {
 			if k := 2*level + kind; ok && (n < fewest[k] || n == fewest[k] && off < fits[k]) {
-				best[k], fewest[k], fits[k] = &recorded{id: id, picks: picks, topic: topic}, n, off
+				best[k], fewest[k], fits[k] = &recorded{id: id, picks: picks, topic: topic, meets: meets}, n, off
 			}
 		}
 	}

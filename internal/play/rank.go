@@ -137,7 +137,8 @@ func ranksOf(ctx context.Context, db querier, userID int64) (map[string]keptRank
 }
 
 // countRanks counts a player's ranks again from their book's ink, as a day's issue finishes (afterRun): each chapter
-// of the bank's at the rank its ink makes, never lower than it was. A rank risen waits to be told (told below level);
+// of the bank's at the rank its ink makes (the ink of finished games: an issue still being played, yesterday's
+// finished after midnight or one brought by a merge, counts when it finishes), never lower than it was. A rank risen waits to be told (told below level);
 // one counted as the ranks began (quiet) is told already.
 func (g *Game) countRanks(ctx context.Context, userID int64, day string, quiet bool) error {
 	return countRanksIn(ctx, g.DB.Read, g.DB.Write, g.Bank(), userID, day, quiet)
@@ -151,7 +152,7 @@ type execer interface {
 // countRanksIn is countRanks, read by r and written by w (a transaction, both, where the book was just written again
 // in it: rewriteBook), by bank b.
 func countRanksIn(ctx context.Context, r querier, w execer, b *bank.Bank, userID int64, day string, quiet bool) error {
-	ink, err := inkIn(ctx, r, b, userID)
+	ink, err := inkIn(ctx, r, b, userID, true)
 	if err != nil {
 		return err
 	}

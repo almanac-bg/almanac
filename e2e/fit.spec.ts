@@ -49,8 +49,10 @@ for (const scheme of ["light", "dark"] as const)
         expect(go.bottom, "„Започни“ is whole, high enough on the screen").toBeLessThanOrEqual(size.go);
       });
 
+      // Each with its fact, as the bank's questions have (one without moves on 3 s after its answer, before a slow
+      // engine has looked at it all).
       for (const [kind, id] of [
-        ["a choice", "his-001"],
+        ["a choice", "his-002"],
         ["the longest number", "gen-305"],
         ["an order", "his-901"],
         ["true or not", "his-961"],

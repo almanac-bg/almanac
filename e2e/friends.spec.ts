@@ -46,7 +46,11 @@ test("friends on the day: who has played it, and how each went", async ({ browse
   );
   const worn = friends.locator(".rank-row").filter({ hasText: ana }).locator(".rank-name .seal");
   await expect(worn).toHaveCount(seal ? 1 : 0);
-  if (seal) await expect(worn).toHaveClass(new RegExp(`t-${seal.chapter}`));
+  if (seal) {
+    await expect(worn).toHaveClass(new RegExp(`t-${seal.chapter}`));
+    // Read out as a seal and its chapter: never the rank's word, which is the Алманах's.
+    await expect(worn).toHaveAttribute("aria-label", /^Печат: [^:]+$/);
+  }
 });
 
 test("friends by tag: a name and a tag of one's own, a request, a yes", async ({ browser }, info) => {

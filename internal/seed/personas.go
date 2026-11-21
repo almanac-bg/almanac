@@ -79,6 +79,9 @@ func (w *world) personas() ([]Persona, error) {
 	if err := w.finish(); err != nil {
 		return nil, err
 	}
+	// What the games just played brought (their ranks, counted in the background: play/after.go) is in before anyone
+	// is said to be anything: else a rank is read half-counted.
+	w.g.Settled(w.ctx)
 	var out []Persona
 	u, token, err := w.accounts.Guest(w.ctx)
 	if err != nil {

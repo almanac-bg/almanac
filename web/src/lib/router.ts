@@ -208,6 +208,31 @@ export function rename(to: string): void {
   path.set(location.pathname);
 }
 
+/** Gives the address shown this fragment (`hash`: „#…“, or "" for none), the screen staying as it is. While a move
+ * through the history is under way (a game's end going back from its own entry: release), it's given once the move
+ * has arrived: else the move's own address would take it away (Safari arrives later than Chromium, after a quick
+ * answer from the server), if `still` says it's still wanted then. */
+export function fragment(hash: string, still: () => boolean = () => true): void {
+  const set = () => {
+    if (!still()) return; // its screen gone meanwhile
+    try {
+      history.replaceState(history.state, "", location.pathname + location.search + hash);
+    } catch {
+      // too many writes for a moment: the address keeps the fragment it had
+    }
+  };
+  const last = moves.length - 1;
+  const then = moves[last];
+  if (!then) {
+    set();
+    return;
+  }
+  moves[last] = () => {
+    then();
+    set();
+  };
+}
+
 /** Keeps this in the entry shown. */
 export function mark(patch: Partial<Entry>): void {
   try {
