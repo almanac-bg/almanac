@@ -312,10 +312,6 @@ func (g *Game) Left(ctx context.Context, userID int64) ([]LeftRun, error) {
 // nothing. A day missed past the week's forgiving ends it, and a streak that ends isn't won back. Days missed one after
 // the other are forgiven across a week's turn too (a Saturday and Sunday, then the Monday and Tuesday after), so a
 // streak ends at most MostForgiven+1 days after the last day played.
-//
-// The days missed before the rule came in were judged by the reserve days of then (earned, held, spent): each such day
-// is kept as it was judged (streak_missed, migration 0084), kept or ended, so that the rule changed no streak that was
-// going, and won back none that had ended. A day kept so is one of its week's.
 
 const (
 	// Forgives is how many missed days a week the streak forgives.
@@ -356,21 +352,18 @@ func (g *Game) StreakOf(ctx context.Context, userID int64) (StreakNow, error) {
 }
 
 // streakHistory is what a streak is made of: the days a player finished the day's questions on (first: the first of
-// them, "" for none), the days missed before today's rule, as they were judged then (kept: true, ended: false),
-// and yesterday, if its run is still being played (open: within DayGrace of its midnight, it may count yet).
+// them, "" for none), and yesterday, if its run is still being played (open: within DayGrace of its midnight, it may count yet).
 type streakHistory struct {
 	played map[string]bool
-	missed map[string]bool
 	first  string
 	open   string
 }
 
 // streakDays are a player's days as the streak counts them (streakHistory), over the last ten years.
 func (g *Game) streakDays(ctx context.Context, userID int64) (streakHistory, error) {
-	h := streakHistory{played: map[string]bool{}, missed: map[string]bool{}}
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT day, NULL FROM runs WHERE user_id = ?1 AND kind = 'day'
-			AND finished_at IS NOT NULL AND day >= ?2
-		UNION ALL SELECT day, kept FROM streak_missed WHERE user_id = ?1 AND day >= ?2`,
+	h := streakHistory{played: map[string]bool{}}
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT day FROM runs WHERE user_id = ?1 AND kind = 'day'
+			AND finished_at IS NOT NULL AND day >= ?2`,
 		userID, g.Now().In(Bulgaria).AddDate(-10, 0, 0).Format(time.DateOnly))
 	if err != nil {
 		return h, err
@@ -378,13 +371,8 @@ func (g *Game) streakDays(ctx context.Context, userID int64) (streakHistory, err
 	defer rows.Close()
 	for rows.Next() {
 		var day string
-		var kept sql.NullBool
-		if err := rows.Scan(&day, &kept); err != nil {
+		if err := rows.Scan(&day); err != nil {
 			return h, err
-		}
-		if kept.Valid {
-			h.missed[day] = kept.Bool
-			continue
 		}
 		h.played[day] = true
 		if h.first == "" || day < h.first {
@@ -429,11 +417,7 @@ func walkStreak(h streakHistory, today string, saw func(day string, forgiven boo
 			s.Best = max(s.Best, s.Days)
 		case day == today || day == h.open || s.Days == 0: // not played yet (it may be still), or no streak to keep
 		default:
-			kept, judged := h.missed[day]
-			if !judged {
-				kept = used < Forgives
-			}
-			if kept {
+			if used < Forgives {
 				used++
 				s.Forgiven = append(s.Forgiven, day)
 				if saw != nil {

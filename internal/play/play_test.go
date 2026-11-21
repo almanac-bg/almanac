@@ -685,36 +685,6 @@ func TestStreakForgives(t *testing.T) {
 	}
 }
 
-// The days missed before the rule came in stay as the reserve days of then judged them (streak_missed): one kept is
-// its week's day forgiven, two kept in a week both hold, and one that ended a streak isn't won back.
-func TestStreakAsJudgedBefore(t *testing.T) {
-	w := setup(t) // Thursday, 12 November
-	ctx := t.Context()
-	ana, bo := w.user(), w.user()
-	judged := func(user int64, day string, kept bool) {
-		t.Helper()
-		if _, err := w.db.Write.Exec(`INSERT INTO streak_missed (user_id, day, kept) VALUES (?, ?, ?)`, user, day, kept); err != nil {
-			t.Fatal(err)
-		}
-	}
-	w.daysPlayed(ana, 3, 1)          // Monday and Wednesday, 9 and 11 November
-	judged(ana, "2026-11-10", false) // Tuesday ended her streak, though the week had a day to forgive
-	w.daysPlayed(bo, 4, 1)           // Sunday and Wednesday
-	judged(bo, "2026-11-09", true)   // Monday and Tuesday were kept by reserve days
-	judged(bo, "2026-11-10", true)
-	if s, _ := w.g.StreakOf(ctx, ana); s.Days != 1 || s.Ended == nil || s.Ended.On != "2026-11-10" || s.Best != 1 {
-		t.Fatalf("a streak ended before: %+v", s)
-	}
-	s, _ := w.g.StreakOf(ctx, bo)
-	if s.Days != 2 || !slices.Equal(s.Forgiven, []string{"2026-11-09", "2026-11-10"}) || s.Spare {
-		t.Fatalf("two kept in a week: %+v", s)
-	}
-	w.wait(48 * time.Hour) // Thursday missed: the week has had its day forgiven
-	if s, _ := w.g.StreakOf(ctx, bo); s.Days != 0 || s.Ended == nil || s.Ended.On != "2026-11-12" {
-		t.Fatalf("a day missed after the kept ones: %+v", s)
-	}
-}
-
 func TestTopics(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()

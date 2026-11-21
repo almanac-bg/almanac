@@ -3,7 +3,6 @@ package play
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"maps"
 	"time"
 
@@ -17,7 +16,7 @@ import (
 // person who knew one or two at once is still a person; three in one game is a pattern. Questions not answered (given
 // up, timed out) don't count. A run is judged as its answers come in (record calls judgeAnswer): only a quick answer
 // can make it a script's, and once it is, it stays one, however the run ends (by its last answer, by its time, or
-// left half-way). The runs played before the mark were judged once, as the server started (JudgeRuns).
+// left half-way).
 //
 // A marked run is a shadow (runs.shadow, ShadowScript): its player sees it as any other game, with its score, and
 // their place among the others as if it were in, and nothing tells them otherwise; for everyone else it isn't there.
@@ -84,7 +83,7 @@ func Floor(q bank.Question) time.Duration {
 	return 700 * time.Millisecond
 }
 
-// floorMost is the highest Floor of any kind (migration 0035 lists the runs to judge by it).
+// floorMost is the highest Floor of any kind.
 const floorMost = 2 * time.Second
 
 // MostQuick is the most answers under their Floor that a person's game has.
@@ -149,52 +148,6 @@ func judge(ctx context.Context, tx *sql.Tx, b *bank.Bank, runID int64, picks []P
 		return false, err
 	}
 	return true, rewriteBook(ctx, tx, b, user, now)
-}
-
-// JudgeRuns judges the runs a migration left for the bank to judge (runs_unjudged: whether an answer came under its
-// Floor depends on its question's kind, which only the bank knows), marks those played at a script's speed, and
-// clears the list. The server runs it as it starts, before it serves; it says how many it marked.
-func (g *Game) JudgeRuns(ctx context.Context) (int, error) {
-	marked := 0
-	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		rows, err := tx.QueryContext(ctx, `SELECT r.id, r.questions FROM runs_unjudged u JOIN runs r ON r.id = u.run_id`)
-		if err != nil {
-			return err
-		}
-		type unjudged struct {
-			id    int64
-			picks []Pick
-		}
-		var list []unjudged
-		for rows.Next() {
-			var u unjudged
-			var raw string
-			if err := rows.Scan(&u.id, &raw); err != nil {
-				rows.Close()
-				return err
-			}
-			if json.Unmarshal([]byte(raw), &u.picks) == nil {
-				list = append(list, u)
-			}
-		}
-		rows.Close()
-		if err := rows.Err(); err != nil {
-			return err
-		}
-		b := g.Bank()
-		for _, u := range list {
-			is, err := judge(ctx, tx, b, u.id, u.picks, g.Now())
-			if err != nil {
-				return err
-			}
-			if is {
-				marked++
-			}
-		}
-		_, err = tx.Exec(`DELETE FROM runs_unjudged`)
-		return err
-	})
-	return marked, err
 }
 
 // FairAnswers is a SQL condition on an answer (its run_id) that leaves out the answers of shadow runs: what a

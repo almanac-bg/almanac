@@ -58,7 +58,7 @@ func rewriteBook(ctx context.Context, tx *sql.Tx, b *bank.Bank, userID int64, no
 	if err := rewriteFacts(tx, userID); err != nil {
 		return err
 	}
-	return countRanksIn(ctx, tx, tx, b, userID, dayOf(now), now, false)
+	return countRanksIn(ctx, tx, tx, b, userID, dayOf(now), now)
 }
 
 // rewriteFacts writes a player's book again from their answers, by the whole rule (factsRule); rewriteBook counts

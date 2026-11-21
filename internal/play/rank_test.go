@@ -72,7 +72,7 @@ func (w *world) dayHistory(user int64, all []answered) {
 // countRanks counts a player's ranks as a day's issue finishing would.
 func (w *world) countRanks(user int64) {
 	w.t.Helper()
-	if err := w.g.countRanks(w.t.Context(), user, w.g.Today(), false); err != nil {
+	if err := w.g.countRanks(w.t.Context(), user, w.g.Today()); err != nil {
 		w.t.Fatal(err)
 	}
 }
@@ -273,35 +273,6 @@ func TestSealAndArt(t *testing.T) {
 	}
 	if err := w.g.SetAvatar(ctx, ana, "lynx-gold"); err != nil {
 		t.Fatalf("an animal: %v", err)
-	}
-}
-
-// The ranks of the players with ink from before them are counted as the server starts, quietly: nothing to tell.
-func TestRanksDue(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana := w.user()
-	var all []answered
-	for _, q := range w.b.Live("geography", "") {
-		if q.Extra().Fact != "" && len(all) < 6 {
-			all = append(all, answered{q.Base().ID, true})
-		}
-	}
-	w.dayHistory(ana, all)
-	if _, err := w.db.Write.Exec(`INSERT INTO ranks_due (user_id) VALUES (?)`, ana); err != nil {
-		t.Fatal(err)
-	}
-	if n, err := w.g.RanksDue(ctx); n != 1 || err != nil {
-		t.Fatalf("counted %d %v", n, err)
-	}
-	if r := w.rankIn(ana, "geography"); r.Level != 2 {
-		t.Fatalf("geography: %+v", r)
-	}
-	if n, _ := w.g.NewsOf(ctx, ana, 0); n.Rose != nil {
-		t.Fatalf("a rank from before told: %+v", n.Rose)
-	}
-	if n := w.count(`SELECT count(*) FROM ranks_due`); n != 0 {
-		t.Fatalf("%d left to count", n)
 	}
 }
 

@@ -2,7 +2,6 @@ package play
 
 import (
 	"encoding/json"
-	"os"
 	"slices"
 	"testing"
 	"time"
@@ -251,56 +250,5 @@ func TestScriptedOutOfStatistics(t *testing.T) {
 	}
 	if after := calibrated(); before != 0 || after < CalibrateFrom {
 		t.Fatalf("calibration: %d answers counted with the script's, %d once they're a person's", before, after)
-	}
-}
-
-// The games played before the mark are judged once, as the server starts: the migration lists the ones that may be a
-// script's, and the bank's floors judge them.
-func TestScriptedBackfill(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	script, person := w.game(w.user(), scriptPace), w.game(w.user(), quickPace(MostQuick))
-	// Orders, matches and splits, put down in a second and a half each: no script would show under the tap's
-	// floor, but they're under their own.
-	var slow []Pick
-	for _, typ := range []string{"order", "match", "split"} {
-		slow = append(slow, Pick{ID: w.b.Live("", typ)[0].Base().ID})
-	}
-	raw, _ := json.Marshal(slow)
-	res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, finished_at) VALUES (?, 'topic', ?, 0, 0)`,
-		w.user(), string(raw))
-	if err != nil {
-		t.Fatal(err)
-	}
-	sorted, _ := res.LastInsertId()
-	for n, p := range slow {
-		if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, given, score, is_right, ms, at)
-			VALUES (?, ?, ?, '{}', 1, 1, 1500, 0)`, sorted, n, p.ID); err != nil {
-			t.Fatal(err)
-		}
-	}
-	// The database as it was before the mark, then the migration (and the one that renamed its column since).
-	if _, err := w.db.Write.Exec(`DROP INDEX runs_shadow; DROP TABLE runs_unjudged; ALTER TABLE runs DROP COLUMN shadow`); err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{"0035_scripted.sql", "0058_runs_shadow.sql"} {
-		body, err := os.ReadFile("../store/migrations/" + name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := w.db.Write.Exec(string(body)); err != nil {
-			t.Fatal(name, err)
-		}
-	}
-	if w.scripted(script) || w.scripted(sorted) {
-		t.Fatal("marked before the bank judged")
-	}
-	n, err := w.g.JudgeRuns(ctx)
-	if err != nil || n != 2 || !w.scripted(script) || !w.scripted(sorted) || w.scripted(person) {
-		t.Fatalf("judged %d (%v): the script's %v, the sorted %v, the person's %v", n, err, w.scripted(script),
-			w.scripted(sorted), w.scripted(person))
-	}
-	if n, err := w.g.JudgeRuns(ctx); err != nil || n != 0 {
-		t.Fatalf("judged again: %d %v", n, err)
 	}
 }

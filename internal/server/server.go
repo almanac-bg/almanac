@@ -164,13 +164,6 @@ func New(cfg Config, d Deps) (*Server, error) {
 // run by themselves, in the background, as they fall due).
 func (s *Server) Count(ctx context.Context) error { return s.game.Count(ctx) }
 
-// JudgeRuns judges the games a migration left for the bank to judge (play.JudgeRuns): which were played at a script's
-// speed. Run as the server starts, before it serves; it says how many it marked.
-func (s *Server) JudgeRuns(ctx context.Context) (int, error) { return s.game.JudgeRuns(ctx) }
-
-// RanksDue counts the ranks a migration left to count (play.RanksDue): of the players with ink from before ranks.
-func (s *Server) RanksDue(ctx context.Context) (int, error) { return s.game.RanksDue(ctx) }
-
 // KeepDays draws the day's questions ahead, in transactions of their own (play.Game.KeepDays), until ctx ends.
 func (s *Server) KeepDays(ctx context.Context) { s.game.KeepDays(ctx) }
 
