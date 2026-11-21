@@ -1310,9 +1310,13 @@ func TestDayCrowd(t *testing.T) {
 		return rev.Crowd
 	}
 	// Every question asked as it is since before the day, whichever the day's second is (the sample's newer ones were
-	// added after it).
+	// added after it); and with a fact, as the day's entry names one: the sample has questions without, and the day's
+	// draw may deal two of them first (1 run in 30 failed so).
 	for _, q := range w.b.Live("", "") {
 		q.Extra().Added, q.Extra().Changed = "2026-11-01", ""
+		if q.Extra().Fact == "" {
+			q.Extra().Fact = "Факт за проверката."
+		}
 	}
 	// Nine players answer the day's first two questions: seven get the first right, two the second.
 	var picks []Pick
