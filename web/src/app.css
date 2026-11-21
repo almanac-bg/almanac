@@ -5977,7 +5977,7 @@
     gap: var(--space-3);
   }
 
-  /* The card as it goes (game/card.ts), its tiles until it's drawn. */
+  /* The card as it goes (the server's: game/share.ts, cardFile), its tiles until it's here. */
   .share-card-box {
     display: grid;
     min-height: 3rem;

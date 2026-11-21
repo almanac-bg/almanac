@@ -339,11 +339,11 @@ flat shapes with depth, lit from the top left, no outlines, painted from one ton
 
 - **The text:** „Брой 42 · 8/10 · серия 23 дни“ (the streak from three days), the squares ■ right, ◧ близо, □ not, and the
   link whole, „https://almanac.bg/d/…“, so that every messenger links it (`game/share.ts`). Unsigned.
-- **The card** (`game/card.ts`), drawn in the browser as it's shared, one look in every theme: the mark and the name,
-  „Брой N“ big with its date, the ten tiles two rows of five (filled, half, dashed and hollow: they part in grey too),
-  and almanac.bg. No score, no streak, no name. The server draws the same card for a shared link's preview
-  (`internal/card`), and in the same look the site's own picture (`/og.png`): the mark and the name, „Десет въпроса на
-  ден, едни и същи за цяла България.“, a day's ten tiles and almanac.bg.
+- **The card** (`internal/card`, `/card/<issue>-<shape>.png`), drawn once, by the server, one look in every theme: the
+  picture a shared link's preview shows, and the one the sheet shows and shares. The mark and the name, „Брой N“ big
+  with its date, the ten tiles two rows of five (filled, half, dashed and hollow: they part in grey too), and
+  almanac.bg. No score, no streak, no name. In the same look the site's own picture (`/og.png`): the mark and the name,
+  „Десет въпроса на ден, едни и същи за цяла България.“, a day's ten tiles and almanac.bg.
 - **The sheet** („Сподели резултата“): the card, the text, „Сподели“ (the text with its link, through the device's
   share sheet), „Копирай текста“, and „Сподели картинката“ where the device shares a picture. Never the text and the
   card together: an app given both may keep only the picture (WhatsApp on an iPhone), and the link is the share's
@@ -372,7 +372,7 @@ flat shapes with depth, lit from the top left, no outlines, painted from one ton
 - `ui.ts`: `leaf`, `glyph`, `chip`, `tiles`, `mini`, `seal`, `pips`, `ladder`, `worn`, `avatar`, `who`, `rankRow`, `verdict`,
   `fact`, `filed`, `segmented`, `failure`, `rosette`, `back`.
 - `game/run.ts`: `trail`, `questionHead`, `timer`, `settle`; `game/questions.ts` each kind; `game/news.ts` what a game
-  wrote; `game/share.ts` and `game/card.ts` the share.
+  wrote; `game/share.ts` the share.
 - **Selectors:** a part has its own class (`.status-n`), not a tag under a class; Biome flags the other kind. A class
   nothing names any more goes, with its rules.
 - **Test hooks** the browser tests depend on: `.question-head`, `.options .option`, `.keypad`, `.sortable-list`,

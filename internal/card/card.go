@@ -2,8 +2,8 @@
 // image, 1200 × 630), in the game's look, „a bright almanac“ (DECISIONS.md), always by day, whatever the theme of whoever
 // opens it:
 //
-//   - a shared day's card (Draw), the card the browser draws as a day is shared (web/src/game/card.ts) drawn again
-//     here, the same to the pixel's intent: the mark and the name, „Брой“ and the issue's number big with its date,
+//   - a shared day's card (Draw), the picture a shared day's link shows and the browser shares as the day is shared
+//     (web/src/game/share.ts, cardFile): the mark and the name, „Брой“ and the issue's number big with its date,
 //     almanac.bg, and the ten tiles two rows of five, each its chapter's colour with its glyph, filled right, the left
 //     half filled близо, dashed and hollow wrong (so that they part in grey too), dashed and empty one that counts for
 //     nobody. Never an answer, never a name, never the score in figures (the link's title says it: server/pages.go);
@@ -53,7 +53,7 @@ type Card struct {
 	Shape string
 }
 
-// The day's colours (web/DESIGN.md), as card.ts has them.
+// The day's colours (web/DESIGN.md).
 var (
 	page = color.RGBA{0xf3, 0xf4, 0xfa, 0xff}
 	ink  = color.RGBA{0x16, 0x13, 0x2b, 0xff}
@@ -62,7 +62,7 @@ var (
 	surf = color.RGBA{0xff, 0xff, 0xff, 0xff}
 )
 
-// vivid and deep are the chapters' colours by day (app.css; card_test.go holds them equal to card.ts's).
+// vivid and deep are the chapters' colours by day (app.css's --t- and --d-; card_test.go holds them equal).
 var (
 	vivid = map[string]color.RGBA{
 		"general": hex(0xffc21a), "science": hex(0x22ccc4), "history": hex(0xff6b4a), "geography": hex(0x4b90ff),
@@ -103,7 +103,7 @@ const (
 	Line    = "Десет въпроса на ден, едни и същи за цяла България."
 )
 
-// Draw draws a shared day's card as a PNG, laid out as card.ts lays it out.
+// Draw draws a shared day's card as a PNG.
 func Draw(c Card) ([]byte, error) {
 	p, err := newPicture()
 	if err != nil {
@@ -202,7 +202,7 @@ func (p *picture) png() ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-// tiles draws the ten tiles, two rows of five at the right, as card.ts does: topics are their chapters, shape how
+// tiles draws the ten tiles, two rows of five at the right, as the screen's are: topics are their chapters, shape how
 // each went (Card.Shape).
 func (p *picture) tiles(topics []string, shape string) error {
 	const size, gap = 120.0, 18.0
@@ -308,7 +308,7 @@ func shape(dst draw.Image, x0, y0, x1, y1 float64, c color.Color, trace func(z *
 }
 
 // rounded is a rectangle with corners rounded by r as points, clockwise from the top edge's left end (where the
-// canvas's roundRect starts, so that dashes begin where card.ts's do).
+// canvas's roundRect starts, so that dashes begin where a browser's do).
 func rounded(x0, y0, x1, y1, r float64) []pt {
 	out := []pt{{x0 + r, y0}}
 	corner := func(cx, cy, from float64) {
@@ -343,7 +343,7 @@ func circle(dst draw.Image, cx, cy, r float64, c color.Color) {
 	})
 }
 
-// outline strokes a rounded rectangle's edge, w wide on its line, dashed (14 on, 9 off, as card.ts) or whole.
+// outline strokes a rounded rectangle's edge, w wide on its line, dashed (14 on, 9 off) or whole.
 func outline(dst draw.Image, x0, y0, x1, y1, r, w float64, c color.Color, dashed bool) {
 	shape(dst, x0-w, y0-w, x1+w, y1+w, c, func(z *vector.Rasterizer, ox, oy float64) {
 		line := rounded(x0-ox, y0-oy, x1-ox, y1-oy, r)
@@ -405,7 +405,7 @@ var petal = [10][2]float64{
 
 // rosette draws the mark, size across from (x, y): four petals about its centre, three in ink and the gold one
 // turned up to the left, as favicon.svg has them, without its tile. Its box is the part of the 64 × 64 the petals
-// fill (5 to 59), as card.ts sets it.
+// fill (5 to 59).
 func rosette(dst draw.Image, x, y, size float64) {
 	scale := size / 54
 	for _, turn := range []float64{45, 135, 225, -45} {

@@ -1,10 +1,10 @@
 // Sharing the day's result (server/share.go, play/share.go): its issue, the score and its tiles, never an answer, and
 // the link that brings whoever opens it to the same ten: „Брой 42 · 8/10 · серия 23 дни“, the tiles as squares (■ right,
 // ◧ близо, □ not), the link. The link is made as the day is first shared (the server's), and kept for the page's life,
-// so a second tap shares at once; where there's no sheet, the text is copied. The card (game/card.ts), drawn here as
-// it's shared, goes on its own, where the device's share sheet takes a picture: never with the text, which an app
-// given both may drop, link and all. What it looks like is the screen's: this is
-// only what it does, for any screen to use.
+// so a second tap shares at once; where there's no sheet, the text is copied. The card is the server's, the picture
+// the link's preview shows (internal/card, /card/<issue>-<shape>.png), fetched as the sheet opens; it goes on its own,
+// where the device's share sheet takes a picture: never with the text, which an app given both may drop, link and all.
+// What it looks like is the screen's: this is only what it does, for any screen to use.
 
 import { api } from "../lib/api.ts";
 import type { Mark } from "./types.ts";
@@ -80,7 +80,21 @@ export async function shareDay(run: number, d: SharedDay): Promise<Shared> {
   }
 }
 
-/** Shares the day's card on its own (game/card.ts: almanac.bg on it), where the device's share sheet takes a picture:
+/** Where the day's card is (server/share.go): its issue, and how each of its ten went as play.Share.Shape spells it,
+ * in the issue's order: 1 right, 2 близо, 3 one that counts for nobody, 0 not. */
+export function cardPath(issue: number, marks: Mark[]): string {
+  const shape = marks.map((m) => (m.void ? "3" : m.right ? "1" : m.close ? "2" : "0")).join("");
+  return `/card/${issue}-${shape}.png`;
+}
+
+/** The day's card (cardPath) as a file to share; null where the server didn't give it. */
+export async function cardFile(issue: number, marks: Mark[]): Promise<File | null> {
+  const r = await fetch(cardPath(issue, marks));
+  if (!r.ok || r.headers.get("Content-Type") !== "image/png") return null;
+  return new File([await r.blob()], `almanah-${issue}.png`, { type: "image/png" });
+}
+
+/** Shares the day's card on its own (cardFile: almanac.bg on it), where the device's share sheet takes a picture:
  * "cancelled" where it was closed without a choice, or it couldn't. */
 export async function shareCard(card: File): Promise<"shared" | "cancelled"> {
   if (typeof navigator.share !== "function" || !navigator.canShare?.({ files: [card] })) return "cancelled";

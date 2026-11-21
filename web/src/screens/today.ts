@@ -12,13 +12,13 @@
 // there; a game brought here by it (its token in the address's fragment: takeHand) lands on the result, whose action
 // is then the ask to keep it and be reminded.
 
-import { loadPictures, picture } from "../art/picture.ts";
+import { picture } from "../art/picture.ts";
 import { news } from "../game/news.ts";
 import { closeLine, count, percent, withOwn } from "../game/numbers.ts";
 import { answerWords } from "../game/questions.ts";
 import { land, reviewed } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting } from "../game/run.ts";
-import { type SharedDay, shareCard, shareDay, shareText } from "../game/share.ts";
+import { cardFile, cardPath, type SharedDay, shareCard, shareDay, shareText } from "../game/share.ts";
 import type { Board, Mark, Reviewed, Score, State } from "../game/types.ts";
 import { api, errorText, serverNow, tally } from "../lib/api.ts";
 import { boot } from "../lib/boot.ts";
@@ -943,7 +943,6 @@ function entryOfDay(r?: DayEntry | null): Child {
 /** Sharing as a quiet link beside the tiles, where the result's action is another (the first results): the same sheet
  * as „Сподели“. */
 function shareLink(run: State, t: Today, streak: () => number, known: () => boolean): Child {
-  cardKit().catch(() => {});
   return h(
     "button",
     {
@@ -957,19 +956,7 @@ function shareLink(run: State, t: Today, streak: () => number, known: () => bool
   );
 }
 
-/** The card's drawing (game/card.ts, a file of its own), sent for as the way to share it shows, so that a tap on it
- * doesn't wait for the file to come. */
-let cardFile: Promise<typeof import("../game/card.ts")> | null = null;
-const cardKit = () => {
-  cardFile ??= import("../game/card.ts").catch((err) => {
-    cardFile = null; // tried again by the next
-    throw err;
-  });
-  return cardFile;
-};
-
 function shareButton(run: State, t: Today, streak: () => number, known: () => boolean): Child {
-  cardKit().catch(() => {});
   const open = () => shareSheet(run, t, streak());
   return h(
     "button",
@@ -979,16 +966,8 @@ function shareButton(run: State, t: Today, streak: () => number, known: () => bo
   );
 }
 
-/** The card as drawn (game/card.ts), shown from its data: the page's own picture, made here, so it's set as it is
- * (h() takes no data: address, lib/dom.ts, safeURL: one from anywhere else never reaches it). */
-function cardImage(data: string, alt: string): HTMLImageElement {
-  const img = h("img", { class: "share-card", alt, width: 1200, height: 630 }) as HTMLImageElement;
-  if (data.startsWith("data:image/png;base64,")) img.src = data;
-  return img;
-}
-
 /** The share sheet over the result (a <dialog>, from the foot on a phone, centred on a big screen): the card that goes
- * with it (game/card.ts, drawn here), the text, and the ways to send it. Esc, „Затвори“ or a tap beside it puts it
+ * with it (the server's, as a link's preview shows it: game/share.ts, cardFile), the text, and the ways to send it. Esc, „Затвори“ or a tap beside it puts it
  * away. */
 function shareSheet(run: State, t: Today, streak: number): void {
   const issue = t.issue ?? issueOf(t.day);
@@ -996,26 +975,15 @@ function shareSheet(run: State, t: Today, streak: number): void {
   const text = signal("");
   const said = signal("");
   const card = signal<File | null>(null);
-  const preview = signal("");
   const sheet = h("dialog", { class: "sheet share-sheet", "aria-labelledby": "share-title" }) as HTMLDialogElement;
   const close = () => {
     sheet.close();
     sheet.remove();
   };
   shareText(run.id, day).then(text.set, (err) => said.set(errorText(err)));
-  Promise.all([cardKit(), loadPictures()])
-    .then(([m, pictures]) => m.drawCard(issue, dateWords(t.day), run.trail, t.topics ?? [], pictures))
-    .then(
-      (file) => {
-        if (!file) return;
-        card.set(file);
-        // Shown as data (the page's pictures are its own or data: server/middleware.go, csp).
-        const read = new FileReader();
-        read.onload = () => preview.set(String(read.result));
-        read.readAsDataURL(file);
-      },
-      () => {},
-    );
+  // Fetched as the sheet opens, so a tap on „Сподели картинката“ shares at once; shown once it's here (from the
+  // browser's cache), the tiles until then or without it.
+  cardFile(issue, run.trail).then(card.set, () => {});
   const send = async () => {
     said.set("");
     try {
@@ -1058,8 +1026,14 @@ function shareSheet(run: State, t: Today, streak: number): void {
         h("button", { class: "link", type: "button", onclick: close }, "Затвори"),
       ),
       h("div", { class: "share-card-box" }, () =>
-        preview()
-          ? cardImage(preview(), `АЛМАНАХ, Брой ${issue}, ${dateWords(t.day)}: как мина всеки от десетте въпроса`)
+        card()
+          ? h("img", {
+              class: "share-card",
+              src: cardPath(issue, run.trail),
+              alt: `АЛМАНАХ, Брой ${issue}, ${dateWords(t.day)}: как мина всеки от десетте въпроса`,
+              width: 1200,
+              height: 630,
+            })
           : tiles(run.trail, t.topics ?? []),
       ),
       h("pre", { class: "share-text" }, () => text() || "…"),

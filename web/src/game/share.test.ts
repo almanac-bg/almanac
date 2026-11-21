@@ -2,7 +2,7 @@
 // else the text to copy by hand; the link asked for once; the text the issue, the score, the streak and the tiles.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { type SharedDay, shareCard, shareDay, shareWords, squares } from "./share.ts";
+import { cardFile, cardPath, type SharedDay, shareCard, shareDay, shareWords, squares } from "./share.ts";
 
 (globalThis as { location?: unknown }).location = { pathname: "/" };
 
@@ -76,6 +76,20 @@ test("the text never goes with the card (an app given both may drop the link); t
   browser(async (d) => void sent.push(d), undefined, false);
   assert.equal(await shareCard(card), "cancelled");
   assert.deepEqual(sent, [{ text }, { files: [card] }]);
+});
+
+test("the card is the server's, by the issue and the shape as play.Share spells it; none where it isn't given", async () => {
+  const marks = [{ right: true }, { right: false, close: true }, { right: false, void: true }, { right: false }];
+  assert.equal(cardPath(9, marks), "/card/9-1230.png");
+  const asked: string[] = [];
+  globalThis.fetch = (async (path: string) => {
+    asked.push(path);
+    return new Response("png", { headers: { "Content-Type": "image/png" } });
+  }) as typeof fetch;
+  const file = await cardFile(9, marks);
+  assert.deepEqual([file?.name, file?.type, asked], ["almanah-9.png", "image/png", ["/card/9-1230.png"]]);
+  globalThis.fetch = (async () => new Response("no", { status: 404 })) as typeof fetch;
+  assert.equal(await cardFile(9, marks), null);
 });
 
 test("the sheet closed without a choice is nothing; refused, the text is copied", async () => {
