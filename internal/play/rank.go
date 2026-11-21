@@ -140,10 +140,9 @@ func ranksOf(ctx context.Context, db querier, userID int64) (map[string]keptRank
 // countRanks counts a player's ranks again from their book's ink, as a day's issue finishes (afterRun): each chapter
 // of the bank's at the rank its ink makes (the ink of games that can't be played on now: an issue still being played,
 // yesterday's finished after midnight or one brought by a merge, counts when it finishes, or once its day is over if
-// it's left: writtenIn), never lower than it was. A rank risen waits to be told (told below level); one counted as the
-// ranks began (quiet) is told already.
-func (g *Game) countRanks(ctx context.Context, userID int64, day string, quiet bool) error {
-	return countRanksIn(ctx, g.DB.Read, g.DB.Write, g.Bank(), userID, day, g.Now(), quiet)
+// it's left: writtenIn), never lower than it was. A rank risen waits to be told (told below level).
+func (g *Game) countRanks(ctx context.Context, userID int64, day string) error {
+	return countRanksIn(ctx, g.DB.Read, g.DB.Write, g.Bank(), userID, day, g.Now())
 }
 
 // execer is what writes: the database, or a transaction.
@@ -153,8 +152,7 @@ type execer interface {
 
 // countRanksIn is countRanks, read by r and written by w (a transaction, both, where the book was just written again
 // in it: rewriteBook), by bank b, at the time now (what counts: writtenIn).
-func countRanksIn(ctx context.Context, r querier, w execer, b *bank.Bank, userID int64, day string, now time.Time,
-	quiet bool) error {
+func countRanksIn(ctx context.Context, r querier, w execer, b *bank.Bank, userID int64, day string, now time.Time) error {
 	ink, err := inkIn(ctx, r, b, userID, now)
 	if err != nil {
 		return err
@@ -173,9 +171,6 @@ func countRanksIn(ctx context.Context, r querier, w execer, b *bank.Bank, userID
 		}
 		quarter := Quarter(level, n)
 		told := 0 // a chapter's first rank waits to be told; a rank kept already keeps what was told of it
-		if quiet {
-			told = level
-		}
 		if ok && level == was.level && quarter == was.quarter && n == was.ink {
 			continue
 		}
@@ -370,39 +365,6 @@ func (g *Game) StepOf(ctx context.Context, userID int64) (*Step, error) {
 		}
 	}
 	return best, nil
-}
-
-// RanksDue counts the ranks of the players a migration left to count (ranks_due: their ink is from before the ranks),
-// quietly (nothing to tell: it was there already), and clears the list. The server runs it as it starts; it says how
-// many players it counted.
-func (g *Game) RanksDue(ctx context.Context) (int, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT user_id FROM ranks_due`)
-	if err != nil {
-		return 0, err
-	}
-	var users []int64
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return 0, err
-		}
-		users = append(users, id)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return 0, err
-	}
-	today := g.Today()
-	for _, id := range users {
-		if err := g.countRanks(ctx, id, today, true); err != nil {
-			return 0, err
-		}
-		if _, err := g.DB.Write.ExecContext(ctx, `DELETE FROM ranks_due WHERE user_id = ?`, id); err != nil {
-			return 0, err
-		}
-	}
-	return len(users), nil
 }
 
 // chapterOfArt is the chapter whose art an avatar's shape is, if it's one (a chapter's id: SetAvatar).

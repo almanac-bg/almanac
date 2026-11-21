@@ -88,7 +88,7 @@ var core = []string{"schema_migrations", "users", "days", "runs"}
 // watched (Changes).
 var transient = []string{
 	"code_mails", "code_misses", "friend_requests", "handoffs", "kv", "mail_suppressed", "outbox", "push_queue",
-	"push_reminded", "runs_after", "runs_unjudged", "sessions", "sign_in_codes",
+	"push_reminded", "runs_after", "sessions", "sign_in_codes",
 }
 
 // Name is the key of a copy made at t, under prefix (hours or days): encrypted copies end in .age.

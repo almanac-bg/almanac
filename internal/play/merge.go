@@ -54,10 +54,6 @@ var mergeSteps = []mergeStep{
 	{carries: []string{"active_days.user_id"},
 		sql: `INSERT OR IGNORE INTO active_days (user_id, day) SELECT ?1, day FROM active_days WHERE user_id = ?2`},
 	{sql: `DELETE FROM active_days WHERE user_id = ?2`},
-	// The days the guest missed before the streak forgave a day a week, as the reserve days judged them (runs.go): a
-	// day the account has judged too stays the account's; one either played isn't missed.
-	{carries: []string{"streak_missed.user_id"}, sql: `INSERT OR IGNORE INTO streak_missed (user_id, day, kept)
-		SELECT ?1, day, kept FROM streak_missed WHERE user_id = ?2`},
 	// The guest's book is written again with the account's, from all their games now (Merge: rewriteFacts), so that a
 	// question met first by either is ink once at most.
 	{carries: []string{"facts.user_id"}, sql: `DELETE FROM facts WHERE user_id IN (?1, ?2)`},
@@ -70,8 +66,6 @@ var mergeSteps = []mergeStep{
 			quarter = CASE WHEN excluded.level > ranks.level THEN excluded.quarter ELSE ranks.quarter END,
 			ink = max(ranks.ink, excluded.ink), day = CASE WHEN excluded.level > ranks.level THEN excluded.day ELSE ranks.day END,
 			told = max(ranks.told, excluded.told)`},
-	{carries: []string{"ranks_due.user_id"}, sql: `INSERT OR IGNORE INTO ranks_due (user_id)
-		SELECT ?1 FROM ranks_due WHERE user_id = ?2`},
 	{carries: []string{"users.seal"}, sql: `UPDATE users SET seal = coalesce(users.seal, g.seal)
 		FROM (SELECT seal FROM users WHERE id = ?2) g WHERE users.id = ?1`},
 	// The guest's notifications come along, with what they chose of them (unless the account has chosen), the days

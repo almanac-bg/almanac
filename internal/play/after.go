@@ -234,7 +234,7 @@ func (g *Game) afterRun(ctx context.Context, p played) error {
 	if p.kind != "day" {
 		return nil
 	}
-	return g.countRanks(ctx, p.user, p.day, false)
+	return g.countRanks(ctx, p.user, p.day)
 }
 
 // AfterDue does what follows the finished runs that their own requests left undone (cut off by a restart, or failed),
