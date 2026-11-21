@@ -1,16 +1,12 @@
 """Merge the checked chunks of /fix-questions into one batch for `almanac bank add`, and their waivers into the bank's.
 
-  python3 -I merge.py [--redraw-days] <work> <bank> <chunk>…
+  python3 -I merge.py <work> <bank> <chunk>…
 
 Writes <work>/batch/<category>.json (the chunks' questions, changed and new), <work>/batch/retire.json,
 <work>/batch/images/, and adds the agreed waivers to <bank>/waivers.json (none twice). The new questions are numbered
 again from the bank's next free id, in order, so the chunks' reserved ranges leave no gaps (their waivers follow), and
 every date is the day it goes in (a run may pass midnight). What the chunks judged goes
 into <work>/judged.json, so the next work list doesn't judge it again. Prints the counts.
-
-A batch that changes the live questions that are dated or about Bulgaria (retires, adds or re-labels one) makes the
-server draw every day after tomorrow again: merge.py stops before it writes anything (exit 1), naming them, unless
---redraw-days says that is meant.
 """
 import collections
 import datetime
@@ -19,12 +15,9 @@ import os
 import shutil
 import sys
 
-args = sys.argv[1:]
-redraw = "--redraw-days" in args
-args = [a for a in args if a != "--redraw-days"]
-if len(args) < 2:
+if len(sys.argv) < 3:
     sys.exit(__doc__)
-work, bank, chunks = args[0], args[1], args[2:]
+work, bank, chunks = sys.argv[1], sys.argv[2], sys.argv[3:]
 out = f"{work}/batch"
 shutil.rmtree(out, ignore_errors=True)
 os.makedirs(out)
@@ -61,7 +54,6 @@ for f in os.listdir(f"{bank}/questions"):
         p_, n = q["id"].rsplit("-", 1)
         last[p_] = max(last.get(p_, 0), int(n))
         have[q["id"]] = q
-bankq = dict(have)  # the bank as it is, by id (have is the waivers further down)
 # The dates are the day it goes in, which bank add checks, not the day an agent wrote it (a run can pass midnight):
 # a change is updated today, and changed today if the agent changed what it asks; a new question is added today.
 today = datetime.date.today().isoformat()
@@ -73,20 +65,6 @@ for lst in qs.values():
             q["added"] = today
         elif q.get("changed") and q.get("changed") != old.get("changed"):
             q["changed"] = today
-# The days ahead are drawn again, all of them after tomorrow, when the live questions that are dated or about Bulgaria
-# change (play.Ahead hashes their ids, `on` and `bg`): a pre-check's batch that does so throws away the month it read.
-# Checked before anything is written.
-def tag(q):
-    return (tuple(q.get("on") or []), bool(q.get("bg"))) if not q.get("retired") else ((), False)
-moved = [q["id"] for lst in qs.values() for q in lst if tag(q) != tag(bankq.get(q["id"]) or {})]
-moved += [r["id"] for r in retire if tag(bankq.get(r["id"]) or {}) != ((), False)]
-if moved:
-    said = (f"the days' dated or Bulgarian questions change ({', '.join(sorted(set(moved)))}): the server will draw"
-            " every day after tomorrow again; a pre-check keeps them as they were")
-    if not redraw:
-        shutil.rmtree(out, ignore_errors=True)
-        sys.exit(f"stopped: {said} (--redraw-days if that is meant)")
-    print(f"warning: {said}")
 renum = {}
 for c, lst in qs.items():
     news = sorted((q for q in lst if int(q["id"].rsplit("-", 1)[1]) > last[q["id"].rsplit("-", 1)[0]]),

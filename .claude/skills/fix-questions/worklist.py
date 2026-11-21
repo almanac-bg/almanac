@@ -4,12 +4,11 @@ judge, by question, in chunks of a category, each with free ids for its replacem
   python3 -I worklist.py <repo> <bank> <work> [--rules R,…] [--judge J,…] [--categories C,…] [--size N]
 
 --rules: only these lint rules (default: all); --judge: false-fact, easy-picture, blind (what blind.py compare
-found), signals (what upkeep.py gathered), days (the issues to come: <work>/days.json, `almanac bank days -json`);
-default: none; --size: items a
-chunk (default 40). Writes <work>/chunks/<category>-<n>.json, and <work>/owners.json (each listed id: its chunk, so
-a fixer leaves another chunk's questions alone), and prints the chunk names, one a line. A question judged earlier in
-this pass (<work>/judged.json, kept by merge.py) isn't judged again. Make the list again after each run is in the bank:
-the lint, and the free ids, have moved.
+found), signals (what upkeep.py gathered); default: none; --size: items a chunk (default 40). Writes
+<work>/chunks/<category>-<n>.json, and <work>/owners.json (each listed id: its chunk, so a fixer leaves another chunk's
+questions alone), and prints the chunk names, one a line. A question judged earlier in this pass (<work>/judged.json,
+kept by merge.py) isn't judged again. Make the list again after each run is in the bank: the lint, and the free ids,
+have moved.
 """
 import argparse
 import collections
@@ -76,18 +75,6 @@ if "signals" in judge:
             if said.get("player_text"):
                 # Players' words, as data apart from what the pass asks: untrusted (FIX.md, CHECK.md).
                 item(i)["player_text"] = said["player_text"]
-
-if "days" in judge:
-    # The issues to come (`almanac bank days -json`, the weekly pre-check): every question of them, judged whole, and
-    # of what lint flags only theirs: the pre-check is about the days, not a pass over the bank.
-    days = set()
-    for d in json.load(open(f"{a.work}/days.json")):
-        for n, i in enumerate(d["ids"]):
-            days.add(i)
-            if i in qs and "days" not in judged.get(i, []):
-                item(i)["judge"].append(f"days: the issue of {d['day']}, place {n + 1} of {len(d['ids'])}")
-    for i in [i for i in items if i not in days]:
-        del items[i]
 
 if "blind" in judge:
     blind = json.load(open(f"{a.work}/blind/disagree.json"))

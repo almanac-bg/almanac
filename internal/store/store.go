@@ -145,7 +145,7 @@ func (db *DB) keepOptimized(ctx context.Context) {
 }
 
 // OpenReadOnly opens the database at path to read it only: no migration, no statistics, no write (its one pool is
-// read-only and query_only), so that a command run beside the server on its live database (`almanac bank days`, `bank
+// read-only and query_only), so that a command run beside the server on its live database (`almanac bank
 // used`) can't change it, however old or new the program is. A database that isn't there is an error, never a new one.
 func OpenReadOnly(path string) (*DB, error) {
 	if _, err := os.Stat(path); err != nil {
