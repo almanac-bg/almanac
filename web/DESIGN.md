@@ -32,7 +32,7 @@ this file passes the rule for later (DECISIONS.md).
 
 ## Places and their budgets
 
-Three places: **Днес** (`/`, and the day's board, `/board`), **Алманах** (`/almanac`), **Приятели** (`/friends`).
+Three places: **Днес** (`/`, the day's board on its result), **Алманах** (`/almanac`), **Приятели** (`/friends`).
 Профил and Настройки open from the avatar in the bar (`/me`, `/settings`). Each screen holds its budget, in this order **in the HTML** (a big screen
 places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/layout.spec.ts` holds Днес's).
 
@@ -78,8 +78,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      crowd), and with a crowd „България днес: средно 6,2“ (the average always to one decimal: „6,0“). Ten of ten:
      „Всички верни“ and the mark drawn over it. None right: right under the score, „Въпросите и фактите“ open
      (`.missed-day`): the first four, each its dashed tile, the question, the right answer (an order, a match, a split
-     in lines) and its fact, and „Още 6 въпроса“, which shows the rest in place and after them the rest of „Въпросите
-     и фактите“; no word of praise. A best rank risen, the big moment, right
+     in lines) and its fact, and „Още 6 въпроса“, which shows the rest in place; no word of praise. A best rank risen, the big moment, right
      under the score, on its chapter's sheet: „Нов печат“, the seal set large, the rank's name, what made it („40
      факта от Кино и телевизия са с мастило в твоя Алманах.“), the ladder from Бележка to Летопис (`ladder()`), the
      art it brings, and other ranks risen with it in a line.
@@ -95,37 +94,33 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      its seal, its name and where it stands (`standing()`: its bar, „Тетрадка“ and „още 2 до „Книга““ under it); or ranks
      risen, their seals and one line, each rank once with its chapters, their names the links („Нови печати: „Страница“ в География и в Технологии и игри.“; one chapter's: its
      ladder under it).
-  4. Friends who played it, up to five (`.friends-day`), each a row as on the day's board (`scoreRow()`): their
-     place among the player and their friends, the avatar with its seal, the name, and under it „7 от 10“ and their
-     small squares. Never a friend who hasn't played, and never before the player has (the squares are the answers).
-     „Класация“ at the head's right: the day's board, among friends (`/board`).
-  5. The action, past the first results: „Сподели“.
-  6. Tomorrow: the next issue's date set big (over its words with large text), „Утре, неделя · Брой 32“ (a line each
+  4. The action, past the first results: „Сподели“.
+  5. Tomorrow: the next issue's date set big (over its words with large text), „Утре, неделя · Брой 32“ (a line each
      with large text, no dot), the chapter of its hard question with its
      glyph („Трудният въпрос е от История“, once tomorrow is drawn), what it makes of the streak; past the first results, the
      reminder's ask under it while reminders are off, a player with a profile's too (a plain button, never a second
      action; three times at most, once a day). Yesterday's issue finished after midnight has today's in its place
      („Вече излезе.“, „Към днешния брой“).
+  6. The day's board (`.day-board`, `dayBoard()`): one card, „Класация“ and two tabs, Приятели and България (among
+     friends once the player has any; with none, on all България). It's there once the day as it stands with the game
+     played has come (before, the board names nobody to the player and shows no squares), never for yesterday's issue
+     finished late, and never before the day is played: Днес is then the issue alone. Among friends: each who played,
+     best first, the player among them; with none, the player's own row and why it's alone (no friends yet: „Още нямаш
+     приятели. Добави приятели и сравнявайте резултатите си всеки ден.“, „Добави приятели“ a link to Приятели; else
+     „Още никой от приятелите ти не е играл днес.“). All България: how it spread (eleven bars, 0 to 10, the player's in
+     ink with „ти“ over it, the average a thin line with its label in a row over the bars, clear of „ти“; from ten
+     players; the ticks no bigger than their columns hold, so „10“ never runs into „9“ with large text), the player's
+     place („В България си на 20-о място от 53.“; with none right only „Днес играха 53 души.“, alone on the board
+     nothing), then the best twenty and the player's own row under them if further down. A row: the place (shared by
+     those as many right and as close on the number, never told apart by time: 1, 2, 2, 4; the player first among
+     their equals), then the row built as a friend's (`scoreRow()`): the avatar with its seal, the name with the row's
+     width and „ти“ after it, and on one line under the name the score (a heavy numeral as a friend's, never
+     display-sized) and the small squares after it, under the score only where the line is too narrow (under 360 px;
+     in large text, as a friend's day, the line runs under the place and the avatar too). The tab chosen stays while
+     the result is open. Nothing else of a board's: no page of its own, no link to one.
 
-  Everything else is under „Въпросите и фактите“ (`.more`): how all of България spread („България днес“, at the
-  head's right „Класация“, the day's board of all България, `/board?tab=bulgaria`, as „Приятели днес“ has its own;
-  „Играха 53 души.“ a line under the head, never beside the link, where a dot would hang at a line's end; the
-  average's label in a row over the bars, clear of „ти“ over the player's; the question fewest knew named by its
-  number, „най-малко от десетте“, never „най-трудният“, which is the issue's tenth), and each question with its fact
-  (its verdict never a true-or-not's answer: „Точно“, „Грешно“).
-- **The day's board** (`/board`, `screens/board.ts`), a page of Днес's (Днес marked in the places): the way back to
-  Днес, „Класация · Брой 31“, and two tabs, Приятели and България (among friends by default once there are any;
-  `?tab=bulgaria` opens on all България, `?tab=friends` among friends). All България: its spread (the player's bar in
-  ink) and the player's place first („В България си на 20-о място от 53.“; with none right only „Днес играха 53
-  души.“), then the best twenty and the player's own row under them if further down. Among friends: each who played,
-  best first; with none, the player's own row and why it's alone (no friends yet: „Добави ги в Приятели“, a link
-  there). A row: the place (shared by those as many right and as close on the number, never told apart by time: 1,
-  2, 2, 4; the player first among their equals), then the row built as a friend's: the avatar with its seal, the name
-  with the row's width and „ти“ after it, and on one line under the name the score (a heavy numeral as a friend's,
-  never display-sized) and the small squares after it, under the score only where the line is too narrow (under 360
-  px; in large text, as a friend's day, the line runs under the place and the avatar too); the squares once the player
-  has played the day, on both tabs. Before that, all България says how many played and that the board comes with the
-  player's own result. One reading column on a big screen.
+  Everything else is under „Въпросите и фактите“ (`.more`): each question with its fact (its verdict never a
+  true-or-not's answer: „Точно“, „Грешно“).
 - **Алманах:** its head (Микс and България as two ways to play, words only, no glyph: theirs would sit apart from the chapters'; no lifetime totals), then the chapters, each a folded
   card in its colour with its seal as the badge (40px), its ink („180 с мастило“), its rank over its bar and what's left to
   the next under it („Тетрадка“, the bar, „още 15 до „Книга““: a card has no room for both under the bar); a counter at zero is hidden, and the head says once how ink is written; a
@@ -350,7 +345,7 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 - **What a tap brings up** under it (an ask, an answer: „Нова връзка“, „Добави“, „Изтрий профила“) is scrolled into
   sight whole, clear of a phone's places at the foot (`inSight()`).
 - **Rows of players:** `who()` (the avatar with its seal, and the name), `playerRow()` (a friend's
-  `.friend` and a board's `.rank-row`, one build: Приятели, the day's board, and Днес's friends), `.duel-row`. **Avatars** (`avatar()`): the drawn animal
+  `.friend` and a board's `.rank-row`, one build: Приятели and the day's board), `.duel-row`. **Avatars** (`avatar()`): the drawn animal
   on a rounded tile of its scene, the seal worn on its corner. Only the fifteen animals: an avatar is a face.
 - **What went wrong** is never a dead end: `failure()` says what happened, offers „Опитай пак“ where it can help, and
   always a way on.
@@ -548,7 +543,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
   nothing names any more goes, with its rules.
 - **Test hooks** the browser tests depend on: `.question-head`, `.options .option`, `.keypad`, `.sortable-list`,
   `.verdict`, `.right-said`, `.after`, `.up-next-go`; `.issue`, `.issue-go`, `.today-side`, `.result`, `.result-main`, `.score-n`,
-  `.tiles .tile`, `.tomorrow`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-entry`, `.friends-day`, `.missed-day`;
+  `.tiles .tile`, `.tomorrow`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-entry`, `.missed-day`;
   `.summary`, `.reviewed`, `.news-facts`; `.toc-row`, `.entry`; `.day-board`, `.rank-row`, `.friend`, `.invitation`,
   `.accepted-notice`, `.duels`, `.duel-turn`, `.duel-row`, `.their-line`; `.me-ladder`, `.ladder`.
 

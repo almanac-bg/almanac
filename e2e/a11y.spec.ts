@@ -33,7 +33,6 @@ for (const scheme of ["light", "dark"] as const) {
       "/",
       "/duel/new",
       "/me",
-      "/board",
       "/friends",
       "/settings",
       "/almanac",
@@ -101,10 +100,18 @@ for (const scheme of ["light", "dark"] as const) {
     await startDay(page);
     await playRun(page);
     await expect(page.locator(".result-share")).toBeVisible();
+    // The day's board in, on its first tab (all България: no friends yet), then on the other.
+    await expect(page.locator(".day-board .rank-row").first()).toBeVisible();
     // The result's moment over (feel.ts: the tiles, the score), every part as it stays.
     await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
-    const { violations } = await new AxeBuilder({ page }).analyze();
-    expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
+    for (const tab of ["България", "Приятели"]) {
+      await page.locator(".day-board").getByRole("tab", { name: tab }).click();
+      const { violations } = await new AxeBuilder({ page }).analyze();
+      expect(
+        violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`),
+        tab,
+      ).toEqual([]);
+    }
     // The score's sheet and the day's entry (its question, „Невярно:“) in the sheet's ink.
     expect(await greyOnSheets(page)).toEqual([]);
   });

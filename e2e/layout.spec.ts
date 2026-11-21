@@ -506,7 +506,7 @@ for (const size of sizes)
         expect(await byDayAndNight(page, () => sideways(page)), "the day's result").toEqual([]);
 
         // A new player's places, the day played.
-        for (const path of ["/almanac", "/me", "/board", "/friends", "/settings", "/duel/new"]) {
+        for (const path of ["/almanac", "/me", "/friends", "/settings", "/duel/new"]) {
           await page.goto(path);
           await expect(page.locator("main :is(h1, h2)").first()).toBeVisible();
           await settled(page);
@@ -615,7 +615,6 @@ for (const size of sizes)
           "/",
           "/me",
           `/players/${kept.tag}`,
-          "/board",
           "/friends",
           "/almanac",
           "/almanac/history",
@@ -635,9 +634,6 @@ for (const size of sizes)
             // The friend and the duels in, before what they look like is measured.
             if (path === "/friends" || path === "/duel/new")
               await expect(page.locator(".friend, .duel-pick").first()).toBeVisible();
-            // The day's board in, its rows (or why there are none).
-            if (path === "/board")
-              await expect(page.locator(".day-board :is(.rank-row, .board-empty)").first()).toBeVisible();
             if (path === "/") await textIs(page, percent);
             await settled(page);
             expect.soft(await byDayAndNight(page, () => placeFlaws(page)), `${path}${at}`).toEqual([]);

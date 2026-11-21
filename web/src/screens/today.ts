@@ -3,9 +3,9 @@
 // shared day's link, the score shared over the same ten). A new visitor has the cover alone; a player has beside it
 // the streak and this week, the friends' day, and the way to their book. Once the day is played, the issue is its
 // result (as it lands, and on every later visit): the score and its shape, how it went among everyone, sharing it
-// (game/share.ts, in a sheet with its card and its text), how all of България did with it (the whole day's board a page
-// of its own, `/board`: screens/board.ts), one entry its right answers
-// wrote in the book (the rarest, once enough others played the day), and tomorrow (when the next issue comes, the streak it makes, the reminder's ask). A wrong game is
+// (game/share.ts, in a sheet with its card and its text), one entry its right answers wrote in the book (the rarest,
+// once enough others played the day), tomorrow (when the next issue comes, the streak it makes, the reminder's ask),
+// and the day's board, among friends and of all България (dayBoard). A wrong game is
 // never celebrated. Topics are played from their chapter in the Алманах, duels from Приятели (a friend's duel waiting
 // is its dot, a friend's yes its line). Once, under the streak: what came of the days just missed. Once, over the day:
 // what came of a step just taken (a profile signed in to, a game brought here). In an app's own browser the result's action
@@ -24,15 +24,28 @@ import type { Board, Mark, Reviewed, Score, State } from "../game/types.ts";
 import { api, errorText, serverNow } from "../lib/api.ts";
 import { boot } from "../lib/boot.ts";
 import { dayInBulgaria, hourInBulgaria } from "../lib/day.ts";
-import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
+import { type Child, h, onCleanup, type Signal, signal, slot } from "../lib/dom.ts";
 import { handToken } from "../lib/embedded.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { type RemindAsks, remindAnswered, remindAsks } from "../lib/keep.ts";
+import { ordinal } from "../lib/ordinal.ts";
 import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { go, goBack, hold, release, title } from "../lib/router.ts";
 import { dateWords, issueOf, onDay, stakeHour, weekday } from "../lib/words.ts";
 import { cover, notice, player, playing, user } from "../state.ts";
-import { chapterName, chip, failure, formatNumber, glyph, leaf, scoreRow, stakeLine, textWords, tiles } from "../ui.ts";
+import {
+  chapterName,
+  chip,
+  failure,
+  formatNumber,
+  glyph,
+  leaf,
+  scoreRow,
+  segmented,
+  stakeLine,
+  textWords,
+  tiles,
+} from "../ui.ts";
 import { app, coverExit, exitWay, handedIn, haveProfile, keepLine, keepStake, mailAsk, takeHand } from "./keep.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
@@ -521,12 +534,12 @@ const outOf = (s: State) => s.total - (s.void ?? 0);
  *
  *   1. the score on its sheet, the tiles, how many knew the tenth, and how all of България did on average;
  *   2. the day's entry in the book and what the day wrote (its ink, the chapter nearest its next rank, or a rank risen);
- *   3. the friends who played it, their tiles;
- *   4. the action: sharing it (on the first results, keeping the game and being reminded, or the way out of an app's
+ *   3. the action: sharing it (on the first results, keeping the game and being reminded, or the way out of an app's
  *      browser, which come right under the score instead);
- *   5. tomorrow.
+ *   4. tomorrow;
+ *   5. the day's board, Приятели · България (dayBoard).
  *
- * Everything else (how all of България spread, the questions and their facts) is under „Въпросите и фактите“. As it's
+ * Everything else (the questions and their facts) is under „Въпросите и фактите“. As it's
  * played (`just`), it lands (feel.ts) and what it brought is told; on a later visit it is as it is. A wrong game is
  * never celebrated; ten of ten is a big moment. */
 function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
@@ -547,6 +560,8 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   const missedList = signal<Reviewed[] | null>(null);
   if (zero) review.then(missedList.set, () => {});
   let reviewHead: HTMLElement | null = null;
+  // The day's board's tab, as the player chose it (none yet: dayBoard opens it).
+  const among = signal<Among | null>(null);
   // The review asked again if it failed (reviewOf keeps only one that came).
   const openReview = async () => {
     reviewList.set(await reviewOf(run.id).catch(() => null));
@@ -630,7 +645,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       { class: "result-main page-1" },
       hero,
       best,
-      zero ? missed(missedList, () => bulgariaToday(fresh(), run, reviewOf(run.id))) : null,
+      zero ? missed(missedList) : null,
       first ? underScore : null,
       // 2. The day's entry in the book, and what the day wrote.
       () => entryOfDay(fresh().entry),
@@ -641,12 +656,12 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       "div",
       { class: "result-side page-2" },
       first ? sideTop : null,
-      // 3. The friends who played it.
-      () => friendsDay(fresh()),
-      // 4. The action, once the first results are past.
+      // 3. The action, once the first results are past.
       first ? null : action,
-      // 5. Tomorrow.
+      // 4. Tomorrow.
       t.late ? onToToday(t, t.late.today) : tomorrow(t, fresh, streak, stake, first ? null : ask),
+      // 5. The day's board (none for yesterday's issue finished late: Днес hasn't its board).
+      t.late ? null : () => dayBoard(fresh(), run, among),
       // None right: the questions are open under the score already, with the way to the rest there (once they came).
       () =>
         missedList()?.length
@@ -662,13 +677,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       const all = reviewList();
       if (!all) return null;
       reviewHead = h("h2", { class: "section-title review-head", tabindex: -1 }, "Въпросите и фактите");
-      return h(
-        "div",
-        { class: "result-review" },
-        reviewHead,
-        bulgariaToday(fresh(), run, reviewOf(run.id)),
-        reviewed(all, null),
-      );
+      return h("div", { class: "result-review" }, reviewHead, reviewed(all, null));
     },
   );
   if (first) {
@@ -685,10 +694,8 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
 const missedShown = 4;
 
 /** None right: the first questions, each its chapter's tile, the question, the right answer and the fact, right under
- * the score; „Още 6 въпроса“ shows the rest in place, and after them the rest of „Въпросите и фактите“ (`rest`: how
- * all of България did). Never a word of praise: only what the questions
- * were. */
-function missed(all: () => Reviewed[] | null, rest: () => Child): Child {
+ * the score; „Още 6 въпроса“ shows the rest in place. Never a word of praise: only what the questions were. */
+function missed(all: () => Reviewed[] | null): Child {
   const open = signal(false);
   return () => {
     const list = all();
@@ -733,7 +740,7 @@ function missed(all: () => Reviewed[] | null, rest: () => Child): Child {
             left === 1 ? "Още един въпрос" : `Още ${left} въпроса`,
             h("span", { class: "i i-right", "aria-hidden": "true" }),
           )
-        : rest(),
+        : null,
     );
   };
 }
@@ -801,126 +808,123 @@ function tenthLine(review: Promise<Reviewed[]>): Child {
   return () => (said() ? h("p", { class: "tenth" }, said()) : null);
 }
 
-/** The friends who have played the day, best first, up to five, each a row as the day's board draws it (scoreRow):
- * their place among the player and their friends, the avatar with its seal, the name, and under it the score and
- * their small squares; nothing while none has (no line asking for friends: the day's result isn't the place). Only
- * on the result: the squares come once the player has finished the day (play.FriendsBoard). */
-function friendsDay(t: Today): Child {
-  const all = (t.friends ?? []).filter((s) => !s.me).slice(0, 5);
-  if (!all.length) return null;
+/** Where the day's board looks: among the player and their friends, or at all of България. */
+type Among = "friends" | "all";
+
+/** The day's board, one card on the result (DESIGN.md, The result): „Класация“ and two tabs, Приятели and България.
+ * It opens among friends, or on all България for a player with none yet (`among` keeps the tab chosen while the
+ * result is open). Nothing until the day as it stands with the game played is here: before, the board doesn't name
+ * its players to the player, nor show anyone's squares (play.FriendsBoard). */
+function dayBoard(t: Today, run: State, among: Signal<Among | null>): Child {
+  if (!t.run?.done) return null;
+  const opens: Among = t.friends?.length || t.befriended ? "friends" : "all";
+  const now = () => among() ?? opens;
   return h(
     "section",
-    { class: "sect friends-day" },
-    h(
-      "div",
-      { class: "sect-head" },
-      h("h2", null, "Приятели днес"),
-      h("a", { class: "sect-note", href: "/board" }, "Класация"),
+    { class: "sect day-board" },
+    h("div", { class: "sect-head" }, h("h2", null, "Класация")),
+    segmented<Among>(
+      "Класация сред",
+      [
+        ["friends", "Приятели"],
+        ["all", "България"],
+      ],
+      now,
+      (v) => among.set(v),
     ),
-    h(
-      "ol",
-      { class: "rows ranks" },
-      all.map((s) => scoreRow(s, null)),
-    ),
+    () => (now() === "all" ? everyone(t, run) : ofFriends(t)),
   );
 }
 
+/** The day among the player's friends: each who played, best first, the player among them. A row says what places
+ * it: the right answers („8 от 10“; a tie between them broken as play/board.go says, never by time: those still equal
+ * share a place, the server's); the player's own row washed, „ти“ after the name. No friend has played yet: the
+ * player's own row all the same, and why it's alone (no friends at all: the way to Приятели to add some). */
+function ofFriends(t: Today): Child {
+  const rows = t.friends ?? [];
+  if (!rows.length) {
+    const mine = t.board.mine ?? t.board.top.find((s) => s.me);
+    return [
+      mine ? h("ol", { class: "rows ranks" }, scoreRow({ ...mine, me: true }, 1)) : null,
+      t.befriended === false
+        ? h(
+            "p",
+            { class: "board-empty" },
+            "Още нямаш приятели. ",
+            h("a", { href: "/friends" }, "Добави приятели"),
+            " и сравнявайте резултатите си всеки ден.",
+          )
+        : h("p", { class: "board-empty" }, "Още никой от приятелите ти не е играл днес."),
+    ];
+  }
+  return h(
+    "ol",
+    { class: "rows ranks" },
+    rows.map((s, i) => scoreRow(s, s.place ?? i + 1)),
+  );
+}
+
+/** The day among everyone who played it: how they spread (spreadChart), where the player stands, then the best twenty
+ * and the player's own place under them if further down. Alone on the board, a place says nothing; with none right,
+ * it would only rub the day in: how many played instead. */
+function everyone(t: Today, run: State): Child {
+  const b = t.board;
+  const mine = b.mine && b.place && !b.top.some((s) => s.me) ? b.mine : null;
+  return [
+    spreadChart(b, run),
+    b.players < 2
+      ? null
+      : b.place && b.mine?.rights
+        ? h(
+            "p",
+            { class: "board-note" },
+            `В България си на ${ordinal(b.place, "n")} място от ${formatNumber(b.players)}.`,
+          )
+        : h("p", { class: "board-note" }, `Днес играха ${formatNumber(b.players)} души.`),
+    b.top.length
+      ? h(
+          "ol",
+          { class: "rows ranks" },
+          b.top.map((s, i) => scoreRow(s, s.place ?? i + 1)),
+          mine && b.place ? scoreRow(mine, b.place, b.place > b.top.length + 1) : null,
+        )
+      : null,
+  ];
+}
+
 /** How all of България did with the day: how many got each count of right answers, the player's own bar in ink with
- * „ти“ over it and the average dashed; under it the average, the tens, and the question fewest knew, by its share
- * („най-малко от десетте“: never „the hardest“, which the issue calls its tenth).
- * From ten players (play.Board.Spread: people only). */
-function bulgariaToday(t: Today, run: State, review: Promise<Reviewed[]>): Child {
-  const spread = t.board.spread;
+ * „ти“ over it and the average dashed. From ten players (play.Board.Spread: people only). */
+function spreadChart(b: Board, run: State): Child {
+  const spread = b.spread;
   if (!spread?.length) return null;
   const most = Math.max(1, ...spread);
-  const avg = t.board.average ?? 0;
-  const hardest = signal<{ n: number; share: number } | null>(null);
-  review.then(
-    (all) => {
-      let low: { n: number; share: number } | null = null;
-      for (const q of all) {
-        const c = q.reveal.crowd;
-        if (!c?.answers || q.void) continue;
-        const share = withOwn(c, -1, q.right).right; // as the issue said it, the player among them
-        if (!low || share < low.share) low = { n: q.n, share };
-      }
-      hardest.set(low);
-    },
-    () => {},
-  );
+  const avg = b.average ?? 0;
   const mine = Math.min(run.rights, spread.length - 1);
   return h(
-    "section",
-    { class: "sect bulgaria-today" },
+    "div",
+    {
+      class: "spread-chart",
+      role: "img",
+      "aria-label": `Колко играчи имат по колко верни отговора: най-много имат ${spread.indexOf(Math.max(...spread))}. Ти: ${run.rights}.`,
+    },
     h(
       "div",
-      { class: "sect-head" },
-      h("h2", null, "България днес"),
-      // The whole board of all България, a page of Днес's (screens/board.ts), as „Приятели днес“ has its own.
-      h("a", { class: "sect-note", href: "/board?tab=bulgaria" }, "Класация"),
-    ),
-    // How many played: a line of its own, so that no dot hangs at a line's end beside the link (large text).
-    h(
-      "p",
-      { class: "sect-lead" },
-      t.board.players === 1 ? "Игра 1\u00a0човек." : `Играха ${formatNumber(t.board.players)}\u00a0души.`,
-    ),
-    h(
-      "div",
-      {
-        class: "spread-chart",
-        role: "img",
-        "aria-label": `Колко играчи имат по колко верни отговора: най-много имат ${spread.indexOf(Math.max(...spread))}. Ти: ${run.rights}.`,
-      },
-      h(
-        "div",
-        { class: "spread-bars" },
-        spread.map((n, i) =>
-          h("i", { class: i === mine ? "me" : undefined, style: { height: `${Math.max(1, (100 * n) / most)}%` } }),
-        ),
-        avg
-          ? h(
-              "span",
-              { class: "spread-avg", style: { left: `${((avg + 0.5) / spread.length) * 100}%` } },
-              h("span", null, `средно ${averageWords(avg)}`),
-            )
-          : null,
+      { class: "spread-bars" },
+      spread.map((n, i) =>
+        h("i", { class: i === mine ? "me" : undefined, style: { height: `${Math.max(1, (100 * n) / most)}%` } }),
       ),
-      h(
-        "div",
-        { class: "spread-ticks", "aria-hidden": "true" },
-        spread.map((_, i) => h("span", { class: i === mine ? "me" : undefined }, String(i))),
-      ),
-    ),
-    h(
-      "div",
-      { class: "figures-row bulgaria-figures" },
-      h(
-        "div",
-        { class: "fig" },
-        h("b", { class: "fig-n" }, averageWords(avg)),
-        h("span", { class: "fig-label" }, `средно от ${t.board.of}`),
-      ),
-      // A counter at zero is hidden (DESIGN.md, Copy): nobody with all ten isn't a figure.
-      spread.at(-1)
+      avg
         ? h(
-            "div",
-            { class: "fig" },
-            h("b", { class: "fig-n" }, formatNumber(spread.at(-1) ?? 0)),
-            h("span", { class: "fig-label" }, "с всички верни"),
+            "span",
+            { class: "spread-avg", style: { left: `${((avg + 0.5) / spread.length) * 100}%` } },
+            h("span", null, `средно ${averageWords(avg)}`),
           )
         : null,
-      () => {
-        const x = hardest();
-        return x
-          ? h(
-              "div",
-              { class: "fig" },
-              h("b", { class: "fig-n" }, percent(x.share)),
-              h("span", { class: "fig-label" }, `отговарят вярно на въпрос ${x.n + 1}, най-малко от десетте`),
-            )
-          : null;
-      },
+    ),
+    h(
+      "div",
+      { class: "spread-ticks", "aria-hidden": "true" },
+      spread.map((_, i) => h("span", { class: i === mine ? "me" : undefined }, String(i))),
     ),
   );
 }

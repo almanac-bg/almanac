@@ -12,7 +12,7 @@ their reasons: read it before changing what a player sees or how the game plays,
 
 Every day ten questions; each one a player gets right in the issue writes its fact in ink in their Алманах, and their
 rank in a chapter says how much of it the book holds in ink; played alone, with friends, beside all of Bulgaria. Three
-places: Днес (the day's issue, the same ten for everyone, asked once, its result shared without the answers, and the
+places: Днес (the day's issue, the same ten for everyone, asked once, its result shared without the answers, and on it the
 day's board), Алманах (the player's book: a chapter per topic, ink from the issues, every other fact met in grey, a seal
 per chapter named for the book), Приятели (friends, duels on one's own time against a friend or a real recorded
 game). The streak is the habit and forgives two missed days a week. The score is the number right; nothing

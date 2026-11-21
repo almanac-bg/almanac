@@ -26,9 +26,9 @@ test("a page loaded before a deploy opens its next screen by loading anew, and n
   expect(await marked(page)).toBe(true);
 
   // Out of the game, to another screen: it comes with the page loaded anew.
-  await page.goto("/board");
-  // The day's board is an answer of the server's: the page is behind.
-  await expect(page.locator(".day-board :is(.rank-row, .board-empty)").first()).toBeVisible();
+  await page.goto("/friends");
+  // Приятели is an answer of the server's: the page is behind.
+  await expect(page.locator(".friends .friends-none")).toHaveText(/^Още нямаш приятели тук\./);
   await mark(page);
   const loaded = page.waitForEvent("load");
   await page.locator("nav.places-foot a[href='/almanac']").click();

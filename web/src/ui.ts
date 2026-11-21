@@ -189,13 +189,14 @@ export function tiles(
   );
 }
 
-/** A row's small shape of the day (a friend's, a board's): ten squares in ink, right filled, близо half. */
+/** A row's small shape of the day (a friend's, a board's): ten squares in ink, right filled, близо half. One picture,
+ * read out in its words („1: вярно, 2: грешно…“): never a list, which can't be a picture. */
 export function mini(marks: { right: boolean; close?: boolean; void?: boolean }[]): HTMLElement {
   const said = marks.map((m, i) => `${i + 1}: ${tileWords[tileOf(m)]}`).join(", ");
   return h(
-    "ol",
+    "span",
     { class: "mini", role: "img", "aria-label": said },
-    marks.map((m) => h("li", { class: tileOf(m) === "near" ? "partial" : tileOf(m) })),
+    marks.map((m) => h("i", { class: tileOf(m) === "near" ? "partial" : tileOf(m) })),
   );
 }
 
