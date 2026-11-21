@@ -73,15 +73,21 @@ func screenOf(path string) string {
 	return ""
 }
 
-// files are what a page asks for at once: its style, its script and its screen's (if it loads on its own), and the
-// fonts its first paint is in; each as the build named it.
+// files are what a page asks for at once: its style, its script, the scripts every page loads as it starts
+// (assets.FirstScripts) and its screen's (if it loads on its own), and the fonts its first paint is in; each as the
+// build named it.
 type files struct {
 	CSS, JS, Screen string
-	Fonts           []string
+	Scripts, Fonts  []string
 }
 
 func filesOf(m map[string]string, path string) files {
 	f := files{CSS: m["app.css"], JS: m["app.js"], Screen: m[screenOf(path)]}
+	for _, js := range assets.FirstScripts {
+		if m[js] != "" {
+			f.Scripts = append(f.Scripts, m[js])
+		}
+	}
 	for _, font := range assets.FirstFonts {
 		if m[font] != "" {
 			f.Fonts = append(f.Fonts, m[font])
@@ -97,7 +103,7 @@ func (f files) link() string {
 	if f.CSS != "" {
 		links = append(links, "</"+f.CSS+">; rel=preload; as=style")
 	}
-	for _, js := range []string{f.JS, f.Screen} {
+	for _, js := range append([]string{f.JS, f.Screen}, f.Scripts...) {
 		if js != "" {
 			links = append(links, "</"+js+">; rel=modulepreload")
 		}
@@ -134,7 +140,8 @@ var shell = template.Must(template.New("shell").Parse(`<!doctype html>
 {{with .Files}}{{range .Fonts}}<link rel="preload" href="/{{.}}" as="font" type="font/woff2" crossorigin>
 {{end}}{{if .CSS}}<link rel="stylesheet" href="/{{.CSS}}">{{end}}
 {{if .JS}}<script type="module" src="/{{.JS}}"></script>{{end}}
-{{if .Screen}}<link rel="modulepreload" href="/{{.Screen}}">{{end}}{{end}}
+{{range .Scripts}}<link rel="modulepreload" href="/{{.}}">
+{{end}}{{if .Screen}}<link rel="modulepreload" href="/{{.Screen}}">{{end}}{{end}}
 <script type="application/json" id="boot">{{.Boot}}</script>
 </head>
 <body>

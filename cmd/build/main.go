@@ -41,9 +41,9 @@ import (
 // daily visit doesn't open loads on its own (web/src/kit.ts) and doesn't count here.
 const firstScreen = 110 << 10
 
-// firstFiles are the scripts and styles Начало draws with: the app, and the pictures (a file of their own, loaded as
-// the page starts: the cover's ten glyphs are theirs).
-var firstFiles = []string{"app.js", "app.css", "pictures.js"}
+// firstFiles are the scripts and styles Начало draws with: the app, and the scripts every page loads as it starts
+// (assets.FirstScripts: the pictures, whose are the cover's ten glyphs).
+var firstFiles = append([]string{"app.js", "app.css"}, assets.FirstScripts...)
 
 // fontCeiling is how big the fonts a page of Bulgarian may need together may grow: each face's first file (the
 // second, <face>-rest, loads only where a letter of another language shows: web/src/fonts/subset.sh). Two faces

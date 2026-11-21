@@ -34,6 +34,11 @@ const ManifestFile = "manifest.json"
 // screen's budget.
 var FirstFonts = []string{"sofia-sans.woff2"}
 
+// FirstScripts are the scripts every page loads as it starts besides the app's own (app.js), each a file of its own:
+// the pictures (the cover's ten glyphs are theirs). The page asks for them at once (server/pages.go), beside the app,
+// not only once the app has run and sent for them; cmd/build counts them in the first screen's budget.
+var FirstScripts = []string{"pictures.js"}
+
 // Manifest reads the build's manifest; empty if the client hasn't been built.
 func Manifest(fsys fs.FS) map[string]string {
 	m := map[string]string{}
