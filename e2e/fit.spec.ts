@@ -1,8 +1,12 @@
 // The look fits (DESIGN.md, Fit): at a 320 × 568 phone, Safari's 375 × 600 and 390 × 664, and a 1366 × 900 laptop,
-// by day and by night, nothing scrolls sideways; Днес shows „Започни“ whole high on the screen; a question has what
-// answers it and its action in sight, and once answered the player's row, the right one and „Напред“; and Днес keeps
-// its budget, in the HTML's order.
+// by day and by night, nothing scrolls sideways; Днес shows „Започни“ whole high on the screen; every kind of question
+// (the longest the sample bank has) has what answers it and its action whole in sight, nothing under the action, and
+// once answered (right, wrong, close) the player's row, the right one and „Напред“, nothing showing under „Напред“;
+// a row's sign never on a line of its own, nor a punctuation mark; and Днес keeps its budget, in the HTML's order.
+//
+// FIT_SHOTS=<folder> keeps a picture of each question before and after its answer, to look at.
 import { expect, type Page, test } from "@playwright/test";
+import { answerAs, closeable, flaws, kinds, panelFlaws, unseenAnswers } from "./kinds.ts";
 import { cutOrOverlapping, dealt, keptPlayer, knows } from "./play.ts";
 
 const sizes = [
@@ -49,72 +53,87 @@ for (const scheme of ["light", "dark"] as const)
         expect(go.bottom, "„Започни“ is whole, high enough on the screen").toBeLessThanOrEqual(size.go);
       });
 
-      // Each with its fact, as the bank's questions have (one without moves on 3 s after its answer, before a slow
-      // engine has looked at it all).
-      for (const [kind, id] of [
-        ["a choice", "his-002"],
-        ["the longest number", "gen-305"],
-        ["an order", "his-901"],
-        ["true or not", "his-961"],
-      ] as const)
-        test(`${kind}: what answers it in sight, then the answer and „Напред“`, async ({ page }) => {
+      // Every kind, at its longest, each with its fact as the bank's questions have; close only where an answer can
+      // be (a number, an order, pairs, groups).
+      for (const how of ["right", "wrong", "close"] as const)
+        test(`every kind of question, answered ${how}: what answers it, then the answer and „Напред“`, async ({
+          page,
+        }) => {
+          test.setTimeout(120_000);
+          const all = kinds().filter((k) => how !== "close" || closeable(k.q));
           await page.goto("/");
-          await dealt(page, id.startsWith("gen") ? "general" : "history", [id]);
-          await page.goto(id.startsWith("gen") ? "/play/general" : "/play/history");
+          await dealt(
+            page,
+            "history",
+            all.map((k) => k.q.id),
+          );
+          await page.goto("/play/history");
           await page.getByRole("button", { name: "Продължи", exact: true }).click();
           await page.getByRole("button", { name: "Започни сега" }).click();
-          await expect(page.locator("article.question h1.ask")).toBeVisible();
-          await page.waitForTimeout(400);
-          expect(await sideways(page)).toBe(false);
-          const q = page.locator("article.question");
-          // What answers it: every answer, or the pad and its action, whole on the screen.
-          const parts = await q
-            .locator(".choices > .option, .tf-options > .option, .keypad .key, .answering .btn.primary")
-            .evaluateAll((all) => all.map((el) => el.getBoundingClientRect().bottom));
-          for (const bottom of parts) expect(bottom).toBeLessThanOrEqual(size.height + 0.5);
-          // Answered: the right row (and the player's) and „Напред“ in sight.
-          if (await q.locator(".keypad").count()) {
-            await q.locator(".key", { hasText: "7" }).click();
-            await q.getByRole("button", { name: "Отговори" }).click();
-          } else if (await q.locator(".sortable-list").count()) await q.getByRole("button", { name: "Готово" }).click();
-          // A choice missed: the player's row and the right one both kept in sight, the right one said in words.
-          else if (await q.locator(".choices").count())
-            await q.locator(".choices > .option").filter({ hasNotText: "Васил Левски" }).first().click();
-          else await q.locator(".options .option, .tf-options .option").first().click();
-          const go = page.locator(".after .up-next-go");
-          await expect(go).toBeVisible();
-          await page.waitForTimeout(500);
-          expect(await sideways(page)).toBe(false);
-          const on = await bottomOf(page, ".after .up-next-go");
-          expect(on.bottom).toBeLessThanOrEqual(size.height + 0.5);
-          for (const row of await q.locator("button.option:is(.right, .wrong)").all()) {
-            const box = await row.evaluate((el) => {
-              const r = el.getBoundingClientRect();
-              const panel = document.querySelector(".after")?.getBoundingClientRect();
-              const head = document.querySelector(".question-top")?.getBoundingClientRect();
-              const docked = getComputedStyle(document.querySelector(".after") as Element).position === "fixed";
-              return {
-                top: r.top,
-                bottom: r.bottom,
-                foot: docked ? (panel?.top ?? innerHeight) : innerHeight,
-                head: head?.bottom ?? 0,
-              };
+          const shot = async (name: string) => {
+            const dir = process.env.FIT_SHOTS;
+            if (dir) await page.screenshot({ path: `${dir}/${name}-${size.width}x${size.height}-${scheme}.png` });
+          };
+          for (const [n, { name, q }] of all.entries()) {
+            const where = `${name} (${q.id})`;
+            await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${all.length}`, {
+              timeout: 10_000,
             });
-            expect(box.top, "the row is under the head").toBeGreaterThanOrEqual(box.head - 1);
-            expect(box.bottom, "the row is over the panel").toBeLessThanOrEqual(box.foot + 1);
-          }
-          // The question stays whole under the head: the page doesn't move it away for the answer.
-          if (await q.locator(".choices").count()) {
-            const sheet = await q.locator(".q-leaf").evaluate((el) => ({
-              top: el.getBoundingClientRect().top,
-              head: document.querySelector(".question-top")?.getBoundingClientRect().bottom ?? 0,
-            }));
-            expect(sheet.top, "the question is whole under the head").toBeGreaterThanOrEqual(sheet.head - 1);
-            await expect(page.locator(".after .right-said")).toHaveText("Вярно е: Васил Левски.");
-            // How many got it stays right under the verdict, the right answer in words after it.
-            await expect(page.locator(".after > .verdict + .right-said")).toHaveCount(
-              (await page.locator(".after > .crowd-says").count()) ? 0 : 1,
+            await expect(page.locator("article.question .answering")).toBeVisible();
+            await page.waitForTimeout(400); // its picture in, and sized
+            if (how === "right") await shot(`${name}-before`);
+            expect.soft(await flaws(page), `${where}, asked`).toEqual([]);
+            expect.soft(await unseenAnswers(page), `${where}, asked`).toEqual([]);
+
+            await answerAs(page, q, how);
+            await expect(page.locator(".after .up-next-go")).toBeVisible({ timeout: 10_000 });
+            await page.waitForTimeout(500); // in its place
+            await shot(`${name}-after-${how}`);
+            expect.soft(await flaws(page), `${where}, answered ${how}`).toEqual([]);
+            expect.soft(await panelFlaws(page), `${where}, answered ${how}`).toEqual([]);
+            // The player's row and the right one under the head, over the panel.
+            const rows = await page.locator("article.question button.option:is(.right, .wrong)").evaluateAll((all) =>
+              all.map((el) => {
+                const r = el.getBoundingClientRect();
+                const after = document.querySelector(".after") as Element;
+                const docked = getComputedStyle(after).position === "fixed";
+                return {
+                  top: r.top,
+                  bottom: r.bottom,
+                  foot: docked ? after.getBoundingClientRect().top : innerHeight,
+                  head: document.querySelector(".question-top")?.getBoundingClientRect().bottom ?? 0,
+                };
+              }),
             );
+            for (const row of rows) {
+              expect.soft(row.top, `${where}: the row is under the head`).toBeGreaterThanOrEqual(row.head - 1);
+              expect.soft(row.bottom, `${where}: the row is over the panel`).toBeLessThanOrEqual(row.foot + 1);
+            }
+            if (q.type === "choice" || q.type === "clues") {
+              // The question stays whole under the head: the page doesn't move it away for the answer, unless the
+              // panel at its least would cover the rows, and then only as far as they need (DESIGN.md, Play).
+              const sheet = await page.locator("article.question .q-leaf").evaluate((el) => {
+                const after = document.querySelector(".after") as Element;
+                const docked = getComputedStyle(after).position === "fixed";
+                const rows = [...document.querySelectorAll("article.question button.option:is(.right, .wrong)")];
+                return {
+                  top: el.getBoundingClientRect().top,
+                  head: document.querySelector(".question-top")?.getBoundingClientRect().bottom ?? 0,
+                  rows: Math.max(...rows.map((r) => r.getBoundingClientRect().bottom)),
+                  foot: docked ? after.getBoundingClientRect().top : innerHeight,
+                };
+              });
+              if (sheet.top < sheet.head - 1)
+                expect
+                  .soft(sheet.rows, `${where}: the question went under the head, further than the rows needed`)
+                  .toBeGreaterThan(sheet.foot - 24);
+              // A miss says the right answer in words, right under how many got it.
+              if (how === "wrong") await expect(page.locator(".after .right-said")).toHaveText(`Вярно е: ${q.answer}.`);
+            }
+            await page
+              .locator(".after .up-next-go")
+              .dispatchEvent("click")
+              .catch(() => {}); // moved on by itself
           }
         });
 

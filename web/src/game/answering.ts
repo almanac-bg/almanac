@@ -15,7 +15,7 @@
 import { ApiError, errorText, passing, tries } from "../lib/api.ts";
 import { effect, h, lifetime, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
 import { type VerdictKind, verdictSays } from "../ui.ts";
-import { type Asked, ask, spokenAnswer } from "./questions.ts";
+import { type Asked, ask, spokenAnswer, wholeWords } from "./questions.ts";
 import type { Answer, Reveal, View } from "./types.ts";
 
 /** Says something to a screen reader, in a game's live region. */
@@ -208,7 +208,7 @@ export function answering<R>(spec: AnswerSpec<R>): Answering<R> {
     was = now;
   });
 
-  const heading = h("h1", { class: "ask", tabindex: -1 }, spec.view.text);
+  const heading = h("h1", { class: "ask", tabindex: -1 }, wholeWords(spec.view.text));
   if (spec.focus)
     requestAnimationFrame(() => {
       if (heading.isConnected) heading.focus({ preventScroll: true });
