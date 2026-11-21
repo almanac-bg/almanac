@@ -8,8 +8,7 @@
 // a deploy loads itself anew at a quiet moment (web/src/fresh.ts).
 //
 // A panic in a request ends that request alone (middleware.go); one in the work done in the background (the sweeps, the loops the program starts) is stopped there by package safe, and told as a problem, mailed to whoever
-// runs the game (problems.go). A run that ends some other way (a crash, a kill, the machine) is told of by the next
-// (running.go).
+// runs the game (problems.go).
 package server
 
 import (
@@ -57,9 +56,6 @@ type Config struct {
 	Operator, Contact string
 	// Alerts is where problems are told (TellProblems).
 	Alerts Alerts
-	// RunningFile is where the server notes that it runs, to tell at its next start whether it stopped cleanly
-	// (running.go; "": nowhere).
-	RunningFile string
 	// LimitsFile is where the limits' counts are kept as the server stops, for its next run to go on counting from
 	// ("": nowhere; a restart then starts every count again).
 	LimitsFile string
@@ -274,15 +270,8 @@ func (s *Server) routes() http.Handler {
 }
 
 // Run serves until ctx ends, then stops taking requests, gives those under way up to grace to finish, and keeps the
-// limits' counts for the next run. A run that ends otherwise is told of by the next (running.go).
+// limits' counts for the next run.
 func (s *Server) Run(ctx context.Context, grace time.Duration) error {
-	s.noteRunning()
-	err := s.run(ctx, grace)
-	s.noteStopped() // not reached past a panic: the next run tells of it
-	return err
-}
-
-func (s *Server) run(ctx context.Context, grace time.Duration) error {
 	srv := &http.Server{
 		Addr:              s.cfg.Addr,
 		Handler:           s.handler,

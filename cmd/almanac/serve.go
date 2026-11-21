@@ -90,7 +90,6 @@ func serve([]string) error {
 		Contact:         env("CONTACT_EMAIL", "privacy@almanac.bg"),
 		Alerts:          server.Alerts{Email: os.Getenv("ALERT_EMAIL")},
 		LimitsFile:      filepath.Join(filepath.Dir(dbPath()), "limits.json"),
-		RunningFile:     filepath.Join(filepath.Dir(dbPath()), "running.json"),
 		DBPath:          dbPath(),
 		Dev:             dev,
 		Version:         version,

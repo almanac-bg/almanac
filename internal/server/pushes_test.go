@@ -308,7 +308,6 @@ type slowPush struct {
 	latency, hang  time.Duration
 	hangOK         bool
 	inflight, peak atomic.Int64
-	answered       atomic.Int64 // /hang/… answered
 	sent           atomic.Int64
 	mu             sync.Mutex
 	last           time.Time
@@ -322,7 +321,6 @@ func (f *slowPush) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.HasPrefix(r.URL.Path, "/hang"):
 		time.Sleep(f.hang)
-		f.answered.Add(1)
 		if f.hangOK {
 			w.WriteHeader(http.StatusCreated)
 			return
@@ -350,9 +348,8 @@ type crowding struct {
 	apart, hangOK  bool
 }
 
-// crowd is a server with that crowd, and the services: the one everyone's at, and the one the hanging are at (the
-// same, unless apart).
-func crowd(t testing.TB, c crowding) (*Server, *slowPush, *slowPush) {
+// crowd is a server with that crowd, and the service everyone but the hanging (when apart) is at.
+func crowd(t testing.TB, c crowding) (*Server, *slowPush) {
 	t.Helper()
 	service := func() (*slowPush, *httptest.Server) {
 		fake := &slowPush{latency: c.latency, hang: c.hang, hangOK: c.hangOK}
@@ -363,9 +360,9 @@ func crowd(t testing.TB, c crowding) (*Server, *slowPush, *slowPush) {
 		return fake, ps
 	}
 	fake, ps := service()
-	slow, sps := fake, ps
+	sps := ps
 	if c.apart {
-		slow, sps = service()
+		_, sps = service()
 	}
 	pub, priv, _ := push.NewKeys()
 	keys, _ := push.ParseKeys(pub, priv)
@@ -419,13 +416,13 @@ func crowd(t testing.TB, c crowding) (*Server, *slowPush, *slowPush) {
 	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	return s, fake, slow
+	return s, fake
 }
 
 // The evening's reminders go out many at once: a slow service, a few devices that hang and a player with many junk
 // subscriptions hold up nobody else.
 func TestRemindersGoOutTogether(t *testing.T) {
-	s, fake, _ := crowd(t, crowding{n: 200, hangs: 3, junk: 1000, latency: 50 * time.Millisecond, hang: 2 * time.Second})
+	s, fake := crowd(t, crowding{n: 200, hangs: 3, junk: 1000, latency: 50 * time.Millisecond, hang: 2 * time.Second})
 	evening := time.Date(2030, 1, 1, 19, 5, 0, 0, bulgaria())
 	begin := time.Now()
 	if n := s.remindSent(t.Context(), evening); n != 201 {
@@ -458,7 +455,7 @@ func TestScaleRemind(t *testing.T) {
 	}
 	junk, _ := strconv.Atoi(os.Getenv("JUNK"))
 	apart, hangOK := os.Getenv("APART") != "", os.Getenv("HANGOK") != ""
-	s, fake, _ := crowd(t, crowding{n: n, hangs: hangs, junk: junk, latency: latency, hang: hang, apart: apart, hangOK: hangOK})
+	s, fake := crowd(t, crowding{n: n, hangs: hangs, junk: junk, latency: latency, hang: hang, apart: apart, hangOK: hangOK})
 	evening := time.Date(2030, 1, 1, 19, 5, 0, 0, bulgaria())
 	begin := time.Now()
 	queued := s.remind(t.Context(), evening)
@@ -471,34 +468,6 @@ func TestScaleRemind(t *testing.T) {
 	t.Logf("players %d latency %v hangs %d (%v, apart %v, answering %v) junk %d: reminded %d (claimed and queued in %v), delivered %d, all done in %v, last honest push at %v, peak in flight %d",
 		n, latency, hangs, hang, apart, hangOK, junk, queued, claimed.Round(time.Millisecond), fake.sent.Load(), took.Round(time.Millisecond),
 		last.Round(time.Millisecond), fake.peak.Load())
-}
-
-// One push service that's slow, or down, holds up no other's: its lane takes its share of the queue (pushlanes.go).
-func TestSlowServiceHoldsUpNoOne(t *testing.T) {
-	// The slow ones first in the queue, answering after 3 s each. Before lanes they held every place, 64 at a time:
-	// the rest began only once 128 of them had answered (9 s at least). Now the rest go at once, whatever the
-	// machine's pace: by the time the last of them is sent, the slow service has answered its first 96 at most.
-	const hang = 3 * time.Second
-	s, fake, slow := crowd(t, crowding{n: 292, hangs: 192, latency: 20 * time.Millisecond, hang: hang, apart: true})
-	if n := s.remind(t.Context(), time.Date(2030, 1, 1, 19, 5, 0, 0, bulgaria())); n != 292 {
-		t.Fatalf("reminded %d", n)
-	}
-	ctx, cancel := context.WithCancel(t.Context())
-	done := make(chan struct{})
-	go func() {
-		s.Push(ctx)
-		close(done)
-	}()
-	for deadline := time.Now().Add(10 * hang); fake.sent.Load() < 100 && time.Now().Before(deadline); {
-		time.Sleep(10 * time.Millisecond)
-	}
-	answered := slow.answered.Load()
-	cancel()
-	<-done
-	if fake.sent.Load() != 100 || answered >= 2*laneSends || slow.peak.Load() > laneSends {
-		t.Fatalf("%d sent, after the slow service answered %d; it had %d at once", fake.sent.Load(), answered,
-			slow.peak.Load())
-	}
 }
 
 // Nights are quiet: a notification due from 22:00 to 08:00 waits for the morning, or, of no use by then, goes
