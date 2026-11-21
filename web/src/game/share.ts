@@ -87,10 +87,11 @@ export function cardPath(issue: number, marks: Mark[]): string {
   return `/card/${issue}-${shape}.png`;
 }
 
-/** The day's card (cardPath) as a file to share; null where the server didn't give it. */
+/** The day's card (cardPath) as a file to share; null where the server didn't give it, or gave the site's picture in
+ * its place (past its budget, marked X-Stand-In), which isn't the day's. */
 export async function cardFile(issue: number, marks: Mark[]): Promise<File | null> {
   const r = await fetch(cardPath(issue, marks));
-  if (!r.ok || r.headers.get("Content-Type") !== "image/png") return null;
+  if (!r.ok || r.headers.get("Content-Type") !== "image/png" || r.headers.has("X-Stand-In")) return null;
   return new File([await r.blob()], `almanah-${issue}.png`, { type: "image/png" });
 }
 

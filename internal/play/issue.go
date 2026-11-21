@@ -49,11 +49,14 @@ func (g *Game) IssueTopics(ctx context.Context, day string) ([]string, error) {
 	if err := json.Unmarshal([]byte(raw), &picks); err != nil {
 		return nil, err
 	}
+	// One for each of the ten, in its place, as the tiles and the card put each mark under its chapter: a retired
+	// question is still the bank's; one gone from it altogether (void for the day: voidDay) is a „Микс“ in its place.
 	b := g.Bank()
-	out := make([]string, 0, len(picks))
-	for _, p := range picks {
+	out := make([]string, len(picks))
+	for i, p := range picks {
+		out[i] = "mix"
 		if q, ok := b.Get(p.ID); ok {
-			out = append(out, q.Base().Category)
+			out[i] = q.Base().Category
 		}
 	}
 	return out, nil

@@ -6,10 +6,12 @@ import (
 	"image/png"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/almanac-bg/almanac/internal/play"
 )
@@ -111,13 +113,43 @@ func TestSharingTheDay(t *testing.T) {
 		!strings.HasPrefix(res.Header.Get("Cache-Control"), "public") {
 		t.Fatalf("the card: %d %v %v", res.StatusCode, err, res.Header)
 	}
+	// Only by its one name, cardOf's: an alias would have the same picture drawn, kept and cached again.
 	for _, name := range []string{
 		fmt.Sprintf("%d-%s.png", issue+1, shape), // not out yet
-		"0-1111111111.png", "1-11111111111.png", "1-4.png", "1-.png", "1-1111.jpg",
+		fmt.Sprintf("0%d-%s.png", issue, shape),  // a leading zero
+		fmt.Sprintf("00%d-%s.png", issue, shape),
+		fmt.Sprintf("%d-%s.png", issue, shape[:9]), // fewer than ten marks
+		"0-1111111111.png", "1-11111111111.png", "1-4.png", "1-.png", "1-1111.png", "1-1111111111.jpg",
+		"1-1111111114.png", "+1-1111111111.png",
 	} {
 		if status, _, _ := other.get("/card/"+name, browserUA); status != 404 {
 			t.Errorf("card %s: %d", name, status)
 		}
+	}
+	if m := cardName.FindStringSubmatch(cardOf(play.Share{Issue: issue, Shape: shape})[len("/card/"):]); m == nil {
+		t.Errorf("the card's own name isn't one it's served by: %s", cardOf(play.Share{Issue: issue, Shape: shape}))
+	}
+
+	// Past a network's budget, a card not drawn yet is the site's picture, for a preview, marked a stand-in, which the
+	// page sharing the day (game/share.ts) doesn't take for the day's card; one drawn already is the card still.
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "127.0.0.1:1"
+	for range cardsNet {
+		g.srv.allowFrom(r, "card", cardsNet, cardsSite, time.Hour)
+	}
+	another := map[byte]string{'0': "1"}[shape[0]]
+	if another == "" {
+		another = "0"
+	}
+	another += shape[1:]
+	status, hdr, _ := other.get(fmt.Sprintf("/card/%d-%s.png", issue, another), browserUA)
+	if status != 200 || hdr.Get("Content-Type") != "image/png" || hdr.Get(standIn) == "" ||
+		hdr.Get("Cache-Control") != "no-store" {
+		t.Fatalf("a card past its budget: %d %v", status, hdr)
+	}
+	status, hdr, _ = other.get(fmt.Sprintf("/card/%d-%s.png", issue, shape), browserUA)
+	if status != 200 || hdr.Get(standIn) != "" || !strings.HasPrefix(hdr.Get("Cache-Control"), "public") {
+		t.Fatalf("a card drawn already, past the budget: %d %v", status, hdr)
 	}
 	// The site's own picture, what a link to any other page shows.
 	res, err = http.Get(g.url + "/og.png")
