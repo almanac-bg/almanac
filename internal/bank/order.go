@@ -153,7 +153,6 @@ func (q *Order) right() []int {
 	return order
 }
 
-
 // Deal shows OrderDealt of the bank's items, which of them and in what order as the seed decides (as a choice's options
 // are dealt), but never in their right order already: „Готово“ untouched is never right. An order is right or not
 // („близо“ is the number's alone), so it shows three: one chronology or ranking still, with two relations to judge and
