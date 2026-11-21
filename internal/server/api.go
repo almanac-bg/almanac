@@ -53,7 +53,7 @@ var playerErrors = map[error]*apiError{
 	play.ErrNoSeal:      {http.StatusBadRequest, "no_seal", "В тази глава още нямаш печат."},
 	play.ErrNotice:      {http.StatusBadRequest, "no_notice", "Няма такова известие."},
 	play.ErrNoPlayer:    {http.StatusNotFound, "no_player", "Няма играч с такова потребителско име."},
-	play.ErrNoDuel:      {http.StatusNotFound, "no_duel", "Този дуел е в друг профил."},
+	play.ErrNoDuel:      {http.StatusNotFound, "no_duel", "Този дуел не е в този профил."},
 	play.ErrDuelGone:    {http.StatusNotFound, "duel_gone", "Този дуел вече го няма."},
 	play.ErrNobody:      {http.StatusConflict, "nobody", "Още няма запис на игра, срещу който да играеш. Опитай по-късно."},
 	play.ErrDuelOver:    {http.StatusGone, "duel_over", "Този дуел вече свърши."},
