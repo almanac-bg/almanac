@@ -2773,11 +2773,12 @@
     transform: translateX(130%) rotate(14deg);
   }
 
-  /* While dragged far enough, the card names the group it's going to. */
+  /* While dragged far enough, the card names the group it's going to. One shows at a time, so each may take the
+     card's width: at half of it, a group's words held together („1878 г.“) broke at twice the text on a small phone. */
   .split-lean {
     position: absolute;
     top: var(--space-3);
-    max-width: 45%;
+    max-width: calc(100% - 2 * var(--space-3));
     padding: 4px 10px;
     border-radius: var(--radius-full);
     background: var(--ink);

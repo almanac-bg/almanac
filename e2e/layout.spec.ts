@@ -9,13 +9,15 @@
 //   text what answers it and its action whole in sight, nothing under the action; once answered the player's row,
 //   the right one and „Напред“, nothing under „Напред“ (on a laptop, the answer beside the question); at twice the
 //   text every control a scroll away; a row's sign, a punctuation mark or a short word never on a line of its own.
+//   On a laptop's short screen too (1366 × 650; a laptop has no touch screen, here as at 1366 × 900): its action in
+//   sight, the answer beside it.
 // - A kept player's places (seals, a friend of a long name, duels, /admin) and a new player's: nothing sideways, no
 //   name cut, nothing over another.
 //
 // And what plays along with them: the sounds start with a tap (and come back from the background), and a question
 // that's over isn't kept in memory. FIT_SHOTS=<folder> keeps a picture of each question before and after its answer.
 import { expect, type Page, test } from "@playwright/test";
-import { answerAs, beside, closeable, flaws, kinds, panelFlaws, unseenAnswers } from "./kinds.ts";
+import { answerAs, beside, closeable, flaws, kinds, panelFlaws, type Q, unseenAnswers } from "./kinds.ts";
 import { cutOrOverlapping, daysPlayed, dealt, keptPlayer, knows, startDay } from "./play.ts";
 
 const sizes = [
@@ -292,7 +294,13 @@ async function questionsKept(page: Page): Promise<string[]> {
 for (const size of sizes)
   for (const text of [100, 200])
     test.describe(`${size.width}×${size.height}, ${text === 100 ? "the usual text" : "twice the text"}`, () => {
-      test.use({ viewport: { width: size.width, height: size.height }, bypassCSP: true });
+      // The laptop a laptop: no touch screen, no phone's way with the page's width.
+      const laptop = size.width > 1000;
+      test.use({
+        viewport: { width: size.width, height: size.height },
+        bypassCSP: true,
+        ...(laptop ? { isMobile: false, hasTouch: false } : {}),
+      });
       const big = text !== 100;
 
       test("Днес, the day's first question and its result, and a new player's places", async ({ page }) => {
@@ -433,17 +441,10 @@ for (const size of sizes)
                     ...(await outOfReach(page, "article.question .options .option")),
                   ]
                 : [...(await panelFlaws(page)), ...(await answerInPlace(page, q.type))]),
-              ...(!big && size.width > 1000 ? await beside(page) : []),
+              ...(!big && laptop ? await beside(page) : []),
             ]);
             expect.soft(said, `${where}, answered ${how}`).toEqual([]);
-            // A miss says the right answer in words, right under how many got it; not where the question names it,
-            // nor under a choice of pictures, each named under it.
-            if (how === "wrong" && (q.type === "choice" || q.type === "clues")) {
-              const word = String(q.answer).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-              const named = new RegExp(`(?<!\\p{L})${word}(?!\\p{L})`, "iu").test(q.text);
-              if (q.pictures || named) await expect.soft(page.locator(".after .right-said")).toHaveCount(0);
-              else await expect.soft(page.locator(".after .right-said")).toHaveText(`Вярно е: ${q.answer}.`);
-            }
+            if (how === "wrong") await rightSaid(page, q);
             await next(page);
           }
         });
@@ -484,6 +485,9 @@ for (const size of sizes)
           for (const path of places) {
             await page.goto(path);
             await expect(page.locator("main :is(h1, h2)").first()).toBeVisible();
+            // The friend and the duels in, before what they look like is measured.
+            if (path === "/friends" || path === "/duel/new")
+              await expect(page.locator(".friend, .duel-pick").first()).toBeVisible();
             if (path === "/") await textIs(page, percent);
             await settled(page);
             expect.soft(await byDayAndNight(page, () => placeFlaws(page)), `${path}${at}`).toEqual([]);
@@ -538,13 +542,27 @@ async function answerInPlace(page: Page, type: string): Promise<string[]> {
       if (r.bottom > foot + 1) out.push(`a row under the panel: ${row.textContent}`);
     }
     const leaf = document.querySelector("article.question .q-leaf");
-    if ((type === "choice" || type === "clues") && leaf) {
+    if (!leaf) out.push("no question's sheet (.q-leaf)");
+    else if (type === "choice" || type === "clues") {
       const bottom = Math.max(...rows.map((r) => r.getBoundingClientRect().bottom));
       if (leaf.getBoundingClientRect().top < head - 1 && !(bottom > foot - 24))
         out.push("the question went under the head, further than the rows needed");
     }
     return out;
   }, type);
+}
+
+/** A miss of a choice says the right answer in words, in the panel right under the verdict and how many got it (when
+ * that's said); not where the question names it, nor under a choice of pictures, each named under it. */
+async function rightSaid(page: Page, q: Q): Promise<void> {
+  if (q.type !== "choice" && q.type !== "clues") return;
+  const word = String(q.answer).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const named = new RegExp(`(?<!\\p{L})${word}(?!\\p{L})`, "iu").test(q.text);
+  const said = page.locator(".after .right-said");
+  if (q.pictures || named) return expect.soft(said, `${q.id}: the right answer said again`).toHaveCount(0);
+  await expect
+    .soft(page.locator(".after > .verdict + .right-said, .after > .verdict + .crowd-says + .right-said"), q.id)
+    .toHaveText(`Вярно е: ${q.answer}.`);
 }
 
 /** The browser's own text size (its setting, not the page's): in Chromium the font size it starts every page at,
@@ -592,6 +610,45 @@ test.describe("every kind of question at a phone's own large text, 24 and 32px, 
       for (let n = 0; n < ids.length; n++) {
         await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${ids.length}`, { timeout: 10_000 });
         await each(`question ${n + 1}`);
+        await next(page);
+      }
+    });
+});
+
+// A laptop's short screen (a browser's bars take what's left of 768): every kind, at its longest, has its action
+// („Готово“, „Отговори“) in sight while the clock runs, and its answer beside it, the fact whole in sight.
+test.describe("on a laptop, 1366 × 650", () => {
+  test.use({ viewport: { width: 1366, height: 650 }, isMobile: false, hasTouch: false });
+
+  for (const how of ["right", "wrong"] as const)
+    test(`every kind of question, answered ${how}: its action in sight, then the answer beside it`, async ({
+      page,
+    }) => {
+      test.setTimeout(120_000);
+      const all = kinds();
+      await page.goto("/");
+      await dealt(
+        page,
+        "history",
+        all.map((k) => k.q.id),
+      );
+      await page.goto("/play/history");
+      await page.getByRole("button", { name: "Продължи", exact: true }).click();
+      await page.getByRole("button", { name: "Започни сега" }).click();
+      for (const [n, { name, q }] of all.entries()) {
+        const where = `${name} (${q.id})`;
+        await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${all.length}`, { timeout: 10_000 });
+        await expect(page.locator("article.question .answering")).toBeVisible();
+        await settled(page);
+        if (["number", "order", "match"].includes(q.type)) {
+          const box = await page.locator(".answering .btn.primary").first().boundingBox();
+          expect.soft(box && box.y + box.height, `${where}: its action below the screen`).toBeLessThanOrEqual(650);
+        }
+        await answerAs(page, q, how);
+        await expect(page.locator(".after .up-next-go")).toBeVisible({ timeout: 40_000 });
+        await settled(page);
+        expect.soft(await beside(page), `${where}, answered ${how}`).toEqual([]);
+        if (how === "wrong") await rightSaid(page, q);
         await next(page);
       }
     });

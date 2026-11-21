@@ -91,9 +91,10 @@ export function testBank(make: boolean): string {
     cpSync(sample, served, { recursive: true });
     const qs = files(served);
     const ids = new Set([...qs.values()].flat().map((q) => q.id));
-    // Each on a day long gone (bank.Tail.On): dealt to a test by its id, never drawn into a day's issue, so that the
-    // tests' days are the sample's, here as on CI.
-    for (const [f, q] of add) if (!ids.has(q.id)) qs.set(f, [...(qs.get(f) ?? []), { ...q, on: ["2000-01-01"] } as Q]);
+    // Each waiting for a day far ahead (bank.Tail.On; play's `waiting`): dealt to a test by its id, never drawn by the
+    // game, into a day's issue, a topic's game or a duel, so that whatever the tests play by chance is the sample's,
+    // here as on CI.
+    for (const [f, q] of add) if (!ids.has(q.id)) qs.set(f, [...(qs.get(f) ?? []), { ...q, on: ["2999-01-01"] } as Q]);
     for (const [f, list] of qs) writeFileSync(resolve(served, "questions", f), JSON.stringify(list, null, 2));
   }
   return "test-results/bank";
