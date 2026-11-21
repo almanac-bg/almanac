@@ -819,7 +819,7 @@ function friendsDay(t: Today): Child {
     h(
       "ol",
       { class: "rows ranks" },
-      all.map((s, i) => scoreRow(s, s.place ?? i + 1)),
+      all.map((s) => scoreRow(s, null)),
     ),
   );
 }

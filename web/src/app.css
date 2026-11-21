@@ -6371,6 +6371,14 @@
       "place pic day";
   }
 
+  /* Днес's friends: no place (the list leaves the player out), the avatar at the row's start as a friend's. */
+  .rank-row.unplaced {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "pic name"
+      "pic day";
+  }
+
   :is(.friend, .rank-row) > .avatar {
     grid-area: pic;
   }
@@ -7805,6 +7813,12 @@
     grid-template-areas:
       "place pic name"
       "day day day";
+  }
+
+  .tight .rank-row.unplaced {
+    grid-template-areas:
+      "pic name"
+      "day day";
   }
 
   /* A friend's day: their score and the duels between you, one under the other. */
