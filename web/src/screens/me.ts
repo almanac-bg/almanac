@@ -136,19 +136,21 @@ function theirView(tag: string | undefined): Child {
  * it. The same head as another's page (ui.ts, profileHead). */
 function head(data: () => Stats | null, pick: () => void): Child {
   return profileHead(
-    // One button, the avatar and its word: the whole of it a tap.
+    // The avatar is the button: a pencil on its corner says so (on a big screen as the pointer comes over it, with the
+    // tooltip; on a phone always), never a word beside it.
     h(
       "button",
-      { class: "me-avatar", type: "button", "aria-label": "Смени аватара", onclick: pick },
+      { class: "me-avatar", type: "button", "aria-label": "Смени аватара", title: "Смени аватара", onclick: pick },
       () => avatar(look(), { size: "l", name: user.peek()?.name, seal: data()?.seal }),
-      h("span", { class: "me-avatar-change", "aria-hidden": "true" }, "Смени"),
+      h("span", { class: "me-avatar-edit", "aria-hidden": "true" }, h("span", { class: "i i-pencil" })),
     ),
     () => nameWords(user()?.name ?? "Профил"),
     () => user()?.tag,
-    () => [
-      user()?.drawn ? "Това име е избрано наслуки. " : null,
-      h("a", { class: "link", href: "/settings#name" }, "Смени името"),
-    ],
+    // The name is changed in Настройки, rarely: said here only while it's one drawn at random, which asks for it.
+    () =>
+      user()?.drawn
+        ? ["Това име е избрано наслуки. ", h("a", { class: "link", href: "/settings#name" }, "Смени го")]
+        : null,
   );
 }
 

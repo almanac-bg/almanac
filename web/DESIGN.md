@@ -176,7 +176,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   hairlines; a spread on a big screen, the ways on (one width) and the record under them on the right (a phone has
   them in that order too: the next duel in sight under the result); its marks as the tiles (близо ◩),
   nothing ringed, no time on any of them: time never counts.
-- **Профил:** one column, on a big screen too: the avatar with the seal worn on its corner and „Смени“ under it, the
+- **Профил:** one column, on a big screen too: the avatar with the seal worn on its corner and a pencil on its top corner (a phone: always; a big screen: as the pointer
+  comes over it, with the tooltip „Смени аватара“), the
   name; a guest's ways in one quiet line under it („Играта ти е само на това устройство. Запази я с имейл · Имаш
   профил? Влез · Как те виждат другите“: the first opens its form in the line's place, the second is the sign-in page); the streak
   as it is now (never an ended one's) and what the week forgives (that it's used up, only while a streak runs); „Печати“, one list on a card
@@ -186,7 +187,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   the best, never chosen: on the avatar's corner); „Как те виждат другите“; Настройки last. No list of past games (a
   game isn't gone over after its day). No duplicate avatar in the bar's corner on this page. The avatars, the fifteen
   animals and nothing else (an avatar is a face: a seal is worn on it, never chosen as it), are a choice made rarely,
-  so never on the page: a sheet (`screens/avatar.ts`) opened by the avatar with „Смени“ under it (one button), the one
+  so never on the page: a sheet (`screens/avatar.ts`) opened by the avatar (one button, its pencil on it), the one
   worn ringed; a tap wears one and, once it's kept, puts the sheet away. Another player's page (`/players/<tag>`) is
   laid out the same, one column (`profileHead`, `sealsSection`): the same head without a way to change it („Играе от
   …“ in the line under the @username), in the streak's place a card of how you stand (ask to be friends, answer their
