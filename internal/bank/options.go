@@ -1,8 +1,11 @@
 package bank
 
 import (
+	"cmp"
 	"fmt"
+	"math"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -147,3 +150,97 @@ func ruleDecoy(q Question) []string {
 	}
 	return nil
 }
+
+// NumberRankAt is how many choices of numbers the rank rule judges at the least (ruleNumberRank), in the bank or a
+// topic: fewer say nothing about where the answers sit.
+const NumberRankAt = 40
+
+// numberRank is where a choice's answer stands among its four options when they are numbers and nothing else tells
+// them apart („15%“ among „10%“, „18%“, „25%“): 1 for the smallest to 4 for the largest; 0 for any other choice.
+func numberRank(q Question) int {
+	opts := namedOptions(q)
+	if len(opts) != ChoiceOptions {
+		return 0
+	}
+	vals, shape := make([]float64, len(opts)), ""
+	for i, o := range opts {
+		ns := numbersIn(o)
+		if len(ns) != 1 {
+			return 0
+		}
+		s := o[:ns[0].start] + "#" + o[ns[0].end:]
+		if i > 0 && s != shape {
+			return 0
+		}
+		vals[i], shape = ns[0].value, s
+	}
+	s := slices.Sorted(slices.Values(vals))
+	if len(slices.Compact(slices.Clone(s))) != len(s) {
+		return 0
+	}
+	return slices.Index(s, vals[0]) + 1
+}
+
+// ruleNumberRank: across the bank, and within a topic, the answer of a choice of numbers sits about as often at
+// each of the four ranks. Writers put the right number between plausible ones, so it ends up second or third, and a
+// player who picks a middle number wins. A group is skewed when a rank's share is off a quarter by more than three
+// standard deviations of chance; the finding names the questions at the rank that has the most, the newest first:
+// the ones whose wrong options to move.
+func ruleNumberRank(l *lintBank) []finding {
+	groups := map[string][]Question{}
+	topics := []string{""}
+	for _, q := range l.live {
+		if numberRank(q) == 0 {
+			continue
+		}
+		c := q.Base().Category
+		if _, ok := groups[c]; !ok {
+			topics = append(topics, c)
+		}
+		groups[""] = append(groups[""], q)
+		groups[c] = append(groups[c], q)
+	}
+	var out []finding
+	for _, g := range topics {
+		qs := groups[g]
+		if len(qs) < NumberRankAt {
+			continue
+		}
+		var at [ChoiceOptions][]Question
+		for _, q := range qs {
+			r := numberRank(q) - 1
+			at[r] = append(at[r], q)
+		}
+		n := float64(len(qs))
+		margin := 3 * math.Sqrt(0.25*0.75/n)
+		skewed, most := false, 0
+		shares := make([]string, ChoiceOptions)
+		for r := range at {
+			share := float64(len(at[r])) / n
+			skewed = skewed || math.Abs(share-0.25) > margin
+			if len(at[r]) > len(at[most]) {
+				most = r
+			}
+			shares[r] = fmt.Sprintf("%.0f", 100*share)
+		}
+		if !skewed {
+			continue
+		}
+		slices.SortFunc(at[most], func(a, b Question) int {
+			return cmp.Or(strings.Compare(b.Extra().Added, a.Extra().Added), strings.Compare(b.Base().ID, a.Base().ID))
+		})
+		ids := make([]string, len(at[most]))
+		for i, q := range at[most] {
+			ids[i] = q.Base().ID
+		}
+		where := "the bank"
+		if g != "" {
+			where = g
+		}
+		out = append(out, finding{ids: ids, msg: fmt.Sprintf("the answers of the %d choices of numbers in %s are the smallest, second, third, largest of the four %s%% of the time (25 ± %.0f by chance): give some of the %d at the %s other wrong options",
+			len(qs), where, strings.Join(shares, "/"), 100*margin, len(ids), rankName[most])})
+	}
+	return out
+}
+
+var rankName = [ChoiceOptions]string{"smallest", "second", "third", "largest"}

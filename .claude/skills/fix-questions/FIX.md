@@ -56,6 +56,9 @@ What the rules ask (the questions skill has the details):
   if it is still so and may change.
 - **twin**: give one of the two other options of the same kind (or replace the weaker, `why`: twin): the change goes
   to the newer one unless the older is the weaker.
+- **number-rank** (the answer of a choice of numbers mostly second or third): move the wrong options, not the
+  answer, so the answer becomes the smallest or the largest of the four where the bank lacks those; each new wrong
+  number plausible and wrong under every source, never another question's value next to the same subject.
 - **stale**: pin it to a date („към 2026 г.“) and add `reviewBy`, or reword to what doesn't change.
 - **dated**: write the `day` line (what happened on that day, naming it: „На 16 декември 1982 г. умира Колин
   Чапман.“). Take the date out of the text unless the date is what's asked. If the fact only repeated the date, write a
