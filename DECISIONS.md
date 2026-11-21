@@ -66,6 +66,10 @@ packages' doc comments; this file holds only what must not drift.
     One link a player who has finished a game, `/f/<code>`, random and nameless; a new one ends the old; it shows the
     inviter's name, avatar and seal; a guest's tap waits for their first game; bounded by MaxFriends, 20 friends a link
     a day, and the limits by network and site. No blocking still: a friend added so is removed as any other.
+  - **Приятели's dot is news since the player last looked there** (2026-11-21), on any device: a friend request, a
+    duel sent to them, a result of one of their duels (played back or run out). Opening Приятели clears it. It isn't
+    a to-do count: as „a duel waits for you“ it stayed lit up to a week after its news was read (the owner hit it), and
+    a result never lit it. A duel to play stays first in Приятели until it's played; the ping is for news arriving.
   - **Sharing:** the score and its tiles, never the answers, unsigned, with a way into the same ten.
   - **A result has a budget:** the score and tiles, the day's entry and its growth line, friends' tiles, one action,
     tomorrow; with a crowd, how Bulgaria did that day („средно 6,2“). Everything else under „Въпросите и фактите“. A

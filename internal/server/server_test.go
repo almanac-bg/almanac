@@ -893,13 +893,13 @@ func TestNotifications(t *testing.T) {
 		bo.call("POST", "/api/friends/requests", map[string]string{"to": "@" + tagOf(ana)})
 	}
 	pushes("/ana", 1)
-	if _, w := ana.call("GET", "/api/friends/requests", nil); w["requests"] != 1.0 {
-		t.Fatalf("Ana's requests waiting: %v", w)
+	if _, w := ana.call("GET", "/api/friends/news", nil); w["news"] != true {
+		t.Fatalf("news for Ana: %v", w)
 	}
 	acceptAll(ana)
 	pushes("/ana", 1)
-	if _, w := ana.call("GET", "/api/friends/requests", nil); w["requests"] != 0.0 {
-		t.Fatalf("Ana's requests waiting, after: %v", w)
+	if _, w := ana.call("GET", "/api/friends/news", nil); w["news"] != false {
+		t.Fatalf("news for Ana once she said yes: %v", w)
 	}
 }
 
@@ -1061,7 +1061,7 @@ func TestFriendsOverHTTP(t *testing.T) {
 		out["error"] != "play_first" {
 		t.Fatalf("Bo asks before a game: %d %v", status, out)
 	}
-	if _, w := ana.call("GET", "/api/friends/requests", nil); w["requests"] != 0.0 {
+	if _, w := ana.call("GET", "/api/friends/news", nil); w["news"] != false {
 		t.Fatalf("a request from a guest who hasn't played: %v", w)
 	}
 	played(ana)

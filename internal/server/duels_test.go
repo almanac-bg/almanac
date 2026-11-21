@@ -45,8 +45,15 @@ func TestADuelOverHTTP(t *testing.T) {
 	pushes("/bo", 1)
 
 	// Bo hears of it: a dot in Приятели, the duel his to play.
-	if _, w := bo.call("GET", "/api/friends/requests", nil); w["duels"] != 1.0 || w["requests"] != 0.0 {
-		t.Fatalf("waiting for Bo: %v", w)
+	if _, w := bo.call("GET", "/api/friends/news", nil); w["news"] != true {
+		t.Fatalf("news for Bo: %v", w)
+	}
+	// He opens Приятели: the dot goes, and the duel stays his to play.
+	if status, out := bo.call("POST", "/api/friends/seen", map[string]any{}); status != 200 {
+		t.Fatalf("Bo opens Приятели: %d %v", status, out)
+	}
+	if _, w := bo.call("GET", "/api/friends/news", nil); w["news"] != false {
+		t.Fatalf("news for Bo once he's looked: %v", w)
 	}
 	if _, list := bo.call("GET", "/api/duels", nil); len(list["yours"].([]any)) != 1 {
 		t.Fatalf("Bo's duels: %v", list)

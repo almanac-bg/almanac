@@ -6,6 +6,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/almanac-bg/almanac/internal/store"
 )
@@ -262,12 +263,39 @@ func (g *Game) Withdraw(ctx context.Context, userID, requestID int64) error {
 	return err
 }
 
-// RequestsWaiting is how many friend requests wait for a player's answer (for the dot on Приятели).
-func (g *Game) RequestsWaiting(ctx context.Context, userID int64) (int, error) {
-	var n int
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT count(*) FROM friend_requests r
-		WHERE (r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1)) AND NOT r.declined`, userID).Scan(&n)
-	return n, err
+// newsReach is how long after it was made a duel can still end: its first side's DuelFor, then the friend's, and a day
+// for the sweep that ends it (SettleDue). FriendsNews looks no further back than that before the player's last look.
+const newsReach = 2*DuelFor + 24*time.Hour
+
+// FriendsNews says whether something has come to Приятели since the player last looked there (SawFriends), on any
+// device: a friend request to them; a duel a friend sent them that they haven't begun (one begun, they know of); a
+// result of a duel with a friend, one they sent (played back, or its time run out) or one sent to them whose time ran
+// out. What they did themselves (a duel they played back) isn't news to them. It's the dot on Приятели: news, not a
+// list of what waits (a duel to play stays first in Приятели until it's played). One query, each part on an index and
+// within newsReach of the last look: light enough for a page to ask every half minute.
+func (g *Game) FriendsNews(ctx context.Context, userID int64) (bool, error) {
+	var news bool
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT
+		EXISTS (SELECT 1 FROM friend_requests r WHERE (r.to_id = u.id OR r.to_email = u.email) AND NOT r.declined
+			AND r.at > u.friends_seen_at)
+		OR EXISTS (SELECT 1 FROM duels d WHERE d.a_id = u.id AND d.created_at > u.friends_seen_at - ?2
+			AND d.kind = 'person' AND d.ended_at > u.friends_seen_at)
+		OR EXISTS (SELECT 1 FROM duels d WHERE d.b_id = u.id AND d.created_at > u.friends_seen_at - ?2
+			AND d.kind = 'person' AND (d.sent_at > u.friends_seen_at AND d.b_run IS NULL
+				OR d.ended_at > u.friends_seen_at AND d.ended_at >= d.expires_at))
+		FROM users u WHERE u.id = ?1`, userID, newsReach.Milliseconds()).Scan(&news)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return news, err
+}
+
+// SawFriends keeps that the player has looked at Приятели now: what came before is seen, on every device
+// (FriendsNews).
+func (g *Game) SawFriends(ctx context.Context, userID int64) error {
+	_, err := g.DB.Write.ExecContext(ctx, `UPDATE users SET friends_seen_at = max(friends_seen_at, ?) WHERE id = ?`,
+		store.Ms(g.Now()), userID)
+	return err
 }
 
 // Asked is whether a player's request to another waits for their answer.

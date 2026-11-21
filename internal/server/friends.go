@@ -152,29 +152,35 @@ func (s *Server) answerRequest(accept bool) func(http.ResponseWriter, *http.Requ
 	}
 }
 
-// requestsWaiting says how many friend requests, and friends' duels, wait for the player: light enough for a page to
-// ask every half minute, to show there's something waiting in Приятели.
-func (s *Server) requestsWaiting(w http.ResponseWriter, r *http.Request) error {
+// friendsNews says whether something has come to Приятели since the player last looked there, on any device
+// (play.FriendsNews): the dot on Приятели. Light enough for a page to ask every half minute.
+func (s *Server) friendsNews(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
 	if err != nil {
 		return err
 	}
 	if u == nil {
-		return ok(w, map[string]int{"requests": 0, "duels": 0})
+		return ok(w, map[string]bool{"news": false})
 	}
-	n, err := s.game.RequestsWaiting(r.Context(), u.ID)
+	news, err := s.game.FriendsNews(r.Context(), u.ID)
 	if err != nil {
 		return err
 	}
-	duels, err := s.game.DuelsWaiting(r.Context(), u.ID)
+	return ok(w, map[string]bool{"news": news})
+}
+
+// sawFriends keeps that the player has opened Приятели (play.SawFriends): its dot goes, on every device. A POST of its
+// own, not a side of GET /api/friends: that one is a read, asked again every quarter minute while the page is open,
+// and a read writes nothing.
+func (s *Server) sawFriends(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
 	if err != nil {
 		return err
 	}
-	waiting := 0
-	if duels != nil {
-		waiting = duels.N
+	if err := s.game.SawFriends(r.Context(), u.ID); err != nil {
+		return err
 	}
-	return ok(w, map[string]int{"requests": n, "duels": waiting})
+	return ok(w, map[string]bool{"ok": true})
 }
 
 func (s *Server) friendOf(r *http.Request) (int64, error) {

@@ -957,7 +957,7 @@ func TestFriendRequests(t *testing.T) {
 	if _, err := w.g.Friend(ctx, ana, bo); err != nil {
 		t.Fatalf("not friends after yes: %v", err)
 	}
-	if n, _ := w.g.RequestsWaiting(ctx, bo); n != 0 {
+	if n := w.requestsIn(bo); n != 0 {
 		t.Fatalf("%d still waiting", n)
 	}
 
@@ -967,7 +967,7 @@ func TestFriendRequests(t *testing.T) {
 	if err != nil || err2 != nil || known != unknown || known.Name != "" {
 		t.Fatalf("by email: %+v %v, %+v %v", known, err, unknown, err2)
 	}
-	if n, _ := w.g.RequestsWaiting(ctx, vi); n != 1 {
+	if n := w.requestsIn(vi); n != 1 {
 		t.Fatalf("Vi has %d waiting", n)
 	}
 	// Vi asks Ana back by her email: Ana asked first, so they're friends at once.
@@ -1055,6 +1055,16 @@ func TestDuelScore(t *testing.T) {
 }
 
 // befriend makes two players friends: a asked, b said yes.
+// requestsIn is how many friend requests wait for a player's answer.
+func (w *world) requestsIn(user int64) int {
+	w.t.Helper()
+	in, _, err := w.g.Requests(w.t.Context(), user)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	return len(in)
+}
+
 func (w *world) befriend(a, b int64) {
 	w.t.Helper()
 	if err := w.g.befriend(w.t.Context(), a, b); err != nil {

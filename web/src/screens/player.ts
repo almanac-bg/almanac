@@ -14,7 +14,7 @@ let {
   nameWords,
   signal,
   title,
-  friendRequests,
+  checkNews,
   user,
   avatar,
   record,
@@ -61,7 +61,7 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
     nameWords,
     signal,
     title,
-    friendRequests,
+    checkNews,
     user,
     avatar,
     record,
@@ -157,12 +157,12 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
       h("p", { class: "player-relation" }, `${p.name} иска да сте приятели.`),
       button("Приеми", "", async () => {
         await api("POST", `/api/friends/requests/${p.request}/accept`, {});
-        friendRequests.update((n) => Math.max(0, n - 1));
+        checkNews();
         await reload();
       }),
       button("Откажи", "", async () => {
         await api("DELETE", `/api/friends/requests/${p.request}`);
-        friendRequests.update((n) => Math.max(0, n - 1));
+        checkNews();
         await reload();
       }),
     ];

@@ -17,7 +17,7 @@ import { forgetOnSignOut, invited, invitePath } from "./screens/invite.ts";
 import { missing } from "./screens/missing.ts";
 import { topic } from "./screens/play.ts";
 import { sharedDay, today } from "./screens/today.ts";
-import { cover, duelsWaiting, friendRequests, look, playing, user, watchWaiting, wornSeal } from "./state.ts";
+import { cover, friendsNews, look, playing, user, watchNews, wornSeal } from "./state.ts";
 import { avatar, rosette, worn } from "./ui.ts";
 
 /** The three places (DECISIONS.md, „The redesign“): where each goes, its name, and which paths are part of it. A game
@@ -34,7 +34,7 @@ keepFresh();
 loadPictures().catch(() => {}); // the illustrations, in a file of their own: on their way at once
 
 /** The places as links (the bar's on a big screen, the foot's on a phone): the one here marked; a dot on Приятели
- * while someone asks to be friends, or a friend's duel waits. */
+ * while something has come there since the player last looked (friendsNews). */
 const placeLinks = () =>
   places.map(([href, label, here]) =>
     h(
@@ -42,18 +42,11 @@ const placeLinks = () =>
       {
         href,
         "aria-current": () => (here(path()) ? "page" : null),
-        // Someone asks to be friends, or a friend's duel waits: a dot on Приятели.
-        class: () => (href === "/friends" && (friendRequests() || duelsWaiting()) ? "news" : ""),
+        // News in Приятели since the player last looked: a dot on it.
+        class: () => (href === "/friends" && friendsNews() ? "news" : ""),
       },
       label,
-      () =>
-        href !== "/friends"
-          ? null
-          : friendRequests()
-            ? h("span", { class: "sr" }, " (покана за приятелство)")
-            : duelsWaiting()
-              ? h("span", { class: "sr" }, " (чака те дуел)")
-              : null,
+      () => (href === "/friends" && friendsNews() ? h("span", { class: "sr" }, " (има ново)") : null),
     ),
   );
 
@@ -114,7 +107,7 @@ if (root) {
   effect(() =>
     document.documentElement.classList.toggle("cover", cover() && (path() === "/" || invitePath.test(path()))),
   );
-  watchWaiting();
+  watchNews();
   forgetOnSignOut();
   prepareSound();
   preparePush();

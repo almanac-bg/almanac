@@ -9,6 +9,11 @@ async function countIn(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Започни сега" }).click();
 }
 
+/** Does what loads a page, and waits until it has asked whether something has come to Приятели (the dot). */
+async function lookedFor(page: Page, load: () => Promise<unknown>): Promise<void> {
+  await Promise.all([page.waitForResponse((r) => new URL(r.url()).pathname === "/api/friends/news"), load()]);
+}
+
 /** Plays a duel's ten as the second side: the other's answer shows beside the player's own, from the first. */
 async function playSecond(page: Page, other: string): Promise<void> {
   for (let n = 0; n < 10; n++) {
@@ -22,7 +27,7 @@ async function playSecond(page: Page, other: string): Promise<void> {
 test("a duel with a friend: played first and sent, played back when they can, the record, a rematch", async ({
   browser,
 }) => {
-  test.setTimeout(240_000);
+  test.setTimeout(300_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
   await befriend(a, b);
@@ -42,12 +47,18 @@ test("a duel with a friend: played first and sent, played back when they can, th
   await expect(a.locator(".duels .duel-row.s-theirs")).toContainText(/Ти: \d+ ·\sоще 7\sдни/);
 
   // Bo: a dot on Приятели (nothing over the day: Днес is the issue and the streak), the duel his to play there, a tap
-  // away.
+  // away. Opened, Приятели has no dot: it's news since the last look, not what waits; the duel stays his to play.
+  const bDot = b.locator("nav.places-foot a[href='/friends']");
   await b.goto("/");
-  await expect(b.locator("nav.places-foot a[href='/friends']")).toHaveClass(/news/);
+  await expect(bDot).toHaveClass(/news/);
   await expect(b.locator(".notices")).toBeEmpty();
-  await b.goto("/friends");
+  await bDot.click();
+  await expect(b).toHaveURL(/\/friends$/);
+  await expect(bDot).not.toHaveClass(/news/);
   await expect(b.locator(".duel-turn")).toContainText("Изиграй същите десет");
+  await lookedFor(b, () => b.goto("/"));
+  await expect(bDot).not.toHaveClass(/news/);
+  await b.goto("/friends");
   await b.locator(".duel-turn").getByRole("link", { name: "Играй" }).click();
   await countIn(b);
   await playSecond(b, "Ана");
@@ -61,8 +72,13 @@ test("a duel with a friend: played first and sent, played back when they can, th
   await expect(b.locator(".duel-record")).toContainText("Срещу Ана");
   await expect(b.getByRole("button", { name: "Реванш" })).toBeVisible();
 
-  // Ana sees it in Приятели, played; his rematch is his to play first.
-  await a.reload();
+  // Ana: his result is news, a dot on Приятели; it goes as she opens it, and she sees it there, played.
+  const aDot = a.locator("nav.places-foot a[href='/friends']");
+  await a.goto("/");
+  await expect(aDot).toHaveClass(/news/);
+  await aDot.click();
+  await expect(a).toHaveURL(/\/friends$/);
+  await expect(aDot).not.toHaveClass(/news/);
   await expect(a.locator(".duels")).toContainText("Изиграни");
   await expect(a.locator(".duels .duel-row").first()).toHaveClass(/s-(won|lost|draw)/);
   // Its end a chip, told apart at a glance: a win filled in ink with its ✓, a loss and a draw outlined.
@@ -72,10 +88,18 @@ test("a duel with a friend: played first and sent, played back when they can, th
   await expect(chip).toHaveText({ won: "✓ Победа", lost: "Загуба", draw: "Равенство" }[end ?? ""] ?? "");
   const fill = await chip.evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(fill === "rgba(0, 0, 0, 0)", `${end}'s chip filled: ${fill}`).toBe(end !== "won");
+  await lookedFor(a, () => a.goto("/"));
+  await expect(aDot).not.toHaveClass(/news/);
+
+  // His rematch, played and sent: news for her again.
   await b.getByRole("button", { name: "Реванш" }).click();
   await meetAs(b);
   await countIn(b);
   await expect(b.locator(".question-head .versus")).toHaveText("Дуел с Ана");
+  await playRun(b);
+  await expect(b.locator(".duel-sent")).toBeVisible();
+  await a.reload();
+  await expect(aDot).toHaveClass(/news/);
 });
 
 test("against a recording: a real game's ten, its player named, its answers as they came", async ({ browser }) => {

@@ -23,8 +23,7 @@ let {
   signal,
   when,
   title,
-  friendRequests,
-  duelsWaiting,
+  sawFriends,
   duelLists,
   startDuel,
   go,
@@ -102,8 +101,7 @@ export function friends(kit: Kit): Child {
     signal,
     when,
     title,
-    friendRequests,
-    duelsWaiting,
+    sawFriends,
     duelLists,
     startDuel,
     go,
@@ -125,6 +123,8 @@ export function friends(kit: Kit): Child {
     inSight,
   } = kit);
   title("Приятели");
+  // Opened: what has come here is seen, on every device, and the dot on Приятели goes.
+  if (user.peek()) sawFriends();
   const board = dayBoard();
   return h(
     "section",
@@ -313,8 +313,6 @@ function friendsCard(reloadBoard: () => void, played: () => boolean): Child {
       data.set(f);
       duels.set(d);
       if (f.accepted && !yes.peek()) yes.set(acceptedLine(f.accepted));
-      friendRequests.set(f.requests.in.length);
-      duelsWaiting.set(d.yours.filter((x) => !x.first).length);
     } catch (err) {
       // A look again that failed, with the list on the screen, waits for the next one quietly.
       if (!data.peek()) failed.set(err);

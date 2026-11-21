@@ -97,10 +97,12 @@ var mergeSteps = []mergeStep{
 			> substr(users.streak_told, instr(users.streak_told, ':') + 1) THEN g.streak_told ELSE users.streak_told END
 		FROM (SELECT streak_told FROM users WHERE id = ?2) g
 		WHERE users.id = ?1`},
-	// The player came in when the earlier of the two did, and was last seen when the later was.
-	{carries: []string{"users.created_at", "users.seen_at"},
-		sql: `UPDATE users SET created_at = min(users.created_at, g.created_at), seen_at = max(users.seen_at, g.seen_at)
-		FROM (SELECT created_at, seen_at FROM users WHERE id = ?2) g WHERE users.id = ?1`},
+	// The player came in when the earlier of the two did, and was last seen when the later was; and last looked at
+	// Приятели when the later of the two did (play.FriendsNews).
+	{carries: []string{"users.created_at", "users.seen_at", "users.friends_seen_at"},
+		sql: `UPDATE users SET created_at = min(users.created_at, g.created_at), seen_at = max(users.seen_at, g.seen_at),
+			friends_seen_at = max(users.friends_seen_at, g.friends_seen_at)
+		FROM (SELECT created_at, seen_at, friends_seen_at FROM users WHERE id = ?2) g WHERE users.id = ?1`},
 }
 
 // mergeLeft are the references to a player that Merge leaves with the guest, to go with them, and why.

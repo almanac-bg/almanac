@@ -70,7 +70,7 @@ func TestTakeInvite(t *testing.T) {
 	if a, err := w.g.AcceptedOf(ctx, ana); err != nil || a == nil || a.ID != bo {
 		t.Fatalf("Ana told of the yes: %+v %v", a, err)
 	}
-	if n, _ := w.g.RequestsWaiting(ctx, ana); n != 0 {
+	if n := w.requestsIn(ana); n != 0 {
 		t.Fatalf("Bo's request still waits: %d", n)
 	}
 	if in, _ := w.g.Invited(ctx, code, bo); !in.Friends {
