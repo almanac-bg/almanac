@@ -143,8 +143,9 @@ const ends: Record<DuelView["state"], string> = {
   expired: "Изтече",
 };
 
-/** What a row says under a duel's end: where an open one stands; a finished one's score and, on even right answers,
- * what broke the tie. The pair's record is said once, on the friend (Приятели), not on each duel. */
+/** What a row says under a duel's end: where an open one stands (begun: a question shown, its time run out or not); a
+ * finished one's score (what broke a tie on even right answers goes on a line of its own: duelRow). The pair's record
+ * is said once, on the friend (Приятели), not on each duel. */
 function rowLine(d: DuelView): string {
   const them = d.opponent;
   const versus = d.recorded ? " · срещу запис" : "";
@@ -155,23 +156,24 @@ function rowLine(d: DuelView): string {
         ? `Довърши своята игра · ${leftWords(d.until ?? 0)}`
         : `Изиграй същите десет въпроса · ${leftWords(d.until ?? 0)}`;
     case "theirs":
-      // The player's ten are in: their score, and how long the other has for the same ten.
-      return `Ти: ${formatNumber(d.you?.rights ?? 0)} · ${them?.name ?? "Приятелят"} има ${leftWords(d.until ?? 0)}`;
+      // The player's ten are in: their score, and how long the other (named over it) has for the same ten.
+      return `Ти: ${formatNumber(d.you?.rights ?? 0)} · ${leftWords(d.until ?? 0)}`;
     case "expired":
       if (d.lapsed === "they") return `${them?.name ?? "Приятелят"} не го изигра навреме`;
       if (d.lapsed === "you") return "Не го изигра навреме";
       return "Без резултат";
   }
   if (them?.gone) return "Играчът вече го няма"; // their game went with them: no score of theirs to set beside the player's
-  const tie = tieWords(d);
-  return `${formatNumber(d.you?.rights ?? 0)}:${formatNumber(them?.rights ?? 0)}${versus}${tie ? ` · ${tie}` : ""}`;
+  return `${formatNumber(d.you?.rights ?? 0)}:${formatNumber(them?.rights ?? 0)}${versus}`;
 }
 
 /** A duel as a row: the other player, where it stands, and a word on it. An open one's list says whose turn it is
- * („Твой ред“, „Чакаш“): its row only how it stands („Ти: 8 · Иво има още 6 дни“). */
+ * („Твой ред“, „Чакаш“): its row only how it stands („Ти: 8 · още 6 дни“). A played one won or lost on even right
+ * answers says what broke the tie on a line of its own under the row, the score staying at the right. */
 export function duelRow(d: DuelView): Child {
   const them = d.opponent;
   const open = d.state === "yours" || d.state === "theirs";
+  const tie = them?.gone ? "" : tieWords(d);
   return h(
     "li",
     null,
@@ -185,6 +187,7 @@ export function duelRow(d: DuelView): Child {
         open ? null : h("strong", { class: "duel-state" }, ends[d.state]),
         h("span", { class: "muted" }, rowLine(d)),
       ),
+      tie ? h("span", { class: "duel-tie muted" }, tie.charAt(0).toUpperCase() + tie.slice(1)) : null,
     ),
   );
 }

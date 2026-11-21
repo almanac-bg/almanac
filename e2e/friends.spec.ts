@@ -188,3 +188,50 @@ test("a friend just accepted is on the day's board at once, without a reload", a
   await expect(board.locator(".rank-row").filter({ hasText: bo })).toHaveCount(1);
   await expect(board.locator(".rank-row")).toHaveCount(2);
 });
+
+// On the narrowest phone, at the usual text and at twice it, the day played: each board's rows hold their score and
+// small squares (both boards have them), nothing goes sideways, and „Дуели“ with „Нов дуел“ is there without a friend.
+test("Приятели at 320 px, the day played: the rows hold their squares, and a duel is a tap away", async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  const page = await (await browser.newContext({ viewport: { width: 320, height: 568 }, bypassCSP: true })).newPage();
+  await page.goto("/");
+  await startDay(page);
+  await playRun(page);
+  for (const percent of [100, 200]) {
+    // Twice the text from the page's start, as a phone set to large text gives it (CSP lets the test add a style).
+    if (percent !== 100)
+      await page.addInitScript((p) => {
+        const style = document.createElement("style");
+        style.textContent = `html { font-size: ${p}% !important; }`;
+        new MutationObserver(() => document.head && !style.isConnected && document.head.append(style)).observe(
+          document,
+          { childList: true, subtree: true },
+        );
+      }, percent);
+    await page.goto("/friends");
+    if (percent !== 100) {
+      await expect(page.locator("html")).toHaveCSS("font-size", `${(16 * percent) / 100}px`);
+      await expect(page.locator("html")).toHaveClass(/\btight\b/);
+    }
+    await expect(page.locator(".duels").getByRole("link", { name: "Нов дуел" })).toBeVisible();
+    for (const tab of ["Приятели", "България"]) {
+      await page.getByRole("tab", { name: tab }).click();
+      const rows = page.locator(".day-board .rank-row");
+      await expect(rows.first().locator(".mini")).toBeVisible();
+      const flaws = await page.evaluate(() => {
+        const out: string[] = [];
+        if (document.documentElement.scrollWidth > innerWidth)
+          out.push(`the page ${document.documentElement.scrollWidth}px`);
+        for (const row of document.querySelectorAll(".day-board .rank-row")) {
+          const edge = row.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(row).paddingRight);
+          for (const el of row.querySelectorAll("*"))
+            if (el.getBoundingClientRect().right > edge + 1) out.push(`${el.className} past its row`);
+        }
+        return out;
+      });
+      expect(flaws, `${tab} at ${percent} %`).toEqual([]);
+    }
+  }
+});

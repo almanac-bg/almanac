@@ -130,7 +130,8 @@ type DuelSide struct {
 	Rights int    `json:"rights"`
 	Ms     int64  `json:"ms"`
 	Done   bool   `json:"done"`
-	// Started is whether the side has answered a question yet (a duel sent first may be made and never begun).
+	// Started is whether the side's game has begun: a question shown (its time running, or run out), or answered (a
+	// duel sent first may be made and never begun).
 	Started bool  `json:"started,omitempty"`
 	Look    *Look `json:"look,omitempty"`
 	// Gone is a player who has gone since (play.Forget): their game went with them, so their score isn't known.
@@ -929,7 +930,7 @@ func (g *Game) duelSide(ctx context.Context, userID, runID int64) (*DuelSide, er
 	s.Look = &look
 	if runID != 0 {
 		err = g.DB.Read.QueryRowContext(ctx, `SELECT finished_at IS NOT NULL, rights, closeness, ms,
-			EXISTS (SELECT 1 FROM answers WHERE run_id = runs.id) FROM runs WHERE id = ?`, runID).
+			at > 0 OR shown_at IS NOT NULL OR EXISTS (SELECT 1 FROM answers WHERE run_id = runs.id) FROM runs WHERE id = ?`, runID).
 			Scan(&s.Done, &s.Rights, &s.score.tie.closeness, &s.Ms, &s.Started)
 		s.score.rights, s.score.ms = s.Rights, s.Ms
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {

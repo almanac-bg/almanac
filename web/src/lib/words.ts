@@ -131,11 +131,11 @@ export function hyphenate(text: string): string {
   });
 }
 
-/** A player's name as a narrow cell holds it: a name of several words breaks only between them; a name of one word,
- * where it's wider than its line, at its syllables, with a hyphen (CSS keeps `overflow-wrap: break-word` for a word no
- * syllable can save: Latin letters, figures). */
+/** A player's name as a narrow cell holds it: between its words, and a word wider than its line (a long surname in
+ * large text at 320 px) at its syllables, with a hyphen, as hyphenate breaks words (CSS keeps `overflow-wrap:
+ * break-word` for a word no syllable can save: Latin letters, figures). */
 export function nameWords(name: string): string {
-  return /\s/.test(name.trim()) ? name : hyphenate(name);
+  return hyphenate(name);
 }
 
 /** The hour (in Bulgaria) from which a streak at stake says it ends at midnight. */

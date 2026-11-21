@@ -115,14 +115,17 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   chapters, „Към Алманаха“). Its start (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
 - **Приятели:** the board (friends by default, or all of България: its spread and the player's place first, then the
   top rows: the place, the avatar, the name with the row's width and the seal and „ти“ after it, the score and the
-  small squares on a line under it); the friends (a row each: avatar, the name and seal across the row, never cut,
-  today's score and the duels between you „дуели 3 : 1“ under it; the column a third of a big screen; a friend
-  removed is out at once, „Премахна Иво от приятелите си. Върни“ in the list's place for five seconds, and only then
-  removed, the duels open between them ending as if their time were up); the
-  duels („Твой ред“ the page's action, „Чакаш“, „Изиграни“: an open one how it stands under the name, „Изиграй същите
-  десет въпроса · още 6 дни“, „Ти: 8 · Иво има още 6 дни“; a played one its score and, on even right answers, what broke the
-  tie, and who was quicker by name: „по-бързо отговаря Иво: 116,9 с срещу твоите 135,1 с“; the record between two is
-  the friend's row's alone). Friends are added by the player's invite link, „Покани приятел“
+  small squares on a line under it, on a line of their own under the score below 340 px or in large text; the
+  squares once the player has played the day, on both boards); the friends (a row each: avatar, the name and seal
+  across the row, never cut, today's score and the duels between you „дуели 3 : 1“ under it; the column a third of a
+  big screen; a friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
+  „Отказ“, then at once, the duels open between them ending as if their time were up); the duels (shown once there
+  are friends or duels, or the day is played: „Нов дуел“ against a recording needs no friend; „Твой ред“ the page's
+  action, „Чакаш“, „Изиграни“: an open one how it stands under the name, „Изиграй същите десет въпроса · още 6 дни“,
+  „Довърши своята игра“ once its first question was shown, „Ти: 8 · още 6 дни“; a played one its score at the right
+  and, on even right answers, what broke the tie on a line of its own under the row, and who was quicker by name:
+  „Равен брой верни · по-бързо отговаря Иво: 116,9 с срещу твоите 135,1 с“; the record between two is the friend's
+  row's alone). Friends are added by the player's invite link, „Покани приятел“
   (`.invite-friend`, an outlined `.btn`: a phone's share sheet with „Добави ме в АЛМАНАХ: <link>“, a big screen's copy,
   „Връзката е копирана. Изпрати я на приятел.“; one quiet line under it, and „Нова връзка“ beside it, which asks once,
   „Старата връзка ще спре да работи.“), and in one field, „име или имейл“; a
