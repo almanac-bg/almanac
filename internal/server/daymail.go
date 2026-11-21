@@ -140,5 +140,5 @@ func (s *Server) dayMail(ctx context.Context, today string, at time.Time, userID
 	if err != nil || !sent {
 		return false, err
 	}
-	return true, s.game.Tally(ctx, "mail:day:sent", 1)
+	return true, nil
 }

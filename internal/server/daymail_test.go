@@ -76,8 +76,8 @@ func TestDayMail(t *testing.T) {
 		t.Fatalf("after a restart: %d", n)
 	}
 	g.outbox.Flush(t.Context())
-	if len(g.inbox.got) != 2 || g.counted("mail:day:sent") != 2 {
-		t.Fatalf("sent %+v, counted %d", g.inbox.got, g.counted("mail:day:sent"))
+	if len(g.inbox.got) != 2 {
+		t.Fatalf("sent %+v", g.inbox.got)
 	}
 	for _, m := range g.inbox.got {
 		if m.To != "ana@example.bg" && m.To != "fe@example.bg" {

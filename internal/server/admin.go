@@ -89,8 +89,8 @@ func PlayerText(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-// admin is the page for whoever keeps the game: whether players come back and what they do (measures), and players (a name to put right, a player to suspend: admin_players.go). The questions are on a page of their own
-// (adminQuestions). Admins only; to anyone else they aren't there.
+// admin is the page for whoever keeps the game: whether players come back (measure.go), and players (a name to put
+// right, a player to suspend: admin_players.go). The questions are on a page of their own (adminQuestions). Admins only; to anyone else they aren't there.
 func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	if !s.isAdmin(r) {
 		s.page(w, r) // to anyone else, the game's own page that isn't there
@@ -101,12 +101,12 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	db := s.db.Read
 	data := struct {
 		Players, WithEmail, DayToday, DayScripted, Questions, Live int
-		M                                                          measures
+		Days                                                       []dayRow
 	}{Questions: len(b.Questions), Live: len(b.Live("", ""))}
 	today := s.game.Today()
 	var err error
-	if data.M, err = s.measures(ctx); err != nil {
-		slog.Error("admin: the measures", "err", err)
+	if data.Days, err = s.dayRows(ctx); err != nil {
+		slog.Error("admin: the days", "err", err)
 	}
 	_ = db.QueryRowContext(ctx, `SELECT count(*), count(email) FROM users`).Scan(&data.Players, &data.WithEmail)
 	// The day's games by people, and apart those played at a script's speed, which nobody else sees (play/fair.go).
@@ -131,7 +131,14 @@ func (s *Server) isAdmin(r *http.Request) bool {
 	return err == nil && u != nil && u.Admin
 }
 
-// adminQuestions is /admin's page of the questions: reports on them, and how each goes.
+// questionKinds are the kinds of questions, as /admin names them.
+var questionKinds = map[string]string{"truefalse": "Вярно или не", "choice": "Избор", "number": "Число",
+	"order": "Подреди", "match": "Свържи", "split": "Раздели", "clues": "Подсказки"}
+
+// timedOutRow is a kind of question's answers run out of time (play.TimedOutSince), as „1,4% (12 от 860)“.
+type timedOutRow struct{ Name, Share string }
+
+// adminQuestions is /admin's page of the questions: reports on them, how each goes, and the clock's answers run out.
 func (s *Server) adminQuestions(w http.ResponseWriter, r *http.Request) {
 	if !s.isAdmin(r) {
 		s.page(w, r) // to anyone else, the game's own page that isn't there
@@ -158,7 +165,16 @@ func (s *Server) adminQuestions(w http.ResponseWriter, r *http.Request) {
 		Reported                       []reported
 		ReportsOpen, QuestionsReported int
 		Hardest, Easiest               []stat
+		TimedOut                       []timedOutRow
 	}{}
+	// The clock: answers run out of time by kind, over 28 days (play.Limit's floors are set so each stays under 2%).
+	if timed, err := s.game.TimedOutSince(ctx, play.DayShift(s.game.Today(), -27)); err == nil {
+		for _, t := range timed {
+			share := strings.Replace(fmt.Sprintf("%.1f%%", 100*float64(t.N)/float64(max(t.Of, 1))), ".", ",", 1)
+			data.TimedOut = append(data.TimedOut, timedOutRow{cmp.Or(questionKinds[t.Kind], t.Kind),
+				fmt.Sprintf("%s (%d от %d)", share, t.N, t.Of)})
+		}
+	}
 
 	// The questions reported most lately first, reportsShown of them, and of each its first reportsEach reports: a
 	// flood of reports can't make the page too long to load.

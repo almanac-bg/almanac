@@ -24,7 +24,7 @@ import (
 //   - the day's board, its count of players and its places, and friends' results of the day (BoardOf, FriendsBoard,
 //     FriendsOf; fairFor);
 //   - the questions' statistics: how players answered each (crowd.go), how hard each is (hardness, Calibrate) and
-//     /admin's tallies (FairAnswers);
+//     /admin's counts of answers (FairAnswers);
 //   - the recordings a duel is played against (recordedRun).
 //
 // What it isn't left out of: the player's own numbers (their profile, Алманах, streak), which are

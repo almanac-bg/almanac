@@ -2,12 +2,31 @@ package play
 
 import (
 	"database/sql"
-	"os"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 )
+
+// stored puts a game straight in the database: begun at 10:00 in Bulgaria on its day, with a question answered.
+func (w *world) stored(user int64, kind, day string, finished, scripted bool) {
+	w.t.Helper()
+	at, _ := time.ParseInLocation(time.DateOnly, day, Bulgaria)
+	at = at.Add(10 * time.Hour)
+	var end any
+	if finished {
+		end = at.Add(5 * time.Minute).UnixMilli()
+	}
+	var dayCol any
+	if kind == "day" {
+		dayCol = day
+	}
+	if _, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, day, questions, at, started_at, finished_at, shadow)
+		VALUES (?, ?, ?, '[]', 1, ?, ?, ?)`, user, kind, dayCol, at.UnixMilli(), end, scripted); err != nil {
+		w.t.Fatal(err)
+	}
+	if _, err := w.db.Write.Exec(`INSERT OR IGNORE INTO active_days (user_id, day) VALUES (?, ?)`, user, day); err != nil {
+		w.t.Fatal(err)
+	}
+}
 
 // shadowed puts a game straight in the database, as stored does, a shadow for the reason given.
 func (w *world) shadowed(user int64, day string, shadow int) {
@@ -42,9 +61,6 @@ func TestPeopleDays(t *testing.T) {
 	if n := act.On("2026-11-12"); n != 3 {
 		t.Fatalf("people on the 12th: %d, want Ана, the one brought and the one gone", n)
 	}
-	if n := act.Within("2026-11-01", "2026-11-12"); n != 3 {
-		t.Fatalf("people in the days: %d", n)
-	}
 	if act.On("2026-11-10") != 0 || act.first(ana) != "2026-11-11" {
 		t.Fatalf("Ана's first day: %q", act.first(ana))
 	}
@@ -66,143 +82,46 @@ func TestNewcomersMerged(t *testing.T) {
 		t.Fatal(err)
 	}
 	act, _ := w.g.Activity(ctx, "2026-11-01")
-	news, err := w.g.Newcomers(ctx, act, "2026-11-01")
-	if err != nil || len(news) != 1 {
-		t.Fatalf("newcomers: %+v %v", news, err)
-	}
-}
-
-// The weeks' players: new, kept, back after a pause, lost (D11); and one window for how many play on a day of those
-// who play in a month.
-func TestGrowthAndStickiness(t *testing.T) {
-	w := setup(t)
-	w.now = time.Date(2026, 11, 25, 10, 0, 0, 0, Bulgaria) // a Wednesday
-	ctx := t.Context()
-	kept, back, lost, fresh := w.user(), w.user(), w.user(), w.user()
-	// Weeks from Monday: 2–8, 9–15, 16–22 November.
-	w.stored(kept, "day", "2026-11-05", true, false)
-	w.stored(back, "day", "2026-11-04", true, false)
-	w.stored(lost, "day", "2026-11-12", true, false)
-	w.stored(kept, "day", "2026-11-13", true, false)
-	w.stored(kept, "day", "2026-11-17", true, false)
-	w.stored(back, "day", "2026-11-18", true, false)
-	w.stored(fresh, "day", "2026-11-20", true, false)
-	act, err := w.g.Activity(ctx, "2026-10-26")
-	if err != nil {
-		t.Fatal(err)
-	}
-	g := act.Growth("2026-11-25", 3)
-	if len(g) != 3 || g[0].Week != "2026-11-16" {
-		t.Fatalf("the weeks: %+v", g)
-	}
-	if x := g[0]; x.New != 1 || x.Kept != 1 || x.Back != 1 || x.Lost != 1 {
-		t.Fatalf("16–22: %+v", x)
-	}
-	if x := g[1]; x.New != 1 || x.Kept != 1 || x.Back != 0 || x.Lost != 1 {
-		t.Fatalf("9–15: %+v", x)
-	}
-	daily, month := act.Stickiness("2026-11-24")
-	if month != 4 || daily != 7.0/28 {
-		t.Fatalf("stickiness: %v of %d", daily, month)
-	}
-}
-
-// The habit: the day's ten on 3 of the last 7 days.
-func TestHabit(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	ana, bo := w.user(), w.user()
-	for _, d := range []string{"2026-11-06", "2026-11-09", "2026-11-11"} {
-		w.stored(ana, "day", d, true, false)
-		w.stored(bo, "day", d, true, d == "2026-11-11") // the last at a script's speed: two days, not three
-	}
-	if n, err := w.g.Habit(ctx, "2026-11-11"); err != nil || n != 1 {
-		t.Fatalf("habit: %d %v", n, err)
-	}
-}
-
-// The version a player met is kept on their first day played, and stays (D3).
-func TestFirstVersion(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	w.g.Version = "v3.9.0"
-	ana := w.user()
-	s, err := w.g.StartTopic(ctx, ana, "science")
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(ana, s.ID, w.right)
-	w.g.Version = "v3.9.1"
-	w.wait(24 * time.Hour)
-	s, _ = w.g.StartTopic(ctx, ana, "science")
-	w.play(ana, s.ID, w.right)
-	var v string
-	if err := w.db.Read.QueryRow(`SELECT first_version FROM users WHERE id = ?`, ana).Scan(&v); err != nil || v != "v3.9.0" {
-		t.Fatalf("first version: %q %v", v, err)
-	}
-	// One who played before versions were kept met none of them: not the version of their next day.
-	bo := w.user()
-	if _, err := w.db.Write.Exec(`INSERT INTO active_days (user_id, day) VALUES (?, '2026-01-01')`, bo); err != nil {
-		t.Fatal(err)
-	}
-	s, _ = w.g.StartTopic(ctx, bo, "science")
-	w.play(bo, s.ID, w.right)
-	var none sql.NullString
-	if err := w.db.Read.QueryRow(`SELECT first_version FROM users WHERE id = ?`, bo).Scan(&none); err != nil || none.Valid {
-		t.Fatalf("an old player's first version: %v %v", none, err)
-	}
-}
-
-// Migration 0069 takes back the versions stamped on players from before 0068 first served.
-func TestFirstVersionsTakenBack(t *testing.T) {
-	w := setup(t)
-	old, fresh := w.user(), w.user()
-	for _, q := range []string{
-		`INSERT INTO releases (version, at) VALUES ('v3.9.0', 1795015380000)`, // 18 Nov 2026, 17:23 in Bulgaria
-		`INSERT INTO active_days (user_id, day) VALUES (` + strconv.FormatInt(old, 10) + `, '2026-11-10'), (` +
-			strconv.FormatInt(old, 10) + `, '2026-11-19'), (` + strconv.FormatInt(fresh, 10) + `, '2026-11-18')`,
-		`UPDATE users SET first_version = 'v3.9.0'`,
-	} {
-		if _, err := w.db.Write.Exec(q); err != nil {
-			t.Fatal(err)
+	for _, c := range act.DayCounts() {
+		if c.Day == "2026-11-12" && (c.New != 1 || c.Played != 1) {
+			t.Fatalf("the 12th: %+v", c)
 		}
 	}
-	body, err := os.ReadFile("../store/migrations/0069_measures_set_right.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Its parts that set data right (the column it drops is gone already).
-	for q := range strings.SplitSeq(string(body), ";\n") {
-		if strings.Contains(q, "day_mails") {
-			continue
-		}
-		if _, err := w.db.Write.Exec(q); err != nil {
-			t.Fatal(err)
-		}
-	}
-	version := func(id int64) string {
-		var v sql.NullString
-		_ = w.db.Read.QueryRow(`SELECT first_version FROM users WHERE id = ?`, id).Scan(&v)
-		return v.String
-	}
-	if version(old) != "" || version(fresh) != "v3.9.0" {
-		t.Fatalf("old %q, fresh %q", version(old), version(fresh))
-	}
 }
 
-// A game keeps the device it was started on, where ctx says it (D5).
-func TestGameKeepsItsDevice(t *testing.T) {
+// /admin's table: a day's players, those new on it, and of those, who played again 1, 7 and 30 days after, told only
+// once that day is over; one who played before the days read is never new in them.
+func TestDayCounts(t *testing.T) {
 	w := setup(t)
-	ana, bo := w.user(), w.user()
-	a, err := w.g.StartTopic(FromDevice(t.Context(), ana, "phone"), ana, "science")
+	w.now = time.Date(2026, 12, 20, 10, 0, 0, 0, Bulgaria)
+	ana, bo, old := w.user(), w.user(), w.user()
+	w.stored(old, "day", "2026-10-01", true, false)
+	w.stored(old, "day", "2026-11-12", true, false)
+	w.stored(ana, "day", "2026-11-12", true, false)
+	w.stored(ana, "day", "2026-11-13", true, false)
+	w.stored(ana, "topic", "2026-12-12", true, false)
+	w.stored(bo, "day", "2026-11-12", true, false)
+	w.stored(bo, "day", "2026-11-19", true, false)
+	w.stored(bo, "day", "2026-12-19", true, false)
+	act, err := w.g.Activity(t.Context(), "2026-11-01")
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, _ := w.g.StartTopic(FromDevice(t.Context(), ana, "phone"), bo, "science") // someone else's device
-	var da, db sql.NullString
-	_ = w.db.Read.QueryRow(`SELECT device FROM runs WHERE id = ?`, a.ID).Scan(&da)
-	_ = w.db.Read.QueryRow(`SELECT device FROM runs WHERE id = ?`, b.ID).Scan(&db)
-	if da.String != "phone" || db.Valid {
-		t.Fatalf("devices: %v %v", da, db)
+	days := act.DayCounts()
+	if len(days) != 50 || days[0].Day != "2026-12-20" || days[49].Day != "2026-11-01" {
+		t.Fatalf("the days: %d, %s to %s", len(days), days[0].Day, days[len(days)-1].Day)
+	}
+	byDay := map[string]DayCount{}
+	for _, d := range days {
+		byDay[d.Day] = d
+	}
+	if d := byDay["2026-11-12"]; d.Played != 3 || d.New != 2 || d.Back != [3]int{1, 1, 1} || d.Due != [3]bool{true, true, true} {
+		t.Fatalf("the 12th: %+v", d)
+	}
+	if d := byDay["2026-12-19"]; d.Played != 1 || d.New != 0 || d.Due != [3]bool{} {
+		t.Fatalf("yesterday: %+v", d)
+	}
+	if d := byDay["2026-11-25"]; d.Due != [3]bool{true, true, false} {
+		t.Fatalf("the 25th: %+v", d)
 	}
 }

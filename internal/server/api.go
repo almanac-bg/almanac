@@ -338,17 +338,9 @@ func (s *Server) guest(w http.ResponseWriter, r *http.Request) error {
 	if !s.guardFrom(r, "guest", guestsNet, guestsSite, time.Hour) {
 		return errTooMany
 	}
-	// Where the player came in: the path the client was first opened at (an old client sends nothing).
-	var in struct {
-		From string `json:"from"`
-	}
-	_ = readJSON(r, &in)
 	u, token, err := s.accounts.Guest(r.Context())
 	if err != nil {
 		return err
-	}
-	if err := s.cameFrom(r.Context(), u.ID, in.From); err != nil {
-		slog.Warn("came from", "err", err) // the guest is made all the same
 	}
 	s.setSession(w, token)
 	return ok(w, map[string]any{"user": u})

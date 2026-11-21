@@ -33,9 +33,6 @@ export interface RemindAsks {
   n: number;
   /** The day of the last answer: never asked twice in a day. */
   day: string;
-  /** The day each way of asking last showed, counted once a day each (play/measure.go: „pushask:shown“,
-   * „mailask:shown“): a refused notification's ask turned into the mail's is two asks shown. */
-  shown: { push?: string; mail?: string };
   /** The day the ask by mail was told „Не сега“: it was the ask for the email, so the line to keep the game with one
    * (screens/keep.ts, keepLine) keeps quiet that day too. */
   mailNo?: string;
@@ -43,25 +40,17 @@ export interface RemindAsks {
 
 /** The asks as kept (`text`; anything unreadable: none yet). */
 export function remindAsks(text: string | null): RemindAsks {
-  let kept: Partial<RemindAsks> & { shown?: unknown } = {};
+  let kept: Partial<RemindAsks> = {};
   try {
     kept = JSON.parse(text ?? "{}") ?? {};
   } catch {
     // none, then
   }
-  // Kept before each way counted apart: one day for whichever showed.
-  const shown = typeof kept.shown === "string" ? { push: kept.shown, mail: kept.shown } : kept.shown;
   return {
     n: typeof kept.n === "number" ? kept.n : 0,
     day: typeof kept.day === "string" ? kept.day : "",
-    shown: shown && typeof shown === "object" ? (shown as RemindAsks["shown"]) : {},
     mailNo: typeof kept.mailNo === "string" ? kept.mailNo : undefined,
   };
-}
-
-/** The asks once `by`'s has shown on `day`: null if it was counted already that day. */
-export function remindShown(a: RemindAsks, by: "push" | "mail", day: string): RemindAsks | null {
-  return a.shown[by] === day ? null : { ...a, shown: { ...a.shown, [by]: day } };
 }
 
 /** The asks once `by`'s is answered on `day`: a yes ends them; a no counts, and by mail it covers the ask to keep the

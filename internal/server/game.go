@@ -155,7 +155,7 @@ func (s *Server) startDay(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	ctx := s.fromClient(r, u.ID)
+	ctx := r.Context()
 	if s.playedHere(r, s.game.Today()) {
 		// This browser started today's issue already, as someone else: a run begun now writes grey (handoff.go).
 		ctx = play.SecondPlay(ctx, u.ID)
@@ -182,7 +182,7 @@ func (s *Server) startTopic(w http.ResponseWriter, r *http.Request) error {
 	if !s.limits.allow("topic:"+strconv.FormatInt(u.ID, 10), 120, time.Hour) {
 		return errTooMany
 	}
-	st, err := s.game.StartTopic(s.fromClient(r, u.ID), u.ID, in.Category)
+	st, err := s.game.StartTopic(r.Context(), u.ID, in.Category)
 	if err != nil {
 		return err
 	}

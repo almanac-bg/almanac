@@ -98,9 +98,7 @@ func (w *world) dress(p *player) error {
 func (w *world) prefs(p *player) error {
 	now := store.Ms(w.clock())
 	if w.chance(0.6) {
-		_ = w.g.Tally(w.ctx, "pushask:shown", 1)
 		if w.chance(0.55) {
-			_ = w.g.Tally(w.ctx, "pushask:yes", 1)
 			if err := w.exec(`INSERT INTO push_subs (endpoint, user_id, p256dh, auth, created_at)
 				VALUES (?, ?, 'seed', 'seed', ?)`, fmt.Sprintf("https://push.invalid/seed/%d", p.id), p.id, now); err != nil {
 				return err
@@ -111,14 +109,10 @@ func (w *world) prefs(p *player) error {
 					return err
 				}
 			}
-		} else {
-			_ = w.g.Tally(w.ctx, "pushask:no", 1)
 		}
 	}
 	if p.profile >= 0 && w.chance(0.5) {
-		_ = w.g.Tally(w.ctx, "mailask:shown", 1)
 		yes := w.chance(0.5)
-		_ = w.g.Tally(w.ctx, map[bool]string{true: "mailask:yes", false: "mailask:no"}[yes], 1)
 		for _, kind := range []string{"streak", "day"} {
 			if err := w.exec(`INSERT INTO mail_prefs (user_id, kind, wanted) VALUES (?, ?, ?)
 				ON CONFLICT DO NOTHING`, p.id, kind, b2i(yes && (kind == "streak" || w.chance(0.6)))); err != nil {

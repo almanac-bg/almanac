@@ -70,7 +70,6 @@ func TestSeededGame(t *testing.T) {
 		"ink":              `SELECT count(*) FROM facts WHERE ink`,
 		"pencil":           `SELECT count(*) FROM facts WHERE NOT ink`,
 		"guests":           `SELECT count(*) FROM users WHERE email IS NULL`,
-		"tallies":          `SELECT count(*) FROM daily_counts`,
 	} {
 		var n int
 		if err := db.Read.QueryRow(q).Scan(&n); err != nil {

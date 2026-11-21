@@ -107,8 +107,8 @@ func (s Subscription) Check() error {
 	return nil
 }
 
-// Message is what a notification shows, and where tapping it goes; and what it's about (its kind), which the browser
-// says back on a tap, so that the game counts the notifications opened by kind.
+// Message is what a notification shows, and where tapping it goes; and what it's about (its kind: the day's last
+// reminder is "stop"), which the game's queue reads.
 type Message struct {
 	Title string `json:"title"`
 	Body  string `json:"body"`

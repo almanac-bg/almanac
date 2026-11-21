@@ -255,12 +255,6 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
 	}
-	if status == http.StatusOK && u == nil {
-		s.countVisit(r)
-	}
-	if isShared {
-		s.countOpen(r)
-	}
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	h.Set("Cache-Control", private) // the boot JSON has the player in it: their email, whether they're an admin

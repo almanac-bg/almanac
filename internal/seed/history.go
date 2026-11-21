@@ -32,23 +32,10 @@ func (w *world) history() error {
 	return nil
 }
 
-// releases are the versions the history's days were played on (/admin marks them on its charts), one every few days.
-func (w *world) release() error {
-	if w.day%9 != 0 {
-		return nil
-	}
-	v := fmt.Sprintf("v3.%d.0", w.day/9)
-	w.g.Version = v
-	return w.exec(`INSERT OR IGNORE INTO releases (version, at) VALUES (?, ?)`, v, store.Ms(w.dayAt(w.day, 5, 0)))
-}
-
 // playDay plays a day: everyone who comes, in the order they come.
 func (w *world) playDay() error {
 	w.g.AftersDone(w.ctx)
 	w.rewind(w.dayAt(w.day, 0, 30))
-	if err := w.release(); err != nil {
-		return err
-	}
 	if err := w.sweep(); err != nil {
 		return err
 	}
@@ -66,7 +53,7 @@ func (w *world) playDay() error {
 			return fmt.Errorf("%s (%d): %w", s.p.name, s.p.id, err)
 		}
 	}
-	return w.tallies()
+	return nil
 }
 
 // plan is who comes on the day, and when, in order.
@@ -145,9 +132,6 @@ func (w *world) visit(s session) error {
 			return err
 		}
 	}
-	if p.email == "" {
-		_ = w.g.Tally(w.ctx, "visit:"+p.from, 1)
-	}
 	if err := w.answerRequests(p); err != nil {
 		return fmt.Errorf("requests: %w", err)
 	}
@@ -188,22 +172,4 @@ func (w *world) visit(s session) error {
 		return fmt.Errorf("dressing: %w", err)
 	}
 	return w.sweep()
-}
-
-// tallies are what /admin counts each day of what no table keeps: notifications sent and opened, mails sent.
-func (w *world) tallies() error {
-	var on int
-	if err := w.one(&on, `SELECT count(DISTINCT user_id) FROM push_subs`); err != nil {
-		return err
-	}
-	sent := on * 6 / 10
-	for key, n := range map[string]int{"push:sent:day": sent, "push:open:day": sent / 4,
-		"push:sent:friends": on / 8, "push:open:friends": on / 20, "mail:day:sent": on / 5} {
-		if n > 0 {
-			if err := w.g.Tally(w.ctx, key, n); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }

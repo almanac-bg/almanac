@@ -98,24 +98,6 @@ func TestSharingTheDay(t *testing.T) {
 			t.Fatalf("the shared day's page names the player (%q)", secret)
 		}
 	}
-	other.get(path, browserUA)      // the same browser again: counted once
-	other.get(path, previewUA)      // a preview: not a person
-	g.player().get(path, previewUA) // nor without a profile
-	counts, err := g.srv.game.Tallies(t.Context(), day, day)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if counts["share:day"] != 1 || counts["share:open"] != 1 {
-		t.Fatalf("counted: %v", counts)
-	}
-	// A new player come by the link came from a share.
-	newcomer := g.player()
-	_, made := newcomer.call("POST", "/api/guest", map[string]any{"from": path})
-	var from string
-	if err := g.db.Read.QueryRow(`SELECT came_from FROM users WHERE id = ?`,
-		made["user"].(map[string]any)["id"]).Scan(&from); err != nil || from != "share" {
-		t.Fatalf("came from %q (%v)", from, err)
-	}
 
 	// The card: the issue's and the shape's, for any issue out, of 1200 × 630, cached by anyone.
 	res, err := http.Get(fmt.Sprintf("%s/card/%d-%s.png", g.url, issue, shape))

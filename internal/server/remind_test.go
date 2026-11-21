@@ -63,8 +63,8 @@ func TestRemindAtTheirHour(t *testing.T) {
 	}
 	var claims int
 	_ = g.db.Read.QueryRow(`SELECT count(*) FROM push_reminded WHERE day = '2030-03-04'`).Scan(&claims)
-	if claims != 2 || g.counted("push:sent:day") != 2 {
-		t.Fatalf("claims %d, sent %d", claims, g.counted("push:sent:day"))
+	if claims != 2 {
+		t.Fatalf("claims %d", claims)
 	}
 }
 
@@ -92,8 +92,10 @@ func TestRemindersBackOff(t *testing.T) {
 			t.Fatalf("day %d after the last played: reminded %v, want %v (all: %v)", d, sent[d], want, sent)
 		}
 	}
-	if fake.count("/ana") != 4 || g.counted("push:sent:stop") != 1 || g.counted("push:sent:day") != 3 {
-		t.Fatalf("pushes %d, last %d", fake.count("/ana"), g.counted("push:sent:stop"))
+	var lasts int
+	_ = g.db.Read.QueryRow(`SELECT count(*) FROM push_reminded WHERE user_id = ? AND last`, anaID).Scan(&lasts)
+	if fake.count("/ana") != 4 || lasts != 1 {
+		t.Fatalf("pushes %d, last %d", fake.count("/ana"), lasts)
 	}
 	if m := s.lastReminder(t.Context(), anaID); m.Body != "Днешният брой те чака" ||
 		m.Title != "Спираме напомнянията, докато не играеш пак" || m.Kind != "stop" {

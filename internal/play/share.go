@@ -115,7 +115,7 @@ func (g *Game) Share(ctx context.Context, userID, runID int64) (Share, error) {
 				return err
 			}
 			if n, _ := res.RowsAffected(); n == 1 {
-				return g.tally(tx, "share:day")
+				return nil
 			}
 		}
 		return errors.New("share: no free code")

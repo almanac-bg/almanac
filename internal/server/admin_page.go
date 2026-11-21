@@ -8,14 +8,12 @@ import (
 	"github.com/almanac-bg/almanac/internal/assets"
 )
 
-// /admin's pages, as they look: wide on a desktop (a grid of the numbers at the top, the charts side by side), one
-// column on a phone (the numbers first, the long tables folded, and those that scroll sideways fading at the edge they
-// go on to). Its style is admin.css, loaded only here.
+// /admin's pages, as they look: as wide as the game's pages, one column on a phone, the tables that scroll sideways
+// fading at the edge they go on to. Its style is admin.css, loaded only here.
 
 // adminSections are /admin's parts, as its menu names them: on /admin, but the questions, on a page of their own.
 var adminSections = []struct{ ID, Name string }{
-	{"back", "Връщане"}, {"path", "Път"}, {"habit", "Навик"}, {"streaks", "Серии"},
-	{"notices", "Известия"}, {"games", "Игри"}, {"players", "Играчи"},
+	{"days", "По дни"}, {"players", "Играчи"},
 }
 
 var adminFrame = template.Must(template.New("admin-page").Parse(`<!doctype html>
@@ -58,136 +56,18 @@ func (s *Server) adminPage(w http.ResponseWriter, title string, body template.HT
 }
 
 var adminBody = template.Must(template.New("admin").Parse(`
-{{with .M}}<div class="tiles">{{range .Tiles}}<div class="tile"><p class="tile-name">{{.Name}}</p>
-<p class="tile-value">{{if .Rate}}{{.Rate.HTML}}{{else}}{{.Value}}{{end}}</p>
-<p class="tile-was">Преди 4 седмици: {{.Was}}</p>{{if .Note}}<p class="tile-note">{{.Note}}</p>{{end}}</div>{{end}}</div>{{end}}
-
 <p>{{.Players}} {{if eq .Players 1}}играч{{else}}играча{{end}} ({{.WithEmail}} с имейл). Днес броя на деня са изиграли {{.DayToday}}.{{if .DayScripted}}
 По-бързо, отколкото играе човек: {{.DayScripted}} (другите не ги виждат).{{end}}
 В банката: {{.Questions}} въпроса, {{.Live}} в игра.</p>
-<p class="muted">Играч тук е човек: отговорил на въпрос с човешка скорост, без администраторите. Гостите, изиграли деня
-за проба преди своя, са вътре: иначе новите изглеждат по-верни, отколкото са. Под всеки дял: колко от колко и между
-какви стойности е с 90 % сигурност. Разлика в рамките на тези стойности може да е случайна. В сиво: под 20 души, малко
-данни.</p>
 
-{{with .M}}
-<section class="admin-section" id="back">
-<h2>Връщане</h2>
-<div class="charts">{{.PlayersChart}}{{.CohortChart}}{{.Curve}}</div>
-<details><summary>Играли на ден, като таблица</summary>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th class="num">Играли</th><th class="num">Завършили деня</th></tr></thead><tbody>
-{{range .ChartRows}}<tr><td class="num">{{.Day}}</td><td class="num">{{.Played}}</td><td class="num">{{.DayFinished}}</td></tr>{{end}}
-</tbody></table></div></details>
-
-<h3>По седмицата на първия ден</h3>
-<p class="muted">Новите и делът от тях, играли пак в прозореца след първия си ден (ден 0); „Денят пак“: от завършилите
-деня на първия си ден, които са го завършили пак до 7-ия. Делът е от тези, за които прозорецът е минал. Седмица с ✓ е замразена: числата ѝ не се
-променят вече. „Средно“: всяка колона е от седмиците, за които е минала, затова не са от едни и същи играчи.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Седмица</th><th class="num">Нови</th>{{range .CohortHeads}}<th class="num">{{.}}</th>{{end}}</tr></thead><tbody>
-{{with .Overall}}{{if .New}}<tr class="total"><td>{{.Name}}</td><td class="num">{{.New}}</td>{{range .Rates}}<td class="num">{{.HTML}}</td>{{end}}</tr>{{end}}{{end}}
-{{range .Cohorts}}<tr><td class="num">{{.Name}}{{if .Frozen}} <span class="frozen" title="Замразени: не се променят вече">✓</span>{{end}}</td><td class="num">{{.New}}</td>{{range .Rates}}<td class="num">{{.HTML}}</td>{{end}}</tr>
-{{else}}<tr><td colspan="7" class="muted">Още няма нови играчи.</td></tr>{{end}}
-</tbody></table></div>
-
-<h3>Седмица по седмица</h3>
-<p class="muted">Играчите на всяка седмица: нови (първият им ден е в нея), останали (играли и предната), върнали се (след
-седмица или повече без игра); и загубени: играли предната седмица, а в тази не. Играят на ден средно {{.Stick}} от
-играещите за последните 28 дни.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Седмица</th><th class="num">Играли</th><th class="num">Нови</th><th class="num">Останали</th><th class="num">Върнали се</th><th class="num">Загубени</th></tr></thead><tbody>
-{{range .Growth}}<tr><td class="num">{{.Week}}</td><td class="num">{{.Played}}</td><td class="num">{{.New}}</td><td class="num">{{.Kept}}</td><td class="num">{{.Back}}</td><td class="num">{{.Lost}}</td></tr>{{end}}
-</tbody></table></div>
-
-<h3>Кои се връщат</h3>
-<p class="muted">Новите от последните 12 седмици, според първия им ден.</p>
-{{range .Splits}}{{if .Rows}}
-<details><summary>{{.Name}}</summary>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">Нови</th>{{range $.M.CohortHeads}}<th class="num">{{.}}</th>{{end}}</tr></thead><tbody>
-{{range .Rows}}<tr><td>{{.Name}}</td><td class="num">{{.New}}</td>{{range .Rates}}<td class="num">{{.HTML}}</td>{{end}}</tr>{{end}}
-</tbody></table></div></details>
-{{end}}{{end}}
-</section>
-
-<section class="admin-section" id="path">
-<h2>Път на новия играч</h2>
-<p class="muted">По седмицата (от понеделник) на първия ден. Посещенията и започналите игра са от същата седмица; гост от
-предишна може да изиграе въпрос в тази, затова дял над 100 % се показва като 100 %. Оттам нататък делът е от изигралите
-въпрос, за които денят вече е минал.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th></th>{{range .Weeks}}<th class="num">{{.}}</th>{{end}}</tr></thead><tbody>
-{{range .Funnel}}<tr><td>{{if .Sub}}<span class="muted">·</span> {{end}}{{.Step}}</td>{{range .Cells}}<td class="num">{{.}}</td>{{end}}</tr>{{end}}
+<section class="admin-section" id="days">
+<h2>По дни</h2>
+<p class="muted">Играч тук е човек: отговорил на въпрос с човешка скорост, без тези, които водят играта. Нови: играли
+за първи път този ден. След 1, 7 и 30 дни: колко от новите са играли пак точно тогава.</p>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th class="num">Играли</th><th class="num">Нови</th><th class="num">След 1 ден</th><th class="num">След 7 дни</th><th class="num">След 30 дни</th></tr></thead><tbody>
+{{range .Days}}<tr><td>{{.Day}}</td><td class="num">{{.Played}}</td><td class="num">{{.New}}</td>{{range .Back}}<td class="num">{{.}}</td>{{end}}</tr>{{end}}
 </tbody></table></div>
 </section>
-
-{{end}}
-
-<div class="admin-side">
-{{with .M}}
-<section class="admin-section" id="habit">
-<h2>Навик</h2>
-<p>Завършили деня в поне 3 от последните 7 дни: <strong>{{.Habit}}</strong> от {{.HabitOf}} играли в тези дни.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">7 дни</th><th class="num">28 дни</th></tr></thead><tbody>
-{{range .Loop}}<tr><td>{{if .Sub}}<span class="muted">·</span> {{end}}{{.Name}}</td><td class="num">{{.Week}}</td><td class="num">{{.Month}}</td></tr>{{end}}
-</tbody></table></div>
-<p>Отговори в деня на въпрос, на който играчът е отговарял преди, за 7 дни: {{.Repeats.HTML}} (трябва да е 0).</p>
-{{if .TimedOut}}<p>Изтекло време, по вид въпрос, за 28 дни (трябва да е под 2 %):</p>
-<div class="table-scroll"><table class="admin-table"><tbody>
-{{range .TimedOut}}<tr><td>{{.Name}}</td><td class="num">{{.Share.HTML}}</td></tr>{{end}}
-</tbody></table></div>{{end}}
-</section>
-
-<section class="admin-section" id="nouns">
-<h2>Думите на играта</h2>
-<p class="muted">От играещите през седмицата (от понеделник), колко са ползвали всяка част. Част, която почти никой не
-ползва, си отива.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">{{index .NounWeeks 0}}</th><th class="num">{{index .NounWeeks 1}}</th></tr></thead><tbody>
-{{range .Nouns}}<tr><td>{{.Name}} <span class="muted">{{.What}}</span></td><td class="num">{{.This.HTML}}</td><td class="num">{{.Last.HTML}}</td></tr>{{end}}
-</tbody></table></div>
-<h3>Залозите</h3>
-<p>Върнали се в дни 28–34: играли само деня през първата си седмица {{.DayOnlyD30.HTML}}, играли и друго {{.OthersD30.HTML}}.</p>
-<p>Печатът, отворен или сменен: редът „печат“ горе.</p>
-<p>Споделени дни за 28 дни · нови играчи, дошли по споделена връзка и завършили първата си игра · на връзка: {{.SharePlays}}.</p>
-</section>
-
-<section class="admin-section" id="streaks">
-<h2>Серии</h2>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Дължина</th><th class="num">Вървят сега</th><th class="num">Прекъснати за 7 дни</th></tr></thead><tbody>
-{{range .Streaks}}<tr><td>{{.Band}}</td><td class="num">{{.Going}}</td><td class="num">{{.Ended}}</td></tr>{{end}}
-</tbody></table></div>
-<p>Пропуснати дни, простени от серията за 7 дни: {{.Forgiven}}.</p>
-</section>
-{{end}}
-
-</div>
-
-{{with .M}}
-<section class="admin-section" id="notices">
-<h2>Известия</h2>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">7 дни</th><th class="num">28 дни</th></tr></thead><tbody>
-{{range .Notices}}<tr><td>{{if .Sub}}<span class="muted">·</span> {{end}}{{.Name}}</td><td class="num">{{.Week}}</td><td class="num">{{.Month}}</td></tr>{{end}}
-</tbody></table></div>
-</section>
-
-<section class="admin-section" id="games">
-<h2>Игри</h2>
-<p class="muted">Игрите по вид, ден по ден. „Само денят“: от завършилите деня, които не са играли нищо друго.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th>{{range .Kinds}}<th class="num">{{.}}</th>{{end}}<th class="num">Само денят</th></tr></thead><tbody>
-{{range .Games}}<tr><td class="num">{{.Day}}</td>{{range .Kinds}}<td class="num">{{.}}</td>{{end}}<td class="num">{{.Only.HTML}}</td></tr>{{end}}
-</tbody></table></div>
-<h3>Части на играта, 28 дни</h3>
-<p class="muted">Колко от играещите за 28 дни са играли всяка, колко игри на играч, и дали новите, които са я играли през
-първата си седмица, се връщат през втората повече от другите: връзка, не причина (който играе повече, пробва и повече).</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">Играли</th><th class="num">Игри на играч</th><th class="num">2-ра седмица: играли я</th><th class="num">не са я играли</th></tr></thead><tbody>
-{{range .Features}}<tr><td>{{.Name}}</td><td class="num">{{.Players.HTML}}</td><td class="num">{{.PerPlayer}}</td><td class="num">{{.Used.HTML}}</td><td class="num">{{.NotUsed.HTML}}</td></tr>
-{{else}}<tr><td colspan="5" class="muted">Няма игри.</td></tr>{{end}}
-</tbody></table></div>
-<h3>Устройства, 28 дни</h3>
-<p class="muted">На какво е започната всяка игра.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">Играчи</th><th class="num">Игри</th><th class="num">Започнат ден, завършен</th></tr></thead><tbody>
-{{range .Devices}}<tr><td>{{.Name}}</td><td class="num">{{.Players}}</td><td class="num">{{.Games}}</td><td class="num">{{.DayFinished.HTML}}</td></tr>
-{{else}}<tr><td colspan="4" class="muted">Няма игри.</td></tr>{{end}}
-</tbody></table></div>
-</section>
-{{end}}
-
 `))
 
 var adminQuestionsBody = template.Must(template.New("admin-questions").Parse(`
@@ -229,4 +109,12 @@ action="/admin/players/{{.Player}}/reports/resolve"><button class="link">Вси�
 </tbody></table></div>
 </section>
 </div>
+
+{{if .TimedOut}}<section class="admin-section" id="clock">
+<h2>Изтекло време</h2>
+<p class="muted">Отговори, за които времето е изтекло, по вид въпрос, за 28 дни: трябва да са под 2 %.</p>
+<div class="table-scroll"><table class="admin-table"><tbody>
+{{range .TimedOut}}<tr><td>{{.Name}}</td><td class="num">{{.Share}}</td></tr>{{end}}
+</tbody></table></div>
+</section>{{end}}
 `))

@@ -113,9 +113,6 @@ type Game struct {
 	// CrowdMin, if set, is how many answers a question needs before how players answered it shows, the day's
 	// players' and everyone's (CrowdFrom, DayCrowdFrom when 0; the browser tests make it 1).
 	CrowdMin int
-	// Version is the game's version as released (the server's; "" in tests and a developer's build): the version a
-	// player met is kept with them on their first day played (users.first_version, retention.go).
-	Version string
 	// DuelNews, if set, tells a player a duel's news another player caused (duels.go: sent to them, or played back).
 	DuelNews func(context.Context, DuelNews)
 
@@ -412,11 +409,6 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, number bool, ms int64)
 	}
 	if err := g.markActive(tx, r.userID); err != nil {
 		return false, err
-	}
-	if r.kind == "day" {
-		if err := g.tallyDayAnswer(tx, r); err != nil {
-			return false, err
-		}
 	}
 	if err := g.judgeAnswer(tx, r, gr, ms); err != nil {
 		return false, err

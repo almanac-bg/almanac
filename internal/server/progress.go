@@ -64,36 +64,11 @@ func (s *Server) setSeal(w http.ResponseWriter, r *http.Request) error {
 	if err := s.game.SetSeal(r.Context(), u.ID, in.Chapter); err != nil {
 		return err
 	}
-	if err := s.game.Used(r.Context(), u.ID, "seal"); err != nil {
-		return err
-	}
 	seal, err := s.game.SealOf(r.Context(), u.ID)
 	if err != nil {
 		return err
 	}
 	return ok(w, map[string]any{"seal": seal})
-}
-
-// used marks that the player opened a part of the game the client alone shows (play.Used: the seal's choice), for
-// /admin to count by week without a name. Once a week each: a mark already made changes nothing.
-func (s *Server) used(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.mustUser(r)
-	if err != nil {
-		return err
-	}
-	var in struct {
-		Noun string `json:"noun"`
-	}
-	if err := readJSON(r, &in); err != nil {
-		return err
-	}
-	if !play.Opened(in.Noun) {
-		return errBadRequest
-	}
-	if err := s.game.Used(r.Context(), u.ID, in.Noun); err != nil {
-		return err
-	}
-	return ok(w, map[string]any{})
 }
 
 // setLook changes the player's avatar (play.SetAvatar).
@@ -133,11 +108,6 @@ func (s *Server) profile(w http.ResponseWriter, r *http.Request) error {
 	p, err := s.profileOf(r, tag, viewer)
 	if err != nil {
 		return err
-	}
-	if viewer != 0 { // a profile looked at, once a week (play.Used: „профил“)
-		if err := s.game.Used(r.Context(), viewer, "profile"); err != nil {
-			return err
-		}
 	}
 	return ok(w, p)
 }

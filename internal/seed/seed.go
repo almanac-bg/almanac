@@ -10,8 +10,7 @@
 // Only what no game function
 // writes is written directly: when a player came and was last seen, their email, their mail and notification
 // preferences, the players' sessions (each guest's from the day they came, as their browser keeps it; the personas'
-// to sign in by), and /admin's
-// tallies of visits and asks.
+// to sign in by).
 //
 // Players play at once, not one after another: each visit begins at its own time (rewind), the clock put back if the
 // visits before it ran past it, so that a day's games stay in its day. One game is one player's, on one clock.
@@ -71,15 +70,14 @@ type Persona struct {
 	Token string `json:"token"`
 }
 
-// ErrNotFresh is a database with players in it already, or one a released version of the game has served.
+// ErrNotFresh is a database with players or games in it already.
 var ErrNotFresh = errors.New("the database isn't a new, empty one")
 
-// Fresh says whether a database is new and empty: no players, no games, and never served by a released version
-// (releases): only such a one is seeded.
+// Fresh says whether a database is new and empty: no players, no games, no days drawn: only such a one is seeded.
 func Fresh(ctx context.Context, db *store.DB) error {
 	var n int
 	err := db.Read.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM users) + (SELECT count(*) FROM runs)
-		+ (SELECT count(*) FROM releases) + (SELECT count(*) FROM days)`).Scan(&n)
+		+ (SELECT count(*) FROM days)`).Scan(&n)
 	if err != nil {
 		return err
 	}

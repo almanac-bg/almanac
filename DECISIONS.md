@@ -68,16 +68,17 @@ packages' doc comments; this file holds only what must not drift.
     wrong game is never celebrated; a best rank rising and a ten of ten are the only big moments.
   - **The player's nouns are a closed list:** Брой, близо, серия, Алманах (глави, факти, мастило), печат, игра на
     главата (Микс, България), приятели, класация, дуел (запис), споделяне, профил, напомняне. Adding one is the owner's
-    call. `/admin` shows each one's weekly use; a session proposes removing one nobody uses.
+    call.
   - **The rule for later.** A change is made only if it makes the issue better or names the measure it moves and what
     it removes; adds no noun; keeps every place's budget; is good at zero (first player, first day, 0 right, no
     friends); pays one deed once; removes at least as much as it adds while effects are too small to detect (judged
     before and after, by the players who come back: `/admin`); and answers „Built to hold“ (CLAUDE.md). "Makes the
     issue better" means it changes only the questions, the clock or the play screen and adds nothing outside it. A
     fix restores stated behaviour; polish adds no data, count, block or notification.
-  - **The bets,** each with its measure in `/admin`: that ink from the issue alone is enough progress (D30 of players
-    who play only the day); that the seals are wanted (players who open or change theirs); that the share brings
-    players (plays per shared link).
+  - **The bets,** each read from what the game keeps anyway (runs, facts, duels, shares), by a query when it's asked,
+    never by new tracking: that ink from the issue alone is enough progress (D30 of the players whose games are only
+    the day's); that the seals are wanted (players who chose the seal they wear, or a chapter's art as their avatar);
+    that the share brings players (new players beside the days shared, day by day).
   The decisions below that this replaces are gone from this file; the code follows as each part lands.
 - **The day's ten questions are the heart;** everything else serves them or stays out of the way. A new system replaces
   one or proves it's needed (CLAUDE.md, Direction).

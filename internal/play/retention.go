@@ -7,31 +7,18 @@ import (
 	"time"
 )
 
-// Retention is whether players come back: the game's measure of itself. A player's days are the days (in Bulgaria)
-// they played on — answered a question in any game — kept in active_days as they happen (markActive), with the
-// version of the game a player met on their first (users.first_version).
+// Retention is whether players come back: the game's measure of itself, and the one /admin tells (DayCounts). A
+// player's days are the days (in Bulgaria) they played on — answered a question in any game — kept in active_days as
+// they happen (markActive).
 //
 // /admin counts people, one population on the whole page (People, fair.go): a day counts when the player isn't an
 // admin and played a game as a person that day, not at a script's speed. That is judged as the days are read
 // (personDays), never as they're kept: a game becomes a script's only after some of its answers, and may be let out of
-// it. A player who goes leaves
-// their days as nobody's (Forget), judged as they go: only those that counted are kept.
-//
-// What the players did in their first days, and the daily loop around them, is measured in measure.go.
+// it. A player who goes leaves their days as nobody's (Forget), judged as they go: only those that counted are kept.
 
-// markActive keeps that a player played today, and on their first day, the version they met: only then (a player from
-// before versions were kept has none, not the one of their next day).
+// markActive keeps that a player played today.
 func (g *Game) markActive(tx *sql.Tx, userID int64) error {
-	today := g.Today()
-	res, err := tx.Exec(`INSERT OR IGNORE INTO active_days (user_id, day) VALUES (?, ?)`, userID, today)
-	if err != nil || g.Version == "" {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return nil // not the day's first answer
-	}
-	_, err = tx.Exec(`UPDATE users SET first_version = ?1 WHERE id = ?2 AND first_version IS NULL
-		AND NOT EXISTS (SELECT 1 FROM active_days WHERE user_id = ?2 AND day < ?3)`, g.Version, userID, today)
+	_, err := tx.Exec(`INSERT OR IGNORE INTO active_days (user_id, day) VALUES (?, ?)`, userID, g.Today())
 	return err
 }
 
@@ -148,27 +135,6 @@ func (a *Activity) On(day string) int {
 	return n
 }
 
-// Within is how many played on any day from `from` to `to` (both in, within the days read).
-func (a *Activity) Within(from, to string) int {
-	n := 0
-	for id := range a.played {
-		if a.playedWithin(id, from, to) {
-			n++
-		}
-	}
-	return n
-}
-
-func (a *Activity) playedWithin(id int64, from, to string) bool {
-	p := a.played[id]
-	for d := max(a.index(from), 0); d >= 0 && d < len(p) && DayShift(a.From, d) <= to; d++ {
-		if p[d] {
-			return true
-		}
-	}
-	return false
-}
-
 // first is a player's first day played, if it's within the days read ("" if they played before them).
 func (a *Activity) first(id int64) string {
 	if a.before[id] {
@@ -182,61 +148,68 @@ func (a *Activity) first(id int64) string {
 	return ""
 }
 
-// Stickiness is how many play on a day, on average over the 28 days to `to` (both in), of those who played in them:
-// one window for both.
-func (a *Activity) Stickiness(to string) (daily float64, month int) {
-	from := DayShift(to, -27)
-	sum := 0
-	for d := from; d <= to; d = DayShift(d, 1) {
-		sum += a.On(d)
+// Backs are the days after a player's first that /admin tells whether they played on again: D1, D7, D30.
+var Backs = [3]int{1, 7, 30}
+
+// DayCount is a day of /admin's table: how many played on it, how many of them for the first time, and of those new,
+// how many played again on each of the days Backs after it (Due: whether that day is over yet).
+type DayCount struct {
+	Day         string
+	Played, New int
+	Back        [3]int
+	Due         [3]bool
+}
+
+// DayCounts are the counts of the days the Activity read, newest first: today, under way, with them. A player is new on
+// their first day played, if it's within the days read (one who played before them isn't new in them).
+func (a *Activity) DayCounts() []DayCount {
+	n := daysBetween(a.From, a.Today) + 1
+	out := make([]DayCount, n)
+	for d := range out {
+		out[n-1-d].Day = DayShift(a.From, d)
 	}
-	return float64(sum) / 28, a.Within(from, to)
-}
-
-// Growth is a week's players, by how they stand to the week before: new (their first day in it), kept (played the week
-// before too), back (after a week or more away), and lost (played the week before, not in it).
-type Growth struct {
-	Week                  string // its Monday
-	New, Kept, Back, Lost int
-}
-
-// Growth tells the weeks (from Monday) whose Monday is `weeks` weeks before the week of `to` or later, and over by `to`,
-// newest first. The days read must begin a week before the first.
-func (a *Activity) Growth(to string, weeks int) []Growth {
-	var out []Growth
-	this := WeekOf(DayShift(to, 1)) // the week `to` ends, if it's a Sunday; else the one it's in, not over
-	for w := 1; w <= weeks; w++ {
-		monday := DayShift(this, -7*w)
-		if DayShift(monday, -7) < a.From {
-			break
+	for id, days := range a.played {
+		first := -1
+		if f := a.first(id); f != "" {
+			first = daysBetween(a.From, f)
 		}
-		g := Growth{Week: monday}
-		sunday, before := DayShift(monday, 6), DayShift(monday, -7)
-		for id := range a.played {
-			now := a.playedWithin(id, monday, sunday)
-			was := a.playedWithin(id, before, DayShift(monday, -1))
-			switch first := a.first(id); {
-			case now && first >= monday && first <= sunday:
-				g.New++
-			case now && was:
-				g.Kept++
-			case now:
-				g.Back++
-			case was:
-				g.Lost++
+		for d, on := range days {
+			if !on {
+				continue
+			}
+			c := &out[n-1-d]
+			c.Played++
+			if d != first {
+				continue
+			}
+			c.New++
+			for k, after := range Backs {
+				if d+after < len(days) && days[d+after] {
+					c.Back[k]++
+				}
 			}
 		}
-		out = append(out, g)
+	}
+	for i := range out {
+		for k, after := range Backs {
+			out[i].Due[k] = DayShift(out[i].Day, after) < a.Today
+		}
 	}
 	return out
 }
 
-// Habit is how many players finished the day's ten on at least 3 of the 7 days to `to` (both in): the habit the game
-// is built for.
-func (g *Game) Habit(ctx context.Context, to string) (int, error) {
-	var n int
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT count(*) FROM (SELECT user_id FROM runs WHERE kind = 'day'
-		AND finished_at IS NOT NULL AND day BETWEEN ? AND ? AND `+People+` GROUP BY user_id HAVING count(*) >= 3)`,
-		DayShift(to, -6), to).Scan(&n)
-	return n, err
+// DayShift is the day n days after a day (before, for n < 0), as the days are kept (YYYY-MM-DD).
+func DayShift(day string, n int) string {
+	t, _ := time.Parse(time.DateOnly, day)
+	return t.AddDate(0, 0, n).Format(time.DateOnly)
+}
+
+// daysBetween is how many days `to` is after `from` (both YYYY-MM-DD; negative when before).
+func daysBetween(from, to string) int {
+	a, err1 := time.Parse(time.DateOnly, from)
+	b, err2 := time.Parse(time.DateOnly, to)
+	if err1 != nil || err2 != nil {
+		return -1
+	}
+	return int(b.Sub(a).Hours() / 24)
 }
