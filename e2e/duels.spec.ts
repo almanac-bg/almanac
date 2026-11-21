@@ -98,7 +98,7 @@ test("against a recording: a real game's ten, its player named, its answers as t
   const kicker = (await c.locator(".duel-head .kicker").textContent()) ?? "";
   expect([`По-силен запис · ${owner}`, `Запис · ${owner}`]).toContain(kicker);
   await expect(c.locator(".duel-meant")).toContainText(`Записът е от истинска игра на ${owner}`);
-  // Another asks for the level chosen last on this device, whatever this one met.
+  // Another asks for the level chosen last on this page, whatever this one met.
   const again = c.waitForRequest((r) => r.method() === "POST" && new URL(r.url()).pathname === "/api/duels");
   await c.getByRole("button", { name: "Още един дуел срещу запис" }).click();
   expect((await again).postDataJSON()).toEqual({ recording: true, level: "stronger" });

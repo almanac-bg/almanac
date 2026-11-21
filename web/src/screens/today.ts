@@ -32,7 +32,7 @@ import { go, goBack, hold, release, title } from "../lib/router.ts";
 import { dateWords, hyphenate, issueOf, onDay, stakeHour, weekday } from "../lib/words.ts";
 import { cover, notice, player, playing, user } from "../state.ts";
 import { chapterName, chip, failure, formatNumber, glyph, leaf, mini, stakeLine, tiles, who } from "../ui.ts";
-import { inviteCard, takeWaiting } from "./invite.ts";
+import { inviteCard, takeWaiting, takeWaitingOnce } from "./invite.ts";
 import { app, coverExit, exitWay, handedIn, haveProfile, keepLine, keepStake, mailAsk, takeHand } from "./keep.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
@@ -145,11 +145,19 @@ export function today() {
   // How many times Днес has asked the day again since yesterday's time was over, and still had it (a question shown
   // before then still in its time): each a while apart, and a few at most.
   let lateAsked = 0;
-  onCleanup(() => clearTimeout(lateEnds));
+  // The screen put away: an answer still on its way draws nothing, and sets no timer again.
+  let gone = false;
+  onCleanup(() => {
+    gone = true;
+    clearTimeout(lateEnds);
+  });
+  // A tap on an invite kept for the player's first game, taken if a game has ended since (on another visit, say).
+  takeWaitingOnce();
   const load = async () => {
     try {
       const t = inPage ?? (await api<Today>("GET", "/api/day"));
       inPage = undefined;
+      if (gone) return;
       day = t.day;
       // Yesterday's issue left half-way just before midnight, while the game lets it be finished: offered first.
       const view = lateView(t) ?? t;
@@ -160,7 +168,7 @@ export function today() {
         screen.show(() => playRun(run, (s) => home(view, s, true)));
       else screen.show(() => home(view, view.run, false));
     } catch (err) {
-      screen.show(() => failure(err, load, null));
+      if (!gone) screen.show(() => failure(err, load, null));
     }
   };
   /** Днес for yesterday's issue (`t.yesterday`): its day, issue, chapters and run; nothing of today's (its board, its
@@ -179,7 +187,7 @@ export function today() {
     // (a question shown before it ended is still in its time), the day is asked again 15 seconds on, a few times.
     const left = y.until - serverNow();
     lateAsked = left > 0 ? 0 : lateAsked + 1;
-    if (lateAsked <= lateAsks)
+    if (lateAsked <= lateAsks && !gone)
       lateEnds = setTimeout(
         () => {
           if (!playing.peek() && !counting) load();

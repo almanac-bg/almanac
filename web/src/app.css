@@ -6247,15 +6247,6 @@
     gap: var(--space-6);
   }
 
-  /* A friend just removed: a line in the list's place, „Върни“ for a few seconds. */
-  .removed-line {
-    margin: 0;
-    padding: 10px 14px;
-    border-radius: var(--r-2);
-    background: var(--surface-2);
-    font: 700 0.9375rem / 1.4 var(--font-sans);
-  }
-
   .sect-lead {
     color: var(--ink-2);
     font: 600 0.875rem / 1.4 var(--font-sans);
