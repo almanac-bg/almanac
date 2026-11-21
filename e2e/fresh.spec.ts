@@ -70,5 +70,6 @@ test("a profile deleted in one tab: another tab of it loads anew as no one's", a
 
   await a.bringToFront();
   await expect.poll(() => marked(a).catch(() => false)).toBe(false);
-  await expect(a).toHaveURL(/\/me$/);
+  // Профил of no one's is the way in.
+  await expect(a).toHaveURL(/\/signin$/);
 });

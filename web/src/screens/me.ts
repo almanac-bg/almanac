@@ -1,8 +1,8 @@
 // Профил: who you are in the game, in its budget's order (DESIGN.md, Places): your avatar with the seal you wear on its
 // corner, your name and tag; the streak as it is now; your seals, one list, a row a chapter with its rank, its
 // progress to the next and its ink (the one worn is the best: never chosen); the avatars (every animal yours); and
-// Настройки, last. A guest is asked to keep their game, and the way in for a profile from elsewhere is apart from it.
-// No lifetime totals.
+// Настройки, last. A guest is asked to keep their game, and the way in for a profile from elsewhere is apart from it
+// (the sign-in page: screens/signin.ts, signInPage). Nobody on this device yet: that page instead. No lifetime totals.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -25,7 +25,6 @@ let {
   look,
   failure,
   profileHref,
-  haveProfile,
   keepGame,
   loadStats,
   formatNumber,
@@ -48,7 +47,6 @@ export function me(kit: Kit) {
     look,
     failure,
     profileHref,
-    haveProfile,
     keepGame,
     loadStats,
     formatNumber,
@@ -56,9 +54,12 @@ export function me(kit: Kit) {
     illustration,
   } = kit);
   title("Профил");
-  // Come by „Вход“ (the bar's, a guest's): the way in open at once.
-  const signingIn = location.hash === "#signin";
-  // A game just kept, or a profile signed in to, here (keepGame, haveProfile): said once, at the top.
+  // Nobody on this device yet: nothing of theirs to show, the way in instead (screens/signin.ts, signInPage).
+  if (!user.peek()) {
+    go("/signin", true);
+    return null;
+  }
+  // A game just kept here (keepGame), or a profile signed in to from here (signInPage): said once, at the top.
   const said = notice.peek();
   notice.set("");
   return h(
@@ -93,7 +94,7 @@ export function me(kit: Kit) {
             // A guest keeps their game with an email, or signs in to a profile they have elsewhere, and sees how others
             // see them: one line of ways (not four loose ones before anything else). Either way in, Профил again, as
             // the profile has it.
-            () => (user()?.email ? null : keepGame(() => go("/me", true), signingIn, theirView(user()?.tag))),
+            () => (user()?.email ? null : keepGame(() => go("/me", true), theirView(user()?.tag))),
             () => streakNow(data()),
             () => seals(ranks(), data()),
             () => (user()?.email && user()?.tag ? h("p", { class: "me-links" }, theirView(user()?.tag)) : null),
@@ -122,16 +123,8 @@ export function me(kit: Kit) {
           ),
         ];
       },
-      // No player here yet („Вход“ in the bar): the sign-in form at once.
-      () => [
-        h("h1", null, "Вход"),
-        h(
-          "p",
-          { class: "lead" },
-          "Имаш профил? Влез с имейла си. Ако нямаш, играта ти се пази на това устройство от първата ти игра. С имейл я имаш навсякъде.",
-        ),
-        haveProfile(() => go("/me", true), undefined, true, true),
-      ],
+      // No player here (signed out on another page since): the way in.
+      () => h("p", null, h("a", { class: "link", href: "/signin" }, "Вход")),
     ),
   );
 }

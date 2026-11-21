@@ -233,7 +233,7 @@ test.describe("in Messenger's own browser", () => {
       await page.goto(path);
       await expect(page.getByText("Тук не може да се влиза с имейл")).toHaveCount(1);
       await expect(page.getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
-      await expect(page.getByRole("button", { name: "Имаш профил? Влез" })).toHaveCount(0);
+      await expect(page.getByRole("link", { name: "Имаш профил? Влез" })).toHaveCount(0);
       await expect(page.getByText(/Добави имейл|Влез с имейл/)).toHaveCount(0);
       await expect(page.getByLabel("Имейл")).toHaveCount(0);
     }
@@ -282,9 +282,12 @@ test("a guest's Профил asks to keep the game and says it's kept; the way i
   await page.goto("/");
   await daysPlayed(page, 1);
   await page.goto("/me");
-  await page.getByRole("button", { name: "Имаш профил? Влез" }).click();
+  // The way in for a profile from elsewhere is the sign-in page, and back from it is Профил.
+  await page.getByRole("link", { name: "Имаш профил? Влез" }).click();
+  await expect(page).toHaveURL(/\/signin$/);
   await expect(page.getByRole("heading", { name: "Влез в профила си" })).toBeVisible();
-  await page.goto("/me");
+  await page.getByRole("link", { name: "Назад" }).click();
+  await expect(page).toHaveURL(/\/me$/);
   await expect(page.getByText("Играта ти е само на това устройство.")).toBeVisible();
   await page.getByRole("button", { name: "Запази я с имейл" }).click();
   await expect(page.getByRole("heading", { name: "Запази играта си" })).toBeVisible();
@@ -297,7 +300,7 @@ test("a guest's Профил asks to keep the game and says it's kept; the way i
     `Готово. Играта ти е запазена с имейла ${email}. Влизай с него на всяко устройство.`,
   );
   await expect(page.getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Имаш профил? Влез" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Имаш профил? Влез" })).toHaveCount(0);
 });
 
 test("Профил names Настройки in words, and a name still drawn leads to the field to change it", async ({ page }) => {

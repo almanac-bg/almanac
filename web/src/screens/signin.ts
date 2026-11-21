@@ -1,15 +1,16 @@
-// Signing in by email, with a code: in Настройки, on Начало (a guest who keeps coming back, a player with a profile
-// before a first game, the reminder by mail), on Профил, and wherever a game asks for a profile (a duel with a
-// friend). The same code keeps a guest's game with the email, or signs in to the profile the email has (which the
-// guest's game here then joins): what came of it is said (lib/keep.ts, keptWords) to `done`.
+// Signing in by email, with a code: on a page of its own (`/signin`, „Вход“: signInPage), in Настройки, on Начало
+// (come from the streak's mail, signed out), on Профил (a guest keeping their game), and wherever a game asks for a
+// profile (a duel with a friend). The same code keeps a guest's game with the email, or signs in to the profile the
+// email has (which the guest's game here then joins): what came of it is said (lib/keep.ts, keptWords) to `done`.
 
 import { type ApiError, api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal, when } from "../lib/dom.ts";
 import { embedded } from "../lib/embedded.ts";
 import { keptWords } from "../lib/keep.ts";
 import { pushable, pushOn } from "../lib/push.ts";
-import { type User, user } from "../state.ts";
-import { emailWords, inSight } from "../ui.ts";
+import { entry, go, leave, title } from "../lib/router.ts";
+import { notice, type User, user } from "../state.ts";
+import { back, emailWords, inSight } from "../ui.ts";
 
 export interface SignInOptions {
   /** Which form it is, of the game's („settings“, „remind-mail“…): a code it sent is kept by it, for a reload to come
@@ -32,6 +33,32 @@ export const noEmail = !!embedded && !embedded.forms;
 
 /** The one line said where no email is asked for (noEmail), in place of every way in by email. */
 export const noEmailLine = "Тук не може да се влиза с имейл. Отвори играта в браузъра на телефона и я запази там.";
+
+/** The sign-in page (`/signin`: „Вход“, in the bar and on the cover): under the bar's mark alone (app.ts: no places,
+ * no „Вход“), the way back to where the visitor came from (else Днес), and the form, nothing else. Signed in, back
+ * there, what came of it said where that page says such things (Днес, Профил: notice). A player signed in already has
+ * nothing to do here: Профил. */
+export function signInPage(): Child {
+  title("Вход");
+  if (user.peek()?.email) {
+    go("/me", true);
+    return null;
+  }
+  const from = entry().from ?? "/";
+  return h(
+    "section",
+    { class: "screen" },
+    h("div", { class: "intro" }, back(from, "Назад"), h("h1", null, "Влез в профила си")),
+    signIn({
+      form: "signin",
+      done: (said) => {
+        if (/^\/(me)?([?#]|$)/.test(from)) notice.set(said);
+        // Once the player is set (signIn sets them after this), so that the page come back to draws them as they are.
+        queueMicrotask(() => leave(from));
+      },
+    }),
+  );
+}
 
 /** Signing in by email, with a code (SignInOptions). Never in Meta's or TikTok's own browsers (lib/embedded.ts,
  * forms): what's typed there the app can read, so the way is the phone's own browser. */

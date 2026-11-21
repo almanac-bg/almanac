@@ -195,10 +195,58 @@ test("a deleted profile lets go of the browser's notifications", async ({ page }
   expect(await page.evaluate(() => localStorage.getItem("unsubscribed"))).toBe("1");
 });
 
-test("„Вход“ in the bar is the sign-in form, at once", async ({ page }) => {
-  await page.goto("/");
+test("„Вход“ is a page of its own: the form alone, back where it was come from, and signed in there", async ({
+  page,
+}, info) => {
+  const email = `signin-${info.project.name}-${Date.now()}@example.com`;
+  const bare = async () => {
+    await expect(page.locator(".brand")).toBeVisible();
+    await expect(page.locator(".bar .places")).toBeHidden();
+    await expect(page.locator(".places-foot")).toBeHidden();
+    await expect(page.locator(".bar-in, .bar-me")).toHaveCount(0);
+  };
+  // Opened by its address: back is Днес.
+  await page.goto("/signin");
+  await bare();
+  await page.getByRole("link", { name: "Назад" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator(".issue")).toBeVisible();
+  // From the cover: back to it, then in, and on the cover again, signed in.
   await page.getByRole("link", { name: "Вход", exact: true }).click();
-  await expect(page).toHaveURL(/\/me#signin$/);
+  await expect(page).toHaveURL(/\/signin$/);
+  await bare();
+  await expect(page.getByRole("heading", { name: "Влез в профила си", level: 1 })).toBeVisible();
+  await page.getByRole("link", { name: "Назад" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.getByRole("link", { name: "Вход", exact: true }).click();
+  await page.getByLabel("Имейл").fill(email);
+  await page.getByRole("button", { name: "Прати ми код" }).click();
+  await expect(page.getByText(`Пратихме код на ${email}`)).toBeVisible();
+  await expect.poll(() => mailedCode(email)).not.toBe("");
+  await page.getByLabel("Код").fill(mailedCode(email));
+  await page.getByRole("button", { name: "Потвърди" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("status").filter({ hasText: /^Влезе като / })).toBeVisible();
+  await expect(page.locator(".bar-me")).toBeVisible();
+  // Signed in, the sign-in page is Профил.
+  await page.goto("/signin");
+  await expect(page).toHaveURL(/\/me$/);
+  // From another page, signed out: back there once in.
+  const other = `signin-2-${info.project.name}-${Date.now()}@example.com`;
+  await page.context().clearCookies();
+  await page.goto("/almanac");
+  await page.getByRole("link", { name: "Вход", exact: true }).click();
+  await page.getByLabel("Имейл").fill(other);
+  await page.getByRole("button", { name: "Прати ми код" }).click();
+  await expect.poll(() => mailedCode(other)).not.toBe("");
+  await page.getByLabel("Код").fill(mailedCode(other));
+  await page.getByRole("button", { name: "Потвърди" }).click();
+  await expect(page).toHaveURL(/\/almanac$/);
+  await expect(page.locator(".bar-me")).toBeVisible();
+});
+
+test("Профил with nobody on the device is the sign-in page", async ({ page }) => {
+  await page.goto("/me");
+  await expect(page).toHaveURL(/\/signin$/);
   await expect(page.getByLabel("Имейл")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Прати ми код" })).toBeVisible();
 });
