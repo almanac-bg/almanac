@@ -96,7 +96,7 @@ if (root) {
       { path: /^\/me$/, view: later(() => import("./screens/me.ts").then((m) => m.me)) },
       { path: /^\/signin$/, view: signInPage },
       {
-        path: /^\/players\/([A-Za-z0-9_]{3,20})$/,
+        path: /^\/players\/([A-Za-z0-9_.]{3,20})$/,
         view: later(() => import("./screens/player.ts").then((m) => m.playerProfile)),
       },
     ],

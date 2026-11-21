@@ -74,9 +74,9 @@ test("friends on the day: who has played it, and how each went", async ({ browse
 test("friends by tag: a name and a tag of one's own, a request, a yes", async ({ browser }, info) => {
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
-  const tag = `ana_${info.project.name.slice(0, 3)}${Date.now() % 100000}`;
+  const tag = `ana.p_${info.project.name.slice(0, 3)}${Date.now() % 100000}`;
 
-  // Ana becomes a player, and takes a full name (anyone's) and a tag (hers alone).
+  // Ana becomes a player, and takes a full name (anyone's) and a tag (hers alone, with a dot in it).
   await a.goto("/friends");
   await a.locator(".friends").getByRole("button", { name: "Добави приятел" }).click();
   await a.goto("/settings");
@@ -158,6 +158,14 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await b.goto("/");
   await expect(b.locator(".day")).toBeVisible();
   await expect(b.locator(".notices")).toBeEmpty();
+
+  // Her name in Приятели takes him to her page, by her tag, dot and all; and the page opens by it at once too.
+  await b.goto("/friends");
+  await b.locator(".friend a.friend-name").click();
+  await expect(b).toHaveURL(new RegExp(`/players/${tag.replace(".", "\\.")}$`));
+  await expect(b.locator(".me-tag")).toHaveText(`@${tag}`);
+  await b.reload();
+  await expect(b.locator(".me-tag")).toHaveText(`@${tag}`);
 });
 
 test("a request turned down, a friend removed", async ({ browser }) => {
