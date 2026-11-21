@@ -475,10 +475,13 @@ flat shapes with depth, lit from the top left, no outlines, painted from one ton
 Every picture is drawn to one sheet, so that none stands out as another hand's:
 
 - **An avatar is a bust, front on**, on a rounded tile of its scene (the picture 88% of the tile, set in 6%; the tile's
-  corners 28% of it; the body runs past its foot). Its skull, without ears, wool or quills, is 34–38 wide about x = 32, its eyes at y 32–36 and 7–9
-  from the middle; ears, antlers and tufts start inside the skull, so nothing floats. Its body is the same shoulders
-  for all, in its darkest fur; what stands in for them keeps their place (the turtle's shell, the sheep's wool, the
-  stork's breast). Only what the animal is changes this: the stork is in profile, the frog's eyes are on top.
+  corners 28% of it; the body runs past its foot). Its skull, without ears, wool or quills, is 34–38 wide about x = 32,
+  its eyes at y 32–36 and 7–9 from the middle; ears, antlers and tufts start inside the skull, so nothing floats. An ear
+  is the head's own fur and one shape with it: its sides curve into the head's edge, its tip is round, its inner part a
+  soft shape set in, drawn over the head; never a triangle set on it. Whatever the body is, it covers the tile's foot
+  from corner to corner, with no ground under it. Its body is the same shoulders for all, in its darkest fur; what
+  stands in for them keeps their place (the turtle's shell, the sheep's wool, the stork's breast). Only what the animal
+  is changes this: the stork is in profile, the frog's eyes are on top.
 - **One eye:** a night-ink circle (radius 2.3–2.8) with a white glint up and to its left, on both eyes alike; the cat
   and the lynx have it on an iris. No lids, brows or whites.
 - **One light**, from the top left: a crescent of light inside the head's upper left edge, the head's shadow on the
