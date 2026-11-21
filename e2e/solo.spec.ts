@@ -25,8 +25,8 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.locator(".places-foot")).toBeVisible();
   // The result tells the streak tomorrow makes.
   await expect(page.locator(".tomorrow")).toContainText("С него серията ти става 2.");
-  // Приятели has the day's board: of friends (none yet), and of all България, the player on it.
-  await page.goto("/friends");
+  // The day's board, a page of Днес's: of friends (none yet), and of all България, the player on it.
+  await page.goto("/board");
   await expect(page.getByRole("tab")).toHaveText(["Приятели", "България"]);
   await page.getByRole("tab", { name: "България" }).click();
   await expect(page.locator(".day-board .rank-row.me")).toContainText(/\d\sот\s10$/);

@@ -36,8 +36,10 @@ packages' doc comments; this file holds only what must not drift.
   evidence, security), whose last round found no flaw in it. *Every day ten questions; each one a player gets right in
   the issue writes its fact in ink in their Алманах; their rank in a chapter says how much of it the book holds in ink;
   played alone, with friends, and beside all of Bulgaria.* Not to drift:
-  - **Three places:** Днес (the issue), Алманах (the book), Приятели (friends, the day's board, duels). Профил and
-    Настройки open from the avatar. Nothing else gets a place.
+  - **Three places:** Днес (the issue and the day's board), Алманах (the book), Приятели (friends, duels). Профил and
+    Настройки open from the avatar. Nothing else gets a place. The board is about the day's issue, so it is Днес's
+    (2026-11-22): a page of its own (`/board`), reached from the result's „Приятели днес“ and „България днес“, so the
+    result keeps its budget; Приятели is then what it says, the people and the duels.
   - **The issue is asked once.** Its score is the number right out of 10; a close answer is „близо“, not right. No
     points and no bonus. No played question is asked again (no Втори шанс, no past issues), and a share link opened
     after its day opens today's issue.
