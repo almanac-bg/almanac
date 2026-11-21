@@ -38,12 +38,17 @@ test("a duel with a friend: played first and sent, played back when they can, th
   await expect(a.locator(".duel-sent")).toContainText("ще изиграе същите десет въпроса");
   await a.goto("/friends");
   await expect(a.locator(".duels")).toContainText("Чакаш");
+  // Her row says her score and how long he has: „Ти: 7 · Бо има още 7 дни“.
+  await expect(a.locator(".duels .duel-row.s-theirs")).toContainText(/Ти: \d+ · .+ има още 7\sдни/);
 
-  // Bo: a dot on Приятели, one line on Начало, the duel his to play, a tap away.
+  // Bo: a dot on Приятели (nothing over the day: Днес is the issue and the streak), the duel his to play there, a tap
+  // away.
   await b.goto("/");
-  await expect(b.locator(".streak-notice")).toContainText("Ана те покани на дуел.");
   await expect(b.locator("nav.places-foot a[href='/friends']")).toHaveClass(/news/);
-  await b.locator(".streak-notice").getByRole("link", { name: "Играй" }).click();
+  await expect(b.locator(".notices")).toBeEmpty();
+  await b.goto("/friends");
+  await expect(b.locator(".duel-turn")).toContainText("Изиграй същите десет");
+  await b.locator(".duel-turn").getByRole("link", { name: "Играй" }).click();
   await countIn(b);
   await playSecond(b, "Ана");
 

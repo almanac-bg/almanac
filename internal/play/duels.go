@@ -22,7 +22,7 @@ import (
 //
 // A duel with a friend (DuelFriend): the player picks a friend and plays ten questions drawn for the two of them
 // (drawFor: „Микс“, at their pair's level, questions neither has seen first). Once their side is played, the duel is
-// sent: the friend is told (DuelNews: a push through the server's notifyFrom, and a line in Приятели and on Начало)
+// sent: the friend is told (DuelNews: a push through the server's notifyFrom, and a dot and a row in Приятели)
 // and has DuelFor to play the same ten, as the first player was shown them (their versions: the same ten exactly);
 // past it, the duel lapses, and says so. Whoever plays second sees both at the end; the first sees the result when
 // it comes, told too. Each pair keeps its record („общо 5 на 3“: recordAgainst). A rematch is a new duel the other
@@ -996,7 +996,7 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 	return v, nil
 }
 
-// DuelWaiting is the duels sent to the player waiting for them to play (Начало's line, Приятели's dot): how many, and
+// DuelWaiting is the duels sent to the player waiting for them to play (Приятели's dot): how many, and
 // the one that lapses first, by whom.
 type DuelWaiting struct {
 	ID   int64  `json:"id"`

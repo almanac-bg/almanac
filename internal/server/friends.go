@@ -33,7 +33,8 @@ func (s *Server) notifyFrom(ctx context.Context, from int64, m push.Message, to 
 	s.notify(ctx, pushFriends, m, to)
 }
 
-// friends is the player's side of being friends: their friends, and the friend requests to and from them.
+// friends is the player's side of being friends: their friends, the friend requests to and from them, and a yes to
+// one of theirs not told yet.
 func (s *Server) friends(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -53,9 +54,15 @@ func (s *Server) friends(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	// A friend said yes to their request: told once, here (POST /api/told).
+	accepted, err := s.game.AcceptedOf(r.Context(), u.ID)
+	if err != nil {
+		return err
+	}
 	return ok(w, map[string]any{
 		"friends":  list,
 		"requests": map[string]any{"in": in, "out": out},
+		"accepted": accepted,
 	})
 }
 

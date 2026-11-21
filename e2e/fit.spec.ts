@@ -77,6 +77,9 @@ for (const scheme of ["light", "dark"] as const)
             await q.locator(".key", { hasText: "7" }).click();
             await q.getByRole("button", { name: "Отговори" }).click();
           } else if (await q.locator(".sortable-list").count()) await q.getByRole("button", { name: "Готово" }).click();
+          // A choice missed: the player's row and the right one both kept in sight, the right one said in words.
+          else if (await q.locator(".choices").count())
+            await q.locator(".choices > .option").filter({ hasNotText: "Васил Левски" }).first().click();
           else await q.locator(".options .option, .tf-options .option").first().click();
           const go = page.locator(".after .up-next-go");
           await expect(go).toBeVisible();
@@ -99,6 +102,15 @@ for (const scheme of ["light", "dark"] as const)
             });
             expect(box.top, "the row is under the head").toBeGreaterThanOrEqual(box.head - 1);
             expect(box.bottom, "the row is over the panel").toBeLessThanOrEqual(box.foot + 1);
+          }
+          // The question stays whole under the head: the page doesn't move it away for the answer.
+          if (await q.locator(".choices").count()) {
+            const sheet = await q.locator(".q-leaf").evaluate((el) => ({
+              top: el.getBoundingClientRect().top,
+              head: document.querySelector(".question-top")?.getBoundingClientRect().bottom ?? 0,
+            }));
+            expect(sheet.top, "the question is whole under the head").toBeGreaterThanOrEqual(sheet.head - 1);
+            await expect(page.locator(".after .right-said")).toHaveText("Вярно е: Васил Левски.");
           }
         });
 

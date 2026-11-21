@@ -8,11 +8,12 @@ import type { Board, Score } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
 import type { Look } from "../ui.ts";
-import type { Duels } from "./duel.ts";
+import type { Accepted, Duels } from "./duel.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
 let {
+  acceptedLine,
   api,
   errorText,
   h,
@@ -67,6 +68,8 @@ interface Request {
 interface Friends {
   friends: Friend[];
   requests: { in: Request[]; out: Request[] };
+  /** A friend said yes to the player's request: told once (play/lines.go). */
+  accepted?: Accepted | null;
 }
 
 /** The day's boards, as /api/day has them. */
@@ -83,6 +86,7 @@ interface Day {
 
 export function friends(kit: Kit): Child {
   ({
+    acceptedLine,
     api,
     errorText,
     h,
@@ -286,6 +290,8 @@ function friendsCard(reloadBoard: () => void): Child {
   // The list that couldn't load (with nothing of it shown yet): the failure, and the way to try again.
   const failed = signal<unknown>(null);
   const editing = signal(false);
+  // A friend's yes, told once over the friends: kept as it was said while the list is asked again.
+  const yes = signal<Child>(null);
 
   const load = async () => {
     if (!user.peek()) return;
@@ -298,6 +304,7 @@ function friendsCard(reloadBoard: () => void): Child {
       if (was && ids(was) !== ids(f)) reloadBoard();
       data.set(f);
       duels.set(d);
+      if (f.accepted && !yes.peek()) yes.set(acceptedLine(f.accepted));
       friendRequests.set(f.requests.in.length);
       duelsWaiting.set(d.yours.filter((x) => !x.first).length);
     } catch (err) {
@@ -380,6 +387,7 @@ function friendsCard(reloadBoard: () => void): Child {
             )
           : null;
       }),
+      yes,
       () =>
         (data()?.requests.in ?? []).map((r) =>
           h(
@@ -522,7 +530,7 @@ function addFriend(reload: () => Promise<void>): Child {
       h("input", {
         name: "to",
         "aria-label": "Потребителско име или имейл на приятел",
-        placeholder: "Потребителско име или имейл",
+        placeholder: "име или имейл",
         autocomplete: "off",
         autocapitalize: "none",
         spellcheck: false,

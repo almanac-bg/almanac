@@ -50,27 +50,33 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/fi
     „Някой позна 7 от 10. А ти?“ and the shared tiles.
   - On a phone the cover is under half the screen (its date sized by the height), so that „Започни“ is whole by 500px
     on 320 × 568 and 540px on 375 × 600 (`fit.spec.ts`).
-  - The streak (`.streak-chip`): the flame, the number and „дни в серията“, from three days; under it a day the week
-    forgave, or while the day waits what it makes of the streak (`stakeLine`).
+  - The streak (`.streak-chip`): the flame, the number and „дни в серията“, from three days; under it one line: what
+    came of the days just missed (told once), a day the week forgave, or while the day waits what it makes of the
+    streak (`stakeLine`). Below three days, what came of the days just missed is that line on its own, in the
+    streak's place (`.streak-notice`).
   - On a big screen, under them, „В броя“: the ten chapters in their order.
   - A new visitor: the cover, „Започни“, and under it „Едни и същи за цяла България.“ In an app's own browser, one
     line under „Започни“: „Имаш игра в браузъра? Отвори там“ (`coverExit`).
-  - Notices (a day forgiven, a friend's duel waiting) are one quiet line each over the issue, told once.
+  - Nothing over the issue but what came of the player's own step (a profile signed in to, a game brought here).
+    Others' news is Приятели's: its dot for a friend's duel or request, its line for a friend's yes.
 - **The day's result** (Днес once the day is played):
   1. The score on a sheet of the issue's first chapter: „Брой 9 · 20 ноември“, the score as the hero numeral „7 от
      10“, the tiles, „Десетият: вярно отговарят 14 %“ (or „Десетият е най-трудният днес“ before a crowd), and with a crowd
-     „България днес: средно 6,2“. Ten of ten: „Всички верни“ and the mark drawn over it.
+     „България днес: средно 6,2“. Ten of ten: „Всички верни“ and the mark drawn over it. None right: right under the
+     score, „Въпросите и фактите“ open (`.missed-day`): the first four, each its dashed tile, the question, the right
+     answer and its fact, and „Още 6 въпроса“ (the rest of the questions and facts); no word of praise.
   2. On the first results (a guest's first day, a game just brought here, an app's own browser): the action, right
      under the score — keeping the game and being reminded, or the way out to the phone's browser; sharing then stays a
      quiet link beside the tiles („Сподели резултата“).
   3. The day's entry („Днес в Алманаха“, or „Най-рядкото ти попадение“ with a crowd): a sheet of its chapter with the
      chip, the answer as a headword, the question, the fact. Under it what the day wrote (`game/news.ts`): „+6 с
      мастило“; „Един от въпросите вече беше в твоя Алманах и остава в сиво.“; the chapter nearest its next rank with
-     its seal and pips („История: още 2 до Книга“); ranks risen, their seals and one line; or a best rank risen, the
-     big moment.
+     its seal and pips („История: още 2 до Книга“); ranks risen, their seals and one line (one chapter's: its ladder
+     under it); or a best rank risen, the big moment, with the ladder from Бележка to Летопис (`ladder()`).
   4. Friends who played it, up to five (`.friends-day`): avatar, name, worn seal, their small squares, their score.
   5. The action, past the first results: „Сподели“.
-  6. Tomorrow: the next issue's date set big, when it comes, what it makes of the streak; past the first results, the
+  6. Tomorrow: the next issue's date set big, „Утре, неделя · Брой 32“, the chapter of its hard question with its
+     glyph („Трудният въпрос е от История“, once tomorrow is drawn), what it makes of the streak; past the first results, the
      reminder's ask under it while reminders are off, a player with a profile's too (a plain button, never a second
      action; three times at most, once a day). Yesterday's issue finished after midnight has today's in its place
      („Вече излезе.“, „Към днешния брой“).
@@ -88,12 +94,15 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/fi
   action, the streak's stake under it, and „Още десет“ plain; once it's played, „Още десет въпроса“ the action.
 - **Приятели:** the board (friends by default, or all of България: its spread and the player's place first, then the
   top rows); the friends (a row each: avatar, name, seal, today's score, the duels between you „дуели 3 : 1“); the
-  duels („Твой ред“ the page's action, „Чакаш“, „Изиграни“: each its score and, on even right answers, what broke the
-  tie; the record between two is the friend's row's alone). Two friends of one name show their @username. A duel's
+  duels („Твой ред“ the page's action, „Чакаш“, „Изиграни“: an open one how it stands under the name, „Изиграй същите
+  десет въпроса · още 6 дни“, „Ти: 8 · Иво има още 6 дни“; a played one its score and, on even right answers, what broke the
+  tie; the record between two is the friend's row's alone). Friends are added in one field, „име или имейл“; a
+  friend's yes to a request is one line over the friends, told once. Two friends of one name show their @username. A duel's
   result is a spread on a big screen: the two face to face on the left, the record and the ways on on the right; its
   marks as the tiles (близо half filled), nothing ringed: speed only breaks a tie.
 - **Профил:** the avatar with the seal worn on its corner, the name; the longest streak and what the week forgives;
-  the seals by chapter, the one worn ringed in ink, another chosen behind „избери друг“; the avatars (every animal,
+  the seal worn on its ladder („Печатът на География“, its ink, Бележка to Летопис, the one reached ringed); the seals
+  by chapter, the one worn ringed in ink, another chosen behind „избери друг“; the avatars (every animal,
   and a chapter's art from its Страница, hollow with a grey ring and „История · от Страница“ until then); Настройки
   last; no list of past games (a game isn't gone over after its day). No
   duplicate avatar in the bar's corner on this page. Another player's page (`/players/<tag>`) is the same head,
@@ -215,6 +224,9 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   rank is four pips under it (`pips()`), from 32px, on a chapter's page and the result's line only. By day a fine
   outline in the deep colour; on a sheet (its own colour, often) a 2px ink rim (`.rimmed`). Beside a player's name only
   the seal shows, never its rank's word (`worn()`); the word is the Алманах's and a rank-up's.
+- **The ladder** (`ladder()`, `.ladder`): a chapter's six ranks in a row, each its seal and name; the one reached ringed
+  in ink, its name heavy; those to come faded. On a rank-up and Профил. Under 380px only the reached one is named;
+  every seal stays.
 - **Buttons:** `.btn` (outlined in `--line-2`), `.btn.primary` (the one action), `.btn.danger`, `.link` (`.tap` for a
   finger's height). Fields (`input`) are white boxes with a 2px `--line-2` frame, a button's height. `.segmented`: tabs
   or a setting's few choices on a well, the chosen one a raised surface. A switch is a 52 × 30 track. Never a native
@@ -245,8 +257,9 @@ under it.
 - **Answered:** the player's own right answer is ink — a dark fill with white text by day, a light fill with dark
   text by night — and a solid ✓; the right one they didn't give has a 3px ink outline and a ✓ in a ring; their wrong
   one is hollow and dashed with a ✕ in a dashed ring and „ти“. The rest shrink to a 36px line of their own words, so
-  that the player's row and the right row are right under the question. The crowd's shares fill in behind each
-  answer.
+  that the player's row and the right row are right under the question; the page doesn't move, so the question stays
+  whole under the head (only if the panel at its least would cover the right row). The crowd's shares fill in behind
+  each answer.
 - **Each kind:** true-or-not, two side by side; order, rows of 48px picked up and put down or dragged by their grip,
   answered as the right order — a row in place with a solid ✓, one out of place hollow and dashed with „ти: 3-ти“;
   match, two columns, the left lettered А–Г and a right one joined taking its left one's letter (never colour);
@@ -254,8 +267,9 @@ under it.
   44px at the least), answered as what was said, the answer, and both on a scale (the answer a filled square; „ти, вярно“ a filled disc,
   „ти, близо“ half filled, „ти“ hollow).
 - **The answer** (`.after`): docked at a phone's foot, a surface over the answers, at most what leaves the player's
-  row and the right one in sight; a longer fact scrolls in it, fading out above „Напред“. In it, the verdict, how many
-  got it, „Записано с мастило · глава История“ for ink, „Знаеше ли?“ and the fact, and „Напред“ (the one action).
+  row and the right one in sight; a longer fact scrolls in it, fading out above „Напред“. In it, the verdict, a choice
+  missed its right answer in words („Вярно е: Съединението.“), how many got it, „Записано с мастило · глава История“
+  for ink, „Знаеше ли?“ and the fact, and „Напред“ (the one action).
 - **Verdicts** are a fixed set, never an answer's own word: „Точно!“, „Вярно!“ (a number near enough to count, not
   spot on), „Не е това.“, „Близо, но не се брои.“, „Времето изтече.“ The verdict's sign is ink: a filled disc with ✓, a half-filled disc, a ✕ or a clock in a dashed
   ring.
@@ -326,17 +340,17 @@ flat shapes with depth, lit from the top left, no outlines, painted from one ton
 
 ## In code
 
-- `ui.ts`: `leaf`, `glyph`, `chip`, `tiles`, `mini`, `seal`, `pips`, `worn`, `avatar`, `who`, `rankRow`, `verdict`,
+- `ui.ts`: `leaf`, `glyph`, `chip`, `tiles`, `mini`, `seal`, `pips`, `ladder`, `worn`, `avatar`, `who`, `rankRow`, `verdict`,
   `fact`, `filed`, `segmented`, `failure`, `rosette`, `back`.
 - `game/run.ts`: `trail`, `questionHead`, `timer`, `settle`; `game/questions.ts` each kind; `game/news.ts` what a game
   wrote; `game/share.ts` and `game/card.ts` the share.
 - **Selectors:** a part has its own class (`.status-n`), not a tag under a class; Biome flags the other kind. A class
   nothing names any more goes, with its rules.
 - **Test hooks** the browser tests depend on: `.question-head`, `.options .option`, `.keypad`, `.sortable-list`,
-  `.verdict`, `.after`, `.up-next-go`; `.issue`, `.issue-go`, `.today-side`, `.result`, `.result-main`, `.score-n`,
-  `.tiles .tile`, `.tomorrow`, `.result-share`, `.share-sheet`, `.streak-chip`, `.day-entry`, `.friends-day`;
+  `.verdict`, `.right-said`, `.after`, `.up-next-go`; `.issue`, `.issue-go`, `.today-side`, `.result`, `.result-main`, `.score-n`,
+  `.tiles .tile`, `.tomorrow`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-entry`, `.friends-day`, `.missed-day`;
   `.summary`, `.reviewed`, `.news-facts`; `.toc-row`, `.entry`; `.day-board`, `.rank-row`, `.friend`, `.invitation`,
-  `.duels`, `.duel-row`, `.their-line`.
+  `.accepted-notice`, `.duels`, `.duel-turn`, `.duel-row`, `.their-line`; `.me-ladder`, `.ladder`.
 
 ## Before a UI change ships
 

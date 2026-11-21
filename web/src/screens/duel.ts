@@ -161,7 +161,8 @@ function rowLine(d: DuelView): string {
         ? `Довърши своята игра · ${leftWords(d.until ?? 0)}`
         : `Изиграй същите десет въпроса · ${leftWords(d.until ?? 0)}`;
     case "theirs":
-      return `Още не е изигран · ${leftWords(d.until ?? 0)}`;
+      // The player's ten are in: their score, and how long the other has for the same ten.
+      return `Ти: ${formatNumber(d.you?.rights ?? 0)} · ${them?.name ?? "Приятелят"} има ${leftWords(d.until ?? 0)}`;
     case "expired":
       if (d.lapsed === "they") return `${them?.name ?? "Приятелят"} не го изигра навреме`;
       if (d.lapsed === "you") return "Не го изигра навреме";
@@ -172,20 +173,22 @@ function rowLine(d: DuelView): string {
   return `${formatNumber(d.you?.rights ?? 0)}:${formatNumber(them?.rights ?? 0)}${versus}${tie ? ` · ${tie}` : ""}`;
 }
 
-/** A duel as a row: the other player, where it stands, and a word on it. */
+/** A duel as a row: the other player, where it stands, and a word on it. An open one's list says whose turn it is
+ * („Твой ред“, „Чакаш“): its row only how it stands („Ти: 8 · Иво има още 6 дни“). */
 export function duelRow(d: DuelView): Child {
   const them = d.opponent;
+  const open = d.state === "yours" || d.state === "theirs";
   return h(
     "li",
     null,
     h(
       "a",
-      { class: `duel-row s-${d.state}`, href: `/duel/${d.id}` },
+      { class: open ? `duel-row open s-${d.state}` : `duel-row s-${d.state}`, href: `/duel/${d.id}` },
       them ? who(them.name, them.look ?? {}, null, them.name) : h("span", { class: "who-name" }, "Съперник"),
       h(
         "span",
         { class: "duel-row-end" },
-        h("strong", { class: "duel-state" }, ends[d.state]),
+        open ? null : h("strong", { class: "duel-state" }, ends[d.state]),
         h("span", { class: "muted" }, rowLine(d)),
       ),
     ),
@@ -228,32 +231,14 @@ function duelTurn(d: DuelView): Child {
   );
 }
 
-/** A friend's duel that waits for the player, as Начало says it (play.DuelWaiting): one quiet line, while it waits. */
-export interface Waiting {
-  id: number;
-  name: string;
-  n: number;
-}
-
-/** Начало's line: a friend's duel waits for the player. */
-export function waitingLine(w?: Waiting | null): Child {
-  if (!w) return null;
-  return h(
-    "p",
-    { class: "streak-notice", role: "status" },
-    w.n > 1 ? `${w.n} дуела те чакат.` : `${w.name} те покани на дуел.`,
-    w.n > 1 ? h("a", { href: "/friends" }, "Приятели") : h("a", { href: `/duel/${w.id}` }, "Играй"),
-  );
-}
-
-/** A friend's yes to the player's request, as Начало hears of it (play.AcceptedOf). */
+/** A friend's yes to the player's request, as Приятели hears of it (play.AcceptedOf). */
 export interface Accepted {
   id: number;
   name: string;
   line: string;
 }
 
-/** Lines told on this page already: Начало drawn again (after a game) doesn't say them twice. */
+/** Lines told on this page already: Приятели drawn again doesn't say them twice. */
 const toldHere = new Set<unknown>();
 
 /** Tells a line once, wherever the player is signed in (the server keeps it as told): whether it's news here. */
@@ -264,15 +249,10 @@ function toldOnce(line: string): boolean {
   return true;
 }
 
-/** A friend said yes to the player's request: said once, above the day, a tap from the friends. */
+/** A friend said yes to the player's request: said once, in Приятели, over the friends. */
 export function acceptedLine(a?: Accepted | null): Child {
   if (!a || !toldOnce(a.line)) return null;
-  return h(
-    "p",
-    { class: "streak-notice", role: "status" },
-    `${a.name} прие поканата ти за приятелство.`,
-    h("a", { href: "/friends" }, "Приятели"),
-  );
+  return h("p", { class: "notice accepted-notice", role: "status" }, `${a.name} прие поканата ти за приятелство.`);
 }
 
 interface Friend {

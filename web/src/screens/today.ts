@@ -5,8 +5,9 @@
 // result (as it lands, and on every later visit): the score and its shape, how it went among everyone, sharing it
 // (game/share.ts, in a sheet with its card and its text), how all of България did with it, one entry its right answers
 // wrote in the book (the rarest, once enough others played the day), and tomorrow (when the next issue comes, the streak it makes, the reminder's ask). A wrong game is
-// never celebrated. Topics are played from their chapter in the Алманах, duels from Приятели. Once, over the day: what
-// came of the days just missed, a friend's duel waiting, a friend's yes. In an app's own browser the result's action
+// never celebrated. Topics are played from their chapter in the Алманах, duels from Приятели (a friend's duel waiting
+// is its dot, a friend's yes its line). Once, under the streak: what came of the days just missed. Once, over the day:
+// what came of a step just taken (a profile signed in to, a game brought here). In an app's own browser the result's action
 // is the way out to the phone's browser with the game (keep.ts, exitWay), and the cover has a line for a game kept
 // there; a game brought here by it (its token in the address's fragment: takeHand) lands on the result, whose action
 // is then the ask to keep it and be reminded.
@@ -14,6 +15,7 @@
 import { loadPictures, picture } from "../art/picture.ts";
 import { news } from "../game/news.ts";
 import { closeLine, count, percent, withOwn } from "../game/numbers.ts";
+import { answerWords } from "../game/questions.ts";
 import { land, reviewed } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting } from "../game/run.ts";
 import { type SharedDay, shareCard, shareDay, shareText } from "../game/share.ts";
@@ -30,7 +32,6 @@ import { go, goBack, hold, release, title } from "../lib/router.ts";
 import { dateWords, issueOf, onDay, weekday } from "../lib/words.ts";
 import { cover, notice, player, playing, user } from "../state.ts";
 import { chapterName, chip, failure, formatNumber, glyph, leaf, mini, stakeLine, tiles, who } from "../ui.ts";
-import { type Accepted, acceptedLine, type Waiting, waitingLine } from "./duel.ts";
 import { app, coverExit, exitWay, handedIn, haveProfile, keepLine, keepStake, mailAsk, takeHand } from "./keep.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
@@ -72,10 +73,8 @@ export interface Today {
   friends?: Score[] | null;
   /** While no friend has played: whether the player has any friends at all. */
   befriended?: boolean;
-  /** A friend said yes to the player's request: told once (play/lines.go). */
-  accepted?: Accepted | null;
-  /** A friend's duel waits for the player (play.DuelWaiting): a quiet line while it does. */
-  duel?: Waiting | null;
+  /** The day played: the chapter of tomorrow's last question, the hard one (its result's „Утре“). */
+  tomorrowHard?: string;
   /** A game that ended without its result on screen (the day's last question let run out, a game left at its end):
    * its news, told here once (play/told.go). */
   untold?: number;
@@ -285,15 +284,15 @@ export function today() {
       (shared && shared.day !== t.day && !run?.done ? `Брой ${shared.issue} вече мина. Ето днешния.` : "");
     bye = "";
     notice.set("");
+    // Over the day, only what came of the player's own step; others' news is Приятели's (its dot, its lines).
     const notices = [
       said ? h("p", { class: "notice", role: "status" }, said) : null,
-      // What came of the days just missed, once.
-      streakNotice(t),
-      // One line at a time, of others: a friend's duel waits (it has a time), or a friend said yes to their request.
-      waitingLine(t.duel) ?? acceptedLine(t.accepted),
       // Come from the streak's mail to a browser signed out: the way in comes first, open.
       fromMail && !user.peek()?.email ? haveProfile(load, undefined, true, mailedTo) : null,
     ];
+    // What came of the days just missed, once: under the streak, before the day is played. The result says the streak
+    // in „Утре“, so there it's only kept as told.
+    const streakSaid = streakNotice(t);
     if (run?.done) return result(t, run, just, notices);
     // The player's numbers (Профил's): the streak's week, the facts in the book.
     const stats = signal<Stats | null>(null);
@@ -310,7 +309,10 @@ export function today() {
         "div",
         { class: "today-side page-2" },
         issueGo(start(t), marks.length, failed, first),
-        first ? null : streakSection(t, stats, false),
+        first ? null : streakSection(t, stats, false, streakSaid),
+        first || t.streak >= 3 || !streakSaid
+          ? null
+          : h("p", { class: "streak-notice", role: "status" }, streakSaid.long),
         first ? null : untold(t),
         // A new visitor's cover says once what the ten are (issueGo): no list of them again beside it.
         first ? null : contents(t),
@@ -451,10 +453,10 @@ function contents(t: Today): Child {
   );
 }
 
-/** The streak: its number and „дни в серията“, a day the week forgave said under it; while the day's ten wait (`done`
- * false), it is at stake, unlit, and from the evening, if it ends at midnight, that's said. Nothing below three days
- * (direction: the streak shows from 3). */
-function streakSection(t: Today, stats: () => Stats | null, done: boolean): Child {
+/** The streak: its number and „дни в серията“, and its one line under it: what came of the days just missed (`said`,
+ * once), or a day the week forgave; while the day's ten wait (`done` false), it is at stake, unlit, and from the
+ * evening, if it ends at midnight, that's said. Nothing below three days (direction: the streak shows from 3). */
+function streakSection(t: Today, stats: () => Stats | null, done: boolean, said?: StreakSaid | null): Child {
   return () => {
     const days = t.streak;
     if (days < 3) return null;
@@ -473,19 +475,21 @@ function streakSection(t: Today, stats: () => Stats | null, done: boolean): Chil
         "span",
         { class: "status-text" },
         h("span", { class: "status-label" }, "дни в серията"),
-        forgiven
-          ? h(
-              "span",
-              { class: "streak-note" },
-              forgiven === 1
-                ? "Тази седмица един пропуснат ден е простен."
-                : forgiven === 2
-                  ? "Тази седмица два пропуснати дни са простени."
-                  : `Тази седмица ${forgiven} пропуснати дни са простени.`,
-            )
-          : done
-            ? null
-            : stakeLine(days, t.spare ?? true),
+        said
+          ? h("span", { class: "streak-note", role: "status" }, said.short)
+          : forgiven
+            ? h(
+                "span",
+                { class: "streak-note" },
+                forgiven === 1
+                  ? "Тази седмица един пропуснат ден е простен."
+                  : forgiven === 2
+                    ? "Тази седмица два пропуснати дни са простени."
+                    : `Тази седмица ${forgiven} пропуснати дни са простени.`,
+              )
+            : done
+              ? null
+              : stakeLine(days, t.spare ?? true),
       ),
     );
   };
@@ -515,6 +519,8 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   now?.then(fresh.set, () => {}).finally(() => known.set(true));
   const of = outOf(run);
   const perfect = of > 0 && run.rights === of;
+  // None right: the questions missed and their facts, open right under the score, the rest a tap away.
+  const zero = of > 0 && run.rights === 0;
   const review = reviewOf(run.id);
   const reviewList = signal<Reviewed[] | null>(null);
   let reviewHead: HTMLElement | null = null;
@@ -590,6 +596,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       "div",
       { class: "result-main page-1" },
       hero,
+      zero ? missed(review, openReview, reviewList) : null,
       first ? action : null,
       // 2. The day's entry in the book, and what the day wrote.
       () => entryOfDay(fresh().entry),
@@ -606,12 +613,15 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       first ? null : action,
       // 5. Tomorrow.
       t.late ? onToToday(t, t.late.today) : tomorrow(t, streak, stake, first ? null : ask),
-      h(
-        "button",
-        { class: "more", type: "button", "aria-expanded": () => !!reviewList(), onclick: openReview },
-        "Въпросите и фактите",
-        h("span", { class: "i i-right", "aria-hidden": "true" }),
-      ),
+      // None right: the questions are open under the score already, with the way to the rest there.
+      zero
+        ? null
+        : h(
+            "button",
+            { class: "more", type: "button", "aria-expanded": () => !!reviewList(), onclick: openReview },
+            "Въпросите и фактите",
+            h("span", { class: "i i-right", "aria-hidden": "true" }),
+          ),
     ),
     () => {
       const all = reviewList();
@@ -628,6 +638,60 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       );
     },
   );
+}
+
+/** How many of the questions missed a result with none right shows at once. */
+const missedShown = 4;
+
+/** None right: the first questions, each its chapter's tile, the question, the right answer and the fact, right under
+ * the score; „Още 6 въпроса“ opens them all (`more`, with the rest of „Въпросите и фактите“). Never a word of praise:
+ * only what the questions were. */
+function missed(review: Promise<Reviewed[]>, more: () => void, opened: () => Reviewed[] | null): Child {
+  const all = signal<Reviewed[] | null>(null);
+  review.then(all.set, () => {});
+  return () => {
+    const list = all();
+    if (!list?.length) return null;
+    const shown = list.slice(0, missedShown);
+    const rest = list.length - shown.length;
+    return h(
+      "section",
+      { class: "sect missed-day" },
+      h(
+        "div",
+        { class: "sect-head" },
+        h("h2", null, "Въпросите и фактите"),
+        h("span", { class: "sect-note" }, `1–${shown.length} от ${list.length}`),
+      ),
+      h(
+        "ol",
+        { class: "missed" },
+        shown.map((q) => {
+          const answer = answerWords(q.view, q.reveal);
+          return h(
+            "li",
+            { class: "miss" },
+            h(
+              "span",
+              { class: `tile ${q.void ? "void" : "wrong"} t-${q.category}`, "aria-label": chapterName(q.category) },
+              h("span", { class: "tile-pic" }, picture(`topic-${q.category}`)),
+            ),
+            h("p", { class: "miss-q" }, q.view.text),
+            answer ? h("p", { class: "miss-a" }, answer) : null,
+            q.reveal.fact ? h("p", { class: "miss-f" }, q.reveal.fact) : null,
+          );
+        }),
+      ),
+      rest > 0
+        ? h(
+            "button",
+            { class: "more", type: "button", "aria-expanded": () => !!opened(), onclick: more },
+            rest === 1 ? "Още един въпрос" : `Още ${rest} въпроса`,
+            h("span", { class: "i i-right", "aria-hidden": "true" }),
+          )
+        : null,
+    );
+  };
 }
 
 /** A question of the ten by its place, as the result's line names it („Десетият“). */
@@ -988,9 +1052,10 @@ function onToToday(t: Today, today: () => void): Child {
   );
 }
 
-/** Tomorrow: the next issue's date set large, when it comes and what it makes of the streak (`streak`: with today's);
- * a guest's ask to keep the game (keep.ts: what it risks till then, `stake`); and, where it isn't on yet, the
- * reminder's ask (`ask`; null where the result's action is the ask, or the way out of an app's browser). */
+/** Tomorrow: the next issue's date set large, „Утре, неделя · Брой 32“, the chapter of its hard question with its
+ * glyph (`t.tomorrowHard`, when it's drawn), and what it makes of the streak (`streak`: with today's); a guest's ask
+ * to keep the game (keep.ts: what it risks till then, `stake`); and, where it isn't on yet, the reminder's ask (`ask`;
+ * null where the result's action is the ask, or the way out of an app's browser). */
 function tomorrow(
   t: Today,
   streak: () => number,
@@ -1000,9 +1065,7 @@ function tomorrow(
   const next = new Date(`${t.day}T12:00:00Z`);
   next.setUTCDate(next.getUTCDate() + 1);
   const day = next.toISOString().slice(0, 10);
-  const left = signal(untilMidnight());
-  const every = setInterval(() => left.set(untilMidnight()), 30_000);
-  onCleanup(() => clearInterval(every));
+  const hard = t.tomorrowHard;
   return h(
     "section",
     { class: "sect tomorrow" },
@@ -1011,10 +1074,18 @@ function tomorrow(
       "div",
       { class: "tomorrow-row" },
       h("b", { class: "tomorrow-n" }, day.slice(8).replace(/^0/, "")),
-      h("p", { class: "tomorrow-words" }, h("b", null, `Брой ${issueOf(day)}, ${weekday(day).toLowerCase()}.`), () => {
-        const n = streak();
-        return ` Излиза след ${left()}${n > 0 ? ` С него серията ти става ${n + 1}.` : ""}`;
-      }),
+      h(
+        "p",
+        { class: "tomorrow-words" },
+        h("b", { class: "tomorrow-head" }, `Утре, ${weekday(day).toLowerCase()} · Брой\u00a0${issueOf(day)}`),
+        hard
+          ? h("span", { class: "tomorrow-hard" }, glyph(hard, 22), ` Трудният въпрос е от ${chapterName(hard)}`)
+          : null,
+        () => {
+          const n = streak();
+          return n > 0 ? h("span", { class: "tomorrow-streak" }, `С него серията ти става ${n + 1}.`) : null;
+        },
+      ),
     ),
     // The ask by mail asks a guest for the email itself: the line to keep the game steps aside for it.
     ask ? [keepLine(stake, ask.mailing), ask.view] : null,
@@ -1044,7 +1115,7 @@ function tellStreak(key: string): boolean {
 /** What came of the days just missed — the week forgave one, or it had forgiven all it does and the streak ended — or,
  * back after days away, a welcome with the longest streak the player has had: said once, over the day (the server
  * sends it until it's told). */
-function streakNotice(t: Today): Child {
+function streakNotice(t: Today): StreakSaid | null {
   const key = t.forgiven
     ? `forgiven:${t.forgiven}`
     : t.ended
@@ -1055,12 +1126,18 @@ function streakNotice(t: Today): Child {
   if (!key || !tellStreak(key)) return null;
   const begins = t.run?.done ? "Днес започна нова серия" : "Днес започва нова серия";
   // An ended streak's number is never said (DECISIONS.md, „The direction“): only that a new one begins.
-  const text = t.forgiven
-    ? `${onDay(t.forgiven).replace(/^./, (c) => c.toUpperCase())} пропусна броя, но серията остава. ${forgivesWords(t.perWeek)} Серия: ${count(t.streak, "ден", "дни")}.`
-    : t.ended
-      ? `Серията ти прекъсна. ${begins}.`
-      : `Радваме се, че се върна. ${begins}.`;
-  return h("p", { class: "streak-notice", role: "status" }, text);
+  if (t.forgiven) {
+    const missed = `${onDay(t.forgiven).replace(/^./, (c) => c.toUpperCase())} пропусна броя, но серията остава.`;
+    return { short: missed, long: `${missed} ${forgivesWords(t.perWeek)} Серия: ${count(t.streak, "ден", "дни")}.` };
+  }
+  const text = t.ended ? `Серията ти прекъсна. ${begins}.` : `Радваме се, че се върна. ${begins}.`;
+  return { short: text, long: text };
+}
+
+/** A streak notice in its two lengths: in the streak's one line, and on its own where the streak doesn't show yet. */
+interface StreakSaid {
+  short: string;
+  long: string;
 }
 
 /** What the streak forgives a week, in words: „До два пропуснати дни на седмица ти се прощават.“ */
@@ -1085,16 +1162,6 @@ function perfectMark(): SVGElement {
     svg.append(group);
   }
   return svg;
-}
-
-function untilMidnight(): string {
-  const now = new Date();
-  const sofia = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Sofia" }));
-  const minutes = 24 * 60 - (sofia.getHours() * 60 + sofia.getMinutes());
-  const hours = Math.floor(minutes / 60);
-  // A number and its unit never part at a line's end (DESIGN.md, Copy).
-  if (!hours) return `${minutes} мин.`;
-  return minutes % 60 ? `${hours} ч. и ${minutes % 60} мин.` : `${hours} ч.`;
 }
 
 /** A moment's time of day in Bulgaria: „00:15“. */

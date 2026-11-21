@@ -31,7 +31,7 @@ import {
   verdictSays,
 } from "../ui.ts";
 import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
-import { answered, beats, crowdLine, picture, picturesIn, type Stage } from "./questions.ts";
+import { answered, answerWords, beats, crowdLine, picture, picturesIn, type Stage } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Reveal, Shown, State, TheirMark, View } from "./types.ts";
 
 /** Where the run whose question this tab showed last is kept (this tab's, for as long as it's open). */
@@ -684,7 +684,7 @@ function question(
       // anything counting up from nothing).
       const told = verdict(kind, verdictSays(kind, q.view.type));
       if (told instanceof HTMLElement) told.removeAttribute("role");
-      append(after, [told, crowd, ...rest]);
+      append(after, [told, rightSaid(q.view, res.reveal, kind), crowd, ...rest]);
       settle(page, head, after, asked.node, at, () => {
         after.hidden = false;
         page.classList.add("answered");
@@ -800,6 +800,15 @@ function theirLine(name: string, m: TheirMark | undefined): Child {
   return h("p", { class: `their-line${m.right ? " right" : ""}` }, h("b", null, `${name}: `), how);
 }
 
+/** A choice missed (or let run out): the right answer in words in the panel, „Вярно е: Съединението.“, besides its
+ * row outlined above (a number says „Отговорът: …“ on its scale; an order, pairs or groups, in their rows). */
+function rightSaid(view: View, reveal: Reveal, kind: VerdictKind): Child {
+  if (kind !== "wrong" && kind !== "time") return null;
+  if (view.type !== "choice" && view.type !== "clues") return null;
+  const name = answerWords(view, reveal);
+  return name ? h("p", { class: "right-said" }, "Вярно е: ", h("b", null, name), ".") : null;
+}
+
 /** How long what the player chose stays chosen before the answer shows, however quick the line. */
 const holdMs = 280;
 
@@ -853,8 +862,9 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
     return { top, bottom, height: bottom - top };
   };
   show();
-  // The docked panel leaves room for them over it, however tall (app.css), as they are once answered.
-  if (right) page.style.setProperty("--keep", `${Math.ceil(keyBox().height)}px`);
+  // The docked panel leaves room for them over it, where they are once answered (app.css): the page stays, so the
+  // question stays whole under the head; it moves only if the panel at its least would cover them.
+  if (right) page.style.setProperty("--keep", `${Math.ceil(keyBox().bottom + 12)}px`);
   // Docked at a phone's foot (fixed), beside the question on a laptop (sticky, in its own column), or under it.
   const place = getComputedStyle(after).position;
   const docked = place === "fixed";
@@ -897,6 +907,8 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   }
   head.stick(head.stuckAt(y - was));
   if (y !== was) scrollTo({ top: y, behavior: "instant" });
+  // Moved after all (the panel at its least would have covered them): the panel takes the room the move made.
+  if (right && y !== was) page.style.setProperty("--keep", `${Math.ceil(keyBox().bottom + 12)}px`);
   // Where the right answer ends, taken before anything glides: once it does, its box is where it's drawn on the way.
   const keyAt = key.getBoundingClientRect();
   at(settling.duration, () => head.hold(false));
