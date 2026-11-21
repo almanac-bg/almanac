@@ -24,7 +24,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.getByRole("button", { name: "Започни" })).toHaveCount(0);
   await expect(page.locator(".places-foot")).toBeVisible();
   // The result tells the streak tomorrow makes.
-  await expect(page.locator(".tomorrow")).toContainText("Серията ти става 2.");
+  await expect(page.locator(".tomorrow")).toContainText("С него серията ти става 2.");
   // Приятели has the day's board: of friends (none yet), and of all България, the player on it.
   await page.goto("/friends");
   await expect(page.getByRole("tab")).toHaveText(["Приятели", "България"]);
@@ -88,12 +88,12 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
   await expect(page.getByRole("alert")).toHaveText("Напиши какво не е наред.");
   await page.getByLabel("Какво не е наред?").fill("Отговорът е остарял.");
   await page.getByRole("button", { name: "Прати" }).click();
-  await expect(page.getByText("Благодарим! Ще го прегледаме.")).toBeVisible();
+  await expect(page.getByText("Благодарим ти! Ще го прегледаме.")).toBeVisible();
   // Another topic is a tap away, under the result.
   await expect(page.locator(".other-topics .chip")).toHaveCount(3);
   await expect(page.locator(".other-topics")).not.toContainText("История");
   // Ten more from a result start at once: the player is ready, no count.
-  await page.getByRole("button", { name: "Още десет" }).click();
+  await page.getByRole("button", { name: "Още десет въпроса" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
 });
 
@@ -116,7 +116,7 @@ test("„България“: the questions about Bulgaria from every topic, a t
   );
   expect(topics.size).toBeGreaterThan(1);
   expect(topics.has("")).toBe(false);
-  await expect(page.getByRole("button", { name: "Още десет" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Още десет въпроса" })).toBeVisible();
 });
 
 test("„Микс“: every topic at once, the first way to play at the book's head, with „България“ after it", async ({
@@ -166,7 +166,7 @@ test("the day's count can be backed out of, and nothing starts; let run, it star
   await page.goto("/");
   const day = page.locator(".issue");
   await page.getByRole("button", { name: "Започни", exact: true }).click();
-  await expect(page.locator(".get-ready .kicker")).toHaveText("Въпросите на деня");
+  await expect(page.locator(".get-ready .kicker")).toHaveText("Днешният брой");
   await page.getByRole("button", { name: "Откажи" }).click();
   await expect(day).toContainText("Десет въпроса за днес");
   // Nothing started behind it: the day is still unplayed, after a reload too.
@@ -244,7 +244,7 @@ test("a question left while its time runs: asked first, given up, and the topic 
   await expect(page.locator(".issue")).toBeVisible();
   // Back to the topic, from its chapter: the same game, the question left counted unanswered, the third next.
   await page.goto("/almanac/history");
-  await page.getByRole("link", { name: "Продължи главата" }).click();
+  await page.getByRole("link", { name: "Продължи играта" }).click();
   await page.getByRole("button", { name: "Започни сега" }).click();
   // First, once, what the question given up was: its answer, without points; then on.
   const missed = page.locator(".given-up");
@@ -329,7 +329,7 @@ test.describe("on a computer", () => {
     await playRun(page);
     await expect(page.locator(".summary")).toBeVisible();
     // Just played, the result is a spread (it's drawn where the game was), as it is after a reload.
-    await expect(page.locator(".tomorrow")).toContainText("Серията ти става 2.");
+    await expect(page.locator(".tomorrow")).toContainText("С него серията ти става 2.");
     // (Few have played in a test: the right page, България's, is empty, and the score has the left one.)
     const box = async () => (await page.locator(".result-main").boundingBox())?.width ?? -1;
     const just = await box();

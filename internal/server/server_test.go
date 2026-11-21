@@ -306,7 +306,7 @@ func TestSignInFlow(t *testing.T) {
 	g.inbox.got = nil
 	other.call("POST", "/api/auth/code", map[string]string{"email": "me@example.com"})
 	if status, out := other.call("POST", "/api/auth/code", map[string]string{"email": "me@example.com"}); status != 429 ||
-		!regexp.MustCompile(`след [1-6]?[0-9] с\.$`).MatchString(fmt.Sprint(out["message"])) {
+		!regexp.MustCompile(`след (1 секунда|[1-6]?[0-9] секунди)\.$`).MatchString(fmt.Sprint(out["message"])) {
 		t.Fatalf("a second code at once: %d %v", status, out)
 	}
 	g.outbox.Flush(t.Context())
@@ -946,7 +946,7 @@ func TestReminderNamesAFriend(t *testing.T) {
 	if _, err := g.db.Write.Exec(`UPDATE runs SET day = ? WHERE user_id = ?`, yesterday, boID); err != nil {
 		t.Fatal(err)
 	}
-	if m := s.reminder(ctx, today, boID); m.Body != "Серията ти е 1 ден. Не я прекъсвай: десет въпроса, до полунощ." {
+	if m := s.reminder(ctx, today, boID); m.Body != "Серията ти е 1 ден. Десет въпроса, до полунощ." {
 		t.Fatalf("with a streak: %+v", m)
 	}
 	// Ana, Bo's friend, plays today: Bo hears how she did.

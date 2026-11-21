@@ -93,12 +93,12 @@ test("against a recording: a real game's ten, its player named, its answers as t
   const kicker = (await c.locator(".duel-head .kicker").textContent()) ?? "";
   expect([`По-силен запис · ${owner}`, `Запис · ${owner}`]).toContain(kicker);
   await expect(c.locator(".duel-meant")).toContainText(`Записът е от истинска игра на ${owner}`);
-  await expect(c.getByRole("button", { name: "Още един срещу запис" })).toBeVisible();
+  await expect(c.getByRole("button", { name: "Още един дуел срещу запис" })).toBeVisible();
 });
 
 test("a duel that is gone is said to be gone, to a guest too: not a sign-in", async ({ page }) => {
   await page.goto("/");
   expect((await page.request.post("/api/guest", { data: {} })).ok()).toBe(true);
   await page.goto("/duel/999999");
-  await expect(page.getByRole("heading", { name: "Тази страница я няма" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Няма такава страница" })).toBeVisible();
 });

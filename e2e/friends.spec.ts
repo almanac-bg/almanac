@@ -98,7 +98,7 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
 
   // Ana sees the dot on Приятели in the bar and the request there, and says yes.
   await a.goto("/");
-  const bar = a.getByRole("navigation", { name: "Основно" });
+  const bar = a.getByRole("navigation", { name: "Основна навигация" });
   await expect(bar.getByRole("link", { name: /Приятели/ })).toHaveClass(/news/);
   await bar.getByRole("link", { name: /Приятели/ }).click();
   await expect(a).toHaveURL(/\/friends$/);
@@ -146,7 +146,7 @@ test("a request turned down, a friend removed", async ({ browser }) => {
   await a.reload();
   await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
   await expect(a.locator(".friend")).toHaveCount(1);
-  await a.getByRole("button", { name: "Промени" }).click();
+  await a.getByRole("button", { name: "Премахни приятел" }).click();
   await a.locator(".friend").getByRole("button", { name: "Премахни" }).click();
   await expect(a.locator(".friend")).toHaveCount(0);
   await b.reload();

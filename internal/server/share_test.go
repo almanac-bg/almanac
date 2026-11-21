@@ -59,12 +59,6 @@ func TestSharingTheDay(t *testing.T) {
 	}
 	_, state := p.call("GET", "/api/runs/"+id, nil)
 	rights := int(state["rights"].(float64))
-	lines := strings.Split(out["text"].(string), "\n")
-	if len(lines) != 3 || lines[0] != fmt.Sprintf("Алманах, брой %d · %s", issue, play.DateWords(day)) ||
-		!regexp.MustCompile(fmt.Sprintf(`^%d от 10 [■□]{10}$`, rights)).MatchString(lines[1]) ||
-		strings.Count(lines[1], "■") != rights || lines[2] != strings.TrimPrefix(link, "http://") {
-		t.Fatalf("the text: %q", out["text"])
-	}
 	if _, again := p.call("POST", "/api/runs/"+id+"/share", nil); again["url"] != link {
 		t.Fatalf("shared again: %v, not %s", again["url"], link)
 	}
@@ -86,7 +80,7 @@ func TestSharingTheDay(t *testing.T) {
 	}
 	status, _, body := other.get(path, browserUA)
 	if status != 200 || !strings.Contains(body, fmt.Sprintf(`property="og:image" content="%s/card/%d-%s.png"`, g.url, issue, shape)) ||
-		!strings.Contains(body, fmt.Sprintf(`content="%d от 10 · АЛМАНАХ, брой %d"`, rights, issue)) ||
+		!strings.Contains(body, fmt.Sprintf(`content="%d от 10 · АЛМАНАХ, Брой %d"`, rights, issue)) ||
 		!strings.Contains(body, fmt.Sprintf(`"shared":{"day":"%s","issue":%d,"shape":"%s"}`, day, issue, shape)) {
 		t.Fatalf("the shared day's page: %d\n%s", status, body)
 	}

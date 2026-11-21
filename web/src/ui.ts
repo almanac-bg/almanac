@@ -72,7 +72,7 @@ export function segmented<T>(
  * „Тема“: in the game that's what questions are about. */
 export function schemeSwitch(): Child {
   const schemes: [Scheme, string][] = [
-    ["device", "Автоматично"],
+    ["device", "Като устройството"],
     ["night", "Нощ"],
     ["day", "Ден"],
   ];
@@ -101,7 +101,7 @@ export function filed(topic: string): Child {
     "p",
     { class: "filed" },
     h("span", { class: "i i-nib", "aria-hidden": "true" }),
-    `Записано с мастило · глава ${chapterName(topic)}`,
+    `Записано с мастило · глава „${chapterName(topic)}“`,
   );
 }
 

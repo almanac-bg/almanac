@@ -54,7 +54,7 @@ export async function turnOn(): Promise<string | null> {
     reportProblem(`push subscribe: ${(err as Error).name}: ${(err as Error).message}`);
     return /Brave/.test(navigator.userAgent) || "brave" in navigator
       ? "Brave изключва известията по подразбиране. Отвори brave://settings/privacy, включи „Use Google services for push messaging“ и опитай пак."
-      : "Браузърът не успя да включи известията. Опитай пак или в друг браузър (Chrome, Firefox, Safari).";
+      : "Браузърът не успя да включи известията. Опитай пак или отвори играта в друг браузър (Chrome, Firefox, Safari).";
   }
   try {
     await api("POST", "/api/push", sub.toJSON());
@@ -66,7 +66,7 @@ export async function turnOn(): Promise<string | null> {
   return null;
 }
 
-const denied = "Браузърът не позволи известия. Можеш да ги разрешиш от настройките на браузъра за този сайт.";
+const denied = "Известията са забранени в браузъра. Можеш да ги разрешиш от настройките на браузъра за този сайт.";
 
 export async function turnOff(): Promise<void> {
   const reg = await navigator.serviceWorker.getRegistration("/");

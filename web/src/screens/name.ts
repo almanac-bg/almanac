@@ -57,7 +57,7 @@ async function ask(without?: () => Promise<boolean>): Promise<boolean> {
   return new Promise((done) =>
     sheet(u, {
       heading: "Как да те виждат останалите?",
-      lead: "С това име ще те виждат в класациите и в игрите с други. Можеш да го смениш и после.",
+      lead: "С това име ще те виждат в класацията и в дуелите. Можеш да го смениш и после.",
       go: "Готово",
       next: () => done(true),
       away: () => done(location.pathname === here),

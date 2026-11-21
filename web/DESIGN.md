@@ -50,7 +50,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/fi
     „Някой позна 7 от 10. А ти?“ and the shared tiles.
   - On a phone the cover is under half the screen (its date sized by the height), so that „Започни“ is whole by 500px
     on 320 × 568 and 540px on 375 × 600 (`fit.spec.ts`).
-  - The streak (`.streak-chip`): the flame, the number and „изиграни дни“, from three days; under it a day the week
+  - The streak (`.streak-chip`): the flame, the number and „дни в серията“, from three days; under it a day the week
     forgave, or while the day waits what it makes of the streak (`stakeLine`).
   - On a big screen, under them, „В броя“: the ten chapters in their order.
   - A new visitor: the cover, „Започни“, and under it „Едни и същи за цяла България.“ In an app's own browser, one
@@ -76,16 +76,16 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/fi
      („Вече излезе.“, „Към днешния брой“).
 
   Everything else is under „Въпросите и фактите“ (`.more`): how others played the player's recordings, how all of
-  България spread, and each question with its fact (its verdict never a true-or-not's answer: „Точно“, „Не е това“).
+  България spread, and each question with its fact (its verdict never a true-or-not's answer: „Точно“, „Грешно“).
 - **Алманах:** its head (Микс and България as two ways to play, no lifetime totals), then the chapters, each a folded
   card in its colour with its seal as the badge (40px) and its ink („180 с мастило“); a counter at zero is hidden, and
   the head says once how ink is written. It leads with the chapter nearest its next step.
 - **A chapter:** its head on its sheet (glyph, name, the seal with its pips, its ink, how much to the next rank),
   „Игра на главата“, then its facts, the latest first: ink black, facts met in grey (a thin solid 1.5px grey outline,
-  lighter text). Where grey first shows: „В сиво са останалите срещнати факти. С мастило пише само броят на деня.“
+  lighter text). Where grey first shows: „В сиво са всички останали факти, които срещнеш. С мастило се пише само в броя на деня.“
   Its game's result: on the chapter's sheet its chip, the score and its tiles; under it, with no number (grey is never
   counted), „Фактите от играта са в книгата ти, в сиво.“ While the day's issue waits, „Към въпросите на деня“ is the
-  action, the streak's stake under it, and „Още десет“ plain; once it's played, „Още десет“ the action.
+  action, the streak's stake under it, and „Още десет“ plain; once it's played, „Още десет въпроса“ the action.
 - **Приятели:** the board (friends by default, or all of България: its spread and the player's place first, then the
   top rows); the friends (a row each: avatar, name, seal, today's score, the duels between you „дуели 3 : 1“); the
   duels („Твой ред“ the page's action, „Чакаш“, „Изиграни“: each its score and, on even right answers, what broke the
@@ -238,7 +238,7 @@ under it.
   over it), and the number big: „4/10“ to the eye, „4 от 10“ aloud. Nothing counts right answers in a row.
 - **The clock** (`.timer`): a bar under the pips, the seconds at its end; ink and heavier for the last ten seconds;
   gone once answered. Its sound: silent until ten seconds are left.
-- **The sheet** (`.q-leaf`, no corner): the chip (and on the day's last question „Трудното число“ beside it), then the
+- **The sheet** (`.q-leaf`, no corner): the chip (and on the day's last question „Най-трудният: число“ beside it), then the
   question. Under 620px of height the chip is the glyph alone. A picture over the question takes at most 30% of the
   height; a choice of pictures is two by two.
 - **Answers** (`.option`): white, a 2px `--line-2` frame, the letter in a box (А–Г, keys 1–4 on a computer).
@@ -299,7 +299,7 @@ flat shapes with depth, lit from the top left, no outlines, painted from one ton
 
 ## The share
 
-- **The text:** „Брой 42 · 8/10 · 23 дни“ (the streak from three days), the squares ■ right, ◧ близо, □ not, and the
+- **The text:** „Брой 42 · 8/10 · серия 23 дни“ (the streak from three days), the squares ■ right, ◧ близо, □ not, and the
   link (`game/share.ts`). Unsigned.
 - **The card** (`game/card.ts`), drawn in the browser as it's shared, one look in every theme: the mark and the name,
   „Брой N“ big with its date, the ten tiles two rows of five (filled, half, dashed and hollow: they part in grey too),

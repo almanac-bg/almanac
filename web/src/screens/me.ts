@@ -135,7 +135,7 @@ export function me(kit: Kit) {
                 "span",
                 { class: "me-settings-text" },
                 h("strong", null, "Настройки"),
-                h("span", { class: "muted" }, "Изглед, звуци, напомняне, името, имейлът и профилът"),
+                h("span", { class: "muted" }, "Изглед, звук, напомняне, име, имейл и профил"),
               ),
               h("span", { class: "i i-right me-settings-i", "aria-hidden": "true" }),
             ),
@@ -179,9 +179,9 @@ function head(data: () => Stats | null): Child {
               "p",
               { class: "me-drawn muted" },
               "Това име е избрано наслуки. ",
-              h("a", { class: "link", href: "/settings#name" }, "Смени го"),
+              h("a", { class: "link", href: "/settings#name" }, "Смени името"),
             )
-          : h("a", { class: "link me-rename", href: "/settings#name" }, "Промени името"),
+          : h("a", { class: "link me-rename", href: "/settings#name" }, "Смени името"),
     ),
   );
 }
@@ -199,8 +199,8 @@ function longest(s: Stats | null): Child {
       h(
         "span",
         { class: "status-text" },
-        h("span", { class: "status-label" }, "най-дълга серия"),
-        h("span", { class: "streak-note" }, "изиграни дни"),
+        h("span", { class: "status-label" }, s.best === 1 ? "ден" : "дни"),
+        h("span", { class: "streak-note" }, "най-дълга серия"),
       ),
     ),
     h(
@@ -210,7 +210,7 @@ function longest(s: Stats | null): Child {
         ? s.perWeek === 1
           ? "Един пропуснат ден в седмицата не прекъсва серията."
           : "До два пропуснати дни в седмицата не прекъсват серията."
-        : "Тази седмица простените дни са използвани: следващият пропуснат прекъсва серията.",
+        : "Тази седмица простените дни са използвани: следващият пропуснат ден прекъсва серията.",
     ),
   ];
 }
@@ -254,11 +254,11 @@ function seals(ranks: Rank[] | null, s: Stats | null, told: (s: Stats) => void):
           h("p", { class: "seal-worn" }, () =>
             choosing()
               ? [
-                  "Докосни печата, който да носиш. ",
+                  "Докосни печата, който искаш да носиш. ",
                   h("button", { class: "link", type: "button", onclick: choose }, "Готово"),
                 ]
               : [
-                  wearing() ? `Носиш печата на ${chapterName(wearing())} · ` : "",
+                  wearing() ? `Носиш печата на глава „${chapterName(wearing())}“ · ` : "",
                   had.length > 1 || !wearing()
                     ? h(
                         "button",
@@ -290,11 +290,11 @@ function seals(ranks: Rank[] | null, s: Stats | null, told: (s: Stats) => void):
           ),
         ]
       : [
-          h("p", { class: "seal-worn" }, "Още няма печат."),
+          h("p", { class: "seal-worn" }, "Още нямаш печат."),
           h(
             "p",
             { class: "small" },
-            "Първият печат на глава идва с първия ѝ факт с мастило: верен отговор в броя на деня.",
+            "Печат на глава получаваш с първия ѝ факт с мастило – при верен отговор в броя на деня.",
           ),
         ],
     () => error() && h("p", { class: "bad", role: "alert" }, error()),

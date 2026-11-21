@@ -663,7 +663,7 @@ function question(
         res.ink && res.reveal.fact ? filed(q.category) : null,
         fact(res.reveal.fact, res.reveal.day),
         res.reveal.credit ? credit(res.reveal.credit) : null,
-        upNext(lasts, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} след малко…`, true),
+        upNext(lasts, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} идва след малко…`, true),
         h(
           "button",
           {
@@ -772,7 +772,7 @@ function question(
           chip(q.category, h("span", { class: "chip-name" }, topicWords)),
           // The day ends on its hard number: said on its sheet.
           s.kind === "day" && q.n === s.total - 1 && q.view.type === "number"
-            ? h("span", { class: "hard-tag" }, "Трудното число")
+            ? h("span", { class: "hard-tag" }, "Най-трудният: число")
             : null,
         ),
         glyph(q.category, 32, "q-mini"),

@@ -539,8 +539,8 @@ function roll(el: HTMLElement, from: string, to: string): Promise<void> {
 }
 
 /** The streak one day longer, in its chip (drawn with the new number): once `after` has come (the result has landed),
- * the number rolls up from the day before (a first streak's words come in with it: never „0 ден поред“), its words
- * (`label`, of a number) following the number shown: never „1 дни поред“. The flame swells once
+ * the number rolls up from the day before (a first streak's words come in with it: never „0 дни в серията“), its words
+ * (`label`, of a number) following the number shown: never a number its words don't fit. The flame swells once
  * with a gold glow, and the streak's sound. Resolves once it's over. */
 export async function streak(
   chip: HTMLElement,

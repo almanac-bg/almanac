@@ -97,7 +97,7 @@ func TestRemindersBackOff(t *testing.T) {
 		t.Fatalf("pushes %d, last %d", fake.count("/ana"), g.counted("push:sent:stop"))
 	}
 	if m := s.lastReminder(t.Context(), anaID); m.Body != "Днешният брой те чака" ||
-		m.Title != "Спираме напомнянията засега" || m.Kind != "stop" {
+		m.Title != "Спираме напомнянията, докато не играеш пак" || m.Kind != "stop" {
 		t.Fatalf("the last: %+v", m)
 	}
 
@@ -126,7 +126,7 @@ func TestLastReminderNamesTheNearestStep(t *testing.T) {
 		return Step{Chapter: "История", Left: 1, Rank: "Тетрадка"}, userID == id, nil
 	}
 	m := s.lastReminder(t.Context(), id)
-	if m.Body != "Днешният брой те чака · История: още 1 до Тетрадка" || strings.Contains(m.Body, "6") ||
+	if m.Body != "Днешният брой те чака · История: още 1 с мастило до „Тетрадка“" || strings.Contains(m.Body, "6") ||
 		strings.Contains(m.Body, "Серия") {
 		t.Fatalf("with a step: %q", m.Body)
 	}

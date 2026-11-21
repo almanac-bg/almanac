@@ -88,14 +88,14 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
       return [
         h("h1", null, "Няма такъв профил"),
         h("p", { class: "lead" }, error()),
-        h("a", { class: "btn primary", href: "/friends" }, "Към приятелите"),
+        h("a", { class: "btn primary", href: "/friends" }, "Към Приятели"),
       ];
     }
     if (!p) return h("p", { class: "muted" }, "…");
     return [
       head(p),
       p.me
-        ? h("p", { class: "muted" }, "Така те виждат другите. ", h("a", { href: "/me" }, "Към профила ти"))
+        ? h("p", { class: "muted" }, "Така те виждат другите. ", h("a", { href: "/me" }, "Към твоя профил"))
         : actions(p, load),
       numbers(p),
       ranks(p),
@@ -177,12 +177,12 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
     // finished is told so by the server).
     body = [
       h("p", { class: "player-relation muted" }, "За да добавяш приятели, първо изиграй една игра или влез с имейл."),
-      h("a", { class: "btn inline primary", href: "/" }, "Към играта"),
+      h("a", { class: "btn inline primary", href: "/" }, "Към днешния брой"),
       h("a", { class: "btn inline", href: "/settings" }, "Влез"),
     ];
   } else {
     body = [
-      h("p", { class: "player-relation muted" }, "Като приятели виждате резултатите си за деня."),
+      h("p", { class: "player-relation muted" }, "Приятелите виждат резултатите си всеки ден."),
       button("Добави приятел", "primary", async () => {
         const r = await api<{ friends?: boolean; name?: string }>("POST", "/api/friends/requests", { to: p.tag });
         await reload();
@@ -207,8 +207,8 @@ function numbers(p: Profile): Child {
     h(
       "span",
       { class: "status-text" },
-      h("span", { class: "status-label" }, "най-дълга серия"),
-      h("span", { class: "streak-note" }, "изиграни дни"),
+      h("span", { class: "status-label" }, p.best === 1 ? "ден" : "дни"),
+      h("span", { class: "streak-note" }, "най-дълга серия"),
     ),
   );
 }

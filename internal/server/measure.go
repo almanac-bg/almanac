@@ -293,7 +293,7 @@ var deviceNames = map[string]string{
 // pushNames are the kinds of notifications as they're counted (pushKind.name; "stop": the day's last reminder), and as
 // the admin page says them.
 var pushNames = []struct{ kind, name string }{
-	{"day", "Въпросите на деня"}, {"stop", "Спираме напомнянията"}, {"friends", "Приятели"},
+	{"day", "Днешният брой"}, {"stop", "Спираме напомнянията"}, {"friends", "Приятели"},
 }
 
 // FunnelWeeks and SplitWeeks are how many weeks of first days the admin page tells: the funnel's, week by week; the
@@ -945,7 +945,7 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 	row("Покана за напомняне по имейл, показана", false, count("mailask:shown"))
 	row("„Напомняй ми по имейл“", true, func(w window) template.HTML { return rate{w.t["mailask:yes"], w.t["mailask:shown"]}.HTML() })
 	row("„Не сега“", true, func(w window) template.HTML { return rate{w.t["mailask:no"], w.t["mailask:shown"]}.HTML() })
-	row("Писма „Въпросите на деня те чакат“, изпратени", true, count("mail:day:sent"))
+	row("Писма „Днешният брой те чака“, изпратени", true, count("mail:day:sent"))
 	for _, k := range pushNames {
 		row("Известия „"+k.name+"“, изпратени", false, count("push:sent:"+k.kind))
 		row("отворени", true, func(w window) template.HTML {

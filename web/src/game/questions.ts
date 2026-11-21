@@ -149,23 +149,26 @@ export function answered(view: View, reveal: Reveal, given: Answer | null, how?:
   return a.node;
 }
 
-/** The right answer as a screen reader says it after a miss, where one short sentence holds it: „Верният отговор е Бийтълс.“
+/** The right answer as a screen reader says it after a miss, where one short sentence holds it: „Верният отговор е „Бийтълс“.“
  * (none for an order, pairs or groups: their rows say it). */
+/** An answer named inside a sentence, in quotes unless it brings its own. */
+const quoted = (name: string) => (/^[„"«]/.test(name) ? name : `„${name}“`);
+
 export function spokenAnswer(view: View, reveal: Reveal): string {
   switch (view.type) {
     case "choice": {
       const pick = reveal.pick ?? -1;
       const name = reveal.names?.[pick] ?? view.choices?.[pick] ?? view.pictures?.[pick]?.alt;
-      return name ? `Верният отговор е ${name}.` : "";
+      return name ? `Верният отговор е ${quoted(name)}.` : "";
     }
     case "clues": {
       const name = view.choices[reveal.pick ?? -1];
-      return name ? `Верният отговор е ${name}.` : "";
+      return name ? `Верният отговор е ${quoted(name)}.` : "";
     }
     case "truefalse":
       return reveal.truth ? "Твърдението е вярно." : "Твърдението е невярно.";
     case "number":
-      return `Верният отговор е ${formatNumber(reveal.value ?? 0, view.step)}${view.unit ? ` ${view.unit}` : ""}.`;
+      return `Верният отговор е ${formatNumber(reveal.value ?? 0, view.step)}${view.unit ? `\u00a0${view.unit}` : ""}.`;
     default:
       return "";
   }
@@ -466,7 +469,7 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
             : [h("span", { class: "typed" }, said(mine)), view.unit ? h("span", { class: "unit" }, view.unit) : null],
         ),
         mine === null || mine === answer ? null : scale(answer, mine, how, view),
-        h("p", { class: "number-answer" }, "Отговорът: ", h("strong", null, `${said(answer)}${unit}`), "."),
+        h("p", { class: "number-answer" }, "Верният отговор: ", h("strong", null, `${said(answer)}${unit}`), "."),
       ]);
       // Everyone's guesses take their room at once, and show on their beat.
       const guesses = reveal.crowd?.guesses;
@@ -509,8 +512,13 @@ function scale(answer: number, mine: number, how: VerdictKind | undefined, view:
     h(
       "p",
       { class: "near-key", "aria-hidden": "true" },
-      h("span", null, h("i", { class: "answer" }), "отговорът"),
-      h("span", null, h("i", { class: mark }), right ? "ти, вярно" : near ? "ти, близо" : "ти"),
+      h("span", null, h("i", { class: "answer" }), "верният отговор"),
+      h(
+        "span",
+        null,
+        h("i", { class: mark }),
+        right ? "твоят отговор, вярно" : near ? "твоят отговор, близо" : "твоят отговор",
+      ),
     ),
   );
 }
@@ -537,7 +545,7 @@ function spread(s: Spread, answer: number, mine: number | null, view: NumberView
     {
       class: "guess-bars",
       role: "img",
-      "aria-label": `${percent(inRange)} от догадките са между ${formatNumber(s.lo, view.step)} и ${formatNumber(s.hi, view.step)}${unit}.`,
+      "aria-label": `${percent(inRange)} от отговорите са между ${formatNumber(s.lo, view.step)} и ${formatNumber(s.hi, view.step)}${unit}.`,
       style: { "grid-template-columns": `0.6fr repeat(${n}, 1fr) 0.6fr` },
     },
     shares.map((x, k) =>
@@ -552,7 +560,7 @@ function spread(s: Spread, answer: number, mine: number | null, view: NumberView
   return h(
     "div",
     { class: "guesses" },
-    h("span", { class: "kicker" }, "Догадките на играчите"),
+    h("span", { class: "kicker" }, "Отговорите на играчите"),
     bars,
     h(
       "div",
@@ -563,8 +571,8 @@ function spread(s: Spread, answer: number, mine: number | null, view: NumberView
     h(
       "div",
       { class: "guess-key", "aria-hidden": "true" },
-      h("span", null, h("i", { class: "guess-swatch answer" }), "отговорът"),
-      mine === null ? null : h("span", null, h("i", { class: "guess-swatch mine" }), "твоята"),
+      h("span", null, h("i", { class: "guess-swatch answer" }), "верният отговор"),
+      mine === null ? null : h("span", null, h("i", { class: "guess-swatch mine" }), "твоят отговор"),
       h("span", null, h("i", { class: "guess-swatch edge" }), "извън целта"),
     ),
   );
@@ -774,7 +782,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
     : h(
         "p",
         { class: "hint", id: how },
-        "Докосни едно, после мястото му, или го плъзни.",
+        "Докосни ред, после новото му място, или го плъзни.",
         h("span", { class: "sr" }, " Стрелките нагоре и надолу също го местят."),
       );
   return {
@@ -784,7 +792,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
     // Nothing put in order (the time ran out first): the right order alone.
     reveal(reveal, given) {
       // The line over the list stays, saying what it shows now, so the answers don't move under the player's eye.
-      hint.replaceChildren("Правилният ред:");
+      hint.replaceChildren("Верният ред:");
       hint.hidden = false;
       done.hidden = true;
       const mine = given && "order" in given ? given.order : null;
@@ -801,7 +809,9 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
               "span",
               null,
               view.items[item] ?? "",
-              how === " missed" && at >= 0 ? h("small", { class: "match-gave" }, `ти: ${ordinal(at + 1, "n")}`) : null,
+              how === " missed" && at >= 0
+                ? h("small", { class: "match-gave" }, `при теб: ${ordinal(at + 1, "n")}`)
+                : null,
             ),
             h("span", { class: "value" }, `${formatValue(reveal.values?.[item] ?? 0)}${unit}`),
             how ? sign() : null,
@@ -983,8 +993,8 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
   const hint = h(
     "p",
     { class: "hint", hidden: display },
-    "Докосни нещо отляво, после двойката му отдясно.",
-    spare ? " Едно отдясно е без двойка." : null,
+    "Докосни нещо вляво, после двойката му вдясно.",
+    spare ? " Едно вдясно остава без двойка." : null,
   );
   const result = h("ol", { class: "options match-result", hidden: true });
   const decoy = h("p", { class: "hint match-decoy", hidden: true });
@@ -992,7 +1002,7 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
     node: h("div", { class: "stack" }, hint, grid, said, display ? null : done, result, decoy),
     pending: () => (pairs.peek().some((j) => j !== -1) ? { pairs: [...pairs.peek()] } : null),
     reveal(reveal, given) {
-      hint.replaceChildren("Правилните двойки:");
+      hint.replaceChildren("Верните двойки:");
       hint.hidden = false;
       grid.hidden = true;
       done.hidden = true;
@@ -1013,7 +1023,9 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
               h("strong", null, left),
               " — ",
               view.right[j] ?? "",
-              ok ? null : h("small", { class: "match-gave" }, gave >= 0 ? `ти: ${view.right[gave]}` : "без връзка"),
+              ok
+                ? null
+                : h("small", { class: "match-gave" }, gave >= 0 ? `при теб: ${view.right[gave]}` : "без двойка"),
             ),
             sign(),
           );
@@ -1207,7 +1219,9 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
               h("strong", null, text),
               " — ",
               view.groups[group] ?? "",
-              ok ? null : h("small", { class: "match-gave" }, gave >= 0 ? `ти: ${view.groups[gave]}` : "без отговор"),
+              ok
+                ? null
+                : h("small", { class: "match-gave" }, gave >= 0 ? `при теб: ${view.groups[gave]}` : "без отговор"),
             ),
             sign(),
           );
@@ -1217,10 +1231,7 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
   };
 }
 
-/** What a right answer to a clues question is worth after each number of clues (bank.ClueWorth). */
-const clueWorth = [1, 0.6, 0.3];
-
-/** „Подсказки“: the clues one under another, each with what a right answer is worth while it's the last one out; the
+/** „Подсказки“: the clues one under another, each with its number (a right answer is right whichever clue it came by: no worth is shown); the
  * ones still to come count down. The four options are there from the start: answer as soon as you know. */
 function clues(
   view: CluesView,
@@ -1238,12 +1249,7 @@ function clues(
   };
   const born = performance.now() - view.sinceMs; // when the question showed, on this screen's clock
   const rows = Array.from({ length: view.total }, (_, i) =>
-    h(
-      "li",
-      { class: "clue" },
-      h("span", { class: "clue-worth" }, percent(clueWorth[i] ?? 0)),
-      h("span", { class: "clue-text" }),
-    ),
+    h("li", { class: "clue" }, h("span", { class: "clue-worth" }, String(i + 1)), h("span", { class: "clue-text" })),
   );
   const list = h("ol", { class: "clues" }, rows);
   const paint = (all?: string[]) => {
@@ -1254,7 +1260,7 @@ function clues(
       row.className = `clue${text === undefined ? " locked" : !all && i === out.length - 1 ? " now" : all ? "" : " past"}`;
       const left = Math.ceil(((now.stepsMs[i] ?? 0) - elapsed) / 1000);
       (row.lastChild as HTMLElement).textContent =
-        text ?? (left > 0 ? `Подсказка ${i + 1} идва след ${left}\u00a0с` : `Подсказка ${i + 1} идва…`);
+        text ?? (left > 0 ? `Подсказка ${i + 1} идва след ${left}\u00a0с` : `Подсказка ${i + 1} идва след миг…`);
     });
   };
   paint();

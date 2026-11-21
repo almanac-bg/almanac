@@ -41,7 +41,7 @@ interface DayEntry {
   n: number;
   crowd: boolean;
   right: number;
-  /** None of the day's others got it: „само ти го знаеш“. */
+  /** None of the day's others got it: „само ти го позна“. */
   alone?: boolean;
   fact: { category: string; question?: string; answer: string; untrue?: boolean; fact: string };
 }
@@ -223,7 +223,7 @@ export function today() {
     counting = true;
     screen.show(() =>
       getReady(
-        "Въпросите на деня",
+        "Днешният брой",
         async () => {
           screen.show(starting);
           try {
@@ -389,7 +389,7 @@ function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): 
             t.late
               ? `Вчерашният брой. Довърши го до ${clockAt(t.late.until)}.`
               : at
-                ? "Довърши ги до полунощ."
+                ? "Довърши броя до полунощ."
                 : // Who has played today, once enough have for it to say something.
                   players >= crowdFrom
                   ? `Около три минути · Днес играха ${formatNumber(players)}\u00a0души`
@@ -419,7 +419,7 @@ function issueGo(start: () => void, at: number, error: string, first: boolean): 
           "div",
           { class: "issue-words" },
           h("h2", null, "Едни и същи за цяла България."),
-          h("p", { class: "deck" }, "По един от всяка глава, от лесен към труден. Без регистрация."),
+          h("p", { class: "deck" }, "По един въпрос от всяка от десетте глави, от лесен към труден. Без регистрация."),
         )
       : null,
   ];
@@ -451,7 +451,7 @@ function contents(t: Today): Child {
   );
 }
 
-/** The streak: its number and „изиграни дни“, a day the week forgave said under it; while the day's ten wait (`done`
+/** The streak: its number and „дни в серията“, a day the week forgave said under it; while the day's ten wait (`done`
  * false), it is at stake, unlit, and from the evening, if it ends at midnight, that's said. Nothing below three days
  * (direction: the streak shows from 3). */
 function streakSection(t: Today, stats: () => Stats | null, done: boolean): Child {
@@ -465,14 +465,14 @@ function streakSection(t: Today, stats: () => Stats | null, done: boolean): Chil
       {
         class: done ? "streak-chip today-streak" : "streak-chip today-streak unlit",
         href: "/me",
-        "aria-label": `Серия: ${days} изиграни дни`,
+        "aria-label": `Серия: ${days} дни`,
       },
       picture("flame", "streak-flame tone-flame"),
       h("b", { class: "status-n" }, String(days)),
       h(
         "span",
         { class: "status-text" },
-        h("span", { class: "status-label" }, "изиграни дни"),
+        h("span", { class: "status-label" }, "дни в серията"),
         forgiven
           ? h(
               "span",
@@ -644,7 +644,7 @@ const lastWords = [
   "Десетият",
 ];
 
-/** How many knew the day's tenth, its hard number: „Десетият: вярно отговарят 14 %“ (the player among them, as the issue said it); before there's a crowd, that it's the
+/** How many knew the day's tenth, its hard number: „На десетия въпрос вярно отговарят 14 %“ (the player among them, as the issue said it); before there's a crowd, that it's the
  * hardest today. */
 function tenthLine(review: Promise<Reviewed[]>): Child {
   const said = signal("");
@@ -658,8 +658,8 @@ function tenthLine(review: Promise<Reviewed[]>): Child {
       // The share as the issue said it when it was answered (crowdLine): the player among them.
       said.set(
         c?.answers
-          ? `${which}: вярно отговарят ${percent(withOwn(c, -1, last.right).right)}`
-          : `${which} е най-трудният днес`,
+          ? `На ${which.slice(0, -1).toLowerCase()} въпрос вярно отговарят ${percent(withOwn(c, -1, last.right).right)}`
+          : `${which} въпрос е най-трудният днес`,
       );
     },
     () => {},
@@ -727,14 +727,18 @@ function bulgariaToday(t: Today, run: State, review: Promise<Reviewed[]>): Child
       "div",
       { class: "sect-head" },
       h("h2", null, "България днес"),
-      h("span", { class: "sect-note" }, `${formatNumber(t.board.players)} играха`),
+      h(
+        "span",
+        { class: "sect-note" },
+        t.board.players === 1 ? "игра 1\u00a0човек" : `играха ${formatNumber(t.board.players)}\u00a0души`,
+      ),
     ),
     h(
       "div",
       {
         class: "spread-chart",
         role: "img",
-        "aria-label": `Колко играчи на колко верни: най-много на ${spread.indexOf(Math.max(...spread))}. Ти: ${run.rights}.`,
+        "aria-label": `Колко играчи имат по колко верни отговора: най-много имат ${spread.indexOf(Math.max(...spread))}. Ти: ${run.rights}.`,
       },
       h(
         "div",
@@ -778,7 +782,7 @@ function bulgariaToday(t: Today, run: State, review: Promise<Reviewed[]>): Child
               "div",
               { class: "fig" },
               h("b", { class: "fig-n" }, percent(x.share)),
-              h("span", { class: "fig-label" }, `вярно отговарят на въпрос ${x.n + 1}, най-трудния днес`),
+              h("span", { class: "fig-label" }, `отговарят вярно на въпрос ${x.n + 1}, най-трудния днес`),
             )
           : null;
       },
@@ -793,7 +797,7 @@ function bulgariaToday(t: Today, run: State, review: Promise<Reviewed[]>): Child
 function entryOfDay(r?: DayEntry | null): Child {
   if (!r) return null;
   const f = r.fact;
-  const kicker = !r.crowd ? `въпрос ${r.n + 1}` : r.alone ? "само ти го знаеш" : `вярно отговарят ${percent(r.right)}`;
+  const kicker = !r.crowd ? `въпрос ${r.n + 1}` : r.alone ? "само ти го позна" : `вярно отговарят ${percent(r.right)}`;
   return h(
     "section",
     { class: "sect day-entry" },
@@ -882,7 +886,7 @@ function shareSheet(run: State, t: Today, streak: number): void {
     try {
       const out = await shareDay(run.id, day);
       if (out === "copied") said.set("Копирано.");
-      else if (typeof out === "object") said.set("Копирай текста по-горе.");
+      else if (typeof out === "object") said.set("Не успяхме да го копираме. Маркирай текста по-горе и го копирай.");
       else if (out === "shared") close();
     } catch (err) {
       said.set(errorText(err));
@@ -904,7 +908,7 @@ function shareSheet(run: State, t: Today, streak: number): void {
       await navigator.clipboard.writeText(text.peek() || (await shareText(run.id, day)));
       said.set("Копирано.");
     } catch {
-      said.set("Копирай текста по-горе.");
+      said.set("Не успяхме да го копираме. Маркирай текста по-горе и го копирай.");
     }
   };
   const canShare = typeof navigator.share === "function";
@@ -935,7 +939,7 @@ function shareSheet(run: State, t: Today, streak: number): void {
             : null,
       ),
       () => (said() ? h("p", { class: "share-said", role: "status" }, said()) : null),
-      h("p", { class: "small share-note" }, "Отговорите не се виждат. Който отвори връзката, играе същия брой."),
+      h("p", { class: "small share-note" }, "Отговорите не се виждат. Който отвори връзката днес, играе същия брой."),
     ),
   );
   sheet.addEventListener("click", (e) => {
@@ -963,8 +967,8 @@ function onToToday(t: Today, today: () => void): Child {
       h(
         "p",
         { class: "tomorrow-words" },
-        h("b", null, `Брой ${issueOf(day)}, ${weekday(day).toLowerCase()}.`),
-        " Вече излезе.",
+        h("b", null, `Брой ${issueOf(day)}, ${weekday(day).toLowerCase()},`),
+        " вече излезе.",
       ),
     ),
     h("button", { class: "btn", type: "button", onclick: today }, "Към днешния брой"),
@@ -996,7 +1000,7 @@ function tomorrow(
       h("b", { class: "tomorrow-n" }, day.slice(8).replace(/^0/, "")),
       h("p", { class: "tomorrow-words" }, h("b", null, `Брой ${issueOf(day)}, ${weekday(day).toLowerCase()}.`), () => {
         const n = streak();
-        return ` Излиза след ${left()}${n > 0 ? ` Серията ти става ${n + 1}.` : ""}`;
+        return ` Излиза след ${left()}${n > 0 ? ` С него серията ти става ${n + 1}.` : ""}`;
       }),
     ),
     // The ask by mail asks a guest for the email itself: the line to keep the game steps aside for it.
@@ -1036,21 +1040,19 @@ function streakNotice(t: Today): Child {
         ? `back:${t.back.last}`
         : "";
   if (!key || !tellStreak(key)) return null;
-  const begins = t.run?.done ? "Днес започна нова" : "Днес започва нова";
+  const begins = t.run?.done ? "Днес започна нова серия" : "Днес започва нова серия";
   // An ended streak's number is never said (DECISIONS.md, „The direction“): only that a new one begins.
   const text = t.forgiven
-    ? `${onDay(t.forgiven).replace(/^./, (c) => c.toUpperCase())} пропусна въпросите, но серията остава. ${forgivesWords(t.perWeek)} Серия: ${count(t.streak, "ден", "дни")}.`
+    ? `${onDay(t.forgiven).replace(/^./, (c) => c.toUpperCase())} пропусна броя, но серията остава. ${forgivesWords(t.perWeek)} Серия: ${count(t.streak, "ден", "дни")}.`
     : t.ended
       ? `Серията ти прекъсна. ${begins}.`
-      : `Радваме се, че се върна. ${begins} серия.`;
+      : `Радваме се, че се върна. ${begins}.`;
   return h("p", { class: "streak-notice", role: "status" }, text);
 }
 
-/** What the streak forgives a week, in words: „Ако пропуснеш ден, до два на седмица ти се прощават.“ */
+/** What the streak forgives a week, in words: „До два пропуснати дни на седмица ти се прощават.“ */
 const forgivesWords = (perWeek = 2) =>
-  perWeek === 1
-    ? "Ако пропуснеш ден, един на седмица ти се прощава."
-    : "Ако пропуснеш ден, до два на седмица ти се прощават.";
+  perWeek === 1 ? "Един пропуснат ден на седмица ти се прощава." : "До два пропуснати дни на седмица ти се прощават.";
 
 /** The logo's rosette over ten of ten: four petals, the gold one last (feel.ts draws them in). */
 function perfectMark(): SVGElement {
@@ -1179,7 +1181,7 @@ function remindAsk(
       return h(
         "p",
         { class: "muted", role: "status" },
-        "Готово. Ще ти напомним около часа, в който играеш, ако въпросите още те чакат.",
+        "Готово. Ще ти напомняме около часа, в който играеш, ако броят още те чака.",
       );
     if (by() === "mail")
       return [
@@ -1195,11 +1197,7 @@ function remindAsk(
         }),
       ];
     return [
-      h(
-        "p",
-        { class: "muted" },
-        "Да ти напомним, ако въпросите още те чакат? Веднъж на ден, около часа, в който играеш.",
-      ),
+      h("p", { class: "muted" }, "Да ти напомняме, ако броят още те чака? Веднъж на ден, около часа, в който играеш."),
       h(
         "div",
         { class: "remind-actions" },

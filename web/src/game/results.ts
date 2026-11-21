@@ -203,15 +203,15 @@ export function reviewed(all: Reviewed[], heading: Child): Child {
     heading,
     all.map((it) => {
       // The verdict never reads as a true-or-not statement's answer („Вярно“, „Невярно“): as in the run (verdictSays),
-      // right there is „Точно“, and wrong, for every kind, „Не е това“.
+      // right is „Точно“ for every kind, as in the run, and wrong „Грешно“, as the tiles' marks say it.
       const [kind, word] = it.void
         ? ["void", "Не се брои"]
         : it.right
-          ? ["right", it.view.type === "truefalse" ? "Точно" : "Вярно"]
+          ? ["right", "Точно"]
           : it.close
             ? ["close", "Близо"]
             : it.given
-              ? ["wrong", "Не е това"]
+              ? ["wrong", "Грешно"]
               : ["wrong", "Без отговор"];
       return h(
         "article",

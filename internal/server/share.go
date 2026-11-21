@@ -60,9 +60,8 @@ func (s *Server) share(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	// The address as it's read in a message: almanac.bg/d/9-k4f2m7qa, which every messenger makes a link of.
-	site := strings.TrimPrefix(strings.TrimPrefix(s.cfg.PublicURL, "https://"), "http://")
-	return ok(w, map[string]string{"text": sh.Text(site + sh.Path()), "url": s.cfg.PublicURL + sh.Path()})
+	// The text it's shared with is the client's (game/share.ts): one wording, made where it's shared.
+	return ok(w, map[string]string{"url": s.cfg.PublicURL + sh.Path()})
 }
 
 // sharedOf is the shared day a page's path is the link to, if it's one that is.

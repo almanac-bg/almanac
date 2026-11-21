@@ -8,7 +8,7 @@ test("Night or Day, whatever the device says", async ({ page }) => {
   const ground = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   await page.goto("/settings");
   const look = page.getByRole("radiogroup", { name: "Изглед" });
-  await expect(look.getByRole("radio", { name: "Автоматично" })).toHaveAttribute("aria-checked", "true");
+  await expect(look.getByRole("radio", { name: "Като устройството" })).toHaveAttribute("aria-checked", "true");
   expect(await ground()).toBe("rgb(243, 244, 250)");
 
   await look.getByRole("radio", { name: "Нощ" }).click();
@@ -27,7 +27,7 @@ test("Night or Day, whatever the device says", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("data-scheme", "day");
   expect(await ground()).toBe("rgb(243, 244, 250)");
 
-  await page.getByRole("radiogroup", { name: "Изглед" }).getByRole("radio", { name: "Автоматично" }).click();
+  await page.getByRole("radiogroup", { name: "Изглед" }).getByRole("radio", { name: "Като устройството" }).click();
   await expect(page.locator("html")).not.toHaveAttribute("data-scheme");
   expect(await ground()).toBe("rgb(14, 12, 29)");
 });

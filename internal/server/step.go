@@ -54,5 +54,5 @@ func (s *Server) stepWords(ctx context.Context, userID int64) string {
 	if !ok || st.Chapter == "" || st.Rank == "" || st.Left < 1 {
 		return issue
 	}
-	return fmt.Sprintf("%s · %s: още %d до %s", issue, st.Chapter, st.Left, st.Rank)
+	return fmt.Sprintf("%s · %s: още %d с мастило до „%s“", issue, st.Chapter, st.Left, st.Rank)
 }

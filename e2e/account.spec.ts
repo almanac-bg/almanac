@@ -23,8 +23,8 @@ test("a guest keeps their game with a code by email, and can sign out", async ({
   await page.reload();
   await expect(page.getByText(`Пратихме код на ${email}`)).toBeVisible();
   // Another code waits a minute, and the wait is said.
-  await expect(page.getByRole("button", { name: "прати нов код" })).toBeDisabled();
-  await expect(page.getByText(/прати нов код след \d+\sс/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "поискай нов код" })).toBeDisabled();
+  await expect(page.getByText(/поискай нов код след \d+\sс/)).toBeVisible();
   // A code too short is said so; a wrong code says so, and counts.
   await page.getByLabel("Код").fill("123");
   await page.getByRole("button", { name: "Потвърди" }).click();
@@ -37,12 +37,12 @@ test("a guest keeps their game with a code by email, and can sign out", async ({
   await expect(page.getByText(`Влизаш с ${email}`)).toBeVisible();
   // What came of it is said: the guest's game is kept.
   await expect(page.getByRole("status")).toHaveText(
-    `Готово. Играта ти е запазена с имейла ${email}. Влизай с него от всяко устройство.`,
+    `Готово. Играта ти е запазена с имейла ${email}. Влизай с него на всяко устройство.`,
   );
   // With an email and notifications on no device, mail: the day's reminder only if asked for, a streak's end on, and
   // both the player's to switch.
   await expect(page.getByRole("switch", { name: "Напомняне по имейл" })).toHaveAttribute("aria-checked", "false");
-  const mail = page.getByRole("switch", { name: "Имейл, когато серията ти прекъсне" });
+  const mail = page.getByRole("switch", { name: "Писмо, когато серията ти прекъсне" });
   await expect(mail).toHaveAttribute("aria-checked", "true");
   await mail.click();
   await expect(mail).toHaveAttribute("aria-checked", "false");
@@ -50,8 +50,8 @@ test("a guest keeps their game with a code by email, and can sign out", async ({
   await expect(mail).toHaveAttribute("aria-checked", "false");
   // Out of the profile everywhere else; still in here.
   await page.getByRole("button", { name: "Излез от другите устройства" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Готово: профилът" })).toHaveText(
-    "Готово: профилът ти е отворен само на това устройство.",
+  await expect(page.getByRole("status").filter({ hasText: "Профилът ти вече" })).toHaveText(
+    "Готово. Профилът ти вече е отворен само на това устройство.",
   );
   await expect(page.getByText(`Влизаш с ${email}`)).toBeVisible();
   await page.getByRole("button", { name: "Излез", exact: true }).click();

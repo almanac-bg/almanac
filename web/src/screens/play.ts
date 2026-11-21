@@ -65,7 +65,7 @@ export function topic([category = ""]: string[]) {
             also: [() => nextOf(day(), again, category).also],
           },
           [
-            h("p", { class: "news-met" }, "Фактите от играта са в книгата ти, в сиво."),
+            h("p", { class: "news-met" }, "Фактите от играта са в твоя Алманах, в сиво."),
             just ? news(s.id) : null,
             otherTopics(category),
           ],
@@ -77,14 +77,14 @@ export function topic([category = ""]: string[]) {
 }
 
 /** A chapter game's result's buttons. While the day's ten wait, the way to them is the one gold action (the habit
- * comes first), the streak at stake under it, and „Още десет“ plain beside the way to the chapter; once the day is
- * played, „Още десет“ is the action. */
+ * comes first), the streak at stake under it, and „Още десет въпроса“ plain beside the way to the chapter; once the day is
+ * played, „Още десет въпроса“ is the action. */
 function nextOf(d: DayWaits | null, again: () => void, chapter: string): { main: Child; also: Child[] } {
   const book = h("a", { class: "btn", href: `/almanac/${chapter}` }, "Към главата");
-  if (!d) return { main: h("button", { class: "btn primary big", onclick: again }, "Още десет"), also: [book] };
+  if (!d) return { main: h("button", { class: "btn primary big", onclick: again }, "Още десет въпроса"), also: [book] };
   return {
-    main: [h("a", { class: "btn primary big", href: "/" }, "Към въпросите на деня"), stakeLine(d.streak, d.spare)],
-    also: [h("button", { class: "btn", onclick: again }, "Още десет"), book],
+    main: [h("a", { class: "btn primary big", href: "/" }, "Към днешния брой"), stakeLine(d.streak, d.spare)],
+    also: [h("button", { class: "btn", onclick: again }, "Още десет въпроса"), book],
   };
 }
 

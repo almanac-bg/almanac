@@ -94,7 +94,7 @@ func TestSendToAPushService(t *testing.T) {
 	sub.Keys.P256dh = b64.EncodeToString(browser.PublicKey().Bytes())
 	sub.Keys.Auth = b64.EncodeToString(auth)
 	s := &Sender{Keys: keys, Subject: "mailto:privacy@almanac.bg", Client: srv.Client(), Services: []string{srv.Listener.Addr().String()}}
-	m := Message{Title: "АЛМАНАХ", Body: "Днешните въпроси те чакат.", URL: "/"}
+	m := Message{Title: "АЛМАНАХ", Body: "Днешният брой те чака.", URL: "/"}
 	if err := s.Send(t.Context(), sub, m); err != nil {
 		t.Fatal(err)
 	}

@@ -79,7 +79,7 @@ func TestStreakFinishedAfterMidnight(t *testing.T) {
 			today["ended"], today["forgiven"])
 	}
 	if m := g.srv.reminder(t.Context(), g.srv.game.Today(), anaID); m.Body !=
-		"Серията ти е 4 дни. Не я прекъсвай: десет въпроса, до полунощ." {
+		"Серията ти е 4 дни. Десет въпроса, до полунощ." {
 		t.Fatalf("the reminder of a streak kept over midnight: %+v", m)
 	}
 }

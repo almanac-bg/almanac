@@ -51,7 +51,7 @@ const placeLinks = () =>
           : friendRequests()
             ? h("span", { class: "sr" }, " (покана за приятелство)")
             : duelsWaiting()
-              ? h("span", { class: "sr" }, " (дуел те чака)")
+              ? h("span", { class: "sr" }, " (чака те дуел)")
               : null,
     ),
   );
@@ -67,7 +67,7 @@ if (root) {
         "div",
         { class: "bar" },
         h("a", { href: "/", class: "brand", "aria-label": "АЛМАНАХ, днешният брой" }, rosette(), "АЛМАНАХ"),
-        h("nav", { class: "places", "aria-label": "Основно" }, placeLinks()),
+        h("nav", { class: "places", "aria-label": "Основна навигация" }, placeLinks()),
         // The player's avatar with the seal they wear: Профил, and Настройки in it (not on Профил itself, whose page
         // has it). Without a profile yet (or on the cover, not signed in), the way in.
         () => {
@@ -84,7 +84,7 @@ if (root) {
       ),
     ),
     main,
-    h("nav", { class: "places-foot", "aria-label": "Основно" }, placeLinks()),
+    h("nav", { class: "places-foot", "aria-label": "Основна навигация" }, placeLinks()),
   ]);
   start(
     main,

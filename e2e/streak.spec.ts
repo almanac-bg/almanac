@@ -7,7 +7,7 @@ test("a streak that ended is said to have ended, once", async ({ page }) => {
   // weekday. Its number is never said (DECISIONS.md, „The direction“).
   await daysPlayed(page, 7, 6);
   await page.reload();
-  await expect(page.locator(".streak-notice")).toContainText("Серията ти прекъсна. Днес започва нова.");
+  await expect(page.locator(".streak-notice")).toContainText("Серията ти прекъсна. Днес започва нова серия.");
   await expect(page.locator(".streak-notice")).not.toContainText(/\d/);
   await page.reload();
   await expect(page.getByRole("button", { name: "Започни" })).toBeVisible();
@@ -31,30 +31,30 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
   await daysPlayed(page, 3, 2, 1);
   await page.reload();
   await expect(page.locator(".streak-chip.unlit")).toContainText("3");
-  await expect(page.locator(".today-streak .day-stake")).toHaveText("С днешния брой серията става 4.");
+  await expect(page.locator(".today-streak .day-stake")).toHaveText("С днешния брой серията ти става 4.");
   // A topic's result points to the day while it waits: the gold button, the streak under it, „Още десет“ plain.
   await openGame(page, "/play/history");
   await playRun(page);
   // A new level may come with the game, in its sheet once the result has landed: put away.
   await page.waitForTimeout(2500);
   await page.keyboard.press("Escape");
-  const day = page.getByRole("link", { name: "Към въпросите на деня" });
+  const day = page.getByRole("link", { name: "Към днешния брой" });
   await expect(day).toHaveClass(/primary/);
-  await expect(page.locator(".actions .day-stake")).toHaveText("С днешния брой серията става 4.");
-  await expect(page.getByRole("button", { name: "Още десет" })).not.toHaveClass(/primary/);
+  await expect(page.locator(".actions .day-stake")).toHaveText("С днешния брой серията ти става 4.");
+  await expect(page.getByRole("button", { name: "Още десет въпроса" })).not.toHaveClass(/primary/);
   await day.click();
   await startDay(page);
   await playRun(page);
   // Played: tomorrow under the result says what it makes of the streak.
   const tomorrow = page.locator(".summary .tomorrow");
   await expect(tomorrow).toContainText("Утре");
-  await expect(tomorrow).toContainText("Серията ти става 5.");
+  await expect(tomorrow).toContainText("С него серията ти става 5.");
   // The day played: a topic's result has „Още десет“ for its action, and says where its facts went, with no number.
   await openGame(page, "/play/history");
   await playRun(page);
-  await expect(page.getByRole("button", { name: "Още десет" })).toHaveClass(/primary/);
-  await expect(page.getByRole("link", { name: "Към въпросите на деня" })).toHaveCount(0);
-  await expect(page.locator(".summary")).toContainText("Фактите от играта са в книгата ти, в сиво.");
+  await expect(page.getByRole("button", { name: "Още десет въпроса" })).toHaveClass(/primary/);
+  await expect(page.getByRole("link", { name: "Към днешния брой" })).toHaveCount(0);
+  await expect(page.locator(".summary")).toContainText("Фактите от играта са в твоя Алманах, в сиво.");
 });
 
 test("a week's streak on Днес, and the day played makes it one more: no sheet over the result, no note of it", async ({
@@ -65,10 +65,10 @@ test("a week's streak on Днес, and the day played makes it one more: no shee
   // Six days: the seventh makes it seven; nothing is noted (DECISIONS.md, „The direction“: no notes as rewards).
   await daysPlayed(page, 6, 5, 4, 3, 2, 1);
   await page.reload();
-  await expect(page.locator(".streak-chip.unlit")).toContainText("6изиграни дни");
+  await expect(page.locator(".streak-chip.unlit")).toContainText("6дни в серията");
   await startDay(page);
   await playRun(page);
-  await expect(page.locator(".summary .tomorrow")).toContainText("Серията ти става 8.");
+  await expect(page.locator(".summary .tomorrow")).toContainText("С него серията ти става 8.");
   await expect(page.locator(".summary")).not.toContainText("Отбелязано");
   // Never a sheet over the result, whatever the game was.
   await page.waitForTimeout(1500);
